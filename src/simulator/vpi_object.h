@@ -91,6 +91,16 @@ struct VpiObject {
   // callback from a simulation callback, which is also a vpiCallback object.
   bool is_systf = false;
 
+  // §39.4.2: whether this callback object stands in for an assertion callback
+  // placed with vpi_register_assertion_cb(). "If the callback is successfully
+  // placed, a handle to the callback is returned. This handle can be used to
+  // remove the callback via vpi_remove_cb()", and the removal has to reach the
+  // assertion model rather than the simulation-callback table, so the two kinds
+  // of callback object are told apart here. `assertion_cb_handle` is what the
+  // placement answered with, which is what the removal names.
+  bool is_assertion_cb = false;
+  std::uint64_t assertion_cb_handle = 0;
+
   // §38.33: the implementation storage location vpi_put_userdata() writes for a
   // system task or system function call instance. vpi_put_userdata() associates
   // this user-data value with the call handle so a later vpi_get_userdata() can

@@ -228,6 +228,25 @@ VpiHandle VpiContext::RegisterCb(VpiCbData* data) {
   return cb_obj;
 }
 
+VpiHandle VpiContext::CreateAssertionCallbackObject(
+    std::uint64_t placed_handle) {
+  // §39.4.2: a placed assertion callback answers with a handle to the callback,
+  // which is a callback object like the one vpi_register_cb() answers with. It
+  // carries no index into the simulation-callback table: what it stands for is
+  // the placement in the assertion model, which is what `assertion_cb_handle`
+  // names and what vpi_remove_cb() removes.
+  auto* cb_obj = AllocObject();
+  cb_obj->type = kVpiCallback;
+  cb_obj->is_assertion_cb = true;
+  cb_obj->assertion_cb_handle = placed_handle;
+  // §38.39 reads `index` as the row of the simulation callback table a handle
+  // stands for, and this handle stands for no row of it. -1 is the value that
+  // names none, so a removal that reaches §38.39 with this handle removes
+  // nothing rather than whatever registration happens to sit in row zero.
+  cb_obj->index = -1;
+  return cb_obj;
+}
+
 int VpiContext::RemoveCb(VpiHandle cb_handle) {
   // §38.39: the argument shall be a handle to the callback object. A null or
   // wrong-typed handle is not a callback object, so removal fails.

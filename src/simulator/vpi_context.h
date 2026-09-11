@@ -457,6 +457,16 @@ class VpiContext {
   // exist yields null as well.
   VpiHandle CreateHandleFor(VpiHandle object);
 
+  // §39.4.2: the handle a successful assertion-callback placement answers with.
+  // "If the callback is successfully placed, a handle to the callback is
+  // returned. This handle can be used to remove the callback via
+  // vpi_remove_cb()", so the object is a callback object like any other and
+  // carries the placement `placed_handle` names, which is what the removal
+  // needs. The placement itself is made in src/simulator/vpi_assertion_cb.cpp,
+  // which is where the assertion model and the object model meet; the object is
+  // made here because this is what owns the objects a run hands out.
+  VpiHandle CreateAssertionCallbackObject(std::uint64_t placed_handle);
+
   // §37.2.2: release a handle, the operation vpi_release_handle() performs. The
   // handle is marked released so it is no longer a live handle to its object;
   // the object itself is left in place. Because the flag is per-handle, a

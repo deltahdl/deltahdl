@@ -2,9 +2,12 @@
 
 #include <iterator>
 #include <string>
+#include <vector>
 
 #include "simulator/dpi_runtime.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi.h"
+#include "simulator/vpi_assertion_cb.h"
 
 using namespace delta;
 
@@ -468,6 +471,225 @@ TEST(AssertionCallback, RemoveNullHandleReportsNoRemoval) {
   api.PlaceAssertionCallback(cbAssertionStart, kA, vpiAssert, noop_cb, nullptr);
   EXPECT_FALSE(api.RemoveAssertionCallback(0));
   EXPECT_EQ(api.PlacedCallbackCount(), 1u);
+}
+
+// -----------------------------------------------------------------------------
+// §39.4.2 through its own entry point: vpi_register_assertion_cb() places the
+// callback, the placed routine is called with the five arguments the clause
+// lists, and vpi_remove_cb() removes it by the handle the placement answered
+// with. The rules about which reasons may be placed on which handle are the
+// ones above; these cases observe them reaching a PLI application.
+// -----------------------------------------------------------------------------
+
+// One call of an application's assertion routine, as the routine was handed it.
+struct RecordedAssertionCall {
+  PLI_INT32 reason = 0;
+  PLI_UINT32 time_high = 0;
+  PLI_UINT32 time_low = 0;
+  vpiHandle assertion = nullptr;
+  bool carried_info = false;
+  PLI_UINT32 attempt_high = 0;
+  PLI_UINT32 attempt_low = 0;
+  PLI_BYTE8* user_data = nullptr;
+};
+
+std::vector<RecordedAssertionCall> g_assertion_calls;
+
+PLI_INT32 RecordAssertionCall(PLI_INT32 reason, s_vpi_time* cb_time,
+                              vpiHandle assertion, p_vpi_attempt_info info,
+                              PLI_BYTE8* user_data) {
+  RecordedAssertionCall call;
+  call.reason = reason;
+  if (cb_time != nullptr) {
+    call.time_high = cb_time->high;
+    call.time_low = cb_time->low;
+  }
+  call.assertion = assertion;
+  call.carried_info = info != nullptr;
+  if (info != nullptr) {
+    call.attempt_high = info->attempt_start_time.high;
+    call.attempt_low = info->attempt_start_time.low;
+  }
+  call.user_data = user_data;
+  g_assertion_calls.push_back(call);
+  return 0;
+}
+
+class VpiAssertionCallbackEntry : public ::testing::Test {
+ protected:
+  void SetUp() override {
+    g_assertion_calls.clear();
+    SetGlobalVpiContext(&vpi_ctx_);
+    SetGlobalAssertionApi(&api_);
+  }
+  void TearDown() override {
+    SetGlobalAssertionApi(nullptr);
+    SetGlobalVpiContext(nullptr);
+  }
+
+  VpiContext vpi_ctx_;
+  AssertionApi api_;
+};
+
+// §39.4.2: "If the callback is successfully placed, a handle to the callback is
+// returned." The placement reaches the assertion model - one callback stands
+// placed afterwards - and the handle is a callback object.
+TEST_F(VpiAssertionCallbackEntry, PlacementAnswersWithAHandleToTheCallback) {
+  vpiHandle assertion = vpi_ctx_.CreateAssertion(kA, vpiAssert);
+
+  vpiHandle cb = vpi_register_assertion_cb(assertion, cbAssertionStart,
+                                           &RecordAssertionCall, nullptr);
+
+  ASSERT_NE(cb, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, cb), vpiCallback);
+  EXPECT_EQ(api_.PlacedCallbackCount(), 1u);
+}
+
+// §39.4.2: "Once the callback is placed, the user-supplied function shall be
+// called each time the specified event occurs on the given assertion", and it
+// "shall be supplied the following arguments": the reason, a pointer to the
+// time of the callback, the handle for the assertion, a pointer to an attempt
+// information structure, and the user data supplied at registration. On a start
+// callback the attempt information is the attempt's start time. The times here
+// are past the 32-bit boundary, so a routine handed only the low half of either
+// would report a different number from the one the event carried.
+TEST_F(VpiAssertionCallbackEntry, PlacedRoutineIsCalledWithTheFiveArguments) {
+  vpiHandle assertion = vpi_ctx_.CreateAssertion(kA, vpiAssert);
+  PLI_BYTE8 user_data[] = "from the registration";
+  ASSERT_NE(vpi_register_assertion_cb(assertion, cbAssertionStart,
+                                      &RecordAssertionCall, user_data),
+            nullptr);
+
+  AssertionAttemptInfo info;
+  info.attempt_start_time = 0x0000000300000004ULL;
+  EXPECT_EQ(api_.DeliverAssertionEvent(kA, cbAssertionStart,
+                                       0x0000000100000002ULL, info),
+            1u);
+
+  ASSERT_EQ(g_assertion_calls.size(), 1u);
+  const RecordedAssertionCall& call = g_assertion_calls[0];
+  EXPECT_EQ(call.reason, cbAssertionStart);
+  EXPECT_EQ(call.time_high, 1u);
+  EXPECT_EQ(call.time_low, 2u);
+  EXPECT_EQ(call.assertion, assertion);
+  ASSERT_TRUE(call.carried_info);
+  EXPECT_EQ(call.attempt_high, 3u);
+  EXPECT_EQ(call.attempt_low, 4u);
+  EXPECT_EQ(call.user_data, user_data);
+}
+
+// §39.4.2: "On lock, unlock, disable, enable, reset, kill, pass action, fail
+// action, vacuous action, and nonvacuous action callbacks, the returned
+// p_vpi_attempt_info info pointer is NULL, and no attempt information is
+// available." The routine is still called; what it is handed for the attempt is
+// nothing.
+TEST_F(VpiAssertionCallbackEntry, ReasonsThatCarryNoAttemptInfoPassNull) {
+  vpiHandle assertion = vpi_ctx_.CreateAssertion(kA, vpiAssert);
+  ASSERT_NE(vpi_register_assertion_cb(assertion, cbAssertionLock,
+                                      &RecordAssertionCall, nullptr),
+            nullptr);
+
+  AssertionAttemptInfo info;
+  info.attempt_start_time = 7;
+  EXPECT_EQ(api_.DeliverAssertionEvent(kA, cbAssertionLock, 9, info), 1u);
+
+  ASSERT_EQ(g_assertion_calls.size(), 1u);
+  EXPECT_EQ(g_assertion_calls[0].reason, cbAssertionLock);
+  EXPECT_FALSE(g_assertion_calls[0].carried_info);
+  EXPECT_EQ(g_assertion_calls[0].user_data, nullptr);
+}
+
+// §39.4.2: "These callbacks are specific to a given assertion; placing such a
+// callback on one assertion does not cause the callback to trigger on an event
+// occurring on a different assertion."
+TEST_F(VpiAssertionCallbackEntry, ThePlacementIsSpecificToItsAssertion) {
+  vpiHandle assertion = vpi_ctx_.CreateAssertion(kA, vpiAssert);
+  ASSERT_NE(vpi_register_assertion_cb(assertion, cbAssertionStart,
+                                      &RecordAssertionCall, nullptr),
+            nullptr);
+
+  AssertionAttemptInfo info;
+  EXPECT_EQ(api_.DeliverAssertionEvent(kB, cbAssertionStart, 1, info), 0u);
+  EXPECT_TRUE(g_assertion_calls.empty());
+}
+
+// §39.4.2: "If there were errors on placing the callback, a NULL handle is
+// returned." A placement with no assertion to be specific to, one with no
+// routine to call, and one whose reason may not be placed on a handle of that
+// kind are each such an error, and none of them leaves a callback placed.
+TEST_F(VpiAssertionCallbackEntry, ErrorsOnPlacingAnswerWithANullHandle) {
+  vpiHandle assertion = vpi_ctx_.CreateAssertion(kA, vpiAssert);
+  VpiObject module;
+  module.type = vpiModule;
+  module.name = "top";
+
+  EXPECT_EQ(vpi_register_assertion_cb(nullptr, cbAssertionStart,
+                                      &RecordAssertionCall, nullptr),
+            nullptr);
+  EXPECT_EQ(
+      vpi_register_assertion_cb(assertion, cbAssertionStart, nullptr, nullptr),
+      nullptr);
+  EXPECT_EQ(vpi_register_assertion_cb(&module, cbAssertionStart,
+                                      &RecordAssertionCall, nullptr),
+            nullptr);
+
+  EXPECT_EQ(api_.PlacedCallbackCount(), 0u);
+}
+
+// §39.4.2: "This handle can be used to remove the callback via
+// vpi_remove_cb()." Removing it takes the placement out of the model, so the
+// event that called the routine before calls nothing after; the handle is spent
+// once, and a second removal through it reports no removal.
+TEST_F(VpiAssertionCallbackEntry, VpiRemoveCbRemovesThePlacedCallback) {
+  vpiHandle assertion = vpi_ctx_.CreateAssertion(kA, vpiAssert);
+  vpiHandle cb = vpi_register_assertion_cb(assertion, cbAssertionStart,
+                                           &RecordAssertionCall, nullptr);
+  ASSERT_NE(cb, nullptr);
+
+  AssertionAttemptInfo info;
+  ASSERT_EQ(api_.DeliverAssertionEvent(kA, cbAssertionStart, 1, info), 1u);
+  ASSERT_EQ(g_assertion_calls.size(), 1u);
+
+  EXPECT_EQ(vpi_remove_cb(cb), 1);
+  EXPECT_EQ(api_.PlacedCallbackCount(), 0u);
+
+  EXPECT_EQ(api_.DeliverAssertionEvent(kA, cbAssertionStart, 2, info), 0u);
+  EXPECT_EQ(g_assertion_calls.size(), 1u);
+  EXPECT_EQ(vpi_remove_cb(cb), 0);
+}
+
+// §38.39 is what vpi_remove_cb() otherwise is, and an assertion callback's
+// handle is not a row of its table: a simulation callback registered alongside
+// is removed by its own handle and by nothing else.
+TEST_F(VpiAssertionCallbackEntry,
+       ASimulationCallbackIsStillRemovedByItsHandle) {
+  vpiHandle assertion = vpi_ctx_.CreateAssertion(kA, vpiAssert);
+  s_cb_data data = {};
+  data.reason = cbEndOfSimulation;
+  data.cb_rtn = nullptr;
+  vpiHandle sim_cb = vpi_register_cb(&data);
+  ASSERT_NE(sim_cb, nullptr);
+  vpiHandle assertion_cb = vpi_register_assertion_cb(
+      assertion, cbAssertionStart, &RecordAssertionCall, nullptr);
+  ASSERT_NE(assertion_cb, nullptr);
+
+  // The assertion callback's handle removes the placement and leaves the
+  // simulation callback registered.
+  EXPECT_EQ(vpi_remove_cb(assertion_cb), 1);
+  EXPECT_EQ(vpi_remove_cb(sim_cb), 1);
+  EXPECT_EQ(vpi_remove_cb(nullptr), 0);
+}
+
+// §39.1: the assertion API answers out of one model per run. A run that
+// installed none still has one - the default - and it is the same one every
+// call reaches.
+TEST_F(VpiAssertionCallbackEntry, TheDefaultModelStandsWhereNoneWasInstalled) {
+  EXPECT_EQ(&GetGlobalAssertionApi(), &api_);
+
+  SetGlobalAssertionApi(nullptr);
+  AssertionApi& fallback = GetGlobalAssertionApi();
+  EXPECT_NE(&fallback, &api_);
+  EXPECT_EQ(&GetGlobalAssertionApi(), &fallback);
 }
 
 }  // namespace

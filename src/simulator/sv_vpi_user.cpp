@@ -1,19 +1,19 @@
-
-
 #include "simulator/sv_vpi_user.h"
 
 #include <optional>
 
+#include "simulator/vpi_assertion_cb.h"
 #include "simulator/vpi_coverage.h"
 
 vpiHandle vpi_register_assertion_cb(vpiHandle assertion, PLI_INT32 reason,
                                     vpi_assertion_callback_func cb_rtn,
                                     PLI_BYTE8* user_data) {
-  (void)assertion;
-  (void)reason;
-  (void)cb_rtn;
-  (void)user_data;
-  return nullptr;
+  // §39.4.2: place the callback on the named assertion, answering with a handle
+  // to it or with NULL where the placement was in error. The routine took its
+  // four arguments and dropped every one of them, answering NULL whatever was
+  // asked, so no PLI application could place an assertion callback at all
+  // through the one entry point §39.1 puts the assertion API behind.
+  return delta::VpiRegisterAssertionCb(assertion, reason, cb_rtn, user_data);
 }
 
 namespace delta {

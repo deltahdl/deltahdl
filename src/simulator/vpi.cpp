@@ -11,6 +11,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "simulator/vpi_assertion_cb.h"
 #include "simulator/vpi_internal.h"
 
 // §37.10 detail 3: the package/interface/program instance kinds are defined in
@@ -191,6 +192,11 @@ vpiHandle vpi_register_cb(s_cb_data* data) {
 
 PLI_INT32 vpi_remove_cb(vpiHandle cb_handle) {
   VpiRoutineErrorScope error_scope;
+  // §39.4.2: the handle vpi_register_assertion_cb() answered with "can be used
+  // to remove the callback via vpi_remove_cb()", and what it names is a
+  // placement in the assertion model rather than a row of the simulation
+  // callback table, so it is removed there. Every other handle is §38.39's.
+  if (delta::VpiRemoveAssertionCb(cb_handle)) return 1;
   return delta::GetGlobalVpiContext().RemoveCb(cb_handle);
 }
 
