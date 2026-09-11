@@ -325,6 +325,22 @@ class CoverageControlState {
   }
 
  private:
+  struct ScopeState {
+    CoverageAvailability availability = CoverageAvailability::kNone;
+    bool collecting = false;
+    bool has_data = false;  // coverage accumulated since the last reset
+    std::uint64_t started = 0;
+    std::uint64_t stopped = 0;
+    std::uint64_t resets = 0;
+    // §40.3.2.2: coverable-item counts per coverage type, used to compute the
+    // 100% (maximum) coverage value. Keyed by the §40.3.1 coverage-type
+    // constant (`SV_COV_ASSERTION, `SV_COV_FSM_STATE, ...).
+    std::unordered_map<int, std::int64_t> coverable_items;
+    // §40.3.2.3: covered-item counts per coverage type, used to report the
+    // current coverage level. Keyed by the §40.3.1 coverage-type constant.
+    std::unordered_map<int, std::int64_t> covered_items;
+  };
+
   // The one-scope control, which the hierarchy walk above applies to each scope
   // it names.
   CoverageStatus ControlOne(CoverageControl control, ScopeState& s) {
@@ -396,22 +412,6 @@ class CoverageControlState {
     }
     return so_far;
   }
-
-  struct ScopeState {
-    CoverageAvailability availability = CoverageAvailability::kNone;
-    bool collecting = false;
-    bool has_data = false;  // coverage accumulated since the last reset
-    std::uint64_t started = 0;
-    std::uint64_t stopped = 0;
-    std::uint64_t resets = 0;
-    // §40.3.2.2: coverable-item counts per coverage type, used to compute the
-    // 100% (maximum) coverage value. Keyed by the §40.3.1 coverage-type
-    // constant (`SV_COV_ASSERTION, `SV_COV_FSM_STATE, ...).
-    std::unordered_map<int, std::int64_t> coverable_items;
-    // §40.3.2.3: covered-item counts per coverage type, used to report the
-    // current coverage level. Keyed by the §40.3.1 coverage-type constant.
-    std::unordered_map<int, std::int64_t> covered_items;
-  };
 
   // §40.3.2.4: a named coverage database that $coverage_merge can load.
   struct CoverageDatabase {

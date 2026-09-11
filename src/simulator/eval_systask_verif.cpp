@@ -278,6 +278,32 @@ static Logic4Vec EvalStochasticQueue(const Expr* expr, SimContext& ctx,
   return MakeLogic4VecVal(arena, 32, 0);
 }
 
+// §40.3.2.1 Table 40-2: the scope_def argument beside the scope says how far
+// the call reaches - `SV_COV_HIER over "the named instance and any hierarchy
+// below it", `SV_COV_MODULE over that instance alone, "excluding any hierarchy
+// in instances below that instance". The two are the §40.3.1 constants 11 and
+// 10; nothing else names a scope definition, and a call that wrote something
+// else wrote a bad argument.
+constexpr int kSvCovModule = 10;
+constexpr int kSvCovHier = 11;
+
+static bool CoverageScopeDefIncludesBelow(const Expr* expr, SimContext& ctx,
+                                          Arena& arena, size_t index,
+                                          bool* include_below) {
+  if (expr->args.size() <= index) return false;
+  int scope_def =
+      static_cast<int>(EvalExpr(expr->args[index], ctx, arena).ToUint64());
+  if (scope_def == kSvCovHier) {
+    *include_below = true;
+    return true;
+  }
+  if (scope_def == kSvCovModule) {
+    *include_below = false;
+    return true;
+  }
+  return false;
+}
+
 // §40.3.2.1: $coverage_control(control_constant, coverage_type, scope_def,
 // modules_or_instance) performs the control action named by its first argument
 // over the scope named by its fourth and returns one of the §40.3.1 status
@@ -332,32 +358,6 @@ static std::string CoverageStrArg(const Expr* expr, size_t index) {
     return ExtractStrArg(expr->args[index]);
   }
   return std::string();
-}
-
-// §40.3.2.1 Table 40-2: the scope_def argument beside the scope says how far
-// the call reaches - `SV_COV_HIER over "the named instance and any hierarchy
-// below it", `SV_COV_MODULE over that instance alone, "excluding any hierarchy
-// in instances below that instance". The two are the §40.3.1 constants 11 and
-// 10; nothing else names a scope definition, and a call that wrote something
-// else wrote a bad argument.
-constexpr int kSvCovModule = 10;
-constexpr int kSvCovHier = 11;
-
-static bool CoverageScopeDefIncludesBelow(const Expr* expr, SimContext& ctx,
-                                          Arena& arena, size_t index,
-                                          bool* include_below) {
-  if (expr->args.size() <= index) return false;
-  int scope_def =
-      static_cast<int>(EvalExpr(expr->args[index], ctx, arena).ToUint64());
-  if (scope_def == kSvCovHier) {
-    *include_below = true;
-    return true;
-  }
-  if (scope_def == kSvCovModule) {
-    *include_below = false;
-    return true;
-  }
-  return false;
 }
 
 // Shared evaluator for the §40.3.2 coverage query functions. They all return
