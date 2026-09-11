@@ -217,16 +217,16 @@ int ProbeInterconnectCalltf(const char*) {
   }
 
   // §37.14 detail 10: the connection inside the instance. For a generic
-  // interconnect port that is the interconnect net the port stands for.
-  vpiHandle port = vpi_handle_by_name("m1.ic", nullptr);
-  if (port == nullptr) {
-    vpiHandle ports = vpi_iterate(vpiPort, mod);
-    port = ports == nullptr ? nullptr : vpi_scan(ports);
-  }
-  if (port != nullptr) {
+  // interconnect port that is the interconnect net the port stands for. The
+  // port is reached by iteration rather than by name, because the port and the
+  // net it stands for are the one name the declaration wrote.
+  vpiHandle ports = vpi_iterate(vpiPort, mod);
+  if (ports == nullptr) return 0;
+  while (vpiHandle port = vpi_scan(ports)) {
     vpiHandle low = vpi_handle(vpiLowConn, port);
-    g_reached_from_the_port =
-        low != nullptr && vpi_get(vpiType, low) == vpiInterconnectNet;
+    if (low != nullptr && vpi_get(vpiType, low) == vpiInterconnectNet) {
+      g_reached_from_the_port = true;
+    }
   }
   return 0;
 }
