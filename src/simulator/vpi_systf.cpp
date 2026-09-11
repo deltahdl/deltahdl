@@ -30,6 +30,27 @@ namespace delta {
 VpiHandle VpiContext::RegisterSystf(VpiSystfData* data) {
   if (!data) return nullptr;
 
+  // §38.37.1: "The type field shall be an integer constant of vpiSysTask or
+  // vpiSysFunc." A record carrying anything else registers the application as
+  // neither, and there is no third thing for it to be: every later reading of
+  // the field asks only whether it is vpiSysFunc, so such a record would stand
+  // in the registry as a system task the application never asked for.
+  //
+  // §38.37.3 is where the field's zero says something of its own. A static
+  // array of s_vpi_systf_data structures may set "the final element in the
+  // array ... to 0", and then "the calls to vpi_register_systf() can be placed
+  // in a loop that terminates when it reaches the 0": the zero marks the end of
+  // the list rather than a registration, so a loop that runs one element too
+  // far has to be refused rather than answered with a handle.
+  if (data->type != kVpiSysTask && data->type != kVpiSysFunc) {
+    last_error_.state = kVpiPLI;
+    last_error_.level = kVpiError;
+    last_error_.message =
+        "system task or function registration must carry a type of vpiSysTask "
+        "or vpiSysFunc";
+    return nullptr;
+  }
+
   // §36.9.1: a user-defined system task or system function name shall begin
   // with a dollar sign. §38.37.1 sharpens this: the dollar sign shall be
   // followed by one or more characters that are legal in a SystemVerilog simple

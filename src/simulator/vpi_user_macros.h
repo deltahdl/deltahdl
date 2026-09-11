@@ -12,6 +12,15 @@ using s_vpi_value = delta::VpiValue;
 using s_vpi_time = delta::VpiTime;
 using s_cb_data = delta::VpiCbData;
 using s_vpi_systf_data = delta::VpiSystfData;
+// §38.37 Figure 38-18 ends the structure definition "} s_vpi_systf_data,
+// *p_vpi_systf_data;", so the pointer spelling is part of the interface a PLI
+// application is written against rather than a convenience: §38.37.2 declares
+// its registration data through it, and §38.37.3's second registration method
+// walks "a static array of s_vpi_systf_data structures" with it. It is a
+// typedef rather than a using-alias for the reason p_vpi_delay is one - the
+// name is the standard's, and the alias naming rule admits it only in that
+// spelling.
+typedef delta::VpiSystfData* p_vpi_systf_data;
 using s_vpi_vecval = delta::VpiVectorVal;
 using SVpiErrorInfo = delta::VpiErrorInfo;
 using SVpiVlogInfo = delta::VpiVlogInfo;
