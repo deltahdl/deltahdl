@@ -267,6 +267,12 @@ void FillPrefixedArgument(VpiObject* arg, VpiObject* prefix, const Expr* actual,
 
 }  // namespace
 
+// §37.42: the object standing for one system task or system function call,
+// carrying the arguments the call site wrote and, where the registration is a
+// system function, the storage its return value is written through. Both
+// periods that call a PLI application build one, and `evaluate_args` is the
+// whole of the difference between them: an execution-time call reads each
+// actual's value, a build-period call has none to read.
 VpiHandle VpiContext::MakeSystfCallObject(const VpiSystfData& data,
                                           const Expr* call_site,
                                           SimContext& ctx, Arena& arena,

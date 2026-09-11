@@ -728,12 +728,8 @@ class VpiContext {
  private:
   VpiHandle AllocObject();
 
-  // §37.42: the object standing for one system task or system function call,
-  // carrying the arguments the call site wrote and, where the registration is a
-  // system function, the storage its return value is written through. Both
-  // periods that call a PLI application build one, and `evaluate_args` is the
-  // whole of the difference between them: an execution-time call reads each
-  // actual's value, a build-period call has none to read.
+  // §37.42: the object standing for one system task or system function call.
+  // Written in vpi_systf.cpp, where what `evaluate_args` separates is set out.
   VpiHandle MakeSystfCallObject(const VpiSystfData& data, const Expr* call_site,
                                 SimContext& ctx, Arena& arena,
                                 bool evaluate_args);
@@ -756,6 +752,10 @@ class VpiContext {
   // and the pass that makes one per nettype. In vpi_design_attach.cpp.
   void AttachNettypeDeclarations(const RtlirDesign* design);
   VpiObject* NettypeDeclarationIn(VpiHandle scope, const RtlirNet& net);
+
+  // §37.62: the event statement object each event trigger the design's
+  // processes wrote stands as. In vpi_helpers_instance.cpp.
+  void AttachEventStatements(const RtlirDesign* design);
 
   // §37.3.4: the source-written delay expression each delay-carrying object of
   // the design reaches through vpiDelay, and the one a net's declaration wrote.

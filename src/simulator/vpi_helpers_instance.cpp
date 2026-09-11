@@ -12,10 +12,12 @@
 
 #include "elaborator/rtlir.h"
 #include "parser/ast_specify.h"
+#include "parser/ast_stmt.h"
 #include "simulator/sim_context.h"
 #include "simulator/specify.h"
 #include "simulator/specify_timing_check.h"
 #include "simulator/vpi.h"
+#include "simulator/vpi_design_walk.h"
 // §37.10 detail 3: the package/interface/program instance kinds are defined in
 // the SystemVerilog VPI header alongside the §37.10 vpiInstance relation.
 #include "simulator/sv_vpi_user.h"
@@ -393,6 +395,96 @@ void VpiContext::AttachTimingChecks(SimContext& sim_ctx) {
           std::string(check.inst_prefix) + std::string(check.notifier));
     }
   }
+}
+
+// ===========================================================================
+// §37.62 Event statement.
+// ===========================================================================
+
+namespace {
+
+// §37.62: every event statement the process holds, innermost blocks included.
+// The clause's object stands for what the source wrote rather than for a
+// trigger that has fired, so the whole body is read whether or not any of it
+// ever runs.
+void CollectEventTriggerStmts(const Stmt* stmt,
+                              std::vector<const Stmt*>& found) {
+  if (stmt == nullptr) return;
+  if (stmt->kind == StmtKind::kEventTrigger ||
+      stmt->kind == StmtKind::kNbEventTrigger) {
+    found.push_back(stmt);
+  }
+  for (const Stmt* sub : stmt->stmts) CollectEventTriggerStmts(sub, found);
+  for (const Stmt* sub : stmt->fork_stmts) CollectEventTriggerStmts(sub, found);
+  for (const Stmt* sub : stmt->for_inits) CollectEventTriggerStmts(sub, found);
+  for (const Stmt* sub : stmt->for_steps) CollectEventTriggerStmts(sub, found);
+  CollectEventTriggerStmts(stmt->then_branch, found);
+  CollectEventTriggerStmts(stmt->else_branch, found);
+  CollectEventTriggerStmts(stmt->body, found);
+  CollectEventTriggerStmts(stmt->for_body, found);
+  CollectEventTriggerStmts(stmt->assert_pass_stmt, found);
+  CollectEventTriggerStmts(stmt->assert_fail_stmt, found);
+  for (const CaseItem& item : stmt->case_items) {
+    CollectEventTriggerStmts(item.body, found);
+  }
+  for (const auto& item : stmt->randcase_items) {
+    CollectEventTriggerStmts(item.second, found);
+  }
+}
+
+// §9.7: the name the trigger names its event by, which is an identifier in the
+// scope the statement stands in. A trigger written through anything else names
+// no declaration this walk can resolve against the design.
+std::string_view EventTriggerTargetName(const Stmt* stmt) {
+  const Expr* target = stmt->expr;
+  if (target == nullptr || target->kind != ExprKind::kIdentifier) return {};
+  return target->text;
+}
+
+}  // namespace
+
+void VpiContext::AttachEventStatements(const RtlirDesign* design) {
+  // §37.62 (figure): the event statement object, the named event it triggers,
+  // and the one property drawn on it - "-> blocking", bool: vpiBlocking. No
+  // pass built an event statement at all, so vpi_get(vpiBlocking, stmt)
+  // reported vpiUndefined for every design, the arrow to the named event
+  // reached nothing, and §38.36.1.3's cbStmt fan-out over a module's statements
+  // found none of the ones the source wrote.
+  if (design == nullptr) return;
+
+  WalkInstancePaths(
+      design, [this](const RtlirModule* mod, const std::string& prefix) {
+        // §36.10: a top module carries the empty prefix, its own declarations
+        // being keyed under their bare names, so the scope it stands for is
+        // found by the module's name rather than by a path that is not there.
+        VpiHandle scope = FindObjectForFlatName(
+            object_map_, prefix.empty() ? std::string(mod->name) : prefix);
+        std::vector<const Stmt*> found;
+        for (const RtlirProcess& proc : mod->processes) {
+          CollectEventTriggerStmts(proc.body, found);
+        }
+        for (const Stmt* stmt : found) {
+          auto* obj = AllocObject();
+          obj->type = vpiEventStmt;
+          // §9.7.2: "->" is the blocking event trigger and "->>" the
+          // nonblocking one, which is the whole of what the property
+          // distinguishes.
+          obj->blocking = stmt->kind == StmtKind::kEventTrigger;
+          // §38.36.1.3 reads a module's statements off its children, and §37.63
+          // draws the statement inside the scope that holds it.
+          if (scope != nullptr) {
+            obj->parent = scope;
+            scope->children.push_back(obj);
+          }
+          VpiHandle event = FindObjectForFlatName(
+              object_map_, VpiFlatName(prefix, EventTriggerTargetName(stmt)));
+          // The figure's single arrow, which the generic one-to-one traversal
+          // walks by the kind of the child: the named event object the design
+          // already carries for the declaration, not a second one standing for
+          // the same event.
+          if (event != nullptr) obj->children.push_back(event);
+        }
+      });
 }
 
 }  // namespace delta

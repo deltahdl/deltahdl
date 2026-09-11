@@ -5,7 +5,6 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
-#include <utility>
 #include <vector>
 
 #include "common/diagnostic.h"
@@ -25,43 +24,12 @@
 #include "simulator/sv_vpi_user.h"
 #include "simulator/variable.h"
 #include "simulator/vpi_context.h"
+#include "simulator/vpi_design_walk.h"
 #include "simulator/vpi_internal.h"
 
 namespace delta {
 
 namespace {
-
-// The child of `parent` carrying this name, or null where it has none. §36.10
-// makes each instance's objects "uniquely accessible", so one component of a
-// flat name is matched against the children of the scope reached so far rather
-// than against every object of the design.
-VpiHandle ChildNamed(VpiHandle parent, std::string_view name) {
-  for (auto* child : parent->children) {
-    if (child->name == name) return child;
-  }
-  return nullptr;
-}
-
-// The object a flat design name already stands for, and null where the name
-// reaches none. DesignObjectForFlatName below makes the scopes it passes
-// through; this one makes nothing, which is what a reader that has something to
-// say about an object the run built wants: a declaration the run built no
-// object for is passed over rather than given an empty one.
-VpiHandle FindObjectForFlatName(
-    const std::unordered_map<std::string_view, VpiObject*>& objects,
-    std::string_view flat_name) {
-  std::vector<std::string_view> parts = VpiNamePathComponents(flat_name);
-  if (parts.empty()) return nullptr;
-
-  auto root = objects.find(parts.front());
-  if (root == objects.end()) return nullptr;
-
-  VpiHandle current = root->second;
-  for (std::size_t i = 1; i < parts.size() && current != nullptr; ++i) {
-    current = ChildNamed(current, parts[i]);
-  }
-  return current;
-}
 
 // §37.3.3: write the file and line of `loc` onto `obj`, which is what
 // vpi_get(vpiLineNo) and vpi_get_str(vpiFile) then report for it. A declaration
@@ -294,47 +262,6 @@ void FillInterconnectNetObject(VpiObject* obj, const RtlirPort& port,
   port_obj->low_conn = obj;
 }
 
-// The instances `mod` holds, pushed onto the walk under their own paths. An
-// instance's path is its parent's with its name on the end, which is the string
-// the simulator keys every object of that instance under.
-void PushChildInstances(
-    const RtlirModule* mod, const std::string& prefix,
-    std::vector<std::pair<const RtlirModule*, std::string>>& work) {
-  work.reserve(work.size() + mod->children.size());
-  for (const auto& child : mod->children) {
-    std::string child_prefix = prefix;
-    if (!child_prefix.empty()) child_prefix += '.';
-    child_prefix += std::string(child.inst_name);
-    work.emplace_back(child.resolved, child_prefix);
-  }
-}
-
-// The flat name the simulator keys one declaration of this scope under: the
-// instance path with the declared name on the end. A top module carries the
-// empty prefix and keys its own declarations under their bare names.
-std::string VpiFlatName(const std::string& prefix, std::string_view name) {
-  if (prefix.empty()) return std::string(name);
-  return prefix + "." + std::string(name);
-}
-
-// Every scope of the design, visited outward from each top module under the
-// flat instance path the simulator keys that scope's objects under. A top
-// carries the empty prefix, having no instantiation over it to be named by.
-template <typename Visit>
-void WalkInstancePaths(const RtlirDesign* design, Visit visit) {
-  std::vector<std::pair<const RtlirModule*, std::string>> work;
-  work.reserve(design->top_modules.size());
-  for (auto* top : design->top_modules) work.emplace_back(top, std::string());
-
-  while (!work.empty()) {
-    auto [mod, prefix] = work.back();
-    work.pop_back();
-    if (mod == nullptr) continue;
-    PushChildInstances(mod, prefix, work);
-    visit(mod, prefix);
-  }
-}
-
 // §37.3.3: "These properties are applicable to every object that corresponds to
 // some object within the source code." Nothing under src/ ever wrote either
 // one, so vpiLineNo answered zero and vpiFile answered NULL for every object of
@@ -351,6 +278,16 @@ void WalkInstancePaths(const RtlirDesign* design, Visit visit) {
 // vpiIntegerVar, vpiTimeVar, and vpiRealVar". So an unpacked array is one kind
 // whatever it holds, and every other variable is the kind it was declared.
 int VpiVariableObjectKind(const RtlirVariable& var) {
+  // §37.62 (figure): the object an event statement triggers is a named event,
+  // and §37.27 draws the array of them beside it. A named event is not a
+  // variable holding a value, so Table 36-10's rule that an unpacked array of
+  // variables is one vpiRegArray object says nothing about it and the event
+  // kinds answer ahead of that rule. Without this an event declaration's object
+  // was a reg, so the arrow §37.62 draws from an event statement reached an
+  // object of a kind the figure has no box for.
+  if (var.is_event) {
+    return var.num_unpacked_dims > 0 ? vpiNamedEventArray : vpiNamedEvent;
+  }
   if (var.num_unpacked_dims > 0) return vpiRegArray;
   // A name declared through a typedef reports kNamed, so the flags the
   // elaborator resolved through the typedef answer first for the kinds that
@@ -731,6 +668,10 @@ void VpiContext::Attach(SimContext& sim_ctx, const RtlirDesign* design) {
   RecordVariableObjectKinds(design, object_map_);
   RecordDeclarationSourceLocations(design, object_map_, SourcesOf(sim_ctx_));
   AttachTopModules(design);
+  // §37.62: the event statements hang in the scope the top has just adopted, so
+  // they are made once those scopes are final and the named event each one
+  // triggers has been told which kind of object it is.
+  AttachEventStatements(design);
   // §37.23: the scope a nettype declaration hangs in is the one the top has
   // just adopted, so the declarations are made once those scopes are final.
   AttachNettypeDeclarations(design);
