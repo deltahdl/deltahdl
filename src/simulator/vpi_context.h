@@ -457,14 +457,10 @@ class VpiContext {
   // exist yields null as well.
   VpiHandle CreateHandleFor(VpiHandle object);
 
-  // §39.4.2: the handle a successful assertion-callback placement answers with.
-  // "If the callback is successfully placed, a handle to the callback is
-  // returned. This handle can be used to remove the callback via
-  // vpi_remove_cb()", so the object is a callback object like any other and
-  // carries the placement `placed_handle` names, which is what the removal
-  // needs. The placement itself is made in src/simulator/vpi_assertion_cb.cpp,
-  // which is where the assertion model and the object model meet; the object is
-  // made here because this is what owns the objects a run hands out.
+  // §39.4.2: the callback object a placed assertion callback is removed
+  // through, carrying the placement `placed_handle` names. It is made here
+  // because this owns the objects a run hands out; the placement that needs one
+  // is made in src/simulator/vpi_assertion_cb.cpp, which says the rest.
   VpiHandle CreateAssertionCallbackObject(std::uint64_t placed_handle);
 
   // §37.2.2: release a handle, the operation vpi_release_handle() performs. The
@@ -610,9 +606,7 @@ class VpiContext {
   // registration to remember the answer against, so it is measured each time.
   int SystfResultSizeBits(const VpiSystfData& data);
 
-  const std::vector<VpiCbData>& RegisteredCallbacks() const {
-    return callbacks_;
-  }
+  const std::vector<VpiCbData>& RegisteredCallbacks() const;
 
   // §36.9.1: the registration of system tasks shall occur prior to elaboration
   // or the resolution of references. Marking elaboration as started closes the
@@ -646,12 +640,8 @@ class VpiContext {
   // into a time slice, and when it has reached the read-only synch region of a
   // time slice. vpi_register_cb() consults these to reject the zero-delay
   // simulation-time callbacks the standard forbids in those situations.
-  void SetSimulationProgressedIntoTimeSlice(bool progressed) {
-    sim_progressed_into_time_slice_ = progressed;
-  }
-  bool SimulationProgressedIntoTimeSlice() const {
-    return sim_progressed_into_time_slice_;
-  }
+  void SetSimulationProgressedIntoTimeSlice(bool progressed);
+  bool SimulationProgressedIntoTimeSlice() const;
   void SetAtReadOnlySynchTime(bool at_read_only) {
     at_read_only_synch_time_ = at_read_only;
   }

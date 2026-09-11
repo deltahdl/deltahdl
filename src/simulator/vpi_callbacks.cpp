@@ -228,6 +228,24 @@ VpiHandle VpiContext::RegisterCb(VpiCbData* data) {
   return cb_obj;
 }
 
+// The three accessors below are defined here rather than in the class because
+// src/simulator/vpi_context.h is one class declaration standing at the line
+// count assert-no-oversized-source-files leaves a file, so what is added to it
+// has to be paid for out of it. Their comments stay with the declarations,
+// where a reader looks for them; this file is where callbacks_ and the time
+// slice flags are read and written anyway.
+const std::vector<VpiCbData>& VpiContext::RegisteredCallbacks() const {
+  return callbacks_;
+}
+
+void VpiContext::SetSimulationProgressedIntoTimeSlice(bool progressed) {
+  sim_progressed_into_time_slice_ = progressed;
+}
+
+bool VpiContext::SimulationProgressedIntoTimeSlice() const {
+  return sim_progressed_into_time_slice_;
+}
+
 VpiHandle VpiContext::CreateAssertionCallbackObject(
     std::uint64_t placed_handle) {
   // §39.4.2: a placed assertion callback answers with a handle to the callback,
