@@ -221,6 +221,47 @@ bool VpiVariableIsPackedArrayMember(VpiHandle var) {
   return VpiIsPackedArrayVarElementType(var->type);
 }
 
+bool VpiVarSelectConstantSelectOf(VpiHandle select) {
+  // §37.19 detail 1, read off the object rather than from a query a caller
+  // filled in: the three conditions are answered from the select itself, its
+  // index expressions and its vpiParent prefix.
+  if (!select || select->type != vpiVarSelect) return false;
+
+  VpiVarSelectConstantSelectQuery query;
+
+  // "every associated index expression is an elaboration-time constant
+  // expression". The index expressions are the ones vpi_iterate(vpiIndex, sel)
+  // reaches - the select's expression children - and an index that is an
+  // elaboration-time constant stands as a constant expression object.
+  query.all_indices_constant = true;
+  for (const VpiObject* child : select->children) {
+    if (!VpiIsExprType(child->type)) continue;
+    if (child->type != vpiConstant) query.all_indices_constant = false;
+  }
+
+  // "the parent of the var select is an unpacked array with static bounds".
+  // §37.17 detail 21 is where those bounds are reported: an unpacked array var
+  // whose vpiArrayType is vpiStaticArray has them, and a dynamic, associative
+  // or queue array does not.
+  VpiHandle parent = select->parent;
+  query.parent_is_unpacked_static_array = parent != nullptr &&
+                                          parent->type == vpiArrayVar &&
+                                          parent->array_type == vpiStaticArray;
+
+  // "vpiConstantSelect returns TRUE for the parent of the var select". A parent
+  // that is itself a var select is answered by this same rule; an array var is
+  // the base of the chain and is a constant select when its lifetime is static,
+  // which is §37.17 detail 27's first arm - static lifetime and no prefix above
+  // it.
+  if (parent != nullptr) {
+    query.parent_constant_select = parent->type == vpiVarSelect
+                                       ? VpiVarSelectConstantSelectOf(parent)
+                                       : !parent->automatic;
+  }
+
+  return VpiVarSelectConstantSelect(query);
+}
+
 bool VpiVarSelectConstantSelect(const VpiVarSelectConstantSelectQuery& query) {
   // §37.19 detail 1: a var select is a constant select only when all three
   // conditions hold together - every index is an elaboration-time constant, the

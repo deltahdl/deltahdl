@@ -460,6 +460,13 @@ struct VpiVarSelectConstantSelectQuery {
 // for that parent; otherwise FALSE.
 bool VpiVarSelectConstantSelect(const VpiVarSelectConstantSelectQuery& query);
 
+// §37.19 detail 1: the same property, answered from a var select object. The
+// three conditions are read off the select - its index expressions, its
+// vpiParent prefix, and that prefix's own constant-select answer - so that
+// vpi_get(vpiConstantSelect, sel) reports the "bool: vpiConstantSelect" the
+// figure draws on the var select. FALSE for anything that is not a var select.
+bool VpiVarSelectConstantSelectOf(VpiHandle select);
+
 // ===========================================================================
 // §37.25 Typespec. The VPI object model for a type specification. Each helper
 // applies one of the clause's numbered "Details"; the figure's range relations

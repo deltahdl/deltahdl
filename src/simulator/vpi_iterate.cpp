@@ -166,6 +166,9 @@ struct VpiIterateModes {
   bool named_event_index = false;
   bool packed_array_var_element = false;
   bool packed_array_var_index = false;
+  // §37.19: a var select's vpiIndex relation, which reaches the index
+  // expressions that select into its vpiParent array.
+  bool var_select_index = false;
   bool interconnect_array_element = false;
   bool interconnect_net_element = false;
   bool interconnect_net_member = false;
@@ -241,6 +244,10 @@ void ComputePackedArrayModes(int type, VpiHandle ref, VpiIterateModes& m) {
       ref && ref->type == vpiPackedArrayVar && type == vpiElement;
   m.packed_array_var_index =
       ref && ref->type == vpiPackedArrayVar && type == vpiIndex;
+  // §37.19 (figure): the var select's vpiIndex arrows reach expr, the same
+  // shape one dimension level up. Nothing recognized the relation, so the index
+  // expressions a select was written with were reachable from it by nothing.
+  m.var_select_index = ref && ref->type == vpiVarSelect && type == vpiIndex;
 }
 
 // §37.24 details 1 and 2: classify the interconnect special modes. An
@@ -405,7 +412,7 @@ bool VpiIterateMatchesKindMode(int obj_type, const VpiIterateModes& modes,
     *matched = VpiIsPackedArrayVarElementType(obj_type);
     return true;
   }
-  if (modes.packed_array_var_index) {
+  if (modes.packed_array_var_index || modes.var_select_index) {
     *matched = VpiIsExprType(obj_type);
     return true;
   }
