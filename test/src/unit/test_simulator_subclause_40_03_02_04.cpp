@@ -101,4 +101,81 @@ TEST(CoverageMerge, MissingArgumentsIsBadArgument) {
             kError);
 }
 
+// §40.3.2.4 "loads and merges coverage data ... into the simulator", so a merge
+// that reports `SV_COV_OK leaves the simulation holding what the database held:
+// the covered-item counts it was written with become part of the coverage this
+// simulation reports, which is the only sense in which the data were loaded
+// rather than merely located.
+TEST(CoverageMerge, LoadsTheCoverageDataIntoTheSimulation) {
+  SimFixture f;
+  Cov(f).RegisterCoverageDatabase(std::string(kName), /*from_this_design=*/true,
+                                  {kToggle});
+  Cov(f).SetDatabaseCoveredItems(std::string(kName), "top.dut", kToggle, 6);
+  Cov(f).SetDatabaseCoveredItems(std::string(kName), "top.dut.u1", kToggle, 4);
+
+  EXPECT_EQ(RunMerge(f, kToggle, kName), kOk);
+
+  // The named instance alone holds what the database recorded against it, and
+  // the hierarchy below it holds the rest.
+  EXPECT_EQ(Cov(f).CoverageGet("top.dut", kToggle, /*include_below=*/false), 6);
+  EXPECT_EQ(Cov(f).CoverageGet("top.dut", kToggle), 10);
+}
+
+// The call names one coverage type, and that is the coverage it loads: a
+// database holding data of several types leaves the types the merge did not ask
+// for where they were, so a later merge of another type is what brings that one
+// in.
+TEST(CoverageMerge, LoadsOnlyTheCoverageTypeTheCallNames) {
+  SimFixture f;
+  Cov(f).RegisterCoverageDatabase(std::string(kName), /*from_this_design=*/true,
+                                  {kToggle, kAssertion});
+  Cov(f).SetDatabaseCoveredItems(std::string(kName), "top.dut", kToggle, 6);
+  Cov(f).SetDatabaseCoveredItems(std::string(kName), "top.dut", kAssertion, 3);
+
+  EXPECT_EQ(RunMerge(f, kToggle, kName), kOk);
+
+  EXPECT_EQ(Cov(f).CoverageGet("top.dut", kToggle), 6);
+  EXPECT_EQ(Cov(f).CoverageGet("top.dut", kAssertion), kNoCov);
+
+  EXPECT_EQ(RunMerge(f, kAssertion, kName), kOk);
+
+  EXPECT_EQ(Cov(f).CoverageGet("top.dut", kAssertion), 3);
+}
+
+// A merge combines the loaded data with the coverage the simulation has already
+// collected rather than replacing it: coverage data are the items covered, and
+// merging two sets of them cannot lose an item either side had. So the scope
+// where this simulation has covered more than the database keeps its own count,
+// and the scope where the database has more takes the database's.
+TEST(CoverageMerge, CombinesWithCoverageAlreadyCollected) {
+  SimFixture f;
+  Cov(f).SetCoveredItems("top.dut", kToggle, 9);
+  Cov(f).SetCoveredItems("top.dut.u1", kToggle, 1);
+  Cov(f).RegisterCoverageDatabase(std::string(kName), /*from_this_design=*/true,
+                                  {kToggle});
+  Cov(f).SetDatabaseCoveredItems(std::string(kName), "top.dut", kToggle, 4);
+  Cov(f).SetDatabaseCoveredItems(std::string(kName), "top.dut.u1", kToggle, 7);
+
+  EXPECT_EQ(RunMerge(f, kToggle, kName), kOk);
+
+  EXPECT_EQ(Cov(f).CoverageGet("top.dut", kToggle, /*include_below=*/false), 9);
+  EXPECT_EQ(Cov(f).CoverageGet("top.dut.u1", kToggle), 7);
+}
+
+// A merge that reports anything but `SV_COV_OK loaded nothing, so the coverage
+// this simulation reports is untouched: the database from another design that
+// §40.3.2.4 requires an error for does not get to contribute its data on the
+// way to that error.
+TEST(CoverageMerge, AMergeThatIsNotPerformedLoadsNothing) {
+  SimFixture f;
+  Cov(f).SetCoverableItems("top.dut", kToggle, 10);
+  Cov(f).SetDatabaseCoveredItems(std::string(kName), "top.dut", kToggle, 6);
+  Cov(f).RegisterCoverageDatabase(std::string(kName),
+                                  /*from_this_design=*/false, {kToggle});
+
+  EXPECT_EQ(RunMerge(f, kToggle, kName), kError);
+
+  EXPECT_EQ(Cov(f).CoverageGet("top.dut", kToggle), kNoCov);
+}
+
 }  // namespace

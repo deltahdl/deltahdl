@@ -15,6 +15,7 @@
 // drives the same model when it evaluates a call. This mirrors the §40.5.2
 // coverage-query helpers in vpi_coverage.h.
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
@@ -174,6 +175,21 @@ class CoverageControlState {
     db.coverage_types = std::move(coverage_types);
   }
 
+  // Records a piece of the coverage data a named database holds: the number of
+  // items of `coverage_type` that stood covered in `scope` when the database
+  // was written. §40.3.2.4 loads coverage data into the simulator, so this is
+  // what a merge of that type has to bring in, and it mirrors what a real
+  // coverage engine would read out of the file it located by that name. A
+  // database holding covered items of a type is a database that contains that
+  // type, so recording data adds the type to what the database holds.
+  void SetDatabaseCoveredItems(const std::string& name,
+                               const std::string& scope, int coverage_type,
+                               std::int64_t count) {
+    CoverageDatabase& db = databases_[name];
+    db.covered_items[scope][coverage_type] = count;
+    db.coverage_types.insert(coverage_type);
+  }
+
   // §40.3.2.4 ($coverage_merge): loads and merges coverage data of
   // `coverage_type` from the database located by `name` into the simulation,
   // and returns the resulting §40.3.1 status.
@@ -204,7 +220,12 @@ class CoverageControlState {
     if (db.coverage_types.find(coverage_type) == db.coverage_types.end()) {
       return CoverageStatus::kNoCoverage;
     }
-    // The data are found and merged.
+    // The data are found and merged. §40.3.2.4 loads them "into the
+    // simulator", so what the database holds of the requested type joins the
+    // coverage this simulation has collected and is reported from then on by
+    // §40.3.2.3 - which is the sense in which coverage numbers this simulation
+    // generates depend on the load having gone through.
+    MergeDatabaseCoverage(db, coverage_type);
     ++db.merges;
     return CoverageStatus::kOk;
   }
@@ -484,11 +505,35 @@ class CoverageControlState {
     bool from_this_design = false;
     // The §40.3.1 coverage-type constants the database holds.
     std::unordered_set<int> coverage_types;
+    // §40.3.2.4: the coverage data the database holds - the covered-item counts
+    // each scope stood at when the database was written, keyed by hierarchical
+    // path and then by the §40.3.1 coverage-type constant. These are what a
+    // merge loads into the simulation.
+    std::unordered_map<std::string, std::unordered_map<int, std::int64_t>>
+        covered_items;
     // Successful merges performed against this database.
     std::uint64_t merges = 0;
     // §40.3.2.5: successful saves recorded under this database.
     std::uint64_t saves = 0;
   };
+
+  // §40.3.2.4: loads the coverage data of one type from a database into the
+  // scopes of this simulation. Coverage data are the items that have been
+  // covered, so merging two sets of them is their union: the merged count is at
+  // least the larger of the two counts and at most their sum, and a count alone
+  // cannot say which items the two sides hold in common. The larger is what
+  // this takes, because summing could carry a scope past the coverable items
+  // §40.3.2.2 fixes for the design, and no design covers more items than it
+  // has. Only the requested type is loaded, that being the coverage the call
+  // names, and a scope the database says nothing about keeps what it had.
+  void MergeDatabaseCoverage(const CoverageDatabase& db, int coverage_type) {
+    for (const auto& entry : db.covered_items) {
+      auto type_it = entry.second.find(coverage_type);
+      if (type_it == entry.second.end()) continue;
+      std::int64_t& covered = scopes_[entry.first].covered_items[coverage_type];
+      covered = std::max(covered, type_it->second);
+    }
+  }
 
   // Begins collection on a scope that is not already collecting. A scope
   // already collecting is left untouched so that a repeated start has no
