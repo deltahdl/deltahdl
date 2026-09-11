@@ -193,6 +193,8 @@ struct VpiIterateModes {
   bool constr_foreach_loopvars = false;
   bool foreach_stmt_loopvars = false;
   bool constraint_expr = false;
+  // §37.38 (figure): a constraint if-else's vpiElseConst relation.
+  bool else_constraint_expr = false;
   bool callback_object = false;
   // §37.57 detail 1: a let expression's vpiArgument iteration, which reads the
   // let declaration's formals rather than the expression's own children.
@@ -333,6 +335,11 @@ void ComputeConstraintAndCallbackModes(int type, VpiHandle ref,
       ref && ref->type == vpiForeachStmt && type == vpiLoopVars;
   m.constraint_expr = ref && type == vpiConstraintExpr &&
                       VpiIsConstraintExprContainerType(ref->type);
+  // §37.38 (figure): a constraint if-else's else branch, drawn as a relation of
+  // its own and recognized by nothing, so it was reachable from the if-else by
+  // nothing either.
+  m.else_constraint_expr =
+      ref && type == vpiElseConst && ref->type == vpiConstrIfElse;
   m.callback_object = ref && type == vpiCallback;
   // §36.10.3: an operation reaches its operands, which carry their own
   // expression kinds rather than the relation tag.
@@ -568,14 +575,6 @@ void CollectForeachLoopVars(VpiObject* ref,
   }
 }
 
-// §37.38 detail 3: collect the container's body constraint expressions in the
-// order they occur in the implication, if, if-else, or foreach.
-void CollectConstraintExprs(VpiObject* ref, VpiObject* iter) {
-  for (auto* expr : ref->constraint_exprs) {
-    iter->children.push_back(expr);
-  }
-}
-
 // §37.80 (figure): collect the callback objects registered on the reference
 // object - each registered callback whose s_cb_data obj field names it. The
 // callback object itself is not a child of the object, so it is found through
@@ -793,8 +792,12 @@ bool DispatchRefSpecialMode(int type, VpiHandle ref,
     CollectForeachLoopVars(ref, stores.all_objects, iter);
     return true;
   }
+  if (modes.else_constraint_expr) {
+    VpiCollectElseConstraintExprs(ref, iter);
+    return true;
+  }
   if (modes.constraint_expr) {
-    CollectConstraintExprs(ref, iter);
+    VpiCollectConstraintExprs(ref, iter);
     return true;
   }
   if (DispatchListedMode(type, ref, modes, iter)) return true;

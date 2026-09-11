@@ -67,6 +67,28 @@ bool VpiIsConstraintExprContainerType(int type) {
   }
 }
 
+VpiHandle VpiConstraintConditionExpr(VpiHandle container) {
+  // §37.38 (figure): an implication, a constraint if and a constraint if-else
+  // each reach the expression they are guarded by through vpiCondition. The
+  // condition's own type is an expression kind rather than the vpiCondition
+  // relation tag, so it is found by scanning for the first expression child;
+  // the guarded constraint expressions are held in the container's own
+  // constraint_exprs list and are not children, so nothing else is in the way.
+  if (!container) return nullptr;
+  switch (container->type) {
+    case vpiImplication:
+    case vpiConstrIf:
+    case vpiConstrIfElse:
+      break;
+    default:
+      return nullptr;
+  }
+  for (auto* child : container->children) {
+    if (VpiIsExprType(child->type)) return child;
+  }
+  return nullptr;
+}
+
 bool VpiIsClassMethodType(int type) {
   // §37.31 detail 1: the vpiMethods relation of a class defn reaches the
   // class's methods, which the diagram draws as the "task func" node - a task
@@ -824,5 +846,20 @@ bool VpiObjectHasActual(int actual_origin, bool has_current_actual) {
 // ===========================================================================
 // §37.59 Expressions.
 // ===========================================================================
+
+// §37.38 detail 3: collect the container's body constraint expressions in the
+// order they occur in the implication, if, if-else, or foreach.
+void VpiCollectConstraintExprs(VpiObject* ref, VpiObject* iter) {
+  for (auto* expr : ref->constraint_exprs) {
+    iter->children.push_back(expr);
+  }
+}
+
+// §37.38 (figure): the else branch, in the order its expressions occur.
+void VpiCollectElseConstraintExprs(VpiObject* ref, VpiObject* iter) {
+  for (auto* expr : ref->else_constraint_exprs) {
+    iter->children.push_back(expr);
+  }
+}
 
 }  // namespace delta

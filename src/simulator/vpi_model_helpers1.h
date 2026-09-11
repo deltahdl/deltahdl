@@ -86,6 +86,19 @@ bool VpiIsAssertionType(int type);
 // one of these.
 bool VpiIsConstraintItemType(int type);
 
+// §37.38 (figure): the expression an implication, a constraint if, or a
+// constraint if-else is guarded by, reached through vpiCondition. Null for any
+// other object and for a container that carries no condition expression.
+VpiHandle VpiConstraintConditionExpr(VpiHandle container);
+
+// §37.38 detail 3: push a container's body constraint expressions onto `iter`,
+// in the order they occur in the implication, if, if-else, or foreach.
+void VpiCollectConstraintExprs(VpiObject* ref, VpiObject* iter);
+
+// §37.38 (figure): the same for a constraint if-else's else branch, which the
+// figure draws as a vpiElseConst relation of its own.
+void VpiCollectElseConstraintExprs(VpiObject* ref, VpiObject* iter);
+
 // §37.38 detail 3: a constraint-expression container is the kind of constraint
 // expression whose vpiConstraintExpr iteration reaches the nested expressions
 // it holds - an implication, a constraint if, a constraint if-else, or a

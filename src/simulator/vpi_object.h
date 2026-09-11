@@ -570,6 +570,14 @@ struct VpiObject {
   // source order. Empty for an object that holds no such body.
   std::vector<VpiObject*> constraint_exprs;
 
+  // §37.38 (figure): the constraint expressions of a constraint if-else's else
+  // branch, which the figure draws as a vpiElseConst relation of its own rather
+  // than as part of the body above - the two branches of an if-else are two
+  // sets of expressions and vpiConstraintExpr reaches the then branch. Empty
+  // for every object that is not a constraint if-else, and for one whose else
+  // branch holds nothing.
+  std::vector<VpiObject*> else_constraint_exprs;
+
   // §37.41 details 1-3: the variable that captures a function's return value,
   // reached through the vpiReturn relation. Detail 1 makes a function contain a
   // return-capture object sharing the function's name, size, and type; detail 2

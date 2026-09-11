@@ -14,12 +14,12 @@ namespace {
 // §37.38 Constraint expression: the VPI object model for a constraint
 // expression - the group spanning an implication, a constraint if / if-else, a
 // foreach constraint, a distribution, a bare (optionally soft) expression, and
-// a soft disable. The diagram's bare relation arrows (vpiCondition to the
-// condition expr, vpiElseConst to the else branch, the soft-disable expr edge,
-// the foreach distribution/variables edges) carry no clause-specific rule and
+// a soft disable. The soft-disable expr edge and the foreach distribution edge
 // are served by the generic object-model and §38 traversal routines. This
 // clause's own rules are its three numbered Details, and the tests below
-// observe the production code that applies them:
+// observe the production code that applies them, together with the two figure
+// edges that reach nothing without a rule of their own - the vpiCondition of a
+// guarded constraint and the vpiElseConst of a constraint if-else:
 //   D1 - the variable reached from a foreach constraint via vpiVariables
 //        represents the array being indexed (the designated-pointer Handle
 //        case).
@@ -240,6 +240,86 @@ TEST_F(ConstraintExpression,
       vpiImplication;  // a container kind, but with an empty body
 
   EXPECT_EQ(vpi_iterate(vpiConstraintExpr, &implication), nullptr);
+}
+
+// The figure's vpiCondition edge. An implication, a constraint if and a
+// constraint if-else are each guarded by an expression the figure draws
+// vpiCondition to. None of the three was named by the condition resolver, so
+// the relation fell through to a walk looking for a child whose own type is the
+// vpiCondition tag - a type no object has - and reached nothing.
+TEST_F(ConstraintExpression, ConditionReachesTheGuardingExpression) {
+  for (int kind : {vpiImplication, vpiConstrIf, vpiConstrIfElse}) {
+    VpiObject condition;
+    condition.type = vpiOperation;
+    VpiObject body;
+    body.type = vpiOperation;
+
+    VpiObject guarded;
+    guarded.type = kind;
+    guarded.children = {&condition};
+    guarded.constraint_exprs = {&body};
+
+    EXPECT_EQ(vpi_handle(vpiCondition, &guarded), &condition)
+        << "constraint kind " << kind;
+  }
+}
+
+// The same edge is drawn on no other constraint expression: a distribution, a
+// soft disable and a bare expression are not guarded by a condition.
+TEST_F(ConstraintExpression, ConditionIsScopedToTheGuardedKinds) {
+  VpiObject expr;
+  expr.type = vpiOperation;
+
+  VpiObject dist;
+  dist.type = vpiDistribution;
+  dist.children = {&expr};
+
+  EXPECT_EQ(vpi_handle(vpiCondition, &dist), nullptr);
+}
+
+// The figure's vpiElseConst edge. A constraint if-else has two branches, and
+// vpiConstraintExpr reaches the then branch, so the else branch is drawn as a
+// relation of its own. Nothing recognized it, so the else branch's expressions
+// were reachable from the if-else by nothing.
+TEST_F(ConstraintExpression, ElseConstReachesTheElseBranchInOrder) {
+  VpiObject then_expr;
+  then_expr.type = vpiOperation;
+  VpiObject else_first;
+  else_first.type = vpiOperation;
+  VpiObject else_second;
+  else_second.type = vpiOperation;
+
+  VpiObject if_else;
+  if_else.type = vpiConstrIfElse;
+  if_else.constraint_exprs = {&then_expr};
+  if_else.else_constraint_exprs = {&else_first, &else_second};
+
+  vpiHandle itr = vpi_iterate(vpiElseConst, &if_else);
+  ASSERT_NE(itr, nullptr);
+  EXPECT_EQ(vpi_scan(itr), &else_first);
+  EXPECT_EQ(vpi_scan(itr), &else_second);
+  EXPECT_EQ(vpi_scan(itr), nullptr);
+
+  // D3 is unchanged by it: vpiConstraintExpr still reaches the then branch
+  // alone, which is what makes the two branches two sets of expressions.
+  vpiHandle body = vpi_iterate(vpiConstraintExpr, &if_else);
+  ASSERT_NE(body, nullptr);
+  EXPECT_EQ(vpi_scan(body), &then_expr);
+  EXPECT_EQ(vpi_scan(body), nullptr);
+}
+
+// The else branch belongs to the if-else alone: a constraint if has one branch,
+// so the relation reaches nothing from it.
+TEST_F(ConstraintExpression, ElseConstIsScopedToTheIfElse) {
+  VpiObject branch;
+  branch.type = vpiOperation;
+
+  VpiObject constr_if;
+  constr_if.type = vpiConstrIf;
+  constr_if.else_constraint_exprs = {&branch};
+
+  vpiHandle itr = vpi_iterate(vpiElseConst, &constr_if);
+  EXPECT_TRUE(itr == nullptr || vpi_scan(itr) == nullptr);
 }
 
 }  // namespace

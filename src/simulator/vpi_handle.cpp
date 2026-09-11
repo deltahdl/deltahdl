@@ -492,6 +492,15 @@ bool TryResolveConditionRelation(int type, VpiHandle ref, VpiHandle& out) {
     out = VpiCaseConditionExpr(ref);
     return true;
   }
+  // §37.38 (figure): the same tagged edge is drawn from an implication, a
+  // constraint if and a constraint if-else to the expression each is guarded
+  // by. None of the three was named here, so the relation fell through to a
+  // walk looking for a child whose own type is the vpiCondition tag - which no
+  // object has - and the condition of a constraint was unreachable.
+  if (VpiHandle condition = VpiConstraintConditionExpr(ref)) {
+    out = condition;
+    return true;
+  }
   return false;
 }
 
