@@ -405,9 +405,14 @@ class VpiContext {
   // §38.28: write already-formatted text to every file the descriptor names.
   // Each channel is a discrete bit of the integer mcd, so one call writes to
   // several files at once; bit 0 names channel 1 (the tool's output channel and
-  // log file), and the MSB names a file opened as an fd by $fopen. The text is
-  // appended to each named channel's output buffer (the same buffer §38.25
-  // flushes). Returns the number of characters written.
+  // log file) and bit 30 names channel 31, the last there is, the bit above
+  // them being the one §38.27 reserves to mark a descriptor an fd from $fopen
+  // rather than an mcd. §38.28 withholds a file represented by such an fd from
+  // this routine, and an fd is one whole value rather than a set of channel
+  // bits, so a descriptor carrying that mark names no channel here at all. The
+  // text is appended to each named channel's output buffer (the same buffer
+  // §38.25 flushes). Returns the number of characters written, which is zero
+  // where the descriptor named no channel to write.
   PLI_INT32 McdPrintf(PLI_UINT32 mcd, std::string_view text);
 
   // §38.30: write already-formatted text to both the output channel of the tool
