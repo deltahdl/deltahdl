@@ -106,4 +106,36 @@ TEST(FsmPossibleStatesPragmaLexing,
   EXPECT_EQ(states[3], "s3");
 }
 
+// The clause's own directive, read off what the lexer records: "Put this pragma
+// immediately after the keyword parameter, unless a bit width for the
+// parameters is used, in which case, specify the pragma immediately after the
+// bit width." Both placements are what the token standing before the pragma
+// says they are - the `parameter` keyword in the one, the closing bracket of
+// the width in the other - and the possible states are the names following it,
+// as far as the semicolon that ends the parameter declaration. Read that way
+// the states come from the pragma rather than from a list of names the case
+// already held, so a parameter declared outside this declaration is none of
+// them.
+TEST(FsmPossibleStatesPragmaLexing, ThePragmaStandsWhereTheClausePutsIt) {
+  const std::string kAfterKeyword =
+      "module fsm;\n"
+      "  parameter OTHER = 9;\n"
+      "  parameter /* tool enum myFSM */\n"
+      "    S0 = 0, s1 = 1, s2 = 2, s3 = 3;\n"
+      "endmodule\n";
+  const std::string kAfterWidth =
+      "module fsm;\n"
+      "  parameter OTHER = 9;\n"
+      "  parameter [1:0] /* tool enum myFSM */\n"
+      "    S0 = 0, s1 = 1, s2 = 2, s3 = 3;\n"
+      "endmodule\n";
+  const std::vector<std::string> kStates = {"S0", "s1", "s2", "s3"};
+
+  EXPECT_EQ(KindBeforeEnumPragma(kAfterKeyword), TokenKind::kKwParameter);
+  EXPECT_EQ(NamesFollowingEnumPragma(kAfterKeyword), kStates);
+
+  EXPECT_EQ(KindBeforeEnumPragma(kAfterWidth), TokenKind::kRBracket);
+  EXPECT_EQ(NamesFollowingEnumPragma(kAfterWidth), kStates);
+}
+
 }  // namespace

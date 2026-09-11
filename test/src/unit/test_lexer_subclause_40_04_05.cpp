@@ -1,6 +1,5 @@
 #include <gtest/gtest.h>
 
-#include <cstddef>
 #include <string>
 #include <vector>
 
@@ -58,51 +57,6 @@ void ExpectOnlyCsIsSignalBearing(const std::vector<FsmPragmaInfo>& pragmas) {
     }
   }
   EXPECT_EQ(signal_bearing, 1);
-}
-
-// Whether `loc` stands after `other` in the same source.
-bool IsAfter(SourceLoc loc, SourceLoc other) {
-  return loc.line > other.line ||
-         (loc.line == other.line && loc.column > other.column);
-}
-
-// §40.4.5's rule applied to what the lexer records, rather than to a list of
-// names the case already knew: the clause speaks of "the first signal following
-// the pragma" and "the next signal", so the pragma's own recorded location is
-// what says which identifiers follow it, and the semicolon ending the
-// declaration is what bounds the ones the clause is speaking of. A case that
-// instead filtered every identifier in the file by the names it expected would
-// pass over a signal declared before the pragma or after the declaration, and
-// would say nothing about following.
-std::vector<std::string> NamesFollowingEnumPragma(const std::string& src) {
-  SourceManager mgr;
-  DiagEngine diag(mgr);
-  auto fid = mgr.AddFile("<test>", src);
-  Lexer lexer(mgr.FileContent(fid), fid, diag);
-  auto tokens = lexer.LexAll();
-
-  SourceLoc pragma_loc;
-  for (const auto& p : lexer.FsmStatePragmas()) {
-    if (p.form == Lexer::FsmStatePragma::Form::kEnumOnly) {
-      pragma_loc = p.loc;
-      break;
-    }
-  }
-
-  size_t i = 0;
-  while (i < tokens.size() && !IsAfter(tokens[i].loc, pragma_loc)) {
-    ++i;
-  }
-  std::vector<std::string> names;
-  for (; i < tokens.size(); ++i) {
-    if (tokens[i].kind == TokenKind::kSemicolon) {
-      break;
-    }
-    if (tokens[i].kind == TokenKind::kIdentifier) {
-      names.push_back(std::string(tokens[i].text));
-    }
-  }
-  return names;
 }
 
 // Collects the identifiers from `src` that belong to `names`, in declaration
