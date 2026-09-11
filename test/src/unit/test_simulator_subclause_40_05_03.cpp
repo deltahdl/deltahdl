@@ -79,7 +79,10 @@ TEST_F(VpiCoverageControlSim, ControlAcceptsAnAssertionHandle) {
       "top.dut", CoverageAvailability::kFull);
   vpi_ctx_.GetCoverageControlState().SetAvailability(
       "top.dut.a1", CoverageAvailability::kFull);
-  VpiHandle assertion = vpi_ctx_.CreateAssertion("top.dut.a1", vpiAssertion);
+  // vpiAssertion is the class the assertion kinds are grouped under; an
+  // assertion object carries one of those kinds, and vpiAssert is the one a
+  // concurrent assert directive carries.
+  VpiHandle assertion = vpi_ctx_.CreateAssertion("top.dut.a1", vpiAssert);
 
   EXPECT_EQ(vpi_control(vpiCoverageStart, vpiAssertCoverage, assertion),
             Status(CoverageStatus::kOk));
@@ -163,6 +166,30 @@ TEST_F(VpiCoverageControlSim, CoverageIsControllableOnlyAtInstanceLevel) {
             Status(CoverageStatus::kOk));
   EXPECT_FALSE(vpi_ctx_.GetCoverageControlState().IsCollecting("top.dut"));
   EXPECT_EQ(vpi_ctx_.GetCoverageControlState().StopCount("top.dut"), 1u);
+}
+
+// C3 read the way the sentence is written: the control is over "an instance
+// handle" or "an assertion handle", and statement, toggle and FSM coverage are
+// "controllable only at the instance level and not on a per-statement, signal,
+// or FSM basis". A signal handle is that per-signal basis, so it is a bad
+// argument rather than a scope of its own. The scope it would have named is one
+// a coverage engine really does keep - toggle coverage is kept per signal - so
+// taken off the handle's name alone the request started collection on that one
+// signal and reported `SV_COV_OK for it.
+TEST_F(VpiCoverageControlSim, ASignalHandleIsNotAScopeCoverageIsControlledAt) {
+  vpi_ctx_.GetCoverageControlState().SetAvailability(
+      "top.dut.sig", CoverageAvailability::kFull);
+  VpiHandle sig = vpi_ctx_.CreateNetObj("top.dut.sig", nullptr, 8);
+
+  EXPECT_EQ(vpi_control(vpiCoverageStart, vpiToggleCoverage, sig),
+            Status(CoverageStatus::kError));
+  EXPECT_FALSE(vpi_ctx_.GetCoverageControlState().IsCollecting("top.dut.sig"));
+  EXPECT_EQ(vpi_ctx_.GetCoverageControlState().StartCount("top.dut.sig"), 0u);
+
+  // Nor the reset that handle would have applied to that one signal.
+  EXPECT_EQ(vpi_control(vpiCoverageReset, vpiToggleCoverage, sig),
+            Status(CoverageStatus::kError));
+  EXPECT_EQ(vpi_ctx_.GetCoverageControlState().ResetCount("top.dut.sig"), 0u);
 }
 
 // C4: vpi_control(vpiCoverageSave, <coverageType>, name) saves the current

@@ -43,8 +43,19 @@ std::optional<int> CoverageTypeForVpiProperty(int property);
 
 // The scope a coverage handle names: its hierarchical name, or its simple name
 // where it carries no hierarchical one. A null handle names no scope, which the
-// §40.3.2 rules read as a nonexisting one - a bad argument. Written in
-// vpi_control.cpp.
+// §40.3.2 rules read as a nonexisting one - a bad argument.
+//
+// So does a handle that is neither an instance nor an assertion. §40.5.3 writes
+// the control over those two kinds and no third, and says why there is no
+// third: "Statement, toggle, and FSM coverage are not individually controllable
+// (i.e., they are controllable only at the instance level and not on a
+// per-statement, signal, or FSM basis)", and §40.5.2 reads the coverage of a
+// type out of an instance handle in the same terms. A handle of any other kind
+// is the per-object control that sentence rules out rather than a scope to act
+// on. Taken off its text alone it was a scope: a signal handle carries a name
+// like any other, and toggle coverage is exactly what a coverage engine keeps
+// per signal, so a PLI application could start, stop or reset one signal and be
+// told `SV_COV_OK for it. Written in vpi_control.cpp.
 std::string CoverageScopeName(const VpiObject* scope_handle);
 
 // The §40.5.1 coverage properties relevant to a coverage query. The four

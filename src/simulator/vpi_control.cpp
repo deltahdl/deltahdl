@@ -17,6 +17,7 @@
 #include "simulator/sim_context.h"
 #include "simulator/vpi.h"
 #include "simulator/vpi_coverage.h"
+#include "simulator/vpi_model_helpers1.h"
 // §37.10 detail 3: the package/interface/program instance kinds are defined in
 // the SystemVerilog VPI header alongside the §37.10 vpiInstance relation.
 #include "simulator/sv_vpi_user.h"
@@ -82,15 +83,12 @@ CoverageControl CoverageControlForOperation(int operation) {
 }  // namespace
 
 std::string CoverageScopeName(const VpiObject* scope_handle) {
-  std::string scope;
-  if (scope_handle != nullptr) {
-    if (!scope_handle->full_name.empty()) {
-      scope = scope_handle->full_name;
-    } else {
-      scope = std::string(scope_handle->name);
-    }
+  if (scope_handle == nullptr || (!VpiIsInstanceType(scope_handle->type) &&
+                                  !VpiIsAssertionType(scope_handle->type))) {
+    return std::string();
   }
-  return scope;
+  if (!scope_handle->full_name.empty()) return scope_handle->full_name;
+  return std::string(scope_handle->name);
 }
 
 // §40.5.1's coverage type properties name the same four coverage types §40.3.1
