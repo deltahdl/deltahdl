@@ -397,6 +397,36 @@ bool VpiIsModuleWideCbStmt(const VpiCbData& data) {
          data.obj->type == kVpiModule;
 }
 
+// §38.36.1.3: report whether a cbStmt registration placed a callback on the
+// statement the dispatch names. The obj field of the registration is what says
+// where the callback was placed: on the statement that field names, or, where
+// it names a module instance, on every statement in that instance which can
+// have one. So a registration against another statement, or against a module
+// instance this statement does not belong to, placed no callback where this
+// statement is executing. A registration whose obj field named no object at
+// all placed the callback on no statement in particular, and stands for
+// whichever one the dispatch names.
+bool VpiCbStmtIsPlacedOn(const VpiCbData& reg, VpiHandle stmt) {
+  if (reg.obj == nullptr || reg.obj == stmt) return true;
+  if (reg.obj->type != kVpiModule) return false;
+  std::vector<VpiObject*> placed;
+  VpiCollectModuleWideStmtTargets(reg.obj, placed);
+  for (VpiObject* target : placed) {
+    if (target == stmt) return true;
+  }
+  return false;
+}
+
+// §38.36.3: the routine is passed a pointer to an s_cb_data structure that is
+// not the one supplied at registration. The simulator fills in the obj and
+// user_data fields where the dispatch has them for this reason, and leaves
+// what the registration supplied in place where it does not.
+void VpiApplyDispatchOverrides(VpiCbData& data, VpiHandle obj,
+                               void* user_data) {
+  if (obj != nullptr) data.obj = obj;
+  if (user_data != nullptr) data.user_data = user_data;
+}
+
 }  // namespace
 
 int VpiContext::DispatchCallbacks(int reason, VpiHandle obj, void* user_data) {
@@ -439,16 +469,19 @@ int VpiContext::DispatchCallbacks(int reason, VpiHandle obj, void* user_data) {
     if (callbacks_[i].reason != reason || callbacks_[i].cb_rtn == nullptr) {
       continue;
     }
+    // §38.36.1.3: a cbStmt callback is placed on particular statements, so
+    // where the dispatch names the statement that is about to execute, only
+    // the registrations that placed a callback on that statement are delivered
+    // for it.
+    if (reason == cbStmt && obj != nullptr &&
+        !VpiCbStmtIsPlacedOn(callbacks_[i], obj)) {
+      continue;
+    }
     // §38.36.3: the routine is passed a pointer to an s_cb_data structure that
     // is not the one supplied at registration. Work from a copy and let the
     // simulator fill obj/user_data when it has them for this reason.
     VpiCbData data = callbacks_[i];
-    if (obj != nullptr) {
-      data.obj = obj;
-    }
-    if (user_data != nullptr) {
-      data.user_data = user_data;
-    }
+    VpiApplyDispatchOverrides(data, obj, user_data);
     // §38.36.1.3: a handle to a module instance in the obj field places a
     // cbStmt callback on every statement in the module that can have one. The
     // single registration stands in for all of them, so deliver the routine

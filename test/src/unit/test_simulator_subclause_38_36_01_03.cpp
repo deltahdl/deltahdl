@@ -68,6 +68,16 @@ class VpiModuleWideCallback : public ::testing::Test {
     return vpi_register_cb(&cb);
   }
 
+  // Register a cbStmt callback whose obj is a single statement rather than a
+  // module instance, which places the callback on that statement alone.
+  vpiHandle RegisterOnStatement(vpiHandle stmt) {
+    s_cb_data cb = {};
+    cb.reason = cbStmt;
+    cb.obj = stmt;
+    cb.cb_rtn = &RecordCb;
+    return vpi_register_cb(&cb);
+  }
+
   SourceManager mgr_;
   Arena arena_;
   Scheduler scheduler_{arena_};
@@ -181,6 +191,77 @@ TEST_F(VpiModuleWideCallback, SingleHandleRemovesCallbackFromEveryStatement) {
   g_objs.clear();
   vpi_ctx_.DispatchCallbacks(cbStmt);
   EXPECT_EQ(g_calls, 0);
+}
+
+// §38.36.1.3: the callback the module-wide registration places on every
+// statement in the instance is a callback on each of those statements, so the
+// statement that is about to execute is what the routine is called before.
+// Naming that statement to the dispatch delivers the module-wide registration
+// once, with obj set to the statement rather than to the module it was
+// registered against.
+TEST_F(VpiModuleWideCallback,
+       StatementAboutToExecuteGetsTheCallbackPlacedOnIt) {
+  vpiHandle module = vpi_ctx_.CreateModule("m", "m");
+  vpiHandle first = AddStmt(module, "m.a", vpiAssignment);
+  AddStmt(module, "m.b", vpiWhile);
+
+  ASSERT_NE(RegisterModuleWide(module), nullptr);
+  EXPECT_EQ(vpi_ctx_.DispatchCallbacks(cbStmt, first), 1);
+
+  EXPECT_EQ(g_calls, 1);
+  EXPECT_TRUE(Fired(first));
+  EXPECT_FALSE(Fired(module));
+}
+
+// §38.36.1.3: the module instance in the obj field places the callback on the
+// statements of that instance, and on no others. A statement of a second
+// module instance had no callback placed on it, so executing it calls nothing:
+// the registration against the first instance is passed over rather than
+// delivered for a statement it never reached.
+TEST_F(VpiModuleWideCallback, StatementOfAnotherInstanceCallsNothing) {
+  vpiHandle module = vpi_ctx_.CreateModule("m", "m");
+  AddStmt(module, "m.s", vpiAssignment);
+  vpiHandle other = vpi_ctx_.CreateModule("n", "n");
+  vpiHandle outside = AddStmt(other, "n.s", vpiAssignment);
+
+  ASSERT_NE(RegisterModuleWide(module), nullptr);
+  EXPECT_EQ(vpi_ctx_.DispatchCallbacks(cbStmt, outside), 0);
+
+  EXPECT_EQ(g_calls, 0);
+  EXPECT_FALSE(Fired(outside));
+}
+
+// §38.36.1.3: statements that reside in protected portions of the code shall
+// not have callbacks placed on them, so a protected statement of the module
+// calls nothing when it executes - the rule holds at the statement the
+// dispatch names, not only over the fan-out that names them all.
+TEST_F(VpiModuleWideCallback, ProtectedStatementAboutToExecuteCallsNothing) {
+  vpiHandle module = vpi_ctx_.CreateModule("m", "m");
+  vpiHandle sealed = AddStmt(module, "m.sealed", vpiWhile, /*protect=*/true);
+
+  ASSERT_NE(RegisterModuleWide(module), nullptr);
+  EXPECT_EQ(vpi_ctx_.DispatchCallbacks(cbStmt, sealed), 0);
+
+  EXPECT_EQ(g_calls, 0);
+  EXPECT_FALSE(Fired(sealed));
+}
+
+// §38.36.1.3 is what a module instance in the obj field is for: placing the
+// callback on every statement at once. A registration that names one statement
+// instead places it on that statement alone, so a sibling statement of the
+// same module executes with no callback of that registration on it.
+TEST_F(VpiModuleWideCallback, RegistrationOnOneStatementReachesNoSibling) {
+  vpiHandle module = vpi_ctx_.CreateModule("m", "m");
+  vpiHandle named = AddStmt(module, "m.a", vpiAssignment);
+  vpiHandle sibling = AddStmt(module, "m.b", vpiWhile);
+
+  ASSERT_NE(RegisterOnStatement(named), nullptr);
+  EXPECT_EQ(vpi_ctx_.DispatchCallbacks(cbStmt, sibling), 0);
+  EXPECT_EQ(g_calls, 0);
+
+  EXPECT_EQ(vpi_ctx_.DispatchCallbacks(cbStmt, named), 1);
+  EXPECT_EQ(g_calls, 1);
+  EXPECT_TRUE(Fired(named));
 }
 
 }  // namespace
