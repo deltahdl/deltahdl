@@ -132,6 +132,21 @@ int VpiGetBlocking(VpiHandle obj) {
   return obj->blocking ? 1 : 0;
 }
 
+// §37.85 details 3 and 4: an object one elaboration of a generate has made a
+// local parameter of - a parameter declared within the gen scope, or a
+// reference to a gen var within it. "References to gen vars within the gen
+// scope shall be treated as local parameters" and "Parameters within the gen
+// scope shall be treated as local parameters", whatever the declaration wrote:
+// the generate has fixed the value for that elaboration of the scope, so there
+// is nothing an override could reach. A gen var reference is told by what it is
+// bound to (§37.15 detail 3), not by its own kind.
+bool VpiIsGenScopeLocalParam(VpiHandle obj) {
+  if (obj->parent == nullptr || obj->parent->type != vpiGenScope) return false;
+  if (obj->type == vpiParameter) return true;
+  return obj->type == vpiRefObj && obj->actual != nullptr &&
+         obj->actual->type == vpiGenVar;
+}
+
 // §37.83: vpiDefAttribute is drawn only on the attribute object; any other kind
 // reports vpiUndefined.
 int VpiGetDefAttribute(VpiHandle obj) {
@@ -342,9 +357,11 @@ int VpiGetSimplePropertyA(int property, VpiHandle obj, bool& handled) {
     case vpiDefDecayTime:
       return obj->def_decay_time;
     // §37.28: a parameter reports whether it is a localparam through the
-    // vpiLocalParam Boolean property.
+    // vpiLocalParam Boolean property. §37.85 details 3 and 4 add the ones a
+    // generate makes local, which the stored flag does not carry because it
+    // records how the declaration was written rather than where it stands.
     case vpiLocalParam:
-      return VpiBool(obj->local_param);
+      return VpiBool(obj->local_param || VpiIsGenScopeLocalParam(obj));
     // §37.28: a param assign reports whether the override connects by name (as
     // opposed to by position) through the vpiConnByName Boolean property.
     case vpiConnByName:

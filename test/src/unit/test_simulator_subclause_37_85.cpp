@@ -25,12 +25,18 @@ namespace {
 // vpiMemory, vpiParameter, vpiTypedef, vpiNetTypedef, the names, and the
 // deprecated vpiArray/vpiArrayMember/vpiProtected booleans) is served by
 // generic scope, instance, typedef, and property machinery owned by §37.10,
-// §37.12, §37.23, and §37.25, so it is not re-tested here. Details 3 and 4 (gen
-// var references and parameters within a gen scope are treated as local
-// parameters) describe elaboration semantics with no §37.85-specific VPI query,
-// and details 5 and 6 (the vpiTypedef/vpiNetTypedef iterations) restate the
-// instance rule already implemented for §37.10, so neither adds production for
-// this clause.
+// §37.12, §37.23, and §37.25, so it is not re-tested here. Details 5 and 6 (the
+// vpiTypedef/vpiNetTypedef iterations) restate the instance rule already
+// implemented for §37.10, so they add no production for this clause.
+//
+// Details 3 and 4 - "References to gen vars within the gen scope shall be
+// treated as local parameters" and "Parameters within the gen scope shall be
+// treated as local parameters" - were read as elaboration semantics with no VPI
+// query of their own. They have one: §37.28 draws vpiLocalParam on a parameter,
+// and being treated as a local parameter is what that property reports. It
+// reported the flag the declaration set, so a parameter written as a plain
+// parameter inside a gen scope answered that an override could still reach it,
+// which one elaboration of a generate has already settled.
 //
 // The fixture installs a context so the public vpi_get, vpi_handle, and
 // vpi_handle_by_index entry points run their real dispatch over the test
@@ -157,6 +163,62 @@ TEST_F(Generates, ImplicitlyDeclaredScopeReportsTrue) {
   named_scope.type = vpiGenScope;
   named_scope.implicit_decl = false;
   EXPECT_EQ(vpi_get(vpiImplicitDecl, &named_scope), 0);
+}
+
+// Detail 4: a parameter declared within a gen scope is treated as a local
+// parameter, so vpi_get(vpiLocalParam, ...) reports TRUE however it was
+// written - the generate has fixed its value for that elaboration of the scope.
+// A parameter written as a localparam reports TRUE wherever it stands, so the
+// case that tells the rule apart is the plain one.
+TEST_F(Generates, ParameterInAGenScopeIsALocalParameter) {
+  VpiObject gen_scope;
+  gen_scope.type = vpiGenScope;
+
+  VpiObject plain_parameter;
+  plain_parameter.type = vpiParameter;
+  plain_parameter.local_param = false;  // written as a plain parameter
+  plain_parameter.parent = &gen_scope;
+
+  EXPECT_EQ(vpi_get(vpiLocalParam, &plain_parameter), 1);
+
+  // The same declaration outside a gen scope is what it was written as.
+  VpiObject module;
+  module.type = vpiModule;
+
+  VpiObject outside;
+  outside.type = vpiParameter;
+  outside.local_param = false;
+  outside.parent = &module;
+
+  EXPECT_EQ(vpi_get(vpiLocalParam, &outside), 0);
+}
+
+// Detail 3: a reference to a gen var within the gen scope is treated as a local
+// parameter too. What makes it one is the object it is bound to (§37.15 detail
+// 3), so a reference to something else in the same scope is not one.
+TEST_F(Generates, GenVarReferenceInAGenScopeIsALocalParameter) {
+  VpiObject gen_scope;
+  gen_scope.type = vpiGenScope;
+
+  VpiObject gen_var;
+  gen_var.type = vpiGenVar;
+
+  VpiObject gen_var_ref;
+  gen_var_ref.type = vpiRefObj;
+  gen_var_ref.actual = &gen_var;
+  gen_var_ref.parent = &gen_scope;
+
+  EXPECT_EQ(vpi_get(vpiLocalParam, &gen_var_ref), 1);
+
+  VpiObject a_net;
+  a_net.type = vpiNet;
+
+  VpiObject net_ref;
+  net_ref.type = vpiRefObj;
+  net_ref.actual = &a_net;
+  net_ref.parent = &gen_scope;
+
+  EXPECT_EQ(vpi_get(vpiLocalParam, &net_ref), 0);
 }
 
 }  // namespace
