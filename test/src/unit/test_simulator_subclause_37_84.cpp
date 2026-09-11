@@ -74,14 +74,32 @@ TEST_F(Iterator, UseRecoversTheReferenceHandle) {
 
 // Edge (vpiUse), detail 2: an iterator may have been created over a NULL
 // reference handle, in which case vpi_handle(vpiUse, iterator) returns NULL.
-// The iterator object exists but carries no reference, and the traversal
-// reports the absence as a null result rather than fabricating a handle.
-TEST_F(Iterator, UseReturnsNullForANullReference) {
-  VpiObject iter;
-  iter.type = vpiIterator;
-  iter.iter_ref = nullptr;
+// The iterator is the one a real NULL-reference iteration hands back - §37.80
+// detail 2's walk of the callbacks no object reaches - rather than an object
+// built with the reference left unset, so what the detail is about is the
+// iterator a caller can actually hold. It still reports the kind it walks.
+TEST_F(Iterator, UseReturnsNullForAnIteratorCreatedOverANullReference) {
+  s_cb_data cb = {};
+  cb.reason = cbEndOfSimulation;
+  ASSERT_NE(vpi_register_cb(&cb), nullptr);
 
-  EXPECT_EQ(vpi_handle(vpiUse, &iter), nullptr);
+  vpiHandle iter = vpi_iterate(vpiCallback, nullptr);
+  ASSERT_NE(iter, nullptr);
+
+  EXPECT_EQ(vpi_handle(vpiUse, iter), nullptr);
+  EXPECT_EQ(vpi_get(vpiIteratorType, iter), vpiCallback);
+}
+
+// Both the property and the edge are drawn on the iterator object alone. An
+// object of another kind reports no iterator type, and vpiUse - which §37.58
+// draws from a simple expression to the places it is used - does not hand back
+// the reference of an iteration that object never was.
+TEST_F(Iterator, TheTypeAndTheEdgeAreDrawnOnTheIteratorAlone) {
+  VpiObject scope;
+  scope.type = vpiModule;
+
+  EXPECT_EQ(vpi_get(vpiIteratorType, &scope), vpiUndefined);
+  EXPECT_EQ(vpi_handle(vpiUse, &scope), nullptr);
 }
 
 }  // namespace
