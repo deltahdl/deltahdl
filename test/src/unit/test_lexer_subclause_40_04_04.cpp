@@ -88,4 +88,55 @@ TEST(FsmNextStatePragmaLexing, NextStatePragmaOmittedWhenNoNextStateSignal) {
   EXPECT_EQ(pragmas[0].signal, "cur_state");
 }
 
+// C1 in the other comment form: §40.4.4 names the pragma that specifies the
+// enumeration name, and that pragma is the same one whichever comment carries
+// it. Written after the bit range in a one-line comment - so the declaration it
+// annotates continues on the line below - it specifies the next-state signal
+// exactly as the block-comment form does.
+TEST(FsmNextStatePragmaLexing, NextStatePragmaInAOneLineComment) {
+  const std::string kSrc =
+      "module fsm;\n"
+      "  /* tool state_vector cur_state enum state_e */\n"
+      "  logic [7:0] cur_state;\n"
+      "  logic [7:0] // tool enum state_e\n"
+      "    nxt_state;\n"
+      "endmodule\n";
+
+  auto pragmas = CollectFsmPragmas(kSrc);
+  ASSERT_EQ(pragmas.size(), 2u);
+  EXPECT_EQ(pragmas[0].form, "state_vector");
+  EXPECT_EQ(pragmas[1].form, "enum_only");
+  EXPECT_TRUE(pragmas[1].has_enum);
+  EXPECT_EQ(pragmas[1].enum_name, "state_e");
+  EXPECT_TRUE(pragmas[1].signal.empty());
+}
+
+// The enumeration name is what ties a next-state signal to its FSM, so two FSMs
+// in one module keep their next-state signals apart by that name and by nothing
+// else: each pragma carries the name written in it. A recognizer that carried a
+// name forward from the pragma before, or that held one enumeration for the
+// file, would give the second FSM the first one's next-state signal.
+TEST(FsmNextStatePragmaLexing, EachNextStatePragmaKeepsItsOwnEnumerationName) {
+  const std::string kSrc =
+      "module two_fsms;\n"
+      "  /* tool state_vector cs_a enum fsm_a */\n"
+      "  logic [1:0] /* tool enum fsm_a */ ns_a;\n"
+      "  /* tool state_vector cs_b enum fsm_b */\n"
+      "  logic [1:0] /* tool enum fsm_b */ ns_b;\n"
+      "endmodule\n";
+
+  auto pragmas = CollectFsmPragmas(kSrc);
+  ASSERT_EQ(pragmas.size(), 4u);
+
+  EXPECT_EQ(pragmas[0].signal, "cs_a");
+  EXPECT_EQ(pragmas[0].enum_name, "fsm_a");
+  EXPECT_EQ(pragmas[1].form, "enum_only");
+  EXPECT_EQ(pragmas[1].enum_name, "fsm_a");
+
+  EXPECT_EQ(pragmas[2].signal, "cs_b");
+  EXPECT_EQ(pragmas[2].enum_name, "fsm_b");
+  EXPECT_EQ(pragmas[3].form, "enum_only");
+  EXPECT_EQ(pragmas[3].enum_name, "fsm_b");
+}
+
 }  // namespace
