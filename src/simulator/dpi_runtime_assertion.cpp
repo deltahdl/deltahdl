@@ -9,6 +9,20 @@
 
 namespace delta {
 
+namespace {
+AssertionApi* g_assertion_api = nullptr;
+}  // namespace
+
+AssertionApi& GetGlobalAssertionApi() {
+  // Function-local static: the default model is constructed on first use rather
+  // than during static init, matching GetGlobalVpiContext().
+  static AssertionApi default_api;
+  if (g_assertion_api != nullptr) return *g_assertion_api;
+  return default_api;
+}
+
+void SetGlobalAssertionApi(AssertionApi* api) { g_assertion_api = api; }
+
 void AssertionApi::RegisterCallback(int reason, AssertionCbFunc cb,
                                     void* user_data) {
   callbacks_.push_back({reason, std::move(cb), user_data});

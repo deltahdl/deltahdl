@@ -829,6 +829,14 @@ class AssertionApi {
   void FlushAllPendingAssertionReports();
 };
 
+// §39.1: the assertion API a run answers out of - one model, the way the VPI
+// routines answer out of one VpiContext. The entry points of clause 39 reach it
+// through here; a test installs its own with SetGlobalAssertionApi() so it can
+// deliver the events a run has no assertion engine to deliver yet, and passing
+// null restores the default.
+AssertionApi& GetGlobalAssertionApi();
+void SetGlobalAssertionApi(AssertionApi* api);
+
 // CoverageControl is the §40.3.1 control enum defined canonically in
 // coverage_control.h (included above); CoverageApi reuses it rather than
 // declaring a second, conflicting copy.

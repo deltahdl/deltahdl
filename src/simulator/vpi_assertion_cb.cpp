@@ -7,8 +7,6 @@
 namespace delta {
 namespace {
 
-AssertionApi* g_assertion_api = nullptr;
-
 // §39.4.2: "A pointer to the time of the callback" - the model keeps a time as
 // one 64-bit count of simulation time units, and s_vpi_time carries it in the
 // two halves vpiSimTime names.
@@ -51,16 +49,6 @@ void VpiCallAssertionRoutine(vpi_assertion_callback_func cb_rtn,
 }
 
 }  // namespace
-
-AssertionApi& GetGlobalAssertionApi() {
-  // Function-local static: the default model is constructed on first use rather
-  // than during static init, matching GetGlobalVpiContext().
-  static AssertionApi default_api;
-  if (g_assertion_api != nullptr) return *g_assertion_api;
-  return default_api;
-}
-
-void SetGlobalAssertionApi(AssertionApi* api) { g_assertion_api = api; }
 
 VpiHandle VpiRegisterAssertionCb(VpiHandle assertion, int reason,
                                  vpi_assertion_callback_func cb_rtn,

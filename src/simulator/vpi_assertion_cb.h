@@ -14,13 +14,6 @@
 
 namespace delta {
 
-// §39.1: the assertion API this clause describes answers out of one assertion
-// model per run, the way the VPI routines answer out of one VpiContext. A test
-// installs its own with SetGlobalAssertionApi() so it can deliver the events a
-// run has no engine to deliver yet; passing null restores the default.
-AssertionApi& GetGlobalAssertionApi();
-void SetGlobalAssertionApi(AssertionApi* api);
-
 // §39.4.2: place `cb_rtn` on `assertion` for `reason`, with `user_data` carried
 // through to every call of it. "If the callback is successfully placed, a
 // handle to the callback is returned ... If there were errors on placing the

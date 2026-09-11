@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "simulator/vpi_assertion_cb.h"
+#include "simulator/vpi_assertion_control.h"
 #include "simulator/vpi_internal.h"
 
 // §37.10 detail 3: the package/interface/program instance kinds are defined in
@@ -225,6 +226,39 @@ PLI_INT32 vpi_release_handle(vpiHandle obj) {
   return delta::GetGlobalVpiContext().ReleaseHandleStatus(obj);
 }
 
+// §39.5: the assertion controls read their own argument lists - a scope handle
+// for a system control, an assertion handle for a per-assertion one, that
+// handle and an attempt start time for the two that name an attempt, and a step
+// control constant on top of those for the enable-step control. They are read
+// here, out of the way of the operations §38.4 defines, and `handled` says
+// whether the operation was one of them.
+static PLI_INT32 VpiAssertionControlWithArgs(PLI_INT32 operation, va_list args,
+                                             bool* handled) {
+  *handled = true;
+  if (delta::VpiIsAssertionSysControl(operation)) {
+    vpiHandle scope = va_arg(args, vpiHandle);
+    return delta::VpiAssertionSysControl(operation, scope);
+  }
+  if (delta::VpiIsAssertionControl(operation)) {
+    vpiHandle assertion = va_arg(args, vpiHandle);
+    return delta::VpiAssertionControl(operation, assertion);
+  }
+  if (delta::VpiIsAssertionAttemptControl(operation)) {
+    vpiHandle assertion = va_arg(args, vpiHandle);
+    s_vpi_time* attempt = va_arg(args, s_vpi_time*);
+    return delta::VpiAssertionAttemptControl(operation, assertion, attempt);
+  }
+  if (delta::VpiIsAssertionStepControl(operation)) {
+    vpiHandle assertion = va_arg(args, vpiHandle);
+    s_vpi_time* attempt = va_arg(args, s_vpi_time*);
+    int step_control = va_arg(args, int);
+    return delta::VpiAssertionStepControl(operation, assertion, attempt,
+                                          step_control);
+  }
+  *handled = false;
+  return 0;
+}
+
 PLI_INT32 VpiControlWithArgs(PLI_INT32 operation, va_list args) {
   // §38.4: vpi_control(operation, varargs) takes a variable number of
   // operation-specific arguments. Read exactly the arguments the operation
@@ -233,6 +267,7 @@ PLI_INT32 VpiControlWithArgs(PLI_INT32 operation, va_list args) {
   // vpi_control can start their own list and hand it here rather than
   // duplicating the argument shapes of every operation.
   int result = 0;
+  bool handled = false;
   switch (operation) {
     case delta::kVpiStop:
     case delta::kVpiFinish: {
@@ -280,7 +315,8 @@ PLI_INT32 VpiControlWithArgs(PLI_INT32 operation, va_list args) {
       break;
     }
     default:
-      result = delta::GetGlobalVpiContext().Control(operation);
+      result = VpiAssertionControlWithArgs(operation, args, &handled);
+      if (!handled) result = delta::GetGlobalVpiContext().Control(operation);
       break;
   }
   return result;
