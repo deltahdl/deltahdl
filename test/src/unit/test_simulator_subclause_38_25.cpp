@@ -94,5 +94,58 @@ TEST_F(VpiMcdFlushSim, FlushingDescriptorWithNoPendingOutputSucceeds) {
   EXPECT_EQ(vpi_ctx_.McdChannelBuffer(mcd), "");
 }
 
+// §38.25 flushes "the output buffers for the file(s) specified by the
+// multichannel descriptor", and §38.28's vpi_mcd_printf() is what fills them -
+// the Related routines name it. The tests above write the buffers through the
+// context, which leaves the routine observed flushing text no VPI call had put
+// there; a print puts it there here, and what the flush commits is what the
+// print left pending.
+TEST_F(VpiMcdFlushSim, WhatAPrintLeftOnAChannelIsWhatTheFlushCommits) {
+  char name[] = "printed.log";
+  PLI_UINT32 mcd = vpi_mcd_open(name);
+  ASSERT_NE(mcd, 0u);
+
+  char format[] = "%s=%d\n";
+  char label[] = "count";
+  ASSERT_EQ(vpi_mcd_printf(mcd, format, label, 3), 8);
+  ASSERT_EQ(vpi_ctx_.McdChannelBuffer(mcd), "count=3\n");
+
+  EXPECT_EQ(vpi_mcd_flush(mcd), 0);
+  EXPECT_EQ(vpi_ctx_.McdChannelBuffer(mcd), "");
+  EXPECT_EQ(vpi_ctx_.McdChannelFlushed(mcd), "count=3\n");
+}
+
+// §38.27: "The channel descriptor 1 (LSB) is reserved for representing the
+// output channel of the tool that invoked the PLI application and the log
+// file", so an mcd naming channel 1 names those, and flushing it flushes the
+// buffers §38.5's vpi_flush() commits. Channel 1 had a buffer of its own, so
+// what a print put on it was flushed to somewhere the tool's own output never
+// reached.
+TEST_F(VpiMcdFlushSim, FlushingChannelOneCommitsTheToolsOutputChannelAndLog) {
+  char format[] = "through-channel-one\n";
+  ASSERT_EQ(vpi_mcd_printf(1, format), 20);
+  ASSERT_EQ(vpi_ctx_.OutputChannelBuffer(), "through-channel-one\n");
+  ASSERT_EQ(vpi_ctx_.LogFileBuffer(), "through-channel-one\n");
+
+  EXPECT_EQ(vpi_mcd_flush(1), 0);
+
+  EXPECT_TRUE(vpi_ctx_.OutputChannelBuffer().empty());
+  EXPECT_TRUE(vpi_ctx_.LogFileBuffer().empty());
+  EXPECT_EQ(vpi_ctx_.OutputChannelFlushed(), "through-channel-one\n");
+  EXPECT_EQ(vpi_ctx_.LogFileFlushed(), "through-channel-one\n");
+}
+
+// §38.25: a flush that cannot complete reports failure. Channel 1's flush is
+// the tool's own, so a tool-level flush failure is reported through this
+// routine too and its pending text is kept.
+TEST_F(VpiMcdFlushSim, AToolFlushFailureIsReportedForChannelOne) {
+  char format[] = "pending\n";
+  ASSERT_EQ(vpi_mcd_printf(1, format), 8);
+  vpi_ctx_.SetFlushShouldFail(true);
+
+  EXPECT_NE(vpi_mcd_flush(1), 0);
+  EXPECT_EQ(vpi_ctx_.OutputChannelBuffer(), "pending\n");
+}
+
 }  // namespace
 }  // namespace delta

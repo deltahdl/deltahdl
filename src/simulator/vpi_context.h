@@ -421,9 +421,7 @@ class VpiContext {
   // a single channel (the one set bit naming the file); the accessors report
   // what is still pending on a channel and what a flush has committed; the
   // failure hook forces the next flush down its nonzero return.
-  void WriteMcdChannel(PLI_UINT32 channel, std::string_view text) {
-    mcd_channel_buffers_[channel].append(text);
-  }
+  void WriteMcdChannel(PLI_UINT32 channel, std::string_view text);
   const std::string& McdChannelBuffer(PLI_UINT32 channel) const {
     auto it = mcd_channel_buffers_.find(channel);
     return it == mcd_channel_buffers_.end() ? kEmptyMcdBuffer : it->second;

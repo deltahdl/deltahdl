@@ -330,6 +330,25 @@ int VpiContext::Flush() {
 // is what tells the two apart in the file namespace they share.
 constexpr PLI_UINT32 kVpiFdDescriptorChannel = PLI_UINT32{1} << 31;
 
+// §38.27: "The channel descriptor 1 (LSB) is reserved for representing the
+// output channel of the tool that invoked the PLI application and the log file
+// (if one is currently open)."
+constexpr PLI_UINT32 kVpiToolOutputChannel = 1;
+
+void VpiContext::WriteMcdChannel(PLI_UINT32 channel, std::string_view text) {
+  // §38.27: channel 1 is the tool's output channel and log file, so writing to
+  // it is writing to those - the same pair §38.30's vpi_printf() writes and
+  // §38.5's vpi_flush() commits. It had a buffer of its own here, so text a
+  // vpi_mcd_printf() put on channel 1 went where neither of those routines
+  // could reach it.
+  if (channel == kVpiToolOutputChannel) {
+    WriteOutputChannel(text);
+    WriteLogFile(text);
+    return;
+  }
+  mcd_channel_buffers_[channel].append(text);
+}
+
 PLI_UINT32 VpiContext::McdOpen(const std::string& filename) {
   // §38.27: a file already open in the shared mcd namespace - whether a prior
   // vpi_mcd_open() assigned it or $fopen seeded it - is reported on the very
@@ -477,6 +496,14 @@ PLI_INT32 VpiContext::McdFlush(PLI_UINT32 mcd) {
   for (int bit = 0; bit < 32; ++bit) {
     PLI_UINT32 channel = PLI_UINT32{1} << bit;
     if ((mcd & channel) == 0) continue;
+    // §38.27: channel 1 is the tool's output channel and log file, so an mcd
+    // naming it flushes those - the buffers §38.5's vpi_flush() commits -
+    // rather than a file of its own. Looked for among the channel buffers, it
+    // found none and flushed nothing.
+    if (channel == kVpiToolOutputChannel) {
+      if (Flush() != 0) return 1;
+      continue;
+    }
     auto it = mcd_channel_buffers_.find(channel);
     if (it == mcd_channel_buffers_.end()) continue;
     mcd_channel_flushed_[channel].append(it->second);
