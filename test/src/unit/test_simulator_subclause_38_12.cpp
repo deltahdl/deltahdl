@@ -143,5 +143,58 @@ TEST_F(VpiGetSystfInfoSim, NonCallbackHandleLeavesDestinationUnchanged) {
   EXPECT_STREQ(out.tfname, "untouched");
 }
 
+// §38.12 Arguments: obj is a handle to the system task or function *callback* -
+// the object vpi_register_systf() handed back. The object an application holds
+// while its calltf runs is a different one: §37.42 detail 3 reaches the system
+// task call itself through vpi_handle(vpiSysTfCall, NULL), and a call is not
+// the registration, so the routine reports nothing for it. This is the nearest
+// thing to a systf callback that is not one.
+TEST_F(VpiGetSystfInfoSim, ASystemTaskCallIsNotTheCallbackTheRoutineReports) {
+  s_vpi_systf_data registered = {};
+  registered.type = vpiSysTask;
+  registered.tfname = "$measure";
+  ASSERT_NE(vpi_register_systf(&registered), nullptr);
+
+  VpiObject call;
+  call.type = vpiSysTaskCall;
+  call.name = "$measure";
+
+  s_vpi_systf_data out = {};
+  out.tfname = "untouched";
+  vpi_get_systf_info(&call, &out);
+
+  EXPECT_STREQ(out.tfname, "untouched");
+}
+
+// §38.12 reports the registration, which reading does not consume: the same
+// handle answers the same way however often it is asked, and a structure the
+// caller has since written over is filled again rather than left as it was.
+TEST_F(VpiGetSystfInfoSim, TheRegistrationIsReportedAsOftenAsItIsAsked) {
+  int payload = 9;
+  s_vpi_systf_data registered = {};
+  registered.type = vpiSysFunc;
+  registered.sysfunctype = vpiIntFunc;
+  registered.tfname = "$probe";
+  registered.calltf = &InfoStubCall;
+  registered.user_data = &payload;
+
+  vpiHandle h = vpi_register_systf(&registered);
+  ASSERT_NE(h, nullptr);
+
+  s_vpi_systf_data out = {};
+  vpi_get_systf_info(h, &out);
+  ASSERT_STREQ(out.tfname, "$probe");
+
+  out.tfname = "overwritten";
+  out.calltf = nullptr;
+  out.user_data = nullptr;
+  vpi_get_systf_info(h, &out);
+
+  EXPECT_STREQ(out.tfname, "$probe");
+  EXPECT_EQ(out.sysfunctype, vpiIntFunc);
+  EXPECT_EQ(out.calltf, &InfoStubCall);
+  EXPECT_EQ(out.user_data, &payload);
+}
+
 }  // namespace
 }  // namespace delta
