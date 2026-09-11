@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <string>
 #include <vector>
 
@@ -57,6 +58,51 @@ void ExpectOnlyCsIsSignalBearing(const std::vector<FsmPragmaInfo>& pragmas) {
     }
   }
   EXPECT_EQ(signal_bearing, 1);
+}
+
+// Whether `loc` stands after `other` in the same source.
+bool IsAfter(SourceLoc loc, SourceLoc other) {
+  return loc.line > other.line ||
+         (loc.line == other.line && loc.column > other.column);
+}
+
+// §40.4.5's rule applied to what the lexer records, rather than to a list of
+// names the case already knew: the clause speaks of "the first signal following
+// the pragma" and "the next signal", so the pragma's own recorded location is
+// what says which identifiers follow it, and the semicolon ending the
+// declaration is what bounds the ones the clause is speaking of. A case that
+// instead filtered every identifier in the file by the names it expected would
+// pass over a signal declared before the pragma or after the declaration, and
+// would say nothing about following.
+std::vector<std::string> NamesFollowingEnumPragma(const std::string& src) {
+  SourceManager mgr;
+  DiagEngine diag(mgr);
+  auto fid = mgr.AddFile("<test>", src);
+  Lexer lexer(mgr.FileContent(fid), fid, diag);
+  auto tokens = lexer.LexAll();
+
+  SourceLoc pragma_loc;
+  for (const auto& p : lexer.FsmStatePragmas()) {
+    if (p.form == Lexer::FsmStatePragma::Form::kEnumOnly) {
+      pragma_loc = p.loc;
+      break;
+    }
+  }
+
+  size_t i = 0;
+  while (i < tokens.size() && !IsAfter(tokens[i].loc, pragma_loc)) {
+    ++i;
+  }
+  std::vector<std::string> names;
+  for (; i < tokens.size(); ++i) {
+    if (tokens[i].kind == TokenKind::kSemicolon) {
+      break;
+    }
+    if (tokens[i].kind == TokenKind::kIdentifier) {
+      names.push_back(std::string(tokens[i].text));
+    }
+  }
+  return names;
 }
 
 // Collects the identifiers from `src` that belong to `names`, in declaration
@@ -179,6 +225,28 @@ TEST(FsmSameDeclarationPragmaLexing, MultipleTrailingSignalsAreAllIgnored) {
   EXPECT_EQ(decl_order[1], "ns");     // next state
   EXPECT_EQ(decl_order[2], "idle");   // ignored
   EXPECT_EQ(decl_order[3], "extra");  // ignored
+}
+
+// R1 + R2 read off the lexer's own record rather than off a list of names the
+// case supplied: the enum pragma's location says which identifiers follow it,
+// and the declaration it sits in says where they stop. The signals declared
+// before the pragma and the ones declared after the declaration are neither the
+// first signal following it nor the next, so the rule reaches neither - which
+// is what tells this apart from reading the file's identifiers in order.
+TEST(FsmSameDeclarationPragmaLexing, TheRuleReachesTheSignalsFollowingPragma) {
+  const std::string kSrc =
+      "module fsm;\n"
+      "  logic [1:0] before_decl;\n"
+      "  /* tool state_vector cs */\n"
+      "  logic [1:0] /* tool enum myFSM */ cs, ns, nonstate;\n"
+      "  logic [1:0] after_decl;\n"
+      "endmodule\n";
+
+  auto following = NamesFollowingEnumPragma(kSrc);
+  ASSERT_EQ(following.size(), 3u);
+  EXPECT_EQ(following[0], "cs");        // the first signal: the current state
+  EXPECT_EQ(following[1], "ns");        // the next signal: the next state
+  EXPECT_EQ(following[2], "nonstate");  // nothing is assumed about this one
 }
 
 }  // namespace
