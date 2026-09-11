@@ -424,11 +424,21 @@ class CoverageControlState {
         }
         return CoverageStatus::kOk;
       case CoverageControl::kReset:
-        // `SV_COV_RESET clears collected coverage; it has no effect when no
-        // coverage has been collected, so repeated resets do nothing after the
-        // first. The operation reports success regardless.
-        if (s.has_data) {
+        // `SV_COV_RESET "resets all available coverage information in the
+        // specified hierarchy", and the covered-item counts are that
+        // information: they are what §40.3.2.3 reads back as the current
+        // coverage value, so a reset leaves that value reporting that nothing
+        // has been covered rather than the count it stood at. The
+        // coverable-item counts §40.3.2.2 reports are not coverage information
+        // but a property of the design structure, and a reset leaves them
+        // alone, since that value "shall remain constant across the duration of
+        // the simulation" - which is what keeps coverage% a fraction of the
+        // same whole after a reset as before one. The reset has no effect when
+        // there is nothing collected to clear, so repeated resets do nothing
+        // after the first.
+        if (s.has_data || !s.covered_items.empty()) {
           s.has_data = false;
+          s.covered_items.clear();
           ++s.resets;
         }
         return CoverageStatus::kOk;

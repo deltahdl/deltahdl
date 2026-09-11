@@ -66,6 +66,20 @@ CoverageControlState& Cov(SimFixture& f) {
   return f.ctx.GetCoverageControlState();
 }
 
+// §40.3.1 control constant used to change what has been collected.
+constexpr int kResetControl = 2;
+
+// Drives a $coverage_control action over a scope through the production
+// evaluator, so what a later $coverage_get reports is read back after a real
+// change to the collection state rather than after one made in the model.
+void RunControl(SimFixture& f, int control, std::string_view scope) {
+  auto* call = MkSysCall(
+      f.arena, "$coverage_control",
+      {MkInt(f.arena, static_cast<uint64_t>(control)), MkInt(f.arena, kToggle),
+       MkInt(f.arena, kHier), MkStr(f.arena, scope)});
+  EvalExpr(call, f.ctx, f.arena);
+}
+
 // +pos_num: with covered items of the requested type, get returns the current
 // count covered, and the coverage_type argument selects which count is
 // reported.
@@ -162,6 +176,50 @@ TEST(CoverageGet, ADefinitionNameSumsOverEveryInstanceOfThatModule) {
 
   EXPECT_EQ(RunGet(f, kToggle, kHier, "leaf"), 14);
   EXPECT_EQ(RunGet(f, kToggle, kModule, "leaf"), 6);
+}
+
+// The value this query obtains is the *current* one, and §40.3.2.1's
+// `SV_COV_RESET "resets all available coverage information in the specified
+// hierarchy": what the covered-item counts hold is that information, so after a
+// reset the query reports that nothing of the type has been covered rather than
+// the count it stood at. `SV_COV_NOCOV is how that reads back, since a current
+// coverage value is a pos_num strictly greater than zero - and it is
+// `SV_COV_NOCOV rather than `SV_COV_ERROR because the reset cleared the scope's
+// coverage rather than removing the scope. The reset walks the hierarchy the
+// scope_def names, on the same reading of Table 40-2 the query uses, so it
+// reaches what is below the named instance and nothing outside it.
+TEST(CoverageGet, ResettingCoverageClearsTheCurrentValue) {
+  SimFixture f;
+  Cov(f).SetAvailability("top.dut", CoverageAvailability::kFull);
+  Cov(f).SetAvailability("top.dut.u1", CoverageAvailability::kFull);
+  Cov(f).SetCoveredItems("top.dut", kToggle, 5);
+  Cov(f).SetCoveredItems("top.dut.u1", kToggle, 3);
+  Cov(f).SetCoveredItems("top.other", kToggle, 100);
+  EXPECT_EQ(RunGet(f, kToggle, kHier, "top.dut"), 8);
+
+  RunControl(f, kResetControl, "top.dut");
+
+  EXPECT_EQ(RunGet(f, kToggle, kHier, "top.dut"), kNoCov);
+  EXPECT_EQ(RunGet(f, kToggle, kModule, "top.dut"), kNoCov);
+  EXPECT_EQ(RunGet(f, kToggle, kHier, "top.other"), 100);
+}
+
+// §40.3.2.2's maximum "shall remain constant across the duration of the
+// simulation", so a reset that clears the current coverage value leaves the
+// coverable items it is a fraction of untouched: the scope still offers the
+// same 100% after the reset as before it, which is what makes coverage% =
+// coverage_get()/coverage_get_max() * 100 read 0% rather than become
+// undefined.
+TEST(CoverageGet, ResettingTheCurrentValueLeavesTheMaximumStanding) {
+  SimFixture f;
+  Cov(f).SetAvailability(std::string(kScope), CoverageAvailability::kFull);
+  Cov(f).SetCoverableItems(std::string(kScope), kToggle, 48);
+  Cov(f).SetCoveredItems(std::string(kScope), kToggle, 30);
+
+  RunControl(f, kResetControl, kScope);
+
+  EXPECT_EQ(RunGet(f, kToggle, kHier, kScope), kNoCov);
+  EXPECT_EQ(Cov(f).CoverageMax(std::string(kScope), kToggle), 48);
 }
 
 }  // namespace
