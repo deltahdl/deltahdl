@@ -17,49 +17,30 @@
 
 namespace delta {
 
-bool VpiIsVariableDriverType(int type) {
-  // §37.21 (figure, variable drivers): the kinds that drive a variable - a
-  // port, a force, a continuous assignment, a single bit of a continuous
-  // assignment, or a procedural assignment statement.
-  switch (type) {
-    case vpiPort:
-    case vpiForce:
-    case vpiContAssign:
-    case vpiContAssignBit:
-    case vpiAssignStmt:
-      return true;
-    default:
-      return false;
-  }
-}
-
-bool VpiIsVariableLoadType(int type) {
-  // §37.21 (figure, variable loads): the kinds that read a variable. The figure
-  // lists the driver kinds without a port - an assignment statement, a force,
-  // and a continuous assignment or single bit of one - because a port only ever
-  // drives a variable, it never loads it.
-  switch (type) {
-    case vpiForce:
-    case vpiContAssign:
-    case vpiContAssignBit:
-    case vpiAssignStmt:
-      return true;
-    default:
-      return false;
-  }
-}
-
 // ===========================================================================
 // §37.46 Net drivers and loads.
 // ===========================================================================
+
+bool VpiIsPortsType(int type) {
+  // §37.46 (figure): the `ports` enclosure inside both the net drivers and the
+  // net loads classes is dotted, so §37.4.1 makes it a class - a grouping of
+  // "other objects and classes" that is never an object itself. §37.14 draws a
+  // port and a port bit inside it, and §37.4.1 has a relation drawn to a class
+  // reach the kinds the class groups, so both are what the two edges mean by a
+  // port.
+  return type == vpiPort || type == vpiPortBit;
+}
 
 bool VpiIsNetDriverType(int type) {
   // §37.46 (figure, net drivers): a port, a force, a delay terminal, a
   // continuous assignment (whole or single bit), or a primitive terminal.
   // Unlike a variable (§37.21) a net is not driven by a procedural assignment
   // statement.
+  //
+  // The ports enclosure was read as the single kind vpiPort, so a port bit
+  // driving a net was a driver to nothing.
+  if (VpiIsPortsType(type)) return true;
   switch (type) {
-    case vpiPort:
     case vpiForce:
     case vpiDelayTerm:
     case vpiContAssign:
@@ -108,7 +89,7 @@ bool VpiPortIsComplexExpressionLoad(VpiHandle port) {
   // concatenation's operands connect their nets individually, and only an input
   // port loads this way. The complex expression itself is reached through
   // vpiHighConn (§37.14).
-  if (!port || port->type != vpiPort) return false;
+  if (!port || !VpiIsPortsType(port->type)) return false;
   if (port->direction != vpiInput) return false;
   VpiObject* expr = port->high_conn;
   if (!expr || expr->type != vpiOperation) return false;
@@ -145,7 +126,7 @@ void CollectNetDriversOrLoads(VpiObject* node, bool want_driver,
   for (auto* child : node->children) {
     if (want_driver) {
       if (VpiIsNetDriverType(child->type)) iter->children.push_back(child);
-    } else if (child->type == vpiPort) {
+    } else if (VpiIsPortsType(child->type)) {
       if (VpiPortIsComplexExpressionLoad(child))
         iter->children.push_back(child);
     } else if (VpiIsNetLoadType(child->type)) {

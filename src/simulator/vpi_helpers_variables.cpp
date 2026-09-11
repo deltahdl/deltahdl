@@ -894,4 +894,41 @@ VpiHandle VpiParameterRightRange(VpiHandle parameter) {
 // §37.29 Virtual interface.
 // ===========================================================================
 
+// ===========================================================================
+// §37.21 Variable drivers and loads: the two kind sets the figure's classes
+// group.
+// ===========================================================================
+
+bool VpiIsVariableDriverType(int type) {
+  // §37.21 (figure, variable drivers): the kinds that drive a variable - a
+  // port, a force, a continuous assignment, a single bit of a continuous
+  // assignment, or a procedural assignment statement.
+  switch (type) {
+    case vpiPort:
+    case vpiForce:
+    case vpiContAssign:
+    case vpiContAssignBit:
+    case vpiAssignStmt:
+      return true;
+    default:
+      return false;
+  }
+}
+
+bool VpiIsVariableLoadType(int type) {
+  // §37.21 (figure, variable loads): the kinds that read a variable. The figure
+  // lists the driver kinds without a port - an assignment statement, a force,
+  // and a continuous assignment or single bit of one - because a port only ever
+  // drives a variable, it never loads it.
+  switch (type) {
+    case vpiForce:
+    case vpiContAssign:
+    case vpiContAssignBit:
+    case vpiAssignStmt:
+      return true;
+    default:
+      return false;
+  }
+}
+
 }  // namespace delta

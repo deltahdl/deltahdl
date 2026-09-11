@@ -270,5 +270,61 @@ TEST(NetDriversAndLoads, InputPortWithoutHighConnectionIsNotLoad) {
   EXPECT_FALSE(VpiIterationContains(loads, &port));
 }
 
+// §37.4.1 read on this figure: the `ports` enclosure inside both classes is
+// dotted, so it is a class rather than an object kind, and §37.14 draws a port
+// and a port bit inside it. A relation drawn to a class reaches the kinds the
+// class groups, so a port bit driving a net is a driver of it. The enclosure
+// was read as the single kind vpiPort, so a port bit was a driver to nothing.
+TEST(NetDriversAndLoads, DriverIterationReachesAPortBit) {
+  VpiContext ctx;
+
+  VpiObject port_bit;
+  port_bit.type = vpiPortBit;
+  VpiObject assign_stmt;
+  assign_stmt.type = vpiAssignStmt;  // a net load, never a net driver
+
+  VpiObject net;
+  net.type = kVpiNet;
+  net.children = {&port_bit, &assign_stmt};
+
+  std::vector<VpiHandle> drivers =
+      CollectVpiIteration(ctx, ctx.Iterate(vpiDriver, &net));
+  ASSERT_EQ(drivers.size(), 1u);
+  EXPECT_TRUE(VpiIterationContains(drivers, &port_bit));
+}
+
+// The same reading on the load side, where detail 1 decides which ports are
+// loads: a port bit carrying a complex expression on an input is a load of the
+// nets that expression reads, exactly as a whole port is.
+TEST(NetDriversAndLoads, LoadIterationReachesAPortBitWithAComplexExpression) {
+  VpiContext ctx;
+
+  VpiObject expr;
+  expr.type = vpiOperation;
+  expr.op_type = vpiNotOp;  // complex, and not a concatenation
+
+  VpiObject port_bit;
+  port_bit.type = vpiPortBit;
+  port_bit.direction = vpiInput;
+  port_bit.high_conn = &expr;
+
+  VpiObject plain_bit;
+  plain_bit.type = vpiPortBit;
+  plain_bit.direction = vpiInput;  // no complex expression: not a load
+
+  VpiObject net;
+  net.type = kVpiNet;
+  net.children = {&port_bit, &plain_bit};
+
+  std::vector<VpiHandle> loads =
+      CollectVpiIteration(ctx, ctx.Iterate(vpiLoad, &net));
+  ASSERT_EQ(loads.size(), 1u);
+  EXPECT_TRUE(VpiIterationContains(loads, &port_bit));
+
+  // Detail 1: "Access to the complex expression shall be available using
+  // vpi_handle(vpiHighConn, portH)".
+  EXPECT_EQ(ctx.Handle(vpiHighConn, loads[0]), &expr);
+}
+
 }  // namespace
 }  // namespace delta
