@@ -7,9 +7,24 @@
 namespace delta {
 namespace {
 
+// A cbEndOfRestart routine that re-establishes the user-data field, which
+// §38.33 says an application may do during or after such a callback. The
+// handle and the value it associates are file-scope so the routine, whose
+// signature the standard fixes, can reach them.
+VpiHandle g_restored_call = nullptr;
+int g_restored_value = 0;
+bool g_restore_ran = false;
+int RestoreUserData(VpiCbData*) {
+  g_restore_ran = true;
+  vpi_put_userdata(g_restored_call, &g_restored_value);
+  return 0;
+}
+
 class VpiPutUserDataSim : public ::testing::Test {
  protected:
   void SetUp() override {
+    g_restored_call = nullptr;
+    g_restore_ran = false;
     vpi_ctx_.SetScheduler(&scheduler_);
     SetGlobalVpiContext(&vpi_ctx_);
   }
@@ -37,7 +52,7 @@ TEST_F(VpiPutUserDataSim, AssociatesUserDataWithFunctionCall) {
   int marker = 0;
 
   EXPECT_EQ(vpi_put_userdata(call, &marker), 1);
-  EXPECT_EQ(call->user_data, &marker);
+  EXPECT_EQ(vpi_get_userdata(call), &marker);
   EXPECT_EQ(vpi_ctx_.LastError().level, 0);
 }
 
@@ -49,7 +64,7 @@ TEST_F(VpiPutUserDataSim, NullUserDataValueStillSucceeds) {
   VpiHandle call = MakeCall(vpiSysFuncCall);
 
   EXPECT_EQ(vpi_put_userdata(call, nullptr), 1);
-  EXPECT_EQ(call->user_data, nullptr);
+  EXPECT_EQ(vpi_get_userdata(call), nullptr);
   EXPECT_EQ(vpi_ctx_.LastError().level, 0);
 }
 
@@ -71,7 +86,8 @@ TEST_F(VpiPutUserDataSim, NonCallHandleIsRejected) {
 
   EXPECT_EQ(vpi_put_userdata(module, &marker), 0);
   EXPECT_EQ(vpi_ctx_.LastError().level, kVpiError);
-  EXPECT_EQ(module->user_data, nullptr);  // left unassociated
+  // §38.14 reads the same storage, and a module has none to have been written.
+  EXPECT_EQ(vpi_get_userdata(module), nullptr);  // left unassociated
 }
 
 // §38.33 (the lone 'shall'): after a restart, a vpi_get_userdata() shall return
@@ -81,11 +97,11 @@ TEST_F(VpiPutUserDataSim, RestartClearsUserData) {
   VpiHandle call = MakeCall(vpiSysFuncCall);
   int marker = 0;
   ASSERT_EQ(vpi_put_userdata(call, &marker), 1);
-  ASSERT_EQ(call->user_data, &marker);
+  ASSERT_EQ(vpi_get_userdata(call), &marker);
 
   vpi_ctx_.DispatchRestart();
 
-  EXPECT_EQ(call->user_data, nullptr);
+  EXPECT_EQ(vpi_get_userdata(call), nullptr);
 }
 
 // §38.33 (the lone 'shall'): a reset clears the user-data association the same
@@ -94,11 +110,36 @@ TEST_F(VpiPutUserDataSim, ResetClearsUserData) {
   VpiHandle call = MakeCall(vpiSysTaskCall);
   int marker = 0;
   ASSERT_EQ(vpi_put_userdata(call, &marker), 1);
-  ASSERT_EQ(call->user_data, &marker);
+  ASSERT_EQ(vpi_get_userdata(call), &marker);
 
   vpi_ctx_.DispatchReset();
 
-  EXPECT_EQ(call->user_data, nullptr);
+  EXPECT_EQ(vpi_get_userdata(call), nullptr);
+}
+
+// §38.33's last sentence: "The user-data field can be set up again during or
+// after callbacks of type cbEndOfRestart or cbEndOfReset." A restart clears the
+// field before those callbacks run, so a routine that sets it while one is
+// being delivered leaves it set afterwards rather than having its write dropped
+// by the clear.
+TEST_F(VpiPutUserDataSim, TheFieldCanBeSetUpAgainFromAnEndOfRestartCallback) {
+  VpiHandle call = MakeCall(vpiSysTaskCall);
+  int before_restart = 0;
+  ASSERT_EQ(vpi_put_userdata(call, &before_restart), 1);
+
+  g_restored_call = call;
+  s_cb_data cb = {};
+  cb.reason = cbEndOfRestart;
+  cb.cb_rtn = RestoreUserData;
+  ASSERT_NE(vpi_register_cb(&cb), nullptr);
+
+  vpi_ctx_.DispatchRestart();
+
+  // The value the callback put there is what a later read finds - not the one
+  // from before the restart, which the clear dropped, and not null.
+  ASSERT_TRUE(g_restore_ran);
+  EXPECT_EQ(vpi_get_userdata(call), &g_restored_value);
+  EXPECT_NE(vpi_get_userdata(call), &before_restart);
 }
 
 }  // namespace
