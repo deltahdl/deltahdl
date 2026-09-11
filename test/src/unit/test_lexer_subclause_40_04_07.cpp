@@ -6,6 +6,7 @@
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "helpers_fsm_pragma_lexing.h"
+#include "helpers_reported_error.h"
 #include "lexer/lexer.h"
 
 using namespace delta;
@@ -192,6 +193,73 @@ TEST(FsmOneLineCommentPragmaLexing,
   EXPECT_TRUE(pragmas[0].has_enum);
   EXPECT_EQ(pragmas[0].enum_name, "myFSM");
   EXPECT_TRUE(pragmas[0].signal.empty());
+}
+
+// Working in a one-line comment is more than being recognized in one. Every
+// rule §40.4.4 through §40.4.6 states is read off where the pragma stands -
+// §40.4.6 puts it immediately after the parameter bit width, §40.4.5 takes the
+// signals following it - so a `//` comment that surfaced the pragma at some
+// other place would bind the FSM to a declaration nobody annotated, and a case
+// counting pragmas would not see it. The LRM's own §40.4.7 example is §40.4.6's
+// bit-width placement written after `//`, and it answers both questions the way
+// the block comment does: the closing bracket of the width stands before the
+// pragma, and the possible states are the names following it, as far as the
+// semicolon ending the declaration. A parameter declared ahead of the pragma is
+// none of them, so the states are read from where the pragma is rather than
+// from a list of names the case already held.
+TEST(FsmOneLineCommentPragmaLexing, TheOneLineFormStandsWhereTheBlockFormDoes) {
+  const std::string kOneLine =
+      "module fsm;\n"
+      "  parameter OTHER = 9;\n"
+      "  parameter [1:0] // tool enum myFSM\n"
+      "    S0 = 0, s1 = 1, s2 = 2, s3 = 3;\n"
+      "endmodule\n";
+  const std::string kBlock =
+      "module fsm;\n"
+      "  parameter OTHER = 9;\n"
+      "  parameter [1:0] /* tool enum myFSM */\n"
+      "    S0 = 0, s1 = 1, s2 = 2, s3 = 3;\n"
+      "endmodule\n";
+  const std::vector<std::string> kPossibleStates = {"S0", "s1", "s2", "s3"};
+
+  EXPECT_EQ(KindBeforeEnumPragma(kOneLine), TokenKind::kRBracket);
+  EXPECT_EQ(NamesFollowingEnumPragma(kOneLine), kPossibleStates);
+
+  // "Both" is the clause's own word, so the two comment forms are asked the
+  // same two questions and have to give the same two answers.
+  EXPECT_EQ(KindBeforeEnumPragma(kBlock), KindBeforeEnumPragma(kOneLine));
+  EXPECT_EQ(NamesFollowingEnumPragma(kBlock),
+            NamesFollowingEnumPragma(kOneLine));
+}
+
+// What the recognizer says about a pragma is part of what works in both comment
+// forms. A §40.4.3 concatenation holding a part-select is an FSM its author
+// meant to specify, and the prohibition that stopped it being one is the tool's
+// one report about such a comment. Following `//` it is the same pragma, so the
+// same warning is reported against it, at the line the `//` stands on. A
+// one-line path that reached the recognizer with a body it had cut short would
+// leave this silent while the block-comment case went on passing.
+TEST(FsmOneLineCommentPragmaLexing,
+     ProhibitedSelectIsReportedFromAOneLineComment) {
+  const std::string kSrc =
+      "module fsm;\n"
+      "  logic [3:0] wide;\n"
+      "  logic bit_lo;\n"
+      "  // tool state_vector {wide[3:0], bit_lo} one_line_fsm enum line_e\n"
+      "endmodule\n";
+
+  SourceManager mgr;
+  DiagEngine diag(mgr);
+  auto fid = mgr.AddFile("<test>", kSrc);
+  Lexer lexer(mgr.FileContent(fid), fid, diag);
+  lexer.LexAll();
+
+  EXPECT_TRUE(lexer.FsmConcatPragmas().empty());
+  EXPECT_TRUE(ReportedWarning(
+      diag.Diagnostics(),
+      "bit-select or part-select cannot be used in an FSM state_vector "
+      "concatenation",
+      LineHolding(kSrc, "// tool state_vector"), "40.4.3"));
 }
 
 }  // namespace
