@@ -746,6 +746,9 @@ void VpiContext::Attach(SimContext& sim_ctx, const RtlirDesign* design) {
   RecordVariableObjectKinds(design, object_map_);
   RecordDeclarationSourceLocations(design, object_map_, SourcesOf(sim_ctx_));
   AttachTopModules(design);
+  // §37.23: the scope a nettype declaration hangs in is the one the top has
+  // just adopted, so the declarations are made once those scopes are final.
+  AttachNettypeDeclarations(design);
 }
 
 namespace {
@@ -765,6 +768,74 @@ void PrefixFullNamesWithTop(VpiObject* obj, std::string_view top) {
 }
 
 }  // namespace
+
+VpiObject* VpiContext::NettypeDeclarationIn(VpiHandle scope,
+                                            const RtlirNet& net) {
+  // §37.23: one declaration object per nettype name in the scope, since every
+  // net declared with that nettype names the same declaration.
+  for (auto* child : scope->children) {
+    if (child->type == vpiNetTypedef && child->name == net.nettype_name) {
+      return child;
+    }
+  }
+
+  name_pool_.emplace_back(net.nettype_name);
+  auto* decl = AllocObject();
+  decl->type = vpiNetTypedef;
+  decl->name = name_pool_.back();
+  decl->full_name =
+      scope->full_name.empty()
+          ? std::string(net.nettype_name)
+          : scope->full_name + "." + std::string(net.nettype_name);
+  decl->parent = scope;
+  scope->children.push_back(decl);
+
+  // §37.23 detail 1: "If the nettype declaration has no associated resolution
+  // function, the vpiWith relation shall return NULL." A declaration written
+  // with one reaches the function the clause draws vpiWith to.
+  if (!net.resolve_func.empty()) {
+    name_pool_.emplace_back(net.resolve_func);
+    auto* func = AllocObject();
+    func->type = vpiFunction;
+    func->name = name_pool_.back();
+    func->parent = scope;
+    // The function is reached through vpiWith and through nothing else: it is
+    // not hung among the scope's children, because a scope's vpiFunction
+    // iteration reports the functions the scope declares and §6.6.7 lets the
+    // with clause name one declared in a package or a class instead.
+    decl->nettype_with = func;
+  }
+  return decl;
+}
+
+void VpiContext::AttachNettypeDeclarations(const RtlirDesign* design) {
+  // §37.23 draws a "nettype decl" object carrying the declaration's name, the
+  // resolution function it was written "with", and the nettype it aliases. No
+  // pass built one, so the object the whole subclause is about did not exist in
+  // any run: §37.10 detail 1's vpiNetTypedef iteration over an instance reached
+  // nothing, and the two details' rules stood over objects a test made.
+  //
+  // §6.6.7's declaration reaches elaboration on the nets declared with it - the
+  // nettype's name and its resolution function travel on RtlirNet - so one
+  // declaration object is made per nettype name in the scope its nets stand in.
+  //
+  // Detail 2's vpiNetTypedefAlias is left null: elaboration resolves an alias
+  // chain to the source nettype's resolution function and keeps no record of
+  // the chain, so which declaration an alias named is not something a run can
+  // still answer.
+  if (design == nullptr) return;
+
+  WalkInstancePaths(
+      design, [&](const RtlirModule* mod, const std::string& prefix) {
+        for (const RtlirNet& net : mod->nets) {
+          if (!net.is_user_nettype || net.nettype_name.empty()) continue;
+          VpiHandle obj =
+              FindObjectForFlatName(object_map_, VpiFlatName(prefix, net.name));
+          if (obj == nullptr || obj->parent == nullptr) continue;
+          NettypeDeclarationIn(obj->parent, net);
+        }
+      });
+}
 
 void VpiContext::AttachTopModules(const RtlirDesign* design) {
   // §37.5 detail 1: "Top-level modules shall be accessed using vpi_iterate()

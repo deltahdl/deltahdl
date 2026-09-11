@@ -750,6 +750,11 @@ class VpiContext {
   void AttachModulePathDelays(SimContext& sim_ctx);
   void AttachModuleDefNames(SimContext& sim_ctx);
 
+  // §37.23: the declaration object a design's user-defined nettype stands as,
+  // and the pass that makes one per nettype. In vpi_design_attach.cpp.
+  void AttachNettypeDeclarations(const RtlirDesign* design);
+  VpiObject* NettypeDeclarationIn(VpiHandle scope, const RtlirNet& net);
+
   // §37.3.4: the source-written delay expression each delay-carrying object of
   // the design reaches through vpiDelay, and the one a net's declaration wrote.
   // Both are written in vpi_design_attach.cpp.
