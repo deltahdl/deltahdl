@@ -5,6 +5,8 @@
 
 #include "simulator/dpi_runtime.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi.h"
+#include "simulator/vpi_assertion_cb.h"
 
 using namespace delta;
 
@@ -193,6 +195,112 @@ TEST(GlobalClockingFutureCallback, NoTickAfterEventNeverFires) {
   EXPECT_EQ(api.AdvanceGlobalClockTick(1000), 0u);
   EXPECT_EQ(fired, 0);
   EXPECT_EQ(api.PendingGlobalClockingCallbackCount(), 1u);
+}
+
+// -----------------------------------------------------------------------------
+// §39.4.2.1 through the routine an application places: cb_time is the second
+// argument of the callback function of §39.4.2, so "cb_time contains the time
+// of the callback event" is a statement about what that routine is handed when
+// the deferred callback finally executes.
+// -----------------------------------------------------------------------------
+
+struct DeferredCall {
+  PLI_INT32 reason = 0;
+  PLI_UINT32 cb_time_low = 0;
+  bool carried_info = false;
+  PLI_UINT32 attempt_start_low = 0;
+};
+
+std::vector<DeferredCall> g_deferred_calls;
+
+PLI_INT32 RecordDeferredCall(PLI_INT32 reason, s_vpi_time* cb_time, vpiHandle,
+                             p_vpi_attempt_info info, PLI_BYTE8*) {
+  DeferredCall call;
+  call.reason = reason;
+  call.cb_time_low = cb_time->low;
+  call.carried_info = info != nullptr;
+  if (info != nullptr) call.attempt_start_low = info->attempt_start_time.low;
+  g_deferred_calls.push_back(call);
+  return 0;
+}
+
+class GlobalClockingFutureCallbackEntry : public ::testing::Test {
+ protected:
+  void SetUp() override {
+    g_deferred_calls.clear();
+    SetGlobalVpiContext(&vpi_ctx_);
+    SetGlobalAssertionApi(&api_);
+  }
+  void TearDown() override {
+    SetGlobalAssertionApi(nullptr);
+    SetGlobalVpiContext(nullptr);
+  }
+
+  VpiContext vpi_ctx_;
+  AssertionApi api_;
+};
+
+// §39.4.2.1, the clause's own example: the assertion refers to a global
+// clocking future sampled value function, $assertkill is issued at time 11, and
+// the callback executes at time 12 - the nearest tick of the global clock
+// strictly following the event - rather than at 11. The routine the application
+// placed is handed 11 for cb_time, "the time of the callback event", which is
+// the time the application would otherwise have no way of learning once the
+// execution had moved on to a later tick.
+TEST_F(GlobalClockingFutureCallbackEntry, TheRoutineIsHandedTheEventTime) {
+  vpiHandle assertion = vpi_ctx_.CreateAssertion(kA, vpiAssert);
+  api_.SetGlobalClockTicks({10, 11, 12, 13});
+  api_.MarkAssertionUsesGlobalClockingFuture(kA);
+  ASSERT_NE(vpi_register_assertion_cb(assertion, cbAssertionKill,
+                                      &RecordDeferredCall, nullptr),
+            nullptr);
+
+  AssertionAttemptInfo info;
+  info.attempt_start_time = 10;
+  EXPECT_EQ(
+      api_.DeliverAssertionEventAtGlobalClock(kA, cbAssertionKill, 11, info),
+      0u);
+  EXPECT_TRUE(g_deferred_calls.empty());
+
+  // The tick that coincides with the event is not one that follows it.
+  EXPECT_EQ(api_.AdvanceGlobalClockTick(11), 0u);
+  EXPECT_TRUE(g_deferred_calls.empty());
+
+  EXPECT_EQ(api_.AdvanceGlobalClockTick(12), 1u);
+  ASSERT_EQ(g_deferred_calls.size(), 1u);
+  EXPECT_EQ(g_deferred_calls[0].reason, cbAssertionKill);
+  EXPECT_EQ(g_deferred_calls[0].cb_time_low, 11u);
+  // §39.4.2: a kill callback is one of the reasons whose attempt-information
+  // pointer is NULL, and the deferral does not turn that into something else.
+  EXPECT_FALSE(g_deferred_calls[0].carried_info);
+}
+
+// §39.4.2.1 with a reason that carries attempt information: what waits for the
+// tick is the callback event as it stood, so the attempt the event belonged to
+// is the one reported when the routine finally runs - the start time §39.4.2
+// makes the attempt's unique identifier survives the wait rather than being
+// re-read at the later tick.
+TEST_F(GlobalClockingFutureCallbackEntry, TheDeferredCallKeepsItsAttempt) {
+  vpiHandle assertion = vpi_ctx_.CreateAssertion(kA, vpiAssert);
+  api_.SetGlobalClockTicks({10, 11, 12, 13});
+  api_.MarkAssertionUsesGlobalClockingFuture(kA);
+  ASSERT_NE(vpi_register_assertion_cb(assertion, cbAssertionFailure,
+                                      &RecordDeferredCall, nullptr),
+            nullptr);
+
+  AssertionAttemptInfo info;
+  info.attempt_start_time = 10;
+  info.fail_expr = "req && !ack";
+  ASSERT_EQ(
+      api_.DeliverAssertionEventAtGlobalClock(kA, cbAssertionFailure, 11, info),
+      0u);
+  ASSERT_EQ(api_.AdvanceGlobalClockTick(12), 1u);
+
+  ASSERT_EQ(g_deferred_calls.size(), 1u);
+  EXPECT_EQ(g_deferred_calls[0].reason, cbAssertionFailure);
+  EXPECT_EQ(g_deferred_calls[0].cb_time_low, 11u);
+  ASSERT_TRUE(g_deferred_calls[0].carried_info);
+  EXPECT_EQ(g_deferred_calls[0].attempt_start_low, 10u);
 }
 
 }  // namespace
