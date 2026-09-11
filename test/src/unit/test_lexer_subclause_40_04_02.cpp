@@ -142,4 +142,26 @@ TEST(FsmPartSelectPragmaLexing, PartSelectIsSeparateFromSimpleSignalPragma) {
   EXPECT_EQ(lexer2.FsmStatePragmas().size(), 1u);
 }
 
+// §40.4.2's `signal_name[n:n]` names bit numbers of the vector signal, so a run
+// of digits too long to be one does not name a part-select and the pragma is
+// not recognized. Nothing is carried round into a bound the source never wrote:
+// a pragma accepted with a wrapped bound would have the coverage tool report
+// the FSM as held by a range of the signal nobody asked for, which is worse
+// than the pragma going unrecognized. A bound an index can hold is accepted, so
+// it is the overflow and not the size of the number that decides.
+TEST(FsmPartSelectPragmaLexing, BoundsTooLargeForAnIndexAreNotRecognized) {
+  EXPECT_TRUE(CollectPartSelectPragmas(
+                  "/* tool state_vector cs[4294967296:0] my_fsm enum e */")
+                  .empty());
+  EXPECT_TRUE(CollectPartSelectPragmas(
+                  "/* tool state_vector cs[3:99999999999] my_fsm enum e */")
+                  .empty());
+
+  auto held = CollectPartSelectPragmas(
+      "/* tool state_vector cs[2147483647:0] my_fsm enum e */");
+  ASSERT_EQ(held.size(), 1u);
+  EXPECT_EQ(held[0].msb, 2147483647);
+  EXPECT_EQ(held[0].lsb, 0);
+}
+
 }  // namespace

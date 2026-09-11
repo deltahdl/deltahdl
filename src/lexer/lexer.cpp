@@ -2,6 +2,7 @@
 
 #include <cctype>
 #include <format>
+#include <limits>
 #include <string>
 
 #include "common/lexical_limits.h"
@@ -261,13 +262,23 @@ bool Lexer::ParsePartSelect(std::string_view word, std::string_view& base,
   if (hi.empty() || lo.empty()) {
     return false;
   }
+  // The bounds of `signal_name[n:n]` are bit numbers of the signal, so digits
+  // that do not name one are not the form. A run of digits too long to be an
+  // index is rejected rather than carried round: a bound that wrapped would let
+  // the pragma through naming a range of the signal nothing in the source
+  // wrote, and the coverage tool would report the FSM as held by the wrong bits
+  // of the vector.
   auto parse_index = [](std::string_view text, int& out) -> bool {
     int value = 0;
     for (char c : text) {
       if (!std::isdigit(static_cast<unsigned char>(c))) {
         return false;
       }
-      value = value * 10 + (c - '0');
+      int digit = c - '0';
+      if (value > (std::numeric_limits<int>::max() - digit) / 10) {
+        return false;
+      }
+      value = value * 10 + digit;
     }
     out = value;
     return true;
