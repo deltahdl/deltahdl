@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -123,6 +125,50 @@ TEST_F(VpiGetCbInfoSim, SystfCallbackHandleLeavesDestinationUntouched) {
   out.reason = 5151;
   vpi_get_cb_info(systf_cb, &out);
   EXPECT_EQ(out.reason, 5151);
+}
+
+// §38.8: the handle names a callback. An object of any other kind names none,
+// so the destination is left untouched rather than read out of the callback
+// registry by whatever index that object happens to carry.
+TEST_F(VpiGetCbInfoSim, NonCallbackHandleLeavesDestinationUntouched) {
+  sim_ctx_.CreateVariable("v", 8);
+  vpi_ctx_.Attach(sim_ctx_);
+  vpiHandle var = vpi_handle_by_name("v", nullptr);
+  ASSERT_NE(var, nullptr);
+
+  s_cb_data out = {};
+  out.reason = 3131;
+  vpi_get_cb_info(var, &out);
+  EXPECT_EQ(out.reason, 3131);
+}
+
+// §38.8 reports the registration, which a firing does not consume. §38.36.2
+// hands a simulation-time callback's routine a structure of the run's own
+// carrying the current simulation time, so what the application asked for is
+// still there to be read back afterwards - the same time pointer, with the
+// delay it was written with.
+TEST_F(VpiGetCbInfoSim, ReportsTheRegistrationAfterTheCallbackHasFired) {
+  VpiTime cb_time = {};
+  cb_time.type = vpiSimTime;
+  cb_time.low = 15;  // the delay asked for
+
+  int marker = 0;
+  s_cb_data reg = {};
+  reg.reason = cbAfterDelay;
+  reg.cb_rtn = SampleCbRtn;
+  reg.time = &cb_time;
+  reg.user_data = &marker;
+  vpiHandle cb = vpi_register_cb(&reg);
+  ASSERT_NE(cb, nullptr);
+
+  EXPECT_EQ(vpi_ctx_.DispatchCallbacks(cbAfterDelay), 1);
+
+  s_cb_data out = {};
+  vpi_get_cb_info(cb, &out);
+  EXPECT_EQ(out.reason, cbAfterDelay);
+  EXPECT_EQ(out.time, &cb_time);
+  EXPECT_EQ(out.user_data, &marker);
+  EXPECT_EQ(cb_time.low, 15u);
 }
 
 }  // namespace
