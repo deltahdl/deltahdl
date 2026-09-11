@@ -460,16 +460,24 @@ bool RanStandaloneMode(const delta::CliOptions& opts,
   return false;
 }
 
+namespace {
+
+// §38.17: vpi_get_vlog_info() reports "the number of invocation options (argc)"
+// and "invocation option values (argv)", entry zero being the tool's name.
+// Nothing told the run what they were, so every invocation reported an empty
+// command line. Recording it before anything else runs means the answer is
+// there for whatever asks, including a PLI application loaded early.
+void RecordInvocationCommandLine(int argc, char* argv[]) {
+  const char* tool_name = argc > 0 ? argv[0] : "deltahdl";
+  std::vector<std::string> options;
+  for (int i = 1; i < argc; ++i) options.emplace_back(argv[i]);
+  delta::GetGlobalVpiContext().SetInvocationArguments(tool_name, options);
+}
+
+}  // namespace
+
 int main(int argc, char* argv[]) {
-  // §38.17: vpi_get_vlog_info() reports "the number of invocation options
-  // (argc)" and "invocation option values (argv)", entry zero being the tool's
-  // name. Nothing told the run what they were, so every invocation reported an
-  // empty command line. Recording it first means the answer is there for
-  // whatever asks, including a PLI application loaded before anything else
-  // runs.
-  delta::GetGlobalVpiContext().SetInvocationArguments(
-      argc > 0 ? argv[0] : "deltahdl",
-      std::vector<std::string>(argv + (argc > 0 ? 1 : 0), argv + argc));
+  RecordInvocationCommandLine(argc, argv);
 
   delta::CliOptions opts;
   if (!delta::ParseArgs(argc, argv, opts)) {
