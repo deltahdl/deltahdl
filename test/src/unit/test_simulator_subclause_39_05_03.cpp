@@ -2,6 +2,7 @@
 
 #include "simulator/dpi_runtime.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi.h"
 
 using namespace delta;
 
@@ -145,6 +146,81 @@ TEST(DeferredAssertionQueue, RejectedDiscardControlDoesNotFlush) {
   EXPECT_FALSE(api.Control(vpiAssertionReset, kA));
 
   EXPECT_EQ(api.PendingAssertionReportCount(kA), 1u);
+}
+
+// -----------------------------------------------------------------------------
+// §39.5.3 speaks of "any VPI function", which is what an application calls
+// rather than what the model does underneath: the controls reach the queues
+// through vpi_control(), and the rule about which of them flush is a rule about
+// that routine's operations.
+// -----------------------------------------------------------------------------
+
+class DeferredAssertionQueueThroughVpiControl : public ::testing::Test {
+ protected:
+  void SetUp() override {
+    SetGlobalVpiContext(&vpi_ctx_);
+    SetGlobalAssertionApi(&api_);
+  }
+  void TearDown() override {
+    SetGlobalAssertionApi(nullptr);
+    SetGlobalVpiContext(nullptr);
+  }
+
+  VpiContext vpi_ctx_;
+  AssertionApi api_;
+};
+
+// §39.5.3: "if it discards current evaluation attempts in progress, that also
+// means it flushes any pending instances that have not yet matured from these
+// queues", and vpiAssertionReset is the clause's own example of one that does.
+// Called on the assertion's handle, it takes the attempt and the queued reports
+// together.
+TEST_F(DeferredAssertionQueueThroughVpiControl, ResetFlushesWhatIsQueued) {
+  vpiHandle assertion = vpi_ctx_.CreateAssertion(kA, vpiAssert);
+  api_.NoteAssertionAttemptStarted(kA, 10);
+  api_.QueuePendingAssertionReport(kA);
+  api_.QueuePendingAssertionReport(kA);
+
+  EXPECT_EQ(vpi_control(vpiAssertionReset, assertion), 1);
+
+  EXPECT_EQ(api_.AssertionAttemptsInProgress(kA), 0u);
+  EXPECT_EQ(api_.PendingAssertionReportCount(kA), 0u);
+}
+
+// §39.5.3: "If a VPI function does not interfere with current attempts, that
+// also means it does not affect or flush these queues" - vpiAssertionDisable
+// stops new attempts starting and leaves the ones in progress, so the reports
+// already queued "may still mature and be reported".
+TEST_F(DeferredAssertionQueueThroughVpiControl, DisableLeavesTheQueueStanding) {
+  vpiHandle assertion = vpi_ctx_.CreateAssertion(kA, vpiAssert);
+  api_.NoteAssertionAttemptStarted(kA, 10);
+  api_.QueuePendingAssertionReport(kA);
+
+  EXPECT_EQ(vpi_control(vpiAssertionDisable, assertion), 1);
+
+  EXPECT_FALSE(api_.AssertionEnabled(kA));
+  EXPECT_EQ(api_.AssertionAttemptsInProgress(kA), 1u);
+  EXPECT_EQ(api_.PendingAssertionReportCount(kA), 1u);
+}
+
+// §39.5.3 over the whole system: the rule is about what a function does to
+// attempts, so the system controls divide the same way. Killing the system
+// discards every attempt in progress and flushes every queue with them; turning
+// it off stops assertions starting and leaves both where they were.
+TEST_F(DeferredAssertionQueueThroughVpiControl, TheSystemControlsDivideAlike) {
+  api_.NoteAssertionAttemptStarted(kA, 10);
+  api_.QueuePendingAssertionReport(kA);
+  api_.QueuePendingAssertionReport(kB);
+
+  EXPECT_EQ(vpi_control(vpiAssertionSysOff, static_cast<vpiHandle>(nullptr)),
+            1);
+  EXPECT_EQ(api_.PendingAssertionReportCount(kA), 1u);
+  EXPECT_EQ(api_.PendingAssertionReportCount(kB), 1u);
+
+  EXPECT_EQ(vpi_control(vpiAssertionSysKill, static_cast<vpiHandle>(nullptr)),
+            1);
+  EXPECT_EQ(api_.PendingAssertionReportCount(kA), 0u);
+  EXPECT_EQ(api_.PendingAssertionReportCount(kB), 0u);
 }
 
 }  // namespace
