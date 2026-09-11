@@ -333,7 +333,10 @@ void ComputeConstraintAndCallbackModes(int type, VpiHandle ref,
   // nothing either.
   m.else_constraint_expr =
       ref && type == vpiElseConst && ref->type == vpiConstrIfElse;
-  m.callback_object = ref && type == vpiCallback;
+  // §37.80 detail 2: with no reference object the iteration hands back the
+  // callbacks not related to the objects the diagram draws reaching one, so
+  // this mode covers both forms rather than the object-scoped one alone.
+  m.callback_object = type == vpiCallback;
   // §37.74: a for statement's header statements, held apart from its children
   // because their own kinds are the ones the `stmt` class groups rather than
   // either relation tag.
@@ -573,29 +576,6 @@ void CollectForeachLoopVars(VpiObject* ref,
   }
 }
 
-// §37.80 (figure): collect the callback objects registered on the reference
-// object - each registered callback whose s_cb_data obj field names it. The
-// callback object itself is not a child of the object, so it is found through
-// the callback registry rather than the generic child walk.
-void CollectCallbackObjects(VpiObject* ref,
-                            const std::vector<VpiHandle>& cb_handles,
-                            const std::vector<VpiCbData>& callbacks,
-                            VpiObject* iter) {
-  for (auto* cb_obj : cb_handles) {
-    int idx = cb_obj->index;
-    if (idx < 0 || idx >= static_cast<int>(callbacks.size())) continue;
-    // §37.2.3: "Handle equivalence cannot be determined with a C '==='
-    // comparison. The function vpi_compare_objects() compares the objects they
-    // refer to." A callback is placed on an object, not on the handle the
-    // application happened to register it through, so a second handle to that
-    // object has to find it - and pointer equality found it only through the
-    // one handle.
-    if (GetGlobalVpiContext().CompareObjects(callbacks[idx].obj, ref) != 0) {
-      iter->children.push_back(cb_obj);
-    }
-  }
-}
-
 // §37.49: the generic child walk - collect every child the (type, ref)
 // iteration matches. §37.31 detail 1 drops implicit built-in methods from a
 // vpiMethods iteration; §37.31 detail 3 drops inline constraints from a
@@ -804,7 +784,7 @@ bool DispatchRefSpecialMode(int type, VpiHandle ref,
     return true;
   }
   if (modes.callback_object) {
-    CollectCallbackObjects(ref, stores.cb_handles, stores.callbacks, iter);
+    VpiCollectCallbackObjects(ref, stores.cb_handles, stores.callbacks, iter);
     return true;
   }
   if (modes.for_header_stmts) {

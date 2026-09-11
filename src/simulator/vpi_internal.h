@@ -33,6 +33,33 @@ VpiHandle VpiForHeaderStmt(int type, VpiHandle for_stmt);
 // vpi_helpers_loops.cpp, used by vpi_iterate.cpp.
 void VpiCollectForHeaderStmts(int type, VpiHandle for_stmt, VpiHandle iter);
 
+// §37.63/§37.66/§37.67/§37.70/§37.71/§37.73/§37.74/§37.75: the body statement
+// the object model draws an untagged arrow to `stmt` for, §37.74's two single
+// arrows to a for statement's header, and the process a statement runs in.
+// Defined in vpi_handle_statements.cpp, used by vpi_handle.cpp.
+bool TryResolveProcessAndStmtRelation(int type, VpiHandle ref, VpiHandle& out);
+
+// §37.80 (figure): whether an object is one of the kinds the callback diagram
+// draws a single arrow from to `callback`. Defined in vpi_callbacks.cpp, used
+// by vpi_handle.cpp.
+bool VpiIsCallbackHostType(int type);
+
+// §37.80 (figure) + detail 2: the callback objects an iteration reaches - those
+// registered on `ref`, or, with no reference object, those no object the
+// diagram draws that arrow from reaches. Defined in vpi_callbacks.cpp, used by
+// vpi_iterate.cpp.
+void VpiCollectCallbackObjects(VpiHandle ref,
+                               const std::vector<VpiHandle>& cb_handles,
+                               const std::vector<VpiCbData>& callbacks,
+                               VpiHandle iter);
+
+// §37.80 (figure): the callback placed on `obj` - what the diagram's single
+// arrow from a prim term, an expr, a time queue or a stmt reaches. Null where
+// the object was given none. Defined in vpi_callbacks.cpp, used by
+// vpi_handle.cpp.
+VpiHandle VpiCallbackOn(VpiHandle obj, const std::vector<VpiHandle>& cb_handles,
+                        const std::vector<VpiCbData>& callbacks);
+
 // Defined in vpi_helpers_statements.cpp, used by vpi_iterate.cpp.
 bool VpiIsVirtualInterfaceArray(VpiHandle obj);
 

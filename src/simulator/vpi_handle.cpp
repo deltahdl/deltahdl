@@ -568,48 +568,6 @@ bool TryResolveTypespecClassRelation(int type, VpiHandle ref, VpiHandle& out) {
   return false;
 }
 
-// §37.63/§37.66/§37.67/§37.70/§37.71/§37.73/§37.74: the body statement the
-// object model draws an untagged arrow to `stmt` for, and the two single arrows
-// §37.74 draws to a for statement's header. VpiIsBodyStmtOwnerType names the
-// kinds that draw the untagged arrow and says why they are one relation rather
-// than six; the body itself is the first child of a kind the `stmt` class
-// groups, because §37.4.1 makes that enclosure a class and no statement of a
-// design carries the class's name for its own type. The header's statements are
-// the for statement's alone and are held apart from its children for that same
-// reason, so they are answered here beside the body they are told from.
-bool TryResolveForAndBodyStmtRelation(int type, VpiHandle ref, VpiHandle& out) {
-  // §37.74: the single arrows to the first statement of each part of a for
-  // statement's header, drawn beside the iterations that walk all of them.
-  if (ref->type == vpiFor &&
-      (type == vpiForInitStmt || type == vpiForIncStmt)) {
-    out = VpiForHeaderStmt(type, ref);
-    return true;
-  }
-  if (type != vpiStmt || !VpiIsBodyStmtOwnerType(ref->type)) return false;
-  for (auto* child : ref->children) {
-    if (!VpiIsScopeBodyStmtType(child->type)) continue;
-    out = child;
-    return true;
-  }
-  return false;
-}
-
-bool TryResolveStmtProcessRelation(int type, VpiHandle ref, VpiHandle& out) {
-  if (type != vpiProcess) return false;
-  for (VpiObject* scope = ref->parent; scope != nullptr;
-       scope = scope->parent) {
-    if (!VpiIsProcessType(scope->type)) continue;
-    out = scope;
-    return true;
-  }
-  return false;
-}
-
-bool TryResolveProcessAndStmtRelation(int type, VpiHandle ref, VpiHandle& out) {
-  return TryResolveForAndBodyStmtRelation(type, ref, out) ||
-         TryResolveStmtProcessRelation(type, ref, out);
-}
-
 bool TryResolvePatternRelation(int type, VpiHandle ref, VpiHandle& out) {
   if (type != vpiPattern || !VpiIsPatternType(ref->type)) return false;
   out = VpiPatternOf(ref);
@@ -933,6 +891,13 @@ VpiHandle VpiContext::Handle(int type, VpiHandle ref) {
   // helper documents the §37.x details for the relations it serves. When one
   // matches, its (possibly null) result is the answer; otherwise the lookup
   // falls through to the generic traversal.
+  // §37.80 (figure): the callback a prim term, an expr, a time queue or a stmt
+  // reaches, which the run holds in its callback registry rather than among the
+  // object's children.
+  if (type == vpiCallback && VpiIsCallbackHostType(ref->type)) {
+    return VpiCallbackOn(ref, cb_handles_, callbacks_);
+  }
+
   VpiHandle designated = nullptr;
   if (TryResolveDesignatedRelation(type, ref, designated)) return designated;
 

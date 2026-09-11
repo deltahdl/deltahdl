@@ -121,6 +121,76 @@ const char* VpiCheckCallbackTiming(const VpiCbData& data,
 
 }  // namespace
 
+bool VpiIsCallbackHostType(int type) {
+  // §37.80 (figure): the objects the diagram draws a single arrow from to
+  // `callback` - a prim term, an expr, a time queue and a stmt. Two of the four
+  // are drawn in dotted enclosures, which §37.4.1 makes classes grouping other
+  // objects and classes rather than kinds, so what they stand for is every kind
+  // §37.59 draws in `expr` and every kind the `stmt` class groups.
+  return type == vpiPrimTerm || type == kVpiTimeQueue || VpiIsExprType(type) ||
+         VpiIsScopeBodyStmtType(type);
+}
+
+// §37.80 (figure) + detail 2: collect the callback objects an iteration
+// reaches. With a reference object those are the callbacks registered on it -
+// each registered callback whose s_cb_data obj field names it. With none they
+// are the callbacks "not related to the above objects", which is what detail 2
+// gives the NULL-reference form: every callback the diagram's single arrow
+// leaves unreachable, because it was placed on no object at all or on one of a
+// kind that arrow is not drawn from. That form handed back every callback the
+// run held, the ones a prim term, an expr, a time queue or a stmt reaches
+// included, so the iteration detail 2 defines for the rest was the whole
+// registry.
+//
+// A callback object is not a child of the object it was placed on, so both
+// forms are answered from the callback registry rather than by the generic
+// child walk.
+void VpiCollectCallbackObjects(VpiHandle ref,
+                               const std::vector<VpiHandle>& cb_handles,
+                               const std::vector<VpiCbData>& callbacks,
+                               VpiHandle iter) {
+  for (auto* cb_obj : cb_handles) {
+    int idx = cb_obj->index;
+    if (idx < 0 || idx >= static_cast<int>(callbacks.size())) continue;
+    VpiHandle placed_on = callbacks[idx].obj;
+    if (ref == nullptr) {
+      if (placed_on == nullptr || !VpiIsCallbackHostType(placed_on->type)) {
+        iter->children.push_back(cb_obj);
+      }
+      continue;
+    }
+    // §37.2.3: "Handle equivalence cannot be determined with a C '=='
+    // comparison. The function vpi_compare_objects() compares the objects they
+    // refer to." A callback is placed on an object, not on the handle the
+    // application happened to register it through, so a second handle to that
+    // object has to find it - and pointer equality found it only through the
+    // one handle.
+    if (GetGlobalVpiContext().CompareObjects(placed_on, ref) != 0) {
+      iter->children.push_back(cb_obj);
+    }
+  }
+}
+
+VpiHandle VpiCallbackOn(VpiHandle obj, const std::vector<VpiHandle>& cb_handles,
+                        const std::vector<VpiCbData>& callbacks) {
+  // §37.80 (figure): the single arrow a prim term, an expr, a time queue and a
+  // stmt each draw to `callback`, which §37.4.3 makes vpi_handle(vpiCallback,
+  // obj). It reached nothing: a callback object lives in the run's registry
+  // rather than among the object's children, and the walk that serves an
+  // untagged relation looks for a child whose own type is the relation's. The
+  // arrow is a one-to-one relationship, so the callback it reaches is the first
+  // the object was given; the rest of them, and the callbacks no such object
+  // holds, are what the iterations reach.
+  for (auto* cb_obj : cb_handles) {
+    int idx = cb_obj->index;
+    if (idx < 0 || idx >= static_cast<int>(callbacks.size())) continue;
+    if (GetGlobalVpiContext().CompareObjects(callbacks[idx].obj, obj) != 0) {
+      return cb_obj;
+    }
+  }
+  return nullptr;
+}
+
 VpiHandle VpiContext::RegisterCb(VpiCbData* data) {
   if (!data) return nullptr;
 
