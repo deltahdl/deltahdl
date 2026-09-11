@@ -126,5 +126,28 @@ TEST_F(VpiMcdOpenSim, ExhaustedChannelsReturnZero) {
   EXPECT_EQ(vpi_mcd_open(overflow), 0u);
 }
 
+// §38.27: "If the MSB of the return value from $fopen is set, then the value is
+// an fd file descriptor, which is not compatible with the mcd descriptor
+// returned by vpi_mcd_open()", and channel 32 - that MSB - "is reserved to
+// represent a file descriptor (fd) returned from the SystemVerilog $fopen
+// system function". So a file $fopen opened in its fd form is not one this
+// routine has open: it opens a channel of its own for it rather than handing
+// back a value its own descriptors are not compatible with.
+TEST_F(VpiMcdOpenSim, AnFdFromFopenIsNotADescriptorThisRoutineHandsBack) {
+  PLI_UINT32 fopen_fd = 0x80000005u;  // the MSB set: an fd, not an mcd
+  vpi_ctx_.RegisterFopenMcdFile("opened_as_fd.log", fopen_fd);
+
+  char name[] = "opened_as_fd.log";
+  PLI_UINT32 mcd = vpi_mcd_open(name);
+
+  EXPECT_NE(mcd, fopen_fd);
+  EXPECT_EQ(mcd & 0x80000001u, 0u);  // neither reserved channel
+  EXPECT_NE(mcd, 0u);
+
+  // The file now stands in the mcd namespace, so opening it again is the
+  // already-open case and reports the same channel rather than taking another.
+  EXPECT_EQ(vpi_mcd_open(name), mcd);
+}
+
 }  // namespace
 }  // namespace delta

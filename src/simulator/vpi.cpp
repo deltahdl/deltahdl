@@ -324,12 +324,28 @@ int VpiContext::Flush() {
   return 0;
 }
 
+// §38.27: channel 32, the MSB, "is reserved to represent a file descriptor (fd)
+// returned from the SystemVerilog $fopen system function", and such a value "is
+// not compatible with the mcd descriptor returned by vpi_mcd_open()". The bit
+// is what tells the two apart in the file namespace they share.
+constexpr PLI_UINT32 kVpiFdDescriptorChannel = PLI_UINT32{1} << 31;
+
 PLI_UINT32 VpiContext::McdOpen(const std::string& filename) {
   // §38.27: a file already open in the shared mcd namespace - whether a prior
   // vpi_mcd_open() assigned it or $fopen seeded it - is reported on the very
   // descriptor it already holds, rather than consuming a second channel.
+  //
+  // An entry holding the fd channel alone is not that: it records a file
+  // $fopen opened in its fd form, which this routine's descriptors are not
+  // compatible with, so a channel of its own is opened for it here. The fd was
+  // handed straight back, as though the two were one kind of descriptor, and
+  // every mcd routine given it then worked on a channel the clause says it does
+  // not name.
   auto existing = mcd_open_files_.find(filename);
-  if (existing != mcd_open_files_.end()) return existing->second;
+  PLI_UINT32 open_channels = existing == mcd_open_files_.end()
+                                 ? 0u
+                                 : existing->second & ~kVpiFdDescriptorChannel;
+  if (open_channels != 0) return open_channels;
 
   // §38.27: an open that cannot be carried out returns 0.
   if (mcd_open_should_fail_) return 0;
@@ -345,7 +361,9 @@ PLI_UINT32 VpiContext::McdOpen(const std::string& filename) {
     // §38.27: open the file for writing and hand back its multichannel
     // descriptor, recording it so a later open of the same file finds it.
     mcd_allocated_channels_ |= channel;
-    mcd_open_files_.emplace(filename, channel);
+    // The file may already be named by the fd channel, which this claim is
+    // added to rather than replacing: each is closed on its own.
+    mcd_open_files_[filename] |= channel;
     return channel;
   }
 
