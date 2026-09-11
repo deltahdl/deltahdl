@@ -740,6 +740,13 @@ bool TryResolveTimingTermRelation(int type, VpiHandle ref, VpiHandle& out) {
     out = ref->tchk_data_term;
     return true;
   }
+  // §37.40 (figure): the notifier register a violated check toggles. The
+  // relation was resolved by nothing, so it fell through to a walk looking for
+  // a child whose own type is the vpiTchkNotifier tag - a type no object has.
+  if (type == vpiTchkNotifier && ref->type == vpiTchk) {
+    out = ref->tchk_notifier;
+    return true;
+  }
   if (type == vpiInTerm && ref->type == vpiDelayDevice) {
     out = ref->in_term;
     return true;

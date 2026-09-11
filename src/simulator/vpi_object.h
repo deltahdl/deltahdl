@@ -520,6 +520,19 @@ struct VpiObject {
   VpiObject* tchk_ref_term = nullptr;
   VpiObject* tchk_data_term = nullptr;
 
+  // §37.40 (figure): the kind of timing check this object is, reported through
+  // vpi_get(vpiTchkType) - one of §31.2's checks, vpiSetup, vpiHold,
+  // vpiSetupHold, vpiRecovery, vpiRemoval, vpiRecrem, vpiWidth, vpiPeriod,
+  // vpiSkew, vpiTimeskew, vpiFullskew or vpiNochange. Zero for every object
+  // that is not a timing check.
+  int tchk_type = 0;
+
+  // §37.40 (figure): the notifier register a timing check toggles when it is
+  // violated, reached through vpiTchkNotifier. Its own type is a variable kind
+  // rather than the relation enum, so it is held as a designated pointer. Null
+  // for a check that was written without a notifier.
+  VpiObject* tchk_notifier = nullptr;
+
   // §37.45: the two delay terminals a delay device reaches. vpiInTerm denotes
   // the input delay term and vpiOutTerm the output delay term. Each is a delay
   // term object, whose own type (vpiDelayTerm) differs from the relation enum

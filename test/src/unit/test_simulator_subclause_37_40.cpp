@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
+#include "fixture_simulator.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi.h"
 
@@ -142,6 +145,101 @@ TEST_F(TimingCheck, ExprIterationIsNullWhenNoArguments) {
   tchk.children = {&notifier};
 
   EXPECT_EQ(vpi_iterate(vpiExpr, &tchk), nullptr);
+}
+
+// What the application found. A calltf is a plain C function with no return
+// path to the case that provoked it.
+int g_tchks_seen = 0;
+int g_tchk_type = 0;
+std::string g_ref_term_name;
+std::string g_data_term_name;
+int g_ref_term_edge = -1;
+std::string g_notifier_name;
+int g_limit = -1;
+
+int ProbeTimingChecksCalltf(const char*) {
+  vpiHandle mod = vpi_handle_by_name("m1", nullptr);
+  if (mod == nullptr) return 0;
+  vpiHandle itr = vpi_iterate(vpiTchk, mod);
+  if (itr == nullptr) return 0;
+  while (vpiHandle tchk = vpi_scan(itr)) {
+    ++g_tchks_seen;
+    g_tchk_type = vpi_get(vpiTchkType, tchk);
+
+    if (vpiHandle ref = vpi_handle(vpiTchkRefTerm, tchk)) {
+      if (const char* name = vpi_get_str(vpiName, ref)) g_ref_term_name = name;
+      g_ref_term_edge = vpi_get(vpiEdge, ref);
+    }
+    if (vpiHandle dat = vpi_handle(vpiTchkDataTerm, tchk)) {
+      if (const char* name = vpi_get_str(vpiName, dat)) g_data_term_name = name;
+    }
+    if (vpiHandle note = vpi_handle(vpiTchkNotifier, tchk)) {
+      if (const char* name = vpi_get_str(vpiName, note)) g_notifier_name = name;
+    }
+
+    s_vpi_delay delays = {};
+    s_vpi_time times[1] = {};
+    delays.da = times;
+    delays.no_of_delays = 1;
+    delays.time_type = vpiSimTime;
+    vpi_get_delays(tchk, &delays);
+    g_limit = static_cast<int>(times[0].low);
+  }
+  return 0;
+}
+
+// §37.40 against a design. Every property and relation the figure draws is
+// drawn on a tchk, and no pass built one, so a module's vpiTchk iteration
+// reached none of the checks its specify block declared and the whole of the
+// subclause answered for objects a test had made.
+TEST(TimingCheckDesign, ADeclaredTimingCheckIsATchkObject) {
+  VpiContext vpi_ctx;
+  SetGlobalVpiContext(&vpi_ctx);
+  g_tchks_seen = 0;
+  g_tchk_type = 0;
+  g_ref_term_name.clear();
+  g_data_term_name.clear();
+  g_ref_term_edge = -1;
+  g_notifier_name.clear();
+  g_limit = -1;
+
+  s_vpi_systf_data data = {};
+  data.type = vpiSysTask;
+  data.tfname = "$probe";
+  data.calltf = &ProbeTimingChecksCalltf;
+  ASSERT_NE(vpi_register_systf(&data), nullptr);
+
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m(input clk, input d);\n"
+      "  reg notifier;\n"
+      "  specify\n"
+      "    $setup(d, posedge clk, 5, notifier);\n"
+      "  endspecify\n"
+      "endmodule\n"
+      "module t;\n"
+      "  reg clk, d;\n"
+      "  m m1(clk, d);\n"
+      "  initial $probe;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+
+  EXPECT_EQ(g_tchks_seen, 1);
+  // The figure's "-> tchk type" property, which is §31.2's $setup.
+  EXPECT_EQ(g_tchk_type, vpiSetup);
+  // Detail 1: the reference event of $setup is its second argument and the data
+  // event its first.
+  EXPECT_EQ(g_ref_term_name, "clk");
+  EXPECT_EQ(g_data_term_name, "d");
+  // The tchk term's "-> edge" property: the reference event was written
+  // posedge.
+  EXPECT_EQ(g_ref_term_edge, vpiPosedge);
+  // The figure's vpiTchkNotifier relation.
+  EXPECT_EQ(g_notifier_name, "notifier");
+  // The figure's "-> limit", retrieved with vpi_get_delays().
+  EXPECT_EQ(g_limit, 5);
 }
 
 }  // namespace

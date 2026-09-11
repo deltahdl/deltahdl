@@ -621,96 +621,6 @@ void VpiContext::AttachModuleDefNames(SimContext& sim_ctx) {
   }
 }
 
-void VpiContext::AttachModulePathDelays(SimContext& sim_ctx) {
-  // §38.10: "the VPI routine vpi_get_delays() shall retrieve the delays or
-  // pulse limits of an object". A module path is one of the four kinds of
-  // object the clause gives legal no_of_delays values for, and it is the one
-  // whose twelve transition delays the clause takes without interpreting them
-  // -- the 12-value row of Table 38-2 is the path's own array. No object a run
-  // built carried a delay at all, so the routine had only what a caller put in
-  // an object of its own making to retrieve.
-  SpecifyManager* specify = sim_ctx.GetSpecifyManager();
-  if (specify == nullptr) return;
-
-  for (const PathDelay& path : specify->GetPathDelays()) {
-    // §30.3 puts a specify block inside a module declaration, so the paths it
-    // declares belong to the instance that declared them. A path of a module
-    // elaborated as a top carries the empty prefix and has no module object
-    // over it to hang from.
-    if (path.inst_prefix.empty()) continue;
-    std::string_view scope = path.inst_prefix;
-    scope.remove_suffix(1);  // the prefix ends in the separator
-    VpiHandle module = DesignObjectForFlatName(scope);
-    if (module == nullptr) continue;
-
-    auto* obj = AllocObject();
-    obj->type = vpiModPath;
-    obj->parent = module;
-    module->children.push_back(obj);
-    // §38.10: "the application-allocated s_vpi_delay array shall contain delays
-    // in the same order in which they occur in the SystemVerilog description",
-    // which for a module path is the order of its transition slots, and the
-    // pulse limits §30.7 gives each of them travel with each delay.
-    obj->delays.reserve(path.delay_count);
-    for (uint8_t i = 0; i < path.delay_count; ++i) {
-      VpiDelayInfo info;
-      info.delay = static_cast<double>(path.delays[i]);
-      info.min_delay = info.delay;
-      info.typ_delay = info.delay;
-      info.max_delay = info.delay;
-      info.reject = static_cast<double>(path.reject_limit[i]);
-      info.min_reject = info.reject;
-      info.typ_reject = info.reject;
-      info.max_reject = info.reject;
-      info.error = static_cast<double>(path.error_limit[i]);
-      info.min_error = info.error;
-      info.typ_error = info.error;
-      info.max_error = info.error;
-      obj->delays.push_back(info);
-    }
-  }
-}
-
-VpiObject* VpiContext::NetSourceDelayExpression(SimContext& sim_ctx,
-                                                const RtlirNet& net) {
-  // §37.3.4: the vpiDelay expression "shall be either an expression that
-  // evaluates to a constant if there is only one delay specified or an
-  // operation if there are more than one delay specified. If multiple delays
-  // are specified, then the operation's vpiOpType shall be vpiListOp."
-  //
-  // §28.16's rise, fall and turn-off delays survive elaboration on RtlirNet in
-  // the order the declaration wrote them, and the slots fill left to right, so
-  // the first empty one ends the list the source specified.
-  Expr* const kWritten[3] = {net.delay_rise, net.delay_fall, net.delay_turnoff};
-  std::vector<VpiObject*> constants;
-  for (Expr* delay : kWritten) {
-    if (delay == nullptr) break;
-    // Each written delay stands as a constant expression carrying the value
-    // evaluating it produced. The storage goes on the run's arena rather than
-    // through SimContext::CreateVariable, which would enter the delay under a
-    // name the design never declared.
-    auto* constant = AllocObject();
-    constant->type = vpiConstant;
-    constant->const_type = vpiIntConst;
-    auto* storage = sim_ctx.GetArena().Create<Variable>();
-    storage->value = EvalExpr(delay, sim_ctx, sim_ctx.GetArena());
-    constant->var = storage;
-    constant->size = static_cast<int>(storage->value.width);
-    constants.push_back(constant);
-  }
-
-  if (constants.empty()) return nullptr;
-  if (constants.size() == 1) return constants.front();
-
-  // The operands of an operation are its expression children (§36.10.3), so the
-  // delays hang there in the order the declaration wrote them.
-  auto* op = AllocObject();
-  op->type = vpiOperation;
-  op->op_type = vpiListOp;
-  for (VpiObject* constant : constants) op->children.push_back(constant);
-  return op;
-}
-
 void VpiContext::AttachSourceDelayExpressions(SimContext& sim_ctx,
                                               const RtlirDesign* design) {
   // §37.3.4: "To access the delay expressions that are specified within the
@@ -761,6 +671,9 @@ void VpiContext::Attach(SimContext& sim_ctx, const RtlirDesign* design) {
   }
   AttachModuleDefNames(sim_ctx);
   AttachModulePathDelays(sim_ctx);
+  // §37.40: the checks a specify block declares, made from the same run's
+  // SpecifyManager as the paths above.
+  AttachTimingChecks(sim_ctx);
   for (auto& [name, net] : sim_ctx.GetNets()) {
     VpiHandle obj = DesignObjectForFlatName(name);
     if (obj == nullptr || net == nullptr) continue;

@@ -746,8 +746,10 @@ class VpiContext {
                              std::string_view full_path);
   VpiHandle DesignObjectForFlatName(std::string_view flat_name);
 
-  // §38.10: the design's module paths; §38.11: each module's definition name.
+  // §38.10: the design's module paths; §37.40: its timing checks; §38.11: each
+  // module's definition name.
   void AttachModulePathDelays(SimContext& sim_ctx);
+  void AttachTimingChecks(SimContext& sim_ctx);
   void AttachModuleDefNames(SimContext& sim_ctx);
 
   // §37.23: the declaration object a design's user-defined nettype stands as,

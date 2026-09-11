@@ -291,6 +291,11 @@ int VpiGetSimplePropertyA(int property, VpiHandle obj, bool& handled) {
       return VpiBool(obj->mod_path_has_if_none);
     case vpiEdge:
       return obj->edge;
+    // §37.40 (figure): a timing check reports which of §31.2's checks it is
+    // through the vpiTchkType integer property. No case answered it, so the
+    // property the figure draws on the tchk read nothing for any check.
+    case vpiTchkType:
+      return obj->tchk_type;
     // §37.14 detail 1: a port reports its port type (vpiPort/vpiInterfacePort/
     // vpiModportPort), fixed by the formal.
     case vpiPortType:
