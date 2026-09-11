@@ -14,6 +14,11 @@ namespace delta {
 // Defined in vpi_helpers_statements.cpp, used by vpi_callbacks.cpp.
 bool VpiIsScopeBodyStmtType(int type);
 
+// §37.63/§37.66/§37.67/§37.70: the kinds that reach a body statement through
+// the object model's untagged arrow to `stmt`. Defined in
+// vpi_helpers_statements.cpp, used by vpi_handle.cpp.
+bool VpiIsBodyStmtOwnerType(int type);
+
 // Defined in vpi_helpers_statements.cpp, used by vpi_iterate.cpp.
 bool VpiIsVirtualInterfaceArray(VpiHandle obj);
 

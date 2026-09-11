@@ -251,6 +251,26 @@ VpiHandle VpiLoopConditionExpr(VpiHandle loop) {
   return nullptr;
 }
 
+bool VpiIsBodyStmtOwnerType(int type) {
+  // The kinds that reach a body statement through vpiStmt by the object model
+  // drawing an untagged single arrow from them to the dotted `stmt` enclosure.
+  // §37.4.3 makes an untagged relation's type the enclosure's words with "vpi"
+  // in front, so one arrow drawn four times is one relation: §37.63 draws it
+  // from a process, §37.66 from the enclosure holding `while` and `repeat`,
+  // §37.67 from the `waits` enclosure, and §37.70 from a forever, which is the
+  // whole of that clause - a forever carries no condition, no property and no
+  // detail beside its body.
+  //
+  // The forever was the one of the four left out, so the single relation §37.70
+  // defines fell through to the traversal that looks for a child whose own type
+  // is the relation tag. §37.4.1 makes the dotted `stmt` enclosure a class that
+  // groups other objects and classes rather than an object kind, so no
+  // statement a design holds has vpiStmt for its own type and the body of every
+  // forever loop that could be written was reached by nothing.
+  return VpiIsProcessType(type) || VpiIsWhileOrRepeatType(type) ||
+         VpiIsWaitType(type) || type == vpiForever;
+}
+
 bool VpiIsWaitType(int type) {
   // §37.67: the wait statements the diagram groups under the abstract "waits"
   // label - a wait, an ordered wait, and a wait fork. All three reach a body

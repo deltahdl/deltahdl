@@ -7,15 +7,20 @@ namespace delta {
 namespace {
 
 // §37.70 Forever: the object model diagram draws a single, unlabeled edge from
-// a forever statement to a body statement - the vpiStmt relation. The clause
-// carries no numbered Details, no 'shall' sentences, and no properties; the
-// body edge is its only content. Unlike the looping statements of §37.66, a
-// forever statement has no controlling condition, so the diagram draws no
-// vpiCondition edge. The body edge needs no dedicated production code: a
-// forever statement is not one of the kinds that override vpiStmt (an event
-// control, a delay control, or a task/func), so it is served by the generic
-// vpiStmt traversal in vpi_handle. These tests observe that production path
-// applying the rule to a forever object.
+// a forever statement to the dotted `stmt` enclosure. §37.4.3 makes an untagged
+// single arrow a vpi_handle() relation whose type is the enclosure's words with
+// "vpi" in front, so the edge is vpiStmt and it is the whole of this clause:
+// there are no numbered Details, no 'shall' sentences and no properties, and -
+// unlike the looping statements of §37.66 - a forever carries no controlling
+// condition.
+//
+// §37.4.1 makes a dotted enclosure a class that "groups other objects and
+// classes" rather than a kind of its own, so the body a forever reaches carries
+// the kind a statement of a design carries - an unnamed begin, an assignment, a
+// nested forever - and never vpiStmt, which is the class's name. Read the other
+// way, as a child whose own type is the relation tag, the relation reached the
+// body of no forever loop that could be written. These tests observe the body
+// resolver applying the class reading to a forever statement.
 
 // The fixture installs a context so the public vpi_handle entry point runs its
 // real dispatch over the test objects.
@@ -26,12 +31,13 @@ class Forever : public ::testing::Test {
   VpiContext ctx_;
 };
 
-// Body edge (the diagram's lone unlabeled arrow to a statement): a forever
-// statement reaches its body through the public vpi_handle(vpiStmt, ...)
-// dispatch path, which resolves to the generic vpiStmt traversal.
-TEST_F(Forever, ForeverStatementReachesBodyThroughVpiStmt) {
+// Body edge (the diagram's lone unlabeled arrow to `stmt`): a forever statement
+// reaches the body it loops over through vpi_handle(vpiStmt, ...). The body
+// here is an unnamed begin, which is one of the block kinds the `stmt` class
+// groups and what a forever with more than one statement in it holds.
+TEST_F(Forever, ForeverStatementReachesBodyByTheKindTheStmtClassGroups) {
   VpiObject body;
-  body.type = vpiStmt;
+  body.type = vpiBegin;
 
   VpiObject forever_stmt;
   forever_stmt.type = vpiForever;
@@ -40,15 +46,35 @@ TEST_F(Forever, ForeverStatementReachesBodyThroughVpiStmt) {
   EXPECT_EQ(vpi_handle(vpiStmt, &forever_stmt), &body);
 }
 
-// Body edge is type-directed: when the forever object also carries an
-// incidental non-statement child, the vpiStmt relation skips it and returns the
-// body statement rather than the first child.
+// Body edge: the kinds the `stmt` class groups are reached whatever the body is
+// written as. A forever whose body is a single statement holds that statement
+// rather than a block, and a forever nested directly inside another is itself
+// the outer one's body.
+TEST_F(Forever, ForeverBodyIsReachedForEachKindAStatementCarries) {
+  for (int body_kind : {vpiAssignment, vpiTaskCall, vpiNamedBegin, vpiFork,
+                        vpiForever, vpiNullStmt}) {
+    VpiObject body;
+    body.type = body_kind;
+
+    VpiObject forever_stmt;
+    forever_stmt.type = vpiForever;
+    forever_stmt.children = {&body};
+
+    EXPECT_EQ(vpi_handle(vpiStmt, &forever_stmt), &body)
+        << "body kind " << body_kind;
+  }
+}
+
+// Body edge is type-directed: where the forever object also carries a
+// non-statement child, the relation steps over it and returns the statement
+// rather than the first child. An expression stands here for the child a
+// forever does not draw - the clause gives it no condition edge at all.
 TEST_F(Forever, ForeverBodyFoundAmongOtherChildren) {
   VpiObject other;
   other.type = vpiOperation;  // a non-statement child, listed first
 
   VpiObject body;
-  body.type = vpiStmt;
+  body.type = vpiBegin;
 
   VpiObject forever_stmt;
   forever_stmt.type = vpiForever;
@@ -57,13 +83,41 @@ TEST_F(Forever, ForeverBodyFoundAmongOtherChildren) {
   EXPECT_EQ(vpi_handle(vpiStmt, &forever_stmt), &body);
 }
 
-// Body edge reports no statement when the forever object has no statement
-// child: the generic traversal finds nothing to return.
+// Body edge reports no statement when the forever object carries none: a
+// forever with only a non-statement child yields null rather than handing that
+// child back, and one with no children at all yields null too.
 TEST_F(Forever, ForeverWithoutBodyReportsNoStatement) {
   VpiObject forever_stmt;
   forever_stmt.type = vpiForever;
 
   EXPECT_EQ(vpi_handle(vpiStmt, &forever_stmt), nullptr);
+
+  VpiObject other;
+  other.type = vpiOperation;
+
+  VpiObject forever_with_no_stmt;
+  forever_with_no_stmt.type = vpiForever;
+  forever_with_no_stmt.children = {&other};
+
+  EXPECT_EQ(vpi_handle(vpiStmt, &forever_with_no_stmt), nullptr);
+}
+
+// The clause draws no other edge: a forever has no controlling condition, so
+// asking one for vpiCondition reports nothing even where it carries an
+// expression child that a loop of §37.66 would answer with.
+TEST_F(Forever, ForeverDrawsNoConditionEdge) {
+  VpiObject expr;
+  expr.type = vpiOperation;
+
+  VpiObject body;
+  body.type = vpiBegin;
+
+  VpiObject forever_stmt;
+  forever_stmt.type = vpiForever;
+  forever_stmt.children = {&expr, &body};
+
+  EXPECT_EQ(vpi_handle(vpiCondition, &forever_stmt), nullptr);
+  EXPECT_EQ(vpi_handle(vpiStmt, &forever_stmt), &body);
 }
 
 }  // namespace

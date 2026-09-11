@@ -568,28 +568,14 @@ bool TryResolveTypespecClassRelation(int type, VpiHandle ref, VpiHandle& out) {
   return false;
 }
 
-// §37.63: a process reaches the statement that is its body through vpiStmt.
-// §37.66 draws that same arrow: the enclosure holding `while` and `repeat`
-// carries an untagged single arrow to `stmt`, and §37.4.3 makes an untagged
-// relation's type the enclosure's words with "vpi" in front, so the body of a
-// loop is reached by the one relation the body of a process is.
-//
-// It was reached by nothing. §37.4.1 makes the dotted `stmt` enclosure a class
-// that "groups other objects and classes" rather than an object kind, so no
-// statement a design holds has vpiStmt for its own type; a while or repeat fell
-// through to the traversal that looks for a child whose type is the relation
-// tag, and found a body only where a caller had built an object out of the tag
-// itself. The body is the first child of a kind the class groups, which is what
-// the process arm already asks for.
+// §37.63/§37.66/§37.67/§37.70: the body statement the object model draws an
+// untagged arrow to `stmt` for. VpiIsBodyStmtOwnerType names the kinds that
+// draw it and says why they are one relation rather than four; the body itself
+// is the first child of a kind the `stmt` class groups, because §37.4.1 makes
+// that enclosure a class and no statement of a design carries the class's name
+// for its own type.
 bool TryResolveBodyStmtRelation(int type, VpiHandle ref, VpiHandle& out) {
-  if (type != vpiStmt) return false;
-  // §37.67 draws the same untagged arrow from the `waits` enclosure, so a wait,
-  // an ordered wait and a wait fork reach a body by the relation a process and
-  // a loop reach one by.
-  if (!VpiIsProcessType(ref->type) && !VpiIsWhileOrRepeatType(ref->type) &&
-      !VpiIsWaitType(ref->type)) {
-    return false;
-  }
+  if (type != vpiStmt || !VpiIsBodyStmtOwnerType(ref->type)) return false;
   for (auto* child : ref->children) {
     if (!VpiIsScopeBodyStmtType(child->type)) continue;
     out = child;
