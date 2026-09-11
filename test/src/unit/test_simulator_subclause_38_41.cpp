@@ -77,5 +77,42 @@ TEST_F(VpiVprintfSim, EmptyFormatStringWritesNothingAndReturnsZero) {
   EXPECT_TRUE(vpi_ctx_.LogFileBuffer().empty());
 }
 
+// §38.41: "This routine performs the same function as vpi_printf(), except
+// that varargs have already been started." The exception is where the arguments
+// come from and nothing else, so the same format and the same arguments reach
+// the same two destinations with the same text and the same count, whichever of
+// the two routines a PLI application called. Each call is given a context of
+// its own so that what one wrote is what is compared, rather than one buffer
+// holding both.
+TEST_F(VpiVprintfSim, PerformsTheSameFunctionAsVpiPrintf) {
+  PLI_INT32 by_vprintf = CallWithStartedVarargs("count=%d of %s", 7, "ten");
+  const std::string kChannelByVprintf = vpi_ctx_.OutputChannelBuffer();
+  const std::string kLogByVprintf = vpi_ctx_.LogFileBuffer();
+  ASSERT_FALSE(kChannelByVprintf.empty());
+
+  VpiContext printf_ctx;
+  SetGlobalVpiContext(&printf_ctx);
+  PLI_INT32 by_printf =
+      vpi_printf(const_cast<PLI_BYTE8*>("count=%d of %s"), 7, "ten");
+
+  EXPECT_EQ(by_vprintf, by_printf);
+  EXPECT_EQ(kChannelByVprintf, printf_ctx.OutputChannelBuffer());
+  EXPECT_EQ(kLogByVprintf, printf_ctx.LogFileBuffer());
+}
+
+// §38.41 Returns: "the number of characters written" - the characters that
+// reached the destinations, which is the expansion rather than the format that
+// produced it. Here the argument is wider than the conversion that carries it,
+// so the two lengths differ and only the expansion's answers.
+TEST_F(VpiVprintfSim, ReturnsTheLengthOfTheExpansionRatherThanOfTheFormat) {
+  PLI_INT32 written = CallWithStartedVarargs("n=%d", 1000);
+
+  const std::string kExpected = "n=1000";
+  EXPECT_EQ(written, static_cast<PLI_INT32>(kExpected.size()));
+  EXPECT_NE(written, static_cast<PLI_INT32>(std::string("n=%d").size()));
+  EXPECT_EQ(vpi_ctx_.OutputChannelBuffer(), kExpected);
+  EXPECT_EQ(vpi_ctx_.LogFileBuffer(), kExpected);
+}
+
 }  // namespace
 }  // namespace delta
