@@ -302,6 +302,29 @@ void PutValueArrayElement(VpiHandle obj, const VpiArrayValue* arrayvalue_p,
   }
 }
 
+// §38.16: whether the requested format suits the data type of the array's
+// elements. The clause names the element kinds three of the formats are
+// appropriate for - vpiShortIntVal "only for arrays of vpiShortIntVar or
+// vpiByteVar elements", vpiLongIntVal "for arrays of vpiLongIntVar,
+// vpiShortIntVar or vpiByteVar elements", and vpiShortRealVal "only for arrays
+// of vpiShortRealVar elements". Every other format it lists is one it allows of
+// any element type: the raw and vector formats are drawn for 4-state arrays and
+// "can also be requested of a 2-state array type", and the reverse, which is
+// the "except where explicitly allowed" the error rule carves out.
+bool VpiArrayFormatSuitsElementType(int fmt, int elem_type) {
+  switch (fmt) {
+    case kVpiShortIntVal:
+      return elem_type == vpiShortIntVar || elem_type == vpiByteVar;
+    case kVpiLongIntVal:
+      return elem_type == vpiLongIntVar || elem_type == vpiShortIntVar ||
+             elem_type == vpiByteVar;
+    case kVpiShortRealVal:
+      return elem_type == vpiShortRealVar;
+    default:
+      return true;
+  }
+}
+
 // §38.16: validate the target handle, format, and starting coordinate for
 // vpi_get_value_array(). On a rejected precondition false is returned and
 // *out_err_msg names the failure; on success *out_start_ordinal holds the flat
@@ -327,6 +350,21 @@ bool ValidateGetValueArrayRequest(VpiHandle obj, VpiArrayValue* arrayvalue_p,
   if (!VpiArrayPutFormatSupported(static_cast<int>(arrayvalue_p->format))) {
     *out_err_msg =
         "vpi_get_value_array() was given an unsupported value format";
+    return false;
+  }
+
+  // §38.16: "formats requested that are inconsistent with the data type of the
+  // array elements (except where explicitly allowed) shall be considered an
+  // error". The data type in question is the elements' own, so it is read off
+  // them; an array holding none has no data type for a format to disagree with.
+  // Only the format's being one the routine knows was checked, so a request for
+  // shorts of an array of anything at all was answered with shorts.
+  if (!obj->children.empty() &&
+      !VpiArrayFormatSuitsElementType(static_cast<int>(arrayvalue_p->format),
+                                      obj->children.front()->type)) {
+    *out_err_msg =
+        "vpi_get_value_array() was given a format the array's element data "
+        "type does not support";
     return false;
   }
 

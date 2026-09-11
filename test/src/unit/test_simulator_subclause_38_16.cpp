@@ -194,6 +194,7 @@ TEST_F(VpiGetValueArraySim, VectorValReturnsAvalAndBvalGroups) {
 // bits.
 TEST_F(VpiGetValueArraySim, LongIntValReturnsSixtyFourBitElements) {
   VpiHandle arr = MakeArray("li", {{0}}, 1, 64);
+  arr->children[0]->type = vpiLongIntVar;  // a kind §38.16 names for the format
   SetElem(0, 0x1122334455667788ull);
 
   s_vpi_arrayvalue av = {};
@@ -209,6 +210,7 @@ TEST_F(VpiGetValueArraySim, LongIntValReturnsSixtyFourBitElements) {
 // through the *shortints arm.
 TEST_F(VpiGetValueArraySim, ShortIntValReturnsShortsPerElement) {
   VpiHandle arr = MakeArray("si", {{0, 1}}, 2, 16);
+  for (auto* elem : arr->children) elem->type = vpiShortIntVar;
   SetElem(0, 0x0102);
   SetElem(1, 0x0304);
 
@@ -226,6 +228,7 @@ TEST_F(VpiGetValueArraySim, ShortIntValReturnsShortsPerElement) {
 // *shortreals arm; the element value is delivered as its floating-point form.
 TEST_F(VpiGetValueArraySim, ShortRealValReturnsFloatsPerElement) {
   VpiHandle arr = MakeArray("sr", {{0, 1}}, 2, 32);
+  for (auto* elem : arr->children) elem->type = vpiShortRealVar;
   SetElem(0, 42);
   SetElem(1, 7);
 
@@ -309,6 +312,59 @@ TEST_F(VpiGetValueArraySim, TimeValReturnsTimeWordsPerElement) {
   ASSERT_NE(av.value.times, nullptr);
   EXPECT_EQ(av.value.times[0].high, 2u);
   EXPECT_EQ(av.value.times[0].low, 5u);
+}
+
+// §38.16: "formats requested that are inconsistent with the data type of the
+// array elements (except where explicitly allowed) shall be considered an
+// error." The clause says what each of these three suits - vpiShortIntVal
+// "only for arrays of vpiShortIntVar or vpiByteVar elements", vpiLongIntVal
+// for those or vpiLongIntVar, vpiShortRealVal "only for arrays of
+// vpiShortRealVar elements" - so an array of regs asked for any of them is the
+// inconsistent request, and the routine reports the error and nulls the value
+// arm rather than answering with shorts, longs or floats it invented.
+TEST_F(VpiGetValueArraySim, AFormatTheElementTypeDoesNotSupportIsAnError) {
+  for (int format : {vpiShortIntVal, vpiLongIntVal, vpiShortRealVal}) {
+    VpiHandle arr = MakeArray("w", {{0, 1}}, 2, 32);  // elements are regs
+    SetElem(0, 1);
+    SetElem(1, 2);
+
+    PLI_INT32 sentinel[2] = {0, 0};
+    s_vpi_arrayvalue av = {};
+    av.format = static_cast<PLI_UINT32>(format);
+    av.value.integers = sentinel;  // non-NULL going in
+    PLI_INT32 index[1] = {0};
+    vpi_get_value_array(arr, &av, index, 2);
+
+    SVpiErrorInfo info = {};
+    EXPECT_EQ(vpi_chk_error(&info), vpiError) << "format " << format;
+    EXPECT_EQ(av.value.integers, nullptr) << "format " << format;
+  }
+}
+
+// §38.16's "except where explicitly allowed": the raw and vector formats are
+// drawn for 4-state arrays and "can also be requested of a 2-state array type",
+// and vpiRawTwoStateVal "can be requested for a 4-state array type". So none of
+// them is inconsistent with any element data type, and a request for one is
+// answered rather than refused whatever the elements are.
+TEST_F(VpiGetValueArraySim, TheRawAndVectorFormatsSuitEveryElementType) {
+  for (int format : {vpiRawFourStateVal, vpiRawTwoStateVal, vpiVectorVal}) {
+    VpiHandle arr = MakeArray("a", {{0}}, 1, 8);  // elements are regs
+    arr->children[0]->type = vpiShortRealVar;     // and a kind of their own
+    SetElem(0, 0x5A);
+
+    s_vpi_arrayvalue av = {};
+    av.format = static_cast<PLI_UINT32>(format);
+    PLI_INT32 index[1] = {0};
+    vpi_get_value_array(arr, &av, index, 1);
+
+    SVpiErrorInfo info = {};
+    EXPECT_EQ(vpi_chk_error(&info), 0) << "format " << format;
+    if (format == vpiVectorVal) {
+      EXPECT_NE(av.value.vectors, nullptr) << "format " << format;
+    } else {
+      EXPECT_NE(av.value.rawvals, nullptr) << "format " << format;
+    }
+  }
 }
 
 }  // namespace
