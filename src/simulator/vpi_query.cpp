@@ -143,6 +143,19 @@ int VpiGetIsFinal(VpiHandle obj) {
   return obj->is_final ? 1 : 0;
 }
 
+// §37.19: the figure draws "-> constant selection / bool: vpiConstantSelect" on
+// a var select, and §37.4.2's key reads a Boolean property with vpi_get().
+// Nothing answered the property at all, so the one normative detail §37.19 owns
+// was computed by a helper no caller reached and the figure's property was
+// unreadable. §37.58 detail 3 owns the property for a bit select and §37.19
+// detail 1 for a var select, so each clause's rule answers for its own object;
+// any other kind reports 0, its own clause owning what the property means for
+// it.
+int VpiGetConstantSelect(VpiHandle obj) {
+  if (VpiVarSelectConstantSelectOf(obj)) return 1;
+  return VpiBitSelectConstantSelectOf(obj) ? 1 : 0;
+}
+
 // Handles the integer properties whose value depends on the object kind (each
 // drawn only on certain kinds, reporting vpiUndefined/0 otherwise). On a match
 // sets handled=true and returns the property value; otherwise leaves handled
@@ -174,20 +187,8 @@ int VpiGetTypeRestricted(int property, VpiHandle obj, bool& handled) {
       return VpiScalarVectorAppliesTo(obj->type) && VpiPortVector(obj->size)
                  ? 1
                  : 0;
-    // §37.19: the figure draws "-> constant selection / bool:
-    // vpiConstantSelect" on a var select, and §37.4.2's key reads a Boolean
-    // property with vpi_get(). Nothing answered the property at all, so the one
-    // normative detail §37.19 owns was computed by a helper no caller reached
-    // and the figure's property was unreadable. Detail 1's rule is applied to a
-    // var select; another object kind reports 0, its own clause owning what the
-    // property means for it.
     case vpiConstantSelect:
-      // §37.58 detail 3 owns the property for a bit-select, §37.19 detail 1 for
-      // a var select; each clause's rule answers for its own object.
-      return VpiVarSelectConstantSelectOf(obj) ||
-                     VpiBitSelectConstantSelectOf(obj)
-                 ? 1
-                 : 0;
+      return VpiGetConstantSelect(obj);
     // §37.14 details 7 and 9: the port index gives port order; it does not
     // apply to a port bit, which reports vpiUndefined.
     case vpiPortIndex:
