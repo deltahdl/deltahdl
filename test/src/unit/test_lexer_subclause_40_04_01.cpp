@@ -142,4 +142,30 @@ TEST(FsmStatePragmaLexing, IgnoresPartSelectAndConcatenationForms) {
       CollectFsmPragmas("/* tool state_vector {hi, lo} fsm enum e */").empty());
 }
 
+// The signal a pragma identifies and the enumeration it binds are identifiers
+// of the surrounding source, so the names a pragma can carry are the names a
+// declaration can give: §5.6 makes a simple identifier any sequence of letters,
+// digits, dollar signs and underscores. A signal declared with a dollar sign in
+// its name is identified as the vector holding the current state like any
+// other.
+TEST(FsmStatePragmaLexing, NamesMayCarryDollarSignsAsIdentifiersDo) {
+  auto pragmas = CollectFsmPragmas("/* tool state_vector n$657 enum e$num */");
+  ASSERT_EQ(pragmas.size(), 1u);
+  EXPECT_EQ(pragmas[0].form, "state_vector");
+  EXPECT_EQ(pragmas[0].signal, "n$657");
+  EXPECT_TRUE(pragmas[0].has_enum);
+  EXPECT_EQ(pragmas[0].enum_name, "e$num");
+}
+
+// §5.6: the first character of a simple identifier shall not be a digit or a
+// dollar sign. A word opening with one names nothing the source could have
+// declared, so the comment identifies no signal and is not an FSM pragma -
+// whichever of the two names it stands in.
+TEST(FsmStatePragmaLexing, NamesMayNotOpenWithADigitOrDollarSign) {
+  EXPECT_TRUE(CollectFsmPragmas("/* tool state_vector $state */").empty());
+  EXPECT_TRUE(CollectFsmPragmas("/* tool state_vector 1state */").empty());
+  EXPECT_TRUE(
+      CollectFsmPragmas("/* tool state_vector cur_state enum $e */").empty());
+}
+
 }  // namespace

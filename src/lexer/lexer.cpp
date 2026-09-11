@@ -218,6 +218,12 @@ uint32_t Lexer::SkipBlockComment(SourceLoc start_loc) {
 }
 
 bool Lexer::IsSimplePragmaIdentifier(std::string_view word) {
+  // The names a §40.4 pragma carries - the signal holding the current state,
+  // the enumeration binding it to an FSM, the FSM the tool reports - are
+  // identifiers of the surrounding source, so what counts as one here is what
+  // §5.6 counts as a simple identifier: any sequence of letters, digits, dollar
+  // signs and underscores, whose first character is a letter or an underscore
+  // and never a digit or a dollar sign.
   if (word.empty()) {
     return false;
   }
@@ -226,7 +232,7 @@ bool Lexer::IsSimplePragmaIdentifier(std::string_view word) {
     return false;
   }
   for (char c : word) {
-    if (!std::isalnum(static_cast<unsigned char>(c)) && c != '_') {
+    if (!std::isalnum(static_cast<unsigned char>(c)) && c != '_' && c != '$') {
       return false;
     }
   }
