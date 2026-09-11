@@ -148,4 +148,31 @@ TEST(CoverageGet, TheScopeDefinitionDecidesWhatIsSummed) {
   EXPECT_EQ(get(10 /* `SV_COV_MODULE */, "top.dut"), 5);
 }
 
+// §40.3.2.1 Table 40-2's definition-name column reaches this query too, which
+// is what §40.3.2.3 means by the current coverage "in this/these
+// hierarchy(ies)": a string that is not an instance path names a module
+// definition, and what has been covered is then summed over every instance of
+// that module - with the hierarchy below those instances under `SV_COV_HIER and
+// without it under `SV_COV_MODULE.
+TEST(CoverageGet, ADefinitionNameSumsOverEveryInstanceOfThatModule) {
+  SimFixture f;
+  Cov(f).SetCoveredItems("top.u1", kToggle, 2);
+  Cov(f).SetModuleDefinition("top.u1", "leaf");
+  Cov(f).SetCoveredItems("top.u2", kToggle, 4);
+  Cov(f).SetModuleDefinition("top.u2", "leaf");
+  Cov(f).SetCoveredItems("top.u2.inner", kToggle, 8);
+  Cov(f).SetModuleDefinition("top.u2.inner", "other");
+
+  auto get = [&f](int scope_def, std::string_view scope) {
+    auto* call = MkSysCall(f.arena, "$coverage_get",
+                           {MkInt(f.arena, static_cast<uint64_t>(kToggle)),
+                            MkInt(f.arena, static_cast<uint64_t>(scope_def)),
+                            MkStr(f.arena, scope)});
+    return static_cast<int32_t>(EvalExpr(call, f.ctx, f.arena).ToUint64());
+  };
+
+  EXPECT_EQ(get(11 /* `SV_COV_HIER */, "leaf"), 14);
+  EXPECT_EQ(get(10 /* `SV_COV_MODULE */, "leaf"), 6);
+}
+
 }  // namespace

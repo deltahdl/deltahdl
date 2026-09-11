@@ -263,6 +263,44 @@ TEST(CoverageControl, APartlyCoverableHierarchyReportsPartial) {
   EXPECT_EQ(RunControlWithScopeDef(f, kStart, kSvCovModule, "top.dut"), kOk);
 }
 
+// §40.3.2.1 Table 40-2, the definition-name column: a string that is not an
+// instance path names a module definition, and the control then applies to "all
+// instances of the given module" rather than to one. `SV_COV_MODULE excludes
+// the hierarchy below each of those instances, which is what the child instance
+// left uncollected here shows, and the status reported is of everything the
+// call reached.
+TEST(CoverageControl, ADefinitionNameControlsEveryInstanceOfThatModule) {
+  SimFixture f;
+  Cov(f).SetAvailability("top.u1", CoverageAvailability::kFull);
+  Cov(f).SetModuleDefinition("top.u1", "leaf");
+  Cov(f).SetAvailability("top.u2", CoverageAvailability::kFull);
+  Cov(f).SetModuleDefinition("top.u2", "leaf");
+  Cov(f).SetAvailability("top.u2.inner", CoverageAvailability::kFull);
+  Cov(f).SetModuleDefinition("top.u2.inner", "other");
+
+  EXPECT_EQ(RunControlWithScopeDef(f, kStart, kSvCovModule, "leaf"), kOk);
+
+  EXPECT_TRUE(Cov(f).IsCollecting("top.u1"));
+  EXPECT_TRUE(Cov(f).IsCollecting("top.u2"));
+  EXPECT_FALSE(Cov(f).IsCollecting("top.u2.inner"));
+}
+
+// §40.3.2.1: a hierarchy is partly available when any part of it is, and under
+// a definition name the hierarchy is every instance of the module together. So
+// one instance offering no coverage is what makes a start over all of them
+// `SV_COV_PARTIAL, where the same start over the covered instance alone reports
+// `SV_COV_OK.
+TEST(CoverageControl, ADefinitionNameReportsTheStatusOfAllItsInstances) {
+  SimFixture f;
+  Cov(f).SetAvailability("top.u1", CoverageAvailability::kFull);
+  Cov(f).SetModuleDefinition("top.u1", "leaf");
+  Cov(f).SetAvailability("top.u2", CoverageAvailability::kNone);
+  Cov(f).SetModuleDefinition("top.u2", "leaf");
+
+  EXPECT_EQ(RunControlWithScopeDef(f, kCheck, kSvCovHier, "leaf"), kPartial);
+  EXPECT_EQ(RunControlWithScopeDef(f, kCheck, kSvCovHier, "top.u1"), kOk);
+}
+
 // §40.3.2.1: the scope definitions are the two the clause names, and a call
 // that wrote something else wrote a bad argument - reported with `SV_COV_ERROR
 // "on all operations ... typically due to errors in arguments" - rather than

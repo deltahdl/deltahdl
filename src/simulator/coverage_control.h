@@ -15,11 +15,13 @@
 // drives the same model when it evaluates a call. This mirrors the §40.5.2
 // coverage-query helpers in vpi_coverage.h.
 
+#include <cstddef>
 #include <cstdint>
 #include <limits>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
 namespace delta {
 
@@ -86,6 +88,20 @@ class CoverageControlState {
     return scopes_.find(scope) != scopes_.end();
   }
 
+  // Registers the module definition a scope is an instance of, mirroring what
+  // elaboration records against each instance it creates. §40.3.2.1 Table 40-2
+  // gives the string beside the scope_def two readings, and this is what tells
+  // them apart: an instance name is the hierarchical path of one scope, while a
+  // definition name stands for "all instances of the given module" and so names
+  // as many scopes as the design instantiated. That second reading is why
+  // §40.3.2.2 and §40.3.2.3 sum over "hierarchy(ies)" rather than over one
+  // hierarchy. A scope registered without a definition is an instance of
+  // nothing any string can name, and is reachable only by its own path.
+  void SetModuleDefinition(const std::string& scope,
+                           const std::string& definition) {
+    scopes_[scope].definition = definition;
+  }
+
   // Registers the number of coverable items of `coverage_type` a scope holds,
   // mirroring what a real coverage engine derives from the design structure.
   // §40.3.2.2 reports this count, summed over the hierarchy, as the value that
@@ -107,15 +123,18 @@ class CoverageControlState {
 
   // §40.3.2.2 ($coverage_get_max): returns the value representing 100% coverage
   // for `coverage_type` over `scope` — the sum of all coverable items of that
-  // type in the hierarchy. That sum is a property of the design structure, not
-  // of the collection state, so it stays constant for the whole simulation;
-  // starting, stopping, or resetting coverage never changes it.
+  // type "over the given hierarchy(ies)". `scope` is read per §40.3.2.1, so it
+  // is one instance or, as a module definition name, every instance of that
+  // module, which is the plural the clause writes. That sum is a property of
+  // the design structure, not of the collection state, so it stays constant for
+  // the whole simulation; starting, stopping, or resetting coverage never
+  // changes it.
   //
-  // The integer result follows §40.3.2.2: a scope the design does not contain
-  // is a bad argument (`SV_COV_ERROR); a scope with no coverable items of the
-  // type offers no coverage (`SV_COV_NOCOV, 0); a count too large to represent
-  // as an integer overflows (`SV_COV_OVERFLOW); otherwise the positive sum is
-  // the maximum coverage number.
+  // The integer result follows §40.3.2.2: a string the design holds no scope
+  // for is a bad argument (`SV_COV_ERROR); scopes with no coverable items of
+  // the type offer no coverage (`SV_COV_NOCOV, 0); a count too large to
+  // represent as an integer overflows (`SV_COV_OVERFLOW); otherwise the
+  // positive sum is the maximum coverage number.
   int CoverageMax(const std::string& scope, int coverage_type,
                   bool include_below = true) const {
     return HierarchyCount(scope, coverage_type, include_below,
@@ -124,12 +143,13 @@ class CoverageControlState {
 
   // §40.3.2.3 ($coverage_get): returns the current coverage value for
   // `coverage_type` over `scope` — the sum of the coverable items of that type
-  // that have been covered so far in the hierarchy. The return follows the same
-  // pattern as §40.3.2.2, but the positive value is the current coverage level
-  // rather than the maximum, so it can grow as collection proceeds.
+  // that have been covered so far in the hierarchy, or in every hierarchy where
+  // `scope` is a module definition name. The return follows the same pattern as
+  // §40.3.2.2, but the positive value is the current coverage level rather than
+  // the maximum, so it can grow as collection proceeds.
   //
-  // The integer result follows §40.3.2.3: a scope the design does not contain
-  // is a bad argument (`SV_COV_ERROR); a count too large to represent as an
+  // The integer result follows §40.3.2.3: a string the design holds no scope
+  // for is a bad argument (`SV_COV_ERROR); a count too large to represent as an
   // integer overflows (`SV_COV_OVERFLOW); a coverage type with nothing covered
   // (no entry, or none of its items covered yet) reports no coverage
   // (`SV_COV_NOCOV, 0, since a positive value is strictly greater than zero);
@@ -280,20 +300,11 @@ class CoverageControlState {
     return Field(scope, &ScopeState::resets);
   }
 
-  // Performs the §40.3.2.1 action selected by `control` over `scope` and
-  // returns the resulting §40.3.1 status.
-  // §40.3.2.1 Table 40-2: what one call names depends on the scope_def
-  // argument beside the scope. `SV_COV_HIER names "the named instance and any
-  // hierarchy below it"; `SV_COV_MODULE names "just the named instance,
-  // excluding any hierarchy in instances below that instance". `include_below`
-  // is that argument, and a scope lies below another when its hierarchical
-  // path continues that path past a dot.
-  //
-  // The table's other column, where the string is a module definition name
-  // rather than an instance path, asks for the sum over "all instances of the
-  // given module". This model holds the scopes under the names the design
-  // registered them by and has no definition-to-instances map to walk, so a
-  // definition name is the one scope registered under it.
+  // §40.3.2.1 Table 40-2: how far below a root one call reaches depends on the
+  // scope_def argument beside the scope. `SV_COV_HIER names "the named instance
+  // and any hierarchy below it"; `SV_COV_MODULE names "just the named instance,
+  // excluding any hierarchy in instances below that instance". A scope lies
+  // below another when its hierarchical path continues that path past a dot.
   static bool ScopeIsBelow(const std::string& root,
                            const std::string& candidate) {
     return candidate.size() > root.size() + 1 &&
@@ -301,31 +312,35 @@ class CoverageControlState {
            candidate[root.size()] == '.';
   }
 
+  // Performs the §40.3.2.1 action selected by `control` over every scope
+  // `scope` names - one instance, or every instance of a module definition -
+  // and returns the resulting §40.3.1 status of the whole of it.
   CoverageStatus Control(CoverageControl control, const std::string& scope,
                          bool include_below = true) {
-    auto it = scopes_.find(scope);
-    // A scope the design does not contain is a bad argument: §40.3.2.1 reports
+    std::vector<std::string> roots = NamedScopes(scope);
+    // A string that names no scope is a bad argument: §40.3.2.1 reports
     // `SV_COV_ERROR for errors such as a nonexisting module.
-    if (it == scopes_.end()) {
+    if (roots.empty()) {
       return CoverageStatus::kError;
     }
-    CoverageStatus status = ControlOne(control, it->second);
-    if (!include_below) return status;
-    // §40.3.2.1: over a hierarchy, the operation is applied to everything in it
-    // and the status reported is of the hierarchy - `SV_COV_PARTIAL "denotes
-    // that coverage is only partially available in the specified hierarchy",
-    // which is what a scope below the named one reporting something else makes
-    // of a start or a check.
-    for (auto& entry : scopes_) {
-      if (!ScopeIsBelow(scope, entry.first)) continue;
-      status =
-          CombineHierarchyStatus(status, ControlOne(control, entry.second));
+    CoverageStatus status =
+        ControlHierarchy(control, roots.front(), include_below);
+    // Table 40-2's definition-name column applies the operation to all
+    // instances of the module, so the status reported is of all of them
+    // together, on the same reading of a partly covered hierarchy.
+    for (std::size_t i = 1; i < roots.size(); ++i) {
+      status = CombineHierarchyStatus(
+          status, ControlHierarchy(control, roots[i], include_below));
     }
     return status;
   }
 
  private:
   struct ScopeState {
+    // §40.3.2.1 Table 40-2: the module definition this scope is an instance of,
+    // which is the name the table's definition-name column reaches it by. Empty
+    // where nothing registered one.
+    std::string definition;
     CoverageAvailability availability = CoverageAvailability::kNone;
     bool collecting = false;
     bool has_data = false;  // coverage accumulated since the last reset
@@ -340,6 +355,46 @@ class CoverageControlState {
     // current coverage level. Keyed by the §40.3.1 coverage-type constant.
     std::unordered_map<int, std::int64_t> covered_items;
   };
+
+  // §40.3.2.1 Table 40-2's two columns: the root scopes one string names. A
+  // string that is the hierarchical path of a registered scope is that
+  // instance, and only that instance; any other string is read as a module
+  // definition name, which names every instance of that module. The path is
+  // tried first because the table's note has instance names "referenced by
+  // hierarchical paths", so a string the design registered a scope under is the
+  // scope it registered - reading it as a definition instead would reach that
+  // scope only when some other instance happened to share the name. A string
+  // that is neither names nothing, which is the nonexisting module §40.3.2.1
+  // calls a bad argument; the empty string of a call that named no scope at all
+  // is one of those, rather than a definition every undeclared instance shares.
+  std::vector<std::string> NamedScopes(const std::string& name) const {
+    if (name.empty()) return {};
+    if (scopes_.find(name) != scopes_.end()) return {name};
+    std::vector<std::string> instances;
+    for (const auto& entry : scopes_) {
+      if (entry.second.definition == name) instances.push_back(entry.first);
+    }
+    return instances;
+  }
+
+  // The action over one root scope and, where the scope_def argument said to
+  // include it, the hierarchy below that root.
+  CoverageStatus ControlHierarchy(CoverageControl control,
+                                  const std::string& root, bool include_below) {
+    CoverageStatus status = ControlOne(control, scopes_.find(root)->second);
+    if (!include_below) return status;
+    // §40.3.2.1: over a hierarchy, the operation is applied to everything in it
+    // and the status reported is of the hierarchy - `SV_COV_PARTIAL "denotes
+    // that coverage is only partially available in the specified hierarchy",
+    // which is what a scope below the named one reporting something else makes
+    // of a start or a check.
+    for (auto& entry : scopes_) {
+      if (!ScopeIsBelow(root, entry.first)) continue;
+      status =
+          CombineHierarchyStatus(status, ControlOne(control, entry.second));
+    }
+    return status;
+  }
 
   // The one-scope control, which the hierarchy walk above applies to each scope
   // it names.
@@ -437,24 +492,23 @@ class CoverageControlState {
   }
 
   // §40.3.2.1 Table 40-2 for the two query functions: the count of one
-  // coverage type over the scopes a call names - the named scope, and the
-  // hierarchy below it where the scope_def argument said to include it. The
-  // §40.3.2.2/§40.3.2.3 result rules are applied to the sum: a scope the design
-  // does not contain is a bad argument, a sum of nothing is no coverage, and a
-  // sum too large to represent overflows.
+  // coverage type over the scopes a call names - the scopes the string names,
+  // and the hierarchy below each of them where the scope_def argument said to
+  // include it. Summing over the instances of a module definition is what
+  // §40.3.2.2 and §40.3.2.3 mean by the count "over the given hierarchy(ies)".
+  // The §40.3.2.2/§40.3.2.3 result rules are applied to the sum: a string the
+  // design holds no scope for is a bad argument, a sum of nothing is no
+  // coverage, and a sum too large to represent overflows.
   int HierarchyCount(
       const std::string& scope, int coverage_type, bool include_below,
       std::unordered_map<int, std::int64_t> ScopeState::* member) const {
-    auto it = scopes_.find(scope);
-    if (it == scopes_.end()) {
+    std::vector<std::string> roots = NamedScopes(scope);
+    if (roots.empty()) {
       return static_cast<int>(CoverageStatus::kError);
     }
-    std::int64_t total = ScopeCount(it->second.*member, coverage_type);
-    if (include_below) {
-      for (const auto& entry : scopes_) {
-        if (!ScopeIsBelow(scope, entry.first)) continue;
-        total += ScopeCount(entry.second.*member, coverage_type);
-      }
+    std::int64_t total = 0;
+    for (const auto& root : roots) {
+      total += HierarchyItems(root, coverage_type, include_below, member);
     }
     if (total <= 0) {
       return static_cast<int>(CoverageStatus::kNoCoverage);
@@ -464,6 +518,21 @@ class CoverageControlState {
       return static_cast<int>(CoverageStatus::kOverflow);
     }
     return static_cast<int>(total);
+  }
+
+  // The count of one coverage type over one root scope and, where the scope_def
+  // argument said to include it, the hierarchy below that root.
+  std::int64_t HierarchyItems(
+      const std::string& root, int coverage_type, bool include_below,
+      std::unordered_map<int, std::int64_t> ScopeState::* member) const {
+    std::int64_t total =
+        ScopeCount(scopes_.find(root)->second.*member, coverage_type);
+    if (!include_below) return total;
+    for (const auto& entry : scopes_) {
+      if (!ScopeIsBelow(root, entry.first)) continue;
+      total += ScopeCount(entry.second.*member, coverage_type);
+    }
+    return total;
   }
 
   // One scope's count of a coverage type, which is nothing where it holds no
