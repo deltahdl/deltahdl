@@ -96,5 +96,87 @@ TEST_F(VpiReleaseHandleSim, FreesAnIteratorReleasedBeforeExhaustion) {
   EXPECT_EQ(vpi_release_handle(iter), 1);
 }
 
+// Iterator paragraph, the other half of it: the memory vpi_release_handle()
+// frees for an iterator is the iterator's own. §38.38 dates the rest of what
+// the traversal touched to somewhere else - "often all required memory has been
+// allocated when the underlying object was first created or elaborated" - so
+// releasing the iterator leaves the objects it was walking exactly where they
+// were, and a fresh iteration over the same scope reaches every one of them
+// again.
+TEST_F(VpiReleaseHandleSim,
+       ReleasingAnIteratorLeavesTheObjectsItWalkedInPlace) {
+  VpiObject first_child;
+  first_child.type = vpiModule;
+  VpiObject second_child;
+  second_child.type = vpiModule;
+
+  VpiObject scope;
+  scope.type = vpiModule;
+  scope.children = {&first_child, &second_child};
+
+  vpiHandle iter = vpi_iterate(vpiModule, &scope);
+  ASSERT_NE(iter, nullptr);
+  ASSERT_EQ(vpi_scan(iter), &first_child);
+  ASSERT_EQ(vpi_release_handle(iter), 1);
+
+  EXPECT_FALSE(vpi_ctx_.HandleReleased(&first_child));
+  EXPECT_FALSE(vpi_ctx_.HandleReleased(&second_child));
+  EXPECT_FALSE(vpi_ctx_.HandleReleased(&scope));
+  EXPECT_EQ(vpi_get(vpiType, &first_child), vpiModule);
+
+  vpiHandle again = vpi_iterate(vpiModule, &scope);
+  ASSERT_NE(again, nullptr);
+  EXPECT_EQ(vpi_scan(again), &first_child);
+  EXPECT_EQ(vpi_scan(again), &second_child);
+  EXPECT_EQ(vpi_scan(again), nullptr);
+}
+
+// Iterator paragraph, first sentence: "the iterator object shall automatically
+// be freed when vpi_scan() returns NULL because it has ... completed an object
+// traversal". A traversal run to its end therefore leaves the application
+// nothing to release - which is also what §38.38's advice to release a handle
+// excludes, "provided the handle is valid and will not automatically become
+// invalid in the future". The iterator here is never released by this test, and
+// the storage being gone rather than leaked is what the sanitizer build reads
+// back. The scope it walked is untouched, so a second iterator can be built
+// over it and this one released the way a broken-out-of loop releases its own.
+TEST_F(VpiReleaseHandleSim, AnExhaustedIteratorIsFreedWithoutARelease) {
+  VpiObject first_child;
+  first_child.type = vpiModule;
+  VpiObject second_child;
+  second_child.type = vpiModule;
+
+  VpiObject scope;
+  scope.type = vpiModule;
+  scope.children = {&first_child, &second_child};
+
+  vpiHandle iter = vpi_iterate(vpiModule, &scope);
+  ASSERT_NE(iter, nullptr);
+  EXPECT_EQ(vpi_scan(iter), &first_child);
+  EXPECT_EQ(vpi_scan(iter), &second_child);
+  EXPECT_EQ(vpi_scan(iter), nullptr);
+
+  vpiHandle again = vpi_iterate(vpiModule, &scope);
+  ASSERT_NE(again, nullptr);
+  EXPECT_EQ(vpi_scan(again), &first_child);
+  EXPECT_EQ(vpi_release_handle(again), 1);
+}
+
+// §38.38: "One may safely ignore calling vpi_release_handle() when a handle is
+// no longer needed, but it is always advisable to do so." The call is advice
+// rather than an obligation, so a handle nobody released is still a valid
+// handle to its object and still answers for it, and the release it never got
+// is one it can still be given later - succeeding then, because the handle was
+// valid the whole time.
+TEST_F(VpiReleaseHandleSim, AHandleThatIsNeverReleasedStaysValid) {
+  VpiObject obj;
+  obj.type = vpiModule;
+
+  EXPECT_TRUE(vpi_ctx_.HandleValid(&obj));
+  EXPECT_EQ(vpi_get(vpiType, &obj), vpiModule);
+
+  EXPECT_EQ(vpi_release_handle(&obj), 1);
+}
+
 }  // namespace
 }  // namespace delta
