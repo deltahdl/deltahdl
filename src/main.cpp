@@ -479,6 +479,15 @@ void RecordInvocationCommandLine(int argc, char* argv[]) {
 int main(int argc, char* argv[]) {
   RecordInvocationCommandLine(argc, argv);
 
+  // §38.37.2: the routines placed in the vlog_startup_routines[] array are the
+  // means of "initializing system task and system function callbacks and
+  // performing any other desired task just after the simulator is invoked", so
+  // the array the tool supplies is walked here, before the run decides what it
+  // is doing with its arguments. A system task a PLI application registers from
+  // one of these routines is then registered ahead of the compilation that
+  // resolves references to it.
+  delta::InvokeVlogStartupRoutines(vlog_startup_routines);
+
   delta::CliOptions opts;
   if (!delta::ParseArgs(argc, argv, opts)) {
     return 1;

@@ -36,3 +36,16 @@ using VlogStartupRoutine = void (*)();
 void InvokeVlogStartupRoutines(VlogStartupRoutine* routines);
 
 }  // namespace delta
+
+// §38.37.2: the vlog_startup_routines array the tool supplies, defined in
+// src/simulator/vlog_startup_routines.cpp, which is also where the vendor
+// definitions §38.37.2 asks for - the array's location and the procedure for
+// linking it with the tool - are written down. It is declared here so that the
+// walk just after the simulator is invoked, and a test of what the tool ships,
+// reach the same array a PLI application adds its register functions to.
+//
+// The declaration stands outside namespace delta because the name is the one
+// §38.37.2 fixes for a C function array: extern "C" gives the symbol C linkage
+// wherever it is written, and writing it at namespace scope would say a PLI
+// application reaches it as delta::vlog_startup_routines, which it does not.
+extern "C" delta::VlogStartupRoutine vlog_startup_routines[];

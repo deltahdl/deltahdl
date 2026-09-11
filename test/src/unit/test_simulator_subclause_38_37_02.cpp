@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <type_traits>
+
 #include "simulator/vpi.h"
 
 namespace delta {
@@ -93,6 +95,33 @@ TEST_F(VlogStartupArrayInitialization, ArrayPerformsAnyOtherDesiredTask) {
   ASSERT_EQ(vpi_ctx_.RegisteredCallbacks().size(), 1u);
   EXPECT_EQ(vpi_ctx_.RegisteredCallbacks()[0].reason, cbEndOfSimulation);
   EXPECT_EQ(vpi_ctx_.RegisteredCallbacks()[0].cb_rtn, &ReportCpuAtEnd);
+}
+
+// §38.37.2: "A tool vendor shall supply a file that contains the
+// vlog_startup_routines array", and the array definition it shall be supplied
+// with is "void (*vlog_startup_routines[]) ();". The symbol this test names is
+// the one src/simulator/vlog_startup_routines.cpp supplies, reached through the
+// extern "C" declaration in simulator/vpi_globals.h, so a tool that supplied no
+// such file would not link this test at all. What is left to check is the type:
+// an array of pointers to functions taking no arguments and returning nothing.
+TEST_F(VlogStartupArrayInitialization, ToolSuppliesTheArrayTheStandardDefines) {
+  EXPECT_TRUE(
+      (std::is_same_v<std::remove_extent_t<decltype(vlog_startup_routines)>,
+                      void (*)()>));
+}
+
+// §38.37.2: "Entries in the array shall be added by the user." The array the
+// tool supplies therefore holds nothing but the null terminator that ends it,
+// leaving every entry in it one somebody added to the vendor-supplied file: the
+// tool registers no system task, system function or callback of its own behind
+// a PLI application's back. Walking what is shipped registers nothing.
+TEST_F(VlogStartupArrayInitialization, SuppliedArrayHoldsOnlyItsTerminator) {
+  EXPECT_EQ(vlog_startup_routines[0], nullptr);
+
+  InvokeVlogStartupRoutines(vlog_startup_routines);
+
+  EXPECT_TRUE(vpi_ctx_.RegisteredSystfs().empty());
+  EXPECT_TRUE(vpi_ctx_.RegisteredCallbacks().empty());
 }
 
 }  // namespace
