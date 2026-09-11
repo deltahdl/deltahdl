@@ -280,10 +280,18 @@ void ComputeDriverLoadModes(int type, VpiHandle ref, VpiIterateModes& m) {
   // array object being what §37.17 represents an unpacked array of any variable
   // with.
   m.array_var_elements = ref && VpiIsArrayVarType(ref->type) && type == kVpiReg;
-  m.net_driver = ref && (ref->type == vpiNet || ref->type == vpiNetBit) &&
-                 type == vpiDriver;
-  m.net_load =
-      ref && (ref->type == vpiNet || ref->type == vpiNetBit) && type == vpiLoad;
+  // §37.45 (figure): a delay terminal's vpiDriver and vpiLoad are drawn to the
+  // `net drivers` and `net loads` classes of §37.46, not to §37.21's variable
+  // ones. A delay terminal was named by neither line, so both relations fell to
+  // the variable arm below and gathered the kinds that drive a variable - which
+  // a delay terminal connects to none of.
+  const bool kDelayTerm = ref && ref->type == vpiDelayTerm;
+  m.net_driver =
+      ref && (ref->type == vpiNet || ref->type == vpiNetBit || kDelayTerm) &&
+      type == vpiDriver;
+  m.net_load = ref &&
+               (ref->type == vpiNet || ref->type == vpiNetBit || kDelayTerm) &&
+               type == vpiLoad;
   m.variable_driver = ref && type == vpiDriver && !m.net_driver;
   m.variable_load = ref && type == vpiLoad && !m.net_load;
 }

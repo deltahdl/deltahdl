@@ -15,10 +15,13 @@ namespace {
 // terminals relative to the device's delay (the input term changes before the
 // delay, the output term not until after it); those are event-scheduling
 // semantics with no VPI query to observe, so they carry no production hook
-// here. The cross-edges to net drivers / net loads (vpiDriver / vpiLoad) and
-// the terminal value (vpi_get_value) are represented by other subclauses. These
-// tests observe the production code that applies the delay-device relations and
-// property through the public vpi_handle / vpi_get dispatch.
+// here. The terminal value (vpi_get_value) is the generic value machinery.
+// The cross-edges the figure draws from a terminal - vpiDriver to §37.46's
+// `net drivers` class and vpiLoad to its `net loads` class - are this clause's
+// own, because which class they reach is what the figure says about them; they
+// are exercised below. These tests observe the production code that applies the
+// delay-device relations, the cross-edges, and the property through the public
+// vpi_handle / vpi_iterate / vpi_get dispatch.
 
 // The fixture installs a context so the public entry points run their real
 // dispatch over the test objects.
@@ -114,6 +117,48 @@ TEST_F(DelayTerminals, ModuleRelationReachesEnclosingModule) {
   VpiObject orphan;
   orphan.type = vpiDelayDevice;
   EXPECT_EQ(vpi_handle(vpiModule, &orphan), nullptr);
+}
+
+// The figure's vpiDriver edge, drawn from a delay terminal to the `net drivers`
+// class. §37.46 is where that class is drawn, and its members are a port, a
+// force, a delay terminal, a continuous assignment or a primitive terminal - a
+// different set from §37.21's variable drivers. A delay terminal was named by
+// neither reference kind of the net arms, so the relation fell to the variable
+// arm and gathered the kinds that drive a variable, which a delay terminal
+// connects to none of.
+TEST_F(DelayTerminals, DriverFromATerminalReachesTheNetDriverKinds) {
+  VpiObject prim_term;
+  prim_term.type = vpiPrimTerm;  // a net driver, not a variable driver
+  VpiObject assign_stmt;
+  assign_stmt.type = vpiAssignStmt;  // a variable driver, not a net driver
+
+  VpiObject in_term;
+  in_term.type = vpiDelayTerm;
+  in_term.children = {&prim_term, &assign_stmt};
+
+  vpiHandle itr = vpi_iterate(vpiDriver, &in_term);
+  ASSERT_NE(itr, nullptr);
+  EXPECT_EQ(vpi_scan(itr), &prim_term);
+  EXPECT_EQ(vpi_scan(itr), nullptr);
+}
+
+// The same for the figure's vpiLoad edge from the output terminal, drawn to the
+// `net loads` class.
+TEST_F(DelayTerminals, LoadFromATerminalReachesTheNetLoadKinds) {
+  VpiObject assign_stmt;
+  assign_stmt.type = vpiAssignStmt;  // a net load
+  VpiObject port;
+  port.type = vpiPort;  // a net driver; §37.46 detail 1 keeps a bare one off
+                        // the load side
+
+  VpiObject out_term;
+  out_term.type = vpiDelayTerm;
+  out_term.children = {&assign_stmt, &port};
+
+  vpiHandle itr = vpi_iterate(vpiLoad, &out_term);
+  ASSERT_NE(itr, nullptr);
+  EXPECT_EQ(vpi_scan(itr), &assign_stmt);
+  EXPECT_EQ(vpi_scan(itr), nullptr);
 }
 
 }  // namespace
