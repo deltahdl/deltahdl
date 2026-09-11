@@ -135,6 +135,61 @@ TEST_F(VpiPutValueArraySim, PropagateOffFlagIsAccepted) {
   EXPECT_EQ(elems_[1]->value.words[0].aval, 6u);
 }
 
+// §38.35: the flag inhibiting notification of the array's fanouts is what says
+// the notification happens without it - the routine tells whatever fans out of
+// the array that one or more values have changed. Every element the call wrote
+// is notified, and an element outside the section is not, nothing having
+// changed there.
+TEST_F(VpiPutValueArraySim, FanoutsOfTheWrittenElementsAreToldValuesChanged) {
+  VpiHandle arr = MakeArray("n", {{0, 1, 2}}, 3, 32);
+  int notified[3] = {0, 0, 0};
+  for (int i = 0; i < 3; ++i) {
+    elems_[i]->AddWatcher([&notified, i]() {
+      ++notified[i];
+      return true;
+    });
+  }
+
+  PLI_INT32 ints[2] = {7, 8};
+  s_vpi_arrayvalue av = {};
+  av.format = vpiIntVal;
+  av.value.integers = ints;
+  PLI_INT32 index[1] = {0};
+  vpi_put_value_array(arr, &av, index, 2);
+
+  EXPECT_EQ(notified[0], 1);
+  EXPECT_EQ(notified[1], 1);
+  EXPECT_EQ(notified[2], 0);
+}
+
+// §38.35: vpiPropagateOff "inhibits notification of the fanouts of the array
+// that one or more values have changed", which is how it reduces the cost of
+// updating large numbers of elements. The values are written as they would be
+// without the flag; what the flag withholds is the notification, and it is
+// withheld from every element of the section rather than some of them.
+TEST_F(VpiPutValueArraySim, PropagateOffWithholdsThatNotificationFromThem) {
+  VpiHandle arr = MakeArray("q", {{0, 1, 2}}, 3, 32);
+  int notified = 0;
+  for (int i = 0; i < 3; ++i) {
+    elems_[i]->AddWatcher([&notified]() {
+      ++notified;
+      return true;
+    });
+  }
+
+  PLI_INT32 ints[3] = {1, 2, 3};
+  s_vpi_arrayvalue av = {};
+  av.format = vpiIntVal;
+  av.flags = vpiPropagateOff;
+  av.value.integers = ints;
+  PLI_INT32 index[1] = {0};
+  vpi_put_value_array(arr, &av, index, 3);
+
+  EXPECT_EQ(notified, 0);
+  EXPECT_EQ(elems_[0]->value.words[0].aval, 1u);
+  EXPECT_EQ(elems_[2]->value.words[0].aval, 3u);
+}
+
 // §38.35: every format outside the supported set is unsupported and is an error
 // if specified; the array is left untouched.
 TEST_F(VpiPutValueArraySim, UnsupportedFormatIsError) {

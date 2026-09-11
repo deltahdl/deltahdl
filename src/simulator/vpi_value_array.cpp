@@ -283,11 +283,12 @@ VpiObject* FindElementByOrdinal(VpiHandle obj, long long ordinal) {
 // element at the given flat ordinal of obj. A missing element or one without a
 // backing variable is skipped silently, exactly as the consecutive fill loop
 // requires. The decoded aval/bval are masked to the element's width before they
-// replace word 0 of its value.
-void PutValueArrayElement(VpiHandle obj, const VpiArrayValue* arrayvalue_p,
-                          long long ordinal, unsigned int src) {
+// replace word 0 of its value. The variable written is handed back so the
+// caller can notify what fans out of it, or nullptr where nothing was written.
+Variable* PutValueArrayElement(VpiHandle obj, const VpiArrayValue* arrayvalue_p,
+                               long long ordinal, unsigned int src) {
   VpiObject* element = FindElementByOrdinal(obj, ordinal);
-  if (!element || !element->var) return;
+  if (!element || !element->var) return nullptr;
 
   Logic4Vec& ev = element->var->value;
   uint32_t width = ev.width;
@@ -300,6 +301,7 @@ void PutValueArrayElement(VpiHandle obj, const VpiArrayValue* arrayvalue_p,
     ev.words[0].aval = value.aval & mask;
     ev.words[0].bval = value.bval & mask;
   }
+  return element->var;
 }
 
 // §38.16: whether the requested format suits the data type of the array's
@@ -571,18 +573,31 @@ void VpiContext::PutValueArray(VpiHandle obj, VpiArrayValue* arrayvalue_p,
   // vpiOneValue the single supplied element value is applied to the whole
   // section, so the source position stays pinned at 0.
   bool one_value = (arrayvalue_p->flags & kVpiOneValue) != 0;
+  std::vector<Variable*> written;
   for (unsigned int k = 0; k < num; ++k) {
     long long ordinal = start_ordinal + static_cast<long long>(k);
     unsigned int src = one_value ? 0u : k;
-    PutValueArrayElement(obj, arrayvalue_p, ordinal, src);
+    Variable* var = PutValueArrayElement(obj, arrayvalue_p, ordinal, src);
+    if (var) written.push_back(var);
+  }
+
+  // §38.35: the fanouts of the array are notified that one or more values have
+  // changed, which is what vpiPropagateOff inhibits - the flag reduces the cost
+  // of updating large numbers of elements, at the price of needing a later
+  // update event before the array reads correctly during active simulation. So
+  // the notification is the default and the flag is what withholds it, rather
+  // than the other way about. Notifying once the whole section is written is
+  // what "one or more values have changed" describes: what fans out of the
+  // array sees the section the call was asked for and not a partial fill of it.
+  if ((arrayvalue_p->flags & kVpiPropagateOff) == 0) {
+    for (Variable* var : written) var->NotifyWatchers();
   }
 
   // §38.35: for a vpiArrayNet target the written values override the resolved
   // values of the named net elements and stay in effect until one of that
   // element's drivers next changes, when normal net resolution resumes. The
   // override is the write applied above; the re-resolution is a property of the
-  // net solver, outside this routine. vpiPropagateOff, when set, suppresses
-  // fanout notification of the change.
+  // net solver, outside this routine.
 }
 
 void VpiContext::GetValueArray(VpiHandle obj, VpiArrayValue* arrayvalue_p,
