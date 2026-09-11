@@ -32,12 +32,16 @@ class ReturnStatement : public ::testing::Test {
 
 // Condition edge (vpiCondition -> expr): a return statement reaches the value
 // it returns through the public vpi_handle(vpiCondition, ...) dispatch. The
-// scan is type-directed: when the return object also carries an incidental
-// child that is not an expression, the dispatch skips it and returns the value
-// expression rather than the first child.
+// scan is type-directed: when the return object also carries a child of a kind
+// the clause draws no edge to, the dispatch skips it and returns the value
+// expression rather than the first child. The child that stands for that here
+// is a statement, which carries the kind a statement of a design carries -
+// §37.4.1 makes the dotted `stmt` enclosure the name of a class grouping other
+// objects rather than a kind any object has, so a child typed vpiStmt was one
+// no design could hold and the case it was written to make was not made.
 TEST_F(ReturnStatement, ReturnReachesReturnedValueAmongOtherChildren) {
   VpiObject other;
-  other.type = vpiStmt;  // not an expression, listed first
+  other.type = vpiNullStmt;  // not an expression, listed first
   VpiObject value;
   value.type = vpiOperation;  // the returned value: an expression kind
 
@@ -46,6 +50,25 @@ TEST_F(ReturnStatement, ReturnReachesReturnedValueAmongOtherChildren) {
   return_stmt.children = {&other, &value};
 
   EXPECT_EQ(vpi_handle(vpiCondition, &return_stmt), &value);
+}
+
+// Condition edge: the value is reached whatever expression kind it is written
+// as. §37.59's `expr` class groups the operations, constants and calls, and
+// through the `simple expr` class §37.58 nests inside it, the references,
+// parameters and selects as well - a return yields any of them.
+TEST_F(ReturnStatement, EachExpressionKindAValueCarriesIsReached) {
+  for (int value_kind : {vpiOperation, vpiConstant, vpiRefObj, vpiFuncCall,
+                         vpiParameter, vpiBitSelect}) {
+    VpiObject value;
+    value.type = value_kind;
+
+    VpiObject return_stmt;
+    return_stmt.type = vpiReturnStmt;
+    return_stmt.children = {&value};
+
+    EXPECT_EQ(vpi_handle(vpiCondition, &return_stmt), &value)
+        << "value kind " << value_kind;
+  }
 }
 
 // Condition edge reports no expression when the return statement yields no
