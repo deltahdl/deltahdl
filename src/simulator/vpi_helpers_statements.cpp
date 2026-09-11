@@ -255,20 +255,22 @@ bool VpiIsBodyStmtOwnerType(int type) {
   // The kinds that reach a body statement through vpiStmt by the object model
   // drawing an untagged single arrow from them to the dotted `stmt` enclosure.
   // §37.4.3 makes an untagged relation's type the enclosure's words with "vpi"
-  // in front, so one arrow drawn four times is one relation: §37.63 draws it
+  // in front, so one arrow drawn five times is one relation: §37.63 draws it
   // from a process, §37.66 from the enclosure holding `while` and `repeat`,
-  // §37.67 from the `waits` enclosure, and §37.70 from a forever, which is the
+  // §37.67 from the `waits` enclosure, §37.70 from a forever, which is the
   // whole of that clause - a forever carries no condition, no property and no
-  // detail beside its body.
+  // detail beside its body - and §37.71 from the enclosure holding `if` and
+  // `if else`, where it is the then-branch the condition selects.
   //
-  // The forever was the one of the four left out, so the single relation §37.70
-  // defines fell through to the traversal that looks for a child whose own type
-  // is the relation tag. §37.4.1 makes the dotted `stmt` enclosure a class that
-  // groups other objects and classes rather than an object kind, so no
+  // The forever and the two conditionals were the ones left out, so the
+  // relation fell through to the traversal that looks for a child whose own
+  // type is the relation tag. §37.4.1 makes the dotted `stmt` enclosure a class
+  // that groups other objects and classes rather than an object kind, so no
   // statement a design holds has vpiStmt for its own type and the body of every
-  // forever loop that could be written was reached by nothing.
+  // forever loop and the then-branch of every conditional that could be written
+  // were reached by nothing.
   return VpiIsProcessType(type) || VpiIsWhileOrRepeatType(type) ||
-         VpiIsWaitType(type) || type == vpiForever;
+         VpiIsWaitType(type) || type == vpiForever || VpiIsIfOrIfElseType(type);
 }
 
 bool VpiIsWaitType(int type) {
@@ -381,16 +383,21 @@ VpiHandle VpiIfConditionExpr(VpiHandle if_stmt) {
 
 VpiHandle VpiIfElseStmt(VpiHandle if_stmt) {
   // §37.71: an if-else statement reaches its else-branch body through
-  // vpiElseStmt. The then-branch and the else-branch are both body statements
-  // (modeled, like every other statement body in this data model, as a vpiStmt
-  // child); the generic traversal serves the then-branch as the first such
-  // child, so the else-branch is the second one. Its own type is a statement
-  // kind rather than the vpiElseStmt relation tag, so the generic walk cannot
-  // find it. Null when there is no second body statement (no else branch).
+  // vpiElseStmt. The then-branch and the else-branch are both drawn to the
+  // dotted `stmt` enclosure, and §9.4.2's conditional_statement writes them one
+  // after the other, so the two are told apart by position: the first statement
+  // child is the then-branch the untagged arrow reaches and the second is the
+  // else-branch. Null when the statement carries no second one.
+  //
+  // Both were counted by asking for a child whose own type is vpiStmt.
+  // §37.4.1 makes the dotted enclosure a class grouping other objects and
+  // classes rather than a kind, so a statement of a design carries the kind it
+  // is - a begin, an assignment, another if - and never the class's name; the
+  // count never reached one and no else-branch was found.
   if (!if_stmt) return nullptr;
   bool seen_then = false;
   for (auto* child : if_stmt->children) {
-    if (child->type == vpiStmt) {
+    if (VpiIsScopeBodyStmtType(child->type)) {
       if (seen_then) return child;
       seen_then = true;
     }

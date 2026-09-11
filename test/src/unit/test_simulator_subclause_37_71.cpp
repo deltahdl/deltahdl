@@ -6,18 +6,26 @@
 namespace delta {
 namespace {
 
-// §37.71 If, if-else: the object model diagram groups a plain if statement and
-// an if-else statement. Each draws a vpiCondition edge to a controlling
-// condition expression and an unlabeled edge to a then-branch body statement
-// (the generic vpiStmt relation); the if-else additionally draws a vpiElseStmt
-// edge to an else-branch body statement. Both kinds carry an int vpiQualifier
-// property (the unique/priority qualifier flags). The clause has no numbered
-// Details and no 'shall' sentences. These tests observe the production code
-// that serves the diagram's relations and property: the vpiCondition edge
-// through the dedicated helper VpiIfConditionExpr (wired into vpi_handle), the
-// then-branch through the generic vpiStmt traversal, the vpiElseStmt edge
-// through VpiIfElseStmt (also wired into vpi_handle), and the vpiQualifier
-// property through the public vpi_get dispatch.
+// §37.71 If, if-else: the object model diagram draws a dotted enclosure holding
+// a plain if statement and an if-else statement. From the enclosure it draws a
+// vpiCondition edge to a controlling condition expression and an unlabeled edge
+// to a body statement - the then-branch the condition selects, whose relation
+// §37.4.3 names by putting "vpi" in front of the target enclosure's words - and
+// from the if-else alone a vpiElseStmt edge to a second body statement. Both
+// kinds carry an int vpiQualifier property (the unique/priority qualifier
+// flags). The clause has no numbered Details and no 'shall' sentences.
+//
+// §37.4.1 makes a dotted enclosure a class that groups other objects and
+// classes rather than a kind of its own, so both branches carry the kind a
+// statement of a design carries - a begin, an assignment, another if - and
+// neither carries vpiStmt, which is the class's name. Read the other way, as a
+// child whose own type is the relation tag, the then-branch of every
+// conditional was reached by nothing and the else-branch, which is found by
+// counting statement children, was never reached either because the count never
+// got past the first. These tests observe the production path for each edge:
+// the condition through VpiIfConditionExpr, the then-branch through the body
+// resolver the process, loop, wait and forever kinds share, and the
+// else-branch through VpiIfElseStmt, all reached by their public dispatch.
 
 // The fixture installs a context so the public vpi_handle / vpi_get entry
 // points run their real dispatch over the test objects.
@@ -35,7 +43,7 @@ TEST_F(IfIfElse, IfStatementReachesConditionThroughVpiCondition) {
   condition.type = vpiOperation;  // an expression kind
 
   VpiObject then_body;
-  then_body.type = vpiStmt;
+  then_body.type = vpiBegin;  // a kind the `stmt` class groups
 
   VpiObject if_stmt;
   if_stmt.type = vpiIf;
@@ -45,16 +53,16 @@ TEST_F(IfIfElse, IfStatementReachesConditionThroughVpiCondition) {
 }
 
 // vpiCondition edge: an if-else statement reaches its condition the same way -
-// the grouping serves both conditional kinds.
+// the edge is drawn from the enclosure, so it serves both conditional kinds.
 TEST_F(IfIfElse, IfElseStatementReachesConditionThroughVpiCondition) {
   VpiObject condition;
   condition.type = vpiRefObj;  // another expression kind
 
   VpiObject then_body;
-  then_body.type = vpiStmt;
+  then_body.type = vpiBegin;
 
   VpiObject else_body;
-  else_body.type = vpiStmt;
+  else_body.type = vpiAssignment;
 
   VpiObject if_else;
   if_else.type = vpiIfElse;
@@ -63,12 +71,12 @@ TEST_F(IfIfElse, IfElseStatementReachesConditionThroughVpiCondition) {
   EXPECT_EQ(vpi_handle(vpiCondition, &if_else), &condition);
 }
 
-// vpiCondition edge: the condition is found even when a non-expression child (a
-// body statement) precedes it in the child list. The scan skips the body and
-// returns the first expression child.
+// vpiCondition edge: the condition is found even when a body statement precedes
+// it in the child list. The scan skips the body and returns the first
+// expression child.
 TEST_F(IfIfElse, ConditionFoundWhenItFollowsABodyChild) {
   VpiObject then_body;
-  then_body.type = vpiStmt;  // a non-expression child, listed first
+  then_body.type = vpiBegin;  // a statement, not an expression, listed first
 
   VpiObject condition;
   condition.type = vpiOperation;
@@ -102,27 +110,29 @@ TEST_F(IfIfElse, VpiConditionIsScopedToConditionalStatements) {
 // the scan completing over the children without finding an expression.
 TEST_F(IfIfElse, ConditionIsNullWhenNoExpressionChild) {
   VpiObject then_body;
-  then_body.type = vpiStmt;
+  then_body.type = vpiBegin;
 
   VpiObject if_stmt;
   if_stmt.type = vpiIf;
   if_stmt.children = {&then_body};
 
+  EXPECT_EQ(vpi_handle(vpiStmt, &if_stmt), &then_body);
   EXPECT_EQ(vpi_handle(vpiCondition, &if_stmt), nullptr);
 }
 
-// Then-branch edge (the diagram's unlabeled arrow to a statement): an if
-// statement reaches its then body through the generic vpiStmt traversal - the
-// first body statement child.
-TEST_F(IfIfElse, ThenBodyReachedThroughGenericVpiStmt) {
+// Then-branch edge (the enclosure's unlabeled arrow to `stmt`): an if-else
+// statement reaches the branch the condition selects through
+// vpi_handle(vpiStmt, ...) - the first statement child, told from the
+// else-branch by position.
+TEST_F(IfIfElse, ThenBodyReachedByTheKindTheStmtClassGroups) {
   VpiObject condition;
   condition.type = vpiOperation;
 
   VpiObject then_body;
-  then_body.type = vpiStmt;
+  then_body.type = vpiBegin;
 
   VpiObject else_body;
-  else_body.type = vpiStmt;
+  else_body.type = vpiAssignment;
 
   VpiObject if_else;
   if_else.type = vpiIfElse;
@@ -131,38 +141,82 @@ TEST_F(IfIfElse, ThenBodyReachedThroughGenericVpiStmt) {
   EXPECT_EQ(vpi_handle(vpiStmt, &if_else), &then_body);
 }
 
-// vpiElseStmt edge: an if-else statement reaches its else-branch body - the
-// second body statement child - through the public vpi_handle(vpiElseStmt, ...)
-// dispatch, distinct from the then-branch served by the generic traversal.
+// Then-branch edge: the arrow is drawn from the enclosure, so a plain if
+// reaches its branch by it too, and it reaches one whatever kind the branch is
+// written as - a lone statement, a block, or a nested conditional.
+TEST_F(IfIfElse, PlainIfReachesEachKindAThenBranchCarries) {
+  for (int body_kind :
+       {vpiAssignment, vpiNamedBegin, vpiFork, vpiIf, vpiNullStmt}) {
+    VpiObject condition;
+    condition.type = vpiOperation;
+
+    VpiObject then_body;
+    then_body.type = body_kind;
+
+    VpiObject if_stmt;
+    if_stmt.type = vpiIf;
+    if_stmt.children = {&condition, &then_body};
+
+    EXPECT_EQ(vpi_handle(vpiStmt, &if_stmt), &then_body)
+        << "then-branch kind " << body_kind;
+  }
+}
+
+// vpiElseStmt edge: an if-else statement reaches its else-branch - the second
+// statement child - through the public vpi_handle(vpiElseStmt, ...) dispatch,
+// distinct from the then-branch the unlabeled arrow reaches.
 TEST_F(IfIfElse, IfElseStatementReachesElseBranchThroughVpiElseStmt) {
   VpiObject condition;
   condition.type = vpiOperation;
 
   VpiObject then_body;
-  then_body.type = vpiStmt;
+  then_body.type = vpiBegin;
 
   VpiObject else_body;
-  else_body.type = vpiStmt;
+  else_body.type = vpiAssignment;
 
   VpiObject if_else;
   if_else.type = vpiIfElse;
   if_else.children = {&condition, &then_body, &else_body};
 
+  EXPECT_EQ(vpi_handle(vpiStmt, &if_else), &then_body);
   EXPECT_EQ(vpi_handle(vpiElseStmt, &if_else), &else_body);
 }
 
-// vpiElseStmt is drawn only from the if-else grouping: a plain if statement
-// reports no else branch even when it carries a second body statement child,
-// because the relation is gated on the if-else kind.
+// vpiElseStmt edge: an else-branch written as a nested if - the else-if chain
+// of 12.4 - is the second statement child like any other, and the two branches
+// are told apart by position rather than by kind even where both carry the same
+// one.
+TEST_F(IfIfElse, ElseBranchWrittenAsANestedConditionalIsTheSecondStatement) {
+  VpiObject condition;
+  condition.type = vpiOperation;
+
+  VpiObject then_body;
+  then_body.type = vpiIf;
+
+  VpiObject else_body;
+  else_body.type = vpiIf;
+
+  VpiObject if_else;
+  if_else.type = vpiIfElse;
+  if_else.children = {&condition, &then_body, &else_body};
+
+  EXPECT_EQ(vpi_handle(vpiStmt, &if_else), &then_body);
+  EXPECT_EQ(vpi_handle(vpiElseStmt, &if_else), &else_body);
+}
+
+// vpiElseStmt is drawn only from the if-else: a plain if reports no else branch
+// even when it carries a second statement child, because the relation is gated
+// on the if-else kind.
 TEST_F(IfIfElse, PlainIfReportsNoElseStatement) {
   VpiObject condition;
   condition.type = vpiOperation;
 
   VpiObject then_body;
-  then_body.type = vpiStmt;
+  then_body.type = vpiBegin;
 
   VpiObject second_body;
-  second_body.type = vpiStmt;
+  second_body.type = vpiAssignment;
 
   VpiObject if_stmt;
   if_stmt.type = vpiIf;
@@ -171,20 +225,22 @@ TEST_F(IfIfElse, PlainIfReportsNoElseStatement) {
   EXPECT_EQ(vpi_handle(vpiElseStmt, &if_stmt), nullptr);
 }
 
-// vpiElseStmt edge: an if-else statement with only a then branch (a single body
-// statement) reports no else branch.
+// vpiElseStmt edge: an if-else carrying only a then branch reports no else
+// branch, so the one statement it holds is not handed back for both edges, and
+// a null handle reports none either.
 TEST_F(IfIfElse, ElseStatementIsNullWhenNoElseBranch) {
   VpiObject condition;
   condition.type = vpiOperation;
 
   VpiObject then_body;
-  then_body.type = vpiStmt;
+  then_body.type = vpiBegin;
 
   VpiObject if_else;
   if_else.type = vpiIfElse;
   if_else.children = {&condition, &then_body};
 
   EXPECT_EQ(vpi_handle(vpiElseStmt, &if_else), nullptr);
+  EXPECT_EQ(VpiIfElseStmt(nullptr), nullptr);
 }
 
 // Property (-> qualifier int: vpiQualifier): an if or if-else statement reports
