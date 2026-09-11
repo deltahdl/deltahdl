@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <string>
 #include <vector>
 
+#include "fixture_simulator.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi.h"
 
@@ -359,6 +361,81 @@ TEST_F(ClassVariablesAndObjects, HandleByNameReachesNonStaticDataMember) {
 
   // Resolved relative to top, "p.Id" reaches the member through the variable.
   EXPECT_EQ(vpi_handle_by_name("p.Id", &top), &data_member);
+}
+
+// What the application found. A calltf is a plain C function with no return
+// path to the case that provoked it.
+int g_class_vars_seen = 0;
+std::string g_class_var_name;
+int g_declared_type = 0;
+bool g_variables_class_reached_it = false;
+
+int ProbeClassVarsCalltf(const char*) {
+  vpiHandle mod = vpi_handle_by_name("m1", nullptr);
+  if (mod == nullptr) return 0;
+
+  vpiHandle itr = vpi_iterate(vpiClassVar, mod);
+  if (itr != nullptr) {
+    while (vpiHandle var = vpi_scan(itr)) {
+      ++g_class_vars_seen;
+      g_declared_type = vpi_get(vpiType, var);
+      if (const char* name = vpi_get_str(vpiName, var)) g_class_var_name = name;
+    }
+  }
+
+  // §37.4.1: a class var is one of the kinds the `variables` class groups, so
+  // the scope's vpiVariables relation reaches it too.
+  vpiHandle vars = vpi_iterate(vpiVariables, mod);
+  if (vars != nullptr) {
+    while (vpiHandle var = vpi_scan(vars)) {
+      if (vpi_get(vpiType, var) == vpiClassVar) {
+        g_variables_class_reached_it = true;
+      }
+    }
+  }
+  return 0;
+}
+
+// §37.33 against a design. Every rule of the subclause is written about a class
+// var and the class obj it references, and a variable declared with a class
+// type was stamped vpiReg: a design's class variables were class vars to
+// nothing, so a vpiClassVar iteration over the scope that declares one reached
+// nothing and the clause's whole model stood over objects a test had made.
+TEST(ClassVariablesDesign, ADeclaredClassVariableIsAClassVarObject) {
+  VpiContext vpi_ctx;
+  SetGlobalVpiContext(&vpi_ctx);
+  g_class_vars_seen = 0;
+  g_class_var_name.clear();
+  g_declared_type = 0;
+  g_variables_class_reached_it = false;
+
+  s_vpi_systf_data data = {};
+  data.type = vpiSysTask;
+  data.tfname = "$probe";
+  data.calltf = &ProbeClassVarsCalltf;
+  ASSERT_NE(vpi_register_systf(&data), nullptr);
+
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  class Packet;\n"
+      "    integer Id;\n"
+      "  endclass\n"
+      "  Packet p;\n"
+      "  integer plain;\n"
+      "endmodule\n"
+      "module t;\n"
+      "  m m1();\n"
+      "  initial $probe;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+
+  EXPECT_EQ(g_class_vars_seen, 1);
+  EXPECT_EQ(g_class_var_name, "p");
+  EXPECT_EQ(g_declared_type, vpiClassVar);
+  EXPECT_TRUE(g_variables_class_reached_it);
 }
 
 }  // namespace

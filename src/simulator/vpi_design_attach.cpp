@@ -354,6 +354,13 @@ int VpiVariableObjectKind(const RtlirVariable& var) {
   // A name declared through a typedef reports kNamed, so the flags the
   // elaborator resolved through the typedef answer first for the kinds that
   // have one.
+  // §37.33: a variable declared with a class type is the clause's "class var",
+  // the object every rule of the subclause is written about. A class type is
+  // named rather than a DataTypeKind of its own, so decl_kind leaves it in the
+  // kNamed default and the variable was stamped vpiReg: a design's class
+  // variables were class vars to nothing, vpiObjId and vpiClassObj answered for
+  // none of them, and a vpiClassVar iteration reached none.
+  if (!var.class_type_name.empty()) return vpiClassVar;
   if (var.decl_kind == DataTypeKind::kShortreal) return vpiShortRealVar;
   if (var.is_real) return vpiRealVar;
   if (var.is_string) return vpiStringVar;
