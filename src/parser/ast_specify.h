@@ -120,6 +120,11 @@ struct SpecifyItem {
 
   std::string_view param_name;
   Expr* param_value = nullptr;
+  // A.2.1.1: `specparam_declaration ::= specparam [ packed_dimension ]
+  // list_of_specparam_assignments ;`. The range is written once and governs
+  // every assignment of the declaration, so each item made from one carries it.
+  Expr* param_packed_left = nullptr;
+  Expr* param_packed_right = nullptr;
 
   bool is_pathpulse = false;
   std::string_view pathpulse_input;

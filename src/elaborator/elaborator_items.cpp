@@ -22,28 +22,33 @@
 
 namespace delta {
 
+uint32_t SpecparamWidth(const DataType& type, const Expr* init,
+                        const TypedefMap& typedefs) {
+  if (type.packed_dim_left != nullptr && type.packed_dim_right != nullptr) {
+    uint32_t w = EvalTypeWidth(type);
+    return w == 0 ? 32 : w;
+  }
+  // §6.20.5: a specify parameter with no range specification takes the range of
+  // its final value, whatever expression states that value. A sized integer
+  // literal carries the width directly (a 4'd5 value is 4 bits), an unsized
+  // literal is 32 bits, and a signing conversion is as wide as its operand
+  // under §11.7. An initializer whose width InferExprWidth cannot answer -- a
+  // bare identifier, whose declaration it does not read -- keeps the 32-bit
+  // default.
+  if (init != nullptr) {
+    uint32_t w = InferExprWidth(init, typedefs);
+    return w == 0 ? 32 : w;
+  }
+  return 32;
+}
+
 void Elaborator::ElaborateSpecparam(ModuleItem* item, RtlirModule* mod) {
   RtlirVariable var;
   var.name = ScopedName(item->name);
   // §37.3.3: a §6.20.5 specify parameter is written in the source text like
   // any other declaration, so its object reports where.
   var.loc = item->loc;
-  if (item->data_type.packed_dim_left && item->data_type.packed_dim_right) {
-    var.width = EvalTypeWidth(item->data_type);
-    if (var.width == 0) var.width = 32;
-  } else if (item->init_expr) {
-    // §6.20.5: a specify parameter with no range specification takes the range
-    // of its final value, whatever expression states that value. A sized
-    // integer literal carries the width directly (a 4'd5 value is 4 bits), an
-    // unsized literal is 32 bits, and a signing conversion is as wide as its
-    // operand under §11.7. An initializer whose width InferExprWidth cannot
-    // answer -- a bare identifier, whose declaration it does not read -- keeps
-    // the 32-bit default.
-    uint32_t w = InferExprWidth(item->init_expr, typedefs_);
-    var.width = w == 0 ? 32 : w;
-  } else {
-    var.width = 32;
-  }
+  var.width = SpecparamWidth(item->data_type, item->init_expr, typedefs_);
   var.init_expr = item->init_expr;
   mod->variables.push_back(var);
   // §32.4.3 has an SDF LABEL section annotate to specparams, and §6.20.5 admits
@@ -852,7 +857,8 @@ bool Elaborator::ElaborateBehavioralItem(ModuleItem* item, RtlirModule* mod) {
       mod->let_decls.push_back(item);
       return true;
     case ModuleItemKind::kSpecifyBlock:
-      RegisterSpecifyBlockSpecparams(item, mod, specparam_names_, const_names_);
+      RegisterSpecifyBlockSpecparams(item, mod, typedefs_, specparam_names_,
+                                     const_names_);
       mod->specify_blocks.push_back(item);
       return true;
     case ModuleItemKind::kCovergroupDecl:

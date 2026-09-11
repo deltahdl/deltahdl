@@ -83,15 +83,26 @@ std::unordered_map<std::string_view, const ClassDecl*> BuildParamClassRegistry(
 // §6.20.5: specify parameters declared inside a specify block are named
 // constants of the enclosing module, exactly like specparams in the main module
 // body. Registers each ordinary specparam of the given specify-block item as a
-// module constant (recorded as a 32-bit variable carrying its value
-// expression), and notes its name in the specparam and constant name sets so it
-// resolves and rejects illegal assignment like a body specparam. PATHPULSE$
-// entries are path-pulse limits rather than named constants and are skipped. A
-// specify block cannot appear in a generate scope, so the bare name is used.
-// Defined in elaborator_validate_specify.cpp.
+// module constant (a variable carrying its value expression, as wide as
+// SpecparamWidth below makes it), and notes its name in the specparam and
+// constant name sets so it resolves and rejects illegal assignment like a body
+// specparam. PATHPULSE$ entries are path-pulse limits rather than named
+// constants and are skipped. A specify block cannot appear in a generate scope,
+// so the bare name is used. Defined in elaborator_validate_specify.cpp.
 void RegisterSpecifyBlockSpecparams(
-    const ModuleItem* item, RtlirModule* mod,
+    const ModuleItem* item, RtlirModule* mod, const TypedefMap& typedefs,
     std::unordered_set<std::string_view>& specparam_names,
     std::unordered_set<std::string_view>& const_names);
+
+// §6.20.5: how wide a specify parameter is. A range specification gives it that
+// range; without one it "takes the range of its final value", the width of the
+// expression that states the value; and a declaration offering neither is 32
+// bits. A.2.1.1 writes one `specparam_declaration` and §6.20.5 admits it
+// "inside a specify block or in the module body", so both declaration sites are
+// sized here rather than each keeping a rule of its own - the specify-block
+// site had none, recording every specparam 32 bits wide whatever its
+// declaration said. Defined in elaborator_items.cpp.
+uint32_t SpecparamWidth(const DataType& type, const Expr* init,
+                        const TypedefMap& typedefs);
 
 }  // namespace delta

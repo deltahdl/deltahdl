@@ -17,7 +17,7 @@
 namespace delta {
 
 void RegisterSpecifyBlockSpecparams(
-    const ModuleItem* item, RtlirModule* mod,
+    const ModuleItem* item, RtlirModule* mod, const TypedefMap& typedefs,
     std::unordered_set<std::string_view>& specparam_names,
     std::unordered_set<std::string_view>& const_names) {
   for (const auto* sp : item->specify_items) {
@@ -29,7 +29,10 @@ void RegisterSpecifyBlockSpecparams(
     var.name = sp->param_name;
     // §37.3.3: the specparam stands where the specify block wrote it.
     var.loc = sp->loc;
-    var.width = 32;
+    DataType type;
+    type.packed_dim_left = sp->param_packed_left;
+    type.packed_dim_right = sp->param_packed_right;
+    var.width = SpecparamWidth(type, sp->param_value, typedefs);
     var.init_expr = sp->param_value;
     mod->variables.push_back(var);
   }
