@@ -8,12 +8,15 @@ namespace {
 
 // §37.66 While, repeat: the object model diagram groups a while statement and a
 // repeat statement, drawing a vpiCondition edge from each to a controlling
-// condition expression and an unlabeled edge from each to a body statement (the
-// vpiStmt relation). The clause carries no numbered Details and no 'shall'
-// sentences. These tests observe the production code that serves the diagram's
-// relations: the vpiCondition edge through the dedicated helper
-// VpiLoopConditionExpr (wired into vpi_handle), and the body edge through the
-// generic vpiStmt traversal.
+// condition expression and an untagged edge from each to a body statement (the
+// vpiStmt relation, §37.4.3 making an untagged arrow's type the enclosure's
+// word with "vpi" in front). The clause carries no numbered Details and no
+// 'shall' sentences. These tests observe the production code that serves the
+// diagram's two relations: the vpiCondition edge through the dedicated helper
+// VpiLoopConditionExpr, and the body edge through the resolver that reads the
+// dotted `stmt` enclosure as §37.4.1 reads it -- a class grouping other
+// objects, never a kind a statement of a design carries -- so the body is
+// reached by what it is rather than by the relation's own tag.
 
 // The fixture installs a context so the public vpi_handle entry point runs its
 // real dispatch over the test objects.
@@ -31,7 +34,7 @@ TEST_F(WhileRepeat, WhileStatementReachesConditionThroughVpiCondition) {
   condition.type = vpiOperation;  // an expression kind
 
   VpiObject body;
-  body.type = vpiStmt;
+  body.type = vpiBegin;  // a statement kind the `stmt` class groups
 
   VpiObject while_stmt;
   while_stmt.type = vpiWhile;
@@ -58,7 +61,7 @@ TEST_F(WhileRepeat, RepeatStatementReachesConditionThroughVpiCondition) {
 // body and returns the first expression child.
 TEST_F(WhileRepeat, ConditionFoundWhenItFollowsTheBodyChild) {
   VpiObject body;
-  body.type = vpiStmt;  // a non-expression child, listed first
+  body.type = vpiBegin;  // a non-expression child, listed first
 
   VpiObject condition;
   condition.type = vpiOperation;
@@ -76,7 +79,7 @@ TEST_F(WhileRepeat, ConditionIsNullWhenAbsentOrHandleNull) {
   EXPECT_EQ(VpiLoopConditionExpr(nullptr), nullptr);
 
   VpiObject body;
-  body.type = vpiStmt;
+  body.type = vpiBegin;  // a statement kind the `stmt` class groups
 
   VpiObject bare_loop;
   bare_loop.type = vpiWhile;
@@ -101,20 +104,49 @@ TEST_F(WhileRepeat, VpiConditionIsScopedToLoopStatements) {
   EXPECT_EQ(vpi_handle(vpiCondition, &forever_stmt), nullptr);
 }
 
-// Body edge (the diagram's unlabeled arrow to a statement): a while statement
-// reaches its body through the generic vpiStmt traversal.
-TEST_F(WhileRepeat, LoopBodyReachedThroughGenericVpiStmt) {
+// Body edge (the diagram's untagged arrow to `stmt`): a while statement reaches
+// its body, and a repeat statement reaches its own, through
+// vpi_handle(vpiStmt, ...). The body objects carry the kinds a statement of a
+// design carries -- an unnamed begin and a single assignment -- rather than
+// vpiStmt, which §37.4.1 makes the name of the class the enclosure groups and
+// not a kind any object has. Read that way the traversal found the body of no
+// loop at all.
+TEST_F(WhileRepeat, LoopBodyReachedByTheKindTheStmtClassGroups) {
   VpiObject condition;
   condition.type = vpiOperation;
 
   VpiObject body;
-  body.type = vpiStmt;
+  body.type = vpiBegin;
 
   VpiObject while_stmt;
   while_stmt.type = vpiWhile;
   while_stmt.children = {&condition, &body};
 
   EXPECT_EQ(vpi_handle(vpiStmt, &while_stmt), &body);
+
+  VpiObject repeat_body;
+  repeat_body.type = vpiAssignment;
+
+  VpiObject repeat_stmt;
+  repeat_stmt.type = vpiRepeat;
+  repeat_stmt.children = {&condition, &repeat_body};
+
+  EXPECT_EQ(vpi_handle(vpiStmt, &repeat_stmt), &repeat_body);
+}
+
+// Body edge: the condition expression is not the body. A loop whose only child
+// is its controlling condition reaches no statement, which is what separates
+// the two arrows the enclosure draws from each other.
+TEST_F(WhileRepeat, TheConditionExpressionIsNotTakenForTheBody) {
+  VpiObject condition;
+  condition.type = vpiOperation;
+
+  VpiObject while_stmt;
+  while_stmt.type = vpiWhile;
+  while_stmt.children = {&condition};
+
+  EXPECT_EQ(vpi_handle(vpiStmt, &while_stmt), nullptr);
+  EXPECT_EQ(vpi_handle(vpiCondition, &while_stmt), &condition);
 }
 
 }  // namespace

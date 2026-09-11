@@ -568,8 +568,24 @@ bool TryResolveTypespecClassRelation(int type, VpiHandle ref, VpiHandle& out) {
   return false;
 }
 
-bool TryResolveProcessStmtRelation(int type, VpiHandle ref, VpiHandle& out) {
-  if (type != vpiStmt || !VpiIsProcessType(ref->type)) return false;
+// §37.63: a process reaches the statement that is its body through vpiStmt.
+// §37.66 draws that same arrow: the enclosure holding `while` and `repeat`
+// carries an untagged single arrow to `stmt`, and §37.4.3 makes an untagged
+// relation's type the enclosure's words with "vpi" in front, so the body of a
+// loop is reached by the one relation the body of a process is.
+//
+// It was reached by nothing. §37.4.1 makes the dotted `stmt` enclosure a class
+// that "groups other objects and classes" rather than an object kind, so no
+// statement a design holds has vpiStmt for its own type; a while or repeat fell
+// through to the traversal that looks for a child whose type is the relation
+// tag, and found a body only where a caller had built an object out of the tag
+// itself. The body is the first child of a kind the class groups, which is what
+// the process arm already asks for.
+bool TryResolveBodyStmtRelation(int type, VpiHandle ref, VpiHandle& out) {
+  if (type != vpiStmt) return false;
+  if (!VpiIsProcessType(ref->type) && !VpiIsWhileOrRepeatType(ref->type)) {
+    return false;
+  }
   for (auto* child : ref->children) {
     if (!VpiIsScopeBodyStmtType(child->type)) continue;
     out = child;
@@ -590,7 +606,7 @@ bool TryResolveStmtProcessRelation(int type, VpiHandle ref, VpiHandle& out) {
 }
 
 bool TryResolveProcessAndStmtRelation(int type, VpiHandle ref, VpiHandle& out) {
-  return TryResolveProcessStmtRelation(type, ref, out) ||
+  return TryResolveBodyStmtRelation(type, ref, out) ||
          TryResolveStmtProcessRelation(type, ref, out);
 }
 
@@ -926,9 +942,5 @@ VpiHandle VpiContext::Handle(int type, VpiHandle ref) {
   }
   return nullptr;
 }
-
-// ===========================================================================
-// §37.21 Variable drivers and loads.
-// ===========================================================================
 
 }  // namespace delta
