@@ -349,7 +349,16 @@ static bool TryResolveClockingRelation(int type, VpiHandle ref,
     out = VpiClockingBlockClockingEvent(ref);
     return true;
   }
-  if (ref->type == vpiClockedSeq) {
+  // §37.52 (figure): the vpiClockingEvent edge is drawn from the property spec
+  // and from the clocked property as well as from §37.56's clocked seq, and the
+  // three carry the event the same way - as the object's event control child.
+  // §39.3.2 is what reaches for them: the "assertion clocking block/expression"
+  // it counts among an assertion's static information is the clocking block of
+  // §37.49 or, where the assertion was written with an event expression of its
+  // own instead, this edge. Only the clocked seq was routed here, so an
+  // assertion clocked by an expression had no traversal that reached it.
+  if (ref->type == vpiClockedSeq || ref->type == vpiPropertySpec ||
+      ref->type == vpiClockedProperty) {
     out = VpiClockingEvent(ref);
     return true;
   }
