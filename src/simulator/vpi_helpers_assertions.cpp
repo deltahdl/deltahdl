@@ -810,6 +810,42 @@ bool VpiSimpleExprBitSelectConstantSelect(bool all_indices_constant,
   return all_indices_constant && parent_constant_select;
 }
 
+bool VpiBitSelectConstantSelectOf(VpiHandle select) {
+  // §37.58 detail 3, read off the object rather than from booleans a caller
+  // worked out: "every associated index expression is an elaboration-time
+  // constant expression, and vpiConstantSelect returns TRUE for the parent of
+  // the bit-select."
+  if (!select || select->type != vpiBitSelect) return false;
+
+  // The index expressions are the ones vpi_iterate(vpiIndex, sel) reaches - the
+  // select's expression children - and an index that is an elaboration-time
+  // constant stands as a constant expression object.
+  bool all_indices_constant = true;
+  for (const VpiObject* child : select->children) {
+    if (!VpiIsExprType(child->type)) continue;
+    if (child->type != vpiConstant) all_indices_constant = false;
+  }
+
+  // The prefix the figure draws vpiParent to is a var select, an integer var, a
+  // time var, a parameter or a spec param. A select prefix is answered by its
+  // own rule; anything else is the base of the chain and is a constant select
+  // when its lifetime is static, which is §37.17 detail 27's first arm.
+  VpiHandle parent = select->parent;
+  bool parent_constant_select = false;
+  if (parent != nullptr) {
+    if (parent->type == vpiBitSelect) {
+      parent_constant_select = VpiBitSelectConstantSelectOf(parent);
+    } else if (parent->type == vpiVarSelect) {
+      parent_constant_select = VpiVarSelectConstantSelectOf(parent);
+    } else {
+      parent_constant_select = !parent->automatic;
+    }
+  }
+
+  return VpiSimpleExprBitSelectConstantSelect(all_indices_constant,
+                                              parent_constant_select);
+}
+
 // ===========================================================================
 // §37.61 Dynamic prefixing.
 // ===========================================================================

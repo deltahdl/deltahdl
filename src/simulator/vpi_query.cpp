@@ -182,7 +182,12 @@ int VpiGetTypeRestricted(int property, VpiHandle obj, bool& handled) {
     // var select; another object kind reports 0, its own clause owning what the
     // property means for it.
     case vpiConstantSelect:
-      return VpiVarSelectConstantSelectOf(obj) ? 1 : 0;
+      // §37.58 detail 3 owns the property for a bit-select, §37.19 detail 1 for
+      // a var select; each clause's rule answers for its own object.
+      return VpiVarSelectConstantSelectOf(obj) ||
+                     VpiBitSelectConstantSelectOf(obj)
+                 ? 1
+                 : 0;
     // §37.14 details 7 and 9: the port index gives port order; it does not
     // apply to a port bit, which reports vpiUndefined.
     case vpiPortIndex:

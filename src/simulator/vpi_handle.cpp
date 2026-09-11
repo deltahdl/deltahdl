@@ -380,6 +380,13 @@ static bool TryResolveParentRelation(int type, VpiHandle ref, VpiHandle& out) {
     out = ref->parent;
     return true;
   }
+  // §37.58 (figure): a bit select reaches the vector it selects into through
+  // vpiParent. The relation is a tag no object's type is, so the traversal this
+  // falls through to reached the vector from none of its bit-selects.
+  if (ref->type == vpiBitSelect) {
+    out = ref->parent;
+    return true;
+  }
   return false;
 }
 

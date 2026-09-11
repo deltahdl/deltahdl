@@ -230,7 +230,9 @@ void ComputePackedArrayModes(int type, VpiHandle ref, VpiIterateModes& m) {
   // §37.19 (figure): the var select's vpiIndex arrows reach expr, the same
   // shape one dimension level up. Nothing recognized the relation, so the index
   // expressions a select was written with were reachable from it by nothing.
-  m.var_select_index = ref && ref->type == vpiVarSelect && type == vpiIndex;
+  // §37.58 (figure) draws the same vpiIndex edge from a bit select to expr.
+  m.var_select_index = ref && type == vpiIndex &&
+                       (ref->type == vpiVarSelect || ref->type == vpiBitSelect);
 }
 
 // §37.24 details 1 and 2: classify the interconnect special modes. An

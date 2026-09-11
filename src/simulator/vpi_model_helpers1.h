@@ -537,6 +537,12 @@ bool VpiSimpleExprBitSelectUseAccessesUse(
 bool VpiSimpleExprBitSelectConstantSelect(bool all_indices_constant,
                                           bool parent_constant_select);
 
+// §37.58 detail 3: the same property, answered from a bit-select object - its
+// index expressions and the prefix the figure draws vpiParent to - so that
+// vpi_get(vpiConstantSelect, sel) reports the figure's "bool:
+// vpiConstantSelect". FALSE for anything that is not a bit-select.
+bool VpiBitSelectConstantSelectOf(VpiHandle select);
+
 // ===========================================================================
 // §37.61 Dynamic prefixing. The object model diagram draws a vpiPrefix relation
 // from a dynamically prefixed object - a simple expression (a reference, a bit-
