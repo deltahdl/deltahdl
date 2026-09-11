@@ -158,7 +158,12 @@ bool VpiIsStructUnionOrClassVar(int type);
 // aggregate variable - a bit-select or either form of part-select.
 bool VpiIsVariableSelectType(int type);
 
-// §37.21 detail 1: the children worth descending into when gathering the
+// §37.21 detail 2: the variable kinds that are an array or a vector - the ones
+// whose drivers and loads "should include driver/load for entire array/vector
+// or any portion of an array/vector to which a handle can be obtained".
+bool VpiIsVariableArrayType(int type);
+
+// §37.21 details 1 and 2: the children worth descending into when gathering the
 // drivers or loads of an aggregate variable - a select of the variable, or a
 // member nested inside it, itself of any kind the `variables` class groups.
 bool VpiIsVariableSelectOrMemberType(int type);

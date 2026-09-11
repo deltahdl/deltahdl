@@ -142,17 +142,29 @@ bool VpiIsVariableSelectType(int type) {
          type == vpiIndexedPartSelect;
 }
 
-// §37.21 detail 1: the children worth descending into when gathering the
-// drivers or loads of an aggregate variable - a bit-select or part-select of
-// the variable, or a member nested inside it (itself any variable kind,
-// including a further aggregate that is walked recursively).
+// §37.21 detail 2: the variable kinds that are an array or a vector, whose
+// drivers and loads the detail says "should include driver/load for entire
+// array/vector or any portion of an array/vector to which a handle can be
+// obtained". An unpacked array var (a reg array under §37.17 detail 19 being
+// the same kind) and a packed array var are those.
+bool VpiIsVariableArrayType(int type) {
+  return VpiIsArrayVarType(type) || type == vpiPackedArrayVar;
+}
+
+// §37.21 details 1 and 2: the children worth descending into when gathering the
+// drivers or loads of an aggregate or array variable - a bit-select or
+// part-select of the variable, a var select of an array element (§37.19's
+// portion of an array a handle can be obtained for), or a member nested inside
+// it (itself any variable kind, including a further aggregate that is walked
+// recursively).
 bool VpiIsVariableSelectOrMemberType(int type) {
   // §37.4.1: a member nested inside an aggregate is a variable, and which kinds
   // those are is what the `variables` class groups. The set was written out
   // here with vpiVariables among its cases -- the class rather than a kind any
   // object has -- and without kinds the class does group, so an int var or a
   // string var member was descended into by neither.
-  return VpiIsVariableSelectType(type) || VpiIsVariablesType(type);
+  return VpiIsVariableSelectType(type) || type == vpiVarSelect ||
+         VpiIsVariablesType(type);
 }
 
 // §37.12 detail 7: expand a declared array of virtual interfaces into its

@@ -772,8 +772,15 @@ bool DispatchRefSpecialMode(int type, VpiHandle ref,
     return true;
   }
   if (modes.variable_driver || modes.variable_load) {
-    CollectVariableDriversOrLoads(ref, modes.variable_driver,
-                                  VpiIsStructUnionOrClassVar(ref->type), iter);
+    // §37.21 detail 1 descends through a structure, union or class variable;
+    // detail 2 says the same of a variable array, whose drivers and loads
+    // "should include driver/load for entire array/vector or any portion of an
+    // array/vector to which a handle can be obtained". Only the aggregate arm
+    // was applied, so an array's elements and the selects into them were walked
+    // by nothing and the relation reported the whole array's drivers alone.
+    const bool kDescend = VpiIsStructUnionOrClassVar(ref->type) ||
+                          VpiIsVariableArrayType(ref->type);
+    CollectVariableDriversOrLoads(ref, modes.variable_driver, kDescend, iter);
     return true;
   }
   if (modes.constr_foreach_loopvars || modes.foreach_stmt_loopvars) {

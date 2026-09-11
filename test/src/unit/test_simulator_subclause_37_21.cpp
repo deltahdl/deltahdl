@@ -217,5 +217,61 @@ TEST(VariableDriversAndLoads, UnionDriverDescendsThroughNestedAggregateMember) {
   EXPECT_TRUE(VpiIterationContains(drivers, &deep_driver));
 }
 
+// Detail 2: "vpiDrivers/Loads for any variable array should include driver/load
+// for entire array/vector or any portion of an array/vector to which a handle
+// can be obtained." A var select is that portion (§37.19), so an array
+// variable's vpiDriver iteration reaches the driver of the element a select
+// names alongside the driver of the whole array. Only the detail 1 arm was
+// applied, so an array was walked as an ordinary variable and reported the
+// whole-array driver alone.
+TEST(VariableDriversAndLoads, ArrayDriverIncludesTheDriverOfAPortionOfIt) {
+  VpiContext ctx;
+
+  VpiObject whole_driver;
+  whole_driver.type = vpiContAssign;
+
+  VpiObject element_driver;
+  element_driver.type = vpiForce;
+  VpiObject select;
+  select.type = vpiVarSelect;
+  select.children = {&element_driver};
+
+  VpiObject array;
+  array.type = vpiArrayVar;
+  array.children = {&whole_driver, &select};
+
+  std::vector<VpiHandle> drivers =
+      CollectVpiIteration(ctx, ctx.Iterate(vpiDriver, &array));
+  ASSERT_EQ(drivers.size(), 2u);
+  EXPECT_TRUE(VpiIterationContains(drivers, &whole_driver));
+  EXPECT_TRUE(VpiIterationContains(drivers, &element_driver));
+}
+
+// Detail 2 on the load side, and on the vector the detail names beside the
+// array: a packed array variable is that vector, and the load of a part-select
+// of it is a load of a portion a handle can be obtained for.
+TEST(VariableDriversAndLoads, PackedArrayLoadIncludesAPartSelectsLoad) {
+  VpiContext ctx;
+
+  VpiObject whole_load;
+  whole_load.type = vpiAssignStmt;
+
+  VpiObject portion_load;
+  portion_load.type = vpiContAssign;
+  VpiObject part_select;
+  part_select.type = vpiPartSelect;
+  part_select.children = {&portion_load};
+
+  VpiObject vector;
+  vector.type = vpiPackedArrayVar;
+  vector.children = {&whole_load, &part_select};
+
+  std::vector<VpiHandle> loads =
+      CollectVpiIteration(ctx, ctx.Iterate(vpiLoad, &vector));
+  ASSERT_EQ(loads.size(), 2u);
+  EXPECT_TRUE(VpiIterationContains(loads, &whole_load));
+  EXPECT_TRUE(VpiIterationContains(loads, &portion_load));
+}
+
 }  // namespace
 }  // namespace delta
