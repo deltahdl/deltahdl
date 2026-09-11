@@ -157,34 +157,42 @@ int g_ref_term_edge = -1;
 std::string g_notifier_name;
 int g_limit = -1;
 
+// The name an object reports, or the empty string where it reports none.
+std::string NameOf(vpiHandle obj) {
+  if (obj == nullptr) return std::string();
+  const char* name = vpi_get_str(vpiName, obj);
+  return name == nullptr ? std::string() : std::string(name);
+}
+
+// The figure's "-> limit", retrieved the way the diagram says it is.
+int LimitOf(vpiHandle tchk) {
+  s_vpi_delay delays = {};
+  s_vpi_time times[1] = {};
+  delays.da = times;
+  delays.no_of_delays = 1;
+  delays.time_type = vpiSimTime;
+  vpi_get_delays(tchk, &delays);
+  return static_cast<int>(times[0].low);
+}
+
+void ReadOneTimingCheck(vpiHandle tchk) {
+  ++g_tchks_seen;
+  g_tchk_type = vpi_get(vpiTchkType, tchk);
+
+  vpiHandle ref = vpi_handle(vpiTchkRefTerm, tchk);
+  g_ref_term_name = NameOf(ref);
+  g_ref_term_edge = ref == nullptr ? -1 : vpi_get(vpiEdge, ref);
+  g_data_term_name = NameOf(vpi_handle(vpiTchkDataTerm, tchk));
+  g_notifier_name = NameOf(vpi_handle(vpiTchkNotifier, tchk));
+  g_limit = LimitOf(tchk);
+}
+
 int ProbeTimingChecksCalltf(const char*) {
   vpiHandle mod = vpi_handle_by_name("m1", nullptr);
   if (mod == nullptr) return 0;
   vpiHandle itr = vpi_iterate(vpiTchk, mod);
   if (itr == nullptr) return 0;
-  while (vpiHandle tchk = vpi_scan(itr)) {
-    ++g_tchks_seen;
-    g_tchk_type = vpi_get(vpiTchkType, tchk);
-
-    if (vpiHandle ref = vpi_handle(vpiTchkRefTerm, tchk)) {
-      if (const char* name = vpi_get_str(vpiName, ref)) g_ref_term_name = name;
-      g_ref_term_edge = vpi_get(vpiEdge, ref);
-    }
-    if (vpiHandle dat = vpi_handle(vpiTchkDataTerm, tchk)) {
-      if (const char* name = vpi_get_str(vpiName, dat)) g_data_term_name = name;
-    }
-    if (vpiHandle note = vpi_handle(vpiTchkNotifier, tchk)) {
-      if (const char* name = vpi_get_str(vpiName, note)) g_notifier_name = name;
-    }
-
-    s_vpi_delay delays = {};
-    s_vpi_time times[1] = {};
-    delays.da = times;
-    delays.no_of_delays = 1;
-    delays.time_type = vpiSimTime;
-    vpi_get_delays(tchk, &delays);
-    g_limit = static_cast<int>(times[0].low);
-  }
+  while (vpiHandle tchk = vpi_scan(itr)) ReadOneTimingCheck(tchk);
   return 0;
 }
 

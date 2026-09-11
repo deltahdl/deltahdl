@@ -621,6 +621,46 @@ void VpiContext::AttachModuleDefNames(SimContext& sim_ctx) {
   }
 }
 
+VpiObject* VpiContext::NetSourceDelayExpression(SimContext& sim_ctx,
+                                                const RtlirNet& net) {
+  // §37.3.4: the vpiDelay expression "shall be either an expression that
+  // evaluates to a constant if there is only one delay specified or an
+  // operation if there are more than one delay specified. If multiple delays
+  // are specified, then the operation's vpiOpType shall be vpiListOp."
+  //
+  // §28.16's rise, fall and turn-off delays survive elaboration on RtlirNet in
+  // the order the declaration wrote them, and the slots fill left to right, so
+  // the first empty one ends the list the source specified.
+  Expr* const kWritten[3] = {net.delay_rise, net.delay_fall, net.delay_turnoff};
+  std::vector<VpiObject*> constants;
+  for (Expr* delay : kWritten) {
+    if (delay == nullptr) break;
+    // Each written delay stands as a constant expression carrying the value
+    // evaluating it produced. The storage goes on the run's arena rather than
+    // through SimContext::CreateVariable, which would enter the delay under a
+    // name the design never declared.
+    auto* constant = AllocObject();
+    constant->type = vpiConstant;
+    constant->const_type = vpiIntConst;
+    auto* storage = sim_ctx.GetArena().Create<Variable>();
+    storage->value = EvalExpr(delay, sim_ctx, sim_ctx.GetArena());
+    constant->var = storage;
+    constant->size = static_cast<int>(storage->value.width);
+    constants.push_back(constant);
+  }
+
+  if (constants.empty()) return nullptr;
+  if (constants.size() == 1) return constants.front();
+
+  // The operands of an operation are its expression children (§36.10.3), so the
+  // delays hang there in the order the declaration wrote them.
+  auto* op = AllocObject();
+  op->type = vpiOperation;
+  op->op_type = vpiListOp;
+  for (VpiObject* constant : constants) op->children.push_back(constant);
+  return op;
+}
+
 void VpiContext::AttachSourceDelayExpressions(SimContext& sim_ctx,
                                               const RtlirDesign* design) {
   // §37.3.4: "To access the delay expressions that are specified within the
