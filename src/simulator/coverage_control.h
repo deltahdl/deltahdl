@@ -39,8 +39,8 @@ enum class CoverageControl : std::uint8_t {
 // src/preprocessor/preprocessor.cpp predefines them. The state below keys
 // coverage by these, so everything that names a coverage type to it names it in
 // these terms - the §40.3.2 system functions, which pass the macro's own value
-// straight through, and the §40.5 VPI extensions, whose §40.5.1 properties spell
-// the same four types differently and are translated to these before they
+// straight through, and the §40.5 VPI extensions, whose §40.5.1 properties
+// spell the same four types differently and are translated to these before they
 // arrive.
 constexpr int kCoverageTypeAssertion = 20;
 constexpr int kCoverageTypeFsmState = 21;
