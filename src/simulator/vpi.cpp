@@ -518,10 +518,20 @@ PLI_BYTE8* VpiContext::McdName(PLI_UINT32 cd) {
   // §38.26: a descriptor of 0 names no file, so it takes the error return.
   if (cd == 0) return nullptr;
 
-  // §38.26: cd is a single-channel descriptor - one mcd channel, or an fd from
-  // $fopen with its MSB set. The file it names is the entry recorded under
-  // exactly that descriptor in the shared mcd/fd namespace, the same one
-  // vpi_mcd_open() and $fopen populate (§38.27, §21.3.1).
+  // §38.26: cd is "a single-channel descriptor" - one mcd channel, or an fd
+  // from $fopen, which its MSB marks and whose remaining bits are its own
+  // numbering rather than channels. A descriptor naming several channels names
+  // several files and so no one name, which is the error return. Only an exact
+  // match against a recorded descriptor was looked for: that found nothing for
+  // such a cd, but by there being no entry under the combination rather than by
+  // the rule, so an entry that ever held one would have answered with its name.
+  const bool kSingleChannel =
+      (cd & kVpiFdDescriptorChannel) != 0 || (cd & (cd - 1)) == 0;
+  if (!kSingleChannel) return nullptr;
+
+  // §38.26: the file it names is the entry recorded under exactly that
+  // descriptor in the shared mcd/fd namespace, the same one vpi_mcd_open() and
+  // $fopen populate (§38.27, §21.3.1).
   for (const auto& [name, descriptor] : mcd_open_files_) {
     if (descriptor != cd) continue;
     // §38.26: the name is returned through a buffer reused on every call, so a

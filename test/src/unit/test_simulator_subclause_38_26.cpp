@@ -91,5 +91,23 @@ TEST_F(VpiMcdNameSim, OverwritesReturnedValueOnSubsequentCalls) {
   EXPECT_EQ(retained, "alpha.log");
 }
 
+// §38.26 returns "the name of a file represented by a single-channel descriptor
+// cd". A descriptor naming several channels names several files, so there is no
+// one name to return and the routine takes its error return. Both of the files
+// named are open and each answers on its own descriptor, so the null is the
+// rule at work rather than the files being absent.
+TEST_F(VpiMcdNameSim, AMultiChannelDescriptorNamesNoOneFile) {
+  char first[] = "first.log";
+  char second[] = "second.log";
+  PLI_UINT32 mcd_first = vpi_mcd_open(first);
+  PLI_UINT32 mcd_second = vpi_mcd_open(second);
+  ASSERT_NE(mcd_first, 0u);
+  ASSERT_NE(mcd_second, 0u);
+  ASSERT_STREQ(vpi_mcd_name(mcd_first), "first.log");
+  ASSERT_STREQ(vpi_mcd_name(mcd_second), "second.log");
+
+  EXPECT_EQ(vpi_mcd_name(mcd_first | mcd_second), nullptr);
+}
+
 }  // namespace
 }  // namespace delta
