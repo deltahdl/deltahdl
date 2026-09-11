@@ -63,5 +63,39 @@ TEST_F(VpiPrintfSim, EmptyFormatWritesNothingAndReturnsZero) {
   EXPECT_TRUE(vpi_ctx_.LogFileBuffer().empty());
 }
 
+// §38.30: the routine writes to the tool's output channel and log file, which
+// are destinations a tool keeps writing to rather than a place one message sits
+// at a time. A second call therefore adds its text after the first on both,
+// while the count it returns is of the characters that call printed and says
+// nothing about what was printed before it.
+TEST_F(VpiPrintfSim, EachCallAddsItsTextAfterTheLastOnBothDestinations) {
+  PLI_BYTE8 first[] = "one ";
+  PLI_BYTE8 second[] = "two=%d";
+  vpi_printf(first);
+
+  int written = vpi_printf(second, 2);
+
+  EXPECT_EQ(written, 5);
+  EXPECT_EQ(vpi_ctx_.OutputChannelBuffer(), "one two=2");
+  EXPECT_EQ(vpi_ctx_.LogFileBuffer(), "one two=2");
+}
+
+// §38.30: what the routine writes goes to the tool's own output channel and log
+// file, so it is the text those two destinations hold pending and hand on when
+// they are flushed (§38.5), rather than text kept somewhere a flush of them
+// does not reach. Flushing after the call commits exactly what was printed and
+// leaves nothing behind it.
+TEST_F(VpiPrintfSim, WhatWasPrintedIsWhatAFlushOfTheToolsChannelsCommits) {
+  PLI_BYTE8 format[] = "pending=%s";
+  vpi_printf(format, "yes");
+
+  ASSERT_EQ(vpi_flush(), 0);
+
+  EXPECT_EQ(vpi_ctx_.OutputChannelFlushed(), "pending=yes");
+  EXPECT_EQ(vpi_ctx_.LogFileFlushed(), "pending=yes");
+  EXPECT_TRUE(vpi_ctx_.OutputChannelBuffer().empty());
+  EXPECT_TRUE(vpi_ctx_.LogFileBuffer().empty());
+}
+
 }  // namespace
 }  // namespace delta
