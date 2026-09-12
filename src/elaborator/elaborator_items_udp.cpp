@@ -298,6 +298,34 @@ void ClassifyInstantiatedChild(const ModuleItem* item, const ModuleDecl* child,
   }
 }
 
+// A.4.1 writes four instantiation forms, and three of them are one form under
+// three identifier classes: `module_instantiation`, `interface_instantiation`
+// and `program_instantiation` each read
+// `<identifier> [ parameter_value_assignment ] hierarchical_instance
+// { , hierarchical_instance } ;`. The fourth is deliberately narrower --
+//
+//     checker_instantiation ::=
+//         ps_checker_identifier name_of_instance
+//         ( [ list_of_checker_port_connections ] ) ;
+//
+// -- and what it leaves out is the parameter value assignment. A checker takes
+// its arguments through the ports that connection list fills (§17.3), so an
+// override written before the instance name names nothing the declaration has.
+// Parsed by the one path all four forms share, it was read as the parameter
+// value assignment of the other three and carried to a declaration that has no
+// parameters for it to override, silently.
+void CheckCheckerInstHasNoParamAssignment(const ModuleItem* item,
+                                          const ModuleDecl* child,
+                                          DiagEngine& diag) {
+  if (child->decl_kind != ModuleDeclKind::kChecker) return;
+  if (item->inst_params.empty()) return;
+  diag.Error(item->loc,
+             std::format("checker '{}' cannot be instantiated with a "
+                         "parameter value assignment",
+                         item->inst_module),
+             Subclause("A.4.1.4"));
+}
+
 // Emits the parent-scope legality diagnostics for a module-instance item whose
 // resolved child is `child`: an interface may not instantiate a module, and a
 // program or checker may only instantiate checkers.
@@ -679,6 +707,7 @@ void ClassifyAndCheckItems(const ModuleDecl* decl,
                                   item_scope.scope);
         CheckModuleInstParentRules(item, decl, child, item_scope.parent_scope,
                                    item_scope.diag);
+        CheckCheckerInstHasNoParamAssignment(item, child, item_scope.diag);
       }
     }
     CheckProgramCheckerItemRules(item, decl, item_scope.parent_scope,
