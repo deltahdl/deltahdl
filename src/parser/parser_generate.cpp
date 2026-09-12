@@ -167,6 +167,13 @@ void Parser::ParseGenerateRegion(std::vector<ModuleItem*>& items) {
 // inc_or_dec_operator -- so a position holding one is reported at the token
 // that breaks the form and read as the statement it is, which is what lets
 // the rest of the header be read.
+//
+// What is recorded for a reported position is still an assignment to an
+// identifier, one with no name and no value: the elaborator reads gen_init as
+// the form A.4.2 gives it, with no guard of its own, and the test fixtures
+// that elaborate a source the parser reported on hand it the tree as it
+// stands. A genvar with no name is looked up by nothing, and a value that is
+// no expression folds to nothing, so the loop builds no instance.
 Stmt* Parser::ParseGenvarInitialization() {
   Match(TokenKind::kKwGenvar);
   auto saved = lexer_.SavePos();
@@ -176,16 +183,18 @@ Stmt* Parser::ParseGenvarInitialization() {
     is_assignment = Check(TokenKind::kEq);
   }
   lexer_.RestorePos(saved);
+  auto* init = arena_.Create<Stmt>();
+  init->kind = StmtKind::kBlockingAssign;
+  init->range.start = CurrentLoc();
   if (!is_assignment) {
     diag_.Error(CurrentLoc(),
                 "a loop generate's initialization is written "
                 "'[ genvar ] genvar_identifier = constant_expression'",
                 Subclause("A.4.2"));
-    return ParseAssignmentOrExprStmt();
+    ParseAssignmentOrExprStmt();
+    init->lhs = MakeIdentifierNode(arena_, "", init->range.start);
+    return init;
   }
-  auto* init = arena_.Create<Stmt>();
-  init->kind = StmtKind::kBlockingAssign;
-  init->range.start = CurrentLoc();
   Token id = Consume();
   init->lhs = MakeIdentifierNode(arena_, id.text, id.loc);
   Consume();
@@ -219,18 +228,29 @@ static bool IsGenvarIteration(const Stmt* step) {
 // A.4.2's genvar_iteration. A position holding none of its three forms -- a
 // bare `i`, a call, a nonblocking `i <= i + 1` -- is reported where it
 // stands; the elaborator's §27.4 rule that the iteration assign to the
-// genvar the initialization assigned to reads the statement after it.
-Stmt* Parser::ParseGenvarIteration() {
+// genvar the initialization assigned to reads the statement after it. What
+// is recorded for a reported position is `genvar ++` on the genvar the
+// initialization named, for the reason ParseGenvarInitialization gives: the
+// elaborator reads gen_step as one of the three forms and nothing else.
+Stmt* Parser::ParseGenvarIteration(std::string_view genvar) {
   SourceLoc loc = CurrentLoc();
   Stmt* step = ParseAssignmentOrExprNoSemi();
-  if (!IsGenvarIteration(step)) {
-    diag_.Error(loc,
-                "a loop generate's iteration is written 'genvar_identifier "
-                "assignment_operator genvar_expression', 'inc_or_dec_operator "
-                "genvar_identifier' or 'genvar_identifier inc_or_dec_operator'",
-                Subclause("A.4.2"));
-  }
-  return step;
+  if (IsGenvarIteration(step)) return step;
+  diag_.Error(loc,
+              "a loop generate's iteration is written 'genvar_identifier "
+              "assignment_operator genvar_expression', 'inc_or_dec_operator "
+              "genvar_identifier' or 'genvar_identifier inc_or_dec_operator'",
+              Subclause("A.4.2"));
+  auto* increment = arena_.Create<Expr>();
+  increment->kind = ExprKind::kPostfixUnary;
+  increment->op = TokenKind::kPlusPlus;
+  increment->lhs = MakeIdentifierNode(arena_, genvar, loc);
+  increment->range.start = loc;
+  auto* recorded = arena_.Create<Stmt>();
+  recorded->kind = StmtKind::kExprStmt;
+  recorded->range.start = loc;
+  recorded->expr = increment;
+  return recorded;
 }
 
 ModuleItem* Parser::ParseGenerateFor() {
@@ -242,7 +262,7 @@ ModuleItem* Parser::ParseGenerateFor() {
   item->gen_init = ParseGenvarInitialization();
   item->gen_cond = ParseExpr();
   Expect(TokenKind::kSemicolon, Subclause("27.4"));
-  item->gen_step = ParseGenvarIteration();
+  item->gen_step = ParseGenvarIteration(item->gen_init->lhs->text);
   Expect(TokenKind::kRParen, Subclause("27.4"));
   // A.4.2 ends loop_generate_construct with its generate_block, so no `else`
   // follows this one.

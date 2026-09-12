@@ -161,7 +161,7 @@ class Parser {
                          bool else_may_follow);
   ModuleItem* ParseGenerateFor();
   Stmt* ParseGenvarInitialization();
-  Stmt* ParseGenvarIteration();
+  Stmt* ParseGenvarIteration(std::string_view genvar);
   void MatchEndBlockLabel(std::string_view inline_label,
                           std::string_view prefix_label);
   ModuleItem* ParseGenerateIf();

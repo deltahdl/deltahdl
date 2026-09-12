@@ -484,4 +484,32 @@ TEST(GenerateElaboration, GenerateForBoundThatFoldsToFalseIsNotReported) {
       << reported;
 }
 
+// A header the parser reported on still reaches the elaborator through this
+// fixture, with the tree as the parser left it.
+// Parser::ParseGenvarInitialization and Parser::ParseGenvarIteration record an
+// assignment to an unnamed genvar with no value and a `++` on it in place of
+// the positions they reported, so the loop is read as one whose initial value
+// folds to nothing, and builds no instance, rather than one the elaborator has
+// to guard against.
+TEST(GenerateElaboration, ReportedHeaderElaboratesAsALoopThatBuildsNothing) {
+  ElabFixture f;
+  auto* design = ElaborateSrcAllowingParseErrors(
+      "module top();\n"
+      "  genvar i;\n"
+      "  for (i++; i < 4; i) begin : g\n"
+      "    logic [7:0] x;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a loop generate's initialization is written", 3,
+                            "A.4.2"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a loop generate's iteration is written", 3,
+                            "A.4.2"));
+  ASSERT_NE(design, nullptr);
+  ASSERT_FALSE(design->top_modules.empty());
+  EXPECT_TRUE(design->top_modules[0]->variables.empty());
+}
+
 }  // namespace
