@@ -71,17 +71,17 @@ DelayModeDirective ModeOf(const RtlirDesign* design, std::string_view module) {
 TEST(Elaborator, DelayModeDistributed_LeavesAModuleDeclaredBeforeItUnset) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(
-      "module before;\n"
+      "module earlier;\n"
       "endmodule\n"
       "`delay_mode_distributed\n"
-      "module after;\n"
+      "module later;\n"
       "endmodule\n",
       f, "", /*auto_top=*/true);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
   ASSERT_EQ(design->top_modules.size(), 2u);
-  EXPECT_EQ(ModeOf(design, "before"), DelayModeDirective::kNone);
-  EXPECT_EQ(ModeOf(design, "after"), DelayModeDirective::kDistributed);
+  EXPECT_EQ(ModeOf(design, "earlier"), DelayModeDirective::kNone);
+  EXPECT_EQ(ModeOf(design, "later"), DelayModeDirective::kDistributed);
 }
 
 // The same rule between two directives: a module declared under E.5's path
