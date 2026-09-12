@@ -46,9 +46,18 @@ static void CollectSelectReads(const Expr* expr,
   // same root name, since CollectAssignLhsName below walks a written select
   // down to the identifier it stands on, which is what §9.2.2.2.1's exception
   // (b) needs it to be.
-  if (cur && cur->kind == ExprKind::kIdentifier && !cur->text.empty()) {
-    out.insert(std::string(cur->text));
+  if (cur && cur->kind == ExprKind::kIdentifier) {
+    if (!cur->text.empty()) out.insert(std::string(cur->text));
+    return;
   }
+  // A select the elaborator built over an expression rather than a name:
+  // EmitConcatContAssigns in elaborator_cont_assign.cpp hands each element of
+  // a concatenation target its slice of the whole right-hand side as
+  // `(rhs + 0)[hi:lo]`, so the chain stands on the widened expression and on
+  // no identifier at all. Its operands are what the slice reads, and they were
+  // read by nothing here: `assign {c, s} = a + b;` was evaluated once and
+  // never again, whatever a and b later did.
+  CollectExprReads(cur, out);
 }
 
 void CollectExprReads(const Expr* expr, std::unordered_set<std::string>& out) {

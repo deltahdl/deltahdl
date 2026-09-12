@@ -1,3 +1,5 @@
+#include <string>
+
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 #include "simulator/lowerer.h"
@@ -493,6 +495,34 @@ TEST(ContAssignStatementSim, ConcatTargetSignExtendsASignedRhs) {
   ASSERT_NE(sv, nullptr);
   EXPECT_EQ(c->value.ToUint64(), 1u);
   EXPECT_EQ(sv->value.ToUint64(), 0xFu);
+}
+
+// §10.3.2: a continuous assignment "shall be evaluated ... whenever the value
+// of any operand changes" -- the operands of the whole right-hand side, for a
+// concatenation target as for any other. Each element of such a target is
+// elaborated into an assignment of its own slice of the right-hand side, a
+// select standing on the widened expression rather than on a name, and the
+// sensitivity walk read no operand through that select: `{carry_out, sum_out}`
+// took the sum of the values the operands had at time zero and never moved
+// again, whatever ina and inb later did.
+TEST(ContAssignStatementSim, ConcatTargetFollowsItsOperandsAfterTimeZero) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  wire carry_out;\n"
+      "  wire [3:0] sum_out;\n"
+      "  logic [3:0] ina, inb;\n"
+      "  logic carry_in;\n"
+      "  assign {carry_out, sum_out} = ina + inb + carry_in;\n"
+      "  initial begin\n"
+      "    ina = 4'd9; inb = 4'd8; carry_in = 1'b1;\n"
+      "    #1 $display(\"%b %b\", carry_out, sum_out);\n"
+      "    ina = 4'd1; inb = 4'd2; carry_in = 1'b0;\n"
+      "    #1 $display(\"%b %b\", carry_out, sum_out);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 0010\n0 0011\n");
 }
 
 }  // namespace
