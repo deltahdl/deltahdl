@@ -653,8 +653,14 @@ static void RegisterScopeTimescales(const RtlirModule* mod, SimContext& ctx,
     if (!child.resolved) continue;
     std::string inst(child.inst_name);
     ctx.SetScopeTimeScale(inst, child.resolved->timescale);
-    RegisterScopeTimescales(child.resolved, ctx, from_top + "." + inst,
-                            below_top.empty() ? inst : below_top + "." + inst);
+    std::string child_from_top = from_top;
+    child_from_top += ".";
+    child_from_top += inst;
+    std::string child_below_top = below_top;
+    if (!child_below_top.empty()) child_below_top += ".";
+    child_below_top += inst;
+    RegisterScopeTimescales(child.resolved, ctx, child_from_top,
+                            child_below_top);
   }
 }
 
