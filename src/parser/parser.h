@@ -379,6 +379,8 @@ class Parser {
   void ParsePathPorts(std::vector<SpecifyTerminal>& ports);
   SpecifyTerminal ParseSpecifyTerminal();
   void ParsePathDelays(std::vector<Expr*>& delays);
+  void ParsePathDelayList(std::vector<Expr*>& delays);
+  bool TryParseParenthesizedPathDelays(std::vector<Expr*>& delays);
   SpecifyEdge ParseSpecifyEdge(
       std::vector<std::pair<char, char>>* edge_descriptors = nullptr);
   void ParseSplitEdgeDescriptor(

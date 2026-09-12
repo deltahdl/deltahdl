@@ -140,6 +140,110 @@ TEST(SpecifyPathDelayGrammar, MinTypMaxPathDelayExpression) {
   EXPECT_EQ((*delays)[0]->kind, ExprKind::kMinTypMax);
 }
 
+// path_delay_value ::= list_of_path_delay_expressions, the bare alternative,
+// admits every list form the parenthesized one does: §30.5 has "one or more
+// delay values" on the right-hand side and "the delay values may be optionally
+// enclosed in a pair of parentheses". A rise and fall pair written without the
+// parentheses is read as two delays.
+TEST(SpecifyPathDelayGrammar, RiseFallTwoValuesUnparenthesized) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a => b) = 3, 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  const auto* delays = FirstPathDelays(r.cu);
+  ASSERT_NE(delays, nullptr);
+  EXPECT_EQ(delays->size(), 2u);
+}
+
+// The bare three-value form, each value a constant_mintypmax_expression: the
+// colons inside a value and the commas between values are read apart.
+TEST(SpecifyPathDelayGrammar, MinTypMaxThreeValuesUnparenthesized) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a => b) = 1:2:3, 4:5:6, 7:8:9;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  const auto* delays = FirstPathDelays(r.cu);
+  ASSERT_NE(delays, nullptr);
+  ASSERT_EQ(delays->size(), 3u);
+  for (const auto* delay : *delays) {
+    ASSERT_NE(delay, nullptr);
+    EXPECT_EQ(delay->kind, ExprKind::kMinTypMax);
+  }
+}
+
+// The bare twelve-value form.
+TEST(SpecifyPathDelayGrammar, TwelveValuesUnparenthesized) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a *> b) = 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  const auto* delays = FirstPathDelays(r.cu);
+  ASSERT_NE(delays, nullptr);
+  EXPECT_EQ(delays->size(), 12u);
+}
+
+// A '(' after the '=' opens the parenthesized path_delay_value only where the
+// ')' that answers it ends the value; otherwise it opens the first
+// constant_mintypmax_expression of the bare list, as in `(1) + 2`, which is
+// one delay of value 3 and no parenthesized list of one followed by `+ 2`.
+TEST(SpecifyPathDelayGrammar, ParenthesizedOperandOpensBareSingleValue) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a => b) = (1) + 2;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  const auto* delays = FirstPathDelays(r.cu);
+  ASSERT_NE(delays, nullptr);
+  ASSERT_EQ(delays->size(), 1u);
+  ASSERT_NE((*delays)[0], nullptr);
+  EXPECT_EQ((*delays)[0]->kind, ExprKind::kBinary);
+}
+
+// The same '(' at the head of a bare list of two: `(2) * 3, (4) + 1` is a rise
+// delay and a fall delay, each a binary expression over a parenthesized
+// operand.
+TEST(SpecifyPathDelayGrammar, ParenthesizedOperandOpensBareList) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a => b) = (2) * 3, (4) + 1;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  const auto* delays = FirstPathDelays(r.cu);
+  ASSERT_NE(delays, nullptr);
+  ASSERT_EQ(delays->size(), 2u);
+  for (const auto* delay : *delays) {
+    ASSERT_NE(delay, nullptr);
+    EXPECT_EQ(delay->kind, ExprKind::kBinary);
+  }
+}
+
+// The closed set of list lengths holds for the bare alternative as for the
+// parenthesized one: four values without parentheses are rejected at the
+// first, where the value begins.
+TEST(SpecifyPathDelayGrammar, NonEnumeratedValueCountUnparenthesizedRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a *> b) = 1, 2, 3, 4;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "path delay must have 1, 2, 3, 6, or 12 values", 3, "30.5"));
+}
+
 // The list_of_path_delay_expressions alternatives form a closed set: only 1, 2,
 // 3, 6, or 12 expressions are accepted. A 4-value list is not a valid
 // alternative and is rejected.

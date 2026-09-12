@@ -300,16 +300,57 @@ void Parser::ParsePathPorts(std::vector<SpecifyTerminal>& ports) {
   }
 }
 
+// A.7.4's list_of_path_delay_expressions: one constant_mintypmax_expression
+// (A.8.3) or a comma-separated list of them. The count the list may have is
+// the caller's to check, once it knows which alternative of path_delay_value
+// held the list.
+void Parser::ParsePathDelayList(std::vector<Expr*>& delays) {
+  delays.push_back(ParseMinTypMaxExpr());
+  while (Match(TokenKind::kComma)) {
+    delays.push_back(ParseMinTypMaxExpr());
+  }
+}
+
+// Reads A.7.4's `( list_of_path_delay_expressions )` alternative of
+// path_delay_value, answering whether that is what stood at the '('. The bare
+// alternative can open with a '(' too, since a constant_mintypmax_expression
+// can, as in `(1) + 2` and `(2) * 3, (4) + 1`; the two are told apart by what
+// follows the ')' that answers the '(': the ';' that ends the path declaration
+// for the parenthesized list, an operator or a ',' for an expression the
+// parentheses opened. A list read cleanly to its ')' with no ';' behind it is
+// given back to the bare reading from the '(' on. A list that drew a report is
+// kept as the parenthesized alternative, so that its report stands once and a
+// ')' it lacks is reported here rather than as the expression's.
+bool Parser::TryParseParenthesizedPathDelays(std::vector<Expr*>& delays) {
+  if (!Check(TokenKind::kLParen)) return false;
+  auto saved = lexer_.SavePos();
+  uint32_t errors_before = diag_.ErrorCount();
+  Consume();
+  std::vector<Expr*> list;
+  ParsePathDelayList(list);
+  bool clean = diag_.ErrorCount() == errors_before;
+  if (clean && Match(TokenKind::kRParen)) {
+    if (Check(TokenKind::kSemicolon)) {
+      delays = std::move(list);
+      return true;
+    }
+    lexer_.RestorePos(saved);
+    return false;
+  }
+  Expect(TokenKind::kRParen, Subclause("30.5"));
+  delays = std::move(list);
+  return true;
+}
+
+// A.7.4's path_delay_value: a list_of_path_delay_expressions bare or in
+// parentheses, §30.5 having "one or more delay values" on the right-hand side
+// that "may be optionally enclosed in a pair of parentheses". The list holds
+// one, two, three, six or twelve values, and no other count, whichever
+// alternative holds it.
 void Parser::ParsePathDelays(std::vector<Expr*>& delays) {
   auto loc = CurrentLoc();
-  if (Match(TokenKind::kLParen)) {
-    delays.push_back(ParseMinTypMaxExpr());
-    while (Match(TokenKind::kComma)) {
-      delays.push_back(ParseMinTypMaxExpr());
-    }
-    Expect(TokenKind::kRParen, Subclause("30.5"));
-  } else {
-    delays.push_back(ParseMinTypMaxExpr());
+  if (!TryParseParenthesizedPathDelays(delays)) {
+    ParsePathDelayList(delays);
   }
 
   auto n = delays.size();
