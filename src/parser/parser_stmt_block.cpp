@@ -11,9 +11,6 @@
 
 namespace delta {
 
-// CPD-dedup: a label preceding begin/fork is equivalent to a block name, so the
-// matching name after end/join* may be the inline name or that prefix label.
-// Validates the optional trailing ": name" against the effective block name.
 // §9.3.4: "a matching block name may be specified after the block end, join,
 // join_any, or join_none keyword, preceded by a colon", and "it shall be an
 // error if the name at the end is different from the block name at the

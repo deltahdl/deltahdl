@@ -798,4 +798,23 @@ TEST(ProgramConstruct,
   EXPECT_FALSE(f.has_errors);
 }
 
+// §24.3: a program "shall not contain ... instances of modules, interfaces, or
+// other programs". The parser reports an instance of a cell it has seen
+// declared; a cell declared after the program is an identifier the parser can
+// tell nothing from, and the elaborator, which knows every declaration, is
+// what reports it.
+TEST(ProgramConstruct, ModuleDeclaredAfterProgramInstantiatingItIsError) {
+  ProgramElabFixture f;
+  ElaborateSource(
+      "program p;\n"
+      "  sub u0();\n"
+      "endprogram\n"
+      "module sub; endmodule\n",
+      f, "p");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "only checkers can be instantiated inside "
+                            "program 'p'",
+                            2, "17.2"));
+}
+
 }  // namespace

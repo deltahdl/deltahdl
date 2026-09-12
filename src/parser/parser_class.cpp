@@ -19,6 +19,7 @@ struct ParserClassHelpers {
     if (!decl->is_automatic) p.Match(TokenKind::kKwStatic);
 
     decl->name = p.Expect(TokenKind::kIdentifier, subclause).text;
+    p.declared_design_elements_.insert(decl->name);
     p.ParseParamsPortsAndSemicolon(*decl);
     return !decl->ports.empty() && decl->ports[0].direction == Direction::kNone;
   }

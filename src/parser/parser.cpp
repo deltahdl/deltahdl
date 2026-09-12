@@ -719,6 +719,7 @@ void Parser::ParseExternTopLevel(CompilationUnit* unit) {
     Consume();
     Match(TokenKind::kKwAutomatic) || Match(TokenKind::kKwStatic);
     decl->name = Expect(TokenKind::kIdentifier, Subclause("25.3")).text;
+    declared_design_elements_.insert(decl->name);
     ParseParamsPortsAndSemicolon(*decl);
     unit->interfaces.push_back(decl);
     return;
@@ -732,6 +733,7 @@ void Parser::ParseExternTopLevel(CompilationUnit* unit) {
     Consume();
     Match(TokenKind::kKwAutomatic) || Match(TokenKind::kKwStatic);
     decl->name = Expect(TokenKind::kIdentifier, Subclause("24.3")).text;
+    declared_design_elements_.insert(decl->name);
     ParseParamsPortsAndSemicolon(*decl);
     unit->programs.push_back(decl);
     return;
@@ -770,6 +772,7 @@ ModuleDecl* Parser::ParseExternModuleDecl() {
   mod->is_automatic = Match(TokenKind::kKwAutomatic);
   if (!mod->is_automatic) Match(TokenKind::kKwStatic);
   mod->name = Expect(TokenKind::kIdentifier, Subclause("23.5")).text;
+  declared_design_elements_.insert(mod->name);
   ParseParamsPortsAndSemicolon(*mod);
   mod->range.end = CurrentLoc();
   return mod;
@@ -792,6 +795,7 @@ ModuleDecl* Parser::ParseModuleDecl() {
   auto name_tok = ExpectIdentifier(Subclause("23.2.1"));
   mod->name = name_tok.text;
   mod->range.start = loc;
+  declared_design_elements_.insert(mod->name);
 
   ParseParamsPortsAndSemicolon(*mod);
   ParseModuleBody(*mod);

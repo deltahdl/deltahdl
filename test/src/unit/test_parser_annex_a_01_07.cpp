@@ -271,4 +271,124 @@ TEST(NonPortProgramItem, ErrorSpecparamInProgramIsRejected) {
       "6.20.5"));
 }
 
+// --- non_port_program_item admits no net_alias, bind_directive or
+// parameter_override ---
+// A.1.4's module_common_item lists net_alias and bind_directive and its
+// module_or_generate_item lists parameter_override; non_port_program_item lists
+// none of the three. Each was accepted in a program body silently and recorded
+// as an item of it; each is now reported under A.1.7 at its keyword and still
+// read, so that the body resumes after it.
+
+TEST(NonPortProgramItem, ErrorNetAliasInProgramIsRejected) {
+  auto r = Parse(
+      "program p;\n"
+      "  alias a = b;\n"
+      "  initial x = 0;\n"
+      "endprogram\n");
+  EXPECT_TRUE(ReportedError(r.diags, "a net alias is not an item of a program",
+                            2, "A.1.7"));
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->programs[0]->items, ModuleItemKind::kInitialBlock));
+}
+
+TEST(NonPortProgramItem, ErrorBindDirectiveInProgramIsRejected) {
+  auto r = Parse(
+      "program p;\n"
+      "  bind m chk c();\n"
+      "endprogram\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a bind directive is not an item of a program", 2, "A.1.7"));
+}
+
+TEST(NonPortProgramItem, ErrorDefparamInProgramIsRejected) {
+  auto r = Parse(
+      "program p;\n"
+      "  defparam u.w = 1;\n"
+      "endprogram\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a defparam statement is not an item of a program", 2, "A.1.7"));
+}
+
+// --- non_port_program_item admits a concurrent_assertion_item and not
+// A.1.4's assertion_item ---
+// assertion_item's other alternative is A.6.10's
+// deferred_immediate_assertion_item, and §16.4.3 has a deferred assertion
+// outside procedural code "treated as if it were contained in an always_comb
+// procedure", which §24.3 has a program not contain. Both deferral forms were
+// accepted in a program body silently.
+TEST(NonPortProgramItem, ErrorDeferredImmediateAssertionInProgramIsRejected) {
+  auto r = Parse(
+      "program p;\n"
+      "  a1: assert #0 (x);\n"
+      "  cover final (y);\n"
+      "endprogram\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a deferred immediate assertion is not an item of a program", 2,
+      "A.1.7"));
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a deferred immediate assertion is not an item of a program", 3,
+      "A.1.7"));
+}
+
+// A concurrent_assertion_item reaches A.4.1.4's checker_instantiation, and
+// §17.3 has a checker instantiated "wherever a concurrent assertion may
+// appear"; the parser reported every instantiation in a program under §24.3,
+// the checker's with the module's it forbids.
+TEST(NonPortProgramItem, ConcurrentAssertionItemCheckerInstantiation) {
+  auto r = Parse(
+      "checker chk(input logic a);\n"
+      "endchecker\n"
+      "program p;\n"
+      "  chk c(x);\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->programs[0]->items, ModuleItemKind::kModuleInst));
+}
+
+// A.4.1.4 names the checker by a ps_checker_identifier, `[ package_scope ]
+// checker_identifier`, where the module, interface and program instantiations
+// §24.3 forbids name their cell by an identifier alone.
+TEST(NonPortProgramItem, PackageScopedCheckerInstantiation) {
+  EXPECT_TRUE(
+      ParseOk("package pkg;\n"
+              "  checker chk(input logic a);\n"
+              "  endchecker\n"
+              "endpackage\n"
+              "program p;\n"
+              "  pkg::chk c(x);\n"
+              "endprogram\n"));
+}
+
+// §24.3's report on an instantiation is made for a cell the parse has seen
+// declared as a module, an interface or a program; a cell declared after the
+// program, or in another file, is the elaborator's to report.
+TEST(NonPortProgramItem, InstantiationOfCellDeclaredLaterIsLeftToElaboration) {
+  auto r = Parse(
+      "program p;\n"
+      "  sub u0();\n"
+      "endprogram\n"
+      "module sub; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// Footnote 5 to program_generate_item: "it shall be illegal for a
+// program_generate_item to include any item that would be illegal in a
+// program_declaration outside a program_generate_item".
+TEST(ProgramGenerateItem, AdmitsProgramItemsOnly) {
+  auto r = Parse(
+      "program p;\n"
+      "  if (1) begin : g\n"
+      "    defparam u.w = 1;\n"
+      "  end\n"
+      "endprogram\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a defparam statement is not an item of a program", 3, "A.1.7"));
+}
+
 }  // namespace

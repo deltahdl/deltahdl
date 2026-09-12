@@ -5,8 +5,9 @@ namespace delta {
 static bool IsDataTypeKeyword(TokenKind tk);
 
 // CPD-dedup helpers for the statements this file parses. The begin/fork block
-// name is not among them: it moved to ParserStmtBlockHelpers in
-// src/parser/parser_stmt_block.cpp with the two statements that ask for it.
+// name is not among them: it is Parser::MatchEndBlockLabel in
+// src/parser/parser_stmt_block.cpp, beside the two statements that ask for it
+// and shared with the generate block in src/parser/parser_generate.cpp.
 struct ParserStmtHelpers {
   static void ApplyStmtLabel(Parser& p, Stmt* stmt,
                              std::string_view prefix_label) {

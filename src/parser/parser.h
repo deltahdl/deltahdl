@@ -76,7 +76,6 @@ class Parser {
   friend void ParseGateInstanceTail(Parser& p, ModuleItem* item, bool has_name);
   // File-local CPD-dedup helpers (defined static in their respective TUs).
   friend struct ParserStmtHelpers;
-  friend struct ParserStmtBlockHelpers;
   friend struct ParserPortHelpers;
   friend struct ParserDpiHelpers;
   friend struct ParserAssertHelpers;
@@ -122,6 +121,7 @@ class Parser {
   bool TryParseKeywordItem(std::vector<ModuleItem*>& items);
   bool TryParseDeclKeywordItem(std::vector<ModuleItem*>& items);
   void RejectInCheckerBody(const char* msg);
+  void RejectInProgramBody(SourceLoc loc, const char* msg);
   bool TryRejectBodyPortDecl();
   bool TryParseSpecifyItem(std::vector<ModuleItem*>& items);
   ModuleItem* ParseExternTfDeclaration(SourceLoc extern_loc);
@@ -459,7 +459,8 @@ class Parser {
   void ParseTypedItemOrInst(std::vector<ModuleItem*>& items,
                             bool had_lifetime = false);
   void ParseImplicitTypeOrInst(std::vector<ModuleItem*>& items);
-  void RejectInstInProgram(SourceLoc loc, const char* msg);
+  void RejectInstInProgram(SourceLoc loc, std::string_view cell,
+                           const char* msg);
   void ParseScopedTypeOrInst(const Token& name_tok,
                              std::vector<ModuleItem*>& items);
   bool LooksLikeScopedInstTail();
@@ -692,6 +693,17 @@ class Parser {
   std::unordered_set<std::string_view> known_types_;
   std::unordered_set<std::string_view> known_nettypes_;
   std::unordered_set<std::string_view> known_udps_;
+  // The names of the modules, interfaces and programs declared so far in this
+  // parse, extern declarations included. §24.3 has a program "shall not
+  // contain ... instances of modules, interfaces, or other programs", and an
+  // instantiation names its cell by an identifier the parser can tell nothing
+  // from, so the report is made here only for a cell declared before the
+  // program that instantiates it; every other name is left to the elaborator,
+  // which knows every declaration and reports the same rule. A checker's name
+  // is never here, since A.1.7's non_port_program_item reaches a
+  // checker_instantiation through concurrent_assertion_item and §17.3 has a
+  // checker instantiated "wherever a concurrent assertion may appear".
+  std::unordered_set<std::string_view> declared_design_elements_;
 
   // What each package and each class declared, keyed by its own name and kept
   // after that scope has closed. known_types_ answers what is a type name where

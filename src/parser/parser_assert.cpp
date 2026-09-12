@@ -219,7 +219,18 @@ static ModuleItem* WrapStmtAsItem(Arena& arena, Stmt* stmt, SourceLoc loc) {
   return item;
 }
 
+// A.6.10's deferred_immediate_assertion_item, the alternative of A.1.4's
+// assertion_item that A.1.7's non_port_program_item leaves out, admitting a
+// concurrent_assertion_item alone: §16.4.3 has a deferred assertion outside
+// procedural code "treated as if it were contained in an always_comb
+// procedure", and §24.3 has a program that "shall not contain always
+// procedures". One in a program body is reported and still read.
 ModuleItem* Parser::ParseDeferredImmediateItem(SourceLoc loc, StmtKind kind) {
+  RejectInProgramBody(loc,
+                      "a deferred immediate assertion is not an item of a "
+                      "program; outside procedural code it stands for an "
+                      "always_comb procedure, which a program does not "
+                      "contain");
   auto* stmt = arena_.Create<Stmt>();
   stmt->kind = kind;
   stmt->range.start = loc;

@@ -193,6 +193,26 @@ void Parser::RejectInCheckerBody(const char* msg) {
   diag_.Error(CurrentLoc(), msg, Subclause("A.1.8"));
 }
 
+// A.1.7's non_port_program_item lists what a program body holds beside its
+// port declarations: a continuous_assign, a
+// module_or_generate_item_declaration, an initial_construct, a final_construct,
+// a concurrent_assertion_item, a timeunits_declaration and a
+// program_generate_item. A.1.4's module_common_item and module_or_generate_item
+// reach more -- a net_alias, a bind_directive, a parameter_override and,
+// through assertion_item, a deferred_immediate_assertion_item -- and the parser
+// reads every body through the same dispatch, so an item on that wider list is
+// reported here under A.1.7 when the body being read is a program's, and still
+// read, so that the body resumes after it. §24.3 names the rest of the
+// difference in prose, "it shall not contain always procedures, primitives,
+// UDPs, or declarations or instances of modules, interfaces, or other
+// programs", and those are reported under §24.3 where each is read. An
+// anonymous program sets no current_module_ and is left to
+// FilterAnonymousProgramItems in parser.cpp, which reports under A.1.11.
+void Parser::RejectInProgramBody(SourceLoc loc, const char* msg) {
+  if (!InProgramBlock()) return;
+  diag_.Error(loc, msg, Subclause("A.1.7"));
+}
+
 // A port declaration standing where an item was due. §27.2: a generate block
 // may not contain port declarations. Top-level non-ANSI port declarations are
 // consumed directly in ParseModuleBody, so a leading port direction reaching
@@ -475,6 +495,8 @@ bool Parser::TryParseMiscKeywordItem(std::vector<ModuleItem*>& items) {
   if (TryParseProcessBlock(items)) return true;
   if (Check(TokenKind::kKwAlias)) {
     RejectInCheckerBody("a net alias is not an item of a checker");
+    RejectInProgramBody(CurrentLoc(),
+                        "a net alias is not an item of a program");
     items.push_back(ParseAlias());
     return true;
   }
@@ -499,6 +521,8 @@ bool Parser::TryParseMiscKeywordItem(std::vector<ModuleItem*>& items) {
   }
   if (Check(TokenKind::kKwBind)) {
     RejectInCheckerBody("a bind directive is not an item of a checker");
+    RejectInProgramBody(CurrentLoc(),
+                        "a bind directive is not an item of a program");
     auto* bd = ParseBindDirective();
     if (current_module_) current_module_->bind_directives.push_back(bd);
     return true;
@@ -656,6 +680,8 @@ void Parser::ParseModuleItem(std::vector<ModuleItem*>& items) {
     ParseParamDecl(items);
   } else if (Check(TokenKind::kKwDefparam)) {
     RejectInCheckerBody("a defparam statement is not an item of a checker");
+    RejectInProgramBody(CurrentLoc(),
+                        "a defparam statement is not an item of a program");
     items.push_back(ParseDefparam());
   } else if (Check(TokenKind::kKwImport)) {
     ParseImportDecl(items);
@@ -782,11 +808,18 @@ void Parser::ParseTypedItemOrInst(std::vector<ModuleItem*>& items,
   ParseImplicitTypeOrInst(items);
 }
 
-// §1800 forbids instantiating modules/primitives inside a program. Emits the
-// matching diagnostic so each dispatch branch stays flat instead of nesting its
-// own in-program guard.
-void Parser::RejectInstInProgram(SourceLoc loc, const char* msg) {
-  if (InProgramBlock()) diag_.Error(loc, msg, Subclause("24.3"));
+// §24.3 forbids instantiating modules, interfaces and other programs inside a
+// program, and the instantiation of a checker is the one a program admits,
+// A.1.7's non_port_program_item reaching checker_instantiation through
+// concurrent_assertion_item. The two are told apart by the cell's name alone,
+// so the report is made for a cell in declared_design_elements_ and every
+// other name is left to the elaborator, which reports the rule for a cell
+// declared after the program or in another file. Emits the diagnostic so each
+// dispatch branch stays flat instead of nesting its own in-program guard.
+void Parser::RejectInstInProgram(SourceLoc loc, std::string_view cell,
+                                 const char* msg) {
+  if (!InProgramBlock() || declared_design_elements_.count(cell) == 0) return;
+  diag_.Error(loc, msg, Subclause("24.3"));
 }
 
 // Looks past the current position (the candidate instance name of a scoped
@@ -826,7 +859,10 @@ void Parser::ParseScopedTypeOrInst(const Token& name_tok,
   bool is_builtin_pkg = name_tok.text == "std";
   bool is_scoped_inst = !is_builtin_pkg && LooksLikeScopedInstTail();
   if (is_scoped_inst) {
-    RejectInstInProgram(name_tok.loc, "instantiations not allowed in programs");
+    // A.4.1.1's module_instantiation, A.4.1.2's interface_instantiation and
+    // A.4.1.3's program_instantiation name their cell by an identifier alone;
+    // only A.4.1.4's checker_instantiation names it by a ps_checker_identifier
+    // with a package scope, and a checker is what a program may instantiate.
     auto start = items.size();
     ParseModuleInstList(type_tok, &items);
     StampInstScope(items, start, name_tok.text);
@@ -895,8 +931,10 @@ void Parser::ParseImplicitTypeOrInst(std::vector<ModuleItem*>& items) {
     return;
   }
   if (known_udps_.count(name_tok.text) != 0) {
-    RejectInstInProgram(name_tok.loc,
-                        "primitive instances not allowed in programs");
+    if (InProgramBlock()) {
+      diag_.Error(name_tok.loc, "primitive instances not allowed in programs",
+                  Subclause("24.3"));
+    }
     ParseUdpInstList(name_tok, items);
     return;
   }
@@ -919,7 +957,8 @@ void Parser::ParseImplicitTypeOrInst(std::vector<ModuleItem*>& items) {
     return;
   }
   if (CheckIdentifier() || Check(TokenKind::kHash)) {
-    RejectInstInProgram(name_tok.loc, "instantiations not allowed in programs");
+    RejectInstInProgram(name_tok.loc, name_tok.text,
+                        "instantiations not allowed in programs");
     ParseModuleInstList(name_tok, &items);
     return;
   }
