@@ -138,6 +138,24 @@ bool StmtContainsNonEventTimingControl(const Stmt* stmt) {
 void CheckCheckerBodyItemRules(const ModuleItem* item, const ModuleDecl* decl,
                                bool parent_is_checker, DiagEngine& diag) {
   if (!parent_is_checker) return;
+  // A.10 item 6: "It shall be illegal for a checker_generate_item to include
+  // any item that would be illegal in a checker_declaration outside a
+  // checker_generate_item", so the items a generate construct holds -- in its
+  // body, in its else body and in each of its case arms, the shape
+  // CollectGenerateRoots in src/elaborator/elaborator_validate_clocking.cpp
+  // walks -- are read by these same rules. The construct itself is none of
+  // the items the rules below name, so it falls through them unreported.
+  for (const auto* sub : item->gen_body) {
+    CheckCheckerBodyItemRules(sub, decl, parent_is_checker, diag);
+  }
+  if (item->gen_else != nullptr) {
+    CheckCheckerBodyItemRules(item->gen_else, decl, parent_is_checker, diag);
+  }
+  for (const auto& arm : item->gen_case_items) {
+    for (const auto* sub : arm.body) {
+      CheckCheckerBodyItemRules(sub, decl, parent_is_checker, diag);
+    }
+  }
   // §17.7: a checker body may define variables but not nets.
   if (item->kind == ModuleItemKind::kNetDecl) {
     diag.Error(item->loc,
