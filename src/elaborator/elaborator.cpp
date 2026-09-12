@@ -633,9 +633,13 @@ RtlirDesign* Elaborator::ElaborateTops(
   applied_defparams_.clear();
   generate_defparams_.clear();
   early_defparam_resolutions_.clear();
+  defparam_top_roots_.clear();
 
   if (!ElaborateTopModules(top_decls, design)) return nullptr;
 
+  // §23.8: every top-level module is a root a defparam's name may start over
+  // from, and the tops are all elaborated now.
+  defparam_top_roots_ = design->top_modules;
   ResolveDefparamsAndGenerates(design);
 
   // §27.5 puts the items of a selected generate block into the enclosing

@@ -462,6 +462,18 @@ class Elaborator : public ElaboratorClassRules {
 
   void ApplyDefparamsRecursively(RtlirModule* mod);
 
+  // §23.8: the root and remaining steps of a defparam's name read upward from
+  // a top-level module, and the module the parameter it reaches is declared
+  // in. Starts as the writer's own module and the whole path, which is what a
+  // name resolved within the writer's hierarchy keeps.
+  struct DefparamTopRooted {
+    RtlirModule* root;
+    HierPath steps;
+    RtlirModule* target_mod;
+  };
+  RtlirParamDecl* ResolveDefparamFromTop(const HierPath& path,
+                                         DefparamTopRooted& rooted);
+
   void WarnUnresolvedDefparams(RtlirModule* mod);
 
   void ReportUnresolvedDefparams(RtlirModule* mod, const ModuleDecl* decl);

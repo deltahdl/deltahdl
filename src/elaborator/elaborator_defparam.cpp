@@ -168,6 +168,39 @@ RtlirParamDecl* Elaborator::ResolveDefparamSteps(RtlirModule* root,
   return nullptr;
 }
 
+// §23.8: a hierarchical name whose leading step names no scope of the module
+// writing it is resolved upward, "until the name is found or the root of the
+// hierarchy is reached", and the root is a top-level module: a leading step
+// naming one roots the remaining steps there, which is how §23.10.4.2's own
+// example, `defparam m.n.p = 1;` written in the m1 that m instantiates,
+// reaches m's instance n, and how a defparam Annex C.4.1 has "in a separate
+// file from the instance to be modified" names that instance from a top-level
+// module of its own. The writer's generate block path is the writer's and
+// does not carry into the top the name starts over from. Answers the parameter
+// the name reaches through a top-level module, or null where its leading step
+// names none or the steps behind that step reach none.
+RtlirParamDecl* Elaborator::ResolveDefparamFromTop(const HierPath& path,
+                                                   DefparamTopRooted& rooted) {
+  for (auto* top : defparam_top_roots_) {
+    if (top->name != path.front().name) continue;
+    rooted.root = top;
+    rooted.steps.assign(path.begin() + 1, path.end());
+    // One remaining step names a parameter of the top-level module itself,
+    // which no descent reaches.
+    if (rooted.steps.size() == 1) {
+      for (auto& p : top->params) {
+        if (p.name == rooted.steps.front().name) {
+          rooted.target_mod = top;
+          return &p;
+        }
+      }
+      return nullptr;
+    }
+    return ResolveDefparamSteps(top, rooted.steps, {}, &rooted.target_mod);
+  }
+  return nullptr;
+}
+
 void Elaborator::RecomputeDependentParams(RtlirModule* mod) {
   if (!mod) return;
   for (auto& p : mod->params) {
@@ -314,9 +347,19 @@ void Elaborator::ApplyDefparamSite(RtlirModule* mod, const DefparamSite& site,
     const auto& [path_expr, val_expr] = site.item->defparam_assigns[idx];
     HierPath path;
     if (!CollectPathSteps(path_expr, scope, path)) continue;
-    RtlirModule* target_mod = nullptr;
-    auto* param = ResolveDefparamSteps(mod, path, site.path, &target_mod);
+    DefparamTopRooted rooted{mod, path, mod};
+    auto* param =
+        ResolveDefparamSteps(mod, path, site.path, &rooted.target_mod);
+    // §23.10.1: a defparam in a generate block "shall not change a parameter
+    // value outside that hierarchy", and a name starting over from a
+    // top-level module leaves the block, so the upward reading is the
+    // module-level statement's alone; ReportUnresolvedDefparamSite reports
+    // the block's.
+    if (param == nullptr && site.path.empty()) {
+      param = ResolveDefparamFromTop(path, rooted);
+    }
     if (!param) continue;
+    RtlirModule* target_mod = rooted.target_mod;
     DefparamOverride ovr{param, val_expr, scope, site.item->loc};
     DefparamAppliedRecord rec{applied_defparams_, key};
     auto value = EvalDefparamOverride(diag_, ovr, rec);
@@ -329,7 +372,8 @@ void Elaborator::ApplyDefparamSite(RtlirModule* mod, const DefparamSite& site,
     RecomputeDependentParams(target_mod);
     applied_defparams_.insert(key);
     early_defparam_resolutions_.push_back(
-        {mod, path, site.path, param, site.item->loc});
+        {rooted.root, rooted.steps, rooted.root == mod ? site.path : HierPath{},
+         param, site.item->loc});
   }
 }
 
@@ -470,8 +514,10 @@ void Elaborator::ReportUnresolvedDefparamSite(RtlirModule* mod,
     const Expr* path_expr = site.item->defparam_assigns[idx].first;
     HierPath path;
     bool read = CollectPathSteps(path_expr, scope, path);
+    DefparamTopRooted rooted{mod, path, mod};
     if (!site.path.empty() && read &&
-        ResolveDefparamSteps(mod, path, {}) != nullptr) {
+        (ResolveDefparamSteps(mod, path, {}) != nullptr ||
+         ResolveDefparamFromTop(path, rooted) != nullptr)) {
       diag_.Error(site.item->loc,
                   "defparam in a generate block shall not change a parameter "
                   "value outside that block",

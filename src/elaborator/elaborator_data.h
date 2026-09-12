@@ -387,6 +387,12 @@ class ElaboratorData {
     SourceLoc loc;
   };
   std::vector<EarlyDefparamResolution> early_defparam_resolutions_;
+  // §23.8: the top-level modules of the design being elaborated, which are
+  // the roots a defparam's hierarchical name is read from once its leading
+  // step names no scope of the writing module. Filled once the tops exist and
+  // read while defparams are applied and while the unresolved ones are
+  // reported, both of which run outside every module.
+  std::vector<RtlirModule*> defparam_top_roots_;
 
   std::unordered_map<std::string_view, const ModuleItem*>
       deferred_subroutine_map_;
