@@ -2,6 +2,7 @@
 #include <cstring>
 #include <iostream>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "common/arena.h"
@@ -177,8 +178,48 @@ std::string ExtractStringArg(const Expr* arg) {
 // A value is still returned, because the caller is an expression evaluator and
 // the run carries on to whatever else it can report. What changed is that the
 // value is no longer the only thing produced.
+// Annex D.1 lists the system tasks and system functions Annex D describes,
+// "for informative purposes only and ... not part of this standard", which
+// "may not be available in all implementations", each under the subclause
+// that describes it. The subclause of a name D.1 lists, or empty for a name
+// it does not.
+static std::string_view AnnexDSubclauseOf(std::string_view name) {
+  struct AnnexDTask {
+    std::string_view name;
+    std::string_view subclause;
+  };
+  static constexpr AnnexDTask kAnnexDTasks[] = {
+      {"$countdrivers", "D.2"}, {"$getpattern", "D.3"},  {"$input", "D.4"},
+      {"$key", "D.5"},          {"$nokey", "D.5"},       {"$list", "D.6"},
+      {"$log", "D.7"},          {"$nolog", "D.7"},       {"$reset", "D.8"},
+      {"$reset_count", "D.8"},  {"$reset_value", "D.8"}, {"$incsave", "D.9"},
+      {"$restart", "D.9"},      {"$save", "D.9"},        {"$scale", "D.10"},
+      {"$scope", "D.11"},       {"$showscopes", "D.12"}, {"$showvars", "D.13"},
+      {"$sreadmemb", "D.14"},   {"$sreadmemh", "D.14"},
+  };
+  for (const auto& task : kAnnexDTasks) {
+    if (task.name == name) return task.subclause;
+  }
+  return {};
+}
+
 static Logic4Vec ReportUnknownSysCall(const Expr* expr, SimContext& ctx,
                                       Arena& arena, std::string_view name) {
+  // A name D.1 lists that no classifier claimed is an optional task or
+  // function this implementation is one of those without, which D.1 allows,
+  // and the report says which annex subclause describes it rather than that
+  // it is no system task at all.
+  std::string_view annex_d = AnnexDSubclauseOf(name);
+  if (!annex_d.empty()) {
+    ctx.GetDiag().Error(
+        expr->range.start,
+        std::string(name) + " is the optional system task or system function " +
+            std::string(annex_d) +
+            " describes, which Annex D.1 has \"may not be available in all "
+            "implementations\"; this implementation is one without it",
+        Subclause("D.1"));
+    return MakeLogic4VecVal(arena, 1, 0);
+  }
   ctx.GetDiag().Error(expr->range.start,
                       std::string(name) +
                           " is not a system task or system function this tool "
