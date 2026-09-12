@@ -181,7 +181,7 @@ void ApplyAssertionLabel(std::vector<ModuleItem*>& items, size_t before,
 // design elements and a package's `specparam`. A generate block is reported
 // under §27.2 instead, whichever body holds it, since that is the rule the
 // block breaks first.
-bool Parser::TryParseClockingOrVerification(std::vector<ModuleItem*>& items) {
+bool Parser::TryParseSpecifyItem(std::vector<ModuleItem*>& items) {
   if (Check(TokenKind::kKwSpecify)) {
     if (InGenerateBlock()) {
       diag_.Error(CurrentLoc(),
@@ -209,6 +209,11 @@ bool Parser::TryParseClockingOrVerification(std::vector<ModuleItem*>& items) {
     ParseSpecparamDecl(items);
     return true;
   }
+  return false;
+}
+
+bool Parser::TryParseClockingOrVerification(std::vector<ModuleItem*>& items) {
+  if (TryParseSpecifyItem(items)) return true;
   if (Check(TokenKind::kKwClocking)) {
     items.push_back(ParseClockingDecl());
     return true;

@@ -119,6 +119,7 @@ class Parser {
   bool TryParseProcessBlock(std::vector<ModuleItem*>& items);
   bool TryParseKeywordItem(std::vector<ModuleItem*>& items);
   bool TryParseDeclKeywordItem(std::vector<ModuleItem*>& items);
+  bool TryParseSpecifyItem(std::vector<ModuleItem*>& items);
   ModuleItem* ParseExternTfDeclaration(SourceLoc extern_loc);
   bool AtMisplacedMethodQualifier();
   void RejectMisplacedMethodQualifier(std::vector<ModuleItem*>& items);
