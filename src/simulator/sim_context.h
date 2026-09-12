@@ -134,22 +134,19 @@ class SimContext : public DeclaredNameTables, public RandomStability {
 
   // Optional $scope system task (Annex D.11). The interactive scope names the
   // level of hierarchy used when identifying objects interactively, as the one
-  // vpi_control reaches through vpiSetInteractiveScope (§38.4) does. Its
-  // initial setting is the first top-level module, established at lowering; a
-  // $scope call retargets it to "the complete hierarchical name of a module,
-  // task, function, or named block", one of the names the lowerer registered
-  // from CompleteHierarchicalScopeNames, and is refused any other.
+  // vpi_control reaches through vpiSetInteractiveScope (§38.4) does. It starts
+  // as the first top-level module; $scope retargets it to the complete name of
+  // a module, task, function, or named block, one of the names the lowerer
+  // registered from CompleteHierarchicalScopeNames, and is refused any other.
   void SetInteractiveScope(std::string_view name);
   const std::string& InteractiveScope() const { return interactive_scope_; }
   void RegisterHierarchicalScope(std::string_view name);
   bool IsHierarchicalScope(std::string_view name) const;
 
-  // Optional $list system task (Annex D.6). $list produces a listing of a
-  // module, task, function, or named block. With no argument it lists the
-  // object that is the current scope setting (the interactive scope above);
-  // with an argument it lists the specific named scope, one of the registered
-  // names as $scope takes. RecordListing remembers the complete hierarchical
-  // name of the most recently listed scope so the selection can be observed.
+  // Optional $list system task (Annex D.6). $list lists a module, task,
+  // function, or named block: the current scope setting (the interactive scope
+  // above) with no argument, the named scope with one, a registered name as
+  // $scope takes. RecordListing remembers the scope last listed.
   void RecordListing(std::string_view name);
   const std::string& LastListedScope() const { return last_listed_scope_; }
 
@@ -166,15 +163,16 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   const std::string& LastShownScope() const { return last_shown_scope_; }
   bool ShowScopesRecursive() const { return show_scopes_recursive_; }
 
-  // Optional $showvars system task (Annex D.13). $showvars produces status
-  // information for the reg and net variables, scalar and vector, in the
-  // current scope (the interactive scope above). With no argument it reports
-  // every variable in that scope; with a list of variables it reports only the
-  // named ones. A bit-select or part-select of a vector reports the status of
-  // every bit of that vector, so such a selection is recorded by the name of
-  // its underlying vector. Remember the scope the request applied to and the
-  // list of variables named (empty when none were given) so the selection can
-  // be observed.
+  // Optional $showvars system task (Annex D.13). $showvars reports the status
+  // of the reg and net variables in the current scope (the interactive scope
+  // above), every one with no argument and the named ones with a list, a
+  // selection of a vector standing for the whole vector. RegisterScopeVariables
+  // holds the names a module instance declares under its complete scope name;
+  // ScopeVariables answers them, null for a scope that is no module instance.
+  // RecordShowVars remembers the scope and the names given so the selection
+  // can be observed.
+  void RegisterScopeVariables(std::string_view scope, ScopeVariableSet set);
+  const ScopeVariableSet* ScopeVariables(std::string_view scope) const;
   void RecordShowVars(std::string_view scope, std::vector<std::string> vars);
   const std::string& LastShowVarsScope() const { return last_showvars_scope_; }
   const std::vector<std::string>& ShowVarsVariables() const;
@@ -825,6 +823,7 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   std::string last_listed_scope_;
   std::string last_shown_scope_;
   bool show_scopes_recursive_ = false;
+  std::unordered_map<std::string, ScopeVariableSet> scope_variables_;
   std::string last_showvars_scope_;
   std::vector<std::string> showvars_variables_;
   OutputLog log_;

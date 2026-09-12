@@ -1,3 +1,5 @@
+#include <string>
+
 #include "fixture_simulator.h"
 
 using namespace delta;
@@ -161,6 +163,89 @@ TEST(OptionalShowVarsSim, IndexedPartSelectReportsWholeVector) {
   LowerAndRun(design, f);
   ASSERT_EQ(f.ctx.ShowVarsVariables().size(), 1u);
   EXPECT_EQ(f.ctx.ShowVarsVariables()[0], "v");
+}
+
+// The design the status tests share: the top declares a net no one drives, a
+// reg no one assigns and a vector with an initial value, and holds an instance
+// declaring a vector of its own, so the status printed tells a z, an x, a
+// value, and which scope's variables were reported.
+constexpr const char* kStatusDesign =
+    "module child;\n"
+    "  reg [3:0] q = 4'b1010;\n"
+    "endmodule\n"
+    "module t;\n"
+    "  wire w;\n"
+    "  reg a;\n"
+    "  reg [7:0] v = 8'h5a;\n"
+    "  child c1();\n"
+    "  initial begin : blk\n"
+    "    #1 %s\n"
+    "  end\n"
+    "endmodule\n";
+
+std::string StatusDesignWith(const std::string& calls) {
+  std::string src = kStatusDesign;
+  src.replace(src.find("%s"), 2, calls);
+  return src;
+}
+
+// Annex D.13: with no argument the status of every reg and net variable of
+// the current scope is displayed, here each by its name and its value in
+// binary, nets before regs in declaration order: the undriven net is z, the
+// unassigned reg x, and the vector shows every bit.
+TEST(OptionalShowVarsSim, NoArgumentDisplaysEveryVariableOfTheScope) {
+  SimFixture f;
+  std::string out = RunCapture(StatusDesignWith("$showvars;"), f);
+  EXPECT_EQ(out, "w = z\na = x\nv = 01011010\n");
+}
+
+// Annex D.13: with a list of variables only the named ones are displayed, in
+// the order given.
+TEST(OptionalShowVarsSim, AListDisplaysTheNamedVariablesAlone) {
+  SimFixture f;
+  std::string out = RunCapture(StatusDesignWith("$showvars(v, w);"), f);
+  EXPECT_EQ(out, "v = 01011010\nw = z\n");
+}
+
+// Annex D.13: a bit-select or part-select of a vector in the list displays
+// the status of all the bits of that vector, so the selected bit's own value
+// of 0 is not what is printed.
+TEST(OptionalShowVarsSim, ASelectOfAVectorDisplaysAllItsBits) {
+  SimFixture f;
+  std::string out = RunCapture(StatusDesignWith("$showvars(v[0], v[7:4]);"), f);
+  EXPECT_EQ(out, "v = 01011010\nv = 01011010\n");
+}
+
+// Annex D.13: the variables displayed are the current scope's, so after
+// $scope moves the interactive scope into the instance the instance's vector
+// is displayed and the top's three are not, whether every variable is asked
+// for or the instance's is named.
+TEST(OptionalShowVarsSim, TheScopeSetByScopeSelectsWhoseVariablesAreShown) {
+  SimFixture f;
+  std::string out =
+      RunCapture(StatusDesignWith("$scope(t.c1); $showvars; $showvars(q);"), f);
+  EXPECT_EQ(out, "q = 1010\nq = 1010\n");
+}
+
+// Annex D.13: a name the scope declares no variable under is displayed as
+// having none rather than as some other scope's variable of that name: the
+// instance declares no v, so the top's v is not what a $showvars(v) in the
+// instance's scope shows.
+TEST(OptionalShowVarsSim, ANameTheScopeDoesNotDeclareHasNoStatus) {
+  SimFixture f;
+  std::string out =
+      RunCapture(StatusDesignWith("$scope(t.c1); $showvars(v);"), f);
+  EXPECT_EQ(out, "v = <no such variable>\n");
+}
+
+// Annex D.13: a named block declares no reg or net variable of the design, so
+// with the interactive scope set to one and no argument nothing is displayed,
+// and a name given is looked up from where the call stands.
+TEST(OptionalShowVarsSim, ANamedBlockScopeShowsWhatItIsAsked) {
+  SimFixture f;
+  std::string out = RunCapture(
+      StatusDesignWith("$scope(t.blk); $showvars; $showvars(a);"), f);
+  EXPECT_EQ(out, "a = x\n");
 }
 
 }  // namespace

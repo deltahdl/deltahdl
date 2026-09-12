@@ -1,6 +1,7 @@
 #include "elaborator/design_scopes.h"
 
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "elaborator/elaborator_validate_internal.h"
@@ -45,6 +46,28 @@ void CollectModuleScopes(const RtlirModule* mod, const std::string& path,
   }
 }
 
+// The variables of one module instance at `path`, keyed under `prefix`, and
+// of the instances it holds.
+void CollectInstanceVariables(const RtlirModule* mod, const std::string& path,
+                              const std::string& prefix,
+                              std::vector<ScopeDeclaredVariables>& out) {
+  ScopeDeclaredVariables here{path, prefix, {}};
+  for (const auto& net : mod->nets) here.names.emplace_back(net.name);
+  for (const auto& var : mod->variables) here.names.emplace_back(var.name);
+  out.push_back(std::move(here));
+  for (const auto& child : mod->children) {
+    if (child.resolved == nullptr) continue;
+    std::string inst(child.inst_name);
+    std::string child_path = path;
+    child_path += ".";
+    child_path += inst;
+    std::string child_prefix = prefix;
+    child_prefix += inst;
+    child_prefix += ".";
+    CollectInstanceVariables(child.resolved, child_path, child_prefix, out);
+  }
+}
+
 }  // namespace
 
 std::vector<std::string> CompleteHierarchicalScopeNames(
@@ -52,6 +75,15 @@ std::vector<std::string> CompleteHierarchicalScopeNames(
   std::vector<std::string> out;
   for (const auto* top : design->top_modules) {
     CollectModuleScopes(top, std::string(top->name), out);
+  }
+  return out;
+}
+
+std::vector<ScopeDeclaredVariables> ModuleInstanceVariables(
+    const RtlirDesign* design) {
+  std::vector<ScopeDeclaredVariables> out;
+  for (const auto* top : design->top_modules) {
+    CollectInstanceVariables(top, std::string(top->name), "", out);
   }
   return out;
 }

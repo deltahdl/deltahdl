@@ -76,6 +76,17 @@ void SimContext::RecordShowScopes(std::string_view scope, bool recursive) {
   show_scopes_recursive_ = recursive;
 }
 
+void SimContext::RegisterScopeVariables(std::string_view scope,
+                                        ScopeVariableSet set) {
+  scope_variables_[std::string(scope)] = std::move(set);
+}
+
+const ScopeVariableSet* SimContext::ScopeVariables(
+    std::string_view scope) const {
+  auto it = scope_variables_.find(std::string(scope));
+  return it == scope_variables_.end() ? nullptr : &it->second;
+}
+
 void SimContext::RecordShowVars(std::string_view scope,
                                 std::vector<std::string> vars) {
   last_showvars_scope_ = std::string(scope);

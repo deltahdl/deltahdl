@@ -638,21 +638,55 @@ static Logic4Vec EvalAnnexDShowScopes(const Expr* expr, SimContext& ctx,
   return MakeLogic4VecVal(arena, 1, 0);
 }
 
+// Annex D.13: the status of one variable of the current scope, printed as its
+// name and its value in binary, every bit of a vector with x and z as they
+// stand. `key` is what the variable is looked up by: from the root of the
+// design, by the instance's prefix and the declared name, for a module
+// instance's, so the lookup does not turn on the instance the call stands in;
+// a name the lookup finds no variable under, one the scope does not declare,
+// is printed as having none.
+static void ShowVariableStatus(std::string_view name, const std::string& key,
+                               SimContext& ctx) {
+  const Variable* var = ctx.FindVariable(key);
+  ctx.Out() << name << " = ";
+  if (var == nullptr) {
+    ctx.Out() << "<no such variable>\n";
+    return;
+  }
+  ctx.Out() << FormatArg(var->value, 'b') << "\n";
+}
+
 // Optional $showvars system task (Annex D.13). It produces status information
 // for the reg and net variables, scalar and vector, in the current scope (the
 // interactive scope established by $scope). With no argument every variable
 // in that scope is reported; with a list of variables only the named ones
 // are. A bit-select or part-select of a vector reports the status of all bits
 // of that vector, so such a selection is reduced to the name of its
-// underlying vector. Collect the requested variable names and record the
-// request against the current scope.
+// underlying vector. The variables of a module instance are the ones the
+// lowerer registered for it, keyed under the instance's prefix; a task,
+// function or named block registers none, its declarations being storage of
+// the run rather than of the design, so with no argument it reports nothing
+// and with a list each name is looked up from where the call stands. The
+// names given are recorded as well, so the selection can be observed.
 static Logic4Vec EvalAnnexDShowVars(const Expr* expr, SimContext& ctx,
                                     Arena& arena) {
   std::vector<std::string> vars;
   for (const Expr* arg : expr->args) {
     if (arg) vars.push_back(ShowVarsVariableName(arg));
   }
-  ctx.RecordShowVars(ctx.InteractiveScope(), std::move(vars));
+  const std::string& scope = ctx.InteractiveScope();
+  const ScopeVariableSet* declared = ctx.ScopeVariables(scope);
+  std::string prefix;
+  if (declared != nullptr) prefix = "$root." + declared->prefix;
+  if (vars.empty() && declared != nullptr) {
+    for (const std::string& name : declared->names) {
+      ShowVariableStatus(name, prefix + name, ctx);
+    }
+  }
+  for (const std::string& name : vars) {
+    ShowVariableStatus(name, prefix + name, ctx);
+  }
+  ctx.RecordShowVars(scope, std::move(vars));
   return MakeLogic4VecVal(arena, 1, 0);
 }
 

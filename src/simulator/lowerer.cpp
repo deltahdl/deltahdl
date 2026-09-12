@@ -788,6 +788,13 @@ static void RegisterInteractiveScopes(const RtlirDesign* design,
   for (const std::string& name : CompleteHierarchicalScopeNames(design)) {
     ctx.RegisterHierarchicalScope(name);
   }
+  // Annex D.13: the reg and net variables $showvars reports for a module
+  // instance, under the instance's complete hierarchical name.
+  for (ScopeDeclaredVariables& vars : ModuleInstanceVariables(design)) {
+    ctx.RegisterScopeVariables(
+        vars.scope,
+        ScopeVariableSet{std::move(vars.prefix), std::move(vars.names)});
+  }
 }
 
 void Lowerer::Lower(const RtlirDesign* design) {

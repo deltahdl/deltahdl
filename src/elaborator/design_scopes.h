@@ -17,4 +17,18 @@ namespace delta {
 std::vector<std::string> CompleteHierarchicalScopeNames(
     const RtlirDesign* design);
 
+// Annex D.13 has $showvars report the reg and net variables of the current
+// scope. These are the ones each module instance of the elaborated design
+// declares, under the instance's complete hierarchical name as above: the
+// prefix the simulator keys the instance's variables by, empty for a
+// top-level module and the instance path below one with its trailing dot, and
+// the declared names, nets before variables, each in declaration order.
+struct ScopeDeclaredVariables {
+  std::string scope;
+  std::string prefix;
+  std::vector<std::string> names;
+};
+std::vector<ScopeDeclaredVariables> ModuleInstanceVariables(
+    const RtlirDesign* design);
+
 }  // namespace delta

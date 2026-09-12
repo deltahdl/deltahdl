@@ -70,6 +70,16 @@ bool ResolveStructFieldPath(const StructTypeInfo* info, std::string_view path,
                             uint32_t* bit_offset, uint32_t* width,
                             DataTypeKind* out_kind = nullptr);
 
+// Annex D.13: the reg and net variables a module instance declares, which
+// $showvars reports the status of. `prefix` is what the instance's variables
+// are keyed by in SimContext, empty for a top-level module and the instance
+// path with its trailing dot below one; `names` are the declared names in
+// declaration order, nets before variables.
+struct ScopeVariableSet {
+  std::string prefix;
+  std::vector<std::string> names;
+};
+
 // §10.6: one expression a procedural continuous assignment drives an element
 // from, and the part of that expression's value the element takes -- the whole
 // of it where the statement named the element alone, and §11.4.12's slice where
