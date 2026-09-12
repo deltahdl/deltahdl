@@ -179,10 +179,9 @@ std::string ExtractStringArg(const Expr* arg) {
 // the run carries on to whatever else it can report. What changed is that the
 // value is no longer the only thing produced.
 // Annex D.1 lists the system tasks and system functions Annex D describes,
-// "for informative purposes only and ... not part of this standard", which
-// "may not be available in all implementations", each under the subclause
-// that describes it. The subclause of a name D.1 lists, or empty for a name
-// it does not.
+// informative rather than part of the standard and ones an implementation may
+// be without, each under the subclause that describes it. The subclause of a
+// name D.1 lists, or empty for a name it does not.
 static std::string_view AnnexDSubclauseOf(std::string_view name) {
   struct AnnexDTask {
     std::string_view name;
@@ -215,8 +214,8 @@ static Logic4Vec ReportUnknownSysCall(const Expr* expr, SimContext& ctx,
         expr->range.start,
         std::string(name) + " is the optional system task or system function " +
             std::string(annex_d) +
-            " describes, which Annex D.1 has \"may not be available in all "
-            "implementations\"; this implementation is one without it",
+            " describes, which Annex D.1 allows an implementation to be "
+            "without; this implementation is one without it",
         Subclause("D.1"));
     return MakeLogic4VecVal(arena, 1, 0);
   }

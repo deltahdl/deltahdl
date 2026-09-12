@@ -6,10 +6,10 @@
 
 // Annex D.1: general.
 //
-// D.1 has the system tasks and system functions Annex D describes "for
-// informative purposes only", "not part of this standard", and "may not be
-// available in all implementations", and lists the twenty of them under the
-// subclause that describes each. A call of one this implementation is without
+// D.1 has the system tasks and system functions Annex D describes as
+// informative rather than part of the standard, ones an implementation may be
+// without, and lists the twenty of them under the subclause that describes
+// each. A call of one this implementation is without
 // is what D.1 allows, so the call is reported under D.1 as the annex's optional
 // task, naming the subclause that describes it, rather than as a name that is
 // no system task or system function at all, which is §20.1's report for a name
@@ -44,8 +44,8 @@ std::string AsTask(const std::string& call) {
 // available here.
 std::string NotAvailable(const std::string& name, const std::string& sub) {
   return name + " is the optional system task or system function " + sub +
-         " describes, which Annex D.1 has \"may not be available in all "
-         "implementations\"; this implementation is one without it";
+         " describes, which Annex D.1 allows an implementation to be without; "
+         "this implementation is one without it";
 }
 
 // D.5's $key, an interactive task with no place in a batch simulator.
@@ -64,13 +64,33 @@ TEST(OptionalSystemTasksGeneral, AnUnavailableInputTaskIsReportedUnderD1) {
                             2, "D.1"));
 }
 
-// D.9's three, of which $save is the one with an argument; the name stands
-// last in D.1's list, so the whole of it is searched.
+// D.9's $save, which saves the complete state of the simulation into the file
+// its argument names; the name stands last in D.1's list, so the whole of it
+// is searched.
 TEST(OptionalSystemTasksGeneral, AnUnavailableSaveTaskIsReportedUnderD1) {
   SimFixture f;
   ASSERT_TRUE(RunAnnexDSource(f, AsTask("$save(\"state.dat\")")));
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), NotAvailable("$save", "D.9"),
                             2, "D.1"));
+}
+
+// D.9's $restart, which restores a state a $save or $incsave wrote to the file
+// its argument names, and D.9's $incsave, which saves what changed since the
+// last $save. Each is reported on its own: a report for $save alone would
+// leave the two that read and extend its file to §20.1's report for a name
+// outside the standard.
+TEST(OptionalSystemTasksGeneral, AnUnavailableRestartTaskIsReportedUnderD1) {
+  SimFixture f;
+  ASSERT_TRUE(RunAnnexDSource(f, AsTask("$restart(\"state.dat\")")));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            NotAvailable("$restart", "D.9"), 2, "D.1"));
+}
+
+TEST(OptionalSystemTasksGeneral, AnUnavailableIncsaveTaskIsReportedUnderD1) {
+  SimFixture f;
+  ASSERT_TRUE(RunAnnexDSource(f, AsTask("$incsave(\"inc1.dat\")")));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            NotAvailable("$incsave", "D.9"), 2, "D.1"));
 }
 
 // D.5's $nokey, the task beside $key, which stands in D.1's list under the
