@@ -467,4 +467,66 @@ TEST_F(SpecifyTest, StateDependentIfnoneSimplePath) {
   EXPECT_EQ(p->condition, nullptr);
 }
 
+// --- The path operator: §30.4.2 gives a simple path "one of two forms",
+// `source *> destination` and `source => destination`, and A.7.2 writes `=>`
+// into parallel_path_description and `*>` into full_path_description with no
+// third token in that place. ---
+
+TEST(SpecifyPathParsing, ErrorPathEqualsIsNoPathOperator) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a = b) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  // The report stands at the '=' written where '=>' or '*>' belongs; the
+  // destination after it is still read, so nothing else is reported.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "path joins its source to its destination with '=>' or '*>'", 3,
+      "30.4.2"));
+  EXPECT_EQ(r.diags.size(), 1u);
+}
+
+TEST(SpecifyPathParsing, ErrorPathArrowIsNoPathOperator) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a -> b) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "path joins its source to its destination with '=>' or '*>'", 3,
+      "30.4.2"));
+  EXPECT_EQ(r.diags.size(), 1u);
+}
+
+TEST(SpecifyPathParsing, ErrorPolarityWithoutPathOperatorIsRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a +> b) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  // §30.4.7.2 prefixes the polarity to '=>' or '*>'; a '>' alone after the
+  // '+' is neither.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "path joins its source to its destination with '=>' or '*>'", 3,
+      "30.4.2"));
+}
+
+TEST(SpecifyPathParsing, ErrorPathWithoutOperatorIsRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a b) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  // The report stands at the destination terminal, which is where the
+  // operator was due, and that terminal is then read as the destination.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "path joins its source to its destination with '=>' or '*>'", 3,
+      "30.4.2"));
+  EXPECT_EQ(r.diags.size(), 1u);
+}
+
 }  // namespace

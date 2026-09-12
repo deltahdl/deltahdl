@@ -276,35 +276,22 @@ SpecifyTerminal Parser::ParseSpecifyTerminal() {
   return term;
 }
 
+// A.7.3: list_of_path_inputs ::= specify_input_terminal_descriptor { ,
+// specify_input_terminal_descriptor }, and list_of_path_outputs likewise; a
+// descriptor is an identifier with an optional range, so there is no brace
+// around either list. A.8.1's module_path_concatenation does take braces, but
+// it is a module_path_primary (A.8.4) and stands only in the
+// module_path_expression a state-dependent path's `if` tests, never in a
+// terminal list. A brace group here is reported at its '{' and skipped whole,
+// so that the operator and the other list are still read.
 void Parser::ParsePathPorts(std::vector<SpecifyTerminal>& ports) {
-  if (Match(TokenKind::kLBrace)) {
-    bool is_replication = false;
-    if (!Check(TokenKind::kIdentifier)) {
-      is_replication = true;
-    } else {
-      auto saved = lexer_.SavePos();
-      Consume();
-      is_replication = Check(TokenKind::kLBrace);
-      lexer_.RestorePos(saved);
-    }
-
-    if (is_replication) {
-      ParseExpr();
-      Expect(TokenKind::kLBrace, Subclause("30.4.6"));
-      ports.push_back(ParseSpecifyTerminal());
-      while (Match(TokenKind::kComma)) {
-        ports.push_back(ParseSpecifyTerminal());
-      }
-      Expect(TokenKind::kRBrace, Subclause("30.4.6"));
-      Expect(TokenKind::kRBrace, Subclause("30.4.6"));
-      return;
-    }
-
-    ports.push_back(ParseSpecifyTerminal());
-    while (Match(TokenKind::kComma)) {
-      ports.push_back(ParseSpecifyTerminal());
-    }
-    Expect(TokenKind::kRBrace, Subclause("30.4.6"));
+  if (Check(TokenKind::kLBrace)) {
+    diag_.Error(CurrentLoc(),
+                "path terminals are listed with commas alone; a concatenation "
+                "is no specify terminal",
+                Subclause("A.7.3"));
+    Consume();
+    SkipBraceBlock(lexer_);
     return;
   }
   ports.push_back(ParseSpecifyTerminal());
@@ -388,15 +375,26 @@ bool Parser::ParsePolarityPrefixedParallelPath(SpecifyItem* item) {
 }
 
 // Consume the path operator that separates source and destination terminals.
+// §30.4.2 gives a simple path "one of two forms", `source *> destination` and
+// `source => destination`, and A.7.2 admits no other token in that place.
+// Anything else is reported where the operator was due; a token that could
+// not open the destination is consumed so that the destination after it is
+// still read, while an identifier or the closing ')' is left to be read as
+// what it is.
 void Parser::ParseSpecifyPathOperator(SpecifyItem* item) {
   if (ParsePolarityPrefixedParallelPath(item)) return;
   if (Match(TokenKind::kEqGt)) {
     item->path.path_kind = SpecifyPathKind::kParallel;
-  } else if (Match(TokenKind::kStarGt)) {
-    item->path.path_kind = SpecifyPathKind::kFull;
-  } else {
-    Consume();
+    return;
   }
+  if (Match(TokenKind::kStarGt)) {
+    item->path.path_kind = SpecifyPathKind::kFull;
+    return;
+  }
+  diag_.Error(CurrentLoc(),
+              "path joins its source to its destination with '=>' or '*>'",
+              Subclause("30.4.2"));
+  if (!Check(TokenKind::kIdentifier) && !Check(TokenKind::kRParen)) Consume();
 }
 
 // Parse the destination terminal descriptor, which is parenthesized only when

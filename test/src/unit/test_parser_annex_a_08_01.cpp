@@ -254,27 +254,50 @@ TEST(ConcatenationParsing, ModulePathMultipleConcatenation) {
                             3, "30.4.5"));
 }
 
-// Positive observation of the module_path_concatenation production. The
-// parallel '=>' form forbids a brace-grouped terminal list, but the full '*>'
-// connection accepts terminal lists, so the concatenation syntax is consumed
-// here rather than rejected.
-TEST(ConcatenationParsing, ModulePathConcatenationInFullPath) {
-  EXPECT_TRUE(
-      ParseOk("module m(input a, input b, output c, output d);\n"
-              "  specify\n"
-              "    ({a, b} *> {c, d}) = 5;\n"
-              "  endspecify\n"
-              "endmodule\n"));
+// A module_path_concatenation is no terminal of a full '*>' path either:
+// A.7.3's list_of_path_inputs and list_of_path_outputs are comma-separated
+// descriptors with no brace around them, and A.8.1's production is a
+// module_path_primary (A.8.4) that stands only in the module_path_expression
+// of a state-dependent path's `if`. The brace group is reported under A.7.3.
+TEST(ConcatenationParsing, ModulePathConcatenationInFullPathIsRejected) {
+  auto r = Parse(
+      "module m(input a, input b, output c, output d);\n"
+      "  specify\n"
+      "    ({a, b} *> {c, d}) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "path terminals are listed with commas alone; a concatenation is no "
+      "specify terminal",
+      3, "A.7.3"));
 }
 
-// Positive observation of the module_path_multiple_concatenation production
-// ({ constant_expression module_path_concatenation }) in the same full '*>'
-// context that admits a terminal list.
-TEST(ConcatenationParsing, ModulePathMultipleConcatenationInFullPath) {
+// The same for module_path_multiple_concatenation
+// ({ constant_expression module_path_concatenation }) in the full '*>' form.
+TEST(ConcatenationParsing,
+     ModulePathMultipleConcatenationInFullPathIsRejected) {
+  auto r = Parse(
+      "module m(input a, input b, output c);\n"
+      "  specify\n"
+      "    ({2{a, b}} *> c) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "path terminals are listed with commas alone; a concatenation is no "
+      "specify terminal",
+      3, "A.7.3"));
+}
+
+// Where the two productions do stand: the module_path_expression of a
+// state-dependent path's `if` (A.7.2 through A.8.3 and A.8.4).
+TEST(ConcatenationParsing, ModulePathConcatenationInPathCondition) {
   EXPECT_TRUE(
-      ParseOk("module m(input a, input b, output c);\n"
+      ParseOk("module m(input a, input b, output y);\n"
               "  specify\n"
-              "    ({2{a, b}} *> c) = 5;\n"
+              "    if ({a, b}) (a => y) = 5;\n"
+              "    if ({2{a}}) (b => y) = 6;\n"
               "  endspecify\n"
               "endmodule\n"));
 }

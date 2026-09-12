@@ -471,4 +471,71 @@ TEST(TimingCheckEventDefParsing, TerminalBitSelectOnDataSignal) {
   EXPECT_EQ(tc->data_terminal.range_kind, SpecifyRangeKind::kBitSelect);
 }
 
+// --- list_of_path_inputs and list_of_path_outputs are comma-separated
+// terminal descriptors, and a descriptor is an identifier with an optional
+// range: A.7.3 puts no brace around either list. A.8.1's
+// module_path_concatenation does take braces, but it is a module_path_primary
+// (A.8.4) and stands only in the module_path_expression a state-dependent
+// path's `if` tests. ---
+
+TEST(SpecifyTerminalParsing, ErrorBraceGroupedInputListIsRejected) {
+  auto r = Parse(
+      "module m(input a, input b, output q);\n"
+      "  specify\n"
+      "    ({a, b} *> q) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  // The report stands at the '{'; the group is skipped and the rest of the
+  // declaration is read, so nothing else is reported.
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "path terminals are listed with commas alone; a concatenation is no "
+      "specify terminal",
+      3, "A.7.3"));
+  EXPECT_EQ(r.diags.size(), 1u);
+}
+
+TEST(SpecifyTerminalParsing, ErrorBraceGroupedOutputListIsRejected) {
+  auto r = Parse(
+      "module m(input a, output q, output r);\n"
+      "  specify\n"
+      "    (a *> {q, r}) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "path terminals are listed with commas alone; a concatenation is no "
+      "specify terminal",
+      3, "A.7.3"));
+  EXPECT_EQ(r.diags.size(), 1u);
+}
+
+TEST(SpecifyTerminalParsing, ErrorReplicatedInputListIsRejected) {
+  auto r = Parse(
+      "module m(input a, input b, output q);\n"
+      "  specify\n"
+      "    ({2{a, b}} *> q) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "path terminals are listed with commas alone; a concatenation is no "
+      "specify terminal",
+      3, "A.7.3"));
+  EXPECT_EQ(r.diags.size(), 1u);
+}
+
+// The comma-separated lists A.7.3 does write are unchanged by the rejection
+// of the brace form: this is §30.4.6's own example.
+TEST(SpecifyTerminalParsing, CommaSeparatedListsWithoutBracesAreKept) {
+  auto r = Parse(
+      "module m(input a, input b, input c, output q1, output q2);\n"
+      "  specify\n"
+      "    (a, b, c *> q1, q2) = 10;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
