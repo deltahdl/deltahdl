@@ -95,44 +95,26 @@ static void ValidateOutputNetLvalues(const std::vector<Expr*>& terms,
                  Subclause("28.3"));
 }
 
+// The terminals A.3.3 makes a net_lvalue, by the instance form A.3.1 gives
+// each A.3.4 type: the two inout_terminals a pass_switch_instance or
+// pass_en_switch_instance opens with, every output_terminal of an
+// n_output_gate_instance, which is each terminal but the last, and the one
+// output_terminal every other instance opens with. The enable_terminal,
+// input_terminal, ncontrol_terminal and pcontrol_terminal after them are
+// expressions, and are left as read.
 static void ValidateGateTerminalLvalues(GateKind kind,
                                         const std::vector<Expr*>& terms,
                                         DiagEngine& diag, SourceLoc loc) {
   if (terms.empty()) return;
-  switch (kind) {
-    case GateKind::kTran:
-    case GateKind::kRtran:
-    case GateKind::kTranif0:
-    case GateKind::kTranif1:
-    case GateKind::kRtranif0:
-    case GateKind::kRtranif1:
-
+  switch (GateTypeOf(kind)) {
+    case GateType::kPassSwitch:
+    case GateType::kPassEnSwitch:
       ValidateInoutNetLvalues(terms, diag, loc);
       break;
-    case GateKind::kBuf:
-    case GateKind::kNot:
-
+    case GateType::kNOutputGate:
       ValidateOutputNetLvalues(terms, diag, loc);
       break;
-    case GateKind::kPullup:
-    case GateKind::kPulldown:
-    case GateKind::kAnd:
-    case GateKind::kNand:
-    case GateKind::kOr:
-    case GateKind::kNor:
-    case GateKind::kXor:
-    case GateKind::kXnor:
-    case GateKind::kBufif0:
-    case GateKind::kBufif1:
-    case GateKind::kNotif0:
-    case GateKind::kNotif1:
-    case GateKind::kNmos:
-    case GateKind::kPmos:
-    case GateKind::kRnmos:
-    case GateKind::kRpmos:
-    case GateKind::kCmos:
-    case GateKind::kRcmos:
-
+    default:
       if (!IsNetLvalue(terms[0]))
         diag.Error(loc, "output terminal must be a net lvalue",
                    Subclause("28.3"));

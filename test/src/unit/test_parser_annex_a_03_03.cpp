@@ -386,4 +386,66 @@ TEST(PrimitiveTerminalParsing, GateInst_ComplexTerminalExpressions) {
               "endmodule\n"));
 }
 
+// A.3.3 makes the output_terminal and the inout_terminal a net_lvalue and the
+// four others an expression, and A.3.1 says which terminal is which by the
+// instance form of each A.3.4 type. The n_output_gate_instance is `(
+// output_terminal { , output_terminal } , input_terminal )`, so every terminal
+// but the last is an output and a literal in the second position is reported
+// as one; the cmos_switch_instance, mos_switch_instance and
+// enable_gate_instance open with their one output_terminal, and their control
+// and enable terminals after it take any expression.
+TEST(PrimitiveTerminalParsing, Error_NOutputGateMiddleOutputLiteral) {
+  auto r = Parse(
+      "module m;\n"
+      "  buf (o1, 1, in);\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, "output terminal must be a net lvalue", 2,
+                            "28.3"));
+}
+
+TEST(PrimitiveTerminalParsing, Error_SwitchOutputTerminalLiteral) {
+  auto r = Parse(
+      "module m;\n"
+      "  cmos (1'b0, i, n, p);\n"
+      "  rpmos (a + b, i, c);\n"
+      "  pulldown (1'b0);\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, "output terminal must be a net lvalue", 2,
+                            "28.3"));
+  EXPECT_TRUE(ReportedError(r.diags, "output terminal must be a net lvalue", 3,
+                            "28.3"));
+  EXPECT_TRUE(ReportedError(r.diags, "output terminal must be a net lvalue", 4,
+                            "28.3"));
+}
+
+TEST(PrimitiveTerminalParsing, ControlAndEnableTerminalsAreExpressions) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  cmos (o1, i1, n & ~rst, p | en);\n"
+              "  rnmos (o2, i2, c ? 1'b1 : 1'b0);\n"
+              "  notif1 (o3, d, en && !rst);\n"
+              "  rtranif0 (x, y, {a, b} == 2'b11);\n"
+              "endmodule\n"));
+}
+
+// A.8.5's net_lvalue is also `{ net_lvalue { , net_lvalue } }` and
+// `[ assignment_pattern_expression_type ] assignment_pattern_net_lvalue`, so
+// an output terminal may be written as either.
+TEST(PrimitiveTerminalParsing, OutputTerminal_AssignmentPatternNetLvalue) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  and ('{a, b}, c, d);\n"
+              "  buf ({p, {q, r}}, in);\n"
+              "endmodule\n"));
+  auto r = Parse(
+      "module m;\n"
+      "  and ('{a, 1'b1}, c, d);\n"
+      "  buf ({p, q & r}, in);\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, "output terminal must be a net lvalue", 2,
+                            "28.3"));
+  EXPECT_TRUE(ReportedError(r.diags, "output terminal must be a net lvalue", 3,
+                            "28.3"));
+}
+
 }  // namespace
