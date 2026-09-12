@@ -1,5 +1,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -415,6 +416,85 @@ TEST(PrimitiveGateTypeParsing, GateTypeKeywordIsExactMatch) {
       "endmodule\n");
   EXPECT_EQ(FindGateByKind(upper.cu->modules[0]->items, GateKind::kAnd),
             nullptr);
+}
+
+// A.3.4 gives each keyword a type, and A.3.1 writes its instance productions
+// against the types rather than the keywords: which of drive_strength, delay2
+// and delay3 an instance may carry, and how many terminals it takes, are the
+// type's. GateTypeOf is the classification, read here for every alternative of
+// the seven productions, and for the two pull gates A.3.1 keeps outside them.
+TEST(PrimitiveGateTypeParsing, EveryKeywordHasItsType) {
+  struct Expected {
+    GateKind kind;
+    GateType type;
+  };
+  const Expected kExpected[] = {
+      {GateKind::kCmos, GateType::kCmosSwitch},
+      {GateKind::kRcmos, GateType::kCmosSwitch},
+      {GateKind::kBufif0, GateType::kEnableGate},
+      {GateKind::kBufif1, GateType::kEnableGate},
+      {GateKind::kNotif0, GateType::kEnableGate},
+      {GateKind::kNotif1, GateType::kEnableGate},
+      {GateKind::kNmos, GateType::kMosSwitch},
+      {GateKind::kPmos, GateType::kMosSwitch},
+      {GateKind::kRnmos, GateType::kMosSwitch},
+      {GateKind::kRpmos, GateType::kMosSwitch},
+      {GateKind::kAnd, GateType::kNInputGate},
+      {GateKind::kNand, GateType::kNInputGate},
+      {GateKind::kOr, GateType::kNInputGate},
+      {GateKind::kNor, GateType::kNInputGate},
+      {GateKind::kXor, GateType::kNInputGate},
+      {GateKind::kXnor, GateType::kNInputGate},
+      {GateKind::kBuf, GateType::kNOutputGate},
+      {GateKind::kNot, GateType::kNOutputGate},
+      {GateKind::kTranif0, GateType::kPassEnSwitch},
+      {GateKind::kTranif1, GateType::kPassEnSwitch},
+      {GateKind::kRtranif1, GateType::kPassEnSwitch},
+      {GateKind::kRtranif0, GateType::kPassEnSwitch},
+      {GateKind::kTran, GateType::kPassSwitch},
+      {GateKind::kRtran, GateType::kPassSwitch},
+      {GateKind::kPullup, GateType::kPullGate},
+      {GateKind::kPulldown, GateType::kPullGate},
+  };
+  for (const auto& e : kExpected) {
+    EXPECT_EQ(GateTypeOf(e.kind), e.type) << static_cast<int>(e.kind);
+  }
+}
+
+// The instance forms A.3.1 gives a type hold across the type's keywords: the
+// resistive spellings take what their non-resistive ones take. Here the
+// `r`-spelt alternative of each switch type and the negated one of each gate
+// type stand where the parser's tests on §28.3 write the first alternative.
+TEST(PrimitiveGateTypeParsing, InstanceFormsFollowTheType) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  rcmos #(1, 2, 3) (o1, i1, nc1, pc1);\n"
+              "  notif1 (strong0, weak1) #(1, 2, 3) (o2, i2, e2);\n"
+              "  rpmos #(1, 2, 3) (o3, i3, c3);\n"
+              "  xnor (weak0, strong1) #(1, 2) (o4, a4, b4);\n"
+              "  not (weak0, strong1) #(1, 2) (o5, o6, i5);\n"
+              "  rtranif0 #(1, 2) (a7, b7, c7);\n"
+              "  rtran (a8, b8);\n"
+              "  pulldown (weak0) (p9);\n"
+              "endmodule\n"));
+  auto r = Parse(
+      "module m;\n"
+      "  rtran #1 (a1, b1);\n"
+      "  rtranif1 (strong0, strong1) (a2, b2, c2);\n"
+      "  rtranif1 #(1, 2, 3) (a3, b3, c3);\n"
+      "  rpmos (strong0, strong1) (o4, i4, c4);\n"
+      "  xnor #(1, 2, 3) (o5, a5, b5);\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, "delay not allowed on this gate type", 2,
+                            "28.3.3"));
+  EXPECT_TRUE(ReportedError(
+      r.diags, "drive strength not allowed on this gate type", 3, "28.3.2"));
+  EXPECT_TRUE(ReportedError(
+      r.diags, "this gate type allows at most 2 delay values", 4, "28.3.3"));
+  EXPECT_TRUE(ReportedError(
+      r.diags, "drive strength not allowed on this gate type", 5, "28.3.2"));
+  EXPECT_TRUE(ReportedError(
+      r.diags, "this gate type allows at most 2 delay values", 6, "28.3.3"));
 }
 
 }  // namespace

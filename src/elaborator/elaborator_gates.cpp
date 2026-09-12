@@ -69,10 +69,11 @@ static const char* DisallowedControlVariableKind(const Expr* term,
   return nullptr;
 }
 
+// A.3.4's pass_switchtype and pass_en_switchtype together: the switches §28.8
+// makes bidirectional.
 static bool IsBidirectionalSwitch(GateKind kind) {
-  return (kind == GateKind::kTran || kind == GateKind::kRtran ||
-          kind == GateKind::kTranif0 || kind == GateKind::kTranif1 ||
-          kind == GateKind::kRtranif0 || kind == GateKind::kRtranif1);
+  GateType type = GateTypeOf(kind);
+  return type == GateType::kPassSwitch || type == GateType::kPassEnSwitch;
 }
 
 static bool IsResistiveBidirectionalSwitch(GateKind kind) {
@@ -80,9 +81,10 @@ static bool IsResistiveBidirectionalSwitch(GateKind kind) {
           kind == GateKind::kRtranif1);
 }
 
+// A.3.4's pass_en_switchtype: the bidirectional switches with a control
+// terminal.
 static bool IsControlBidirectionalSwitch(GateKind kind) {
-  return (kind == GateKind::kTranif0 || kind == GateKind::kTranif1 ||
-          kind == GateKind::kRtranif0 || kind == GateKind::kRtranif1);
+  return GateTypeOf(kind) == GateType::kPassEnSwitch;
 }
 
 // §6.6.2: a uwire net allows only a single driver, so it shall not be
@@ -190,25 +192,22 @@ void ValidateBidirectionalSwitchConnections(
   CheckBidirNettypeCompatibility(item, mod, diag, nettype_canonical);
 }
 
+// A.3.1 puts the driven terminals first: every output_terminal of an
+// n_output_gate_instance before its one input_terminal, the two
+// inout_terminals of a pass or pass-enable switch, and the one
+// output_terminal of everything else.
 static std::vector<size_t> OutputOrInoutTerminalIndices(GateKind kind,
                                                         size_t nterms) {
-  switch (kind) {
-    case GateKind::kBuf:
-    case GateKind::kNot: {
+  switch (GateTypeOf(kind)) {
+    case GateType::kNOutputGate: {
       std::vector<size_t> outs;
       for (size_t i = 0; i + 1 < nterms; ++i) outs.push_back(i);
       return outs;
     }
-    case GateKind::kTran:
-    case GateKind::kRtran:
-    case GateKind::kTranif0:
-    case GateKind::kTranif1:
-    case GateKind::kRtranif0:
-    case GateKind::kRtranif1:
-
+    case GateType::kPassSwitch:
+    case GateType::kPassEnSwitch:
       return (nterms >= 2) ? std::vector<size_t>{0, 1} : std::vector<size_t>{};
     default:
-
       return (nterms >= 1) ? std::vector<size_t>{0} : std::vector<size_t>{};
   }
 }
@@ -610,13 +609,13 @@ static void ElaborateOneGate(ModuleItem* item, RtlirModule* mod, Arena& arena) {
   auto& terms = item->gate_terminals;
   if (terms.empty()) return;
 
-  if (kind == GateKind::kBuf || kind == GateKind::kNot) {
+  GateType type = GateTypeOf(kind);
+  if (type == GateType::kNOutputGate) {
     ElaborateBufNotGate(item, mod, arena);
     return;
   }
 
-  if (kind == GateKind::kBufif0 || kind == GateKind::kBufif1 ||
-      kind == GateKind::kNotif0 || kind == GateKind::kNotif1) {
+  if (type == GateType::kEnableGate) {
     ElaborateBufifNotifGate(item, mod, arena);
     return;
   }
@@ -625,18 +624,17 @@ static void ElaborateOneGate(ModuleItem* item, RtlirModule* mod, Arena& arena) {
     return;
   }
 
-  if (kind == GateKind::kNmos || kind == GateKind::kPmos ||
-      kind == GateKind::kRnmos || kind == GateKind::kRpmos) {
+  if (type == GateType::kMosSwitch) {
     ElaborateMosGate(item, mod, arena);
     return;
   }
 
-  if (kind == GateKind::kPullup || kind == GateKind::kPulldown) {
+  if (type == GateType::kPullGate) {
     ElaboratePullGate(item, mod, arena);
     return;
   }
 
-  if (kind == GateKind::kCmos || kind == GateKind::kRcmos) {
+  if (type == GateType::kCmosSwitch) {
     ElaborateCmosGate(item, mod, arena);
     return;
   }

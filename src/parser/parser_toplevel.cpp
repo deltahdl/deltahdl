@@ -24,22 +24,18 @@ void ParseGateInstanceTail(Parser& p, ModuleItem* item, bool has_name) {
   p.Expect(TokenKind::kRParen, Subclause("28.3.6"));
 }
 
+// What A.3.1 lets an instance of each A.3.4 type carry. n_input_gate_instance
+// and n_output_gate_instance are written `[ drive_strength ] [ delay2 ]`,
+// enable_gate_instance `[ drive_strength ] [ delay3 ]`, mos_switch_instance
+// and cmos_switch_instance `[ delay3 ]`, pass_en_switch_instance `[ delay2 ]`,
+// pass_switch_instance nothing, and the pull gates `[ pullup_strength ]` and
+// `[ pulldown_strength ]` alone.
 static bool GateAllowsStrength(GateKind kind) {
-  switch (kind) {
-    case GateKind::kAnd:
-    case GateKind::kNand:
-    case GateKind::kOr:
-    case GateKind::kNor:
-    case GateKind::kXor:
-    case GateKind::kXnor:
-    case GateKind::kBuf:
-    case GateKind::kNot:
-    case GateKind::kBufif0:
-    case GateKind::kBufif1:
-    case GateKind::kNotif0:
-    case GateKind::kNotif1:
-    case GateKind::kPullup:
-    case GateKind::kPulldown:
+  switch (GateTypeOf(kind)) {
+    case GateType::kNInputGate:
+    case GateType::kNOutputGate:
+    case GateType::kEnableGate:
+    case GateType::kPullGate:
       return true;
     default:
       return false;
@@ -47,29 +43,15 @@ static bool GateAllowsStrength(GateKind kind) {
 }
 
 static bool GateAllowsDelay(GateKind kind) {
-  switch (kind) {
-    case GateKind::kTran:
-    case GateKind::kRtran:
-    case GateKind::kPullup:
-    case GateKind::kPulldown:
-      return false;
-    default:
-      return true;
-  }
+  GateType type = GateTypeOf(kind);
+  return type != GateType::kPassSwitch && type != GateType::kPullGate;
 }
 
 static bool GateUsesDelay3(GateKind kind) {
-  switch (kind) {
-    case GateKind::kCmos:
-    case GateKind::kRcmos:
-    case GateKind::kNmos:
-    case GateKind::kPmos:
-    case GateKind::kRnmos:
-    case GateKind::kRpmos:
-    case GateKind::kBufif0:
-    case GateKind::kBufif1:
-    case GateKind::kNotif0:
-    case GateKind::kNotif1:
+  switch (GateTypeOf(kind)) {
+    case GateType::kCmosSwitch:
+    case GateType::kMosSwitch:
+    case GateType::kEnableGate:
       return true;
     default:
       return false;
@@ -158,38 +140,27 @@ static void ValidateGateTerminalLvalues(GateKind kind,
   }
 }
 
+// The terminals A.3.1 gives an instance of each A.3.4 type:
+// cmos_switch_instance four, mos_switch_instance, enable_gate_instance and
+// pass_en_switch_instance three, pass_switch_instance two, pull_gate_instance
+// one, and n_input_gate_instance `output_terminal , input_terminal { ,
+// input_terminal
+// }` and n_output_gate_instance `output_terminal { , output_terminal } ,
+// input_terminal`, two at least.
 static bool ValidGateTerminalCount(GateKind kind, size_t count) {
-  switch (kind) {
-    case GateKind::kCmos:
-    case GateKind::kRcmos:
+  switch (GateTypeOf(kind)) {
+    case GateType::kCmosSwitch:
       return count == 4;
-    case GateKind::kNmos:
-    case GateKind::kPmos:
-    case GateKind::kRnmos:
-    case GateKind::kRpmos:
-    case GateKind::kBufif0:
-    case GateKind::kBufif1:
-    case GateKind::kNotif0:
-    case GateKind::kNotif1:
-    case GateKind::kTranif0:
-    case GateKind::kTranif1:
-    case GateKind::kRtranif0:
-    case GateKind::kRtranif1:
+    case GateType::kMosSwitch:
+    case GateType::kEnableGate:
+    case GateType::kPassEnSwitch:
       return count == 3;
-    case GateKind::kTran:
-    case GateKind::kRtran:
+    case GateType::kPassSwitch:
       return count == 2;
-    case GateKind::kPullup:
-    case GateKind::kPulldown:
+    case GateType::kPullGate:
       return count == 1;
-    case GateKind::kAnd:
-    case GateKind::kNand:
-    case GateKind::kOr:
-    case GateKind::kNor:
-    case GateKind::kXor:
-    case GateKind::kXnor:
-    case GateKind::kBuf:
-    case GateKind::kNot:
+    case GateType::kNInputGate:
+    case GateType::kNOutputGate:
       return count >= 2;
   }
   return true;
