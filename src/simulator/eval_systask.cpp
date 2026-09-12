@@ -494,12 +494,15 @@ static Logic4Vec EvalTypename(const Expr* expr, SimContext& ctx, Arena& arena) {
   return StringToLogic4Vec(arena, "logic");
 }
 
-// §21.3.4.3 / §21.3.1 / §21.4: read a system-task argument as text. A string
-// literal yields its quoted contents; any other expression has its packed-byte
-// value decoded back into a std::string, dropping all-zero (high) padding
-// bytes. Shared with eval_systask_io.cpp / eval_systask_readmem.cpp.
+// §21.3.4.3 / §21.3.1 / §21.4: read a system-task argument as text. The
+// expression's packed-byte value is decoded back into a std::string, dropping
+// all-zero (high) padding bytes. A string literal is evaluated the same way,
+// which is what gives it the value §5.9.1 gives it, its escape sequences each
+// standing for the character they spell; it used to yield its quoted contents
+// as written, so a "\n" in a string handed to $sreadmemh (Annex D.14) was a
+// backslash and an n rather than the line break a load file's comment ends at.
+// Shared with eval_systask_io.cpp / eval_systask_readmem.cpp.
 std::string EvalStringArg(const Expr* arg, SimContext& ctx, Arena& arena) {
-  if (arg->kind == ExprKind::kStringLiteral) return ExtractStrArg(arg);
   auto val = EvalExpr(arg, ctx, arena);
   uint32_t nbytes = val.width / 8;
   std::string result;
