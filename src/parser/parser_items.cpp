@@ -169,12 +169,28 @@ void ApplyAssertionLabel(std::vector<ModuleItem*>& items, size_t before,
 
 }  // namespace
 
+// A specify block and a specparam declaration are items of a module body
+// alone: A.1.4's non_port_module_item admits specify_block and
+// specparam_declaration, and the bodies A.1.6, A.1.7 and A.1.8 give an
+// interface, a program and a checker admit neither. §30.3 and §6.20.5 say the
+// same in prose, the specify block being "defined within a module" and a
+// specparam one that "shall be declared inside a module or specify block". A
+// package intercepts its own `specify` in Parser::ParsePackageDecl, and an
+// anonymous program is left to FilterAnonymousProgramItems in parser.cpp,
+// which reports under A.1.11, so the bodies reported here are the three
+// design elements and a package's `specparam`. A generate block is reported
+// under §27.2 instead, whichever body holds it, since that is the rule the
+// block breaks first.
 bool Parser::TryParseClockingOrVerification(std::vector<ModuleItem*>& items) {
   if (Check(TokenKind::kKwSpecify)) {
     if (InGenerateBlock()) {
       diag_.Error(CurrentLoc(),
                   "specify block not allowed inside a generate block",
                   Subclause("27.2"));
+    } else if (!InModuleBody() && !in_anonymous_program_) {
+      diag_.Error(CurrentLoc(),
+                  "specify block must appear inside a module declaration",
+                  Subclause("30.3"));
     }
     items.push_back(ParseSpecifyBlock());
     return true;
@@ -184,6 +200,11 @@ bool Parser::TryParseClockingOrVerification(std::vector<ModuleItem*>& items) {
       diag_.Error(CurrentLoc(),
                   "specparam declaration not allowed inside a generate block",
                   Subclause("27.2"));
+    } else if (!InModuleBody() && !in_anonymous_program_) {
+      diag_.Error(CurrentLoc(),
+                  "specparam declaration must appear inside a module or a "
+                  "specify block",
+                  Subclause("6.20.5"));
     }
     ParseSpecparamDecl(items);
     return true;
@@ -308,6 +329,7 @@ bool Parser::TryParseDeclKeywordItem(std::vector<ModuleItem*>& items) {
     return true;
   }
   if (Check(TokenKind::kKwExtern)) {
+    SourceLoc extern_loc = CurrentLoc();
     Consume();
     // §23.5: an extern module (or macromodule) declaration can appear at any
     // level of the instantiation hierarchy, so one may be nested inside a
@@ -322,19 +344,41 @@ bool Parser::TryParseDeclKeywordItem(std::vector<ModuleItem*>& items) {
       items.push_back(item);
       return true;
     }
-    bool forkjoin = Match(TokenKind::kKwForkjoin);
-    ModuleItem* item = nullptr;
-    if (forkjoin || Check(TokenKind::kKwTask)) {
-      item = ParseTaskDecl(true);
-    } else {
-      item = ParseFunctionDecl(true);
-    }
-    item->is_extern = true;
-    item->is_forkjoin = forkjoin;
-    items.push_back(item);
+    items.push_back(ParseExternTfDeclaration(extern_loc));
     return true;
   }
   return false;
+}
+
+// A.1.6's extern_tf_declaration, `extern method_prototype ;` or `extern
+// forkjoin task_prototype ;`, with the `extern` keyword already consumed and
+// its position in `extern_loc`. A.1.6 is the one place the declaration
+// stands: interface_or_generate_item admits it, and the bodies A.1.4, A.1.7,
+// A.1.8 and A.1.11 give a module, a program, a checker and a package do not,
+// while a class reads its own `extern` under A.1.9's class_method. §25.7 says
+// what the prototype is for, "if the subroutines are defined in a module using
+// a hierarchical name, they shall also be declared as extern in the
+// interface". So one written in any body but an interface's is reported at
+// the keyword. The prototype is still read, so that the body resumes after
+// its own ';'. An anonymous program is left to FilterAnonymousProgramItems in
+// parser.cpp, which reports every prototype under A.1.11 and drops it.
+ModuleItem* Parser::ParseExternTfDeclaration(SourceLoc extern_loc) {
+  if (!InInterfaceBody() && !in_anonymous_program_) {
+    diag_.Error(extern_loc,
+                "an extern task or function prototype is an item of an "
+                "interface",
+                Subclause("A.1.6"));
+  }
+  bool forkjoin = Match(TokenKind::kKwForkjoin);
+  ModuleItem* item = nullptr;
+  if (forkjoin || Check(TokenKind::kKwTask)) {
+    item = ParseTaskDecl(true);
+  } else {
+    item = ParseFunctionDecl(true);
+  }
+  item->is_extern = true;
+  item->is_forkjoin = forkjoin;
+  return item;
 }
 
 bool Parser::TryParseMiscKeywordItem(std::vector<ModuleItem*>& items) {

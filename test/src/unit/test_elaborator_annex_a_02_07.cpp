@@ -80,10 +80,14 @@ TEST(TaskDeclElaboration, TaskConstRefPortElaborates) {
              "endmodule\n"));
 }
 
+// The prototype stands in an interface, A.1.6's extern_tf_declaration being
+// an interface_or_generate_item and no item of a module body.
 TEST(TaskDeclElaboration, TaskPrototypeExternElaborates) {
   EXPECT_TRUE(
-      ElabOk("module m;\n"
+      ElabOk("interface ifc;\n"
              "  extern task my_task(input int x);\n"
+             "endinterface\n"
+             "module m;\n"
              "endmodule\n"));
 }
 

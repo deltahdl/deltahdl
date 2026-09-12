@@ -181,14 +181,17 @@ TEST(TaskDeclParsing, TfPortItemWithUnpackedDims) {
   EXPECT_FALSE(item->func_args[0].unpacked_dims.empty());
 }
 
+// The task prototypes below stand in an interface, A.1.6's
+// extern_tf_declaration being an interface_or_generate_item and no item of a
+// module body.
 TEST(TaskDeclParsing, TfPortItemNoIdentifier) {
   auto r = Parse(
-      "module m;\n"
+      "interface ifc;\n"
       "  extern task my_task(input int);\n"
-      "endmodule\n");
+      "endinterface\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->interfaces[0]->items[0];
   ASSERT_EQ(item->func_args.size(), 1u);
   EXPECT_EQ(item->func_args[0].direction, Direction::kInput);
 }
@@ -367,12 +370,12 @@ TEST(TaskDeclParsing, TfPortDeclWithDefaultValue) {
 
 TEST(TaskDeclParsing, TaskPrototypeWithArgs) {
   auto r = Parse(
-      "module m;\n"
+      "interface ifc;\n"
       "  extern task my_task(input int x);\n"
-      "endmodule\n");
+      "endinterface\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->interfaces[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kTaskDecl);
   EXPECT_TRUE(item->is_extern);
   ASSERT_EQ(item->func_args.size(), 1u);
@@ -381,24 +384,24 @@ TEST(TaskDeclParsing, TaskPrototypeWithArgs) {
 
 TEST(TaskDeclParsing, TaskPrototypeEmptyParens) {
   auto r = Parse(
-      "module m;\n"
+      "interface ifc;\n"
       "  extern task my_task();\n"
-      "endmodule\n");
+      "endinterface\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->interfaces[0]->items[0];
   EXPECT_TRUE(item->is_extern);
   EXPECT_TRUE(item->func_args.empty());
 }
 
 TEST(TaskDeclParsing, TaskPrototypeNoParens) {
   auto r = Parse(
-      "module m;\n"
+      "interface ifc;\n"
       "  extern task my_task;\n"
-      "endmodule\n");
+      "endinterface\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->interfaces[0]->items[0];
   EXPECT_TRUE(item->is_extern);
   EXPECT_TRUE(item->func_args.empty());
 }
@@ -648,12 +651,12 @@ TEST(TaskDeclParsing, TaskBodyWithNullStatement) {
 TEST(TaskDeclParsing, TaskPrototypeMultiplePorts) {
   // task_prototype's optional ( [ tf_port_list ] ) accepts multi-item lists.
   auto r = Parse(
-      "module m;\n"
+      "interface ifc;\n"
       "  extern task my_task(input int a, output int b);\n"
-      "endmodule\n");
+      "endinterface\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->interfaces[0]->items[0];
   EXPECT_TRUE(item->is_extern);
   ASSERT_EQ(item->func_args.size(), 2u);
   EXPECT_EQ(item->func_args[0].direction, Direction::kInput);

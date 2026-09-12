@@ -235,4 +235,40 @@ TEST(ProgramGenerateItem, ElaborationSeveritySystemTask) {
   EXPECT_TRUE(HasItemOfKind(ProgItems(r), ModuleItemKind::kElabSystemTask));
 }
 
+// --- non_port_program_item admits no specify_block or specparam_declaration
+// ---
+// A.1.4's non_port_module_item lists specify_block and
+// { attribute_instance } specparam_declaration; non_port_program_item lists
+// neither, and §30.3 has the specify block "defined within a module" while
+// §6.20.5 has a specparam "declared inside a module or specify block". Each
+// was accepted in a program body silently and recorded as an item of it.
+
+TEST(NonPortProgramItem, ErrorSpecifyBlockInProgramIsRejected) {
+  auto r = Parse(
+      "program p;\n"
+      "  specify\n"
+      "    (a => b) = 5;\n"
+      "  endspecify\n"
+      "  initial x = 0;\n"
+      "endprogram\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "specify block must appear inside a module declaration", 2,
+      "30.3"));
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->programs[0]->items, ModuleItemKind::kInitialBlock));
+}
+
+TEST(NonPortProgramItem, ErrorSpecparamInProgramIsRejected) {
+  auto r = Parse(
+      "program p;\n"
+      "  specparam tRise = 150;\n"
+      "endprogram\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "specparam declaration must appear inside a module or a specify block", 2,
+      "6.20.5"));
+}
+
 }  // namespace

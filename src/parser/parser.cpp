@@ -704,6 +704,7 @@ bool Parser::TryParseCuScopeDataDecl(CompilationUnit* unit) {
 }
 
 void Parser::ParseExternTopLevel(CompilationUnit* unit) {
+  SourceLoc extern_loc = CurrentLoc();
   Consume();
   if (Check(TokenKind::kKwModule) || Check(TokenKind::kKwMacromodule)) {
     unit->modules.push_back(ParseExternModuleDecl());
@@ -739,6 +740,16 @@ void Parser::ParseExternTopLevel(CompilationUnit* unit) {
     auto* udp = ParseExternUdpDecl();
     unit->udps.push_back(udp);
     known_udps_.insert(udp->name);
+    return;
+  }
+  // A.1.6's extern_tf_declaration at compilation-unit scope, which A.1.2's
+  // description does not admit. Parser::ParseExternTfDeclaration reports it,
+  // no interface body being open, and reads the prototype so that the unit
+  // resumes after its ';'; the prototype itself is dropped, an interface
+  // being the one scope §25.7 defines it for.
+  if (Check(TokenKind::kKwTask) || Check(TokenKind::kKwFunction) ||
+      Check(TokenKind::kKwForkjoin)) {
+    ParseExternTfDeclaration(extern_loc);
     return;
   }
   SkipToSemicolon(lexer_);

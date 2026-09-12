@@ -461,4 +461,38 @@ TEST(CheckerItemsParsing, CheckerDefaultDisableIffMissingSemicolonRejected) {
       ReportedError(r.diags, "expected ';', got 'endchecker'", 3, "16.15"));
 }
 
+// checker_or_generate_item admits no specify_block or specparam_declaration:
+// A.1.4's non_port_module_item lists both, and A.1.8 lists neither, §30.3
+// having the specify block "defined within a module" and §6.20.5 a specparam
+// "declared inside a module or specify block". Each was accepted in a checker
+// body silently and recorded as an item of it.
+
+TEST(CheckerItemsParsing, CheckerSpecifyBlockRejected) {
+  auto r = Parse(
+      "checker c;\n"
+      "  specify\n"
+      "    (a => b) = 5;\n"
+      "  endspecify\n"
+      "  initial x = 0;\n"
+      "endchecker\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "specify block must appear inside a module declaration", 2,
+      "30.3"));
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->checkers.size(), 1u);
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->checkers[0]->items, ModuleItemKind::kInitialBlock));
+}
+
+TEST(CheckerItemsParsing, CheckerSpecparamRejected) {
+  auto r = Parse(
+      "checker c;\n"
+      "  specparam tRise = 150;\n"
+      "endchecker\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "specparam declaration must appear inside a module or a specify block", 2,
+      "6.20.5"));
+}
+
 }  // namespace

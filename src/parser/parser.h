@@ -119,6 +119,7 @@ class Parser {
   bool TryParseProcessBlock(std::vector<ModuleItem*>& items);
   bool TryParseKeywordItem(std::vector<ModuleItem*>& items);
   bool TryParseDeclKeywordItem(std::vector<ModuleItem*>& items);
+  ModuleItem* ParseExternTfDeclaration(SourceLoc extern_loc);
   bool AtMisplacedMethodQualifier();
   void RejectMisplacedMethodQualifier(std::vector<ModuleItem*>& items);
   bool TryParseMiscKeywordItem(std::vector<ModuleItem*>& items);
@@ -766,6 +767,14 @@ class Parser {
   bool InProgramBlock() const {
     return current_module_ &&
            current_module_->decl_kind == ModuleDeclKind::kProgram;
+  }
+  bool InModuleBody() const {
+    return current_module_ &&
+           current_module_->decl_kind == ModuleDeclKind::kModule;
+  }
+  bool InInterfaceBody() const {
+    return current_module_ &&
+           current_module_->decl_kind == ModuleDeclKind::kInterface;
   }
 
   int generate_block_depth_ = 0;

@@ -481,4 +481,25 @@ TEST(PackageItemsParsing, AnonymousProgramWithFunctionDeclIsAccepted) {
   EXPECT_EQ(r.cu->packages[0]->items.size(), 1u);
 }
 
+// package_item reaches package_or_generate_item_declaration, which lists no
+// specparam_declaration; A.1.4's non_port_module_item is what does, and
+// §6.20.5 has a specparam "declared inside a module or specify block". One in
+// a package body was accepted silently and recorded as an item of the package,
+// where the specify block beside it was already reported under §30.3.
+TEST(PackageItemsParsing, ErrorSpecparamInPackageIsRejected) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  specparam tRise = 150;\n"
+      "  int x;\n"
+      "endpackage\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "specparam declaration must appear inside a module or a specify block", 2,
+      "6.20.5"));
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->packages[0]->items, ModuleItemKind::kVarDecl));
+}
+
 }  // namespace

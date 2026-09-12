@@ -48,14 +48,16 @@ TEST(TaskDeclParsing, TfPortItemVarWithDirection) {
   EXPECT_EQ(item->func_args[0].name, "x");
 }
 
+// The prototype stands in an interface, A.1.6's extern_tf_declaration being
+// an interface_or_generate_item and no item of a module body.
 TEST(TaskDeclParsing, TfPortItemNoNameInPrototype) {
   auto r = Parse(
-      "module m;\n"
+      "interface ifc;\n"
       "  extern task my_task(input int, output int);\n"
-      "endmodule\n");
+      "endinterface\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->interfaces[0]->items[0];
   ASSERT_EQ(item->func_args.size(), 2u);
 }
 
@@ -465,15 +467,17 @@ TEST(TaskAndFunctionParsing, FormalArgRequiresIdentifierInFunctionBody) {
       r.diags, "tf_port_item shall include a port_identifier", 2, "13.3"));
 }
 
+// Each prototype stands in an interface, A.1.6's extern_tf_declaration being
+// an interface_or_generate_item and no item of a module body.
 TEST(TaskAndFunctionParsing, FormalArgIdentifierOptionalInPrototype) {
   EXPECT_TRUE(
-      ParseOk("module m;\n"
+      ParseOk("interface ifc;\n"
               "  extern task my_task(input int, output int);\n"
-              "endmodule\n"));
+              "endinterface\n"));
   EXPECT_TRUE(
-      ParseOk("module m;\n"
+      ParseOk("interface ifc;\n"
               "  extern function int f(input int);\n"
-              "endmodule\n"));
+              "endinterface\n"));
 }
 
 TEST(TaskAndFunctionParsing, RefStaticQualifierStickyInherited) {
