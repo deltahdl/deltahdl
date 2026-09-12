@@ -1,3 +1,5 @@
+#include <string>
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
@@ -256,6 +258,73 @@ TEST(TimingCheckCommandParsing, WidthThresholdNoDataEvent) {
   EXPECT_EQ(tc->data_edge, SpecifyEdge::kNone);
   EXPECT_TRUE(tc->data_terminal.name.empty());
   ASSERT_EQ(tc->limits.size(), 2u);
+}
+
+// $recrem_timing_check writes the same tail $setuphold_timing_check does,
+// `[ , [ notifier ] [ , [ timestamp_condition ] [ , [ timecheck_condition ]
+// [ , [ delayed_reference ] [ , [ delayed_data ] ] ] ] ]`, and every one of
+// the five is read.
+TEST(TimingCheckCommandParsing, RecremTakesConditionsAndDelayedSignals) {
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $recrem(posedge rst, posedge clk, 10, 5, n, tsc, tcc, dr, dd);\n"
+      "endspecify\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* tc = GetSoleTimingCheck(r);
+  ASSERT_NE(tc, nullptr);
+  EXPECT_EQ(tc->check_kind, TimingCheckKind::kRecrem);
+  EXPECT_EQ(tc->notifier, "n");
+  EXPECT_NE(tc->timestamp_cond, nullptr);
+  EXPECT_NE(tc->timecheck_cond, nullptr);
+  EXPECT_EQ(tc->delayed_ref, "dr");
+  EXPECT_EQ(tc->delayed_data, "dd");
+}
+
+// Four of the twelve productions write arguments past the notifier: the
+// conditions and delayed signals of $setuphold and $recrem, the flags of
+// $timeskew and $fullskew. The other eight end at `[ , [ notifier ] ] )`, so
+// an argument after the notifier of any of them stands where the ')' is due,
+// and the ',' before it is reported there under §31.2 as $skew's is.
+TEST(TimingCheckCommandParsing, ChecksEndingAtTheNotifierTakeNothingPastIt) {
+  const char* const kChecks[] = {
+      "$setup(d, posedge clk, 10, n, tsc)",
+      "$hold(posedge clk, d, 10, n, tsc, tcc, dr, dd)",
+      "$recovery(posedge clk, d, 10, n, 1)",
+      "$removal(posedge clk, d, 10, n, 1)",
+      "$skew(posedge clk, d, 10, n, 1)",
+      "$period(posedge clk, 10, n, 1)",
+      "$width(posedge clk, 10, 0, n, 1)",
+      "$nochange(posedge clk, d, 0, 0, n, 1)",
+  };
+  for (const char* check : kChecks) {
+    auto r = Parse(std::string("module m;\nspecify\n  ") + check +
+                   ";\nendspecify\nendmodule\n");
+    EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ','", 3, "31.2"))
+        << check;
+  }
+}
+
+// The same eight with the notifier omitted and an argument behind its ','.
+TEST(TimingCheckCommandParsing,
+     ChecksEndingAtTheNotifierTakeNothingPastItsSlot) {
+  const char* const kChecks[] = {
+      "$setup(d, posedge clk, 10, , tsc)",
+      "$hold(posedge clk, d, 10, , tsc)",
+      "$recovery(posedge clk, d, 10, , 1)",
+      "$removal(posedge clk, d, 10, , 1)",
+      "$skew(posedge clk, d, 10, , 1)",
+      "$period(posedge clk, 10, , 1)",
+      "$width(posedge clk, 10, 0, , 1)",
+      "$nochange(posedge clk, d, 0, 0, , 1)",
+  };
+  for (const char* check : kChecks) {
+    auto r = Parse(std::string("module m;\nspecify\n  ") + check +
+                   ";\nendspecify\nendmodule\n");
+    EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ','", 3, "31.2"))
+        << check;
+  }
 }
 
 TEST(TimingCheckCommandParsing, ErrorMissingCloseParen) {

@@ -652,17 +652,23 @@ void Parser::ParseSetupholdExtendedArgs(TimingCheckDecl& tc) {
                           "delayed_data");
 }
 
+// A.7.5.1 writes arguments past the notifier for four checks alone:
+// $setuphold and $recrem take `[ , [ timestamp_condition ] [ , [
+// timecheck_condition ] [ , [ delayed_reference ] [ , [ delayed_data ] ] ] ]`,
+// and $timeskew and $fullskew take `[ , [ event_based_flag ] [ , [
+// remain_active_flag ] ]`. The eight others end at `[ , [ notifier ] ] )`, so
+// a ',' after their notifier is left standing where Parser::ParseTimingCheck
+// expects the ')' and reports it under §31.2.
 void Parser::ParseExtendedTimingCheckArgs(TimingCheckDecl& tc) {
   if (tc.check_kind == TimingCheckKind::kTimeskew ||
       tc.check_kind == TimingCheckKind::kFullskew) {
     ParseTimeskewExtendedArgs(tc);
     return;
   }
-
-  if (tc.check_kind == TimingCheckKind::kSkew) {
-    return;
+  if (tc.check_kind == TimingCheckKind::kSetuphold ||
+      tc.check_kind == TimingCheckKind::kRecrem) {
+    ParseSetupholdExtendedArgs(tc);
   }
-  ParseSetupholdExtendedArgs(tc);
 }
 
 // Checks that timing checks requiring two timing_check_limit arguments
