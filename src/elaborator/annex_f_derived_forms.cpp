@@ -128,4 +128,51 @@ std::shared_ptr<const SequenceExpr> SeqConcatDelayExactly(
   return SeqFusion(std::move(r1), std::move(r2));
 }
 
+// !b[*0:$], the run of letters without b that a goto repetition's unit opens
+// with and a nonconsecutive repetition ends with, in the §F.3.4.2.1 unfolding
+// of [*0:$].
+static std::shared_ptr<const SequenceExpr> SeqRunWithout(
+    const std::shared_ptr<const BooleanExpr>& b) {
+  return SeqRepeatAtLeast(SeqBoolean(BoolNot(b)), 0);
+}
+
+// (!b[*0:$] ##1 b), the unit a goto repetition repeats.
+static std::shared_ptr<const SequenceExpr> SeqGotoUnit(
+    const std::shared_ptr<const BooleanExpr>& b) {
+  return SeqConcat(SeqRunWithout(b), SeqBoolean(b));
+}
+
+std::shared_ptr<const SequenceExpr> SeqGotoRange(
+    std::shared_ptr<const BooleanExpr> b, unsigned int m, unsigned int n) {
+  return SeqRepeatRange(SeqGotoUnit(b), m, n);
+}
+
+std::shared_ptr<const SequenceExpr> SeqGotoAtLeast(
+    std::shared_ptr<const BooleanExpr> b, unsigned int m) {
+  return SeqRepeatAtLeast(SeqGotoUnit(b), m);
+}
+
+std::shared_ptr<const SequenceExpr> SeqGotoExactly(
+    std::shared_ptr<const BooleanExpr> b, unsigned int m) {
+  return SeqRepeatExactly(SeqGotoUnit(b), m);
+}
+
+std::shared_ptr<const SequenceExpr> SeqNonconsecutiveRange(
+    std::shared_ptr<const BooleanExpr> b, unsigned int m, unsigned int n) {
+  auto gotos = SeqGotoRange(b, m, n);
+  return SeqConcat(std::move(gotos), SeqRunWithout(b));
+}
+
+std::shared_ptr<const SequenceExpr> SeqNonconsecutiveAtLeast(
+    std::shared_ptr<const BooleanExpr> b, unsigned int m) {
+  auto gotos = SeqGotoAtLeast(b, m);
+  return SeqConcat(std::move(gotos), SeqRunWithout(b));
+}
+
+std::shared_ptr<const SequenceExpr> SeqNonconsecutiveExactly(
+    std::shared_ptr<const BooleanExpr> b, unsigned int m) {
+  auto gotos = SeqGotoExactly(b, m);
+  return SeqConcat(std::move(gotos), SeqRunWithout(b));
+}
+
 }  // namespace delta

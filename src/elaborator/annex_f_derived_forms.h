@@ -101,4 +101,24 @@ std::shared_ptr<const SequenceExpr> SeqConcatDelayExactly(
     std::shared_ptr<const SequenceExpr> r1, unsigned int m,
     std::shared_ptr<const SequenceExpr> r2);
 
+// §F.3.4.2.3: the derived nonconsecutive repetition operators of §16.9.2, over
+// a Boolean b. A goto repetition b[->m:n] is the consecutive repetition
+// (!b[*0:$] ##1 b)[*m:n] of a unit that runs through letters without b and
+// ends at one with it, so the word ends at the last b; a nonconsecutive
+// repetition b[=m:n] is (b[->m:n] ##1 !b[*0:$]), the same followed by a run
+// of letters without b. The bounded, unbounded and exact forms unfold through
+// the §F.3.4.2.1 repetitions of the same shape.
+std::shared_ptr<const SequenceExpr> SeqGotoRange(
+    std::shared_ptr<const BooleanExpr> b, unsigned int m, unsigned int n);
+std::shared_ptr<const SequenceExpr> SeqGotoAtLeast(
+    std::shared_ptr<const BooleanExpr> b, unsigned int m);
+std::shared_ptr<const SequenceExpr> SeqGotoExactly(
+    std::shared_ptr<const BooleanExpr> b, unsigned int m);
+std::shared_ptr<const SequenceExpr> SeqNonconsecutiveRange(
+    std::shared_ptr<const BooleanExpr> b, unsigned int m, unsigned int n);
+std::shared_ptr<const SequenceExpr> SeqNonconsecutiveAtLeast(
+    std::shared_ptr<const BooleanExpr> b, unsigned int m);
+std::shared_ptr<const SequenceExpr> SeqNonconsecutiveExactly(
+    std::shared_ptr<const BooleanExpr> b, unsigned int m);
+
 }  // namespace delta
