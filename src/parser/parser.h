@@ -294,6 +294,11 @@ class Parser {
   void ParseSampleFormalList(const std::vector<std::string>& covergroup_formals,
                              std::vector<std::string>& sample_names);
   void ParseBlockEventExpression();
+  void ParseHierarchicalBtfIdentifier();
+  bool IdentifierOpensCoverageLabel();
+  void ParseCoverpointDataType();
+  void ParseCoverpointHead();
+  void ParseCoverageIffGuard();
   // §19.7: skip one covergroup-body item. `seen_options` accumulates the
   // covergroup-level coverage options already assigned in this definition so a
   // repeated assignment of the same option can be flagged as an error.

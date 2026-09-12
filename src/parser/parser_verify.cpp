@@ -1,5 +1,10 @@
 #include <functional>
+#include <optional>
+#include <string>
+#include <string_view>
 #include <unordered_set>
+#include <utility>
+#include <vector>
 
 #include "parser/parser.h"
 
@@ -32,26 +37,39 @@ static bool IsBinsKeyword(TokenKind k) {
          k == TokenKind::kKwIgnoreBins;
 }
 
-// §19.5: a bins selection is `bins_keyword name [array] = ...`. Consume the
-// keyword, name, and optional array dimension already known to lead the item,
-// then require the '=' that every bins form has.
-static void ScanBinsSelectionHeader(Lexer& lexer, DiagEngine& diag) {
-  lexer.Next();  // bins keyword
-  if (lexer.Peek().Is(TokenKind::kIdentifier)) lexer.Next();
-  if (lexer.Peek().Is(TokenKind::kLBracket)) {
-    int bd = 0;
-    do {
-      if (lexer.Peek().Is(TokenKind::kLBracket))
-        ++bd;
-      else if (lexer.Peek().Is(TokenKind::kRBracket))
-        --bd;
-      lexer.Next();
-    } while (bd > 0 && !lexer.Peek().Is(TokenKind::kEof));
+static bool IsOptionKeyword(std::string_view text) {
+  return text == "option" || text == "type_option";
+}
+
+// A.2.11 writes a coverage_option as `option . member_identifier = expression`
+// or `type_option . member_identifier = constant_expression`, and §19.7 has
+// an option take effect by that assignment alone: a member named with no
+// value, or a keyword with no member, sets nothing. Positioned on the `option`
+// or `type_option` keyword; reads it, the '.' and the member, and stops on the
+// '=', which the caller's scan of the value takes. Returns the member once it
+// is read, whether or not the '=' follows, so a caller keying on the member
+// still keys on it; a break in the form is reported where the form breaks.
+static std::optional<Token> ReadCoverageOptionMember(Lexer& lexer,
+                                                     DiagEngine& diag) {
+  Token keyword = lexer.Next();
+  auto report = [&](SourceLoc loc) {
+    diag.Error(loc,
+               "a coverage option is set as '" + std::string(keyword.text) +
+                   ".member = value'",
+               Subclause("A.2.11"));
+  };
+  if (!lexer.Peek().Is(TokenKind::kDot)) {
+    report(lexer.Peek().loc);
+    return std::nullopt;
   }
-  if (!lexer.Peek().Is(TokenKind::kEq)) {
-    diag.Error(lexer.Peek().loc, "expected '=' in bins declaration",
-               Subclause("19.5.1"));
+  lexer.Next();
+  if (!lexer.Peek().Is(TokenKind::kIdentifier)) {
+    report(lexer.Peek().loc);
+    return std::nullopt;
   }
+  Token member = lexer.Next();
+  if (!lexer.Peek().Is(TokenKind::kEq)) report(lexer.Peek().loc);
+  return member;
 }
 
 enum class CovBodyStep : uint8_t { kNotHandled, kContinue, kReturn };
@@ -60,6 +78,101 @@ enum class CovBodyStep : uint8_t { kNotHandled, kContinue, kReturn };
 // covergroup body (LRM 19.7, Table 19-2). The covergroup level itself accepts
 // every instance option and so is not represented here.
 enum class CovItemLevel : uint8_t { kCoverpoint, kCross };
+
+// How a bins name is subscripted: not at all, `[ ]`, or `[ expression ]`.
+// A.2.11's bins_or_options puts `[ [ covergroup_expression ] ]` after the
+// name of a bin over values and `[ ]` alone after the name of a bin over
+// transitions, and its bins_selection, the form a cross_body holds, admits
+// neither.
+enum class BinsSubscript : uint8_t { kNone, kEmpty, kSized };
+
+// Reads the subscript after a bins name, `[` already seen, up to its `]`.
+static BinsSubscript ScanBinsSubscript(Lexer& lexer, DiagEngine& diag,
+                                       CovItemLevel level) {
+  if (level == CovItemLevel::kCross) {
+    diag.Error(lexer.Peek().loc,
+               "a cross bin is not an array; a bins_selection subscripts "
+               "nothing",
+               Subclause("A.2.11"));
+  }
+  lexer.Next();  // [
+  BinsSubscript subscript = BinsSubscript::kEmpty;
+  int bd = 1;
+  while (bd > 0 && !lexer.Peek().Is(TokenKind::kEof)) {
+    if (lexer.Peek().Is(TokenKind::kLBracket)) {
+      ++bd;
+    } else if (lexer.Peek().Is(TokenKind::kRBracket)) {
+      --bd;
+    } else {
+      subscript = BinsSubscript::kSized;
+    }
+    lexer.Next();
+  }
+  return subscript;
+}
+
+// Holds what a bins value opens with to the subscript and the `wildcard`
+// before it. `wildcard` is written on A.2.11's four value and transition
+// forms and on neither `default` form; `default sequence` carries no
+// subscript; a trans_list follows `[ ]` alone, §19.5.2 (printed page 592)
+// naming its bins "binname[transition]" for the transitions the list holds
+// rather than for a size the declaration gives. A cross_body's bins_selection
+// takes a select_expression, of which `default` is no form.
+static void CheckBinsValueHead(Lexer& lexer, DiagEngine& diag,
+                               CovItemLevel level,
+                               const std::optional<Token>& wildcard,
+                               BinsSubscript subscript) {
+  Token head = lexer.Peek();
+  if (head.Is(TokenKind::kKwDefault)) {
+    if (level == CovItemLevel::kCross) {
+      diag.Error(head.loc,
+                 "a cross bin selects with a select_expression; 'default' "
+                 "is a coverpoint bin",
+                 Subclause("A.2.11"));
+    }
+    if (wildcard) {
+      diag.Error(wildcard->loc,
+                 "'wildcard' qualifies a bin over values or transitions; a "
+                 "'default' bin takes none",
+                 Subclause("A.2.11"));
+    }
+    lexer.Next();
+    if (lexer.Peek().Is(TokenKind::kKwSequence) &&
+        subscript != BinsSubscript::kNone) {
+      diag.Error(lexer.Peek().loc, "a 'default sequence' bin is not an array",
+                 Subclause("A.2.11"));
+    }
+    return;
+  }
+  if (head.Is(TokenKind::kLParen) && subscript == BinsSubscript::kSized) {
+    diag.Error(head.loc,
+               "a transition bin's array is written '[ ]'; its size is the "
+               "number of transitions",
+               Subclause("A.2.11"));
+  }
+}
+
+// §19.5: a bins selection is `bins_keyword name [array] = ...`. Consume the
+// keyword, name, and optional array dimension already known to lead the item,
+// then require the '=' that every bins form has, and hold what follows it to
+// the forms the subscript and a preceding `wildcard` leave open.
+static void ScanBinsSelectionHeader(Lexer& lexer, DiagEngine& diag,
+                                    CovItemLevel level,
+                                    const std::optional<Token>& wildcard) {
+  lexer.Next();  // bins keyword
+  if (lexer.Peek().Is(TokenKind::kIdentifier)) lexer.Next();
+  BinsSubscript subscript = BinsSubscript::kNone;
+  if (lexer.Peek().Is(TokenKind::kLBracket)) {
+    subscript = ScanBinsSubscript(lexer, diag, level);
+  }
+  if (!lexer.Peek().Is(TokenKind::kEq)) {
+    diag.Error(lexer.Peek().loc, "expected '=' in bins declaration",
+               Subclause("19.5.1"));
+    return;
+  }
+  lexer.Next();  // =
+  CheckBinsValueHead(lexer, diag, level, wildcard, subscript);
+}
 
 // §19.7, Table 19-2: report whether an instance coverage option named by
 // `member` may NOT be specified at the given coverpoint/cross level. Only the
@@ -82,32 +195,45 @@ static bool InstanceOptionForbiddenAtItemLevel(std::string_view member,
   return member == "auto_bin_max" || member == "detect_overlap";
 }
 
-// Handle a token seen at item level (body brace depth 1, no open parens),
-// reporting the missing ';' / '=' diagnostics. Returns kNotHandled when the
-// token is ordinary value content for the caller's nesting scan to consume.
 // §19.7, Table 19-2: an instance coverage option set inside a coverpoint or
 // cross body is written `option . member = expression`. A member that may not
-// be specified at this syntactic level is rejected. `type_option` (§19.7.1) is
-// deliberately not intercepted here.
+// be specified at this syntactic level is rejected. A `type_option` is read
+// for its form alone, §19.7.1 governing which of its members stand where.
 static void ScanItemLevelCoverageOption(Lexer& lexer, DiagEngine& diag,
                                         CovItemLevel level) {
-  lexer.Next();  // option
-  if (!lexer.Peek().Is(TokenKind::kDot)) return;
-  lexer.Next();  // .
-  Token member = lexer.Peek();
-  if (!member.Is(TokenKind::kIdentifier)) return;
-  if (InstanceOptionForbiddenAtItemLevel(member.text, level)) {
-    diag.Error(member.loc,
-               "coverage option 'option." + std::string(member.text) +
+  bool instance = lexer.Peek().text == "option";
+  std::optional<Token> member = ReadCoverageOptionMember(lexer, diag);
+  if (!member || !instance) return;
+  if (InstanceOptionForbiddenAtItemLevel(member->text, level)) {
+    diag.Error(member->loc,
+               "coverage option 'option." + std::string(member->text) +
                    "' may not be specified at the " +
                    std::string(level == CovItemLevel::kCross ? "cross"
                                                              : "coverpoint") +
                    " level",
                Subclause("19.7"));
   }
-  lexer.Next();  // member
 }
 
+// Reads the `wildcard` a bins item opens with. A.2.11 writes it on
+// bins_or_options alone, the form a cover_point's body holds; the
+// bins_selection of a cross_body admits none, so at cross level it is
+// reported where it stands.
+static Token ScanWildcardPrefix(Lexer& lexer, DiagEngine& diag,
+                                CovItemLevel level) {
+  Token wildcard = lexer.Next();
+  if (level == CovItemLevel::kCross) {
+    diag.Error(wildcard.loc,
+               "a cross bin is not a wildcard bin; a bins_selection admits "
+               "no 'wildcard'",
+               Subclause("A.2.11"));
+  }
+  return wildcard;
+}
+
+// Handle a token seen at item level (body brace depth 1, no open parens),
+// reporting the missing ';' / '=' diagnostics. Returns kNotHandled when the
+// token is ordinary value content for the caller's nesting scan to consume.
 static CovBodyStep ScanCoverpointItemToken(Lexer& lexer, DiagEngine& diag,
                                            CovItemLevel level,
                                            bool& item_active) {
@@ -125,22 +251,20 @@ static CovBodyStep ScanCoverpointItemToken(Lexer& lexer, DiagEngine& diag,
   }
   // 'wildcard' is a prefix of the following bins selection; consume it without
   // starting a fresh item so the bins keyword sees the prior termination state.
+  std::optional<Token> wildcard;
   if (t.Is(TokenKind::kKwWildcard)) {
-    lexer.Next();
-    return CovBodyStep::kContinue;
+    wildcard = ScanWildcardPrefix(lexer, diag, level);
+    t = lexer.Peek();
+    if (!IsBinsKeyword(t.kind)) return CovBodyStep::kContinue;
   }
   if (IsBinsKeyword(t.kind)) {
     if (item_active)
       diag.Error(t.loc, "missing ';' in covergroup item", Subclause("19.3"));
     item_active = true;
-    ScanBinsSelectionHeader(lexer, diag);
+    ScanBinsSelectionHeader(lexer, diag, level, wildcard);
     return CovBodyStep::kContinue;
   }
-  // §19.7, Table 19-2: an instance coverage option set inside a coverpoint or
-  // cross body is written `option . member = expression`. Reject a member that
-  // may not be specified at this syntactic level. `type_option` (§19.7.1) is
-  // deliberately not intercepted here.
-  if (t.Is(TokenKind::kIdentifier) && t.text == "option") {
+  if (t.Is(TokenKind::kIdentifier) && IsOptionKeyword(t.text)) {
     ScanItemLevelCoverageOption(lexer, diag, level);
     return CovBodyStep::kContinue;
   }
@@ -219,11 +343,40 @@ void Parser::ParseBlockEventExpression() {
       return;
     }
     Consume();
-    ExpectIdentifier(Subclause("19.3"));
-    while (Match(TokenKind::kDot)) {
-      ExpectIdentifier(Subclause("19.3"));
-    }
+    ParseHierarchicalBtfIdentifier();
   } while (Match(TokenKind::kKwOr));
+}
+
+// Reads A.2.11's hierarchical_btf_identifier, a hierarchical_tf_identifier, a
+// hierarchical_block_identifier or `[ hierarchical_identifier . | class_scope
+// ] method_identifier`, where A.9.3 spells hierarchical_identifier `[ $root .
+// ] { identifier constant_bit_select . } identifier` and A.8.4 spells
+// class_scope `class_type ::` with class_type `ps_class_identifier [
+// parameter_value_assignment ] { :: class_identifier [
+// parameter_value_assignment ] }`. §19.3 (printed page 577) says what the
+// name denotes, "a named block, task, function, or class method". The three
+// forms share their first identifier and differ in what separates the
+// identifiers after it, so the separators are read as they come. Nothing
+// records the name: no reader of the tree consumes a coverage event.
+void Parser::ParseHierarchicalBtfIdentifier() {
+  if (Check(TokenKind::kSystemIdentifier) && CurrentToken().text == "$root") {
+    Consume();
+    Expect(TokenKind::kDot, Subclause("A.2.11"));
+  }
+  ExpectIdentifier(Subclause("A.2.11"));
+  while (true) {
+    if (Match(TokenKind::kLBracket)) {
+      ParseExpr();
+      Expect(TokenKind::kRBracket, Subclause("A.2.11"));
+    } else if (Match(TokenKind::kDot) || Match(TokenKind::kColonColon)) {
+      ExpectIdentifier(Subclause("A.2.11"));
+    } else if (Match(TokenKind::kHash)) {
+      std::vector<std::pair<std::string_view, Expr*>> params;
+      ParseParamValueAssignment(params);
+    } else {
+      return;
+    }
+  }
 }
 
 // Classify the current token and update the tf_port-style formal-list scan
@@ -447,10 +600,6 @@ void Parser::ParseCovergroupDecl(std::vector<ModuleItem*>& items) {
   items.push_back(item);
 }
 
-static bool IsOptionKeyword(std::string_view text) {
-  return text == "option" || text == "type_option";
-}
-
 // §19.8.1: a sample method formal may only designate a coverpoint or a
 // conditional guard expression; it shall be an error to use one in any other
 // context. A coverage-option assignment (option.* / type_option.*) is such a
@@ -519,17 +668,16 @@ void Parser::SkipCovergroupOptionAssignment(
     const std::vector<std::string>& sample_formals,
     std::unordered_set<std::string>& seen_options) {
   std::string keyword(CurrentToken().text);
-  Consume();  // option / type_option
-  if (Match(TokenKind::kDot) && Check(TokenKind::kIdentifier)) {
-    std::string option_name = keyword + '.' + std::string(CurrentToken().text);
+  std::optional<Token> member = ReadCoverageOptionMember(lexer_, diag_);
+  if (member) {
+    std::string option_name = keyword + '.' + std::string(member->text);
     if (!seen_options.insert(option_name).second) {
-      diag_.Error(CurrentLoc(),
+      diag_.Error(member->loc,
                   "coverage option '" + option_name +
                       "' is assigned more than once in the same covergroup "
                       "definition",
                   Subclause("19.7"));
     }
-    Consume();  // member_name
   }
   if (sample_formals.empty()) {
     SkipToSemiOrEnd(lexer_, TokenKind::kKwEndgroup);
@@ -538,8 +686,16 @@ void Parser::SkipCovergroupOptionAssignment(
   }
 }
 
+// A.2.11's coverage_spec_or_option opens both of its alternatives with
+// `{ attribute_instance }`, and cover_point's label may be preceded by a
+// data_type_or_implicit, so both are read before the item is told apart by
+// its first token. An identifier followed by ':' is the label itself, and is
+// asked about first because a name a typedef has declared can label a
+// coverpoint as well as type one.
 void Parser::SkipCovergroupItem(const std::vector<std::string>& sample_formals,
                                 std::unordered_set<std::string>& seen_options) {
+  ParseAttributes();
+
   if (Check(TokenKind::kIdentifier) && IsOptionKeyword(CurrentToken().text)) {
     SkipCovergroupOptionAssignment(sample_formals, seen_options);
     return;
@@ -550,7 +706,13 @@ void Parser::SkipCovergroupItem(const std::vector<std::string>& sample_formals,
     return;
   }
 
-  if (Check(TokenKind::kIdentifier)) {
+  if (Check(TokenKind::kIdentifier) && IdentifierOpensCoverageLabel()) {
+    SkipLabelledCoverpointItem();
+    return;
+  }
+
+  if (AtDataTypeOrVoid()) {
+    ParseCoverpointDataType();
     SkipLabelledCoverpointItem();
     return;
   }
@@ -558,11 +720,36 @@ void Parser::SkipCovergroupItem(const std::vector<std::string>& sample_formals,
   SkipToSemiOrEnd(lexer_, TokenKind::kKwEndgroup);
 }
 
+// True where the identifier the parse stands on is followed by ':', the shape
+// of a cover_point_identifier or cross_identifier label rather than of a type
+// name before one.
+bool Parser::IdentifierOpensCoverageLabel() {
+  auto saved = lexer_.SavePos();
+  Consume();
+  bool labelled = Check(TokenKind::kColon);
+  lexer_.RestorePos(saved);
+  return labelled;
+}
+
+// Reads the data_type_or_implicit before a cover_point's label. A.2.2.1 gives
+// it as a data_type or an implicit_data_type, `[ signing ] { packed_dimension
+// }`; ParseDataType reads the first and a leading signing, and a bare packed
+// dimension is what it leaves standing.
+void Parser::ParseCoverpointDataType() {
+  DataType dtype = ParseDataType();
+  if (Check(TokenKind::kLBracket)) ParsePackedDims(dtype);
+}
+
 // §19.5/§19.6: a coverpoint or cross written without a label.
 void Parser::SkipUnlabelledCoverpointItem() {
   bool is_cross = Check(TokenKind::kKwCross);
   Consume();
-  if (is_cross) ValidateCrossItemList();
+  if (is_cross) {
+    ValidateCrossItemList();
+    ParseCoverageIffGuard();
+  } else {
+    ParseCoverpointHead();
+  }
   SkipCoverpointBody(
       lexer_, diag_,
       is_cross ? CovItemLevel::kCross : CovItemLevel::kCoverpoint);
@@ -576,9 +763,49 @@ void Parser::SkipLabelledCoverpointItem() {
   if (Match(TokenKind::kColon) && IsCoverpointOrCross(CurrentToken().kind)) {
     if (Check(TokenKind::kKwCross)) level = CovItemLevel::kCross;
     Consume();
-    if (level == CovItemLevel::kCross) ValidateCrossItemList();
+    if (level == CovItemLevel::kCross) {
+      ValidateCrossItemList();
+      ParseCoverageIffGuard();
+    } else {
+      ParseCoverpointHead();
+    }
   }
   SkipCoverpointBody(lexer_, diag_, level);
+}
+
+// Reads what A.2.11's cover_point puts after the `coverpoint` keyword,
+// `expression [ iff ( expression ) ]`. §19.3 (printed page 577) has "a
+// coverage point can cover a variable or an expression", and a coverpoint
+// written with nothing to cover is reported where its expression was due.
+void Parser::ParseCoverpointHead() {
+  if (Check(TokenKind::kSemicolon) || Check(TokenKind::kLBrace) ||
+      Check(TokenKind::kKwIff) || Check(TokenKind::kKwEndgroup) || AtEnd()) {
+    diag_.Error(CurrentLoc(),
+                "a coverpoint covers an expression; none is written",
+                Subclause("A.2.11"));
+  } else {
+    ParseExpr();
+  }
+  ParseCoverageIffGuard();
+}
+
+// Reads the `[ iff ( expression ) ]` that A.2.11 puts after a cover_point's
+// expression and after a cover_cross's list_of_cross_items: the guard's
+// expression is parenthesized in both, and one written bare is reported at
+// the token where its '(' was due and read on to where the item's body or
+// terminator resumes.
+void Parser::ParseCoverageIffGuard() {
+  if (!Match(TokenKind::kKwIff)) return;
+  if (Match(TokenKind::kLParen)) {
+    ParseExpr();
+    Expect(TokenKind::kRParen, Subclause("A.2.11"));
+    return;
+  }
+  diag_.Error(CurrentLoc(),
+              "a coverage guard is written 'iff ( expression )'; its "
+              "expression is parenthesized",
+              Subclause("A.2.11"));
+  if (!Check(TokenKind::kSemicolon) && !Check(TokenKind::kLBrace)) ParseExpr();
 }
 
 void Parser::ValidateCrossItemList() {

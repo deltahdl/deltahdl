@@ -328,11 +328,15 @@ TEST(CovergroupDeclParsing, CoverPoint_ComplexExpression) {
               "endmodule\n"));
 }
 
+// cover_point's label may be preceded by a data_type_or_implicit: §19.5
+// (printed page 583) has "a data type for the coverpoint may be specified
+// explicitly or implicitly in data_type_or_implicit", and "if a data type is
+// specified, then a cover_point_identifier shall also be specified".
 TEST(CovergroupDeclParsing, CoverPoint_WithDataType) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg;\n"
-              "    cp1: coverpoint x {\n"
+              "    bit [3:0] cp1: coverpoint x {\n"
               "      bins low = {[0:3]};\n"
               "    }\n"
               "  endgroup\n"
