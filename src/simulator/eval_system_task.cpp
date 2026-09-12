@@ -3,8 +3,8 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
-#include <iostream>
 #include <optional>
+#include <ostream>
 #include <string>
 #include <vector>
 
@@ -707,10 +707,10 @@ void ExecDisplayWrite(const Expr* expr, SimContext& ctx, Arena& arena) {
   std::string output;
   for (size_t i = 0; i < expr->args.size(); ++i)
     AppendDisplayArg(expr, i, ctx, arena, output);
-  std::cout << output;
+  ctx.Out() << output;
   // The display family ($display, $displayb, $displayo, $displayh) terminates
   // its output with a newline; the write family does not.
-  if (expr->callee.starts_with("$display")) std::cout << "\n";
+  if (expr->callee.starts_with("$display")) ctx.Out() << "\n";
 }
 
 // §20.10: the hierarchical name of the scope in which a severity system task is
@@ -792,7 +792,7 @@ Logic4Vec EvalDeferredPrint(const Expr* expr, SimContext& ctx, Arena& arena) {
     ctx.SetDeferredBindingScope(scope);
     ExecDisplayWrite(expr, ctx, arena);
     ctx.SetDeferredBindingScope(std::nullopt);
-    std::cout << "\n";
+    ctx.Out() << "\n";
   };
   ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), Region::kPostponed,
                                    event);

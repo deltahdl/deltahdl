@@ -189,6 +189,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/sim_context.cpp
     simulator/sim_context_binding.cpp
     simulator/sim_context_fileio.cpp
+    simulator/output_log.cpp
     simulator/sim_context_vcd.cpp
     simulator/vcd_dump_state.cpp
     simulator/class_object.cpp

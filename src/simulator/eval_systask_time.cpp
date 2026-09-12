@@ -24,7 +24,6 @@
 
 #include <cstdint>
 #include <cstring>
-#include <iostream>
 #include <string>
 #include <string_view>
 
@@ -221,7 +220,7 @@ std::string BuildPrinttimescaleReport(const Expr* expr, SimContext& ctx) {
 
 Logic4Vec EvalPrinttimescaleTask(const Expr* expr, SimContext& ctx,
                                  Arena& arena) {
-  std::cout << BuildPrinttimescaleReport(expr, ctx) << "\n";
+  ctx.Out() << BuildPrinttimescaleReport(expr, ctx) << "\n";
   return MakeLogic4VecVal(arena, 1, 0);
 }
 

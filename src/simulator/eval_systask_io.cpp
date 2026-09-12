@@ -266,10 +266,21 @@ static std::string RenderFileOutputText(const Expr* expr, SimContext& ctx,
 // too: §21.3.5 requires every append write to land at the end of the file and
 // reposition the pointer there, which the host only performs at the actual
 // write, so it must not be deferred.
+//
+// Annex D.7 has the log file hold a copy of all the text printed to the
+// standard output, and the standard output is what the STDOUT descriptor and
+// channel 0 of an mcd stand for (§21.3.1), so text written to it here is
+// handed to the log as well; it is written to the C stdout rather than through
+// SimContext::Out() so that the NUL bytes above survive and the stream stays
+// the one the flush rule is stated for.
 static void WriteFileOutputText(FILE* fp, const std::string& output,
-                                bool is_display_family) {
+                                bool is_display_family, SimContext& ctx) {
   std::fwrite(output.data(), 1, output.size(), fp);
   if (is_display_family) std::fputc('\n', fp);
+  if (fp == stdout) {
+    ctx.Log().Copy(output);
+    if (is_display_family) ctx.Log().Copy("\n");
+  }
   int fd_flags = fcntl(fileno(fp), F_GETFL);
   bool is_append = fd_flags != -1 && (fd_flags & O_APPEND) != 0;
   if (fp == stdout || fp == stderr || is_append) std::fflush(fp);
@@ -289,7 +300,9 @@ static Logic4Vec EvalFdisplayWrite(const Expr* expr, SimContext& ctx,
                            name.rfind("$fmonitor", 0) == 0;
 
   std::string output = RenderFileOutputText(expr, ctx, arena, suffix);
-  for (FILE* fp : targets) WriteFileOutputText(fp, output, is_display_family);
+  for (FILE* fp : targets) {
+    WriteFileOutputText(fp, output, is_display_family, ctx);
+  }
   return MakeLogic4VecVal(arena, 1, 0);
 }
 

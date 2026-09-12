@@ -315,14 +315,14 @@ static Logic4Vec EvalSeveritySysCall(const Expr* expr, SimContext& ctx,
       level =
           static_cast<int64_t>(EvalExpr(expr->args[0], ctx, arena).ToUint64());
     }
-    EmitFinishDiagnostic(ctx, "$finish", level, std::cout);
+    EmitFinishDiagnostic(ctx, "$finish", level, ctx.Out());
     ctx.RequestFinish();
   } else if (name == "$error") {
     ExecSeverityTask(expr, ctx, arena, "ERROR", std::cerr);
   } else if (name == "$warning") {
-    ExecSeverityTask(expr, ctx, arena, "WARNING", std::cout);
+    ExecSeverityTask(expr, ctx, arena, "WARNING", ctx.Out());
   } else if (name == "$info") {
-    ExecSeverityTask(expr, ctx, arena, "INFO", std::cout);
+    ExecSeverityTask(expr, ctx, arena, "INFO", ctx.Out());
   }
   return MakeLogic4VecVal(arena, 1, 0);
 }
@@ -644,9 +644,9 @@ static Logic4Vec EvalAnnexDShowVars(const Expr* expr, SimContext& ctx,
 static Logic4Vec EvalAnnexDLog(const Expr* expr, SimContext& ctx,
                                Arena& arena) {
   if (!expr->args.empty() && expr->args[0]) {
-    ctx.SetLogFile(ExtractStringArg(expr->args[0]));
+    ctx.Log().Open(ExtractStringArg(expr->args[0]));
   } else {
-    ctx.EnableLogging();
+    ctx.Log().Enable();
   }
   return MakeLogic4VecVal(arena, 1, 0);
 }
@@ -691,7 +691,7 @@ static bool TryEvalAnnexDInteractiveTask(const Expr* expr, SimContext& ctx,
   }
   // Optional $nolog system task (Annex D.7): disables the standard-output copy.
   if (name == "$nolog") {
-    ctx.DisableLogging();
+    ctx.Log().Disable();
     out = MakeLogic4VecVal(arena, 1, 0);
     return true;
   }
@@ -829,7 +829,7 @@ Logic4Vec EvalSystemCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   // §20.2: $stop suspends the run and $finish ends it, returning control to the
   // host; both honor the Table 20-1 diagnostic level before halting.
   if (name == "$finish" || name == "$stop") {
-    EmitSimControlDiagnostic(expr, ctx, arena, name, std::cout);
+    EmitSimControlDiagnostic(expr, ctx, arena, name, ctx.Out());
     ctx.RequestFinish();
     return MakeLogic4VecVal(arena, 1, 0);
   }

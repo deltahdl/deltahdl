@@ -1,4 +1,3 @@
-#include <iostream>
 #include <string>
 
 #include "common/diagnostic.h"
@@ -48,7 +47,7 @@ bool TryExecSystemCallTask(const Expr* expr, SimContext& ctx, Arena& arena) {
   // context calling it, up to the top-level process. The function form, which
   // instead returns the same text as a string, is evaluated as an expression.
   if (expr->callee == "$stacktrace") {
-    std::cout << BuildStackTraceReport(ctx) << "\n";
+    ctx.Out() << BuildStackTraceReport(ctx) << "\n";
     return true;
   }
 

@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <cstdlib>
 #include <cstring>
-#include <iostream>
 #include <optional>
 #include <string>
 #include <vector>
@@ -86,7 +85,7 @@ static void ScheduleMonitorDisplay(SimContext& ctx, Arena& arena) {
     ctx.SetDeferredBindingScope(std::string(ctx.MonitorBindingScope()));
     ExecDisplayWrite(monitor, ctx, arena);
     ctx.SetDeferredBindingScope(std::nullopt);
-    std::cout << "\n";
+    ctx.Out() << "\n";
   };
   ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), Region::kPostponed,
                                    event);

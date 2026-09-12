@@ -3,8 +3,9 @@
 // $timeunit/$timeprecision settings of §20.4, the severity-task report of
 // §20.10, the whole-design assertion controls of §20.11, the $monitor display
 // list of §21.2.3, and the optional interactive tasks of Annex D ($reset,
-// $scope, $list, $showscopes, $showvars, $log). Each body only records or
-// answers a value; the tasks themselves are evaluated elsewhere.
+// $scope, $list, $showscopes, $showvars). Each body only records or answers a
+// value; the tasks themselves are evaluated elsewhere. The $log and $nolog
+// state of Annex D.7 is the OutputLog member's own.
 //
 // It is split out of sim_context.h, where these bodies were defined inside the
 // class, so the header carries the interface and no one file carries the whole
@@ -62,11 +63,6 @@ void SimContext::RecordShowVars(std::string_view scope,
 
 const std::vector<std::string>& SimContext::ShowVarsVariables() const {
   return showvars_variables_;
-}
-
-void SimContext::SetLogFile(std::string_view name) {
-  log_file_ = std::string(name);
-  logging_enabled_ = true;
 }
 
 void SimContext::SetTimeFormat(const TimeFormatSpec& spec) {

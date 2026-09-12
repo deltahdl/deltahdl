@@ -21,6 +21,7 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <ostream>
 #include <random>
 #include <string>
 #include <string_view>
@@ -37,6 +38,7 @@
 #include "simulator/coverage.h"
 #include "simulator/coverage_control.h"
 #include "simulator/net.h"
+#include "simulator/output_log.h"
 #include "simulator/scheduler.h"
 #include "simulator/scope.h"
 #include "simulator/sim_context_name_tables.h"
@@ -176,18 +178,16 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   const std::string& LastShowVarsScope() const { return last_showvars_scope_; }
   const std::vector<std::string>& ShowVarsVariables() const;
 
-  // Optional $log and $nolog system tasks (Annex D.7). A log file holds a copy
-  // of everything printed to standard output. $nolog disables that copy and
-  // $log reenables it; an optional filename argument to $log closes the current
-  // log file and starts directing output to a freshly named one. Track whether
-  // logging is currently enabled and the name of the active log file so the
-  // effect of each task can be observed. Logging starts enabled, since a log
-  // file otherwise mirrors all standard output.
-  void EnableLogging() { logging_enabled_ = true; }
-  void DisableLogging() { logging_enabled_ = false; }
-  void SetLogFile(std::string_view name);
-  bool LoggingEnabled() const { return logging_enabled_; }
-  const std::string& LogFile() const { return log_file_; }
+  // The stream standard output is printed through, and the log file of Annex
+  // D.7 that holds a copy of all the text printed to the standard output:
+  // $nolog disables the copy, $log reenables it, and a filename argument to
+  // $log closes the log file and directs the copy to the named one. The copy
+  // starts enabled and, the clause naming no default file, goes nowhere until
+  // a $log names one. simulator/output_log.h has the whole of it.
+  std::ostream& Out() { return log_.Out(); }
+  OutputLog& Log() { return log_; }
+  bool LoggingEnabled() const { return log_.Enabled(); }
+  const std::string& LogFile() const { return log_.Name(); }
 
   // §40.3.2.1 coverage-collection state driven by $coverage_control.
   CoverageControlState& GetCoverageControlState() { return coverage_control_; }
@@ -826,8 +826,7 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   bool show_scopes_recursive_ = false;
   std::string last_showvars_scope_;
   std::vector<std::string> showvars_variables_;
-  bool logging_enabled_ = true;
-  std::string log_file_;
+  OutputLog log_;
   CoverageControlState coverage_control_;
 
   std::unordered_map<const Expr*, Logic4Vec> deferred_arg_snapshots_;
