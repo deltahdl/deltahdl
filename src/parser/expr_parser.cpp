@@ -336,6 +336,18 @@ Expr* MakeNodeCast(Arena& arena, Expr* type_node, Expr* value) {
   return cast;
 }
 
+// Builds a bare identifier node carrying the given name text and location.
+// Pure node construction; declared in expr_parser_internal.h for the loop
+// generate header in parser_generate.cpp, so it stands outside the unnamed
+// namespace the other node builders share.
+Expr* MakeIdentifierNode(Arena& arena, std::string_view text, SourceLoc loc) {
+  auto* id = arena.Create<Expr>();
+  id->kind = ExprKind::kIdentifier;
+  id->text = text;
+  id->range.start = loc;
+  return id;
+}
+
 namespace {
 
 // Builds a cast whose target type is carried by a name string (cast->text) and
@@ -349,16 +361,6 @@ Expr* MakeTextCast(Arena& arena, std::string_view type_text, SourceLoc start,
   cast->range.start = start;
   cast->lhs = value;
   return cast;
-}
-
-// Builds a bare identifier node carrying the given name text and location.
-// Pure node construction.
-Expr* MakeIdentifierNode(Arena& arena, std::string_view text, SourceLoc loc) {
-  auto* id = arena.Create<Expr>();
-  id->kind = ExprKind::kIdentifier;
-  id->text = text;
-  id->range.start = loc;
-  return id;
 }
 
 // Builds a postfix increment/decrement node wrapping an already-parsed operand,
