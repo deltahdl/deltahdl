@@ -6,6 +6,14 @@
 
 namespace delta {
 
+// A.5.4's udp_instance, `[ name_of_instance ] ( output_terminal ,
+// input_terminal { , input_terminal } )`: two terminals at least, the first
+// a net_lvalue under A.3.3. The parser had read the terminal list as any list
+// of expressions and left both to elaboration, which reports the count for a
+// primitive it resolves and the output terminal for none; each is now reported
+// where the instance is read, the count under A.5.4 and the terminal under
+// §28.3 as a gate's is, §29.8 having a UDP instantiated "in the same manner as
+// gates".
 ModuleItem* Parser::ParseOneUdpInstance(const Token& udp_tok, SourceLoc loc) {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kUdpInst;
@@ -14,6 +22,15 @@ ModuleItem* Parser::ParseOneUdpInstance(const Token& udp_tok, SourceLoc loc) {
 
   ParseGateInstanceTail(*this, item,
                         CheckIdentifier() && !Check(TokenKind::kLParen));
+  if (item->gate_terminals.size() < 2) {
+    diag_.Error(loc,
+                "a UDP instance connects an output terminal and at least one "
+                "input terminal",
+                Subclause("A.5.4"));
+  }
+  if (!item->gate_terminals.empty() && !IsNetLvalue(item->gate_terminals[0])) {
+    diag_.Error(loc, "output terminal must be a net lvalue", Subclause("28.3"));
+  }
   return item;
 }
 

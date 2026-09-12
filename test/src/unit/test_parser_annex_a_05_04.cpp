@@ -435,6 +435,11 @@ TEST(UdpInstantiationParsing, UdpInst_ExternUdp) {
   EXPECT_EQ(insts[0]->inst_module, "my_udp");
 }
 
+// udp_instance ::= [ name_of_instance ] ( output_terminal , input_terminal
+//   { , input_terminal } )
+// Two terminals at least. An instance with one was read and left to
+// elaboration, which reports the count for a primitive it resolves; it is now
+// reported where the instance is read, and the instance kept as written.
 TEST(UdpInstantiationParsing, SingleTerminalError) {
   auto r = Parse(
       "primitive inv(output out, input in);\n"
@@ -444,10 +449,33 @@ TEST(UdpInstantiationParsing, SingleTerminalError) {
       "  inv u1(y);\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a UDP instance connects an output terminal and at least one", 5,
+      "A.5.4"));
   auto insts = FindUdpInsts(r.cu->modules[0]->items);
-  if (!insts.empty()) {
-    EXPECT_EQ(insts[0]->gate_terminals.size(), 1u);
-  }
+  ASSERT_EQ(insts.size(), 1u);
+  EXPECT_EQ(insts[0]->gate_terminals.size(), 1u);
+}
+
+// The output_terminal is A.3.3's, a net_lvalue; one that is no net_lvalue was
+// accepted silently, where a gate's is reported under §28.3.
+TEST(UdpInstantiationParsing, OutputTerminalMustBeNetLvalue) {
+  auto r = Parse(
+      "primitive inv(output out, input in);\n"
+      "  table 0 : 1; 1 : 0; endtable\n"
+      "endprimitive\n"
+      "module m;\n"
+      "  inv u1(1'b0, a);\n"
+      "  inv u2(b & c, a);\n"
+      "  inv u3({d, e[0]}, a);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_TRUE(ReportedError(r.diags, "output terminal must be a net lvalue", 5,
+                            "28.3"));
+  EXPECT_TRUE(ReportedError(r.diags, "output terminal must be a net lvalue", 6,
+                            "28.3"));
+  EXPECT_FALSE(ReportedError(r.diags, "output terminal must be a net lvalue", 7,
+                             "28.3"));
 }
 
 TEST(UdpInstantiationParsing, MultipleUnnamedInstances) {

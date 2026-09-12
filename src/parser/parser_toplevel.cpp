@@ -86,7 +86,13 @@ static bool GateUsesDelay3(GateKind kind) {
   }
 }
 
-static bool IsNetLvalue(const Expr* e) {
+// Whether `e` has one of the forms A.8.5 gives net_lvalue: a
+// ps_or_hierarchical_net_identifier with its constant_select, `{ net_lvalue
+// { , net_lvalue } }`, or `[ assignment_pattern_expression_type ]
+// assignment_pattern_net_lvalue`. Declared in parser_instance_internal.h for
+// the UDP instance in parser_udp.cpp, whose output_terminal is the same
+// net_lvalue a gate's is.
+bool IsNetLvalue(const Expr* e) {
   switch (e->kind) {
     case ExprKind::kIdentifier:
     case ExprKind::kSelect:
