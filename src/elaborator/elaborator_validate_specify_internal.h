@@ -51,6 +51,10 @@ void CheckDelayExpr(const Expr* e, SourceLoc loc, const SignalSet& specparams,
 // ValidateOneSpecifyModule.
 void ValidateTimingCheckLimitOperands(const ModuleDecl* mod, DiagEngine& diag);
 
+// A.7.5.2, Table 31-8 and Table 31-9: the event_based_flag and
+// remain_active_flag of a $timeskew or $fullskew are constant expressions.
+void ValidateTimingCheckFlags(const ModuleDecl* mod, DiagEngine& diag);
+
 // §31.3, §31.4: the limits of the timing checks that take only non-negative
 // limits shall be non-negative constant expressions. Checks every limit a
 // timing check of `kind` carries -- the two-limit forms ($fullskew's pair,

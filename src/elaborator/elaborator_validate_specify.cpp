@@ -721,6 +721,7 @@ void ValidateOneSpecifyModule(const ModuleDecl* mod, const IfaceMap& iface_map,
   ValidatePulseStyleConflicts(mod, diag);
   ValidateDelayOperands(mod, diag);
   ValidateTimingCheckLimitOperands(mod, diag);
+  ValidateTimingCheckFlags(mod, diag);
   // Each check's own subclause states the limits it takes, so each pass names
   // the subclause of the check it walks.
   ValidateTimingCheckLimitNonNegative(mod, diag, TimingCheckKind::kHold,

@@ -1,4 +1,5 @@
 #include <format>
+#include <initializer_list>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -14,6 +15,81 @@
 #include "parser/ast.h"
 
 namespace delta {
+
+// §11.2.1's constant expressions a specify block's flag may name, as the
+// scope IsConstantExpr reads: the module's parameters, its localparams, and
+// the specparams of the block and of the module body. The value each maps to
+// is not read, the question being whether the name is a constant at all.
+static ScopeMap BuildSpecifyConstantScope(const ModuleDecl* mod,
+                                          const ModuleItem* block) {
+  ScopeMap scope;
+  for (const auto& param : mod->params) scope.emplace(param.first, 0);
+  for (auto* item : mod->items) {
+    if (item->kind == ModuleItemKind::kParamDecl && !item->name.empty()) {
+      scope.emplace(item->name, 0);
+    }
+  }
+  for (std::string_view sp : CollectSpecparamsInScope(mod, block)) {
+    scope.emplace(sp, 0);
+  }
+  return scope;
+}
+
+// Whether a flag is a constant expression. A.7.5.2 writes the
+// remain_active_flag as a constant_mintypmax_expression, which A.8.3 spells
+// `constant_expression | constant_expression : constant_expression :
+// constant_expression`, so a triple is constant where its three members are;
+// IsConstantExpr answers for a constant_expression and does not read the
+// triple, which Parser::ParseMinTypMaxExpr records in lhs, condition and rhs.
+static bool IsConstantFlag(const Expr* flag, const ScopeMap& scope) {
+  if (flag->kind != ExprKind::kMinTypMax) return IsConstantExpr(flag, scope);
+  for (const Expr* member : {flag->lhs, flag->condition, flag->rhs}) {
+    if (!IsConstantExpr(member, scope)) return false;
+  }
+  return true;
+}
+
+// Reports one flag of a $timeskew or $fullskew that is no constant expression,
+// naming the check and the flag; a flag left out is nothing to check.
+static void CheckTimingCheckFlag(const Expr* flag, std::string_view name,
+                                 const SpecifyItem* si, const ScopeMap& scope,
+                                 std::string_view task, Subclause subclause,
+                                 DiagEngine& diag) {
+  if (flag == nullptr || IsConstantFlag(flag, scope)) return;
+  diag.Error(si->loc,
+             std::format("{} {} is not a constant expression", task, name),
+             subclause);
+}
+
+// A.7.5.2 gives `event_based_flag ::= constant_expression` and
+// `remain_active_flag ::= constant_mintypmax_expression`, and Table 31-8 and
+// Table 31-9 describe each of $timeskew's and $fullskew's two flags as a
+// "Constant expression". A net or variable there is reported at the check
+// under the check's own subclause, the one whose table describes the flag.
+void ValidateTimingCheckFlags(const ModuleDecl* mod, DiagEngine& diag) {
+  for (auto* item : mod->items) {
+    if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
+    ScopeMap scope = BuildSpecifyConstantScope(mod, item);
+    for (auto* si : item->specify_items) {
+      if (si->kind != SpecifyItemKind::kTimingCheck) continue;
+      const auto& tc = si->timing_check;
+      std::string_view task;
+      Subclause subclause("31.4.2");
+      if (tc.check_kind == TimingCheckKind::kTimeskew) {
+        task = "$timeskew";
+      } else if (tc.check_kind == TimingCheckKind::kFullskew) {
+        task = "$fullskew";
+        subclause = Subclause("31.4.3");
+      } else {
+        continue;
+      }
+      CheckTimingCheckFlag(tc.event_based_flag, "event_based_flag", si, scope,
+                           task, subclause, diag);
+      CheckTimingCheckFlag(tc.remain_active_flag, "remain_active_flag", si,
+                           scope, task, subclause, diag);
+    }
+  }
+}
 
 void ValidateTimingCheckLimitOperands(const ModuleDecl* mod, DiagEngine& diag) {
   for (auto* item : mod->items) {
