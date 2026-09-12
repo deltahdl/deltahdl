@@ -457,4 +457,72 @@ TEST(UdpBodyGrammar, ParenEdgeEndpointsRejectNonLevelSymbol) {
       "29.3.6"));
 }
 
+// level_input_list ::= level_symbol { level_symbol } and edge_input_list ::=
+// { level_symbol } edge_indicator { level_symbol }: an input field holds a
+// level_symbol, `0 | 1 | x | X | ? | b | B`, or an edge_symbol, `r | R | f |
+// F | p | P | n | N | *`, and nothing else. The parser took the first
+// character of whatever token stood there, so `2` and `a` were accepted
+// silently.
+TEST(UdpBodyGrammar, InputSymbolOutsideLevelAndEdgeIsRejected) {
+  auto r = Parse(
+      "primitive p(output q, input a, b);\n"
+      "  table\n"
+      "    2 0 : 0;\n"
+      "    a 1 : 1;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a UDP input field is a level_symbol (0, 1, x, X, ?, b, B)", 3,
+      "A.5.3"));
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a UDP input field is a level_symbol (0, 1, x, X, ?, b, B)", 4,
+      "A.5.3"));
+  EXPECT_FALSE(
+      ReportedError(r.diags, "UDP table row has 1 input field", 3, "29.3.4"));
+}
+
+// The symbols stand with no separator between them, so a run the lexer read
+// as one token is every character of it: `01` is the two levels 0 and 1, and
+// `x1` the levels x and 1. The parser had taken the first character alone and
+// reported the row one field short.
+TEST(UdpBodyGrammar, InputSymbolRunIsEveryCharacter) {
+  auto r = Parse(
+      "primitive p(output q, input a, b);\n"
+      "  table\n"
+      "    01 : 0;\n"
+      "    x1 : 1;\n"
+      "    1b : 1;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->udps[0]->table.size(), 3u);
+  ASSERT_EQ(r.cu->udps[0]->table[0].inputs.size(), 2u);
+  EXPECT_EQ(r.cu->udps[0]->table[0].inputs[0], '0');
+  EXPECT_EQ(r.cu->udps[0]->table[0].inputs[1], '1');
+  ASSERT_EQ(r.cu->udps[0]->table[1].inputs.size(), 2u);
+  EXPECT_EQ(r.cu->udps[0]->table[1].inputs[0], 'x');
+  ASSERT_EQ(r.cu->udps[0]->table[2].inputs.size(), 2u);
+  EXPECT_EQ(r.cu->udps[0]->table[2].inputs[1], 'b');
+}
+
+// current_state ::= level_symbol and next_state ::= output_symbol | -, one
+// symbol each; a run of two in either field was read as its first character
+// with nothing said.
+TEST(UdpBodyGrammar, StateAndOutputFieldsAreOneSymbolEach) {
+  auto r = Parse(
+      "primitive p(output reg q, input a);\n"
+      "  table\n"
+      "    0 : 01 : 1;\n"
+      "    1 : 0 : 10;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a UDP entry's state and output fields are one symbol each", 3,
+      "A.5.3"));
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a UDP entry's state and output fields are one symbol each", 4,
+      "A.5.3"));
+}
+
 }  // namespace

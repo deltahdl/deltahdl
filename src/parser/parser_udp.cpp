@@ -445,6 +445,45 @@ static void ValidateUdpRowWidth(DiagEngine& diag, const UdpDecl* udp,
       Subclause("29.3.4"));
 }
 
+// The symbols one token of a UDP input list stands for. A.5.3 writes
+// level_input_list `level_symbol { level_symbol }` and edge_input_list
+// `{ level_symbol } edge_indicator { level_symbol }` over single characters
+// with no separator between them, so a run the lexer read as one token --
+// `01` as a number, `x1` or `bx` as an identifier -- is every character of it,
+// and a symbol outside level_symbol `0 | 1 | x | X | ? | b | B` and
+// edge_symbol `r | R | f | F | p | P | n | N | *` is reported at the token and
+// kept, so that the row's width still answers to the header. A `z` is left to
+// §29.3.5's own report.
+void Parser::AppendUdpInputSymbols(UdpTableRow& row, const Token& tok) {
+  if (tok.kind == TokenKind::kStar || tok.kind == TokenKind::kMinus ||
+      tok.kind == TokenKind::kQuestion || tok.text.empty()) {
+    row.inputs.push_back(UdpCharFromToken(tok));
+    return;
+  }
+  for (char c : tok.text) {
+    if (!UdpIsLevelSymbol(c) && !UdpInputIsEdge(c) && !UdpSymbolIsZ(c)) {
+      diag_.Error(tok.loc,
+                  "a UDP input field is a level_symbol (0, 1, x, X, ?, b, B) "
+                  "or an edge_symbol (r, R, f, F, p, P, n, N, *)",
+                  Subclause("A.5.3"));
+    }
+    row.inputs.push_back(c);
+  }
+}
+
+// One symbol of a UDP entry's current_state or next_state field, which A.5.3
+// writes as a single level_symbol or output_symbol; a token of more than one
+// character there is reported and its first character taken.
+char Parser::ParseUdpFieldSymbol() {
+  Token tok = Consume();
+  if (tok.text.size() > 1) {
+    diag_.Error(tok.loc,
+                "a UDP entry's state and output fields are one symbol each",
+                Subclause("A.5.3"));
+  }
+  return UdpCharFromToken(tok);
+}
+
 void Parser::ParseUdpTableRow(UdpDecl* udp, bool& reg_mismatch_reported,
                               bool& row_width_reported) {
   UdpTableRow row;
@@ -468,7 +507,7 @@ void Parser::ParseUdpTableRow(UdpDecl* udp, bool& reg_mismatch_reported,
       row.inputs.push_back('\x01');
       row.paren_edges.push_back({from, to});
     } else {
-      row.inputs.push_back(UdpCharFromToken(Consume()));
+      AppendUdpInputSymbols(row, Consume());
     }
   }
   Expect(TokenKind::kColon, Subclause("29.3.4"));
@@ -479,11 +518,11 @@ void Parser::ParseUdpTableRow(UdpDecl* udp, bool& reg_mismatch_reported,
   // which records only how the output port was declared. The two are separate
   // statements about the same UDP, and comparing them is what
   // ValidateUdpRowAgainstRegDecl below does.
-  char first_field = UdpCharFromToken(Consume());
+  char first_field = ParseUdpFieldSymbol();
   bool row_is_sequential = Match(TokenKind::kColon);
   if (row_is_sequential) {
     row.current_state = first_field;
-    row.output = UdpCharFromToken(Consume());
+    row.output = ParseUdpFieldSymbol();
   } else {
     row.output = first_field;
   }
@@ -752,7 +791,18 @@ UdpDecl* Parser::ParseUdpDecl() {
     }
   }
 
-  if (Match(TokenKind::kKwInitial)) {
+  if (Check(TokenKind::kKwInitial)) {
+    // A.5.3 writes `[ udp_initial_statement ]` into sequential_body alone,
+    // combinational_body opening with `table`; §29.4 has the statement give
+    // "the initial value of the output" of a sequential UDP, and a
+    // combinational UDP's output has no state to initialize.
+    if (!udp->is_sequential) {
+      diag_.Error(CurrentLoc(),
+                  "a UDP initial statement stands in a sequential body; a "
+                  "combinational UDP's body opens with 'table'",
+                  Subclause("A.5.3"));
+    }
+    Consume();
     ParseUdpInitialStatement(udp);
   }
 

@@ -293,6 +293,8 @@ class Parser {
 
   void RejectUdpInoutPort();
   void RejectUdpInitialValueOn(const char* declaration);
+  void AppendUdpInputSymbols(UdpTableRow& row, const Token& tok);
+  char ParseUdpFieldSymbol();
   void ParseUdpInputDecl(UdpDecl* udp);
 
   void ValidateUdpHeader(UdpDecl* udp);

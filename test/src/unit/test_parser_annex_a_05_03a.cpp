@@ -555,4 +555,26 @@ TEST(UdpBodyGrammar, EdgeIndicator_SimParen01) {
   eval.SetInputs({'0', '0'});
   EXPECT_EQ(eval.EvaluateWithEdge({'0', '1'}, 1, '0'), '0');
 }
+
+// udp_body ::= combinational_body | sequential_body, and only sequential_body
+// opens with `[ udp_initial_statement ]`; combinational_body opens with
+// `table`. §29.4 has the statement give "the initial value of the output" of
+// a sequential UDP. One written in a combinational UDP was accepted silently.
+TEST(UdpBodyGrammar, InitialStatementInCombinationalBodyIsRejected) {
+  auto r = Parse(
+      "primitive inv(output q, input a);\n"
+      "  initial q = 0;\n"
+      "  table\n"
+      "    0 : 1;\n"
+      "    1 : 0;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a UDP initial statement stands in a sequential body", 2,
+      "A.5.3"));
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->udps.size(), 1u);
+  EXPECT_EQ(r.cu->udps[0]->table.size(), 2u);
+}
+
 }  // namespace
