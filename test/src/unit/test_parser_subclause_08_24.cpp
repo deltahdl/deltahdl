@@ -18,14 +18,16 @@ TEST(ClassParsing, OutOfBlockMethod) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
+// A.1.6's interface_or_generate_item is the one body production that admits
+// an extern_tf_declaration, so the prototype is hosted in an interface.
 TEST(FunctionDeclParsing, FuncPrototypeExtern) {
   auto r = Parse(
-      "module m;\n"
+      "interface ifc;\n"
       "  extern function int foo(input int x);\n"
-      "endmodule\n");
+      "endinterface\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
+  auto* item = r.cu->interfaces[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
   EXPECT_TRUE(item->is_extern);
   EXPECT_EQ(item->name, "foo");
