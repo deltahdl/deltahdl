@@ -161,4 +161,52 @@ TEST(ProgramInstantiationGrammar, Error_MissingSemicolon) {
       ReportedError(r.diags, "expected ';', got 'endmodule'", 3, "23.3.2"));
 }
 
+// program_instantiation ::= program_identifier [ parameter_value_assignment ]
+//   hierarchical_instance { , hierarchical_instance } ;
+// Its sub-symbols are A.4.1.1's: name_of_instance takes A.9.3's
+// escaped_identifier, and param_expression is one of A.8.3's
+// `mintypmax_expression | data_type | $`.
+TEST(ProgramInstantiationGrammar, EscapedNameAndParamExpressionForms) {
+  auto r = Parse(
+      "program p #(parameter int W = 8, parameter type T = logic) ();\n"
+      "endprogram\n"
+      "module m;\n"
+      "  p #(1:2:3, bit) \\u.0 ();\n"
+      "  p #(.W($), .T(int)) u1();\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  const auto& items = r.cu->modules[0]->items;
+  ASSERT_EQ(items.size(), 2u);
+  EXPECT_EQ(items[0]->inst_name, "u.0");
+  ASSERT_EQ(items[0]->inst_params.size(), 2u);
+  EXPECT_EQ(items[0]->inst_params[0].second->kind, ExprKind::kMinTypMax);
+  ASSERT_EQ(items[1]->inst_params.size(), 2u);
+  EXPECT_EQ(items[1]->inst_params[0].first, "W");
+  EXPECT_EQ(items[1]->inst_params[1].first, "T");
+}
+
+// A.1.4's module_common_item admits program_instantiation and A.1.6's
+// interface_or_generate_item reaches module_common_item, as §24.3 has it,
+// "program blocks can be nested within modules or interfaces"; a program is
+// instantiated inside an interface and inside a generate block of it.
+TEST(ProgramInstantiationGrammar, ProgramInstantiatedInsideInterface) {
+  auto r = Parse(
+      "program p(input logic clk); endprogram\n"
+      "interface ifc(input logic clk);\n"
+      "  p p0(clk);\n"
+      "  if (1) begin : g\n"
+      "    p p1(.clk(clk));\n"
+      "  end\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  auto* inst =
+      FindItemByKind(r.cu->interfaces[0]->items, ModuleItemKind::kModuleInst);
+  ASSERT_NE(inst, nullptr);
+  EXPECT_EQ(inst->inst_module, "p");
+  EXPECT_EQ(inst->inst_name, "p0");
+}
+
 }  // namespace
