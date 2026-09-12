@@ -657,6 +657,11 @@ TEST(SourceText, TimeprecisionWithSlashIsReportedOnce) {
       "  logic q;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "timeprecision takes one time literal; the slash form belongs to "
+      "timeunit alone",
+      2, "3.14.2.2"));
   EXPECT_EQ(r.diags.size(), 1u);
 }
 
