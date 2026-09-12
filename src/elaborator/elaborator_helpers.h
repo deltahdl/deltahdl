@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -109,7 +110,8 @@ struct ProcessBuildEnv {
 void AddProcess(RtlirProcessKind kind, ModuleItem* item, RtlirModule* mod,
                 const ProcessBuildEnv& env);
 
-void ElaborateGateInst(ModuleItem* item, RtlirModule* mod, Arena& arena);
+void ElaborateGateInst(ModuleItem* item, RtlirModule* mod, Arena& arena,
+                       const ScopeMap& scope);
 
 // §28.3.6: expands an instance array written with a range into one instance per
 // array element, calling `elaborate_element` once for each with `item` holding
@@ -119,15 +121,18 @@ void ElaborateGateInst(ModuleItem* item, RtlirModule* mod, Arena& arena);
 // sees it. The whole terminal list is restored before returning, so `item` is
 // left as the caller passed it.
 //
-// The array length is taken from the widest terminal rather than from the
-// range bounds. The two are the same number for a source that satisfies
-// §28.3.6, and CheckGateInstanceArrayTerminalWidths
-// (src/elaborator/elaborator_items.cpp) has already reported a terminal that is
-// neither scalar nor array-length by the time this is called.
+// The array length is InstanceArrayLength below: §28.3.5's count, read off the
+// range the declaration wrote. It was read off the widest terminal instead, on
+// the grounds that a source satisfying §28.3.6 makes the two the same number,
+// which the clause does not - a terminal may be scalar as well as
+// array-length, and an array whose terminals were all scalar was built as one
+// instance. CheckGateInstanceArrayTerminalWidths
+// (src/elaborator/elaborator_items.cpp) measures a terminal against the same
+// count, so what a terminal was checked against is what is built.
 //
-// Returns false, having called `elaborate_element` no times, when every
-// terminal is single-bit: there is then nothing to distribute, and the caller
-// elaborates `item` as the one instance it already is.
+// Returns false, having called `elaborate_element` no times, when the range
+// declares a single instance or carries a bound this pass cannot fold: the
+// caller then elaborates `item` as the one instance it already is.
 //
 // Shared because §29.8 makes this one rule for two kinds of instance -- an
 // array of user-defined primitive instances connects its terminals by "the
@@ -135,7 +140,22 @@ void ElaborateGateInst(ModuleItem* item, RtlirModule* mod, Arena& arena);
 // gates connects by.
 bool ExpandInstanceArray(
     ModuleItem* item, const RtlirModule* mod, Arena& arena,
+    const ScopeMap& scope,
     const std::function<void(ModuleItem*)>& elaborate_element);
+
+// §28.3.5: how many instances the range written on an instance name declares -
+// "the range ... shall define the instance array's size" - which is the count
+// of values its two bounds span, in either order. A.3.1 admits the range on
+// every primitive through `[ name_of_instance ]`, and §29.8 admits it on a
+// user-defined primitive on the same terms, so this is what says how many
+// instances any of those declarations makes.
+//
+// Absent where `item` carries no range, and where a bound is not a constant
+// this pass can fold against `scope`: such a range is not one §28.3.5 admits,
+// and CheckGateInstanceArrayTerminalWidths reports it.
+// Defined in elaborator_gates.cpp.
+std::optional<uint32_t> InstanceArrayLength(const ModuleItem* item,
+                                            const ScopeMap& scope);
 
 // §6.7.1: "Certain restrictions apply to the data type of a net. A valid data
 // type for a net shall be one of the following: a) A 4-state integral type ...

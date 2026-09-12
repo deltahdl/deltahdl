@@ -22,7 +22,8 @@
 
 namespace delta {
 
-void ElaborateGateInst(ModuleItem* item, RtlirModule* mod, Arena& arena);
+void ElaborateGateInst(ModuleItem* item, RtlirModule* mod, Arena& arena,
+                       const ScopeMap& scope);
 
 Elaborator::Elaborator(Arena& arena, DiagEngine& diag, CompilationUnit* unit)
     : ElaboratorClassRules(arena, diag, unit) {}

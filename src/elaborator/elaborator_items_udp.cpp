@@ -177,12 +177,12 @@ void Elaborator::ElaborateUdpInst(ModuleItem* item, RtlirModule* mod) {
   // way ElaborateGateInst (src/elaborator/elaborator_gates.cpp) expands the
   // range on an array of gates. ExpandInstanceArray
   // (src/elaborator/elaborator_helpers.h) is that one expansion, and it answers
-  // false where every terminal is single-bit, leaving the range to record the
-  // one instance it describes.
-  if (item->inst_range_left != nullptr && item->inst_range_right != nullptr &&
-      ExpandInstanceArray(item, mod, arena_, [this, mod](ModuleItem* element) {
-        ElaborateOneUdpInst(element, mod);
-      }))
+  // false where the range declares one instance or names a bound it cannot
+  // fold, leaving the range to record the one instance it describes.
+  if (ExpandInstanceArray(item, mod, arena_, BuildParamScope(mod),
+                          [this, mod](ModuleItem* element) {
+                            ElaborateOneUdpInst(element, mod);
+                          }))
     return;
 
   ElaborateOneUdpInst(item, mod);

@@ -1,6 +1,7 @@
-#include <algorithm>
+#include <cstdlib>
 #include <format>
 #include <functional>
+#include <optional>
 #include <unordered_map>
 #include <vector>
 
@@ -657,12 +658,35 @@ static std::vector<Expr*> InstanceArrayElementTerminals(
   return bit_terms;
 }
 
+std::optional<uint32_t> InstanceArrayLength(const ModuleItem* item,
+                                            const ScopeMap& scope) {
+  if (item->inst_range_left == nullptr || item->inst_range_right == nullptr) {
+    return std::nullopt;
+  }
+  auto lhi = ConstEvalInt(item->inst_range_left, scope);
+  auto rhi = ConstEvalInt(item->inst_range_right, scope);
+  if (!lhi || !rhi) return std::nullopt;
+  return static_cast<uint32_t>(std::abs(*lhi - *rhi) + 1);
+}
+
 bool ExpandInstanceArray(
     ModuleItem* item, const RtlirModule* mod, Arena& arena,
+    const ScopeMap& scope,
     const std::function<void(ModuleItem*)>& elaborate_element) {
-  uint32_t array_len = 0;
-  for (auto* t : item->gate_terminals)
-    array_len = std::max(array_len, LookupLhsWidth(t, mod));
+  // §28.3.5: "the range ... shall define the instance array's size", so how
+  // many primitives the declaration makes is read off the range and not off the
+  // terminals. Taken from the widest terminal it was neither of those things:
+  // an array all of whose terminals were single-bit collapsed to the one
+  // instance, however many the range declared, so every instance but the first
+  // went unbuilt - and one whose terminals were wider than the range made an
+  // instance per terminal bit, building instances the source never declared and
+  // driving the bits of the connection past the array's end from them.
+  // CheckGateInstanceArrayTerminalWidths (elaborator_items.cpp) reads the
+  // length the same way, so the count a terminal was measured against is the
+  // count of instances built.
+  auto len = InstanceArrayLength(item, scope);
+  if (!len) return false;
+  uint32_t array_len = *len;
   if (array_len <= 1) return false;
   std::vector<Expr*> saved = item->gate_terminals;
   for (uint32_t p = 0; p < array_len; ++p) {
@@ -674,7 +698,8 @@ bool ExpandInstanceArray(
   return true;
 }
 
-void ElaborateGateInst(ModuleItem* item, RtlirModule* mod, Arena& arena) {
+void ElaborateGateInst(ModuleItem* item, RtlirModule* mod, Arena& arena,
+                       const ScopeMap& scope) {
   // The declaration is kept alongside the continuous assignments it is about to
   // become, because §32.4.1 has an SDF DEVICE entry annotate the delay of the
   // primitive instance itself and only the declaration still says which
@@ -684,16 +709,18 @@ void ElaborateGateInst(ModuleItem* item, RtlirModule* mod, Arena& arena) {
   // it to be, rather than once per expanded element.
   mod->gate_insts.push_back(item);
 
-  // §28.3.6: an instance array whose terminals carry more than one bit is
-  // expanded into one scalar primitive per array element. Rebuilding each
+  // §28.3.5 and §28.3.6: an instance array is expanded into one scalar
+  // primitive per element the range declares, each connected by the rules
+  // §28.3.6 states - a terminal as wide as the array distributed a bit to each
+  // element, a narrower one connected whole to every element. Rebuilding each
   // element from bit-selects reproduces the per-element connection for every
   // gate family, including the control-driven three-state and MOS switches
   // whose vector control would otherwise collapse to one scalar condition
   // shared across the whole array.
-  if (item->inst_range_left && item->inst_range_right &&
-      ExpandInstanceArray(item, mod, arena, [mod, &arena](ModuleItem* element) {
-        ElaborateOneGate(element, mod, arena);
-      }))
+  if (ExpandInstanceArray(item, mod, arena, scope,
+                          [mod, &arena](ModuleItem* element) {
+                            ElaborateOneGate(element, mod, arena);
+                          }))
     return;
 
   ElaborateOneGate(item, mod, arena);

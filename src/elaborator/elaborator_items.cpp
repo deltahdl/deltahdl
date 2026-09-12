@@ -1,5 +1,3 @@
-#include <cmath>
-#include <cstdlib>
 #include <format>
 #include <optional>
 #include <string>
@@ -503,16 +501,15 @@ void CheckGateInstanceArrayTerminalWidths(
     const ModuleItem* item, const RtlirModule* mod, const ScopeMap& scope,
     const std::unordered_set<std::string_view>& interconnect_names,
     DiagEngine& diag) {
-  auto lhi = ConstEvalInt(item->inst_range_left, scope);
-  auto rhi = ConstEvalInt(item->inst_range_right, scope);
-  if (!lhi || !rhi) {
+  auto len = InstanceArrayLength(item, scope);
+  if (!len) {
     diag.Error(item->loc,
                "gate, switch or primitive instance range bound is not a "
                "constant expression",
                Subclause("28.3.5"));
     return;
   }
-  auto array_len = static_cast<uint32_t>(std::abs(*lhi - *rhi) + 1);
+  uint32_t array_len = *len;
   for (auto* term : item->gate_terminals) {
     uint32_t w = LookupLhsWidth(term, mod);
     if (w == 0) continue;
@@ -732,7 +729,7 @@ bool Elaborator::ElaborateDeclItem(ModuleItem* item, RtlirModule* mod) {
       CheckInstanceTerminalWidths(item, mod);
       ValidateBidirectionalSwitchConnections(item, mod, diag_,
                                              nettype_canonical_);
-      ElaborateGateInst(item, mod, arena_);
+      ElaborateGateInst(item, mod, arena_, BuildParamScope(mod));
       ResolveInterconnectPrimitiveTerminals(item->gate_terminals, mod);
       return true;
     case ModuleItemKind::kUdpInst:
