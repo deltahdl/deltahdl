@@ -211,6 +211,120 @@ TEST(TimingCheckArgumentParsing, EventBasedFlagExpression) {
   ASSERT_NE(tc->event_based_flag, nullptr);
 }
 
+// notifier ::= variable_identifier, which A.9.3 spells `simple_identifier |
+// escaped_identifier`; an escaped name at the notifier's place is the
+// notifier, without the backslash, and §5.6.1 ends it at the white space
+// before the ')'.
+TEST(TimingCheckArgumentParsing, NotifierEscapedIdentifier) {
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $setup(d, posedge clk, 10, \\notif-1 );\n"
+      "endspecify\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* tc = GetSoleTimingCheck(r);
+  ASSERT_NE(tc, nullptr);
+  EXPECT_EQ(tc->notifier, "notif-1");
+  EXPECT_EQ(tc->limits.size(), 1u);
+}
+
+// A notifier is a variable_identifier and nothing else: a literal where the
+// notifier stands is rejected rather than read as a further limit.
+TEST(TimingCheckArgumentParsing, NotifierThatIsNoIdentifierIsRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $setup(d, posedge clk, 10, 5);\n"
+      "endspecify\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a timing check's notifier is a variable identifier", 3,
+      "A.7.5.2"));
+}
+
+// An expression over an identifier is no variable_identifier either.
+TEST(TimingCheckArgumentParsing, NotifierExpressionIsRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $hold(posedge clk, d, 10, n + 1);\n"
+      "endspecify\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a timing check's notifier is a variable identifier", 3,
+      "A.7.5.2"));
+}
+
+// delayed_reference and delayed_data are each a terminal_identifier with an
+// optional `[ constant_mintypmax_expression ]`, and a terminal_identifier is
+// an escaped_identifier where written so.
+TEST(TimingCheckArgumentParsing, DelayedReferenceAndDataEscapedIdentifiers) {
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $setuphold(posedge clk, d, 1, 2, n, , , \\d-clk , \\d-d [1]);\n"
+      "endspecify\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* tc = GetSoleTimingCheck(r);
+  ASSERT_NE(tc, nullptr);
+  EXPECT_EQ(tc->delayed_ref, "d-clk");
+  EXPECT_EQ(tc->delayed_ref_expr, nullptr);
+  EXPECT_EQ(tc->delayed_data, "d-d");
+  EXPECT_NE(tc->delayed_data_expr, nullptr);
+}
+
+// `[ , [ delayed_reference ] [ , [ delayed_data ] ] ]`: the delayed_reference
+// may be omitted while the delayed_data behind it is given.
+TEST(TimingCheckArgumentParsing, DelayedReferenceOmittedBeforeDelayedData) {
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $setuphold(posedge clk, d, 1, 2, n, , , , dD);\n"
+      "endspecify\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* tc = GetSoleTimingCheck(r);
+  ASSERT_NE(tc, nullptr);
+  EXPECT_TRUE(tc->delayed_ref.empty());
+  EXPECT_EQ(tc->delayed_data, "dD");
+}
+
+// A delayed_reference is a terminal_identifier: a literal where it stands is
+// rejected at the literal, and the delayed_data behind it is still read.
+TEST(TimingCheckArgumentParsing, DelayedReferenceThatIsNoIdentifierIsRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $setuphold(posedge clk, d, 1, 2, n, , , 5, dD);\n"
+      "endspecify\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a delayed_reference is a terminal identifier", 3, "A.7.5.2"));
+  auto* tc = GetSoleTimingCheck(r);
+  ASSERT_NE(tc, nullptr);
+  EXPECT_TRUE(tc->delayed_ref.empty());
+  EXPECT_EQ(tc->delayed_data, "dD");
+}
+
+// A delayed_data is a terminal_identifier: an expression where it stands is
+// rejected at the expression.
+TEST(TimingCheckArgumentParsing, DelayedDataThatIsNoIdentifierIsRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $setuphold(posedge clk, d, 1, 2, n, , , dCLK, 3 + 1);\n"
+      "endspecify\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, "a delayed_data is a terminal identifier",
+                            3, "A.7.5.2"));
+  auto* tc = GetSoleTimingCheck(r);
+  ASSERT_NE(tc, nullptr);
+  EXPECT_EQ(tc->delayed_ref, "dCLK");
+  EXPECT_TRUE(tc->delayed_data.empty());
+}
+
 TEST(TimingCheckArgumentParsing, ErrorDelayedRefMissingCloseBracket) {
   auto r = Parse(
       "module m;\n"

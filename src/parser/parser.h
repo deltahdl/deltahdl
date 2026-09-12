@@ -392,10 +392,12 @@ class Parser {
   static bool IsTimingCheckName(std::string_view name);
   bool CheckNextIsCommaOrRParen();
   void ParseTimingCheckTrailingArgs(TimingCheckDecl& tc);
+  void ParseTimingCheckNotifier(TimingCheckDecl& tc);
   void ParseExtendedTimingCheckArgs(TimingCheckDecl& tc);
   void ParseTimeskewExtendedArgs(TimingCheckDecl& tc);
   void ParseSetupholdExtendedArgs(TimingCheckDecl& tc);
-  void ParseOptionalDelayedRef(std::string_view& name, Expr*& expr);
+  void ParseOptionalDelayedRef(std::string_view& name, Expr*& expr,
+                               std::string_view production);
 
   LibraryDecl* ParseLibraryDecl();
   IncludeStmt* ParseLibraryIncludeStmt();

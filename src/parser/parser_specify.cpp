@@ -555,40 +555,48 @@ bool Parser::CheckNextIsCommaOrRParen() {
   return result;
 }
 
+// A.7.5.2's notifier, `variable_identifier`, at the place every A.7.5.1
+// production gives it, after the check's limits: an identifier, simple or
+// escaped, that the ',' or ')' ending the argument follows. The notifier is
+// optional inside its brackets, `[ , [ notifier ] ... ]`, so a ',' standing
+// where it would is an omitted notifier and is left for the arguments behind
+// it. Anything else there is reported and read as an expression, so that the
+// rest of the list is still read.
+void Parser::ParseTimingCheckNotifier(TimingCheckDecl& tc) {
+  if (Check(TokenKind::kComma)) return;
+  if (CheckIdentifier() && CheckNextIsCommaOrRParen()) {
+    tc.notifier = Consume().text;
+    return;
+  }
+  diag_.Error(CurrentLoc(),
+              "a timing check's notifier is a variable identifier",
+              Subclause("A.7.5.2"));
+  ParseMinTypMaxExpr();
+}
+
 void Parser::ParseTimingCheckTrailingArgs(TimingCheckDecl& tc) {
   while (Match(TokenKind::kComma)) {
     if (Check(TokenKind::kRParen)) break;
 
     // Some checks still expect a second timing_check_limit at this position
-    // ($width's optional threshold; the mandatory pair of $setuphold/$recrem/
-    // $fullskew; $nochange's start/end edge offsets). A bare identifier there
-    // is that limit (e.g. a specparam-named constant offset), not the notifier.
+    // ($width's threshold; the mandatory pair of $setuphold/$recrem/$fullskew;
+    // $nochange's start/end edge offsets). Whatever stands there is that
+    // limit, a specparam-named constant included, and not the notifier.
     bool two_limit_check = tc.check_kind == TimingCheckKind::kWidth ||
                            tc.check_kind == TimingCheckKind::kSetuphold ||
                            tc.check_kind == TimingCheckKind::kRecrem ||
                            tc.check_kind == TimingCheckKind::kFullskew ||
                            tc.check_kind == TimingCheckKind::kNochange;
-    bool needs_second_limit = two_limit_check && tc.limits.size() < 2;
-
-    // $timeskew/$fullskew allow the notifier to be an empty placeholder while
-    // the event_based_flag/remain_active_flag still follow (Syntax 31-10/31-11
-    // and the worked examples). An omitted notifier surfaces here as a comma
-    // with nothing to consume for it, so hand straight to the extended-argument
-    // parser with the notifier left empty.
-    bool has_flag_args = tc.check_kind == TimingCheckKind::kTimeskew ||
-                         tc.check_kind == TimingCheckKind::kFullskew;
-    if (!needs_second_limit && has_flag_args && Check(TokenKind::kComma)) {
-      ParseExtendedTimingCheckArgs(tc);
-      break;
+    if (two_limit_check && tc.limits.size() < 2) {
+      tc.limits.push_back(ParseMinTypMaxExpr());
+      continue;
     }
 
-    if (!needs_second_limit && Check(TokenKind::kIdentifier) &&
-        CheckNextIsCommaOrRParen()) {
-      tc.notifier = Consume().text;
-      ParseExtendedTimingCheckArgs(tc);
-      break;
-    }
-    tc.limits.push_back(ParseMinTypMaxExpr());
+    // With the limits read, what follows is the notifier, given or omitted,
+    // and then the arguments the check's own production writes behind it.
+    ParseTimingCheckNotifier(tc);
+    ParseExtendedTimingCheckArgs(tc);
+    break;
   }
 }
 
@@ -603,8 +611,23 @@ void Parser::ParseTimeskewExtendedArgs(TimingCheckDecl& tc) {
   }
 }
 
-void Parser::ParseOptionalDelayedRef(std::string_view& name, Expr*& expr) {
-  if (!Check(TokenKind::kIdentifier)) return;
+// A.7.5.2's delayed_reference and delayed_data, each `terminal_identifier |
+// terminal_identifier [ constant_mintypmax_expression ]`, at the place
+// $setuphold's and $recrem's productions give them, where `production` names
+// which. Each is optional inside its brackets, so a ',' standing where it
+// would is an omitted one and is left for what follows. What else stands
+// there is reported and read as an expression, so that the rest of the list
+// is still read.
+void Parser::ParseOptionalDelayedRef(std::string_view& name, Expr*& expr,
+                                     std::string_view production) {
+  if (Check(TokenKind::kComma)) return;
+  if (!CheckIdentifier()) {
+    diag_.Error(CurrentLoc(),
+                "a " + std::string(production) + " is a terminal identifier",
+                Subclause("A.7.5.2"));
+    ParseMinTypMaxExpr();
+    return;
+  }
   name = Consume().text;
   if (Match(TokenKind::kLBracket)) {
     expr = ParseMinTypMaxExpr();
@@ -622,9 +645,11 @@ void Parser::ParseSetupholdExtendedArgs(TimingCheckDecl& tc) {
     tc.timecheck_cond = ParseMinTypMaxExpr();
   }
   if (!Match(TokenKind::kComma) || Check(TokenKind::kRParen)) return;
-  ParseOptionalDelayedRef(tc.delayed_ref, tc.delayed_ref_expr);
+  ParseOptionalDelayedRef(tc.delayed_ref, tc.delayed_ref_expr,
+                          "delayed_reference");
   if (!Match(TokenKind::kComma) || Check(TokenKind::kRParen)) return;
-  ParseOptionalDelayedRef(tc.delayed_data, tc.delayed_data_expr);
+  ParseOptionalDelayedRef(tc.delayed_data, tc.delayed_data_expr,
+                          "delayed_data");
 }
 
 void Parser::ParseExtendedTimingCheckArgs(TimingCheckDecl& tc) {
