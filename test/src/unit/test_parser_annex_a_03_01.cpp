@@ -729,4 +729,60 @@ TEST(PrimitiveInstantiationParsing, GateInGenerateBlock) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// Every instance production of A.3.1 opens with `[ name_of_instance ]`, which
+// A.4.1.1 spells `instance_identifier { unpacked_dimension }` and A.9.3 gives
+// the identifier `simple_identifier | escaped_identifier`. The parser looked
+// for a simple identifier alone, so an instance named by an escaped one was
+// reported as a missing '('.
+TEST(GateInstantiationParsing, EscapedInstanceName) {
+  auto r = Parse(
+      "module m;\n"
+      "  and \\g+1 (y, a, b);\n"
+      "  tranif0 \\sw-0 (p, q, en);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kAnd);
+  ASSERT_NE(g, nullptr);
+  EXPECT_EQ(g->gate_inst_name, "g+1");
+  auto* sw = FindGateByKind(r.cu->modules[0]->items, GateKind::kTranif0);
+  ASSERT_NE(sw, nullptr);
+  EXPECT_EQ(sw->gate_inst_name, "sw-0");
+}
+
+// §28.3.5 gives the one unpacked_dimension an array of instances takes: "the
+// range shall be specified by two constant expressions, left-hand index (lhi)
+// and right-hand index (rhi), separated by a colon". A.2.5's other
+// unpacked_dimension, `[ constant_expression ]`, was read and then dropped, so
+// `g[3]` was accepted silently as the one instance `g`.
+TEST(GateInstantiationParsing, SizeAloneIsNoInstanceRange) {
+  auto r = Parse(
+      "module m;\n"
+      "  and g[3] (y, a, b);\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "an array of instances is declared by a range of two constant",
+      2, "28.3.5"));
+}
+
+// §28.3.5: "one instance identifier shall be associated with only one range to
+// declare an array of instances". A second range after the first was reported
+// as a missing '(' under §28.3.6; it is now reported for what it is, and read
+// past, the first range standing.
+TEST(GateInstantiationParsing, SecondInstanceRangeIsRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  and g[0:3][1:0] (y, a, b);\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "one instance identifier shall be associated with only one", 2,
+      "28.3.5"));
+  EXPECT_FALSE(ReportedError(r.diags, "expected '('", 2, "28.3.6"));
+  ASSERT_NE(r.cu, nullptr);
+  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kAnd);
+  ASSERT_NE(g, nullptr);
+  EXPECT_NE(g->inst_range_left, nullptr);
+  EXPECT_NE(g->inst_range_right, nullptr);
+}
+
 }  // namespace

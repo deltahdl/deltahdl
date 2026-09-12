@@ -3,16 +3,44 @@
 
 namespace delta {
 
+// The `[ ... ]` after an instance name. A.4.1.1's name_of_instance is
+// `instance_identifier { unpacked_dimension }`, and §28.3.5 gives the one
+// unpacked_dimension an array of instances takes: "the range shall be
+// specified by two constant expressions, left-hand index (lhi) and right-hand
+// index (rhi), separated by a colon and enclosed within a pair of square
+// brackets", and "one instance identifier shall be associated with only one
+// range". The first range is recorded; a size alone, A.2.5's `[
+// constant_expression ]`, is reported where its colon was due and the
+// instance is one, as it was; and every range after the first is reported
+// and read past.
+void Parser::ParseInstanceRange(ModuleItem* item, bool first) {
+  Expect(TokenKind::kLBracket, Subclause("28.3.5"));
+  Expr* left = ParseExpr();
+  Expr* right = nullptr;
+  if (Match(TokenKind::kColon)) {
+    right = ParseExpr();
+  } else {
+    diag_.Error(CurrentLoc(),
+                "an array of instances is declared by a range of two "
+                "constant expressions, [lhi:rhi]; a size alone is no range",
+                Subclause("28.3.5"));
+  }
+  Expect(TokenKind::kRBracket, Subclause("28.3.5"));
+  if (!first) return;
+  item->inst_range_left = left;
+  item->inst_range_right = right;
+}
+
 void ParseGateInstanceTail(Parser& p, ModuleItem* item, bool has_name) {
   if (has_name) {
     item->gate_inst_name = p.Consume().text;
-    if (p.Check(TokenKind::kLBracket)) {
-      p.Consume();
-      item->inst_range_left = p.ParseExpr();
-      if (p.Match(TokenKind::kColon)) {
-        item->inst_range_right = p.ParseExpr();
-      }
-      p.Expect(TokenKind::kRBracket, Subclause("28.3.5"));
+    if (p.Check(TokenKind::kLBracket)) p.ParseInstanceRange(item, true);
+    while (p.Check(TokenKind::kLBracket)) {
+      p.diag_.Error(p.CurrentLoc(),
+                    "one instance identifier shall be associated with only "
+                    "one range to declare an array of instances",
+                    Subclause("28.3.5"));
+      p.ParseInstanceRange(item, false);
     }
   }
 
@@ -325,7 +353,9 @@ ModuleItem* Parser::ParseOneGateInstance(GateKind kind, SourceLoc loc) {
   item->loc = loc;
   item->gate_kind = kind;
 
-  ParseGateInstanceTail(*this, item, Check(TokenKind::kIdentifier));
+  // A.4.1.1's name_of_instance opens with an instance_identifier, which A.9.3
+  // spells `simple_identifier | escaped_identifier`.
+  ParseGateInstanceTail(*this, item, CheckIdentifier());
   if (!ValidGateTerminalCount(kind, item->gate_terminals.size()))
     diag_.Error(loc, "incorrect number of terminals for gate instance",
                 Subclause("28.3"));

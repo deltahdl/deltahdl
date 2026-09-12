@@ -263,6 +263,7 @@ class Parser {
   void ParseInlineGateTerminals(GateKind kind, SourceLoc loc,
                                 std::vector<ModuleItem*>& items);
   ModuleItem* ParseOneGateInstance(GateKind kind, SourceLoc loc);
+  void ParseInstanceRange(ModuleItem* item, bool first);
   uint8_t ParseStrength0();
   uint8_t ParseStrength1();
   void ParseGateDelay(Expr*& d1, Expr*& d2, Expr*& d3);
