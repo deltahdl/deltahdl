@@ -637,13 +637,24 @@ static void InitPackageDataVariables(const RtlirDesign* design, SimContext& ctx,
 
 // §20.4.1: publish each design element's resolved timescale under its module
 // name and instance name so a $timeunit/$timeprecision argument that names the
-// element (e.g. $timeunit(dut)) reports that element's value.
-static void RegisterScopeTimescales(const RtlirModule* mod, SimContext& ctx) {
+// element (e.g. $timeunit(dut)) reports that element's value. Annex D.10 adds
+// the element's complete hierarchical instance path, `from_top` starting at
+// the top module's name and `below_top` starting under it, so a $scale
+// argument that names a value through the instances above it, top.m1.l1.d or
+// m1.l1.d, reaches the unit of the module holding the value, and the instance
+// a process runs in is reached by the prefix the process carries.
+static void RegisterScopeTimescales(const RtlirModule* mod, SimContext& ctx,
+                                    const std::string& from_top,
+                                    const std::string& below_top) {
   ctx.SetScopeTimeScale(mod->name, mod->timescale);
+  ctx.SetScopeTimeScale(from_top, mod->timescale);
+  if (!below_top.empty()) ctx.SetScopeTimeScale(below_top, mod->timescale);
   for (const auto& child : mod->children) {
     if (!child.resolved) continue;
-    ctx.SetScopeTimeScale(child.inst_name, child.resolved->timescale);
-    RegisterScopeTimescales(child.resolved, ctx);
+    std::string inst(child.inst_name);
+    ctx.SetScopeTimeScale(inst, child.resolved->timescale);
+    RegisterScopeTimescales(child.resolved, ctx, from_top + "." + inst,
+                            below_top.empty() ? inst : below_top + "." + inst);
   }
 }
 
@@ -793,7 +804,7 @@ void Lowerer::Lower(const RtlirDesign* design) {
     ctx_.SetCurrentScopeName(top->name);
   }
   for (auto* top : design->top_modules) {
-    RegisterScopeTimescales(top, ctx_);
+    RegisterScopeTimescales(top, ctx_, std::string(top->name), "");
   }
   RegisterDesignTypeWidths(design, ctx_);
   // §7.2.1: what is inside each of those names, for the member selects that

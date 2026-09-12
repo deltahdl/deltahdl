@@ -363,6 +363,19 @@ static std::string ShowVarsVariableName(const Expr* e) {
   return HierarchicalScopeName(e);
 }
 
+// Annex D.10: the time unit of the module that invokes $scale. That is the
+// module of the instance the running process stands in, reached by the prefix
+// the process carries, which the lowerer registered as the instance's path
+// below the top; the top module's own unit, which CurrentTimeScale holds,
+// when the process stands in the top or when none is running. The prefix ends
+// in the dot that joins it to a name, which no registered path carries.
+static const TimeScale& InvokingTimeScale(SimContext& ctx) {
+  std::string prefix = ctx.ActiveInstancePrefix();
+  if (!prefix.empty()) prefix.pop_back();
+  if (const TimeScale* found = ctx.FindScopeTimeScale(prefix)) return *found;
+  return ctx.CurrentTimeScale();
+}
+
 // Annex D.10: $scale converts a time value held in one module into the time
 // unit of the module that invokes $scale. The argument is the complete
 // hierarchical name of the source value: the hierarchy above the final
@@ -380,7 +393,7 @@ static Logic4Vec EvalScale(const Expr* expr, SimContext& ctx, Arena& arena) {
   const Expr* arg = expr->args[0];
   uint64_t raw = EvalExpr(arg, ctx, arena).ToUint64();
 
-  const TimeScale& dst = ctx.CurrentTimeScale();
+  const TimeScale& dst = InvokingTimeScale(ctx);
   const TimeScale* src = &dst;
   if (arg->kind == ExprKind::kMemberAccess) {
     std::string source_scope = HierarchicalScopeName(arg->lhs);

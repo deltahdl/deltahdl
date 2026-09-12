@@ -1,3 +1,5 @@
+#include <string>
+
 #include "builders_systask.h"
 #include "fixture_simulator.h"
 #include "parser/ast.h"
@@ -128,6 +130,81 @@ TEST(OptionalScaleSim, MissingArgumentYieldsZero) {
   f.ctx.SetCurrentTimeScale(TimeScale{TimeUnit::kNs, 1, TimeUnit::kNs, 1});
   auto* call = MkSysCall(f.arena, "$scale", {});
   EXPECT_EQ(EvalExpr(call, f.ctx, f.arena).ToUint64(), 0u);
+}
+
+// The cases above hand the evaluator a call and a context seeded by hand. The
+// three below run a design, so the module that invokes $scale and the module
+// holding the value are the ones the lowerer built.
+
+// Annex D.10: the time value is converted from the time unit of the module
+// holding it to that of the module that invokes $scale. The top invokes it on
+// a value a child instance holds under a 1 ns unit, the top's own unit being
+// 1 ps, so 5 becomes 5000; the child is named by its instance name, as a
+// hierarchical name written from the top names it.
+TEST(OptionalScaleSim, ConvertsAChildInstanceValueIntoTheInvokingTopUnit) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module child;\n"
+      "  timeunit 1ns / 1ps;\n"
+      "  integer d = 5;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  timeunit 1ps / 1ps;\n"
+      "  child c1();\n"
+      "  initial #1 $display(\"%0d\", $scale(c1.d));\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "5000\n");
+}
+
+// Annex D.10: the unit converted into is that of the module invoking $scale,
+// which is not the top module's when the call stands in an instance. The top
+// holds 7 under a 1 ns unit and the child, under 1 ps, invokes $scale on it,
+// so the child reads 7000; the invoking module's unit read off the top instead
+// leaves the value at 7.
+TEST(OptionalScaleSim, AnInstanceInvokingScaleConvertsIntoItsOwnUnit) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module child;\n"
+      "  timeunit 1ps / 1ps;\n"
+      "  initial #1 $display(\"%0d\", $scale(top.d));\n"
+      "endmodule\n"
+      "module top;\n"
+      "  timeunit 1ns / 1ps;\n"
+      "  integer d = 7;\n"
+      "  child c1();\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "7000\n");
+}
+
+// Annex D.10: the argument is a hierarchical name, and the module whose unit
+// the value carries is the one the whole path above the value reaches. A leaf
+// two instances below the top holds 3 under 1 us; the top, under 1 ns, reaches
+// it through the middle instance, so 3 becomes 3000 whether the path starts
+// at the top module's name or below it. A lookup keyed by the leaf's bare
+// instance name alone would find no unit for either path and leave 3.
+TEST(OptionalScaleSim, ThePathAboveTheValueNamesTheSourceModule) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module leaf;\n"
+      "  timeunit 1us / 1ns;\n"
+      "  integer d = 3;\n"
+      "endmodule\n"
+      "module mid;\n"
+      "  timeunit 1ns / 1ns;\n"
+      "  leaf l1();\n"
+      "endmodule\n"
+      "module top;\n"
+      "  timeunit 1ns / 1ns;\n"
+      "  mid m1();\n"
+      "  initial #1 begin\n"
+      "    $display(\"%0d\", $scale(m1.l1.d));\n"
+      "    $display(\"%0d\", $scale(top.m1.l1.d));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "3000\n3000\n");
 }
 
 }  // namespace
