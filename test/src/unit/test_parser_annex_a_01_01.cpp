@@ -403,4 +403,60 @@ TEST(LibraryText, ErrorTrailingCommaInFileList) {
       ReportedError(r.diags, "expected file path specification", 1, "33.3.1"));
 }
 
+// A.1.1 writes -incdir as a token of its own between a library's file paths
+// and its include directories, so a specification spelled that way is the
+// option standing where a path was due rather than a file the library holds.
+TEST(LibraryText, ErrorIncdirWhereFilePathWasDueIsRejected) {
+  auto r = ParseLibrary("library lib -incdir /inc;\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "library names its file paths before -incdir", 1, "A.1.1"));
+  EXPECT_EQ(r.diags.size(), 1u);
+  ASSERT_EQ(r.cu->libraries.size(), 1u);
+  EXPECT_TRUE(r.cu->libraries[0]->file_paths.empty());
+  ASSERT_EQ(r.cu->libraries[0]->incdir_paths.size(), 1u);
+  EXPECT_EQ(r.cu->libraries[0]->incdir_paths[0], "/inc");
+}
+
+TEST(LibraryText, ErrorIncdirAloneIsRejected) {
+  auto r = ParseLibrary("library lib -incdir;\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "library names its file paths before -incdir", 1, "A.1.1"));
+  ASSERT_EQ(r.cu->libraries.size(), 1u);
+  EXPECT_TRUE(r.cu->libraries[0]->file_paths.empty());
+  EXPECT_TRUE(r.cu->libraries[0]->incdir_paths.empty());
+}
+
+TEST(LibraryText, ErrorIncdirAfterCommaIsRejected) {
+  auto r = ParseLibrary("library lib /a.v, -incdir /inc;\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "library names its file paths before -incdir", 1, "A.1.1"));
+  EXPECT_EQ(r.diags.size(), 1u);
+  ASSERT_EQ(r.cu->libraries.size(), 1u);
+  ASSERT_EQ(r.cu->libraries[0]->file_paths.size(), 1u);
+  EXPECT_EQ(r.cu->libraries[0]->file_paths[0], "/a.v");
+  ASSERT_EQ(r.cu->libraries[0]->incdir_paths.size(), 1u);
+  EXPECT_EQ(r.cu->libraries[0]->incdir_paths[0], "/inc");
+}
+
+TEST(LibraryText, ErrorRepeatedIncdirIsRejected) {
+  auto r = ParseLibrary("library lib /a.v -incdir /i, -incdir /j;\n");
+  EXPECT_TRUE(ReportedError(r.diags, "-incdir is written once", 1, "A.1.1"));
+  EXPECT_EQ(r.diags.size(), 1u);
+  ASSERT_EQ(r.cu->libraries.size(), 1u);
+  ASSERT_EQ(r.cu->libraries[0]->incdir_paths.size(), 2u);
+  EXPECT_EQ(r.cu->libraries[0]->incdir_paths[0], "/i");
+  EXPECT_EQ(r.cu->libraries[0]->incdir_paths[1], "/j");
+}
+
+// A trailing comma leaves the list short by one entry rather than padded with
+// an empty path.
+TEST(LibraryText, TrailingCommaAddsNoEmptyFilePath) {
+  auto r = ParseLibrary("library lib /a.v, ;\n");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected file path specification", 1, "33.3.1"));
+  ASSERT_EQ(r.cu->libraries.size(), 1u);
+  ASSERT_EQ(r.cu->libraries[0]->file_paths.size(), 1u);
+  EXPECT_EQ(r.cu->libraries[0]->file_paths[0], "/a.v");
+}
+
 }  // namespace

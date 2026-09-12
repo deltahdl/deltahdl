@@ -289,14 +289,46 @@ CompilationUnit* Parser::ParseLibraryText() {
   return unit;
 }
 
-std::string_view Parser::ParseFilePathSpec() {
+// Reads one file_path_spec, or reports its absence and returns a token of
+// kind kEof whose text is empty.
+Token Parser::ParseFilePathSpec() {
   auto tok = lexer_.NextFilePathSpec();
   if (tok.kind == TokenKind::kEof) {
     diag_.Error(CurrentLoc(), "expected file path specification",
                 Subclause("33.3.1"));
-    return {};
+    return tok;
   }
-  return ArenaCopy(tok.text);
+  tok.text = ArenaCopy(tok.text);
+  return tok;
+}
+
+// Reads file_path_spec { , file_path_spec } into `paths` and returns the
+// position of a `-incdir` read where a path was due, or SourceLoc::None() when
+// none was. A.1.1 writes -incdir as a token of its own between a library's
+// file paths and its include directories, so no file_path_spec is spelled that
+// way, but the lexer reads a specification up to the next blank, comma or
+// semicolon and hands `-incdir` back as one all the same; the caller reports
+// it and reads the option's own list, rather than binding the library to a
+// file of that name.
+SourceLoc Parser::ParseFilePathSpecList(std::vector<std::string_view>& paths) {
+  do {
+    auto tok = ParseFilePathSpec();
+    if (tok.text == "-incdir") return tok.loc;
+    if (tok.kind != TokenKind::kEof) paths.push_back(tok.text);
+  } while (Match(TokenKind::kComma));
+  return SourceLoc::None();
+}
+
+// Matches the `-incdir` that opens a library's include directories, a '-'
+// followed by the keyword. A '-' followed by anything else is left where it
+// stands for the semicolon check to report.
+bool Parser::MatchIncdirOption() {
+  if (!Check(TokenKind::kMinus)) return false;
+  auto saved = lexer_.SavePos();
+  Consume();
+  if (Match(TokenKind::kKwIncdir)) return true;
+  lexer_.RestorePos(saved);
+  return false;
 }
 
 LibraryDecl* Parser::ParseLibraryDecl() {
@@ -308,30 +340,28 @@ LibraryDecl* Parser::ParseLibraryDecl() {
   decl->name =
       ArenaCopy(Expect(TokenKind::kIdentifier, Subclause("33.3.1")).text);
 
-  auto path = ParseFilePathSpec();
-  if (path.empty()) {
+  SourceLoc incdir_loc = ParseFilePathSpecList(decl->file_paths);
+  bool has_incdir = incdir_loc.IsValid();
+  if (has_incdir) {
+    diag_.Error(incdir_loc, "library names its file paths before -incdir",
+                Subclause("A.1.1"));
+  } else if (decl->file_paths.empty()) {
     diag_.Error(CurrentLoc(), "expected at least one file path in library",
                 Subclause("33.3.1"));
     Synchronize();
     return decl;
-  }
-  decl->file_paths.push_back(path);
-
-  while (Match(TokenKind::kComma)) {
-    decl->file_paths.push_back(ParseFilePathSpec());
+  } else {
+    has_incdir = MatchIncdirOption();
   }
 
-  if (Check(TokenKind::kMinus)) {
-    auto saved = lexer_.SavePos();
-    Consume();
-    if (Check(TokenKind::kKwIncdir)) {
-      Consume();
-      decl->incdir_paths.push_back(ParseFilePathSpec());
-      while (Match(TokenKind::kComma)) {
-        decl->incdir_paths.push_back(ParseFilePathSpec());
-      }
-    } else {
-      lexer_.RestorePos(saved);
+  if (has_incdir) {
+    SourceLoc again = ParseFilePathSpecList(decl->incdir_paths);
+    while (again.IsValid()) {
+      diag_.Error(again,
+                  "-incdir is written once, its directories after it "
+                  "separated by commas",
+                  Subclause("A.1.1"));
+      again = ParseFilePathSpecList(decl->incdir_paths);
     }
   }
 
@@ -344,7 +374,7 @@ IncludeStmt* Parser::ParseLibraryIncludeStmt() {
   auto* stmt = arena_.Create<IncludeStmt>();
   stmt->loc = CurrentLoc();
   Expect(TokenKind::kKwInclude, Subclause("33.3.2"));
-  stmt->file_path = ParseFilePathSpec();
+  stmt->file_path = ParseFilePathSpec().text;
   if (stmt->file_path.empty()) {
     diag_.Error(CurrentLoc(), "expected file path after 'include'",
                 Subclause("33.3.1"));

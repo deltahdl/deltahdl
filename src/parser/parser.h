@@ -341,7 +341,9 @@ class Parser {
 
   LibraryDecl* ParseLibraryDecl();
   IncludeStmt* ParseLibraryIncludeStmt();
-  std::string_view ParseFilePathSpec();
+  Token ParseFilePathSpec();
+  SourceLoc ParseFilePathSpecList(std::vector<std::string_view>& paths);
+  bool MatchIncdirOption();
   // Copies text into the parser arena so the resulting view outlives the
   // SourceManager that produced the token (needed for library-map loading,
   // which parses each map file with a throwaway local SourceManager).
