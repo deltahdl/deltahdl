@@ -627,7 +627,7 @@ void ValidateParallelPathWidths(const ModuleDecl* mod, const PortMap& port_map,
   }
 }
 
-// Reports every signal in `si->signal_list` that names a module-path
+// Reports every signal in `si->path_outputs` that names a module-path
 // destination in `path_dsts`, using `kw` as the declaration keyword.
 // §30.7.4.1 states the rule for a pulse style declaration and §30.7.4.2 the
 // same rule for a showcancelled declaration, so the caller passes the one its
@@ -635,7 +635,8 @@ void ValidateParallelPathWidths(const ModuleDecl* mod, const PortMap& port_map,
 void ReportPulseStyleConflicts(const SpecifyItem* si, const char* kw,
                                const SignalSet& path_dsts, DiagEngine& diag,
                                Subclause subclause) {
-  for (std::string_view sig : si->signal_list) {
+  for (const auto& out : si->path_outputs) {
+    std::string_view sig = out.name;
     if (path_dsts.contains(sig)) {
       diag.Error(si->loc,
                  std::format("{} declaration for '{}' conflicts "

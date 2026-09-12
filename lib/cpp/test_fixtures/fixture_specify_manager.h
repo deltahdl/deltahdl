@@ -64,7 +64,8 @@ inline void RegisterPulseStyles(const ModuleDecl& mod, SpecifyManager& mgr) {
       if (si->kind != SpecifyItemKind::kPulsestyle) continue;
       PulseStyle style =
           si->is_ondetect ? PulseStyle::kOnDetect : PulseStyle::kOnEvent;
-      for (std::string_view sig : si->signal_list) {
+      for (const auto& out : si->path_outputs) {
+        std::string_view sig = out.name;
         mgr.SetPathOutputPulseStyle(std::string(sig), style);
       }
     }
@@ -81,7 +82,8 @@ inline void RegisterShowCancelled(const ModuleDecl& mod, SpecifyManager& mgr) {
       ShowCancelled mode = si->is_noshowcancelled
                                ? ShowCancelled::kNoshowcancelled
                                : ShowCancelled::kShowcancelled;
-      for (std::string_view sig : si->signal_list) {
+      for (const auto& out : si->path_outputs) {
+        std::string_view sig = out.name;
         mgr.SetPathOutputShowCancelled(std::string(sig), mode);
       }
     }

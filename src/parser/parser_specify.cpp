@@ -794,6 +794,12 @@ SpecifyItem* Parser::ParseTimingCheck() {
   return item;
 }
 
+// A.7.1: `pulsestyle_declaration ::= pulsestyle_onevent list_of_path_outputs
+// ; | pulsestyle_ondetect list_of_path_outputs ;`. The list is A.7.3's, the
+// same one a full path's destination side is, so Parser::ParsePathPorts reads
+// it: each output a specify_output_terminal_descriptor with its optional
+// range, its `interface_identifier . port_identifier` form and its escaped
+// spelling.
 SpecifyItem* Parser::ParsePulsestyleDecl() {
   auto* item = arena_.Create<SpecifyItem>();
   item->kind = SpecifyItemKind::kPulsestyle;
@@ -804,16 +810,14 @@ SpecifyItem* Parser::ParsePulsestyleDecl() {
   }
   Consume();
 
-  item->signal_list.push_back(
-      Expect(TokenKind::kIdentifier, Subclause("30.7.4.1")).text);
-  while (Match(TokenKind::kComma)) {
-    item->signal_list.push_back(
-        Expect(TokenKind::kIdentifier, Subclause("30.7.4.1")).text);
-  }
+  ParsePathPorts(item->path_outputs);
   Expect(TokenKind::kSemicolon, Subclause("30.7.4.1"));
   return item;
 }
 
+// A.7.1: `showcancelled_declaration ::= showcancelled list_of_path_outputs ;
+// | noshowcancelled list_of_path_outputs ;`, its list read as the pulse style
+// declaration's is.
 SpecifyItem* Parser::ParseShowcancelledDecl() {
   auto* item = arena_.Create<SpecifyItem>();
   item->kind = SpecifyItemKind::kShowcancelled;
@@ -824,12 +828,7 @@ SpecifyItem* Parser::ParseShowcancelledDecl() {
   }
   Consume();
 
-  item->signal_list.push_back(
-      Expect(TokenKind::kIdentifier, Subclause("30.7.4.2")).text);
-  while (Match(TokenKind::kComma)) {
-    item->signal_list.push_back(
-        Expect(TokenKind::kIdentifier, Subclause("30.7.4.2")).text);
-  }
+  ParsePathPorts(item->path_outputs);
   Expect(TokenKind::kSemicolon, Subclause("30.7.4.2"));
   return item;
 }

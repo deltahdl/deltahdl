@@ -98,7 +98,8 @@ static void RegisterPulseStyles(const std::vector<ModuleItem*>& blocks,
       blocks, SpecifyItemKind::kPulsestyle, [&](const SpecifyItem& si) {
         PulseStyle style =
             si.is_ondetect ? PulseStyle::kOnDetect : PulseStyle::kOnEvent;
-        for (std::string_view sig : si.signal_list) {
+        for (const auto& out : si.path_outputs) {
+          std::string_view sig = out.name;
           mgr.SetPathOutputPulseStyle(
               std::string(inst_prefix) + std::string(sig), style);
         }
@@ -119,7 +120,8 @@ static void RegisterShowCancelled(const std::vector<ModuleItem*>& blocks,
         ShowCancelled mode = si.is_noshowcancelled
                                  ? ShowCancelled::kNoshowcancelled
                                  : ShowCancelled::kShowcancelled;
-        for (std::string_view sig : si.signal_list) {
+        for (const auto& out : si.path_outputs) {
+          std::string_view sig = out.name;
           mgr.SetPathOutputShowCancelled(
               std::string(inst_prefix) + std::string(sig), mode);
         }

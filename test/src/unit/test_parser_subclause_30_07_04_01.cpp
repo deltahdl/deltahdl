@@ -21,8 +21,8 @@ TEST(SpecifyBlockDeclParsing, PulsestyleOneventSingleOutput) {
   auto* item = spec->specify_items[0];
   EXPECT_EQ(item->kind, SpecifyItemKind::kPulsestyle);
   EXPECT_FALSE(item->is_ondetect);
-  ASSERT_EQ(item->signal_list.size(), 1u);
-  EXPECT_EQ(item->signal_list[0], "out1");
+  ASSERT_EQ(item->path_outputs.size(), 1u);
+  EXPECT_EQ(item->path_outputs[0].name, "out1");
 }
 
 TEST(SpecifyBlockDeclParsing, PulsestyleOneventMultipleOutputs) {
@@ -39,10 +39,10 @@ TEST(SpecifyBlockDeclParsing, PulsestyleOneventMultipleOutputs) {
   auto* item = spec->specify_items[0];
   EXPECT_EQ(item->kind, SpecifyItemKind::kPulsestyle);
   EXPECT_FALSE(item->is_ondetect);
-  ASSERT_EQ(item->signal_list.size(), 3u);
-  EXPECT_EQ(item->signal_list[0], "out1");
-  EXPECT_EQ(item->signal_list[1], "out2");
-  EXPECT_EQ(item->signal_list[2], "out3");
+  ASSERT_EQ(item->path_outputs.size(), 3u);
+  EXPECT_EQ(item->path_outputs[0].name, "out1");
+  EXPECT_EQ(item->path_outputs[1].name, "out2");
+  EXPECT_EQ(item->path_outputs[2].name, "out3");
 }
 
 TEST(SpecifyBlockDeclParsing, PulsestyleOndetectSingleOutput) {
@@ -59,8 +59,8 @@ TEST(SpecifyBlockDeclParsing, PulsestyleOndetectSingleOutput) {
   auto* item = spec->specify_items[0];
   EXPECT_EQ(item->kind, SpecifyItemKind::kPulsestyle);
   EXPECT_TRUE(item->is_ondetect);
-  ASSERT_EQ(item->signal_list.size(), 1u);
-  EXPECT_EQ(item->signal_list[0], "q");
+  ASSERT_EQ(item->path_outputs.size(), 1u);
+  EXPECT_EQ(item->path_outputs[0].name, "q");
 }
 
 // The list_of_path_outputs form of Syntax 30-8 applies to the ondetect
@@ -80,9 +80,9 @@ TEST(SpecifyBlockDeclParsing, PulsestyleOndetectMultipleOutputs) {
   auto* item = spec->specify_items[0];
   EXPECT_EQ(item->kind, SpecifyItemKind::kPulsestyle);
   EXPECT_TRUE(item->is_ondetect);
-  ASSERT_EQ(item->signal_list.size(), 2u);
-  EXPECT_EQ(item->signal_list[0], "a");
-  EXPECT_EQ(item->signal_list[1], "b");
+  ASSERT_EQ(item->path_outputs.size(), 2u);
+  EXPECT_EQ(item->path_outputs[0].name, "a");
+  EXPECT_EQ(item->path_outputs[1].name, "b");
 }
 
 // list_of_path_outputs requires at least one output; a pulsestyle declaration
@@ -95,8 +95,10 @@ TEST(SpecifyBlockDeclParsing, ErrorPulsestyleEmptyOutputList) {
       "    pulsestyle_onevent ;\n"
       "  endspecify\n"
       "endmodule\n");
+  // The list is A.7.3's list_of_path_outputs, read as a path's destination
+  // side is, so the missing identifier is reported under §30.4 as a path's.
   EXPECT_TRUE(
-      ReportedError(r.diags, "expected identifier, got ';'", 3, "30.7.4.1"));
+      ReportedError(r.diags, "expected identifier, got ';'", 3, "30.4"));
 }
 
 TEST(SpecifyBlockDeclParsing, ErrorPulsestyleMissingSemicolon) {

@@ -116,7 +116,10 @@ struct SpecifyItem {
 
   bool is_ondetect = false;
   bool is_noshowcancelled = false;
-  std::vector<std::string_view> signal_list;
+  // A.7.1: the list_of_path_outputs of a pulsestyle_declaration or a
+  // showcancelled_declaration, each entry A.7.3's
+  // specify_output_terminal_descriptor as a path's destination is.
+  std::vector<SpecifyTerminal> path_outputs;
 
   std::string_view param_name;
   Expr* param_value = nullptr;

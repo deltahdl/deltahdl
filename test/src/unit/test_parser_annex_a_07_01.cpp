@@ -129,6 +129,74 @@ TEST(SpecifyBlockDeclParsing, SystemTimingCheckAsSpecifyItem) {
   EXPECT_EQ(spec->specify_items[0]->kind, SpecifyItemKind::kTimingCheck);
 }
 
+// pulsestyle_declaration ::= pulsestyle_ondetect list_of_path_outputs ;
+// The list is A.7.3's: each entry a specify_output_terminal_descriptor,
+// `output_identifier [ [ constant_range_expression ] ]`, whose
+// output_identifier is a port_identifier, `interface_identifier .
+// port_identifier`, or the escaped spelling of either. A bit-select, a
+// part-select, an escaped name and an interface port are each one output.
+TEST(SpecifyBlockDeclParsing, PulsestyleListOfPathOutputsTakesDescriptors) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    pulsestyle_ondetect q[3], bus[7:0], \\q-1 , intf.p;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
+  ASSERT_NE(spec, nullptr);
+  ASSERT_EQ(spec->specify_items.size(), 1u);
+  const auto& outs = spec->specify_items[0]->path_outputs;
+  ASSERT_EQ(outs.size(), 4u);
+  EXPECT_EQ(outs[0].name, "q");
+  EXPECT_EQ(outs[0].range_kind, SpecifyRangeKind::kBitSelect);
+  EXPECT_EQ(outs[1].name, "bus");
+  EXPECT_EQ(outs[1].range_kind, SpecifyRangeKind::kPartSelect);
+  EXPECT_EQ(outs[2].name, "q-1");
+  EXPECT_EQ(outs[3].interface_name, "intf");
+  EXPECT_EQ(outs[3].name, "p");
+}
+
+// showcancelled_declaration ::= noshowcancelled list_of_path_outputs ;
+// The same list, read the same way.
+TEST(SpecifyBlockDeclParsing, ShowcancelledListOfPathOutputsTakesDescriptors) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    noshowcancelled q[0], \\q-1 ;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
+  ASSERT_NE(spec, nullptr);
+  ASSERT_EQ(spec->specify_items.size(), 1u);
+  EXPECT_TRUE(spec->specify_items[0]->is_noshowcancelled);
+  const auto& outs = spec->specify_items[0]->path_outputs;
+  ASSERT_EQ(outs.size(), 2u);
+  EXPECT_EQ(outs[0].name, "q");
+  EXPECT_EQ(outs[0].range_kind, SpecifyRangeKind::kBitSelect);
+  EXPECT_EQ(outs[1].name, "q-1");
+  EXPECT_EQ(outs[1].range_kind, SpecifyRangeKind::kNone);
+}
+
+// list_of_path_outputs lists its descriptors with commas alone; a brace group
+// is no specify terminal in a pulse style declaration any more than in a path,
+// and is reported under A.7.3 at its '{'.
+TEST(SpecifyBlockDeclParsing, PulsestyleBraceListRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    pulsestyle_onevent {a, b};\n"
+      "  endspecify\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "path terminals are listed with commas alone; a "
+                            "concatenation is no specify terminal",
+                            3, "A.7.3"));
+}
+
 // pulsestyle_declaration ::= pulsestyle_onevent list_of_path_outputs ; | ...
 // The trailing ';' is a required terminal of the production: dropping it is an
 // error. The item is still produced, so the parser reached the ';' check.

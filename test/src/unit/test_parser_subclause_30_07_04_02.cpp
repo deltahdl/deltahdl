@@ -21,8 +21,8 @@ TEST(SpecifyBlockDeclParsing, ShowcancelledSingleOutput) {
   auto* item = spec->specify_items[0];
   EXPECT_EQ(item->kind, SpecifyItemKind::kShowcancelled);
   EXPECT_FALSE(item->is_noshowcancelled);
-  ASSERT_EQ(item->signal_list.size(), 1u);
-  EXPECT_EQ(item->signal_list[0], "out1");
+  ASSERT_EQ(item->path_outputs.size(), 1u);
+  EXPECT_EQ(item->path_outputs[0].name, "out1");
 }
 
 TEST(SpecifyBlockDeclParsing, NoshowcancelledSingleOutput) {
@@ -39,8 +39,8 @@ TEST(SpecifyBlockDeclParsing, NoshowcancelledSingleOutput) {
   auto* item = spec->specify_items[0];
   EXPECT_EQ(item->kind, SpecifyItemKind::kShowcancelled);
   EXPECT_TRUE(item->is_noshowcancelled);
-  ASSERT_EQ(item->signal_list.size(), 1u);
-  EXPECT_EQ(item->signal_list[0], "out1");
+  ASSERT_EQ(item->path_outputs.size(), 1u);
+  EXPECT_EQ(item->path_outputs[0].name, "out1");
 }
 
 TEST(SpecifyBlockDeclParsing, ShowcancelledMultipleOutputs) {
@@ -56,10 +56,10 @@ TEST(SpecifyBlockDeclParsing, ShowcancelledMultipleOutputs) {
   ASSERT_NE(spec, nullptr);
   auto* item = spec->specify_items[0];
   EXPECT_FALSE(item->is_noshowcancelled);
-  ASSERT_EQ(item->signal_list.size(), 3u);
-  EXPECT_EQ(item->signal_list[0], "out1");
-  EXPECT_EQ(item->signal_list[1], "out2");
-  EXPECT_EQ(item->signal_list[2], "out3");
+  ASSERT_EQ(item->path_outputs.size(), 3u);
+  EXPECT_EQ(item->path_outputs[0].name, "out1");
+  EXPECT_EQ(item->path_outputs[1].name, "out2");
+  EXPECT_EQ(item->path_outputs[2].name, "out3");
 }
 
 TEST(SpecifyBlockDeclParsing, ErrorShowcancelledMissingSemicolon) {
