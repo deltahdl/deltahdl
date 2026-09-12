@@ -1,4 +1,5 @@
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -83,6 +84,27 @@ TEST(LoopGenerateParsing, ForBodySingleItemRecordsNoBeginEnd) {
   auto* loop = mod->items[1];
   ASSERT_EQ(loop->kind, ModuleItemKind::kGenerateFor);
   EXPECT_FALSE(loop->gen_body_has_begin_end);
+}
+
+// A.4.2 gives genvar_iteration three forms -- an assignment_operator on the
+// genvar, and ++ or -- before or after it -- and §27.4 says the same in prose:
+// "Both the initialization and iteration assignments in the loop generate
+// scheme shall assign to the same genvar". A `~i` in the third header position
+// names the genvar and assigns to nothing: inc_or_dec_operator is ++ or -- and
+// nothing else, so the form is reported by the parser, where every position
+// that reaches the elaborator has one of the three.
+TEST(LoopGenerateParsing, StepThatIsANonIncrementUnaryIsRejected) {
+  auto r = Parse(
+      "module top();\n"
+      "  genvar i;\n"
+      "  generate\n"
+      "    for (i = 0; i < 4; ~i) begin\n"
+      "      logic [7:0] x;\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, "a loop generate's iteration is written",
+                            4, "A.4.2"));
 }
 
 }  // namespace

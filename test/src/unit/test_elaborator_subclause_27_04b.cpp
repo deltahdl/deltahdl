@@ -484,49 +484,4 @@ TEST(GenerateElaboration, GenerateForBoundThatFoldsToFalseIsNotReported) {
       << reported;
 }
 
-// §27.3 gives genvar_iteration three forms -- an assignment_operator on the
-// genvar, and ++ or -- before or after it -- so a third header position holding
-// a bare identifier is no genvar_iteration and the source is illegal. §27.4
-// says the same in prose: "Both the initialization and iteration assignments in
-// the loop generate scheme shall assign to the same genvar", and `i` assigns to
-// nothing. Name the report rather than count the instances, because a loop that
-// elaborates once and a source that never parsed leave the same design behind.
-TEST(GenerateElaboration, GenerateForStepThatIsAPlainIdentifierIsRejected) {
-  ElabFixture f;
-  ElabOk(
-      "module top();\n"
-      "  genvar i;\n"
-      "  generate\n"
-      "    for (i = 0; i < 4; i) begin\n"
-      "      logic [7:0] x;\n"
-      "    end\n"
-      "  endgenerate\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "generate-for iteration shall assign to a genvar",
-                            4, "27.4"));
-}
-
-// §27.3: inc_or_dec_operator is ++ or -- and nothing else, so `~i` in the third
-// header position is no genvar_iteration either. It reaches the rule by the
-// other route: the step does name the genvar the initialization named, so the
-// same-genvar check has nothing to object to and only the form is wrong.
-TEST(GenerateElaboration, GenerateForStepThatIsANonIncrementUnaryIsRejected) {
-  ElabFixture f;
-  ElabOk(
-      "module top();\n"
-      "  genvar i;\n"
-      "  generate\n"
-      "    for (i = 0; i < 4; ~i) begin\n"
-      "      logic [7:0] x;\n"
-      "    end\n"
-      "  endgenerate\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "generate-for iteration shall assign to a genvar",
-                            4, "27.4"));
-}
-
 }  // namespace
