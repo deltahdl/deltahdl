@@ -83,6 +83,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     parser/parser_config.cpp
     parser/parser_inst.cpp
     parser/parser_items.cpp
+    parser/parser_modport.cpp
     parser/parser_items_placement.cpp
     parser/time_resolve.cpp
     parser/library_map.cpp

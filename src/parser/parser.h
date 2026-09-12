@@ -185,6 +185,8 @@ class Parser {
   bool TryParseMethodOrConstraint(std::vector<ClassMember*>& members,
                                   ClassMember* member, bool proto);
   void RejectPureVirtualMethodBody(const ClassMember* member, bool is_func);
+  void ParseClassParameterMembers(std::vector<ClassMember*>& members,
+                                  ClassMember* member);
   bool TryParseKeywordClassMember(std::vector<ClassMember*>& members,
                                   ClassMember* member, bool proto);
   bool ParseClassQualifiers(ClassMember* member);
