@@ -1,3 +1,5 @@
+#include <vector>
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
@@ -315,6 +317,52 @@ TEST(ModuleInstantiationGrammar, ErrorMissingSemicolon) {
   // §23.3.2 owns the terminating semicolon of a module_instantiation.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected ';', got 'endmodule'", 1, "23.3.2"));
+}
+
+// name_of_instance ::= instance_identifier { unpacked_dimension }, and A.9.3
+// spells the identifier `simple_identifier | escaped_identifier`; the parser
+// looked for a simple identifier alone, so an instance named by an escaped one
+// was reported as a missing identifier.
+TEST(ModuleInstantiationParsing, EscapedInstanceName) {
+  auto r = Parse(
+      "module sub(input a, output b); endmodule\n"
+      "module m;\n"
+      "  sub \\u.1 (x, y);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* inst =
+      FindItemByKind(r.cu->modules[1]->items, ModuleItemKind::kModuleInst);
+  ASSERT_NE(inst, nullptr);
+  EXPECT_EQ(inst->inst_name, "u.1");
+}
+
+// ordered_parameter_assignment ::= param_expression and
+// named_parameter_assignment ::= . parameter_identifier ( [ param_expression ]
+// ), where A.8.3 spells param_expression `mintypmax_expression | data_type |
+// $`; the parser read the value as an expression, so a min:typ:max value was
+// reported at its first ':'.
+TEST(ModuleInstantiationParsing, ParamExpressionMinTypMax) {
+  auto r = Parse(
+      "module sub #(parameter int W = 1) (); endmodule\n"
+      "module m;\n"
+      "  sub #(1:2:3) u1();\n"
+      "  sub #(.W(4:5:6)) u2();\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  std::vector<ModuleItem*> insts;
+  for (auto* item : r.cu->modules[1]->items) {
+    if (item->kind == ModuleItemKind::kModuleInst) insts.push_back(item);
+  }
+  ASSERT_EQ(insts.size(), 2u);
+  ASSERT_EQ(insts[0]->inst_params.size(), 1u);
+  ASSERT_NE(insts[0]->inst_params[0].second, nullptr);
+  EXPECT_EQ(insts[0]->inst_params[0].second->kind, ExprKind::kMinTypMax);
+  ASSERT_EQ(insts[1]->inst_params.size(), 1u);
+  EXPECT_EQ(insts[1]->inst_params[0].first, "W");
+  ASSERT_NE(insts[1]->inst_params[0].second, nullptr);
+  EXPECT_EQ(insts[1]->inst_params[0].second->kind, ExprKind::kMinTypMax);
 }
 
 }  // namespace

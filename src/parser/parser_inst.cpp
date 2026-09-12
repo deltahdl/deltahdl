@@ -84,7 +84,9 @@ ModuleItem* Parser::ParseModuleInstList(const Token& module_tok,
 
   auto parse_one_instance = [&]() -> ModuleItem* {
     auto* item = MakeInstanceItem(arena_, module_tok, params);
-    item->inst_name = Expect(TokenKind::kIdentifier, Subclause("23.3.2")).text;
+    // A.4.1.1's name_of_instance opens with an instance_identifier, which
+    // A.9.3 spells `simple_identifier | escaped_identifier`.
+    item->inst_name = ExpectIdentifier(Subclause("23.3.2")).text;
     parse_inst_dims(item);
     RecordInstRange(item);
     parse_inst_port_list(item);
@@ -112,6 +114,12 @@ void Parser::ParseParenList(std::vector<Expr*>& out) {
   Expect(TokenKind::kRParen, Subclause("13.5"));
 }
 
+// One entry of A.4.1.1's list_of_parameter_value_assignments: a
+// named_parameter_assignment, `. parameter_identifier ( [ param_expression ]
+// )`, or an ordered_parameter_assignment, a param_expression alone. A.8.3
+// spells param_expression `mintypmax_expression | data_type | $`, so the value
+// is read as a mintypmax_expression, which is an expression where no ':'
+// follows it.
 bool Parser::ParseParamValueEntry(
     std::vector<std::pair<std::string_view, Expr*>>& out) {
   if (Match(TokenKind::kDot)) {
@@ -119,13 +127,13 @@ bool Parser::ParseParamValueEntry(
     Expect(TokenKind::kLParen, Subclause("23.10.2.2"));
     Expr* expr = nullptr;
     if (!Check(TokenKind::kRParen)) {
-      expr = ParseExpr();
+      expr = ParseMinTypMaxExpr();
     }
     Expect(TokenKind::kRParen, Subclause("23.10.2.2"));
     out.push_back({name.text, expr});
     return true;
   }
-  out.push_back({{}, ParseExpr()});
+  out.push_back({{}, ParseMinTypMaxExpr()});
   return false;
 }
 
