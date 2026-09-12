@@ -1,3 +1,4 @@
+#include "parser/expr_parser_internal.h"
 #include "parser/parser.h"
 
 namespace delta {
@@ -797,8 +798,36 @@ Stmt* Parser::ParseAssignmentOrExprNoSemi() {
   return stmt;
 }
 
+// A.6.9's second subroutine_call_statement, `void ' ( function_subroutine_call
+// ) ;`, which §13.4.1 has discard a nonvoid function's return value without
+// the warning a bare call draws. The cast wraps a function_subroutine_call
+// and nothing else, so what stands inside the parentheses is read as an
+// expression and reported under A.6.9 where it is no call; the statement is
+// recorded as the expression statement over a `void` cast that the
+// elaborator reads.
+Stmt* Parser::ParseVoidCastCallStmt() {
+  auto* stmt = arena_.Create<Stmt>();
+  stmt->kind = StmtKind::kExprStmt;
+  stmt->range.start = CurrentLoc();
+  Token void_tok = Consume();
+  Expect(TokenKind::kApostrophe, Subclause("A.6.9"));
+  Expect(TokenKind::kLParen, Subclause("A.6.9"));
+  Expr* call = ParseExpr();
+  if (call->kind != ExprKind::kCall && call->kind != ExprKind::kSystemCall) {
+    diag_.Error(call->range.start,
+                "a void cast discards a function call's return value; "
+                "void'(...) wraps a function_subroutine_call and no other "
+                "expression",
+                Subclause("A.6.9"));
+  }
+  Expect(TokenKind::kRParen, Subclause("A.6.9"));
+  stmt->expr = MakeTextCast(arena_, void_tok.text, void_tok.loc, call);
+  return stmt;
+}
+
 Stmt* Parser::ParseAssignmentOrExprStmt() {
-  auto* stmt = ParseAssignmentOrExprNoSemi();
+  auto* stmt = Check(TokenKind::kKwVoid) ? ParseVoidCastCallStmt()
+                                         : ParseAssignmentOrExprNoSemi();
   Expect(TokenKind::kSemicolon, Subclause("12.3"));
   return stmt;
 }

@@ -151,6 +151,18 @@ Expr* Parser::ParseConcatenation() {
 
 Expr* Parser::ParseCastExpr() {
   auto type_tok = Consume();
+  // A.8.4's casting_type is `simple_type | constant_primary | signing |
+  // string | const`, and `void` is none of them: A.6.9 writes `void ' (
+  // function_subroutine_call ) ;` as a subroutine_call_statement and nowhere
+  // else, §13.4.1 having it discard a function's return value "as a
+  // statement". Parser::ParseVoidCastCallStmt reads that statement, so a
+  // `void'` reaching the expression parser stands where an expression does.
+  if (type_tok.kind == TokenKind::kKwVoid) {
+    diag_.Error(type_tok.loc,
+                "a void cast is a statement, void'(function_subroutine_call); "
+                "and no expression, 'void' being no casting_type",
+                Subclause("A.6.9"));
+  }
   Expect(TokenKind::kApostrophe, Subclause("6.24.1"));
   Expect(TokenKind::kLParen, Subclause("6.24.1"));
   auto* cast = arena_.Create<Expr>();

@@ -92,4 +92,65 @@ TEST(SubroutineCallStatementParsing, VoidCastRequiresSemicolon) {
       ReportedError(r.diags, "expected ';', got 'endmodule'", 3, "12.3"));
 }
 
+// void ' ( function_subroutine_call ) ; wraps a function_subroutine_call and
+// nothing else; §13.4.1 has the cast discard "the return value" of a function
+// called as a statement. The parser read the cast as one of any expression, so
+// `void'(a + b);` was accepted silently.
+TEST(SubroutineCallStatementParsing, VoidCastOfNonCallIsRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial void'(a + b);\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a void cast discards a function call's return value", 2,
+      "A.6.9"));
+}
+
+// A.8.4's casting_type is `simple_type | constant_primary | signing | string |
+// const`, so `void'` is no expression: it stands in A.6.9's statement alone.
+// The parser accepted a void cast wherever an expression stands.
+TEST(SubroutineCallStatementParsing, VoidCastInExpressionIsRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    x = void'(compute(3));\n"
+      "    if (void'(compute(3))) y = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a void cast is a statement, void'(function_subroutine_call);",
+      3, "A.6.9"));
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a void cast is a statement, void'(function_subroutine_call);",
+      4, "A.6.9"));
+}
+
+// function_subroutine_call reaches a method call and a system function call
+// as well as a plain one; each stands in the cast, and a label may precede
+// the statement as it may any other.
+TEST(SubroutineCallStatementParsing, VoidCastOfEveryCallForm) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    void'(compute(3));\n"
+      "    void'(obj.next());\n"
+      "    lbl: void'($urandom());\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* block = FirstInitialStmt(r);
+  ASSERT_NE(block, nullptr);
+  ASSERT_EQ(block->stmts.size(), 3u);
+  for (auto* stmt : block->stmts) {
+    EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
+    ASSERT_NE(stmt->expr, nullptr);
+    EXPECT_EQ(stmt->expr->kind, ExprKind::kCast);
+    EXPECT_EQ(stmt->expr->text, "void");
+  }
+  EXPECT_EQ(block->stmts[1]->expr->lhs->kind, ExprKind::kCall);
+  EXPECT_EQ(block->stmts[2]->expr->lhs->kind, ExprKind::kSystemCall);
+  EXPECT_EQ(block->stmts[2]->label, "lbl");
+}
+
 }  // namespace

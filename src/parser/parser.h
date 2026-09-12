@@ -550,6 +550,7 @@ class Parser {
   Stmt* ParseDisableStmt();
   Stmt* ParseEventTriggerStmt();
   Stmt* ParseNbEventTriggerStmt();
+  Stmt* ParseVoidCastCallStmt();
   Stmt* ParseAssignmentOrExprStmt();
   Stmt* ParseAssignmentOrExprNoSemi();
   Stmt* ParseCycleDelayStmt();

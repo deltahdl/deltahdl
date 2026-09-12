@@ -30,4 +30,11 @@ Expr* MakeNodeCast(Arena& arena, Expr* type_node, Expr* value);
 // names its genvar by an identifier alone.
 Expr* MakeIdentifierNode(Arena& arena, std::string_view text, SourceLoc loc);
 
+// Builds a cast whose target type is carried by a name string (cast->text)
+// and whose value is carried by cast->lhs, starting at the given location.
+// Pure node construction; defined in expr_parser.cpp, and shared with the
+// A.6.9 void cast statement in parser_stmt.cpp.
+Expr* MakeTextCast(Arena& arena, std::string_view type_text, SourceLoc start,
+                   Expr* value);
+
 }  // namespace delta
