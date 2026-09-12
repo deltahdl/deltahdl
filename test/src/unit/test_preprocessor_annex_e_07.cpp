@@ -88,4 +88,29 @@ TEST(Preprocessor, DelayModeZero_SupersedesEarlierMode) {
   EXPECT_EQ(pp.DelayModeDirective(), DelayModeDirective::kZero);
 }
 
+// E.7 has the directive select the mode for the modules that follow it, so
+// the record the preprocessor keeps of the directives in force at each module
+// header carries, for a module between a `delay_mode_unit and this directive,
+// the unit mode, and the zero mode for the module after this directive, while
+// the unit-wide query above answers only with the last.
+TEST(Preprocessor, DelayModeZero_RecordedAtEachModuleHeader) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  auto fid = f.mgr.AddFile("<test>",
+                           "`delay_mode_unit\n"
+                           "module ticking;\n"
+                           "endmodule\n"
+                           "`delay_mode_zero\n"
+                           "module instant;\n"
+                           "endmodule\n");
+  pp.Preprocess(fid);
+  EXPECT_FALSE(f.diag.HasErrors());
+  const auto& per_module = pp.ModuleDirectivesList();
+  ASSERT_EQ(per_module.size(), 2u);
+  EXPECT_EQ(per_module[0].module, "ticking");
+  EXPECT_EQ(per_module[0].delay_mode, DelayModeDirective::kUnit);
+  EXPECT_EQ(per_module[1].module, "instant");
+  EXPECT_EQ(per_module[1].delay_mode, DelayModeDirective::kZero);
+}
+
 }  // namespace
