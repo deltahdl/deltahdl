@@ -131,19 +131,14 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   int64_t ResetValue() const { return reset_value_; }
 
   // Optional $scope system task (Annex D.11). The interactive scope names the
-  // level of hierarchy used when identifying objects interactively. Its initial
-  // setting is the first top-level module (established at lowering); a $scope
-  // call retargets it to the complete hierarchical name supplied as its single
-  // argument (a module, task, function, or named block). This mirrors, on the
-  // system-task side, the interactive scope that vpi_control reaches through
-  // vpiSetInteractiveScope (§38.4).
+  // level of hierarchy used when identifying objects interactively, as the one
+  // vpi_control reaches through vpiSetInteractiveScope (§38.4) does. Its
+  // initial setting is the first top-level module, established at lowering; a
+  // $scope call retargets it to "the complete hierarchical name of a module,
+  // task, function, or named block", one of the names the lowerer registered
+  // from CompleteHierarchicalScopeNames, and is refused any other.
   void SetInteractiveScope(std::string_view name);
   const std::string& InteractiveScope() const { return interactive_scope_; }
-
-  // Annex D.11: the complete hierarchical names of the design's modules,
-  // tasks, functions and named blocks, registered at lowering from
-  // CompleteHierarchicalScopeNames, which a $scope argument is one of or is
-  // refused.
   void RegisterHierarchicalScope(std::string_view name);
   bool IsHierarchicalScope(std::string_view name) const;
 
