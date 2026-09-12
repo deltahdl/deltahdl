@@ -603,7 +603,7 @@ class Parser {
   ModuleItem* ParseAssertProperty();
   ModuleItem* ParseAssumeProperty();
   ModuleItem* ParsePropertyAssertLike(ModuleItemKind kind, TokenKind keyword);
-  bool TryParseSimpleConcurrentProperty(ModuleItem* item);
+  bool TryParseSimpleConcurrentProperty(ModuleItem* item, StmtKind body_kind);
   bool BodyHasTemporalOperator();
   void WarnUnevaluatedConcurrentAssertion(SourceLoc loc, ModuleItemKind kind);
   // §16.14.6: the report for a procedural concurrent assertion this tool does

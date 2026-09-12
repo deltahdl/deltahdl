@@ -40,28 +40,48 @@ int UnevaluatedReports(const ParseResult& r) {
 }
 
 // §16.14 Syntax 16-18 lists assume_property_statement among the concurrent
-// assertion statements, and Parser::ParsePropertyAssertLike takes the
-// clocked-boolean path only for assert, so an assume is skipped whatever its
-// property_spec holds. The spec here is the one form deltahdl does evaluate,
-// which is what shows the directive rather than the body is the reason.
-TEST(ConcurrentAssertionEvaluationReporting, AssumePropertyIsNotEvaluated) {
+// assertion statements, and Annex F.5.3.1 gives it the assert property
+// statement's satisfaction, so Parser::ParsePropertyAssertLike takes the
+// clocked-boolean path for an assume as for an assert: the one form deltahdl
+// evaluates is reported as nothing, and a temporal spec is reported for its
+// body as an assert's is.
+TEST(ConcurrentAssertionEvaluationReporting,
+     AssumePropertyInTheClockedBooleanFormIsEvaluated) {
   auto r = Parse(
       "module m;\n"
       "  assume property (@(posedge clk) a);\n"
       "endmodule\n");
-  EXPECT_TRUE(ReportedWarning(
-      r.diags, "assume property is parsed and then discarded", 2, "16.14"));
+  EXPECT_EQ(UnevaluatedReports(r), 0);
 }
 
-// §16.14 Syntax 16-18 lists cover_property_statement, which
-// Parser::ParseCoverProperty skips outright.
-TEST(ConcurrentAssertionEvaluationReporting, CoverPropertyIsNotEvaluated) {
+TEST(ConcurrentAssertionEvaluationReporting,
+     ATemporalAssumePropertyIsNotEvaluated) {
+  auto r = Parse(
+      "module m;\n"
+      "  assume property (@(posedge clk) a |-> b);\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedWarning(r.diags, "its property is temporal", 2, "16.14"));
+}
+
+// §16.14 Syntax 16-18 lists cover_property_statement, whose satisfaction Annex
+// F.5.3.1 defines over the same words, so Parser::ParseCoverProperty takes the
+// clocked-boolean path too and reports the other specs by their body.
+TEST(ConcurrentAssertionEvaluationReporting,
+     CoverPropertyInTheClockedBooleanFormIsEvaluated) {
   auto r = Parse(
       "module m;\n"
       "  cover property (@(posedge clk) a);\n"
       "endmodule\n");
-  EXPECT_TRUE(ReportedWarning(
-      r.diags, "cover property is parsed and then discarded", 2, "16.14"));
+  EXPECT_EQ(UnevaluatedReports(r), 0);
+}
+
+TEST(ConcurrentAssertionEvaluationReporting,
+     ATemporalCoverPropertyIsNotEvaluated) {
+  auto r = Parse(
+      "module m;\n"
+      "  cover property (@(posedge clk) a ##1 b);\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedWarning(r.diags, "its property is temporal", 2, "16.14"));
 }
 
 // §16.14 Syntax 16-18 lists cover_sequence_statement separately from

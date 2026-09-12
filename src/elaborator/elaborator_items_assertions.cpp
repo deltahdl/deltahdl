@@ -221,9 +221,17 @@ bool Elaborator::ElaborateAssertionItem(ModuleItem* item, RtlirModule* mod) {
                     "concurrent assert, assume, or cover statement",
                     Subclause("16.14.3"));
       }
-      ValidateClockingBlock(item, mod);
+      // Annex F.5.3.1 defines a cover property statement's satisfaction over
+      // the words an assert property statement's is, so a cover property in
+      // the clocked boolean form is a process as an assert property is; a
+      // cover sequence has no body and takes the path's validation alone.
+      ElaborateAssertPropertyItem(item, mod);
       return true;
     case ModuleItemKind::kAssumeProperty:
+      // Annex F.5.3.1 defines an assume property statement's satisfaction as
+      // the assert property statement's, so it takes the same path.
+      ElaborateAssertPropertyItem(item, mod);
+      return true;
     case ModuleItemKind::kRestrictProperty:
       ValidateClockingBlock(item, mod);
       return true;

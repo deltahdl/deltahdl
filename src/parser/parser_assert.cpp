@@ -362,11 +362,7 @@ void Parser::WarnUnevaluatedConcurrentAssertion(SourceLoc loc,
   // Named as §16.14 Syntax 16-18 writes the statement, so the report quotes
   // the source back rather than an internal enumerator name.
   std::string_view directive;
-  if (kind == ModuleItemKind::kAssumeProperty) {
-    directive = "assume property";
-  } else if (kind == ModuleItemKind::kCoverProperty) {
-    directive = "cover property";
-  } else if (kind == ModuleItemKind::kCoverSequence) {
+  if (kind == ModuleItemKind::kCoverSequence) {
     directive = "cover sequence";
   } else if (kind == ModuleItemKind::kRestrictProperty) {
     directive = "restrict property";
@@ -374,12 +370,13 @@ void Parser::WarnUnevaluatedConcurrentAssertion(SourceLoc loc,
 
   std::string reason;
   if (!directive.empty()) {
-    // Reason one: the statement is not `assert property`, and no other
-    // directive has an evaluation path at all, whatever its property_spec
-    // holds. #2923 covers assume.
+    // Reason one: the statement is a cover sequence or a restrict property,
+    // and neither has an evaluation path at all, whatever its property_spec
+    // holds. An assert, assume or cover property statement has the clocked
+    // boolean path, and one of the reasons below says why its spec missed it.
     reason = std::string(directive) +
              " is parsed and then discarded, this tool evaluating only "
-             "assert property";
+             "assert, assume and cover property";
   } else if (BodyHasTemporalOperator()) {
     // Reason two: the property is temporal, so it is not the sampled boolean
     // TryParseSimpleConcurrentProperty lowers. #2924 and #2927 cover the
@@ -406,7 +403,8 @@ void Parser::WarnUnevaluatedConcurrentAssertion(SourceLoc loc,
                 Subclause("16.14"));
 }
 
-bool Parser::TryParseSimpleConcurrentProperty(ModuleItem* item) {
+bool Parser::TryParseSimpleConcurrentProperty(ModuleItem* item,
+                                              StmtKind body_kind) {
   if (!Check(TokenKind::kAt)) return false;
   auto saved = lexer_.SavePos();
   diag_.PushSuppress();
@@ -433,7 +431,7 @@ bool Parser::TryParseSimpleConcurrentProperty(ModuleItem* item) {
   item->sensitivity = std::move(events);
   item->assert_expr = prop;
   auto* stmt = arena_.Create<Stmt>();
-  stmt->kind = StmtKind::kAssertImmediate;
+  stmt->kind = body_kind;
   stmt->range.start = item->loc;
   stmt->assert_expr = prop;
   // §16.5: this statement carries a concurrent assertion's property, not an
@@ -460,8 +458,14 @@ ModuleItem* Parser::ParsePropertyAssertLike(ModuleItemKind kind,
 
   Expect(TokenKind::kKwProperty, Subclause("16.14"));
   Expect(TokenKind::kLParen, Subclause("16.14"));
-  bool simple_concurrent = kind == ModuleItemKind::kAssertProperty &&
-                           TryParseSimpleConcurrentProperty(item);
+  // Annex F.5.3.1 defines an assume property statement's satisfaction as the
+  // assert property statement's, and §16.14.2 has a simulator check an
+  // assumption as it checks an assertion, so the clocked boolean form is read
+  // for both; the body's kind keeps the directive for §20.11's controls.
+  bool simple_concurrent = TryParseSimpleConcurrentProperty(
+      item, kind == ModuleItemKind::kAssertProperty
+                ? StmtKind::kAssertImmediate
+                : StmtKind::kAssumeImmediate);
   if (!simple_concurrent) {
     // Before SkipPropertySpec, which moves the lexer off the property_spec the
     // reason is read from.
@@ -535,11 +539,20 @@ ModuleItem* Parser::ParseCoverProperty() {
   }
 
   Expect(TokenKind::kLParen, Subclause("16.14.3"));
-  // §16.14 lists cover_property_statement and cover_sequence_statement among
-  // the concurrent assertion statements, and neither reaches the
-  // clocked-boolean path in ParsePropertyAssertLike: both skip the spec here.
-  WarnUnevaluatedConcurrentAssertion(item->loc, item->kind);
-  item->assert_expr = SkipPropertySpec(arena_, lexer_, CurrentLoc());
+  // Annex F.5.3.1 defines a cover property statement's satisfaction over the
+  // same words as an assert property statement's, and §16.14.3 runs its pass
+  // statement once per successful evaluation, so the clocked boolean form is
+  // read as ParsePropertyAssertLike reads it, with a cover body so the
+  // evaluation reports nothing where the property does not hold. §16.14 lists
+  // cover_sequence_statement beside it, and that one has no evaluation path:
+  // its spec is skipped, as is a cover property whose spec is not the form.
+  bool simple_concurrent =
+      item->kind == ModuleItemKind::kCoverProperty &&
+      TryParseSimpleConcurrentProperty(item, StmtKind::kCoverImmediate);
+  if (!simple_concurrent) {
+    WarnUnevaluatedConcurrentAssertion(item->loc, item->kind);
+    item->assert_expr = SkipPropertySpec(arena_, lexer_, CurrentLoc());
+  }
   Expect(TokenKind::kRParen, Subclause("16.14.3"));
 
   if (!Check(TokenKind::kSemicolon)) {
@@ -547,6 +560,7 @@ ModuleItem* Parser::ParseCoverProperty() {
   } else {
     Expect(TokenKind::kSemicolon, Subclause("16.14.3"));
   }
+  if (simple_concurrent) item->body->assert_pass_stmt = item->assert_pass_stmt;
   return item;
 }
 
