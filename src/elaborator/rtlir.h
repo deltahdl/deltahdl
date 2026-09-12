@@ -98,7 +98,15 @@ struct RtlirPort {
   bool is_interconnect = false;
   bool is_interface_port = false;
   std::string_view interface_type_name;
+  // §23.2.2.4: the default value of an input port, which an instantiation that
+  // leaves the port unconnected takes as its connection. Null for every other
+  // port.
   Expr* default_value = nullptr;
+  // §23.2.2.2, Syntax 23-4's `[ = constant_expression ]` on a variable output
+  // port, which its footnote 2 permits as the one initialization a port takes:
+  // the value the port's variable holds before any procedure runs, as a
+  // variable declaration's initializer is. Null for every other port.
+  Expr* init_value = nullptr;
   std::vector<ResolvedAttribute> attrs;
   // The number of unpacked dimensions the port declaration wrote, whether or
   // not each one folded to constants. A count larger than unpacked_dims.size()

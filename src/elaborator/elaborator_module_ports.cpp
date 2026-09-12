@@ -68,14 +68,15 @@ static void ValidatePortDefaultValue(const PortDecl& port, bool is_non_ansi,
                                      const TypedefMap& typedefs,
                                      DiagEngine& diag) {
   if (port.direction != Direction::kInput) {
-    diag.Error(port.loc,
-               std::format("default value on {} port '{}'; defaults are "
-                           "only allowed on input ports",
-                           port.direction == Direction::kOutput  ? "output"
-                           : port.direction == Direction::kInout ? "inout"
-                                                                 : "ref",
-                           port.name),
-               Subclause("23.2.2.4"));
+    // An output never reaches here: ValidatePortAssignment settles its
+    // expression as an initializer, so the direction is inout or ref.
+    diag.Error(
+        port.loc,
+        std::format("default value on {} port '{}'; defaults are "
+                    "only allowed on input ports",
+                    port.direction == Direction::kInout ? "inout" : "ref",
+                    port.name),
+        Subclause("23.2.2.4"));
   }
   if (is_non_ansi) {
     diag.Error(port.loc,
@@ -98,6 +99,31 @@ static void ValidatePortDefaultValue(const PortDecl& port, bool is_non_ansi,
         std::format("default value on non-singular port '{}'", port.name),
         Subclause("23.2.2.4"));
   }
+}
+
+// §23.2.2.2's Syntax 23-4 writes `[ = constant_expression ]` behind a port's
+// identifier, and its footnote 2 says which port each reading belongs to: "It
+// shall be illegal to initialize a port that is not a variable output port or
+// to specify a default value for a port that is not an input port", which A.10
+// item 2 repeats. On a variable output port the expression is the port's
+// initializer and is legal as written; on an output that is a net it is an
+// initialization of a port that is no variable, reported here; on every other
+// port it is the §23.2.2.4 default value ValidatePortDefaultValue holds to
+// the input port.
+static void ValidatePortAssignment(const PortDecl& port, bool port_is_var,
+                                   bool is_non_ansi, const TypedefMap& typedefs,
+                                   DiagEngine& diag) {
+  if (port.direction != Direction::kOutput) {
+    ValidatePortDefaultValue(port, is_non_ansi, typedefs, diag);
+    return;
+  }
+  if (port_is_var) return;
+  diag.Error(port.loc,
+             std::format("initializer on output port '{}', which is a net and "
+                         "no variable; only a variable output port may be "
+                         "initialized",
+                         port.name),
+             Subclause("23.2.2.2"));
 }
 
 // Fold one unpacked dimension of a port into the address range it declares.
@@ -318,7 +344,17 @@ static RtlirPort BuildRtlirPortBase(const PortDecl& port, bool port_is_var,
                       ? NetType::kInterconnect
                       : DataTypeToNetType(port.data_type.kind);
   }
-  rp.default_value = port.default_value;
+  // Syntax 23-4's one `= constant_expression` is an initializer on a variable
+  // output port and a default value on an input port (§23.2.2.2, footnote 2),
+  // so each kind of port carries it in the field its readers look in: the
+  // instantiation that leaves an input unconnected reads default_value, and
+  // the simulator's port variable takes init_value; an output that is no
+  // variable was reported and carries neither.
+  if (port.direction == Direction::kOutput) {
+    if (port_is_var) rp.init_value = port.default_value;
+  } else {
+    rp.default_value = port.default_value;
+  }
   ComputePortUnpackedDims(port, rp, scope, diag);
   return rp;
 }
@@ -331,12 +367,12 @@ static RtlirPort ElaborateOnePort(const ModuleDecl* decl, const PortDecl& port,
   DiagnoseMissingNonAnsiPortDirection(port, decl->is_non_ansi_ports, ctx.diag);
   TrackNonAnsiPortType(decl, port, ctx);
 
+  bool port_is_var = !port.data_type.is_net && !port.data_type.is_interconnect;
   if (port.default_value) {
-    ValidatePortDefaultValue(port, decl->is_non_ansi_ports, ctx.typedefs,
-                             ctx.diag);
+    ValidatePortAssignment(port, port_is_var, decl->is_non_ansi_ports,
+                           ctx.typedefs, ctx.diag);
   }
 
-  bool port_is_var = !port.data_type.is_net && !port.data_type.is_interconnect;
   DiagnosePortTypeConstraints(port, port_is_var, ctx.diag);
   ValidateNetPortDataType(decl, port, port_is_var, ctx);
 
@@ -351,19 +387,27 @@ static RtlirPort ElaborateOnePort(const ModuleDecl* decl, const PortDecl& port,
 // already includes the compilation-unit scope and any per-instance parameter
 // overrides) and capture the resolved constant as a literal, so it is not
 // re-resolved in the instantiating scope when later used as a port connection.
-static void FoldPortDefaultValue(Arena& arena, const ScopeMap& scope,
-                                 RtlirPort& rp) {
-  if (rp.default_value == nullptr) return;
-  // A literal default is already scope-independent, so leave it untouched; this
-  // also avoids truncating a wide (>64-bit) literal through the 64-bit fold.
-  // Only name-bearing expressions need to be pinned to the defining scope.
-  if (rp.default_value->kind == ExprKind::kIntegerLiteral) return;
-  auto v = ConstEvalInt(rp.default_value, scope);
+static void FoldPortConstant(Arena& arena, const ScopeMap& scope,
+                             Expr*& value) {
+  if (value == nullptr) return;
+  // A literal is already scope-independent, so leave it untouched; this also
+  // avoids truncating a wide (>64-bit) literal through the 64-bit fold. Only
+  // name-bearing expressions need to be pinned to the defining scope.
+  if (value->kind == ExprKind::kIntegerLiteral) return;
+  auto v = ConstEvalInt(value, scope);
   if (!v) return;
   auto* lit = arena.Create<Expr>();
   lit->kind = ExprKind::kIntegerLiteral;
   lit->int_val = static_cast<uint64_t>(*v);
-  rp.default_value = lit;
+  value = lit;
+}
+
+// A variable output port's initializer is a constant_expression of the same
+// scope (§23.2.2.2), so it is folded the same way for the simulator to read.
+static void FoldPortDefaultValue(Arena& arena, const ScopeMap& scope,
+                                 RtlirPort& rp) {
+  FoldPortConstant(arena, scope, rp.default_value);
+  FoldPortConstant(arena, scope, rp.init_value);
 }
 
 // §23.2.3: port declarations can be based on parameter declarations. In the

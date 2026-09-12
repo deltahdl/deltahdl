@@ -5,6 +5,27 @@ using namespace delta;
 
 namespace {
 
+// A.10 item 2: "It shall be illegal to initialize a port that is not a
+// variable output port or to specify a default value for a port that is not
+// an input port". A variable output port with `= constant_expression` is the
+// initialized port the item permits; an output net with one is the port it
+// forbids initializing.
+TEST(BnfClarificationElaboration, VariableOutputPortInitializerOk) {
+  ElabFixture f;
+  EXPECT_TRUE(ElabOk(
+      "module m(output logic [3:0] q = 4'd9, output var int c = 3); endmodule",
+      f));
+}
+
+TEST(BnfClarificationElaboration, NetOutputPortInitializerError) {
+  ElabFixture f;
+  ElaborateSrc("module m(output q = 1'b0); endmodule", f, "m");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "initializer on output port 'q', which is a net and no variable", 1,
+      "23.2.2.2"));
+}
+
 TEST(BnfClarificationElaboration, RefPortOnModule) {
   EXPECT_TRUE(
       ElabOk("module m(ref int x);\n"

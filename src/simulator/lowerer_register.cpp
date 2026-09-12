@@ -19,6 +19,7 @@
 #include "simulator/sequence_monitor.h"
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"
+#include "simulator/statement_assign_internal.h"
 #include "simulator/stmt_exec.h"
 
 namespace delta {
@@ -110,6 +111,19 @@ void CreatePortVariable(std::string_view name, const RtlirPort& port,
   // needs writing.
   if (PortDefaultsToZero(port))
     v->value = MakeLogic4VecVal(arena, port.width, 0);
+  // §23.2.2.2, footnote 2: a variable output port may be initialized, and its
+  // `= constant_expression` is the value it holds before any procedure runs,
+  // as §6.8 gives a variable declaration's initializer. The value is sized to
+  // the port as an assignment to it would be (§10.7), and a 2-state port takes
+  // it through §6.11.2's conversion as any variable's initializer does.
+  if (port.init_value != nullptr) {
+    Logic4Vec init = OwnRhsWords(
+        ResizeToWidth(EvalExpr(port.init_value, ctx, arena, port.width),
+                      port.width, arena),
+        arena);
+    if (PortDefaultsToZero(port)) CoerceTo2State(init);
+    v->value = init;
+  }
   if (port.is_signed) v->is_signed = true;
   // §11.5.1: "The actual bit that is accessed by an address is, in part,
   // determined by the declaration" -- port.width says how many bits the port

@@ -9,11 +9,25 @@ TEST(DefaultPortValueElaboration, InputPortWithDefaultElaborates) {
   EXPECT_TRUE(ElabOk("module m(input logic a = 1'b0); endmodule", f));
 }
 
-TEST(DefaultPortValueElaboration, OutputPortWithDefaultIsError) {
+// §23.2.2.2's Syntax 23-4 writes `[ = constant_expression ]` behind a
+// variable port's identifier, and its footnote 2 has it "illegal to initialize
+// a port that is not a variable output port or to specify a default value for
+// a port that is not an input port": on a variable output port the expression
+// is the port's initializer, not a §23.2.2.4 default, and is legal.
+TEST(DefaultPortValueElaboration, VariableOutputPortWithInitializerElaborates) {
   ElabFixture f;
-  ElaborateSrc("module m(output logic q = 1'b0); endmodule", f, "m");
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "default value on output port 'q'", 1, "23.2.2.4"));
+  EXPECT_TRUE(ElabOk("module m(output logic q = 1'b0); endmodule", f));
+}
+
+// The same footnote's other half: an output port that is a net is no variable
+// output port, so it can be neither initialized nor given a default.
+TEST(DefaultPortValueElaboration, NetOutputPortWithInitializerIsError) {
+  ElabFixture f;
+  ElaborateSrc("module m(output wire q = 1'b0); endmodule", f, "m");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "initializer on output port 'q', which is a net and no variable", 1,
+      "23.2.2.2"));
 }
 
 TEST(DefaultPortValueElaboration, InterconnectPortWithDefaultIsError) {
