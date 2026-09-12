@@ -181,22 +181,23 @@ RtlirParamDecl* Elaborator::ResolveDefparamSteps(RtlirModule* root,
 // names none or the steps behind that step reach none.
 RtlirParamDecl* Elaborator::ResolveDefparamFromTop(const HierPath& path,
                                                    DefparamTopRooted& rooted) {
-  for (auto* top : defparam_top_roots_) {
-    if (top->name != path.front().name) continue;
-    rooted.root = top;
-    rooted.steps.assign(path.begin() + 1, path.end());
-    // One remaining step names a parameter of the top-level module itself,
-    // which no descent reaches.
-    if (rooted.steps.size() == 1) {
-      for (auto& p : top->params) {
-        if (p.name == rooted.steps.front().name) {
-          rooted.target_mod = top;
-          return &p;
-        }
-      }
-      return nullptr;
-    }
+  RtlirModule* top = nullptr;
+  for (auto* candidate : defparam_top_roots_) {
+    if (candidate->name == path.front().name) top = candidate;
+  }
+  if (top == nullptr) return nullptr;
+  rooted.root = top;
+  rooted.steps.assign(path.begin() + 1, path.end());
+  // One remaining step names a parameter of the top-level module itself,
+  // which no descent reaches.
+  if (rooted.steps.size() != 1) {
     return ResolveDefparamSteps(top, rooted.steps, {}, &rooted.target_mod);
+  }
+  for (auto& p : top->params) {
+    if (p.name == rooted.steps.front().name) {
+      rooted.target_mod = top;
+      return &p;
+    }
   }
   return nullptr;
 }
