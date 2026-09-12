@@ -110,14 +110,15 @@ TEST(AlwaysProcedureInCheckers, GeneralAlwaysInCheckerGenerateIsRejected) {
 // blocks as in its body.
 TEST(AlwaysProcedureInCheckers, AlwaysFfInCheckerGenerateIsAccepted) {
   ElabFixture f;
-  EXPECT_TRUE(
-      ElabOk("checker chk(input logic clk);\n"
-             "  logic a;\n"
-             "  if (1) begin : g\n"
-             "    always_ff @(posedge clk) a <= 1'b1;\n"
-             "  end\n"
-             "endchecker\n",
-             f, "chk"));
+  ElaborateSrc(
+      "checker chk(input logic clk);\n"
+      "  logic a;\n"
+      "  if (1) begin : g\n"
+      "    always_ff @(posedge clk) a <= 1'b1;\n"
+      "  end\n"
+      "endchecker\n",
+      f, "chk");
+  EXPECT_FALSE(f.has_errors);
 }
 
 TEST(AlwaysProcedureInCheckers, GeneralAlwaysOutsideCheckerIsStillAllowed) {
