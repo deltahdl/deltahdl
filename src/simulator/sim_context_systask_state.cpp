@@ -11,6 +11,7 @@
 // class, so the header carries the interface and no one file carries the whole
 // of the context's implementation.
 
+#include <algorithm>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -48,6 +49,26 @@ bool SimContext::IsHierarchicalScope(std::string_view name) const {
 
 void SimContext::RecordListing(std::string_view name) {
   last_listed_scope_ = std::string(name);
+}
+
+std::vector<std::string> SimContext::HierarchicalScopesUnder(
+    std::string_view scope, bool recursive) const {
+  // A scope's own name is not under it, and a name under it has this prefix;
+  // one at the level directly below has no dot beyond the prefix.
+  std::string prefix = std::string(scope) + ".";
+  std::vector<std::string> out;
+  for (const std::string& name : hierarchical_scopes_) {
+    if (name.size() <= prefix.size() ||
+        name.compare(0, prefix.size(), prefix) != 0) {
+      continue;
+    }
+    if (!recursive && name.find('.', prefix.size()) != std::string::npos) {
+      continue;
+    }
+    out.push_back(name);
+  }
+  std::sort(out.begin(), out.end());
+  return out;
 }
 
 void SimContext::RecordShowScopes(std::string_view scope, bool recursive) {

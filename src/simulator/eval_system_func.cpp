@@ -619,15 +619,22 @@ static Logic4Vec EvalAnnexDList(const Expr* expr, SimContext& ctx,
 // scope level (the interactive scope established by $scope). An optional
 // integer argument widens the listing: a nonzero value lists every such
 // object in or below the current hierarchical scope, while no argument or a
-// zero value lists only the objects at the current scope level itself.
-// Evaluate the optional argument to decide the depth and record the request.
+// zero value lists only the objects at the current scope level itself. The
+// list is the registered complete hierarchical names under the scope, the
+// ones $scope may name, printed one per line to the standard output; the
+// request was recorded without the list being produced.
 static Logic4Vec EvalAnnexDShowScopes(const Expr* expr, SimContext& ctx,
                                       Arena& arena) {
   bool recursive = false;
   if (!expr->args.empty() && expr->args[0]) {
     recursive = EvalExpr(expr->args[0], ctx, arena).ToUint64() != 0;
   }
-  ctx.RecordShowScopes(ctx.InteractiveScope(), recursive);
+  const std::string& scope = ctx.InteractiveScope();
+  for (const std::string& name :
+       ctx.HierarchicalScopesUnder(scope, recursive)) {
+    ctx.Out() << name << "\n";
+  }
+  ctx.RecordShowScopes(scope, recursive);
   return MakeLogic4VecVal(arena, 1, 0);
 }
 

@@ -153,14 +153,15 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   void RecordListing(std::string_view name);
   const std::string& LastListedScope() const { return last_listed_scope_; }
 
-  // Optional $showscopes system task (Annex D.12). $showscopes produces a
-  // complete list of the modules, tasks, functions, and named blocks defined at
-  // the current scope level (the interactive scope above). Its optional integer
-  // argument widens the listing: a nonzero value lists every such object in or
-  // below the current hierarchical scope, while no argument or a zero value
-  // lists only the objects at the current scope level itself. Remember the
-  // scope whose contents were shown and whether the listing recursed so the
-  // selection can be observed.
+  // Optional $showscopes system task (Annex D.12). $showscopes lists the
+  // modules, tasks, functions, and named blocks defined at the current scope
+  // level (the interactive scope above), and with a nonzero integer argument
+  // every one in or below it. HierarchicalScopesUnder answers that list from
+  // the registered names, in sorted order; RecordShowScopes remembers the
+  // scope shown and whether the listing recursed so the selection can be
+  // observed.
+  std::vector<std::string> HierarchicalScopesUnder(std::string_view scope,
+                                                   bool recursive) const;
   void RecordShowScopes(std::string_view scope, bool recursive);
   const std::string& LastShownScope() const { return last_shown_scope_; }
   bool ShowScopesRecursive() const { return show_scopes_recursive_; }
