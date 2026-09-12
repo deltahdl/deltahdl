@@ -1,3 +1,4 @@
+#include "parser/expr_parser_internal.h"
 #include "parser/parser.h"
 
 namespace delta {
@@ -125,7 +126,10 @@ void Parser::ParseGenerateBody(std::vector<ModuleItem*>& body,
   // construct its endcase and the if_generate_construct its else branch. Expect
   // reports without consuming, so it survives.
   Expect(TokenKind::kKwEnd, Subclause("27.3"));
-  if (Match(TokenKind::kColon)) Match(TokenKind::kIdentifier);
+  // A.4.2 closes the block with `end [ : generate_block_identifier ]`, the
+  // same identifier the block opened with, and §9.3.4 has the mismatch an
+  // error; an unnamed block has no name for an end label to match.
+  MatchEndBlockLabel(out_label, {});
 }
 
 void Parser::ParseGenerateRegion(std::vector<ModuleItem*>& items) {
@@ -156,17 +160,89 @@ void Parser::ParseGenerateRegion(std::vector<ModuleItem*>& items) {
   Expect(TokenKind::kKwEndgenerate, Subclause("27.3"));
 }
 
+// A.4.2's genvar_initialization, `[ genvar ] genvar_identifier =
+// constant_expression`, read as the blocking assignment the elaborator's
+// loop evaluation takes it for. The header position admits no other form --
+// no select on the genvar, no compound assignment_operator, no
+// inc_or_dec_operator -- so a position holding one is reported at the token
+// that breaks the form and read as the statement it is, which is what lets
+// the rest of the header be read.
+Stmt* Parser::ParseGenvarInitialization() {
+  Match(TokenKind::kKwGenvar);
+  auto saved = lexer_.SavePos();
+  bool is_assignment = CheckIdentifier();
+  if (is_assignment) {
+    Consume();
+    is_assignment = Check(TokenKind::kEq);
+  }
+  lexer_.RestorePos(saved);
+  if (!is_assignment) {
+    diag_.Error(CurrentLoc(),
+                "a loop generate's initialization is written "
+                "'[ genvar ] genvar_identifier = constant_expression'",
+                Subclause("A.4.2"));
+    return ParseAssignmentOrExprStmt();
+  }
+  auto* init = arena_.Create<Stmt>();
+  init->kind = StmtKind::kBlockingAssign;
+  init->range.start = CurrentLoc();
+  Token id = Consume();
+  init->lhs = MakeIdentifierNode(arena_, id.text, id.loc);
+  Consume();
+  init->rhs = ParseExpr();
+  Expect(TokenKind::kSemicolon, Subclause("27.4"));
+  return init;
+}
+
+// Whether a statement read from a loop generate's third header position has
+// one of the three forms A.4.2 gives genvar_iteration: `genvar_identifier
+// assignment_operator genvar_expression`, `inc_or_dec_operator
+// genvar_identifier` or `genvar_identifier inc_or_dec_operator`.
+// Parser::ParseAssignmentOrExprNoSemi records every assignment_operator as a
+// StmtKind::kBlockingAssign, the compound ones with the operation folded into
+// the right-hand side, and `<=` as a StmtKind::kNonblockingAssign, which is no
+// assignment_operator of A.6.2; the two inc_or_dec forms are expression
+// statements over a unary or postfix-unary node.
+static bool IsGenvarIteration(const Stmt* step) {
+  if (step->kind == StmtKind::kBlockingAssign) {
+    return step->lhs != nullptr && step->lhs->kind == ExprKind::kIdentifier;
+  }
+  if (step->kind != StmtKind::kExprStmt || step->expr == nullptr) return false;
+  const Expr* e = step->expr;
+  bool inc_or_dec =
+      (e->kind == ExprKind::kUnary || e->kind == ExprKind::kPostfixUnary) &&
+      (e->op == TokenKind::kPlusPlus || e->op == TokenKind::kMinusMinus);
+  return inc_or_dec && e->lhs != nullptr &&
+         e->lhs->kind == ExprKind::kIdentifier;
+}
+
+// A.4.2's genvar_iteration. A position holding none of its three forms -- a
+// bare `i`, a call, a nonblocking `i <= i + 1` -- is reported where it
+// stands; the elaborator's §27.4 rule that the iteration assign to the
+// genvar the initialization assigned to reads the statement after it.
+Stmt* Parser::ParseGenvarIteration() {
+  SourceLoc loc = CurrentLoc();
+  Stmt* step = ParseAssignmentOrExprNoSemi();
+  if (!IsGenvarIteration(step)) {
+    diag_.Error(loc,
+                "a loop generate's iteration is written 'genvar_identifier "
+                "assignment_operator genvar_expression', 'inc_or_dec_operator "
+                "genvar_identifier' or 'genvar_identifier inc_or_dec_operator'",
+                Subclause("A.4.2"));
+  }
+  return step;
+}
+
 ModuleItem* Parser::ParseGenerateFor() {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kGenerateFor;
   item->loc = CurrentLoc();
   Expect(TokenKind::kKwFor, Subclause("27.4"));
   Expect(TokenKind::kLParen, Subclause("27.4"));
-  Match(TokenKind::kKwGenvar);
-  item->gen_init = ParseAssignmentOrExprStmt();
+  item->gen_init = ParseGenvarInitialization();
   item->gen_cond = ParseExpr();
   Expect(TokenKind::kSemicolon, Subclause("27.4"));
-  item->gen_step = ParseAssignmentOrExprNoSemi();
+  item->gen_step = ParseGenvarIteration();
   Expect(TokenKind::kRParen, Subclause("27.4"));
   // A.4.2 ends loop_generate_construct with its generate_block, so no `else`
   // follows this one.
@@ -231,6 +307,15 @@ ModuleItem* Parser::ParseGenerateCase() {
     // follows this one.
     ParseGenerateBody(ci.body, ci.label, ci.has_begin_end, false);
     item->gen_case_items.push_back(std::move(ci));
+  }
+  // A.4.2 writes the construct `case ( constant_expression )
+  // case_generate_item { case_generate_item } endcase`: one item at least,
+  // and one written with none is reported where its first item was due.
+  if (item->gen_case_items.empty()) {
+    diag_.Error(CurrentLoc(),
+                "a case generate construct has at least one "
+                "case_generate_item",
+                Subclause("A.4.2"));
   }
   Expect(TokenKind::kKwEndcase, Subclause("27.5"));
   return item;

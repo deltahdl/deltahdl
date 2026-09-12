@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <string_view>
 
+#include "common/source_loc.h"
+
 namespace delta {
 
 class Arena;
@@ -21,5 +23,11 @@ uint64_t ParseIntText(std::string_view text);
 // the sized integer literal followed by '(expr) in expr_parser_literals.cpp;
 // defined once in expr_parser.cpp.
 Expr* MakeNodeCast(Arena& arena, Expr* type_node, Expr* value);
+
+// Builds a bare identifier node carrying the given name text and location.
+// Pure node construction; defined in expr_parser.cpp, and shared with the
+// loop generate header in parser_generate.cpp, whose genvar_initialization
+// names its genvar by an identifier alone.
+Expr* MakeIdentifierNode(Arena& arena, std::string_view text, SourceLoc loc);
 
 }  // namespace delta

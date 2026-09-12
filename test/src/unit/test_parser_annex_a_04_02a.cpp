@@ -416,4 +416,161 @@ TEST(GenerateInstantiationGrammar, IfGenerateMissingParenRejected) {
       ReportedError(r.diags, "expected '(', got identifier", 2, "27.5"));
 }
 
+// genvar_initialization ::= [ genvar ] genvar_identifier = constant_expression
+// The first header position holds that assignment and nothing else. The
+// parser read it as any assignment or expression statement, so an increment,
+// a compound assignment and a select on the genvar were each accepted
+// silently.
+TEST(GenerateInstantiationGrammar, LoopGenerateInitIncrementRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  genvar i;\n"
+      "  for (i++; i < 4; i++) begin end\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a loop generate's initialization is written", 3, "A.4.2"));
+}
+
+TEST(GenerateInstantiationGrammar, LoopGenerateInitCompoundAssignRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  genvar i;\n"
+      "  for (i += 1; i < 4; i++) begin end\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a loop generate's initialization is written", 3, "A.4.2"));
+}
+
+TEST(GenerateInstantiationGrammar, LoopGenerateInitSelectRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  genvar i;\n"
+      "  for (i[0] = 0; i < 4; i++) begin end\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a loop generate's initialization is written", 3, "A.4.2"));
+}
+
+// The `genvar` keyword is the production's one option, and what follows it is
+// the same assignment; the genvar and its bound are recorded as the elaborator
+// reads them.
+TEST(GenerateInstantiationGrammar, LoopGenerateInitRecordsGenvarAndBound) {
+  auto r = Parse(
+      "module m;\n"
+      "  for (genvar i = 2; i < 4; i++) begin end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item =
+      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kGenerateFor);
+  ASSERT_NE(item, nullptr);
+  ASSERT_NE(item->gen_init, nullptr);
+  EXPECT_EQ(item->gen_init->kind, StmtKind::kBlockingAssign);
+  ASSERT_NE(item->gen_init->lhs, nullptr);
+  EXPECT_EQ(item->gen_init->lhs->kind, ExprKind::kIdentifier);
+  EXPECT_EQ(item->gen_init->lhs->text, "i");
+  ASSERT_NE(item->gen_init->rhs, nullptr);
+  EXPECT_EQ(item->gen_init->rhs->kind, ExprKind::kIntegerLiteral);
+}
+
+// genvar_iteration ::= genvar_identifier assignment_operator genvar_expression
+//   | inc_or_dec_operator genvar_identifier
+//   | genvar_identifier inc_or_dec_operator
+// The third header position holds one of those three; a bare genvar, a call
+// and a nonblocking assignment were each accepted silently.
+TEST(GenerateInstantiationGrammar, LoopGenerateIterationBareGenvarRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  genvar i;\n"
+      "  for (i = 0; i < 4; i) begin end\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, "a loop generate's iteration is written",
+                            3, "A.4.2"));
+}
+
+TEST(GenerateInstantiationGrammar, LoopGenerateIterationCallRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  genvar i;\n"
+      "  for (i = 0; i < 4; next(i)) begin end\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, "a loop generate's iteration is written",
+                            3, "A.4.2"));
+}
+
+TEST(GenerateInstantiationGrammar, LoopGenerateIterationNonblockingRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  genvar i;\n"
+      "  for (i = 0; i < 4; i <= i + 1) begin end\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, "a loop generate's iteration is written",
+                            3, "A.4.2"));
+}
+
+// The two forms the tests above do not already observe: a compound
+// assignment_operator other than `+=`, and a prefix decrement.
+TEST(GenerateInstantiationGrammar, LoopGenerateIterationOtherForms) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  genvar i, j;\n"
+              "  for (i = 1; i < 16; i *= 2) begin end\n"
+              "  for (j = 4; j > 0; --j) begin end\n"
+              "endmodule\n"));
+}
+
+// case_generate_construct ::= case ( constant_expression ) case_generate_item
+//   { case_generate_item } endcase
+// One item at least; a construct with none was accepted silently.
+TEST(GenerateInstantiationGrammar, CaseGenerateWithoutItemsRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  case (WIDTH)\n"
+      "  endcase\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a case generate construct has at least one case_generate_item",
+      3, "A.4.2"));
+}
+
+// generate_block ::= ... begin [ : generate_block_identifier ] { generate_item
+// }
+//   end [ : generate_block_identifier ]
+// The identifier after `end` is the one the block opened with: §9.3.4 has "it
+// shall be an error if the name at the end is different from the block name
+// at the beginning", and a block with no name has none for it to match. The
+// parser skipped whatever identifier stood there.
+TEST(GenerateInstantiationGrammar, GenerateBlockEndLabelMismatchRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  if (1) begin : g\n"
+      "    assign a = b;\n"
+      "  end : h\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "end label 'h' does not match block name 'g'", 4, "9.3.4"));
+}
+
+TEST(GenerateInstantiationGrammar, GenerateBlockEndLabelOnUnnamedRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  for (genvar i = 0; i < 2; i++) begin\n"
+      "    assign a[i] = b[i];\n"
+      "  end : g\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "end label 'g' specified for unnamed block", 4, "9.3.4"));
+}
+
+// The label before `begin` names the block as the one after it does, so the
+// end label matches either.
+TEST(GenerateInstantiationGrammar, GenerateBlockEndLabelMatchesPrefixLabel) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  if (1) g : begin\n"
+              "    assign a = b;\n"
+              "  end : g\n"
+              "endmodule\n"));
+}
+
 }  // namespace

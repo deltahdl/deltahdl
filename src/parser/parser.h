@@ -160,6 +160,10 @@ class Parser {
                          std::string_view& out_label, bool& out_has_begin_end,
                          bool else_may_follow);
   ModuleItem* ParseGenerateFor();
+  Stmt* ParseGenvarInitialization();
+  Stmt* ParseGenvarIteration();
+  void MatchEndBlockLabel(std::string_view inline_label,
+                          std::string_view prefix_label);
   ModuleItem* ParseGenerateIf();
   void ParseGenerateCaseLabel(GenerateCaseItem& ci);
   ModuleItem* ParseGenerateCase();

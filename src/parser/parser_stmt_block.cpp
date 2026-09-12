@@ -14,28 +14,32 @@ namespace delta {
 // CPD-dedup: a label preceding begin/fork is equivalent to a block name, so the
 // matching name after end/join* may be the inline name or that prefix label.
 // Validates the optional trailing ": name" against the effective block name.
-struct ParserStmtBlockHelpers {
-  static void MatchEndBlockLabel(Parser& p, std::string_view inline_label,
-                                 std::string_view prefix_label) {
-    std::string_view block_name =
-        inline_label.empty() ? prefix_label : inline_label;
-    if (p.Match(TokenKind::kColon)) {
-      auto end_id = p.ExpectIdentifier(Subclause("9.3.4"));
-      if (block_name.empty()) {
-        p.diag_.Error(end_id.loc,
-                      "end label '" + std::string(end_id.text) +
-                          "' specified for unnamed block",
-                      Subclause("9.3.4"));
-      } else if (end_id.text != block_name) {
-        p.diag_.Error(end_id.loc,
-                      "end label '" + std::string(end_id.text) +
-                          "' does not match block name '" +
-                          std::string(block_name) + "'",
-                      Subclause("9.3.4"));
-      }
-    }
+// §9.3.4: "a matching block name may be specified after the block end, join,
+// join_any, or join_none keyword, preceded by a colon", and "it shall be an
+// error if the name at the end is different from the block name at the
+// beginning". A.4.2's generate_block ends the same way, `end [ :
+// generate_block_identifier ]`, so Parser::ParseGenerateBody reads its end
+// label here too. The block's name is the inline one after `begin` or `fork`
+// where there is one, else the §9.3.5 label before it.
+void Parser::MatchEndBlockLabel(std::string_view inline_label,
+                                std::string_view prefix_label) {
+  std::string_view block_name =
+      inline_label.empty() ? prefix_label : inline_label;
+  if (!Match(TokenKind::kColon)) return;
+  auto end_id = ExpectIdentifier(Subclause("9.3.4"));
+  if (block_name.empty()) {
+    diag_.Error(end_id.loc,
+                "end label '" + std::string(end_id.text) +
+                    "' specified for unnamed block",
+                Subclause("9.3.4"));
+  } else if (end_id.text != block_name) {
+    diag_.Error(end_id.loc,
+                "end label '" + std::string(end_id.text) +
+                    "' does not match block name '" + std::string(block_name) +
+                    "'",
+                Subclause("9.3.4"));
   }
-};
+}
 
 std::string_view Parser::TryParseStmtLabel() {
   if (!CheckIdentifier()) return {};
@@ -181,7 +185,7 @@ Stmt* Parser::ParseBlockStmt(std::string_view prefix_label) {
   // endmodule. Expect reports without consuming, so the closer survives.
   Expect(TokenKind::kKwEnd, Subclause("9.3.1"));
 
-  ParserStmtBlockHelpers::MatchEndBlockLabel(*this, stmt->label, prefix_label);
+  MatchEndBlockLabel(stmt->label, prefix_label);
   stmt->range.end = CurrentLoc();
   return stmt;
 }
@@ -233,7 +237,7 @@ Stmt* Parser::ParseForkStmt(std::string_view prefix_label) {
         Subclause("9.3.2"));
   }
 
-  ParserStmtBlockHelpers::MatchEndBlockLabel(*this, stmt->label, prefix_label);
+  MatchEndBlockLabel(stmt->label, prefix_label);
   return stmt;
 }
 
