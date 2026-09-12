@@ -321,6 +321,9 @@ struct SequencePortScan {
       item_saw_explicit_type = true;
     }
     item->prop_formals.push_back(name_tok.text);
+    // §16.8.2: whether this formal is a local variable formal argument, which
+    // §16.10 keeps out of the sequence's clocking events.
+    item->prop_formal_is_local.push_back(item_saw_local);
     // §16.8: the formal starts out with no default; a following `= actual`
     // (handled in DispatchTopLevel) flips this entry to true.
     item->prop_formal_has_default.push_back(false);
@@ -556,44 +559,19 @@ ModuleItem* Parser::ParseSequenceDecl() {
   return item;
 }
 
-// §16.10: a local variable declared in the sequence body cannot be used in the
-// body's clocking event expression. The assertion_variable_declarations are
-// harvested before this runs, so any identifier inside a `@( ... )` event group
-// (an edge signal or an iff guard) that matches a body local is rejected. The
-// whole parenthesized event group is consumed so its names are not also
-// recorded as sequence instance references.
+// §16.10: a local variable of the sequence, one its body declares or a local
+// variable formal argument, cannot be used in the body's clocking event
+// expression, which is the condition Annex F.5.1 puts on its clock rewrite.
+// The assertion_variable_declarations are harvested before this runs, so any
+// identifier inside a `@( ... )` event group (an edge signal or an iff guard)
+// that matches one is rejected. The whole parenthesized event group is
+// consumed so its names are not also recorded as sequence instance references.
 void Parser::ScanSequenceClockEvent(ModuleItem* item) {
   // §16.16(b2): count each explicit clocking event so a multiclocked sequence
   // (a non-leading or additional `@(...)`) can be recognized.
   ++item->decl_clock_event_count;
   Consume();  // '@'
-  if (!Check(TokenKind::kLParen)) return;
-  Consume();  // '('
-  int depth = 1;
-  while (depth > 0 && !AtEnd()) {
-    if (Check(TokenKind::kLParen)) {
-      ++depth;
-    } else if (Check(TokenKind::kRParen)) {
-      --depth;
-    } else if (Check(TokenKind::kIdentifier)) {
-      RejectLocalInClockEvent(item, CurrentToken().text);
-    }
-    Consume();
-  }
-}
-
-void Parser::RejectLocalInClockEvent(const ModuleItem* item,
-                                     std::string_view name) {
-  for (auto local : item->prop_seq_assert_vars) {
-    if (local == name) {
-      diag_.Error(CurrentLoc(),
-                  "local variable \"" + std::string(name) +
-                      "\" may not be used in a clocking event "
-                      "expression",
-                  Subclause("16.10"));
-      return;
-    }
-  }
+  ScanClockEventGroupForLocals(lexer_, diag_, item);
 }
 
 // §16.10: assertion_variable_declarations precede the sequence_expr in the

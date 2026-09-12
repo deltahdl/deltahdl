@@ -19,6 +19,41 @@ bool LexerCheck(Lexer& lexer, TokenKind kind) {
   return cur == kind;
 }
 
+bool IsLocalVariableOfDecl(const ModuleItem* item, std::string_view name) {
+  for (auto local : item->prop_seq_assert_vars) {
+    if (local == name) return true;
+  }
+  for (size_t i = 0; i < item->prop_formals.size(); ++i) {
+    if (item->prop_formals[i] == name &&
+        i < item->prop_formal_is_local.size() &&
+        item->prop_formal_is_local[i]) {
+      return true;
+    }
+  }
+  return false;
+}
+
+void ScanClockEventGroupForLocals(Lexer& lexer, DiagEngine& diag,
+                                  const ModuleItem* item) {
+  if (!LexerCheck(lexer, TokenKind::kLParen)) return;
+  lexer.Next();  // '('
+  int depth = 1;
+  while (depth > 0 && !lexer.Peek().Is(TokenKind::kEof)) {
+    if (LexerCheck(lexer, TokenKind::kLParen)) {
+      ++depth;
+    } else if (LexerCheck(lexer, TokenKind::kRParen)) {
+      --depth;
+    } else if (LexerCheck(lexer, TokenKind::kIdentifier) &&
+               IsLocalVariableOfDecl(item, lexer.Peek().text)) {
+      diag.Error(lexer.Peek().loc,
+                 "local variable \"" + std::string(lexer.Peek().text) +
+                     "\" may not be used in a clocking event expression",
+                 Subclause("16.10"));
+    }
+    lexer.Next();
+  }
+}
+
 // §16.12.17 Restriction 4: cross-token state for the actual-argument scan of
 // one property instance. `d` is the parenthesis depth; the per-argument fields
 // accumulate the identifiers and token count of the argument currently being
@@ -736,11 +771,14 @@ static void ScanPropertyBodyToken(Lexer& lexer, DiagEngine& diag,
     return;
   }
   // §16.16(b2): an `@(...)` in the property body is an explicit clocking event.
-  // Count it (the following parenthesized event group is consumed as ordinary
-  // tokens by later iterations) so a multiclocked property can be recognized.
+  // Count it so a multiclocked property can be recognized, and read its event
+  // group for the local variables §16.10 keeps out of a clocking event, which
+  // is what Annex F.5.1's clock rewrite requires of a property as of a
+  // sequence.
   if (LexerCheck(lexer, TokenKind::kAt)) {
     ++item->decl_clock_event_count;
     lexer.Next();
+    ScanClockEventGroupForLocals(lexer, diag, item);
     return;
   }
   if (ScanCaseDefaultToken(lexer, diag, state)) return;
