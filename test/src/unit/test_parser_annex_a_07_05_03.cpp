@@ -284,6 +284,45 @@ TEST(TimingCheckEventDefParsing, ScalarConditionCaseInequalityScalarConstant) {
   EXPECT_EQ(tc->data_condition->op, TokenKind::kBangEqEq);
 }
 
+// specify_terminal_descriptor names its terminal by A.7.3's input_identifier
+// or output_identifier, each a port_identifier, which A.9.3 spells
+// `simple_identifier | escaped_identifier`. An escaped name in either event
+// is the terminal it names, without the backslash, and §5.6.1 ends it at the
+// white space before the ','.
+TEST(TimingCheckEventDefParsing, EscapedTerminalIdentifiers) {
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $setup(\\data-in , posedge \\clk-1 , 10);\n"
+      "endspecify\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* tc = GetSoleTimingCheck(r);
+  ASSERT_NE(tc, nullptr);
+  EXPECT_EQ(tc->data_terminal.name, "data-in");
+  EXPECT_EQ(tc->ref_edge, SpecifyEdge::kPosedge);
+  EXPECT_EQ(tc->ref_terminal.name, "clk-1");
+}
+
+// input_identifier ::= ... | interface_identifier . port_identifier, both
+// halves identifiers and so each an escaped_identifier where written so; a
+// controlled_timing_check_event names the terminal through that form as a
+// timing_check_event does.
+TEST(TimingCheckEventDefParsing, EscapedInterfacePortTerminal) {
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $width(negedge \\bus-1 .\\rd-en , 5);\n"
+      "endspecify\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* tc = GetSoleTimingCheck(r);
+  ASSERT_NE(tc, nullptr);
+  EXPECT_EQ(tc->ref_edge, SpecifyEdge::kNegedge);
+  EXPECT_EQ(tc->ref_terminal.interface_name, "bus-1");
+  EXPECT_EQ(tc->ref_terminal.name, "rd-en");
+}
+
 // edge_descriptor enumerates a closed set (01|10|z_or_x zero_or_one|
 // zero_or_one z_or_x); a token outside it — here "00", whose two digits match
 // and so satisfy neither zero_or_one zero_or_one form — must be rejected.

@@ -247,13 +247,20 @@ SpecifyEdge Parser::ParseSpecifyEdge(
   return SpecifyEdge::kNone;
 }
 
+// A.7.3's specify_input_terminal_descriptor and
+// specify_output_terminal_descriptor, which A.7.5.3's timing_check_event and
+// A.7.2's path descriptions share: an input_identifier or output_identifier,
+// each a port_identifier or `interface_identifier . port_identifier`, with an
+// optional `[ constant_range_expression ]`. Every identifier here is A.9.3's
+// `simple_identifier | escaped_identifier`, so each is read by
+// Parser::ExpectIdentifier, which takes either.
 SpecifyTerminal Parser::ParseSpecifyTerminal() {
   SpecifyTerminal term;
-  term.name = Expect(TokenKind::kIdentifier, Subclause("30.4")).text;
+  term.name = ExpectIdentifier(Subclause("30.4")).text;
 
   if (Match(TokenKind::kDot)) {
     term.interface_name = term.name;
-    term.name = Expect(TokenKind::kIdentifier, Subclause("25.6")).text;
+    term.name = ExpectIdentifier(Subclause("25.6")).text;
   }
 
   if (Match(TokenKind::kLBracket)) {
