@@ -1,4 +1,5 @@
 #include <optional>
+#include <string>
 
 #include "parser/parser.h"
 
@@ -369,9 +370,32 @@ void Parser::ParseInterconnectItem(std::vector<ModuleItem*>& items) {
   ParseVarDeclList(items, dtype);
 }
 
+// C.4.2 has two forms of assignment by where they are placed, "continuous
+// assignments, placed outside any procedures" and "procedural continuous
+// assignments, placed within a procedure", and A.6.2 has deassign, force and
+// release in the procedural_continuous_assignment alone, a statement_item. One
+// of the three written where a module item stands is that statement outside
+// any procedure; it is reported as such at its keyword and read to its ';' so
+// that the items behind it are still read.
+void Parser::RejectProceduralContinuousAssignItem() {
+  const Token& kw = CurrentToken();
+  diag_.Error(kw.loc,
+              std::string("'") + std::string(kw.text) +
+                  "' is a procedural continuous assignment statement and is "
+                  "placed within a procedure; outside any procedure the "
+                  "assignment is the continuous 'assign' alone",
+              Subclause("C.4.2"));
+  SkipToSemicolon(lexer_);
+}
+
 bool Parser::TryParseMiscKeywordItem(std::vector<ModuleItem*>& items) {
   if (Check(TokenKind::kKwAssign)) {
     ParseContinuousAssign(items);
+    return true;
+  }
+  if (Check(TokenKind::kKwDeassign) || Check(TokenKind::kKwForce) ||
+      Check(TokenKind::kKwRelease)) {
+    RejectProceduralContinuousAssignItem();
     return true;
   }
   if (TryParseProcessBlock(items)) return true;

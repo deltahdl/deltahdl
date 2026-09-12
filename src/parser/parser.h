@@ -131,6 +131,7 @@ class Parser {
   bool AtMisplacedMethodQualifier();
   void RejectMisplacedMethodQualifier(std::vector<ModuleItem*>& items);
   bool TryParseMiscKeywordItem(std::vector<ModuleItem*>& items);
+  void RejectProceduralContinuousAssignItem();
   void ParseTimeunitItem();
   void ParseInterconnectItem(std::vector<ModuleItem*>& items);
   bool TryParseNonPortItem(std::vector<ModuleItem*>& items);
