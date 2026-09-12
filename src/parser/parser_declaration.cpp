@@ -530,10 +530,20 @@ Direction Parser::ParseArgDirection(FunctionArg& arg, Direction sticky_dir,
 
 // §8.17: the 'default' sentinel in a class constructor argument list. Records
 // a default placeholder argument; returns true when consumed so the caller
-// skips to the next argument.
+// skips to the next argument. A.1.9 gives the sentinel to
+// class_constructor_arg alone -- `class_constructor_arg ::= tf_port_item |
+// default` -- where A.2.7's tf_port_item, the argument of every other task and
+// function, has no such form, so one in another subroutine's list is reported
+// and still recorded.
 bool Parser::TryParseDefaultArgSentinel(std::vector<FunctionArg>& args,
                                         FuncArgScan& scan) {
   if (!Check(TokenKind::kKwDefault)) return false;
+  if (!scan.constructor_args) {
+    diag_.Error(CurrentLoc(),
+                "a 'default' argument stands in a class constructor's "
+                "argument list alone",
+                Subclause("A.1.9"));
+  }
   if (scan.seen_default) {
     diag_.Error(CurrentLoc(),
                 "'default' keyword shall appear at most once "
@@ -605,7 +615,8 @@ void Parser::ParseOneFunctionArg(std::vector<FunctionArg>& args,
   args.push_back(arg);
 }
 
-std::vector<FunctionArg> Parser::ParseFunctionArgs(bool require_identifiers) {
+std::vector<FunctionArg> Parser::ParseFunctionArgs(bool require_identifiers,
+                                                   bool constructor_args) {
   std::vector<FunctionArg> args;
   Expect(TokenKind::kLParen, Subclause("13.3"));
   if (Check(TokenKind::kRParen)) {
@@ -617,6 +628,7 @@ std::vector<FunctionArg> Parser::ParseFunctionArgs(bool require_identifiers) {
   // direction or data type; it falls back to the default direction (input) and
   // default data type (logic). That carried state lives in FuncArgScan.
   FuncArgScan scan;
+  scan.constructor_args = constructor_args;
   do {
     ParseOneFunctionArg(args, scan, require_identifiers);
   } while (Match(TokenKind::kComma));
@@ -754,7 +766,7 @@ ModuleItem* Parser::ParseFunctionDecl(bool prototype_only) {
   ParseFuncName(item);
 
   if (Check(TokenKind::kLParen)) {
-    item->func_args = ParseFunctionArgs(!prototype_only);
+    item->func_args = ParseFunctionArgs(!prototype_only, item->name == "new");
     item->is_ansi_ports = true;
   }
   Expect(TokenKind::kSemicolon, Subclause("13.4"));

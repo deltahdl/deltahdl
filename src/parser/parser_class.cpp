@@ -1,3 +1,6 @@
+#include <cstdint>
+#include <format>
+
 #include "parser/parser.h"
 
 namespace delta {
@@ -474,6 +477,46 @@ bool Parser::ParseClassQualifiers(ClassMember* m) {
   return proto;
 }
 
+// A.1.9 gives each kind of class_item its own qualifiers: class_property
+// takes `{ property_qualifier }`, rand, randc, static, protected and local,
+// and the const form `const { class_item_qualifier }`; class_method takes
+// `{ method_qualifier }`, `[ pure ] virtual`, static, protected and local,
+// and `extern` before a prototype; A.1.10's constraint_prototype and
+// constraint_declaration take extern, pure and static; a nested
+// class_declaration opens with `[ virtual ]`; a type_declaration is a
+// data_declaration and takes what a class_property takes; and a
+// local_parameter_declaration, a parameter_declaration and a
+// covergroup_declaration take none. ParseClassQualifiers reads every qualifier
+// before it knows which item follows, so what it read is checked here against
+// `allowed`, the set the item admits, and each qualifier outside it is
+// reported at the item under A.1.9 and left as it was read.
+void Parser::RejectMisplacedClassQualifiers(const ClassMember& member,
+                                            uint16_t allowed,
+                                            const char* item) {
+  struct Qualifier {
+    bool present;
+    uint16_t bit;
+    const char* keyword;
+  };
+  const Qualifier kQualifiers[] = {
+      {member.is_rand, kQualRand, "rand"},
+      {member.is_randc, kQualRandc, "randc"},
+      {member.is_static, kQualStatic, "static"},
+      {member.is_protected, kQualProtected, "protected"},
+      {member.is_local, kQualLocal, "local"},
+      {member.is_virtual, kQualVirtual, "virtual"},
+      {member.is_pure_virtual, kQualPure, "pure"},
+      {member.is_const, kQualConst, "const"},
+      {member.is_constraint_extern, kQualExtern, "extern"},
+  };
+  for (const auto& q : kQualifiers) {
+    if (!q.present || (allowed & q.bit) != 0) continue;
+    diag_.Error(member.loc,
+                std::format("'{}' is no qualifier of a {}", q.keyword, item),
+                Subclause("A.1.9"));
+  }
+}
+
 void Parser::ValidateClassMethod(ClassMember* member) {
   if (member->method->is_static) {
     diag_.Error(member->method->loc,
@@ -548,6 +591,18 @@ bool Parser::TryParseMethodOrConstraint(std::vector<ClassMember*>& members,
                                         ClassMember* member, bool proto) {
   bool is_func = Check(TokenKind::kKwFunction);
   if (is_func || Check(TokenKind::kKwTask)) {
+    RejectMisplacedClassQualifiers(*member,
+                                   kQualStatic | kQualProtected | kQualLocal |
+                                       kQualVirtual | kQualPure | kQualExtern,
+                                   "class method");
+    // A.1.9's method_qualifier is `[ pure ] virtual`: `pure` stands before
+    // `virtual` and before nothing else.
+    if (member->is_pure_virtual && !member->is_virtual) {
+      diag_.Error(member->loc,
+                  "'pure' qualifies 'virtual'; a method is pure virtual or "
+                  "virtual",
+                  Subclause("A.1.9"));
+    }
     member->kind = ClassMemberKind::kMethod;
     member->method = is_func ? ParseFunctionDecl(proto) : ParseTaskDecl(proto);
     // Mirror the method name onto the ClassMember, like every other member kind
@@ -561,6 +616,8 @@ bool Parser::TryParseMethodOrConstraint(std::vector<ClassMember*>& members,
     return true;
   }
   if (Check(TokenKind::kKwConstraint)) {
+    RejectMisplacedClassQualifiers(
+        *member, kQualStatic | kQualPure | kQualExtern, "class constraint");
     members.push_back(ParseConstraintStub(member));
     return true;
   }
@@ -571,6 +628,10 @@ bool Parser::TryParseKeywordClassMember(std::vector<ClassMember*>& members,
                                         ClassMember* member, bool proto) {
   if (TryParseMethodOrConstraint(members, member, proto)) return true;
   if (Check(TokenKind::kKwTypedef)) {
+    RejectMisplacedClassQualifiers(
+        *member,
+        kQualRand | kQualRandc | kQualStatic | kQualProtected | kQualLocal,
+        "type declaration");
     member->kind = ClassMemberKind::kTypedef;
     member->typedef_item = ParseTypedef();
     member->name = member->typedef_item->name;
@@ -578,6 +639,7 @@ bool Parser::TryParseKeywordClassMember(std::vector<ClassMember*>& members,
     return true;
   }
   if (Check(TokenKind::kKwParameter) || Check(TokenKind::kKwLocalparam)) {
+    RejectMisplacedClassQualifiers(*member, 0, "parameter declaration");
     std::vector<ModuleItem*> param_items;
     ParseParamDecl(param_items);
     for (size_t i = 0; i < param_items.size(); ++i) {
@@ -595,13 +657,20 @@ bool Parser::TryParseKeywordClassMember(std::vector<ClassMember*>& members,
     return true;
   }
   if (IsAtClassDecl()) {
+    RejectMisplacedClassQualifiers(*member, kQualVirtual,
+                                   "nested class declaration");
     member->kind = ClassMemberKind::kClassDecl;
     member->nested_class = ParseClassDecl();
+    // A.1.9's class_declaration opens with `[ virtual ] class`, and the
+    // `virtual` of a nested one was read as a member qualifier above, so the
+    // declaration takes it from the member.
+    if (member->is_virtual) member->nested_class->is_virtual = true;
     member->name = member->nested_class->name;
     members.push_back(member);
     return true;
   }
   if (Check(TokenKind::kKwCovergroup)) {
+    RejectMisplacedClassQualifiers(*member, 0, "covergroup declaration");
     member->kind = ClassMemberKind::kCovergroup;
     std::vector<ModuleItem*> temp;
     ParseCovergroupDecl(temp);
@@ -659,6 +728,10 @@ void Parser::ParseClassMembers(std::vector<ClassMember*>& members) {
   // (6.19/7.2) a class property may use an inline enum/struct/union data type,
   // which ParseDataType() does not consume; dispatch those here first, as every
   // other data-type caller must.
+  RejectMisplacedClassQualifiers(*member,
+                                 kQualRand | kQualRandc | kQualStatic |
+                                     kQualProtected | kQualLocal | kQualConst,
+                                 "class property");
   DataType dtype;
   if (!TryParseInlineAggregateType(dtype)) dtype = ParseDataType();
   member->kind = ClassMemberKind::kProperty;

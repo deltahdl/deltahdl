@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <functional>
 #include <string>
 #include <string_view>
@@ -187,6 +188,21 @@ class Parser {
   bool TryParseKeywordClassMember(std::vector<ClassMember*>& members,
                                   ClassMember* member, bool proto);
   bool ParseClassQualifiers(ClassMember* member);
+  // The qualifiers A.1.9 lets stand before one kind of class_item, as a set
+  // of ClassQualifier bits, for RejectMisplacedClassQualifiers.
+  enum ClassQualifier : uint16_t {
+    kQualRand = 1,
+    kQualRandc = 2,
+    kQualStatic = 4,
+    kQualProtected = 8,
+    kQualLocal = 16,
+    kQualVirtual = 32,
+    kQualPure = 64,
+    kQualConst = 128,
+    kQualExtern = 256,
+  };
+  void RejectMisplacedClassQualifiers(const ClassMember& member,
+                                      uint16_t allowed, const char* item);
   bool VirtualIsClassQualifier();
   bool TryConsumeClassQualifier(ClassMember* m, TokenKind kw,
                                 bool ClassMember::* flag, const char* dup_msg);
@@ -416,13 +432,17 @@ class Parser {
   // argument's data type, whether this is the first argument, and whether the
   // previous slot was the 'default' sentinel.
   struct FuncArgScan {
+    // Whether the list is a class_constructor_arg_list, the one A.1.9 lets a
+    // `default` argument stand in.
+    bool constructor_args = false;
     Direction sticky_dir = Direction::kInput;
     bool seen_default = false;
     DataType prev_data_type;
     bool first_arg = true;
     bool prev_was_default = false;
   };
-  std::vector<FunctionArg> ParseFunctionArgs(bool require_identifiers = true);
+  std::vector<FunctionArg> ParseFunctionArgs(bool require_identifiers = true,
+                                             bool constructor_args = false);
   bool TryParseDefaultArgSentinel(std::vector<FunctionArg>& args,
                                   FuncArgScan& scan);
   void ParseFunctionArgTrailer(FunctionArg& arg, bool require_identifiers);

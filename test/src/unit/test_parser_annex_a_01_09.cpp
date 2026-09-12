@@ -7,6 +7,7 @@
 // separate subclause, so they are not A.1.9's own requirements.
 
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -495,6 +496,179 @@ TEST(ClassItems, ClassConstraintDeclarationAndPrototype) {
   EXPECT_FALSE(c->members[0]->is_constraint_prototype);
   EXPECT_EQ(c->members[1]->kind, ClassMemberKind::kConstraint);
   EXPECT_TRUE(c->members[1]->is_constraint_prototype);
+}
+
+// --- the qualifiers each class_item admits -----------------------------------
+// A.1.9 gives each item its own: class_property `{ property_qualifier }` and
+// the const form's `const { class_item_qualifier }`; class_method
+// `{ method_qualifier }`, `[ pure ] virtual` and class_item_qualifier, with
+// `extern` before a prototype; class_constraint what A.1.10 gives a
+// constraint_prototype and a constraint_declaration, extern, pure and static;
+// a nested class_declaration its `[ virtual ]`; a type_declaration, being a
+// data_declaration, what a property takes; and a parameter declaration and a
+// covergroup_declaration none. The parser read every qualifier before it knew
+// the item and kept whatever it read, so each of the forms below was accepted
+// silently.
+
+TEST(ClassItems, MethodQualifierAdmitsNoRandomQualifierOrConst) {
+  auto r = Parse(
+      "class C;\n"
+      "  rand function void f();\n"
+      "  endfunction\n"
+      "  const task t();\n"
+      "  endtask\n"
+      "endclass\n");
+  EXPECT_TRUE(ReportedError(r.diags, "'rand' is no qualifier of a class method",
+                            2, "A.1.9"));
+  EXPECT_TRUE(ReportedError(
+      r.diags, "'const' is no qualifier of a class method", 4, "A.1.9"));
+}
+
+// method_qualifier ::= [ pure ] virtual | class_item_qualifier: `pure` stands
+// before `virtual` and before nothing else.
+TEST(ClassItems, PureWithoutVirtualIsRejected) {
+  auto r = Parse(
+      "class C;\n"
+      "  pure function void f();\n"
+      "endclass\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "'pure' qualifies 'virtual'; a method is pure virtual", 2,
+      "A.1.9"));
+}
+
+TEST(ClassItems, PropertyQualifierAdmitsNoMethodQualifier) {
+  auto r = Parse(
+      "class C;\n"
+      "  virtual int x;\n"
+      "  pure virtual int y;\n"
+      "  extern int z;\n"
+      "endclass\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "'virtual' is no qualifier of a class property", 2, "A.1.9"));
+  EXPECT_TRUE(ReportedError(
+      r.diags, "'pure' is no qualifier of a class property", 3, "A.1.9"));
+  EXPECT_TRUE(ReportedError(
+      r.diags, "'extern' is no qualifier of a class property", 4, "A.1.9"));
+}
+
+// The qualifiers a property does take are left as they were: a report on one
+// item is no report on the next.
+TEST(ClassItems, PropertyQualifiersEachAdmitted) {
+  EXPECT_TRUE(
+      ParseOk("class C;\n"
+              "  rand int a;\n"
+              "  randc bit [1:0] b;\n"
+              "  static int c;\n"
+              "  protected int d;\n"
+              "  local int e;\n"
+              "  const static int f = 1;\n"
+              "  static const int g = 2;\n"
+              "endclass\n"));
+}
+
+TEST(ClassItems, ConstraintAdmitsNoPropertyOrMethodQualifier) {
+  auto r = Parse(
+      "class C;\n"
+      "  rand constraint c1 { x > 0; }\n"
+      "  protected constraint c2 { x > 0; }\n"
+      "  virtual constraint c3;\n"
+      "  static constraint c4 { x > 0; }\n"
+      "  extern constraint c5;\n"
+      "  pure constraint c6;\n"
+      "endclass\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "'rand' is no qualifier of a class constraint", 2, "A.1.9"));
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "'protected' is no qualifier of a class constraint",
+                            3, "A.1.9"));
+  EXPECT_TRUE(ReportedError(
+      r.diags, "'virtual' is no qualifier of a class constraint", 4, "A.1.9"));
+  EXPECT_FALSE(ReportedError(r.diags, "is no qualifier of a class constraint",
+                             5, "A.1.9"));
+  EXPECT_FALSE(ReportedError(r.diags, "is no qualifier of a class constraint",
+                             6, "A.1.9"));
+  EXPECT_FALSE(ReportedError(r.diags, "is no qualifier of a class constraint",
+                             7, "A.1.9"));
+}
+
+TEST(ClassItems, ParameterAndCovergroupAdmitNoQualifier) {
+  auto r = Parse(
+      "class C;\n"
+      "  static parameter int W = 4;\n"
+      "  local localparam int D = 2;\n"
+      "  protected covergroup cg;\n"
+      "  endgroup\n"
+      "endclass\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "'static' is no qualifier of a parameter declaration", 2,
+      "A.1.9"));
+  EXPECT_TRUE(ReportedError(
+      r.diags, "'local' is no qualifier of a parameter declaration", 3,
+      "A.1.9"));
+  EXPECT_TRUE(ReportedError(
+      r.diags, "'protected' is no qualifier of a covergroup declaration", 4,
+      "A.1.9"));
+}
+
+TEST(ClassItems, TypeDeclarationAdmitsNoMethodQualifierOrConst) {
+  auto r = Parse(
+      "class C;\n"
+      "  virtual typedef int t1;\n"
+      "  const typedef int t2;\n"
+      "endclass\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "'virtual' is no qualifier of a type declaration", 2, "A.1.9"));
+  EXPECT_TRUE(ReportedError(
+      r.diags, "'const' is no qualifier of a type declaration", 3, "A.1.9"));
+}
+
+// class_declaration ::= [ virtual ] class ...: the `virtual` of a nested class
+// is the declaration's, and the parser read it as a member qualifier and
+// dropped it, so the nested class was recorded as a concrete one. Every other
+// qualifier before a nested class is no part of its declaration.
+TEST(ClassItems, NestedVirtualClassKeepsItsVirtual) {
+  auto r = Parse(
+      "class C;\n"
+      "  virtual class Inner;\n"
+      "  endclass\n"
+      "  static class Other;\n"
+      "  endclass\n"
+      "endclass\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "'static' is no qualifier of a nested class declaration", 4,
+      "A.1.9"));
+  const ClassDecl* c = FirstClass(r);
+  ASSERT_NE(c, nullptr);
+  ASSERT_EQ(c->members.size(), 2u);
+  ASSERT_NE(c->members[0]->nested_class, nullptr);
+  EXPECT_TRUE(c->members[0]->nested_class->is_virtual);
+  ASSERT_NE(c->members[1]->nested_class, nullptr);
+  EXPECT_FALSE(c->members[1]->nested_class->is_virtual);
+}
+
+// --- class_constructor_arg
+// ----------------------------------------------------- class_constructor_arg
+// ::= tf_port_item | default. The `default` argument is a class constructor's;
+// A.2.7's tf_port_item, the argument of every other task and function, has no
+// such form, and the parser recorded one in any list.
+TEST(ClassItems, DefaultArgumentOutsideConstructorIsRejected) {
+  auto r = Parse(
+      "class C;\n"
+      "  function void f(int a, default);\n"
+      "  endfunction\n"
+      "  task t(default);\n"
+      "  endtask\n"
+      "endclass\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "a 'default' argument stands in a class constructor's argument list "
+      "alone",
+      2, "A.1.9"));
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "a 'default' argument stands in a class constructor's argument list "
+      "alone",
+      4, "A.1.9"));
 }
 
 }  // namespace
