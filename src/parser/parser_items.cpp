@@ -444,30 +444,30 @@ ModuleItem* Parser::ParseExternTfDeclaration(SourceLoc extern_loc) {
   return item;
 }
 
-bool Parser::TryParseMiscKeywordItem(std::vector<ModuleItem*>& items) {
-  // Parses a timeunit/timeprecision declaration with its surrounding §3.14.2
-  // snapshot/validate dance. Kept as a local lambda so its branch logic is
-  // scored separately and does not inflate this dispatcher's complexity.
-  auto parse_timeunit = [&] {
-    bool validate_pkg = !current_module_ && current_package_ != nullptr;
-    TimeScopeRefs refs =
-        CollectTimeScopeRefs(current_module_, current_package_);
-    auto loc = CurrentLoc();
-    ParseTimeunitDecl(current_module_, nullptr,
-                      validate_pkg ? current_package_ : nullptr);
-    ValidateTimeScopeAfterParse(refs, diag_, loc);
-  };
-  // Parses an `interconnect` net declaration (§6.6.8), including its optional
-  // signedness and packed dimensions, into a var-decl list.
-  auto parse_interconnect = [&] {
-    Consume();
-    DataType dtype = MakeInterconnectDataType();
-    dtype.is_signed = Match(TokenKind::kKwSigned);
-    if (!dtype.is_signed) Match(TokenKind::kKwUnsigned);
-    ParsePackedDims(dtype);
-    ParseVarDeclList(items, dtype);
-  };
+// Parses a timeunit/timeprecision declaration with its surrounding §3.14.2
+// snapshot/validate dance. A function of its own so its branch logic is
+// scored separately and does not inflate the dispatcher's complexity.
+void Parser::ParseTimeunitItem() {
+  bool validate_pkg = !current_module_ && current_package_ != nullptr;
+  TimeScopeRefs refs = CollectTimeScopeRefs(current_module_, current_package_);
+  auto loc = CurrentLoc();
+  ParseTimeunitDecl(current_module_, nullptr,
+                    validate_pkg ? current_package_ : nullptr);
+  ValidateTimeScopeAfterParse(refs, diag_, loc);
+}
 
+// Parses an `interconnect` net declaration (§6.6.8), including its optional
+// signedness and packed dimensions, into a var-decl list.
+void Parser::ParseInterconnectItem(std::vector<ModuleItem*>& items) {
+  Consume();
+  DataType dtype = MakeInterconnectDataType();
+  dtype.is_signed = Match(TokenKind::kKwSigned);
+  if (!dtype.is_signed) Match(TokenKind::kKwUnsigned);
+  ParsePackedDims(dtype);
+  ParseVarDeclList(items, dtype);
+}
+
+bool Parser::TryParseMiscKeywordItem(std::vector<ModuleItem*>& items) {
   if (Check(TokenKind::kKwAssign)) {
     ParseContinuousAssign(items);
     return true;
@@ -486,7 +486,7 @@ bool Parser::TryParseMiscKeywordItem(std::vector<ModuleItem*>& items) {
     RejectInCheckerBody(
         "a timeunit or timeprecision declaration is not an item of a "
         "checker; a checker sets no time scope");
-    parse_timeunit();
+    ParseTimeunitItem();
     return true;
   }
   if (Check(TokenKind::kKwLet)) {
@@ -494,7 +494,7 @@ bool Parser::TryParseMiscKeywordItem(std::vector<ModuleItem*>& items) {
     return true;
   }
   if (Check(TokenKind::kKwInterconnect)) {
-    parse_interconnect();
+    ParseInterconnectItem(items);
     return true;
   }
   if (Check(TokenKind::kKwBind)) {
