@@ -412,4 +412,62 @@ TEST(ConfigSourceText, UseClauseParamsWithConfigSuffix) {
   EXPECT_TRUE(rule->use_config);
 }
 
+// --- The three forms of use_clause each name something: a cell, a list of
+// named_parameter_assignment, or a cell with such a list, and §33.4.1.6 says
+// what the clause is for, "it specifies the exact library and cell to which a
+// selected cell or instance is bound". A `use` followed by nothing but its
+// terminator, or by the `: config` suffix alone, is none of the three. ---
+
+TEST(ConfigSourceText, UseClauseNamingNothingIsRejected) {
+  auto r = Parse(
+      "config cfg;\n"
+      "  design top;\n"
+      "  instance top.u1 use;\n"
+      "endconfig\n");
+  ASSERT_NE(r.cu, nullptr);
+  // The report stands at the `use` keyword.
+  EXPECT_TRUE(ReportedError(
+      r.diags, "use clause names a cell, a parameter assignment, or both", 3,
+      "A.1.5"));
+}
+
+TEST(ConfigSourceText, UseClauseConfigSuffixAloneIsRejected) {
+  auto r = Parse(
+      "config cfg;\n"
+      "  design top;\n"
+      "  instance top.u1 use : config;\n"
+      "endconfig\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "use clause names a cell, a parameter assignment, or both", 3,
+      "A.1.5"));
+}
+
+TEST(ConfigSourceText, CellClauseUseNamingNothingIsRejected) {
+  auto r = Parse(
+      "config cfg;\n"
+      "  design top;\n"
+      "  cell adder use;\n"
+      "endconfig\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "use clause names a cell, a parameter assignment, or both", 3,
+      "A.1.5"));
+}
+
+// The second form, a parameter assignment list with no cell, is one of the
+// three and stays accepted.
+TEST(ConfigSourceText, UseClauseParamsAloneIsKept) {
+  auto r = Parse(
+      "config cfg;\n"
+      "  design top;\n"
+      "  instance top.u1 use .W(8);\n"
+      "endconfig\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rule = r.cu->configs[0]->rules[0];
+  EXPECT_TRUE(rule->use_cell.empty());
+  ASSERT_EQ(rule->use_params.size(), 1u);
+}
+
 }  // namespace

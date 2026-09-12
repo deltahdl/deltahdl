@@ -96,6 +96,7 @@ void Parser::ParseUseClauseCell(ConfigRule* rule) {
 }
 
 void Parser::ParseUseClause(ConfigRule* rule) {
+  auto use_loc = CurrentLoc();
   Expect(TokenKind::kKwUse, Subclause("33.4.1.6"));
 
   // Parses a comma-separated list of named_parameter_assignment, consuming the
@@ -132,6 +133,18 @@ void Parser::ParseUseClause(ConfigRule* rule) {
   if (Match(TokenKind::kColon) && Check(TokenKind::kKwConfig)) {
     Consume();
     rule->use_config = true;
+  }
+
+  // A.1.5 gives use_clause three forms, and each names something: a cell, a
+  // list of named_parameter_assignment, or a cell with such a list. §33.4.1.6
+  // says what the clause is for, "it specifies the exact library and cell to
+  // which a selected cell or instance is bound", and a `use` followed by its
+  // terminator, or by the `: config` suffix alone, specifies nothing.
+  if (rule->use_cell.empty() && rule->use_params.empty() &&
+      !rule->use_param_reset_all) {
+    diag_.Error(use_loc,
+                "use clause names a cell, a parameter assignment, or both",
+                Subclause("A.1.5"));
   }
 }
 
