@@ -397,4 +397,34 @@ TEST(UdpDeclGrammar, MissingEndprimitiveInUdpDeclarationProductionIsError) {
       ReportedError(r.diags, "expected 'endprimitive', got EOF", 6, "29.3"));
 }
 
+// Every alternative of udp_declaration names the UDP by a udp_identifier,
+// which A.9.3 spells `simple_identifier | escaped_identifier`, in the header
+// and again in the `[ : udp_identifier ]` after endprimitive; the parser looked
+// for a simple identifier in the header of the definition and of the extern
+// declaration alike, so a UDP with an escaped name was reported as a missing
+// identifier. §5.6.1 ends an escaped identifier at white space, so each below
+// is followed by a space.
+TEST(UdpDeclGrammar, EscapedUdpIdentifier) {
+  auto r = Parse(
+      "extern primitive \\inv-1 (output q, input a);\n"
+      "primitive \\inv-1 (output q, input a);\n"
+      "  table 0 : 1; 1 : 0; endtable\n"
+      "endprimitive : \\inv-1\n"
+      "module m;\n"
+      "  wire q, a;\n"
+      "  \\inv-1 u1(q, a);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->udps.size(), 2u);
+  EXPECT_EQ(r.cu->udps[0]->name, "inv-1");
+  EXPECT_EQ(r.cu->udps[1]->name, "inv-1");
+  EXPECT_EQ(r.cu->udps[1]->table.size(), 2u);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  auto* inst =
+      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kUdpInst);
+  ASSERT_NE(inst, nullptr);
+  EXPECT_EQ(inst->inst_module, "inv-1");
+}
+
 }  // namespace

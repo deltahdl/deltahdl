@@ -774,7 +774,7 @@ UdpDecl* Parser::ParseUdpDecl() {
   auto* udp = arena_.Create<UdpDecl>();
   udp->range.start = CurrentLoc();
   Expect(TokenKind::kKwPrimitive, Subclause("29.3"));
-  udp->name = Expect(TokenKind::kIdentifier, Subclause("29.3.1")).text;
+  udp->name = ExpectIdentifier(Subclause("29.3.1")).text;
 
   Expect(TokenKind::kLParen, Subclause("29.3.1"));
   if (Check(TokenKind::kDotStar)) {
@@ -819,7 +819,7 @@ UdpDecl* Parser::ParseExternUdpDecl() {
   auto* udp = arena_.Create<UdpDecl>();
   udp->range.start = CurrentLoc();
   Expect(TokenKind::kKwPrimitive, Subclause("29.3"));
-  udp->name = Expect(TokenKind::kIdentifier, Subclause("29.3.1")).text;
+  udp->name = ExpectIdentifier(Subclause("29.3.1")).text;
 
   Expect(TokenKind::kLParen, Subclause("29.3.1"));
   ParseAttributes();
