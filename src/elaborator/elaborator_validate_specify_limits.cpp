@@ -49,16 +49,26 @@ static bool IsConstantFlag(const Expr* flag, const ScopeMap& scope) {
   return true;
 }
 
-// Reports one flag of a $timeskew or $fullskew that is no constant expression,
-// naming the check and the flag; a flag left out is nothing to check.
+// One of the two checks A.7.5.1 gives flags to, as its own subclause's table
+// describes it: the check, the system task the report names, and the
+// subclause whose table describes the flags, §31.4.2 for Table 31-8 and
+// §31.4.3 for Table 31-9.
+struct FlaggedTimingCheck {
+  const SpecifyItem* si;
+  std::string_view task;
+  Subclause subclause;
+};
+
+// Reports one flag of `check` that is no constant expression, naming the check
+// and the flag; a flag left out is nothing to check.
 static void CheckTimingCheckFlag(const Expr* flag, std::string_view name,
-                                 const SpecifyItem* si, const ScopeMap& scope,
-                                 std::string_view task, Subclause subclause,
-                                 DiagEngine& diag) {
+                                 const FlaggedTimingCheck& check,
+                                 const ScopeMap& scope, DiagEngine& diag) {
   if (flag == nullptr || IsConstantFlag(flag, scope)) return;
-  diag.Error(si->loc,
-             std::format("{} {} is not a constant expression", task, name),
-             subclause);
+  diag.Error(
+      check.si->loc,
+      std::format("{} {} is not a constant expression", check.task, name),
+      check.subclause);
 }
 
 // A.7.5.2 gives `event_based_flag ::= constant_expression` and
@@ -73,20 +83,16 @@ void ValidateTimingCheckFlags(const ModuleDecl* mod, DiagEngine& diag) {
     for (auto* si : item->specify_items) {
       if (si->kind != SpecifyItemKind::kTimingCheck) continue;
       const auto& tc = si->timing_check;
-      std::string_view task;
-      Subclause subclause("31.4.2");
-      if (tc.check_kind == TimingCheckKind::kTimeskew) {
-        task = "$timeskew";
-      } else if (tc.check_kind == TimingCheckKind::kFullskew) {
-        task = "$fullskew";
-        subclause = Subclause("31.4.3");
-      } else {
+      FlaggedTimingCheck check{si, "$timeskew", Subclause("31.4.2")};
+      if (tc.check_kind == TimingCheckKind::kFullskew) {
+        check = {si, "$fullskew", Subclause("31.4.3")};
+      } else if (tc.check_kind != TimingCheckKind::kTimeskew) {
         continue;
       }
-      CheckTimingCheckFlag(tc.event_based_flag, "event_based_flag", si, scope,
-                           task, subclause, diag);
-      CheckTimingCheckFlag(tc.remain_active_flag, "remain_active_flag", si,
-                           scope, task, subclause, diag);
+      CheckTimingCheckFlag(tc.event_based_flag, "event_based_flag", check,
+                           scope, diag);
+      CheckTimingCheckFlag(tc.remain_active_flag, "remain_active_flag", check,
+                           scope, diag);
     }
   }
 }
