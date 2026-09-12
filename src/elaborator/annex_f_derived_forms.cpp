@@ -54,4 +54,78 @@ std::shared_ptr<const SequenceExpr> SeqRepeatOneOrMore(
   return SeqUnboundedRepeat(std::move(r));
 }
 
+// The constant 1 as a sequence, the operand every delay's repetition spans.
+static std::shared_ptr<const SequenceExpr> SeqTrue() {
+  return SeqBoolean(BoolTrue());
+}
+
+std::shared_ptr<const SequenceExpr> SeqDelayRange(
+    unsigned int m, unsigned int n, std::shared_ptr<const SequenceExpr> r) {
+  return SeqConcat(SeqRepeatRange(SeqTrue(), m, n), std::move(r));
+}
+
+std::shared_ptr<const SequenceExpr> SeqDelayAtLeast(
+    unsigned int m, std::shared_ptr<const SequenceExpr> r) {
+  return SeqConcat(SeqRepeatAtLeast(SeqTrue(), m), std::move(r));
+}
+
+std::shared_ptr<const SequenceExpr> SeqDelayExactly(
+    unsigned int m, std::shared_ptr<const SequenceExpr> r) {
+  return SeqConcat(SeqRepeatExactly(SeqTrue(), m), std::move(r));
+}
+
+std::shared_ptr<const SequenceExpr> SeqDelayZeroOrMore(
+    std::shared_ptr<const SequenceExpr> r) {
+  return SeqDelayAtLeast(0, std::move(r));
+}
+
+std::shared_ptr<const SequenceExpr> SeqDelayOneOrMore(
+    std::shared_ptr<const SequenceExpr> r) {
+  return SeqDelayAtLeast(1, std::move(r));
+}
+
+// (R1 ##1 gap ##1 R2), grouped to the left as §F.3.4's convention allows.
+static std::shared_ptr<const SequenceExpr> SeqConcatAcrossGap(
+    std::shared_ptr<const SequenceExpr> r1,
+    std::shared_ptr<const SequenceExpr> gap,
+    std::shared_ptr<const SequenceExpr> r2) {
+  return SeqConcat(SeqConcat(std::move(r1), std::move(gap)), std::move(r2));
+}
+
+std::shared_ptr<const SequenceExpr> SeqConcatDelayRange(
+    std::shared_ptr<const SequenceExpr> r1, unsigned int m, unsigned int n,
+    std::shared_ptr<const SequenceExpr> r2) {
+  if (m > 0) {
+    return SeqConcatAcrossGap(
+        std::move(r1), SeqRepeatRange(SeqTrue(), m - 1, n - 1), std::move(r2));
+  }
+  if (n == 0) return SeqFusion(std::move(r1), std::move(r2));
+  auto fused = SeqFusion(r1, r2);
+  return SeqOr(std::move(fused),
+               SeqConcatDelayRange(std::move(r1), 1, n, std::move(r2)));
+}
+
+std::shared_ptr<const SequenceExpr> SeqConcatDelayAtLeast(
+    std::shared_ptr<const SequenceExpr> r1, unsigned int m,
+    std::shared_ptr<const SequenceExpr> r2) {
+  if (m > 0) {
+    return SeqConcatAcrossGap(std::move(r1), SeqRepeatAtLeast(SeqTrue(), m - 1),
+                              std::move(r2));
+  }
+  auto fused = SeqFusion(r1, r2);
+  return SeqOr(std::move(fused),
+               SeqConcatDelayAtLeast(std::move(r1), 1, std::move(r2)));
+}
+
+std::shared_ptr<const SequenceExpr> SeqConcatDelayExactly(
+    std::shared_ptr<const SequenceExpr> r1, unsigned int m,
+    std::shared_ptr<const SequenceExpr> r2) {
+  if (m > 1) {
+    return SeqConcatAcrossGap(std::move(r1), SeqRepeatExactly(SeqTrue(), m - 1),
+                              std::move(r2));
+  }
+  if (m == 1) return SeqConcat(std::move(r1), std::move(r2));
+  return SeqFusion(std::move(r1), std::move(r2));
+}
+
 }  // namespace delta

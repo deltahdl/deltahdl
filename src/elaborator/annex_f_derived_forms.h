@@ -59,4 +59,46 @@ std::shared_ptr<const SequenceExpr> SeqRepeatZeroOrMore(
 std::shared_ptr<const SequenceExpr> SeqRepeatOneOrMore(
     std::shared_ptr<const SequenceExpr> r);
 
+// §F.3.4.2.2: the derived delay and concatenation operators of §16.9.1,
+// unfolded into ##1, ##0 and a consecutive repetition of the constant 1 that
+// stands for the ticks the delay spans. The unary forms put the repetition
+// before R; the binary forms put one tick fewer between R1 and R2, since the
+// ##1 that joins them is a tick of its own, and a delay that may be zero
+// unfolds to an or whose first alternative is the fusion R1 ##0 R2.
+
+// ##[m:n] R for m <= n, which is (1[*m:n] ##1 R); ##[m:$] R, which is
+// (1[*m:$] ##1 R); and ##m R, which is (1[*m] ##1 R).
+std::shared_ptr<const SequenceExpr> SeqDelayRange(
+    unsigned int m, unsigned int n, std::shared_ptr<const SequenceExpr> r);
+std::shared_ptr<const SequenceExpr> SeqDelayAtLeast(
+    unsigned int m, std::shared_ptr<const SequenceExpr> r);
+std::shared_ptr<const SequenceExpr> SeqDelayExactly(
+    unsigned int m, std::shared_ptr<const SequenceExpr> r);
+
+// ##[*] R, which is ##[0:$] R, and ##[+] R, which is ##[1:$] R.
+std::shared_ptr<const SequenceExpr> SeqDelayZeroOrMore(
+    std::shared_ptr<const SequenceExpr> r);
+std::shared_ptr<const SequenceExpr> SeqDelayOneOrMore(
+    std::shared_ptr<const SequenceExpr> r);
+
+// R1 ##[m:n] R2 for m <= n: (R1 ##1 1[*m-1:n-1] ##1 R2) for m > 0,
+// (R1 ##0 R2) for m = n = 0, and ((R1 ##0 R2) or (R1 ##[1:n] R2)) for m = 0
+// under a positive n.
+std::shared_ptr<const SequenceExpr> SeqConcatDelayRange(
+    std::shared_ptr<const SequenceExpr> r1, unsigned int m, unsigned int n,
+    std::shared_ptr<const SequenceExpr> r2);
+
+// R1 ##[m:$] R2: (R1 ##1 1[*m-1:$] ##1 R2) for m > 0 and
+// ((R1 ##0 R2) or (R1 ##[1:$] R2)) for m = 0.
+std::shared_ptr<const SequenceExpr> SeqConcatDelayAtLeast(
+    std::shared_ptr<const SequenceExpr> r1, unsigned int m,
+    std::shared_ptr<const SequenceExpr> r2);
+
+// R1 ##m R2: (R1 ##1 1[*m-1] ##1 R2) for m > 1, and the primitives
+// (R1 ##1 R2) and (R1 ##0 R2) for m = 1 and m = 0, which §F.3.2 has and
+// §F.3.4.2.2 therefore leaves as they are.
+std::shared_ptr<const SequenceExpr> SeqConcatDelayExactly(
+    std::shared_ptr<const SequenceExpr> r1, unsigned int m,
+    std::shared_ptr<const SequenceExpr> r2);
+
 }  // namespace delta
