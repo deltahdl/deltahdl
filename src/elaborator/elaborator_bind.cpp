@@ -68,11 +68,11 @@ static void ReportUnmatchedBindTargets(
     const CompilationUnit* unit, DiagEngine& diag) {
   for (auto* bd : binds) {
     if (applied.count(bd)) continue;
-    if (IsBindTargetScope(bd->target, unit)) continue;
+    if (IsBindTargetScope(bd->target.path, unit)) continue;
     diag.Error(bd->loc,
                std::format("bind target '{}' is neither a module or interface "
                            "scope nor an instance",
-                           bd->target),
+                           bd->target.path),
                Subclause("23.11"));
   }
 }
@@ -93,18 +93,18 @@ static bool BindAppliesToModule(const BindDirective* bd, const RtlirModule* mod,
                                 const std::string& hier_path,
                                 const CompilationUnit* unit) {
   bool has_instances = !bd->target_instances.empty();
-  bool is_scope = IsBindTargetScope(bd->target, unit);
+  bool is_scope = IsBindTargetScope(bd->target.path, unit);
   if (is_scope && !has_instances) {
-    return mod->name == bd->target;
+    return mod->name == bd->target.path;
   }
   if (is_scope && has_instances) {
-    if (mod->name != bd->target) return false;
-    for (auto inst_path : bd->target_instances) {
-      if (hier_path == inst_path) return true;
+    if (mod->name != bd->target.path) return false;
+    for (const auto& inst : bd->target_instances) {
+      if (hier_path == inst.path) return true;
     }
     return false;
   }
-  return hier_path == bd->target;
+  return hier_path == bd->target.path;
 }
 
 // Build the dotted hierarchical path of a child instance from its parent path.

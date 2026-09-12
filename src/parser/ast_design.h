@@ -14,11 +14,32 @@
 
 namespace delta {
 
+// One identifier of a bind target and the constant_bit_select written after
+// it. A.9.3 spells hierarchical_identifier as `[ $root . ] { identifier
+// constant_bit_select . } identifier` and A.1.4 puts one more
+// constant_bit_select after the bind_target_instance's last identifier, so
+// every identifier of the target may carry selects; constant_bit_select is
+// `{ [ constant_expression ] }`, zero or more of them.
+struct BindTargetSegment {
+  std::string_view name;
+  std::vector<Expr*> selects;
+};
+
+// A bind_target_instance (A.1.4), `hierarchical_identifier
+// constant_bit_select`. The first form's bind_target_scope is read into the
+// same shape, as one segment without selects.
+struct BindTargetInstance {
+  // The identifiers joined by '.', with the selects and any `$root .` prefix
+  // left out: the elaborator matches an instance's hierarchical path against
+  // it, and a module or interface name is one segment of it.
+  std::string_view path;
+  bool from_root = false;
+  std::vector<BindTargetSegment> segments;
+};
+
 struct BindDirective {
-  std::string_view target;
-  Expr* target_bit_select = nullptr;
-  std::vector<std::string_view> target_instances;
-  std::vector<Expr*> target_instance_bit_selects;
+  BindTargetInstance target;
+  std::vector<BindTargetInstance> target_instances;
   ModuleItem* instantiation = nullptr;
   SourceLoc loc;
 };

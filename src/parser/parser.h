@@ -350,6 +350,7 @@ class Parser {
   std::string_view ArenaCopy(std::string_view text);
 
   BindDirective* ParseBindDirective();
+  BindTargetInstance ParseBindTargetInstance();
 
   ConfigDecl* ParseConfigDecl();
   void ParseDesignStatement(ConfigDecl* decl);

@@ -383,28 +383,58 @@ IncludeStmt* Parser::ParseLibraryIncludeStmt() {
   return stmt;
 }
 
+// Reads A.1.4's bind_target_instance, `hierarchical_identifier
+// constant_bit_select`, where A.9.3 gives hierarchical_identifier as
+// `[ $root . ] { identifier constant_bit_select . } identifier` and
+// constant_bit_select as `{ [ constant_expression ] }`: any identifier of the
+// path may be followed by selects, and by more than one of them.
+BindTargetInstance Parser::ParseBindTargetInstance() {
+  BindTargetInstance target;
+  if (Check(TokenKind::kSystemIdentifier) && CurrentToken().text == "$root") {
+    Consume();
+    Expect(TokenKind::kDot, Subclause("23.11"));
+    target.from_root = true;
+  }
+  std::string path;
+  do {
+    BindTargetSegment segment;
+    segment.name = ExpectIdentifier(Subclause("23.11")).text;
+    if (!path.empty()) path.push_back('.');
+    path.append(segment.name.data(), segment.name.size());
+    while (Match(TokenKind::kLBracket)) {
+      segment.selects.push_back(ParseExpr());
+      Expect(TokenKind::kRBracket, Subclause("23.11"));
+    }
+    target.segments.push_back(std::move(segment));
+  } while (Match(TokenKind::kDot));
+  target.path = ArenaCopy(path);
+  return target;
+}
+
 BindDirective* Parser::ParseBindDirective() {
   auto* decl = arena_.Create<BindDirective>();
   decl->loc = CurrentLoc();
   Expect(TokenKind::kKwBind, Subclause("23.11"));
 
-  decl->target = ParseDottedPath();
-  if (Check(TokenKind::kLBracket)) {
-    Consume();
-    decl->target_bit_select = ParseExpr();
-    Expect(TokenKind::kRBracket, Subclause("23.11"));
-  }
+  // Which of A.1.4's two forms the directive takes is settled by the token
+  // after the target, so the target is read as a bind_target_instance either
+  // way and held to bind_target_scope once a ':' names the first form.
+  auto target_loc = CurrentLoc();
+  decl->target = ParseBindTargetInstance();
 
   if (Match(TokenKind::kColon)) {
+    // A.1.4: bind_target_scope ::= module_identifier | interface_identifier,
+    // one name, since §23.11 has it name the module or interface whose
+    // instances the list then narrows; an instance path, a select or a
+    // `$root .` prefix names an instance instead.
+    if (decl->target.from_root || decl->target.segments.size() != 1 ||
+        !decl->target.segments[0].selects.empty()) {
+      diag_.Error(target_loc,
+                  "bind target scope is a module or interface identifier",
+                  Subclause("A.1.4"));
+    }
     do {
-      decl->target_instances.push_back(ParseDottedPath());
-      Expr* bit_sel = nullptr;
-      if (Check(TokenKind::kLBracket)) {
-        Consume();
-        bit_sel = ParseExpr();
-        Expect(TokenKind::kRBracket, Subclause("23.11"));
-      }
-      decl->target_instance_bit_selects.push_back(bit_sel);
+      decl->target_instances.push_back(ParseBindTargetInstance());
     } while (Match(TokenKind::kComma));
   }
 

@@ -38,7 +38,7 @@ TEST(BindDirective, BindDirectiveBasic) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->bind_directives.size(), 1u);
-  EXPECT_EQ(r.cu->bind_directives[0]->target, "target_mod");
+  EXPECT_EQ(r.cu->bind_directives[0]->target.path, "target_mod");
   EXPECT_TRUE(r.cu->bind_directives[0]->target_instances.empty());
   ASSERT_NE(r.cu->bind_directives[0]->instantiation, nullptr);
   EXPECT_EQ(r.cu->bind_directives[0]->instantiation->inst_module,
@@ -51,10 +51,10 @@ TEST(BindDirective, BindDirectiveWithInstanceList) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->bind_directives.size(), 1u);
-  EXPECT_EQ(r.cu->bind_directives[0]->target, "dut");
+  EXPECT_EQ(r.cu->bind_directives[0]->target.path, "dut");
   ASSERT_EQ(r.cu->bind_directives[0]->target_instances.size(), 2u);
-  EXPECT_EQ(r.cu->bind_directives[0]->target_instances[0], "i1");
-  EXPECT_EQ(r.cu->bind_directives[0]->target_instances[1], "i2");
+  EXPECT_EQ(r.cu->bind_directives[0]->target_instances[0].path, "i1");
+  EXPECT_EQ(r.cu->bind_directives[0]->target_instances[1].path, "i2");
 }
 
 TEST(BindDirective, BindDirectiveHierarchical) {
@@ -62,7 +62,7 @@ TEST(BindDirective, BindDirectiveHierarchical) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->bind_directives.size(), 1u);
-  EXPECT_EQ(r.cu->bind_directives[0]->target, "top.dut.u1");
+  EXPECT_EQ(r.cu->bind_directives[0]->target.path, "top.dut.u1");
 }
 
 TEST(ElaborationSeverityTask, FatalThroughPreprocessor) {

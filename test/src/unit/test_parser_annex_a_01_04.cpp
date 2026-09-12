@@ -126,8 +126,8 @@ TEST(BindDirective, MultipleBindDirectives) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->bind_directives.size(), 2u);
-  EXPECT_EQ(r.cu->bind_directives[0]->target, "mod1");
-  EXPECT_EQ(r.cu->bind_directives[1]->target, "mod2");
+  EXPECT_EQ(r.cu->bind_directives[0]->target.path, "mod1");
+  EXPECT_EQ(r.cu->bind_directives[1]->target.path, "mod2");
 }
 
 TEST(BindDirective, BindMixedWithOtherDescriptions) {
@@ -159,7 +159,7 @@ TEST(BindDirective, BindTargetInterfaceScope) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->bind_directives.size(), 1u);
-  EXPECT_EQ(r.cu->bind_directives[0]->target, "ifc");
+  EXPECT_EQ(r.cu->bind_directives[0]->target.path, "ifc");
 }
 
 TEST(BindDirective, BindEmptyPortList) {
@@ -181,8 +181,9 @@ TEST(BindDirective, BindTargetInstanceWithBitSelect) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->bind_directives.size(), 1u);
-  EXPECT_EQ(r.cu->bind_directives[0]->target, "target");
-  EXPECT_NE(r.cu->bind_directives[0]->target_bit_select, nullptr);
+  EXPECT_EQ(r.cu->bind_directives[0]->target.path, "target");
+  ASSERT_EQ(r.cu->bind_directives[0]->target.segments.size(), 1u);
+  EXPECT_EQ(r.cu->bind_directives[0]->target.segments[0].selects.size(), 1u);
 }
 
 TEST(BindDirective, BindTargetHierarchicalWithBitSelect) {
@@ -190,8 +191,10 @@ TEST(BindDirective, BindTargetHierarchicalWithBitSelect) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->bind_directives.size(), 1u);
-  EXPECT_EQ(r.cu->bind_directives[0]->target, "top.dut");
-  EXPECT_NE(r.cu->bind_directives[0]->target_bit_select, nullptr);
+  EXPECT_EQ(r.cu->bind_directives[0]->target.path, "top.dut");
+  ASSERT_EQ(r.cu->bind_directives[0]->target.segments.size(), 2u);
+  EXPECT_TRUE(r.cu->bind_directives[0]->target.segments[0].selects.empty());
+  EXPECT_EQ(r.cu->bind_directives[0]->target.segments[1].selects.size(), 1u);
 }
 
 TEST(BindDirective, BindInstanceListWithBitSelects) {
@@ -199,10 +202,12 @@ TEST(BindDirective, BindInstanceListWithBitSelects) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->bind_directives.size(), 1u);
-  ASSERT_EQ(r.cu->bind_directives[0]->target_instances.size(), 2u);
-  ASSERT_EQ(r.cu->bind_directives[0]->target_instance_bit_selects.size(), 2u);
-  EXPECT_NE(r.cu->bind_directives[0]->target_instance_bit_selects[0], nullptr);
-  EXPECT_NE(r.cu->bind_directives[0]->target_instance_bit_selects[1], nullptr);
+  const auto& instances = r.cu->bind_directives[0]->target_instances;
+  ASSERT_EQ(instances.size(), 2u);
+  ASSERT_EQ(instances[0].segments.size(), 1u);
+  EXPECT_EQ(instances[0].segments[0].selects.size(), 1u);
+  ASSERT_EQ(instances[1].segments.size(), 1u);
+  EXPECT_EQ(instances[1].segments[0].selects.size(), 1u);
 }
 
 TEST(BindDirective, BindTargetWithoutBitSelect) {
@@ -210,16 +215,131 @@ TEST(BindDirective, BindTargetWithoutBitSelect) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->bind_directives.size(), 1u);
-  EXPECT_EQ(r.cu->bind_directives[0]->target_bit_select, nullptr);
+  ASSERT_EQ(r.cu->bind_directives[0]->target.segments.size(), 1u);
+  EXPECT_TRUE(r.cu->bind_directives[0]->target.segments[0].selects.empty());
 }
 
 TEST(BindDirective, ErrorBindMissingTarget) {
   auto r = Parse("bind ;\n");
-  // The bind target is read by Parser::ParseDottedPath, which files its report
-  // under §23.6 with the rest of the hierarchical names rather than under
-  // §23.11 with the bind directive.
   EXPECT_TRUE(
-      ReportedError(r.diags, "expected identifier, got ';'", 1, "23.6"));
+      ReportedError(r.diags, "expected identifier, got ';'", 1, "23.11"));
+}
+
+// bind_target_instance ::= hierarchical_identifier constant_bit_select, and
+// A.9.3's hierarchical_identifier, `[ $root . ] { identifier
+// constant_bit_select . } identifier`, lets a select stand on any identifier of
+// the path, not only its last: the instance inside a generate loop's block is
+// spelled `top.g[0].u`.
+TEST(BindDirective, TargetInstanceSelectInsideHierarchicalIdentifier) {
+  auto r = Parse("bind top.g[0].u chk c();\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->bind_directives.size(), 1u);
+  const auto& target = r.cu->bind_directives[0]->target;
+  EXPECT_EQ(target.path, "top.g.u");
+  ASSERT_EQ(target.segments.size(), 3u);
+  EXPECT_EQ(target.segments[0].name, "top");
+  EXPECT_TRUE(target.segments[0].selects.empty());
+  EXPECT_EQ(target.segments[1].name, "g");
+  EXPECT_EQ(target.segments[1].selects.size(), 1u);
+  EXPECT_EQ(target.segments[2].name, "u");
+  EXPECT_TRUE(target.segments[2].selects.empty());
+  EXPECT_TRUE(r.cu->bind_directives[0]->target_instances.empty());
+}
+
+// constant_bit_select ::= { [ constant_expression ] } -- zero or more, so an
+// element of a two-dimensional instance array carries two.
+TEST(BindDirective, TargetInstanceCarriesEverySelect) {
+  auto r = Parse("bind top.u[0][1] chk c();\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->bind_directives.size(), 1u);
+  const auto& target = r.cu->bind_directives[0]->target;
+  EXPECT_EQ(target.path, "top.u");
+  ASSERT_EQ(target.segments.size(), 2u);
+  EXPECT_EQ(target.segments[1].selects.size(), 2u);
+}
+
+// A.9.3 opens hierarchical_identifier with an optional `$root .`, which names
+// the same instance as the path without it and is left out of the recorded
+// path.
+TEST(BindDirective, RootedTargetInstance) {
+  auto r = Parse("bind $root.top.c1 chk c();\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->bind_directives.size(), 1u);
+  const auto& target = r.cu->bind_directives[0]->target;
+  EXPECT_TRUE(target.from_root);
+  EXPECT_EQ(target.path, "top.c1");
+  ASSERT_EQ(target.segments.size(), 2u);
+}
+
+// Each bind_target_instance of the first form's list is read by the same
+// production, so the selects inside its path are held as the second form's.
+TEST(BindDirective, TargetInstanceListEntrySelectInsideHierarchicalIdentifier) {
+  auto r = Parse("bind cpu : top.g[0].u, top.v[1][2] chk c();\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->bind_directives.size(), 1u);
+  EXPECT_EQ(r.cu->bind_directives[0]->target.path, "cpu");
+  const auto& instances = r.cu->bind_directives[0]->target_instances;
+  ASSERT_EQ(instances.size(), 2u);
+  EXPECT_EQ(instances[0].path, "top.g.u");
+  ASSERT_EQ(instances[0].segments.size(), 3u);
+  EXPECT_EQ(instances[0].segments[1].selects.size(), 1u);
+  EXPECT_EQ(instances[1].path, "top.v");
+  ASSERT_EQ(instances[1].segments.size(), 2u);
+  EXPECT_EQ(instances[1].segments[1].selects.size(), 2u);
+}
+
+// bind_target_scope ::= module_identifier | interface_identifier, one name;
+// §23.11 has it name the module or interface whose instances the list after
+// the ':' narrows. An instance path in its place names one instance, and the
+// list then narrows nothing, so it is reported at the target; the list and the
+// instantiation are still read, so the directive ends at its own ';'.
+TEST(BindDirective, ErrorHierarchicalTargetScopeIsRejected) {
+  auto r = Parse("bind top.dut : u1 chk c();\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "bind target scope is a module or interface identifier", 1,
+      "A.1.4"));
+  ASSERT_EQ(r.cu->bind_directives.size(), 1u);
+  ASSERT_EQ(r.cu->bind_directives[0]->target_instances.size(), 1u);
+  EXPECT_EQ(r.cu->bind_directives[0]->target_instances[0].path, "u1");
+  EXPECT_NE(r.cu->bind_directives[0]->instantiation, nullptr);
+}
+
+// A select on the scope's name makes it an element of an instance array, a
+// bind_target_instance rather than a bind_target_scope.
+TEST(BindDirective, ErrorSelectedTargetScopeIsRejected) {
+  auto r = Parse("bind dut[0] : u1 chk c();\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "bind target scope is a module or interface identifier", 1,
+      "A.1.4"));
+  ASSERT_EQ(r.cu->bind_directives.size(), 1u);
+  EXPECT_NE(r.cu->bind_directives[0]->instantiation, nullptr);
+}
+
+// `$root .` opens a hierarchical_identifier and so an instance path; a
+// module_identifier carries no such prefix.
+TEST(BindDirective, ErrorRootedTargetScopeIsRejected) {
+  auto r = Parse("bind $root.cpu : top.c1 chk c();\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "bind target scope is a module or interface identifier", 1,
+      "A.1.4"));
+  ASSERT_EQ(r.cu->bind_directives.size(), 1u);
+  EXPECT_NE(r.cu->bind_directives[0]->instantiation, nullptr);
+}
+
+// The first form with a single module name and the second form with a single
+// instance name are spelled alike up to the ':', so a plain name before it is
+// held to nothing; §23.11 settles which the name is at elaboration.
+TEST(BindDirective, PlainTargetScopeBeforeInstanceListIsAccepted) {
+  auto r = Parse("bind cpu : top.c1 chk c();\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->bind_directives.size(), 1u);
+  EXPECT_EQ(r.cu->bind_directives[0]->target.path, "cpu");
+  EXPECT_FALSE(r.cu->bind_directives[0]->target.from_root);
 }
 
 // --- module_common_item ---

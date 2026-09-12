@@ -48,7 +48,7 @@ TEST(BindDirective, SecondFormBindsHierarchicalInstanceTarget) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->bind_directives.size(), 1u);
-  EXPECT_EQ(r.cu->bind_directives[0]->target, "top.c1");
+  EXPECT_EQ(r.cu->bind_directives[0]->target.path, "top.c1");
   EXPECT_TRUE(r.cu->bind_directives[0]->target_instances.empty());
 }
 
@@ -62,10 +62,10 @@ TEST(BindDirective, FirstFormParsesTargetInstanceList) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->bind_directives.size(), 1u);
-  EXPECT_EQ(r.cu->bind_directives[0]->target, "cpu");
+  EXPECT_EQ(r.cu->bind_directives[0]->target.path, "cpu");
   ASSERT_EQ(r.cu->bind_directives[0]->target_instances.size(), 2u);
-  EXPECT_EQ(r.cu->bind_directives[0]->target_instances[0], "top.c1");
-  EXPECT_EQ(r.cu->bind_directives[0]->target_instances[1], "top.c3");
+  EXPECT_EQ(r.cu->bind_directives[0]->target_instances[0].path, "top.c1");
+  EXPECT_EQ(r.cu->bind_directives[0]->target_instances[1].path, "top.c3");
 }
 
 // A bind_target_instance carries a constant_bit_select, used to single out one
@@ -80,15 +80,18 @@ TEST(BindDirective, TargetInstanceCarriesConstantBitSelect) {
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->bind_directives.size(), 1u);
   ASSERT_EQ(r.cu->bind_directives[0]->target_instances.size(), 1u);
-  EXPECT_EQ(r.cu->bind_directives[0]->target_instances[0], "top.c");
-  ASSERT_EQ(r.cu->bind_directives[0]->target_instance_bit_selects.size(), 1u);
-  EXPECT_NE(r.cu->bind_directives[0]->target_instance_bit_selects[0], nullptr);
+  EXPECT_EQ(r.cu->bind_directives[0]->target_instances[0].path, "top.c");
+  const auto& segments = r.cu->bind_directives[0]->target_instances[0].segments;
+  ASSERT_EQ(segments.size(), 2u);
+  EXPECT_TRUE(segments[0].selects.empty());
+  ASSERT_EQ(segments[1].selects.size(), 1u);
+  EXPECT_NE(segments[1].selects[0], nullptr);
 }
 
 // The same bind_target_instance production also governs the second form's own
 // target: a hierarchical_identifier followed by a constant_bit_select. Here the
 // select rides on the directive target itself (not a list entry), so the parser
-// records it in target_bit_select while the instance list stays empty.
+// records it on the target's last segment while the instance list stays empty.
 TEST(BindDirective, SecondFormTargetCarriesConstantBitSelect) {
   auto r = Parse(
       "module probe; endmodule\n"
@@ -97,8 +100,11 @@ TEST(BindDirective, SecondFormTargetCarriesConstantBitSelect) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->bind_directives.size(), 1u);
-  EXPECT_EQ(r.cu->bind_directives[0]->target, "top.c");
-  EXPECT_NE(r.cu->bind_directives[0]->target_bit_select, nullptr);
+  EXPECT_EQ(r.cu->bind_directives[0]->target.path, "top.c");
+  const auto& segments = r.cu->bind_directives[0]->target.segments;
+  ASSERT_EQ(segments.size(), 2u);
+  ASSERT_EQ(segments[1].selects.size(), 1u);
+  EXPECT_NE(segments[1].selects[0], nullptr);
   EXPECT_TRUE(r.cu->bind_directives[0]->target_instances.empty());
 }
 
