@@ -184,9 +184,10 @@ TEST(SubroutineCallSyntaxParsing, ErrorVoidCastStatementMissingCloseParen) {
       "  function int foo(); return 1; endfunction\n"
       "  initial void'(foo();\n"
       "endmodule\n");
-  // §6.24.1 owns the cast parentheses, so the report for the unclosed
+  // A.6.9 writes the void cast statement's parentheses and
+  // Parser::ParseVoidCastCallStmt reads them, so the report for the unclosed
   // `void'(` is filed there rather than under §13.5.
-  EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ';'", 3, "6.24.1"));
+  EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ';'", 3, "A.6.9"));
 }
 
 // A void-cast subroutine_call_statement still terminates with a semicolon.

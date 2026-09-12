@@ -292,8 +292,11 @@ TEST(SubroutineCallSyntaxParsing, ErrorVoidCastMissingCloseParen) {
       "  function int foo(); return 1; endfunction\n"
       "  initial void'(foo();\n"
       "endmodule\n");
-  // §6.24.1 owns the cast operator's parentheses.
-  EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ';'", 3, "6.24.1"));
+  // A.6.9 writes the void cast statement's parentheses, `void ' (
+  // function_subroutine_call ) ;`, and Parser::ParseVoidCastCallStmt reads
+  // them: A.8.4's casting_type names no `void`, so §6.24.1's cast operator is
+  // not what stands here.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ';'", 3, "A.6.9"));
 }
 
 TEST(SubroutineCallExprParsing, ListOfArgsAllNamed) {

@@ -139,8 +139,9 @@ TEST(SubroutineCallStatementParsing, VoidCastOfEveryCallForm) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* block = FirstInitialStmt(r);
+  auto* block = InitialBody(r);
   ASSERT_NE(block, nullptr);
+  ASSERT_EQ(block->kind, StmtKind::kBlock);
   ASSERT_EQ(block->stmts.size(), 3u);
   for (auto* stmt : block->stmts) {
     EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
