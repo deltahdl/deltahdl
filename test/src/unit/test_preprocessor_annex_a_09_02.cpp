@@ -178,4 +178,60 @@ TEST(CommentPreprocessing, BlockCommentContainsLineMarker) {
   EXPECT_TRUE(Contains(out, "beta"));
 }
 
+// A comment begins where a lexical token may begin, and §5.2 makes a string
+// literal one token: a "//" inside A.8.8's triple_quoted_string, whose items
+// are any ASCII character but '\', is string content and no one_line_comment.
+// The lone '"' inside the string is one of those items, not the string's end,
+// so the "//" behind it is still inside.
+TEST(CommentPreprocessing, LineMarkerInsideTripleQuotedStringWithLoneQuote) {
+  PreprocFixture f;
+  auto out = Preprocess("x = \"\"\"a\"b // c\"\"\";\n", f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_TRUE(Contains(out, "\"\"\"a\"b // c\"\"\";"));
+}
+
+// The same for "/*": inside a triple_quoted_string it opens no block_comment,
+// and the "*/" behind it closes none, so the text between them stands and the
+// line after the string is read as code.
+TEST(CommentPreprocessing, BlockMarkersInsideTripleQuotedString) {
+  PreprocFixture f;
+  auto out = Preprocess("x = \"\"\"a\"b /* c */ d\"\"\";\ny = 1;\n", f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_TRUE(Contains(out, "/* c */ d\"\"\";"));
+  EXPECT_TRUE(Contains(out, "y = 1;"));
+}
+
+// A triple_quoted_string spans lines, so a "//" on a later line of one is
+// still string content, here behind a '\' that ends the first line as the
+// string_escape_seq over the newline; the string's end on the third line
+// closes it, and the comment behind that end is a one_line_comment.
+TEST(CommentPreprocessing, LineMarkerOnLaterLineOfTripleQuotedString) {
+  PreprocFixture f;
+  auto out = Preprocess("x = \"\"\"first\\\n// second\n\"\"\"; // tail\n", f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_TRUE(Contains(out, "// second"));
+  EXPECT_FALSE(Contains(out, "tail"));
+}
+
+// A one_line_comment behind a closed triple_quoted_string is a comment as
+// behind any token: its body is blanked.
+TEST(CommentPreprocessing, LineCommentAfterTripleQuotedString) {
+  PreprocFixture f;
+  auto out = Preprocess("x = \"\"\"a\"b\"\"\"; // tail\n", f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_TRUE(Contains(out, "\"\"\"a\"b\"\"\";"));
+  EXPECT_FALSE(Contains(out, "tail"));
+}
+
+// A '\' inside a triple_quoted_string opens A.8.8's string_escape_seq, so the
+// '"' behind it is the sequence's and the `"""` it begins closes nothing; the
+// string ends at the `"""` after it, and the comment behind that is blanked.
+TEST(CommentPreprocessing, EscapedQuoteInsideTripleQuotedStringClosesNothing) {
+  PreprocFixture f;
+  auto out = Preprocess("x = \"\"\"a\\\"\"\"b\"\"\"; // tail\n", f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_TRUE(Contains(out, "\"\"\"a\\\"\"\"b\"\"\";"));
+  EXPECT_FALSE(Contains(out, "tail"));
+}
+
 }  // namespace

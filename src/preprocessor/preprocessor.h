@@ -664,6 +664,9 @@ class Preprocessor {
   uint32_t design_element_depth_ = 0;
   std::vector<std::string> cell_module_names_;
   bool in_block_comment_ = false;
+  // A.8.8's triple_quoted_string may span lines, so one left open at a line's
+  // end is carried to the next as an open block comment is.
+  bool in_triple_string_ = false;
   ProtectEnvelopeState protect_envelopes_;
   ProtectKeywordScope protect_keywords_;
   // The viewports written since the envelope in force opened. §34.5.32.2 has

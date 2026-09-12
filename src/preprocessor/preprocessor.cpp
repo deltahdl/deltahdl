@@ -462,8 +462,37 @@ static bool StripNormalChar(std::string_view line, size_t& i,
   return false;
 }
 
-static std::string StripComments(std::string_view line,
-                                 bool& in_block_comment) {
+// Whether the three characters at `i` are the `"""` that opens or closes
+// A.8.8's triple_quoted_string.
+static bool AtTripleQuote(std::string_view line, size_t i) {
+  return line.substr(i, 3) == "\"\"\"";
+}
+
+// Copies one item of an open triple_quoted_string, or the `"""` that closes
+// it, clearing `in_triple_string` at the close. A.8.8's
+// triple_quoted_string_item is any ASCII character but '\', so a "//" or "/*"
+// inside is string content and no A.9.2 comment, and a lone '"' is an item
+// rather than the string's end; a '\' opens a string_escape_seq, so the
+// character behind it is the sequence's and closes nothing.
+static void CopyTripleQuotedChar(std::string_view line, size_t& i,
+                                 std::string& result, bool& in_triple_string) {
+  if (AtTripleQuote(line, i)) {
+    result += "\"\"\"";
+    i += 3;
+    in_triple_string = false;
+    return;
+  }
+  if (line[i] == '\\') result += line[i++];
+  if (i < line.size()) result += line[i++];
+}
+
+// Blanks the body of every A.9.2 comment on `line`, keeping the delimiters,
+// and leaves what a string literal holds alone. A block comment and a
+// triple_quoted_string each may span lines, so each is carried from one line
+// to the next by its flag; a quoted_string cannot, A.8.8's quoted_string_item
+// excluding the newline, so its state is the line's own.
+static std::string StripComments(std::string_view line, bool& in_block_comment,
+                                 bool& in_triple_string) {
   std::string result;
   result.reserve(line.size());
   bool in_string = false;
@@ -472,6 +501,16 @@ static std::string StripComments(std::string_view line,
   while (i < line.size()) {
     if (in_block_comment) {
       if (StripBlockCommentContent(line, i, result)) in_block_comment = false;
+      continue;
+    }
+    if (in_triple_string) {
+      CopyTripleQuotedChar(line, i, result, in_triple_string);
+      continue;
+    }
+    if (!in_string && AtTripleQuote(line, i)) {
+      result += "\"\"\"";
+      i += 3;
+      in_triple_string = true;
       continue;
     }
     if (line[i] == '"' && (i == 0 || line[i - 1] != '\\')) {
@@ -490,7 +529,7 @@ static std::string StripComments(std::string_view line,
 
 void Preprocessor::ExpandAndAppendLine(std::string_view line, uint32_t file_id,
                                        uint32_t line_num, std::string& output) {
-  auto stripped = StripComments(line, in_block_comment_);
+  auto stripped = StripComments(line, in_block_comment_, in_triple_string_);
   auto conditioned = ExpandInlineConditionals(stripped);
   auto expanded = ExpandInlineMacros(conditioned, file_id, line_num);
   TrackDesignElement(Trim(expanded));
@@ -589,7 +628,7 @@ void Preprocessor::SkipBlockCommentLine(std::string_view line, uint32_t file_id,
       // must still act on the conditional stack while the block is skipped.
       if (!ProcessDirective(remainder, file_id, line_num, depth, output) &&
           !IsActive()) {
-        StripComments(remainder, in_block_comment_);
+        StripComments(remainder, in_block_comment_, in_triple_string_);
       }
     }
   }
@@ -818,14 +857,15 @@ std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
     return ProcessDirective(line, file_id, line_num, depth, output);
   };
   ops.emit_active_line = [&](std::string_view line) {
-    auto stripped = StripComments(std::string(line), in_block_comment_);
+    auto stripped =
+        StripComments(std::string(line), in_block_comment_, in_triple_string_);
     EmitStrippedActiveLine(stripped, HasInlineConditional(stripped), emit,
                            output);
   };
   // Inside an ignored block nothing is emitted, but track an opening block
   // comment so a later in-comment directive stays hidden (22.6).
   ops.note_ignored_line = [&](std::string_view line) {
-    StripComments(line, in_block_comment_);
+    StripComments(line, in_block_comment_, in_triple_string_);
   };
   // The line just ended is this file's, at the number this frame is on. An
   // `include has already recorded the included file's lines by the time this
@@ -845,7 +885,7 @@ std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
 void Preprocessor::OutputText(std::string_view text, uint32_t file_id,
                               uint32_t line_num, std::string& output) {
   if (Trim(text).empty()) return;
-  auto stripped = StripComments(text, in_block_comment_);
+  auto stripped = StripComments(text, in_block_comment_, in_triple_string_);
   auto expanded = ExpandInlineMacros(stripped, file_id, line_num);
   TrackDesignElement(Trim(expanded));
   output.append(expanded);
@@ -854,7 +894,7 @@ void Preprocessor::OutputText(std::string_view text, uint32_t file_id,
 void Preprocessor::OutputPreExpanded(std::string_view text,
                                      std::string& output) {
   if (Trim(text).empty()) return;
-  auto stripped = StripComments(text, in_block_comment_);
+  auto stripped = StripComments(text, in_block_comment_, in_triple_string_);
   TrackDesignElement(Trim(std::string_view(stripped)));
   output.append(stripped);
 }
