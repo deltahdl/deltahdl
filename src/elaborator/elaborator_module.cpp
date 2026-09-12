@@ -400,14 +400,19 @@ static void InitRtlirModuleHeader(RtlirModule* mod, const ModuleDecl* decl,
   mod->is_program = (decl->decl_kind == ModuleDeclKind::kProgram);
   mod->is_interface = (decl->decl_kind == ModuleDeclKind::kInterface);
   mod->delay_mode = unit->delay_mode_directive;
-  // Annex E.2: the directive applies to the modules that follow it, so the
-  // value recorded at this module's header stands ahead of the unit's last.
-  if (decl->has_default_decay_time) {
+  // Annex E.2 and E.3: each directive applies to the modules that follow it,
+  // so the values recorded at this module's header stand ahead of the unit's
+  // last.
+  if (decl->has_trireg_defaults) {
     mod->default_decay_time = decl->default_decay_time;
     mod->default_decay_time_infinite = decl->default_decay_time_infinite;
+    mod->default_trireg_strength = decl->default_trireg_strength;
+    mod->has_default_trireg_strength = decl->has_default_trireg_strength;
   } else {
     mod->default_decay_time = unit->default_decay_time;
     mod->default_decay_time_infinite = unit->default_decay_time_infinite;
+    mod->default_trireg_strength = unit->default_trireg_strength;
+    mod->has_default_trireg_strength = unit->has_default_trireg_strength;
   }
   mod->attrs = ResolveAttributes(decl->attrs, diag);
 

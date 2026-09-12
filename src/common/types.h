@@ -246,17 +246,21 @@ enum class DelayModeDirective : uint8_t {
   kZero,
 };
 
-// Annex E.2: the default decay time in force where a module was declared. The
-// directive applies to the trireg nets of the modules that follow it in the
-// source, so the preprocessor records the value in force at each module
-// header under the module's name, and the value reaches the declaration by
-// that name once the module is parsed. `ticks` is the decay time as the
-// directive's argument was rounded; `infinite` is the state E.2's keyword
-// names, and the state before any directive.
-struct ModuleDefaultDecayTime {
+// Annex E.2 and E.3: the trireg defaults in force where a module was declared,
+// the default decay time and the default charge strength. Each directive
+// applies to the modules that follow it in the source, so the preprocessor
+// records the values in force at each module header under the module's name,
+// and the values reach the declaration by that name once the module is
+// parsed. `decay_ticks` is the decay time as the directive's argument was
+// rounded and `decay_infinite` the state E.2's keyword names, and the state
+// before any directive; `has_strength` is whether a strength directive came
+// before the module and `strength` the last one's value.
+struct ModuleTriregDefaults {
   std::string module;
-  uint64_t ticks = 0;
-  bool infinite = true;
+  uint64_t decay_ticks = 0;
+  bool decay_infinite = true;
+  uint32_t strength = 0;
+  bool has_strength = false;
 };
 
 // Which member of a min:typ:max expression is selected. §11.11 writes the three

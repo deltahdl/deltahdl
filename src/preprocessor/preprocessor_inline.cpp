@@ -571,14 +571,16 @@ static std::string_view DeclaredModuleName(std::string_view trimmed) {
 void Preprocessor::TrackDesignElement(std::string_view trimmed) {
   if (IsDesignElementStart(trimmed)) {
     if (in_celldefine_) TrackCellModuleName(trimmed, cell_module_names_);
-    // Annex E.2: the directive applies to the modules that follow it, so the
-    // decay time in force at this header is the one this module's trireg nets
-    // take, whatever a later directive sets.
+    // Annex E.2 and E.3: each directive applies to the modules that follow
+    // it, so the decay time and charge strength in force at this header are
+    // the ones this module's trireg nets take, whatever a later directive
+    // sets.
     auto module_name = DeclaredModuleName(trimmed);
     if (!module_name.empty()) {
-      module_decay_times_.push_back({std::string(module_name),
-                                     default_decay_time_,
-                                     default_decay_time_infinite_});
+      module_trireg_defaults_.push_back(
+          {std::string(module_name), default_decay_time_,
+           default_decay_time_infinite_, default_trireg_strength_,
+           has_default_trireg_strength_});
     }
     ++design_element_depth_;
   }

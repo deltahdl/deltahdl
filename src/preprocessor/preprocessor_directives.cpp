@@ -357,7 +357,7 @@ void Preprocessor::HandleDefaultDecayTime(std::string_view rest,
   auto arg = TrimDirective(rest);
   if (arg.empty()) {
     diag_.Error(loc, "`default_decay_time requires an argument",
-                Subclause::None());
+                Subclause("E.2"));
     return;
   }
   if (arg == "infinite") {
@@ -370,7 +370,7 @@ void Preprocessor::HandleDefaultDecayTime(std::string_view rest,
   if (!ValidateDecayTimeChars(arg, has_dot)) {
     diag_.Error(
         loc, "invalid `default_decay_time argument: '" + std::string(arg) + "'",
-        Subclause::None());
+        Subclause("E.2"));
     return;
   }
   if (has_dot) {
@@ -396,7 +396,7 @@ void Preprocessor::HandleDefaultTriregStrength(std::string_view rest,
   auto arg = TrimDirective(rest);
   if (arg.empty()) {
     diag_.Error(loc, "`default_trireg_strength requires an argument",
-                Subclause::None());
+                Subclause("E.3"));
     return;
   }
   for (char c : arg) {
@@ -404,7 +404,7 @@ void Preprocessor::HandleDefaultTriregStrength(std::string_view rest,
       diag_.Error(loc,
                   "invalid `default_trireg_strength argument: '" +
                       std::string(arg) + "'",
-                  Subclause::None());
+                  Subclause("E.3"));
       return;
     }
   }
@@ -413,7 +413,7 @@ void Preprocessor::HandleDefaultTriregStrength(std::string_view rest,
 
   if (val > 250) {
     diag_.Error(loc, "`default_trireg_strength value must be between 0 and 250",
-                Subclause::None());
+                Subclause("E.3"));
     return;
   }
   default_trireg_strength_ = val;

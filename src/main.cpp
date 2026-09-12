@@ -112,7 +112,7 @@ struct PreprocResult {
   delta::NetType default_nettype = delta::NetType::kWire;
   delta::NetType unconnected_drive = delta::NetType::kWire;
   std::vector<std::string> cell_module_names;
-  std::vector<delta::ModuleDefaultDecayTime> module_decay_times;
+  std::vector<delta::ModuleTriregDefaults> module_trireg_defaults;
 
   uint64_t default_decay_time = 0;
   double default_decay_time_real = 0.0;
@@ -152,7 +152,7 @@ PreprocResult PreprocessSources(const delta::CliOptions& opts,
   result.default_nettype = preproc.DefaultNetType();
   result.unconnected_drive = preproc.UnconnectedDrive();
   result.cell_module_names = preproc.CellModuleNames();
-  result.module_decay_times = preproc.ModuleDecayTimes();
+  result.module_trireg_defaults = preproc.ModuleTriregDefaultsList();
   result.default_decay_time = preproc.DefaultDecayTime();
   result.default_decay_time_real = preproc.DefaultDecayTimeReal();
   result.default_decay_time_infinite = preproc.DefaultDecayTimeInfinite();
@@ -233,7 +233,7 @@ void ApplyPreprocMetadata(delta::CompilationUnit* cu, const PreprocResult& pp) {
   cu->default_nettype = pp.default_nettype;
   cu->unconnected_drive = pp.unconnected_drive;
   delta::MarkCellModules(cu, pp.cell_module_names);
-  delta::ApplyModuleDecayTimes(cu, pp.module_decay_times);
+  delta::ApplyModuleTriregDefaults(cu, pp.module_trireg_defaults);
   cu->default_decay_time = pp.default_decay_time;
   cu->default_decay_time_real = pp.default_decay_time_real;
   cu->default_decay_time_infinite = pp.default_decay_time_infinite;

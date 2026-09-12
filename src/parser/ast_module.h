@@ -609,13 +609,16 @@ struct ModuleDecl {
 
   bool is_cell = false;
 
-  // Annex E.2: the default decay time in force where this module was
-  // declared, put here by ApplyModuleDecayTimes from what the preprocessor
-  // recorded; `has_default_decay_time` is false for a module parsed without
-  // the preprocessor, which then takes the compilation unit's value.
-  bool has_default_decay_time = false;
+  // Annex E.2 and E.3: the default decay time and charge strength in force
+  // where this module was declared, put here by ApplyModuleTriregDefaults
+  // from what the preprocessor recorded; `has_trireg_defaults` is false for a
+  // module parsed without the preprocessor, which then takes the compilation
+  // unit's values.
+  bool has_trireg_defaults = false;
   uint64_t default_decay_time = 0;
   bool default_decay_time_infinite = true;
+  uint32_t default_trireg_strength = 0;
+  bool has_default_trireg_strength = false;
 
   std::string_view library;
 

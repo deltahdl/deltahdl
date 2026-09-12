@@ -31,11 +31,12 @@ TEST(Preprocessor, DefaultTriregStrength_MissingArgumentIsError) {
   Preprocessor pp(f.mgr, f.diag, {});
   auto fid = f.mgr.AddFile("<test>", "`default_trireg_strength\n");
   pp.Preprocess(fid);
-  // Annex E is informative and states that its directives are not part of
-  // the standard, so the report enforces no subclause of it.
+  // Annex E is informative, and the report names the subclause whose syntax
+  // the directive breaks all the same, as a report under Annex D names its
+  // subclause, so a reader can follow it to the rule.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "`default_trireg_strength requires an argument", 1,
-                            ""));
+                            "E.3"));
 }
 
 // E3-C1 (syntax, integer_constant): a non-integer argument does not satisfy the
@@ -47,7 +48,7 @@ TEST(Preprocessor, DefaultTriregStrength_NonIntegerArgumentIsError) {
   pp.Preprocess(fid);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "invalid `default_trireg_strength argument: 'strong'", 1, ""));
+      "invalid `default_trireg_strength argument: 'strong'", 1, "E.3"));
 }
 
 // E3-C2 (shall, lower bound): 0 is within the legal 0..250 range and is
@@ -81,7 +82,7 @@ TEST(Preprocessor, DefaultTriregStrength_AboveRangeIsError) {
   pp.Preprocess(fid);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "`default_trireg_strength value must be between 0 and 250", 1, ""));
+      "`default_trireg_strength value must be between 0 and 250", 1, "E.3"));
 }
 
 // E3 (baseline): with no directive present, no default trireg strength is in

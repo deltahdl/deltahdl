@@ -197,19 +197,22 @@ inline void MarkCellModules(CompilationUnit* cu,
   }
 }
 
-// Annex E.2: puts on each module declaration the default decay time the
-// preprocessor recorded in force at its header, so the trireg nets of a module
-// take the directive that preceded it in the source rather than the last one
-// of the compilation unit. Lives here beside MarkCellModules for the same
-// reason: every path that preprocesses and then parses applies it alike.
-inline void ApplyModuleDecayTimes(
-    CompilationUnit* cu, const std::vector<ModuleDefaultDecayTime>& times) {
+// Annex E.2 and E.3: puts on each module declaration the default decay time
+// and charge strength the preprocessor recorded in force at its header, so
+// the trireg nets of a module take the directives that preceded it in the
+// source rather than the last ones of the compilation unit. Lives here beside
+// MarkCellModules for the same reason: every path that preprocesses and then
+// parses applies it alike.
+inline void ApplyModuleTriregDefaults(
+    CompilationUnit* cu, const std::vector<ModuleTriregDefaults>& defaults) {
   for (auto* mod : cu->modules) {
-    for (const auto& time : times) {
-      if (mod->name != time.module) continue;
-      mod->has_default_decay_time = true;
-      mod->default_decay_time = time.ticks;
-      mod->default_decay_time_infinite = time.infinite;
+    for (const auto& d : defaults) {
+      if (mod->name != d.module) continue;
+      mod->has_trireg_defaults = true;
+      mod->default_decay_time = d.decay_ticks;
+      mod->default_decay_time_infinite = d.decay_infinite;
+      mod->default_trireg_strength = d.strength;
+      mod->has_default_trireg_strength = d.has_strength;
       break;
     }
   }

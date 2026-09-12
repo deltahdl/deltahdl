@@ -500,9 +500,8 @@ static void LowerNetDeclAssignment(const ModuleItem* item, const RtlirNet& net,
 }
 
 // The defaults a trireg declaration takes what it does not write from: the
-// compilation unit's default charge strength (Annex E.3) and the module's
-// default decay time (Annex E.2), the latter the directive in force where the
-// module was declared.
+// module's default charge strength (Annex E.3) and default decay time (Annex
+// E.2), each the directive in force where the module was declared.
 struct TriregDefaults {
   uint32_t strength = 0;
   bool has_strength = false;
@@ -830,9 +829,9 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
 
   ApplyTriregNetDefaults(
       item, net,
-      TriregDefaults{unit_->default_trireg_strength,
-                     unit_->has_default_trireg_strength,
-                     mod->default_decay_time, mod->default_decay_time_infinite},
+      TriregDefaults{mod->default_trireg_strength,
+                     mod->has_default_trireg_strength, mod->default_decay_time,
+                     mod->default_decay_time_infinite},
       BuildParamScope(mod), diag_);
 
   RecordNetDeclDelay(item, net);
