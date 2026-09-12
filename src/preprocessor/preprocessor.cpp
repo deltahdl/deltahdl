@@ -491,6 +491,29 @@ static void CopyTripleQuotedChar(std::string_view line, size_t& i,
 // triple_quoted_string each may span lines, so each is carried from one line
 // to the next by its flag; a quoted_string cannot, A.8.8's quoted_string_item
 // excluding the newline, so its state is the line's own.
+// Copies the `"""` that opens a triple_quoted_string, the unescaped '"' that
+// opens or closes a quoted_string, or one character inside an open
+// quoted_string, and answers whether it copied one; answers false at a
+// character outside every string, which is the comment stripper's to read.
+static bool CopyStringLiteralChar(std::string_view line, size_t& i,
+                                  std::string& result, bool& in_string,
+                                  bool& in_triple_string) {
+  if (!in_string && AtTripleQuote(line, i)) {
+    result += "\"\"\"";
+    i += 3;
+    in_triple_string = true;
+    return true;
+  }
+  if (line[i] == '"' && (i == 0 || line[i - 1] != '\\')) {
+    in_string = !in_string;
+    result += line[i++];
+    return true;
+  }
+  if (!in_string) return false;
+  result += line[i++];
+  return true;
+}
+
 static std::string StripComments(std::string_view line, bool& in_block_comment,
                                  bool& in_triple_string) {
   std::string result;
@@ -507,19 +530,7 @@ static std::string StripComments(std::string_view line, bool& in_block_comment,
       CopyTripleQuotedChar(line, i, result, in_triple_string);
       continue;
     }
-    if (!in_string && AtTripleQuote(line, i)) {
-      result += "\"\"\"";
-      i += 3;
-      in_triple_string = true;
-      continue;
-    }
-    if (line[i] == '"' && (i == 0 || line[i - 1] != '\\')) {
-      in_string = !in_string;
-      result += line[i++];
-      continue;
-    }
-    if (in_string) {
-      result += line[i++];
+    if (CopyStringLiteralChar(line, i, result, in_string, in_triple_string)) {
       continue;
     }
     if (StripNormalChar(line, i, result, in_block_comment)) return result;
