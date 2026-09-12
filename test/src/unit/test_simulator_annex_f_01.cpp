@@ -26,7 +26,7 @@ namespace {
 // immediate assertion of §16.4, whose condition is read where the statement
 // executes as the simple one's is. The rise and the tick stand in one time
 // step, which is what tells a sampled read from a live one.
-const std::string kOneTick =
+constexpr const char* kOneTick =
     "module m;\n"
     "  logic clk = 0;\n"
     "  logic a = 0;\n"
