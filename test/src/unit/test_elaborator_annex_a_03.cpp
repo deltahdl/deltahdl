@@ -97,20 +97,22 @@ TEST(PrimitiveInstanceElaboration, APullGateArrayBuildsOnePullPerElement) {
   EXPECT_EQ(AssignCount(mod), 3u);
 }
 
-// A declaration with no range is the one instance it is, whatever its terminals
-// are wide: `name_of_instance` carries no dimension, so there is no array to
-// expand and a 4-bit connection is one 4-bit gate.
-TEST(PrimitiveInstanceElaboration, NoRangeIsOneInstanceOfWhateverWidth) {
+// A declaration with no range is the one instance it is: `name_of_instance`
+// carries no dimension, so there is no array to expand. Nor does a range whose
+// bounds are equal declare more than the one §28.3.5 counts them as spanning.
+// Two such declarations are two instances and no more.
+TEST(PrimitiveInstanceElaboration, NoRangeAndAnEqualBoundedRangeAreOneEach) {
   ElabFixture f;
   const auto* mod = ElaborateTop(
       "module m;\n"
-      "  wire [3:0] y, a, b;\n"
+      "  wire y, z, a, b;\n"
       "  and g1(y, a, b);\n"
+      "  and g2[5:5](z, a, b);\n"
       "endmodule\n",
       f);
   ASSERT_NE(mod, nullptr);
   EXPECT_FALSE(f.has_errors);
-  EXPECT_EQ(AssignCount(mod), 1u);
+  EXPECT_EQ(AssignCount(mod), 2u);
 }
 
 }  // namespace
