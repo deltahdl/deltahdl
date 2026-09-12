@@ -324,11 +324,11 @@ struct RhsWatcherSpec {
 };
 
 // Writes into `var` the part of `val` this installation owns. A singular target
-// owns the whole value and takes it whole, width and all. An element of a
-// concatenation owns the two windows above instead, and the bits outside its
-// destination window belong to the other elements or to nothing at all and have
-// to be left standing, which is what DepositBitField does and what writing the
-// variable whole did not: `force {w, bus[3]} = 2'b11;` gave `bus` the whole
+// owns the whole value and takes it whole, sized to its own width. An element
+// of a concatenation owns the two windows above instead, and the bits outside
+// its destination window belong to the other elements or to nothing at all and
+// have to be left standing, which is what DepositBitField does and what writing
+// the variable whole did not: `force {w, bus[3]} = 2'b11;` gave `bus` the whole
 // two-bit value.
 //
 // The deposit is made into a fresh copy of the target's current value rather
@@ -344,8 +344,14 @@ struct RhsWatcherSpec {
 static void WriteOwnedBits(Variable* var, const Logic4Vec& val,
                            const RhsWatcherSpec& spec, Arena& arena) {
   if (spec.window.dst_width == 0) {
-    if (spec.forced) var->forced_value = val;
-    var->value = val;
+    // §10.6.2 gives the force and the assign a right-hand expression as an
+    // assignment does, and §10.7 sizes an assigned value to its target: the
+    // value takes the width the variable has, as WriteVar gives a blocking
+    // assignment's. Taken as evaluated, `force w = 0;` on a scalar net left w
+    // holding the literal's 32 bits as its value, width and all.
+    Logic4Vec sized = ResizeToWidth(val, var->value.width, arena);
+    if (spec.forced) var->forced_value = sized;
+    var->value = sized;
   } else {
     Logic4Vec updated = ExtractBitField(arena, var->value, 0, var->value.width);
     DepositBitField(updated, spec.window.dst_lo,
