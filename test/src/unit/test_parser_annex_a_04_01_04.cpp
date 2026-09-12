@@ -216,4 +216,26 @@ TEST(CheckerInstantiationGrammar, Error_MixedOrderedAndNamedPorts) {
       "23.3.2"));
 }
 
+// checker_instantiation writes one name_of_instance where A.4.1.1's three
+// forms write `hierarchical_instance { , hierarchical_instance }`. The parser
+// reads all four through one path and cannot tell a checker's name from a
+// module's, so it records which instances continued a list after a ',' and
+// the elaborator, which knows the cell, reports the checker's under A.4.1.4.
+TEST(CheckerInstantiationGrammar, InstanceListContinuationIsRecorded) {
+  auto r = Parse(
+      "checker chk(input logic a);\n"
+      "endchecker\n"
+      "module m;\n"
+      "  chk c1(s), c2(t);\n"
+      "  chk c3(u);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  const auto& items = r.cu->modules[0]->items;
+  ASSERT_EQ(items.size(), 3u);
+  EXPECT_FALSE(items[0]->inst_continues_list);
+  EXPECT_TRUE(items[1]->inst_continues_list);
+  EXPECT_FALSE(items[2]->inst_continues_list);
+}
+
 }  // namespace

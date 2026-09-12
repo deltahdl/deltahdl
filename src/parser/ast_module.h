@@ -373,6 +373,13 @@ struct ModuleItem {
   std::vector<std::pair<std::string_view, Expr*>> inst_ports;
   std::vector<bool> inst_ports_implicit;
   bool inst_wildcard = false;
+  // Whether this instance is the second or a later hierarchical_instance of
+  // one instantiation, `chk c1(a), c2(b);`. A.4.1.1's module_instantiation,
+  // A.4.1.2's interface_instantiation and A.4.1.3's program_instantiation
+  // write `hierarchical_instance { , hierarchical_instance }`; A.4.1.4's
+  // checker_instantiation writes one name_of_instance, and the elaborator,
+  // which knows what the cell is, reads this to hold a checker to it.
+  bool inst_continues_list = false;
   Expr* inst_range_left = nullptr;
   Expr* inst_range_right = nullptr;
   std::vector<std::pair<Expr*, Expr*>> inst_dims;

@@ -110,4 +110,47 @@ TEST(InstantiationFormElaboration, TheOtherThreeFormsTakeTheAssignment) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// A.4.1.4 writes one name_of_instance where the other three forms write
+// `hierarchical_instance { , hierarchical_instance }`. Read by the shared path,
+// `chk c1(s), c2(t);` was two instances of the checker; the second is now
+// reported, and the first stands.
+TEST(InstantiationFormElaboration, ACheckerTakesOneInstancePerInstantiation) {
+  ElabFixture f;
+  ElaborateSrc(
+      "checker chk(input logic a);\n"
+      "endchecker\n"
+      "module m;\n"
+      "  logic s, t;\n"
+      "  chk c1(s), c2(t);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "checker 'chk' is instantiated one instance to an "
+                            "instantiation; 'c2' after a ',' is a second",
+                            5, "A.4.1.4"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "'c1' after a ',' is a second", 5, "A.4.1.4"));
+}
+
+// The three forms that do write the list keep it: two instances to one
+// instantiation of a module, an interface and a program elaborate.
+TEST(InstantiationFormElaboration, TheOtherThreeFormsTakeTheInstanceList) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "interface ifc ();\n"
+      "endinterface\n"
+      "program prg ();\n"
+      "endprogram\n"
+      "module sub ();\n"
+      "endmodule\n"
+      "module m;\n"
+      "  ifc i1(), i2();\n"
+      "  prg p1(), p2();\n"
+      "  sub s1(), s2();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

@@ -97,6 +97,7 @@ ModuleItem* Parser::ParseModuleInstList(const Token& module_tok,
   std::vector<ModuleItem*> instances;
   do {
     instances.push_back(parse_one_instance());
+    instances.back()->inst_continues_list = instances.size() > 1;
   } while (Match(TokenKind::kComma));
   Expect(TokenKind::kSemicolon, Subclause("23.3.2"));
   PublishInstances(extra_items, instances);

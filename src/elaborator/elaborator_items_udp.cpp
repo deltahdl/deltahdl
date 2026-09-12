@@ -347,22 +347,32 @@ void ClassifyInstantiatedChild(const ModuleItem* item, const ModuleDecl* child,
 //         ps_checker_identifier name_of_instance
 //         ( [ list_of_checker_port_connections ] ) ;
 //
-// -- and what it leaves out is the parameter value assignment. A checker takes
-// its arguments through the ports that connection list fills (§17.3), so an
-// override written before the instance name names nothing the declaration has.
-// Parsed by the one path all four forms share, it was read as the parameter
-// value assignment of the other three and carried to a declaration that has no
-// parameters for it to override, silently.
-void CheckCheckerInstHasNoParamAssignment(const ModuleItem* item,
-                                          const ModuleDecl* child,
-                                          DiagEngine& diag) {
+// -- and what it leaves out is the parameter value assignment and the
+// `{ , hierarchical_instance }` after the first instance. A checker takes its
+// arguments through the ports that connection list fills (§17.3), so an
+// override written before the instance name names nothing the declaration has;
+// and one instantiation names one instance of it. Parsed by the one path all
+// four forms share, an override was read as the parameter value assignment of
+// the other three and carried to a declaration that has no parameters for it
+// to override, and `chk c1(a), c2(b);` was read as the other three's list and
+// elaborated as two instances, both silently.
+void CheckCheckerInstForm(const ModuleItem* item, const ModuleDecl* child,
+                          DiagEngine& diag) {
   if (child->decl_kind != ModuleDeclKind::kChecker) return;
-  if (item->inst_params.empty()) return;
-  diag.Error(item->loc,
-             std::format("checker '{}' cannot be instantiated with a "
-                         "parameter value assignment",
-                         item->inst_module),
-             Subclause("A.4.1.4"));
+  if (!item->inst_params.empty()) {
+    diag.Error(item->loc,
+               std::format("checker '{}' cannot be instantiated with a "
+                           "parameter value assignment",
+                           item->inst_module),
+               Subclause("A.4.1.4"));
+  }
+  if (item->inst_continues_list) {
+    diag.Error(item->loc,
+               std::format("checker '{}' is instantiated one instance to an "
+                           "instantiation; '{}' after a ',' is a second",
+                           item->inst_module, item->inst_name),
+               Subclause("A.4.1.4"));
+  }
 }
 
 // Emits the parent-scope legality diagnostics for a module-instance item whose
@@ -746,7 +756,7 @@ void ClassifyAndCheckItems(const ModuleDecl* decl,
                                   item_scope.scope);
         CheckModuleInstParentRules(item, decl, child, item_scope.parent_scope,
                                    item_scope.diag);
-        CheckCheckerInstHasNoParamAssignment(item, child, item_scope.diag);
+        CheckCheckerInstForm(item, child, item_scope.diag);
       }
     }
     CheckProgramCheckerItemRules(item, decl, item_scope.parent_scope,
