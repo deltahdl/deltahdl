@@ -1,4 +1,5 @@
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -41,8 +42,10 @@ TEST(ModportExpressionParsing, PortExpressionMixedWithBareIdentifier) {
   EXPECT_EQ(mp->ports[1].name, "R");
 }
 
-// N1: a modport expression with no preceding direction keyword parses with
-// direction kNone (the default-direction path of the modport-item loop).
+// A modport expression stands in A.2.9's modport_simple_ports_declaration,
+// which opens with a port_direction; one written with no direction before it
+// is reported under A.2.9 and read as a port of no direction, its expression
+// kept.
 TEST(ModportExpressionParsing, DotNotationWithoutDirection) {
   auto r = Parse(
       "interface ifc;\n"
@@ -50,7 +53,9 @@ TEST(ModportExpressionParsing, DotNotationWithoutDirection) {
       "  modport mp(.x(a));\n"
       "endinterface\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a modport_ports_declaration opens with a port_direction", 3,
+      "A.2.9"));
   auto* mp = r.cu->interfaces[0]->modports[0];
   ASSERT_EQ(mp->ports.size(), 1u);
   EXPECT_EQ(mp->ports[0].name, "x");

@@ -175,7 +175,20 @@ class Parser {
   ModuleDecl* ParseProgramDecl();
   void ParseModportDecl(std::vector<ModportDecl*>& out);
   void ParseModportItem(ModportDecl* mp);
-  void ParseModportPortEntry(ModportDecl* mp, Direction& cur_dir, int& tf_mode);
+  // What the modport_ports_declaration being read opened with, and so what a
+  // bare entry after a ',' continues: A.2.9's modport_simple_ports_declaration
+  // continues with modport_simple_ports of its port_direction, its
+  // modport_tf_ports_declaration with modport_tf_ports of its import_export,
+  // and its modport_clocking_declaration, one clocking_identifier, with
+  // nothing.
+  struct ModportScan {
+    enum class Opened : uint8_t { kNothing, kSimple, kTf, kClocking };
+    Opened opened = Opened::kNothing;
+    Direction dir = Direction::kNone;
+    bool is_import = false;
+  };
+  void ParseModportPortEntry(ModportDecl* mp, ModportScan& scan);
+  void ParseModportPrototypeSpecifiers(ModuleItem* item);
   ModportPort ParseModportTfPort(bool is_import);
   ModportPort ParseModportSimplePort(Direction dir);
   bool IsAtClassDecl();

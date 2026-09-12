@@ -136,7 +136,7 @@ TEST(ModportDeclarationParsing, DotNotationModportName) {
   auto r = Parse(
       "interface bus;\n"
       "  logic [7:0] bus_data;\n"
-      "  modport target(.data(bus_data));\n"
+      "  modport target(input .data(bus_data));\n"
       "endinterface\n");
   ASSERT_NE(r.cu, nullptr);
   auto* iface = r.cu->interfaces[0];
@@ -151,7 +151,7 @@ TEST(ModportDeclarationParsing, DotNotationModportName) {
 TEST(ModportDeclarationParsing, DotNotationEmptyExpression) {
   auto r = Parse(
       "interface bus;\n"
-      "  modport target(.data());\n"
+      "  modport target(input .data());\n"
       "endinterface\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -366,6 +366,86 @@ TEST(ModportDeclarationParsing, MissingSemicolon) {
   // should be is `endinterface`.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected ';', got 'endinterface'", 4, "25.5"));
+}
+
+// modport_item ::= modport_identifier ( modport_ports_declaration
+//   { , modport_ports_declaration } )
+// One declaration at least; an item written with none was accepted silently.
+TEST(ModportDeclarationParsing, EmptyModportItemIsRejected) {
+  auto r = Parse(
+      "interface bus;\n"
+      "  modport empty();\n"
+      "endinterface\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a modport item has at least one modport_ports_declaration", 2,
+      "A.2.9"));
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->interfaces[0]->modports.size(), 1u);
+  EXPECT_EQ(r.cu->interfaces[0]->modports[0]->name, "empty");
+}
+
+// modport_ports_declaration opens with a port_direction, import_export or
+// `clocking`; a first entry that is a bare port has no declaration to stand
+// in, and was read as a port of no direction with nothing said.
+TEST(ModportDeclarationParsing, PortWithoutDeclarationIsRejected) {
+  auto r = Parse(
+      "interface bus;\n"
+      "  logic a, b;\n"
+      "  modport mp(a, output b);\n"
+      "endinterface\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a modport_ports_declaration opens with a port_direction", 3,
+      "A.2.9"));
+  ASSERT_NE(r.cu, nullptr);
+  auto* mp = r.cu->interfaces[0]->modports[0];
+  ASSERT_EQ(mp->ports.size(), 2u);
+  EXPECT_EQ(mp->ports[0].name, "a");
+  EXPECT_EQ(mp->ports[1].direction, Direction::kOutput);
+}
+
+// modport_clocking_declaration ::= clocking clocking_identifier -- one
+// identifier, so the entry after it opens a declaration of its own; a bare
+// port there was read as a port of the direction last named.
+TEST(ModportDeclarationParsing, PortAfterClockingDeclarationIsRejected) {
+  auto r = Parse(
+      "interface bus(input logic clk);\n"
+      "  logic a, b;\n"
+      "  clocking cb @(posedge clk);\n"
+      "  endclocking\n"
+      "  modport mp(input a, clocking cb, b);\n"
+      "endinterface\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a modport_ports_declaration opens with a port_direction", 5,
+      "A.2.9"));
+  ASSERT_NE(r.cu, nullptr);
+  auto* mp = r.cu->interfaces[0]->modports[0];
+  ASSERT_EQ(mp->ports.size(), 3u);
+  EXPECT_EQ(mp->ports[2].name, "b");
+  EXPECT_EQ(mp->ports[2].direction, Direction::kNone);
+}
+
+// modport_tf_port ::= method_prototype | tf_identifier, and A.2.7 writes both
+// prototypes with `[ dynamic_override_specifiers ]` after the keyword, which
+// A.10's footnote 25 has "only be legal on method declarations inside a
+// non-interface class scope". A prototype carrying one was reported as a
+// missing identifier at the ':'; it is now read to its name and reported for
+// the specifier.
+TEST(ModportDeclarationParsing, PrototypeWithOverrideSpecifierIsRejected) {
+  auto r = Parse(
+      "interface bus;\n"
+      "  modport mp(import task : final t(), function : initial int f());\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "dynamic_override_specifiers shall only be legal "
+                            "on method declarations inside a non-interface "
+                            "class scope",
+                            2, "8.20"));
+  EXPECT_FALSE(ReportedError(r.diags, "expected identifier", 2, "25.5"));
+  auto* mp = r.cu->interfaces[0]->modports[0];
+  ASSERT_EQ(mp->ports.size(), 2u);
+  EXPECT_EQ(mp->ports[0].name, "t");
+  EXPECT_EQ(mp->ports[1].name, "f");
 }
 
 }  // namespace
