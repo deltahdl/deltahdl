@@ -61,6 +61,63 @@ bool VpiModeIs1364(int mode) {
          mode == vpiMode1364v2005;
 }
 
+// §36.12.1 Table 36-10 rows 1 and 2 with Annex C.4.3 items 1 and 2: vpiMemory
+// and vpiMemoryWord are object types "under certain backwards compatibility
+// modes", present in IEEE Std 1364-1995 and, deprecated, in IEEE Std 1364-2001
+// (Y and D), and "no longer present" from IEEE Std 1364-2005 on, where a memory
+// is a vpiRegArray and its word a vpiReg as in this standard.
+bool VpiModeHasMemoryObjects(int mode) {
+  return mode == vpiMode1364v1995 || mode == vpiMode1364v2001;
+}
+
+// Rows 3 and 4 with C.4.3 item 3: vpiIntegerVar and vpiTimeVar "can be arrays"
+// in every IEEE 1364 standard and vpiRealVar in IEEE Std 1364-2001 and
+// 1364-2005, "instead of simple variables", so an unpacked array of one of
+// those kinds is an object of that kind under such a mode, told from the
+// simple variable by the vpiArray property. The kind such a mode reads
+// `array` as, or 0 for an array it reads as an array object.
+int Vpi1364ArrayAsVariableKind(delta::VpiHandle array, int mode) {
+  for (const auto* word : array->children) {
+    if (word->type == vpiIntegerVar || word->type == vpiTimeVar) {
+      return word->type;
+    }
+    if (word->type == vpiRealVar && mode != vpiMode1364v1995) {
+      return word->type;
+    }
+  }
+  return 0;
+}
+
+// The vpiType an IEEE 1364 mode reports for `obj`, or 0 where it reports the
+// kind this standard does. Row 1 has "unpacked unidimensional reg arrays"
+// characterized as vpiMemory objects; an array of more dimensions is the
+// vpiRegArray IEEE Std 1364-2001 introduced for it.
+int Vpi1364Type(delta::VpiHandle obj, int mode) {
+  if (delta::VpiIsArrayVarType(obj->type)) {
+    if (obj->array_dim_indices.size() > 1) return 0;
+    if (delta::VpiArrayVarIsMemory(obj)) {
+      return VpiModeHasMemoryObjects(mode) ? vpiMemory : 0;
+    }
+    return Vpi1364ArrayAsVariableKind(obj, mode);
+  }
+  if (obj->type == vpiReg && VpiModeHasMemoryObjects(mode) &&
+      delta::VpiArrayVarIsMemory(obj->parent)) {
+    return vpiMemoryWord;
+  }
+  return 0;
+}
+
+// Row 3 and C.4.3 item 3: the vpiArray property "returned TRUE when they were
+// arrays" for the integer, time and real variables an IEEE 1364 mode reads an
+// array as, and "indicated when vpiReg types represented elements of
+// vpiRegArrays"; FALSE for every other object under such a mode.
+int Vpi1364ArrayProperty(delta::VpiHandle obj, int mode) {
+  if (delta::VpiIsArrayVarType(obj->type)) {
+    return Vpi1364ArrayAsVariableKind(obj, mode) != 0 ? 1 : 0;
+  }
+  return obj->type == vpiReg && delta::VpiVariableIsArrayMember(obj) ? 1 : 0;
+}
+
 }  // namespace
 
 namespace delta {
@@ -83,6 +140,23 @@ const char* VpiCompatibilityUnsupportedConstruct(
     }
   }
   return nullptr;
+}
+
+int VpiGetInCompatibilityMode(int property, VpiHandle obj, int mode) {
+  // The property as the current routine answers it, with an error it recorded
+  // kept; under an IEEE 1364 mode the object type and vpiArray property are
+  // then the ones Table 36-10 rows 1 through 4 give that version, and every
+  // other property is the current one.
+  int value = delta::GetGlobalVpiContext().Get(property, obj);
+  if (value == vpiUndefined || obj == nullptr || !VpiModeIs1364(mode)) {
+    return value;
+  }
+  if (property == vpiType) {
+    int older = Vpi1364Type(obj, mode);
+    return older != 0 ? older : value;
+  }
+  if (property == vpiArray) return Vpi1364ArrayProperty(obj, mode);
+  return value;
 }
 
 vpiHandle VpiIterateInCompatibilityMode(int type, VpiHandle ref, int mode) {
@@ -109,7 +183,10 @@ PLI_INT32 vpi_compare_objects_1364v1995(vpiHandle obj1, vpiHandle obj2) {
   return vpi_compare_objects(obj1, obj2);
 }
 PLI_INT32 vpi_get_1364v1995(PLI_INT32 property, vpiHandle obj) {
-  return vpi_get(property, obj);
+  return delta::VpiGetInCompatibilityMode(
+      property, obj,
+      delta::GetGlobalVpiContext().EffectiveCompatibilityMode(
+          true, vpiMode1364v1995));
 }
 PLI_BYTE8* vpi_get_str_1364v1995(PLI_INT32 property, vpiHandle obj) {
   return vpi_get_str(property, obj);
@@ -164,7 +241,10 @@ PLI_INT32 vpi_compare_objects_1364v2001(vpiHandle obj1, vpiHandle obj2) {
   return vpi_compare_objects(obj1, obj2);
 }
 PLI_INT32 vpi_get_1364v2001(PLI_INT32 property, vpiHandle obj) {
-  return vpi_get(property, obj);
+  return delta::VpiGetInCompatibilityMode(
+      property, obj,
+      delta::GetGlobalVpiContext().EffectiveCompatibilityMode(
+          true, vpiMode1364v2001));
 }
 PLI_BYTE8* vpi_get_str_1364v2001(PLI_INT32 property, vpiHandle obj) {
   return vpi_get_str(property, obj);
@@ -219,7 +299,10 @@ PLI_INT32 vpi_compare_objects_1364v2005(vpiHandle obj1, vpiHandle obj2) {
   return vpi_compare_objects(obj1, obj2);
 }
 PLI_INT32 vpi_get_1364v2005(PLI_INT32 property, vpiHandle obj) {
-  return vpi_get(property, obj);
+  return delta::VpiGetInCompatibilityMode(
+      property, obj,
+      delta::GetGlobalVpiContext().EffectiveCompatibilityMode(
+          true, vpiMode1364v2005));
 }
 PLI_BYTE8* vpi_get_str_1364v2005(PLI_INT32 property, vpiHandle obj) {
   return vpi_get_str(property, obj);

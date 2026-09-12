@@ -203,7 +203,11 @@ PLI_INT32 vpi_remove_cb(vpiHandle cb_handle) {
 
 PLI_INT32 vpi_get(PLI_INT32 property, vpiHandle obj) {
   VpiRoutineErrorScope error_scope;
-  return delta::GetGlobalVpiContext().Get(property, obj);
+  // §36.12.2.2: as for vpi_iterate, an application reaching this entry point
+  // is governed by the default mode the run was given.
+  return delta::VpiGetInCompatibilityMode(
+      property, obj,
+      delta::GetGlobalVpiContext().EffectiveCompatibilityMode(false, 0));
 }
 
 PLI_INT64 vpi_get64(PLI_INT32 property, vpiHandle obj) {

@@ -544,6 +544,13 @@ int VpiGetSimplePropertyB(int property, VpiHandle obj, bool& handled) {
     case vpiPacked:
       return VpiBool(obj->packed || obj->type == vpiPackedArrayVar ||
                      VpiVariableIsPackedArrayMember(obj));
+    // §37.17 detail 2 and §37.16 detail 2: a variable or a net reports whether
+    // it is an element of an array variable or an array net through
+    // vpiArrayMember, the property Annex C.4.3 item 3 has "now used, thus
+    // replacing the original use of vpiArray". The two helpers that answer it
+    // were reached by nothing, so every element answered FALSE.
+    case vpiArrayMember:
+      return VpiBool(VpiVariableIsArrayMember(obj) || VpiNetIsArrayMember(obj));
     // §37.20 (figure): a reg array reports whether it is a memory. §37.20
     // detail 1 turned vpiMemory and vpiMemoryWord into methods returning
     // vpiRegArray and vpiReg, so what tells a memory from any other array
