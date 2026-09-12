@@ -109,16 +109,18 @@ std::shared_ptr<const SequenceExpr> SeqConcatDelayExactly(
 // of letters without b. The bounded, unbounded and exact forms unfold through
 // the §F.3.4.2.1 repetitions of the same shape.
 std::shared_ptr<const SequenceExpr> SeqGotoRange(
-    std::shared_ptr<const BooleanExpr> b, unsigned int m, unsigned int n);
+    const std::shared_ptr<const BooleanExpr>& b, unsigned int m,
+    unsigned int n);
 std::shared_ptr<const SequenceExpr> SeqGotoAtLeast(
-    std::shared_ptr<const BooleanExpr> b, unsigned int m);
+    const std::shared_ptr<const BooleanExpr>& b, unsigned int m);
 std::shared_ptr<const SequenceExpr> SeqGotoExactly(
-    std::shared_ptr<const BooleanExpr> b, unsigned int m);
+    const std::shared_ptr<const BooleanExpr>& b, unsigned int m);
 std::shared_ptr<const SequenceExpr> SeqNonconsecutiveRange(
-    std::shared_ptr<const BooleanExpr> b, unsigned int m, unsigned int n);
+    const std::shared_ptr<const BooleanExpr>& b, unsigned int m,
+    unsigned int n);
 std::shared_ptr<const SequenceExpr> SeqNonconsecutiveAtLeast(
-    std::shared_ptr<const BooleanExpr> b, unsigned int m);
+    const std::shared_ptr<const BooleanExpr>& b, unsigned int m);
 std::shared_ptr<const SequenceExpr> SeqNonconsecutiveExactly(
-    std::shared_ptr<const BooleanExpr> b, unsigned int m);
+    const std::shared_ptr<const BooleanExpr>& b, unsigned int m);
 
 }  // namespace delta

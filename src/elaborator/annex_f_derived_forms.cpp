@@ -143,34 +143,36 @@ static std::shared_ptr<const SequenceExpr> SeqGotoUnit(
 }
 
 std::shared_ptr<const SequenceExpr> SeqGotoRange(
-    std::shared_ptr<const BooleanExpr> b, unsigned int m, unsigned int n) {
+    const std::shared_ptr<const BooleanExpr>& b, unsigned int m,
+    unsigned int n) {
   return SeqRepeatRange(SeqGotoUnit(b), m, n);
 }
 
 std::shared_ptr<const SequenceExpr> SeqGotoAtLeast(
-    std::shared_ptr<const BooleanExpr> b, unsigned int m) {
+    const std::shared_ptr<const BooleanExpr>& b, unsigned int m) {
   return SeqRepeatAtLeast(SeqGotoUnit(b), m);
 }
 
 std::shared_ptr<const SequenceExpr> SeqGotoExactly(
-    std::shared_ptr<const BooleanExpr> b, unsigned int m) {
+    const std::shared_ptr<const BooleanExpr>& b, unsigned int m) {
   return SeqRepeatExactly(SeqGotoUnit(b), m);
 }
 
 std::shared_ptr<const SequenceExpr> SeqNonconsecutiveRange(
-    std::shared_ptr<const BooleanExpr> b, unsigned int m, unsigned int n) {
+    const std::shared_ptr<const BooleanExpr>& b, unsigned int m,
+    unsigned int n) {
   auto gotos = SeqGotoRange(b, m, n);
   return SeqConcat(std::move(gotos), SeqRunWithout(b));
 }
 
 std::shared_ptr<const SequenceExpr> SeqNonconsecutiveAtLeast(
-    std::shared_ptr<const BooleanExpr> b, unsigned int m) {
+    const std::shared_ptr<const BooleanExpr>& b, unsigned int m) {
   auto gotos = SeqGotoAtLeast(b, m);
   return SeqConcat(std::move(gotos), SeqRunWithout(b));
 }
 
 std::shared_ptr<const SequenceExpr> SeqNonconsecutiveExactly(
-    std::shared_ptr<const BooleanExpr> b, unsigned int m) {
+    const std::shared_ptr<const BooleanExpr>& b, unsigned int m) {
   auto gotos = SeqGotoExactly(b, m);
   return SeqConcat(std::move(gotos), SeqRunWithout(b));
 }
