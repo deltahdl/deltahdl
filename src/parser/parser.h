@@ -511,6 +511,8 @@ class Parser {
   void RejectClockingDecl(std::string_view message);
   void ParseClockingItemList(ModuleItem* item);
   void ParseClockingItem(ModuleItem* item);
+  void ParseClockingDefaultSkew(const Token& direction, Edge& edge,
+                                Expr*& delay);
   void ParseClockingDefaultSkews(ModuleItem* item);
   void CheckClockingBlockDecl(const ModuleItem* decl, std::string_view kind);
   void ParseClockingSkew(Edge& edge, Expr*& delay);

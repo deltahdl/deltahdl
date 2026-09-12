@@ -199,17 +199,54 @@ Direction Parser::ParseClockingDirection(Edge& in_edge, Expr*& in_delay,
   return Direction::kNone;
 }
 
+// One direction of a default_skew: the `input` or `output` keyword has been
+// read, and A.6.11 writes a clocking_skew behind it -- `edge_identifier [
+// delay_control ] | delay_control` -- so a direction followed by neither an
+// edge nor a delay names no skew, and is reported at the keyword. `direction`
+// is the keyword's own text, for the report.
+void Parser::ParseClockingDefaultSkew(const Token& direction, Edge& edge,
+                                      Expr*& delay) {
+  ParseClockingSkew(edge, delay);
+  if (edge != Edge::kNone || delay != nullptr) return;
+  diag_.Error(direction.loc,
+              "default " + std::string(direction.text) +
+                  " skew names no clocking_skew: an edge, a delay, or both",
+              Subclause("A.6.11"));
+}
+
 // The `default input/output skew` alternative of a clocking_item, which sets
-// the block-wide skews rather than declaring a signal.
+// the block-wide skews rather than declaring a signal. A.6.11 writes it as
+// `default_skew ::= input clocking_skew | output clocking_skew | input
+// clocking_skew output clocking_skew`: at least one direction, each with its
+// skew, and the input skew before the output skew. §14.3 says what it is for --
+// "A single skew can be specified for the entire block by using a default
+// clocking item" -- so a `default` item that specifies no skew has nothing to
+// set, and was taken silently before as a block that set neither default.
 void Parser::ParseClockingDefaultSkews(ModuleItem* item) {
-  Consume();  // 'default'
-  if (Match(TokenKind::kKwInput)) {
-    ParseClockingSkew(item->default_input_skew_edge,
-                      item->default_input_skew_delay);
+  auto default_tok = Consume();  // 'default'
+  bool has_direction = false;
+  if (Check(TokenKind::kKwInput)) {
+    has_direction = true;
+    ParseClockingDefaultSkew(Consume(), item->default_input_skew_edge,
+                             item->default_input_skew_delay);
   }
-  if (Match(TokenKind::kKwOutput)) {
-    ParseClockingSkew(item->default_output_skew_edge,
-                      item->default_output_skew_delay);
+  if (Check(TokenKind::kKwOutput)) {
+    has_direction = true;
+    ParseClockingDefaultSkew(Consume(), item->default_output_skew_edge,
+                             item->default_output_skew_delay);
+    if (Check(TokenKind::kKwInput)) {
+      diag_.Error(CurrentLoc(),
+                  "default skew writes the input skew before the output skew",
+                  Subclause("A.6.11"));
+      ParseClockingDefaultSkew(Consume(), item->default_input_skew_edge,
+                               item->default_input_skew_delay);
+    }
+  }
+  if (!has_direction) {
+    diag_.Error(default_tok.loc,
+                "default clocking item takes an input skew, an output skew, or "
+                "both",
+                Subclause("A.6.11"));
   }
   Expect(TokenKind::kSemicolon, Subclause("14.4"));
 }

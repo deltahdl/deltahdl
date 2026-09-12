@@ -782,4 +782,94 @@ TEST(GlobalClockingParse, RejectsClockingItems) {
       ReportedError(r.diags, "expected 'endclocking', got 'input'", 3, "14.3"));
 }
 
+// A.6.11 writes `default_skew ::= input clocking_skew | output clocking_skew |
+// input clocking_skew output clocking_skew`, and `clocking_skew ::=
+// edge_identifier [ delay_control ] | delay_control`, so each direction of a
+// default item carries a skew of its own. §14.3 gives the item its purpose --
+// "A single skew can be specified for the entire block by using a default
+// clocking item" -- and a direction written without one specifies nothing.
+TEST(ClockingSkewParse, DefaultInputWithoutSkewIsRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    default input;\n"
+      "    input data;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "default input skew names no clocking_skew: an edge, a delay, or both", 3,
+      "A.6.11"));
+}
+
+TEST(ClockingSkewParse, DefaultOutputWithoutSkewIsRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    default input #1 output;\n"
+      "    output data;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "default output skew names no clocking_skew: an edge, a delay, or both",
+      3, "A.6.11"));
+  // The input skew before the missing one is still the block's.
+  auto* item = FindClockingBlockByIndex(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_NE(item->default_input_skew_delay, nullptr);
+}
+
+TEST(ClockingSkewParse, DefaultWithoutDirectionIsRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    default;\n"
+      "    input data;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "default clocking item takes an input skew, an output skew, or both", 3,
+      "A.6.11"));
+}
+
+// The one two-direction form A.6.11 writes puts the input skew first. The
+// other order is reported, and both skews are still kept, so the report is the
+// only consequence of the order.
+TEST(ClockingSkewParse, DefaultOutputBeforeInputIsRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    default output #1 input #2;\n"
+      "    input data;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "default skew writes the input skew before the output skew", 3,
+      "A.6.11"));
+  auto* item = FindClockingBlockByIndex(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_NE(item->default_input_skew_delay, nullptr);
+  EXPECT_NE(item->default_output_skew_delay, nullptr);
+}
+
+// An edge_identifier alone is a clocking_skew, so a default written with an
+// edge and no delay specifies a skew and draws no report.
+TEST(ClockingSkewParse, DefaultInputEdgeAloneIsASkew) {
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    default input posedge;\n"
+      "    input data;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindClockingBlockByIndex(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->default_input_skew_edge, Edge::kPosedge);
+  EXPECT_EQ(item->default_input_skew_delay, nullptr);
+}
+
 }  // namespace
