@@ -1,3 +1,5 @@
+#include <format>
+
 #include "parser/parser.h"
 #include "parser/parser_instance_internal.h"
 
@@ -349,7 +351,36 @@ static void ValidateUdpRowAgainstRegDecl(DiagEngine& diag, const UdpDecl* udp,
              Subclause("29.3.2"));
 }
 
-void Parser::ParseUdpTableRow(UdpDecl* udp, bool& reg_mismatch_reported) {
+// §29.3.4 reads a row's input fields off the header's port list by position:
+// "The order of the input state fields of each row of the state table is taken
+// directly from the port list in the UDP definition header", and it gives a row
+// "one field per input and one field for the output". A row carrying some other
+// number of fields therefore names no combination of this UDP's inputs at all.
+// UdpRowMatchesLevels (src/simulator/udp_eval.cpp) answers no match for such a
+// row whatever the inputs are, so the primitive falls to §29.3.4's default of
+// "a default output state of x" and runs as though the row had not been
+// written. Reports once per UDP, at the first row that disagrees, since one
+// port list read wrong is one mistake however many rows stand under it.
+//
+// Says nothing where the header declared no inputs: ValidateUdpHeader has
+// already reported that, every row would disagree with a port list that is not
+// there, and the count this would name is the one already being reported.
+static void ValidateUdpRowWidth(DiagEngine& diag, const UdpDecl* udp,
+                                const UdpTableRow& row, SourceLoc row_loc,
+                                bool& already_reported) {
+  if (udp->input_names.empty() || already_reported) return;
+  if (row.inputs.size() == udp->input_names.size()) return;
+  already_reported = true;
+  diag.Error(
+      row_loc,
+      std::format("UDP table row has {} input field(s) but primitive '{}' "
+                  "declares {} input port(s)",
+                  row.inputs.size(), udp->name, udp->input_names.size()),
+      Subclause("29.3.4"));
+}
+
+void Parser::ParseUdpTableRow(UdpDecl* udp, bool& reg_mismatch_reported,
+                              bool& row_width_reported) {
   UdpTableRow row;
   SourceLoc row_loc = CurrentLoc();
   while (!Check(TokenKind::kColon) && !AtEnd()) {
@@ -395,6 +426,7 @@ void Parser::ParseUdpTableRow(UdpDecl* udp, bool& reg_mismatch_reported) {
   ValidateUdpRowAgainstRegDecl(diag_, udp, row_is_sequential, row_loc,
                                reg_mismatch_reported);
   ValidateUdpTableRow(diag_, row_is_sequential, row, row_loc);
+  ValidateUdpRowWidth(diag_, udp, row, row_loc, row_width_reported);
 
   udp->table.push_back(row);
 }
@@ -402,8 +434,9 @@ void Parser::ParseUdpTableRow(UdpDecl* udp, bool& reg_mismatch_reported) {
 void Parser::ParseUdpTable(UdpDecl* udp) {
   Expect(TokenKind::kKwTable, Subclause("29.3.4"));
   bool reg_mismatch_reported = false;
+  bool row_width_reported = false;
   while (!Check(TokenKind::kKwEndtable) && !AtEnd()) {
-    ParseUdpTableRow(udp, reg_mismatch_reported);
+    ParseUdpTableRow(udp, reg_mismatch_reported, row_width_reported);
   }
   if (udp->table.empty()) {
     diag_.Error(CurrentLoc(), "UDP table shall contain at least one entry",

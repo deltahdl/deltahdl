@@ -162,6 +162,37 @@ void Elaborator::ReclassifyForwardUdpInstances(const ModuleDecl* decl) {
   }
 }
 
+// §29.8: "The terminal connection order is as specified in the UDP
+// definition", and A.5.4 writes that connection as `( output_terminal ,
+// input_terminal { , input_terminal } )` -- one terminal for the output port
+// §29.3.1 makes the first of the port list, and one for each input port the
+// same list names. The count is therefore the header's and not the
+// instantiation's to choose: an instantiation carrying some other number of
+// terminals leaves an input port with nothing driving it or names a terminal no
+// port receives.
+//
+// Nothing downstream says so. Elaborator::ElaborateOneUdpInst below splits the
+// list at index 1 whatever its length, and UdpRowMatchesLevels
+// (src/simulator/udp_eval.cpp) compares that length against each row's field
+// count and answers no match when they differ, so every row of the table is
+// passed over and the instance drives §29.3.4's default of x for the whole run.
+//
+// Says nothing where the primitive declared no inputs.
+// Parser::ValidateUdpHeader (src/parser/parser_udp.cpp) has already reported
+// that header, and the count this would name is the one already being reported.
+static void CheckUdpInstTerminalCount(const ModuleItem* item,
+                                      const UdpDecl* decl, DiagEngine& diag) {
+  if (decl->input_names.empty()) return;
+  size_t declared = decl->input_names.size() + 1;
+  if (item->gate_terminals.size() == declared) return;
+  diag.Error(
+      item->loc,
+      std::format("primitive '{}' takes {} terminal(s) but this instance "
+                  "connects {}",
+                  decl->name, declared, item->gate_terminals.size()),
+      Subclause("29.8"));
+}
+
 // §29.8: records on `mod` every instance of a user-defined primitive that one
 // instantiation writes, so that the primitive drives the nets its output
 // terminals name. "Instances of UDPs are specified inside modules in the same
@@ -171,6 +202,14 @@ void Elaborator::ReclassifyForwardUdpInstances(const ModuleDecl* decl) {
 // Elaborator::ElaborateOneUdpInst appends. Append nothing and no instance's
 // output terminal has a driver.
 void Elaborator::ElaborateUdpInst(ModuleItem* item, RtlirModule* mod) {
+  // §29.8 reads the terminal count off the primitive's own port list, so it is
+  // answered once for the instantiation rather than once per element of an
+  // array: every element of an expanded array carries the terminal list written
+  // here, and one list written wrong is one mistake.
+  if (const UdpDecl* decl = FindUdpByName(item->inst_module); decl != nullptr) {
+    CheckUdpInstTerminalCount(item, decl, diag_);
+  }
+
   // §29.8: "An optional range may be specified for an array of UDP instances",
   // and "The terminal connection rules remain the same as outlined in 28.3.6",
   // so such a range is expanded here into one instance per array element the

@@ -235,8 +235,10 @@ class Parser {
   void ParseUdpTable(UdpDecl* udp);
   // `reg_mismatch_reported` carries §29.3.2's report across the rows of one
   // table, so a table whose every row disagrees with the reg declaration draws
-  // one report rather than one per row. ParseUdpTable owns it.
-  void ParseUdpTableRow(UdpDecl* udp, bool& reg_mismatch_reported);
+  // one report rather than one per row, and `row_width_reported` carries
+  // §29.3.4's the same way. ParseUdpTable owns both.
+  void ParseUdpTableRow(UdpDecl* udp, bool& reg_mismatch_reported,
+                        bool& row_width_reported);
 
   void RejectUdpPortDimension();
 

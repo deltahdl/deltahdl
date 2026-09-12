@@ -1,3 +1,6 @@
+#include <algorithm>
+#include <string>
+
 #include "fixture_parser.h"
 #include "helpers_reported_error.h"
 
@@ -341,6 +344,135 @@ TEST(UdpStateTable, MalformedRowNames29_3_4) {
       "  endtable\n"
       "endprimitive\n");
   EXPECT_TRUE(ReportedError(r.diags, "expected ';'", 4, "29.3.4"));
+}
+
+// §29.3.4: "Combinational UDPs have one field per input and one field for the
+// output", and "The order of the input state fields of each row of the state
+// table is taken directly from the port list in the UDP definition header". A
+// row of two input fields under a header naming three inputs leaves one input
+// with no field at all, so the row describes no combination of this UDP's
+// inputs. The report stands on the row's own line rather than the header's, so
+// this case tells it from the header rejections §29.3.1 writes at line 1, and
+// from AllXInputsWithOneOutputNames29_3_4 above, which names the same subclause
+// for a different rule.
+//
+// Before this check the row was kept as written: UdpRowMatchesLevels
+// (src/simulator/udp_eval.cpp) compares the field count against the input
+// count and answers no match, so the primitive drove x for the whole run and
+// nothing said why.
+TEST(UdpStateTable, RowWithFewerFieldsThanInputsRejected) {
+  auto r = Parse(
+      "primitive p(output y, input a, input b, input c);\n"
+      "  table\n"
+      "    0 0 0 : 0;\n"
+      "    1 1 : 1;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "UDP table row has 2 input field(s) but primitive 'p' declares",
+      4, "29.3.4"));
+}
+
+// The other side of the rule above. A row of three input fields under a header
+// naming two inputs writes a field no port receives: the output symbol is the
+// one past the colon, so the surplus is an input field and the row is again
+// one that describes no combination of the declared inputs. The row is
+// sequential, so the case also fixes that the count is over the input fields
+// alone: the current-state field between the colons is §29.3.4's "additional
+// field inserted between the input fields and the output field" and belongs
+// to no input port. A count that took it in would report `3` for the row this
+// case accepts below and `4` here.
+TEST(UdpStateTable, SequentialRowWithMoreFieldsThanInputsRejected) {
+  auto r = Parse(
+      "primitive p(output reg q, input d, input clk);\n"
+      "  table\n"
+      "    0 r 0 : ? : 0;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "UDP table row has 3 input field(s) but primitive 'p' declares",
+      3, "29.3.4"));
+}
+
+// The pair for the case above: a sequential row whose input fields number the
+// header's inputs is accepted, with the current-state field standing between
+// the colons and counted for no input. The edge is written in the (01) form so
+// that a count over the characters of the row rather than its fields reads
+// four here and would reject the row.
+TEST(UdpStateTable, SequentialRowWidthCountsInputFieldsOnly) {
+  auto r = Parse(
+      "primitive p(output reg q, input d, input clk);\n"
+      "  table\n"
+      "    0 (01) : ? : 0;\n"
+      "    1 (01) : ? : 1;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// §29.3.4 takes the field order "directly from the port list in the UDP
+// definition header", and in the udp_nonansi_declaration form of §29.3.1 that
+// list names ports the declarations after it describe. The input count a row
+// is held to is therefore the count of those declarations, two here, which the
+// row of one field falls short of. The header line is not where the report
+// stands: it stands on the row.
+TEST(UdpStateTable, NonAnsiRowWidthIsReadOffTheInputDeclarations) {
+  auto r = Parse(
+      "primitive p(y, a, b);\n"
+      "  output y;\n"
+      "  input a, b;\n"
+      "  table\n"
+      "    0 : 0;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "UDP table row has 1 input field(s) but primitive 'p' declares",
+      5, "29.3.4"));
+}
+
+// One port list read wrong is one mistake, however many rows stand under it,
+// so a table whose every row disagrees draws one report and not one per row.
+// The report stands on the first such row. The third row is of a different
+// wrong width from the first two, so an implementation reporting once per
+// distinct width counts two here rather than one.
+TEST(UdpStateTable, RowWidthIsReportedOncePerTable) {
+  auto r = Parse(
+      "primitive p(output y, input a, input b);\n"
+      "  table\n"
+      "    0 : 0;\n"
+      "    1 : 1;\n"
+      "    0 0 0 : 1;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "UDP table row has 1 input field(s) but primitive 'p' declares",
+      3, "29.3.4"));
+  auto width_reports =
+      std::count_if(r.diags.begin(), r.diags.end(), [](const Diagnostic& d) {
+        return d.message.find("UDP table row has") != std::string::npos;
+      });
+  EXPECT_EQ(width_reports, 1);
+}
+
+// §29.3.1 rejects a header naming no input port, and every row under such a
+// header disagrees with a port list that is not there. The row draws no
+// second report: the count it would name is the one the header report already
+// names, and the header's line is where the mistake stands.
+TEST(UdpStateTable, RowWidthIsNotReportedUnderAHeaderWithNoInputs) {
+  auto r = Parse(
+      "primitive p(output y);\n"
+      "  table\n"
+      "    0 : 0;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  EXPECT_TRUE(ReportedError(r.diags, "UDP shall have at least one input port",
+                            1, "29.3.1"));
+  auto width_reports =
+      std::count_if(r.diags.begin(), r.diags.end(), [](const Diagnostic& d) {
+        return d.message.find("UDP table row has") != std::string::npos;
+      });
+  EXPECT_EQ(width_reports, 0);
 }
 
 }  // namespace

@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cstdint>
 #include <set>
 #include <string>
@@ -440,6 +441,97 @@ TEST(UdpInstanceElaboration, GenerateBlockPrefixNamesTheInstanceDeclarations) {
   EXPECT_EQ(
       std::string(mod->udp_insts[0].gen_block_prefixes.back()) + "c_local",
       std::string(block_net->name));
+}
+
+// §29.8: `udp_instance ::= [ name_of_instance ] ( output_terminal ,
+// input_terminal { , input_terminal } )` and "The terminal connection order is
+// as specified in the UDP definition", so the list holds one terminal for the
+// output port and one per input port of the primitive, three for `p_two`. The
+// instance below writes two, leaving the second input port with nothing
+// driving it. The report stands on the instantiation's line rather than the
+// primitive's, and names the counts, so the case tells it from the §28.3.6
+// width report the array case above expects and from any rejection of the
+// primitive itself.
+//
+// Before this check nothing said so: ElaborateOneUdpInst split the list at
+// index 1 whatever its length, and UdpRowMatchesLevels
+// (src/simulator/udp_eval.cpp) compared that length against each row's field
+// count and answered no match, so the instance drove x for the whole run.
+TEST(UdpInstanceElaboration, InstanceWithTooFewTerminalsIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "primitive p_two(output t_out, input t_a, input t_b);\n"
+      "  table\n"
+      "    0 0 : 0;\n"
+      "    1 1 : 1;\n"
+      "  endtable\n"
+      "endprimitive\n"
+      "module few_top;\n"
+      "  wire t_out, t_a;\n"
+      "  p_two u_few(t_out, t_a);\n"
+      "endmodule\n",
+      f, "few_top");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "primitive 'p_two' takes 3 terminal(s) but this instance connects 2", 9,
+      "29.8"));
+}
+
+// The other side of the rule above: a fourth terminal on an instance of a
+// two-input primitive names a net no port receives. The count is over the
+// terminals the instantiation wrote, so an implementation that stopped
+// reading at the primitive's port count and dropped the rest would find
+// nothing to report here.
+TEST(UdpInstanceElaboration, InstanceWithTooManyTerminalsIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "primitive p_two(output t_out, input t_a, input t_b);\n"
+      "  table\n"
+      "    0 0 : 0;\n"
+      "    1 1 : 1;\n"
+      "  endtable\n"
+      "endprimitive\n"
+      "module many_top;\n"
+      "  wire t_out, t_a, t_b, t_c;\n"
+      "  p_two u_many(t_out, t_a, t_b, t_c);\n"
+      "endmodule\n",
+      f, "many_top");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "primitive 'p_two' takes 3 terminal(s) but this instance connects 4", 9,
+      "29.8"));
+}
+
+// §29.8 reads the terminal count off the primitive's port list, and an array
+// of instances writes one terminal list for every element, so an array whose
+// list is short is one mistake and draws one report rather than one per
+// element. The range declares four elements, so an implementation that ran
+// the check once per expanded element counts four here.
+TEST(UdpInstanceElaboration, InstanceArrayTerminalCountIsReportedOnce) {
+  ElabFixture f;
+  ElaborateSrc(
+      "primitive p_two(output t_out, input t_a, input t_b);\n"
+      "  table\n"
+      "    0 0 : 0;\n"
+      "    1 1 : 1;\n"
+      "  endtable\n"
+      "endprimitive\n"
+      "module arr_few_top;\n"
+      "  wire [3:0] t_out_v, t_a_v;\n"
+      "  p_two u_arr_few [7:4] (t_out_v, t_a_v);\n"
+      "endmodule\n",
+      f, "arr_few_top");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "primitive 'p_two' takes 3 terminal(s) but this instance connects 2", 9,
+      "29.8"));
+  const auto& diags = f.diag.Diagnostics();
+  auto count_reports =
+      std::count_if(diags.begin(), diags.end(), [](const Diagnostic& d) {
+        return d.message.find("terminal(s) but this instance connects") !=
+               std::string::npos;
+      });
+  EXPECT_EQ(count_reports, 1);
 }
 
 }  // namespace
