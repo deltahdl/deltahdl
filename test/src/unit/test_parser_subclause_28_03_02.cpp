@@ -7,9 +7,9 @@
 namespace {
 
 TEST(GateStrengthValidity, StrengthSpecAllowedForNInputGates) {
-  constexpr GateType kNInputGates[] = {
-      GateType::kAnd, GateType::kNand, GateType::kOr,
-      GateType::kNor, GateType::kXor,  GateType::kXnor,
+  constexpr ModelGateType kNInputGates[] = {
+      ModelGateType::kAnd, ModelGateType::kNand, ModelGateType::kOr,
+      ModelGateType::kNor, ModelGateType::kXor,  ModelGateType::kXnor,
   };
   for (auto gate : kNInputGates) {
     EXPECT_TRUE(CanHaveStrengthSpec(gate));
@@ -17,15 +17,15 @@ TEST(GateStrengthValidity, StrengthSpecAllowedForNInputGates) {
 }
 
 TEST(GateStrengthValidity, StrengthSpecAllowedForEnableGates) {
-  EXPECT_TRUE(CanHaveStrengthSpec(GateType::kBufif0));
-  EXPECT_TRUE(CanHaveStrengthSpec(GateType::kBufif1));
-  EXPECT_TRUE(CanHaveStrengthSpec(GateType::kNotif0));
-  EXPECT_TRUE(CanHaveStrengthSpec(GateType::kNotif1));
+  EXPECT_TRUE(CanHaveStrengthSpec(ModelGateType::kBufif0));
+  EXPECT_TRUE(CanHaveStrengthSpec(ModelGateType::kBufif1));
+  EXPECT_TRUE(CanHaveStrengthSpec(ModelGateType::kNotif0));
+  EXPECT_TRUE(CanHaveStrengthSpec(ModelGateType::kNotif1));
 }
 
 TEST(GateStrengthValidity, StrengthSpecAllowedForNOutputGates) {
-  EXPECT_TRUE(CanHaveStrengthSpec(GateType::kBuf));
-  EXPECT_TRUE(CanHaveStrengthSpec(GateType::kNot));
+  EXPECT_TRUE(CanHaveStrengthSpec(ModelGateType::kBuf));
+  EXPECT_TRUE(CanHaveStrengthSpec(ModelGateType::kNot));
 }
 
 TEST(GateInstStrengthParsing, Strength0Strength1KeywordEncoding) {

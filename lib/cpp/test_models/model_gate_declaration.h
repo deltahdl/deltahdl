@@ -4,7 +4,7 @@
 #include <cstdlib>
 
 // --- Local types for gate declaration (§28.3) ---
-enum class GateType : uint8_t {
+enum class ModelGateType : uint8_t {
   kAnd,
   kNand,
   kOr,
@@ -45,7 +45,7 @@ enum class StrengthLvl : uint8_t {
 };
 
 struct GateDeclInfo {
-  GateType type = GateType::kAnd;
+  ModelGateType type = ModelGateType::kAnd;
   bool has_strength = false;
   StrengthLvl strength0 = StrengthLvl::kStrong;
   StrengthLvl strength1 = StrengthLvl::kStrong;
@@ -59,47 +59,48 @@ struct GateDeclInfo {
 
 inline bool ValidateGateDecl(const GateDeclInfo& info);
 
-inline bool CanHaveStrengthSpec(GateType type);
+inline bool CanHaveStrengthSpec(ModelGateType type);
 
 inline uint32_t ComputeArraySize(int32_t lhi, int32_t rhi);
 
-inline bool ValidateStrengthSpec(StrengthLvl s0, StrengthLvl s1, GateType type);
+inline bool ValidateStrengthSpec(StrengthLvl s0, StrengthLvl s1,
+                                 ModelGateType type);
 
-inline uint32_t MaxDelays(GateType type);
+inline uint32_t MaxDelays(ModelGateType type);
 
 inline bool ValidateGateDecl(const GateDeclInfo& info) {
   return !info.has_range || info.has_name;
 }
 
-inline bool CanHaveStrengthSpec(GateType type) {
+inline bool CanHaveStrengthSpec(ModelGateType type) {
   switch (type) {
-    case GateType::kAnd:
-    case GateType::kNand:
-    case GateType::kOr:
-    case GateType::kNor:
-    case GateType::kXor:
-    case GateType::kXnor:
-    case GateType::kBuf:
-    case GateType::kNot:
-    case GateType::kBufif0:
-    case GateType::kBufif1:
-    case GateType::kNotif0:
-    case GateType::kNotif1:
-    case GateType::kPullup:
-    case GateType::kPulldown:
+    case ModelGateType::kAnd:
+    case ModelGateType::kNand:
+    case ModelGateType::kOr:
+    case ModelGateType::kNor:
+    case ModelGateType::kXor:
+    case ModelGateType::kXnor:
+    case ModelGateType::kBuf:
+    case ModelGateType::kNot:
+    case ModelGateType::kBufif0:
+    case ModelGateType::kBufif1:
+    case ModelGateType::kNotif0:
+    case ModelGateType::kNotif1:
+    case ModelGateType::kPullup:
+    case ModelGateType::kPulldown:
       return true;
-    case GateType::kNmos:
-    case GateType::kPmos:
-    case GateType::kRnmos:
-    case GateType::kRpmos:
-    case GateType::kTran:
-    case GateType::kRtran:
-    case GateType::kTranif0:
-    case GateType::kTranif1:
-    case GateType::kRtranif0:
-    case GateType::kRtranif1:
-    case GateType::kCmos:
-    case GateType::kRcmos:
+    case ModelGateType::kNmos:
+    case ModelGateType::kPmos:
+    case ModelGateType::kRnmos:
+    case ModelGateType::kRpmos:
+    case ModelGateType::kTran:
+    case ModelGateType::kRtran:
+    case ModelGateType::kTranif0:
+    case ModelGateType::kTranif1:
+    case ModelGateType::kRtranif0:
+    case ModelGateType::kRtranif1:
+    case ModelGateType::kCmos:
+    case ModelGateType::kRcmos:
       return false;
   }
   return false;
@@ -110,42 +111,42 @@ inline uint32_t ComputeArraySize(int32_t lhi, int32_t rhi) {
 }
 
 inline bool ValidateStrengthSpec(StrengthLvl s0, StrengthLvl s1,
-                                 GateType /*type*/) {
+                                 ModelGateType /*type*/) {
   return s0 != StrengthLvl::kHighz || s1 != StrengthLvl::kHighz;
 }
 
-inline uint32_t MaxDelays(GateType type) {
+inline uint32_t MaxDelays(ModelGateType type) {
   switch (type) {
-    case GateType::kPullup:
-    case GateType::kPulldown:
+    case ModelGateType::kPullup:
+    case ModelGateType::kPulldown:
       return 0;
-    case GateType::kAnd:
-    case GateType::kNand:
-    case GateType::kOr:
-    case GateType::kNor:
-    case GateType::kXor:
-    case GateType::kXnor:
-    case GateType::kBuf:
-    case GateType::kNot:
+    case ModelGateType::kAnd:
+    case ModelGateType::kNand:
+    case ModelGateType::kOr:
+    case ModelGateType::kNor:
+    case ModelGateType::kXor:
+    case ModelGateType::kXnor:
+    case ModelGateType::kBuf:
+    case ModelGateType::kNot:
       return 2;
-    case GateType::kBufif0:
-    case GateType::kBufif1:
-    case GateType::kNotif0:
-    case GateType::kNotif1:
-    case GateType::kNmos:
-    case GateType::kPmos:
-    case GateType::kRnmos:
-    case GateType::kRpmos:
-    case GateType::kCmos:
-    case GateType::kRcmos:
+    case ModelGateType::kBufif0:
+    case ModelGateType::kBufif1:
+    case ModelGateType::kNotif0:
+    case ModelGateType::kNotif1:
+    case ModelGateType::kNmos:
+    case ModelGateType::kPmos:
+    case ModelGateType::kRnmos:
+    case ModelGateType::kRpmos:
+    case ModelGateType::kCmos:
+    case ModelGateType::kRcmos:
       return 3;
-    case GateType::kTranif0:
-    case GateType::kTranif1:
-    case GateType::kRtranif0:
-    case GateType::kRtranif1:
+    case ModelGateType::kTranif0:
+    case ModelGateType::kTranif1:
+    case ModelGateType::kRtranif0:
+    case ModelGateType::kRtranif1:
       return 2;
-    case GateType::kTran:
-    case GateType::kRtran:
+    case ModelGateType::kTran:
+    case ModelGateType::kRtran:
       return 0;
   }
   return 0;

@@ -7,15 +7,15 @@
 namespace {
 
 TEST(GateStrengthValidity, StrengthSpecAllowedForPullGates) {
-  EXPECT_TRUE(CanHaveStrengthSpec(GateType::kPullup));
-  EXPECT_TRUE(CanHaveStrengthSpec(GateType::kPulldown));
+  EXPECT_TRUE(CanHaveStrengthSpec(ModelGateType::kPullup));
+  EXPECT_TRUE(CanHaveStrengthSpec(ModelGateType::kPulldown));
 }
 
 TEST(GateStrengthValidity, StrengthSpecDisallowedForSwitches) {
-  EXPECT_FALSE(CanHaveStrengthSpec(GateType::kNmos));
-  EXPECT_FALSE(CanHaveStrengthSpec(GateType::kPmos));
-  EXPECT_FALSE(CanHaveStrengthSpec(GateType::kTran));
-  EXPECT_FALSE(CanHaveStrengthSpec(GateType::kCmos));
+  EXPECT_FALSE(CanHaveStrengthSpec(ModelGateType::kNmos));
+  EXPECT_FALSE(CanHaveStrengthSpec(ModelGateType::kPmos));
+  EXPECT_FALSE(CanHaveStrengthSpec(ModelGateType::kTran));
+  EXPECT_FALSE(CanHaveStrengthSpec(ModelGateType::kCmos));
 }
 
 TEST(GateStrengthValidity, DefaultStrengthIsStrong) {
