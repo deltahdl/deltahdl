@@ -88,4 +88,29 @@ TEST(Preprocessor, DelayModePath_SupersedesEarlierMode) {
   EXPECT_EQ(pp.DelayModeDirective(), DelayModeDirective::kPath);
 }
 
+// E.5 has the directive select the mode for the modules that follow it, so
+// the record the preprocessor keeps of the directives in force at each module
+// header carries, for a module between a `delay_mode_distributed and this
+// directive, the distributed mode, and the path mode for the module after
+// this directive, while the unit-wide query above answers only with the last.
+TEST(Preprocessor, DelayModePath_RecordedAtEachModuleHeader) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  auto fid = f.mgr.AddFile("<test>",
+                           "`delay_mode_distributed\n"
+                           "module dist;\n"
+                           "endmodule\n"
+                           "`delay_mode_path\n"
+                           "module pathed;\n"
+                           "endmodule\n");
+  pp.Preprocess(fid);
+  EXPECT_FALSE(f.diag.HasErrors());
+  const auto& recorded = pp.ModuleDirectivesList();
+  ASSERT_EQ(recorded.size(), 2u);
+  EXPECT_EQ(recorded[0].module, "dist");
+  EXPECT_EQ(recorded[0].delay_mode, DelayModeDirective::kDistributed);
+  EXPECT_EQ(recorded[1].module, "pathed");
+  EXPECT_EQ(recorded[1].delay_mode, DelayModeDirective::kPath);
+}
+
 }  // namespace
