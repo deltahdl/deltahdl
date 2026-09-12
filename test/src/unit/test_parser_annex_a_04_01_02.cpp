@@ -129,4 +129,70 @@ TEST(InterfaceInstantiationGrammar, ErrorTrailingCommaInInstanceList) {
       ReportedError(r.diags, "expected identifier, got ';'", 3, "23.3.2"));
 }
 
+// hierarchical_instance is A.4.1.1's, `name_of_instance ( [
+// list_of_port_connections ] )` with name_of_instance `instance_identifier {
+// unpacked_dimension }`, and A.9.3 gives the identifier `simple_identifier |
+// escaped_identifier`: an interface instance takes an escaped name, an
+// unpacked dimension, and the `.*` named_port_connection.
+TEST(InterfaceInstantiationGrammar, InstanceNameDimensionAndWildcard) {
+  auto r = Parse(
+      "interface ifc(input logic clk); endinterface\n"
+      "module m(input logic clk);\n"
+      "  ifc \\b.0 (.*);\n"
+      "  ifc bs[0:3] (clk);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  const auto& items = r.cu->modules[0]->items;
+  ASSERT_EQ(items.size(), 2u);
+  EXPECT_EQ(items[0]->inst_name, "b.0");
+  EXPECT_TRUE(items[0]->inst_wildcard);
+  EXPECT_EQ(items[1]->inst_name, "bs");
+  EXPECT_NE(items[1]->inst_range_left, nullptr);
+  EXPECT_NE(items[1]->inst_range_right, nullptr);
+}
+
+// parameter_value_assignment is A.4.1.1's, whose param_expression A.8.3 spells
+// `mintypmax_expression | data_type | $`.
+TEST(InterfaceInstantiationGrammar, ParameterValueForms) {
+  auto r = Parse(
+      "interface ifc #(parameter int W = 8, parameter type T = logic);\n"
+      "endinterface\n"
+      "module m;\n"
+      "  ifc #(1:2:3, bit) u0();\n"
+      "  ifc #(.W($), .T(int)) u1();\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  const auto& items = r.cu->modules[0]->items;
+  ASSERT_EQ(items.size(), 2u);
+  ASSERT_EQ(items[0]->inst_params.size(), 2u);
+  EXPECT_EQ(items[0]->inst_params[0].second->kind, ExprKind::kMinTypMax);
+  ASSERT_EQ(items[1]->inst_params.size(), 2u);
+  EXPECT_EQ(items[1]->inst_params[0].first, "W");
+  EXPECT_EQ(items[1]->inst_params[1].first, "T");
+}
+
+// A.1.4's module_common_item admits interface_instantiation, and A.1.6's
+// interface_or_generate_item reaches module_common_item, so an interface is
+// instantiated inside a module, inside an interface, and inside a generate
+// block of either.
+TEST(InterfaceInstantiationGrammar, InstantiatedInsideInterfaceAndGenerate) {
+  auto r = Parse(
+      "interface leaf; endinterface\n"
+      "interface bus;\n"
+      "  leaf l0();\n"
+      "  if (1) begin : g\n"
+      "    leaf l1();\n"
+      "  end\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 2u);
+  auto* inst = FindInstantiation(r.cu->interfaces[1]->items);
+  ASSERT_NE(inst, nullptr);
+  EXPECT_EQ(inst->inst_module, "leaf");
+  EXPECT_EQ(inst->inst_name, "l0");
+}
+
 }  // namespace
