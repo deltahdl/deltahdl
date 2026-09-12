@@ -51,10 +51,12 @@ TEST(DefparamSupport, DefparamBeforeTheInstanceApplies) {
 
 // C.4.1: "can be in a separate file from the instance to be modified". A
 // separate file holds a module of its own, a top-level one, whose defparam
-// names the instance from the top-level module that holds it.
+// names the instance from the top-level module that holds it. Both modules
+// are roots, so the design is elaborated with every uninstantiated module a
+// top (§23.3.1) rather than with the last module alone.
 TEST(DefparamSupport, DefparamInASeparateTopModuleReachesTheInstance) {
   ElabFixture f;
-  auto* design = ElaborateSrc(
+  auto* design = ElaborateWithPreprocessor(
       "module leaf #(parameter int P = 1)(); endmodule\n"
       "module top;\n"
       "  leaf u1();\n"
@@ -62,7 +64,7 @@ TEST(DefparamSupport, DefparamInASeparateTopModuleReachesTheInstance) {
       "module annotate;\n"
       "  defparam top.u1.P = 7;\n"
       "endmodule\n",
-      f);
+      f, "", /*auto_top=*/true);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
   ASSERT_EQ(design->top_modules.size(), 2u);
@@ -73,12 +75,12 @@ TEST(DefparamSupport, DefparamInASeparateTopModuleReachesTheInstance) {
 // the root of the path is the module the parameter is declared in.
 TEST(DefparamSupport, DefparamInASeparateTopModuleReachesTheTopsParameter) {
   ElabFixture f;
-  auto* design = ElaborateSrc(
+  auto* design = ElaborateWithPreprocessor(
       "module top #(parameter int P = 1)(); endmodule\n"
       "module annotate;\n"
       "  defparam top.P = 9;\n"
       "endmodule\n",
-      f);
+      f, "", /*auto_top=*/true);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
   ASSERT_EQ(design->top_modules.size(), 2u);
