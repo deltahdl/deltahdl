@@ -375,19 +375,21 @@ TEST(UdpPortGrammar, NonAnsiOutputWithoutRegTakesNoInitialValue) {
 // two port declarations, variable_identifier in udp_reg_declaration -- is
 // A.9.3's `simple_identifier | escaped_identifier`. The parser looked for a
 // simple identifier at each, so a UDP whose ports carried escaped names was
-// reported as a missing identifier in either header form.
+// reported as a missing identifier in either header form. §5.6.1 ends an
+// escaped identifier at white space, so each below is followed by a space
+// before the ',' or ';' after it.
 TEST(UdpPortGrammar, EscapedPortIdentifiers) {
   auto r = Parse(
-      "primitive p1 (\\q+, \\a.0, b);\n"
-      "  output \\q+;\n"
-      "  reg \\q+;\n"
-      "  input \\a.0, b;\n"
+      "primitive p1 (\\q+ , \\a.0 , b);\n"
+      "  output \\q+ ;\n"
+      "  reg \\q+ ;\n"
+      "  input \\a.0 , b;\n"
       "  table\n"
       "    0 0 : ? : 0;\n"
       "    1 1 : ? : 1;\n"
       "  endtable\n"
       "endprimitive\n"
-      "primitive p2 (output \\o-, input \\i-);\n"
+      "primitive p2 (output \\o- , input \\i- );\n"
       "  table 0 : 1; 1 : 0; endtable\n"
       "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
