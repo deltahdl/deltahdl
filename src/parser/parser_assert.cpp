@@ -15,6 +15,21 @@ static void ExpectDeferredHashZero(DiagEngine& diag, const Token& tok) {
 // pieces of syntax — the deferral, the asserted expression and the action
 // block — so each piece is read in one place here.
 struct ParserAssertHelpers {
+  // A.6.10's deferred_immediate_assertion_item, the alternative of A.1.4's
+  // assertion_item that A.1.7's non_port_program_item leaves out, admitting a
+  // concurrent_assertion_item alone: §16.4.3 has a deferred assertion outside
+  // procedural code "treated as if it were contained in an always_comb
+  // procedure", and §24.3 has a program that "shall not contain always
+  // procedures". One in a program body is reported and still read, from the
+  // assert and assume path and from the cover path alike.
+  static void RejectDeferredInProgram(Parser& p, SourceLoc loc) {
+    p.RejectInProgramBody(loc,
+                          "a deferred immediate assertion is not an item of a "
+                          "program; outside procedural code it stands for an "
+                          "always_comb procedure, which a program does not "
+                          "contain");
+  }
+
   // §16.4: an immediate assertion is deferred when it is written with #0 or
   // with final. Records which of the two the source used, and rejects any
   // delay other than #0.
@@ -219,18 +234,8 @@ static ModuleItem* WrapStmtAsItem(Arena& arena, Stmt* stmt, SourceLoc loc) {
   return item;
 }
 
-// A.6.10's deferred_immediate_assertion_item, the alternative of A.1.4's
-// assertion_item that A.1.7's non_port_program_item leaves out, admitting a
-// concurrent_assertion_item alone: §16.4.3 has a deferred assertion outside
-// procedural code "treated as if it were contained in an always_comb
-// procedure", and §24.3 has a program that "shall not contain always
-// procedures". One in a program body is reported and still read.
 ModuleItem* Parser::ParseDeferredImmediateItem(SourceLoc loc, StmtKind kind) {
-  RejectInProgramBody(loc,
-                      "a deferred immediate assertion is not an item of a "
-                      "program; outside procedural code it stands for an "
-                      "always_comb procedure, which a program does not "
-                      "contain");
+  ParserAssertHelpers::RejectDeferredInProgram(*this, loc);
   auto* stmt = arena_.Create<Stmt>();
   stmt->kind = kind;
   stmt->range.start = loc;
@@ -501,6 +506,9 @@ ModuleItem* Parser::ParseCoverProperty() {
   Expect(TokenKind::kKwCover, Subclause("16.14.3"));
 
   if (IsDeferredImmediate(lexer_)) {
+    // The deferred cover is read here rather than through
+    // ParseDeferredImmediateItem, its tail being a cover's.
+    ParserAssertHelpers::RejectDeferredInProgram(*this, item->loc);
     auto* stmt = arena_.Create<Stmt>();
     stmt->kind = StmtKind::kCoverImmediate;
     stmt->range.start = item->loc;
