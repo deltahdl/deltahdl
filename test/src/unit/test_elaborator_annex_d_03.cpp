@@ -151,7 +151,7 @@ TEST(GetpatternPlacement, AnArgumentNamingNoMemoryElementIsRejected) {
       "  assign {k1, k2, k3} = $getpattern();\n"
       "endmodule\n",
       f);
-  const char* kArg =
+  constexpr const char* kArg =
       "$getpattern takes a memory element reference as its argument, a select "
       "of a variable declared with an unpacked dimension";
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kArg, 4, "D.3"));

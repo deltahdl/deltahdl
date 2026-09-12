@@ -746,6 +746,26 @@ static bool TryEvalRegisteredSystf(const Expr* expr, SimContext& ctx,
                                                    expr, ctx, out, arena);
 }
 
+// The optional system functions of Annex D that answer a value: D.2's
+// $countdrivers, D.3's $getpattern and D.10's $scale, which reads the time
+// value named by a hierarchical reference and converts it from the time unit
+// of the module that holds it to the time unit of the module that invokes it.
+// Answers whether `name` is one of them, leaving its value in `result`.
+static bool TryEvalAnnexDFunction(const Expr* expr, SimContext& ctx,
+                                  Arena& arena, std::string_view name,
+                                  Logic4Vec& result) {
+  if (name == "$countdrivers") {
+    result = EvalCountDrivers(expr, ctx, arena);
+  } else if (name == "$getpattern") {
+    result = EvalGetpattern(expr, ctx, arena);
+  } else if (name == "$scale") {
+    result = EvalScale(expr, ctx, arena);
+  } else {
+    return false;
+  }
+  return true;
+}
+
 Logic4Vec EvalSystemCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   auto name = expr->callee;
 
@@ -785,24 +805,16 @@ Logic4Vec EvalSystemCall(const Expr* expr, SimContext& ctx, Arena& arena) {
     ctx.RequestFinish();
     return MakeLogic4VecVal(arena, 1, 0);
   }
-  // Optional $countdrivers function (Annex D.2).
-  if (name == "$countdrivers") {
-    return EvalCountDrivers(expr, ctx, arena);
+  Logic4Vec annex_d_result;
+  if (TryEvalAnnexDFunction(expr, ctx, arena, name, annex_d_result)) {
+    return annex_d_result;
   }
-  if (name == "$getpattern") return EvalGetpattern(expr, ctx, arena);
   Logic4Vec coverage_result;
   if (TryEvalCoverageSysCall(expr, ctx, arena, name, coverage_result)) {
     return coverage_result;
   }
-  Logic4Vec annex_d_result;
   if (TryEvalAnnexDInteractiveTask(expr, ctx, arena, name, annex_d_result)) {
     return annex_d_result;
-  }
-  // Optional $scale function (Annex D.10). It reads the time value named by a
-  // hierarchical reference and converts it from the time unit of the module
-  // that holds it to the time unit of the module that invokes $scale.
-  if (name == "$scale") {
-    return EvalScale(expr, ctx, arena);
   }
   if (name == "$exit") {
     auto* cur = ctx.CurrentProcess();
