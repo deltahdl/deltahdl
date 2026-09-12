@@ -609,6 +609,14 @@ struct ModuleDecl {
 
   bool is_cell = false;
 
+  // Annex E.2: the default decay time in force where this module was
+  // declared, put here by ApplyModuleDecayTimes from what the preprocessor
+  // recorded; `has_default_decay_time` is false for a module parsed without
+  // the preprocessor, which then takes the compilation unit's value.
+  bool has_default_decay_time = false;
+  uint64_t default_decay_time = 0;
+  bool default_decay_time_infinite = true;
+
   std::string_view library;
 
   TimeUnit time_unit = TimeUnit::kNs;

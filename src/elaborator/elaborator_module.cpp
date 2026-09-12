@@ -400,6 +400,15 @@ static void InitRtlirModuleHeader(RtlirModule* mod, const ModuleDecl* decl,
   mod->is_program = (decl->decl_kind == ModuleDeclKind::kProgram);
   mod->is_interface = (decl->decl_kind == ModuleDeclKind::kInterface);
   mod->delay_mode = unit->delay_mode_directive;
+  // Annex E.2: the directive applies to the modules that follow it, so the
+  // value recorded at this module's header stands ahead of the unit's last.
+  if (decl->has_default_decay_time) {
+    mod->default_decay_time = decl->default_decay_time;
+    mod->default_decay_time_infinite = decl->default_decay_time_infinite;
+  } else {
+    mod->default_decay_time = unit->default_decay_time;
+    mod->default_decay_time_infinite = unit->default_decay_time_infinite;
+  }
   mod->attrs = ResolveAttributes(decl->attrs, diag);
 
   // §20.4.1: capture the time unit/precision $timeunit/$timeprecision report

@@ -584,6 +584,12 @@ struct RtlirModule {
   std::vector<ResolvedAttribute> attrs;
   DelayModeDirective delay_mode = DelayModeDirective::kNone;
 
+  // Annex E.2: the default decay time for this module's trireg nets that
+  // declare none, the directive in force where the module was declared or,
+  // for a module parsed without the preprocessor, the compilation unit's.
+  uint64_t default_decay_time = 0;
+  bool default_decay_time_infinite = true;
+
   // §20.4.1: the time unit and precision reported for this design element by
   // $timeunit/$timeprecision. Resolved from the element's own timeunit/
   // timeprecision declarations, falling back to the compilation unit's.

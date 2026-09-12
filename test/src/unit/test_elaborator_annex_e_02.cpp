@@ -1,3 +1,6 @@
+#include <cstdint>
+#include <string_view>
+
 #include "fixture_elaborator.h"
 
 using namespace delta;
@@ -178,6 +181,73 @@ TEST(Elaborator, DefaultDecayTime_AppliesToAllTriregNets) {
     }
   }
   EXPECT_EQ(count, 2);
+}
+
+// The decay time a named net of a named module was given, or 0 with `decays`
+// false when the module or the net is not in the design.
+struct DecayOf {
+  uint64_t ticks = 0;
+  bool decays = false;
+};
+DecayOf DecayOfNet(const RtlirDesign* design, std::string_view module,
+                   std::string_view net_name) {
+  for (const auto* mod : design->top_modules) {
+    if (mod->name != module) continue;
+    for (const auto& net : mod->nets) {
+      if (net.name == net_name) return {net.decay_ticks, net.decays};
+    }
+  }
+  return {};
+}
+
+// Annex E.2: the directive applies to the trireg nets of the modules that
+// follow it in the source, so a second directive between two modules leaves
+// the first module's net under the first value and gives the second module's
+// net the second value. A default read off the compilation unit's last
+// directive would give both nets 200.
+TEST(Elaborator, DefaultDecayTime_EachModuleTakesTheDirectiveBeforeIt) {
+  ElabFixture f;
+  auto* design = ElaborateWithPreprocessor(
+      "`default_decay_time 50\n"
+      "module a;\n"
+      "  trireg cap;\n"
+      "endmodule\n"
+      "`default_decay_time 200\n"
+      "module b;\n"
+      "  trireg cap;\n"
+      "endmodule\n",
+      f, "", /*auto_top=*/true);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(DecayOfNet(design, "a", "cap").ticks, 50u);
+  EXPECT_EQ(DecayOfNet(design, "b", "cap").ticks, 200u);
+}
+
+// Annex E.2: a module declared before any directive has trireg nets with no
+// decay time, the state E.2's infinite names, whatever directive follows it;
+// and an infinite directive between two finite ones puts the module after it
+// back under no decay.
+TEST(Elaborator, DefaultDecayTime_AModuleBeforeTheDirectiveIsNotUnderIt) {
+  ElabFixture f;
+  auto* design = ElaborateWithPreprocessor(
+      "module a;\n"
+      "  trireg cap;\n"
+      "endmodule\n"
+      "`default_decay_time 50\n"
+      "module b;\n"
+      "  trireg cap;\n"
+      "endmodule\n"
+      "`default_decay_time infinite\n"
+      "module c;\n"
+      "  trireg cap;\n"
+      "endmodule\n",
+      f, "", /*auto_top=*/true);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_FALSE(DecayOfNet(design, "a", "cap").decays);
+  EXPECT_EQ(DecayOfNet(design, "b", "cap").ticks, 50u);
+  EXPECT_TRUE(DecayOfNet(design, "b", "cap").decays);
+  EXPECT_FALSE(DecayOfNet(design, "c", "cap").decays);
 }
 
 }  // namespace

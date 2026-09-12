@@ -499,18 +499,29 @@ static void LowerNetDeclAssignment(const ModuleItem* item, const RtlirNet& net,
   sink.mod->assigns.push_back(BuildNetDeclContAssign(item, net, sink.arena));
 }
 
+// The defaults a trireg declaration takes what it does not write from: the
+// compilation unit's default charge strength (Annex E.3) and the module's
+// default decay time (Annex E.2), the latter the directive in force where the
+// module was declared.
+struct TriregDefaults {
+  uint32_t strength = 0;
+  bool has_strength = false;
+  uint64_t decay_ticks = 0;
+  bool decay_infinite = true;
+};
+
 // §28.16.2.2: give the net the charge decay time its declaration writes as the
 // third delay -- "The third delay in a trireg net declaration shall specify the
 // charge decay time" -- or, where the declaration writes no third delay, the
-// compilation unit's default decay time. The third delay is evaluated in the
-// module's parameter scope, so a parameter or localparam decay time resolves
-// and not just a bare literal.
+// module's default decay time. The third delay is evaluated in the module's
+// parameter scope, so a parameter or localparam decay time resolves and not
+// just a bare literal.
 static void ApplyTriregDecayTime(const ModuleItem* item, RtlirNet& net,
-                                 const CompilationUnit* unit,
+                                 const TriregDefaults& defaults,
                                  const ScopeMap& scope, DiagEngine& diag) {
   if (item->net_delay_decay == nullptr) {
-    if (!unit->default_decay_time_infinite) {
-      net.decay_ticks = unit->default_decay_time;
+    if (!defaults.decay_infinite) {
+      net.decay_ticks = defaults.decay_ticks;
       net.decays = true;
     }
     return;
@@ -572,14 +583,13 @@ static void ApplyTriregDecayTime(const ModuleItem* item, RtlirNet& net,
 // in a transition to the z logic state" -- on every other net that delay is the
 // turn-off delay RecordNetDeclDelay below records.
 static void ApplyTriregNetDefaults(const ModuleItem* item, RtlirNet& net,
-                                   const CompilationUnit* unit,
+                                   const TriregDefaults& defaults,
                                    const ScopeMap& scope, DiagEngine& diag) {
   if (net.net_type != NetType::kTrireg) return;
-  if (item->data_type.charge_strength == 0 &&
-      unit->has_default_trireg_strength) {
-    net.trireg_capacitance = unit->default_trireg_strength;
+  if (item->data_type.charge_strength == 0 && defaults.has_strength) {
+    net.trireg_capacitance = defaults.strength;
   }
-  ApplyTriregDecayTime(item, net, unit, scope, diag);
+  ApplyTriregDecayTime(item, net, defaults, scope, diag);
 }
 
 // §28.16: record on the net the delay its declaration wrote, which is what
@@ -818,7 +828,12 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
         static_cast<Strength>(item->data_type.charge_strength);
   }
 
-  ApplyTriregNetDefaults(item, net, unit_, BuildParamScope(mod), diag_);
+  ApplyTriregNetDefaults(
+      item, net,
+      TriregDefaults{unit_->default_trireg_strength,
+                     unit_->has_default_trireg_strength,
+                     mod->default_decay_time, mod->default_decay_time_infinite},
+      BuildParamScope(mod), diag_);
 
   RecordNetDeclDelay(item, net);
 

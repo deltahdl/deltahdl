@@ -246,6 +246,19 @@ enum class DelayModeDirective : uint8_t {
   kZero,
 };
 
+// Annex E.2: the default decay time in force where a module was declared. The
+// directive applies to the trireg nets of the modules that follow it in the
+// source, so the preprocessor records the value in force at each module
+// header under the module's name, and the value reaches the declaration by
+// that name once the module is parsed. `ticks` is the decay time as the
+// directive's argument was rounded; `infinite` is the state E.2's keyword
+// names, and the state before any directive.
+struct ModuleDefaultDecayTime {
+  std::string module;
+  uint64_t ticks = 0;
+  bool infinite = true;
+};
+
 // Which member of a min:typ:max expression is selected. §11.11 writes the three
 // as "minimum, typical, and maximum values -- in that order", and says "The
 // three values allow a design to be tested with minimum, typical, or maximum

@@ -556,9 +556,30 @@ static void TrackCellModuleName(std::string_view trimmed,
   }
 }
 
+// The module a header line declares, or empty for a header of another design
+// element.
+static std::string_view DeclaredModuleName(std::string_view trimmed) {
+  if (trimmed.starts_with("module ")) {
+    return ExtractModuleName(trimmed, "module ");
+  }
+  if (trimmed.starts_with("macromodule ")) {
+    return ExtractModuleName(trimmed, "macromodule ");
+  }
+  return {};
+}
+
 void Preprocessor::TrackDesignElement(std::string_view trimmed) {
   if (IsDesignElementStart(trimmed)) {
     if (in_celldefine_) TrackCellModuleName(trimmed, cell_module_names_);
+    // Annex E.2: the directive applies to the modules that follow it, so the
+    // decay time in force at this header is the one this module's trireg nets
+    // take, whatever a later directive sets.
+    auto module_name = DeclaredModuleName(trimmed);
+    if (!module_name.empty()) {
+      module_decay_times_.push_back({std::string(module_name),
+                                     default_decay_time_,
+                                     default_decay_time_infinite_});
+    }
     ++design_element_depth_;
   }
 

@@ -467,6 +467,11 @@ class Preprocessor {
   bool HasTimescale() const { return has_timescale_; }
   NetType DefaultNetType() const { return default_net_type_; }
   bool InCelldefine() const { return in_celldefine_; }
+  // Annex E.2: the default decay time in force at each module header the
+  // preprocessor passed, under the module's name, in source order.
+  const std::vector<ModuleDefaultDecayTime>& ModuleDecayTimes() const {
+    return module_decay_times_;
+  }
   const std::vector<std::string>& CellModuleNames() const {
     return cell_module_names_;
   }
@@ -663,6 +668,7 @@ class Preprocessor {
   std::vector<std::string> expansion_stack_;
   uint32_t design_element_depth_ = 0;
   std::vector<std::string> cell_module_names_;
+  std::vector<ModuleDefaultDecayTime> module_decay_times_;
   bool in_block_comment_ = false;
   // A.8.8's triple_quoted_string may span lines, so one left open at a line's
   // end is carried to the next as an open block comment is.
