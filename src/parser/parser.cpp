@@ -411,10 +411,54 @@ BindTargetInstance Parser::ParseBindTargetInstance() {
   return target;
 }
 
+// Whether `kind` is one of the fifteen operators IEEE 1800-2012 §11.11 let an
+// overload_declaration bind a function to: `+ ++ - -- * ** / % == != < <= >
+// >= =`. Annex C.2.8 has that construct deprecated by IEEE 1800-2017 and
+// absent from this version, so `bind` followed by one of these is nothing this
+// standard writes.
+static bool IsOverloadableOperator(TokenKind kind) {
+  switch (kind) {
+    case TokenKind::kPlus:
+    case TokenKind::kPlusPlus:
+    case TokenKind::kMinus:
+    case TokenKind::kMinusMinus:
+    case TokenKind::kStar:
+    case TokenKind::kPower:
+    case TokenKind::kSlash:
+    case TokenKind::kPercent:
+    case TokenKind::kEqEq:
+    case TokenKind::kBangEq:
+    case TokenKind::kLt:
+    case TokenKind::kLtEq:
+    case TokenKind::kGt:
+    case TokenKind::kGtEq:
+    case TokenKind::kEq:
+      return true;
+    default:
+      return false;
+  }
+}
+
+// A.1.4's bind_directive, or null for the removed construct of Annex C.2.8:
+// `bind` followed by an operator was IEEE 1800-2012 §11.11's
+// overload_declaration, `bind overload_operator function data_type
+// function_identifier ( overload_proto_formals ) ;`, which is reported at the
+// operator as removed and read on to its ';' so that what follows is still
+// read; there is no bind directive in it to record.
 BindDirective* Parser::ParseBindDirective() {
-  auto* decl = arena_.Create<BindDirective>();
-  decl->loc = CurrentLoc();
+  auto bind_loc = CurrentLoc();
   Expect(TokenKind::kKwBind, Subclause("23.11"));
+  if (IsOverloadableOperator(CurrentToken().kind)) {
+    diag_.Error(CurrentLoc(),
+                "operator overloading has been removed; `bind` followed by an "
+                "operator was IEEE 1800-2012's overload_declaration, which "
+                "this standard no longer has",
+                Subclause("C.2.8"));
+    SkipToSemicolon(lexer_);
+    return nullptr;
+  }
+  auto* decl = arena_.Create<BindDirective>();
+  decl->loc = bind_loc;
 
   // Which of A.1.4's two forms the directive takes is settled by the token
   // after the target, so the target is read as a bind_target_instance either
@@ -590,7 +634,7 @@ void Parser::ParseTopLevel(CompilationUnit* unit) {
     return;
   }
   if (Check(TokenKind::kKwBind)) {
-    unit->bind_directives.push_back(ParseBindDirective());
+    if (auto* bd = ParseBindDirective()) unit->bind_directives.push_back(bd);
     return;
   }
   if (TryParseSecondaryTopLevel(unit)) {
