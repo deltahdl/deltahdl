@@ -88,4 +88,29 @@ TEST(Preprocessor, DelayModeUnit_SupersedesEarlierMode) {
   EXPECT_EQ(pp.DelayModeDirective(), DelayModeDirective::kUnit);
 }
 
+// E.6 has the directive select the mode for the modules that follow it, so
+// the record the preprocessor keeps of the directives in force at each module
+// header carries, for a module between a `delay_mode_path and this directive,
+// the path mode, and the unit mode for the module after this directive, while
+// the unit-wide query above answers only with the last.
+TEST(Preprocessor, DelayModeUnit_RecordedAtEachModuleHeader) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  auto fid = f.mgr.AddFile("<test>",
+                           "`delay_mode_path\n"
+                           "module routed;\n"
+                           "endmodule\n"
+                           "`delay_mode_unit\n"
+                           "module stepped;\n"
+                           "endmodule\n");
+  pp.Preprocess(fid);
+  EXPECT_FALSE(f.diag.HasErrors());
+  const auto& at_headers = pp.ModuleDirectivesList();
+  ASSERT_EQ(at_headers.size(), 2u);
+  EXPECT_EQ(at_headers[0].module, "routed");
+  EXPECT_EQ(at_headers[0].delay_mode, DelayModeDirective::kPath);
+  EXPECT_EQ(at_headers[1].module, "stepped");
+  EXPECT_EQ(at_headers[1].delay_mode, DelayModeDirective::kUnit);
+}
+
 }  // namespace
