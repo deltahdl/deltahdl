@@ -44,16 +44,19 @@ TEST(PrimitiveStrengthParsing, PullupStrength_Strength1Strength0) {
   EXPECT_EQ(g->drive_strength1, 5u);
 }
 
+// A.3.2 writes pullup_strength and pulldown_strength over A.2.2.2's strength0
+// and strength1, `supply0 | strong0 | pull0 | weak0` and `supply1 | strong1 |
+// pull1 | weak1`; highz0 and highz1 stand in drive_strength alone. The parser
+// read the pull strengths with the drive_strength's keywords, so each of the
+// five forms below was accepted silently.
 TEST(PrimitiveStrengthParsing, PullupStrength_Highz1Strong0) {
   auto r = Parse(
       "module m;\n"
       "  pullup (highz1, strong0) (out);\n"
       "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kPullup);
-  ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->drive_strength0, 4u);
-  EXPECT_EQ(g->drive_strength1, 1u);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a pull source's strength is a strength0 or strength1 keyword",
+      2, "A.3.2"));
 }
 
 TEST(PrimitiveStrengthParsing, PullupStrength_SingleStrength1) {
@@ -109,11 +112,9 @@ TEST(PrimitiveStrengthParsing, PullupStrength_SingleHighz1) {
       "module m;\n"
       "  pullup (highz1) pu1(out);\n"
       "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kPullup);
-  ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->drive_strength0, 0u);
-  EXPECT_EQ(g->drive_strength1, 1u);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a pull source's strength is a strength0 or strength1 keyword",
+      2, "A.3.2"));
 }
 
 TEST(PrimitiveStrengthParsing, PullupStrength_MultipleInstances) {
@@ -173,13 +174,11 @@ TEST(PrimitiveStrengthParsing, PulldownStrength_Supply0Weak1) {
 TEST(PrimitiveStrengthParsing, PulldownStrength_Pull0Highz1) {
   auto r = Parse(
       "module m;\n"
-      "  pulldown (pull0, highz1) pd1(out);\n"
+      "  pulldown (pull0, highz1) (out);\n"
       "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kPulldown);
-  ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->drive_strength0, 3u);
-  EXPECT_EQ(g->drive_strength1, 1u);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a pull source's strength is a strength0 or strength1 keyword",
+      2, "A.3.2"));
 }
 
 TEST(PrimitiveStrengthParsing, PulldownStrength_Strength1Strength0) {
@@ -199,11 +198,9 @@ TEST(PrimitiveStrengthParsing, PulldownStrength_Highz1Supply0) {
       "module m;\n"
       "  pulldown (highz1, supply0) (out);\n"
       "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kPulldown);
-  ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->drive_strength0, 5u);
-  EXPECT_EQ(g->drive_strength1, 1u);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a pull source's strength is a strength0 or strength1 keyword",
+      2, "A.3.2"));
 }
 
 TEST(PrimitiveStrengthParsing, PulldownStrength_SingleStrength0) {
@@ -259,11 +256,9 @@ TEST(PrimitiveStrengthParsing, PulldownStrength_SingleHighz0) {
       "module m;\n"
       "  pulldown (highz0) pd1(out);\n"
       "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kPulldown);
-  ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->drive_strength0, 1u);
-  EXPECT_EQ(g->drive_strength1, 0u);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a pull source's strength is a strength0 or strength1 keyword",
+      2, "A.3.2"));
 }
 
 TEST(PrimitiveStrengthParsing, PulldownStrength_MultipleInstances) {

@@ -407,11 +407,29 @@ void Parser::ParseGateDelay(Expr*& d1, Expr*& d2, Expr*& d3) {
   }
 }
 
+// The strength value ParseStrength0 and ParseStrength1 give highz0 and highz1,
+// the two keywords A.2.2.2 lists in drive_strength alone and in neither
+// strength0 nor strength1.
+constexpr uint8_t kHighzStrength = 1;
+
 static void ValidateGateStrength(GateKind gate_kind, SourceLoc loc,
                                  uint8_t str0, uint8_t str1, DiagEngine& diag) {
   if (!GateAllowsStrength(gate_kind))
     diag.Error(loc, "drive strength not allowed on this gate type",
                Subclause("28.3.2"));
+
+  // A.3.2 writes pullup_strength and pulldown_strength over strength0 and
+  // strength1 alone, `( strength0 , strength1 )`, `( strength1 , strength0 )`
+  // and the one keyword the gate drives with, where A.2.2.2's drive_strength
+  // adds the four forms that pair highz0 or highz1 with the other; §28.10 has
+  // the pull sources place "pull strength in the absence of a strength
+  // specification", and a highz strength is no strength a source can place.
+  if (GateTypeOf(gate_kind) == GateType::kPullGate &&
+      (str0 == kHighzStrength || str1 == kHighzStrength))
+    diag.Error(loc,
+               "a pull source's strength is a strength0 or strength1 keyword; "
+               "highz0 and highz1 are neither",
+               Subclause("A.3.2"));
 
   if (gate_kind == GateKind::kPulldown && str0 == 0 && str1 != 0)
     diag.Error(loc, "pulldown single-strength must be a strength0 keyword",
