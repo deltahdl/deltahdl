@@ -901,8 +901,18 @@ Logic4Vec EvalReadmem(const Expr* expr, SimContext& ctx, Arena& arena,
 // adjacent strings keeps their tokens separated.
 Logic4Vec EvalSreadmem(const Expr* expr, SimContext& ctx, Arena& arena,
                        bool is_hex) {
-  // mem_name, start_address, finish_address, and at least one data string.
-  if (expr->args.size() < 4) return MakeLogic4VecVal(arena, 1, 0);
+  // §D.14's syntax: mem_name, start_address, finish_address, and at least one
+  // string. A call short of that names no data to load, or no memory or bounds
+  // to load it into, and is reported rather than left doing nothing.
+  if (expr->args.size() < 4) {
+    ctx.GetDiag().Error(expr->range.start,
+                        std::string(is_hex ? "$sreadmemh" : "$sreadmemb") +
+                            " takes a memory name, a start address, a finish "
+                            "address, and one or more strings, and this call "
+                            "has fewer",
+                        Subclause("D.14"));
+    return MakeLogic4VecVal(arena, 1, 0);
+  }
   int64_t start_arg =
       static_cast<int64_t>(EvalExpr(expr->args[1], ctx, arena).ToUint64());
   int64_t finish_arg =

@@ -5,6 +5,7 @@
 #include "builders_systask.h"
 #include "fixture_simulator.h"
 #include "helpers_memload.h"
+#include "helpers_reported_error.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 
@@ -128,7 +129,8 @@ TEST(OptionalSreadmemSim, AdjacentStringsAreTokenSeparated) {
 
 // Annex D.14 (C1, error): the syntax requires at least one data string after
 // the addresses. A call supplying no string has nothing to load, so the memory
-// is left unchanged.
+// is left unchanged, and the call is reported; the report's place is observed
+// by ACallWithoutAStringIsReportedUnderD14, which runs the call from a source.
 TEST(OptionalSreadmemSim, MissingDataStringLeavesMemoryUnchanged) {
   SimFixture f;
   SetupMem(f, "mem", 0, 4, 8);
@@ -139,6 +141,83 @@ TEST(OptionalSreadmemSim, MissingDataStringLeavesMemoryUnchanged) {
   EXPECT_EQ(Cell(f, "mem", 1)->value.ToUint64(), 0x00u);
   EXPECT_EQ(Cell(f, "mem", 2)->value.ToUint64(), 0x00u);
   EXPECT_EQ(Cell(f, "mem", 3)->value.ToUint64(), 0x00u);
+}
+
+// The cases above hand the evaluator a call built by hand. The four below run
+// a design, so the memory is one the module declares and the strings are the
+// literals the source carries.
+
+// Annex D.14: $sreadmemh loads the memory named by its first argument from
+// the strings that follow the two addresses, reading each number as
+// hexadecimal into successive words from the start address.
+TEST(OptionalSreadmemSim, LoadsADeclaredMemoryFromTheSource) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  reg [7:0] mem [0:3];\n"
+      "  initial begin\n"
+      "    $sreadmemh(mem, 0, 3, \"0A 14 1E 28\");\n"
+      "    $display(\"%h %h %h %h\", mem[0], mem[1], mem[2], mem[3]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "0a 14 1e 28\n");
+}
+
+// Annex D.14: the start and finish addresses bound where the data is stored,
+// so a $sreadmemb given 1 and 2 fills those two words and leaves the words
+// outside the bounds as they were.
+TEST(OptionalSreadmemSim, TheAddressesBoundWhereTheSourceDataIsStored) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  reg [7:0] mem [0:3];\n"
+      "  initial begin\n"
+      "    $sreadmemb(mem, 1, 2, \"1010 0110\");\n"
+      "    $display(\"%h %h %h %h\", mem[0], mem[1], mem[2], mem[3]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "xx 0a 06 xx\n");
+}
+
+// Annex D.14: the strings take the format of a $readmem load file, so a
+// comment and an @ address in a string are read as they are in a file: the
+// comment loads nothing and the address places the word that follows it.
+TEST(OptionalSreadmemSim, AStringCarriesACommentAndAnAddressAsAFileDoes) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  reg [7:0] mem [0:3];\n"
+      "  initial begin\n"
+      "    $sreadmemh(mem, 0, 3, \"// header\\n@2 7F\", \"/* skip */ 01\");\n"
+      "    $display(\"%h %h %h %h\", mem[0], mem[1], mem[2], mem[3]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "xx xx 7f 01\n");
+}
+
+// Annex D.14: the syntax takes a memory name, both addresses, and at least
+// one string, so a call giving no string is reported under D.14 at the call
+// rather than loading nothing in silence, and the memory is left as it was.
+TEST(OptionalSreadmemSim, ACallWithoutAStringIsReportedUnderD14) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  reg [7:0] mem [0:3];\n"
+      "  initial begin\n"
+      "    $sreadmemh(mem, 0, 3);\n"
+      "    $display(\"%h %h\", mem[0], mem[3]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "xx xx\n");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "$sreadmemh takes a memory name, a start address, "
+                            "a finish address, and one or more strings, and "
+                            "this call has fewer",
+                            4, "D.14"));
 }
 
 }  // namespace
