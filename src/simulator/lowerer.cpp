@@ -759,6 +759,20 @@ void Lowerer::RegisterDesignTiming() {
   WatchTimingChecks(mgr, ctx_);
 }
 
+// Annex D.11: the interactive scope consulted by the optional $scope system
+// task starts at the first top-level module, and a later $scope call retargets
+// it to one of the scopes registered here, each by its complete hierarchical
+// name.
+static void RegisterInteractiveScopes(const RtlirDesign* design,
+                                      SimContext& ctx) {
+  if (!design->top_modules.empty()) {
+    ctx.SetInteractiveScope(design->top_modules.front()->name);
+  }
+  for (const std::string& name : CompleteHierarchicalScopeNames(design)) {
+    ctx.RegisterHierarchicalScope(name);
+  }
+}
+
 void Lowerer::Lower(const RtlirDesign* design) {
   if (!design) return;
   // §20.10.1: a $fatal or $error elaboration severity task that survived
@@ -766,17 +780,7 @@ void Lowerer::Lower(const RtlirDesign* design) {
   // any part of it so the scheduler sees an empty event calendar.
   if (design->simulation_blocked) return;
   design_ = design;
-  // Annex D.11: the interactive scope consulted by the optional $scope system
-  // task starts at the first top-level module. A later $scope call retargets
-  // it.
-  if (!design->top_modules.empty()) {
-    ctx_.SetInteractiveScope(design->top_modules.front()->name);
-  }
-  // Annex D.11: the scopes a later $scope may name, each by its complete
-  // hierarchical name.
-  for (const std::string& name : CompleteHierarchicalScopeNames(design)) {
-    ctx_.RegisterHierarchicalScope(name);
-  }
+  RegisterInteractiveScopes(design, ctx_);
   // §20.4.1 / §3.14.3: seed the runtime timescale state read by
   // $timeunit/$timeprecision. The simulation time unit and compilation-unit
   // timescale come from the design; the top module is the initial current

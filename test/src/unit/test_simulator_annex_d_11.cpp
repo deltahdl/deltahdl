@@ -86,7 +86,7 @@ TEST(OptionalScopeSim, ScopeAcceptsAnInstanceATaskAndAFunction) {
       "    $scope(t.u1.f);\n"
       "  end\n"
       "endmodule\n",
-      f, "t");
+      f);
   LowerAndRun(design, f);
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_EQ(f.ctx.InteractiveScope(), "t.u1.f");
