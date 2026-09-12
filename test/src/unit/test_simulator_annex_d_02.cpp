@@ -1,4 +1,5 @@
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "helpers_scheduler.h"
 
 using namespace delta;
@@ -175,6 +176,54 @@ TEST(OptionalCountDriversSim, NetIsForcedReportedAfterForce) {
                       "endmodule\n",
                       "fc"),
             1u);
+}
+
+// Annex D.2: "The specified net shall be a scalar or a bit-select of a vector
+// net." A vector net named whole is neither, and the call is reported rather
+// than answered from the vector's bit 0 -- which, driven twice here, would
+// have flagged contention as if the argument were the bit-select it is not.
+TEST(OptionalCountDriversSim, AVectorNetNamedWholeIsRejected) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  wire [3:0] v;\n"
+      "  integer n;\n"
+      "  assign v = 4'b0001;\n"
+      "  assign v = 4'b0001;\n"
+      "  initial begin\n"
+      "    #1;\n"
+      "    n = $countdrivers(v);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerAndRun(design, f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "$countdrivers takes a scalar net or a bit-select "
+                            "of a vector net, and its net argument names a "
+                            "vector net whole and no bit-select of it",
+                            8, "D.2"));
+  auto* n = f.ctx.FindVariable("n");
+  ASSERT_NE(n, nullptr);
+  EXPECT_EQ(n->value.ToUint64(), 0u);
+}
+
+// The same rule for an argument that is no net at all, a variable here: the
+// drivers of no net were counted and the call answered 0 in silence.
+TEST(OptionalCountDriversSim, AnArgumentNamingNoNetIsRejected) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic r;\n"
+      "  integer n;\n"
+      "  initial n = $countdrivers(r);\n"
+      "endmodule\n",
+      f);
+  LowerAndRun(design, f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "$countdrivers takes a scalar net or a bit-select "
+                            "of a vector net, and its net argument names no "
+                            "net",
+                            4, "D.2"));
 }
 
 }  // namespace

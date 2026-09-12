@@ -451,7 +451,6 @@ static void ResolveCountDriversNet(const Expr* net_arg, SimContext& ctx,
 // counted; the 0/1/x tallies cover the drivers that are.
 static void TallyCountDriversBit(const Net* net, uint32_t bit, uint64_t& n0,
                                  uint64_t& n1, uint64_t& nx) {
-  if (net == nullptr) return;
   const uint32_t kWord = bit / 64;
   const uint64_t kMask = uint64_t{1} << (bit % 64);
   for (const auto& drv : net->drivers) {
@@ -467,6 +466,28 @@ static void TallyCountDriversBit(const Net* net, uint32_t bit, uint64_t& n0,
   }
 }
 
+// D.2: "The specified net shall be a scalar or a bit-select of a vector net."
+// An argument that names no net, or that names a vector net whole, is neither,
+// and the call is reported under D.2 rather than counting the drivers of no
+// net or of the vector's bit 0. Returns whether the argument is one of the two.
+static bool CheckCountDriversNet(const Expr* expr, const Expr* net_arg,
+                                 const Net* net, SimContext& ctx) {
+  std::string_view fault;
+  if (net == nullptr) {
+    fault = "names no net";
+  } else if (net_arg->kind == ExprKind::kIdentifier &&
+             net->resolved->value.width > 1) {
+    fault = "names a vector net whole and no bit-select of it";
+  }
+  if (fault.empty()) return true;
+  ctx.GetDiag().Error(expr->range.start,
+                      "$countdrivers takes a scalar net or a bit-select of a "
+                      "vector net, and its net argument " +
+                          std::string(fault),
+                      Subclause("D.2"));
+  return false;
+}
+
 static Logic4Vec EvalCountDrivers(const Expr* expr, SimContext& ctx,
                                   Arena& arena) {
   const Expr* net_arg = expr->args.empty() ? nullptr : expr->args[0];
@@ -474,8 +495,11 @@ static Logic4Vec EvalCountDrivers(const Expr* expr, SimContext& ctx,
   uint32_t bit = 0;
   ResolveCountDriversNet(net_arg, ctx, arena, net_name, bit);
 
-  uint64_t n0 = 0, n1 = 0, nx = 0;
   Net* net = net_name.empty() ? nullptr : ctx.FindNet(net_name);
+  if (!CheckCountDriversNet(expr, net_arg, net, ctx)) {
+    return MakeLogic4VecVal(arena, 1, 0);
+  }
+  uint64_t n0 = 0, n1 = 0, nx = 0;
   TallyCountDriversBit(net, bit, n0, n1, nx);
   const uint64_t kN01x = n0 + n1 + nx;
 
@@ -484,8 +508,7 @@ static Logic4Vec EvalCountDrivers(const Expr* expr, SimContext& ctx,
   // §10.6.2 lets a force name "a constant bit-select of a vector net": a force
   // on bus[3] holds bit 3 and no other, so bus[7] reports 0 for it. Reading the
   // flag alone answered 1 for every bit of the net.
-  const bool kForced = net != nullptr && net->resolved != nullptr &&
-                       net->resolved->BitIsForced(bit);
+  const bool kForced = net->resolved->BitIsForced(bit);
   const uint64_t kOuts[5] = {kForced ? 1u : 0u, kN01x, n0, n1, nx};
   for (size_t i = 1; i < expr->args.size() && i <= 5u; ++i) {
     if (expr->args[i] != nullptr) {
