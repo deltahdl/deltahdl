@@ -769,4 +769,109 @@ TEST(LoopSyntaxParsing, ErrorForeachMissingBrackets) {
   EXPECT_TRUE(ReportedError(r.diags, "expected '[', got ')'", 4, "12.7.3"));
 }
 
+// for_initialization ::= list_of_variable_assignments |
+// for_variable_declaration
+//   { , for_variable_declaration }, each item assigning with '=':
+// list_of_variable_assignments is `variable_lvalue = expression { , ... }` and
+// for_variable_declaration `[ var ] data_type variable_identifier = expression
+// { , variable_identifier = expression }`. The parser read each item as any
+// assignment or expression statement, so a bare `i`, a nonblocking `i <= 0`
+// and a declaration with no initial value were accepted silently.
+TEST(LoopSyntaxParsing, ErrorForInitializationWithoutAssignmentRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  int i;\n"
+      "  initial begin\n"
+      "    for (i; i < 4; i++) ;\n"
+      "    for (i <= 0; i < 4; i++) ;\n"
+      "    for (int j; j < 4; j++) ;\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a for loop's initialization is a list of variable assignments",
+      4, "A.6.8"));
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a for loop's initialization is a list of variable assignments",
+      5, "A.6.8"));
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a for loop's variable declaration is written 'data_type", 6,
+      "A.6.8"));
+}
+
+// for_step_assignment ::= operator_assignment | inc_or_dec_expression |
+//   function_subroutine_call
+// A bare expression and a nonblocking assignment are neither; each was
+// accepted silently.
+TEST(LoopSyntaxParsing, ErrorForStepOutsideItsThreeFormsRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  int i;\n"
+      "  initial begin\n"
+      "    for (i = 0; i < 4; i) ;\n"
+      "    for (i = 0; i < 4; i + 1) ;\n"
+      "    for (i = 0; i < 4; i <= i + 1) ;\n"
+      "    for (i = 0; i < 4; i++, i += 2, next(i), $urandom()) ;\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a for loop's step is an operator assignment", 4, "A.6.8"));
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a for loop's step is an operator assignment", 5, "A.6.8"));
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a for loop's step is an operator assignment", 6, "A.6.8"));
+  EXPECT_FALSE(ReportedError(
+      r.diags, "a for loop's step is an operator assignment", 7, "A.6.8"));
+}
+
+// foreach ( ps_or_hierarchical_array_identifier [ loop_variables ] ) statement
+// -- a statement, where the five other loops take a statement_or_null. A ';'
+// body was accepted silently.
+TEST(LoopSyntaxParsing, ErrorForeachNullBodyRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  int arr [0:7];\n"
+      "  initial foreach (arr[i]) ;\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a foreach loop's body is a statement; ';' alone is none", 3,
+      "A.6.8"));
+}
+
+// ps_or_hierarchical_array_identifier is A.9.3's `[ implicit_class_handle . |
+// class_scope | package_scope ] hierarchical_array_identifier`, so the array
+// may be reached through `this.`, a class or package scope, or a hierarchical
+// path; the parser read '.' alone, so the first three were reported as a
+// missing identifier or '['.
+TEST(LoopSyntaxParsing, ForeachScopedAndClassHandleArrayId) {
+  auto r = Parse(
+      "class C;\n"
+      "  int arr [4];\n"
+      "  static int tab [4];\n"
+      "  function void f();\n"
+      "    foreach (this.arr[i]) arr[i] = i;\n"
+      "    foreach (C::tab[i]) tab[i] = i;\n"
+      "    foreach (pkg::mem[i]) arr[0] = i;\n"
+      "  endfunction\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  auto* method = r.cu->classes[0]->members[2]->method;
+  ASSERT_NE(method, nullptr);
+  const auto& loops = method->func_body_stmts;
+  ASSERT_EQ(loops.size(), 3u);
+  for (auto* loop : loops) {
+    ASSERT_EQ(loop->kind, StmtKind::kForeach);
+    ASSERT_NE(loop->expr, nullptr);
+    EXPECT_EQ(loop->expr->kind, ExprKind::kMemberAccess);
+    ASSERT_NE(loop->expr->rhs, nullptr);
+  }
+  EXPECT_EQ(loops[0]->expr->lhs->text, "this");
+  EXPECT_EQ(loops[0]->expr->rhs->text, "arr");
+  EXPECT_TRUE(loops[1]->expr->is_scope_resolution);
+  EXPECT_EQ(loops[1]->expr->rhs->text, "tab");
+  EXPECT_TRUE(loops[2]->expr->is_scope_resolution);
+  EXPECT_EQ(loops[2]->expr->lhs->text, "pkg");
+}
+
 }  // namespace

@@ -40,10 +40,12 @@ static std::string_view LvalueRootName(const Expr* e) {
 
 // §12.7.3 — the identifier naming the array a foreach iterates over. For a
 // hierarchical designator (a.b.arr) this is the trailing member name.
+// The array's own identifier: the name itself, or the last member of the
+// chain Parser::ParseForeachArrayId reads a hierarchical or scoped name into.
 static std::string_view ForeachArrayName(const Expr* e) {
   if (!e) return {};
-  if (e->kind == ExprKind::kIdentifier || e->kind == ExprKind::kMemberAccess)
-    return e->text;
+  if (e->kind == ExprKind::kIdentifier) return e->text;
+  if (e->kind == ExprKind::kMemberAccess && e->rhs) return e->rhs->text;
   return {};
 }
 

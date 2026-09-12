@@ -43,11 +43,32 @@ struct ParserStmtHelpers {
     }
   }
 
+  // One item of A.6.8's for_initialization, which is a list_of_variable_
+  // assignments, each `variable_lvalue = expression`, or for_variable_
+  // declarations, each `[ var ] data_type variable_identifier = expression
+  // { , variable_identifier = expression }`: every item assigns with '='.
+  // Parser::ParseAssignmentOrExprNoSemi reads that as a
+  // StmtKind::kBlockingAssign, and reads the bare `i` or the `i <= 0` neither
+  // form admits as an expression statement or a nonblocking assignment, which
+  // is reported at the item and kept as read.
+  static Stmt* ParseForInitItem(Parser& p, const char* form) {
+    SourceLoc loc = p.CurrentLoc();
+    Stmt* init = p.ParseAssignmentOrExprNoSemi();
+    if (init->kind != StmtKind::kBlockingAssign) {
+      p.diag_.Error(loc, form, Subclause("A.6.8"));
+    }
+    return init;
+  }
+
   static void ParseForLocalDeclInits(Parser& p, Stmt* stmt) {
     do {
       p.Match(TokenKind::kKwVar);
       stmt->for_init_types.push_back(p.ParseDataType());
-      stmt->for_inits.push_back(p.ParseAssignmentOrExprNoSemi());
+      stmt->for_inits.push_back(ParseForInitItem(
+          p,
+          "a for loop's variable declaration is written 'data_type "
+          "variable_identifier = expression'; the initial value is not "
+          "optional"));
     } while (p.Match(TokenKind::kComma));
     p.Expect(TokenKind::kSemicolon, Subclause("12.7.1"));
   }
@@ -66,13 +87,48 @@ struct ParserStmtHelpers {
             Subclause("12.7.1"));
         p.Match(TokenKind::kKwVar);
         stmt->for_init_types.push_back(p.ParseDataType());
-        stmt->for_inits.push_back(p.ParseAssignmentOrExprNoSemi());
       } else {
         stmt->for_init_types.emplace_back();
-        stmt->for_inits.push_back(p.ParseAssignmentOrExprNoSemi());
       }
+      stmt->for_inits.push_back(ParseForInitItem(
+          p,
+          "a for loop's initialization is a list of variable assignments, "
+          "each 'variable_lvalue = expression', or of variable "
+          "declarations"));
     } while (p.Match(TokenKind::kComma));
     p.Expect(TokenKind::kSemicolon, Subclause("12.7.1"));
+  }
+
+  // Whether a statement read from a for loop's third header position has one
+  // of the three forms A.6.8 gives for_step_assignment: an
+  // operator_assignment, which Parser::ParseAssignmentOrExprNoSemi records as
+  // a StmtKind::kBlockingAssign for every assignment_operator; an
+  // inc_or_dec_expression; or a function_subroutine_call. A nonblocking
+  // assignment and a bare expression are neither.
+  static bool IsForStepAssignment(const Stmt* step) {
+    if (step->kind == StmtKind::kBlockingAssign) return true;
+    if (step->kind != StmtKind::kExprStmt || step->expr == nullptr) {
+      return false;
+    }
+    const Expr* e = step->expr;
+    if (e->kind == ExprKind::kCall || e->kind == ExprKind::kSystemCall) {
+      return true;
+    }
+    return (e->kind == ExprKind::kUnary ||
+            e->kind == ExprKind::kPostfixUnary) &&
+           (e->op == TokenKind::kPlusPlus || e->op == TokenKind::kMinusMinus);
+  }
+
+  static Stmt* ParseForStep(Parser& p) {
+    SourceLoc loc = p.CurrentLoc();
+    Stmt* step = p.ParseAssignmentOrExprNoSemi();
+    if (!IsForStepAssignment(step)) {
+      p.diag_.Error(loc,
+                    "a for loop's step is an operator assignment, an "
+                    "increment or decrement, or a subroutine call",
+                    Subclause("A.6.8"));
+    }
+    return step;
   }
 };
 
@@ -584,7 +640,7 @@ Stmt* Parser::ParseForStmt() {
 
   if (!Check(TokenKind::kRParen)) {
     do {
-      stmt->for_steps.push_back(ParseAssignmentOrExprNoSemi());
+      stmt->for_steps.push_back(ParserStmtHelpers::ParseForStep(*this));
     } while (Match(TokenKind::kComma));
   }
   Expect(TokenKind::kRParen, Subclause("12.7.1"));

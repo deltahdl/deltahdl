@@ -32,6 +32,23 @@ TEST(DeclarationRangeParsing, WildcardNotStringIndex) {
   EXPECT_FALSE(v.is_string_index);
 }
 
+// The rule reads the array's own identifier through the hierarchical name
+// A.6.8's ps_or_hierarchical_array_identifier lets a foreach write, which
+// Parser::ParseForeachArrayId reads into a member-access chain.
+TEST(WildcardIndexType, ForeachOnWildcardThroughHierarchicalNameIsError) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  int aa[*];\n"
+      "  initial foreach (m.aa[i]) begin end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "wildcard associative array 'aa' may not be used "
+                            "in a foreach loop",
+                            3, "7.8.1"));
+}
+
 // §7.8.1 — a wildcard-indexed associative array may not be used in a foreach
 // loop.
 TEST(WildcardIndexType, ForeachOnWildcardIsError) {
@@ -39,7 +56,7 @@ TEST(WildcardIndexType, ForeachOnWildcardIsError) {
   Elaborate(
       "module m;\n"
       "  int aa[*];\n"
-      "  initial foreach (aa[i]) ;\n"
+      "  initial foreach (aa[i]) begin end\n"
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
@@ -55,7 +72,7 @@ TEST(WildcardIndexType, ForeachOnFixedArrayIsAllowed) {
   Elaborate(
       "module m;\n"
       "  int arr[4];\n"
-      "  initial foreach (arr[i]) ;\n"
+      "  initial foreach (arr[i]) begin end\n"
       "endmodule\n",
       f);
   EXPECT_FALSE(f.has_errors);
@@ -229,7 +246,7 @@ TEST(WildcardIndexType, ForeachOnWildcardInForkArmIsError) {
       "  int aa[*];\n"
       "  initial begin\n"
       "    fork\n"
-      "      foreach (aa[i]) ;\n"
+      "      foreach (aa[i]) begin end\n"
       "    join\n"
       "  end\n"
       "endmodule\n",
@@ -280,7 +297,7 @@ TEST(WildcardIndexType, ForeachOnWildcardInAssertPassIsError) {
   Elaborate(
       "module m;\n"
       "  int aa[*];\n"
-      "  initial assert (1) foreach (aa[i]) ;\n"
+      "  initial assert (1) foreach (aa[i]) begin end\n"
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
@@ -294,7 +311,7 @@ TEST(WildcardIndexType, ForeachOnWildcardInAssertFailIsError) {
   Elaborate(
       "module m;\n"
       "  int aa[*];\n"
-      "  initial assert (1) else foreach (aa[i]) ;\n"
+      "  initial assert (1) else foreach (aa[i]) begin end\n"
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
@@ -311,7 +328,7 @@ TEST(WildcardIndexType, ForeachOnWildcardInRandcaseItemIsError) {
       "  int aa[*];\n"
       "  initial begin\n"
       "    randcase\n"
-      "      1: foreach (aa[i]) ;\n"
+      "      1: foreach (aa[i]) begin end\n"
       "    endcase\n"
       "  end\n"
       "endmodule\n",
@@ -331,7 +348,7 @@ TEST(WildcardIndexType, ForeachOnWildcardInRandsequenceCodeBlockIsError) {
       "  int aa[*];\n"
       "  initial begin\n"
       "    randsequence(main)\n"
-      "      main : { foreach (aa[i]) ; };\n"
+      "      main : { foreach (aa[i]) begin end };\n"
       "    endsequence\n"
       "  end\n"
       "endmodule\n",

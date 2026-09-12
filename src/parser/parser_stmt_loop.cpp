@@ -41,25 +41,19 @@ Stmt* Parser::ParseRepeatStmt() {
   return stmt;
 }
 
+// A.6.8 writes the foreach array as a ps_or_hierarchical_array_identifier,
+// which A.9.3 spells `[ implicit_class_handle . | class_scope | package_scope
+// ] hierarchical_array_identifier`: a name reached through `this.` or
+// `super.`, a class or package scope's `::`, or a hierarchical path's '.'.
+// Read as the member-access chain an expression's name is, which is the
+// shape the elaborator's and simulator's name walks take; the parser had
+// built a chain of its own shape that took '.' alone, so `pkg::arr`,
+// `this.arr` and `C::arr` were reported as a missing identifier or '['.
 Expr* Parser::ParseForeachArrayId() {
-  auto* expr = arena_.Create<Expr>();
-  expr->kind = ExprKind::kIdentifier;
-  expr->range.start = CurrentLoc();
-  expr->text = ExpectIdentifier(Subclause("12.7.3")).text;
-
-  while (Check(TokenKind::kDot) && !AtEnd()) {
-    Consume();
-    auto* mem = arena_.Create<Expr>();
-    mem->kind = ExprKind::kMemberAccess;
-    // §12.7.3 writes the array identifier as its own name followed by the
-    // member names, so it begins where the name at the bottom does, which is
-    // what Parser::MakeMemberAccess does for a dotted name in an expression.
-    mem->range.start = expr->range.start;
-    mem->lhs = expr;
-    mem->text = ExpectIdentifier(Subclause("12.7.3")).text;
-    expr = mem;
-  }
-  return expr;
+  Token head = Check(TokenKind::kKwThis) || Check(TokenKind::kKwSuper)
+                   ? Consume()
+                   : ExpectIdentifier(Subclause("12.7.3"));
+  return ParseMemberAccessChain(head);
 }
 
 Stmt* Parser::ParseForeachStmt() {
@@ -74,6 +68,13 @@ Stmt* Parser::ParseForeachStmt() {
   ParseForeachVars(stmt->foreach_vars);
   Expect(TokenKind::kRBracket, Subclause("12.7.3"));
   Expect(TokenKind::kRParen, Subclause("12.7.3"));
+  // A.6.8 ends foreach with a statement, where the five other loops end with
+  // a statement_or_null: a ';' here is no body.
+  if (Check(TokenKind::kSemicolon)) {
+    diag_.Error(CurrentLoc(),
+                "a foreach loop's body is a statement; ';' alone is none",
+                Subclause("A.6.8"));
+  }
   stmt->body = ParseStmt();
   return stmt;
 }

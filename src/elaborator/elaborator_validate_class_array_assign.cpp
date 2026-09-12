@@ -605,14 +605,21 @@ static void WalkStmtsForWildcardTraversal(
     const TypeMap& var_types, DiagEngine& diag) {
   if (!s) return;
   // §7.8.1 — a wildcard-indexed associative array may not drive a foreach loop.
-  if (s->kind == StmtKind::kForeach && s->expr &&
-      (s->expr->kind == ExprKind::kIdentifier ||
-       s->expr->kind == ExprKind::kMemberAccess) &&
-      wildcard_names.count(s->expr->text)) {
+  std::string_view foreach_array;
+  if (s->kind == StmtKind::kForeach && s->expr) {
+    // The array's own identifier: the name itself, or the last member of the
+    // chain Parser::ParseForeachArrayId reads a hierarchical name into.
+    if (s->expr->kind == ExprKind::kIdentifier) {
+      foreach_array = s->expr->text;
+    } else if (s->expr->kind == ExprKind::kMemberAccess && s->expr->rhs) {
+      foreach_array = s->expr->rhs->text;
+    }
+  }
+  if (!foreach_array.empty() && wildcard_names.count(foreach_array)) {
     diag.Error(s->range.start,
                std::format("wildcard associative array '{}' may not be used in "
                            "a foreach loop",
-                           s->expr->text),
+                           foreach_array),
                Subclause("7.8.1"));
   }
   CheckWildcardTraversalExpr(s->lhs, wildcard_names, var_types, diag);
