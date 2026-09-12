@@ -159,6 +159,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/annex_f_extended_booleans.cpp
     elaborator/annex_f_past.cpp
     elaborator/annex_f_future.cpp
+    elaborator/annex_f_derived_forms.cpp
     elaborator/elaborator_defparam.cpp
     elaborator/elaborator_gates.cpp
     elaborator/elaborator_validate_delays.cpp
