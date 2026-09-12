@@ -555,6 +555,14 @@ class Elaborator : public ElaboratorClassRules {
   // §15.5.5.3: restrict the operators allowed on event variables.
   void ValidateEventOps(const ModuleDecl* decl);
 
+  // Annex D.3: $getpattern stands as the whole right-hand side of a
+  // continuous assignment to a concatenation of scalar nets, with a memory
+  // element as its argument, and nowhere else.
+  void ValidateGetpatternUses(const ModuleDecl* decl);
+  void ValidateGetpatternContAssign(const ModuleItem* item,
+                                    const RtlirModule* mod);
+  bool NamesMemoryElement(const Expr* arg) const;
+
   void WalkStmtsForEventOps(const Stmt* s);
 
   void ValidateVirtualInterfaceClocking(const ModuleDecl* decl);

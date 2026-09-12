@@ -73,17 +73,13 @@ TEST(OptionalSystemTasksGeneral, AnUnavailableSaveTaskIsReportedUnderD1) {
                             2, "D.1"));
 }
 
-// D.3's $getpattern is a function, called for its value on line 3.
-TEST(OptionalSystemTasksGeneral,
-     AnUnavailableGetpatternFunctionIsReportedUnderD1) {
+// D.5's $nokey, the task beside $key, which stands in D.1's list under the
+// same subclause.
+TEST(OptionalSystemTasksGeneral, AnUnavailableNokeyTaskIsReportedUnderD1) {
   SimFixture f;
-  ASSERT_TRUE(RunAnnexDSource(f,
-                              "module t;\n"
-                              "  int x, a;\n"
-                              "  initial x = $getpattern(a);\n"
-                              "endmodule\n"));
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            NotAvailable("$getpattern", "D.3"), 3, "D.1"));
+  ASSERT_TRUE(RunAnnexDSource(f, AsTask("$nokey")));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), NotAvailable("$nokey", "D.5"),
+                            2, "D.1"));
 }
 
 // The control: an optional task this implementation does provide, D.6's

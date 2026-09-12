@@ -297,6 +297,7 @@ void Elaborator::ElaborateContAssign(ModuleItem* item, RtlirModule* mod) {
       item->assign_lhs) {
     ValidateContAssignDriveStrength(item, mod);
   }
+  ValidateGetpatternContAssign(item, mod);
   if (item->assign_lhs && item->assign_lhs->kind == ExprKind::kConcatenation) {
     ScopeMap scope = BuildParamScope(mod);
     ConcatContAssignCtx cx{item, mod, arena_, diag_, scope};

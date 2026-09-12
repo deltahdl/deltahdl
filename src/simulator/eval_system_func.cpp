@@ -521,6 +521,18 @@ static Logic4Vec EvalCountDrivers(const Expr* expr, SimContext& ctx,
   return MakeLogic4VecVal(arena, 1, kN01x > 1 ? 1 : 0);
 }
 
+// Optional $getpattern function (Annex D.3): "reads stimulus patterns that
+// have been loaded into a memory", one word per call, which the continuous
+// assignment it stands in drives onto its concatenation of scalar nets a bit
+// at a time. The word is the value of the memory element the argument names;
+// the elaborator holds the call to the placements D.3 allows, so the argument
+// is that element, and a call written with none answers a zero.
+static Logic4Vec EvalGetpattern(const Expr* expr, SimContext& ctx,
+                                Arena& arena) {
+  if (expr->args.empty()) return MakeLogic4VecVal(arena, 1, 0);
+  return EvalExpr(expr->args[0], ctx, arena);
+}
+
 // Optional $reset family (Annex D.8). $reset tallies a reset of the tool and
 // captures its reset_value argument (the second argument, after stop_value)
 // so that the value can be communicated to after the reset; the other
@@ -777,6 +789,7 @@ Logic4Vec EvalSystemCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (name == "$countdrivers") {
     return EvalCountDrivers(expr, ctx, arena);
   }
+  if (name == "$getpattern") return EvalGetpattern(expr, ctx, arena);
   Logic4Vec coverage_result;
   if (TryEvalCoverageSysCall(expr, ctx, arena, name, coverage_result)) {
     return coverage_result;

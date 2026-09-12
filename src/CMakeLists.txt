@@ -314,6 +314,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/elaborator_validate_config.cpp
     elaborator/elaborator_validate_config_rules.cpp
     elaborator/elaborator_validate_datatype_ops.cpp
+    elaborator/elaborator_validate_getpattern.cpp
     elaborator/elaborator_validate_funcbody.cpp
     elaborator/elaborator_validate_funcchecks.cpp
     elaborator/elaborator_validate_hier_refs.cpp
