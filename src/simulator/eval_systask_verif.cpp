@@ -688,11 +688,13 @@ static std::string_view PastAnalogueOfFutureFunction(std::string_view name) {
 
 // §16.9.4's five future functions, evaluated at the global clock tick that
 // follows the assertion's own. The argument's sampled value here is the one the
-// clause calls the value "at the next global clock tick"; the value at the
-// assertion's tick was recorded against this call site before the wait, so
-// PastValue reads it back. A site with no history is one whose attempt did not
-// go through that wait, and the clause's own fallback for a comparison with no
-// prior tick is the expression's default sampled value.
+// clause calls the value at the next global clock tick; the value at the
+// assertion's tick was sampled by the attempt at that tick and written into
+// this call site's history just before this evaluation (see
+// FutureGclkAttemptCoroutine in stmt_exec_deferred.cpp), so PastValue reads it
+// back. A site with no history is one whose attempt did not go through that
+// wait, and the clause's own fallback for a comparison with no prior tick is
+// the expression's default sampled value.
 static Logic4Vec EvalFutureGclk(const Expr* expr, SimContext& ctx, Arena& arena,
                                 std::string_view name) {
   if (expr->args.empty() || expr->args[0] == nullptr) {

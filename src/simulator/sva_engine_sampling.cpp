@@ -268,4 +268,11 @@ void AssertionSampleStore::RecordTick(const Expr* site,
   if (history.size() > depth) history.resize(depth);
 }
 
+Logic4Vec AssertionSampleStore::OwnedSample(const Logic4Vec& sampled,
+                                            Arena& arena) {
+  Logic4Vec copy;
+  CopySample(sampled, copy, arena);
+  return copy;
+}
+
 }  // namespace delta

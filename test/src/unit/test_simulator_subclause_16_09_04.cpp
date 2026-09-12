@@ -316,4 +316,47 @@ TEST(GlobalClockingFutureSim, TheActionBlockRunsAtTheFollowingGlobalTick) {
   EXPECT_EQ(when->value.ToUint64(), 10u);
 }
 
+// §16.9.4 gives each attempt its own interval, from its tick of the assertion
+// clock to the global clocking tick that follows, so an attempt is started at
+// every tick of the assertion clock while the one before it is still waiting
+// to be answered. The assertion here is clocked on the global clock itself and
+// v is sampled 0, 1, 1, 0, 1, 1, 0 at its seven ticks, each change made in the
+// slot of the tick before the one that samples it; the eighth tick answers the
+// seventh attempt. $rising_gclk(v) holds for the attempts at the first and
+// fourth ticks, so the pass action runs twice, the second time at the fifth
+// tick. An assertion that waited for the answering tick in its own process
+// would miss every other tick and pass once, at the first; one comparing with
+// the value a tick back rather than a tick ahead would pass at the second and
+// fifth attempts, the second time at the sixth tick.
+TEST(GlobalClockingFutureSim, AnAttemptStartsAtEveryTickWhileOneIsWaiting) {
+  SimFixture f;
+  auto* hits = RunAndFindVar(
+      "module t;\n"
+      "  logic gclk = 1'b0;\n"
+      "  logic v = 1'b0;\n"
+      "  int hits = 0;\n"
+      "  int last = 0;\n"
+      "  global clocking gc @(posedge gclk); endclocking\n"
+      "  assert property (@(posedge gclk) $rising_gclk(v)) begin\n"
+      "    hits = hits + 1; last = $time;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    #5 gclk = 1'b1; v = 1'b1; #5 gclk = 1'b0;\n"
+      "    #5 gclk = 1'b1; #5 gclk = 1'b0;\n"
+      "    #5 gclk = 1'b1; v = 1'b0; #5 gclk = 1'b0;\n"
+      "    #5 gclk = 1'b1; v = 1'b1; #5 gclk = 1'b0;\n"
+      "    #5 gclk = 1'b1; #5 gclk = 1'b0;\n"
+      "    #5 gclk = 1'b1; v = 1'b0; #5 gclk = 1'b0;\n"
+      "    #5 gclk = 1'b1; #5 gclk = 1'b0;\n"
+      "    #5 gclk = 1'b1; #5 gclk = 1'b0;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "hits");
+  ASSERT_NE(hits, nullptr);
+  EXPECT_EQ(hits->value.ToUint64(), 2u);
+  auto* last = f.ctx.FindVariable("last");
+  ASSERT_NE(last, nullptr);
+  EXPECT_EQ(last->value.ToUint64(), 45u);
+}
+
 }  // namespace

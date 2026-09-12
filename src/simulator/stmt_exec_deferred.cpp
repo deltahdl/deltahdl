@@ -7,6 +7,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "common/arena.h"
@@ -23,6 +24,7 @@
 #include "simulator/stmt_exec.h"
 #include "simulator/stmt_exec_internal.h"
 #include "simulator/sva_engine.h"
+#include "simulator/sva_engine_sampling.h"
 
 namespace delta {
 
@@ -172,17 +174,16 @@ static SimCoroutine ConcurrentAssertActionCoroutine(const Stmt* action,
   co_await ExecStmt(action, ctx, arena);
 }
 
-// The process an action block runs in. §23.6 resolves the names it writes under
-// the instance and generate prefixes the assertion stands in, so the process
-// carries the ones the process that reached the assertion had; and §4.4.2.6
-// makes its code reactive, so a blocking assignment it makes and a #0 it
-// executes belong to the reactive region set rather than to the active one.
-static Process* CreateConcurrentAssertActionProcess(SimContext& ctx,
-                                                    Arena& arena) {
+// A process a concurrent assertion hands part of an attempt to: its action
+// block (§4.4.2.6), or the attempt itself where §16.9.4 answers it at a later
+// tick. §23.6 resolves the names it writes under the instance and generate
+// prefixes the assertion stands in, so the process carries the ones the
+// process that reached the assertion had.
+static Process* CreateAssertionChildProcess(SimContext& ctx, Arena& arena,
+                                            Region home_region) {
   auto* p = arena.Create<Process>();
   p->kind = ProcessKind::kInitial;
-  p->home_region = ConcurrentAssertActionRegion();
-  p->is_reactive = true;
+  p->home_region = home_region;
   if (auto* asserting = ctx.CurrentProcess()) {
     p->inst_prefix = asserting->inst_prefix;
     p->gen_prefixes = asserting->gen_prefixes;
@@ -195,6 +196,19 @@ static Process* CreateConcurrentAssertActionProcess(SimContext& ctx,
   return p;
 }
 
+// Starts the process at the current time in `region`, where its coroutine runs
+// to its first wait. A process disabled before that is left where it is.
+static void ScheduleAssertionChildStart(Process* p, Region region,
+                                        SimContext& ctx) {
+  auto* ev = ctx.GetScheduler().GetEventPool().Acquire();
+  ev->callback = [p, &ctx]() {
+    if (!p->active) return;
+    ctx.SetCurrentProcess(p);
+    p->Resume();
+  };
+  ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), region, ev);
+}
+
 // Schedules a concurrent assertion's action block into the region §4.4.2.6
 // gives it and reports whether it did, so a caller that gets false runs the
 // action where it stands. An immediate assertion's action block is that case:
@@ -204,15 +218,14 @@ static bool TryScheduleConcurrentAssertAction(const Stmt* action,
                                               const Stmt* stmt, SimContext& ctx,
                                               Arena& arena) {
   if (!stmt->is_concurrent_clocked) return false;
-  auto* p = CreateConcurrentAssertActionProcess(ctx, arena);
+  // §4.4.2.6 makes the action block's code reactive, so a blocking assignment
+  // it makes and a #0 it executes belong to the reactive region set rather
+  // than to the active one.
+  auto* p =
+      CreateAssertionChildProcess(ctx, arena, ConcurrentAssertActionRegion());
+  p->is_reactive = true;
   p->coro = ConcurrentAssertActionCoroutine(action, ctx, arena).Release();
-  auto* ev = ctx.GetScheduler().GetEventPool().Acquire();
-  ev->callback = [p, &ctx]() {
-    if (!p->active) return;
-    ctx.SetCurrentProcess(p);
-    p->Resume();
-  };
-  ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), p->home_region, ev);
+  ScheduleAssertionChildStart(p, p->home_region, ctx);
   return true;
 }
 
@@ -313,27 +326,140 @@ static void ReportDefaultAssertionFailure(const Stmt* stmt, uint32_t type_bit,
   EmitSeverityHeader(ctx, "ERROR", "Assertion failed.", std::cerr);
 }
 
+// §16.5.1's mode raised around one evaluation of a concurrent assertion's
+// property and lowered again before anything else runs, because the subclause
+// reaches the assertion's own expression and nothing else in the source: the
+// pass and fail statements are ordinary procedural code and read the values
+// standing when they run. The previous setting is put back rather than cleared
+// so that an immediate assertion reached from a function called by the property
+// leaves the property's own reads sampled.
+static bool EvalAssertionCondition(const Stmt* stmt, SimContext& ctx,
+                                   Arena& arena) {
+  auto& samples = ctx.AssertionSamples();
+  bool outer_evaluating_property = samples.EvaluatingProperty();
+  samples.SetEvaluatingProperty(stmt->is_concurrent_clocked);
+  auto cond = EvalExpr(stmt->assert_expr, ctx, arena);
+  samples.SetEvaluatingProperty(outer_evaluating_property);
+  return cond.IsTruthy();
+}
+
+// One attempt of the assertion from its evaluation on: the property is judged
+// on §16.5.1's sampled values, the verdict's action block is scheduled where
+// §16.4 or §4.4.2.6 puts it, and a failure with no action block is reported.
+// Returns the action block the caller is to run where it stands, which is an
+// immediate assertion's (§16.3), and nullptr where the action was scheduled
+// elsewhere or there is none.
+static const Stmt* JudgeAssertion(const Stmt* stmt, SimContext& ctx,
+                                  Arena& arena) {
+  // §16.3 / §20.11: the execution of immediate assertions can be controlled by
+  // the assertion control system tasks. When $assertcontrol Off/Kill (or
+  // $assertoff/$assertkill) has stopped checking for this assertion's type and
+  // directive, the assertion is not evaluated, records nothing, and runs no
+  // action on this activation.
+  uint32_t type_bit = ImmediateAssertionTypeBit(stmt);
+  uint32_t directive_bit = ImmediateDirectiveTypeBit(stmt);
+  if (!ctx.AssertCheckingEnabled(type_bit, directive_bit)) return nullptr;
+
+  bool is_true = EvalAssertionCondition(stmt, ctx, arena);
+  RecordCoverImmediateSample(stmt, is_true, ctx);
+  const Stmt* action =
+      is_true ? stmt->assert_pass_stmt : stmt->assert_fail_stmt;
+  if (action != nullptr) {
+    if (TryScheduleDeferredAssertAction(action, stmt, ctx, arena) ||
+        TryScheduleConcurrentAssertAction(action, stmt, ctx, arena)) {
+      return nullptr;
+    }
+    return action;
+  }
+  if (!is_true && stmt->kind != StmtKind::kCoverImmediate) {
+    ReportDefaultAssertionFailure(stmt, type_bit, directive_bit, ctx);
+  }
+  return nullptr;
+}
+
 // §16.9.4: the value each of the five future sampled value functions names is
-// "the sampled value of v at the next global clock tick", and the four
+// the argument's sampled value at the next global clocking tick, and the four
 // predicates beside $future_gclk compare it with the value at the tick the
-// function was called in. That second value is this one, so it is sampled here,
-// before the attempt waits for the global clocking tick that answers the first.
-//
-// Each call site records under itself, which is the keying §16.9.3's past
-// functions already use: the store is per call site, so two calls naming one
-// variable keep two histories and neither reads the other's. What the delayed
-// evaluation then asks for is one tick back, which is this.
-static void SampleFutureGclkOperands(const Expr* root, SimContext& ctx,
-                                     Arena& arena) {
+// function was called in. That second value is what this takes, one per call
+// site under `root`, before the attempt waits for the global clocking tick that
+// answers the first. The values are copied out of the variables they were read
+// from, because the attempt keeps them across a tick the variables may change
+// in.
+using FutureGclkSamples = std::vector<std::pair<const Expr*, Logic4Vec>>;
+static FutureGclkSamples* SampleFutureGclkOperands(const Expr* root,
+                                                   SimContext& ctx,
+                                                   Arena& arena) {
+  auto* samples = arena.Create<FutureGclkSamples>();
   ForEachSubExpr(root, [&](const Expr* e) {
     GlobalClockingSampledFunction fn = GlobalClockingSampledFunction::kPastGclk;
     if (e->kind != ExprKind::kSystemCall) return;
     if (e->args.empty() || e->args[0] == nullptr) return;
     if (!ClassifyGlobalClockingSampledFunction(e->callee, fn)) return;
     if (!IsGlobalClockingFutureFunction(fn)) return;
-    ctx.AssertionSamples().RecordTick(e, EvalSampledArg(e->args[0], ctx, arena),
-                                      1, arena);
+    samples->emplace_back(e,
+                          AssertionSampleStore::OwnedSample(
+                              EvalSampledArg(e->args[0], ctx, arena), arena));
   });
+  return samples;
+}
+
+// §16.9.4: one attempt of an assertion whose property names a future sampled
+// value function, from its own tick to the global clocking tick that answers
+// it. The attempt waits for that tick, evaluates the whole property there, and
+// schedules its action block there, which is where the subclause has the
+// action block of such an assertion run -- delayed to the global clocking tick
+// that follows the last tick of the assertion clock for the attempt.
+//
+// What the attempt sampled at its own tick is written into the call sites'
+// tick history just before the evaluation, so that EvalFutureGclk reads it
+// back as the value one tick before the one it samples now. The history is
+// written here rather than at the attempt's tick because an attempt the next
+// tick starts would record over it before this one is answered: the sites are
+// shared by every attempt of the assertion, and the tick history keeps one
+// value per site.
+//
+// The whole property is evaluated at the later tick, so an operand of it that
+// is not an argument of one of the five reads its sampled value there rather
+// than at the assertion's tick. §16.9.4 puts the attempt's interval at the
+// assertion clock, as though the future sampled values were known in advance,
+// so a property mixing a future function with a plain operand reads the plain
+// one a tick late. What that costs is one tick of a value the property also
+// names directly, and what it buys is the five functions answering at all.
+static SimCoroutine FutureGclkAttemptCoroutine(
+    const Stmt* stmt, const std::vector<EventExpr>& gclk_event,
+    const FutureGclkSamples* samples, SimContext& ctx, Arena& arena) {
+  co_await EventAwaiter{ctx, gclk_event, arena};
+  co_await ObservedRegionAwaiter{ctx};
+  auto& store = ctx.AssertionSamples();
+  for (const auto& [site, at_tick] : *samples) {
+    store.RecordTick(site, at_tick, 1, arena);
+  }
+  // The statement carries a concurrent assertion's property, so the verdict's
+  // action block is scheduled into the Reactive region rather than handed back
+  // to be run here.
+  JudgeAssertion(stmt, ctx, arena);
+}
+
+// §16.9.4: starts the attempt above in a process of its own, so that the
+// process carrying the assertion is back at its clocking event for the next
+// tick while this attempt waits for the global clocking tick that answers it.
+// An attempt started at every tick of the assertion clock is what the
+// subclause's interval asks for; an assertion that waited in its own process
+// would start one attempt per two ticks, the wait consuming the tick between.
+//
+// The process is marked as carrying a concurrent assertion so that §16.5's
+// rule resumes it in the Observed region of the global clocking tick, which is
+// also where it starts: the asserting process is there already, and starting
+// in the same region arms the wait before the tick can arrive.
+static void StartFutureGclkAttempt(const Stmt* stmt, const Process& asserting,
+                                   SimContext& ctx, Arena& arena) {
+  auto* samples = SampleFutureGclkOperands(stmt->assert_expr, ctx, arena);
+  auto* p = CreateAssertionChildProcess(ctx, arena, Region::kObserved);
+  p->is_concurrent_clocked = true;
+  p->coro = FutureGclkAttemptCoroutine(stmt, asserting.gclk_future_event,
+                                       samples, ctx, arena)
+                .Release();
+  ScheduleAssertionChildStart(p, p->home_region, ctx);
 }
 
 ExecTask ExecImmediateAssert(const Stmt* stmt, SimContext& ctx, Arena& arena) {
@@ -344,73 +470,19 @@ ExecTask ExecImmediateAssert(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (stmt->is_concurrent_clocked) co_await ObservedRegionAwaiter{ctx};
 
   // §16.9.4: an attempt of a property naming one of the five future sampled
-  // value functions is answered at the global clocking tick that follows the
-  // last tick of its own clock -- "Execution of the action block of an
-  // assertion containing global clocking future sampled value functions shall
-  // be delayed until the global clocking tick that follows the last tick of the
-  // assertion clock for the attempt" -- so the value each of the five names is
-  // sampled at that tick rather than predicted at this one. What the attempt
-  // needs from its own tick is sampled here, before the wait.
-  //
-  // The whole property is then evaluated at that later tick, so an operand of
-  // it that is not an argument of one of the five reads its sampled value there
-  // rather than at the assertion's tick. §16.9.4 puts the attempt's interval at
-  // the assertion clock, "as though the future sampled values were known in
-  // advance", so a property mixing a future function with a plain operand reads
-  // the plain one a tick late. What that costs is one tick of a value the
-  // property also names directly, and what it buys is the five functions
-  // answering at all.
-  //
-  // Lowerer::LowerProcess carries the event onto the process, and it is empty
-  // for every process whose property names none of the five, which is every
-  // assertion in a design that uses none.
+  // value functions is answered at the global clocking tick that follows this
+  // one, so it is handed to a process of its own and this process goes back to
+  // its clocking event. Lowerer::LowerProcess carries the event onto the
+  // process, and it is empty for every process whose property names none of
+  // the five, which is every assertion in a design that uses none.
   Process* proc = ctx.CurrentProcess();
   if (proc != nullptr && !proc->gclk_future_event.empty()) {
-    SampleFutureGclkOperands(stmt->assert_expr, ctx, arena);
-    co_await EventAwaiter{ctx, proc->gclk_future_event, arena};
-    co_await ObservedRegionAwaiter{ctx};
-  }
-
-  // §16.3 / §20.11: the execution of immediate assertions can be controlled by
-  // the assertion control system tasks. When $assertcontrol Off/Kill (or
-  // $assertoff/$assertkill) has stopped checking for this assertion's type and
-  // directive, the assertion is not evaluated, records nothing, and runs no
-  // action on this activation.
-  uint32_t type_bit = ImmediateAssertionTypeBit(stmt);
-  uint32_t directive_bit = ImmediateDirectiveTypeBit(stmt);
-  if (!ctx.AssertCheckingEnabled(type_bit, directive_bit)) {
+    StartFutureGclkAttempt(stmt, *proc, ctx, arena);
     co_return StmtResult::kDone;
   }
 
-  // §16.5.1: a concurrent assertion's property is evaluated on the sampled
-  // values of the variables it names, and §16.5.2 makes the sampled value "the
-  // only valid value of a variable during a clock tick". The mode is raised
-  // around this one evaluation and lowered again before anything else runs,
-  // because §16.5.1 reaches the assertion's own expression and nothing else in
-  // the source: the pass and fail statements below are ordinary procedural code
-  // and read the values standing when they run. The previous setting is put
-  // back rather than cleared so that an immediate assertion reached from a
-  // function called by the property leaves the property's own reads sampled.
-  auto& samples = ctx.AssertionSamples();
-  bool outer_evaluating_property = samples.EvaluatingProperty();
-  samples.SetEvaluatingProperty(stmt->is_concurrent_clocked);
-  auto cond = EvalExpr(stmt->assert_expr, ctx, arena);
-  samples.SetEvaluatingProperty(outer_evaluating_property);
-
-  bool is_true = cond.IsTruthy();
-  RecordCoverImmediateSample(stmt, is_true, ctx);
-  const Stmt* action =
-      is_true ? stmt->assert_pass_stmt : stmt->assert_fail_stmt;
-  if (action != nullptr) {
-    if (TryScheduleDeferredAssertAction(action, stmt, ctx, arena) ||
-        TryScheduleConcurrentAssertAction(action, stmt, ctx, arena)) {
-      co_return StmtResult::kDone;
-    }
-    co_return co_await ExecStmt(action, ctx, arena);
-  }
-  if (!is_true && stmt->kind != StmtKind::kCoverImmediate) {
-    ReportDefaultAssertionFailure(stmt, type_bit, directive_bit, ctx);
-  }
+  const Stmt* action = JudgeAssertion(stmt, ctx, arena);
+  if (action != nullptr) co_return co_await ExecStmt(action, ctx, arena);
   co_return StmtResult::kDone;
 }
 

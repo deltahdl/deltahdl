@@ -267,6 +267,14 @@ class AssertionSampleStore {
   void RecordTick(const Expr* site, const Logic4Vec& sampled, uint32_t depth,
                   Arena& arena);
 
+  // A copy of `sampled` that owns its words, for a caller that keeps a sampled
+  // value past the tick it read it at: the value a read of a variable answers
+  // shares the variable's words, and the tick history above is kept by copy
+  // for the same reason. §16.9.4's attempts are the caller, each keeping what
+  // its future call sites sampled at its own tick until the global clocking
+  // tick that answers it.
+  static Logic4Vec OwnedSample(const Logic4Vec& sampled, Arena& arena);
+
  private:
   struct Entry {
     Logic4Vec default_value;
