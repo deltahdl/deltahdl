@@ -92,6 +92,24 @@ static char UdpInputChar(const Expr* terminal, SimContext& ctx, Arena& arena) {
   return bits.empty() ? 'x' : bits.back();
 }
 
+// The value a sequential primitive's output holds when simulation begins, as
+// the character UdpEvalState seeds its state with. A.5.2 writes the header's
+// initial value as `output reg port_identifier = constant_expression`, and the
+// parser keeps that expression on UdpDecl::initial_expr because `~1'b0` is not
+// a bit it can read off the spelling; it is evaluated here, in the one-bit
+// context the reg gives it, the same way an input terminal is. §29.3.4 rules
+// that "The z state is explicitly excluded from consideration in UDPs", so a z
+// the expression evaluates to seeds x, as §29.3.5 gives a z input. Where the
+// header wrote no expression the bit is the one the parser read, off a literal
+// or off §29.3.3's initial statement, whose right-hand side A.5.3 closes over
+// literals.
+static char UdpInitialOutput(const UdpDecl& decl, SimContext& ctx,
+                             Arena& arena) {
+  if (decl.initial_expr == nullptr) return decl.initial_value;
+  char bit = UdpInputChar(decl.initial_expr, ctx, arena);
+  return bit == 'z' ? 'x' : bit;
+}
+
 // The input terminals of one instance, in the order the state table indexes
 // them. §29.3.4 rules that "The order of the input state fields of each row of
 // the state table is taken directly from the port list in the UDP definition
@@ -267,7 +285,7 @@ static SimCoroutine MakeUdpInstCoroutine(const RtlirUdpInst* inst,
   // of a sequential primitive the current output value, so a UdpEvalState built
   // per evaluation would match every row against the initial value §29.7 gives
   // rather than against the state the previous evaluation left.
-  UdpEvalState state(*inst->decl);
+  UdpEvalState state(*inst->decl, UdpInitialOutput(*inst->decl, ctx, arena));
   // The driver lives in the arena rather than in this coroutine frame because a
   // delayed commit is a scheduler event that runs after this coroutine has
   // moved on to its next evaluation.

@@ -4,9 +4,12 @@
 
 namespace delta {
 
-UdpEvalState::UdpEvalState(const UdpDecl& decl) : decl_(decl) {
-  output_ =
-      (decl_.is_sequential && decl_.has_initial) ? decl_.initial_value : 'x';
+UdpEvalState::UdpEvalState(const UdpDecl& decl)
+    : UdpEvalState(decl, decl.initial_value) {}
+
+UdpEvalState::UdpEvalState(const UdpDecl& decl, char initial_output)
+    : decl_(decl) {
+  output_ = (decl_.is_sequential && decl_.has_initial) ? initial_output : 'x';
 }
 
 static bool IsEdgeSymbol(char symbol) {

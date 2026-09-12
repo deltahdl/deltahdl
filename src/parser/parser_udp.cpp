@@ -148,10 +148,49 @@ char Parser::ParseUdpInitialValue(TokenKind stop1, TokenKind stop2) {
   return result;
 }
 
-void Parser::ParseUdpOutputDecl(UdpDecl* udp) {
-  if (Match(TokenKind::kKwReg)) {
-    udp->is_sequential = true;
+// A.5.2: the one bit a 1-bit reg keeps of an integer literal written as its
+// initial value, which is the literal's least significant bit under §10.7's
+// truncation of an assignment to a narrower variable, or 'x' where that bit is
+// unknown. The low bit of every base's value is the low bit of its last digit,
+// so the literal's int_val answers it, and an x, z or ? as that last digit is
+// the one spelling that leaves the bit unknown. 'x' for an expression that is
+// not a literal: that bit is the run's to evaluate from UdpDecl::initial_expr.
+static char UdpLiteralInitialBit(const Expr* expr) {
+  if (expr == nullptr || expr->kind != ExprKind::kIntegerLiteral) return 'x';
+  if (!expr->text.empty()) {
+    char last = expr->text.back();
+    if (last == 'x' || last == 'X' || last == 'z' || last == 'Z' ||
+        last == '?') {
+      return 'x';
+    }
   }
+  return (expr->int_val & 1) != 0 ? '1' : '0';
+}
+
+// A.5.2 gives `[ = constant_expression ]` to `output reg port_identifier`
+// alone; the `output port_identifier` alternative carries none. Reads the `=`
+// the current token stands at and the expression after it, and returns the
+// expression where the output was declared reg. After an output declared
+// without reg the `=` is reported and the expression read past all the same,
+// so the declaration is otherwise taken as written and the header's port count
+// still agrees with the table below; nullptr is returned then.
+Expr* Parser::ParseUdpOutputInitialValue(bool declares_reg) {
+  auto eq_tok = Consume();
+  Expr* value = ParseExpr();
+  if (declares_reg) return value;
+  diag_.Error(eq_tok.loc,
+              "UDP output port takes an initial value only as 'output reg'",
+              Subclause("A.5.2"));
+  return nullptr;
+}
+
+void Parser::ParseUdpOutputDecl(UdpDecl* udp) {
+  // Read into its own flag rather than off udp->is_sequential, which a
+  // `reg q;` declared above this line has already set: A.5.2 puts the initial
+  // value on the `output reg` form and not on an `output` that a separate
+  // udp_reg_declaration makes sequential.
+  bool declares_reg = Match(TokenKind::kKwReg);
+  if (declares_reg) udp->is_sequential = true;
   RejectUdpPortDimension();
   auto id_tok = Expect(TokenKind::kIdentifier, Subclause("29.3.2"));
 
@@ -160,10 +199,12 @@ void Parser::ParseUdpOutputDecl(UdpDecl* udp) {
                 Subclause("29.3.1"));
   }
   udp->output_name = id_tok.text;
-  if (Match(TokenKind::kEq)) {
-    udp->has_initial = true;
-    udp->initial_value =
-        ParseUdpInitialValue(TokenKind::kSemicolon, TokenKind::kSemicolon);
+  if (Check(TokenKind::kEq)) {
+    if (Expr* value = ParseUdpOutputInitialValue(declares_reg)) {
+      udp->has_initial = true;
+      udp->initial_expr = value;
+      udp->initial_value = UdpLiteralInitialBit(value);
+    }
   }
   Expect(TokenKind::kSemicolon, Subclause("29.3.2"));
 }
@@ -554,10 +595,8 @@ UdpAnsiPortEntry Parser::ParseUdpAnsiPortEntry() {
   entry.declares_reg = entry.is_output && Match(TokenKind::kKwReg);
   RejectUdpPortDimension();
   entry.name = Expect(TokenKind::kIdentifier, Subclause("29.3.1")).text;
-  entry.declares_initial = entry.is_output && Match(TokenKind::kEq);
-  if (entry.declares_initial) {
-    entry.initial_value =
-        ParseUdpInitialValue(TokenKind::kComma, TokenKind::kRParen);
+  if (entry.is_output && Check(TokenKind::kEq)) {
+    entry.initial_expr = ParseUdpOutputInitialValue(entry.declares_reg);
   }
   return entry;
 }
@@ -583,9 +622,10 @@ static bool PlaceUdpAnsiPortEntry(DiagEngine& diag, UdpDecl* udp,
   }
   udp->output_name = entry.name;
   if (entry.declares_reg) udp->is_sequential = true;
-  if (entry.declares_initial) {
+  if (entry.initial_expr != nullptr) {
     udp->has_initial = true;
-    udp->initial_value = entry.initial_value;
+    udp->initial_expr = entry.initial_expr;
+    udp->initial_value = UdpLiteralInitialBit(entry.initial_expr);
   }
   return true;
 }

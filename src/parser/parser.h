@@ -23,8 +23,10 @@ struct UdpAnsiPortEntry {
   bool is_output = false;
   bool is_inout = false;
   bool declares_reg = false;
-  bool declares_initial = false;
-  char initial_value = '0';
+  // A.5.2's `= constant_expression`, as written; null where the entry wrote
+  // none, or wrote one after an output declared without reg, which is not a
+  // place the grammar puts one.
+  Expr* initial_expr = nullptr;
   std::string_view name;
   SourceLoc loc;
 };
@@ -230,6 +232,7 @@ class Parser {
   void ParseUdpInitialStatement(UdpDecl* udp);
   UdpDecl* ParseExternUdpDecl();
   char ParseUdpInitialValue(TokenKind stop1, TokenKind stop2);
+  Expr* ParseUdpOutputInitialValue(bool declares_reg);
   void ParseUdpOutputDecl(UdpDecl* udp);
   void ParseUdpPortDecls(UdpDecl* udp);
   void ParseUdpTable(UdpDecl* udp);

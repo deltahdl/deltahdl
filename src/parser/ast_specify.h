@@ -149,7 +149,19 @@ struct UdpDecl {
   std::vector<std::string_view> input_names;
   bool is_sequential = false;
   bool has_initial = false;
+  // The one bit the output holds when simulation begins, where the parser can
+  // read it: §29.3.3's initial statement assigns one of A.5.3's init_val
+  // literals, and A.5.2's `output reg port_identifier = constant_expression`
+  // may write a literal too. 'x' where nothing gave one, and where the header
+  // wrote an expression the parser cannot fold, which the run evaluates from
+  // initial_expr instead.
   char initial_value = 'x';
+  // A.5.2's constant_expression as written after `output reg port_identifier
+  // =`, kept for the run to evaluate: `~1'b0` is the negation of a literal and
+  // not the literal, so the bit it stands for is not one the parser can read.
+  // Null where the initial value came from §29.3.3's initial statement, whose
+  // right-hand side A.5.3 closes over literals, or where there is none.
+  Expr* initial_expr = nullptr;
   std::vector<UdpTableRow> table;
   std::string_view library;
 };
