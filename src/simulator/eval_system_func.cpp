@@ -578,14 +578,27 @@ static Logic4Vec EvalAnnexDScope(const Expr* expr, SimContext& ctx,
 // Optional $list system task (Annex D.6). It produces a listing of a module,
 // task, function, or named block. With no argument the object listed is the
 // current scope setting (the interactive scope established by $scope); with
-// an argument, the argument is the complete hierarchical name of the specific
-// scope to list. Resolve which scope is selected and record it.
+// an argument, the argument "shall refer to a specific module, task,
+// function, or named block", one of the complete hierarchical names the
+// lowerer registered, and an argument naming none of them is reported under
+// D.6 and lists nothing. Resolve which scope is selected and record it.
 static Logic4Vec EvalAnnexDList(const Expr* expr, SimContext& ctx,
                                 Arena& arena) {
-  std::string target = (!expr->args.empty() && expr->args[0])
-                           ? HierarchicalScopeName(expr->args[0])
-                           : ctx.InteractiveScope();
-  ctx.RecordListing(target);
+  if (expr->args.empty() || !expr->args[0]) {
+    ctx.RecordListing(ctx.InteractiveScope());
+    return MakeLogic4VecVal(arena, 1, 0);
+  }
+  std::string name = HierarchicalScopeName(expr->args[0]);
+  if (ctx.IsHierarchicalScope(name)) {
+    ctx.RecordListing(name);
+  } else {
+    ctx.GetDiag().Error(
+        expr->args[0]->range.start,
+        "$list takes the complete hierarchical name of a module, task, "
+        "function, or named block, and '" +
+            name + "' is none",
+        Subclause("D.6"));
+  }
   return MakeLogic4VecVal(arena, 1, 0);
 }
 

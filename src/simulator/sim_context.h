@@ -145,9 +145,9 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   // Optional $list system task (Annex D.6). $list produces a listing of a
   // module, task, function, or named block. With no argument it lists the
   // object that is the current scope setting (the interactive scope above);
-  // with an argument it lists the specific named scope. RecordListing remembers
-  // the complete hierarchical name of the most recently listed scope so the
-  // selection can be observed.
+  // with an argument it lists the specific named scope, one of the registered
+  // names as $scope takes. RecordListing remembers the complete hierarchical
+  // name of the most recently listed scope so the selection can be observed.
   void RecordListing(std::string_view name);
   const std::string& LastListedScope() const { return last_listed_scope_; }
 
