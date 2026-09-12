@@ -105,4 +105,14 @@ void RegisterSpecifyBlockSpecparams(
 uint32_t SpecparamWidth(const DataType& type, const Expr* init,
                         const TypedefMap& typedefs);
 
+// §17.5/§17.7: the rules that govern what a checker body may contain -- no
+// nets, no general `always`, no blocking assignment in an always_ff, only
+// event-controlled timing in an initial procedure, and no design element other
+// than a further checker -- read for each item of a checker's body, and for
+// nothing where `parent_is_checker` is false. Defined in
+// elaborator_items_checker_rules.cpp and called from the item-classification
+// pass in elaborator_items_udp.cpp.
+void CheckCheckerBodyItemRules(const ModuleItem* item, const ModuleDecl* decl,
+                               bool parent_is_checker, DiagEngine& diag);
+
 }  // namespace delta

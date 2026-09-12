@@ -92,6 +92,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     parser/assertion_control_task.cpp
     elaborator/elaborator.cpp
     elaborator/elaborator_items.cpp
+    elaborator/elaborator_items_checker_rules.cpp
     elaborator/elaborator_items_udp.cpp
     elaborator/elaborator_items_scope.cpp
     elaborator/elaborator_items_assertions.cpp
