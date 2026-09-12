@@ -246,35 +246,37 @@ enum class DelayModeDirective : uint8_t {
   kZero,
 };
 
-// Annex E.2 and E.3: the trireg defaults in force where a module was declared,
-// the default decay time and the default charge strength. Each directive
-// applies to the modules that follow it in the source, so the preprocessor
-// records the values in force at each module header under the module's name,
-// and the values reach the declaration by that name once the module is
-// parsed. `decay_ticks` is the decay time as the directive's argument was
-// rounded and `decay_infinite` the state E.2's keyword names, and the state
-// before any directive; `has_strength` is whether a strength directive came
-// before the module and `strength` the last one's value.
-struct ModuleTriregDefaults {
+// Annex E: the compiler directives of the annex in force where a module was
+// declared, E.2's default decay time, E.3's default charge strength and the
+// delay mode of E.4 to E.7. Each directive applies to the modules that follow
+// it in the source, so the preprocessor records the values in force at each
+// module header under the module's name, and the values reach the declaration
+// by that name once the module is parsed. `decay_ticks` is the decay time as
+// the directive's argument was rounded and `decay_infinite` the state E.2's
+// keyword names, and the state before any directive; `has_strength` is whether
+// a strength directive came before the module and `strength` the last one's
+// value; `delay_mode` is the last delay mode directive before the module, or
+// kNone where none came.
+struct ModuleDirectives {
   std::string module;
   uint64_t decay_ticks = 0;
   bool decay_infinite = true;
   uint32_t strength = 0;
   bool has_strength = false;
+  DelayModeDirective delay_mode = DelayModeDirective::kNone;
 };
 
-// Which member of a min:typ:max expression is selected. §11.11 writes the three
-// as "minimum, typical, and maximum values -- in that order", and says "The
-// three values allow a design to be tested with minimum, typical, or maximum
-// delay values", so one of the three is chosen for a whole run rather than per
-// expression.
+// Which member of a min:typ:max expression is selected. §11.11 orders the
+// three as the minimum, the typical and the maximum, and has the three there
+// so a design can be tested under any one of them, so one of the three is
+// chosen for a whole run rather than per expression.
 //
 // This is not DelayModeDirective above, which carries the `delay_mode_path
 // family that Preprocessor::ProcessDelayModeDirective in
 // src/preprocessor/preprocessor_lines.cpp accepts and which selects nothing
 // among three values. §22.1 lists the compiler directives alphabetically and
-// names none of that family, which is why that function reports them under
-// Subclause::None().
+// names none of that family; Annex E.4 to E.7 describe them, and that function
+// reports each under its own subclause there.
 enum class DelayMode : uint8_t { kMin, kTyp, kMax };
 
 enum class NetType : uint8_t {

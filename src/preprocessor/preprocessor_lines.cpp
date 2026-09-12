@@ -53,29 +53,34 @@ void Preprocessor::ResetDirectiveState() {
   delay_mode_directive_ = DelayModeDirective::kNone;
 }
 
+// Annex E.4 to E.7: each of the four delay mode directives selects its mode
+// for the modules that follow it, and each is to come before the declaration
+// of the module it controls, so one inside a design element is reported under
+// the subclause that describes it. The mode is carried per module header by
+// TrackDesignElement.
 bool Preprocessor::ProcessDelayModeDirective(std::string_view line,
                                              SourceLoc loc) {
   if (StartsWithDirective(line, "delay_mode_distributed")) {
     if (RejectInsideDesignElement("delay_mode_distributed", loc,
-                                  Subclause::None()))
+                                  Subclause("E.4")))
       return true;
     delay_mode_directive_ = DelayModeDirective::kDistributed;
     return true;
   }
   if (StartsWithDirective(line, "delay_mode_path")) {
-    if (RejectInsideDesignElement("delay_mode_path", loc, Subclause::None()))
+    if (RejectInsideDesignElement("delay_mode_path", loc, Subclause("E.5")))
       return true;
     delay_mode_directive_ = DelayModeDirective::kPath;
     return true;
   }
   if (StartsWithDirective(line, "delay_mode_unit")) {
-    if (RejectInsideDesignElement("delay_mode_unit", loc, Subclause::None()))
+    if (RejectInsideDesignElement("delay_mode_unit", loc, Subclause("E.6")))
       return true;
     delay_mode_directive_ = DelayModeDirective::kUnit;
     return true;
   }
   if (StartsWithDirective(line, "delay_mode_zero")) {
-    if (RejectInsideDesignElement("delay_mode_zero", loc, Subclause::None()))
+    if (RejectInsideDesignElement("delay_mode_zero", loc, Subclause("E.7")))
       return true;
     delay_mode_directive_ = DelayModeDirective::kZero;
     return true;

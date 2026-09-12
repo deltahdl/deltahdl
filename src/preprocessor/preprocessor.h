@@ -467,11 +467,11 @@ class Preprocessor {
   bool HasTimescale() const { return has_timescale_; }
   NetType DefaultNetType() const { return default_net_type_; }
   bool InCelldefine() const { return in_celldefine_; }
-  // Annex E.2 and E.3: the default decay time and charge strength in force at
-  // each module header the preprocessor passed, under the module's name, in
-  // source order.
-  const std::vector<ModuleTriregDefaults>& ModuleTriregDefaultsList() const {
-    return module_trireg_defaults_;
+  // Annex E: the default decay time, charge strength and delay mode in force
+  // at each module header the preprocessor passed, under the module's name,
+  // in source order.
+  const std::vector<ModuleDirectives>& ModuleDirectivesList() const {
+    return module_directives_;
   }
   const std::vector<std::string>& CellModuleNames() const {
     return cell_module_names_;
@@ -669,7 +669,7 @@ class Preprocessor {
   std::vector<std::string> expansion_stack_;
   uint32_t design_element_depth_ = 0;
   std::vector<std::string> cell_module_names_;
-  std::vector<ModuleTriregDefaults> module_trireg_defaults_;
+  std::vector<ModuleDirectives> module_directives_;
   bool in_block_comment_ = false;
   // A.8.8's triple_quoted_string may span lines, so one left open at a line's
   // end is carried to the next as an open block comment is.

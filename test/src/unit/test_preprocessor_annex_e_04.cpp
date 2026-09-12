@@ -48,11 +48,11 @@ TEST(Preprocessor, DelayModeDistributed_IllegalInsideModule) {
                            "`delay_mode_distributed\n"
                            "endmodule\n");
   pp.Preprocess(fid);
-  // Annex E is informative and states that its directives are not part of
-  // the standard, so the report enforces no subclause of it.
+  // E.4 is where the standard says the directive comes before the module
+  // it controls, so the report names it.
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "`delay_mode_distributed illegal inside a design element", 2, ""));
+      "`delay_mode_distributed illegal inside a design element", 2, "E.4"));
 }
 
 // E4-C3 (shall, boundary): once a module declaration has closed, the design
@@ -70,6 +70,30 @@ TEST(Preprocessor, DelayModeDistributed_LegalBetweenModules) {
   pp.Preprocess(fid);
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_EQ(pp.DelayModeDirective(), DelayModeDirective::kDistributed);
+}
+
+// E.4 has the directive select the mode for the modules that follow it, so
+// the record the preprocessor keeps of the directives in force at each module
+// header carries no mode for a module declared before the directive and the
+// distributed mode for the module declared after it, while the unit-wide
+// query above answers only with the last directive.
+TEST(Preprocessor, DelayModeDistributed_RecordedAtEachModuleHeader) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  auto fid = f.mgr.AddFile("<test>",
+                           "module a;\n"
+                           "endmodule\n"
+                           "`delay_mode_distributed\n"
+                           "module b;\n"
+                           "endmodule\n");
+  pp.Preprocess(fid);
+  EXPECT_FALSE(f.diag.HasErrors());
+  const auto& list = pp.ModuleDirectivesList();
+  ASSERT_EQ(list.size(), 2u);
+  EXPECT_EQ(list[0].module, "a");
+  EXPECT_EQ(list[0].delay_mode, DelayModeDirective::kNone);
+  EXPECT_EQ(list[1].module, "b");
+  EXPECT_EQ(list[1].delay_mode, DelayModeDirective::kDistributed);
 }
 
 }  // namespace

@@ -582,6 +582,9 @@ struct RtlirModule {
   bool is_program = false;
   bool is_interface = false;
   std::vector<ResolvedAttribute> attrs;
+  // Annex E.4 to E.7: the delay mode the last directive before this module
+  // selected, in force where the module was declared or, for a module parsed
+  // without the preprocessor, the compilation unit's.
   DelayModeDirective delay_mode = DelayModeDirective::kNone;
 
   // Annex E.2 and E.3: the default decay time and charge strength for this

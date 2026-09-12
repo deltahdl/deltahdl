@@ -48,11 +48,11 @@ TEST(Preprocessor, DelayModeZero_IllegalInsideModule) {
                            "`delay_mode_zero\n"
                            "endmodule\n");
   pp.Preprocess(fid);
-  // Annex E is informative and states that its directives are not part of
-  // the standard, so the report enforces no subclause of it.
+  // E.7 is where the standard says the directive comes before the module
+  // it controls, so the report names it.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "`delay_mode_zero illegal inside a design element",
-                            2, ""));
+                            2, "E.7"));
 }
 
 // E7-C3 (shall, boundary): once a module declaration has closed, the design

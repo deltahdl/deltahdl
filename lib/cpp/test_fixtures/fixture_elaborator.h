@@ -129,7 +129,7 @@ inline void PropagateDecayAndDelayToCu(CompilationUnit* cu,
   cu->default_decay_time_infinite = preproc.DefaultDecayTimeInfinite();
   cu->default_trireg_strength = preproc.DefaultTriregStrength();
   cu->has_default_trireg_strength = preproc.HasDefaultTriregStrength();
-  ApplyModuleTriregDefaults(cu, preproc.ModuleTriregDefaultsList());
+  ApplyModuleDirectives(cu, preproc.ModuleDirectivesList());
   cu->delay_mode_directive = preproc.DelayModeDirective();
 }
 

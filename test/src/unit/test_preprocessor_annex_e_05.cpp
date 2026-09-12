@@ -48,11 +48,11 @@ TEST(Preprocessor, DelayModePath_IllegalInsideModule) {
                            "`delay_mode_path\n"
                            "endmodule\n");
   pp.Preprocess(fid);
-  // Annex E is informative and states that its directives are not part of
-  // the standard, so the report enforces no subclause of it.
+  // E.5 is where the standard says the directive comes before the module
+  // it controls, so the report names it.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "`delay_mode_path illegal inside a design element",
-                            2, ""));
+                            2, "E.5"));
 }
 
 // E5-C3 (shall, boundary): once a module declaration has closed, the design
