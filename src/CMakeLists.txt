@@ -176,6 +176,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/const_eval_is_constant.cpp
     elaborator/const_eval_builtin_method.cpp
     elaborator/sensitivity.cpp
+    elaborator/design_scopes.cpp
     simulator/driver_update.cpp
     simulator/net.cpp
     simulator/net_strength.cpp

@@ -37,6 +37,14 @@ void SimContext::SetInteractiveScope(std::string_view name) {
   interactive_scope_ = std::string(name);
 }
 
+void SimContext::RegisterHierarchicalScope(std::string_view name) {
+  hierarchical_scopes_.insert(std::string(name));
+}
+
+bool SimContext::IsHierarchicalScope(std::string_view name) const {
+  return hierarchical_scopes_.count(std::string(name)) != 0;
+}
+
 void SimContext::RecordListing(std::string_view name) {
   last_listed_scope_ = std::string(name);
 }

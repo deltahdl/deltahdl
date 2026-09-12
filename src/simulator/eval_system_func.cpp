@@ -552,10 +552,25 @@ static Logic4Vec EvalAnnexDReset(const Expr* expr, SimContext& ctx,
 // as the interactive scope used to identify objects. Its single argument is
 // the complete hierarchical name of a module, task, function, or named block;
 // record that name as the new interactive scope.
+//
+// D.11 has the argument "shall be the complete hierarchical name of a module,
+// task, function, or named block", and the lowerer registered every such name
+// of the design: an argument naming none of them is reported under D.11 and
+// the scope stays where it was, where any text was recorded as the scope.
 static Logic4Vec EvalAnnexDScope(const Expr* expr, SimContext& ctx,
                                  Arena& arena) {
   if (!expr->args.empty() && expr->args[0]) {
-    ctx.SetInteractiveScope(HierarchicalScopeName(expr->args[0]));
+    std::string name = HierarchicalScopeName(expr->args[0]);
+    if (ctx.IsHierarchicalScope(name)) {
+      ctx.SetInteractiveScope(name);
+    } else {
+      ctx.GetDiag().Error(
+          expr->args[0]->range.start,
+          "$scope takes the complete hierarchical name of a module, task, "
+          "function, or named block, and '" +
+              name + "' is none",
+          Subclause("D.11"));
+    }
   }
   return MakeLogic4VecVal(arena, 1, 0);
 }

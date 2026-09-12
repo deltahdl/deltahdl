@@ -14,6 +14,7 @@
 #include "simulator/module_path_delay.h"
 #include "simulator/timing_check_driver.h"
 // CollectExprReads, the walk over the names an expression reads.
+#include "elaborator/design_scopes.h"
 #include "elaborator/global_clocking_sampled_value.h"
 #include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"
@@ -770,6 +771,11 @@ void Lowerer::Lower(const RtlirDesign* design) {
   // it.
   if (!design->top_modules.empty()) {
     ctx_.SetInteractiveScope(design->top_modules.front()->name);
+  }
+  // Annex D.11: the scopes a later $scope may name, each by its complete
+  // hierarchical name.
+  for (const std::string& name : CompleteHierarchicalScopeNames(design)) {
+    ctx_.RegisterHierarchicalScope(name);
   }
   // §20.4.1 / §3.14.3: seed the runtime timescale state read by
   // $timeunit/$timeprecision. The simulation time unit and compilation-unit

@@ -140,6 +140,13 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   void SetInteractiveScope(std::string_view name);
   const std::string& InteractiveScope() const { return interactive_scope_; }
 
+  // Annex D.11: the complete hierarchical names of the design's modules,
+  // tasks, functions and named blocks, registered at lowering from
+  // CompleteHierarchicalScopeNames, which a $scope argument is one of or is
+  // refused.
+  void RegisterHierarchicalScope(std::string_view name);
+  bool IsHierarchicalScope(std::string_view name) const;
+
   // Optional $list system task (Annex D.6). $list produces a listing of a
   // module, task, function, or named block. With no argument it lists the
   // object that is the current scope setting (the interactive scope above);
@@ -818,6 +825,7 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   uint32_t reset_count_ = 0;
   int64_t reset_value_ = 0;
   std::string interactive_scope_;
+  std::unordered_set<std::string> hierarchical_scopes_;
   std::string last_listed_scope_;
   std::string last_shown_scope_;
   bool show_scopes_recursive_ = false;
