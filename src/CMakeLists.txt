@@ -58,6 +58,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     parser/parser_port.cpp
     parser/parser_dpi.cpp
     parser/parser_dpi_validate.cpp
+    parser/parser_aggregate_types.cpp
     parser/parser_declaration.cpp
     parser/parser_types.cpp
     parser/parser_generate.cpp
