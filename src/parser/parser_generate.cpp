@@ -134,6 +134,10 @@ void Parser::ParseGenerateBody(std::vector<ModuleItem*>& body,
 
 void Parser::ParseGenerateRegion(std::vector<ModuleItem*>& items) {
   auto loc = CurrentLoc();
+  // A.1.11's package_item reaches no generate_region, and the region's items
+  // are read into the holder's list where FilterPackageItems reports each by
+  // its kind, so the region itself is reported here.
+  RejectInPackageBody("a generate region is not an item of a package");
   Expect(TokenKind::kKwGenerate, Subclause("27.3"));
 
   if (in_generate_region_) {

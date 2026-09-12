@@ -502,4 +502,162 @@ TEST(PackageItemsParsing, ErrorSpecparamInPackageIsRejected) {
       HasItemOfKind(r.cu->packages[0]->items, ModuleItemKind::kVarDecl));
 }
 
+// ---------------------------------------------------------------------------
+// package_item admits what A.1.11 lists and nothing A.1.4's module body
+// reaches beyond it. Each item below was accepted in a package body silently
+// and recorded as an item of the package; each is now reported under A.1.11 at
+// the item and dropped, so that the package declares nothing the source could
+// not legally declare in it. The items §26.2 names as processes stay the
+// elaborator's to report.
+// ---------------------------------------------------------------------------
+
+TEST(PackageItemsParsing, ErrorModuleItemsInPackageAreRejected) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  assign a = b;\n"
+      "  for (genvar i = 0; i < 2; i++) begin end\n"
+      "  if (1) begin end\n"
+      "  case (1) default: begin end endcase\n"
+      "  sub u0();\n"
+      "  and g0(o, a, b);\n"
+      "  defparam u0.p = 1;\n"
+      "  alias a = b;\n"
+      "  assert property (@(posedge clk) a);\n"
+      "  assume property (@(posedge clk) a);\n"
+      "  cover property (@(posedge clk) a);\n"
+      "  cover sequence (@(posedge clk) a);\n"
+      "  restrict property (@(posedge clk) a);\n"
+      "  $error(\"x\");\n"
+      "  default disable iff rst;\n"
+      "  module m; endmodule\n"
+      "  genvar j;\n"
+      "  int x;\n"
+      "endpackage\n");
+  const auto& d = r.diags;
+  EXPECT_TRUE(ReportedError(
+      d, "a continuous assignment is not an item of a package", 2, "A.1.11"));
+  EXPECT_TRUE(ReportedError(
+      d, "a generate construct is not an item of a package", 3, "A.1.11"));
+  EXPECT_TRUE(ReportedError(
+      d, "a generate construct is not an item of a package", 4, "A.1.11"));
+  EXPECT_TRUE(ReportedError(
+      d, "a generate construct is not an item of a package", 5, "A.1.11"));
+  EXPECT_TRUE(ReportedError(d, "an instantiation is not an item of a package",
+                            6, "A.1.11"));
+  EXPECT_TRUE(ReportedError(
+      d, "a primitive instantiation is not an item of a package", 7, "A.1.11"));
+  EXPECT_TRUE(ReportedError(
+      d, "a defparam statement is not an item of a package", 8, "A.1.11"));
+  EXPECT_TRUE(
+      ReportedError(d, "a net alias is not an item of a package", 9, "A.1.11"));
+  for (int line = 10; line <= 14; ++line) {
+    EXPECT_TRUE(
+        ReportedError(d, "an assertion statement is not an item of a package",
+                      line, "A.1.11"))
+        << line;
+  }
+  EXPECT_TRUE(
+      ReportedError(d, "an elaboration system task is not an item of a package",
+                    15, "A.1.11"));
+  EXPECT_TRUE(ReportedError(
+      d, "a default disable iff declaration is not an item of a package", 16,
+      "A.1.11"));
+  EXPECT_TRUE(ReportedError(
+      d,
+      "a module, interface or program declaration is not an item of a "
+      "package",
+      17, "A.1.11"));
+  EXPECT_TRUE(ReportedError(
+      d, "a genvar declaration is not an item of a package", 18, "A.1.11"));
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+  // The one item the list admits is the one kept.
+  ASSERT_EQ(r.cu->packages[0]->items.size(), 1u);
+  EXPECT_EQ(r.cu->packages[0]->items[0]->kind, ModuleItemKind::kVarDecl);
+  EXPECT_EQ(r.cu->packages[0]->items[0]->name, "x");
+}
+
+// A UDP instance is told from a module instance by the primitive's
+// declaration, and is reported as the gate instance is.
+TEST(PackageItemsParsing, ErrorUdpInstanceInPackageIsRejected) {
+  auto r = Parse(
+      "primitive inv(output out, input in);\n"
+      "  table 0 : 1; 1 : 0; endtable\n"
+      "endprimitive\n"
+      "package pkg;\n"
+      "  inv u1(a, b);\n"
+      "endpackage\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a primitive instantiation is not an item of a package", 5,
+      "A.1.11"));
+}
+
+// checker_declaration is the one design element the list admits; the package
+// keeps it where it drops a module.
+TEST(PackageItemsParsing, CheckerDeclarationInPackageIsKept) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  checker chk(input logic a);\n"
+      "  endchecker\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+  EXPECT_TRUE(HasItemOfKind(r.cu->packages[0]->items,
+                            ModuleItemKind::kNestedModuleDecl));
+}
+
+// A bind_directive is kept on the design element being read and a package is
+// none, so one in a package was dropped with nothing said; a generate_region
+// reads its items into the package's list, so the region itself is what is
+// reported; and a port_declaration was reported as an unexpected token of a
+// module body under §23.2.4.
+TEST(PackageItemsParsing, ErrorBindGenerateRegionAndPortDeclInPackage) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  bind m chk c();\n"
+      "  generate\n"
+      "    int y;\n"
+      "  endgenerate\n"
+      "  input clk;\n"
+      "  int x;\n"
+      "endpackage\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a bind directive is not an item of a package", 2, "A.1.11"));
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a generate region is not an item of a package", 3, "A.1.11"));
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a port declaration is not an item of a package", 6, "A.1.11"));
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->packages[0]->items, ModuleItemKind::kVarDecl));
+}
+
+// The items of a checker declared in the package are the checker's, read under
+// A.1.8's checker_or_generate_item, and an anonymous program's are held to
+// anonymous_program_item by FilterAnonymousProgramItems: neither body is the
+// package's, so a continuous assignment in the checker draws no A.1.11 report
+// and one in the anonymous program draws that filter's alone.
+TEST(PackageItemsParsing, NestedBodiesAreNotThePackageBody) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  checker chk(input logic a);\n"
+      "    assign b = a;\n"
+      "  endchecker\n"
+      "  program;\n"
+      "    assign c = d;\n"
+      "  endprogram\n"
+      "endpackage\n");
+  EXPECT_FALSE(ReportedError(
+      r.diags, "a continuous assignment is not an item of a package", 3,
+      "A.1.11"));
+  EXPECT_FALSE(ReportedError(
+      r.diags, "a continuous assignment is not an item of a package", 6,
+      "A.1.11"));
+  EXPECT_TRUE(ReportedError(
+      r.diags, "an anonymous program may contain only task, function, class", 6,
+      "A.1.11"));
+}
+
 }  // namespace

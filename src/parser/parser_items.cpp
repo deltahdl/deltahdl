@@ -405,6 +405,7 @@ bool Parser::TryParseMiscKeywordItem(std::vector<ModuleItem*>& items) {
     RejectInCheckerBody("a bind directive is not an item of a checker");
     RejectInProgramBody(CurrentLoc(),
                         "a bind directive is not an item of a program");
+    RejectInPackageBody("a bind directive is not an item of a package");
     auto* bd = ParseBindDirective();
     if (current_module_) current_module_->bind_directives.push_back(bd);
     return true;

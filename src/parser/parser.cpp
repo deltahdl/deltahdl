@@ -872,7 +872,9 @@ PackageDecl* Parser::ParsePackageDecl() {
       continue;
     }
     if (!TryParsePackageBodyItem(pkg->items)) {
+      size_t before = pkg->items.size();
       ParseModuleItem(pkg->items);
+      FilterPackageItems(pkg->items, before);
     }
   }
   --package_body_depth_;

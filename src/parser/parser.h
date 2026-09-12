@@ -123,6 +123,8 @@ class Parser {
   bool TryParseDeclKeywordItem(std::vector<ModuleItem*>& items);
   void RejectInCheckerBody(const char* msg);
   void RejectInProgramBody(SourceLoc loc, const char* msg);
+  void RejectInPackageBody(const char* msg);
+  void FilterPackageItems(std::vector<ModuleItem*>& items, size_t before);
   bool TryRejectBodyPortDecl();
   bool TryParseSpecifyItem(std::vector<ModuleItem*>& items);
   ModuleItem* ParseExternTfDeclaration(SourceLoc extern_loc);
@@ -834,6 +836,14 @@ class Parser {
   bool InCheckerBody() const {
     return current_module_ &&
            current_module_->decl_kind == ModuleDeclKind::kChecker;
+  }
+  // True while a package's own items are read: not a design element declared
+  // inside the package, whose body is that element's, and not an anonymous
+  // program in it, which FilterAnonymousProgramItems in parser.cpp holds to
+  // A.1.11's anonymous_program_item.
+  bool InPackageBody() const {
+    return current_package_ != nullptr && current_module_ == nullptr &&
+           !in_anonymous_program_;
   }
 
   int generate_block_depth_ = 0;

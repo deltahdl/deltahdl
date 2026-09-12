@@ -8,6 +8,7 @@
 // are the reports, gathered here from parser_items.cpp to keep both files
 // inside the limit assert-no-oversized-source-files enforces.
 
+#include <cstddef>
 #include <string_view>
 #include <vector>
 
@@ -59,6 +60,96 @@ void Parser::RejectInProgramBody(SourceLoc loc, const char* msg) {
   diag_.Error(loc, msg, Subclause("A.1.7"));
 }
 
+// A.1.11's package_item is a package_or_generate_item_declaration, an
+// anonymous_program, a package_export_declaration or a timeunits_declaration,
+// and package_or_generate_item_declaration is a net_declaration, a
+// data_declaration, a task_declaration, a function_declaration, a
+// checker_declaration, a dpi_import_export, an extern_constraint_declaration,
+// a class_declaration, an interface_class_declaration, a
+// class_constructor_declaration, a local_parameter_declaration, a
+// parameter_declaration, a covergroup_declaration, an
+// assertion_item_declaration or ';'. §26.2 has the same in prose: "items
+// within packages are generally type definitions, tasks, and functions", with
+// "parameters, variables, and nets" beside them. The parser reads a package
+// body through the dispatch every body shares, so an item A.1.4's module
+// body reaches beyond that list is reported here under A.1.11. Two are
+// reported where they are read, because neither reaches the items a package
+// records: a bind_directive is kept on the design element being read and a
+// package is none, and a generate_region's items are read into the region's
+// holder. A port_declaration is reported from TryRejectBodyPortDecl. The rest
+// are reported from FilterPackageItems, by the kind each was recorded with.
+void Parser::RejectInPackageBody(const char* msg) {
+  if (!InPackageBody()) return;
+  diag_.Error(CurrentLoc(), msg, Subclause("A.1.11"));
+}
+
+// The report FilterPackageItems makes on an item of this kind, or nullptr
+// where A.1.11 admits the kind. The three structured procedures are left out:
+// the elaborator reports those under §26.2, "variable declaration assignments
+// within the package shall occur before any initial or always procedures are
+// started", and reads them to do so. A clocking block, a specparam and an
+// extern prototype are reported under §14.7, §6.20.5 and A.1.6 where each is
+// read. A checker_declaration is the one design element the list admits, and
+// a genvar_declaration is recorded as a variable it does not.
+static const char* PackageItemRejection(const ModuleItem& item) {
+  switch (item.kind) {
+    case ModuleItemKind::kContAssign:
+      return "a continuous assignment is not an item of a package";
+    case ModuleItemKind::kGenerateFor:
+    case ModuleItemKind::kGenerateIf:
+    case ModuleItemKind::kGenerateCase:
+      return "a generate construct is not an item of a package";
+    case ModuleItemKind::kModuleInst:
+      return "an instantiation is not an item of a package";
+    case ModuleItemKind::kGateInst:
+    case ModuleItemKind::kUdpInst:
+      return "a primitive instantiation is not an item of a package";
+    case ModuleItemKind::kDefparam:
+      return "a defparam statement is not an item of a package";
+    case ModuleItemKind::kAlias:
+      return "a net alias is not an item of a package";
+    case ModuleItemKind::kAssertProperty:
+    case ModuleItemKind::kAssumeProperty:
+    case ModuleItemKind::kCoverProperty:
+    case ModuleItemKind::kCoverSequence:
+    case ModuleItemKind::kRestrictProperty:
+      return "an assertion statement is not an item of a package; a package "
+             "holds property, sequence and let declarations";
+    case ModuleItemKind::kElabSystemTask:
+      return "an elaboration system task is not an item of a package";
+    case ModuleItemKind::kDefaultDisableIff:
+      return "a default disable iff declaration is not an item of a package";
+    case ModuleItemKind::kNestedModuleDecl:
+      return item.nested_module_decl->decl_kind == ModuleDeclKind::kChecker
+                 ? nullptr
+                 : "a module, interface or program declaration is not an "
+                   "item of a package";
+    case ModuleItemKind::kVarDecl:
+      return item.is_genvar ? "a genvar declaration is not an item of a package"
+                            : nullptr;
+    default:
+      return nullptr;
+  }
+}
+
+// Reports every item Parser::ParseModuleItem appended to `items` at or after
+// `before` that A.1.11 does not admit in a package, and drops it, so that the
+// package declares nothing the source could not legally declare in it.
+void Parser::FilterPackageItems(std::vector<ModuleItem*>& items,
+                                size_t before) {
+  size_t kept = before;
+  for (size_t i = before; i < items.size(); ++i) {
+    ModuleItem* item = items[i];
+    const char* rejection = PackageItemRejection(*item);
+    if (rejection != nullptr) {
+      diag_.Error(item->loc, rejection, Subclause("A.1.11"));
+      continue;
+    }
+    items[kept++] = item;
+  }
+  items.resize(kept);
+}
+
 // A port declaration standing where an item was due. §27.2: a generate block
 // may not contain port declarations. Top-level non-ANSI port declarations are
 // consumed directly in ParseModuleBody, so a leading port direction reaching
@@ -79,6 +170,11 @@ bool Parser::TryRejectBodyPortDecl() {
                 "a port declaration is not an item of a checker; its formal "
                 "arguments are declared in its port list",
                 Subclause("A.1.8"));
+  } else if (InPackageBody()) {
+    diag_.Error(CurrentLoc(),
+                "a port declaration is not an item of a package; a package "
+                "has no ports",
+                Subclause("A.1.11"));
   } else {
     return false;
   }
