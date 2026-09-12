@@ -310,6 +310,50 @@ struct ParserPortHelpers {
     }
   }
 
+  // The three keyword forms of A.1.8's property_formal_type, `sequence`,
+  // `untyped` and `property`, which a checker_port_item may carry where a
+  // module's port carries a data type. Consumes the keyword and records it
+  // when the port opens with one; otherwise leaves the lexer untouched and
+  // returns false so the caller parses a data type.
+  static bool TryParseKeywordFormalType(Parser& p, PortDecl& port) {
+    switch (p.CurrentToken().kind) {
+      case TokenKind::kKwSequence:
+        port.formal_type = PropertyFormalType::kSequence;
+        break;
+      case TokenKind::kKwUntyped:
+        port.formal_type = PropertyFormalType::kUntyped;
+        break;
+      case TokenKind::kKwProperty:
+        port.formal_type = PropertyFormalType::kProperty;
+        break;
+      default:
+        return false;
+    }
+    p.Consume();
+    return true;
+  }
+
+  // The data type of an ANSI port and what may trail it: a modport after a
+  // named type, or one packed dimension after an implicit type.
+  static void ParseTypedPortHead(Parser& p, PortDecl& port, Direction dir) {
+    ParsePortType(p, port, dir);
+
+    if (port.data_type.kind == DataTypeKind::kNamed &&
+        p.Check(TokenKind::kDot)) {
+      p.Consume();
+      port.data_type.modport_name = p.ExpectIdentifier(Subclause("25.5")).text;
+    }
+
+    if (port.data_type.kind == DataTypeKind::kImplicit &&
+        !port.data_type.packed_dim_left && p.Check(TokenKind::kLBracket)) {
+      p.Consume();
+      port.data_type.packed_dim_left = p.ParseExpr();
+      p.Expect(TokenKind::kColon, Subclause("23.2.2.3"));
+      port.data_type.packed_dim_right = p.ParseExpr();
+      p.Expect(TokenKind::kRBracket, Subclause("23.2.2.3"));
+    }
+  }
+
   // After a comma in an ANSI port list, a bare identifier (with no preceding
   // type) continues the previous port's type/direction. Returns true and
   // appends the port when this form is matched; otherwise leaves the lexer
@@ -337,6 +381,7 @@ struct ParserPortHelpers {
     if (!prev.is_explicit_named) {
       port.direction = prev.direction;
       port.data_type = prev.data_type;
+      port.formal_type = prev.formal_type;
     } else {
       ResolvePortDefaults(port, &prev, is_checker);
     }
@@ -533,21 +578,67 @@ static void InferImplicitNetForPort(PortDecl& port) {
   }
 }
 
-// §17.2: the type of a checker output argument shall not be untyped (the
-// sequence and property type forms are already rejected while the port type is
-// parsed). `type_omitted` records whether the port had no explicit data type
-// before defaults were applied; an output whose type was omitted is untyped and
-// therefore illegal.
-static void DiagnoseUntypedCheckerOutput(const PortDecl& port,
-                                         bool type_omitted, bool is_checker,
-                                         DiagEngine& diag) {
-  if (is_checker && type_omitted && port.direction == Direction::kOutput) {
+// Whether a checker formal was written with no type at all: A.1.8's
+// property_formal_type reaches data_type_or_implicit, and an implicit type
+// with a signing or a packed dimension is still a type written.
+static bool FormalTypeOmitted(const PortDecl& port) {
+  return port.formal_type == PropertyFormalType::kData &&
+         port.data_type.kind == DataTypeKind::kImplicit &&
+         !port.data_type.is_signed && !port.data_type.packed_dim_left;
+}
+
+// The keyword a formal's property_formal_type was written with.
+static const char* FormalTypeKeyword(PropertyFormalType type) {
+  switch (type) {
+    case PropertyFormalType::kSequence:
+      return "sequence";
+    case PropertyFormalType::kUntyped:
+      return "untyped";
+    case PropertyFormalType::kProperty:
+      return "property";
+    default:
+      return "";
+  }
+}
+
+// §17.2's two rules on the type of a checker formal: "if the argument has an
+// explicit direction qualifier, it shall be an error to omit its type", and
+// "the type of an output argument shall not be of untyped, sequence, or
+// property". `type_omitted` and `direction_written` record the port as it was
+// written, before ResolvePortDefaults gave it the direction and type it
+// inherits, since inheriting is what an omitted type and direction do. A
+// formal that omits its type with a direction written breaks the first rule
+// whichever direction it is, so an output written `output a` is reported once,
+// under that rule; the second is left the output written with one of the
+// three keywords, or inheriting one.
+static void DiagnoseCheckerFormalType(const PortDecl& port, bool type_omitted,
+                                      bool direction_written, bool is_checker,
+                                      DiagEngine& diag) {
+  if (!is_checker) return;
+  if (type_omitted && direction_written) {
     diag.Error(port.loc,
-               std::format("checker output formal '{}' shall have a type; an "
-                           "output argument cannot be untyped",
+               std::format("checker formal '{}' has an explicit direction, so "
+                           "its type shall not be omitted",
                            port.name),
                Subclause("17.2"));
+    return;
   }
+  if (port.direction == Direction::kOutput &&
+      port.formal_type != PropertyFormalType::kData) {
+    diag.Error(port.loc,
+               std::format("the type of checker output formal '{}' shall not "
+                           "be '{}'",
+                           port.name, FormalTypeKeyword(port.formal_type)),
+               Subclause("17.2"));
+  }
+}
+
+// §17.2: when a checker formal argument omits its direction, the direction of
+// the previous formal is inferred; the first formal defaults to input.
+// Module-style ports instead default to inout when no prior direction exists.
+static Direction InheritedPortDirection(const PortDecl* prev, bool is_checker) {
+  if (prev) return prev->direction;
+  return is_checker ? Direction::kInput : Direction::kInout;
 }
 
 static void ResolvePortDefaults(PortDecl& port, const PortDecl* prev,
@@ -563,13 +654,17 @@ static void ResolvePortDefaults(PortDecl& port, const PortDecl* prev,
     return;
   }
 
-  // §17.2: when a checker formal argument omits its direction, the direction
-  // of the previous formal is inferred; the first formal defaults to input.
-  // Module-style ports instead default to inout when no prior direction exists.
-  if (port.direction == Direction::kNone)
-    port.direction = prev
-                         ? prev->direction
-                         : (is_checker ? Direction::kInput : Direction::kInout);
+  if (port.direction == Direction::kNone) {
+    port.direction = InheritedPortDirection(prev, is_checker);
+  }
+
+  // §17.2: a checker's first formal with its type omitted "is assumed to be
+  // input untyped", and a formal of one of the keyword types has no data type
+  // to resolve.
+  if (is_checker && !prev && FormalTypeOmitted(port)) {
+    port.formal_type = PropertyFormalType::kUntyped;
+  }
+  if (port.formal_type != PropertyFormalType::kData) return;
 
   InferImplicitNetForPort(port);
 
@@ -591,23 +686,19 @@ void Parser::ParsePortList(ModuleDecl& mod) {
     return;
   }
 
-  if (Check(TokenKind::kDot) || Check(TokenKind::kLBrace)) {
-    ParseNonAnsiPortList(mod);
-    return;
-  }
-
-  if (ParserPortHelpers::LooksLikeNonAnsiPortList(*this)) {
-    ParseNonAnsiPortList(mod);
-    return;
-  }
-
+  // A.1.3's list_of_ports, the non-ANSI form, is a module's, an interface's
+  // and a program's: A.1.8's checker_port_list is checker_port_item alone,
+  // whose formal_port_identifier follows a property_formal_type that may be
+  // implicit, so `checker c(a, b)` names two formals of the type §17.2 infers
+  // rather than two ports declared in the body.
   const bool kIsChecker = mod.decl_kind == ModuleDeclKind::kChecker;
-  mod.ports.push_back(ParsePortDecl());
-  bool type_omitted =
-      mod.ports.back().data_type.kind == DataTypeKind::kImplicit;
-  ResolvePortDefaults(mod.ports.back(), nullptr, kIsChecker);
-  DiagnoseUntypedCheckerOutput(mod.ports.back(), type_omitted, kIsChecker,
-                               diag_);
+  if (!kIsChecker && (Check(TokenKind::kDot) || Check(TokenKind::kLBrace) ||
+                      ParserPortHelpers::LooksLikeNonAnsiPortList(*this))) {
+    ParseNonAnsiPortList(mod);
+    return;
+  }
+
+  ParseOnePortOfList(mod, nullptr, kIsChecker);
   while (Match(TokenKind::kComma)) {
     PortDecl prev = mod.ports.back();
 
@@ -615,13 +706,33 @@ void Parser::ParsePortList(ModuleDecl& mod) {
                                                         kIsChecker)) {
       continue;
     }
-    mod.ports.push_back(ParsePortDecl());
-    type_omitted = mod.ports.back().data_type.kind == DataTypeKind::kImplicit;
-    ResolvePortDefaults(mod.ports.back(), &prev, kIsChecker);
-    DiagnoseUntypedCheckerOutput(mod.ports.back(), type_omitted, kIsChecker,
-                                 diag_);
+    ParseOnePortOfList(mod, &prev, kIsChecker);
   }
   Expect(TokenKind::kRParen, Subclause("23.2.2.2"));
+}
+
+// One port of an ANSI port list, read, given the direction and type it
+// inherits from `prev`, and checked as a checker's formal when the list is a
+// checker's. A.1.8's checker_port_item names its formal with an identifier
+// alone, where A.1.3's ansi_port_declaration also admits `. port_identifier
+// ( [ expression ] )`, so a checker formal written that way is reported.
+void Parser::ParseOnePortOfList(ModuleDecl& mod, const PortDecl* prev,
+                                bool is_checker) {
+  mod.ports.push_back(ParsePortDecl());
+  PortDecl& port = mod.ports.back();
+  if (is_checker && port.is_explicit_named) {
+    diag_.Error(port.loc,
+                std::format("checker formal '{}' is named by an identifier "
+                            "alone; a checker_port_item has no '.name(...)' "
+                            "form",
+                            port.name),
+                Subclause("A.1.8"));
+  }
+  bool type_omitted = FormalTypeOmitted(port);
+  bool direction_written = port.direction != Direction::kNone;
+  ResolvePortDefaults(port, prev, is_checker);
+  DiagnoseCheckerFormalType(port, type_omitted, direction_written, is_checker,
+                            diag_);
 }
 
 void Parser::ParseNonAnsiPortList(ModuleDecl& mod) {
@@ -674,20 +785,8 @@ PortDecl Parser::ParsePortDecl() {
     }
   }
 
-  ParserPortHelpers::ParsePortType(*this, port, dir);
-
-  if (port.data_type.kind == DataTypeKind::kNamed && Check(TokenKind::kDot)) {
-    Consume();
-    port.data_type.modport_name = ExpectIdentifier(Subclause("25.5")).text;
-  }
-
-  if (port.data_type.kind == DataTypeKind::kImplicit &&
-      !port.data_type.packed_dim_left && Check(TokenKind::kLBracket)) {
-    Consume();
-    port.data_type.packed_dim_left = ParseExpr();
-    Expect(TokenKind::kColon, Subclause("23.2.2.3"));
-    port.data_type.packed_dim_right = ParseExpr();
-    Expect(TokenKind::kRBracket, Subclause("23.2.2.3"));
+  if (!ParserPortHelpers::TryParseKeywordFormalType(*this, port)) {
+    ParserPortHelpers::ParseTypedPortHead(*this, port, dir);
   }
 
   auto name_tok = ExpectIdentifier(Subclause("23.2.2.2"));

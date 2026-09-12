@@ -30,7 +30,7 @@ TEST(ClockingScopeElab, ClockingInProgramElaborates) {
 TEST(ClockingScopeElab, ClockingInCheckerElaborates) {
   ElabFixture f;
   ElaborateSrc(
-      "checker chk(input clk, input data);\n"
+      "checker chk(input logic clk, input logic data);\n"
       "  clocking cb @(posedge clk);\n"
       "    input data;\n"
       "  endclocking\n"

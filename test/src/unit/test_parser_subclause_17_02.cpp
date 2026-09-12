@@ -296,14 +296,87 @@ TEST(CheckerDeclaration, InputPortDefaultValueParses) {
   EXPECT_NE(r.cu->checkers[0]->ports[0].default_value, nullptr);
 }
 
-// §17.2: the type of a checker output argument shall not be untyped. An output
-// formal that omits its type is rejected (the counterpart accept path is
-// covered by the typed-output tests above).
+// §17.2: "if the argument has an explicit direction qualifier, it shall be an
+// error to omit its type". An output formal that omits its type breaks that
+// rule before the one on untyped outputs, and is reported under it (the
+// counterpart accept path is covered by the typed-output tests above).
 TEST(CheckerDeclaration, UntypedOutputFormalIsError) {
   auto r = Parse("checker c(output a); endchecker\n");
   ASSERT_NE(r.cu, nullptr);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "checker formal 'a' has an explicit direction, so "
+                            "its type shall not be omitted",
+                            1, "17.2"));
+}
+
+// The same rule reaches an input formal: `input clk` omits the type that the
+// direction written on it requires.
+TEST(CheckerDeclaration, DirectedInputFormalWithoutTypeIsError) {
+  auto r = Parse("checker c(input logic clk, input a); endchecker\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "checker formal 'a' has an explicit direction, so "
+                            "its type shall not be omitted",
+                            1, "17.2"));
+}
+
+// A signing or a packed dimension written alone is a type written: A.1.8's
+// property_formal_type reaches data_type_or_implicit, whose implicit form
+// §6.8 spells `[ signing ] { packed_dimension }`.
+TEST(CheckerDeclaration, DirectedFormalWithImplicitTypeIsAccepted) {
+  auto r = Parse("checker c(input [3:0] a, output signed b); endchecker\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// §17.2: "if the argument is the first argument of the checker, it is assumed
+// to be input untyped" when its type is omitted, and a later formal with
+// neither direction nor type takes both from the one before it.
+TEST(CheckerDeclaration, FirstFormalWithoutTypeIsInputUntyped) {
+  auto r = Parse("checker c(a, b); endchecker\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->checkers.size(), 1u);
+  ASSERT_EQ(r.cu->checkers[0]->ports.size(), 2u);
+  EXPECT_FALSE(r.cu->checkers[0]->is_non_ansi_ports);
+  EXPECT_EQ(r.cu->checkers[0]->ports[0].direction, Direction::kInput);
+  EXPECT_EQ(r.cu->checkers[0]->ports[0].formal_type,
+            PropertyFormalType::kUntyped);
+  EXPECT_EQ(r.cu->checkers[0]->ports[1].name, "b");
+  EXPECT_EQ(r.cu->checkers[0]->ports[1].direction, Direction::kInput);
+  EXPECT_EQ(r.cu->checkers[0]->ports[1].formal_type,
+            PropertyFormalType::kUntyped);
+}
+
+// §17.2: "the type of an output argument shall not be of untyped, sequence,
+// or property"; the same three keyword types are the input formals' to take.
+TEST(CheckerDeclaration, OutputFormalOfKeywordTypeIsError) {
+  auto r = Parse(
+      "checker c(output sequence s, input bit x, untyped u, property p, "
+      "output q);\n"
+      "endchecker\n");
+  ASSERT_NE(r.cu, nullptr);
   EXPECT_TRUE(ReportedError(
-      r.diags, "checker output formal 'a' shall have a type", 1, "17.2"));
+      r.diags, "the type of checker output formal 's' shall not be 'sequence'",
+      1, "17.2"));
+  EXPECT_FALSE(ReportedError(r.diags, "the type of checker output formal 'u'",
+                             1, "17.2"));
+  EXPECT_FALSE(ReportedError(r.diags, "the type of checker output formal 'p'",
+                             1, "17.2"));
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "checker formal 'q' has an explicit direction, so "
+                            "its type shall not be omitted",
+                            1, "17.2"));
+}
+
+// The direction the rule reads is the one the formal has, inherited from the
+// formal before it when none is written on it.
+TEST(CheckerDeclaration, OutputFormalInheritingDirectionOfKeywordTypeIsError) {
+  auto r = Parse("checker c(output bit x, untyped u); endchecker\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "the type of checker output formal 'u' shall not be 'untyped'",
+      1, "17.2"));
 }
 
 // §17.2: an output formal that carries a type is accepted, confirming the

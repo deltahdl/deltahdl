@@ -162,7 +162,7 @@ TEST(GlobalClockingElab, DuplicateGlobalClockingInProgramErrors) {
 TEST(GlobalClockingElab, DuplicateGlobalClockingInCheckerErrors) {
   ElabFixture f;
   ElaborateSrc(
-      "checker chk(input clk1, input clk2);\n"
+      "checker chk(input logic clk1, input logic clk2);\n"
       "  global clocking gc1 @(posedge clk1); endclocking\n"
       "  global clocking gc2 @(posedge clk2); endclocking\n"
       "endchecker\n",

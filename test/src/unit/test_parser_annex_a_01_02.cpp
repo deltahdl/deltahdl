@@ -28,7 +28,7 @@ TEST(SourceText, EmptyCuCompletelyEmpty) {
 
 TEST(SourceText, CheckerDecl) {
   auto r = Parse(
-      "checker my_chk(input clk, input rst);\n"
+      "checker my_chk(input logic clk, input logic rst);\n"
       "endchecker\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);

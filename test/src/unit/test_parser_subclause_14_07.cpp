@@ -36,7 +36,7 @@ TEST(ClockingScopeParse, AmongOtherModuleItems) {
 
 TEST(ClockingScopeParse, InChecker) {
   EXPECT_TRUE(
-      ParseOk("checker my_check(input clk, input data);\n"
+      ParseOk("checker my_check(input logic clk, input logic data);\n"
               "  clocking cb @(posedge clk);\n"
               "    input data;\n"
               "  endclocking\n"

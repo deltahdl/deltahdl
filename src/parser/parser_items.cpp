@@ -169,6 +169,61 @@ void ApplyAssertionLabel(std::vector<ModuleItem*>& items, size_t before,
 
 }  // namespace
 
+// A.1.8's checker_or_generate_item lists what a checker body holds: a
+// checker_or_generate_item_declaration, which is a `[ rand ]`
+// data_declaration, a function_declaration, a checker_declaration, an
+// assertion_item_declaration, a covergroup_declaration, a
+// genvar_declaration, a clocking_declaration, `default clocking`, `default
+// disable iff` or ';'; an initial_construct, an always_construct, a
+// final_construct, an assertion_item, a continuous_assign or a
+// checker_generate_item. The bodies A.1.4, A.1.6, A.1.7 and A.1.11 give a
+// module, an interface, a program and a package reach more through
+// module_or_generate_item_declaration and module_common_item -- a
+// task_declaration, a class_declaration, a parameter_declaration, a
+// parameter_override, a net_alias, a bind_directive, a gate_instantiation and
+// a timeunits_declaration among them -- and the parser reads every body
+// through the same dispatch. So an item on that wider list is reported here
+// under A.1.8, at the token that opens it, when the body being read is a
+// checker's; the item is still read, so that the body resumes after it. §17.2
+// says the same of the design elements in prose, "modules, interfaces,
+// programs, and packages shall not be declared inside checkers", and the
+// elaborator reports those with the nets §17.7 refuses.
+void Parser::RejectInCheckerBody(const char* msg) {
+  if (!InCheckerBody()) return;
+  diag_.Error(CurrentLoc(), msg, Subclause("A.1.8"));
+}
+
+// A port declaration standing where an item was due. §27.2: a generate block
+// may not contain port declarations. Top-level non-ANSI port declarations are
+// consumed directly in ParseModuleBody, so a leading port direction reaching
+// a generate-block item is always an illegal non-ANSI port declaration. A
+// checker body admits none either: A.1.8's checker_or_generate_item has no
+// port_declaration, where A.1.4's module_item opens with `port_declaration
+// ;`, and a checker's formals are the checker_port_list alone. Either is
+// reported and the declaration skipped to its ';', so the body resumes after
+// it; returns whether one was found.
+bool Parser::TryRejectBodyPortDecl() {
+  if (!IsPortDirection(CurrentToken().kind)) return false;
+  if (InGenerateBlock()) {
+    diag_.Error(CurrentLoc(),
+                "port declaration not allowed inside a generate block",
+                Subclause("27.2"));
+  } else if (InCheckerBody()) {
+    diag_.Error(CurrentLoc(),
+                "a port declaration is not an item of a checker; its formal "
+                "arguments are declared in its port list",
+                Subclause("A.1.8"));
+  } else {
+    return false;
+  }
+  while (!Check(TokenKind::kSemicolon) && !Check(TokenKind::kKwEnd) &&
+         !AtEnd()) {
+    Consume();
+  }
+  Match(TokenKind::kSemicolon);
+  return true;
+}
+
 // A specify block and a specparam declaration are items of a module body
 // alone: A.1.4's non_port_module_item admits specify_block and
 // specparam_declaration, and the bodies A.1.6, A.1.7 and A.1.8 give an
@@ -330,6 +385,9 @@ bool Parser::TryParseDeclKeywordItem(std::vector<ModuleItem*>& items) {
     return true;
   }
   if (Check(TokenKind::kKwTask)) {
+    RejectInCheckerBody(
+        "a task declaration is not an item of a checker; a checker's "
+        "subroutine is a function");
     items.push_back(ParseTaskDecl());
     return true;
   }
@@ -416,6 +474,7 @@ bool Parser::TryParseMiscKeywordItem(std::vector<ModuleItem*>& items) {
   }
   if (TryParseProcessBlock(items)) return true;
   if (Check(TokenKind::kKwAlias)) {
+    RejectInCheckerBody("a net alias is not an item of a checker");
     items.push_back(ParseAlias());
     return true;
   }
@@ -424,6 +483,9 @@ bool Parser::TryParseMiscKeywordItem(std::vector<ModuleItem*>& items) {
     return true;
   }
   if (IsTimeunitKeyword(CurrentToken().kind)) {
+    RejectInCheckerBody(
+        "a timeunit or timeprecision declaration is not an item of a "
+        "checker; a checker sets no time scope");
     parse_timeunit();
     return true;
   }
@@ -436,6 +498,7 @@ bool Parser::TryParseMiscKeywordItem(std::vector<ModuleItem*>& items) {
     return true;
   }
   if (Check(TokenKind::kKwBind)) {
+    RejectInCheckerBody("a bind directive is not an item of a checker");
     auto* bd = ParseBindDirective();
     if (current_module_) current_module_->bind_directives.push_back(bd);
     return true;
@@ -451,6 +514,7 @@ bool Parser::TryParseKeywordItem(std::vector<ModuleItem*>& items) {
 
 bool Parser::TryParseClassOrVerification(std::vector<ModuleItem*>& items) {
   if (IsAtClassDecl()) {
+    RejectInCheckerBody("a class declaration is not an item of a checker");
     auto* item = arena_.Create<ModuleItem>();
     item->kind = ModuleItemKind::kClassDecl;
     item->loc = CurrentLoc();
@@ -577,22 +641,7 @@ void Parser::ParseModuleItem(std::vector<ModuleItem*>& items) {
   // Consume the label here so the dispatch below sees the bare keyword.
   auto assertion_label = TryParseAssertionItemLabel();
 
-  // §27.2: a generate block may not contain port declarations. Top-level
-  // non-ANSI port declarations are consumed directly in ParseModuleBody, so a
-  // leading port direction reaching a generate-block item is always an illegal
-  // non-ANSI port declaration. Reject it explicitly and recover past the
-  // declaration, mirroring the specify/specparam rejections above.
-  if (InGenerateBlock() && IsPortDirection(CurrentToken().kind)) {
-    diag_.Error(CurrentLoc(),
-                "port declaration not allowed inside a generate block",
-                Subclause("27.2"));
-    while (!Check(TokenKind::kSemicolon) && !Check(TokenKind::kKwEnd) &&
-           !AtEnd()) {
-      Consume();
-    }
-    Match(TokenKind::kSemicolon);
-    return;
-  }
+  if (TryRejectBodyPortDecl()) return;
 
   // Each branch parses one module_or_generate_item form; the shared
   // AttachAttrs is applied once after the dispatch. The data-declaration
@@ -601,8 +650,12 @@ void Parser::ParseModuleItem(std::vector<ModuleItem*>& items) {
     ApplyAssertionLabel(items, before, assertion_label);
   } else if (Check(TokenKind::kKwParameter) ||
              Check(TokenKind::kKwLocalparam)) {
+    RejectInCheckerBody(
+        "a parameter declaration is not an item of a checker; a checker "
+        "takes an elaboration-time constant through a formal argument");
     ParseParamDecl(items);
   } else if (Check(TokenKind::kKwDefparam)) {
+    RejectInCheckerBody("a defparam statement is not an item of a checker");
     items.push_back(ParseDefparam());
   } else if (Check(TokenKind::kKwImport)) {
     ParseImportDecl(items);
@@ -687,6 +740,7 @@ void Parser::ParseTypedItemOrInst(std::vector<ModuleItem*>& items,
     if (InProgramBlock())
       diag_.Error(CurrentLoc(), "primitive instances not allowed in programs",
                   Subclause("24.3"));
+    RejectInCheckerBody("a gate instantiation is not an item of a checker");
     ParseGateInst(items);
     return;
   }

@@ -15,9 +15,24 @@
 
 namespace delta {
 
+// The keyword forms of A.1.8's property_formal_type, which A.2.10 spells
+// `sequence_formal_type | property` with `sequence_formal_type ::=
+// data_type_or_implicit | sequence | untyped`. A checker formal written with
+// a data type, or with none, is kData and carries the type in its data_type;
+// one written with one of the three keywords carries the keyword here. §17.2
+// has the first formal of a checker "assumed to be input untyped" when its
+// type is omitted, so a checker's first formal with no type is kUntyped.
+enum class PropertyFormalType : uint8_t {
+  kData,
+  kSequence,
+  kUntyped,
+  kProperty
+};
+
 struct PortDecl {
   Direction direction = Direction::kNone;
   DataType data_type;
+  PropertyFormalType formal_type = PropertyFormalType::kData;
   std::string_view name;
   std::vector<Expr*> unpacked_dims;
   Expr* default_value = nullptr;

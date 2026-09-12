@@ -107,6 +107,8 @@ class Parser {
   ModuleItem* ParseDpiImport();
   ModuleItem* ParseDpiExport(SourceLoc loc);
   void ParsePortList(ModuleDecl& mod);
+  void ParseOnePortOfList(ModuleDecl& mod, const PortDecl* prev,
+                          bool is_checker);
   void ParseNonAnsiPortList(ModuleDecl& mod);
   PortDecl ParsePortDecl();
   void ParseModuleBody(ModuleDecl& mod);
@@ -119,6 +121,8 @@ class Parser {
   bool TryParseProcessBlock(std::vector<ModuleItem*>& items);
   bool TryParseKeywordItem(std::vector<ModuleItem*>& items);
   bool TryParseDeclKeywordItem(std::vector<ModuleItem*>& items);
+  void RejectInCheckerBody(const char* msg);
+  bool TryRejectBodyPortDecl();
   bool TryParseSpecifyItem(std::vector<ModuleItem*>& items);
   ModuleItem* ParseExternTfDeclaration(SourceLoc extern_loc);
   bool AtMisplacedMethodQualifier();
@@ -782,6 +786,14 @@ class Parser {
   bool InInterfaceBody() const {
     return current_module_ &&
            current_module_->decl_kind == ModuleDeclKind::kInterface;
+  }
+  // True inside a checker body, a generate block of it included: A.1.8's
+  // footnote 6 has "it shall be illegal for a checker_generate_item to
+  // include any item that would be illegal in a checker_declaration outside
+  // a checker_generate_item", so the block admits what the body admits.
+  bool InCheckerBody() const {
+    return current_module_ &&
+           current_module_->decl_kind == ModuleDeclKind::kChecker;
   }
 
   int generate_block_depth_ = 0;

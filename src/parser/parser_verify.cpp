@@ -1,3 +1,4 @@
+#include <format>
 #include <functional>
 #include <optional>
 #include <string>
@@ -23,6 +24,20 @@ ModuleDecl* Parser::ParseCheckerDecl() {
   current_module_ = decl;
   while (!Check(TokenKind::kKwEndchecker) && !AtEnd()) {
     if (Match(TokenKind::kSemicolon)) continue;
+    // §17.2: "modules, interfaces, programs, and packages shall not be
+    // declared inside checkers". The first three are read as items and left
+    // to the elaborator, which reports them with the rest of the body's
+    // rules; a package is no item of any body, so it is reported here and
+    // read to its `endpackage`, and the checker's own body resumes after it.
+    if (Check(TokenKind::kKwPackage)) {
+      diag_.Error(CurrentLoc(),
+                  std::format("a package cannot be declared inside checker "
+                              "'{}'",
+                              decl->name),
+                  Subclause("17.2"));
+      ParsePackageDecl();
+      continue;
+    }
     ParseModuleItem(decl->items);
   }
   current_module_ = prev_module;

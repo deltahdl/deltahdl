@@ -96,7 +96,7 @@ TEST(DefaultClockingParse, PlainClockingIsNotDefault) {
 // so a checker body admits the same `default clocking <id>;` statement.
 TEST(DefaultClockingParse, AssignmentFormInChecker) {
   auto r = Parse(
-      "checker c(input clk, input a);\n"
+      "checker c(input logic clk, input logic a);\n"
       "  clocking cb @(posedge clk);\n"
       "    input a;\n"
       "  endclocking\n"
@@ -160,7 +160,7 @@ TEST(DefaultClockingParse, InlineDefaultInProgram) {
 // a checker (complementing AssignmentFormInChecker's assignment position).
 TEST(DefaultClockingParse, InlineDefaultInChecker) {
   auto r = Parse(
-      "checker c(input clk, input a);\n"
+      "checker c(input logic clk, input logic a);\n"
       "  default clocking cb @(posedge clk);\n"
       "    input a;\n"
       "  endclocking\n"
