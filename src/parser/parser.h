@@ -297,6 +297,7 @@ class Parser {
   void ParseHierarchicalBtfIdentifier();
   bool IdentifierOpensCoverageLabel();
   void ParseCoverpointDataType();
+  bool BraceOpensCoverpointBody();
   void ParseCoverpointHead();
   void ParseCoverageIffGuard();
   // §19.7: skip one covergroup-body item. `seen_options` accumulates the

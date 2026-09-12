@@ -773,13 +773,30 @@ void Parser::SkipLabelledCoverpointItem() {
   SkipCoverpointBody(lexer_, diag_, level);
 }
 
+// True when the '{' the parser is on opens the coverpoint's bins_or_empty
+// rather than a concatenation: A.8.1's concatenation is `{ expression { ,
+// expression } }` and no expression opens with '}', a bins_keyword,
+// `wildcard`, `option`, `type_option` or an attribute_instance, which are the
+// tokens A.2.11's bins_or_options may open with.
+bool Parser::BraceOpensCoverpointBody() {
+  auto saved = lexer_.SavePos();
+  Consume();
+  Token t = CurrentToken();
+  bool is_body = t.Is(TokenKind::kRBrace) || IsBinsKeyword(t.kind) ||
+                 t.Is(TokenKind::kKwWildcard) || t.Is(TokenKind::kAttrStart) ||
+                 (t.Is(TokenKind::kIdentifier) && IsOptionKeyword(t.text));
+  lexer_.RestorePos(saved);
+  return is_body;
+}
+
 // Reads what A.2.11's cover_point puts after the `coverpoint` keyword,
 // `expression [ iff ( expression ) ]`. §19.3 (printed page 577) has "a
 // coverage point can cover a variable or an expression", and a coverpoint
 // written with nothing to cover is reported where its expression was due.
 void Parser::ParseCoverpointHead() {
-  if (Check(TokenKind::kSemicolon) || Check(TokenKind::kLBrace) ||
-      Check(TokenKind::kKwIff) || Check(TokenKind::kKwEndgroup) || AtEnd()) {
+  if (Check(TokenKind::kSemicolon) || Check(TokenKind::kKwIff) ||
+      Check(TokenKind::kKwEndgroup) || AtEnd() ||
+      (Check(TokenKind::kLBrace) && BraceOpensCoverpointBody())) {
     diag_.Error(CurrentLoc(),
                 "a coverpoint covers an expression; none is written",
                 Subclause("A.2.11"));

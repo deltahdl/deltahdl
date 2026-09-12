@@ -529,6 +529,22 @@ TEST(CovergroupDeclParsing, CoverPoint_WithoutExpressionIsRejected) {
       "A.2.11"));
 }
 
+// A '{' that opens the body rather than a concatenation is where the
+// expression was due: no expression opens with a bins_keyword.
+TEST(CovergroupDeclParsing, CoverPoint_BodyWithoutExpressionIsRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  covergroup cg;\n"
+      "    coverpoint { bins b = {1}; }\n"
+      "  endgroup\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a coverpoint covers an expression; none is written", 3,
+      "A.2.11"));
+  EXPECT_FALSE(
+      ReportedError(r.diags, "expected '=' in bins declaration", 3, "19.5.1"));
+}
+
 // The expression is read as one: the parser skipped to the first '{' and so
 // took a concatenation for the body, leaving the body itself unread.
 TEST(CovergroupDeclParsing, CoverPoint_ConcatenationExpressionThenBody) {
