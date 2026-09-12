@@ -371,4 +371,65 @@ TEST(UdpPortGrammar, NonAnsiOutputWithoutRegTakesNoInitialValue) {
   EXPECT_FALSE(r.cu->udps[0]->has_initial);
 }
 
+// Every identifier A.5.2 writes -- port_identifier in udp_port_list and the
+// two port declarations, variable_identifier in udp_reg_declaration -- is
+// A.9.3's `simple_identifier | escaped_identifier`. The parser looked for a
+// simple identifier at each, so a UDP whose ports carried escaped names was
+// reported as a missing identifier in either header form.
+TEST(UdpPortGrammar, EscapedPortIdentifiers) {
+  auto r = Parse(
+      "primitive p1 (\\q+, \\a.0, b);\n"
+      "  output \\q+;\n"
+      "  reg \\q+;\n"
+      "  input \\a.0, b;\n"
+      "  table\n"
+      "    0 0 : ? : 0;\n"
+      "    1 1 : ? : 1;\n"
+      "  endtable\n"
+      "endprimitive\n"
+      "primitive p2 (output \\o-, input \\i-);\n"
+      "  table 0 : 1; 1 : 0; endtable\n"
+      "endprimitive\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->udps.size(), 2u);
+  EXPECT_EQ(r.cu->udps[0]->output_name, "q+");
+  ASSERT_EQ(r.cu->udps[0]->input_names.size(), 2u);
+  EXPECT_EQ(r.cu->udps[0]->input_names[0], "a.0");
+  EXPECT_TRUE(r.cu->udps[0]->is_sequential);
+  EXPECT_EQ(r.cu->udps[1]->output_name, "o-");
+  ASSERT_EQ(r.cu->udps[1]->input_names.size(), 1u);
+  EXPECT_EQ(r.cu->udps[1]->input_names[0], "i-");
+}
+
+// udp_reg_declaration ::= { attribute_instance } reg variable_identifier, and
+// udp_input_declaration ::= { attribute_instance } input
+// list_of_udp_port_identifiers: neither carries `= constant_expression`, which
+// A.5.2 writes on `output reg` alone. An initial value on either was reported
+// as a missing ';' or ')'.
+TEST(UdpPortGrammar, InitialValueOnRegOrInputDeclarationIsRejected) {
+  auto r = Parse(
+      "primitive p1 (q, a);\n"
+      "  output q;\n"
+      "  reg q = 1'b0;\n"
+      "  input a = 1'b1;\n"
+      "  table 0 : ? : 0; 1 : ? : 1; endtable\n"
+      "endprimitive\n"
+      "primitive p2 (output o, input i = 1'b0);\n"
+      "  table 0 : 1; 1 : 0; endtable\n"
+      "endprimitive\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a UDP reg declaration takes no initial value", 3, "A.5.2"));
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a UDP input declaration takes no initial value", 4, "A.5.2"));
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a UDP input declaration takes no initial value", 7, "A.5.2"));
+  EXPECT_FALSE(ReportedError(r.diags, "expected ';'", 3, "29.3.2"));
+  EXPECT_FALSE(ReportedError(r.diags, "expected ';'", 4, "29.3.2"));
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->udps.size(), 2u);
+  EXPECT_EQ(r.cu->udps[0]->input_names.size(), 1u);
+  EXPECT_EQ(r.cu->udps[1]->input_names.size(), 1u);
+}
+
 }  // namespace

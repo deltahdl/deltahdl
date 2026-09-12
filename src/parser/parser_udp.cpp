@@ -1,4 +1,5 @@
 #include <format>
+#include <string>
 
 #include "parser/parser.h"
 #include "parser/parser_instance_internal.h"
@@ -192,7 +193,7 @@ void Parser::ParseUdpOutputDecl(UdpDecl* udp) {
   bool declares_reg = Match(TokenKind::kKwReg);
   if (declares_reg) udp->is_sequential = true;
   RejectUdpPortDimension();
-  auto id_tok = Expect(TokenKind::kIdentifier, Subclause("29.3.2"));
+  auto id_tok = ExpectIdentifier(Subclause("29.3.2"));
 
   if (!udp->output_name.empty()) {
     diag_.Error(id_tok.loc, "UDP shall have exactly one output port",
@@ -226,6 +227,37 @@ void ValidatePendingUdpRegs(DiagEngine& diag, const UdpDecl* udp,
 }
 }  // namespace
 
+// A.5.2 writes an initial value on udp_output_declaration's `output reg
+// port_identifier [ = constant_expression ]` alone: udp_input_declaration is
+// `input list_of_udp_port_identifiers` and udp_reg_declaration `reg
+// variable_identifier`, and §29.4 gives the other place a sequential UDP's
+// initial value stands, the initial statement. One written on either
+// declaration is reported at its '=' and read past, so that the declaration
+// ends at its own terminator.
+void Parser::RejectUdpInitialValueOn(const char* declaration) {
+  if (!Check(TokenKind::kEq)) return;
+  diag_.Error(CurrentLoc(),
+              std::string(declaration) +
+                  " takes no initial value; a UDP's is written on 'output "
+                  "reg' or in its initial statement",
+              Subclause("A.5.2"));
+  Consume();
+  ParseExpr();
+}
+
+// A.5.2's udp_input_declaration, `input list_of_udp_port_identifiers`, the
+// `input` keyword consumed, read to its ';'. A.2.3 writes the list
+// `port_identifier { , port_identifier }`, and A.9.3 spells the identifier
+// `simple_identifier | escaped_identifier`.
+void Parser::ParseUdpInputDecl(UdpDecl* udp) {
+  do {
+    RejectUdpPortDimension();
+    udp->input_names.push_back(ExpectIdentifier(Subclause("29.3.2")).text);
+    RejectUdpInitialValueOn("a UDP input declaration");
+  } while (Match(TokenKind::kComma));
+  Expect(TokenKind::kSemicolon, Subclause("29.3.2"));
+}
+
 void Parser::ParseUdpPortDecls(UdpDecl* udp) {
   std::vector<PendingUdpReg> reg_decls;
   while (!Check(TokenKind::kKwTable) && !Check(TokenKind::kKwInitial) &&
@@ -234,19 +266,12 @@ void Parser::ParseUdpPortDecls(UdpDecl* udp) {
     if (Match(TokenKind::kKwOutput)) {
       ParseUdpOutputDecl(udp);
     } else if (Match(TokenKind::kKwInput)) {
-      RejectUdpPortDimension();
-      udp->input_names.push_back(
-          Expect(TokenKind::kIdentifier, Subclause("29.3.2")).text);
-      while (Match(TokenKind::kComma)) {
-        RejectUdpPortDimension();
-        udp->input_names.push_back(
-            Expect(TokenKind::kIdentifier, Subclause("29.3.2")).text);
-      }
-      Expect(TokenKind::kSemicolon, Subclause("29.3.2"));
+      ParseUdpInputDecl(udp);
     } else if (Match(TokenKind::kKwReg)) {
       udp->is_sequential = true;
-      auto id_tok = Expect(TokenKind::kIdentifier, Subclause("29.3.2"));
+      auto id_tok = ExpectIdentifier(Subclause("29.3.2"));
       reg_decls.push_back({id_tok.text, id_tok.loc});
+      RejectUdpInitialValueOn("a UDP reg declaration");
       Expect(TokenKind::kSemicolon, Subclause("29.3.2"));
     } else if (Check(TokenKind::kKwInout)) {
       RejectUdpInoutPort();
@@ -594,9 +619,11 @@ UdpAnsiPortEntry Parser::ParseUdpAnsiPortEntry() {
   // `udp_output_declaration` alone, so neither is read on an input entry.
   entry.declares_reg = entry.is_output && Match(TokenKind::kKwReg);
   RejectUdpPortDimension();
-  entry.name = Expect(TokenKind::kIdentifier, Subclause("29.3.1")).text;
+  entry.name = ExpectIdentifier(Subclause("29.3.1")).text;
   if (entry.is_output && Check(TokenKind::kEq)) {
     entry.initial_expr = ParseUdpOutputInitialValue(entry.declares_reg);
+  } else if (!entry.is_output) {
+    RejectUdpInitialValueOn("a UDP input declaration");
   }
   return entry;
 }
@@ -664,13 +691,12 @@ void Parser::ParseUdpAnsiHeader(UdpDecl* udp) {
 // Parses the non-ANSI header (a bare port-name list) followed by the separate
 // port declarations, then reconciles the port-list order against them.
 void Parser::ParseUdpNonAnsiHeader(UdpDecl* udp) {
-  auto first_tok = Expect(TokenKind::kIdentifier, Subclause("29.3.1"));
+  auto first_tok = ExpectIdentifier(Subclause("29.3.1"));
   std::string_view first_name = first_tok.text;
   SourceLoc first_loc = first_tok.loc;
   std::vector<std::string_view> port_list_inputs;
   while (Match(TokenKind::kComma)) {
-    port_list_inputs.push_back(
-        Expect(TokenKind::kIdentifier, Subclause("29.3.1")).text);
+    port_list_inputs.push_back(ExpectIdentifier(Subclause("29.3.1")).text);
   }
   Expect(TokenKind::kRParen, Subclause("29.3.1"));
   Expect(TokenKind::kSemicolon, Subclause("29.3.1"));
@@ -689,7 +715,7 @@ void Parser::ParseUdpInitialStatement(UdpDecl* udp) {
   scan.begin_loc = CurrentLoc();
   scan.saw_hash = Check(TokenKind::kHash);
   scan.hash_loc = CurrentLoc();
-  auto id_tok = Expect(TokenKind::kIdentifier, Subclause("29.3.3"));
+  auto id_tok = ExpectIdentifier(Subclause("29.3.3"));
   ValidateUdpInitialHeader(diag_, udp, scan, id_tok);
   Expect(TokenKind::kEq, Subclause("29.3.3"));
 
@@ -754,10 +780,9 @@ UdpDecl* Parser::ParseExternUdpDecl() {
     // and no `udp_body`, so A.5.2's `udp_port_list` is the whole prototype: its
     // first name is the output port and the rest are inputs, and no separate
     // declarations exist to reconcile that order against.
-    udp->output_name = Expect(TokenKind::kIdentifier, Subclause("29.3.1")).text;
+    udp->output_name = ExpectIdentifier(Subclause("29.3.1")).text;
     while (Match(TokenKind::kComma)) {
-      udp->input_names.push_back(
-          Expect(TokenKind::kIdentifier, Subclause("29.3.1")).text);
+      udp->input_names.push_back(ExpectIdentifier(Subclause("29.3.1")).text);
     }
     Expect(TokenKind::kRParen, Subclause("29.3.1"));
     Expect(TokenKind::kSemicolon, Subclause("29.3.1"));

@@ -292,6 +292,8 @@ class Parser {
   void RejectUdpPortDimension();
 
   void RejectUdpInoutPort();
+  void RejectUdpInitialValueOn(const char* declaration);
+  void ParseUdpInputDecl(UdpDecl* udp);
 
   void ValidateUdpHeader(UdpDecl* udp);
 
