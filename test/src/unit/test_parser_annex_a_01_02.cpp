@@ -611,4 +611,53 @@ TEST(SourceText, ErrorMissingEndmodule) {
       ReportedError(r.diags, "expected 'endmodule', got EOF", 2, "23.2"));
 }
 
+// --- timeunits_declaration gives the slash to `timeunit` alone:
+// `timeunit time_literal [ / time_literal ] ;` against `timeprecision
+// time_literal ;`, and §3.14.2.2 says which keyword the second argument
+// belongs to: "The time precision may also be declared using an optional
+// second argument to the timeunit keyword using the slash separator." ---
+
+TEST(SourceText, TimeprecisionWithSlashIsRejectedInCompilationUnit) {
+  auto r = Parse("timeprecision 1ns / 1ps;\nmodule m; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "timeprecision takes one time literal; the slash form belongs to "
+      "timeunit alone",
+      1, "3.14.2.2"));
+  // The precision before the slash is the one declared; the literal after it
+  // sets nothing, and the unit in particular stays undeclared.
+  EXPECT_TRUE(r.cu->has_cu_timeprecision);
+  EXPECT_EQ(r.cu->cu_time_prec, TimeUnit::kNs);
+  EXPECT_FALSE(r.cu->has_cu_timeunit);
+}
+
+TEST(SourceText, TimeprecisionWithSlashIsRejectedInModule) {
+  auto r = Parse(
+      "module m;\n"
+      "  timeprecision 1ns / 1ps;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "timeprecision takes one time literal; the slash form belongs to "
+      "timeunit alone",
+      2, "3.14.2.2"));
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_TRUE(r.cu->modules[0]->has_timeprecision);
+  EXPECT_EQ(r.cu->modules[0]->time_prec, TimeUnit::kNs);
+  EXPECT_FALSE(r.cu->modules[0]->has_timeunit);
+}
+
+// The declaration is read to its semicolon, so what follows it is still read.
+TEST(SourceText, TimeprecisionWithSlashIsReportedOnce) {
+  auto r = Parse(
+      "module m;\n"
+      "  timeprecision 1ns / 1ps;\n"
+      "  logic q;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_EQ(r.diags.size(), 1u);
+}
+
 }  // namespace

@@ -119,8 +119,9 @@ static void ApplyTimePrecision(const TimeScopeTargets& targets,
 namespace {
 // Validate the precision side of a "timeunit <unit> / <precision>" declaration
 // (its token already consumed and known not to be 'step'), reporting a bad
-// literal or a precision coarser than the unit, then store it when the
-// declaration is a timeunit. Mirrors the inline logic it replaces exactly.
+// literal or a precision coarser than the unit, then store it. The declaration
+// is a timeunit: ParseTimeunitDecl reports a slash after `timeprecision`
+// before reaching here.
 void ParsePrecisionFromToken(DiagEngine& diag, Token prec_tok,
                              const TimeunitDecl& decl,
                              const TimeScopeTargets& targets) {
@@ -139,7 +140,7 @@ void ParsePrecisionFromToken(DiagEngine& diag, Token prec_tok,
                "time precision is less precise than the time unit",
                Subclause("3.14"));
   }
-  if (decl.is_unit) ApplyTimePrecision(targets, decl, prec, prec_mag);
+  ApplyTimePrecision(targets, decl, prec, prec_mag);
 }
 }  // namespace
 
@@ -188,8 +189,23 @@ void Parser::ParseTimeunitDecl(ModuleDecl* mod, CompilationUnit* cu,
     ApplyTimeUnit(targets,
                   TimeunitDecl{is_unit, unit_is_step, tu, mag, kw_tok.loc});
   }
+  // A.1.2 gives the slash to `timeunit time_literal [ / time_literal ]` alone,
+  // and §3.14.2.2 says whose the second argument is: "The time precision may
+  // also be declared using an optional second argument to the timeunit keyword
+  // using the slash separator." After `timeprecision` the slash and the
+  // literal behind it are read so that the declaration still ends at its
+  // semicolon, and they set nothing.
+  auto slash_loc = CurrentLoc();
   if (Match(TokenKind::kSlash)) {
     auto prec_tok = Consume();
+    if (!is_unit) {
+      diag_.Error(slash_loc,
+                  "timeprecision takes one time literal; the slash form "
+                  "belongs to timeunit alone",
+                  Subclause("3.14.2.2"));
+      Expect(TokenKind::kSemicolon, Subclause("3.14.2.2"));
+      return;
+    }
     bool prec_is_step =
         Check(TokenKind::kIdentifier) && CurrentToken().text == "step";
     if (prec_is_step) {
