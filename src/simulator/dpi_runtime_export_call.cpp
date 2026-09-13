@@ -118,11 +118,16 @@ DpiExportCallStatus DpiRuntime::CallExportFromImport(
   // around the call so that any scope changes performed by the export (or
   // by code it called) do not leak back to the import chain.
   const DpiScope* saved_scope = current_scope_;
+  // §H.9: the export is a call back into SystemVerilog, which the chain is
+  // unbroken by only until it happens: an import the export's code calls
+  // starts a chain of its own, at the frame the next entry pushes.
+  chain_starts_.push_back(call_chain_.size());
   // The instance selected above is entered directly rather than through
   // CallExport, which looks the export up by name and so would enter whichever
   // instance holds the name index rather than the one this scope declares.
   DpiArgValue result =
       exp != nullptr ? CallExportBody(*exp, args) : DpiArgValue::FromInt(0);
+  chain_starts_.pop_back();
   current_scope_ = saved_scope;
   if (exp != nullptr && exp->is_task) {
     // §35.8: "SystemVerilog tasks do not have return value types. The return

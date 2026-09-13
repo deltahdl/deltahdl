@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <iostream>
@@ -734,6 +735,31 @@ bool DpiRuntime::ChainRootIsContext() const {
   // §35.5.3: context property attaches to the *root* of the import chain,
   // never transitively promoted to subsequent inner calls.
   return call_chain_.front().is_context;
+}
+
+bool DpiRuntime::InCallChain() const {
+  // §H.9: a chain is open from the import frame it starts at; an export call
+  // that has pushed a start the chain has not yet reached stands in
+  // SystemVerilog code, in no chain.
+  const size_t kStart = chain_starts_.empty() ? 0 : chain_starts_.back();
+  return call_chain_.size() > kStart;
+}
+
+uint32_t DpiRuntime::OpenCallChainCount() const {
+  // §H.9: the first chain, and one more for each export call whose
+  // SystemVerilog code has called an import again.
+  if (call_chain_.empty()) return 0;
+  uint32_t open = 1;
+  for (size_t start : chain_starts_) {
+    if (call_chain_.size() > start) ++open;
+  }
+  return open;
+}
+
+bool DpiRuntime::InContextCallChain() const {
+  // §H.9 with §35.5.3: the chain is a context chain where its innermost import
+  // is context, the property never being promoted to an inner call.
+  return InCallChain() && call_chain_.back().is_context;
 }
 
 bool DpiRuntime::IsImportCallOptimizationBarrier(

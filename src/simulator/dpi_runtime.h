@@ -308,6 +308,23 @@ class DpiRuntime {
   uint32_t ImportCallDepth() const;
   bool ChainRootIsContext() const;
 
+  // §H.9: a DPI-C context call chain is a sequence of C subroutine
+  // invocations that starts with a SystemVerilog entity calling a DPI-C import
+  // declared with the context keyword and continues in C, unbroken by a call
+  // back into SystemVerilog. A call of an export is such a call back, so the
+  // chain ends at it and an import the export's SystemVerilog code then calls
+  // starts a chain of its own; when the export returns the chain it broke off
+  // from resumes. These read the chain the current point of execution is in:
+  // whether there is one, how many are open -- one more per export call whose
+  // SystemVerilog code has called an import again -- and whether the current
+  // one is a context chain, which is its innermost import being context since
+  // §35.5.3 has the property not promoted to an inner call. The behavior of
+  // the DPI utility functions that manipulate context is undefined outside a
+  // context chain, so this is what a caller of them stands on.
+  bool InCallChain() const;
+  uint32_t OpenCallChainCount() const;
+  bool InContextCallChain() const;
+
   // §35.5.3: only context import calls (i.e., chains whose root is a context
   // import) can safely invoke a SystemVerilog export subroutine. Returns the
   // outcome and, on kOk, runs the export's registered implementation.
@@ -493,6 +510,11 @@ class DpiRuntime {
   std::vector<DpiScope> scope_stack_;
   const DpiScope* current_scope_ = nullptr;
   std::vector<ImportFrame> call_chain_;
+  // §H.9: the index in call_chain_ at which each open chain starts. The first
+  // chain starts at 0; an export call that has called back into SystemVerilog
+  // pushes the index the next import frame will take, and pops it when the
+  // export returns.
+  std::vector<size_t> chain_starts_;
   // §35.9: whether a disable-protocol violation has issued its fatal simulation
   // error, and the message of the first one, which is the error that ends the
   // run.
