@@ -38,6 +38,28 @@ std::string DpiCTypeOfFormal(const DpiArg& formal, bool open_array);
 // passed by value.
 bool DpiTypeIsSmall(DataTypeKind kind);
 
+// §H.7 defines the data types of the C layer of the DPI, and a value
+// crosses the interface as one of them: a basic type of Table H.1 (§H.7.4),
+// which the small types of §H.8.7 are, the canonical representation of a
+// packed array (§H.7.7), or the handle of an open array (§H.12). A type
+// none of them covers does not cross.
+enum class DpiCLayerType : uint8_t {
+  kBasic,
+  kCanonicalElement,
+  kOpenArrayHandle,
+  kNone
+};
+
+// Which of the layer's types a formal crosses as: the handle for an open
+// array whatever its type, the canonical representation for a packed
+// array, integer and time included, a basic type for a small type, and
+// none for the rest.
+DpiCLayerType DpiCLayerTypeOfFormal(const DpiArg& formal, bool open_array);
+
+// The subclause of Annex H that defines one of the layer's types; empty for
+// kNone.
+std::string_view DpiSubclauseDefiningCLayerType(DpiCLayerType type);
+
 // §H.7.4: Table H.1's mapping of the basic SystemVerilog data types to C
 // types -- byte to char, shortint to short int, int to int, longint to long
 // long, real to double, shortreal to float, chandle to void*, string to

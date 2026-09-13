@@ -370,4 +370,25 @@ DpiMemorySide DpiSideOwningBlockBehindChandle() { return DpiMemorySide::kC; }
 
 DpiMemorySide DpiSideOfImportedCall() { return DpiMemorySide::kC; }
 
+DpiCLayerType DpiCLayerTypeOfFormal(const DpiArg& formal, bool open_array) {
+  if (open_array) return DpiCLayerType::kOpenArrayHandle;
+  if (IsPackedArray(formal)) return DpiCLayerType::kCanonicalElement;
+  if (DpiTypeIsSmall(formal.type)) return DpiCLayerType::kBasic;
+  return DpiCLayerType::kNone;
+}
+
+std::string_view DpiSubclauseDefiningCLayerType(DpiCLayerType type) {
+  switch (type) {
+    case DpiCLayerType::kBasic:
+      return "H.7.4";
+    case DpiCLayerType::kCanonicalElement:
+      return "H.7.7";
+    case DpiCLayerType::kOpenArrayHandle:
+      return "H.12";
+    case DpiCLayerType::kNone:
+      return "";
+  }
+  return "";
+}
+
 }  // namespace delta
