@@ -284,8 +284,12 @@ bool Satisfies(const Word& word, const PropertyExpr& property) {
       // §F.5.3.1: w |= ( P ) iff w |= P.
       return property.lhs && Satisfies(word, *property.lhs);
     case PropertyExpr::Kind::kNot:
-      // §F.5.3.1: w |= not P iff w-bar |= P.
-      return property.lhs && Satisfies(ComplementWord(word), *property.lhs);
+      // §F.5.3.1: w |= not P iff w-bar does not satisfy P. The word is
+      // complemented and the verdict negated, both: over a word of letters in
+      // 2^P the complement is the word itself and not P is the negation of P,
+      // which is the subclause's remark that not b holds where !b does, and
+      // over T and _|_ the swap is what keeps T satisfying every property.
+      return property.lhs && !Satisfies(ComplementWord(word), *property.lhs);
     case PropertyExpr::Kind::kStrong:
       // §F.5.3.1: w |= strong(R) iff some w^{0,j} tightly satisfies R.
       return property.sequence && StrongHolds(word, *property.sequence);

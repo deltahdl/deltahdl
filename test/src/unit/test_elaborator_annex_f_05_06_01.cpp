@@ -61,27 +61,24 @@ TEST(NeutralSatisfactionLocals, WeakIsVacuousOnEmptyWordAndCompletesPrefixes) {
                                             LocalContext{}));
 }
 
-// §F.5.6.1 (not), printed p.1249: w, L_0 |= not P iff w-bar, L_0 |= P --
-// negation is by word complementation, NOT a logical negation of the verdict
-// (only the boolean Remark, w |= not b iff w |= !b, negates). This mirrors the
-// plain neutral-satisfaction rule §F.5.3.1, so the local-variable layer agrees
-// with it letter for letter (cf. NeutralSatisfaction.NotEvaluatesAgainstThe-
-// ComplementWord / NotLeavesAtomLettersUnchanged in test_..._annex_f_05_03_01).
+// §F.5.6.1 (not), printed p.1254: w, L_0 |= not P iff w-bar, L_0 does not
+// satisfy P, the word complemented and the verdict negated as in §F.5.3.1
+// (cf. NeutralSatisfaction.NotEvaluatesAgainstTheComplementWord and
+// NotNegatesTheVerdictOverAtomLetters in test_..._annex_f_05_03_01).
 TEST(NeutralSatisfactionLocals, NotEvaluatesAgainstTheComplementWord) {
   // Over atom-set letters the complement is the identity, so not strong(a)
-  // tracks strong(a): false where a is absent, true where a holds.
-  EXPECT_FALSE(NeutrallySatisfiesWithLocals(
-      Word{A({"b"})}, *LvNot(LvStrong(Bool("a"))), LocalContext{}));
+  // is the negation of strong(a): true where a is absent, false where a holds.
   EXPECT_TRUE(NeutrallySatisfiesWithLocals(
+      Word{A({"b"})}, *LvNot(LvStrong(Bool("a"))), LocalContext{}));
+  EXPECT_FALSE(NeutrallySatisfiesWithLocals(
       Word{A({"a"})}, *LvNot(LvStrong(Bool("a"))), LocalContext{}));
   // The rule is evaluated on w-bar, so the T/_|_ swap is observable: over [T]
-  // the property is checked on the complement [_|_], where _|_ |= a fails, so
-  // strong(a) fails on w-bar and (no logical negation) not strong(a) fails too.
-  EXPECT_FALSE(NeutrallySatisfiesWithLocals(
-      Word{LetterTop()}, *LvNot(LvStrong(Bool("a"))), LocalContext{}));
-  // Dually, over [_|_] the property is checked on [T], where strong(a) holds,
-  // so not strong(a) holds.
+  // the property is checked on the complement [_|_], where strong(a) fails,
+  // so not strong(a) holds; over [_|_] it is checked on [T], where strong(a)
+  // holds, so not strong(a) fails.
   EXPECT_TRUE(NeutrallySatisfiesWithLocals(
+      Word{LetterTop()}, *LvNot(LvStrong(Bool("a"))), LocalContext{}));
+  EXPECT_FALSE(NeutrallySatisfiesWithLocals(
       Word{LetterBottom()}, *LvNot(LvStrong(Bool("a"))), LocalContext{}));
 }
 

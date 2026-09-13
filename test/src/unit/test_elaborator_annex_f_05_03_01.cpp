@@ -56,14 +56,18 @@ TEST(NeutralSatisfaction, ParenthesisIsTransparent) {
   EXPECT_FALSE(NeutrallySatisfies(Word{A({"x"})}, *p));
 }
 
-// §F.5.3.1: w |= not P iff w-bar |= P. The complement only swaps the T and _|_
-// letters, so it flips a strong(a) verdict between the top and bottom letters.
+// §F.5.3.1: w |= not P iff w-bar does not satisfy P. The complement swaps the
+// T and _|_ letters, so not strong(a) is judged on _|_ where the word is T and
+// on T where the word is _|_: strong(a) fails on _|_, so not strong(a) holds
+// on T, and holds on T, so not strong(a) fails on _|_. T thereby satisfies
+// strong(a) and its negation alike, and _|_ neither.
 TEST(NeutralSatisfaction, NotEvaluatesAgainstTheComplementWord) {
   auto strong = PropStrong(BoolSeq("a"));
   auto negated = PropNot(PropStrong(BoolSeq("a")));
   EXPECT_TRUE(NeutrallySatisfies(Word{LetterTop()}, *strong));
-  EXPECT_FALSE(NeutrallySatisfies(Word{LetterTop()}, *negated));
-  EXPECT_TRUE(NeutrallySatisfies(Word{LetterBottom()}, *negated));
+  EXPECT_TRUE(NeutrallySatisfies(Word{LetterTop()}, *negated));
+  EXPECT_FALSE(NeutrallySatisfies(Word{LetterBottom()}, *strong));
+  EXPECT_FALSE(NeutrallySatisfies(Word{LetterBottom()}, *negated));
 }
 
 // §F.5.3.1: w |= ( R |-> P ) iff for every 0 <= j < |w| with w-bar^{0,j} |= R,
@@ -213,13 +217,13 @@ TEST(NeutralSatisfaction, UntilHoldsWhenLeftOperandHoldsThroughout) {
   EXPECT_TRUE(NeutrallySatisfies(Word{A({"a"}), A({"a"})}, *p));
 }
 
-// Edge of §F.5.3.1: w |= not P uses the complement w-bar, which leaves letters
-// in 2^P untouched -- so over atom-only words negation tracks the underlying
-// property rather than flipping it (the flip is exclusive to T and _|_).
-TEST(NeutralSatisfaction, NotLeavesAtomLettersUnchanged) {
+// §F.5.3.1: the complement leaves a letter in 2^P as it is, so over such
+// words not P is the negation of P, which is the subclause's remark that
+// not b holds exactly where !b does.
+TEST(NeutralSatisfaction, NotNegatesTheVerdictOverAtomLetters) {
   auto negated = PropNot(PropStrong(BoolSeq("a")));
-  EXPECT_TRUE(NeutrallySatisfies(Word{A({"a"})}, *negated));
-  EXPECT_FALSE(NeutrallySatisfies(Word{A({"x"})}, *negated));
+  EXPECT_FALSE(NeutrallySatisfies(Word{A({"a"})}, *negated));
+  EXPECT_TRUE(NeutrallySatisfies(Word{A({"x"})}, *negated));
 }
 
 // Edge of §F.5.3.1: ( R |-> P ) with a two-letter antecedent matches at index
