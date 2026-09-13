@@ -163,16 +163,31 @@ bool StdClassHasConstructor(StdPackageMember member) {
   return StdMethodNamed(member, "new") != nullptr;
 }
 
+const std::vector<StdMethodPrototype>& WeakReferencePrototype() {
+  // §G.7: class weak_reference #(type class T); function new(T referent);
+  // function T get(); function void clear(); static function longint
+  // get_id(T obj); endclass.
+  static const std::vector<StdMethodPrototype> kPrototype{
+      {"new", StdMethodKind::kFunction, "", {{"T", "referent"}}},
+      {"get", StdMethodKind::kFunction, "T", {}},
+      {"clear", StdMethodKind::kFunction, "void", {}},
+      {"get_id", StdMethodKind::kFunction, "longint", {{"T", "obj"}}, true},
+  };
+  return kPrototype;
+}
+
 std::optional<StdTypeParameter> StdClassTypeParameterOf(
     StdPackageMember member) {
   switch (member) {
     case StdPackageMember::kMailbox:
       // §G.4: #(type T = dynamic_singular_type).
       return StdTypeParameter{"T", "dynamic_singular_type", false};
+    case StdPackageMember::kWeakReference:
+      // §G.7: #(type class T).
+      return StdTypeParameter{"T", "", true};
     case StdPackageMember::kSemaphore:
     case StdPackageMember::kRandomize:
     case StdPackageMember::kProcess:
-    case StdPackageMember::kWeakReference:
       return std::nullopt;
   }
   return std::nullopt;
@@ -188,8 +203,9 @@ const std::vector<StdMethodPrototype>& StdClassPrototype(
       return MailboxPrototype();
     case StdPackageMember::kProcess:
       return ProcessPrototype();
-    case StdPackageMember::kRandomize:
     case StdPackageMember::kWeakReference:
+      return WeakReferencePrototype();
+    case StdPackageMember::kRandomize:
       return kNone;
   }
   return kNone;

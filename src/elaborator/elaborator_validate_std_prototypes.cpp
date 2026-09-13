@@ -41,6 +41,37 @@ void CollectStdHandlesInStmt(const Stmt* s, StdHandles& handles) {
       s, [&](Stmt* const& sub) { CollectStdHandlesInStmt(sub, handles); });
 }
 
+// The count of actuals a call passes against what a method of a std class
+// takes, reported under the subclause giving the prototype as a call of
+// `what` -- "method 'get'" or "constructor" -- of the class.
+void CheckStdActualCount(const Expr* call, const StdMethodPrototype& method,
+                         StdPackageMember member, std::string_view what,
+                         DiagEngine& diag) {
+  const std::size_t kGiven = call->args.size();
+  const std::size_t kLeast = LeastActualsOf(method);
+  const std::size_t kMost = MostActualsOf(method);
+  if (kGiven <= kMost && kGiven >= kLeast) return;
+  const bool kTooMany = kGiven > kMost;
+  const std::size_t kBound = kTooMany ? kMost : kLeast;
+  diag.Error(
+      call->range.start,
+      std::format("{} of class '{}' takes at {} {} argument{}; {} given", what,
+                  StdPackageMemberName(member), kTooMany ? "most" : "least",
+                  kBound, kBound == 1 ? "" : "s", kGiven),
+      Subclause(PrototypeSubclauseOfStdPackageMember(member)));
+}
+
+// §G.3 through §G.7: a construction new(...) of a handle of a std class
+// passes the actuals the prototype's constructor takes; a class without one
+// is the concern of the rule that refuses its construction outright.
+void CheckStdConstruction(const Expr* init, StdPackageMember member,
+                          DiagEngine& diag) {
+  if (!init || init->kind != ExprKind::kCall || init->text != "new") return;
+  const StdMethodPrototype* constructor = StdMethodNamed(member, "new");
+  if (constructor == nullptr) return;
+  CheckStdActualCount(init, *constructor, member, "constructor", diag);
+}
+
 // §G.3: a call obj.method(...) on a handle of a std class is checked against
 // the class's prototype -- the method shall be one the prototype declares,
 // and the actuals shall be no fewer than its formals without a default and no
@@ -68,24 +99,8 @@ void CheckStdMethodCall(const Expr* e, const StdHandles& handles,
         Subclause(kSubclause));
     return;
   }
-  const std::size_t kGiven = e->args.size();
-  const std::size_t kLeast = LeastActualsOf(*method);
-  const std::size_t kMost = MostActualsOf(*method);
-  if (kGiven > kMost) {
-    diag.Error(
-        e->range.start,
-        std::format("method '{}' of class '{}' takes at most {} "
-                    "argument{}; {} given",
-                    kMethod, kClass, kMost, kMost == 1 ? "" : "s", kGiven),
-        Subclause(kSubclause));
-  } else if (kGiven < kLeast) {
-    diag.Error(
-        e->range.start,
-        std::format("method '{}' of class '{}' takes at least {} "
-                    "argument{}; {} given",
-                    kMethod, kClass, kLeast, kLeast == 1 ? "" : "s", kGiven),
-        Subclause(kSubclause));
-  }
+  CheckStdActualCount(e, *method, kMember, std::format("method '{}'", kMethod),
+                      diag);
 }
 
 void CheckStdCallsInExpr(const Expr* e, const StdHandles& handles,
@@ -100,9 +115,27 @@ void CheckStdCallsInExpr(const Expr* e, const StdHandles& handles,
 // position a statement holds an expression or a statement in is visited;
 // ForEachChildExpr and ForEachChildStmt in elaborator_validate_internal.h
 // state those positions once for the whole elaborator.
+// The constructions a statement holds: a declaration of a std handle
+// initialized with new, and an assignment of new to one.
+void CheckStdConstructionsInStmt(const Stmt* s, const StdHandles& handles,
+                                 DiagEngine& diag) {
+  if (s->kind == StmtKind::kVarDecl) {
+    const std::optional<StdPackageMember> kMember =
+        StdClassOfType(s->var_decl_type);
+    if (kMember) CheckStdConstruction(s->var_init, *kMember, diag);
+    return;
+  }
+  if (!s->lhs || s->lhs->kind != ExprKind::kIdentifier) return;
+  const auto kFound = handles.find(s->lhs->text);
+  if (kFound != handles.end()) {
+    CheckStdConstruction(s->rhs, kFound->second, diag);
+  }
+}
+
 void CheckStdCallsInStmt(const Stmt* s, const StdHandles& handles,
                          DiagEngine& diag) {
   if (!s) return;
+  CheckStdConstructionsInStmt(s, handles, diag);
   ForEachChildExpr(
       s, [&](Expr* const& e) { CheckStdCallsInExpr(e, handles, diag); });
   ForEachChildStmt(
@@ -123,13 +156,17 @@ void ForEachBodyStmt(const ModuleDecl* decl, Visit visit) {
   }
 }
 
-// The module-scope variables of a std class with a prototype.
-void CollectStdHandlesInItems(const ModuleDecl* decl, StdHandles& handles) {
+// The module-scope variables of a std class with a prototype, and the
+// construction each is declared with, if any.
+void CollectStdHandlesInItems(const ModuleDecl* decl, StdHandles& handles,
+                              DiagEngine& diag) {
   for (const auto* item : decl->items) {
     if (item->kind != ModuleItemKind::kVarDecl) continue;
     const std::optional<StdPackageMember> kMember =
         StdClassOfType(item->data_type);
-    if (kMember) handles[item->name] = *kMember;
+    if (!kMember) continue;
+    handles[item->name] = *kMember;
+    CheckStdConstruction(item->init_expr, *kMember, diag);
   }
 }
 
@@ -139,7 +176,7 @@ void Elaborator::ValidateStdClassMethodCalls(const ModuleDecl* decl) {
   // The handles: the module-scope variables of a std class, and those the
   // procedural bodies and subroutines declare.
   StdHandles handles;
-  CollectStdHandlesInItems(decl, handles);
+  CollectStdHandlesInItems(decl, handles, diag_);
   ForEachBodyStmt(
       decl, [&handles](const Stmt* s) { CollectStdHandlesInStmt(s, handles); });
   if (handles.empty()) return;

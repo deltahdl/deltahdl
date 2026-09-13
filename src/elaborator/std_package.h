@@ -128,6 +128,12 @@ const std::vector<std::string_view>& ProcessStateEnumMembers();
 bool StdClassIsFinal(StdPackageMember member);
 bool StdClassHasConstructor(StdPackageMember member);
 
+// §G.7: the prototype of the weak reference class -- class weak_reference
+// #(type class T), with new(T referent), T get(), void clear() and the static
+// function longint get_id(T obj) -- over a type parameter restricted to a
+// class type and given no default.
+const std::vector<StdMethodPrototype>& WeakReferencePrototype();
+
 // The type parameter a std class prototype is written over, where it has
 // one: its name, its default, and whether it is restricted to a class type.
 struct StdTypeParameter {
