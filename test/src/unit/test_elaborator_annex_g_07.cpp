@@ -197,7 +197,7 @@ TEST(WeakReferenceStdPackageElaborator,
       "    wr = new;\n"
       "    wr = new(strong_obj);\n"
       "    result = wr.get(1);\n"
-      "    wr.release();\n"
+      "    wr.drop();\n"
       "    result = wr.get();\n"
       "    wr.clear();\n"
       "  end\n"
@@ -216,8 +216,7 @@ TEST(WeakReferenceStdPackageElaborator,
                             "most 0 arguments; 1 given",
                             13, "G.7"));
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "class 'weak_reference' declares no method "
-                            "'release'",
+                            "class 'weak_reference' declares no method 'drop'",
                             14, "G.7"));
   for (const auto& d : f.diag.Diagnostics()) {
     EXPECT_NE(d.loc.line, 12u);
