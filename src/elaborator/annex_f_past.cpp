@@ -3,8 +3,11 @@
 #include <cstddef>
 #include <memory>
 #include <optional>
+#include <string>
+#include <utility>
 #include <vector>
 
+#include "elaborator/annex_f_extended_expressions.h"
 #include "elaborator/annex_f_grammar.h"
 #include "elaborator/annex_f_tight_satisfaction.h"
 
@@ -102,6 +105,40 @@ std::optional<std::size_t> PastGclkSourceIndex(const Word& word,
     return std::nullopt;  // §F.6.2: at w^0, $past_gclk takes the initial value.
   }
   return j - 1;  // §F.6.2: $past_gclk(e)[w^j] = e[w^{j-1}] for j > 0.
+}
+
+bool PastInitialValue(VariableKind kind,
+                      std::optional<bool> declaration_assignment,
+                      bool type_default) {
+  // §F.6.2: the declaration's value for a static variable that has one; the
+  // type's default otherwise.
+  if (kind == VariableKind::kStatic && declaration_assignment) {
+    return *declaration_assignment;
+  }
+  return type_default;
+}
+
+ExtendedExpression PastOfAtom(const std::string& name, unsigned int n,
+                              std::shared_ptr<const BooleanExpr> gate,
+                              std::shared_ptr<const BooleanExpr> clock,
+                              bool initial) {
+  return [name, n, gate = std::move(gate), clock = std::move(clock), initial](
+             const Word& word, std::size_t j) -> std::optional<bool> {
+    if (j >= word.size() || n == 0) {
+      return std::nullopt;
+    }
+    const std::vector<std::size_t> kSources =
+        PastSourceIndices(word, j, n, gate, clock);
+    if (kSources.empty()) {
+      // §F.6.2 "Otherwise": e1 at its initial values.
+      return initial;
+    }
+    return LetterSatisfiesBoolean(word[kSources.front()], *BoolAtom(name));
+  };
+}
+
+ExtendedExpression PastOfAtom(const std::string& name, bool initial) {
+  return PastOfAtom(name, 1, BoolTrue(), BoolTrue(), initial);
 }
 
 }  // namespace delta

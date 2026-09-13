@@ -7,7 +7,9 @@
 #include <utility>
 #include <vector>
 
+#include "elaborator/annex_f_extended_expressions.h"
 #include "elaborator/annex_f_grammar.h"
+#include "elaborator/annex_f_neutral_satisfaction.h"
 #include "elaborator/annex_f_past.h"
 #include "elaborator/annex_f_tight_satisfaction.h"
 
@@ -143,6 +145,86 @@ TEST(PastGclk, TakesInitialValueAtTheFirstLetter) {
 TEST(PastGclk, RejectsOutOfRangePoint) {
   const Word kWord{A({}), A({})};
   EXPECT_EQ(PastGclkSourceIndex(kWord, /*j=*/2), std::nullopt);
+}
+
+// §F.6.2 ($past) "Otherwise": the initial value of a static variable is the
+// value its declaration assigns, or the default value of its type where the
+// declaration assigns none; the initial value of any other variable or signal
+// is the default value of its type, whatever a declaration assigns.
+TEST(Past, TheInitialValueFollowsTheDeclarationForAStaticVariable) {
+  EXPECT_TRUE(PastInitialValue(VariableKind::kStatic, true, false));
+  EXPECT_FALSE(PastInitialValue(VariableKind::kStatic, false, true));
+  EXPECT_FALSE(PastInitialValue(VariableKind::kStatic, std::nullopt, false));
+  EXPECT_TRUE(PastInitialValue(VariableKind::kStatic, std::nullopt, true));
+  EXPECT_FALSE(PastInitialValue(VariableKind::kOther, true, false));
+  EXPECT_TRUE(PastInitialValue(VariableKind::kOther, false, true));
+}
+
+// §F.6.2 under §F.6: $past(e1, n, e2, c) as an extended expression takes e1
+// at the source letter the gating sequence selects, the initial value where
+// no letter qualifies, and is undefined past the word and for n = 0. With en
+// gating and clk clocking, the active ticks of [a,en,clk][x][a,en,clk][x,en]
+// [x,en,clk] are the first, third and fifth letters, so two ticks back from
+// the fifth is the first, which carries a, and from the third is nothing, so
+// the initial value stands; and at every point the expression agrees with
+// the source indices.
+TEST(Past, TheExpressionReadsTheSourceLetter) {
+  auto en = BoolAtom("en");
+  auto clk = BoolAtom("clk");
+  const Word kWord{A({"a", "en", "clk"}), A({"x"}), A({"a", "en", "clk"}),
+                   A({"x", "en"}), A({"x", "en", "clk"})};
+  auto past = PastOfAtom("a", /*n=*/2, en, clk, /*initial=*/false);
+  EXPECT_EQ(past(kWord, 4), true);
+  EXPECT_EQ(past(kWord, 2), false);
+  EXPECT_EQ(PastOfAtom("a", /*n=*/2, en, clk, /*initial=*/true)(kWord, 2),
+            true);
+  EXPECT_EQ(past(kWord, 5), std::nullopt);
+  EXPECT_EQ(PastOfAtom("a", /*n=*/0, en, clk, false)(kWord, 4), std::nullopt);
+  for (std::size_t j = 0; j < kWord.size(); ++j) {
+    const Indices kSources = PastSourceIndices(kWord, j, /*n=*/2, en, clk);
+    const std::optional<bool> kExpected =
+        kSources.empty() ? std::optional<bool>{false}
+                         : std::optional<bool>{LetterSatisfiesBoolean(
+                               kWord[kSources.front()], *BoolAtom("a"))};
+    EXPECT_EQ(past(kWord, j), kExpected);
+  }
+}
+
+// §F.6.2 (NOTE): $past(e) is $past(e, 1, 1'b1, 1'b1), so the default form
+// agrees with the four-argument one at every point of a word, the letters T
+// and _|_ included, and reads the letter before: a the first letter carries
+// where the second is the point, not the x the second carries, and T, which
+// satisfies every Boolean, where the fourth is; and the initial value where
+// the point or the letter before it is _|_, which satisfies no Boolean, not
+// the 1 of the gating sequence's last letter and not its active condition.
+TEST(Past, TheDefaultFormIsTheFourArgumentOne) {
+  const Word kWord{A({"a"}), A({"x"}),       LetterTop(),
+                   A({"a"}), LetterBottom(), A({"x"})};
+  auto brief = PastOfAtom("a", /*initial=*/true);
+  auto full = PastOfAtom("a", /*n=*/1, One(), One(), /*initial=*/true);
+  for (std::size_t j = 0; j <= kWord.size(); ++j) {
+    EXPECT_EQ(brief(kWord, j), full(kWord, j));
+  }
+  EXPECT_EQ(brief(kWord, 0), true);
+  EXPECT_EQ(brief(kWord, 1), true);
+  EXPECT_EQ(brief(kWord, 2), false);
+  EXPECT_EQ(brief(kWord, 3), true);
+  EXPECT_EQ(brief(kWord, 4), true);
+  EXPECT_EQ(brief(kWord, 5), true);
+  EXPECT_EQ(PastOfAtom("a", /*initial=*/false)(kWord, 5), false);
+}
+
+// §F.6.2 under §F.6: read into a word, $past(a) is decided by the preceding
+// subclauses as any atom is: strong( 1 ##1 p ) with p read as $past(a) holds
+// on [a][x] and not on [x][a].
+TEST(Past, TheExpressionReadIntoAWordIsDecidedByThePrecedingSubclauses) {
+  auto p =
+      PropStrong(SeqConcat(SeqBoolean(BoolTrue()), SeqBoolean(BoolAtom("p"))));
+  auto past = PastOfAtom("a", /*initial=*/false);
+  EXPECT_TRUE(NeutrallySatisfies(
+      WordWithExtendedAtom(Word{A({"a"}), A({"x"})}, "p", past), *p));
+  EXPECT_FALSE(NeutrallySatisfies(
+      WordWithExtendedAtom(Word{A({"x"}), A({"a"})}, "p", past), *p));
 }
 
 }  // namespace
