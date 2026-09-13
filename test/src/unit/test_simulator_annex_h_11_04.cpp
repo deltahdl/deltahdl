@@ -33,17 +33,17 @@ DpiArg Formal(DataTypeKind type, Direction direction, uint32_t width = 0) {
 }
 
 // `int a [3:1][2:5]`: two unpacked dimensions of 3 and 4 elements.
-const std::vector<SvActualDimension> kThreeByFour{{3, 1}, {2, 5}};
+std::vector<SvActualDimension> ThreeByFour() { return {{3, 1}, {2, 5}}; }
 
 // §H.11.4: `int a [3:1][2:5]` is declared to C as int a[3][4], the sizes the
 // counts of the ranges in declaration order, const for an input as §H.8.7
 // has every input and without for an output or inout.
 TEST(DpiUnpackedArrayLayout, ASizedUnpackedFormalIsACArrayOfItsElementType) {
   EXPECT_EQ(DpiCDeclarationOfUnpackedFormal(
-                Formal(DataTypeKind::kInt, Direction::kInput), kThreeByFour),
+                Formal(DataTypeKind::kInt, Direction::kInput), ThreeByFour()),
             "const int a[3][4]");
   EXPECT_EQ(DpiCDeclarationOfUnpackedFormal(
-                Formal(DataTypeKind::kInt, Direction::kOutput), kThreeByFour),
+                Formal(DataTypeKind::kInt, Direction::kOutput), ThreeByFour()),
             "int a[3][4]");
   EXPECT_EQ(DpiCDeclarationOfUnpackedFormal(
                 Formal(DataTypeKind::kByte, Direction::kInout), {{-1, -8}}),
@@ -100,11 +100,11 @@ TEST(DpiUnpackedArrayLayout, AnElementIsSizeofItsCType) {
 // bound the same way.
 TEST(DpiUnpackedArrayLayout, ASystemVerilogIndexCountsFromTheLowBound) {
   using Indices = std::vector<uint32_t>;
-  EXPECT_EQ(DpiCIndicesOfUnpackedElement(kThreeByFour, {1, 2}),
+  EXPECT_EQ(DpiCIndicesOfUnpackedElement(ThreeByFour(), {1, 2}),
             (Indices{0, 0}));
-  EXPECT_EQ(DpiCIndicesOfUnpackedElement(kThreeByFour, {3, 5}),
+  EXPECT_EQ(DpiCIndicesOfUnpackedElement(ThreeByFour(), {3, 5}),
             (Indices{2, 3}));
-  EXPECT_EQ(DpiCIndicesOfUnpackedElement(kThreeByFour, {3, 2}),
+  EXPECT_EQ(DpiCIndicesOfUnpackedElement(ThreeByFour(), {3, 2}),
             (Indices{2, 0}));
   EXPECT_EQ(DpiCIndicesOfUnpackedElement({{-1, -8}}, {-8}), (Indices{0}));
   EXPECT_EQ(DpiCIndicesOfUnpackedElement({{-1, -8}}, {-1}), (Indices{7}));
@@ -117,12 +117,12 @@ TEST(DpiUnpackedArrayLayout, ASystemVerilogIndexCountsFromTheLowBound) {
 // three rows in.
 TEST(DpiUnpackedArrayLayout, ElementsLieRowMajorTheLastDimensionFastest) {
   const DpiArg kInt = Formal(DataTypeKind::kInt, Direction::kInput);
-  EXPECT_EQ(DpiCOffsetOfUnpackedElement(kInt, kThreeByFour, {1, 2}), 0U);
-  EXPECT_EQ(DpiCOffsetOfUnpackedElement(kInt, kThreeByFour, {1, 3}),
+  EXPECT_EQ(DpiCOffsetOfUnpackedElement(kInt, ThreeByFour(), {1, 2}), 0U);
+  EXPECT_EQ(DpiCOffsetOfUnpackedElement(kInt, ThreeByFour(), {1, 3}),
             sizeof(int));
-  EXPECT_EQ(DpiCOffsetOfUnpackedElement(kInt, kThreeByFour, {2, 2}),
+  EXPECT_EQ(DpiCOffsetOfUnpackedElement(kInt, ThreeByFour(), {2, 2}),
             4 * sizeof(int));
-  EXPECT_EQ(DpiCOffsetOfUnpackedElement(kInt, kThreeByFour, {3, 5}),
+  EXPECT_EQ(DpiCOffsetOfUnpackedElement(kInt, ThreeByFour(), {3, 5}),
             11 * sizeof(int));
   const DpiArg kLogic = Formal(DataTypeKind::kLogic, Direction::kInput, 18);
   EXPECT_EQ(DpiCOffsetOfUnpackedElement(kLogic, {{1, 10}, {31, 0}}, {2, 0}),
@@ -138,9 +138,9 @@ TEST(DpiUnpackedArrayLayout, TheOffsetIsWhereTheCCompilerPlacesTheElement) {
   const DpiArg kInt = Formal(DataTypeKind::kInt, Direction::kInput);
   for (int32_t i = 1; i <= 3; ++i) {
     for (int32_t j = 2; j <= 5; ++j) {
-      const std::size_t kCompiler = static_cast<std::size_t>(
+      const auto kCompiler = static_cast<std::size_t>(
           reinterpret_cast<const char*>(&a[i - 1][j - 2]) - kBase);
-      EXPECT_EQ(DpiCOffsetOfUnpackedElement(kInt, kThreeByFour, {i, j}),
+      EXPECT_EQ(DpiCOffsetOfUnpackedElement(kInt, ThreeByFour(), {i, j}),
                 kCompiler)
           << i << " " << j;
     }
