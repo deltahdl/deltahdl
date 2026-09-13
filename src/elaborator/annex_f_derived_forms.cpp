@@ -7,6 +7,7 @@
 
 #include "elaborator/annex_f_grammar.h"
 #include "elaborator/annex_f_neutral_satisfaction.h"
+#include "elaborator/annex_f_property_rewrite.h"
 
 namespace delta {
 
@@ -214,6 +215,23 @@ std::shared_ptr<const SequenceExpr> SeqWithLocalAssignments(
   if (names.size() == 1) return first;
   std::vector<std::string> rest(names.begin() + 1, names.end());
   return SeqFusion(std::move(first), SeqWithLocalAssignments(SeqTrue(), rest));
+}
+
+bool BareSequenceIsStrong(SequencePropertyContext context) {
+  return context == SequencePropertyContext::kCoverProperty ||
+         context == SequencePropertyContext::kExpect;
+}
+
+std::shared_ptr<const PropertyExpr> PropOfBareSequence(
+    std::shared_ptr<const SequenceExpr> r, SequencePropertyContext context) {
+  if (BareSequenceIsStrong(context)) return PropStrong(std::move(r));
+  return PropWeak(std::move(r));
+}
+
+std::shared_ptr<const ClockedProperty> ClkOfBareSequence(
+    std::shared_ptr<const SequenceExpr> r, SequencePropertyContext context) {
+  if (BareSequenceIsStrong(context)) return ClkStrong(std::move(r));
+  return ClkWeak(std::move(r));
 }
 
 }  // namespace delta

@@ -7,6 +7,7 @@
 
 #include "elaborator/annex_f_grammar.h"
 #include "elaborator/annex_f_neutral_satisfaction.h"
+#include "elaborator/annex_f_property_rewrite.h"
 
 namespace delta {
 
@@ -155,5 +156,29 @@ std::shared_ptr<const SequenceExpr> SeqThroughout(
 std::shared_ptr<const SequenceExpr> SeqWithLocalAssignments(
     std::shared_ptr<const SequenceExpr> r,
     const std::vector<std::string>& names);
+
+// §F.3.4.3.1: the derived sequential property. A sequence R written where a
+// property is expected stands for strong(R) in a cover property or expect
+// statement and for weak(R) in an assert property or assume property
+// statement, which by §F.3.4.1 is where a restrict property statement stands
+// too. The statement is the context, since the same R reads two ways.
+enum class SequencePropertyContext : std::uint8_t {
+  kAssertProperty,
+  kAssumeProperty,
+  kCoverProperty,
+  kRestrictProperty,
+  kExpect,
+};
+
+// True where §F.3.4.3.1 reads a bare sequence as strong(R) in the context,
+// false where it reads it as weak(R).
+bool BareSequenceIsStrong(SequencePropertyContext context);
+
+// The §F.3.2 property a bare sequence stands for in the context, in the
+// unclocked property model of §F.5.3.1 and in the clocked one of §F.5.1.2.
+std::shared_ptr<const PropertyExpr> PropOfBareSequence(
+    std::shared_ptr<const SequenceExpr> r, SequencePropertyContext context);
+std::shared_ptr<const ClockedProperty> ClkOfBareSequence(
+    std::shared_ptr<const SequenceExpr> r, SequencePropertyContext context);
 
 }  // namespace delta
