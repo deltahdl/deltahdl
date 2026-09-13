@@ -818,20 +818,44 @@ bool IsPropertyNameArg(const Expr* arg) {
 
 }  // namespace
 
+namespace {
+
+// G.5: a call written as std::randomize, the scope randomize of 18.12 named
+// through the std package, whose form the subclause summarizes as randomize
+// [ ( [ variable_identifier_list ] ) ] [ with constraint_block ].
+bool IsStdRandomizeCall(const Expr* call) {
+  return call->lhs != nullptr && call->lhs->kind == ExprKind::kMemberAccess &&
+         call->lhs->is_scope_resolution && call->lhs->lhs != nullptr &&
+         call->lhs->lhs->text == "std";
+}
+
+}  // namespace
+
 void Parser::CheckRandomizeArgList(const Expr* call) {
   // 18.11: the inline random variable control list passed to randomize() is
   // limited to the names of properties of the calling object; expressions are
   // not allowed. Recognize the call either as a bare randomize(...) or as a
   // method call whose member name is randomize, then reject any argument that
   // is not a plain property reference. (A null argument, 18.11.1, is lexed as
-  // an identifier and so is accepted here.)
+  // an identifier and so is accepted here.) G.5 gives std::randomize the
+  // narrower list of A.8.2's randomize_call, a variable_identifier_list, so
+  // for that form an argument that is not a variable identifier -- a member
+  // access, a select or any expression -- is rejected under G.5.
   bool is_randomize =
       call->callee == "randomize" ||
       (call->lhs != nullptr && call->lhs->kind == ExprKind::kMemberAccess &&
        call->lhs->rhs != nullptr && call->lhs->rhs->text == "randomize");
   if (!is_randomize) return;
+  const bool kStd = IsStdRandomizeCall(call);
   for (const Expr* arg : call->args) {
     if (arg == nullptr) continue;
+    if (kStd) {
+      if (arg->kind == ExprKind::kIdentifier) continue;
+      diag_.Error(arg->range.start,
+                  "argument to std::randomize shall be a variable identifier",
+                  Subclause("G.5"));
+      continue;
+    }
     if (IsPropertyNameArg(arg)) continue;
     diag_.Error(arg->range.start,
                 "randomize() arguments shall be object property names, not "

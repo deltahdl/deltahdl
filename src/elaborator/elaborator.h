@@ -771,6 +771,11 @@ class Elaborator : public ElaboratorClassRules {
 
   void ValidateSubroutineCallArgs(const ModuleDecl* decl);
 
+  // §A.8.2 footnote 43 and §G.5: the forms a scope randomize_call may not
+  // take -- a null argument, a parenthesized identifier list after with, and
+  // an argument that is no variable identifier.
+  void ValidateScopeRandomizeCalls(const ModuleDecl* decl);
+
   // §15.4.9: the compile-time type check a parameterized mailbox applies to the
   // arguments of its put/get/peek (and try_ variants) methods.
   void ValidateParameterizedMailboxCalls(const ModuleDecl* decl);

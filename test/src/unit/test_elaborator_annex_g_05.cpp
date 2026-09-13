@@ -8,13 +8,12 @@
 //   randomize { attribute_instance } [ ( [ variable_identifier_list ] ) ]
 //       [ with constraint_block ]
 //
-// src/elaborator/std_package.h writes the prototype down, and the elaborator
-// holds a call of std::randomize to that form: its arguments, any number of
-// them, are variable identifiers. These tests observe the prototype, the
-// accepted forms -- no list, an empty list, a list of variables, a with
-// block -- and the rejection, at the argument and under §G.5, of an argument
-// that is no variable identifier, where the same argument to the bare scope
-// randomize of A.8.2 is rejected under that subclause.
+// src/elaborator/std_package.h writes the prototype down; the parser holds a
+// call of std::randomize to that form, its arguments being variable
+// identifiers (test_parser_annex_g_05.cpp), and the elaborator holds the bare
+// scope form of A.8.2 to the same list where the parser lets a property name
+// through. These tests observe the prototype, the accepted forms -- an empty
+// list, a list of variables, a with block -- and the elaborator's rejection.
 
 #include "elaborator/std_package.h"
 #include "fixture_elaborator.h"
@@ -57,38 +56,36 @@ TEST(RandomizeStdPackageElaborator, TheFormsOfTheSummaryAreAccepted) {
              "endmodule\n"));
 }
 
-// §G.5: the list is a variable_identifier_list, so an expression and a
-// literal are rejected as arguments, at the argument and under §G.5 for
-// std::randomize, while a variable beside them is accepted; the same
-// arguments to the bare scope randomize are rejected under A.8.2, whose
-// randomize_call gives the list.
-TEST(RandomizeStdPackageElaborator, AnArgumentShallBeAVariableIdentifier) {
+// §G.5 with §A.8.2: the list of a scope randomize call is a
+// variable_identifier_list. The parser refuses an expression to any
+// randomize call and, under §G.5, anything but a variable identifier to
+// std::randomize; what it lets through to the bare scope form as a property
+// name of §18.11, a member access and a select, the elaborator rejects under
+// §A.8.2 at the argument, while a variable beside them is accepted.
+TEST(RandomizeStdPackageElaborator, AScopeArgumentShallBeAVariableIdentifier) {
   ElabFixture f;
   ElabOk(
       "module m;\n"
       "  int a;\n"
-      "  int b;\n"
+      "  int arr [4];\n"
       "  int ok;\n"
       "  initial begin\n"
-      "    ok = std::randomize(a, b + 1);\n"
-      "    ok = std::randomize(1);\n"
-      "    ok = randomize(a + 1);\n"
-      "    ok = std::randomize(a);\n"
+      "    ok = randomize(a, m.a);\n"
+      "    ok = randomize(arr[0]);\n"
+      "    ok = randomize(a);\n"
       "  end\n"
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "argument to std::randomize shall be a variable identifier", 6, "G.5"));
+      "argument to a scope randomize call shall be a variable identifier", 6,
+      "A.8.2"));
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "argument to std::randomize shall be a variable identifier", 7, "G.5"));
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "argument to a scope randomize call shall be a variable identifier", 8,
+      "argument to a scope randomize call shall be a variable identifier", 7,
       "A.8.2"));
   for (const auto& d : f.diag.Diagnostics()) {
-    EXPECT_NE(d.loc.line, 9u);
+    EXPECT_NE(d.loc.line, 8u);
   }
 }
 

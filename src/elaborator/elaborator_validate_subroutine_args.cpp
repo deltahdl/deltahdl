@@ -507,108 +507,6 @@ static void WalkStmtForCallArgs(
   WalkChildStmtsForCallArgs(s, func_decls, net_names, diag);
 }
 
-// A scope randomize is a randomize_call that is not a method on a class
-// object — see §A.8.2's randomize_call production and its footnote 43. The
-// parser leaves `randomize` as a plain identifier, so we detect the scope
-// form syntactically: either a bare callee with no member-access prefix, or
-// a callee reached through the `std::` package scope. The kCall's `callee`
-// field carries the simple-identifier text only, so we inspect `lhs` to
-// distinguish the bare and `std::` forms from a class-method `obj.randomize`.
-static bool IsScopeRandomizeCall(const Expr* expr) {
-  if (!expr || expr->kind != ExprKind::kCall) return false;
-  const Expr* lhs = expr->lhs;
-  if (!lhs) return false;
-  if (lhs->kind == ExprKind::kIdentifier && lhs->text == "randomize") {
-    return true;
-  }
-  if (lhs->kind == ExprKind::kMemberAccess && lhs->rhs &&
-      lhs->rhs->kind == ExprKind::kIdentifier &&
-      lhs->rhs->text == "randomize" && lhs->lhs &&
-      lhs->lhs->kind == ExprKind::kIdentifier && lhs->lhs->text == "std") {
-    return true;
-  }
-  return false;
-}
-
-// Whether a scope randomize call is written through the std package, as
-// std::randomize, rather than by the bare name §18.12 also allows.
-static bool IsStdQualifiedRandomizeCall(const Expr* expr) {
-  return expr->lhs && expr->lhs->kind == ExprKind::kMemberAccess;
-}
-
-// The arguments of a scope randomize call. Footnote 43 (§A.8.2) bars `null`;
-// and the list is a variable_identifier_list -- §G.5 gives the form of
-// std::randomize as randomize [ ( [ variable_identifier_list ] ) ], and
-// §A.8.2 the same list for the bare form -- so an argument that is not a
-// variable identifier, an expression or a literal, is rejected under the
-// subclause giving the form the call is written in.
-static void CheckScopeRandomizeArguments(const Expr* expr, DiagEngine& diag) {
-  for (const auto* arg : expr->args) {
-    if (!arg) continue;
-    if (arg->kind == ExprKind::kIdentifier && arg->text == "null") {
-      diag.Error(arg->range.start,
-                 "'null' is not a legal argument to a scope randomize call",
-                 Subclause("A.8.2"));
-    } else if (arg->kind != ExprKind::kIdentifier) {
-      const bool kStd = IsStdQualifiedRandomizeCall(expr);
-      diag.Error(arg->range.start,
-                 kStd ? "argument to std::randomize shall be a variable "
-                        "identifier"
-                      : "argument to a scope randomize call shall be a "
-                        "variable identifier",
-                 Subclause(kStd ? "G.5" : "A.8.2"));
-    }
-  }
-}
-
-// Footnote 43 (§A.8.2): in a scope randomize_call, `null` is not a legal
-// argument and the with-clause's parenthesized identifier_list is also
-// illegal, and §G.5 has the arguments be variable identifiers. Walks the
-// expression tree and reports each offending site. The parenthesized-form
-// check uses the `with_has_parens` AST flag set by the parser regardless of
-// whether the parenthesized list happened to be empty or non-empty.
-static void CheckScopeRandomizeRulesInExpr(const Expr* expr, DiagEngine& diag) {
-  if (!expr) return;
-  if (IsScopeRandomizeCall(expr)) {
-    CheckScopeRandomizeArguments(expr, diag);
-    if (expr->with_has_parens) {
-      diag.Error(expr->range.start,
-                 "scope randomize call cannot use a parenthesized identifier "
-                 "list after 'with'",
-                 Subclause("A.8.2"));
-    }
-  }
-  CheckScopeRandomizeRulesInExpr(expr->lhs, diag);
-  CheckScopeRandomizeRulesInExpr(expr->rhs, diag);
-  CheckScopeRandomizeRulesInExpr(expr->condition, diag);
-  CheckScopeRandomizeRulesInExpr(expr->true_expr, diag);
-  CheckScopeRandomizeRulesInExpr(expr->false_expr, diag);
-  CheckScopeRandomizeRulesInExpr(expr->base, diag);
-  CheckScopeRandomizeRulesInExpr(expr->index, diag);
-  CheckScopeRandomizeRulesInExpr(expr->index_end, diag);
-  for (const auto* a : expr->args) CheckScopeRandomizeRulesInExpr(a, diag);
-  for (const auto* e : expr->elements) CheckScopeRandomizeRulesInExpr(e, diag);
-}
-
-// Footnote 43 of A.8.2 bars `null` and a parenthesized identifier list from a
-// scope randomize_call wherever the call is written, and A.6.4 makes a
-// subroutine_call_statement a statement_item, so every position a statement
-// holds a statement in is one this walk is owed at. ForEachChildStmt in
-// elaborator_validate_internal.h states those positions once for the whole
-// elaborator, which is why the list is not written out again here.
-static void WalkStmtForScopeRandomize(const Stmt* s, DiagEngine& diag) {
-  if (!s) return;
-  CheckScopeRandomizeRulesInExpr(s->expr, diag);
-  CheckScopeRandomizeRulesInExpr(s->lhs, diag);
-  CheckScopeRandomizeRulesInExpr(s->rhs, diag);
-  CheckScopeRandomizeRulesInExpr(s->condition, diag);
-  CheckScopeRandomizeRulesInExpr(s->for_cond, diag);
-  ForEachChildStmt(
-      s, [&](Stmt* const& sub) { WalkStmtForScopeRandomize(sub, diag); });
-}
-
-// Builds a name→decl map of all callable subroutines (the elaborator's known
-// functions plus the task declarations local to `decl`).
 static std::unordered_map<std::string_view, const ModuleItem*> BuildAllDecls(
     const ModuleDecl* decl,
     const std::unordered_map<std::string_view, const ModuleItem*>& func_decls) {
@@ -624,21 +522,6 @@ static std::unordered_map<std::string_view, const ModuleItem*> BuildAllDecls(
     if (item->kind == ModuleItemKind::kDpiImport) all_decls[item->name] = item;
   }
   return all_decls;
-}
-
-// Footnote 43 (§A.8.2): walk every procedural and subroutine body for illegal
-// scope randomize_call forms.
-static void ValidateScopeRandomizeInDecl(const ModuleDecl* decl,
-                                         DiagEngine& diag) {
-  for (const auto* item : decl->items) {
-    if (IsProceduralItemKind(item->kind))
-      WalkStmtForScopeRandomize(item->body, diag);
-    if (item->kind == ModuleItemKind::kFunctionDecl ||
-        item->kind == ModuleItemKind::kTaskDecl) {
-      for (const auto* s : item->func_body_stmts)
-        WalkStmtForScopeRandomize(s, diag);
-    }
-  }
 }
 
 // Collects names of variables whose declared type is non-singular (an unpacked
@@ -766,7 +649,7 @@ void Elaborator::ValidateSubroutineCallArgs(const ModuleDecl* decl) {
   std::unordered_map<std::string_view, const ModuleItem*> all_decls =
       BuildAllDecls(decl, func_decls_);
 
-  ValidateScopeRandomizeInDecl(decl, diag_);
+  ValidateScopeRandomizeCalls(decl);
 
   std::unordered_set<std::string_view> non_singular_vars =
       CollectNonSingularVars(decl);

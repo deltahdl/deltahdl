@@ -339,6 +339,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/elaborator_validate_specify_limits.cpp
     elaborator/elaborator_validate_static_methods.cpp
     elaborator/elaborator_validate_subroutine.cpp
+    elaborator/elaborator_validate_scope_randomize.cpp
     elaborator/elaborator_validate_subroutine_args.cpp
     elaborator/elaborator_validate_std_prototypes.cpp
     elaborator/queue_dim.cpp
