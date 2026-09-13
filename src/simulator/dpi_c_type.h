@@ -61,6 +61,23 @@ DpiPassingMode DpiPassingModeOfResult();
 // value or by reference, and not by handle.
 bool DpiFormalIsDirectlyAccessibleInC(DpiPassingMode mode);
 
+// §H.8.6: an argument specified as an open, unsized array is always passed
+// by a handle, regardless of the direction of the SystemVerilog formal,
+// and is reached through library functions; the implementation of a handle
+// is tool specific and transparent to the user, the handle being the
+// generic pointer void* under the name svOpenArrayHandle (this simulator's
+// pointing at the descriptor of svdpi_open_array.h); and an argument passed
+// by handle shall always have a const qualifier, because the user shall
+// not modify the contents of a handle.
+
+// The C type every argument passed by handle takes, whatever its direction
+// and element type: const svOpenArrayHandle.
+std::string_view DpiCTypeOfHandleArgument();
+
+// Whether the user may modify the contents of a handle: never, which the
+// const qualifier says.
+bool DpiUserMayModifyHandleContents();
+
 // §H.7 defines the data types of the C layer of the DPI, and a value
 // crosses the interface as one of them: a basic type of Table H.1 (§H.7.4),
 // which the small types of §H.8.7 are, the canonical representation of a

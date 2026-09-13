@@ -113,10 +113,16 @@ bool DpiTypeIsSmall(DataTypeKind kind) {
   return !SmallCType(kind, false).empty();
 }
 
+std::string_view DpiCTypeOfHandleArgument() {
+  return "const svOpenArrayHandle";
+}
+
+bool DpiUserMayModifyHandleContents() { return false; }
+
 std::string DpiCTypeOfFormal(const DpiArg& formal, bool open_array) {
   // §H.8.6: an open array is passed by handle whatever the direction, and the
   // handle always carries the const qualifier.
-  if (open_array) return "const svOpenArrayHandle";
+  if (open_array) return std::string(DpiCTypeOfHandleArgument());
   const bool kInput = formal.direction == Direction::kInput;
   if (IsPackedArray(formal)) {
     // §H.8.4 and §H.8.8: a packed array is passed by reference to its
