@@ -362,4 +362,12 @@ bool DpiImportMaySafelyCallOtherApis(bool is_context) { return is_context; }
 
 bool DpiImportCallIsOptimizationBarrier(bool is_context) { return is_context; }
 
+bool DpiSideMayFree(DpiMemorySide allocated_by, DpiMemorySide freed_by) {
+  return allocated_by == freed_by;
+}
+
+DpiMemorySide DpiSideOwningBlockBehindChandle() { return DpiMemorySide::kC; }
+
+DpiMemorySide DpiSideOfImportedCall() { return DpiMemorySide::kC; }
+
 }  // namespace delta

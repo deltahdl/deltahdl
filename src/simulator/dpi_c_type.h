@@ -318,4 +318,29 @@ bool DpiImportMaySafelyCallOtherApis(bool is_context);
 // DpiRuntime::IsImportCallOptimizationBarrier answers for a registered one.
 bool DpiImportCallIsOptimizationBarrier(bool is_context);
 
+// §H.6.6, beside §35.5.1.4: the memory spaces C code and SystemVerilog
+// code own and allocate are disjoint, and each side is responsible for its
+// own -- C shall not free memory SystemVerilog or its compiler allocated,
+// nor expect SystemVerilog to free memory C or its compiler allocated. This
+// does not exclude C allocating a block and passing a handle to it to
+// SystemVerilog, which in turn calls a C function that frees the block,
+// directly if it is free itself or indirectly: in that scenario the block
+// is allocated and freed in C even where malloc and free are called
+// directly from SystemVerilog code.
+
+// The two sides that own memory.
+enum class DpiMemorySide : uint8_t { kC, kSystemVerilog };
+
+// Whether a side may free a block: only the side that allocated it.
+bool DpiSideMayFree(DpiMemorySide allocated_by, DpiMemorySide freed_by);
+
+// The side a block a chandle refers to belongs to: C, SystemVerilog holding
+// the handle and never the block (§35.5.6 has chandle as the type of such a
+// handle).
+DpiMemorySide DpiSideOwningBlockBehindChandle();
+
+// The side on which a call of an imported function does its work, free
+// among them, whatever SystemVerilog code made the call: C.
+DpiMemorySide DpiSideOfImportedCall();
+
 }  // namespace delta
