@@ -115,3 +115,40 @@ TEST(SvdpiPortability, PlatformLinkageDecorationIsProvided) {
 
 }  // namespace
 }  // namespace delta
+
+// §H.4: object code compiled on a platform works with every simulator on it,
+// which needs the interface to be one C object code links against: every
+// function svdpi.h declares has C language linkage, so a foreign compiler
+// resolves it by its plain name under the platform's C calling convention,
+// with no C++ mangling or convention of one simulator's compiler in the way.
+// A redeclaration with extern "C" is well formed only where the header gave
+// the function that linkage -- a C++-linkage declaration of the same name
+// would make it ill formed -- so these redeclarations, one from each family
+// the header carries, compile only while the header keeps the C linkage that
+// makes the promise hold. They stand at global scope, where the header's own
+// declarations are.
+extern "C" const char* svDpiVersion(void);
+extern "C" svBit svGetBitselBit(const svBitVecVal* s, int i);
+extern "C" int svLeft(svOpenArrayHandle h, int d);
+extern "C" int svSize(svOpenArrayHandle h, int d);
+extern "C" void* svGetArrElemPtr(svOpenArrayHandle h, int indx1, ...);
+extern "C" svScope svGetScope(void);
+extern "C" svScope svSetScope(svScope scope);
+extern "C" const char* svGetNameFromScope(svScope scope);
+extern "C" int svIsDisabledState(void);
+extern "C" int svGetTime(svScope scope, svTimeVal* time);
+
+namespace delta {
+namespace {
+
+// §H.4: the redeclarations above name the functions the header declares, and
+// a call through one of them reaches the interface, so the C-linkage name a
+// foreign application links against is the one the simulator answers to.
+TEST(SvdpiPortability, InterfaceFunctionsHaveCLinkage) {
+  EXPECT_NE(svDpiVersion(), nullptr);
+  svScope current = svGetScope();
+  EXPECT_EQ(svSetScope(current), current);
+}
+
+}  // namespace
+}  // namespace delta
