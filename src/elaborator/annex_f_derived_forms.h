@@ -328,4 +328,45 @@ std::shared_ptr<const ClockedProperty> ClkSyncRejectOn(
     std::shared_ptr<const BooleanExpr> b,
     std::shared_ptr<const ClockedProperty> q);
 
+// §F.3.4.3.8: the derived unbounded temporal operators, unfolded into the
+// §F.3.2 until, not and and. (always p) is (p until 0): the release
+// condition is the Boolean 0, which no letter satisfies, so the until never
+// releases and p is required from every letter. (s_eventually p) is
+// (not (always (not p))), so p is required from some letter.
+// (p s_until q) is ((p until q) and s_eventually q): the until, which also
+// holds where q never releases it, strengthened by the requirement that q hold
+// from some letter. (p until_with q) is (p until (p and q)), so p holds from
+// the letter that releases the until as well as from those before it; and
+// (p s_until_with q) is (p s_until (p and q)), the same over the strong
+// until. Each is given in the unclocked property model of §F.5.3.1, where the
+// Boolean 0 in property position is read as strong(0) by the convention the
+// §F.5.3.1 layer applies to a Boolean T^p emits, and in the clocked one of
+// §F.5.1.2, where it is the Boolean property 0 that T^p leaves as it is.
+std::shared_ptr<const PropertyExpr> PropAlways(
+    std::shared_ptr<const PropertyExpr> p);
+std::shared_ptr<const PropertyExpr> PropSEventually(
+    std::shared_ptr<const PropertyExpr> p);
+std::shared_ptr<const PropertyExpr> PropSUntil(
+    const std::shared_ptr<const PropertyExpr>& p,
+    const std::shared_ptr<const PropertyExpr>& q);
+std::shared_ptr<const PropertyExpr> PropUntilWith(
+    const std::shared_ptr<const PropertyExpr>& p,
+    std::shared_ptr<const PropertyExpr> q);
+std::shared_ptr<const PropertyExpr> PropSUntilWith(
+    const std::shared_ptr<const PropertyExpr>& p,
+    std::shared_ptr<const PropertyExpr> q);
+std::shared_ptr<const ClockedProperty> ClkAlways(
+    std::shared_ptr<const ClockedProperty> q);
+std::shared_ptr<const ClockedProperty> ClkSEventually(
+    std::shared_ptr<const ClockedProperty> q);
+std::shared_ptr<const ClockedProperty> ClkSUntil(
+    const std::shared_ptr<const ClockedProperty>& q1,
+    const std::shared_ptr<const ClockedProperty>& q2);
+std::shared_ptr<const ClockedProperty> ClkUntilWith(
+    const std::shared_ptr<const ClockedProperty>& q1,
+    std::shared_ptr<const ClockedProperty> q2);
+std::shared_ptr<const ClockedProperty> ClkSUntilWith(
+    const std::shared_ptr<const ClockedProperty>& q1,
+    std::shared_ptr<const ClockedProperty> q2);
+
 }  // namespace delta

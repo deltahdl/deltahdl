@@ -423,4 +423,68 @@ std::shared_ptr<const ClockedProperty> ClkSyncRejectOn(
   return ClkNot(ClkSyncAcceptOn(std::move(b), ClkNot(std::move(q))));
 }
 
+namespace {
+
+// The Boolean 0 of §F.3.4.3.8, which no letter satisfies, as the §F.3.2
+// Boolean !1.
+std::shared_ptr<const BooleanExpr> BoolFalse() { return BoolNot(BoolTrue()); }
+
+}  // namespace
+
+std::shared_ptr<const PropertyExpr> PropAlways(
+    std::shared_ptr<const PropertyExpr> p) {
+  return PropUntil(std::move(p), PropStrong(SeqBoolean(BoolFalse())));
+}
+
+std::shared_ptr<const PropertyExpr> PropSEventually(
+    std::shared_ptr<const PropertyExpr> p) {
+  return PropNot(PropAlways(PropNot(std::move(p))));
+}
+
+std::shared_ptr<const PropertyExpr> PropSUntil(
+    const std::shared_ptr<const PropertyExpr>& p,
+    const std::shared_ptr<const PropertyExpr>& q) {
+  return PropAnd(PropUntil(p, q), PropSEventually(q));
+}
+
+std::shared_ptr<const PropertyExpr> PropUntilWith(
+    const std::shared_ptr<const PropertyExpr>& p,
+    std::shared_ptr<const PropertyExpr> q) {
+  return PropUntil(p, PropAnd(p, std::move(q)));
+}
+
+std::shared_ptr<const PropertyExpr> PropSUntilWith(
+    const std::shared_ptr<const PropertyExpr>& p,
+    std::shared_ptr<const PropertyExpr> q) {
+  return PropSUntil(p, PropAnd(p, std::move(q)));
+}
+
+std::shared_ptr<const ClockedProperty> ClkAlways(
+    std::shared_ptr<const ClockedProperty> q) {
+  return ClkUntil(std::move(q), ClkBoolean(BoolFalse()));
+}
+
+std::shared_ptr<const ClockedProperty> ClkSEventually(
+    std::shared_ptr<const ClockedProperty> q) {
+  return ClkNot(ClkAlways(ClkNot(std::move(q))));
+}
+
+std::shared_ptr<const ClockedProperty> ClkSUntil(
+    const std::shared_ptr<const ClockedProperty>& q1,
+    const std::shared_ptr<const ClockedProperty>& q2) {
+  return ClkAnd(ClkUntil(q1, q2), ClkSEventually(q2));
+}
+
+std::shared_ptr<const ClockedProperty> ClkUntilWith(
+    const std::shared_ptr<const ClockedProperty>& q1,
+    std::shared_ptr<const ClockedProperty> q2) {
+  return ClkUntil(q1, ClkAnd(q1, std::move(q2)));
+}
+
+std::shared_ptr<const ClockedProperty> ClkSUntilWith(
+    const std::shared_ptr<const ClockedProperty>& q1,
+    std::shared_ptr<const ClockedProperty> q2) {
+  return ClkSUntil(q1, ClkAnd(q1, std::move(q2)));
+}
+
 }  // namespace delta
