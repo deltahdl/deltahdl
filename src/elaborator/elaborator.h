@@ -775,6 +775,12 @@ class Elaborator : public ElaboratorClassRules {
   // arguments of its put/get/peek (and try_ variants) methods.
   void ValidateParameterizedMailboxCalls(const ModuleDecl* decl);
 
+  // §G.3: a call on a handle of a std class whose prototype
+  // src/elaborator/std_package.h writes down names a method the prototype
+  // declares and passes no fewer actuals than its formals without a default
+  // and no more than its formals.
+  void ValidateStdClassMethodCalls(const ModuleDecl* decl);
+
   void ValidateArrayArgTypes(const ModuleDecl* decl);
 
   void TrackEnumVariable(const ModuleItem* item);

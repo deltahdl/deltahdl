@@ -37,7 +37,14 @@ TEST(StdPackageOverview, EachMemberHasTheDefiningSubclauseItsPrototypeNames) {
   for (const StdPackageEntry& entry : StdPackageContents()) {
     EXPECT_EQ(DefiningSubclauseOfStdPackageMember(entry.member),
               entry.defining_subclause);
+    EXPECT_EQ(PrototypeSubclauseOfStdPackageMember(entry.member),
+              entry.prototype_subclause);
   }
+  EXPECT_EQ(PrototypeSubclauseOfStdPackageMember(StdPackageMember::kSemaphore),
+            "G.3");
+  EXPECT_EQ(
+      PrototypeSubclauseOfStdPackageMember(StdPackageMember::kWeakReference),
+      "G.7");
 }
 
 // A subclause lies where a member's semantics are defined iff it is the

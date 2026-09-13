@@ -1,5 +1,6 @@
 #include "elaborator/std_package.h"
 
+#include <cstddef>
 #include <optional>
 #include <string_view>
 #include <vector>
@@ -13,15 +14,15 @@ const std::vector<StdPackageEntry>& StdPackageContents() {
   // defining its semantics.
   static const std::vector<StdPackageEntry> kContents{
       {StdPackageMember::kSemaphore, "semaphore", StdPackageMemberKind::kClass,
-       "15.3"},
+       "15.3", "G.3"},
       {StdPackageMember::kMailbox, "mailbox", StdPackageMemberKind::kClass,
-       "15.4"},
+       "15.4", "G.4"},
       {StdPackageMember::kRandomize, "randomize",
-       StdPackageMemberKind::kFunction, "18.12"},
+       StdPackageMemberKind::kFunction, "18.12", "G.5"},
       {StdPackageMember::kProcess, "process", StdPackageMemberKind::kClass,
-       "9.7"},
+       "9.7", "G.6"},
       {StdPackageMember::kWeakReference, "weak_reference",
-       StdPackageMemberKind::kClass, "8.30"},
+       StdPackageMemberKind::kClass, "8.30", "G.7"},
   };
   return kContents;
 }
@@ -54,6 +55,13 @@ std::string_view DefiningSubclauseOfStdPackageMember(StdPackageMember member) {
   return {};
 }
 
+std::string_view PrototypeSubclauseOfStdPackageMember(StdPackageMember member) {
+  for (const StdPackageEntry& entry : StdPackageContents()) {
+    if (entry.member == member) return entry.prototype_subclause;
+  }
+  return {};
+}
+
 bool StdPackageDefinesSemanticsIn(StdPackageMember member,
                                   std::string_view subclause) {
   // §G.2: the indicated subclause, or one beneath it -- "8.30.1" lies in
@@ -70,6 +78,54 @@ bool IsStdPackageSystemType(std::string_view name) {
   const std::optional<StdPackageMember> kMember = StdPackageMemberNamed(name);
   return kMember &&
          KindOfStdPackageMember(*kMember) == StdPackageMemberKind::kClass;
+}
+
+const std::vector<StdMethodPrototype>& SemaphorePrototype() {
+  // §G.3: class semaphore; function new(int keyCount = 0); function void
+  // put(int keyCount = 1); task get(int keyCount = 1); function int
+  // try_get(int keyCount = 1); endclass.
+  static const std::vector<StdMethodPrototype> kPrototype{
+      {"new", StdMethodKind::kFunction, "", {{"int", "keyCount", true}}},
+      {"put", StdMethodKind::kFunction, "void", {{"int", "keyCount", true}}},
+      {"get", StdMethodKind::kTask, "void", {{"int", "keyCount", true}}},
+      {"try_get", StdMethodKind::kFunction, "int", {{"int", "keyCount", true}}},
+  };
+  return kPrototype;
+}
+
+const std::vector<StdMethodPrototype>& StdClassPrototype(
+    StdPackageMember member) {
+  static const std::vector<StdMethodPrototype> kNone;
+  switch (member) {
+    case StdPackageMember::kSemaphore:
+      return SemaphorePrototype();
+    case StdPackageMember::kMailbox:
+    case StdPackageMember::kRandomize:
+    case StdPackageMember::kProcess:
+    case StdPackageMember::kWeakReference:
+      return kNone;
+  }
+  return kNone;
+}
+
+const StdMethodPrototype* StdMethodNamed(StdPackageMember member,
+                                         std::string_view name) {
+  for (const StdMethodPrototype& method : StdClassPrototype(member)) {
+    if (method.name == name) return &method;
+  }
+  return nullptr;
+}
+
+std::size_t LeastActualsOf(const StdMethodPrototype& method) {
+  std::size_t least = 0;
+  for (const StdFormal& formal : method.formals) {
+    if (!formal.has_default) ++least;
+  }
+  return least;
+}
+
+std::size_t MostActualsOf(const StdMethodPrototype& method) {
+  return method.formals.size();
 }
 
 }  // namespace delta
