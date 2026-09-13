@@ -2,6 +2,8 @@
 
 #include <cstdint>
 #include <memory>
+#include <string>
+#include <vector>
 
 #include "elaborator/annex_f_grammar.h"
 #include "elaborator/annex_f_neutral_satisfaction.h"
@@ -122,5 +124,36 @@ std::shared_ptr<const SequenceExpr> SeqNonconsecutiveAtLeast(
     const std::shared_ptr<const BooleanExpr>& b, unsigned int m);
 std::shared_ptr<const SequenceExpr> SeqNonconsecutiveExactly(
     const std::shared_ptr<const BooleanExpr>& b, unsigned int m);
+
+// §F.3.4.2.4: the other derived sequence operators, unfolded into intersect,
+// ##1, ##0 and the repetitions above.
+
+// (R1 and R2), which is (((R1 ##1 1[*0:$]) intersect R2) or (R1 intersect
+// (R2 ##1 1[*0:$]))): both operands match from the same letter and the word
+// ends where the longer of them does.
+std::shared_ptr<const SequenceExpr> SeqAnd(
+    std::shared_ptr<const SequenceExpr> r1,
+    std::shared_ptr<const SequenceExpr> r2);
+
+// (R1 within R2), which is ((1[*0:$] ##1 R1 ##1 1[*0:$]) intersect R2): R1
+// matches somewhere inside a match of R2.
+std::shared_ptr<const SequenceExpr> SeqWithin(
+    std::shared_ptr<const SequenceExpr> r1,
+    std::shared_ptr<const SequenceExpr> r2);
+
+// (b throughout R), which is ((b[*0:$]) intersect R): b holds at every letter
+// of a match of R.
+std::shared_ptr<const SequenceExpr> SeqThroughout(
+    const std::shared_ptr<const BooleanExpr>& b,
+    std::shared_ptr<const SequenceExpr> r);
+
+// (R, v1 = e1, ..., vk = ek) for k >= 1: (R ##0 (1, v1 = e1)) for one
+// assignment, and ((R, v1 = e1) ##0 (1, v2 = e2, ..., vk = ek)) above, the
+// second operand unfolding the same way until one assignment is left. The
+// grammar's sampling form records the name alone, as (1, v = e) does in
+// §F.3.2, so the assignments are given by their names.
+std::shared_ptr<const SequenceExpr> SeqWithLocalAssignments(
+    std::shared_ptr<const SequenceExpr> r,
+    const std::vector<std::string>& names);
 
 }  // namespace delta

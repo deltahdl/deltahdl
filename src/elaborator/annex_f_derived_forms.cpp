@@ -1,7 +1,9 @@
 #include "elaborator/annex_f_derived_forms.h"
 
 #include <memory>
+#include <string>
 #include <utility>
+#include <vector>
 
 #include "elaborator/annex_f_grammar.h"
 #include "elaborator/annex_f_neutral_satisfaction.h"
@@ -175,6 +177,43 @@ std::shared_ptr<const SequenceExpr> SeqNonconsecutiveExactly(
     const std::shared_ptr<const BooleanExpr>& b, unsigned int m) {
   auto gotos = SeqGotoExactly(b, m);
   return SeqConcat(std::move(gotos), SeqRunWithout(b));
+}
+
+// 1[*0:$], the padding that lets one operand of and or within run on past the
+// other, in the §F.3.4.2.1 unfolding of [*0:$].
+static std::shared_ptr<const SequenceExpr> SeqAnyRun() {
+  return SeqRepeatAtLeast(SeqTrue(), 0);
+}
+
+std::shared_ptr<const SequenceExpr> SeqAnd(
+    std::shared_ptr<const SequenceExpr> r1,
+    std::shared_ptr<const SequenceExpr> r2) {
+  auto first_padded = SeqIntersect(SeqConcat(r1, SeqAnyRun()), r2);
+  auto second_padded =
+      SeqIntersect(std::move(r1), SeqConcat(std::move(r2), SeqAnyRun()));
+  return SeqOr(std::move(first_padded), std::move(second_padded));
+}
+
+std::shared_ptr<const SequenceExpr> SeqWithin(
+    std::shared_ptr<const SequenceExpr> r1,
+    std::shared_ptr<const SequenceExpr> r2) {
+  auto padded = SeqConcat(SeqConcat(SeqAnyRun(), std::move(r1)), SeqAnyRun());
+  return SeqIntersect(std::move(padded), std::move(r2));
+}
+
+std::shared_ptr<const SequenceExpr> SeqThroughout(
+    const std::shared_ptr<const BooleanExpr>& b,
+    std::shared_ptr<const SequenceExpr> r) {
+  return SeqIntersect(SeqRepeatAtLeast(SeqBoolean(b), 0), std::move(r));
+}
+
+std::shared_ptr<const SequenceExpr> SeqWithLocalAssignments(
+    std::shared_ptr<const SequenceExpr> r,
+    const std::vector<std::string>& names) {
+  auto first = SeqFusion(std::move(r), SeqLocalVarSampling(names.front()));
+  if (names.size() == 1) return first;
+  std::vector<std::string> rest(names.begin() + 1, names.end());
+  return SeqFusion(std::move(first), SeqWithLocalAssignments(SeqTrue(), rest));
 }
 
 }  // namespace delta
