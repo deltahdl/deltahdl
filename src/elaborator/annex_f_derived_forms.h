@@ -300,4 +300,32 @@ std::shared_ptr<const ClockedProperty> ClkNonoverlappingFollowedBy(
     std::shared_ptr<const SequenceExpr> s,
     std::shared_ptr<const ClockedProperty> q);
 
+// §F.3.4.3.7: the derived abort operators, unfolded into the §F.3.2 accept_on
+// form and negation. (reject_on(b) P) is (not accept_on(b) not P): where the
+// accept_on holds once P holds on the word or on the completion of some
+// prefix cut at a letter satisfying b, the reject_on holds only where P holds
+// on the word and on every such completion. (sync_accept_on(b) P) is
+// (accept_on(b) P) when the clock context is 1, which is the context the
+// unclocked model of §F.5.3.1 evaluates in, so PropSyncAcceptOn is the
+// accept_on itself there; under a clock, the §F.5.1.2 ClkSyncAcceptOn form
+// keeps the abort sampled with the clock and stands in its own right. And
+// (sync_reject_on(b) P) is (not (sync_accept_on(b) not P)), the same
+// negation over the synchronous form. Each is given in the unclocked property
+// model of §F.5.3.1 and in the clocked one of §F.5.1.2.
+std::shared_ptr<const PropertyExpr> PropRejectOn(
+    std::shared_ptr<const BooleanExpr> b,
+    std::shared_ptr<const PropertyExpr> p);
+std::shared_ptr<const PropertyExpr> PropSyncAcceptOn(
+    std::shared_ptr<const BooleanExpr> b,
+    std::shared_ptr<const PropertyExpr> p);
+std::shared_ptr<const PropertyExpr> PropSyncRejectOn(
+    std::shared_ptr<const BooleanExpr> b,
+    std::shared_ptr<const PropertyExpr> p);
+std::shared_ptr<const ClockedProperty> ClkRejectOn(
+    std::shared_ptr<const BooleanExpr> b,
+    std::shared_ptr<const ClockedProperty> q);
+std::shared_ptr<const ClockedProperty> ClkSyncRejectOn(
+    std::shared_ptr<const BooleanExpr> b,
+    std::shared_ptr<const ClockedProperty> q);
+
 }  // namespace delta

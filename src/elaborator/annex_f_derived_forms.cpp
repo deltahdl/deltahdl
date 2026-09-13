@@ -393,4 +393,34 @@ std::shared_ptr<const ClockedProperty> ClkNonoverlappingFollowedBy(
       ClkNonoverlappingImplication(std::move(s), ClkNot(std::move(q))));
 }
 
+std::shared_ptr<const PropertyExpr> PropRejectOn(
+    std::shared_ptr<const BooleanExpr> b,
+    std::shared_ptr<const PropertyExpr> p) {
+  return PropNot(PropAcceptOn(std::move(b), PropNot(std::move(p))));
+}
+
+std::shared_ptr<const PropertyExpr> PropSyncAcceptOn(
+    std::shared_ptr<const BooleanExpr> b,
+    std::shared_ptr<const PropertyExpr> p) {
+  return PropAcceptOn(std::move(b), std::move(p));
+}
+
+std::shared_ptr<const PropertyExpr> PropSyncRejectOn(
+    std::shared_ptr<const BooleanExpr> b,
+    std::shared_ptr<const PropertyExpr> p) {
+  return PropNot(PropSyncAcceptOn(std::move(b), PropNot(std::move(p))));
+}
+
+std::shared_ptr<const ClockedProperty> ClkRejectOn(
+    std::shared_ptr<const BooleanExpr> b,
+    std::shared_ptr<const ClockedProperty> q) {
+  return ClkNot(ClkAcceptOn(std::move(b), ClkNot(std::move(q))));
+}
+
+std::shared_ptr<const ClockedProperty> ClkSyncRejectOn(
+    std::shared_ptr<const BooleanExpr> b,
+    std::shared_ptr<const ClockedProperty> q) {
+  return ClkNot(ClkSyncAcceptOn(std::move(b), ClkNot(std::move(q))));
+}
+
 }  // namespace delta
