@@ -129,7 +129,148 @@ bool NonVacuous(const Word& word, const LvProperty& property,
   return false;
 }
 
+// The guard the always and eventually rules place on the letters before their
+// witness: w, L_0 |= P, or w, L_0 |= not P, which is w-bar, L_0 |/= P by the
+// negation rule of §F.5.6.1.
+bool GuardHolds(const Word& word, const LvProperty& p, bool negated,
+                const LocalContext& context) {
+  if (negated) {
+    return !NeutrallySatisfiesWithLocals(ComplementWord(word), p, context);
+  }
+  return NeutrallySatisfiesWithLocals(word, p, context);
+}
+
+// The indices a witness may take: first through last inclusive.
+struct IndexRange {
+  std::size_t first = 0;
+  std::size_t last = 0;
+};
+
+// §F.5.3.3's shape for the always and eventually rules of the derived
+// operators, with the context threaded: some index i in the range has
+// w^{i.}, L_0 |=^non P, and every j from the first index up to i has
+// w^{j.}, L_0 |= P for the always rules or w^{j.}, L_0 |= not P for the
+// eventually rules.
+bool NonVacuousAfterGuardedPrefix(const Word& word, const LvProperty& p,
+                                  bool guard_negated, IndexRange range,
+                                  const LocalContext& context) {
+  for (std::size_t i = range.first; i <= range.last; ++i) {
+    if (!NonVacuous(Suffix(word, i), p, context)) {
+      continue;
+    }
+    bool guarded = true;
+    for (std::size_t j = range.first; j < i; ++j) {
+      if (!GuardHolds(Suffix(word, j), p, guard_negated, context)) {
+        guarded = false;
+        break;
+      }
+    }
+    if (guarded) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// The range 0 .. |w|-1 of the unbounded rules, empty on the empty word.
+bool NonVacuousAfterGuardedPrefixOnTheWord(const Word& word,
+                                           const LvProperty& p,
+                                           bool guard_negated,
+                                           const LocalContext& context) {
+  if (word.empty()) {
+    return false;
+  }
+  return NonVacuousAfterGuardedPrefix(word, p, guard_negated,
+                                      IndexRange{0, word.size() - 1}, context);
+}
+
 }  // namespace
+
+bool NonVacuouslyEvaluatesIffWithLocals(const Word& word, const LvProperty& p1,
+                                        const LvProperty& p2,
+                                        const LocalContext& context) {
+  // §F.5.3.3: either operand nonvacuous.
+  return NonVacuous(word, p1, context) || NonVacuous(word, p2, context);
+}
+
+bool NonVacuouslyEvaluatesImpliesWithLocals(const Word& word,
+                                            const LvProperty& p1,
+                                            const LvProperty& p2,
+                                            const LocalContext& context) {
+  // §F.5.3.3: the antecedent holds and is nonvacuous, and the consequent is
+  // nonvacuous.
+  return NeutrallySatisfiesWithLocals(word, p1, context) &&
+         NonVacuous(word, p1, context) && NonVacuous(word, p2, context);
+}
+
+bool NonVacuouslyEvaluatesSUntilWithLocals(const Word& word,
+                                           const LvProperty& p1,
+                                           const LvProperty& p2,
+                                           const LocalContext& context) {
+  // §F.5.3.3: the rule of the until, stated again for s_until.
+  return NonVacuousUntil(word,
+                         *LvUntil(std::make_shared<LvProperty>(p1),
+                                  std::make_shared<LvProperty>(p2)),
+                         context);
+}
+
+bool NonVacuouslyEvaluatesAlwaysWithLocals(const Word& word,
+                                           const LvProperty& p,
+                                           const LocalContext& context) {
+  // §F.5.3.3: some 0 <= i < |w| from which P is nonvacuous, P holding from
+  // every earlier letter.
+  return NonVacuousAfterGuardedPrefixOnTheWord(word, p, false, context);
+}
+
+bool NonVacuouslyEvaluatesAlwaysRangeWithLocals(const Word& word,
+                                                const LvProperty& p,
+                                                unsigned int m, unsigned int n,
+                                                const LocalContext& context) {
+  // §F.5.3.3: some m <= i <= n from which P is nonvacuous, P holding from
+  // every letter m through i-1.
+  return NonVacuousAfterGuardedPrefix(word, p, false, IndexRange{m, n},
+                                      context);
+}
+
+bool NonVacuouslyEvaluatesSAlwaysRangeWithLocals(const Word& word,
+                                                 const LvProperty& p,
+                                                 unsigned int m, unsigned int n,
+                                                 const LocalContext& context) {
+  // §F.5.3.3: the rule of always [m:n], stated again for s_always [m:n].
+  return NonVacuouslyEvaluatesAlwaysRangeWithLocals(word, p, m, n, context);
+}
+
+bool NonVacuouslyEvaluatesSEventuallyWithLocals(const Word& word,
+                                                const LvProperty& p,
+                                                const LocalContext& context) {
+  // §F.5.3.3: some 0 <= i < |w| from which P is nonvacuous, not P holding
+  // from every earlier letter.
+  return NonVacuousAfterGuardedPrefixOnTheWord(word, p, true, context);
+}
+
+bool NonVacuouslyEvaluatesEventuallyRangeWithLocals(
+    const Word& word, const LvProperty& p, unsigned int m, unsigned int n,
+    const LocalContext& context) {
+  // §F.5.3.3: some m <= i <= n from which P is nonvacuous, not P holding from
+  // every letter m through i-1.
+  return NonVacuousAfterGuardedPrefix(word, p, true, IndexRange{m, n}, context);
+}
+
+bool NonVacuouslyEvaluatesSEventuallyRangeWithLocals(
+    const Word& word, const LvProperty& p, unsigned int m, unsigned int n,
+    const LocalContext& context) {
+  // §F.5.3.3: the rule of eventually [m:n], stated again for
+  // s_eventually [m:n].
+  return NonVacuouslyEvaluatesEventuallyRangeWithLocals(word, p, m, n, context);
+}
+
+bool NonVacuouslyEvaluatesRejectOnWithLocals(const Word& word,
+                                             const BooleanExpr& b,
+                                             const LvProperty& p,
+                                             const LocalContext& context) {
+  // §F.5.3.3: reject_on (b) P shares the abort/disable shape.
+  return NonVacuousAbortShape(word, b, p, context);
+}
 
 bool NonVacuouslyEvaluatesWithLocals(const Word& word,
                                      const LvProperty& property,

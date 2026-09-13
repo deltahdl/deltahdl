@@ -56,6 +56,49 @@ bool NonVacuouslyEvaluatesTopLevelWithLocals(const Word& word,
                                              const LvTopLevelProperty& top,
                                              const LocalContext& context);
 
+// §F.5.6.3 inherits the rules §F.5.3.3 states for ten derived operators of
+// §F.3.4.3 -- iff, implies, s_until, always, always [m:n], s_always [m:n],
+// s_eventually, eventually [m:n], s_eventually [m:n] and reject_on -- each
+// over the operands, with the context threaded through the non-vacuity and
+// the neutral satisfaction of §F.5.6.1 the rules are stated by. An operand
+// may declare a local variable, whose name the declaration rule strips from
+// the context its body sees.
+bool NonVacuouslyEvaluatesIffWithLocals(const Word& word, const LvProperty& p1,
+                                        const LvProperty& p2,
+                                        const LocalContext& context);
+bool NonVacuouslyEvaluatesImpliesWithLocals(const Word& word,
+                                            const LvProperty& p1,
+                                            const LvProperty& p2,
+                                            const LocalContext& context);
+bool NonVacuouslyEvaluatesSUntilWithLocals(const Word& word,
+                                           const LvProperty& p1,
+                                           const LvProperty& p2,
+                                           const LocalContext& context);
+bool NonVacuouslyEvaluatesAlwaysWithLocals(const Word& word,
+                                           const LvProperty& p,
+                                           const LocalContext& context);
+bool NonVacuouslyEvaluatesAlwaysRangeWithLocals(const Word& word,
+                                                const LvProperty& p,
+                                                unsigned int m, unsigned int n,
+                                                const LocalContext& context);
+bool NonVacuouslyEvaluatesSAlwaysRangeWithLocals(const Word& word,
+                                                 const LvProperty& p,
+                                                 unsigned int m, unsigned int n,
+                                                 const LocalContext& context);
+bool NonVacuouslyEvaluatesSEventuallyWithLocals(const Word& word,
+                                                const LvProperty& p,
+                                                const LocalContext& context);
+bool NonVacuouslyEvaluatesEventuallyRangeWithLocals(
+    const Word& word, const LvProperty& p, unsigned int m, unsigned int n,
+    const LocalContext& context);
+bool NonVacuouslyEvaluatesSEventuallyRangeWithLocals(
+    const Word& word, const LvProperty& p, unsigned int m, unsigned int n,
+    const LocalContext& context);
+bool NonVacuouslyEvaluatesRejectOnWithLocals(const Word& word,
+                                             const BooleanExpr& b,
+                                             const LvProperty& p,
+                                             const LocalContext& context);
+
 // §F.5.6.3 inherits §F.5.3.3's "w satisfies P nonvacuously iff w |= P and
 // w |=^non P," realized with local variables: §F.5.6.1's neutral satisfaction
 // with locals together with this subclause's non-vacuity.

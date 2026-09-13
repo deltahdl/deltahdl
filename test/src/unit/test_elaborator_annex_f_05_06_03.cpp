@@ -1,12 +1,16 @@
 #include <gtest/gtest.h>
 
+#include <memory>
 #include <set>
 #include <string>
+#include <vector>
 
 #include "elaborator/annex_f_grammar.h"
 #include "elaborator/annex_f_neutral_satisfaction_local_variables.h"
+#include "elaborator/annex_f_satisfaction_with_local_variables.h"
 #include "elaborator/annex_f_tight_satisfaction.h"
 #include "elaborator/annex_f_tight_satisfaction_local_variables.h"
+#include "elaborator/annex_f_vacuity.h"
 #include "elaborator/annex_f_vacuity_local_variables.h"
 
 using namespace delta;
@@ -293,6 +297,186 @@ TEST(NonVacuityLocals, TopLevelDisableIffOnTheEmptyWordFollowsTheOperand) {
       Word{}, *LvTopDisableIff(BoolAtom("b"), Strong("s")), LocalContext{}));
   EXPECT_FALSE(NonVacuouslyEvaluatesTopLevelWithLocals(
       Word{}, *LvTopDisableIff(BoolAtom("b"), Trig("a")), LocalContext{}));
+}
+
+// --- §F.5.6.3: the rules §F.5.3.3 states for the derived operators, with
+// local variables. ---
+
+// ( int v ; ( a ##1 (1, v = e) |-> strong( t ) ) ): a declared local sampled
+// by the trigger, whose non-vacuity needs a letter with a followed by one the
+// sampling takes, and whose satisfaction needs t on that second letter.
+std::shared_ptr<const LvProperty> DeclTrig() {
+  return LvLocalVarDecl(
+      "int", "v", LvImplication(SeqConcat(Bs("a"), Samp("v")), Strong("t")));
+}
+
+std::vector<LocalContext> Contexts() {
+  return {LocalContext{}, LocalContext{{"v", L({"old"})}}};
+}
+
+// A pair of operands without local variables beside their retractions.
+struct OperandPair {
+  std::shared_ptr<const LvProperty> lv1;
+  std::shared_ptr<const LvProperty> lv2;
+  std::shared_ptr<const PropertyExpr> p1;
+  std::shared_ptr<const PropertyExpr> p2;
+};
+std::vector<OperandPair> OperandPairs() {
+  const std::vector<std::shared_ptr<const LvProperty>> kOperands{
+      Trig("a"), Strong("s"), LvNot(Trig("a"))};
+  std::vector<OperandPair> out;
+  for (const auto& lv1 : kOperands) {
+    for (const auto& lv2 : kOperands) {
+      out.push_back({lv1, lv2, AsPropertyWithoutLocalVariables(*lv1),
+                     AsPropertyWithoutLocalVariables(*lv2)});
+    }
+  }
+  return out;
+}
+
+// §F.5.6.3: on operands without local variables each derived rule agrees
+// with §F.5.3.3's on the retraction, under the empty context and one binding
+// a name alike, with both verdicts occurring across the rules.
+TEST(NonVacuityLocals, DerivedRulesAgreeWithF533OnTheFragment) {
+  const std::vector<Word> kWords{Word{L({"x"}), L({"a", "t"})},
+                                 Word{L({"a", "t"})},
+                                 Word{L({"x"}), L({"x"})},
+                                 Word{},
+                                 Word{L({"a"})},
+                                 Word{L({"b", "s"})}};
+  const auto kB = BoolAtom("b");
+  std::set<bool> seen;
+  for (const OperandPair& o : OperandPairs()) {
+    for (const Word& w : kWords) {
+      for (const LocalContext& ctx : Contexts()) {
+        const bool kIff =
+            NonVacuouslyEvaluatesIffWithLocals(w, *o.lv1, *o.lv2, ctx);
+        seen.insert(kIff);
+        EXPECT_EQ(kIff, NonVacuouslyEvaluatesIff(w, *o.p1, *o.p2));
+        EXPECT_EQ(
+            NonVacuouslyEvaluatesImpliesWithLocals(w, *o.lv1, *o.lv2, ctx),
+            NonVacuouslyEvaluatesImplies(w, *o.p1, *o.p2));
+        EXPECT_EQ(NonVacuouslyEvaluatesSUntilWithLocals(w, *o.lv1, *o.lv2, ctx),
+                  NonVacuouslyEvaluatesSUntil(w, *o.p1, *o.p2));
+        EXPECT_EQ(NonVacuouslyEvaluatesAlwaysWithLocals(w, *o.lv1, ctx),
+                  NonVacuouslyEvaluatesAlways(w, *o.p1));
+        EXPECT_EQ(
+            NonVacuouslyEvaluatesAlwaysRangeWithLocals(w, *o.lv1, 0, 1, ctx),
+            NonVacuouslyEvaluatesAlwaysRange(w, *o.p1, 0, 1));
+        EXPECT_EQ(
+            NonVacuouslyEvaluatesSAlwaysRangeWithLocals(w, *o.lv1, 1, 2, ctx),
+            NonVacuouslyEvaluatesSAlwaysRange(w, *o.p1, 1, 2));
+        EXPECT_EQ(NonVacuouslyEvaluatesSEventuallyWithLocals(w, *o.lv1, ctx),
+                  NonVacuouslyEvaluatesSEventually(w, *o.p1));
+        EXPECT_EQ(NonVacuouslyEvaluatesEventuallyRangeWithLocals(w, *o.lv1, 0,
+                                                                 1, ctx),
+                  NonVacuouslyEvaluatesEventuallyRange(w, *o.p1, 0, 1));
+        EXPECT_EQ(NonVacuouslyEvaluatesSEventuallyRangeWithLocals(w, *o.lv1, 1,
+                                                                  2, ctx),
+                  NonVacuouslyEvaluatesSEventuallyRange(w, *o.p1, 1, 2));
+        EXPECT_EQ(NonVacuouslyEvaluatesRejectOnWithLocals(w, *kB, *o.lv1, ctx),
+                  NonVacuouslyEvaluatesRejectOn(w, *kB, *o.p1));
+      }
+    }
+  }
+  EXPECT_EQ(seen.size(), 2U);
+}
+
+// §F.5.6.3: the derived rules read the local variable forms of their
+// operands, the declaration hiding its name from the body under any context.
+// always DeclTrig on [x][a][b,t]: from the second letter the trigger samples
+// v on the third and the body is nonvacuous, and from the first the
+// implication holds vacuously, so the witness stands; on [x][x] there is
+// none. always ( not DeclTrig ) on the same word has its witness at the
+// second letter but DeclTrig holds from the first, so the guard fails.
+TEST(NonVacuityLocals, AlwaysReadsTheSamplingUnderTheDeclaration) {
+  const Word kWord{L({"x"}), L({"a"}), L({"b", "t"})};
+  for (const LocalContext& ctx : Contexts()) {
+    EXPECT_TRUE(NonVacuouslyEvaluatesAlwaysWithLocals(kWord, *DeclTrig(), ctx));
+    EXPECT_FALSE(NonVacuouslyEvaluatesAlwaysWithLocals(Word{L({"x"}), L({"x"})},
+                                                       *DeclTrig(), ctx));
+    EXPECT_FALSE(
+        NonVacuouslyEvaluatesAlwaysWithLocals(kWord, *LvNot(DeclTrig()), ctx));
+    EXPECT_TRUE(NonVacuouslyEvaluatesAlwaysRangeWithLocals(kWord, *DeclTrig(),
+                                                           1, 1, ctx));
+    EXPECT_FALSE(NonVacuouslyEvaluatesAlwaysRangeWithLocals(kWord, *DeclTrig(),
+                                                            0, 0, ctx));
+    EXPECT_EQ(NonVacuouslyEvaluatesSAlwaysRangeWithLocals(kWord, *DeclTrig(), 1,
+                                                          2, ctx),
+              NonVacuouslyEvaluatesAlwaysRangeWithLocals(kWord, *DeclTrig(), 1,
+                                                         2, ctx));
+  }
+}
+
+// §F.5.6.3: ( DeclTrig implies strong( s ) ) needs the antecedent to hold and
+// be nonvacuous: on [a][t] the sampling takes the second letter and t is
+// there; on [a][x] the antecedent fails; on [x][x] it holds vacuously.
+TEST(NonVacuityLocals, ImpliesReadsTheSamplingUnderTheDeclaration) {
+  for (const LocalContext& ctx : Contexts()) {
+    EXPECT_TRUE(NonVacuouslyEvaluatesImpliesWithLocals(
+        Word{L({"a"}), L({"t"})}, *DeclTrig(), *Strong("s"), ctx));
+    EXPECT_FALSE(NonVacuouslyEvaluatesImpliesWithLocals(
+        Word{L({"a"}), L({"x"})}, *DeclTrig(), *Strong("s"), ctx));
+    EXPECT_FALSE(NonVacuouslyEvaluatesImpliesWithLocals(
+        Word{L({"x"}), L({"x"})}, *DeclTrig(), *Strong("s"), ctx));
+    EXPECT_TRUE(NonVacuouslyEvaluatesIffWithLocals(
+        Word{L({"a"}), L({"x"})}, *DeclTrig(), *DeclTrig(), ctx));
+    EXPECT_FALSE(NonVacuouslyEvaluatesIffWithLocals(
+        Word{L({"x"}), L({"a"})}, *DeclTrig(), *DeclTrig(), ctx));
+  }
+}
+
+// §F.5.6.3: s_eventually ( not DeclTrig ) on [x][a][b,t] has its witness at
+// the second letter and DeclTrig, the negation of its operand, holding from
+// the first; s_eventually DeclTrig has the witness but not the guard; and the
+// bounded forms take both from m, eventually [0:1] finding the witness at 1
+// and eventually [0:0] none.
+TEST(NonVacuityLocals, SEventuallyReadsTheSamplingUnderTheDeclaration) {
+  const Word kWord{L({"x"}), L({"a"}), L({"b", "t"})};
+  auto neg = LvNot(DeclTrig());
+  for (const LocalContext& ctx : Contexts()) {
+    EXPECT_TRUE(NonVacuouslyEvaluatesSEventuallyWithLocals(kWord, *neg, ctx));
+    EXPECT_FALSE(
+        NonVacuouslyEvaluatesSEventuallyWithLocals(kWord, *DeclTrig(), ctx));
+    EXPECT_TRUE(
+        NonVacuouslyEvaluatesEventuallyRangeWithLocals(kWord, *neg, 0, 1, ctx));
+    EXPECT_FALSE(
+        NonVacuouslyEvaluatesEventuallyRangeWithLocals(kWord, *neg, 0, 0, ctx));
+    EXPECT_EQ(
+        NonVacuouslyEvaluatesSEventuallyRangeWithLocals(kWord, *neg, 0, 2, ctx),
+        NonVacuouslyEvaluatesEventuallyRangeWithLocals(kWord, *neg, 0, 2, ctx));
+  }
+}
+
+// §F.5.6.3: ( DeclTrig s_until not DeclTrig ) has the until rule with locals.
+TEST(NonVacuityLocals, SUntilSharesTheUntilRuleWithLocals) {
+  auto until = LvUntil(DeclTrig(), LvNot(DeclTrig()));
+  const std::vector<Word> kWords{Word{L({"x"}), L({"a"}), L({"b", "t"})},
+                                 Word{L({"x"}), L({"x"})}, Word{L({"a"})},
+                                 Word{}};
+  for (const Word& w : kWords) {
+    for (const LocalContext& ctx : Contexts()) {
+      EXPECT_EQ(NonVacuouslyEvaluatesSUntilWithLocals(w, *DeclTrig(),
+                                                      *LvNot(DeclTrig()), ctx),
+                NonVacuouslyEvaluatesWithLocals(w, *until, ctx));
+    }
+  }
+}
+
+// §F.5.6.3: reject_on (b) strong( s ##1 (1, v = e) ) has the abort shape with
+// locals: on [s][x][b] the prefix [s][x] settles the operand under _|_^omega,
+// its sampling taking the second letter, while on [b,s] the empty prefix
+// settles nothing.
+TEST(NonVacuityLocals, RejectOnSharesTheAbortShapeWithLocals) {
+  auto p = LvStrong(SeqConcat(Bs("s"), Samp("v")));
+  for (const LocalContext& ctx : Contexts()) {
+    EXPECT_TRUE(NonVacuouslyEvaluatesRejectOnWithLocals(
+        Word{L({"s"}), L({"x"}), L({"b"})}, *BoolAtom("b"), *p, ctx));
+    EXPECT_FALSE(NonVacuouslyEvaluatesRejectOnWithLocals(
+        Word{L({"b", "s"})}, *BoolAtom("b"), *p, ctx));
+    EXPECT_TRUE(NonVacuouslyEvaluatesRejectOnWithLocals(
+        Word{L({"x"})}, *BoolAtom("b"), *p, ctx));
+  }
 }
 
 }  // namespace
