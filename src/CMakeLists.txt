@@ -160,6 +160,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/annex_f_vacuity_local_variables.cpp
     elaborator/annex_f_satisfaction_with_local_variables.cpp
     elaborator/annex_f_satisfaction_without_local_variables.cpp
+    elaborator/annex_f_extended_expressions.cpp
     elaborator/annex_f_extended_booleans.cpp
     elaborator/annex_f_past.cpp
     elaborator/annex_f_future.cpp
