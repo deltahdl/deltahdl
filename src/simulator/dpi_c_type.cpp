@@ -208,4 +208,22 @@ std::size_t DpiCOffsetOfUnpackedElement(
   return linear * DpiCElementBytes(formal);
 }
 
+bool DpiPartSelectAppliesTo(const DpiArg& formal) {
+  // §H.11.5: a slice of a packed array of bit or logic, which is what has a
+  // canonical representation to slice.
+  return IsPackedArray(formal);
+}
+
+bool DpiPartSelectIsDetermined(uint32_t width, int i, int w) {
+  if (w < 1 || w > kDpiPartSelectMaxWidth || i < 0) return false;
+  // [(i+w-1):i] within [width-1:0]: the bit past the top of the select is
+  // no further than the bit past the top of the array.
+  return static_cast<uint64_t>(i) + static_cast<uint64_t>(w) <= width;
+}
+
+int DpiNormalizedBitIndex(SvActualDimension packed, int32_t sv_index) {
+  // §H.7.6 b): [L:R] is normalized to [abs(L-R):0], the LSB at R index 0.
+  return std::abs(sv_index - packed.high);
+}
+
 }  // namespace delta

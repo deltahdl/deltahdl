@@ -1,5 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+
+#include "parser/ast.h"
+#include "simulator/dpi_arg_value.h"
+#include "simulator/dpi_c_type.h"
 #include "simulator/svdpi.h"
 
 namespace {
@@ -191,6 +196,109 @@ TEST(SvDpi, PartSelectWidthOutOfRangeIsNoOp) {
   EXPECT_EQ(putdst, 0x12345678u);
   svPutPartselBit(&putdst, 0xFFu, 0, 0);
   EXPECT_EQ(putdst, 0x12345678u);
+}
+
+// Annex H.11.5 as a statement about the C layer: what the bit-select and
+// part-select utilities apply to, the limit on a part-select's width, when a
+// part-select's behavior is determined at all, and the normalized index of
+// §H.7.6 both utilities take.
+
+delta::DpiArg PackedFormal(delta::DataTypeKind type, uint32_t width) {
+  delta::DpiArg formal;
+  formal.name = "a";
+  formal.type = type;
+  formal.direction = delta::Direction::kInput;
+  formal.width = width;
+  return formal;
+}
+
+// §H.11.5: a part-select is a slice of a packed array of type bit or logic
+// -- reg being logic, integer and time packed 4-state -- and there is no
+// slice of an unpacked array, a scalar, or a type with no canonical form.
+TEST(DpiCanonicalUtilities, APartSelectIsASliceOfAPackedBitOrLogicArray) {
+  using delta::DataTypeKind;
+  EXPECT_TRUE(
+      delta::DpiPartSelectAppliesTo(PackedFormal(DataTypeKind::kBit, 8)));
+  EXPECT_TRUE(
+      delta::DpiPartSelectAppliesTo(PackedFormal(DataTypeKind::kLogic, 18)));
+  EXPECT_TRUE(
+      delta::DpiPartSelectAppliesTo(PackedFormal(DataTypeKind::kReg, 2)));
+  EXPECT_TRUE(
+      delta::DpiPartSelectAppliesTo(PackedFormal(DataTypeKind::kInteger, 0)));
+  EXPECT_TRUE(
+      delta::DpiPartSelectAppliesTo(PackedFormal(DataTypeKind::kTime, 0)));
+  // A scalar bit or logic is a small type passed by value (§H.8.7), not a
+  // packed array in canonical form.
+  EXPECT_FALSE(
+      delta::DpiPartSelectAppliesTo(PackedFormal(DataTypeKind::kBit, 1)));
+  EXPECT_FALSE(
+      delta::DpiPartSelectAppliesTo(PackedFormal(DataTypeKind::kLogic, 1)));
+  EXPECT_FALSE(
+      delta::DpiPartSelectAppliesTo(PackedFormal(DataTypeKind::kInt, 0)));
+  EXPECT_FALSE(
+      delta::DpiPartSelectAppliesTo(PackedFormal(DataTypeKind::kReal, 0)));
+  EXPECT_FALSE(
+      delta::DpiPartSelectAppliesTo(PackedFormal(DataTypeKind::kString, 0)));
+  EXPECT_FALSE(
+      delta::DpiPartSelectAppliesTo(PackedFormal(DataTypeKind::kChandle, 0)));
+  EXPECT_FALSE(
+      delta::DpiPartSelectAppliesTo(PackedFormal(DataTypeKind::kStruct, 0)));
+}
+
+// §H.11.5: the part-select functions reach a narrow subrange of up to 32
+// bits; 32 is the limit itself and 33 is beyond it, and a width of no bits
+// selects nothing.
+TEST(DpiCanonicalUtilities, APartSelectReachesAtMostThirtyTwoBits) {
+  EXPECT_EQ(delta::kDpiPartSelectMaxWidth, 32);
+  EXPECT_TRUE(delta::DpiPartSelectIsDetermined(64, 0, 32));
+  EXPECT_TRUE(delta::DpiPartSelectIsDetermined(64, 32, 32));
+  EXPECT_TRUE(delta::DpiPartSelectIsDetermined(64, 0, 1));
+  EXPECT_FALSE(delta::DpiPartSelectIsDetermined(64, 0, 33));
+  EXPECT_FALSE(delta::DpiPartSelectIsDetermined(64, 0, 0));
+  EXPECT_FALSE(delta::DpiPartSelectIsDetermined(64, 0, -1));
+}
+
+// §H.11.5: where the range [(i+w-1):i] a part-select names is not fully
+// within the array's normalized range [n-1:0] the behavior is undetermined
+// -- so of a 40-bit array bits [39:8] are determined and bits [40:9], one
+// past the MSB, are not, nor is a range starting below bit 0.
+TEST(DpiCanonicalUtilities,
+     APartSelectOutsideTheNormalizedRangeIsUndetermined) {
+  EXPECT_TRUE(delta::DpiPartSelectIsDetermined(40, 8, 32));
+  EXPECT_FALSE(delta::DpiPartSelectIsDetermined(40, 9, 32));
+  EXPECT_TRUE(delta::DpiPartSelectIsDetermined(40, 39, 1));
+  EXPECT_FALSE(delta::DpiPartSelectIsDetermined(40, 40, 1));
+  EXPECT_FALSE(delta::DpiPartSelectIsDetermined(40, -1, 8));
+  // A width the limit allows is still undetermined on an array narrower
+  // than it.
+  EXPECT_FALSE(delta::DpiPartSelectIsDetermined(18, 0, 32));
+  EXPECT_TRUE(delta::DpiPartSelectIsDetermined(18, 0, 18));
+}
+
+// §H.11.5 with §H.7.6 b): the utilities index the normalized range [n-1:0],
+// 0 the LSB, whatever range the declaration ran over -- so in `bit [4:7] a`
+// the bit a[7] is at index 0 and a[4] at index 3, in `logic [17:0] b` b[k]
+// is at index k, and in `bit [-1:-8] c` c[-8] is at 0 and c[-1] at 7.
+TEST(DpiCanonicalUtilities, TheUtilitiesIndexTheNormalizedRange) {
+  const delta::SvActualDimension kAscending{4, 7};
+  EXPECT_EQ(delta::DpiNormalizedBitIndex(kAscending, 7), 0);
+  EXPECT_EQ(delta::DpiNormalizedBitIndex(kAscending, 6), 1);
+  EXPECT_EQ(delta::DpiNormalizedBitIndex(kAscending, 4), 3);
+  const delta::SvActualDimension kDescending{17, 0};
+  EXPECT_EQ(delta::DpiNormalizedBitIndex(kDescending, 0), 0);
+  EXPECT_EQ(delta::DpiNormalizedBitIndex(kDescending, 17), 17);
+  const delta::SvActualDimension kNegative{-1, -8};
+  EXPECT_EQ(delta::DpiNormalizedBitIndex(kNegative, -8), 0);
+  EXPECT_EQ(delta::DpiNormalizedBitIndex(kNegative, -1), 7);
+  // The index so found is what the bit-select utility takes: with a holding
+  // 4'b1010 in canonical form, a[7], the LSB, is 0 and a[6] is 1.
+  const svBitVecVal kA = 0x0Au;
+  EXPECT_EQ(svGetBitselBit(&kA, delta::DpiNormalizedBitIndex(kAscending, 7)),
+            0U);
+  EXPECT_EQ(svGetBitselBit(&kA, delta::DpiNormalizedBitIndex(kAscending, 6)),
+            1U);
+  EXPECT_EQ(svGetBitselBit(&kA, delta::DpiNormalizedBitIndex(kAscending, 4)),
+            1U);
 }
 
 }  // namespace

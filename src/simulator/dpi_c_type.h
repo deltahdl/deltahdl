@@ -77,4 +77,37 @@ std::size_t DpiCOffsetOfUnpackedElement(
     const DpiArg& formal, const std::vector<SvActualDimension>& unpacked_dims,
     const std::vector<int32_t>& sv_indices);
 
+// §H.11.5: a packed array is accessible through its canonical representation
+// (§H.7.7), and the C layer's utility functions -- the bit-select and
+// part-select functions svdpi.h declares -- work on that representation. A
+// part-select is a slice of a packed array of type bit or logic, and there
+// is no slice of an unpacked array. The part-select functions reach only a
+// narrow subrange of up to 32 bits, and where the range a part-select names
+// does not lie wholly within the array's normalized range its behavior is
+// undetermined. Source and destination alike are indexed over the
+// normalized range [n-1:0] of §H.7.6 b), 0 the LSB.
+
+// Whether a formal is one the bit-select and part-select utilities reach: a
+// packed array of bit, logic or reg (a logic by Table H.1), or an integer or
+// time since §H.7.3 has them packed 4-state. Not a scalar bit or logic,
+// which §H.8.7 passes by value rather than in canonical form, not a type
+// with no canonical form, and not an unpacked array as such -- its packed
+// elements are, one at a time.
+bool DpiPartSelectAppliesTo(const DpiArg& formal);
+
+// The limit §H.11.5 puts on the width of a part-select.
+constexpr int kDpiPartSelectMaxWidth = 32;
+
+// Whether a part-select of width `w` starting at normalized index `i` of a
+// packed array of `width` bits is one whose behavior §H.11.5 determines:
+// the width at least one bit and within the limit, and the bits [(i+w-1):i]
+// all within [width-1:0].
+bool DpiPartSelectIsDetermined(uint32_t width, int i, int w);
+
+// The normalized index the utilities take for the bit SystemVerilog index
+// `sv_index` names in a packed dimension [L:R]: abs(sv_index - R) by §H.7.6
+// b), the LSB at R being index 0 and the MSB at L abs(L-R) whichever way
+// the range runs, so a[7] of `bit [4:7] a` is index 0 and a[4] index 3.
+int DpiNormalizedBitIndex(SvActualDimension packed, int32_t sv_index);
+
 }  // namespace delta
