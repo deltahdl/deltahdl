@@ -349,4 +349,8 @@ bool DpiFormalIsDeterminedOnEntry(Direction direction) {
   return direction != Direction::kOutput;
 }
 
+bool DpiSimulatorDetectsChangesOf(Direction direction) {
+  return direction == Direction::kOutput || direction == Direction::kInout;
+}
+
 }  // namespace delta

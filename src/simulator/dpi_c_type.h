@@ -280,4 +280,13 @@ bool DpiForeignCodeMayModifyFormal(Direction direction);
 // what this implementation hands it there.
 bool DpiFormalIsDeterminedOnEntry(Direction direction);
 
+// §H.6.4: the SystemVerilog simulator is responsible for handling value
+// changes for output and inout arguments, and such changes shall be
+// detected and handled after control returns from C code to SystemVerilog
+// code -- DpiRuntime::CallImportDetectingChanges is where this simulator
+// does so, once the import has returned. This is which directions it
+// watches for a change: an output and an inout, and not an input, which
+// the foreign code may not modify (§H.6.2).
+bool DpiSimulatorDetectsChangesOf(Direction direction);
+
 }  // namespace delta
