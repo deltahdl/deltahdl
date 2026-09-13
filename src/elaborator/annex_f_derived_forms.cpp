@@ -274,4 +274,34 @@ std::shared_ptr<const ClockedProperty> ClkNonoverlappingImplication(
                         std::move(q));
 }
 
+std::shared_ptr<const PropertyExpr> PropIf(
+    std::shared_ptr<const BooleanExpr> b,
+    std::shared_ptr<const PropertyExpr> p) {
+  return PropImplication(SeqBoolean(std::move(b)), std::move(p));
+}
+
+std::shared_ptr<const PropertyExpr> PropIfElse(
+    const std::shared_ptr<const BooleanExpr>& b,
+    std::shared_ptr<const PropertyExpr> p1,
+    std::shared_ptr<const PropertyExpr> p2) {
+  auto then_branch = PropImplication(SeqBoolean(b), std::move(p1));
+  auto else_branch = PropOr(PropWeak(SeqBoolean(b)), std::move(p2));
+  return PropAnd(std::move(then_branch), std::move(else_branch));
+}
+
+std::shared_ptr<const ClockedProperty> ClkIf(
+    std::shared_ptr<const BooleanExpr> b,
+    std::shared_ptr<const ClockedProperty> q) {
+  return ClkImplication(SeqBoolean(std::move(b)), std::move(q));
+}
+
+std::shared_ptr<const ClockedProperty> ClkIfElse(
+    const std::shared_ptr<const BooleanExpr>& b,
+    std::shared_ptr<const ClockedProperty> q1,
+    std::shared_ptr<const ClockedProperty> q2) {
+  auto then_branch = ClkImplication(SeqBoolean(b), std::move(q1));
+  auto else_branch = ClkOr(ClkWeak(SeqBoolean(b)), std::move(q2));
+  return ClkAnd(std::move(then_branch), std::move(else_branch));
+}
+
 }  // namespace delta

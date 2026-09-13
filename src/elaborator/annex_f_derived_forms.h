@@ -214,4 +214,27 @@ std::shared_ptr<const ClockedProperty> ClkNonoverlappingImplication(
     std::shared_ptr<const SequenceExpr> s,
     std::shared_ptr<const ClockedProperty> q);
 
+// §F.3.4.3.4: the derived conditional operators, unfolded into the §F.3.2
+// overlapping implication over the Boolean b read as a one-letter sequence.
+// (if (b) P) is (b |-> P), so P is required where b holds at the first letter
+// and nothing is required where it does not. (if (b) P1 else P2) is
+// ((b |-> P1) and (weak(b) or P2)): the first conjunct requires P1 where b
+// holds, and the second, since weak(b) holds exactly where b does at the
+// first letter, requires P2 where b fails. Each is given in the unclocked
+// property model of §F.5.3.1 and in the clocked one of §F.5.1.2.
+std::shared_ptr<const PropertyExpr> PropIf(
+    std::shared_ptr<const BooleanExpr> b,
+    std::shared_ptr<const PropertyExpr> p);
+std::shared_ptr<const PropertyExpr> PropIfElse(
+    const std::shared_ptr<const BooleanExpr>& b,
+    std::shared_ptr<const PropertyExpr> p1,
+    std::shared_ptr<const PropertyExpr> p2);
+std::shared_ptr<const ClockedProperty> ClkIf(
+    std::shared_ptr<const BooleanExpr> b,
+    std::shared_ptr<const ClockedProperty> q);
+std::shared_ptr<const ClockedProperty> ClkIfElse(
+    const std::shared_ptr<const BooleanExpr>& b,
+    std::shared_ptr<const ClockedProperty> q1,
+    std::shared_ptr<const ClockedProperty> q2);
+
 }  // namespace delta
