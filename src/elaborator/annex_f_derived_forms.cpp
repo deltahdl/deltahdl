@@ -487,4 +487,108 @@ std::shared_ptr<const ClockedProperty> ClkSUntilWith(
   return ClkSUntil(q1, ClkAnd(q1, std::move(q2)));
 }
 
+std::shared_ptr<const PropertyExpr> PropSNexttime(
+    std::shared_ptr<const PropertyExpr> p) {
+  return PropNot(PropNexttime(PropNot(std::move(p))));
+}
+
+std::shared_ptr<const PropertyExpr> PropNexttimeExactly(
+    std::shared_ptr<const PropertyExpr> p, unsigned int m) {
+  if (m == 0) return PropImplication(SeqTrue(), std::move(p));
+  return PropNexttime(PropNexttimeExactly(std::move(p), m - 1));
+}
+
+std::shared_ptr<const PropertyExpr> PropSNexttimeExactly(
+    std::shared_ptr<const PropertyExpr> p, unsigned int m) {
+  return PropNot(PropNexttimeExactly(PropNot(std::move(p)), m));
+}
+
+std::shared_ptr<const PropertyExpr> PropEventuallyRange(
+    const std::shared_ptr<const PropertyExpr>& p, unsigned int m,
+    unsigned int n) {
+  if (m == n) return PropNexttimeExactly(p, m);
+  auto narrower = PropEventuallyRange(p, m, n - 1);
+  return PropOr(std::move(narrower), PropNexttimeExactly(p, n));
+}
+
+std::shared_ptr<const PropertyExpr> PropAlwaysRange(
+    const std::shared_ptr<const PropertyExpr>& p, unsigned int m,
+    unsigned int n) {
+  if (m == n) return PropNexttimeExactly(p, m);
+  auto narrower = PropAlwaysRange(p, m, n - 1);
+  return PropAnd(std::move(narrower), PropNexttimeExactly(p, n));
+}
+
+std::shared_ptr<const PropertyExpr> PropAlwaysAtLeast(
+    std::shared_ptr<const PropertyExpr> p, unsigned int m) {
+  return PropNexttimeExactly(PropAlways(std::move(p)), m);
+}
+
+std::shared_ptr<const PropertyExpr> PropSEventuallyRange(
+    std::shared_ptr<const PropertyExpr> p, unsigned int m, unsigned int n) {
+  return PropNot(PropAlwaysRange(PropNot(std::move(p)), m, n));
+}
+
+std::shared_ptr<const PropertyExpr> PropSEventuallyAtLeast(
+    std::shared_ptr<const PropertyExpr> p, unsigned int m) {
+  return PropSNexttimeExactly(PropSEventually(std::move(p)), m);
+}
+
+std::shared_ptr<const PropertyExpr> PropSAlwaysRange(
+    std::shared_ptr<const PropertyExpr> p, unsigned int m, unsigned int n) {
+  return PropNot(PropEventuallyRange(PropNot(std::move(p)), m, n));
+}
+
+std::shared_ptr<const ClockedProperty> ClkSNexttime(
+    std::shared_ptr<const ClockedProperty> q) {
+  return ClkNot(ClkNexttime(ClkNot(std::move(q))));
+}
+
+std::shared_ptr<const ClockedProperty> ClkNexttimeExactly(
+    std::shared_ptr<const ClockedProperty> q, unsigned int m) {
+  if (m == 0) return ClkImplication(SeqTrue(), std::move(q));
+  return ClkNexttime(ClkNexttimeExactly(std::move(q), m - 1));
+}
+
+std::shared_ptr<const ClockedProperty> ClkSNexttimeExactly(
+    std::shared_ptr<const ClockedProperty> q, unsigned int m) {
+  return ClkNot(ClkNexttimeExactly(ClkNot(std::move(q)), m));
+}
+
+std::shared_ptr<const ClockedProperty> ClkEventuallyRange(
+    const std::shared_ptr<const ClockedProperty>& q, unsigned int m,
+    unsigned int n) {
+  if (m == n) return ClkNexttimeExactly(q, m);
+  auto narrower = ClkEventuallyRange(q, m, n - 1);
+  return ClkOr(std::move(narrower), ClkNexttimeExactly(q, n));
+}
+
+std::shared_ptr<const ClockedProperty> ClkAlwaysRange(
+    const std::shared_ptr<const ClockedProperty>& q, unsigned int m,
+    unsigned int n) {
+  if (m == n) return ClkNexttimeExactly(q, m);
+  auto narrower = ClkAlwaysRange(q, m, n - 1);
+  return ClkAnd(std::move(narrower), ClkNexttimeExactly(q, n));
+}
+
+std::shared_ptr<const ClockedProperty> ClkAlwaysAtLeast(
+    std::shared_ptr<const ClockedProperty> q, unsigned int m) {
+  return ClkNexttimeExactly(ClkAlways(std::move(q)), m);
+}
+
+std::shared_ptr<const ClockedProperty> ClkSEventuallyRange(
+    std::shared_ptr<const ClockedProperty> q, unsigned int m, unsigned int n) {
+  return ClkNot(ClkAlwaysRange(ClkNot(std::move(q)), m, n));
+}
+
+std::shared_ptr<const ClockedProperty> ClkSEventuallyAtLeast(
+    std::shared_ptr<const ClockedProperty> q, unsigned int m) {
+  return ClkSNexttimeExactly(ClkSEventually(std::move(q)), m);
+}
+
+std::shared_ptr<const ClockedProperty> ClkSAlwaysRange(
+    std::shared_ptr<const ClockedProperty> q, unsigned int m, unsigned int n) {
+  return ClkNot(ClkEventuallyRange(ClkNot(std::move(q)), m, n));
+}
+
 }  // namespace delta

@@ -369,4 +369,63 @@ std::shared_ptr<const ClockedProperty> ClkSUntilWith(
     const std::shared_ptr<const ClockedProperty>& q1,
     std::shared_ptr<const ClockedProperty> q2);
 
+// §F.3.4.3.9: the derived bounded temporal operators, unfolded into the §F.3.2
+// nexttime, implication, not, or and and over the §F.3.4.3.8 always and
+// s_eventually. (s_nexttime p) is (not nexttime not p), so it fails on the
+// empty word where the §F.3.2 nexttime holds outright.
+// (nexttime[0] p) is (1 |-> p), which requires p from the first letter and
+// holds on the empty word, and (nexttime[m] p) for m > 0 is
+// (nexttime (nexttime[m-1] p)); (s_nexttime[m] p) is (not nexttime[m] not p).
+// (eventually[m:m] p) is (nexttime[m] p) and (eventually[m:n] p) for m < n is
+// (eventually[m:n-1] p or nexttime[n] p), so p is required from one of the
+// letters m through n; (always[m:m] p) is (nexttime[m] p) and
+// (always[m:n] p) for m < n is (always[m:n-1] p and nexttime[n] p), so p is
+// required from each of them; (always[m:$] p) is (nexttime[m] always p).
+// (s_eventually[m:n] p) is (not always[m:n] not p), (s_eventually[m:$] p) is
+// (s_nexttime[m] s_eventually p), and (s_always[m:n] p) is
+// (not eventually[m:n] not p). The ranges take m <= n, as the identities do.
+// Each is given in the unclocked property model of §F.5.3.1 and in the
+// clocked one of §F.5.1.2, where the antecedent 1 of nexttime[0] is the
+// Boolean sequence that T^s of §F.5.1.2 aligns to the next tick.
+std::shared_ptr<const PropertyExpr> PropSNexttime(
+    std::shared_ptr<const PropertyExpr> p);
+std::shared_ptr<const PropertyExpr> PropNexttimeExactly(
+    std::shared_ptr<const PropertyExpr> p, unsigned int m);
+std::shared_ptr<const PropertyExpr> PropSNexttimeExactly(
+    std::shared_ptr<const PropertyExpr> p, unsigned int m);
+std::shared_ptr<const PropertyExpr> PropEventuallyRange(
+    const std::shared_ptr<const PropertyExpr>& p, unsigned int m,
+    unsigned int n);
+std::shared_ptr<const PropertyExpr> PropAlwaysRange(
+    const std::shared_ptr<const PropertyExpr>& p, unsigned int m,
+    unsigned int n);
+std::shared_ptr<const PropertyExpr> PropAlwaysAtLeast(
+    std::shared_ptr<const PropertyExpr> p, unsigned int m);
+std::shared_ptr<const PropertyExpr> PropSEventuallyRange(
+    std::shared_ptr<const PropertyExpr> p, unsigned int m, unsigned int n);
+std::shared_ptr<const PropertyExpr> PropSEventuallyAtLeast(
+    std::shared_ptr<const PropertyExpr> p, unsigned int m);
+std::shared_ptr<const PropertyExpr> PropSAlwaysRange(
+    std::shared_ptr<const PropertyExpr> p, unsigned int m, unsigned int n);
+std::shared_ptr<const ClockedProperty> ClkSNexttime(
+    std::shared_ptr<const ClockedProperty> q);
+std::shared_ptr<const ClockedProperty> ClkNexttimeExactly(
+    std::shared_ptr<const ClockedProperty> q, unsigned int m);
+std::shared_ptr<const ClockedProperty> ClkSNexttimeExactly(
+    std::shared_ptr<const ClockedProperty> q, unsigned int m);
+std::shared_ptr<const ClockedProperty> ClkEventuallyRange(
+    const std::shared_ptr<const ClockedProperty>& q, unsigned int m,
+    unsigned int n);
+std::shared_ptr<const ClockedProperty> ClkAlwaysRange(
+    const std::shared_ptr<const ClockedProperty>& q, unsigned int m,
+    unsigned int n);
+std::shared_ptr<const ClockedProperty> ClkAlwaysAtLeast(
+    std::shared_ptr<const ClockedProperty> q, unsigned int m);
+std::shared_ptr<const ClockedProperty> ClkSEventuallyRange(
+    std::shared_ptr<const ClockedProperty> q, unsigned int m, unsigned int n);
+std::shared_ptr<const ClockedProperty> ClkSEventuallyAtLeast(
+    std::shared_ptr<const ClockedProperty> q, unsigned int m);
+std::shared_ptr<const ClockedProperty> ClkSAlwaysRange(
+    std::shared_ptr<const ClockedProperty> q, unsigned int m, unsigned int n);
+
 }  // namespace delta
