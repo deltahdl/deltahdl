@@ -998,6 +998,45 @@ jobs:
       - uses: actions/checkout@v5
       - name: Assert every citation names a clause and every message one rule
         run: PYTHONPATH=.:scripts python3 -m assert_subclause_citations
+  # Annex H.3 has every name the DPI C layer introduces follow one of its
+  # four conventions, and svdpi.h is where the layer introduces them, so this
+  # job reads that header and fails on a function or type name that is not sv
+  # followed by initially capitalized words with no separator, and on a
+  # symbolic constant or macro that is neither sv_ in lowercase nor SV_ in
+  # uppercase. test/src/unit/test_simulator_annex_h_03.cpp checks the names the
+  # header holds today by spelling; this job is what catches a name added to
+  # the header without being added there.
+  assert-svdpi-naming:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Check every name svdpi.h introduces follows Annex H.3
+        run: |
+          set -euo pipefail
+          f=src/simulator/svdpi.h
+          fail=0
+          types=$(grep -oE 'typedef [^;]*[[:space:]]\*?(sv[A-Za-z0-9_]*)[[:space:]]*;' "$f" \
+            | grep -oE 'sv[A-Za-z0-9_]*[[:space:]]*;$' | tr -d ' ;' | sort -u)
+          funcs=$(grep -oE '(^|[^A-Za-z0-9_])sv[A-Za-z0-9_]*[[:space:]]*\(' "$f" \
+            | grep -oE 'sv[A-Za-z0-9_]*' | sort -u)
+          for n in $types $funcs
+          do
+            if ! echo "$n" | grep -qE '^sv[A-Z][A-Za-z0-9]*$'
+            then
+              echo "::error file=$f::function or type name '$n' is not sv followed by capitalized words without separators (Annex H.3)"
+              fail=1
+            fi
+          done
+          defs=$(grep -oE '^#define[[:space:]]+(sv|SV_)[A-Za-z0-9_]*' "$f" | awk '{print $2}' | sort -u)
+          for n in $defs
+          do
+            if ! echo "$n" | grep -qE '^sv_[a-z0-9_]+$|^SV_[A-Z0-9_]+$'
+            then
+              echo "::error file=$f::symbolic constant or macro name '$n' is neither sv_ in lowercase nor SV_ in uppercase (Annex H.3)"
+              fail=1
+            fi
+          done
+          exit $fail
   build-asan-ubsan:
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
