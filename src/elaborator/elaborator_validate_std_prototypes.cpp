@@ -53,9 +53,9 @@ void CheckStdMethodCall(const Expr* e, const StdHandles& handles,
       !e->lhs->rhs) {
     return;
   }
-  const auto it = handles.find(e->lhs->lhs->text);
-  if (it == handles.end()) return;
-  const StdPackageMember kMember = it->second;
+  const auto kFound = handles.find(e->lhs->lhs->text);
+  if (kFound == handles.end()) return;
+  const StdPackageMember kMember = kFound->second;
   const std::string_view kClass = StdPackageMemberName(kMember);
   const std::string_view kMethod = e->lhs->rhs->text;
   const std::string_view kSubclause =
@@ -109,42 +109,43 @@ void CheckStdCallsInStmt(const Stmt* s, const StdHandles& handles,
       s, [&](Stmt* const& sub) { CheckStdCallsInStmt(sub, handles, diag); });
 }
 
-}  // namespace
+// The statements a module's procedural blocks and subroutines hold: each
+// procedural item's body and each function's or task's body statements.
+template <typename Visit>
+void ForEachBodyStmt(const ModuleDecl* decl, Visit visit) {
+  for (const auto* item : decl->items) {
+    if (IsProceduralItemKind(item->kind)) {
+      visit(item->body);
+    } else if (item->kind == ModuleItemKind::kFunctionDecl ||
+               item->kind == ModuleItemKind::kTaskDecl) {
+      for (const auto* s : item->func_body_stmts) visit(s);
+    }
+  }
+}
 
-void Elaborator::ValidateStdClassMethodCalls(const ModuleDecl* decl) {
-  // The handles: the module-scope variables of a std class, and those the
-  // procedural bodies and subroutines declare.
-  StdHandles handles;
+// The module-scope variables of a std class with a prototype.
+void CollectStdHandlesInItems(const ModuleDecl* decl, StdHandles& handles) {
   for (const auto* item : decl->items) {
     if (item->kind != ModuleItemKind::kVarDecl) continue;
     const std::optional<StdPackageMember> kMember =
         StdClassOfType(item->data_type);
     if (kMember) handles[item->name] = *kMember;
   }
-  for (const auto* item : decl->items) {
-    if (IsProceduralItemKind(item->kind)) {
-      CollectStdHandlesInStmt(item->body, handles);
-    }
-    if (item->kind == ModuleItemKind::kFunctionDecl ||
-        item->kind == ModuleItemKind::kTaskDecl) {
-      for (const auto* s : item->func_body_stmts) {
-        CollectStdHandlesInStmt(s, handles);
-      }
-    }
-  }
-  if (handles.empty()) return;
+}
 
-  for (const auto* item : decl->items) {
-    if (IsProceduralItemKind(item->kind)) {
-      CheckStdCallsInStmt(item->body, handles, diag_);
-    }
-    if (item->kind == ModuleItemKind::kFunctionDecl ||
-        item->kind == ModuleItemKind::kTaskDecl) {
-      for (const auto* s : item->func_body_stmts) {
-        CheckStdCallsInStmt(s, handles, diag_);
-      }
-    }
-  }
+}  // namespace
+
+void Elaborator::ValidateStdClassMethodCalls(const ModuleDecl* decl) {
+  // The handles: the module-scope variables of a std class, and those the
+  // procedural bodies and subroutines declare.
+  StdHandles handles;
+  CollectStdHandlesInItems(decl, handles);
+  ForEachBodyStmt(
+      decl, [&handles](const Stmt* s) { CollectStdHandlesInStmt(s, handles); });
+  if (handles.empty()) return;
+  ForEachBodyStmt(decl, [&handles, this](const Stmt* s) {
+    CheckStdCallsInStmt(s, handles, diag_);
+  });
 }
 
 }  // namespace delta
