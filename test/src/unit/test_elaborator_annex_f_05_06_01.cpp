@@ -1,11 +1,16 @@
 #include <gtest/gtest.h>
 
+#include <memory>
 #include <set>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "elaborator/annex_f_grammar.h"
+#include "elaborator/annex_f_neutral_satisfaction.h"
 #include "elaborator/annex_f_neutral_satisfaction_local_variables.h"
+#include "elaborator/annex_f_neutral_satisfaction_local_variables_clocked.h"
+#include "elaborator/annex_f_property_rewrite.h"
 #include "elaborator/annex_f_tight_satisfaction.h"
 #include "elaborator/annex_f_tight_satisfaction_local_variables.h"
 
@@ -344,6 +349,162 @@ TEST(NeutralSatisfactionLocals,
   EXPECT_FALSE(PassesTopLevelWithLocals(kWord, *top, LocalContext{}));
   EXPECT_FALSE(IsDisabledTopLevelWithLocals(kWord, *top, LocalContext{}));
   EXPECT_TRUE(FailsTopLevelWithLocals(kWord, *top, LocalContext{}));
+}
+
+// --- The clocked column ---
+
+using Activation = AssertionStatement::Activation;
+using Role = AssertionStatement::Role;
+
+// @( clk ) strong( a ##1 (1, v = e) ): a clocked property whose sequence
+// samples a local at the tick after a.
+std::shared_ptr<const ClockedProperty> ClockedSampling() {
+  return ClkClock(BoolAtom("clk"), ClkStrong(SeqConcat(Bool("a"), Samp("v"))));
+}
+
+// §F.5.6.1 (clocked property): w, L_0 |= Q iff w, L_0 |= T^p(Q, 1). The
+// sequence under the clock samples a local, which T^s fuses onto the clocked
+// tick, so @( clk ) strong( (1, v = e) ) is met at the first tick and not on
+// a word without one, and @( clk ) strong( a ##1 (1, v = e) ) at the tick
+// after the one carrying a, under the empty context and one binding v alike;
+// on a property without local variables the relation is §F.5.3.1's.
+TEST(NeutralSatisfactionLocals, ClockedPropertyIsDecidedByItsRewrite) {
+  auto tick = ClkClock(BoolAtom("clk"), ClkStrong(Samp("v")));
+  const std::vector<LocalContext> kContexts{LocalContext{},
+                                            LocalContext{{"v", A({"old"})}}};
+  for (const LocalContext& ctx : kContexts) {
+    EXPECT_TRUE(NeutrallySatisfiesClockedPropertyWithLocals(
+        Word{A({"x"}), A({"clk"})}, *tick, ctx));
+    EXPECT_FALSE(NeutrallySatisfiesClockedPropertyWithLocals(Word{A({"x"})},
+                                                             *tick, ctx));
+    EXPECT_TRUE(NeutrallySatisfiesClockedPropertyWithLocals(
+        Word{A({"a", "clk"}), A({"x"}), A({"b", "clk"})}, *ClockedSampling(),
+        ctx));
+    EXPECT_FALSE(NeutrallySatisfiesClockedPropertyWithLocals(
+        Word{A({"a", "clk"}), A({"x"})}, *ClockedSampling(), ctx));
+  }
+  auto plain = ClkClock(BoolAtom("clk"), ClkStrong(Bool("a")));
+  const std::vector<Word> kWords{Word{A({"a", "clk"})}, Word{A({"x", "clk"})},
+                                 Word{A({"x"}), A({"a", "clk"})}};
+  for (const Word& w : kWords) {
+    EXPECT_EQ(
+        NeutrallySatisfiesClockedPropertyWithLocals(w, *plain, LocalContext{}),
+        NeutrallySatisfiesClockedProperty(w, *plain));
+  }
+}
+
+// §F.5.6.1 (clocked top-level): the U forms reduce to their T counterparts
+// with T^p(Q, 1) for P, the declaration and the parenthesis carried through,
+// and the pass, disabled and fail verdicts follow. ( int v ; ( disable iff
+// (rst) @( clk ) strong( (1, v = e) ) ) ) passes on [x][clk] under a context
+// binding v, the declaration hiding it; on [rst] the guard fires at the first
+// letter and the empty prefix passes under T^omega and not under _|_^omega,
+// so it is disabled; and on [x] there is no tick and no rst, so it fails.
+TEST(NeutralSatisfactionLocals, ClockedTopLevelFormsReduceToTheirTForms) {
+  auto u = LvClockedTopLocalVarDecl(
+      "int", "v",
+      LvClockedTopParen(LvClockedTopDisableIff(
+          BoolAtom("rst"), ClkClock(BoolAtom("clk"), ClkStrong(Samp("v"))))));
+  auto t = UnclockTopLevelWithLocals(*u, BoolTrue());
+  ASSERT_EQ(t->kind, LvTopLevelProperty::Kind::kLocalVarDecl);
+  EXPECT_EQ(t->local_var_name, "v");
+  ASSERT_EQ(t->inner->kind, LvTopLevelProperty::Kind::kParen);
+  ASSERT_EQ(t->inner->inner->kind, LvTopLevelProperty::Kind::kDisableIff);
+  EXPECT_TRUE(
+      BooleanExprEqual(*t->inner->inner->disable_condition, *BoolAtom("rst")));
+  const LocalContext kBound{{"v", A({"old"})}};
+  EXPECT_TRUE(
+      PassesTopLevelClockedWithLocals(Word{A({"x"}), A({"clk"})}, *u, kBound));
+  EXPECT_TRUE(NeutrallySatisfiesTopLevelClockedWithLocals(
+      Word{A({"x"}), A({"clk"})}, *u, kBound));
+  EXPECT_FALSE(IsDisabledTopLevelClockedWithLocals(Word{A({"x"}), A({"clk"})},
+                                                   *u, kBound));
+  EXPECT_TRUE(IsDisabledTopLevelClockedWithLocals(Word{A({"rst"})}, *u,
+                                                  LocalContext{}));
+  EXPECT_TRUE(
+      DisablesTopLevelClockedWithLocals(Word{A({"rst"})}, *u, LocalContext{}));
+  EXPECT_FALSE(
+      PassesTopLevelClockedWithLocals(Word{A({"rst"})}, *u, LocalContext{}));
+  EXPECT_FALSE(
+      FailsTopLevelClockedWithLocals(Word{A({"rst"})}, *u, LocalContext{}));
+  EXPECT_TRUE(FailsTopLevelClockedWithLocals(Word{A({"x"})}, *u, kBound));
+  EXPECT_FALSE(PassesTopLevelClockedWithLocals(Word{A({"x"})}, *u, kBound));
+  EXPECT_FALSE(IsDisabledTopLevelClockedWithLocals(Word{A({"x"})}, *u, kBound));
+}
+
+// §F.5.6.1 (assertion): the rules are §F.5.3.1's with bodies that may carry
+// local variables. initial @( clk ) assert property ( int v ; strong( a ##1
+// (1, v = e) ) ) fires at the first tick, where a must hold and the sampling
+// be met at the next tick: it holds on [a,clk][b,clk], not on [a,clk], which
+// has no next tick, and not on [x,clk][a,clk][b,clk], whose first tick lacks
+// a. always @( clk ) cover property strong( a ##1 (1, v = e) ) passes at the
+// second tick of [x,clk][a,clk][b,clk] and nowhere on [x,clk][x,clk]. The U
+// form initial assert property ( int v ; @( clk ) strong( a ##1 (1, v = e) ) )
+// fires at index 0 and holds on [a,clk][b,clk]; and the enabling condition
+// gates it, an activation the letter does not enable letting [a,clk] go.
+TEST(NeutralSatisfactionLocals, AssertionsThreadLocalsThroughTheirBodies) {
+  auto body = LvClockedTopLocalVarDecl(
+      "int", "v",
+      LvClockedTopProperty(ClkStrong(SeqConcat(Bool("a"), Samp("v")))));
+  auto initial = LvAssertionWithClock(Activation::kInitial, Role::kAssert,
+                                      BoolAtom("clk"), body);
+  EXPECT_TRUE(NeutrallySatisfiesAssertionWithLocals(
+      Word{A({"a", "clk"}), A({"b", "clk"})}, *BoolTrue(), *initial));
+  EXPECT_FALSE(NeutrallySatisfiesAssertionWithLocals(Word{A({"a", "clk"})},
+                                                     *BoolTrue(), *initial));
+  EXPECT_FALSE(NeutrallySatisfiesAssertionWithLocals(
+      Word{A({"x", "clk"}), A({"a", "clk"}), A({"b", "clk"})}, *BoolTrue(),
+      *initial));
+  auto cover = LvAssertionWithClock(
+      Activation::kAlways, Role::kCover, BoolAtom("clk"),
+      LvClockedTopProperty(ClkStrong(SeqConcat(Bool("a"), Samp("v")))));
+  EXPECT_TRUE(NeutrallySatisfiesAssertionWithLocals(
+      Word{A({"x", "clk"}), A({"a", "clk"}), A({"b", "clk"})}, *BoolTrue(),
+      *cover));
+  EXPECT_FALSE(NeutrallySatisfiesAssertionWithLocals(
+      Word{A({"x", "clk"}), A({"x", "clk"})}, *BoolTrue(), *cover));
+  auto u = LvAssertionWithClockedTop(
+      Activation::kInitial, Role::kAssert,
+      LvClockedTopLocalVarDecl("int", "v",
+                               LvClockedTopProperty(ClockedSampling())));
+  EXPECT_TRUE(NeutrallySatisfiesAssertionWithLocals(
+      Word{A({"a", "clk"}), A({"b", "clk"})}, *BoolTrue(), *u));
+  EXPECT_FALSE(NeutrallySatisfiesAssertionWithLocals(Word{A({"a", "clk"})},
+                                                     *BoolTrue(), *u));
+  EXPECT_TRUE(NeutrallySatisfiesAssertionWithLocals(Word{A({"a", "clk"})},
+                                                    *BoolAtom("en"), *u));
+}
+
+// §F.5.6.1 (assertion): on a body without local variables the relation is
+// §F.5.3.1's, for both shapes of body, both activations and the assert and
+// cover roles, over words with a match, a late match, no match and no letter.
+TEST(NeutralSatisfactionLocals, AssertionsAgreeWithF531WithoutLocals) {
+  const auto kAThenB = SeqConcat(Bool("a"), Bool("b"));
+  auto q = ClkClock(BoolAtom("clk"), ClkStrong(kAThenB));
+  const std::vector<Word> kWords{
+      Word{A({"a", "clk"}), A({"b", "clk"})},
+      Word{A({"a", "clk"}), A({"x"}), A({"b", "clk"})},
+      Word{A({"x", "clk"}), A({"a", "clk"}), A({"b", "clk"})},
+      Word{A({"x", "clk"})}, Word{}};
+  for (Activation activation : {Activation::kAlways, Activation::kInitial}) {
+    for (Role role : {Role::kAssert, Role::kCover}) {
+      auto lv_u =
+          LvAssertionWithClockedTop(activation, role, LvClockedTopProperty(q));
+      auto plain_u =
+          AssertionWithClockedTop(activation, role, ClockedTopProperty(q));
+      auto lv_t =
+          LvAssertionWithClock(activation, role, BoolAtom("clk"),
+                               LvClockedTopProperty(ClkStrong(kAThenB)));
+      auto plain_t = AssertionWithClock(activation, role, BoolAtom("clk"),
+                                        TopProperty(PropStrong(kAThenB)));
+      for (const Word& w : kWords) {
+        EXPECT_EQ(NeutrallySatisfiesAssertionWithLocals(w, *BoolTrue(), *lv_u),
+                  NeutrallySatisfiesAssertion(w, *BoolTrue(), *plain_u));
+        EXPECT_EQ(NeutrallySatisfiesAssertionWithLocals(w, *BoolTrue(), *lv_t),
+                  NeutrallySatisfiesAssertion(w, *BoolTrue(), *plain_t));
+      }
+    }
+  }
 }
 
 }  // namespace

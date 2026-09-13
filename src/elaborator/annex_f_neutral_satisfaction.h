@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -159,6 +160,15 @@ std::shared_ptr<const ClockedTopLevelProperty> ClockedTopDisableIff(
 std::shared_ptr<const ClockedTopLevelProperty> ClockedTopParen(
     std::shared_ptr<const ClockedTopLevelProperty> inner);
 
+// §F.5.3.1: the unclocked property that decides w |= Q, T^p(Q, c) read into
+// the property model for the clock c -- 1 for a clocked property standing
+// alone, the clock of @( c ) T for a property under an explicit clock -- with
+// a Boolean T^p emits in property position read as strong(b), a Boolean being
+// a length-one sequence on which strong and weak coincide. §F.5.1.2's
+// RewritePropertyUnderClock is the satisfied dependency that supplies T^p.
+std::shared_ptr<const PropertyExpr> UnclockedPropertyOf(
+    const ClockedProperty& q, const std::shared_ptr<const BooleanExpr>& clock);
+
 // §F.5.3.1: neutral satisfaction w |= U and disabling w |=^d U of a clocked
 // top-level property. The U forms mirror the unclocked T forms with Q replacing
 // P, so each reduces to its T counterpart over the unclocked property T^p(Q,
@@ -198,6 +208,28 @@ struct AssertionStatement {
   std::shared_ptr<const TopLevelProperty> top;  // T, for kExplicitClock
   std::shared_ptr<const ClockedTopLevelProperty> clocked_top;  // U, kClockedTop
 };
+
+// §F.5.3.1: what fixes the activation points of an assertion statement, apart
+// from its body and role -- its activation, its form and, for the explicit
+// clock form, its clock -- so that a statement whose body carries local
+// variables (§F.5.6.1) activates by the same rule.
+struct AssertionActivation {
+  AssertionStatement::Activation activation =
+      AssertionStatement::Activation::kAlways;
+  AssertionStatement::Form form = AssertionStatement::Form::kExplicitClock;
+  std::shared_ptr<const BooleanExpr> clock;  // c, for kExplicitClock
+};
+AssertionActivation ActivationOf(const AssertionStatement& assertion);
+
+// §F.5.3.1: every rule guards an activation point i by the enabling condition
+// (w-bar^i |= b) and, depending on activation and form, by the clock. The
+// always forms scan every index; the initial forms fire only at the first
+// clock tick, the index whose prefix of w-bar tightly satisfies
+// !c [*0:$] ##1 c (explicit clock), or at index 0 (the U column).
+// `complement` is w-bar.
+bool ActivationPointEnabled(std::size_t i, const Word& complement,
+                            const BooleanExpr& enabling,
+                            const AssertionActivation& activation);
 
 std::shared_ptr<const AssertionStatement> AssertionWithClock(
     AssertionStatement::Activation activation, AssertionStatement::Role role,

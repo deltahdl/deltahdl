@@ -363,10 +363,9 @@ std::shared_ptr<const PropertyExpr> BridgeClockedProperty(
 }
 
 // §F.5.3.1: the unclocked property that decides w |= Q, namely T^p(Q, 1)
-// bridged into a PropertyExpr. §F.5.1.2's RewritePropertyUnderClock is the
-// satisfied dependency that supplies T^p.
+// bridged into a PropertyExpr.
 std::shared_ptr<const PropertyExpr> UnclockProperty(const ClockedProperty& q) {
-  return BridgeClockedProperty(*RewritePropertyUnderClock(q, BoolTrue()));
+  return UnclockedPropertyOf(q, BoolTrue());
 }
 
 // Lifts an unclocked property P into the §F.5.1.2 ClockedProperty model so an
@@ -452,28 +451,41 @@ std::shared_ptr<const SequenceExpr> FirstClockTickSequence(
                    SeqBoolean(clock));
 }
 
-// §F.5.3.1: every rule guards an activation point i by the enabling condition
-// (w-bar^i |= b) and, depending on activation and form, by the clock. The
-// always forms scan every index; the initial forms fire only at the first
-// clock tick (clocked) or at index 0 (the U column). kComplement is w-bar.
+}  // namespace
+
+std::shared_ptr<const PropertyExpr> UnclockedPropertyOf(
+    const ClockedProperty& q, const std::shared_ptr<const BooleanExpr>& clock) {
+  return BridgeClockedProperty(*RewritePropertyUnderClock(q, clock));
+}
+
+AssertionActivation ActivationOf(const AssertionStatement& assertion) {
+  AssertionActivation activation;
+  activation.activation = assertion.activation;
+  activation.form = assertion.form;
+  activation.clock = assertion.clock;
+  return activation;
+}
+
 bool ActivationPointEnabled(std::size_t i, const Word& complement,
                             const BooleanExpr& enabling,
-                            const AssertionStatement& assertion) {
+                            const AssertionActivation& activation) {
   if (!LetterSatisfiesBoolean(complement[i], enabling)) {
     return false;
   }
-  if (assertion.activation == AssertionStatement::Activation::kAlways) {
-    if (assertion.form == AssertionStatement::Form::kExplicitClock) {
-      return LetterSatisfiesBoolean(complement[i], *assertion.clock);
+  if (activation.activation == AssertionStatement::Activation::kAlways) {
+    if (activation.form == AssertionStatement::Form::kExplicitClock) {
+      return LetterSatisfiesBoolean(complement[i], *activation.clock);
     }
     return true;
   }
-  if (assertion.form == AssertionStatement::Form::kExplicitClock) {
+  if (activation.form == AssertionStatement::Form::kExplicitClock) {
     return TightlySatisfies(PrefixInclusive(complement, i),
-                            *FirstClockTickSequence(assertion.clock));
+                            *FirstClockTickSequence(activation.clock));
   }
   return i == 0;
 }
+
+namespace {
 
 // The reach of the body an assertion statement evaluates: that of the property
 // under its guard and parentheses.
@@ -500,7 +512,8 @@ bool HoldsAtActivationPoints(std::size_t count, const Word& complement,
       AssertionBody(assertion);
   const bool kCover = assertion.role == AssertionStatement::Role::kCover;
   for (std::size_t i = 0; i < count; ++i) {
-    if (!ActivationPointEnabled(i, complement, enabling, assertion)) {
+    if (!ActivationPointEnabled(i, complement, enabling,
+                                ActivationOf(assertion))) {
       continue;
     }
     const Word kSuffix = suffix(i);

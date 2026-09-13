@@ -31,12 +31,13 @@ namespace delta {
 //   * the entry point w |= P starts the recursion from the empty context {},
 //     mirroring §F.5.6.1's "w |= Q iff w, {} |= Q".
 //
-// The clocked column (w, L_0 |= Q iff w, L_0 |= T^p(Q, 1) and the clocked
-// top-level property U) is the no-local-variable rule of §F.5.3.1 with the
-// context threaded inertly: T^p (§F.5.1.2) rewrites a ClockedProperty, whose
-// model carries no local variable forms, so it can neither introduce nor
-// consume a binding. That column adds no observable local-variable rule beyond
-// this layer and is left to §F.5.3.1.
+// The clocked column -- w, L_0 |= Q iff w, L_0 |= T^p(Q, 1), the clocked
+// top-level property U with its declaration form ( t v ; U ), and the
+// assertion statement -- is in
+// annex_f_neutral_satisfaction_local_variables_clocked.h, which reduces each
+// through T^p to this layer: T^p (§F.5.1.2) rewrites a ClockedProperty, whose
+// model carries no declaration form, but whose sequences may declare and
+// sample local variables under the clock.
 
 // §F.3.2 production P with local variables: the property forms §F.5.6.1 threads
 // a context through. It mirrors §F.5.3.1's PropertyExpr and adds the local
