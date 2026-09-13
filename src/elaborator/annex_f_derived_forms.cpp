@@ -619,4 +619,33 @@ std::shared_ptr<const LvTopLevelProperty> LvTopLocalVarDecls(
   return body;
 }
 
+namespace {
+
+// §F.3.4.6: the body both assumptions share, assume property (@1 b): the
+// clock form over the constant 1 whose operand is the Boolean read as a bare
+// sequence in an assume property statement.
+std::shared_ptr<const ClockedTopLevelProperty> AssumedAtGlobalClock(
+    std::shared_ptr<const BooleanExpr> b) {
+  return ClockedTopProperty(ClkClock(
+      BoolTrue(), ClkOfBareSequence(SeqBoolean(std::move(b)),
+                                    SequencePropertyContext::kAssumeProperty)));
+}
+
+}  // namespace
+
+std::shared_ptr<const AssertionStatement> FreeCheckerRandAssignment(
+    const std::string& u, const FreeCheckerEquality& equality) {
+  return AssertionWithClockedTop(AssertionStatement::Activation::kInitial,
+                                 AssertionStatement::Role::kAssume,
+                                 AssumedAtGlobalClock(equality(u)));
+}
+
+std::shared_ptr<const AssertionStatement> FreeCheckerAlwaysFfAssignment(
+    const std::string& u, const std::shared_ptr<const BooleanExpr>& c,
+    const FreeCheckerNextValue& next_value) {
+  return AssertionWithClockedTop(AssertionStatement::Activation::kAlways,
+                                 AssertionStatement::Role::kAssume,
+                                 AssumedAtGlobalClock(next_value(u, c)));
+}
+
 }  // namespace delta

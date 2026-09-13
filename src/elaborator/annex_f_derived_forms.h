@@ -458,4 +458,33 @@ std::shared_ptr<const LvTopLevelProperty> LvTopLocalVarDecls(
     const std::vector<LocalVarDeclaration>& declarations,
     std::shared_ptr<const LvTopLevelProperty> body);
 
+// §F.3.4.6: the free checker variable assignments, unfolded into assume
+// property statements over the §F.3.2 assertion production A. The assignment
+// rand t u = e is the statement initial assume property (@1 u === e), and the
+// assignment always_ff @c u <= e is the statement always_ff assume property
+// (@1 $future_gclk(u) === (c ? e : u)); so the first constrains u to equal e
+// at the first tick of the global clock and the second constrains the next
+// value of u to be e where c holds and u itself where it does not. The §F.3.2
+// Boolean model carries no case equality, conditional or $future_gclk form
+// and no expression e, so the Boolean each assumption compares is supplied
+// by the caller, as a FreeCheckerEquality called on the name u for the first
+// form and as a FreeCheckerNextValue called on u and c for the second. Each
+// factory then builds the statement around it: the @1 is the clock form over
+// the constant 1, the Boolean under it is a bare sequence in an assume
+// property statement and so reads as weak(b) by §F.3.4.3.1, the role is
+// assume, and the activation is initial for the first form and always for
+// the second, since an always_ff procedure holding the assumption alone
+// activates it at every tick as the always form of A does. The type t of the
+// first form names nothing on the statement's side and so is not taken.
+using FreeCheckerEquality =
+    std::function<std::shared_ptr<const BooleanExpr>(const std::string& u)>;
+using FreeCheckerNextValue = std::function<std::shared_ptr<const BooleanExpr>(
+    const std::string& u, const std::shared_ptr<const BooleanExpr>& c)>;
+
+std::shared_ptr<const AssertionStatement> FreeCheckerRandAssignment(
+    const std::string& u, const FreeCheckerEquality& equality);
+std::shared_ptr<const AssertionStatement> FreeCheckerAlwaysFfAssignment(
+    const std::string& u, const std::shared_ptr<const BooleanExpr>& c,
+    const FreeCheckerNextValue& next_value);
+
 }  // namespace delta
