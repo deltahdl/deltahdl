@@ -99,7 +99,7 @@ TEST(ExtendedExpressions, ReadingIntoTheWordSetsTheAtomWhereItHolds) {
   EXPECT_EQ(kPast[5].kind, Letter::Kind::kBottom);
   EXPECT_EQ(kPast[6].atoms, std::set<std::string>());
   const Word kFuture = WordWithExtendedAtom(kWord, "p", FutureGclkOfAtom("a"));
-  EXPECT_EQ(kFuture[0].atoms, std::set<std::string>());
+  EXPECT_EQ(kFuture[0].atoms, std::set<std::string>({"a"}));
   EXPECT_EQ(kFuture[1].atoms, std::set<std::string>({"x", "p"}));
   EXPECT_EQ(kFuture[2].atoms, std::set<std::string>({"a", "p"}));
   EXPECT_EQ(kFuture[4].atoms, std::set<std::string>({"x"}));
