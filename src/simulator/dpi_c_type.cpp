@@ -341,4 +341,8 @@ std::vector<SvActualDimension> DpiFormalRangesAtCall(
   return ranges;
 }
 
+bool DpiForeignCodeMayModifyFormal(Direction direction) {
+  return direction != Direction::kInput;
+}
+
 }  // namespace delta

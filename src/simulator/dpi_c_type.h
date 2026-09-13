@@ -262,4 +262,15 @@ std::vector<SvActualDimension> DpiFormalRangesAtCall(
     const std::vector<SvActualDimension>& actual_packed,
     const std::vector<SvActualDimension>& actual_unpacked);
 
+// §H.6.2: a formal specified in SystemVerilog as input shall not be
+// modified by the foreign language code (§35.5.1.2). In the C layer the
+// const qualifier every input's C type carries (DpiCTypeOfFormal) says so,
+// whether the input is passed by value, by reference to its canonical form
+// or by handle, and the runtime discards whatever the foreign code wrote to
+// an input's copy.
+
+// Whether the foreign code may modify a formal of a direction: an output
+// or an inout, never an input.
+bool DpiForeignCodeMayModifyFormal(Direction direction);
+
 }  // namespace delta
