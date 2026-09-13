@@ -8,6 +8,8 @@
 #include <vector>
 
 #include "simulator/coverage_control.h"
+#include "simulator/dpi_arg_value.h"
+#include "simulator/sva_engine_sequences.h"
 
 namespace delta {
 
