@@ -91,4 +91,12 @@ std::shared_ptr<const ClockedProperty> RewritePropertyUnderClock(
     const ClockedProperty& property,
     const std::shared_ptr<const BooleanExpr>& clock);
 
+// §F.5.1.2 opens by saying T^p produces a property P from a property p: the
+// result is in the unclocked production of §F.3.2, which has no clock form
+// and whose sequence operands are unclocked, and it has no sync_accept_on
+// either, which is the form the sixth rule turns into accept_on. True iff
+// the property is such a P, so that the output of the rules is one and an
+// input carrying a clock at any depth is not.
+bool PropertyIsUnclocked(const ClockedProperty& property);
+
 }  // namespace delta

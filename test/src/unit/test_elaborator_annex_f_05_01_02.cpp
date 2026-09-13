@@ -20,7 +20,7 @@ std::shared_ptr<const SequenceExpr> ClockedBoolean(const char* clock,
 }
 
 // §F.5.1.2: T^p(strong(r), c) = (strong(T^s(r, c))).
-TEST(PropertyRewrite, StrongDelegatesToSequenceRewrite) {
+TEST(PropertyClockRewrite, StrongDelegatesToSequenceRewrite) {
   auto input = ClkStrong(SeqBoolean(BoolAtom("a")));
   auto result = RewritePropertyUnderClock(*input, BoolAtom("clk"));
   auto expected = ClkStrong(ClockedBoolean("clk", "a"));
@@ -28,7 +28,7 @@ TEST(PropertyRewrite, StrongDelegatesToSequenceRewrite) {
 }
 
 // §F.5.1.2: T^p(weak(r), c) = (weak(T^s(r, c))).
-TEST(PropertyRewrite, WeakDelegatesToSequenceRewrite) {
+TEST(PropertyClockRewrite, WeakDelegatesToSequenceRewrite) {
   auto input = ClkWeak(SeqBoolean(BoolAtom("a")));
   auto result = RewritePropertyUnderClock(*input, BoolAtom("clk"));
   auto expected = ClkWeak(ClockedBoolean("clk", "a"));
@@ -37,7 +37,7 @@ TEST(PropertyRewrite, WeakDelegatesToSequenceRewrite) {
 
 // §F.5.1.2: T^p((@(c2) p), c1) = T^p(p, c2). The inner clock supersedes the
 // incoming clock.
-TEST(PropertyRewrite, NestedClockSupersedesIncomingClock) {
+TEST(PropertyClockRewrite, NestedClockSupersedesIncomingClock) {
   auto input = ClkClock(BoolAtom("c2"), ClkStrong(SeqBoolean(BoolAtom("a"))));
   auto result = RewritePropertyUnderClock(*input, BoolAtom("c1"));
   auto expected = ClkStrong(ClockedBoolean("c2", "a"));
@@ -46,7 +46,7 @@ TEST(PropertyRewrite, NestedClockSupersedesIncomingClock) {
 
 // §F.5.1.2: T^p((disable iff(b) p), c) = (disable iff(b) T^p(p, c)). The
 // disable condition is preserved and the clock pushes into the body.
-TEST(PropertyRewrite, DisableIffPreservesConditionAndClocksBody) {
+TEST(PropertyClockRewrite, DisableIffPreservesConditionAndClocksBody) {
   auto input =
       ClkDisableIff(BoolAtom("rst"), ClkStrong(SeqBoolean(BoolAtom("a"))));
   auto result = RewritePropertyUnderClock(*input, BoolAtom("clk"));
@@ -57,7 +57,7 @@ TEST(PropertyRewrite, DisableIffPreservesConditionAndClocksBody) {
 
 // §F.5.1.2: T^p((accept_on(b) p), c) = (accept_on(b) T^p(p, c)). The
 // asynchronous abort condition is left unchanged.
-TEST(PropertyRewrite, AcceptOnLeavesConditionUntouched) {
+TEST(PropertyClockRewrite, AcceptOnLeavesConditionUntouched) {
   auto input =
       ClkAcceptOn(BoolAtom("ab"), ClkStrong(SeqBoolean(BoolAtom("a"))));
   auto result = RewritePropertyUnderClock(*input, BoolAtom("clk"));
@@ -69,7 +69,7 @@ TEST(PropertyRewrite, AcceptOnLeavesConditionUntouched) {
 // §F.5.1.2: T^p((sync_accept_on(b) p), c) = (accept_on(b && c) T^p(p, c)). The
 // synchronous abort condition is conjoined with the clock and becomes a plain
 // accept_on.
-TEST(PropertyRewrite, SyncAcceptOnConjoinsClockAndBecomesAcceptOn) {
+TEST(PropertyClockRewrite, SyncAcceptOnConjoinsClockAndBecomesAcceptOn) {
   auto input =
       ClkSyncAcceptOn(BoolAtom("ab"), ClkStrong(SeqBoolean(BoolAtom("a"))));
   auto result = RewritePropertyUnderClock(*input, BoolAtom("clk"));
@@ -79,7 +79,7 @@ TEST(PropertyRewrite, SyncAcceptOnConjoinsClockAndBecomesAcceptOn) {
 }
 
 // §F.5.1.2: T^p((not p), c) = (not T^p(p, c)).
-TEST(PropertyRewrite, NegationClocksItsBody) {
+TEST(PropertyClockRewrite, NegationClocksItsBody) {
   auto input = ClkNot(ClkStrong(SeqBoolean(BoolAtom("a"))));
   auto result = RewritePropertyUnderClock(*input, BoolAtom("clk"));
   auto expected = ClkNot(ClkStrong(ClockedBoolean("clk", "a")));
@@ -88,7 +88,7 @@ TEST(PropertyRewrite, NegationClocksItsBody) {
 
 // §F.5.1.2: T^p((r |-> p), c) = (T^s(r, c) |-> T^p(p, c)). The antecedent goes
 // through the sequence rewrite, the consequent through the property rewrite.
-TEST(PropertyRewrite, ImplicationClocksAntecedentAndConsequent) {
+TEST(PropertyClockRewrite, ImplicationClocksAntecedentAndConsequent) {
   auto input = ClkImplication(SeqBoolean(BoolAtom("a")),
                               ClkStrong(SeqBoolean(BoolAtom("b"))));
   auto result = RewritePropertyUnderClock(*input, BoolAtom("clk"));
@@ -98,7 +98,7 @@ TEST(PropertyRewrite, ImplicationClocksAntecedentAndConsequent) {
 }
 
 // §F.5.1.2: T^p((p1 or p2), c) = (T^p(p1, c) or T^p(p2, c)).
-TEST(PropertyRewrite, OrDistributesClock) {
+TEST(PropertyClockRewrite, OrDistributesClock) {
   auto input = ClkOr(ClkStrong(SeqBoolean(BoolAtom("a"))),
                      ClkWeak(SeqBoolean(BoolAtom("b"))));
   auto result = RewritePropertyUnderClock(*input, BoolAtom("clk"));
@@ -108,7 +108,7 @@ TEST(PropertyRewrite, OrDistributesClock) {
 }
 
 // §F.5.1.2: T^p((p1 and p2), c) = (T^p(p1, c) and T^p(p2, c)).
-TEST(PropertyRewrite, AndDistributesClock) {
+TEST(PropertyClockRewrite, AndDistributesClock) {
   auto input = ClkAnd(ClkStrong(SeqBoolean(BoolAtom("a"))),
                       ClkWeak(SeqBoolean(BoolAtom("b"))));
   auto result = RewritePropertyUnderClock(*input, BoolAtom("clk"));
@@ -119,7 +119,7 @@ TEST(PropertyRewrite, AndDistributesClock) {
 
 // §F.5.1.2: T^p((nexttime p), c) =
 //   (!c until (c and nexttime(!c until (c and T^p(p, c))))).
-TEST(PropertyRewrite, NexttimeExpandsToClockGatedUntil) {
+TEST(PropertyClockRewrite, NexttimeExpandsToClockGatedUntil) {
   auto body = ClkStrong(SeqBoolean(BoolAtom("a")));
   auto input = ClkNexttime(body);
   auto result = RewritePropertyUnderClock(*input, BoolAtom("clk"));
@@ -136,7 +136,7 @@ TEST(PropertyRewrite, NexttimeExpandsToClockGatedUntil) {
 
 // §F.5.1.2: T^p((p1 until p2), c) =
 //   ((not(c and not T^p(p1, c))) until (c and T^p(p2, c))).
-TEST(PropertyRewrite, UntilGatesBothOperandsOnTheClock) {
+TEST(PropertyClockRewrite, UntilGatesBothOperandsOnTheClock) {
   auto input = ClkUntil(ClkStrong(SeqBoolean(BoolAtom("a"))),
                         ClkWeak(SeqBoolean(BoolAtom("b"))));
   auto result = RewritePropertyUnderClock(*input, BoolAtom("clk"));
@@ -153,7 +153,7 @@ TEST(PropertyRewrite, UntilGatesBothOperandsOnTheClock) {
 
 // A Boolean used as a property is already level-sensitive: T^p leaves it as is.
 // This exercises the leaf the nexttime/until rules emit.
-TEST(PropertyRewrite, BooleanPropertyIsUnchanged) {
+TEST(PropertyClockRewrite, BooleanPropertyIsUnchanged) {
   auto input = ClkBoolean(BoolAtom("a"));
   auto result = RewritePropertyUnderClock(*input, BoolAtom("clk"));
   EXPECT_TRUE(ClockedPropertyEqual(*result, *ClkBoolean(BoolAtom("a"))));
@@ -163,7 +163,7 @@ TEST(PropertyRewrite, BooleanPropertyIsUnchanged) {
 // nest, the rule fires at each level, so the innermost clock wins and both
 // outer clocks are discarded. This exercises the recursion the single-level
 // test does not reach.
-TEST(PropertyRewrite, NestedClocksSupersedeRecursively) {
+TEST(PropertyClockRewrite, NestedClocksSupersedeRecursively) {
   auto input =
       ClkClock(BoolAtom("c2"),
                ClkClock(BoolAtom("c3"), ClkStrong(SeqBoolean(BoolAtom("a")))));
@@ -176,7 +176,7 @@ TEST(PropertyRewrite, NestedClocksSupersedeRecursively) {
 // operand carries its own clock and the other does not, the incoming clock must
 // recurse into the bare operand while the nested clock overrides locally. This
 // confirms T^p descends through an operator before any inner clock takes over.
-TEST(PropertyRewrite,
+TEST(PropertyClockRewrite,
      IncomingClockReachesBareOperandWhileNestedClockOverrides) {
   auto clocked_left =
       ClkClock(BoolAtom("c2"), ClkStrong(SeqBoolean(BoolAtom("a"))));
@@ -191,7 +191,7 @@ TEST(PropertyRewrite,
 // Edge case for §F.5.1.2's nexttime rule: its body is itself a compound
 // property, so T^p must recurse into it before wrapping the result in the
 // clock-gated until/nexttime scaffold. Here the body is (not strong(a)).
-TEST(PropertyRewrite, NexttimeRecursesIntoCompoundBody) {
+TEST(PropertyClockRewrite, NexttimeRecursesIntoCompoundBody) {
   auto body = ClkNot(ClkStrong(SeqBoolean(BoolAtom("a"))));
   auto input = ClkNexttime(body);
   auto result = RewritePropertyUnderClock(*input, BoolAtom("clk"));
@@ -204,6 +204,49 @@ TEST(PropertyRewrite, NexttimeRecursesIntoCompoundBody) {
   auto expected = ClkUntil(not_clock, ClkAnd(on_clock, step));
 
   EXPECT_TRUE(ClockedPropertyEqual(*result, *expected));
+}
+
+// §F.5.1.2 produces a property P from a property p: whatever clocks the input
+// carries, the rules leave none behind. A clock nested under every operator
+// -- a clock form inside a nexttime body, a clocked sequence operand of a
+// strong and of an implication, a sync_accept_on under an until -- is
+// removed by the rule for its form, so the input is clocked at each of those
+// depths and the result is not.
+TEST(PropertyClockRewrite, TheResultIsAnUnclockedProperty) {
+  auto clocked_seq = SeqClock(BoolAtom("c2"), SeqBoolean(BoolAtom("a")));
+  auto under_nexttime =
+      ClkNexttime(ClkClock(BoolAtom("c3"), ClkStrong(clocked_seq)));
+  auto under_implication = ClkImplication(clocked_seq, ClkWeak(clocked_seq));
+  auto under_until = ClkUntil(
+      ClkSyncAcceptOn(BoolAtom("ab"), ClkStrong(SeqBoolean(BoolAtom("b")))),
+      ClkNot(ClkDisableIff(BoolAtom("rst"), ClkStrong(clocked_seq))));
+  for (const auto& input : {under_nexttime, under_implication, under_until,
+                            ClkOr(under_nexttime, under_until),
+                            ClkAnd(under_implication, under_nexttime)}) {
+    EXPECT_FALSE(PropertyIsUnclocked(*input));
+    EXPECT_TRUE(PropertyIsUnclocked(
+        *RewritePropertyUnderClock(*input, BoolAtom("c1"))));
+  }
+}
+
+// The unclocked property is the one with no clock form, no sync_accept_on
+// and no clocked sequence operand at any depth: a Boolean, an accept_on over
+// a strong of a bare sequence and an until of two such are unclocked, where
+// a clock form, a sync_accept_on or a clocked sequence operand nested three
+// levels down makes the property clocked.
+TEST(PropertyClockRewrite, AnUnclockedPropertyHasNoClockAtAnyDepth) {
+  auto bare = ClkStrong(SeqBoolean(BoolAtom("a")));
+  EXPECT_TRUE(PropertyIsUnclocked(*ClkBoolean(BoolAtom("a"))));
+  EXPECT_TRUE(PropertyIsUnclocked(*ClkAcceptOn(BoolAtom("ab"), bare)));
+  EXPECT_TRUE(PropertyIsUnclocked(*ClkUntil(bare, ClkNot(bare))));
+  EXPECT_FALSE(PropertyIsUnclocked(*ClkClock(BoolAtom("c"), bare)));
+  EXPECT_FALSE(PropertyIsUnclocked(*ClkSyncAcceptOn(BoolAtom("ab"), bare)));
+  auto clocked_seq = SeqClock(BoolAtom("c"), SeqBoolean(BoolAtom("a")));
+  EXPECT_FALSE(PropertyIsUnclocked(
+      *ClkAnd(bare, ClkNot(ClkOr(bare, ClkWeak(clocked_seq))))));
+  EXPECT_FALSE(PropertyIsUnclocked(
+      *ClkAnd(bare, ClkNot(ClkOr(bare, ClkClock(BoolAtom("c"), bare))))));
+  EXPECT_FALSE(PropertyIsUnclocked(*ClkImplication(clocked_seq, ClkNot(bare))));
 }
 
 }  // namespace

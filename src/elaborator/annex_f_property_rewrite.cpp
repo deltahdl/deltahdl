@@ -231,4 +231,21 @@ std::shared_ptr<const ClockedProperty> RewritePropertyUnderClock(
   return std::make_shared<ClockedProperty>(property);
 }
 
+bool PropertyIsUnclocked(const ClockedProperty& property) {
+  // The two forms only a clocked property has, and then the operands: a
+  // sequence operand by §F.3.2's R against S, a property operand by this
+  // predicate again.
+  if (property.kind == ClockedProperty::Kind::kClock ||
+      property.kind == ClockedProperty::Kind::kSyncAcceptOn) {
+    return false;
+  }
+  if (property.sequence != nullptr && ContainsClock(*property.sequence)) {
+    return false;
+  }
+  if (property.lhs != nullptr && !PropertyIsUnclocked(*property.lhs)) {
+    return false;
+  }
+  return property.rhs == nullptr || PropertyIsUnclocked(*property.rhs);
+}
+
 }  // namespace delta
