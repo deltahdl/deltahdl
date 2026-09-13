@@ -475,4 +475,13 @@ bool DpiReferenceOutlivesTheCall() { return false; }
 
 DpiMemorySide DpiSideOwningACopyKeptAcrossCalls() { return DpiMemorySide::kC; }
 
+bool DpiFormalIsPassedByValue(const DpiArg& formal, bool open_array) {
+  return DpiPassingModeOfFormal(formal, open_array) == DpiPassingMode::kByValue;
+}
+
+std::string DpiCTypeOfResult(DataTypeKind kind) {
+  if (kind == DataTypeKind::kVoid) return "void";
+  return SmallCType(kind, false);
+}
+
 }  // namespace delta
