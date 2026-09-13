@@ -34,9 +34,9 @@ uint32_t DpiRuntime::LinearizedPackedSize(
   // dimensions, each counted from whichever bound is the lower.
   uint64_t size = packed_dims.empty() ? 0 : 1;
   for (const SvActualDimension& dim : packed_dims) {
-    const int64_t values =
+    const int64_t kValues =
         std::abs(static_cast<int64_t>(dim.high) - dim.low) + 1;
-    size *= static_cast<uint64_t>(values);
+    size *= static_cast<uint64_t>(kValues);
   }
   return static_cast<uint32_t>(size);
 }
