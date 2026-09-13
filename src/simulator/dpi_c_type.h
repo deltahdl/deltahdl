@@ -38,6 +38,29 @@ std::string DpiCTypeOfFormal(const DpiArg& formal, bool open_array);
 // passed by value.
 bool DpiTypeIsSmall(DataTypeKind kind);
 
+// §H.8 defines the ways to pass arguments in the C layer of the DPI, and
+// §H.8.1 gives the overview: an argument is generally passed by some form
+// of reference, except a small value of an input argument, which is passed
+// by value, and the function result, restricted to small values, which is
+// passed by value, directly returned. A formal other than an open array is
+// passed by direct reference or by value and so is directly accessible in
+// C code; an open array formal is passed by handle, an svOpenArrayHandle,
+// and reached through the library functions of §H.12.
+enum class DpiPassingMode : uint8_t { kByValue, kByReference, kByHandle };
+
+// The mode a formal is passed in: by handle for an open array whatever its
+// type or direction, by value for an input of a small type, and by
+// reference for the rest -- an output or inout of any type, an input packed
+// array.
+DpiPassingMode DpiPassingModeOfFormal(const DpiArg& formal, bool open_array);
+
+// The mode a function result is passed in: by value.
+DpiPassingMode DpiPassingModeOfResult();
+
+// Whether a formal passed in a mode is directly accessible in C: it is by
+// value or by reference, and not by handle.
+bool DpiFormalIsDirectlyAccessibleInC(DpiPassingMode mode);
+
 // §H.7 defines the data types of the C layer of the DPI, and a value
 // crosses the interface as one of them: a basic type of Table H.1 (§H.7.4),
 // which the small types of §H.8.7 are, the canonical representation of a

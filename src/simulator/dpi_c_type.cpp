@@ -445,4 +445,19 @@ bool DpiAggregateLayoutIsCCompatible(const DpiAggregateElement& aggregate) {
   return !IsPackedArray(as_formal);
 }
 
+DpiPassingMode DpiPassingModeOfFormal(const DpiArg& formal, bool open_array) {
+  if (open_array) return DpiPassingMode::kByHandle;
+  if (formal.direction == Direction::kInput && !IsPackedArray(formal) &&
+      DpiTypeIsSmall(formal.type)) {
+    return DpiPassingMode::kByValue;
+  }
+  return DpiPassingMode::kByReference;
+}
+
+DpiPassingMode DpiPassingModeOfResult() { return DpiPassingMode::kByValue; }
+
+bool DpiFormalIsDirectlyAccessibleInC(DpiPassingMode mode) {
+  return mode != DpiPassingMode::kByHandle;
+}
+
 }  // namespace delta
