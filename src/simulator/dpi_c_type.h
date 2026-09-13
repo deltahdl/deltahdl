@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "simulator/dpi_arg_value.h"
+#include "simulator/svdpi_open_array.h"
 
 namespace delta {
 
@@ -109,5 +110,37 @@ bool DpiPartSelectIsDetermined(uint32_t width, int i, int w);
 // b), the LSB at R being index 0 and the MSB at L abs(L-R) whichever way
 // the range runs, so a[7] of `bit [4:7] a` is index 0 and a[4] index 3.
 int DpiNormalizedBitIndex(SvActualDimension packed, int32_t sv_index);
+
+// §H.12: a formal declared as an open array takes actuals of different
+// sizes -- a different range, a different count of elements -- so C code
+// written against it handles SystemVerilog arrays of any size; its elements
+// are reached in C by the same range of indices and the same indexing as in
+// SystemVerilog, and the dimensions and original bounds of the actual can
+// be inquired about (§H.12.2). The sole packed dimension (§H.7.1) and any
+// number of unpacked dimensions can be unsized (§35.5.6.1). Every open array
+// formal is passed by handle, an svOpenArrayHandle, whatever its direction
+// (DpiCTypeOfFormal above), and is reached through the functions that take
+// the handle, svGetArrayPtr among them giving its address. For an inout or
+// output open array the space C code may write is determined by the
+// actual's size, and writing more to the array's address than the actual's
+// capacity accommodates is undefined. The handle's descriptor
+// (svdpi_open_array.h) records what the actual bound on the call: its
+// dimension 0 is the packed part and dimensions 1 and up the unpacked ones.
+
+// The count of elements the actual has: the product of the sizes of its
+// unpacked dimensions, 1 where the array is a packed vector alone and 0 for
+// a descriptor recording no dimensions, which describes no actual.
+uint64_t DpiOpenArrayElementCount(const SvOpenArrayDesc& desc);
+
+// The capacity of an inout or output open array in bytes, the space C code
+// may write: the element count times the byte stride of an element the
+// descriptor records, 0 where that stride is 0 because the element's
+// representation differs from a value's (§H.12.4) and there is no address
+// to write at.
+uint64_t DpiOpenArrayCapacityBytes(const SvOpenArrayDesc& desc);
+
+// Whether a write of `bytes` from the array's address is one §H.12 defines:
+// no more than the capacity.
+bool DpiOpenArrayWriteIsDefined(const SvOpenArrayDesc& desc, uint64_t bytes);
 
 }  // namespace delta

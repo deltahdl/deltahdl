@@ -9,6 +9,7 @@
 
 #include "parser/ast.h"
 #include "simulator/dpi_arg_value.h"
+#include "simulator/svdpi_open_array.h"
 
 namespace delta {
 
@@ -224,6 +225,28 @@ bool DpiPartSelectIsDetermined(uint32_t width, int i, int w) {
 int DpiNormalizedBitIndex(SvActualDimension packed, int32_t sv_index) {
   // §H.7.6 b): [L:R] is normalized to [abs(L-R):0], the LSB at R index 0.
   return std::abs(sv_index - packed.high);
+}
+
+uint64_t DpiOpenArrayElementCount(const SvOpenArrayDesc& desc) {
+  // §H.12: the actual's size, over the unpacked dimensions the handle
+  // records after the packed part at dimension 0; a dimension is counted
+  // however its range runs.
+  if (desc.ranges == nullptr) return 0;
+  uint64_t count = 1;
+  for (int d = 1; d < desc.n_dims; ++d) {
+    const SvOpenArrayDimRange& r = desc.ranges[d];
+    count *= static_cast<uint64_t>(
+        std::abs(static_cast<int64_t>(r.left) - r.right) + 1);
+  }
+  return count;
+}
+
+uint64_t DpiOpenArrayCapacityBytes(const SvOpenArrayDesc& desc) {
+  return DpiOpenArrayElementCount(desc) * desc.elem_size;
+}
+
+bool DpiOpenArrayWriteIsDefined(const SvOpenArrayDesc& desc, uint64_t bytes) {
+  return bytes <= DpiOpenArrayCapacityBytes(desc);
 }
 
 }  // namespace delta
