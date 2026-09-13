@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "simulator/svdpi.h"
+#include "simulator/svdpi_open_array.h"
 
 // Annex H.12.4 - Access to actual representation.
 //

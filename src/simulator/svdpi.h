@@ -7,7 +7,6 @@
 extern "C" {
 #endif
 
-#include <stddef.h>
 #include <stdint.h>
 
 #if (defined(_MSC_VER) || defined(__MINGW32__) || defined(__CYGWIN__))
@@ -71,6 +70,7 @@ typedef struct t_vpi_time {
 } s_vpi_time, *p_vpi_time;
 #define vpiScaledRealTime 1
 #define vpiSimTime 2
+#define vpiSuppressTime 3
 #endif
 
 typedef s_vpi_time svTimeVal;
@@ -79,30 +79,6 @@ typedef s_vpi_time svTimeVal;
 
 typedef void* svScope;
 typedef void* svOpenArrayHandle;
-
-// Backing representation an svOpenArrayHandle points to. The array querying
-// functions of Annex H.12.2 are modeled on the SystemVerilog array querying
-// functions (20.7), so each dimension is described by its declared left and
-// right bounds; low/high/size/increment are then derived exactly as 20.7
-// defines them. The dimension at index 0 describes the single packed part of
-// the array and the dimensions at indices greater than 0 describe the unpacked
-// part, following H.12.2's dimension-numbering convention.
-typedef struct SvOpenArrayDimRange {
-  int left;
-  int right;
-} SvOpenArrayDimRange;
-
-// elem_size is the byte stride of one array element within the actual
-// representation that data points at. Annex H.12.4's element-address functions
-// use it to step between consecutive elements. A value of 0 marks an element
-// representation that differs from that of an individual value of the same
-// type, for which H.12.4 requires those functions to return a null pointer.
-typedef struct SvOpenArrayDesc {
-  void* data;
-  int n_dims;
-  const SvOpenArrayDimRange* ranges;
-  size_t elem_size;
-} SvOpenArrayDesc;
 
 XXTERN const char* svDpiVersion(void);
 

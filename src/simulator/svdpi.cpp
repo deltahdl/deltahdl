@@ -9,6 +9,7 @@
 
 #include "simulator/dpi.h"
 #include "simulator/dpi_runtime.h"
+#include "simulator/svdpi_open_array.h"
 
 static thread_local svScope g_current_scope = nullptr;
 

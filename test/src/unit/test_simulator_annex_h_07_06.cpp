@@ -4,6 +4,7 @@
 
 #include "helpers_open_array_natural_order.h"
 #include "simulator/svdpi.h"
+#include "simulator/svdpi_open_array.h"
 
 // Annex H.7.6 - Mapping between SystemVerilog ranges and C ranges.
 //

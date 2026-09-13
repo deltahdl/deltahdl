@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "simulator/svdpi.h"
+#include "simulator/svdpi_open_array.h"
 
 // Annex H.12.5 - Access to elements via canonical representation.
 //
