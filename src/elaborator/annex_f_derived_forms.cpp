@@ -7,6 +7,7 @@
 
 #include "elaborator/annex_f_grammar.h"
 #include "elaborator/annex_f_neutral_satisfaction.h"
+#include "elaborator/annex_f_neutral_satisfaction_local_variables.h"
 #include "elaborator/annex_f_property_rewrite.h"
 
 namespace delta {
@@ -589,6 +590,33 @@ std::shared_ptr<const ClockedProperty> ClkSEventuallyAtLeast(
 std::shared_ptr<const ClockedProperty> ClkSAlwaysRange(
     std::shared_ptr<const ClockedProperty> q, unsigned int m, unsigned int n) {
   return ClkNot(ClkEventuallyRange(ClkNot(std::move(q)), m, n));
+}
+
+std::shared_ptr<const SequenceExpr> SeqLocalVarDecls(
+    const std::vector<LocalVarDeclaration>& declarations,
+    std::shared_ptr<const SequenceExpr> rest) {
+  for (auto it = declarations.rbegin(); it != declarations.rend(); ++it) {
+    rest = SeqLocalVarDecl(it->type, it->name, std::move(rest));
+  }
+  return rest;
+}
+
+std::shared_ptr<const LvProperty> LvLocalVarDecls(
+    const std::vector<LocalVarDeclaration>& declarations,
+    std::shared_ptr<const LvProperty> body) {
+  for (auto it = declarations.rbegin(); it != declarations.rend(); ++it) {
+    body = LvLocalVarDecl(it->type, it->name, std::move(body));
+  }
+  return body;
+}
+
+std::shared_ptr<const LvTopLevelProperty> LvTopLocalVarDecls(
+    const std::vector<LocalVarDeclaration>& declarations,
+    std::shared_ptr<const LvTopLevelProperty> body) {
+  for (auto it = declarations.rbegin(); it != declarations.rend(); ++it) {
+    body = LvTopLocalVarDecl(it->type, it->name, std::move(body));
+  }
+  return body;
 }
 
 }  // namespace delta

@@ -8,6 +8,7 @@
 
 #include "elaborator/annex_f_grammar.h"
 #include "elaborator/annex_f_neutral_satisfaction.h"
+#include "elaborator/annex_f_neutral_satisfaction_local_variables.h"
 #include "elaborator/annex_f_property_rewrite.h"
 
 namespace delta {
@@ -427,5 +428,34 @@ std::shared_ptr<const ClockedProperty> ClkSEventuallyAtLeast(
     std::shared_ptr<const ClockedProperty> q, unsigned int m);
 std::shared_ptr<const ClockedProperty> ClkSAlwaysRange(
     std::shared_ptr<const ClockedProperty> q, unsigned int m, unsigned int n);
+
+// §F.3.4.5: a local variable declaration naming more than one variable,
+// (t1 v1 = e1; ...; tk vk = ek; X) for k > 1, is the declaration of its first
+// variable over the declaration of the rest, (t1 v1 = e1; (t2 v2 = e2; ...;
+// tk vk = ek; X)), unfolded until each declaration names one variable, which
+// is the §F.3.2 form. X is any of the productions P, Q, R, S, T and U, so the
+// factories below take the declarations in the order written and nest them
+// from the right over each body this model has a declaration form for: the
+// SequenceExpr that carries R and S, and the LvProperty and LvTopLevelProperty
+// that carry P and T with local variables. The ClockedProperty that carries Q
+// and U has no declaration form, because §F.5.6.1 threads the context through
+// that column inertly, so those two productions have no factory here. The
+// grammar's declaration records the type and the name and not the initializer
+// e, so each declaration is given by those two. No declaration is X itself,
+// and one declaration is the §F.3.2 form.
+struct LocalVarDeclaration {
+  std::string type;  // t
+  std::string name;  // v
+};
+
+std::shared_ptr<const SequenceExpr> SeqLocalVarDecls(
+    const std::vector<LocalVarDeclaration>& declarations,
+    std::shared_ptr<const SequenceExpr> rest);
+std::shared_ptr<const LvProperty> LvLocalVarDecls(
+    const std::vector<LocalVarDeclaration>& declarations,
+    std::shared_ptr<const LvProperty> body);
+std::shared_ptr<const LvTopLevelProperty> LvTopLocalVarDecls(
+    const std::vector<LocalVarDeclaration>& declarations,
+    std::shared_ptr<const LvTopLevelProperty> body);
 
 }  // namespace delta
