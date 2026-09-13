@@ -34,9 +34,19 @@ namespace delta {
 // for a kind the DPI does not pass.
 std::string DpiCTypeOfFormal(const DpiArg& formal, bool open_array);
 
-// §H.8.7: whether a type is one of the small ones an input of which is
-// passed by value.
+// §H.8.7: an input argument of an imported function implemented in C shall
+// always have a const qualifier, which DpiCTypeOfFormal gives every input;
+// an input, open arrays apart, is passed by value or by reference depending
+// on its size, a small value by value and an input of any other type by
+// reference.
+
+// Whether a type is one of the small ones an input of which is passed by
+// value.
 bool DpiTypeIsSmall(DataTypeKind kind);
+
+// The small types as the clause lists them: byte, shortint, int, longint,
+// real and shortreal; scalar bit and logic; chandle and string.
+const std::vector<DataTypeKind>& DpiSmallTypes();
 
 // §H.8 defines the ways to pass arguments in the C layer of the DPI, and
 // §H.8.1 gives the overview: an argument is generally passed by some form

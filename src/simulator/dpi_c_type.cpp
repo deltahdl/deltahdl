@@ -484,4 +484,13 @@ std::string DpiCTypeOfResult(DataTypeKind kind) {
   return SmallCType(kind, false);
 }
 
+const std::vector<DataTypeKind>& DpiSmallTypes() {
+  static const std::vector<DataTypeKind> kSmall = {
+      DataTypeKind::kByte,    DataTypeKind::kShortint, DataTypeKind::kInt,
+      DataTypeKind::kLongint, DataTypeKind::kReal,     DataTypeKind::kShortreal,
+      DataTypeKind::kBit,     DataTypeKind::kLogic,    DataTypeKind::kChandle,
+      DataTypeKind::kString};
+  return kSmall;
+}
+
 }  // namespace delta
