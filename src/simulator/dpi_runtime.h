@@ -404,6 +404,20 @@ class DpiRuntime {
                                                          uint32_t actual_bits,
                                                          uint32_t elem_width);
 
+  // §H.7.1: packed arrays can have any number of dimensions but are always
+  // equivalent to a one-dimensional packed array and treated as such, so an
+  // actual whose packed part is multidimensional is linearized and normalized
+  // into the equivalent one-dimensional packed array before an open-array
+  // formal takes its range -- the size is the product of the dimensions'
+  // sizes and the range the normalized 0 to size-1 of §H.7.5, the original
+  // packed ranges not being kept, where an unpacked dimension's are (above).
+  // A dimension is counted however its range runs, [7:0] and [0:7] alike.
+  static uint32_t LinearizedPackedSize(
+      const std::vector<SvActualDimension>& packed_dims);
+  static SvOpenArrayHandle MakeOpenArrayFromPackedActual(
+      void* actual_data, const std::vector<SvActualDimension>& packed_dims,
+      uint32_t elem_width);
+
   // §35.6.1.1: "A formal's unsized, unpacked dimensions take on the ranges of
   // the corresponding actual dimension." No normalization here: the formal
   // reports the actual dimension's own bounds, so §35.5.6.1's `MyType a_10x5
