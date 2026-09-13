@@ -179,9 +179,10 @@ TEST(MailboxStdPackageElaborator, ThePrototypeIsWrittenDown) {
   const std::optional<StdTypeParameter> kParameter =
       StdClassTypeParameterOf(StdPackageMember::kMailbox);
   ASSERT_TRUE(kParameter.has_value());
-  EXPECT_EQ(kParameter->name, "T");
-  EXPECT_EQ(kParameter->default_type, "dynamic_singular_type");
-  EXPECT_FALSE(kParameter->class_only);
+  const StdTypeParameter kT = kParameter.value_or(StdTypeParameter{});
+  EXPECT_EQ(kT.name, "T");
+  EXPECT_EQ(kT.default_type, "dynamic_singular_type");
+  EXPECT_FALSE(kT.class_only);
   EXPECT_EQ(StdClassTypeParameterOf(StdPackageMember::kSemaphore),
             std::nullopt);
 }
