@@ -199,4 +199,19 @@ std::shared_ptr<const ClockedProperty> ClkIff(
     std::shared_ptr<const ClockedProperty> p1,
     std::shared_ptr<const ClockedProperty> p2);
 
+// §F.3.4.3.3: the derived nonoverlapping implication operator, unfolded into
+// the §F.3.2 overlapping implication |-> over an antecedent lengthened by one
+// letter, so the consequent is evaluated from the letter after the one the
+// antecedent's match ends at. Over an unclocked sequence R and property P,
+// (R |=> P) is ((R ##1 1) |-> P), the unclocked property model of §F.5.3.1;
+// over a clocked sequence S and property Q, (S |=> Q) is ((S ##1 @(1) 1) |->
+// Q), the clocked one of §F.5.1.2, where the clock form on the constant 1
+// keeps that letter a letter rather than a tick of whatever clock S is under.
+std::shared_ptr<const PropertyExpr> PropNonoverlappingImplication(
+    std::shared_ptr<const SequenceExpr> r,
+    std::shared_ptr<const PropertyExpr> p);
+std::shared_ptr<const ClockedProperty> ClkNonoverlappingImplication(
+    std::shared_ptr<const SequenceExpr> s,
+    std::shared_ptr<const ClockedProperty> q);
+
 }  // namespace delta

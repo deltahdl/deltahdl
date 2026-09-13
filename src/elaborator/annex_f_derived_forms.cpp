@@ -260,4 +260,18 @@ std::shared_ptr<const ClockedProperty> ClkIff(
   return ClkAnd(std::move(forward), ClkImplies(std::move(p2), std::move(p1)));
 }
 
+std::shared_ptr<const PropertyExpr> PropNonoverlappingImplication(
+    std::shared_ptr<const SequenceExpr> r,
+    std::shared_ptr<const PropertyExpr> p) {
+  return PropImplication(SeqConcat(std::move(r), SeqTrue()), std::move(p));
+}
+
+std::shared_ptr<const ClockedProperty> ClkNonoverlappingImplication(
+    std::shared_ptr<const SequenceExpr> s,
+    std::shared_ptr<const ClockedProperty> q) {
+  auto one_letter = SeqClock(BoolTrue(), SeqTrue());
+  return ClkImplication(SeqConcat(std::move(s), std::move(one_letter)),
+                        std::move(q));
+}
+
 }  // namespace delta
