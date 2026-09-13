@@ -93,6 +93,46 @@ const std::vector<StdMethodPrototype>& SemaphorePrototype() {
   return kPrototype;
 }
 
+const std::vector<StdMethodPrototype>& MailboxPrototype() {
+  // §G.4: class mailbox #(type T = dynamic_singular_type); function new(int
+  // bound = 0); function int num(); task put(T message); function int
+  // try_put(T message); task get(ref T message); function int try_get(ref T
+  // message); task peek(ref T message); function int try_peek(ref T
+  // message); endclass.
+  static const std::vector<StdMethodPrototype> kPrototype{
+      {"new", StdMethodKind::kFunction, "", {{"int", "bound", true}}},
+      {"num", StdMethodKind::kFunction, "int", {}},
+      {"put", StdMethodKind::kTask, "void", {{"T", "message"}}},
+      {"try_put", StdMethodKind::kFunction, "int", {{"T", "message"}}},
+      {"get", StdMethodKind::kTask, "void", {{"T", "message", false, true}}},
+      {"try_get",
+       StdMethodKind::kFunction,
+       "int",
+       {{"T", "message", false, true}}},
+      {"peek", StdMethodKind::kTask, "void", {{"T", "message", false, true}}},
+      {"try_peek",
+       StdMethodKind::kFunction,
+       "int",
+       {{"T", "message", false, true}}},
+  };
+  return kPrototype;
+}
+
+std::optional<StdTypeParameter> StdClassTypeParameterOf(
+    StdPackageMember member) {
+  switch (member) {
+    case StdPackageMember::kMailbox:
+      // §G.4: #(type T = dynamic_singular_type).
+      return StdTypeParameter{"T", "dynamic_singular_type", false};
+    case StdPackageMember::kSemaphore:
+    case StdPackageMember::kRandomize:
+    case StdPackageMember::kProcess:
+    case StdPackageMember::kWeakReference:
+      return std::nullopt;
+  }
+  return std::nullopt;
+}
+
 const std::vector<StdMethodPrototype>& StdClassPrototype(
     StdPackageMember member) {
   static const std::vector<StdMethodPrototype> kNone;
@@ -100,6 +140,7 @@ const std::vector<StdMethodPrototype>& StdClassPrototype(
     case StdPackageMember::kSemaphore:
       return SemaphorePrototype();
     case StdPackageMember::kMailbox:
+      return MailboxPrototype();
     case StdPackageMember::kRandomize:
     case StdPackageMember::kProcess:
     case StdPackageMember::kWeakReference:

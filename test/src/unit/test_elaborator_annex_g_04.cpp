@@ -21,7 +21,14 @@
 // std-package class name), and each prototype method elaborates at the call
 // site, including the documented default new() argument omitted.
 
+#include <cstddef>
+#include <optional>
+#include <string_view>
+#include <vector>
+
+#include "elaborator/std_package.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -134,6 +141,95 @@ TEST(MailboxStdPackageElaborator, ValueReturningMethodsUsableInExpression) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
+}
+
+// §G.4: the prototype as src/elaborator/std_package.h writes it down -- the
+// constructor new with its defaulted int bound, num taking nothing and
+// returning int, the tasks put, get and peek and the int functions try_put,
+// try_get and try_peek, each over one formal T message, by reference for the
+// four that receive a message and by value for the two that send one -- over
+// the type parameter T defaulting to dynamic_singular_type.
+TEST(MailboxStdPackageElaborator, ThePrototypeIsWrittenDown) {
+  const auto& prototype = MailboxPrototype();
+  ASSERT_EQ(prototype.size(), 8u);
+  EXPECT_EQ(prototype[0].name, "new");
+  ASSERT_EQ(prototype[0].formals.size(), 1u);
+  EXPECT_EQ(prototype[0].formals[0].name, "bound");
+  EXPECT_TRUE(prototype[0].formals[0].has_default);
+  EXPECT_EQ(prototype[1].name, "num");
+  EXPECT_EQ(prototype[1].return_type, "int");
+  EXPECT_TRUE(prototype[1].formals.empty());
+  const std::vector<std::string_view> kNames{"put",     "try_put", "get",
+                                             "try_get", "peek",    "try_peek"};
+  for (std::size_t i = 0; i < 6; ++i) {
+    const StdMethodPrototype& method = prototype[i + 2];
+    EXPECT_EQ(method.name, kNames[i]);
+    ASSERT_EQ(method.formals.size(), 1u);
+    EXPECT_EQ(method.formals[0].type, "T");
+    EXPECT_EQ(method.formals[0].name, "message");
+    EXPECT_FALSE(method.formals[0].has_default);
+    EXPECT_EQ(method.formals[0].by_reference, i >= 2);
+    EXPECT_EQ(method.kind,
+              i % 2 == 0 ? StdMethodKind::kTask : StdMethodKind::kFunction);
+    EXPECT_EQ(method.return_type, i % 2 == 0 ? "void" : "int");
+    EXPECT_EQ(LeastActualsOf(method), 1u);
+    EXPECT_EQ(MostActualsOf(method), 1u);
+  }
+  EXPECT_EQ(&StdClassPrototype(StdPackageMember::kMailbox), &prototype);
+  const std::optional<StdTypeParameter> kParameter =
+      StdClassTypeParameterOf(StdPackageMember::kMailbox);
+  ASSERT_TRUE(kParameter.has_value());
+  EXPECT_EQ(kParameter->name, "T");
+  EXPECT_EQ(kParameter->default_type, "dynamic_singular_type");
+  EXPECT_FALSE(kParameter->class_only);
+  EXPECT_EQ(StdClassTypeParameterOf(StdPackageMember::kSemaphore),
+            std::nullopt);
+}
+
+// §G.4: a call on a mailbox handle, parameterized or not, is checked against
+// the prototype: a method it does not declare is rejected, as is put with no
+// message, num with an argument and try_get with no destination, each under
+// the subclause giving the prototype and at the call, while the prototype's
+// own calls beside them are accepted.
+TEST(MailboxStdPackageElaborator, CallsAreCheckedAgainstThePrototype) {
+  ElabFixture f;
+  ElabOk(
+      "module m;\n"
+      "  mailbox mbx;\n"
+      "  mailbox #(int) pm;\n"
+      "  int msg;\n"
+      "  int got;\n"
+      "  initial begin\n"
+      "    mbx = new(4);\n"
+      "    mbx.flush();\n"
+      "    mbx.put();\n"
+      "    got = mbx.num(1);\n"
+      "    got = pm.try_get();\n"
+      "    got = mbx.num();\n"
+      "    pm.put(msg);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "class 'mailbox' declares no method 'flush'", 8,
+                            "G.4"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "method 'put' of class 'mailbox' takes at least 1 "
+                            "argument; 0 given",
+                            9, "G.4"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "method 'num' of class 'mailbox' takes at most 0 "
+                            "arguments; 1 given",
+                            10, "G.4"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "method 'try_get' of class 'mailbox' takes at "
+                            "least 1 argument; 0 given",
+                            11, "G.4"));
+  for (const auto& d : f.diag.Diagnostics()) {
+    EXPECT_NE(d.loc.line, 7u);
+    EXPECT_NE(d.loc.line, 12u);
+    EXPECT_NE(d.loc.line, 13u);
+  }
 }
 
 }  // namespace

@@ -79,6 +79,7 @@ struct StdFormal {
   std::string_view type;
   std::string_view name;
   bool has_default = false;
+  bool by_reference = false;  // a ref formal
 };
 
 struct StdMethodPrototype {
@@ -93,6 +94,24 @@ struct StdMethodPrototype {
 // void put(int keyCount = 1), task get(int keyCount = 1) and
 // int try_get(int keyCount = 1).
 const std::vector<StdMethodPrototype>& SemaphorePrototype();
+
+// §G.4: the prototype of the mailbox class -- new(int bound = 0), int num(),
+// the tasks put(T message), get(ref T message) and peek(ref T message) and
+// the int functions try_put(T message), try_get(ref T message) and
+// try_peek(ref T message) -- over its type parameter T, whose default,
+// dynamic_singular_type, is the special type that enables run-time type
+// checking.
+const std::vector<StdMethodPrototype>& MailboxPrototype();
+
+// The type parameter a std class prototype is written over, where it has
+// one: its name, its default, and whether it is restricted to a class type.
+struct StdTypeParameter {
+  std::string_view name;
+  std::string_view default_type;  // empty where the parameter has no default
+  bool class_only = false;        // type class T
+};
+std::optional<StdTypeParameter> StdClassTypeParameterOf(
+    StdPackageMember member);
 
 // The prototype of a member of the std package: empty for the randomize
 // function, which is no class, and for a class whose prototype is not
