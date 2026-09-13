@@ -304,4 +304,67 @@ std::shared_ptr<const ClockedProperty> ClkIfElse(
   return ClkAnd(std::move(then_branch), std::move(else_branch));
 }
 
+namespace {
+
+// The recursion of §F.3.4.3.5 over the items from `first` on: the case over
+// no items is the default, and the case over an item followed by others is
+// the §F.3.4.3.4 conditional over that item's match, with the case over the
+// others as its else where there is one. The same b is nested rather than
+// specify(b), which the match already applies.
+std::shared_ptr<const PropertyExpr> PropCaseFrom(
+    const std::shared_ptr<const BooleanExpr>& b,
+    std::vector<PropCaseItem>::const_iterator first,
+    std::vector<PropCaseItem>::const_iterator last,
+    std::shared_ptr<const PropertyExpr> default_property,
+    const CaseMatch& match) {
+  if (first == last) {
+    return default_property;
+  }
+  auto condition = match(b, first->b);
+  auto rest =
+      PropCaseFrom(b, first + 1, last, std::move(default_property), match);
+  if (rest == nullptr) {
+    return PropIf(std::move(condition), first->property);
+  }
+  return PropIfElse(condition, first->property, std::move(rest));
+}
+
+std::shared_ptr<const ClockedProperty> ClkCaseFrom(
+    const std::shared_ptr<const BooleanExpr>& b,
+    std::vector<ClkCaseItem>::const_iterator first,
+    std::vector<ClkCaseItem>::const_iterator last,
+    std::shared_ptr<const ClockedProperty> default_property,
+    const CaseMatch& match) {
+  if (first == last) {
+    return default_property;
+  }
+  auto condition = match(b, first->b);
+  auto rest =
+      ClkCaseFrom(b, first + 1, last, std::move(default_property), match);
+  if (rest == nullptr) {
+    return ClkIf(std::move(condition), first->property);
+  }
+  return ClkIfElse(condition, first->property, std::move(rest));
+}
+
+}  // namespace
+
+std::shared_ptr<const PropertyExpr> PropCase(
+    const std::shared_ptr<const BooleanExpr>& b,
+    const std::vector<PropCaseItem>& items,
+    std::shared_ptr<const PropertyExpr> default_property,
+    const CaseMatch& match) {
+  return PropCaseFrom(b, items.begin(), items.end(),
+                      std::move(default_property), match);
+}
+
+std::shared_ptr<const ClockedProperty> ClkCase(
+    const std::shared_ptr<const BooleanExpr>& b,
+    const std::vector<ClkCaseItem>& items,
+    std::shared_ptr<const ClockedProperty> default_property,
+    const CaseMatch& match) {
+  return ClkCaseFrom(b, items.begin(), items.end(), std::move(default_property),
+                     match);
+}
+
 }  // namespace delta

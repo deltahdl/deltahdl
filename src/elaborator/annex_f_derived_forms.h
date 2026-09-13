@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
@@ -236,5 +237,44 @@ std::shared_ptr<const ClockedProperty> ClkIfElse(
     const std::shared_ptr<const BooleanExpr>& b,
     std::shared_ptr<const ClockedProperty> q1,
     std::shared_ptr<const ClockedProperty> q2);
+
+// §F.3.4.3.5: the derived case operators, unfolded into the §F.3.4.3.4
+// conditional operators over the Boolean specify(b) === specify(b_i) each
+// item's match is. The subclause lets specify(b) be the function that expands
+// b and treats it as signed or unsigned by the §12.5 rules for comparing the
+// expressions of a case statement, and the §F.3.2 Boolean model carries no
+// comparison form, so the Boolean that match denotes is supplied by the
+// caller as a CaseMatch, which each factory calls on b and the b_i of each
+// item in turn. The identities are then: a case with a default alone is that
+// default; one item without a default is (if (match) P1); one item with a
+// default is (if (match) P1 else Pd); and more items are
+// (if (match) P1 else case ...) over the remaining items and the default,
+// where the subclause nests the case over specify(b) and the match is the
+// same, since expanding and signing an expression a second time changes
+// nothing. A case with neither an item nor a default names no property and
+// yields null.
+using CaseMatch = std::function<std::shared_ptr<const BooleanExpr>(
+    const std::shared_ptr<const BooleanExpr>& b,
+    const std::shared_ptr<const BooleanExpr>& item)>;
+
+struct PropCaseItem {
+  std::shared_ptr<const BooleanExpr> b;
+  std::shared_ptr<const PropertyExpr> property;
+};
+struct ClkCaseItem {
+  std::shared_ptr<const BooleanExpr> b;
+  std::shared_ptr<const ClockedProperty> property;
+};
+
+std::shared_ptr<const PropertyExpr> PropCase(
+    const std::shared_ptr<const BooleanExpr>& b,
+    const std::vector<PropCaseItem>& items,
+    std::shared_ptr<const PropertyExpr> default_property,
+    const CaseMatch& match);
+std::shared_ptr<const ClockedProperty> ClkCase(
+    const std::shared_ptr<const BooleanExpr>& b,
+    const std::vector<ClkCaseItem>& items,
+    std::shared_ptr<const ClockedProperty> default_property,
+    const CaseMatch& match);
 
 }  // namespace delta
