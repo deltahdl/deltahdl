@@ -476,15 +476,23 @@ std::shared_ptr<const LvTopLevelProperty> LvTopLocalVarDecls(
 // the second, since an always_ff procedure holding the assumption alone
 // activates it at every tick as the always form of A does. The type t of the
 // first form names nothing on the statement's side and so is not taken.
+// Where the assignment is in the scope of one or more conditional statements
+// whose resulting enabling condition is b, the subclause has the assumption
+// evaluated under that same b by §F.5.3.1, so each factory takes b and yields
+// the statement paired with it as an EnabledAssertion; an assignment in the
+// scope of no conditional statement takes the constant 1, which §F.5.3.1
+// gives a declarative assertion statement.
 using FreeCheckerEquality =
     std::function<std::shared_ptr<const BooleanExpr>(const std::string& u)>;
 using FreeCheckerNextValue = std::function<std::shared_ptr<const BooleanExpr>(
     const std::string& u, const std::shared_ptr<const BooleanExpr>& c)>;
 
-std::shared_ptr<const AssertionStatement> FreeCheckerRandAssignment(
-    const std::string& u, const FreeCheckerEquality& equality);
-std::shared_ptr<const AssertionStatement> FreeCheckerAlwaysFfAssignment(
+EnabledAssertion FreeCheckerRandAssignment(
+    const std::string& u, const FreeCheckerEquality& equality,
+    std::shared_ptr<const BooleanExpr> enabling);
+EnabledAssertion FreeCheckerAlwaysFfAssignment(
     const std::string& u, const std::shared_ptr<const BooleanExpr>& c,
-    const FreeCheckerNextValue& next_value);
+    const FreeCheckerNextValue& next_value,
+    std::shared_ptr<const BooleanExpr> enabling);
 
 }  // namespace delta

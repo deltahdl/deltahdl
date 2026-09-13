@@ -633,19 +633,23 @@ std::shared_ptr<const ClockedTopLevelProperty> AssumedAtGlobalClock(
 
 }  // namespace
 
-std::shared_ptr<const AssertionStatement> FreeCheckerRandAssignment(
-    const std::string& u, const FreeCheckerEquality& equality) {
-  return AssertionWithClockedTop(AssertionStatement::Activation::kInitial,
-                                 AssertionStatement::Role::kAssume,
-                                 AssumedAtGlobalClock(equality(u)));
+EnabledAssertion FreeCheckerRandAssignment(
+    const std::string& u, const FreeCheckerEquality& equality,
+    std::shared_ptr<const BooleanExpr> enabling) {
+  return {*AssertionWithClockedTop(AssertionStatement::Activation::kInitial,
+                                   AssertionStatement::Role::kAssume,
+                                   AssumedAtGlobalClock(equality(u))),
+          std::move(enabling)};
 }
 
-std::shared_ptr<const AssertionStatement> FreeCheckerAlwaysFfAssignment(
+EnabledAssertion FreeCheckerAlwaysFfAssignment(
     const std::string& u, const std::shared_ptr<const BooleanExpr>& c,
-    const FreeCheckerNextValue& next_value) {
-  return AssertionWithClockedTop(AssertionStatement::Activation::kAlways,
-                                 AssertionStatement::Role::kAssume,
-                                 AssumedAtGlobalClock(next_value(u, c)));
+    const FreeCheckerNextValue& next_value,
+    std::shared_ptr<const BooleanExpr> enabling) {
+  return {*AssertionWithClockedTop(AssertionStatement::Activation::kAlways,
+                                   AssertionStatement::Role::kAssume,
+                                   AssumedAtGlobalClock(next_value(u, c))),
+          std::move(enabling)};
 }
 
 }  // namespace delta
