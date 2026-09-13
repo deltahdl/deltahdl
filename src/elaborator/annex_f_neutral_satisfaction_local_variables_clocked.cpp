@@ -40,6 +40,64 @@ std::shared_ptr<const BooleanExpr> BodyClock(const LvAssertionStatement& a) {
   return BoolTrue();
 }
 
+// The unclocked top-level property with local variables an assertion
+// statement evaluates at each activation point.
+std::shared_ptr<const LvTopLevelProperty> LvAssertionBody(
+    const LvAssertionStatement& a) {
+  return UnclockTopLevelWithLocals(*a.body, BodyClock(a));
+}
+
+// The activation, form and clock of a statement, by which §F.5.3.1's
+// activation rule decides its activation points.
+AssertionActivation ActivationOfWithLocals(const LvAssertionStatement& a) {
+  AssertionActivation activation;
+  activation.activation = a.activation;
+  activation.form = a.form;
+  activation.clock = a.clock;
+  return activation;
+}
+
+// The reach of the body: that of the property under its guard, parenthesis
+// and declaration.
+std::size_t LvTopLevelReach(const LvTopLevelProperty& top) {
+  if (top.kind == LvTopLevelProperty::Kind::kParen ||
+      top.kind == LvTopLevelProperty::Kind::kLocalVarDecl) {
+    return top.inner ? LvTopLevelReach(*top.inner) : 0;
+  }
+  return top.property ? PropertyReach(*top.property) : 0;
+}
+
+// §F.5.6.1: the scan over activation points both assertion relations share,
+// as §F.5.3.1's: the points 0 .. count-1 are tried against `complement`, and
+// the body is decided from the empty context on the suffix `suffix` gives for
+// each enabled one; an assert or assume statement requires that it not fail
+// at every enabled point, a cover statement that it pass at some.
+template <typename SuffixFn>
+bool HoldsAtActivationPointsWithLocals(std::size_t count,
+                                       const Word& complement,
+                                       const BooleanExpr& enabling,
+                                       const LvAssertionStatement& assertion,
+                                       SuffixFn suffix) {
+  const std::shared_ptr<const LvTopLevelProperty> kBody =
+      LvAssertionBody(assertion);
+  const AssertionActivation kActivation = ActivationOfWithLocals(assertion);
+  const bool kCover = assertion.role == AssertionStatement::Role::kCover;
+  for (std::size_t i = 0; i < count; ++i) {
+    if (!ActivationPointEnabled(i, complement, enabling, kActivation)) {
+      continue;
+    }
+    const Word kSuffix = suffix(i);
+    if (kCover) {
+      if (PassesTopLevelWithLocals(kSuffix, *kBody, LocalContext{})) {
+        return true;
+      }
+    } else if (FailsTopLevelWithLocals(kSuffix, *kBody, LocalContext{})) {
+      return false;
+    }
+  }
+  return !kCover;
+}
+
 }  // namespace
 
 bool NeutrallySatisfiesClockedPropertyWithLocals(const Word& word,
@@ -172,28 +230,25 @@ bool NeutrallySatisfiesAssertionWithLocals(
     const LvAssertionStatement& assertion) {
   // §F.5.6.1: the rules of §F.5.3.1, the body decided from the empty context
   // at each enabled activation point.
-  const std::shared_ptr<const LvTopLevelProperty> kBody =
-      UnclockTopLevelWithLocals(*assertion.body, BodyClock(assertion));
-  AssertionActivation activation;
-  activation.activation = assertion.activation;
-  activation.form = assertion.form;
-  activation.clock = assertion.clock;
-  const Word kComplement = ComplementWord(word);
-  const bool kCover = assertion.role == AssertionStatement::Role::kCover;
-  for (std::size_t i = 0; i < word.size(); ++i) {
-    if (!ActivationPointEnabled(i, kComplement, enabling, activation)) {
-      continue;
-    }
-    const Word kSuffix = Suffix(word, i);
-    if (kCover) {
-      if (PassesTopLevelWithLocals(kSuffix, *kBody, LocalContext{})) {
-        return true;
-      }
-    } else if (FailsTopLevelWithLocals(kSuffix, *kBody, LocalContext{})) {
-      return false;
-    }
-  }
-  return !kCover;
+  return HoldsAtActivationPointsWithLocals(
+      word.size(), ComplementWord(word), enabling, assertion,
+      [&word](std::size_t i) { return Suffix(word, i); });
+}
+
+bool NeutrallySatisfiesAssertionWithLocalsWithTail(
+    const Word& word, const Letter& tail, const BooleanExpr& enabling,
+    const LvAssertionStatement& assertion) {
+  // The complement of w tail^omega is w-bar followed by the complement of the
+  // tail forever; the point at index |w| stands for every point in the tail,
+  // as in §F.5.3.1's NeutrallySatisfiesAssertionWithTail.
+  const std::size_t kReach = LvTopLevelReach(*LvAssertionBody(assertion));
+  Word complement = ComplementWord(word);
+  complement.push_back(ComplementLetter(tail));
+  return HoldsAtActivationPointsWithLocals(
+      word.size() + 1, complement, enabling, assertion,
+      [&word, &tail, kReach](std::size_t i) {
+        return PrefixWithTail(Suffix(word, i), tail, kReach);
+      });
 }
 
 }  // namespace delta

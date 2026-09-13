@@ -125,4 +125,14 @@ bool NeutrallySatisfiesAssertionWithLocals(
     const Word& word, const BooleanExpr& enabling,
     const LvAssertionStatement& assertion);
 
+// §F.5.6.1 on the infinite word w tail^omega, tail being T or _|_, as
+// §F.5.3.1's NeutrallySatisfiesAssertionWithTail has it: the word §F.5.6.2
+// reads a finite word through. The |w| activation points of the prefix and
+// one standing for the whole tail decide the relation, the body at each
+// decided from the empty context on its suffix completed with the tail past
+// the reach of the body.
+bool NeutrallySatisfiesAssertionWithLocalsWithTail(
+    const Word& word, const Letter& tail, const BooleanExpr& enabling,
+    const LvAssertionStatement& assertion);
+
 }  // namespace delta
