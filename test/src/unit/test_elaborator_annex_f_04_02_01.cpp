@@ -1,6 +1,12 @@
 #include <gtest/gtest.h>
 
+#include <optional>
+
+#include "elaborator/checker_rewrite.h"
 #include "elaborator/checker_rewrite_algorithm.h"
+#include "elaborator/rewrite_algorithm.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_module.h"
 
 using namespace delta;
 
@@ -13,6 +19,48 @@ TEST(CheckerRewriteAlgorithm, MainLoopHasSingleStage) {
   EXPECT_EQ(FirstCheckerRewriteStage(), CheckerRewriteStage::kCheckerInstances);
   EXPECT_EQ(NextCheckerRewriteStage(CheckerRewriteStage::kCheckerInstances),
             CheckerRewriteStage::kCheckerInstances);
+}
+
+// §F.4.2.1 step 2: a formal input argument bound in the instance takes the
+// bound actual, with or without a declared default; one not bound takes the
+// declared default; and one neither bound nor defaulted has no actual.
+TEST(CheckerRewriteAlgorithm, ActualIsTheBoundOneElseTheDeclaredDefault) {
+  EXPECT_EQ(CheckerActualArgumentFor(true, false),
+            ActualArgumentSource::kBoundInInstance);
+  EXPECT_EQ(CheckerActualArgumentFor(true, true),
+            ActualArgumentSource::kBoundInInstance);
+  EXPECT_EQ(CheckerActualArgumentFor(false, true),
+            ActualArgumentSource::kDeclaredDefault);
+  EXPECT_EQ(CheckerActualArgumentFor(false, false), std::nullopt);
+}
+
+// §F.4.2.1 step 2 on a registered checker: with input formals a, b and c of
+// which c alone declares a default, and an output formal the algorithm does
+// not bind, an instance binding a and b flattens legally, since c takes its
+// default, where one binding a alone leaves b without an actual, one binding
+// all three is legal, and one binding four exceeds the input formals.
+TEST(CheckerRewriteAlgorithm, UnboundInputFormalTakesItsDeclaredDefault) {
+  ModuleDecl decl;
+  decl.decl_kind = ModuleDeclKind::kChecker;
+  decl.name = "chk";
+  PortDecl a;
+  a.direction = Direction::kInput;
+  PortDecl b;
+  b.direction = Direction::kInput;
+  PortDecl c;
+  c.direction = Direction::kInput;
+  Expr c_default{};
+  c.default_value = &c_default;
+  PortDecl out;
+  out.direction = Direction::kOutput;
+  decl.ports = {a, b, c, out};
+  CheckerRegistry reg;
+  reg.Register(&decl);
+
+  EXPECT_TRUE(reg.Flatten("chk", 2).legal);
+  EXPECT_FALSE(reg.Flatten("chk", 1).legal);
+  EXPECT_TRUE(reg.Flatten("chk", 3).legal);
+  EXPECT_FALSE(reg.Flatten("chk", 4).legal);
 }
 
 // §F.4.2.1 steps 3–5: a formal input argument is rewritten when it is untyped,
@@ -120,6 +168,26 @@ TEST(CheckerRewriteAlgorithm, TypedMatchingParenthesizesUnlessMethodOperand) {
   EXPECT_EQ(ReplaceCheckerFormalReference(FormalKind::kTypedMatching,
                                           ActualNature::kDollarOrLvalue),
             ReferenceReplacement::kParenthesizedActual);
+}
+
+// §F.4.2.1 step 5b: the parentheses around the substituted actual may be
+// omitted where the reference is already enclosed in parentheses, and not
+// otherwise, as in §F.4.1.1.
+TEST(CheckerRewriteAlgorithm, ParenthesesOmittedOnlyWhereTheReferenceHasThem) {
+  EXPECT_FALSE(CheckerParenthesizedActualNeedsParentheses(true));
+  EXPECT_TRUE(CheckerParenthesizedActualNeedsParentheses(false));
+}
+
+// §F.4.2.1 step 6: flatten_checker returns the checker body as it stands,
+// with no local variable declarations prepended, no match-item assignments
+// appended and no enclosing parentheses, where the flattened forms of
+// §F.4.1.1 are parenthesized.
+TEST(CheckerRewriteAlgorithm, FlattenedCheckerIsTheBareBody) {
+  auto shape = FlattenedCheckerForm();
+  EXPECT_FALSE(shape.prepends_local_var_declarations);
+  EXPECT_FALSE(shape.appends_match_item_assignments);
+  EXPECT_FALSE(shape.enclosed_in_parentheses);
+  EXPECT_TRUE(FlattenedForm(FlattenTarget::kProperty).enclosed_in_parentheses);
 }
 
 }  // namespace

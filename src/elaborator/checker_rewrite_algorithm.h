@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 
 #include "elaborator/rewrite_algorithm.h"
 
@@ -42,6 +43,14 @@ CheckerRewriteStage FirstCheckerRewriteStage();
 // structure observable and distinguishes it from §F.4.1.1's two-stage loop.
 CheckerRewriteStage NextCheckerRewriteStage(CheckerRewriteStage stage);
 
+// §F.4.2.1 step 2: the actual a_f standing for a formal input argument f of
+// the copied checker is the actual bound to f in the instance where one is,
+// and the default actual declared for f where none is, which is the rule
+// §F.4.1.1 step 2 states for a sequence or property formal; so this delegates
+// to ActualArgumentFor, answering nullopt where neither exists.
+std::optional<ActualArgumentSource> CheckerActualArgumentFor(
+    bool bound_in_instance, bool default_declared);
+
 // §F.4.2.1 step 2 / step 6: the algorithm rewrites references for formal
 // *input* arguments, each classified as untyped, typed-non-matching, or
 // typed-matching. A checker formal input argument is never a local variable, so
@@ -80,5 +89,24 @@ struct Step4LvalueRule {
 
 // Returns the §F.4.2.1 step-4 variable_lvalue prohibition.
 Step4LvalueRule CheckerStep4LvalueRule();
+
+// §F.4.2.1 step 5b: the parentheses around the substituted actual a_f may be
+// omitted where the reference is itself already enclosed in parentheses, as
+// §F.4.1.1 step 5b has it; delegates to ParenthesizedActualNeedsParentheses.
+bool CheckerParenthesizedActualNeedsParentheses(
+    bool reference_already_parenthesized);
+
+// §F.4.2.1 step 6: flatten_checker returns the checker body as it stands.
+// Where §F.4.1.1 steps 6 and 7 prepend local variable declarations, append
+// match-item assignments and enclose the result in parentheses, the checker
+// algorithm does none of those, since a checker formal input argument is
+// never a local variable and a checker body is not an expression.
+struct FlattenedCheckerShape {
+  bool prepends_local_var_declarations = false;
+  bool appends_match_item_assignments = false;
+  bool enclosed_in_parentheses = false;
+};
+
+FlattenedCheckerShape FlattenedCheckerForm();
 
 }  // namespace delta

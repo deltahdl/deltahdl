@@ -49,7 +49,10 @@ class CheckerRegistry {
   int CheckerInstanceCount(const ModuleDecl* decl) const;
 
   // Models the flattened result for `actual_input_arg_count` actual arguments
-  // bound to the checker's input formals. Output formals are never bound here.
+  // bound positionally to the checker's input formals, so by §F.4.2.1 step 2
+  // the first that many input formals are bound in the instance and the rest
+  // take their declared defaults, of which each must have one. Output formals
+  // are never bound here.
   FlattenedChecker Flatten(std::string_view name,
                            std::size_t actual_input_arg_count) const;
 

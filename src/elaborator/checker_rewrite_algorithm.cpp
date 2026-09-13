@@ -1,5 +1,9 @@
 #include "elaborator/checker_rewrite_algorithm.h"
 
+#include <optional>
+
+#include "elaborator/rewrite_algorithm.h"
+
 namespace delta {
 
 CheckerRewriteStage FirstCheckerRewriteStage() {
@@ -10,6 +14,13 @@ CheckerRewriteStage NextCheckerRewriteStage(CheckerRewriteStage /*stage*/) {
   // The checker main loop drains a single kind of instance, so its only stage
   // is its own successor — there is no second pass to advance to.
   return CheckerRewriteStage::kCheckerInstances;
+}
+
+std::optional<ActualArgumentSource> CheckerActualArgumentFor(
+    bool bound_in_instance, bool default_declared) {
+  // Step 2 is the same binding rule as §F.4.1.1 step 2, over the input
+  // formals alone.
+  return ActualArgumentFor(bound_in_instance, default_declared);
 }
 
 bool CheckerAlgorithmHandlesFormal(FormalKind kind) {
@@ -40,6 +51,22 @@ Step4LvalueRule CheckerStep4LvalueRule() {
   rule.replacement_may_be_lvalue = false;
   rule.scope = LvalueProhibitionScope::kWholeChecker;
   return rule;
+}
+
+bool CheckerParenthesizedActualNeedsParentheses(
+    bool reference_already_parenthesized) {
+  // Step 5b is the same rule as §F.4.1.1 step 5b.
+  return ParenthesizedActualNeedsParentheses(reference_already_parenthesized);
+}
+
+FlattenedCheckerShape FlattenedCheckerForm() {
+  // Step 6 returns the body: nothing prepended, nothing appended, and no
+  // enclosing parentheses.
+  FlattenedCheckerShape shape;
+  shape.prepends_local_var_declarations = false;
+  shape.appends_match_item_assignments = false;
+  shape.enclosed_in_parentheses = false;
+  return shape;
 }
 
 }  // namespace delta

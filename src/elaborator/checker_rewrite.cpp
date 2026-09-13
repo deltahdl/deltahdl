@@ -65,11 +65,24 @@ FlattenedChecker CheckerRegistry::Flatten(
   fc.output_formal_count = OutputFormalCount(decl);
   // The flattened result is a checker without instances.
   fc.remaining_instances = 0;
-  // §F.4.2: actuals are substituted for references to the formal input
-  // arguments, so every input formal must be bound by an actual. Output
-  // formals are not bound by the algorithm and are excluded from the count.
+  // §F.4.2.1 step 2: each formal input argument takes the actual bound to it
+  // in the instance, or the default actual declared for it where none is
+  // bound; so with the actuals bound positionally to the input formals, the
+  // count may fall short of them only where every input formal it leaves
+  // unbound declares a default, and may not exceed them. Output formals are
+  // not bound by the algorithm and are excluded from the count.
   // §F.4.2: a flattened checker that is not legal makes its source not legal.
-  fc.legal = actual_input_arg_count == fc.input_formal_count;
+  bool args_ok = actual_input_arg_count <= fc.input_formal_count;
+  std::size_t input_index = 0;
+  for (const auto& formal : decl->ports) {
+    if (!AlgorithmAppliesToFormal(formal)) continue;
+    if (input_index >= actual_input_arg_count &&
+        formal.default_value == nullptr) {
+      args_ok = false;
+    }
+    ++input_index;
+  }
+  fc.legal = args_ok;
   return fc;
 }
 
