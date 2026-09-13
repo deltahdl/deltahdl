@@ -24,23 +24,23 @@ namespace {
 // §G.1 lists five members, four classes and the randomize function, in the
 // order semaphore, mailbox, randomize, process, weak reference.
 TEST(StdPackageContents, TheAnnexListsFiveMembersInOrder) {
-  const auto& kContents = StdPackageContents();
-  ASSERT_EQ(kContents.size(), 5u);
-  EXPECT_EQ(kContents[0].member, StdPackageMember::kSemaphore);
-  EXPECT_EQ(kContents[0].name, "semaphore");
-  EXPECT_EQ(kContents[0].kind, StdPackageMemberKind::kClass);
-  EXPECT_EQ(kContents[1].member, StdPackageMember::kMailbox);
-  EXPECT_EQ(kContents[1].name, "mailbox");
-  EXPECT_EQ(kContents[1].kind, StdPackageMemberKind::kClass);
-  EXPECT_EQ(kContents[2].member, StdPackageMember::kRandomize);
-  EXPECT_EQ(kContents[2].name, "randomize");
-  EXPECT_EQ(kContents[2].kind, StdPackageMemberKind::kFunction);
-  EXPECT_EQ(kContents[3].member, StdPackageMember::kProcess);
-  EXPECT_EQ(kContents[3].name, "process");
-  EXPECT_EQ(kContents[3].kind, StdPackageMemberKind::kClass);
-  EXPECT_EQ(kContents[4].member, StdPackageMember::kWeakReference);
-  EXPECT_EQ(kContents[4].name, "weak_reference");
-  EXPECT_EQ(kContents[4].kind, StdPackageMemberKind::kClass);
+  const auto& contents = StdPackageContents();
+  ASSERT_EQ(contents.size(), 5u);
+  EXPECT_EQ(contents[0].member, StdPackageMember::kSemaphore);
+  EXPECT_EQ(contents[0].name, "semaphore");
+  EXPECT_EQ(contents[0].kind, StdPackageMemberKind::kClass);
+  EXPECT_EQ(contents[1].member, StdPackageMember::kMailbox);
+  EXPECT_EQ(contents[1].name, "mailbox");
+  EXPECT_EQ(contents[1].kind, StdPackageMemberKind::kClass);
+  EXPECT_EQ(contents[2].member, StdPackageMember::kRandomize);
+  EXPECT_EQ(contents[2].name, "randomize");
+  EXPECT_EQ(contents[2].kind, StdPackageMemberKind::kFunction);
+  EXPECT_EQ(contents[3].member, StdPackageMember::kProcess);
+  EXPECT_EQ(contents[3].name, "process");
+  EXPECT_EQ(contents[3].kind, StdPackageMemberKind::kClass);
+  EXPECT_EQ(contents[4].member, StdPackageMember::kWeakReference);
+  EXPECT_EQ(contents[4].name, "weak_reference");
+  EXPECT_EQ(contents[4].kind, StdPackageMemberKind::kClass);
 }
 
 // Each member answers to its name and kind, and a name the std package does
