@@ -13,6 +13,8 @@
 #include <utility>
 #include <vector>
 
+#include "simulator/assertion_api.h"
+
 namespace delta {
 
 // §35.9 disable-protocol state for the current execution thread. A foreign
