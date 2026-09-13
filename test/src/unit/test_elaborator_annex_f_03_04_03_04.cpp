@@ -76,31 +76,35 @@ TEST(DerivedConditionalOperators, ClockedFormsAreTheStatedTrees) {
                                     *ClkIf(BoolAtom("a"), q1)));
 }
 
-// Under §F.5.3.1, if (a) strong(b) requires b on the letter with a: it holds
-// on a then b, fails on a lone a, and holds vacuously on a word whose first
-// letter lacks a, whatever follows.
+// Under §F.5.3.1, if (a) strong(b) requires b on the letter with a, since
+// the implication it unfolds to is the overlapping one: it holds on a letter
+// with both atoms, fails on a lone a and on a then b, where b arrives a letter
+// too late, and holds vacuously on a word whose first letter lacks a, whatever
+// follows.
 TEST(DerivedConditionalOperators, IfRequiresTheBranchOnlyWhereTheBooleanHolds) {
   auto form = PropIf(BoolAtom("a"), PropStrong(Atom("b")));
+  const Word kAWithB{A({"a", "b"})};
   const Word kAThenB{A({"a"}), A({"b"})};
   const Word kLoneA{A({"a"})};
-  const Word kNoA{A({"x"})};
-  EXPECT_TRUE(NeutrallySatisfies(kAThenB, *form));
+  const Word kNoA{A({"x"}), A({"b"})};
+  EXPECT_TRUE(NeutrallySatisfies(kAWithB, *form));
+  EXPECT_FALSE(NeutrallySatisfies(kAThenB, *form));
   EXPECT_FALSE(NeutrallySatisfies(kLoneA, *form));
   EXPECT_TRUE(NeutrallySatisfies(kNoA, *form));
 }
 
 // Under §F.5.3.1, if (a) strong(b) else strong(c) is decided by the branch a
 // selects at the first letter and by that branch alone: with a it holds on a
-// then b and fails on a lone a, where strong(a) would have held had the else
-// been consulted; without a it holds on c and fails on a letter with neither
-// atom, and fails on b, where strong(b) would have held had the then been
-// consulted.
+// letter with both atoms and fails on a lone a, where strong(a) would have
+// held had the else been consulted; without a it holds on c and fails on a
+// letter with neither atom, and fails on b, where strong(b) would have held
+// had the then been consulted.
 TEST(DerivedConditionalOperators, IfElseRequiresTheBranchTheBooleanSelects) {
   auto with_a_then_b =
       PropIfElse(BoolAtom("a"), PropStrong(Atom("b")), PropStrong(Atom("a")));
-  const Word kAThenB{A({"a"}), A({"b"})};
+  const Word kAWithB{A({"a", "b"})};
   const Word kLoneA{A({"a"})};
-  EXPECT_TRUE(NeutrallySatisfies(kAThenB, *with_a_then_b));
+  EXPECT_TRUE(NeutrallySatisfies(kAWithB, *with_a_then_b));
   EXPECT_FALSE(NeutrallySatisfies(kLoneA, *with_a_then_b));
 
   auto else_c =
