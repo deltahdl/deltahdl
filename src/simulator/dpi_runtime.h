@@ -48,6 +48,10 @@ struct DpiRtFunction {
   DpiRtArgCallback arg_impl;
   bool is_pure = false;
   bool is_context = false;
+  // §H.2: true where the declaration imports a task -- a function implemented
+  // in C that can in turn call exported tasks -- and false where it imports a
+  // function, which §35.8 bars from calling one.
+  bool is_task = false;
   // Annex H.14: the argument passing semantics this declaration selects for its
   // packed data arguments. The SV3.1a semantics are deprecated functionality a
   // simulator need not implement, so a declaration that does not ask for them
@@ -295,8 +299,10 @@ class DpiRuntime {
   // `decl_scope`, and an import declared pure opens a noncontext frame, as does
   // one declared with neither property. A name this runtime holds no
   // declaration for has declared neither, and opens a noncontext frame too.
-  void EnterDeclaredImportCall(std::string_view sv_name, DpiScope decl_scope,
-                               bool is_task = false);
+  // §H.2: whether the frame is a task's is likewise the declaration's, an
+  // imported task being the kind that can call exported tasks; a name without
+  // a declaration opens a function frame.
+  void EnterDeclaredImportCall(std::string_view sv_name, DpiScope decl_scope);
 
   void LeaveImportCall();
   uint32_t ImportCallDepth() const;

@@ -176,6 +176,9 @@ void RegisterModuleDpiImports(const RtlirModule* mod, SimContext& ctx) {
     // context, and §35.5.2 and §35.5.3 are read off those two.
     func.is_pure = item->dpi_is_pure;
     func.is_context = item->dpi_is_context;
+    // §H.2: an import declares a task or a function, and only an imported task
+    // can in turn call exported tasks.
+    func.is_task = item->dpi_is_task;
     for (const auto& arg : item->func_args) {
       DpiArg formal;
       formal.name = arg.name;

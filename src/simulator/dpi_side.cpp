@@ -33,6 +33,31 @@ DpiSide DpiCallingSide(const DpiRtExport& /*exported*/) {
   return DpiSide::kForeign;
 }
 
+DpiSubroutineKind DpiKindOf(const DpiRtFunction& import) {
+  return import.is_task ? DpiSubroutineKind::kImportedTask
+                        : DpiSubroutineKind::kImportedFunction;
+}
+
+DpiSubroutineKind DpiKindOf(const DpiRtExport& exported) {
+  return exported.is_task ? DpiSubroutineKind::kExportedTask
+                          : DpiSubroutineKind::kExportedFunction;
+}
+
+bool DpiKindMayCallExportedTask(DpiSubroutineKind kind) {
+  // §H.2: imported tasks can in turn call exported tasks; §35.8: an imported
+  // function never can. The exported kinds are SystemVerilog subroutines,
+  // for which a task may enable a task and a function may not.
+  switch (kind) {
+    case DpiSubroutineKind::kImportedTask:
+    case DpiSubroutineKind::kExportedTask:
+      return true;
+    case DpiSubroutineKind::kImportedFunction:
+    case DpiSubroutineKind::kExportedFunction:
+      return false;
+  }
+  return false;
+}
+
 std::string_view DpiNameOnSide(const DpiRtFunction& import, DpiSide side) {
   // §35.4: the foreign side's name is the global linkage name, which is the
   // SystemVerilog name where the declaration gives none.

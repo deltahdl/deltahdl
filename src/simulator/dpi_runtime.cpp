@@ -665,18 +665,21 @@ void DpiRuntime::EnterNoncontextImportCall(std::string_view sv_name,
 }
 
 void DpiRuntime::EnterDeclaredImportCall(std::string_view sv_name,
-                                         DpiScope decl_scope, bool is_task) {
+                                         DpiScope decl_scope) {
   const auto* func = FindImport(sv_name);
+  // §H.2: the declaration says whether the import is a task or a function; a
+  // name without one is a function.
+  const bool kIsTask = func != nullptr && func->is_task;
   // §35.5.1.3: a subroutine declared pure and a subroutine declared with
   // neither special property are both barred from reading or writing any
   // SystemVerilog data object other than their actual arguments, so neither
   // opens a context frame. An import this runtime holds no declaration for has
   // declared nothing, which is the same case as declaring neither.
   if (func == nullptr || func->is_pure || !func->is_context) {
-    EnterNoncontextImportCall(sv_name, is_task);
+    EnterNoncontextImportCall(sv_name, kIsTask);
     return;
   }
-  EnterContextImportCall(sv_name, std::move(decl_scope), is_task);
+  EnterContextImportCall(sv_name, std::move(decl_scope), kIsTask);
 }
 
 void DpiRuntime::LeaveImportCall() {
