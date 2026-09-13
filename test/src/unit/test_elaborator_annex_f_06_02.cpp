@@ -192,14 +192,14 @@ TEST(Past, TheExpressionReadsTheSourceLetter) {
 
 // §F.6.2 (NOTE): $past(e) is $past(e, 1, 1'b1, 1'b1), so the default form
 // agrees with the four-argument one at every point of a word, the letters T
-// and _|_ included, and reads the letter before: a the first letter carries
-// where the second is the point, not the x the second carries, and T, which
-// satisfies every Boolean, where the fourth is; and the initial value where
-// the point or the letter before it is _|_, which satisfies no Boolean, not
-// the 1 of the gating sequence's last letter and not its active condition.
+// and _|_ included, and reads the letter before: the a the first letter
+// carries where the second is the point, the x the second carries where the
+// third, T, is the point, T satisfying the 1 of the gating sequence's last
+// letter; and the initial value where the point is _|_, which satisfies no
+// Boolean, and where the letter before it is, since _|_ is neither active
+// nor inactive and no earlier window reaches across it.
 TEST(Past, TheDefaultFormIsTheFourArgumentOne) {
-  const Word kWord{A({"a"}), A({"x"}),       LetterTop(),
-                   A({"a"}), LetterBottom(), A({"x"})};
+  const Word kWord{A({"a"}), A({"x"}), LetterTop(), LetterBottom(), A({"x"})};
   auto brief = PastOfAtom("a", /*initial=*/true);
   auto full = PastOfAtom("a", /*n=*/1, One(), One(), /*initial=*/true);
   for (std::size_t j = 0; j <= kWord.size(); ++j) {
@@ -210,8 +210,9 @@ TEST(Past, TheDefaultFormIsTheFourArgumentOne) {
   EXPECT_EQ(brief(kWord, 2), false);
   EXPECT_EQ(brief(kWord, 3), true);
   EXPECT_EQ(brief(kWord, 4), true);
-  EXPECT_EQ(brief(kWord, 5), true);
-  EXPECT_EQ(PastOfAtom("a", /*initial=*/false)(kWord, 5), false);
+  EXPECT_EQ(PastOfAtom("a", /*initial=*/false)(kWord, 3), false);
+  EXPECT_EQ(PastOfAtom("a", /*initial=*/false)(kWord, 4), false);
+  EXPECT_EQ(brief(kWord, 5), std::nullopt);
 }
 
 // §F.6.2 under §F.6: read into a word, $past(a) is decided by the preceding
