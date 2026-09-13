@@ -107,36 +107,51 @@ std::vector<Word> Words() {
           Word{A({"a", "clk"}), LetterBottom()}};
 }
 
-// §F.5.6.2: on a body without local variables the two relations and the
-// verdict are §F.5.3.2's, for both shapes of body, both activations and the
-// assert and cover roles.
-TEST(FiniteWordSatisfactionLocals, TheVerdictsAgreeWithF532WithoutLocals) {
+// A statement without local variables in the §F.5.6.1 model beside the same
+// statement in the §F.5.3.1 model: @( clk ) strong( a ##1 b ) in the U shape
+// and in the @( c ) T shape, under each activation and role.
+struct Paired {
+  std::shared_ptr<const LvAssertionStatement> lv;
+  std::shared_ptr<const AssertionStatement> plain;
+};
+std::vector<Paired> PairsWithoutLocals() {
   const auto kAThenB = SeqConcat(Bs("a"), Bs("b"));
   auto q = ClkClock(BoolAtom("clk"), ClkStrong(kAThenB));
+  const std::vector<std::pair<Activation, Role>> kShapes{
+      {Activation::kAlways, Role::kAssert},
+      {Activation::kAlways, Role::kCover},
+      {Activation::kInitial, Role::kAssert},
+      {Activation::kInitial, Role::kCover}};
+  std::vector<Paired> out;
+  for (const auto& [activation, role] : kShapes) {
+    out.push_back(
+        {LvAssertionWithClockedTop(activation, role, LvClockedTopProperty(q)),
+         AssertionWithClockedTop(activation, role, ClockedTopProperty(q))});
+    out.push_back(
+        {LvAssertionWithClock(activation, role, BoolAtom("clk"),
+                              LvClockedTopProperty(ClkStrong(kAThenB))),
+         AssertionWithClock(activation, role, BoolAtom("clk"),
+                            TopProperty(PropStrong(kAThenB)))});
+  }
+  return out;
+}
+
+// §F.5.6.2: on a body without local variables the two relations and the
+// verdict are §F.5.3.2's, for both shapes of body, both activations and the
+// assert and cover roles, with every verdict occurring.
+TEST(FiniteWordSatisfactionLocals, TheVerdictsAgreeWithF532WithoutLocals) {
   std::set<FiniteWordVerdict> seen;
-  for (Activation activation : {Activation::kAlways, Activation::kInitial}) {
-    for (Role role : {Role::kAssert, Role::kCover}) {
-      auto lv_u =
-          LvAssertionWithClockedTop(activation, role, LvClockedTopProperty(q));
-      auto plain_u =
-          AssertionWithClockedTop(activation, role, ClockedTopProperty(q));
-      auto lv_t =
-          LvAssertionWithClock(activation, role, BoolAtom("clk"),
-                               LvClockedTopProperty(ClkStrong(kAThenB)));
-      auto plain_t = AssertionWithClock(activation, role, BoolAtom("clk"),
-                                        TopProperty(PropStrong(kAThenB)));
-      for (const Word& w : Words()) {
-        EXPECT_EQ(WeaklySatisfiesByFiniteWordWithLocals(w, *BoolTrue(), *lv_u),
-                  WeaklySatisfiesByFiniteWord(w, *BoolTrue(), *plain_u));
-        EXPECT_EQ(
-            StronglySatisfiesByFiniteWordWithLocals(w, *BoolTrue(), *lv_u),
-            StronglySatisfiesByFiniteWord(w, *BoolTrue(), *plain_u));
-        EXPECT_EQ(CheckFiniteWordWithLocals(w, *BoolTrue(), *lv_u),
-                  CheckFiniteWord(w, *BoolTrue(), *plain_u));
-        EXPECT_EQ(CheckFiniteWordWithLocals(w, *BoolTrue(), *lv_t),
-                  CheckFiniteWord(w, *BoolTrue(), *plain_t));
-        seen.insert(CheckFiniteWordWithLocals(w, *BoolTrue(), *lv_u));
-      }
+  for (const Paired& pair : PairsWithoutLocals()) {
+    for (const Word& w : Words()) {
+      EXPECT_EQ(WeaklySatisfiesByFiniteWordWithLocals(w, *BoolTrue(), *pair.lv),
+                WeaklySatisfiesByFiniteWord(w, *BoolTrue(), *pair.plain));
+      EXPECT_EQ(
+          StronglySatisfiesByFiniteWordWithLocals(w, *BoolTrue(), *pair.lv),
+          StronglySatisfiesByFiniteWord(w, *BoolTrue(), *pair.plain));
+      const FiniteWordVerdict kVerdict =
+          CheckFiniteWordWithLocals(w, *BoolTrue(), *pair.lv);
+      EXPECT_EQ(kVerdict, CheckFiniteWord(w, *BoolTrue(), *pair.plain));
+      seen.insert(kVerdict);
     }
   }
   EXPECT_EQ(seen.size(), 4U);
