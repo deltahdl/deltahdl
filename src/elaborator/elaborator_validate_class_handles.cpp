@@ -1,4 +1,5 @@
 #include <format>
+#include <optional>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -7,6 +8,7 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_validate_classes_internal.h"
 #include "elaborator/elaborator_validate_internal.h"
+#include "elaborator/std_package.h"
 #include "parser/ast.h"
 
 namespace delta {
@@ -533,9 +535,15 @@ static void CheckNewOnUnconstructibleHandle(
   auto lhs_name = ExprIdent(s->lhs);
   auto lt = class_var_types.find(lhs_name);
   if (lt == class_var_types.end()) return;
-  if (lt->second == "process") {
-    diag.Error(s->range.start, "cannot construct a process object with 'new'",
-               Subclause("9.7"));
+  // §G.6 gives process no constructor, where the other std classes have one.
+  const std::optional<StdPackageMember> kStd =
+      StdPackageMemberNamed(lt->second);
+  if (kStd && !StdClassPrototype(*kStd).empty() &&
+      !StdClassHasConstructor(*kStd)) {
+    diag.Error(
+        s->range.start,
+        std::format("cannot construct a {} object with 'new'", lt->second),
+        Subclause("9.7"));
     return;
   }
   const auto* cls = FindClassDecl(lt->second, unit);

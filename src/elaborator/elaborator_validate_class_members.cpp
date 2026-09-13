@@ -8,6 +8,7 @@
 // 1000-line cap in .github/workflows/deltahdl.yml separated from this file.
 
 #include <format>
+#include <optional>
 #include <string_view>
 #include <unordered_set>
 #include <vector>
@@ -15,6 +16,7 @@
 #include "common/diagnostic.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_validate_internal.h"
+#include "elaborator/std_package.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
 
@@ -24,7 +26,10 @@ void ElaboratorClassRules::ValidateFinalClassExtension() {
   auto check = [&](const ClassDecl* cls) {
     if (cls->base_class.empty()) return;
 
-    if (cls->base_class == "process") {
+    // §G.6 declares process :final; the other std classes are not.
+    const std::optional<StdPackageMember> kStd =
+        StdPackageMemberNamed(cls->base_class);
+    if (kStd && StdClassIsFinal(*kStd)) {
       diag_.Error(cls->range.start, "cannot extend a class declared ':final'",
                   Subclause("8.13"));
       return;

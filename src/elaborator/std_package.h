@@ -111,6 +111,23 @@ const StdMethodPrototype& RandomizePrototype();
 // checking.
 const std::vector<StdMethodPrototype>& MailboxPrototype();
 
+// §G.6: the prototype of the process class -- class :final process, with the
+// nested typedef enum state of FINISHED, RUNNING, WAITING, SUSPENDED and
+// KILLED, the static function process self(), state status(), void kill(),
+// the task await(), void suspend(), void resume(), void srandom(int seed),
+// string get_randstate() and void set_randstate(string state), and no
+// constructor new.
+const std::vector<StdMethodPrototype>& ProcessPrototype();
+
+// §G.6: the members of the process class's nested enum state, in order.
+const std::vector<std::string_view>& ProcessStateEnumMembers();
+
+// §G.6: whether a std class is declared :final, which process alone is, so
+// that it cannot be extended; and whether it declares a constructor, which
+// process alone does not, so that a handle of it cannot be built with new.
+bool StdClassIsFinal(StdPackageMember member);
+bool StdClassHasConstructor(StdPackageMember member);
+
 // The type parameter a std class prototype is written over, where it has
 // one: its name, its default, and whether it is restricted to a class type.
 struct StdTypeParameter {

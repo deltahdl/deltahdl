@@ -125,6 +125,44 @@ const std::vector<StdMethodPrototype>& MailboxPrototype() {
   return kPrototype;
 }
 
+const std::vector<StdMethodPrototype>& ProcessPrototype() {
+  // §G.6: class :final process; typedef enum {FINISHED, RUNNING, WAITING,
+  // SUSPENDED, KILLED} state; static function process self(); function state
+  // status(); function void kill(); task await(); function void suspend();
+  // function void resume(); function void srandom(int seed); function string
+  // get_randstate(); function void set_randstate(string state); endclass.
+  static const std::vector<StdMethodPrototype> kPrototype{
+      {"self", StdMethodKind::kFunction, "process", {}, true},
+      {"status", StdMethodKind::kFunction, "state", {}},
+      {"kill", StdMethodKind::kFunction, "void", {}},
+      {"await", StdMethodKind::kTask, "void", {}},
+      {"suspend", StdMethodKind::kFunction, "void", {}},
+      {"resume", StdMethodKind::kFunction, "void", {}},
+      {"srandom", StdMethodKind::kFunction, "void", {{"int", "seed"}}},
+      {"get_randstate", StdMethodKind::kFunction, "string", {}},
+      {"set_randstate",
+       StdMethodKind::kFunction,
+       "void",
+       {{"string", "state"}}},
+  };
+  return kPrototype;
+}
+
+const std::vector<std::string_view>& ProcessStateEnumMembers() {
+  static const std::vector<std::string_view> kMembers{
+      "FINISHED", "RUNNING", "WAITING", "SUSPENDED", "KILLED"};
+  return kMembers;
+}
+
+bool StdClassIsFinal(StdPackageMember member) {
+  // §G.6: class :final process; the other prototypes carry no :final.
+  return member == StdPackageMember::kProcess;
+}
+
+bool StdClassHasConstructor(StdPackageMember member) {
+  return StdMethodNamed(member, "new") != nullptr;
+}
+
 std::optional<StdTypeParameter> StdClassTypeParameterOf(
     StdPackageMember member) {
   switch (member) {
@@ -148,8 +186,9 @@ const std::vector<StdMethodPrototype>& StdClassPrototype(
       return SemaphorePrototype();
     case StdPackageMember::kMailbox:
       return MailboxPrototype();
-    case StdPackageMember::kRandomize:
     case StdPackageMember::kProcess:
+      return ProcessPrototype();
+    case StdPackageMember::kRandomize:
     case StdPackageMember::kWeakReference:
       return kNone;
   }
