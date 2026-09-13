@@ -2,7 +2,9 @@
 
 #include <cstddef>
 #include <optional>
+#include <string>
 
+#include "elaborator/annex_f_extended_expressions.h"
 #include "elaborator/annex_f_tight_satisfaction.h"
 
 namespace delta {
@@ -28,5 +30,14 @@ std::optional<std::size_t> FutureGclkSourceIndex(const Word& word,
 // to sample. This is distinct from a point that lies past the end of the word
 // (outside the rule's domain): it is the position the rule names as undefined.
 bool FutureGclkIsUndefined(const Word& word, std::size_t j);
+
+// §F.6.3 on an infinite word: the subclause leaves $future_gclk undefined at
+// the last letter of a finite word alone, so on the infinite word w tail^omega
+// of §F.5.3.2, whose every letter has a following one, the expression is
+// defined at every point of the prefix w and reads the tail at the last,
+// which satisfies every Boolean where the tail is T and none where it is
+// _|_; a point in the tail reads the tail as well.
+ExtendedExpression FutureGclkOfAtomOnCompletion(const std::string& name,
+                                                const Letter& tail);
 
 }  // namespace delta

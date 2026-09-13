@@ -2,7 +2,10 @@
 
 #include <cstddef>
 #include <optional>
+#include <string>
 
+#include "elaborator/annex_f_extended_expressions.h"
+#include "elaborator/annex_f_grammar.h"
 #include "elaborator/annex_f_tight_satisfaction.h"
 
 namespace delta {
@@ -27,6 +30,19 @@ bool FutureGclkIsUndefined(const Word& word, std::size_t j) {
   }
   // §F.6.3: for a finite word, $future_gclk(e)[w^{|w|-1}] is undefined.
   return j == word.size() - 1;
+}
+
+ExtendedExpression FutureGclkOfAtomOnCompletion(const std::string& name,
+                                                const Letter& tail) {
+  // §F.6.3: e[w^{j+1}], the following letter being the tail from the last
+  // letter of the prefix on.
+  return [name, tail](const Word& word, std::size_t j) -> std::optional<bool> {
+    const std::optional<std::size_t> kSource = FutureGclkSourceIndex(word, j);
+    if (kSource) {
+      return LetterSatisfiesBoolean(word[*kSource], *BoolAtom(name));
+    }
+    return LetterSatisfiesBoolean(tail, *BoolAtom(name));
+  };
 }
 
 }  // namespace delta
