@@ -407,4 +407,33 @@ DpiRepresentation DpiRepresentationOfOpenArrayElement(DataTypeKind kind);
 // and an integer, time or packed bit base does not.
 bool DpiEnumIsSmall(DataTypeKind base, uint32_t base_width);
 
+// §H.7.8: imported and exported DPI subroutines can take unpacked
+// aggregate types -- unpacked arrays and structures -- as formal or actual
+// arguments, composed of packed elements, unpacked elements or both,
+// subaggregates included, a nonaggregate element being one of the basic
+// types of Table H.1 (§35.5.6). Where an unpacked type consists purely of
+// unpacked elements, subaggregates included, the layout presented to the C
+// programmer is guaranteed to be compatible with the C compiler's layout on
+// the operating system; an aggregate may include packed elements as well,
+// without that guarantee, each in the canonical form of §H.7.7.
+
+// One element of an unpacked aggregate: a nonaggregate of a basic type,
+// packed where the type and width make a packed array, or a subaggregate
+// with elements of its own.
+struct DpiAggregateElement {
+  DataTypeKind kind = DataTypeKind::kInt;
+  uint32_t width = 0;
+  std::vector<DpiAggregateElement> members;
+};
+
+// Whether an aggregate is one the interface takes as an argument: every
+// nonaggregate element, down through the subaggregates, a basic type of
+// Table H.1 or a packed array of bit or logic.
+bool DpiAggregateIsAnArgument(const DpiAggregateElement& aggregate);
+
+// Whether the aggregate's layout is guaranteed to be the C compiler's: it
+// is where every element, down through the subaggregates, is unpacked, and
+// not where a packed element lies anywhere in it.
+bool DpiAggregateLayoutIsCCompatible(const DpiAggregateElement& aggregate);
+
 }  // namespace delta

@@ -421,4 +421,28 @@ bool DpiEnumIsSmall(DataTypeKind base, uint32_t base_width) {
   return DpiRepresentationOfFormal(as_formal) == DpiRepresentation::kBasic;
 }
 
+bool DpiAggregateIsAnArgument(const DpiAggregateElement& aggregate) {
+  if (aggregate.kind == DataTypeKind::kStruct ||
+      aggregate.kind == DataTypeKind::kUnion) {
+    return std::all_of(aggregate.members.begin(), aggregate.members.end(),
+                       DpiAggregateIsAnArgument);
+  }
+  DpiArg as_formal;
+  as_formal.type = aggregate.kind;
+  as_formal.width = aggregate.width;
+  return IsPackedArray(as_formal) || DpiTypeIsSmall(aggregate.kind);
+}
+
+bool DpiAggregateLayoutIsCCompatible(const DpiAggregateElement& aggregate) {
+  if (aggregate.kind == DataTypeKind::kStruct ||
+      aggregate.kind == DataTypeKind::kUnion) {
+    return std::all_of(aggregate.members.begin(), aggregate.members.end(),
+                       DpiAggregateLayoutIsCCompatible);
+  }
+  DpiArg as_formal;
+  as_formal.type = aggregate.kind;
+  as_formal.width = aggregate.width;
+  return !IsPackedArray(as_formal);
+}
+
 }  // namespace delta
