@@ -31,12 +31,17 @@ extern "C" {
 #define EETERN DPI_EXTERN DPI_DLLESPEC
 #endif
 
+/* Annex H.10.1.1: the canonical representation of a scalar of type bit or
+ * logic, spelled as the standard's own svdpi.h spells it, since §H.10.1 has
+ * every simulator use the same file. */
 #define sv_0 0
 #define sv_1 1
-#define sv_z 2
-#define sv_x 3
+#define sv_z 2 /* the 4-state scalar z */
+#define sv_x 3 /* the 4-state scalar x */
 
-typedef uint8_t svScalar;
+/* the one type a bit scalar and a logic scalar share */
+typedef unsigned char svScalar;
+
 typedef svScalar svBit;
 typedef svScalar svLogic;
 

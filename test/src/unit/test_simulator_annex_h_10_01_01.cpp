@@ -25,6 +25,13 @@ TEST(SvDpi, ScalarTypeIsSingleByte) {
   EXPECT_EQ(codes[3], 3);
 }
 
+// §H.10.1.1 spells the common scalar type as unsigned char, and §H.10.1 has
+// every simulator use the standard's file, so svScalar is that type by name
+// and not merely a type of its size.
+TEST(SvDpi, ScalarIsTheStandardsUnsignedChar) {
+  EXPECT_TRUE((std::is_same<svScalar, unsigned char>::value));
+}
+
 // Both bit and logic scalars are spelled as the common svScalar type, so the
 // three names denote one and the same underlying representation.
 TEST(SvDpi, BitAndLogicShareScalarType) {
