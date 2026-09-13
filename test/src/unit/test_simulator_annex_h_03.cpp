@@ -147,7 +147,7 @@ TEST(SvdpiNamingConventions, MacroNamesUseSvUnderscoreUppercase) {
 // assert-svdpi-naming in .github/workflows/deltahdl.yml reads the header
 // itself, so a name added to it that breaks the convention fails the run
 // whether or not it is added here.
-#define FUNCTION_NAME(fn) ((void)sizeof(&fn), std::string_view(#fn))
+#define FUNCTION_NAME(fn) ((void)sizeof(&(fn)), std::string_view(#fn))
 #define TYPE_NAME(t) ((void)sizeof(t), std::string_view(#t))
 #define CONSTANT_NAME(c) ((void)(c), std::string_view(#c))
 
