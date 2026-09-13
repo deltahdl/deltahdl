@@ -485,17 +485,19 @@ std::size_t TopLevelReach(const TopLevelProperty& top) {
 }
 
 // §F.5.3.1: the scan over activation points both assertion relations share.
-// The points 0 .. count-1 are tried in order against kComplement, and the body
-// is evaluated on the suffix `suffix` gives for each enabled one. An assert or
-// assume statement requires that the body pass or be disabled (i.e. not fail)
-// at every enabled activation point, assume statements sharing the assert
-// definition; a cover statement holds when the body passes at some enabled
-// activation point.
+// The points 0 .. count-1 are tried in order against `complement`, and the
+// body of the assertion statement is evaluated on the suffix `suffix` gives
+// for each enabled one. An assert or assume statement requires that the body
+// pass or be disabled (i.e. not fail) at every enabled activation point,
+// assume statements sharing the assert definition; a cover statement holds
+// when the body passes at some enabled activation point.
 template <typename SuffixFn>
 bool HoldsAtActivationPoints(std::size_t count, const Word& complement,
                              const BooleanExpr& enabling,
                              const AssertionStatement& assertion,
-                             const TopLevelProperty& body, SuffixFn suffix) {
+                             SuffixFn suffix) {
+  const std::shared_ptr<const TopLevelProperty> kBody =
+      AssertionBody(assertion);
   const bool kCover = assertion.role == AssertionStatement::Role::kCover;
   for (std::size_t i = 0; i < count; ++i) {
     if (!ActivationPointEnabled(i, complement, enabling, assertion)) {
@@ -503,10 +505,10 @@ bool HoldsAtActivationPoints(std::size_t count, const Word& complement,
     }
     const Word kSuffix = suffix(i);
     if (kCover) {
-      if (NeutrallySatisfiesTopLevel(kSuffix, body)) {
+      if (NeutrallySatisfiesTopLevel(kSuffix, *kBody)) {
         return true;
       }
-    } else if (FailsTopLevel(kSuffix, body)) {
+    } else if (FailsTopLevel(kSuffix, *kBody)) {
       return false;
     }
   }
@@ -625,19 +627,15 @@ bool FailsTopLevelClocked(const Word& word,
 
 bool NeutrallySatisfiesAssertion(const Word& word, const BooleanExpr& enabling,
                                  const AssertionStatement& assertion) {
-  const std::shared_ptr<const TopLevelProperty> kBody =
-      AssertionBody(assertion);
   return HoldsAtActivationPoints(
-      word.size(), ComplementWord(word), enabling, assertion, *kBody,
+      word.size(), ComplementWord(word), enabling, assertion,
       [&word](std::size_t i) { return Suffix(word, i); });
 }
 
 bool NeutrallySatisfiesAssertionWithTail(const Word& word, const Letter& tail,
                                          const BooleanExpr& enabling,
                                          const AssertionStatement& assertion) {
-  const std::shared_ptr<const TopLevelProperty> kBody =
-      AssertionBody(assertion);
-  const std::size_t kReach = TopLevelReach(*kBody);
+  const std::size_t kReach = TopLevelReach(*AssertionBody(assertion));
   // The complement of w tail^omega is w-bar followed by the complement of the
   // tail forever; the point at index |w| stands for every point in the tail,
   // since the always forms read the letter alone and the initial forms fire
@@ -645,7 +643,7 @@ bool NeutrallySatisfiesAssertionWithTail(const Word& word, const Letter& tail,
   Word complement = ComplementWord(word);
   complement.push_back(ComplementLetter(tail));
   return HoldsAtActivationPoints(
-      word.size() + 1, complement, enabling, assertion, *kBody,
+      word.size() + 1, complement, enabling, assertion,
       [&word, &tail, kReach](std::size_t i) {
         return PrefixWithTail(Suffix(word, i), tail, kReach);
       });
