@@ -1,5 +1,7 @@
 #include "elaborator/rewrite_algorithm.h"
 
+#include <optional>
+
 namespace delta {
 
 RewriteStage FirstRewriteStage() { return RewriteStage::kProperties; }
@@ -27,6 +29,15 @@ bool SequenceInstanceNeedsItemWrap(SequenceInstanceContext context) {
       return false;
   }
   return false;
+}
+
+std::optional<ActualArgumentSource> ActualArgumentFor(bool bound_in_instance,
+                                                      bool default_declared) {
+  // step 2: the bound actual comes first; the default stands in only where
+  // no argument is bound to the formal.
+  if (bound_in_instance) return ActualArgumentSource::kBoundInInstance;
+  if (default_declared) return ActualArgumentSource::kDeclaredDefault;
+  return std::nullopt;
 }
 
 ReferenceReplacement ReplaceFormalReference(FormalKind kind,
@@ -67,6 +78,29 @@ ReferenceReplacement ReplaceFormalReference(FormalKind kind,
   return ReferenceReplacement::kActualDirect;
 }
 
+bool ReplacementMayStandAsMatchItemLvalue(ReferenceReplacement replacement) {
+  // step 4: the two casts through the formal's type are the references
+  // §16.8.1 keeps out of the lvalue of a match-item assignment or increment;
+  // the replacements of steps 3 and 5 carry no such note.
+  switch (replacement) {
+    case ReferenceReplacement::kItemCastToFormalType:
+    case ReferenceReplacement::kItemCastTypeOfFormal:
+      return false;
+    case ReferenceReplacement::kActualDirect:
+    case ReferenceReplacement::kItemCastInferredType:
+    case ReferenceReplacement::kItemActual:
+    case ReferenceReplacement::kParenthesizedActual:
+      return true;
+  }
+  return true;
+}
+
+bool ParenthesizedActualNeedsParentheses(bool reference_already_parenthesized) {
+  // step 5b: the parentheses may be omitted only where the reference already
+  // has its own.
+  return !reference_already_parenthesized;
+}
+
 LocalVarSubstitution LocalVariableFlatten(LocalVarDirection direction) {
   LocalVarSubstitution sub;
   switch (direction) {
@@ -89,6 +123,25 @@ LocalVarSubstitution LocalVariableFlatten(LocalVarDirection direction) {
       return sub;
   }
   return sub;
+}
+
+LocalVarSubstitution PropertyLocalVariableFlatten() {
+  // flatten_property step 6: "t f = a_f;" for every local variable formal,
+  // with nothing appended, which is the input shape of flatten_sequence.
+  return LocalVariableFlatten(LocalVarDirection::kInput);
+}
+
+FlattenedFormShape FlattenedForm(FlattenTarget target) {
+  FlattenedFormShape shape;
+  // step 6: the declarations may be arranged in any order; step 7: the
+  // result is enclosed in parentheses. Both hold for either target.
+  shape.local_var_declarations_ordered = false;
+  shape.enclosed_in_parentheses = true;
+  // steps 6b and 6c: only flatten_sequence appends match-item assignments,
+  // and the closing note has their order not matter.
+  shape.appends_match_item_assignments = target == FlattenTarget::kSequence;
+  shape.match_item_assignments_ordered = false;
+  return shape;
 }
 
 }  // namespace delta

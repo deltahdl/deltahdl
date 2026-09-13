@@ -97,9 +97,17 @@ FlattenedProperty PropertyRegistry::Flatten(
   fp.formal_count = decl->prop_formals.size();
   fp.disable_iff_count = FlattenedDisableIffCount(decl);
   fp.remaining_instances = 0;
-  // §16.12: actuals must bind every formal, otherwise the substituted body
-  // would still reference an unbound formal.
-  bool args_ok = actual_arg_count == fp.formal_count;
+  // §F.4.1.1 step 2: each formal takes the actual bound to it in the
+  // instance, or the default actual declared for it where none is bound; so
+  // with the actuals bound positionally, the count may fall short of the
+  // formals only where every formal it leaves unbound declares a default,
+  // and may not exceed them.
+  bool args_ok = actual_arg_count <= fp.formal_count;
+  for (size_t i = actual_arg_count; i < fp.formal_count; ++i) {
+    bool has_default = i < decl->prop_formal_has_default.size() &&
+                       decl->prop_formal_has_default[i];
+    args_ok = args_ok && has_default;
+  }
   // §16.12: nesting of disable iff, explicitly or through instantiation, is
   // not allowed.
   bool no_disable_iff_nesting = fp.disable_iff_count <= 1;

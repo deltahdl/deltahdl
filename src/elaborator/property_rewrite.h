@@ -44,6 +44,9 @@ class PropertyRegistry {
   // `disable iff` count after that inlining finishes.
   int FlattenedDisableIffCount(const ModuleItem* decl) const;
 
+  // §F.4.1.1 step 2: the actuals are taken as bound positionally, so the
+  // first actual_arg_count formals are bound in the instance and the rest
+  // take their declared defaults, of which each must have one.
   FlattenedProperty Flatten(std::string_view name,
                             std::size_t actual_arg_count) const;
 

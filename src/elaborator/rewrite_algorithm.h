@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 
 namespace delta {
 
@@ -55,6 +56,22 @@ enum class SequenceInstanceContext : std::uint8_t {
 // bare flatten_sequence(r). Returns true iff the item(sequence'...) wrap is
 // required.
 bool SequenceInstanceNeedsItemWrap(SequenceInstanceContext context);
+
+// §F.4.1.1 flatten_property/flatten_sequence step 2: the actual argument
+// expression a_f that stands for a formal f of the copied declaration is the
+// actual bound to f in the instance where one is, and the default actual
+// declared for f where none is. A formal that is bound in the instance takes
+// the bound actual whether or not a default is declared, since the default
+// stands in only where no argument is bound. A formal neither bound nor
+// defaulted has no a_f: §16.8 makes such an instance an error before the
+// algorithm runs, so that case answers nullopt.
+enum class ActualArgumentSource : std::uint8_t {
+  kBoundInInstance,  // a_f is the actual bound to f in the instance
+  kDeclaredDefault,  // a_f is the default actual declared for f
+};
+
+std::optional<ActualArgumentSource> ActualArgumentFor(bool bound_in_instance,
+                                                      bool default_declared);
 
 // §F.4.1.1 flatten_property/flatten_sequence steps 3–6 classify each formal
 // argument of the instantiated declaration.
@@ -119,6 +136,20 @@ enum class ReferenceReplacement : std::uint8_t {
 ReferenceReplacement ReplaceFormalReference(FormalKind kind,
                                             ActualNature actual);
 
+// §F.4.1.1 flatten_property/flatten_sequence step 4, by way of §16.8.1: a
+// reference that step 4 replaces by a cast through the formal's type stands
+// as an rvalue, so none of the references so replaced shall be the
+// variable_lvalue in an operator_assignment or inc_or_dec_expression in a
+// sequence_match_item. The replacements of the other steps carry no such
+// note. Returns true iff a reference given the replacement may stand as
+// that lvalue.
+bool ReplacementMayStandAsMatchItemLvalue(ReferenceReplacement replacement);
+
+// §F.4.1.1 flatten_property/flatten_sequence step 5b: the parentheses around
+// the substituted actual a_f may be omitted where the reference is itself
+// already enclosed in parentheses, and are required where it is not.
+bool ParenthesizedActualNeedsParentheses(bool reference_already_parenthesized);
+
 // §F.4.1.1 flatten_sequence step 6: a local variable formal argument is
 // substituted by a prepended declaration, and, for the directions that pass a
 // value back out, an assignment appended to the sequence's match items. (In
@@ -142,5 +173,37 @@ struct LocalVarSubstitution {
 // Returns how a local variable formal of the given direction is flattened in
 // flatten_sequence step 6.
 LocalVarSubstitution LocalVariableFlatten(LocalVarDirection direction);
+
+// §F.4.1.1 flatten_property step 6: every local variable formal argument of a
+// property is flattened to the prepended declaration "t f = a_f;" and no
+// match-item assignment, the shape flatten_sequence gives an input, since a
+// property has no match items to carry a value back out through.
+LocalVarSubstitution PropertyLocalVariableFlatten();
+
+// §F.4.1.1 flatten_property and flatten_sequence, steps 6 and 7, and the
+// note that closes the subclause: the shape of the expression each returns.
+// Both prepend the local variable declarations of step 6 in any order and
+// enclose the copied declarations and body in parentheses (step 7). Only
+// flatten_sequence appends match-item assignments (steps 6b and 6c), and
+// their order does not matter either, because by §16.8.2 distinct inout or
+// output local variable formals are bound to distinct actuals, so no two
+// assignments write the same a_f.
+enum class FlattenTarget : std::uint8_t {
+  kProperty,  // flatten_property
+  kSequence,  // flatten_sequence
+};
+
+struct FlattenedFormShape {
+  // Whether the prepended local variable declarations have a fixed order.
+  bool local_var_declarations_ordered = false;
+  // Whether match-item assignments a_f = f are appended to the body at all.
+  bool appends_match_item_assignments = false;
+  // Whether the appended match-item assignments have a fixed order.
+  bool match_item_assignments_ordered = false;
+  // Whether the returned expression is enclosed in parentheses.
+  bool enclosed_in_parentheses = false;
+};
+
+FlattenedFormShape FlattenedForm(FlattenTarget target);
 
 }  // namespace delta
