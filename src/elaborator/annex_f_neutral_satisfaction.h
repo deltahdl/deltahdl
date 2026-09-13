@@ -216,6 +216,17 @@ std::shared_ptr<const AssertionStatement> AssertionWithClockedTop(
 bool NeutrallySatisfiesAssertion(const Word& word, const BooleanExpr& enabling,
                                  const AssertionStatement& assertion);
 
+// §F.5.3.1 on the infinite word w tail^omega, tail being T or _|_, which is
+// the word §F.5.3.2 reads the finite word w through. The activation points in
+// the tail all see the suffix tail^omega and the same letter of the
+// complement, so the |w| points of the prefix and one point standing for the
+// whole tail decide the relation, the body at each evaluated on its suffix
+// completed with the tail far enough past the prefix for its verdict to have
+// settled, as the disable iff rule of §F.5.3.1 completes its prefix.
+bool NeutrallySatisfiesAssertionWithTail(const Word& word, const Letter& tail,
+                                         const BooleanExpr& enabling,
+                                         const AssertionStatement& assertion);
+
 // §F.5.3.1: an assertion statement together with the enabling condition under
 // which it is evaluated, so a set of assumptions can be carried as a list.
 struct EnabledAssertion {

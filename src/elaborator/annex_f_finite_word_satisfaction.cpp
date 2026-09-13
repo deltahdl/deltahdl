@@ -1,68 +1,23 @@
 #include "elaborator/annex_f_finite_word_satisfaction.h"
 
-#include <cstddef>
-
 #include "elaborator/annex_f_neutral_satisfaction.h"
 #include "elaborator/annex_f_tight_satisfaction.h"
 
 namespace delta {
-namespace {
-
-// The finite word w followed by `count` copies of `tail`. The constant tail
-// materializes a finite prefix of the infinite completion w T^omega (tail = T)
-// or w _|_^omega (tail = _|_) that §F.5.3.2 evaluates against.
-Word CompleteWord(const Word& word, const Letter& tail, std::size_t count) {
-  Word out = word;
-  out.reserve(word.size() + count);
-  for (std::size_t i = 0; i < count; ++i) {
-    out.push_back(tail);
-  }
-  return out;
-}
-
-// §F.5.3.2: neutral satisfaction of A by the infinite word w tail^omega, the
-// completion §F.5.3.1's NeutrallySatisfiesAssertion is asked to decide. The
-// tail is constant, so the assertion verdict is eventually independent of how
-// many tail letters are present; this materializes a growing finite prefix of
-// the tail and returns the verdict once it has held steady across a window. The
-// cap keeps the search finite and is exact for the finite assertions this model
-// is exercised on, mirroring §F.5.2's bounded witness search and §F.5.3.1's
-// PrefixWithTail completion.
-bool NeutralOnCompletion(const Word& word, const Letter& tail,
-                         const BooleanExpr& enabling,
-                         const AssertionStatement& assertion) {
-  const std::size_t kCap = word.size() * 4 + 64;
-  const std::size_t kWindow = 3;
-  bool steady_value = false;
-  std::size_t steady_run = 0;
-  for (std::size_t count = 1; count <= kCap; ++count) {
-    const bool kValue = NeutrallySatisfiesAssertion(
-        CompleteWord(word, tail, count), enabling, assertion);
-    if (count > 1 && kValue == steady_value) {
-      if (++steady_run >= kWindow) {
-        return steady_value;
-      }
-    } else {
-      steady_value = kValue;
-      steady_run = 1;
-    }
-  }
-  return steady_value;
-}
-
-}  // namespace
 
 bool WeaklySatisfiesByFiniteWord(const Word& word, const BooleanExpr& enabling,
                                  const AssertionStatement& assertion) {
   // §F.5.3.2: w |=^- A iff w T^omega |= A.
-  return NeutralOnCompletion(word, LetterTop(), enabling, assertion);
+  return NeutrallySatisfiesAssertionWithTail(word, LetterTop(), enabling,
+                                             assertion);
 }
 
 bool StronglySatisfiesByFiniteWord(const Word& word,
                                    const BooleanExpr& enabling,
                                    const AssertionStatement& assertion) {
   // §F.5.3.2: w |=^+ A iff w _|_^omega |= A.
-  return NeutralOnCompletion(word, LetterBottom(), enabling, assertion);
+  return NeutrallySatisfiesAssertionWithTail(word, LetterBottom(), enabling,
+                                             assertion);
 }
 
 FiniteWordVerdict CheckFiniteWord(const Word& word, const BooleanExpr& enabling,
@@ -81,6 +36,25 @@ FiniteWordVerdict CheckFiniteWord(const Word& word, const BooleanExpr& enabling,
     return FiniteWordVerdict::kHolds;  // w |= A and not w |=^+ A
   }
   return FiniteWordVerdict::kPending;  // w |=^- A and not w |= A
+}
+
+bool FiniteWordVerdictCondition(FiniteWordVerdict verdict, const Word& word,
+                                const BooleanExpr& enabling,
+                                const AssertionStatement& assertion) {
+  // §F.5.3.2: each verdict's condition as the subclause states it.
+  switch (verdict) {
+    case FiniteWordVerdict::kHoldsStrongly:
+      return StronglySatisfiesByFiniteWord(word, enabling, assertion);
+    case FiniteWordVerdict::kFails:
+      return !WeaklySatisfiesByFiniteWord(word, enabling, assertion);
+    case FiniteWordVerdict::kHolds:
+      return NeutrallySatisfiesAssertion(word, enabling, assertion) &&
+             !StronglySatisfiesByFiniteWord(word, enabling, assertion);
+    case FiniteWordVerdict::kPending:
+      return WeaklySatisfiesByFiniteWord(word, enabling, assertion) &&
+             !NeutrallySatisfiesAssertion(word, enabling, assertion);
+  }
+  return false;
 }
 
 const char* FiniteWordVerdictLabel(FiniteWordVerdict verdict) {

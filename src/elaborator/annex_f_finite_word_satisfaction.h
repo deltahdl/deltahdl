@@ -11,9 +11,11 @@ namespace delta {
 // §F.5.3.2 defines weak and strong satisfaction of an assertion statement A by
 // a finite (possibly empty) word w over Sigma, written w |=^- A and w |=^+ A.
 // Both are layered directly on §F.5.3.1's neutral satisfaction of A by an
-// infinite word (NeutrallySatisfiesAssertion, a satisfied dependency): the
-// finite word is completed with a constant tail and that relation decides the
-// result.
+// infinite word (NeutrallySatisfiesAssertionWithTail, a satisfied dependency):
+// the finite word is completed with a constant tail and that relation decides
+// the result. The completion is an infinite word, so an always form has
+// activation points in the tail as well as in w; they are what tell w |=^- A
+// from w |= A for an assertion whose body no last letter can meet.
 //   - w |=^- A iff (w followed by the infinite top tail T^omega) neutrally
 //     satisfies A.
 //   - w |=^+ A iff (w followed by the infinite bottom tail _|_^omega) neutrally
@@ -47,6 +49,16 @@ enum class FiniteWordVerdict : std::uint8_t {
 // exactly one of the four mutually exclusive conditions the standard lists.
 FiniteWordVerdict CheckFiniteWord(const Word& word, const BooleanExpr& enabling,
                                   const AssertionStatement& assertion);
+
+// §F.5.3.2: the condition the subclause states for a verdict, in its own
+// terms: "Holds strongly" is w |=^+ A; "Fails" is not w |=^- A; "Holds (but
+// does not hold strongly)" is w |= A and not w |=^+ A; "Pending" is w |=^- A
+// and not w |= A. CheckFiniteWord returns the one verdict whose condition
+// holds, which this lets be observed condition by condition rather than
+// through the order CheckFiniteWord tests the relations in.
+bool FiniteWordVerdictCondition(FiniteWordVerdict verdict, const Word& word,
+                                const BooleanExpr& enabling,
+                                const AssertionStatement& assertion);
 
 // §F.5.3.2: the label a tool reports for each verdict.
 const char* FiniteWordVerdictLabel(FiniteWordVerdict verdict);
