@@ -34,13 +34,17 @@ std::shared_ptr<const SequenceExpr> Samp(const std::string& name) {
   return SeqLocalVarSampling(name);
 }
 
-const std::vector<LocalVarDeclaration> kVThenW{{"int", "v"}, {"bit", "w"}};
+// The declarations (int v; bit w), built per call rather than held in a
+// static, since a static of this type may throw at initialization.
+std::vector<LocalVarDeclaration> VThenW() {
+  return {{"int", "v"}, {"bit", "w"}};
+}
 
 // (int v; bit w; R) is the declaration of v over the declaration of w over R,
 // and not the declaration of w over the declaration of v.
 TEST(DerivedLocalVariableDeclarations, TheSequenceFormNestsInTheOrderWritten) {
   auto rest = SeqConcat(Samp("v"), Samp("w"));
-  auto form = SeqLocalVarDecls(kVThenW, rest);
+  auto form = SeqLocalVarDecls(VThenW(), rest);
   ASSERT_EQ(form->kind, SequenceExpr::Kind::kLocalVarDecl);
   EXPECT_EQ(form->local_var_type, "int");
   EXPECT_EQ(form->local_var_name, "v");
@@ -95,7 +99,7 @@ TEST(DerivedLocalVariableDeclarations, NoneIsTheBodyAndOneIsThePrimitive) {
 // top-level form over T.
 TEST(DerivedLocalVariableDeclarations, ThePropertyFormsNestTheSameWay) {
   auto body = LvStrong(Samp("w"));
-  auto form = LvLocalVarDecls(kVThenW, body);
+  auto form = LvLocalVarDecls(VThenW(), body);
   ASSERT_EQ(form->kind, LvProperty::Kind::kLocalVarDecl);
   EXPECT_EQ(form->local_var_type, "int");
   EXPECT_EQ(form->local_var_name, "v");
@@ -106,7 +110,7 @@ TEST(DerivedLocalVariableDeclarations, ThePropertyFormsNestTheSameWay) {
   EXPECT_EQ(form->lhs->lhs, body);
 
   auto top = LvTopProperty(body);
-  auto top_form = LvTopLocalVarDecls(kVThenW, top);
+  auto top_form = LvTopLocalVarDecls(VThenW(), top);
   ASSERT_EQ(top_form->kind, LvTopLevelProperty::Kind::kLocalVarDecl);
   EXPECT_EQ(top_form->local_var_type, "int");
   EXPECT_EQ(top_form->local_var_name, "v");
@@ -127,8 +131,8 @@ TEST(DerivedLocalVariableDeclarations, EveryDeclaredNameIsScopedOut) {
   const Word kWord{A({"x"}), A({"y"})};
   const LocalContext kInput{{"v", A({"old"})}, {"u", A({"z"})}};
 
-  auto both =
-      TightSatisfactionOutputs(kWord, *SeqLocalVarDecls(kVThenW, body), kInput);
+  auto both = TightSatisfactionOutputs(kWord, *SeqLocalVarDecls(VThenW(), body),
+                                       kInput);
   ASSERT_EQ(both.size(), 1U);
   EXPECT_TRUE(LocalContextEqual(both[0], kInput));
 
@@ -153,22 +157,22 @@ TEST(DerivedLocalVariableDeclarations, EveryDeclaredNameIsScopedOut) {
 // and (int v; bit w; strong(a)) fails on a letter without a. The top-level
 // form passes and fails the same way.
 TEST(DerivedLocalVariableDeclarations, TheBodyVerdictPassesThroughTheNesting) {
-  auto holds = LvLocalVarDecls(kVThenW, LvStrong(Samp("w")));
+  auto holds = LvLocalVarDecls(VThenW(), LvStrong(Samp("w")));
   EXPECT_TRUE(
       NeutrallySatisfiesWithLocals(Word{A({"x"})}, *holds, LocalContext{}));
   EXPECT_TRUE(NeutrallySatisfiesWithLocals(
       Word{A({"x"})}, *holds,
       LocalContext{{"v", A({"old"})}, {"w", A({"old"})}}));
-  auto fails = LvLocalVarDecls(kVThenW, LvStrong(Atom("a")));
+  auto fails = LvLocalVarDecls(VThenW(), LvStrong(Atom("a")));
   EXPECT_FALSE(
       NeutrallySatisfiesWithLocals(Word{A({"b"})}, *fails, LocalContext{}));
 
   auto top_holds =
-      LvTopLocalVarDecls(kVThenW, LvTopProperty(LvStrong(Samp("w"))));
+      LvTopLocalVarDecls(VThenW(), LvTopProperty(LvStrong(Samp("w"))));
   EXPECT_TRUE(
       PassesTopLevelWithLocals(Word{A({"x"})}, *top_holds, LocalContext{}));
   auto top_fails =
-      LvTopLocalVarDecls(kVThenW, LvTopProperty(LvStrong(Atom("a"))));
+      LvTopLocalVarDecls(VThenW(), LvTopProperty(LvStrong(Atom("a"))));
   EXPECT_TRUE(
       FailsTopLevelWithLocals(Word{A({"b"})}, *top_fails, LocalContext{}));
 }
