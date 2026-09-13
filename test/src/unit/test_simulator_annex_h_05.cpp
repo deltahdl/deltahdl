@@ -15,7 +15,10 @@
 // canonical representation, the references, the headers, the helpers), which is
 // distinct from H.3's naming spellings and H.4's binary layout. svdpi.h is
 // included alone: it intentionally redefines a few VPI names, so it must not
-// share a translation unit with vpi.h.
+// share a translation unit with vpi.h. That an application written in C, not
+// C++, can include the file is what these C++ translation units cannot show;
+// the assert-svdpi-compiles-as-c job of .github/workflows/deltahdl.yml
+// compiles such an application as strict C99 against it.
 #include "simulator/svdpi.h"
 
 namespace delta {
