@@ -391,4 +391,34 @@ std::string_view DpiSubclauseDefiningCLayerType(DpiCLayerType type) {
   return "";
 }
 
+DpiRepresentation DpiRepresentationOfFormal(const DpiArg& formal) {
+  if (IsPackedArray(formal)) return DpiRepresentation::kCanonical;
+  if (DpiTypeIsSmall(formal.type)) return DpiRepresentation::kBasic;
+  if (formal.type == DataTypeKind::kStruct ||
+      formal.type == DataTypeKind::kUnion) {
+    return DpiRepresentation::kCCompatible;
+  }
+  return DpiRepresentation::kNone;
+}
+
+DpiRepresentation DpiRepresentationOfOpenArrayElement(DataTypeKind kind) {
+  switch (kind) {
+    case DataTypeKind::kBit:
+    case DataTypeKind::kLogic:
+    case DataTypeKind::kReg:
+    case DataTypeKind::kInteger:
+    case DataTypeKind::kTime:
+      return DpiRepresentation::kCanonical;
+    default:
+      return DpiRepresentation::kCCompatible;
+  }
+}
+
+bool DpiEnumIsSmall(DataTypeKind base, uint32_t base_width) {
+  DpiArg as_formal;
+  as_formal.type = base;
+  as_formal.width = base_width;
+  return DpiRepresentationOfFormal(as_formal) == DpiRepresentation::kBasic;
+}
+
 }  // namespace delta

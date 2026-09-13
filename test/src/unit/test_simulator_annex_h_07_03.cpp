@@ -3,6 +3,9 @@
 #include <cstdint>
 
 #include "helpers_open_array_natural_order.h"
+#include "parser/ast.h"
+#include "simulator/dpi_arg_value.h"
+#include "simulator/dpi_c_type.h"
 #include "simulator/svdpi.h"
 #include "simulator/svdpi_open_array.h"
 
@@ -346,6 +349,99 @@ TEST(DataRepresentation, UnpackedLowerIndicesGoFirst) {
     ++expected_c;
   }
   EXPECT_EQ(expected_c, kSize);
+}
+
+// Annex H.7.3 as a statement about the representation itself, in
+// src/simulator/dpi_c_type.h: which representation a formal of each type
+// takes, which an element of an open array takes -- a 2-state or 4-state
+// scalar taking the canonical form there where as a formal it is a basic
+// type -- and which enumeration base types make a small value.
+
+delta::DpiArg FormalOf(delta::DataTypeKind type, uint32_t width = 0) {
+  delta::DpiArg formal;
+  formal.name = "a";
+  formal.type = type;
+  formal.direction = delta::Direction::kInput;
+  formal.width = width;
+  return formal;
+}
+
+// §H.7.3: a basic integer or real type, a chandle, a string and a scalar
+// bit or logic are represented as §H.7.4 defines; a packed type -- a packed
+// array, integer, time -- in the canonical form of §H.7.7; an unpacked
+// struct or union, being neither packed nor holding packed elements as far
+// as the interface sees, is C compatible; an event has no representation.
+TEST(DpiDataRepresentation, EachFormalTakesTheRepresentationOfItsType) {
+  using delta::DataTypeKind;
+  using delta::DpiRepresentation;
+  EXPECT_EQ(delta::DpiRepresentationOfFormal(FormalOf(DataTypeKind::kInt)),
+            DpiRepresentation::kBasic);
+  EXPECT_EQ(delta::DpiRepresentationOfFormal(FormalOf(DataTypeKind::kReal)),
+            DpiRepresentation::kBasic);
+  EXPECT_EQ(delta::DpiRepresentationOfFormal(FormalOf(DataTypeKind::kString)),
+            DpiRepresentation::kBasic);
+  EXPECT_EQ(delta::DpiRepresentationOfFormal(FormalOf(DataTypeKind::kBit, 1)),
+            DpiRepresentation::kBasic);
+  EXPECT_EQ(delta::DpiRepresentationOfFormal(FormalOf(DataTypeKind::kBit, 8)),
+            DpiRepresentation::kCanonical);
+  EXPECT_EQ(delta::DpiRepresentationOfFormal(FormalOf(DataTypeKind::kInteger)),
+            DpiRepresentation::kCanonical);
+  EXPECT_EQ(delta::DpiRepresentationOfFormal(FormalOf(DataTypeKind::kTime)),
+            DpiRepresentation::kCanonical);
+  EXPECT_EQ(delta::DpiRepresentationOfFormal(FormalOf(DataTypeKind::kStruct)),
+            DpiRepresentation::kCCompatible);
+  EXPECT_EQ(delta::DpiRepresentationOfFormal(FormalOf(DataTypeKind::kUnion)),
+            DpiRepresentation::kCCompatible);
+  EXPECT_EQ(delta::DpiRepresentationOfFormal(FormalOf(DataTypeKind::kEvent)),
+            DpiRepresentation::kNone);
+}
+
+// §H.7.3: the element of a stand-alone array passed to an open array formal
+// is in canonical form when its type is a 2-state or 4-state scalar or
+// packed type -- a scalar bit included, which as a formal is a basic type
+// -- and C compatible otherwise, an int, a real, a chandle or a struct
+// element having the representation of an individual value.
+TEST(DpiDataRepresentation, AnOpenArraysElementIsCanonicalOnlyWhenPacked) {
+  using delta::DataTypeKind;
+  using delta::DpiRepresentation;
+  EXPECT_EQ(delta::DpiRepresentationOfOpenArrayElement(DataTypeKind::kBit),
+            DpiRepresentation::kCanonical);
+  EXPECT_EQ(delta::DpiRepresentationOfOpenArrayElement(DataTypeKind::kLogic),
+            DpiRepresentation::kCanonical);
+  EXPECT_EQ(delta::DpiRepresentationOfOpenArrayElement(DataTypeKind::kBit),
+            DpiRepresentation::kCanonical);
+  EXPECT_EQ(delta::DpiRepresentationOfOpenArrayElement(DataTypeKind::kInteger),
+            DpiRepresentation::kCanonical);
+  EXPECT_EQ(delta::DpiRepresentationOfOpenArrayElement(DataTypeKind::kInt),
+            DpiRepresentation::kCCompatible);
+  EXPECT_EQ(delta::DpiRepresentationOfOpenArrayElement(DataTypeKind::kReal),
+            DpiRepresentation::kCCompatible);
+  EXPECT_EQ(delta::DpiRepresentationOfOpenArrayElement(DataTypeKind::kChandle),
+            DpiRepresentation::kCCompatible);
+  EXPECT_EQ(delta::DpiRepresentationOfOpenArrayElement(DataTypeKind::kStruct),
+            DpiRepresentation::kCCompatible);
+}
+
+// §H.7.3: an enumeration is represented by the C type of its base type, and
+// the base type says whether it is a small value -- int, byte, shortint and
+// longint bases are small and cross as their Table H.1 type, integer and
+// time bases are 4-state packed arrays and cross in canonical form, and a
+// packed bit or logic base is a packed array.
+TEST(DpiDataRepresentation, AnEnumIsItsBaseTypeAndSmallWhenItIs) {
+  using delta::DataTypeKind;
+  EXPECT_TRUE(delta::DpiEnumIsSmall(DataTypeKind::kInt, 0));
+  EXPECT_TRUE(delta::DpiEnumIsSmall(DataTypeKind::kByte, 0));
+  EXPECT_TRUE(delta::DpiEnumIsSmall(DataTypeKind::kShortint, 0));
+  EXPECT_TRUE(delta::DpiEnumIsSmall(DataTypeKind::kLongint, 0));
+  EXPECT_FALSE(delta::DpiEnumIsSmall(DataTypeKind::kInteger, 0));
+  EXPECT_FALSE(delta::DpiEnumIsSmall(DataTypeKind::kTime, 0));
+  EXPECT_FALSE(delta::DpiEnumIsSmall(DataTypeKind::kBit, 4));
+  EXPECT_EQ(delta::DpiCTypeOfFormal(FormalOf(DataTypeKind::kInt), false),
+            "const int");
+  EXPECT_EQ(delta::DpiCTypeOfFormal(FormalOf(DataTypeKind::kInteger), false),
+            "const svLogicVecVal*");
+  EXPECT_EQ(delta::DpiCTypeOfFormal(FormalOf(DataTypeKind::kBit, 4), false),
+            "const svBitVecVal*");
 }
 
 }  // namespace

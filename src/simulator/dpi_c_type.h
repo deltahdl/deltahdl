@@ -365,4 +365,46 @@ DpiMemorySide DpiSideOwningBlockBehindChandle();
 // among them, whatever SystemVerilog code made the call: C.
 DpiMemorySide DpiSideOfImportedCall();
 
+// §H.7.3: the DPI restricts how SystemVerilog data types are represented
+// in C. A type that is not packed and holds no packed element has a
+// C-compatible representation; a basic integer or real type is represented
+// as §H.7.4 defines; a packed type, time and integer and a user-defined
+// packed type among them, in the canonical form of §H.7.7; an enumeration
+// by the C type of its SystemVerilog base type, an integer or time base
+// being a 4-state packed array, the base type deciding whether the
+// enumeration is a small value (§35.5.5) and its names unavailable in C.
+// An unpacked array embedded in a struct, and a stand-alone array passed
+// to a sized formal, have a C-compatible layout whatever their element; a
+// stand-alone array passed to an open array formal is in canonical form
+// where its element is a 2-state or 4-state scalar or packed type and C
+// compatible otherwise, an element then having the representation of an
+// individual value of its type and reached by C indexing. The elements of
+// each dimension of an unpacked array lie in their natural order, the
+// lower indices first (§H.7.6 c).
+
+// The representations the clause names, and none for a type that does not
+// cross.
+enum class DpiRepresentation : uint8_t {
+  kCCompatible,
+  kBasic,
+  kCanonical,
+  kNone
+};
+
+// The representation a formal takes: canonical for a packed type, basic
+// for a small type, C compatible for an unpacked struct or union, none for
+// the rest.
+DpiRepresentation DpiRepresentationOfFormal(const DpiArg& formal);
+
+// The representation an element of a stand-alone array passed to an open
+// array formal takes: canonical for a 2-state or 4-state scalar or packed
+// type, a scalar bit or logic included whatever its width, and C
+// compatible for every other.
+DpiRepresentation DpiRepresentationOfOpenArrayElement(DataTypeKind kind);
+
+// Whether an enumeration with the base type is a small value: it is when
+// the base is a small type and not a packed one, so an int base makes one
+// and an integer, time or packed bit base does not.
+bool DpiEnumIsSmall(DataTypeKind base, uint32_t base_width);
+
 }  // namespace delta
