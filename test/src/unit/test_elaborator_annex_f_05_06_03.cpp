@@ -138,15 +138,19 @@ TEST(NonVacuityLocals, UntilNeedsAnOperandToBecomeNonvacuous) {
 
 // §F.5.3.3: w, L_0 |=^non accept_on (b) P requires the operand to be nonvacuous
 // together with the abort condition. When no letter satisfies b the no-abort
-// alternative holds; with the only letter satisfying b non-vacuity can come
-// only through the prefix alternative; and a vacuous operand makes the whole
-// vacuous.
+// alternative holds; with a letter satisfying b non-vacuity can come only
+// through the prefix alternative, some b-free prefix meeting P under
+// _|_^omega or not meeting it under T^omega, which [s] does before the b of
+// [s][b] and the empty prefix does not before the b of [b,s]; and a vacuous
+// operand makes the whole vacuous.
 TEST(NonVacuityLocals, AcceptOnFollowsTheAbortShape) {
   auto good = LvAcceptOn(BoolAtom("b"), Strong("s"));
   EXPECT_TRUE(
       NonVacuouslyEvaluatesWithLocals(Word{L({"s"})}, *good, LocalContext{}));
-  EXPECT_TRUE(NonVacuouslyEvaluatesWithLocals(Word{L({"b", "s"})}, *good,
+  EXPECT_TRUE(NonVacuouslyEvaluatesWithLocals(Word{L({"s"}), L({"b"})}, *good,
                                               LocalContext{}));
+  EXPECT_FALSE(NonVacuouslyEvaluatesWithLocals(Word{L({"b", "s"})}, *good,
+                                               LocalContext{}));
   auto vacuous = LvAcceptOn(BoolAtom("b"), Trig("a"));
   EXPECT_FALSE(NonVacuouslyEvaluatesWithLocals(Word{L({"x"})}, *vacuous,
                                                LocalContext{}));

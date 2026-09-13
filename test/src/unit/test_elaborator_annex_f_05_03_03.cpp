@@ -2,7 +2,9 @@
 
 #include <set>
 #include <string>
+#include <vector>
 
+#include "elaborator/annex_f_derived_forms.h"
 #include "elaborator/annex_f_grammar.h"
 #include "elaborator/annex_f_neutral_satisfaction.h"
 #include "elaborator/annex_f_tight_satisfaction.h"
@@ -116,13 +118,20 @@ TEST(NonVacuity, AcceptOnHoldsViaTheNoAbortAlternative) {
   EXPECT_TRUE(NonVacuouslyEvaluates(Word{L({"s"})}, *p));
 }
 
-// §F.5.3.3: when the only letter satisfies b the no-abort alternative fails, so
-// non-vacuity can hold only through the prefix alternative -- here the empty
-// prefix completed with _|_^omega fails strong(s). The result is still true,
-// and it can only come from that alternative since b is present.
+// §F.5.3.3: when a letter satisfies b the no-abort alternative fails, so
+// non-vacuity can hold only through the prefix alternative: some prefix x free
+// of b settles P, x _|_^omega meeting it or x T^omega not meeting it. On
+// [s][b] the prefix [s] completed with _|_^omega meets strong(s); on [x][b]
+// the prefix [x] completed with T^omega does not meet it, no prefix of that
+// completion being the one letter s; and on [b,s] the only b-free prefix is
+// the empty one, whose bottom completion does not meet strong(s) and whose
+// top completion does, so the evaluation is vacuous -- which reading the
+// bottom completion as settling P by failing it would have got wrong.
 TEST(NonVacuity, AcceptOnHoldsViaThePrefixAlternativeWhenBOccurs) {
   auto p = PropAcceptOn(BoolAtom("b"), Strong("s"));
-  EXPECT_TRUE(NonVacuouslyEvaluates(Word{L({"b", "s"})}, *p));
+  EXPECT_TRUE(NonVacuouslyEvaluates(Word{L({"s"}), L({"b"})}, *p));
+  EXPECT_TRUE(NonVacuouslyEvaluates(Word{L({"x"}), L({"b"})}, *p));
+  EXPECT_FALSE(NonVacuouslyEvaluates(Word{L({"b", "s"})}, *p));
 }
 
 // §F.5.3.3: accept_on still requires its operand to be nonvacuous. With a
@@ -219,6 +228,176 @@ TEST(NonVacuity, DisableIffOnTheEmptyWordFollowsTheOperand) {
       Word{}, *TopDisableIff(BoolAtom("b"), Strong("s"))));
   EXPECT_FALSE(NonVacuouslyEvaluatesTopLevel(
       Word{}, *TopDisableIff(BoolAtom("b"), Trig("a"))));
+}
+
+// The derived operators §F.5.3.3 states a rule for. Each rule is over the
+// operands, and where it parts from the unfolding of §F.3.4.3 the cases show
+// both, the unfolding through NonVacuouslyEvaluates on the unfolded form.
+
+// §F.5.3.3: ( P1 iff P2 ) is nonvacuous iff either operand is. On the
+// letter _|_ neither trigger matches, so the stated rule says vacuous, where
+// the unfolding into implications is nonvacuous through the negation that
+// turns _|_ into the T both triggers match.
+TEST(NonVacuity, IffIsNonvacuousWhenEitherSideIs) {
+  auto p1 = Trig("a");
+  auto p2 = Trig("b");
+  EXPECT_TRUE(NonVacuouslyEvaluatesIff(Word{L({"a"})}, *p1, *p2));
+  EXPECT_TRUE(NonVacuouslyEvaluatesIff(Word{L({"b"})}, *p1, *p2));
+  EXPECT_FALSE(NonVacuouslyEvaluatesIff(Word{L({"x"})}, *p1, *p2));
+  EXPECT_FALSE(NonVacuouslyEvaluatesIff(Word{LetterBottom()}, *p1, *p2));
+  EXPECT_TRUE(NonVacuouslyEvaluates(Word{LetterBottom()}, *PropIff(p1, p2)));
+}
+
+// §F.5.3.3: ( P1 implies P2 ) is nonvacuous iff P1 holds and is nonvacuous
+// and P2 is nonvacuous. On [a,t] the trigger of P1 matches and its strong(t)
+// is met; on [a] the trigger matches but P1 fails; on [x] P1 holds only
+// vacuously, which the stated rule rejects where the unfolding ( not P1 or
+// P2 ) accepts through the nonvacuous strong(s); and a vacuous consequent is
+// rejected too.
+TEST(NonVacuity, ImpliesNeedsTheAntecedentToHoldNonvacuously) {
+  auto p1 = Trig("a");
+  auto p2 = Strong("s");
+  EXPECT_TRUE(NonVacuouslyEvaluatesImplies(Word{L({"a", "t"})}, *p1, *p2));
+  EXPECT_FALSE(NonVacuouslyEvaluatesImplies(Word{L({"a"})}, *p1, *p2));
+  EXPECT_FALSE(NonVacuouslyEvaluatesImplies(Word{L({"x"})}, *p1, *p2));
+  EXPECT_TRUE(NonVacuouslyEvaluates(Word{L({"x"})}, *PropImplies(p1, p2)));
+  EXPECT_FALSE(NonVacuouslyEvaluatesImplies(Word{L({"s"})}, *p2, *p1));
+  EXPECT_TRUE(NonVacuouslyEvaluatesImplies(Word{L({"s", "a"})}, *p2, *p1));
+}
+
+// §F.5.3.3: ( P1 s_until P2 ) has the rule of ( P1 until P2 ), witness past
+// index 0 included.
+TEST(NonVacuity, SUntilSharesTheUntilRule) {
+  auto p1 = Trig("a");
+  auto p2 = PropNot(Trig("a"));
+  auto until = PropUntil(p1, p2);
+  const std::vector<Word> kWords{Word{L({"x"}), L({"a"})},
+                                 Word{L({"x"}), L({"x"})}, Word{L({"a"})},
+                                 Word{}};
+  for (const Word& w : kWords) {
+    EXPECT_EQ(NonVacuouslyEvaluatesSUntil(w, *p1, *p2),
+              NonVacuouslyEvaluates(w, *until));
+  }
+  EXPECT_TRUE(NonVacuouslyEvaluatesSUntil(Word{L({"x"}), L({"a"})}, *p1, *p2));
+  EXPECT_FALSE(NonVacuouslyEvaluatesSUntil(Word{L({"x"}), L({"x"})}, *p1, *p2));
+}
+
+// §F.5.3.3: ( always P ) is nonvacuous iff some letter is one from which P
+// is nonvacuous and before which P holds. always Trig(a) on [x][a,t]: the
+// trigger matches from the second letter, and from the first P holds
+// vacuously, so the witness stands; on [x][x] there is none, nor on the
+// empty word. always ( not Trig(a) ) on the same [x][a,t]: from the second
+// letter the negation is nonvacuous, but from the first it fails, since
+// Trig(a) holds there, so the stated rule says vacuous -- where the
+// unfolding ( P until 0 ) is nonvacuous from its first letter, strong(0)
+// being a base case.
+TEST(NonVacuity, AlwaysNeedsAWitnessBeforeWhichPHolds) {
+  const Word kXAt{L({"x"}), L({"a", "t"})};
+  EXPECT_TRUE(NonVacuouslyEvaluatesAlways(kXAt, *Trig("a")));
+  EXPECT_FALSE(
+      NonVacuouslyEvaluatesAlways(Word{L({"x"}), L({"x"})}, *Trig("a")));
+  EXPECT_FALSE(NonVacuouslyEvaluatesAlways(Word{}, *Trig("a")));
+  EXPECT_FALSE(NonVacuouslyEvaluatesAlways(kXAt, *PropNot(Trig("a"))));
+  EXPECT_TRUE(NonVacuouslyEvaluates(kXAt, *PropAlways(PropNot(Trig("a")))));
+}
+
+// §F.5.3.3: ( always [m:n] P ) and ( s_always [m:n] P ) take their witness
+// from m through n and their guard from m, and n alone bounds the witness,
+// w^{i.} being the empty word past |w|. always [0:0] Trig(a) on [x][a,t] has
+// no witness where always [1:1] and always [1:2] do; always [0:1] of the
+// negation fails its guard at index 0 where always [1:1] has no guard to
+// fail; and always [3:4] strong(s) on [x][x] is nonvacuous from the empty
+// suffix, as strong is on every word, where Trig(a) is not.
+TEST(NonVacuity, AlwaysRangeIsBoundedByItsIndicesAlone) {
+  const Word kXAt{L({"x"}), L({"a", "t"})};
+  const Word kXX{L({"x"}), L({"x"})};
+  EXPECT_FALSE(NonVacuouslyEvaluatesAlwaysRange(kXAt, *Trig("a"), 0, 0));
+  EXPECT_TRUE(NonVacuouslyEvaluatesAlwaysRange(kXAt, *Trig("a"), 1, 1));
+  EXPECT_TRUE(NonVacuouslyEvaluatesAlwaysRange(kXAt, *Trig("a"), 1, 2));
+  EXPECT_FALSE(
+      NonVacuouslyEvaluatesAlwaysRange(kXAt, *PropNot(Trig("a")), 0, 1));
+  EXPECT_TRUE(
+      NonVacuouslyEvaluatesAlwaysRange(kXAt, *PropNot(Trig("a")), 1, 1));
+  EXPECT_TRUE(NonVacuouslyEvaluatesAlwaysRange(kXX, *Strong("s"), 3, 4));
+  EXPECT_FALSE(NonVacuouslyEvaluatesAlwaysRange(kXX, *Trig("a"), 3, 4));
+  const std::vector<Word> kWords{kXAt, kXX};
+  for (const Word& w : kWords) {
+    for (unsigned int m = 0; m < 3; ++m) {
+      EXPECT_EQ(NonVacuouslyEvaluatesSAlwaysRange(w, *Trig("a"), m, 3),
+                NonVacuouslyEvaluatesAlwaysRange(w, *Trig("a"), m, 3));
+    }
+  }
+}
+
+// §F.5.3.3: ( s_eventually P ) is nonvacuous iff some letter is one from
+// which P is nonvacuous and before which not P holds. s_eventually
+// ( not Trig(a) ) on [x][a,t]: from the second letter the negation is
+// nonvacuous and from the first not not Trig(a), that is Trig(a), holds, so
+// the witness stands; s_eventually Trig(a) on the same word has its witness
+// at the second letter but Trig(a) holds from the first, so not P does not,
+// and the stated rule says vacuous -- where the unfolding
+// ( not always not P ) is nonvacuous through the strong(0) of its always.
+TEST(NonVacuity, SEventuallyNeedsPToFailBeforeItsWitness) {
+  const Word kXAt{L({"x"}), L({"a", "t"})};
+  EXPECT_TRUE(NonVacuouslyEvaluatesSEventually(kXAt, *PropNot(Trig("a"))));
+  EXPECT_FALSE(NonVacuouslyEvaluatesSEventually(kXAt, *Trig("a")));
+  EXPECT_TRUE(NonVacuouslyEvaluates(kXAt, *PropSEventually(Trig("a"))));
+  EXPECT_FALSE(NonVacuouslyEvaluatesSEventually(Word{L({"x"}), L({"x"})},
+                                                *PropNot(Trig("a"))));
+  EXPECT_FALSE(NonVacuouslyEvaluatesSEventually(Word{}, *PropNot(Trig("a"))));
+}
+
+// §F.5.3.3: ( eventually [m:n] P ) and ( s_eventually [m:n] P ) take their
+// witness from m through n and their guard from m. eventually [1:1] of the
+// negation on [x][a,t] has its witness and no guard, eventually [0:1] has
+// the guard hold at index 0, eventually [0:0] has no witness; and
+// eventually [0:1] Trig(a) fails its guard where eventually [1:1] has none.
+TEST(NonVacuity, EventuallyRangeIsBoundedByItsIndicesAlone) {
+  const Word kXAt{L({"x"}), L({"a", "t"})};
+  auto neg = PropNot(Trig("a"));
+  EXPECT_TRUE(NonVacuouslyEvaluatesEventuallyRange(kXAt, *neg, 1, 1));
+  EXPECT_TRUE(NonVacuouslyEvaluatesEventuallyRange(kXAt, *neg, 0, 1));
+  EXPECT_FALSE(NonVacuouslyEvaluatesEventuallyRange(kXAt, *neg, 0, 0));
+  EXPECT_FALSE(NonVacuouslyEvaluatesEventuallyRange(kXAt, *Trig("a"), 0, 1));
+  EXPECT_TRUE(NonVacuouslyEvaluatesEventuallyRange(kXAt, *Trig("a"), 1, 1));
+  for (unsigned int m = 0; m < 3; ++m) {
+    EXPECT_EQ(NonVacuouslyEvaluatesSEventuallyRange(kXAt, *Trig("a"), m, 3),
+              NonVacuouslyEvaluatesEventuallyRange(kXAt, *Trig("a"), m, 3));
+    EXPECT_EQ(NonVacuouslyEvaluatesSEventuallyRange(kXAt, *neg, m, 3),
+              NonVacuouslyEvaluatesEventuallyRange(kXAt, *neg, m, 3));
+  }
+}
+
+// §F.5.3.3: ( reject_on (b) P ) has the abort shape of accept_on: on [x] no
+// letter satisfies b; on [s][b] the prefix [s] settles strong(s) under
+// _|_^omega; on [b,s] the empty prefix settles nothing. On the letter T,
+// which satisfies b, the empty prefix settles nothing either, so the stated
+// rule says vacuous, where the unfolding ( not accept_on (b) not P ) is
+// nonvacuous, its negation turning the T into a _|_ that satisfies no b.
+TEST(NonVacuity, RejectOnSharesTheAbortShape) {
+  auto b = BoolAtom("b");
+  EXPECT_TRUE(NonVacuouslyEvaluatesRejectOn(Word{L({"x"})}, *b, *Strong("s")));
+  EXPECT_TRUE(NonVacuouslyEvaluatesRejectOn(Word{L({"s"}), L({"b"})}, *b,
+                                            *Strong("s")));
+  EXPECT_FALSE(
+      NonVacuouslyEvaluatesRejectOn(Word{L({"b", "s"})}, *b, *Strong("s")));
+  EXPECT_FALSE(
+      NonVacuouslyEvaluatesRejectOn(Word{LetterTop()}, *b, *Strong("s")));
+  EXPECT_TRUE(
+      NonVacuouslyEvaluates(Word{LetterTop()}, *PropRejectOn(b, Strong("s"))));
+  EXPECT_FALSE(NonVacuouslyEvaluatesRejectOn(Word{L({"x"})}, *b, *Trig("a")));
+}
+
+// §F.5.3.3 closes that the relation is not stated for every derived operator
+// and is then defined by unrolling the derivation. ( s_nexttime P ) is
+// ( not nexttime not P ), and unrolling gives |w| > 0 and w^{1.} |=^non P:
+// nonvacuous on [x][a,t], where the second letter matches the trigger, and
+// not on [a,t][x] or on the empty word.
+TEST(NonVacuity, TheOtherDerivedOperatorsUnroll) {
+  auto p = PropSNexttime(Trig("a"));
+  EXPECT_TRUE(NonVacuouslyEvaluates(Word{L({"x"}), L({"a", "t"})}, *p));
+  EXPECT_FALSE(NonVacuouslyEvaluates(Word{L({"a", "t"}), L({"x"})}, *p));
+  EXPECT_FALSE(NonVacuouslyEvaluates(Word{}, *p));
 }
 
 }  // namespace

@@ -204,11 +204,12 @@ bool DisableIffShape(const Word& word, const TopProperty& top,
 
 // §F.5.3.3 (and §F.5.6.3): the abort/disable family shares one shape. The
 // property w |=^non OP(b) P holds iff w |=^non P and one of: (1) no letter of w
-// satisfies b; or (2) some b-free prefix x of w leaves P unmet under one of the
-// constant tails x _|_^omega / x T^omega. accept_on (b) P and disable iff (b) P
-// both use this rule. Templated on the property type plus a non-vacuity policy
-// and a neutral-satisfaction policy so the plain and local-variable layers --
-// the latter threading a LocalContext through both policies -- share one body.
+// satisfies b; or (2) some b-free prefix x of w settles P before b can act,
+// x _|_^omega meeting P or x T^omega not meeting it. accept_on (b) P,
+// reject_on (b) P and disable iff (b) P all use this rule. Templated on the
+// property type plus a non-vacuity policy and a neutral-satisfaction policy so
+// the plain and local-variable layers -- the latter threading a LocalContext
+// through both policies -- share one body.
 template <typename Property, typename NonVacuousFn, typename NeutralFn>
 bool NonVacuousAbortShape(const Word& word, const BooleanExpr& boolean,
                           const Property& operand, NonVacuousFn non_vacuous,
@@ -221,14 +222,15 @@ bool NonVacuousAbortShape(const Word& word, const BooleanExpr& boolean,
   if (kFirstB == word.size()) {
     return true;
   }
-  // (2) Some b-free prefix x leaves P unmet under one of the constant tails.
-  // The prefixes with no b-letter are exactly those of length 0..kFirstB.
+  // (2) Some b-free prefix x settles P: x _|_^omega meets it, or x T^omega
+  // does not. The prefixes with no b-letter are exactly those of length
+  // 0..kFirstB.
   const std::size_t kReach = PropertyReach(operand);
   for (std::size_t len = 0; len <= kFirstB; ++len) {
     const Word kPrefix = FirstLetters(word, len);
     const Word kBottom = PrefixWithTail(kPrefix, LetterBottom(), kReach);
     const Word kTop = PrefixWithTail(kPrefix, LetterTop(), kReach);
-    if (!neutrally_satisfies(kBottom, operand) ||
+    if (neutrally_satisfies(kBottom, operand) ||
         !neutrally_satisfies(kTop, operand)) {
       return true;
     }

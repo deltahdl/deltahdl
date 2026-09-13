@@ -256,7 +256,112 @@ bool NonVacuous(const Word& word, const PropertyExpr& property) {
   return false;
 }
 
+// The guard the always and eventually rules of §F.5.3.3 place on the letters
+// before their witness: w |= P, or w |= not P, which is w-bar |/= P by the
+// negation rule of §F.5.3.1.
+bool GuardHolds(const Word& word, const PropertyExpr& p, bool negated) {
+  if (negated) {
+    return !NeutrallySatisfies(ComplementWord(word), p);
+  }
+  return NeutrallySatisfies(word, p);
+}
+
+// §F.5.3.3: the shape the always and eventually rules of the derived
+// operators share. Some index i in [first, last] has w^{i.} |=^non P, and
+// every j in [first, i) has w^{j.} |= P for the always rules or
+// w^{j.} |= not P for the eventually rules.
+bool NonVacuousAfterGuardedPrefix(const Word& word, const PropertyExpr& p,
+                                  bool guard_negated, std::size_t first,
+                                  std::size_t last) {
+  for (std::size_t i = first; i <= last; ++i) {
+    if (!NonVacuous(Suffix(word, i), p)) {
+      continue;
+    }
+    bool guarded = true;
+    for (std::size_t j = first; j < i; ++j) {
+      if (!GuardHolds(Suffix(word, j), p, guard_negated)) {
+        guarded = false;
+        break;
+      }
+    }
+    if (guarded) {
+      return true;
+    }
+  }
+  return false;
+}
+
 }  // namespace
+
+bool NonVacuouslyEvaluatesIff(const Word& word, const PropertyExpr& p1,
+                              const PropertyExpr& p2) {
+  // §F.5.3.3: either operand nonvacuous.
+  return NonVacuous(word, p1) || NonVacuous(word, p2);
+}
+
+bool NonVacuouslyEvaluatesImplies(const Word& word, const PropertyExpr& p1,
+                                  const PropertyExpr& p2) {
+  // §F.5.3.3: the antecedent holds and is nonvacuous, and the consequent is
+  // nonvacuous.
+  return NeutrallySatisfies(word, p1) && NonVacuous(word, p1) &&
+         NonVacuous(word, p2);
+}
+
+bool NonVacuouslyEvaluatesSUntil(const Word& word, const PropertyExpr& p1,
+                                 const PropertyExpr& p2) {
+  // §F.5.3.3: the rule of the until, stated again for s_until.
+  return NonVacuousUntil(word, *PropUntil(std::make_shared<PropertyExpr>(p1),
+                                          std::make_shared<PropertyExpr>(p2)));
+}
+
+bool NonVacuouslyEvaluatesAlways(const Word& word, const PropertyExpr& p) {
+  // §F.5.3.3: some 0 <= i < |w| from which P is nonvacuous, P holding from
+  // every earlier letter.
+  return !word.empty() &&
+         NonVacuousAfterGuardedPrefix(word, p, false, 0, word.size() - 1);
+}
+
+bool NonVacuouslyEvaluatesAlwaysRange(const Word& word, const PropertyExpr& p,
+                                      unsigned int m, unsigned int n) {
+  // §F.5.3.3: some m <= i <= n from which P is nonvacuous, P holding from
+  // every letter m through i-1.
+  return NonVacuousAfterGuardedPrefix(word, p, false, m, n);
+}
+
+bool NonVacuouslyEvaluatesSAlwaysRange(const Word& word, const PropertyExpr& p,
+                                       unsigned int m, unsigned int n) {
+  // §F.5.3.3: the rule of always [m:n], stated again for s_always [m:n].
+  return NonVacuouslyEvaluatesAlwaysRange(word, p, m, n);
+}
+
+bool NonVacuouslyEvaluatesSEventually(const Word& word, const PropertyExpr& p) {
+  // §F.5.3.3: some 0 <= i < |w| from which P is nonvacuous, not P holding
+  // from every earlier letter.
+  return !word.empty() &&
+         NonVacuousAfterGuardedPrefix(word, p, true, 0, word.size() - 1);
+}
+
+bool NonVacuouslyEvaluatesEventuallyRange(const Word& word,
+                                          const PropertyExpr& p, unsigned int m,
+                                          unsigned int n) {
+  // §F.5.3.3: some m <= i <= n from which P is nonvacuous, not P holding from
+  // every letter m through i-1.
+  return NonVacuousAfterGuardedPrefix(word, p, true, m, n);
+}
+
+bool NonVacuouslyEvaluatesSEventuallyRange(const Word& word,
+                                           const PropertyExpr& p,
+                                           unsigned int m, unsigned int n) {
+  // §F.5.3.3: the rule of eventually [m:n], stated again for
+  // s_eventually [m:n].
+  return NonVacuouslyEvaluatesEventuallyRange(word, p, m, n);
+}
+
+bool NonVacuouslyEvaluatesRejectOn(const Word& word, const BooleanExpr& b,
+                                   const PropertyExpr& p) {
+  // §F.5.3.3: w |=^non ( reject_on (b) P ) shares the abort/disable shape.
+  return NonVacuousAbortShape(word, b, p);
+}
 
 bool NonVacuouslyEvaluates(const Word& word, const PropertyExpr& property) {
   return NonVacuous(word, property);
