@@ -336,4 +336,49 @@ TEST(ElementCanonicalAccess, ExactWordWidthElementRoundTrip) {
   EXPECT_EQ(out, 0xFFFFFFFFu);
 }
 
+// §H.12.5 with §H.12.3: SystemVerilog allows arbitrary dimensions and hence
+// an arbitrary number of indices, so beside the specialized one-, two- and
+// three-index forms the group has variable argument list forms that take as
+// many indices as the array has unpacked dimensions -- svPutBitArrElemVecVal
+// and svGetLogicArrElemVecVal here copying the same elements the
+// specialized forms reach. The handles model bit [3:0] a [0:1][0:2] and
+// logic [3:0] b [0:1][0:1][0:1].
+TEST(ElementCanonicalAccess, TheVariadicFormsTakeAsManyIndicesAsDimensions) {
+  const SvOpenArrayDimRange kBitRanges[] = {{3, 0}, {0, 1}, {0, 2}};
+  svBitVecVal bits[6] = {0, 0, 0, 0, 0, 0};
+  SvOpenArrayDesc bit_desc;
+  svOpenArrayHandle hb = MakeHandle(bits, kBitRanges, 3, &bit_desc);
+  const svBitVecVal kIn = 0xAu;
+  svPutBitArrElemVecVal(hb, &kIn, 1, 2);  // 1*3 + 2 = 5
+  EXPECT_EQ(bits[5], 0xAu);
+  EXPECT_EQ(bits[4], 0u);
+  svBitVecVal out = 0;
+  svGetBitArrElemVecVal(&out, hb, 1, 2);
+  EXPECT_EQ(out, 0xAu);
+  svGetBitArrElem2VecVal(&out, hb, 1, 2);
+  EXPECT_EQ(out, 0xAu);
+
+  const SvOpenArrayDimRange kLogicRanges[] = {{3, 0}, {0, 1}, {0, 1}, {0, 1}};
+  svLogicVecVal logics[8];
+  for (auto& w : logics) w = svLogicVecVal{0, 0};
+  SvOpenArrayDesc logic_desc;
+  svOpenArrayHandle hl = MakeHandle(logics, kLogicRanges, 4, &logic_desc);
+  const svLogicVecVal kLogicIn = {0x3u, 0x5u};
+  svPutLogicArrElemVecVal(hl, &kLogicIn, 0, 1, 1);  // ((0*2+1)*2+1) = 3
+  EXPECT_TRUE(LogicEq(logics[3], kLogicIn));
+  svLogicVecVal logic_out = {0, 0};
+  svGetLogicArrElemVecVal(&logic_out, hl, 0, 1, 1);
+  EXPECT_TRUE(LogicEq(logic_out, kLogicIn));
+  svGetLogicArrElem3VecVal(&logic_out, hl, 0, 1, 1);
+  EXPECT_TRUE(LogicEq(logic_out, kLogicIn));
+  // A handle with no unpacked dimension gives the variadic forms no index
+  // to take, and they copy nothing.
+  const SvOpenArrayDimRange kVectorAlone[] = {{3, 0}};
+  svBitVecVal vector[1] = {0};
+  SvOpenArrayDesc vector_desc;
+  svOpenArrayHandle hv = MakeHandle(vector, kVectorAlone, 1, &vector_desc);
+  svPutBitArrElemVecVal(hv, &kIn, 0);
+  EXPECT_EQ(vector[0], 0u);
+}
+
 }  // namespace

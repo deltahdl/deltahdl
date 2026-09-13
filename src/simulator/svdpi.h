@@ -114,6 +114,8 @@ XXTERN void* svGetArrElemPtr2(svOpenArrayHandle h, int indx1, int indx2);
 XXTERN void* svGetArrElemPtr3(svOpenArrayHandle h, int indx1, int indx2,
                               int indx3);
 
+XXTERN void svPutBitArrElemVecVal(svOpenArrayHandle d, const svBitVecVal* s,
+                                  int indx1, ...);
 XXTERN void svPutBitArrElem1VecVal(svOpenArrayHandle d, const svBitVecVal* s,
                                    int indx1);
 XXTERN void svPutBitArrElem2VecVal(svOpenArrayHandle d, const svBitVecVal* s,
@@ -121,6 +123,8 @@ XXTERN void svPutBitArrElem2VecVal(svOpenArrayHandle d, const svBitVecVal* s,
 XXTERN void svPutBitArrElem3VecVal(svOpenArrayHandle d, const svBitVecVal* s,
                                    int indx1, int indx2, int indx3);
 
+XXTERN void svPutLogicArrElemVecVal(svOpenArrayHandle d, const svLogicVecVal* s,
+                                    int indx1, ...);
 XXTERN void svPutLogicArrElem1VecVal(svOpenArrayHandle d,
                                      const svLogicVecVal* s, int indx1);
 XXTERN void svPutLogicArrElem2VecVal(svOpenArrayHandle d,
@@ -130,6 +134,8 @@ XXTERN void svPutLogicArrElem3VecVal(svOpenArrayHandle d,
                                      const svLogicVecVal* s, int indx1,
                                      int indx2, int indx3);
 
+XXTERN void svGetBitArrElemVecVal(svBitVecVal* d, svOpenArrayHandle s,
+                                  int indx1, ...);
 XXTERN void svGetBitArrElem1VecVal(svBitVecVal* d, svOpenArrayHandle s,
                                    int indx1);
 XXTERN void svGetBitArrElem2VecVal(svBitVecVal* d, svOpenArrayHandle s,
@@ -137,6 +143,8 @@ XXTERN void svGetBitArrElem2VecVal(svBitVecVal* d, svOpenArrayHandle s,
 XXTERN void svGetBitArrElem3VecVal(svBitVecVal* d, svOpenArrayHandle s,
                                    int indx1, int indx2, int indx3);
 
+XXTERN void svGetLogicArrElemVecVal(svLogicVecVal* d, svOpenArrayHandle s,
+                                    int indx1, ...);
 XXTERN void svGetLogicArrElem1VecVal(svLogicVecVal* d, svOpenArrayHandle s,
                                      int indx1);
 XXTERN void svGetLogicArrElem2VecVal(svLogicVecVal* d, svOpenArrayHandle s,

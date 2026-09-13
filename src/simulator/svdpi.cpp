@@ -445,6 +445,29 @@ void* svGetArrElemPtr(svOpenArrayHandle h, int indx1, ...) {
   return svElemAddr(h, idx.data(), n);
 }
 
+// §H.12.3 and §H.12.5: the variable argument list forms take as many indices
+// as the array has unpacked dimensions, indx1 first and the rest from the
+// list; a handle with no unpacked dimension gives them none to take.
+static std::vector<int> svIndicesOfVariadicCall(svOpenArrayHandle h, int indx1,
+                                                va_list ap) {
+  std::vector<int> idx;
+  int n = svDimensions(h) - 1;
+  if (n < 1) return idx;
+  idx.reserve(n);
+  idx.push_back(indx1);
+  for (int k = 1; k < n; ++k) idx.push_back(va_arg(ap, int));
+  return idx;
+}
+
+void svPutBitArrElemVecVal(svOpenArrayHandle d, const svBitVecVal* s, int indx1,
+                           ...) {
+  va_list ap;
+  va_start(ap, indx1);
+  const std::vector<int> kIdx = svIndicesOfVariadicCall(d, indx1, ap);
+  va_end(ap);
+  if (kIdx.empty()) return;
+  svPutBitElem(d, s, kIdx.data(), static_cast<int>(kIdx.size()));
+}
 void svPutBitArrElem1VecVal(svOpenArrayHandle d, const svBitVecVal* s,
                             int indx1) {
   int idx[1] = {indx1};
@@ -459,6 +482,15 @@ void svPutBitArrElem3VecVal(svOpenArrayHandle d, const svBitVecVal* s,
                             int indx1, int indx2, int indx3) {
   int idx[3] = {indx1, indx2, indx3};
   svPutBitElem(d, s, idx, 3);
+}
+void svPutLogicArrElemVecVal(svOpenArrayHandle d, const svLogicVecVal* s,
+                             int indx1, ...) {
+  va_list ap;
+  va_start(ap, indx1);
+  const std::vector<int> kIdx = svIndicesOfVariadicCall(d, indx1, ap);
+  va_end(ap);
+  if (kIdx.empty()) return;
+  svPutLogicElem(d, s, kIdx.data(), static_cast<int>(kIdx.size()));
 }
 void svPutLogicArrElem1VecVal(svOpenArrayHandle d, const svLogicVecVal* s,
                               int indx1) {
@@ -475,6 +507,15 @@ void svPutLogicArrElem3VecVal(svOpenArrayHandle d, const svLogicVecVal* s,
   int idx[3] = {indx1, indx2, indx3};
   svPutLogicElem(d, s, idx, 3);
 }
+void svGetBitArrElemVecVal(svBitVecVal* d, svOpenArrayHandle s, int indx1,
+                           ...) {
+  va_list ap;
+  va_start(ap, indx1);
+  const std::vector<int> kIdx = svIndicesOfVariadicCall(s, indx1, ap);
+  va_end(ap);
+  if (kIdx.empty()) return;
+  svGetBitElem(d, s, kIdx.data(), static_cast<int>(kIdx.size()));
+}
 void svGetBitArrElem1VecVal(svBitVecVal* d, svOpenArrayHandle s, int indx1) {
   int idx[1] = {indx1};
   svGetBitElem(d, s, idx, 1);
@@ -488,6 +529,15 @@ void svGetBitArrElem3VecVal(svBitVecVal* d, svOpenArrayHandle s, int indx1,
                             int indx2, int indx3) {
   int idx[3] = {indx1, indx2, indx3};
   svGetBitElem(d, s, idx, 3);
+}
+void svGetLogicArrElemVecVal(svLogicVecVal* d, svOpenArrayHandle s, int indx1,
+                             ...) {
+  va_list ap;
+  va_start(ap, indx1);
+  const std::vector<int> kIdx = svIndicesOfVariadicCall(s, indx1, ap);
+  va_end(ap);
+  if (kIdx.empty()) return;
+  svGetLogicElem(d, s, kIdx.data(), static_cast<int>(kIdx.size()));
 }
 void svGetLogicArrElem1VecVal(svLogicVecVal* d, svOpenArrayHandle s,
                               int indx1) {
