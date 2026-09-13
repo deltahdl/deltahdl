@@ -119,15 +119,21 @@ TEST(NonVacuityLocals, NexttimeRequiresANonemptyWord) {
 
 // §F.5.3.3: w, L_0 |=^non ( P1 until P2 ) needs an index where one operand
 // becomes nonvacuous, with the guard "P1 and not P2" holding neutrally before
-// it. The witness may lie past index 0.
+// it. The witness may lie past index 0, but only where the guard can hold
+// there: with P2 the negation of P1 the guard is P1 twice over and holds
+// vacuously on [x][a] at j = 0, whereas the same operand on both sides makes
+// it a contradiction under the §F.5.6.1 not rule and hides the witness.
 TEST(NonVacuityLocals, UntilNeedsAnOperandToBecomeNonvacuous) {
   auto until = LvUntil(Trig("a"), Trig("a"));
   EXPECT_FALSE(
       NonVacuouslyEvaluatesWithLocals(Word{L({"x"})}, *until, LocalContext{}));
   EXPECT_TRUE(
       NonVacuouslyEvaluatesWithLocals(Word{L({"a"})}, *until, LocalContext{}));
-  EXPECT_TRUE(NonVacuouslyEvaluatesWithLocals(Word{L({"x"}), L({"a"})}, *until,
-                                              LocalContext{}));
+  EXPECT_FALSE(NonVacuouslyEvaluatesWithLocals(Word{L({"x"}), L({"a"})}, *until,
+                                               LocalContext{}));
+  EXPECT_TRUE(NonVacuouslyEvaluatesWithLocals(
+      Word{L({"x"}), L({"a"})}, *LvUntil(Trig("a"), LvNot(Trig("a"))),
+      LocalContext{}));
 }
 
 // §F.5.3.3: w, L_0 |=^non accept_on (b) P requires the operand to be nonvacuous

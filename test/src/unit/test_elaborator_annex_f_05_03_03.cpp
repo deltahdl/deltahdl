@@ -95,12 +95,17 @@ TEST(NonVacuity, UntilNeedsAnOperandToBecomeNonvacuous) {
 }
 
 // §F.5.3.3: the until witness may lie past index 0, which exercises the guard
-// "for all 0 <= j < i, w^{j.} |= ( P1 and not P2 )". On [x][a] neither operand
-// is nonvacuous at i = 0, but at i = 1 the suffix [a] matches the trigger while
-// the guard holds vacuously across j = 0.
+// "for all 0 <= j < i, w^{j.} |= ( P1 and not P2 )". With P2 the negation of
+// P1, the guard is P1 twice over. On [x][a] neither operand is nonvacuous at
+// i = 0, since the trigger matches no prefix there and the §F.5.3.1 complement
+// leaves an atom letter as it is, but at i = 1 the suffix [a] matches the
+// trigger while the guard holds vacuously across j = 0. The same operand on
+// both sides would make the guard a contradiction and hide the witness.
 TEST(NonVacuity, UntilWitnessMayFollowANonvacuousGuardPrefix) {
-  auto until = PropUntil(Trig("a"), Trig("a"));
+  auto until = PropUntil(Trig("a"), PropNot(Trig("a")));
   EXPECT_TRUE(NonVacuouslyEvaluates(Word{L({"x"}), L({"a"})}, *until));
+  EXPECT_FALSE(NonVacuouslyEvaluates(Word{L({"x"}), L({"a"})},
+                                     *PropUntil(Trig("a"), Trig("a"))));
 }
 
 // §F.5.3.3: w |=^non accept_on (b) P requires w |=^non P together with the
