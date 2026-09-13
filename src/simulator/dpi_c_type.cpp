@@ -466,4 +466,13 @@ bool DpiFormalIsDirectlyAccessibleInC(DpiPassingMode mode) {
   return mode != DpiPassingMode::kByHandle;
 }
 
+DpiReferent DpiReferentOfFormal(const DpiArg& formal) {
+  return IsPackedArray(formal) ? DpiReferent::kCanonicalDataObject
+                               : DpiReferent::kActualDataObject;
+}
+
+bool DpiReferenceOutlivesTheCall() { return false; }
+
+DpiMemorySide DpiSideOwningACopyKeptAcrossCalls() { return DpiMemorySide::kC; }
+
 }  // namespace delta

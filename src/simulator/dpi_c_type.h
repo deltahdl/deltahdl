@@ -476,4 +476,28 @@ bool DpiAggregateIsAnArgument(const DpiAggregateElement& aggregate);
 // not where a packed element lies anywhere in it.
 bool DpiAggregateLayoutIsCCompatible(const DpiAggregateElement& aggregate);
 
+// §H.8.4: an argument passed by reference is passed as a pointer to the
+// actual data object, and packed data as a pointer to a canonical data
+// object (§H.7.7); the actual is usually the caller's allocation, or an
+// object allocated elsewhere the caller holds a reference to, its own
+// formal passed by reference for one. An argument of type T passed by
+// reference has a formal of type T*, DpiCTypeOfFormal's spelling, a packed
+// array a pointer to the canonical type, svLogicVecVal* or svBitVecVal*. A
+// DPI C application shall make no assumption about the lifetime of an
+// argument passed by reference: a value to keep across calls is copied
+// into memory the C application owns and manages (§H.6.6).
+
+// What the pointer a formal is passed by refers to: the actual data object
+// itself, or for packed data a canonical data object.
+enum class DpiReferent : uint8_t { kActualDataObject, kCanonicalDataObject };
+DpiReferent DpiReferentOfFormal(const DpiArg& formal);
+
+// Whether a reference an argument was passed by may be assumed to remain
+// valid once the call has returned: never.
+bool DpiReferenceOutlivesTheCall();
+
+// The side owning the copy a C application keeps of a referenced value
+// across calls: C.
+DpiMemorySide DpiSideOwningACopyKeptAcrossCalls();
+
 }  // namespace delta
