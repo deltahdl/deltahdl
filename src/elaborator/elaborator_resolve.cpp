@@ -14,6 +14,7 @@
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
+#include "elaborator/std_package.h"
 #include "parser/ast.h"
 
 namespace delta {
@@ -320,13 +321,15 @@ void RegisterClassTypedefs(CompilationUnit* unit, TypedefMap& typedefs,
 }
 
 // Inserts the built-in class names that always live in the compilation-unit
-// scope (§6.14, §15.x predefined process/semaphore/mailbox classes).
+// scope: the classes of the std package, which §G.1 lists and
+// src/elaborator/std_package.h writes down (§6.14, §26.7).
 void RegisterBuiltinClassNames(
     std::unordered_set<std::string_view>& class_names) {
-  class_names.insert("semaphore");
-  class_names.insert("mailbox");
-  class_names.insert("weak_reference");
-  class_names.insert("process");
+  for (const StdPackageEntry& entry : StdPackageContents()) {
+    if (entry.kind == StdPackageMemberKind::kClass) {
+      class_names.insert(entry.name);
+    }
+  }
 }
 
 // The compilation-unit scope (§26.3, §6.14): the set of elaborator name spaces

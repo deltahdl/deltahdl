@@ -301,6 +301,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/elaborator_port_binding_checks.cpp
     elaborator/elaborator_process.cpp
     elaborator/elaborator_resolve.cpp
+    elaborator/std_package.cpp
     elaborator/elaborator_scope_rules.cpp
     elaborator/elaborator_scope_rules_enclosing.cpp
     elaborator/elaborator_scope_rules_hier.cpp
