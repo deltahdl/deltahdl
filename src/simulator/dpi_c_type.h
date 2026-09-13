@@ -216,7 +216,7 @@ uint32_t DpiCanonicalLastElementWithUnusedBits(uint32_t last, uint32_t width,
 
 // The coercion the caller's side gives a packed actual of one width bound
 // to a formal of another.
-enum class DpiActualCoercion { kNone, kTruncate, kExtend };
+enum class DpiActualCoercion : uint8_t { kNone, kTruncate, kExtend };
 DpiActualCoercion DpiCoercionOfPackedActual(uint32_t actual_width,
                                             uint32_t formal_width);
 
