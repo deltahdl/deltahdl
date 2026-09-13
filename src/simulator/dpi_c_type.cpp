@@ -345,4 +345,8 @@ bool DpiForeignCodeMayModifyFormal(Direction direction) {
   return direction != Direction::kInput;
 }
 
+bool DpiFormalIsDeterminedOnEntry(Direction direction) {
+  return direction != Direction::kOutput;
+}
+
 }  // namespace delta

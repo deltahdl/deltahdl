@@ -273,4 +273,11 @@ std::vector<SvActualDimension> DpiFormalRangesAtCall(
 // or an inout, never an input.
 bool DpiForeignCodeMayModifyFormal(Direction direction);
 
+// §H.6.3: the initial value of a formal specified in SystemVerilog as
+// output is undetermined and implementation dependent (§35.5.1.2), so the
+// foreign code finds a value it may rely on in an input or an inout, the
+// actual's, and none in an output; DpiRuntime::UndeterminedOutputValue is
+// what this implementation hands it there.
+bool DpiFormalIsDeterminedOnEntry(Direction direction);
+
 }  // namespace delta
