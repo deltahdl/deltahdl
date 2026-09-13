@@ -181,4 +181,22 @@ std::shared_ptr<const PropertyExpr> PropOfBareSequence(
 std::shared_ptr<const ClockedProperty> ClkOfBareSequence(
     std::shared_ptr<const SequenceExpr> r, SequencePropertyContext context);
 
+// §F.3.4.3.2: the derived Boolean property operators, unfolded into the
+// §F.3.2 not, or and and. (p1 implies p2) is (not p1 or p2), so it holds
+// wherever p1 fails or p2 holds; (p1 iff p2) is ((p1 implies p2) and
+// (p2 implies p1)), so it holds where the two agree. Each is given in the
+// unclocked property model of §F.5.3.1 and in the clocked one of §F.5.1.2.
+std::shared_ptr<const PropertyExpr> PropImplies(
+    std::shared_ptr<const PropertyExpr> p1,
+    std::shared_ptr<const PropertyExpr> p2);
+std::shared_ptr<const PropertyExpr> PropIff(
+    std::shared_ptr<const PropertyExpr> p1,
+    std::shared_ptr<const PropertyExpr> p2);
+std::shared_ptr<const ClockedProperty> ClkImplies(
+    std::shared_ptr<const ClockedProperty> p1,
+    std::shared_ptr<const ClockedProperty> p2);
+std::shared_ptr<const ClockedProperty> ClkIff(
+    std::shared_ptr<const ClockedProperty> p1,
+    std::shared_ptr<const ClockedProperty> p2);
+
 }  // namespace delta

@@ -234,4 +234,30 @@ std::shared_ptr<const ClockedProperty> ClkOfBareSequence(
   return ClkWeak(std::move(r));
 }
 
+std::shared_ptr<const PropertyExpr> PropImplies(
+    std::shared_ptr<const PropertyExpr> p1,
+    std::shared_ptr<const PropertyExpr> p2) {
+  return PropOr(PropNot(std::move(p1)), std::move(p2));
+}
+
+std::shared_ptr<const PropertyExpr> PropIff(
+    std::shared_ptr<const PropertyExpr> p1,
+    std::shared_ptr<const PropertyExpr> p2) {
+  auto forward = PropImplies(p1, p2);
+  return PropAnd(std::move(forward), PropImplies(std::move(p2), std::move(p1)));
+}
+
+std::shared_ptr<const ClockedProperty> ClkImplies(
+    std::shared_ptr<const ClockedProperty> p1,
+    std::shared_ptr<const ClockedProperty> p2) {
+  return ClkOr(ClkNot(std::move(p1)), std::move(p2));
+}
+
+std::shared_ptr<const ClockedProperty> ClkIff(
+    std::shared_ptr<const ClockedProperty> p1,
+    std::shared_ptr<const ClockedProperty> p2) {
+  auto forward = ClkImplies(p1, p2);
+  return ClkAnd(std::move(forward), ClkImplies(std::move(p2), std::move(p1)));
+}
+
 }  // namespace delta
