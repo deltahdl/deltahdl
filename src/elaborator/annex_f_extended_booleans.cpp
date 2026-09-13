@@ -2,11 +2,13 @@
 
 #include <cstddef>
 #include <memory>
+#include <optional>
 #include <set>
 #include <string>
 #include <utility>
 #include <vector>
 
+#include "elaborator/annex_f_extended_expressions.h"
 #include "elaborator/annex_f_grammar.h"
 #include "elaborator/annex_f_tight_satisfaction.h"
 #include "elaborator/annex_f_tight_satisfaction_local_variables.h"
@@ -141,6 +143,33 @@ bool MatchedSatisfies(const ExtendedBooleanQuery& query,
     }
   }
   return false;
+}
+
+ExtendedExpression TriggeredExpression(
+    std::shared_ptr<const SequenceExpr> sequence,
+    std::set<std::string> actuals) {
+  return [sequence = std::move(sequence), actuals = std::move(actuals)](
+             const Word& word, std::size_t j) -> std::optional<bool> {
+    if (j >= word.size()) {
+      return std::nullopt;
+    }
+    return !TriggeredOutputs({word, j, *sequence, actuals}, LocalContext{})
+                .empty();
+  };
+}
+
+ExtendedExpression MatchedExpression(
+    std::shared_ptr<const SequenceExpr> sequence, std::set<std::string> actuals,
+    std::shared_ptr<const BooleanExpr> clock) {
+  return [sequence = std::move(sequence), actuals = std::move(actuals),
+          clock = std::move(clock)](const Word& word,
+                                    std::size_t j) -> std::optional<bool> {
+    if (j >= word.size()) {
+      return std::nullopt;
+    }
+    return !MatchedOutputs({word, j, *sequence, actuals}, clock, LocalContext{})
+                .empty();
+  };
 }
 
 }  // namespace delta

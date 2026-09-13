@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "elaborator/annex_f_extended_expressions.h"
 #include "elaborator/annex_f_grammar.h"
 #include "elaborator/annex_f_tight_satisfaction.h"
 #include "elaborator/annex_f_tight_satisfaction_local_variables.h"
@@ -63,5 +64,19 @@ std::vector<LocalContext> MatchedOutputs(
 bool MatchedSatisfies(const ExtendedBooleanQuery& query,
                       const std::shared_ptr<const BooleanExpr>& clock,
                       const LocalContext& input, const LocalContext& output);
+
+// §F.6.1 under §F.6: T(V).triggered and @(c)(T(V).matched) as the extended
+// expressions §F.6 has them be, a meaning at a point read from the whole
+// word, true at j iff the relation yields some output context from the empty
+// input context and undefined past the word, so that WordWithExtendedAtom of
+// §F.6 can read either into a word for the preceding subclauses to decide. T
+// may be clocked or unclocked, as the subclause has it; a clocked T is
+// decided through its §F.5.1.1 rewrite, as §F.5.5 decides it.
+ExtendedExpression TriggeredExpression(
+    std::shared_ptr<const SequenceExpr> sequence,
+    std::set<std::string> actuals);
+ExtendedExpression MatchedExpression(
+    std::shared_ptr<const SequenceExpr> sequence, std::set<std::string> actuals,
+    std::shared_ptr<const BooleanExpr> clock);
 
 }  // namespace delta

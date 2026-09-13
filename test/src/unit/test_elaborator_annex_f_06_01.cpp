@@ -1,11 +1,15 @@
 #include <gtest/gtest.h>
 
+#include <optional>
+#include <set>
 #include <string>
 #include <utility>
 #include <vector>
 
 #include "elaborator/annex_f_extended_booleans.h"
+#include "elaborator/annex_f_extended_expressions.h"
 #include "elaborator/annex_f_grammar.h"
+#include "elaborator/annex_f_neutral_satisfaction.h"
 #include "elaborator/annex_f_tight_satisfaction.h"
 #include "elaborator/annex_f_tight_satisfaction_local_variables.h"
 #include "helpers_annex_f_tight_satisfaction.h"
@@ -203,6 +207,59 @@ TEST(ExtendedBooleans, MatchedRequiresTriggerNotJustClock) {
   EXPECT_TRUE(
       MatchedOutputs({kWord, /*j=*/1, *seq, NameSet{}}, clk, LocalContext{})
           .empty());
+}
+
+// §F.6.1: T may be a clocked sequence, decided through its rewrite as §F.5.5
+// decides it. @( clk )( a ##1 b ) is triggered at the tick carrying b that
+// follows the tick carrying a, whatever lies between, and not at that earlier
+// tick or at a letter that is no tick.
+TEST(ExtendedBooleans, TriggeredDecidesAClockedSequenceThroughItsRewrite) {
+  auto seq = SeqClock(BoolAtom("clk"), SeqConcat(Bool("a"), Bool("b")));
+  const Word kWord{A({"a", "clk"}), A({"x"}), A({"b", "clk"}), A({"b"})};
+  EXPECT_TRUE(TriggeredSatisfies({kWord, /*j=*/2, *seq, NameSet{}},
+                                 LocalContext{}, LocalContext{}));
+  EXPECT_TRUE(
+      TriggeredOutputs({kWord, /*j=*/0, *seq, NameSet{}}, LocalContext{})
+          .empty());
+  EXPECT_TRUE(
+      TriggeredOutputs({kWord, /*j=*/1, *seq, NameSet{}}, LocalContext{})
+          .empty());
+  EXPECT_TRUE(
+      TriggeredOutputs({kWord, /*j=*/3, *seq, NameSet{}}, LocalContext{})
+          .empty());
+}
+
+// §F.6.1 under §F.6: triggered and matched are extended expressions, true at
+// the points the relations yield an output context from the empty context,
+// undefined past the word, and read into a word for the preceding subclauses
+// to decide. ( a ##1 b ).triggered holds at the second letter of [a][b][x][clk]
+// alone; @( clk )( ( a ##1 b ).matched ) at the fourth, where clk ticks once
+// after the trigger; and strong( 1 ##1 tr ) with tr read as the former holds
+// on the word so read and not on the word as written.
+TEST(ExtendedBooleans,
+     TheExpressionsAreReadIntoAWordForThePrecedingSubclauses) {
+  auto seq = SeqConcat(Bool("a"), Bool("b"));
+  auto triggered = TriggeredExpression(seq, NameSet{});
+  auto matched = MatchedExpression(seq, NameSet{}, BoolAtom("clk"));
+  const Word kWord{A({"a"}), A({"b"}), A({"x"}), A({"clk"})};
+  EXPECT_EQ(triggered(kWord, 0), false);
+  EXPECT_EQ(triggered(kWord, 1), true);
+  EXPECT_EQ(triggered(kWord, 2), false);
+  EXPECT_EQ(triggered(kWord, 3), false);
+  EXPECT_EQ(triggered(kWord, 4), std::nullopt);
+  EXPECT_EQ(matched(kWord, 1), false);
+  EXPECT_EQ(matched(kWord, 2), false);
+  EXPECT_EQ(matched(kWord, 3), true);
+  EXPECT_EQ(matched(kWord, 4), std::nullopt);
+  const Word kRead = WordWithExtendedAtom(kWord, "tr", triggered);
+  EXPECT_EQ(kRead[1].atoms, NameSet({"b", "tr"}));
+  EXPECT_EQ(kRead[2].atoms, NameSet({"x"}));
+  auto p = PropStrong(SeqConcat(SeqBoolean(BoolTrue()), Bool("tr")));
+  EXPECT_TRUE(NeutrallySatisfies(kRead, *p));
+  EXPECT_FALSE(NeutrallySatisfies(kWord, *p));
+  const Word kMatched = WordWithExtendedAtom(kWord, "m", matched);
+  EXPECT_EQ(kMatched[3].atoms, NameSet({"clk", "m"}));
+  EXPECT_EQ(kMatched[2].atoms, NameSet({"x"}));
 }
 
 }  // namespace
