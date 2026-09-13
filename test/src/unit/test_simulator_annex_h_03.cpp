@@ -248,7 +248,7 @@ std::vector<std::string_view> EveryMacroName() {
 }
 
 // §H.3: every name the interface introduces carries the sv or SV_ prefix and
-// follows the rule of its category -- the sixty-two functions and eight types
+// follows the rule of its category -- the sixty-six functions and eight types
 // in sv camel case, the six symbolic constants in sv_ lowercase and the four
 // macros in SV_ uppercase -- and no name falls under two categories' rules.
 TEST(SvdpiNamingConventions, EveryNameTheHeaderIntroducesConforms) {
@@ -256,7 +256,7 @@ TEST(SvdpiNamingConventions, EveryNameTheHeaderIntroducesConforms) {
   const std::vector<std::string_view> kTypes = EveryTypeName();
   const std::vector<std::string_view> kConstants = EveryConstantName();
   const std::vector<std::string_view> kMacros = EveryMacroName();
-  EXPECT_EQ(kFunctions.size(), 62u);
+  EXPECT_EQ(kFunctions.size(), 66u);
   EXPECT_EQ(kTypes.size(), 8u);
   for (std::string_view n : kFunctions) {
     EXPECT_TRUE(HasInterfacePrefix(n)) << n;
