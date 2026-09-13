@@ -226,4 +226,40 @@ DpiActualCoercion DpiCoercionOfPackedActual(uint32_t actual_width,
 bool DpiCTypeMatchesFormal(const DpiArg& formal, bool open_array,
                            std::string_view c_type);
 
+// §H.6.1: the WYSIWYG principle verifies the types of the formal arguments
+// of imported functions -- an actual is required to be of the type the
+// import declaration specifies for the formal -- with the exception of open
+// arrays, whose unspecified ranges are statically unknown. A formal other
+// than an open array is fully defined by the declaration: its packed and
+// unpacked ranges are exactly as specified there, and only the declaration
+// site is relevant to it. An open array formal is passed by handle (§H.12);
+// its unpacked dimensions match those of the actual, its packed dimension
+// is the linearized, normalized version of all the actual's packed
+// dimensions (§H.7.1), and its unsized ranges are determined at each call
+// site while the rest of its type is specified at the declaration. So `bit
+// [15:8] b []` is an unpacked array of packed bit arrays with bounds 15 to
+// 8, and the actual at each call defines the bounds of the unpacked part.
+
+// One dimension of a formal as the import declaration wrote it: sized, with
+// the range the declaration gave it, or unsized, which only an open array's
+// dimension is.
+struct DpiFormalDimension {
+  bool sized = true;
+  SvActualDimension range;
+};
+
+// The ranges a formal has on one call, in the order the descriptor of
+// svdpi_open_array.h keeps them for §H.12.2's functions: dimension 0 the
+// packed part, then the unpacked dimensions in declaration order, each
+// beside the actual's corresponding dimension. A sized dimension keeps the
+// declaration's range whatever the actual's; an unsized unpacked dimension
+// takes the range of the corresponding actual dimension; an unsized packed
+// dimension takes [size-1:0] where size is the product of the sizes of all
+// the actual's packed dimensions.
+std::vector<SvActualDimension> DpiFormalRangesAtCall(
+    const DpiFormalDimension& packed,
+    const std::vector<DpiFormalDimension>& unpacked,
+    const std::vector<SvActualDimension>& actual_packed,
+    const std::vector<SvActualDimension>& actual_unpacked);
+
 }  // namespace delta

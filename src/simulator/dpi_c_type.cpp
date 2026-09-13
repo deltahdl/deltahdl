@@ -93,6 +93,18 @@ uint32_t SizeOfDimension(const SvActualDimension& dim) {
   return static_cast<uint32_t>(std::abs(dim.high - dim.low)) + 1U;
 }
 
+// §H.7.1: the range of the one-dimensional packed array equivalent to the
+// actual's packed dimensions, one element per combination of their indices,
+// normalized to [size-1:0].
+SvActualDimension LinearizedNormalizedRange(
+    const std::vector<SvActualDimension>& actual_packed) {
+  int32_t size = actual_packed.empty() ? 0 : 1;
+  for (const SvActualDimension& dim : actual_packed) {
+    size *= static_cast<int32_t>(SizeOfDimension(dim));
+  }
+  return SvActualDimension{size > 0 ? size - 1 : 0, 0};
+}
+
 }  // namespace
 
 bool DpiTypeIsSmall(DataTypeKind kind) {
@@ -309,6 +321,24 @@ bool DpiCTypeMatchesFormal(const DpiArg& formal, bool open_array,
     spelled += c_type[i];
   }
   return spelled == DpiCTypeOfFormal(formal, open_array);
+}
+
+std::vector<SvActualDimension> DpiFormalRangesAtCall(
+    const DpiFormalDimension& packed,
+    const std::vector<DpiFormalDimension>& unpacked,
+    const std::vector<SvActualDimension>& actual_packed,
+    const std::vector<SvActualDimension>& actual_unpacked) {
+  std::vector<SvActualDimension> ranges;
+  ranges.push_back(packed.sized ? packed.range
+                                : LinearizedNormalizedRange(actual_packed));
+  for (std::size_t k = 0; k < unpacked.size(); ++k) {
+    if (unpacked[k].sized) {
+      ranges.push_back(unpacked[k].range);
+    } else if (k < actual_unpacked.size()) {
+      ranges.push_back(actual_unpacked[k]);
+    }
+  }
+  return ranges;
 }
 
 }  // namespace delta
