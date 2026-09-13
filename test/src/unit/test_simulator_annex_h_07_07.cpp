@@ -1,7 +1,11 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
 #include <type_traits>
 
+#include "parser/ast.h"
+#include "simulator/dpi_arg_value.h"
+#include "simulator/dpi_c_type.h"
 #include "simulator/dpi_runtime.h"
 #include "simulator/svdpi.h"
 
@@ -131,6 +135,94 @@ TEST(PackedArrayCanonicalRepresentation, FullWidthElementHasNoUnusedBits) {
   int full_width = 32;
   EXPECT_EQ(SV_GET_UNSIGNED_BITS(full_elem, full_width), 0xDEADBEEFu);
   EXPECT_EQ(SV_GET_SIGNED_BITS(full_elem, full_width), 0xDEADBEEFu);
+}
+
+// Annex H.7.7 as a statement about the representation itself, in
+// src/simulator/dpi_c_type.h: the element type each packed type is
+// represented in, where a bit lies, how many bits of the last element are
+// unused, and what the user makes of them.
+
+// §H.7.7 with §H.7.3: a 2-state packed array is represented in svBitVecVal
+// and a 4-state one in svLogicVecVal -- logic and reg, and integer and time
+// -- while a real, a string or a struct has no canonical representation.
+TEST(DpiCanonicalRepresentation, TwoStateInBitVecValFourStateInLogicVecVal) {
+  using delta::DataTypeKind;
+  EXPECT_EQ(delta::DpiCanonicalElementType(DataTypeKind::kBit), "svBitVecVal");
+  EXPECT_EQ(delta::DpiCanonicalElementType(DataTypeKind::kLogic),
+            "svLogicVecVal");
+  EXPECT_EQ(delta::DpiCanonicalElementType(DataTypeKind::kReg),
+            "svLogicVecVal");
+  EXPECT_EQ(delta::DpiCanonicalElementType(DataTypeKind::kInteger),
+            "svLogicVecVal");
+  EXPECT_EQ(delta::DpiCanonicalElementType(DataTypeKind::kTime),
+            "svLogicVecVal");
+  EXPECT_EQ(delta::DpiCanonicalElementType(DataTypeKind::kReal), "");
+  EXPECT_EQ(delta::DpiCanonicalElementType(DataTypeKind::kString), "");
+  EXPECT_EQ(delta::DpiCanonicalElementType(DataTypeKind::kStruct), "");
+}
+
+// §H.7.7: each element groups 32 bits, the first the 32 least significant
+// -- so bit 0 is bit 0 of element 0, bit 31 bit 31 of it, bit 32 bit 0 of
+// element 1, and bit 70 bit 6 of element 2 -- and the bit so placed is the
+// one the bit-select utility reaches.
+TEST(DpiCanonicalRepresentation, TheFirstElementHoldsTheLeastSignificantBits) {
+  EXPECT_EQ(delta::kDpiCanonicalElementBits, 32U);
+  EXPECT_EQ(delta::DpiCanonicalPositionOfBit(0).element, 0U);
+  EXPECT_EQ(delta::DpiCanonicalPositionOfBit(0).bit, 0U);
+  EXPECT_EQ(delta::DpiCanonicalPositionOfBit(31).element, 0U);
+  EXPECT_EQ(delta::DpiCanonicalPositionOfBit(31).bit, 31U);
+  EXPECT_EQ(delta::DpiCanonicalPositionOfBit(32).element, 1U);
+  EXPECT_EQ(delta::DpiCanonicalPositionOfBit(32).bit, 0U);
+  EXPECT_EQ(delta::DpiCanonicalPositionOfBit(70).element, 2U);
+  EXPECT_EQ(delta::DpiCanonicalPositionOfBit(70).bit, 6U);
+  svBitVecVal vec[3] = {0U, 0U, 0U};
+  const delta::DpiCanonicalBitPosition kSeventy =
+      delta::DpiCanonicalPositionOfBit(70);
+  vec[kSeventy.element] = 1U << kSeventy.bit;
+  EXPECT_EQ(svGetBitselBit(vec, 70), 1U);
+}
+
+// §H.7.7: the last element can contain unused bits -- 27 of them for a
+// 5-bit array, 31 for a 33-bit one, none for 32 or 64 bits -- and there are
+// as many elements as groups of 32 the width needs.
+TEST(DpiCanonicalRepresentation, TheLastElementCanHoldUnusedBits) {
+  EXPECT_EQ(delta::DpiCanonicalUnusedBits(5), 27U);
+  EXPECT_EQ(delta::DpiCanonicalUnusedBits(33), 31U);
+  EXPECT_EQ(delta::DpiCanonicalUnusedBits(32), 0U);
+  EXPECT_EQ(delta::DpiCanonicalUnusedBits(64), 0U);
+  EXPECT_EQ(delta::DpiCanonicalUnusedBits(18), 14U);
+  EXPECT_EQ(delta::DpiCanonicalWordCount(5), 1U);
+  EXPECT_EQ(delta::DpiCanonicalWordCount(33), 2U);
+}
+
+// §H.7.7: the contents of the unused bits are undetermined and the user is
+// responsible for masking them, or for sign extension by the sign: the
+// last element of a 5-bit array holding 5'b01001 under 27 bits of anything
+// is 0x09 masked, and 0x09 sign-extended since its sign bit is clear, while
+// 5'b11001 is 0x19 masked and 0xFFFFFFF9 sign-extended; an element with no
+// unused bits is left as it is either way.
+TEST(DpiCanonicalRepresentation, TheUserMasksOrSignExtendsTheUnusedBits) {
+  const uint32_t kPositive = 0xFFFFFFE9U;  // 5'b01001 under garbage
+  EXPECT_EQ(delta::DpiCanonicalLastElementWithUnusedBits(kPositive, 5, false),
+            0x09U);
+  EXPECT_EQ(delta::DpiCanonicalLastElementWithUnusedBits(kPositive, 5, true),
+            0x09U);
+  const uint32_t kNegative = 0x00000019U;  // 5'b11001 under clear bits
+  EXPECT_EQ(delta::DpiCanonicalLastElementWithUnusedBits(kNegative, 5, false),
+            0x19U);
+  EXPECT_EQ(delta::DpiCanonicalLastElementWithUnusedBits(kNegative, 5, true),
+            0xFFFFFFF9U);
+  // A 33-bit array's last element holds one bit: bit 0 masked, or the sign
+  // over the whole element.
+  EXPECT_EQ(
+      delta::DpiCanonicalLastElementWithUnusedBits(0xFFFFFFFFU, 33, false), 1U);
+  EXPECT_EQ(delta::DpiCanonicalLastElementWithUnusedBits(0x1U, 33, true),
+            0xFFFFFFFFU);
+  EXPECT_EQ(delta::DpiCanonicalLastElementWithUnusedBits(0xDEADBEEFU, 32, true),
+            0xDEADBEEFU);
+  EXPECT_EQ(
+      delta::DpiCanonicalLastElementWithUnusedBits(0xDEADBEEFU, 64, false),
+      0xDEADBEEFU);
 }
 
 }  // namespace

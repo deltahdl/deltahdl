@@ -47,22 +47,6 @@ const char* SmallCType(DataTypeKind kind) {
   }
 }
 
-// §H.7.3 and §H.7.7: the canonical chunk type of a packed type -- 2-state
-// for bit, 4-state for logic, reg, integer and time.
-const char* CanonicalChunkType(DataTypeKind kind) {
-  switch (kind) {
-    case DataTypeKind::kBit:
-      return "svBitVecVal";
-    case DataTypeKind::kLogic:
-    case DataTypeKind::kReg:
-    case DataTypeKind::kInteger:
-    case DataTypeKind::kTime:
-      return "svLogicVecVal";
-    default:
-      return "";
-  }
-}
-
 // A formal of bit, logic or reg whose declaration gave it a width is a packed
 // array; one without is the scalar.
 bool IsPackedArray(const DpiArg& formal) {
@@ -140,7 +124,7 @@ std::string DpiCTypeOfFormal(const DpiArg& formal, bool open_array) {
   if (IsPackedArray(formal)) {
     // §H.8.4 and §H.8.8: a packed array is passed by reference to its
     // canonical representation, const for an input.
-    const std::string kChunk = CanonicalChunkType(formal.type);
+    const std::string kChunk = DpiCanonicalElementType(formal.type);
     if (kChunk.empty()) return "";
     return (kInput ? "const " : "") + kChunk + "*";
   }
@@ -168,8 +152,8 @@ std::size_t DpiCElementBytes(const DpiArg& formal) {
 std::string DpiCDeclarationOfUnpackedFormal(
     const DpiArg& formal, const std::vector<SvActualDimension>& unpacked_dims) {
   const bool kPacked = IsPackedArray(formal);
-  const std::string kElement =
-      kPacked ? CanonicalChunkType(formal.type) : SmallCType(formal.type);
+  const std::string kElement = kPacked ? DpiCanonicalElementType(formal.type)
+                                       : std::string(SmallCType(formal.type));
   if (kElement.empty()) return "";
   std::string decl = formal.direction == Direction::kInput ? "const " : "";
   decl += kElement + " " + std::string(formal.name);
@@ -247,6 +231,48 @@ uint64_t DpiOpenArrayCapacityBytes(const SvOpenArrayDesc& desc) {
 
 bool DpiOpenArrayWriteIsDefined(const SvOpenArrayDesc& desc, uint64_t bytes) {
   return bytes <= DpiOpenArrayCapacityBytes(desc);
+}
+
+std::string DpiCanonicalElementType(DataTypeKind kind) {
+  // §H.7.3 and §H.7.7: 2-state for bit, 4-state for logic and reg and for
+  // integer and time.
+  switch (kind) {
+    case DataTypeKind::kBit:
+      return "svBitVecVal";
+    case DataTypeKind::kLogic:
+    case DataTypeKind::kReg:
+    case DataTypeKind::kInteger:
+    case DataTypeKind::kTime:
+      return "svLogicVecVal";
+    default:
+      return "";
+  }
+}
+
+DpiCanonicalBitPosition DpiCanonicalPositionOfBit(uint32_t bit) {
+  // §H.7.7: element 0 holds bits 0 to 31, element 1 the 32 more significant
+  // bits, and so on.
+  return DpiCanonicalBitPosition{bit / kDpiCanonicalElementBits,
+                                 bit % kDpiCanonicalElementBits};
+}
+
+uint32_t DpiCanonicalUnusedBits(uint32_t width) {
+  // §H.7.7: the last element holds width mod 32 bits when the width is not
+  // a multiple of 32, and the rest of it is unused.
+  const uint32_t kUsed = width % kDpiCanonicalElementBits;
+  return kUsed == 0 ? 0 : kDpiCanonicalElementBits - kUsed;
+}
+
+uint32_t DpiCanonicalLastElementWithUnusedBits(uint32_t last, uint32_t width,
+                                               bool is_signed) {
+  const uint32_t kUnused = DpiCanonicalUnusedBits(width);
+  if (kUnused == 0) return last;
+  const uint32_t kUsed = kDpiCanonicalElementBits - kUnused;
+  const uint32_t kUsedMask = (1U << kUsed) - 1U;
+  // §H.7.7: masking for an unsigned array, sign extension for a signed one
+  // from the array's most significant bit, bit kUsed-1 of the element.
+  const bool kNegative = is_signed && ((last >> (kUsed - 1)) & 1U) != 0;
+  return kNegative ? (last | ~kUsedMask) : (last & kUsedMask);
 }
 
 }  // namespace delta

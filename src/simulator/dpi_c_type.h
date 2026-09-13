@@ -143,4 +143,45 @@ uint64_t DpiOpenArrayCapacityBytes(const SvOpenArrayDesc& desc);
 // no more than the capacity.
 bool DpiOpenArrayWriteIsDefined(const SvOpenArrayDesc& desc, uint64_t bytes);
 
+// §H.7.7: the DPI defines a canonical representation for packed arrays, of
+// type svBitVecVal for a 2-state array and svLogicVecVal for a 4-state one,
+// the latter fully equivalent to the s_vpi_vecval the VPI represents 4-state
+// logic in. A packed array is represented as an array of one or more
+// elements, each a group of 32 bits: the first holds the 32 least
+// significant bits, the next the 32 more significant, and so on. The last
+// element can hold unused bits, whose contents are undetermined, and the
+// user is responsible for masking them or, by the sign, for sign extension
+// over them.
+
+// The bits one element of the representation groups.
+constexpr uint32_t kDpiCanonicalElementBits = 32;
+
+// The C type of one element of the canonical representation of a packed
+// array of a type: svBitVecVal for bit, svLogicVecVal for logic and reg and
+// for integer and time, packed 4-state by §H.7.3; empty for a type with no
+// canonical representation.
+std::string DpiCanonicalElementType(DataTypeKind kind);
+
+// Where a bit of a packed array lies in the representation, the bit given
+// by its normalized index (§H.7.6 b): the element holding it, and the bit
+// within that element.
+struct DpiCanonicalBitPosition {
+  uint32_t element = 0;
+  uint32_t bit = 0;
+};
+DpiCanonicalBitPosition DpiCanonicalPositionOfBit(uint32_t bit);
+
+// The count of unused bits in the last element of the representation of a
+// `width`-bit array: 32 less the bits the last group holds, none when the
+// width is a multiple of 32. DpiCanonicalWordCount in dpi_arg_value.h is
+// how many elements there are.
+uint32_t DpiCanonicalUnusedBits(uint32_t width);
+
+// The last element `last` of a `width`-bit array with its unused bits given
+// the contents the user is responsible for: cleared for an unsigned array,
+// or each set to the array's sign, its most significant bit, for a signed
+// one; unchanged when the element has no unused bits.
+uint32_t DpiCanonicalLastElementWithUnusedBits(uint32_t last, uint32_t width,
+                                               bool is_signed);
+
 }  // namespace delta
