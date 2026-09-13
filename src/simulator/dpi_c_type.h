@@ -1,6 +1,9 @@
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
 #include <string>
+#include <vector>
 
 #include "simulator/dpi_arg_value.h"
 
@@ -32,5 +35,46 @@ std::string DpiCTypeOfFormal(const DpiArg& formal, bool open_array);
 // §H.8.7: whether a type is one of the small ones an input of which is
 // passed by value.
 bool DpiTypeIsSmall(DataTypeKind kind);
+
+// §H.11.4: an unpacked array formal that is not an open array has the same
+// layout a C compiler gives an array of the element's C type with the same
+// dimension sizes, and C code reaches its elements by C indexing, which is
+// the mapping of §H.7.6: each dimension is counted from 0 in the natural
+// order, so the element at SystemVerilog index min(L,R) of a dimension [L:R]
+// is at C index 0 and the one at max(L,R) at abs(L-R), the elements lie in
+// row-major order with the last dimension varying fastest, and each is
+// sizeof the element's C type apart. An open array is what §H.8.6 passes by
+// handle instead and is reached through the functions of §H.12.
+
+// The C declaration of such a formal: the element's C type, the formal's
+// name and one [size] per unpacked dimension in declaration order, each size
+// the count of the dimension's range -- `int a [3:1][2:5]` is `int a[3][4]`.
+// A packed element is its canonical array of chunks (§H.7.7), one more
+// dimension of ceil(width/32) of them, so `logic [17:0] b [1:10][31:0]` is
+// `svLogicVecVal b[10][32][1]`; an input's element is const, as §H.8.7 has
+// every input. An empty string is returned for an element type the DPI
+// does not pass.
+std::string DpiCDeclarationOfUnpackedFormal(
+    const DpiArg& formal, const std::vector<SvActualDimension>& unpacked_dims);
+
+// The size in bytes of one element as C lays it out, sizeof the element's C
+// type -- 4 for an int, 8 for a longint, one svBitVecVal or svLogicVecVal per
+// 32 bits of a packed element -- which is what one step along the last
+// dimension moves the address by. 0 for an element type the DPI does not
+// pass.
+std::size_t DpiCElementBytes(const DpiArg& formal);
+
+// The C indices of the element at SystemVerilog indices `sv_indices`, one per
+// unpacked dimension: sv - min(L,R) for a dimension [L:R], by §H.7.6 c).
+std::vector<uint32_t> DpiCIndicesOfUnpackedElement(
+    const std::vector<SvActualDimension>& unpacked_dims,
+    const std::vector<int32_t>& sv_indices);
+
+// The byte offset of that element from the start of the array under the C
+// compiler's layout: the row-major linear index, the last dimension varying
+// fastest, times the element's size.
+std::size_t DpiCOffsetOfUnpackedElement(
+    const DpiArg& formal, const std::vector<SvActualDimension>& unpacked_dims,
+    const std::vector<int32_t>& sv_indices);
 
 }  // namespace delta
