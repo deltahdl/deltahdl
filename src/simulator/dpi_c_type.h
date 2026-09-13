@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "simulator/dpi_arg_value.h"
@@ -198,5 +199,31 @@ uint32_t DpiCanonicalUnusedBits(uint32_t width);
 // one; unchanged when the element has no unused bits.
 uint32_t DpiCanonicalLastElementWithUnusedBits(uint32_t last, uint32_t width,
                                                bool is_signed);
+
+// §H.6, restating §35.5.1: the formal and actual arguments of imported and
+// exported subroutines are bound by the WYSIWYG principle -- the callee gets
+// its actuals as specified for its formals, and the caller's arguments
+// conform to the formal types, by coercion on the caller's side where
+// necessary. No compiler on either side can coerce between the caller's
+// declared formals and the callee's, the two being declared in different
+// languages with no visible relationship between them, so the user provides
+// matched types on both sides (§H.7.2), the imported or exported function's
+// types matching those of the corresponding foreign subroutine, a qualifier
+// such as rand ignored. What the SystemVerilog compiler does provide is the
+// coercion of the actual arguments of every imported call to the formal's
+// type, truncating or extending the bits of a packed array whose width
+// differs from the formal's.
+
+// The coercion the caller's side gives a packed actual of one width bound
+// to a formal of another.
+enum class DpiActualCoercion { kNone, kTruncate, kExtend };
+DpiActualCoercion DpiCoercionOfPackedActual(uint32_t actual_width,
+                                            uint32_t formal_width);
+
+// Whether the type a C prototype declares for a formal is the one
+// DpiCTypeOfFormal says the SystemVerilog declaration requires, the spacing
+// around a * being no part of it.
+bool DpiCTypeMatchesFormal(const DpiArg& formal, bool open_array,
+                           std::string_view c_type);
 
 }  // namespace delta

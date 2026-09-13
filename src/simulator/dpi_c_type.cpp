@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "parser/ast.h"
@@ -286,6 +287,28 @@ std::string DpiCTypeOfBasicType(DataTypeKind kind, bool is_unsigned) {
     default:
       return "";
   }
+}
+
+DpiActualCoercion DpiCoercionOfPackedActual(uint32_t actual_width,
+                                            uint32_t formal_width) {
+  if (actual_width > formal_width) return DpiActualCoercion::kTruncate;
+  if (actual_width < formal_width) return DpiActualCoercion::kExtend;
+  return DpiActualCoercion::kNone;
+}
+
+bool DpiCTypeMatchesFormal(const DpiArg& formal, bool open_array,
+                           std::string_view c_type) {
+  // The spelling DpiCTypeOfFormal gives puts the * against the type, so the
+  // prototype's spaces around a * are dropped before the comparison.
+  std::string spelled;
+  for (std::size_t i = 0; i < c_type.size(); ++i) {
+    if (c_type[i] == ' ' && (i + 1 == c_type.size() || c_type[i + 1] == '*' ||
+                             (!spelled.empty() && spelled.back() == '*'))) {
+      continue;
+    }
+    spelled += c_type[i];
+  }
+  return spelled == DpiCTypeOfFormal(formal, open_array);
 }
 
 }  // namespace delta
