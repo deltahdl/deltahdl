@@ -15,35 +15,19 @@ namespace delta {
 
 namespace {
 
-// Table H.1: the C type a small SystemVerilog type maps to, the one an input
-// of it is passed by value as and a pointer to which an output or inout of
-// it is passed by reference as.
-const char* SmallCType(DataTypeKind kind) {
+// The C type a small SystemVerilog type maps to, the one an input of it is
+// passed by value as and a pointer to which an output or inout of it is
+// passed by reference as: Table H.1's row, a scalar bit or logic under the
+// svBit and svLogic names svdpi.h gives its unsigned char.
+std::string SmallCType(DataTypeKind kind, bool is_unsigned) {
   switch (kind) {
-    case DataTypeKind::kByte:
-      return "char";
-    case DataTypeKind::kShortint:
-      return "short int";
-    case DataTypeKind::kInt:
-      return "int";
-    case DataTypeKind::kLongint:
-      return "long long";
-    case DataTypeKind::kReal:
-    case DataTypeKind::kRealtime:
-      return "double";
-    case DataTypeKind::kShortreal:
-      return "float";
-    case DataTypeKind::kChandle:
-      return "void*";
-    case DataTypeKind::kString:
-      return "const char*";
     case DataTypeKind::kBit:
       return "svBit";
     case DataTypeKind::kLogic:
     case DataTypeKind::kReg:
       return "svLogic";
     default:
-      return "";
+      return DpiCTypeOfBasicType(kind, is_unsigned);
   }
 }
 
@@ -113,7 +97,7 @@ uint32_t SizeOfDimension(const SvActualDimension& dim) {
 bool DpiTypeIsSmall(DataTypeKind kind) {
   // §H.8.7: byte, shortint, int, longint, real, shortreal; scalar bit and
   // logic; chandle and string.
-  return SmallCType(kind)[0] != '\0';
+  return !SmallCType(kind, false).empty();
 }
 
 std::string DpiCTypeOfFormal(const DpiArg& formal, bool open_array) {
@@ -128,7 +112,7 @@ std::string DpiCTypeOfFormal(const DpiArg& formal, bool open_array) {
     if (kChunk.empty()) return "";
     return (kInput ? "const " : "") + kChunk + "*";
   }
-  const std::string kSmall = SmallCType(formal.type);
+  const std::string kSmall = SmallCType(formal.type, formal.is_unsigned);
   if (kSmall.empty()) return "";
   // §H.8.7: an input of a small type is passed by value with the const
   // qualifier, which a string's table type const char* already carries
@@ -152,8 +136,9 @@ std::size_t DpiCElementBytes(const DpiArg& formal) {
 std::string DpiCDeclarationOfUnpackedFormal(
     const DpiArg& formal, const std::vector<SvActualDimension>& unpacked_dims) {
   const bool kPacked = IsPackedArray(formal);
-  const std::string kElement = kPacked ? DpiCanonicalElementType(formal.type)
-                                       : std::string(SmallCType(formal.type));
+  const std::string kElement =
+      kPacked ? DpiCanonicalElementType(formal.type)
+              : SmallCType(formal.type, formal.is_unsigned);
   if (kElement.empty()) return "";
   std::string decl = formal.direction == Direction::kInput ? "const " : "";
   decl += kElement + " " + std::string(formal.name);
@@ -273,6 +258,34 @@ uint32_t DpiCanonicalLastElementWithUnusedBits(uint32_t last, uint32_t width,
   // from the array's most significant bit, bit kUsed-1 of the element.
   const bool kNegative = is_signed && ((last >> (kUsed - 1)) & 1U) != 0;
   return kNegative ? (last | ~kUsedMask) : (last & kUsedMask);
+}
+
+std::string DpiCTypeOfBasicType(DataTypeKind kind, bool is_unsigned) {
+  switch (kind) {
+    case DataTypeKind::kByte:
+      return is_unsigned ? "unsigned char" : "char";
+    case DataTypeKind::kShortint:
+      return is_unsigned ? "unsigned short" : "short int";
+    case DataTypeKind::kInt:
+      return is_unsigned ? "unsigned int" : "int";
+    case DataTypeKind::kLongint:
+      return is_unsigned ? "unsigned long long" : "long long";
+    case DataTypeKind::kReal:
+    case DataTypeKind::kRealtime:
+      return "double";
+    case DataTypeKind::kShortreal:
+      return "float";
+    case DataTypeKind::kChandle:
+      return "void*";
+    case DataTypeKind::kString:
+      return "const char*";
+    case DataTypeKind::kBit:
+    case DataTypeKind::kLogic:
+    case DataTypeKind::kReg:
+      return "unsigned char";
+    default:
+      return "";
+  }
 }
 
 }  // namespace delta

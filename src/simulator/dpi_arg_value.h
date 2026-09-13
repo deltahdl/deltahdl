@@ -103,6 +103,12 @@ struct DpiArg {
   // is. This is the width the declaration gave it; 0 leaves the width to the
   // kind, which is what every formal whose type carries its own width has.
   uint32_t width = 0;
+  // §H.7.4: whether the type is unsigned -- a byte, shortint, int or
+  // longint the declaration qualified unsigned crosses as the unsigned C
+  // type corresponding to Table H.1's row for the signed type. For any other
+  // type the flag changes nothing on the C side, the table having no signed
+  // row for it to differ from.
+  bool is_unsigned = false;
 };
 
 struct DpiArgValue {

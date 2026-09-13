@@ -37,6 +37,21 @@ std::string DpiCTypeOfFormal(const DpiArg& formal, bool open_array);
 // passed by value.
 bool DpiTypeIsSmall(DataTypeKind kind);
 
+// §H.7.4: Table H.1's mapping of the basic SystemVerilog data types to C
+// types -- byte to char, shortint to short int, int to int, longint to long
+// long, real to double, shortreal to float, chandle to void*, string to
+// const char*, and bit and logic to unsigned char under the encodings
+// svdpi.h gives them, reg using logic's -- and, with `is_unsigned`, the
+// unsigned integer types the DPI also supports, each mapped to the unsigned
+// C type corresponding to its signed equivalent's row: unsigned char,
+// unsigned short, unsigned int and unsigned long long. The qualifier changes
+// nothing for a type with no signed row. Empty for a type the table has no
+// row for. Since byte unsigned crosses as unsigned char by value and bit
+// [7:0] as svBitVecVal by reference, and likewise shortint unsigned and bit
+// [15:0], the one is not equivalent to the other in any direction, which
+// DpiCTypeOfFormal reflects.
+std::string DpiCTypeOfBasicType(DataTypeKind kind, bool is_unsigned);
+
 // §H.11.4: an unpacked array formal that is not an open array has the same
 // layout a C compiler gives an array of the element's C type with the same
 // dimension sizes, and C code reaches its elements by C indexing, which is

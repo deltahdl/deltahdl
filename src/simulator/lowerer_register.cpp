@@ -201,6 +201,10 @@ void RegisterModuleDpiImports(const RtlirModule* mod, SimContext& ctx) {
           kind == DataTypeKind::kReg) {
         formal.width = EvalTypeWidth(arg.data_type);
       }
+      // §H.7.4: an integer type the declaration qualified unsigned crosses
+      // as the unsigned C type; the parser has already settled the default
+      // signedness of a type that named neither qualifier.
+      formal.is_unsigned = !arg.data_type.is_signed;
       func.args.push_back(formal);
     }
     dpi.RegisterImport(std::move(func));
