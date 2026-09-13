@@ -289,4 +289,33 @@ bool DpiFormalIsDeterminedOnEntry(Direction direction);
 // the foreign code may not modify (§H.6.2).
 bool DpiSimulatorDetectsChangesOf(Direction direction);
 
+// §H.6.5, beside §35.5.3: some imported subroutines, or interface functions
+// they call, need the context of their call known, which takes special
+// instrumentation of their call instances, and to spare the overhead an
+// import's calls are instrumented only where the import is declared
+// context. An export called from an import has the context the import set
+// with svSetScope or otherwise the instantiated scope where the import
+// declaration is, DpiRuntime's scope being that context. A noncontext
+// import shall not access any SystemVerilog data object other than its
+// actual arguments, so its call is no barrier to compiler optimizations,
+// where a context import can access any data object through the VPI or an
+// embedded export and its call is such a barrier. Only a context import's
+// calls are properly instrumented, so only it can safely call functions of
+// other APIs, the VPI and exported subroutines included; from a noncontext
+// import the effect is unpredictable, and DpiRuntime refuses it an export
+// call. The utility functions of §H.9, svGetScope among them, are what an
+// import retrieves and operates on its context with.
+
+// What an import may access of SystemVerilog: its actual arguments alone,
+// or any data object.
+enum class DpiImportAccess : uint8_t { kActualArgumentsOnly, kAnyDataObject };
+DpiImportAccess DpiAccessOfImport(bool is_context);
+
+// Whether an import may safely call functions of other APIs.
+bool DpiImportMaySafelyCallOtherApis(bool is_context);
+
+// Whether a call of an import is a barrier to compiler optimizations, which
+// DpiRuntime::IsImportCallOptimizationBarrier answers for a registered one.
+bool DpiImportCallIsOptimizationBarrier(bool is_context);
+
 }  // namespace delta

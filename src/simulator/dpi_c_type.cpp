@@ -353,4 +353,13 @@ bool DpiSimulatorDetectsChangesOf(Direction direction) {
   return direction == Direction::kOutput || direction == Direction::kInout;
 }
 
+DpiImportAccess DpiAccessOfImport(bool is_context) {
+  return is_context ? DpiImportAccess::kAnyDataObject
+                    : DpiImportAccess::kActualArgumentsOnly;
+}
+
+bool DpiImportMaySafelyCallOtherApis(bool is_context) { return is_context; }
+
+bool DpiImportCallIsOptimizationBarrier(bool is_context) { return is_context; }
+
 }  // namespace delta
