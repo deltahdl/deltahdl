@@ -82,11 +82,12 @@ std::shared_ptr<const PropertyExpr> AsPropertyWithoutLocalVariables(
     const LvProperty& property) {
   // §F.5.6: outside the fragment without local variables there is nothing to
   // retract to; inside it, the shape is kept operator for operator.
-  if (LvPropertyInvolvesLocalVariables(property)) {
+  const std::optional<PropertyExpr::Kind> kKind = KindOf(property.kind);
+  if (!kKind || LvPropertyInvolvesLocalVariables(property)) {
     return nullptr;
   }
   auto p = std::make_shared<PropertyExpr>();
-  p->kind = *KindOf(property.kind);
+  p->kind = *kKind;
   p->sequence = property.sequence;
   p->boolean = property.boolean;
   if (property.lhs) p->lhs = AsPropertyWithoutLocalVariables(*property.lhs);
@@ -96,11 +97,12 @@ std::shared_ptr<const PropertyExpr> AsPropertyWithoutLocalVariables(
 
 std::shared_ptr<const TopLevelProperty> AsTopLevelPropertyWithoutLocalVariables(
     const LvTopLevelProperty& top) {
-  if (LvTopLevelPropertyInvolvesLocalVariables(top)) {
+  const std::optional<TopLevelProperty::Kind> kKind = TopKindOf(top.kind);
+  if (!kKind || LvTopLevelPropertyInvolvesLocalVariables(top)) {
     return nullptr;
   }
   auto t = std::make_shared<TopLevelProperty>();
-  t->kind = *TopKindOf(top.kind);
+  t->kind = *kKind;
   t->disable_condition = top.disable_condition;
   if (top.property)
     t->property = AsPropertyWithoutLocalVariables(*top.property);
