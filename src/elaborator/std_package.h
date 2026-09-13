@@ -88,12 +88,20 @@ struct StdMethodPrototype {
   std::string_view return_type;  // void for a task and a void function
   std::vector<StdFormal> formals;
   bool is_static = false;
+  bool variadic = false;  // written ( ... ): any number of actuals
 };
 
 // §G.3: the prototype of the semaphore class -- new(int keyCount = 0),
 // void put(int keyCount = 1), task get(int keyCount = 1) and
 // int try_get(int keyCount = 1).
 const std::vector<StdMethodPrototype>& SemaphorePrototype();
+
+// §G.5: the prototype of the randomize function, function int
+// randomize( ... ), a function of the package and no class, whose call
+// takes the form randomize { attribute_instance } [ ( [
+// variable_identifier_list ] ) ] [ with constraint_block ] of randomize_call
+// in §A.8.2: the actuals, any number of them, are variable identifiers.
+const StdMethodPrototype& RandomizePrototype();
 
 // §G.4: the prototype of the mailbox class -- new(int bound = 0), int num(),
 // the tasks put(T message), get(ref T message) and peek(ref T message) and

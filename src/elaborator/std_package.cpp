@@ -93,6 +93,13 @@ const std::vector<StdMethodPrototype>& SemaphorePrototype() {
   return kPrototype;
 }
 
+const StdMethodPrototype& RandomizePrototype() {
+  // §G.5: function int randomize( ... ).
+  static const StdMethodPrototype kPrototype{
+      "randomize", StdMethodKind::kFunction, "int", {}, false, true};
+  return kPrototype;
+}
+
 const std::vector<StdMethodPrototype>& MailboxPrototype() {
   // §G.4: class mailbox #(type T = dynamic_singular_type); function new(int
   // bound = 0); function int num(); task put(T message); function int

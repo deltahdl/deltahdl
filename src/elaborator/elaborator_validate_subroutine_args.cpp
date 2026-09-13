@@ -530,22 +530,47 @@ static bool IsScopeRandomizeCall(const Expr* expr) {
   return false;
 }
 
+// Whether a scope randomize call is written through the std package, as
+// std::randomize, rather than by the bare name §18.12 also allows.
+static bool IsStdQualifiedRandomizeCall(const Expr* expr) {
+  return expr->lhs && expr->lhs->kind == ExprKind::kMemberAccess;
+}
+
+// The arguments of a scope randomize call. Footnote 43 (§A.8.2) bars `null`;
+// and the list is a variable_identifier_list -- §G.5 gives the form of
+// std::randomize as randomize [ ( [ variable_identifier_list ] ) ], and
+// §A.8.2 the same list for the bare form -- so an argument that is not a
+// variable identifier, an expression or a literal, is rejected under the
+// subclause giving the form the call is written in.
+static void CheckScopeRandomizeArguments(const Expr* expr, DiagEngine& diag) {
+  for (const auto* arg : expr->args) {
+    if (!arg) continue;
+    if (arg->kind == ExprKind::kIdentifier && arg->text == "null") {
+      diag.Error(arg->range.start,
+                 "'null' is not a legal argument to a scope randomize call",
+                 Subclause("A.8.2"));
+    } else if (arg->kind != ExprKind::kIdentifier) {
+      const bool kStd = IsStdQualifiedRandomizeCall(expr);
+      diag.Error(arg->range.start,
+                 kStd ? "argument to std::randomize shall be a variable "
+                        "identifier"
+                      : "argument to a scope randomize call shall be a "
+                        "variable identifier",
+                 Subclause(kStd ? "G.5" : "A.8.2"));
+    }
+  }
+}
+
 // Footnote 43 (§A.8.2): in a scope randomize_call, `null` is not a legal
 // argument and the with-clause's parenthesized identifier_list is also
-// illegal. Walks the expression tree and reports each offending site. The
-// parenthesized-form check uses the `with_has_parens` AST flag set by the
-// parser regardless of whether the parenthesized list happened to be empty
-// or non-empty.
+// illegal, and §G.5 has the arguments be variable identifiers. Walks the
+// expression tree and reports each offending site. The parenthesized-form
+// check uses the `with_has_parens` AST flag set by the parser regardless of
+// whether the parenthesized list happened to be empty or non-empty.
 static void CheckScopeRandomizeRulesInExpr(const Expr* expr, DiagEngine& diag) {
   if (!expr) return;
   if (IsScopeRandomizeCall(expr)) {
-    for (const auto* arg : expr->args) {
-      if (arg && arg->kind == ExprKind::kIdentifier && arg->text == "null") {
-        diag.Error(arg->range.start,
-                   "'null' is not a legal argument to a scope randomize call",
-                   Subclause("A.8.2"));
-      }
-    }
+    CheckScopeRandomizeArguments(expr, diag);
     if (expr->with_has_parens) {
       diag.Error(expr->range.start,
                  "scope randomize call cannot use a parenthesized identifier "
