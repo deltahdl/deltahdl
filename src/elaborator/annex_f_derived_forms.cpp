@@ -367,4 +367,30 @@ std::shared_ptr<const ClockedProperty> ClkCase(
                      match);
 }
 
+std::shared_ptr<const PropertyExpr> PropFollowedBy(
+    std::shared_ptr<const SequenceExpr> r,
+    std::shared_ptr<const PropertyExpr> p) {
+  return PropNot(PropImplication(std::move(r), PropNot(std::move(p))));
+}
+
+std::shared_ptr<const PropertyExpr> PropNonoverlappingFollowedBy(
+    std::shared_ptr<const SequenceExpr> r,
+    std::shared_ptr<const PropertyExpr> p) {
+  return PropNot(
+      PropNonoverlappingImplication(std::move(r), PropNot(std::move(p))));
+}
+
+std::shared_ptr<const ClockedProperty> ClkFollowedBy(
+    std::shared_ptr<const SequenceExpr> s,
+    std::shared_ptr<const ClockedProperty> q) {
+  return ClkNot(ClkImplication(std::move(s), ClkNot(std::move(q))));
+}
+
+std::shared_ptr<const ClockedProperty> ClkNonoverlappingFollowedBy(
+    std::shared_ptr<const SequenceExpr> s,
+    std::shared_ptr<const ClockedProperty> q) {
+  return ClkNot(
+      ClkNonoverlappingImplication(std::move(s), ClkNot(std::move(q))));
+}
+
 }  // namespace delta

@@ -277,4 +277,27 @@ std::shared_ptr<const ClockedProperty> ClkCase(
     std::shared_ptr<const ClockedProperty> default_property,
     const CaseMatch& match);
 
+// §F.3.4.3.6: the derived followed_by operators, unfolded into the negation
+// of an implication over the negated consequent. (r #-# p) is
+// (not (r |-> not p)), so where the implication would require p to fail from
+// the letter every match of r ends at, the followed_by requires p to hold from
+// the letter some match of r ends at; and (r #=# p) is (not (r |=> not p)),
+// the same over the §F.3.4.3.3 nonoverlapping implication, so p is required
+// from the letter after some match of r. Neither holds where r has no match,
+// since the implication then holds vacuously and its negation does not. Each
+// is given in the unclocked property model of §F.5.3.1 and in the clocked one
+// of §F.5.1.2.
+std::shared_ptr<const PropertyExpr> PropFollowedBy(
+    std::shared_ptr<const SequenceExpr> r,
+    std::shared_ptr<const PropertyExpr> p);
+std::shared_ptr<const PropertyExpr> PropNonoverlappingFollowedBy(
+    std::shared_ptr<const SequenceExpr> r,
+    std::shared_ptr<const PropertyExpr> p);
+std::shared_ptr<const ClockedProperty> ClkFollowedBy(
+    std::shared_ptr<const SequenceExpr> s,
+    std::shared_ptr<const ClockedProperty> q);
+std::shared_ptr<const ClockedProperty> ClkNonoverlappingFollowedBy(
+    std::shared_ptr<const SequenceExpr> s,
+    std::shared_ptr<const ClockedProperty> q);
+
 }  // namespace delta
