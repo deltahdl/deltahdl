@@ -716,6 +716,29 @@ uint32_t DpiPackedDimensionCountInC();
 // Whether the number of unpacked dimensions is limited: never.
 bool DpiUnpackedDimensionCountIsLimited();
 
+// §H.12.3: the access functions of the C layer are of two families: the
+// library functions for copying data between an open array handle and a
+// canonical form buffer the C programmer provides (§H.12.5), and the
+// functions for obtaining the actual address of a SystemVerilog data object
+// or of an individual element of an unpacked array (§H.12.4).
+enum class DpiOpenArrayAccess : uint8_t {
+  kCopyElementToCanonicalBuffer,
+  kCopyElementFromCanonicalBuffer,
+  kAddressOfArray,
+  kAddressOfElement,
+};
+
+// The side providing the canonical form buffer a copy goes to or from: C.
+DpiMemorySide DpiSideProvidingCanonicalBuffer();
+
+// Whether an access copies through a canonical buffer or yields an address.
+bool DpiAccessCopiesThroughCanonicalBuffer(DpiOpenArrayAccess access);
+
+// The library function of svdpi.h that performs an access, for an element
+// of type bit where `four_state` is false and of type logic where true; the
+// address functions serve either type.
+std::string_view DpiAccessFunction(DpiOpenArrayAccess access, bool four_state);
+
 // §H.11.3: a packed struct or union argument corresponds to a
 // one-dimensional packed array argument of its width, of type bit where its
 // members are 2-state and logic where 4-state -- the formal DpiCTypeOfFormal

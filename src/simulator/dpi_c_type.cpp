@@ -607,6 +607,27 @@ std::string_view DpiCTypeOfStringArray(Direction /*direction*/) {
   return "const char**";
 }
 
+DpiMemorySide DpiSideProvidingCanonicalBuffer() { return DpiMemorySide::kC; }
+
+bool DpiAccessCopiesThroughCanonicalBuffer(DpiOpenArrayAccess access) {
+  return access == DpiOpenArrayAccess::kCopyElementToCanonicalBuffer ||
+         access == DpiOpenArrayAccess::kCopyElementFromCanonicalBuffer;
+}
+
+std::string_view DpiAccessFunction(DpiOpenArrayAccess access, bool four_state) {
+  switch (access) {
+    case DpiOpenArrayAccess::kCopyElementToCanonicalBuffer:
+      return four_state ? "svGetLogicArrElemVecVal" : "svGetBitArrElemVecVal";
+    case DpiOpenArrayAccess::kCopyElementFromCanonicalBuffer:
+      return four_state ? "svPutLogicArrElemVecVal" : "svPutBitArrElemVecVal";
+    case DpiOpenArrayAccess::kAddressOfArray:
+      return "svGetArrayPtr";
+    case DpiOpenArrayAccess::kAddressOfElement:
+      return "svGetArrElemPtr";
+  }
+  return "";
+}
+
 DpiArg DpiPackedAggregateAsPackedArrayFormal(const DpiArg& aggregate,
                                              bool four_state, uint32_t width) {
   DpiArg formal = aggregate;
