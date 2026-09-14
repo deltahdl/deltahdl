@@ -57,12 +57,12 @@ TEST(DpiInputArgumentPassing, ASmallInputByValueAndAnyOtherByReference) {
     const std::string kType = DpiCTypeOfFormal(kFormal, false);
     EXPECT_TRUE(kType.starts_with("const ")) << kType;
   }
-  for (const DpiArg& kFormal :
+  for (const DpiArg& formal :
        {Input(DataTypeKind::kInteger), Input(DataTypeKind::kTime),
         Input(DataTypeKind::kBit, 8), Input(DataTypeKind::kLogic, 64)}) {
-    EXPECT_EQ(DpiPassingModeOfFormal(kFormal, false),
+    EXPECT_EQ(DpiPassingModeOfFormal(formal, false),
               DpiPassingMode::kByReference);
-    const std::string kType = DpiCTypeOfFormal(kFormal, false);
+    const std::string kType = DpiCTypeOfFormal(formal, false);
     EXPECT_TRUE(kType.starts_with("const ")) << kType;
     EXPECT_TRUE(kType.ends_with("*")) << kType;
   }
