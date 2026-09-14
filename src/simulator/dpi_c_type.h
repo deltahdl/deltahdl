@@ -34,6 +34,14 @@ namespace delta {
 // for a kind the DPI does not pass.
 std::string DpiCTypeOfFormal(const DpiArg& formal, bool open_array);
 
+// §H.8.8: an inout or output argument, open arrays excepted, is always
+// passed by reference, a packed array as svBitVecVal* or svLogicVecVal*
+// (DpiCTypeOfFormal, DpiPassingModeOfFormal), and the same rules about
+// unused bits apply as in §H.7.7: the bits of the last chunk beyond the
+// width are undetermined whichever way the value crosses, and the value
+// is what lies within the width.
+bool DpiOutputOrInoutIsPassedByReference(const DpiArg& formal, bool open_array);
+
 // §H.8.7: an input argument of an imported function implemented in C shall
 // always have a const qualifier, which DpiCTypeOfFormal gives every input;
 // an input, open arrays apart, is passed by value or by reference depending

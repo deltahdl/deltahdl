@@ -547,4 +547,11 @@ std::string DpiCAllocationOfExportActual(const DpiArg& formal) {
   return DpiCDeclarationOfUnpackedFormal(as_allocated, {});
 }
 
+bool DpiOutputOrInoutIsPassedByReference(const DpiArg& formal,
+                                         bool open_array) {
+  return formal.direction != Direction::kInput &&
+         DpiPassingModeOfFormal(formal, open_array) ==
+             DpiPassingMode::kByReference;
+}
+
 }  // namespace delta
