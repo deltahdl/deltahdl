@@ -18,10 +18,21 @@
 
 namespace delta {
 
+// §H.13: the value a scope's time unit or precision has where none is bound
+// to it, in which case the simulation's apply.
+inline constexpr int32_t kDpiNoTimescale = INT32_MIN;
+
 struct DpiScope {
   std::string name;
   std::string_view module_name;
   void* user_data = nullptr;
+  // §H.13: the time unit and time precision of the instance scope, each a
+  // base-ten exponent of one second (-9 for ns), which svGetTime scales the
+  // current time to and svGetTimeUnit and svGetTimePrecision report for the
+  // scope; kDpiNoTimescale where the scope has none bound, the simulation
+  // time unit then standing in as it does for a NULL scope.
+  int32_t time_unit = kDpiNoTimescale;
+  int32_t time_precision = kDpiNoTimescale;
 };
 
 // Annex H.14: how an import's declaration has its packed data arguments passed
@@ -152,6 +163,18 @@ bool DpiCurrentDisableAcknowledged();
 const DpiScope* DpiRegisterScope(std::string_view name);
 const DpiScope* DpiScopeFromName(std::string_view name);
 const char* DpiNameFromScope(const DpiScope* scope);
+
+// §H.13: bind the time unit and precision of the instance scope a registered
+// handle names, each a base-ten exponent of one second, so that svGetTime
+// scales to the unit and svGetTimeUnit and svGetTimePrecision report the two
+// for the scope. A handle the registry did not produce binds nothing.
+// DpiScopeTimescale reads them back, answering false for an unrecognized
+// handle, a NULL one, or a scope with no timescale bound -- the cases the
+// simulation time unit stands in for.
+void DpiSetScopeTimescale(const DpiScope* scope, int32_t time_unit,
+                          int32_t time_precision);
+bool DpiScopeTimescale(const DpiScope* scope, int32_t* time_unit,
+                       int32_t* time_precision);
 
 class DpiRuntime {
  public:

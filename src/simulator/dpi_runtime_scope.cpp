@@ -1,6 +1,7 @@
 // §H.9.3: the scope-name registry the svGetScopeFromName and svGetNameFromScope
 // entry points consult, and the scope stack the context import frames of a
 // DpiRuntime push, whose entries are the registry's handles.
+#include <cstdint>
 #include <functional>
 #include <list>
 #include <map>
@@ -55,6 +56,38 @@ const char* DpiNameFromScope(const DpiScope* scope) {
     if (&s == scope) return s.name.c_str();
   }
   return "";
+}
+
+namespace {
+// The registry's own entry for a handle it produced, or nullptr for any other
+// pointer, which is not a recognized scope.
+DpiScope* RegisteredScope(const DpiScope* scope) {
+  if (scope == nullptr) return nullptr;
+  for (DpiScope& s : DpiScopeRegistryStorage()) {
+    if (&s == scope) return &s;
+  }
+  return nullptr;
+}
+}  // namespace
+
+void DpiSetScopeTimescale(const DpiScope* scope, int32_t time_unit,
+                          int32_t time_precision) {
+  DpiScope* registered = RegisteredScope(scope);
+  if (registered == nullptr) return;
+  registered->time_unit = time_unit;
+  registered->time_precision = time_precision;
+}
+
+bool DpiScopeTimescale(const DpiScope* scope, int32_t* time_unit,
+                       int32_t* time_precision) {
+  const DpiScope* registered = RegisteredScope(scope);
+  if (registered == nullptr || registered->time_unit == kDpiNoTimescale ||
+      registered->time_precision == kDpiNoTimescale) {
+    return false;
+  }
+  if (time_unit != nullptr) *time_unit = registered->time_unit;
+  if (time_precision != nullptr) *time_precision = registered->time_precision;
+  return true;
 }
 
 void DpiRuntime::PushScope(DpiScope scope) {

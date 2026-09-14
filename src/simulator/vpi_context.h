@@ -195,6 +195,7 @@ class VpiContext {
   // the scaling reference for a scaled-real result and as the unit reported for
   // a null obj or a time queue object.
   void SetSimTimeUnit(int exponent) { sim_time_unit_ = exponent; }
+  int SimTimeUnit() const { return sim_time_unit_; }
 
   // §38.13: create a time queue object so vpi_get_time() can report the
   // scheduled time of the next future event.

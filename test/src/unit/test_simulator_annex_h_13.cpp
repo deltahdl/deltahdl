@@ -4,6 +4,7 @@
 
 #include "common/arena.h"
 #include "common/types.h"
+#include "simulator/dpi_runtime.h"
 #include "simulator/scheduler.h"
 #include "simulator/vpi.h"
 
@@ -179,6 +180,71 @@ TEST_F(SvGetTimeSim, NonNullScopeUnitAndPrecisionMatchNullScope) {
   EXPECT_EQ(svGetTimePrecision(scope, &prec_scoped), 0);
   EXPECT_EQ(svGetTimePrecision(nullptr, &prec_null), 0);
   EXPECT_EQ(prec_scoped, prec_null);
+}
+
+// §H.13: svGetTime retrieves the current time scaled to the time unit of the
+// instance scope associated with the svScope, and svGetTimeUnit and
+// svGetTimePrecision the unit and precision of that scope. A registered scope
+// bound to a nanosecond unit and a picosecond precision, in a simulation
+// counting picoseconds, reads 2500 ps as 2.5 ns, and reports -9 and -12 where
+// the NULL scope reports the simulation's own.
+TEST_F(SvGetTimeSim, AScopeWithATimescaleScalesToItsOwnUnit) {
+  vpiHandle top = vpi_ctx_.CreateModule("top", "top");
+  ASSERT_NE(top, nullptr);
+  top->time_precision = -12;
+  vpi_ctx_.SetSimTimeUnit(-12);  // simulation counts in 1 ps
+  AdvanceTo(2500);
+
+  const DpiScope* scope = DpiRegisterScope("top.u_ns_h_13");
+  ASSERT_NE(scope, nullptr);
+  DpiSetScopeTimescale(scope, -9, -12);
+
+  VpiTime scaled = {};
+  scaled.type = kSvScaledRealTime;
+  EXPECT_EQ(svGetTime(scope, &scaled), 0);
+  EXPECT_DOUBLE_EQ(scaled.real, 2.5);
+
+  VpiTime sim = {};
+  sim.type = kSvScaledRealTime;
+  EXPECT_EQ(svGetTime(nullptr, &sim), 0);
+  EXPECT_DOUBLE_EQ(sim.real, 2500.0);
+
+  int32_t unit = 0;
+  int32_t prec = 0;
+  EXPECT_EQ(svGetTimeUnit(scope, &unit), 0);
+  EXPECT_EQ(svGetTimePrecision(scope, &prec), 0);
+  EXPECT_EQ(unit, -9);
+  EXPECT_EQ(prec, -12);
+  int32_t sim_unit = 0;
+  EXPECT_EQ(svGetTimeUnit(nullptr, &sim_unit), 0);
+  EXPECT_EQ(sim_unit, -12);
+}
+
+// §H.13: the simulation-time form is the raw count whatever the scope, and a
+// registered scope with no timescale bound reads as the NULL scope does.
+TEST_F(SvGetTimeSim, AScopeWithoutATimescaleReadsAsTheNullScope) {
+  vpi_ctx_.SetSimTimeUnit(-12);
+  AdvanceTo(7);
+  const DpiScope* scope = DpiRegisterScope("top.u_unbound_h_13");
+  ASSERT_NE(scope, nullptr);
+  const DpiScope* bound = DpiRegisterScope("top.u_bound_h_13");
+  DpiSetScopeTimescale(bound, -9, -12);
+
+  VpiTime raw = {};
+  raw.type = kSvSimTime;
+  EXPECT_EQ(svGetTime(bound, &raw), 0);
+  EXPECT_EQ(raw.low, 7u);
+
+  VpiTime unbound = {};
+  unbound.type = kSvScaledRealTime;
+  EXPECT_EQ(svGetTime(scope, &unbound), 0);
+  EXPECT_DOUBLE_EQ(unbound.real, 7.0);
+  int32_t unit = 0;
+  int32_t prec = 0;
+  EXPECT_FALSE(DpiScopeTimescale(scope, &unit, &prec));
+  EXPECT_TRUE(DpiScopeTimescale(bound, &unit, &prec));
+  EXPECT_EQ(unit, -9);
+  EXPECT_EQ(prec, -12);
 }
 
 // §H.13 / Annex I: each routine reports failure when there is nowhere to write

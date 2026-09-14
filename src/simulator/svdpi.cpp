@@ -747,9 +747,18 @@ void svAckDisabledState(void) { delta::DpiAckCurrentDisable(); }
 // VPI time routines read, so svGetTime and vpi_get_time() always agree. Returns
 // -1 when there is nowhere to write the result, 0 otherwise.
 int svGetTime(svScope scope, svTimeVal* time) {
-  (void)scope;
   if (time == nullptr) return -1;
   bool want_scaled_real = (time->type == sv_scaled_real_time);
+  // §H.13: scaled to the time unit of the instance scope associated with the
+  // svScope where one is bound to it; the simulation time unit otherwise, as
+  // for a NULL scope.
+  int32_t scope_unit = 0;
+  if (want_scaled_real &&
+      delta::DpiScopeTimescale(static_cast<const delta::DpiScope*>(scope),
+                               &scope_unit, nullptr)) {
+    time->real = delta::DpiGetSimTimeScaledTo(scope_unit);
+    return 0;
+  }
   delta::DpiGetSimTime(want_scaled_real, &time->high, &time->low, &time->real);
   return 0;
 }
@@ -759,8 +768,12 @@ int svGetTime(svScope scope, svTimeVal* time) {
 // reports that same unit. The value matches vpi_get(vpiTimeUnit) for the
 // design. Returns -1 when there is nowhere to write the result, 0 otherwise.
 int svGetTimeUnit(svScope scope, int32_t* time_unit) {
-  (void)scope;
   if (time_unit == nullptr) return -1;
+  // §H.13: the instance scope's own unit where one is bound to the svScope.
+  if (delta::DpiScopeTimescale(static_cast<const delta::DpiScope*>(scope),
+                               time_unit, nullptr)) {
+    return 0;
+  }
   *time_unit = delta::DpiGetSimTimeUnit();
   return 0;
 }
@@ -770,8 +783,12 @@ int svGetTimeUnit(svScope scope, int32_t* time_unit) {
 // vpi_get(vpiTimePrecision) for the design. Returns -1 when there is nowhere to
 // write the result, 0 otherwise.
 int svGetTimePrecision(svScope scope, int32_t* time_precision) {
-  (void)scope;
   if (time_precision == nullptr) return -1;
+  // §H.13: the instance scope's own precision where one is bound to it.
+  if (delta::DpiScopeTimescale(static_cast<const delta::DpiScope*>(scope),
+                               nullptr, time_precision)) {
+    return 0;
+  }
   *time_precision = delta::DpiGetSimTimePrecision();
   return 0;
 }

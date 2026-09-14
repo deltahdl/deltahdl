@@ -23,5 +23,10 @@ void DpiGetSimTime(bool want_scaled_real, uint32_t* high, uint32_t* low,
 // vpi_get() yields for vpiTimeUnit and vpiTimePrecision with a null object.
 int32_t DpiGetSimTimeUnit();
 int32_t DpiGetSimTimePrecision();
+// §H.13: the current simulation time scaled to `time_unit`, a base-ten
+// exponent of one second, which is what svGetTime reports for an svScope whose
+// instance scope has that time unit. Scaled from the scheduler's count by the
+// same rule vpi_get_time() applies to an object with a time unit of its own.
+double DpiGetSimTimeScaledTo(int32_t time_unit);
 
 }  // namespace delta

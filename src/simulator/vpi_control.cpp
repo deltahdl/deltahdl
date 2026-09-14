@@ -932,4 +932,19 @@ int32_t DpiGetSimTimePrecision() {
       GetGlobalVpiContext().Get(vpiTimePrecision, nullptr));
 }
 
+double DpiGetSimTimeScaledTo(int32_t time_unit) {
+  // §H.13 with §38.13: the count the scheduler keeps is in the simulation time
+  // unit, and the exponent difference to the requested unit is the power of
+  // ten between the two -- the rule VpiContext::GetTime applies to an object
+  // read in its own timescale.
+  VpiTime t = {};
+  t.type = kVpiSimTime;
+  GetGlobalVpiContext().GetTime(nullptr, &t);
+  const uint64_t kTicks = (static_cast<uint64_t>(t.high) << 32) | t.low;
+  const double kScale = std::pow(
+      10.0,
+      static_cast<double>(GetGlobalVpiContext().SimTimeUnit() - time_unit));
+  return static_cast<double>(kTicks) * kScale;
+}
+
 }  // namespace delta
