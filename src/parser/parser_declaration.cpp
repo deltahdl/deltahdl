@@ -402,6 +402,15 @@ void Parser::ParseOneFunctionArg(std::vector<FunctionArg>& args,
   if (!TryParseInlineAggregateType(arg.data_type)) {
     arg.data_type = ParseDataType();
   }
+  // A.2.7's tf_port_item takes a data_type_or_implicit, and A.2.2.1's
+  // implicit_data_type is `[ signing ] { packed_dimension }`: a port written
+  // `input [W-1:0] fbv3` (§H.11.1's Example 4) names no type and no signing
+  // and carries its packed dimensions alone, which ParseDataType leaves
+  // unread when nothing precedes them.
+  if (arg.data_type.kind == DataTypeKind::kImplicit &&
+      arg.data_type.packed_dim_left == nullptr && Check(TokenKind::kLBracket)) {
+    ParsePackedDims(arg.data_type);
+  }
   ResolveImplicitArgDataType(arg, scan.prev_data_type, dir_explicit,
                              scan.first_arg, scan.prev_was_default);
 
