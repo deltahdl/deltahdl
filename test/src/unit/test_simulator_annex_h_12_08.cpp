@@ -15,8 +15,10 @@ namespace {
 
 // §H.12.8, the C side of Example 6, compiled against this svdpi.h as the
 // example writes it -- under the names this tree's naming rules give C++
-// code, F1 for f1: a struct MyType compatible with C, and f1 taking the
-// two-dimensional open array by handle, reading the bounds of each of its
+// code, F1 for f1, and without the const the example puts on the handle
+// parameter, which those rules read as a constant: a struct MyType
+// compatible with C, and f1 taking the two-dimensional open array by
+// handle, reading the bounds of each of its
 // two unpacked dimensions with svLow and svHigh, and visiting every element
 // by its own indices through the address svGetArrElemPtr2 computes, reading
 // it into a MyType and writing a MyType back.
@@ -32,7 +34,7 @@ int g_lo2 = 0;
 int g_hi2 = 0;
 int g_visited = 0;
 
-void F1(const svOpenArrayHandle h) {
+void F1(svOpenArrayHandle h) {
   MyType my_value = {};
   int i = 0;
   int j = 0;
