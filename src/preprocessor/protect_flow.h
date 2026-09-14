@@ -111,4 +111,24 @@ ExpressionsTheToolVendorSecretKeyOutputCarries();
 std::span<const std::string_view>
 WhatTheToolVendorSecretKeyDataBlockIsComposedOf();
 
+// §O.4: in the IP author secret key encryption system the IP is encrypted
+// with the public key of the IP author's public/private key pair, and the
+// decrypting tool has the IP author's private key in its secure key database,
+// the IP authors having to provide their private keys to the tools' database
+// so that the tool can decrypt the design.
+bool IpAuthorSecretKeyEncryptsWithTheAuthorsPublicKey();
+bool IpAuthorSecretKeyDecryptsWithThePrivateKeyInTheToolsDatabase();
+bool IpAuthorsProvideTheirPrivateKeysToTheToolsDatabase();
+
+// §O.4 as this tool has it: the database the scenario has the tool keep is
+// the list of keys a run is given under §34.5.10's owner and name, and the
+// author's key is provided by giving it to the decrypting run under the
+// author's own owner and name; the design it opens is the one an encrypting
+// run sealed under the key the same owner and name designated. The algorithm
+// this tool encrypts with is the symmetric one of §34.3.1, so the key the
+// database holds under the author's name is the key the author encrypted
+// under, and no second key of a pair is derived from it.
+bool ToolsKeyDatabaseIsTheKeysGivenToTheRun();
+bool ToolDerivesADecryptionKeyFromTheAuthorsEncryptionKey();
+
 }  // namespace delta

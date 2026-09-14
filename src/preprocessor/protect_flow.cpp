@@ -107,4 +107,16 @@ WhatTheToolVendorSecretKeyDataBlockIsComposedOf() {
   return kComposition;
 }
 
+bool IpAuthorSecretKeyEncryptsWithTheAuthorsPublicKey() { return true; }
+
+bool IpAuthorSecretKeyDecryptsWithThePrivateKeyInTheToolsDatabase() {
+  return true;
+}
+
+bool IpAuthorsProvideTheirPrivateKeysToTheToolsDatabase() { return true; }
+
+bool ToolsKeyDatabaseIsTheKeysGivenToTheRun() { return true; }
+
+bool ToolDerivesADecryptionKeyFromTheAuthorsEncryptionKey() { return false; }
+
 }  // namespace delta
