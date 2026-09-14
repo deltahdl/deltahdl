@@ -10,7 +10,7 @@ namespace delta {
 // in the VPI headers (their time constants and s_vpi_time spelling collide with
 // svdpi.h's own). These accessors expose the design-wide time state as plain
 // integers so the DPI layer stays free of those headers; the implementation
-// lives in vpi.cpp where the VPI context is in scope.
+// lives in dpi_time.cpp where the VPI context is in scope.
 //
 // Report the current simulation time for the design as a whole (the time a NULL
 // svScope selects). When want_scaled_real is true the time scaled to the
