@@ -702,6 +702,20 @@ SvActualDimension DpiNormalizedRange(SvActualDimension declared);
 std::vector<SvActualDimension> DpiRangesForAccessing(
     const std::vector<SvActualDimension>& declared, bool formal_is_open_array);
 
+// §H.11.2: multiple packed dimensions of a SystemVerilog array are
+// linearized (§H.7.5) into the one normalized packed dimension the C side
+// sees, [size-1:0] with size the product of the dimensions' counts, so that
+// `bit [6:1][1:8]` is [47:0] in two canonical chunks; unpacked arrays can
+// have an arbitrary number of dimensions, each a dimension of the C array.
+SvActualDimension DpiLinearizedPackedRange(
+    const std::vector<SvActualDimension>& packed_dims);
+
+// The number of packed dimensions the C side sees of a packed array: one.
+uint32_t DpiPackedDimensionCountInC();
+
+// Whether the number of unpacked dimensions is limited: never.
+bool DpiUnpackedDimensionCountIsLimited();
+
 // §H.11.1: two alternatives for working with 2-state packed data. A DPI
 // formal argument can be of a C-compatible type -- the classical int-to-int
 // correspondence of Table H.1, or an int unsigned an arbitrary 2-state bit

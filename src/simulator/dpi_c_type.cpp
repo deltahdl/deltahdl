@@ -607,6 +607,15 @@ std::string_view DpiCTypeOfStringArray(Direction /*direction*/) {
   return "const char**";
 }
 
+SvActualDimension DpiLinearizedPackedRange(
+    const std::vector<SvActualDimension>& packed_dims) {
+  return LinearizedNormalizedRange(packed_dims);
+}
+
+uint32_t DpiPackedDimensionCountInC() { return 1; }
+
+bool DpiUnpackedDimensionCountIsLimited() { return false; }
+
 bool DpiCCompatibleFormalCanHoldTwoStateVector(uint32_t width) {
   return width <= kDpiInlineValueBits;
 }
