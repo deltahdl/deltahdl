@@ -94,4 +94,21 @@ bool ToolEmbedsAVendorSecretKey();
 std::span<const std::string_view> PragmasRequiredByToolVendorSecretKeyInput();
 std::span<const std::string_view> PragmasOptionalInToolVendorSecretKeyInput();
 
+// §O.3.2: the encrypting tool should take the input file and copy all
+// cleartext to the corresponding output sections, and for each protect
+// begin-end block generate begin_protected to start the protected region,
+// then data_keyowner, data_keyname, data_method and encoding, author and
+// author_info if the input provided them, digest_block followed by the
+// encoded encrypted digest, data_block followed by the encoded encrypted data
+// composed of the licences and the text found between begin and end, and
+// end_protected. The annex writes the second licence as encrypt_license, a
+// name §34.4 does not tabulate and §O.3.1's input does not list; the licence
+// that input lists beside decrypt_license is runtime_license, and that is
+// what the data are read as composed of here.
+bool CleartextIsCopiedToTheToolVendorSecretKeyOutput();
+std::span<const std::string_view>
+ExpressionsTheToolVendorSecretKeyOutputCarries();
+std::span<const std::string_view>
+WhatTheToolVendorSecretKeyDataBlockIsComposedOf();
+
 }  // namespace delta

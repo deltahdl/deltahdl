@@ -8,6 +8,7 @@
 #include "preprocessor/protect_envelope.h"
 #include "preprocessor/protect_keywords.h"
 #include "preprocessor/protect_license.h"
+#include "preprocessor/protect_processing.h"
 
 namespace delta {
 
@@ -81,6 +82,29 @@ std::span<const std::string_view> PragmasOptionalInToolVendorSecretKeyInput() {
       kDecryptLicenseKeyword, kRuntimeLicenseKeyword,
   };
   return kOptional;
+}
+
+bool CleartextIsCopiedToTheToolVendorSecretKeyOutput() { return true; }
+
+std::span<const std::string_view>
+ExpressionsTheToolVendorSecretKeyOutputCarries() {
+  static constexpr std::string_view kExpressions[] = {
+      kBeginDecryptionKeyword, kDataKeyownerKeyword, kDataKeynameKeyword,
+      kDataMethodKeyword,      kEncodingKeyword,     kAuthorKeyword,
+      kAuthorInfoKeyword,      kDigestBlockKeyword,  kDataBlockKeyword,
+      kEndDecryptionKeyword,
+  };
+  return kExpressions;
+}
+
+std::span<const std::string_view>
+WhatTheToolVendorSecretKeyDataBlockIsComposedOf() {
+  static constexpr std::string_view kComposition[] = {
+      kDecryptLicenseKeyword,
+      kRuntimeLicenseKeyword,
+      "the text found between begin and end",
+  };
+  return kComposition;
 }
 
 }  // namespace delta
