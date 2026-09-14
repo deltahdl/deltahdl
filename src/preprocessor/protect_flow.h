@@ -223,4 +223,24 @@ bool DataKeyownerShallBeTheOwnerOfTheKeyNameProvided();
 // none under that name.
 std::span<const std::string_view> KeyMethodsThisToolSealsAKeyBlockUnder();
 
+// §O.5.2: the encrypting tool should take the input file and copy all
+// cleartext to the corresponding output sections, and for each protect
+// begin-end block generate begin_protected to start the protected region,
+// then key_keyowner, key_method and key_keyname, a key_block holding the
+// data key's owner, the data_method and the symmetric data key itself in
+// encrypted form, encoding, author and author_info if the input provided
+// them, digest_block followed by the encoded encrypted digest, data_block
+// followed by the encoded encrypted data composed of the licences and the
+// text found between begin and end, and end_protected. The data are read as
+// composed of what §O.3.2's are, the annex writing the second licence there
+// under the same untabulated name. The annex writes key_block with its data
+// against it; §34.5.27 has the block on the lines beneath the keyword, and
+// that is where this tool writes it, as it writes the two blocks the annex
+// puts beneath theirs.
+bool CleartextIsCopiedToTheDigitalEnvelopeOutput();
+std::span<const std::string_view> ExpressionsTheDigitalEnvelopeOutputCarries();
+std::span<const std::string_view> WhatTheDigitalEnvelopeKeyBlockContains();
+std::span<const std::string_view> WhatTheDigitalEnvelopeDataBlockIsComposedOf();
+bool DigitalEnvelopeKeyBlockDataStandBeneathTheKeyword();
+
 }  // namespace delta

@@ -197,4 +197,34 @@ std::span<const std::string_view> KeyMethodsThisToolSealsAKeyBlockUnder() {
   return kMethods;
 }
 
+bool CleartextIsCopiedToTheDigitalEnvelopeOutput() {
+  return CleartextIsCopiedToTheToolVendorSecretKeyOutput();
+}
+
+std::span<const std::string_view> ExpressionsTheDigitalEnvelopeOutputCarries() {
+  static constexpr std::string_view kExpressions[] = {
+      kBeginDecryptionKeyword, kKeyKeyownerKeyword,   kKeyMethodKeyword,
+      kKeyKeynameKeyword,      kKeyBlockKeyword,      kEncodingKeyword,
+      kAuthorKeyword,          kAuthorInfoKeyword,    kDigestBlockKeyword,
+      kDataBlockKeyword,       kEndDecryptionKeyword,
+  };
+  return kExpressions;
+}
+
+std::span<const std::string_view> WhatTheDigitalEnvelopeKeyBlockContains() {
+  static constexpr std::string_view kContents[] = {
+      kDataKeyownerKeyword,
+      kDataMethodKeyword,
+      kDataDecryptKeyKeyword,
+  };
+  return kContents;
+}
+
+std::span<const std::string_view>
+WhatTheDigitalEnvelopeDataBlockIsComposedOf() {
+  return WhatTheToolVendorSecretKeyDataBlockIsComposedOf();
+}
+
+bool DigitalEnvelopeKeyBlockDataStandBeneathTheKeyword() { return true; }
+
 }  // namespace delta
