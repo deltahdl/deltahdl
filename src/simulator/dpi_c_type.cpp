@@ -599,4 +599,18 @@ std::string_view DpiCTypeOfStringArray(Direction /*direction*/) {
   return "const char**";
 }
 
+std::string_view DpiCLayerIncludeFile() { return "svdpi.h"; }
+
+uint32_t DpiCLayerIncludeFileCount() { return 1; }
+
+bool DpiCLayerIncludeFileIsImplementationIndependent() { return true; }
+
+bool DpiIncludeFileDefines(DpiIncludeFileContent /*content*/) {
+  // §H.10: the canonical representation, all basic types and all interface
+  // functions alike.
+  return true;
+}
+
+std::string_view DpiAnnexShowingIncludeFile() { return "Annex I"; }
+
 }  // namespace delta

@@ -678,4 +678,24 @@ bool DpiStringMemberStipulationsAreStandalone();
 // array's own indirection and no other.
 std::string_view DpiCTypeOfStringArray(Direction direction);
 
+// §H.10: the C layer of the DPI defines one include file, svdpi.h. The file
+// is implementation independent and defines the canonical representation,
+// all basic types and all interface functions; the actual file is shown in
+// Annex I, and this simulator's src/simulator/svdpi.h is that file.
+std::string_view DpiCLayerIncludeFile();
+uint32_t DpiCLayerIncludeFileCount();
+bool DpiCLayerIncludeFileIsImplementationIndependent();
+
+// §H.10: what the include file defines.
+enum class DpiIncludeFileContent : uint8_t {
+  kCanonicalRepresentation,
+  kBasicTypes,
+  kInterfaceFunctions,
+};
+
+bool DpiIncludeFileDefines(DpiIncludeFileContent content);
+
+// §H.10: where the standard shows the actual file.
+std::string_view DpiAnnexShowingIncludeFile();
+
 }  // namespace delta
