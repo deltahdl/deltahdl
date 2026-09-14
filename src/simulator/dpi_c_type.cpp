@@ -607,6 +607,43 @@ std::string_view DpiCTypeOfStringArray(Direction /*direction*/) {
   return "const char**";
 }
 
+DpiElementAccessMethod DpiElementAccessMethodOf(DataTypeKind kind,
+                                                uint32_t width) {
+  DpiArg element;
+  element.type = kind;
+  element.width = width;
+  if (IsPackedArray(element)) {
+    return DpiElementAccessMethod::kCopyingToOrFromCanonical;
+  }
+  if (kind == DataTypeKind::kBit || kind == DataTypeKind::kLogic ||
+      kind == DataTypeKind::kReg) {
+    return DpiElementAccessMethod::kDirectly;
+  }
+  return DpiElementAccessMethod::kGenericPointerWithCasting;
+}
+
+bool DpiScalarOrPackedElementIsAccessibleByPointer(
+    bool implementation_supports_it_for_the_array) {
+  return implementation_supports_it_for_the_array;
+}
+
+bool DpiIndexingFunctionIsSpecializedFor(uint32_t index_count) {
+  return index_count >= 1 && index_count <= 3;
+}
+
+bool DpiWholeArrayIsAccessible(bool actual_layout_is_c) {
+  return actual_layout_is_c;
+}
+
+bool DpiElementAddressIsAlwaysSupported() { return true; }
+
+std::string_view DpiAddressFunctionPointerType() { return "void*"; }
+
+bool DpiElementPointerIsMeaningful(
+    bool element_represented_as_individual_value) {
+  return element_represented_as_individual_value;
+}
+
 DpiMemorySide DpiSideProvidingCanonicalBuffer() { return DpiMemorySide::kC; }
 
 bool DpiAccessCopiesThroughCanonicalBuffer(DpiOpenArrayAccess access) {

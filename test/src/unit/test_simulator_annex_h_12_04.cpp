@@ -1,5 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <type_traits>
+
+#include "parser/ast.h"
+#include "simulator/dpi_c_type.h"
 #include "simulator/svdpi.h"
 #include "simulator/svdpi_open_array.h"
 
@@ -24,6 +29,8 @@
 // descriptor's dimension 0 describes the single packed part (H.12.2) and
 // dimensions above 0 the unpacked part; elem_size records the per-element byte
 // stride of the actual representation.
+
+using namespace delta;
 
 namespace {
 
@@ -197,6 +204,76 @@ TEST(ActualRepresentation, NullArrayPointerReturnsNull) {
 
   EXPECT_EQ(svGetArrElemPtr1(h, 0), nullptr);
   EXPECT_EQ(svGetArrElemPtr(h, 0), nullptr);
+}
+
+// ---------------------------------------------------------------------------
+// The clause's prose, modeled in dpi_c_type.h beside the functions above.
+// ---------------------------------------------------------------------------
+
+// §H.12.3: the access method depends on the element's type -- a packed
+// array by copying through the canonical representation, a scalar bit or
+// logic directly, and any other type, an int compatible with C or a
+// structure, through a generic pointer with the user's casting.
+TEST(DpiActualRepresentationModel, TheAccessMethodFollowsTheElementsType) {
+  EXPECT_EQ(DpiElementAccessMethodOf(DataTypeKind::kBit, 8),
+            DpiElementAccessMethod::kCopyingToOrFromCanonical);
+  EXPECT_EQ(DpiElementAccessMethodOf(DataTypeKind::kLogic, 64),
+            DpiElementAccessMethod::kCopyingToOrFromCanonical);
+  EXPECT_EQ(DpiElementAccessMethodOf(DataTypeKind::kBit, 1),
+            DpiElementAccessMethod::kDirectly);
+  EXPECT_EQ(DpiElementAccessMethodOf(DataTypeKind::kLogic, 1),
+            DpiElementAccessMethod::kDirectly);
+  EXPECT_EQ(DpiElementAccessMethodOf(DataTypeKind::kInt, 0),
+            DpiElementAccessMethod::kGenericPointerWithCasting);
+  EXPECT_EQ(DpiElementAccessMethodOf(DataTypeKind::kStruct, 0),
+            DpiElementAccessMethod::kGenericPointerWithCasting);
+}
+
+// §H.12.3: a scalar or packed array is accessible through a pointer only
+// where the implementation supports it for the array in question; and the
+// indexing functions are specialized for one, two and three indices, the
+// variable argument list form serving any count.
+TEST(DpiActualRepresentationModel,
+     PointerAccessIsPerArrayAndIndexingIsSpecializedToThree) {
+  EXPECT_TRUE(DpiScalarOrPackedElementIsAccessibleByPointer(true));
+  EXPECT_FALSE(DpiScalarOrPackedElementIsAccessibleByPointer(false));
+  EXPECT_TRUE(DpiIndexingFunctionIsSpecializedFor(1));
+  EXPECT_TRUE(DpiIndexingFunctionIsSpecializedFor(2));
+  EXPECT_TRUE(DpiIndexingFunctionIsSpecializedFor(3));
+  EXPECT_FALSE(DpiIndexingFunctionIsSpecializedFor(4));
+  EXPECT_FALSE(DpiIndexingFunctionIsSpecializedFor(0));
+}
+
+// §H.12.4: the whole array is accessible only where the actual's layout is
+// the C layout, its address and size being 0 otherwise, while an element's
+// address is always supported; every function hands back a generic void*.
+TEST(DpiActualRepresentationModel, TheWholeArrayNeedsTheCLayoutAnElementNever) {
+  EXPECT_TRUE(DpiWholeArrayIsAccessible(true));
+  EXPECT_FALSE(DpiWholeArrayIsAccessible(false));
+  EXPECT_TRUE(DpiElementAddressIsAlwaysSupported());
+  EXPECT_EQ(DpiAddressFunctionPointerType(), "void*");
+  EXPECT_TRUE((std::is_same<decltype(svGetArrayPtr(nullptr)), void*>::value));
+  EXPECT_TRUE(
+      (std::is_same<decltype(svGetArrElemPtr1(nullptr, 0)), void*>::value));
+}
+
+// §H.12.4: an element's pointer is meaningful only where the element is
+// represented as an individual value of the same type would be, which this
+// simulator's canonical storage of a packed element satisfies and a
+// compacted representation, marked by a zero stride, does not.
+TEST(DpiActualRepresentationModel,
+     AnElementPointerNeedsTheIndividualValuesRepresentation) {
+  EXPECT_TRUE(DpiElementPointerIsMeaningful(true));
+  EXPECT_FALSE(DpiElementPointerIsMeaningful(false));
+  const SvOpenArrayDimRange kRanges[] = {{7, 0}, {0, 3}};
+  svBitVecVal data[4] = {1, 2, 3, 4};
+  SvOpenArrayDesc same;
+  svOpenArrayHandle as_values =
+      MakeHandle(data, kRanges, 2, sizeof(svBitVecVal), &same);
+  EXPECT_EQ(*static_cast<svBitVecVal*>(svGetArrElemPtr1(as_values, 3)), 4u);
+  SvOpenArrayDesc compacted;
+  svOpenArrayHandle differing = MakeHandle(data, kRanges, 2, 0, &compacted);
+  EXPECT_EQ(svGetArrElemPtr1(differing, 3), nullptr);
 }
 
 }  // namespace

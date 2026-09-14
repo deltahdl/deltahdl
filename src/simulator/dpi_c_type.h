@@ -739,6 +739,50 @@ bool DpiAccessCopiesThroughCanonicalBuffer(DpiOpenArrayAccess access);
 // address functions serve either type.
 std::string_view DpiAccessFunction(DpiOpenArrayAccess access, bool four_state);
 
+// §H.12.3: the access method used for an element of an unpacked array
+// depends on the element's type: a packed array of bit or logic is accessed
+// by copying to or from the canonical representation; a scalar, the 1-bit
+// value of type bit or logic, is read or written directly; a value of any
+// other type, a structure or a type compatible with C among them, is
+// accessed through the generic pointer a library function calculates the
+// address into, with the casting the user provides. A scalar or packed
+// array is accessible through a pointer only where the implementation
+// supports it for the array in question, one array being represented in a
+// form that allows it while another uses a compacted representation that
+// does not, within one simulator. The indexing functions take a variable
+// argument list, one index per unpacked dimension, with specialized
+// versions for one, two and three indices for the sake of performance.
+enum class DpiElementAccessMethod : uint8_t {
+  kCopyingToOrFromCanonical,
+  kDirectly,
+  kGenericPointerWithCasting,
+};
+
+DpiElementAccessMethod DpiElementAccessMethodOf(DataTypeKind kind,
+                                                uint32_t width);
+bool DpiScalarOrPackedElementIsAccessibleByPointer(
+    bool implementation_supports_it_for_the_array);
+bool DpiIndexingFunctionIsSpecializedFor(uint32_t index_count);
+
+// §H.12.4: svGetArrayPtr, svSizeOfArray and the svGetArrElemPtr functions
+// provide the actual address of the whole array or of its individual
+// elements, for accessing elements of arrays of types compatible with C and
+// for vendors reaching the actual representation of arrays of every type.
+// Where the actual layout of the SystemVerilog array passed for an open
+// unpacked array formal differs from the C layout, the array cannot be
+// accessed as a whole, and its address and size are undefined, 0 to be
+// exact; the addresses of individual elements are always supported. No
+// representation is assumed, so every function uses a generic void*. Access
+// to an element through its pointer makes sense only where the element is
+// represented as an individual value of the same type would be, the
+// representation of elements of a scalar or packed type being
+// implementation dependent, and the functions return NULL where it differs.
+bool DpiWholeArrayIsAccessible(bool actual_layout_is_c);
+bool DpiElementAddressIsAlwaysSupported();
+std::string_view DpiAddressFunctionPointerType();
+bool DpiElementPointerIsMeaningful(
+    bool element_represented_as_individual_value);
+
 // §H.11.3: a packed struct or union argument corresponds to a
 // one-dimensional packed array argument of its width, of type bit where its
 // members are 2-state and logic where 4-state -- the formal DpiCTypeOfFormal
