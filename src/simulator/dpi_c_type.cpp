@@ -607,6 +607,22 @@ std::string_view DpiCTypeOfStringArray(Direction /*direction*/) {
   return "const char**";
 }
 
+std::string DpiCDeclarationOfAggregateMember(
+    std::string_view name, DataTypeKind kind,
+    const std::vector<SvActualDimension>& packed_dims,
+    const std::vector<SvActualDimension>& unpacked_dims) {
+  DpiArg member;
+  member.name = name;
+  member.type = kind;
+  // §H.7.1: the packed dimensions linearize to one normalized range, whose
+  // count is the member's width.
+  member.width = SizeOfDimension(LinearizedNormalizedRange(packed_dims));
+  if (packed_dims.empty()) member.width = 0;
+  // A member is qualified by no direction; an inout formal carries none.
+  member.direction = Direction::kInout;
+  return DpiCDeclarationOfUnpackedFormal(member, unpacked_dims);
+}
+
 std::string_view DpiCLayerIncludeFile() { return "svdpi.h"; }
 
 uint32_t DpiCLayerIncludeFileCount() { return 1; }

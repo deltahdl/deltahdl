@@ -682,6 +682,19 @@ bool DpiStringMemberStipulationsAreStandalone();
 // array's own indirection and no other.
 std::string_view DpiCTypeOfStringArray(Direction direction);
 
+// §H.10.3 with §H.7.8 and §H.11: a packed array member of an unpacked
+// aggregate is declared in the C-compatible struct as an inout formal of
+// its type would be, no direction qualifying it, in the normalized ranges
+// of §H.11 -- the example's `bit [6:1][1:8] b [65:2]` is defined as for
+// `bit [47:0] b [63:0]`, svBitVecVal b[64][2], two chunks holding the
+// linearized 48 packed bits (SV_PACKED_DATA_NELEMS(6*8)). The packed
+// dimensions are given as declared and linearized here; a member of a small
+// type has no packed dimensions and no chunk dimension.
+std::string DpiCDeclarationOfAggregateMember(
+    std::string_view name, DataTypeKind kind,
+    const std::vector<SvActualDimension>& packed_dims,
+    const std::vector<SvActualDimension>& unpacked_dims);
+
 // §H.10: the C layer of the DPI defines one include file, svdpi.h. The file
 // is implementation independent and defines the canonical representation,
 // all basic types and all interface functions; the actual file is shown in
