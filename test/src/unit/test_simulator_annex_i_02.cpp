@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <array>
 #include <cstdint>
 #include <limits>
+#include <string_view>
 #include <type_traits>
 
 // Annex I.2 (Overview) makes two normative requirements on the svdpi.h
@@ -14,6 +16,7 @@
 // two obligations. The tests below observe the production header satisfying
 // them: including it must compile (it is provided), and the two width types
 // must be visible and have the widths their names promise.
+#include "simulator/dpi_include_file.h"
 #include "simulator/svdpi.h"
 
 namespace {
@@ -71,6 +74,48 @@ TEST(SvdpiIncludeFileContract, WidthTypesHaveExactValueRanges) {
 TEST(SvdpiIncludeFileContract, WidthTypesBackPublicDeclarations) {
   EXPECT_EQ(sizeof(svScalar), sizeof(uint8_t));
   EXPECT_EQ(sizeof(svBitVecVal), sizeof(uint32_t));
+}
+
+// ---------------------------------------------------------------------------
+// The clause's prose, modeled in dpi_include_file.h.
+// ---------------------------------------------------------------------------
+
+// §I.2: the file is normative and every simulator provides it, its
+// normative section mandatory and its deprecated section, delimited by
+// comments at the bottom of the file, optional.
+TEST(SvdpiIncludeFileOverview, TheNormativeSectionIsMandatoryTheDeprecatedNot) {
+  EXPECT_TRUE(delta::DpiSvdpiHIsProvidedByEverySimulator());
+  EXPECT_TRUE(
+      delta::DpiSvdpiSectionMustBeProvided(delta::DpiSvdpiSection::kNormative));
+  EXPECT_FALSE(delta::DpiSvdpiSectionMustBeProvided(
+      delta::DpiSvdpiSection::kDeprecated));
+  EXPECT_TRUE(delta::DpiDeprecatedSectionIsDelimitedByComments());
+}
+
+// §I.2: this simulator's svdpi.h carries the normative section alone, the
+// deprecated SV3.1a functionality standing in the companion svdpi_sv31a.h
+// an application includes when it wants it -- so including svdpi.h alone
+// reaches none of it.
+TEST(SvdpiIncludeFileOverview, ThisFileOmitsTheDeprecatedSection) {
+#ifdef INCLUDED_SVDPI_SV31A
+  const bool kDeprecatedReached = true;
+#else
+  const bool kDeprecatedReached = false;
+#endif
+  EXPECT_FALSE(kDeprecatedReached);
+}
+
+// §I.2: implementations define uint8_t and uint32_t, the exact method not
+// prescribed -- this file takes them from <stdint.h>, one of the ways the
+// suggested section chooses among by platform.
+TEST(SvdpiIncludeFileOverview, TheWidthTypesAreDefinedByAnUnprescribedMethod) {
+  const std::array<std::string_view, 2> kTypes =
+      delta::DpiWidthTypesImplementationsDefine();
+  EXPECT_EQ(kTypes[0], "uint8_t");
+  EXPECT_EQ(kTypes[1], "uint32_t");
+  EXPECT_FALSE(delta::DpiWidthTypeDefinitionMethodIsPrescribed());
+  EXPECT_EQ(sizeof(uint8_t), 1u);
+  EXPECT_EQ(sizeof(uint32_t), 4u);
 }
 
 }  // namespace

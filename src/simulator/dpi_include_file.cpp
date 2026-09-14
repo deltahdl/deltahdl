@@ -15,4 +15,18 @@ std::array<DpiSvdpiContent, 3> DpiSvdpiContents() {
 
 bool DpiSvdpiHContains(DpiSvdpiContent /*content*/) { return true; }
 
+bool DpiSvdpiHIsProvidedByEverySimulator() { return true; }
+
+bool DpiSvdpiSectionMustBeProvided(DpiSvdpiSection section) {
+  return section == DpiSvdpiSection::kNormative;
+}
+
+bool DpiDeprecatedSectionIsDelimitedByComments() { return true; }
+
+std::array<std::string_view, 2> DpiWidthTypesImplementationsDefine() {
+  return {"uint8_t", "uint32_t"};
+}
+
+bool DpiWidthTypeDefinitionMethodIsPrescribed() { return false; }
+
 }  // namespace delta
