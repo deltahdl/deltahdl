@@ -62,4 +62,24 @@ std::span<const ProtectionThreat> ThreatsTheBlockProtectsFrom();
 // encrypted with the block rather than standing in the clear outside it.
 bool InformationInTheBlockIsProtectedOnceEncrypted();
 
+// §O.3: in the tool vendor secret key encryption system the key is the tool
+// vendor's own, proprietary and embedded within the tool itself, and the same
+// key serves both encryption and decryption -- the simplest scenario in the
+// EDA domain, roughly equivalent to the historical `protect technique, whose
+// drawback is that it is completely tool-vendor-specific: the IP author
+// encrypts the IP, and any IP consumer with appropriate licences and the same
+// tool vendor can use it.
+bool ToolVendorSecretKeyIsEmbeddedInTheTool();
+bool ToolVendorSecretKeyEncryptsAndDecrypts();
+bool ToolVendorSecretKeySystemIsToolVendorSpecific();
+std::string_view DirectiveTheToolVendorSecretKeySystemIsEquivalentTo();
+
+// §O.3 as this tool has it: the scenario turns on a key the vendor keeps
+// secret inside the tool, and this tool embeds none. Every key it holds is
+// one it was given under §34.5.10's owner and name, or the exchange key of
+// §34.3.1, on the command line of the run -- so the same key given to the
+// encrypting run and to the decrypting run is what stands in for the
+// vendor's, and a decrypting run given no key opens nothing.
+bool ToolEmbedsAVendorSecretKey();
+
 }  // namespace delta

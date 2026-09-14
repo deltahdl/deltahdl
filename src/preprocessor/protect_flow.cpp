@@ -49,4 +49,16 @@ std::span<const ProtectionThreat> ThreatsTheBlockProtectsFrom() {
 
 bool InformationInTheBlockIsProtectedOnceEncrypted() { return true; }
 
+bool ToolVendorSecretKeyIsEmbeddedInTheTool() { return true; }
+
+bool ToolVendorSecretKeyEncryptsAndDecrypts() { return true; }
+
+bool ToolVendorSecretKeySystemIsToolVendorSpecific() { return true; }
+
+std::string_view DirectiveTheToolVendorSecretKeySystemIsEquivalentTo() {
+  return "`protect";
+}
+
+bool ToolEmbedsAVendorSecretKey() { return false; }
+
 }  // namespace delta
