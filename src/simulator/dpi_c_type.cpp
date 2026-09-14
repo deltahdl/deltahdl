@@ -607,6 +607,44 @@ std::string_view DpiCTypeOfStringArray(Direction /*direction*/) {
   return "const char**";
 }
 
+bool DpiProgrammerChoosesFormalSizing() { return true; }
+
+DpiPassingMode DpiPassingModeOfSizing(DpiFormalArraySizing sizing) {
+  return sizing == DpiFormalArraySizing::kOpen ? DpiPassingMode::kByHandle
+                                               : DpiPassingMode::kByReference;
+}
+
+bool DpiSizingHasOverhead(DpiFormalArraySizing sizing) {
+  return sizing == DpiFormalArraySizing::kOpen;
+}
+
+DpiArrayAccessibility DpiAccessibilityOfSizing(DpiFormalArraySizing sizing) {
+  return sizing == DpiFormalArraySizing::kOpen
+             ? DpiArrayAccessibility::kMostlyIndirectlyThroughTheHandle
+             : DpiArrayAccessibility::kDirectlyAsNormalizedArray;
+}
+
+std::vector<SvActualDimension> DpiCRangesAtCall(
+    const DpiFormalDimension& packed,
+    const std::vector<DpiFormalDimension>& unpacked,
+    const std::vector<SvActualDimension>& actual_packed,
+    const std::vector<SvActualDimension>& actual_unpacked) {
+  std::vector<SvActualDimension> ranges =
+      DpiFormalRangesAtCall(packed, unpacked, actual_packed, actual_unpacked);
+  if (ranges.empty()) return ranges;
+  // §H.12.1: the packed part is normalized on the C side either way, [n:0].
+  ranges[0] = DpiNormalizedRange(ranges[0]);
+  for (std::size_t k = 1; k < ranges.size() && k - 1 < unpacked.size(); ++k) {
+    // §H.12.1: a sized unpacked dimension is normalized to C style, [0:k];
+    // an unsized one keeps the actual's original range.
+    if (unpacked[k - 1].sized) {
+      const int32_t kSize = static_cast<int32_t>(SizeOfDimension(ranges[k]));
+      ranges[k] = SvActualDimension{0, kSize - 1};
+    }
+  }
+  return ranges;
+}
+
 DpiElementAccessMethod DpiElementAccessMethodOf(DataTypeKind kind,
                                                 uint32_t width) {
   DpiArg element;

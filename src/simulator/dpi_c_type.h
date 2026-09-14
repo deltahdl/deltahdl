@@ -716,6 +716,50 @@ uint32_t DpiPackedDimensionCountInC();
 // Whether the number of unpacked dimensions is limited: never.
 bool DpiUnpackedDimensionCountIsLimited();
 
+// §H.12.1: a formal defined as an open array has its sizes and ranges
+// determined by the actual argument on a per-call basis, and the programmer
+// always has the choice of specifying a formal as a sized array or as an
+// open (unsized) one. A sized formal is passed by reference with no
+// overhead and is directly accessible as a normalized array, every index
+// normalized on the C side to 0 and up, so the programmer needs to know the
+// array's size and how the actual's ranges map onto C-style ranges (§H.7.6)
+// -- the tip being to write [n:0]name[0:k] style ranges in SystemVerilog. An
+// open formal is passed by handle with some overhead and is mostly
+// indirectly accessible: the actual's original range and indices of an
+// unsized unpacked dimension are available through the query functions of
+// §H.12.2 and serve the copying and access functions of §H.12.4 and
+// §H.12.5, and an unsized packed dimension's query functions provide the
+// linearized, normalized form of the actual's packed dimensions, whose
+// indices serve the canonical utilities of §H.11.5. The trade-off between
+// performance and convenience is the programmer's to make.
+enum class DpiFormalArraySizing : uint8_t { kSized, kOpen };
+
+bool DpiProgrammerChoosesFormalSizing();
+DpiPassingMode DpiPassingModeOfSizing(DpiFormalArraySizing sizing);
+bool DpiSizingHasOverhead(DpiFormalArraySizing sizing);
+
+// How C code reaches the elements of a formal of the sizing.
+enum class DpiArrayAccessibility : uint8_t {
+  kDirectlyAsNormalizedArray,
+  kMostlyIndirectlyThroughTheHandle,
+};
+
+DpiArrayAccessibility DpiAccessibilityOfSizing(DpiFormalArraySizing sizing);
+
+// The C-style ranges C code uses for a formal on one call, dimension 0 the
+// packed part and then the unpacked dimensions: [n:0] for the packed part,
+// normalized whether the dimension is sized or the linearization of the
+// actual's; [0:k] for a sized unpacked dimension, normalized; and the
+// actual's original range for an unsized unpacked one. The clause's f2 with
+// its sized `logic [31:16] i [64:1][-1:-8]` is [15:0][0:63][0:7] on any
+// call, and its f1 with the open `logic [] i [][]` called with b_64x8 is
+// [15:0][64:1][-1:-8].
+std::vector<SvActualDimension> DpiCRangesAtCall(
+    const DpiFormalDimension& packed,
+    const std::vector<DpiFormalDimension>& unpacked,
+    const std::vector<SvActualDimension>& actual_packed,
+    const std::vector<SvActualDimension>& actual_unpacked);
+
 // §H.12.3: the access functions of the C layer are of two families: the
 // library functions for copying data between an open array handle and a
 // canonical form buffer the C programmer provides (§H.12.5), and the
