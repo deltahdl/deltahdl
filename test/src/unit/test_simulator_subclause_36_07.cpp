@@ -113,10 +113,10 @@ TEST(PliIncludeFiles, TheFilesDefineTheStructuresTheRoutinesAreCalledWith) {
   // The SV file's own structure, which the base file does not lay out: an
   // assertion attempt's step detail, from the sv_vpi_user.h half of §36.7.
   s_vpi_assertion_step_info step = {};
-  step.state_from = 1;
-  step.state_to = 2;
-  EXPECT_EQ(step.state_from, 1);
-  EXPECT_EQ(step.state_to, 2);
+  step.stateFrom = 1;
+  step.stateTo = 2;
+  EXPECT_EQ(step.stateFrom, 1);
+  EXPECT_EQ(step.stateTo, 2);
 }
 
 // A run reaching the library through nothing but the two include files. The

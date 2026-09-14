@@ -219,7 +219,7 @@ PLI_INT32 RecordDeferredCall(PLI_INT32 reason, s_vpi_time* cb_time, vpiHandle,
   call.reason = reason;
   call.cb_time_low = cb_time->low;
   call.carried_info = info != nullptr;
-  if (info != nullptr) call.attempt_start_low = info->attempt_start_time.low;
+  if (info != nullptr) call.attempt_start_low = info->attemptStartTime.low;
   g_deferred_calls.push_back(call);
   return 0;
 }

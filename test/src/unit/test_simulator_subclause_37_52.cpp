@@ -27,7 +27,7 @@ TEST(PropertySpecModel, PropertyExprClassGroupsItsMemberKinds) {
   EXPECT_TRUE(VpiIsPropertyExprType(vpiOperation));
   EXPECT_TRUE(VpiIsPropertyExprType(vpiMulticlockSequenceExpr));
   EXPECT_TRUE(VpiIsPropertyExprType(vpiPropertyInst));
-  EXPECT_TRUE(VpiIsPropertyExprType(vpiClockedProperty));
+  EXPECT_TRUE(VpiIsPropertyExprType(vpiClockedProp));
   EXPECT_TRUE(VpiIsPropertyExprType(vpiCaseProperty));
 
   EXPECT_FALSE(VpiIsPropertyExprType(vpiNet));
@@ -194,7 +194,7 @@ TEST(PropertySpecModel, CaseItemGroupsConditionsBranchingToOneStatement) {
   VpiObject c1;
   c1.type = vpiExpr;
   VpiObject branch;
-  branch.type = vpiClockedProperty;  // the property statement (a property expr)
+  branch.type = vpiClockedProp;  // the property statement (a property expr)
   item.children = {&c0, &c1, &branch};
 
   auto conditions = VpiCaseItemConditions(&item);
@@ -273,7 +273,7 @@ TEST(PropertySpecModel, ClockingEventRelationIsSharedBySpecAndClockedProperty) {
   EXPECT_EQ(VpiClockingEvent(&spec), &ev);
 
   VpiObject clocked;
-  clocked.type = vpiClockedProperty;
+  clocked.type = vpiClockedProp;
   VpiObject ev2;
   ev2.type = vpiEventControl;
   clocked.children = {&ev2};
@@ -306,14 +306,14 @@ TEST(PropertySpecModel, PropertySpecReachesItsPropertyExpr) {
 // property expr is attached.
 TEST(PropertySpecModel, ClockedPropertyReachesItsPropertyExpr) {
   VpiObject clocked;
-  clocked.type = vpiClockedProperty;
+  clocked.type = vpiClockedProp;
   VpiObject pe;
   pe.type = vpiOperation;  // a property-expr kind
   clocked.children = {&pe};
   EXPECT_EQ(VpiPropertyExprChild(&clocked), &pe);
 
   VpiObject empty;
-  empty.type = vpiClockedProperty;
+  empty.type = vpiClockedProp;
   EXPECT_EQ(VpiPropertyExprChild(&empty), nullptr);
 }
 

@@ -40,7 +40,7 @@ PLI_INT32 DumpAssertionEvent(PLI_INT32 reason, s_vpi_time* cb_time,
   event.reason = reason;
   event.assertion = assertion;
   event.time_low = cb_time->low;
-  if (info != nullptr) event.attempt_low = info->attempt_start_time.low;
+  if (info != nullptr) event.attempt_low = info->attemptStartTime.low;
   static_cast<void>(user_data);
   g_dump.push_back(event);
   return 0;

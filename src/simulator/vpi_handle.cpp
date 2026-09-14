@@ -358,7 +358,7 @@ static bool TryResolveClockingRelation(int type, VpiHandle ref,
   // own instead, this edge. Only the clocked seq was routed here, so an
   // assertion clocked by an expression had no traversal that reached it.
   if (ref->type == vpiClockedSeq || ref->type == vpiPropertySpec ||
-      ref->type == vpiClockedProperty) {
+      ref->type == vpiClockedProp) {
     out = VpiClockingEvent(ref);
     return true;
   }
@@ -802,11 +802,11 @@ VpiHandle ResolveModPathOwningModule(VpiHandle ref) {
 
 // §37.23: a nettype declaration's alias and resolution (with) function.
 bool TryResolveNettypeRelation(int type, VpiHandle ref, VpiHandle& out) {
-  if (type == vpiNetTypedefAlias && ref->type == vpiNetTypedef) {
+  if (type == vpiNetTypedefAlias && ref->type == vpiNettypeDecl) {
     out = ref->nettype_alias;
     return true;
   }
-  if (type == vpiWith && ref->type == vpiNetTypedef) {
+  if (type == vpiWith && ref->type == vpiNettypeDecl) {
     out = ref->nettype_with;
     return true;
   }

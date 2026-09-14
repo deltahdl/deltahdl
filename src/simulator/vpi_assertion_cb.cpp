@@ -33,14 +33,14 @@ s_vpi_time VpiAssertionCallbackTime(std::uint64_t model_time) {
 // carries are held by the model as the source text of the expression rather
 // than as objects, so there is no handle to put in failExpr or in a step's
 // expression array until the run's assertion engine drives this API.
-void VpiCallAssertionRoutine(vpi_assertion_callback_func cb_rtn,
+void VpiCallAssertionRoutine(vpi_assertion_callback_func* cb_rtn,
                              VpiHandle assertion,
                              const AssertionCallbackArgs& args) {
   s_vpi_time cb_time = VpiAssertionCallbackTime(args.cb_time);
   s_vpi_attempt_info info = {};
   p_vpi_attempt_info info_p = nullptr;
   if (args.info != nullptr) {
-    info.attempt_start_time =
+    info.attemptStartTime =
         VpiAssertionCallbackTime(args.info->attempt_start_time);
     info_p = &info;
   }
@@ -51,7 +51,7 @@ void VpiCallAssertionRoutine(vpi_assertion_callback_func cb_rtn,
 }  // namespace
 
 VpiHandle VpiRegisterAssertionCb(VpiHandle assertion, int reason,
-                                 vpi_assertion_callback_func cb_rtn,
+                                 vpi_assertion_callback_func* cb_rtn,
                                  PLI_BYTE8* user_data) {
   // §39.4.2: the placement names an assertion and a routine to call on it.
   // Neither is optional - a placement with no assertion has nothing to be

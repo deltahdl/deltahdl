@@ -481,6 +481,10 @@ bool VpiIterateMatches(int obj_type, int type, VpiHandle ref,
   if (type == vpiProcess) return VpiIsProcessType(obj_type);
   // §37.20 detail 1: vpiMemory is a method returning vpiRegArray objects.
   if (type == vpiMemory) return obj_type == VpiMemoryIterationItemType();
+  // §37.10: the vpiNetTypedef iteration reaches the instance's nettype
+  // declarations, whose own type is the vpiNettypeDecl of Annex M; the tag the
+  // diagram writes on the iteration is not the type of what it reaches.
+  if (type == vpiNetTypedef) return obj_type == vpiNettypeDecl;
   // §37.11/§37.5: the module's edges to `instance array` and to the `primitive
   // array` nested inside it are drawn to those class enclosures, so they reach
   // the module, interface, program, gate, switch and udp arrays the two group.

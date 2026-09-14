@@ -712,14 +712,14 @@ VpiObject* VpiContext::NettypeDeclarationIn(VpiHandle scope,
   // §37.23: one declaration object per nettype name in the scope, since every
   // net declared with that nettype names the same declaration.
   for (auto* child : scope->children) {
-    if (child->type == vpiNetTypedef && child->name == net.nettype_name) {
+    if (child->type == vpiNettypeDecl && child->name == net.nettype_name) {
       return child;
     }
   }
 
   name_pool_.emplace_back(net.nettype_name);
   auto* decl = AllocObject();
-  decl->type = vpiNetTypedef;
+  decl->type = vpiNettypeDecl;
   decl->name = name_pool_.back();
   decl->full_name =
       scope->full_name.empty()

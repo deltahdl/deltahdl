@@ -54,6 +54,9 @@ CheckOptions:
   readability-identifier-naming.ProtectedMemberCase: lower_case
   readability-identifier-naming.ProtectedMemberSuffix: '_'
   readability-identifier-naming.PublicMemberCase: lower_case
+  # IEEE 1800-2023 Annex M: the members of s_vpi_assertion_step_info and
+  # s_vpi_attempt_info as the annex spells them
+  readability-identifier-naming.PublicMemberIgnoredRegexp: 'stateFrom|stateTo|failExpr|attemptStartTime'
   readability-identifier-naming.ScopedEnumConstantCase: CamelCase
   readability-identifier-naming.ScopedEnumConstantPrefix: k
   readability-identifier-naming.StaticConstantCase: CamelCase

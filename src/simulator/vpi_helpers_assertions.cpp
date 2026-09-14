@@ -435,7 +435,7 @@ bool VpiIsPropertyExprType(int type) {
     case vpiOperation:
     case vpiMulticlockSequenceExpr:
     case vpiPropertyInst:
-    case vpiClockedProperty:
+    case vpiClockedProp:
     case vpiCaseProperty:
       return true;
     default:

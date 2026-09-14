@@ -158,7 +158,7 @@ TEST_F(AssertionStaticInformationItems, TheClockingExpressionOfTheAssertion) {
   VpiObject inner_event;
   inner_event.type = vpiEventControl;
   VpiObject clocked_property;
-  clocked_property.type = vpiClockedProperty;
+  clocked_property.type = vpiClockedProp;
   clocked_property.children = {&inner_event};
 
   VpiObject unclocked_spec;

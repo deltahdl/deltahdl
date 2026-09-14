@@ -124,7 +124,7 @@ TEST(PropertyDeclModel, FormalInitExprReachesNamedEventOrPropertyExpr) {
   VpiObject with_prop_expr;
   with_prop_expr.type = vpiPropFormalDecl;
   VpiObject pe;
-  pe.type = vpiClockedProperty;  // a property-expr kind (see §37.52)
+  pe.type = vpiClockedProp;  // a property-expr kind (see §37.52)
   with_prop_expr.children = {&pe};
   EXPECT_EQ(VpiPropFormalInitExpr(&with_prop_expr), &pe);
 
@@ -166,7 +166,7 @@ TEST(PropertyDeclModel, PropertyInstResolvesItsDeclaration) {
 // arguments.
 TEST(PropertyDeclModel, PropertyArgumentKindsAreNamedEventOrPropertyExpr) {
   EXPECT_TRUE(VpiIsPropertyArgumentType(vpiNamedEvent));
-  EXPECT_TRUE(VpiIsPropertyArgumentType(vpiClockedProperty));
+  EXPECT_TRUE(VpiIsPropertyArgumentType(vpiClockedProp));
   EXPECT_TRUE(VpiIsPropertyArgumentType(vpiCaseProperty));
   EXPECT_TRUE(VpiIsPropertyArgumentType(vpiPropertyInst));
 

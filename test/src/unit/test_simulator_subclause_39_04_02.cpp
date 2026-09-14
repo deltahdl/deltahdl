@@ -57,14 +57,14 @@ TEST(AssertionCallback, ApiSurfaceMatchesPrototype) {
   s_vpi_assertion_step_info step{};
   step.matched_expression_count = 0;
   step.matched_exprs = nullptr;
-  step.state_from = 0;
-  step.state_to = 1;
+  step.stateFrom = 0;
+  step.stateTo = 1;
 
   s_vpi_attempt_info info{};
   info.detail.step = &step;
-  (void)info.attempt_start_time;
+  (void)info.attemptStartTime;
 
-  vpi_assertion_callback_func fn = nullptr;
+  vpi_assertion_callback_func* fn = nullptr;
   (void)fn;
 
   vpiHandle h =
@@ -507,8 +507,8 @@ PLI_INT32 RecordAssertionCall(PLI_INT32 reason, s_vpi_time* cb_time,
   call.assertion = assertion;
   call.carried_info = info != nullptr;
   if (info != nullptr) {
-    call.attempt_high = info->attempt_start_time.high;
-    call.attempt_low = info->attempt_start_time.low;
+    call.attempt_high = info->attemptStartTime.high;
+    call.attempt_low = info->attemptStartTime.low;
   }
   call.user_data = user_data;
   g_assertion_calls.push_back(call);

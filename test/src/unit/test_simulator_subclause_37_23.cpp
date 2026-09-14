@@ -11,7 +11,9 @@ namespace delta {
 namespace {
 
 // §37.23 Nettype declaration: the VPI object model for a user-defined nettype
-// (an object of type vpiNetTypedef). The clause's own normative content is its
+// (an object of type vpiNettypeDecl, the type Annex M gives it; vpiNetTypedef
+// is the tag §37.10 writes on the iteration that reaches it from an instance).
+// The clause's own normative content is its
 // two numbered details, exercised here through the production Handle dispatch:
 //   detail 1 - vpiWith reaches the nettype's resolution function, and reports
 //              NULL when the nettype has no associated resolution function;
@@ -28,7 +30,7 @@ TEST(NettypeDeclarationModel, WithIsNullWithoutResolutionFunction) {
   VpiContext ctx;
 
   VpiObject nettype;
-  nettype.type = vpiNetTypedef;  // no resolution function attached
+  nettype.type = vpiNettypeDecl;  // no resolution function attached
 
   EXPECT_EQ(ctx.Handle(vpiWith, &nettype), nullptr);
 }
@@ -42,7 +44,7 @@ TEST(NettypeDeclarationModel, WithReachesResolutionFunction) {
   resolver.type = vpiFunction;
 
   VpiObject nettype;
-  nettype.type = vpiNetTypedef;
+  nettype.type = vpiNettypeDecl;
   nettype.nettype_with = &resolver;
 
   EXPECT_EQ(ctx.Handle(vpiWith, &nettype), &resolver);
@@ -54,10 +56,10 @@ TEST(NettypeDeclarationModel, NetTypedefAliasReachesAliasedNettype) {
   VpiContext ctx;
 
   VpiObject base;
-  base.type = vpiNetTypedef;
+  base.type = vpiNettypeDecl;
 
   VpiObject alias;
-  alias.type = vpiNetTypedef;
+  alias.type = vpiNettypeDecl;
   alias.nettype_alias = &base;
 
   VpiHandle aliased = ctx.Handle(vpiNetTypedefAlias, &alias);
@@ -71,7 +73,7 @@ TEST(NettypeDeclarationModel, NetTypedefAliasIsNullWhenNotAnAlias) {
   VpiContext ctx;
 
   VpiObject nettype;
-  nettype.type = vpiNetTypedef;  // a primary declaration, not an alias
+  nettype.type = vpiNettypeDecl;  // a primary declaration, not an alias
 
   EXPECT_EQ(ctx.Handle(vpiNetTypedefAlias, &nettype), nullptr);
 }
@@ -79,6 +81,7 @@ TEST(NettypeDeclarationModel, NetTypedefAliasIsNullWhenNotAnAlias) {
 // What the application found. A calltf is a plain C function with no return
 // path to the case that provoked it.
 int g_nettype_decls = 0;
+int g_nettype_decls_of_the_annex_type = 0;
 std::string g_plain_nettype_name;
 std::string g_resolved_nettype_name;
 bool g_plain_with_is_null = false;
@@ -91,6 +94,9 @@ int ProbeNettypeDeclsCalltf(const char*) {
   if (itr == nullptr) return 0;
   while (vpiHandle decl = vpi_scan(itr)) {
     ++g_nettype_decls;
+    if (vpi_get(vpiType, decl) == vpiNettypeDecl) {
+      ++g_nettype_decls_of_the_annex_type;
+    }
     const char* name = vpi_get_str(vpiName, decl);
     vpiHandle with = vpi_handle(vpiWith, decl);
     if (with == nullptr) {
@@ -114,6 +120,7 @@ TEST(NettypeDeclarationDesign, ADesignsNettypeDeclarationsAreObjects) {
   VpiContext vpi_ctx;
   SetGlobalVpiContext(&vpi_ctx);
   g_nettype_decls = 0;
+  g_nettype_decls_of_the_annex_type = 0;
   g_plain_nettype_name.clear();
   g_resolved_nettype_name.clear();
   g_plain_with_is_null = false;
@@ -142,6 +149,9 @@ TEST(NettypeDeclarationDesign, ADesignsNettypeDeclarationsAreObjects) {
   LowerAndRun(design, f);
 
   EXPECT_EQ(g_nettype_decls, 2);
+  // The objects the §37.10 iteration reaches are nettype declarations, whose
+  // type is the vpiNettypeDecl of Annex M and not the tag of the iteration.
+  EXPECT_EQ(g_nettype_decls_of_the_annex_type, 2);
   EXPECT_EQ(g_plain_nettype_name, "plainnt");
   EXPECT_EQ(g_resolved_nettype_name, "busnt");
 

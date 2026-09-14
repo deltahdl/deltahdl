@@ -116,9 +116,9 @@ constexpr int kVpiDefName = 9;
 constexpr int kVpiAutomatic = 50;
 
 // §37.3.7: vpiAllocScheme is the enumeration property naming how an object's
-// memory was obtained. 731 is the lowest selector value not yet claimed by any
-// other property/object/callback constant in this module.
-constexpr int kVpiAllocScheme = 731;
+// memory was obtained. 658 is the number Annex M gives it in sv_vpi_user.h,
+// which this constant mirrors as the other kVpi constants mirror theirs.
+constexpr int kVpiAllocScheme = 658;
 
 // §37.3.7: the three (and only three) allocation schemes
 // vpi_get(vpiAllocScheme) may return. These live in the property-RETURN-value

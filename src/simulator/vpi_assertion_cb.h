@@ -20,7 +20,7 @@ namespace delta {
 // callback, a NULL handle is returned": no assertion, no routine to call, or a
 // reason that may not be placed on an assertion of that kind are those errors.
 VpiHandle VpiRegisterAssertionCb(VpiHandle assertion, int reason,
-                                 vpi_assertion_callback_func cb_rtn,
+                                 vpi_assertion_callback_func* cb_rtn,
                                  PLI_BYTE8* user_data);
 
 // §39.4.2: "This handle can be used to remove the callback via

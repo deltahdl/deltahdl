@@ -63,7 +63,7 @@ TEST(SvVpiUserHeaderProvided, TheFileTheAnnexNamesIncludesTheBaseFile) {
 // purely at compile time.
 static_assert(
     std::is_same_v<decltype(vpi_register_assertion_cb),
-                   vpiHandle(vpiHandle, PLI_INT32, vpi_assertion_callback_func,
+                   vpiHandle(vpiHandle, PLI_INT32, vpi_assertion_callback_func*,
                              PLI_BYTE8*)>,
     "sv_vpi_user.h must provide vpi_register_assertion_cb");
 
@@ -98,8 +98,8 @@ TEST(SvVpiUserHeaderProvided, ProvidesExtensionStructures) {
   s_vpi_assertion_step_info step = {};
   s_vpi_attempt_info attempt = {};
   EXPECT_EQ(step.matched_expression_count, 0);
-  EXPECT_EQ(step.state_from, 0);
-  EXPECT_EQ(attempt.detail.fail_expr, nullptr);
+  EXPECT_EQ(step.stateFrom, 0);
+  EXPECT_EQ(attempt.detail.failExpr, nullptr);
 }
 
 TEST(SvVpiUserHeaderProvided, ProvidesResolvableExtensionRoutine) {

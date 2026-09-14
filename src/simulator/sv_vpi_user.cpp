@@ -6,7 +6,7 @@
 #include "simulator/vpi_coverage.h"
 
 vpiHandle vpi_register_assertion_cb(vpiHandle assertion, PLI_INT32 reason,
-                                    vpi_assertion_callback_func cb_rtn,
+                                    vpi_assertion_callback_func* cb_rtn,
                                     PLI_BYTE8* user_data) {
   // §39.4.2: place the callback on the named assertion, answering with a handle
   // to it or with NULL where the placement was in error. The routine took its

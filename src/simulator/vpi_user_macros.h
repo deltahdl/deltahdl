@@ -476,14 +476,6 @@ using SVpiVlogInfo = delta::VpiVlogInfo;
 #define vpiScheduled 46
 #define vpiActive 49
 #define vpiAutomatic 50
-
-// §37.3.7: allocation-scheme property selector and its three return values. The
-// selector (731) is a free property number; the return values share the small
-// property-result namespace.
-#define vpiAllocScheme 731
-#define vpiAutomaticScheme 1
-#define vpiDynamicScheme 2
-#define vpiOtherScheme 3
 #define vpiConstantSelect 53
 #define vpiDecompile 54
 #define vpiDefAttribute 55
