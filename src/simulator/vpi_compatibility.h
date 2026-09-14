@@ -1,7 +1,14 @@
-
-
 #ifndef VPI_COMPATIBILITY_H
 #define VPI_COMPATIBILITY_H
+
+/*
+ * §L.1 -- this file holds the special macro definitions that support the
+ * VPI compatibility mode functionality of §36.12, and especially of
+ * §36.12.2.1. vpi_user.h includes it automatically, ahead of the routine
+ * declarations the definitions rename, so user application code does not
+ * include this file directly: it includes vpi_user.h, and the mode it
+ * selected before that include takes effect through this file.
+ */
 
 /*
  * §36.12.2.1 -- Mechanism 1: compile-based binding to a compatibility
