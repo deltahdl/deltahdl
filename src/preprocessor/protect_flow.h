@@ -163,4 +163,39 @@ std::span<const std::string_view>
 WhatTheIpAuthorSecretKeyDataBlockIsComposedOf();
 bool IpAuthorSecretKeyOutputNamesThePublicPrivateSchemeAsItsMethod();
 
+// §O.5: in a digital envelope each recipient has a public and a private key
+// for an asymmetric algorithm; the sender encrypts the design under a
+// symmetric key algorithm and then encrypts the symmetric key under the
+// recipient's public key, recording it in a key_block of the protected
+// envelope; the recipient recovers the symmetric key with its private key
+// and decrypts the design with it. Efficient methods serve the design data
+// while no secret is ever transmitted unencrypted; the envelope can be
+// created under either secret key scheme, the recipient's or the tool's keys
+// protecting the transmission of the symmetric key; and with more than one
+// key_block a single envelope can be decrypted by the tools of different
+// vendors or different users.
+bool DigitalEnvelopeEncryptsTheDesignUnderASymmetricKey();
+bool DigitalEnvelopeEncryptsTheSymmetricKeyUnderTheRecipientsPublicKey();
+std::string_view KeywordRecordingTheEncryptedSymmetricKey();
+bool DigitalEnvelopesCanBeCreatedUnderEitherSecretKeyScheme();
+bool AnEnvelopeWithSeveralKeyBlocksOpensToSeveralRecipients();
+
+// §O.5's example: the key encrypting the data_block is specified either by a
+// data_keyowner/data_keyname pair, which the encrypting tool encrypts into
+// the key_block with the data_method, or by a data_decrypt_key expression,
+// the key itself, encrypted into the key_block. The first leaves the
+// decrypting tool needing the key the pair names; the second leaves it
+// needing nothing, the key being in the file, and the annex has the
+// encrypting tool read the pair's key and put it in the key_block as
+// data_decrypt_key for better security -- the dependency gone and the
+// data_block safe from hit-and-trial with the keys at the user's end. That
+// is the specification this tool writes into every key_block it forms.
+enum class DataKeySpecification : std::uint8_t {
+  kKeyownerAndKeyname,
+  kDataDecryptKey,
+};
+DataKeySpecification DataKeySpecificationNeedingTheKeyAtTheDecryptingTool();
+DataKeySpecification DataKeySpecificationTheAnnexPrefers();
+DataKeySpecification DataKeySpecificationThisToolWritesIntoAKeyBlock();
+
 }  // namespace delta

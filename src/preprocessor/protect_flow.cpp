@@ -6,6 +6,7 @@
 #include "preprocessor/protect_digest_block.h"
 #include "preprocessor/protect_encoding.h"
 #include "preprocessor/protect_envelope.h"
+#include "preprocessor/protect_key_block.h"
 #include "preprocessor/protect_keywords.h"
 #include "preprocessor/protect_license.h"
 #include "preprocessor/protect_processing.h"
@@ -147,6 +148,32 @@ WhatTheIpAuthorSecretKeyDataBlockIsComposedOf() {
 
 bool IpAuthorSecretKeyOutputNamesThePublicPrivateSchemeAsItsMethod() {
   return true;
+}
+
+bool DigitalEnvelopeEncryptsTheDesignUnderASymmetricKey() { return true; }
+
+bool DigitalEnvelopeEncryptsTheSymmetricKeyUnderTheRecipientsPublicKey() {
+  return true;
+}
+
+std::string_view KeywordRecordingTheEncryptedSymmetricKey() {
+  return kKeyBlockKeyword;
+}
+
+bool DigitalEnvelopesCanBeCreatedUnderEitherSecretKeyScheme() { return true; }
+
+bool AnEnvelopeWithSeveralKeyBlocksOpensToSeveralRecipients() { return true; }
+
+DataKeySpecification DataKeySpecificationNeedingTheKeyAtTheDecryptingTool() {
+  return DataKeySpecification::kKeyownerAndKeyname;
+}
+
+DataKeySpecification DataKeySpecificationTheAnnexPrefers() {
+  return DataKeySpecification::kDataDecryptKey;
+}
+
+DataKeySpecification DataKeySpecificationThisToolWritesIntoAKeyBlock() {
+  return DataKeySpecification::kDataDecryptKey;
 }
 
 }  // namespace delta
