@@ -554,4 +554,13 @@ bool DpiOutputOrInoutIsPassedByReference(const DpiArg& formal,
              DpiPassingMode::kByReference;
 }
 
+const std::vector<DataTypeKind>& DpiResultTypes() {
+  static const std::vector<DataTypeKind> kResults = {
+      DataTypeKind::kByte,    DataTypeKind::kShortint, DataTypeKind::kInt,
+      DataTypeKind::kLongint, DataTypeKind::kReal,     DataTypeKind::kShortreal,
+      DataTypeKind::kChandle, DataTypeKind::kString,   DataTypeKind::kBit,
+      DataTypeKind::kLogic};
+  return kResults;
+}
+
 }  // namespace delta

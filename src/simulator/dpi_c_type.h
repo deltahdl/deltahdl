@@ -85,6 +85,13 @@ bool DpiModeIsAFormOfReference(DpiPassingMode mode);
 // returning none.
 bool DpiTypeMayBeAResult(DataTypeKind kind);
 
+// §H.8.9: the types a function result is restricted to, as the clause
+// lists them: byte, shortint, int, longint, real, shortreal, chandle and
+// string, and scalar bit and logic -- each returned as the C type Table
+// H.1 gives it (DpiCTypeOfResult), a scalar bit or logic under svdpi.h's
+// encoding (§H.10.1.1).
+const std::vector<DataTypeKind>& DpiResultTypes();
+
 // §H.8.3: only a small value of a formal input argument is passed by
 // value, a function result is directly passed by value as well, and the
 // user provides the C type equivalent to the SystemVerilog type of a
