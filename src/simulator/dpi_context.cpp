@@ -1,0 +1,58 @@
+#include "simulator/dpi_context.h"
+
+#include <algorithm>
+#include <cstdint>
+#include <optional>
+#include <string_view>
+#include <vector>
+
+namespace delta {
+
+DpiContextNotion DpiContextNotionOf(DpiContextUser user) {
+  // §H.9.1: an import is a proxy for a native subroutine and follows the same
+  // model, so both have DPI context; only a VPI function has VPI context.
+  return user == DpiContextUser::kVpiFunction ? DpiContextNotion::kVpiContext
+                                              : DpiContextNotion::kDpiContext;
+}
+
+DpiContextSite DpiContextSiteOf(DpiContextNotion notion) {
+  return notion == DpiContextNotion::kVpiContext
+             ? DpiContextSite::kCallSite
+             : DpiContextSite::kDeclarationSite;
+}
+
+std::string_view DpiContextOfSubroutine(std::string_view declaration_scope,
+                                        std::string_view /*call_site_scope*/) {
+  // §H.9.1: a native or imported subroutine executes in the context of its
+  // surrounding declarative scope rather than that of its call site.
+  return declaration_scope;
+}
+
+bool DpiHasUnqualifiedVisibility(std::string_view context,
+                                 std::string_view variable_scope) {
+  return context == variable_scope;
+}
+
+DpiExportContextOrigin DpiExportContextOriginOf(bool sv_set_scope_invoked) {
+  return sv_set_scope_invoked
+             ? DpiExportContextOrigin::kSetExplicitlyBySvSetScope
+             : DpiExportContextOrigin::kImportDeclarationsInstantiatedScope;
+}
+
+std::string_view DpiContextOfExportCalledFromImport(
+    std::string_view import_declaration_scope,
+    std::optional<std::string_view> sv_set_scope_named) {
+  return sv_set_scope_named.value_or(import_declaration_scope);
+}
+
+uint32_t DpiExportInstanceCount(
+    const std::vector<std::string_view>& importing_scopes) {
+  // §H.9.1: one instance per instantiated scope; two imports declared in one
+  // scope share the instance that scope's context reflects.
+  std::vector<std::string_view> distinct(importing_scopes);
+  std::sort(distinct.begin(), distinct.end());
+  distinct.erase(std::unique(distinct.begin(), distinct.end()), distinct.end());
+  return static_cast<uint32_t>(distinct.size());
+}
+
+}  // namespace delta

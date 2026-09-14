@@ -250,6 +250,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/sva_engine.cpp
     simulator/coverage.cpp
     simulator/dpi_c_type.cpp
+    simulator/dpi_context.cpp
     simulator/dpi_side.cpp
     simulator/dpi_runtime.cpp
     simulator/compiled_sim.cpp
