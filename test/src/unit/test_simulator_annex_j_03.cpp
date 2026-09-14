@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "driver/cli_options.h"
+#include "helpers_command_line.h"
 #include "simulator/foreign_code.h"
 
 using namespace delta;
@@ -48,18 +49,6 @@ TEST(ForeignCodeLocation, ALaterRootReplacesTheEarlier) {
   locator.SetRoot("/first");
   locator.SetRoot("/second");
   EXPECT_EQ(locator.Resolve("x"), "/second/x");
-}
-
-// Runs ParseArgs over the words as written on a command line, the program
-// name prepended as argv[0].
-bool ParseCommandLine(const std::vector<std::string>& args, CliOptions& opts) {
-  std::vector<std::string> words;
-  words.emplace_back("deltahdl");
-  for (const std::string& arg : args) words.push_back(arg);
-  std::vector<char*> argv;
-  argv.reserve(words.size());
-  for (std::string& word : words) argv.push_back(word.data());
-  return ParseArgs(static_cast<int>(argv.size()), argv.data(), opts);
 }
 
 // §J.3: the driver takes -sv_root with its directory, and leaves the root

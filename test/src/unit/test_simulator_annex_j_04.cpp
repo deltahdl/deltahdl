@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "driver/cli_options.h"
+#include "helpers_command_line.h"
 #include "simulator/foreign_code.h"
 
 using namespace delta;
@@ -155,18 +156,6 @@ TEST(ForeignCodeObjectInclusion, TheSameFileIsKnownByPathNameOrByInode) {
   ASSERT_EQ(kOrder.size(), 2u);
   EXPECT_EQ(kOrder[0].path, kLib);
   EXPECT_EQ(kOrder[1].path, kOther);
-}
-
-// Runs ParseArgs over the words as written on a command line, the program
-// name prepended as argv[0].
-bool ParseCommandLine(const std::vector<std::string>& args, CliOptions& opts) {
-  std::vector<std::string> words;
-  words.emplace_back("deltahdl");
-  for (const std::string& arg : args) words.push_back(arg);
-  std::vector<char*> argv;
-  argv.reserve(words.size());
-  for (std::string& word : words) argv.push_back(word.data());
-  return ParseArgs(static_cast<int>(argv.size()), argv.data(), opts);
 }
 
 // §J.4 with §J.3: the driver takes -sv_lib and -sv_liblist, each any number
