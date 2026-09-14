@@ -537,4 +537,14 @@ DpiMemorySide DpiSideAllocatingActualOfExportCall() {
   return DpiMemorySide::kC;
 }
 
+bool DpiCallerAllocatesExportActual(const DpiArg& formal) {
+  return DpiPassingModeOfFormal(formal, false) == DpiPassingMode::kByReference;
+}
+
+std::string DpiCAllocationOfExportActual(const DpiArg& formal) {
+  DpiArg as_allocated = formal;
+  as_allocated.direction = Direction::kOutput;
+  return DpiCDeclarationOfUnpackedFormal(as_allocated, {});
+}
+
 }  // namespace delta

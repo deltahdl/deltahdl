@@ -576,4 +576,23 @@ bool DpiExportFormalMayHaveType(DataTypeKind kind);
 // subroutine called from C: the caller, C.
 DpiMemorySide DpiSideAllocatingActualOfExportCall();
 
+// §H.8.5: relevant only to calling an exported SystemVerilog subroutine
+// from C, where the caller is responsible for allocating every actual
+// argument passed by reference. Static allocation requires knowledge of
+// the data type; where the type involves SystemVerilog packed arrays, a C
+// array of the canonical type, svLogicVecVal or svBitVecVal, is allocated
+// and initialized before being passed by reference to the export.
+
+// Whether the caller of an export allocates the actual for a formal: it
+// does for one passed by reference, and not for one passed by value.
+bool DpiCallerAllocatesExportActual(const DpiArg& formal);
+
+// The C declaration that allocates the actual for a formal: an object of
+// Table H.1's type for a small type, and for a packed array a C array of
+// its canonical type with one element per 32 bits, `svLogicVecVal w[2]`
+// for logic [39:0] -- without the const of an input, which qualifies the
+// export's view and not the caller's allocation. Empty for a type the DPI
+// does not pass.
+std::string DpiCAllocationOfExportActual(const DpiArg& formal);
+
 }  // namespace delta
