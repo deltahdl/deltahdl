@@ -501,4 +501,40 @@ bool DpiTypeMayBeAResult(DataTypeKind kind) {
   return kind == DataTypeKind::kVoid || DpiTypeIsSmall(kind);
 }
 
+std::string DpiCFunctionHeader(std::string_view c_name, DataTypeKind result,
+                               const std::vector<DpiArg>& formals) {
+  std::string header =
+      DpiCTypeOfResult(result) + " " + std::string(c_name) + "(";
+  for (std::size_t i = 0; i < formals.size(); ++i) {
+    if (i > 0) header += ", ";
+    header += DpiCTypeOfFormal(formals[i], false) + " " +
+              std::string(formals[i].name);
+  }
+  return header + ")";
+}
+
+std::string DpiCHeaderOfExportedSubroutine(std::string_view c_name,
+                                           DataTypeKind result,
+                                           const std::vector<DpiArg>& formals,
+                                           bool is_task) {
+  return DpiCFunctionHeader(c_name, is_task ? DataTypeKind::kInt : result,
+                            formals);
+}
+
+std::string_view DpiCTypeOfExportedTaskResult() { return "int"; }
+
+bool DpiExportFormalMayBeAnOpenArray() { return false; }
+
+bool DpiExportFormalMayHaveType(DataTypeKind kind) {
+  DpiArg as_formal;
+  as_formal.type = kind;
+  as_formal.width =
+      kind == DataTypeKind::kBit || kind == DataTypeKind::kLogic ? 1 : 0;
+  return !DpiCTypeOfFormal(as_formal, false).empty();
+}
+
+DpiMemorySide DpiSideAllocatingActualOfExportCall() {
+  return DpiMemorySide::kC;
+}
+
 }  // namespace delta

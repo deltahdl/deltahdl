@@ -535,4 +535,45 @@ bool DpiReferenceOutlivesTheCall();
 // across calls: C.
 DpiMemorySide DpiSideOwningACopyKeptAcrossCalls();
 
+// §H.8.2: there is no difference in argument passing between a call from
+// SystemVerilog to C and one from C to SystemVerilog. A task or function
+// exported from SystemVerilog cannot have an open array as an argument;
+// apart from that restriction the same types of formal can be declared for
+// an export as for an import, and a subroutine exported from SystemVerilog
+// shall have the same function header in C as an imported function with
+// the same result type and the same formal list would. For an argument
+// passed by reference, the actual to a SystemVerilog subroutine called
+// from C shall be allocated with the same layout of data SystemVerilog
+// uses for that type, the caller being responsible for the allocation.
+// Calling a SystemVerilog task from C is the same as calling a function
+// from C, except that the return type of an exported task is an int whose
+// meaning §35.9 gives.
+
+// The function header a subroutine has in C: the result's C type, the
+// name, and the formals in declaration order each as DpiCTypeOfFormal
+// spells it followed by its name, a subroutine with no formals taking ().
+std::string DpiCFunctionHeader(std::string_view c_name, DataTypeKind result,
+                               const std::vector<DpiArg>& formals);
+
+// The header an exported subroutine has: that of an import with the same
+// result and formals, the result being int for a task.
+std::string DpiCHeaderOfExportedSubroutine(std::string_view c_name,
+                                           DataTypeKind result,
+                                           const std::vector<DpiArg>& formals,
+                                           bool is_task);
+
+// The C type an exported task returns: int.
+std::string_view DpiCTypeOfExportedTaskResult();
+
+// Whether an export's formal may be an open array: never.
+bool DpiExportFormalMayBeAnOpenArray();
+
+// Whether an export's formal may have a type: the same types an import's
+// may, those the C layer has a type for.
+bool DpiExportFormalMayHaveType(DataTypeKind kind);
+
+// The side that allocates an actual passed by reference to a SystemVerilog
+// subroutine called from C: the caller, C.
+DpiMemorySide DpiSideAllocatingActualOfExportCall();
+
 }  // namespace delta
