@@ -53,6 +53,12 @@ struct CliOptions {
   // path name the annex's switches specify after it; empty while none was
   // given, the user's current working directory then being the default.
   std::string sv_root;
+  // Annex J.4: the path names -sv_lib and -sv_liblist gave, each in order of
+  // occurrence and each resolved as it was processed against the root then
+  // in force, so that a relative name written before -sv_root resolves
+  // against the working directory and one written after against the root.
+  std::vector<std::string> sv_libs;
+  std::vector<std::string> sv_liblists;
 
   std::vector<std::pair<std::string, std::string>> defines;
   uint64_t max_time = 0;

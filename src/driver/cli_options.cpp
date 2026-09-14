@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "common/arg_origin.h"
+#include "simulator/foreign_code.h"
 
 namespace delta {
 
@@ -77,6 +78,21 @@ bool TakeValue(std::string_view arg, std::string_view name, ArgCursor cur,
     return true;
   }
   out.emplace_back(cur.argv[++cur.i]);
+  return true;
+}
+
+// The same for a path name of Annex J, resolved as §J.3 has it -- against the
+// -sv_root in force when the option is processed, the working directory while
+// none is -- so that the value kept is the location the switch specified.
+bool TakeResolvedPath(std::string_view arg, std::string_view name,
+                      ArgCursor cur, std::vector<std::string>& out) {
+  const int kBefore = cur.i;
+  std::string value;
+  if (!TakeValue(arg, name, cur, value)) return false;
+  if (cur.i == kBefore) return true;
+  ForeignCodeLocator locator;
+  locator.SetRoot(cur.opts.sv_root);
+  out.push_back(locator.Resolve(value));
   return true;
 }
 
@@ -261,7 +277,14 @@ bool TryParseLibArg(std::string_view arg, int& i, int argc,
   }
   // Annex J.3: -sv_root receives a single directory path name, the root the
   // annex's relative path names are prepended with from then on.
-  return TakeValue(arg, "-sv_root", cur, opts.sv_root);
+  if (TakeValue(arg, ForeignCodeRootSwitch(), cur, opts.sv_root)) return true;
+  // Annex J.4: -sv_lib and -sv_liblist each receive one path name and can
+  // each be written more than once.
+  if (TakeResolvedPath(arg, ForeignCodeLibSwitch(), cur, opts.sv_libs)) {
+    return true;
+  }
+  return TakeResolvedPath(arg, ForeignCodeLibListSwitch(), cur,
+                          opts.sv_liblists);
 }
 
 bool TryParseDefineArg(std::string_view arg, int& i, int argc,

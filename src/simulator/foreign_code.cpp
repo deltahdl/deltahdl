@@ -7,6 +7,7 @@
 #include <string>
 #include <string_view>
 #include <system_error>
+#include <vector>
 
 namespace delta {
 
@@ -158,6 +159,91 @@ std::string ForeignCodeLocator::Resolve(std::string_view path) const {
   const std::filesystem::path kPath(path);
   if (kPath.is_absolute()) return kPath.string();
   return (std::filesystem::path(Root()) / kPath).string();
+}
+
+std::string_view ForeignCodeLibListSwitch() { return "-sv_liblist"; }
+
+std::string_view ForeignCodeLibSwitch() { return "-sv_lib"; }
+
+std::string_view ForeignCodeSwitchOf(ForeignCodeSpecificationMethod method) {
+  return method == ForeignCodeSpecificationMethod::kBootstrapFileEntry
+             ? ForeignCodeLibListSwitch()
+             : ForeignCodeLibSwitch();
+}
+
+bool ForeignCodeSwitchMayRepeat(std::string_view switch_name) {
+  return switch_name == ForeignCodeLibListSwitch() ||
+         switch_name == ForeignCodeLibSwitch();
+}
+
+bool ForeignCodeMethodsAreAvailableConcurrently() { return true; }
+
+bool ForeignCodeMethodsMayBeMixed() { return true; }
+
+std::string_view ForeignCodeSharedLibraryExtension() {
+#if defined(_WIN32)
+  return ".dll";
+#elif defined(__APPLE__)
+  return ".dylib";
+#else
+  return ".so";
+#endif
+}
+
+std::string ForeignCodeSharedLibraryFileName(
+    std::string_view pathname_without_extension) {
+  return std::string(pathname_without_extension) +
+         std::string(ForeignCodeSharedLibraryExtension());
+}
+
+ForeignCodeParty ForeignCodeResponsibleFor(ForeignCodeDuty duty) {
+  const bool kExtension = duty == ForeignCodeDuty::kIdentifyTheExtension ||
+                          duty == ForeignCodeDuty::kAppendTheExtension;
+  return kExtension ? ForeignCodeParty::kApplication
+                    : ForeignCodeParty::kProvider;
+}
+
+ForeignCodeLoadScope ForeignCodeLoadRequired() {
+  return ForeignCodeLoadScope::kReferencedObjectCodeOnly;
+}
+
+bool ForeignCodeIsSameFile(std::string_view a, std::string_view b) {
+  const std::filesystem::path kA(a);
+  const std::filesystem::path kB(b);
+  if (kA.lexically_normal() == kB.lexically_normal()) return true;
+  std::error_code ec;
+  const bool kSame =
+      std::filesystem::equivalent(ForeignCodeSharedLibraryFileName(a),
+                                  ForeignCodeSharedLibraryFileName(b), ec);
+  return !ec && kSame;
+}
+
+namespace {
+
+// Appends `path` under `method` unless a library already in the order is the
+// same file, an earlier occurrence taking precedence over a later one.
+void LoadOnce(std::string_view path, ForeignCodeSpecificationMethod method,
+              std::vector<ForeignCodeLibrary>* order) {
+  for (const ForeignCodeLibrary& loaded : *order) {
+    if (ForeignCodeIsSameFile(loaded.path, path)) return;
+  }
+  order->push_back({std::string(path), method});
+}
+
+}  // namespace
+
+std::vector<ForeignCodeLibrary> ForeignCodeLoadOrder(
+    const std::vector<std::string>& bootstrap_entries,
+    const std::vector<std::string>& lib_switch_values) {
+  std::vector<ForeignCodeLibrary> order;
+  for (const std::string& entry : bootstrap_entries) {
+    LoadOnce(entry, ForeignCodeSpecificationMethod::kBootstrapFileEntry,
+             &order);
+  }
+  for (const std::string& value : lib_switch_values) {
+    LoadOnce(value, ForeignCodeSpecificationMethod::kLibSwitch, &order);
+  }
+  return order;
 }
 
 }  // namespace delta
