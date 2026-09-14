@@ -4,10 +4,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
-#include <functional>
 #include <iostream>
-#include <list>
-#include <map>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -40,47 +37,6 @@ void DpiSetCurrentDisabledState(bool disabled) {
 void DpiAckCurrentDisable() { g_disable_acked = true; }
 
 bool DpiCurrentDisableAcknowledged() { return g_disable_acked; }
-
-namespace {
-// §H.9.3 scope-name registry storage. std::list keeps element addresses stable
-// as scopes are added, so a handle handed to C code stays valid for the life of
-// the simulation. The by-name index drives svGetScopeFromName().
-std::list<DpiScope>& DpiScopeRegistryStorage() {
-  static std::list<DpiScope> storage;
-  return storage;
-}
-std::map<std::string, DpiScope*, std::less<>>& DpiScopeRegistryByName() {
-  static std::map<std::string, DpiScope*, std::less<>> by_name;
-  return by_name;
-}
-}  // namespace
-
-const DpiScope* DpiRegisterScope(std::string_view name) {
-  auto& by_name = DpiScopeRegistryByName();
-  auto it = by_name.find(name);
-  if (it != by_name.end()) return it->second;
-  DpiScope& scope = DpiScopeRegistryStorage().emplace_back();
-  scope.name = std::string(name);
-  by_name.emplace(scope.name, &scope);
-  return &scope;
-}
-
-const DpiScope* DpiScopeFromName(std::string_view name) {
-  auto& by_name = DpiScopeRegistryByName();
-  auto it = by_name.find(name);
-  return it == by_name.end() ? nullptr : it->second;
-}
-
-const char* DpiNameFromScope(const DpiScope* scope) {
-  if (scope == nullptr) return "";
-  // Only handles this registry produced map back to a name; an unregistered
-  // pointer is not a recognized scope, so it yields an empty name rather than a
-  // dereference of an unknown address.
-  for (const DpiScope& s : DpiScopeRegistryStorage()) {
-    if (&s == scope) return s.name.c_str();
-  }
-  return "";
-}
 
 DpiArgValue DpiArgValue::FromInt(int32_t v) {
   DpiArgValue a;
@@ -622,23 +578,6 @@ DpiArgValue DpiRuntime::CallImportDetectingChanges(
   return result;
 }
 
-void DpiRuntime::PushScope(DpiScope scope) {
-  scope_stack_.push_back(std::move(scope));
-  current_scope_ = &scope_stack_.back();
-}
-
-void DpiRuntime::PopScope() {
-  if (scope_stack_.empty()) return;
-  scope_stack_.pop_back();
-  current_scope_ = scope_stack_.empty() ? nullptr : &scope_stack_.back();
-}
-
-const DpiScope* DpiRuntime::CurrentScope() const { return current_scope_; }
-
-void DpiRuntime::SetScope(const DpiScope* scope) { current_scope_ = scope; }
-
-const DpiScope* DpiRuntime::GetScope() const { return current_scope_; }
-
 void DpiRuntime::EnterContextImportCall(std::string_view sv_name,
                                         DpiScope decl_scope, bool is_task) {
   // §35.9: the disabled state is a per-thread property of an in-progress
@@ -663,7 +602,7 @@ void DpiRuntime::EnterNoncontextImportCall(std::string_view sv_name,
   // affects only its actual arguments, so a scope set while it ran belongs to
   // it and not to whatever runs after it returns.
   bool from_stack =
-      !scope_stack_.empty() && current_scope_ == &scope_stack_.back();
+      !scope_stack_.empty() && current_scope_ == scope_stack_.back();
   call_chain_.push_back({sv_name, false, is_task, current_scope_, from_stack});
 }
 
@@ -722,7 +661,7 @@ void DpiRuntime::LeaveImportCall() {
   // not specified as context, so the scope this frame was entered under is the
   // scope its caller resumes in.
   if (entry_scope_from_stack) {
-    current_scope_ = scope_stack_.empty() ? nullptr : &scope_stack_.back();
+    current_scope_ = scope_stack_.empty() ? nullptr : scope_stack_.back();
     return;
   }
   current_scope_ = entry_scope;

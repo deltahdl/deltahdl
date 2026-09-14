@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <deque>
 #include <functional>
 #include <string>
 #include <string_view>
@@ -508,7 +509,16 @@ class DpiRuntime {
   // name and the values its input arguments presented, so that a later call
   // presenting the same values can be answered from it.
   std::unordered_map<std::string, DpiArgValue> pure_results_;
-  std::vector<DpiScope> scope_stack_;
+  // §H.9.3: the scopes pushed by the context import frames, each the handle
+  // the §H.9.3 registry holds for its name, so that the scope svGetScope
+  // reports inside a chain is the one svGetScopeFromName reports for the
+  // instance and user data stored under either is found under the other --
+  // §H.9.4's example stores a model under the handle a name resolves to and
+  // retrieves it under the scope the executing import reports. A pushed scope
+  // with no name, which a run that does not yet carry instantiated scopes
+  // pushes, is held in unnamed_scopes_ for the length of its frame instead.
+  std::vector<const DpiScope*> scope_stack_;
+  std::deque<DpiScope> unnamed_scopes_;
   const DpiScope* current_scope_ = nullptr;
   std::vector<ImportFrame> call_chain_;
   // §H.9: the index in call_chain_ at which each open chain starts. The first
