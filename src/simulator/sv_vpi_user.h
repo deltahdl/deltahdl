@@ -1,7 +1,15 @@
-
-
 #ifndef SV_VPI_USER_H
 #define SV_VPI_USER_H
+
+/*
+ * §M.1 -- this is the sv_vpi_user.h include file whose contents Annex M
+ * shows: the SystemVerilog extensions of the VPI, holding the constant
+ * definitions, structure definitions and routine declarations the
+ * SystemVerilog VPI access routines use beyond the base interface of
+ * vpi_user.h, which this file includes as the annex has it. The annex makes
+ * the file a normative one that every SystemVerilog simulator shall provide,
+ * and this simulator provides it under that name.
+ */
 
 #include "simulator/vpi_user.h"
 

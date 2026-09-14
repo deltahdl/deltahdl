@@ -1,6 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <string_view>
 #include <type_traits>
+
+#include "simulator/vpi_include_file.h"
 
 // §M.1 General makes a single normative claim: sv_vpi_user.h is a normative
 // include file that every SystemVerilog simulator shall provide. Where §K.1
@@ -22,7 +25,34 @@
 // for the edge case below.
 #include "simulator/sv_vpi_user.h"
 
+using namespace delta;
+
 namespace {
+
+// §M.1: Annex M shows the contents of the sv_vpi_user.h include file, and
+// the file is a normative one that every SystemVerilog simulator shall
+// provide.
+TEST(SvVpiUserHeaderProvided,
+     TheAnnexShowsANormativeFileEverySimulatorProvides) {
+  EXPECT_EQ(VpiAnnexShowingSvVpiUserH(), "Annex M");
+  EXPECT_EQ(SvVpiUserHFileName(), "sv_vpi_user.h");
+  EXPECT_TRUE(SvVpiUserHIsNormative());
+  EXPECT_TRUE(SvVpiUserHIsProvidedByEverySimulator());
+}
+
+// §M.1: the file the annex names is what this simulator provides, under that
+// name -- src/simulator/sv_vpi_user.h is the file the include above found,
+// and the file it includes, as the annex has it include vpi_user.h, is the
+// base file Annex K shows, whose guard is defined once the SystemVerilog file
+// has been read.
+TEST(SvVpiUserHeaderProvided, TheFileTheAnnexNamesIncludesTheBaseFile) {
+#ifdef VPI_USER_H
+  SUCCEED();
+#else
+  FAIL() << "sv_vpi_user.h, the file Annex M shows, does not include "
+            "vpi_user.h";
+#endif
+}
 
 // Compile-time provision lock: the supplied header must declare the
 // SystemVerilog VPI extension routine with its canonical PLI-typed signature.

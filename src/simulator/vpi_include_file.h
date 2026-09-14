@@ -1,12 +1,15 @@
-// Annexes K and L: the VPI include files. §K.1 has Annex K show the contents
-// of vpi_user.h, and has the file be a normative include file that every
-// SystemVerilog simulator shall provide. §L.1 has Annex L show the contents
-// of vpi_compatibility.h, the file that holds the special macro definitions
-// required to support VPI compatibility mode functionality (§36.12, and
-// especially §36.12.2.1); has vpi_user.h include that file automatically; and
-// therefore has user application code not include it directly. This header
-// states what the annexes say of the two files; the files themselves are
-// src/simulator/vpi_user.h and src/simulator/vpi_compatibility.h.
+// Annexes K, L and M: the VPI include files. §K.1 has Annex K show the
+// contents of vpi_user.h, and has the file be a normative include file that
+// every SystemVerilog simulator shall provide. §L.1 has Annex L show the
+// contents of vpi_compatibility.h, the file that holds the special macro
+// definitions required to support VPI compatibility mode functionality
+// (§36.12, and especially §36.12.2.1); has vpi_user.h include that file
+// automatically; and therefore has user application code not include it
+// directly. §M.1 has Annex M show the contents of sv_vpi_user.h, and has that
+// file too be a normative include file that every SystemVerilog simulator
+// shall provide. This header states what the annexes say of the three files;
+// the files themselves are src/simulator/vpi_user.h,
+// src/simulator/vpi_compatibility.h and src/simulator/sv_vpi_user.h.
 #ifndef DELTA_SIMULATOR_VPI_INCLUDE_FILE_H_
 #define DELTA_SIMULATOR_VPI_INCLUDE_FILE_H_
 
@@ -57,6 +60,18 @@ enum class VpiCompatibilityHIncluder : uint8_t {
 
 bool VpiCompatibilityHIsIncludedBy(VpiCompatibilityHIncluder includer);
 bool VpiCompatibilityHIsIncludedAutomatically();
+
+// §M.1: the annex that shows the contents of sv_vpi_user.h.
+std::string_view VpiAnnexShowingSvVpiUserH();
+
+// §M.1: the file whose contents the annex shows.
+std::string_view SvVpiUserHFileName();
+
+// §M.1: sv_vpi_user.h is a normative include file, not an informative one.
+bool SvVpiUserHIsNormative();
+
+// §M.1: every SystemVerilog simulator shall provide sv_vpi_user.h.
+bool SvVpiUserHIsProvidedByEverySimulator();
 
 }  // namespace delta
 

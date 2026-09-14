@@ -32,4 +32,12 @@ bool VpiCompatibilityHIsIncludedBy(VpiCompatibilityHIncluder includer) {
 
 bool VpiCompatibilityHIsIncludedAutomatically() { return true; }
 
+std::string_view VpiAnnexShowingSvVpiUserH() { return "Annex M"; }
+
+std::string_view SvVpiUserHFileName() { return "sv_vpi_user.h"; }
+
+bool SvVpiUserHIsNormative() { return true; }
+
+bool SvVpiUserHIsProvidedByEverySimulator() { return true; }
+
 }  // namespace delta
