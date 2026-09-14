@@ -6,7 +6,9 @@
 #include "preprocessor/protect_digest_block.h"
 #include "preprocessor/protect_encoding.h"
 #include "preprocessor/protect_envelope.h"
+#include "preprocessor/protect_envelope_output.h"
 #include "preprocessor/protect_key_block.h"
+#include "preprocessor/protect_key_method.h"
 #include "preprocessor/protect_keywords.h"
 #include "preprocessor/protect_license.h"
 #include "preprocessor/protect_processing.h"
@@ -174,6 +176,25 @@ DataKeySpecification DataKeySpecificationTheAnnexPrefers() {
 
 DataKeySpecification DataKeySpecificationThisToolWritesIntoAKeyBlock() {
   return DataKeySpecification::kDataDecryptKey;
+}
+
+std::span<const std::string_view> PragmasExpectedByDigitalEnvelopeInput() {
+  static constexpr std::string_view kExpected[] = {
+      kKeyKeyownerKeyword, kKeyMethodKeyword,       kKeyKeynameKeyword,
+      kDataKeynameKeyword, kBeginEncryptionKeyword, kEndEncryptionKeyword,
+  };
+  return kExpected;
+}
+
+std::span<const std::string_view> PragmasOptionalInDigitalEnvelopeInput() {
+  return PragmasOptionalInToolVendorSecretKeyInput();
+}
+
+bool DataKeyownerShallBeTheOwnerOfTheKeyNameProvided() { return true; }
+
+std::span<const std::string_view> KeyMethodsThisToolSealsAKeyBlockUnder() {
+  static constexpr std::string_view kMethods[] = {kDesCbcMethod, kDataMethod};
+  return kMethods;
 }
 
 }  // namespace delta

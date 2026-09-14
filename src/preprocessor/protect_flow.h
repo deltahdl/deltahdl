@@ -198,4 +198,29 @@ DataKeySpecification DataKeySpecificationNeedingTheKeyAtTheDecryptingTool();
 DataKeySpecification DataKeySpecificationTheAnnexPrefers();
 DataKeySpecification DataKeySpecificationThisToolWritesIntoAKeyBlock();
 
+// §O.5.1: the pragmas expected when using digital envelopes -- key_keyowner
+// naming the recipient's owner identity, key_method naming an encryption
+// scheme, key_keyname naming the provider's key, data_keyname naming the
+// provider's key, and begin and end surrounding the regions to be
+// encrypted -- and the further ones the input may include, the eight
+// §O.3.1's input may: the author's name and information, the key owner of
+// the name provided, which shall be the owner of that key, a method
+// appropriate for the given key name where the default rounds,
+// initialization vector or key width are not what is wanted, a different
+// encoding, a digest block where a message authorization code is wanted,
+// and a decryption or a run-time licence where the author wants one.
+std::span<const std::string_view> PragmasExpectedByDigitalEnvelopeInput();
+std::span<const std::string_view> PragmasOptionalInDigitalEnvelopeInput();
+bool DataKeyownerShallBeTheOwnerOfTheKeyNameProvided();
+
+// §O.5.1 as this tool has it: the scheme key_method names is the one the
+// key_block is sealed under, and this tool seals a key block under
+// §34.5.11's required des-cbc where the input names it and under its own
+// cipher otherwise, an input naming a scheme it does not provide drawing
+// §34.5.24.2's report. key_keyowner and key_keyname reach the recipient's
+// key among the keys the sender's run holds, and data_keyname names the
+// symmetric key the design is under, which the run makes where it holds
+// none under that name.
+std::span<const std::string_view> KeyMethodsThisToolSealsAKeyBlockUnder();
+
 }  // namespace delta
