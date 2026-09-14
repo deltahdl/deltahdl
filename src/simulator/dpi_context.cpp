@@ -92,4 +92,47 @@ bool DpiImportContextMayChangeAcrossBoundary(bool chain_has_context_property) {
   return chain_has_context_property;
 }
 
+bool DpiScopeAndContextAreEquivalent() { return true; }
+
+bool DpiBehaviorIsDefinedForChainMember(bool chain_is_context) {
+  return chain_is_context;
+}
+
+DpiUserDataStorage DpiUserDataStorageOf(bool related_imports_use_one_key) {
+  return related_imports_use_one_key ? DpiUserDataStorage::kShared
+                                     : DpiUserDataStorage::kUnique;
+}
+
+bool DpiUserKeyGenerationIsSafe(DpiUserKeyOrigin origin) {
+  return origin == DpiUserKeyOrigin::kAddressOfStaticCSymbol;
+}
+
+bool DpiUserDataStorageIsSharedAcrossContexts() { return false; }
+
+uint32_t DpiPutUserDataCallsSharingAnAreaAcross(uint32_t context_count) {
+  // §H.9.3: one call per context, the pointer being stored individually for
+  // each of the contexts in question.
+  return context_count;
+}
+
+bool DpiSvSetScopeIsRequiredBeforeExportCall(
+    bool export_called_while_executing_import) {
+  return !export_called_while_executing_import;
+}
+
+bool DpiDeclarativeScopeHasInstanceScopeHandle(DpiDeclarativeScope scope) {
+  return scope != DpiDeclarativeScope::kPackage &&
+         scope != DpiDeclarativeScope::kCompilationUnit;
+}
+
+bool DpiUserDataIsDiscernibleFromError(const void* user_data) {
+  return user_data != nullptr;
+}
+
+bool DpiCallerInfoFileNameIsValid(bool sv_function_called_since) {
+  return !sv_function_called_since;
+}
+
+bool DpiApplicationMayModifyOrFreeCallerInfoFileName() { return false; }
+
 }  // namespace delta

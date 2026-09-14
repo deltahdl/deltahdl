@@ -150,6 +150,79 @@ bool DpiBehaviorIsDefinedAcross(DpiBoundaryCrossing crossing);
 // the context property, and a chain without it has no context to change.
 bool DpiImportContextMayChangeAcrossBoundary(bool chain_has_context_property);
 
+// §H.9.3: the terms scope and context are equivalent for DPI tasks and
+// functions, scope being the one the subroutine names use for consistency
+// with the rest of SystemVerilog.
+bool DpiScopeAndContextAreEquivalent();
+
+// §H.9.3: the behavior of the functions that retrieve and manipulate the
+// current operational scope is undefined when they are invoked by an entity
+// other than a member of a DPI context call chain, and that of an exported
+// subroutine is undefined when it is invoked by a member of a chain that
+// lacks the context characteristic. Both are defined for a member of a
+// context chain, which DpiRuntime::InContextCallChain answers for the
+// current point of execution.
+bool DpiBehaviorIsDefinedForChainMember(bool chain_is_context);
+
+// §H.9.3: the "put" and "get" user data functions set data specific to C
+// models into the simulator for later retrieval, shared or unique per
+// function under the control of a user-defined key: a related set of context
+// imports using one key share their storage, and an import using a key of
+// its own has unique storage.
+enum class DpiUserDataStorage : uint8_t { kShared, kUnique };
+
+DpiUserDataStorage DpiUserDataStorageOf(bool related_imports_use_one_key);
+
+// §H.9.3: a unique key has to be unique from every key any C code in the
+// simulation could use, completely unknown C code included, so taking the
+// address of a static C symbol -- a function or an object of static
+// storage -- is what is suggested for generating one; generating keys from
+// arbitrary integers is not a safe practice.
+enum class DpiUserKeyOrigin : uint8_t {
+  kAddressOfStaticCSymbol,
+  kArbitraryInteger,
+};
+
+bool DpiUserKeyGenerationIsSafe(DpiUserKeyOrigin origin);
+
+// §H.9.3: it is never possible to share user data storage across different
+// contexts: a module declaring a context import and instantiated more than
+// once has the import execute under a different svScope per instance, and no
+// two of those executing instances can share user data through the storage
+// svPutUserData provides. A user sharing a data area across contexts
+// allocates the common area and stores its pointer for each context in
+// question with one svPutUserData call per context, a common key
+// notwithstanding, because the data is associated with the individual
+// scopes.
+bool DpiUserDataStorageIsSharedAcrossContexts();
+uint32_t DpiPutUserDataCallsSharingAnAreaAcross(uint32_t context_count);
+
+// §H.9.3: svSetScope shall be called before calling an export function,
+// unless the export is called while executing an import, in which case the
+// export inherits the scope of the surrounding import, known as the "default
+// scope".
+bool DpiSvSetScopeIsRequiredBeforeExportCall(
+    bool export_called_while_executing_import);
+
+// §H.9.3: svGetScopeFromName retrieves the svScope of the instance scope of
+// an arbitrary function declaration, which can be a module, program,
+// interface or generate scope. A package and the compilation unit, the other
+// two scopes §H.9.2 lets a subroutine be declared in, are not instance
+// scopes with such a handle.
+bool DpiDeclarativeScopeHasInstanceScopeHandle(DpiDeclarativeScope scope);
+
+// §H.9.3: svGetUserData returns NULL for every error case and where no prior
+// svPutUserData stored a pointer, so a user data value of 0 is indiscernible
+// from an error status when retrieved, and its use is not suggested.
+bool DpiUserDataIsDiscernibleFromError(const void* user_data);
+
+// §H.9.3: the file name svGetCallerInfo provides is a string owned by the
+// SystemVerilog implementation, valid only until the next call to any
+// SystemVerilog function, which an application shall neither modify nor
+// free.
+bool DpiCallerInfoFileNameIsValid(bool sv_function_called_since);
+bool DpiApplicationMayModifyOrFreeCallerInfoFileName();
+
 }  // namespace delta
 
 #endif  // DELTA_SIMULATOR_DPI_CONTEXT_H_
