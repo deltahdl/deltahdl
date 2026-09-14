@@ -702,6 +702,31 @@ SvActualDimension DpiNormalizedRange(SvActualDimension declared);
 std::vector<SvActualDimension> DpiRangesForAccessing(
     const std::vector<SvActualDimension>& declared, bool formal_is_open_array);
 
+// §H.11.1: two alternatives for working with 2-state packed data. A DPI
+// formal argument can be of a C-compatible type -- the classical int-to-int
+// correspondence of Table H.1, or an int unsigned an arbitrary 2-state bit
+// vector actual is associated with by the caller's coercion (§H.6) -- or a
+// packed formal of the vector's width, passed as the canonical const
+// svBitVecVal* of §H.7.7, the portable technique for an arbitrary width.
+// The canonical technique is less efficient than a C-compatible formal, and
+// required once a 2-state vector exceeds 64 bits.
+enum class DpiTwoStateTechnique : uint8_t { kCCompatibleFormal, kCanonical };
+
+// Whether a 2-state vector of the width can be handled by a C-compatible
+// formal: it can up to 64 bits, beyond which the canonical technique is
+// required.
+bool DpiCCompatibleFormalCanHoldTwoStateVector(uint32_t width);
+
+// The technique required for a 2-state vector of the width: the canonical
+// one beyond 64 bits, either up to it -- the C-compatible one, being the
+// more efficient, where the choice is open.
+DpiTwoStateTechnique DpiTechniqueRequiredForTwoStateVector(uint32_t width);
+
+// Whether one technique is more efficient than the other: a C-compatible
+// formal is more efficient than the canonical technique.
+bool DpiTechniqueIsMoreEfficient(DpiTwoStateTechnique technique,
+                                 DpiTwoStateTechnique other);
+
 // §H.10.3 with §H.7.8 and §H.11: a packed array member of an unpacked
 // aggregate is declared in the C-compatible struct as an inout formal of
 // its type would be, no direction qualifying it, in the normalized ranges

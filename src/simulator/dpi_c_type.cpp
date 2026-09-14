@@ -607,6 +607,22 @@ std::string_view DpiCTypeOfStringArray(Direction /*direction*/) {
   return "const char**";
 }
 
+bool DpiCCompatibleFormalCanHoldTwoStateVector(uint32_t width) {
+  return width <= kDpiInlineValueBits;
+}
+
+DpiTwoStateTechnique DpiTechniqueRequiredForTwoStateVector(uint32_t width) {
+  return DpiCCompatibleFormalCanHoldTwoStateVector(width)
+             ? DpiTwoStateTechnique::kCCompatibleFormal
+             : DpiTwoStateTechnique::kCanonical;
+}
+
+bool DpiTechniqueIsMoreEfficient(DpiTwoStateTechnique technique,
+                                 DpiTwoStateTechnique other) {
+  return technique == DpiTwoStateTechnique::kCCompatibleFormal &&
+         other == DpiTwoStateTechnique::kCanonical;
+}
+
 DpiArrayRanges DpiRangesUsedForAccessing(bool formal_is_open_array) {
   return formal_is_open_array ? DpiArrayRanges::kOfTheActual
                               : DpiArrayRanges::kNormalized;
