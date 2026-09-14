@@ -15,6 +15,7 @@
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/net.h"
+#include "simulator/probabilistic_distribution.h"
 #include "simulator/process.h"
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"
@@ -30,15 +31,26 @@ bool IsPrngSysCall(std::string_view name) {
 Logic4Vec EvalPrngCall(const Expr* expr, SimContext& ctx, Arena& arena,
                        std::string_view name) {
   if (name == "$random") {
-    // §20.14.1: an optional seed selects the stream, so different seeds yield
-    // different sequences and a given seed replays identically. Reseed the
-    // active generator from the argument before drawing, mirroring $urandom.
+    // §20.14 with Table N.1: $random is rtl_dist_uniform(seed, LONG_MIN,
+    // LONG_MAX), the §N.2 algorithm drawn over the whole 32-bit range, so its
+    // values are the standard's and not a generator of this tool's choosing;
+    // it drew from the $urandom stream, which no seed of the annex's selects.
+    // §20.14.1: the seed argument selects the stream, so different seeds yield
+    // different sequences and a given seed replays identically; the seed the
+    // draw advanced goes back to the variable, and the seedless form continues
+    // from the stream the last seed selected.
+    int32_t* seed = ctx.RandomSeed();
     if (!expr->args.empty()) {
-      ctx.SeedUrandom(static_cast<uint32_t>(
-          EvalExpr(expr->args[0], ctx, arena).ToUint64()));
+      *seed =
+          static_cast<int32_t>(EvalExpr(expr->args[0], ctx, arena).ToUint64());
     }
     // The returned 32-bit number is a signed integer (it may be negative).
-    return MakeLogic4VecVal(arena, 32, ctx.Random32());
+    int32_t result = RtlDistRandom(seed);
+    if (!expr->args.empty()) {
+      WriteBackDistributionSeed(expr->args[0], *seed, ctx, arena);
+    }
+    return MakeLogic4VecVal(
+        arena, 32, static_cast<uint64_t>(static_cast<uint32_t>(result)));
   }
   if (name == "$urandom") {
     // An optional seed (any integral expression) selects the sequence; the

@@ -8,11 +8,12 @@
 // touch nothing SimContext stores.
 //
 // The generator SimContext does hold -- the one seeded from its constructor's
-// seed argument, which $random and $urandom draw from when no process is
-// running -- stays with the rest of the context in
-// src/simulator/sim_context.h, and so do ActiveRng, DrawSeedForChild,
-// Random32, Urandom32, SeedUrandom and UrandomRange, each of which chooses
-// between that generator and the running process's stream.
+// seed argument, which $urandom draws from when no process is running --
+// stays with the rest of the context in src/simulator/sim_context.h, and so
+// do ActiveRng, DrawSeedForChild, Urandom32, SeedUrandom and UrandomRange,
+// each of which chooses between that generator and the running process's
+// stream. $random draws from none of them: Table N.1 computes it with the
+// §N.2 rtl_dist_uniform over the seed SimContext::RandomSeed holds.
 
 #include <cstdint>
 #include <random>

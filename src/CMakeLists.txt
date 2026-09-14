@@ -219,6 +219,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/eval_array_assoc.cpp
     simulator/eval_string.cpp
     simulator/eval_math.cpp
+    simulator/probabilistic_distribution.cpp
     simulator/eval_fileio.cpp
     simulator/eval_format.cpp
     simulator/stmt_exec.cpp

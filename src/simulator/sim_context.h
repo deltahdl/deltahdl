@@ -462,7 +462,11 @@ class SimContext : public DeclaredNameTables, public RandomStability {
     return stochastic_queues_;
   }
 
-  int32_t Random32();
+  // §20.14.1 with Table N.1: the seed of the $random stream, the 32-bit state
+  // rtl_dist_uniform advances. A call with a seed argument sets it and a call
+  // without one continues from it, so the stream the last seed selected is the
+  // one the seedless form draws from.
+  int32_t* RandomSeed() { return &random_seed_; }
   uint32_t Urandom32();
   // Reseed the generator so a given seed always replays the same sequence.
   void SeedUrandom(uint32_t seed);
@@ -786,6 +790,7 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   Arena& arena_;
   DiagEngine& diag_;
   std::mt19937 rng_;
+  int32_t random_seed_ = 0;
   std::unordered_map<std::string_view, Variable*> variables_;
   std::unordered_map<std::string_view, Net*> nets_;
   std::vector<Scope> scope_stack_;

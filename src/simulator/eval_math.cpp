@@ -8,6 +8,7 @@
 #include "common/types.h"
 #include "parser/ast.h"
 #include "simulator/evaluation.h"
+#include "simulator/probabilistic_distribution.h"
 #include "simulator/sim_context.h"
 
 namespace delta {
@@ -321,8 +322,10 @@ static int32_t RtlDistUniformFullRange(int32_t* seed, int32_t start,
 
 // §N.2 rtl_dist_uniform(): rounds toward the interval and clamps the result so
 // it stays inside [start, end], handling the LONG_MAX and LONG_MIN edges the
-// way the reference does (its long is the 32-bit integer modeled here).
-static int32_t RtlDistUniform(int32_t* seed, int32_t start, int32_t end) {
+// way the reference does (its long is the 32-bit integer modeled here). It is
+// declared in simulator/probabilistic_distribution.h for $random, which Table
+// N.1 computes with it over the whole range.
+int32_t RtlDistUniform(int32_t* seed, int32_t start, int32_t end) {
   if (start >= end) return start;
   if (end != INT32_MAX) return RtlDistUniformGeneral(seed, start, end);
   if (start != INT32_MIN) return RtlDistUniformHighEdge(seed, start, end);
@@ -360,9 +363,10 @@ static int32_t RtlDistErlang(int32_t* seed, int32_t k, int32_t mean) {
 // value comes back. When the seed names a variable, the advanced LCG state
 // produced by the §N.2 algorithm is written back, so consecutive calls walk the
 // stream while a run that re-initializes the seed to its original value replays
-// identically.
-static void WriteBackSeed(const Expr* seed_arg, int32_t seed, SimContext& ctx,
-                          Arena& arena) {
+// identically. Declared in simulator/probabilistic_distribution.h, since
+// $random's seed is written back the same way.
+void WriteBackDistributionSeed(const Expr* seed_arg, int32_t seed,
+                               SimContext& ctx, Arena& arena) {
   if (seed_arg->kind != ExprKind::kIdentifier) return;
   Variable* var = ctx.FindVariable(seed_arg->text);
   if (var == nullptr) return;
@@ -471,7 +475,7 @@ static Logic4Vec EvalDistSysCall(const Expr* expr, SimContext& ctx,
     result = RtlDistErlang(&seed, arg(1), arg(2));
   }
 
-  WriteBackSeed(expr->args[0], seed, ctx, arena);
+  WriteBackDistributionSeed(expr->args[0], seed, ctx, arena);
   return MakeLogic4VecVal(arena, 32,
                           static_cast<uint64_t>(static_cast<uint32_t>(result)));
 }

@@ -652,8 +652,6 @@ uint32_t SimContext::DrawSeedForChild() {
   return static_cast<uint32_t>(ActiveRng()());
 }
 
-int32_t SimContext::Random32() { return static_cast<int32_t>(ActiveRng()()); }
-
 uint32_t SimContext::Urandom32() {
   return static_cast<uint32_t>(ActiveRng()());
 }
