@@ -50,8 +50,7 @@ TEST(DpiCompatibility, TheSv31aDefinitionsAreOptionalAndBindingMayFail) {
 // §H.14.1 under the run: a design declaring one import with "DPI" and one
 // with "DPI-C" registers the first with the SV3.1a reference semantics and
 // the second with the canonical ones, the choice being per declaration.
-TEST(DpiCompatibilityLevel,
-     ADesignsDeclarationsSelectTheirSemanticsPerFunction) {
+TEST(DpiCompatibility, ADesignsDeclarationsSelectTheirSemanticsPerFunction) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

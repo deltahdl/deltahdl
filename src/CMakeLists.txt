@@ -269,6 +269,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/udp_eval.cpp
     simulator/sdf_parser.cpp
     simulator/svdpi.cpp
+    simulator/svdpi_sv31a.cpp
     simulator/sv_vpi_user.cpp
     synthesizer/aig.cpp
     synthesizer/synth_lower.cpp
