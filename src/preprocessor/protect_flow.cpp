@@ -119,4 +119,16 @@ bool ToolsKeyDatabaseIsTheKeysGivenToTheRun() { return true; }
 
 bool ToolDerivesADecryptionKeyFromTheAuthorsEncryptionKey() { return false; }
 
+std::span<const std::string_view> PragmasRequiredByIpAuthorSecretKeyInput() {
+  return PragmasRequiredByToolVendorSecretKeyInput();
+}
+
+std::span<const std::string_view> PragmasOptionalInIpAuthorSecretKeyInput() {
+  return PragmasOptionalInToolVendorSecretKeyInput();
+}
+
+bool IpAuthorSecretKeyDataMethodNamesAPublicPrivateScheme() { return true; }
+
+bool ToolProvidesAPublicPrivateEncryptionScheme() { return false; }
+
 }  // namespace delta

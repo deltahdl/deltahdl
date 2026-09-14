@@ -131,4 +131,23 @@ bool IpAuthorsProvideTheirPrivateKeysToTheToolsDatabase();
 bool ToolsKeyDatabaseIsTheKeysGivenToTheRun();
 bool ToolDerivesADecryptionKeyFromTheAuthorsEncryptionKey();
 
+// §O.4.1: the pragmas the encryption input of the IP author secret key
+// system requires and may include are the ones §O.3.1 lists, with two
+// differences in what they carry: data_keyname names the provider's key,
+// and data_method names a public/private encryption scheme beside its method
+// specifier, a method appropriate for the key where the default rounds,
+// initialization vector or key width are not what is wanted.
+std::span<const std::string_view> PragmasRequiredByIpAuthorSecretKeyInput();
+std::span<const std::string_view> PragmasOptionalInIpAuthorSecretKeyInput();
+bool IpAuthorSecretKeyDataMethodNamesAPublicPrivateScheme();
+
+// §O.4.1 as this tool has it: the scheme the input's data_method names is
+// one this tool would encrypt under, and this tool provides no public/private
+// scheme -- §34.5.11's table names rsa, elgamal and pgp-rsa, and this tool
+// provides des-cbc and its own symmetric cipher -- so
+// an input naming one draws the report §34.5.11.2 has for an algorithm the
+// implementation does not provide, and the author's key stands in the
+// tool's database as §O.4 has it.
+bool ToolProvidesAPublicPrivateEncryptionScheme();
+
 }  // namespace delta
