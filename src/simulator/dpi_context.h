@@ -25,6 +25,7 @@
 #ifndef DELTA_SIMULATOR_DPI_CONTEXT_H_
 #define DELTA_SIMULATOR_DPI_CONTEXT_H_
 
+#include <array>
 #include <cstdint>
 #include <optional>
 #include <string_view>
@@ -99,6 +100,55 @@ std::string_view DpiContextOfExportCalledFromImport(
 // caller's instantiated scope until svSetScope is invoked.
 uint32_t DpiExportInstanceCount(
     const std::vector<std::string_view>& importing_scopes);
+
+// §H.9.2: the declarative scopes a DPI imported or exported task or function
+// can be declared in, in the clause's order.
+enum class DpiDeclarativeScope : uint8_t {
+  kModule,
+  kProgram,
+  kInterface,
+  kPackage,
+  kCompilationUnit,
+  kGenerate,
+};
+
+std::array<DpiDeclarativeScope, 6> DpiDeclarativeScopes();
+
+// §H.9.2: the context of an imported or exported subroutine corresponds to
+// the fully qualified name of the subroutine minus the subroutine name
+// itself: top.i1_m.f has the context top.i1_m, and pkg::f the context pkg. A
+// name with no qualification is the compilation unit's, whose context is
+// empty.
+std::string_view DpiContextOfQualifiedName(std::string_view qualified_name);
+
+// §H.9.2: the context property is transitive through imported and exported
+// context subroutines declared in one scope, so an import running in a
+// context can call an export available in that same context without any use
+// of svSetScope. An export in another context is reached through svSetScope
+// (§35.5.3).
+bool DpiExportIsCallableWithoutSvSetScope(std::string_view import_context,
+                                          std::string_view export_context);
+
+// §H.9.2: the ways control passes across the boundary between SystemVerilog
+// and a DPI import call chain with the context property.
+enum class DpiBoundaryCrossing : uint8_t {
+  // A call of an export from the chain, and the export's return.
+  kExportCallAndReturn,
+  // C code unwinding across the boundary by setjmp and longjmp, circumventing
+  // the SystemVerilog exports it passes.
+  kUnwindingBySetjmpAndLongjmp,
+};
+
+// §H.9.2: whether user code's behavior is defined for a crossing. Across a
+// call and return the import's context is potentially set or reset by the
+// rules of §35.5.3; for C code that unwinds across the boundary it is
+// undefined.
+bool DpiBehaviorIsDefinedAcross(DpiBoundaryCrossing crossing);
+
+// §H.9.2: whether the value of the import's context is potentially set or
+// reset when control passes across the boundary: it is where the chain has
+// the context property, and a chain without it has no context to change.
+bool DpiImportContextMayChangeAcrossBoundary(bool chain_has_context_property);
 
 }  // namespace delta
 

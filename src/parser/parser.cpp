@@ -548,6 +548,22 @@ void Parser::ReportUnexpectedTopLevelToken() {
   Consume();
 }
 
+bool Parser::TryParseCuImportOrExportDecl(CompilationUnit* unit) {
+  const bool kIsImport = Check(TokenKind::kKwImport);
+  if (!kIsImport && !Check(TokenKind::kKwExport)) return false;
+  std::vector<ModuleItem*> items;
+  if (kIsImport) {
+    ParseImportDecl(items);
+  } else {
+    // §H.9.2 lists compilation-unit scope among the scopes a DPI export can be
+    // declared in, and ParseExportDecl is what reads one wherever it stands,
+    // the package export declaration of §26.6 beside it.
+    ParseExportDecl(items);
+  }
+  for (auto* item : items) unit->cu_items.push_back(item);
+  return true;
+}
+
 bool Parser::TryParseCuScopeItem(CompilationUnit* unit) {
   if (Check(TokenKind::kKwParameter) || Check(TokenKind::kKwLocalparam)) {
     std::vector<ModuleItem*> items;
@@ -558,12 +574,7 @@ bool Parser::TryParseCuScopeItem(CompilationUnit* unit) {
     return true;
   }
 
-  if (Check(TokenKind::kKwImport)) {
-    std::vector<ModuleItem*> items;
-    ParseImportDecl(items);
-    for (auto* item : items) unit->cu_items.push_back(item);
-    return true;
-  }
+  if (TryParseCuImportOrExportDecl(unit)) return true;
 
   if (Check(TokenKind::kKwLet)) {
     unit->cu_items.push_back(ParseLetDecl());

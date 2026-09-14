@@ -1,6 +1,8 @@
 #include "simulator/dpi_context.h"
 
 #include <algorithm>
+#include <array>
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <string_view>
@@ -53,6 +55,41 @@ uint32_t DpiExportInstanceCount(
   std::sort(distinct.begin(), distinct.end());
   distinct.erase(std::unique(distinct.begin(), distinct.end()), distinct.end());
   return static_cast<uint32_t>(distinct.size());
+}
+
+std::array<DpiDeclarativeScope, 6> DpiDeclarativeScopes() {
+  return {
+      DpiDeclarativeScope::kModule,          DpiDeclarativeScope::kProgram,
+      DpiDeclarativeScope::kInterface,       DpiDeclarativeScope::kPackage,
+      DpiDeclarativeScope::kCompilationUnit, DpiDeclarativeScope::kGenerate};
+}
+
+std::string_view DpiContextOfQualifiedName(std::string_view qualified_name) {
+  // §H.9.2: minus the subroutine name itself, which follows the last of the
+  // hierarchical dot and the package's scope resolution operator.
+  const size_t kDot = qualified_name.rfind('.');
+  const size_t kColons = qualified_name.rfind("::");
+  if (kDot == std::string_view::npos && kColons == std::string_view::npos) {
+    return {};
+  }
+  if (kColons != std::string_view::npos &&
+      (kDot == std::string_view::npos || kColons > kDot)) {
+    return qualified_name.substr(0, kColons);
+  }
+  return qualified_name.substr(0, kDot);
+}
+
+bool DpiExportIsCallableWithoutSvSetScope(std::string_view import_context,
+                                          std::string_view export_context) {
+  return import_context == export_context;
+}
+
+bool DpiBehaviorIsDefinedAcross(DpiBoundaryCrossing crossing) {
+  return crossing == DpiBoundaryCrossing::kExportCallAndReturn;
+}
+
+bool DpiImportContextMayChangeAcrossBoundary(bool chain_has_context_property) {
+  return chain_has_context_property;
 }
 
 }  // namespace delta
