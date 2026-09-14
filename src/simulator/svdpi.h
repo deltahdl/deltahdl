@@ -40,8 +40,9 @@ extern "C" {
 #define sv_z 2 /* the 4-state scalar z */
 #define sv_x 3 /* the 4-state scalar x */
 
-/* the one type a bit scalar and a logic scalar share */
-typedef unsigned char svScalar;
+/* the one type a bit scalar and a logic scalar share, the uint8_t of
+ * Annex I.3 */
+typedef uint8_t svScalar;
 
 typedef svScalar svBit;
 typedef svScalar svLogic;
