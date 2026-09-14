@@ -205,6 +205,8 @@ void RegisterModuleDpiImports(const RtlirModule* mod, SimContext& ctx) {
       // as the unsigned C type; the parser has already settled the default
       // signedness of a type that named neither qualifier.
       formal.is_unsigned = !arg.data_type.is_signed;
+      // §H.7.5: a struct or union crosses under the name of its type.
+      formal.type_name = arg.data_type.type_name;
       func.args.push_back(formal);
     }
     dpi.RegisterImport(std::move(func));

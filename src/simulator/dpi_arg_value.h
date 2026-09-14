@@ -109,6 +109,11 @@ struct DpiArg {
   // type the flag changes nothing on the C side, the table having no signed
   // row for it to differ from.
   bool is_unsigned = false;
+  // §H.7.5 with §H.10.2: the name of the type a struct or union formal was
+  // declared with, which is the C typedef the aggregate crosses under -- the
+  // example's `pair i2` is `const pair* i2` in C. Empty for a formal whose
+  // kind names its C type itself.
+  std::string_view type_name;
 };
 
 struct DpiArgValue {

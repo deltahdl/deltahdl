@@ -28,10 +28,14 @@ namespace delta {
 //     representation, a const svBitVecVal* or const svLogicVecVal* (§H.8.4);
 //   - an inout or output, open arrays apart, is always passed by reference
 //     (§H.8.8), a pointer to the C type of the value -- a packed array's
-//     svBitVecVal* or svLogicVecVal*, a small type's T*.
+//     svBitVecVal* or svLogicVecVal*, a small type's T*;
+//   - a struct or union named by its type (DpiArg::type_name) is passed by
+//     reference to the C-compatible object of that type (§H.7.5, §H.8.4), a
+//     const T* for an input and a T* otherwise -- §H.10.2's `pair i2` is
+//     `const pair* i2`.
 // integer and time are packed 4-state types (§H.7.3) and so cross as
 // svLogicVecVal; a reg is a logic (Table H.1). An empty string is returned
-// for a kind the DPI does not pass.
+// for a kind the DPI does not pass, an unnamed struct or union among them.
 std::string DpiCTypeOfFormal(const DpiArg& formal, bool open_array);
 
 // §H.8.8: an inout or output argument, open arrays excepted, is always

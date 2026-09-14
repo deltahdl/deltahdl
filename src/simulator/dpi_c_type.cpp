@@ -131,6 +131,14 @@ std::string DpiCTypeOfFormal(const DpiArg& formal, bool open_array) {
     if (kChunk.empty()) return "";
     return (kInput ? "const " : "") + kChunk + "*";
   }
+  if ((formal.type == DataTypeKind::kStruct ||
+       formal.type == DataTypeKind::kUnion) &&
+      !formal.type_name.empty()) {
+    // §H.7.5 and §H.8.4: a struct or union is passed by reference to the
+    // C-compatible object of the type it was declared with, const for an
+    // input -- §H.10.2's `pair i2` being `const pair* i2`.
+    return (kInput ? "const " : "") + std::string(formal.type_name) + "*";
+  }
   const std::string kSmall = SmallCType(formal.type, formal.is_unsigned);
   if (kSmall.empty()) return "";
   // §H.8.7: an input of a small type is passed by value with the const
