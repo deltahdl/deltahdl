@@ -256,7 +256,12 @@ bool TryParseLibArg(std::string_view arg, int& i, int argc,
   if (TakeValue(arg, "--precompile-into", cur, opts.precompile_library)) {
     return true;
   }
-  return TakeValue(arg, "--precompile-out", cur, opts.precompile_output);
+  if (TakeValue(arg, "--precompile-out", cur, opts.precompile_output)) {
+    return true;
+  }
+  // Annex J.3: -sv_root receives a single directory path name, the root the
+  // annex's relative path names are prepended with from then on.
+  return TakeValue(arg, "-sv_root", cur, opts.sv_root);
 }
 
 bool TryParseDefineArg(std::string_view arg, int& i, int argc,

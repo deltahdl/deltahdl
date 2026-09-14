@@ -2,6 +2,10 @@
 
 #include <array>
 #include <cstdint>
+#include <filesystem>
+#include <string>
+#include <string_view>
+#include <system_error>
 
 namespace delta {
 
@@ -48,5 +52,26 @@ bool ForeignCodeUseCaseMayUseBootstrapFile(ForeignCodeUseCase /*use_case*/) {
 }
 
 bool ForeignCodeSwitchNamesAreRequirements() { return false; }
+
+std::string_view ForeignCodeRootSwitch() { return "-sv_root"; }
+
+void ForeignCodeLocator::SetRoot(std::string_view directory) {
+  root_ = std::string(directory);
+}
+
+bool ForeignCodeLocator::HasRoot() const { return !root_.empty(); }
+
+std::string ForeignCodeLocator::Root() const {
+  if (HasRoot()) return root_;
+  std::error_code ec;
+  const std::filesystem::path kCwd = std::filesystem::current_path(ec);
+  return ec ? std::string(".") : kCwd.string();
+}
+
+std::string ForeignCodeLocator::Resolve(std::string_view path) const {
+  const std::filesystem::path kPath(path);
+  if (kPath.is_absolute()) return kPath.string();
+  return (std::filesystem::path(Root()) / kPath).string();
+}
 
 }  // namespace delta

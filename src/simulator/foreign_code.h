@@ -8,6 +8,8 @@
 
 #include <array>
 #include <cstdint>
+#include <string>
+#include <string_view>
 
 namespace delta {
 
@@ -81,6 +83,31 @@ ForeignCodeInclusionMethod ForeignCodeMethodOftenCovering(
     ForeignCodeUseCase use_case);
 bool ForeignCodeUseCaseMayUseBootstrapFile(ForeignCodeUseCase use_case);
 bool ForeignCodeSwitchNamesAreRequirements();
+
+// §J.3: every path name the annex specifies is intended to be location
+// independent, which the switch -sv_root accomplishes: it receives a single
+// directory path name as its value, which is then prepended to any relative
+// path name specified. In the absence of the switch, or for relative file
+// names processed before any -sv_root specification, the user's current
+// working directory is the default. A locator resolves each path name as it
+// is processed, against the root in force at that moment.
+std::string_view ForeignCodeRootSwitch();
+
+class ForeignCodeLocator {
+ public:
+  // The directory a -sv_root specification gave, replacing any earlier one.
+  void SetRoot(std::string_view directory);
+  bool HasRoot() const;
+  // The root relative path names are prepended with: the directory set, or
+  // the user's current working directory while none is.
+  std::string Root() const;
+  // `path` as an absolute path name: itself where it is absolute already,
+  // and the root followed by it where it is relative.
+  std::string Resolve(std::string_view path) const;
+
+ private:
+  std::string root_;
+};
 
 }  // namespace delta
 

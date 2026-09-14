@@ -49,6 +49,10 @@ struct CliOptions {
   // form has to live somewhere.
   std::string precompile_library;
   std::string precompile_output;
+  // Annex J.3: the directory -sv_root gives, prepended to every relative
+  // path name the annex's switches specify after it; empty while none was
+  // given, the user's current working directory then being the default.
+  std::string sv_root;
 
   std::vector<std::pair<std::string, std::string>> defines;
   uint64_t max_time = 0;
