@@ -5,15 +5,16 @@
 // §18.14.2 thread stability gives every process one, so ObjectRng,
 // SeedObjectRng and the §18.13.4/§18.13.5 get_randstate/set_randstate pair
 // read and write the stream on the ClassObject or the Process handed in and
-// touch nothing SimContext stores.
+// touch nothing SimContext stores. The one state kept here is the seed of
+// $random, which is no generator at all: Table N.1 computes $random with the
+// §N.2 rtl_dist_uniform, whose whole state is the 32-bit seed it advances.
 //
 // The generator SimContext does hold -- the one seeded from its constructor's
 // seed argument, which $urandom draws from when no process is running --
 // stays with the rest of the context in src/simulator/sim_context.h, and so
 // do ActiveRng, DrawSeedForChild, Urandom32, SeedUrandom and UrandomRange,
 // each of which chooses between that generator and the running process's
-// stream. $random draws from none of them: Table N.1 computes it with the
-// §N.2 rtl_dist_uniform over the seed SimContext::RandomSeed holds.
+// stream. $random draws from none of them.
 
 #include <cstdint>
 #include <random>
@@ -61,6 +62,15 @@ class RandomStability {
   // §18.13.5 set_randstate(): the same install for the RNG owned by a process
   // (the state given to the process's set_randstate() method).
   void SetRandState(Process* proc, const std::string& state);
+
+  // §20.14.1 with Table N.1: the seed of the $random stream, the 32-bit state
+  // rtl_dist_uniform advances. A call with a seed argument sets it and a call
+  // without one continues from it, so the stream the last seed selected is the
+  // one the seedless form draws from.
+  int32_t* RandomSeed() { return &random_seed_; }
+
+ private:
+  int32_t random_seed_ = 0;
 };
 
 }  // namespace delta
