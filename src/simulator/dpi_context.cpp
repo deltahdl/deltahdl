@@ -135,4 +135,24 @@ bool DpiCallerInfoFileNameIsValid(bool sv_function_called_since) {
 
 bool DpiApplicationMayModifyOrFreeCallerInfoFileName() { return false; }
 
+bool DpiOpenArrayHandleIsInterchangeableWithVpiHandle() { return false; }
+
+std::array<std::string_view, 10> DpiVpiRoutinesCallableWithoutContext() {
+  return {"vpi_printf",       "vpi_vprintf",     "vpi_flush",
+          "vpi_mcd_open",     "vpi_mcd_close",   "vpi_mcd_name",
+          "vpi_mcd_printf",   "vpi_mcd_vprintf", "vpi_mcd_flush",
+          "vpi_get_vlog_info"};
+}
+
+bool DpiVpiRoutineRequiresContext(std::string_view vpi_routine) {
+  const std::array<std::string_view, 10> kExceptions =
+      DpiVpiRoutinesCallableWithoutContext();
+  return std::find(kExceptions.begin(), kExceptions.end(), vpi_routine) ==
+         kExceptions.end();
+}
+
+bool DpiVpiActivityIsAvailableFromContextImport(DpiVpiActivity activity) {
+  return activity == DpiVpiActivity::kIterateTopLevelModules;
+}
+
 }  // namespace delta

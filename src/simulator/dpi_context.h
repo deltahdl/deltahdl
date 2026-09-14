@@ -223,6 +223,38 @@ bool DpiUserDataIsDiscernibleFromError(const void* user_data);
 bool DpiCallerInfoFileNameIsValid(bool sv_function_called_since);
 bool DpiApplicationMayModifyOrFreeCallerInfoFileName();
 
+// §H.9.5: the relationship between DPI and VPI. DPI lets C code run in the
+// context of a SystemVerilog simulation, so using VPI C code from within an
+// import is natural; but no specific relationship is defined between the two
+// interfaces and programmers may make no assumptions about how they interact:
+// a vpiHandle is not equivalent to an svOpenArrayHandle, and the two may not
+// be interchanged and passed between functions of the two interfaces.
+bool DpiOpenArrayHandleIsInterchangeableWithVpiHandle();
+
+// §H.9.5: a user wanting to call VPI functions from within an import shall
+// flag the import with the context qualifier, with the exceptions of Table
+// 36-9: the vpi_printf, vpi_vprintf and vpi_flush I/O routines, the
+// vpi_mcd_open, vpi_mcd_close, vpi_mcd_name, vpi_mcd_printf, vpi_mcd_vprintf
+// and vpi_mcd_flush I/O routines, and the vpi_get_vlog_info utility routine,
+// which do not access the Verilog model and so require no additional
+// instrumentation or conservative optimizations (§35.5.3).
+std::array<std::string_view, 10> DpiVpiRoutinesCallableWithoutContext();
+bool DpiVpiRoutineRequiresContext(std::string_view vpi_routine);
+
+// §H.9.5: not all VPI functionality is available from within a DPI context
+// import. An imported subroutine is not a system task, so retrieving the
+// handle to the system task call site results in an error, and callbacks and
+// other activities associated with system tasks are not supported inside an
+// import -- a user wanting them uses VPI. Scanning the top-level modules by
+// iterating vpiModule from a NULL reference works reliably.
+enum class DpiVpiActivity : uint8_t {
+  kSystemTaskCallSiteHandle,
+  kSystemTaskCallback,
+  kIterateTopLevelModules,
+};
+
+bool DpiVpiActivityIsAvailableFromContextImport(DpiVpiActivity activity);
+
 }  // namespace delta
 
 #endif  // DELTA_SIMULATOR_DPI_CONTEXT_H_
