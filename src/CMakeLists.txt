@@ -251,6 +251,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/coverage.cpp
     simulator/dpi_c_type.cpp
     simulator/dpi_context.cpp
+    simulator/dpi_include_file.cpp
     simulator/dpi_side.cpp
     simulator/dpi_time.cpp
     simulator/dpi_runtime.cpp

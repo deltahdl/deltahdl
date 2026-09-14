@@ -1,5 +1,6 @@
-
-
+/* svdpi.h -- the include file of the SystemVerilog Direct Programming
+ * Interface (DPI): the constant definitions, structure definitions and
+ * routine declarations SystemVerilog DPI uses, as Annex I lists them. */
 #ifndef INCLUDED_SVDPI
 #define INCLUDED_SVDPI
 
