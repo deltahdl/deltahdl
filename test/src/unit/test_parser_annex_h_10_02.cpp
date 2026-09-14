@@ -11,7 +11,7 @@ namespace {
 // an output unpacked array of eight ints.
 class ExampleTwoParsing : public ::testing::Test {
  protected:
-  ParseResult r = Parse(
+  ParseResult r_ = Parse(
       "module m;\n"
       "  typedef struct {int x; int y;} pair;\n"
       "  import \"DPI-C\" function void f1(input int i1, pair i2,\n"
@@ -24,17 +24,17 @@ class ExampleTwoParsing : public ::testing::Test {
 };
 
 TEST_F(ExampleTwoParsing, TheSystemVerilogSideParses) {
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
+  ASSERT_NE(r_.cu, nullptr);
+  EXPECT_FALSE(r_.has_errors);
+  ASSERT_EQ(r_.cu->modules.size(), 1u);
 }
 
 // The import f1: three formals, the int input, the pair input under the name
 // of its type, and the 64-bit logic output.
 TEST_F(ExampleTwoParsing, TheImportTakesAnIntAPairAndAWideLogicOutput) {
-  ASSERT_NE(r.cu, nullptr);
+  ASSERT_NE(r_.cu, nullptr);
   const ModuleItem* f1 =
-      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kDpiImport);
+      FindItemByKind(r_.cu->modules[0]->items, ModuleItemKind::kDpiImport);
   ASSERT_NE(f1, nullptr);
   EXPECT_EQ(f1->name, "f1");
   EXPECT_EQ(f1->return_type.kind, DataTypeKind::kVoid);
@@ -55,14 +55,14 @@ TEST_F(ExampleTwoParsing, TheImportTakesAnIntAPairAndAWideLogicOutput) {
 // The export names exported_sv_func, and the function it exports takes the
 // int input and the output unpacked array of ints o [0:7].
 TEST_F(ExampleTwoParsing, TheExportedFunctionTakesAnUnpackedOutputArray) {
-  ASSERT_NE(r.cu, nullptr);
+  ASSERT_NE(r_.cu, nullptr);
   const ModuleItem* exp =
-      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kDpiExport);
+      FindItemByKind(r_.cu->modules[0]->items, ModuleItemKind::kDpiExport);
   ASSERT_NE(exp, nullptr);
   EXPECT_EQ(exp->name, "exported_sv_func");
   EXPECT_FALSE(exp->dpi_is_task);
   const ModuleItem* func =
-      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kFunctionDecl);
+      FindItemByKind(r_.cu->modules[0]->items, ModuleItemKind::kFunctionDecl);
   ASSERT_NE(func, nullptr);
   EXPECT_EQ(func->name, "exported_sv_func");
   ASSERT_EQ(func->func_args.size(), 2u);

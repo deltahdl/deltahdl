@@ -113,7 +113,7 @@ struct DpiArg {
   // declared with, which is the C typedef the aggregate crosses under -- the
   // example's `pair i2` is `const pair* i2` in C. Empty for a formal whose
   // kind names its C type itself.
-  std::string_view type_name;
+  std::string_view type_name = {};
 };
 
 struct DpiArgValue {

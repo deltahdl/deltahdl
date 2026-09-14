@@ -37,7 +37,7 @@ void ExportedSvFunc(int i, int* o) {
 // last element is kept here for the observation.
 int g_tab_last = 0;
 
-void F1(const int i1, const Pair* i2, svLogicVecVal* o3) {
+void F1(int i1, const Pair* i2, svLogicVecVal* o3) {
   int tab[8] = {0};
   o3[0].aval = static_cast<uint32_t>(i2->x);
   o3[0].bval = 0;
