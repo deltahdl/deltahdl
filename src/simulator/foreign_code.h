@@ -6,6 +6,7 @@
 #ifndef DELTA_SIMULATOR_FOREIGN_CODE_H_
 #define DELTA_SIMULATOR_FOREIGN_CODE_H_
 
+#include <array>
 #include <cstdint>
 
 namespace delta {
@@ -23,6 +24,63 @@ ForeignCodeRedistributionForm ForeignCodeIntendedRedistributionForm();
 // §J.1: the guidelines are common ones, for the inclusion of foreign language
 // code into any SystemVerilog application rather than into one simulator's.
 bool ForeignCodeGuidelinesAreCommonToApplications();
+
+// §J.2: foreign language code is functionality included into SystemVerilog
+// using the DPI, so the annex applies only to code included through that
+// interface, and code included through another, the VPI say, is outside the
+// standard's scope. Most such code is created from C or C++ source, but
+// nothing precludes object code from other languages, and the annex is
+// independent of the language used. The code is provided in general as
+// object code compiled for the platform, and every simulator shall support
+// including it in that form as the annex specifies.
+enum class ForeignCodeInterface : uint8_t { kDpi, kVpi };
+
+bool ForeignCodeAnnexApplies(ForeignCodeInterface included_through);
+bool ForeignCodeIsLimitedToCOrCpp();
+
+enum class ForeignCodeForm : uint8_t { kObjectCode, kSourceCode };
+
+ForeignCodeForm ForeignCodeProvidedForm();
+bool ForeignCodeObjectFormMustBeSupported();
+
+// §J.2: what the annex defines how to do -- specify the location of the
+// files within the filesystem, specify the files to be loaded, and provide
+// the object code, as a shared library or an archive.
+enum class ForeignCodeFacility : uint8_t {
+  kSpecifyLocationOfFiles,
+  kSpecifyFilesToLoad,
+  kProvideObjectCode,
+};
+
+std::array<ForeignCodeFacility, 3> ForeignCodeFacilitiesDefined();
+
+enum class ForeignCodeObjectPackaging : uint8_t { kSharedLibrary, kArchive };
+
+bool ForeignCodeObjectMayBePackagedAs(ForeignCodeObjectPackaging packaging);
+
+// §J.2: the annex requires multiple implementations, usually two, of the
+// facilities, users having different viewpoints: a vendor providing IP as
+// foreign code wants a self-contained integration a third party can still
+// make, often covered by a bootstrap file; a project team specifying a
+// common set of foreign code that changes with technology, cells and
+// back-annotation data is often covered by a set of tool switches; and a
+// user switching between selections or adding code is covered by tool
+// switches -- each of the three able to use the bootstrap file approach
+// too. The switch names the annex defines are recommendations, not
+// requirements of the language, naming being outside the standard and some
+// character configurations impossible in some shells.
+enum class ForeignCodeInclusionMethod : uint8_t {
+  kBootstrapFile,
+  kToolSwitches
+};
+
+enum class ForeignCodeUseCase : uint8_t { kVendorIp, kProjectTeam, kUser };
+
+uint32_t ForeignCodeImplementationsUsuallyRequired();
+ForeignCodeInclusionMethod ForeignCodeMethodOftenCovering(
+    ForeignCodeUseCase use_case);
+bool ForeignCodeUseCaseMayUseBootstrapFile(ForeignCodeUseCase use_case);
+bool ForeignCodeSwitchNamesAreRequirements();
 
 }  // namespace delta
 
