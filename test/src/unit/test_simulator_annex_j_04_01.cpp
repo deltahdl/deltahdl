@@ -46,8 +46,10 @@ TEST(ForeignCodeBootstrapFile, BlanksSurroundEntriesAndCommentsAreSkipped) {
 // §J.4.1 a): the first line contains the header string, and a file whose
 // first line does not is no bootstrap file -- an empty file among them.
 TEST(ForeignCodeBootstrapFile, TheFirstLineMustCarryTheHeader) {
-  EXPECT_FALSE(ParseForeignCodeBootstrap(" myclibs/lib1\n").Ok());
-  EXPECT_FALSE(ParseForeignCodeBootstrap("").Ok());
+  const std::string kMissing =
+      "line 1: the first line of a bootstrap file contains #!SV_LIBRARIES";
+  EXPECT_EQ(ParseForeignCodeBootstrap(" myclibs/lib1\n").error, kMissing);
+  EXPECT_EQ(ParseForeignCodeBootstrap("").error, kMissing);
   EXPECT_TRUE(ParseForeignCodeBootstrap("#!SV_LIBRARIES\n").Ok());
   EXPECT_TRUE(ParseForeignCodeBootstrap("#!SV_LIBRARIES").Ok());
 }
@@ -57,16 +59,18 @@ TEST(ForeignCodeBootstrapFile, TheFirstLineMustCarryTheHeader) {
 TEST(ForeignCodeBootstrapFile, AnEntryIsOnePathPrecededByABlank) {
   const ForeignCodeBootstrap kUnpreceded =
       ParseForeignCodeBootstrap("#!SV_LIBRARIES\nmyclibs/lib1\n");
-  EXPECT_FALSE(kUnpreceded.Ok());
-  EXPECT_NE(kUnpreceded.error.find("line 2"), std::string::npos);
+  EXPECT_EQ(kUnpreceded.error,
+            "line 2: a library entry shall be preceded by at least one blank");
   const ForeignCodeBootstrap kTwo =
       ParseForeignCodeBootstrap("#!SV_LIBRARIES\n lib1 lib2\n");
-  EXPECT_FALSE(kTwo.Ok());
-  EXPECT_NE(kTwo.error.find("exactly one"), std::string::npos);
+  EXPECT_EQ(kTwo.error,
+            "line 2: a line holds exactly one library entry, and this holds "
+            "more");
   const ForeignCodeBootstrap kBlank =
       ParseForeignCodeBootstrap("#!SV_LIBRARIES\n   \n lib1\n");
-  EXPECT_FALSE(kBlank.Ok());
-  EXPECT_NE(kBlank.error.find("line 2"), std::string::npos);
+  EXPECT_EQ(kBlank.error,
+            "line 2: a line holds one library entry or a comment, and this "
+            "holds neither");
 }
 
 // §J.4.1 b): an entry is the path name without extension, equivalent to the
