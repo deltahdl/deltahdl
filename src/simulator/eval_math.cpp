@@ -273,12 +273,18 @@ static double RefErlangian(int32_t* seed, int32_t k, int32_t mean) {
   return -a * std::log(x) / b;
 }
 
-// §N.2: every rtl_dist_* wrapper except uniform rounds its real draw to the
-// nearest integer, preserving the sign by rounding the magnitude.
-static int32_t RoundDistResult(double r) {
-  if (r >= 0) return static_cast<int32_t>(std::lround(r));
+// §N.2: every rtl_dist_* wrapper except uniform rounds its real draw with
+// the annex's own idiom, (long)(r + 0.5) for a non-negative draw and the
+// negation of that of the negated draw for a negative one. The idiom is the
+// annex's code and not a rounding of this tool's choosing: it adds one half
+// in double and truncates, so the one double just below one half rounds up
+// where a rounding of the exact value would not, and a draw landing there is
+// answered as the annex answers it. It rounded with std::lround, which is
+// exact.
+int32_t RtlDistRound(double r) {
+  if (r >= 0) return static_cast<int32_t>(r + 0.5);
   r = -r;
-  return -static_cast<int32_t>(std::lround(r));
+  return -static_cast<int32_t>(r + 0.5);
 }
 
 // §N.2 rtl_dist_uniform() common rounding: the reference floors a non-negative
@@ -334,29 +340,31 @@ int32_t RtlDistUniform(int32_t* seed, int32_t start, int32_t end) {
 
 // §N.2 rtl_dist_*: each guards the argument the reference requires to be
 // positive and returns 0 otherwise (the diagnostic for that case is raised by
-// ValidateDistArgs, §20.14.2). $dist_normal accepts any mean.
-static int32_t RtlDistNormal(int32_t* seed, int32_t mean, int32_t sd) {
-  return RoundDistResult(RefNormal(seed, mean, sd));
+// ValidateDistArgs, §20.14.2). $dist_normal accepts any mean. The six are
+// declared in simulator/probabilistic_distribution.h beside rtl_dist_uniform,
+// as the C functions Table N.1 names.
+int32_t RtlDistNormal(int32_t* seed, int32_t mean, int32_t sd) {
+  return RtlDistRound(RefNormal(seed, mean, sd));
 }
-static int32_t RtlDistExponential(int32_t* seed, int32_t mean) {
+int32_t RtlDistExponential(int32_t* seed, int32_t mean) {
   if (mean <= 0) return 0;
-  return RoundDistResult(RefExponential(seed, mean));
+  return RtlDistRound(RefExponential(seed, mean));
 }
-static int32_t RtlDistPoisson(int32_t* seed, int32_t mean) {
+int32_t RtlDistPoisson(int32_t* seed, int32_t mean) {
   if (mean <= 0) return 0;
   return RefPoisson(seed, mean);
 }
-static int32_t RtlDistChiSquare(int32_t* seed, int32_t df) {
+int32_t RtlDistChiSquare(int32_t* seed, int32_t df) {
   if (df <= 0) return 0;
-  return RoundDistResult(RefChiSquare(seed, df));
+  return RtlDistRound(RefChiSquare(seed, df));
 }
-static int32_t RtlDistT(int32_t* seed, int32_t df) {
+int32_t RtlDistT(int32_t* seed, int32_t df) {
   if (df <= 0) return 0;
-  return RoundDistResult(RefT(seed, df));
+  return RtlDistRound(RefT(seed, df));
 }
-static int32_t RtlDistErlang(int32_t* seed, int32_t k, int32_t mean) {
+int32_t RtlDistErlang(int32_t* seed, int32_t k, int32_t mean) {
   if (k <= 0) return 0;
-  return RoundDistResult(RefErlangian(seed, k, mean));
+  return RtlDistRound(RefErlangian(seed, k, mean));
 }
 
 // §20.14.2: the seed is an inout argument — a value goes in and a different

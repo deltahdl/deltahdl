@@ -107,12 +107,17 @@ CheckOptions:
 # - bugprone-command-processor: IEEE 1800-2023 20.17.1 defines $system as
 #   passing its argument to the C system() command processor; the check forbids
 #   the one call the task is specified to make.
+# - bugprone-incorrect-roundings: IEEE 1800-2023 Annex N.2 rounds every
+#   distribution draw with (long)(r + 0.5), and the annex's code is the
+#   normative algorithm; the check forbids the one rounding the standard
+#   specifies.
 Checks: >-
   -*,
   bugprone-*,
   -bugprone-easily-swappable-parameters,
   -bugprone-random-generator-seed,
   -bugprone-command-processor,
+  -bugprone-incorrect-roundings,
   cppcoreguidelines-avoid-goto,
   cppcoreguidelines-init-variables,
   cppcoreguidelines-slicing,

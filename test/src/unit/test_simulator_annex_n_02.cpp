@@ -10,6 +10,7 @@
 #include "fixture_simulator.h"
 #include "parser/ast.h"
 #include "simulator/evaluation.h"
+#include "simulator/probabilistic_distribution.h"
 
 using namespace delta;
 
@@ -106,10 +107,11 @@ double RefErlangian(int32_t* seed, int32_t k, int32_t mean) {
 }
 
 int32_t RoundDistResult(double r) {
-  // Round half away from zero, matching the §N.2 reference's
-  // (int)(r + 0.5) / -(int)(-r + 0.5) idiom. std::lround rounds halves away
-  // from zero, so it reproduces both the positive and negative branches.
-  return static_cast<int32_t>(std::lround(r));
+  // The §N.2 reference's own idiom, (long)(r + 0.5) of the magnitude with the
+  // sign put back: one half added in double, then truncated.
+  if (r >= 0) return static_cast<int32_t>(r + 0.5);
+  r = -r;
+  return -static_cast<int32_t>(r + 0.5);
 }
 
 // §N.2 reference's truncation-toward-the-draw step: positive draws truncate
@@ -119,7 +121,7 @@ int32_t DistTruncate(double r) {
 }
 
 // §N.2 rtl_dist_uniform, common (end != INT32_MAX) branch.
-int32_t RtlDistUniformIncEnd(int32_t* seed, int32_t start, int32_t end) {
+int32_t GoldenRtlDistUniformIncEnd(int32_t* seed, int32_t start, int32_t end) {
   end++;
   int32_t i = DistTruncate(RefUniform(seed, start, end));
   if (i < start) i = start;
@@ -128,7 +130,8 @@ int32_t RtlDistUniformIncEnd(int32_t* seed, int32_t start, int32_t end) {
 }
 
 // §N.2 rtl_dist_uniform, end-at-INT32_MAX branch (decrements start).
-int32_t RtlDistUniformDecStart(int32_t* seed, int32_t start, int32_t end) {
+int32_t GoldenRtlDistUniformDecStart(int32_t* seed, int32_t start,
+                                     int32_t end) {
   start--;
   int32_t i = DistTruncate(RefUniform(seed, start, end) + 1.0);
   if (i <= start) i = start + 1;
@@ -137,39 +140,40 @@ int32_t RtlDistUniformDecStart(int32_t* seed, int32_t start, int32_t end) {
 }
 
 // §N.2 rtl_dist_uniform, full signed-range branch (rescales the draw).
-int32_t RtlDistUniformFullRange(int32_t* seed, int32_t start, int32_t end) {
+int32_t GoldenRtlDistUniformFullRange(int32_t* seed, int32_t start,
+                                      int32_t end) {
   double r = (RefUniform(seed, start, end) + 2147483648.0) / 4294967295.0;
   r = r * 4294967296.0 - 2147483648.0;
   return DistTruncate(r);
 }
 
-int32_t RtlDistUniform(int32_t* seed, int32_t start, int32_t end) {
+int32_t GoldenRtlDistUniform(int32_t* seed, int32_t start, int32_t end) {
   if (start >= end) return start;
-  if (end != INT32_MAX) return RtlDistUniformIncEnd(seed, start, end);
-  if (start != INT32_MIN) return RtlDistUniformDecStart(seed, start, end);
-  return RtlDistUniformFullRange(seed, start, end);
+  if (end != INT32_MAX) return GoldenRtlDistUniformIncEnd(seed, start, end);
+  if (start != INT32_MIN) return GoldenRtlDistUniformDecStart(seed, start, end);
+  return GoldenRtlDistUniformFullRange(seed, start, end);
 }
 
-int32_t RtlDistNormal(int32_t* seed, int32_t mean, int32_t sd) {
+int32_t GoldenRtlDistNormal(int32_t* seed, int32_t mean, int32_t sd) {
   return RoundDistResult(RefNormal(seed, mean, sd));
 }
-int32_t RtlDistExponential(int32_t* seed, int32_t mean) {
+int32_t GoldenRtlDistExponential(int32_t* seed, int32_t mean) {
   if (mean <= 0) return 0;
   return RoundDistResult(RefExponential(seed, mean));
 }
-int32_t RtlDistPoisson(int32_t* seed, int32_t mean) {
+int32_t GoldenRtlDistPoisson(int32_t* seed, int32_t mean) {
   if (mean <= 0) return 0;
   return RefPoisson(seed, mean);
 }
-int32_t RtlDistChiSquare(int32_t* seed, int32_t df) {
+int32_t GoldenRtlDistChiSquare(int32_t* seed, int32_t df) {
   if (df <= 0) return 0;
   return RoundDistResult(RefChiSquare(seed, df));
 }
-int32_t RtlDistT(int32_t* seed, int32_t df) {
+int32_t GoldenRtlDistT(int32_t* seed, int32_t df) {
   if (df <= 0) return 0;
   return RoundDistResult(RefT(seed, df));
 }
-int32_t RtlDistErlang(int32_t* seed, int32_t k, int32_t mean) {
+int32_t GoldenRtlDistErlang(int32_t* seed, int32_t k, int32_t mean) {
   if (k <= 0) return 0;
   return RoundDistResult(RefErlangian(seed, k, mean));
 }
@@ -188,7 +192,7 @@ const int32_t kSeeds[] = {1, 7, 42, 12345, 65535, 99999, 259341593, 0};
 TEST(ProbabilisticDistributionAlgorithm, UniformMatchesReference) {
   for (int32_t s : kSeeds) {
     int32_t rseed = s;
-    int32_t expected = RtlDistUniform(&rseed, 0, 1000);
+    int32_t expected = GoldenRtlDistUniform(&rseed, 0, 1000);
     SimFixture f;
     int32_t got = EvalDist(f, "$dist_uniform",
                            {MkInt(f.arena, static_cast<uint32_t>(s)),
@@ -203,7 +207,7 @@ TEST(ProbabilisticDistributionAlgorithm, UniformMatchesReference) {
 TEST(ProbabilisticDistributionAlgorithm, UniformEndAtMaxMatchesReference) {
   for (int32_t s : kSeeds) {
     int32_t rseed = s;
-    int32_t expected = RtlDistUniform(&rseed, 100, INT32_MAX);
+    int32_t expected = GoldenRtlDistUniform(&rseed, 100, INT32_MAX);
     SimFixture f;
     int32_t got = EvalDist(
         f, "$dist_uniform",
@@ -219,7 +223,7 @@ TEST(ProbabilisticDistributionAlgorithm, UniformEndAtMaxMatchesReference) {
 TEST(ProbabilisticDistributionAlgorithm, UniformFullRangeMatchesReference) {
   for (int32_t s : kSeeds) {
     int32_t rseed = s;
-    int32_t expected = RtlDistUniform(&rseed, INT32_MIN, INT32_MAX);
+    int32_t expected = GoldenRtlDistUniform(&rseed, INT32_MIN, INT32_MAX);
     SimFixture f;
     int32_t got = EvalDist(f, "$dist_uniform",
                            {MkInt(f.arena, static_cast<uint32_t>(s)),
@@ -233,7 +237,7 @@ TEST(ProbabilisticDistributionAlgorithm, UniformFullRangeMatchesReference) {
 TEST(ProbabilisticDistributionAlgorithm, NormalMatchesReference) {
   for (int32_t s : kSeeds) {
     int32_t rseed = s;
-    int32_t expected = RtlDistNormal(&rseed, 100, 10);
+    int32_t expected = GoldenRtlDistNormal(&rseed, 100, 10);
     SimFixture f;
     int32_t got = EvalDist(f, "$dist_normal",
                            {MkInt(f.arena, static_cast<uint32_t>(s)),
@@ -248,7 +252,7 @@ TEST(ProbabilisticDistributionAlgorithm, NormalMatchesReference) {
 TEST(ProbabilisticDistributionAlgorithm, NormalSignedRoundingMatchesReference) {
   for (int32_t s : kSeeds) {
     int32_t rseed = s;
-    int32_t expected = RtlDistNormal(&rseed, 0, 50);
+    int32_t expected = GoldenRtlDistNormal(&rseed, 0, 50);
     SimFixture f;
     int32_t got = EvalDist(f, "$dist_normal",
                            {MkInt(f.arena, static_cast<uint32_t>(s)),
@@ -261,7 +265,7 @@ TEST(ProbabilisticDistributionAlgorithm, NormalSignedRoundingMatchesReference) {
 TEST(ProbabilisticDistributionAlgorithm, ExponentialMatchesReference) {
   for (int32_t s : kSeeds) {
     int32_t rseed = s;
-    int32_t expected = RtlDistExponential(&rseed, 25);
+    int32_t expected = GoldenRtlDistExponential(&rseed, 25);
     SimFixture f;
     int32_t got = EvalDist(
         f, "$dist_exponential",
@@ -274,7 +278,7 @@ TEST(ProbabilisticDistributionAlgorithm, ExponentialMatchesReference) {
 TEST(ProbabilisticDistributionAlgorithm, PoissonMatchesReference) {
   for (int32_t s : kSeeds) {
     int32_t rseed = s;
-    int32_t expected = RtlDistPoisson(&rseed, 5);
+    int32_t expected = GoldenRtlDistPoisson(&rseed, 5);
     SimFixture f;
     int32_t got = EvalDist(
         f, "$dist_poisson",
@@ -289,7 +293,7 @@ TEST(ProbabilisticDistributionAlgorithm, PoissonMatchesReference) {
 TEST(ProbabilisticDistributionAlgorithm, ChiSquareMatchesReference) {
   for (int32_t s : kSeeds) {
     int32_t rseed = s;
-    int32_t expected = RtlDistChiSquare(&rseed, 5);
+    int32_t expected = GoldenRtlDistChiSquare(&rseed, 5);
     SimFixture f;
     int32_t got = EvalDist(
         f, "$dist_chi_square",
@@ -303,7 +307,7 @@ TEST(ProbabilisticDistributionAlgorithm, ChiSquareMatchesReference) {
 TEST(ProbabilisticDistributionAlgorithm, TMatchesReference) {
   for (int32_t s : kSeeds) {
     int32_t rseed = s;
-    int32_t expected = RtlDistT(&rseed, 5);
+    int32_t expected = GoldenRtlDistT(&rseed, 5);
     SimFixture f;
     int32_t got = EvalDist(
         f, "$dist_t",
@@ -316,7 +320,7 @@ TEST(ProbabilisticDistributionAlgorithm, TMatchesReference) {
 TEST(ProbabilisticDistributionAlgorithm, ErlangMatchesReference) {
   for (int32_t s : kSeeds) {
     int32_t rseed = s;
-    int32_t expected = RtlDistErlang(&rseed, 3, 7);
+    int32_t expected = GoldenRtlDistErlang(&rseed, 3, 7);
     SimFixture f;
     int32_t got = EvalDist(f, "$dist_erlang",
                            {MkInt(f.arena, static_cast<uint32_t>(s)),
@@ -337,7 +341,7 @@ TEST(ProbabilisticDistributionAlgorithm, SeedAdvancesByReferenceLcg) {
   EvalExpr(call, f.ctx, f.arena);
 
   int32_t rseed = 1;
-  RtlDistUniform(&rseed, 0, 1000);  // advance the golden seed identically
+  GoldenRtlDistUniform(&rseed, 0, 1000);  // advance the golden seed identically
   auto after =
       static_cast<uint32_t>(f.ctx.FindVariable("seed")->value.ToUint64());
   EXPECT_EQ(after, static_cast<uint32_t>(rseed));
@@ -458,6 +462,44 @@ TEST(ProbabilisticDistributionAlgorithm, ChiSquareIsAlgorithmicNotRawRandom) {
         {MkInt(f.arena, static_cast<uint32_t>(s)), MkInt(f.arena, 5u)});
     EXPECT_GE(v, 0) << "seed=" << s;
     EXPECT_LT(v, 100000) << "seed=" << s;
+  }
+}
+
+// §N.2 rounds every draw but the uniform one with (long)(r + 0.5), one half
+// added in double and the sum truncated, the sign of a negative draw put back
+// after rounding its magnitude. The one double just below one half is where
+// that idiom parts from an exact rounding: the sum ties to one, so the idiom
+// answers 1 where an exact rounding of the value answers 0, and the annex's
+// answer is the idiom's. A half rounds away from zero either way.
+TEST(ProbabilisticDistributionAlgorithm, RoundingIsTheAnnexsIdiom) {
+  const double kJustBelowHalf = 0.49999999999999994;
+  EXPECT_EQ(delta::RtlDistRound(kJustBelowHalf), 1);
+  EXPECT_EQ(delta::RtlDistRound(-kJustBelowHalf), -1);
+  EXPECT_EQ(std::lround(kJustBelowHalf), 0);
+  EXPECT_EQ(delta::RtlDistRound(2.5), 3);
+  EXPECT_EQ(delta::RtlDistRound(-2.5), -3);
+  EXPECT_EQ(delta::RtlDistRound(0.4), 0);
+  EXPECT_EQ(delta::RtlDistRound(-0.4), 0);
+  EXPECT_EQ(delta::RtlDistRound(0.0), 0);
+}
+
+// §N.2's seven rtl_dist_ functions are the ones Table N.1 names, callable as
+// the annex declares them, each reproducing the golden transcription's value
+// and its advance of the seed for the same seed and arguments.
+TEST(ProbabilisticDistributionAlgorithm, TheSevenCFunctionsMatchTheReference) {
+  for (int32_t s : kSeeds) {
+    int32_t g = s;
+    int32_t p = s;
+    EXPECT_EQ(delta::RtlDistUniform(&p, -5, 5),
+              GoldenRtlDistUniform(&g, -5, 5));
+    EXPECT_EQ(delta::RtlDistNormal(&p, 10, 3), GoldenRtlDistNormal(&g, 10, 3));
+    EXPECT_EQ(delta::RtlDistExponential(&p, 4),
+              GoldenRtlDistExponential(&g, 4));
+    EXPECT_EQ(delta::RtlDistPoisson(&p, 6), GoldenRtlDistPoisson(&g, 6));
+    EXPECT_EQ(delta::RtlDistChiSquare(&p, 5), GoldenRtlDistChiSquare(&g, 5));
+    EXPECT_EQ(delta::RtlDistT(&p, 4), GoldenRtlDistT(&g, 4));
+    EXPECT_EQ(delta::RtlDistErlang(&p, 3, 7), GoldenRtlDistErlang(&g, 3, 7));
+    EXPECT_EQ(p, g) << "seed=" << s;
   }
 }
 

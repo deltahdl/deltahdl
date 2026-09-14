@@ -76,11 +76,15 @@ CheckOptions:
 # bugprone-random-generator-seed disabled: IEEE 1800-2023 18.13/18.14
 # randomization tests use fixed seeds on purpose to assert reproducible
 # sequences; the check demands an unpredictable seed, which would defeat them.
+# bugprone-incorrect-roundings disabled: IEEE 1800-2023 Annex N.2 rounds every
+# distribution draw with (long)(r + 0.5), and the golden transcription the
+# Annex N tests hold the simulator to writes the rounding as the annex does.
 Checks: >-
   -*,
   bugprone-*,
   -bugprone-easily-swappable-parameters,
   -bugprone-random-generator-seed,
+  -bugprone-incorrect-roundings,
   cppcoreguidelines-avoid-goto,
   cppcoreguidelines-init-variables,
   cppcoreguidelines-slicing,

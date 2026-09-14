@@ -36,6 +36,24 @@ std::optional<std::string_view> CFunctionComputing(
 // seed, the reference's long being the 32-bit integer modeled here.
 int32_t RtlDistUniform(int32_t* seed, int32_t start, int32_t end);
 
+// §N.2 rtl_dist_normal, rtl_dist_exponential, rtl_dist_poisson,
+// rtl_dist_chi_square, rtl_dist_t and rtl_dist_erlang: the six other C
+// functions Table N.1 names, each drawing from the seed and rounding its draw
+// as the annex does, and each but rtl_dist_normal answering 0 for an argument
+// the annex requires to be positive and is not.
+int32_t RtlDistNormal(int32_t* seed, int32_t mean, int32_t sd);
+int32_t RtlDistExponential(int32_t* seed, int32_t mean);
+int32_t RtlDistPoisson(int32_t* seed, int32_t mean);
+int32_t RtlDistChiSquare(int32_t* seed, int32_t df);
+int32_t RtlDistT(int32_t* seed, int32_t df);
+int32_t RtlDistErlang(int32_t* seed, int32_t k, int32_t mean);
+
+// §N.2: the rounding every draw but the uniform one gets, (long)(r + 0.5) of
+// the draw's magnitude with the draw's sign put back -- one half added in
+// double, then truncated -- which is the annex's idiom rather than an exact
+// rounding of the value.
+int32_t RtlDistRound(double r);
+
 // §N.1, Table N.1: $random is rtl_dist_uniform(seed, LONG_MIN, LONG_MAX), a
 // uniform draw over the whole 32-bit range that advances the seed.
 int32_t RtlDistRandom(int32_t* seed);
