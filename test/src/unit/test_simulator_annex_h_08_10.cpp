@@ -5,6 +5,9 @@
 #include <string>
 #include <vector>
 
+#include "parser/ast.h"
+#include "simulator/dpi_arg_value.h"
+#include "simulator/dpi_c_type.h"
 #include "simulator/dpi_runtime.h"
 
 using namespace delta;
@@ -185,6 +188,93 @@ TEST(DpiStringArguments,
   std::vector<DpiArgValue> actuals = {DpiArgValue::FromString("keep-me")};
   rt.CallImportWithArgs("sv_peek_inout", actuals);
   EXPECT_EQ(actuals[0].AsString(), "keep-me");
+}
+
+// §H.8.10 as a statement about the C layer, in src/simulator/dpi_c_type.h:
+// the direction of a string argument applies to the pointer and not to the
+// characters, the side that provided a pointer owns the storage it refers
+// to and the other side shall not free it, a receiver never modifies the
+// characters, and a string to be kept beyond the call is copied.
+
+DpiArg StringFormal(Direction direction) {
+  DpiArg formal;
+  formal.name = "s";
+  formal.type = DataTypeKind::kString;
+  formal.direction = direction;
+  return formal;
+}
+
+// §H.8.10: the direction mode applies to the const char* pointer, so an
+// input is a const char* and an output or inout a const char**, the
+// characters const under every mode.
+TEST(DpiStringArgumentRules, TheDirectionAppliesToThePointer) {
+  EXPECT_EQ(DpiCTypeOfFormal(StringFormal(Direction::kInput), false),
+            "const char*");
+  EXPECT_EQ(DpiCTypeOfFormal(StringFormal(Direction::kOutput), false),
+            "const char**");
+  EXPECT_EQ(DpiCTypeOfFormal(StringFormal(Direction::kInout), false),
+            "const char**");
+  EXPECT_FALSE(DpiStringCharactersMayBeModifiedByReceiver());
+}
+
+// §H.8.10: the storage a string pointer refers to is the provider's -- for
+// an import, SystemVerilog provides an input's and an inout's on arrival
+// and C provides an output's and an inout's it changed; for an export, C
+// provides an input's and an inout's on arrival and SystemVerilog provides
+// an output's and an inout's it changed -- and the other side shall not
+// free it.
+TEST(DpiStringArgumentRules, TheSideThatProvidedThePointerOwnsTheStorage) {
+  EXPECT_EQ(
+      DpiSideProvidingStringPointer(DpiStringPointerProvider::kImportInput),
+      DpiMemorySide::kSystemVerilog);
+  EXPECT_EQ(
+      DpiSideProvidingStringPointer(DpiStringPointerProvider::kImportOutput),
+      DpiMemorySide::kC);
+  EXPECT_EQ(DpiSideProvidingStringPointer(
+                DpiStringPointerProvider::kImportInoutOnArrival),
+            DpiMemorySide::kSystemVerilog);
+  EXPECT_EQ(DpiSideProvidingStringPointer(
+                DpiStringPointerProvider::kImportInoutChanged),
+            DpiMemorySide::kC);
+  EXPECT_EQ(
+      DpiSideProvidingStringPointer(DpiStringPointerProvider::kExportInput),
+      DpiMemorySide::kC);
+  EXPECT_EQ(
+      DpiSideProvidingStringPointer(DpiStringPointerProvider::kExportOutput),
+      DpiMemorySide::kSystemVerilog);
+  EXPECT_EQ(DpiSideProvidingStringPointer(
+                DpiStringPointerProvider::kExportInoutOnArrival),
+            DpiMemorySide::kC);
+  EXPECT_EQ(DpiSideProvidingStringPointer(
+                DpiStringPointerProvider::kExportInoutChanged),
+            DpiMemorySide::kSystemVerilog);
+  // Only the provider frees what it provided.
+  EXPECT_FALSE(DpiSideMayFree(
+      DpiSideProvidingStringPointer(DpiStringPointerProvider::kImportInput),
+      DpiMemorySide::kC));
+  EXPECT_FALSE(DpiSideMayFree(
+      DpiSideProvidingStringPointer(DpiStringPointerProvider::kImportOutput),
+      DpiMemorySide::kSystemVerilog));
+  EXPECT_FALSE(DpiSideMayFree(
+      DpiSideProvidingStringPointer(DpiStringPointerProvider::kExportOutput),
+      DpiMemorySide::kC));
+}
+
+// §H.8.10: no assumption holds about the lifetime of a string's storage
+// beyond the call, so a string to be kept is copied into memory the
+// keeping side owns -- C for an export's output or changed inout, and
+// SystemVerilog, which copies the contents of an import's changed inout
+// into its own memory.
+TEST(DpiStringArgumentRules, AStringToBeKeptIsCopiedByTheKeepingSide) {
+  EXPECT_FALSE(DpiReferenceOutlivesTheCall());
+  EXPECT_EQ(DpiSideCopyingString(DpiStringPointerProvider::kExportOutput),
+            DpiMemorySide::kC);
+  EXPECT_EQ(DpiSideCopyingString(DpiStringPointerProvider::kExportInoutChanged),
+            DpiMemorySide::kC);
+  EXPECT_EQ(DpiSideCopyingString(DpiStringPointerProvider::kImportInoutChanged),
+            DpiMemorySide::kSystemVerilog);
+  EXPECT_EQ(DpiSideCopyingString(DpiStringPointerProvider::kImportOutput),
+            DpiMemorySide::kSystemVerilog);
 }
 
 }  // namespace

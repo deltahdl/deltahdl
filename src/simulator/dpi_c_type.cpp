@@ -563,4 +563,28 @@ const std::vector<DataTypeKind>& DpiResultTypes() {
   return kResults;
 }
 
+DpiMemorySide DpiSideProvidingStringPointer(DpiStringPointerProvider provider) {
+  switch (provider) {
+    case DpiStringPointerProvider::kImportInput:
+    case DpiStringPointerProvider::kImportInoutOnArrival:
+    case DpiStringPointerProvider::kExportOutput:
+    case DpiStringPointerProvider::kExportInoutChanged:
+      return DpiMemorySide::kSystemVerilog;
+    case DpiStringPointerProvider::kImportOutput:
+    case DpiStringPointerProvider::kImportInoutChanged:
+    case DpiStringPointerProvider::kExportInput:
+    case DpiStringPointerProvider::kExportInoutOnArrival:
+      return DpiMemorySide::kC;
+  }
+  return DpiMemorySide::kC;
+}
+
+DpiMemorySide DpiSideCopyingString(DpiStringPointerProvider provider) {
+  return DpiSideProvidingStringPointer(provider) == DpiMemorySide::kC
+             ? DpiMemorySide::kSystemVerilog
+             : DpiMemorySide::kC;
+}
+
+bool DpiStringCharactersMayBeModifiedByReceiver() { return false; }
+
 }  // namespace delta

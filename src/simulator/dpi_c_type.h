@@ -610,4 +610,50 @@ bool DpiCallerAllocatesExportActual(const DpiArg& formal);
 // does not pass.
 std::string DpiCAllocationOfExportActual(const DpiArg& formal);
 
+// §H.8.10: the layout of a SystemVerilog string is implementation
+// dependent, but a string passed from SystemVerilog to C is laid out as a
+// C string with its trailing null, and a C string passed to SystemVerilog
+// is the user's to null-terminate. The direction mode applies to the
+// pointer, Table H.1's const char*, and not to the characters. For an
+// import: an input arrives through a pointer SystemVerilog provides that C
+// shall not free, makes no lifetime assumption about and whose change is
+// not propagated back; an output arrives in a const char** with no
+// meaningful value, and C writes a valid address there that SystemVerilog
+// shall not free; an inout arrives in a const char** holding a valid
+// address to storage C shall not free, and C changes the string by writing
+// a new address SystemVerilog shall not free, whose contents SystemVerilog
+// then copies into its own memory. For an export: an input reaches
+// SystemVerilog through a const char* it only reads; an output is a const
+// char** with no meaningful initial value into which SystemVerilog writes
+// a valid address, C making no lifetime assumption and not freeing it; an
+// inout is a const char** holding a pointer to memory the user allocated,
+// which SystemVerilog only reads and changes by writing a valid address of
+// its own, again not C's to free or rely on -- a string C wants later it
+// copies into memory of its own (§H.6.6).
+
+// The pointer a string argument carries, by who provides it and when.
+enum class DpiStringPointerProvider : uint8_t {
+  kImportInput,
+  kImportOutput,
+  kImportInoutOnArrival,
+  kImportInoutChanged,
+  kExportInput,
+  kExportOutput,
+  kExportInoutOnArrival,
+  kExportInoutChanged,
+};
+
+// The side that provided the pointer, whose storage the string is and who
+// alone may free it (DpiSideMayFree): SystemVerilog for what it hands C
+// and C for what it hands SystemVerilog.
+DpiMemorySide DpiSideProvidingStringPointer(DpiStringPointerProvider provider);
+
+// The side that copies the string a pointer refers to when it is to be
+// kept: the receiving side, which makes no assumption about the storage's
+// lifetime.
+DpiMemorySide DpiSideCopyingString(DpiStringPointerProvider provider);
+
+// Whether the side receiving a string may modify its characters: never.
+bool DpiStringCharactersMayBeModifiedByReceiver();
+
 }  // namespace delta
