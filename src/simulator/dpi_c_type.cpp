@@ -607,6 +607,15 @@ std::string_view DpiCTypeOfStringArray(Direction /*direction*/) {
   return "const char**";
 }
 
+DpiArg DpiPackedAggregateAsPackedArrayFormal(const DpiArg& aggregate,
+                                             bool four_state, uint32_t width) {
+  DpiArg formal = aggregate;
+  formal.type = four_state ? DataTypeKind::kLogic : DataTypeKind::kBit;
+  formal.width = width;
+  formal.type_name = {};
+  return formal;
+}
+
 SvActualDimension DpiLinearizedPackedRange(
     const std::vector<SvActualDimension>& packed_dims) {
   return LinearizedNormalizedRange(packed_dims);

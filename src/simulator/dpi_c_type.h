@@ -716,6 +716,15 @@ uint32_t DpiPackedDimensionCountInC();
 // Whether the number of unpacked dimensions is limited: never.
 bool DpiUnpackedDimensionCountIsLimited();
 
+// §H.11.3: a packed struct or union argument corresponds to a
+// one-dimensional packed array argument of its width, of type bit where its
+// members are 2-state and logic where 4-state -- the formal DpiCTypeOfFormal
+// spells and the canonical representation of §H.7.7 applies to, so that the
+// example's A, S and U formals are each a const svBitVecVal* holding the
+// three bits, whichever of the three types declared them.
+DpiArg DpiPackedAggregateAsPackedArrayFormal(const DpiArg& aggregate,
+                                             bool four_state, uint32_t width);
+
 // §H.11.1: two alternatives for working with 2-state packed data. A DPI
 // formal argument can be of a C-compatible type -- the classical int-to-int
 // correspondence of Table H.1, or an int unsigned an arbitrary 2-state bit
