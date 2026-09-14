@@ -40,8 +40,11 @@ struct Encrypting {
   }
 };
 
-// The cleartext the one block of `written` records under the vendor's key.
-std::string Recovered(std::string_view written) {
+// The cleartext the one block of `written` records under the vendor's key,
+// read with the cipher `method` names -- the default one where the input named
+// none, and the one it named where it did, since a block is opened by the
+// cipher that closed it.
+std::string Recovered(std::string_view written, std::string_view method = {}) {
   constexpr std::string_view kOpening = "`pragma protect data_block\n";
   size_t pos = written.find(kOpening);
   if (pos == std::string_view::npos) return "";
@@ -50,7 +53,7 @@ std::string Recovered(std::string_view written) {
   if (close == std::string_view::npos) close = written.size();
   std::string cleartext;
   if (!DecryptProtectedRegion(written.substr(start, close - start), kVendorKey,
-                              &cleartext)) {
+                              &cleartext, kBlockEnctype, method)) {
     return "";
   }
   return cleartext;
@@ -125,7 +128,7 @@ TEST(ToolVendorSecretKeyInput, TheOptionalPragmasMayBeIncluded) {
   Encrypting run(src);
   EXPECT_FALSE(run.diag.HasErrors());
   EXPECT_FALSE(Holds(run.written, "result = 42"));
-  EXPECT_EQ(Recovered(run.written), kDesign);
+  EXPECT_EQ(Recovered(run.written, "des-cbc"), kDesign);
 }
 
 }  // namespace
