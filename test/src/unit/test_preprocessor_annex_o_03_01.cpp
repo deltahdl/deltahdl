@@ -6,6 +6,7 @@
 
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_flow.h"
 #include "preprocessor/protect_keywords.h"
 #include "preprocessor/protect_processing.h"
@@ -40,23 +41,18 @@ struct Encrypting {
   }
 };
 
-// The cleartext the one block of `written` records under the vendor's key,
-// read with the cipher `method` names -- the default one where the input named
-// none, and the one it named where it did, since a block is opened by the
-// cipher that closed it.
-std::string Recovered(std::string_view written, std::string_view method = {}) {
-  constexpr std::string_view kOpening = "`pragma protect data_block\n";
-  size_t pos = written.find(kOpening);
-  if (pos == std::string_view::npos) return "";
-  size_t start = pos + kOpening.size();
-  size_t close = written.find('\n', start);
-  if (close == std::string_view::npos) close = written.size();
-  std::string cleartext;
-  if (!DecryptProtectedRegion(written.substr(start, close - start), kVendorKey,
-                              &cleartext, kBlockEnctype, method)) {
-    return "";
-  }
-  return cleartext;
+// The text a decrypting run of `envelope` under the vendor's key produced,
+// which is where the design an input asked to have encrypted comes back: the
+// run reads the envelope by its own description -- the cipher and the coding
+// scheme the input chose -- and puts the recovered text where the envelope
+// stood.
+std::string Recovered(const std::string& envelope) {
+  SourceManager mgr;
+  DiagEngine diag{mgr};
+  PreprocConfig config;
+  config.protect_key = kVendorKey;
+  Preprocessor pp(mgr, diag, config);
+  return pp.Preprocess(mgr.AddFile("<envelope>", envelope));
 }
 
 // §O.3.1: the input requires data_keyname, naming an embedded key, and the
@@ -101,7 +97,7 @@ TEST(ToolVendorSecretKeyInput, TheRequiredPragmasAloneAreACompleteInput) {
   Encrypting run(src);
   EXPECT_FALSE(run.diag.HasErrors());
   EXPECT_FALSE(Holds(run.written, "result = 42"));
-  EXPECT_EQ(Recovered(run.written), kDesign);
+  EXPECT_TRUE(Holds(Recovered(run.written), kDesign));
 }
 
 // §O.3.1 against the flow: the eight optional pragmas may be included, and
@@ -128,7 +124,7 @@ TEST(ToolVendorSecretKeyInput, TheOptionalPragmasMayBeIncluded) {
   Encrypting run(src);
   EXPECT_FALSE(run.diag.HasErrors());
   EXPECT_FALSE(Holds(run.written, "result = 42"));
-  EXPECT_EQ(Recovered(run.written, "des-cbc"), kDesign);
+  EXPECT_TRUE(Holds(Recovered(run.written), kDesign));
 }
 
 }  // namespace
