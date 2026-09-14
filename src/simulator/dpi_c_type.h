@@ -827,6 +827,21 @@ std::string_view DpiAddressFunctionPointerType();
 bool DpiElementPointerIsMeaningful(
     bool element_represented_as_individual_value);
 
+// §H.12.6: another group of functions is needed for scalars, the elements
+// of an array that are a simple scalar of type bit or logic: svGetBitArrElem
+// and svGetLogicArrElem read one, returning the svBit or svLogic itself, and
+// svPutBitArrElem and svPutLogicArrElem write one, taking the value itself,
+// each with its variable argument list form and the specialized forms for
+// one, two and three indices. The group an element's type takes is that of
+// its access method (§H.12.3): the scalar group for a scalar, the canonical
+// group of §H.12.5 for a packed array, and the address group of §H.12.4 for
+// a type compatible with C.
+enum class DpiElementFunctionGroup : uint8_t { kScalar, kCanonical, kAddress };
+
+DpiElementFunctionGroup DpiElementFunctionGroupOf(DataTypeKind kind,
+                                                  uint32_t width);
+std::string_view DpiScalarElementFunction(bool four_state, bool put);
+
 // §H.11.3: a packed struct or union argument corresponds to a
 // one-dimensional packed array argument of its width, of type bit where its
 // members are 2-state and logic where 4-state -- the formal DpiCTypeOfFormal

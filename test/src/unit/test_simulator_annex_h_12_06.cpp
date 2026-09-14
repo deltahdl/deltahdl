@@ -1,5 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <type_traits>
+
+#include "parser/ast.h"
+#include "simulator/dpi_c_type.h"
 #include "simulator/svdpi.h"
 #include "simulator/svdpi_open_array.h"
 
@@ -26,6 +31,8 @@
 // These tests build an svOpenArrayHandle backed by a real SvOpenArrayDesc
 // buffer whose packed dimension is one bit wide (a scalar element) and observe
 // the svdpi.cpp scalar access functions applying those rules.
+
+using namespace delta;
 
 namespace {
 
@@ -341,6 +348,52 @@ TEST(ScalarElementAccess, OutOfRangeAndNullHandle) {
   // A null-handle Put is a no-op (no crash, nothing to observe but stability).
   svPutBitArrElem1(nullptr, 1, 0);
   svPutLogicArrElem1(nullptr, sv_1, 0);
+}
+
+// ---------------------------------------------------------------------------
+// The clause's prose, modeled in dpi_c_type.h beside the functions above.
+// ---------------------------------------------------------------------------
+
+// §H.12.6: the scalar group serves an element that is a simple scalar of
+// type bit or logic; a packed array element takes the canonical group of
+// §H.12.5 and an element of a type compatible with C the address group of
+// §H.12.4.
+TEST(DpiScalarElementModel, TheScalarGroupServesScalarElementsAlone) {
+  EXPECT_EQ(DpiElementFunctionGroupOf(DataTypeKind::kBit, 1),
+            DpiElementFunctionGroup::kScalar);
+  EXPECT_EQ(DpiElementFunctionGroupOf(DataTypeKind::kLogic, 1),
+            DpiElementFunctionGroup::kScalar);
+  EXPECT_EQ(DpiElementFunctionGroupOf(DataTypeKind::kBit, 8),
+            DpiElementFunctionGroup::kCanonical);
+  EXPECT_EQ(DpiElementFunctionGroupOf(DataTypeKind::kLogic, 64),
+            DpiElementFunctionGroup::kCanonical);
+  EXPECT_EQ(DpiElementFunctionGroupOf(DataTypeKind::kInt, 0),
+            DpiElementFunctionGroup::kAddress);
+  EXPECT_EQ(DpiElementFunctionGroupOf(DataTypeKind::kStruct, 0),
+            DpiElementFunctionGroup::kAddress);
+}
+
+// §H.12.6: the group's four functions by element type and direction.
+TEST(DpiScalarElementModel, TheGroupHasAGetAndAPutForBitAndForLogic) {
+  EXPECT_EQ(DpiScalarElementFunction(false, false), "svGetBitArrElem");
+  EXPECT_EQ(DpiScalarElementFunction(false, true), "svPutBitArrElem");
+  EXPECT_EQ(DpiScalarElementFunction(true, false), "svGetLogicArrElem");
+  EXPECT_EQ(DpiScalarElementFunction(true, true), "svPutLogicArrElem");
+}
+
+// §H.12.6: unlike the canonical group, which copies through a buffer the
+// caller points at, a Get of this group returns the scalar itself, svBit or
+// svLogic, and a Put takes the value itself rather than a pointer to it.
+TEST(DpiScalarElementModel, AGetReturnsTheScalarAndAPutTakesItByValue) {
+  EXPECT_TRUE(
+      (std::is_same<decltype(svGetBitArrElem1(nullptr, 0)), svBit>::value));
+  EXPECT_TRUE(
+      (std::is_same<decltype(svGetLogicArrElem1(nullptr, 0)), svLogic>::value));
+  EXPECT_TRUE((std::is_same<decltype(&svPutBitArrElem1),
+                            void (*)(svOpenArrayHandle, svBit, int)>::value));
+  EXPECT_TRUE(
+      (std::is_same<decltype(&svPutLogicArrElem2),
+                    void (*)(svOpenArrayHandle, svLogic, int, int)>::value));
 }
 
 }  // namespace

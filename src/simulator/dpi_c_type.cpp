@@ -682,6 +682,24 @@ bool DpiElementPointerIsMeaningful(
   return element_represented_as_individual_value;
 }
 
+DpiElementFunctionGroup DpiElementFunctionGroupOf(DataTypeKind kind,
+                                                  uint32_t width) {
+  switch (DpiElementAccessMethodOf(kind, width)) {
+    case DpiElementAccessMethod::kDirectly:
+      return DpiElementFunctionGroup::kScalar;
+    case DpiElementAccessMethod::kCopyingToOrFromCanonical:
+      return DpiElementFunctionGroup::kCanonical;
+    case DpiElementAccessMethod::kGenericPointerWithCasting:
+      return DpiElementFunctionGroup::kAddress;
+  }
+  return DpiElementFunctionGroup::kAddress;
+}
+
+std::string_view DpiScalarElementFunction(bool four_state, bool put) {
+  if (four_state) return put ? "svPutLogicArrElem" : "svGetLogicArrElem";
+  return put ? "svPutBitArrElem" : "svGetBitArrElem";
+}
+
 DpiMemorySide DpiSideProvidingCanonicalBuffer() { return DpiMemorySide::kC; }
 
 bool DpiAccessCopiesThroughCanonicalBuffer(DpiOpenArrayAccess access) {
