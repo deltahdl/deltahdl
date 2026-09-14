@@ -73,6 +73,11 @@ uint32_t DpiSvdpiSrcSymbolCount() { return 2; }
 
 bool DpiPackedArrayMacroMayDefineAnArrayType() { return false; }
 
+bool DpiSvdpiSrcIsNeededForExportCall(
+    bool allocates_representation_dynamically) {
+  return !allocates_representation_dynamically;
+}
+
 DpiArgValue DpiArgValue::FromInt(int32_t v) {
   DpiArgValue a;
   a.type = DataTypeKind::kInt;

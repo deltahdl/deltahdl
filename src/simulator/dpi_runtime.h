@@ -86,6 +86,16 @@ bool DpiApplicationIsRecompiledPerSimulator(bool uses_svdpi_src);
 uint32_t DpiSvdpiSrcSymbolCount();
 bool DpiPackedArrayMacroMayDefineAnArrayType();
 
+// §H.14.6: svdpi_src.h is not needed where a C function dynamically
+// allocates the data structure for the simulator's representation of a
+// packed array to be passed to an exported SystemVerilog function -- a block
+// of svSizeOfLogicPackedArr or svSizeOfBitPackedArr bytes it passes as the
+// opaque reference, reads back into a canonical buffer and frees, using the
+// canonical representation alone from then on -- so such an application
+// stays binary compatible.
+bool DpiSvdpiSrcIsNeededForExportCall(
+    bool allocates_representation_dynamically);
+
 struct DpiRtFunction {
   std::string_view c_name;
   std::string_view sv_name;
