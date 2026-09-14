@@ -10,6 +10,7 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace delta {
 
@@ -108,6 +109,28 @@ class ForeignCodeLocator {
  private:
   std::string root_;
 };
+
+// §J.4.1: the syntax of the object code bootstrap file. Its first line
+// contains the string #!SV_LIBRARIES; an arbitrary number of entries follow,
+// one per line, each holding exactly one library location -- the path name
+// without extension of the object code file to be loaded, equivalent to the
+// value of -sv_lib -- surrounded by any number of blanks, at least one blank
+// preceding the entry in its line; and any number of comment lines, each
+// starting with # after any number of blanks and ending at a newline, can
+// be interspersed between the entries.
+std::string_view ForeignCodeBootstrapHeader();
+
+// The library locations a bootstrap file's text lists, in order, or a
+// description of the first line that departs from the syntax -- a first line
+// without the header, an entry no blank precedes, a line holding more than
+// one entry, or a line that is neither an entry nor a comment.
+struct ForeignCodeBootstrap {
+  std::vector<std::string> libraries;
+  std::string error;
+  bool ok() const { return error.empty(); }
+};
+
+ForeignCodeBootstrap ParseForeignCodeBootstrap(std::string_view text);
 
 }  // namespace delta
 
