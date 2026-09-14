@@ -638,7 +638,7 @@ std::vector<SvActualDimension> DpiCRangesAtCall(
     // §H.12.1: a sized unpacked dimension is normalized to C style, [0:k];
     // an unsized one keeps the actual's original range.
     if (unpacked[k - 1].sized) {
-      const int32_t kSize = static_cast<int32_t>(SizeOfDimension(ranges[k]));
+      const auto kSize = static_cast<int32_t>(SizeOfDimension(ranges[k]));
       ranges[k] = SvActualDimension{0, kSize - 1};
     }
   }

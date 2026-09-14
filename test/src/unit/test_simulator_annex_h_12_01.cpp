@@ -85,9 +85,10 @@ TEST(DpiActualRanges, ASizedFormalIsNormalizedThroughout) {
 }
 
 // §H.12.1 with §H.7.6: under a sized formal the programmer maps the actual's
-// ranges onto C-style ones -- b_64x8[64][-1] is element [0][0] of f2's
-// normalized array and b_64x8[1][-8] its element [63][7] -- where a
-// [n:0]name[0:k] style declaration, the clause's tip, needs no mapping.
+// ranges onto C-style ones, an index counting from the low bound of its
+// dimension -- b_64x8[64][-1] is element [63][7] of f2's normalized array
+// and b_64x8[1][-8] its element [0][0] -- where a [n:0]name[0:k] style
+// declaration, the clause's tip, needs no mapping.
 TEST(DpiActualRanges, TheActualsIndicesMapOntoTheNormalizedOnes) {
   std::vector<uint32_t> first =
       DpiCIndicesOfUnpackedElement(UnpackedOfB(), {64, -1});
