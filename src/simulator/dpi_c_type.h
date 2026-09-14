@@ -682,6 +682,26 @@ bool DpiStringMemberStipulationsAreStandalone();
 // array's own indirection and no other.
 std::string_view DpiCTypeOfStringArray(Direction direction);
 
+// §H.11: normalized ranges are used for accessing SystemVerilog arrays,
+// with the exception of formal arguments specified as open arrays. A sized
+// packed or unpacked dimension [L:R] is accessed in C as [size-1:0], so an
+// index counts from the low bound (DpiCIndicesOfUnpackedElement,
+// DpiNormalizedBitIndex); an open array keeps the ranges of the actual bound
+// to it, which the querying functions of §H.12.2 report and by which its
+// elements are indexed in C as in SystemVerilog (§H.12).
+enum class DpiArrayRanges : uint8_t { kNormalized, kOfTheActual };
+
+DpiArrayRanges DpiRangesUsedForAccessing(bool formal_is_open_array);
+
+// The normalized range of a dimension declared [L:R]: [size-1:0].
+SvActualDimension DpiNormalizedRange(SvActualDimension declared);
+
+// The ranges an array's dimensions are accessed by: each normalized for a
+// sized formal, and the declared ranges of the actual as they are for an
+// open array formal.
+std::vector<SvActualDimension> DpiRangesForAccessing(
+    const std::vector<SvActualDimension>& declared, bool formal_is_open_array);
+
 // §H.10.3 with §H.7.8 and §H.11: a packed array member of an unpacked
 // aggregate is declared in the C-compatible struct as an inout formal of
 // its type would be, no direction qualifying it, in the normalized ranges

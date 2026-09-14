@@ -607,6 +607,27 @@ std::string_view DpiCTypeOfStringArray(Direction /*direction*/) {
   return "const char**";
 }
 
+DpiArrayRanges DpiRangesUsedForAccessing(bool formal_is_open_array) {
+  return formal_is_open_array ? DpiArrayRanges::kOfTheActual
+                              : DpiArrayRanges::kNormalized;
+}
+
+SvActualDimension DpiNormalizedRange(SvActualDimension declared) {
+  return SvActualDimension{static_cast<int32_t>(SizeOfDimension(declared)) - 1,
+                           0};
+}
+
+std::vector<SvActualDimension> DpiRangesForAccessing(
+    const std::vector<SvActualDimension>& declared, bool formal_is_open_array) {
+  if (formal_is_open_array) return declared;
+  std::vector<SvActualDimension> normalized;
+  normalized.reserve(declared.size());
+  for (const SvActualDimension& dim : declared) {
+    normalized.push_back(DpiNormalizedRange(dim));
+  }
+  return normalized;
+}
+
 std::string DpiCDeclarationOfAggregateMember(
     std::string_view name, DataTypeKind kind,
     const std::vector<SvActualDimension>& packed_dims,
