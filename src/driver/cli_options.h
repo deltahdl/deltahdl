@@ -9,6 +9,7 @@
 #include "common/types.h"
 #include "elaborator/elaborator_data.h"
 #include "preprocessor/protect_cli.h"
+#include "simulator/foreign_code.h"
 
 namespace delta {
 
@@ -57,8 +58,10 @@ struct CliOptions {
   // occurrence and each resolved as it was processed against the root then
   // in force, so that a relative name written before -sv_root resolves
   // against the working directory and one written after against the root.
+  // §J.4.2 c) has a bootstrap file's entries resolve against that same root,
+  // which each -sv_liblist keeps beside the file's location.
   std::vector<std::string> sv_libs;
-  std::vector<std::string> sv_liblists;
+  std::vector<ForeignCodeLibList> sv_liblists;
 
   std::vector<std::pair<std::string, std::string>> defines;
   uint64_t max_time = 0;

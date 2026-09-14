@@ -173,8 +173,8 @@ TEST(ForeignCodeObjectInclusion, TheDriverTakesSvLibAndSvLiblistAsProcessed) {
   EXPECT_EQ(opts.sv_libs[0], kCwd + "/early/lib");
   EXPECT_EQ(opts.sv_libs[1], "/ip/late/lib");
   ASSERT_EQ(opts.sv_liblists.size(), 2u);
-  EXPECT_EQ(opts.sv_liblists[0], "/abs/boot.txt");
-  EXPECT_EQ(opts.sv_liblists[1], "/ip/proj/boot");
+  EXPECT_EQ(opts.sv_liblists[0].path, "/abs/boot.txt");
+  EXPECT_EQ(opts.sv_liblists[1].path, "/ip/proj/boot");
   EXPECT_EQ(opts.source_files, std::vector<std::string>{"top.sv"});
 }
 

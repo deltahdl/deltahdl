@@ -246,4 +246,26 @@ std::vector<ForeignCodeLibrary> ForeignCodeLoadOrder(
   return order;
 }
 
+std::vector<std::string> ForeignCodeResolveBootstrapEntries(
+    const ForeignCodeBootstrap& file, std::string_view root) {
+  ForeignCodeLocator locator;
+  locator.SetRoot(root);
+  std::vector<std::string> resolved;
+  resolved.reserve(file.libraries.size());
+  for (const std::string& entry : file.libraries) {
+    resolved.push_back(locator.Resolve(entry));
+  }
+  return resolved;
+}
+
+std::vector<std::string> ForeignCodeLibraryFileNames(
+    const std::vector<ForeignCodeLibrary>& order) {
+  std::vector<std::string> names;
+  names.reserve(order.size());
+  for (const ForeignCodeLibrary& library : order) {
+    names.push_back(ForeignCodeSharedLibraryFileName(library.path));
+  }
+  return names;
+}
+
 }  // namespace delta

@@ -217,6 +217,35 @@ std::vector<ForeignCodeLibrary> ForeignCodeLoadOrder(
     const std::vector<std::string>& bootstrap_entries,
     const std::vector<std::string>& lib_switch_values);
 
+// §J.4.2: the examples of the annex. Example a) has a bootstrap file and a
+// list of -sv_lib switches naming the same libraries under one -sv_root load
+// the same files, the two methods being equivalent; example b) has -sv_lib
+// values resolve against the working directory before any -sv_root and
+// against the root in force after each; and example c) has the entries of a
+// bootstrap file resolve against the root in force when the -sv_liblist
+// switch naming the file was processed, an absolute entry left as it is, so
+// that a later -sv_root moves the entries of a later bootstrap file only. A
+// specification therefore keeps, with each bootstrap file's location, the
+// root its entries resolve against.
+struct ForeignCodeLibList {
+  // The bootstrap file's location, resolved as §J.3 has it.
+  std::string path;
+  // The root in force when the switch naming the file was processed: the
+  // directory -sv_root gave, or the working directory while none had.
+  std::string root;
+};
+
+// The entries of a bootstrap file, each resolved as §J.3 has it against
+// `root`, the root in force when the -sv_liblist switch naming the file was
+// processed, the working directory where `root` is empty.
+std::vector<std::string> ForeignCodeResolveBootstrapEntries(
+    const ForeignCodeBootstrap& file, std::string_view root);
+
+// The file names the libraries of a load order are loaded from, in order,
+// the platform's extension appended to each path name.
+std::vector<std::string> ForeignCodeLibraryFileNames(
+    const std::vector<ForeignCodeLibrary>& order);
+
 }  // namespace delta
 
 #endif  // DELTA_SIMULATOR_FOREIGN_CODE_H_

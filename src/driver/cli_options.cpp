@@ -81,18 +81,38 @@ bool TakeValue(std::string_view arg, std::string_view name, ArgCursor cur,
   return true;
 }
 
-// The same for a path name of Annex J, resolved as §J.3 has it -- against the
-// -sv_root in force when the option is processed, the working directory while
-// none is -- so that the value kept is the location the switch specified.
+// The locator of §J.3 as it stands while an option is processed: the -sv_root
+// in force, the working directory while none is.
+ForeignCodeLocator LocatorInForce(const CliOptions& opts) {
+  ForeignCodeLocator locator;
+  locator.SetRoot(opts.sv_root);
+  return locator;
+}
+
+// The same for a path name of Annex J, resolved as §J.3 has it against the
+// locator in force, so that the value kept is the location the switch
+// specified.
 bool TakeResolvedPath(std::string_view arg, std::string_view name,
                       ArgCursor cur, std::vector<std::string>& out) {
   const int kBefore = cur.i;
   std::string value;
   if (!TakeValue(arg, name, cur, value)) return false;
   if (cur.i == kBefore) return true;
-  ForeignCodeLocator locator;
-  locator.SetRoot(cur.opts.sv_root);
-  out.push_back(locator.Resolve(value));
+  out.push_back(LocatorInForce(cur.opts).Resolve(value));
+  return true;
+}
+
+// The same for -sv_liblist, which keeps beside the bootstrap file's location
+// the root in force when the switch was processed, since §J.4.2 c) has the
+// file's entries resolve against that root rather than against a later one.
+bool TakeLibList(std::string_view arg, ArgCursor cur,
+                 std::vector<ForeignCodeLibList>& out) {
+  const int kBefore = cur.i;
+  std::string value;
+  if (!TakeValue(arg, ForeignCodeLibListSwitch(), cur, value)) return false;
+  if (cur.i == kBefore) return true;
+  const ForeignCodeLocator kLocator = LocatorInForce(cur.opts);
+  out.push_back({kLocator.Resolve(value), kLocator.Root()});
   return true;
 }
 
@@ -283,8 +303,7 @@ bool TryParseLibArg(std::string_view arg, int& i, int argc,
   if (TakeResolvedPath(arg, ForeignCodeLibSwitch(), cur, opts.sv_libs)) {
     return true;
   }
-  return TakeResolvedPath(arg, ForeignCodeLibListSwitch(), cur,
-                          opts.sv_liblists);
+  return TakeLibList(arg, cur, opts.sv_liblists);
 }
 
 bool TryParseDefineArg(std::string_view arg, int& i, int argc,
