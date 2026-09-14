@@ -159,7 +159,11 @@ std::string DpiCDeclarationOfUnpackedFormal(
       kPacked ? DpiCanonicalElementType(formal.type)
               : SmallCType(formal.type, formal.is_unsigned);
   if (kElement.empty()) return "";
-  std::string decl = formal.direction == Direction::kInput ? "const " : "";
+  // §H.8.10.1: a string element's const char* already carries the const an
+  // input has, and an array of strings is const char** in every direction.
+  const bool kQualify =
+      formal.direction == Direction::kInput && !kElement.starts_with("const ");
+  std::string decl = kQualify ? "const " : "";
   decl += kElement + " " + std::string(formal.name);
   for (const SvActualDimension& dim : unpacked_dims) {
     decl += "[" + std::to_string(SizeOfDimension(dim)) + "]";
@@ -586,5 +590,13 @@ DpiMemorySide DpiSideCopyingString(DpiStringPointerProvider provider) {
 }
 
 bool DpiStringCharactersMayBeModifiedByReceiver() { return false; }
+
+std::string_view DpiCTypeOfStringMember() { return "const char*"; }
+
+bool DpiStringMemberStipulationsAreStandalone() { return true; }
+
+std::string_view DpiCTypeOfStringArray(Direction /*direction*/) {
+  return "const char**";
+}
 
 }  // namespace delta

@@ -181,8 +181,9 @@ std::string DpiCTypeOfBasicType(DataTypeKind kind, bool is_unsigned);
 // A packed element is its canonical array of chunks (§H.7.7), one more
 // dimension of ceil(width/32) of them, so `logic [17:0] b [1:10][31:0]` is
 // `svLogicVecVal b[10][32][1]`; an input's element is const, as §H.8.7 has
-// every input. An empty string is returned for an element type the DPI
-// does not pass.
+// every input, which a string's const char* already carries so that an
+// array of strings is `const char* s[3]` in every direction (§H.8.10.1).
+// An empty string is returned for an element type the DPI does not pass.
 std::string DpiCDeclarationOfUnpackedFormal(
     const DpiArg& formal, const std::vector<SvActualDimension>& unpacked_dims);
 
@@ -655,5 +656,26 @@ DpiMemorySide DpiSideCopyingString(DpiStringPointerProvider provider);
 
 // Whether the side receiving a string may modify its characters: never.
 bool DpiStringCharactersMayBeModifiedByReceiver();
+
+// §H.8.10.1: a string contained in an aggregate argument is represented
+// by a const char* member too, and every stipulation of §H.8.10 on a
+// stand-alone string applies to it as well. An array of strings takes no
+// extra level of indirection, the one a stand-alone output or inout has:
+// by §H.7.8 every array of strings is represented in C as const char**,
+// whatever its direction.
+
+// The C type of a string member of an aggregate: Table H.1's const char*.
+std::string_view DpiCTypeOfStringMember();
+
+// Whether the stipulations on a string member of an aggregate are those on
+// a stand-alone string argument -- who provides its pointer, who may free
+// its storage, who copies it and that its characters are not modified:
+// always.
+bool DpiStringMemberStipulationsAreStandalone();
+
+// The C type of an array of strings in the direction: const char** for an
+// input, an output and an inout alike, the element const char* with the
+// array's own indirection and no other.
+std::string_view DpiCTypeOfStringArray(Direction direction);
 
 }  // namespace delta
