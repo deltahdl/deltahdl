@@ -127,7 +127,7 @@ std::string_view ForeignCodeBootstrapHeader();
 struct ForeignCodeBootstrap {
   std::vector<std::string> libraries;
   std::string error;
-  bool ok() const { return error.empty(); }
+  bool Ok() const { return error.empty(); }
 };
 
 ForeignCodeBootstrap ParseForeignCodeBootstrap(std::string_view text);

@@ -132,7 +132,7 @@ ForeignCodeBootstrap ParseForeignCodeBootstrap(std::string_view text) {
     if (IsCommentLine(kLine)) continue;
     // §J.4.1 b): otherwise the line holds one entry.
     std::string entry = ParseBootstrapEntry(kLine, line_no, &file.error);
-    if (!file.ok()) return file;
+    if (!file.Ok()) return file;
     file.libraries.push_back(entry);
   }
   if (line_no == 0) file.error = MissingHeaderError();

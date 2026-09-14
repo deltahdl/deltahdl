@@ -19,7 +19,7 @@ TEST(ForeignCodeBootstrapFile, TheFigureFileListsItsFourLibrariesInOrder) {
       " myclibs/lib3\n"
       " proj1/clibs/lib4\n"
       " proj3/clibs/lib2\n");
-  ASSERT_TRUE(kFile.ok()) << kFile.error;
+  ASSERT_TRUE(kFile.Ok()) << kFile.error;
   ASSERT_EQ(kFile.libraries.size(), 4u);
   EXPECT_EQ(kFile.libraries[0], "myclibs/lib1");
   EXPECT_EQ(kFile.libraries[1], "myclibs/lib3");
@@ -37,7 +37,7 @@ TEST(ForeignCodeBootstrapFile, BlanksSurroundEntriesAndCommentsAreSkipped) {
       "\t  vendor/model   \n"
       "   # and the project's\n"
       " proj/lib\n");
-  ASSERT_TRUE(kFile.ok()) << kFile.error;
+  ASSERT_TRUE(kFile.Ok()) << kFile.error;
   ASSERT_EQ(kFile.libraries.size(), 2u);
   EXPECT_EQ(kFile.libraries[0], "vendor/model");
   EXPECT_EQ(kFile.libraries[1], "proj/lib");
@@ -46,10 +46,10 @@ TEST(ForeignCodeBootstrapFile, BlanksSurroundEntriesAndCommentsAreSkipped) {
 // §J.4.1 a): the first line contains the header string, and a file whose
 // first line does not is no bootstrap file -- an empty file among them.
 TEST(ForeignCodeBootstrapFile, TheFirstLineMustCarryTheHeader) {
-  EXPECT_FALSE(ParseForeignCodeBootstrap(" myclibs/lib1\n").ok());
-  EXPECT_FALSE(ParseForeignCodeBootstrap("").ok());
-  EXPECT_TRUE(ParseForeignCodeBootstrap("#!SV_LIBRARIES\n").ok());
-  EXPECT_TRUE(ParseForeignCodeBootstrap("#!SV_LIBRARIES").ok());
+  EXPECT_FALSE(ParseForeignCodeBootstrap(" myclibs/lib1\n").Ok());
+  EXPECT_FALSE(ParseForeignCodeBootstrap("").Ok());
+  EXPECT_TRUE(ParseForeignCodeBootstrap("#!SV_LIBRARIES\n").Ok());
+  EXPECT_TRUE(ParseForeignCodeBootstrap("#!SV_LIBRARIES").Ok());
 }
 
 // §J.4.1 b): at least one blank precedes an entry, a line holds exactly one
@@ -57,15 +57,15 @@ TEST(ForeignCodeBootstrapFile, TheFirstLineMustCarryTheHeader) {
 TEST(ForeignCodeBootstrapFile, AnEntryIsOnePathPrecededByABlank) {
   const ForeignCodeBootstrap kUnpreceded =
       ParseForeignCodeBootstrap("#!SV_LIBRARIES\nmyclibs/lib1\n");
-  EXPECT_FALSE(kUnpreceded.ok());
+  EXPECT_FALSE(kUnpreceded.Ok());
   EXPECT_NE(kUnpreceded.error.find("line 2"), std::string::npos);
   const ForeignCodeBootstrap kTwo =
       ParseForeignCodeBootstrap("#!SV_LIBRARIES\n lib1 lib2\n");
-  EXPECT_FALSE(kTwo.ok());
+  EXPECT_FALSE(kTwo.Ok());
   EXPECT_NE(kTwo.error.find("exactly one"), std::string::npos);
   const ForeignCodeBootstrap kBlank =
       ParseForeignCodeBootstrap("#!SV_LIBRARIES\n   \n lib1\n");
-  EXPECT_FALSE(kBlank.ok());
+  EXPECT_FALSE(kBlank.Ok());
   EXPECT_NE(kBlank.error.find("line 2"), std::string::npos);
 }
 
@@ -75,7 +75,7 @@ TEST(ForeignCodeBootstrapFile, AnEntryIsOnePathPrecededByABlank) {
 TEST(ForeignCodeBootstrapFile, AnEntryIsKeptAsThePathNameWithoutExtension) {
   const ForeignCodeBootstrap kFile =
       ParseForeignCodeBootstrap("#!SV_LIBRARIES\n /abs/dir/lib\n rel/lib\n");
-  ASSERT_TRUE(kFile.ok()) << kFile.error;
+  ASSERT_TRUE(kFile.Ok()) << kFile.error;
   EXPECT_EQ(kFile.libraries[0], "/abs/dir/lib");
   ForeignCodeLocator locator;
   locator.SetRoot("/home/user");
