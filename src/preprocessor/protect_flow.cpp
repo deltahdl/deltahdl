@@ -131,4 +131,22 @@ bool IpAuthorSecretKeyDataMethodNamesAPublicPrivateScheme() { return true; }
 
 bool ToolProvidesAPublicPrivateEncryptionScheme() { return false; }
 
+bool CleartextIsCopiedToTheIpAuthorSecretKeyOutput() {
+  return CleartextIsCopiedToTheToolVendorSecretKeyOutput();
+}
+
+std::span<const std::string_view>
+ExpressionsTheIpAuthorSecretKeyOutputCarries() {
+  return ExpressionsTheToolVendorSecretKeyOutputCarries();
+}
+
+std::span<const std::string_view>
+WhatTheIpAuthorSecretKeyDataBlockIsComposedOf() {
+  return WhatTheToolVendorSecretKeyDataBlockIsComposedOf();
+}
+
+bool IpAuthorSecretKeyOutputNamesThePublicPrivateSchemeAsItsMethod() {
+  return true;
+}
+
 }  // namespace delta

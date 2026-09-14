@@ -150,4 +150,17 @@ bool IpAuthorSecretKeyDataMethodNamesAPublicPrivateScheme();
 // tool's database as §O.4 has it.
 bool ToolProvidesAPublicPrivateEncryptionScheme();
 
+// §O.4.2: the output of the IP author secret key system is the one §O.3.2
+// has the tool generate -- the cleartext copied to the output sections and,
+// for each block, the same ten expressions with the same two blocks on the
+// lines beneath their keywords -- with data_keyname the provider's key name
+// and data_method the public/private encryption scheme's name. What the
+// data are composed of is the same as well.
+bool CleartextIsCopiedToTheIpAuthorSecretKeyOutput();
+std::span<const std::string_view>
+ExpressionsTheIpAuthorSecretKeyOutputCarries();
+std::span<const std::string_view>
+WhatTheIpAuthorSecretKeyDataBlockIsComposedOf();
+bool IpAuthorSecretKeyOutputNamesThePublicPrivateSchemeAsItsMethod();
+
 }  // namespace delta
