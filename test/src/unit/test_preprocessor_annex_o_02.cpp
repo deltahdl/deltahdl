@@ -66,26 +66,30 @@ TEST(EncryptionFlowOverview, WhatIsPlacedWithinTheBlockIsWhatIsProtected) {
 }
 
 // §O.2: information in the begin-end block, once encrypted, is also
-// protected. A pragma expression the author writes inside the block -- here
-// the author's own name and a licence -- is encrypted with the block rather
-// than left in the clear, so the output carries neither, and both come back
-// only under the key.
+// protected. A pragma expression the author writes inside the block -- here a
+// licence -- and a note written beside the design are encrypted with the
+// block rather than left in the clear, so the output carries neither, and
+// both come back only under the key. The three expressions §34.5.5, §34.5.6
+// and §34.5.30 have an envelope publish in the clear -- the author's name,
+// what more the author offers and the documentation nothing interprets -- are
+// the standard's own exception and are lifted out of the block by those
+// subclauses, so none of them is written here.
 TEST(EncryptionFlowOverview, InformationInTheBlockIsProtectedOnceEncrypted) {
   std::string written = EncryptEnvelopes(
       "`pragma protect begin\n"
-      "`pragma protect author=\"Acme Author\"\n"
       "`pragma protect runtime_license=(library=\"lic.so\", "
       "entry=\"acquire\", feature=\"simulate\")\n"
+      "  // proprietary: the phase detector's gain schedule\n"
       "  initial result = 42;\n"
       "`pragma protect end\n",
       kExchangeKey);
-  EXPECT_FALSE(Holds(written, "Acme Author"));
   EXPECT_FALSE(Holds(written, "lic.so"));
+  EXPECT_FALSE(Holds(written, "gain schedule"));
   std::string cleartext;
   ASSERT_TRUE(DecryptProtectedRegion(TheRecordedBlock(written), kExchangeKey,
                                      &cleartext));
-  EXPECT_TRUE(Holds(cleartext, "author=\"Acme Author\""));
   EXPECT_TRUE(Holds(cleartext, "library=\"lic.so\""));
+  EXPECT_TRUE(Holds(cleartext, "gain schedule"));
   EXPECT_FALSE(DecryptProtectedRegion(TheRecordedBlock(written),
                                       "not-the-authors-key", &cleartext));
 }
