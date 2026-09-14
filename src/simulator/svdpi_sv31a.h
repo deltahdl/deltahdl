@@ -28,6 +28,14 @@
 extern "C" {
 #endif
 
+/* svdpi.h undefines its linkage macros at its end, so the prototypes below
+   carry the same linkage spelled again the way that file spells it. */
+#if (defined(_MSC_VER) || defined(__MINGW32__) || defined(__CYGWIN__))
+#define SV31A_XXTERN __declspec(dllimport)
+#else
+#define SV31A_XXTERN
+#endif
+
 /* 2-state and 4-state vectors, modeled upon PLI's avalue/bvalue */
 #define SV_CANONICAL_SIZE(WIDTH) (((WIDTH) + 31) >> 5)
 
@@ -44,45 +52,50 @@ typedef void* svLogicPackedArrRef;
 
 /* total size in bytes of the simulator's representation of a packed array */
 /* width in bits */
-XXTERN int svSizeOfBitPackedArr(int width);
-XXTERN int svSizeOfLogicPackedArr(int width);
+SV31A_XXTERN int svSizeOfBitPackedArr(int width);
+SV31A_XXTERN int svSizeOfLogicPackedArr(int width);
 
 /* s=source, d=destination, w=width */
 /* actual <-- canonical */
-XXTERN void svPutBitVec32(svBitPackedArrRef d, const svBitVec32* s, int w);
-XXTERN void svPutLogicVec32(svLogicPackedArrRef d, const svLogicVec32* s,
-                            int w);
+SV31A_XXTERN void svPutBitVec32(svBitPackedArrRef d, const svBitVec32* s,
+                                int w);
+SV31A_XXTERN void svPutLogicVec32(svLogicPackedArrRef d, const svLogicVec32* s,
+                                  int w);
 
 /* canonical <-- actual */
-XXTERN void svGetBitVec32(svBitVec32* d, svBitPackedArrRef s, int w);
-XXTERN void svGetLogicVec32(svLogicVec32* d, svLogicPackedArrRef s, int w);
+SV31A_XXTERN void svGetBitVec32(svBitVec32* d, svBitPackedArrRef s, int w);
+SV31A_XXTERN void svGetLogicVec32(svLogicVec32* d, svLogicPackedArrRef s,
+                                  int w);
 
 /* Packed arrays are assumed to be indexed n-1:0, where 0 is the index of
    LSB */
 /* functions for bit-select */
 /* s=source, i=bit-index */
-XXTERN svBit svGetSelectBit(svBitPackedArrRef s, int i);
-XXTERN svLogic svGetSelectLogic(svLogicPackedArrRef s, int i);
+SV31A_XXTERN svBit svGetSelectBit(svBitPackedArrRef s, int i);
+SV31A_XXTERN svLogic svGetSelectLogic(svLogicPackedArrRef s, int i);
 
 /* d=destination, i=bit-index, s=scalar */
-XXTERN void svPutSelectBit(svBitPackedArrRef d, int i, svBit s);
-XXTERN void svPutSelectLogic(svLogicPackedArrRef d, int i, svLogic s);
+SV31A_XXTERN void svPutSelectBit(svBitPackedArrRef d, int i, svBit s);
+SV31A_XXTERN void svPutSelectLogic(svLogicPackedArrRef d, int i, svLogic s);
 
 /* functions for part-select: s=source, d=destination, i=starting bit index,
    w=width like for variable part-selects; limitations: w <= 32 */
 /* canonical <-- actual */
-XXTERN void svGetPartSelectBit(svBitVec32* d, svBitPackedArrRef s, int i,
-                               int w);
-XXTERN svBitVec32 svGetBits(svBitPackedArrRef s, int i, int w);
-XXTERN svBitVec32 svGet32Bits(svBitPackedArrRef s, int i); /* 32-bits */
-XXTERN uint64_t svGet64Bits(svBitPackedArrRef s, int i);   /* 64-bits */
-XXTERN void svGetPartSelectLogic(svLogicVec32* d, svLogicPackedArrRef s, int i,
-                                 int w);
+SV31A_XXTERN void svGetPartSelectBit(svBitVec32* d, svBitPackedArrRef s, int i,
+                                     int w);
+SV31A_XXTERN svBitVec32 svGetBits(svBitPackedArrRef s, int i, int w);
+SV31A_XXTERN svBitVec32 svGet32Bits(svBitPackedArrRef s, int i); /* 32-bits */
+SV31A_XXTERN uint64_t svGet64Bits(svBitPackedArrRef s, int i);   /* 64-bits */
+SV31A_XXTERN void svGetPartSelectLogic(svLogicVec32* d, svLogicPackedArrRef s,
+                                       int i, int w);
 
 /* actual <-- canonical */
-XXTERN void svPutPartSelectBit(svBitPackedArrRef d, svBitVec32 s, int i, int w);
-XXTERN void svPutPartSelectLogic(svLogicPackedArrRef d, svLogicVec32 s, int i,
-                                 int w);
+SV31A_XXTERN void svPutPartSelectBit(svBitPackedArrRef d, svBitVec32 s, int i,
+                                     int w);
+SV31A_XXTERN void svPutPartSelectLogic(svLogicPackedArrRef d, svLogicVec32 s,
+                                       int i, int w);
+
+#undef SV31A_XXTERN
 
 #ifdef __cplusplus
 }
