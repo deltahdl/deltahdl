@@ -179,6 +179,11 @@ void RegisterModuleDpiImports(const RtlirModule* mod, SimContext& ctx) {
     // §H.2: an import declares a task or a function, and only an imported task
     // can in turn call exported tasks.
     func.is_task = item->dpi_is_task;
+    // §H.14.1: a declaration annotated "DPI" selects the SV3.1a argument
+    // passing semantics on the C side and one annotated "DPI-C" the IEEE Std
+    // 1800 semantics, per function.
+    func.packed_arg_passing =
+        DpiPassingSemanticsOfSpecString(item->dpi_spec_string);
     for (const auto& arg : item->func_args) {
       DpiArg formal;
       formal.name = arg.name;

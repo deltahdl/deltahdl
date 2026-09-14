@@ -38,6 +38,28 @@ void DpiAckCurrentDisable() { g_disable_acked = true; }
 
 bool DpiCurrentDisableAcknowledged() { return g_disable_acked; }
 
+DpiCompatibilityLevel DpiCompatibilityLevelOf(std::string_view sv_dpi_version) {
+  return sv_dpi_version == "SV3.1a" ? DpiCompatibilityLevel::kSv31a
+                                    : DpiCompatibilityLevel::kIeee1800;
+}
+
+bool DpiOpaqueHandlesAreRequiredForAllPackedArguments(
+    DpiCompatibilityLevel level) {
+  return level == DpiCompatibilityLevel::kSv31a;
+}
+
+DpiPackedArgPassing DpiPassingSemanticsOfSpecString(
+    std::string_view dpi_spec_string) {
+  return dpi_spec_string == "DPI" ? DpiPackedArgPassing::kSv31aReference
+                                  : DpiPackedArgPassing::kCanonical;
+}
+
+bool DpiSv31aDefinitionsAreObligatoryInSvdpiH() { return false; }
+
+bool DpiCCodeMayFailToBind(bool implementation_supports_sv31a_functionality) {
+  return !implementation_supports_sv31a_functionality;
+}
+
 DpiArgValue DpiArgValue::FromInt(int32_t v) {
   DpiArgValue a;
   a.type = DataTypeKind::kInt;
