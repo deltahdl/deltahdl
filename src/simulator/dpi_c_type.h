@@ -67,6 +67,16 @@ DpiPassingMode DpiPassingModeOfFormal(const DpiArg& formal, bool open_array);
 // The mode a function result is passed in: by value.
 DpiPassingMode DpiPassingModeOfResult();
 
+// §H.8.1: whether a mode is a form of reference, which by reference and by
+// handle are and by value, the exception a small input alone takes, is
+// not.
+bool DpiModeIsAFormOfReference(DpiPassingMode mode);
+
+// §H.8.1: whether a type may be a function result, the result being
+// restricted to small values: a small type, or void for a function
+// returning none.
+bool DpiTypeMayBeAResult(DataTypeKind kind);
+
 // §H.8.3: only a small value of a formal input argument is passed by
 // value, a function result is directly passed by value as well, and the
 // user provides the C type equivalent to the SystemVerilog type of a

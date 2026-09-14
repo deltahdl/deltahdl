@@ -493,4 +493,12 @@ const std::vector<DataTypeKind>& DpiSmallTypes() {
   return kSmall;
 }
 
+bool DpiModeIsAFormOfReference(DpiPassingMode mode) {
+  return mode != DpiPassingMode::kByValue;
+}
+
+bool DpiTypeMayBeAResult(DataTypeKind kind) {
+  return kind == DataTypeKind::kVoid || DpiTypeIsSmall(kind);
+}
+
 }  // namespace delta
