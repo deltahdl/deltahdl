@@ -92,7 +92,7 @@ struct ExampleOneDesign {
     map_id.sv_name = "MapID";
     map_id.c_name = "MyCFunc";
     map_id.is_context = true;
-    map_id.return_type = DataTypeKind::kInteger;
+    map_id.return_type = DataTypeKind::kInt;
     map_id.impl = [](const std::vector<DpiArgValue>& args) -> DpiArgValue {
       return DpiArgValue::FromInt(MyCFunc(args[0].AsInt()));
     };
