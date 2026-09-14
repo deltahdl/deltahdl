@@ -48,8 +48,8 @@ TEST(VpiCompatibilityHeaderProvided,
 }
 
 // §L.1: the inclusion is automatic -- this file named vpi_user.h only, and
-// the guard of src/simulator/vpi_compatibility.h is defined once that include
-// has been read.
+// the mark src/simulator/vpi_compatibility.h leaves of its reading is defined
+// once that include has been read.
 TEST(VpiCompatibilityHeaderProvided, IncludingVpiUserHReadsTheFile) {
 #ifdef VPI_COMPATIBILITY_H
   SUCCEED();

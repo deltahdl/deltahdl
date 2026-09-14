@@ -10,8 +10,9 @@
 // object-like macro) when a mode is active. The two-step stringizer below reads
 // the post-preprocessing spelling of such a name so a test can assert which
 // variant it currently resolves to. Because the macro state of a translation
-// unit is global, the header's include guard is reset between sections so the
-// same source file can exercise several modes in textual order.
+// unit is global, the mark the header leaves of its reading -- §L.2 has it
+// reject a second reading rather than ignore it -- is reset between sections
+// so the same source file can exercise several modes in textual order.
 
 #define DELTA_VPI_STR2(x) #x
 #define DELTA_VPI_STR(x) DELTA_VPI_STR2(x)
@@ -20,7 +21,7 @@
 // the header starts from a clean slate.
 //
 //   undo the 14 retargeted entry points, every selectable version symbol
-//   (including the chained 1800v2012), and the include guard.
+//   (including the chained 1800v2012), and the mark of the reading.
 
 // --- Section: no version selected (default, native data model) ---
 #include "simulator/vpi_compatibility.h"
