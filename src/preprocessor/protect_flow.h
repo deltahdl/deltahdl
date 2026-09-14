@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <span>
 #include <string_view>
 
@@ -24,7 +25,7 @@ bool ProtectionScenariosAreInformative();
 // §O.1: the scenarios the annex describes, one per subclause from §O.3 on:
 // the tool vendor secret key encryption system, the IP author secret key
 // encryption system, and digital envelopes.
-enum class ProtectionScenario {
+enum class ProtectionScenario : std::uint8_t {
   kToolVendorSecretKey,
   kIpAuthorSecretKey,
   kDigitalEnvelope,
@@ -36,7 +37,7 @@ std::string_view PragmaUsedForProtection();
 
 // §O.1: the effects the pragmas are used to achieve -- securely protecting
 // the model, distributing it, and decrypting it.
-enum class ProtectionEffect {
+enum class ProtectionEffect : std::uint8_t {
   kSecurelyProtecting,
   kDistributing,
   kDecrypting,
