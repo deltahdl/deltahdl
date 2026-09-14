@@ -22,6 +22,11 @@ struct VpiStrengthVal {
   int s1 = 0;
 };
 
+struct VpiTime;
+
+// §K.2 (s_vpi_value): the format names which arm of the union is live. The
+// annex gives the union eight arms; time is the one a vpiTimeVal read fills
+// and misc the one the annex leaves for any other value.
 struct VpiValue {
   int format = 0;
   union {
@@ -29,8 +34,10 @@ struct VpiValue {
     double real;
     const char* str;
     int scalar;
+    VpiTime* time;
     VpiVectorVal* vector;
     VpiStrengthVal* strength;
+    char* misc;
   } value = {};
 };
 

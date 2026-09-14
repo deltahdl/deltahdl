@@ -94,7 +94,7 @@ CheckOptions:
   readability-identifier-naming.TypeAliasIgnoredRegexp: 'vpiHandle|s_vpi_.*|s_cb_data|SVpi.*|PLI_.*'
   readability-identifier-naming.TypedefCase: CamelCase
   # IEEE 1800-2023 Annex I/K/L/M: VPI/DPI C-API typedefs and struct tags
-  readability-identifier-naming.TypedefIgnoredRegexp: 's_vpi_.*|s_cb_data|sv[A-Z].*|t_vpi_.*|p_vpi_.*|vpi_assertion_callback_func'
+  readability-identifier-naming.TypedefIgnoredRegexp: 's_vpi_.*|s_cb_data|p_cb_data|sv[A-Z].*|t_vpi_.*|p_vpi_.*|vpi_assertion_callback_func'
   readability-identifier-naming.VariableCase: lower_case
 # Disabled checks (only valid exceptions, see header rule 4):
 # - bugprone-random-generator-seed: IEEE 1800-2023 18.13/18.14 require

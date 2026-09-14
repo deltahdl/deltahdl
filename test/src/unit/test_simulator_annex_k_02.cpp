@@ -1,18 +1,41 @@
+// §K.2 defines PLI_DLLISPEC only where nothing defined it before the include,
+// and takes back at the end of the file only the one it defined itself; this
+// definition, made ahead of the first include, is what the portability tests
+// below look for afterwards.
+#define PLI_DLLISPEC
+
 #include <gtest/gtest.h>
 
+#include <type_traits>
+
 #include "simulator/sv_vpi_user.h"
+#include "simulator/svdpi.h"
 #include "simulator/vpi.h"
 
 namespace {
 
+// §K.2 numbers the value formats from vpiBinStrVal at 1 through
+// vpiRawFourStateVal at 18, vpiDecStrVal standing third so that every format
+// after it is one higher than a header that left the decimal string out.
 TEST(VpiConstantAndStructSim, ValueFormatConstants) {
   EXPECT_EQ(vpiBinStrVal, 1);
   EXPECT_EQ(vpiOctStrVal, 2);
-  EXPECT_EQ(vpiHexStrVal, 3);
-  EXPECT_EQ(vpiScalarVal, 4);
-  EXPECT_EQ(vpiIntVal, 5);
-  EXPECT_EQ(vpiRealVal, 6);
-  EXPECT_EQ(vpiStringVal, 7);
+  EXPECT_EQ(vpiDecStrVal, 3);
+  EXPECT_EQ(vpiHexStrVal, 4);
+  EXPECT_EQ(vpiScalarVal, 5);
+  EXPECT_EQ(vpiIntVal, 6);
+  EXPECT_EQ(vpiRealVal, 7);
+  EXPECT_EQ(vpiStringVal, 8);
+  EXPECT_EQ(vpiVectorVal, 9);
+  EXPECT_EQ(vpiStrengthVal, 10);
+  EXPECT_EQ(vpiTimeVal, 11);
+  EXPECT_EQ(vpiObjTypeVal, 12);
+  EXPECT_EQ(vpiSuppressVal, 13);
+  EXPECT_EQ(vpiShortIntVal, 14);
+  EXPECT_EQ(vpiLongIntVal, 15);
+  EXPECT_EQ(vpiShortRealVal, 16);
+  EXPECT_EQ(vpiRawTwoStateVal, 17);
+  EXPECT_EQ(vpiRawFourStateVal, 18);
 }
 
 TEST(VpiConstantAndStructSim, ObjectTypeConstants) {
@@ -23,15 +46,74 @@ TEST(VpiConstantAndStructSim, ObjectTypeConstants) {
   EXPECT_EQ(vpiCallback, 107);
 }
 
+// §K.2 has vpiScaledRealTime first among the time types, the same numbering
+// the svdpi.h of Annex I carries, so a time structure filled by a DPI call
+// reads the same to a VPI routine.
 TEST(VpiConstantAndStructSim, TimeTypeConstants) {
-  EXPECT_EQ(vpiSimTime, 1);
-  EXPECT_EQ(vpiScaledRealTime, 2);
+  EXPECT_EQ(vpiScaledRealTime, 1);
+  EXPECT_EQ(vpiSimTime, 2);
+  EXPECT_EQ(vpiSuppressTime, 3);
 }
 
+// §K.2 numbers the callback reasons in four groups: the simulation-related
+// reasons 1 through 4, the time-related 5 through 9, the action-related 10
+// through 24, and those added with 1364-2001 and 1364-2005 from 25 through
+// 31.
 TEST(VpiConstantAndStructSim, CallbackReasonConstants) {
   EXPECT_EQ(cbValueChange, 1);
-  EXPECT_EQ(cbReadWriteSynch, 2);
-  EXPECT_EQ(cbEndOfSimulation, 3);
+  EXPECT_EQ(cbStmt, 2);
+  EXPECT_EQ(cbForce, 3);
+  EXPECT_EQ(cbRelease, 4);
+  EXPECT_EQ(cbAtStartOfSimTime, 5);
+  EXPECT_EQ(cbReadWriteSynch, 6);
+  EXPECT_EQ(cbReadOnlySynch, 7);
+  EXPECT_EQ(cbNextSimTime, 8);
+  EXPECT_EQ(cbAfterDelay, 9);
+  EXPECT_EQ(cbEndOfCompile, 10);
+  EXPECT_EQ(cbStartOfSimulation, 11);
+  EXPECT_EQ(cbEndOfSimulation, 12);
+  EXPECT_EQ(cbError, 13);
+  EXPECT_EQ(cbTchkViolation, 14);
+  EXPECT_EQ(cbStartOfSave, 15);
+  EXPECT_EQ(cbEndOfSave, 16);
+  EXPECT_EQ(cbStartOfRestart, 17);
+  EXPECT_EQ(cbEndOfRestart, 18);
+  EXPECT_EQ(cbStartOfReset, 19);
+  EXPECT_EQ(cbEndOfReset, 20);
+  EXPECT_EQ(cbEnterInteractive, 21);
+  EXPECT_EQ(cbExitInteractive, 22);
+  EXPECT_EQ(cbInteractiveScopeChange, 23);
+  EXPECT_EQ(cbUnresolvedSystf, 24);
+  EXPECT_EQ(cbAssign, 25);
+  EXPECT_EQ(cbDeassign, 26);
+  EXPECT_EQ(cbDisable, 27);
+  EXPECT_EQ(cbPLIError, 28);
+  EXPECT_EQ(cbSignal, 29);
+  EXPECT_EQ(cbNBASynch, 30);
+  EXPECT_EQ(cbAtEndOfSimTime, 31);
+}
+
+// §K.2 numbers the generic and module properties, the vpi_control()
+// operations and the scalar values; each of these once carried another
+// property's or operation's number, so a PLI application written to the annex
+// asked the tool for one thing and was answered about another.
+TEST(VpiConstantAndStructSim, PropertyControlAndScalarConstants) {
+  EXPECT_EQ(vpiDefName, 9);
+  EXPECT_EQ(vpiDirection, 20);
+  EXPECT_EQ(vpiCell, 51);
+  EXPECT_EQ(vpiConfig, 52);
+  EXPECT_EQ(vpiLibrary, 58);
+  EXPECT_EQ(vpiStop, 66);
+  EXPECT_EQ(vpiFinish, 67);
+  EXPECT_EQ(vpiReset, 68);
+  EXPECT_EQ(vpiSetInteractiveScope, 69);
+  EXPECT_EQ(vpi0, 0);
+  EXPECT_EQ(vpi1, 1);
+  EXPECT_EQ(vpiZ, 2);
+  EXPECT_EQ(vpiX, 3);
+  EXPECT_EQ(vpiH, 4);
+  EXPECT_EQ(vpiL, 5);
+  EXPECT_EQ(vpiDontCare, 6);
 }
 
 TEST(VpiConstantAndStructSim, VpiValueDefaultInit) {
@@ -664,6 +746,97 @@ TEST(VpiUserHeader, StrengthMasksOccupyDistinctBits) {
             vpiWeakDrive | vpiMediumCharge | vpiSmallCharge | vpiHiZ;
   EXPECT_EQ(all, 0xFF);
   EXPECT_EQ(vpiSupplyDrive & vpiStrongDrive, 0);
+}
+
+// §K.2 guards the 64-bit sized types with SVPI_TYPES and the rest with
+// PLI_TYPES, so that a file which brought its own definitions of them under
+// those names is not handed a second set; the file defines both where it
+// defines the types.
+TEST(VpiUserHeaderPortability, TheSizedTypeGuardsAreDefined) {
+#if defined(SVPI_TYPES) && defined(PLI_TYPES)
+  SUCCEED();
+#else
+  FAIL() << "vpi_user.h defines SVPI_TYPES and PLI_TYPES with the sized types";
+#endif
+}
+
+// §K.2 guards the time structure with VPI_TIME and the vector value with
+// VPI_VECVAL, the guards svdpi.h of Annex I tests before laying down its own
+// copies of the two; read after vpi_user.h, svdpi.h finds both and its
+// svTimeVal and svLogicVecVal are this file's s_vpi_time and s_vpi_vecval.
+TEST(VpiUserHeaderPortability, TheStructureGuardsMakeSvdpiHShareTheTypes) {
+#if defined(VPI_TIME) && defined(VPI_VECVAL)
+  SUCCEED();
+#else
+  FAIL() << "vpi_user.h defines VPI_TIME and VPI_VECVAL with the structures";
+#endif
+  static_assert(std::is_same_v<svTimeVal, s_vpi_time>);
+  static_assert(std::is_same_v<svLogicVecVal, s_vpi_vecval>);
+  EXPECT_EQ(sv_scaled_real_time, vpiScaledRealTime);
+  EXPECT_EQ(sv_sim_time, vpiSimTime);
+}
+
+// §K.2 ends the file by undefining PLI_EXTERN and PLI_VEXTERN, and, with
+// PLI_PROTOTYPES, the PROTO_PARAMS, XXTERN and EETERN it wrote its declarations
+// with, so that none of them is left for the code after the include.
+TEST(VpiUserHeaderPortability, TheFileTakesBackItsPrototypeMacros) {
+#if defined(PLI_EXTERN) || defined(PLI_VEXTERN) || defined(PLI_PROTOTYPES) || \
+    defined(PROTO_PARAMS) || defined(XXTERN) || defined(EETERN)
+  FAIL() << "vpi_user.h leaves none of its prototype macros defined";
+#else
+  SUCCEED();
+#endif
+}
+
+// §K.2 defines a DLL specification only where the includer defined none, and
+// records with VPI_USER_DEFINED_DLLISPEC that it did so, undefining both at
+// the end; the PLI_DLLISPEC this file defined before the include is therefore
+// still defined after it, and the record is not.
+TEST(VpiUserHeaderPortability, ADllSpecificationDefinedBeforeTheIncludeStands) {
+#if defined(PLI_DLLISPEC) && !defined(VPI_USER_DEFINED_DLLISPEC)
+  SUCCEED();
+#else
+  FAIL() << "a PLI_DLLISPEC defined before vpi_user.h is read survives it";
+#endif
+}
+
+// §K.2 ends each structure definition with a pointer spelling beside the
+// structure's, and declares the routines that take a pointer with it:
+// vpi_register_cb takes a p_cb_data, vpi_chk_error a p_vpi_error_info and
+// vpi_get_vlog_info a p_vpi_vlog_info.
+TEST(VpiUserHeaderPortability, EachStructureHasItsPointerSpelling) {
+  static_assert(std::is_same_v<p_vpi_time, s_vpi_time*>);
+  static_assert(std::is_same_v<p_vpi_value, s_vpi_value*>);
+  static_assert(std::is_same_v<p_vpi_vecval, s_vpi_vecval*>);
+  static_assert(std::is_same_v<p_vpi_strengthval, s_vpi_strengthval*>);
+  static_assert(std::is_same_v<p_vpi_delay, s_vpi_delay*>);
+  static_assert(std::is_same_v<p_vpi_arrayvalue, s_vpi_arrayvalue*>);
+  static_assert(std::is_same_v<p_vpi_systf_data, s_vpi_systf_data*>);
+  static_assert(std::is_same_v<p_vpi_vlog_info, s_vpi_vlog_info*>);
+  static_assert(std::is_same_v<p_vpi_error_info, s_vpi_error_info*>);
+  static_assert(std::is_same_v<p_cb_data, s_cb_data*>);
+  static_assert(
+      std::is_same_v<decltype(&vpi_register_cb), vpiHandle (*)(p_cb_data)>);
+  static_assert(std::is_same_v<decltype(&vpi_chk_error),
+                               PLI_INT32 (*)(p_vpi_error_info)>);
+  static_assert(std::is_same_v<decltype(&vpi_get_vlog_info),
+                               PLI_INT32 (*)(p_vpi_vlog_info)>);
+  SUCCEED();
+}
+
+// §K.2 gives the value union eight arms, a time arm for a vpiTimeVal and a
+// misc arm for any other value among them; each is a pointer the application
+// can set and read back through the same union.
+TEST(VpiUserHeaderPortability, TheValueUnionHasTheTimeAndMiscArms) {
+  s_vpi_time t = {};
+  t.type = vpiSimTime;
+  s_vpi_value v = {};
+  v.format = vpiTimeVal;
+  v.value.time = &t;
+  EXPECT_EQ(v.value.time->type, vpiSimTime);
+  char misc[] = "other";
+  v.value.misc = misc;
+  EXPECT_STREQ(v.value.misc, "other");
 }
 
 }  // namespace

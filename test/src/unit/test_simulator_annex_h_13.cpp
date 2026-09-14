@@ -9,14 +9,11 @@
 #include "simulator/vpi.h"
 
 // Annex H.13 functions under test. They belong to the DPI C layer (svdpi.cpp)
-// and are declared in svdpi.h, but svdpi.h cannot be included in this
-// translation unit: it spells the time-form constants vpiSimTime and
-// vpiScaledRealTime with the two swapped relative to vpi.h, and redefines
-// s_vpi_time, which this test needs from vpi.h to build the simulation-time
-// state and to compare against vpi_get(). H.13 states that svTimeVal is "fully
-// equivalent to s_vpi_time", so the layout-identical delta::VpiTime stands in
-// for svTimeVal across the C ABI; driving svGetTime through it also exercises
-// that equivalence.
+// and are declared in svdpi.h, which this translation unit does not include:
+// its svScope is a pointer to non-const, and the scopes this test registers
+// are const. H.13 states that svTimeVal is "fully equivalent to s_vpi_time",
+// so the layout-identical delta::VpiTime stands in for svTimeVal across the C
+// ABI; driving svGetTime through it also exercises that equivalence.
 extern "C" {
 int svGetTime(const void* scope, delta::VpiTime* time);
 int svGetTimeUnit(const void* scope, int32_t* time_unit);
@@ -26,12 +23,12 @@ int svGetTimePrecision(const void* scope, int32_t* time_precision);
 namespace delta {
 namespace {
 
-// svdpi.h encodes the requested time form in svTimeVal.type. These are its
-// values (sv_scaled_real_time and sv_sim_time); vpi.h spells the same two names
-// swapped, so the field must be set with svdpi.h's encoding for svGetTime to
-// interpret the request the way the standard svdpi.h does.
-constexpr int kSvScaledRealTime = 1;
-constexpr int kSvSimTime = 2;
+// svdpi.h encodes the requested time form in svTimeVal.type as
+// sv_scaled_real_time and sv_sim_time, which Annex I defines as the
+// vpiScaledRealTime and vpiSimTime of Annex K; §K.2 numbers those 1 and 2, and
+// the two headers agree, so the request is written with vpi.h's names.
+constexpr int kSvScaledRealTime = vpiScaledRealTime;
+constexpr int kSvSimTime = vpiSimTime;
 
 class SvGetTimeSim : public ::testing::Test {
  protected:

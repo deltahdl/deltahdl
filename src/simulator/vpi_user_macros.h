@@ -6,11 +6,22 @@
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_model_helpers3.h"
 #include "simulator/vpi_pli_types.h"
+#include "simulator/vpi_portability.h"
 
 using vpiHandle = delta::VpiHandle;
+
+// §K.2 ends each structure definition with the two spellings a PLI
+// application is written against, s_vpi_xxx for the structure and p_vpi_xxx
+// for a pointer to it, so a routine that takes p_vpi_value or p_cb_data in the
+// annex takes the same name here. The pointer spellings are typedefs rather
+// than using-aliases for the reason p_vpi_delay is one - the name is the
+// standard's, and the alias naming rule admits it only in that spelling.
 using s_vpi_value = delta::VpiValue;
+typedef delta::VpiValue* p_vpi_value;
 using s_vpi_time = delta::VpiTime;
+typedef delta::VpiTime* p_vpi_time;
 using s_cb_data = delta::VpiCbData;
+typedef delta::VpiCbData* p_cb_data;
 using s_vpi_systf_data = delta::VpiSystfData;
 // §38.37 Figure 38-18 ends the structure definition "} s_vpi_systf_data,
 // *p_vpi_systf_data;", so the pointer spelling is part of the interface a PLI
@@ -22,6 +33,24 @@ using s_vpi_systf_data = delta::VpiSystfData;
 // spelling.
 typedef delta::VpiSystfData* p_vpi_systf_data;
 using s_vpi_vecval = delta::VpiVectorVal;
+typedef delta::VpiVectorVal* p_vpi_vecval;
+
+// §K.2 guards the time structure with VPI_TIME and the vector value with
+// VPI_VECVAL, the two being definitions svdpi.h of Annex I carries as well for
+// a DPI application that never reads this file. Each is defined here once the
+// structure is, so that an svdpi.h read after this file finds the structure
+// present and takes this file's rather than laying its own beside it.
+#define VPI_TIME
+#define VPI_VECVAL
+
+// §K.2 names the execution information structure s_vpi_vlog_info and the
+// error information structure s_vpi_error_info, the names vpi_get_vlog_info()
+// and vpi_chk_error() take their argument under; the CamelCase spellings are
+// what this tool's own sources were written with and stay for them.
+using s_vpi_vlog_info = delta::VpiVlogInfo;
+typedef delta::VpiVlogInfo* p_vpi_vlog_info;
+using s_vpi_error_info = delta::VpiErrorInfo;
+typedef delta::VpiErrorInfo* p_vpi_error_info;
 using SVpiErrorInfo = delta::VpiErrorInfo;
 using SVpiVlogInfo = delta::VpiVlogInfo;
 
@@ -34,56 +63,56 @@ using SVpiVlogInfo = delta::VpiVlogInfo;
 
 #define vpiBinStrVal 1
 #define vpiOctStrVal 2
-#define vpiHexStrVal 3
-#define vpiScalarVal 4
-#define vpiIntVal 5
-#define vpiRealVal 6
-#define vpiStringVal 7
-#define vpiTimeVal 8
+#define vpiHexStrVal 4
+#define vpiScalarVal 5
+#define vpiIntVal 6
+#define vpiRealVal 7
+#define vpiStringVal 8
+#define vpiTimeVal 11
 #define vpiVectorVal 9
 
-#define vpiSimTime 1
-#define vpiScaledRealTime 2
+#define vpiSimTime 2
+#define vpiScaledRealTime 1
 
 #define cbValueChange 1
-#define cbReadWriteSynch 2
-#define cbEndOfSimulation 3
-#define cbStmt 4
+#define cbReadWriteSynch 6
+#define cbEndOfSimulation 12
+#define cbStmt 2
 #define cbAtStartOfSimTime 5
-#define cbReadOnlySynch 6
-#define cbAfterDelay 7
+#define cbReadOnlySynch 7
+#define cbAfterDelay 9
 #define cbNextSimTime 8
-#define cbNBASynch 9
-#define cbAtEndOfSimTime 10
+#define cbNBASynch 30
+#define cbAtEndOfSimTime 31
 
 // §38.36.3 simulator action/feature callback reasons (mirror of the kCb*
 // values).
-#define cbEndOfCompile 11
-#define cbStartOfSimulation 12
+#define cbEndOfCompile 10
+#define cbStartOfSimulation 11
 #define cbError 13
-#define cbPLIError 14
-#define cbTchkViolation 15
-#define cbSignal 16
-#define cbStartOfSave 17
-#define cbEndOfSave 18
-#define cbStartOfRestart 19
-#define cbEndOfRestart 20
-#define cbStartOfReset 21
-#define cbEndOfReset 22
-#define cbEnterInteractive 23
-#define cbExitInteractive 24
-#define cbInteractiveScopeChange 25
-#define cbUnresolvedSystf 26
+#define cbPLIError 28
+#define cbTchkViolation 14
+#define cbSignal 29
+#define cbStartOfSave 15
+#define cbEndOfSave 16
+#define cbStartOfRestart 17
+#define cbEndOfRestart 18
+#define cbStartOfReset 19
+#define cbEndOfReset 20
+#define cbEnterInteractive 21
+#define cbExitInteractive 22
+#define cbInteractiveScopeChange 23
+#define cbUnresolvedSystf 24
 
 #define vpiType 1
 #define vpiName 2
 #define vpiFullName 3
 #define vpiSize 4
-#define vpiDirection 5
-#define vpiDefName 6
-#define vpiLibrary 67
-#define vpiConfig 70
-#define vpiCell 71
+#define vpiDirection 20
+#define vpiDefName 9
+#define vpiLibrary 58
+#define vpiConfig 52
+#define vpiCell 51
 
 #define vpiInput 1
 #define vpiOutput 2
@@ -94,14 +123,14 @@ using SVpiVlogInfo = delta::VpiVlogInfo;
 #define vpiTransportDelay 3
 #define vpiPureTransportDelay 4
 
-#define vpiFinish 66
-#define vpiStop 67
+#define vpiFinish 67
+#define vpiStop 66
 #define vpiReset 68
 
 #define vpi0 0
 #define vpi1 1
-#define vpiX 2
-#define vpiZ 3
+#define vpiX 3
+#define vpiZ 2
 
 // §38.2 Table 38-1: vpi_chk_error() severity levels, lowest to highest.
 #define vpiNotice 1
@@ -556,37 +585,42 @@ typedef delta::VpiArrayValue* p_vpi_arrayvalue;
 // rows - a type or index argument is PLI_INT32 and a status result is
 // PLI_INT32, not the plain int several of them were written with. On this
 // target the two spell one type, so no application changes; what changes is
-// that the header says which one it means.
-vpiHandle vpi_register_systf(s_vpi_systf_data* data);
-void vpi_get_systf_info(vpiHandle obj, s_vpi_systf_data* systf_data_p);
-void vpi_get_cb_info(vpiHandle obj, s_cb_data* cb_data_p);
-void vpi_get_time(vpiHandle obj, s_vpi_time* time_p);
-void vpi_get_delays(vpiHandle obj, p_vpi_delay delay_p);
-void vpi_put_delays(vpiHandle obj, p_vpi_delay delay_p);
-PLI_INT32 vpi_get_data(PLI_INT32 id, PLI_BYTE8* data_loc,
-                       PLI_INT32 num_of_bytes);
-PLI_INT32 vpi_put_data(PLI_INT32 id, PLI_BYTE8* data_loc,
-                       PLI_INT32 num_of_bytes);
-PLI_INT32 vpi_put_userdata(vpiHandle obj, void* userdata);
-void* vpi_get_userdata(vpiHandle obj);
-vpiHandle vpi_handle(PLI_INT32 type, vpiHandle ref);
-vpiHandle vpi_handle_by_name(const char* name, vpiHandle scope);
-vpiHandle vpi_handle_by_index(vpiHandle parent, PLI_INT32 index);
-vpiHandle vpi_handle_by_multi_index(vpiHandle parent, PLI_INT32 num_index,
-                                    PLI_INT32* index_array);
-vpiHandle vpi_handle_multi(PLI_INT32 type, vpiHandle ref1, vpiHandle ref2);
-PLI_INT32 vpi_compare_objects(vpiHandle obj1, vpiHandle obj2);
-vpiHandle vpi_iterate(PLI_INT32 type, vpiHandle ref);
-vpiHandle vpi_scan(vpiHandle iterator);
-void vpi_get_value(vpiHandle obj, s_vpi_value* value);
-vpiHandle vpi_put_value(vpiHandle obj, s_vpi_value* value, s_vpi_time* time,
-                        PLI_INT32 flags);
-void vpi_put_value_array(vpiHandle obj, p_vpi_arrayvalue arrayvalue_p,
-                         PLI_INT32* index_p, PLI_UINT32 num);
-void vpi_get_value_array(vpiHandle obj, p_vpi_arrayvalue arrayvalue_p,
-                         PLI_INT32* index_p, PLI_UINT32 num);
-vpiHandle vpi_register_cb(s_cb_data* data);
-PLI_INT32 vpi_remove_cb(vpiHandle cb_handle);
+// that the header says which one it means. Each is written with §K.2's
+// XXTERN, the mark of an object the application imports, which
+// simulator/vpi_portability.h defines from PLI_EXTERN and PLI_DLLISPEC so
+// that a file defining either before the include reaches every declaration.
+XXTERN vpiHandle vpi_register_systf(s_vpi_systf_data* data);
+XXTERN void vpi_get_systf_info(vpiHandle obj, s_vpi_systf_data* systf_data_p);
+XXTERN void vpi_get_cb_info(vpiHandle obj, s_cb_data* cb_data_p);
+XXTERN void vpi_get_time(vpiHandle obj, s_vpi_time* time_p);
+XXTERN void vpi_get_delays(vpiHandle obj, p_vpi_delay delay_p);
+XXTERN void vpi_put_delays(vpiHandle obj, p_vpi_delay delay_p);
+XXTERN PLI_INT32 vpi_get_data(PLI_INT32 id, PLI_BYTE8* data_loc,
+                              PLI_INT32 num_of_bytes);
+XXTERN PLI_INT32 vpi_put_data(PLI_INT32 id, PLI_BYTE8* data_loc,
+                              PLI_INT32 num_of_bytes);
+XXTERN PLI_INT32 vpi_put_userdata(vpiHandle obj, void* userdata);
+XXTERN void* vpi_get_userdata(vpiHandle obj);
+XXTERN vpiHandle vpi_handle(PLI_INT32 type, vpiHandle ref);
+XXTERN vpiHandle vpi_handle_by_name(const char* name, vpiHandle scope);
+XXTERN vpiHandle vpi_handle_by_index(vpiHandle parent, PLI_INT32 index);
+XXTERN vpiHandle vpi_handle_by_multi_index(vpiHandle parent,
+                                           PLI_INT32 num_index,
+                                           PLI_INT32* index_array);
+XXTERN vpiHandle vpi_handle_multi(PLI_INT32 type, vpiHandle ref1,
+                                  vpiHandle ref2);
+XXTERN PLI_INT32 vpi_compare_objects(vpiHandle obj1, vpiHandle obj2);
+XXTERN vpiHandle vpi_iterate(PLI_INT32 type, vpiHandle ref);
+XXTERN vpiHandle vpi_scan(vpiHandle iterator);
+XXTERN void vpi_get_value(vpiHandle obj, s_vpi_value* value);
+XXTERN vpiHandle vpi_put_value(vpiHandle obj, s_vpi_value* value,
+                               s_vpi_time* time, PLI_INT32 flags);
+XXTERN void vpi_put_value_array(vpiHandle obj, p_vpi_arrayvalue arrayvalue_p,
+                                PLI_INT32* index_p, PLI_UINT32 num);
+XXTERN void vpi_get_value_array(vpiHandle obj, p_vpi_arrayvalue arrayvalue_p,
+                                PLI_INT32* index_p, PLI_UINT32 num);
+XXTERN vpiHandle vpi_register_cb(s_cb_data* data);
+XXTERN PLI_INT32 vpi_remove_cb(vpiHandle cb_handle);
 // §37.4.2: "Integer and Boolean properties are accessed with the routine
 // vpi_get(). These properties are of type PLI_INT32", and "String properties
 // are accessed with routine vpi_get_str(). String properties are of type
@@ -596,20 +630,20 @@ PLI_INT32 vpi_remove_cb(vpiHandle cb_handle);
 // other: the string one used to hand back a pointer to const, which is not the
 // type the clause gives a string property and which the assignment it writes
 // cannot be made from. §38.6, §38.7 and §38.11 give the same three prototypes.
-PLI_INT32 vpi_get(PLI_INT32 property, vpiHandle obj);
-PLI_INT64 vpi_get64(PLI_INT32 property, vpiHandle obj);
-PLI_BYTE8* vpi_get_str(PLI_INT32 property, vpiHandle obj);
-PLI_INT32 vpi_free_object(vpiHandle obj);
-PLI_INT32 vpi_release_handle(vpiHandle obj);
-PLI_INT32 vpi_control(PLI_INT32 operation, ...);
-PLI_INT32 vpi_chk_error(SVpiErrorInfo* info);
-PLI_INT32 vpi_get_vlog_info(SVpiVlogInfo* info);
-PLI_INT32 vpi_flush();
-PLI_UINT32 vpi_mcd_open(PLI_BYTE8* file);
-PLI_UINT32 vpi_mcd_close(PLI_UINT32 mcd);
-PLI_INT32 vpi_mcd_flush(PLI_UINT32 mcd);
-PLI_BYTE8* vpi_mcd_name(PLI_UINT32 cd);
-PLI_INT32 vpi_mcd_printf(PLI_UINT32 mcd, PLI_BYTE8* format, ...);
-PLI_INT32 vpi_mcd_vprintf(PLI_UINT32 mcd, PLI_BYTE8* format, va_list ap);
-PLI_INT32 vpi_printf(PLI_BYTE8* format, ...);
-PLI_INT32 vpi_vprintf(PLI_BYTE8* format, va_list ap);
+XXTERN PLI_INT32 vpi_get(PLI_INT32 property, vpiHandle obj);
+XXTERN PLI_INT64 vpi_get64(PLI_INT32 property, vpiHandle obj);
+XXTERN PLI_BYTE8* vpi_get_str(PLI_INT32 property, vpiHandle obj);
+XXTERN PLI_INT32 vpi_free_object(vpiHandle obj);
+XXTERN PLI_INT32 vpi_release_handle(vpiHandle obj);
+XXTERN PLI_INT32 vpi_control(PLI_INT32 operation, ...);
+XXTERN PLI_INT32 vpi_chk_error(p_vpi_error_info error_info_p);
+XXTERN PLI_INT32 vpi_get_vlog_info(p_vpi_vlog_info vlog_info_p);
+XXTERN PLI_INT32 vpi_flush();
+XXTERN PLI_UINT32 vpi_mcd_open(PLI_BYTE8* file);
+XXTERN PLI_UINT32 vpi_mcd_close(PLI_UINT32 mcd);
+XXTERN PLI_INT32 vpi_mcd_flush(PLI_UINT32 mcd);
+XXTERN PLI_BYTE8* vpi_mcd_name(PLI_UINT32 cd);
+XXTERN PLI_INT32 vpi_mcd_printf(PLI_UINT32 mcd, PLI_BYTE8* format, ...);
+XXTERN PLI_INT32 vpi_mcd_vprintf(PLI_UINT32 mcd, PLI_BYTE8* format, va_list ap);
+XXTERN PLI_INT32 vpi_printf(PLI_BYTE8* format, ...);
+XXTERN PLI_INT32 vpi_vprintf(PLI_BYTE8* format, va_list ap);

@@ -42,6 +42,15 @@
 // read here, ahead of the declarations it renames, which is the whole of what
 // makes the selection take effect.
 //
+// §K.2 opens the file with its portability help -- the sized integer types,
+// and the macros that say how a symbol is imported, exported or marked
+// external -- and closes it by undefining the macros the file defined for
+// itself, so that a translation unit sees them only inside the file and keeps
+// any it had defined before the include. simulator/vpi_portability.h is that
+// opening, which simulator/vpi_user_macros.h reads ahead of the declarations
+// it writes with what the opening defines; the closing is at the end of this
+// file.
+//
 // Do not reorder the includes - each depends on types the ones above it
 // declare, and the PLI typedefs and macros come last, after the delta::
 // declarations they alias.
@@ -54,6 +63,31 @@
 #include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_model_helpers3.h"
 #include "simulator/vpi_object.h"
+#include "simulator/vpi_portability.h"
 #include "simulator/vpi_user_macros.h"
 
+// §K.2: the file ends by taking back the portability macros it defined for
+// itself. PLI_EXTERN and PLI_VEXTERN go unconditionally; the two DLL
+// specifications go only where simulator/vpi_portability.h defined them, which
+// the VPI_USER_DEFINED_ pair records; and the prototype macros go with the
+// PLI_PROTOTYPES that marked them.
+#undef PLI_EXTERN
+#undef PLI_VEXTERN
+
+#ifdef VPI_USER_DEFINED_DLLISPEC
+#undef VPI_USER_DEFINED_DLLISPEC
+#undef PLI_DLLISPEC
 #endif
+#ifdef VPI_USER_DEFINED_DLLESPEC
+#undef VPI_USER_DEFINED_DLLESPEC
+#undef PLI_DLLESPEC
+#endif
+
+#ifdef PLI_PROTOTYPES
+#undef PLI_PROTOTYPES
+#undef PROTO_PARAMS
+#undef XXTERN
+#undef EETERN
+#endif
+
+#endif /* VPI_USER_H */

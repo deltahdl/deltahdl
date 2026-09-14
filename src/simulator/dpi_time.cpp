@@ -1,7 +1,7 @@
 // §H.13 time bridge for the DPI C layer, declared in dpi.h and read by the
 // svGetTime, svGetTimeUnit and svGetTimePrecision functions of svdpi.cpp. It
-// stands in a translation unit of its own so that the VPI time constants it
-// uses stay out of svdpi.cpp, where they would clash with svdpi.h's spelling.
+// stands in a translation unit of its own so that the VPI headers it reads
+// stay out of svdpi.cpp, whose svdpi.h lays down its own s_vpi_time.
 #include <cmath>
 #include <cstdint>
 
@@ -16,8 +16,7 @@ namespace delta {
 // svGetTime/svGetTimeUnit/svGetTimePrecision functions deliver the very values
 // VPI's vpi_get_time()/vpi_get(vpiTimeUnit/vpiTimePrecision) deliver for a null
 // object. The VPI time constants are used here, inside the VPI translation
-// unit, keeping them out of svdpi.cpp where they would clash with svdpi.h's
-// spelling.
+// unit, keeping the VPI headers out of svdpi.cpp.
 void DpiGetSimTime(bool want_scaled_real, uint32_t* high, uint32_t* low,
                    double* real) {
   VpiTime t = {};

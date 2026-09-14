@@ -33,12 +33,12 @@ constexpr int kVpiTimeQueue = 64;
 
 constexpr int kVpiBinStrVal = 1;
 constexpr int kVpiOctStrVal = 2;
-constexpr int kVpiHexStrVal = 3;
-constexpr int kVpiScalarVal = 4;
-constexpr int kVpiIntVal = 5;
-constexpr int kVpiRealVal = 6;
-constexpr int kVpiStringVal = 7;
-constexpr int kVpiTimeVal = 8;
+constexpr int kVpiHexStrVal = 4;
+constexpr int kVpiScalarVal = 5;
+constexpr int kVpiIntVal = 6;
+constexpr int kVpiRealVal = 7;
+constexpr int kVpiStringVal = 8;
+constexpr int kVpiTimeVal = 11;
 constexpr int kVpiVectorVal = 9;
 constexpr int kVpiStrengthVal = 10;
 constexpr int kVpiObjTypeVal = 12;
@@ -65,49 +65,49 @@ constexpr int kVpiPropagateOff = 0x8000;
 // the value arm at, instead of allocating VPI-owned storage for them.
 constexpr int kVpiUserAllocFlag = 0x2000;
 
-constexpr int kVpiSimTime = 1;
-constexpr int kVpiScaledRealTime = 2;
+constexpr int kVpiSimTime = 2;
+constexpr int kVpiScaledRealTime = 1;
 
 constexpr int kCbValueChange = 1;
-constexpr int kCbReadWriteSynch = 2;
-constexpr int kCbEndOfSimulation = 3;
-constexpr int kCbStmt = 4;
+constexpr int kCbReadWriteSynch = 6;
+constexpr int kCbEndOfSimulation = 12;
+constexpr int kCbStmt = 2;
 constexpr int kCbAtStartOfSimTime = 5;
-constexpr int kCbReadOnlySynch = 6;
+constexpr int kCbReadOnlySynch = 7;
 
-constexpr int kCbAfterDelay = 7;
+constexpr int kCbAfterDelay = 9;
 constexpr int kCbNextSimTime = 8;
-constexpr int kCbNBASynch = 9;
-constexpr int kCbAtEndOfSimTime = 10;
+constexpr int kCbNBASynch = 30;
+constexpr int kCbAtEndOfSimTime = 31;
 
 // §38.36.3: simulator action callbacks name reasons that every VPI-compliant
 // tool provides (kCbEndOfSimulation above is also an action reason); simulator
 // feature callbacks name optional, tool-specific reasons such as save, restart,
 // reset, and interactive-mode transitions. They are registered through the same
 // vpi_register_cb() path as every other callback reason.
-constexpr int kCbEndOfCompile = 11;
-constexpr int kCbStartOfSimulation = 12;
+constexpr int kCbEndOfCompile = 10;
+constexpr int kCbStartOfSimulation = 11;
 constexpr int kCbError = 13;
-constexpr int kCbPLIError = 14;
-constexpr int kCbTchkViolation = 15;
-constexpr int kCbSignal = 16;
-constexpr int kCbStartOfSave = 17;
-constexpr int kCbEndOfSave = 18;
-constexpr int kCbStartOfRestart = 19;
-constexpr int kCbEndOfRestart = 20;
-constexpr int kCbStartOfReset = 21;
-constexpr int kCbEndOfReset = 22;
-constexpr int kCbEnterInteractive = 23;
-constexpr int kCbExitInteractive = 24;
-constexpr int kCbInteractiveScopeChange = 25;
-constexpr int kCbUnresolvedSystf = 26;
+constexpr int kCbPLIError = 28;
+constexpr int kCbTchkViolation = 14;
+constexpr int kCbSignal = 29;
+constexpr int kCbStartOfSave = 15;
+constexpr int kCbEndOfSave = 16;
+constexpr int kCbStartOfRestart = 17;
+constexpr int kCbEndOfRestart = 18;
+constexpr int kCbStartOfReset = 19;
+constexpr int kCbEndOfReset = 20;
+constexpr int kCbEnterInteractive = 21;
+constexpr int kCbExitInteractive = 22;
+constexpr int kCbInteractiveScopeChange = 23;
+constexpr int kCbUnresolvedSystf = 24;
 
 constexpr int kVpiType = 1;
 constexpr int kVpiName = 2;
 constexpr int kVpiFullName = 3;
 constexpr int kVpiSize = 4;
-constexpr int kVpiDirection = 5;
-constexpr int kVpiDefName = 6;
+constexpr int kVpiDirection = 20;
+constexpr int kVpiDefName = 9;
 
 // §37.3.7: vpiAutomatic is the standard Boolean lifetime selector (the same
 // value 50 already used elsewhere in this header). It is repeated here as a
@@ -154,9 +154,9 @@ constexpr int kVpiActualLexicalDefn = 3;
 constexpr int kVpiActualClassTypespec = 4;
 constexpr int kVpiActualTaskFuncVar = 5;
 
-constexpr int kVpiLibrary = 67;
-constexpr int kVpiConfig = 70;
-constexpr int kVpiCell = 71;
+constexpr int kVpiLibrary = 58;
+constexpr int kVpiConfig = 52;
+constexpr int kVpiCell = 51;
 
 constexpr int kVpiInput = 1;
 constexpr int kVpiOutput = 2;
@@ -167,8 +167,8 @@ constexpr int kVpiInertialDelay = 2;
 constexpr int kVpiTransportDelay = 3;
 constexpr int kVpiPureTransportDelay = 4;
 
-constexpr int kVpiFinish = 66;
-constexpr int kVpiStop = 67;
+constexpr int kVpiFinish = 67;
+constexpr int kVpiStop = 66;
 // §38.36.3: a reset can be requested indirectly through vpi_control(vpiReset).
 constexpr int kVpiReset = 68;
 // §38.4: vpi_control(vpiSetInteractiveScope, handle) immediately retargets the
@@ -177,8 +177,8 @@ constexpr int kVpiSetInteractiveScope = 69;
 
 constexpr int kVpi0 = 0;
 constexpr int kVpi1 = 1;
-constexpr int kVpiX = 2;
-constexpr int kVpiZ = 3;
+constexpr int kVpiX = 3;
+constexpr int kVpiZ = 2;
 
 // §38.2 Table 38-1: the vpi_chk_error() severity levels, ordered from lowest
 // (vpiNotice) to highest (vpiInternal). The values increase with severity, so
