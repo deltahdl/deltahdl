@@ -71,6 +71,21 @@ DpiPackedArgPassing DpiPassingSemanticsOfSpecString(
 bool DpiSv31aDefinitionsAreObligatoryInSvdpiH();
 bool DpiCCodeMayFailToBind(bool implementation_supports_sv31a_functionality);
 
+// §H.14.3: the source-level compatibility include file svdpi_src.h defines
+// two symbols only, the macros SV_BIT_PACKED_ARRAY and SV_LOGIC_PACKED_ARRAY
+// that declare variables representing SystemVerilog packed arrays of bit or
+// logic, whose definitions are implementation-specific and define no array
+// type. An application that does not need the file is binary compatible --
+// its DPI C code runs on different simulators without recompilation -- and
+// one that makes use of it has to be recompiled for each simulator it runs
+// on.
+enum class DpiApplicationCompatibility : uint8_t { kBinary, kSource };
+
+DpiApplicationCompatibility DpiCompatibilityOfApplication(bool uses_svdpi_src);
+bool DpiApplicationIsRecompiledPerSimulator(bool uses_svdpi_src);
+uint32_t DpiSvdpiSrcSymbolCount();
+bool DpiPackedArrayMacroMayDefineAnArrayType();
+
 struct DpiRtFunction {
   std::string_view c_name;
   std::string_view sv_name;

@@ -60,6 +60,19 @@ bool DpiCCodeMayFailToBind(bool implementation_supports_sv31a_functionality) {
   return !implementation_supports_sv31a_functionality;
 }
 
+DpiApplicationCompatibility DpiCompatibilityOfApplication(bool uses_svdpi_src) {
+  return uses_svdpi_src ? DpiApplicationCompatibility::kSource
+                        : DpiApplicationCompatibility::kBinary;
+}
+
+bool DpiApplicationIsRecompiledPerSimulator(bool uses_svdpi_src) {
+  return uses_svdpi_src;
+}
+
+uint32_t DpiSvdpiSrcSymbolCount() { return 2; }
+
+bool DpiPackedArrayMacroMayDefineAnArrayType() { return false; }
+
 DpiArgValue DpiArgValue::FromInt(int32_t v) {
   DpiArgValue a;
   a.type = DataTypeKind::kInt;
