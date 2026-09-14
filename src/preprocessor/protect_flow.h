@@ -82,4 +82,16 @@ std::string_view DirectiveTheToolVendorSecretKeySystemIsEquivalentTo();
 // vendor's, and a decrypting run given no key opens nothing.
 bool ToolEmbedsAVendorSecretKey();
 
+// §O.3.1: the pragmas the encryption input of the tool vendor secret key
+// system requires -- data_keyname naming one of the tool's embedded keys, and
+// begin and end surrounding the regions to be encrypted -- and the further
+// ones the input may include: the author's name and information, the key
+// owner of the name provided, a method appropriate for the key where the
+// default rounds, initialization vector or key width are not what is wanted,
+// a different encoding, a digest block where a message authorization code is
+// wanted, and a decryption or a run-time licence where the author wants one.
+// Each is a keyword §34.4 tabulates for the protect pragma.
+std::span<const std::string_view> PragmasRequiredByToolVendorSecretKeyInput();
+std::span<const std::string_view> PragmasOptionalInToolVendorSecretKeyInput();
+
 }  // namespace delta

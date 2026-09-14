@@ -3,7 +3,11 @@
 #include <span>
 #include <string_view>
 
+#include "preprocessor/protect_digest_block.h"
+#include "preprocessor/protect_encoding.h"
 #include "preprocessor/protect_envelope.h"
+#include "preprocessor/protect_keywords.h"
+#include "preprocessor/protect_license.h"
 
 namespace delta {
 
@@ -60,5 +64,23 @@ std::string_view DirectiveTheToolVendorSecretKeySystemIsEquivalentTo() {
 }
 
 bool ToolEmbedsAVendorSecretKey() { return false; }
+
+std::span<const std::string_view> PragmasRequiredByToolVendorSecretKeyInput() {
+  static constexpr std::string_view kRequired[] = {
+      kDataKeynameKeyword,
+      kBeginEncryptionKeyword,
+      kEndEncryptionKeyword,
+  };
+  return kRequired;
+}
+
+std::span<const std::string_view> PragmasOptionalInToolVendorSecretKeyInput() {
+  static constexpr std::string_view kOptional[] = {
+      kAuthorKeyword,         kAuthorInfoKeyword,     kDataKeyownerKeyword,
+      kDataMethodKeyword,     kEncodingKeyword,       kDigestBlockKeyword,
+      kDecryptLicenseKeyword, kRuntimeLicenseKeyword,
+  };
+  return kOptional;
+}
 
 }  // namespace delta
