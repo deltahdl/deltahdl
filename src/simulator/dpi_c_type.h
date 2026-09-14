@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -841,6 +842,21 @@ enum class DpiElementFunctionGroup : uint8_t { kScalar, kCanonical, kAddress };
 DpiElementFunctionGroup DpiElementFunctionGroupOf(DataTypeKind kind,
                                                   uint32_t width);
 std::string_view DpiScalarElementFunction(bool four_state, bool put);
+
+// §H.12.7: where an array's elements are of a type compatible with C there
+// is no need to use the canonical representation; the elements are
+// accessed through pointers, the actual address of an element being
+// computed first, by the functions of §H.12.4, and then used to access the
+// element.
+bool DpiCanonicalRepresentationIsNeededForElement(DataTypeKind kind,
+                                                  uint32_t width);
+
+enum class DpiPointerAccessStep : uint8_t {
+  kComputeTheElementsAddress,
+  kAccessTheElementThroughIt,
+};
+
+std::array<DpiPointerAccessStep, 2> DpiPointerAccessSteps();
 
 // §H.11.3: a packed struct or union argument corresponds to a
 // one-dimensional packed array argument of its width, of type bit where its

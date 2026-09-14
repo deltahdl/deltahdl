@@ -1,6 +1,7 @@
 #include "simulator/dpi_c_type.h"
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
@@ -680,6 +681,17 @@ std::string_view DpiAddressFunctionPointerType() { return "void*"; }
 bool DpiElementPointerIsMeaningful(
     bool element_represented_as_individual_value) {
   return element_represented_as_individual_value;
+}
+
+bool DpiCanonicalRepresentationIsNeededForElement(DataTypeKind kind,
+                                                  uint32_t width) {
+  return DpiElementAccessMethodOf(kind, width) ==
+         DpiElementAccessMethod::kCopyingToOrFromCanonical;
+}
+
+std::array<DpiPointerAccessStep, 2> DpiPointerAccessSteps() {
+  return {DpiPointerAccessStep::kComputeTheElementsAddress,
+          DpiPointerAccessStep::kAccessTheElementThroughIt};
 }
 
 DpiElementFunctionGroup DpiElementFunctionGroupOf(DataTypeKind kind,
