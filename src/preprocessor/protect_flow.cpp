@@ -31,4 +31,22 @@ std::span<const ProtectionEffect> EffectsThePragmasAchieve() {
   return kEffects;
 }
 
+std::string_view KeywordOpeningTheProtectedBlock() {
+  return kBeginEncryptionKeyword;
+}
+
+std::string_view KeywordClosingTheProtectedBlock() {
+  return kEndEncryptionKeyword;
+}
+
+std::span<const ProtectionThreat> ThreatsTheBlockProtectsFrom() {
+  static constexpr ProtectionThreat kThreats[] = {
+      ProtectionThreat::kInappropriateAccess,
+      ProtectionThreat::kUnauthorizedModification,
+  };
+  return kThreats;
+}
+
+bool InformationInTheBlockIsProtectedOnceEncrypted() { return true; }
+
 }  // namespace delta

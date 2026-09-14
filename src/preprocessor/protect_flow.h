@@ -44,4 +44,22 @@ enum class ProtectionEffect : std::uint8_t {
 };
 std::span<const ProtectionEffect> EffectsThePragmasAchieve();
 
+// §O.2: the data to be protected is placed within a protect begin-end block,
+// the block the protect pragma's begin and end keywords delimit.
+std::string_view KeywordOpeningTheProtectedBlock();
+std::string_view KeywordClosingTheProtectedBlock();
+
+// §O.2: what the block protects the data from -- inappropriate access, and
+// unauthorized modification.
+enum class ProtectionThreat : std::uint8_t {
+  kInappropriateAccess,
+  kUnauthorizedModification,
+};
+std::span<const ProtectionThreat> ThreatsTheBlockProtectsFrom();
+
+// §O.2: information written in the block, once encrypted, is protected as
+// the data is -- a pragma expression the author writes inside the block is
+// encrypted with the block rather than standing in the clear outside it.
+bool InformationInTheBlockIsProtectedOnceEncrypted();
+
 }  // namespace delta
