@@ -686,18 +686,19 @@ SimCoroutine MakeSequenceMonitorCoroutine(LinearSequence body,
   }
 }
 
-struct SequenceAttempt {
+struct LinearSequenceAttempt {
   FirstMatchAttempt attempt;
 };
 
-SequenceAttempt* NewSequenceAttempt(const LinearSequence& body, Arena& arena) {
-  auto* attempt = arena.Create<SequenceAttempt>();
+LinearSequenceAttempt* NewSequenceAttempt(const LinearSequence& body,
+                                          Arena& arena) {
+  auto* attempt = arena.Create<LinearSequenceAttempt>();
   attempt->attempt = FreshFirstMatchAttempt(body);
   return attempt;
 }
 
 SequenceStep StepSequenceAttempt(const LinearSequence& body,
-                                 SequenceAttempt& attempt, bool begin,
+                                 LinearSequenceAttempt& attempt, bool begin,
                                  SimContext& ctx, Arena& arena) {
   if (AdvanceFirstMatchAttempt(body, attempt.attempt, begin, ctx, arena)) {
     return SequenceStep::kMatched;

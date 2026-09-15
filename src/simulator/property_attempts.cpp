@@ -32,7 +32,7 @@ struct Leaf {
 // operand's verdict, and a sequence operand's attempt while it is in flight.
 struct LeafState {
   Tri verdict = Tri::kPending;
-  SequenceAttempt* attempt = nullptr;
+  LinearSequenceAttempt* attempt = nullptr;
 };
 
 struct TreeAttempt {
