@@ -290,6 +290,26 @@ struct ParserSeqLinearHelpers {
     return true;
   }
 
+  // One match item: an inc_or_dec_expression in either form, or `lvar =
+  // rhs` or `lvar op= rhs`.
+  static bool ParseSequenceMatchItem(Parser& p, SeqMatchAssign& item) {
+    if (p.Check(TokenKind::kPlusPlus) || p.Check(TokenKind::kMinusMinus)) {
+      return ParseIncDecMatchItem(p, item, true);
+    }
+    if (!p.Check(TokenKind::kIdentifier)) return false;
+    item.lvar = p.Consume().text;
+    if (p.Check(TokenKind::kPlusPlus) || p.Check(TokenKind::kMinusMinus)) {
+      return ParseIncDecMatchItem(p, item, false);
+    }
+    if (!p.Check(TokenKind::kEq) &&
+        !IsCompoundAssignToken(p.CurrentToken().kind)) {
+      return false;
+    }
+    item.op = p.Consume().kind;
+    item.rhs = p.ParseExpr();
+    return item.rhs != nullptr;
+  }
+
   // §16.10: the match items after a group's sequence_expr, each `lvar = rhs`,
   // `lvar op= rhs` or an inc_or_dec_expression, attached to the group's last
   // operand.
@@ -297,25 +317,7 @@ struct ParserSeqLinearHelpers {
                                       std::vector<SeqMatchAssign>& items) {
     while (p.Match(TokenKind::kComma)) {
       SeqMatchAssign item;
-      if (p.Check(TokenKind::kPlusPlus) || p.Check(TokenKind::kMinusMinus)) {
-        if (!ParseIncDecMatchItem(p, item, true)) return false;
-        items.push_back(item);
-        continue;
-      }
-      if (!p.Check(TokenKind::kIdentifier)) return false;
-      item.lvar = p.Consume().text;
-      if (p.Check(TokenKind::kPlusPlus) || p.Check(TokenKind::kMinusMinus)) {
-        if (!ParseIncDecMatchItem(p, item, false)) return false;
-        items.push_back(item);
-        continue;
-      }
-      if (!p.Check(TokenKind::kEq) &&
-          !IsCompoundAssignToken(p.CurrentToken().kind)) {
-        return false;
-      }
-      item.op = p.Consume().kind;
-      item.rhs = p.ParseExpr();
-      if (item.rhs == nullptr) return false;
+      if (!ParseSequenceMatchItem(p, item)) return false;
       items.push_back(item);
     }
     return true;
