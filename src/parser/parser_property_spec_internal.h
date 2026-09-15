@@ -42,6 +42,7 @@ struct ParserPropertySpecHelpers {
   static PropertyExprNode* ParsePropertyAlways(Parser& p,
                                                PropertyExprNode::Kind kind,
                                                bool strong);
+  static PropertyExprNode* TryParseKeywordTerm(Parser& p, bool& read);
   static PropertyExprNode* ParsePropertyTerm(Parser& p);
   static PropertyExprNode* ParsePropertyAnd(Parser& p);
   static PropertyExprNode* ParsePropertyOr(Parser& p);

@@ -241,7 +241,13 @@ PropertyExprNode* ParserPropertySpecHelpers::ParsePropertyAlways(
   return node;
 }
 
-PropertyExprNode* ParserPropertySpecHelpers::ParsePropertyTerm(Parser& p) {
+// The operators that open an operand with a keyword: if-else, always and
+// eventually in their weak and strong forms, nexttime likewise and not;
+// `read` says the keyword was one of them, and the node is null where its
+// operand failed to read.
+PropertyExprNode* ParserPropertySpecHelpers::TryParseKeywordTerm(Parser& p,
+                                                                 bool& read) {
+  read = true;
   if (p.Match(TokenKind::kKwIf)) return ParsePropertyIfElse(p);
   if (p.Match(TokenKind::kKwAlways)) {
     return ParsePropertyAlways(p, PropertyExprNode::Kind::kAlways, false);
@@ -264,6 +270,14 @@ PropertyExprNode* ParserPropertySpecHelpers::ParsePropertyTerm(Parser& p) {
     node->operands.push_back(operand);
     return node;
   }
+  read = false;
+  return nullptr;
+}
+
+PropertyExprNode* ParserPropertySpecHelpers::ParsePropertyTerm(Parser& p) {
+  bool read = false;
+  auto* keyword = TryParseKeywordTerm(p, read);
+  if (read) return keyword;
   bool group = false;
   auto* inner = TryParsePropertyGroup(p, group);
   if (group) return inner;
