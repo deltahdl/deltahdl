@@ -64,5 +64,3 @@ def parse_and_validate(
     args = parser.parse_args(argv)
     validate_lrm(parser, args)
     return args
-
-

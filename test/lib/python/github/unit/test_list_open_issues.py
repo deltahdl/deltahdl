@@ -4,8 +4,9 @@ A caller of this function decides something against the whole open set,
 so the hazard is not a wrong query but a short answer: ``gh issue list``
 caps its results, and a listing cut off at the cap looks exactly like a
 repository holding that many issues. These pin the state selector, the
-limit reaching gh, and the report that a result count touching the limit
-is suspected truncation.
+limit reaching gh, the report that a result count touching the limit is
+suspected truncation, and the exit that a listing gh could not take is
+not handed back as an empty one.
 """
 
 import json
@@ -73,3 +74,21 @@ def test_list_open_issues_stays_quiet_below_the_limit(
     """A listing that did not reach the limit is reported without comment."""
     _call(stub_completed, [{"number": 1, "title": "one"}], limit=2)
     assert capsys.readouterr().err == ""
+
+
+def test_list_open_issues_exits_when_gh_fails(
+    capsys: pytest.CaptureFixture[str],
+    stub_completed: Callable[..., MagicMock],
+) -> None:
+    """A listing gh could not take exits with gh's code and its stderr.
+
+    An empty list here would have the caller conclude the repository holds
+    no open issues, which is the one thing a failed listing cannot say.
+    """
+    with patch(
+        "lib.python.github.subprocess.run",
+        return_value=stub_completed(returncode=4, stderr="gh: auth required"),
+    ), pytest.raises(SystemExit) as exit_info:
+        list_open_issues()
+    assert exit_info.value.code == 4
+    assert "gh: auth required" in capsys.readouterr().err

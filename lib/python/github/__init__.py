@@ -122,5 +122,3 @@ def list_open_issues(*, limit: int = 5000) -> list[dict[str, Any]]:
             file=sys.stderr,
         )
     return issues
-
-
