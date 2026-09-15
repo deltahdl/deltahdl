@@ -1,0 +1,8 @@
+v sampled xxx at 5 is false
+v sampled zzz at 15 is false
+v sampled 000 at 25 is false
+v sampled 010 at 35 is true
+v sampled 100 at 45 is true
+v sampled 100 at 55 is true
+q[0] == 5 held at 2 of 6 ticks, the tick in whose time step q was emptied among them
+$finish at time 57
