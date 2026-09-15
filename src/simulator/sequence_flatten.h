@@ -17,6 +17,12 @@ class Arena;
 struct LinearSequence {
   std::vector<Expr*> operands;
   std::vector<SeqCycleDelay> delays;
+  // §16.10: the match items each operand carries, parallel to the operands,
+  // and the local variables of the flattened body, those the bodies declare
+  // and, under names of their own, the local variable formal arguments of
+  // the instances (§16.8.2).
+  std::vector<std::vector<SeqMatchAssign>> match_items;
+  std::vector<SeqLocalDecl> locals;
   std::vector<EventExpr> clock;
 };
 
@@ -32,7 +38,13 @@ struct LinearSequence {
 // formal, and a formal of type event stands for the event expression passed
 // to it, so a sequence declared without a clock takes the clock an instance in
 // it names through such a formal, as one declared with a clock lends its own
-// to the clockless sequences it instantiates. Answers false where `seq` has
+// to the clockless sequences it instantiates. §16.8.2: a local variable formal
+// argument is a local variable of the instance, a new copy of it made at each
+// attempt, initialized from the actual before the instance's first operand is
+// evaluated when its direction is input or inout, and assigned back to the
+// actual's local variable when the instance matches when its direction is
+// inout or output; every local of an instantiated body takes a name of its
+// own in the flattened sequence. Answers false where `seq` has
 // no linear body the parser captured, where an instance names a sequence that
 // has none, or where instances nest past the depth a cyclic dependency, which
 // §16.8 makes an error, would reach.

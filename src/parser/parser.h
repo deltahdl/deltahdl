@@ -80,6 +80,7 @@ class Parser {
   friend struct ParserPortHelpers;
   friend struct ParserDpiHelpers;
   friend struct ParserAssertHelpers;
+  friend struct ParserSeqLinearHelpers;
   friend struct ParserClassHelpers;
   friend struct ParserClassOverrideHelpers;
   // Expect reports through the diagnostic engine and is reached from nowhere
@@ -262,13 +263,6 @@ class Parser {
   // instance of the property can be evaluated as an assertion in that form.
   void CaptureClockedBooleanPropertyBody(ModuleItem* item);
   bool PropertyBodyHasTemporalOperator();
-  bool ParseLinearSeqOperands(ModuleItem* item);
-  bool ParseLinearSeqCycleDelay(SeqCycleDelay& delay);
-  bool ParseSeqDelayBound(uint32_t& val, std::string_view& formal, bool dollar);
-  uint32_t ParseSeqDelayLiteral();
-  bool AheadIsSequenceInstanceOperand();
-  Expr* ParseSequenceInstanceOperand();
-  Expr* ParseSequenceActualArg();
   void CheckConstraintExprToken(const Token& tok);
   void CheckForeachConstraintHeader(ClassMember* member);
   void CheckSolveBeforeConstraint(ClassMember* member);

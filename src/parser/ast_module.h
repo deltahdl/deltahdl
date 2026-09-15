@@ -311,6 +311,41 @@ struct SeqCycleDelay {
   std::string_view max_formal;
 };
 
+// §16.10: one assignment of a sequence_match_item, `lvar = rhs` or
+// `lvar op= rhs`, executed when the operand it stands with holds, or, where
+// `init` is set, before that operand is evaluated: §16.8.2's initialization
+// assignment of a local variable formal argument at the beginning of an
+// attempt of the instance.
+struct SeqMatchAssign {
+  std::string_view lvar;
+  TokenKind op = TokenKind::kEq;
+  Expr* rhs = nullptr;
+  bool init = false;
+};
+
+// §16.10: a local variable of a sequence body, one an
+// assertion_variable_declaration declares or, in the flattened form, a local
+// variable formal argument of an instance, with the keyword of its type and
+// its declaration assignment where it has one.
+struct SeqLocalDecl {
+  std::string_view name;
+  TokenKind type_kw = TokenKind::kKwInt;
+  Expr* init = nullptr;
+};
+
+// §16.13.6/§9.4.4: the linear form of a sequence body, `[##d0] b0 ##d1 b1
+// ... ##dn bn` (each bi a Boolean, each di one of §16.7's cycle_delay_range
+// forms, each operand carrying the §16.10 match items written with it), which
+// the parser captures for the simulator's sequence monitor. The delay before
+// each operand is parallel to the operands, the first one the leading delay,
+// 0 where none is written.
+struct SeqLinearBody {
+  std::vector<Expr*> operands;
+  std::vector<SeqCycleDelay> delays;
+  std::vector<std::vector<SeqMatchAssign>> match_items;
+  std::vector<SeqLocalDecl> locals;
+};
+
 struct ModuleItem {
   ModuleItemKind kind;
   SourceLoc loc;
@@ -541,18 +576,14 @@ struct ModuleItem {
 
   std::vector<EventExpr> clocking_event;
 
-  // §16.13.6/§9.4.4: for a named sequence whose body is the clocked linear
-  // form `@(edge clk) [##d0] b0 ##d1 b1 ... ##dn bn` (each bi a Boolean and
-  // each di one of §16.7's cycle_delay_range forms), the clocking event, the
-  // operand expressions in order and the delay before each operand, the first
-  // one the leading delay, 0 where none is written. Captured by the parser so
-  // the simulator can run a monitor that fires the sequence's endpoint event
-  // on a match and make `sequence.triggered` work. A dedicated field (not
+  // §16.13.6/§9.4.4: for a named sequence whose body the parser captured in
+  // its linear form, the clocking event and that form. Captured so the
+  // simulator can run a monitor that fires the sequence's endpoint event on a
+  // match and make `sequence.triggered` work. A dedicated field (not
   // clocking_event, which marks a clocking block) so clocking-block validation
-  // is unaffected. All empty for any other sequence shape.
+  // is unaffected. Both empty for any other sequence shape.
   std::vector<EventExpr> seq_clock;
-  std::vector<Expr*> seq_linear_operands;
-  std::vector<SeqCycleDelay> seq_linear_delays;
+  SeqLinearBody seq_linear;
 
   // §16.16(b1): true when this property or sequence declaration's body begins
   // with an explicit leading clocking event (a `@(...)`). Recorded so a
