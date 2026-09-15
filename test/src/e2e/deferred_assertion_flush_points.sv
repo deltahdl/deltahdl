@@ -47,9 +47,13 @@ module deferred_assertion_flush_points;
   bit s = 0;
   bit t = 0;
   bit u;
+  // §13.4: a function cannot enable a task, so f's action is a void function.
+  function void say(input string what);
+    $display("%s", what);
+  endfunction
   function bit f(input bit v);
     $display("f called with %0d", v);
-    pf: assert #0 (v) note("pf: pass"); else note("pf: fail");
+    pf: assert #0 (v) say("pf: pass"); else say("pf: fail");
     return v;
   endfunction
   always_comb begin : myblk
@@ -59,15 +63,19 @@ module deferred_assertion_flush_points;
   // The argument evaluation example: the action block's arguments are
   // evaluated on every failure, so error_type runs with 64 on the first pass
   // and its own assertion prints, though that pass's reports are flushed; the
-  // reports that mature carry the 0 of the second pass.
+  // reports that mature carry the 0 of the second pass. §9.2.2.2.1 keeps an
+  // action block's expressions out of the sensitivity list, so b4 reads
+  // opcode outside them to be re-run by its change.
   bit my_cond = 1;
   int opcode = 0;
+  int seen;
   function int error_type(input int op);
     func_assert: assert (op < 64) else $display("Opcode error.");
     if (op < 32) return 0;
     else return 1;
   endfunction
   always_comb begin : b4
+    seen = opcode;
     e1: assert #0 (my_cond) else $error("Error on operation of type %0d", error_type(opcode));
     e2: assert #0 (my_cond) else void'(error_type(opcode));
   end
@@ -85,8 +93,8 @@ module deferred_assertion_flush_points;
       t = 1;
       s = 0;
     end
-    #10 my_cond = 0;
-    opcode = 64;
+    #10 opcode = 64;
+    my_cond = 0;
     #0 opcode = 0;
     #1 $finish;
   end

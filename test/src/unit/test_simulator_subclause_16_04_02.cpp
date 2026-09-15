@@ -491,35 +491,40 @@ TEST(DeferredFlushPointsLive, FlushedDeferredCoverIsNotCountedAsCovered) {
 // arguments are evaluated on every failure, even one whose report is later
 // flushed, so a function called in an argument runs each time, and the simple
 // immediate assertion inside it reports on the call. The block fails a1 and a2
-// twice in one time step, first with opcode 64 and then, after the Inactive
-// region's write re-runs it, with 0: "Opcode error." prints once, from the
-// first evaluation of error_type(64), and the one report that matures carries
-// the 0 of the second failure.
+// with opcode at 64 and then, re-run by the Inactive region's write of 0, with
+// 0: "Opcode error." prints once, from the evaluation of error_type(64), and
+// the one report that matures carries the 0 of the second failure. §9.2.2.2.1
+// keeps an action block's expressions out of the always_comb's sensitivity,
+// so the block reads opcode outside them to be re-run by its change, and
+// opcode is written before my_cond so that the failing pass sees 64 whether
+// the block runs at each write or once after both (§4.7).
 TEST(DeferredFlushPointsLive, ActionBlockArgumentsAreEvaluatedOnEveryFailure) {
   SimFixture f;
   std::string out = RunCapture(
       "module t;\n"
       "  bit my_cond = 1;\n"
       "  int opcode;\n"
+      "  int seen;\n"
       "  function int error_type(input int opcode);\n"
       "    func_assert: assert (opcode < 64) else $display(\"Opcode "
       "error.\");\n"
       "    if (opcode < 32) return 0; else return 1;\n"
       "  endfunction\n"
       "  always_comb begin : b1\n"
+      "    seen = opcode;\n"
       "    a1: assert #0 (my_cond) else\n"
       "      $info(\"Error on operation of type %0d\", error_type(opcode));\n"
       "    a2: assert #0 (my_cond) else void'(error_type(opcode));\n"
       "  end\n"
       "  initial begin\n"
-      "    #1 my_cond = 0; opcode = 64;\n"
+      "    #1 opcode = 64; my_cond = 0;\n"
       "    #0 opcode = 0;\n"
       "  end\n"
       "endmodule\n",
       f);
   EXPECT_EQ(out,
             "Opcode error.\n"
-            "[1] INFO t.b1.a1 (line 10): Error on operation of type 0\n");
+            "[1] INFO t.b1.a1 (line 12): Error on operation of type 0\n");
 }
 
 }  // namespace
