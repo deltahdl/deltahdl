@@ -12,12 +12,50 @@
 #include "simulator/eval_array.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
+#include "simulator/scope.h"
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
 #include "simulator/stmt_exec.h"
 
 namespace delta {
+
+// §13.5: an actual argument is an expression of the caller, read before the
+// subroutine's formals exist. BindFunctionArgs runs after the callee's scope
+// is pushed, and for a static subroutine §13.3.2 has that scope carry the
+// formals of the last call, so an actual named after a formal read the formal:
+// error_type(opcode) with `input int opcode` refreshed the formal from itself
+// and never saw the caller's opcode change, and an actual named after a formal
+// bound just before it read that formal instead of the caller's variable.
+// While one of these lives the callee's scope is set aside and the caller's
+// stands on top; it is put back when the object goes, so the binding that
+// follows the read still lands in the callee's scope.
+class CalleeScopeAside {
+ public:
+  explicit CalleeScopeAside(SimContext& ctx) : ctx_(ctx) {
+    std::vector<Scope> stack = ctx_.SwapScopeStack({});
+    if (!stack.empty()) {
+      callee_ = std::move(stack.back());
+      stack.pop_back();
+      set_aside_ = true;
+    }
+    ctx_.SwapScopeStack(std::move(stack));
+  }
+  ~CalleeScopeAside() {
+    if (!set_aside_) return;
+    std::vector<Scope> stack = ctx_.SwapScopeStack({});
+    stack.push_back(std::move(callee_));
+    ctx_.SwapScopeStack(std::move(stack));
+  }
+  CalleeScopeAside(const CalleeScopeAside&) = delete;
+  CalleeScopeAside& operator=(const CalleeScopeAside&) = delete;
+
+ private:
+  SimContext& ctx_;
+  Scope callee_;
+  bool set_aside_ = false;
+};
+
 static int ResolveArgIndex(const ModuleItem* func, const Expr* expr,
                            size_t param_idx) {
   if (expr->arg_names.empty()) {
@@ -42,7 +80,11 @@ static bool TryBindRefArg(const Expr* expr, int arg_index,
   auto* call_arg = expr->args[static_cast<size_t>(arg_index)];
   if (!call_arg) return false;
   if (call_arg->kind != ExprKind::kIdentifier) return false;
-  auto* target = ctx.FindVariable(call_arg->text);
+  Variable* target = nullptr;
+  {
+    CalleeScopeAside aside(ctx);
+    target = ctx.FindVariable(call_arg->text);
+  }
   if (!target) return false;
   ctx.AliasLocalVariable(param_name, target);
   return true;
@@ -174,9 +216,13 @@ void WritebackAssocRefs(SimContext& ctx) {
   }
 }
 
+// The actual is the caller's expression and is read with the callee's scope
+// set aside; §13.5.3 has a default argument evaluated in the scope of the
+// subroutine's declaration, so the default stays with the callee's scope up.
 static Logic4Vec ResolveArgValue(const FunctionArg& param, const Expr* expr,
                                  int arg_index, SimContext& ctx, Arena& arena) {
   if (arg_index >= 0 && expr->args[static_cast<size_t>(arg_index)] != nullptr) {
+    CalleeScopeAside aside(ctx);
     return EvalExpr(expr->args[static_cast<size_t>(arg_index)], ctx, arena);
   }
   if (param.default_value) return EvalExpr(param.default_value, ctx, arena);

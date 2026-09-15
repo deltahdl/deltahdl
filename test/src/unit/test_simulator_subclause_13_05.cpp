@@ -1,3 +1,5 @@
+#include <cstdint>
+
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 #include "simulator/evaluation.h"
@@ -293,6 +295,57 @@ TEST(SubroutineCallArgWriteback, ConcatenationOutputArgWriteback) {
       "endmodule\n",
       f);
   LowerRunAndCheck(f, design, {{"a", 0xAu}, {"b", 0xBu}});
+}
+
+// §13.5: an actual is an expression of the caller, read before the formal it
+// is passed to exists. §13.3.2 gives a static function's formal storage that
+// retains the last call's value, so an actual named after the formal must not
+// read that retained value: the second call of twice(k) reads the module's k
+// at 7, not the formal's retained 3, and sums to 20. Read from the formal,
+// the second call would repeat the first and the sum would be 12.
+TEST(SubroutineCallSim, ActualNamedAfterAStaticFormalReadsTheCallersVariable) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  int k, sum;\n"
+      "  function int twice(input int k);\n"
+      "    return 2 * k;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    k = 3;\n"
+      "    sum = twice(k);\n"
+      "    k = 7;\n"
+      "    sum = sum + twice(k);\n"
+      "  end\n"
+      "endmodule\n",
+      f, "sum");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 20u);
+}
+
+// The same rule between the formals of one call: an actual named after a
+// formal bound before it reads the caller's variable of that name, not the
+// formal just bound. diff(b, a) with the module's a at 10 and b at 4 binds the
+// formal a to 4 and then the formal b to the caller's a, 10, and answers 4 -
+// 10 as -6; read from the formal a, b would be 4 and the answer 0.
+TEST(SubroutineCallSim,
+     ActualNamedAfterAnEarlierFormalReadsTheCallersVariable) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  int a, b, d;\n"
+      "  function int diff(input int a, input int b);\n"
+      "    return a - b;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    a = 10;\n"
+      "    b = 4;\n"
+      "    d = diff(b, a);\n"
+      "  end\n"
+      "endmodule\n",
+      f, "d");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(static_cast<int32_t>(var->value.ToUint64()), -6);
 }
 
 }  // namespace
