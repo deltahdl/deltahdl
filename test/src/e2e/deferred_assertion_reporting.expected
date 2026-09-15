@@ -1,0 +1,12 @@
+a1: a is 1
+f1: a is 1
+at 5: resumed at the flush point, the three reports cleared
+at 10: matured, reported before the process resumes
+at 10: resumed after go2 was triggered in the Reactive region
+a1: a is not 1
+a1: a is 1
+f1: a is 1
+$finish at time 26
+cover deferred_assertion_reporting (line 56): evaluated 1, succeeded 1
+cover deferred_assertion_reporting (line 67): evaluated 1, succeeded 1
+[25] ERROR deferred_assertion_reporting (line 71): Assertion failed.

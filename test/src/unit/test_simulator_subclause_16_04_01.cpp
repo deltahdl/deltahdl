@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 
 #include "fixture_simulator.h"
 
@@ -209,6 +210,41 @@ TEST(DeferredAssertionReporting, PassingDeferredAssertProducesNoReport) {
   ASSERT_NE(design, nullptr);
   LowerAndRun(design, f);
   EXPECT_EQ(f.ctx.LastSeverity(), "");
+}
+
+// §16.4.1's note: code in the Reactive region that modifies a signal causes
+// another pass through the Active region, which may re-execute an observed
+// deferred assertion with a different result, so observed deferral prevents the
+// glitches of procedural order but not those of a loop between the regions.
+// The always_comb queues "a is not 1" when the initial block writes 2; the
+// initial block's observed cover action then writes 1 in the Reactive region,
+// after that report has matured, so the report is executed and the always_comb
+// re-runs and reports "a is 1" as well. The final assertion beside it reports
+// only the settled value: its first report is flushed by the re-run before the
+// Postponed region matures it.
+TEST(DeferredAssertionReporting,
+     ReactiveRegionWriteReexecutesAnObservedDeferredAssertion) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  int a = 1;\n"
+      "  task automatic note(input string s); $display(\"%s\", s); endtask\n"
+      "  function void set_a_1; a = 1; endfunction\n"
+      "  always_comb begin\n"
+      "    assert #0 (a == 1) note(\"observed: a is 1\");\n"
+      "    else note(\"observed: a is not 1\");\n"
+      "    assert final (a == 1) note(\"final: a is 1\");\n"
+      "    else note(\"final: a is not 1\");\n"
+      "  end\n"
+      "  initial begin\n"
+      "    #1 a = 2;\n"
+      "    cover #0 (1) set_a_1();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out,
+            "observed: a is 1\nfinal: a is 1\n"
+            "observed: a is not 1\nobserved: a is 1\nfinal: a is 1\n");
 }
 
 }  // namespace
