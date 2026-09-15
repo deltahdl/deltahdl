@@ -142,10 +142,68 @@ NodeState* NewNodeState(const PropertyExprNode* node, Arena& arena) {
   return state;
 }
 
+// What one tick's steps read: the tree with its flattened sequences, the
+// context and the arena.
+struct StepContext {
+  PropertyTreeState& tree;
+  SimContext& ctx;
+  Arena& arena;
+};
+
 // One tick of one attempt's node, `begin` where the tick is the one the
 // attempt begins at, answering the node's verdict so far.
-Tri Step(const PropertyExprNode* node, NodeState& state,
-         PropertyTreeState& tree, bool begin, SimContext& ctx, Arena& arena);
+Tri Step(const PropertyExprNode* node, NodeState& state, StepContext& sc,
+         bool begin);
+
+Tri StepSequence(const PropertyExprNode* node, NodeState& state,
+                 StepContext& sc, bool begin) {
+  const LinearSequence& body = BodyOf(sc.tree, node);
+  if (begin) state.attempt = NewSequenceAttempt(body, sc.arena);
+  return FromStep(
+      StepSequenceAttempt(body, *state.attempt, begin, sc.ctx, sc.arena));
+}
+
+Tri StepJunction(const PropertyExprNode* node, NodeState& state,
+                 StepContext& sc, bool begin) {
+  std::vector<Tri> verdicts;
+  for (size_t i = 0; i < node->operands.size(); ++i) {
+    verdicts.push_back(Step(node->operands[i], *state.operands[i], sc, begin));
+  }
+  return Junction(node->kind == PropertyExprNode::Kind::kOr, verdicts);
+}
+
+// §16.12.6: the condition is read at the attempt's tick, and the branch it
+// selects is the property; the else absent is true.
+Tri StepIfElse(const PropertyExprNode* node, NodeState& state, StepContext& sc,
+               bool begin) {
+  if (begin) {
+    state.condition = EvalExpr(node->boolean, sc.ctx, sc.arena).IsTruthy();
+  }
+  Tri then_branch = Step(node->operands[0], *state.operands[0], sc, begin);
+  Tri else_branch = node->operands.size() > 1
+                        ? Step(node->operands[1], *state.operands[1], sc, begin)
+                        : Tri::kTrue;
+  return state.condition ? then_branch : else_branch;
+}
+
+// §16.12.7: one tick of the antecedent's attempt while it can still match,
+// answering whether a consequent is to begin at this tick; a match of the
+// nonoverlapped form begins one at the next tick instead.
+bool StepAntecedent(const PropertyExprNode* node, NodeState& state,
+                    StepContext& sc, bool begin) {
+  if (state.antecedent_done) return false;
+  const LinearSequence& body = BodyOf(sc.tree, node);
+  if (begin) state.attempt = NewSequenceAttempt(body, sc.arena);
+  SequenceStep step =
+      StepSequenceAttempt(body, *state.attempt, begin, sc.ctx, sc.arena);
+  if (step == SequenceStep::kFailed || step == SequenceStep::kMatchedLast) {
+    state.antecedent_done = true;
+  }
+  if (!Matched(step)) return false;
+  if (!node->strong) return true;
+  state.spawn_next = true;
+  return false;
+}
 
 // §16.12.7: the antecedent's attempt is stepped until it can match no more,
 // and at each tick it matches at a consequent attempt begins, at that tick
@@ -153,35 +211,19 @@ Tri Step(const PropertyExprNode* node, NodeState& state,
 // a consequent is, and true once the antecedent can match no more and every
 // consequent begun is true, no match of the antecedent making it true.
 Tri StepImplication(const PropertyExprNode* node, NodeState& state,
-                    PropertyTreeState& tree, bool begin, SimContext& ctx,
-                    Arena& arena) {
+                    StepContext& sc, bool begin) {
   const PropertyExprNode* consequent = node->operands[0];
   std::vector<Tri> verdicts;
   for (NodeState* c : state.consequents) {
-    verdicts.push_back(Step(consequent, *c, tree, false, ctx, arena));
+    verdicts.push_back(Step(consequent, *c, sc, false));
   }
   bool spawn_now = state.spawn_next;
   state.spawn_next = false;
-  if (!state.antecedent_done) {
-    if (begin)
-      state.attempt = NewLinearSequenceAttempt(BodyOf(tree, node), arena);
-    SequenceStep step = StepLinearSequenceAttempt(
-        BodyOf(tree, node), *state.attempt, begin, ctx, arena);
-    if (Matched(step)) {
-      if (node->strong) {
-        state.spawn_next = true;
-      } else {
-        spawn_now = true;
-      }
-    }
-    if (step == SequenceStep::kFailed || step == SequenceStep::kMatchedLast) {
-      state.antecedent_done = true;
-    }
-  }
+  if (StepAntecedent(node, state, sc, begin)) spawn_now = true;
   if (spawn_now) {
-    NodeState* c = NewNodeState(consequent, arena);
+    NodeState* c = NewNodeState(consequent, sc.arena);
     state.consequents.push_back(c);
-    verdicts.push_back(Step(consequent, *c, tree, true, ctx, arena));
+    verdicts.push_back(Step(consequent, *c, sc, true));
   }
   Tri all = Junction(false, verdicts);
   if (all == Tri::kFalse) return Tri::kFalse;
@@ -191,52 +233,30 @@ Tri StepImplication(const PropertyExprNode* node, NodeState& state,
   return Tri::kPending;
 }
 
-Tri Step(const PropertyExprNode* node, NodeState& state,
-         PropertyTreeState& tree, bool begin, SimContext& ctx, Arena& arena) {
+Tri Step(const PropertyExprNode* node, NodeState& state, StepContext& sc,
+         bool begin) {
   if (state.verdict != Tri::kPending) return state.verdict;
   switch (node->kind) {
     case PropertyExprNode::Kind::kBoolean:
-      state.verdict = FromBool(EvalExpr(node->boolean, ctx, arena).IsTruthy());
+      state.verdict =
+          FromBool(EvalExpr(node->boolean, sc.ctx, sc.arena).IsTruthy());
       break;
     case PropertyExprNode::Kind::kSequence:
-      if (begin)
-        state.attempt = NewLinearSequenceAttempt(BodyOf(tree, node), arena);
-      state.verdict = FromStep(StepLinearSequenceAttempt(
-          BodyOf(tree, node), *state.attempt, begin, ctx, arena));
+      state.verdict = StepSequence(node, state, sc, begin);
       break;
     case PropertyExprNode::Kind::kNot:
-      state.verdict = Not(
-          Step(node->operands[0], *state.operands[0], tree, begin, ctx, arena));
+      state.verdict =
+          Not(Step(node->operands[0], *state.operands[0], sc, begin));
       break;
     case PropertyExprNode::Kind::kOr:
-    case PropertyExprNode::Kind::kAnd: {
-      std::vector<Tri> verdicts;
-      for (size_t i = 0; i < node->operands.size(); ++i) {
-        verdicts.push_back(Step(node->operands[i], *state.operands[i], tree,
-                                begin, ctx, arena));
-      }
-      state.verdict =
-          Junction(node->kind == PropertyExprNode::Kind::kOr, verdicts);
+    case PropertyExprNode::Kind::kAnd:
+      state.verdict = StepJunction(node, state, sc, begin);
       break;
-    }
-    case PropertyExprNode::Kind::kIfElse: {
-      // §16.12.6: the condition is read at the attempt's tick, and the
-      // branch it selects is the property; the else absent is true.
-      if (begin) {
-        state.condition = EvalExpr(node->boolean, ctx, arena).IsTruthy();
-      }
-      bool taken = state.condition;
-      Tri then_branch =
-          Step(node->operands[0], *state.operands[0], tree, begin, ctx, arena);
-      Tri else_branch = node->operands.size() > 1
-                            ? Step(node->operands[1], *state.operands[1], tree,
-                                   begin, ctx, arena)
-                            : Tri::kTrue;
-      state.verdict = taken ? then_branch : else_branch;
+    case PropertyExprNode::Kind::kIfElse:
+      state.verdict = StepIfElse(node, state, sc, begin);
       break;
-    }
     case PropertyExprNode::Kind::kImplication:
-      state.verdict = StepImplication(node, state, tree, begin, ctx, arena);
+      state.verdict = StepImplication(node, state, sc, begin);
       break;
   }
   return state.verdict;
@@ -304,11 +324,11 @@ std::vector<bool> AdvancePropertyTree(PropertyTreeState& state, bool disabled,
     return verdicts;
   }
   state.attempts.push_back(NewNodeState(state.root, arena));
+  StepContext sc{state, ctx, arena};
   std::vector<NodeState*> kept;
   for (size_t i = 0; i < state.attempts.size(); ++i) {
     bool begin = i + 1 == state.attempts.size();
-    Tri verdict =
-        Step(state.root, *state.attempts[i], state, begin, ctx, arena);
+    Tri verdict = Step(state.root, *state.attempts[i], sc, begin);
     if (verdict == Tri::kPending) {
       kept.push_back(state.attempts[i]);
     } else {
