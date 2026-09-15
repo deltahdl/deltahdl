@@ -71,7 +71,8 @@ struct ModuleItem;
 // implication (§16.12.7), implies and iff (§16.12.8), the last two over two
 // operands, nexttime (§16.12.10), `strong` where it is s_nexttime and its
 // tick count, one where none was written, in `boolean`, always
-// (§16.12.11), `strong` where it is s_always, over the range below, and
+// (§16.12.11), `strong` where it is s_always, over the range below,
+// eventually (§16.12.13) likewise, `strong` where it is s_eventually, and
 // until (§16.12.12) over two operands, `strong` where it is s_until or
 // s_until_with and `range_unbounded` where it is an overlapping form,
 // until_with or s_until_with. A boolean leaf
@@ -94,7 +95,8 @@ struct PropertyExprNode {
     kIff,
     kNexttime,
     kAlways,
-    kUntil
+    kUntil,
+    kEventually
   };
   Kind kind = Kind::kBoolean;
   Expr* boolean = nullptr;

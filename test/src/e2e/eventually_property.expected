@@ -1,0 +1,11 @@
+s_eventually a passes 3 fails 0 at ticks
+eventually [0:1] a passes 2 fails 1 at ticks
+s_eventually [0:1] a passes 2 fails 1 at ticks
+s_eventually [2:$] a passes 1 fails 0 at ticks
+$finish at time 40
+s_eventually a fails at the end of the run
+eventually [0:1] a passes at the end of the run
+s_eventually [0:1] a fails at the end of the run
+s_eventually [2:$] a fails at the end of the run
+s_eventually [2:$] a fails at the end of the run
+s_eventually [2:$] a fails at the end of the run

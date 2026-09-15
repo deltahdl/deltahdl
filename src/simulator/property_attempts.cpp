@@ -285,9 +285,11 @@ uint64_t EvalCount(const Expr* e, StepContext& sc, uint64_t absent) {
   return EvalExpr(e, sc.ctx, sc.arena).ToUint64();
 }
 
-// §16.12.11: an operand attempt begins at each tick of the range, and the
-// always is false as soon as one is false and true once every tick of a
-// bounded range has begun one and all are true.
+// §16.12.11 and §16.12.13: an operand attempt begins at each tick of the
+// range; the always is false as soon as one is false and true once every
+// tick of a bounded range has begun one and all are true, and the
+// eventually true as soon as one is true and false once every tick of a
+// bounded range has begun one and all are false.
 Tri StepAlways(const PropertyExprNode* node, NodeState& state, StepContext& sc,
                bool begin) {
   const PropertyExprNode* operand = node->operands[0];
@@ -310,9 +312,11 @@ Tri StepAlways(const PropertyExprNode* node, NodeState& state, StepContext& sc,
     verdicts.push_back(Step(operand, *c, sc, true));
     if (!node->range_unbounded) --state.remaining;
   }
-  Tri all = Junction(false, verdicts);
-  if (all == Tri::kFalse) return Tri::kFalse;
-  return state.remaining == 0 ? all : Tri::kPending;
+  bool eventually = node->kind == PropertyExprNode::Kind::kEventually;
+  Tri joined = Junction(eventually, verdicts);
+  Tri decisive = eventually ? Tri::kTrue : Tri::kFalse;
+  if (joined == decisive) return decisive;
+  return state.remaining == 0 ? joined : Tri::kPending;
 }
 
 // §16.12.12: what an until's tick says from its operands' verdicts there:
@@ -403,6 +407,7 @@ Tri Step(const PropertyExprNode* node, NodeState& state, StepContext& sc,
       state.verdict = StepNexttime(node, state, sc, begin);
       break;
     case PropertyExprNode::Kind::kAlways:
+    case PropertyExprNode::Kind::kEventually:
       state.verdict = StepAlways(node, state, sc, begin);
       break;
     case PropertyExprNode::Kind::kUntil:
@@ -458,14 +463,22 @@ Tri FinishPair(const PropertyExprNode* node, NodeState& state) {
                                                         : Iff(first, second);
 }
 
-// §16.12.11: the operand attempts begun are finished as themselves; ticks
-// of the range the run never reached are no failure of the weak form and
-// fail the strong.
+// §16.12.11 and §16.12.13: the operand attempts begun are finished as
+// themselves; ticks of the range the run never reached are no failure of
+// the weak forms and fail the strong, an eventually with a true operand
+// holding either way.
 Tri FinishAlways(const PropertyExprNode* node, NodeState& state) {
-  Tri all = FinishImplication(node, state);
-  if (all == Tri::kFalse) return Tri::kFalse;
-  if (state.remaining > 0 && node->strong) return Tri::kFalse;
-  return all;
+  bool eventually = node->kind == PropertyExprNode::Kind::kEventually;
+  std::vector<Tri> verdicts;
+  verdicts.reserve(state.consequents.size());
+  for (NodeState* c : state.consequents) {
+    verdicts.push_back(Finish(node->operands[0], *c));
+  }
+  Tri joined = Junction(eventually, verdicts);
+  Tri decisive = eventually ? Tri::kTrue : Tri::kFalse;
+  if (joined == decisive) return decisive;
+  if (state.remaining > 0) return node->strong ? Tri::kFalse : Tri::kTrue;
+  return joined;
 }
 
 // §16.12.12: the ticks' operands are finished as themselves and the ticks
@@ -517,6 +530,7 @@ Tri Finish(const PropertyExprNode* node, NodeState& state) {
       state.verdict = FinishNexttime(node, state);
       break;
     case PropertyExprNode::Kind::kAlways:
+    case PropertyExprNode::Kind::kEventually:
       state.verdict = FinishAlways(node, state);
       break;
     case PropertyExprNode::Kind::kUntil:
