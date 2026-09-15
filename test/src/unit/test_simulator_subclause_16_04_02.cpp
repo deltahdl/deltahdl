@@ -497,7 +497,9 @@ TEST(DeferredFlushPointsLive, FlushedDeferredCoverIsNotCountedAsCovered) {
 // keeps an action block's expressions out of the always_comb's sensitivity,
 // so the block reads opcode outside them to be re-run by its change, and
 // opcode is written before my_cond so that the failing pass sees 64 whether
-// the block runs at each write or once after both (§4.7).
+// the block runs at each write or once after both (§4.7). The block and the
+// initial block each say where they are, so a failure names the pass that
+// went missing rather than only the report that did.
 TEST(DeferredFlushPointsLive, ActionBlockArgumentsAreEvaluatedOnEveryFailure) {
   SimFixture f;
   std::string out = RunCapture(
@@ -512,19 +514,69 @@ TEST(DeferredFlushPointsLive, ActionBlockArgumentsAreEvaluatedOnEveryFailure) {
       "  endfunction\n"
       "  always_comb begin : b1\n"
       "    seen = opcode;\n"
+      "    if (!my_cond) $display(\"b1: failing pass with opcode %0d\", "
+      "opcode);\n"
       "    a1: assert #0 (my_cond) else\n"
       "      $info(\"Error on operation of type %0d\", error_type(opcode));\n"
       "    a2: assert #0 (my_cond) else void'(error_type(opcode));\n"
       "  end\n"
       "  initial begin\n"
       "    #1 opcode = 64; my_cond = 0;\n"
+      "    $display(\"initial: after the writes of 64 and 0\");\n"
       "    #0 opcode = 0;\n"
+      "    $display(\"initial: after the write of 0\");\n"
       "  end\n"
       "endmodule\n",
       f);
   EXPECT_EQ(out,
+            "b1: failing pass with opcode 64\n"
             "Opcode error.\n"
-            "[1] INFO t.b1.a1 (line 12): Error on operation of type 0\n");
+            "initial: after the writes of 64 and 0\n"
+            "b1: failing pass with opcode 0\n"
+            "initial: after the write of 0\n"
+            "[1] INFO t.b1.a1 (line 13): Error on operation of type 0\n");
+}
+
+// The same example with the function's formal named apart from the module's
+// opcode. §13.3.2 gives a static function's formal static storage, so a formal
+// named after the variable the block reads shares nothing with it but the
+// name; the two cases are expected to read alike, and one failing alone names
+// the formal's storage as what the report's argument reached.
+TEST(DeferredFlushPointsLive,
+     ActionBlockArgumentsAreEvaluatedOnEveryFailureWithAFormalNamedApart) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  bit my_cond = 1;\n"
+      "  int opcode;\n"
+      "  int seen;\n"
+      "  function int error_type(input int op);\n"
+      "    func_assert: assert (op < 64) else $display(\"Opcode error.\");\n"
+      "    if (op < 32) return 0; else return 1;\n"
+      "  endfunction\n"
+      "  always_comb begin : b1\n"
+      "    seen = opcode;\n"
+      "    if (!my_cond) $display(\"b1: failing pass with opcode %0d\", "
+      "opcode);\n"
+      "    a1: assert #0 (my_cond) else\n"
+      "      $info(\"Error on operation of type %0d\", error_type(opcode));\n"
+      "    a2: assert #0 (my_cond) else void'(error_type(opcode));\n"
+      "  end\n"
+      "  initial begin\n"
+      "    #1 opcode = 64; my_cond = 0;\n"
+      "    $display(\"initial: after the writes of 64 and 0\");\n"
+      "    #0 opcode = 0;\n"
+      "    $display(\"initial: after the write of 0\");\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out,
+            "b1: failing pass with opcode 64\n"
+            "Opcode error.\n"
+            "initial: after the writes of 64 and 0\n"
+            "b1: failing pass with opcode 0\n"
+            "initial: after the write of 0\n"
+            "[1] INFO t.b1.a1 (line 13): Error on operation of type 0\n");
 }
 
 }  // namespace
