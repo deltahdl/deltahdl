@@ -479,6 +479,28 @@ static void CollectSampledFunctionArgsInStmt(
       stmt, [&out](const Expr* e) { CollectSampledFunctionArgs(e, out); });
 }
 
+static void CollectSequenceReadNames(const ModuleItem* seq, SimContext& ctx,
+                                     Arena& arena,
+                                     std::unordered_set<std::string>& names) {
+  LinearSequence flat;
+  if (!FlattenLinearSequence(seq, ctx, arena, flat)) return;
+  ForEachLinearSequenceExpr(
+      flat, [&names](const Expr* e) { CollectSampledOperandNames(e, names); });
+}
+
+static void CollectPropertyTreeReadNames(
+    const PropertyExprNode* node, SimContext& ctx, Arena& arena,
+    std::unordered_set<std::string>& names) {
+  if (node->boolean != nullptr)
+    CollectSampledOperandNames(node->boolean, names);
+  if (node->sequence != nullptr) {
+    CollectSequenceReadNames(node->sequence, ctx, arena, names);
+  }
+  for (const PropertyExprNode* operand : node->operands) {
+    CollectPropertyTreeReadNames(operand, ctx, arena, names);
+  }
+}
+
 void Lowerer::RecordAssertionSampleScope(const RtlirProcess& proc) {
   if (proc.body == nullptr) return;
   std::unordered_set<std::string> names;
@@ -487,14 +509,14 @@ void Lowerer::RecordAssertionSampleScope(const RtlirProcess& proc) {
   }
   // §16.12.2: a sequential property's operands are read sampled as a boolean
   // property is, so the names its flattened sequence reads, the sequences it
-  // instantiates included, are enrolled with the assertion's.
+  // instantiates included, are enrolled with the assertion's; §16.12.4 and
+  // §16.12.5 likewise for each operand of a property of operands.
   if (proc.body->assert_sequence != nullptr) {
-    LinearSequence flat;
-    if (FlattenLinearSequence(proc.body->assert_sequence, ctx_, arena_, flat)) {
-      ForEachLinearSequenceExpr(flat, [&names](const Expr* e) {
-        CollectSampledOperandNames(e, names);
-      });
-    }
+    CollectSequenceReadNames(proc.body->assert_sequence, ctx_, arena_, names);
+  }
+  if (proc.body->assert_property != nullptr) {
+    CollectPropertyTreeReadNames(proc.body->assert_property, ctx_, arena_,
+                                 names);
   }
   CollectSampledFunctionArgsInStmt(proc.body, names);
   if (names.empty()) return;

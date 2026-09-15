@@ -65,6 +65,20 @@ enum class Edge : uint8_t {
 
 struct ModuleItem;
 
+// §16.12: a property_expr built from the operands the evaluation reads --
+// a boolean, a sequence weak or strong (§16.12.2) -- under the operators
+// not (§16.12.3), or (§16.12.4) and and (§16.12.5). A boolean leaf carries
+// `boolean`, a sequence leaf `sequence` and `strong`, and an operator its
+// operands.
+struct PropertyExprNode {
+  enum class Kind : uint8_t { kBoolean, kSequence, kNot, kOr, kAnd };
+  Kind kind = Kind::kBoolean;
+  Expr* boolean = nullptr;
+  ModuleItem* sequence = nullptr;
+  bool strong = false;
+  std::vector<PropertyExprNode*> operands;
+};
+
 struct EventExpr {
   Edge edge = Edge::kNone;
   Expr* signal = nullptr;
@@ -212,6 +226,10 @@ struct Stmt {
   // attempt's result is the opposite of the underlying one, the strength of
   // a sequence switched with it.
   bool assert_negated = false;
+  // §16.12.4 and §16.12.5: the property as a tree of the operands above
+  // under or and and, set where the property_spec holds either operator;
+  // the fields above then stand unset but for the placeholder.
+  PropertyExprNode* assert_property = nullptr;
   Stmt* assert_pass_stmt = nullptr;
   Stmt* assert_fail_stmt = nullptr;
   bool is_deferred = false;

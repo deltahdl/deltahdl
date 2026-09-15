@@ -15,16 +15,14 @@ static void ExpectDeferredHashZero(DiagEngine& diag, const Token& tok) {
 // pieces of syntax — the deferral, the asserted expression and the action
 // block — so each piece is read in one place here.
 
-// §16.12: the tokens of the property operators, an implication or
-// followed-by among them, which make a spec a property_expr rather than the
-// sequence_expr of a sequential property.
+// §16.12: the tokens of the property operators the evaluation does not read,
+// an implication or followed-by among them; not, or and and are read.
 static bool IsPropertyOperatorToken(TokenKind k) {
   switch (k) {
     case TokenKind::kPipeDashGt:
     case TokenKind::kPipeEqGt:
     case TokenKind::kHashMinusHash:
     case TokenKind::kHashEqHash:
-    case TokenKind::kKwNot:
     case TokenKind::kKwNexttime:
     case TokenKind::kKwSNexttime:
     case TokenKind::kKwAlways:
@@ -151,10 +149,11 @@ struct ParserAssertHelpers {
 
   // §16.12.2: the sequence_expr of a sequential property, bare or under
   // strong(...) or weak(...), read as a linear sequence body into a sequence
-  // declaration of its own; `strong` says which operator was written.
-  // Answers nullptr, the lexer where it was, where the sequence is not one
-  // the monitor reads.
-  static ModuleItem* TryParseSequenceSpec(Parser& p, bool& strong) {
+  // declaration of its own; `strong` says which operator was written, and
+  // `term` that the sequence is one operand of a property's or or and, read
+  // to the operator. Answers nullptr, the lexer where it was, where the
+  // sequence is not one the monitor reads.
+  static ModuleItem* TryParseSequenceSpec(Parser& p, bool& strong, bool term) {
     auto saved = p.lexer_.SavePos();
     bool wrapped = p.Check(TokenKind::kKwStrong) || p.Check(TokenKind::kKwWeak);
     strong = p.Check(TokenKind::kKwStrong);
@@ -168,7 +167,8 @@ struct ParserAssertHelpers {
     auto* sequence = p.arena_.Create<ModuleItem>();
     sequence->kind = ModuleItemKind::kSequenceDecl;
     sequence->loc = p.CurrentLoc();
-    bool ok = p.ParseSequenceExprInto(sequence);
+    bool ok = (term && !wrapped) ? p.ParseSequenceTermInto(sequence)
+                                 : p.ParseSequenceExprInto(sequence);
     if (ok && wrapped) ok = p.Match(TokenKind::kRParen);
     if (!ok) {
       p.lexer_.RestorePos(saved);
@@ -177,21 +177,135 @@ struct ParserAssertHelpers {
     return sequence;
   }
 
+  // Whether the tokens ahead, to the closing parenthesis of the spec or,
+  // where `to_junction` says so, to the first `or` or `and` at the spec's
+  // own depth, hold a token `wanted` at that depth or below.
+  static bool AheadHolds(Parser& p, TokenKind wanted, bool to_junction) {
+    auto scan = p.lexer_.SavePos();
+    int depth = 0;
+    bool found = false;
+    while (!p.Check(TokenKind::kEof)) {
+      TokenKind k = p.CurrentToken().kind;
+      bool junction = k == TokenKind::kKwOr || k == TokenKind::kKwAnd;
+      if (k == TokenKind::kLParen) {
+        ++depth;
+      } else if (k == TokenKind::kRParen) {
+        if (depth == 0) break;
+        --depth;
+      } else if (depth == 0 && junction && to_junction) {
+        break;
+      } else if (k == wanted && (depth == 0 || !junction)) {
+        found = true;
+        break;
+      }
+      p.Consume();
+    }
+    p.lexer_.RestorePos(scan);
+    return found;
+  }
+
+  // Whether the spec holds an `or` or an `and` at its own depth, which makes
+  // it a property built of operands (§16.12.4, §16.12.5) rather than one
+  // operand; a sequence's own `or` and `and` read the same, which §16.12.2's
+  // strength rules make the same property.
+  static bool BodyHasPropertyJunction(Parser& p) {
+    return AheadHolds(p, TokenKind::kKwOr, false) ||
+           AheadHolds(p, TokenKind::kKwAnd, false);
+  }
+
+  static PropertyExprNode* NewPropertyNode(Parser& p,
+                                           PropertyExprNode::Kind kind) {
+    auto* node = p.arena_.Create<PropertyExprNode>();
+    node->kind = kind;
+    return node;
+  }
+
+  static PropertyExprNode* ParsePropertyOr(Parser& p);
+
+  // One operand of a property's or or and: `not` before an operand negates
+  // it (§16.12.3); a parenthesised property holding an or or and of its own
+  // is read as one; and otherwise the operand is a sequence where it holds
+  // a cycle delay before the next operator or stands under strong or weak,
+  // and a boolean else.
+  static PropertyExprNode* ParsePropertyTerm(Parser& p) {
+    if (p.Match(TokenKind::kKwNot)) {
+      auto* node = NewPropertyNode(p, PropertyExprNode::Kind::kNot);
+      auto* operand = ParsePropertyTerm(p);
+      if (operand == nullptr) return nullptr;
+      node->operands.push_back(operand);
+      return node;
+    }
+    if (p.Check(TokenKind::kLParen)) {
+      auto saved = p.lexer_.SavePos();
+      p.Consume();
+      if (BodyHasPropertyJunction(p)) {
+        auto* inner = ParsePropertyOr(p);
+        if (inner != nullptr && p.Match(TokenKind::kRParen)) return inner;
+        return nullptr;
+      }
+      p.lexer_.RestorePos(saved);
+    }
+    bool wrapped = p.Check(TokenKind::kKwStrong) || p.Check(TokenKind::kKwWeak);
+    if (wrapped || AheadHolds(p, TokenKind::kHashHash, true)) {
+      auto* node = NewPropertyNode(p, PropertyExprNode::Kind::kSequence);
+      node->sequence = TryParseSequenceSpec(p, node->strong, true);
+      return node->sequence != nullptr ? node : nullptr;
+    }
+    auto* node = NewPropertyNode(p, PropertyExprNode::Kind::kBoolean);
+    node->boolean = p.ParseExpr();
+    return node->boolean != nullptr ? node : nullptr;
+  }
+
+  // §16.12.5 and Table 16-3: `and` binds tighter than `or`, both left
+  // associative, so an `and` gathers its operands under one node and an
+  // `or` gathers the conjunctions.
+  static PropertyExprNode* ParsePropertyAnd(Parser& p) {
+    auto* left = ParsePropertyTerm(p);
+    if (left == nullptr || !p.Check(TokenKind::kKwAnd)) return left;
+    auto* node = NewPropertyNode(p, PropertyExprNode::Kind::kAnd);
+    node->operands.push_back(left);
+    while (p.Match(TokenKind::kKwAnd)) {
+      auto* right = ParsePropertyTerm(p);
+      if (right == nullptr) return nullptr;
+      node->operands.push_back(right);
+    }
+    return node;
+  }
+
+  static PropertyExprNode* ParsePropertyOr(Parser& p) {
+    auto* left = ParsePropertyAnd(p);
+    if (left == nullptr || !p.Check(TokenKind::kKwOr)) return left;
+    auto* node = NewPropertyNode(p, PropertyExprNode::Kind::kOr);
+    node->operands.push_back(left);
+    while (p.Match(TokenKind::kKwOr)) {
+      auto* right = ParsePropertyAnd(p);
+      if (right == nullptr) return nullptr;
+      node->operands.push_back(right);
+    }
+    return node;
+  }
+
   // §16.12.2: the body of the spec after its clock and disable condition: a
-  // spec holding `##` and no property operator is a sequential property,
-  // read as a sequence into `sequence`; one holding neither a cycle delay
-  // nor an implication is a boolean, read into `prop`. Answers false where
-  // the body is neither.
+  // spec holding an or or an and at its own depth is a property of operands
+  // read as a tree into `property`; one holding `##` and no property
+  // operator is a sequential property, read as a sequence into `sequence`;
+  // one holding neither a cycle delay nor an implication is a boolean, read
+  // into `prop`. Answers false where the body is none of these.
   static bool ParseSimpleSpecBody(Parser& p, Expr*& prop, ModuleItem*& sequence,
-                                  bool& strong, bool& negated) {
+                                  bool& strong, bool& negated,
+                                  PropertyExprNode*& property) {
     // §16.12.3: each `not` before the body negates it once more.
     while (p.Match(TokenKind::kKwNot)) negated = !negated;
+    if (BodyHasPropertyOperator(p)) return false;
+    if (BodyHasPropertyJunction(p)) {
+      property = ParsePropertyOr(p);
+      return property != nullptr;
+    }
     if (!p.BodyHasTemporalOperator()) {
       prop = p.ParseExpr();
       return prop != nullptr;
     }
-    if (BodyHasPropertyOperator(p)) return false;
-    sequence = TryParseSequenceSpec(p, strong);
+    sequence = TryParseSequenceSpec(p, strong, false);
     return sequence != nullptr;
   }
 };
@@ -541,10 +655,11 @@ bool Parser::TryParseSimpleConcurrentProperty(ModuleItem* item,
   bool strong = false;
   bool negated = false;
   ModuleItem* sequence = nullptr;
+  PropertyExprNode* property = nullptr;
   Expr* prop = nullptr;
   if (ok) {
     ok = ParserAssertHelpers::ParseSimpleSpecBody(*this, prop, sequence, strong,
-                                                  negated);
+                                                  negated, property);
   }
   // Accept only what consumes the whole spec, so the next token is the
   // property's closing parenthesis. Anything else restores the lexer and the
@@ -570,6 +685,14 @@ bool Parser::TryParseSimpleConcurrentProperty(ModuleItem* item,
   // unless written strong(...), and one in a cover as strong.
   stmt->assert_strong = strong || body_kind == StmtKind::kCoverImmediate;
   stmt->assert_negated = negated;
+  // §16.12.3: a `not` before a property of operands negates the whole.
+  if (property != nullptr && negated) {
+    auto* whole = arena_.Create<PropertyExprNode>();
+    whole->kind = PropertyExprNode::Kind::kNot;
+    whole->operands.push_back(property);
+    property = whole;
+  }
+  stmt->assert_property = property;
   stmt->assert_disable_iff = disable_iff;
   // §16.5: this statement carries a concurrent assertion's property, not an
   // immediate assertion's expression, so the mark travels with it to the

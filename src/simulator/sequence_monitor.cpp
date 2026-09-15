@@ -686,6 +686,26 @@ SimCoroutine MakeSequenceMonitorCoroutine(LinearSequence body,
   }
 }
 
+struct SequenceAttempt {
+  FirstMatchAttempt attempt;
+};
+
+SequenceAttempt* NewSequenceAttempt(const LinearSequence& body, Arena& arena) {
+  auto* attempt = arena.Create<SequenceAttempt>();
+  attempt->attempt = FreshFirstMatchAttempt(body);
+  return attempt;
+}
+
+SequenceStep StepSequenceAttempt(const LinearSequence& body,
+                                 SequenceAttempt& attempt, bool begin,
+                                 SimContext& ctx, Arena& arena) {
+  if (AdvanceFirstMatchAttempt(body, attempt.attempt, begin, ctx, arena)) {
+    return SequenceStep::kMatched;
+  }
+  if (FirstMatchAttemptIsSpent(attempt.attempt)) return SequenceStep::kFailed;
+  return SequenceStep::kPending;
+}
+
 // §16.12.2: one evaluation attempt of a sequential property is one attempt
 // of its sequence, begun at the tick the property's attempt begins at and
 // kept apart from the others as first_match keeps them; it holds where the

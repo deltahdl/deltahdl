@@ -104,6 +104,7 @@ struct WaitForkState {
   std::coroutine_handle<> waiter;
 };
 
+struct PropertyTreeState;
 struct SequencePropertyState;
 
 struct Process {
@@ -193,6 +194,9 @@ struct Process {
   // statement's first tick.
   std::unordered_map<const Stmt*, SequencePropertyState*>
       sequence_property_states;
+  // §16.12.4 and §16.12.5: likewise for each property of operands under or
+  // and and.
+  std::unordered_map<const Stmt*, PropertyTreeState*> property_tree_states;
 
   std::string inst_prefix;
 

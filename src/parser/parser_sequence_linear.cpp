@@ -700,4 +700,21 @@ bool Parser::ParseSequenceExprInto(ModuleItem* item) {
   return true;
 }
 
+// §16.12.4 and §16.12.5: one operand of a property's `or` or `and`, read
+// as the chain of a sequence with its intersects and within, the `or` and
+// `and` after it left for the property level, which §16.12.2 makes the same
+// as the sequence's own for two sequences and which reaches a negated or
+// boolean operand beside a sequence as well.
+bool Parser::ParseSequenceTermInto(ModuleItem* item) {
+  in_sequence_body_ = true;
+  bool ok = ParserSeqLinearHelpers::ParseLinearSeqIntersection(
+      *this, item->seq_linear);
+  in_sequence_body_ = false;
+  if (!ok || item->seq_linear.operands.empty()) {
+    item->seq_linear = SeqLinearBody{};
+    return false;
+  }
+  return true;
+}
+
 }  // namespace delta

@@ -19,6 +19,7 @@
 #include "simulator/evaluation.h"
 #include "simulator/expr_walk.h"
 #include "simulator/process.h"
+#include "simulator/property_attempts.h"
 #include "simulator/scheduler.h"
 #include "simulator/scope_hier_name.h"
 #include "simulator/sequence_monitor.h"
@@ -508,6 +509,55 @@ static void RegisterStrongAttemptsFinal(const Stmt* stmt,
   ctx.RegisterFinalProcess(p);
 }
 
+// §16.12.4 and §16.12.5: one tick of a property of operands under or and
+// and, evaluated as the sequential property above is, each attempt's tree
+// deciding the assertion's verdict, and the attempts still in flight when
+// the run ends decided then in a final process with their sequences read by
+// their strength.
+static SimCoroutine PropertyTreeFinalCoroutine(const Stmt* stmt,
+                                               PropertyTreeState* state,
+                                               SimContext& ctx, Arena& arena) {
+  for (bool verdict : FinishPropertyTree(*state)) {
+    RecordCoverImmediateSample(stmt, verdict, ctx);
+    const Stmt* action =
+        verdict ? stmt->assert_pass_stmt : stmt->assert_fail_stmt;
+    if (action != nullptr) {
+      co_await ExecStmt(action, ctx, arena);
+    } else if (!verdict && stmt->kind != StmtKind::kCoverImmediate) {
+      ReportDefaultAssertionFailure(stmt, ImmediateAssertionTypeBit(stmt),
+                                    ImmediateDirectiveTypeBit(stmt), ctx);
+    }
+  }
+}
+
+static void ExecPropertyTreeTick(const Stmt* stmt, SimContext& ctx,
+                                 Arena& arena) {
+  if (!ctx.AssertCheckingEnabled(ImmediateAssertionTypeBit(stmt),
+                                 ImmediateDirectiveTypeBit(stmt))) {
+    return;
+  }
+  Process* proc = ctx.CurrentProcess();
+  if (proc == nullptr) return;
+  PropertyTreeState*& state = proc->property_tree_states[stmt];
+  if (state == nullptr) {
+    state = CreatePropertyTreeState(stmt->assert_property, ctx, arena);
+    if (state == nullptr) return;
+    auto* p = CreateAssertionChildProcess(ctx, arena, Region::kActive);
+    p->kind = ProcessKind::kFinal;
+    p->coro = PropertyTreeFinalCoroutine(stmt, state, ctx, arena).Release();
+    ctx.RegisterFinalProcess(p);
+  }
+  bool disabled = stmt->assert_disable_iff != nullptr &&
+                  EvalExpr(stmt->assert_disable_iff, ctx, arena).IsTruthy();
+  auto& samples = ctx.AssertionSamples();
+  bool outer_evaluating_property = samples.EvaluatingProperty();
+  samples.SetEvaluatingProperty(true);
+  std::vector<bool> verdicts =
+      AdvancePropertyTree(*state, disabled, ctx, arena);
+  samples.SetEvaluatingProperty(outer_evaluating_property);
+  for (bool verdict : verdicts) ConcludeAssertion(stmt, verdict, ctx, arena);
+}
+
 static void ExecSequencePropertyTick(const Stmt* stmt, SimContext& ctx,
                                      Arena& arena) {
   uint32_t type_bit = ImmediateAssertionTypeBit(stmt);
@@ -666,6 +716,10 @@ ExecTask ExecImmediateAssert(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     co_return StmtResult::kDone;
   }
 
+  if (stmt->assert_property != nullptr) {
+    ExecPropertyTreeTick(stmt, ctx, arena);
+    co_return StmtResult::kDone;
+  }
   if (stmt->assert_sequence != nullptr) {
     ExecSequencePropertyTick(stmt, ctx, arena);
     co_return StmtResult::kDone;

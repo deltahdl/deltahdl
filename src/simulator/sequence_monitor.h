@@ -24,6 +24,20 @@ SimCoroutine MakeSequenceMonitorCoroutine(LinearSequence body,
                                           std::string ep_name, SimContext& ctx,
                                           Arena& arena);
 
+// §16.12.2: one attempt of a sequence begun at one tick, kept apart from the
+// others as first_match keeps them, for a property that reads the sequence
+// as one operand. StepSequenceAttempt advances it one tick, `begin` where
+// the tick is the one it begins at, and says whether it matched at the
+// tick, can no longer match, or is still in flight.
+struct SequenceAttempt;
+
+enum class SequenceStep : uint8_t { kPending, kMatched, kFailed };
+
+SequenceAttempt* NewSequenceAttempt(const LinearSequence& body, Arena& arena);
+SequenceStep StepSequenceAttempt(const LinearSequence& body,
+                                 SequenceAttempt& attempt, bool begin,
+                                 SimContext& ctx, Arena& arena);
+
 // §16.12.2: the attempts in flight of one sequential property, over its
 // sequence flattened as a named sequence's is. CreateSequencePropertyState
 // answers nullptr where the sequence is not one the monitor reads.

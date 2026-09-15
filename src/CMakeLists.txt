@@ -243,6 +243,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/lowerer_udp.cpp
     simulator/lowerer_register.cpp
     simulator/lowerer_sequence_monitors.cpp
+    simulator/property_attempts.cpp
     simulator/lowerer_process.cpp
     simulator/lowerer_inst.cpp
     simulator/lowerer_import.cpp
