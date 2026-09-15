@@ -211,6 +211,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/eval_randomize_joint.cpp
     simulator/eval_randomize_mode.cpp
     simulator/eval_static_method.cpp
+    simulator/sequence_flatten.cpp
     simulator/sequence_monitor.cpp
     simulator/eval_systask.cpp
     simulator/eval_expr.cpp

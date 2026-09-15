@@ -265,7 +265,12 @@ class Parser {
   bool ParseLinearSeqOperands(std::vector<Expr*>& operands,
                               std::vector<SeqCycleDelay>& delays);
   bool ParseLinearSeqCycleDelay(SeqCycleDelay& delay);
+  bool ParseLinearSeqDelayBound(uint32_t& value, std::string_view& formal,
+                                bool allow_dollar);
   uint32_t ParseSeqDelayLiteral();
+  bool AheadIsSequenceInstanceOperand();
+  Expr* ParseSequenceInstanceOperand();
+  Expr* ParseSequenceActualArg();
   void CheckConstraintExprToken(const Token& tok);
   void CheckForeachConstraintHeader(ClassMember* member);
   void CheckSolveBeforeConstraint(ClassMember* member);

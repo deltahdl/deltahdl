@@ -28,6 +28,7 @@
 #include "simulator/lowerer_register.h"
 #include "simulator/net.h"
 #include "simulator/process.h"
+#include "simulator/sequence_flatten.h"
 #include "simulator/sequence_monitor.h"
 #include "simulator/sim_context.h"
 #include "simulator/specify.h"
@@ -594,14 +595,21 @@ void Lowerer::LowerProcess(const RtlirProcess& proc, bool from_program,
 // other code fires these endpoint events.
 void Lowerer::LowerSequenceMonitors(const RtlirModule* mod) {
   for (auto* seq : mod->sequence_decls) {
-    if (seq->seq_clock.empty() || seq->seq_linear_operands.empty()) continue;
+    // §16.8: a sequence declared without a clock is matched through the
+    // sequences that instantiate it, which inherit it into their own bodies.
+    if (seq->seq_clock.empty()) continue;
+    LinearSequence body;
+    if (!FlattenLinearSequence(seq, ctx_, arena_, body)) continue;
     auto* p = arena_.Create<Process>();
     p->kind = ProcessKind::kAlways;
     p->id = next_id_++;
     p->home_region = Region::kActive;
     p->inst_prefix = inst_prefix_;
     p->rng_seed = ctx_.DrawSeedForChild();
-    p->coro = MakeSequenceMonitorCoroutine(seq, ctx_, arena_).Release();
+    p->coro = MakeSequenceMonitorCoroutine(std::move(body), seq->seq_clock,
+                                           "__seq_" + std::string(seq->name),
+                                           ctx_, arena_)
+                  .Release();
     ScheduleProcess(p, ctx_);
   }
 }

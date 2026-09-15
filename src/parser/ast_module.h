@@ -300,10 +300,15 @@ struct ClockingSignalDecl {
 // number of clock ticks from the operand before to the one this stands
 // before, `##N` being [N:N], `##[a:b]` the closed range, `##[a:$]` a range
 // with no upper bound, `##[*]` [0:$] and `##[+]` [1:$].
+// A bound written as the name of a formal argument of the declaring sequence
+// is kept by name until §16.8's instantiation supplies the actual, an
+// elaboration-time constant or `$`, that the flattening reads it as.
 struct SeqCycleDelay {
   static constexpr uint32_t kUnbounded = UINT32_MAX;
   uint32_t min = 1;
   uint32_t max = 1;
+  std::string_view min_formal;
+  std::string_view max_formal;
 };
 
 struct ModuleItem {

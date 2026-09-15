@@ -468,17 +468,41 @@ static void ParseSequencePortList(Lexer& lexer, DiagEngine& diag,
   }
 }
 
-// §16.7's cycle_delay_range after its `##`: a constant_primary N for [N:N], a
-// bracketed `a:b` or `a:$`, and the two abbreviations `[*]` for [0:$] and
-// `[+]` for [1:$]. Only an integer literal is read as the constant, which is
-// what the monitor needs of one; any other form leaves the sequence without a
-// monitor, as before. Returns false where the delay is not one of these.
-bool Parser::ParseLinearSeqCycleDelay(SeqCycleDelay& delay) {
+// One bound of §16.7's cycle_delay_range as the linear monitor reads it: an
+// integer literal, `$` where the caller admits it, or the name of a formal
+// argument the instantiation supplies (§16.8). Returns false for any other
+// form, which leaves the sequence without a monitor as before.
+bool Parser::ParseLinearSeqDelayBound(uint32_t& value, std::string_view& formal,
+                                      bool allow_dollar) {
   if (Check(TokenKind::kIntLiteral)) {
-    delay.min = delay.max = ParseSeqDelayLiteral();
+    value = ParseSeqDelayLiteral();
     return true;
   }
-  if (!Match(TokenKind::kLBracket)) return false;
+  if (allow_dollar && Match(TokenKind::kDollar)) {
+    value = SeqCycleDelay::kUnbounded;
+    return true;
+  }
+  if (Check(TokenKind::kIdentifier)) {
+    formal = Consume().text;
+    return true;
+  }
+  return false;
+}
+
+// §16.7's cycle_delay_range after its `##`: a constant_primary N for [N:N], a
+// bracketed `a:b` or `a:$`, and the two abbreviations `[*]` for [0:$] and
+// `[+]` for [1:$]. Returns false where the delay is not one of these.
+bool Parser::ParseLinearSeqCycleDelay(SeqCycleDelay& delay) {
+  delay = SeqCycleDelay{};
+  if (!Check(TokenKind::kLBracket)) {
+    if (!ParseLinearSeqDelayBound(delay.min, delay.min_formal, false)) {
+      return false;
+    }
+    delay.max = delay.min;
+    delay.max_formal = delay.min_formal;
+    return true;
+  }
+  Consume();  // '['
   if (Match(TokenKind::kStar)) {
     delay.min = 0;
     delay.max = SeqCycleDelay::kUnbounded;
@@ -489,17 +513,16 @@ bool Parser::ParseLinearSeqCycleDelay(SeqCycleDelay& delay) {
     delay.max = SeqCycleDelay::kUnbounded;
     return Match(TokenKind::kRBracket);
   }
-  if (!Check(TokenKind::kIntLiteral)) return false;
-  delay.min = ParseSeqDelayLiteral();
-  if (!Match(TokenKind::kColon)) return false;
-  if (Match(TokenKind::kDollar)) {
-    delay.max = SeqCycleDelay::kUnbounded;
-  } else if (Check(TokenKind::kIntLiteral)) {
-    delay.max = ParseSeqDelayLiteral();
-  } else {
+  if (!ParseLinearSeqDelayBound(delay.min, delay.min_formal, false)) {
     return false;
   }
-  return delay.max >= delay.min && Match(TokenKind::kRBracket);
+  if (!Match(TokenKind::kColon)) return false;
+  if (!ParseLinearSeqDelayBound(delay.max, delay.max_formal, true)) {
+    return false;
+  }
+  bool ordered = !delay.min_formal.empty() || !delay.max_formal.empty() ||
+                 delay.max >= delay.min;
+  return ordered && Match(TokenKind::kRBracket);
 }
 
 uint32_t Parser::ParseSeqDelayLiteral() {
@@ -513,19 +536,88 @@ uint32_t Parser::ParseSeqDelayLiteral() {
   return value;
 }
 
+// Whether the tokens ahead are `identifier ( ... )` followed by what ends an
+// operand -- `##`, `;` or `endsequence` -- which is how a sequence instance
+// with an argument list stands in a linear body. The lexer is rewound.
+bool Parser::AheadIsSequenceInstanceOperand() {
+  if (!Check(TokenKind::kIdentifier)) return false;
+  auto saved = lexer_.SavePos();
+  Consume();
+  bool is_instance = false;
+  if (Match(TokenKind::kLParen)) {
+    int depth = 1;
+    while (depth > 0 && !AtEnd()) {
+      if (Check(TokenKind::kLParen)) ++depth;
+      if (Check(TokenKind::kRParen)) --depth;
+      Consume();
+    }
+    is_instance = Check(TokenKind::kHashHash) || Check(TokenKind::kSemicolon) ||
+                  Check(TokenKind::kKwEndsequence);
+  }
+  lexer_.RestorePos(saved);
+  return is_instance;
+}
+
+// §16.8: a sequence instance's argument list, `sequence_list_of_arguments`,
+// read as a call: each actual is an expression, `$`, kept as an identifier
+// named `$`, or `.formal(actual)` bound by name. The instance is recorded as
+// a call the lowering resolves against the named sequences, so an instance of
+// a sequence declared after this one is reached as §16.8 allows.
+Expr* Parser::ParseSequenceInstanceOperand() {
+  Token name = Consume();
+  auto* call = arena_.Create<Expr>();
+  call->kind = ExprKind::kCall;
+  call->callee = name.text;
+  call->text = name.text;
+  call->range.start = name.loc;
+  Expect(TokenKind::kLParen, Subclause("16.8"));
+  while (!Check(TokenKind::kRParen) && !AtEnd()) {
+    if (Check(TokenKind::kDot)) {
+      Consume();
+      call->arg_names.push_back(
+          Expect(TokenKind::kIdentifier, Subclause("16.8")).text);
+      Expect(TokenKind::kLParen, Subclause("16.8"));
+      call->args.push_back(ParseSequenceActualArg());
+      Expect(TokenKind::kRParen, Subclause("16.8"));
+    } else {
+      call->args.push_back(ParseSequenceActualArg());
+    }
+    if (!Match(TokenKind::kComma)) break;
+  }
+  Expect(TokenKind::kRParen, Subclause("16.8"));
+  return call;
+}
+
+Expr* Parser::ParseSequenceActualArg() {
+  if (Check(TokenKind::kDollar)) {
+    Token tok = Consume();
+    auto* dollar = arena_.Create<Expr>();
+    dollar->kind = ExprKind::kIdentifier;
+    dollar->text = tok.text;
+    dollar->range.start = tok.loc;
+    return dollar;
+  }
+  return ParseExpr();
+}
+
 // §16.13.6: parse the operand chain `[##d0] b0 ##d1 b1 ... ##dn bn` of a
 // linear sequence body, recording each operand and the §16.7 cycle delay
-// before it, the leading one 0 where the body starts with an operand. Returns
-// false on a delay form the monitor does not read or on a parse failure.
+// before it, the leading one 0 where the body starts with an operand. An
+// operand is a Boolean expression or, as §16.8 has it, an instance of a named
+// sequence. Returns false on a delay form the monitor does not read or on a
+// parse failure.
 bool Parser::ParseLinearSeqOperands(std::vector<Expr*>& operands,
                                     std::vector<SeqCycleDelay>& delays) {
-  SeqCycleDelay next{0, 0};
+  SeqCycleDelay next;
+  next.min = 0;
+  next.max = 0;
   if (Match(TokenKind::kHashHash) && !ParseLinearSeqCycleDelay(next)) {
     return false;
   }
   while (!Check(TokenKind::kKwEndsequence) && !Check(TokenKind::kSemicolon) &&
          !AtEnd()) {
-    Expr* op = ParseExpr();
+    Expr* op = AheadIsSequenceInstanceOperand() ? ParseSequenceInstanceOperand()
+                                                : ParseExpr();
     if (!op) return false;
     operands.push_back(op);
     delays.push_back(next);
@@ -543,15 +635,19 @@ bool Parser::ParseLinearSeqOperands(std::vector<Expr*>& operands,
 // re-reads the same tokens unchanged; any other body shape leaves the fields
 // empty and no monitor is created.
 void Parser::CaptureLinearSequenceBody(ModuleItem* item) {
-  if (!Check(TokenKind::kAt)) return;
   auto saved = lexer_.SavePos();
   diag_.PushSuppress();
-  Consume();  // '@'
   std::vector<EventExpr> clock;
-  bool ok = Match(TokenKind::kLParen);
-  if (ok) {
-    clock = ParseEventList();
-    ok = Match(TokenKind::kRParen);
+  bool ok = true;
+  // §16.8: a sequence declared without a clock inherits one from the sequence
+  // or assertion that instantiates it, so a body without a leading `@` is
+  // captured as well, with no clock of its own.
+  if (Match(TokenKind::kAt)) {
+    ok = Match(TokenKind::kLParen);
+    if (ok) {
+      clock = ParseEventList();
+      ok = Match(TokenKind::kRParen);
+    }
   }
   std::vector<Expr*> operands;
   std::vector<SeqCycleDelay> delays;

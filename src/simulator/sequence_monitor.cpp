@@ -105,17 +105,16 @@ void FireSequenceEndpoint(SimContext& ctx, const std::string& ep_name) {
 
 }  // namespace
 
-SimCoroutine MakeSequenceMonitorCoroutine(const ModuleItem* seq,
-                                          SimContext& ctx, Arena& arena) {
-  std::string ep_name = "__seq_" + std::string(seq->name);
-  const std::vector<Expr*>& operands = seq->seq_linear_operands;
-  const std::vector<SeqCycleDelay>& delays = seq->seq_linear_delays;
+SimCoroutine MakeSequenceMonitorCoroutine(LinearSequence body,
+                                          std::vector<EventExpr> clock,
+                                          std::string ep_name, SimContext& ctx,
+                                          Arena& arena) {
   std::vector<LinearAttempt> active;
   while (!ctx.StopRequested()) {
-    co_await EventAwaiter{ctx, seq->seq_clock, arena};
+    co_await EventAwaiter{ctx, clock, arena};
     // §16.14.5: a new evaluation attempt begins at every clock tick, which
     // AdvanceLinearAttempts adds beside the ones in flight.
-    if (AdvanceLinearAttempts(operands, delays, active, ctx, arena)) {
+    if (AdvanceLinearAttempts(body.operands, body.delays, active, ctx, arena)) {
       FireSequenceEndpoint(ctx, ep_name);
     }
   }

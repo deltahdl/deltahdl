@@ -1,0 +1,7 @@
+rule, trans ##1 start_trans ##1 s ##1 end_trans, ends at 65
+s20_1(8'h5a, 4'hf) ends at 85
+win(a, c, 2, $), a ##[2:$] c, ends at 55
+win(.hi(2), .lo(1), .y(b), .x(a)), a ##[1:2] b, ends at 45
+s3 on negedge clk ends at 40
+s4 on edge clk ends at 50
+$finish at time 100
