@@ -651,7 +651,7 @@ Expr* Parser::TryParseIdentifierCast(Expr* base, bool* handled) {
 // Parse the run of postfix call/select operators (with optional intervening
 // attribute lists and trailing member accesses) that follow a name primary.
 Expr* Parser::ParseIdentifierPostfixChain(Expr* result) {
-  while (Check(TokenKind::kLParen) || Check(TokenKind::kLBracket) ||
+  while (Check(TokenKind::kLParen) || AtSelectBracket() ||
          Check(TokenKind::kAttrStart)) {
     if (Check(TokenKind::kAttrStart)) {
       ParseAttributes();
@@ -677,7 +677,7 @@ Expr* Parser::ParseIdentifierPostfixChain(Expr* result) {
 
 // Parse the member/select tail that may follow a 'with' clause expression.
 Expr* Parser::ParseWithClauseTail(Expr* result) {
-  while (Check(TokenKind::kDot) || Check(TokenKind::kLBracket)) {
+  while (Check(TokenKind::kDot) || AtSelectBracket()) {
     if (!Check(TokenKind::kDot)) {
       result = ParseSelectExpr(result);
       continue;

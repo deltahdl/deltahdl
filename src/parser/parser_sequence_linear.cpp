@@ -287,26 +287,9 @@ struct ParserSeqLinearHelpers {
   // `[->min:max]` for goto, `[=n]` and `[=min:max]` for nonconsecutive, an
   // upper bound of `$` unbounded. Returns false where the brackets hold
   // anything else; `rep` stays kNone where no repetition follows.
-  static bool ParseSequenceRepetition(Parser& p, SeqRepetition& rep) {
-    rep = SeqRepetition{};
-    if (!p.Check(TokenKind::kLBracket)) return true;
-    auto saved = p.lexer_.SavePos();
-    p.Consume();
-    if (p.Match(TokenKind::kStar)) {
-      rep.kind = SeqRepetition::Kind::kConsecutive;
-    } else if (p.Match(TokenKind::kArrow)) {
-      rep.kind = SeqRepetition::Kind::kGoto;
-    } else if (p.Match(TokenKind::kEq)) {
-      rep.kind = SeqRepetition::Kind::kNonconsecutive;
-    } else if (p.Match(TokenKind::kPlus)) {
-      rep.kind = SeqRepetition::Kind::kConsecutive;
-      rep.min = 1;
-      rep.max = SeqCycleDelay::kUnbounded;
-      return p.Match(TokenKind::kRBracket);
-    } else {
-      p.lexer_.RestorePos(saved);
-      return true;
-    }
+  // The count inside a repetition's brackets after its operator: `n`,
+  // `min:max` or `min:$`, or nothing for `[*]`.
+  static bool ParseRepetitionCount(Parser& p, SeqRepetition& rep) {
     if (p.Match(TokenKind::kRBracket)) {
       if (rep.kind != SeqRepetition::Kind::kConsecutive) return false;
       rep.min = 0;
@@ -324,6 +307,27 @@ struct ParserSeqLinearHelpers {
       }
     }
     return rep.max >= rep.min && p.Match(TokenKind::kRBracket);
+  }
+
+  static bool ParseSequenceRepetition(Parser& p, SeqRepetition& rep) {
+    rep = SeqRepetition{};
+    if (!AtRepetitionBracket(p)) return true;
+    p.Consume();  // '['
+    if (p.Match(TokenKind::kPlus)) {
+      rep.kind = SeqRepetition::Kind::kConsecutive;
+      rep.min = 1;
+      rep.max = SeqCycleDelay::kUnbounded;
+      return p.Match(TokenKind::kRBracket);
+    }
+    if (p.Match(TokenKind::kStar)) {
+      rep.kind = SeqRepetition::Kind::kConsecutive;
+    } else if (p.Match(TokenKind::kArrow)) {
+      rep.kind = SeqRepetition::Kind::kGoto;
+    } else {
+      p.Consume();  // '='
+      rep.kind = SeqRepetition::Kind::kNonconsecutive;
+    }
+    return ParseRepetitionCount(p, rep);
   }
 
   // §16.9.2: consecutive repetition of a group by an exact count, unrolled

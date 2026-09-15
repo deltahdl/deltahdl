@@ -180,43 +180,48 @@ void CarryAttempt(LinearAttempt attempt, const SeqCycleDelay& delay,
 // before it checked at this same tick as §16.7 has the concatenation with a
 // delay of 0 overlap; and whether or not it holds, the attempt stays for the
 // later ticks of its range. Reports whether any attempt matched at this tick.
-// The attempts one tick of an attempt gives rise to: the ones to read again
-// at this tick, at the operand after a match with a delay of 0 to it, the ones
-// kept for the next tick, and whether the sequence matched at this tick.
-struct TickOutcome {
+// What one tick of an attempt reads and writes: the sequence, the attempts
+// to read again at this tick, at the operand after a match with a delay of 0
+// to it, the ones kept for the next tick, whether the sequence matched at
+// this tick, and the context the operands are evaluated in.
+struct TickStep {
+  const LinearSequence& body;
   std::vector<LinearAttempt>& pending;
   std::vector<LinearAttempt>& carry;
+  SimContext& ctx;
+  Arena& arena;
   bool matched = false;
 };
 
 // The attempt's operand has matched at this tick: the sequence ends here where
 // it was the last, and otherwise an attempt at the next operand begins its
 // wait here with the locals as written.
-void EndOperand(const LinearSequence& body, LinearAttempt& advanced,
-                TickOutcome& out) {
-  if (advanced.pos + 1 == body.operands.size()) {
-    out.matched = true;
+void EndOperand(TickStep& step, LinearAttempt& advanced) {
+  if (advanced.pos + 1 == step.body.operands.size()) {
+    step.matched = true;
     return;
   }
-  out.pending.push_back({advanced.pos + 1, 0, advanced.locals});
+  step.pending.push_back({advanced.pos + 1, 0, advanced.locals});
+}
+
+// Keeps an attempt inside a repetition for the next tick.
+void KeepRepeating(TickStep& step, LinearAttempt advanced) {
+  advanced.waited = 0;
+  advanced.repeating = true;
+  step.carry.push_back(std::move(advanced));
 }
 
 // §16.9.2 consecutive repetition `b[*min:max]`: the operand matches at
 // consecutive ticks, the repetition ending at the last; the whole may end
 // after any number of matches from min to max, and a further match is read
 // at the very next tick while fewer than max have been.
-void StepConsecutive(const LinearSequence& body, LinearAttempt& attempt,
-                     const SeqRepetition& rep, TickOutcome& out,
-                     SimContext& ctx, Arena& arena) {
+void StepConsecutive(TickStep& step, const LinearAttempt& attempt,
+                     const SeqRepetition& rep) {
   LinearAttempt advanced = attempt;
-  if (!EvalOperand(body, advanced, ctx, arena)) return;
+  if (!EvalOperand(step.body, advanced, step.ctx, step.arena)) return;
   advanced.count = attempt.count + 1;
-  if (advanced.count >= rep.min) EndOperand(body, advanced, out);
-  if (advanced.count < rep.max) {
-    advanced.waited = 0;
-    advanced.repeating = true;
-    out.carry.push_back(std::move(advanced));
-  }
+  if (advanced.count >= rep.min) EndOperand(step, advanced);
+  if (advanced.count < rep.max) KeepRepeating(step, std::move(advanced));
 }
 
 // §16.9.2 goto `b[->min:max]` and nonconsecutive `b[=min:max]` repetition:
@@ -224,62 +229,67 @@ void StepConsecutive(const LinearSequence& body, LinearAttempt& attempt,
 // at the last match after min to max of them, or, for the nonconsecutive
 // form, at any later tick the operand does not hold at, before any further
 // match.
-void StepNonconsecutive(const LinearSequence& body, LinearAttempt& attempt,
-                        const SeqRepetition& rep, TickOutcome& out,
-                        SimContext& ctx, Arena& arena) {
+void StepNonconsecutive(TickStep& step, const LinearAttempt& attempt,
+                        const SeqRepetition& rep) {
   LinearAttempt advanced = attempt;
-  bool holds = EvalOperand(body, advanced, ctx, arena);
+  bool holds = EvalOperand(step.body, advanced, step.ctx, step.arena);
   bool extends = rep.kind == SeqRepetition::Kind::kNonconsecutive;
   if (holds) {
     advanced.count = attempt.count + 1;
     if (advanced.count > rep.max) return;
-    if (advanced.count >= rep.min) EndOperand(body, advanced, out);
+    if (advanced.count >= rep.min) EndOperand(step, advanced);
     if (advanced.count == rep.max && !extends) return;
-  } else {
-    advanced.count = attempt.count;
-    if (extends && attempt.count >= rep.min) EndOperand(body, advanced, out);
+  } else if (extends && attempt.count >= rep.min) {
+    EndOperand(step, advanced);
   }
-  advanced.waited = 0;
-  advanced.repeating = true;
-  out.carry.push_back(std::move(advanced));
+  KeepRepeating(step, std::move(advanced));
 }
 
-// One attempt at this tick. An attempt inside a repetition steps by the
-// repetition's rules; one arriving at its operand within the delay range
-// reads it, a repeated operand beginning its repetition, an empty consecutive
-// repetition also letting the attempt pass on as §16.9.2.1 has `empty ##n
-// seq` be `##(n-1) seq`; and an attempt still inside its delay range is kept
-// for the next tick.
-void StepAttempt(const LinearSequence& body, LinearAttempt attempt,
-                 TickOutcome& out, SimContext& ctx, Arena& arena) {
-  const SeqCycleDelay& delay = body.delays[attempt.pos];
-  const SeqRepetition& rep = body.repetitions[attempt.pos];
-  bool consecutive = rep.kind == SeqRepetition::Kind::kConsecutive;
-  if (attempt.repeating) {
-    if (consecutive) {
-      StepConsecutive(body, attempt, rep, out, ctx, arena);
-    } else {
-      StepNonconsecutive(body, attempt, rep, out, ctx, arena);
+// An attempt arriving at its operand within the delay range reads it: a
+// plain operand ends where it holds, a repeated one begins its repetition,
+// and an empty consecutive repetition also lets the attempt pass on, as
+// §16.9.2.1 has `empty ##n seq` be `##(n-1) seq`.
+void ArriveAtOperand(TickStep& step, const LinearAttempt& attempt,
+                     const SeqRepetition& rep) {
+  if (rep.kind == SeqRepetition::Kind::kNone) {
+    LinearAttempt advanced = attempt;
+    if (EvalOperand(step.body, advanced, step.ctx, step.arena)) {
+      EndOperand(step, advanced);
     }
     return;
   }
-  if (WithinDelay(delay, attempt.waited)) {
-    if (rep.kind == SeqRepetition::Kind::kNone) {
-      LinearAttempt advanced = attempt;
-      if (EvalOperand(body, advanced, ctx, arena)) {
-        EndOperand(body, advanced, out);
-      }
-    } else if (consecutive) {
-      if (rep.min == 0 && attempt.pos + 1 < body.operands.size()) {
-        out.pending.push_back({attempt.pos + 1, 1, attempt.locals});
-      }
-      StepConsecutive(body, attempt, rep, out, ctx, arena);
-    } else {
-      StepNonconsecutive(body, attempt, rep, out, ctx, arena);
-      return;
-    }
+  if (rep.kind != SeqRepetition::Kind::kConsecutive) {
+    StepNonconsecutive(step, attempt, rep);
+    return;
   }
-  CarryAttempt(std::move(attempt), delay, out.carry);
+  if (rep.min == 0 && attempt.pos + 1 < step.body.operands.size()) {
+    step.pending.push_back({attempt.pos + 1, 1, attempt.locals});
+  }
+  StepConsecutive(step, attempt, rep);
+}
+
+// One attempt at this tick: inside a repetition it steps by the repetition's
+// rules; otherwise it reads its operand where the tick is within the delay
+// range, and stays for the next tick while the range runs.
+void StepAttempt(TickStep& step, LinearAttempt attempt) {
+  const SeqCycleDelay& delay = step.body.delays[attempt.pos];
+  const SeqRepetition& rep = step.body.repetitions[attempt.pos];
+  if (attempt.repeating) {
+    if (rep.kind == SeqRepetition::Kind::kConsecutive) {
+      StepConsecutive(step, attempt, rep);
+    } else {
+      StepNonconsecutive(step, attempt, rep);
+    }
+    return;
+  }
+  if (WithinDelay(delay, attempt.waited)) ArriveAtOperand(step, attempt, rep);
+  // A goto or nonconsecutive repetition, once begun, waits by its own rules
+  // rather than by the delay range before it.
+  if (rep.kind == SeqRepetition::Kind::kGoto ||
+      rep.kind == SeqRepetition::Kind::kNonconsecutive) {
+    if (WithinDelay(delay, attempt.waited)) return;
+  }
+  CarryAttempt(std::move(attempt), delay, step.carry);
 }
 
 bool AdvanceLinearAttempts(const LinearSequence& body,
@@ -296,14 +306,14 @@ bool AdvanceLinearAttempts(const LinearSequence& body,
     pending.push_back({0, 0, InitialLocals(body.locals, ctx, arena)});
   }
   std::vector<LinearAttempt> carry;
-  TickOutcome out{pending, carry};
+  TickStep step{body, pending, carry, ctx, arena};
   while (!pending.empty()) {
     LinearAttempt attempt = std::move(pending.back());
     pending.pop_back();
-    StepAttempt(body, std::move(attempt), out, ctx, arena);
+    StepAttempt(step, std::move(attempt));
   }
   active = std::move(carry);
-  return out.matched;
+  return step.matched;
 }
 
 // §16.9.5: one attempt of `s1 and s2 ...`, begun at one tick: the attempts

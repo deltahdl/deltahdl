@@ -333,7 +333,7 @@ TEST(SequenceRepetition, GotoRepetitionEndsAtTheLastMatch) {
 // form needs c at 45, `a ##1 b[=2:3] ##1 c` ends at 55 and the goto form
 // never.
 TEST(SequenceRepetition, NonconsecutiveRepetitionExtendsPastTheLastMatch) {
-  const char* const two_then_gap =
+  const char* const kTwoThenGap =
       "    #10 a = 1;\n"
       "    #10 a = 0; b = 1;\n"
       "    #20 b = 0;\n"
@@ -341,13 +341,13 @@ TEST(SequenceRepetition, NonconsecutiveRepetitionExtendsPastTheLastMatch) {
       "    #10 c = 0;\n";
   SimFixture f;
   auto* hits = RunAndFindVar(
-      RepetitionSource("a ##1 b[=2:3] ##1 c", two_then_gap), f, "hits");
+      RepetitionSource("a ##1 b[=2:3] ##1 c", kTwoThenGap), f, "hits");
   ASSERT_NE(hits, nullptr);
   EXPECT_EQ(hits->value.ToUint64(), 1u);
   EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 55u);
   SimFixture g;
   auto* goto_hits = RunAndFindVar(
-      RepetitionSource("a ##1 b[->2:3] ##1 c", two_then_gap), g, "hits");
+      RepetitionSource("a ##1 b[->2:3] ##1 c", kTwoThenGap), g, "hits");
   ASSERT_NE(goto_hits, nullptr);
   EXPECT_EQ(goto_hits->value.ToUint64(), 0u);
 }
