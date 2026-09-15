@@ -472,14 +472,14 @@ static void ParseSequencePortList(Lexer& lexer, DiagEngine& diag,
 // integer literal, `$` where the caller admits it, or the name of a formal
 // argument the instantiation supplies (§16.8). Returns false for any other
 // form, which leaves the sequence without a monitor as before.
-bool Parser::ParseLinearSeqDelayBound(uint32_t& value, std::string_view& formal,
-                                      bool allow_dollar) {
+bool Parser::ParseSeqDelayBound(uint32_t& val, std::string_view& formal,
+                                bool dollar) {
   if (Check(TokenKind::kIntLiteral)) {
-    value = ParseSeqDelayLiteral();
+    val = ParseSeqDelayLiteral();
     return true;
   }
-  if (allow_dollar && Match(TokenKind::kDollar)) {
-    value = SeqCycleDelay::kUnbounded;
+  if (dollar && Match(TokenKind::kDollar)) {
+    val = SeqCycleDelay::kUnbounded;
     return true;
   }
   if (Check(TokenKind::kIdentifier)) {
@@ -495,7 +495,7 @@ bool Parser::ParseLinearSeqDelayBound(uint32_t& value, std::string_view& formal,
 bool Parser::ParseLinearSeqCycleDelay(SeqCycleDelay& delay) {
   delay = SeqCycleDelay{};
   if (!Check(TokenKind::kLBracket)) {
-    if (!ParseLinearSeqDelayBound(delay.min, delay.min_formal, false)) {
+    if (!ParseSeqDelayBound(delay.min, delay.min_formal, false)) {
       return false;
     }
     delay.max = delay.min;
@@ -513,11 +513,11 @@ bool Parser::ParseLinearSeqCycleDelay(SeqCycleDelay& delay) {
     delay.max = SeqCycleDelay::kUnbounded;
     return Match(TokenKind::kRBracket);
   }
-  if (!ParseLinearSeqDelayBound(delay.min, delay.min_formal, false)) {
+  if (!ParseSeqDelayBound(delay.min, delay.min_formal, false)) {
     return false;
   }
   if (!Match(TokenKind::kColon)) return false;
-  if (!ParseLinearSeqDelayBound(delay.max, delay.max_formal, true)) {
+  if (!ParseSeqDelayBound(delay.max, delay.max_formal, true)) {
     return false;
   }
   bool ordered = !delay.min_formal.empty() || !delay.max_formal.empty() ||
@@ -606,8 +606,9 @@ Expr* Parser::ParseSequenceActualArg() {
 // operand is a Boolean expression or, as §16.8 has it, an instance of a named
 // sequence. Returns false on a delay form the monitor does not read or on a
 // parse failure.
-bool Parser::ParseLinearSeqOperands(std::vector<Expr*>& operands,
-                                    std::vector<SeqCycleDelay>& delays) {
+bool Parser::ParseLinearSeqOperands(ModuleItem* item) {
+  std::vector<Expr*>& operands = item->seq_linear_operands;
+  std::vector<SeqCycleDelay>& delays = item->seq_linear_delays;
   SeqCycleDelay next;
   next.min = 0;
   next.max = 0;
@@ -649,18 +650,18 @@ void Parser::CaptureLinearSequenceBody(ModuleItem* item) {
       ok = Match(TokenKind::kRParen);
     }
   }
-  std::vector<Expr*> operands;
-  std::vector<SeqCycleDelay> delays;
-  if (ok) ok = ParseLinearSeqOperands(operands, delays);
+  if (ok) ok = ParseLinearSeqOperands(item);
   // The sequence_expr is terminated by ';' before `endsequence`.
   if (ok) Match(TokenKind::kSemicolon);
-  ok = ok && Check(TokenKind::kKwEndsequence) && !operands.empty();
+  ok = ok && Check(TokenKind::kKwEndsequence) &&
+       !item->seq_linear_operands.empty();
   diag_.PopSuppress();
   lexer_.RestorePos(saved);
   if (ok) {
     item->seq_clock = std::move(clock);
-    item->seq_linear_operands = std::move(operands);
-    item->seq_linear_delays = std::move(delays);
+  } else {
+    item->seq_linear_operands.clear();
+    item->seq_linear_delays.clear();
   }
 }
 

@@ -262,11 +262,9 @@ class Parser {
   // instance of the property can be evaluated as an assertion in that form.
   void CaptureClockedBooleanPropertyBody(ModuleItem* item);
   bool PropertyBodyHasTemporalOperator();
-  bool ParseLinearSeqOperands(std::vector<Expr*>& operands,
-                              std::vector<SeqCycleDelay>& delays);
+  bool ParseLinearSeqOperands(ModuleItem* item);
   bool ParseLinearSeqCycleDelay(SeqCycleDelay& delay);
-  bool ParseLinearSeqDelayBound(uint32_t& value, std::string_view& formal,
-                                bool allow_dollar);
+  bool ParseSeqDelayBound(uint32_t& val, std::string_view& formal, bool dollar);
   uint32_t ParseSeqDelayLiteral();
   bool AheadIsSequenceInstanceOperand();
   Expr* ParseSequenceInstanceOperand();
