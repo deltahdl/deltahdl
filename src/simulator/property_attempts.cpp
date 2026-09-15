@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -11,7 +12,9 @@
 #include "common/types.h"
 #include "elaborator/sensitivity.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
+#include "parser/expr_substitute.h"
 #include "simulator/evaluation.h"
 #include "simulator/evaluation_internal.h"
 #include "simulator/expr_walk.h"
@@ -68,6 +71,10 @@ struct NodeState {
   // §16.12.16: the index of the case item selected at the attempt's tick,
   // the count of the items where none was.
   size_t selected = 0;
+  // §16.12.17: the body a boolean operand that instantiates a named
+  // property was expanded to when it began, the actuals substituted, its
+  // state the one operand's.
+  const PropertyExprNode* expansion = nullptr;
 };
 
 }  // namespace
@@ -124,10 +131,12 @@ void WatchAsynchronousAbort(const PropertyExprNode* node,
   }
 }
 
-// The sequences of the tree flattened, each node's once; answers false where
-// a sequence is not readable.
+// The sequences of the tree flattened, each node's once, with the actuals
+// of the instance the tree is the expansion of substituted where `actuals`
+// holds any; answers false where a sequence is not readable.
 bool CollectSequences(const PropertyExprNode* node, PropertyTreeState& state,
-                      SimContext& ctx, Arena& arena) {
+                      SimContext& ctx, Arena& arena,
+                      const ActualsByFormal& actuals) {
   if (node->boolean != nullptr) {
     CollectPastDirectedSites(node->boolean, state.past_sites);
   }
@@ -139,15 +148,39 @@ bool CollectSequences(const PropertyExprNode* node, PropertyTreeState& state,
     if (!FlattenLinearSequence(node->sequence, ctx, arena, flat.body)) {
       return false;
     }
+    if (!actuals.empty()) {
+      flat.body = SubstituteLinearSequence(flat.body, actuals, ctx, arena);
+    }
     ForEachLinearSequenceExpr(flat.body, [&state](const Expr* e) {
       CollectPastDirectedSites(e, state.past_sites);
     });
     state.sequences.push_back(std::move(flat));
   }
   for (const PropertyExprNode* operand : node->operands) {
-    if (!CollectSequences(operand, state, ctx, arena)) return false;
+    if (!CollectSequences(operand, state, ctx, arena, actuals)) return false;
   }
   return true;
+}
+
+// §F.4.1: a copy of the tree under `node` with the actuals substituted for
+// the formals in every expression it holds; a sequence is shared with the
+// original and substituted where it is flattened.
+PropertyExprNode* SubstituteTree(const PropertyExprNode* node,
+                                 const ActualsByFormal& actuals, Arena& arena) {
+  auto* copy = arena.Create<PropertyExprNode>(*node);
+  copy->boolean = SubstituteFormals(node->boolean, actuals, arena);
+  copy->range_min = SubstituteFormals(node->range_min, actuals, arena);
+  copy->range_max = SubstituteFormals(node->range_max, actuals, arena);
+  for (std::vector<Expr*>& values : copy->case_values) {
+    for (Expr*& value : values) {
+      value = SubstituteFormals(value, actuals, arena);
+    }
+  }
+  copy->operands.clear();
+  for (const PropertyExprNode* operand : node->operands) {
+    copy->operands.push_back(SubstituteTree(operand, actuals, arena));
+  }
+  return copy;
 }
 
 const LinearSequence& BodyOf(const PropertyTreeState& state,
@@ -227,6 +260,37 @@ struct StepContext {
 // attempt begins at, answering the node's verdict so far.
 Tri Step(const PropertyExprNode* node, NodeState& state, StepContext& sc,
          bool begin);
+
+// §16.12.17: a boolean operand that instantiates a named property is, when
+// it begins, expanded to the property's body with the actuals substituted
+// for the formals, stood up as the operand's one operand and stepped from
+// the tick; an instance in that body, the property's own included, is
+// expanded in turn when it begins, after the positive advance in time
+// Restriction 3 requires of it. Answers false, the operand a boolean,
+// where it instantiates no property or the body is not readable.
+bool ExpandInstance(const PropertyExprNode* node, NodeState& state,
+                    StepContext& sc) {
+  const ModuleItem* decl = InstantiatedProperty(node->boolean, sc.ctx);
+  if (decl == nullptr) return false;
+  ActualsByFormal actuals = BindInstanceActuals(decl, node->boolean, sc.arena);
+  PropertyExprNode* body =
+      SubstituteTree(decl->prop_body_tree, actuals, sc.arena);
+  if (!CollectSequences(body, sc.tree, sc.ctx, sc.arena, actuals)) {
+    return false;
+  }
+  state.expansion = body;
+  state.operands.push_back(NewNodeState(body, sc.arena));
+  return true;
+}
+
+Tri StepBoolean(const PropertyExprNode* node, NodeState& state, StepContext& sc,
+                bool begin) {
+  if (begin) ExpandInstance(node, state, sc);
+  if (state.expansion != nullptr) {
+    return Step(state.expansion, *state.operands[0], sc, begin);
+  }
+  return FromBool(EvalExpr(node->boolean, sc.ctx, sc.arena).IsTruthy());
+}
 
 Tri StepSequence(const PropertyExprNode* node, NodeState& state,
                  StepContext& sc, bool begin) {
@@ -487,8 +551,7 @@ Tri Step(const PropertyExprNode* node, NodeState& state, StepContext& sc,
   if (state.verdict != Tri::kPending) return state.verdict;
   switch (node->kind) {
     case PropertyExprNode::Kind::kBoolean:
-      state.verdict =
-          FromBool(EvalExpr(node->boolean, sc.ctx, sc.arena).IsTruthy());
+      state.verdict = StepBoolean(node, state, sc, begin);
       break;
     case PropertyExprNode::Kind::kSequence:
       state.verdict = StepSequence(node, state, sc, begin);
@@ -627,7 +690,11 @@ Tri Finish(const PropertyExprNode* node, NodeState& state) {
   if (state.verdict != Tri::kPending) return state.verdict;
   switch (node->kind) {
     case PropertyExprNode::Kind::kBoolean:
-      return Tri::kTrue;
+      // §16.12.17: an instance expanded is finished as its body; a boolean
+      // never stepped was never required.
+      if (state.expansion == nullptr) return Tri::kTrue;
+      state.verdict = Finish(state.expansion, *state.operands[0]);
+      break;
     case PropertyExprNode::Kind::kSequence:
       state.verdict = node->strong ? Tri::kFalse : Tri::kTrue;
       break;
@@ -674,11 +741,26 @@ Tri Finish(const PropertyExprNode* node, NodeState& state) {
 
 }  // namespace
 
+const ModuleItem* InstantiatedProperty(const Expr* instance, SimContext& ctx) {
+  if (instance == nullptr) return nullptr;
+  if (instance->kind != ExprKind::kIdentifier &&
+      instance->kind != ExprKind::kCall) {
+    return nullptr;
+  }
+  std::string_view name =
+      instance->kind == ExprKind::kCall ? instance->callee : instance->text;
+  const ModuleItem* decl = ctx.FindPropertyDecl(name);
+  if (decl == nullptr || decl->prop_body_tree == nullptr) return nullptr;
+  return decl;
+}
+
 PropertyTreeState* CreatePropertyTreeState(const PropertyExprNode* root,
                                            SimContext& ctx, Arena& arena) {
   auto* state = arena.Create<PropertyTreeState>();
   state->root = root;
-  if (!CollectSequences(root, *state, ctx, arena)) return nullptr;
+  if (!CollectSequences(root, *state, ctx, arena, ActualsByFormal{})) {
+    return nullptr;
+  }
   return state;
 }
 

@@ -38,6 +38,10 @@ class DeclaredNameTables {
 
   void RegisterSequenceDecl(std::string_view name, ModuleItem* item);
   ModuleItem* FindSequenceDecl(std::string_view name);
+  // §16.12: a named property declaration, which an instance in a property
+  // tree is expanded from when it begins.
+  void RegisterPropertyDecl(std::string_view name, ModuleItem* item);
+  ModuleItem* FindPropertyDecl(std::string_view name);
 
   // §16.9.11: `e2(ready, proc1, proc2).triggered` applies the method to an
   // instance with arguments, which is matched by a monitor of its own; the
@@ -117,6 +121,7 @@ class DeclaredNameTables {
   std::unordered_map<std::string_view, ModuleItem*> functions_;
   std::unordered_map<std::string_view, ModuleItem*> let_decls_;
   std::unordered_map<std::string_view, ModuleItem*> sequence_decls_;
+  std::unordered_map<std::string_view, ModuleItem*> property_decls_;
   std::unordered_map<const Expr*, std::string_view> sequence_instance_eps_;
 
   std::unordered_set<std::string_view> real_vars_;

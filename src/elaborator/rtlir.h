@@ -672,6 +672,10 @@ struct RtlirModule {
   // only the bare name.
   std::vector<std::string_view> specparam_names;
   std::vector<ModuleItem*> sequence_decls;
+  // §16.12: the module's named property declarations, which the run
+  // registers so that an instance of one in a property tree is expanded,
+  // §16.12.17's recursion included, when it begins.
+  std::vector<ModuleItem*> property_decls;
   std::vector<ClassDecl*> class_decls;
   std::vector<RtlirImport> imports;
 

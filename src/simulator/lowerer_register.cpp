@@ -219,6 +219,9 @@ void RegisterModuleDpiImports(const RtlirModule* mod, SimContext& ctx) {
 }
 
 void RegisterModuleSequenceDecls(const RtlirModule* mod, SimContext& ctx) {
+  for (auto* prop_decl : mod->property_decls) {
+    ctx.RegisterPropertyDecl(prop_decl->name, prop_decl);
+  }
   for (auto* seq_decl : mod->sequence_decls) {
     ctx.RegisterSequenceDecl(seq_decl->name, seq_decl);
 

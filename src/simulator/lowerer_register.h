@@ -72,6 +72,8 @@ void RegisterModuleSubroutines(const RtlirModule* mod, SimContext& ctx);
 // registry is acquired on the first module that declares an import, so a design
 // that declares none never makes one.
 void RegisterModuleDpiImports(const RtlirModule* mod, SimContext& ctx);
+// §16.8 and §16.12: the module's named sequence and property declarations,
+// which an instance of one is expanded from at the run.
 void RegisterModuleSequenceDecls(const RtlirModule* mod, SimContext& ctx);
 void RegisterProcessClassType(SimContext& ctx, Arena& arena);
 

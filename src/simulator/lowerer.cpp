@@ -28,6 +28,7 @@
 #include "simulator/lowerer_register.h"
 #include "simulator/net.h"
 #include "simulator/process.h"
+#include "simulator/property_attempts.h"
 #include "simulator/sequence_flatten.h"
 #include "simulator/sim_context.h"
 #include "simulator/specify.h"
@@ -488,16 +489,24 @@ static void CollectSequenceReadNames(const ModuleItem* seq, SimContext& ctx,
       flat, [&names](const Expr* e) { CollectSampledOperandNames(e, names); });
 }
 
-static void CollectPropertyTreeReadNames(
-    const PropertyExprNode* node, SimContext& ctx, Arena& arena,
-    std::unordered_set<std::string>& names) {
+// §16.12.17: an instance of a named property reads what the body reads, so
+// the body is walked too, to a depth that reads a recursive body once.
+static void CollectPropertyTreeReadNames(const PropertyExprNode* node,
+                                         SimContext& ctx, Arena& arena,
+                                         std::unordered_set<std::string>& names,
+                                         int depth = 0) {
   if (node->boolean != nullptr)
     CollectSampledOperandNames(node->boolean, names);
+  const ModuleItem* decl = InstantiatedProperty(node->boolean, ctx);
+  if (decl != nullptr && depth < 4) {
+    CollectPropertyTreeReadNames(decl->prop_body_tree, ctx, arena, names,
+                                 depth + 1);
+  }
   if (node->sequence != nullptr) {
     CollectSequenceReadNames(node->sequence, ctx, arena, names);
   }
   for (const PropertyExprNode* operand : node->operands) {
-    CollectPropertyTreeReadNames(operand, ctx, arena, names);
+    CollectPropertyTreeReadNames(operand, ctx, arena, names, depth);
   }
 }
 

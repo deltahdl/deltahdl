@@ -3,6 +3,7 @@
 #include <string_view>
 
 #include "parser/parser.h"
+#include "parser/parser_property_spec_internal.h"
 #include "parser/parser_sequence_property_decl_internal.h"
 
 namespace delta {
@@ -875,6 +876,7 @@ ModuleItem* Parser::ParsePropertyDecl() {
   item->decl_has_leading_clock = Check(TokenKind::kAt);
 
   CaptureClockedBooleanPropertyBody(item);
+  ParserPropertySpecHelpers::CapturePropertyTreeBody(*this, item);
 
   // §16.10: assertion_variable_declarations may appear at the head of a
   // property body, just as in a sequence body. Harvest them before the

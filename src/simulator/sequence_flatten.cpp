@@ -165,12 +165,12 @@ SeqCycleDelay AddDelays(const SeqCycleDelay& before,
   return sum;
 }
 
-// §16.8: the actuals of an instance bound to the declaration's formals, by
-// position for the leading actuals and by name for the `.formal(actual)` ones,
-// which the parser keeps after the positional ones with their names beside,
-// each cast as §16.8.1 has it for the formal's type.
-ActualsByFormal BindActuals(const ModuleItem* decl, const Expr* instance,
-                            Arena& arena) {
+}  // namespace
+
+// The parser keeps the named actuals after the positional ones with their
+// names beside.
+ActualsByFormal BindInstanceActuals(const ModuleItem* decl,
+                                    const Expr* instance, Arena& arena) {
   ActualsByFormal actuals;
   if (instance->kind != ExprKind::kCall) return actuals;
   size_t named = instance->arg_names.size();
@@ -190,6 +190,8 @@ ActualsByFormal BindActuals(const ModuleItem* decl, const Expr* instance,
   }
   return actuals;
 }
+
+namespace {
 
 // §16.8.1 (b): the instantiated sequence's clock with its formals replaced by
 // the actuals: an event actual supplies the edge and the signal, an ordinary
@@ -408,7 +410,7 @@ bool ExpandInstance(const InstanceOperand& op, SimContext& ctx, Arena& arena,
       !body.intersects.empty()) {
     return false;
   }
-  ActualsByFormal actuals = BindActuals(op.inner, op.instance, arena);
+  ActualsByFormal actuals = BindInstanceActuals(op.inner, op.instance, arena);
   // The operands already flattened number the instance, each instance adding
   // at least one, so the locals of two instances of one sequence differ.
   Renaming renaming{static_cast<int>(out.operands.size()) + 1, out, arena};
@@ -590,6 +592,31 @@ bool FlattenLinearSequence(const ModuleItem* seq, SimContext& ctx, Arena& arena,
                            LinearSequence& out) {
   out = LinearSequence{};
   return Flatten(seq, ctx, arena, out, 0);
+}
+
+LinearSequence SubstituteLinearSequence(const LinearSequence& body,
+                                        const ActualsByFormal& actuals,
+                                        SimContext& ctx, Arena& arena) {
+  LinearSequence out = body;
+  for (size_t j = 0; j < body.operands.size(); ++j) {
+    out.operands[j] = SubstituteFormals(body.operands[j], actuals, arena);
+    out.delays[j] = ResolveDelay(body.delays[j], actuals, ctx, arena);
+    out.match_items[j] =
+        SubstituteMatchItems(body.match_items[j], actuals, arena);
+  }
+  for (SeqThroughout& guard : out.throughouts) {
+    guard.cond = SubstituteFormals(guard.cond, actuals, arena);
+  }
+  for (LinearSequence& inner : out.intersects) {
+    inner = SubstituteLinearSequence(inner, actuals, ctx, arena);
+  }
+  for (LinearSequence& inner : out.conjuncts) {
+    inner = SubstituteLinearSequence(inner, actuals, ctx, arena);
+  }
+  for (LinearSequence& inner : out.alternatives) {
+    inner = SubstituteLinearSequence(inner, actuals, ctx, arena);
+  }
+  return out;
 }
 
 }  // namespace delta

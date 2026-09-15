@@ -57,6 +57,9 @@ struct ParserPropertySpecHelpers {
   static Stmt* MakeSimplePropertyStmt(Parser& p, ModuleItem* item,
                                       StmtKind body_kind,
                                       const SimpleSpecBody& body);
+  static PropertyExprNode* TreeOfSpecBody(Parser& p,
+                                          const SimpleSpecBody& body);
+  static void CapturePropertyTreeBody(Parser& p, ModuleItem* item);
 };
 
 }  // namespace delta

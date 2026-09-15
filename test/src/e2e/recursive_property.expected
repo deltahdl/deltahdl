@@ -1,0 +1,13 @@
+prop_always(a) passes 0 fails 6 at ticks
+prop_weak_until(hold, done) passes 5 fails 1 at ticks
+p1(go, a) passes 6 fails 1 at ticks
+check_phase1 passes 7 fails 1 at ticks
+p3(a, acc, abt) passes 2 fails 4 at ticks
+$finish at time 80
+prop_always(a) passes at the end of the run
+prop_always(a) passes at the end of the run
+prop_weak_until(hold, done) passes at the end of the run
+prop_weak_until(hold, done) passes at the end of the run
+p1(go, a) passes at the end of the run
+p3(a, acc, abt) passes at the end of the run
+p3(a, acc, abt) passes at the end of the run

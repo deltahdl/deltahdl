@@ -577,6 +577,13 @@ struct ModuleItem {
   Expr* prop_disable_iff = nullptr;
   // §16.12.3: whether that body's boolean stands under `not`.
   bool prop_negated = false;
+  // §16.12: for a named property whose body is a property the tree
+  // evaluator reads, that body as a tree, its clock and disable condition
+  // in prop_clock and prop_disable_iff as the clocked boolean form's are;
+  // null for the clocked boolean form and for any other body. §16.12.17:
+  // an instance of the property in the tree, its own included, is expanded
+  // when it begins.
+  PropertyExprNode* prop_body_tree = nullptr;
 
   // §16.12 / §F.4.1: metadata the rewriter needs to flatten property
   // instances and enforce the disable-iff no-nesting rule.

@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "parser/ast.h"
+#include "parser/expr_substitute.h"
 
 namespace delta {
 
@@ -76,5 +77,21 @@ void ForEachLinearSequenceExpr(const LinearSequence& body,
 
 bool FlattenLinearSequence(const ModuleItem* seq, SimContext& ctx, Arena& arena,
                            LinearSequence& out);
+
+// §16.8 and §16.12: the actuals of `instance`, an instance of the named
+// sequence or property `decl` written as a call, bound to the declaration's
+// formals, by position for the leading actuals and by name for the
+// `.formal(actual)` ones, each cast as §16.8.1 has it for the formal's
+// type; empty for an instance written as a name alone.
+ActualsByFormal BindInstanceActuals(const ModuleItem* decl,
+                                    const Expr* instance, Arena& arena);
+
+// §F.4.1: a copy of the flattened `body` with the actuals substituted for
+// the formals in its operands, the bounds of its delays, its match items
+// and its throughout conditions, and likewise in the operands under its
+// intersect, and and or.
+LinearSequence SubstituteLinearSequence(const LinearSequence& body,
+                                        const ActualsByFormal& actuals,
+                                        SimContext& ctx, Arena& arena);
 
 }  // namespace delta

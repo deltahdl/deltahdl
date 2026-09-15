@@ -29,6 +29,11 @@ PropertyTreeState* CreatePropertyTreeState(const PropertyExprNode* root,
 std::vector<bool> AdvancePropertyTree(PropertyTreeState& state, bool disabled,
                                       SimContext& ctx, Arena& arena);
 
+// §16.12.17: the declaration `instance` names where it is an instance,
+// written as a name or a call, of a named property whose body the tree
+// evaluator reads; nullptr for any other expression.
+const ModuleItem* InstantiatedProperty(const Expr* instance, SimContext& ctx);
+
 // The end of the run: each attempt still in flight is decided with its
 // sequence operands still in flight read as §16.12.2 has them, a strong one
 // false and a weak one true, and reaches its verdict.

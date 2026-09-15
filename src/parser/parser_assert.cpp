@@ -267,6 +267,9 @@ ModuleItem* Parser::ParseDeferredImmediateItem(SourceLoc loc, StmtKind kind) {
 // because the depth count treats the clocking event's own parentheses like any
 // other pair: `@ ( posedge clk )` raises the depth to 1 and returns it to 0,
 // leaving the scan to stop on the property_spec's own closing parenthesis.
+// From the body of a named property declaration, where
+// ParserPropertySpecHelpers::CapturePropertyTreeBody calls it, the scan stops
+// at the semicolon ending the body, which stands at the same depth.
 
 bool Parser::BodyHasTemporalOperator() {
   auto scan = lexer_.SavePos();
@@ -279,6 +282,8 @@ bool Parser::BodyHasTemporalOperator() {
     } else if (k == TokenKind::kRParen) {
       if (depth == 0) break;  // the property's own closing parenthesis
       --depth;
+    } else if (k == TokenKind::kSemicolon && depth == 0) {
+      break;  // the end of a named property's body
     } else if (k == TokenKind::kPipeDashGt || k == TokenKind::kPipeEqGt ||
                k == TokenKind::kHashHash) {
       found = true;

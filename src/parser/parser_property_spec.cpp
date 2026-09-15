@@ -545,4 +545,59 @@ Stmt* ParserPropertySpecHelpers::MakeSimplePropertyStmt(
   return stmt;
 }
 
+// The body as one tree: the tree read, or a node over the boolean or the
+// sequence with its strength, under a not where the body was negated.
+PropertyExprNode* ParserPropertySpecHelpers::TreeOfSpecBody(
+    Parser& p, const SimpleSpecBody& body) {
+  PropertyExprNode* tree = body.property;
+  if (tree == nullptr) {
+    tree = NewPropertyNode(p, body.sequence != nullptr
+                                  ? PropertyExprNode::Kind::kSequence
+                                  : PropertyExprNode::Kind::kBoolean);
+    tree->boolean = body.prop;
+    tree->sequence = body.sequence;
+    tree->strong = body.strong;
+  }
+  if (!body.negated) return tree;
+  auto* whole = NewPropertyNode(p, PropertyExprNode::Kind::kNot);
+  whole->operands.push_back(tree);
+  return whole;
+}
+
+// §16.12 and §16.12.17: the body of a named property declaration that is
+// not the clocked boolean form, trial-parsed as an assertion's property_spec
+// is -- a clock where one is written, a disable condition where one is,
+// and the property -- and recorded in prop_body_tree with the clock and
+// the condition beside, so that an instance of the property, in an
+// assertion or in a property's body, its own included, is evaluated as the
+// body with the actuals substituted. Diagnostics are suppressed and the
+// lexer rewound, so the body scan re-reads the same tokens; a body of any
+// other shape leaves the tree null.
+void ParserPropertySpecHelpers::CapturePropertyTreeBody(Parser& p,
+                                                        ModuleItem* item) {
+  if (item->prop_body_expr != nullptr) return;
+  auto saved = p.lexer_.SavePos();
+  p.diag_.PushSuppress();
+  std::vector<EventExpr> clock;
+  bool ok = true;
+  if (p.Match(TokenKind::kAt)) {
+    ok = p.Match(TokenKind::kLParen);
+    if (ok) {
+      clock = p.ParseEventList();
+      ok = p.Match(TokenKind::kRParen);
+    }
+  }
+  SimpleSpecBody body;
+  if (ok) ok = p.TryParseDisableIff(body.disable_iff);
+  if (ok) ok = ParseSimpleSpecBody(p, body);
+  ok = ok && p.Match(TokenKind::kSemicolon) &&
+       p.Check(TokenKind::kKwEndproperty);
+  p.diag_.PopSuppress();
+  p.lexer_.RestorePos(saved);
+  if (!ok) return;
+  item->prop_clock = std::move(clock);
+  item->prop_disable_iff = body.disable_iff;
+  item->prop_body_tree = TreeOfSpecBody(p, body);
+}
+
 }  // namespace delta

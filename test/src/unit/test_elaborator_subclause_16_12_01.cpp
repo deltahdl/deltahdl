@@ -263,11 +263,12 @@ TEST(PropertyInstantiation, ANameThatIsNoPropertysIsReportedUnevaluated) {
   EXPECT_EQ(AssertionProcess(design->top_modules[0]), nullptr);
 }
 
-// The substitution reaches only a body in the clocked boolean form. A body
-// holding an implication is temporal, which this tool does not evaluate, so
-// the instance is reported unevaluated, with the property named so the reader
-// knows which body to look at.
-TEST(PropertyInstantiation, AnInstanceOfATemporalPropertyIsReported) {
+// The substitution reaches a body in the clocked boolean form and, since
+// §16.12.17 was evaluated, a body the tree evaluator reads: one holding an
+// implication is such a body, so the instance is the process the assertion
+// written with that spec is, its tree rooted at the instance for the
+// evaluator to expand.
+TEST(PropertyInstantiation, AnInstanceOfATemporalPropertyIsTheBodysProcess) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -279,10 +280,39 @@ TEST(PropertyInstantiation, AnInstanceOfATemporalPropertyIsReported) {
       "endmodule\n",
       f, "m");
   ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const RtlirProcess* p = AssertionProcess(design->top_modules[0]);
+  ASSERT_NE(p, nullptr);
+  ASSERT_EQ(p->sensitivity.size(), 1u);
+  EXPECT_EQ(p->sensitivity[0].signal->text, "clk");
+  ASSERT_NE(p->body, nullptr);
+  ASSERT_NE(p->body->assert_property, nullptr);
+  EXPECT_EQ(p->body->assert_property->kind, PropertyExprNode::Kind::kBoolean);
+  ASSERT_NE(p->body->assert_property->boolean, nullptr);
+  EXPECT_EQ(p->body->assert_property->boolean->text, "p_base");
+}
+
+// A body with no leading clocking event leaves an instance that is the
+// whole spec with no clock to evaluate on: §16.14.5 would infer one from a
+// default clocking, which this tool does not, so the instance is reported
+// unevaluated with the property named so the reader knows which body to
+// look at.
+TEST(PropertyInstantiation, AnInstanceOfAnUnclockedPropertyIsReported) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic clk, a, b;\n"
+      "  property p_base;\n"
+      "    a |-> b;\n"
+      "  endproperty\n"
+      "  assert property (p_base);\n"
+      "endmodule\n",
+      f, "m");
+  ASSERT_NE(design, nullptr);
   EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
-                              "the body of property \"p_base\" is not the "
-                              "@(event) boolean_expression this tool "
-                              "evaluates",
+                              "the body of property \"p_base\" has no "
+                              "leading clocking event, and this tool infers "
+                              "none",
                               6, "16.14"));
   EXPECT_EQ(AssertionProcess(design->top_modules[0]), nullptr);
 }

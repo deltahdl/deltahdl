@@ -118,13 +118,23 @@ void SubstitutePropertyInstance(ModuleItem* item, Arena& arena,
                  Subclause("16.14"));
     return;
   }
-  if (decl->prop_body_expr == nullptr) {
+  if (decl->prop_body_expr == nullptr && decl->prop_body_tree == nullptr) {
     diag.Warning(item->loc,
                  "concurrent assertion is not evaluated: the body of property "
                  "\"" +
                      name +
                      "\" is not the @(event) boolean_expression this tool "
                      "evaluates",
+                 Subclause("16.14"));
+    return;
+  }
+  if (decl->prop_clock.empty()) {
+    diag.Warning(item->loc,
+                 "concurrent assertion is not evaluated: the body of property "
+                 "\"" +
+                     name +
+                     "\" has no leading clocking event, and this tool infers "
+                     "none",
                  Subclause("16.14"));
     return;
   }
@@ -153,7 +163,16 @@ void SubstitutePropertyInstance(ModuleItem* item, Arena& arena,
                    ? StmtKind::kAssumeImmediate
                    : StmtKind::kAssertImmediate;
   stmt->range.start = item->loc;
-  stmt->assert_expr = SubstituteFormals(decl->prop_body_expr, actuals, arena);
+  if (decl->prop_body_expr != nullptr) {
+    stmt->assert_expr = SubstituteFormals(decl->prop_body_expr, actuals, arena);
+  } else {
+    // §16.12.17: a body the tree evaluator reads is expanded at the run,
+    // its recursion included, so the statement carries the instance as
+    // the root of its tree, and the actuals are substituted there.
+    stmt->assert_expr = item->assert_expr;
+    stmt->assert_property = arena.Create<PropertyExprNode>();
+    stmt->assert_property->boolean = item->assert_expr;
+  }
   stmt->assert_disable_iff =
       SubstituteFormals(decl->prop_disable_iff, actuals, arena);
   stmt->assert_negated = decl->prop_negated;
@@ -167,6 +186,41 @@ void SubstitutePropertyInstance(ModuleItem* item, Arena& arena,
     item->sensitivity.push_back(ev);
   }
   item->body = stmt;
+}
+
+// §16.12.1 and §16.12.17: a clocked assertion whose boolean is an instance
+// of a named property whose body is a tree, `@(posedge clk) prop_always(a)`,
+// which the parser read as a boolean because a call and a variable's name
+// read the same. The statement is given the instance as the root of a tree
+// so that the evaluator expands it, its recursion included; a `not` before
+// the instance negates the tree.
+void PromotePropertyInstanceBoolean(ModuleItem* item, Arena& arena,
+                                    const PropertyRegistry& registry) {
+  Stmt* stmt = item->body;
+  if (stmt == nullptr || stmt->assert_property != nullptr ||
+      stmt->assert_sequence != nullptr || stmt->assert_expr == nullptr) {
+    return;
+  }
+  const Expr* instance = stmt->assert_expr;
+  if (instance->kind != ExprKind::kIdentifier &&
+      instance->kind != ExprKind::kCall) {
+    return;
+  }
+  const ModuleItem* decl = registry.Find(
+      instance->kind == ExprKind::kCall ? instance->callee : instance->text);
+  if (decl == nullptr || decl->kind != ModuleItemKind::kPropertyDecl ||
+      decl->prop_body_tree == nullptr) {
+    return;
+  }
+  auto* root = arena.Create<PropertyExprNode>();
+  root->boolean = stmt->assert_expr;
+  if (stmt->assert_negated) {
+    auto* whole = arena.Create<PropertyExprNode>();
+    whole->kind = PropertyExprNode::Kind::kNot;
+    whole->operands.push_back(root);
+    root = whole;
+  }
+  stmt->assert_property = root;
 }
 
 }  // namespace
@@ -214,6 +268,7 @@ void Elaborator::CheckPropertyOperandInstances(const ModuleItem* item) {
 }
 
 void Elaborator::ElaboratePropertyDeclItem(ModuleItem* item, RtlirModule* mod) {
+  mod->property_decls.push_back(item);
   // §16.12: nesting of disable iff (explicitly or via property instantiation)
   // is forbidden; the §F.4.1 flattened count catches both.
   if (property_registry_.FlattenedDisableIffCount(item) > 1) {
@@ -233,6 +288,7 @@ void Elaborator::ElaboratePropertyDeclItem(ModuleItem* item, RtlirModule* mod) {
 void Elaborator::ElaborateAssertPropertyItem(ModuleItem* item,
                                              RtlirModule* mod) {
   SubstitutePropertyInstance(item, arena_, property_registry_, diag_);
+  PromotePropertyInstanceBoolean(item, arena_, property_registry_);
   CheckConcurrentAssertionNoChandle(item, mod, diag_);
   // §16.5.2: `assert property(@$global_clock a);` under a
   // `global clocking @clk; endclocking` declaration is logically equivalent to
