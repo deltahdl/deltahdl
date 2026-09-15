@@ -191,18 +191,18 @@ TEST(ConcurrentAssertionEvaluationReporting,
 }
 
 // A clocked assert whose property_spec is not exhausted by what the
-// evaluation reads: §16.12.16's case is a property operator the evaluation
-// does not read, so the spec is not the whole of what stands after the
-// clock, and the report names this rather than the missing clock, because
-// the clock is present. `a and b`, `if (a) b else c`, `nexttime b`,
-// `s_always [1:3] b`, `eventually [1:3] b` and `accept_on (rst) b` stood
-// here until §16.12.5, §16.12.6, §16.12.10, §16.12.11, §16.12.13 and
-// §16.12.14 were evaluated.
+// evaluation reads: the dist of A.2.10's expression_or_dist is a constraint
+// the evaluation does not read, so the spec is not the whole of what stands
+// after the clock, and the report names this rather than the missing clock,
+// because the clock is present. `a and b`, `if (a) b else c`, `nexttime
+// b`, `s_always [1:3] b`, `eventually [1:3] b`, `accept_on (rst) b` and
+// `case (sel) 1: b; endcase` stood here until §16.12.5, §16.12.6,
+// §16.12.10, §16.12.11, §16.12.13, §16.12.14 and §16.12.16 were evaluated.
 TEST(ConcurrentAssertionEvaluationReporting,
      ClockedNonBooleanPropertyIsNotEvaluated) {
   auto r = Parse(
       "module m;\n"
-      "  assert property (@(posedge clk) case (sel) 1: b; endcase);\n"
+      "  assert property (@(posedge clk) b dist {1 := 1});\n"
       "endmodule\n");
   EXPECT_TRUE(ReportedWarning(
       r.diags, "holds more than the @(event) boolean_expression", 2, "16.14"));

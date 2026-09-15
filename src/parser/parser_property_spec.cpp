@@ -1,3 +1,6 @@
+#include <utility>
+#include <vector>
+
 #include "common/arena.h"
 #include "common/source_loc.h"
 #include "lexer/token.h"
@@ -7,32 +10,20 @@
 
 namespace delta {
 
-// §16.12: the tokens of the property operators the evaluation does not read,
-// case alone; not, or, and, if-else, the implications, the followed-bys,
-// implies, iff, nexttime, always, the untils, eventually and the aborts are
-// read.
-static bool IsPropertyOperatorToken(TokenKind k) {
-  switch (k) {
-    case TokenKind::kKwCase:
-      return true;
-    default:
-      return false;
-  }
-}
-
 // §16.12.14: the keywords of the four abort operators.
 static bool IsAbortToken(TokenKind k) {
   return k == TokenKind::kKwAcceptOn || k == TokenKind::kKwRejectOn ||
          k == TokenKind::kKwSyncAcceptOn || k == TokenKind::kKwSyncRejectOn;
 }
 
-// Whether the token opens an operand a keyword reads: if-else, a nexttime,
-// an always, an eventually or an abort.
+// Whether the token opens an operand a keyword reads: if-else, a case, a
+// nexttime, an always, an eventually or an abort.
 static bool OpensKeywordTerm(TokenKind k) {
-  return k == TokenKind::kKwIf || k == TokenKind::kKwNexttime ||
-         k == TokenKind::kKwSNexttime || k == TokenKind::kKwAlways ||
-         k == TokenKind::kKwSAlways || k == TokenKind::kKwEventually ||
-         k == TokenKind::kKwSEventually || IsAbortToken(k);
+  return k == TokenKind::kKwIf || k == TokenKind::kKwCase ||
+         k == TokenKind::kKwNexttime || k == TokenKind::kKwSNexttime ||
+         k == TokenKind::kKwAlways || k == TokenKind::kKwSAlways ||
+         k == TokenKind::kKwEventually || k == TokenKind::kKwSEventually ||
+         IsAbortToken(k);
 }
 
 // Whether the tokens ahead, past any `not` and any opening parenthesis,
@@ -48,10 +39,10 @@ bool ParserPropertySpecHelpers::AheadOpensKeywordTerm(Parser& p) {
   return opens;
 }
 
-// Whether the tokens ahead, to the closing parenthesis of the spec or the
-// first `or` or `and` at the spec's own depth, hold §16.9.2's repetition,
-// `[*`, `[->`, `[=` or `[+`, which makes the operand a sequence where no
-// `##` does. The lexer is rewound.
+// Whether the tokens ahead, to the closing parenthesis of the spec, the
+// semicolon ending a case item or the first `or` or `and` at the spec's
+// own depth, hold §16.9.2's repetition, `[*`, `[->`, `[=` or `[+`, which
+// makes the operand a sequence where no `##` does. The lexer is rewound.
 bool ParserPropertySpecHelpers::AheadHoldsRepetition(Parser& p) {
   auto scan = p.lexer_.SavePos();
   int depth = 0;
@@ -64,8 +55,8 @@ bool ParserPropertySpecHelpers::AheadHoldsRepetition(Parser& p) {
     } else if (k == TokenKind::kRParen) {
       if (depth == 0) break;
       --depth;
-    } else if (depth == 0 &&
-               (k == TokenKind::kKwOr || k == TokenKind::kKwAnd)) {
+    } else if (depth == 0 && (k == TokenKind::kKwOr || k == TokenKind::kKwAnd ||
+                              k == TokenKind::kSemicolon)) {
       break;
     } else if (bracket && (k == TokenKind::kStar || k == TokenKind::kArrow ||
                            k == TokenKind::kEq || k == TokenKind::kPlus)) {
@@ -88,31 +79,6 @@ Expr* ParserPropertySpecHelpers::PropertySpecPlaceholder(Arena& arena,
   expr->text = "<property_spec>";
   expr->range.start = loc;
   return expr;
-}
-
-// §16.12: whether the property_spec ahead, to its closing parenthesis,
-// holds a property operator -- an implication or followed-by, a property
-// keyword such as not, until or nexttime, or an if or case -- which makes
-// it a property_expr and not the sequence_expr of a sequential property.
-bool ParserPropertySpecHelpers::BodyHasPropertyOperator(Parser& p) {
-  auto scan = p.lexer_.SavePos();
-  int depth = 0;
-  bool found = false;
-  while (!p.Check(TokenKind::kEof)) {
-    TokenKind k = p.CurrentToken().kind;
-    if (k == TokenKind::kLParen) {
-      ++depth;
-    } else if (k == TokenKind::kRParen) {
-      if (depth == 0) break;
-      --depth;
-    } else if (IsPropertyOperatorToken(k)) {
-      found = true;
-      break;
-    }
-    p.Consume();
-  }
-  p.lexer_.RestorePos(scan);
-  return found;
 }
 
 // §16.12.2: the sequence_expr of a sequential property, bare or under
@@ -147,9 +113,10 @@ ModuleItem* ParserPropertySpecHelpers::TryParseSequenceSpec(Parser& p,
   return sequence;
 }
 
-// Whether the tokens ahead, to the closing parenthesis of the spec or,
-// where `to_junction` says so, to the first `or` or `and` at the spec's
-// own depth, hold a token `wanted` at that depth or below.
+// Whether the tokens ahead, to the closing parenthesis of the spec, the
+// semicolon ending a case item at the spec's own depth or, where
+// `to_junction` says so, the first `or` or `and` at that depth, hold a
+// token `wanted` at that depth or below.
 bool ParserPropertySpecHelpers::AheadHolds(Parser& p, TokenKind wanted,
                                            bool to_junction) {
   auto scan = p.lexer_.SavePos();
@@ -163,7 +130,8 @@ bool ParserPropertySpecHelpers::AheadHolds(Parser& p, TokenKind wanted,
     } else if (k == TokenKind::kRParen) {
       if (depth == 0) break;
       --depth;
-    } else if (depth == 0 && junction && to_junction) {
+    } else if (depth == 0 &&
+               (k == TokenKind::kSemicolon || (junction && to_junction))) {
       break;
     } else if (k == wanted && (depth == 0 || !junction)) {
       found = true;
@@ -245,6 +213,47 @@ PropertyExprNode* ParserPropertySpecHelpers::ParsePropertyIfElse(Parser& p) {
   return node;
 }
 
+// §16.12.16: one property_case_item, `expression_or_dist { ,
+// expression_or_dist } : property_expr ;` or `default [ : ] property_expr
+// ;`, its expressions and its property added to `node`, the default's
+// expressions none. Answers false where the item failed to read.
+bool ParserPropertySpecHelpers::ParsePropertyCaseItem(Parser& p,
+                                                      PropertyExprNode& node) {
+  std::vector<Expr*> values;
+  if (p.Match(TokenKind::kKwDefault)) {
+    p.Match(TokenKind::kColon);
+  } else {
+    do {
+      Expr* value = p.ParseExpr();
+      if (value == nullptr) return false;
+      values.push_back(value);
+    } while (p.Match(TokenKind::kComma));
+    if (!p.Match(TokenKind::kColon)) return false;
+  }
+  auto* property = ParsePropertyImplication(p);
+  if (property == nullptr || !p.Match(TokenKind::kSemicolon)) return false;
+  node.case_values.push_back(std::move(values));
+  node.operands.push_back(property);
+  return true;
+}
+
+// §16.12.16: `case ( expression_or_dist ) property_case_item {
+// property_case_item } endcase`, the case keyword consumed; Table 16-3
+// puts case beside if-else, below every other operator, so each item's
+// property runs to its semicolon.
+PropertyExprNode* ParserPropertySpecHelpers::ParsePropertyCase(Parser& p) {
+  auto* node = NewPropertyNode(p, PropertyExprNode::Kind::kCase);
+  if (!p.Match(TokenKind::kLParen)) return nullptr;
+  node->boolean = p.ParseExpr();
+  if (node->boolean == nullptr || !p.Match(TokenKind::kRParen)) return nullptr;
+  while (!p.Match(TokenKind::kKwEndcase)) {
+    if (p.Check(TokenKind::kEof) || !ParsePropertyCaseItem(p, *node)) {
+      return nullptr;
+    }
+  }
+  return node->operands.empty() ? nullptr : node;
+}
+
 // One operand of a property's or or and: `not` before an operand negates
 // it (§16.12.3); an if-else is read whole (§16.12.6); a parenthesised
 // property holding an or or and of its own is read as one; and otherwise
@@ -298,14 +307,15 @@ PropertyExprNode* ParserPropertySpecHelpers::ParsePropertyAlways(
   return node;
 }
 
-// The operators that open an operand with a keyword: if-else, always and
-// eventually in their weak and strong forms, nexttime likewise and not;
+// The operators that open an operand with a keyword: if-else, case, always
+// and eventually in their weak and strong forms, nexttime likewise and not;
 // `read` says the keyword was one of them, and the node is null where its
 // operand failed to read.
 PropertyExprNode* ParserPropertySpecHelpers::TryParseKeywordTerm(Parser& p,
                                                                  bool& read) {
   read = true;
   if (p.Match(TokenKind::kKwIf)) return ParsePropertyIfElse(p);
+  if (p.Match(TokenKind::kKwCase)) return ParsePropertyCase(p);
   if (p.Match(TokenKind::kKwAlways)) {
     return ParsePropertyAlways(p, PropertyExprNode::Kind::kAlways, false);
   }
@@ -480,7 +490,6 @@ PropertyExprNode* ParserPropertySpecHelpers::ParsePropertyOr(Parser& p) {
 // into `prop`. Answers false where the body is none of these.
 bool ParserPropertySpecHelpers::ParseSimpleSpecBody(Parser& p,
                                                     SimpleSpecBody& body) {
-  if (BodyHasPropertyOperator(p)) return false;
   // Table 16-3 has `not` bind tighter than `or` and `and`, so where the
   // spec is a property of operands a leading `not` is the first operand's,
   // read with the operands; a spec opening with an operand a keyword reads,

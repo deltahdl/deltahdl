@@ -1,0 +1,6 @@
+decode passes 3 fails 5
+linear passes 6 fails 2
+no_default passes 6 fails 2
+nested passes 5 fails 3
+exact passes 8 fails 0
+$finish at time 80

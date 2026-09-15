@@ -8,10 +8,12 @@
 #include <vector>
 
 #include "common/arena.h"
+#include "common/types.h"
 #include "elaborator/sensitivity.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
 #include "simulator/evaluation.h"
+#include "simulator/evaluation_internal.h"
 #include "simulator/expr_walk.h"
 #include "simulator/sequence_flatten.h"
 #include "simulator/sequence_monitor.h"
@@ -63,6 +65,9 @@ struct NodeState {
   // the ticks can be marked on the attempts in flight, and the mark.
   const PropertyExprNode* abort_node = nullptr;
   bool aborted = false;
+  // §16.12.16: the index of the case item selected at the attempt's tick,
+  // the count of the items where none was.
+  size_t selected = 0;
 };
 
 }  // namespace
@@ -253,6 +258,50 @@ Tri StepIfElse(const PropertyExprNode* node, NodeState& state, StepContext& sc,
                         ? Step(node->operands[1], *state.operands[1], sc, begin)
                         : Tri::kTrue;
   return state.condition ? then_branch : else_branch;
+}
+
+// §12.5: the case expression and one item's expression are compared with
+// the case equality, the narrower extended to the wider's width, signed
+// where both are.
+bool CaseMatches(Logic4Vec sel, Logic4Vec item, Arena& arena) {
+  uint32_t width = sel.width > item.width ? sel.width : item.width;
+  bool sign_ext = sel.is_signed && item.is_signed;
+  if (sel.width < width) sel = ExtendVec(sel, width, sign_ext, arena);
+  if (item.width < width) item = ExtendVec(item, width, sign_ext, arena);
+  return EvalCaseEquality(sel, item);
+}
+
+// §16.12.16: the linear search over the items in order, the default item
+// ignored in it: the first item one of whose expressions matches the case
+// expression is selected and the search ends there; where every comparison
+// fails the default is selected, and the count of the items where there is
+// none.
+size_t SelectCaseItem(const PropertyExprNode* node, StepContext& sc) {
+  Logic4Vec sel = EvalExpr(node->boolean, sc.ctx, sc.arena);
+  size_t selected = node->operands.size();
+  for (size_t i = 0; i < node->case_values.size(); ++i) {
+    if (node->case_values[i].empty()) {
+      selected = i;
+      continue;
+    }
+    for (const Expr* value : node->case_values[i]) {
+      if (CaseMatches(sel, EvalExpr(value, sc.ctx, sc.arena), sc.arena)) {
+        return i;
+      }
+    }
+  }
+  return selected;
+}
+
+// §16.12.16: the item is selected at the attempt's tick and its property
+// alone is the case's, evaluated from that tick; with no item selected none
+// is evaluated and the case holds, vacuously.
+Tri StepCase(const PropertyExprNode* node, NodeState& state, StepContext& sc,
+             bool begin) {
+  if (begin) state.selected = SelectCaseItem(node, sc);
+  if (state.selected == node->operands.size()) return Tri::kTrue;
+  return Step(node->operands[state.selected], *state.operands[state.selected],
+              sc, begin);
 }
 
 // §16.12.7: one tick of the antecedent's attempt while it can still match,
@@ -471,6 +520,9 @@ Tri Step(const PropertyExprNode* node, NodeState& state, StepContext& sc,
     case PropertyExprNode::Kind::kAbort:
       state.verdict = StepAbort(node, state, sc, begin);
       break;
+    case PropertyExprNode::Kind::kCase:
+      state.verdict = StepCase(node, state, sc, begin);
+      break;
     case PropertyExprNode::Kind::kImplies:
     case PropertyExprNode::Kind::kIff: {
       Tri first = Step(node->operands[0], *state.operands[0], sc, begin);
@@ -503,6 +555,14 @@ Tri FinishIfElse(const PropertyExprNode* node, NodeState& state) {
                         ? Finish(node->operands[1], *state.operands[1])
                         : Tri::kTrue;
   return state.condition ? then_branch : else_branch;
+}
+
+// §16.12.16: the item selected is finished as itself; none selected, the
+// case holds.
+Tri FinishCase(const PropertyExprNode* node, NodeState& state) {
+  if (state.selected == node->operands.size()) return Tri::kTrue;
+  return Finish(node->operands[state.selected],
+                *state.operands[state.selected]);
 }
 
 Tri FinishImplication(const PropertyExprNode* node, NodeState& state) {
@@ -600,6 +660,9 @@ Tri Finish(const PropertyExprNode* node, NodeState& state) {
       state.verdict = state.aborted
                           ? (node->accept ? Tri::kTrue : Tri::kFalse)
                           : Finish(node->operands[0], *state.operands[0]);
+      break;
+    case PropertyExprNode::Kind::kCase:
+      state.verdict = FinishCase(node, state);
       break;
     case PropertyExprNode::Kind::kImplies:
     case PropertyExprNode::Kind::kIff:

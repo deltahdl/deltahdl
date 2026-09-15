@@ -98,7 +98,8 @@ struct PropertyExprNode {
     kAlways,
     kUntil,
     kEventually,
-    kAbort
+    kAbort,
+    kCase
   };
   Kind kind = Kind::kBoolean;
   Expr* boolean = nullptr;
@@ -117,6 +118,10 @@ struct PropertyExprNode {
   // it is one of the sync_ forms, checked at the clock ticks alone.
   bool accept = false;
   bool synchronous = false;
+  // §16.12.16: a case over the case expression in `boolean`, each operand
+  // the property of one property_case_item and the item's expressions at
+  // the same index here, the default's none.
+  std::vector<std::vector<Expr*>> case_values;
 };
 
 struct EventExpr {
