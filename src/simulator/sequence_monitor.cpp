@@ -11,6 +11,7 @@
 #include "parser/ast.h"
 #include "simulator/awaiters.h"
 #include "simulator/evaluation.h"
+#include "simulator/expr_walk.h"
 #include "simulator/process.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
@@ -586,6 +587,43 @@ bool AdvanceBody(const LinearSequence& body, BodyAttempts& attempts,
   return matched;
 }
 
+// §16.9.3: a sampled value function in a sequence is clocked by the
+// sequence's clock, and the history it looks back through is sampled at
+// every tick of that clock whether or not an attempt reads the operand at
+// the tick -- `$rose(ready)` standing after `inst` in a chain still answers
+// the tick before. The calls are collected once, over every chain of the
+// body, and each is evaluated as the monitor resumes so that its sample for
+// the tick is recorded; an attempt reading it records the same value over
+// it.
+bool IsPastDirectedCall(const Expr* e) {
+  if (e->kind != ExprKind::kSystemCall) return false;
+  return e->callee == "$past" || e->callee == "$rose" || e->callee == "$fell" ||
+         e->callee == "$stable" || e->callee == "$changed";
+}
+
+void CollectPastDirectedSites(const LinearSequence& body,
+                              std::vector<const Expr*>& sites) {
+  auto collect = [&sites](const Expr* e) {
+    ForEachSubExpr(e, [&sites](const Expr* sub) {
+      if (IsPastDirectedCall(sub)) sites.push_back(sub);
+    });
+  };
+  for (const Expr* operand : body.operands) collect(operand);
+  for (const auto& items : body.match_items) {
+    for (const SeqMatchAssign& item : items) collect(item.rhs);
+  }
+  for (const SeqThroughout& guard : body.throughouts) collect(guard.cond);
+  for (const LinearSequence& inner : body.intersects) {
+    CollectPastDirectedSites(inner, sites);
+  }
+  for (const LinearSequence& inner : body.conjuncts) {
+    CollectPastDirectedSites(inner, sites);
+  }
+  for (const LinearSequence& inner : body.alternatives) {
+    CollectPastDirectedSites(inner, sites);
+  }
+}
+
 // §16.13.6: mark the sequence endpoint event triggered and wake its waiters,
 // mirroring the named-event `-> ev` trigger path (stmt_exec.cpp).
 void FireSequenceEndpoint(SimContext& ctx, const std::string& ep_name) {
@@ -611,8 +649,11 @@ SimCoroutine MakeSequenceMonitorCoroutine(LinearSequence body,
                                           Arena& arena) {
   BodyAttempts active;
   active.alternatives.resize(body.alternatives.size());
+  std::vector<const Expr*> past_sites;
+  CollectPastDirectedSites(body, past_sites);
   while (!ctx.StopRequested()) {
     co_await EventAwaiter{ctx, clock, arena};
+    for (const Expr* site : past_sites) EvalExpr(site, ctx, arena);
     // §16.14.5: a new evaluation attempt begins at every clock tick, which
     // each advance adds beside the ones in flight.
     if (AdvanceBody(body, active, ctx, arena)) {
