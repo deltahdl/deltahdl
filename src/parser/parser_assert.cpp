@@ -202,6 +202,16 @@ Stmt* Parser::ParseImmediateCover() {
   return stmt;
 }
 
+// The expression standing for a property_spec the assertion does not carry
+// as one: a skipped spec, or a sequential property carried as a sequence.
+static Expr* PropertySpecPlaceholder(Arena& arena, SourceLoc loc) {
+  auto* expr = arena.Create<Expr>();
+  expr->kind = ExprKind::kIdentifier;
+  expr->text = "<property_spec>";
+  expr->range.start = loc;
+  return expr;
+}
+
 static Expr* SkipPropertySpec(Arena& arena, Lexer& lexer, SourceLoc loc) {
   int depth = 1;
   while (depth > 0 && !lexer.Peek().Is(TokenKind::kEof)) {
@@ -213,11 +223,7 @@ static Expr* SkipPropertySpec(Arena& arena, Lexer& lexer, SourceLoc loc) {
     }
     lexer.Next();
   }
-  auto* expr = arena.Create<Expr>();
-  expr->kind = ExprKind::kIdentifier;
-  expr->text = "<property_spec>";
-  expr->range.start = loc;
-  return expr;
+  return PropertySpecPlaceholder(arena, loc);
 }
 
 static bool IsDeferredImmediate(Lexer& lexer) {
@@ -457,8 +463,9 @@ bool Parser::TryParseSimpleConcurrentProperty(ModuleItem* item,
   // sequence; one holding neither that nor an implication is a boolean.
   bool temporal = ok && BodyHasTemporalOperator();
   bool strong = false;
-  ModuleItem* sequence =
-      (ok && temporal) ? TryParseSequenceSpec(strong) : nullptr;
+  ModuleItem* sequence = (ok && temporal && !BodyHasPropertyOperator())
+                             ? TryParseSequenceSpec(strong)
+                             : nullptr;
   Expr* prop = (ok && !temporal) ? ParseExpr() : nullptr;
   // Accept only what consumes the whole spec, so the next token is the
   // property's closing parenthesis. Anything else restores the lexer and the
@@ -470,6 +477,10 @@ bool Parser::TryParseSimpleConcurrentProperty(ModuleItem* item,
     return false;
   }
   diag_.PopSuppress();
+  // A sequential property stands under the placeholder a skipped spec does,
+  // so what reads the item's expression finds one; the evaluation reads the
+  // sequence.
+  if (prop == nullptr) prop = PropertySpecPlaceholder(arena_, item->loc);
   item->sensitivity = std::move(events);
   item->assert_expr = prop;
   auto* stmt = arena_.Create<Stmt>();

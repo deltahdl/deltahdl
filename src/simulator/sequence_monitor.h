@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -32,7 +33,7 @@ SequencePropertyState* CreateSequencePropertyState(const ModuleItem* seq,
                                                    SimContext& ctx,
                                                    Arena& arena);
 
-enum class SequenceVerdict { kMatched, kFailed };
+enum class SequenceVerdict : uint8_t { kMatched, kFailed };
 
 // One tick of the property: every attempt in flight advances and a new one
 // begins, each that matches at this tick or can no longer match reaching
