@@ -1,0 +1,9 @@
+e1 = $rose(req) at 25
+$changed at 25, $stable(req) is 0
+at 25: current a = 0, b = 0; sampled a = 0, b = 1
+at 45: v is 1010 and $past(v[i]) over i is 0101
+e2 = $fell(ack) at 55
+$changed at 55, $stable(req) is 1
+at 65: $past(q) is 45, $past(q, 2) is 35, $past(q, 2, enable) is 25
+reg1 set by $rose(b_p) at 75
+$finish at time 80

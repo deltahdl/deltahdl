@@ -312,4 +312,86 @@ TEST(SampledValueSim, PastReturnsTheValueSampledAtThePreviousTick) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
+// §16.9.3: `$past(expression1, number_of_ticks)` returns the value sampled
+// number_of_ticks ticks back, so at the third edge `$past(x, 2)` is the 1 of
+// the first while `$past(x)` is the 2 of the second.
+TEST(SampledValueSim, PastLooksBackTheStatedNumberOfTicks) {
+  SimFixture f;
+  auto* two_back = RunAndFindVar(
+      "module t;\n"
+      "  logic clk = 0;\n"
+      "  int x = 1;\n"
+      "  int two_back = 99;\n"
+      "  int one_back = 99;\n"
+      "  always @(posedge clk) begin\n"
+      "    two_back = $past(x, 2);\n"
+      "    one_back = $past(x);\n"
+      "  end\n"
+      "  initial begin\n"
+      "    #1 clk = 1;\n"
+      "    #1 clk = 0; x = 2;\n"
+      "    #1 clk = 1;\n"
+      "    #1 clk = 0; x = 3;\n"
+      "    #1 clk = 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "two_back");
+  ASSERT_NE(two_back, nullptr);
+  EXPECT_EQ(two_back->value.ToUint64(), 1u);
+  EXPECT_EQ(f.ctx.FindVariable("one_back")->value.ToUint64(), 2u);
+}
+
+// §16.9.3: `expression2` gates the clocking event of $past, the sampling of
+// expression1 being on `posedge clk iff enable`, so ticks at which enable is
+// low are neither recorded nor counted: with q written 1, 2 and 3 at the
+// three edges and enable low at the second, `$past(q, 1, enable)` at the
+// third edge is the 1 of the first and not the 2 of the second.
+TEST(SampledValueSim, PastGatedByExpression2SkipsTheTicksItIsLowAt) {
+  SimFixture f;
+  auto* seen = RunAndFindVar(
+      "module t;\n"
+      "  logic clk = 0;\n"
+      "  logic enable = 1;\n"
+      "  int q = 1;\n"
+      "  int seen = 99;\n"
+      "  always @(posedge clk) seen = $past(q, 1, enable);\n"
+      "  initial begin\n"
+      "    #1 clk = 1;\n"
+      "    #1 clk = 0; q = 2; enable = 0;\n"
+      "    #1 clk = 1;\n"
+      "    #1 clk = 0; q = 3; enable = 1;\n"
+      "    #1 clk = 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "seen");
+  ASSERT_NE(seen, nullptr);
+  EXPECT_EQ(seen->value.ToUint64(), 1u);
+}
+
+// §16.9.3: $past may refer to automatic variables, its example reading
+// `$past(b[i])` in a for loop over i and returning at each iteration the past
+// value of the i-th bit. b is 4'b0101 at the first edge and 4'b1010 at the
+// second, so at the second edge the loop copies the first edge's bits, 0101,
+// into r; one history for the whole call site would hand every iteration the
+// last value it saw.
+TEST(SampledValueSim, PastOfAnIndexedBitInALoopReadsThatBitsPast) {
+  SimFixture f;
+  auto* r = RunAndFindVar(
+      "module t;\n"
+      "  logic clk = 0;\n"
+      "  logic [3:0] b = 4'b0101;\n"
+      "  logic [3:0] r = 4'b1111;\n"
+      "  always @(posedge clk)\n"
+      "    for (int i = 0; i < 4; i++) r[i] = $past(b[i]);\n"
+      "  initial begin\n"
+      "    #1 clk = 1;\n"
+      "    #1 clk = 0; b = 4'b1010;\n"
+      "    #1 clk = 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(r, nullptr);
+  EXPECT_EQ(r->value.ToUint64(), 0b0101u);
+}
+
 }  // namespace

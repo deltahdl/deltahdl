@@ -1,7 +1,9 @@
 #ifndef DELTA_SIMULATOR_SVA_ENGINE_SAMPLING_H_
 #define DELTA_SIMULATOR_SVA_ENGINE_SAMPLING_H_
 
+#include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <unordered_map>
 #include <vector>
 
@@ -281,13 +283,18 @@ class AssertionSampleStore {
   // sequence of values it has seen is "the sampled value of the expression from
   // the most recent strictly prior time step in which the clocking event
   // occurred" and the ticks before that.
-  const Logic4Vec* PastValue(const Expr* site, uint32_t ticks_back) const;
+  // A site evaluated several times at one tick with different operands --
+  // §16.9.3's `$past(b[i])` in a for loop over i -- keeps one history per
+  // `variant`, the value the site's select indices took, so each iteration
+  // reads the past value of its own bit.
+  const Logic4Vec* PastValue(const Expr* site, uint32_t ticks_back,
+                             uint64_t variant = 0) const;
 
   // Records what the site sampled at this tick, so the next evaluation of it
   // can read this value back. `depth` is how many ticks of history that site
   // asks for, which bounds what is kept.
   void RecordTick(const Expr* site, const Logic4Vec& sampled, uint32_t depth,
-                  Arena& arena);
+                  Arena& arena, uint64_t variant = 0);
 
   // A copy of `sampled` that owns its words, for a caller that keeps a sampled
   // value past the tick it read it at: the value a read of a variable answers
@@ -308,11 +315,27 @@ class AssertionSampleStore {
     std::vector<Logic4Vec> preponed_elements;
   };
 
+  // One call site's history under one variant of its operands.
+  struct SiteKey {
+    const Expr* site;
+    uint64_t variant;
+    bool operator==(const SiteKey& other) const {
+      return site == other.site && variant == other.variant;
+    }
+  };
+  struct SiteKeyHash {
+    size_t operator()(const SiteKey& key) const {
+      return std::hash<const Expr*>()(key.site) ^
+             (std::hash<uint64_t>()(key.variant) << 1);
+    }
+  };
+
   std::unordered_map<const Variable*, Entry> entries_;
   std::unordered_map<const QueueObject*, QueueEntry> queue_entries_;
   // Most recent first, so entry 0 is the previous tick's value -- $past's
   // default of one tick back.
-  std::unordered_map<const Expr*, std::vector<Logic4Vec>> tick_history_;
+  std::unordered_map<SiteKey, std::vector<Logic4Vec>, SiteKeyHash>
+      tick_history_;
   bool evaluating_property_ = false;
   bool reading_defaults_ = false;
 };

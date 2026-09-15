@@ -280,9 +280,10 @@ const Logic4Vec* AssertionSampleStore::Read(const Variable* var,
 }
 
 const Logic4Vec* AssertionSampleStore::PastValue(const Expr* site,
-                                                 uint32_t ticks_back) const {
+                                                 uint32_t ticks_back,
+                                                 uint64_t variant) const {
   if (site == nullptr || ticks_back == 0) return nullptr;
-  auto it = tick_history_.find(site);
+  auto it = tick_history_.find(SiteKey{site, variant});
   if (it == tick_history_.end() || it->second.size() < ticks_back) {
     return nullptr;
   }
@@ -291,9 +292,9 @@ const Logic4Vec* AssertionSampleStore::PastValue(const Expr* site,
 
 void AssertionSampleStore::RecordTick(const Expr* site,
                                       const Logic4Vec& sampled, uint32_t depth,
-                                      Arena& arena) {
+                                      Arena& arena, uint64_t variant) {
   if (site == nullptr) return;
-  auto& history = tick_history_[site];
+  auto& history = tick_history_[SiteKey{site, variant}];
   Logic4Vec copy;
   CopySample(sampled, copy, arena);
   history.insert(history.begin(), copy);

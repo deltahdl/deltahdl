@@ -11,6 +11,7 @@
 #include "simulator/coverage_control.h"
 #include "simulator/eval_systask_internal.h"
 #include "simulator/evaluation.h"
+#include "simulator/expr_walk.h"
 #include "simulator/sim_context.h"
 #include "simulator/sva_engine.h"
 #include "simulator/variable.h"
@@ -656,17 +657,46 @@ static bool IsValueChangeFunction(std::string_view name) {
 // read the history this call site has and record what it sampled now, and both
 // fall back to the default sampled value the clause names for a site that has
 // not been evaluated that many times yet.
+// §16.9.3: `$past` may refer to automatic variables, its example reading
+// `$past(b[i])` in a for loop over i and returning at each iteration the past
+// value of the i-th bit, so one call site keeps one history per value its
+// select indices take: the indices of every select in the argument, evaluated
+// here, folded into one number. An argument with no select answers 0, the
+// one history the site had.
+static uint64_t ArgumentVariant(const Expr* arg, SimContext& ctx,
+                                Arena& arena) {
+  uint64_t variant = 0;
+  ForEachSubExpr(arg, [&](const Expr* e) {
+    if (e->kind != ExprKind::kSelect || e->index == nullptr) return;
+    uint64_t index = EvalExpr(e->index, ctx, arena).ToUint64();
+    variant = variant * 1000003u + index + 1;
+  });
+  return variant;
+}
+
+// §16.9.3: `expression2` of $past gates the clocking event, the sampling of
+// expression1 being based on the clock `iff expression2`, so a tick at which
+// the gate is false is neither recorded nor counted among the ticks looked
+// back over. An absent gate defaults to 1'b1.
+static bool PastGateOpen(const Expr* expr, SimContext& ctx, Arena& arena) {
+  if (expr->args.size() < 3 || expr->args[2] == nullptr) return true;
+  return EvalSampledArg(expr->args[2], ctx, arena).IsTruthy();
+}
+
 static Logic4Vec EvalPastOrValueChange(const Expr* expr, SimContext& ctx,
                                        Arena& arena, std::string_view name,
                                        const Logic4Vec& now_val) {
   auto& samples = ctx.AssertionSamples();
   bool is_past = IsPastSampledFunction(name);
   uint32_t ticks = is_past ? PastTickCount(expr, ctx, arena) : 1;
-  const Logic4Vec* past = samples.PastValue(expr, ticks);
+  uint64_t variant = ArgumentVariant(expr->args[0], ctx, arena);
+  const Logic4Vec* past = samples.PastValue(expr, ticks, variant);
   Logic4Vec prev_val = past != nullptr
                            ? *past
                            : EvalDefaultSampledArg(expr->args[0], ctx, arena);
-  samples.RecordTick(expr, now_val, ticks, arena);
+  if (!is_past || PastGateOpen(expr, ctx, arena)) {
+    samples.RecordTick(expr, now_val, ticks, arena, variant);
+  }
   if (is_past) return prev_val;
   return ValueChangeAnswer(name, now_val, prev_val, arena);
 }
