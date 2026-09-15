@@ -315,6 +315,48 @@ Tri Step(const PropertyExprNode* node, NodeState& state, StepContext& sc,
 
 // The end of the run: a sequence still in flight reads by its strength, an
 // antecedent still in flight matches no more, and the rest follows.
+Tri Finish(const PropertyExprNode* node, NodeState& state);
+
+Tri FinishJunction(const PropertyExprNode* node, NodeState& state) {
+  std::vector<Tri> verdicts;
+  verdicts.reserve(node->operands.size());
+  for (size_t i = 0; i < node->operands.size(); ++i) {
+    verdicts.push_back(Finish(node->operands[i], *state.operands[i]));
+  }
+  return Junction(node->kind == PropertyExprNode::Kind::kOr, verdicts);
+}
+
+Tri FinishIfElse(const PropertyExprNode* node, NodeState& state) {
+  Tri then_branch = Finish(node->operands[0], *state.operands[0]);
+  Tri else_branch = node->operands.size() > 1
+                        ? Finish(node->operands[1], *state.operands[1])
+                        : Tri::kTrue;
+  return state.condition ? then_branch : else_branch;
+}
+
+Tri FinishImplication(const PropertyExprNode* node, NodeState& state) {
+  std::vector<Tri> verdicts;
+  verdicts.reserve(state.consequents.size());
+  for (NodeState* c : state.consequents) {
+    verdicts.push_back(Finish(node->operands[0], *c));
+  }
+  return Junction(false, verdicts);
+}
+
+Tri FinishPair(const PropertyExprNode* node, NodeState& state) {
+  Tri first = Finish(node->operands[0], *state.operands[0]);
+  Tri second = Finish(node->operands[1], *state.operands[1]);
+  return node->kind == PropertyExprNode::Kind::kImplies ? Implies(first, second)
+                                                        : Iff(first, second);
+}
+
+// §16.12.10: with no further tick the weak form holds and the strong fails;
+// an operand begun is finished as itself.
+Tri FinishNexttime(const PropertyExprNode* node, NodeState& state) {
+  if (state.begun) return Finish(node->operands[0], *state.operands[0]);
+  return node->strong ? Tri::kFalse : Tri::kTrue;
+}
+
 Tri Finish(const PropertyExprNode* node, NodeState& state) {
   if (state.verdict != Tri::kPending) return state.verdict;
   switch (node->kind) {
@@ -327,49 +369,22 @@ Tri Finish(const PropertyExprNode* node, NodeState& state) {
       state.verdict = Not(Finish(node->operands[0], *state.operands[0]));
       break;
     case PropertyExprNode::Kind::kOr:
-    case PropertyExprNode::Kind::kAnd: {
-      std::vector<Tri> verdicts;
-      verdicts.reserve(node->operands.size());
-      for (size_t i = 0; i < node->operands.size(); ++i) {
-        verdicts.push_back(Finish(node->operands[i], *state.operands[i]));
-      }
-      state.verdict =
-          Junction(node->kind == PropertyExprNode::Kind::kOr, verdicts);
+    case PropertyExprNode::Kind::kAnd:
+      state.verdict = FinishJunction(node, state);
       break;
-    }
-    case PropertyExprNode::Kind::kIfElse: {
-      Tri then_branch = Finish(node->operands[0], *state.operands[0]);
-      Tri else_branch = node->operands.size() > 1
-                            ? Finish(node->operands[1], *state.operands[1])
-                            : Tri::kTrue;
-      state.verdict = state.condition ? then_branch : else_branch;
+    case PropertyExprNode::Kind::kIfElse:
+      state.verdict = FinishIfElse(node, state);
       break;
-    }
-    case PropertyExprNode::Kind::kImplication: {
-      std::vector<Tri> verdicts;
-      verdicts.reserve(state.consequents.size());
-      for (NodeState* c : state.consequents) {
-        verdicts.push_back(Finish(node->operands[0], *c));
-      }
-      state.verdict = Junction(false, verdicts);
+    case PropertyExprNode::Kind::kImplication:
+      state.verdict = FinishImplication(node, state);
       break;
-    }
     case PropertyExprNode::Kind::kNexttime:
-      // §16.12.10: with no further tick the weak form holds and the strong
-      // fails; an operand begun is finished as itself.
-      state.verdict = state.begun
-                          ? Finish(node->operands[0], *state.operands[0])
-                          : (node->strong ? Tri::kFalse : Tri::kTrue);
+      state.verdict = FinishNexttime(node, state);
       break;
     case PropertyExprNode::Kind::kImplies:
-    case PropertyExprNode::Kind::kIff: {
-      Tri first = Finish(node->operands[0], *state.operands[0]);
-      Tri second = Finish(node->operands[1], *state.operands[1]);
-      state.verdict = node->kind == PropertyExprNode::Kind::kImplies
-                          ? Implies(first, second)
-                          : Iff(first, second);
+    case PropertyExprNode::Kind::kIff:
+      state.verdict = FinishPair(node, state);
       break;
-    }
   }
   return state.verdict;
 }
