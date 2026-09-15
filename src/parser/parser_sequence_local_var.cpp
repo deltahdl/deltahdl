@@ -354,6 +354,26 @@ struct SequencePortScan {
     lexer.Next();
   }
 
+  // §16.8.1: a data type keyword types the formals after it until the next
+  // type, and `event`, `sequence` and `untyped` do the same for a formal that
+  // is not local, `untyped` ending a type's reach; a `[` after a data type
+  // keyword makes a type the keyword alone does not name. Returns true where
+  // the token was one of these and was consumed.
+  bool HandleTypeKeyword(Lexer& lexer) {
+    TokenKind kind = lexer.Peek().kind;
+    if (IsBuiltinTypeKwForLocalVar(kind)) {
+      lexer.Next();
+      carry_type_kw =
+          LexerCheck(lexer, TokenKind::kLBracket) ? TokenKind::kEof : kind;
+      item_saw_explicit_type = true;
+      return true;
+    }
+    if (item_saw_local || !IsDisallowedLocalVarTypeKw(kind)) return false;
+    lexer.Next();
+    carry_type_kw = kind == TokenKind::kKwUntyped ? TokenKind::kEof : kind;
+    return true;
+  }
+
   // Handles the depth==1 (top-level) tokens of a port item. Returns true if the
   // current token was consumed here; false means the caller falls through to
   // the default skip. All branches assume depth==1 has already been
@@ -406,18 +426,8 @@ struct SequencePortScan {
                LexerCheck(lexer, TokenKind::kKwOutput) ||
                LexerCheck(lexer, TokenKind::kKwInout)) {
       HandleDirection(lexer, diag);
-    } else if (IsBuiltinTypeKwForLocalVar(lexer.Peek().kind)) {
-      carry_type_kw = lexer.Next().kind;
-      if (LexerCheck(lexer, TokenKind::kLBracket)) {
-        carry_type_kw = TokenKind::kEof;
-      }
-      item_saw_explicit_type = true;
-    } else if (!item_saw_local &&
-               IsDisallowedLocalVarTypeKw(lexer.Peek().kind)) {
-      // §16.8.1: `event`, `sequence` and `untyped` type the formals after them
-      // as a data type keyword does, `untyped` ending a type's reach.
-      TokenKind kw = lexer.Next().kind;
-      carry_type_kw = kw == TokenKind::kKwUntyped ? TokenKind::kEof : kw;
+    } else if (HandleTypeKeyword(lexer)) {
+      // The keyword was consumed and its type recorded for the formals after.
     } else if (item_saw_local &&
                IsDisallowedLocalVarTypeKw(lexer.Peek().kind)) {
       // §16.8.2: a local variable formal argument's type must be one of the

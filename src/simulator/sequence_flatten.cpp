@@ -226,6 +226,30 @@ const ModuleItem* InstantiatedSequence(const Expr* operand, SimContext& ctx) {
 }
 
 bool Flatten(const ModuleItem* seq, SimContext& ctx, Arena& arena,
+             LinearSequence& out, int depth);
+
+// One instance of `inner` standing as an operand of the sequence being
+// flattened, `before` being the delay written before it: the instantiated
+// body's flattened operands are appended with the actuals substituted, its
+// clock taken where the outer sequence has none.
+bool ExpandInstance(const ModuleItem* inner, const Expr* instance,
+                    const SeqCycleDelay& before, SimContext& ctx, Arena& arena,
+                    LinearSequence& out, int depth) {
+  LinearSequence body;
+  if (!Flatten(inner, ctx, arena, body, depth + 1)) return false;
+  ActualsByFormal actuals = BindActuals(inner, instance, arena);
+  if (out.clock.empty() && !body.clock.empty()) {
+    out.clock = SubstituteClock(body.clock, actuals, arena);
+  }
+  for (size_t j = 0; j < body.operands.size(); ++j) {
+    out.operands.push_back(SubstituteFormals(body.operands[j], actuals, arena));
+    SeqCycleDelay delay = ResolveDelay(body.delays[j], actuals, ctx, arena);
+    out.delays.push_back(j == 0 ? AddDelays(before, delay) : delay);
+  }
+  return true;
+}
+
+bool Flatten(const ModuleItem* seq, SimContext& ctx, Arena& arena,
              LinearSequence& out, int depth) {
   if (seq == nullptr || seq->seq_linear_operands.empty()) return false;
   if (depth > kMaxInstanceDepth) return false;
@@ -237,19 +261,9 @@ bool Flatten(const ModuleItem* seq, SimContext& ctx, Arena& arena,
     if (inner == nullptr) {
       out.operands.push_back(operand);
       out.delays.push_back(before);
-      continue;
-    }
-    LinearSequence body;
-    if (!Flatten(inner, ctx, arena, body, depth + 1)) return false;
-    ActualsByFormal actuals = BindActuals(inner, operand, arena);
-    if (out.clock.empty() && !body.clock.empty()) {
-      out.clock = SubstituteClock(body.clock, actuals, arena);
-    }
-    for (size_t j = 0; j < body.operands.size(); ++j) {
-      out.operands.push_back(
-          SubstituteFormals(body.operands[j], actuals, arena));
-      SeqCycleDelay delay = ResolveDelay(body.delays[j], actuals, ctx, arena);
-      out.delays.push_back(j == 0 ? AddDelays(before, delay) : delay);
+    } else if (!ExpandInstance(inner, operand, before, ctx, arena, out,
+                               depth)) {
+      return false;
     }
   }
   return true;
