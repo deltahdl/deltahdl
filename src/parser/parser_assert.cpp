@@ -220,8 +220,6 @@ struct ParserAssertHelpers {
     return node;
   }
 
-  static PropertyExprNode* ParsePropertyOr(Parser& p);
-
   // One operand of a property's or or and: `not` before an operand negates
   // it (§16.12.3); a parenthesised property holding an or or and of its own
   // is read as one; and otherwise the operand is a sequence where it holds
