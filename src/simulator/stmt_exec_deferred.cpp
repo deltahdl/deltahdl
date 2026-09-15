@@ -529,7 +529,8 @@ void ExecDeferredImmediateAssertInFunction(const Stmt* stmt, SimContext& ctx,
     if (ctx.AssertFailActionEnabled(type_bit, directive_bit)) {
       // §16.4.1: the default $error is a pending report scheduled with the
       // calling process's other deferred reports, not emitted here.
-      ScheduleDeferredSeverityReport(stmt->is_final_deferred, stmt->label, ctx);
+      ScheduleDeferredSeverityReport(stmt->is_final_deferred, stmt->label,
+                                     stmt->range.start.line, ctx);
     }
   }
 }
