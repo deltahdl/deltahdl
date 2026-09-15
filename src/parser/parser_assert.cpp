@@ -398,6 +398,17 @@ void Parser::WarnUnevaluatedConcurrentAssertion(SourceLoc loc,
                 Subclause("16.14"));
 }
 
+// §16.12: `disable iff ( expression_or_dist )` may stand between the clock
+// and the property_expr, making the spec a property_spec; `disable_iff`
+// takes the condition where one is written and stays null otherwise. Answers
+// false where the clause is malformed.
+bool Parser::TryParseDisableIff(Expr*& disable_iff) {
+  if (!Match(TokenKind::kKwDisable)) return true;
+  if (!Match(TokenKind::kKwIff) || !Match(TokenKind::kLParen)) return false;
+  disable_iff = ParseExpr();
+  return disable_iff != nullptr && Match(TokenKind::kRParen);
+}
+
 bool Parser::TryParseSimpleConcurrentProperty(ModuleItem* item,
                                               StmtKind body_kind) {
   if (!Check(TokenKind::kAt)) return false;
@@ -412,14 +423,8 @@ bool Parser::TryParseSimpleConcurrentProperty(ModuleItem* item,
   } else {
     events.push_back(ParseSingleEvent());
   }
-  // §16.12: `disable iff ( expression_or_dist )` may stand between the clock
-  // and the property_expr, making the spec a property_spec.
   Expr* disable_iff = nullptr;
-  if (ok && Match(TokenKind::kKwDisable)) {
-    ok = Match(TokenKind::kKwIff) && Match(TokenKind::kLParen);
-    disable_iff = ok ? ParseExpr() : nullptr;
-    ok = disable_iff != nullptr && Match(TokenKind::kRParen);
-  }
+  if (ok) ok = TryParseDisableIff(disable_iff);
   bool temporal = ok && BodyHasTemporalOperator();
   Expr* prop = (ok && !temporal) ? ParseExpr() : nullptr;
   // Accept only the simple form: a non-temporal boolean that consumes the whole

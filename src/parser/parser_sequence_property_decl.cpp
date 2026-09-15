@@ -837,11 +837,7 @@ void Parser::CaptureClockedBooleanPropertyBody(ModuleItem* item) {
   // §16.12: a `disable iff ( expression_or_dist )` between the clock and the
   // boolean is the body's disable condition.
   Expr* disable_iff = nullptr;
-  if (ok && Match(TokenKind::kKwDisable)) {
-    ok = Match(TokenKind::kKwIff) && Match(TokenKind::kLParen);
-    disable_iff = ok ? ParseExpr() : nullptr;
-    ok = disable_iff != nullptr && Match(TokenKind::kRParen);
-  }
+  if (ok) ok = TryParseDisableIff(disable_iff);
   Expr* boolean = ok ? ParseExpr() : nullptr;
   ok = boolean != nullptr && Match(TokenKind::kSemicolon) &&
        Check(TokenKind::kKwEndproperty);
