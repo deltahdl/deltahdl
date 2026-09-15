@@ -38,14 +38,22 @@ def test_main_prints_the_subclause_and_the_issue_tracking_it(
     assert capsys.readouterr().out == "§3.2 #100\n"
 
 
+def _exit_code_with_nothing_tracked(
+    get_exit_code: Callable[[Callable[[], object]], int | str | None],
+    monkeypatch: pytest.MonkeyPatch,
+    write_graph: Callable[[list[list[str]]], Path],
+) -> int | str | None:
+    _stub_issues(monkeypatch, [])
+    graph = str(write_graph([["3.1"]]))
+    return get_exit_code(lambda: main(["--graph", graph]))
+
+
 def test_main_exits_nonzero_when_no_subclause_is_tracked(
     get_exit_code: Callable[[Callable[[], object]], int | str | None],
     monkeypatch: pytest.MonkeyPatch,
     write_graph: Callable[[list[list[str]]], Path],
 ) -> None:
-    _stub_issues(monkeypatch, [])
-    graph = str(write_graph([["3.1"]]))
-    assert get_exit_code(lambda: main(["--graph", graph])) == 1
+    assert _exit_code_with_nothing_tracked(get_exit_code, monkeypatch, write_graph) == 1
 
 
 def test_main_says_why_it_had_no_answer(
@@ -54,9 +62,7 @@ def test_main_says_why_it_had_no_answer(
     monkeypatch: pytest.MonkeyPatch,
     write_graph: Callable[[list[list[str]]], Path],
 ) -> None:
-    _stub_issues(monkeypatch, [])
-    graph = str(write_graph([["3.1"]]))
-    get_exit_code(lambda: main(["--graph", graph]))
+    _exit_code_with_nothing_tracked(get_exit_code, monkeypatch, write_graph)
     assert "no subclause" in capsys.readouterr().err.lower()
 
 

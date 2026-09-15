@@ -1,10 +1,8 @@
-import runpy
 import subprocess
+from collections.abc import Callable
 from pathlib import Path
 from types import ModuleType
 from unittest.mock import MagicMock, patch
-
-import pytest
 
 
 def _run_over_streams(
@@ -512,12 +510,7 @@ class TestArtifactComparison:
 
 
 def test_running_the_package_as_a_module_calls_main(
-    rst: ModuleType, monkeypatch: pytest.MonkeyPatch,
+    rst: ModuleType,
+    calls_made_by_running_as_a_module: Callable[[ModuleType], list[str]],
 ) -> None:
-    calls: list[str] = []
-    monkeypatch.setattr(rst, "main", lambda: calls.append("main"))
-    runpy.run_path(
-        str(Path(rst.__file__ or "").with_name("__main__.py")),
-        run_name="run_sim_tests.__main__",
-    )
-    assert calls == ["main"]
+    assert calls_made_by_running_as_a_module(rst) == ["main"]

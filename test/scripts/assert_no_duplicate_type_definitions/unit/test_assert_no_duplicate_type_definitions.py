@@ -210,16 +210,11 @@ class TestMain:
         assert andt.main([root]) == 1
 
     def test_each_header_is_annotated(
-        self,
-        andt: ModuleType,
-        header_tree: Callable[..., Path],
+        self, andt: ModuleType, header_tree: Callable[..., Path],
         capsys: pytest.CaptureFixture[str],
     ) -> None:
-        root = header_tree(
-            **{"a.h": "class F {\n};\n", "b.h": "class F {\n};\n"},
-        )
-        andt.main([root])
-        assert capsys.readouterr().out.count("::error file=") == 2
+        report = _report_on_two_headers_defining_f(andt, header_tree, capsys)
+        assert report.count("::error file=") == 2
 
     def test_the_report_names_the_scoped_type(
         self,
@@ -233,16 +228,20 @@ class TestMain:
         assert "delta::F is defined by 2 headers" in capsys.readouterr().out
 
     def test_the_report_of_a_file_scope_type_names_it_alone(
-        self,
-        andt: ModuleType,
-        header_tree: Callable[..., Path],
+        self, andt: ModuleType, header_tree: Callable[..., Path],
         capsys: pytest.CaptureFixture[str],
     ) -> None:
-        root = header_tree(
-            **{"a.h": "class F {\n};\n", "b.h": "class F {\n};\n"},
-        )
-        andt.main([root])
-        assert "line=1::F is defined by 2 headers" in capsys.readouterr().out
+        report = _report_on_two_headers_defining_f(andt, header_tree, capsys)
+        assert "line=1::F is defined by 2 headers" in report
+
+
+def _report_on_two_headers_defining_f(
+    andt: ModuleType, header_tree: Callable[..., Path],
+    capsys: pytest.CaptureFixture[str],
+) -> str:
+    root = header_tree(**{"a.h": "class F {\n};\n", "b.h": "class F {\n};\n"})
+    andt.main([root])
+    return capsys.readouterr().out
 
 
 def test_running_the_module_exits_with_the_status_main_returned(

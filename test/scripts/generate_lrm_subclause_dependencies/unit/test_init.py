@@ -157,13 +157,21 @@ def test_main_walks_every_toc_entry(
     assert mock_record.call_count == 3
 
 
-def test_main_writes_record_per_subclause(
+def _payload_written_by(
     run_main: Callable[..., tuple[MagicMock, MagicMock, MagicMock]],
     make_output: Path,
+    **arguments: Any,
+) -> dict[str, Any]:
+    run_main(**arguments)
+    payload: dict[str, Any] = json.loads(make_output.read_text())
+    return payload
+
+
+def test_main_writes_record_per_subclause(
+    run_main: Callable[..., tuple[MagicMock, MagicMock, MagicMock]], make_output: Path,
 ) -> None:
-    run_main(toc={"4.4": (10, 20), "5.6": (21, 30)})
-    payload = json.loads(make_output.read_text())
-    assert set(payload["records"]) == {"4.4", "5.6"}
+    toc = {"4.4": (10, 20), "5.6": (21, 30)}
+    assert set(_payload_written_by(run_main, make_output, toc=toc)["records"]) == {"4.4", "5.6"}
 
 
 def test_main_writes_pretty_printed_json(
@@ -175,22 +183,19 @@ def test_main_writes_pretty_printed_json(
 
 
 def test_main_record_payload(
-    run_main: Callable[..., tuple[MagicMock, MagicMock, MagicMock]],
-    make_output: Path,
+    run_main: Callable[..., tuple[MagicMock, MagicMock, MagicMock]], make_output: Path,
 ) -> None:
     record = {"dependencies": ["3.14.3"]}
-    run_main(record=record)
-    payload = json.loads(make_output.read_text())
+    payload = _payload_written_by(run_main, make_output, record=record)
     assert payload["records"]["4.4"] == record
 
 
 def test_main_writes_order_section(
-    run_main: Callable[..., tuple[MagicMock, MagicMock, MagicMock]],
-    make_output: Path,
+    run_main: Callable[..., tuple[MagicMock, MagicMock, MagicMock]], make_output: Path,
 ) -> None:
-    run_main(toc={"4.4": (10, 20), "5.6": (21, 30)})
-    payload = json.loads(make_output.read_text())
-    assert sorted(g[0] for g in payload["order"]) == ["4.4", "5.6"]
+    toc = {"4.4": (10, 20), "5.6": (21, 30)}
+    order = _payload_written_by(run_main, make_output, toc=toc)["order"]
+    assert sorted(g[0] for g in order) == ["4.4", "5.6"]
 
 
 def test_main_forwards_model_to_record_builder(
@@ -505,44 +510,42 @@ _ANNEX_AGGREGATE_TOC: dict[str, tuple[int, int]] = {
 _ANNEX_SINGLETON_TOC: dict[str, tuple[int, int]] = {"B": (940, 949)}
 
 
+def _walked_over(
+    run_main: Callable[..., tuple[MagicMock, MagicMock, MagicMock]],
+    toc: dict[str, tuple[int, int]],
+) -> list[str]:
+    _, mock_record, _ = run_main(toc=toc)
+    return [c.args[0] for c in mock_record.call_args_list]
+
+
 def test_main_skips_aggregate_chapter(
     run_main: Callable[..., tuple[MagicMock, MagicMock, MagicMock]],
 ) -> None:
-    _, mock_record, _ = run_main(toc=_AGGREGATE_TOC)
-    walked = [c.args[0] for c in mock_record.call_args_list]
-    assert "23" not in walked
+    assert "23" not in _walked_over(run_main, _AGGREGATE_TOC)
 
 
 def test_main_walks_subclauses_under_aggregate(
     run_main: Callable[..., tuple[MagicMock, MagicMock, MagicMock]],
 ) -> None:
-    _, mock_record, _ = run_main(toc=_AGGREGATE_TOC)
-    walked = [c.args[0] for c in mock_record.call_args_list]
-    assert walked == ["23.1"]
+    assert _walked_over(run_main, _AGGREGATE_TOC) == ["23.1"]
 
 
 def test_main_walks_singleton_chapter(
     run_main: Callable[..., tuple[MagicMock, MagicMock, MagicMock]],
 ) -> None:
-    _, mock_record, _ = run_main(toc=_SINGLETON_TOC)
-    walked = [c.args[0] for c in mock_record.call_args_list]
-    assert walked == ["2"]
+    assert _walked_over(run_main, _SINGLETON_TOC) == ["2"]
 
 
 def test_main_skips_aggregate_annex(
     run_main: Callable[..., tuple[MagicMock, MagicMock, MagicMock]],
 ) -> None:
-    _, mock_record, _ = run_main(toc=_ANNEX_AGGREGATE_TOC)
-    walked = [c.args[0] for c in mock_record.call_args_list]
-    assert "A" not in walked
+    assert "A" not in _walked_over(run_main, _ANNEX_AGGREGATE_TOC)
 
 
 def test_main_walks_singleton_annex(
     run_main: Callable[..., tuple[MagicMock, MagicMock, MagicMock]],
 ) -> None:
-    _, mock_record, _ = run_main(toc=_ANNEX_SINGLETON_TOC)
-    walked = [c.args[0] for c in mock_record.call_args_list]
-    assert walked == ["B"]
+    assert _walked_over(run_main, _ANNEX_SINGLETON_TOC) == ["B"]
 
 
 def test_main_drops_aggregate_records_from_output(

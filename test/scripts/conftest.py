@@ -1,3 +1,4 @@
+import runpy
 import stat
 import sys
 from collections.abc import Callable, Iterator
@@ -22,6 +23,22 @@ if str(SCRIPTS_DIR) not in sys.path:
 @pytest.fixture()
 def module_loader() -> Callable[[str, Path], ModuleType]:
     return load_module_from_path
+
+
+@pytest.fixture()
+def calls_made_by_running_as_a_module(
+    monkeypatch: pytest.MonkeyPatch,
+) -> Callable[[ModuleType], list[str]]:
+    def run(module: ModuleType) -> list[str]:
+        calls: list[str] = []
+        monkeypatch.setattr(module, "main", lambda: calls.append("main"))
+        runpy.run_path(
+            str(Path(module.__file__ or "").with_name("__main__.py")),
+            run_name=f"{module.__name__}.__main__",
+        )
+        return calls
+
+    return run
 
 
 def _shell_quote(s: str) -> str:
