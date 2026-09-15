@@ -485,6 +485,11 @@ void Lowerer::RegisterDesignAssertionSampling() {
       if (auto* var = ctx_.FindVariable(name)) {
         ctx_.AssertionSamples().Register(var, ctx_.GetArena());
       }
+      // §16.6: a queue the property reads an element of is enrolled whole, so
+      // the element read at a tick is the one sampled for it.
+      if (auto* queue = ctx_.FindQueue(name)) {
+        ctx_.AssertionSamples().RegisterQueue(queue, ctx_.GetArena());
+      }
     }
   }
   ctx_.SetLoweringInstancePrefix("");

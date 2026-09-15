@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <limits>
 
+#include "fixture_simulator.h"
 #include "simulator/sva_engine.h"
 
 using namespace delta;
@@ -81,6 +82,30 @@ TEST(AssertionBooleanExprPlace, DisableConditionUsesCurrentValuesNotSampled) {
   EXPECT_FALSE(
       BooleanExprUsesSampledValues(BooleanExprPlace::kDisableCondition));
   EXPECT_TRUE(DisableConditionUsesCurrentValues());
+}
+
+// §16.6: an element of a queue sampled for an assertion's evaluation continues
+// to exist for that evaluation though the queue sheds it before the evaluation
+// runs. q holds 5 from time zero; in the time step of the one tick the initial
+// block empties q before raising the clock, and the property still reads the
+// 5 sampled in the Preponed region, so the pass statement counts once. Read
+// live, q[0] is the absent element's 0 and the count stays at zero.
+TEST(AssertionSampledArrayElement, QueueHeadSampledForTheTickOutlivesThePop) {
+  SimFixture f;
+  auto* held = RunAndFindVar(
+      "module m;\n"
+      "  logic clk = 0;\n"
+      "  int q[$];\n"
+      "  int held = 0;\n"
+      "  assert property (@(posedge clk) q[0] == 5) held = held + 1;\n"
+      "  initial begin\n"
+      "    q.push_back(5);\n"
+      "    #5 q.pop_front(); clk = 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "held");
+  ASSERT_NE(held, nullptr);
+  EXPECT_EQ(held->value.ToUint64(), 1u);
 }
 
 }  // namespace

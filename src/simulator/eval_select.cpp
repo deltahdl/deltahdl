@@ -14,6 +14,7 @@
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign_internal.h"
+#include "simulator/sva_engine_sampling.h"
 #include "simulator/variable.h"
 
 namespace delta {
@@ -58,8 +59,15 @@ static bool TryQueueSelect(const Expr* expr, SimContext& ctx, Arena& arena,
     out = NonexistentQueueElement(q, arena);
     return true;
   }
-  out = (idx < q->elements.size()) ? q->elements[idx]
-                                   : NonexistentQueueElement(q, arena);
+  // §16.6: within a concurrent assertion's property the element read is the
+  // one sampled for the tick, which exists for the evaluation though the queue
+  // may have shed or moved it since; the store answers nothing anywhere else.
+  const std::vector<Logic4Vec>* sampled =
+      ctx.AssertionSamples().ReadQueueWithinProperty(q, ctx.CurrentTime());
+  const std::vector<Logic4Vec>& elements =
+      sampled != nullptr ? *sampled : q->elements;
+  out = (idx < elements.size()) ? elements[idx]
+                                : NonexistentQueueElement(q, arena);
   return true;
 }
 

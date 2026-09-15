@@ -6,3 +6,7 @@ v sampled 100 at 45 is true
 v sampled 100 at 55 is true
 q[0] == 5 held at 2 of 6 ticks, the tick in whose time step q was emptied among them
 $finish at time 57
+[25] ERROR assertion_boolean_expressions.q_head (line 22): Assertion failed.
+[35] ERROR assertion_boolean_expressions.q_head (line 22): Assertion failed.
+[45] ERROR assertion_boolean_expressions.q_head (line 22): Assertion failed.
+[55] ERROR assertion_boolean_expressions.q_head (line 22): Assertion failed.

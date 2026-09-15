@@ -1,9 +1,13 @@
 #include "simulator/sva_engine_sampling.h"
 
+#include <cstddef>
 #include <cstdint>
+#include <utility>
+#include <vector>
 
 #include "common/arena.h"
 #include "common/types.h"
+#include "simulator/sim_context_types.h"
 #include "simulator/variable.h"
 
 namespace delta {
@@ -225,10 +229,40 @@ void AssertionSampleStore::Register(const Variable* var, Arena& arena) {
   entries_.emplace(var, entry);
 }
 
+static void CopyQueueSample(const std::vector<Logic4Vec>& src,
+                            std::vector<Logic4Vec>& dst, Arena& arena) {
+  dst.resize(src.size());
+  for (size_t i = 0; i < src.size(); ++i) CopySample(src[i], dst[i], arena);
+}
+
+void AssertionSampleStore::RegisterQueue(const QueueObject* queue,
+                                         Arena& arena) {
+  if (queue == nullptr || queue_entries_.count(queue) != 0) return;
+  QueueEntry entry;
+  CopyQueueSample(queue->elements, entry.default_elements, arena);
+  CopyQueueSample(queue->elements, entry.preponed_elements, arena);
+  queue_entries_.emplace(queue, std::move(entry));
+}
+
 void AssertionSampleStore::Refill(Arena& arena) {
   for (auto& [var, entry] : entries_) {
     CopySample(var->value, entry.preponed_value, arena);
   }
+  for (auto& [queue, entry] : queue_entries_) {
+    CopyQueueSample(queue->elements, entry.preponed_elements, arena);
+  }
+}
+
+const std::vector<Logic4Vec>* AssertionSampleStore::ReadQueueWithinProperty(
+    const QueueObject* queue, SimTime t) const {
+  if (!evaluating_property_) return nullptr;
+  auto it = queue_entries_.find(queue);
+  if (it == queue_entries_.end()) return nullptr;
+  // The same split as Read: the default sampled elements at time 0, and the
+  // Preponed ones in every later time slot.
+  SampledValue decision = SampleStaticVariable(0, t, 0);
+  return decision.mode == SampleMode::kDefault ? &it->second.default_elements
+                                               : &it->second.preponed_elements;
 }
 
 const Logic4Vec* AssertionSampleStore::Read(const Variable* var,

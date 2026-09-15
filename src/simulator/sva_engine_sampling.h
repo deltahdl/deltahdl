@@ -12,6 +12,7 @@ namespace delta {
 
 class Arena;
 struct Expr;
+struct QueueObject;
 struct Variable;
 
 enum class AssertionKind : uint8_t {
@@ -217,9 +218,30 @@ class AssertionSampleStore {
   // Enrolling the same variable twice keeps the first default.
   void Register(const Variable* var, Arena& arena);
 
-  // Copies every enrolled variable's value. Call at the end of a time slot,
-  // where §4.4.2.1 makes the copy the next slot's Preponed value.
+  // §16.6: "Elements of dynamic arrays, queues, and associative arrays that
+  // are sampled for assertion expression evaluation may get removed from the
+  // array or the array may get resized before the assertion expression is
+  // evaluated. These specific array elements sampled for assertion expression
+  // evaluation shall continue to exist within the scope of the assertion until
+  // the assertion expression evaluation completes." A queue a property reads
+  // an element of is enrolled whole, its elements at the moment of the call
+  // being their default sampled values, and Refill copies them as it copies
+  // a variable's value, so a select made while the property is evaluated reads
+  // the element the queue held in the Preponed region whatever the queue holds
+  // now.
+  void RegisterQueue(const QueueObject* queue, Arena& arena);
+
+  // Copies every enrolled variable's value and every enrolled queue's
+  // elements. Call at the end of a time slot, where §4.4.2.1 makes the copy
+  // the next slot's Preponed value.
   void Refill(Arena& arena);
+
+  // The elements §16.5.1 samples for `queue` in the time slot at `t` where a
+  // concurrent assertion's property is what is being evaluated, and nullptr
+  // everywhere else and for a queue no such property reads, so a select
+  // consults it and reads the live elements whenever it answers nothing.
+  const std::vector<Logic4Vec>* ReadQueueWithinProperty(
+      const QueueObject* queue, SimTime t) const;
 
   // §16.5.1's sampled value of `var` in the time slot at `t`, or nullptr where
   // `var` was never enrolled.
@@ -281,7 +303,13 @@ class AssertionSampleStore {
     Logic4Vec preponed_value;
   };
 
+  struct QueueEntry {
+    std::vector<Logic4Vec> default_elements;
+    std::vector<Logic4Vec> preponed_elements;
+  };
+
   std::unordered_map<const Variable*, Entry> entries_;
+  std::unordered_map<const QueueObject*, QueueEntry> queue_entries_;
   // Most recent first, so entry 0 is the previous tick's value -- $past's
   // default of one tick back.
   std::unordered_map<const Expr*, std::vector<Logic4Vec>> tick_history_;

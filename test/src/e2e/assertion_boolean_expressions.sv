@@ -4,7 +4,9 @@
 // variables, an element of a queue sampled for the evaluation continuing to
 // exist for it though the queue is emptied before the evaluation runs. v takes
 // x, z, 0, 2 and 4 between the ticks at 5, 15, 25, 35, 45 and 55; q holds 5
-// from time zero and is emptied in the time step of the tick at 15.
+// from time zero and is emptied in the time step of the tick at 15, so q_head
+// holds at the first two ticks and, having no else, draws §16.14.1's default
+// $error at each of the four after.
 module assertion_boolean_expressions;
   logic clk = 0;
   logic [2:0] v;
