@@ -211,6 +211,12 @@ Expr* Parser::ParseInfixBp(Expr* lhs, int min_bp) {
 
     auto [lbp, rbp] = InfixBp(tok.kind);
     if (lbp < 0 || lbp < min_bp) break;
+    // §16.12.7: inside a sequence body an implication operator ends the
+    // operand, the antecedent, rather than joining it to the consequent.
+    if (in_sequence_body_ && (tok.kind == TokenKind::kPipeDashGt ||
+                              tok.kind == TokenKind::kPipeEqGt)) {
+      break;
+    }
 
     auto op = Consume();
     ParseAttributes();

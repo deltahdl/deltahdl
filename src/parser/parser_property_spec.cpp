@@ -8,11 +8,10 @@
 namespace delta {
 
 // §16.12: the tokens of the property operators the evaluation does not read,
-// an implication or followed-by among them; not, or and and are read.
+// a followed-by among them; not, or, and, if-else and the implications are
+// read.
 static bool IsPropertyOperatorToken(TokenKind k) {
   switch (k) {
-    case TokenKind::kPipeDashGt:
-    case TokenKind::kPipeEqGt:
     case TokenKind::kHashMinusHash:
     case TokenKind::kHashEqHash:
     case TokenKind::kKwNexttime:
@@ -134,13 +133,16 @@ bool ParserPropertySpecHelpers::AheadHolds(Parser& p, TokenKind wanted,
   return found;
 }
 
-// Whether the spec holds an `or` or an `and` at its own depth, which makes
-// it a property built of operands (§16.12.4, §16.12.5) rather than one
-// operand; a sequence's own `or` and `and` read the same, which §16.12.2's
-// strength rules make the same property.
+// Whether the spec holds an `or` or an `and` at its own depth, or an
+// implication, which makes it a property built of operands (§16.12.4,
+// §16.12.5, §16.12.7) rather than one operand; a sequence's own `or` and
+// `and` read the same, which §16.12.2's strength rules make the same
+// property.
 bool ParserPropertySpecHelpers::BodyHasPropertyJunction(Parser& p) {
   return AheadHolds(p, TokenKind::kKwOr, false) ||
-         AheadHolds(p, TokenKind::kKwAnd, false);
+         AheadHolds(p, TokenKind::kKwAnd, false) ||
+         AheadHolds(p, TokenKind::kPipeDashGt, false) ||
+         AheadHolds(p, TokenKind::kPipeEqGt, false);
 }
 
 PropertyExprNode* ParserPropertySpecHelpers::NewPropertyNode(
@@ -165,7 +167,7 @@ PropertyExprNode* ParserPropertySpecHelpers::TryParsePropertyGroup(
     return nullptr;
   }
   group = true;
-  auto* inner = ParsePropertyOr(p);
+  auto* inner = ParsePropertyImplication(p);
   if (inner != nullptr && p.Match(TokenKind::kRParen)) return inner;
   return nullptr;
 }
@@ -180,11 +182,11 @@ PropertyExprNode* ParserPropertySpecHelpers::ParsePropertyIfElse(Parser& p) {
   if (node->boolean == nullptr || !p.Match(TokenKind::kRParen)) {
     return nullptr;
   }
-  auto* then_branch = ParsePropertyOr(p);
+  auto* then_branch = ParsePropertyImplication(p);
   if (then_branch == nullptr) return nullptr;
   node->operands.push_back(then_branch);
   if (p.Match(TokenKind::kKwElse)) {
-    auto* else_branch = ParsePropertyOr(p);
+    auto* else_branch = ParsePropertyImplication(p);
     if (else_branch == nullptr) return nullptr;
     node->operands.push_back(else_branch);
   }
@@ -235,6 +237,30 @@ PropertyExprNode* ParserPropertySpecHelpers::ParsePropertyAnd(Parser& p) {
   return node;
 }
 
+// §16.12.7: `sequence_expr |-> property_expr` and `sequence_expr |=>
+// property_expr`, the antecedent a sequence read to the operator and the
+// consequent any property, the operator right associative and, in Table
+// 16-3, above if-else alone; a spec without an implication is its or.
+PropertyExprNode* ParserPropertySpecHelpers::ParsePropertyImplication(
+    Parser& p) {
+  auto saved = p.lexer_.SavePos();
+  auto* node = NewPropertyNode(p, PropertyExprNode::Kind::kImplication);
+  bool strong = false;
+  node->sequence = TryParseSequenceSpec(p, strong, true);
+  bool overlapped = p.Check(TokenKind::kPipeDashGt);
+  if (node->sequence == nullptr || strong ||
+      (!overlapped && !p.Check(TokenKind::kPipeEqGt))) {
+    p.lexer_.RestorePos(saved);
+    return ParsePropertyOr(p);
+  }
+  p.Consume();
+  node->strong = !overlapped;
+  auto* consequent = ParsePropertyImplication(p);
+  if (consequent == nullptr) return nullptr;
+  node->operands.push_back(consequent);
+  return node;
+}
+
 PropertyExprNode* ParserPropertySpecHelpers::ParsePropertyOr(Parser& p) {
   auto* left = ParsePropertyAnd(p);
   if (left == nullptr || !p.Check(TokenKind::kKwOr)) return left;
@@ -262,7 +288,7 @@ bool ParserPropertySpecHelpers::ParseSimpleSpecBody(Parser& p,
   // read with the operands; a spec opening with `if` is a property of
   // operands as well.
   if (BodyHasPropertyJunction(p) || p.Check(TokenKind::kKwIf)) {
-    body.property = ParsePropertyOr(p);
+    body.property = ParsePropertyImplication(p);
     return body.property != nullptr;
   }
   // §16.12.3: each `not` before the body negates it once more.

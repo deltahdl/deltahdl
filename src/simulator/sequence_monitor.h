@@ -31,7 +31,10 @@ SimCoroutine MakeSequenceMonitorCoroutine(LinearSequence body,
 // tick, can no longer match, or is still in flight.
 struct LinearSequenceAttempt;
 
-enum class SequenceStep : uint8_t { kPending, kMatched, kFailed };
+// kMatched says the attempt matched at the tick and may match again, and
+// kMatchedLast that it matched with no attempt of the sequence left in
+// flight.
+enum class SequenceStep : uint8_t { kPending, kMatched, kMatchedLast, kFailed };
 
 LinearSequenceAttempt* NewSequenceAttempt(const LinearSequence& body,
                                           Arena& arena);

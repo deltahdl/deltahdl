@@ -58,7 +58,7 @@ TEST(ConcurrentAssertionEvaluationReporting,
      ATemporalAssumePropertyIsNotEvaluated) {
   auto r = Parse(
       "module m;\n"
-      "  assume property (@(posedge clk) a |-> b);\n"
+      "  assume property (@(posedge clk) always (a ##1 b));\n"
       "endmodule\n");
   EXPECT_TRUE(ReportedWarning(r.diags, "its property is temporal", 2, "16.14"));
 }
@@ -114,28 +114,26 @@ TEST(ConcurrentAssertionEvaluationReporting,
   EXPECT_EQ(UnevaluatedReports(r), 0);
 }
 
-// §16.12.6: |-> is the overlapped implication operator, so the property is
-// temporal rather than the sampled boolean deltahdl evaluates. #2924 and #2927
-// cover the operators.
-TEST(ConcurrentAssertionEvaluationReporting,
-     OverlappedImplicationIsNotEvaluated) {
-  auto r = Parse(
+// §16.12.7: |-> and |=> are the implication operators, which the evaluation
+// reads as a property of operands, so neither spec is reported. `always` over
+// a cycle delay, an operator it does not read, is still the temporal branch's.
+TEST(ConcurrentAssertionEvaluationReporting, ImplicationsAreEvaluated) {
+  auto overlapped = Parse(
       "module m;\n"
       "  assert property (@(posedge clk) a |-> b);\n"
       "endmodule\n");
-  EXPECT_TRUE(ReportedWarning(r.diags, "its property is temporal", 2, "16.14"));
-}
-
-// §16.12.6: |=> is the nonoverlapped implication operator. It reaches the same
-// branch as |-> by its own route through Parser::BodyHasTemporalOperator, so it
-// takes its own case.
-TEST(ConcurrentAssertionEvaluationReporting,
-     NonoverlappedImplicationIsNotEvaluated) {
-  auto r = Parse(
+  EXPECT_EQ(UnevaluatedReports(overlapped), 0);
+  auto nonoverlapped = Parse(
       "module m;\n"
       "  assert property (@(posedge clk) a |=> b);\n"
       "endmodule\n");
-  EXPECT_TRUE(ReportedWarning(r.diags, "its property is temporal", 2, "16.14"));
+  EXPECT_EQ(UnevaluatedReports(nonoverlapped), 0);
+  auto under = Parse(
+      "module m;\n"
+      "  assert property (@(posedge clk) always (a ##1 b));\n"
+      "endmodule\n");
+  EXPECT_TRUE(
+      ReportedWarning(under.diags, "its property is temporal", 2, "16.14"));
 }
 
 // §16.7: ## is the cycle delay range, and §16.12.2 has a sequence_expr be a

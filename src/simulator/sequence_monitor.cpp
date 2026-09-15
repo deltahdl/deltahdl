@@ -700,11 +700,13 @@ LinearSequenceAttempt* NewSequenceAttempt(const LinearSequence& body,
 SequenceStep StepSequenceAttempt(const LinearSequence& body,
                                  LinearSequenceAttempt& attempt, bool begin,
                                  SimContext& ctx, Arena& arena) {
-  if (AdvanceFirstMatchAttempt(body, attempt.attempt, begin, ctx, arena)) {
-    return SequenceStep::kMatched;
+  bool matched =
+      AdvanceFirstMatchAttempt(body, attempt.attempt, begin, ctx, arena);
+  bool spent = FirstMatchAttemptIsSpent(attempt.attempt);
+  if (matched) {
+    return spent ? SequenceStep::kMatchedLast : SequenceStep::kMatched;
   }
-  if (FirstMatchAttemptIsSpent(attempt.attempt)) return SequenceStep::kFailed;
-  return SequenceStep::kPending;
+  return spent ? SequenceStep::kFailed : SequenceStep::kPending;
 }
 
 // §16.12.2: one evaluation attempt of a sequential property is one attempt

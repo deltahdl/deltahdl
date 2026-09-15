@@ -1,0 +1,8 @@
+req |-> gnt passes 3 fails 1
+req |=> gnt passes 1 fails 2 at ticks
+(req ##[1:2] ack) |-> done passes 3 fails 0 at ticks
+(req ##[1:2] ack) |-> late passes 1 fails 2 at ticks
+$finish at time 40
+req |=> gnt passes at the end of the run
+(req ##[1:2] ack) |-> done passes at the end of the run
+(req ##[1:2] ack) |-> late passes at the end of the run
