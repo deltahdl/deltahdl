@@ -219,8 +219,8 @@ struct AndAttempt {
   std::vector<bool> matched;
 };
 
-const LinearSequence& ChainOf(const LinearSequence& body, size_t i) {
-  return i == 0 ? body : body.conjuncts[i - 1];
+const LinearSequence* ChainOf(const LinearSequence& body, size_t i) {
+  return i == 0 ? &body : &body.conjuncts[i - 1];
 }
 
 // Advances one and-attempt over every chain at this tick, the chains' own
@@ -231,7 +231,7 @@ bool AdvanceAndAttempt(const LinearSequence& body, AndAttempt& attempt,
   bool matched_now = false;
   bool all_matched = true;
   for (size_t i = 0; i < attempt.active.size(); ++i) {
-    if (AdvanceLinearAttempts(ChainOf(body, i), attempt.active[i], ctx, arena,
+    if (AdvanceLinearAttempts(*ChainOf(body, i), attempt.active[i], ctx, arena,
                               begin)) {
       matched_now = true;
       attempt.matched[i] = true;
