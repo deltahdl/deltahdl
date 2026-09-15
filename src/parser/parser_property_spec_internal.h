@@ -34,6 +34,8 @@ struct ParserPropertySpecHelpers {
   static ModuleItem* TryParseSequenceSpec(Parser& p, bool& strong, bool term);
   static bool AheadHolds(Parser& p, TokenKind wanted, bool to_junction);
   static bool BodyHasPropertyJunction(Parser& p);
+  static bool AheadOpensKeywordTerm(Parser& p);
+  static bool AheadHoldsRepetition(Parser& p);
   static PropertyExprNode* NewPropertyNode(Parser& p,
                                            PropertyExprNode::Kind kind);
   static PropertyExprNode* TryParsePropertyGroup(Parser& p, bool& group);

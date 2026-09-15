@@ -38,7 +38,7 @@ static bool OpensKeywordTerm(TokenKind k) {
 // Whether the tokens ahead, past any `not` and any opening parenthesis,
 // open an operand a keyword reads, so the spec is a property of operands
 // whether or not a junction joins them. The lexer is rewound.
-static bool AheadOpensKeywordTerm(Parser& p) {
+bool ParserPropertySpecHelpers::AheadOpensKeywordTerm(Parser& p) {
   auto saved = p.lexer_.SavePos();
   while (p.Check(TokenKind::kKwNot) || p.Check(TokenKind::kLParen)) {
     p.Consume();
@@ -52,7 +52,7 @@ static bool AheadOpensKeywordTerm(Parser& p) {
 // first `or` or `and` at the spec's own depth, hold §16.9.2's repetition,
 // `[*`, `[->`, `[=` or `[+`, which makes the operand a sequence where no
 // `##` does. The lexer is rewound.
-static bool AheadHoldsRepetition(Parser& p) {
+bool ParserPropertySpecHelpers::AheadHoldsRepetition(Parser& p) {
   auto scan = p.lexer_.SavePos();
   int depth = 0;
   bool found = false;
