@@ -259,6 +259,8 @@ class Parser {
   Expr* MakeConstraintAnd(Expr* lhs, Expr* rhs);
   Expr* MakeConstraintNot(Expr* operand);
   void CaptureLinearSequenceBody(ModuleItem* item);
+  bool AtSelectBracket();
+  bool in_sequence_body_ = false;
   // §16.12.1: the clocked boolean body of a named property, kept so an
   // instance of the property can be evaluated as an assertion in that form.
   void CaptureClockedBooleanPropertyBody(ModuleItem* item);

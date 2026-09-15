@@ -272,7 +272,34 @@ struct InstanceOperand {
   const ModuleItem* inner;
   const Expr* instance;
   SeqCycleDelay before;
+  SeqRepetition repetition;
 };
+
+// §16.9.2: consecutive repetition of an instance by an exact count, unrolled
+// as the parser unrolls a group's, the operands from `first` on appended
+// again `count - 1` times with the copy's first operand a tick after the
+// last. A range or an unbounded count on an instance is not read.
+bool UnrollInstanceRepetition(LinearSequence& out, size_t first,
+                              const SeqRepetition& rep) {
+  if (rep.kind == SeqRepetition::Kind::kNone) return true;
+  if (rep.kind != SeqRepetition::Kind::kConsecutive) return false;
+  if (rep.min != rep.max || rep.min == 0) return false;
+  size_t n = out.operands.size() - first;
+  for (uint32_t k = 1; k < rep.min; ++k) {
+    for (size_t i = 0; i < n; ++i) {
+      out.operands.push_back(out.operands[first + i]);
+      SeqCycleDelay delay = out.delays[first + i];
+      if (i == 0) {
+        delay.min = 1;
+        delay.max = 1;
+      }
+      out.delays.push_back(delay);
+      out.match_items.push_back(out.match_items[first + i]);
+      out.repetitions.push_back(out.repetitions[first + i]);
+    }
+  }
+  return true;
+}
 
 // §16.8.2: the local variable formal arguments of `decl`, each with its
 // direction, in the order of the formals. The directions the port scan keeps
@@ -419,11 +446,12 @@ bool ExpandInstance(const InstanceOperand& op, SimContext& ctx, Arena& arena,
     out.delays.push_back(j == 0 ? AddDelays(op.before, delay) : delay);
     out.match_items.push_back(
         SubstituteMatchItems(body.match_items[j], actuals, arena));
+    out.repetitions.push_back(body.repetitions[j]);
   }
   if (out.operands.size() == first) return true;
   AddLocalFormalAssignments(formals, out.match_items[first],
                             out.match_items.back(), arena);
-  return true;
+  return UnrollInstanceRepetition(out, first, op.repetition);
 }
 
 bool FlattenChain(const SeqLinearBody& body, SimContext& ctx, Arena& arena,
@@ -476,8 +504,9 @@ bool FlattenChain(const SeqLinearBody& body, SimContext& ctx, Arena& arena,
       out.operands.push_back(operand);
       out.delays.push_back(before);
       out.match_items.push_back(body.match_items[i]);
-    } else if (!ExpandInstance({inner, operand, before}, ctx, arena, out,
-                               depth)) {
+      out.repetitions.push_back(body.repetitions[i]);
+    } else if (!ExpandInstance({inner, operand, before, body.repetitions[i]},
+                               ctx, arena, out, depth)) {
       return false;
     }
   }

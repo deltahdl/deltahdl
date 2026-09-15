@@ -333,6 +333,17 @@ struct SeqLocalDecl {
   Expr* init = nullptr;
 };
 
+// §16.9.2: the repetition written after an operand of a linear body: none,
+// consecutive `[*min:max]` on a Boolean or a group, goto `[->min:max]` or
+// nonconsecutive `[=min:max]` on a Boolean, the count an exact `[*n]` being
+// [n:n], `[*]` [0:$] and `[+]` [1:$], `$` kept as SeqCycleDelay::kUnbounded.
+struct SeqRepetition {
+  enum class Kind : uint8_t { kNone, kConsecutive, kGoto, kNonconsecutive };
+  Kind kind = Kind::kNone;
+  uint32_t min = 1;
+  uint32_t max = 1;
+};
+
 // §16.13.6/§9.4.4: the linear form of a sequence body, `[##d0] b0 ##d1 b1
 // ... ##dn bn` (each bi a Boolean, each di one of §16.7's cycle_delay_range
 // forms, each operand carrying the §16.10 match items written with it), which
@@ -343,6 +354,8 @@ struct SeqLinearBody {
   std::vector<Expr*> operands;
   std::vector<SeqCycleDelay> delays;
   std::vector<std::vector<SeqMatchAssign>> match_items;
+  // §16.9.2: the repetition each operand carries, parallel to the operands.
+  std::vector<SeqRepetition> repetitions;
   std::vector<SeqLocalDecl> locals;
   // §16.9.5: the other operands of an `and` this chain is the first operand
   // of, each a chain of its own that must match from the same tick, the

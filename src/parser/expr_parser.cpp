@@ -320,7 +320,7 @@ Expr* Parser::ParseThisOrSuperExpr() {
     }
   }
   if (Check(TokenKind::kLParen)) result = ParseCallExpr(result);
-  if (Check(TokenKind::kLBracket)) result = ParseSelectExpr(result);
+  if (AtSelectBracket()) result = ParseSelectExpr(result);
   return ParseWithClause(result);
 }
 
@@ -490,7 +490,7 @@ Expr* Parser::ParseCastOrTypedPattern() {
   // first alone. Parser::ParseIdentifierPostfixChain already loops this way for
   // a name base, which is why `word_t [3:0][7:0]` parses and, until this loop,
   // `logic [3:0][7:0]` left its second range for the caller to trip over.
-  while (Check(TokenKind::kLBracket)) id = ParseSelectExpr(id);
+  while (AtSelectBracket()) id = ParseSelectExpr(id);
   return id;
 }
 
@@ -875,6 +875,21 @@ ClassMember* Parser::CaptureInlineConstraintBlock() {
   block->kind = ClassMemberKind::kConstraint;
   ScanConstraintBodyRelations(block);
   return block;
+}
+
+// §16.9.2: in a sequence body a `[` after an operand may open a repetition,
+// `[*`, `[->`, `[=` or `[+]`, rather than a select; while the linear capture
+// reads such a body, an expression stops before one, leaving it to the
+// capture, and everywhere else a `[` is the select it has always been.
+bool Parser::AtSelectBracket() {
+  if (!Check(TokenKind::kLBracket)) return false;
+  if (!in_sequence_body_) return true;
+  auto saved = lexer_.SavePos();
+  Consume();
+  bool repetition = Check(TokenKind::kStar) || Check(TokenKind::kArrow) ||
+                    Check(TokenKind::kEq) || Check(TokenKind::kPlus);
+  lexer_.RestorePos(saved);
+  return !repetition;
 }
 
 Expr* Parser::ParseSelectExpr(Expr* base) {

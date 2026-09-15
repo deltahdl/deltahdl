@@ -1,0 +1,8 @@
+a ##1 b[*3] ##1 c ends at 55
+a ##1 b[*1:$] ##1 c ends at 55
+a[*0:3] ##1 b ##1 c ends at 55
+a ##1 b[->2:10] ##1 c ends at 55
+a ##1 b[=2:10] ##1 c ends at 55 155
+a ##3 (b[*3]) ends at 365
+(a ##2 b)[*3] ends at 295
+$finish at time 390

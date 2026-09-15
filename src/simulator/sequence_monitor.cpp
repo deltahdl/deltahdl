@@ -30,6 +30,12 @@ struct LinearAttempt {
   size_t pos;
   uint32_t waited;
   std::vector<Logic4Vec> locals;
+  // §16.9.2: inside a repetition of the operand at pos, the iterations
+  // matched so far; `repeating` once the attempt has arrived at a repeated
+  // operand, after which it is kept from tick to tick by the repetition's
+  // own rules rather than the operand's delay range.
+  uint32_t count = 0;
+  bool repeating = false;
 };
 
 // §16.10 and §6.8: the width and state of a local declared with a data type
@@ -158,7 +164,10 @@ void CarryAttempt(LinearAttempt attempt, const SeqCycleDelay& delay,
   // locals, an attempt's locals being its own.
   if (attempt.locals.empty()) {
     for (const auto& kept : carry) {
-      if (kept.pos == attempt.pos && kept.waited == attempt.waited) return;
+      if (kept.pos == attempt.pos && kept.waited == attempt.waited &&
+          kept.count == attempt.count && kept.repeating == attempt.repeating) {
+        return;
+      }
     }
   }
   carry.push_back(std::move(attempt));
@@ -171,6 +180,108 @@ void CarryAttempt(LinearAttempt attempt, const SeqCycleDelay& delay,
 // before it checked at this same tick as §16.7 has the concatenation with a
 // delay of 0 overlap; and whether or not it holds, the attempt stays for the
 // later ticks of its range. Reports whether any attempt matched at this tick.
+// The attempts one tick of an attempt gives rise to: the ones to read again
+// at this tick, at the operand after a match with a delay of 0 to it, the ones
+// kept for the next tick, and whether the sequence matched at this tick.
+struct TickOutcome {
+  std::vector<LinearAttempt>& pending;
+  std::vector<LinearAttempt>& carry;
+  bool matched = false;
+};
+
+// The attempt's operand has matched at this tick: the sequence ends here where
+// it was the last, and otherwise an attempt at the next operand begins its
+// wait here with the locals as written.
+void EndOperand(const LinearSequence& body, LinearAttempt& advanced,
+                TickOutcome& out) {
+  if (advanced.pos + 1 == body.operands.size()) {
+    out.matched = true;
+    return;
+  }
+  out.pending.push_back({advanced.pos + 1, 0, advanced.locals});
+}
+
+// §16.9.2 consecutive repetition `b[*min:max]`: the operand matches at
+// consecutive ticks, the repetition ending at the last; the whole may end
+// after any number of matches from min to max, and a further match is read
+// at the very next tick while fewer than max have been.
+void StepConsecutive(const LinearSequence& body, LinearAttempt& attempt,
+                     const SeqRepetition& rep, TickOutcome& out,
+                     SimContext& ctx, Arena& arena) {
+  LinearAttempt advanced = attempt;
+  if (!EvalOperand(body, advanced, ctx, arena)) return;
+  advanced.count = attempt.count + 1;
+  if (advanced.count >= rep.min) EndOperand(body, advanced, out);
+  if (advanced.count < rep.max) {
+    advanced.waited = 0;
+    advanced.repeating = true;
+    out.carry.push_back(std::move(advanced));
+  }
+}
+
+// §16.9.2 goto `b[->min:max]` and nonconsecutive `b[=min:max]` repetition:
+// the operand matches at ticks that need not be consecutive, the whole ending
+// at the last match after min to max of them, or, for the nonconsecutive
+// form, at any later tick the operand does not hold at, before any further
+// match.
+void StepNonconsecutive(const LinearSequence& body, LinearAttempt& attempt,
+                        const SeqRepetition& rep, TickOutcome& out,
+                        SimContext& ctx, Arena& arena) {
+  LinearAttempt advanced = attempt;
+  bool holds = EvalOperand(body, advanced, ctx, arena);
+  bool extends = rep.kind == SeqRepetition::Kind::kNonconsecutive;
+  if (holds) {
+    advanced.count = attempt.count + 1;
+    if (advanced.count > rep.max) return;
+    if (advanced.count >= rep.min) EndOperand(body, advanced, out);
+    if (advanced.count == rep.max && !extends) return;
+  } else {
+    advanced.count = attempt.count;
+    if (extends && attempt.count >= rep.min) EndOperand(body, advanced, out);
+  }
+  advanced.waited = 0;
+  advanced.repeating = true;
+  out.carry.push_back(std::move(advanced));
+}
+
+// One attempt at this tick. An attempt inside a repetition steps by the
+// repetition's rules; one arriving at its operand within the delay range
+// reads it, a repeated operand beginning its repetition, an empty consecutive
+// repetition also letting the attempt pass on as §16.9.2.1 has `empty ##n
+// seq` be `##(n-1) seq`; and an attempt still inside its delay range is kept
+// for the next tick.
+void StepAttempt(const LinearSequence& body, LinearAttempt attempt,
+                 TickOutcome& out, SimContext& ctx, Arena& arena) {
+  const SeqCycleDelay& delay = body.delays[attempt.pos];
+  const SeqRepetition& rep = body.repetitions[attempt.pos];
+  bool consecutive = rep.kind == SeqRepetition::Kind::kConsecutive;
+  if (attempt.repeating) {
+    if (consecutive) {
+      StepConsecutive(body, attempt, rep, out, ctx, arena);
+    } else {
+      StepNonconsecutive(body, attempt, rep, out, ctx, arena);
+    }
+    return;
+  }
+  if (WithinDelay(delay, attempt.waited)) {
+    if (rep.kind == SeqRepetition::Kind::kNone) {
+      LinearAttempt advanced = attempt;
+      if (EvalOperand(body, advanced, ctx, arena)) {
+        EndOperand(body, advanced, out);
+      }
+    } else if (consecutive) {
+      if (rep.min == 0 && attempt.pos + 1 < body.operands.size()) {
+        out.pending.push_back({attempt.pos + 1, 1, attempt.locals});
+      }
+      StepConsecutive(body, attempt, rep, out, ctx, arena);
+    } else {
+      StepNonconsecutive(body, attempt, rep, out, ctx, arena);
+      return;
+    }
+  }
+  CarryAttempt(std::move(attempt), delay, out.carry);
+}
+
 bool AdvanceLinearAttempts(const LinearSequence& body,
                            std::vector<LinearAttempt>& active, SimContext& ctx,
                            Arena& arena, bool begin_attempt) {
@@ -185,27 +296,14 @@ bool AdvanceLinearAttempts(const LinearSequence& body,
     pending.push_back({0, 0, InitialLocals(body.locals, ctx, arena)});
   }
   std::vector<LinearAttempt> carry;
-  bool matched = false;
+  TickOutcome out{pending, carry};
   while (!pending.empty()) {
     LinearAttempt attempt = std::move(pending.back());
     pending.pop_back();
-    const SeqCycleDelay& delay = body.delays[attempt.pos];
-    // The operand reads and writes the attempt's locals, so an attempt that
-    // goes on to the next operand carries the values as written, and the one
-    // kept for the later ticks of the range carries the values as they stood.
-    LinearAttempt advanced = attempt;
-    if (WithinDelay(delay, attempt.waited) &&
-        EvalOperand(body, advanced, ctx, arena)) {
-      if (advanced.pos + 1 == body.operands.size()) {
-        matched = true;
-      } else {
-        pending.push_back({advanced.pos + 1, 0, std::move(advanced.locals)});
-      }
-    }
-    CarryAttempt(std::move(attempt), delay, carry);
+    StepAttempt(body, std::move(attempt), out, ctx, arena);
   }
   active = std::move(carry);
-  return matched;
+  return out.matched;
 }
 
 // §16.9.5: one attempt of `s1 and s2 ...`, begun at one tick: the attempts

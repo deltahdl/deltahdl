@@ -21,7 +21,7 @@ Expr* Parser::ParseSysRootTail(Expr* expr) {
   while (Check(TokenKind::kDot) || Check(TokenKind::kColonColon)) {
     expr = MakeMemberAccess(expr);
   }
-  if (Check(TokenKind::kLBracket)) expr = ParseSelectExpr(expr);
+  if (AtSelectBracket()) expr = ParseSelectExpr(expr);
   return expr;
 }
 
@@ -86,7 +86,7 @@ Expr* Parser::ParseSystemCall() {
   call->callee = tok.text;
   call->range.start = tok.loc;
   if (!Match(TokenKind::kLParen)) {
-    if (Check(TokenKind::kLBracket)) return ParseSelectExpr(call);
+    if (AtSelectBracket()) return ParseSelectExpr(call);
     return call;
   }
 
@@ -94,7 +94,7 @@ Expr* Parser::ParseSystemCall() {
     ParseSysCallArgs(call);
   }
   Expect(TokenKind::kRParen, Subclause("13.5"));
-  if (Check(TokenKind::kLBracket)) return ParseSelectExpr(call);
+  if (AtSelectBracket()) return ParseSelectExpr(call);
   return call;
 }
 
@@ -132,7 +132,7 @@ Expr* Parser::ParseConcatenation() {
     Expect(TokenKind::kRBrace, Subclause("11.4.12.1"));
     Expect(TokenKind::kRBrace, Subclause("11.4.12.1"));
 
-    if (Check(TokenKind::kLBracket)) return ParseSelectExpr(rep);
+    if (AtSelectBracket()) return ParseSelectExpr(rep);
     return rep;
   }
 
@@ -145,7 +145,7 @@ Expr* Parser::ParseConcatenation() {
   }
   Expect(TokenKind::kRBrace, Subclause("11.4.12"));
 
-  if (Check(TokenKind::kLBracket)) return ParseSelectExpr(cat);
+  if (AtSelectBracket()) return ParseSelectExpr(cat);
   return cat;
 }
 

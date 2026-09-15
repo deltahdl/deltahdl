@@ -22,6 +22,8 @@ struct LinearSequence {
   // and, under names of their own, the local variable formal arguments of
   // the instances (§16.8.2).
   std::vector<std::vector<SeqMatchAssign>> match_items;
+  // §16.9.2: the repetition each operand carries, parallel to the operands.
+  std::vector<SeqRepetition> repetitions;
   std::vector<SeqLocalDecl> locals;
   std::vector<EventExpr> clock;
   // §16.9.5: the flattened forms of the other operands of the `and` this

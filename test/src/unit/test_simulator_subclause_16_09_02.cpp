@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -12,6 +13,7 @@
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/sva_engine.h"
+#include "simulator/variable.h"
 
 using namespace delta;
 
@@ -202,6 +204,174 @@ TEST(SvaEngine, NonConsecutiveRepetitionAllowsTrailingNonMatch) {
 
   // Too few matches of b still fails the count.
   EXPECT_FALSE(MatchNonConsecutiveRepetition(seq, {1, 0, 0}));
+}
+
+// --- Live cases: the linear sequence monitor over real source ---
+
+// The source the cases share: clk rises at 5, 15, 25, ...; `drive` writes a,
+// b and c between the ticks; and a process counts the ticks at which the named
+// sequence `rule`, whose body is `body`, reaches its end point, keeping the
+// last such time.
+std::string RepetitionSource(const std::string& body,
+                             const std::string& drive) {
+  return "module t;\n"
+         "  logic clk = 0;\n"
+         "  logic a = 0;\n"
+         "  logic b = 0;\n"
+         "  logic c = 0;\n"
+         "  int hits = 0;\n"
+         "  int last = 0;\n"
+         "  always #5 clk = ~clk;\n"
+         "  sequence rule;\n"
+         "    @(posedge clk) " +
+         body +
+         ";\n"
+         "  endsequence\n"
+         "  initial begin\n" +
+         drive +
+         "    #40 $finish;\n"
+         "  end\n"
+         "  initial forever begin\n"
+         "    wait (rule.triggered);\n"
+         "    hits = hits + 1;\n"
+         "    last = $time;\n"
+         "    @(posedge clk);\n"
+         "  end\n"
+         "endmodule\n";
+}
+
+// a for the tick at 15, b for the ticks at 25, 35 and 45, c for the tick at
+// 55.
+const char* const kThreeBs =
+    "    #10 a = 1;\n"
+    "    #10 a = 0; b = 1;\n"
+    "    #30 b = 0; c = 1;\n"
+    "    #10 c = 0;\n";
+
+// §16.9.2: `b[*3]` is three consecutive matches of b, so `a ##1 b[*3] ##1 c`
+// is `a ##1 b ##1 b ##1 b ##1 c`, ending at 55 over the three b's; with b at
+// two ticks alone it does not end.
+TEST(SequenceRepetition, ConsecutiveRepetitionByExactCount) {
+  SimFixture f;
+  auto* hits =
+      RunAndFindVar(RepetitionSource("a ##1 b[*3] ##1 c", kThreeBs), f, "hits");
+  ASSERT_NE(hits, nullptr);
+  EXPECT_EQ(hits->value.ToUint64(), 1u);
+  EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 55u);
+  SimFixture g;
+  auto* none = RunAndFindVar(RepetitionSource("a ##1 b[*3] ##1 c",
+                                              "    #10 a = 1;\n"
+                                              "    #10 a = 0; b = 1;\n"
+                                              "    #20 b = 0; c = 1;\n"
+                                              "    #10 c = 0;\n"),
+                             g, "hits");
+  ASSERT_NE(none, nullptr);
+  EXPECT_EQ(none->value.ToUint64(), 0u);
+}
+
+// §16.9.2: `a ##1 b[*1:$] ##1 c` matches over three or more ticks with a at
+// the first, c at the last and b at every tick strictly between: over the
+// three b's it ends at 55 alone, c being low before.
+TEST(SequenceRepetition, UnboundedConsecutiveRepetitionFillsTheMiddle) {
+  SimFixture f;
+  auto* hits = RunAndFindVar(RepetitionSource("a ##1 b[*1:$] ##1 c", kThreeBs),
+                             f, "hits");
+  ASSERT_NE(hits, nullptr);
+  EXPECT_EQ(hits->value.ToUint64(), 1u);
+  EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 55u);
+}
+
+// §16.9.2 and §16.9.2.1: `a[*0:3] ##1 b ##1 c` admits an empty match of a,
+// `empty ##1 b` being `b`, so with a never high it ends at 25 over b at 15
+// and c at 25; with a high at 15 and 25 it ends at 45 over b at 35 and c at
+// 45.
+TEST(SequenceRepetition, RangeFromZeroAdmitsAnEmptyMatch) {
+  SimFixture f;
+  auto* hits = RunAndFindVar(RepetitionSource("a[*0:3] ##1 b ##1 c",
+                                              "    #10 b = 1;\n"
+                                              "    #10 b = 0; c = 1;\n"
+                                              "    #10 c = 0;\n"),
+                             f, "hits");
+  ASSERT_NE(hits, nullptr);
+  EXPECT_EQ(hits->value.ToUint64(), 1u);
+  EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 25u);
+  SimFixture g;
+  auto* two = RunAndFindVar(RepetitionSource("a[*0:3] ##1 b ##1 c",
+                                             "    #10 a = 1;\n"
+                                             "    #20 a = 0; b = 1;\n"
+                                             "    #10 b = 0; c = 1;\n"
+                                             "    #10 c = 0;\n"),
+                            g, "hits");
+  ASSERT_NE(two, nullptr);
+  EXPECT_EQ(two->value.ToUint64(), 1u);
+  EXPECT_EQ(g.ctx.FindVariable("last")->value.ToUint64(), 45u);
+}
+
+// a for the tick at 15, b for the ticks at 25 and 45, c for the tick at 55.
+const char* const kTwoBsApart =
+    "    #10 a = 1;\n"
+    "    #10 a = 0; b = 1;\n"
+    "    #10 b = 0;\n"
+    "    #10 b = 1;\n"
+    "    #10 b = 0; c = 1;\n"
+    "    #10 c = 0;\n";
+
+// §16.9.2: goto repetition `b[->2:3]` matches b at two or three ticks that
+// need not be consecutive and ends at the last of them, so `a ##1 b[->2:3]
+// ##1 c` ends at 55 with b at 25 and 45 and c at 55.
+TEST(SequenceRepetition, GotoRepetitionEndsAtTheLastMatch) {
+  SimFixture f;
+  auto* hits = RunAndFindVar(
+      RepetitionSource("a ##1 b[->2:3] ##1 c", kTwoBsApart), f, "hits");
+  ASSERT_NE(hits, nullptr);
+  EXPECT_EQ(hits->value.ToUint64(), 1u);
+  EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 55u);
+}
+
+// §16.9.2: nonconsecutive repetition `b[=2:3]` is the goto form extended by
+// ticks b is false at, so with b at 25 and 35 and c at 55, where the goto
+// form needs c at 45, `a ##1 b[=2:3] ##1 c` ends at 55 and the goto form
+// never.
+TEST(SequenceRepetition, NonconsecutiveRepetitionExtendsPastTheLastMatch) {
+  const char* const two_then_gap =
+      "    #10 a = 1;\n"
+      "    #10 a = 0; b = 1;\n"
+      "    #20 b = 0;\n"
+      "    #10 c = 1;\n"
+      "    #10 c = 0;\n";
+  SimFixture f;
+  auto* hits = RunAndFindVar(
+      RepetitionSource("a ##1 b[=2:3] ##1 c", two_then_gap), f, "hits");
+  ASSERT_NE(hits, nullptr);
+  EXPECT_EQ(hits->value.ToUint64(), 1u);
+  EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 55u);
+  SimFixture g;
+  auto* goto_hits = RunAndFindVar(
+      RepetitionSource("a ##1 b[->2:3] ##1 c", two_then_gap), g, "hits");
+  ASSERT_NE(goto_hits, nullptr);
+  EXPECT_EQ(goto_hits->value.ToUint64(), 0u);
+}
+
+// §16.9.2: consecutive repetition of a sequence, `(a ##2 b)[*3]`, is the
+// sequence three times over with a tick between, `(a ##2 b) ##1 (a ##2 b) ##1
+// (a ##2 b)`, ending at 95 over a at 15, 45 and 75 and b at 35, 65 and 95.
+TEST(SequenceRepetition, ConsecutiveRepetitionOfASequenceUnrolls) {
+  SimFixture f;
+  auto* hits = RunAndFindVar(RepetitionSource("(a ##2 b)[*3]",
+                                              "    #10 a = 1;\n"
+                                              "    #10 a = 0;\n"
+                                              "    #10 b = 1;\n"
+                                              "    #10 b = 0; a = 1;\n"
+                                              "    #10 a = 0;\n"
+                                              "    #10 b = 1;\n"
+                                              "    #10 b = 0; a = 1;\n"
+                                              "    #10 a = 0;\n"
+                                              "    #10 b = 1;\n"
+                                              "    #10 b = 0;\n"),
+                             f, "hits");
+  ASSERT_NE(hits, nullptr);
+  EXPECT_EQ(hits->value.ToUint64(), 1u);
+  EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 95u);
 }
 
 }  // namespace

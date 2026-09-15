@@ -147,10 +147,21 @@ struct ParserSeqLinearHelpers {
     }
   }
 
-  // Whether the tokens ahead are a parenthesised group holding a `##` or a `,`
-  // at its own depth: a sub-sequence, or §16.10's `( sequence_expr ,
-  // sequence_match_item ... )`, either of which ParseExpr cannot read. The
-  // lexer is rewound.
+  // Whether the token opens §16.9.2's repetition, `[*`, `[->`, `[=` or `[+]`.
+  static bool AtRepetitionBracket(Parser& p) {
+    if (!p.Check(TokenKind::kLBracket)) return false;
+    auto saved = p.lexer_.SavePos();
+    p.Consume();
+    bool repetition = p.Check(TokenKind::kStar) || p.Check(TokenKind::kArrow) ||
+                      p.Check(TokenKind::kEq) || p.Check(TokenKind::kPlus);
+    p.lexer_.RestorePos(saved);
+    return repetition;
+  }
+
+  // Whether the tokens ahead are a parenthesised group holding a `##`, a `,`
+  // or a repetition at its own depth: a sub-sequence, §16.10's
+  // `( sequence_expr , sequence_match_item ... )` or a repeated operand in
+  // parentheses, none of which ParseExpr can read. The lexer is rewound.
   static bool AheadIsSequenceGroup(Parser& p) {
     if (!p.Check(TokenKind::kLParen)) return false;
     auto saved = p.lexer_.SavePos();
@@ -161,7 +172,8 @@ struct ParserSeqLinearHelpers {
       if (p.Check(TokenKind::kLParen)) ++depth;
       if (p.Check(TokenKind::kRParen)) --depth;
       if (depth == 1 &&
-          (p.Check(TokenKind::kHashHash) || p.Check(TokenKind::kComma))) {
+          (p.Check(TokenKind::kHashHash) || p.Check(TokenKind::kComma) ||
+           AtRepetitionBracket(p))) {
         is_group = true;
       }
       p.Consume();
@@ -270,6 +282,77 @@ struct ParserSeqLinearHelpers {
     return true;
   }
 
+  // §16.9.2's boolean_abbrev or sequence_abbrev after an operand: `[*n]`,
+  // `[*min:max]`, `[*]` and `[+]` for consecutive repetition, `[->n]` and
+  // `[->min:max]` for goto, `[=n]` and `[=min:max]` for nonconsecutive, an
+  // upper bound of `$` unbounded. Returns false where the brackets hold
+  // anything else; `rep` stays kNone where no repetition follows.
+  static bool ParseSequenceRepetition(Parser& p, SeqRepetition& rep) {
+    rep = SeqRepetition{};
+    if (!p.Check(TokenKind::kLBracket)) return true;
+    auto saved = p.lexer_.SavePos();
+    p.Consume();
+    if (p.Match(TokenKind::kStar)) {
+      rep.kind = SeqRepetition::Kind::kConsecutive;
+    } else if (p.Match(TokenKind::kArrow)) {
+      rep.kind = SeqRepetition::Kind::kGoto;
+    } else if (p.Match(TokenKind::kEq)) {
+      rep.kind = SeqRepetition::Kind::kNonconsecutive;
+    } else if (p.Match(TokenKind::kPlus)) {
+      rep.kind = SeqRepetition::Kind::kConsecutive;
+      rep.min = 1;
+      rep.max = SeqCycleDelay::kUnbounded;
+      return p.Match(TokenKind::kRBracket);
+    } else {
+      p.lexer_.RestorePos(saved);
+      return true;
+    }
+    if (p.Match(TokenKind::kRBracket)) {
+      if (rep.kind != SeqRepetition::Kind::kConsecutive) return false;
+      rep.min = 0;
+      rep.max = SeqCycleDelay::kUnbounded;
+      return true;
+    }
+    std::string_view formal;
+    if (!ParseSeqDelayBound(p, rep.min, formal, false) || !formal.empty()) {
+      return false;
+    }
+    rep.max = rep.min;
+    if (p.Match(TokenKind::kColon)) {
+      if (!ParseSeqDelayBound(p, rep.max, formal, true) || !formal.empty()) {
+        return false;
+      }
+    }
+    return rep.max >= rep.min && p.Match(TokenKind::kRBracket);
+  }
+
+  // §16.9.2: consecutive repetition of a group by an exact count, unrolled
+  // as the clause has it, `(a ##2 b)[*3]` being `(a ##2 b) ##1 (a ##2 b) ##1
+  // (a ##2 b)`: the group's operands from `first` on are appended again
+  // `count - 1` times, the copy's first operand a tick after the last. A
+  // range or an unbounded count on a group is not read.
+  static bool UnrollGroupRepetition(SeqLinearBody& body, size_t first,
+                                    const SeqRepetition& rep) {
+    if (rep.kind == SeqRepetition::Kind::kNone) return true;
+    if (rep.kind != SeqRepetition::Kind::kConsecutive) return false;
+    if (rep.min != rep.max || rep.min == 0) return false;
+    size_t n = body.operands.size() - first;
+    for (uint32_t k = 1; k < rep.min; ++k) {
+      for (size_t i = 0; i < n; ++i) {
+        body.operands.push_back(body.operands[first + i]);
+        SeqCycleDelay delay = body.delays[first + i];
+        if (i == 0) {
+          delay.min = 1;
+          delay.max = 1;
+        }
+        body.delays.push_back(delay);
+        body.match_items.push_back(body.match_items[first + i]);
+        body.repetitions.push_back(body.repetitions[first + i]);
+      }
+    }
+    return true;
+  }
+
   // A parenthesised group, `( sequence_expr [, match_items] )`: its operands
   // are read into `body` as the outer operands are, the delay before the group
   // adding to the group's leading delay, and its match items are attached to
@@ -281,7 +364,10 @@ struct ParserSeqLinearHelpers {
     if (!ParseLinearSeqOperandChain(p, body, before)) return false;
     if (body.operands.size() == first) return false;
     if (!ParseSequenceMatchItems(p, body.match_items.back())) return false;
-    return p.Match(TokenKind::kRParen);
+    if (!p.Match(TokenKind::kRParen)) return false;
+    SeqRepetition rep;
+    if (!ParseSequenceRepetition(p, rep)) return false;
+    return UnrollGroupRepetition(body, first, rep);
   }
 
   // §16.13.6: parse the operand chain `[##d0] b0 ##d1 b1 ... ##dn bn` of a
@@ -311,9 +397,12 @@ struct ParserSeqLinearHelpers {
                    ? ParseSequenceInstanceOperand(p)
                    : p.ParseExpr();
     if (!op) return false;
+    SeqRepetition rep;
+    if (!ParseSequenceRepetition(p, rep)) return false;
     body.operands.push_back(op);
     body.delays.push_back(before);
     body.match_items.emplace_back();
+    body.repetitions.push_back(rep);
     return true;
   }
 
@@ -380,6 +469,7 @@ struct ParserSeqLinearHelpers {
 void Parser::CaptureLinearSequenceBody(ModuleItem* item) {
   auto saved = lexer_.SavePos();
   diag_.PushSuppress();
+  in_sequence_body_ = true;
   std::vector<EventExpr> clock;
   bool ok =
       ParserSeqLinearHelpers::ParseLinearSeqLocalDecls(*this, item->seq_linear);
@@ -398,6 +488,7 @@ void Parser::CaptureLinearSequenceBody(ModuleItem* item) {
   if (ok) Match(TokenKind::kSemicolon);
   ok = ok && Check(TokenKind::kKwEndsequence) &&
        !item->seq_linear.operands.empty();
+  in_sequence_body_ = false;
   diag_.PopSuppress();
   lexer_.RestorePos(saved);
   if (ok) {
