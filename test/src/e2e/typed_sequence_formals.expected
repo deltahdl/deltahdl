@@ -1,0 +1,6 @@
+s1(v, w), x untyped, ends at 25 35
+s2(v, w), x a bit, ends at 35
+event_arg_example(posedge clk) ends at 25
+event_arg_example2(clk) ends at 25
+delay_arg_example(my_delay, my_delay - 1) ends at 45
+$finish at time 70

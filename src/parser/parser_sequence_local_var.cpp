@@ -246,6 +246,10 @@ struct SequencePortScan {
   // the head of a formal's default value (the token immediately after `=`) so a
   // $inferred_clock default on a typed formal can be rejected.
   TokenKind prev_kind = TokenKind::kComma;
+  // §16.8.1: the type keyword in force for the formals that follow, kEof for
+  // untyped, cleared by `untyped` and by a type the keyword alone does not
+  // name, which a `[` or a type identifier after it shows.
+  TokenKind carry_type_kw = TokenKind::kEof;
 
   void FinalizePortItem(DiagEngine& diag, ModuleItem* item) {
     if (!item_saw_local) return;
@@ -316,11 +320,15 @@ struct SequencePortScan {
     // §16.8.2: a chain of more than one identifier means the leading
     // identifier(s) supply a (user-defined) type alias, satisfying the
     // explicit-type requirement.
+    bool user_typed = false;
     while (LexerCheck(lexer, TokenKind::kIdentifier)) {
       name_tok = lexer.Next();
       item_saw_explicit_type = true;
+      user_typed = true;
     }
+    if (user_typed) carry_type_kw = TokenKind::kEof;
     item->prop_formals.push_back(name_tok.text);
+    item->prop_formal_type_kw.push_back(carry_type_kw);
     // §16.8.2: whether this formal is a local variable formal argument, which
     // §16.10 keeps out of the sequence's clocking events.
     item->prop_formal_is_local.push_back(item_saw_local);
@@ -399,8 +407,17 @@ struct SequencePortScan {
                LexerCheck(lexer, TokenKind::kKwInout)) {
       HandleDirection(lexer, diag);
     } else if (IsBuiltinTypeKwForLocalVar(lexer.Peek().kind)) {
-      lexer.Next();
+      carry_type_kw = lexer.Next().kind;
+      if (LexerCheck(lexer, TokenKind::kLBracket)) {
+        carry_type_kw = TokenKind::kEof;
+      }
       item_saw_explicit_type = true;
+    } else if (!item_saw_local &&
+               IsDisallowedLocalVarTypeKw(lexer.Peek().kind)) {
+      // §16.8.1: `event`, `sequence` and `untyped` type the formals after them
+      // as a data type keyword does, `untyped` ending a type's reach.
+      TokenKind kw = lexer.Next().kind;
+      carry_type_kw = kw == TokenKind::kKwUntyped ? TokenKind::kEof : kw;
     } else if (item_saw_local &&
                IsDisallowedLocalVarTypeKw(lexer.Peek().kind)) {
       // §16.8.2: a local variable formal argument's type must be one of the
@@ -588,6 +605,11 @@ Expr* Parser::ParseSequenceInstanceOperand() {
   return call;
 }
 
+// §16.8.1: an actual for a formal of type event is an event_expression, so
+// one opening with an edge keyword is kept as the edge over its signal, a
+// unary expression whose operator is the keyword, for the flattening to read
+// as the instantiated sequence's clock; an actual with no edge is an ordinary
+// expression, which an `@(posedge sig)` over a formal sig takes as the signal.
 Expr* Parser::ParseSequenceActualArg() {
   if (Check(TokenKind::kDollar)) {
     Token tok = Consume();
@@ -596,6 +618,17 @@ Expr* Parser::ParseSequenceActualArg() {
     dollar->text = tok.text;
     dollar->range.start = tok.loc;
     return dollar;
+  }
+  if (Check(TokenKind::kKwPosedge) || Check(TokenKind::kKwNegedge) ||
+      Check(TokenKind::kKwEdge)) {
+    Token edge = Consume();
+    auto* event = arena_.Create<Expr>();
+    event->kind = ExprKind::kUnary;
+    event->op = edge.kind;
+    event->text = edge.text;
+    event->range.start = edge.loc;
+    event->lhs = ParseExpr();
+    return event;
   }
   return ParseExpr();
 }

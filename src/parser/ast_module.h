@@ -525,6 +525,14 @@ struct ModuleItem {
   // to decide which formals an instance must supply an actual for.
   std::vector<bool> prop_formal_has_default;
 
+  // §16.8.1: parallel to prop_formals; the keyword of the type a formal was
+  // declared with, applying to every formal that follows the keyword and
+  // precedes the next, kEof where the formal is untyped or its type is one no
+  // keyword alone names, a packed vector or a user-defined type. The sequence
+  // flattening casts an actual to a keyword type and reads an `event` formal
+  // as the clock's event expression.
+  std::vector<TokenKind> prop_formal_type_kw;
+
   // §16.10: identifiers introduced by assertion_variable_declaration items in
   // the body of a sequence or property declaration. Each entry is one local
   // variable declared in the body (a single declaration with N comma-

@@ -7,7 +7,10 @@
 #include <vector>
 
 #include "common/arena.h"
+#include "common/types.h"
+#include "lexer/token.h"
 #include "parser/ast.h"
+#include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 
 namespace delta {
@@ -20,6 +23,67 @@ namespace {
 constexpr int kMaxInstanceDepth = 16;
 
 using ActualsByFormal = std::unordered_map<std::string_view, Expr*>;
+
+// Whether an actual is the edge-and-signal form ParseSequenceActualArg keeps
+// for a formal of type event.
+bool IsEventActual(const Expr* e) {
+  return e != nullptr && e->kind == ExprKind::kUnary &&
+         (e->op == TokenKind::kKwPosedge || e->op == TokenKind::kKwNegedge ||
+          e->op == TokenKind::kKwEdge);
+}
+
+Edge EdgeOfActual(const Expr* e) {
+  if (e->op == TokenKind::kKwPosedge) return Edge::kPosedge;
+  if (e->op == TokenKind::kKwNegedge) return Edge::kNegedge;
+  return Edge::kEdge;
+}
+
+// §16.8.1 (c): an actual bound to a formal of a keyword data type is cast to
+// that type before it is substituted, so an 8-bit actual passed to a `bit`
+// formal is truncated and a `bit` passed to a `byte` formal extended. A `$`,
+// an event actual and an untyped formal's actual are substituted as they are.
+Expr* CastActual(Expr* actual, TokenKind type_kw, Arena& arena) {
+  if (actual == nullptr || type_kw == TokenKind::kEof) return actual;
+  if (IsEventActual(actual)) return actual;
+  if (actual->kind == ExprKind::kIdentifier && actual->text == "$") {
+    return actual;
+  }
+  std::string_view type_name;
+  switch (type_kw) {
+    case TokenKind::kKwBit:
+      type_name = "bit";
+      break;
+    case TokenKind::kKwLogic:
+      type_name = "logic";
+      break;
+    case TokenKind::kKwReg:
+      type_name = "reg";
+      break;
+    case TokenKind::kKwByte:
+      type_name = "byte";
+      break;
+    case TokenKind::kKwShortint:
+      type_name = "shortint";
+      break;
+    case TokenKind::kKwInt:
+      type_name = "int";
+      break;
+    case TokenKind::kKwLongint:
+      type_name = "longint";
+      break;
+    case TokenKind::kKwInteger:
+      type_name = "integer";
+      break;
+    default:
+      return actual;
+  }
+  auto* cast = arena.Create<Expr>();
+  cast->kind = ExprKind::kCast;
+  cast->text = type_name;
+  cast->range = actual->range;
+  cast->lhs = actual;
+  return cast;
+}
 
 // Annex F.4.1's substitution over one expression: a copy of `e` in which every
 // identifier naming a formal is replaced by the actual bound to it. The actual
@@ -49,10 +113,12 @@ Expr* SubstituteFormals(const Expr* e, const ActualsByFormal& actuals,
 }
 
 // The value a delay bound written as a formal's name takes from its actual:
-// an integer literal, or `$` for no upper bound. Any other actual leaves the
-// bound as it was, which is the parser's default of 1.
+// `$` for no upper bound, or the elaboration-time constant §16.8 requires of
+// it, evaluated here as a parameter or a literal is. An actual that answers no
+// known value leaves the bound as it was, which is the parser's default of 1.
 void ResolveDelayBound(uint32_t& bound, std::string_view formal,
-                       const ActualsByFormal& actuals) {
+                       const ActualsByFormal& actuals, SimContext& ctx,
+                       Arena& arena) {
   if (formal.empty()) return;
   auto it = actuals.find(formal);
   if (it == actuals.end() || it->second == nullptr) return;
@@ -61,20 +127,15 @@ void ResolveDelayBound(uint32_t& bound, std::string_view formal,
     bound = SeqCycleDelay::kUnbounded;
     return;
   }
-  if (actual->kind != ExprKind::kIntegerLiteral) return;
-  uint32_t value = 0;
-  for (char c : actual->text) {
-    if (c == '_') continue;
-    if (c < '0' || c > '9') break;
-    value = value * 10 + static_cast<uint32_t>(c - '0');
-  }
-  bound = value;
+  Logic4Vec value = EvalExpr(actual, ctx, arena);
+  if (!value.IsKnown()) return;
+  bound = static_cast<uint32_t>(value.ToUint64());
 }
 
-SeqCycleDelay ResolveDelay(SeqCycleDelay delay,
-                           const ActualsByFormal& actuals) {
-  ResolveDelayBound(delay.min, delay.min_formal, actuals);
-  ResolveDelayBound(delay.max, delay.max_formal, actuals);
+SeqCycleDelay ResolveDelay(SeqCycleDelay delay, const ActualsByFormal& actuals,
+                           SimContext& ctx, Arena& arena) {
+  ResolveDelayBound(delay.min, delay.min_formal, actuals, ctx, arena);
+  ResolveDelayBound(delay.max, delay.max_formal, actuals, ctx, arena);
   delay.min_formal = {};
   delay.max_formal = {};
   return delay;
@@ -94,8 +155,10 @@ SeqCycleDelay AddDelays(const SeqCycleDelay& before,
 
 // §16.8: the actuals of an instance bound to the declaration's formals, by
 // position for the leading actuals and by name for the `.formal(actual)` ones,
-// which the parser keeps after the positional ones with their names beside.
-ActualsByFormal BindActuals(const ModuleItem* decl, const Expr* instance) {
+// which the parser keeps after the positional ones with their names beside,
+// each cast as §16.8.1 has it for the formal's type.
+ActualsByFormal BindActuals(const ModuleItem* decl, const Expr* instance,
+                            Arena& arena) {
   ActualsByFormal actuals;
   if (instance->kind != ExprKind::kCall) return actuals;
   size_t named = instance->arg_names.size();
@@ -106,7 +169,49 @@ ActualsByFormal BindActuals(const ModuleItem* decl, const Expr* instance) {
   for (size_t i = 0; i < named; ++i) {
     actuals[instance->arg_names[i]] = instance->args[positional + i];
   }
+  for (size_t i = 0;
+       i < decl->prop_formals.size() && i < decl->prop_formal_type_kw.size();
+       ++i) {
+    auto it = actuals.find(decl->prop_formals[i]);
+    if (it == actuals.end()) continue;
+    it->second = CastActual(it->second, decl->prop_formal_type_kw[i], arena);
+  }
   return actuals;
+}
+
+// §16.8.1 (b): the instantiated sequence's clock with its formals replaced by
+// the actuals: an event actual supplies the edge and the signal, an ordinary
+// actual the signal alone under the edge the clock wrote.
+std::vector<EventExpr> SubstituteClock(const std::vector<EventExpr>& clock,
+                                       const ActualsByFormal& actuals,
+                                       Arena& arena) {
+  std::vector<EventExpr> out;
+  for (const EventExpr& ev : clock) {
+    EventExpr copy = ev;
+    if (ev.signal != nullptr && ev.signal->kind == ExprKind::kIdentifier) {
+      auto it = actuals.find(ev.signal->text);
+      if (it != actuals.end() && IsEventActual(it->second)) {
+        copy.edge = EdgeOfActual(it->second);
+        copy.signal = it->second->lhs;
+        out.push_back(copy);
+        continue;
+      }
+      // A signal under an edge is watched as the object it names, so the cast
+      // §16.8.1 (c) put on the actual of a typed formal is looked through.
+      if (it != actuals.end() && it->second != nullptr &&
+          it->second->kind == ExprKind::kCast) {
+        copy.signal = it->second->lhs;
+        copy.iff_condition =
+            SubstituteFormals(ev.iff_condition, actuals, arena);
+        out.push_back(copy);
+        continue;
+      }
+    }
+    copy.signal = SubstituteFormals(ev.signal, actuals, arena);
+    copy.iff_condition = SubstituteFormals(ev.iff_condition, actuals, arena);
+    out.push_back(copy);
+  }
+  return out;
 }
 
 const ModuleItem* InstantiatedSequence(const Expr* operand, SimContext& ctx) {
@@ -124,6 +229,7 @@ bool Flatten(const ModuleItem* seq, SimContext& ctx, Arena& arena,
              LinearSequence& out, int depth) {
   if (seq == nullptr || seq->seq_linear_operands.empty()) return false;
   if (depth > kMaxInstanceDepth) return false;
+  out.clock = seq->seq_clock;
   for (size_t i = 0; i < seq->seq_linear_operands.size(); ++i) {
     Expr* operand = seq->seq_linear_operands[i];
     const SeqCycleDelay& before = seq->seq_linear_delays[i];
@@ -135,11 +241,14 @@ bool Flatten(const ModuleItem* seq, SimContext& ctx, Arena& arena,
     }
     LinearSequence body;
     if (!Flatten(inner, ctx, arena, body, depth + 1)) return false;
-    ActualsByFormal actuals = BindActuals(inner, operand);
+    ActualsByFormal actuals = BindActuals(inner, operand, arena);
+    if (out.clock.empty() && !body.clock.empty()) {
+      out.clock = SubstituteClock(body.clock, actuals, arena);
+    }
     for (size_t j = 0; j < body.operands.size(); ++j) {
       out.operands.push_back(
           SubstituteFormals(body.operands[j], actuals, arena));
-      SeqCycleDelay delay = ResolveDelay(body.delays[j], actuals);
+      SeqCycleDelay delay = ResolveDelay(body.delays[j], actuals, ctx, arena);
       out.delays.push_back(j == 0 ? AddDelays(before, delay) : delay);
     }
   }
