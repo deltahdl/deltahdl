@@ -9,10 +9,10 @@
 // counting through: a is high at ticks 1, 2 and 4, b at 3 and c at every
 // tick, and the run ends at 40.
 //
-// weak, `a until b`, is true at 3 for the attempts from 1 to 3, a not
+// weak_until, `a until b`, is true at 3 for the attempts from 1 to 3, a not
 // needed there, and true when the run ends for the attempt from 4, a high
 // with b never true again, its pass action run in the final blocks after
-// $finish; strong, `a s_until b`, fails then instead. with_a, `a until_with
+// $finish; strong_until, `a s_until b`, fails then instead. with_a, `a until_with
 // b`, needs a at 3 as well and fails there for the attempts from 1 to 3,
 // holding at the end for the attempt from 4; with_c, `c until_with b`, is
 // true at 3 for those attempts and at the end for the last, where
@@ -33,13 +33,13 @@ module until_property;
   assign b = tick inside {3};
   assign c = tick inside {1, 2, 3, 4};
 
-  weak: assert property (@(posedge clk) a until b)
+  weak_until: assert property (@(posedge clk) a until b)
     begin
       weak_pass++;
       if ($time == 40) $display("a until b passes at the end of the run");
     end else weak_fail++;
 
-  strong: assert property (@(posedge clk) a s_until b)
+  strong_until: assert property (@(posedge clk) a s_until b)
     strong_pass++; else begin
       strong_fail++;
       if ($time == 40) $display("a s_until b fails at the end of the run");
