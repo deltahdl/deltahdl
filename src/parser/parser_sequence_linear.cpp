@@ -290,9 +290,26 @@ struct ParserSeqLinearHelpers {
     return true;
   }
 
-  // One match item: an inc_or_dec_expression in either form, or `lvar =
-  // rhs` or `lvar op= rhs`.
+  // §16.11: whether the tokens ahead are a subroutine call, a system task's
+  // name or an identifier followed by `(`, rather than the local an
+  // assignment begins with. The lexer is rewound.
+  static bool AheadIsSubroutineCall(Parser& p) {
+    if (p.Check(TokenKind::kSystemIdentifier)) return true;
+    if (!p.Check(TokenKind::kIdentifier)) return false;
+    auto saved = p.lexer_.SavePos();
+    p.Consume();
+    bool call = p.Check(TokenKind::kLParen);
+    p.lexer_.RestorePos(saved);
+    return call;
+  }
+
+  // One match item: §16.11's subroutine call, an inc_or_dec_expression in
+  // either form, or `lvar = rhs` or `lvar op= rhs`.
   static bool ParseSequenceMatchItem(Parser& p, SeqMatchAssign& item) {
+    if (AheadIsSubroutineCall(p)) {
+      item.call = p.ParseExpr();
+      return item.call != nullptr;
+    }
     if (p.Check(TokenKind::kPlusPlus) || p.Check(TokenKind::kMinusMinus)) {
       return ParseIncDecMatchItem(p, item, true);
     }

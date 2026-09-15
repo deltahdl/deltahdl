@@ -17,6 +17,7 @@
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
+#include "simulator/stmt_exec.h"
 #include "simulator/variable.h"
 
 namespace delta {
@@ -90,6 +91,28 @@ std::vector<Logic4Vec> InitialLocals(const std::vector<SeqLocalDecl>& decls,
   return values;
 }
 
+// §16.11: a subroutine call attached to a sequence is executed at each end
+// point, in the Reactive region like an action block, and does not hold the
+// evaluation up; an argument passed by value reads the sampled value the
+// match was evaluated with, so each argument is evaluated here, the attempt's
+// locals in scope, and its value stands in for the expression while the call
+// runs.
+void ScheduleMatchCall(const Expr* call, SimContext& ctx, Arena& arena) {
+  std::vector<std::pair<const Expr*, Logic4Vec>> snaps;
+  for (const Expr* arg : call->args) {
+    if (arg != nullptr) snaps.emplace_back(arg, EvalExpr(arg, ctx, arena));
+  }
+  auto* ev = ctx.GetScheduler().GetEventPool().Acquire();
+  ev->callback = [call, snaps = std::move(snaps), &ctx, &arena]() {
+    for (const auto& snap : snaps) {
+      ctx.SetDeferredArgSnapshot(snap.first, snap.second);
+    }
+    if (!TryExecSystemCallTask(call, ctx, arena)) EvalExpr(call, ctx, arena);
+    for (const auto& snap : snaps) ctx.ClearDeferredArgSnapshot(snap.first);
+  };
+  ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), Region::kReactive, ev);
+}
+
 // §16.10: the attempt's locals stood up as variables of a scope of their own
 // for the length of one operand's evaluation, read back into the attempt when
 // the scope is popped, so an operand and its match items read and write the
@@ -119,7 +142,12 @@ class AttemptLocalsScope {
 
   // §16.10: one match item, `lvar = rhs` or `lvar op= rhs`, assigning the
   // attempt's copy of the local; the assigned value takes words of its own.
+  // §16.11: a subroutine call among the items is scheduled instead.
   void Assign(const SeqMatchAssign& item, Arena& arena) {
+    if (item.call != nullptr) {
+      ScheduleMatchCall(item.call, ctx_, arena);
+      return;
+    }
     Variable* var = ctx_.FindLocalVariable(item.lvar);
     if (var == nullptr) return;
     Logic4Vec rhs = EvalExpr(item.rhs, ctx_, arena);

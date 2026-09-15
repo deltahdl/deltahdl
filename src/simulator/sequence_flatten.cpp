@@ -129,6 +129,9 @@ std::vector<SeqMatchAssign> SubstituteMatchItems(
       copy.lvar = it->second->text;
     }
     copy.rhs = SubstituteFormals(item.rhs, actuals, arena);
+    if (item.call != nullptr) {
+      copy.call = SubstituteFormals(item.call, actuals, arena);
+    }
     out.push_back(copy);
   }
   return out;

@@ -1,0 +1,9 @@
+b after a with v = 1, w = 0
+b after a with v = 0, w = 1
+c ##[1:2] d ends at tick 22
+c ##[1:2] d ends at tick 23
+first at tick 31
+second at tick 31
+note at tick 31
+k by value = 40, by reference = 41
+$finish at time 450

@@ -321,6 +321,11 @@ struct SeqMatchAssign {
   TokenKind op = TokenKind::kEq;
   Expr* rhs = nullptr;
   bool init = false;
+  // §16.11: a subroutine call attached to the sequence in place of an
+  // assignment, executed at each end point in the Reactive region with its
+  // by-value arguments as they read at the match; `lvar` and `rhs` are unset
+  // where this is.
+  Expr* call = nullptr;
 };
 
 // §16.10: a local variable of a sequence body, one an
