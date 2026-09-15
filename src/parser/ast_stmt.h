@@ -208,6 +208,10 @@ struct Stmt {
   // is unset where this is set.
   ModuleItem* assert_sequence = nullptr;
   bool assert_strong = false;
+  // §16.12.3: the property is `not` the boolean or sequence carried, so each
+  // attempt's result is the opposite of the underlying one, the strength of
+  // a sequence switched with it.
+  bool assert_negated = false;
   Stmt* assert_pass_stmt = nullptr;
   Stmt* assert_fail_stmt = nullptr;
   bool is_deferred = false;

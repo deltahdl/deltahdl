@@ -1,0 +1,6 @@
+not a ##1 b passes 2 fails 1 at ticks
+not strong(a ##1 b) passes 2 fails 1 at ticks
+not busy passes 3 fails 1
+p_idle passes 3 fails 1
+$finish at time 40
+not a ##1 b fails at the end of the run

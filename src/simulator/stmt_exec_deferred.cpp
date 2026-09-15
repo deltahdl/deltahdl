@@ -472,15 +472,17 @@ static const Stmt* JudgeAssertion(const Stmt* stmt, SimContext& ctx,
     return nullptr;
   }
 
-  return ConcludeAssertion(stmt, EvalAssertionCondition(stmt, ctx, arena), ctx,
-                           arena);
+  // §16.12.3: `not` returns the opposite of the underlying evaluation.
+  bool is_true = EvalAssertionCondition(stmt, ctx, arena);
+  return ConcludeAssertion(stmt, is_true != stmt->assert_negated, ctx, arena);
 }
 
 // §16.12.2: one tick of a sequential property. The attempts in flight and
 // the one this tick begins advance over §16.5.1's sampled values, and each
 // that reaches its verdict at this tick, matching or failing, concludes the
-// assertion as a boolean property's evaluation does; a strong property's
-// attempts still in flight when the run ends fail then.
+// assertion as a boolean property's evaluation does; the attempts still in
+// flight when the run ends fail then where the property is strong, or, as
+// §16.12.3 has `not` switch the strength, weak and negated.
 static SimCoroutine StrongAttemptsFinalCoroutine(const Stmt* stmt,
                                                  SequencePropertyState* state,
                                                  SimContext& ctx,
@@ -517,8 +519,11 @@ static void ExecSequencePropertyTick(const Stmt* stmt, SimContext& ctx,
   if (state == nullptr) {
     state = CreateSequencePropertyState(stmt->assert_sequence, ctx, arena);
     if (state == nullptr) return;
-    if (stmt->assert_strong)
+    // §16.12.3: `not` switches the strength, so the attempts unfinished at
+    // the end fail under strong, and under weak once negated.
+    if (stmt->assert_strong != stmt->assert_negated) {
       RegisterStrongAttemptsFinal(stmt, state, ctx, arena);
+    }
   }
   bool disabled = stmt->assert_disable_iff != nullptr &&
                   EvalExpr(stmt->assert_disable_iff, ctx, arena).IsTruthy();
@@ -529,7 +534,8 @@ static void ExecSequencePropertyTick(const Stmt* stmt, SimContext& ctx,
       AdvanceSequenceProperty(*state, disabled, ctx, arena);
   samples.SetEvaluatingProperty(outer_evaluating_property);
   for (SequenceVerdict verdict : verdicts) {
-    ConcludeAssertion(stmt, verdict == SequenceVerdict::kMatched, ctx, arena);
+    bool matched = verdict == SequenceVerdict::kMatched;
+    ConcludeAssertion(stmt, matched != stmt->assert_negated, ctx, arena);
   }
 }
 

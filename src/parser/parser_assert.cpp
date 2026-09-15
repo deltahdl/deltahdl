@@ -183,7 +183,9 @@ struct ParserAssertHelpers {
   // nor an implication is a boolean, read into `prop`. Answers false where
   // the body is neither.
   static bool ParseSimpleSpecBody(Parser& p, Expr*& prop, ModuleItem*& sequence,
-                                  bool& strong) {
+                                  bool& strong, bool& negated) {
+    // §16.12.3: each `not` before the body negates it once more.
+    while (p.Match(TokenKind::kKwNot)) negated = !negated;
     if (!p.BodyHasTemporalOperator()) {
       prop = p.ParseExpr();
       return prop != nullptr;
@@ -537,11 +539,12 @@ bool Parser::TryParseSimpleConcurrentProperty(ModuleItem* item,
   Expr* disable_iff = nullptr;
   if (ok) ok = TryParseDisableIff(disable_iff);
   bool strong = false;
+  bool negated = false;
   ModuleItem* sequence = nullptr;
   Expr* prop = nullptr;
   if (ok) {
-    ok =
-        ParserAssertHelpers::ParseSimpleSpecBody(*this, prop, sequence, strong);
+    ok = ParserAssertHelpers::ParseSimpleSpecBody(*this, prop, sequence, strong,
+                                                  negated);
   }
   // Accept only what consumes the whole spec, so the next token is the
   // property's closing parenthesis. Anything else restores the lexer and the
@@ -566,6 +569,7 @@ bool Parser::TryParseSimpleConcurrentProperty(ModuleItem* item,
   // §16.12.2: a sequence_expr in an assert or assume is evaluated as weak
   // unless written strong(...), and one in a cover as strong.
   stmt->assert_strong = strong || body_kind == StmtKind::kCoverImmediate;
+  stmt->assert_negated = negated;
   stmt->assert_disable_iff = disable_iff;
   // §16.5: this statement carries a concurrent assertion's property, not an
   // immediate assertion's expression, so the mark travels with it to the

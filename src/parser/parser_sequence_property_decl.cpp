@@ -838,6 +838,9 @@ void Parser::CaptureClockedBooleanPropertyBody(ModuleItem* item) {
   // boolean is the body's disable condition.
   Expr* disable_iff = nullptr;
   if (ok) ok = TryParseDisableIff(disable_iff);
+  // §16.12.3: each `not` before the boolean negates it once more.
+  bool negated = false;
+  while (ok && Match(TokenKind::kKwNot)) negated = !negated;
   Expr* boolean = ok ? ParseExpr() : nullptr;
   ok = boolean != nullptr && Match(TokenKind::kSemicolon) &&
        Check(TokenKind::kKwEndproperty);
@@ -847,6 +850,7 @@ void Parser::CaptureClockedBooleanPropertyBody(ModuleItem* item) {
   item->prop_clock = std::move(clock);
   item->prop_body_expr = boolean;
   item->prop_disable_iff = disable_iff;
+  item->prop_negated = negated;
 }
 
 // §16.12 + §F.4.1: capture formal names, body disable-iff count, and nested

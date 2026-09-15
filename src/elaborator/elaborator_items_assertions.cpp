@@ -156,6 +156,7 @@ void SubstitutePropertyInstance(ModuleItem* item, Arena& arena,
   stmt->assert_expr = SubstituteFormals(decl->prop_body_expr, actuals, arena);
   stmt->assert_disable_iff =
       SubstituteFormals(decl->prop_disable_iff, actuals, arena);
+  stmt->assert_negated = decl->prop_negated;
   stmt->is_concurrent_clocked = true;
   stmt->assert_pass_stmt = item->assert_pass_stmt;
   stmt->assert_fail_stmt = item->assert_fail_stmt;

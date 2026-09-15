@@ -575,6 +575,8 @@ struct ModuleItem {
   // §16.12: the disable condition of that body's property_spec, where it
   // carries a `disable iff` between the clock and the boolean.
   Expr* prop_disable_iff = nullptr;
+  // §16.12.3: whether that body's boolean stands under `not`.
+  bool prop_negated = false;
 
   // §16.12 / §F.4.1: metadata the rewriter needs to flatten property
   // instances and enforce the disable-iff no-nesting rule.
