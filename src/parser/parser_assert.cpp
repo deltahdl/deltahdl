@@ -412,6 +412,14 @@ bool Parser::TryParseSimpleConcurrentProperty(ModuleItem* item,
   } else {
     events.push_back(ParseSingleEvent());
   }
+  // §16.12: `disable iff ( expression_or_dist )` may stand between the clock
+  // and the property_expr, making the spec a property_spec.
+  Expr* disable_iff = nullptr;
+  if (ok && Match(TokenKind::kKwDisable)) {
+    ok = Match(TokenKind::kKwIff) && Match(TokenKind::kLParen);
+    disable_iff = ok ? ParseExpr() : nullptr;
+    ok = disable_iff != nullptr && Match(TokenKind::kRParen);
+  }
   bool temporal = ok && BodyHasTemporalOperator();
   Expr* prop = (ok && !temporal) ? ParseExpr() : nullptr;
   // Accept only the simple form: a non-temporal boolean that consumes the whole
@@ -429,6 +437,7 @@ bool Parser::TryParseSimpleConcurrentProperty(ModuleItem* item,
   stmt->kind = body_kind;
   stmt->range.start = item->loc;
   stmt->assert_expr = prop;
+  stmt->assert_disable_iff = disable_iff;
   // §16.5: this statement carries a concurrent assertion's property, not an
   // immediate assertion's expression, so the mark travels with it to the
   // evaluation that §16.5.1 gives sampled values.
@@ -449,17 +458,21 @@ bool Parser::TryParseSimpleConcurrentProperty(ModuleItem* item,
 bool Parser::TryParsePropertyInstanceSpec(ModuleItem* item) {
   if (!Check(TokenKind::kIdentifier)) return false;
   auto saved = lexer_.SavePos();
-  Token name = Consume();
-  if (!Check(TokenKind::kRParen)) {
+  diag_.PushSuppress();
+  // §16.12: an instance may carry actual arguments, `p(a, b)`, read as a
+  // call is; the elaborator binds them to the property's formals.
+  Expr* instance = ParseExpr();
+  diag_.PopSuppress();
+  bool is_instance = instance != nullptr && Check(TokenKind::kRParen) &&
+                     (instance->kind == ExprKind::kIdentifier ||
+                      instance->kind == ExprKind::kCall);
+  if (!is_instance) {
     lexer_.RestorePos(saved);
     return false;
   }
-  item->prop_instance_name = name.text;
-  auto* expr = arena_.Create<Expr>();
-  expr->kind = ExprKind::kIdentifier;
-  expr->text = name.text;
-  expr->range.start = name.loc;
-  item->assert_expr = expr;
+  item->prop_instance_name =
+      instance->kind == ExprKind::kCall ? instance->callee : instance->text;
+  item->assert_expr = instance;
   return true;
 }
 

@@ -834,6 +834,14 @@ void Parser::CaptureClockedBooleanPropertyBody(ModuleItem* item) {
     clock = ParseEventList();
     ok = Match(TokenKind::kRParen);
   }
+  // §16.12: a `disable iff ( expression_or_dist )` between the clock and the
+  // boolean is the body's disable condition.
+  Expr* disable_iff = nullptr;
+  if (ok && Match(TokenKind::kKwDisable)) {
+    ok = Match(TokenKind::kKwIff) && Match(TokenKind::kLParen);
+    disable_iff = ok ? ParseExpr() : nullptr;
+    ok = disable_iff != nullptr && Match(TokenKind::kRParen);
+  }
   Expr* boolean = ok ? ParseExpr() : nullptr;
   ok = boolean != nullptr && Match(TokenKind::kSemicolon) &&
        Check(TokenKind::kKwEndproperty);
@@ -842,6 +850,7 @@ void Parser::CaptureClockedBooleanPropertyBody(ModuleItem* item) {
   if (!ok) return;
   item->prop_clock = std::move(clock);
   item->prop_body_expr = boolean;
+  item->prop_disable_iff = disable_iff;
 }
 
 // §16.12 + §F.4.1: capture formal names, body disable-iff count, and nested

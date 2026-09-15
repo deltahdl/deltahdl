@@ -437,6 +437,14 @@ static const Stmt* JudgeAssertion(const Stmt* stmt, SimContext& ctx,
   uint32_t directive_bit = ImmediateDirectiveTypeBit(stmt);
   if (!ctx.AssertCheckingEnabled(type_bit, directive_bit)) return nullptr;
 
+  // §16.12: an attempt at which the disable condition, read as the variables
+  // stand rather than sampled, is true is disabled: it neither succeeds nor
+  // fails, so no action block runs and no failure is reported.
+  if (stmt->assert_disable_iff != nullptr &&
+      EvalExpr(stmt->assert_disable_iff, ctx, arena).IsTruthy()) {
+    return nullptr;
+  }
+
   bool is_true = EvalAssertionCondition(stmt, ctx, arena);
   RecordCoverImmediateSample(stmt, is_true, ctx);
   const Stmt* action =

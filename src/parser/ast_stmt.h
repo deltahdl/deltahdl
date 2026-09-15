@@ -194,6 +194,10 @@ struct Stmt {
   std::vector<std::string_view> foreach_vars;
 
   Expr* assert_expr = nullptr;
+  // §16.12: the disable condition of a concurrent assertion's property_spec,
+  // `disable iff ( expression )`, read live at each attempt; an attempt at
+  // which it is true is disabled, neither succeeding nor failing.
+  Expr* assert_disable_iff = nullptr;
   Stmt* assert_pass_stmt = nullptr;
   Stmt* assert_fail_stmt = nullptr;
   bool is_deferred = false;

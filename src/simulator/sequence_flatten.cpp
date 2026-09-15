@@ -4,13 +4,13 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
-#include <unordered_map>
 #include <vector>
 
 #include "common/arena.h"
 #include "common/types.h"
 #include "lexer/token.h"
 #include "parser/ast.h"
+#include "parser/expr_substitute.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 
@@ -22,8 +22,6 @@ namespace {
 // an error the elaborator reports; the flattening stops descending here so a
 // cycle it is handed all the same ends the instance rather than the run.
 constexpr int kMaxInstanceDepth = 16;
-
-using ActualsByFormal = std::unordered_map<std::string_view, Expr*>;
 
 // Whether an actual is the edge-and-signal form ParseSequenceActualArg keeps
 // for a formal of type event.
@@ -84,33 +82,6 @@ Expr* CastActual(Expr* actual, TokenKind type_kw, Arena& arena) {
   cast->range = actual->range;
   cast->lhs = actual;
   return cast;
-}
-
-// Annex F.4.1's substitution over one expression: a copy of `e` in which every
-// identifier naming a formal is replaced by the actual bound to it. The actual
-// is shared rather than copied, so an actual that is an expression stands as
-// one term, which is what the clause's parenthesising of the actual secures.
-Expr* SubstituteFormals(const Expr* e, const ActualsByFormal& actuals,
-                        Arena& arena) {
-  if (e == nullptr) return nullptr;
-  if (e->kind == ExprKind::kIdentifier) {
-    auto it = actuals.find(e->text);
-    if (it != actuals.end()) return it->second;
-  }
-  auto* copy = arena.Create<Expr>(*e);
-  copy->lhs = SubstituteFormals(e->lhs, actuals, arena);
-  copy->rhs = SubstituteFormals(e->rhs, actuals, arena);
-  copy->condition = SubstituteFormals(e->condition, actuals, arena);
-  copy->true_expr = SubstituteFormals(e->true_expr, actuals, arena);
-  copy->false_expr = SubstituteFormals(e->false_expr, actuals, arena);
-  copy->base = SubstituteFormals(e->base, actuals, arena);
-  copy->index = SubstituteFormals(e->index, actuals, arena);
-  copy->index_end = SubstituteFormals(e->index_end, actuals, arena);
-  copy->with_expr = SubstituteFormals(e->with_expr, actuals, arena);
-  copy->repeat_count = SubstituteFormals(e->repeat_count, actuals, arena);
-  for (auto& sub : copy->elements) sub = SubstituteFormals(sub, actuals, arena);
-  for (auto& sub : copy->args) sub = SubstituteFormals(sub, actuals, arena);
-  return copy;
 }
 
 // §16.10 over the match items of one operand: the right-hand sides read the

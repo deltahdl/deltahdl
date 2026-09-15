@@ -1,5 +1,7 @@
+#include <cstddef>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
@@ -11,6 +13,7 @@
 #include "elaborator/property_rewrite.h"
 #include "elaborator/rtlir.h"
 #include "parser/ast.h"
+#include "parser/expr_substitute.h"
 
 namespace delta {
 
@@ -115,26 +118,53 @@ void SubstitutePropertyInstance(ModuleItem* item, Arena& arena,
                  Subclause("16.14"));
     return;
   }
-  if (decl->prop_body_expr == nullptr || !decl->prop_formals.empty()) {
+  if (decl->prop_body_expr == nullptr) {
     diag.Warning(item->loc,
                  "concurrent assertion is not evaluated: the body of property "
                  "\"" +
                      name +
                      "\" is not the @(event) boolean_expression this tool "
-                     "evaluates, or the property declares formal arguments",
+                     "evaluates",
                  Subclause("16.14"));
     return;
+  }
+  // §16.12 and §16.8: the actual arguments of the instance are bound to the
+  // formals by position, and §F.4.1's rewriting substitutes each for the
+  // references to its formal in the clock, the disable condition and the
+  // boolean. A formal left to its default actual, which this tool does not
+  // keep, leaves the assertion unevaluated; the count of actuals against
+  // formals is validated where §16.8's rules are.
+  ActualsByFormal actuals;
+  const std::vector<Expr*>& args = item->assert_expr->args;
+  for (size_t i = 0; i < decl->prop_formals.size(); ++i) {
+    if (i >= args.size() || args[i] == nullptr) {
+      diag.Warning(item->loc,
+                   "concurrent assertion is not evaluated: the instance of "
+                   "property \"" +
+                       name + "\" binds no actual argument to the formal \"" +
+                       std::string(decl->prop_formals[i]) + "\"",
+                   Subclause("16.14"));
+      return;
+    }
+    actuals[decl->prop_formals[i]] = args[i];
   }
   auto* stmt = arena.Create<Stmt>();
   stmt->kind = item->kind == ModuleItemKind::kAssumeProperty
                    ? StmtKind::kAssumeImmediate
                    : StmtKind::kAssertImmediate;
   stmt->range.start = item->loc;
-  stmt->assert_expr = decl->prop_body_expr;
+  stmt->assert_expr = SubstituteFormals(decl->prop_body_expr, actuals, arena);
+  stmt->assert_disable_iff =
+      SubstituteFormals(decl->prop_disable_iff, actuals, arena);
   stmt->is_concurrent_clocked = true;
   stmt->assert_pass_stmt = item->assert_pass_stmt;
   stmt->assert_fail_stmt = item->assert_fail_stmt;
-  item->sensitivity = decl->prop_clock;
+  item->sensitivity.clear();
+  for (EventExpr ev : decl->prop_clock) {
+    ev.signal = SubstituteFormals(ev.signal, actuals, arena);
+    ev.iff_condition = SubstituteFormals(ev.iff_condition, actuals, arena);
+    item->sensitivity.push_back(ev);
+  }
   item->body = stmt;
 }
 

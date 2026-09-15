@@ -572,6 +572,9 @@ struct ModuleItem {
   // an assertion written in that form is. Both empty for any other body.
   std::vector<EventExpr> prop_clock;
   Expr* prop_body_expr = nullptr;
+  // §16.12: the disable condition of that body's property_spec, where it
+  // carries a `disable iff` between the clock and the boolean.
+  Expr* prop_disable_iff = nullptr;
 
   // §16.12 / §F.4.1: metadata the rewriter needs to flatten property
   // instances and enforce the disable-iff no-nesting rule.
