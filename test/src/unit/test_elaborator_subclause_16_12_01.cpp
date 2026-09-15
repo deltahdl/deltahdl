@@ -282,8 +282,7 @@ TEST(PropertyInstantiation, AnInstanceOfATemporalPropertyIsReported) {
   EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
                               "the body of property \"p_base\" is not the "
                               "@(event) boolean_expression this tool "
-                              "evaluates, or the property declares formal "
-                              "arguments",
+                              "evaluates",
                               6, "16.14"));
   EXPECT_EQ(AssertionProcess(design->top_modules[0]), nullptr);
 }
