@@ -344,6 +344,10 @@ struct SeqLinearBody {
   std::vector<SeqCycleDelay> delays;
   std::vector<std::vector<SeqMatchAssign>> match_items;
   std::vector<SeqLocalDecl> locals;
+  // §16.9.7: the operands of a top-level `or`, each a linear chain of its own
+  // beside this one, the sequence matching where any of them does; §16.9.1
+  // has `or` bind loosest, so each chain runs from one `or` to the next.
+  std::vector<SeqLinearBody> alternatives;
 };
 
 struct ModuleItem {

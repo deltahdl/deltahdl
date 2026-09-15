@@ -400,6 +400,8 @@ bool ExpandInstance(const InstanceOperand& op, SimContext& ctx, Arena& arena,
                     LinearSequence& out, int depth) {
   LinearSequence body;
   if (!Flatten(op.inner, ctx, arena, body, depth + 1)) return false;
+  // A sequence with `or` operands of its own does not splice into one chain.
+  if (!body.alternatives.empty()) return false;
   ActualsByFormal actuals = BindActuals(op.inner, op.instance, arena);
   // The operands already flattened number the instance, each instance adding
   // at least one, so the locals of two instances of one sequence differ.
@@ -423,13 +425,32 @@ bool ExpandInstance(const InstanceOperand& op, SimContext& ctx, Arena& arena,
   return true;
 }
 
+bool FlattenChain(const SeqLinearBody& body, SimContext& ctx, Arena& arena,
+                  LinearSequence& out, int depth);
+
 bool Flatten(const ModuleItem* seq, SimContext& ctx, Arena& arena,
              LinearSequence& out, int depth) {
   if (seq == nullptr || seq->seq_linear.operands.empty()) return false;
   if (depth > kMaxInstanceDepth) return false;
   out.clock = seq->seq_clock;
-  out.locals = seq->seq_linear.locals;
-  const SeqLinearBody& body = seq->seq_linear;
+  if (!FlattenChain(seq->seq_linear, ctx, arena, out, depth)) return false;
+  // §16.9.7: each `or` operand is flattened as a chain of its own; an instance
+  // in one that names the clock gives it to the whole.
+  for (const SeqLinearBody& alt : seq->seq_linear.alternatives) {
+    LinearSequence flat;
+    flat.clock = out.clock;
+    if (!FlattenChain(alt, ctx, arena, flat, depth)) return false;
+    if (out.clock.empty()) out.clock = flat.clock;
+    out.alternatives.push_back(std::move(flat));
+  }
+  return true;
+}
+
+// One chain of a body: its operands, an instance among them expanded, with
+// the chain's locals.
+bool FlattenChain(const SeqLinearBody& body, SimContext& ctx, Arena& arena,
+                  LinearSequence& out, int depth) {
+  out.locals = body.locals;
   for (size_t i = 0; i < body.operands.size(); ++i) {
     Expr* operand = body.operands[i];
     const SeqCycleDelay& before = body.delays[i];

@@ -24,6 +24,9 @@ struct LinearSequence {
   std::vector<std::vector<SeqMatchAssign>> match_items;
   std::vector<SeqLocalDecl> locals;
   std::vector<EventExpr> clock;
+  // §16.9.7: the flattened forms of the body's other `or` operands, each
+  // matched beside this one under the same clock.
+  std::vector<LinearSequence> alternatives;
 };
 
 // §16.8: the sequential behaviour of an instance of a named sequence is that

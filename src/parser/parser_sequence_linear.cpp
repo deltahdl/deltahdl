@@ -292,11 +292,12 @@ struct ParserSeqLinearHelpers {
   // of a named sequence as §16.8 has it, or a group. Returns false on a delay
   // form the monitor does not read or on a parse failure.
   // Whether the token ends an operand chain: the body's `;` or
-  // `endsequence`, or a group's `)` or the `,` before its match items.
+  // `endsequence`, a group's `)` or the `,` before its match items, or the
+  // `or` before the next alternative.
   static bool AtChainEnd(Parser& p) {
     return p.Check(TokenKind::kKwEndsequence) ||
            p.Check(TokenKind::kSemicolon) || p.Check(TokenKind::kRParen) ||
-           p.Check(TokenKind::kComma) || p.AtEnd();
+           p.Check(TokenKind::kComma) || p.Check(TokenKind::kKwOr) || p.AtEnd();
   }
 
   // One operand of a chain with the delay owed before it: a group read into
@@ -331,11 +332,23 @@ struct ParserSeqLinearHelpers {
     return true;
   }
 
+  // §16.9.1: `or` binds loosest of the sequence operators, so the body is
+  // one chain per `or` operand, each read to the next `or`, the body's local
+  // declarations reaching every chain.
   static bool ParseLinearSeqOperands(Parser& p, ModuleItem* item) {
     SeqCycleDelay none;
     none.min = 0;
     none.max = 0;
-    return ParseLinearSeqOperandChain(p, item->seq_linear, none);
+    SeqLinearBody& body = item->seq_linear;
+    if (!ParseLinearSeqOperandChain(p, body, none)) return false;
+    while (p.Match(TokenKind::kKwOr)) {
+      body.alternatives.emplace_back();
+      SeqLinearBody& alt = body.alternatives.back();
+      alt.locals = body.locals;
+      if (!ParseLinearSeqOperandChain(p, alt, none)) return false;
+      if (alt.operands.empty()) return false;
+    }
+    return true;
   }
 };
 

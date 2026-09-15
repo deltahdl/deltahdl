@@ -229,14 +229,23 @@ SimCoroutine MakeSequenceMonitorCoroutine(LinearSequence body,
                                           std::vector<EventExpr> clock,
                                           std::string ep_name, SimContext& ctx,
                                           Arena& arena) {
+  // §16.9.7: the body's `or` operands are matched side by side, each with
+  // attempts of its own, and the sequence reaches an end point at a tick any
+  // of them ends at.
   std::vector<LinearAttempt> active;
+  std::vector<std::vector<LinearAttempt>> alt_active(body.alternatives.size());
   while (!ctx.StopRequested()) {
     co_await EventAwaiter{ctx, clock, arena};
     // §16.14.5: a new evaluation attempt begins at every clock tick, which
     // AdvanceLinearAttempts adds beside the ones in flight.
-    if (AdvanceLinearAttempts(body, active, ctx, arena)) {
-      FireSequenceEndpoint(ctx, ep_name);
+    bool matched = AdvanceLinearAttempts(body, active, ctx, arena);
+    for (size_t i = 0; i < body.alternatives.size(); ++i) {
+      if (AdvanceLinearAttempts(body.alternatives[i], alt_active[i], ctx,
+                                arena)) {
+        matched = true;
+      }
     }
+    if (matched) FireSequenceEndpoint(ctx, ep_name);
   }
 }
 
