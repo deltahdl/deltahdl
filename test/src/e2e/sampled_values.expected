@@ -1,0 +1,12 @@
+t0_v: at time 0 v samples its declared 5 while v is now 9
+t0_y: at time 0 y samples x while y is now 1
+pre: sampled a is 0 at 5, a is now 0
+cc: const'(a) equals sampled a at 5
+pre: sampled a is 0 at 15, a is now 1
+cc: const'(a) is 1 while sampled a differs at 15
+pre: sampled a is 1 at 25, a is now 1
+cc: const'(a) equals sampled a at 25
+ev: e.triggered is current at 25
+pre: sampled a is 0 at 35, a is now 0
+cc: const'(a) equals sampled a at 35
+$finish at time 44
