@@ -288,9 +288,34 @@ bool EndsAsTrailingEmpty(const TickStep& step, const LinearAttempt& attempt) {
   return WithinDelay(step.body.delays[attempt.pos], attempt.waited + 1);
 }
 
+// §16.9.9: whether the attempt is inside the interval of a throughout at
+// this tick: past its first operand and not past its last, or at the first
+// operand, in its repetition or with the delay before the throughout up, the
+// interval beginning where the guarded sequence begins, `lead` ticks before
+// its first operand is read.
+bool InsideThroughout(const TickStep& step, const LinearAttempt& attempt,
+                      const SeqThroughout& guard) {
+  if (attempt.pos < guard.first || attempt.pos > guard.last) return false;
+  if (attempt.pos > guard.first || attempt.repeating) return true;
+  return attempt.waited + guard.lead >= step.body.delays[guard.first].min;
+}
+
+// §16.9.9: an attempt inside the interval of a throughout whose condition
+// does not hold at this tick is dropped, `(exp)[*0:$] intersect seq` having
+// no match over an interval exp is false at a tick of.
+bool ThroughoutHolds(TickStep& step, LinearAttempt& attempt) {
+  for (const SeqThroughout& guard : step.body.throughouts) {
+    if (!InsideThroughout(step, attempt, guard)) continue;
+    AttemptLocalsScope scope(step.body.locals, attempt, step.ctx);
+    if (!EvalExpr(guard.cond, step.ctx, step.arena).IsTruthy()) return false;
+  }
+  return true;
+}
+
 void StepAttempt(TickStep& step, LinearAttempt attempt) {
   const SeqCycleDelay& delay = step.body.delays[attempt.pos];
   const SeqRepetition& rep = step.body.repetitions[attempt.pos];
+  if (!ThroughoutHolds(step, attempt)) return;
   if (EndsAsTrailingEmpty(step, attempt)) step.matched = true;
   if (attempt.repeating) {
     if (rep.kind == SeqRepetition::Kind::kConsecutive) {

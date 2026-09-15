@@ -451,6 +451,14 @@ bool ExpandInstance(const InstanceOperand& op, SimContext& ctx, Arena& arena,
         SubstituteMatchItems(body.match_items[j], actuals, arena));
     out.repetitions.push_back(body.repetitions[j]);
   }
+  // §16.9.9: a throughout of the instantiated body spans the same operands
+  // where they now stand, its condition over the actuals.
+  for (SeqThroughout guard : body.throughouts) {
+    guard.cond = SubstituteFormals(guard.cond, actuals, arena);
+    guard.first += first;
+    guard.last += first;
+    out.throughouts.push_back(guard);
+  }
   if (out.operands.size() == first) return true;
   AddLocalFormalAssignments(formals, out.match_items[first],
                             out.match_items.back(), arena);
@@ -551,10 +559,15 @@ bool Flatten(const ModuleItem* seq, SimContext& ctx, Arena& arena,
 bool FlattenChain(const SeqLinearBody& body, SimContext& ctx, Arena& arena,
                   LinearSequence& out, int depth) {
   out.locals = body.locals;
+  // Where each of the body's operands begins and ends among the flattened
+  // ones, an instance among them expanding to several.
+  std::vector<size_t> begins;
+  std::vector<size_t> ends;
   for (size_t i = 0; i < body.operands.size(); ++i) {
     Expr* operand = body.operands[i];
     const SeqCycleDelay& before = body.delays[i];
     const ModuleItem* inner = InstantiatedSequence(operand, ctx);
+    begins.push_back(out.operands.size());
     if (inner == nullptr) {
       out.operands.push_back(operand);
       out.delays.push_back(before);
@@ -564,6 +577,13 @@ bool FlattenChain(const SeqLinearBody& body, SimContext& ctx, Arena& arena,
                                ctx, arena, out, depth)) {
       return false;
     }
+    ends.push_back(out.operands.size() - 1);
+  }
+  // §16.9.9: a throughout spans the flattened operands its operands became.
+  for (SeqThroughout guard : body.throughouts) {
+    guard.first = begins[guard.first];
+    guard.last = ends[guard.last];
+    out.throughouts.push_back(guard);
   }
   return true;
 }

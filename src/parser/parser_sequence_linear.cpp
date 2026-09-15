@@ -158,10 +158,11 @@ struct ParserSeqLinearHelpers {
     return repetition;
   }
 
-  // Whether the tokens ahead are a parenthesised group holding a `##`, a `,`
-  // or a repetition at its own depth: a sub-sequence, §16.10's
-  // `( sequence_expr , sequence_match_item ... )` or a repeated operand in
-  // parentheses, none of which ParseExpr can read. The lexer is rewound.
+  // Whether the tokens ahead are a parenthesised group holding a `##`, a `,`,
+  // a `throughout` or a repetition at its own depth: a sub-sequence, §16.10's
+  // `( sequence_expr , sequence_match_item ... )`, §16.9.9's condition over
+  // one or a repeated operand in parentheses, none of which ParseExpr can
+  // read. The lexer is rewound.
   static bool AheadIsSequenceGroup(Parser& p) {
     if (!p.Check(TokenKind::kLParen)) return false;
     auto saved = p.lexer_.SavePos();
@@ -173,7 +174,7 @@ struct ParserSeqLinearHelpers {
       if (p.Check(TokenKind::kRParen)) --depth;
       if (depth == 1 &&
           (p.Check(TokenKind::kHashHash) || p.Check(TokenKind::kComma) ||
-           AtRepetitionBracket(p))) {
+           p.Check(TokenKind::kKwThroughout) || AtRepetitionBracket(p))) {
         is_group = true;
       }
       p.Consume();
@@ -341,6 +342,7 @@ struct ParserSeqLinearHelpers {
     if (rep.kind != SeqRepetition::Kind::kConsecutive) return false;
     if (rep.min != rep.max || rep.min == 0) return false;
     size_t n = body.operands.size() - first;
+    size_t guards = body.throughouts.size();
     for (uint32_t k = 1; k < rep.min; ++k) {
       for (size_t i = 0; i < n; ++i) {
         body.operands.push_back(body.operands[first + i]);
@@ -352,6 +354,15 @@ struct ParserSeqLinearHelpers {
         body.delays.push_back(delay);
         body.match_items.push_back(body.match_items[first + i]);
         body.repetitions.push_back(body.repetitions[first + i]);
+      }
+      // §16.9.9: a throughout inside the group spans each copy as it did the
+      // first.
+      for (size_t g = 0; g < guards; ++g) {
+        SeqThroughout guard = body.throughouts[g];
+        if (guard.first < first) continue;
+        guard.first += n * k;
+        guard.last += n * k;
+        body.throughouts.push_back(guard);
       }
     }
     return true;
@@ -392,6 +403,28 @@ struct ParserSeqLinearHelpers {
            p.AtEnd();
   }
 
+  // §16.9.9: `exp throughout seq`, exp already read, seq the chain that
+  // follows, read into `body` after the delay owed before the throughout,
+  // which is where the condition's interval begins; §16.9.1 has throughout
+  // bind looser than `##` and tighter than `intersect`, so seq runs to the
+  // chain's end. The delay before and seq's leading delay are each one tick
+  // count, the interval's start being told from the first operand's delay.
+  static bool ParseThroughout(Parser& p, SeqLinearBody& body,
+                              SeqCycleDelay before, Expr* cond) {
+    if (before.min != before.max) return false;
+    SeqThroughout guard;
+    guard.cond = cond;
+    guard.first = body.operands.size();
+    if (!ParseLinearSeqOperandChain(p, body, before)) return false;
+    if (body.operands.size() == guard.first) return false;
+    const SeqCycleDelay& lead = body.delays[guard.first];
+    if (lead.min != lead.max) return false;
+    guard.lead = lead.min - before.min;
+    guard.last = body.operands.size() - 1;
+    body.throughouts.push_back(guard);
+    return true;
+  }
+
   // One operand of a chain with the delay owed before it: a group read into
   // `body` as a chain of its own, or a Boolean expression or a sequence
   // instance appended with no match items of its own.
@@ -402,6 +435,9 @@ struct ParserSeqLinearHelpers {
                    ? ParseSequenceInstanceOperand(p)
                    : p.ParseExpr();
     if (!op) return false;
+    if (p.Match(TokenKind::kKwThroughout)) {
+      return ParseThroughout(p, body, before, op);
+    }
     SeqRepetition rep;
     if (!ParseSequenceRepetition(p, rep)) return false;
     body.operands.push_back(op);

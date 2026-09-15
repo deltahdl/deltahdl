@@ -344,6 +344,20 @@ struct SeqRepetition {
   uint32_t max = 1;
 };
 
+// §16.9.9: `exp throughout seq` inside a chain, `(exp)[*0:$] intersect seq`,
+// which matches where seq does and exp holds at every tick of the match: the
+// condition, the operands of the chain from `first` to `last` that seq
+// became, and seq's own leading delay, `lead` ticks by which the first
+// operand's delay exceeds the delay written before the throughout, so that
+// the interval exp holds over begins where seq begins rather than where its
+// first operand is read.
+struct SeqThroughout {
+  Expr* cond = nullptr;
+  size_t first = 0;
+  size_t last = 0;
+  uint32_t lead = 0;
+};
+
 // §16.13.6/§9.4.4: the linear form of a sequence body, `[##d0] b0 ##d1 b1
 // ... ##dn bn` (each bi a Boolean, each di one of §16.7's cycle_delay_range
 // forms, each operand carrying the §16.10 match items written with it), which
@@ -357,6 +371,8 @@ struct SeqLinearBody {
   // §16.9.2: the repetition each operand carries, parallel to the operands.
   std::vector<SeqRepetition> repetitions;
   std::vector<SeqLocalDecl> locals;
+  // §16.9.9: the conditions held throughout spans of this chain.
+  std::vector<SeqThroughout> throughouts;
   // §16.9.6: the other operands of an `intersect` this chain is the first
   // operand of, each a chain of its own that must match from the same tick
   // and end at the same tick as this one; §16.9.1 has `intersect` bind

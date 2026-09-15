@@ -25,6 +25,8 @@ struct LinearSequence {
   // §16.9.2: the repetition each operand carries, parallel to the operands.
   std::vector<SeqRepetition> repetitions;
   std::vector<SeqLocalDecl> locals;
+  // §16.9.9: the conditions held throughout spans of the flattened chain.
+  std::vector<SeqThroughout> throughouts;
   std::vector<EventExpr> clock;
   // §16.9.6: the flattened forms of the other operands of the `intersect`
   // this chain is the first operand of, each matched from the same tick as
