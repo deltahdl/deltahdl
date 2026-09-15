@@ -70,6 +70,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     parser/parser_toplevel.cpp
     parser/expr_parser.cpp
     parser/expr_substitute.cpp
+    parser/parser_property_spec.cpp
     parser/expr_parser_aux.cpp
     parser/expr_parser_patterns.cpp
     parser/parser_stmt.cpp

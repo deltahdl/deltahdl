@@ -80,6 +80,7 @@ class Parser {
   friend struct ParserPortHelpers;
   friend struct ParserDpiHelpers;
   friend struct ParserAssertHelpers;
+  friend struct ParserPropertySpecHelpers;
   friend struct ParserSeqLinearHelpers;
   friend struct ParserClassHelpers;
   friend struct ParserClassOverrideHelpers;
