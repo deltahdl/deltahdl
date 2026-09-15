@@ -75,13 +75,15 @@ TEST(ConcurrentAssertionEvaluationReporting,
   EXPECT_EQ(UnevaluatedReports(r), 0);
 }
 
+// §16.12.2: a sequence_expr is a sequential property the evaluation reads,
+// strong in a cover, so a cover of `a ##1 b` is reported by nothing.
 TEST(ConcurrentAssertionEvaluationReporting,
-     ATemporalCoverPropertyIsNotEvaluated) {
+     ASequentialCoverPropertyIsEvaluated) {
   auto r = Parse(
       "module m;\n"
       "  cover property (@(posedge clk) a ##1 b);\n"
       "endmodule\n");
-  EXPECT_TRUE(ReportedWarning(r.diags, "its property is temporal", 2, "16.14"));
+  EXPECT_EQ(UnevaluatedReports(r), 0);
 }
 
 // §16.14 Syntax 16-18 lists cover_sequence_statement separately from
@@ -136,14 +138,24 @@ TEST(ConcurrentAssertionEvaluationReporting,
   EXPECT_TRUE(ReportedWarning(r.diags, "its property is temporal", 2, "16.14"));
 }
 
-// §16.7: ## is the cycle delay range, and it is the third route into the
-// temporal branch.
-TEST(ConcurrentAssertionEvaluationReporting, CycleDelayIsNotEvaluated) {
+// §16.7: ## is the cycle delay range, and §16.12.2 has a sequence_expr be a
+// sequential property, which the evaluation reads as weak in an assert; a
+// spec that holds a cycle delay and no property operator is reported by
+// nothing. One holding a cycle delay under a property operator is still the
+// temporal branch's.
+TEST(ConcurrentAssertionEvaluationReporting,
+     CycleDelayIsEvaluatedAsASequentialProperty) {
   auto r = Parse(
       "module m;\n"
       "  assert property (@(posedge clk) a ##1 b);\n"
       "endmodule\n");
-  EXPECT_TRUE(ReportedWarning(r.diags, "its property is temporal", 2, "16.14"));
+  EXPECT_EQ(UnevaluatedReports(r), 0);
+  auto under = Parse(
+      "module m;\n"
+      "  assert property (@(posedge clk) not (a ##1 b));\n"
+      "endmodule\n");
+  EXPECT_TRUE(
+      ReportedWarning(under.diags, "its property is temporal", 2, "16.14"));
 }
 
 // §16.14.5 allows a concurrent assertion outside procedural code to take its

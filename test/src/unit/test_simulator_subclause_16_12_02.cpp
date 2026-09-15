@@ -136,7 +136,8 @@ TEST(SequenceProperty, BareSequenceInAssertIsWeak) {
 
 // §16.12.2: strong(sequence_expr) is true if and only if there is a nonempty
 // match, so the attempt from 4, unfinished when the run ends, fails then as
-// well: one pass and three failures.
+// well, in the final blocks the run ends with: one pass, two failures at
+// ticks and a third at the end.
 TEST(SequenceProperty, StrongSequenceFailsWhenUnfinishedAtTheEnd) {
   SimFixture f;
   auto* passes = RunAndFindVar(
@@ -146,6 +147,8 @@ TEST(SequenceProperty, StrongSequenceFailsWhenUnfinishedAtTheEnd) {
       f, "passes");
   ASSERT_NE(passes, nullptr);
   EXPECT_EQ(passes->value.ToUint64(), 1u);
+  EXPECT_EQ(f.ctx.FindVariable("fails")->value.ToUint64(), 2u);
+  f.ctx.RunFinalBlocks();
   EXPECT_EQ(f.ctx.FindVariable("fails")->value.ToUint64(), 3u);
 }
 
