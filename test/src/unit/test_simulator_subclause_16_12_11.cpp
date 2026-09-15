@@ -1,6 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
+#include "fixture_simulator.h"
 #include "simulator/sva_engine.h"
+#include "simulator/variable.h"
 
 using namespace delta;
 
@@ -102,6 +106,101 @@ TEST(SvaEngine, StrongAlwaysComposesPresenceWithInnerVerdict) {
   EXPECT_EQ(EvalAlways(/*strong=*/true, present,
                        /*inner_holds_at_present_ticks=*/true),
             PropertyResult::kPass);
+}
+
+// --- Live cases: always properties over real source ---
+
+// The module the cases share: clk rises at 5, 15, 25 and 35, tick n at
+// 10n - 5, the tick counter counting through; a is high at ticks 1 to 3 and
+// b at every tick. `items` declare the assertions, counting in `passes` and
+// `fails`.
+std::string AlwaysSource(const std::string& items) {
+  return "module t;\n"
+         "  logic clk = 0;\n"
+         "  int tick = 1;\n"
+         "  logic a, b;\n"
+         "  int passes = 0;\n"
+         "  int fails = 0;\n"
+         "  always #5 clk = ~clk;\n"
+         "  always #10 tick = tick + 1;\n"
+         "  assign a = tick inside {1, 2, 3};\n"
+         "  assign b = tick inside {1, 2, 3, 4};\n" +
+         items +
+         "  initial #40 $finish;\n"
+         "endmodule\n";
+}
+
+// §16.12.11: `always a` is true if and only if a holds at every current or
+// future tick: every attempt fails at 4, where a is low, while `always b`,
+// b high throughout, is decided by no tick and holds for every attempt when
+// the run ends.
+TEST(AlwaysProperty, WeakAlwaysHoldsUntilATickFails) {
+  SimFixture f;
+  auto* fails_at_four = RunAndFindVar(
+      AlwaysSource("  p: assert property (@(posedge clk) always a) passes++; "
+                   "else fails++;\n"),
+      f, "passes");
+  ASSERT_NE(fails_at_four, nullptr);
+  EXPECT_EQ(fails_at_four->value.ToUint64(), 0u);
+  EXPECT_EQ(f.ctx.FindVariable("fails")->value.ToUint64(), 4u);
+  SimFixture g;
+  auto* holds = RunAndFindVar(
+      AlwaysSource("  p: assert property (@(posedge clk) always b) passes++; "
+                   "else fails++;\n"),
+      g, "passes");
+  ASSERT_NE(holds, nullptr);
+  EXPECT_EQ(holds->value.ToUint64(), 0u);
+  g.ctx.RunFinalBlocks();
+  EXPECT_EQ(holds->value.ToUint64(), 4u);
+  EXPECT_EQ(g.ctx.FindVariable("fails")->value.ToUint64(), 0u);
+}
+
+// §16.12.11: `always [0:1] b` needs b at the attempt's tick and the next
+// where they exist, so the attempts from 1 to 3 are true at 2 to 4 and the
+// attempt from 4, its second tick never reached, is true when the run
+// ends.
+TEST(AlwaysProperty, RangedWeakAlwaysNeedsOnlyTheTicksThatExist) {
+  SimFixture f;
+  auto* passes = RunAndFindVar(
+      AlwaysSource("  p: assert property (@(posedge clk) always [0:1] b) "
+                   "passes++; else fails++;\n"),
+      f, "passes");
+  ASSERT_NE(passes, nullptr);
+  EXPECT_EQ(passes->value.ToUint64(), 3u);
+  EXPECT_EQ(f.ctx.FindVariable("fails")->value.ToUint64(), 0u);
+  f.ctx.RunFinalBlocks();
+  EXPECT_EQ(passes->value.ToUint64(), 4u);
+}
+
+// §16.12.11: `s_always [0:1] b` needs every tick of the range to exist, so
+// the attempt from 4 fails when the run ends.
+TEST(AlwaysProperty, RangedStrongAlwaysNeedsEveryTickOfTheRange) {
+  SimFixture f;
+  auto* passes = RunAndFindVar(
+      AlwaysSource("  p: assert property (@(posedge clk) s_always [0:1] b) "
+                   "passes++; else fails++;\n"),
+      f, "passes");
+  ASSERT_NE(passes, nullptr);
+  EXPECT_EQ(passes->value.ToUint64(), 3u);
+  f.ctx.RunFinalBlocks();
+  EXPECT_EQ(f.ctx.FindVariable("fails")->value.ToUint64(), 1u);
+}
+
+// §16.12.11: the range begins after its minimum: `always [1:2] a` reads a
+// at the next two ticks, so the attempt from 1 is true at 3 and those from
+// 2 and 3 false at 4, where a is low, the attempt from 4 true at the end
+// with no tick of its range reached.
+TEST(AlwaysProperty, RangeBeginsAfterItsMinimum) {
+  SimFixture f;
+  auto* passes = RunAndFindVar(
+      AlwaysSource("  p: assert property (@(posedge clk) always [1:2] a) "
+                   "passes++; else fails++;\n"),
+      f, "passes");
+  ASSERT_NE(passes, nullptr);
+  EXPECT_EQ(passes->value.ToUint64(), 1u);
+  EXPECT_EQ(f.ctx.FindVariable("fails")->value.ToUint64(), 2u);
+  f.ctx.RunFinalBlocks();
+  EXPECT_EQ(passes->value.ToUint64(), 2u);
 }
 
 }  // namespace

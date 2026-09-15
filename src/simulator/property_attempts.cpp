@@ -44,9 +44,13 @@ struct NodeState {
   // §16.12.6: the condition as read at the attempt's tick.
   bool condition = false;
   // §16.12.10: the ticks a nexttime has still to wait before its operand
-  // begins, and whether the operand has begun.
+  // begins, and whether the operand has begun; §16.12.11: the ticks an
+  // always has still to wait before its range, and the ticks of the range
+  // at which an operand attempt has still to begin, UINT64_MAX where the
+  // range is unbounded.
   uint64_t wait = 0;
   bool begun = false;
+  uint64_t remaining = 0;
 };
 
 }  // namespace
@@ -272,6 +276,41 @@ Tri StepNexttime(const PropertyExprNode* node, NodeState& state,
   return Step(node->operands[0], *state.operands[0], sc, first);
 }
 
+uint64_t EvalCount(const Expr* e, StepContext& sc, uint64_t absent) {
+  if (e == nullptr) return absent;
+  return EvalExpr(e, sc.ctx, sc.arena).ToUint64();
+}
+
+// §16.12.11: an operand attempt begins at each tick of the range, and the
+// always is false as soon as one is false and true once every tick of a
+// bounded range has begun one and all are true.
+Tri StepAlways(const PropertyExprNode* node, NodeState& state, StepContext& sc,
+               bool begin) {
+  const PropertyExprNode* operand = node->operands[0];
+  if (begin) {
+    state.wait = EvalCount(node->range_min, sc, 0);
+    state.remaining = node->range_unbounded
+                          ? UINT64_MAX
+                          : EvalCount(node->range_max, sc, 0) - state.wait + 1;
+  } else if (state.wait > 0) {
+    --state.wait;
+  }
+  std::vector<Tri> verdicts;
+  verdicts.reserve(state.consequents.size() + 1);
+  for (NodeState* c : state.consequents) {
+    verdicts.push_back(Step(operand, *c, sc, false));
+  }
+  if (state.wait == 0 && state.remaining > 0) {
+    NodeState* c = NewNodeState(operand, sc.arena);
+    state.consequents.push_back(c);
+    verdicts.push_back(Step(operand, *c, sc, true));
+    if (!node->range_unbounded) --state.remaining;
+  }
+  Tri all = Junction(false, verdicts);
+  if (all == Tri::kFalse) return Tri::kFalse;
+  return state.remaining == 0 ? all : Tri::kPending;
+}
+
 Tri Step(const PropertyExprNode* node, NodeState& state, StepContext& sc,
          bool begin) {
   if (state.verdict != Tri::kPending) return state.verdict;
@@ -299,6 +338,9 @@ Tri Step(const PropertyExprNode* node, NodeState& state, StepContext& sc,
       break;
     case PropertyExprNode::Kind::kNexttime:
       state.verdict = StepNexttime(node, state, sc, begin);
+      break;
+    case PropertyExprNode::Kind::kAlways:
+      state.verdict = StepAlways(node, state, sc, begin);
       break;
     case PropertyExprNode::Kind::kImplies:
     case PropertyExprNode::Kind::kIff: {
@@ -350,6 +392,16 @@ Tri FinishPair(const PropertyExprNode* node, NodeState& state) {
                                                         : Iff(first, second);
 }
 
+// §16.12.11: the operand attempts begun are finished as themselves; ticks
+// of the range the run never reached are no failure of the weak form and
+// fail the strong.
+Tri FinishAlways(const PropertyExprNode* node, NodeState& state) {
+  Tri all = FinishImplication(node, state);
+  if (all == Tri::kFalse) return Tri::kFalse;
+  if (state.remaining > 0 && node->strong) return Tri::kFalse;
+  return all;
+}
+
 // §16.12.10: with no further tick the weak form holds and the strong fails;
 // an operand begun is finished as itself.
 Tri FinishNexttime(const PropertyExprNode* node, NodeState& state) {
@@ -380,6 +432,9 @@ Tri Finish(const PropertyExprNode* node, NodeState& state) {
       break;
     case PropertyExprNode::Kind::kNexttime:
       state.verdict = FinishNexttime(node, state);
+      break;
+    case PropertyExprNode::Kind::kAlways:
+      state.verdict = FinishAlways(node, state);
       break;
     case PropertyExprNode::Kind::kImplies:
     case PropertyExprNode::Kind::kIff:

@@ -8,12 +8,10 @@
 namespace delta {
 
 // §16.12: the tokens of the property operators the evaluation does not read;
-// not, or, and, if-else, the implications, the followed-bys, implies, iff and
-// nexttime are read.
+// not, or, and, if-else, the implications, the followed-bys, implies, iff,
+// nexttime and always are read.
 static bool IsPropertyOperatorToken(TokenKind k) {
   switch (k) {
-    case TokenKind::kKwAlways:
-    case TokenKind::kKwSAlways:
     case TokenKind::kKwEventually:
     case TokenKind::kKwSEventually:
     case TokenKind::kKwUntil:
@@ -215,8 +213,38 @@ PropertyExprNode* ParserPropertySpecHelpers::ParsePropertyNexttime(
   return node;
 }
 
+// §16.12.11: `always [ [ range ] ] property_expr` and `s_always [ range ]
+// property_expr`, the range `min:max` or `min:$`, the operand any property
+// as Table 16-3 puts always beside if-else, below every other operator.
+PropertyExprNode* ParserPropertySpecHelpers::ParsePropertyAlways(Parser& p,
+                                                                 bool strong) {
+  auto* node = NewPropertyNode(p, PropertyExprNode::Kind::kAlways);
+  node->strong = strong;
+  node->range_unbounded = true;
+  if (p.Match(TokenKind::kLBracket)) {
+    node->range_min = p.ParseExpr();
+    if (node->range_min == nullptr || !p.Match(TokenKind::kColon)) {
+      return nullptr;
+    }
+    if (p.Match(TokenKind::kDollar)) {
+      node->range_unbounded = true;
+    } else {
+      node->range_max = p.ParseExpr();
+      node->range_unbounded = false;
+      if (node->range_max == nullptr) return nullptr;
+    }
+    if (!p.Match(TokenKind::kRBracket)) return nullptr;
+  }
+  auto* operand = ParsePropertyImplication(p);
+  if (operand == nullptr) return nullptr;
+  node->operands.push_back(operand);
+  return node;
+}
+
 PropertyExprNode* ParserPropertySpecHelpers::ParsePropertyTerm(Parser& p) {
   if (p.Match(TokenKind::kKwIf)) return ParsePropertyIfElse(p);
+  if (p.Match(TokenKind::kKwAlways)) return ParsePropertyAlways(p, false);
+  if (p.Match(TokenKind::kKwSAlways)) return ParsePropertyAlways(p, true);
   if (p.Match(TokenKind::kKwNexttime)) return ParsePropertyNexttime(p, false);
   if (p.Match(TokenKind::kKwSNexttime)) return ParsePropertyNexttime(p, true);
   if (p.Match(TokenKind::kKwNot)) {
@@ -343,7 +371,8 @@ bool ParserPropertySpecHelpers::ParseSimpleSpecBody(Parser& p,
   // read with the operands; a spec opening with `if` is a property of
   // operands as well.
   if (BodyHasPropertyJunction(p) || p.Check(TokenKind::kKwIf) ||
-      p.Check(TokenKind::kKwNexttime) || p.Check(TokenKind::kKwSNexttime)) {
+      p.Check(TokenKind::kKwNexttime) || p.Check(TokenKind::kKwSNexttime) ||
+      p.Check(TokenKind::kKwAlways) || p.Check(TokenKind::kKwSAlways)) {
     body.property = ParsePropertyImplication(p);
     return body.property != nullptr;
   }

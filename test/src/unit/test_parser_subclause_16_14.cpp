@@ -58,7 +58,7 @@ TEST(ConcurrentAssertionEvaluationReporting,
      ATemporalAssumePropertyIsNotEvaluated) {
   auto r = Parse(
       "module m;\n"
-      "  assume property (@(posedge clk) always (a ##1 b));\n"
+      "  assume property (@(posedge clk) eventually [1:3] (a ##1 b));\n"
       "endmodule\n");
   EXPECT_TRUE(ReportedWarning(r.diags, "its property is temporal", 2, "16.14"));
 }
@@ -115,8 +115,9 @@ TEST(ConcurrentAssertionEvaluationReporting,
 }
 
 // §16.12.7: |-> and |=> are the implication operators, which the evaluation
-// reads as a property of operands, so neither spec is reported. `always` over
-// a cycle delay, an operator it does not read, is still the temporal branch's.
+// reads as a property of operands, so neither spec is reported. `eventually`
+// over a cycle delay, an operator it does not read, is still the temporal
+// branch's.
 TEST(ConcurrentAssertionEvaluationReporting, ImplicationsAreEvaluated) {
   auto overlapped = Parse(
       "module m;\n"
@@ -130,7 +131,7 @@ TEST(ConcurrentAssertionEvaluationReporting, ImplicationsAreEvaluated) {
   EXPECT_EQ(UnevaluatedReports(nonoverlapped), 0);
   auto under = Parse(
       "module m;\n"
-      "  assert property (@(posedge clk) always (a ##1 b));\n"
+      "  assert property (@(posedge clk) eventually [1:3] (a ##1 b));\n"
       "endmodule\n");
   EXPECT_TRUE(
       ReportedWarning(under.diags, "its property is temporal", 2, "16.14"));
@@ -191,16 +192,17 @@ TEST(ConcurrentAssertionEvaluationReporting,
 }
 
 // A clocked assert whose property_spec is not exhausted by what the
-// evaluation reads: §16.12.11's s_always is a property operator the
+// evaluation reads: §16.12.12's eventually is a property operator the
 // evaluation does not read, so the spec is not the whole of what stands
 // after the clock, and the report names this rather than the missing clock,
-// because the clock is present. `a and b`, `if (a) b else c` and `nexttime
-// b` stood here until §16.12.5, §16.12.6 and §16.12.10 were evaluated.
+// because the clock is present. `a and b`, `if (a) b else c`, `nexttime b`
+// and `s_always [1:3] b` stood here until §16.12.5, §16.12.6, §16.12.10 and
+// §16.12.11 were evaluated.
 TEST(ConcurrentAssertionEvaluationReporting,
      ClockedNonBooleanPropertyIsNotEvaluated) {
   auto r = Parse(
       "module m;\n"
-      "  assert property (@(posedge clk) s_always [1:3] b);\n"
+      "  assert property (@(posedge clk) eventually [1:3] b);\n"
       "endmodule\n");
   EXPECT_TRUE(ReportedWarning(
       r.diags, "holds more than the @(event) boolean_expression", 2, "16.14"));

@@ -1,0 +1,11 @@
+always a passes 0 fails 4
+always b passes 0 fails 0 at ticks
+always [0:1] b passes 3 fails 0 at ticks
+s_always [0:1] b passes 3 fails 0 at ticks
+$finish at time 40
+always b passes at the end of the run
+always b passes at the end of the run
+always b passes at the end of the run
+always b passes at the end of the run
+always [0:1] b passes at the end of the run
+s_always [0:1] b fails at the end of the run

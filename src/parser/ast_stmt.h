@@ -69,8 +69,10 @@ struct ModuleItem;
 // a boolean, a sequence weak or strong (§16.12.2) -- under the operators
 // not (§16.12.3), or (§16.12.4), and (§16.12.5), if-else (§16.12.6),
 // implication (§16.12.7), implies and iff (§16.12.8), the last two over two
-// operands, and nexttime (§16.12.10), `strong` where it is s_nexttime and
-// its tick count, one where none was written, in `boolean`. A boolean leaf
+// operands, nexttime (§16.12.10), `strong` where it is s_nexttime and its
+// tick count, one where none was written, in `boolean`, and always
+// (§16.12.11), `strong` where it is s_always, over the range below. A
+// boolean leaf
 // carries `boolean`, a sequence leaf
 // `sequence` and `strong`, an operator its operands, an if-else its
 // condition in `boolean` with the then and else properties as its operands,
@@ -88,13 +90,21 @@ struct PropertyExprNode {
     kImplication,
     kImplies,
     kIff,
-    kNexttime
+    kNexttime,
+    kAlways
   };
   Kind kind = Kind::kBoolean;
   Expr* boolean = nullptr;
   ModuleItem* sequence = nullptr;
   bool strong = false;
   std::vector<PropertyExprNode*> operands;
+  // §16.12.11: the range of ticks an always covers, from `range_min` to
+  // `range_max` after the attempt's tick, `range_unbounded` where the
+  // maximum is `$` or no range was written; the minimum null where none
+  // was written stands for 0.
+  Expr* range_min = nullptr;
+  Expr* range_max = nullptr;
+  bool range_unbounded = false;
 };
 
 struct EventExpr {
