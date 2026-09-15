@@ -1,0 +1,11 @@
+tick 1 at 5
+a_low: passed at 5, a is now 0
+tick 2 at 15
+a_low: passed at 15, a is now 0
+tick 3 at 25
+a_low: passed at 25, a is now 1
+tick 4 at 35
+a_low: failed at 35, a is now 1
+tick 5 at 45
+a_low: passed at 45, a is now 0
+$finish at time 50
