@@ -173,7 +173,7 @@ void CarryAttempt(LinearAttempt attempt, const SeqCycleDelay& delay,
 // later ticks of its range. Reports whether any attempt matched at this tick.
 bool AdvanceLinearAttempts(const LinearSequence& body,
                            std::vector<LinearAttempt>& active, SimContext& ctx,
-                           Arena& arena) {
+                           Arena& arena, bool begin_attempt) {
   std::vector<LinearAttempt> pending;
   pending.reserve(active.size() + 1);
   for (LinearAttempt attempt : active) {
@@ -181,7 +181,9 @@ bool AdvanceLinearAttempts(const LinearSequence& body,
     pending.push_back(std::move(attempt));
   }
   // §16.10: a new attempt begins with a new copy of every local variable.
-  pending.push_back({0, 0, InitialLocals(body.locals, ctx, arena)});
+  if (begin_attempt) {
+    pending.push_back({0, 0, InitialLocals(body.locals, ctx, arena)});
+  }
   std::vector<LinearAttempt> carry;
   bool matched = false;
   while (!pending.empty()) {
@@ -204,6 +206,90 @@ bool AdvanceLinearAttempts(const LinearSequence& body,
   }
   active = std::move(carry);
   return matched;
+}
+
+// §16.9.5: one attempt of `s1 and s2 ...`, begun at one tick: the attempts
+// of each operand chain that tick began, and whether each chain has matched
+// since. The whole matches at a tick where every chain has matched by then
+// and one matches at that tick, which is the later of the end points; it is
+// dropped once no chain can go on, or every chain has matched and none has an
+// attempt in flight.
+struct AndAttempt {
+  std::vector<std::vector<LinearAttempt>> active;
+  std::vector<bool> matched;
+};
+
+const LinearSequence& ChainOf(const LinearSequence& body, size_t i) {
+  return i == 0 ? body : body.conjuncts[i - 1];
+}
+
+// Advances one and-attempt over every chain at this tick, the chains' own
+// attempts begun where `begin` says this is the tick the and-attempt begins
+// at. Reports whether the whole matched at this tick.
+bool AdvanceAndAttempt(const LinearSequence& body, AndAttempt& attempt,
+                       bool begin, SimContext& ctx, Arena& arena) {
+  bool matched_now = false;
+  bool all_matched = true;
+  for (size_t i = 0; i < attempt.active.size(); ++i) {
+    if (AdvanceLinearAttempts(ChainOf(body, i), attempt.active[i], ctx, arena,
+                              begin)) {
+      matched_now = true;
+      attempt.matched[i] = true;
+    }
+    if (!attempt.matched[i]) all_matched = false;
+  }
+  return matched_now && all_matched;
+}
+
+bool AndAttemptIsSpent(const AndAttempt& attempt) {
+  bool any_active = false;
+  bool all_matched = true;
+  for (size_t i = 0; i < attempt.active.size(); ++i) {
+    if (!attempt.active[i].empty()) any_active = true;
+    if (!attempt.matched[i]) all_matched = false;
+  }
+  if (all_matched && !any_active) return true;
+  for (size_t i = 0; i < attempt.active.size(); ++i) {
+    if (!attempt.matched[i] && attempt.active[i].empty()) return true;
+  }
+  return false;
+}
+
+// One tick of a conjunction: the and-attempts in flight advance, a new one
+// begins, and the spent ones are dropped. Reports whether any matched.
+bool AdvanceConjunction(const LinearSequence& body,
+                        std::vector<AndAttempt>& attempts, SimContext& ctx,
+                        Arena& arena) {
+  bool matched = false;
+  for (AndAttempt& attempt : attempts) {
+    if (AdvanceAndAttempt(body, attempt, false, ctx, arena)) matched = true;
+  }
+  size_t chains = body.conjuncts.size() + 1;
+  AndAttempt fresh{std::vector<std::vector<LinearAttempt>>(chains),
+                   std::vector<bool>(chains, false)};
+  if (AdvanceAndAttempt(body, fresh, true, ctx, arena)) matched = true;
+  attempts.push_back(std::move(fresh));
+  std::vector<AndAttempt> kept;
+  for (AndAttempt& attempt : attempts) {
+    if (!AndAttemptIsSpent(attempt)) kept.push_back(std::move(attempt));
+  }
+  attempts = std::move(kept);
+  return matched;
+}
+
+// One tick of an `or` operand: a plain chain advances its own attempts, and a
+// chain with conjuncts its and-attempts.
+struct OperandAttempts {
+  std::vector<LinearAttempt> linear;
+  std::vector<AndAttempt> conjunctive;
+};
+
+bool AdvanceOperand(const LinearSequence& body, OperandAttempts& attempts,
+                    SimContext& ctx, Arena& arena) {
+  if (body.conjuncts.empty()) {
+    return AdvanceLinearAttempts(body, attempts.linear, ctx, arena, true);
+  }
+  return AdvanceConjunction(body, attempts.conjunctive, ctx, arena);
 }
 
 // §16.13.6: mark the sequence endpoint event triggered and wake its waiters,
@@ -232,16 +318,15 @@ SimCoroutine MakeSequenceMonitorCoroutine(LinearSequence body,
   // §16.9.7: the body's `or` operands are matched side by side, each with
   // attempts of its own, and the sequence reaches an end point at a tick any
   // of them ends at.
-  std::vector<LinearAttempt> active;
-  std::vector<std::vector<LinearAttempt>> alt_active(body.alternatives.size());
+  OperandAttempts active;
+  std::vector<OperandAttempts> alt_active(body.alternatives.size());
   while (!ctx.StopRequested()) {
     co_await EventAwaiter{ctx, clock, arena};
     // §16.14.5: a new evaluation attempt begins at every clock tick, which
-    // AdvanceLinearAttempts adds beside the ones in flight.
-    bool matched = AdvanceLinearAttempts(body, active, ctx, arena);
+    // each advance adds beside the ones in flight.
+    bool matched = AdvanceOperand(body, active, ctx, arena);
     for (size_t i = 0; i < body.alternatives.size(); ++i) {
-      if (AdvanceLinearAttempts(body.alternatives[i], alt_active[i], ctx,
-                                arena)) {
+      if (AdvanceOperand(body.alternatives[i], alt_active[i], ctx, arena)) {
         matched = true;
       }
     }

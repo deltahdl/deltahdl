@@ -344,9 +344,15 @@ struct SeqLinearBody {
   std::vector<SeqCycleDelay> delays;
   std::vector<std::vector<SeqMatchAssign>> match_items;
   std::vector<SeqLocalDecl> locals;
-  // §16.9.7: the operands of a top-level `or`, each a linear chain of its own
-  // beside this one, the sequence matching where any of them does; §16.9.1
-  // has `or` bind loosest, so each chain runs from one `or` to the next.
+  // §16.9.5: the other operands of an `and` this chain is the first operand
+  // of, each a chain of its own that must match from the same tick, the
+  // whole ending at the later of the end points; §16.9.1 has `and` bind
+  // tighter than `or` and looser than `##`.
+  std::vector<SeqLinearBody> conjuncts;
+  // §16.9.7: the operands of a top-level `or`, each a chain, with its
+  // conjuncts, of its own beside this one, the sequence matching where any of
+  // them does; §16.9.1 has `or` bind loosest, so each runs from one `or` to
+  // the next.
   std::vector<SeqLinearBody> alternatives;
 };
 

@@ -400,8 +400,9 @@ bool ExpandInstance(const InstanceOperand& op, SimContext& ctx, Arena& arena,
                     LinearSequence& out, int depth) {
   LinearSequence body;
   if (!Flatten(op.inner, ctx, arena, body, depth + 1)) return false;
-  // A sequence with `or` operands of its own does not splice into one chain.
-  if (!body.alternatives.empty()) return false;
+  // A sequence with `and` or `or` operands of its own does not splice into
+  // one chain.
+  if (!body.alternatives.empty() || !body.conjuncts.empty()) return false;
   ActualsByFormal actuals = BindActuals(op.inner, op.instance, arena);
   // The operands already flattened number the instance, each instance adding
   // at least one, so the locals of two instances of one sequence differ.
@@ -428,18 +429,34 @@ bool ExpandInstance(const InstanceOperand& op, SimContext& ctx, Arena& arena,
 bool FlattenChain(const SeqLinearBody& body, SimContext& ctx, Arena& arena,
                   LinearSequence& out, int depth);
 
+// One `and` operand with its conjuncts, each flattened as a chain of its own;
+// an instance in any that names the clock gives it to the whole.
+bool FlattenConjunction(const SeqLinearBody& body, SimContext& ctx,
+                        Arena& arena, LinearSequence& out, int depth) {
+  if (!FlattenChain(body, ctx, arena, out, depth)) return false;
+  for (const SeqLinearBody& conjunct : body.conjuncts) {
+    LinearSequence flat;
+    flat.clock = out.clock;
+    if (!FlattenChain(conjunct, ctx, arena, flat, depth)) return false;
+    if (out.clock.empty()) out.clock = flat.clock;
+    out.conjuncts.push_back(std::move(flat));
+  }
+  return true;
+}
+
 bool Flatten(const ModuleItem* seq, SimContext& ctx, Arena& arena,
              LinearSequence& out, int depth) {
   if (seq == nullptr || seq->seq_linear.operands.empty()) return false;
   if (depth > kMaxInstanceDepth) return false;
   out.clock = seq->seq_clock;
-  if (!FlattenChain(seq->seq_linear, ctx, arena, out, depth)) return false;
-  // §16.9.7: each `or` operand is flattened as a chain of its own; an instance
-  // in one that names the clock gives it to the whole.
+  if (!FlattenConjunction(seq->seq_linear, ctx, arena, out, depth)) {
+    return false;
+  }
+  // §16.9.7: each `or` operand is flattened on its own.
   for (const SeqLinearBody& alt : seq->seq_linear.alternatives) {
     LinearSequence flat;
     flat.clock = out.clock;
-    if (!FlattenChain(alt, ctx, arena, flat, depth)) return false;
+    if (!FlattenConjunction(alt, ctx, arena, flat, depth)) return false;
     if (out.clock.empty()) out.clock = flat.clock;
     out.alternatives.push_back(std::move(flat));
   }

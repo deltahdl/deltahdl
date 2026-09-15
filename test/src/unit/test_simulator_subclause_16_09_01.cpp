@@ -9,9 +9,11 @@ namespace {
 
 // The source the cases share: clk rises at 5, 15, 25, ...; a is high for the
 // tick at 15, b for the tick at 25, c for the tick at 45 and d for the tick
-// at 55; and a process counts the ticks at which the named sequence `rule`,
-// whose body is `body`, reaches its end point, keeping the last such time.
-std::string PrecedenceSource(const std::string& body) {
+// at 55, unless `drive` says otherwise; and a process counts the ticks at
+// which the named sequence `rule`, whose body is `body`, reaches its end
+// point, keeping the last such time.
+std::string PrecedenceSource(const std::string& body,
+                             const std::string& drive = "") {
   return "module t;\n"
          "  logic clk = 0;\n"
          "  logic a = 0;\n"
@@ -26,13 +28,14 @@ std::string PrecedenceSource(const std::string& body) {
          body +
          ";\n"
          "  endsequence\n"
-         "  initial begin\n"
-         "    #10 a = 1;\n"
-         "    #10 a = 0; b = 1;\n"
-         "    #10 b = 0;\n"
-         "    #10 c = 1;\n"
-         "    #10 c = 0; d = 1;\n"
-         "    #10 d = 0;\n"
+         "  initial begin\n" +
+         (drive.empty() ? std::string("    #10 a = 1;\n"
+                                      "    #10 a = 0; b = 1;\n"
+                                      "    #10 b = 0;\n"
+                                      "    #10 c = 1;\n"
+                                      "    #10 c = 0; d = 1;\n"
+                                      "    #10 d = 0;\n")
+                        : drive) +
          "    #20 $finish;\n"
          "  end\n"
          "  initial forever begin\n"
@@ -59,6 +62,39 @@ TEST(SequenceOperatorPrecedence, ConcatenationBindsTighterThanOr) {
   ASSERT_NE(either, nullptr);
   EXPECT_EQ(either->value.ToUint64(), 2u);
   EXPECT_EQ(g.ctx.FindVariable("last")->value.ToUint64(), 45u);
+}
+
+// §16.9.1: `##` binds tighter than `and`, so `a ##1 b and c` is `(a ##1 b)
+// and c`, both operands matched from the tick at 15 where a and c hold and
+// the whole ending at the later end point, 25 where b holds; read as `a ##1
+// (b and c)` it would need c at 25, low then, and never end.
+TEST(SequenceOperatorPrecedence, ConcatenationBindsTighterThanAnd) {
+  SimFixture f;
+  auto* hits = RunAndFindVar(PrecedenceSource("a ##1 b and c",
+                                              "    #10 a = 1; c = 1;\n"
+                                              "    #10 a = 0; c = 0; b = 1;\n"
+                                              "    #10 b = 0;\n"),
+                             f, "hits");
+  ASSERT_NE(hits, nullptr);
+  EXPECT_EQ(hits->value.ToUint64(), 1u);
+  EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 25u);
+}
+
+// §16.9.1: `and` binds tighter than `or`, so `a and c or d` is `(a and c) or
+// d`, ending at 15 where a and c both hold and at 25 and 45 where d holds;
+// read as `a and (c or d)` it would need a beside d and end at 15 alone.
+TEST(SequenceOperatorPrecedence, AndBindsTighterThanOr) {
+  SimFixture f;
+  auto* hits = RunAndFindVar(PrecedenceSource("a and c or d",
+                                              "    #10 a = 1; c = 1;\n"
+                                              "    #10 a = 0; c = 0; d = 1;\n"
+                                              "    #10 d = 0;\n"
+                                              "    #10 d = 1;\n"
+                                              "    #10 d = 0;\n"),
+                             f, "hits");
+  ASSERT_NE(hits, nullptr);
+  EXPECT_EQ(hits->value.ToUint64(), 3u);
+  EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 45u);
 }
 
 }  // namespace

@@ -1,0 +1,4 @@
+a ##1 b and c ends at 25
+a and c or d ends at 15 25 45 55
+a ##1 b or c ##1 d ends at 25 55
+$finish at time 80
