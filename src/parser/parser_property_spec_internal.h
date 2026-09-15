@@ -25,8 +25,8 @@ struct SimpleSpecBody {
 // §16.12 to §16.12.6: the parse of the property_spec of a concurrent
 // assertion in the forms the evaluation reads, after its clock: the disable
 // condition, and a boolean, a sequential property or a property of operands
-// under not, or, and, if-else and implication. A friend of Parser, defined in
-// src/parser/parser_property_spec.cpp.
+// under not, or, and, if-else, implication, implies and iff. A friend of
+// Parser, defined in src/parser/parser_property_spec.cpp.
 struct ParserPropertySpecHelpers {
   static Expr* PropertySpecPlaceholder(Arena& arena, SourceLoc loc);
   static bool BodyHasPropertyOperator(Parser& p);
@@ -41,6 +41,8 @@ struct ParserPropertySpecHelpers {
   static PropertyExprNode* ParsePropertyAnd(Parser& p);
   static PropertyExprNode* ParsePropertyOr(Parser& p);
   static PropertyExprNode* ParsePropertyImplication(Parser& p);
+  static PropertyExprNode* ParsePropertyImplies(Parser& p);
+  static PropertyExprNode* ParsePropertyIff(Parser& p);
   static bool ParseSimpleSpecBody(Parser& p, SimpleSpecBody& body);
   static Stmt* MakeSimplePropertyStmt(Parser& p, ModuleItem* item,
                                       StmtKind body_kind,

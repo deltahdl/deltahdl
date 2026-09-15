@@ -131,6 +131,21 @@ Tri Junction(bool is_or, const std::vector<Tri>& verdicts) {
   return result;
 }
 
+// §16.12.8 over two operands' verdicts: implies is true where the first is
+// false or the second true, false where the first is true and the second
+// false; iff is true where both are decided alike and false where decided
+// apart; else not yet decided.
+Tri Implies(Tri first, Tri second) {
+  if (first == Tri::kFalse || second == Tri::kTrue) return Tri::kTrue;
+  if (first == Tri::kTrue && second == Tri::kFalse) return Tri::kFalse;
+  return Tri::kPending;
+}
+
+Tri Iff(Tri first, Tri second) {
+  if (first == Tri::kPending || second == Tri::kPending) return Tri::kPending;
+  return first == second ? Tri::kTrue : Tri::kFalse;
+}
+
 // The state of one attempt of the tree under `node`, its operators' operands
 // stood up with it and its sequences' attempts to be begun at the first
 // tick.
@@ -260,6 +275,15 @@ Tri Step(const PropertyExprNode* node, NodeState& state, StepContext& sc,
     case PropertyExprNode::Kind::kImplication:
       state.verdict = StepImplication(node, state, sc, begin);
       break;
+    case PropertyExprNode::Kind::kImplies:
+    case PropertyExprNode::Kind::kIff: {
+      Tri first = Step(node->operands[0], *state.operands[0], sc, begin);
+      Tri second = Step(node->operands[1], *state.operands[1], sc, begin);
+      state.verdict = node->kind == PropertyExprNode::Kind::kImplies
+                          ? Implies(first, second)
+                          : Iff(first, second);
+      break;
+    }
   }
   return state.verdict;
 }
@@ -303,6 +327,15 @@ Tri Finish(const PropertyExprNode* node, NodeState& state) {
         verdicts.push_back(Finish(node->operands[0], *c));
       }
       state.verdict = Junction(false, verdicts);
+      break;
+    }
+    case PropertyExprNode::Kind::kImplies:
+    case PropertyExprNode::Kind::kIff: {
+      Tri first = Finish(node->operands[0], *state.operands[0]);
+      Tri second = Finish(node->operands[1], *state.operands[1]);
+      state.verdict = node->kind == PropertyExprNode::Kind::kImplies
+                          ? Implies(first, second)
+                          : Iff(first, second);
       break;
     }
   }

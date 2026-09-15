@@ -8,8 +8,8 @@
 namespace delta {
 
 // §16.12: the tokens of the property operators the evaluation does not read,
-// a followed-by among them; not, or, and, if-else and the implications are
-// read.
+// a followed-by among them; not, or, and, if-else, the implications, implies
+// and iff are read.
 static bool IsPropertyOperatorToken(TokenKind k) {
   switch (k) {
     case TokenKind::kHashMinusHash:
@@ -24,8 +24,6 @@ static bool IsPropertyOperatorToken(TokenKind k) {
     case TokenKind::kKwSUntil:
     case TokenKind::kKwUntilWith:
     case TokenKind::kKwSUntilWith:
-    case TokenKind::kKwImplies:
-    case TokenKind::kKwIff:
     case TokenKind::kKwAcceptOn:
     case TokenKind::kKwRejectOn:
     case TokenKind::kKwSyncAcceptOn:
@@ -134,15 +132,17 @@ bool ParserPropertySpecHelpers::AheadHolds(Parser& p, TokenKind wanted,
 }
 
 // Whether the spec holds an `or` or an `and` at its own depth, or an
-// implication, which makes it a property built of operands (§16.12.4,
-// §16.12.5, §16.12.7) rather than one operand; a sequence's own `or` and
-// `and` read the same, which §16.12.2's strength rules make the same
-// property.
+// implication, implies or iff, which makes it a property built of operands
+// (§16.12.4, §16.12.5, §16.12.7, §16.12.8) rather than one operand; a
+// sequence's own `or` and `and` read the same, which §16.12.2's strength rules
+// make the same property.
 bool ParserPropertySpecHelpers::BodyHasPropertyJunction(Parser& p) {
   return AheadHolds(p, TokenKind::kKwOr, false) ||
          AheadHolds(p, TokenKind::kKwAnd, false) ||
          AheadHolds(p, TokenKind::kPipeDashGt, false) ||
-         AheadHolds(p, TokenKind::kPipeEqGt, false);
+         AheadHolds(p, TokenKind::kPipeEqGt, false) ||
+         AheadHolds(p, TokenKind::kKwImplies, false) ||
+         AheadHolds(p, TokenKind::kKwIff, false);
 }
 
 PropertyExprNode* ParserPropertySpecHelpers::NewPropertyNode(
@@ -251,13 +251,37 @@ PropertyExprNode* ParserPropertySpecHelpers::ParsePropertyImplication(
   if (node->sequence == nullptr || strong ||
       (!overlapped && !p.Check(TokenKind::kPipeEqGt))) {
     p.lexer_.RestorePos(saved);
-    return ParsePropertyOr(p);
+    return ParsePropertyImplies(p);
   }
   p.Consume();
   node->strong = !overlapped;
   auto* consequent = ParsePropertyImplication(p);
   if (consequent == nullptr) return nullptr;
   node->operands.push_back(consequent);
+  return node;
+}
+
+// §16.12.8 and Table 16-3: `iff` binds tighter than `implies` and looser
+// than `or`, both right associative, each over two operands.
+PropertyExprNode* ParserPropertySpecHelpers::ParsePropertyIff(Parser& p) {
+  auto* left = ParsePropertyOr(p);
+  if (left == nullptr || !p.Match(TokenKind::kKwIff)) return left;
+  auto* node = NewPropertyNode(p, PropertyExprNode::Kind::kIff);
+  node->operands.push_back(left);
+  auto* right = ParsePropertyIff(p);
+  if (right == nullptr) return nullptr;
+  node->operands.push_back(right);
+  return node;
+}
+
+PropertyExprNode* ParserPropertySpecHelpers::ParsePropertyImplies(Parser& p) {
+  auto* left = ParsePropertyIff(p);
+  if (left == nullptr || !p.Match(TokenKind::kKwImplies)) return left;
+  auto* node = NewPropertyNode(p, PropertyExprNode::Kind::kImplies);
+  node->operands.push_back(left);
+  auto* right = ParsePropertyImplies(p);
+  if (right == nullptr) return nullptr;
+  node->operands.push_back(right);
   return node;
 }
 

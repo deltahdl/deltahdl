@@ -1,0 +1,5 @@
+a implies b passes 3 fails 1
+a iff b passes 2 fails 2
+a iff b implies c passes 3 fails 1
+(a ##1 b) implies c passes 3 fails 1
+$finish at time 40

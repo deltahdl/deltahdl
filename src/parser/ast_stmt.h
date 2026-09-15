@@ -67,8 +67,9 @@ struct ModuleItem;
 
 // §16.12: a property_expr built from the operands the evaluation reads --
 // a boolean, a sequence weak or strong (§16.12.2) -- under the operators
-// not (§16.12.3), or (§16.12.4), and (§16.12.5), if-else (§16.12.6) and
-// implication (§16.12.7). A boolean leaf carries `boolean`, a sequence leaf
+// not (§16.12.3), or (§16.12.4), and (§16.12.5), if-else (§16.12.6),
+// implication (§16.12.7) and implies and iff (§16.12.8), the last two over
+// two operands. A boolean leaf carries `boolean`, a sequence leaf
 // `sequence` and `strong`, an operator its operands, an if-else its
 // condition in `boolean` with the then and else properties as its operands,
 // the else absent where none was written, and an implication its antecedent
@@ -82,7 +83,9 @@ struct PropertyExprNode {
     kOr,
     kAnd,
     kIfElse,
-    kImplication
+    kImplication,
+    kImplies,
+    kIff
   };
   Kind kind = Kind::kBoolean;
   Expr* boolean = nullptr;
