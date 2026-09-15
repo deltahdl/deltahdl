@@ -44,6 +44,16 @@ void SpawnForkJoinNone(const Stmt* stmt, SimContext& ctx, Arena& arena);
 void ExecDeferredImmediateAssertInFunction(const Stmt* stmt, SimContext& ctx,
                                            Arena& arena);
 
+// §13.4.4 keeps time-controlled statements out of a function and §13.3.1 lets a
+// task called from a synchronous position, such as a deferred assertion's
+// action (§16.4), run only what a function may, and neither rules out an event
+// trigger: `-> e` fires at once and `->> e` schedules its update event without
+// blocking. Runs either from the synchronous function-body executor, which
+// cannot co_await, waking whatever waits on the event as the statement
+// executor would.
+void ExecEventTriggerInFunction(const Stmt* stmt, SimContext& ctx,
+                                Arena& arena);
+
 bool IsTimeControlStatement(StmtKind kind);
 
 }  // namespace delta

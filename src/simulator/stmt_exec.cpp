@@ -104,6 +104,18 @@ static StmtResult ExecEventTriggerImpl(const Stmt* stmt, SimContext& ctx) {
   return StmtResult::kDone;
 }
 
+static StmtResult ExecNbEventTriggerImpl(const Stmt* stmt, SimContext& ctx,
+                                         Arena& arena);
+
+void ExecEventTriggerInFunction(const Stmt* stmt, SimContext& ctx,
+                                Arena& arena) {
+  if (stmt->kind == StmtKind::kEventTrigger) {
+    ExecEventTriggerImpl(stmt, ctx);
+  } else if (stmt->kind == StmtKind::kNbEventTrigger) {
+    ExecNbEventTriggerImpl(stmt, ctx, arena);
+  }
+}
+
 // Schedules the nonblocking-assignment-region update event that fires a named
 // event: it marks the event triggered and wakes every process waiting on it.
 // Shared by both the delay/immediate and the event-control forms of ->>.

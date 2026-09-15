@@ -54,4 +54,47 @@ TEST(FunctionBackgroundProcessSim, NonblockingAssignFromFunction) {
             99u);
 }
 
+// §13.4.4 rules time-controlled statements out of a function and nothing else
+// of the kind: a named event trigger blocks nothing, so a void function may
+// fire one, and the process waiting on the event resumes. The waiter writes
+// 5 only once it has resumed; left unexecuted, the trigger leaves x at 1.
+TEST(FunctionBackgroundProcessSim, EventTriggerFromFunctionWakesTheWaiter) {
+  EXPECT_EQ(RunAndGet("module m;\n"
+                      "  event e;\n"
+                      "  logic [7:0] x;\n"
+                      "  function void fire();\n"
+                      "    -> e;\n"
+                      "  endfunction\n"
+                      "  initial begin\n"
+                      "    x = 1;\n"
+                      "    @e;\n"
+                      "    x = 5;\n"
+                      "  end\n"
+                      "  initial #1 fire();\n"
+                      "endmodule\n",
+                      "x"),
+            5u);
+}
+
+// The nonblocking form ->> schedules its update event in the NBA region rather
+// than firing at once, and a function may issue it too: the waiter resumes
+// after the update event, so x reads 6 at the end of the run.
+TEST(FunctionBackgroundProcessSim, NbEventTriggerFromFunctionWakesTheWaiter) {
+  EXPECT_EQ(RunAndGet("module m;\n"
+                      "  event e;\n"
+                      "  logic [7:0] x;\n"
+                      "  function void fire();\n"
+                      "    ->> e;\n"
+                      "  endfunction\n"
+                      "  initial begin\n"
+                      "    x = 1;\n"
+                      "    @e;\n"
+                      "    x = 6;\n"
+                      "  end\n"
+                      "  initial #1 fire();\n"
+                      "endmodule\n",
+                      "x"),
+            6u);
+}
+
 }  // namespace

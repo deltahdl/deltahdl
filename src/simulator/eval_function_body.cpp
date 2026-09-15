@@ -582,6 +582,15 @@ static bool ExecFuncStmt(const Stmt* stmt, const FuncExecCtx& exec) {
       return ExecFuncDoWhile(stmt, exec);
     case StmtKind::kForever:
       return ExecFuncForever(stmt, exec);
+    case StmtKind::kEventTrigger:
+    case StmtKind::kNbEventTrigger:
+      // §13.4.4 names no event trigger among what a function may not hold, and
+      // a task reached from a synchronous position -- a deferred assertion's
+      // action (§16.4) -- runs here too, so `-> e` fires and `->> e` schedules
+      // its update event as they would in a process; left to the default they
+      // did nothing, and a process waiting on the event never woke.
+      ExecEventTriggerInFunction(stmt, exec.ctx, exec.arena);
+      return false;
     case StmtKind::kFork:
       // §13.4.4: a function may fork off background processes with join_none
       // (join/join_any would block and are illegal here). Spawn the children
