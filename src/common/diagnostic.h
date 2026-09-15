@@ -111,6 +111,10 @@ class DiagEngine {
   void PopSuppress() {
     if (suppress_depth_ > 0) --suppress_depth_;
   }
+  // The errors suppressed so far, which a trial parse compares before and
+  // after to learn whether the text it read was well formed, the report
+  // itself being discarded.
+  uint32_t SuppressedErrorCount() const { return suppressed_error_count_; }
 
  private:
   void Emit(DiagSeverity sev, SourceLoc loc, std::string msg,
@@ -122,6 +126,7 @@ class DiagEngine {
   uint32_t warning_count_ = 0;
   bool warnings_as_errors_ = false;
   uint32_t suppress_depth_ = 0;
+  uint32_t suppressed_error_count_ = 0;
 };
 
 }  // namespace delta

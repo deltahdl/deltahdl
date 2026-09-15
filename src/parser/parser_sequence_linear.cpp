@@ -692,9 +692,12 @@ void Parser::CaptureLinearSequenceBody(ModuleItem* item) {
 // assertion evaluates. Answers false, leaving the body empty, where the
 // sequence is not one the monitor reads.
 bool Parser::ParseSequenceExprInto(ModuleItem* item) {
+  uint32_t errors = diag_.ErrorCount() + diag_.SuppressedErrorCount();
   in_sequence_body_ = true;
   bool ok = ParserSeqLinearHelpers::ParseLinearSeqOperands(*this, item);
   in_sequence_body_ = false;
+  // An operand that read with an error, reported or suppressed, is not one.
+  if (diag_.ErrorCount() + diag_.SuppressedErrorCount() != errors) ok = false;
   if (!ok || item->seq_linear.operands.empty()) {
     item->seq_linear = SeqLinearBody{};
     return false;
@@ -708,10 +711,12 @@ bool Parser::ParseSequenceExprInto(ModuleItem* item) {
 // as the sequence's own for two sequences and which reaches a negated or
 // boolean operand beside a sequence as well.
 bool Parser::ParseSequenceTermInto(ModuleItem* item) {
+  uint32_t errors = diag_.ErrorCount() + diag_.SuppressedErrorCount();
   in_sequence_body_ = true;
   bool ok = ParserSeqLinearHelpers::ParseLinearSeqIntersection(
       *this, item->seq_linear);
   in_sequence_body_ = false;
+  if (diag_.ErrorCount() + diag_.SuppressedErrorCount() != errors) ok = false;
   if (!ok || item->seq_linear.operands.empty()) {
     item->seq_linear = SeqLinearBody{};
     return false;

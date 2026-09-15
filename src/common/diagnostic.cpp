@@ -29,7 +29,10 @@ void DiagEngine::Error(SourceLoc loc, std::string msg, Subclause subclause) {
 
 void DiagEngine::Emit(DiagSeverity sev, SourceLoc loc, std::string msg,
                       Subclause subclause) {
-  if (suppress_depth_ > 0) return;
+  if (suppress_depth_ > 0) {
+    if (sev == DiagSeverity::kError) ++suppressed_error_count_;
+    return;
+  }
   if (sev == DiagSeverity::kError) {
     ++error_count_;
   } else if (sev == DiagSeverity::kWarning) {
