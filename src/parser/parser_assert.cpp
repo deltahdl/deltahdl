@@ -325,13 +325,16 @@ struct ParserAssertHelpers {
   // one holding neither a cycle delay nor an implication is a boolean, read
   // into `prop`. Answers false where the body is none of these.
   static bool ParseSimpleSpecBody(Parser& p, SimpleSpecBody& body) {
-    // §16.12.3: each `not` before the body negates it once more.
-    while (p.Match(TokenKind::kKwNot)) body.negated = !body.negated;
     if (BodyHasPropertyOperator(p)) return false;
+    // Table 16-3 has `not` bind tighter than `or` and `and`, so where the
+    // spec is a property of operands a leading `not` is the first operand's,
+    // read with the operands.
     if (BodyHasPropertyJunction(p)) {
       body.property = ParsePropertyOr(p);
       return body.property != nullptr;
     }
+    // §16.12.3: each `not` before the body negates it once more.
+    while (p.Match(TokenKind::kKwNot)) body.negated = !body.negated;
     if (!p.BodyHasTemporalOperator()) {
       body.prop = p.ParseExpr();
       return body.prop != nullptr;
