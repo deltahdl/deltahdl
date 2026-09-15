@@ -1,0 +1,4 @@
+(te1 ##2 te2) and (te3 ##2 te4 ##2 te5) ends at 115 255
+(te1 ##[1:5] te2) and (te3 ##2 te4 ##2 te5) ends at 115 255 265
+te1 and te2 ends at 285 305 355 415
+$finish at time 430
