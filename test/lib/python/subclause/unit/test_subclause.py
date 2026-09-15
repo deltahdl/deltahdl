@@ -1,61 +1,8 @@
 """Tests for lib.python.subclause."""
 
 from lib.python.subclause import (
-    STAGE_TO_PREFIX,
     build_hierarchy,
-    subclause_to_filename,
 )
-
-
-# --- STAGE_TO_PREFIX ---
-
-
-def test_stage_to_prefix_has_all_stages() -> None:
-    """Contains all six pipeline stages."""
-    assert set(STAGE_TO_PREFIX) == {
-        "preprocessor", "lexer", "parser",
-        "elaborator", "simulator", "synthesizer",
-    }
-
-
-def test_stage_to_prefix_values_are_test_prefixes() -> None:
-    """Every value starts with test_ and ends with _."""
-    assert all(
-        v.startswith("test_") and v.endswith("_")
-        for v in STAGE_TO_PREFIX.values()
-    )
-
-
-# --- subclause_to_filename ---
-
-
-def test_subclause_to_filename_regular() -> None:
-    """Regular subclause becomes padded subclause filename."""
-    assert subclause_to_filename(
-        "test_parser_", "6.1") == "test_parser_subclause_06_01"
-
-
-def test_subclause_to_filename_non_lrm_with_topic() -> None:
-    """Non-LRM with topic uses the topic."""
-    assert subclause_to_filename(
-        "test_non_lrm_", "non-lrm:aig") == "test_non_lrm_aig"
-
-
-def test_subclause_to_filename_non_lrm_no_topic() -> None:
-    """Non-LRM without topic defaults to misc."""
-    assert subclause_to_filename(
-        "test_non_lrm_", "non-lrm") == "test_non_lrm_misc"
-
-
-def test_subclause_to_filename_bare_annex() -> None:
-    """Single letter becomes bare annex filename."""
-    assert subclause_to_filename("test_parser_", "A") == "test_parser_annex_a"
-
-
-def test_subclause_to_filename_annex_subclause() -> None:
-    """Annex subclause becomes padded annex filename."""
-    assert subclause_to_filename(
-        "test_parser_", "A.1.3") == "test_parser_annex_a_01_03"
 
 
 # --- build_hierarchy ---

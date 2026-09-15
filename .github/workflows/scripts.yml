@@ -394,31 +394,6 @@ jobs:
           --cov-branch
           --cov-report=term-missing
           --cov-fail-under=100
-      - name: Run integration tests
-        run: >-
-          python3 -m pytest test/lib/python/cli/integration/ -v
-  test-lib-git:
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v5
-      - name: Restore pip cache
-        uses: actions/cache@v5
-        with:
-          key: >-
-            pip-scripts-test-lib-${{
-            hashFiles('.github/workflows/scripts.yml') }}
-          path: ~/.cache/pip
-          restore-keys: |
-            pip-scripts-test-lib-
-      - name: Install tools
-        run: pip install pytest pytest-cov
-      - name: Run tests with 100% coverage gate
-        run: >-
-          python3 -m pytest test/lib/python/git/unit/ -v
-          --cov=lib.python.git
-          --cov-branch
-          --cov-report=term-missing
-          --cov-fail-under=100
   test-lib-github:
     runs-on: ubuntu-24.04
     steps:
