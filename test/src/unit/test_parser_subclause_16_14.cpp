@@ -141,8 +141,8 @@ TEST(ConcurrentAssertionEvaluationReporting,
 // §16.7: ## is the cycle delay range, and §16.12.2 has a sequence_expr be a
 // sequential property, which the evaluation reads as weak in an assert; a
 // spec that holds a cycle delay and no property operator is reported by
-// nothing. One holding a cycle delay under a property operator is still the
-// temporal branch's.
+// nothing. One holding a cycle delay under a property operator the
+// evaluation does not read, nexttime here, is still the temporal branch's.
 TEST(ConcurrentAssertionEvaluationReporting,
      CycleDelayIsEvaluatedAsASequentialProperty) {
   auto r = Parse(
@@ -152,7 +152,7 @@ TEST(ConcurrentAssertionEvaluationReporting,
   EXPECT_EQ(UnevaluatedReports(r), 0);
   auto under = Parse(
       "module m;\n"
-      "  assert property (@(posedge clk) not (a ##1 b));\n"
+      "  assert property (@(posedge clk) nexttime (a ##1 b));\n"
       "endmodule\n");
   EXPECT_TRUE(
       ReportedWarning(under.diags, "its property is temporal", 2, "16.14"));
