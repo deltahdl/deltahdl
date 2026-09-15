@@ -36,6 +36,8 @@ TEST(AttachedSubroutineScheduling, ByValueArgumentMatchesSequenceEvaluation) {
 }
 
 // --- Live cases: the linear sequence monitor over real source ---
+//
+// The shared source finishes at 160, which the capture ends with.
 
 // §16.11: the clause's s1 over te1 as a and te2 as b, with v and w assigned
 // from te3 and te4: the attached $display runs at the match, at the first te2
@@ -49,7 +51,7 @@ TEST(AttachedSubroutine, RunsAtTheMatchWithTheLocalsAssigned) {
           "= %h, w = %h at %0t\", v, w, $time))",
           DriveTicks({{1}, {3}, {1}, {}, {}}), "", "    logic v, w;\n"),
       f);
-  EXPECT_EQ(out, "b after a with v = 1, w = 0 at 25\n");
+  EXPECT_EQ(out, "b after a with v = 1, w = 0 at 25\n$finish at time 160\n");
 }
 
 // §16.11: the attached calls are executed at every end point of the
@@ -62,7 +64,9 @@ TEST(AttachedSubroutine, RunsAtEveryEndPointInListOrder) {
                          "$display(\"second at %0t\", $time))",
                          DriveTicks({{1}, {2, 3}, {}, {}, {}})),
       f);
-  EXPECT_EQ(out, "first at 15\nsecond at 15\nfirst at 25\nsecond at 25\n");
+  EXPECT_EQ(out,
+            "first at 15\nsecond at 15\nfirst at 25\nsecond at 25\n"
+            "$finish at time 160\n");
 }
 
 // §16.11: an argument passed by value reads the sampled value the sequence
@@ -78,7 +82,7 @@ TEST(AttachedSubroutine, ByValueArgumentReadsTheSampledValue) {
                                     "  int k = 0;\n"
                                     "  always @(posedge clk) k <= k + 1;\n"),
                  f);
-  EXPECT_EQ(out, "k = 2\n");
+  EXPECT_EQ(out, "k = 2\n$finish at time 160\n");
 }
 
 // §16.11: a void function is called as a system task is, its by-value
@@ -92,7 +96,7 @@ TEST(AttachedSubroutine, VoidFunctionIsCalledAtTheMatch) {
                                     "    $display(\"noted %0d\", t);\n"
                                     "  endfunction\n"),
                  f);
-  EXPECT_EQ(out, "noted 25\n");
+  EXPECT_EQ(out, "noted 25\n$finish at time 160\n");
 }
 
 }  // namespace
