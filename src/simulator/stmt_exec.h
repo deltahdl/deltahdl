@@ -36,13 +36,14 @@ bool TryExecSystemCallTask(const Expr* expr, SimContext& ctx, Arena& arena);
 // the fork's join kind is join_none.
 void SpawnForkJoinNone(const Stmt* stmt, SimContext& ctx, Arena& arena);
 
-// §16.4.5: evaluate and schedule a deferred immediate assertion reached from a
-// function body. The report is queued against the calling process, so a
-// function shared by several processes produces an independent report per
-// process. Intended for the synchronous function-body executor, which cannot
-// co_await; only the deferred (#0 / final) forms are handled.
-void ExecDeferredImmediateAssertInFunction(const Stmt* stmt, SimContext& ctx,
-                                           Arena& arena);
+// §16.4.5 and §16.3: judge one attempt of an immediate assertion reached from a
+// function body. A deferred assertion's report is queued against the calling
+// process, so a function shared by several processes produces an independent
+// report per process; a simple immediate assertion's pass or fail statement is
+// returned for the caller to run inline, as the synchronous function-body
+// executor cannot co_await. Returns nullptr where there is nothing to run.
+const Stmt* ExecImmediateAssertInFunction(const Stmt* stmt, SimContext& ctx,
+                                          Arena& arena);
 
 // §13.4.4 keeps time-controlled statements out of a function and §13.3.1 lets a
 // task called from a synchronous position, such as a deferred assertion's

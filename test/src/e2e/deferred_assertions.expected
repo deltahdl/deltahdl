@@ -11,6 +11,6 @@ observed fail at 2
 zero: flag is 0
 $finish at time 11
 cover deferred_assertions (line 65): evaluated 1, succeeded 1
-cover deferred_assertions.never (line 79): evaluated 1, succeeded 0
 cover deferred_assertions.zero (line 80): evaluated 1, succeeded 1
+cover deferred_assertions.never (line 79): evaluated 1, succeeded 0
 [10] ERROR deferred_assertions (line 73): Assertion failed.

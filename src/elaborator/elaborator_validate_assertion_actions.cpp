@@ -155,10 +155,7 @@ void Elaborator::ValidateSequenceEventArgs(const ModuleDecl* decl) {
 static bool IsSingleSubroutineCall(const Stmt* action) {
   if (!action) return true;
   if (action->kind == StmtKind::kNull) return true;
-  if (action->kind != StmtKind::kExprStmt) return false;
-  if (!action->expr) return false;
-  return action->expr->kind == ExprKind::kCall ||
-         action->expr->kind == ExprKind::kSystemCall;
+  return SubroutineCallOfStmt(action) != nullptr;
 }
 
 static bool ContainsPostponedIllegalStmt(const Stmt* s) {
@@ -215,17 +212,16 @@ using DeferredSubroutineMap =
 static void CheckFinalDeferredCallee(const Stmt* action,
                                      const DeferredSubroutineMap& subs,
                                      DiagEngine& diag) {
-  if (!IsSingleSubroutineCall(action)) return;
-  if (!action || action->kind != StmtKind::kExprStmt || !action->expr) return;
-  if (action->expr->kind != ExprKind::kCall) return;
-  auto it = subs.find(action->expr->callee);
+  const Expr* call = SubroutineCallOfStmt(action);
+  if (call == nullptr || call->kind != ExprKind::kCall) return;
+  auto it = subs.find(call->callee);
   if (it == subs.end()) return;
   if (CalleeBodyHasPostponedIllegal(it->second)) {
     diag.Warning(action->range.start,
                  std::format("final deferred assertion calls '{}', whose body "
                              "contains statements not legally callable in the "
                              "Postponed region (§4.4.2.9)",
-                             action->expr->callee),
+                             call->callee),
                  Subclause("16.4"));
   }
 }
@@ -261,13 +257,12 @@ static void CheckDeferredRefActual(
 static void CheckDeferredCallRefArgs(
     const Stmt* action, const DeferredSubroutineMap& subs,
     const std::unordered_set<std::string_view>& auto_vars, DiagEngine& diag) {
-  if (!IsSingleSubroutineCall(action)) return;
-  if (!action || action->kind != StmtKind::kExprStmt || !action->expr) return;
-  if (action->expr->kind != ExprKind::kCall) return;
-  auto it = subs.find(action->expr->callee);
+  const Expr* call = SubroutineCallOfStmt(action);
+  if (call == nullptr || call->kind != ExprKind::kCall) return;
+  auto it = subs.find(call->callee);
   if (it == subs.end()) return;
   const auto& formals = it->second->func_args;
-  const auto& actuals = action->expr->args;
+  const auto& actuals = call->args;
   size_t n = std::min(formals.size(), actuals.size());
   for (size_t i = 0; i < n; ++i) {
     if (formals[i].direction != Direction::kRef) continue;

@@ -72,14 +72,9 @@ static DeferredArgSnapshots SnapshotDeferredCallArgs(const Stmt* action,
                                                      SimContext& ctx,
                                                      Arena& arena) {
   DeferredArgSnapshots snaps;
-  if (!action || action->kind != StmtKind::kExprStmt || !action->expr) {
-    return snaps;
-  }
-  if (action->expr->kind != ExprKind::kCall &&
-      action->expr->kind != ExprKind::kSystemCall) {
-    return snaps;
-  }
-  for (auto* arg : action->expr->args) {
+  const Expr* call = SubroutineCallOfStmt(action);
+  if (call == nullptr) return snaps;
+  for (auto* arg : call->args) {
     if (!arg) continue;
     snaps.emplace_back(arg, EvalExpr(arg, ctx, arena));
   }
@@ -105,57 +100,86 @@ static bool DeferredReportCancelled(const Process* proc,
          proc->cancelled_deferred_labels.count(label) != 0;
 }
 
+// §16.4.1: a pending assertion report is placed in the queue of the process
+// executing the assertion, and §20.10 has its severity message and §21.2.1.5
+// its %m name the hierarchical scope of the statement, which the labels the
+// process stands inside are part of. The report's event runs after the process
+// has moved on or suspended, with the context holding whatever ran last, so
+// the process and its named scopes are recorded when the report is queued and
+// stood back up around the report, then put back as they were.
+struct PendingReportScope {
+  Process* proc = nullptr;
+  std::vector<std::string_view> named_scopes;
+
+  static PendingReportScope Capture(const SimContext& ctx) {
+    return {ctx.CurrentProcess(), ctx.ActiveNamedScopes()};
+  }
+
+  void Install(SimContext& ctx, PendingReportScope& saved) const {
+    saved = Capture(ctx);
+    Swap(ctx, *this);
+  }
+
+  static void Swap(SimContext& ctx, const PendingReportScope& to) {
+    ctx.SetCurrentProcess(to.proc);
+    while (!ctx.ActiveNamedScopes().empty()) ctx.PopActiveNamedScope();
+    for (std::string_view scope : to.named_scopes) {
+      ctx.PushActiveNamedScope(scope);
+    }
+  }
+};
+
+// §16.4.1 and §16.4.2: queues one pending assertion report -- an action
+// block's subroutine call, the default $error, or a deferred cover's result --
+// in the Reactive region for an observed deferred assertion and the Postponed
+// region for a final one, where `run` executes it. The process and its report
+// generation are captured now; if a flush point bumps the generation before
+// the region fires (the process resumes, or an always_comb re-triggers in the
+// same time step), the queued report has been flushed and is skipped, as it
+// is when §16.4.4's `disable <assertion_label>` has cancelled it.
+static void SchedulePendingReport(bool is_final_deferred,
+                                  std::string_view assertion_label,
+                                  SimContext& ctx, std::function<void()> run) {
+  Region region = is_final_deferred ? Region::kPostponed : Region::kReactive;
+  PendingReportScope scope = PendingReportScope::Capture(ctx);
+  uint64_t gen = ctx.CurrentDeferredReportGeneration();
+  std::string label(assertion_label);
+  auto* ev = ctx.GetScheduler().GetEventPool().Acquire();
+  ev->callback = [scope, gen, label, run = std::move(run), &ctx]() {
+    if (scope.proc && scope.proc->deferred_report_generation != gen) return;
+    if (DeferredReportCancelled(scope.proc, label)) return;
+    PendingReportScope saved;
+    scope.Install(ctx, saved);
+    run();
+    PendingReportScope::Swap(ctx, saved);
+  };
+  ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), region, ev);
+}
+
 static void ScheduleDeferredAction(const Stmt* action, bool is_final_deferred,
                                    std::string_view assertion_label,
                                    SimContext& ctx, Arena& arena) {
   if (!action) return;
-
   DeferredArgSnapshots snaps = SnapshotDeferredCallArgs(action, ctx, arena);
-  Region region = is_final_deferred ? Region::kPostponed : Region::kReactive;
-  // §16.4.2: the report is pending until its region runs. Capture the process
-  // and its report generation now; if a flush point bumps the generation before
-  // the region fires (e.g. the process resumes or an always_comb re-triggers in
-  // the same time step), the queued report has been flushed and is skipped.
-  Process* proc = ctx.CurrentProcess();
-  uint64_t gen = ctx.CurrentDeferredReportGeneration();
-  // §16.4.4: also remember which assertion queued this report, so a later
-  // `disable <that label>` in the same process can cancel just this report.
-  std::string label(assertion_label);
-  auto* ev = ctx.GetScheduler().GetEventPool().Acquire();
-  ev->callback = [action, snaps = std::move(snaps), proc, gen, label, &ctx,
-                  &arena]() {
-    if ((!proc || proc->deferred_report_generation == gen) &&
-        !DeferredReportCancelled(proc, label)) {
-      RunDeferredActionWithSnapshots(action, snaps, ctx, arena);
-    }
-  };
-  ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), region, ev);
+  SchedulePendingReport(is_final_deferred, assertion_label, ctx,
+                        [action, snaps = std::move(snaps), &ctx, &arena]() {
+                          RunDeferredActionWithSnapshots(action, snaps, ctx,
+                                                         arena);
+                        });
 }
 
 // §16.4.1: when a deferred assertion fails with no else clause, its default
 // $error report is a pending assertion report rather than an immediate one.
 // Like the action-block subroutine call, it is not emitted where the assertion
 // is processed; it is deferred and executed with the rest of the process's
-// pending reports -- in the Reactive region for an observed (#0) deferred
-// assertion, or in the Postponed region for a final deferred assertion.
+// pending reports.
 static void ScheduleDeferredSeverityReport(bool is_final_deferred,
                                            std::string_view assertion_label,
                                            uint32_t line, SimContext& ctx) {
-  Region region = is_final_deferred ? Region::kPostponed : Region::kReactive;
-  // §16.4.2: the default $error is a pending report too, so it is flushed the
-  // same way when the process reaches a flush point before its region runs.
-  Process* proc = ctx.CurrentProcess();
-  uint64_t gen = ctx.CurrentDeferredReportGeneration();
-  // §16.4.4: the default $error is cancellable by a specific-assertion disable
-  // just like an action-block report; carry the assertion's label to check.
-  std::string label(assertion_label);
-  auto* ev = ctx.GetScheduler().GetEventPool().Acquire();
-  ev->callback = [proc, gen, label, line, &ctx]() {
-    if (proc && proc->deferred_report_generation != gen) return;
-    if (DeferredReportCancelled(proc, label)) return;
-    EmitSeverityHeader(ctx, "ERROR", "Assertion failed.", std::cerr, line);
-  };
-  ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), region, ev);
+  SchedulePendingReport(
+      is_final_deferred, assertion_label, ctx, [line, &ctx]() {
+        EmitSeverityHeader(ctx, "ERROR", "Assertion failed.", std::cerr, line);
+      });
 }
 
 // If this assertion is deferred, schedules its pass/fail action in the
@@ -294,14 +318,26 @@ struct ObservedRegionAwaiter {
 // process stands in. No-op for assert/assume forms, and for the clocked
 // boolean body a cover property is lowered to: that is a concurrent cover,
 // whose results §16.14.3 defines over attempts and vacuity rather than these
-// two counts, so it is not an immediate statement's result to report.
+// two counts, so it is not an immediate statement's result to report. A
+// deferred cover's result is a pending report like its pass statement: §16.4.2
+// has the point be flushed, and not reported as covered in that time step,
+// when its process reaches a flush point before the report matures, so the
+// evaluation is recorded only when the report runs in its region.
 static void RecordCoverImmediateSample(const Stmt* stmt, bool is_true,
                                        SimContext& ctx) {
   if (stmt->kind != StmtKind::kCoverImmediate || stmt->is_concurrent_clocked) {
     return;
   }
-  ctx.ImmediateCovers().Record(ScopeHierName(ctx), stmt->range.start.line,
-                               is_true);
+  std::string scope = ScopeHierName(ctx);
+  uint32_t line = stmt->range.start.line;
+  if (!stmt->is_deferred) {
+    ctx.ImmediateCovers().Record(scope, line, is_true);
+    return;
+  }
+  SchedulePendingReport(stmt->is_final_deferred, stmt->label, ctx,
+                        [scope, line, is_true, &ctx]() {
+                          ctx.ImmediateCovers().Record(scope, line, is_true);
+                        });
 }
 
 // §20.11: the Table 20-6 assertion_type bit that identifies an immediate
@@ -523,39 +559,18 @@ ExecTask ExecImmediateAssert(const Stmt* stmt, SimContext& ctx, Arena& arena) {
 // (see §16.4.1/§16.4.2) and matures or is flushed independently of the other
 // callers -- each process execution is independent.
 //
-// The function-body executor (ExecFuncStmt) is synchronous and cannot co_await,
-// but a deferred assertion never runs its action inline: it only evaluates its
-// expression and schedules the pass/fail report into a later region. That work
-// is entirely synchronous, so it is exposed here for ExecFuncStmt to invoke.
-// This mirrors the deferred branches of ExecImmediateAssert; the simple
-// immediate (non-deferred) case is outside this subclause and not handled here.
-void ExecDeferredImmediateAssertInFunction(const Stmt* stmt, SimContext& ctx,
-                                           Arena& arena) {
-  uint32_t type_bit = ImmediateAssertionTypeBit(stmt);
-  uint32_t directive_bit = ImmediateDirectiveTypeBit(stmt);
-  if (!ctx.AssertCheckingEnabled(type_bit, directive_bit)) return;
-
-  auto cond = EvalExpr(stmt->assert_expr, ctx, arena);
-  bool is_true = cond.IsTruthy();
-  RecordCoverImmediateSample(stmt, is_true, ctx);
-  if (is_true) {
-    if (stmt->assert_pass_stmt) {
-      ScheduleDeferredAction(stmt->assert_pass_stmt, stmt->is_final_deferred,
-                             stmt->label, ctx, arena);
-    }
-  } else if (stmt->assert_fail_stmt) {
-    ScheduleDeferredAction(stmt->assert_fail_stmt, stmt->is_final_deferred,
-                           stmt->label, ctx, arena);
-  } else if (stmt->kind != StmtKind::kCoverImmediate) {
-    // §20.11: the failure is counted even when its report action is suppressed.
-    ctx.IncrementAssertionFailCount();
-    if (ctx.AssertFailActionEnabled(type_bit, directive_bit)) {
-      // §16.4.1: the default $error is a pending report scheduled with the
-      // calling process's other deferred reports, not emitted here.
-      ScheduleDeferredSeverityReport(stmt->is_final_deferred, stmt->label,
-                                     stmt->range.start.line, ctx);
-    }
-  }
+// The function-body executor (ExecFuncStmt) is synchronous and cannot co_await.
+// A deferred assertion never runs its action inline, only evaluating its
+// expression and scheduling the pass/fail report into a later region, and a
+// simple immediate assertion's action is an ordinary statement of the function
+// body, so one attempt is judged here as ExecImmediateAssert judges it and the
+// action a simple immediate assertion owes inline is returned for ExecFuncStmt
+// to run, nullptr where there is none or it was scheduled elsewhere. §16.4.2's
+// own example rests on the simple form: a function called to evaluate an
+// action block's argument holds an assertion that reports on the call.
+const Stmt* ExecImmediateAssertInFunction(const Stmt* stmt, SimContext& ctx,
+                                          Arena& arena) {
+  return JudgeAssertion(stmt, ctx, arena);
 }
 
 }  // namespace delta

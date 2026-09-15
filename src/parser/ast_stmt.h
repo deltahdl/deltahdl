@@ -228,4 +228,23 @@ struct Stmt {
   ModuleItem* decl_item = nullptr;
 };
 
+// The subroutine call an expression statement consists of, or nullptr where
+// the statement is not one: A.6.9's subroutine_call_statement is the call
+// itself or `void'(function_subroutine_call)`, which §13.4.1 has discard a
+// nonvoid function's result, so a void cast is seen through to the call it
+// wraps. §16.4 states its action-block rule over this statement, and its
+// readers look at the call rather than at the cast.
+inline const Expr* SubroutineCallOfStmt(const Stmt* stmt) {
+  if (stmt == nullptr || stmt->kind != StmtKind::kExprStmt) return nullptr;
+  const Expr* e = stmt->expr;
+  if (e != nullptr && e->kind == ExprKind::kCast && e->text == "void") {
+    e = e->lhs;
+  }
+  if (e == nullptr) return nullptr;
+  if (e->kind != ExprKind::kCall && e->kind != ExprKind::kSystemCall) {
+    return nullptr;
+  }
+  return e;
+}
+
 }  // namespace delta

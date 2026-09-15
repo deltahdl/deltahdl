@@ -544,6 +544,24 @@ static void ExecFuncReturn(const Stmt* stmt, const FuncExecCtx& exec) {
   if (!exec.ret_var->is_4state) CoerceTo2State(exec.ret_var->value);
 }
 
+static bool ExecFuncStmt(const Stmt* stmt, const FuncExecCtx& exec);
+
+// §16.4.5: a deferred immediate assertion inside a function is evaluated and
+// its report scheduled against the calling process, so each process that calls
+// the function reports independently. §16.3: a simple immediate assertion runs
+// its pass or fail statement where it stands, and that statement is a
+// statement of the function body, a return included. §21.2.1.5: the label is
+// a hierarchy level while the statement runs, so a report under it names it.
+static bool ExecFuncImmediateAssert(const Stmt* stmt, const FuncExecCtx& exec) {
+  bool labeled = !stmt->label.empty();
+  if (labeled) exec.ctx.PushActiveNamedScope(stmt->label);
+  const Stmt* action =
+      ExecImmediateAssertInFunction(stmt, exec.ctx, exec.arena);
+  bool returned = action != nullptr && ExecFuncStmt(action, exec);
+  if (labeled) exec.ctx.PopActiveNamedScope();
+  return returned;
+}
+
 static bool ExecFuncStmt(const Stmt* stmt, const FuncExecCtx& exec) {
   if (!stmt) return false;
   switch (stmt->kind) {
@@ -600,13 +618,7 @@ static bool ExecFuncStmt(const Stmt* stmt, const FuncExecCtx& exec) {
     case StmtKind::kAssertImmediate:
     case StmtKind::kAssumeImmediate:
     case StmtKind::kCoverImmediate:
-      // §16.4.5: a deferred immediate assertion inside a function is evaluated
-      // and its report scheduled against the calling process, so each process
-      // that calls the function reports independently. A simple immediate
-      // assertion in a function is outside this subclause and left unhandled.
-      if (stmt->is_deferred)
-        ExecDeferredImmediateAssertInFunction(stmt, exec.ctx, exec.arena);
-      return false;
+      return ExecFuncImmediateAssert(stmt, exec);
     default:
       return false;
   }

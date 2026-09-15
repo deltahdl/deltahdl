@@ -247,4 +247,27 @@ TEST(DeferredAssertionReporting,
             "observed: a is not 1\nobserved: a is 1\nfinal: a is 1\n");
 }
 
+// §16.4.1 places the pending report in the queue of the process executing the
+// assertion, and §20.10 has the default $error name the hierarchical scope of
+// the statement, which the labels the process stood inside are part of. The
+// report runs in the Reactive region after the process has suspended, so the
+// scope it names is the one recorded when it was queued, t.b1.a1, and not
+// whatever the context holds when the region runs.
+TEST(DeferredAssertionReporting, DeferredDefaultErrorNamesTheAssertionsScope) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  initial begin : b1\n"
+      "    a1: assert #0 (0);\n"
+      "    #1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_EQ(f.ctx.LastSeverity(), "ERROR");
+  EXPECT_EQ(f.ctx.LastSeverityScope(), "t.b1.a1");
+  EXPECT_EQ(f.ctx.LastSeverityLine(), 3u);
+}
+
 }  // namespace

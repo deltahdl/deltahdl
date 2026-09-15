@@ -700,4 +700,29 @@ TEST(DeferredAssertionElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
+// §16.4 has each action be a single subroutine call, and A.6.9 writes the
+// subroutine_call_statement two ways: the call, or `void'(...)` around a
+// nonvoid function's call, which §13.4.1 gives for discarding its result. The
+// cast form is that same call and is accepted, where a bare nonvoid call would
+// be accepted with §13.4.1's warning.
+TEST(DeferredAssertionElaboration, VoidCastOfAFunctionCallIsASingleCall) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  logic c;\n"
+      "  function int report(input int n); return n; endfunction\n"
+      "  initial assert #0 (c) void'(report(1)); else void'(report(0));\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "deferred assertion pass action shall be a single "
+                             "subroutine call",
+                             4, "16.4"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "deferred assertion fail action shall be a single "
+                             "subroutine call",
+                             4, "16.4"));
+}
+
 }  // namespace

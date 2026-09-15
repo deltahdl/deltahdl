@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
@@ -448,6 +449,77 @@ TEST(DeferredFlushPointsLive, CastTaskInActionBlockRaisesRuntimeError) {
 
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "$cast task could not assign",
                             6, "6.24.2"));
+}
+
+// §16.4.2's cover example: a deferred cover point queued by an evaluation the
+// always_comb's re-run supersedes is flushed with the rest of the queue and is
+// not reported as covered in that time step. The simple cover beside it is
+// credited by the transitional values, as the clause says it is. The initial
+// block writes a in the Active region of time 1 and b from the Inactive
+// region, so the always_comb, which saw the two equal at time 0, sees b
+// lagging once before it sees them equal again: the simple cover is evaluated
+// three times and succeeds once, the deferred one twice, its succeeding
+// evaluation flushed, and never.
+TEST(DeferredFlushPointsLive, FlushedDeferredCoverIsNotCountedAsCovered) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int a, b;\n"
+      "  always_comb begin : b1\n"
+      "    c1: cover (b != a);\n"
+      "    c2: cover #0 (b != a);\n"
+      "  end\n"
+      "  initial begin\n"
+      "    #1 a = 5;\n"
+      "    #0 b = 5;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  const auto& results = f.ctx.ImmediateCovers().Results();
+  ASSERT_EQ(results.size(), 2u);
+  EXPECT_EQ(results[0].scope, "t.b1.c1");
+  EXPECT_EQ(results[0].evaluated, 3u);
+  EXPECT_EQ(results[0].succeeded, 1u);
+  EXPECT_EQ(results[1].scope, "t.b1.c2");
+  EXPECT_EQ(results[1].evaluated, 2u);
+  EXPECT_EQ(results[1].succeeded, 0u);
+}
+
+// §16.4.2's argument evaluation example: an action block's subroutine
+// arguments are evaluated on every failure, even one whose report is later
+// flushed, so a function called in an argument runs each time, and the simple
+// immediate assertion inside it reports on the call. The block fails a1 and a2
+// twice in one time step, first with opcode 64 and then, after the Inactive
+// region's write re-runs it, with 0: "Opcode error." prints once, from the
+// first evaluation of error_type(64), and the one report that matures carries
+// the 0 of the second failure.
+TEST(DeferredFlushPointsLive, ActionBlockArgumentsAreEvaluatedOnEveryFailure) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  bit my_cond = 1;\n"
+      "  int opcode;\n"
+      "  function int error_type(input int opcode);\n"
+      "    func_assert: assert (opcode < 64) else $display(\"Opcode "
+      "error.\");\n"
+      "    if (opcode < 32) return 0; else return 1;\n"
+      "  endfunction\n"
+      "  always_comb begin : b1\n"
+      "    a1: assert #0 (my_cond) else\n"
+      "      $info(\"Error on operation of type %0d\", error_type(opcode));\n"
+      "    a2: assert #0 (my_cond) else void'(error_type(opcode));\n"
+      "  end\n"
+      "  initial begin\n"
+      "    #1 my_cond = 0; opcode = 64;\n"
+      "    #0 opcode = 0;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out,
+            "Opcode error.\n"
+            "[1] INFO t.b1.a1 (line 10): Error on operation of type 0\n");
 }
 
 }  // namespace
