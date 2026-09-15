@@ -1,6 +1,7 @@
 #include <cmath>
 #include <cstring>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "common/arena.h"
@@ -14,6 +15,7 @@
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"
+#include "simulator/sva_engine_sampling.h"
 
 namespace delta {
 
@@ -304,6 +306,24 @@ static bool TryKeywordCast(std::string_view type_name, Logic4Vec& inner,
   return false;
 }
 
+// §16.5.1: the sampled value of a const cast expression is the current value
+// of its argument, where every other expression of a concurrent assertion is
+// evaluated over the sampled values of its variables. The property's sampling
+// mode is lowered for the length of the argument's evaluation and put back
+// after, so `const'(a)` reads a as it stands at the tick and `a` beside it
+// reads the Preponed value; outside a property the mode is already off and the
+// argument is read as any expression is.
+static Logic4Vec EvalCastOperand(const Expr* operand, std::string_view cast,
+                                 SimContext& ctx, Arena& arena) {
+  if (cast != "const") return EvalExpr(operand, ctx, arena);
+  auto& samples = ctx.AssertionSamples();
+  bool sampling = samples.EvaluatingProperty();
+  samples.SetEvaluatingProperty(false);
+  auto inner = EvalExpr(operand, ctx, arena);
+  samples.SetEvaluatingProperty(sampling);
+  return inner;
+}
+
 Logic4Vec EvalCast(const Expr* expr, SimContext& ctx, Arena& arena) {
   Logic4Vec stream_out;
   if (TryArrayBitStreamCast(expr, ctx, arena, stream_out)) return stream_out;
@@ -311,8 +331,8 @@ Logic4Vec EvalCast(const Expr* expr, SimContext& ctx, Arena& arena) {
   Logic4Vec size_out;
   if (TrySizeCast(expr, ctx, arena, size_out)) return size_out;
 
-  auto inner = EvalExpr(expr->lhs, ctx, arena);
   std::string_view type_name = expr->text;
+  auto inner = EvalCastOperand(expr->lhs, type_name, ctx, arena);
 
   Logic4Vec kw_out;
   if (TryKeywordCast(type_name, inner, arena, kw_out)) return kw_out;

@@ -336,4 +336,34 @@ TEST(ConcurrentAssertionSampling, LikeNamedOperandsAreSampledPerInstance) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
+// §16.5.1: "The sampled value of a const cast expression is defined as the
+// current value of its argument", where the variable beside it reads its
+// Preponed value. `a` is written 1 in the tick's own time step, before the
+// clock, so the property's `a` samples the 0 the step began with and
+// `const'(a)` reads the 1 standing at the tick: the two differ and the pass
+// statement counts. A const cast read through the sampling reads 0 as well
+// and the fail statement counts instead.
+TEST(ConcurrentAssertionSampling, ConstCastReadsTheCurrentValueAtTheTick) {
+  SimFixture f;
+  auto* hits = RunAndFindVar(
+      "module m;\n"
+      "  logic clk;\n"
+      "  logic a;\n"
+      "  int hits = 0;\n"
+      "  int misses = 0;\n"
+      "  assert property (@(posedge clk) const'(a) != a) hits = hits + 1;\n"
+      "  else misses = misses + 1;\n"
+      "  initial begin\n"
+      "    clk = 1'b0; a = 1'b0;\n"
+      "    #5 a = 1'b1; clk = 1'b1;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "hits");
+  ASSERT_NE(hits, nullptr);
+  auto* misses = f.ctx.FindVariable("misses");
+  ASSERT_NE(misses, nullptr);
+  EXPECT_EQ(hits->value.ToUint64(), 1u);
+  EXPECT_EQ(misses->value.ToUint64(), 0u);
+}
+
 }  // namespace
