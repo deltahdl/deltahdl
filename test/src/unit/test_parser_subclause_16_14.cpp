@@ -58,7 +58,7 @@ TEST(ConcurrentAssertionEvaluationReporting,
      ATemporalAssumePropertyIsNotEvaluated) {
   auto r = Parse(
       "module m;\n"
-      "  assume property (@(posedge clk) case (sel) 1: (a ##1 b); endcase);\n"
+      "  assume property (@(posedge clk) a ##1 b dist {1 := 1});\n"
       "endmodule\n");
   EXPECT_TRUE(ReportedWarning(r.diags, "its property is temporal", 2, "16.14"));
 }
@@ -115,9 +115,9 @@ TEST(ConcurrentAssertionEvaluationReporting,
 }
 
 // §16.12.7: |-> and |=> are the implication operators, which the evaluation
-// reads as a property of operands, so neither spec is reported. `case` over
-// a cycle delay, an operator it does not read, is still the temporal
-// branch's.
+// reads as a property of operands, so neither spec is reported. A dist
+// after a cycle delay, a constraint it does not read, is still the
+// temporal branch's.
 TEST(ConcurrentAssertionEvaluationReporting, ImplicationsAreEvaluated) {
   auto overlapped = Parse(
       "module m;\n"
@@ -131,7 +131,7 @@ TEST(ConcurrentAssertionEvaluationReporting, ImplicationsAreEvaluated) {
   EXPECT_EQ(UnevaluatedReports(nonoverlapped), 0);
   auto under = Parse(
       "module m;\n"
-      "  assert property (@(posedge clk) case (sel) 1: (a ##1 b); endcase);\n"
+      "  assert property (@(posedge clk) a ##1 b dist {1 := 1});\n"
       "endmodule\n");
   EXPECT_TRUE(
       ReportedWarning(under.diags, "its property is temporal", 2, "16.14"));
@@ -140,8 +140,8 @@ TEST(ConcurrentAssertionEvaluationReporting, ImplicationsAreEvaluated) {
 // §16.7: ## is the cycle delay range, and §16.12.2 has a sequence_expr be a
 // sequential property, which the evaluation reads as weak in an assert; a
 // spec that holds a cycle delay and no property operator is reported by
-// nothing. One holding a cycle delay under a property operator the
-// evaluation does not read, case here, is still the temporal branch's.
+// nothing. One holding a cycle delay and a dist, a constraint the
+// evaluation does not read, is still the temporal branch's.
 TEST(ConcurrentAssertionEvaluationReporting,
      CycleDelayIsEvaluatedAsASequentialProperty) {
   auto r = Parse(
@@ -151,7 +151,7 @@ TEST(ConcurrentAssertionEvaluationReporting,
   EXPECT_EQ(UnevaluatedReports(r), 0);
   auto under = Parse(
       "module m;\n"
-      "  assert property (@(posedge clk) case (sel) 1: (a ##1 b); endcase);\n"
+      "  assert property (@(posedge clk) a ##1 b dist {1 := 1});\n"
       "endmodule\n");
   EXPECT_TRUE(
       ReportedWarning(under.diags, "its property is temporal", 2, "16.14"));
