@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 
 #include "fixture_simulator.h"
 
@@ -245,6 +246,26 @@ TEST(AssertionClockSim,
   auto* sampled_high = f.ctx.FindVariable("sampled_high");
   ASSERT_NE(sampled_high, nullptr);
   EXPECT_EQ(sampled_high->value.ToUint64(), 0u);
+}
+
+// §16.5.2's example of a concurrent assertion prints "%m, passing" from its
+// pass statement, and §21.2.1.5 has %m name the scope the statement stands in,
+// which is the assertion's label: the action block names m.base_rule1, not the
+// module alone, though it runs in a process of its own started from the
+// Reactive region.
+TEST(AssertionClockSim, ActionBlockPercentMNamesTheAssertion) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module m;\n"
+      "  logic clk = 0;\n"
+      "  base_rule1: assert property (@(posedge clk) 1'b1)\n"
+      "    $display(\"%m, passing\");\n"
+      "  else\n"
+      "    $display(\"%m, failed\");\n"
+      "  initial #1 clk = 1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "m.base_rule1, passing\n");
 }
 
 }  // namespace

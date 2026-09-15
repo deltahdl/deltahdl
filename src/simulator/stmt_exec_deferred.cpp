@@ -211,10 +211,20 @@ static bool TryScheduleDeferredAssertAction(const Stmt* action,
 // clocking event for the next tick whatever the action does. Running it inline
 // from a Reactive-region callback would put the region right and leave a
 // delayed action stalling the assertion that queued it.
-static SimCoroutine ConcurrentAssertActionCoroutine(const Stmt* action,
-                                                    SimContext& ctx,
-                                                    Arena& arena) {
+// §21.2.1.5 has %m name the scope the statement stands in, which for an
+// action block is the assertion's label, as §16.5.2's own example prints
+// "%m, passing" to say which assertion passed. The child process starts from
+// an event of its region with the context's named scopes whatever ran last, so
+// the scopes standing when the attempt scheduled the action are stood up
+// around it and put back after.
+static SimCoroutine ConcurrentAssertActionCoroutine(
+    const Stmt* action, std::vector<std::string_view> named_scopes,
+    SimContext& ctx, Arena& arena) {
+  PendingReportScope scope{ctx.CurrentProcess(), std::move(named_scopes)};
+  PendingReportScope saved;
+  scope.Install(ctx, saved);
   co_await ExecStmt(action, ctx, arena);
+  PendingReportScope::Swap(ctx, saved);
 }
 
 // A process a concurrent assertion hands part of an attempt to: its action
@@ -267,7 +277,9 @@ static bool TryScheduleConcurrentAssertAction(const Stmt* action,
   auto* p =
       CreateAssertionChildProcess(ctx, arena, ConcurrentAssertActionRegion());
   p->is_reactive = true;
-  p->coro = ConcurrentAssertActionCoroutine(action, ctx, arena).Release();
+  p->coro = ConcurrentAssertActionCoroutine(action, ctx.ActiveNamedScopes(),
+                                            ctx, arena)
+                .Release();
   ScheduleAssertionChildStart(p, p->home_region, ctx);
   return true;
 }

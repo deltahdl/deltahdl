@@ -1,0 +1,23 @@
+clk_low: sampled clk is 0 at 5 while clk reads 1
+gated: tick at 5
+gl: req sampled low at 5
+assertion_clock.base_rule1, failed
+clk_low: sampled clk is 0 at 15 while clk reads 1
+gated: tick at 15
+gl: req sampled low at 15
+assertion_clock.base_rule1, failed
+clk_low: sampled clk is 0 at 25 while clk reads 1
+gated: tick at 25
+gl: req sampled low at 25
+assertion_clock.base_rule1, failed
+clk_low: sampled clk is 0 at 35 while clk reads 1
+gl: req sampled high at 35
+assertion_clock.base_rule1, passing
+clk_low: sampled clk is 0 at 45 while clk reads 1
+gl: req sampled high at 45
+assertion_clock.base_rule1, passing
+clk_low: sampled clk is 0 at 55 while clk reads 1
+gated: tick at 55
+gl: req sampled high at 55
+assertion_clock.base_rule1, passing
+$finish at time 57
