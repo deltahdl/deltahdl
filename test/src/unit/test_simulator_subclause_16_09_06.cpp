@@ -1,7 +1,6 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
-#include <string>
 #include <string_view>
 #include <vector>
 
@@ -10,6 +9,7 @@
 #include "common/source_mgr.h"
 #include "common/types.h"
 #include "fixture_simulator.h"
+#include "helpers_sequence_ticks.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/sva_engine.h"
@@ -108,56 +108,6 @@ TEST(SvaEngine, IntersectHasNoMatchWithoutAnEqualLengthPair) {
 
 // --- Live cases: the linear sequence monitor over real source ---
 
-// The source the cases share: clk rises at 5, 15, 25, ..., tick n at 10n-5,
-// with te1 to te5 driven high for the ticks `drive` names; a process counts
-// the ticks at which the named sequence `rule`, whose body is `body`, reaches
-// its end point, keeping the last such time.
-std::string IntersectSource(const std::string& body, const std::string& drive) {
-  return "module t;\n"
-         "  logic clk = 0;\n"
-         "  logic te1 = 0;\n"
-         "  logic te2 = 0;\n"
-         "  logic te3 = 0;\n"
-         "  logic te4 = 0;\n"
-         "  logic te5 = 0;\n"
-         "  int hits = 0;\n"
-         "  int last = 0;\n"
-         "  always #5 clk = ~clk;\n"
-         "  sequence rule;\n"
-         "    @(posedge clk) " +
-         body +
-         ";\n"
-         "  endsequence\n"
-         "  initial begin\n" +
-         drive +
-         "    #10 $finish;\n"
-         "  end\n"
-         "  initial forever begin\n"
-         "    wait (rule.triggered);\n"
-         "    hits = hits + 1;\n"
-         "    last = $time;\n"
-         "    @(posedge clk);\n"
-         "  end\n"
-         "endmodule\n";
-}
-
-// The drive of fourteen ticks: before each tick n, te1 to te5 are set to
-// whether n is among the ticks the signal is to be high at, and before the
-// tick after the fourteenth they are all set low.
-std::string DriveTicks(const std::vector<std::vector<int>>& high_at) {
-  std::string drive;
-  for (int tick = 1; tick <= 15; ++tick) {
-    drive += "   ";
-    for (size_t i = 0; i < high_at.size(); ++i) {
-      bool high = false;
-      for (int at : high_at[i]) high = high || at == tick;
-      drive += " te" + std::to_string(i + 1) + " = " + (high ? "1" : "0") + ";";
-    }
-    drive += "\n    #10;\n";
-  }
-  return drive;
-}
-
 // §16.9.6, Figure 16-8: te1 at ticks 1, 2 and 8; te2 at 9 to 13; te3 at 2, 3
 // and 8; te4 at 4 and 10; te5 at 6 and 12. From tick 8, te1 ##[1:5] te2 has
 // five matches ending at 9 to 13 and te3 ##2 te4 ##2 te5 one ending at 12,
@@ -166,7 +116,7 @@ std::string DriveTicks(const std::vector<std::vector<int>>& high_at) {
 TEST(SequenceIntersect, PairsTheOperandMatchesOfTheSameLength) {
   SimFixture f;
   auto* hits = RunAndFindVar(
-      IntersectSource(
+      SequenceTickSource(
           "(te1 ##[1:5] te2) intersect (te3 ##2 te4 ##2 te5)",
           DriveTicks(
               {{1, 2, 8}, {9, 10, 11, 12, 13}, {2, 3, 8}, {4, 10}, {6, 12}})),
@@ -182,7 +132,7 @@ TEST(SequenceIntersect, PairsTheOperandMatchesOfTheSameLength) {
 TEST(SequenceIntersect, OperandMatchesOfDifferentLengthsDoNotPair) {
   SimFixture f;
   auto* hits = RunAndFindVar(
-      IntersectSource(
+      SequenceTickSource(
           "(te1 ##[1:5] te2) intersect (te3 ##2 te4 ##2 te5)",
           DriveTicks({{1, 2, 8}, {10}, {2, 3, 8}, {4, 10}, {6, 12}})),
       f, "hits");
@@ -198,7 +148,7 @@ TEST(SequenceIntersect, OperandMatchesOfDifferentLengthsDoNotPair) {
 TEST(SequenceIntersect, EachPairOfTheSameLengthIsAMatch) {
   SimFixture f;
   auto* hits = RunAndFindVar(
-      IntersectSource(
+      SequenceTickSource(
           "(te1 ##[1:5] te2) intersect (te3 ##2 te4 ##[0:2] te5)",
           DriveTicks({{1, 2, 8}, {10, 12}, {2, 3, 8}, {4, 10}, {6, 10, 12}})),
       f, "hits");
@@ -216,7 +166,7 @@ TEST(SequenceIntersect, EachPairOfTheSameLengthIsAMatch) {
 TEST(SequenceIntersect, BindsTighterThanAnd) {
   SimFixture f;
   auto* hits = RunAndFindVar(
-      IntersectSource(
+      SequenceTickSource(
           "te1 ##2 te2 intersect te3 ##2 te4 and te3 ##2 te4 ##2 te5",
           DriveTicks({{1, 2, 8}, {10, 12}, {2, 3, 8}, {4, 10}, {6, 12}})),
       f, "hits");

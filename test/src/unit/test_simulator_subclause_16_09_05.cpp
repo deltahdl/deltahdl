@@ -10,6 +10,7 @@
 #include "common/source_mgr.h"
 #include "common/types.h"
 #include "fixture_simulator.h"
+#include "helpers_sequence_ticks.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/sva_engine.h"
@@ -82,57 +83,6 @@ TEST(SvaEngine, AndFailsWhenNeitherOperandMatches) {
 
 // --- Live cases: the linear sequence monitor over real source ---
 
-// The source the cases share: clk rises at 5, 15, 25, ..., tick n at 10n-5,
-// with te1 to te5 driven high for the ticks `drive` names; a process counts
-// the ticks at which the named sequence `rule`, whose body is `body`, reaches
-// its end point, keeping the last such time.
-std::string AndSource(const std::string& body, const std::string& drive) {
-  return "module t;\n"
-         "  logic clk = 0;\n"
-         "  logic te1 = 0;\n"
-         "  logic te2 = 0;\n"
-         "  logic te3 = 0;\n"
-         "  logic te4 = 0;\n"
-         "  logic te5 = 0;\n"
-         "  int hits = 0;\n"
-         "  int last = 0;\n"
-         "  always #5 clk = ~clk;\n"
-         "  sequence rule;\n"
-         "    @(posedge clk) " +
-         body +
-         ";\n"
-         "  endsequence\n"
-         "  initial begin\n" +
-         drive +
-         "    #10 $finish;\n"
-         "  end\n"
-         "  initial forever begin\n"
-         "    wait (rule.triggered);\n"
-         "    hits = hits + 1;\n"
-         "    last = $time;\n"
-         "    @(posedge clk);\n"
-         "  end\n"
-         "endmodule\n";
-}
-
-// The drive of fourteen ticks: before each tick n, te1 to te5 are set to
-// whether n is among the ticks the signal is to be high at, and before the
-// tick after the fourteenth they are all set low, so that a signal high at
-// the last tick is not read as high at the next.
-std::string Drive(const std::vector<std::vector<int>>& high_at) {
-  std::string drive;
-  for (int tick = 1; tick <= 15; ++tick) {
-    drive += "   ";
-    for (size_t i = 0; i < high_at.size(); ++i) {
-      bool high = false;
-      for (int at : high_at[i]) high = high || at == tick;
-      drive += " te" + std::to_string(i + 1) + " = " + (high ? "1" : "0") + ";";
-    }
-    drive += "\n    #10;\n";
-  }
-  return drive;
-}
-
 // §16.9.5, Figure 16-5: te1 at ticks 1, 2 and 8; te2 at 10 and 12; te3 at 2,
 // 3 and 8; te4 at 4 and 10; te5 at 6 and 12. The operands begin at the same
 // tick: at 8, te1 ##2 te2 ends at 10 and te3 ##2 te4 ##2 te5 at 12, so the
@@ -140,8 +90,9 @@ std::string Drive(const std::vector<std::vector<int>>& high_at) {
 TEST(SequenceAnd, EndsWhereTheLaterOperandEnds) {
   SimFixture f;
   auto* hits = RunAndFindVar(
-      AndSource("(te1 ##2 te2) and (te3 ##2 te4 ##2 te5)",
-                Drive({{1, 2, 8}, {10, 12}, {2, 3, 8}, {4, 10}, {6, 12}})),
+      SequenceTickSource(
+          "(te1 ##2 te2) and (te3 ##2 te4 ##2 te5)",
+          DriveTicks({{1, 2, 8}, {10, 12}, {2, 3, 8}, {4, 10}, {6, 12}})),
       f, "hits");
   ASSERT_NE(hits, nullptr);
   EXPECT_EQ(hits->value.ToUint64(), 1u);
@@ -155,9 +106,10 @@ TEST(SequenceAnd, EndsWhereTheLaterOperandEnds) {
 TEST(SequenceAnd, RangeOperandEndsAtEachLaterTick) {
   SimFixture f;
   auto* hits = RunAndFindVar(
-      AndSource(
+      SequenceTickSource(
           "(te1 ##[1:5] te2) and (te3 ##2 te4 ##2 te5)",
-          Drive({{1, 2, 8}, {9, 10, 11, 12, 13}, {2, 3, 8}, {4, 10}, {6, 12}})),
+          DriveTicks(
+              {{1, 2, 8}, {9, 10, 11, 12, 13}, {2, 3, 8}, {4, 10}, {6, 12}})),
       f, "hits");
   ASSERT_NE(hits, nullptr);
   EXPECT_EQ(hits->value.ToUint64(), 2u);
@@ -171,13 +123,15 @@ TEST(SequenceAnd, OneOperandMatchingAloneIsNoMatch) {
   const std::string kBody = "(te1 ##2 te2) and (te3 ##2 te4 ##2 te5)";
   SimFixture f;
   auto* first_alone = RunAndFindVar(
-      AndSource(kBody, Drive({{1, 2, 8}, {10, 12}, {}, {}, {}})), f, "hits");
+      SequenceTickSource(kBody, DriveTicks({{1, 2, 8}, {10, 12}, {}, {}, {}})),
+      f, "hits");
   ASSERT_NE(first_alone, nullptr);
   EXPECT_EQ(first_alone->value.ToUint64(), 0u);
   SimFixture g;
   auto* second_alone = RunAndFindVar(
-      AndSource(kBody, Drive({{1, 2, 8}, {}, {2, 3, 8}, {4, 10}, {6, 12}})), g,
-      "hits");
+      SequenceTickSource(
+          kBody, DriveTicks({{1, 2, 8}, {}, {2, 3, 8}, {4, 10}, {6, 12}})),
+      g, "hits");
   ASSERT_NE(second_alone, nullptr);
   EXPECT_EQ(second_alone->value.ToUint64(), 0u);
 }
@@ -188,8 +142,9 @@ TEST(SequenceAnd, OneOperandMatchingAloneIsNoMatch) {
 TEST(SequenceAnd, BooleanOperandsMatchWhereBothHold) {
   SimFixture f;
   auto* hits = RunAndFindVar(
-      AndSource("te1 and te2",
-                Drive({{1, 3, 8, 14}, {1, 3, 5, 8, 9, 14}, {}, {}, {}})),
+      SequenceTickSource(
+          "te1 and te2",
+          DriveTicks({{1, 3, 8, 14}, {1, 3, 5, 8, 9, 14}, {}, {}, {}})),
       f, "hits");
   ASSERT_NE(hits, nullptr);
   EXPECT_EQ(hits->value.ToUint64(), 4u);
