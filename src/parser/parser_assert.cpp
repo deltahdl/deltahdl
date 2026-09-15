@@ -361,22 +361,17 @@ void Parser::WarnUnevaluatedConcurrentAssertion(SourceLoc loc,
                                                 ModuleItemKind kind) {
   // Named as §16.14 Syntax 16-18 writes the statement, so the report quotes
   // the source back rather than an internal enumerator name.
-  std::string_view directive;
-  if (kind == ModuleItemKind::kCoverSequence) {
-    directive = "cover sequence";
-  } else if (kind == ModuleItemKind::kRestrictProperty) {
-    directive = "restrict property";
-  }
-
   std::string reason;
-  if (!directive.empty()) {
-    // Reason one: the statement is a cover sequence or a restrict property,
-    // and neither has an evaluation path at all, whatever its property_spec
-    // holds. An assert, assume or cover property statement has the clocked
-    // boolean path, and one of the reasons below says why its spec missed it.
-    reason = std::string(directive) +
-             " is parsed and then discarded, this tool evaluating only "
-             "assert, assume and cover property";
+  if (kind == ModuleItemKind::kCoverSequence) {
+    // Reason one: the statement is a cover sequence, which has no evaluation
+    // path at all, whatever its property_spec holds. An assert, assume or
+    // cover property statement has the clocked boolean path, and one of the
+    // reasons below says why its spec missed it. A restrict property never
+    // reaches here: §16.2 and §16.14.4 have a simulator not check it, so its
+    // going unevaluated is the standard's rule rather than this tool's gap.
+    reason =
+        "cover sequence is parsed and then discarded, this tool evaluating "
+        "only assert, assume and cover property";
   } else if (BodyHasTemporalOperator()) {
     // Reason two: the property is temporal, so it is not the sampled boolean
     // TryParseSimpleConcurrentProperty lowers. #2924 and #2927 cover the
@@ -597,9 +592,10 @@ ModuleItem* Parser::ParseRestrictProperty() {
   Expect(TokenKind::kKwRestrict, Subclause("16.14.4"));
   Expect(TokenKind::kKwProperty, Subclause("16.14.4"));
   Expect(TokenKind::kLParen, Subclause("16.14.4"));
-  // §16.14 lists restrict_property_statement among the concurrent assertion
-  // statements too, and it likewise only ever skips its spec.
-  WarnUnevaluatedConcurrentAssertion(item->loc, item->kind);
+  // §16.2 has a simulator not check a restrict property, and §16.14.4 says the
+  // statement is not verified in simulation, so its spec is skipped without
+  // the §16.14 non-evaluation report the other concurrent assertions draw
+  // when this tool cannot evaluate them: here, not evaluating is the rule.
   item->assert_expr = SkipPropertySpec(arena_, lexer_, CurrentLoc());
   Expect(TokenKind::kRParen, Subclause("16.14.4"));
   Expect(TokenKind::kSemicolon, Subclause("16.14.4"));

@@ -1,0 +1,7 @@
+concurrent assert: failed 1 time, at 25
+concurrent assume: failed 1 time
+concurrent cover: hit 1 time
+immediate assert: failed 2 times, first at 12
+immediate assume: failed 2 times
+immediate cover: hit 2 times
+$finish at time 40

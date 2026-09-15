@@ -97,14 +97,19 @@ TEST(ConcurrentAssertionEvaluationReporting, CoverSequenceIsNotEvaluated) {
 }
 
 // §16.14 Syntax 16-18 lists restrict_property_statement, which
-// Parser::ParseRestrictProperty skips outright.
-TEST(ConcurrentAssertionEvaluationReporting, RestrictPropertyIsNotEvaluated) {
+// Parser::ParseRestrictProperty skips outright, and that is no gap: §16.2 has
+// a simulator not check a restrict property, and §16.14.4 says the statement
+// is not verified in simulation. So the skip draws none of the reports above,
+// which name what this tool cannot evaluate rather than what the standard has
+// it leave alone.
+TEST(ConcurrentAssertionEvaluationReporting,
+     RestrictPropertyGoesUnevaluatedWithoutAReport) {
   auto r = Parse(
       "module m;\n"
       "  restrict property (@(posedge clk) a);\n"
       "endmodule\n");
-  EXPECT_TRUE(ReportedWarning(
-      r.diags, "restrict property is parsed and then discarded", 2, "16.14"));
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(UnevaluatedReports(r), 0);
 }
 
 // §16.12.6: |-> is the overlapped implication operator, so the property is
