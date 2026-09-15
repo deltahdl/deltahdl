@@ -310,34 +310,85 @@ struct LocalBinding {
   Direction direction;
 };
 
-std::vector<LocalBinding> RenameInstanceLocals(
-    const ModuleItem* inner, const LinearSequence& body, int instance,
-    ActualsByFormal& actuals, LinearSequence& out, Arena& arena) {
+// Where the locals of one instance are renamed into: the number the instance
+// takes in the flattened sequence, that sequence, and the arena the new names
+// live in.
+struct Renaming {
+  int instance;
+  LinearSequence& out;
+  Arena& arena;
+};
+
+// One local variable formal argument of `inner` renamed into the flattened
+// sequence, its actual recorded before the renaming replaces it in `actuals`.
+LocalBinding RenameLocalFormal(const ModuleItem* inner, const LocalFormal& lf,
+                               ActualsByFormal& actuals, Renaming& renaming) {
+  std::string_view name = inner->prop_formals[lf.index];
+  LocalBinding binding;
+  binding.renamed = RenamedLocal(name, renaming.instance, renaming.arena);
+  auto it = actuals.find(name);
+  binding.actual = it == actuals.end() ? nullptr : it->second;
+  binding.direction = lf.direction;
+  SeqLocalDecl decl;
+  decl.name = binding.renamed;
+  decl.type_kw = lf.index < inner->prop_formal_type_kw.size()
+                     ? inner->prop_formal_type_kw[lf.index]
+                     : TokenKind::kKwInt;
+  renaming.out.locals.push_back(decl);
+  actuals[name] = LocalNameExpr(binding.renamed, renaming.arena);
+  return binding;
+}
+
+std::vector<LocalBinding> RenameInstanceLocals(const ModuleItem* inner,
+                                               const LinearSequence& body,
+                                               ActualsByFormal& actuals,
+                                               Renaming& renaming) {
   std::vector<LocalBinding> formals;
   for (const LocalFormal& lf : LocalFormalsOf(inner)) {
-    std::string_view name = inner->prop_formals[lf.index];
-    LocalBinding binding;
-    binding.renamed = RenamedLocal(name, instance, arena);
-    auto it = actuals.find(name);
-    binding.actual = it == actuals.end() ? nullptr : it->second;
-    binding.direction = lf.direction;
-    formals.push_back(binding);
-    SeqLocalDecl decl;
-    decl.name = binding.renamed;
-    decl.type_kw = lf.index < inner->prop_formal_type_kw.size()
-                       ? inner->prop_formal_type_kw[lf.index]
-                       : TokenKind::kKwInt;
-    out.locals.push_back(decl);
-    actuals[name] = LocalNameExpr(binding.renamed, arena);
+    formals.push_back(RenameLocalFormal(inner, lf, actuals, renaming));
   }
   for (const SeqLocalDecl& local : body.locals) {
     SeqLocalDecl decl = local;
-    decl.name = RenamedLocal(local.name, instance, arena);
-    decl.init = SubstituteFormals(local.init, actuals, arena);
-    out.locals.push_back(decl);
-    actuals[local.name] = LocalNameExpr(decl.name, arena);
+    decl.name = RenamedLocal(local.name, renaming.instance, renaming.arena);
+    decl.init = SubstituteFormals(local.init, actuals, renaming.arena);
+    renaming.out.locals.push_back(decl);
+    actuals[local.name] = LocalNameExpr(decl.name, renaming.arena);
   }
   return formals;
+}
+
+// §16.8.2: the assignments an instance owes for its local variable formal
+// arguments, written as match items: the initialization of an input or inout
+// one from its actual before the instance's first operand, and the assignment
+// of an inout or output one back to the actual's local variable at the
+// instance's last operand. The actual of an inout or output formal is a
+// reference to a local variable, which the cast §16.8.1 put on it is looked
+// through to name.
+void AddLocalFormalAssignments(const std::vector<LocalBinding>& formals,
+                               std::vector<SeqMatchAssign>& at_first,
+                               std::vector<SeqMatchAssign>& at_last,
+                               Arena& arena) {
+  for (const LocalBinding& f : formals) {
+    if (f.actual == nullptr) continue;
+    if (f.direction != Direction::kOutput) {
+      SeqMatchAssign init;
+      init.lvar = f.renamed;
+      init.rhs = f.actual;
+      init.init = true;
+      at_first.insert(at_first.begin(), init);
+    }
+    const Expr* target = f.actual;
+    if (target->kind == ExprKind::kCast && target->lhs != nullptr) {
+      target = target->lhs;
+    }
+    if (f.direction != Direction::kInput &&
+        target->kind == ExprKind::kIdentifier) {
+      SeqMatchAssign back;
+      back.lvar = target->text;
+      back.rhs = LocalNameExpr(f.renamed, arena);
+      at_last.push_back(back);
+    }
+  }
 }
 
 // Appends the instantiated body's flattened operands with the actuals
@@ -352,9 +403,9 @@ bool ExpandInstance(const InstanceOperand& op, SimContext& ctx, Arena& arena,
   ActualsByFormal actuals = BindActuals(op.inner, op.instance, arena);
   // The operands already flattened number the instance, each instance adding
   // at least one, so the locals of two instances of one sequence differ.
-  int instance = static_cast<int>(out.operands.size()) + 1;
+  Renaming renaming{static_cast<int>(out.operands.size()) + 1, out, arena};
   std::vector<LocalBinding> formals =
-      RenameInstanceLocals(op.inner, body, instance, actuals, out, arena);
+      RenameInstanceLocals(op.inner, body, actuals, renaming);
   if (out.clock.empty() && !body.clock.empty()) {
     out.clock = SubstituteClock(body.clock, actuals, arena);
   }
@@ -367,25 +418,8 @@ bool ExpandInstance(const InstanceOperand& op, SimContext& ctx, Arena& arena,
         SubstituteMatchItems(body.match_items[j], actuals, arena));
   }
   if (out.operands.size() == first) return true;
-  std::vector<SeqMatchAssign>& at_first = out.match_items[first];
-  std::vector<SeqMatchAssign>& at_last = out.match_items.back();
-  for (const LocalBinding& f : formals) {
-    if (f.actual == nullptr) continue;
-    if (f.direction != Direction::kOutput) {
-      SeqMatchAssign init;
-      init.lvar = f.renamed;
-      init.rhs = f.actual;
-      init.init = true;
-      at_first.insert(at_first.begin(), init);
-    }
-    if (f.direction != Direction::kInput &&
-        f.actual->kind == ExprKind::kIdentifier) {
-      SeqMatchAssign back;
-      back.lvar = f.actual->text;
-      back.rhs = LocalNameExpr(f.renamed, arena);
-      at_last.push_back(back);
-    }
-  }
+  AddLocalFormalAssignments(formals, out.match_items[first],
+                            out.match_items.back(), arena);
   return true;
 }
 

@@ -291,6 +291,30 @@ struct ParserSeqLinearHelpers {
   // the chain is the group's. An operand is a Boolean expression, an instance
   // of a named sequence as §16.8 has it, or a group. Returns false on a delay
   // form the monitor does not read or on a parse failure.
+  // Whether the token ends an operand chain: the body's `;` or
+  // `endsequence`, or a group's `)` or the `,` before its match items.
+  static bool AtChainEnd(Parser& p) {
+    return p.Check(TokenKind::kKwEndsequence) ||
+           p.Check(TokenKind::kSemicolon) || p.Check(TokenKind::kRParen) ||
+           p.Check(TokenKind::kComma) || p.AtEnd();
+  }
+
+  // One operand of a chain with the delay owed before it: a group read into
+  // `body` as a chain of its own, or a Boolean expression or a sequence
+  // instance appended with no match items of its own.
+  static bool ParseLinearSeqOperand(Parser& p, SeqLinearBody& body,
+                                    SeqCycleDelay before) {
+    if (AheadIsSequenceGroup(p)) return ParseSequenceGroup(p, body, before);
+    Expr* op = AheadIsSequenceInstanceOperand(p)
+                   ? ParseSequenceInstanceOperand(p)
+                   : p.ParseExpr();
+    if (!op) return false;
+    body.operands.push_back(op);
+    body.delays.push_back(before);
+    body.match_items.emplace_back();
+    return true;
+  }
+
   static bool ParseLinearSeqOperandChain(Parser& p, SeqLinearBody& body,
                                          SeqCycleDelay lead) {
     SeqCycleDelay next = lead;
@@ -299,22 +323,9 @@ struct ParserSeqLinearHelpers {
       if (!ParseLinearSeqCycleDelay(p, written)) return false;
       next = AddSeqDelays(lead, written);
     }
-    while (!p.Check(TokenKind::kKwEndsequence) &&
-           !p.Check(TokenKind::kSemicolon) && !p.Check(TokenKind::kRParen) &&
-           !p.Check(TokenKind::kComma) && !p.AtEnd()) {
-      if (AheadIsSequenceGroup(p)) {
-        if (!ParseSequenceGroup(p, body, next)) return false;
-      } else {
-        Expr* op = AheadIsSequenceInstanceOperand(p)
-                       ? ParseSequenceInstanceOperand(p)
-                       : p.ParseExpr();
-        if (!op) return false;
-        body.operands.push_back(op);
-        body.delays.push_back(next);
-        body.match_items.emplace_back();
-      }
-      if (!p.Check(TokenKind::kHashHash)) break;
-      p.Consume();  // '##'
+    while (!AtChainEnd(p)) {
+      if (!ParseLinearSeqOperand(p, body, next)) return false;
+      if (!p.Match(TokenKind::kHashHash)) break;
       if (!ParseLinearSeqCycleDelay(p, next)) return false;
     }
     return true;
