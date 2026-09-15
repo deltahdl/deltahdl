@@ -25,6 +25,7 @@
 
 namespace delta {
 
+struct Expr;
 struct ModuleItem;
 struct Process;
 

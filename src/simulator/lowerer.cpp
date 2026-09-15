@@ -28,8 +28,6 @@
 #include "simulator/lowerer_register.h"
 #include "simulator/net.h"
 #include "simulator/process.h"
-#include "simulator/sequence_flatten.h"
-#include "simulator/sequence_monitor.h"
 #include "simulator/sim_context.h"
 #include "simulator/specify.h"
 #include "simulator/specify_sdf.h"
@@ -615,34 +613,6 @@ void Lowerer::LowerProcess(const RtlirProcess& proc, bool from_program,
   }
 
   ScheduleProcess(p, ctx_);
-}
-
-// §16.13.6/§9.4.4: spawn a monitor process for each named sequence whose simple
-// clocked linear body the parser captured, so its endpoint event fires on a
-// match and procedural `sequence.triggered`/`wait` observe it. Additive: no
-// other code fires these endpoint events.
-void Lowerer::LowerSequenceMonitors(const RtlirModule* mod) {
-  for (auto* seq : mod->sequence_decls) {
-    // §16.8: a sequence declared without a clock is matched through the
-    // sequences that instantiate it, which inherit it into their own bodies,
-    // unless an instance in it names the clock through an event formal
-    // (§16.8.1), which the flattening then answers as the sequence's own.
-    LinearSequence body;
-    if (!FlattenLinearSequence(seq, ctx_, arena_, body)) continue;
-    if (body.clock.empty()) continue;
-    auto* p = arena_.Create<Process>();
-    p->kind = ProcessKind::kAlways;
-    p->id = next_id_++;
-    p->home_region = Region::kActive;
-    p->inst_prefix = inst_prefix_;
-    p->rng_seed = ctx_.DrawSeedForChild();
-    std::vector<EventExpr> clock = body.clock;
-    p->coro = MakeSequenceMonitorCoroutine(std::move(body), std::move(clock),
-                                           "__seq_" + std::string(seq->name),
-                                           ctx_, arena_)
-                  .Release();
-    ScheduleProcess(p, ctx_);
-  }
 }
 
 static void RegisterDesignTypeWidths(const RtlirDesign* design,

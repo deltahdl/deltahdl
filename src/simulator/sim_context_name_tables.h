@@ -39,6 +39,15 @@ class DeclaredNameTables {
   void RegisterSequenceDecl(std::string_view name, ModuleItem* item);
   ModuleItem* FindSequenceDecl(std::string_view name);
 
+  // §16.9.11: `e2(ready, proc1, proc2).triggered` applies the method to an
+  // instance with arguments, which is matched by a monitor of its own; the
+  // lowering registers the endpoint event that monitor fires under the
+  // instance as written, and the evaluator reads it back by the same
+  // expression. `ep_name` must outlive the context.
+  void RegisterSequenceInstanceEndpoint(const Expr* instance,
+                                        std::string_view ep_name);
+  std::string_view FindSequenceInstanceEndpoint(const Expr* instance) const;
+
   void RegisterRealVariable(std::string_view name);
   bool IsRealVariable(std::string_view name) const;
 
@@ -108,6 +117,7 @@ class DeclaredNameTables {
   std::unordered_map<std::string_view, ModuleItem*> functions_;
   std::unordered_map<std::string_view, ModuleItem*> let_decls_;
   std::unordered_map<std::string_view, ModuleItem*> sequence_decls_;
+  std::unordered_map<const Expr*, std::string_view> sequence_instance_eps_;
 
   std::unordered_set<std::string_view> real_vars_;
 

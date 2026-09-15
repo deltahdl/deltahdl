@@ -105,7 +105,11 @@ class Lowerer {
   // §29.8 instantiates a UDP "in the same manner as gates". Defined in
   // src/simulator/lowerer_udp.cpp.
   void LowerUdpInst(const RtlirUdpInst& inst, bool from_program);
+  // §16.13.6 and §16.9.11: the monitor processes of a module's named
+  // sequences and of the instances with arguments its bodies apply
+  // `triggered` to. Defined in src/simulator/lowerer_sequence_monitors.cpp.
   void LowerSequenceMonitors(const RtlirModule* mod);
+  void LowerSequenceMonitor(const ModuleItem* seq, std::string_view ep_name);
   void LowerClassDecl(const ClassDecl* cls);
   void LowerImports(const RtlirModule* mod);
   void LowerPackageItem(ModuleItem* item);

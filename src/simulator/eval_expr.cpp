@@ -615,7 +615,26 @@ static bool TryParameterizedScopeParam(const Expr* expr, SimContext& ctx,
   return true;
 }
 
+// §16.9.11: `.triggered` applied to a sequence instance with arguments reads
+// the endpoint of the monitor the lowering gave that instance; answers false
+// where no monitor was made for it.
+static bool TryInstanceTriggered(const Expr* expr, SimContext& ctx,
+                                 Arena& arena, Logic4Vec& out) {
+  if (expr->lhs == nullptr || expr->lhs->kind != ExprKind::kCall ||
+      expr->rhs == nullptr || expr->rhs->text != "triggered" ||
+      ctx.FindSequenceDecl(expr->lhs->callee) == nullptr) {
+    return false;
+  }
+  std::string_view ep_name = ctx.FindSequenceInstanceEndpoint(expr->lhs);
+  bool triggered = !ep_name.empty() && ctx.IsEventTriggered(ep_name);
+  out = MakeLogic4VecVal(arena, 1, triggered ? 1u : 0u);
+  return true;
+}
+
 Logic4Vec EvalMemberAccess(const Expr* expr, SimContext& ctx, Arena& arena) {
+  Logic4Vec instance_out;
+  if (TryInstanceTriggered(expr, ctx, arena, instance_out)) return instance_out;
+
   Logic4Vec reduce_out;
   if (TryEvalArrayReductionWithClause(expr, ctx, arena, reduce_out))
     return reduce_out;

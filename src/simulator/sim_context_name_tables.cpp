@@ -53,6 +53,17 @@ ModuleItem* DeclaredNameTables::FindSequenceDecl(std::string_view name) {
   return (it != sequence_decls_.end()) ? it->second : nullptr;
 }
 
+void DeclaredNameTables::RegisterSequenceInstanceEndpoint(
+    const Expr* instance, std::string_view ep_name) {
+  sequence_instance_eps_[instance] = ep_name;
+}
+
+std::string_view DeclaredNameTables::FindSequenceInstanceEndpoint(
+    const Expr* instance) const {
+  auto it = sequence_instance_eps_.find(instance);
+  return (it != sequence_instance_eps_.end()) ? it->second : std::string_view{};
+}
+
 void DeclaredNameTables::RegisterRealVariable(std::string_view name) {
   real_vars_.insert(name);
 }
