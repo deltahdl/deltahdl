@@ -103,9 +103,9 @@ def extract_subclause_from_title(title: str) -> str:
 # Subclause-issue find-or-create
 # ---------------------------------------------------------------------------
 #
-# Consumed by multiple satisfaction scripts (satisfy_subclause,
-# satisfy_clause, satisfy_subclauses), so the find-or-create surface
-# lives here rather than inside any one script.
+# ``issue_title_for`` is what ``scripts/next_subclause`` matches open issues
+# on, and the find-or-create surface is what any script opening the issue
+# for a subclause goes through, so both live here rather than in a script.
 
 
 def issue_title_for(subclause: str) -> str:
