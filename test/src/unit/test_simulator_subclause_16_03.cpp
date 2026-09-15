@@ -569,4 +569,29 @@ TEST(ImmediateAssertSim, CoverResultsAreReportedPerStatementAtEndOfSimulation) {
             "cover t.never (line 6): evaluated 3, succeeded 0\n");
 }
 
+// §16.3's results are the immediate cover statement's. A cover property in the
+// clocked boolean form is lowered to the same statement kind inside a clocked
+// process, but it is a concurrent cover, whose results §16.14.3 defines as
+// attempts, successes and vacuous successes, so it leaves the immediate
+// results empty however many ticks it is evaluated at.
+TEST(ImmediateAssertSim, CoverPropertyIsNotAnImmediateCoverResult) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic clk = 1'b0;\n"
+      "  cover property (@(posedge clk) clk);\n"
+      "  initial begin\n"
+      "    #5 clk = 1;\n"
+      "    #5 clk = 0;\n"
+      "    #5 clk = 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_TRUE(f.ctx.ImmediateCovers().Results().empty());
+}
+
 }  // namespace

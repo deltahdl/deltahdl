@@ -273,10 +273,15 @@ struct ObservedRegionAwaiter {
 
 // §16.3: records one evaluation of an immediate cover statement, succeeded
 // when the covered expression held, against the statement in the scope the
-// process stands in. No-op for assert/assume forms.
+// process stands in. No-op for assert/assume forms, and for the clocked
+// boolean body a cover property is lowered to: that is a concurrent cover,
+// whose results §16.14.3 defines over attempts and vacuity rather than these
+// two counts, so it is not an immediate statement's result to report.
 static void RecordCoverImmediateSample(const Stmt* stmt, bool is_true,
                                        SimContext& ctx) {
-  if (stmt->kind != StmtKind::kCoverImmediate) return;
+  if (stmt->kind != StmtKind::kCoverImmediate || stmt->is_concurrent_clocked) {
+    return;
+  }
   ctx.ImmediateCovers().Record(ScopeHierName(ctx), stmt->range.start.line,
                                is_true);
 }
