@@ -166,6 +166,7 @@ Tri StepSequence(const PropertyExprNode* node, NodeState& state,
 Tri StepJunction(const PropertyExprNode* node, NodeState& state,
                  StepContext& sc, bool begin) {
   std::vector<Tri> verdicts;
+  verdicts.reserve(node->operands.size());
   for (size_t i = 0; i < node->operands.size(); ++i) {
     verdicts.push_back(Step(node->operands[i], *state.operands[i], sc, begin));
   }
@@ -214,6 +215,7 @@ Tri StepImplication(const PropertyExprNode* node, NodeState& state,
                     StepContext& sc, bool begin) {
   const PropertyExprNode* consequent = node->operands[0];
   std::vector<Tri> verdicts;
+  verdicts.reserve(state.consequents.size() + 1);
   for (NodeState* c : state.consequents) {
     verdicts.push_back(Step(consequent, *c, sc, false));
   }
@@ -278,6 +280,7 @@ Tri Finish(const PropertyExprNode* node, NodeState& state) {
     case PropertyExprNode::Kind::kOr:
     case PropertyExprNode::Kind::kAnd: {
       std::vector<Tri> verdicts;
+      verdicts.reserve(node->operands.size());
       for (size_t i = 0; i < node->operands.size(); ++i) {
         verdicts.push_back(Finish(node->operands[i], *state.operands[i]));
       }
@@ -295,6 +298,7 @@ Tri Finish(const PropertyExprNode* node, NodeState& state) {
     }
     case PropertyExprNode::Kind::kImplication: {
       std::vector<Tri> verdicts;
+      verdicts.reserve(state.consequents.size());
       for (NodeState* c : state.consequents) {
         verdicts.push_back(Finish(node->operands[0], *c));
       }
@@ -341,6 +345,7 @@ std::vector<bool> AdvancePropertyTree(PropertyTreeState& state, bool disabled,
 
 std::vector<bool> FinishPropertyTree(PropertyTreeState& state) {
   std::vector<bool> verdicts;
+  verdicts.reserve(state.attempts.size());
   for (NodeState* attempt : state.attempts) {
     verdicts.push_back(Finish(state.root, *attempt) == Tri::kTrue);
   }
