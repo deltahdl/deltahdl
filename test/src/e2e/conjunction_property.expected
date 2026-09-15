@@ -1,0 +1,7 @@
+a and b passes 1 fails 3
+(a ##1 c) and d passes 1 fails 2 at ticks
+strong(a ##1 c) and d passes 1 fails 2 at ticks
+a or b and c passes 3 fails 1
+$finish at time 40
+(a ##1 c) and d passes at the end of the run
+strong(a ##1 c) and d fails at the end of the run
