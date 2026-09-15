@@ -6,6 +6,7 @@
 #include <random>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -103,6 +104,8 @@ struct WaitForkState {
   std::coroutine_handle<> waiter;
 };
 
+struct SequencePropertyState;
+
 struct Process {
   ProcessKind kind = ProcessKind::kInitial;
   ProcessHandle coro = nullptr;
@@ -184,6 +187,12 @@ struct Process {
   // (which already discards every pending report), so a cancellation never
   // leaks past the activation that issued the disable.
   std::unordered_set<std::string> cancelled_deferred_labels;
+
+  // §16.12.2: the attempts in flight of each sequential property this
+  // process evaluates, keyed by the assertion statement; created at the
+  // statement's first tick.
+  std::unordered_map<const Stmt*, SequencePropertyState*>
+      sequence_property_states;
 
   std::string inst_prefix;
 

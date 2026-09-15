@@ -641,25 +641,11 @@ bool IsPastDirectedCall(const Expr* e) {
 
 void CollectPastDirectedSites(const LinearSequence& body,
                               std::vector<const Expr*>& sites) {
-  auto collect = [&sites](const Expr* e) {
+  ForEachLinearSequenceExpr(body, [&sites](const Expr* e) {
     ForEachSubExpr(e, [&sites](const Expr* sub) {
       if (IsPastDirectedCall(sub)) sites.push_back(sub);
     });
-  };
-  for (const Expr* operand : body.operands) collect(operand);
-  for (const auto& items : body.match_items) {
-    for (const SeqMatchAssign& item : items) collect(item.rhs);
-  }
-  for (const SeqThroughout& guard : body.throughouts) collect(guard.cond);
-  for (const LinearSequence& inner : body.intersects) {
-    CollectPastDirectedSites(inner, sites);
-  }
-  for (const LinearSequence& inner : body.conjuncts) {
-    CollectPastDirectedSites(inner, sites);
-  }
-  for (const LinearSequence& inner : body.alternatives) {
-    CollectPastDirectedSites(inner, sites);
-  }
+  });
 }
 
 // §16.13.6: mark the sequence endpoint event triggered and wake its waiters,
@@ -698,6 +684,58 @@ SimCoroutine MakeSequenceMonitorCoroutine(LinearSequence body,
       FireSequenceEndpoint(ctx, ep_name);
     }
   }
+}
+
+// §16.12.2: one evaluation attempt of a sequential property is one attempt
+// of its sequence, begun at the tick the property's attempt begins at and
+// kept apart from the others as first_match keeps them; it holds where the
+// sequence matches and fails where no attempt of the sequence can go on, a
+// prefix witnessing that the sequence cannot match.
+struct SequencePropertyState {
+  LinearSequence body;
+  std::vector<const Expr*> past_sites;
+  std::vector<FirstMatchAttempt> attempts;
+};
+
+SequencePropertyState* CreateSequencePropertyState(const ModuleItem* seq,
+                                                   SimContext& ctx,
+                                                   Arena& arena) {
+  auto* state = arena.Create<SequencePropertyState>();
+  if (!FlattenLinearSequence(seq, ctx, arena, state->body)) return nullptr;
+  CollectPastDirectedSites(state->body, state->past_sites);
+  return state;
+}
+
+std::vector<SequenceVerdict> AdvanceSequenceProperty(
+    SequencePropertyState& state, bool disabled, SimContext& ctx,
+    Arena& arena) {
+  std::vector<SequenceVerdict> verdicts;
+  for (const Expr* site : state.past_sites) EvalExpr(site, ctx, arena);
+  // §16.12: a disable condition true at any tick of an attempt disables it,
+  // and the attempt beginning at this tick with it.
+  if (disabled) {
+    state.attempts.clear();
+    return verdicts;
+  }
+  state.attempts.push_back(FreshFirstMatchAttempt(state.body));
+  std::vector<FirstMatchAttempt> kept;
+  for (size_t i = 0; i < state.attempts.size(); ++i) {
+    bool begin = i + 1 == state.attempts.size();
+    if (AdvanceFirstMatchAttempt(state.body, state.attempts[i], begin, ctx,
+                                 arena)) {
+      verdicts.push_back(SequenceVerdict::kMatched);
+    } else if (FirstMatchAttemptIsSpent(state.attempts[i])) {
+      verdicts.push_back(SequenceVerdict::kFailed);
+    } else {
+      kept.push_back(std::move(state.attempts[i]));
+    }
+  }
+  state.attempts = std::move(kept);
+  return verdicts;
+}
+
+size_t PendingSequenceAttempts(const SequencePropertyState& state) {
+  return state.attempts.size();
 }
 
 }  // namespace delta

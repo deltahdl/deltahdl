@@ -63,6 +63,8 @@ enum class Edge : uint8_t {
   kEdge,
 };
 
+struct ModuleItem;
+
 struct EventExpr {
   Edge edge = Edge::kNone;
   Expr* signal = nullptr;
@@ -198,6 +200,14 @@ struct Stmt {
   // `disable iff ( expression )`, read live at each attempt; an attempt at
   // which it is true is disabled, neither succeeding nor failing.
   Expr* assert_disable_iff = nullptr;
+  // §16.12.2: a sequential property, the sequence_expr of a concurrent
+  // assertion's property_spec read as a linear sequence body, and whether it
+  // is `strong(...)`, so that an attempt still in flight when the run ends
+  // fails; a weak one, written `weak(...)` or bare in an assert or assume,
+  // never fails that way, and a cover statement's is strong. `assert_expr`
+  // is unset where this is set.
+  ModuleItem* assert_sequence = nullptr;
+  bool assert_strong = false;
   Stmt* assert_pass_stmt = nullptr;
   Stmt* assert_fail_stmt = nullptr;
   bool is_deferred = false;

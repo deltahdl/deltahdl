@@ -616,6 +616,8 @@ class Parser {
   ModuleItem* ParseAssumeProperty();
   ModuleItem* ParsePropertyAssertLike(ModuleItemKind kind, TokenKind keyword);
   bool TryParseDisableIff(Expr*& disable_iff);
+  ModuleItem* TryParseSequenceSpec(bool& strong);
+  bool ParseSequenceExprInto(ModuleItem* item);
   bool TryParseSimpleConcurrentProperty(ModuleItem* item, StmtKind body_kind);
   bool TryParsePropertyInstanceSpec(ModuleItem* item);
   bool BodyHasTemporalOperator();

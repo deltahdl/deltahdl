@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <vector>
 
 #include "parser/ast.h"
@@ -67,6 +68,12 @@ struct LinearSequence {
 // no linear body the parser captured, where an instance names a sequence that
 // has none, or where instances nest past the depth a cyclic dependency, which
 // §16.8 makes an error, would reach.
+// Every expression a flattened sequence holds -- its operands, match items,
+// throughout conditions -- and those of its intersects, conjuncts and
+// alternatives, each handed to `fn` once.
+void ForEachLinearSequenceExpr(const LinearSequence& body,
+                               const std::function<void(const Expr*)>& fn);
+
 bool FlattenLinearSequence(const ModuleItem* seq, SimContext& ctx, Arena& arena,
                            LinearSequence& out);
 

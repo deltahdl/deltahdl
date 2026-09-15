@@ -409,6 +409,34 @@ bool Parser::TryParseDisableIff(Expr*& disable_iff) {
   return disable_iff != nullptr && Match(TokenKind::kRParen);
 }
 
+// §16.12.2: the sequence_expr of a sequential property, bare or under
+// strong(...) or weak(...), read as a linear sequence body into a sequence
+// declaration of its own; `strong` says which operator was written. Answers
+// nullptr, the lexer where it was, where the sequence is not one the monitor
+// reads.
+ModuleItem* Parser::TryParseSequenceSpec(bool& strong) {
+  auto saved = lexer_.SavePos();
+  bool wrapped = Check(TokenKind::kKwStrong) || Check(TokenKind::kKwWeak);
+  strong = Check(TokenKind::kKwStrong);
+  if (wrapped) {
+    Consume();
+    if (!Match(TokenKind::kLParen)) {
+      lexer_.RestorePos(saved);
+      return nullptr;
+    }
+  }
+  auto* sequence = arena_.Create<ModuleItem>();
+  sequence->kind = ModuleItemKind::kSequenceDecl;
+  sequence->loc = CurrentLoc();
+  bool ok = ParseSequenceExprInto(sequence);
+  if (ok && wrapped) ok = Match(TokenKind::kRParen);
+  if (!ok) {
+    lexer_.RestorePos(saved);
+    return nullptr;
+  }
+  return sequence;
+}
+
 bool Parser::TryParseSimpleConcurrentProperty(ModuleItem* item,
                                               StmtKind body_kind) {
   if (!Check(TokenKind::kAt)) return false;
@@ -425,12 +453,18 @@ bool Parser::TryParseSimpleConcurrentProperty(ModuleItem* item,
   }
   Expr* disable_iff = nullptr;
   if (ok) ok = TryParseDisableIff(disable_iff);
+  // §16.12.2: a spec holding `##` is a sequential property, read as a
+  // sequence; one holding neither that nor an implication is a boolean.
   bool temporal = ok && BodyHasTemporalOperator();
+  bool strong = false;
+  ModuleItem* sequence =
+      (ok && temporal) ? TryParseSequenceSpec(strong) : nullptr;
   Expr* prop = (ok && !temporal) ? ParseExpr() : nullptr;
-  // Accept only the simple form: a non-temporal boolean that consumes the whole
-  // spec, so the next token is the property's closing parenthesis. Anything
-  // else restores the lexer and the caller skips the spec as before.
-  if (!ok || temporal || !Check(TokenKind::kRParen)) {
+  // Accept only what consumes the whole spec, so the next token is the
+  // property's closing parenthesis. Anything else restores the lexer and the
+  // caller skips the spec as before.
+  if (!ok || (prop == nullptr && sequence == nullptr) ||
+      !Check(TokenKind::kRParen)) {
     diag_.PopSuppress();
     lexer_.RestorePos(saved);
     return false;
@@ -442,6 +476,10 @@ bool Parser::TryParseSimpleConcurrentProperty(ModuleItem* item,
   stmt->kind = body_kind;
   stmt->range.start = item->loc;
   stmt->assert_expr = prop;
+  stmt->assert_sequence = sequence;
+  // §16.12.2: a sequence_expr in an assert or assume is evaluated as weak
+  // unless written strong(...), and one in a cover as strong.
+  stmt->assert_strong = strong || body_kind == StmtKind::kCoverImmediate;
   stmt->assert_disable_iff = disable_iff;
   // §16.5: this statement carries a concurrent assertion's property, not an
   // immediate assertion's expression, so the mark travels with it to the

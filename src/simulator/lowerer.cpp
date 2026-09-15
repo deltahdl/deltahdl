@@ -28,6 +28,7 @@
 #include "simulator/lowerer_register.h"
 #include "simulator/net.h"
 #include "simulator/process.h"
+#include "simulator/sequence_flatten.h"
 #include "simulator/sim_context.h"
 #include "simulator/specify.h"
 #include "simulator/specify_sdf.h"
@@ -483,6 +484,17 @@ void Lowerer::RecordAssertionSampleScope(const RtlirProcess& proc) {
   std::unordered_set<std::string> names;
   if (proc.body->assert_expr != nullptr) {
     CollectSampledOperandNames(proc.body->assert_expr, names);
+  }
+  // §16.12.2: a sequential property's operands are read sampled as a boolean
+  // property is, so the names its flattened sequence reads, the sequences it
+  // instantiates included, are enrolled with the assertion's.
+  if (proc.body->assert_sequence != nullptr) {
+    LinearSequence flat;
+    if (FlattenLinearSequence(proc.body->assert_sequence, ctx_, arena_, flat)) {
+      ForEachLinearSequenceExpr(flat, [&names](const Expr* e) {
+        CollectSampledOperandNames(e, names);
+      });
+    }
   }
   CollectSampledFunctionArgsInStmt(proc.body, names);
   if (names.empty()) return;

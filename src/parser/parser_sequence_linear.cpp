@@ -685,4 +685,19 @@ void Parser::CaptureLinearSequenceBody(ModuleItem* item) {
   }
 }
 
+// §16.12.2: the sequence_expr of a concurrent assertion's property_spec read
+// into `item` as a named sequence's body is, for the sequential property the
+// assertion evaluates. Answers false, leaving the body empty, where the
+// sequence is not one the monitor reads.
+bool Parser::ParseSequenceExprInto(ModuleItem* item) {
+  in_sequence_body_ = true;
+  bool ok = ParserSeqLinearHelpers::ParseLinearSeqOperands(*this, item);
+  in_sequence_body_ = false;
+  if (!ok || item->seq_linear.operands.empty()) {
+    item->seq_linear = SeqLinearBody{};
+    return false;
+  }
+  return true;
+}
+
 }  // namespace delta

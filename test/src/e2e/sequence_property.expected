@@ -1,0 +1,6 @@
+b ##1 c passes 1 fails 2
+weak(b ##1 c) passes 1 fails 2
+strong(b ##1 c) passes 1 fails 2 at ticks
+cover b ##1 c matches 1
+$finish at time 40
+strong(b ##1 c) fails at the end of the run

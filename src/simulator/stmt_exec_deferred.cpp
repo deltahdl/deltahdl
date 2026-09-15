@@ -1,5 +1,6 @@
 #include <cmath>
 #include <coroutine>
+#include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <functional>
@@ -20,6 +21,7 @@
 #include "simulator/process.h"
 #include "simulator/scheduler.h"
 #include "simulator/scope_hier_name.h"
+#include "simulator/sequence_monitor.h"
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"
 #include "simulator/stmt_exec.h"
@@ -420,6 +422,31 @@ static bool EvalAssertionCondition(const Stmt* stmt, SimContext& ctx,
   return cond.IsTruthy();
 }
 
+// The assertion's verdict at one attempt: a cover's sample is recorded, the
+// verdict's action block is scheduled where §16.4 or §4.4.2.6 puts it, and a
+// failure with no action block is reported. Returns the action block the
+// caller is to run where it stands, which is an immediate assertion's
+// (§16.3), and nullptr where the action was scheduled elsewhere or there is
+// none.
+static const Stmt* ConcludeAssertion(const Stmt* stmt, bool is_true,
+                                     SimContext& ctx, Arena& arena) {
+  RecordCoverImmediateSample(stmt, is_true, ctx);
+  const Stmt* action =
+      is_true ? stmt->assert_pass_stmt : stmt->assert_fail_stmt;
+  if (action != nullptr) {
+    if (TryScheduleDeferredAssertAction(action, stmt, ctx, arena) ||
+        TryScheduleConcurrentAssertAction(action, stmt, ctx, arena)) {
+      return nullptr;
+    }
+    return action;
+  }
+  if (!is_true && stmt->kind != StmtKind::kCoverImmediate) {
+    ReportDefaultAssertionFailure(stmt, ImmediateAssertionTypeBit(stmt),
+                                  ImmediateDirectiveTypeBit(stmt), ctx);
+  }
+  return nullptr;
+}
+
 // One attempt of the assertion from its evaluation on: the property is judged
 // on §16.5.1's sampled values, the verdict's action block is scheduled where
 // §16.4 or §4.4.2.6 puts it, and a failure with no action block is reported.
@@ -445,21 +472,65 @@ static const Stmt* JudgeAssertion(const Stmt* stmt, SimContext& ctx,
     return nullptr;
   }
 
-  bool is_true = EvalAssertionCondition(stmt, ctx, arena);
-  RecordCoverImmediateSample(stmt, is_true, ctx);
-  const Stmt* action =
-      is_true ? stmt->assert_pass_stmt : stmt->assert_fail_stmt;
-  if (action != nullptr) {
-    if (TryScheduleDeferredAssertAction(action, stmt, ctx, arena) ||
-        TryScheduleConcurrentAssertAction(action, stmt, ctx, arena)) {
-      return nullptr;
+  return ConcludeAssertion(stmt, EvalAssertionCondition(stmt, ctx, arena), ctx,
+                           arena);
+}
+
+// §16.12.2: one tick of a sequential property. The attempts in flight and
+// the one this tick begins advance over §16.5.1's sampled values, and each
+// that reaches its verdict at this tick, matching or failing, concludes the
+// assertion as a boolean property's evaluation does; a strong property's
+// attempts still in flight when the run ends fail then.
+static SimCoroutine StrongAttemptsFinalCoroutine(const Stmt* stmt,
+                                                 SequencePropertyState* state,
+                                                 SimContext& ctx,
+                                                 Arena& arena) {
+  size_t pending = PendingSequenceAttempts(*state);
+  for (size_t i = 0; i < pending; ++i) {
+    RecordCoverImmediateSample(stmt, false, ctx);
+    if (stmt->assert_fail_stmt != nullptr) {
+      co_await ExecStmt(stmt->assert_fail_stmt, ctx, arena);
+    } else if (stmt->kind != StmtKind::kCoverImmediate) {
+      ReportDefaultAssertionFailure(stmt, ImmediateAssertionTypeBit(stmt),
+                                    ImmediateDirectiveTypeBit(stmt), ctx);
     }
-    return action;
   }
-  if (!is_true && stmt->kind != StmtKind::kCoverImmediate) {
-    ReportDefaultAssertionFailure(stmt, type_bit, directive_bit, ctx);
+}
+
+static void RegisterStrongAttemptsFinal(const Stmt* stmt,
+                                        SequencePropertyState* state,
+                                        SimContext& ctx, Arena& arena) {
+  auto* p = CreateAssertionChildProcess(ctx, arena, Region::kActive);
+  p->kind = ProcessKind::kFinal;
+  p->coro = StrongAttemptsFinalCoroutine(stmt, state, ctx, arena).Release();
+  ctx.RegisterFinalProcess(p);
+}
+
+static void ExecSequencePropertyTick(const Stmt* stmt, SimContext& ctx,
+                                     Arena& arena) {
+  uint32_t type_bit = ImmediateAssertionTypeBit(stmt);
+  uint32_t directive_bit = ImmediateDirectiveTypeBit(stmt);
+  if (!ctx.AssertCheckingEnabled(type_bit, directive_bit)) return;
+  Process* proc = ctx.CurrentProcess();
+  if (proc == nullptr) return;
+  SequencePropertyState*& state = proc->sequence_property_states[stmt];
+  if (state == nullptr) {
+    state = CreateSequencePropertyState(stmt->assert_sequence, ctx, arena);
+    if (state == nullptr) return;
+    if (stmt->assert_strong)
+      RegisterStrongAttemptsFinal(stmt, state, ctx, arena);
   }
-  return nullptr;
+  bool disabled = stmt->assert_disable_iff != nullptr &&
+                  EvalExpr(stmt->assert_disable_iff, ctx, arena).IsTruthy();
+  auto& samples = ctx.AssertionSamples();
+  bool outer_evaluating_property = samples.EvaluatingProperty();
+  samples.SetEvaluatingProperty(true);
+  std::vector<SequenceVerdict> verdicts =
+      AdvanceSequenceProperty(*state, disabled, ctx, arena);
+  samples.SetEvaluatingProperty(outer_evaluating_property);
+  for (SequenceVerdict verdict : verdicts) {
+    ConcludeAssertion(stmt, verdict == SequenceVerdict::kMatched, ctx, arena);
+  }
 }
 
 // §16.9.4: the value each of the five future sampled value functions names is
@@ -586,6 +657,11 @@ ExecTask ExecImmediateAssert(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   Process* proc = ctx.CurrentProcess();
   if (proc != nullptr && !proc->gclk_future_event.empty()) {
     StartFutureGclkAttempt(stmt, *proc, ctx, arena);
+    co_return StmtResult::kDone;
+  }
+
+  if (stmt->assert_sequence != nullptr) {
+    ExecSequencePropertyTick(stmt, ctx, arena);
     co_return StmtResult::kDone;
   }
 

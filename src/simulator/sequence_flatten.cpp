@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -563,6 +564,27 @@ bool FlattenChain(const SeqLinearBody& body, SimContext& ctx, Arena& arena,
 }
 
 }  // namespace
+
+void ForEachLinearSequenceExpr(const LinearSequence& body,
+                               const std::function<void(const Expr*)>& fn) {
+  for (const Expr* operand : body.operands) fn(operand);
+  for (const auto& items : body.match_items) {
+    for (const SeqMatchAssign& item : items) {
+      if (item.rhs != nullptr) fn(item.rhs);
+      if (item.call != nullptr) fn(item.call);
+    }
+  }
+  for (const SeqThroughout& guard : body.throughouts) fn(guard.cond);
+  for (const LinearSequence& inner : body.intersects) {
+    ForEachLinearSequenceExpr(inner, fn);
+  }
+  for (const LinearSequence& inner : body.conjuncts) {
+    ForEachLinearSequenceExpr(inner, fn);
+  }
+  for (const LinearSequence& inner : body.alternatives) {
+    ForEachLinearSequenceExpr(inner, fn);
+  }
+}
 
 bool FlattenLinearSequence(const ModuleItem* seq, SimContext& ctx, Arena& arena,
                            LinearSequence& out) {
