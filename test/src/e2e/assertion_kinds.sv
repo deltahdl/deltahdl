@@ -71,11 +71,11 @@ module assertion_kinds;
     #9 ok = 1'b0;
     #6 ok = 1'b1;
     #12;
-    $display("concurrent assert: failed %0d time, at %0t",
+    $display("concurrent assert: failed %0d time, at %0d",
              concurrent_assert_fails, concurrent_assert_fail_time);
     $display("concurrent assume: failed %0d time", concurrent_assume_fails);
     $display("concurrent cover: hit %0d time", concurrent_cover_hits);
-    $display("immediate assert: failed %0d times, first at %0t",
+    $display("immediate assert: failed %0d times, first at %0d",
              immediate_assert_fails, immediate_assert_fail_time);
     $display("immediate assume: failed %0d times", immediate_assume_fails);
     $display("immediate cover: hit %0d times", immediate_cover_hits);
