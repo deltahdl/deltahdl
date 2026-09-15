@@ -17,18 +17,14 @@ def test_startup_then_print(capsys: pytest.CaptureFixture[str]) -> None:
     assert all(s in out for s in ("PASS", "startup_check"))
 
 
-class TestColorConsistency:
-    def test_colors_all_empty_when_no_color(
-        self, reload_no_color: ModuleType,
-    ) -> None:
-        mod = reload_no_color
-        assert all(v == "" for v in (mod.GREEN, mod.RED, mod.RESET))
+def test_colors_all_empty_when_no_color(reload_no_color: ModuleType) -> None:
+    mod = reload_no_color
+    assert all(v == "" for v in (mod.GREEN, mod.RED, mod.RESET))
 
-    def test_colors_all_nonempty_when_tty(
-        self, reload_with_colors: ModuleType,
-    ) -> None:
-        mod = reload_with_colors
-        assert all(v != "" for v in (mod.GREEN, mod.RED, mod.RESET))
+
+def test_colors_all_nonempty_when_tty(reload_with_colors: ModuleType) -> None:
+    mod = reload_with_colors
+    assert all(v != "" for v in (mod.GREEN, mod.RED, mod.RESET))
 
 
 def test_binary_is_under_repo_root() -> None:

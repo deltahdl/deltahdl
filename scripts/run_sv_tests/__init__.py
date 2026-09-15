@@ -391,12 +391,6 @@ def print_status(result: dict[str, Any], ok_int: int) -> None:
     print_reason(result)
 
 
-def execute_single_test(path: str) -> tuple[dict[str, Any], int]:
-    result, ok_int = build_result(path)
-    print_status(result, ok_int)
-    return result, ok_int
-
-
 def corpus_revision() -> str:
     try:
         result = subprocess.run(

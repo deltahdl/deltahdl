@@ -3,6 +3,27 @@ concurrency:
   cancel-in-progress: true
   group: scripts-${{ github.head_ref || github.ref_name }}
 jobs:
+  assert-every-dataclass-field-is-read:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Restore pip cache
+        uses: actions/cache@v5
+        with:
+          key: >-
+            pip-${{ github.job }}-${{
+            hashFiles('.github/workflows/scripts.yml') }}
+          path: ~/.cache/pip
+          restore-keys: |
+            pip-${{ github.job }}-
+      - name: Install assert-every-dataclass-field-is-read
+        run: pip install assert-every-dataclass-field-is-read
+      - name: Assert every dataclass field is read
+        run: >-
+          assert-every-dataclass-field-is-read
+          --verbose
+          ${{ github.workspace }}/lib/python/
+          ${{ github.workspace }}/scripts/
   assert-no-comments:
     runs-on: ubuntu-24.04
     steps:
@@ -69,90 +90,28 @@ jobs:
           --linters pylint,mypy,yamllint
           --verbose
           ${{ github.workspace }}
-  assert-no-test-only-python-definition:
+  assert-no-pytest-plugin-declarations:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
-      - name: Assert every lib/python definition is used outside its tests
-        run: |
-          python3 - <<'PY'
-          import ast
-          import pathlib
-          import re
-          import sys
-          consumers = sorted(pathlib.Path("lib/python").rglob("*.py"))
-          consumers += sorted(pathlib.Path("scripts").rglob("*.py"))
-          consumers += sorted(pathlib.Path("test").rglob("*.py"))
-          source = {p: p.read_text().splitlines() for p in consumers}
-          kinds = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
-          def used(name, path, lineno, tests):
-              named = re.compile(r"\b" + re.escape(name) + r"\b")
-              return any(
-                  named.search(line)
-                  for other, lines in source.items()
-                  if tests not in other.parents
-                  for number, line in enumerate(lines, 1)
-                  if not (other == path and number == lineno)
-              )
-          dead = []
-          for module in sorted(pathlib.Path("lib/python").iterdir()):
-              if not module.is_dir():
-                  continue
-              tests = pathlib.Path("test") / module
-              for path in sorted(module.rglob("*.py")):
-                  for node in ast.parse("\n".join(source[path])).body:
-                      if not isinstance(node, kinds):
-                          continue
-                      if node.name.startswith("_"):
-                          continue
-                      if used(node.name, path, node.lineno, tests):
-                          continue
-                      dead.append((path, node.lineno, node.name))
-          for path, line, name in dead:
-              print(
-                  f"::error file={path},line={line}::{path}:{line} defines"
-                  f" {name}, and nothing outside {path.parent} and its own"
-                  f" tests uses it; delete it or use it"
-              )
-          sys.exit(1 if dead else 0)
-          PY
-  assert-no-unused-python-definition:
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v5
-      - name: Assert every lib/python definition is used somewhere
-        run: |
-          python3 - <<'PY'
-          import ast
-          import pathlib
-          import re
-          import sys
-          lib = sorted(pathlib.Path("lib/python").rglob("*.py"))
-          consumers = lib + sorted(pathlib.Path("scripts").rglob("*.py"))
-          consumers += sorted(pathlib.Path("test").rglob("*.py"))
-          source = {p: p.read_text().splitlines() for p in consumers}
-          kinds = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
-          dead = []
-          for path in lib:
-              for node in ast.parse("\n".join(source[path])).body:
-                  if not isinstance(node, kinds) or node.name.startswith("_"):
-                      continue
-                  named = re.compile(r"\b" + re.escape(node.name) + r"\b")
-                  found = any(
-                      named.search(line)
-                      for other, lines in source.items()
-                      for number, line in enumerate(lines, 1)
-                      if not (other == path and number == node.lineno)
-                  )
-                  if not found:
-                      dead.append((path, node.lineno, node.name))
-          for path, line, name in dead:
-              print(
-                  f"::error file={path},line={line}::{path}:{line} defines"
-                  f" {name} and nothing uses it; delete it or use it"
-              )
-          sys.exit(1 if dead else 0)
-          PY
+      - name: Restore pip cache
+        uses: actions/cache@v5
+        with:
+          key: >-
+            pip-${{ github.job }}-${{
+            hashFiles('.github/workflows/scripts.yml') }}
+          path: ~/.cache/pip
+          restore-keys: |
+            pip-${{ github.job }}-
+      - name: Install assert-no-pytest-plugin-declarations
+        run: pip install assert-no-pytest-plugin-declarations
+      - name: Assert no pytest plugin declarations
+        run: >-
+          assert-no-pytest-plugin-declarations
+          --verbose
+          ${{ github.workspace }}/lib/python/
+          ${{ github.workspace }}/test/lib/python/
+          ${{ github.workspace }}/test/scripts/
   assert-one-assert-per-pytest:
     runs-on: ubuntu-24.04
     steps:
@@ -174,6 +133,84 @@ jobs:
           --verbose
           ${{ github.workspace }}/test/lib/python/
           ${{ github.workspace }}/test/scripts/
+  assert-pytest-class-holds-state:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Restore pip cache
+        uses: actions/cache@v5
+        with:
+          key: >-
+            pip-${{ github.job }}-${{
+            hashFiles('.github/workflows/scripts.yml') }}
+          path: ~/.cache/pip
+          restore-keys: |
+            pip-${{ github.job }}-
+      - name: Install assert-pytest-class-holds-state
+        run: pip install assert-pytest-class-holds-state
+      - name: Assert every pytest class holds state
+        run: >-
+          assert-pytest-class-holds-state
+          --verbose
+          ${{ github.workspace }}/test/lib/python/
+          ${{ github.workspace }}/test/scripts/
+  assert-pytest-fixture-name-is-needed:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Restore pip cache
+        uses: actions/cache@v5
+        with:
+          key: >-
+            pip-${{ github.job }}-${{
+            hashFiles('.github/workflows/scripts.yml') }}
+          path: ~/.cache/pip
+          restore-keys: |
+            pip-${{ github.job }}-
+      - name: Install assert-pytest-fixture-name-is-needed
+        run: pip install assert-pytest-fixture-name-is-needed
+      - name: Assert every pytest fixture name is needed
+        run: >-
+          assert-pytest-fixture-name-is-needed
+          --verbose
+          ${{ github.workspace }}/lib/python/
+          ${{ github.workspace }}/test/lib/python/
+          ${{ github.workspace }}/test/scripts/
+  assert-python-definition-is-used:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Restore pip cache
+        uses: actions/cache@v5
+        with:
+          key: >-
+            pip-${{ github.job }}-${{
+            hashFiles('.github/workflows/scripts.yml') }}
+          path: ~/.cache/pip
+          restore-keys: |
+            pip-${{ github.job }}-
+      - name: Install assert-python-definition-is-used
+        run: pip install assert-python-definition-is-used
+      - name: Assert every lib/python definition is used outside its own tests
+        run: >-
+          assert-python-definition-is-used
+          --verbose
+          --dont-search-in '${{ github.workspace }}/test/lib/python/{package}'
+          --search-in ${{ github.workspace }}/lib/python/
+          --search-in ${{ github.workspace }}/scripts/
+          --search-in ${{ github.workspace }}/test/lib/python/
+          --search-in ${{ github.workspace }}/test/scripts/
+          ${{ github.workspace }}/lib/python/
+      - name: Assert every scripts definition is used outside its own tests
+        run: >-
+          assert-python-definition-is-used
+          --verbose
+          --dont-search-in '${{ github.workspace }}/test/scripts/{package}'
+          --search-in ${{ github.workspace }}/lib/python/
+          --search-in ${{ github.workspace }}/scripts/
+          --search-in ${{ github.workspace }}/test/lib/python/
+          --search-in ${{ github.workspace }}/test/scripts/
+          ${{ github.workspace }}/scripts/
   copy-paste-source:
     runs-on: ubuntu-24.04
     steps:

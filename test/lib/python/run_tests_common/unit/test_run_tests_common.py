@@ -19,55 +19,47 @@ def test_binary_equals_expected_path() -> None:
     assert run_tests_common.BINARY == expected
 
 
-class TestColorConstants:
-    def test_no_color_env_disables_colors(
-        self, reload_no_color: ModuleType,
-    ) -> None:
-        mod = reload_no_color
-        assert (mod.GREEN, mod.RED, mod.RESET) == ("", "", "")
-
-    def test_ci_env_enables_colors_on_tty(
-        self, reload_with_colors: ModuleType,
-    ) -> None:
-        mod = reload_with_colors
-        assert (mod.GREEN, mod.RED, mod.RESET) == (
-            "\033[32m",
-            "\033[31m",
-            "\033[0m",
-        )
+def test_no_color_env_disables_colors(reload_no_color: ModuleType) -> None:
+    mod = reload_no_color
+    assert (mod.GREEN, mod.RED, mod.RESET) == ("", "", "")
 
 
-class TestCheckBinary:
-    def test_exits_when_binary_missing(self) -> None:
-        mock_binary = MagicMock(spec=Path)
-        mock_binary.exists.return_value = False
-        exit_code: int | str | None = None
-        try:
-            with patch("lib.python.run_tests_common.BINARY", mock_binary):
-                run_tests_common.check_binary()
-        except SystemExit as exc:
-            exit_code = exc.code
-        assert exit_code == 1
+def test_ci_env_enables_colors_on_tty(reload_with_colors: ModuleType) -> None:
+    mod = reload_with_colors
+    assert (mod.GREEN, mod.RED, mod.RESET) == (
+        "\033[32m",
+        "\033[31m",
+        "\033[0m",
+    )
 
-    def test_returns_normally_when_binary_exists(self) -> None:
-        mock_binary = MagicMock(spec=Path)
-        mock_binary.exists.return_value = True
+
+def test_exits_when_binary_missing() -> None:
+    mock_binary = MagicMock(spec=Path)
+    mock_binary.exists.return_value = False
+    exit_code: int | str | None = None
+    try:
         with patch("lib.python.run_tests_common.BINARY", mock_binary):
             run_tests_common.check_binary()
-            assert mock_binary.exists.called
+    except SystemExit as exc:
+        exit_code = exc.code
+    assert exit_code == 1
 
 
-class TestPrintResult:
-    def test_pass_output_contains_pass_and_name(
-        self, capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        run_tests_common.print_result(True, "my_test")
-        out = capsys.readouterr().out
-        assert all(s in out for s in ("PASS", "my_test"))
+def test_returns_normally_when_binary_exists() -> None:
+    mock_binary = MagicMock(spec=Path)
+    mock_binary.exists.return_value = True
+    with patch("lib.python.run_tests_common.BINARY", mock_binary):
+        run_tests_common.check_binary()
+        assert mock_binary.exists.called
 
-    def test_fail_output_contains_fail_and_name(
-        self, capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        run_tests_common.print_result(False, "my_test")
-        out = capsys.readouterr().out
-        assert all(s in out for s in ("FAIL", "my_test"))
+
+def test_pass_output_contains_pass_and_name(capsys: pytest.CaptureFixture[str]) -> None:
+    run_tests_common.print_result(True, "my_test")
+    out = capsys.readouterr().out
+    assert all(s in out for s in ("PASS", "my_test"))
+
+
+def test_fail_output_contains_fail_and_name(capsys: pytest.CaptureFixture[str]) -> None:
+    run_tests_common.print_result(False, "my_test")
+    out = capsys.readouterr().out
+    assert all(s in out for s in ("FAIL", "my_test"))

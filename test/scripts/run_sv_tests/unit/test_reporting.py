@@ -73,106 +73,110 @@ def _print_status_for_a_clause_mismatch(rst: ModuleType) -> None:
     )
 
 
-class TestPrintStatus:
-    def test_prints_pass(
-        self, rst: ModuleType, capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        rst.print_status({"name": "x.sv", "status": "pass"}, 1)
-        assert "PASS" in capsys.readouterr().out
+def test_prints_pass(rst: ModuleType, capsys: pytest.CaptureFixture[str]) -> None:
+    rst.print_status({"name": "x.sv", "status": "pass"}, 1)
+    assert "PASS" in capsys.readouterr().out
 
-    def test_prints_fail(
-        self, rst: ModuleType, capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        rst.print_status({"name": "x.sv", "status": "fail"}, 0)
-        assert "FAIL" in capsys.readouterr().out
 
-    def test_prints_timeout(
-        self, rst: ModuleType, capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        rst.print_status({"name": "x.sv", "status": "timeout"}, 0)
-        assert "TIMEOUT" in capsys.readouterr().out
+def test_prints_fail(rst: ModuleType, capsys: pytest.CaptureFixture[str]) -> None:
+    rst.print_status({"name": "x.sv", "status": "fail"}, 0)
+    assert "FAIL" in capsys.readouterr().out
 
-    def test_prints_what_the_tool_said_about_a_failure(
-        self, rst: ModuleType, capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        rst.print_status(
-            {"name": "x.sv", "status": "fail", "stderr": "x.sv:3:1: error: no"},
-            0,
-        )
-        assert "x.sv:3:1: error: no" in capsys.readouterr().out
 
-    def test_says_nothing_about_an_ordinary_pass(
-        self, rst: ModuleType, capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        rst.print_status(
-            {"name": "x.sv", "status": "pass", "should_fail": False,
-             "stderr": "x.sv:3:1: error: no"},
-            1,
-        )
-        assert "error" not in capsys.readouterr().out
+def test_prints_timeout(rst: ModuleType, capsys: pytest.CaptureFixture[str]) -> None:
+    rst.print_status({"name": "x.sv", "status": "timeout"}, 0)
+    assert "TIMEOUT" in capsys.readouterr().out
 
-    def test_prints_what_the_tool_said_about_an_expected_rejection(
-        self, rst: ModuleType, capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        rst.print_status(
-            {"name": "y.sv", "status": "pass", "should_fail": True,
-             "stderr": "y.sv:4:2: error: redeclaration of 'v'"},
-            1,
-        )
-        assert "y.sv:4:2: error: redeclaration of 'v'" in capsys.readouterr().out
 
-    def test_prints_the_exit_code_when_an_expected_rejection_crashed(
-        self, rst: ModuleType, capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        rst.print_status(
-            {"name": "z.sv", "status": "fail", "should_fail": True,
-             "stderr": "", "returncode": -11},
-            0,
-        )
-        assert "-11" in capsys.readouterr().out
+def test_prints_what_the_tool_said_about_a_failure(
+    rst: ModuleType, capsys: pytest.CaptureFixture[str],
+) -> None:
+    rst.print_status(
+        {"name": "x.sv", "status": "fail", "stderr": "x.sv:3:1: error: no"},
+        0,
+    )
+    assert "x.sv:3:1: error: no" in capsys.readouterr().out
 
-    def test_says_nothing_extra_when_an_expected_rejection_was_accepted(
-        self, rst: ModuleType, capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        rst.print_status(
-            {"name": "z.sv", "status": "fail", "should_fail": True,
-             "stderr": "", "returncode": 0},
-            0,
-        )
-        assert "exited" not in capsys.readouterr().out
 
-    def test_prints_both_clauses_when_the_rejection_names_another(
-        self, rst: ModuleType, capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        _print_status_for_a_clause_mismatch(rst)
-        out = capsys.readouterr().out
-        assert all(clause in out for clause in ("7.3", "6.19"))
+def test_says_nothing_about_an_ordinary_pass(
+    rst: ModuleType, capsys: pytest.CaptureFixture[str],
+) -> None:
+    rst.print_status(
+        {"name": "x.sv", "status": "pass", "should_fail": False,
+         "stderr": "x.sv:3:1: error: no"},
+        1,
+    )
+    assert "error" not in capsys.readouterr().out
 
-    def test_says_nothing_about_the_exit_code_when_the_clauses_disagree(
-        self, rst: ModuleType, capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        _print_status_for_a_clause_mismatch(rst)
-        assert "exited" not in capsys.readouterr().out
 
-    def test_prints_the_exit_code_when_the_tagged_clause_was_named(
-        self, rst: ModuleType, capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        rst.print_status(
-            {"name": "z.sv", "status": "fail", "should_fail": True,
-             "stderr": "z.sv:1:1: error: enum has an x assignment (§6.19)",
-             "returncode": -11, "clause": "6.19"},
-            0,
-        )
-        assert "-11" in capsys.readouterr().out
+def test_prints_what_the_tool_said_about_an_expected_rejection(
+    rst: ModuleType, capsys: pytest.CaptureFixture[str],
+) -> None:
+    rst.print_status(
+        {"name": "y.sv", "status": "pass", "should_fail": True,
+         "stderr": "y.sv:4:2: error: redeclaration of 'v'"},
+        1,
+    )
+    assert "y.sv:4:2: error: redeclaration of 'v'" in capsys.readouterr().out
 
-    def test_prints_what_the_tool_said_before_a_timeout(
-        self, rst: ModuleType, capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        rst.print_status(
-            {"name": "x.sv", "status": "timeout", "stderr": "elaborating top"},
-            0,
-        )
-        assert "elaborating top" in capsys.readouterr().out
+
+def test_prints_the_exit_code_when_an_expected_rejection_crashed(
+    rst: ModuleType, capsys: pytest.CaptureFixture[str],
+) -> None:
+    rst.print_status(
+        {"name": "z.sv", "status": "fail", "should_fail": True,
+         "stderr": "", "returncode": -11},
+        0,
+    )
+    assert "-11" in capsys.readouterr().out
+
+
+def test_says_nothing_extra_when_an_expected_rejection_was_accepted(
+    rst: ModuleType, capsys: pytest.CaptureFixture[str],
+) -> None:
+    rst.print_status(
+        {"name": "z.sv", "status": "fail", "should_fail": True,
+         "stderr": "", "returncode": 0},
+        0,
+    )
+    assert "exited" not in capsys.readouterr().out
+
+
+def test_prints_both_clauses_when_the_rejection_names_another(
+    rst: ModuleType, capsys: pytest.CaptureFixture[str],
+) -> None:
+    _print_status_for_a_clause_mismatch(rst)
+    out = capsys.readouterr().out
+    assert all(clause in out for clause in ("7.3", "6.19"))
+
+
+def test_says_nothing_about_the_exit_code_when_the_clauses_disagree(
+    rst: ModuleType, capsys: pytest.CaptureFixture[str],
+) -> None:
+    _print_status_for_a_clause_mismatch(rst)
+    assert "exited" not in capsys.readouterr().out
+
+
+def test_prints_the_exit_code_when_the_tagged_clause_was_named(
+    rst: ModuleType, capsys: pytest.CaptureFixture[str],
+) -> None:
+    rst.print_status(
+        {"name": "z.sv", "status": "fail", "should_fail": True,
+         "stderr": "z.sv:1:1: error: enum has an x assignment (§6.19)",
+         "returncode": -11, "clause": "6.19"},
+        0,
+    )
+    assert "-11" in capsys.readouterr().out
+
+
+def test_prints_what_the_tool_said_before_a_timeout(
+    rst: ModuleType, capsys: pytest.CaptureFixture[str],
+) -> None:
+    rst.print_status(
+        {"name": "x.sv", "status": "timeout", "stderr": "elaborating top"},
+        0,
+    )
+    assert "elaborating top" in capsys.readouterr().out
 
 
 class TestWriteJunitXml:
@@ -186,9 +190,7 @@ class TestWriteJunitXml:
              "time": 30.0, "stderr": ""},
         ]
 
-    def test_correct_suite_attributes(
-        self, rst: ModuleType, tmp_path: Path,
-    ) -> None:
+    def test_correct_suite_attributes(self, rst: ModuleType, tmp_path: Path) -> None:
         results = self._make_results()
         filepath = str(tmp_path / "report.xml")
         rst.write_junit_xml(results, 5.0, filepath)
@@ -202,9 +204,7 @@ class TestWriteJunitXml:
             root.attrib["errors"],
         ) == ("testsuite", "3", "1", "1")
 
-    def test_failure_elements_present(
-        self, rst: ModuleType, tmp_path: Path,
-    ) -> None:
+    def test_failure_elements_present(self, rst: ModuleType, tmp_path: Path) -> None:
         results = self._make_results()
         filepath = str(tmp_path / "report.xml")
         rst.write_junit_xml(results, 5.0, filepath)
@@ -215,9 +215,7 @@ class TestWriteJunitXml:
             ("b.sv failed lint", "error msg"),
         ]
 
-    def test_error_elements_present(
-        self, rst: ModuleType, tmp_path: Path,
-    ) -> None:
+    def test_error_elements_present(self, rst: ModuleType, tmp_path: Path) -> None:
         results = self._make_results()
         filepath = str(tmp_path / "report.xml")
         rst.write_junit_xml(results, 5.0, filepath)

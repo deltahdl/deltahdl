@@ -8,13 +8,12 @@ from xml.etree import ElementTree as ET
 import pytest
 
 
-def _execute_one_test(
-    rst: ModuleType, path: str, run: MagicMock,
-) -> tuple[dict[str, object], int]:
+def _execute_one_test(rst: ModuleType, path: str, run: MagicMock) -> tuple[dict[str, object], int]:
     with patch.object(rst.subprocess, "run", run), \
          patch.object(rst, "parse_metadata", return_value={}):
-        outcome: tuple[dict[str, object], int] = rst.execute_single_test(path)
-    return outcome
+        result, ok_int = rst.build_result(path)
+        rst.print_status(result, ok_int)
+    return result, ok_int
 
 
 def _execute_one_passing_test(rst: ModuleType) -> tuple[dict[str, object], int]:
@@ -31,50 +30,52 @@ def _execute_one_timing_out_test(rst: ModuleType) -> tuple[dict[str, object], in
     )
 
 
-class TestExecuteSingleTest:
-    def test_returns_dict_with_all_required_keys(self, rst: ModuleType) -> None:
-        result, _ = _execute_one_passing_test(rst)
-        assert set(result) == {
-            "name", "chapter", "status", "time", "stderr", "should_fail",
-            "returncode", "clause",
-        }
+def test_returns_dict_with_all_required_keys(rst: ModuleType) -> None:
+    result, _ = _execute_one_passing_test(rst)
+    assert set(result) == {
+        "name", "chapter", "status", "time", "stderr", "should_fail",
+        "returncode", "clause",
+    }
 
-    def test_reports_the_file_it_ran_and_what_the_run_said(
-        self, rst: ModuleType,
-    ) -> None:
-        result, _ = _execute_one_passing_test(rst)
-        assert {k: result[k] for k in ("name", "chapter", "status", "stderr")} == {
-            "name": "foo.sv", "chapter": "chapter-5",
-            "status": "pass", "stderr": "",
-        }
 
-    def test_an_accepted_file_scores_a_pass(self, rst: ModuleType) -> None:
-        assert _execute_one_passing_test(rst)[1] == 1
+def test_reports_the_file_it_ran_and_what_the_run_said(rst: ModuleType) -> None:
+    result, _ = _execute_one_passing_test(rst)
+    assert {k: result[k] for k in ("name", "chapter", "status", "stderr")} == {
+        "name": "foo.sv", "chapter": "chapter-5",
+        "status": "pass", "stderr": "",
+    }
 
-    def test_prints_pass_for_an_accepted_file(
-        self, rst: ModuleType, capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        _execute_one_passing_test(rst)
-        assert "PASS" in capsys.readouterr().out
 
-    def test_timeout_produces_timeout_status(self, rst: ModuleType) -> None:
-        result, _ = _execute_one_timing_out_test(rst)
-        assert result["status"] == "timeout"
+def test_an_accepted_file_scores_a_pass(rst: ModuleType) -> None:
+    assert _execute_one_passing_test(rst)[1] == 1
 
-    def test_timeout_names_the_file_that_did_not_finish(
-        self, rst: ModuleType,
-    ) -> None:
-        result, _ = _execute_one_timing_out_test(rst)
-        assert result["name"] == "bar.sv"
 
-    def test_timeout_scores_no_pass(self, rst: ModuleType) -> None:
-        assert _execute_one_timing_out_test(rst)[1] == 0
+def test_prints_pass_for_an_accepted_file(
+    rst: ModuleType, capsys: pytest.CaptureFixture[str],
+) -> None:
+    _execute_one_passing_test(rst)
+    assert "PASS" in capsys.readouterr().out
 
-    def test_prints_timeout_for_a_file_that_did_not_finish(
-        self, rst: ModuleType, capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        _execute_one_timing_out_test(rst)
-        assert "TIMEOUT" in capsys.readouterr().out
+
+def test_timeout_produces_timeout_status(rst: ModuleType) -> None:
+    result, _ = _execute_one_timing_out_test(rst)
+    assert result["status"] == "timeout"
+
+
+def test_timeout_names_the_file_that_did_not_finish(rst: ModuleType) -> None:
+    result, _ = _execute_one_timing_out_test(rst)
+    assert result["name"] == "bar.sv"
+
+
+def test_timeout_scores_no_pass(rst: ModuleType) -> None:
+    assert _execute_one_timing_out_test(rst)[1] == 0
+
+
+def test_prints_timeout_for_a_file_that_did_not_finish(
+    rst: ModuleType, capsys: pytest.CaptureFixture[str],
+) -> None:
+    _execute_one_timing_out_test(rst)
+    assert "TIMEOUT" in capsys.readouterr().out
 
 
 def test_pipeline_produces_correct_result_list(rst: ModuleType) -> None:
@@ -87,7 +88,7 @@ def test_pipeline_produces_correct_result_list(rst: ModuleType) -> None:
         tests = rst.collect_tests()
         results = []
         for path in tests:
-            result, _ = rst.execute_single_test(path)
+            result, _ = rst.build_result(path)
             results.append(result)
 
     assert [(r["name"], r["chapter"]) for r in results] == [
@@ -107,14 +108,12 @@ def test_pipeline_carries_the_diagnostic_of_an_expected_rejection(
              return_value={"should_fail_because": "Variable redeclaration"},
          ):
         for path in rst.collect_tests():
-            rst.execute_single_test(path)
+            rst.print_status(*rst.build_result(path))
 
     assert "a.sv:3:1: error: redeclared" in capsys.readouterr().out
 
 
-def _junit_root_over_one_pass_and_one_failure(
-    rst: ModuleType, tmp_path: Path,
-) -> ET.Element:
+def _junit_root_over_one_pass_and_one_failure(rst: ModuleType, tmp_path: Path) -> ET.Element:
     results = [
         {"name": "x.sv", "chapter": "chapter-5", "status": "pass",
          "time": 0.5, "stderr": ""},
@@ -126,25 +125,19 @@ def _junit_root_over_one_pass_and_one_failure(
     return ET.parse(filepath).getroot()
 
 
-def test_write_junit_xml_names_the_suite(
-    rst: ModuleType, tmp_path: Path,
-) -> None:
+def test_write_junit_xml_names_the_suite(rst: ModuleType, tmp_path: Path) -> None:
     root = _junit_root_over_one_pass_and_one_failure(rst, tmp_path)
     assert (root.tag, root.attrib["name"]) == ("testsuite", "sv-tests")
 
 
-def test_write_junit_xml_writes_a_testcase_for_each_result(
-    rst: ModuleType, tmp_path: Path,
-) -> None:
+def test_write_junit_xml_writes_a_testcase_for_each_result(rst: ModuleType, tmp_path: Path) -> None:
     root = _junit_root_over_one_pass_and_one_failure(rst, tmp_path)
     assert [tc.attrib["name"] for tc in root.findall("testcase")] == [
         "x.sv", "y.sv",
     ]
 
 
-def test_write_junit_xml_carries_the_failure_text(
-    rst: ModuleType, tmp_path: Path,
-) -> None:
+def test_write_junit_xml_carries_the_failure_text(rst: ModuleType, tmp_path: Path) -> None:
     root = _junit_root_over_one_pass_and_one_failure(rst, tmp_path)
     fail_tc = [
         tc for tc in root.findall("testcase") if tc.attrib["name"] == "y.sv"
@@ -152,16 +145,16 @@ def test_write_junit_xml_carries_the_failure_text(
     assert [f.text for f in fail_tc.findall("failure")] == ["lint error"]
 
 
-class TestParseArgs:
-    def test_junit_xml_flag(self, rst: ModuleType) -> None:
-        with patch("sys.argv", ["run_sv_tests.py", "--junit-xml", "out.xml"]):
-            args = rst.parse_args()
-        assert args.junit_xml == "out.xml"
+def test_junit_xml_flag(rst: ModuleType) -> None:
+    with patch("sys.argv", ["run_sv_tests.py", "--junit-xml", "out.xml"]):
+        args = rst.parse_args()
+    assert args.junit_xml == "out.xml"
 
-    def test_no_flags_defaults_to_none(self, rst: ModuleType) -> None:
-        with patch("sys.argv", ["run_sv_tests.py"]):
-            args = rst.parse_args()
-        assert args.junit_xml is None
+
+def test_no_flags_defaults_to_none(rst: ModuleType) -> None:
+    with patch("sys.argv", ["run_sv_tests.py"]):
+        args = rst.parse_args()
+    assert args.junit_xml is None
 
 
 def _run_main_patched(
@@ -200,67 +193,65 @@ def _run_with_a_failing_pool(rst: ModuleType) -> Callable[[], None]:
     return run
 
 
-class TestMain:
-    def test_all_pass_exits_zero(
-        self,
-        rst: ModuleType,
-        get_exit_code: Callable[[Callable[[], object]], int | str | None],
-    ) -> None:
-        assert get_exit_code(_all_passing_run(rst)) == 0
+def test_all_pass_exits_zero(
+    rst: ModuleType,
+    get_exit_code: Callable[[Callable[[], object]], int | str | None],
+) -> None:
+    assert get_exit_code(_all_passing_run(rst)) == 0
 
-    def test_all_pass_summary_gives_the_percentage(
-        self,
-        rst: ModuleType,
-        capsys: pytest.CaptureFixture[str],
-        get_exit_code: Callable[[Callable[[], object]], int | str | None],
-    ) -> None:
-        get_exit_code(_all_passing_run(rst))
-        assert "100.0%" in capsys.readouterr().out
 
-    def test_no_tests_exits_one(
-        self,
-        rst: ModuleType,
-        get_exit_code: Callable[[Callable[[], object]], int | str | None],
-    ) -> None:
-        def run() -> None:
-            with patch("sys.argv", ["run_sv_tests.py"]), \
-                 patch.object(rst, "check_binary"), \
-                 patch.object(rst.glob, "glob", return_value=[]):
-                rst.main()
+def test_all_pass_summary_gives_the_percentage(
+    rst: ModuleType,
+    capsys: pytest.CaptureFixture[str],
+    get_exit_code: Callable[[Callable[[], object]], int | str | None],
+) -> None:
+    get_exit_code(_all_passing_run(rst))
+    assert "100.0%" in capsys.readouterr().out
 
-        assert get_exit_code(run) == 1
 
-    def test_pool_map_exception_still_exits(
-        self,
-        rst: ModuleType,
-        get_exit_code: Callable[[Callable[[], object]], int | str | None],
-    ) -> None:
-        assert get_exit_code(_run_with_a_failing_pool(rst)) == 0
+def test_no_tests_exits_one(
+    rst: ModuleType,
+    get_exit_code: Callable[[Callable[[], object]], int | str | None],
+) -> None:
+    def run() -> None:
+        with patch("sys.argv", ["run_sv_tests.py"]), \
+             patch.object(rst, "check_binary"), \
+             patch.object(rst.glob, "glob", return_value=[]):
+            rst.main()
 
-    def test_pool_map_exception_prints_a_diagnostic(
-        self,
-        rst: ModuleType,
-        capsys: pytest.CaptureFixture[str],
-        get_exit_code: Callable[[Callable[[], object]], int | str | None],
-    ) -> None:
-        get_exit_code(_run_with_a_failing_pool(rst))
-        assert "pool.map failed after 0/1" in capsys.readouterr().err
+    assert get_exit_code(run) == 1
 
-    def test_writes_junit_xml(
-        self,
-        rst: ModuleType,
-        tmp_path: Path,
-        get_exit_code: Callable[[Callable[[], object]], int | str | None],
-    ) -> None:
-        xml_path = str(tmp_path / "report.xml")
-        fake_paths = ["/tests/chapter-5/a.sv"]
-        mock_result = MagicMock(returncode=0, stderr="")
 
-        def run() -> None:
-            _run_main_patched(
-                rst, fake_paths, mock_result,
-                extra_argv=["--junit-xml", xml_path],
-            )
+def test_pool_map_exception_still_exits(
+    rst: ModuleType,
+    get_exit_code: Callable[[Callable[[], object]], int | str | None],
+) -> None:
+    assert get_exit_code(_run_with_a_failing_pool(rst)) == 0
 
-        get_exit_code(run)
-        assert Path(xml_path).exists()
+
+def test_pool_map_exception_prints_a_diagnostic(
+    rst: ModuleType,
+    capsys: pytest.CaptureFixture[str],
+    get_exit_code: Callable[[Callable[[], object]], int | str | None],
+) -> None:
+    get_exit_code(_run_with_a_failing_pool(rst))
+    assert "pool.map failed after 0/1" in capsys.readouterr().err
+
+
+def test_writes_junit_xml(
+    rst: ModuleType,
+    tmp_path: Path,
+    get_exit_code: Callable[[Callable[[], object]], int | str | None],
+) -> None:
+    xml_path = str(tmp_path / "report.xml")
+    fake_paths = ["/tests/chapter-5/a.sv"]
+    mock_result = MagicMock(returncode=0, stderr="")
+
+    def run() -> None:
+        _run_main_patched(
+            rst, fake_paths, mock_result,
+            extra_argv=["--junit-xml", xml_path],
+        )
+
+    get_exit_code(run)
+    assert Path(xml_path).exists()
