@@ -106,11 +106,41 @@ Tri Not(Tri t) {
   return t == Tri::kTrue ? Tri::kFalse : Tri::kTrue;
 }
 
-// §16.12.3 to §16.12.6 over the operands' verdicts: not inverts a decided
-// operand; or is true where any operand is and false where every one is;
-// and is false where any operand is and true where every one is; if-else
-// is the branch its condition selects; else the tree is not yet decided.
-// `next` walks the leaves in the order they were collected.
+Tri Evaluate(const PropertyExprNode* node, const TreeAttempt& attempt,
+             size_t& next);
+
+// §16.12.4 and §16.12.5: or is true where any operand is and false where
+// every one is; and is false where any operand is and true where every one
+// is; else the junction is not yet decided.
+Tri EvaluateJunction(const PropertyExprNode* node, const TreeAttempt& attempt,
+                     size_t& next) {
+  bool is_or = node->kind == PropertyExprNode::Kind::kOr;
+  Tri decisive = is_or ? Tri::kTrue : Tri::kFalse;
+  Tri result = is_or ? Tri::kFalse : Tri::kTrue;
+  for (const PropertyExprNode* operand : node->operands) {
+    Tri t = Evaluate(operand, attempt, next);
+    if (t == decisive) result = decisive;
+    if (t == Tri::kPending && result != decisive) result = Tri::kPending;
+  }
+  return result;
+}
+
+// §16.12.6: with the condition true the property is the then branch; with
+// it false, the else branch, or true where none was written. Both branches
+// are walked so that `next` passes their leaves.
+Tri EvaluateIfElse(const PropertyExprNode* node, const TreeAttempt& attempt,
+                   size_t& next) {
+  Tri condition = attempt.leaves[next++].verdict;
+  Tri then_branch = Evaluate(node->operands[0], attempt, next);
+  Tri else_branch = node->operands.size() > 1
+                        ? Evaluate(node->operands[1], attempt, next)
+                        : Tri::kTrue;
+  return condition == Tri::kTrue ? then_branch : else_branch;
+}
+
+// §16.12.3 to §16.12.6 over the operands' verdicts: a leaf answers its
+// verdict, not inverts a decided operand, and the junctions and if-else
+// answer as above. `next` walks the leaves in the order they were collected.
 Tri Evaluate(const PropertyExprNode* node, const TreeAttempt& attempt,
              size_t& next) {
   switch (node->kind) {
@@ -119,29 +149,11 @@ Tri Evaluate(const PropertyExprNode* node, const TreeAttempt& attempt,
       return attempt.leaves[next++].verdict;
     case PropertyExprNode::Kind::kNot:
       return Not(Evaluate(node->operands[0], attempt, next));
-    case PropertyExprNode::Kind::kIfElse: {
-      // §16.12.6: with the condition true the property is the then branch;
-      // with it false, the else branch, or true where none was written.
-      // Both branches are walked so that `next` passes their leaves.
-      Tri condition = attempt.leaves[next++].verdict;
-      Tri then_branch = Evaluate(node->operands[0], attempt, next);
-      Tri else_branch = node->operands.size() > 1
-                            ? Evaluate(node->operands[1], attempt, next)
-                            : Tri::kTrue;
-      return condition == Tri::kTrue ? then_branch : else_branch;
-    }
+    case PropertyExprNode::Kind::kIfElse:
+      return EvaluateIfElse(node, attempt, next);
     case PropertyExprNode::Kind::kOr:
-    case PropertyExprNode::Kind::kAnd: {
-      bool is_or = node->kind == PropertyExprNode::Kind::kOr;
-      Tri decisive = is_or ? Tri::kTrue : Tri::kFalse;
-      Tri result = is_or ? Tri::kFalse : Tri::kTrue;
-      for (const PropertyExprNode* operand : node->operands) {
-        Tri t = Evaluate(operand, attempt, next);
-        if (t == decisive) result = decisive;
-        if (t == Tri::kPending && result != decisive) result = Tri::kPending;
-      }
-      return result;
-    }
+    case PropertyExprNode::Kind::kAnd:
+      return EvaluateJunction(node, attempt, next);
   }
   return Tri::kPending;
 }
