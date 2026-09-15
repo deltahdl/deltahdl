@@ -14,6 +14,41 @@ static void ExpectDeferredHashZero(DiagEngine& diag, const Token& tok) {
 // CPD-dedup: the assertion forms below are written out of the same three
 // pieces of syntax — the deferral, the asserted expression and the action
 // block — so each piece is read in one place here.
+
+// §16.12: the tokens of the property operators, an implication or
+// followed-by among them, which make a spec a property_expr rather than the
+// sequence_expr of a sequential property.
+static bool IsPropertyOperatorToken(TokenKind k) {
+  switch (k) {
+    case TokenKind::kPipeDashGt:
+    case TokenKind::kPipeEqGt:
+    case TokenKind::kHashMinusHash:
+    case TokenKind::kHashEqHash:
+    case TokenKind::kKwNot:
+    case TokenKind::kKwNexttime:
+    case TokenKind::kKwSNexttime:
+    case TokenKind::kKwAlways:
+    case TokenKind::kKwSAlways:
+    case TokenKind::kKwEventually:
+    case TokenKind::kKwSEventually:
+    case TokenKind::kKwUntil:
+    case TokenKind::kKwSUntil:
+    case TokenKind::kKwUntilWith:
+    case TokenKind::kKwSUntilWith:
+    case TokenKind::kKwImplies:
+    case TokenKind::kKwIff:
+    case TokenKind::kKwAcceptOn:
+    case TokenKind::kKwRejectOn:
+    case TokenKind::kKwSyncAcceptOn:
+    case TokenKind::kKwSyncRejectOn:
+    case TokenKind::kKwIf:
+    case TokenKind::kKwCase:
+      return true;
+    default:
+      return false;
+  }
+}
+
 struct ParserAssertHelpers {
   // A.6.10's deferred_immediate_assertion_item, the alternative of A.1.4's
   // assertion_item that A.1.7's non_port_program_item leaves out, admitting a
@@ -87,6 +122,75 @@ struct ParserAssertHelpers {
     // Read the fail statement rather than leaving it, and discard it: §16.3
     // gives a cover nowhere to keep one, and Stmt::assert_fail_stmt stays null.
     p.ParseStmt();
+  }
+
+  // §16.12: whether the property_spec ahead, to its closing parenthesis,
+  // holds a property operator -- an implication or followed-by, a property
+  // keyword such as not, until or nexttime, or an if or case -- which makes
+  // it a property_expr and not the sequence_expr of a sequential property.
+  static bool BodyHasPropertyOperator(Parser& p) {
+    auto scan = p.lexer_.SavePos();
+    int depth = 0;
+    bool found = false;
+    while (!p.Check(TokenKind::kEof)) {
+      TokenKind k = p.CurrentToken().kind;
+      if (k == TokenKind::kLParen) {
+        ++depth;
+      } else if (k == TokenKind::kRParen) {
+        if (depth == 0) break;
+        --depth;
+      } else if (IsPropertyOperatorToken(k)) {
+        found = true;
+        break;
+      }
+      p.Consume();
+    }
+    p.lexer_.RestorePos(scan);
+    return found;
+  }
+
+  // §16.12.2: the sequence_expr of a sequential property, bare or under
+  // strong(...) or weak(...), read as a linear sequence body into a sequence
+  // declaration of its own; `strong` says which operator was written.
+  // Answers nullptr, the lexer where it was, where the sequence is not one
+  // the monitor reads.
+  static ModuleItem* TryParseSequenceSpec(Parser& p, bool& strong) {
+    auto saved = p.lexer_.SavePos();
+    bool wrapped = p.Check(TokenKind::kKwStrong) || p.Check(TokenKind::kKwWeak);
+    strong = p.Check(TokenKind::kKwStrong);
+    if (wrapped) {
+      p.Consume();
+      if (!p.Match(TokenKind::kLParen)) {
+        p.lexer_.RestorePos(saved);
+        return nullptr;
+      }
+    }
+    auto* sequence = p.arena_.Create<ModuleItem>();
+    sequence->kind = ModuleItemKind::kSequenceDecl;
+    sequence->loc = p.CurrentLoc();
+    bool ok = p.ParseSequenceExprInto(sequence);
+    if (ok && wrapped) ok = p.Match(TokenKind::kRParen);
+    if (!ok) {
+      p.lexer_.RestorePos(saved);
+      return nullptr;
+    }
+    return sequence;
+  }
+
+  // §16.12.2: the body of the spec after its clock and disable condition: a
+  // spec holding `##` and no property operator is a sequential property,
+  // read as a sequence into `sequence`; one holding neither a cycle delay
+  // nor an implication is a boolean, read into `prop`. Answers false where
+  // the body is neither.
+  static bool ParseSimpleSpecBody(Parser& p, Expr*& prop, ModuleItem*& sequence,
+                                  bool& strong) {
+    if (!p.BodyHasTemporalOperator()) {
+      prop = p.ParseExpr();
+      return prop != nullptr;
+    }
+    if (BodyHasPropertyOperator(p)) return false;
+    sequence = TryParseSequenceSpec(p, strong);
+    return sequence != nullptr;
   }
 };
 
@@ -275,6 +379,7 @@ ModuleItem* Parser::ParseDeferredImmediateItem(SourceLoc loc, StmtKind kind) {
 // because the depth count treats the clocking event's own parentheses like any
 // other pair: `@ ( posedge clk )` raises the depth to 1 and returns it to 0,
 // leaving the scan to stop on the property_spec's own closing parenthesis.
+
 bool Parser::BodyHasTemporalOperator() {
   auto scan = lexer_.SavePos();
   int depth = 0;
@@ -415,34 +520,6 @@ bool Parser::TryParseDisableIff(Expr*& disable_iff) {
   return disable_iff != nullptr && Match(TokenKind::kRParen);
 }
 
-// §16.12.2: the sequence_expr of a sequential property, bare or under
-// strong(...) or weak(...), read as a linear sequence body into a sequence
-// declaration of its own; `strong` says which operator was written. Answers
-// nullptr, the lexer where it was, where the sequence is not one the monitor
-// reads.
-ModuleItem* Parser::TryParseSequenceSpec(bool& strong) {
-  auto saved = lexer_.SavePos();
-  bool wrapped = Check(TokenKind::kKwStrong) || Check(TokenKind::kKwWeak);
-  strong = Check(TokenKind::kKwStrong);
-  if (wrapped) {
-    Consume();
-    if (!Match(TokenKind::kLParen)) {
-      lexer_.RestorePos(saved);
-      return nullptr;
-    }
-  }
-  auto* sequence = arena_.Create<ModuleItem>();
-  sequence->kind = ModuleItemKind::kSequenceDecl;
-  sequence->loc = CurrentLoc();
-  bool ok = ParseSequenceExprInto(sequence);
-  if (ok && wrapped) ok = Match(TokenKind::kRParen);
-  if (!ok) {
-    lexer_.RestorePos(saved);
-    return nullptr;
-  }
-  return sequence;
-}
-
 bool Parser::TryParseSimpleConcurrentProperty(ModuleItem* item,
                                               StmtKind body_kind) {
   if (!Check(TokenKind::kAt)) return false;
@@ -459,19 +536,17 @@ bool Parser::TryParseSimpleConcurrentProperty(ModuleItem* item,
   }
   Expr* disable_iff = nullptr;
   if (ok) ok = TryParseDisableIff(disable_iff);
-  // §16.12.2: a spec holding `##` is a sequential property, read as a
-  // sequence; one holding neither that nor an implication is a boolean.
-  bool temporal = ok && BodyHasTemporalOperator();
   bool strong = false;
-  ModuleItem* sequence = (ok && temporal && !BodyHasPropertyOperator())
-                             ? TryParseSequenceSpec(strong)
-                             : nullptr;
-  Expr* prop = (ok && !temporal) ? ParseExpr() : nullptr;
+  ModuleItem* sequence = nullptr;
+  Expr* prop = nullptr;
+  if (ok) {
+    ok =
+        ParserAssertHelpers::ParseSimpleSpecBody(*this, prop, sequence, strong);
+  }
   // Accept only what consumes the whole spec, so the next token is the
   // property's closing parenthesis. Anything else restores the lexer and the
   // caller skips the spec as before.
-  if (!ok || (prop == nullptr && sequence == nullptr) ||
-      !Check(TokenKind::kRParen)) {
+  if (!ok || !Check(TokenKind::kRParen)) {
     diag_.PopSuppress();
     lexer_.RestorePos(saved);
     return false;
