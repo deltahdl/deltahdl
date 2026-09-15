@@ -1,0 +1,7 @@
+req ##1 gnt ends at 25 55
+req ##2 gnt ends at 65
+req ##0 gnt ends at 45
+req ##[2:4] gnt ends at 45 55 65 75
+req ##1 gnt ##2 `true ends at 45 75
+req ##[3:$] gnt ends at 45 55 65 75
+$finish at time 100

@@ -468,20 +468,70 @@ static void ParseSequencePortList(Lexer& lexer, DiagEngine& diag,
   }
 }
 
-// §16.13.6: parse the operand chain `b0 ##1 b1 ##1 ... bn` of a simple linear
-// sequence body. Returns false on any non-unit cycle delay or parse failure;
-// only `##1` between Boolean operands is supported by the linear monitor.
-bool Parser::ParseLinearSeqOperands(std::vector<Expr*>& operands) {
+// §16.7's cycle_delay_range after its `##`: a constant_primary N for [N:N], a
+// bracketed `a:b` or `a:$`, and the two abbreviations `[*]` for [0:$] and
+// `[+]` for [1:$]. Only an integer literal is read as the constant, which is
+// what the monitor needs of one; any other form leaves the sequence without a
+// monitor, as before. Returns false where the delay is not one of these.
+bool Parser::ParseLinearSeqCycleDelay(SeqCycleDelay& delay) {
+  if (Check(TokenKind::kIntLiteral)) {
+    delay.min = delay.max = ParseSeqDelayLiteral();
+    return true;
+  }
+  if (!Match(TokenKind::kLBracket)) return false;
+  if (Match(TokenKind::kStar)) {
+    delay.min = 0;
+    delay.max = SeqCycleDelay::kUnbounded;
+    return Match(TokenKind::kRBracket);
+  }
+  if (Match(TokenKind::kPlus)) {
+    delay.min = 1;
+    delay.max = SeqCycleDelay::kUnbounded;
+    return Match(TokenKind::kRBracket);
+  }
+  if (!Check(TokenKind::kIntLiteral)) return false;
+  delay.min = ParseSeqDelayLiteral();
+  if (!Match(TokenKind::kColon)) return false;
+  if (Match(TokenKind::kDollar)) {
+    delay.max = SeqCycleDelay::kUnbounded;
+  } else if (Check(TokenKind::kIntLiteral)) {
+    delay.max = ParseSeqDelayLiteral();
+  } else {
+    return false;
+  }
+  return delay.max >= delay.min && Match(TokenKind::kRBracket);
+}
+
+uint32_t Parser::ParseSeqDelayLiteral() {
+  Token tok = Consume();
+  uint32_t value = 0;
+  for (char c : tok.text) {
+    if (c == '_') continue;
+    if (c < '0' || c > '9') break;
+    value = value * 10 + static_cast<uint32_t>(c - '0');
+  }
+  return value;
+}
+
+// §16.13.6: parse the operand chain `[##d0] b0 ##d1 b1 ... ##dn bn` of a
+// linear sequence body, recording each operand and the §16.7 cycle delay
+// before it, the leading one 0 where the body starts with an operand. Returns
+// false on a delay form the monitor does not read or on a parse failure.
+bool Parser::ParseLinearSeqOperands(std::vector<Expr*>& operands,
+                                    std::vector<SeqCycleDelay>& delays) {
+  SeqCycleDelay next{0, 0};
+  if (Match(TokenKind::kHashHash) && !ParseLinearSeqCycleDelay(next)) {
+    return false;
+  }
   while (!Check(TokenKind::kKwEndsequence) && !Check(TokenKind::kSemicolon) &&
          !AtEnd()) {
     Expr* op = ParseExpr();
     if (!op) return false;
     operands.push_back(op);
+    delays.push_back(next);
     if (!Check(TokenKind::kHashHash)) break;
     Consume();  // '##'
-    if (!Check(TokenKind::kIntLiteral) || CurrentToken().text != "1")
-      return false;
-    Consume();  // '1'
+    if (!ParseLinearSeqCycleDelay(next)) return false;
   }
   return true;
 }
@@ -504,7 +554,8 @@ void Parser::CaptureLinearSequenceBody(ModuleItem* item) {
     ok = Match(TokenKind::kRParen);
   }
   std::vector<Expr*> operands;
-  if (ok) ok = ParseLinearSeqOperands(operands);
+  std::vector<SeqCycleDelay> delays;
+  if (ok) ok = ParseLinearSeqOperands(operands, delays);
   // The sequence_expr is terminated by ';' before `endsequence`.
   if (ok) Match(TokenKind::kSemicolon);
   ok = ok && Check(TokenKind::kKwEndsequence) && !operands.empty();
@@ -513,6 +564,7 @@ void Parser::CaptureLinearSequenceBody(ModuleItem* item) {
   if (ok) {
     item->seq_clock = std::move(clock);
     item->seq_linear_operands = std::move(operands);
+    item->seq_linear_delays = std::move(delays);
   }
 }
 
