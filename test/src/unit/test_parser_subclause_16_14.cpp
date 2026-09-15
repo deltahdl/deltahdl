@@ -191,15 +191,16 @@ TEST(ConcurrentAssertionEvaluationReporting,
   EXPECT_EQ(UnevaluatedReports(r), 0);
 }
 
-// A clocked assert whose property_spec is not exhausted by one boolean
-// expression: §16.12 admits the property operator and, since ParseExpr stops
-// before it, the boolean leaves the rest of the spec unread. The report names
-// this rather than the missing clock, because the clock is present.
+// A clocked assert whose property_spec is not exhausted by what the
+// evaluation reads: §16.12.6's if-else is a property operator the evaluation
+// does not read, and, since the boolean before it is not the whole spec, the
+// report names this rather than the missing clock, because the clock is
+// present. `a and b` stood here until §16.12.5's conjunction was evaluated.
 TEST(ConcurrentAssertionEvaluationReporting,
      ClockedNonBooleanPropertyIsNotEvaluated) {
   auto r = Parse(
       "module m;\n"
-      "  assert property (@(posedge clk) a and b);\n"
+      "  assert property (@(posedge clk) if (a) b else c);\n"
       "endmodule\n");
   EXPECT_TRUE(ReportedWarning(
       r.diags, "holds more than the @(event) boolean_expression", 2, "16.14"));
