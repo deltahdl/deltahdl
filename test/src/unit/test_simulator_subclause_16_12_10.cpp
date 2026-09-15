@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -12,6 +13,7 @@
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/sva_engine.h"
+#include "simulator/variable.h"
 
 using namespace delta;
 
@@ -128,6 +130,96 @@ TEST(SvaEngine, ReachableNexttimePassesInnerVacuousVerdictThrough) {
   EXPECT_EQ(EvalNexttime(/*strong=*/true, /*target_tick_reachable=*/true,
                          PropertyResult::kVacuousPass),
             PropertyResult::kVacuousPass);
+}
+
+// --- Live cases: nexttime properties over real source ---
+
+// The module the cases share: clk rises at 5, 15, 25 and 35, tick n at
+// 10n - 5, the tick counter counting through; a is high at ticks 2 and 3.
+// `items` declare the assertions, counting in `passes` and `fails`.
+std::string NexttimeSource(const std::string& items) {
+  return "module t;\n"
+         "  logic clk = 0;\n"
+         "  int tick = 1;\n"
+         "  logic a;\n"
+         "  int passes = 0;\n"
+         "  int fails = 0;\n"
+         "  always #5 clk = ~clk;\n"
+         "  always #10 tick = tick + 1;\n"
+         "  assign a = tick inside {2, 3};\n" +
+         items +
+         "  initial #40 $finish;\n"
+         "endmodule\n";
+}
+
+// §16.12.10: `nexttime a` is true if and only if a is true at the next tick
+// or there is no further tick: the attempts from 1 and 2 are true at 2 and
+// 3, the attempt from 3 is false at 4, and the attempt from 4, with no tick
+// after, is true when the run ends.
+TEST(NexttimeProperty, WeakNexttimeHoldsWithoutAFurtherTick) {
+  SimFixture f;
+  auto* passes = RunAndFindVar(
+      NexttimeSource("  p: assert property (@(posedge clk) nexttime a) "
+                     "passes++; else fails++;\n"),
+      f, "passes");
+  ASSERT_NE(passes, nullptr);
+  EXPECT_EQ(passes->value.ToUint64(), 2u);
+  EXPECT_EQ(f.ctx.FindVariable("fails")->value.ToUint64(), 1u);
+  f.ctx.RunFinalBlocks();
+  EXPECT_EQ(passes->value.ToUint64(), 3u);
+}
+
+// §16.12.10: `s_nexttime a` needs a next tick, so the attempt from 4 fails
+// when the run ends.
+TEST(NexttimeProperty, StrongNexttimeFailsWithoutAFurtherTick) {
+  SimFixture f;
+  auto* passes = RunAndFindVar(
+      NexttimeSource("  p: assert property (@(posedge clk) s_nexttime a) "
+                     "passes++; else fails++;\n"),
+      f, "passes");
+  ASSERT_NE(passes, nullptr);
+  EXPECT_EQ(passes->value.ToUint64(), 2u);
+  EXPECT_EQ(f.ctx.FindVariable("fails")->value.ToUint64(), 1u);
+  f.ctx.RunFinalBlocks();
+  EXPECT_EQ(f.ctx.FindVariable("fails")->value.ToUint64(), 2u);
+}
+
+// §16.12.10: `nexttime [2] a` reads a at the second tick after the
+// attempt's, or holds where fewer ticks follow: the attempt from 1 is true
+// at 3, the one from 2 false at 4, and those from 3 and 4 true when the run
+// ends; `s_nexttime [2] a` has the last two fail then.
+TEST(NexttimeProperty, IndexedFormsCountTheTicks) {
+  SimFixture f;
+  auto* weak = RunAndFindVar(
+      NexttimeSource("  p: assert property (@(posedge clk) nexttime [2] a) "
+                     "passes++; else fails++;\n"),
+      f, "passes");
+  ASSERT_NE(weak, nullptr);
+  EXPECT_EQ(weak->value.ToUint64(), 1u);
+  EXPECT_EQ(f.ctx.FindVariable("fails")->value.ToUint64(), 1u);
+  f.ctx.RunFinalBlocks();
+  EXPECT_EQ(weak->value.ToUint64(), 3u);
+  SimFixture g;
+  auto* strong = RunAndFindVar(
+      NexttimeSource("  p: assert property (@(posedge clk) s_nexttime [2] a) "
+                     "passes++; else fails++;\n"),
+      g, "passes");
+  ASSERT_NE(strong, nullptr);
+  EXPECT_EQ(strong->value.ToUint64(), 1u);
+  g.ctx.RunFinalBlocks();
+  EXPECT_EQ(g.ctx.FindVariable("fails")->value.ToUint64(), 3u);
+}
+
+// §16.12.10: `nexttime [0] a` is a at the attempt's own tick.
+TEST(NexttimeProperty, ZeroIndexIsTheCurrentTick) {
+  SimFixture f;
+  auto* passes = RunAndFindVar(
+      NexttimeSource("  p: assert property (@(posedge clk) nexttime [0] a) "
+                     "passes++; else fails++;\n"),
+      f, "passes");
+  ASSERT_NE(passes, nullptr);
+  EXPECT_EQ(passes->value.ToUint64(), 2u);
+  EXPECT_EQ(f.ctx.FindVariable("fails")->value.ToUint64(), 2u);
 }
 
 }  // namespace

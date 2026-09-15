@@ -43,6 +43,10 @@ struct NodeState {
   bool antecedent_done = false;
   // §16.12.6: the condition as read at the attempt's tick.
   bool condition = false;
+  // §16.12.10: the ticks a nexttime has still to wait before its operand
+  // begins, and whether the operand has begun.
+  uint64_t wait = 0;
+  bool begun = false;
 };
 
 }  // namespace
@@ -250,6 +254,24 @@ Tri StepImplication(const PropertyExprNode* node, NodeState& state,
   return Tri::kPending;
 }
 
+// §16.12.10: the operand begins at the tick the count of ticks after the
+// attempt's has passed, one where none was written, `nexttime [0]` at the
+// attempt's own tick; until then the property is not decided.
+Tri StepNexttime(const PropertyExprNode* node, NodeState& state,
+                 StepContext& sc, bool begin) {
+  if (begin) {
+    state.wait = node->boolean != nullptr
+                     ? EvalExpr(node->boolean, sc.ctx, sc.arena).ToUint64()
+                     : 1;
+  } else if (!state.begun) {
+    --state.wait;
+  }
+  if (!state.begun && state.wait > 0) return Tri::kPending;
+  bool first = !state.begun;
+  state.begun = true;
+  return Step(node->operands[0], *state.operands[0], sc, first);
+}
+
 Tri Step(const PropertyExprNode* node, NodeState& state, StepContext& sc,
          bool begin) {
   if (state.verdict != Tri::kPending) return state.verdict;
@@ -274,6 +296,9 @@ Tri Step(const PropertyExprNode* node, NodeState& state, StepContext& sc,
       break;
     case PropertyExprNode::Kind::kImplication:
       state.verdict = StepImplication(node, state, sc, begin);
+      break;
+    case PropertyExprNode::Kind::kNexttime:
+      state.verdict = StepNexttime(node, state, sc, begin);
       break;
     case PropertyExprNode::Kind::kImplies:
     case PropertyExprNode::Kind::kIff: {
@@ -329,6 +354,13 @@ Tri Finish(const PropertyExprNode* node, NodeState& state) {
       state.verdict = Junction(false, verdicts);
       break;
     }
+    case PropertyExprNode::Kind::kNexttime:
+      // §16.12.10: with no further tick the weak form holds and the strong
+      // fails; an operand begun is finished as itself.
+      state.verdict = state.begun
+                          ? Finish(node->operands[0], *state.operands[0])
+                          : (node->strong ? Tri::kFalse : Tri::kTrue);
+      break;
     case PropertyExprNode::Kind::kImplies:
     case PropertyExprNode::Kind::kIff: {
       Tri first = Finish(node->operands[0], *state.operands[0]);

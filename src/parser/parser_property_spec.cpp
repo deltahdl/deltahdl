@@ -8,12 +8,10 @@
 namespace delta {
 
 // §16.12: the tokens of the property operators the evaluation does not read;
-// not, or, and, if-else, the implications, the followed-bys, implies and iff
-// are read.
+// not, or, and, if-else, the implications, the followed-bys, implies, iff and
+// nexttime are read.
 static bool IsPropertyOperatorToken(TokenKind k) {
   switch (k) {
-    case TokenKind::kKwNexttime:
-    case TokenKind::kKwSNexttime:
     case TokenKind::kKwAlways:
     case TokenKind::kKwSAlways:
     case TokenKind::kKwEventually:
@@ -199,8 +197,28 @@ PropertyExprNode* ParserPropertySpecHelpers::ParsePropertyIfElse(Parser& p) {
 // property holding an or or and of its own is read as one; and otherwise
 // the operand is a sequence where it holds a cycle delay before the next
 // operator or stands under strong or weak, and a boolean else.
+// §16.12.10: `nexttime [ [ constant_expression ] ] property_expr` and the
+// strong s_nexttime, the operand bound as tightly as not's.
+PropertyExprNode* ParserPropertySpecHelpers::ParsePropertyNexttime(
+    Parser& p, bool strong) {
+  auto* node = NewPropertyNode(p, PropertyExprNode::Kind::kNexttime);
+  node->strong = strong;
+  if (p.Match(TokenKind::kLBracket)) {
+    node->boolean = p.ParseExpr();
+    if (node->boolean == nullptr || !p.Match(TokenKind::kRBracket)) {
+      return nullptr;
+    }
+  }
+  auto* operand = ParsePropertyTerm(p);
+  if (operand == nullptr) return nullptr;
+  node->operands.push_back(operand);
+  return node;
+}
+
 PropertyExprNode* ParserPropertySpecHelpers::ParsePropertyTerm(Parser& p) {
   if (p.Match(TokenKind::kKwIf)) return ParsePropertyIfElse(p);
+  if (p.Match(TokenKind::kKwNexttime)) return ParsePropertyNexttime(p, false);
+  if (p.Match(TokenKind::kKwSNexttime)) return ParsePropertyNexttime(p, true);
   if (p.Match(TokenKind::kKwNot)) {
     auto* node = NewPropertyNode(p, PropertyExprNode::Kind::kNot);
     auto* operand = ParsePropertyTerm(p);
@@ -324,7 +342,8 @@ bool ParserPropertySpecHelpers::ParseSimpleSpecBody(Parser& p,
   // spec is a property of operands a leading `not` is the first operand's,
   // read with the operands; a spec opening with `if` is a property of
   // operands as well.
-  if (BodyHasPropertyJunction(p) || p.Check(TokenKind::kKwIf)) {
+  if (BodyHasPropertyJunction(p) || p.Check(TokenKind::kKwIf) ||
+      p.Check(TokenKind::kKwNexttime) || p.Check(TokenKind::kKwSNexttime)) {
     body.property = ParsePropertyImplication(p);
     return body.property != nullptr;
   }

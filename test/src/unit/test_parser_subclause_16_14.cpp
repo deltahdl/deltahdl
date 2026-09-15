@@ -140,7 +140,8 @@ TEST(ConcurrentAssertionEvaluationReporting, ImplicationsAreEvaluated) {
 // sequential property, which the evaluation reads as weak in an assert; a
 // spec that holds a cycle delay and no property operator is reported by
 // nothing. One holding a cycle delay under a property operator the
-// evaluation does not read, nexttime here, is still the temporal branch's.
+// evaluation does not read, s_eventually here, is still the temporal
+// branch's.
 TEST(ConcurrentAssertionEvaluationReporting,
      CycleDelayIsEvaluatedAsASequentialProperty) {
   auto r = Parse(
@@ -150,7 +151,7 @@ TEST(ConcurrentAssertionEvaluationReporting,
   EXPECT_EQ(UnevaluatedReports(r), 0);
   auto under = Parse(
       "module m;\n"
-      "  assert property (@(posedge clk) nexttime (a ##1 b));\n"
+      "  assert property (@(posedge clk) s_eventually (a ##1 b));\n"
       "endmodule\n");
   EXPECT_TRUE(
       ReportedWarning(under.diags, "its property is temporal", 2, "16.14"));
@@ -190,16 +191,16 @@ TEST(ConcurrentAssertionEvaluationReporting,
 }
 
 // A clocked assert whose property_spec is not exhausted by what the
-// evaluation reads: §16.12.8's nexttime is a property operator the
+// evaluation reads: §16.12.11's s_always is a property operator the
 // evaluation does not read, so the spec is not the whole of what stands
 // after the clock, and the report names this rather than the missing clock,
-// because the clock is present. `a and b` and `if (a) b else c` stood here
-// until §16.12.5's conjunction and §16.12.6's if-else were evaluated.
+// because the clock is present. `a and b`, `if (a) b else c` and `nexttime
+// b` stood here until §16.12.5, §16.12.6 and §16.12.10 were evaluated.
 TEST(ConcurrentAssertionEvaluationReporting,
      ClockedNonBooleanPropertyIsNotEvaluated) {
   auto r = Parse(
       "module m;\n"
-      "  assert property (@(posedge clk) nexttime b);\n"
+      "  assert property (@(posedge clk) s_always [1:3] b);\n"
       "endmodule\n");
   EXPECT_TRUE(ReportedWarning(
       r.diags, "holds more than the @(event) boolean_expression", 2, "16.14"));

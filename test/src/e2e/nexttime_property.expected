@@ -1,0 +1,11 @@
+nexttime a passes 2 fails 1 at ticks
+s_nexttime a passes 2 fails 1 at ticks
+nexttime [2] a passes 1 fails 1 at ticks
+s_nexttime [2] a passes 1 fails 1 at ticks
+$finish at time 40
+nexttime a passes at the end of the run
+s_nexttime a fails at the end of the run
+nexttime [2] a passes at the end of the run
+nexttime [2] a passes at the end of the run
+s_nexttime [2] a fails at the end of the run
+s_nexttime [2] a fails at the end of the run
