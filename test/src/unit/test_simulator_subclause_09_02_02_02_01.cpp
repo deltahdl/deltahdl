@@ -663,4 +663,32 @@ TEST(AlwaysCombSensitivitySim, StillReactsToAWriteOfThePackedBitItReads) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
+// §9.2.2.2.1 excludes a called function's formals and block-locals from the
+// reads made within that function, and no further: the block's own read of a
+// module variable stays in the list though the function it calls names a
+// formal after that variable. The formal `k` of `twice` shadows nothing
+// outside `twice`, so the write of the module's `k` at time 1 re-runs the
+// block, and `y` reads 2 * 7 + 7. Before the fix the formal silenced the
+// block's read of `k`, and `y` stayed at 2 * 3 + 3.
+TEST(AlwaysCombSensitivitySim,
+     FormalNamedAsAModuleVariableDoesNotSilenceTheBlocksRead) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  int k, y;\n"
+      "  function int twice(input int k);\n"
+      "    return 2 * k;\n"
+      "  endfunction\n"
+      "  always_comb y = twice(3) + k;\n"
+      "  initial begin\n"
+      "    k = 3;\n"
+      "    #1 k = 7;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "y");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 13u);
+}
+
 }  // namespace

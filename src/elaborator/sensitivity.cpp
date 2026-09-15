@@ -302,6 +302,15 @@ static std::unordered_set<std::string_view> ResolveCalledFunctions(
   return visited;
 }
 
+// The base identifier a read's longest static prefix (e.g. "state[0]", "s.f")
+// stands on. It is one of the two names the prefix expands to, and the one that
+// always denotes a simulation object: `logic [7:0] a` is a single Variable
+// named `a`, so a bit-select read of it can only be watched through that name.
+static std::string_view BaseSignalName(std::string_view name) {
+  auto pos = name.find_first_of("[.");
+  return pos == std::string_view::npos ? name : name.substr(0, pos);
+}
+
 static void MergeOneCalledFunctionReads(
     const ModuleItem* func, std::unordered_set<std::string>& reads) {
   for (auto* s : func->func_body_stmts) {
@@ -326,6 +335,23 @@ static void MergeOneCalledFunctionWritten(
   }
 }
 
+// Copies into `out` every name of `names` whose longest static prefix does not
+// stand on one of `locals`, the names a called function declares. §9.2.2.2.1
+// excludes a formal or a block-local of the function from the reads made
+// within it, and the function's names reach no further: a formal named as a
+// variable of the module says nothing about the block's own read of that
+// variable, which stays in the list. Merging the function's locals into the
+// block's exclusions had a function taking `input int opcode` silence the
+// block's `seen = opcode`, so a write of opcode never re-ran it.
+static void MergeNamesNotLocalTo(const std::unordered_set<std::string>& names,
+                                 const std::unordered_set<std::string>& locals,
+                                 std::unordered_set<std::string>& out) {
+  for (const auto& name : names) {
+    if (locals.count(std::string(BaseSignalName(name))) != 0) continue;
+    out.insert(name);
+  }
+}
+
 // The three signal-name accumulators collected while inferring an implicit
 // sensitivity list (IEEE 1800 §9.2.2.2.1, @* / @(*)): identifiers read by the
 // process (reads), identifiers that are block-local declarations or formal
@@ -346,21 +372,17 @@ static void MergeCalledFunctionSignals(const Stmt* body, const FuncMap& funcs,
     auto it = funcs.find(fname);
     if (it == funcs.end()) continue;
     const auto* func = it->second;
-    MergeOneCalledFunctionReads(func, sigs.reads);
-    MergeOneCalledFunctionLocals(func, sigs.locals);
+    std::unordered_set<std::string> func_locals;
+    MergeOneCalledFunctionLocals(func, func_locals);
+    std::unordered_set<std::string> func_reads;
+    MergeOneCalledFunctionReads(func, func_reads);
+    MergeNamesNotLocalTo(func_reads, func_locals, sigs.reads);
     if (exclude_written) {
-      MergeOneCalledFunctionWritten(func, sigs.written);
+      std::unordered_set<std::string> func_written;
+      MergeOneCalledFunctionWritten(func, func_written);
+      MergeNamesNotLocalTo(func_written, func_locals, sigs.written);
     }
   }
-}
-
-// The base identifier a read's longest static prefix (e.g. "state[0]", "s.f")
-// stands on. It is one of the two names the prefix expands to, and the one that
-// always denotes a simulation object: `logic [7:0] a` is a single Variable
-// named `a`, so a bit-select read of it can only be watched through that name.
-static std::string_view BaseSignalName(std::string_view name) {
-  auto pos = name.find_first_of("[.");
-  return pos == std::string_view::npos ? name : name.substr(0, pos);
 }
 
 // Records one watchable name, deduped, as a plain identifier event the
