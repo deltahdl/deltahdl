@@ -1,0 +1,5 @@
+te1 ##[2:5] te2 ends at ticks 3 4 5 6
+first_match(te1 ##[2:5] te2) ends at ticks 3
+(a ##[2:3] b) or (c ##[1:2] d) ends at ticks 13 14 22 23
+first_match(t2) ends at ticks 13 22
+$finish at time 250

@@ -472,6 +472,95 @@ bool AdvanceOperand(const LinearSequence& body, OperandAttempts& attempts,
   return AdvanceConjunction(body, attempts.conjunctive, ctx, arena);
 }
 
+// §16.9.8: one attempt of `first_match(s)`, begun at one tick: an
+// and-attempt for each `or` operand of s, all begun at that tick, so that the
+// attempt's matches over every operand are kept together. The whole matches
+// at the first tick any operand matches at, every match ending there being a
+// match of the first_match, and is dropped then, the matches that would end
+// later discarded; it is dropped as well once no operand can go on.
+struct FirstMatchAttempt {
+  std::vector<AndAttempt> operands;
+};
+
+const LinearSequence* OrOperandOf(const LinearSequence& body, size_t i) {
+  return i == 0 ? &body : &body.alternatives[i - 1];
+}
+
+FirstMatchAttempt FreshFirstMatchAttempt(const LinearSequence& body) {
+  FirstMatchAttempt fresh;
+  for (size_t i = 0; i <= body.alternatives.size(); ++i) {
+    fresh.operands.push_back(FreshAndAttempt(*OrOperandOf(body, i)));
+  }
+  return fresh;
+}
+
+bool AdvanceFirstMatchAttempt(const LinearSequence& body,
+                              FirstMatchAttempt& attempt, bool begin,
+                              SimContext& ctx, Arena& arena) {
+  bool matched = false;
+  for (size_t i = 0; i < attempt.operands.size(); ++i) {
+    if (AdvanceAndAttempt(*OrOperandOf(body, i), attempt.operands[i], begin,
+                          ctx, arena)) {
+      matched = true;
+    }
+  }
+  return matched;
+}
+
+bool FirstMatchAttemptIsSpent(const FirstMatchAttempt& attempt) {
+  for (const AndAttempt& operand : attempt.operands) {
+    if (!AndAttemptIsSpent(operand)) return false;
+  }
+  return true;
+}
+
+// One tick of a first_match body: the attempts in flight advance, a new one
+// begins, and those that matched or are spent are dropped. Reports whether
+// any matched.
+bool AdvanceFirstMatch(const LinearSequence& body,
+                       std::vector<FirstMatchAttempt>& attempts,
+                       SimContext& ctx, Arena& arena) {
+  attempts.push_back(FreshFirstMatchAttempt(body));
+  bool matched = false;
+  std::vector<FirstMatchAttempt> kept;
+  for (size_t i = 0; i < attempts.size(); ++i) {
+    bool begin = i + 1 == attempts.size();
+    if (AdvanceFirstMatchAttempt(body, attempts[i], begin, ctx, arena)) {
+      matched = true;
+    } else if (!FirstMatchAttemptIsSpent(attempts[i])) {
+      kept.push_back(std::move(attempts[i]));
+    }
+  }
+  attempts = std::move(kept);
+  return matched;
+}
+
+// The attempts of a whole body: those of a first_match body, kept apart by
+// the tick they began at, or each `or` operand's own.
+struct BodyAttempts {
+  std::vector<FirstMatchAttempt> first_match;
+  OperandAttempts body;
+  std::vector<OperandAttempts> alternatives;
+};
+
+bool AdvanceBody(const LinearSequence& body, BodyAttempts& attempts,
+                 SimContext& ctx, Arena& arena) {
+  if (body.first_match) {
+    return AdvanceFirstMatch(body, attempts.first_match, ctx, arena);
+  }
+  // §16.9.7: the body's `or` operands are matched side by side, each with
+  // attempts of its own, and the sequence reaches an end point at a tick any
+  // of them ends at.
+  bool matched = AdvanceOperand(body, attempts.body, ctx, arena);
+  for (size_t i = 0; i < body.alternatives.size(); ++i) {
+    if (AdvanceOperand(body.alternatives[i], attempts.alternatives[i], ctx,
+                       arena)) {
+      matched = true;
+    }
+  }
+  return matched;
+}
+
 // §16.13.6: mark the sequence endpoint event triggered and wake its waiters,
 // mirroring the named-event `-> ev` trigger path (stmt_exec.cpp).
 void FireSequenceEndpoint(SimContext& ctx, const std::string& ep_name) {
@@ -495,22 +584,15 @@ SimCoroutine MakeSequenceMonitorCoroutine(LinearSequence body,
                                           std::vector<EventExpr> clock,
                                           std::string ep_name, SimContext& ctx,
                                           Arena& arena) {
-  // §16.9.7: the body's `or` operands are matched side by side, each with
-  // attempts of its own, and the sequence reaches an end point at a tick any
-  // of them ends at.
-  OperandAttempts active;
-  std::vector<OperandAttempts> alt_active(body.alternatives.size());
+  BodyAttempts active;
+  active.alternatives.resize(body.alternatives.size());
   while (!ctx.StopRequested()) {
     co_await EventAwaiter{ctx, clock, arena};
     // §16.14.5: a new evaluation attempt begins at every clock tick, which
     // each advance adds beside the ones in flight.
-    bool matched = AdvanceOperand(body, active, ctx, arena);
-    for (size_t i = 0; i < body.alternatives.size(); ++i) {
-      if (AdvanceOperand(body.alternatives[i], alt_active[i], ctx, arena)) {
-        matched = true;
-      }
+    if (AdvanceBody(body, active, ctx, arena)) {
+      FireSequenceEndpoint(ctx, ep_name);
     }
-    if (matched) FireSequenceEndpoint(ctx, ep_name);
   }
 }
 

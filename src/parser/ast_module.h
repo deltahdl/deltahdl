@@ -372,6 +372,12 @@ struct SeqLinearBody {
   // them does; §16.9.1 has `or` bind loosest, so each runs from one `or` to
   // the next.
   std::vector<SeqLinearBody> alternatives;
+  // §16.9.8: whether the whole body is the operand of `first_match`, so
+  // that of an attempt's matches only those ending earliest count, and the
+  // match items written after the operand inside its parentheses, executed
+  // at the end of each of those matches.
+  bool first_match = false;
+  std::vector<SeqMatchAssign> first_match_items;
 };
 
 struct ModuleItem {

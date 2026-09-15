@@ -490,22 +490,59 @@ bool FlattenConjunction(const SeqLinearBody& body, SimContext& ctx,
   return true;
 }
 
+// §16.9.8: the match items written on a `first_match` are the operand's own,
+// so they are executed at the end of each `or` operand's chain.
+void AttachFirstMatchItems(const SeqLinearBody& body, LinearSequence& out) {
+  if (body.first_match_items.empty()) return;
+  for (const SeqMatchAssign& item : body.first_match_items) {
+    out.match_items.back().push_back(item);
+    for (LinearSequence& alt : out.alternatives) {
+      alt.match_items.back().push_back(item);
+    }
+  }
+}
+
+// Whether the body is one instance of a named sequence, written with no
+// arguments, delay, repetition, match items or operator of its own: such a
+// body stands for the instantiated sequence whole, `or` operands and all,
+// where an instance among other operands splices into one chain.
+const ModuleItem* BareInstance(const SeqLinearBody& body, SimContext& ctx) {
+  if (body.operands.size() != 1 || !body.alternatives.empty() ||
+      !body.conjuncts.empty() || !body.intersects.empty()) {
+    return nullptr;
+  }
+  const Expr* operand = body.operands[0];
+  if (operand->kind != ExprKind::kIdentifier) return nullptr;
+  if (body.delays[0].min != 0 || body.delays[0].max != 0) return nullptr;
+  if (!body.match_items[0].empty()) return nullptr;
+  if (body.repetitions[0].kind != SeqRepetition::Kind::kNone) return nullptr;
+  return InstantiatedSequence(operand, ctx);
+}
+
 bool Flatten(const ModuleItem* seq, SimContext& ctx, Arena& arena,
              LinearSequence& out, int depth) {
   if (seq == nullptr || seq->seq_linear.operands.empty()) return false;
   if (depth > kMaxInstanceDepth) return false;
-  out.clock = seq->seq_clock;
-  if (!FlattenConjunction(seq->seq_linear, ctx, arena, out, depth)) {
-    return false;
+  const SeqLinearBody& body = seq->seq_linear;
+  if (const ModuleItem* inner = BareInstance(body, ctx)) {
+    if (!Flatten(inner, ctx, arena, out, depth + 1)) return false;
+    if (!seq->seq_clock.empty()) out.clock = seq->seq_clock;
+    out.first_match = out.first_match || body.first_match;
+    AttachFirstMatchItems(body, out);
+    return true;
   }
+  out.clock = seq->seq_clock;
+  out.first_match = body.first_match;
+  if (!FlattenConjunction(body, ctx, arena, out, depth)) return false;
   // §16.9.7: each `or` operand is flattened on its own.
-  for (const SeqLinearBody& alt : seq->seq_linear.alternatives) {
+  for (const SeqLinearBody& alt : body.alternatives) {
     LinearSequence flat;
     flat.clock = out.clock;
     if (!FlattenConjunction(alt, ctx, arena, flat, depth)) return false;
     if (out.clock.empty()) out.clock = flat.clock;
     out.alternatives.push_back(std::move(flat));
   }
+  AttachFirstMatchItems(body, out);
   return true;
 }
 

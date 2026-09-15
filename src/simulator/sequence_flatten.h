@@ -37,6 +37,10 @@ struct LinearSequence {
   // §16.9.7: the flattened forms of the body's other `or` operands, each
   // matched beside this one under the same clock.
   std::vector<LinearSequence> alternatives;
+  // §16.9.8: whether the body is the operand of `first_match`, so that of
+  // the matches of one attempt, over every `or` operand, only those ending
+  // at the earliest tick count.
+  bool first_match = false;
 };
 
 // §16.8: the sequential behaviour of an instance of a named sequence is that

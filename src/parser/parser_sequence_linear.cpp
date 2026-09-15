@@ -464,8 +464,7 @@ struct ParserSeqLinearHelpers {
   // §16.9.1: `or` binds loosest of the sequence operators, so the body is
   // one conjunction per `or` operand, each read to the next `or`, the body's
   // local declarations reaching every chain.
-  static bool ParseLinearSeqOperands(Parser& p, ModuleItem* item) {
-    SeqLinearBody& body = item->seq_linear;
+  static bool ParseLinearSeqDisjunction(Parser& p, SeqLinearBody& body) {
     if (!ParseLinearSeqConjunction(p, body)) return false;
     while (p.Match(TokenKind::kKwOr)) {
       body.alternatives.emplace_back();
@@ -474,6 +473,22 @@ struct ParserSeqLinearHelpers {
       if (!ParseLinearSeqConjunction(p, alt)) return false;
     }
     return true;
+  }
+
+  // The body's sequence_expr: the `or` operands, or §16.9.8's `first_match (
+  // sequence_expr [, match_items] )` around them, whose match items are the
+  // operand's own, `first_match(seq, x = e)` being `first_match((seq, x =
+  // e))`.
+  static bool ParseLinearSeqOperands(Parser& p, ModuleItem* item) {
+    SeqLinearBody& body = item->seq_linear;
+    if (!p.Match(TokenKind::kKwFirstMatch)) {
+      return ParseLinearSeqDisjunction(p, body);
+    }
+    if (!p.Match(TokenKind::kLParen)) return false;
+    body.first_match = true;
+    if (!ParseLinearSeqDisjunction(p, body)) return false;
+    if (!ParseSequenceMatchItems(p, body.first_match_items)) return false;
+    return p.Match(TokenKind::kRParen);
   }
 };
 
