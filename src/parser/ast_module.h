@@ -455,6 +455,17 @@ struct ModuleItem {
   Expr* assert_expr = nullptr;
   Stmt* assert_pass_stmt = nullptr;
   Stmt* assert_fail_stmt = nullptr;
+  // §16.12.1: for a concurrent assertion whose property_spec is an instance of
+  // a named property written without arguments, the property's name. The
+  // parser cannot tell such a name from a variable's, so it records the name
+  // and the elaborator substitutes the property's body in place of the
+  // instance, or reports why it cannot. Empty for every other property_spec.
+  std::string_view prop_instance_name;
+  // §16.12.1: for a named property whose body is the clocked boolean form
+  // `@(event) boolean_expression`, the leading clocking event and the boolean,
+  // captured by the parser so an instance of the property can be evaluated as
+  // an assertion written in that form is. Both empty for any other body.
+  std::vector<EventExpr> prop_clock;
   Expr* prop_body_expr = nullptr;
 
   // §16.12 / §F.4.1: metadata the rewriter needs to flatten property

@@ -1,0 +1,5 @@
+sequence: req then ack matched at 25
+concurrent: req while disabled at 35
+immediate: 4 ticks held
+immediate: 1 tick failed
+$finish at time 46

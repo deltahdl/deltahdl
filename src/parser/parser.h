@@ -258,6 +258,10 @@ class Parser {
   Expr* MakeConstraintAnd(Expr* lhs, Expr* rhs);
   Expr* MakeConstraintNot(Expr* operand);
   void CaptureLinearSequenceBody(ModuleItem* item);
+  // §16.12.1: the clocked boolean body of a named property, kept so an
+  // instance of the property can be evaluated as an assertion in that form.
+  void CaptureClockedBooleanPropertyBody(ModuleItem* item);
+  bool PropertyBodyHasTemporalOperator();
   bool ParseLinearSeqOperands(std::vector<Expr*>& operands);
   void CheckConstraintExprToken(const Token& tok);
   void CheckForeachConstraintHeader(ClassMember* member);
@@ -610,6 +614,7 @@ class Parser {
   ModuleItem* ParseAssumeProperty();
   ModuleItem* ParsePropertyAssertLike(ModuleItemKind kind, TokenKind keyword);
   bool TryParseSimpleConcurrentProperty(ModuleItem* item, StmtKind body_kind);
+  bool TryParsePropertyInstanceSpec(ModuleItem* item);
   bool BodyHasTemporalOperator();
   void WarnUnevaluatedConcurrentAssertion(SourceLoc loc, ModuleItemKind kind);
   // §16.14.6: the report for a procedural concurrent assertion this tool does

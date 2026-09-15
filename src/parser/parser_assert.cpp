@@ -442,6 +442,32 @@ bool Parser::TryParseSimpleConcurrentProperty(ModuleItem* item,
   return true;
 }
 
+// §16.12.1: an instance of a named property can be used as a property_spec.
+// A property_spec that is one name and nothing else is such an instance when
+// the name is a property's, and the parser has no way to know whether it is:
+// the declaration may come later in the module, and a variable's name reads
+// the same. The name is recorded in prop_instance_name for
+// Elaborator::ElaborateAssertPropertyItem, which substitutes the property's
+// body when it is the clocked boolean form and reports the assertion
+// unevaluated otherwise, so the parser reports nothing here. A spec of any
+// other shape leaves the lexer where it was and answers false.
+bool Parser::TryParsePropertyInstanceSpec(ModuleItem* item) {
+  if (!Check(TokenKind::kIdentifier)) return false;
+  auto saved = lexer_.SavePos();
+  Token name = Consume();
+  if (!Check(TokenKind::kRParen)) {
+    lexer_.RestorePos(saved);
+    return false;
+  }
+  item->prop_instance_name = name.text;
+  auto* expr = arena_.Create<Expr>();
+  expr->kind = ExprKind::kIdentifier;
+  expr->text = name.text;
+  expr->range.start = name.loc;
+  item->assert_expr = expr;
+  return true;
+}
+
 ModuleItem* Parser::ParsePropertyAssertLike(ModuleItemKind kind,
                                             TokenKind keyword) {
   auto* item = arena_.Create<ModuleItem>();
@@ -466,7 +492,7 @@ ModuleItem* Parser::ParsePropertyAssertLike(ModuleItemKind kind,
       item, kind == ModuleItemKind::kAssertProperty
                 ? StmtKind::kAssertImmediate
                 : StmtKind::kAssumeImmediate);
-  if (!simple_concurrent) {
+  if (!simple_concurrent && !TryParsePropertyInstanceSpec(item)) {
     // Before SkipPropertySpec, which moves the lexer off the property_spec the
     // reason is read from.
     WarnUnevaluatedConcurrentAssertion(item->loc, kind);

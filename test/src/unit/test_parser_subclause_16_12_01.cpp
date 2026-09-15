@@ -4,6 +4,20 @@ using namespace delta;
 
 namespace {
 
+// §16.12.1 has an instance of a named property stand as a property_spec, so
+// `assert property (p_base)` is evaluated as the body of p_base would be in
+// its place. The three cases at the end read what the parser keeps for that
+// substitution: the body's leading clock and boolean on the declaration, and
+// the instance's name on the assertion, with no report of its own, since only
+// the elaborator can tell the name of a property from the name of a variable.
+
+const ModuleItem* FindAssertProperty(ParseResult& r) {
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kAssertProperty) return item;
+  }
+  return nullptr;
+}
+
 bool HasItemKind(ParseResult& r, ModuleItemKind kind) {
   for (auto* item : r.cu->modules[0]->items) {
     if (item->kind == kind) return true;
@@ -63,6 +77,69 @@ TEST(AssertionSemanticsParsing, PropertyInstanceUsedAsPropertyExprOperand) {
   const ModuleItem* outer = FindPropertyDecl(r, "outer");
   ASSERT_NE(outer, nullptr);
   EXPECT_TRUE(RefersToInstance(outer, "leaf"));
+}
+
+// A property whose body is a leading clocking event and a boolean is the form
+// an assertion written in place of its instance is evaluated in, so the parser
+// keeps the clock and the boolean. The boolean here is a disjunction, so a
+// capture that stopped at the first operand would keep an expression of a
+// different kind.
+TEST(AssertionSemanticsParsing, ClockedBooleanPropertyBodyIsCaptured) {
+  auto r = Parse(
+      "module m;\n"
+      "  property req_only_when_enabled;\n"
+      "    @(posedge clk) !req || en;\n"
+      "  endproperty\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  const ModuleItem* decl = FindPropertyDecl(r, "req_only_when_enabled");
+  ASSERT_NE(decl, nullptr);
+  ASSERT_EQ(decl->prop_clock.size(), 1u);
+  EXPECT_EQ(decl->prop_clock[0].edge, Edge::kPosedge);
+  ASSERT_NE(decl->prop_body_expr, nullptr);
+  EXPECT_EQ(decl->prop_body_expr->kind, ExprKind::kBinary);
+}
+
+// A body holding an implication is a temporal property_spec rather than the
+// clocked boolean form, so nothing is kept for it: an instance of this
+// property is left unevaluated, and the elaborator says so.
+TEST(AssertionSemanticsParsing, TemporalPropertyBodyIsNotCaptured) {
+  auto r = Parse(
+      "module m;\n"
+      "  property p_base;\n"
+      "    @(posedge clk) a |-> b;\n"
+      "  endproperty\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  const ModuleItem* decl = FindPropertyDecl(r, "p_base");
+  ASSERT_NE(decl, nullptr);
+  EXPECT_TRUE(decl->prop_clock.empty());
+  EXPECT_EQ(decl->prop_body_expr, nullptr);
+}
+
+// An assertion whose whole property_spec is one name is an instance of a
+// named property when the name is a property's. The parser records the name
+// and reports nothing, leaving the substitution and the report to the
+// elaborator.
+TEST(AssertionSemanticsParsing, PropertyInstanceSpecIsRecordedUnreported) {
+  auto r = Parse(
+      "module m;\n"
+      "  property p_base;\n"
+      "    @(posedge clk) a;\n"
+      "  endproperty\n"
+      "  assert property (p_base) x = 1; else x = 0;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  const ModuleItem* assertion = FindAssertProperty(r);
+  ASSERT_NE(assertion, nullptr);
+  EXPECT_EQ(assertion->prop_instance_name, "p_base");
+  EXPECT_EQ(assertion->body, nullptr);
+  ASSERT_NE(assertion->assert_pass_stmt, nullptr);
+  ASSERT_NE(assertion->assert_fail_stmt, nullptr);
+  EXPECT_TRUE(r.diags.empty());
 }
 
 }  // namespace

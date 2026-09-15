@@ -145,15 +145,33 @@ TEST(ConcurrentAssertionEvaluationReporting, CycleDelayIsNotEvaluated) {
 // clock from a default clocking block rather than from a leading clocking
 // event. deltahdl infers no clock, so an assert property written without one
 // has nothing to sample its boolean on and is skipped even though it is an
-// assert and even though its body is boolean.
+// assert and even though its body is boolean. The boolean is two names joined
+// rather than one name, because one name alone is read as a property instance
+// (see the next case).
 TEST(ConcurrentAssertionEvaluationReporting,
      AssertWithoutAClockIsNotEvaluated) {
   auto r = Parse(
       "module m;\n"
-      "  assert property (a);\n"
+      "  assert property (a && b);\n"
       "endmodule\n");
   EXPECT_TRUE(ReportedWarning(
       r.diags, "its property_spec has no leading clocking event", 2, "16.14"));
+}
+
+// §16.12.1 lets an instance of a named property stand as the property_spec,
+// and a spec that is one name is such an instance when the name is a
+// property's. The parser cannot know whether it is, since the declaration may
+// follow the assertion and a variable's name reads the same, so it records the
+// name and reports nothing; Elaborator::ElaborateAssertPropertyItem makes the
+// substitution or the report, and test_elaborator_subclause_16_12_01.cpp reads
+// both.
+TEST(ConcurrentAssertionEvaluationReporting,
+     ABareNameSpecIsLeftToTheElaborator) {
+  auto r = Parse(
+      "module m;\n"
+      "  assert property (a);\n"
+      "endmodule\n");
+  EXPECT_EQ(UnevaluatedReports(r), 0);
 }
 
 // A clocked assert whose property_spec is not exhausted by one boolean

@@ -1,6 +1,7 @@
 #include <string>
 #include <string_view>
 
+#include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "elaborator/concurrent_assertion_expr.h"
@@ -82,6 +83,61 @@ bool IsStaticDeferredAssertion(const ModuleItem* item) {  // §16.4.3
   return item->body != nullptr && item->body->is_deferred;
 }
 
+// §16.12.1: an instance of a named property can be used as a property_spec,
+// and the assertion is then legal provided the property's body, substituted in
+// place of the instance, is a legal property_spec. The parser records the name
+// of an argument-less instance in prop_instance_name (see
+// Parser::TryParsePropertyInstanceSpec); this makes the substitution when the
+// body is the clocked boolean form the parser captured, giving `item` the
+// clock and body an assertion written in that form has, so the caller lowers
+// it to the same process. The property may name no formals, since an instance
+// without arguments binds none; §16.12.1 puts substitution of actuals for
+// formals ahead of the check, and there are none to substitute.
+//
+// The rewrite is made on `item`, which every instance of the module shares,
+// and it is made once: the property declaration is the same for every
+// instance, so the second instance finds the body already there. Reports the
+// assertion unevaluated, under the rule
+// Parser::WarnUnevaluatedConcurrentAssertion states, when the name is no
+// property's or the body is not that form; the parser left the report to here
+// because it could not tell the two apart.
+void SubstitutePropertyInstance(ModuleItem* item, Arena& arena,
+                                const PropertyRegistry& registry,
+                                DiagEngine& diag) {
+  if (item->prop_instance_name.empty() || item->body != nullptr) return;
+  const ModuleItem* decl = registry.Find(item->prop_instance_name);
+  const std::string name(item->prop_instance_name);
+  if (decl == nullptr || decl->kind != ModuleItemKind::kPropertyDecl) {
+    diag.Warning(item->loc,
+                 "concurrent assertion is not evaluated: its property_spec "
+                 "has no leading clocking event, and \"" +
+                     name + "\" names no property whose body could supply one",
+                 Subclause("16.14"));
+    return;
+  }
+  if (decl->prop_body_expr == nullptr || !decl->prop_formals.empty()) {
+    diag.Warning(item->loc,
+                 "concurrent assertion is not evaluated: the body of property "
+                 "\"" +
+                     name +
+                     "\" is not the @(event) boolean_expression this tool "
+                     "evaluates, or the property declares formal arguments",
+                 Subclause("16.14"));
+    return;
+  }
+  auto* stmt = arena.Create<Stmt>();
+  stmt->kind = item->kind == ModuleItemKind::kAssumeProperty
+                   ? StmtKind::kAssumeImmediate
+                   : StmtKind::kAssertImmediate;
+  stmt->range.start = item->loc;
+  stmt->assert_expr = decl->prop_body_expr;
+  stmt->is_concurrent_clocked = true;
+  stmt->assert_pass_stmt = item->assert_pass_stmt;
+  stmt->assert_fail_stmt = item->assert_fail_stmt;
+  item->sensitivity = decl->prop_clock;
+  item->body = stmt;
+}
+
 }  // namespace
 
 void Elaborator::ElaborateSequenceDeclItem(ModuleItem* item, RtlirModule* mod) {
@@ -145,6 +201,7 @@ void Elaborator::ElaboratePropertyDeclItem(ModuleItem* item, RtlirModule* mod) {
 
 void Elaborator::ElaborateAssertPropertyItem(ModuleItem* item,
                                              RtlirModule* mod) {
+  SubstitutePropertyInstance(item, arena_, property_registry_, diag_);
   CheckConcurrentAssertionNoChandle(item, mod, diag_);
   // §16.5.2: `assert property(@$global_clock a);` under a
   // `global clocking @clk; endclocking` declaration is logically equivalent to

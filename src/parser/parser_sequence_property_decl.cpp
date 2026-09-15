@@ -794,6 +794,56 @@ static void ScanPropertyBodyToken(Lexer& lexer, DiagEngine& diag,
   lexer.Next();
 }
 
+// §16.12.1: a property body is a property_spec, and one that is temporal --
+// holding an implication or a cycle delay -- is not the clocked boolean form
+// CaptureClockedBooleanPropertyBody records. ParseExpr would read `a |-> b` as
+// an expression, so the operators are looked for before it is tried. Scans from
+// the current token to `endproperty` and leaves the lexer where it was.
+bool Parser::PropertyBodyHasTemporalOperator() {
+  auto scan = lexer_.SavePos();
+  bool found = false;
+  while (!Check(TokenKind::kEof) && !Check(TokenKind::kKwEndproperty)) {
+    TokenKind k = CurrentToken().kind;
+    if (k == TokenKind::kPipeDashGt || k == TokenKind::kPipeEqGt ||
+        k == TokenKind::kHashHash) {
+      found = true;
+      break;
+    }
+    Consume();
+  }
+  lexer_.RestorePos(scan);
+  return found;
+}
+
+// §16.12.1: an instance of a named property may stand as the property_spec of
+// a concurrent assertion, and the assertion is then the property's body in
+// that place. Trial-parses the body `@(event_list) boolean_expression ;` that
+// Parser::TryParseSimpleConcurrentProperty accepts in an assertion, and records
+// its clock in prop_clock and its boolean in prop_body_expr so the elaborator
+// can make that substitution. Diagnostics are suppressed and the lexer is
+// rewound, so the body scan in ParsePropertyDecl re-reads the same tokens; a
+// body of any other shape leaves both fields empty.
+void Parser::CaptureClockedBooleanPropertyBody(ModuleItem* item) {
+  if (!Check(TokenKind::kAt) || PropertyBodyHasTemporalOperator()) return;
+  auto saved = lexer_.SavePos();
+  diag_.PushSuppress();
+  Consume();  // '@'
+  std::vector<EventExpr> clock;
+  bool ok = Match(TokenKind::kLParen);
+  if (ok) {
+    clock = ParseEventList();
+    ok = Match(TokenKind::kRParen);
+  }
+  Expr* boolean = ok ? ParseExpr() : nullptr;
+  ok = boolean != nullptr && Match(TokenKind::kSemicolon) &&
+       Check(TokenKind::kKwEndproperty);
+  diag_.PopSuppress();
+  lexer_.RestorePos(saved);
+  if (!ok) return;
+  item->prop_clock = std::move(clock);
+  item->prop_body_expr = boolean;
+}
+
 // §16.12 + §F.4.1: capture formal names, body disable-iff count, and nested
 // property/sequence instance references so the rewriter has what it needs.
 ModuleItem* Parser::ParsePropertyDecl() {
@@ -814,6 +864,8 @@ ModuleItem* Parser::ParsePropertyDecl() {
   // block, which forbids such an event on the declarations it contains, can
   // reject it.
   item->decl_has_leading_clock = Check(TokenKind::kAt);
+
+  CaptureClockedBooleanPropertyBody(item);
 
   // §16.10: assertion_variable_declarations may appear at the head of a
   // property body, just as in a sequence body. Harvest them before the

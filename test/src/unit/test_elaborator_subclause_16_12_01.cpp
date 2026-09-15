@@ -1,12 +1,25 @@
 #include <gtest/gtest.h>
 
 #include "elaborator/property_instantiation.h"
+#include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
+#include "parser/ast_stmt.h"
 
 using namespace delta;
 
 namespace {
+
+// The process a static concurrent assertion is lowered to (§16.14.5 gives it
+// always semantics, so it is a kAlwaysFF), or nullptr when the module holds
+// none. The last three cases read the instance's substituted clock and body
+// off it.
+const RtlirProcess* AssertionProcess(const RtlirModule* mod) {
+  for (const auto& p : mod->processes) {
+    if (p.kind == RtlirProcessKind::kAlwaysFF) return &p;
+  }
+  return nullptr;
+}
 
 TEST(PropertyInstantiation, LegalAsPropertyExprWhenBodyFits) {
   // §16.12.1: an instance is legal as a property_expr provided the named
@@ -188,6 +201,91 @@ TEST(PropertyInstantiation,
                             "cannot be used as an operand of a property "
                             "operator in \"outer\"",
                             8, "16.12.1"));
+}
+
+// §16.12.1: an instance of a named property can be used as a property_spec,
+// legal when the body substituted in place of the instance is a legal
+// property_spec. The instance here is the whole spec of an assert property, and
+// the body is the clocked boolean form, so the assertion is the process an
+// assert property written as `@(posedge clk) !req || en` is: clocked by the
+// property's leading event, carrying the property's boolean as a concurrent
+// clocked body, and carrying the assertion's own action block. An
+// implementation that left the instance unevaluated would build no process.
+TEST(PropertyInstantiation, InstanceAsPropertySpecIsTheBodysProcess) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic clk, req, en;\n"
+      "  int fails = 0;\n"
+      "  property req_only_when_enabled;\n"
+      "    @(posedge clk) !req || en;\n"
+      "  endproperty\n"
+      "  assert property (req_only_when_enabled) else fails = fails + 1;\n"
+      "endmodule\n",
+      f, "m");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_FALSE(design->top_modules.empty());
+  const RtlirProcess* p = AssertionProcess(design->top_modules[0]);
+  ASSERT_NE(p, nullptr);
+  EXPECT_TRUE(p->is_concurrent_clocked);
+  ASSERT_EQ(p->sensitivity.size(), 1u);
+  EXPECT_EQ(p->sensitivity[0].edge, Edge::kPosedge);
+  ASSERT_NE(p->sensitivity[0].signal, nullptr);
+  EXPECT_EQ(p->sensitivity[0].signal->text, "clk");
+  ASSERT_NE(p->body, nullptr);
+  EXPECT_EQ(p->body->kind, StmtKind::kAssertImmediate);
+  EXPECT_TRUE(p->body->is_concurrent_clocked);
+  ASSERT_NE(p->body->assert_expr, nullptr);
+  EXPECT_EQ(p->body->assert_expr->kind, ExprKind::kBinary);
+  EXPECT_EQ(p->body->assert_pass_stmt, nullptr);
+  EXPECT_NE(p->body->assert_fail_stmt, nullptr);
+}
+
+// A spec that is one name is an instance only when the name is a property's.
+// Here it is a variable's, so the assertion has no leading clocking event and
+// no property body to take one from, and the report says both, since the
+// parser left it to the elaborator to tell the two apart.
+TEST(PropertyInstantiation, ANameThatIsNoPropertysIsReportedUnevaluated) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic a;\n"
+      "  assert property (a);\n"
+      "endmodule\n",
+      f, "m");
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
+                              "its property_spec has no leading clocking "
+                              "event, and \"a\" names no property whose body "
+                              "could supply one",
+                              3, "16.14"));
+  EXPECT_EQ(AssertionProcess(design->top_modules[0]), nullptr);
+}
+
+// The substitution reaches only a body in the clocked boolean form. A body
+// holding an implication is temporal, which this tool does not evaluate, so
+// the instance is reported unevaluated, with the property named so the reader
+// knows which body to look at.
+TEST(PropertyInstantiation, AnInstanceOfATemporalPropertyIsReported) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic clk, a, b;\n"
+      "  property p_base;\n"
+      "    @(posedge clk) a |-> b;\n"
+      "  endproperty\n"
+      "  assert property (p_base);\n"
+      "endmodule\n",
+      f, "m");
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
+                              "the body of property \"p_base\" is not the "
+                              "@(event) boolean_expression this tool "
+                              "evaluates, or the property declares formal "
+                              "arguments",
+                              6, "16.14"));
+  EXPECT_EQ(AssertionProcess(design->top_modules[0]), nullptr);
 }
 
 }  // namespace
