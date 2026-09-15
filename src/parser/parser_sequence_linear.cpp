@@ -459,14 +459,16 @@ struct ParserSeqLinearHelpers {
   // of a named sequence as §16.8 has it, or a group. Returns false on a delay
   // form the monitor does not read or on a parse failure.
   // Whether the token ends an operand chain: the body's `;` or
-  // `endsequence`, a group's `)` or the `,` before its match items, or the
-  // `intersect`, `and` or `or` before the next operand of those.
+  // `endsequence`, a group's `)` or the `,` before its match items, the
+  // `intersect`, `and` or `or` before the next operand of those, or the
+  // `else` after a property's if branch (§16.12.6).
   static bool AtChainEnd(Parser& p) {
     return p.Check(TokenKind::kKwEndsequence) ||
            p.Check(TokenKind::kSemicolon) || p.Check(TokenKind::kRParen) ||
            p.Check(TokenKind::kComma) || p.Check(TokenKind::kKwOr) ||
            p.Check(TokenKind::kKwAnd) || p.Check(TokenKind::kKwIntersect) ||
-           p.Check(TokenKind::kKwWithin) || p.AtEnd();
+           p.Check(TokenKind::kKwWithin) || p.Check(TokenKind::kKwElse) ||
+           p.AtEnd();
   }
 
   // §16.9.9: `exp throughout seq`, exp already read, seq the chain that

@@ -39,7 +39,6 @@ static bool IsPropertyOperatorToken(TokenKind k) {
     case TokenKind::kKwRejectOn:
     case TokenKind::kKwSyncAcceptOn:
     case TokenKind::kKwSyncRejectOn:
-    case TokenKind::kKwIf:
     case TokenKind::kKwCase:
       return true;
     default:
@@ -262,12 +261,34 @@ struct ParserAssertHelpers {
     return nullptr;
   }
 
+  // §16.12.6: `if ( expression_or_dist ) property_expr [ else property_expr
+  // ]`, the if keyword consumed; Table 16-3 puts if-else below every other
+  // operator, so each branch runs to the else or the end.
+  static PropertyExprNode* ParsePropertyIfElse(Parser& p) {
+    auto* node = NewPropertyNode(p, PropertyExprNode::Kind::kIfElse);
+    if (!p.Match(TokenKind::kLParen)) return nullptr;
+    node->boolean = p.ParseExpr();
+    if (node->boolean == nullptr || !p.Match(TokenKind::kRParen)) {
+      return nullptr;
+    }
+    auto* then_branch = ParsePropertyOr(p);
+    if (then_branch == nullptr) return nullptr;
+    node->operands.push_back(then_branch);
+    if (p.Match(TokenKind::kKwElse)) {
+      auto* else_branch = ParsePropertyOr(p);
+      if (else_branch == nullptr) return nullptr;
+      node->operands.push_back(else_branch);
+    }
+    return node;
+  }
+
   // One operand of a property's or or and: `not` before an operand negates
-  // it (§16.12.3); a parenthesised property holding an or or and of its own
-  // is read as one; and otherwise the operand is a sequence where it holds
-  // a cycle delay before the next operator or stands under strong or weak,
-  // and a boolean else.
+  // it (§16.12.3); an if-else is read whole (§16.12.6); a parenthesised
+  // property holding an or or and of its own is read as one; and otherwise
+  // the operand is a sequence where it holds a cycle delay before the next
+  // operator or stands under strong or weak, and a boolean else.
   static PropertyExprNode* ParsePropertyTerm(Parser& p) {
+    if (p.Match(TokenKind::kKwIf)) return ParsePropertyIfElse(p);
     if (p.Match(TokenKind::kKwNot)) {
       auto* node = NewPropertyNode(p, PropertyExprNode::Kind::kNot);
       auto* operand = ParsePropertyTerm(p);
@@ -328,8 +349,9 @@ struct ParserAssertHelpers {
     if (BodyHasPropertyOperator(p)) return false;
     // Table 16-3 has `not` bind tighter than `or` and `and`, so where the
     // spec is a property of operands a leading `not` is the first operand's,
-    // read with the operands.
-    if (BodyHasPropertyJunction(p)) {
+    // read with the operands; a spec opening with `if` is a property of
+    // operands as well.
+    if (BodyHasPropertyJunction(p) || p.Check(TokenKind::kKwIf)) {
       body.property = ParsePropertyOr(p);
       return body.property != nullptr;
     }

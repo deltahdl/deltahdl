@@ -1,0 +1,6 @@
+if (req) gnt passes 3 fails 1
+if (req) gnt else idle passes 2 fails 2
+if (req) gnt ##1 done else idle passes 1 fails 2 at ticks
+if (req) gnt and idle passes 2 fails 2
+$finish at time 40
+if (req) gnt ##1 done else idle passes at the end of the run

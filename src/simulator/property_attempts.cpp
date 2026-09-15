@@ -73,6 +73,15 @@ bool CollectLeaves(const PropertyExprNode* node, PropertyTreeState& state,
       state.leaves.push_back({node, LinearSequence{}});
       CollectPastDirectedSites(node->boolean, state.past_sites);
       return true;
+    case PropertyExprNode::Kind::kIfElse:
+      // §16.12.6: the condition is read at the attempt's tick as a boolean
+      // operand is, its leaf standing before the branches'.
+      state.leaves.push_back({node, LinearSequence{}});
+      CollectPastDirectedSites(node->boolean, state.past_sites);
+      for (const PropertyExprNode* operand : node->operands) {
+        if (!CollectLeaves(operand, state, ctx, arena)) return false;
+      }
+      return true;
     case PropertyExprNode::Kind::kSequence: {
       Leaf leaf{node, LinearSequence{}};
       if (!FlattenLinearSequence(node->sequence, ctx, arena, leaf.body)) {
@@ -97,11 +106,11 @@ Tri Not(Tri t) {
   return t == Tri::kTrue ? Tri::kFalse : Tri::kTrue;
 }
 
-// §16.12.3 to §16.12.5 over the operands' verdicts: not inverts a decided
+// §16.12.3 to §16.12.6 over the operands' verdicts: not inverts a decided
 // operand; or is true where any operand is and false where every one is;
-// and is false where any operand is and true where every one is; else the
-// tree is not yet decided. `next` walks the leaves in the order they were
-// collected.
+// and is false where any operand is and true where every one is; if-else
+// is the branch its condition selects; else the tree is not yet decided.
+// `next` walks the leaves in the order they were collected.
 Tri Evaluate(const PropertyExprNode* node, const TreeAttempt& attempt,
              size_t& next) {
   switch (node->kind) {
@@ -110,6 +119,17 @@ Tri Evaluate(const PropertyExprNode* node, const TreeAttempt& attempt,
       return attempt.leaves[next++].verdict;
     case PropertyExprNode::Kind::kNot:
       return Not(Evaluate(node->operands[0], attempt, next));
+    case PropertyExprNode::Kind::kIfElse: {
+      // §16.12.6: with the condition true the property is the then branch;
+      // with it false, the else branch, or true where none was written.
+      // Both branches are walked so that `next` passes their leaves.
+      Tri condition = attempt.leaves[next++].verdict;
+      Tri then_branch = Evaluate(node->operands[0], attempt, next);
+      Tri else_branch = node->operands.size() > 1
+                            ? Evaluate(node->operands[1], attempt, next)
+                            : Tri::kTrue;
+      return condition == Tri::kTrue ? then_branch : else_branch;
+    }
     case PropertyExprNode::Kind::kOr:
     case PropertyExprNode::Kind::kAnd: {
       bool is_or = node->kind == PropertyExprNode::Kind::kOr;
@@ -141,7 +161,8 @@ void StepLeaves(PropertyTreeState& state, TreeAttempt& attempt, bool begin,
     const Leaf& leaf = state.leaves[i];
     LeafState& ls = attempt.leaves[i];
     if (ls.verdict != Tri::kPending) continue;
-    if (leaf.node->kind == PropertyExprNode::Kind::kBoolean) {
+    if (leaf.node->kind == PropertyExprNode::Kind::kBoolean ||
+        leaf.node->kind == PropertyExprNode::Kind::kIfElse) {
       ls.verdict = EvalExpr(leaf.node->boolean, ctx, arena).IsTruthy()
                        ? Tri::kTrue
                        : Tri::kFalse;
