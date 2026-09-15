@@ -5,4 +5,4 @@ immediate assert: failed 2 times, first at 12
 immediate assume: failed 2 times
 immediate cover: hit 2 times
 $finish at time 40
-cover assertion_kinds (line 65): evaluated 4, succeeded 2
+cover assertion_kinds (line 69): evaluated 4, succeeded 2
