@@ -1,0 +1,5 @@
+!trdy[*7] within ($fell(irdy) ##1 !irdy[*8]) ends at ticks 11
+!irdy[*9] within ($fell(irdy) ##1 !irdy[*8]) ends at ticks 11
+(irdy ##1 !irdy) within ($fell(irdy) ##1 !irdy[*8]) ends at ticks
+(!trdy ##1 trdy ##1 trdy) within ($fell(irdy) ##1 !irdy[*8]) ends at ticks
+$finish at time 150

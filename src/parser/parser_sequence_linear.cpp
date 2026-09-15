@@ -400,7 +400,7 @@ struct ParserSeqLinearHelpers {
            p.Check(TokenKind::kSemicolon) || p.Check(TokenKind::kRParen) ||
            p.Check(TokenKind::kComma) || p.Check(TokenKind::kKwOr) ||
            p.Check(TokenKind::kKwAnd) || p.Check(TokenKind::kKwIntersect) ||
-           p.AtEnd();
+           p.Check(TokenKind::kKwWithin) || p.AtEnd();
   }
 
   // §16.9.9: `exp throughout seq`, exp already read, seq the chain that
@@ -463,15 +463,79 @@ struct ParserSeqLinearHelpers {
     return true;
   }
 
+  // The literal 1 of §16.9.10's abbreviation, standing where an operand
+  // does.
+  static Expr* TrueLiteral(Parser& p) {
+    auto* one = p.arena_.Create<Expr>();
+    one->kind = ExprKind::kIntegerLiteral;
+    one->text = "1";
+    one->int_val = 1;
+    one->range.start = p.CurrentToken().loc;
+    return one;
+  }
+
+  // §16.9.10: `seq1 within seq2` abbreviates `(1[*0:$] ##1 seq1 ##1 1[*0:$])
+  // intersect seq2`, so the chain seq1 was read into becomes that first
+  // operand: a 1 repeated any number of times before it, a tick between, and
+  // another after, its own operands' delays and throughouts moved along.
+  static void WrapWithinOperand(Parser& p, SeqLinearBody& body) {
+    SeqRepetition any;
+    any.kind = SeqRepetition::Kind::kConsecutive;
+    any.min = 0;
+    any.max = SeqCycleDelay::kUnbounded;
+    SeqCycleDelay none;
+    none.min = 0;
+    none.max = 0;
+    SeqCycleDelay one;
+    one.min = 1;
+    one.max = 1;
+    SeqLinearBody wrapped;
+    wrapped.operands.push_back(TrueLiteral(p));
+    wrapped.delays.push_back(none);
+    wrapped.match_items.emplace_back();
+    wrapped.repetitions.push_back(any);
+    for (size_t i = 0; i < body.operands.size(); ++i) {
+      wrapped.operands.push_back(body.operands[i]);
+      wrapped.delays.push_back(i == 0 ? AddSeqDelays(one, body.delays[0])
+                                      : body.delays[i]);
+      wrapped.match_items.push_back(body.match_items[i]);
+      wrapped.repetitions.push_back(body.repetitions[i]);
+    }
+    wrapped.operands.push_back(TrueLiteral(p));
+    wrapped.delays.push_back(one);
+    wrapped.match_items.emplace_back();
+    wrapped.repetitions.push_back(any);
+    for (SeqThroughout guard : body.throughouts) {
+      guard.first += 1;
+      guard.last += 1;
+      wrapped.throughouts.push_back(guard);
+    }
+    body.operands = std::move(wrapped.operands);
+    body.delays = std::move(wrapped.delays);
+    body.match_items = std::move(wrapped.match_items);
+    body.repetitions = std::move(wrapped.repetitions);
+    body.throughouts = std::move(wrapped.throughouts);
+  }
+
   // §16.9.1: `intersect` binds tighter than `and` and looser than `##`, so
   // an `intersect` operand is one chain, read to the next `intersect`, `and`
-  // or `or`, and the operands after the first are the first's intersects.
+  // or `or`, and the operands after the first are the first's intersects;
+  // §16.9.10's `within`, binding tighter still, makes the chain before it
+  // the first operand of an intersect with the chain after it.
   static bool ParseLinearSeqIntersection(Parser& p, SeqLinearBody& body) {
     SeqCycleDelay none;
     none.min = 0;
     none.max = 0;
     if (!ParseLinearSeqOperandChain(p, body, none)) return false;
     if (body.operands.empty()) return false;
+    if (p.Match(TokenKind::kKwWithin)) {
+      WrapWithinOperand(p, body);
+      body.intersects.emplace_back();
+      SeqLinearBody& enclosing = body.intersects.back();
+      enclosing.locals = body.locals;
+      if (!ParseLinearSeqOperandChain(p, enclosing, none)) return false;
+      if (enclosing.operands.empty()) return false;
+    }
     while (p.Match(TokenKind::kKwIntersect)) {
       body.intersects.emplace_back();
       SeqLinearBody& operand = body.intersects.back();
