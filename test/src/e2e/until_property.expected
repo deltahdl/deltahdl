@@ -1,0 +1,11 @@
+a until b passes 3 fails 0 at ticks
+a s_until b passes 3 fails 0 at ticks
+a until_with b passes 0 fails 3 at ticks
+c until_with b passes 3 fails 0 at ticks
+c s_until_with b passes 3 fails 0 at ticks
+$finish at time 40
+a until b passes at the end of the run
+a s_until b fails at the end of the run
+a until_with b passes at the end of the run
+c until_with b passes at the end of the run
+c s_until_with b fails at the end of the run

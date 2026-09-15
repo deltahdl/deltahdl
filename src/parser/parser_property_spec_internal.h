@@ -26,7 +26,7 @@ struct SimpleSpecBody {
 // assertion in the forms the evaluation reads, after its clock: the disable
 // condition, and a boolean, a sequential property or a property of operands
 // under not, or, and, if-else, implication, followed-by, implies, iff,
-// nexttime and always. A
+// nexttime, always and until. A
 // friend of Parser, defined in src/parser/parser_property_spec.cpp.
 struct ParserPropertySpecHelpers {
   static Expr* PropertySpecPlaceholder(Arena& arena, SourceLoc loc);

@@ -9,15 +9,11 @@ namespace delta {
 
 // §16.12: the tokens of the property operators the evaluation does not read;
 // not, or, and, if-else, the implications, the followed-bys, implies, iff,
-// nexttime and always are read.
+// nexttime, always and the untils are read.
 static bool IsPropertyOperatorToken(TokenKind k) {
   switch (k) {
     case TokenKind::kKwEventually:
     case TokenKind::kKwSEventually:
-    case TokenKind::kKwUntil:
-    case TokenKind::kKwSUntil:
-    case TokenKind::kKwUntilWith:
-    case TokenKind::kKwSUntilWith:
     case TokenKind::kKwAcceptOn:
     case TokenKind::kKwRejectOn:
     case TokenKind::kKwSyncAcceptOn:
@@ -126,9 +122,9 @@ bool ParserPropertySpecHelpers::AheadHolds(Parser& p, TokenKind wanted,
 }
 
 // Whether the spec holds an `or` or an `and` at its own depth, or an
-// implication, a followed-by, implies or iff, which makes it a property built
-// of operands (§16.12.4, §16.12.5, §16.12.7 to §16.12.9) rather than one
-// operand; a
+// implication, a followed-by, implies, iff or an until, which makes it a
+// property built of operands (§16.12.4, §16.12.5, §16.12.7 to §16.12.9,
+// §16.12.12) rather than one operand; a
 // sequence's own `or` and `and` read the same, which §16.12.2's strength rules
 // make the same property.
 bool ParserPropertySpecHelpers::BodyHasPropertyJunction(Parser& p) {
@@ -139,6 +135,10 @@ bool ParserPropertySpecHelpers::BodyHasPropertyJunction(Parser& p) {
          AheadHolds(p, TokenKind::kHashMinusHash, false) ||
          AheadHolds(p, TokenKind::kHashEqHash, false) ||
          AheadHolds(p, TokenKind::kKwImplies, false) ||
+         AheadHolds(p, TokenKind::kKwUntil, false) ||
+         AheadHolds(p, TokenKind::kKwSUntil, false) ||
+         AheadHolds(p, TokenKind::kKwUntilWith, false) ||
+         AheadHolds(p, TokenKind::kKwSUntilWith, false) ||
          AheadHolds(p, TokenKind::kKwIff, false);
 }
 
@@ -333,10 +333,23 @@ PropertyExprNode* ParserPropertySpecHelpers::ParsePropertyIff(Parser& p) {
   return node;
 }
 
+// §16.12.8 and §16.12.12: `implies` and the four untils stand in one row of
+// Table 16-3, right associative, below iff; an until is strong where it is
+// s_until or s_until_with and overlapping where it is until_with or
+// s_until_with.
 PropertyExprNode* ParserPropertySpecHelpers::ParsePropertyImplies(Parser& p) {
   auto* left = ParsePropertyIff(p);
-  if (left == nullptr || !p.Match(TokenKind::kKwImplies)) return left;
-  auto* node = NewPropertyNode(p, PropertyExprNode::Kind::kImplies);
+  if (left == nullptr) return nullptr;
+  TokenKind op = p.CurrentToken().kind;
+  bool until = op == TokenKind::kKwUntil || op == TokenKind::kKwSUntil ||
+               op == TokenKind::kKwUntilWith || op == TokenKind::kKwSUntilWith;
+  if (op != TokenKind::kKwImplies && !until) return left;
+  p.Consume();
+  auto* node = NewPropertyNode(p, until ? PropertyExprNode::Kind::kUntil
+                                        : PropertyExprNode::Kind::kImplies);
+  node->strong = op == TokenKind::kKwSUntil || op == TokenKind::kKwSUntilWith;
+  node->range_unbounded =
+      op == TokenKind::kKwUntilWith || op == TokenKind::kKwSUntilWith;
   node->operands.push_back(left);
   auto* right = ParsePropertyImplies(p);
   if (right == nullptr) return nullptr;

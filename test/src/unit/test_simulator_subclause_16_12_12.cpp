@@ -1,6 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
+#include "fixture_simulator.h"
 #include "simulator/sva_engine.h"
+#include "simulator/variable.h"
 
 using namespace delta;
 
@@ -159,6 +163,120 @@ TEST(SvaEngineUntil, ComposesWeakOverlappingFailsAtRhsTick) {
                                     /*first_rhs_index=*/2, /*trace_length=*/5);
   EXPECT_EQ(EvalUntil(/*strong=*/false, /*rhs_holds_eventually=*/true, lhs),
             PropertyResult::kFail);
+}
+
+// --- Live cases: until properties over real source ---
+
+// The module the cases share: clk rises at 5, 15, 25 and 35, tick n at
+// 10n - 5, the tick counter counting through; a is high at ticks 1, 2 and 4,
+// b at 3 and c at every tick. `items` declare the assertions, counting in
+// `passes` and `fails`.
+std::string UntilSource(const std::string& items) {
+  return "module t;\n"
+         "  logic clk = 0;\n"
+         "  int tick = 1;\n"
+         "  logic a, b, c;\n"
+         "  int passes = 0;\n"
+         "  int fails = 0;\n"
+         "  always #5 clk = ~clk;\n"
+         "  always #10 tick = tick + 1;\n"
+         "  assign a = tick inside {1, 2, 4};\n"
+         "  assign b = tick inside {3};\n"
+         "  assign c = tick inside {1, 2, 3, 4};\n" +
+         items +
+         "  initial #40 $finish;\n"
+         "endmodule\n";
+}
+
+// §16.12.12: `a until b` is true where a holds at every tick from the
+// attempt's until, not including, a tick b holds at: the attempts from 1, 2
+// and 3 are true at 3, a not needed there, and the attempt from 4, a high
+// with b never true again, is true when the run ends; `a s_until b` needs
+// a tick b holds at and fails then instead.
+TEST(UntilProperty, NonOverlappingFormsExcludeTheTickTheSecondHoldsAt) {
+  SimFixture f;
+  auto* weak = RunAndFindVar(
+      UntilSource("  p: assert property (@(posedge clk) a until b) passes++; "
+                  "else fails++;\n"),
+      f, "passes");
+  ASSERT_NE(weak, nullptr);
+  EXPECT_EQ(weak->value.ToUint64(), 3u);
+  EXPECT_EQ(f.ctx.FindVariable("fails")->value.ToUint64(), 0u);
+  f.ctx.RunFinalBlocks();
+  EXPECT_EQ(weak->value.ToUint64(), 4u);
+  SimFixture g;
+  auto* strong = RunAndFindVar(
+      UntilSource("  p: assert property (@(posedge clk) a s_until b) "
+                  "passes++; else fails++;\n"),
+      g, "passes");
+  ASSERT_NE(strong, nullptr);
+  EXPECT_EQ(strong->value.ToUint64(), 3u);
+  g.ctx.RunFinalBlocks();
+  EXPECT_EQ(g.ctx.FindVariable("fails")->value.ToUint64(), 1u);
+}
+
+// §16.12.12: `a until_with b` needs a at the tick b holds at as well, so
+// with a low at 3 the attempts from 1, 2 and 3 fail there, and the attempt
+// from 4 is true when the run ends; `c until_with b`, c high throughout, is
+// true at 3 for those attempts.
+TEST(UntilProperty, OverlappingFormsIncludeTheTickTheSecondHoldsAt) {
+  SimFixture f;
+  auto* a_fails = RunAndFindVar(
+      UntilSource("  p: assert property (@(posedge clk) a until_with b) "
+                  "passes++; else fails++;\n"),
+      f, "passes");
+  ASSERT_NE(a_fails, nullptr);
+  EXPECT_EQ(a_fails->value.ToUint64(), 0u);
+  EXPECT_EQ(f.ctx.FindVariable("fails")->value.ToUint64(), 3u);
+  f.ctx.RunFinalBlocks();
+  EXPECT_EQ(a_fails->value.ToUint64(), 1u);
+  SimFixture g;
+  auto* c_holds = RunAndFindVar(
+      UntilSource("  p: assert property (@(posedge clk) c until_with b) "
+                  "passes++; else fails++;\n"),
+      g, "passes");
+  ASSERT_NE(c_holds, nullptr);
+  EXPECT_EQ(c_holds->value.ToUint64(), 3u);
+  EXPECT_EQ(g.ctx.FindVariable("fails")->value.ToUint64(), 0u);
+}
+
+// §16.12.12: `c s_until_with b` needs a tick b holds at, so the attempt
+// from 4 fails when the run ends where `c until_with b` holds.
+TEST(UntilProperty, StrongOverlappingFormNeedsTheSecondToHold) {
+  SimFixture f;
+  auto* passes = RunAndFindVar(
+      UntilSource("  p: assert property (@(posedge clk) c s_until_with b) "
+                  "passes++; else fails++;\n"),
+      f, "passes");
+  ASSERT_NE(passes, nullptr);
+  EXPECT_EQ(passes->value.ToUint64(), 3u);
+  f.ctx.RunFinalBlocks();
+  EXPECT_EQ(f.ctx.FindVariable("fails")->value.ToUint64(), 1u);
+}
+
+// §16.12.12: `b until a` is decided true at the first tick a holds at, b
+// not needed there, so the attempts from 1, 2 and 4 are true at their own
+// tick, a high, and the attempt from 3 passes its tick, b high with a low,
+// and is true at 4. `b until_with a` needs b where a holds, so the attempts
+// from 1, 2 and 4 fail at their own tick, b low, and the attempt from 3 at
+// 4.
+TEST(UntilProperty, TheFirstOperandFailingBeforeTheSecondHoldsFails) {
+  SimFixture f;
+  auto* decided_by_a = RunAndFindVar(
+      UntilSource("  p: assert property (@(posedge clk) b until a) passes++; "
+                  "else fails++;\n"),
+      f, "passes");
+  ASSERT_NE(decided_by_a, nullptr);
+  EXPECT_EQ(decided_by_a->value.ToUint64(), 4u);
+  EXPECT_EQ(f.ctx.FindVariable("fails")->value.ToUint64(), 0u);
+  SimFixture g;
+  auto* needs_b = RunAndFindVar(
+      UntilSource("  p: assert property (@(posedge clk) b until_with a) "
+                  "passes++; else fails++;\n"),
+      g, "passes");
+  ASSERT_NE(needs_b, nullptr);
+  EXPECT_EQ(needs_b->value.ToUint64(), 0u);
+  EXPECT_EQ(g.ctx.FindVariable("fails")->value.ToUint64(), 4u);
 }
 
 }  // namespace

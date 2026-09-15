@@ -51,6 +51,10 @@ struct NodeState {
   uint64_t wait = 0;
   bool begun = false;
   uint64_t remaining = 0;
+  // §16.12.12: an until's attempts of its second operand, one begun at each
+  // tick beside the first operand's in `consequents`, and the index of the
+  // first tick not yet decided in `wait`.
+  std::vector<NodeState*> seconds;
 };
 
 }  // namespace
@@ -311,6 +315,65 @@ Tri StepAlways(const PropertyExprNode* node, NodeState& state, StepContext& sc,
   return state.remaining == 0 ? all : Tri::kPending;
 }
 
+// §16.12.12: what an until's tick says from its operands' verdicts there:
+// the until decided true or false, the tick passed on to the next, or not
+// yet known. The non-overlapping forms are true at a tick the second operand
+// holds at, whatever the first, and the overlapping forms need the first
+// there too; a tick the first operand fails at before that fails the until;
+// a tick the first holds at with the second false passes on.
+enum class UntilTick : uint8_t { kTrue, kFalse, kNext, kPending };
+
+UntilTick TickOfUntil(const PropertyExprNode* node, Tri first, Tri second) {
+  bool overlapping = node->range_unbounded;
+  if (!overlapping && second == Tri::kTrue) return UntilTick::kTrue;
+  if (first == Tri::kFalse) return UntilTick::kFalse;
+  if (first == Tri::kPending || second == Tri::kPending) {
+    return UntilTick::kPending;
+  }
+  return second == Tri::kTrue ? UntilTick::kTrue : UntilTick::kNext;
+}
+
+// The ticks in order from the first not yet decided, which `wait` indexes;
+// an until whose every tick has passed on is not yet decided.
+Tri DecideUntil(const PropertyExprNode* node, NodeState& state,
+                const std::vector<Tri>& firsts,
+                const std::vector<Tri>& seconds) {
+  while (state.wait < firsts.size()) {
+    switch (TickOfUntil(node, firsts[state.wait], seconds[state.wait])) {
+      case UntilTick::kTrue:
+        return Tri::kTrue;
+      case UntilTick::kFalse:
+        return Tri::kFalse;
+      case UntilTick::kPending:
+        return Tri::kPending;
+      case UntilTick::kNext:
+        ++state.wait;
+        break;
+    }
+  }
+  return Tri::kPending;
+}
+
+// One tick of an until: the operands' attempts of the ticks before step on,
+// a pair begins at this tick, and the ticks are decided in order.
+Tri StepUntil(const PropertyExprNode* node, NodeState& state, StepContext& sc) {
+  std::vector<Tri> firsts;
+  std::vector<Tri> seconds;
+  firsts.reserve(state.consequents.size() + 1);
+  seconds.reserve(state.seconds.size() + 1);
+  for (size_t i = 0; i < state.consequents.size(); ++i) {
+    firsts.push_back(Step(node->operands[0], *state.consequents[i], sc, false));
+    seconds.push_back(Step(node->operands[1], *state.seconds[i], sc, false));
+  }
+  NodeState* first = NewNodeState(node->operands[0], sc.arena);
+  NodeState* second = NewNodeState(node->operands[1], sc.arena);
+  state.consequents.push_back(first);
+  state.seconds.push_back(second);
+  firsts.push_back(Step(node->operands[0], *first, sc, true));
+  seconds.push_back(Step(node->operands[1], *second, sc, true));
+  return DecideUntil(node, state, firsts, seconds);
+}
+
 Tri Step(const PropertyExprNode* node, NodeState& state, StepContext& sc,
          bool begin) {
   if (state.verdict != Tri::kPending) return state.verdict;
@@ -341,6 +404,9 @@ Tri Step(const PropertyExprNode* node, NodeState& state, StepContext& sc,
       break;
     case PropertyExprNode::Kind::kAlways:
       state.verdict = StepAlways(node, state, sc, begin);
+      break;
+    case PropertyExprNode::Kind::kUntil:
+      state.verdict = StepUntil(node, state, sc);
       break;
     case PropertyExprNode::Kind::kImplies:
     case PropertyExprNode::Kind::kIff: {
@@ -402,6 +468,23 @@ Tri FinishAlways(const PropertyExprNode* node, NodeState& state) {
   return all;
 }
 
+// §16.12.12: the ticks' operands are finished as themselves and the ticks
+// decided in order; an until whose every tick passed on is the weak form
+// holding and the strong failing, no tick having the second operand true.
+Tri FinishUntil(const PropertyExprNode* node, NodeState& state) {
+  std::vector<Tri> firsts;
+  std::vector<Tri> seconds;
+  firsts.reserve(state.consequents.size());
+  seconds.reserve(state.seconds.size());
+  for (size_t i = 0; i < state.consequents.size(); ++i) {
+    firsts.push_back(Finish(node->operands[0], *state.consequents[i]));
+    seconds.push_back(Finish(node->operands[1], *state.seconds[i]));
+  }
+  Tri decided = DecideUntil(node, state, firsts, seconds);
+  if (decided != Tri::kPending) return decided;
+  return node->strong ? Tri::kFalse : Tri::kTrue;
+}
+
 // §16.12.10: with no further tick the weak form holds and the strong fails;
 // an operand begun is finished as itself.
 Tri FinishNexttime(const PropertyExprNode* node, NodeState& state) {
@@ -435,6 +518,9 @@ Tri Finish(const PropertyExprNode* node, NodeState& state) {
       break;
     case PropertyExprNode::Kind::kAlways:
       state.verdict = FinishAlways(node, state);
+      break;
+    case PropertyExprNode::Kind::kUntil:
+      state.verdict = FinishUntil(node, state);
       break;
     case PropertyExprNode::Kind::kImplies:
     case PropertyExprNode::Kind::kIff:
