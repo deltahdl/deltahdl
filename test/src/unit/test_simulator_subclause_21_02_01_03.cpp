@@ -460,4 +460,21 @@ TEST(UnknownAndHighImpedance, PackedStructOperandClassifiesLikeVector) {
   EXPECT_EQ(out, ":1z0x: :X:\n");
 }
 
+// §21.2.1.3: a field width written between the % and the letter overrides the
+// automatic sizing, and a width of 0 gives the minimum width with no leading
+// spaces. For %t the automatic sizing is the $timeformat minimum field width,
+// 20 by Table 20-3 when no call has run, so %0t prints the time unpadded and
+// %4t pads it to 4, while a bare %t keeps the 20. The three are read in one
+// run so the override is seen to be the specifier's rather than a change to
+// the configuration.
+TEST(UnknownAndHighImpedance, TimeFieldWidthOverridesTheTimeformatMinimum) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  initial $display(\":%0t:%4t:%t:\", 12, 12, 12);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, ":12:  12:" + std::string(18, ' ') + "12:\n");
+}
+
 }  // namespace

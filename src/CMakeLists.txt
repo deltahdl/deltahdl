@@ -194,6 +194,8 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/eval_semaphore.cpp
     simulator/queue_bound.cpp
     simulator/sim_context.cpp
+    simulator/immediate_cover.cpp
+    simulator/scope_hier_name.cpp
     simulator/sim_context_binding.cpp
     simulator/sim_context_fileio.cpp
     simulator/output_log.cpp

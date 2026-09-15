@@ -1,0 +1,17 @@
+0 fails
+x fails
+z fails
+2 passes
+no pass statement: v is not 0
+assume: v is not 0
+cover: v is 2
+[0] INFO immediate_assertions.assert_f (line 71): passed in immediate_assertions.assert_f
+[0] INFO immediate_assertions.assert_f (line 71): failed in immediate_assertions.assert_f
+event: fail statement triggered failed at 15
+flag after the fail statement is 1
+checked after on: failed
+$finish at time 16
+cover immediate_assertions.cover_two (line 66): evaluated 1, succeeded 1
+cover immediate_assertions.cover_never (line 67): evaluated 1, succeeded 0
+[0] ERROR immediate_assertions (line 64): Assertion failed.
+[15] ERROR immediate_assertions (line 77): assert failed at time 10

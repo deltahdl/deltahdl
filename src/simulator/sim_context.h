@@ -37,6 +37,7 @@
 #include "simulator/class_object.h"
 #include "simulator/coverage.h"
 #include "simulator/coverage_control.h"
+#include "simulator/immediate_cover.h"
 #include "simulator/net.h"
 #include "simulator/output_log.h"
 #include "simulator/scheduler.h"
@@ -680,10 +681,9 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   void IncrementAssertionFailCount() { ++assertion_fail_count_; }
   int AssertionFailCount() const { return assertion_fail_count_; }
 
-  void IncrementCoverEvalCount() { ++cover_eval_count_; }
-  void IncrementCoverSuccessCount() { ++cover_success_count_; }
-  int CoverEvalCount() const { return cover_eval_count_; }
-  int CoverSuccessCount() const { return cover_success_count_; }
+  // §16.3: the coverage results of the immediate cover statements the run has
+  // evaluated, reported at the end of simulation.
+  ImmediateCoverResults& ImmediateCovers() { return immediate_covers_; }
 
   // §20.11: whole-design assertion control applied by an assertion control
   // system task ($assertcontrol/$asserton/$assertoff/$assertkill and the action
@@ -912,8 +912,7 @@ class SimContext : public DeclaredNameTables, public RandomStability {
 
   int assertion_fail_count_ = 0;
 
-  int cover_eval_count_ = 0;
-  int cover_success_count_ = 0;
+  ImmediateCoverResults immediate_covers_;
 
   // §20.11: whole-design assertion control state (see the accessor comment).
   bool assert_checking_off_ = false;

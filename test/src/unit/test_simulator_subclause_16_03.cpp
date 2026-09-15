@@ -1,4 +1,8 @@
+#include <sstream>
+#include <string>
+
 #include "fixture_simulator.h"
+#include "simulator/immediate_cover.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 
@@ -322,8 +326,8 @@ TEST(ImmediateAssertSim, CoverEvaluationAndSuccessCountsTracked) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  EXPECT_EQ(f.ctx.CoverEvalCount(), 3);
-  EXPECT_EQ(f.ctx.CoverSuccessCount(), 2);
+  EXPECT_EQ(f.ctx.ImmediateCovers().Evaluated(), 3u);
+  EXPECT_EQ(f.ctx.ImmediateCovers().Succeeded(), 2u);
 }
 
 TEST(ImmediateAssertSim, DefaultErrorRecordsSeverityViaSharedHelper) {
@@ -503,6 +507,66 @@ TEST(ImmediateAssertSim, AssertConditionFromFunctionCall) {
       f, "flag");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 2u);  // is_hi(3) is false -> else arm
+}
+
+// §16.3: when the severity task runs at a time other than the failure's, the
+// failure time recorded in the action block is what the message prints. The
+// clause's own example records $time into t, delays the $error by 5, and says
+// the message printed at 15 reads "assert failed at time 10". The example
+// writes the time through %0t, so the string is the clause's only where a 0
+// field width prints the time with no leading spaces; padded to Table 20-3's
+// 20-column default the string would not be the one the clause gives. $info
+// stands in for the example's $error so std::cout carries the message, and the
+// tool-specific header the same $info emits goes ahead of it on the line, so
+// the check is for the clause's string at the end of the header's line.
+TEST(ImmediateAssertSim, DelayedSeverityTaskPrintsTheRecordedFailureTime) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  time fail_time;\n"
+      "  initial begin\n"
+      "    #10 assert (0) else begin\n"
+      "      fail_time = $time;\n"
+      "      #5 $info(\"assert failed at time %0t\", fail_time);\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_NE(out.find(": assert failed at time 10\n"), std::string::npos);
+  EXPECT_EQ(out.find("assert failed at time  "), std::string::npos);
+  EXPECT_EQ(out.rfind("[15]", 0), 0u);
+}
+
+// §16.3: the results of coverage for an immediate cover statement contain the
+// number of times it was evaluated and the number of times it succeeded, and a
+// tool reports them at the end of simulation. Two statements in a loop of
+// three, one holding on every pass and one on none, so the two records differ
+// from each other and from a count kept over all cover statements together;
+// the report names each by its scope and line, and the label the second one
+// carries is in its scope, as §16.3 has the label create a named block around
+// the statement.
+TEST(ImmediateAssertSim, CoverResultsAreReportedPerStatementAtEndOfSimulation) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int i;\n"
+      "  initial begin\n"
+      "    for (i = 0; i < 3; i = i + 1) begin\n"
+      "      cover (i < 3);\n"
+      "      never: cover (i > 3);\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  std::ostringstream report;
+  ReportImmediateCoverResults(f.ctx.ImmediateCovers(), report);
+  EXPECT_EQ(report.str(),
+            "cover t (line 5): evaluated 3, succeeded 3\n"
+            "cover t.never (line 6): evaluated 3, succeeded 0\n");
 }
 
 }  // namespace

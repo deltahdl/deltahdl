@@ -647,7 +647,7 @@ TEST(AssertControlSim, DirectiveMaskStopsCoverImmediate) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  EXPECT_EQ(f.ctx.CoverEvalCount(), 0);
+  EXPECT_EQ(f.ctx.ImmediateCovers().Evaluated(), 0u);
 }
 
 }  // namespace

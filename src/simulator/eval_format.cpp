@@ -8,6 +8,7 @@
 #include "parser/ast.h"
 #include "simulator/evaluation.h"
 #include "simulator/process.h"
+#include "simulator/scope_hier_name.h"
 #include "simulator/sim_context.h"
 
 namespace delta {
@@ -39,32 +40,6 @@ struct FormatArgs {
   // nowhere.
   SourceLoc loc;
 };
-
-// §21.2.1.5: build the hierarchical name that %m expands to -- the name of the
-// design element, subroutine, named block, or labeled statement that contains
-// the system task being run. The name starts at the top-level module and walks
-// down through the chain of instance names recorded on the running process,
-// then through the active subroutine / named-block / labeled-statement scopes
-// that the statement executor tracks in lexical-nesting order.
-static std::string BuildScopeHierName(SimContext* ctx) {
-  if (ctx == nullptr) return "";
-  // The empty instance prefix is the top level; its registered type name is the
-  // top module's name, which doubles as the top instance name for %m.
-  std::string name(ctx->FindInstanceType(""));
-  if (Process* proc = ctx->CurrentProcess()) {
-    std::string prefix = proc->inst_prefix;  // "u1.u2." form, empty at top
-    if (!prefix.empty() && prefix.back() == '.') prefix.pop_back();
-    if (!prefix.empty()) {
-      if (!name.empty()) name += '.';
-      name += prefix;
-    }
-  }
-  for (std::string_view scope : ctx->ActiveNamedScopes()) {
-    if (!name.empty()) name += '.';
-    name += std::string(scope);
-  }
-  return name;
-}
 
 // §33.7: build the "library.cell" string that %l / %L expands to -- the actual
 // library and cell bound to the module instance that contains the running
@@ -682,7 +657,7 @@ static bool TryNoArgScopeSpec(char spec, FormatArgs& args, std::string& out) {
   // §21.2.1.5: %m expands to the hierarchical name of the scope that invokes
   // the system task.
   if (spec == 'm') {
-    out += BuildScopeHierName(args.ctx);
+    if (args.ctx != nullptr) out += ScopeHierName(*args.ctx);
     return true;
   }
   // §33.7: %l / %L expand to the library.cell binding of the module instance
@@ -806,15 +781,24 @@ static bool AppendStringSpecOnAggregate(char norm, FormatArgs& args,
 // configuration installed by the most recent $timeformat call (or the Table
 // 20-3 defaults when none has run yet). This is what makes a plain
 // $display/$fmonitor with %t honor $timeformat "for all %t formats in the
-// design until another $timeformat system task is invoked". §21.2.1.1: the
-// C-style width.precision (e.g. %10.3g) applies to reals.
+// design until another $timeformat system task is invoked". A field width
+// written into the specifier overrides that configuration's minimum field
+// width alone, as §21.2.1.3 has a field width override the automatic sizing
+// and a width of 0 mean the minimum width with no leading spaces: §16.3's
+// example prints `%0t` of a time of 10 as "10", not padded to Table 20-3's
+// default of 20 columns. §21.2.1.1: the C-style width.precision (e.g. %10.3g)
+// applies to reals.
 static void AppendRenderedValue(char spec, char norm,
                                 const FormatFieldSpec& field, FormatArgs& args,
                                 std::string& out) {
   const TimeFormatSpec* tf = args.time_format;
   if (tf == nullptr && args.ctx != nullptr) tf = &args.ctx->GetTimeFormat();
   if (spec == 't' && tf != nullptr) {
-    out += FormatTimeUnderTimeformat(args.vals[args.vi++], *tf);
+    TimeFormatSpec widened = *tf;
+    if (field.has_width) {
+      widened.minimum_field_width = static_cast<int>(field.width);
+    }
+    out += FormatTimeUnderTimeformat(args.vals[args.vi++], widened);
     return;
   }
   if ((norm == 'e' || norm == 'f' || norm == 'g') &&

@@ -19,6 +19,7 @@
 #include "simulator/expr_walk.h"
 #include "simulator/process.h"
 #include "simulator/scheduler.h"
+#include "simulator/scope_hier_name.h"
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"
 #include "simulator/stmt_exec.h"
@@ -121,7 +122,7 @@ static void ScheduleDeferredAction(const Stmt* action, bool is_final_deferred,
 // assertion, or in the Postponed region for a final deferred assertion.
 static void ScheduleDeferredSeverityReport(bool is_final_deferred,
                                            std::string_view assertion_label,
-                                           SimContext& ctx) {
+                                           uint32_t line, SimContext& ctx) {
   Region region = is_final_deferred ? Region::kPostponed : Region::kReactive;
   // §16.4.2: the default $error is a pending report too, so it is flushed the
   // same way when the process reaches a flush point before its region runs.
@@ -131,10 +132,10 @@ static void ScheduleDeferredSeverityReport(bool is_final_deferred,
   // just like an action-block report; carry the assertion's label to check.
   std::string label(assertion_label);
   auto* ev = ctx.GetScheduler().GetEventPool().Acquire();
-  ev->callback = [proc, gen, label, &ctx]() {
+  ev->callback = [proc, gen, label, line, &ctx]() {
     if (proc && proc->deferred_report_generation != gen) return;
     if (DeferredReportCancelled(proc, label)) return;
-    EmitSeverityHeader(ctx, "ERROR", "Assertion failed.", std::cerr);
+    EmitSeverityHeader(ctx, "ERROR", "Assertion failed.", std::cerr, line);
   };
   ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), region, ev);
 }
@@ -270,13 +271,14 @@ struct ObservedRegionAwaiter {
   void await_resume() const noexcept {}
 };
 
-// Records a cover-immediate sampling: bumps the evaluation count and, when the
-// covered expression held, the success count. No-op for assert/assume forms.
+// §16.3: records one evaluation of an immediate cover statement, succeeded
+// when the covered expression held, against the statement in the scope the
+// process stands in. No-op for assert/assume forms.
 static void RecordCoverImmediateSample(const Stmt* stmt, bool is_true,
                                        SimContext& ctx) {
   if (stmt->kind != StmtKind::kCoverImmediate) return;
-  ctx.IncrementCoverEvalCount();
-  if (is_true) ctx.IncrementCoverSuccessCount();
+  ctx.ImmediateCovers().Record(ScopeHierName(ctx), stmt->range.start.line,
+                               is_true);
 }
 
 // §20.11: the Table 20-6 assertion_type bit that identifies an immediate
@@ -319,11 +321,15 @@ static void ReportDefaultAssertionFailure(const Stmt* stmt, uint32_t type_bit,
                                           SimContext& ctx) {
   ctx.IncrementAssertionFailCount();
   if (!ctx.AssertFailActionEnabled(type_bit, directive_bit)) return;
+  // §20.10: the tool-specific message carries the line of the statement, as
+  // it carries a severity task's own line.
+  uint32_t line = stmt->range.start.line;
   if (stmt->is_deferred) {
-    ScheduleDeferredSeverityReport(stmt->is_final_deferred, stmt->label, ctx);
+    ScheduleDeferredSeverityReport(stmt->is_final_deferred, stmt->label, line,
+                                   ctx);
     return;
   }
-  EmitSeverityHeader(ctx, "ERROR", "Assertion failed.", std::cerr);
+  EmitSeverityHeader(ctx, "ERROR", "Assertion failed.", std::cerr, line);
 }
 
 // §16.5.1's mode raised around one evaluation of a concurrent assertion's
