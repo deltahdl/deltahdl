@@ -63,11 +63,39 @@ static SimCoroutine MakeAlwaysCoroutine(const Stmt* body, SimContext& ctx,
   }
 }
 
+// §16.9.3: a sampled value function in a procedure is clocked by the
+// procedure's event control, and the history it looks back through is
+// sampled at every tick of that clock whether or not the statement holding
+// the call is reached at the tick -- `$past(q)` written under an `if` still
+// answers the tick before. The calls are collected once, and each is
+// evaluated as the procedure resumes so that its sample for the tick is
+// recorded; the evaluation where the statement is reached records the same
+// value over it. $sampled looks back through nothing and is left out.
+static bool IsPastDirectedFunction(std::string_view name) {
+  return name == "$past" || name == "$rose" || name == "$fell" ||
+         name == "$stable" || name == "$changed";
+}
+
+static std::vector<const Expr*> CollectPastDirectedSites(const Stmt* body) {
+  std::vector<const Expr*> sites;
+  ForEachStmtReadExpr(body, [&sites](const Expr* e) {
+    ForEachSubExpr(e, [&sites](const Expr* sub) {
+      if (sub->kind == ExprKind::kSystemCall &&
+          IsPastDirectedFunction(sub->callee)) {
+        sites.push_back(sub);
+      }
+    });
+  });
+  return sites;
+}
+
 static SimCoroutine MakeAlwaysSensCoroutine(const Stmt* body,
                                             const std::vector<EventExpr>& sens,
                                             SimContext& ctx, Arena& arena) {
+  std::vector<const Expr*> past_sites = CollectPastDirectedSites(body);
   while (!ctx.StopRequested()) {
     co_await EventAwaiter{ctx, sens, arena};
+    for (const Expr* site : past_sites) EvalExpr(site, ctx, arena);
 
     ctx.FlushPendingViolations();
     // §16.4.2: resuming after suspending on this event control is a deferred

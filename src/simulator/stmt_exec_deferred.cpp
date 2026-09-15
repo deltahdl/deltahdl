@@ -505,11 +505,15 @@ static FutureGclkSamples* SampleFutureGclkOperands(const Expr* root,
 static SimCoroutine FutureGclkAttemptCoroutine(
     const Stmt* stmt, const std::vector<EventExpr>& gclk_event,
     const FutureGclkSamples* samples, SimContext& ctx, Arena& arena) {
+  // The values were sampled at the assertion's own tick, and are recorded
+  // under that time step so that the evaluation at the global clocking tick
+  // that follows reads them as the tick before its own.
+  uint64_t sampled_at = ctx.CurrentTime().ticks;
   co_await EventAwaiter{ctx, gclk_event, arena};
   co_await ObservedRegionAwaiter{ctx};
   auto& store = ctx.AssertionSamples();
   for (const auto& [site, at_tick] : *samples) {
-    store.RecordTick(site, at_tick, 1, arena);
+    store.RecordTick(site, at_tick, 1, arena, 0, sampled_at);
   }
   // The statement carries a concurrent assertion's property, so the verdict's
   // action block is scheduled into the Reactive region rather than handed back

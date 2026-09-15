@@ -281,26 +281,35 @@ const Logic4Vec* AssertionSampleStore::Read(const Variable* var,
 
 const Logic4Vec* AssertionSampleStore::PastValue(const Expr* site,
                                                  uint32_t ticks_back,
-                                                 uint64_t variant) const {
+                                                 uint64_t variant,
+                                                 uint64_t now) const {
   if (site == nullptr || ticks_back == 0) return nullptr;
   auto it = tick_history_.find(SiteKey{site, variant});
-  if (it == tick_history_.end() || it->second.size() < ticks_back) {
-    return nullptr;
-  }
-  return &it->second[ticks_back - 1];
+  if (it == tick_history_.end()) return nullptr;
+  const SiteHistory& history = it->second;
+  size_t index = history.recorded_at == now ? ticks_back : ticks_back - 1;
+  if (history.values.size() <= index) return nullptr;
+  return &history.values[index];
 }
 
 void AssertionSampleStore::RecordTick(const Expr* site,
                                       const Logic4Vec& sampled, uint32_t depth,
-                                      Arena& arena, uint64_t variant) {
+                                      Arena& arena, uint64_t variant,
+                                      uint64_t now) {
   if (site == nullptr) return;
-  auto& history = tick_history_[SiteKey{site, variant}];
+  SiteHistory& history = tick_history_[SiteKey{site, variant}];
   Logic4Vec copy;
   CopySample(sampled, copy, arena);
-  history.insert(history.begin(), copy);
-  // Only as many ticks as the site asks for are kept, so a `$past(x)` written
-  // once costs one value however long the run is.
-  if (history.size() > depth) history.resize(depth);
+  if (history.recorded_at == now && !history.values.empty()) {
+    history.values[0] = copy;
+    return;
+  }
+  history.values.insert(history.values.begin(), copy);
+  history.recorded_at = now;
+  // Only as many ticks as the site asks for are kept, plus this tick's own
+  // sample, so a `$past(x)` written once costs two values however long the
+  // run is.
+  if (history.values.size() > depth + 1) history.values.resize(depth + 1);
 }
 
 Logic4Vec AssertionSampleStore::OwnedSample(const Logic4Vec& sampled,

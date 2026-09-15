@@ -287,14 +287,23 @@ class AssertionSampleStore {
   // §16.9.3's `$past(b[i])` in a for loop over i -- keeps one history per
   // `variant`, the value the site's select indices took, so each iteration
   // reads the past value of its own bit.
+  //
+  // The history is read against `now`, the current time step: a site recorded
+  // at this step already holds this tick's sample as its most recent entry,
+  // so `ticks_back` counts from behind it, and a site last recorded at an
+  // earlier step counts from that entry itself.
   const Logic4Vec* PastValue(const Expr* site, uint32_t ticks_back,
-                             uint64_t variant = 0) const;
+                             uint64_t variant, uint64_t now) const;
 
   // Records what the site sampled at this tick, so the next evaluation of it
   // can read this value back. `depth` is how many ticks of history that site
-  // asks for, which bounds what is kept.
+  // asks for, which bounds what is kept. Recorded twice in one time step, a
+  // site keeps one entry for it: §16.9.3 samples at the clock tick, so the
+  // process a site stands in records every site as it resumes at its clock,
+  // and the site's own evaluation, where the statement is reached, records
+  // the same value over it.
   void RecordTick(const Expr* site, const Logic4Vec& sampled, uint32_t depth,
-                  Arena& arena, uint64_t variant = 0);
+                  Arena& arena, uint64_t variant, uint64_t now);
 
   // A copy of `sampled` that owns its words, for a caller that keeps a sampled
   // value past the tick it read it at: the value a read of a variable answers
@@ -334,8 +343,13 @@ class AssertionSampleStore {
   std::unordered_map<const QueueObject*, QueueEntry> queue_entries_;
   // Most recent first, so entry 0 is the previous tick's value -- $past's
   // default of one tick back.
-  std::unordered_map<SiteKey, std::vector<Logic4Vec>, SiteKeyHash>
-      tick_history_;
+  struct SiteHistory {
+    // Most recent first.
+    std::vector<Logic4Vec> values;
+    // The time step the most recent entry was recorded at.
+    uint64_t recorded_at = UINT64_MAX;
+  };
+  std::unordered_map<SiteKey, SiteHistory, SiteKeyHash> tick_history_;
   bool evaluating_property_ = false;
   bool reading_defaults_ = false;
 };
