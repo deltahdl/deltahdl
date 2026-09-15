@@ -51,6 +51,7 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 
 - [Verifying through CI](verifying-through-ci.md) — never build locally, never run a gate CI runs; push and read the run.
 - [Reading a CI run](reading-a-ci-run.md) — `gh run list --limit 1` before pushing, `gh run view --log-failed` after.
+- [Watching a run in the background](watching-a-run-in-the-background.md) — a background shell or a Monitor, never a foreground `gh run watch`.
 - [Fixing a red run](fixing-a-red-run.md) — fix it in the session that finds it, whoever caused it.
 - [Gate limits live in tracked files](gate-limits-live-in-tracked-files.md) — read the linter config or workflow threshold rather than running the gate.
 - [Read the sv-tests log first](reading-the-sv-tests-log-first.md) — the tool's own output is already under every FAIL line.

@@ -106,7 +106,7 @@ void SubstitutePropertyInstance(ModuleItem* item, Arena& arena,
                                 DiagEngine& diag) {
   if (item->prop_instance_name.empty() || item->body != nullptr) return;
   const ModuleItem* decl = registry.Find(item->prop_instance_name);
-  const std::string name(item->prop_instance_name);
+  std::string name(item->prop_instance_name);
   if (decl == nullptr || decl->kind != ModuleItemKind::kPropertyDecl) {
     diag.Warning(item->loc,
                  "concurrent assertion is not evaluated: its property_spec "
