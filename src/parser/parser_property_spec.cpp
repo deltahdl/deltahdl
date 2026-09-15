@@ -26,6 +26,59 @@ static bool IsAbortToken(TokenKind k) {
          k == TokenKind::kKwSyncAcceptOn || k == TokenKind::kKwSyncRejectOn;
 }
 
+// Whether the token opens an operand a keyword reads: if-else, a nexttime,
+// an always, an eventually or an abort.
+static bool OpensKeywordTerm(TokenKind k) {
+  return k == TokenKind::kKwIf || k == TokenKind::kKwNexttime ||
+         k == TokenKind::kKwSNexttime || k == TokenKind::kKwAlways ||
+         k == TokenKind::kKwSAlways || k == TokenKind::kKwEventually ||
+         k == TokenKind::kKwSEventually || IsAbortToken(k);
+}
+
+// Whether the tokens ahead, past any `not` and any opening parenthesis,
+// open an operand a keyword reads, so the spec is a property of operands
+// whether or not a junction joins them. The lexer is rewound.
+static bool AheadOpensKeywordTerm(Parser& p) {
+  auto saved = p.lexer_.SavePos();
+  while (p.Check(TokenKind::kKwNot) || p.Check(TokenKind::kLParen)) {
+    p.Consume();
+  }
+  bool opens = OpensKeywordTerm(p.CurrentToken().kind);
+  p.lexer_.RestorePos(saved);
+  return opens;
+}
+
+// Whether the tokens ahead, to the closing parenthesis of the spec or the
+// first `or` or `and` at the spec's own depth, hold §16.9.2's repetition,
+// `[*`, `[->`, `[=` or `[+`, which makes the operand a sequence where no
+// `##` does. The lexer is rewound.
+static bool AheadHoldsRepetition(Parser& p) {
+  auto scan = p.lexer_.SavePos();
+  int depth = 0;
+  bool found = false;
+  bool bracket = false;
+  while (!p.Check(TokenKind::kEof)) {
+    TokenKind k = p.CurrentToken().kind;
+    if (k == TokenKind::kLParen) {
+      ++depth;
+    } else if (k == TokenKind::kRParen) {
+      if (depth == 0) break;
+      --depth;
+    } else if (depth == 0 &&
+               (k == TokenKind::kKwOr || k == TokenKind::kKwAnd)) {
+      break;
+    } else if (bracket && (k == TokenKind::kStar || k == TokenKind::kArrow ||
+                           k == TokenKind::kEq || k == TokenKind::kPlus)) {
+      found = true;
+      break;
+    }
+    bracket = k == TokenKind::kLBracket;
+    p.Consume();
+  }
+  p.lexer_.RestorePos(scan);
+  return found;
+}
+
 // The expression standing for a property_spec the assertion does not carry
 // as one: a skipped spec, or a sequential property carried as a sequence.
 Expr* ParserPropertySpecHelpers::PropertySpecPlaceholder(Arena& arena,
@@ -150,17 +203,18 @@ PropertyExprNode* ParserPropertySpecHelpers::NewPropertyNode(
   return node;
 }
 
-// A parenthesised property holding an or or an and of its own, read as
-// one operand; `group` says the tokens were such a group, and the node is
-// null where the group failed to read. The lexer is left where it was
-// where the parentheses hold no such property.
+// A parenthesised property holding an or or an and of its own, or opening
+// with an operand a keyword reads, read as one operand; `group` says the
+// tokens were such a group, and the node is null where the group failed to
+// read. The lexer is left where it was where the parentheses hold no such
+// property.
 PropertyExprNode* ParserPropertySpecHelpers::TryParsePropertyGroup(
     Parser& p, bool& group) {
   group = false;
   if (!p.Check(TokenKind::kLParen)) return nullptr;
   auto saved = p.lexer_.SavePos();
   p.Consume();
-  if (!BodyHasPropertyJunction(p)) {
+  if (!BodyHasPropertyJunction(p) && !AheadOpensKeywordTerm(p)) {
     p.lexer_.RestorePos(saved);
     return nullptr;
   }
@@ -305,7 +359,8 @@ PropertyExprNode* ParserPropertySpecHelpers::ParsePropertyTerm(Parser& p) {
   auto* inner = TryParsePropertyGroup(p, group);
   if (group) return inner;
   bool wrapped = p.Check(TokenKind::kKwStrong) || p.Check(TokenKind::kKwWeak);
-  if (wrapped || AheadHolds(p, TokenKind::kHashHash, true)) {
+  if (wrapped || AheadHolds(p, TokenKind::kHashHash, true) ||
+      AheadHoldsRepetition(p)) {
     auto* node = NewPropertyNode(p, PropertyExprNode::Kind::kSequence);
     node->sequence = TryParseSequenceSpec(p, node->strong, true);
     return node->sequence != nullptr ? node : nullptr;
@@ -428,13 +483,9 @@ bool ParserPropertySpecHelpers::ParseSimpleSpecBody(Parser& p,
   if (BodyHasPropertyOperator(p)) return false;
   // Table 16-3 has `not` bind tighter than `or` and `and`, so where the
   // spec is a property of operands a leading `not` is the first operand's,
-  // read with the operands; a spec opening with `if` is a property of
-  // operands as well.
-  if (BodyHasPropertyJunction(p) || p.Check(TokenKind::kKwIf) ||
-      p.Check(TokenKind::kKwNexttime) || p.Check(TokenKind::kKwSNexttime) ||
-      p.Check(TokenKind::kKwAlways) || p.Check(TokenKind::kKwSAlways) ||
-      p.Check(TokenKind::kKwEventually) || p.Check(TokenKind::kKwSEventually) ||
-      IsAbortToken(p.CurrentToken().kind)) {
+  // read with the operands; a spec opening with an operand a keyword reads,
+  // after any nots and parentheses, is a property of operands as well.
+  if (BodyHasPropertyJunction(p) || AheadOpensKeywordTerm(p)) {
     body.property = ParsePropertyImplication(p);
     return body.property != nullptr;
   }
