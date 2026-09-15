@@ -296,4 +296,27 @@ TEST(AssertionStatementSim, ObservedDeferredAssumeActionDeferred) {
   EXPECT_EQ(var->value.ToUint64(), 88u);
 }
 
+// §16.4 has each by-value actual evaluated at the instant the deferred
+// assertion's expression is, so one statement processed three times in a time
+// step queues three reports, each carrying the actual of its own pass: the
+// loop counter as 0, 1 and 2, folded into 12. A snapshot store keyed by the
+// argument expression alone kept only the last pass's 2 for the first report,
+// then read the counter live at its final 3 for the other two, folding to 233.
+TEST(AssertionStatementSim, EachDeferredReportCarriesItsOwnByValueActual) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  int i;\n"
+      "  int result;\n"
+      "  task fold(input int n); result = result * 10 + n; endtask\n"
+      "  initial begin\n"
+      "    result = 0;\n"
+      "    for (i = 0; i < 3; i++) assert #0 (1) fold(i);\n"
+      "  end\n"
+      "endmodule\n",
+      f, "result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 12u);
+}
+
 }  // namespace

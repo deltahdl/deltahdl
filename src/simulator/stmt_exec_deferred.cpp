@@ -51,30 +51,48 @@ static void RunDeferredActionSync(const Stmt* action, SimContext& ctx,
   }
 }
 
-static void SnapshotDeferredCallArgs(const Stmt* action, SimContext& ctx,
-                                     Arena& arena) {
-  if (!action || action->kind != StmtKind::kExprStmt || !action->expr) return;
+// §16.4: an actual argument passed by value to the action's subroutine,
+// function calls included, is fully evaluated at the instant the deferred
+// assertion's expression is evaluated, not when the call runs in its region.
+// The values are evaluated here, where the assertion is processed, and
+// returned to the caller to carry in the report's event: each pending report
+// keeps its own, because one statement processed several times in a time step
+// -- in a loop, say -- queues one report per pass, each owing the actuals of
+// the pass that queued it, and a store keyed by the expression alone would hold
+// only the last pass's values for all of them. The values are installed in the
+// context for the length of the call and removed after it, so an argument
+// expression evaluated inside the call answers with its snapshot rather than
+// the value then current. A pass-by-reference actual is aliased to its
+// variable when the call binds it, so a snapshot of it goes unread, and the
+// call reads the value the variable holds in the Reactive or Postponed region
+// as §16.4 has it.
+using DeferredArgSnapshots = std::vector<std::pair<const Expr*, Logic4Vec>>;
+
+static DeferredArgSnapshots SnapshotDeferredCallArgs(const Stmt* action,
+                                                     SimContext& ctx,
+                                                     Arena& arena) {
+  DeferredArgSnapshots snaps;
+  if (!action || action->kind != StmtKind::kExprStmt || !action->expr) {
+    return snaps;
+  }
   if (action->expr->kind != ExprKind::kCall &&
       action->expr->kind != ExprKind::kSystemCall) {
-    return;
+    return snaps;
   }
   for (auto* arg : action->expr->args) {
     if (!arg) continue;
-    auto val = EvalExpr(arg, ctx, arena);
-    ctx.SetDeferredArgSnapshot(arg, val);
+    snaps.emplace_back(arg, EvalExpr(arg, ctx, arena));
   }
+  return snaps;
 }
 
-static void ClearDeferredCallArgSnapshots(const Stmt* action, SimContext& ctx) {
-  if (!action || action->kind != StmtKind::kExprStmt || !action->expr) return;
-  if (action->expr->kind != ExprKind::kCall &&
-      action->expr->kind != ExprKind::kSystemCall) {
-    return;
-  }
-  for (auto* arg : action->expr->args) {
-    if (!arg) continue;
-    ctx.ClearDeferredArgSnapshot(arg);
-  }
+static void RunDeferredActionWithSnapshots(const Stmt* action,
+                                           const DeferredArgSnapshots& snaps,
+                                           SimContext& ctx, Arena& arena) {
+  for (const auto& snap : snaps)
+    ctx.SetDeferredArgSnapshot(snap.first, snap.second);
+  RunDeferredActionSync(action, ctx, arena);
+  for (const auto& snap : snaps) ctx.ClearDeferredArgSnapshot(snap.first);
 }
 
 // §16.4.4: reports whether a pending deferred report has been individually
@@ -92,7 +110,7 @@ static void ScheduleDeferredAction(const Stmt* action, bool is_final_deferred,
                                    SimContext& ctx, Arena& arena) {
   if (!action) return;
 
-  SnapshotDeferredCallArgs(action, ctx, arena);
+  DeferredArgSnapshots snaps = SnapshotDeferredCallArgs(action, ctx, arena);
   Region region = is_final_deferred ? Region::kPostponed : Region::kReactive;
   // §16.4.2: the report is pending until its region runs. Capture the process
   // and its report generation now; if a flush point bumps the generation before
@@ -104,12 +122,12 @@ static void ScheduleDeferredAction(const Stmt* action, bool is_final_deferred,
   // `disable <that label>` in the same process can cancel just this report.
   std::string label(assertion_label);
   auto* ev = ctx.GetScheduler().GetEventPool().Acquire();
-  ev->callback = [action, proc, gen, label, &ctx, &arena]() {
+  ev->callback = [action, snaps = std::move(snaps), proc, gen, label, &ctx,
+                  &arena]() {
     if ((!proc || proc->deferred_report_generation == gen) &&
         !DeferredReportCancelled(proc, label)) {
-      RunDeferredActionSync(action, ctx, arena);
+      RunDeferredActionWithSnapshots(action, snaps, ctx, arena);
     }
-    ClearDeferredCallArgSnapshots(action, ctx);
   };
   ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), region, ev);
 }

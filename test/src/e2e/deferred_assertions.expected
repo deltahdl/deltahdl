@@ -1,0 +1,16 @@
+active: v is 2, and no deferred action has run yet
+observed: by value 1, by reference 3
+observed twice: by value 2, by reference 3
+Log.say: a method call as the pass statement
+write_v in the Reactive region: v is now 20
+final: by value 1, by reference 20
+active at 10: the loop's reports and the covers are pending
+observed pass at 0
+observed pass at 1
+observed fail at 2
+zero: flag is 0
+$finish at time 11
+cover deferred_assertions (line 65): evaluated 1, succeeded 1
+cover deferred_assertions.never (line 79): evaluated 1, succeeded 0
+cover deferred_assertions.zero (line 80): evaluated 1, succeeded 1
+[10] ERROR deferred_assertions (line 73): Assertion failed.
