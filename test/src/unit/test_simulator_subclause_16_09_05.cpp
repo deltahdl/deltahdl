@@ -116,10 +116,12 @@ std::string AndSource(const std::string& body, const std::string& drive) {
 }
 
 // The drive of fourteen ticks: before each tick n, te1 to te5 are set to
-// whether n is among the ticks the signal is to be high at.
+// whether n is among the ticks the signal is to be high at, and before the
+// tick after the fourteenth they are all set low, so that a signal high at
+// the last tick is not read as high at the next.
 std::string Drive(const std::vector<std::vector<int>>& high_at) {
   std::string drive;
-  for (int tick = 1; tick <= 14; ++tick) {
+  for (int tick = 1; tick <= 15; ++tick) {
     drive += "   ";
     for (size_t i = 0; i < high_at.size(); ++i) {
       bool high = false;
