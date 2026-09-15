@@ -31,14 +31,18 @@ std::string WeakStrongSource(const std::string& items) {
          "endmodule\n";
 }
 
-// The fail count of an assertion whose property is `spec`, after the run.
+// The fail count of an assertion whose property is `spec`, after the run
+// and its final blocks, where the verdicts on the attempts in flight when
+// the run ends are reached.
 uint64_t FailsOf(const std::string& spec) {
   SimFixture f;
   auto* fails = RunAndFindVar(
       WeakStrongSource("  p: assert property (@(posedge clk) " + spec +
                        ") passes++; else begin fails++; when = $time; end\n"),
       f, "fails");
-  return fails == nullptr ? ~0ull : fails->value.ToUint64();
+  if (fails == nullptr) return ~0ull;
+  f.ctx.RunFinalBlocks();
+  return fails->value.ToUint64();
 }
 
 // §16.12.15: nexttime imposes no requirement that the clock tick again, so
