@@ -513,7 +513,7 @@ static SimCoroutine FutureGclkAttemptCoroutine(
   co_await ObservedRegionAwaiter{ctx};
   auto& store = ctx.AssertionSamples();
   for (const auto& [site, at_tick] : *samples) {
-    store.RecordTick(site, at_tick, 1, arena, 0, sampled_at);
+    store.RecordTick(SampleSite{site, 0, sampled_at}, at_tick, 1, arena);
   }
   // The statement carries a concurrent assertion's property, so the verdict's
   // action block is scheduled into the Reactive region rather than handed back

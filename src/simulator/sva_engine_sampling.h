@@ -210,6 +210,15 @@ bool IsClockingBlockInputSamplingValid(ClockingInputSkew skew);
 //
 // Only the variables an enrolled assertion reads are held, and a variable
 // nothing enrolled reads back as absent so its caller keeps the live value.
+// One evaluation of a sampled value function call site as the store keys its
+// history: the site's expression, the variant its select indices take (see
+// PastValue), and the time step the evaluation stands in.
+struct SampleSite {
+  const Expr* site = nullptr;
+  uint64_t variant = 0;
+  uint64_t now = 0;
+};
+
 class AssertionSampleStore {
  public:
   // Enrols `var`, whose value at the moment of the call is taken as its default
@@ -292,8 +301,7 @@ class AssertionSampleStore {
   // at this step already holds this tick's sample as its most recent entry,
   // so `ticks_back` counts from behind it, and a site last recorded at an
   // earlier step counts from that entry itself.
-  const Logic4Vec* PastValue(const Expr* site, uint32_t ticks_back,
-                             uint64_t variant, uint64_t now) const;
+  const Logic4Vec* PastValue(const SampleSite& site, uint32_t ticks_back) const;
 
   // Records what the site sampled at this tick, so the next evaluation of it
   // can read this value back. `depth` is how many ticks of history that site
@@ -302,8 +310,8 @@ class AssertionSampleStore {
   // process a site stands in records every site as it resumes at its clock,
   // and the site's own evaluation, where the statement is reached, records
   // the same value over it.
-  void RecordTick(const Expr* site, const Logic4Vec& sampled, uint32_t depth,
-                  Arena& arena, uint64_t variant, uint64_t now);
+  void RecordTick(const SampleSite& site, const Logic4Vec& sampled,
+                  uint32_t depth, Arena& arena);
 
   // A copy of `sampled` that owns its words, for a caller that keeps a sampled
   // value past the tick it read it at: the value a read of a variable answers

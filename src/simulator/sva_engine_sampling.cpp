@@ -279,33 +279,30 @@ const Logic4Vec* AssertionSampleStore::Read(const Variable* var,
                                                : &it->second.preponed_value;
 }
 
-const Logic4Vec* AssertionSampleStore::PastValue(const Expr* site,
-                                                 uint32_t ticks_back,
-                                                 uint64_t variant,
-                                                 uint64_t now) const {
-  if (site == nullptr || ticks_back == 0) return nullptr;
-  auto it = tick_history_.find(SiteKey{site, variant});
+const Logic4Vec* AssertionSampleStore::PastValue(const SampleSite& site,
+                                                 uint32_t ticks_back) const {
+  if (site.site == nullptr || ticks_back == 0) return nullptr;
+  auto it = tick_history_.find(SiteKey{site.site, site.variant});
   if (it == tick_history_.end()) return nullptr;
   const SiteHistory& history = it->second;
-  size_t index = history.recorded_at == now ? ticks_back : ticks_back - 1;
+  size_t index = history.recorded_at == site.now ? ticks_back : ticks_back - 1;
   if (history.values.size() <= index) return nullptr;
   return &history.values[index];
 }
 
-void AssertionSampleStore::RecordTick(const Expr* site,
+void AssertionSampleStore::RecordTick(const SampleSite& site,
                                       const Logic4Vec& sampled, uint32_t depth,
-                                      Arena& arena, uint64_t variant,
-                                      uint64_t now) {
-  if (site == nullptr) return;
-  SiteHistory& history = tick_history_[SiteKey{site, variant}];
+                                      Arena& arena) {
+  if (site.site == nullptr) return;
+  SiteHistory& history = tick_history_[SiteKey{site.site, site.variant}];
   Logic4Vec copy;
   CopySample(sampled, copy, arena);
-  if (history.recorded_at == now && !history.values.empty()) {
+  if (history.recorded_at == site.now && !history.values.empty()) {
     history.values[0] = copy;
     return;
   }
   history.values.insert(history.values.begin(), copy);
-  history.recorded_at = now;
+  history.recorded_at = site.now;
   // Only as many ticks as the site asks for are kept, plus this tick's own
   // sample, so a `$past(x)` written once costs two values however long the
   // run is.

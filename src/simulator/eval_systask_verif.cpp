@@ -689,14 +689,14 @@ static Logic4Vec EvalPastOrValueChange(const Expr* expr, SimContext& ctx,
   auto& samples = ctx.AssertionSamples();
   bool is_past = IsPastSampledFunction(name);
   uint32_t ticks = is_past ? PastTickCount(expr, ctx, arena) : 1;
-  uint64_t variant = ArgumentVariant(expr->args[0], ctx, arena);
-  uint64_t now = ctx.CurrentTime().ticks;
+  SampleSite site{expr, ArgumentVariant(expr->args[0], ctx, arena),
+                  ctx.CurrentTime().ticks};
   // This tick's sample is recorded first, once per time step however often
   // the site is evaluated in it, and the value asked for is read behind it.
   if (!is_past || PastGateOpen(expr, ctx, arena)) {
-    samples.RecordTick(expr, now_val, ticks, arena, variant, now);
+    samples.RecordTick(site, now_val, ticks, arena);
   }
-  const Logic4Vec* past = samples.PastValue(expr, ticks, variant, now);
+  const Logic4Vec* past = samples.PastValue(site, ticks);
   Logic4Vec prev_val = past != nullptr
                            ? *past
                            : EvalDefaultSampledArg(expr->args[0], ctx, arena);
@@ -735,8 +735,8 @@ static Logic4Vec EvalFutureGclk(const Expr* expr, SimContext& ctx, Arena& arena,
   }
   auto next_val = EvalSampledArg(expr->args[0], ctx, arena);
   if (name == "$future_gclk") return next_val;
-  const Logic4Vec* at_tick =
-      ctx.AssertionSamples().PastValue(expr, 1, 0, ctx.CurrentTime().ticks);
+  const Logic4Vec* at_tick = ctx.AssertionSamples().PastValue(
+      SampleSite{expr, 0, ctx.CurrentTime().ticks}, 1);
   Logic4Vec cur_val = at_tick != nullptr
                           ? *at_tick
                           : EvalDefaultSampledArg(expr->args[0], ctx, arena);
