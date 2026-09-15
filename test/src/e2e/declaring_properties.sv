@@ -64,7 +64,7 @@ module declaring_properties;
   endproperty
 
   initial begin
-    #50;
+    #40;
     $display("a_plain passes %0d fails %0d", plain_pass, plain_fail);
     $display("a_rst passes %0d fails %0d", rst_pass, rst_fail);
     $display("a_live passes %0d fails %0d", live_pass, live_fail);

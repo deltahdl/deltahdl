@@ -57,7 +57,7 @@ std::string PropertySource(const std::string& items) {
          "  assign sig = tick inside {2, 3};\n"
          "  assign rst = tick inside {2, 4};\n" +
          items +
-         "  initial #50 $finish;\n"
+         "  initial #40 $finish;\n"
          "endmodule\n";
 }
 

@@ -4,4 +4,4 @@ a_live passes 2 fails 1
 a_sampled passes 3 fails 1
 a_guarded passes 1 fails 1
 a_early passes 2 fails 2
-$finish at time 50
+$finish at time 40
