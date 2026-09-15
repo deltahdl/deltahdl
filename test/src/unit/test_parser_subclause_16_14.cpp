@@ -191,7 +191,7 @@ TEST(ConcurrentAssertionEvaluationReporting,
 }
 
 // A clocked assert whose property_spec is not exhausted by what the
-// evaluation reads: §16.12.15's case is a property operator the evaluation
+// evaluation reads: §16.12.16's case is a property operator the evaluation
 // does not read, so the spec is not the whole of what stands after the
 // clock, and the report names this rather than the missing clock, because
 // the clock is present. `a and b`, `if (a) b else c`, `nexttime b`,
