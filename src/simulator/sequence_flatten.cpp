@@ -427,9 +427,12 @@ bool ExpandInstance(const InstanceOperand& op, SimContext& ctx, Arena& arena,
                     LinearSequence& out, int depth) {
   LinearSequence body;
   if (!Flatten(op.inner, ctx, arena, body, depth + 1)) return false;
-  // A sequence with `and` or `or` operands of its own does not splice into
-  // one chain.
-  if (!body.alternatives.empty() || !body.conjuncts.empty()) return false;
+  // A sequence with `intersect`, `and` or `or` operands of its own does not
+  // splice into one chain.
+  if (!body.alternatives.empty() || !body.conjuncts.empty() ||
+      !body.intersects.empty()) {
+    return false;
+  }
   ActualsByFormal actuals = BindActuals(op.inner, op.instance, arena);
   // The operands already flattened number the instance, each instance adding
   // at least one, so the locals of two instances of one sequence differ.
@@ -457,15 +460,30 @@ bool ExpandInstance(const InstanceOperand& op, SimContext& ctx, Arena& arena,
 bool FlattenChain(const SeqLinearBody& body, SimContext& ctx, Arena& arena,
                   LinearSequence& out, int depth);
 
-// One `and` operand with its conjuncts, each flattened as a chain of its own;
-// an instance in any that names the clock gives it to the whole.
+// One `intersect` operand with its intersects, each flattened as a chain of
+// its own; an instance in any that names the clock gives it to the whole.
+bool FlattenIntersection(const SeqLinearBody& body, SimContext& ctx,
+                         Arena& arena, LinearSequence& out, int depth) {
+  if (!FlattenChain(body, ctx, arena, out, depth)) return false;
+  for (const SeqLinearBody& operand : body.intersects) {
+    LinearSequence flat;
+    flat.clock = out.clock;
+    if (!FlattenChain(operand, ctx, arena, flat, depth)) return false;
+    if (out.clock.empty()) out.clock = flat.clock;
+    out.intersects.push_back(std::move(flat));
+  }
+  return true;
+}
+
+// One `and` operand with its conjuncts, each flattened as an intersection of
+// its own; an instance in any that names the clock gives it to the whole.
 bool FlattenConjunction(const SeqLinearBody& body, SimContext& ctx,
                         Arena& arena, LinearSequence& out, int depth) {
-  if (!FlattenChain(body, ctx, arena, out, depth)) return false;
+  if (!FlattenIntersection(body, ctx, arena, out, depth)) return false;
   for (const SeqLinearBody& conjunct : body.conjuncts) {
     LinearSequence flat;
     flat.clock = out.clock;
-    if (!FlattenChain(conjunct, ctx, arena, flat, depth)) return false;
+    if (!FlattenIntersection(conjunct, ctx, arena, flat, depth)) return false;
     if (out.clock.empty()) out.clock = flat.clock;
     out.conjuncts.push_back(std::move(flat));
   }

@@ -1,0 +1,4 @@
+(te1 ##[1:5] te2) intersect (te3 ##2 te4 ##2 te5) ends at 115 255
+(te1 ##[1:5] te2) and (te3 ##2 te4 ##2 te5) ends at 115 125 255 395
+(te1 ##[1:5] te2) intersect (te3 ##2 te4 ##[0:2] te5) ends at 115 235 255
+$finish at time 430

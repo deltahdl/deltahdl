@@ -334,19 +334,72 @@ bool AdvanceLinearAttempts(const LinearSequence& body,
   return step.matched;
 }
 
-// §16.9.5: one attempt of `s1 and s2 ...`, begun at one tick: the attempts
-// of each operand chain that tick began, and whether each chain has matched
-// since. The whole matches at a tick where every chain has matched by then
-// and one matches at that tick, which is the later of the end points; it is
-// dropped once no chain can go on, or every chain has matched and none has an
-// attempt in flight.
-struct AndAttempt {
+// §16.9.6: one attempt of `s1 intersect s2 ...`, begun at one tick: the
+// attempts of the chain and of each of its intersects that tick began. The
+// whole matches at a tick where every operand matches at it, the matches
+// paired by their shared length; it is spent once any operand has no attempt
+// in flight, no further pair being possible.
+struct IntersectAttempt {
   std::vector<std::vector<LinearAttempt>> active;
+};
+
+const LinearSequence* IntersectOperandOf(const LinearSequence& chain,
+                                         size_t i) {
+  return i == 0 ? &chain : &chain.intersects[i - 1];
+}
+
+IntersectAttempt FreshIntersectAttempt(const LinearSequence& chain) {
+  return IntersectAttempt{
+      std::vector<std::vector<LinearAttempt>>(chain.intersects.size() + 1)};
+}
+
+// Advances one intersect-attempt over every operand at this tick, the
+// operands' own attempts begun where `begin` says this is the tick the
+// intersect-attempt begins at. Reports whether the whole matched at this
+// tick.
+bool AdvanceIntersectAttempt(const LinearSequence& chain,
+                             IntersectAttempt& attempt, bool begin,
+                             SimContext& ctx, Arena& arena) {
+  bool all_matched_now = true;
+  for (size_t i = 0; i < attempt.active.size(); ++i) {
+    if (!AdvanceLinearAttempts(*IntersectOperandOf(chain, i), attempt.active[i],
+                               ctx, arena, begin)) {
+      all_matched_now = false;
+    }
+  }
+  return all_matched_now;
+}
+
+bool IntersectAttemptIsSpent(const IntersectAttempt& attempt) {
+  for (const auto& active : attempt.active) {
+    if (active.empty()) return true;
+  }
+  return false;
+}
+
+// §16.9.5: one attempt of `s1 and s2 ...`, begun at one tick: the attempts
+// of each operand chain, an intersection of its own, that tick began, and
+// whether each chain has matched since. The whole matches at a tick where
+// every chain has matched by then and one matches at that tick, which is the
+// later of the end points; it is dropped once no chain can go on, or every
+// chain has matched and none has an attempt in flight.
+struct AndAttempt {
+  std::vector<IntersectAttempt> active;
   std::vector<bool> matched;
 };
 
 const LinearSequence* ChainOf(const LinearSequence& body, size_t i) {
   return i == 0 ? &body : &body.conjuncts[i - 1];
+}
+
+AndAttempt FreshAndAttempt(const LinearSequence& body) {
+  size_t chains = body.conjuncts.size() + 1;
+  AndAttempt fresh{std::vector<IntersectAttempt>(chains),
+                   std::vector<bool>(chains, false)};
+  for (size_t i = 0; i < chains; ++i) {
+    fresh.active[i] = FreshIntersectAttempt(*ChainOf(body, i));
+  }
+  return fresh;
 }
 
 // Advances one and-attempt over every chain at this tick, the chains' own
@@ -357,8 +410,8 @@ bool AdvanceAndAttempt(const LinearSequence& body, AndAttempt& attempt,
   bool matched_now = false;
   bool all_matched = true;
   for (size_t i = 0; i < attempt.active.size(); ++i) {
-    if (AdvanceLinearAttempts(*ChainOf(body, i), attempt.active[i], ctx, arena,
-                              begin)) {
+    if (AdvanceIntersectAttempt(*ChainOf(body, i), attempt.active[i], begin,
+                                ctx, arena)) {
       matched_now = true;
       attempt.matched[i] = true;
     }
@@ -371,12 +424,14 @@ bool AndAttemptIsSpent(const AndAttempt& attempt) {
   bool any_active = false;
   bool all_matched = true;
   for (size_t i = 0; i < attempt.active.size(); ++i) {
-    if (!attempt.active[i].empty()) any_active = true;
+    if (!IntersectAttemptIsSpent(attempt.active[i])) any_active = true;
     if (!attempt.matched[i]) all_matched = false;
   }
   if (all_matched && !any_active) return true;
   for (size_t i = 0; i < attempt.active.size(); ++i) {
-    if (!attempt.matched[i] && attempt.active[i].empty()) return true;
+    if (!attempt.matched[i] && IntersectAttemptIsSpent(attempt.active[i])) {
+      return true;
+    }
   }
   return false;
 }
@@ -390,9 +445,7 @@ bool AdvanceConjunction(const LinearSequence& body,
   for (AndAttempt& attempt : attempts) {
     if (AdvanceAndAttempt(body, attempt, false, ctx, arena)) matched = true;
   }
-  size_t chains = body.conjuncts.size() + 1;
-  AndAttempt fresh{std::vector<std::vector<LinearAttempt>>(chains),
-                   std::vector<bool>(chains, false)};
+  AndAttempt fresh = FreshAndAttempt(body);
   if (AdvanceAndAttempt(body, fresh, true, ctx, arena)) matched = true;
   attempts.push_back(std::move(fresh));
   std::vector<AndAttempt> kept;
@@ -404,7 +457,8 @@ bool AdvanceConjunction(const LinearSequence& body,
 }
 
 // One tick of an `or` operand: a plain chain advances its own attempts, and a
-// chain with conjuncts its and-attempts.
+// chain with intersects or conjuncts its and-attempts, whose attempts are
+// kept apart by the tick they began at as the pairing of matches needs.
 struct OperandAttempts {
   std::vector<LinearAttempt> linear;
   std::vector<AndAttempt> conjunctive;
@@ -412,7 +466,7 @@ struct OperandAttempts {
 
 bool AdvanceOperand(const LinearSequence& body, OperandAttempts& attempts,
                     SimContext& ctx, Arena& arena) {
-  if (body.conjuncts.empty()) {
+  if (body.conjuncts.empty() && body.intersects.empty()) {
     return AdvanceLinearAttempts(body, attempts.linear, ctx, arena, true);
   }
   return AdvanceConjunction(body, attempts.conjunctive, ctx, arena);

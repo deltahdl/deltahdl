@@ -26,9 +26,13 @@ struct LinearSequence {
   std::vector<SeqRepetition> repetitions;
   std::vector<SeqLocalDecl> locals;
   std::vector<EventExpr> clock;
+  // §16.9.6: the flattened forms of the other operands of the `intersect`
+  // this chain is the first operand of, each matched from the same tick as
+  // this one and ending at the same tick.
+  std::vector<LinearSequence> intersects;
   // §16.9.5: the flattened forms of the other operands of the `and` this
-  // chain is the first operand of, each matched from the same tick as this
-  // one, the whole ending at the later end point.
+  // chain is the first operand of, each, with its intersects, matched from
+  // the same tick as this one, the whole ending at the later end point.
   std::vector<LinearSequence> conjuncts;
   // §16.9.7: the flattened forms of the body's other `or` operands, each
   // matched beside this one under the same clock.

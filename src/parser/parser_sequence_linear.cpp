@@ -383,12 +383,13 @@ struct ParserSeqLinearHelpers {
   // form the monitor does not read or on a parse failure.
   // Whether the token ends an operand chain: the body's `;` or
   // `endsequence`, a group's `)` or the `,` before its match items, or the
-  // `and` or `or` before the next operand of those.
+  // `intersect`, `and` or `or` before the next operand of those.
   static bool AtChainEnd(Parser& p) {
     return p.Check(TokenKind::kKwEndsequence) ||
            p.Check(TokenKind::kSemicolon) || p.Check(TokenKind::kRParen) ||
            p.Check(TokenKind::kComma) || p.Check(TokenKind::kKwOr) ||
-           p.Check(TokenKind::kKwAnd) || p.AtEnd();
+           p.Check(TokenKind::kKwAnd) || p.Check(TokenKind::kKwIntersect) ||
+           p.AtEnd();
   }
 
   // One operand of a chain with the delay owed before it: a group read into
@@ -426,24 +427,36 @@ struct ParserSeqLinearHelpers {
     return true;
   }
 
-  // §16.9.1: `or` binds loosest of the sequence operators, so the body is
-  // one chain per `or` operand, each read to the next `or`, the body's local
-  // declarations reaching every chain.
-  // §16.9.1: `and` binds tighter than `or` and looser than `##`, so an `and`
-  // operand is one chain, read to the next `and` or `or`, and the operands
-  // after the first are the first's conjuncts.
-  static bool ParseLinearSeqConjunction(Parser& p, SeqLinearBody& body) {
+  // §16.9.1: `intersect` binds tighter than `and` and looser than `##`, so
+  // an `intersect` operand is one chain, read to the next `intersect`, `and`
+  // or `or`, and the operands after the first are the first's intersects.
+  static bool ParseLinearSeqIntersection(Parser& p, SeqLinearBody& body) {
     SeqCycleDelay none;
     none.min = 0;
     none.max = 0;
     if (!ParseLinearSeqOperandChain(p, body, none)) return false;
     if (body.operands.empty()) return false;
+    while (p.Match(TokenKind::kKwIntersect)) {
+      body.intersects.emplace_back();
+      SeqLinearBody& operand = body.intersects.back();
+      operand.locals = body.locals;
+      if (!ParseLinearSeqOperandChain(p, operand, none)) return false;
+      if (operand.operands.empty()) return false;
+    }
+    return true;
+  }
+
+  // §16.9.1: `and` binds tighter than `or` and looser than `intersect`, so
+  // an `and` operand is one chain with its intersects, read to the next
+  // `and` or `or`, and the operands after the first are the first's
+  // conjuncts.
+  static bool ParseLinearSeqConjunction(Parser& p, SeqLinearBody& body) {
+    if (!ParseLinearSeqIntersection(p, body)) return false;
     while (p.Match(TokenKind::kKwAnd)) {
       body.conjuncts.emplace_back();
       SeqLinearBody& conjunct = body.conjuncts.back();
       conjunct.locals = body.locals;
-      if (!ParseLinearSeqOperandChain(p, conjunct, none)) return false;
-      if (conjunct.operands.empty()) return false;
+      if (!ParseLinearSeqIntersection(p, conjunct)) return false;
     }
     return true;
   }

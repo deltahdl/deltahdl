@@ -357,10 +357,15 @@ struct SeqLinearBody {
   // §16.9.2: the repetition each operand carries, parallel to the operands.
   std::vector<SeqRepetition> repetitions;
   std::vector<SeqLocalDecl> locals;
+  // §16.9.6: the other operands of an `intersect` this chain is the first
+  // operand of, each a chain of its own that must match from the same tick
+  // and end at the same tick as this one; §16.9.1 has `intersect` bind
+  // tighter than `and` and looser than `##`.
+  std::vector<SeqLinearBody> intersects;
   // §16.9.5: the other operands of an `and` this chain is the first operand
-  // of, each a chain of its own that must match from the same tick, the
-  // whole ending at the later of the end points; §16.9.1 has `and` bind
-  // tighter than `or` and looser than `##`.
+  // of, each a chain of its own, with its intersects, that must match from
+  // the same tick, the whole ending at the later of the end points; §16.9.1
+  // has `and` bind tighter than `or` and looser than `intersect`.
   std::vector<SeqLinearBody> conjuncts;
   // §16.9.7: the operands of a top-level `or`, each a chain, with its
   // conjuncts, of its own beside this one, the sequence matching where any of
