@@ -1,0 +1,6 @@
+$fell_gclk(sig) at 20
+$rose_gclk(sig) at 60
+$fell_gclk(sig) at 90
+$future_gclk(sig) held at 3 ticks, $rising_gclk(sig) at 1, $falling_gclk(sig) at 2, $changing_gclk(sig) at 3, $steady_gclk(sig) at 7
+$finish at time 115
+[90] ERROR global_clocking_sampled_values.a1 (line 45): sig is not stable

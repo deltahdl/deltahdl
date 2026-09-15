@@ -507,8 +507,11 @@ static SimCoroutine FutureGclkAttemptCoroutine(
     const FutureGclkSamples* samples, SimContext& ctx, Arena& arena) {
   // The values were sampled at the assertion's own tick, and are recorded
   // under that time step so that the evaluation at the global clocking tick
-  // that follows reads them as the tick before its own.
+  // that follows reads them as the tick before its own. The named scopes the
+  // assertion stands in, its label among them, are captured with them, so
+  // the verdict's report names the assertion as §20.10 has it.
   uint64_t sampled_at = ctx.CurrentTime().ticks;
+  std::vector<std::string_view> named_scopes = ctx.ActiveNamedScopes();
   co_await EventAwaiter{ctx, gclk_event, arena};
   co_await ObservedRegionAwaiter{ctx};
   auto& store = ctx.AssertionSamples();
@@ -518,7 +521,11 @@ static SimCoroutine FutureGclkAttemptCoroutine(
   // The statement carries a concurrent assertion's property, so the verdict's
   // action block is scheduled into the Reactive region rather than handed back
   // to be run here.
+  PendingReportScope scope{ctx.CurrentProcess(), std::move(named_scopes)};
+  PendingReportScope saved;
+  scope.Install(ctx, saved);
   JudgeAssertion(stmt, ctx, arena);
+  PendingReportScope::Swap(ctx, saved);
 }
 
 // §16.9.4: starts the attempt above in a process of its own, so that the
