@@ -502,29 +502,37 @@ static FutureGclkSamples* SampleFutureGclkOperands(const Expr* root,
 // so a property mixing a future function with a plain operand reads the plain
 // one a tick late. What that costs is one tick of a value the property also
 // names directly, and what it buys is the five functions answering at all.
+// One attempt of an assertion holding a future function: the statement, the
+// values its future call sites sampled at the assertion's own tick, and the
+// process and named scopes the assertion stands in, its label among them,
+// captured where the attempt starts so that the verdict's report names the
+// assertion as §20.10 has it.
+struct FutureGclkAttempt {
+  const Stmt* stmt;
+  const FutureGclkSamples* samples;
+  PendingReportScope scope;
+};
+
 static SimCoroutine FutureGclkAttemptCoroutine(
-    const Stmt* stmt, const std::vector<EventExpr>& gclk_event,
-    const FutureGclkSamples* samples, SimContext& ctx, Arena& arena) {
+    FutureGclkAttempt attempt, const std::vector<EventExpr>& gclk_event,
+    SimContext& ctx, Arena& arena) {
   // The values were sampled at the assertion's own tick, and are recorded
   // under that time step so that the evaluation at the global clocking tick
-  // that follows reads them as the tick before its own. The named scopes the
-  // assertion stands in, its label among them, are captured with them, so
-  // the verdict's report names the assertion as §20.10 has it.
+  // that follows reads them as the tick before its own.
   uint64_t sampled_at = ctx.CurrentTime().ticks;
-  std::vector<std::string_view> named_scopes = ctx.ActiveNamedScopes();
   co_await EventAwaiter{ctx, gclk_event, arena};
   co_await ObservedRegionAwaiter{ctx};
   auto& store = ctx.AssertionSamples();
-  for (const auto& [site, at_tick] : *samples) {
+  for (const auto& [site, at_tick] : *attempt.samples) {
     store.RecordTick(SampleSite{site, 0, sampled_at}, at_tick, 1, arena);
   }
   // The statement carries a concurrent assertion's property, so the verdict's
   // action block is scheduled into the Reactive region rather than handed back
   // to be run here.
-  PendingReportScope scope{ctx.CurrentProcess(), std::move(named_scopes)};
+  attempt.scope.proc = ctx.CurrentProcess();
   PendingReportScope saved;
-  scope.Install(ctx, saved);
-  JudgeAssertion(stmt, ctx, arena);
+  attempt.scope.Install(ctx, saved);
+  JudgeAssertion(attempt.stmt, ctx, arena);
   PendingReportScope::Swap(ctx, saved);
 }
 
@@ -544,8 +552,12 @@ static void StartFutureGclkAttempt(const Stmt* stmt, const Process& asserting,
   auto* samples = SampleFutureGclkOperands(stmt->assert_expr, ctx, arena);
   auto* p = CreateAssertionChildProcess(ctx, arena, Region::kObserved);
   p->is_concurrent_clocked = true;
-  p->coro = FutureGclkAttemptCoroutine(stmt, asserting.gclk_future_event,
-                                       samples, ctx, arena)
+  // The coroutine's body runs only when the attempt is first resumed, by
+  // which time the scopes the assertion stands in have been popped, so they
+  // are captured here.
+  FutureGclkAttempt attempt{stmt, samples, PendingReportScope::Capture(ctx)};
+  p->coro = FutureGclkAttemptCoroutine(std::move(attempt),
+                                       asserting.gclk_future_event, ctx, arena)
                 .Release();
   ScheduleAssertionChildStart(p, p->home_region, ctx);
 }
