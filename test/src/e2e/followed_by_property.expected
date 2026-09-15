@@ -1,0 +1,7 @@
+req #-# gnt passes 2 fails 2
+req #=# gnt passes 0 fails 3 at ticks
+##[0:5] done #-# !rst passes 3 fails 0 at ticks
+not (req |-> not gnt) passes 2 fails 2
+$finish at time 40
+req #=# gnt fails at the end of the run
+##[0:5] done #-# !rst fails at the end of the run

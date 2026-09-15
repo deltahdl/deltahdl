@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -12,6 +13,7 @@
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/sva_engine.h"
+#include "simulator/variable.h"
 
 using namespace delta;
 
@@ -114,6 +116,92 @@ TEST(SvaEngine, NonOverlappingFollowedByMatchesImplicationDual) {
       EXPECT_EQ(EvalFollowedBy(a, c, true), dual);
     }
   }
+}
+
+// --- Live cases: followed-by properties over real source ---
+
+// The module the cases share: clk rises at 5, 15, 25 and 35, tick n at
+// 10n - 5, the tick counter counting through; req is high at ticks 1, 2 and
+// 4, gnt at 1 and 4, done at 3 and rst at 2. `items` declare the
+// assertions, counting in `passes` and `fails`.
+std::string FollowedBySource(const std::string& items) {
+  return "module t;\n"
+         "  logic clk = 0;\n"
+         "  int tick = 1;\n"
+         "  logic req, gnt, done, rst;\n"
+         "  int passes = 0;\n"
+         "  int fails = 0;\n"
+         "  always #5 clk = ~clk;\n"
+         "  always #10 tick = tick + 1;\n"
+         "  assign req = tick inside {1, 2, 4};\n"
+         "  assign gnt = tick inside {1, 4};\n"
+         "  assign done = tick inside {3};\n"
+         "  assign rst = tick inside {2};\n" +
+         items +
+         "  initial #40 $finish;\n"
+         "endmodule\n";
+}
+
+// §16.12.9: `req #-# gnt` is true if and only if req matches at the
+// attempt's tick and gnt holds at that end point, so unlike `req |-> gnt` it
+// is false where req has no match: true at 1 and 4, false at 2 and 3.
+TEST(FollowedByProperty, OverlappedNeedsAMatchWithTheConsequentTrue) {
+  SimFixture f;
+  auto* passes = RunAndFindVar(
+      FollowedBySource("  p: assert property (@(posedge clk) req #-# gnt) "
+                       "passes++; else fails++;\n"),
+      f, "passes");
+  ASSERT_NE(passes, nullptr);
+  EXPECT_EQ(passes->value.ToUint64(), 2u);
+  EXPECT_EQ(f.ctx.FindVariable("fails")->value.ToUint64(), 2u);
+}
+
+// §16.12.9: `req #=# gnt` reads gnt the tick after the match: the attempts
+// from 1 and 2 fail at 2 and 3, the attempt from 3 has no match and fails,
+// and the attempt from 4, its consequent beginning at a tick the run never
+// reaches, fails when the run ends.
+TEST(FollowedByProperty, NonoverlappedReadsTheConsequentTheTickAfter) {
+  SimFixture f;
+  auto* passes = RunAndFindVar(
+      FollowedBySource("  p: assert property (@(posedge clk) req #=# gnt) "
+                       "passes++; else fails++;\n"),
+      f, "passes");
+  ASSERT_NE(passes, nullptr);
+  EXPECT_EQ(passes->value.ToUint64(), 0u);
+  EXPECT_EQ(f.ctx.FindVariable("fails")->value.ToUint64(), 3u);
+  f.ctx.RunFinalBlocks();
+  EXPECT_EQ(f.ctx.FindVariable("fails")->value.ToUint64(), 4u);
+}
+
+// §16.12.9: the clause's p1 with `!rst` as the consequent, `##[0:5] done
+// #-# !rst`, is true where done holds at some tick of the window with rst
+// low there: the attempts from 1, 2 and 3 are true at 3, and the attempt
+// from 4, its window unfinished when the run ends with no match, fails
+// then.
+TEST(FollowedByProperty, WindowedAntecedentIsTrueAtTheMatchWithTheConsequent) {
+  SimFixture f;
+  auto* passes = RunAndFindVar(
+      FollowedBySource("  p: assert property (@(posedge clk) ##[0:5] done #-# "
+                       "!rst) passes++; else fails++;\n"),
+      f, "passes");
+  ASSERT_NE(passes, nullptr);
+  EXPECT_EQ(passes->value.ToUint64(), 3u);
+  EXPECT_EQ(f.ctx.FindVariable("fails")->value.ToUint64(), 0u);
+  f.ctx.RunFinalBlocks();
+  EXPECT_EQ(f.ctx.FindVariable("fails")->value.ToUint64(), 1u);
+}
+
+// §16.12.9: `s #-# p` is `not (s |-> not p)`, so the two read alike: `not
+// (req |-> not gnt)` counts as `req #-# gnt` does.
+TEST(FollowedByProperty, IsTheDualOfTheImplication) {
+  SimFixture f;
+  auto* passes = RunAndFindVar(
+      FollowedBySource("  p: assert property (@(posedge clk) not (req |-> not "
+                       "gnt)) passes++; else fails++;\n"),
+      f, "passes");
+  ASSERT_NE(passes, nullptr);
+  EXPECT_EQ(passes->value.ToUint64(), 2u);
+  EXPECT_EQ(f.ctx.FindVariable("fails")->value.ToUint64(), 2u);
 }
 
 }  // namespace
