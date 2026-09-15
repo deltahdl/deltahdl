@@ -217,6 +217,9 @@ void KeepRepeating(TickStep& step, LinearAttempt advanced) {
 // at the very next tick while fewer than max have been.
 void StepConsecutive(TickStep& step, const LinearAttempt& attempt,
                      const SeqRepetition& rep) {
+  // §16.9.2.1: `a[*0]` admits the empty match alone, so a match of a is not
+  // an iteration of it.
+  if (attempt.count >= rep.max) return;
   LinearAttempt advanced = attempt;
   if (!EvalOperand(step.body, advanced, step.ctx, step.arena)) return;
   advanced.count = attempt.count + 1;
@@ -271,9 +274,24 @@ void ArriveAtOperand(TickStep& step, const LinearAttempt& attempt,
 // One attempt at this tick: inside a repetition it steps by the repetition's
 // rules; otherwise it reads its operand where the tick is within the delay
 // range, and stays for the next tick while the range runs.
+// §16.9.2.1: `seq ##n empty` is `seq ##(n-1) `true`, so an attempt owed a
+// last operand that admits the empty match ends a tick before the delay to
+// that operand would be up, and `seq ##0 empty` ends nowhere.
+bool EndsAsTrailingEmpty(const TickStep& step, const LinearAttempt& attempt) {
+  const SeqRepetition& rep = step.body.repetitions[attempt.pos];
+  if (attempt.repeating || rep.kind != SeqRepetition::Kind::kConsecutive) {
+    return false;
+  }
+  if (rep.min != 0 || attempt.pos + 1 != step.body.operands.size()) {
+    return false;
+  }
+  return WithinDelay(step.body.delays[attempt.pos], attempt.waited + 1);
+}
+
 void StepAttempt(TickStep& step, LinearAttempt attempt) {
   const SeqCycleDelay& delay = step.body.delays[attempt.pos];
   const SeqRepetition& rep = step.body.repetitions[attempt.pos];
+  if (EndsAsTrailingEmpty(step, attempt)) step.matched = true;
   if (attempt.repeating) {
     if (rep.kind == SeqRepetition::Kind::kConsecutive) {
       StepConsecutive(step, attempt, rep);

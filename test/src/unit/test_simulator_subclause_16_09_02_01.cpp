@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -8,9 +9,11 @@
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "common/types.h"
+#include "fixture_simulator.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/sva_engine.h"
+#include "simulator/variable.h"
 
 using namespace delta;
 
@@ -122,6 +125,108 @@ TEST(SvaEngine, EmptyConcatLeftMinimalDelayDoesNotAppendTrue) {
   EXPECT_TRUE(r.matchable);
   EXPECT_EQ(r.effective_delay, 0u);
   EXPECT_FALSE(r.append_true);
+}
+
+// --- Live cases: the linear sequence monitor over real source ---
+
+// The source the cases share: clk rises at 5, 15, 25, ...; `drive` writes a,
+// b and c between the ticks; and a process counts the ticks at which the named
+// sequence `rule`, whose body is `body`, reaches its end point, keeping the
+// last such time.
+std::string EmptyMatchSource(const std::string& body,
+                             const std::string& drive) {
+  return "module t;\n"
+         "  logic clk = 0;\n"
+         "  logic a = 0;\n"
+         "  logic b = 0;\n"
+         "  logic c = 0;\n"
+         "  int hits = 0;\n"
+         "  int last = 0;\n"
+         "  always #5 clk = ~clk;\n"
+         "  sequence rule;\n"
+         "    @(posedge clk) " +
+         body +
+         ";\n"
+         "  endsequence\n"
+         "  initial begin\n" +
+         drive +
+         "    #40 $finish;\n"
+         "  end\n"
+         "  initial forever begin\n"
+         "    wait (rule.triggered);\n"
+         "    hits = hits + 1;\n"
+         "    last = $time;\n"
+         "    @(posedge clk);\n"
+         "  end\n"
+         "endmodule\n";
+}
+
+// b for the ticks at 15 and 25, a for the tick at 25.
+const char* const kBThenAb =
+    "    #10 b = 1;\n"
+    "    #10 a = 1;\n"
+    "    #10 a = 0; b = 0;\n";
+
+// §16.9.2.1: `empty ##0 seq` is no match, so `a[*0] ##0 b` never ends,
+// while ``true ##0 b`, the fusion of two sequences of length 1, ends at every
+// tick b holds at, 15 and 25.
+TEST(EmptyMatchSequences, EmptyBeforeZeroDelayNeverMatches) {
+  SimFixture f;
+  auto* hits =
+      RunAndFindVar(EmptyMatchSource("a[*0] ##0 b", kBThenAb), f, "hits");
+  ASSERT_NE(hits, nullptr);
+  EXPECT_EQ(hits->value.ToUint64(), 0u);
+  SimFixture g;
+  auto* fused =
+      RunAndFindVar(EmptyMatchSource("1'b1 ##0 b", kBThenAb), g, "hits");
+  ASSERT_NE(fused, nullptr);
+  EXPECT_EQ(fused->value.ToUint64(), 2u);
+  EXPECT_EQ(g.ctx.FindVariable("last")->value.ToUint64(), 25u);
+}
+
+// §16.9.2.1: `seq ##n empty` is `seq ##(n-1) `true`, so `b ##2 a[*0]` ends
+// one tick after each b, at 25 and 35, and `seq ##0 empty` is no match, so
+// `b ##0 a[*0]` never ends.
+TEST(EmptyMatchSequences, EmptyAfterADelayCollapsesItByOne) {
+  SimFixture f;
+  auto* hits =
+      RunAndFindVar(EmptyMatchSource("b ##2 a[*0]", kBThenAb), f, "hits");
+  ASSERT_NE(hits, nullptr);
+  EXPECT_EQ(hits->value.ToUint64(), 2u);
+  EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 35u);
+  SimFixture g;
+  auto* none =
+      RunAndFindVar(EmptyMatchSource("b ##0 a[*0]", kBThenAb), g, "hits");
+  ASSERT_NE(none, nullptr);
+  EXPECT_EQ(none->value.ToUint64(), 0u);
+}
+
+// §16.9.2.1: a sequence admitting empty and nonempty matches is the or of
+// its cases, `b ##1 a[*0:1] ##2 c` being `(b ##2 c) or (b ##1 a ##2 c)`: with
+// b at 15 and c at 35 it ends at 35 by the empty case, and with b at 45, a at
+// 55 and c at 75 it ends at 75 by the other; the or written out ends alike.
+TEST(EmptyMatchSequences, RangeAdmittingEmptyIsTheOrOfItsCases) {
+  const char* const kTwoRounds =
+      "    #10 b = 1;\n"
+      "    #10 b = 0;\n"
+      "    #10 c = 1;\n"
+      "    #10 c = 0; b = 1;\n"
+      "    #10 b = 0; a = 1;\n"
+      "    #10 a = 0;\n"
+      "    #10 c = 1;\n"
+      "    #10 c = 0;\n";
+  SimFixture f;
+  auto* hits = RunAndFindVar(
+      EmptyMatchSource("b ##1 a[*0:1] ##2 c", kTwoRounds), f, "hits");
+  ASSERT_NE(hits, nullptr);
+  EXPECT_EQ(hits->value.ToUint64(), 2u);
+  EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 75u);
+  SimFixture g;
+  auto* spelled = RunAndFindVar(
+      EmptyMatchSource("b ##2 c or b ##1 a ##2 c", kTwoRounds), g, "hits");
+  ASSERT_NE(spelled, nullptr);
+  EXPECT_EQ(spelled->value.ToUint64(), 2u);
+  EXPECT_EQ(g.ctx.FindVariable("last")->value.ToUint64(), 75u);
 }
 
 }  // namespace
