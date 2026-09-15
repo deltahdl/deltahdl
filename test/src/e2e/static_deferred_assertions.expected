@@ -1,0 +1,5 @@
+c1: covered a 5 against b 0
+$finish at time 40
+cover static_deferred_assertions.u.c1 (line 11): evaluated 4, succeeded 1
+[10] ERROR static_deferred_assertions.u.a1 (line 9): a1: a is 5 and b is 0
+[10] ERROR static_deferred_assertions.u.f1 (line 10): f1: a is 5 and b is 0

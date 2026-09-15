@@ -87,4 +87,53 @@ TEST(StaticDeferredAssertionSim,
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
+// Treated as an always_comb, the static deferred assertion reaches §16.4.2's
+// flush point when an operand changes again in the same time step: the
+// evaluation that saw a at 7 against b at 5 queued its else action, the
+// re-run for b's write from the Inactive region flushed it, and the re-run
+// found the two equal, so nothing fires.
+TEST(StaticDeferredAssertionSim,
+     ModuleLevelDeferredAssertIsFlushedByASecondOperandChange) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic [3:0] a = 4'd5;\n"
+      "  logic [3:0] b = 4'd5;\n"
+      "  int fires = 0;\n"
+      "  function void count_fire; fires = fires + 1; endfunction\n"
+      "  a1: assert #0 (a == b) else count_fire();\n"
+      "  initial begin\n"
+      "    #1 a = 4'd7;\n"
+      "    #0 b = 4'd7;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  LowerAndRun(design, f);
+  auto* var = f.ctx.FindVariable("fires");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0u);
+}
+
+// The static deferred assertion's label is the block identifier of the
+// implicit procedure, so the default $error of a failing one names the scope
+// m.a1 and the statement's own line, as §20.10 has the report carry.
+TEST(StaticDeferredAssertionSim, ModuleLevelDeferredAssertNamesItsLabel) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic a = 1'b0;\n"
+      "  logic b = 1'b1;\n"
+      "  a1: assert #0 (a == b);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  LowerAndRun(design, f);
+  EXPECT_EQ(f.ctx.LastSeverity(), "ERROR");
+  EXPECT_EQ(f.ctx.LastSeverityScope(), "m.a1");
+  EXPECT_EQ(f.ctx.LastSeverityLine(), 4u);
+}
+
 }  // namespace
