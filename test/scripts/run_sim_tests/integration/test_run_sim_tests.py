@@ -1,5 +1,3 @@
-"""Integration tests for run_sim_tests module."""
-
 from collections.abc import Callable
 from pathlib import Path
 from types import ModuleType
@@ -10,12 +8,9 @@ import pytest
 
 
 class TestCollectAndRunPipeline:
-    """Tests for the collect_tests() -> run_test() pipeline."""
-
     def test_all_pass_scenario(
         self, rst: ModuleType, sim_test_tree: Path,
     ) -> None:
-        """All tests passing should yield correct pass/fail counts."""
         with patch.object(rst, "TEST_DIR", sim_test_tree):
             pairs = rst.collect_tests()
 
@@ -36,7 +31,6 @@ class TestCollectAndRunPipeline:
     def test_mixed_pass_fail_scenario(
         self, rst: ModuleType, sim_test_tree: Path,
     ) -> None:
-        """Mixed results should report correct counts."""
         with patch.object(rst, "TEST_DIR", sim_test_tree):
             pairs = rst.collect_tests()
 
@@ -64,7 +58,6 @@ def _run_main_with_fake(
     test_dir: Path,
     fake_run: Callable[..., MagicMock],
 ) -> None:
-    """Run rst.main() with TEST_DIR, check_binary, and subprocess.run patched."""
     with patch.object(rst, "TEST_DIR", test_dir), \
          patch.object(rst, "check_binary"), \
          patch.object(rst.subprocess, "run", side_effect=fake_run):
@@ -72,16 +65,12 @@ def _run_main_with_fake(
 
 
 class TestMain:
-    """Tests for the main() function."""
-
     def test_all_passing_exits_zero(
         self,
         rst: ModuleType,
         sim_test_tree: Path,
         get_exit_code: Callable[[Callable[[], object]], int | str | None],
     ) -> None:
-        """main() should call sys.exit(0) when all tests pass."""
-
         def fake_run(cmd: list[str], **_: Any) -> MagicMock:
             sv_path = cmd[1]
             expected_path = sv_path.replace(".sv", ".expected")
@@ -102,8 +91,6 @@ class TestMain:
         tmp_path: Path,
         get_exit_code: Callable[[Callable[[], object]], int | str | None],
     ) -> None:
-        """main() should exit 1 when no .sv/.expected pairs exist."""
-
         def run() -> None:
             with patch.object(rst, "TEST_DIR", tmp_path), \
                  patch.object(rst, "check_binary"):
@@ -118,8 +105,6 @@ class TestMain:
         capsys: pytest.CaptureFixture[str],
         get_exit_code: Callable[[Callable[[], object]], int | str | None],
     ) -> None:
-        """main() should print indented detail lines when a test fails."""
-
         def fake_run(_cmd: list[str], **_: Any) -> MagicMock:
             mock = MagicMock()
             mock.stdout = "wrong output\n"
@@ -139,12 +124,6 @@ class TestMain:
         capsys: pytest.CaptureFixture[str],
         get_exit_code: Callable[[Callable[[], object]], int | str | None],
     ) -> None:
-        """main() should report a case whose .exit file is unreadable and go on.
-
-        The unreadable case is named so that it sorts first, since collect_tests
-        orders the cases by their source path and a run that stopped at this one
-        would leave the case after it unreported.
-        """
         (tmp_path / "bad.sv").write_text("module bad; endmodule\n")
         (tmp_path / "bad.expected").write_text("bad output\n")
         (tmp_path / "bad.exit").write_text("yes\n")

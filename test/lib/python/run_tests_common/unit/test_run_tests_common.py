@@ -1,5 +1,3 @@
-"""Unit tests for run_tests_common module."""
-
 from pathlib import Path
 from types import ModuleType
 from unittest.mock import MagicMock, patch
@@ -10,7 +8,6 @@ from lib.python import run_tests_common
 
 
 def test_repo_root_contains_scripts_dir() -> None:
-    """REPO_ROOT should contain a scripts/ subdirectory."""
     scripts_dir = run_tests_common.REPO_ROOT / "scripts"
     assert scripts_dir.is_dir(), (
         f"Expected scripts/ directory at {scripts_dir}"
@@ -18,25 +15,20 @@ def test_repo_root_contains_scripts_dir() -> None:
 
 
 def test_binary_equals_expected_path() -> None:
-    """BINARY should equal REPO_ROOT / build / src / deltahdl."""
     expected = run_tests_common.REPO_ROOT / "build" / "src" / "deltahdl"
     assert run_tests_common.BINARY == expected
 
 
 class TestColorConstants:
-    """Tests for color constants (GREEN, RED, RESET)."""
-
     def test_no_color_env_disables_colors(
         self, reload_no_color: ModuleType,
     ) -> None:
-        """Setting NO_COLOR=1 should make all color constants empty."""
         mod = reload_no_color
         assert (mod.GREEN, mod.RED, mod.RESET) == ("", "", "")
 
     def test_ci_env_enables_colors_on_tty(
         self, reload_with_colors: ModuleType,
     ) -> None:
-        """With NO_COLOR unset and CI=true and a tty, colors are ANSI."""
         mod = reload_with_colors
         assert (mod.GREEN, mod.RED, mod.RESET) == (
             "\033[32m",
@@ -46,10 +38,7 @@ class TestColorConstants:
 
 
 class TestCheckBinary:
-    """Tests for the check_binary() function."""
-
     def test_exits_when_binary_missing(self) -> None:
-        """check_binary() should call sys.exit(1) when binary is absent."""
         mock_binary = MagicMock(spec=Path)
         mock_binary.exists.return_value = False
         exit_code: int | str | None = None
@@ -61,7 +50,6 @@ class TestCheckBinary:
         assert exit_code == 1
 
     def test_returns_normally_when_binary_exists(self) -> None:
-        """check_binary() should return None when the binary is present."""
         mock_binary = MagicMock(spec=Path)
         mock_binary.exists.return_value = True
         with patch("lib.python.run_tests_common.BINARY", mock_binary):
@@ -70,12 +58,9 @@ class TestCheckBinary:
 
 
 class TestPrintResult:
-    """Tests for the print_result() function."""
-
     def test_pass_output_contains_pass_and_name(
         self, capsys: pytest.CaptureFixture[str],
     ) -> None:
-        """print_result(True, ...) should print PASS and the test name."""
         run_tests_common.print_result(True, "my_test")
         out = capsys.readouterr().out
         assert all(s in out for s in ("PASS", "my_test"))
@@ -83,7 +68,6 @@ class TestPrintResult:
     def test_fail_output_contains_fail_and_name(
         self, capsys: pytest.CaptureFixture[str],
     ) -> None:
-        """print_result(False, ...) should print FAIL and the test name."""
         run_tests_common.print_result(False, "my_test")
         out = capsys.readouterr().out
         assert all(s in out for s in ("FAIL", "my_test"))

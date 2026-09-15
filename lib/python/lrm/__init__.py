@@ -1,5 +1,3 @@
-"""Helpers for reading the SystemVerilog LRM PDF."""
-
 import os
 import re
 from typing import Any, Iterator
@@ -16,7 +14,6 @@ _TOC_CACHE: dict[str, dict[str, tuple[int, int]]] = {}
 
 
 def _walk_outline(items: Any) -> Iterator[Any]:
-    """Yield outline items in document order from a pypdf outline tree."""
     for item in items:
         if isinstance(item, list):
             yield from _walk_outline(item)
@@ -25,14 +22,6 @@ def _walk_outline(items: Any) -> Iterator[Any]:
 
 
 def _identifier_from_title(title: str) -> str | None:
-    """Return the subclause identifier embedded in an outline title, or None.
-
-    Numbered titles like ``23.2.1 Tasks`` and ``A.7 Foo`` resolve to
-    ``23.2.1`` and ``A.7`` via the dotted-decimal regex. Annex headings
-    like ``Annex B Keywords`` resolve to the single-letter identifier
-    ``B`` so the annex appears in ``load_toc`` as a top-level entry on
-    the same footing as numbered chapters.
-    """
     subclause_match = _SUBCLAUSE_RE.match(title)
     if subclause_match is not None:
         return subclause_match.group(0)
@@ -43,7 +32,6 @@ def _identifier_from_title(title: str) -> str | None:
 
 
 def _extract_entries(reader: PdfReader) -> list[tuple[str, int]]:
-    """Return ``[(subclause, start_page)]`` from a PDF reader, in doc order."""
     entries: list[tuple[str, int]] = []
     for item in _walk_outline(reader.outline):
         title = str(item.title or "")
@@ -60,7 +48,6 @@ def _extract_entries(reader: PdfReader) -> list[tuple[str, int]]:
 def _compute_ranges(
     entries: list[tuple[str, int]], total_pages: int,
 ) -> dict[str, tuple[int, int]]:
-    """Compute ``{subclause: (start, end)}`` from ordered ``entries``."""
     result: dict[str, tuple[int, int]] = {}
     for i, (subclause, start) in enumerate(entries):
         end = total_pages
@@ -76,9 +63,6 @@ def _compute_ranges(
 def _has_numbered_subclauses(
     subclause: str, toc: dict[str, tuple[int, int]],
 ) -> bool:
-    """Return True iff ``subclause`` is in ``toc`` and another TOC entry
-    sits directly under it as ``subclause.<digits>...``.
-    """
     if subclause not in toc:
         return False
     prefix = subclause + "."
@@ -88,26 +72,6 @@ def _has_numbered_subclauses(
 def identifier_kind(
     identifier: str, toc: dict[str, tuple[int, int]],
 ) -> str | None:
-    """Return the word IEEE 1800-2023 uses for ``identifier``: ``clause``,
-    ``annex`` or ``subclause``. Returns None when ``toc`` has no such
-    entry, because the standard names its own divisions and has nothing
-    to call an identifier it does not contain.
-
-    §1.5 states that the standard "is organized into clauses, each of
-    which focuses on a specific area of the language", and that there
-    "are subclauses within each clause to discuss individual constructs
-    and concepts". Annex A's opening sets annexes beside clauses rather
-    than under them — "the normative text description contained within
-    the clauses and annexes of this standard" — and its next sentence
-    calls a numbered division of an annex a subclause: "Subclause A.10
-    includes a list of clarifying details on specific BNF productions
-    defined in A.1 through A.9."
-
-    So a dotted identifier is a subclause whether it hangs from a clause
-    or from an annex, a bare number is a clause, and a bare letter is an
-    annex. The standard offers no word covering all three; it enumerates
-    them, and a caller that admits all three has to do the same.
-    """
     if identifier not in toc:
         return None
     if "." in identifier:
@@ -120,29 +84,12 @@ def identifier_kind(
 def is_top_level_aggregate(
     subclause: str, toc: dict[str, tuple[int, int]],
 ) -> bool:
-    """Return True iff ``subclause`` is a top-level entry that has at least
-    one numbered subclause in ``toc``.
-
-    Such clauses are aggregates: the enumeration root for a list of
-    numbered subclauses, with no individual satisfaction work of their
-    own. They are skipped by the walker and rejected as dependency-list
-    entries. Top-level singletons like §2, §41, and Annex B remain
-    non-aggregate and are walked as ordinary satisfaction units.
-    """
     return "." not in subclause and _has_numbered_subclauses(subclause, toc)
 
 
 def direct_numbered_children(
     subclause: str, toc: dict[str, tuple[int, int]],
 ) -> list[str]:
-    """Return ``subclause``'s direct numbered children in TOC order.
-
-    A direct child is a TOC entry whose identifier is ``subclause.<digits>``
-    with no further dotted tail. The result preserves the TOC's
-    iteration order so callers see entries in document order. Returns
-    ``[]`` when ``subclause`` has no numbered children — including when
-    ``subclause`` itself is absent from the TOC.
-    """
     prefix = subclause + "."
     return [
         other for other in toc
@@ -153,23 +100,10 @@ def direct_numbered_children(
 def is_sub_level_parent(
     subclause: str, toc: dict[str, tuple[int, int]],
 ) -> bool:
-    """Return True iff ``subclause`` is a sub-level entry that has at
-    least one numbered subclause directly under it in ``toc``.
-
-    A sub-level parent carries its own preamble rules and contains
-    named numbered subclauses. The dependency oracle queries it for
-    the deps of the preamble alone, since the named numbered subclauses
-    are queried separately as their own targets.
-    """
     return "." in subclause and _has_numbered_subclauses(subclause, toc)
 
 
 def load_toc(lrm_path: str) -> dict[str, tuple[int, int]]:
-    """Return a mapping subclause → (start_page, end_page) for ``lrm_path``.
-
-    Pages are 1-indexed. Returns ``{}`` for any unreadable PDF or empty
-    outline. Memoized in-process by absolute path.
-    """
     key = os.path.abspath(lrm_path)
     if key in _TOC_CACHE:
         return _TOC_CACHE[key]
@@ -189,13 +123,6 @@ def _format_subclause(
     *,
     truncate_at: str | None = None,
 ) -> str:
-    """Return ``§subclause`` with an optional ``(pages A-B)`` suffix.
-
-    When ``truncate_at`` names another subclause present in ``toc``, the
-    end page is clamped to ``toc[truncate_at].start - 1`` so an
-    ancestor's range does not overlap the descendant being read
-    separately.
-    """
     if subclause not in toc:
         return f"§{subclause}"
     start, end = toc[subclause]
@@ -209,7 +136,6 @@ def _format_subclause(
 
 
 def build_lrm_read_instruction(subclause: str, lrm: str) -> str:
-    """Build an instruction to read the relevant LRM sections."""
     h = build_hierarchy(subclause)
     toc = load_toc(lrm)
     page_hint = (

@@ -1,17 +1,3 @@
-"""Cycle detection and dependency-respecting ordering for the graph.
-
-The dependency oracle returns identifiers that may form cycles —
-mutually-dependent subclauses must be implemented together. This
-module collapses each strongly-connected component into one group and
-sorts the resulting groups so any group whose members other groups
-depend on comes first.
-
-Edges named in the records but missing from the keys (e.g. a record
-references §Y but the walk never reached §Y) are treated as
-already-satisfied roots — they cannot participate in a cycle, and
-ordering ignores them.
-"""
-
 from typing import Any
 
 
@@ -19,7 +5,6 @@ _Records = dict[str, dict[str, Any]]
 
 
 def _adjacency(records: _Records) -> dict[str, list[str]]:
-    """Return the deps adjacency map limited to keys present in *records*."""
     keys = set(records)
     return {
         sub: [d for d in records[sub]["dependencies"] if d in keys]
@@ -28,13 +13,6 @@ def _adjacency(records: _Records) -> dict[str, list[str]]:
 
 
 def find_cycle_groups(records: _Records) -> list[list[str]]:
-    """Return the strongly-connected components of the dependency graph.
-
-    Each component is one cycle group. Subclauses with no cycle-mate
-    appear as one-element groups. Components are ordered the way
-    Tarjan emits them — sinks first — so callers that want
-    foundations-first should pass the result through ``order_groups``.
-    """
     adj = _adjacency(records)
     index_counter = [0]
     stack: list[str] = []
@@ -74,15 +52,6 @@ def find_cycle_groups(records: _Records) -> list[list[str]]:
 def order_groups(
     groups: list[list[str]], records: _Records,
 ) -> list[list[str]]:
-    """Sort *groups* so any group whose subclauses other groups depend on comes first.
-
-    Tarjan already returns components in reverse-topological order
-    over the condensation (sinks first). Groups whose members no
-    other in-scope subclause depends on are foundations and must
-    move to the front; this is exactly the reverse of that order.
-    Inputs other than the Tarjan output are sorted by walking the
-    condensation explicitly.
-    """
     adj = _adjacency(records)
     member_to_group: dict[str, int] = {
         member: idx for idx, group in enumerate(groups) for member in group

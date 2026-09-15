@@ -1,5 +1,3 @@
-"""Run CHIPS Alliance sv-tests against deltahdl (advisory)."""
-
 import argparse
 import ast
 import glob
@@ -23,7 +21,6 @@ TEST_DIR = REPO_ROOT / "third_party" / "sv-tests" / "tests"
 
 
 def parse_args() -> argparse.Namespace:
-    """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
         description="Run CHIPS Alliance sv-tests against deltahdl."
     )
@@ -41,22 +38,16 @@ def parse_args() -> argparse.Namespace:
 
 
 def _natural_sort_key(text: str) -> list[Any]:
-    """Split text into (str, int, str, int, ...) for natural ordering."""
     return [int(tok) if tok.isdigit() else tok for tok in re.split(r"(\d+)", text)]
 
 
 def collect_tests(chapter: str | None = None) -> list[str]:
-    """Collect .sv files under the chapter directories.
-
-    If *chapter* is given (e.g. "5"), only that chapter's tests are collected.
-    """
     chapter_glob = f"chapter-{chapter}" if chapter else "chapter-*"
     pattern = str(TEST_DIR / chapter_glob / "**" / "*.sv")
     return sorted(glob.glob(pattern, recursive=True), key=_natural_sort_key)
 
 
 def parse_metadata(path: str) -> dict[str, str]:
-    """Parse sv-tests metadata from a .sv file header comment."""
     text = Path(path).read_text(encoding="utf-8")
     match = re.search(r"/\*(.*?)\*/", text, re.DOTALL)
     if not match:
@@ -89,7 +80,6 @@ _COMPARE_OPS: dict[type[ast.cmpop], Callable[[Any, Any], bool]] = {
 
 
 def eval_node(node: ast.AST) -> Any:
-    """Evaluate an AST node containing only constants and comparisons."""
     if isinstance(node, ast.Constant):
         return node.value
     if isinstance(node, ast.Compare):
@@ -111,7 +101,6 @@ def eval_node(node: ast.AST) -> Any:
 
 
 def try_string_equality(expr: str) -> bool | None:
-    """Fallback: regex-based string equality for SV-style quoting."""
     m = re.match(r"\(\s*'(.*)'\s*==\s*'(.*)'\s*\)$", expr)
     if m:
         return m.group(1) == m.group(2)
@@ -119,7 +108,6 @@ def try_string_equality(expr: str) -> bool | None:
 
 
 def check_assertions(stdout: str) -> tuple[bool, str]:
-    """Evaluate :assert: patterns in simulation output."""
     for line in stdout.splitlines():
         match = re.search(r":assert:\s*(.*)", line)
         if not match:
@@ -143,16 +131,6 @@ def run_test(
     simulate: bool = False,
     defines: tuple[str, ...] | list[str] = (),
 ) -> tuple[bool, str, int]:
-    """Run deltahdl on a single .sv file.
-
-    Returns (passed, stderr_or_detail, returncode) tuple.
-
-    The return code is handed back rather than collapsed into *passed*
-    because "did not succeed" and "refused the source" are different findings
-    and a caller can be asking for either. A process killed by a signal has a
-    negative return code, so the code tells a tool that judged the source from
-    a tool that died before it could.
-    """
     cmd = [str(BINARY)] if simulate else [str(BINARY), "--lint-only"]
     for d in defines:
         cmd.extend(["-D", d])
@@ -173,7 +151,6 @@ def run_test(
 
 
 def chapter_from_path(path: str) -> str:
-    """Extract the chapter directory name (e.g. 'chapter-5') from a path."""
     for part in Path(path).parts:
         if part.startswith("chapter-"):
             return part
@@ -183,7 +160,6 @@ def chapter_from_path(path: str) -> str:
 def _aggregate_chapters(
     results: list[dict[str, Any]],
 ) -> list[tuple[str, str, str, str]]:
-    """Aggregate into sorted (clause, total, failed, pct) row tuples."""
     chapters: defaultdict[str, dict[str, int]] = defaultdict(
         lambda: {"passed": 0, "failed": 0},
     )
@@ -206,7 +182,6 @@ def _aggregate_chapters(
 
 
 def print_chapter_breakdown(results: list[dict[str, Any]]) -> None:
-    """Print per-chapter pass/fail summary as a box-drawing table."""
     rows = _aggregate_chapters(results)
     headers = ("Clause", "# of tests", "Failed", "Percentage")
     widths = [
@@ -239,7 +214,6 @@ def print_chapter_breakdown(results: list[dict[str, Any]]) -> None:
 def write_junit_xml(
     results: list[dict[str, Any]], elapsed: float, filepath: str,
 ) -> None:
-    """Write JUnit XML report to the given filepath."""
     total = len(results)
     failures = sum(1 for r in results if r["status"] == "fail")
     errors = sum(1 for r in results if r["status"] == "timeout")
@@ -283,29 +257,10 @@ _SUBCLAUSE_RE = re.compile(r"\(§(\d+(?:\.\d+)*)\)")
 
 
 def reported_subclauses(stderr: str) -> list[str]:
-    """List every subclause named by a diagnostic in *stderr*, in the order written.
-
-    ``DiagEngine::Emit`` in ``src/common/diagnostic.cpp`` appends the subclause
-    of IEEE 1800-2023 a diagnostic enforces to the end of its message, as
-    ``(§11.4.14)``. A report constructed with
-    ``Subclause::None()`` states a fact about the run rather than a breach of
-    the standard, so it names nothing and contributes nothing here.
-    """
     return _SUBCLAUSE_RE.findall(stderr)
 
 
 def tagged_clause(metadata: dict[str, str]) -> str:
-    """Return the clause of IEEE 1800-2023 the corpus says *metadata*'s file exercises.
-
-    Every file in the sv-tests corpus carries a header comment whose ``:tags:``
-    field names what running the file is meant to test, as a space-separated
-    list whose first entry is usually a clause number such as ``6.19`` or
-    ``16.12.17``. That first entry is the clause.
-
-    Returns "" when the file carries no tag, and when its first tag names
-    something other than a clause: three files in the corpus tag
-    ``uvm-random uvm`` instead.
-    """
     tags = metadata.get("tags", "").split()
     if tags and re.fullmatch(r"\d+(?:\.\d+)*", tags[0]):
         return tags[0]
@@ -313,27 +268,11 @@ def tagged_clause(metadata: dict[str, str]) -> str:
 
 
 def subclause_is_within(reported: str, clause: str) -> bool:
-    """Report whether *reported* is *clause* or a subclause of it.
-
-    The two are compared one dot-separated component at a time, so that
-    ``16.12`` contains ``16.12.17`` and does not contain ``16.121``. A corpus
-    file tagged with a clause exercises the rules under that clause, and a
-    diagnostic is free to name something deeper than the tag.
-    """
     clause_parts = clause.split(".")
     return reported.split(".")[: len(clause_parts)] == clause_parts
 
 
 def _rejection_matches_tag(stderr: str, clause: str) -> bool:
-    """Report whether the rejection in *stderr* enforces a rule under *clause*.
-
-    True when some subclause named in *stderr* is *clause* or a subclause of
-    it. Also true in the two cases there is nothing to compare: when *clause*
-    is empty, because the corpus file names no clause, and when no diagnostic
-    in *stderr* named a subclause, because a report constructed with
-    ``Subclause::None()`` enforces no rule of the standard. Failing either
-    case would fail a corpus file over a comparison that was never available.
-    """
     if not clause:
         return True
     reported = reported_subclauses(stderr)
@@ -349,27 +288,6 @@ def _run_and_score(
     should_fail: bool,
     clause: str,
 ) -> tuple[str, str, int, int]:
-    """Run the tool over *path* and score what it did.
-
-    Returns (status, stderr, ok_int, returncode).
-
-    A file the corpus marks ``should_fail_because`` is scored on whether the
-    tool rejected it, and not on whether the tool failed to accept it. The
-    tool exits 0 when it accepts a source and 1 when it refuses one, so a
-    refusal is an exit of 1 carrying a complaint on standard error. Every
-    other exit is the tool having gone wrong on the file: a signal death, an
-    abort on a failed internal assertion, an unwound exception. None of those
-    is the tool judging the source, so none of them is the file conforming to
-    the clause it was written for.
-
-    Such a file must also be rejected under *clause*, the clause the corpus
-    tags it with. Without that, a file tagged ``6.19`` scores a pass for a
-    rejection that enforced some other rule of the standard, and the run
-    reports the corpus as covering a clause it never exercised. A rejection
-    that names no clause, and a file that carries no tag, still score a pass:
-    there is no comparison to make in either case, and a pass is what the
-    file scored before the clause was read.
-    """
     ok, stderr, returncode = run_test(path, simulate=simulate, defines=defines)
     if should_fail:
         ok = (
@@ -381,14 +299,6 @@ def _run_and_score(
 
 
 def _tag_prefixed(name: str, metadata: dict[str, str]) -> str:
-    """Prefix *name* with the file's first ``:tags:`` entry, for display only.
-
-    A corpus file whose own name does not start with a clause number is shown
-    under its tag, so that the run sorts and reads in the order of the
-    standard. The tag is taken as written, and not through
-    ``tagged_clause()``: three files tag ``uvm-random uvm``, and the display
-    name says so rather than dropping it.
-    """
     tags = metadata.get("tags", "").split()
     if tags and not re.match(r"^\d+\.", name):
         return f"{tags[0]}--{name}"
@@ -396,7 +306,6 @@ def _tag_prefixed(name: str, metadata: dict[str, str]) -> str:
 
 
 def build_result(path: str) -> tuple[dict[str, Any], int]:
-    """Run one sv-test and return (result_dict, ok_int). Does not print."""
     chapter = chapter_from_path(path)
     try:
         name = str(Path(path).relative_to(TEST_DIR / chapter))
@@ -450,38 +359,6 @@ def build_result(path: str) -> tuple[dict[str, Any], int]:
 
 
 def print_reason(result: dict[str, Any]) -> None:
-    """Print what the tool said about a test whose verdict rests on it.
-
-    A line naming the file that failed says nothing about why it failed, so
-    whoever picks the failure up has to run the tool over that file themselves
-    to find out -- and working it out from the source instead is a reliable way
-    to reach a confident wrong answer. The output was captured when the test
-    ran; this puts it where the run can be read afterwards.
-
-    A test that passed by being accepted is silent even when the tool wrote
-    something, because nothing it wrote was needed to reach that verdict.
-
-    A test the corpus marks with ``should_fail_because`` passed because the
-    tool rejected it under the clause the corpus tags the file with, or under
-    no clause at all, so the rejection is printed. A rejection naming no clause
-    scores the pass whether or not it was drawn by the construct the file was
-    written for, and the message is what tells those two apart.
-
-    Such a test fails either because the tool accepted the file or because the
-    tool went wrong on it, and the exit code is what separates the two. An
-    exit of 0 is the acceptance, which the FAIL line already reports in full.
-    Any other exit is the tool having gone wrong, which often writes nothing
-    at all, so the code is printed rather than left to be guessed at from
-    silence.
-
-    It fails for a third reason, which is that the tool rejected the file
-    under a clause other than the one the corpus tags it with. That mismatch
-    is printed naming both clauses, because the rejection alone reads as a
-    pass and the reader would otherwise have to know the tag to see why it is
-    not one. Nothing else is printed after it: the exit was 1, so "tool
-    exited 1 without rejecting the file" would be false. The tool did reject
-    the file, under another clause.
-    """
     if result["status"] == "pass" and not result.get("should_fail"):
         return
     for line in result.get("stderr", "").splitlines():
@@ -507,7 +384,6 @@ def print_reason(result: dict[str, Any]) -> None:
 
 
 def print_status(result: dict[str, Any], ok_int: int) -> None:
-    """Print PASS/FAIL/TIMEOUT for a single test result, and why."""
     if result["status"] == "timeout":
         print(f"  {RED}TIMEOUT{RESET}: {result['name']}", flush=True)
     else:
@@ -516,21 +392,12 @@ def print_status(result: dict[str, Any], ok_int: int) -> None:
 
 
 def execute_single_test(path: str) -> tuple[dict[str, Any], int]:
-    """Run one sv-test, print result, and return (result_dict, ok_int)."""
     result, ok_int = build_result(path)
     print_status(result, ok_int)
     return result, ok_int
 
 
 def corpus_revision() -> str:
-    """Return the commit of the sv-tests checkout, or "unknown".
-
-    The corpus is a checkout of an upstream repository whose revision the
-    caller does not choose, so a count taken from a run says little without
-    the revision it was counted over. A directory with no repository around
-    it reports "unknown" rather than failing, because this is a label on a
-    report and not a condition the run is scored on.
-    """
     try:
         result = subprocess.run(
             ["git", "-C", str(TEST_DIR), "rev-parse", "HEAD"],
@@ -547,7 +414,6 @@ def corpus_revision() -> str:
 
 
 def main() -> None:
-    """Run all sv-tests and print a summary."""
     args = parse_args()
 
     check_binary()
@@ -574,7 +440,6 @@ def main() -> None:
             flush=True,
         )
 
-    # Sort results by clause-number prefix for hierarchical display.
     pairs = sorted(zip(results, ok_flags), key=lambda p: _natural_sort_key(p[0]["name"]))
     passed = sum(ok for _, ok in pairs)
     failed = len(results) - passed

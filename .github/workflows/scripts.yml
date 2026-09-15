@@ -3,6 +3,30 @@ concurrency:
   cancel-in-progress: true
   group: scripts-${{ github.head_ref || github.ref_name }}
 jobs:
+  assert-no-comments:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Restore pip cache
+        uses: actions/cache@v5
+        with:
+          key: >-
+            pip-${{ github.job }}-${{
+            hashFiles('.github/workflows/scripts.yml') }}
+          path: ~/.cache/pip
+          restore-keys: |
+            pip-${{ github.job }}-
+      - name: Install assert-no-comments
+        run: pip install assert-no-comments
+      - name: Assert no comments
+        run: >-
+          assert-no-comments
+          --verbose
+          ${{ github.workspace }}/.github/workflows/scripts.yml
+          ${{ github.workspace }}/lib/python/
+          ${{ github.workspace }}/scripts/
+          ${{ github.workspace }}/test/lib/python/
+          ${{ github.workspace }}/test/scripts/
   assert-no-inline-directives:
     runs-on: ubuntu-24.04
     steps:
@@ -45,14 +69,6 @@ jobs:
           --linters pylint,mypy,yamllint
           --verbose
           ${{ github.workspace }}
-  # A definition under lib/python/ whose only caller is its own unit test
-  # is dead, and assert-no-unused-python-definition cannot say so: it
-  # counts any name written under lib/python/, scripts/ or test/ as a
-  # use, and the test that holds the module at --cov-fail-under=100
-  # writes that name. This job counts the same uses except those in the
-  # module's own test directory, so a fixture in lib/python/test_fixtures/
-  # called from another module's tests still counts as a use. The fifteen
-  # exports 7062648dc deleted under #2996 are what it would have reported.
   assert-no-test-only-python-definition:
     runs-on: ubuntu-24.04
     steps:
@@ -79,9 +95,6 @@ jobs:
                   if not (other == path and number == lineno)
               )
           dead = []
-          # A file sitting directly in lib/python/ is skipped, because it
-          # has no test directory of its own: discounting one would
-          # discount the whole of test/lib/python/ and blind the scan.
           for module in sorted(pathlib.Path("lib/python").iterdir()):
               if not module.is_dir():
                   continue
@@ -103,14 +116,6 @@ jobs:
               )
           sys.exit(1 if dead else 0)
           PY
-  # A function under lib/python/ whose only caller is its own unit test
-  # is dead, and --cov-fail-under=100 cannot say so: the test that keeps
-  # the module at 100% is the call that makes the function look used.
-  # That is how the fifteen deleted under #2996 survived, several of them
-  # for months after the script that imported them was deleted. This job
-  # asks the different question -- does anything use it -- and a use in
-  # test/ counts, because lib/python/test_fixtures/ exists to be called
-  # from there.
   assert-no-unused-python-definition:
     runs-on: ubuntu-24.04
     steps:
@@ -247,6 +252,9 @@ jobs:
         run: >-
           PYTHONPATH=.:scripts python3 -m pylint
           lib/python/ scripts/
+          --disable=missing-class-docstring
+          --disable=missing-function-docstring
+          --disable=missing-module-docstring
           --fail-on=C,R,W --fail-under=10.0
   pylint-tests:
     runs-on: ubuntu-24.04
@@ -268,6 +276,9 @@ jobs:
           PYTHONPATH=.:scripts
           python3 -m pylint --recursive=y
           lib/python/ test/scripts/ test/lib/python/
+          --disable=missing-class-docstring
+          --disable=missing-function-docstring
+          --disable=missing-module-docstring
           --fail-on=C,R,W --fail-under=10.0
   test-assert-no-duplicate-type-definitions:
     runs-on: ubuntu-24.04
@@ -529,14 +540,6 @@ jobs:
           --cov-branch
           --cov-report=term-missing
           --cov-fail-under=100
-  # lib/python/test_fixtures/ and lib/python/test_utils/ were named by no
-  # --cov flag until #2996, so nothing measured them and nothing was owed for
-  # them. Six of the seven functions in test_utils/__init__.py had reached
-  # zero callers by the time anybody counted. What these two jobs add is the
-  # measurement the other ten packages already had; the claims themselves are
-  # in the tests, and they are worth making because a stub that reports
-  # success where it meant failure turns a test of an error path in another
-  # suite into a test of nothing.
   test-lib-test-fixtures:
     runs-on: ubuntu-24.04
     steps:
@@ -693,16 +696,6 @@ on:
   push:
     branches: [main]
     paths:
-      # Every job here lints or tests the Python under lib/python/ and
-      # scripts/ with the tests beside it, so a change to any of those trees
-      # is a change this workflow has to observe. Its own file is watched
-      # because the yamllint job lints it, and the dependency graph because
-      # test-lib-cli reads it as the record of which identifiers the
-      # --subclause argument has to admit. src/ is deliberately absent: a job
-      # reading that tree has to run on a push that changes it, and this list
-      # would start all of this workflow's jobs on every such push, so
-      # assert-subclause-citations runs in .github/workflows/deltahdl.yml
-      # instead. #3156 records the measurement.
       - .github/workflows/scripts.yml
       - docs/dependency_graph.json
       - lib/python/**

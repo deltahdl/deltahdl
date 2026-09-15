@@ -1,5 +1,3 @@
-"""Shared fixtures for lib.lrm tests."""
-
 from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any
@@ -10,7 +8,6 @@ from pypdf import PdfWriter
 
 @pytest.fixture()
 def nested_outline() -> list[tuple[int, str, int]]:
-    """A 4-level outline used across lrm tests."""
     return [
         (1, "23 Tasks and functions", 100),
         (2, "23.1 Introduction", 100),
@@ -23,7 +20,6 @@ def nested_outline() -> list[tuple[int, str, int]]:
 
 @pytest.fixture()
 def annex_outline() -> list[tuple[int, str, int]]:
-    """Outline modelled on the LRM annex layout."""
     return [
         (1, "40 Last chapter", 800),
         (1, "Annex A SystemVerilog formal syntax", 900),
@@ -37,7 +33,6 @@ def annex_outline() -> list[tuple[int, str, int]]:
 
 @pytest.fixture()
 def blank_pdf(tmp_path: Path) -> str:
-    """Write a single-page PDF with no outline; return its path."""
     path = tmp_path / "blank.pdf"
     writer = PdfWriter()
     writer.add_blank_page(width=72, height=72)
@@ -50,11 +45,6 @@ def blank_pdf(tmp_path: Path) -> str:
 def make_pdf(
     tmp_path: Path,
 ) -> Callable[[str, int, Sequence[tuple[int, str, int]]], str]:
-    """Return a builder that writes a PDF with a bookmark outline.
-
-    Outline entries are ``(depth, title, page_1indexed)``. Depth 1 is
-    a top-level bookmark; depth 2 is its child; etc.
-    """
     def _make(
         name: str,
         num_pages: int,

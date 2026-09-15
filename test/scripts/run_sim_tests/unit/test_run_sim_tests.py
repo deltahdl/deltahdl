@@ -1,20 +1,15 @@
-"""Unit tests for run_sim_tests module."""
-
+import runpy
 import subprocess
 from pathlib import Path
 from types import ModuleType
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 
 def _run_over_streams(
     rst: ModuleType, tmp_path: Path, out: str, err: str, expected: str,
 ) -> tuple[bool, str]:
-    """Run run_test() over a stub deltahdl writing out and err to its streams.
-
-    The .sv file is written for the caller and the .expected file is given the
-    expected text, so a test says only what the two streams hold and what the
-    recording of them says.
-    """
     sv = tmp_path / "streams.sv"
     sv.write_text("module streams; endmodule\n")
     expected_path = tmp_path / "streams.expected"
@@ -31,14 +26,6 @@ def _run_over_streams(
 def _run_over_case(
     rst: ModuleType, tmp_path: Path, stem: str, returncode: int,
 ) -> tuple[list[str], tuple[bool, str]]:
-    """Run run_test() over a stub deltahdl and return its command and outcome.
-
-    The .sv file and the .expected file are written for the caller and are made
-    to agree, so a test says only which optional sibling files the case carries
-    and what status the stub exits with. The command line comes back so that a
-    test about .args can read what the stub was asked to run, and the outcome
-    comes back so that a test about .exit can read what run_test decided.
-    """
     sv = tmp_path / f"{stem}.sv"
     sv.write_text("module m; endmodule\n")
     expected_path = tmp_path / f"{stem}.expected"
@@ -60,12 +47,9 @@ def _run_over_case(
 
 
 class TestCollectTests:
-    """Tests for the collect_tests() function."""
-
     def test_finds_sv_expected_pairs(
         self, rst: ModuleType, sim_test_tree: Path,
     ) -> None:
-        """collect_tests() should return pairs of .sv and .expected files."""
         with patch.object(rst, "TEST_DIR", sim_test_tree):
             pairs = rst.collect_tests()
         names = [sv.stem for sv, _ in pairs]
@@ -74,7 +58,6 @@ class TestCollectTests:
     def test_ignores_sv_without_expected(
         self, rst: ModuleType, sim_test_tree: Path,
     ) -> None:
-        """collect_tests() should skip .sv files that lack a .expected."""
         with patch.object(rst, "TEST_DIR", sim_test_tree):
             pairs = rst.collect_tests()
         names = [sv.stem for sv, _ in pairs]
@@ -83,22 +66,12 @@ class TestCollectTests:
     def test_returns_empty_list_when_no_pairs(
         self, rst: ModuleType, tmp_path: Path,
     ) -> None:
-        """collect_tests() should return [] when no .sv/.expected pairs exist."""
         (tmp_path / "readme.txt").write_text("nothing here\n")
         with patch.object(rst, "TEST_DIR", tmp_path):
             pairs = rst.collect_tests()
         assert not pairs
 
     def test_every_e2e_source_has_an_expected_file(self, rst: ModuleType) -> None:
-        """Every source in the real e2e directory should be a case.
-
-        collect_tests skips a .sv with no .expected beside it, which is what
-        lets a shared file sit in the directory without being run as a case.
-        The skip is silent, so a source meant as a case and left unpaired
-        asserts nothing and reads as covered. This is the claim that keeps the
-        directory holding nothing the skip could hide, and it is over TEST_DIR
-        itself rather than a fixture because the directory is its subject.
-        """
         unpaired = [
             sv.name for sv in sorted(rst.TEST_DIR.glob("*.sv"))
             if not sv.with_suffix(".expected").exists()
@@ -107,12 +80,9 @@ class TestCollectTests:
 
 
 class TestRunTest:
-    """Tests for the run_test() function."""
-
     def test_returns_true_on_matching_output(
         self, rst: ModuleType, tmp_path: Path,
     ) -> None:
-        """run_test() should return (True, '') when stdout matches expected."""
         sv = tmp_path / "test.sv"
         sv.write_text("module test; endmodule\n")
         expected = tmp_path / "test.expected"
@@ -128,7 +98,6 @@ class TestRunTest:
     def test_returns_false_on_mismatched_output(
         self, rst: ModuleType, tmp_path: Path,
     ) -> None:
-        """run_test() should return False when stdout differs from expected."""
         ok, _ = _run_over_streams(
             rst, tmp_path, "wrong output\n", "", "expected output\n",
         )
@@ -137,7 +106,6 @@ class TestRunTest:
     def test_the_detail_holds_both_sides_of_a_mismatch(
         self, rst: ModuleType, tmp_path: Path,
     ) -> None:
-        """run_test()'s detail should quote the recorded text and the run's."""
         detail = _run_over_streams(
             rst, tmp_path, "wrong output\n", "", "expected output\n",
         )[1]
@@ -148,7 +116,6 @@ class TestRunTest:
     def test_strips_trailing_newlines_before_comparing(
         self, rst: ModuleType, tmp_path: Path,
     ) -> None:
-        """run_test() should strip trailing newlines from both sides."""
         sv = tmp_path / "test.sv"
         sv.write_text("module test; endmodule\n")
         expected = tmp_path / "test.expected"
@@ -164,7 +131,6 @@ class TestRunTest:
     def test_returns_timeout_on_timeout_expired(
         self, rst: ModuleType, tmp_path: Path,
     ) -> None:
-        """run_test() should return (False, 'TIMEOUT') on TimeoutExpired."""
         sv = tmp_path / "test.sv"
         sv.write_text("module test; endmodule\n")
         expected = tmp_path / "test.expected"
@@ -180,7 +146,6 @@ class TestRunTest:
     def test_matches_a_diagnostic_written_only_to_standard_error(
         self, rst: ModuleType, tmp_path: Path,
     ) -> None:
-        """run_test() should compare a report deltahdl wrote to standard error."""
         result = _run_over_streams(
             rst, tmp_path, "", "error: syntax error\n", "error: syntax error\n",
         )
@@ -189,7 +154,6 @@ class TestRunTest:
     def test_compares_standard_output_ahead_of_standard_error(
         self, rst: ModuleType, tmp_path: Path,
     ) -> None:
-        """run_test() should compare both streams, standard output first."""
         result = _run_over_streams(
             rst, tmp_path, "displayed\n", "error: rejected\n",
             "displayed\nerror: rejected\n",
@@ -199,7 +163,6 @@ class TestRunTest:
     def test_matches_a_reported_path_named_relative_to_the_repository(
         self, rst: ModuleType, tmp_path: Path,
     ) -> None:
-        """run_test() should cut the repository root off a path a report names."""
         named = rst.REPO_ROOT / "test" / "src" / "e2e" / "reject.sv"
         result = _run_over_streams(
             rst, tmp_path, "", f"{named}:3:1: error: rejected\n",
@@ -209,12 +172,9 @@ class TestRunTest:
 
 
 class TestCaseArguments:
-    """Tests for the arguments a case names in its .args file."""
-
     def test_passes_the_named_arguments_after_the_source_path(
         self, rst: ModuleType, tmp_path: Path,
     ) -> None:
-        """run_test() should pass a case's .args lines after its source path."""
         (tmp_path / "opt.args").write_text("--lint-only\n--top\nm\n")
         cmd, _ = _run_over_case(rst, tmp_path, "opt", 0)
         assert cmd == [
@@ -225,7 +185,6 @@ class TestCaseArguments:
     def test_a_blank_line_names_no_argument(
         self, rst: ModuleType, tmp_path: Path,
     ) -> None:
-        """run_test() should pass no empty argument for a blank .args line."""
         (tmp_path / "blank.args").write_text("--lint-only\n\n--synth\n")
         cmd, _ = _run_over_case(rst, tmp_path, "blank", 0)
         assert cmd[2:] == ["--lint-only", "--synth"]
@@ -233,18 +192,14 @@ class TestCaseArguments:
     def test_a_case_without_an_args_file_runs_the_source_path_alone(
         self, rst: ModuleType, tmp_path: Path,
     ) -> None:
-        """run_test() should build a two-element command with no .args file."""
         cmd, _ = _run_over_case(rst, tmp_path, "plain", 0)
         assert cmd == [str(rst.BINARY), str(tmp_path / "plain.sv")]
 
 
 class TestExpectedStatus:
-    """Tests for the exit status a case names in its .exit file."""
-
     def test_a_matching_status_passes_the_case(
         self, rst: ModuleType, tmp_path: Path,
     ) -> None:
-        """run_test() should pass when the status matches the .exit file."""
         (tmp_path / "refused.exit").write_text("2\n")
         _, outcome = _run_over_case(rst, tmp_path, "refused", 2)
         assert outcome == (True, "")
@@ -252,14 +207,12 @@ class TestExpectedStatus:
     def test_a_differing_status_fails_the_case(
         self, rst: ModuleType, tmp_path: Path,
     ) -> None:
-        """run_test() should fail when the status differs from the .exit file."""
         (tmp_path / "silent.exit").write_text("1\n")
         assert not _run_over_case(rst, tmp_path, "silent", 0)[1][0]
 
     def test_a_differing_status_is_named_in_the_detail(
         self, rst: ModuleType, tmp_path: Path,
     ) -> None:
-        """run_test() should name the status it wanted and the one it got."""
         (tmp_path / "silent.exit").write_text("1\n")
         detail = _run_over_case(rst, tmp_path, "silent", 0)[1][1]
         assert "expected exit status 1, got 0" in detail
@@ -267,21 +220,18 @@ class TestExpectedStatus:
     def test_a_case_without_an_exit_file_judges_the_text_alone(
         self, rst: ModuleType, tmp_path: Path,
     ) -> None:
-        """run_test() should pass a matching text whatever the status was."""
         _, outcome = _run_over_case(rst, tmp_path, "loose", 3)
         assert outcome == (True, "")
 
     def test_a_malformed_exit_file_fails_the_case_rather_than_raising(
         self, rst: ModuleType, tmp_path: Path,
     ) -> None:
-        """run_test() should fail a case whose .exit file holds no status."""
         (tmp_path / "bogus.exit").write_text("yes\n")
         assert not _run_over_case(rst, tmp_path, "bogus", 0)[1][0]
 
     def test_a_malformed_exit_file_is_named_in_the_detail(
         self, rst: ModuleType, tmp_path: Path,
     ) -> None:
-        """run_test() should name the .exit file and the text it holds."""
         status_path = tmp_path / "unreadable.exit"
         status_path.write_text("yes\n")
         detail = _run_over_case(rst, tmp_path, "unreadable", 4)[1][1]
@@ -291,7 +241,6 @@ class TestExpectedStatus:
     def test_a_negative_status_is_accepted(
         self, rst: ModuleType, tmp_path: Path,
     ) -> None:
-        """run_test() should read a signed status from a .exit file."""
         (tmp_path / "killed.exit").write_text("-1\n")
         assert _run_over_case(rst, tmp_path, "killed", -1)[1] == (True, "")
 
@@ -299,17 +248,6 @@ class TestExpectedStatus:
 def _run_over_two_invocations(
     rst: ModuleType, tmp_path: Path, before_text: str, before_code: int | None,
 ) -> tuple[list[tuple[list[str], str]], tuple[bool, str]]:
-    """Run run_test() over a case whose .before file holds before_text.
-
-    The .sv, .args and .expected files are written for the caller. The .args
-    file names one argument, so a test can tell the two invocations apart by
-    their command lines, and the .expected file holds what the stub prints for
-    the invocation under test alone. before_code is the status the earlier
-    invocation exits with, and None makes it time out instead. Every invocation
-    the stub saw comes back as its command line and the directory it ran in, in
-    the order the invocations were made, so a test about the order or about the
-    directory can read them.
-    """
     sv = tmp_path / "two.sv"
     sv.write_text("module two; endmodule\n")
     (tmp_path / "two.before").write_text(before_text)
@@ -336,12 +274,9 @@ def _run_over_two_invocations(
 
 
 class TestBeforeArguments:
-    """Tests for the invocation a case names in its .before file."""
-
     def test_runs_the_named_invocation_before_the_one_under_test(
         self, rst: ModuleType, tmp_path: Path,
     ) -> None:
-        """run_test() should run the .before command line first."""
         calls, _ = _run_over_two_invocations(
             rst, tmp_path, "--precompile-into\ncells\n", 0,
         )
@@ -354,7 +289,6 @@ class TestBeforeArguments:
     def test_a_blank_line_names_no_earlier_argument(
         self, rst: ModuleType, tmp_path: Path,
     ) -> None:
-        """run_test() should pass no empty argument for a blank .before line."""
         calls, _ = _run_over_two_invocations(
             rst, tmp_path, "--precompile-into\n\ncells\n", 0,
         )
@@ -363,13 +297,6 @@ class TestBeforeArguments:
     def test_both_invocations_run_in_one_directory(
         self, rst: ModuleType, tmp_path: Path,
     ) -> None:
-        """run_test() should run both invocations in one directory it made.
-
-        A precompiled library the earlier invocation writes under a relative
-        path lands in the directory that invocation ran in, and the bind after
-        it reads the library back from the directory it runs in, so the two
-        directories being one is what lets a case name that file once.
-        """
         calls, _ = _run_over_two_invocations(
             rst, tmp_path, "--precompile-into\ncells\n", 0,
         )
@@ -379,12 +306,6 @@ class TestBeforeArguments:
     def test_the_invocations_run_outside_the_repository(
         self, rst: ModuleType, tmp_path: Path,
     ) -> None:
-        """run_test() should run an invocation outside the repository.
-
-        A precompiled library is written under the directory an invocation
-        runs in, so running inside the repository would leave the library in
-        test/src/e2e/ for `git status` to report.
-        """
         calls, _ = _run_over_two_invocations(
             rst, tmp_path, "--precompile-into\ncells\n", 0,
         )
@@ -394,11 +315,6 @@ class TestBeforeArguments:
     def test_only_the_invocation_under_test_is_compared_to_expected(
         self, rst: ModuleType, tmp_path: Path,
     ) -> None:
-        """run_test() should judge the case on the last invocation's output.
-
-        The stub prints 'compiled' for the earlier invocation and 'bound' for
-        the one under test, and the .expected file holds 'bound' alone.
-        """
         _, outcome = _run_over_two_invocations(
             rst, tmp_path, "--precompile-into\ncells\n", 0,
         )
@@ -407,7 +323,6 @@ class TestBeforeArguments:
     def test_a_failing_earlier_invocation_fails_the_case(
         self, rst: ModuleType, tmp_path: Path,
     ) -> None:
-        """run_test() should fail a case whose earlier invocation exited 1."""
         _, (ok, _) = _run_over_two_invocations(
             rst, tmp_path, "--precompile-into\ncells\n", 1,
         )
@@ -416,7 +331,6 @@ class TestBeforeArguments:
     def test_a_failing_earlier_invocation_is_named_in_the_detail(
         self, rst: ModuleType, tmp_path: Path,
     ) -> None:
-        """run_test() should name the .before file and the status it exited."""
         detail = _run_over_two_invocations(
             rst, tmp_path, "--precompile-into\ncells\n", 1,
         )[1][1]
@@ -425,7 +339,6 @@ class TestBeforeArguments:
     def test_the_invocation_under_test_does_not_run_after_a_failure(
         self, rst: ModuleType, tmp_path: Path,
     ) -> None:
-        """run_test() should not run the second invocation after the first."""
         calls, _ = _run_over_two_invocations(
             rst, tmp_path, "--precompile-into\ncells\n", 1,
         )
@@ -434,7 +347,6 @@ class TestBeforeArguments:
     def test_an_earlier_invocation_that_times_out_fails_the_case(
         self, rst: ModuleType, tmp_path: Path,
     ) -> None:
-        """run_test() should fail the case rather than raise on a timeout."""
         outcome = _run_over_two_invocations(
             rst, tmp_path, "--precompile-into\ncells\n", None,
         )[1]
@@ -447,18 +359,6 @@ def _run_over_artifact(
     written: str | None,
     recorded: str | None,
 ) -> tuple[list[str], tuple[bool, str]]:
-    """Run run_test() over a case whose .artifact file holds named.
-
-    The .sv and .expected files are written for the caller and are made to
-    agree, so a case fails on its artifact alone. `named` is what the .artifact
-    file holds, `written` is what the stub writes into the directory it runs in
-    under that name -- None writes nothing, which is a run that produced no such
-    file -- and `recorded` is what the .artifact.expected file holds, with None
-    writing no such file at all.
-
-    The directory each invocation ran in comes back so that a test can read
-    where the file was expected to land.
-    """
     sv = tmp_path / "artifact.sv"
     sv.write_text("module artifact; endmodule\n")
     (tmp_path / "artifact.artifact").write_text(named)
@@ -486,11 +386,6 @@ def _run_over_artifact(
     return directories, outcome
 
 
-# A four-state VCD header carrying the two declaration commands of §21.7.2.3's
-# Table 21-10 that a test needs to tell apart: $date, whose section names when
-# the file was written, and $timescale, which does not vary. The {} is where a
-# test puts a date, so that two headers differing in nothing else can be
-# compared.
 _VCD_HEADER = (
     "$date\n  {}\n$end\n"
     "$version\n  DeltaHDL 0.1.0\n$end\n"
@@ -500,12 +395,9 @@ _VCD_HEADER = (
 
 
 class TestArtifactComparison:
-    """Tests for the file a case names in its .artifact file."""
-
     def test_a_matching_artifact_passes_the_case(
         self, rst: ModuleType, tmp_path: Path,
     ) -> None:
-        """run_test() should pass where the written file matches its record."""
         _, outcome = _run_over_artifact(
             rst, tmp_path, "dump.vcd\n", "same\n", "same\n",
         )
@@ -514,11 +406,6 @@ class TestArtifactComparison:
     def test_a_differing_artifact_fails_the_case(
         self, rst: ModuleType, tmp_path: Path,
     ) -> None:
-        """run_test() should fail where the written file differs.
-
-        The stub prints what .expected holds and exits zero, so the case is
-        judged on the file alone: a runner comparing stdout alone passes it.
-        """
         _, outcome = _run_over_artifact(
             rst, tmp_path, "dump.vcd\n", "written\n", "recorded\n",
         )
@@ -527,7 +414,6 @@ class TestArtifactComparison:
     def test_a_differing_artifact_is_named_in_the_detail(
         self, rst: ModuleType, tmp_path: Path,
     ) -> None:
-        """run_test() should name the file and both sides of the difference."""
         _, outcome = _run_over_artifact(
             rst, tmp_path, "dump.vcd\n", "written\n", "recorded\n",
         )
@@ -536,12 +422,6 @@ class TestArtifactComparison:
     def test_a_date_section_may_differ_without_failing_the_case(
         self, rst: ModuleType, tmp_path: Path,
     ) -> None:
-        """run_test() should compare a VCD header past its $date section.
-
-        §21.7.2.3: "The $date section indicates the date on which the VCD file
-        was generated", so it holds a different text every run and a recorded
-        copy of it could match on the run that recorded it alone.
-        """
         _, outcome = _run_over_artifact(
             rst,
             tmp_path,
@@ -554,12 +434,6 @@ class TestArtifactComparison:
     def test_a_difference_past_the_date_section_still_fails_the_case(
         self, rst: ModuleType, tmp_path: Path,
     ) -> None:
-        """run_test() should still compare what the $date section is not.
-
-        Without this the case above is satisfied by a normalisation that
-        discards the whole header, which is the failure mode a normalisation
-        has.
-        """
         _, outcome = _run_over_artifact(
             rst,
             tmp_path,
@@ -573,11 +447,6 @@ class TestArtifactComparison:
     def test_a_file_the_run_did_not_write_fails_the_case(
         self, rst: ModuleType, tmp_path: Path,
     ) -> None:
-        """run_test() should fail where the run wrote no such file.
-
-        A missing file is what a design whose dump task did nothing produces,
-        and reading it as an empty one would pass against an empty record.
-        """
         _, outcome = _run_over_artifact(
             rst, tmp_path, "dump.vcd\n", None, "recorded\n",
         )
@@ -586,7 +455,6 @@ class TestArtifactComparison:
     def test_a_file_the_run_did_not_write_is_named_in_the_detail(
         self, rst: ModuleType, tmp_path: Path,
     ) -> None:
-        """run_test() should name the file the run was to have written."""
         _, outcome = _run_over_artifact(
             rst, tmp_path, "dump.vcd\n", None, "recorded\n",
         )
@@ -595,12 +463,6 @@ class TestArtifactComparison:
     def test_an_artifact_without_a_recorded_copy_fails_the_case(
         self, rst: ModuleType, tmp_path: Path,
     ) -> None:
-        """run_test() should fail a case whose record is missing.
-
-        A .artifact naming a file with nothing to compare it against is a case
-        that cannot be judged, and passing it would leave the file unchecked
-        while the case reads as covered.
-        """
         _, outcome = _run_over_artifact(
             rst, tmp_path, "dump.vcd\n", "written\n", None,
         )
@@ -609,7 +471,6 @@ class TestArtifactComparison:
     def test_an_artifact_without_a_recorded_copy_is_named_in_the_detail(
         self, rst: ModuleType, tmp_path: Path,
     ) -> None:
-        """run_test() should name the record it looked for and did not find."""
         _, outcome = _run_over_artifact(
             rst, tmp_path, "dump.vcd\n", "written\n", None,
         )
@@ -620,7 +481,6 @@ class TestArtifactComparison:
     def test_an_artifact_file_naming_no_file_fails_the_case(
         self, rst: ModuleType, tmp_path: Path,
     ) -> None:
-        """run_test() should fail rather than raise on a blank .artifact."""
         _, outcome = _run_over_artifact(
             rst, tmp_path, "\n", None, "recorded\n",
         )
@@ -629,13 +489,6 @@ class TestArtifactComparison:
     def test_an_artifact_file_naming_two_files_is_named_in_the_detail(
         self, rst: ModuleType, tmp_path: Path,
     ) -> None:
-        """run_test() should name the file and how many names it held.
-
-        One .artifact names one file, because the record beside it is one file
-        too. int() and open() would each raise on the malformed case without
-        naming which case carries it, which leaves a maintainer reading a
-        traceback into this module.
-        """
         _, outcome = _run_over_artifact(
             rst, tmp_path, "one.vcd\ntwo.vcd\n", None, "recorded\n",
         )
@@ -646,12 +499,6 @@ class TestArtifactComparison:
     def test_the_run_writes_its_artifact_outside_the_repository(
         self, rst: ModuleType, tmp_path: Path,
     ) -> None:
-        """run_test() should run a case with an artifact in its own directory.
-
-        The runner is started at the repository root, so a design writing
-        dump.vcd under a relative path would drop it into the source tree for
-        `git status` to report and a later `git add` to commit.
-        """
         directories, _ = _run_over_artifact(
             rst, tmp_path, "dump.vcd\n", "same\n", "same\n",
         )
@@ -660,11 +507,17 @@ class TestArtifactComparison:
     def test_a_case_without_an_artifact_file_judges_the_text_alone(
         self, rst: ModuleType, tmp_path: Path,
     ) -> None:
-        """run_test() should compare no file where the case names none.
-
-        Every case that stood before this file existed carries no .artifact,
-        and runs where the runner was started rather than in a directory of its
-        own.
-        """
         _, outcome = _run_over_case(rst, tmp_path, "plain", 0)
         assert outcome == (True, "")
+
+
+def test_running_the_package_as_a_module_calls_main(
+    rst: ModuleType, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[str] = []
+    monkeypatch.setattr(rst, "main", lambda: calls.append("main"))
+    runpy.run_path(
+        str(Path(rst.__file__ or "").with_name("__main__.py")),
+        run_name="run_sim_tests.__main__",
+    )
+    assert calls == ["main"]

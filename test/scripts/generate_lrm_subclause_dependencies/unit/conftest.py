@@ -1,5 +1,3 @@
-"""Shared fixtures for generate_lrm_subclause_dependencies unit tests."""
-
 from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any
@@ -22,21 +20,6 @@ _DEFAULT_RECORD: dict[str, Any] = {"dependencies": []}
 def run_main(
     make_lrm: Path, make_output: Path,
 ) -> Callable[..., tuple[MagicMock, MagicMock, MagicMock]]:
-    """Patch the walk hooks, run main(), and return the mock pair.
-
-    The mocks (load_toc, build_subclause_record, commit_output) are
-    returned so each test can assert on call counts/args without
-    re-stating the boilerplate of patching, building argv, and
-    invoking main(). assert_clean_tree is stubbed silently because
-    --commit-using tests should not actually shell out to git status.
-
-    The run is pinned to one oracle call at a time. These tests read
-    the order a mock was called in and the checkpoint written after
-    each answer, and both of those are properties of a walk that runs
-    its calls one after another. ``extra_argv`` is appended after the
-    pin, so a test about overlapping calls can pass its own --jobs.
-    """
-
     def _run(
         *,
         toc: dict[str, tuple[int, int]] | None = None,
@@ -76,7 +59,6 @@ def run_main(
 
 
 def _completed(returncode: int = 0, stdout: str = "") -> MagicMock:
-    """Build a stubbed CompletedProcess for subprocess.run."""
     proc = MagicMock()
     proc.returncode = returncode
     proc.stdout = stdout
@@ -88,14 +70,6 @@ def _completed(returncode: int = 0, stdout: str = "") -> MagicMock:
 def run_commit(
     tmp_path: Path,
 ) -> Callable[..., tuple[list[str], RuntimeError | None, Path]]:
-    """Run commit_output(out, message=...) with a stubbed git.
-
-    Returns (cmds, raised, out): the joined git commands the stub
-    observed, the RuntimeError if commit_output raised (else None),
-    and the output Path. Keyword args toggle the stub's per-command
-    behavior so each test can drive one branch.
-    """
-
     def _make(
         *,
         message: str = "test-message",
@@ -134,13 +108,6 @@ def run_commit(
 
 @pytest.fixture()
 def run_assert_clean_tree() -> Callable[..., RuntimeError | None]:
-    """Run assert_clean_tree() with a stubbed git status; return raised.
-
-    ``dirty=True`` makes the stubbed `git status --porcelain` return
-    one modified line so the assertion raises; ``dirty=False`` returns
-    empty stdout so it passes.
-    """
-
     def _make(*, dirty: bool = False) -> RuntimeError | None:
         def _run(cmd: list[str], **_kwargs: Any) -> MagicMock:
             joined = " ".join(cmd)

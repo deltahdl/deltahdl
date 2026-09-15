@@ -1,5 +1,3 @@
-"""Shared fixtures for next_subclause e2e tests."""
-
 import json
 import os
 import stat
@@ -17,12 +15,6 @@ REPO_ROOT = Path(__file__).resolve().parents[4]
 
 @pytest.fixture()
 def run_cli(tmp_path: Path) -> Callable[..., subprocess.CompletedProcess[str]]:
-    """Return a factory running the CLI with a stub ``gh`` answering *issues*.
-
-    The stub is put first on the path, so the command under test resolves
-    it the way it resolves the real one. Nothing here reaches the network
-    or depends on what the repository's issues happen to be today.
-    """
     def _run(
         graph: Path, issues: list[dict[str, Any]],
     ) -> subprocess.CompletedProcess[str]:

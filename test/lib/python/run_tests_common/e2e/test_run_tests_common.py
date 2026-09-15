@@ -1,5 +1,3 @@
-"""End-to-end tests for run_tests_common module."""
-
 import subprocess
 import sys
 
@@ -9,7 +7,6 @@ REPO_ROOT = run_tests_common.REPO_ROOT
 
 
 def test_import_succeeds_in_subprocess() -> None:
-    """Importing run_tests_common in a fresh Python process should succeed."""
     repo_root = str(REPO_ROOT)
     result = subprocess.run(
         [
@@ -27,8 +24,6 @@ def test_import_succeeds_in_subprocess() -> None:
 
 
 def test_public_names_are_accessible() -> None:
-    """REPO_ROOT, BINARY, GREEN, RED, RESET, check_binary, and
-    print_result should all be importable attributes."""
     expected = [
         "REPO_ROOT",
         "BINARY",

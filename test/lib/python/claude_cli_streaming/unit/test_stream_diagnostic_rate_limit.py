@@ -1,5 +1,3 @@
-"""Unit tests for the RateLimitError public exception type."""
-
 from types import ModuleType
 
 
@@ -11,16 +9,11 @@ _FULL_INFO_PAYLOAD: dict[str, object] = {
 }
 
 
-# --- RateLimitError ---------------------------------------------------------
-
-
 def test_rate_limit_error_is_exception(streaming: ModuleType) -> None:
-    """RateLimitError is exposed as an Exception subclass."""
     assert issubclass(streaming.RateLimitError, Exception)
 
 
 def test_rate_limit_error_carries_rate_limit_type(streaming: ModuleType) -> None:
-    """The exception unpacks rateLimitType from the info payload."""
     exc = streaming.RateLimitError(
         rate_limit_info=_FULL_INFO_PAYLOAD,
         synthetic_text="...", stderr="",
@@ -29,7 +22,6 @@ def test_rate_limit_error_carries_rate_limit_type(streaming: ModuleType) -> None
 
 
 def test_rate_limit_error_carries_resets_at(streaming: ModuleType) -> None:
-    """The exception unpacks resetsAt from the info payload."""
     exc = streaming.RateLimitError(
         rate_limit_info=_FULL_INFO_PAYLOAD,
         synthetic_text=None, stderr="",
@@ -38,7 +30,6 @@ def test_rate_limit_error_carries_resets_at(streaming: ModuleType) -> None:
 
 
 def test_rate_limit_error_carries_overage_status(streaming: ModuleType) -> None:
-    """The exception unpacks overageStatus from the info payload."""
     exc = streaming.RateLimitError(
         rate_limit_info=_FULL_INFO_PAYLOAD,
         synthetic_text=None, stderr="",
@@ -49,7 +40,6 @@ def test_rate_limit_error_carries_overage_status(streaming: ModuleType) -> None:
 def test_rate_limit_error_carries_overage_disabled_reason(
     streaming: ModuleType,
 ) -> None:
-    """The exception unpacks overageDisabledReason from the info payload."""
     exc = streaming.RateLimitError(
         rate_limit_info=_FULL_INFO_PAYLOAD,
         synthetic_text=None, stderr="",
@@ -58,7 +48,6 @@ def test_rate_limit_error_carries_overage_disabled_reason(
 
 
 def test_rate_limit_error_carries_synthetic_text(streaming: ModuleType) -> None:
-    """The exception preserves the CLI's synthetic message text."""
     exc = streaming.RateLimitError(
         rate_limit_info=None,
         synthetic_text="Usage credits are required.", stderr="",
@@ -67,7 +56,6 @@ def test_rate_limit_error_carries_synthetic_text(streaming: ModuleType) -> None:
 
 
 def test_rate_limit_error_carries_stderr(streaming: ModuleType) -> None:
-    """The exception preserves the captured stderr for the loud-fatal."""
     exc = streaming.RateLimitError(
         rate_limit_info=None,
         synthetic_text=None, stderr="UNIQUE_RATE_LIMIT_STDERR",
@@ -76,7 +64,6 @@ def test_rate_limit_error_carries_stderr(streaming: ModuleType) -> None:
 
 
 def test_rate_limit_error_handles_none_info(streaming: ModuleType) -> None:
-    """rate_limit_info=None flattens every attribute to None."""
     exc = streaming.RateLimitError(
         rate_limit_info=None, synthetic_text=None, stderr="",
     )
@@ -87,7 +74,6 @@ def test_rate_limit_error_handles_none_info(streaming: ModuleType) -> None:
 
 
 def test_rate_limit_error_handles_partial_info(streaming: ModuleType) -> None:
-    """Missing sub-keys default to None rather than raising KeyError."""
     exc = streaming.RateLimitError(
         rate_limit_info={"rateLimitType": "five_hour"},
         synthetic_text=None, stderr="",
@@ -98,7 +84,6 @@ def test_rate_limit_error_handles_partial_info(streaming: ModuleType) -> None:
 def test_rate_limit_error_str_includes_rate_limit_type(
     streaming: ModuleType,
 ) -> None:
-    """str(exception) names the rate-limit type for log correlation."""
     exc = streaming.RateLimitError(
         rate_limit_info=_FULL_INFO_PAYLOAD,
         synthetic_text=None, stderr="",
@@ -107,7 +92,6 @@ def test_rate_limit_error_str_includes_rate_limit_type(
 
 
 def test_rate_limit_error_str_includes_resets_at(streaming: ModuleType) -> None:
-    """str(exception) includes the resetsAt epoch for log correlation."""
     exc = streaming.RateLimitError(
         rate_limit_info=_FULL_INFO_PAYLOAD,
         synthetic_text=None, stderr="",

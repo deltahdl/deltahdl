@@ -1,12 +1,3 @@
-"""Unit tests for multi-aggregate batching and the bumped parse-retry budget.
-
-These tests cover the recovery surface that lets a single retry turn
-present every rejected aggregate's child menu to the oracle at once
-(instead of peeling aggregates off one retry at a time) and the wider
-``MAX_PARSE_RETRIES`` budget that accommodates unanticipated
-multi-step recoveries.
-"""
-
 from typing import Any
 from unittest.mock import patch
 
@@ -25,11 +16,7 @@ from lib.python.test_fixtures.lrm_subclause_dependencies import (
 )
 
 
-# --- parse_dependencies: multi-aggregate single-pass collection -------------
-
-
 def test_parse_dependencies_collects_all_aggregates_when_multiple_present() -> None:
-    """A payload with two aggregates raises with both of them in ``.identifiers``."""
     captured: list[str] | None = None
     try:
         parse_dependencies('["8", "A"]', toc=AGGREGATE_TOC)
@@ -39,7 +26,6 @@ def test_parse_dependencies_collects_all_aggregates_when_multiple_present() -> N
 
 
 def test_parse_dependencies_aggregate_rejection_preserves_payload_order() -> None:
-    """``.identifiers`` preserves the order aggregates appeared in the payload."""
     captured: list[str] | None = None
     try:
         parse_dependencies('["A", "8"]', toc=AGGREGATE_TOC)
@@ -49,7 +35,6 @@ def test_parse_dependencies_aggregate_rejection_preserves_payload_order() -> Non
 
 
 def test_parse_dependencies_aggregate_rejection_skips_non_aggregates() -> None:
-    """Non-aggregate valid entries interleaved with aggregates are not in ``.identifiers``."""
     captured: list[str] | None = None
     try:
         parse_dependencies('["8", "8.1", "A"]', toc=AGGREGATE_TOC)
@@ -59,7 +44,6 @@ def test_parse_dependencies_aggregate_rejection_skips_non_aggregates() -> None:
 
 
 def test_parse_dependencies_short_circuits_on_bad_shape_before_aggregates() -> None:
-    """A bad-shape entry raises plain ValueError even when aggregates also exist."""
     captured: ValueError | None = None
     try:
         parse_dependencies('["not-a-clause", "8"]', toc=AGGREGATE_TOC)
@@ -69,7 +53,6 @@ def test_parse_dependencies_short_circuits_on_bad_shape_before_aggregates() -> N
 
 
 def test_aggregate_rejection_message_names_every_identifier() -> None:
-    """The combined rejection message quotes every rejected aggregate identifier."""
     captured: str = ""
     try:
         parse_dependencies('["8", "A"]', toc=AGGREGATE_TOC)
@@ -79,11 +62,7 @@ def test_aggregate_rejection_message_names_every_identifier() -> None:
     assert not missing
 
 
-# --- build_parse_retry_prompt: multi-aggregate signature --------------------
-
-
 def test_build_parse_retry_prompt_lists_each_rejected_aggregate() -> None:
-    """The aggregate-branch prompt names every aggregate identifier from the list."""
     prompt = build_parse_retry_prompt(
         "reason", aggregates=["13", "24"],
         alternatives_map={"13": ["13.1"], "24": ["24.1"]},
@@ -93,7 +72,6 @@ def test_build_parse_retry_prompt_lists_each_rejected_aggregate() -> None:
 
 
 def test_build_parse_retry_prompt_lists_first_aggregate_children() -> None:
-    """The aggregate-branch prompt enumerates children for the first aggregate."""
     prompt = build_parse_retry_prompt(
         "reason", aggregates=["13", "24"],
         alternatives_map={"13": ["13.3", "13.4"], "24": ["24.6", "24.7"]},
@@ -103,7 +81,6 @@ def test_build_parse_retry_prompt_lists_first_aggregate_children() -> None:
 
 
 def test_build_parse_retry_prompt_lists_second_aggregate_children() -> None:
-    """The aggregate-branch prompt enumerates children for the second aggregate."""
     prompt = build_parse_retry_prompt(
         "reason", aggregates=["13", "24"],
         alternatives_map={"13": ["13.3", "13.4"], "24": ["24.6", "24.7"]},
@@ -113,15 +90,11 @@ def test_build_parse_retry_prompt_lists_second_aggregate_children() -> None:
 
 
 def test_build_parse_retry_prompt_preserves_aggregate_order() -> None:
-    """The aggregate menu lists aggregates in the order supplied."""
     prompt = build_parse_retry_prompt(
         "reason", aggregates=["24", "13"],
         alternatives_map={"13": ["13.1"], "24": ["24.1"]},
     )
     assert prompt.index("'24'") < prompt.index("'13'")
-
-
-# --- compute_subclause_dependencies: multi-aggregate end-to-end -------------
 
 
 _MULTI_AGG_TOC: dict[str, tuple[int, int]] = {
@@ -133,7 +106,6 @@ _MULTI_AGG_TOC: dict[str, tuple[int, int]] = {
 
 
 def _patched_multi_agg_toc() -> Any:
-    """Patch load_toc so the multi-aggregate retry uses _MULTI_AGG_TOC."""
     return patch(
         "lib.python.lrm_subclause_dependencies.load_toc",
         return_value=_MULTI_AGG_TOC,
@@ -141,7 +113,6 @@ def _patched_multi_agg_toc() -> Any:
 
 
 def test_compute_subclause_dependencies_retry_prompt_names_all_aggregates() -> None:
-    """A multi-aggregate response yields a retry prompt that names every aggregate."""
     with patched_oracle_sequence(
         '["13", "24"]', "[]",
     ) as mock_run, _patched_multi_agg_toc():
@@ -152,7 +123,6 @@ def test_compute_subclause_dependencies_retry_prompt_names_all_aggregates() -> N
 
 
 def test_compute_subclause_dependencies_retry_prompt_enumerates_each_aggregates_children() -> None:
-    """The multi-aggregate retry prompt enumerates children for each rejected aggregate."""
     with patched_oracle_sequence(
         '["13", "24"]', "[]",
     ) as mock_run, _patched_multi_agg_toc():
@@ -163,7 +133,6 @@ def test_compute_subclause_dependencies_retry_prompt_enumerates_each_aggregates_
 
 
 def test_compute_subclause_dependencies_resolves_multi_aggregate_in_single_retry() -> None:
-    """A multi-aggregate first response resolves in one retry, well under the budget."""
     with patched_oracle_sequence(
         '["13", "24"]', '["13.3", "24.3"]',
     ) as mock_run, _patched_multi_agg_toc():
@@ -173,11 +142,7 @@ def test_compute_subclause_dependencies_resolves_multi_aggregate_in_single_retry
     assert (deps, mock_run.call_count) == (["13.3", "24.3"], 2)
 
 
-# --- compute_subclause_dependencies: bumped retry budget --------------------
-
-
 def test_compute_subclause_dependencies_allows_four_retries_before_exit() -> None:
-    """With MAX_PARSE_RETRIES=4, four failed retries (5 total) precede the exit."""
     mock_run = None
     with patched_oracle_sequence(
         '["8"]', '["8"]', '["8"]', '["8"]', '["8"]',
@@ -194,7 +159,6 @@ def test_compute_subclause_dependencies_allows_four_retries_before_exit() -> Non
 def test_compute_subclause_dependencies_exit_message_quotes_five_attempts(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """The exit message after the bumped budget is exhausted reports 5 attempts."""
     with patched_oracle_sequence(
         '["8"]', '["8"]', '["8"]', '["8"]', '["8"]',
     ), patched_retry_toc():
@@ -208,7 +172,6 @@ def test_compute_subclause_dependencies_exit_message_quotes_five_attempts(
 
 
 def test_compute_subclause_dependencies_succeeds_within_bumped_budget() -> None:
-    """A clean array on the fifth call (within the 4-retry budget) is returned."""
     with patched_oracle_sequence(
         '["8"]', '["8"]', '["8"]', '["8"]', '["33.6.1"]',
     ), patched_retry_toc():
@@ -218,11 +181,7 @@ def test_compute_subclause_dependencies_succeeds_within_bumped_budget() -> None:
     assert deps == ["33.6.1"]
 
 
-# --- the rejection message names the kind the standard gives the entry ------
-
-
 def test_aggregate_rejection_calls_a_bare_number_a_clause() -> None:
-    """§1.5 organizes the standard into clauses, so "8" is named as one."""
     captured = ""
     try:
         parse_dependencies('["8"]', toc=AGGREGATE_TOC)
@@ -232,7 +191,6 @@ def test_aggregate_rejection_calls_a_bare_number_a_clause() -> None:
 
 
 def test_aggregate_rejection_calls_a_bare_letter_an_annex() -> None:
-    """Annex A's opening sets annexes beside clauses, so "A" is named as one."""
     captured = ""
     try:
         parse_dependencies('["A"]', toc=AGGREGATE_TOC)
@@ -242,7 +200,6 @@ def test_aggregate_rejection_calls_a_bare_letter_an_annex() -> None:
 
 
 def test_aggregate_rejection_names_every_entry_it_turns_down() -> None:
-    """A payload naming both kinds gets both words, since neither covers both."""
     captured = ""
     try:
         parse_dependencies('["8", "A"]', toc=AGGREGATE_TOC)

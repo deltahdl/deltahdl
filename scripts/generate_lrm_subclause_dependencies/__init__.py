@@ -1,11 +1,3 @@
-"""Generate the LRM dependency graph as a JSON file.
-
-``generate_lrm_subclause_dependencies --lrm path --output graph.json`` walks the
-LRM table of contents, asks the read-only oracles once per subclause,
-and writes the resulting graph to disk so downstream tools can plan a
-satisfaction pass without re-querying Claude on every recursion.
-"""
-
 import argparse
 import json
 from collections.abc import Callable
@@ -32,17 +24,10 @@ _DESCRIPTION = (
     " can plan a satisfaction pass without re-querying."
 )
 
-# How many oracle calls a walk runs at once when --jobs is not given.
-# One call takes around 37 seconds, nearly all of it a session reading
-# the LRM rather than the walk doing anything, and the table of
-# contents holds about 1,700 walkable subclauses. One call at a time is
-# therefore something like seventeen hours, and sixteen at a time is
-# something like one.
 _JOBS_DEFAULT = 16
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    """Parse and validate CLI arguments."""
     parser = argparse.ArgumentParser(prog=__package__, description=_DESCRIPTION)
     add_lrm_arg(parser)
     add_model_arg(parser, default="sonnet")
@@ -93,13 +78,6 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 def _load_checkpoint(output: Path) -> dict[str, Any]:
-    """Return the cached records dict from ``output``, or empty if absent.
-
-    A pre-existing --output file lets a resumed run skip oracle calls
-    for subclauses that already have a record. Malformed JSON raises
-    so a corrupt checkpoint becomes a loud failure rather than a silent
-    rerun-from-scratch.
-    """
     if not output.exists():
         return {}
     records: dict[str, Any] = json.loads(output.read_text()).get(
@@ -111,21 +89,6 @@ def _load_checkpoint(output: Path) -> dict[str, Any]:
 def _write_checkpoint(
     output: Path, records: dict[str, Any], walked: list[str],
 ) -> None:
-    """Write the records for *walked* and their dependency order to *output*.
-
-    The records are written in *walked* order rather than the order
-    they were answered in. Answers arrive in whatever order the oracle
-    calls happen to finish, which differs from one run to the next, and
-    a graph file whose entries reshuffled on every rebuild would show a
-    whole-file diff for a handful of changed answers.
-
-    The payload goes to a file beside *output* and is then moved into
-    place, so a reader sees either the previous checkpoint or this one
-    and never a partly written file. That matters because this file is
-    what a resumed run reads to find out which answers have already
-    been paid for: a half-written one is a file the resumed run raises
-    on, and the whole walk has to be bought again.
-    """
     ordered = {sub: records[sub] for sub in walked if sub in records}
     order = order_groups(find_cycle_groups(ordered), ordered)
     payload = json.dumps({"records": ordered, "order": order}, indent=2)
@@ -135,12 +98,6 @@ def _write_checkpoint(
 
 
 def _checkpoint_message(recorded: int, total: int) -> str:
-    """Return the checkpoint commit message for *recorded* of *total* answers.
-
-    A checkpoint covers however many subclauses were answered since the
-    last one, so the message counts answers rather than naming one of
-    them.
-    """
     return (
         f"generate_lrm_subclause_dependencies: "
         f"checkpoint {recorded}/{total} answered"
@@ -153,24 +110,6 @@ def _walk_records(
     args: argparse.Namespace,
     checkpoint: Callable[[], None],
 ) -> None:
-    """Fill *records* with an answer for every entry of *walked* it lacks.
-
-    The oracle calls run ``--jobs`` at a time. Each one is built from
-    its subclause identifier alone and is read by nothing until every
-    answer exists, so overlapping them yields the records a
-    one-at-a-time walk yields, and the walk finishes when the slowest
-    call does rather than when the sum of them does.
-
-    *checkpoint* is called once every ``--jobs`` answers, and again on
-    the way out whenever answers are in hand that no checkpoint has
-    written yet — on the failing path as well as the succeeding one.
-    Persisting those is what keeps a failure from re-purchasing work
-    already paid for, and it is also what writes the file at all when
-    every answer came from the cache and no call ran. Queued calls are
-    cancelled on the failing path, so a failure costs the calls already
-    running and no more instead of working through the rest of the
-    table of contents for a walk that cannot finish.
-    """
     executor = ThreadPoolExecutor(max_workers=args.jobs)
     written = len(records)
     checkpointed = False
@@ -195,7 +134,6 @@ def _walk_records(
 
 
 def main(argv: list[str] | None = None) -> None:
-    """Run the dependency oracles for every subclause and write the graph."""
     args = parse_args(argv)
     toc = load_toc(str(args.lrm))
     cached = _load_checkpoint(args.output) if args.resume else {}
@@ -207,7 +145,6 @@ def main(argv: list[str] | None = None) -> None:
     }
 
     def _checkpoint() -> None:
-        """Persist the answers in hand, committing them when asked to."""
         _write_checkpoint(args.output, records, walked)
         if args.commit:
             commit_output(
