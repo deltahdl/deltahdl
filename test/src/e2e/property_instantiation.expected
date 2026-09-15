@@ -1,0 +1,4 @@
+p_low(sig) passes 2 fails 2
+p_low(other) passes 3 fails 1
+p_guarded(sig, rst) passes 2 fails 1
+$finish at time 40
