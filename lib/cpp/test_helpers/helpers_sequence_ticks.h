@@ -4,13 +4,17 @@
 #include <string>
 #include <vector>
 
-// The source the §16.9 sequence-operator cases share: clk rises at 5, 15,
+// The source the §16.9 and §16.10 sequence cases share: clk rises at 5, 15,
 // 25, ..., tick n at 10n-5, with te1 to te5 driven as `drive` says; a
 // process counts the ticks at which the named sequence `rule`, whose body is
 // `body`, reaches its end point, keeping the last such time in `last`, and
-// the run finishes ten time units after the drive ends.
+// the run finishes ten time units after the drive ends. `prelude` declares
+// what stands before `rule`, other sequences among it, and `locals` the
+// §16.10 local variables of `rule`, written before its clock.
 inline std::string SequenceTickSource(const std::string& body,
-                                      const std::string& drive) {
+                                      const std::string& drive,
+                                      const std::string& prelude = "",
+                                      const std::string& locals = "") {
   return "module t;\n"
          "  logic clk = 0;\n"
          "  logic te1 = 0;\n"
@@ -20,9 +24,8 @@ inline std::string SequenceTickSource(const std::string& body,
          "  logic te5 = 0;\n"
          "  int hits = 0;\n"
          "  int last = 0;\n"
-         "  always #5 clk = ~clk;\n"
-         "  sequence rule;\n"
-         "    @(posedge clk) " +
+         "  always #5 clk = ~clk;\n" +
+         prelude + "  sequence rule;\n" + locals + "    @(posedge clk) " +
          body +
          ";\n"
          "  endsequence\n"

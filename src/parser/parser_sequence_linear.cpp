@@ -263,14 +263,52 @@ struct ParserSeqLinearHelpers {
     return true;
   }
 
-  // §16.10: the match items after a group's sequence_expr, each `lvar = rhs`
-  // or `lvar op= rhs`, attached to the group's last operand.
+  // The literal 1: §16.9.10's abbreviation stands it where an operand does,
+  // and an inc_or_dec_expression adds or subtracts it.
+  static Expr* OneLiteral(Parser& p) {
+    auto* one = p.arena_.Create<Expr>();
+    one->kind = ExprKind::kIntegerLiteral;
+    one->text = "1";
+    one->int_val = 1;
+    one->range.start = p.CurrentToken().loc;
+    return one;
+  }
+
+  // §16.10: an inc_or_dec_expression as a match item, `lvar++`, `lvar--`,
+  // `++lvar` or `--lvar`, is the local updated by one, `lvar += 1` or `lvar
+  // -= 1`; `prefix` says the operator stood before the name.
+  static bool ParseIncDecMatchItem(Parser& p, SeqMatchAssign& item,
+                                   bool prefix) {
+    TokenKind op = p.Consume().kind;
+    if (prefix) {
+      if (!p.Check(TokenKind::kIdentifier)) return false;
+      item.lvar = p.Consume().text;
+    }
+    item.op =
+        op == TokenKind::kPlusPlus ? TokenKind::kPlusEq : TokenKind::kMinusEq;
+    item.rhs = OneLiteral(p);
+    return true;
+  }
+
+  // §16.10: the match items after a group's sequence_expr, each `lvar = rhs`,
+  // `lvar op= rhs` or an inc_or_dec_expression, attached to the group's last
+  // operand.
   static bool ParseSequenceMatchItems(Parser& p,
                                       std::vector<SeqMatchAssign>& items) {
     while (p.Match(TokenKind::kComma)) {
-      if (!p.Check(TokenKind::kIdentifier)) return false;
       SeqMatchAssign item;
+      if (p.Check(TokenKind::kPlusPlus) || p.Check(TokenKind::kMinusMinus)) {
+        if (!ParseIncDecMatchItem(p, item, true)) return false;
+        items.push_back(item);
+        continue;
+      }
+      if (!p.Check(TokenKind::kIdentifier)) return false;
       item.lvar = p.Consume().text;
+      if (p.Check(TokenKind::kPlusPlus) || p.Check(TokenKind::kMinusMinus)) {
+        if (!ParseIncDecMatchItem(p, item, false)) return false;
+        items.push_back(item);
+        continue;
+      }
       if (!p.Check(TokenKind::kEq) &&
           !IsCompoundAssignToken(p.CurrentToken().kind)) {
         return false;
@@ -382,6 +420,15 @@ struct ParserSeqLinearHelpers {
     if (!p.Match(TokenKind::kRParen)) return false;
     SeqRepetition rep;
     if (!ParseSequenceRepetition(p, rep)) return false;
+    // §16.10: a repetition of a group holding one unrepeated operand, `(a,
+    // x++)[*0:$]`, is that operand's own, its match items performed at each
+    // iteration's match, which admits the ranges unrolling does not.
+    if (rep.kind != SeqRepetition::Kind::kNone &&
+        body.operands.size() == first + 1 &&
+        body.repetitions[first].kind == SeqRepetition::Kind::kNone) {
+      body.repetitions[first] = rep;
+      return true;
+    }
     return UnrollGroupRepetition(body, first, rep);
   }
 
@@ -463,17 +510,6 @@ struct ParserSeqLinearHelpers {
     return true;
   }
 
-  // The literal 1 of §16.9.10's abbreviation, standing where an operand
-  // does.
-  static Expr* TrueLiteral(Parser& p) {
-    auto* one = p.arena_.Create<Expr>();
-    one->kind = ExprKind::kIntegerLiteral;
-    one->text = "1";
-    one->int_val = 1;
-    one->range.start = p.CurrentToken().loc;
-    return one;
-  }
-
   // §16.9.10: `seq1 within seq2` abbreviates `(1[*0:$] ##1 seq1 ##1 1[*0:$])
   // intersect seq2`, so the chain seq1 was read into becomes that first
   // operand: a 1 repeated any number of times before it, a tick between, and
@@ -490,7 +526,7 @@ struct ParserSeqLinearHelpers {
     one.min = 1;
     one.max = 1;
     SeqLinearBody wrapped;
-    wrapped.operands.push_back(TrueLiteral(p));
+    wrapped.operands.push_back(OneLiteral(p));
     wrapped.delays.push_back(none);
     wrapped.match_items.emplace_back();
     wrapped.repetitions.push_back(any);
@@ -501,7 +537,7 @@ struct ParserSeqLinearHelpers {
       wrapped.match_items.push_back(body.match_items[i]);
       wrapped.repetitions.push_back(body.repetitions[i]);
     }
-    wrapped.operands.push_back(TrueLiteral(p));
+    wrapped.operands.push_back(OneLiteral(p));
     wrapped.delays.push_back(one);
     wrapped.match_items.emplace_back();
     wrapped.repetitions.push_back(any);

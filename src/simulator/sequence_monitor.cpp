@@ -63,10 +63,16 @@ bool LocalIs4State(TokenKind type_kw) {
          type_kw == TokenKind::kKwInteger;
 }
 
+// §16.10: the initialization assignments are performed in the order the
+// locals are declared, one's expression reading the locals declared before
+// it as assigned, so each is stood up in a scope of its own as its value is
+// found; a local without an initialization is unassigned, x for a 4-state
+// type.
 std::vector<Logic4Vec> InitialLocals(const std::vector<SeqLocalDecl>& decls,
                                      SimContext& ctx, Arena& arena) {
   std::vector<Logic4Vec> values;
   values.reserve(decls.size());
+  ctx.PushScope();
   for (const SeqLocalDecl& decl : decls) {
     Logic4Vec value = MakeLogic4Vec(arena, LocalWidth(decl.type_kw));
     if (decl.init != nullptr) {
@@ -75,8 +81,12 @@ std::vector<Logic4Vec> InitialLocals(const std::vector<SeqLocalDecl>& decls,
     } else if (LocalIs4State(decl.type_kw)) {
       FillWithX(value);
     }
+    Variable* var = ctx.CreateLocalVariable(decl.name, value.width);
+    var->is_4state = LocalIs4State(decl.type_kw);
+    var->value = value;
     values.push_back(value);
   }
+  ctx.PopScope();
   return values;
 }
 
