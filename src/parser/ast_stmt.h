@@ -72,8 +72,9 @@ struct ModuleItem;
 // operands, nexttime (§16.12.10), `strong` where it is s_nexttime and its
 // tick count, one where none was written, in `boolean`, always
 // (§16.12.11), `strong` where it is s_always, over the range below,
-// eventually (§16.12.13) likewise, `strong` where it is s_eventually, and
-// until (§16.12.12) over two operands, `strong` where it is s_until or
+// eventually (§16.12.13) likewise, `strong` where it is s_eventually, the
+// aborts (§16.12.14) over one operand, and until (§16.12.12) over two
+// operands, `strong` where it is s_until or
 // s_until_with and `range_unbounded` where it is an overlapping form,
 // until_with or s_until_with. A boolean leaf
 // carries `boolean`, a sequence leaf
@@ -96,7 +97,8 @@ struct PropertyExprNode {
     kNexttime,
     kAlways,
     kUntil,
-    kEventually
+    kEventually,
+    kAbort
   };
   Kind kind = Kind::kBoolean;
   Expr* boolean = nullptr;
@@ -110,6 +112,11 @@ struct PropertyExprNode {
   Expr* range_min = nullptr;
   Expr* range_max = nullptr;
   bool range_unbounded = false;
+  // §16.12.14: an abort over its one operand, its condition in `boolean`,
+  // `accept` where it is accept_on or sync_accept_on and `synchronous` where
+  // it is one of the sync_ forms, checked at the clock ticks alone.
+  bool accept = false;
+  bool synchronous = false;
 };
 
 struct EventExpr {

@@ -1,0 +1,7 @@
+sync_reject_on(stop) passes 7 fails 1
+reject_on(stop_async) passes 7 fails 1
+sync_reject_on(stop_async) passes 8 fails 0
+sync_accept_on(flag) nv passes 1 fails 7
+sync_accept_on(both) sync_reject_on(both) nv passes 1 fails 7
+not (sync_accept_on(flag) nv) passes 7 fails 1
+$finish at time 80

@@ -1,6 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
+#include "fixture_simulator.h"
 #include "simulator/sva_engine.h"
+#include "simulator/variable.h"
 
 using namespace delta;
 
@@ -194,6 +198,125 @@ TEST(SvaEngineAbort, NestedRejectOuterOverridesAcceptInner) {
                       /*inner_forces_true=*/true, /*inner_condition=*/true,
                       PropertyResult::kFail),
       PropertyResult::kPass);
+}
+
+// --- Live cases: abort properties over real source ---
+
+// The module the cases share: clk rises at 5, 15, ..., 75, tick n at
+// 10n - 5, the tick counter counting through eight ticks; go is high at
+// tick 1, get at 2 and 3, put at 4 and 6, stop at 5, flag at 2 and both at
+// 3, stop_async is high from 47 to 49 alone, between the ticks at 45 and
+// 55, and nv is low throughout. `items` declare the assertions, counting in
+// `passes` and `fails`.
+std::string AbortSource(const std::string& items) {
+  return "module t;\n"
+         "  logic clk = 0;\n"
+         "  int tick = 1;\n"
+         "  logic go, get, put, stop, flag, both, nv;\n"
+         "  logic stop_async = 0;\n"
+         "  int passes = 0;\n"
+         "  int fails = 0;\n"
+         "  always #5 clk = ~clk;\n"
+         "  always #10 tick = tick + 1;\n"
+         "  assign go = tick inside {1};\n"
+         "  assign get = tick inside {2, 3};\n"
+         "  assign put = tick inside {4, 6};\n"
+         "  assign stop = tick inside {5};\n"
+         "  assign flag = tick inside {2};\n"
+         "  assign both = tick inside {3};\n"
+         "  assign nv = 0;\n"
+         "  initial begin\n"
+         "    #47 stop_async = 1;\n"
+         "    #2 stop_async = 0;\n"
+         "  end\n" +
+         items +
+         "  initial #80 $finish;\n"
+         "endmodule\n";
+}
+
+// §16.12.14: the clause's assertion in its synchronous form, `go ##1
+// get[*2] |-> sync_reject_on(stop) put[->2]`: the attempt from 1 has its
+// consequent begin at 3, put holds at 4 and stop at 5, checked at the tick,
+// so the reject makes the consequent false and the attempt fails at 5; the
+// seven other attempts, go low, are true.
+TEST(AbortProperty, SynchronousRejectReadsTheConditionAtTheTicks) {
+  SimFixture f;
+  auto* passes = RunAndFindVar(
+      AbortSource("  p: assert property (@(posedge clk) go ##1 get[*2] |-> "
+                  "sync_reject_on(stop) put[->2]) passes++; else fails++;\n"),
+      f, "passes");
+  ASSERT_NE(passes, nullptr);
+  EXPECT_EQ(passes->value.ToUint64(), 7u);
+  EXPECT_EQ(f.ctx.FindVariable("fails")->value.ToUint64(), 1u);
+}
+
+// §16.12.14: `reject_on(stop_async)` checks its condition at every time
+// step, so the pulse between the ticks at 45 and 55 aborts the consequent,
+// which fails at 6, where `sync_reject_on(stop_async)`, reading the
+// condition at the ticks alone, never sees it and put[->2] matches at 6.
+TEST(AbortProperty, AsynchronousRejectSeesAChangeBetweenTicks) {
+  SimFixture f;
+  auto* async_fails = RunAndFindVar(
+      AbortSource("  p: assert property (@(posedge clk) go ##1 get[*2] |-> "
+                  "reject_on(stop_async) put[->2]) passes++; else fails++;\n"),
+      f, "passes");
+  ASSERT_NE(async_fails, nullptr);
+  EXPECT_EQ(async_fails->value.ToUint64(), 7u);
+  EXPECT_EQ(f.ctx.FindVariable("fails")->value.ToUint64(), 1u);
+  SimFixture g;
+  auto* sync_holds = RunAndFindVar(
+      AbortSource("  p: assert property (@(posedge clk) go ##1 get[*2] |-> "
+                  "sync_reject_on(stop_async) put[->2]) passes++; else "
+                  "fails++;\n"),
+      g, "passes");
+  ASSERT_NE(sync_holds, nullptr);
+  EXPECT_EQ(sync_holds->value.ToUint64(), 8u);
+  EXPECT_EQ(g.ctx.FindVariable("fails")->value.ToUint64(), 0u);
+}
+
+// §16.12.14: `sync_accept_on(flag) nv` is true at the tick flag holds at,
+// nv false notwithstanding, and its operand otherwise: one pass and seven
+// failures; `not (sync_accept_on(flag) nv)` inverts the effect.
+TEST(AbortProperty, AcceptMakesThePropertyTrueAndNotInvertsIt) {
+  SimFixture f;
+  auto* accepts = RunAndFindVar(
+      AbortSource("  p: assert property (@(posedge clk) sync_accept_on(flag) "
+                  "nv) passes++; else fails++;\n"),
+      f, "passes");
+  ASSERT_NE(accepts, nullptr);
+  EXPECT_EQ(accepts->value.ToUint64(), 1u);
+  EXPECT_EQ(f.ctx.FindVariable("fails")->value.ToUint64(), 7u);
+  SimFixture g;
+  auto* inverted = RunAndFindVar(
+      AbortSource("  p: assert property (@(posedge clk) not "
+                  "(sync_accept_on(flag) nv)) passes++; else fails++;\n"),
+      g, "passes");
+  ASSERT_NE(inverted, nullptr);
+  EXPECT_EQ(inverted->value.ToUint64(), 7u);
+  EXPECT_EQ(g.ctx.FindVariable("fails")->value.ToUint64(), 1u);
+}
+
+// §16.12.14: nested aborts whose conditions become true in the same time
+// step are decided by the outermost: `sync_accept_on(both)
+// sync_reject_on(both) nv` is true at 3, and `sync_reject_on(both)
+// sync_accept_on(both) nv` false there.
+TEST(AbortProperty, TheOutermostOfNestedAbortsTakesPrecedence) {
+  SimFixture f;
+  auto* accept_outer = RunAndFindVar(
+      AbortSource("  p: assert property (@(posedge clk) sync_accept_on(both) "
+                  "sync_reject_on(both) nv) passes++; else fails++;\n"),
+      f, "passes");
+  ASSERT_NE(accept_outer, nullptr);
+  EXPECT_EQ(accept_outer->value.ToUint64(), 1u);
+  EXPECT_EQ(f.ctx.FindVariable("fails")->value.ToUint64(), 7u);
+  SimFixture g;
+  auto* reject_outer = RunAndFindVar(
+      AbortSource("  p: assert property (@(posedge clk) sync_reject_on(both) "
+                  "sync_accept_on(both) nv) passes++; else fails++;\n"),
+      g, "passes");
+  ASSERT_NE(reject_outer, nullptr);
+  EXPECT_EQ(reject_outer->value.ToUint64(), 0u);
+  EXPECT_EQ(g.ctx.FindVariable("fails")->value.ToUint64(), 8u);
 }
 
 }  // namespace

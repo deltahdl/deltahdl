@@ -58,7 +58,7 @@ TEST(ConcurrentAssertionEvaluationReporting,
      ATemporalAssumePropertyIsNotEvaluated) {
   auto r = Parse(
       "module m;\n"
-      "  assume property (@(posedge clk) accept_on (rst) (a ##1 b));\n"
+      "  assume property (@(posedge clk) case (sel) 1: (a ##1 b); endcase);\n"
       "endmodule\n");
   EXPECT_TRUE(ReportedWarning(r.diags, "its property is temporal", 2, "16.14"));
 }
@@ -115,8 +115,8 @@ TEST(ConcurrentAssertionEvaluationReporting,
 }
 
 // §16.12.7: |-> and |=> are the implication operators, which the evaluation
-// reads as a property of operands, so neither spec is reported. `accept_on`
-// over a cycle delay, an operator it does not read, is still the temporal
+// reads as a property of operands, so neither spec is reported. `case` over
+// a cycle delay, an operator it does not read, is still the temporal
 // branch's.
 TEST(ConcurrentAssertionEvaluationReporting, ImplicationsAreEvaluated) {
   auto overlapped = Parse(
@@ -131,7 +131,7 @@ TEST(ConcurrentAssertionEvaluationReporting, ImplicationsAreEvaluated) {
   EXPECT_EQ(UnevaluatedReports(nonoverlapped), 0);
   auto under = Parse(
       "module m;\n"
-      "  assert property (@(posedge clk) accept_on (rst) (a ##1 b));\n"
+      "  assert property (@(posedge clk) case (sel) 1: (a ##1 b); endcase);\n"
       "endmodule\n");
   EXPECT_TRUE(
       ReportedWarning(under.diags, "its property is temporal", 2, "16.14"));
@@ -141,8 +141,7 @@ TEST(ConcurrentAssertionEvaluationReporting, ImplicationsAreEvaluated) {
 // sequential property, which the evaluation reads as weak in an assert; a
 // spec that holds a cycle delay and no property operator is reported by
 // nothing. One holding a cycle delay under a property operator the
-// evaluation does not read, accept_on here, is still the temporal
-// branch's.
+// evaluation does not read, case here, is still the temporal branch's.
 TEST(ConcurrentAssertionEvaluationReporting,
      CycleDelayIsEvaluatedAsASequentialProperty) {
   auto r = Parse(
@@ -152,7 +151,7 @@ TEST(ConcurrentAssertionEvaluationReporting,
   EXPECT_EQ(UnevaluatedReports(r), 0);
   auto under = Parse(
       "module m;\n"
-      "  assert property (@(posedge clk) accept_on (rst) (a ##1 b));\n"
+      "  assert property (@(posedge clk) case (sel) 1: (a ##1 b); endcase);\n"
       "endmodule\n");
   EXPECT_TRUE(
       ReportedWarning(under.diags, "its property is temporal", 2, "16.14"));
@@ -192,17 +191,18 @@ TEST(ConcurrentAssertionEvaluationReporting,
 }
 
 // A clocked assert whose property_spec is not exhausted by what the
-// evaluation reads: §16.12.14's accept_on is a property operator the
-// evaluation does not read, so the spec is not the whole of what stands
-// after the clock, and the report names this rather than the missing clock,
-// because the clock is present. `a and b`, `if (a) b else c`, `nexttime b`,
-// `s_always [1:3] b` and `eventually [1:3] b` stood here until §16.12.5,
-// §16.12.6, §16.12.10, §16.12.11 and §16.12.13 were evaluated.
+// evaluation reads: §16.12.15's case is a property operator the evaluation
+// does not read, so the spec is not the whole of what stands after the
+// clock, and the report names this rather than the missing clock, because
+// the clock is present. `a and b`, `if (a) b else c`, `nexttime b`,
+// `s_always [1:3] b`, `eventually [1:3] b` and `accept_on (rst) b` stood
+// here until §16.12.5, §16.12.6, §16.12.10, §16.12.11, §16.12.13 and
+// §16.12.14 were evaluated.
 TEST(ConcurrentAssertionEvaluationReporting,
      ClockedNonBooleanPropertyIsNotEvaluated) {
   auto r = Parse(
       "module m;\n"
-      "  assert property (@(posedge clk) accept_on (rst) b);\n"
+      "  assert property (@(posedge clk) case (sel) 1: b; endcase);\n"
       "endmodule\n");
   EXPECT_TRUE(ReportedWarning(
       r.diags, "holds more than the @(event) boolean_expression", 2, "16.14"));

@@ -2,10 +2,13 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <string>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
 #include "common/arena.h"
+#include "elaborator/sensitivity.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
 #include "simulator/evaluation.h"
@@ -13,6 +16,7 @@
 #include "simulator/sequence_flatten.h"
 #include "simulator/sequence_monitor.h"
 #include "simulator/sim_context.h"
+#include "simulator/variable.h"
 
 namespace delta {
 namespace {
@@ -55,6 +59,10 @@ struct NodeState {
   // tick beside the first operand's in `consequents`, and the index of the
   // first tick not yet decided in `wait`.
   std::vector<NodeState*> seconds;
+  // §16.12.14: an abort's node, so that its condition becoming true between
+  // the ticks can be marked on the attempts in flight, and the mark.
+  const PropertyExprNode* abort_node = nullptr;
+  bool aborted = false;
 };
 
 }  // namespace
@@ -82,12 +90,44 @@ void CollectPastDirectedSites(const Expr* e, std::vector<const Expr*>& sites) {
   });
 }
 
+// §16.12.14: marks the states of the abort `node` in the attempt under
+// `state`, in flight at the time step the condition became true at.
+void MarkAborted(NodeState& state, const PropertyExprNode* node) {
+  if (state.abort_node == node) state.aborted = true;
+  for (NodeState* operand : state.operands) MarkAborted(*operand, node);
+  for (NodeState* c : state.consequents) MarkAborted(*c, node);
+  for (NodeState* c : state.seconds) MarkAborted(*c, node);
+}
+
+// §16.12.14: an asynchronous abort's condition is checked at the
+// granularity of the simulation time step, so each variable it reads is
+// watched, and a change that makes it true marks the attempts in flight.
+void WatchAsynchronousAbort(const PropertyExprNode* node,
+                            PropertyTreeState& state, SimContext& ctx,
+                            Arena& arena) {
+  std::unordered_set<std::string> names;
+  CollectExprReads(node->boolean, names);
+  for (const std::string& name : names) {
+    Variable* var = ctx.FindVariable(name);
+    if (var == nullptr) continue;
+    var->AddWatcher([node, &state, &ctx, &arena]() {
+      if (EvalExpr(node->boolean, ctx, arena).IsTruthy()) {
+        for (NodeState* attempt : state.attempts) MarkAborted(*attempt, node);
+      }
+      return false;
+    });
+  }
+}
+
 // The sequences of the tree flattened, each node's once; answers false where
 // a sequence is not readable.
 bool CollectSequences(const PropertyExprNode* node, PropertyTreeState& state,
                       SimContext& ctx, Arena& arena) {
   if (node->boolean != nullptr) {
     CollectPastDirectedSites(node->boolean, state.past_sites);
+  }
+  if (node->kind == PropertyExprNode::Kind::kAbort && !node->synchronous) {
+    WatchAsynchronousAbort(node, state, ctx, arena);
   }
   if (node->sequence != nullptr) {
     FlatSequence flat{node, LinearSequence{}};
@@ -163,6 +203,7 @@ Tri Iff(Tri first, Tri second) {
 // tick.
 NodeState* NewNodeState(const PropertyExprNode* node, Arena& arena) {
   auto* state = arena.Create<NodeState>();
+  if (node->kind == PropertyExprNode::Kind::kAbort) state->abort_node = node;
   for (const PropertyExprNode* operand : node->operands) {
     state->operands.push_back(NewNodeState(operand, arena));
   }
@@ -378,6 +419,20 @@ Tri StepUntil(const PropertyExprNode* node, NodeState& state, StepContext& sc) {
   return DecideUntil(node, state, firsts, seconds);
 }
 
+// §16.12.14: the abort condition is read at each tick of the attempt, and
+// for the asynchronous forms at each time step between as well, before the
+// operand is stepped, so that an abort at the step the operand's evaluation
+// ends at takes precedence and the outermost of nested aborts does; the
+// condition true makes an accept true and a reject false, and otherwise the
+// property is its operand.
+Tri StepAbort(const PropertyExprNode* node, NodeState& state, StepContext& sc,
+              bool begin) {
+  bool fired =
+      state.aborted || EvalExpr(node->boolean, sc.ctx, sc.arena).IsTruthy();
+  if (fired) return node->accept ? Tri::kTrue : Tri::kFalse;
+  return Step(node->operands[0], *state.operands[0], sc, begin);
+}
+
 Tri Step(const PropertyExprNode* node, NodeState& state, StepContext& sc,
          bool begin) {
   if (state.verdict != Tri::kPending) return state.verdict;
@@ -412,6 +467,9 @@ Tri Step(const PropertyExprNode* node, NodeState& state, StepContext& sc,
       break;
     case PropertyExprNode::Kind::kUntil:
       state.verdict = StepUntil(node, state, sc);
+      break;
+    case PropertyExprNode::Kind::kAbort:
+      state.verdict = StepAbort(node, state, sc, begin);
       break;
     case PropertyExprNode::Kind::kImplies:
     case PropertyExprNode::Kind::kIff: {
@@ -535,6 +593,13 @@ Tri Finish(const PropertyExprNode* node, NodeState& state) {
       break;
     case PropertyExprNode::Kind::kUntil:
       state.verdict = FinishUntil(node, state);
+      break;
+    case PropertyExprNode::Kind::kAbort:
+      // §16.12.14: an abort marked between the last tick and the end takes
+      // precedence; otherwise the property is its operand.
+      state.verdict = state.aborted
+                          ? (node->accept ? Tri::kTrue : Tri::kFalse)
+                          : Finish(node->operands[0], *state.operands[0]);
       break;
     case PropertyExprNode::Kind::kImplies:
     case PropertyExprNode::Kind::kIff:

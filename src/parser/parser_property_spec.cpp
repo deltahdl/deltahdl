@@ -7,20 +7,23 @@
 
 namespace delta {
 
-// §16.12: the tokens of the property operators the evaluation does not read;
-// not, or, and, if-else, the implications, the followed-bys, implies, iff,
-// nexttime, always, the untils and eventually are read.
+// §16.12: the tokens of the property operators the evaluation does not read,
+// case alone; not, or, and, if-else, the implications, the followed-bys,
+// implies, iff, nexttime, always, the untils, eventually and the aborts are
+// read.
 static bool IsPropertyOperatorToken(TokenKind k) {
   switch (k) {
-    case TokenKind::kKwAcceptOn:
-    case TokenKind::kKwRejectOn:
-    case TokenKind::kKwSyncAcceptOn:
-    case TokenKind::kKwSyncRejectOn:
     case TokenKind::kKwCase:
       return true;
     default:
       return false;
   }
+}
+
+// §16.12.14: the keywords of the four abort operators.
+static bool IsAbortToken(TokenKind k) {
+  return k == TokenKind::kKwAcceptOn || k == TokenKind::kKwRejectOn ||
+         k == TokenKind::kKwSyncAcceptOn || k == TokenKind::kKwSyncRejectOn;
 }
 
 // The expression standing for a property_spec the assertion does not carry
@@ -263,6 +266,7 @@ PropertyExprNode* ParserPropertySpecHelpers::TryParseKeywordTerm(Parser& p,
   }
   if (p.Match(TokenKind::kKwNexttime)) return ParsePropertyNexttime(p, false);
   if (p.Match(TokenKind::kKwSNexttime)) return ParsePropertyNexttime(p, true);
+  if (IsAbortToken(p.CurrentToken().kind)) return ParsePropertyAbort(p);
   if (p.Match(TokenKind::kKwNot)) {
     auto* node = NewPropertyNode(p, PropertyExprNode::Kind::kNot);
     auto* operand = ParsePropertyTerm(p);
@@ -272,6 +276,25 @@ PropertyExprNode* ParserPropertySpecHelpers::TryParseKeywordTerm(Parser& p,
   }
   read = false;
   return nullptr;
+}
+
+// §16.12.14: `accept_on ( expression_or_dist ) property_expr`, reject_on
+// and the sync_ forms, the operand any property as Table 16-3 puts the
+// aborts beside if-else, below every other operator.
+PropertyExprNode* ParserPropertySpecHelpers::ParsePropertyAbort(Parser& p) {
+  TokenKind op = p.Consume().kind;
+  auto* node = NewPropertyNode(p, PropertyExprNode::Kind::kAbort);
+  node->accept =
+      op == TokenKind::kKwAcceptOn || op == TokenKind::kKwSyncAcceptOn;
+  node->synchronous =
+      op == TokenKind::kKwSyncAcceptOn || op == TokenKind::kKwSyncRejectOn;
+  if (!p.Match(TokenKind::kLParen)) return nullptr;
+  node->boolean = p.ParseExpr();
+  if (node->boolean == nullptr || !p.Match(TokenKind::kRParen)) return nullptr;
+  auto* operand = ParsePropertyImplication(p);
+  if (operand == nullptr) return nullptr;
+  node->operands.push_back(operand);
+  return node;
 }
 
 PropertyExprNode* ParserPropertySpecHelpers::ParsePropertyTerm(Parser& p) {
@@ -410,7 +433,8 @@ bool ParserPropertySpecHelpers::ParseSimpleSpecBody(Parser& p,
   if (BodyHasPropertyJunction(p) || p.Check(TokenKind::kKwIf) ||
       p.Check(TokenKind::kKwNexttime) || p.Check(TokenKind::kKwSNexttime) ||
       p.Check(TokenKind::kKwAlways) || p.Check(TokenKind::kKwSAlways) ||
-      p.Check(TokenKind::kKwEventually) || p.Check(TokenKind::kKwSEventually)) {
+      p.Check(TokenKind::kKwEventually) || p.Check(TokenKind::kKwSEventually) ||
+      IsAbortToken(p.CurrentToken().kind)) {
     body.property = ParsePropertyImplication(p);
     return body.property != nullptr;
   }
