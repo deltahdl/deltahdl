@@ -76,19 +76,33 @@ def test_list_open_issues_stays_quiet_below_the_limit(
     assert capsys.readouterr().err == ""
 
 
-def test_list_open_issues_exits_when_gh_fails(
-    capsys: pytest.CaptureFixture[str],
+def _call_failing(
     stub_completed: Callable[..., MagicMock],
-) -> None:
-    """A listing gh could not take exits with gh's code and its stderr.
-
-    An empty list here would have the caller conclude the repository holds
-    no open issues, which is the one thing a failed listing cannot say.
-    """
+) -> pytest.ExceptionInfo[SystemExit]:
+    """Run list_open_issues against a gh that fails; return the exit raised."""
     with patch(
         "lib.python.github.subprocess.run",
         return_value=stub_completed(returncode=4, stderr="gh: auth required"),
     ), pytest.raises(SystemExit) as exit_info:
         list_open_issues()
-    assert exit_info.value.code == 4
+    return exit_info
+
+
+def test_list_open_issues_exits_with_the_code_gh_gave(
+    stub_completed: Callable[..., MagicMock],
+) -> None:
+    """A listing gh could not take exits with gh's own code.
+
+    An empty list here would have the caller conclude the repository holds
+    no open issues, which is the one thing a failed listing cannot say.
+    """
+    assert _call_failing(stub_completed).value.code == 4
+
+
+def test_list_open_issues_repeats_what_gh_said_on_failure(
+    capsys: pytest.CaptureFixture[str],
+    stub_completed: Callable[..., MagicMock],
+) -> None:
+    """gh's stderr reaches the caller's stderr before the exit."""
+    _call_failing(stub_completed)
     assert "gh: auth required" in capsys.readouterr().err
