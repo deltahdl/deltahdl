@@ -1,0 +1,7 @@
+at 10: a1 fails in b1 and in b2, and is reported twice
+at 20: b1's first failure is flushed by its re-run, which passes
+at 30: a1 fails in b1 alone, and b2 passes
+$finish at time 40
+[10] ERROR deferred_assertions_multiple_processes.b1.f.a1 (line 16): a1: a is 1 and b is 0
+[10] ERROR deferred_assertions_multiple_processes.b2.f.a1 (line 16): a1: a is 1 and b is 0
+[30] ERROR deferred_assertions_multiple_processes.b1.f.a1 (line 16): a1: a is 3 and b is 2
