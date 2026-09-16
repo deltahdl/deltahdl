@@ -125,6 +125,10 @@ void Lowerer::LowerChildModules(const RtlirModule* mod) {
     // its own body resolves (and %m composes the instance + subroutine path);
     // LowerModule registers these for the top only.
     RegisterModuleSubroutines(child.resolved, ctx_);
+    // §16.12.1: an assertion of the instance that instantiates a property or
+    // sequence the instance's module declares expands it at the run, so the
+    // declarations are registered as the top's are.
+    RegisterModuleSequenceDecls(child.resolved, ctx_);
     // §26.3: an import makes a package's names visible "within the current
     // scope", and the scope is the one that writes the import. A module writes
     // its own imports whether it is the top or an instance, so the instance's

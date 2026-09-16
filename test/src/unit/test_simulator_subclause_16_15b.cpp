@@ -147,7 +147,7 @@ TEST(DisableIffResolutionRun,
                  f);
   EXPECT_EQ(out,
             "a_leaf failed at 15\na_leaf failed at 25\n"
-            "a_gen failed at 35\na_leaf failed at 35\n$finish at time 40\n");
+            "a_leaf failed at 35\na_gen failed at 35\n$finish at time 40\n");
 }
 
 }  // namespace

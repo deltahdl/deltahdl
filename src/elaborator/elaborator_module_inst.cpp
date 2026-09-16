@@ -836,10 +836,7 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
     ValidateUnpackedArrayPorts(inst, item, mod);
   }
 
-  CheckPortCoercion(inst, item->loc);
-  CheckUwirePortMerge(inst, item, mod);
-  CheckInterconnectPortMerge(inst, item, mod);
-
+  CheckInstancePorts(inst, item, mod);
   inst.attrs = ResolveAttributes(item->attrs, diag_);
   // §28.3.5: an instance-array range shall be given by two constant
   // expressions; a non-constant bound in a [lhi:rhi] range is an error, the
@@ -854,6 +851,13 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
   InstArrayDistribCtx dctx{arena_, mod, var_array_info_, parent_scope};
   AppendModuleInstOrArray(dctx, mod, inst, item, parent_scope);
   current_inst_path_ = std::move(saved_inst_path);
+}
+
+void Elaborator::CheckInstancePorts(const RtlirModuleInst& inst,
+                                    const ModuleItem* item, RtlirModule* mod) {
+  CheckPortCoercion(inst, item->loc);
+  CheckUwirePortMerge(inst, item, mod);
+  CheckInterconnectPortMerge(inst, item, mod);
 }
 
 }  // namespace delta

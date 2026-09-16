@@ -255,8 +255,7 @@ void ElaborateProceduralConcurrentAssertions(ModuleItem* procedure,
       stmt->assert_disable_iff = at_instance.disable;
     }
     PromoteSequenceInstances(stmt->assert_property, registry, arena);
-    if (stmt->assert_clock.empty()) stmt->assert_clock = inferred;
-    if (stmt->assert_clock.empty()) stmt->assert_clock = fallback;
+    if (stmt->assert_clock.empty()) stmt->assert_clock = at_instance.clock;
     if (!stmt->assert_clock.empty()) continue;
     diag.Error(stmt->range.start,
                "no clock is inferred for the procedural concurrent assertion: "
