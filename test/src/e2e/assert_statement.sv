@@ -6,13 +6,15 @@
 // hold a concurrent assertion but may hold an immediate one; and the pass
 // and fail statements run in the Reactive region. clk rises at 5, 15, ...,
 // 75. The clause's env_prop asserts abc(rst, in1, in2), not (b ##1 c)
-// disabled while a is 2: in1 is high at 15 and in2 at 25, so the attempt
-// of 15 fails at 25; in1 is high at 35 and in2 at 45, but rst is 2 across
-// 45, so that attempt is disabled and runs no statement; the other
-// attempts pass, five in all. no_else has no else clause and x is low at
-// 65, so the tool reports the failure itself; null_pass has a null pass
-// statement and y is low at 55; nested holds an immediate assertion in its
-// fail statement, which reads z's value in the Reactive region, 0, at 75.
+// disabled while a is 2, on the clock the body opens with after its
+// disable condition: in1 is high at 15 and in2 at 25, so the attempt of 15
+// fails at 25; in1 is high at 35 and in2 at 45, but rst is 2 across 45, so
+// that attempt is disabled and runs no statement; the other attempts pass,
+// five in all. no_else has no else clause and x is low at 65, so the tool
+// reports the failure itself; null_fail has a null fail statement and y is
+// low at 55, so its else clause is not omitted and the tool reports
+// nothing; nested holds an immediate assertion in its fail statement,
+// which reads z's value in the Reactive region, 0, at 75.
 // reactive counts the ticks at which its pass statement saw the write an
 // always procedure made in the tick's Active region.
 module assert_statement;
@@ -20,7 +22,7 @@ module assert_statement;
   int rst = 0;
   logic in1 = 0, in2 = 0;
   logic x = 1, y = 1, z = 1;
-  int passes = 0, fails = 0;
+  int passes = 0, fails = 0, y_passes = 0;
   int marker = 0, reactive_ok = 0, ticks = 0;
   always #5 clk = ~clk;
 
@@ -36,9 +38,9 @@ module assert_statement;
 
   no_else: assert property (@(posedge clk) x);
 
-  null_pass: assert property (@(posedge clk) y)
-    ;
-  else $display("null_pass failed at %0d", $time);
+  null_fail: assert property (@(posedge clk) y)
+    y_passes++;
+  else ;
 
   nested: assert property (@(posedge clk) z)
     else begin
@@ -67,6 +69,7 @@ module assert_statement;
     #10 x = 1; z = 0;
     #10 z = 1;
     $display("env_prop passes %0d fails %0d", passes, fails);
+    $display("null_fail passes %0d of %0d ticks", y_passes, ticks);
     $display("reactive: pass statements saw the tick's Active write at %0d of %0d ticks",
              reactive_ok, ticks);
     $finish;

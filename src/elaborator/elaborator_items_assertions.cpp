@@ -319,15 +319,19 @@ void PromoteSequenceInstances(PropertyExprNode* node,
 }
 
 // §16.13.3 and §16.13.4: the clock flowing into a property declared with
-// none from the sequence its body opens with, where that sequence, the
-// body itself or the antecedent of the implication it is, is one instance
-// of a sequence declared with a clock, `mult_s |=> mult_s` being on
-// mult_s's; empty otherwise.
+// none: the clocking event its body's property_expr opens with, after the
+// disable condition where §16.14.1's `abc` writes one, or else the clock
+// of the sequence its body opens with, where that sequence, the body itself
+// or the antecedent of the implication it is, is one instance of a sequence
+// declared with a clock, `mult_s |=> mult_s` being on mult_s's; empty
+// otherwise.
 const std::vector<EventExpr>& FlowedBodyClock(
     const ModuleItem* decl, const PropertyRegistry& registry) {
   static const std::vector<EventExpr> kNone;
   const PropertyExprNode* root = decl->prop_body_tree;
-  if (root == nullptr || root->sequence == nullptr) return kNone;
+  if (root == nullptr) return kNone;
+  if (!root->clock.empty()) return root->clock;
+  if (root->sequence == nullptr) return kNone;
   bool opens = root->kind == PropertyExprNode::Kind::kSequence ||
                root->kind == PropertyExprNode::Kind::kImplication;
   const SeqLinearBody& body = root->sequence->seq_linear;

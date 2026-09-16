@@ -63,6 +63,20 @@ TEST(AssertStatementRun, WithoutAnElseClauseTheToolReportsTheFailure) {
   EXPECT_EQ(f.ctx.AssertionFailCount(), 1);
 }
 
+// §16.14.1: a null fail statement is no action too, and the else clause
+// it stands in is not omitted, so the tool reports nothing where the
+// property fails.
+TEST(AssertStatementRun, ANullFailStatementLeavesTheFailureUnreported) {
+  SimFixture f;
+  std::string out = RunCapture(
+      AssertSource("  env_prop: assert property (abc(rst, in1, in2))\n"
+                   "    passes++; else ;\n"),
+      f);
+  EXPECT_EQ(out, "$finish at time 80\n");
+  EXPECT_EQ(f.ctx.AssertionFailCount(), 0);
+  EXPECT_EQ(f.ctx.FindVariable("passes")->value.ToUint64(), 5u);
+}
+
 // §16.14.1: the action block may hold an immediate assertion, which runs
 // with the fail statement, in the Reactive region, where it reads the
 // value the variables then hold.
