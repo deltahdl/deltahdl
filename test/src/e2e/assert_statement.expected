@@ -1,0 +1,7 @@
+env_prop failed at 25
+null_pass failed at 55
+nested: immediate assertion in the fail statement passed at 75
+env_prop passes 5 fails 1
+reactive: pass statements saw the tick's Active write at 8 of 8 ticks
+$finish at time 80
+[65] ERROR assert_statement.no_else (line 37): Assertion failed.
