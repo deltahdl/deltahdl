@@ -1,0 +1,9 @@
+test/src/e2e/multiclock_sequence_rules.sv:15:3: error: a maximal singly clocked subsequence of a multiclocked sequence may not match the empty word (§16.13.1)
+    assert property (@(posedge clk0) sig0 ##1 @(posedge clk1) sig1[*0:1]);
+    ^
+test/src/e2e/multiclock_sequence_rules.sv:16:3: error: differently clocked sequence operands may be joined only by the single-delay (##1) or zero-delay (##0) operator (§16.13.1)
+    assert property (@(posedge clk1) s1 ##2 @(posedge clk2) s2);
+    ^
+test/src/e2e/multiclock_sequence_rules.sv:17:3: error: differently clocked sequence operands may be joined only by the single-delay (##1) or zero-delay (##0) operator, not by intersect (§16.13.1)
+    assert property (@(posedge clk1) s1 intersect @(posedge clk2) s2);
+    ^

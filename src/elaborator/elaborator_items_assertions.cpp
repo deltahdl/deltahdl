@@ -10,6 +10,7 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_internal.h"
+#include "elaborator/multiclock_sequence_rules.h"
 #include "elaborator/property_rewrite.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/sequence_match_class.h"
@@ -425,6 +426,8 @@ void Elaborator::ElaboratePropertyDeclItem(ModuleItem* item, RtlirModule* mod) {
   // are checked where the body is declared, once for every instance.
   ValidateSequenceDegeneracy(item->prop_body_tree, item->loc,
                              property_registry_, diag_);
+  ValidateMulticlockSequences(item->prop_body_tree, item->prop_clock, item->loc,
+                              property_registry_, diag_);
   // §16.12: nesting of disable iff (explicitly or via property instantiation)
   // is forbidden; the §F.4.1 flattened count catches both.
   if (property_registry_.FlattenedDisableIffCount(item) > 1) {
@@ -463,6 +466,14 @@ void Elaborator::ElaborateAssertPropertyItem(ModuleItem* item,
     CollectTreeClocks(item->body->assert_property, property_registry_, named,
                       0);
     for (const EventExpr& ev : named) AppendClockOnce(item->sensitivity, ev);
+    // §16.13.1: the rules on the sequences built of subsequences on
+    // different clocks, under the leading clock.
+    ValidateMulticlockSequences(item->body->assert_property,
+                                item->body->assert_clock, item->loc,
+                                property_registry_, diag_);
+    ValidateMulticlockSequence(item->body->assert_sequence,
+                               item->body->assert_clock, item->loc,
+                               property_registry_, diag_);
   }
   // §16.5.2: `assert property(@$global_clock a);` under a
   // `global clocking @clk; endclocking` declaration is logically equivalent to

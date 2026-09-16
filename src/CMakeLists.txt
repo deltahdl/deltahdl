@@ -133,6 +133,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/sequence_admits_empty.cpp
     elaborator/sequence_degeneracy.cpp
     elaborator/sequence_match_class.cpp
+    elaborator/multiclock_sequence_rules.cpp
     elaborator/disable_iff_resolution.cpp
     elaborator/inferred_clock_disable.cpp
     elaborator/sequence_match_attach.cpp

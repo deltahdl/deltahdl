@@ -228,7 +228,12 @@ void CheckUsage(const ModuleItem* seq, SequenceUsageContext ctx, SourceLoc loc,
 SequenceMatchClass ClassifySequenceMatches(const ModuleItem* seq,
                                            const PropertyRegistry& registry) {
   if (seq == nullptr) return SequenceMatchClass::kAdmitsAtLeastOneNonempty;
-  return ClassOfRange(RangeOfBody(seq->seq_linear, registry, 0));
+  return ClassifyBodyMatches(seq->seq_linear, registry);
+}
+
+SequenceMatchClass ClassifyBodyMatches(const SeqLinearBody& body,
+                                       const PropertyRegistry& registry) {
+  return ClassOfRange(RangeOfBody(body, registry, 0));
 }
 
 void ValidateSequenceUsedAsProperty(const ModuleItem* seq, SourceLoc loc,

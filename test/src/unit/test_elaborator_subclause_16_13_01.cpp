@@ -1,12 +1,83 @@
 #include <gtest/gtest.h>
 
 #include <optional>
+#include <string>
 
 #include "elaborator/multiclock_sequence.h"
+#include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
 namespace {
+
+// The module of test/src/e2e/multiclock_sequence_rules.sv around one
+// assertion.
+std::string RulesSource(const std::string& spec) {
+  return "module m;\n"
+         "  logic clk0, clk1, clk2, sig0, sig1, s1, s2;\n"
+         "  assert property (" +
+         spec +
+         ");\n"
+         "endmodule\n";
+}
+
+// §16.13.1: each maximal singly clocked subsequence of a multiclocked
+// sequence shall admit only nonempty matches: the clause's sig1[*0:1]
+// after the change to clk1 admits an empty match, which would leave the
+// ending clock ambiguous, and is reported.
+TEST(MulticlockSequenceLegality, AnEmptyMatchingSubsequenceIsReported) {
+  ElabFixture f;
+  Elaborate(RulesSource("@(posedge clk0) sig0 ##1 @(posedge clk1) sig1[*0:1]"),
+            f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a maximal singly clocked subsequence of a "
+                            "multiclocked sequence may not match the empty "
+                            "word",
+                            3, "16.13.1"));
+}
+
+// §16.13.1: differently clocked subsequences are concatenated by ##1 or
+// ##0 alone; the clause's ##2 between them is reported.
+TEST(MulticlockSequenceLegality,
+     ADelayOtherThanOneOrZeroAcrossClocksIsReported) {
+  ElabFixture f;
+  Elaborate(RulesSource("@(posedge clk1) s1 ##2 @(posedge clk2) s2"), f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "differently clocked sequence operands may be "
+                            "joined only by the single-delay (##1) or "
+                            "zero-delay (##0) operator",
+                            3, "16.13.1"));
+}
+
+// §16.13.1: differently clocked operands are combined by no other sequence
+// operator; the clause's intersect over them is reported, naming the
+// operator.
+TEST(MulticlockSequenceLegality, AnIntersectOverDifferentClocksIsReported) {
+  ElabFixture f;
+  Elaborate(RulesSource("@(posedge clk1) s1 intersect @(posedge clk2) s2"), f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "differently clocked sequence operands may be "
+                            "joined only by the single-delay (##1) or "
+                            "zero-delay (##0) operator, not by intersect",
+                            3, "16.13.1"));
+}
+
+// §16.13.1: the two joins the clause allows, and a delay under the same
+// clock named again, which changes nothing, are not reported.
+TEST(MulticlockSequenceLegality, TheJoinsTheClauseAllowsAreNotReported) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic clk0, clk1, sig0, sig1, s1, s2;\n"
+      "  assert property (@(posedge clk0) sig0 ##1 @(posedge clk1) sig1);\n"
+      "  assert property (@(posedge clk0) sig0 ##0 @(posedge clk1) sig1);\n"
+      "  assert property (@(posedge clk1) s1 ##2 @(posedge clk1) s2);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
 
 // §16.13.1: a singly clocked sequence is a degenerate multiclocked sequence and
 // is always legal, even when its subsequence admits the empty match.

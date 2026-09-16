@@ -639,6 +639,24 @@ bool ParserPropertySpecHelpers::ParseSimpleSpecBody(Parser& p,
 // The statement carrying the property_spec read, for the process the
 // elaborator makes of the assertion: its clock is the item's sensitivity,
 // and a `not` before a property of operands negates the whole.
+// §16.13.1: whether the body, or an operand of its intersect, and or or,
+// names a clock of its own.
+static bool SequenceNamesClocks(const SeqLinearBody& body) {
+  for (const auto& clock : body.clocks) {
+    if (!clock.empty()) return true;
+  }
+  for (const SeqLinearBody& inner : body.intersects) {
+    if (SequenceNamesClocks(inner)) return true;
+  }
+  for (const SeqLinearBody& inner : body.conjuncts) {
+    if (SequenceNamesClocks(inner)) return true;
+  }
+  for (const SeqLinearBody& inner : body.alternatives) {
+    if (SequenceNamesClocks(inner)) return true;
+  }
+  return false;
+}
+
 Stmt* ParserPropertySpecHelpers::MakeSimplePropertyStmt(
     Parser& p, ModuleItem* item, StmtKind body_kind,
     const SimpleSpecBody& read) {
@@ -647,7 +665,7 @@ Stmt* ParserPropertySpecHelpers::MakeSimplePropertyStmt(
   // told apart.
   SimpleSpecBody body = read;
   if (body.property == nullptr && body.sequence != nullptr &&
-      !body.sequence->seq_linear.clocks.empty()) {
+      SequenceNamesClocks(body.sequence->seq_linear)) {
     body.strong = body.strong || body_kind == StmtKind::kCoverImmediate;
     body.property = TreeOfSpecBody(p, body);
     body.sequence = nullptr;

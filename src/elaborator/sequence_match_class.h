@@ -18,6 +18,11 @@ namespace delta {
 SequenceMatchClass ClassifySequenceMatches(const ModuleItem* seq,
                                            const PropertyRegistry& registry);
 
+// The same over a linear body on its own, a chain cut from a sequence's
+// among them.
+SequenceMatchClass ClassifyBodyMatches(const SeqLinearBody& body,
+                                       const PropertyRegistry& registry);
+
 // §16.12.22: the restrictions on degenerate sequences applied over the
 // property tree under `node`: a sequence used as a property shall be
 // nondegenerate and admit no empty match (a), the antecedent of |-> shall
