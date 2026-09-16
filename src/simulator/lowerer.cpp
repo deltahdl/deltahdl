@@ -387,6 +387,7 @@ void Lowerer::LowerModule(const RtlirModule* mod) {
   for (const auto& var : mod->variables) LowerVar(var.name, var);
   RegisterModulePorts(mod, ctx_, arena_);
   RegisterModuleSubroutines(mod, ctx_);
+  RecordSubroutineAssertionSampleScopes(mod);
   // §35.5.4: an imported subroutine is declared where the source writes it and
   // called like a native one, so the declarations of the module being lowered
   // go into the registry EvalDpiCall reaches an import through.
@@ -492,15 +493,25 @@ static void CollectProceduralAssertionReadNames(
 
 void Lowerer::RecordAssertionSampleScope(const RtlirProcess& proc) {
   if (proc.body == nullptr) return;
+  RecordAssertionSampleScope(proc.body);
+}
+
+void Lowerer::RecordAssertionSampleScope(const Stmt* body) {
   std::unordered_set<std::string> names;
-  CollectAssertionReadNames(proc.body, ctx_, arena_, names);
-  CollectProceduralAssertionReadNames(proc.body, ctx_, arena_, names);
-  CollectSampledFunctionArgsInStmt(proc.body, names);
+  CollectAssertionReadNames(body, ctx_, arena_, names);
+  CollectProceduralAssertionReadNames(body, ctx_, arena_, names);
+  CollectSampledFunctionArgsInStmt(body, names);
   if (names.empty()) return;
   AssertionSampleScope scope;
   scope.inst_prefix = inst_prefix_;
   scope.names.assign(names.begin(), names.end());
   assertion_sample_scopes_.push_back(std::move(scope));
+}
+
+void Lowerer::RecordSubroutineAssertionSampleScopes(const RtlirModule* mod) {
+  for (const ModuleItem* func : mod->function_decls) {
+    for (const Stmt* s : func->func_body_stmts) RecordAssertionSampleScope(s);
+  }
 }
 
 void Lowerer::RegisterDesignAssertionSampling() {

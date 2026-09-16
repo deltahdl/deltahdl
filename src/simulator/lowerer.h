@@ -143,6 +143,13 @@ class Lowerer {
   // enrol them for §16.5.1 sampling once every module has been lowered. A
   // process reading none is not recorded.
   void RecordAssertionSampleScope(const RtlirProcess& proc);
+  // The same for one statement, a process's body or a statement of a task
+  // or function body, which §16.17 has hold an expect statement whose
+  // property reads sampled values as a concurrent assertion's does.
+  void RecordAssertionSampleScope(const Stmt* body);
+  // Records the names the tasks and functions of `mod` read in expect
+  // statements and sampled value function calls.
+  void RecordSubroutineAssertionSampleScopes(const RtlirModule* mod);
   // Enrols into the run's AssertionSampleStore every variable
   // RecordAssertionSampleScope gathered, once every module has been lowered.
   void RegisterDesignAssertionSampling();

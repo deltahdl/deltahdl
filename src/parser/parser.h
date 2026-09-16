@@ -610,6 +610,8 @@ class Parser {
   Stmt* ParseImmediateAssertLike(StmtKind kind, TokenKind keyword);
 
   Stmt* ParseProceduralConcurrentAssertLike(StmtKind kind);
+  Stmt* ParseProceduralPropertySpec(StmtKind kind, SourceLoc loc,
+                                    Subclause subclause);
   ModuleItem* ParseDeferredImmediateItem(SourceLoc loc, StmtKind kind);
   Stmt* ParseExpectStmt();
   Stmt* ParseImmediateCover();

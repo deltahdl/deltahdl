@@ -733,6 +733,13 @@ static bool SequenceNamesClocks(const SeqLinearBody& body) {
   return false;
 }
 
+// §16.12.2 and F.4.1: the statements whose bare sequence is read as
+// strong(...), a cover and an expect.
+static bool BareSequenceIsStrong(StmtKind body_kind) {
+  return body_kind == StmtKind::kCoverImmediate ||
+         body_kind == StmtKind::kExpect;
+}
+
 Stmt* ParserPropertySpecHelpers::MakeSimplePropertyStmt(
     Parser& p, ModuleItem* item, StmtKind body_kind,
     const SimpleSpecBody& read) {
@@ -742,7 +749,7 @@ Stmt* ParserPropertySpecHelpers::MakeSimplePropertyStmt(
   SimpleSpecBody body = read;
   if (body.property == nullptr && body.sequence != nullptr &&
       SequenceNamesClocks(body.sequence->seq_linear)) {
-    body.strong = body.strong || body_kind == StmtKind::kCoverImmediate;
+    body.strong = body.strong || BareSequenceIsStrong(body_kind);
     body.property = TreeOfSpecBody(p, body);
     body.sequence = nullptr;
     body.negated = false;
@@ -760,8 +767,9 @@ Stmt* ParserPropertySpecHelpers::MakeSimplePropertyStmt(
   stmt->assert_expr = prop;
   stmt->assert_sequence = body.sequence;
   // §16.12.2: a sequence_expr in an assert or assume is evaluated as weak
-  // unless written strong(...), and one in a cover as strong.
-  stmt->assert_strong = body.strong || body_kind == StmtKind::kCoverImmediate;
+  // unless written strong(...), and one in a cover as strong, F.4.1 having
+  // an expect statement's read as a cover's.
+  stmt->assert_strong = body.strong || BareSequenceIsStrong(body_kind);
   stmt->assert_negated = body.negated;
   PropertyExprNode* property = body.property;
   if (property != nullptr && body.negated) {

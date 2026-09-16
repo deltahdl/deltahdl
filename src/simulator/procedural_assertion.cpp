@@ -24,11 +24,13 @@ namespace delta {
 namespace {
 
 // The concurrent assertions embedded in `s` that carry a leading clocking
-// event, those in the action block of another among them.
+// event, those in the action block of another among them; not §16.17's
+// expect, which blocks the process on its property rather than queueing
+// an instance.
 void CollectQueuedAssertions(const Stmt* s, std::vector<const Stmt*>& out) {
   if (s == nullptr) return;
   if (s->is_procedural_concurrent && s->is_concurrent_clocked &&
-      !s->assert_clock.empty()) {
+      !s->assert_clock.empty() && s->kind != StmtKind::kExpect) {
     out.push_back(s);
   }
   ForEachChildStmt(

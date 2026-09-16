@@ -347,6 +347,9 @@ static void RecordConcurrentCoverVerdict(const Stmt* stmt,
 // assertion statement -- simple immediate, observed deferred, or final deferred
 // -- so a $assertcontrol assertion_type mask can select whether it is checked.
 static uint32_t ImmediateAssertionTypeBit(const Stmt* stmt) {
+  if (stmt->kind == StmtKind::kExpect) {
+    return static_cast<uint32_t>(AssertionTypeBit::kExpect);
+  }
   if (!stmt->is_deferred) {
     return static_cast<uint32_t>(AssertionTypeBit::kSimpleImmediate);
   }
@@ -424,6 +427,20 @@ static const Stmt* ConcludeAssertion(const Stmt* stmt, PropertyVerdict verdict,
   RecordConcurrentCoverVerdict(stmt, verdict, ctx);
   const Stmt* action =
       is_true ? stmt->assert_pass_stmt : stmt->assert_fail_stmt;
+  // §16.17: an expect statement's verdict unblocks the process it stands
+  // in, which runs the action block itself once it resumes; a failure with
+  // no else clause is reported through $error here.
+  if (stmt->kind == StmtKind::kExpect) {
+    if (Process* proc = ctx.CurrentProcess()) {
+      proc->expect_decided = true;
+      proc->expect_holds = is_true;
+    }
+    if (!is_true && action == nullptr) {
+      ReportDefaultAssertionFailure(stmt, ImmediateAssertionTypeBit(stmt),
+                                    ImmediateDirectiveTypeBit(stmt), ctx);
+    }
+    return nullptr;
+  }
   if (action != nullptr) {
     if (TryScheduleDeferredAssertAction(action, stmt, ctx, arena) ||
         TryScheduleConcurrentAssertAction(action, stmt, ctx, arena)) {

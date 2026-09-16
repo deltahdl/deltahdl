@@ -3,6 +3,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "common/arena.h"
@@ -20,17 +21,16 @@ namespace delta {
 
 namespace {
 
-bool IsProceduralConcurrent(const Stmt* s) {
-  return s != nullptr && s->is_procedural_concurrent &&
-         (s->kind == StmtKind::kAssertImmediate ||
-          s->kind == StmtKind::kAssumeImmediate ||
-          s->kind == StmtKind::kCoverImmediate);
-}
-
+// An assert, assume or cover statement, or §16.17's expect, which takes a
+// property_spec as they do and resolves its clock as they do.
 bool IsAssertionStatement(const Stmt* s) {
   return s->kind == StmtKind::kAssertImmediate ||
          s->kind == StmtKind::kAssumeImmediate ||
-         s->kind == StmtKind::kCoverImmediate;
+         s->kind == StmtKind::kCoverImmediate || s->kind == StmtKind::kExpect;
+}
+
+bool IsProceduralConcurrent(const Stmt* s) {
+  return s != nullptr && s->is_procedural_concurrent && IsAssertionStatement(s);
 }
 
 // The procedural concurrent assertions of the procedure in source order,
@@ -280,20 +280,33 @@ void SubstituteInstance(Stmt* stmt, const PropertyRegistry& registry,
   SubstitutePropertyBody(stmt, decl, registry, arena);
 }
 
-}  // namespace
-
-void ElaborateProceduralConcurrentAssertions(ModuleItem* procedure,
-                                             const RtlirModule* mod,
-                                             const PropertyRegistry& registry,
-                                             Arena& arena, DiagEngine& diag) {
-  std::vector<Stmt*> assertions;
-  CollectProceduralAssertions(procedure->body, assertions);
-  if (assertions.empty()) return;
-  std::vector<EventExpr> inferred = InferredProcedureClock(procedure, mod);
-  std::vector<EventExpr> fallback = DefaultClockingEvent(mod);
+// What the statements of one procedure or subroutine resolve against: the
+// clock the procedure gives, empty where it gives none, and what an
+// instance takes at the statement, that clock or the default clocking
+// behind it and the default disable iff of the module.
+struct ProcedureContext {
+  std::vector<EventExpr> inferred;
   InferredAtInstance at_instance;
-  at_instance.clock = inferred.empty() ? fallback : inferred;
-  at_instance.disable = mod != nullptr ? mod->default_disable_iff : nullptr;
+};
+
+ProcedureContext ContextOf(std::vector<EventExpr> inferred,
+                           const RtlirModule* mod) {
+  ProcedureContext context;
+  context.at_instance.clock =
+      inferred.empty() ? DefaultClockingEvent(mod) : inferred;
+  context.at_instance.disable =
+      mod != nullptr ? mod->default_disable_iff : nullptr;
+  context.inferred = std::move(inferred);
+  return context;
+}
+
+// The statements collected, made ready under `context`.
+void ResolveProceduralAssertions(const std::vector<Stmt*>& assertions,
+                                 const ProcedureContext& context,
+                                 const PropertyRegistry& registry, Arena& arena,
+                                 DiagEngine& diag) {
+  const std::vector<EventExpr>& inferred = context.inferred;
+  const InferredAtInstance& at_instance = context.at_instance;
   for (Stmt* stmt : assertions) {
     if (!stmt->is_concurrent_clocked) continue;
     SubstituteInstance(stmt, registry, at_instance, arena, diag);
@@ -307,6 +320,33 @@ void ElaborateProceduralConcurrentAssertions(ModuleItem* procedure,
     if (!TakesInferredClock(stmt, inferred, registry, diag)) continue;
     ResolveProceduralClock(stmt, at_instance.clock, registry, diag);
   }
+}
+
+}  // namespace
+
+void ElaborateProceduralConcurrentAssertions(ModuleItem* procedure,
+                                             const RtlirModule* mod,
+                                             const PropertyRegistry& registry,
+                                             Arena& arena, DiagEngine& diag) {
+  std::vector<Stmt*> assertions;
+  CollectProceduralAssertions(procedure->body, assertions);
+  if (assertions.empty()) return;
+  ResolveProceduralAssertions(
+      assertions, ContextOf(InferredProcedureClock(procedure, mod), mod),
+      registry, arena, diag);
+}
+
+void ElaborateSubroutineConcurrentAssertions(ModuleItem* subroutine,
+                                             const RtlirModule* mod,
+                                             const PropertyRegistry& registry,
+                                             Arena& arena, DiagEngine& diag) {
+  std::vector<Stmt*> assertions;
+  for (Stmt* s : subroutine->func_body_stmts) {
+    CollectProceduralAssertions(s, assertions);
+  }
+  if (assertions.empty()) return;
+  ResolveProceduralAssertions(assertions, ContextOf({}, mod), registry, arena,
+                              diag);
 }
 
 }  // namespace delta

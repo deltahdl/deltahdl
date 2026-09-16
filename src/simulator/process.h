@@ -204,6 +204,12 @@ struct Process {
   // its leading clocking event (procedural_assertion.h).
   std::unordered_map<const Stmt*, ProceduralAssertionState*>
       procedural_assertions;
+  // §16.17: the verdict of the expect statement this process is blocked
+  // on, `expect_decided` once the evaluation succeeded or failed and
+  // `expect_holds` which of the two, written where the attempt concludes
+  // and read by the statement to unblock (expect_statement.cpp).
+  bool expect_decided = false;
+  bool expect_holds = false;
 
   std::string inst_prefix;
 

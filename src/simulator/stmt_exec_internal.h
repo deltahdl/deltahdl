@@ -57,5 +57,10 @@ ExecTask ExecDoWhile(const Stmt* stmt, SimContext& ctx, Arena& arena);
 // §16.3 immediate assertion, including its deferred forms (defined in
 // stmt_exec_deferred.cpp); reached from the statement dispatcher.
 ExecTask ExecImmediateAssert(const Stmt* stmt, SimContext& ctx, Arena& arena);
+// §16.17: the expect statement, which blocks the process until the single
+// evaluation of its property it starts at the next clocking event succeeds
+// or fails, and runs its action block after the Observed region that
+// concluded it (expect_statement.cpp).
+ExecTask ExecExpect(const Stmt* stmt, SimContext& ctx, Arena& arena);
 
 }  // namespace delta

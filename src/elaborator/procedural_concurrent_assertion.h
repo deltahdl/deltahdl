@@ -27,4 +27,13 @@ void ElaborateProceduralConcurrentAssertions(ModuleItem* procedure,
                                              const PropertyRegistry& registry,
                                              Arena& arena, DiagEngine& diag);
 
+// §16.17: the same for the expect statements of the task or function
+// `subroutine`, which §16.17 has appear wherever a wait statement can; a
+// subroutine gives no contextually inferred clock, so a spec that opens
+// with none takes the default clocking of `mod`.
+void ElaborateSubroutineConcurrentAssertions(ModuleItem* subroutine,
+                                             const RtlirModule* mod,
+                                             const PropertyRegistry& registry,
+                                             Arena& arena, DiagEngine& diag);
+
 }  // namespace delta

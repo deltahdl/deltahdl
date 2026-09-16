@@ -850,6 +850,8 @@ bool Elaborator::ElaborateBehavioralItem(ModuleItem* item, RtlirModule* mod) {
           declared_names_, diag_);
       ValidateFunctionBody(item);
       ValidateFunctionArgDefaultsScope(item);
+      ElaborateSubroutineConcurrentAssertions(item, mod, property_registry_,
+                                              arena_, diag_);
       mod->function_decls.push_back(item);
       return true;
     case ModuleItemKind::kElabSystemTask:

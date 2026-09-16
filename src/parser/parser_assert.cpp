@@ -117,11 +117,25 @@ static void SkipBalancedPropertySpec(Lexer& lexer) {
 // beside the cover property. A spec of a form the static path does not read
 // is reported and skipped.
 Stmt* Parser::ParseProceduralConcurrentAssertLike(StmtKind kind) {
-  auto* spec = arena_.Create<ModuleItem>();
-  spec->loc = CurrentLoc();
+  SourceLoc loc = CurrentLoc();
   bool sequence = Match(TokenKind::kKwSequence);
   if (!sequence) Expect(TokenKind::kKwProperty, Subclause("16.14.6"));
-  Expect(TokenKind::kLParen, Subclause("16.14.6"));
+  Stmt* stmt = ParseProceduralPropertySpec(kind, loc, Subclause("16.14.6"));
+  stmt->cover_sequence = sequence;
+  ParserAssertHelpers::ParseActionBlock(*this, stmt);
+  return stmt;
+}
+
+// The parenthesized property_spec of a concurrent assertion embedded in
+// procedural code, an expect statement's among them (§16.17), read as a
+// static one's is into a statement of `kind` standing at `loc`, its
+// leading clocking event on the statement; a spec beyond the forms this
+// tool evaluates is skipped and the statement left with no property.
+Stmt* Parser::ParseProceduralPropertySpec(StmtKind kind, SourceLoc loc,
+                                          Subclause subclause) {
+  auto* spec = arena_.Create<ModuleItem>();
+  spec->loc = loc;
+  Expect(TokenKind::kLParen, subclause);
   Stmt* stmt = nullptr;
   if (TryParseSimpleConcurrentProperty(spec, kind)) {
     stmt = spec->body;
@@ -138,10 +152,7 @@ Stmt* Parser::ParseProceduralConcurrentAssertLike(StmtKind kind) {
     SkipBalancedPropertySpec(lexer_);
   }
   stmt->is_procedural_concurrent = true;
-  stmt->cover_sequence = sequence;
-  Expect(TokenKind::kRParen, Subclause("16.14.6"));
-
-  ParserAssertHelpers::ParseActionBlock(*this, stmt);
+  Expect(TokenKind::kRParen, subclause);
   return stmt;
 }
 
@@ -632,32 +643,16 @@ ModuleItem* Parser::ParseRestrictProperty() {
   return item;
 }
 
+// §16.17: `expect ( property_spec ) action_block`, the spec the one an
+// assert property accepts, read as a procedural concurrent assertion's is
+// so that its clocking event, its sequence or its property tree stand on
+// the statement for the executor to evaluate.
 Stmt* Parser::ParseExpectStmt() {
-  auto* stmt = arena_.Create<Stmt>();
-
-  stmt->kind = StmtKind::kExpect;
-  stmt->range.start = CurrentLoc();
+  SourceLoc loc = CurrentLoc();
   Expect(TokenKind::kKwExpect, Subclause("16.17"));
-  Expect(TokenKind::kLParen, Subclause("16.17"));
-
-  int depth = 1;
-  while (depth > 0 && !AtEnd()) {
-    if (Match(TokenKind::kLParen)) {
-      ++depth;
-    } else if (Match(TokenKind::kRParen)) {
-      --depth;
-    } else {
-      Consume();
-    }
-  }
-
-  if (!Check(TokenKind::kSemicolon) && !Check(TokenKind::kKwElse)) {
-    stmt->assert_pass_stmt = ParseStmt();
-  }
-  if (Match(TokenKind::kKwElse)) stmt->assert_fail_stmt = ParseStmt();
-  if (!stmt->assert_pass_stmt && !stmt->assert_fail_stmt) {
-    Expect(TokenKind::kSemicolon, Subclause("16.17"));
-  }
+  Stmt* stmt =
+      ParseProceduralPropertySpec(StmtKind::kExpect, loc, Subclause("16.17"));
+  ParserAssertHelpers::ParseActionBlock(*this, stmt);
   stmt->range.end = CurrentLoc();
   return stmt;
 }

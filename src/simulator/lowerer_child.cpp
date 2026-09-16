@@ -125,6 +125,7 @@ void Lowerer::LowerChildModules(const RtlirModule* mod) {
     // its own body resolves (and %m composes the instance + subroutine path);
     // LowerModule registers these for the top only.
     RegisterModuleSubroutines(child.resolved, ctx_);
+    RecordSubroutineAssertionSampleScopes(child.resolved);
     // §16.12.1: an assertion of the instance that instantiates a property or
     // sequence the instance's module declares expands it at the run, so the
     // declarations are registered as the top's are.
