@@ -102,9 +102,11 @@ TEST(AssertionSemanticsParsing, ClockedBooleanPropertyBodyIsCaptured) {
 }
 
 // A body holding an implication is a temporal property_spec rather than the
-// clocked boolean form, so nothing is kept for it: an instance of this
-// property is left unevaluated, and the elaborator says so.
-TEST(AssertionSemanticsParsing, TemporalPropertyBodyIsNotCaptured) {
+// clocked boolean form, so the parser keeps its clock and the tree of
+// operands an assertion's spec is read into (§16.12.17), and no boolean: an
+// instance of this property is the root of the instantiating assertion's
+// tree.
+TEST(AssertionSemanticsParsing, TemporalPropertyBodyIsCapturedAsATree) {
   auto r = Parse(
       "module m;\n"
       "  property p_base;\n"
@@ -115,8 +117,11 @@ TEST(AssertionSemanticsParsing, TemporalPropertyBodyIsNotCaptured) {
   EXPECT_FALSE(r.has_errors);
   const ModuleItem* decl = FindPropertyDecl(r, "p_base");
   ASSERT_NE(decl, nullptr);
-  EXPECT_TRUE(decl->prop_clock.empty());
+  ASSERT_EQ(decl->prop_clock.size(), 1u);
+  EXPECT_EQ(decl->prop_clock[0].edge, Edge::kPosedge);
   EXPECT_EQ(decl->prop_body_expr, nullptr);
+  ASSERT_NE(decl->prop_body_tree, nullptr);
+  EXPECT_EQ(decl->prop_body_tree->kind, PropertyExprNode::Kind::kImplication);
 }
 
 // An assertion whose whole property_spec is one name is an instance of a
