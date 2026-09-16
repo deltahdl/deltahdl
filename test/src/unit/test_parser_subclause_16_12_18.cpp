@@ -182,8 +182,10 @@ TEST(TypedPropertyFormalParsing, ASequenceActualIsReadAsASequence) {
 }
 
 // §16.12.18: the actual may be a property_expr of any form, read as the
-// tree an assertion's property is, here under the assertion's own clock; a
-// second actual that is an expression is read as one.
+// tree an assertion's property is, here under the assertion's own clock,
+// where the implication in the actual makes the spec a property of
+// operands whose one operand is the instance; a second actual that is an
+// expression is read as one.
 TEST(TypedPropertyFormalParsing, APropertyActualIsReadAsATree) {
   auto r = Parse(
       "module m;\n"
@@ -196,16 +198,21 @@ TEST(TypedPropertyFormalParsing, APropertyActualIsReadAsATree) {
   EXPECT_FALSE(r.has_errors);
   auto* item = FindItemByKind(r, ModuleItemKind::kAssertProperty);
   ASSERT_NE(item, nullptr);
-  ASSERT_NE(item->assert_expr, nullptr);
-  EXPECT_EQ(item->assert_expr->kind, ExprKind::kCall);
-  ASSERT_EQ(item->assert_expr->args.size(), 2u);
-  const PropertyExprNode* actual = item->assert_expr->args[0]->property_actual;
+  ASSERT_NE(item->body, nullptr);
+  const PropertyExprNode* root = item->body->assert_property;
+  ASSERT_NE(root, nullptr);
+  EXPECT_EQ(root->kind, PropertyExprNode::Kind::kBoolean);
+  const Expr* instance = root->boolean;
+  ASSERT_NE(instance, nullptr);
+  EXPECT_EQ(instance->kind, ExprKind::kCall);
+  ASSERT_EQ(instance->args.size(), 2u);
+  const PropertyExprNode* actual = instance->args[0]->property_actual;
   ASSERT_NE(actual, nullptr);
   EXPECT_EQ(actual->kind, PropertyExprNode::Kind::kImplication);
   ASSERT_EQ(actual->operands.size(), 1u);
   EXPECT_EQ(actual->operands[0]->kind, PropertyExprNode::Kind::kNexttime);
-  EXPECT_EQ(item->assert_expr->args[1]->property_actual, nullptr);
-  EXPECT_EQ(item->assert_expr->args[1]->text, "d");
+  EXPECT_EQ(instance->args[1]->property_actual, nullptr);
+  EXPECT_EQ(instance->args[1]->text, "d");
 }
 
 // §16.12.18 by way of §16.8.1: the actual for a formal of type event is an
@@ -229,6 +236,32 @@ TEST(TypedPropertyFormalParsing, AnEventActualIsReadAsTheEdgeOverItsSignal) {
   EXPECT_EQ(actual->op, TokenKind::kKwNegedge);
   ASSERT_NE(actual->lhs, nullptr);
   EXPECT_EQ(actual->lhs->text, "clk");
+}
+
+// §16.12.18: a body of the clocked boolean form whose boolean references a
+// formal of type property, `not q`, is captured as a tree as well as a
+// boolean, the boolean under a not, since an actual that is a sequence or
+// a property is read by the tree's substitution alone.
+TEST(TypedPropertyFormalParsing, AClockedBooleanBodyIsCapturedAsATreeToo) {
+  auto r = Parse(
+      "module m;\n"
+      "  property p(property q);\n"
+      "    @(posedge clk) not q;\n"
+      "  endproperty\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindItemByKind(r, ModuleItemKind::kPropertyDecl);
+  ASSERT_NE(item, nullptr);
+  ASSERT_NE(item->prop_body_expr, nullptr);
+  EXPECT_TRUE(item->prop_negated);
+  ASSERT_NE(item->prop_body_tree, nullptr);
+  EXPECT_EQ(item->prop_body_tree->kind, PropertyExprNode::Kind::kNot);
+  ASSERT_EQ(item->prop_body_tree->operands.size(), 1u);
+  const PropertyExprNode* operand = item->prop_body_tree->operands[0];
+  EXPECT_EQ(operand->kind, PropertyExprNode::Kind::kBoolean);
+  ASSERT_NE(operand->boolean, nullptr);
+  EXPECT_EQ(operand->boolean->text, "q");
 }
 
 }  // namespace

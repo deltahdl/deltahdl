@@ -682,18 +682,19 @@ PropertyExprNode* ParserPropertySpecHelpers::TreeOfSpecBody(
   return whole;
 }
 
-// §16.12 and §16.12.17: the body of a named property declaration that is
-// not the clocked boolean form, trial-parsed as an assertion's property_spec
-// is -- a clock where one is written, a disable condition where one is,
-// and the property -- and recorded in prop_body_tree with the clock and
-// the condition beside, so that an instance of the property, in an
-// assertion or in a property's body, its own included, is evaluated as the
-// body with the actuals substituted. Diagnostics are suppressed and the
-// lexer rewound, so the body scan re-reads the same tokens; a body of any
-// other shape leaves the tree null.
+// §16.12 and §16.12.17: the body of a named property declaration,
+// trial-parsed as an assertion's property_spec is -- a clock where one is
+// written, a disable condition where one is, and the property -- and
+// recorded in prop_body_tree with the clock and the condition beside, so
+// that an instance of the property, in an assertion or in a property's
+// body, its own included, is evaluated as the body with the actuals
+// substituted. The clocked boolean form is captured as a tree too, a
+// boolean under a not where negated, for the instance whose actuals the
+// boolean substitution does not read (§16.12.18). Diagnostics are
+// suppressed and the lexer rewound, so the body scan re-reads the same
+// tokens; a body of any other shape leaves the tree null.
 void ParserPropertySpecHelpers::CapturePropertyTreeBody(Parser& p,
                                                         ModuleItem* item) {
-  if (item->prop_body_expr != nullptr) return;
   auto saved = p.lexer_.SavePos();
   p.diag_.PushSuppress();
   std::vector<EventExpr> clock;

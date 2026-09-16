@@ -87,6 +87,17 @@ bool IsStaticDeferredAssertion(const ModuleItem* item) {  // §16.4.3
   return item->body != nullptr && item->body->is_deferred;
 }
 
+// §16.12.18: whether an actual argument of `instance` is a sequence_expr or
+// a property_expr, which the boolean substitution does not read, so the
+// instance is evaluated as the body's tree.
+bool InstanceHasTreeActual(const Expr* instance) {
+  if (instance == nullptr || instance->kind != ExprKind::kCall) return false;
+  for (const Expr* arg : instance->args) {
+    if (arg != nullptr && arg->property_actual != nullptr) return true;
+  }
+  return false;
+}
+
 // §16.12.18 by way of §16.8.1: one event of the instantiated property's
 // clock with the actuals in the formals' places: the actual of a formal of
 // type event, an edge keyword over a signal, supplies the edge and the
@@ -189,8 +200,10 @@ void SubstitutePropertyInstance(ModuleItem* item, Arena& arena,
                    ? StmtKind::kAssumeImmediate
                    : StmtKind::kAssertImmediate;
   stmt->range.start = item->loc;
-  if (decl->prop_body_expr != nullptr) {
+  if (decl->prop_body_expr != nullptr &&
+      !InstanceHasTreeActual(item->assert_expr)) {
     stmt->assert_expr = SubstituteFormals(decl->prop_body_expr, actuals, arena);
+    stmt->assert_negated = decl->prop_negated;
   } else {
     // §16.12.17: a body the tree evaluator reads is expanded at the run,
     // its recursion included, so the statement carries the instance as
@@ -201,7 +214,6 @@ void SubstitutePropertyInstance(ModuleItem* item, Arena& arena,
   }
   stmt->assert_disable_iff =
       SubstituteFormals(decl->prop_disable_iff, actuals, arena);
-  stmt->assert_negated = decl->prop_negated;
   stmt->is_concurrent_clocked = true;
   stmt->assert_pass_stmt = item->assert_pass_stmt;
   stmt->assert_fail_stmt = item->assert_fail_stmt;
@@ -234,6 +246,12 @@ void PromotePropertyInstanceBoolean(ModuleItem* item, Arena& arena,
       instance->kind == ExprKind::kCall ? instance->callee : instance->text);
   if (decl == nullptr || decl->kind != ModuleItemKind::kPropertyDecl ||
       decl->prop_body_tree == nullptr) {
+    return;
+  }
+  // §16.12.18: an instance of the clocked boolean form is left as the
+  // boolean it was read as unless an actual is a tree, which the boolean
+  // does not read.
+  if (decl->prop_body_expr != nullptr && !InstanceHasTreeActual(instance)) {
     return;
   }
   auto* root = arena.Create<PropertyExprNode>();
