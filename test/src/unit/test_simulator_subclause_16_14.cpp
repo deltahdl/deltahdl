@@ -27,7 +27,8 @@ std::string AssertionSource(const std::string& items,
          "endmodule\n";
 }
 
-std::string Run(const std::string& items, const std::string& before = "") {
+std::string RunAssertions(const std::string& items,
+                          const std::string& before = "") {
   SimFixture f;
   return RunCapture(AssertionSource(items, before), f);
 }
@@ -112,26 +113,28 @@ TEST(ConcurrentAssertionStatements,
   EXPECT_NE(out.find("t.u_chk.chk_named failed at 15\n"), std::string::npos);
 }
 
-// §16.14: a statement in an initial procedure, of the module or of a
-// program, is executed once, so it runs one attempt, at the next tick.
-TEST(ConcurrentAssertionStatements,
-     AStatementInAnInitialProcedureRunsOneAttempt) {
-  std::string out =
-      Run("  initial begin : init\n"
-          "    #10;\n"
-          "    i_named: assert property (@(posedge clk) a)\n"
-          "      else $display(\"%m failed at %0d\", $time);\n"
-          "  end\n"
-          "  program prog;\n"
-          "    initial begin\n"
-          "      pr_named: assert property (@(posedge clk) 0)\n"
-          "        else $display(\"%m failed at %0d\", $time);\n"
-          "      #50;\n"
-          "    end\n"
-          "  endprogram\n");
-  EXPECT_EQ(out,
-            "t.prog.pr_named failed at 5\n"
-            "t.init.i_named failed at 15\n");
+// §16.14: a concurrent assertion statement may stand in a program, a scope
+// of the hierarchical name its action block reports.
+TEST(ConcurrentAssertionStatements, AStatementStandsInAProgram) {
+  std::string out = RunAssertions(
+      "  program prog;\n"
+      "    pr_named: assert property (@(posedge clk) a)\n"
+      "      else $display(\"%m failed at %0d\", $time);\n"
+      "  endprogram\n");
+  EXPECT_EQ(out, "t.prog.pr_named failed at 15\n");
+}
+
+// §21.2.1.5 by way of §16.14: the label a procedure stands inside is that
+// procedure's level alone, so a statement of the module reports none of
+// another process's labels.
+TEST(ConcurrentAssertionStatements, ALabelOfOneProcessIsNotReportedByAnother) {
+  std::string out = RunAssertions(
+      "  initial begin : waiting\n"
+      "    #100;\n"
+      "  end\n"
+      "  m_named: assert property (@(posedge clk) a)\n"
+      "    else $display(\"%m failed at %0d\", $time);\n");
+  EXPECT_EQ(out, "t.m_named failed at 15\n");
 }
 
 }  // namespace

@@ -411,13 +411,17 @@ void SimContext::SetCurrentProcess(Process* proc) {
   // the outgoing process's stack and bring in the incoming process's. Static
   // storage is unaffected -- it lives in static_frames_, shared across
   // activations of the same instance.
+  // §21.2.1.5: the named scopes travel with the process as its locals do.
   if (current_process_) {
     current_process_->saved_scope_stack = std::move(scope_stack_);
+    current_process_->saved_named_scopes = std::move(active_scope_stack_);
   }
   if (proc) {
     scope_stack_ = std::move(proc->saved_scope_stack);
+    active_scope_stack_ = std::move(proc->saved_named_scopes);
   } else {
     scope_stack_.clear();
+    active_scope_stack_.clear();
   }
   current_process_ = proc;
 }

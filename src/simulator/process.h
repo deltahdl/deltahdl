@@ -227,6 +227,11 @@ struct Process {
   // this one is suspended. Kept last so adding it does not shift the offsets
   // of the fields above.
   std::vector<Scope> saved_scope_stack;
+  // §21.2.1.5: the labels of the named blocks and statements this process
+  // stands inside, which %m reports as levels of the hierarchical name,
+  // parked while the process is suspended as saved_scope_stack is, so that
+  // a label one process is inside is not reported by another.
+  std::vector<std::string_view> saved_named_scopes;
 
   ~Process() {
     if (coro) coro.destroy();

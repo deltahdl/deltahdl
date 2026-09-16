@@ -86,16 +86,19 @@ TEST(ConcurrentAssertionEvaluationReporting,
   EXPECT_EQ(UnevaluatedReports(r), 0);
 }
 
-// §16.14 Syntax 16-18 lists cover_sequence_statement separately from
-// cover_property_statement, and the report names the statement the source
-// wrote rather than folding the two together.
-TEST(ConcurrentAssertionEvaluationReporting, CoverSequenceIsNotEvaluated) {
+// §16.14 Syntax 16-18 lists cover_sequence_statement beside
+// cover_property_statement, its spec a sequence_expr under a clocking event,
+// which is read as a cover property's is and evaluated.
+TEST(ConcurrentAssertionEvaluationReporting, CoverSequenceIsEvaluated) {
   auto r = Parse(
       "module m;\n"
-      "  cover sequence (@(posedge clk) a);\n"
+      "  cover sequence (@(posedge clk) a ##1 b);\n"
       "endmodule\n");
-  EXPECT_TRUE(ReportedWarning(
-      r.diags, "cover sequence is parsed and then discarded", 2, "16.14"));
+  EXPECT_EQ(UnevaluatedReports(r), 0);
+  auto* item = FindItemByKind(r, ModuleItemKind::kCoverSequence);
+  ASSERT_NE(item, nullptr);
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_NE(item->body->assert_sequence, nullptr);
 }
 
 // §16.14 Syntax 16-18 lists restrict_property_statement, which

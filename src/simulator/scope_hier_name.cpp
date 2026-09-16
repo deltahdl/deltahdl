@@ -19,6 +19,16 @@ std::string ScopeHierName(const SimContext& ctx) {
       if (!name.empty()) name += '.';
       name += prefix;
     }
+    // §27.3: a generate block is a level of hierarchy of its own; the
+    // innermost prefix the process stands in spells the whole nesting.
+    if (!proc->gen_prefixes.empty()) {
+      std::string blocks = proc->gen_prefixes.back();
+      if (!blocks.empty() && blocks.back() == '.') blocks.pop_back();
+      if (!blocks.empty()) {
+        if (!name.empty()) name += '.';
+        name += blocks;
+      }
+    }
   }
   for (std::string_view scope : ctx.ActiveNamedScopes()) {
     if (!name.empty()) name += '.';

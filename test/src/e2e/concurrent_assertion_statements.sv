@@ -5,14 +5,12 @@
 // interface, a program, a generate block or a checker; a statement may be
 // named, and its name is a level of the hierarchical name its action block
 // reports, while an unnamed statement creates no scope. clk rises at 5,
-// 15, ..., 105, and each of the signals a to i is low across one tick, a at
-// 15, b at 25 and so on to i at 95, so that each statement below fails or
+// 15, ..., 105, and each of the signals a to j is low across one tick, a at
+// 15, b at 25 and so on to j at 105, so that each statement below fails or
 // is covered at a tick of its own and reports %m there. The declared
 // property idle is never instantiated, so nothing evaluates it. The
-// assertion in the program's initial procedure and the one in the module's
-// are executed once each, the first at 0 and the second at 100, so each
-// runs one attempt, at 5 and at 105; the others are executed as always
-// procedures are, an attempt at every tick.
+// statement in the always procedure takes the procedure's clock; a
+// statement in an initial procedure, on a clock of its own, is §16.14.6's.
 interface bus_if(input logic clk, input logic f);
   if_named: assert property (@(posedge clk) f)
     else $display("%m failed at %0d", $time);
@@ -26,6 +24,7 @@ endchecker
 module concurrent_assertion_statements;
   logic clk = 0;
   logic a = 1, b = 1, c = 1, d = 1, e = 1, f = 1, g = 1, h = 1, i = 1;
+  logic j = 1;
   always #5 clk = ~clk;
 
   bus_if bus(clk, f);
@@ -59,18 +58,9 @@ module concurrent_assertion_statements;
       else $display("%m failed at %0d", $time);
   end
 
-  initial begin : init
-    #100;
-    i_named: assert property (@(posedge clk) 0)
-      else $display("%m failed at %0d", $time);
-  end
-
   program prog;
-    initial begin
-      pr_named: assert property (@(posedge clk) 0)
-        else $display("%m failed at %0d", $time);
-      #110 $finish;
-    end
+    pr_named: assert property (@(posedge clk) j)
+      else $display("%m failed at %0d", $time);
   endprogram
 
   initial begin
@@ -83,6 +73,8 @@ module concurrent_assertion_statements;
     #10 f = 1; g = 0;
     #10 g = 1; h = 0;
     #10 h = 1; i = 0;
-    #10 i = 1;
+    #10 i = 1; j = 0;
+    #10 j = 1;
+    $finish;
   end
 endmodule
