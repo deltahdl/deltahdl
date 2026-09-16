@@ -595,6 +595,12 @@ struct ModuleItem {
   // an instance of the property in the tree, its own included, is expanded
   // when it begins.
   PropertyExprNode* prop_body_tree = nullptr;
+  // §16.10 and §16.13.7: the local variables the body declares ahead of
+  // the property, each with the keyword of its type and its initialization
+  // assignment where it has one, a copy of each made for an evaluation
+  // attempt of an instance and initialized at the first tick of the clock
+  // the copy is for.
+  std::vector<SeqLocalDecl> prop_locals;
 
   // §16.12 / §F.4.1: metadata the rewriter needs to flatten property
   // instances and enforce the disable-iff no-nesting rule.

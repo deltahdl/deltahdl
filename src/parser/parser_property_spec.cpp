@@ -751,9 +751,10 @@ PropertyExprNode* ParserPropertySpecHelpers::TreeOfSpecBody(
 }
 
 // §16.12 and §16.12.17: the body of a named property declaration,
-// trial-parsed as an assertion's property_spec is -- a clock where one is
-// written, a disable condition where one is, and the property -- and
-// recorded in prop_body_tree with the clock and the condition beside, so
+// trial-parsed as an assertion's property_spec is -- the local variables
+// declared ahead of it (§16.10), a clock where one is written, a disable
+// condition where one is, and the property -- and recorded in
+// prop_body_tree with the locals, the clock and the condition beside, so
 // that an instance of the property, in an assertion or in a property's
 // body, its own included, is evaluated as the body with the actuals
 // substituted. The clocked boolean form is captured as a tree too, a
@@ -766,7 +767,9 @@ void ParserPropertySpecHelpers::CapturePropertyTreeBody(Parser& p,
   auto saved = p.lexer_.SavePos();
   p.diag_.PushSuppress();
   std::vector<EventExpr> clock;
-  bool ok = true;
+  // §16.10: the body's local variables are declared ahead of the property.
+  std::vector<SeqLocalDecl> locals;
+  bool ok = p.ParsePropertyLocalDecls(locals);
   // §16.13.3: of two clocking events juxtaposed the second nullifies the
   // first, so the last written is the body's.
   while (ok && p.Match(TokenKind::kAt)) {
@@ -787,6 +790,7 @@ void ParserPropertySpecHelpers::CapturePropertyTreeBody(Parser& p,
   item->prop_clock = std::move(clock);
   item->prop_disable_iff = body.disable_iff;
   item->prop_body_tree = TreeOfSpecBody(p, body);
+  item->prop_locals = std::move(locals);
 }
 
 }  // namespace delta

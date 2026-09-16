@@ -12,6 +12,7 @@
 #include "common/arena.h"
 #include "common/types.h"
 #include "elaborator/sensitivity.h"
+#include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
@@ -24,15 +25,31 @@
 #include "simulator/sequence_flatten.h"
 #include "simulator/sequence_monitor.h"
 #include "simulator/sim_context.h"
+#include "simulator/statement_assign.h"
+#include "simulator/statement_assign_internal.h"
 #include "simulator/variable.h"
 
 namespace delta {
+
+// §16.13.7: one copy of a local variable of a named property for one
+// semantic leading clock of an instance's attempt: the node of the
+// expansion it is for, whose subtree reads `literal` in the local's place,
+// and the initialization assignment performed, into the literal, at the
+// first tick of that node's clock at or after the attempt begins.
+struct LocalCopy {
+  const PropertyExprNode* node;
+  std::string_view name;
+  Expr* literal;
+  const Expr* init;
+  TokenKind type_kw;
+};
 
 struct PropertyTreeState {
   const PropertyExprNode* root = nullptr;
   std::vector<FlatSequence> sequences;
   std::vector<const Expr*> past_sites;
   std::vector<NodeState*> attempts;
+  std::vector<LocalCopy> local_copies;
   // §16.13: the clocks the sequences are evaluated on, the leading clock
   // first, and the time step the tree last advanced at.
   PropertyClocks clocks;
@@ -129,7 +146,26 @@ struct Collection {
   SimContext& ctx;
   Arena& arena;
   const ActualsByFormal& actuals;
+  // §16.13.7: the copies of the property's locals in force under the node,
+  // by the local's name, the sequences under it substituted with them.
+  ActualsByFormal locals;
 };
+
+// §16.13.7: the copies of the locals made for `node`, where any were,
+// added to the copies in force above it.
+void AddLocalCopies(const PropertyExprNode* node, Collection& in) {
+  for (const LocalCopy& copy : in.state.local_copies) {
+    if (copy.node == node) in.locals[copy.name] = copy.literal;
+  }
+}
+
+// The actuals a sequence under the node is substituted with: the
+// instance's and the local copies in force.
+ActualsByFormal SubstitutedActuals(const Collection& in) {
+  ActualsByFormal all = in.actuals;
+  for (const auto& [name, literal] : in.locals) all[name] = literal;
+  return all;
+}
 
 // The sequences of the tree flattened, each node's once, with the actuals
 // substituted where the collection holds any, each operand numbered by its
@@ -140,6 +176,8 @@ bool CollectSequences(const PropertyExprNode* node, Collection& in,
   PropertyTreeState& state = in.state;
   int own =
       node->clock.empty() ? inherited : ClockIndexOf(state.clocks, node->clock);
+  ActualsByFormal outer_locals = in.locals;
+  AddLocalCopies(node, in);
   if (node->boolean != nullptr) {
     CollectPastDirectedSites(node->boolean, state.past_sites);
   }
@@ -151,9 +189,9 @@ bool CollectSequences(const PropertyExprNode* node, Collection& in,
     if (!FlattenLinearSequence(node->sequence, in.ctx, in.arena, flat.body)) {
       return false;
     }
-    if (!in.actuals.empty()) {
-      flat.body =
-          SubstituteLinearSequence(flat.body, in.actuals, in.ctx, in.arena);
+    if (!in.actuals.empty() || !in.locals.empty()) {
+      flat.body = SubstituteLinearSequence(flat.body, SubstitutedActuals(in),
+                                           in.ctx, in.arena);
     }
     NumberOperandClocks(flat.body, state.clocks, own);
     ForEachLinearSequenceExpr(flat.body, [&state](const Expr* e) {
@@ -164,6 +202,7 @@ bool CollectSequences(const PropertyExprNode* node, Collection& in,
   for (const PropertyExprNode* operand : node->operands) {
     if (!CollectSequences(operand, in, own)) return false;
   }
+  in.locals = std::move(outer_locals);
   return true;
 }
 
@@ -306,6 +345,84 @@ void CaptureLocalFormals(const ModuleItem* decl, ActualsByFormal& actuals,
   }
 }
 
+// §16.13.7: the expressions of one node of an expansion with the copies of
+// the locals in force substituted for the locals, in place, the node being
+// the expansion's own; a sequence is substituted where it is flattened.
+void SubstituteNodeLocals(PropertyExprNode* node, const ActualsByFormal& locals,
+                          Arena& arena) {
+  node->boolean = SubstituteFormals(node->boolean, locals, arena);
+  SubstituteActualProperties(node->boolean, locals, arena);
+  node->range_min = SubstituteFormals(node->range_min, locals, arena);
+  node->range_max = SubstituteFormals(node->range_max, locals, arena);
+  for (std::vector<Expr*>& values : node->case_values) {
+    for (Expr*& value : values) value = SubstituteFormals(value, locals, arena);
+  }
+}
+
+// §16.13.7: a copy of each of the property's locals for `node`, one of the
+// expansion's nodes that names a clock or its root, the initialization of
+// each reading the copies of the locals declared before it; the copies by
+// the locals' names.
+ActualsByFormal NewLocalCopies(const PropertyExprNode* node,
+                               const std::vector<SeqLocalDecl>& locals,
+                               PropertyTreeState& tree, Arena& arena) {
+  ActualsByFormal copies;
+  for (const SeqLocalDecl& local : locals) {
+    Logic4Vec unassigned = MakeLogic4Vec(arena, LocalWidth(local.type_kw));
+    FillWithX(unassigned);
+    Expr* literal = LiteralOfValue(unassigned, arena);
+    const Expr* init = SubstituteFormals(local.init, copies, arena);
+    tree.local_copies.push_back(
+        {node, local.name, literal, init, local.type_kw});
+    copies[local.name] = literal;
+  }
+  return copies;
+}
+
+// §16.13.7: a separate copy of each local of the property for each semantic
+// leading clock of the expansion, the clock a node names being one and the
+// clock flowing into the root another, each subtree reading the copy of the
+// nearest clock above it, and a copy's initialization performed at the
+// first tick of its clock at or after the attempt begins, which is where
+// its node begins.
+void PlaceLocalCopies(PropertyExprNode* node,
+                      const std::vector<SeqLocalDecl>& locals,
+                      const ActualsByFormal* in_force, PropertyTreeState& tree,
+                      Arena& arena) {
+  ActualsByFormal own;
+  if (in_force == nullptr || !node->clock.empty()) {
+    own = NewLocalCopies(node, locals, tree, arena);
+    in_force = &own;
+  }
+  SubstituteNodeLocals(node, *in_force, arena);
+  for (PropertyExprNode* operand : node->operands) {
+    PlaceLocalCopies(operand, locals, in_force, tree, arena);
+  }
+}
+
+// §16.13.7: the initialization assignments of the copies made for `node`,
+// performed as the node begins, at the first tick of its clock at or after
+// the attempt began, each in the order the locals are declared, the value
+// cast to the local's type; a copy initialized lives on in its literal
+// alone.
+void InitializeLocalCopies(const PropertyExprNode* node, StepContext& sc) {
+  std::vector<LocalCopy>& copies = sc.tree.local_copies;
+  std::vector<LocalCopy> waiting;
+  waiting.reserve(copies.size());
+  for (LocalCopy& copy : copies) {
+    if (copy.node != node) {
+      waiting.push_back(copy);
+      continue;
+    }
+    if (copy.init == nullptr) continue;
+    Logic4Vec value = ResizeToWidth(
+        OwnRhsWords(EvalExpr(copy.init, sc.ctx, sc.arena), sc.arena),
+        LocalWidth(copy.type_kw), sc.arena);
+    *copy.literal = *LiteralOfValue(value, sc.arena);
+  }
+  copies = std::move(waiting);
+}
+
 // §16.12.17: a boolean operand that instantiates a named property is, when
 // it begins, expanded to the property's body with the actuals substituted
 // for the formals, stood up as the operand's one operand and stepped from
@@ -321,6 +438,9 @@ bool ExpandInstance(const PropertyExprNode* node, NodeState& state,
   CaptureLocalFormals(decl, actuals, sc);
   PropertyExprNode* body =
       SubstituteTree(decl->prop_body_tree, actuals, sc.arena);
+  if (!decl->prop_locals.empty()) {
+    PlaceLocalCopies(body, decl->prop_locals, nullptr, sc.tree, sc.arena);
+  }
   Collection collection{sc.tree, sc.ctx, sc.arena, actuals};
   if (!CollectSequences(body, collection, state.clock)) return false;
   InstallClockWatchers(sc.tree.clocks, sc.ctx, sc.arena);
@@ -626,6 +746,7 @@ Tri Step(const PropertyExprNode* node, NodeState& state, StepContext& sc,
     begin = true;
   }
   if (!own_tick && !AdvancesOffItsClock(node, state)) return state.verdict;
+  if (begin && !sc.tree.local_copies.empty()) InitializeLocalCopies(node, sc);
   switch (node->kind) {
     case PropertyExprNode::Kind::kBoolean:
       state.verdict = StepBoolean(node, state, sc, begin);

@@ -695,6 +695,18 @@ struct ParserSeqLinearHelpers {
 // suppressed and the lexer is rewound, so the harvest scan in
 // ParseSequenceDecl re-reads the same tokens unchanged; any other body shape
 // leaves the fields empty and no monitor is created.
+// §16.10 and §16.13.7: the assertion_variable_declarations at the head of
+// a named property's body, `logic v = e;`, read as a sequence body's are;
+// false where one is malformed.
+bool Parser::ParsePropertyLocalDecls(std::vector<SeqLocalDecl>& locals) {
+  SeqLinearBody body;
+  if (!ParserSeqLinearHelpers::ParseLinearSeqLocalDecls(*this, body)) {
+    return false;
+  }
+  locals = std::move(body.locals);
+  return true;
+}
+
 void Parser::CaptureLinearSequenceBody(ModuleItem* item) {
   auto saved = lexer_.SavePos();
   diag_.PushSuppress();

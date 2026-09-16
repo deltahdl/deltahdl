@@ -1,0 +1,7 @@
+p passes 10 fails 0
+p with d != v passes 9 fails 1 at 22
+r passes 10 fails 0
+r with !b passes 9 fails 1 at 18
+q passes 10 fails 0
+q with g != w passes 9 fails 1 at 15
+$finish at time 100

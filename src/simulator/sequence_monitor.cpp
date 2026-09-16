@@ -22,6 +22,23 @@
 #include "simulator/variable.h"
 
 namespace delta {
+
+uint32_t LocalWidth(TokenKind type_kw) {
+  switch (type_kw) {
+    case TokenKind::kKwByte:
+      return 8;
+    case TokenKind::kKwShortint:
+      return 16;
+    case TokenKind::kKwInt:
+    case TokenKind::kKwInteger:
+      return 32;
+    case TokenKind::kKwLongint:
+      return 64;
+    default:
+      return 1;
+  }
+}
+
 namespace {
 
 // One attempt of the sequence part way through: the operand it is to match
@@ -55,25 +72,9 @@ bool OperandClockTicked(const LinearSequence& body, size_t pos,
   return clock >= 32 || ((ticked >> clock) & 1u) != 0;
 }
 
-// §16.10 and §6.8: the width and state of a local declared with a data type
-// keyword, and the value it holds before any assignment, x for a 4-state
-// type and 0 for a 2-state one.
-uint32_t LocalWidth(TokenKind type_kw) {
-  switch (type_kw) {
-    case TokenKind::kKwByte:
-      return 8;
-    case TokenKind::kKwShortint:
-      return 16;
-    case TokenKind::kKwInt:
-    case TokenKind::kKwInteger:
-      return 32;
-    case TokenKind::kKwLongint:
-      return 64;
-    default:
-      return 1;
-  }
-}
-
+// §16.10 and §6.8: the state of a local declared with a data type keyword,
+// and the value it holds before any assignment, x for a 4-state type and 0
+// for a 2-state one.
 bool LocalIs4State(TokenKind type_kw) {
   return type_kw == TokenKind::kKwLogic || type_kw == TokenKind::kKwReg ||
          type_kw == TokenKind::kKwInteger;
