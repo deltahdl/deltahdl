@@ -192,6 +192,14 @@ PropertyExprNode* ParserPropertySpecHelpers::TryParsePropertyGroup(
   return nullptr;
 }
 
+// §16.12.7: the expression parser joins an antecedent to a consequent under
+// `|->` and `|=>`, which only a sequence body's read stops at, so an actual
+// read as such an expression is a property_expr, to be read as one.
+static bool IsImplicationExpr(const Expr* e) {
+  return e != nullptr && e->kind == ExprKind::kBinary &&
+         (e->op == TokenKind::kPipeDashGt || e->op == TokenKind::kPipeEqGt);
+}
+
 // §16.12.18: one actual argument of a property instance: `$`, kept as an
 // identifier named `$`; an event expression opening with an edge keyword,
 // kept as the edge over its signal for a formal of type event; an
@@ -226,7 +234,7 @@ Expr* ParserPropertySpecHelpers::ParsePropertyActualArg(Parser& p,
   auto saved = p.lexer_.SavePos();
   p.diag_.PushSuppress();
   Expr* expr = p.ParseExpr();
-  bool ends = expr != nullptr &&
+  bool ends = expr != nullptr && !IsImplicationExpr(expr) &&
               (p.Check(TokenKind::kComma) || p.Check(TokenKind::kRParen));
   p.diag_.PopSuppress();
   if (ends) return expr;
