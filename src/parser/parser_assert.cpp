@@ -581,10 +581,12 @@ ModuleItem* Parser::ParseCoverProperty() {
   // cover_sequence_statement beside it, whose spec is a sequence_expr under
   // a clocking event and a disable condition, read as the same spec is and
   // covered at every match of the sequence, which the body is marked for; a
-  // cover whose spec is not the form has its spec skipped.
+  // cover whose spec is an instance of a named property or sequence, §16.12.1
+  // and §16.14, is recorded for the elaborator as ParsePropertyAssertLike
+  // records one, and a cover whose spec is neither has its spec skipped.
   bool simple_concurrent =
       TryParseSimpleConcurrentProperty(item, StmtKind::kCoverImmediate);
-  if (!simple_concurrent) {
+  if (!simple_concurrent && !TryParsePropertyInstanceSpec(item)) {
     WarnUnevaluatedConcurrentAssertion(item->loc);
     item->assert_expr = SkipPropertySpec(arena_, lexer_, CurrentLoc());
   }

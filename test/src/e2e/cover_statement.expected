@@ -2,7 +2,7 @@ implied: pass statement ran 7 times
 acked: pass statement ran 4 times, 4 in the Reactive region
 matched: pass statement ran 3 times
 $finish at time 90
-cover property cover_statement.implied (line 34): attempted 9, succeeded 2, succeeded vacuously 5
-cover property cover_statement.acked (line 36): attempted 9, succeeded 4, succeeded vacuously 0
-cover property cover_statement.requested (line 40): attempted 9, succeeded 3, succeeded vacuously 0
-cover sequence cover_statement.matched (line 41): attempted 9, matched 3
+cover property cover_statement.implied (line 35): attempted 9, succeeded 2, succeeded vacuously 5
+cover property cover_statement.acked (line 37): attempted 9, succeeded 4, succeeded vacuously 0
+cover property cover_statement.requested (line 41): attempted 9, succeeded 3, succeeded vacuously 0
+cover sequence cover_statement.matched (line 42): attempted 9, matched 3
