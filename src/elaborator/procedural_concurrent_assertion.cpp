@@ -161,6 +161,35 @@ bool BodyIsRead(Stmt* stmt, const ModuleItem* decl, DiagEngine& diag) {
   return false;
 }
 
+// The body, the disable condition and the clock of the property `decl` the
+// statement instantiates, with the actuals in the formals' places: the
+// boolean body substituted, any other as a tree whose root is the instance
+// for the run to expand; the declaration's clock, or the one flowing into
+// it, where the spec opened with none.
+void SubstitutePropertyBody(Stmt* stmt, const ModuleItem* decl,
+                            const PropertyRegistry& registry, Arena& arena) {
+  Expr* instance = stmt->assert_expr;
+  ActualsByFormal actuals = BindActuals(decl->prop_formals, instance);
+  if (decl->prop_body_expr != nullptr && !InstanceHasTreeActual(instance)) {
+    stmt->assert_expr = SubstituteFormals(decl->prop_body_expr, actuals, arena);
+    stmt->assert_negated = decl->prop_negated;
+  } else {
+    stmt->assert_property = arena.Create<PropertyExprNode>();
+    stmt->assert_property->boolean = instance;
+  }
+  if (stmt->assert_disable_iff == nullptr) {
+    stmt->assert_disable_iff =
+        SubstituteFormals(decl->prop_disable_iff, actuals, arena);
+  }
+  if (!stmt->assert_clock.empty()) return;
+  const std::vector<EventExpr>& clock = decl->prop_clock.empty()
+                                            ? FlowedBodyClock(decl, registry)
+                                            : decl->prop_clock;
+  for (const EventExpr& ev : clock) {
+    stmt->assert_clock.push_back(SubstituteClockEvent(ev, actuals, arena));
+  }
+}
+
 // §16.12.1 and §16.13.4, for a statement in procedural code: the body of
 // the named property or sequence the spec instantiates, as
 // SubstitutePropertyInstance and SubstituteSequenceInstance give a static
@@ -199,25 +228,7 @@ void SubstituteInstance(Stmt* stmt, const PropertyRegistry& registry,
   const ModuleItem* decl =
       InstantiatedDecl(instance, ModuleItemKind::kPropertyDecl, registry);
   if (decl == nullptr || !BodyIsRead(stmt, decl, diag)) return;
-  ActualsByFormal actuals = BindActuals(decl->prop_formals, instance);
-  if (decl->prop_body_expr != nullptr && !InstanceHasTreeActual(instance)) {
-    stmt->assert_expr = SubstituteFormals(decl->prop_body_expr, actuals, arena);
-    stmt->assert_negated = decl->prop_negated;
-  } else {
-    stmt->assert_property = arena.Create<PropertyExprNode>();
-    stmt->assert_property->boolean = instance;
-  }
-  if (stmt->assert_disable_iff == nullptr) {
-    stmt->assert_disable_iff =
-        SubstituteFormals(decl->prop_disable_iff, actuals, arena);
-  }
-  if (!stmt->assert_clock.empty()) return;
-  const std::vector<EventExpr>& clock = decl->prop_clock.empty()
-                                            ? FlowedBodyClock(decl, registry)
-                                            : decl->prop_clock;
-  for (const EventExpr& ev : clock) {
-    stmt->assert_clock.push_back(SubstituteClockEvent(ev, actuals, arena));
-  }
+  SubstitutePropertyBody(stmt, decl, registry, arena);
 }
 
 }  // namespace
