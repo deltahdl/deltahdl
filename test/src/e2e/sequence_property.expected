@@ -4,3 +4,4 @@ strong(b ##1 c) passes 1 fails 2 at ticks
 cover b ##1 c matches 1
 $finish at time 40
 strong(b ##1 c) fails at the end of the run
+cover property sequence_property (line 43): attempted 4, succeeded 1, succeeded vacuously 0

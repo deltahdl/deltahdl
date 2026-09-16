@@ -318,6 +318,32 @@ void PromoteSequenceInstances(PropertyExprNode* node,
   }
 }
 
+// The statement the elaborator makes for an assertion whose spec is an
+// instance of a named sequence or property: the parser's kinds for the
+// assert, assume and cover directives, a cover of either category running
+// no fail statement and reporting no failure, a cover sequence marked for
+// §16.14.3's results, and, §16.14, the item's label as a level of the name
+// its action block reports, as the parser gives a body it makes itself.
+Stmt* NewInstanceStmt(const ModuleItem* item, Arena& arena) {
+  auto* stmt = arena.Create<Stmt>();
+  switch (item->kind) {
+    case ModuleItemKind::kAssumeProperty:
+      stmt->kind = StmtKind::kAssumeImmediate;
+      break;
+    case ModuleItemKind::kCoverProperty:
+    case ModuleItemKind::kCoverSequence:
+      stmt->kind = StmtKind::kCoverImmediate;
+      break;
+    default:
+      stmt->kind = StmtKind::kAssertImmediate;
+      break;
+  }
+  stmt->cover_sequence = item->kind == ModuleItemKind::kCoverSequence;
+  stmt->range.start = item->loc;
+  stmt->label = item->name;
+  return stmt;
+}
+
 // §16.13.3 and §16.13.4: the clock flowing into a property declared with
 // none: the clocking event its body's property_expr opens with, after the
 // disable condition where §16.14.1's `abc` writes one, on the root where
@@ -361,14 +387,7 @@ bool SubstituteSequenceInstance(ModuleItem* item, const ModuleItem* decl,
                  Subclause("16.14"));
     return false;
   }
-  auto* stmt = arena.Create<Stmt>();
-  stmt->kind = item->kind == ModuleItemKind::kAssumeProperty
-                   ? StmtKind::kAssumeImmediate
-                   : StmtKind::kAssertImmediate;
-  stmt->range.start = item->loc;
-  // §16.14: the statement's label is a level of the name its action block
-  // reports, as the parser gives a body it makes itself.
-  stmt->label = item->name;
+  auto* stmt = NewInstanceStmt(item, arena);
   stmt->assert_expr = item->assert_expr;
   stmt->assert_property = arena.Create<PropertyExprNode>();
   stmt->assert_property->kind = PropertyExprNode::Kind::kSequence;
@@ -482,12 +501,7 @@ void SubstitutePropertyInstance(ModuleItem* item, Arena& arena,
     }
     actuals[decl->prop_formals[i]] = args[i];
   }
-  auto* stmt = arena.Create<Stmt>();
-  stmt->kind = item->kind == ModuleItemKind::kAssumeProperty
-                   ? StmtKind::kAssumeImmediate
-                   : StmtKind::kAssertImmediate;
-  stmt->range.start = item->loc;
-  stmt->label = item->name;
+  auto* stmt = NewInstanceStmt(item, arena);
   GiveInstanceBody(stmt, item->assert_expr, decl, actuals, arena);
   stmt->assert_disable_iff =
       SubstituteFormals(decl->prop_disable_iff, actuals, arena);

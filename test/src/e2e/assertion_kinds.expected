@@ -6,3 +6,4 @@ immediate assume: failed 2 times
 immediate cover: hit 2 times
 $finish at time 40
 cover assertion_kinds (line 69): evaluated 4, succeeded 2
+cover property assertion_kinds (line 56): attempted 4, succeeded 1, succeeded vacuously 0

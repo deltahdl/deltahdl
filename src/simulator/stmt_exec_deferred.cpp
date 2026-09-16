@@ -16,6 +16,8 @@
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
 #include "simulator/awaiters_event_control.h"
+#include "simulator/cover_results.h"
+#include "simulator/cover_statement.h"
 #include "simulator/evaluation.h"
 #include "simulator/expr_walk.h"
 #include "simulator/process.h"
@@ -366,6 +368,54 @@ static void RecordCoverImmediateSample(const Stmt* stmt, bool is_true,
                         });
 }
 
+// §16.14.3: the results record of a concurrent cover statement, the clocked
+// body a cover property or a cover sequence is lowered to, in the scope the
+// process stands in; nullptr for every other assertion statement.
+static ConcurrentCoverResult* ConcurrentCoverRecord(const Stmt* stmt,
+                                                    SimContext& ctx) {
+  if (stmt->kind != StmtKind::kCoverImmediate || !stmt->is_concurrent_clocked) {
+    return nullptr;
+  }
+  return &ctx.ConcurrentCovers().Record(
+      ScopeHierName(ctx), stmt->range.start.line,
+      stmt->cover_sequence ? CoverStatementCategory::kSequence
+                           : CoverStatementCategory::kProperty);
+}
+
+// §16.14.3: one attempt of a concurrent cover begun, disabled or not,
+// counted in its results; nothing for any other assertion.
+static void RecordConcurrentCoverAttempt(const Stmt* stmt, SimContext& ctx) {
+  ConcurrentCoverResult* record = ConcurrentCoverRecord(stmt, ctx);
+  if (record == nullptr) return;
+  record->attempted += stmt->cover_sequence
+                           ? CoverSequenceAttemptDelta()
+                           : CoverPropertyAttemptDelta(/*outcome=*/{});
+}
+
+// §16.14.3: one verdict of a concurrent cover's attempt counted in its
+// results: a cover sequence's match, with multiplicity, or a cover
+// property's success, at most once per attempt and apart where it is by
+// vacuity; a verdict that does not hold counts nothing, and a disabled
+// attempt reaches none. Nothing for any other assertion.
+static void RecordConcurrentCoverVerdict(const Stmt* stmt,
+                                         PropertyVerdict verdict,
+                                         SimContext& ctx) {
+  ConcurrentCoverResult* record = ConcurrentCoverRecord(stmt, ctx);
+  if (record == nullptr || !verdict.holds) return;
+  if (stmt->cover_sequence) {
+    // The evaluation drops an attempt at the tick the disable condition is
+    // true at, so a match that reaches a verdict completed without it.
+    record->matched +=
+        CoverSequenceMatchDelta({/*disable_iff_occurred=*/false});
+    return;
+  }
+  CoverPropertyAttemptOutcome outcome;
+  outcome.nonvacuous_success = !verdict.vacuous;
+  outcome.vacuous_success = verdict.vacuous;
+  record->succeeded += CoverPropertySuccessDelta(outcome);
+  record->vacuous += CoverPropertyVacuousSuccessDelta(outcome);
+}
+
 // §20.11: the Table 20-6 assertion_type bit that identifies an immediate
 // assertion statement -- simple immediate, observed deferred, or final deferred
 // -- so a $assertcontrol assertion_type mask can select whether it is checked.
@@ -440,9 +490,11 @@ static bool EvalAssertionCondition(const Stmt* stmt, SimContext& ctx,
 // caller is to run where it stands, which is an immediate assertion's
 // (§16.3), and nullptr where the action was scheduled elsewhere or there is
 // none.
-static const Stmt* ConcludeAssertion(const Stmt* stmt, bool is_true,
+static const Stmt* ConcludeAssertion(const Stmt* stmt, PropertyVerdict verdict,
                                      SimContext& ctx, Arena& arena) {
+  bool is_true = verdict.holds;
   RecordCoverImmediateSample(stmt, is_true, ctx);
+  RecordConcurrentCoverVerdict(stmt, verdict, ctx);
   const Stmt* action =
       is_true ? stmt->assert_pass_stmt : stmt->assert_fail_stmt;
   if (action != nullptr) {
@@ -475,6 +527,7 @@ static const Stmt* JudgeAssertion(const Stmt* stmt, SimContext& ctx,
   uint32_t type_bit = ImmediateAssertionTypeBit(stmt);
   uint32_t directive_bit = ImmediateDirectiveTypeBit(stmt);
   if (!ctx.AssertCheckingEnabled(type_bit, directive_bit)) return nullptr;
+  RecordConcurrentCoverAttempt(stmt, ctx);
 
   // §16.12: an attempt at which the disable condition, read as the variables
   // stand rather than sampled, is true is disabled: it neither succeeds nor
@@ -486,7 +539,9 @@ static const Stmt* JudgeAssertion(const Stmt* stmt, SimContext& ctx,
 
   // §16.12.3: `not` returns the opposite of the underlying evaluation.
   bool is_true = EvalAssertionCondition(stmt, ctx, arena);
-  return ConcludeAssertion(stmt, is_true != stmt->assert_negated, ctx, arena);
+  PropertyVerdict verdict;
+  verdict.holds = is_true != stmt->assert_negated;
+  return ConcludeAssertion(stmt, verdict, ctx, arena);
 }
 
 // §16.12.2: one tick of a sequential property. The attempts in flight and
@@ -528,13 +583,14 @@ static void RegisterStrongAttemptsFinal(const Stmt* stmt,
 static SimCoroutine PropertyTreeFinalCoroutine(const Stmt* stmt,
                                                PropertyTreeState* state,
                                                SimContext& ctx, Arena& arena) {
-  for (bool verdict : FinishPropertyTree(*state)) {
-    RecordCoverImmediateSample(stmt, verdict, ctx);
+  for (PropertyVerdict verdict : FinishPropertyTree(*state)) {
+    RecordCoverImmediateSample(stmt, verdict.holds, ctx);
+    RecordConcurrentCoverVerdict(stmt, verdict, ctx);
     const Stmt* action =
-        verdict ? stmt->assert_pass_stmt : stmt->assert_fail_stmt;
+        verdict.holds ? stmt->assert_pass_stmt : stmt->assert_fail_stmt;
     if (action != nullptr) {
       co_await ExecStmt(action, ctx, arena);
-    } else if (!verdict && stmt->kind != StmtKind::kCoverImmediate) {
+    } else if (!verdict.holds && stmt->kind != StmtKind::kCoverImmediate) {
       ReportDefaultAssertionFailure(stmt, ImmediateAssertionTypeBit(stmt),
                                     ImmediateDirectiveTypeBit(stmt), ctx);
     }
@@ -564,10 +620,12 @@ static void ExecPropertyTreeTick(const Stmt* stmt, SimContext& ctx,
   auto& samples = ctx.AssertionSamples();
   bool outer_evaluating_property = samples.EvaluatingProperty();
   samples.SetEvaluatingProperty(true);
-  std::vector<bool> verdicts =
-      AdvancePropertyTree(*state, disabled, ctx, arena);
+  PropertyTick tick = AdvancePropertyTree(*state, disabled, ctx, arena);
   samples.SetEvaluatingProperty(outer_evaluating_property);
-  for (bool verdict : verdicts) ConcludeAssertion(stmt, verdict, ctx, arena);
+  if (tick.attempted) RecordConcurrentCoverAttempt(stmt, ctx);
+  for (PropertyVerdict verdict : tick.verdicts) {
+    ConcludeAssertion(stmt, verdict, ctx, arena);
+  }
 }
 
 static void ExecSequencePropertyTick(const Stmt* stmt, SimContext& ctx,
@@ -587,17 +645,23 @@ static void ExecSequencePropertyTick(const Stmt* stmt, SimContext& ctx,
       RegisterStrongAttemptsFinal(stmt, state, ctx, arena);
     }
   }
+  RecordConcurrentCoverAttempt(stmt, ctx);
   bool disabled = stmt->assert_disable_iff != nullptr &&
                   EvalExpr(stmt->assert_disable_iff, ctx, arena).IsTruthy();
   auto& samples = ctx.AssertionSamples();
   bool outer_evaluating_property = samples.EvaluatingProperty();
   samples.SetEvaluatingProperty(true);
-  std::vector<SequenceVerdict> verdicts =
-      AdvanceSequenceProperty(*state, disabled, ctx, arena);
+  // §16.14.3: a cover sequence's attempt stays in flight past a match, every
+  // match of it counted; a property, a cover property's among them, holds
+  // at the first.
+  std::vector<SequenceVerdict> verdicts = AdvanceSequenceProperty(
+      *state, disabled, stmt->cover_sequence, ctx, arena);
   samples.SetEvaluatingProperty(outer_evaluating_property);
   for (SequenceVerdict verdict : verdicts) {
     bool matched = verdict == SequenceVerdict::kMatched;
-    ConcludeAssertion(stmt, matched != stmt->assert_negated, ctx, arena);
+    PropertyVerdict decided;
+    decided.holds = matched != stmt->assert_negated;
+    ConcludeAssertion(stmt, decided, ctx, arena);
   }
 }
 

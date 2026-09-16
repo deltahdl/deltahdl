@@ -26,10 +26,10 @@
 // The action blocks count rather than print, since the three concurrent
 // assertions fire in one time step and the clause fixes no order among them;
 // the counts and the recorded times are printed once, after the last edge.
-// The line after $finish is the end-of-simulation report 16.3 gives an
+// The lines after $finish are the end-of-simulation reports: 16.3's for the
 // immediate cover statement, evaluated at each of ok's four changes and
-// succeeding at the two falls; the concurrent cover has no line there, its
-// results being 16.14.3's rather than 16.3's.
+// succeeding at the two falls, and 16.14.3's for the concurrent cover,
+// attempted at the four edges and succeeding at 25.
 module assertion_kinds;
   logic clk = 1'b0;
   logic ok = 1'b1;

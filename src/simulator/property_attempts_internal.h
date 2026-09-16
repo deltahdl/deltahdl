@@ -92,4 +92,10 @@ Tri DecideUntil(const PropertyExprNode* node, NodeState& state,
 // antecedent still in flight matches no more, and the rest follows.
 Tri Finish(const PropertyExprNode* node, NodeState& state);
 
+// §16.14.3: whether an attempt decided true held because of vacuity: its
+// root, or the body the root expanded to as an instance, is an implication
+// no consequent of which began, an if without else whose condition was
+// false, or a case that selected no item.
+bool DecidedVacuously(const PropertyExprNode* node, const NodeState& state);
+
 }  // namespace delta

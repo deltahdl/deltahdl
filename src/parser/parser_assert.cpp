@@ -580,8 +580,8 @@ ModuleItem* Parser::ParseCoverProperty() {
   // evaluation reports nothing where the property does not hold. §16.14 lists
   // cover_sequence_statement beside it, whose spec is a sequence_expr under
   // a clocking event and a disable condition, read as the same spec is and
-  // covered as the sequence is matched; a cover whose spec is not the form
-  // has its spec skipped.
+  // covered at every match of the sequence, which the body is marked for; a
+  // cover whose spec is not the form has its spec skipped.
   bool simple_concurrent =
       TryParseSimpleConcurrentProperty(item, StmtKind::kCoverImmediate);
   if (!simple_concurrent) {
@@ -595,7 +595,10 @@ ModuleItem* Parser::ParseCoverProperty() {
   } else {
     Expect(TokenKind::kSemicolon, Subclause("16.14.3"));
   }
-  if (simple_concurrent) item->body->assert_pass_stmt = item->assert_pass_stmt;
+  if (simple_concurrent) {
+    item->body->assert_pass_stmt = item->assert_pass_stmt;
+    item->body->cover_sequence = item->kind == ModuleItemKind::kCoverSequence;
+  }
   return item;
 }
 

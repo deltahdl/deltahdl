@@ -299,6 +299,10 @@ struct Stmt {
   // written inside an always_ff: §16.5.1 samples the expressions of the first
   // and leaves the second reading the values standing now.
   bool is_concurrent_clocked = false;
+  // §16.14.3: the statement is a cover sequence, whose results are attempts
+  // and matches, every match of an attempt counted, rather than a cover
+  // property's attempts and successes, at most one per attempt.
+  bool cover_sequence = false;
 
   std::vector<Expr*> wait_order_events;
 

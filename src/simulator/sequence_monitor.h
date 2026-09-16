@@ -63,8 +63,13 @@ enum class SequenceVerdict : uint8_t { kMatched, kFailed };
 // its verdict and leaving; `disabled` says the disable condition is true at
 // this tick, which drops every attempt in flight and begins none. The
 // sampled value functions the sequence holds are sampled at the tick first.
+// §16.14.3: `every_match` keeps an attempt that matched in flight while it
+// can match again, so that each later match of it is a verdict too, as a
+// cover sequence counts every match of an attempt; a property holds at the
+// first.
 std::vector<SequenceVerdict> AdvanceSequenceProperty(
-    SequencePropertyState& state, bool disabled, SimContext& ctx, Arena& arena);
+    SequencePropertyState& state, bool disabled, bool every_match,
+    SimContext& ctx, Arena& arena);
 
 // The attempts still in flight, which a strong property has fail when the
 // run ends.

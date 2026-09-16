@@ -3,6 +3,7 @@ v dist {0:=40, 1:=60} asserted passes 8 fails 1
 v inside {0, 1} asserted passes 8 fails 1
 v dist {0:=40, 1:=60} covered at 8 of 9 ticks
 $finish at time 90
+cover property assume_statement (line 56): attempted 9, succeeded 8, succeeded vacuously 0
 [45] ERROR assume_statement.env_prop (line 42): Assumption failed.
 [65] ERROR assume_statement.null_stmt (line 47): Assertion failed.
 [75] ERROR assume_statement.assert_ack1 (line 77): ack asserted while req is still deasserted

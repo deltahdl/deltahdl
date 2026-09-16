@@ -23,7 +23,7 @@
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_cli.h"
 #include "preprocessor/protect_processing.h"
-#include "simulator/immediate_cover.h"
+#include "simulator/cover_results.h"
 #include "simulator/lowerer.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
@@ -345,10 +345,11 @@ int RunSimulation(const delta::CliOptions& opts, delta::CompilationUnit* cu,
 
   scheduler.Run();
   sim_ctx.RunFinalBlocks();
-  // §16.3: the results of coverage for the immediate cover statements are
-  // reported at the end of simulation, once the final blocks that could still
-  // evaluate one have run.
+  // §16.3 and §16.14.3: the results of coverage for the immediate and the
+  // concurrent cover statements are reported at the end of simulation, once
+  // the final blocks that could still evaluate one have run.
   delta::ReportImmediateCoverResults(sim_ctx.ImmediateCovers(), std::cout);
+  delta::ReportConcurrentCoverResults(sim_ctx.ConcurrentCovers(), std::cout);
   // §21.7.3.6.1: close the dump by recording the final simulation time, which
   // an extended VCD file ends with. This covers a dump the source's own VCD
   // tasks opened as well as one --vcd asked for, and does nothing when the run

@@ -2,7 +2,7 @@
 #include <string>
 
 #include "fixture_simulator.h"
-#include "simulator/immediate_cover.h"
+#include "simulator/cover_results.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 

@@ -826,6 +826,15 @@ Tri Step(const PropertyExprNode* node, NodeState& state, StepContext& sc,
   return state.verdict;
 }
 
+// The verdict of an attempt decided, read off its root's state.
+PropertyVerdict VerdictOf(const PropertyExprNode* root,
+                          const NodeState& state) {
+  PropertyVerdict verdict;
+  verdict.holds = state.verdict == Tri::kTrue;
+  verdict.vacuous = verdict.holds && DecidedVacuously(root, state);
+  return verdict;
+}
+
 }  // namespace
 
 void ForEachPropertyActual(
@@ -865,23 +874,24 @@ PropertyTreeState* CreatePropertyTreeState(
   return state;
 }
 
-std::vector<bool> AdvancePropertyTree(PropertyTreeState& state, bool disabled,
-                                      SimContext& ctx, Arena& arena) {
-  std::vector<bool> verdicts;
+PropertyTick AdvancePropertyTree(PropertyTreeState& state, bool disabled,
+                                 SimContext& ctx, Arena& arena) {
+  PropertyTick tick;
   // §16.13: which clocks ticked at this time step; a second wake at one
   // time step, by another of the clocks, advances nothing again.
   SimTime now = ctx.CurrentTime();
-  if (state.clocks.multiclock && state.advanced_at == now) return verdicts;
+  if (state.clocks.multiclock && state.advanced_at == now) return tick;
   state.advanced_at = now;
   uint32_t ticked = ClocksTicked(state.clocks, now);
-  if (ticked == 0) return verdicts;
+  if (ticked == 0) return tick;
   bool leading = (ticked & 1u) != 0;
+  tick.attempted = leading;
   ctx.AssertionSamples().SetClockTicks(ticked);
   for (const Expr* site : state.past_sites) EvalExpr(site, ctx, arena);
   if (disabled) {
     state.attempts.clear();
     ctx.AssertionSamples().SetClockTicks(~0u);
-    return verdicts;
+    return tick;
   }
   if (leading) {
     state.attempts.push_back(NewNodeState(state.root, state, 0, arena));
@@ -894,19 +904,20 @@ std::vector<bool> AdvancePropertyTree(PropertyTreeState& state, bool disabled,
     if (verdict == Tri::kPending) {
       kept.push_back(state.attempts[i]);
     } else {
-      verdicts.push_back(verdict == Tri::kTrue);
+      tick.verdicts.push_back(VerdictOf(state.root, *state.attempts[i]));
     }
   }
   state.attempts = std::move(kept);
   ctx.AssertionSamples().SetClockTicks(~0u);
-  return verdicts;
+  return tick;
 }
 
-std::vector<bool> FinishPropertyTree(PropertyTreeState& state) {
-  std::vector<bool> verdicts;
+std::vector<PropertyVerdict> FinishPropertyTree(PropertyTreeState& state) {
+  std::vector<PropertyVerdict> verdicts;
   verdicts.reserve(state.attempts.size());
   for (NodeState* attempt : state.attempts) {
-    verdicts.push_back(Finish(state.root, *attempt) == Tri::kTrue);
+    Finish(state.root, *attempt);
+    verdicts.push_back(VerdictOf(state.root, *attempt));
   }
   state.attempts.clear();
   return verdicts;

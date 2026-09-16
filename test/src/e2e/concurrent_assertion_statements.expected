@@ -9,3 +9,5 @@ concurrent_assertion_statements.m_cover_seq covered at 85
 concurrent_assertion_statements.m_cover covered at 95
 concurrent_assertion_statements.prog.pr_named failed at 105
 $finish at time 110
+cover sequence concurrent_assertion_statements (line 43): attempted 11, matched 1
+cover property concurrent_assertion_statements (line 45): attempted 11, succeeded 1, succeeded vacuously 0

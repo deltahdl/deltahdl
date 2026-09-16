@@ -26,12 +26,28 @@ PropertyTreeState* CreatePropertyTreeState(
     const PropertyExprNode* root, const std::vector<EventExpr>& leading_clock,
     SimContext& ctx, Arena& arena);
 
+// The verdict of one attempt: whether the property held, and, where it did,
+// whether because of vacuity, which §16.14.3 counts apart: an implication
+// whose antecedent had no match, an if without else whose condition was
+// false or a case selecting no item, at the root of the tree.
+struct PropertyVerdict {
+  bool holds = false;
+  bool vacuous = false;
+};
+
 // One tick: every attempt in flight advances and a new one begins, and each
-// whose tree is decided at this tick reaches its verdict, true or false, and
-// leaves; `disabled` drops every attempt in flight and begins none. The
-// sampled value functions the tree holds are sampled at the tick first.
-std::vector<bool> AdvancePropertyTree(PropertyTreeState& state, bool disabled,
-                                      SimContext& ctx, Arena& arena);
+// whose tree is decided at this tick reaches its verdict and leaves;
+// `disabled` drops every attempt in flight and begins none, though
+// `attempted` says one began, disabled or not, at a tick of the leading
+// clock, as §16.14.3 counts attempts. The sampled value functions the tree
+// holds are sampled at the tick first.
+struct PropertyTick {
+  bool attempted = false;
+  std::vector<PropertyVerdict> verdicts;
+};
+
+PropertyTick AdvancePropertyTree(PropertyTreeState& state, bool disabled,
+                                 SimContext& ctx, Arena& arena);
 
 // §16.12.17: the declaration `instance` names where it is an instance,
 // written as a name or a call, of a named property whose body the tree
@@ -47,6 +63,6 @@ void ForEachPropertyActual(
 // The end of the run: each attempt still in flight is decided with its
 // sequence operands still in flight read as §16.12.2 has them, a strong one
 // false and a weak one true, and reaches its verdict.
-std::vector<bool> FinishPropertyTree(PropertyTreeState& state);
+std::vector<PropertyVerdict> FinishPropertyTree(PropertyTreeState& state);
 
 }  // namespace delta
