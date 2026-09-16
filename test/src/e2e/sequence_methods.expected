@@ -1,0 +1,5 @@
+e1 passed at 56
+e2 passed at 72
+e3 with e1.matched ends at 75
+e4 with subseq.triggered ends at 72
+$finish at time 90

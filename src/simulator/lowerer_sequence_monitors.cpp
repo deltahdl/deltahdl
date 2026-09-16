@@ -82,6 +82,46 @@ std::vector<const Expr*> TriggeredInstances(const RtlirModule* mod,
   return instances;
 }
 
+// §16.13.6: the sequence actuals the module's bodies pass to instances,
+// `e2_with_arg(@(posedge sysclk) $rose(a) ##1 b ##1 c)`, each carried by
+// the identifier standing in the argument's place, in its sequence bodies
+// and its procedures, each once. A method the instantiated body applies to
+// the formal, `subseq.triggered`, reads the end point of the actual's own
+// monitor.
+std::vector<const Expr*> SequenceActuals(const RtlirModule* mod) {
+  std::vector<const Expr*> actuals;
+  std::unordered_set<const Expr*> seen;
+  auto collect = [&](const Expr* e) {
+    if (e->kind != ExprKind::kIdentifier || e->property_actual == nullptr ||
+        e->property_actual->kind != PropertyExprNode::Kind::kSequence ||
+        e->property_actual->sequence == nullptr || !seen.insert(e).second) {
+      return;
+    }
+    actuals.push_back(e);
+  };
+  for (const auto* seq : mod->sequence_decls) {
+    ForEachBodyExpr(seq->seq_linear, collect);
+  }
+  for (const auto& proc : mod->processes) {
+    ForEachStmtReadExpr(proc.body,
+                        [&](const Expr* e) { ForEachSubExpr(e, collect); });
+  }
+  return actuals;
+}
+
+// §16.13.6: the sequence_expr an actual carries as a declaration of its
+// own, on the clock the actual opens with, `@(posedge sysclk)`, where it
+// opens with one.
+ModuleItem* ActualAsSequence(const Expr* holder, std::string_view name,
+                             Arena& arena) {
+  auto* seq = arena.Create<ModuleItem>(*holder->property_actual->sequence);
+  seq->kind = ModuleItemKind::kSequenceDecl;
+  seq->loc = holder->range.start;
+  seq->name = name;
+  if (seq->seq_clock.empty()) seq->seq_clock = holder->property_actual->clock;
+  return seq;
+}
+
 // Whether every sequence the body applies `triggered` to, itself aside, has
 // its monitor made.
 bool DependenciesMade(const ModuleItem* seq,
@@ -143,13 +183,23 @@ void Lowerer::LowerSequenceMonitor(const ModuleItem* seq,
   ScheduleProcess(p, ctx_);
 }
 
-// §16.9.11: the monitors of a module's sequences, the instances with
-// arguments its bodies apply `triggered` to first, each under an endpoint of
-// its own that the evaluator finds by the instance, and then the named
+// §16.9.11 and §16.13.6: the monitors of a module's sequences, the
+// sequence actuals its bodies pass and the instances with arguments its
+// bodies apply `triggered` to first, each under an endpoint of its own that
+// the evaluator finds by the actual or the instance, and then the named
 // sequences, a sequence reading another's `triggered` after the one it
 // reads, so that at each tick the end point is fired before it is read; a
 // cycle among them is broken in declaration order.
 void Lowerer::LowerSequenceMonitors(const RtlirModule* mod) {
+  for (const Expr* actual : SequenceActuals(mod)) {
+    auto* name =
+        arena_.Create<std::string>("actual@" + std::to_string(next_id_));
+    auto* ep_name = arena_.Create<std::string>("__seq_" + *name);
+    auto* ep_var = ctx_.CreateVariable(*ep_name, 1);
+    ep_var->is_event = true;
+    ctx_.RegisterSequenceInstanceEndpoint(actual, *ep_name);
+    LowerSequenceMonitor(ActualAsSequence(actual, *name, arena_), *ep_name);
+  }
   for (const Expr* instance : TriggeredInstances(mod, ctx_)) {
     auto* name = arena_.Create<std::string>(std::string(instance->callee) +
                                             "@" + std::to_string(next_id_));

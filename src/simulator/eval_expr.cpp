@@ -638,17 +638,29 @@ static bool TryParameterizedScopeParam(const Expr* expr, SimContext& ctx,
   return true;
 }
 
-// §16.9.11 and §16.13.5: `.triggered` or `.matched` applied to a sequence
-// instance with arguments reads the endpoint of the monitor the lowering
-// gave that instance; answers false where no monitor was made for it.
-static bool TryInstanceTriggered(const Expr* expr, SimContext& ctx,
-                                 Arena& arena, Logic4Vec& out) {
-  if (expr->lhs == nullptr || expr->lhs->kind != ExprKind::kCall ||
-      expr->rhs == nullptr ||
-      (expr->rhs->text != "triggered" && expr->rhs->text != "matched") ||
-      ctx.FindSequenceDecl(expr->lhs->callee) == nullptr) {
+// §16.9.11, §16.13.5 and §16.13.6: whether the expression applies
+// `triggered` or `matched` to a sequence instance with arguments, `e2(ready,
+// proc1, proc2).triggered`, or to a sequence actual, the identifier
+// carrying it standing where the formal of `subseq.triggered` stood.
+static bool ReadsAMonitorEndPoint(const Expr* expr, SimContext& ctx) {
+  if (expr->lhs == nullptr || expr->rhs == nullptr ||
+      (expr->rhs->text != "triggered" && expr->rhs->text != "matched")) {
     return false;
   }
+  if (expr->lhs->kind == ExprKind::kCall) {
+    return ctx.FindSequenceDecl(expr->lhs->callee) != nullptr;
+  }
+  return expr->lhs->kind == ExprKind::kIdentifier &&
+         expr->lhs->property_actual != nullptr;
+}
+
+// §16.9.11, §16.13.5 and §16.13.6: `.triggered` or `.matched` applied to a
+// sequence instance with arguments or to a sequence actual reads the
+// endpoint of the monitor the lowering gave it; answers false where no
+// monitor was made for it.
+static bool TryInstanceTriggered(const Expr* expr, SimContext& ctx,
+                                 Arena& arena, Logic4Vec& out) {
+  if (!ReadsAMonitorEndPoint(expr, ctx)) return false;
   std::string_view ep_name = ctx.FindSequenceInstanceEndpoint(expr->lhs);
   bool triggered = !ep_name.empty() && (expr->rhs->text == "matched"
                                             ? SequenceMatched(ep_name, ctx)

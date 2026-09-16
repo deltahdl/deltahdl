@@ -7,6 +7,7 @@
 #include "lexer/token.h"
 #include "parser/ast.h"
 #include "parser/parser.h"
+#include "parser/parser_property_spec_internal.h"
 #include "parser/parser_sequence_property_decl_internal.h"
 
 namespace delta {
@@ -213,33 +214,18 @@ struct ParserSeqLinearHelpers {
     return call;
   }
 
-  // §16.8.1: an actual for a formal of type event is an event_expression, so
+  // §16.8.1: an actual of a sequence instance is read as a property
+  // instance's is. One for a formal of type event is an event_expression, so
   // one opening with an edge keyword is kept as the edge over its signal, a
   // unary expression whose operator is the keyword, for the flattening to read
   // as the instantiated sequence's clock; an actual with no edge is an ordinary
   // expression, which an `@(posedge sig)` over a formal sig takes as the
-  // signal.
+  // signal. §16.13.6: one that is a sequence_expr, for a formal of type
+  // sequence, `e2_with_arg(@(posedge sysclk) $rose(a) ##1 b ##1 c)`, is
+  // carried by an identifier standing in the argument's place.
   static Expr* ParseSequenceActualArg(Parser& p) {
-    if (p.Check(TokenKind::kDollar)) {
-      Token tok = p.Consume();
-      auto* dollar = p.arena_.Create<Expr>();
-      dollar->kind = ExprKind::kIdentifier;
-      dollar->text = tok.text;
-      dollar->range.start = tok.loc;
-      return dollar;
-    }
-    if (p.Check(TokenKind::kKwPosedge) || p.Check(TokenKind::kKwNegedge) ||
-        p.Check(TokenKind::kKwEdge)) {
-      Token edge = p.Consume();
-      auto* event = p.arena_.Create<Expr>();
-      event->kind = ExprKind::kUnary;
-      event->op = edge.kind;
-      event->text = edge.text;
-      event->range.start = edge.loc;
-      event->lhs = p.ParseExpr();
-      return event;
-    }
-    return p.ParseExpr();
+    bool plain = true;
+    return ParserPropertySpecHelpers::ParsePropertyActualArg(p, plain);
   }
 
   // §16.10 Syntax 16-13: the assertion_variable_declarations a sequence body
@@ -747,9 +733,12 @@ void Parser::CaptureLinearSequenceBody(ModuleItem* item) {
 // sequence is not one the monitor reads.
 bool Parser::ParseSequenceExprInto(ModuleItem* item) {
   uint32_t errors = diag_.ErrorCount() + diag_.SuppressedErrorCount();
+  // A sequence read inside another's actual argument leaves the mark as it
+  // found it.
+  bool was_in_sequence_body = in_sequence_body_;
   in_sequence_body_ = true;
   bool ok = ParserSeqLinearHelpers::ParseLinearSeqOperands(*this, item);
-  in_sequence_body_ = false;
+  in_sequence_body_ = was_in_sequence_body;
   // An operand that read with an error, reported or suppressed, is not one.
   if (diag_.ErrorCount() + diag_.SuppressedErrorCount() != errors) ok = false;
   if (!ok || item->seq_linear.operands.empty()) {
@@ -766,10 +755,11 @@ bool Parser::ParseSequenceExprInto(ModuleItem* item) {
 // boolean operand beside a sequence as well.
 bool Parser::ParseSequenceTermInto(ModuleItem* item) {
   uint32_t errors = diag_.ErrorCount() + diag_.SuppressedErrorCount();
+  bool was_in_sequence_body = in_sequence_body_;
   in_sequence_body_ = true;
   bool ok = ParserSeqLinearHelpers::ParseLinearSeqIntersection(
       *this, item->seq_linear);
-  in_sequence_body_ = false;
+  in_sequence_body_ = was_in_sequence_body;
   if (diag_.ErrorCount() + diag_.SuppressedErrorCount() != errors) ok = false;
   if (!ok || item->seq_linear.operands.empty()) {
     item->seq_linear = SeqLinearBody{};
