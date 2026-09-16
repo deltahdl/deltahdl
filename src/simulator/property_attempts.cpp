@@ -831,7 +831,7 @@ PropertyVerdict VerdictOf(const PropertyExprNode* root,
                           const NodeState& state) {
   PropertyVerdict verdict;
   verdict.holds = state.verdict == Tri::kTrue;
-  verdict.vacuous = verdict.holds && DecidedVacuously(root, state);
+  verdict.vacuous = verdict.holds && !Nonvacuous(root, state);
   verdict.bindings = state.bindings;
   return verdict;
 }

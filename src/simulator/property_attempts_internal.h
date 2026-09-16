@@ -98,10 +98,17 @@ Tri DecideUntil(const PropertyExprNode* node, NodeState& state,
 // antecedent still in flight matches no more, and the rest follows.
 Tri Finish(const PropertyExprNode* node, NodeState& state);
 
-// §16.14.3: whether an attempt decided true held because of vacuity: its
-// root, or the body the root expanded to as an instance, is an implication
-// no consequent of which began, an if without else whose condition was
-// false, or a case that selected no item.
-bool DecidedVacuously(const PropertyExprNode* node, const NodeState& state);
+// §16.14.8: whether the attempt of `node`, decided, was nonvacuous, defined
+// on the structure of the property: a sequence's attempt is nonvacuous
+// always, a not's, an instance's, a nexttime's begun and an abort's not
+// aborted as its operand's, an or's, an and's and an iff's where either
+// operand's is, an if's as the branch its condition took, an implication's
+// where a consequent begun at an end point of the antecedent is, an
+// implies' where the first operand held and the second's is, an always's,
+// an eventually's and an until's where a tick's operand attempt is with
+// the ticks before it holding, not holding or, for an until, the first
+// holding and the second not, and a case's as the item it selected. Defined
+// in property_vacuity.cpp.
+bool Nonvacuous(const PropertyExprNode* node, const NodeState& state);
 
 }  // namespace delta

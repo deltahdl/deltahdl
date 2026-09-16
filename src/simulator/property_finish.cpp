@@ -236,20 +236,4 @@ Tri Finish(const PropertyExprNode* node, NodeState& state) {
   return state.verdict;
 }
 
-bool DecidedVacuously(const PropertyExprNode* node, const NodeState& state) {
-  switch (node->kind) {
-    case PropertyExprNode::Kind::kBoolean:
-      return state.expansion != nullptr &&
-             DecidedVacuously(state.expansion, *state.operands[0]);
-    case PropertyExprNode::Kind::kImplication:
-      return state.consequents.empty();
-    case PropertyExprNode::Kind::kIfElse:
-      return node->operands.size() == 1 && !state.condition;
-    case PropertyExprNode::Kind::kCase:
-      return state.selected == node->operands.size();
-    default:
-      return false;
-  }
-}
-
 }  // namespace delta

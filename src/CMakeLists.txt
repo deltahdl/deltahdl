@@ -252,6 +252,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/procedural_assertion.cpp
     simulator/property_attempts.cpp
     simulator/property_instance_lookup.cpp
+    simulator/property_vacuity.cpp
     simulator/property_clocks.cpp
     simulator/property_finish.cpp
     simulator/lowerer_process.cpp
