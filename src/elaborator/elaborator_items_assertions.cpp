@@ -204,23 +204,6 @@ void CollectTreeClocks(const PropertyExprNode* node,
                        const PropertyRegistry& registry,
                        std::vector<EventExpr>& out, int depth);
 
-// §16.8 and §16.12: the actuals of an instance written as a call bound to
-// the declaration's formals, by position for the leading actuals and by
-// name for the `.formal(actual)` ones; empty for a name alone.
-ActualsByFormal InstanceActuals(const ModuleItem* decl, const Expr* instance) {
-  ActualsByFormal actuals;
-  if (instance->kind != ExprKind::kCall) return actuals;
-  size_t named = instance->arg_names.size();
-  size_t positional = instance->args.size() - named;
-  for (size_t i = 0; i < positional && i < decl->prop_formals.size(); ++i) {
-    actuals[decl->prop_formals[i]] = instance->args[i];
-  }
-  for (size_t i = 0; i < named; ++i) {
-    actuals[instance->arg_names[i]] = instance->args[positional + i];
-  }
-  return actuals;
-}
-
 // §16.13.2 by way of §16.8.1: one event of an instantiated property's
 // declared clock with the actual in the formal's place, for the process to
 // wake on: an event actual supplies the edge and the signal, and any other
@@ -258,7 +241,7 @@ void CollectInstanceClocks(const Expr* instance,
   if (decl != nullptr) {
     // §16.13.2: a property declared with a clock is evaluated on it, the
     // actuals in the formals' places.
-    ActualsByFormal actuals = InstanceActuals(decl, instance);
+    ActualsByFormal actuals = BindActuals(decl->prop_formals, instance);
     for (const EventExpr& ev : decl->prop_clock) {
       AppendClockOnce(out, InstanceClockEvent(ev, actuals));
     }

@@ -2,6 +2,7 @@
 
 #include <string_view>
 #include <unordered_map>
+#include <vector>
 
 #include "common/arena.h"
 #include "parser/ast_expr.h"
@@ -18,5 +19,11 @@ using ActualsByFormal = std::unordered_map<std::string_view, Expr*>;
 // map supplies.
 Expr* SubstituteFormals(const Expr* e, const ActualsByFormal& actuals,
                         Arena& arena);
+
+// §16.8 and §16.12: the actuals of `instance`, written as a call, bound to
+// `formals`, by position for the leading actuals and by name for the
+// `.formal(actual)` ones; empty for an instance written as a name alone.
+ActualsByFormal BindActuals(const std::vector<std::string_view>& formals,
+                            const Expr* instance);
 
 }  // namespace delta

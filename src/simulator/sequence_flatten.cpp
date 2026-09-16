@@ -172,16 +172,7 @@ SeqCycleDelay AddDelays(const SeqCycleDelay& before,
 // names beside.
 ActualsByFormal BindInstanceActuals(const ModuleItem* decl,
                                     const Expr* instance, Arena& arena) {
-  ActualsByFormal actuals;
-  if (instance->kind != ExprKind::kCall) return actuals;
-  size_t named = instance->arg_names.size();
-  size_t positional = instance->args.size() - named;
-  for (size_t i = 0; i < positional && i < decl->prop_formals.size(); ++i) {
-    actuals[decl->prop_formals[i]] = instance->args[i];
-  }
-  for (size_t i = 0; i < named; ++i) {
-    actuals[instance->arg_names[i]] = instance->args[positional + i];
-  }
+  ActualsByFormal actuals = BindActuals(decl->prop_formals, instance);
   for (size_t i = 0;
        i < decl->prop_formals.size() && i < decl->prop_formal_type_kw.size();
        ++i) {

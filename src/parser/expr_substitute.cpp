@@ -1,5 +1,9 @@
 #include "parser/expr_substitute.h"
 
+#include <cstddef>
+#include <string_view>
+#include <vector>
+
 #include "common/arena.h"
 #include "parser/ast_expr.h"
 
@@ -26,6 +30,21 @@ Expr* SubstituteFormals(const Expr* e, const ActualsByFormal& actuals,
   for (auto& sub : copy->elements) sub = SubstituteFormals(sub, actuals, arena);
   for (auto& sub : copy->args) sub = SubstituteFormals(sub, actuals, arena);
   return copy;
+}
+
+ActualsByFormal BindActuals(const std::vector<std::string_view>& formals,
+                            const Expr* instance) {
+  ActualsByFormal actuals;
+  if (instance->kind != ExprKind::kCall) return actuals;
+  size_t named = instance->arg_names.size();
+  size_t positional = instance->args.size() - named;
+  for (size_t i = 0; i < positional && i < formals.size(); ++i) {
+    actuals[formals[i]] = instance->args[i];
+  }
+  for (size_t i = 0; i < named; ++i) {
+    actuals[instance->arg_names[i]] = instance->args[positional + i];
+  }
+  return actuals;
 }
 
 }  // namespace delta
