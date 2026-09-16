@@ -213,4 +213,14 @@ void FlushProceduralAssertionQueue(Process& proc) {
   }
 }
 
+bool DisableProceduralAssertion(Process& proc, std::string_view label) {
+  bool named = false;
+  for (auto& entry : proc.procedural_assertions) {
+    if (entry.first->label != label) continue;
+    entry.second->pending.clear();
+    named = true;
+  }
+  return named;
+}
+
 }  // namespace delta

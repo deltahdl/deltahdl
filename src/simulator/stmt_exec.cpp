@@ -16,6 +16,7 @@
 #include "simulator/awaiters.h"
 #include "simulator/eval_semaphore.h"
 #include "simulator/evaluation.h"
+#include "simulator/procedural_assertion.h"
 #include "simulator/process.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
@@ -689,11 +690,17 @@ static SimCoroutine NbEventTriggerEventCoroutine(const Stmt* stmt,
 // the process is left running rather than deactivated.
 // Reports whether the target named the outermost scope of any procedure, so
 // that a name answered here is not also taken for an assertion label below.
+//
+// §16.14.6.4: the same disable flushes the procedure's procedural assertion
+// queue, every pending instance of its procedural concurrent assertions
+// cleared, the matured ones impacted by no disable; the procedure disabling
+// its own outermost scope flushes its own.
 static bool FlushDeferredQueueOfOutermostScope(std::string_view target,
                                                const Process* current,
                                                SimContext& ctx) {
   const auto& procs = ctx.FindOutermostScopeProcesses(target);
   for (auto* proc : procs) {
+    FlushProceduralAssertionQueue(*proc);
     if (proc == current) continue;
     proc->deferred_report_generation++;
   }
@@ -750,6 +757,9 @@ static StmtResult ExecDisableImpl(const Stmt* stmt, SimContext& ctx) {
   // report that has already matured, are untouched.
   if (procs.empty() && !named_a_procedure_scope && current) {
     current->cancelled_deferred_labels.insert(std::string(target));
+    // §16.14.6.4: or a specific procedural concurrent assertion, whose
+    // pending instances alone are cleared.
+    DisableProceduralAssertion(*current, target);
   }
 
   return StmtResult::kDone;

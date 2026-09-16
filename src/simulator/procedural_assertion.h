@@ -74,4 +74,10 @@ bool EnqueueProceduralAssertion(const Stmt* stmt, SimContext& ctx,
 // matured in an earlier Observed region are kept.
 void FlushProceduralAssertionQueue(Process& proc);
 
+// §16.14.6.4: a disable naming a specific procedural concurrent assertion
+// of `proc`, by its label, clears the pending instances of that assertion
+// alone, those of the others staying in the queue and a matured instance
+// being impacted by no disable; answers whether `label` named one.
+bool DisableProceduralAssertion(Process& proc, std::string_view label);
+
 }  // namespace delta
