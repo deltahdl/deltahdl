@@ -11,6 +11,7 @@
 #include "elaborator/property_instance.h"
 #include "elaborator/property_rewrite.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/semantic_leading_clocks.h"
 #include "elaborator/sensitivity.h"
 #include "parser/ast.h"
 #include "parser/expr_substitute.h"
@@ -161,38 +162,16 @@ bool BodyIsRead(Stmt* stmt, const ModuleItem* decl, DiagEngine& diag) {
   return false;
 }
 
-// Whether the property tree names a clocking event of its own anywhere, on
-// an operand, in a sequence or in a property it instantiates, which makes
-// the property multiclocked under a leading clock from elsewhere.
-bool TreeNamesAClock(const PropertyExprNode* node,
-                     const PropertyRegistry& registry) {
-  if (node == nullptr) return false;
-  if (!node->clock.empty()) return true;
-  if (node->sequence != nullptr) {
-    for (const auto& clock : node->sequence->seq_linear.clocks) {
-      if (!clock.empty()) return true;
-    }
-  }
-  const ModuleItem* decl =
-      InstantiatedDecl(node->boolean, ModuleItemKind::kPropertyDecl, registry);
-  if (decl != nullptr && !decl->prop_clock.empty()) return true;
-  const ModuleItem* seq =
-      InstantiatedDecl(node->boolean, ModuleItemKind::kSequenceDecl, registry);
-  if (seq != nullptr && !seq->seq_clock.empty()) return true;
-  for (const PropertyExprNode* operand : node->operands) {
-    if (TreeNamesAClock(operand, registry)) return true;
-  }
-  return false;
-}
-
 // §16.16 (c): the contextually inferred clocking event is treated as the
 // leading clocking event of an assertion that opens with none, which a
-// multiclocked property may not take: the clause's a3 is reported and left
-// as no concurrent assertion. Answers whether the statement goes on.
+// multiclocked property may not take, an operand clocked as the inferred
+// clock is being no other clock (§16.16.1's a4): the clause's a3 is
+// reported and left as no concurrent assertion. Answers whether the
+// statement goes on.
 bool TakesInferredClock(Stmt* stmt, const std::vector<EventExpr>& inferred,
                         const PropertyRegistry& registry, DiagEngine& diag) {
   if (!stmt->assert_clock.empty() || inferred.empty() ||
-      !TreeNamesAClock(stmt->assert_property, registry)) {
+      TreeNamesOnlyClock(stmt->assert_property, inferred, registry)) {
     return true;
   }
   diag.Error(stmt->range.start,
@@ -207,9 +186,21 @@ bool TakesInferredClock(Stmt* stmt, const std::vector<EventExpr>& inferred,
 // instantiates gave it, else `context`, the procedure's inferred clock or
 // the default clocking's; with none, the statement is reported.
 void ResolveProceduralClock(Stmt* stmt, const std::vector<EventExpr>& context,
+                            const PropertyRegistry& registry,
                             DiagEngine& diag) {
   if (stmt->assert_clock.empty()) stmt->assert_clock = context;
-  if (!stmt->assert_clock.empty()) return;
+  if (!stmt->assert_clock.empty()) {
+    // §16.16 (e) and §16.16.1: a multiclocked property needs a unique
+    // semantic leading clock under the clock flowing in.
+    if (!HasUniqueSemanticLeadingClock(stmt->assert_property,
+                                       stmt->assert_clock, registry)) {
+      diag.Error(stmt->range.start,
+                 "the property has no unique semantic leading clock",
+                 Subclause("16.16.1"));
+      stmt->is_concurrent_clocked = false;
+    }
+    return;
+  }
   diag.Error(stmt->range.start,
              "no clock is inferred for the procedural concurrent assertion: "
              "its property_spec opens with no clocking event, the procedure "
@@ -314,7 +305,7 @@ void ElaborateProceduralConcurrentAssertions(ModuleItem* procedure,
     }
     PromoteSequenceInstances(stmt->assert_property, registry, arena);
     if (!TakesInferredClock(stmt, inferred, registry, diag)) continue;
-    ResolveProceduralClock(stmt, at_instance.clock, diag);
+    ResolveProceduralClock(stmt, at_instance.clock, registry, diag);
   }
 }
 

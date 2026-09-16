@@ -14,6 +14,7 @@
 #include "elaborator/property_instance.h"
 #include "elaborator/property_rewrite.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/semantic_leading_clocks.h"
 #include "elaborator/sequence_match_class.h"
 #include "lexer/token.h"
 #include "parser/ast.h"
@@ -544,21 +545,27 @@ void Elaborator::ResolveStaticAssertionClock(
     ModuleItem* item, const std::vector<EventExpr>& default_clock) {
   // §16.4.3: a deferred immediate assertion outside procedural code stands
   // for an always_comb procedure and has no clock to resolve.
-  if (item->body == nullptr || item->body->is_deferred ||
-      !item->sensitivity.empty()) {
+  if (item->body == nullptr || item->body->is_deferred) return;
+  if (item->sensitivity.empty()) item->sensitivity = default_clock;
+  if (item->sensitivity.empty()) {
+    diag_.Error(item->loc,
+                "concurrent assertion has no leading clocking event: none is "
+                "written, no default clocking is in scope and the property "
+                "is no instance of a sequence or property declared with a "
+                "unique leading clocking event",
+                Subclause("16.16"));
+    item->body = nullptr;
     return;
   }
-  if (!default_clock.empty()) {
-    item->sensitivity = default_clock;
-    return;
+  // §16.16 (e) and §16.16.1: a multiclocked maximal property needs a unique
+  // semantic leading clock under the clock flowing in, the clause's a1
+  // naming two.
+  if (!HasUniqueSemanticLeadingClock(item->body->assert_property,
+                                     item->sensitivity, property_registry_)) {
+    diag_.Error(item->loc, "the property has no unique semantic leading clock",
+                Subclause("16.16.1"));
+    item->body = nullptr;
   }
-  diag_.Error(item->loc,
-              "concurrent assertion has no leading clocking event: none is "
-              "written, no default clocking is in scope and the property is "
-              "no instance of a sequence or property declared with a unique "
-              "leading clocking event",
-              Subclause("16.16"));
-  item->body = nullptr;
 }
 
 void Elaborator::ElaborateAssertPropertyItem(ModuleItem* item,

@@ -1,0 +1,6 @@
+a2 passed at 15
+a2 passed at 20
+a4 passed at 25
+c1 covered at 30
+$finish at time 40
+cover property semantic_leading_clocks.c1 (line 38): attempted 4, succeeded 1, succeeded vacuously 0
