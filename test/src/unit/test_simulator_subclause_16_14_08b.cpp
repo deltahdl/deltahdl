@@ -14,7 +14,7 @@ namespace {
 // test/src/e2e/nonvacuous_evaluations.sv is: clk rises at 5, 15, ..., 55,
 // tick n at 10n - 5; a is high at ticks 2, 4 and 5, b at 2 and 5, c and en
 // at 1 to 3 and x at 4; the run ends at 60. The cover's results at the end
-// count its successes and the vacuous ones among them.
+// count its nonvacuous successes and, apart from them, its vacuous ones.
 struct CoverCounts {
   uint64_t attempted = 0;
   uint64_t succeeded = 0;
@@ -73,7 +73,7 @@ TEST(NonvacuousEvaluationRun, AnOrIsNonvacuousWhereEitherOperandIs) {
 TEST(NonvacuousEvaluationRun, AnIfIsAsNonvacuousAsTheBranchTaken) {
   CoverCounts counts = Cover("if (en) a |-> b else c");
   EXPECT_EQ(counts.attempted, 6u);
-  EXPECT_EQ(counts.succeeded, 3u);
+  EXPECT_EQ(counts.succeeded, 1u);
   EXPECT_EQ(counts.vacuous, 2u);
 }
 
@@ -83,7 +83,7 @@ TEST(NonvacuousEvaluationRun, AnIfIsAsNonvacuousAsTheBranchTaken) {
 TEST(NonvacuousEvaluationRun, ANexttimeNeedsANextTickAndANonvacuousAttempt) {
   CoverCounts counts = Cover("nexttime (a |-> b)");
   EXPECT_EQ(counts.attempted, 6u);
-  EXPECT_EQ(counts.succeeded, 5u);
+  EXPECT_EQ(counts.succeeded, 2u);
   EXPECT_EQ(counts.vacuous, 3u);
 }
 
@@ -94,7 +94,7 @@ TEST(NonvacuousEvaluationRun, ANexttimeNeedsANextTickAndANonvacuousAttempt) {
 TEST(NonvacuousEvaluationRun, AnAlwaysNeedsANonvacuousTickAndNoPriorFailure) {
   CoverCounts counts = Cover("always [0:1] (a |-> b)");
   EXPECT_EQ(counts.attempted, 6u);
-  EXPECT_EQ(counts.succeeded, 4u);
+  EXPECT_EQ(counts.succeeded, 3u);
   EXPECT_EQ(counts.vacuous, 1u);
 }
 
@@ -105,7 +105,7 @@ TEST(NonvacuousEvaluationRun, AnAlwaysNeedsANonvacuousTickAndNoPriorFailure) {
 TEST(NonvacuousEvaluationRun, AnAcceptedAttemptIsVacuous) {
   CoverCounts counts = Cover("accept_on (x) (a |=> b)");
   EXPECT_EQ(counts.attempted, 6u);
-  EXPECT_EQ(counts.succeeded, 4u);
+  EXPECT_EQ(counts.succeeded, 0u);
   EXPECT_EQ(counts.vacuous, 4u);
 }
 

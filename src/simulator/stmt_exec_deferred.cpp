@@ -477,10 +477,18 @@ static const Stmt* JudgeAssertion(const Stmt* stmt, SimContext& ctx,
 // assertion as a boolean property's evaluation does; the attempts still in
 // flight when the run ends fail then where the property is strong, or, as
 // §16.12.3 has `not` switch the strength, weak and negated.
+//
+// The final process runs with the context holding whatever ran last, so the
+// scopes the assertion stands in, its label among them, are captured where
+// the process is registered, at the statement's first tick, and stood up
+// around the reports, which §21.2.1.5 and §16.14.3's results name by them.
 static SimCoroutine StrongAttemptsFinalCoroutine(const Stmt* stmt,
                                                  SequencePropertyState* state,
+                                                 PendingReportScope scope,
                                                  SimContext& ctx,
                                                  Arena& arena) {
+  PendingReportScope saved;
+  scope.Install(ctx, saved);
   size_t pending = PendingSequenceAttempts(*state);
   for (size_t i = 0; i < pending; ++i) {
     RecordCoverImmediateSample(stmt, false, ctx);
@@ -491,6 +499,7 @@ static SimCoroutine StrongAttemptsFinalCoroutine(const Stmt* stmt,
                                     ImmediateDirectiveTypeBit(stmt), ctx);
     }
   }
+  PendingReportScope::Restore(ctx, saved);
 }
 
 static void RegisterStrongAttemptsFinal(const Stmt* stmt,
@@ -498,7 +507,9 @@ static void RegisterStrongAttemptsFinal(const Stmt* stmt,
                                         SimContext& ctx, Arena& arena) {
   auto* p = CreateAssertionChildProcess(ctx, arena, Region::kActive);
   p->kind = ProcessKind::kFinal;
-  p->coro = StrongAttemptsFinalCoroutine(stmt, state, ctx, arena).Release();
+  p->coro = StrongAttemptsFinalCoroutine(
+                stmt, state, PendingReportScope::Capture(ctx), ctx, arena)
+                .Release();
   ctx.RegisterFinalProcess(p);
 }
 
@@ -509,7 +520,10 @@ static void RegisterStrongAttemptsFinal(const Stmt* stmt,
 // their strength.
 static SimCoroutine PropertyTreeFinalCoroutine(const Stmt* stmt,
                                                PropertyTreeState* state,
+                                               PendingReportScope scope,
                                                SimContext& ctx, Arena& arena) {
+  PendingReportScope saved;
+  scope.Install(ctx, saved);
   for (PropertyVerdict verdict : FinishPropertyTree(*state)) {
     RecordCoverImmediateSample(stmt, verdict.holds, ctx);
     RecordConcurrentCoverVerdict(stmt, verdict, ctx);
@@ -524,6 +538,7 @@ static SimCoroutine PropertyTreeFinalCoroutine(const Stmt* stmt,
                                     ImmediateDirectiveTypeBit(stmt), ctx);
     }
   }
+  PendingReportScope::Restore(ctx, saved);
 }
 
 static void ExecPropertyTreeTick(const Stmt* stmt,
@@ -542,7 +557,9 @@ static void ExecPropertyTreeTick(const Stmt* stmt,
     if (state == nullptr) return;
     auto* p = CreateAssertionChildProcess(ctx, arena, Region::kActive);
     p->kind = ProcessKind::kFinal;
-    p->coro = PropertyTreeFinalCoroutine(stmt, state, ctx, arena).Release();
+    p->coro = PropertyTreeFinalCoroutine(
+                  stmt, state, PendingReportScope::Capture(ctx), ctx, arena)
+                  .Release();
     ctx.RegisterFinalProcess(p);
   }
   bool disabled = stmt->assert_disable_iff != nullptr &&

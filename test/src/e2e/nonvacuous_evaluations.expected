@@ -1,7 +1,7 @@
 $finish at time 60
 cover property nonvacuous_evaluations.c1 (line 48): attempted 6, succeeded 1, succeeded vacuously 0
 cover property nonvacuous_evaluations.c2 (line 49): attempted 6, succeeded 5, succeeded vacuously 0
-cover property nonvacuous_evaluations.c3 (line 50): attempted 6, succeeded 3, succeeded vacuously 2
-cover property nonvacuous_evaluations.c4 (line 51): attempted 6, succeeded 5, succeeded vacuously 3
-cover property nonvacuous_evaluations.c5 (line 52): attempted 6, succeeded 4, succeeded vacuously 1
-cover property nonvacuous_evaluations.c6 (line 53): attempted 6, succeeded 4, succeeded vacuously 4
+cover property nonvacuous_evaluations.c3 (line 50): attempted 6, succeeded 1, succeeded vacuously 2
+cover property nonvacuous_evaluations.c4 (line 51): attempted 6, succeeded 2, succeeded vacuously 3
+cover property nonvacuous_evaluations.c5 (line 52): attempted 6, succeeded 3, succeeded vacuously 1
+cover property nonvacuous_evaluations.c6 (line 53): attempted 6, succeeded 0, succeeded vacuously 4

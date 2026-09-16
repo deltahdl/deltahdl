@@ -14,8 +14,8 @@
 // rising at 5, 15, ..., 55 so that tick n is at 10n - 5, the tick counter
 // counting through: a is high at ticks 2, 4 and 5, b at 2 and 5, c and en
 // at 1 to 3, and x at 4; the run ends at 60, and the results the tool
-// reports at its end count each cover's successes and, among them, the
-// vacuous ones.
+// reports at its end count each cover's nonvacuous successes and, apart
+// from them, its vacuous ones.
 //
 // c1, not (a |-> b), succeeds at 4 alone, where a is high and b low, and
 // nonvacuously, the implication's attempt having begun its consequent;
