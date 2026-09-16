@@ -37,6 +37,12 @@ struct LinearSequence {
   // one flowing in does, and its number once numbered.
   std::vector<EventExpr> clock_out;
   int clock_out_index = 0;
+  // §16.13.3: the clock the sequence is declared with, which its operands
+  // naming none are evaluated on and which flows no further than the
+  // sequence; empty where it is declared with none, `clock` then holding
+  // one an instance in it supplied for the monitor. The clock of the
+  // declaration a bare instance stands for where its own has none.
+  std::vector<EventExpr> declared_clock;
   std::vector<SeqLocalDecl> locals;
   // §16.9.9: the conditions held throughout spans of the flattened chain.
   std::vector<SeqThroughout> throughouts;
@@ -94,6 +100,11 @@ bool FlattenLinearSequence(const ModuleItem* seq, SimContext& ctx, Arena& arena,
 const std::vector<EventExpr>& OperandClock(const LinearSequence& body,
                                            size_t pos);
 int OperandClockIndex(const LinearSequence& body, size_t pos);
+
+// §16.13.1: whether an operand of the sequence is evaluated on a clock
+// other than the sequence's own, told by the edges and the signals'
+// spellings.
+bool NamesAnotherClock(const LinearSequence& body);
 
 // §16.8 and §16.12: the actuals of `instance`, an instance of the named
 // sequence or property `decl` written as a call, bound to the declaration's

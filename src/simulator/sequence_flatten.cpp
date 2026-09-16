@@ -415,6 +415,22 @@ void AddLocalFormalAssignments(const std::vector<LocalBinding>& formals,
   }
 }
 
+// §16.13.1 and §16.13.3: the clock the operand at `j` of an instantiated
+// body is evaluated on: the one it names, else the one the declaration is
+// declared with, its formals replaced by the actuals, else the one flowing
+// into the instance.
+std::vector<EventExpr> InstanceOperandClock(const LinearSequence& body,
+                                            size_t j, const InstanceOperand& op,
+                                            const ActualsByFormal& actuals,
+                                            Arena& arena) {
+  const std::vector<EventExpr>& own = OperandClock(body, j);
+  if (!own.empty()) return own;
+  if (!body.declared_clock.empty()) {
+    return SubstituteClock(body.declared_clock, actuals, arena);
+  }
+  return op.clock;
+}
+
 // Appends the instantiated body's flattened operands with the actuals
 // substituted, its clock taken where the outer sequence has none, and the
 // §16.8.2 assignments of its local variable formal arguments: the
@@ -450,12 +466,7 @@ bool ExpandInstance(const InstanceOperand& op, SimContext& ctx, Arena& arena,
     // §16.13.1 and §16.13.3: an operand of the instantiated body is
     // evaluated on the clock it names, else on the declaration's own, else
     // on the one flowing into the instance.
-    const std::vector<EventExpr>& own = OperandClock(body, j);
-    if (!own.empty()) {
-      PushOperandClock(out, own);
-    } else {
-      PushOperandClock(out, body.clock.empty() ? op.clock : body.clock);
-    }
+    PushOperandClock(out, InstanceOperandClock(body, j, op, actuals, arena));
   }
   // §16.9.9: a throughout of the instantiated body spans the same operands
   // where they now stand, its condition over the actuals.
@@ -541,11 +552,13 @@ bool Flatten(const ModuleItem* seq, SimContext& ctx, Arena& arena,
   if (const ModuleItem* inner = BareInstance(body, ctx)) {
     if (!Flatten(inner, ctx, arena, out, depth + 1)) return false;
     if (!seq->seq_clock.empty()) out.clock = seq->seq_clock;
+    if (!seq->seq_clock.empty()) out.declared_clock = seq->seq_clock;
     out.first_match = out.first_match || body.first_match;
     AttachFirstMatchItems(body, out);
     return true;
   }
   out.clock = seq->seq_clock;
+  out.declared_clock = seq->seq_clock;
   out.clock_out = body.clock_out;
   out.first_match = body.first_match;
   if (!FlattenConjunction(body, ctx, arena, out, depth)) return false;
@@ -624,6 +637,22 @@ const std::vector<EventExpr>& OperandClock(const LinearSequence& body,
                                            size_t pos) {
   static const std::vector<EventExpr> kNone;
   return pos < body.operand_clocks.size() ? body.operand_clocks[pos] : kNone;
+}
+
+bool NamesAnotherClock(const LinearSequence& body) {
+  for (const auto& clock : body.operand_clocks) {
+    if (clock.empty()) continue;
+    if (clock.size() != body.clock.size()) return true;
+    for (size_t i = 0; i < clock.size(); ++i) {
+      const EventExpr& a = clock[i];
+      const EventExpr& b = body.clock[i];
+      if (a.edge != b.edge || a.signal == nullptr || b.signal == nullptr ||
+          a.signal->text != b.signal->text) {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 int OperandClockIndex(const LinearSequence& body, size_t pos) {

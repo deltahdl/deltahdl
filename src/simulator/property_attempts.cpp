@@ -92,8 +92,9 @@ void NumberOperandClocks(LinearSequence& body, PropertyClocks& clocks,
                          int inherited) {
   // §16.13.3: a named sequence declared with a clock is evaluated on it,
   // which flows no further than the sequence.
-  int own_clock =
-      body.clock.empty() ? inherited : ClockIndexOf(clocks, body.clock);
+  int own_clock = body.declared_clock.empty()
+                      ? inherited
+                      : ClockIndexOf(clocks, body.declared_clock);
   body.clock_out_index =
       body.clock_out.empty() ? inherited : ClockIndexOf(clocks, body.clock_out);
   if (body.operand_clocks.empty() && own_clock == 0) return;
