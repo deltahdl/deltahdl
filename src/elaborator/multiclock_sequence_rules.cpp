@@ -63,9 +63,12 @@ bool SegmentAdmitsEmpty(const SeqLinearBody& body, size_t first, size_t last,
                         const PropertyRegistry& registry) {
   SeqLinearBody segment;
   segment.locals = body.locals;
+  SeqCycleDelay none;
+  none.min = 0;
+  none.max = 0;
   for (size_t i = first; i <= last; ++i) {
     segment.operands.push_back(body.operands[i]);
-    segment.delays.push_back(i == first ? SeqCycleDelay{0, 0} : body.delays[i]);
+    segment.delays.push_back(i == first ? none : body.delays[i]);
     segment.match_items.push_back(body.match_items[i]);
     segment.repetitions.push_back(body.repetitions[i]);
   }
