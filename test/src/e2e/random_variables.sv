@@ -41,7 +41,7 @@ endclass
 module random_variables;
   initial begin
     Vars vars = new;
-    Inner before = vars.in;
+    Inner held = vars.in;
     int solved = 0, y_in_range = 0, r_in_range = 0, e_named = 0;
     int s_unnamed = 0, in_solved = 0, w_above = 0, handle_kept = 0;
     int cycles = 0;
@@ -57,7 +57,7 @@ module random_variables;
         if (vars.s != 2'b00 && vars.s != 2'b11) s_unnamed++;
         if (vars.in.v >= 1 && vars.in.v <= 3) in_solved++;
         if (vars.w > vars.in.v) w_above++;
-        if (vars.in == before) handle_kept++;
+        if (vars.in == held) handle_kept++;
       end
       if (seen == 4'b1111) cycles++;
     end

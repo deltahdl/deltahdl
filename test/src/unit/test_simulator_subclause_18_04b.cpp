@@ -10,7 +10,7 @@ namespace {
 
 // The Vars of test/src/e2e/random_variables.sv, an object holding one
 // random variable per rule of the clause, around the statements of an
-// initial that holds it as vars, its Inner as before and the ints n and m.
+// initial that holds it as vars, its Inner as held and the ints n and m.
 std::string Design(const std::string& body) {
   return "typedef enum bit [1:0] {A = 2'b00, B = 2'b11} ab_e;\n"
          "typedef struct packed {\n"
@@ -37,7 +37,7 @@ std::string Design(const std::string& body) {
          "module t;\n"
          "  initial begin\n"
          "    Vars vars = new;\n"
-         "    Inner before = vars.in;\n"
+         "    Inner held = vars.in;\n"
          "    int n = 0, m = 0;\n" +
          body +
          "  end\n"
@@ -95,7 +95,7 @@ TEST(RandomVariableRun, ARandHandlesObjectIsSolvedWithTheHolder) {
                         "      void'(vars.randomize());\n"
                         "      if (vars.in.v >= 1 && vars.in.v <= 3 && "
                         "vars.w > vars.in.v) n++;\n"
-                        "      if (vars.in == before) m++;\n"
+                        "      if (vars.in == held) m++;\n"
                         "    end\n"
                         "    $display(\"%0d %0d\", n, m);\n"),
                  f);
