@@ -8,6 +8,7 @@
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "elaborator/const_eval.h"
+#include "elaborator/property_rewrite.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
@@ -22,6 +23,14 @@ struct ClassDecl;
 // declared at compilation-unit scope. `module_scope` is the enclosing module's
 // parameter scope, which a default may name; the folded values are recorded
 // under their "Class.name" keys in `cu_param_scope`.
+// §16.13.4: a bare name of a named sequence in a property's body, which the
+// parser read as a boolean, is made the sequence operand it is, in every
+// property declaration of `decl`, once the registry names the sequences;
+// defined in elaborator_items_assertions.cpp.
+void PromoteSequenceInstancesInProperties(const ModuleDecl* decl,
+                                          const PropertyRegistry& registry,
+                                          Arena& arena);
+
 void RegisterModuleClassParams(const ClassDecl* cls,
                                const ScopeMap& module_scope,
                                ScopeMap& cu_param_scope, Arena& arena,

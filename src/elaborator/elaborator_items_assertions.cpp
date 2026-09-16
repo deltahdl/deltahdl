@@ -243,6 +243,100 @@ void CollectTreeClocks(const PropertyExprNode* node,
   }
 }
 
+// §16.12.2 and §16.13.4: a sequence declaration of one operand, an instance
+// of the named sequence `instance` names, for the flattening to expand: a
+// bare name in a property is a sequence where the name is a sequence's.
+ModuleItem* SequenceInstanceBody(Expr* instance, Arena& arena) {
+  auto* seq = arena.Create<ModuleItem>();
+  seq->kind = ModuleItemKind::kSequenceDecl;
+  seq->loc = instance->range.start;
+  seq->seq_linear.operands.push_back(instance);
+  SeqCycleDelay none;
+  none.min = 0;
+  none.max = 0;
+  seq->seq_linear.delays.push_back(none);
+  seq->seq_linear.match_items.emplace_back();
+  seq->seq_linear.repetitions.emplace_back();
+  return seq;
+}
+
+// §16.13.4: a boolean operand of the tree that is the bare name of a named
+// sequence, or a call of one, which the parser read as a boolean since a
+// variable's name reads the same, is the sequence, a node the flattening
+// expands; the walk reaches the trees an instance's actuals carry too.
+void PromoteSequenceInstances(PropertyExprNode* node,
+                              const PropertyRegistry& registry, Arena& arena) {
+  if (node == nullptr) return;
+  if (node->kind == PropertyExprNode::Kind::kBoolean &&
+      node->boolean != nullptr &&
+      InstantiatedDecl(node->boolean, ModuleItemKind::kSequenceDecl,
+                       registry) != nullptr) {
+    node->kind = PropertyExprNode::Kind::kSequence;
+    node->sequence = SequenceInstanceBody(node->boolean, arena);
+    node->boolean = nullptr;
+  }
+  if (node->boolean != nullptr && node->boolean->kind == ExprKind::kCall) {
+    for (Expr* arg : node->boolean->args) {
+      if (arg != nullptr) {
+        PromoteSequenceInstances(arg->property_actual, registry, arena);
+      }
+    }
+  }
+  for (PropertyExprNode* operand : node->operands) {
+    PromoteSequenceInstances(operand, registry, arena);
+  }
+}
+
+// §16.13.4: the clock of the sequence a property's body instantiates
+// whole, where the body is one instance of a sequence declared with a
+// clock; empty otherwise.
+const std::vector<EventExpr>& FlowedBodyClock(
+    const ModuleItem* decl, const PropertyRegistry& registry) {
+  static const std::vector<EventExpr> kNone;
+  const PropertyExprNode* root = decl->prop_body_tree;
+  if (root == nullptr || root->kind != PropertyExprNode::Kind::kSequence ||
+      root->sequence == nullptr ||
+      root->sequence->seq_linear.operands.size() != 1) {
+    return kNone;
+  }
+  const ModuleItem* seq =
+      InstantiatedDecl(root->sequence->seq_linear.operands[0],
+                       ModuleItemKind::kSequenceDecl, registry);
+  return seq == nullptr ? kNone : seq->seq_clock;
+}
+
+// §16.13.4: an instance of a named sequence standing as the whole
+// property_spec, `assert property (mult_s)`, is the sequential property the
+// sequence is, evaluated on the clock the sequence is declared with.
+bool SubstituteSequenceInstance(ModuleItem* item, const ModuleItem* decl,
+                                Arena& arena, DiagEngine& diag) {
+  if (decl->seq_clock.empty()) {
+    diag.Warning(item->loc,
+                 "concurrent assertion is not evaluated: the sequence \"" +
+                     std::string(decl->name) +
+                     "\" has no leading clocking event, and this tool infers "
+                     "none",
+                 Subclause("16.14"));
+    return false;
+  }
+  auto* stmt = arena.Create<Stmt>();
+  stmt->kind = item->kind == ModuleItemKind::kAssumeProperty
+                   ? StmtKind::kAssumeImmediate
+                   : StmtKind::kAssertImmediate;
+  stmt->range.start = item->loc;
+  stmt->assert_expr = item->assert_expr;
+  stmt->assert_property = arena.Create<PropertyExprNode>();
+  stmt->assert_property->kind = PropertyExprNode::Kind::kSequence;
+  stmt->assert_property->sequence =
+      SequenceInstanceBody(item->assert_expr, arena);
+  stmt->is_concurrent_clocked = true;
+  stmt->assert_pass_stmt = item->assert_pass_stmt;
+  stmt->assert_fail_stmt = item->assert_fail_stmt;
+  item->sensitivity = decl->seq_clock;
+  item->body = stmt;
+  return true;
+}
+
 // The body the statement of the instance `instance` of `decl` carries: the
 // boolean with the actuals substituted where the body is the clocked
 // boolean form and every actual an expression, and otherwise, §16.12.17, a
@@ -273,6 +367,10 @@ void SubstitutePropertyInstance(ModuleItem* item, Arena& arena,
   if (item->prop_instance_name.empty() || item->body != nullptr) return;
   const ModuleItem* decl = registry.Find(item->prop_instance_name);
   std::string name(item->prop_instance_name);
+  if (decl != nullptr && decl->kind == ModuleItemKind::kSequenceDecl) {
+    SubstituteSequenceInstance(item, decl, arena, diag);
+    return;
+  }
   if (decl == nullptr || decl->kind != ModuleItemKind::kPropertyDecl) {
     diag.Warning(item->loc,
                  "concurrent assertion is not evaluated: its property_spec "
@@ -291,7 +389,13 @@ void SubstitutePropertyInstance(ModuleItem* item, Arena& arena,
                  Subclause("16.14"));
     return;
   }
-  if (decl->prop_clock.empty()) {
+  // §16.13.3 and §16.13.4: a property declared with no clock whose body is
+  // a sequence declared with one is on that clock, `mult_p2` being
+  // `mult_s`.
+  const std::vector<EventExpr>& clock = decl->prop_clock.empty()
+                                            ? FlowedBodyClock(decl, registry)
+                                            : decl->prop_clock;
+  if (clock.empty()) {
     diag.Warning(item->loc,
                  "concurrent assertion is not evaluated: the body of property "
                  "\"" +
@@ -333,7 +437,7 @@ void SubstitutePropertyInstance(ModuleItem* item, Arena& arena,
   stmt->assert_pass_stmt = item->assert_pass_stmt;
   stmt->assert_fail_stmt = item->assert_fail_stmt;
   item->sensitivity.clear();
-  for (const EventExpr& ev : decl->prop_clock) {
+  for (const EventExpr& ev : clock) {
     item->sensitivity.push_back(SubstituteClockEvent(ev, actuals, arena));
   }
   item->body = stmt;
@@ -424,6 +528,16 @@ void Elaborator::CheckPropertyOperandInstances(const ModuleItem* item) {
   }
 }
 
+void PromoteSequenceInstancesInProperties(const ModuleDecl* decl,
+                                          const PropertyRegistry& registry,
+                                          Arena& arena) {
+  for (ModuleItem* item : decl->items) {
+    if (item->kind == ModuleItemKind::kPropertyDecl) {
+      PromoteSequenceInstances(item->prop_body_tree, registry, arena);
+    }
+  }
+}
+
 void Elaborator::ElaboratePropertyDeclItem(ModuleItem* item, RtlirModule* mod) {
   mod->property_decls.push_back(item);
   // §16.12.22: the sequences the body uses as properties and as antecedents
@@ -452,6 +566,10 @@ void Elaborator::ElaborateAssertPropertyItem(ModuleItem* item,
                                              RtlirModule* mod) {
   SubstitutePropertyInstance(item, arena_, property_registry_, diag_);
   PromotePropertyInstanceBoolean(item, arena_, property_registry_);
+  if (item->body != nullptr) {
+    PromoteSequenceInstances(item->body->assert_property, property_registry_,
+                             arena_);
+  }
   CheckConcurrentAssertionNoChandle(item, mod, diag_);
   // §16.12.22: the sequences the property_spec uses as properties and as
   // antecedents, a sequential property standing as the whole spec included.

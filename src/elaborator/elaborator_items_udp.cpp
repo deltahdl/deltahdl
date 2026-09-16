@@ -729,6 +729,7 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
       nested_module_decls_.begin(), nested_module_decls_.end());
 
   BuildPropertyRegistry(decl, property_registry_);
+  PromoteSequenceInstancesInProperties(decl, property_registry_, arena_);
 
   // §13.4.3: make this scope's functions available to the constant-expression
   // folder so a parameter/localparam initialized from a constant function call

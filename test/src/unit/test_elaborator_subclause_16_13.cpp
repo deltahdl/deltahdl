@@ -35,4 +35,40 @@ TEST(MulticlockElaboration, TheProcessWakesOnEveryClockTheSequenceNames) {
   EXPECT_EQ(p->body->assert_clock[0].signal->text, "clk0");
 }
 
+// §16.13.4: a property whose body is the bare name of a named sequence,
+// which the parser read as a boolean since a variable's name reads the
+// same, is the sequence: the elaborator makes the body a sequence operand
+// instantiating it, and the assertion's process wakes on the clocks the
+// sequence names.
+TEST(MulticlockElaboration, ABareSequenceNameInAPropertyBodyIsTheSequence) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic clk, clk1, a, b;\n"
+      "  sequence mult_s;\n"
+      "    @(posedge clk) a ##1 @(posedge clk1) b;\n"
+      "  endsequence\n"
+      "  property mult_p2;\n"
+      "    mult_s;\n"
+      "  endproperty\n"
+      "  assert property (mult_p2);\n"
+      "endmodule\n",
+      f, "m");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const RtlirProcess* p = nullptr;
+  for (const auto& candidate : design->top_modules[0]->processes) {
+    if (candidate.kind == RtlirProcessKind::kAlwaysFF) p = &candidate;
+  }
+  ASSERT_NE(p, nullptr);
+  ASSERT_EQ(p->sensitivity.size(), 2u);
+  EXPECT_EQ(p->sensitivity[0].signal->text, "clk");
+  EXPECT_EQ(p->sensitivity[1].signal->text, "clk1");
+  const ModuleItem* decl = design->top_modules[0]->property_decls[0];
+  ASSERT_NE(decl->prop_body_tree, nullptr);
+  EXPECT_EQ(decl->prop_body_tree->kind, PropertyExprNode::Kind::kSequence);
+  ASSERT_NE(decl->prop_body_tree->sequence, nullptr);
+  EXPECT_EQ(decl->prop_body_tree->sequence->seq_linear.operands.size(), 1u);
+}
+
 }  // namespace

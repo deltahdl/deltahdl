@@ -1,0 +1,8 @@
+mult_s passes 1 fails 7 at 25 27 35 45 55 65 75
+mult_p1 passes 1 fails 7 at 25 27 35 45 55 65 75
+mult_p2 passes 1 fails 7 at 25 27 35 45 55 65 75
+mult_p3 passes 8 fails 0 at
+mult_p6 passes 7 fails 1 at 65
+mult_p7 passes 7 fails 1 at 27
+mult_p8 passes 7 fails 1 at 27
+$finish at time 80
