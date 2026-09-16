@@ -1,0 +1,7 @@
+start |-> ##1 b passes 8 fails 0 at ticks, 0 in flight: holds strongly
+start |-> always a passes 7 fails 0 at ticks, 1 in flight
+start |-> s_eventually c passes 7 fails 0 at ticks, 1 in flight
+start |-> ##1 c passes 7 fails 1 at ticks, 0 in flight: fails
+$finish at time 80
+start |-> always a holds at the end of the run: no bad state seen, no obligation unmet, an extension may fail it
+start |-> s_eventually c is pending at the end of the run: no bad state seen, an obligation unmet
