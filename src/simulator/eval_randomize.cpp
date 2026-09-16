@@ -735,24 +735,29 @@ ClassObject* ResolveRandomizeTarget(SimContext& ctx,
   return obj;
 }
 
+Logic4Vec SolvedValue(const RandInfo& ri, const ConstraintSolver& solver,
+                      Arena& arena) {
+  if (ri.var.is_real) {
+    // 18.4.1: the real drawn is written back as the real it is.
+    return MakeRealVec(arena, solver.GetRealValue(ri.name),
+                       ri.var.width == 32 ? 32 : 64);
+  }
+  int64_t v = solver.GetValue(ri.name);
+  Logic4Vec lv =
+      MakeLogic4VecVal(arena, ri.var.width, static_cast<uint64_t>(v));
+  // 6.11.3: the member's declared signedness belongs to the value stored in
+  // it, so a negative draw written into a signed member reads back as that
+  // negative number rather than as its unsigned bit pattern.
+  lv.is_signed = ri.var.is_signed;
+  return lv;
+}
+
 // 18.6.1: write each solved value back to the object, keeping the bare and
 // scoped ("Class::name") property aliases in sync so member reads see it.
 void WriteBackSolved(ClassObject* obj, std::vector<RandInfo>& rands,
                      ConstraintSolver& solver, Arena& arena) {
   for (auto& ri : rands) {
-    Logic4Vec lv;
-    if (ri.var.is_real) {
-      // 18.4.1: the real drawn is written back as the real it is.
-      lv = MakeRealVec(arena, solver.GetRealValue(ri.name),
-                       ri.var.width == 32 ? 32 : 64);
-    } else {
-      int64_t v = solver.GetValue(ri.name);
-      lv = MakeLogic4VecVal(arena, ri.var.width, static_cast<uint64_t>(v));
-      // 6.11.3: the member's declared signedness belongs to the value stored
-      // in it, so a negative draw written into a signed member reads back as
-      // that negative number rather than as its unsigned bit pattern.
-      lv.is_signed = ri.var.is_signed;
-    }
+    Logic4Vec lv = SolvedValue(ri, solver, arena);
     // 18.6.3: a static random variable is a single storage shared by every
     // instance of the class, so a successful randomize() must publish the drawn
     // value to that class-wide cell — not to a private per-object copy. Writing

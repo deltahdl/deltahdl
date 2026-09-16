@@ -172,6 +172,11 @@ void FoldRealBound(RandInfo& ri, ConstraintKind kind, double c);
 // is no rand variable folds nothing.
 void FoldComparison(std::vector<RandInfo>& rands, std::string_view name,
                     ConstraintKind kind, const Logic4Vec& cv, int64_t c);
+// 18.6.1: the value the solver drew for `ri` as the member holds it, 18.4.1
+// a real as the real it is and 6.11.3 an integral one in the member's
+// declared signedness.
+Logic4Vec SolvedValue(const RandInfo& ri, const ConstraintSolver& solver,
+                      Arena& arena);
 bool IsObjectConstraintActive(const ClassObject* obj, std::string_view name);
 bool IsObjectRandActive(const ClassObject* obj, std::string_view name);
 void InvokePostRandomize(ClassObject* obj, const Expr* expr, SimContext& ctx,

@@ -395,18 +395,7 @@ void RegisterJointPreRandomize(const std::vector<JointObject>& objects,
 void WriteBackJointSolved(std::vector<RandInfo>& rands,
                           const ConstraintSolver& solver, Arena& arena) {
   for (auto& ri : rands) {
-    Logic4Vec lv;
-    if (ri.var.is_real) {
-      // 18.4.1: the real drawn is written back as the real it is.
-      lv = MakeRealVec(arena, solver.GetRealValue(ri.name),
-                       ri.var.width == 32 ? 32 : 64);
-    } else {
-      int64_t v = solver.GetValue(ri.name);
-      lv = MakeLogic4VecVal(arena, ri.var.width, static_cast<uint64_t>(v));
-      // 6.11.3: the member's declared signedness belongs to the value stored
-      // in it, so a negative draw reads back as that negative number.
-      lv.is_signed = ri.var.is_signed;
-    }
+    Logic4Vec lv = SolvedValue(ri, solver, arena);
     if (ri.is_static && ri.level != nullptr) {
       ri.level->static_properties[ri.member] = lv;
       continue;
