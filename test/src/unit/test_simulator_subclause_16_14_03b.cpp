@@ -74,7 +74,7 @@ TEST(CoverStatementRun, ACoverPropertysResultsCountAttemptsAndSuccesses) {
   const ConcurrentCoverResult* record = TheRecord(f);
   ASSERT_NE(record, nullptr);
   EXPECT_EQ(record->category, CoverStatementCategory::kProperty);
-  EXPECT_EQ(record->scope, "t");
+  EXPECT_EQ(record->scope, "t.implied");
   EXPECT_EQ(record->line, 7u);
   EXPECT_EQ(record->attempted, 9u);
   EXPECT_EQ(record->succeeded, 2u);
@@ -174,7 +174,7 @@ TEST(CoverStatementRun, ACoverOfANamedPropertyInstanceReportsNoFailure) {
       RunCapture(CoverSource("  property p;\n"
                              "    @(posedge clk) req |=> ack;\n"
                              "  endproperty\n"
-                             "  instance: cover property (p) hits++;\n"),
+                             "  named: cover property (p) hits++;\n"),
                  f);
   EXPECT_EQ(out, "$finish at time 90\n");
   EXPECT_EQ(f.ctx.AssertionFailCount(), 0);
@@ -188,9 +188,10 @@ TEST(CoverStatementRun, ACoverOfANamedPropertyInstanceReportsNoFailure) {
 }
 
 // §16.14.3: the tool reports the results at the end of simulation, one line
-// per statement in the order they first attempted, a cover property's with
-// its three counts and a cover sequence's with its two, the null pass
-// statement of a cover being no bar to its results.
+// per statement in the order they first attempted, each named by its label
+// as %m in its pass statement would name it, a cover property's with its
+// three counts and a cover sequence's with its two, the null pass statement
+// of a cover being no bar to its results.
 TEST(CoverStatementRun, TheReportNamesEachStatementsCategoryAndCounts) {
   SimFixture f;
   RunAndFindVar(CoverSource("  acked: cover property (@(posedge clk) ack);\n"
@@ -199,10 +200,11 @@ TEST(CoverStatementRun, TheReportNamesEachStatementsCategoryAndCounts) {
                 f, "hits");
   std::ostringstream report;
   ReportConcurrentCoverResults(f.ctx.ConcurrentCovers(), report);
-  EXPECT_EQ(report.str(),
-            "cover property t (line 7): attempted 9, succeeded 4, succeeded "
-            "vacuously 0\n"
-            "cover sequence t (line 8): attempted 9, matched 4\n");
+  EXPECT_EQ(
+      report.str(),
+      "cover property t.acked (line 7): attempted 9, succeeded 4, succeeded "
+      "vacuously 0\n"
+      "cover sequence t.matched (line 8): attempted 9, matched 4\n");
 }
 
 }  // namespace

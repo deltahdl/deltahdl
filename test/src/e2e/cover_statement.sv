@@ -4,12 +4,13 @@
 // the pass statement of the first runs once for each successful attempt
 // and the pass statement of the second once for each match, both in the
 // Reactive region of the time step the attempt succeeds or the match
-// completes in; the results a tool reports at the end of simulation are,
-// for a property, the attempts, the successes and the successes because of
-// vacuity, the attempts counting the disabled evaluations and the other two
-// not, and, for a sequence, the attempts and the matches, a match that
-// completes after the disable condition occurred counting nothing. clk
-// rises at 5, 15, ..., 85, so each statement attempts nine times; req is
+// completes in; the results a tool reports at the end of simulation, each
+// statement's under the label that names it, are, for a property, the
+// attempts, the successes and the successes because of vacuity, the
+// attempts counting the disabled evaluations and the other two not, and,
+// for a sequence, the attempts and the matches, a match that completes
+// after the disable condition occurred counting nothing. clk rises at 5,
+// 15, ..., 85, so each statement attempts nine times; req is
 // high at 15, 45 and 75, ack at 25, 35, 55 and 65, and rst across 65.
 // implied covers req |=> ack disabled while rst: the attempts of 15 and 45
 // succeed at 25 and 55, the attempts of 5, 25, 35, 55 and 85 succeed

@@ -47,11 +47,13 @@ void ReportImmediateCoverResults(const ImmediateCoverResults& results,
                                  std::ostream& os);
 
 // §16.14.3: the results of coverage for one concurrent cover statement in one
-// scope, named as an immediate cover's record is. A cover property's results
-// are the attempts, the disabled ones among them, the successes, at most one
-// per attempt and none disabled, and the successes because of vacuity, which
-// are counted apart from the successes; a cover sequence's are the attempts
-// and the matches, every match of an attempt counted with multiplicity.
+// scope, named as an immediate cover's record is, the scope being the
+// statement's own where it carries a label, as %m in its pass statement names
+// it (§21.2.1.5). A cover property's results are the attempts, the disabled
+// ones among them, the successes, at most one per attempt and none disabled,
+// and the successes because of vacuity, which are counted apart from the
+// successes; a cover sequence's are the attempts and the matches, every match
+// of an attempt counted with multiplicity.
 struct ConcurrentCoverResult {
   std::string scope;
   uint32_t line = 0;

@@ -10,4 +10,4 @@ ev: e.triggered is current at 25
 pre: sampled a is 0 at 35, a is now 0
 cc: const'(a) equals sampled a at 35
 $finish at time 44
-cover property sampled_values (line 57): attempted 4, succeeded 1, succeeded vacuously 0
+cover property sampled_values.ev (line 57): attempted 4, succeeded 1, succeeded vacuously 0
