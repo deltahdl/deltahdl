@@ -185,6 +185,24 @@ bool TreeNamesAClock(const PropertyExprNode* node,
   return false;
 }
 
+// §16.16 (c): the contextually inferred clocking event is treated as the
+// leading clocking event of an assertion that opens with none, which a
+// multiclocked property may not take: the clause's a3 is reported and left
+// as no concurrent assertion. Answers whether the statement goes on.
+bool TakesInferredClock(Stmt* stmt, const std::vector<EventExpr>& inferred,
+                        const PropertyRegistry& registry, DiagEngine& diag) {
+  if (!stmt->assert_clock.empty() || inferred.empty() ||
+      !TreeNamesAClock(stmt->assert_property, registry)) {
+    return true;
+  }
+  diag.Error(stmt->range.start,
+             "a multiclocked property may not take a contextually inferred "
+             "leading clocking event",
+             Subclause("16.16"));
+  stmt->is_concurrent_clocked = false;
+  return false;
+}
+
 // The body, the disable condition and the clock of the property `decl` the
 // statement instantiates, with the actuals in the formals' places: the
 // boolean body substituted, any other as a tree whose root is the instance
@@ -279,18 +297,7 @@ void ElaborateProceduralConcurrentAssertions(ModuleItem* procedure,
       stmt->assert_disable_iff = at_instance.disable;
     }
     PromoteSequenceInstances(stmt->assert_property, registry, arena);
-    if (stmt->assert_clock.empty() && !inferred.empty() &&
-        TreeNamesAClock(stmt->assert_property, registry)) {
-      // §16.16 (c): the contextually inferred clocking event is treated as
-      // the leading clocking event of the assertion, which a multiclocked
-      // property may not take: the clause's a3.
-      diag.Error(stmt->range.start,
-                 "a multiclocked property may not take a contextually "
-                 "inferred leading clocking event",
-                 Subclause("16.16"));
-      stmt->is_concurrent_clocked = false;
-      continue;
-    }
+    if (!TakesInferredClock(stmt, inferred, registry, diag)) continue;
     if (stmt->assert_clock.empty()) stmt->assert_clock = at_instance.clock;
     if (!stmt->assert_clock.empty()) continue;
     diag.Error(stmt->range.start,

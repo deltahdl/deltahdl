@@ -412,6 +412,16 @@ void PromotePropertyInstanceBoolean(ModuleItem* item, Arena& arena,
   }
   const ModuleItem* decl = registry.Find(
       instance->kind == ExprKind::kCall ? instance->callee : instance->text);
+  if (decl != nullptr && decl->kind == ModuleItemKind::kSequenceDecl) {
+    // §16.12.2 and §16.13.4: `@(negedge clk) s2` is the sequential property
+    // the sequence s2 is, evaluated on the clock written.
+    stmt->assert_property = arena.Create<PropertyExprNode>();
+    stmt->assert_property->kind = PropertyExprNode::Kind::kSequence;
+    stmt->assert_property->sequence = SequenceInstanceBody(instance, arena);
+    stmt->assert_property->strong =
+        stmt->kind == StmtKind::kCoverImmediate || stmt->assert_strong;
+    return;
+  }
   if (decl == nullptr || decl->kind != ModuleItemKind::kPropertyDecl ||
       decl->prop_body_tree == nullptr) {
     return;
@@ -532,7 +542,12 @@ void Elaborator::ElaboratePropertyDeclItem(ModuleItem* item, RtlirModule* mod) {
 // event is determined.
 void Elaborator::ResolveStaticAssertionClock(
     ModuleItem* item, const std::vector<EventExpr>& default_clock) {
-  if (item->body == nullptr || !item->sensitivity.empty()) return;
+  // §16.4.3: a deferred immediate assertion outside procedural code stands
+  // for an always_comb procedure and has no clock to resolve.
+  if (item->body == nullptr || item->body->is_deferred ||
+      !item->sensitivity.empty()) {
+    return;
+  }
   if (!default_clock.empty()) {
     item->sensitivity = default_clock;
     return;
@@ -645,6 +660,23 @@ void Elaborator::ElaborateAssertPropertyItem(ModuleItem* item,
   ValidateClockingBlock(item, mod);
 }
 
+// §14.3: a clocking block is a declaration the run needs, not only one
+// elaboration checks. Lowerer::LowerClockingBlocks registers it with the
+// ClockingManager, which is what makes §14.16's synchronous drive and
+// §14.10's clocking block event reach anything. §16.16 (b): the block's
+// declarations are the module's for the run to expand, clocked by the block
+// and named through it.
+static void RecordClockingBlock(ModuleItem* item, RtlirModule* mod) {
+  mod->clocking_blocks.push_back(item);
+  for (ModuleItem* decl : item->clocking_decls) {
+    if (decl->kind == ModuleItemKind::kPropertyDecl) {
+      mod->property_decls.push_back(decl);
+    } else {
+      mod->sequence_decls.push_back(decl);
+    }
+  }
+}
+
 bool Elaborator::ElaborateAssertionItem(ModuleItem* item, RtlirModule* mod) {
   switch (item->kind) {
     case ModuleItemKind::kSequenceDecl:
@@ -683,22 +715,7 @@ bool Elaborator::ElaborateAssertionItem(ModuleItem* item, RtlirModule* mod) {
       return true;
     case ModuleItemKind::kClockingBlock:
       ValidateClockingBlock(item, mod);
-      // §14.3: a clocking block is a declaration the run needs, not only one
-      // elaboration checks. Lowerer::LowerClockingBlocks registers it with the
-      // ClockingManager, which is what makes §14.16's synchronous drive and
-      // §14.10's clocking block event reach anything.
-      if (mod != nullptr) {
-        mod->clocking_blocks.push_back(item);
-        // §16.16 (b): the block's declarations are the module's for the run
-        // to expand, clocked by the block and named through it.
-        for (ModuleItem* decl : item->clocking_decls) {
-          if (decl->kind == ModuleItemKind::kPropertyDecl) {
-            mod->property_decls.push_back(decl);
-          } else {
-            mod->sequence_decls.push_back(decl);
-          }
-        }
-      }
+      if (mod != nullptr) RecordClockingBlock(item, mod);
       return true;
     default:
       // §23.10.4 kDefparam, kExportDecl, kNestedModuleDecl, and any remaining

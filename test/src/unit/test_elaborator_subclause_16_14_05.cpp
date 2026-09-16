@@ -6,11 +6,14 @@ namespace {
 
 // §16.14.5: a concurrent assertion statement can be used outside a procedural
 // context — directly within a module — so it elaborates as a module item.
+// Each statement here writes its clocking event, §16.16 having one written
+// with none take the default clocking or, with none in scope, be illegal.
 TEST(AssertionStatementElaboration, AssertPropertyElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
-      "  assert property (1);\n"
+      "  logic clk;\n"
+      "  assert property (@(posedge clk) 1);\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
@@ -41,7 +44,8 @@ TEST(AssertionStatementElaboration, AssertPropertyElaboratesInInterface) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "interface intf;\n"
-      "  assert property (1);\n"
+      "  logic clk;\n"
+      "  assert property (@(posedge clk) 1);\n"
       "endinterface\n",
       f, "intf");
   ASSERT_NE(design, nullptr);
@@ -54,7 +58,8 @@ TEST(AssertionStatementElaboration, AssertPropertyElaboratesInProgram) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "program prog;\n"
-      "  assert property (1);\n"
+      "  logic clk;\n"
+      "  assert property (@(posedge clk) 1);\n"
       "endprogram\n",
       f, "prog");
   ASSERT_NE(design, nullptr);
@@ -67,7 +72,8 @@ TEST(AssertionStatementElaboration, CoverPropertyElaboratesOutsideProcedure) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
-      "  cover property (1);\n"
+      "  logic clk;\n"
+      "  cover property (@(posedge clk) 1);\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
@@ -81,7 +87,8 @@ TEST(AssertionStatementElaboration, AssumePropertyElaboratesOutsideProcedure) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
-      "  assume property (1);\n"
+      "  logic clk;\n"
+      "  assume property (@(posedge clk) 1);\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
@@ -96,7 +103,8 @@ TEST(AssertionStatementElaboration,
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
-      "  restrict property (1);\n"
+      "  logic clk;\n"
+      "  restrict property (@(posedge clk) 1);\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
@@ -110,7 +118,8 @@ TEST(AssertionStatementElaboration, AssumePropertyElaboratesInInterface) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "interface intf;\n"
-      "  assume property (1);\n"
+      "  logic clk;\n"
+      "  assume property (@(posedge clk) 1);\n"
       "endinterface\n",
       f, "intf");
   ASSERT_NE(design, nullptr);
@@ -123,7 +132,8 @@ TEST(AssertionStatementElaboration, AssumePropertyElaboratesInProgram) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "program prog;\n"
-      "  assume property (1);\n"
+      "  logic clk;\n"
+      "  assume property (@(posedge clk) 1);\n"
       "endprogram\n",
       f, "prog");
   ASSERT_NE(design, nullptr);
@@ -136,7 +146,8 @@ TEST(AssertionStatementElaboration, CoverPropertyElaboratesInInterface) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "interface intf;\n"
-      "  cover property (1);\n"
+      "  logic clk;\n"
+      "  cover property (@(posedge clk) 1);\n"
       "endinterface\n",
       f, "intf");
   ASSERT_NE(design, nullptr);
@@ -148,7 +159,8 @@ TEST(AssertionStatementElaboration, CoverPropertyElaboratesInProgram) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "program prog;\n"
-      "  cover property (1);\n"
+      "  logic clk;\n"
+      "  cover property (@(posedge clk) 1);\n"
       "endprogram\n",
       f, "prog");
   ASSERT_NE(design, nullptr);
@@ -161,7 +173,8 @@ TEST(AssertionStatementElaboration, RestrictPropertyElaboratesInInterface) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "interface intf;\n"
-      "  restrict property (1);\n"
+      "  logic clk;\n"
+      "  restrict property (@(posedge clk) 1);\n"
       "endinterface\n",
       f, "intf");
   ASSERT_NE(design, nullptr);
@@ -174,7 +187,8 @@ TEST(AssertionStatementElaboration, RestrictPropertyElaboratesInProgram) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "program prog;\n"
-      "  restrict property (1);\n"
+      "  logic clk;\n"
+      "  restrict property (@(posedge clk) 1);\n"
       "endprogram\n",
       f, "prog");
   ASSERT_NE(design, nullptr);
