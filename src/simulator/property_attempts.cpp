@@ -2,7 +2,6 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <functional>
 #include <string>
 #include <string_view>
 #include <unordered_set>
@@ -838,30 +837,6 @@ PropertyVerdict VerdictOf(const PropertyExprNode* root,
 }
 
 }  // namespace
-
-void ForEachPropertyActual(
-    const Expr* instance,
-    const std::function<void(const PropertyExprNode*)>& fn) {
-  if (instance == nullptr || instance->kind != ExprKind::kCall) return;
-  for (const Expr* arg : instance->args) {
-    if (arg != nullptr && arg->property_actual != nullptr) {
-      fn(arg->property_actual);
-    }
-  }
-}
-
-const ModuleItem* InstantiatedProperty(const Expr* instance, SimContext& ctx) {
-  if (instance == nullptr) return nullptr;
-  if (instance->kind != ExprKind::kIdentifier &&
-      instance->kind != ExprKind::kCall) {
-    return nullptr;
-  }
-  std::string_view name =
-      instance->kind == ExprKind::kCall ? instance->callee : instance->text;
-  const ModuleItem* decl = ctx.FindPropertyDecl(name);
-  if (decl == nullptr || decl->prop_body_tree == nullptr) return nullptr;
-  return decl;
-}
 
 PropertyTreeState* CreatePropertyTreeState(
     const PropertyExprNode* root, const std::vector<EventExpr>& leading_clock,

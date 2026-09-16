@@ -7,5 +7,5 @@ p1 failed at 35
 p1 passed at 35
 $finish at time 40
 test/src/e2e/procedural_assertion_glitches.sv:30:3: warning: always_comb may infer latched behavior; ensure all paths assign all outputs (§9.2.2.2)
-  always_comb begin : procedural_block_1
-  ^
+    always_comb begin : procedural_block_1
+    ^
