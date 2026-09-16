@@ -1,0 +1,7 @@
+rule1 passes 5 fails 3 at ticks
+rule2 passes 4 fails 1 at ticks
+rule3 passes 7 fails 1 at ticks
+rule4 passes 6 fails 2 at ticks
+rule5 passes 6 fails 2 at ticks
+rule5a passes 6 fails 2 at ticks
+$finish at time 80
