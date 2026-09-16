@@ -1,0 +1,10 @@
+randomize returns 1
+addr[1:0] == 0 after randomize
+with: addr == 8 holds 1
+rand_mode(0): data stays 99
+constraint_mode(0): addr == 3 holds 1
+std::randomize: v in [10:12] holds 1
+srandom(42) twice: same addr 1
+randcase weights 1 and 0: taken 1
+randsequence: first then second
+$finish at time 0
