@@ -626,7 +626,9 @@ bool ParserPropertySpecHelpers::ParseSimpleSpecBody(Parser& p,
   // read before the scan below, which its actuals would answer.
   body.prop = TryParsePropertyInstance(p);
   if (body.prop != nullptr) return true;
-  if (!p.BodyHasTemporalOperator()) {
+  // §16.9.2: a repetition makes the spec a sequence where no cycle delay
+  // does, `a[*0:2]` as much as `a ##1 b`.
+  if (!p.BodyHasTemporalOperator() && !AheadHoldsRepetition(p)) {
     body.prop = p.ParseExpr();
     return body.prop != nullptr;
   }
