@@ -329,6 +329,11 @@ class ElaboratorData {
     TypedefMap typedefs;
     ScopeMap cu_param_scope;
     std::unordered_map<std::string_view, const ModuleItem*> func_decls;
+    // §16.12: the module's property and sequence declarations, which an
+    // assertion in the selected body instantiates by name; property_registry_
+    // is per-module state as func_decls_ is, gone by the time the generate is
+    // elaborated, so the copy taken at the queue site is what names them.
+    PropertyRegistry property_registry;
   };
   std::vector<PendingGenerate> pending_generates_;
 

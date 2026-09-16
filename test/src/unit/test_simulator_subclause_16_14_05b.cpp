@@ -121,4 +121,33 @@ TEST(StaticConcurrentAssertionRun, AnAssertInAnInterfaceIsAlwaysChecked) {
   EXPECT_EQ(out, "t.bus.if_a1 failed at 35\n$finish at time 80\n");
 }
 
+// §16.14.5: the module's own declarations are what its statements
+// instantiate wherever the statement stands among the items: a cover of the
+// module's seq3 after the instance of an interface declaring a rule3 of its
+// own reads the module's seq3, and an assert of rule3 in a generate block
+// reads the module's rule3, both evaluated from the beginning to the end.
+TEST(StaticConcurrentAssertionRun,
+     AStatementAfterAnInstanceOrInAGenerateReadsItsOwnModulesDeclarations) {
+  SimFixture f;
+  RunAndFindVar(
+      "interface bus_if(input logic clk, input logic a, input logic b,\n"
+      "                 input logic c);\n"
+      "  property rule3;\n"
+      "    @(posedge clk) a |-> b ##1 c;\n"
+      "  endproperty\n"
+      "  if_a1: assert property (rule3);\n"
+      "endinterface\n" +
+          StaticSource("  bus_if bus(clk, a, b, c);\n"
+                       "  c1: cover property (seq3) covered++;\n"
+                       "  if (1) begin : gen\n"
+                       "    g1: assert property (rule3) passes++;\n"
+                       "    else fails++;\n"
+                       "  end\n"),
+      f, "covered");
+  EXPECT_TRUE(f.diag.Diagnostics().empty());
+  EXPECT_EQ(Count(f, "covered"), 3u);
+  EXPECT_EQ(Count(f, "passes"), 7u);
+  EXPECT_EQ(Count(f, "fails"), 1u);
+}
+
 }  // namespace

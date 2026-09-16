@@ -826,9 +826,11 @@ bool Elaborator::ElaborateBehavioralItem(ModuleItem* item, RtlirModule* mod) {
       // func_decls_ is copied for the same reason and reaches §13.4.3 rather
       // than §26.3: Elaborator::ElaborateItems filled it from this module's
       // ModuleDecl before the item loop that reached here, and
-      // ItemElaborationStateSaver takes it back out when the module returns.
-      pending_generates_.push_back(
-          {item, mod, typedefs_, cu_param_scope_, func_decls_});
+      // ItemElaborationStateSaver takes it back out when the module returns,
+      // and property_registry_ for §16.12's instances of a named property or
+      // sequence, which it fills and takes back the same way.
+      pending_generates_.push_back({item, mod, typedefs_, cu_param_scope_,
+                                    func_decls_, property_registry_});
       return true;
     case ModuleItemKind::kFunctionDecl:
     case ModuleItemKind::kTaskDecl:

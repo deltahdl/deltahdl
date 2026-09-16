@@ -587,6 +587,11 @@ struct ItemElaborationStateSaver {
   decltype(Elaborator::task_names_) task_names;
   decltype(Elaborator::let_names_) let_names;
   decltype(Elaborator::sequence_names_) sequence_names;
+  // §16.12: the registry of the module's own property and sequence
+  // declarations, which an instance an item makes rebuilds for the module it
+  // instantiates, so the items after the instance read their own module's
+  // declarations only because it is put back.
+  decltype(Elaborator::property_registry_) property_registry;
   decltype(Elaborator::func_decls_) func_decls;
 
   // §26.3 and §6.18: a name an import or a typedef declaration introduces
@@ -659,6 +664,7 @@ struct ItemElaborationStateSaver {
     task_names = std::move(e.task_names_);
     let_names = std::move(e.let_names_);
     sequence_names = std::move(e.sequence_names_);
+    property_registry = std::move(e.property_registry_);
     func_decls = std::move(e.func_decls_);
     e.ResetItemElaborationState();
   }
@@ -723,6 +729,7 @@ struct ItemElaborationStateSaver {
     e.task_names_ = std::move(task_names);
     e.let_names_ = std::move(let_names);
     e.sequence_names_ = std::move(sequence_names);
+    e.property_registry_ = std::move(property_registry);
     e.func_decls_ = std::move(func_decls);
     RestoreScopeMaps(e);
   }

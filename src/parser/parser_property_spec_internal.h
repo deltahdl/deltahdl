@@ -76,6 +76,11 @@ struct ParserPropertySpecHelpers {
   // src/parser/parser_sequence_linear.cpp beside the sequence body's.
   static bool ParsePropertyLocalDecls(Parser& p,
                                       std::vector<SeqLocalDecl>& locals);
+  // §16.14.5: the concurrent assertion item an always procedure whose body
+  // opens with one of §16.14's statements is equivalent to, or nullptr,
+  // nothing consumed, where the body opens with anything else. Defined in
+  // src/parser/parser_assert.cpp beside the statements.
+  static ModuleItem* TryParseAlwaysConcurrentAssertion(Parser& p);
 };
 
 }  // namespace delta

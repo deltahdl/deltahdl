@@ -93,6 +93,12 @@ void Elaborator::ProcessPendingGenerate(const PendingGenerate& pg) {
   // check on a name rather than a fold of a value, so each is left to whatever
   // reaches it rather than fixed here.
   ConstFuncRegistryGuard const_func_guard(&pg.func_decls);
+  // §16.12: an assertion in the selected body that instantiates a named
+  // property or sequence reads property_registry_, per-module state the
+  // saver has taken back as it took func_decls_, so the copy the queue site
+  // took is installed for the body and the member put back after it.
+  PropertyRegistry saved_property_registry = std::move(property_registry_);
+  property_registry_ = pg.property_registry;
   auto scope = BuildParamScope(pg.mod);
   switch (pg.item->kind) {
     case ModuleItemKind::kGenerateIf:
@@ -120,6 +126,7 @@ void Elaborator::ProcessPendingGenerate(const PendingGenerate& pg) {
     saved_typedefs.insert_or_assign(name, dtype);
   typedefs_ = std::move(saved_typedefs);
   cu_param_scope_ = std::move(saved_cu_param_scope);
+  property_registry_ = std::move(saved_property_registry);
   // Write what this generate declared back into the module's entry rather than
   // dropping it. §27.4 puts two generate block instance arrays of one module in
   // one scope, so a name one generate construct of a module declared has to be

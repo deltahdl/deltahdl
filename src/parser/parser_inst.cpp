@@ -1,6 +1,7 @@
 #include <format>
 
 #include "parser/parser.h"
+#include "parser/parser_property_spec_internal.h"
 
 namespace delta {
 
@@ -385,22 +386,13 @@ static ModuleItemKind AlwaysKindToItemKind(AlwaysKind kind) {
   return ModuleItemKind::kAlwaysBlock;
 }
 
-// §16.14: the keywords a concurrent_assertion_statement opens with.
-static bool IsConcurrentAssertionKeyword(TokenKind kind) {
-  return kind == TokenKind::kKwAssert || kind == TokenKind::kKwAssume ||
-         kind == TokenKind::kKwCover || kind == TokenKind::kKwRestrict;
-}
-
 // §16.14.5: `always assert property (ps) action_block ;` and `always cover
 // property (ps) statement_or_null` are the forms the concurrent assertion
 // statements outside procedural code are equivalent to, an evaluation
 // attempt of the property_spec beginning at every leading clock event, so
 // an always procedure whose body opens with one of §16.14's statements is
-// read as the statement it is equivalent to, an assume, a cover sequence
-// and a restrict as the assert and the cover are. The `;` the assert form
-// ends with is a null module item. An always procedure whose body is an
-// immediate or a deferred assertion is a procedure, so the keyword alone
-// decides nothing; the property or sequence keyword after it does.
+// read as the statement it is equivalent to. An always procedure with a
+// clocking event of its own, or of the other three kinds, is a procedure.
 ModuleItem* Parser::ParseAlwaysBlock(AlwaysKind kind) {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = AlwaysKindToItemKind(kind);
@@ -408,19 +400,10 @@ ModuleItem* Parser::ParseAlwaysBlock(AlwaysKind kind) {
   item->loc = CurrentLoc();
   Consume();
 
-  if (kind == AlwaysKind::kAlways &&
-      IsConcurrentAssertionKeyword(CurrentToken().kind)) {
-    auto saved = lexer_.SavePos();
-    TokenKind keyword = Consume().kind;
-    bool is_concurrent =
-        Check(TokenKind::kKwProperty) || Check(TokenKind::kKwSequence);
-    lexer_.RestorePos(saved);
-    if (is_concurrent) {
-      if (keyword == TokenKind::kKwAssert) return ParseAssertProperty();
-      if (keyword == TokenKind::kKwAssume) return ParseAssumeProperty();
-      if (keyword == TokenKind::kKwCover) return ParseCoverProperty();
-      return ParseRestrictProperty();
-    }
+  if (kind == AlwaysKind::kAlways) {
+    ModuleItem* statement =
+        ParserPropertySpecHelpers::TryParseAlwaysConcurrentAssertion(*this);
+    if (statement != nullptr) return statement;
   }
 
   if (Check(TokenKind::kAt)) {

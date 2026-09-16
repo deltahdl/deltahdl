@@ -604,6 +604,38 @@ ModuleItem* Parser::ParseCoverProperty() {
   return item;
 }
 
+// §16.14: the keywords a concurrent_assertion_statement opens with.
+static bool IsConcurrentAssertionKeyword(TokenKind kind) {
+  return kind == TokenKind::kKwAssert || kind == TokenKind::kKwAssume ||
+         kind == TokenKind::kKwCover || kind == TokenKind::kKwRestrict;
+}
+
+// The keyword alone decides nothing, an always procedure whose body is an
+// immediate or a deferred assertion being a procedure; the property or
+// sequence keyword after it does. The `;` the assert form ends with is a
+// null module item, and an assume, a cover sequence and a restrict under
+// always are read as the assert and the cover are.
+ModuleItem* ParserPropertySpecHelpers::TryParseAlwaysConcurrentAssertion(
+    Parser& p) {
+  if (!IsConcurrentAssertionKeyword(p.CurrentToken().kind)) return nullptr;
+  auto saved = p.lexer_.SavePos();
+  TokenKind keyword = p.Consume().kind;
+  bool is_concurrent =
+      p.Check(TokenKind::kKwProperty) || p.Check(TokenKind::kKwSequence);
+  p.lexer_.RestorePos(saved);
+  if (!is_concurrent) return nullptr;
+  switch (keyword) {
+    case TokenKind::kKwAssert:
+      return p.ParseAssertProperty();
+    case TokenKind::kKwAssume:
+      return p.ParseAssumeProperty();
+    case TokenKind::kKwCover:
+      return p.ParseCoverProperty();
+    default:
+      return p.ParseRestrictProperty();
+  }
+}
+
 ModuleItem* Parser::ParseRestrictProperty() {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kRestrictProperty;
