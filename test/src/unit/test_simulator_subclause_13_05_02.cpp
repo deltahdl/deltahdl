@@ -657,4 +657,31 @@ TEST(QueueRef, RefFormalOfANonEquivalentTypedefDoesNotBind) {
   EXPECT_EQ(v, 5u);
 }
 
+// §13.5.2: an output argument is copied to its actual when the subroutine
+// returns, the actual being the caller's variable however it is spelled: a
+// task whose formal and actual share the name met, and a function whose
+// formal and actual share the name n, each write the caller's variable.
+TEST(ArgumentPassingSim, OutputActualSpelledLikeTheFormalIsWritten) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  int r;\n"
+      "  task count_up(output int met);\n"
+      "    met = 0;\n"
+      "    met += 3;\n"
+      "  endtask\n"
+      "  function void twice(inout int n);\n"
+      "    n = n * 2;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    int met, n;\n"
+      "    n = 5;\n"
+      "    count_up(met);\n"
+      "    twice(n);\n"
+      "    r = met * 100 + n;\n"
+      "  end\n"
+      "endmodule\n",
+      "r");
+  EXPECT_EQ(val, 310u);
+}
+
 }  // namespace

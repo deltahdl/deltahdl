@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "common/arena.h"
@@ -577,8 +578,15 @@ void BindFunctionArgs(const ModuleItem* func, const Expr* expr, SimContext& ctx,
   }
 }
 
+// §13.5.2: an output or inout formal is copied to its actual when the
+// subroutine returns. The actual is an expression of the caller's, so it is
+// assigned with the callee's scope, the top of the stack at this point,
+// taken off the stack and put back after: an actual spelled like the formal
+// would otherwise resolve to the formal and the caller's variable never
+// change.
 void WritebackOutputArgs(const ModuleItem* func, const Expr* expr,
                          SimContext& ctx, Arena& arena) {
+  std::vector<std::pair<const Expr*, Logic4Vec>> writes;
   for (size_t i = 0; i < func->func_args.size(); ++i) {
     auto dir = func->func_args[i].direction;
     if (dir != Direction::kOutput && dir != Direction::kInout) continue;
@@ -589,7 +597,18 @@ void WritebackOutputArgs(const ModuleItem* func, const Expr* expr,
     if (ai >= 0) wb_target = expr->args[static_cast<size_t>(ai)];
     if (!wb_target) wb_target = func->func_args[i].default_value;
     if (!wb_target) continue;
-    PerformBlockingAssign(wb_target, local->value, ctx, arena);
+    writes.emplace_back(wb_target, local->value);
   }
+  if (writes.empty()) return;
+  std::vector<Scope> stack = ctx.SwapScopeStack({});
+  Scope callee = std::move(stack.back());
+  stack.pop_back();
+  ctx.SwapScopeStack(std::move(stack));
+  for (const auto& [target, value] : writes) {
+    PerformBlockingAssign(target, value, ctx, arena);
+  }
+  stack = ctx.SwapScopeStack({});
+  stack.push_back(std::move(callee));
+  ctx.SwapScopeStack(std::move(stack));
 }
 }  // namespace delta
