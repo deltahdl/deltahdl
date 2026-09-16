@@ -253,6 +253,7 @@ static Process* CreateAssertionChildProcess(SimContext& ctx, Arena& arena,
   if (auto* asserting = ctx.CurrentProcess()) {
     p->inst_prefix = asserting->inst_prefix;
     p->gen_prefixes = asserting->gen_prefixes;
+    p->gen_block_name = asserting->gen_block_name;
     p->program_block_id = asserting->program_block_id;
   }
   // §18.14.2: a new thread's RNG is seeded with the next value drawn from the

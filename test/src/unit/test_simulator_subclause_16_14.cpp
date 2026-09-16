@@ -78,7 +78,7 @@ TEST(ConcurrentAssertionStatements, APropertyOnItsOwnIsNeverEvaluated) {
       "  endproperty\n"
       "  m_used: assert property (@(posedge clk) a)\n"
       "    else $display(\"%m failed at %0d\", $time);\n");
-  EXPECT_EQ(out, "t.m_used failed at 15\n");
+  EXPECT_EQ(out, "t.m_used failed at 15\n$finish at time 40\n");
 }
 
 // §16.14: a concurrent assertion statement may stand in a generate block,
@@ -121,7 +121,7 @@ TEST(ConcurrentAssertionStatements, AStatementStandsInAProgram) {
       "    pr_named: assert property (@(posedge clk) a)\n"
       "      else $display(\"%m failed at %0d\", $time);\n"
       "  endprogram\n");
-  EXPECT_EQ(out, "t.prog.pr_named failed at 15\n");
+  EXPECT_EQ(out, "t.prog.pr_named failed at 15\n$finish at time 40\n");
 }
 
 // §21.2.1.5 by way of §16.14: the label a procedure stands inside is that
@@ -134,7 +134,7 @@ TEST(ConcurrentAssertionStatements, ALabelOfOneProcessIsNotReportedByAnother) {
       "  end\n"
       "  m_named: assert property (@(posedge clk) a)\n"
       "    else $display(\"%m failed at %0d\", $time);\n");
-  EXPECT_EQ(out, "t.m_named failed at 15\n");
+  EXPECT_EQ(out, "t.m_named failed at 15\n$finish at time 40\n");
 }
 
 }  // namespace
