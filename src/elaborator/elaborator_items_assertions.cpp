@@ -287,21 +287,22 @@ void PromoteSequenceInstances(PropertyExprNode* node,
   }
 }
 
-// §16.13.4: the clock of the sequence a property's body instantiates
-// whole, where the body is one instance of a sequence declared with a
-// clock; empty otherwise.
+// §16.13.3 and §16.13.4: the clock flowing into a property declared with
+// none from the sequence its body opens with, where that sequence, the
+// body itself or the antecedent of the implication it is, is one instance
+// of a sequence declared with a clock, `mult_s |=> mult_s` being on
+// mult_s's; empty otherwise.
 const std::vector<EventExpr>& FlowedBodyClock(
     const ModuleItem* decl, const PropertyRegistry& registry) {
   static const std::vector<EventExpr> kNone;
   const PropertyExprNode* root = decl->prop_body_tree;
-  if (root == nullptr || root->kind != PropertyExprNode::Kind::kSequence ||
-      root->sequence == nullptr ||
-      root->sequence->seq_linear.operands.size() != 1) {
-    return kNone;
-  }
-  const ModuleItem* seq =
-      InstantiatedDecl(root->sequence->seq_linear.operands[0],
-                       ModuleItemKind::kSequenceDecl, registry);
+  if (root == nullptr || root->sequence == nullptr) return kNone;
+  bool opens = root->kind == PropertyExprNode::Kind::kSequence ||
+               root->kind == PropertyExprNode::Kind::kImplication;
+  const SeqLinearBody& body = root->sequence->seq_linear;
+  if (!opens || body.operands.size() != 1) return kNone;
+  const ModuleItem* seq = InstantiatedDecl(
+      body.operands[0], ModuleItemKind::kSequenceDecl, registry);
   return seq == nullptr ? kNone : seq->seq_clock;
 }
 
@@ -354,6 +355,45 @@ void GiveInstanceBody(Stmt* stmt, Expr* instance, const ModuleItem* decl,
   stmt->assert_property->boolean = instance;
 }
 
+// Whether the instance `item` of `decl` is one this tool evaluates, which
+// needs `decl` to be a property whose body it reads and a clock, the
+// property's own or the one flowing from its body; each want is reported
+// under the rule Parser::WarnUnevaluatedConcurrentAssertion states.
+bool PropertyInstanceIsEvaluated(const ModuleItem* item, const ModuleItem* decl,
+                                 const PropertyRegistry& registry,
+                                 DiagEngine& diag) {
+  std::string name(item->prop_instance_name);
+  if (decl == nullptr || decl->kind != ModuleItemKind::kPropertyDecl) {
+    diag.Warning(item->loc,
+                 "concurrent assertion is not evaluated: its property_spec "
+                 "has no leading clocking event, and \"" +
+                     name + "\" names no property whose body could supply one",
+                 Subclause("16.14"));
+    return false;
+  }
+  if (decl->prop_body_expr == nullptr && decl->prop_body_tree == nullptr) {
+    diag.Warning(item->loc,
+                 "concurrent assertion is not evaluated: the body of property "
+                 "\"" +
+                     name +
+                     "\" is not the @(event) boolean_expression this tool "
+                     "evaluates",
+                 Subclause("16.14"));
+    return false;
+  }
+  if (decl->prop_clock.empty() && FlowedBodyClock(decl, registry).empty()) {
+    diag.Warning(item->loc,
+                 "concurrent assertion is not evaluated: the body of property "
+                 "\"" +
+                     name +
+                     "\" has no leading clocking event, and this tool infers "
+                     "none",
+                 Subclause("16.14"));
+    return false;
+  }
+  return true;
+}
+
 // The rewrite is made on `item`, which every instance of the module shares,
 // and it is made once: the property declaration is the same for every
 // instance, so the second instance finds the body already there. Reports the
@@ -371,40 +411,13 @@ void SubstitutePropertyInstance(ModuleItem* item, Arena& arena,
     SubstituteSequenceInstance(item, decl, arena, diag);
     return;
   }
-  if (decl == nullptr || decl->kind != ModuleItemKind::kPropertyDecl) {
-    diag.Warning(item->loc,
-                 "concurrent assertion is not evaluated: its property_spec "
-                 "has no leading clocking event, and \"" +
-                     name + "\" names no property whose body could supply one",
-                 Subclause("16.14"));
-    return;
-  }
-  if (decl->prop_body_expr == nullptr && decl->prop_body_tree == nullptr) {
-    diag.Warning(item->loc,
-                 "concurrent assertion is not evaluated: the body of property "
-                 "\"" +
-                     name +
-                     "\" is not the @(event) boolean_expression this tool "
-                     "evaluates",
-                 Subclause("16.14"));
-    return;
-  }
+  if (!PropertyInstanceIsEvaluated(item, decl, registry, diag)) return;
   // §16.13.3 and §16.13.4: a property declared with no clock whose body is
   // a sequence declared with one is on that clock, `mult_p2` being
   // `mult_s`.
   const std::vector<EventExpr>& clock = decl->prop_clock.empty()
                                             ? FlowedBodyClock(decl, registry)
                                             : decl->prop_clock;
-  if (clock.empty()) {
-    diag.Warning(item->loc,
-                 "concurrent assertion is not evaluated: the body of property "
-                 "\"" +
-                     name +
-                     "\" has no leading clocking event, and this tool infers "
-                     "none",
-                 Subclause("16.14"));
-    return;
-  }
   // §16.12 and §16.8: the actual arguments of the instance are bound to the
   // formals by position, and §F.4.1's rewriting substitutes each for the
   // references to its formal in the clock, the disable condition and the
