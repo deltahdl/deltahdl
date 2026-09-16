@@ -12,6 +12,7 @@
 #include "simulator/awaiters.h"
 #include "simulator/evaluation.h"
 #include "simulator/expr_walk.h"
+#include "simulator/instance_bindings.h"
 #include "simulator/process.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
@@ -583,6 +584,10 @@ bool AdvanceOperand(const LinearSequence& body, OperandAttempts& attempts,
 // later discarded; it is dropped as well once no operand can go on.
 struct FirstMatchAttempt {
   std::vector<AndAttempt> operands;
+  // §16.14.6.1: the values the instance this attempt is saved when it was
+  // queued, bound around every step of the attempt; nullptr for a static
+  // assertion's attempt.
+  const InstanceBindings* bindings = nullptr;
 };
 
 const LinearSequence* OrOperandOf(const LinearSequence& body, size_t i) {
@@ -768,37 +773,44 @@ SequencePropertyState* CreateSequencePropertyState(const ModuleItem* seq,
   return state;
 }
 
-std::vector<SequenceVerdict> AdvanceSequenceProperty(
+std::vector<SequenceOutcome> AdvanceSequenceProperty(
     SequencePropertyState& state, const SequenceTick& tick, SimContext& ctx,
     Arena& arena) {
-  std::vector<SequenceVerdict> verdicts;
+  std::vector<SequenceOutcome> outcomes;
   for (const Expr* site : state.past_sites) EvalExpr(site, ctx, arena);
   // §16.12: a disable condition true at any tick of an attempt disables it,
   // and the attempts beginning at this tick with it.
   if (tick.disabled) {
     state.attempts.clear();
-    return verdicts;
+    return outcomes;
   }
-  for (uint32_t i = 0; i < tick.begin; ++i) {
+  for (const InstanceBindings* bindings : tick.instances) {
     state.attempts.push_back(FreshFirstMatchAttempt(state.body));
+    state.attempts.back().bindings = bindings;
   }
+  auto& samples = ctx.AssertionSamples();
   std::vector<FirstMatchAttempt> kept;
   for (size_t i = 0; i < state.attempts.size(); ++i) {
-    bool first = i + tick.begin >= state.attempts.size();
+    bool first = i + tick.instances.size() >= state.attempts.size();
+    // §16.14.6.1: the attempt reads the values its instance saved.
+    samples.SetInstanceBindings(state.attempts[i].bindings);
     bool matched = AdvanceFirstMatchAttempt(state.body, state.attempts[i],
                                             first, ctx, arena);
+    samples.SetInstanceBindings(nullptr);
     bool spent = FirstMatchAttemptIsSpent(state.attempts[i]);
     if (matched) {
-      verdicts.push_back(SequenceVerdict::kMatched);
+      outcomes.push_back(
+          {SequenceVerdict::kMatched, state.attempts[i].bindings});
     } else if (spent) {
-      verdicts.push_back(SequenceVerdict::kFailed);
+      outcomes.push_back(
+          {SequenceVerdict::kFailed, state.attempts[i].bindings});
     }
     if (!spent && (!matched || tick.every_match)) {
       kept.push_back(std::move(state.attempts[i]));
     }
   }
   state.attempts = std::move(kept);
-  return verdicts;
+  return outcomes;
 }
 
 size_t PendingSequenceAttempts(const SequencePropertyState& state) {

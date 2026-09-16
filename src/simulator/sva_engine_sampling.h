@@ -14,6 +14,7 @@ namespace delta {
 
 class Arena;
 struct Expr;
+struct InstanceBindings;
 struct QueueObject;
 struct Variable;
 
@@ -276,6 +277,15 @@ class AssertionSampleStore {
   void SetEvaluatingProperty(bool on) { evaluating_property_ = on; }
   bool EvaluatingProperty() const { return evaluating_property_; }
 
+  // §16.14.6.1: the values the instance of a procedural concurrent assertion
+  // being evaluated saved when it was queued, which a read of one of their
+  // sites answers ahead of every other value; nullptr outside the evaluation
+  // of such an instance, where no site is bound.
+  void SetInstanceBindings(const InstanceBindings* bindings) {
+    bindings_ = bindings;
+  }
+  const InstanceBindings* Bindings() const { return bindings_; }
+
   // §16.13.1: while a property of more than one clock is being evaluated,
   // the clocks that ticked at the time step, a bit per clock in the order
   // the property numbered them, the leading clock bit 0; every bit set
@@ -356,6 +366,7 @@ class AssertionSampleStore {
 
   std::unordered_map<const Variable*, Entry> entries_;
   std::unordered_map<const QueueObject*, QueueEntry> queue_entries_;
+  const InstanceBindings* bindings_ = nullptr;
   // Most recent first, so entry 0 is the previous tick's value -- $past's
   // default of one tick back.
   struct SiteHistory {

@@ -6,6 +6,7 @@
 
 #include "common/arena.h"
 #include "parser/ast_stmt.h"
+#include "simulator/instance_bindings.h"
 
 namespace delta {
 
@@ -33,22 +34,29 @@ PropertyTreeState* CreatePropertyTreeState(
 struct PropertyVerdict {
   bool holds = false;
   bool vacuous = false;
+  // §16.14.6.1: the values the instance the attempt was saved when it was
+  // queued, for its action block to read; nullptr for a static assertion's.
+  const InstanceBindings* bindings = nullptr;
 };
 
-// One tick: every attempt in flight advances and `begin` new ones begin,
-// one for a static assertion and, §16.14.6, one per matured instance of a
-// procedural one, and each whose tree is decided at this tick reaches its
-// verdict and leaves; `disabled` drops every attempt in flight and begins
-// none, though `attempted` counts those that would have begun, disabled or
-// not, at a tick of the leading clock, as §16.14.3 counts attempts. The
-// sampled value functions the tree holds are sampled at the tick first.
+// One tick: every attempt in flight advances and one new one begins per
+// entry of `instances`, one entry, null, for a static assertion and,
+// §16.14.6, the saved values of each matured instance of a procedural one,
+// and each whose tree is decided at this tick reaches its verdict and
+// leaves; `disabled` drops every attempt in flight and begins none, though
+// `attempted` counts those that would have begun, disabled or not, at a
+// tick of the leading clock, as §16.14.3 counts attempts. The sampled value
+// functions the tree holds are sampled at the tick first.
 struct PropertyTick {
   uint32_t attempted = 0;
   std::vector<PropertyVerdict> verdicts;
 };
 
+using AttemptInstances = std::vector<const InstanceBindings*>;
+
 PropertyTick AdvancePropertyTree(PropertyTreeState& state, bool disabled,
-                                 uint32_t begin, SimContext& ctx, Arena& arena);
+                                 const AttemptInstances& instances,
+                                 SimContext& ctx, Arena& arena);
 
 // §16.12.17: the declaration `instance` names where it is an instance,
 // written as a name or a call, of a named property whose body the tree

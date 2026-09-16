@@ -20,6 +20,7 @@
 #include "simulator/evaluation.h"
 #include "simulator/evaluation_internal.h"
 #include "simulator/expr_walk.h"
+#include "simulator/instance_bindings.h"
 #include "simulator/property_attempts_internal.h"
 #include "simulator/property_clocks.h"
 #include "simulator/sequence_flatten.h"
@@ -832,6 +833,7 @@ PropertyVerdict VerdictOf(const PropertyExprNode* root,
   PropertyVerdict verdict;
   verdict.holds = state.verdict == Tri::kTrue;
   verdict.vacuous = verdict.holds && DecidedVacuously(root, state);
+  verdict.bindings = state.bindings;
   return verdict;
 }
 
@@ -875,8 +877,8 @@ PropertyTreeState* CreatePropertyTreeState(
 }
 
 PropertyTick AdvancePropertyTree(PropertyTreeState& state, bool disabled,
-                                 uint32_t begin, SimContext& ctx,
-                                 Arena& arena) {
+                                 const AttemptInstances& instances,
+                                 SimContext& ctx, Arena& arena) {
   PropertyTick tick;
   // §16.13: which clocks ticked at this time step; a second wake at one
   // time step, by another of the clocks, advances nothing again.
@@ -885,23 +887,29 @@ PropertyTick AdvancePropertyTree(PropertyTreeState& state, bool disabled,
   state.advanced_at = now;
   uint32_t ticked = ClocksTicked(state.clocks, now);
   if (ticked == 0) return tick;
-  uint32_t beginning = (ticked & 1u) != 0 ? begin : 0;
-  tick.attempted = beginning;
-  ctx.AssertionSamples().SetClockTicks(ticked);
+  size_t beginning = (ticked & 1u) != 0 ? instances.size() : 0;
+  tick.attempted = static_cast<uint32_t>(beginning);
+  auto& samples = ctx.AssertionSamples();
+  samples.SetClockTicks(ticked);
   for (const Expr* site : state.past_sites) EvalExpr(site, ctx, arena);
   if (disabled) {
     state.attempts.clear();
-    ctx.AssertionSamples().SetClockTicks(~0u);
+    samples.SetClockTicks(~0u);
     return tick;
   }
-  for (uint32_t i = 0; i < beginning; ++i) {
-    state.attempts.push_back(NewNodeState(state.root, state, 0, arena));
+  for (size_t i = 0; i < beginning; ++i) {
+    NodeState* attempt = NewNodeState(state.root, state, 0, arena);
+    attempt->bindings = instances[i];
+    state.attempts.push_back(attempt);
   }
   StepContext sc{state, ctx, arena, ticked};
   std::vector<NodeState*> kept;
   for (size_t i = 0; i < state.attempts.size(); ++i) {
     bool first = i + beginning >= state.attempts.size();
+    // §16.14.6.1: the attempt reads the values its instance saved.
+    samples.SetInstanceBindings(state.attempts[i]->bindings);
     Tri verdict = Step(state.root, *state.attempts[i], sc, first);
+    samples.SetInstanceBindings(nullptr);
     if (verdict == Tri::kPending) {
       kept.push_back(state.attempts[i]);
     } else {
@@ -909,7 +917,7 @@ PropertyTick AdvancePropertyTree(PropertyTreeState& state, bool disabled,
     }
   }
   state.attempts = std::move(kept);
-  ctx.AssertionSamples().SetClockTicks(~0u);
+  samples.SetClockTicks(~0u);
   return tick;
 }
 

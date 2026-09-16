@@ -18,6 +18,7 @@
 #include "simulator/cover_statement.h"
 #include "simulator/evaluation.h"
 #include "simulator/expr_walk.h"
+#include "simulator/instance_bindings.h"
 #include "simulator/procedural_assertion.h"
 #include "simulator/process.h"
 #include "simulator/property_attempts.h"
@@ -193,13 +194,19 @@ static bool TryScheduleDeferredAssertAction(const Stmt* action,
 // an event of its region with the context's named scopes whatever ran last, so
 // the scopes standing when the attempt scheduled the action are stood up
 // around it and put back after.
+//
+// §16.14.6.1: the action block of a procedural concurrent assertion reads the
+// values its instance saved as the property does, so the bindings standing
+// when the attempt scheduled the action are stood up around it as well.
 static SimCoroutine ConcurrentAssertActionCoroutine(
     const Stmt* action, std::vector<std::string_view> named_scopes,
-    SimContext& ctx, Arena& arena) {
+    const InstanceBindings* bindings, SimContext& ctx, Arena& arena) {
   PendingReportScope scope{ctx.CurrentProcess(), std::move(named_scopes)};
   PendingReportScope saved;
   scope.Install(ctx, saved);
+  ctx.AssertionSamples().SetInstanceBindings(bindings);
   co_await ExecStmt(action, ctx, arena);
+  ctx.AssertionSamples().SetInstanceBindings(nullptr);
   PendingReportScope::Restore(ctx, saved);
 }
 
@@ -254,6 +261,7 @@ static bool TryScheduleConcurrentAssertAction(const Stmt* action,
       CreateAssertionChildProcess(ctx, arena, ConcurrentAssertActionRegion());
   p->is_reactive = true;
   p->coro = ConcurrentAssertActionCoroutine(action, ctx.ActiveNamedScopes(),
+                                            ctx.AssertionSamples().Bindings(),
                                             ctx, arena)
                 .Release();
   ScheduleAssertionChildStart(p, p->home_region, ctx);
@@ -508,7 +516,9 @@ static SimCoroutine PropertyTreeFinalCoroutine(const Stmt* stmt,
     const Stmt* action =
         verdict.holds ? stmt->assert_pass_stmt : stmt->assert_fail_stmt;
     if (action != nullptr) {
+      ctx.AssertionSamples().SetInstanceBindings(verdict.bindings);
       co_await ExecStmt(action, ctx, arena);
+      ctx.AssertionSamples().SetInstanceBindings(nullptr);
     } else if (!verdict.holds && stmt->kind != StmtKind::kCoverImmediate) {
       ReportDefaultAssertionFailure(stmt, ImmediateAssertionTypeBit(stmt),
                                     ImmediateDirectiveTypeBit(stmt), ctx);
@@ -516,7 +526,8 @@ static SimCoroutine PropertyTreeFinalCoroutine(const Stmt* stmt,
   }
 }
 
-static void ExecPropertyTreeTick(const Stmt* stmt, uint32_t begin,
+static void ExecPropertyTreeTick(const Stmt* stmt,
+                                 const AttemptInstances& instances,
                                  SimContext& ctx, Arena& arena) {
   if (!ctx.AssertCheckingEnabled(ImmediateAssertionTypeBit(stmt),
                                  ImmediateDirectiveTypeBit(stmt))) {
@@ -539,17 +550,23 @@ static void ExecPropertyTreeTick(const Stmt* stmt, uint32_t begin,
   auto& samples = ctx.AssertionSamples();
   bool outer_evaluating_property = samples.EvaluatingProperty();
   samples.SetEvaluatingProperty(true);
-  PropertyTick tick = AdvancePropertyTree(*state, disabled, begin, ctx, arena);
+  PropertyTick tick =
+      AdvancePropertyTree(*state, disabled, instances, ctx, arena);
   samples.SetEvaluatingProperty(outer_evaluating_property);
   for (uint32_t i = 0; i < tick.attempted; ++i) {
     RecordConcurrentCoverAttempt(stmt, ctx);
   }
   for (PropertyVerdict verdict : tick.verdicts) {
+    // §16.14.6.1: the action block scheduled for the verdict reads what the
+    // instance saved, so the bindings stand while it is scheduled.
+    samples.SetInstanceBindings(verdict.bindings);
     ConcludeAssertion(stmt, verdict, ctx, arena);
+    samples.SetInstanceBindings(nullptr);
   }
 }
 
-static void ExecSequencePropertyTick(const Stmt* stmt, uint32_t begin,
+static void ExecSequencePropertyTick(const Stmt* stmt,
+                                     const AttemptInstances& instances,
                                      SimContext& ctx, Arena& arena) {
   uint32_t type_bit = ImmediateAssertionTypeBit(stmt);
   uint32_t directive_bit = ImmediateDirectiveTypeBit(stmt);
@@ -566,7 +583,9 @@ static void ExecSequencePropertyTick(const Stmt* stmt, uint32_t begin,
       RegisterStrongAttemptsFinal(stmt, state, ctx, arena);
     }
   }
-  for (uint32_t i = 0; i < begin; ++i) RecordConcurrentCoverAttempt(stmt, ctx);
+  for (size_t i = 0; i < instances.size(); ++i) {
+    RecordConcurrentCoverAttempt(stmt, ctx);
+  }
   SequenceTick tick;
   tick.disabled = stmt->assert_disable_iff != nullptr &&
                   EvalExpr(stmt->assert_disable_iff, ctx, arena).IsTruthy();
@@ -574,18 +593,21 @@ static void ExecSequencePropertyTick(const Stmt* stmt, uint32_t begin,
   // match of it counted; a property, a cover property's among them, holds
   // at the first.
   tick.every_match = stmt->cover_sequence;
-  tick.begin = begin;
+  tick.instances = instances;
   auto& samples = ctx.AssertionSamples();
   bool outer_evaluating_property = samples.EvaluatingProperty();
   samples.SetEvaluatingProperty(true);
-  std::vector<SequenceVerdict> verdicts =
+  std::vector<SequenceOutcome> outcomes =
       AdvanceSequenceProperty(*state, tick, ctx, arena);
   samples.SetEvaluatingProperty(outer_evaluating_property);
-  for (SequenceVerdict verdict : verdicts) {
-    bool matched = verdict == SequenceVerdict::kMatched;
+  for (const SequenceOutcome& outcome : outcomes) {
+    bool matched = outcome.verdict == SequenceVerdict::kMatched;
     PropertyVerdict decided;
     decided.holds = matched != stmt->assert_negated;
+    decided.bindings = outcome.bindings;
+    samples.SetInstanceBindings(outcome.bindings);
     ConcludeAssertion(stmt, decided, ctx, arena);
+    samples.SetInstanceBindings(nullptr);
   }
 }
 
@@ -697,17 +719,24 @@ static void StartFutureGclkAttempt(const Stmt* stmt, const Process& asserting,
   ScheduleAssertionChildStart(p, p->home_region, ctx);
 }
 
-void ExecConcurrentAssertionTick(const Stmt* stmt, uint32_t begin,
+void ExecConcurrentAssertionTick(const Stmt* stmt,
+                                 const AttemptInstances& instances,
                                  SimContext& ctx, Arena& arena) {
   if (stmt->assert_property != nullptr) {
-    ExecPropertyTreeTick(stmt, begin, ctx, arena);
+    ExecPropertyTreeTick(stmt, instances, ctx, arena);
   } else if (stmt->assert_sequence != nullptr) {
-    ExecSequencePropertyTick(stmt, begin, ctx, arena);
+    ExecSequencePropertyTick(stmt, instances, ctx, arena);
   } else {
     // A boolean property is decided at its own tick, so each attempt is one
-    // evaluation; its action block, a concurrent assertion's, is scheduled
-    // into the Reactive region rather than handed back.
-    for (uint32_t i = 0; i < begin; ++i) JudgeAssertion(stmt, ctx, arena);
+    // evaluation, reading what its instance saved (§16.14.6.1); its action
+    // block, a concurrent assertion's, is scheduled into the Reactive
+    // region rather than handed back.
+    auto& samples = ctx.AssertionSamples();
+    for (const InstanceBindings* bindings : instances) {
+      samples.SetInstanceBindings(bindings);
+      JudgeAssertion(stmt, ctx, arena);
+      samples.SetInstanceBindings(nullptr);
+    }
   }
 }
 
@@ -716,7 +745,8 @@ ExecTask ExecImmediateAssert(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   // evaluated where it is reached but placed in the procedural assertion
   // queue of the process, to be evaluated at its leading clocking event.
   if (stmt->is_procedural_concurrent && stmt->is_concurrent_clocked &&
-      !stmt->assert_clock.empty() && EnqueueProceduralAssertion(stmt, ctx)) {
+      !stmt->assert_clock.empty() &&
+      EnqueueProceduralAssertion(stmt, ctx, arena)) {
     co_return StmtResult::kDone;
   }
   // §16.5: a concurrent assertion's property is evaluated in the Observed
@@ -738,11 +768,11 @@ ExecTask ExecImmediateAssert(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   }
 
   if (stmt->assert_property != nullptr) {
-    ExecPropertyTreeTick(stmt, 1, ctx, arena);
+    ExecPropertyTreeTick(stmt, AttemptInstances{nullptr}, ctx, arena);
     co_return StmtResult::kDone;
   }
   if (stmt->assert_sequence != nullptr) {
-    ExecSequencePropertyTick(stmt, 1, ctx, arena);
+    ExecSequencePropertyTick(stmt, AttemptInstances{nullptr}, ctx, arena);
     co_return StmtResult::kDone;
   }
 

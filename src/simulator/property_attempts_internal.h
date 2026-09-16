@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "parser/ast_stmt.h"
+#include "simulator/instance_bindings.h"
 #include "simulator/sequence_flatten.h"
 #include "simulator/sequence_monitor.h"
 
@@ -33,6 +34,11 @@ struct FlatSequence {
 // antecedent can match no more.
 struct NodeState {
   Tri verdict = Tri::kPending;
+  // §16.14.6.1: the values the instance of a procedural concurrent assertion
+  // this attempt is saved when it was queued, bound around every step of the
+  // attempt; nullptr for a static assertion's attempt. Set on the root and
+  // read there alone.
+  const InstanceBindings* bindings = nullptr;
   LinearSequenceAttempt* attempt = nullptr;
   std::vector<NodeState*> operands;
   std::vector<NodeState*> consequents;

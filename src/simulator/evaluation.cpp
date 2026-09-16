@@ -12,6 +12,7 @@
 #include "lexer/token.h"
 #include "parser/ast.h"
 #include "simulator/evaluation_internal.h"
+#include "simulator/instance_bindings.h"
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"
 // AssertionSampleStore, the §16.5.1 sampled values a concurrent assertion
@@ -37,6 +38,15 @@ static Logic4Vec EvalIdentifierClassScope(const Expr* expr, SimContext& ctx,
   if (method_cls)
     return self->GetPropertyForType(expr->text, method_cls, arena);
   return self->GetProperty(expr->text, arena);
+}
+
+// §16.14.6.1: the value the instance of a procedural concurrent assertion
+// being evaluated saved for `expr` when it was queued, a const cast's or an
+// automatic variable's, or nullptr where no instance is being evaluated or
+// the instance saved none for the site.
+static const Logic4Vec* BoundInstanceValue(const Expr* expr, SimContext& ctx) {
+  const InstanceBindings* bindings = ctx.AssertionSamples().Bindings();
+  return bindings == nullptr ? nullptr : bindings->Find(expr);
 }
 
 static Logic4Vec EvalIdentifier(const Expr* expr, SimContext& ctx,
@@ -893,6 +903,7 @@ Logic4Vec EvalExpr(const Expr* expr, SimContext& ctx, Arena& arena,
     case ExprKind::kTimeLiteral:
       return EvalRealOrTimeLiteral(expr, arena);
     case ExprKind::kIdentifier:
+      if (const Logic4Vec* bound = BoundInstanceValue(expr, ctx)) return *bound;
       return EvalIdentifier(expr, ctx, arena);
     case ExprKind::kUnary:
       return EvalUnaryExpr(expr, ctx, arena);
@@ -915,6 +926,7 @@ Logic4Vec EvalExpr(const Expr* expr, SimContext& ctx, Arena& arena,
     case ExprKind::kMemberAccess:
       return EvalMemberAccess(expr, ctx, arena);
     case ExprKind::kCast:
+      if (const Logic4Vec* bound = BoundInstanceValue(expr, ctx)) return *bound;
       return EvalCast(expr, ctx, arena);
     case ExprKind::kInside:
       return EvalInside(expr, ctx, arena);

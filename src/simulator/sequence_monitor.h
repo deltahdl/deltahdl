@@ -7,6 +7,7 @@
 
 #include "lexer/token.h"
 #include "parser/ast.h"
+#include "simulator/instance_bindings.h"
 #include "simulator/sequence_flatten.h"
 
 namespace delta {
@@ -63,20 +64,27 @@ enum class SequenceVerdict : uint8_t { kMatched, kFailed };
 // begins none; §16.14.3: `every_match` keeps an attempt that matched in
 // flight while it can match again, so that each later match of it is a
 // verdict too, as a cover sequence counts every match of an attempt, where
-// a property holds at the first; `begin` is the number of attempts
-// beginning at the tick, one for a static assertion and, §16.14.6, one per
-// matured instance of a procedural one.
+// a property holds at the first; `instances` are the attempts beginning at
+// the tick, one entry, null, for a static assertion and, §16.14.6, the
+// values each matured instance of a procedural one saved (§16.14.6.1).
 struct SequenceTick {
   bool disabled = false;
   bool every_match = false;
-  uint32_t begin = 1;
+  std::vector<const InstanceBindings*> instances;
+};
+
+// The verdict one attempt reached at a tick, with the values its instance
+// saved for the action block to read, null for a static assertion's.
+struct SequenceOutcome {
+  SequenceVerdict verdict = SequenceVerdict::kFailed;
+  const InstanceBindings* bindings = nullptr;
 };
 
 // One tick of the property: every attempt in flight advances and the new
 // ones begin, each that matches at this tick or can no longer match
 // reaching its verdict and leaving. The sampled value functions the
 // sequence holds are sampled at the tick first.
-std::vector<SequenceVerdict> AdvanceSequenceProperty(
+std::vector<SequenceOutcome> AdvanceSequenceProperty(
     SequencePropertyState& state, const SequenceTick& tick, SimContext& ctx,
     Arena& arena);
 

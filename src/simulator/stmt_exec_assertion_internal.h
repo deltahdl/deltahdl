@@ -7,6 +7,7 @@
 
 #include "common/arena.h"
 #include "simulator/process.h"
+#include "simulator/property_attempts.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 
@@ -112,10 +113,13 @@ void ScheduleAssertionChildStart(Process* p, Region region, SimContext& ctx);
 
 // One tick of the leading clock of the concurrent assertion `stmt` carries,
 // in the current process, whose state the attempts in flight are kept on:
-// every attempt in flight advances and `begin` new ones begin, the verdicts
-// reached at the tick concluding the assertion, its action block scheduled
-// into the Reactive region. Called in the Observed region of the tick.
-void ExecConcurrentAssertionTick(const Stmt* stmt, uint32_t begin,
+// every attempt in flight advances and one new one begins per entry of
+// `instances`, a null entry for a static assertion's and, §16.14.6.1, the
+// values a matured instance of a procedural one saved, the verdicts reached
+// at the tick concluding the assertion, its action block scheduled into the
+// Reactive region. Called in the Observed region of the tick.
+void ExecConcurrentAssertionTick(const Stmt* stmt,
+                                 const AttemptInstances& instances,
                                  SimContext& ctx, Arena& arena);
 
 }  // namespace delta
