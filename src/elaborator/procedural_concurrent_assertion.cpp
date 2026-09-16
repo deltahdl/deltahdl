@@ -249,6 +249,11 @@ void ElaborateProceduralConcurrentAssertions(ModuleItem* procedure,
     if (!stmt->is_concurrent_clocked) continue;
     SubstituteInstance(stmt, registry, at_instance, arena, diag);
     if (!stmt->is_concurrent_clocked) continue;
+    // §16.15: a statement without a disable iff clause of its own within the
+    // scope of a default disable iff declaration takes its condition.
+    if (stmt->assert_disable_iff == nullptr) {
+      stmt->assert_disable_iff = at_instance.disable;
+    }
     PromoteSequenceInstances(stmt->assert_property, registry, arena);
     if (stmt->assert_clock.empty()) stmt->assert_clock = inferred;
     if (stmt->assert_clock.empty()) stmt->assert_clock = fallback;

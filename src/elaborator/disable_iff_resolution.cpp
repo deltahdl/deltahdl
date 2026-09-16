@@ -134,4 +134,13 @@ DisableConditionSource ResolveDisableConditionSource(
   return DisableConditionSource::kNoneEquivalentToFalse;
 }
 
+Expr* DeclaredDefaultDisableIff(const std::vector<ModuleItem*>& items) {
+  for (const ModuleItem* item : items) {
+    if (item->kind == ModuleItemKind::kDefaultDisableIff) {
+      return item->init_expr;
+    }
+  }
+  return nullptr;
+}
+
 }  // namespace delta

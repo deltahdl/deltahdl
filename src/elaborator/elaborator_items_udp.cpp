@@ -14,6 +14,7 @@
 #include "common/source_loc.h"
 #include "elaborator/concurrent_assertion_expr.h"
 #include "elaborator/const_eval.h"
+#include "elaborator/disable_iff_resolution.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_items_internal.h"
@@ -689,6 +690,7 @@ void Elaborator::InstantiateImplicitNestedModules(
     // this enclosing scope, so hand its visible names to ElaborateModule.
     pending_enclosing_scope_ = CaptureCurrentScopeNames();
     has_pending_enclosing_scope_ = true;
+    nested_default_disable_iff_ = mod->default_disable_iff;
     inst.resolved = ElaborateModule(nested_decl, empty_params);
     current_inst_path_ = std::move(saved_inst_path);
     mod->children.push_back(inst);
@@ -730,6 +732,14 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
 
   BuildPropertyRegistry(decl, property_registry_);
   PromoteSequenceInstancesInProperties(decl, property_registry_, arena_);
+  // §16.15: the default disable iff of this scope, wherever it stands among
+  // the items, or the enclosing declaration's where this is a nested
+  // declaration without one, which the concurrent assertions of the scope
+  // without a disable iff clause of their own take.
+  mod->default_disable_iff = DeclaredDefaultDisableIff(decl->items);
+  if (mod->default_disable_iff == nullptr) {
+    mod->default_disable_iff = inherited_default_disable_iff_;
+  }
 
   // §13.4.3: make this scope's functions available to the constant-expression
   // folder so a parameter/localparam initialized from a constant function call

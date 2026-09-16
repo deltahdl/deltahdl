@@ -10,6 +10,7 @@
 
 #include "common/diagnostic.h"
 #include "elaborator/const_eval.h"
+#include "elaborator/disable_iff_resolution.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_items_internal.h"
 #include "elaborator/rtlir.h"
@@ -256,6 +257,13 @@ void Elaborator::ElaborateGenerateItems(const std::vector<ModuleItem*>& items,
         gen_func_decls[item->name] = item;
     gen_func_guard.emplace(&gen_func_decls);
   }
+  // §16.15: a generate block with a default disable iff of its own applies
+  // it within the block, overriding the enclosing scope's, which is put
+  // back after the block's items.
+  Expr* enclosing_default_disable_iff = mod->default_disable_iff;
+  if (Expr* own = DeclaredDefaultDisableIff(items)) {
+    mod->default_disable_iff = own;
+  }
   for (auto* item : items) {
     switch (item->kind) {
       case ModuleItemKind::kGenerateIf:
@@ -286,6 +294,7 @@ void Elaborator::ElaborateGenerateItems(const std::vector<ModuleItem*>& items,
         break;
     }
   }
+  mod->default_disable_iff = enclosing_default_disable_iff;
   gen_const_scope_ = saved_gen_const_scope;
 }
 

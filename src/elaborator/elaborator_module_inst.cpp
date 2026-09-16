@@ -814,6 +814,10 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
   // types, then restore the map once the child has been elaborated.
   auto saved_type_params =
       ApplyChildTypeParams(item, child_decl, typedefs_, unit_, diag_);
+  // §16.15: the default disable iff extends to a nested declaration and not
+  // into an instance of a module declared elsewhere.
+  if (inst.is_nested_decl)
+    nested_default_disable_iff_ = mod->default_disable_iff;
   inst.resolved = ElaborateModule(child_decl, child_params);
   RestoreChildTypeParams(typedefs_, saved_type_params);
   nested_module_decls_ = std::move(saved_nested);

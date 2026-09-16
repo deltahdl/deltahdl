@@ -1,8 +1,12 @@
 #pragma once
 
 #include <cstdint>
+#include <vector>
 
 namespace delta {
+
+struct Expr;
+struct ModuleItem;
 
 // §16.15 governs how the disable condition of a concurrent assertion is
 // resolved, including the scoping of a `default disable iff` declaration. The
@@ -91,5 +95,11 @@ bool AssertionGovernedBySameScopeDefault(DeclarationPosition position);
 // declaration within that scope.
 DisableConditionSource ResolveDisableConditionSource(
     bool assertion_has_explicit_disable_iff, bool within_default_disable_scope);
+
+// §16.15: the condition of the default disable iff declared among `items`,
+// the items of a module, interface or program declaration or of a generate
+// block, wherever it stands among them, the effect of the declaration being
+// independent of its position; nullptr where none is declared there.
+Expr* DeclaredDefaultDisableIff(const std::vector<ModuleItem*>& items);
 
 }  // namespace delta

@@ -444,6 +444,13 @@ void PromotePropertyInstanceBoolean(ModuleItem* item, Arena& arena,
     root = whole;
   }
   stmt->assert_property = root;
+  // §16.15: the disable iff clause the property declares is the instance's
+  // own, the actuals in the formals' places, ahead of any default.
+  if (stmt->assert_disable_iff == nullptr) {
+    stmt->assert_disable_iff =
+        SubstituteFormals(decl->prop_disable_iff,
+                          BindActuals(decl->prop_formals, instance), arena);
+  }
 }
 
 }  // namespace
@@ -531,6 +538,13 @@ void Elaborator::ElaborateAssertPropertyItem(ModuleItem* item,
   inferred.disable = mod != nullptr ? mod->default_disable_iff : nullptr;
   SubstitutePropertyInstance(item, arena_, property_registry_, inferred, diag_);
   PromotePropertyInstanceBoolean(item, arena_, property_registry_, inferred);
+  // §16.15: an assertion without a disable iff clause of its own, in the
+  // spec or in the property it instantiates, within the scope of a default
+  // disable iff declaration takes its condition; with none, none is
+  // inferred.
+  if (item->body != nullptr && item->body->assert_disable_iff == nullptr) {
+    item->body->assert_disable_iff = inferred.disable;
+  }
   if (item->body != nullptr) {
     PromoteSequenceInstances(item->body->assert_property, property_registry_,
                              arena_);
@@ -659,14 +673,10 @@ bool Elaborator::ElaborateAssertionItem(ModuleItem* item, RtlirModule* mod) {
       // §14.10's clocking block event reach anything.
       if (mod != nullptr) mod->clocking_blocks.push_back(item);
       return true;
-    case ModuleItemKind::kDefaultDisableIff:
-      // §16.15: the declaration's condition is what §16.14.7's
-      // $inferred_disable returns to the instances in its scope.
-      if (mod != nullptr) mod->default_disable_iff = item->init_expr;
-      return true;
     default:
       // §23.10.4 kDefparam, kExportDecl, kNestedModuleDecl, and any remaining
-      // kind are no-ops at behavioral elaboration.
+      // kind are no-ops at behavioral elaboration; kDefaultDisableIff was read
+      // ahead of the items, its effect being independent of its position.
       return true;
   }
 }

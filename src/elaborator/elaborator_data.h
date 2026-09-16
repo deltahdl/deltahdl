@@ -117,6 +117,13 @@ class ElaboratorData {
   std::vector<std::unordered_set<std::string_view>> enclosing_scope_names_;
   std::unordered_set<std::string_view> pending_enclosing_scope_;
   bool has_pending_enclosing_scope_ = false;
+  // §16.15: the default disable iff of the scope a nested declaration is
+  // elaborated in, which extends to the declaration unless it has one of its
+  // own; set by the two sites instantiating a nested declaration, taken by
+  // Elaborator::ElaborateModule as it enters, and null for every other
+  // instance, into which the default does not extend.
+  Expr* nested_default_disable_iff_ = nullptr;
+  Expr* inherited_default_disable_iff_ = nullptr;
 
   std::unordered_set<std::string_view> declared_names_;
   // §23.9: the declared names of each elaborated module scope, keyed by the

@@ -817,6 +817,11 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
     pending_enclosing_scope_.clear();
     has_pending_enclosing_scope_ = false;
   }
+  // §16.15: the default disable iff a nested declaration inherits from the
+  // scope it is declared in, taken here so that the instances this cell
+  // contains, other than its own nested declarations, inherit none.
+  inherited_default_disable_iff_ = nested_default_disable_iff_;
+  nested_default_disable_iff_ = nullptr;
 
   // While this cell is elaborated it is the parent of any instances it
   // contains; record its library so child binding can fall back to it
