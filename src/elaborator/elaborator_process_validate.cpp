@@ -7,6 +7,7 @@
 #include "common/diagnostic.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/rtlir.h"
+#include "lexer/token.h"
 #include "parser/ast.h"
 
 namespace delta {

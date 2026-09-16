@@ -13,7 +13,6 @@
 #include "elaborator/global_clock_assertion_event.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/sensitivity.h"
-#include "lexer/token.h"
 #include "parser/ast.h"
 
 namespace delta {
