@@ -102,4 +102,65 @@ TEST(RandomVariableRun, ARandHandlesObjectIsSolvedWithTheHolder) {
   EXPECT_EQ(out, "40 40\n");
 }
 
+// A class holding the one member `decl` and the constraint `constraint`,
+// randomized 8 times by an initial that counts the calls answering 1.
+std::string Lone(const std::string& decl, const std::string& constraint) {
+  return "class Lone;\n" + decl + constraint +
+         "endclass\n"
+         "module t;\n"
+         "  initial begin\n"
+         "    Lone o = new;\n"
+         "    int n = 0;\n"
+         "    repeat (8) if (o.randomize() == 1) n++;\n"
+         "    $display(\"%0d\", n);\n"
+         "  end\n"
+         "endmodule\n";
+}
+
+// §18.4.1: a rand real member alone, under its range constraint, is drawn
+// eight times over.
+TEST(RandomVariableRun, ALoneRealMemberIsDrawn) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(Lone("  rand real r;\n",
+                            "  constraint cr { r > 0.0 && r < 2.0; }\n"),
+                       f),
+            "8\n");
+}
+
+// §18.4.2: a randc member alone is drawn eight times over, two cycles of
+// its four values.
+TEST(RandomVariableRun, ALoneRandcMemberIsDrawn) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(Lone("  randc bit [1:0] c;\n", ""), f), "8\n");
+}
+
+// §18.4: a rand packed structure with an enum member, and a rand enum, are
+// drawn eight times over.
+TEST(RandomVariableRun, LoneEnumAndPackedStructMembersAreDrawn) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("typedef enum bit [1:0] {A = 2'b00, B = 2'b11} ab_e;\n"
+                       "typedef struct packed {\n"
+                       "  ab_e ValidAB;\n"
+                       "} VStructEnum;\n" +
+                           Lone("  rand ab_e e;\n  rand VStructEnum s;\n", ""),
+                       f),
+            "8\n");
+}
+
+// §18.4: a rand object handle whose object carries a constraint, under a
+// global constraint of the holder's, is solved eight times over.
+TEST(RandomVariableRun, ALoneRandHandleIsSolvedWithTheHolder) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("class Inner;\n"
+                       "  rand int v;\n"
+                       "  constraint cv { v inside {[1:3]}; }\n"
+                       "endclass\n" +
+                           Lone("  rand Inner in;\n  rand bit [3:0] w;\n"
+                                "  function new();\n    in = new;\n"
+                                "  endfunction\n",
+                                "  constraint cw { w > in.v; }\n"),
+                       f),
+            "8\n");
+}
+
 }  // namespace
