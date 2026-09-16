@@ -441,7 +441,7 @@ bool ExpandInstance(const PropertyExprNode* node, NodeState& state,
   if (!decl->prop_locals.empty()) {
     PlaceLocalCopies(body, decl->prop_locals, nullptr, sc.tree, sc.arena);
   }
-  Collection collection{sc.tree, sc.ctx, sc.arena, actuals};
+  Collection collection{sc.tree, sc.ctx, sc.arena, actuals, {}};
   if (!CollectSequences(body, collection, state.clock)) return false;
   InstallClockWatchers(sc.tree.clocks, sc.ctx, sc.arena);
   state.expansion = body;
@@ -728,25 +728,33 @@ bool AdvancesOffItsClock(const PropertyExprNode* node, const NodeState& state) {
   return false;
 }
 
-Tri Step(const PropertyExprNode* node, NodeState& state, StepContext& sc,
-         bool begin) {
-  if (state.verdict != Tri::kPending) return state.verdict;
-  // §16.13.2: an operand on a clock of its own begins at that clock's
-  // nearest tick, the one it was begun at where the clock ticked there,
-  // and advances at its clock's ticks, and at the others' only where an
-  // operand of its own may be on them.
+// §16.13.2: whether the node advances at this tick: an operand on a clock
+// of its own begins at that clock's nearest tick, the one it was begun at
+// where the clock ticked there, `begin` set where that is this tick, and
+// advances at its clock's ticks, and at the others' only where an operand
+// of its own may be on them. §16.13.7: the copies of the locals made for
+// the node are initialized as it begins.
+bool AdvancesAtTick(const PropertyExprNode* node, NodeState& state,
+                    StepContext& sc, bool& begin) {
   bool own_tick = Ticked(sc, state.clock);
   if (begin && !own_tick) {
     state.awaiting = true;
-    return Tri::kPending;
+    return false;
   }
   if (state.awaiting) {
-    if (!own_tick) return Tri::kPending;
+    if (!own_tick) return false;
     state.awaiting = false;
     begin = true;
   }
-  if (!own_tick && !AdvancesOffItsClock(node, state)) return state.verdict;
+  if (!own_tick && !AdvancesOffItsClock(node, state)) return false;
   if (begin && !sc.tree.local_copies.empty()) InitializeLocalCopies(node, sc);
+  return true;
+}
+
+Tri Step(const PropertyExprNode* node, NodeState& state, StepContext& sc,
+         bool begin) {
+  if (state.verdict != Tri::kPending) return state.verdict;
+  if (!AdvancesAtTick(node, state, sc, begin)) return state.verdict;
   switch (node->kind) {
     case PropertyExprNode::Kind::kBoolean:
       state.verdict = StepBoolean(node, state, sc, begin);
@@ -830,7 +838,7 @@ PropertyTreeState* CreatePropertyTreeState(
   state->root = root;
   state->clocks.clocks.push_back(leading_clock);
   const ActualsByFormal kNoActuals;
-  Collection collection{*state, ctx, arena, kNoActuals};
+  Collection collection{*state, ctx, arena, kNoActuals, {}};
   if (!CollectSequences(root, collection, 0)) return nullptr;
   InstallClockWatchers(state->clocks, ctx, arena);
   return state;

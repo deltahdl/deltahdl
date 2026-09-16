@@ -1,5 +1,7 @@
 #pragma once
 
+#include <vector>
+
 #include "common/arena.h"
 #include "common/source_loc.h"
 #include "lexer/token.h"
@@ -66,6 +68,12 @@ struct ParserPropertySpecHelpers {
   static PropertyExprNode* TreeOfSpecBody(Parser& p,
                                           const SimpleSpecBody& body);
   static void CapturePropertyTreeBody(Parser& p, ModuleItem* item);
+  // §16.10 and §16.13.7: the assertion_variable_declarations at the head
+  // of a named property's body, `logic v = e;`, read as a sequence body's
+  // are; false where one is malformed. Defined in
+  // src/parser/parser_sequence_linear.cpp beside the sequence body's.
+  static bool ParsePropertyLocalDecls(Parser& p,
+                                      std::vector<SeqLocalDecl>& locals);
 };
 
 }  // namespace delta

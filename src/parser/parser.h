@@ -260,7 +260,6 @@ class Parser {
   Expr* MakeConstraintAnd(Expr* lhs, Expr* rhs);
   Expr* MakeConstraintNot(Expr* operand);
   void CaptureLinearSequenceBody(ModuleItem* item);
-  bool ParsePropertyLocalDecls(std::vector<SeqLocalDecl>& locals);
   bool AtSelectBracket();
   bool in_sequence_body_ = false;
   // §16.12.1: the clocked boolean body of a named property, kept so an

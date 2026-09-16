@@ -769,7 +769,7 @@ void ParserPropertySpecHelpers::CapturePropertyTreeBody(Parser& p,
   std::vector<EventExpr> clock;
   // §16.10: the body's local variables are declared ahead of the property.
   std::vector<SeqLocalDecl> locals;
-  bool ok = p.ParsePropertyLocalDecls(locals);
+  bool ok = ParsePropertyLocalDecls(p, locals);
   // §16.13.3: of two clocking events juxtaposed the second nullifies the
   // first, so the last written is the body's.
   while (ok && p.Match(TokenKind::kAt)) {

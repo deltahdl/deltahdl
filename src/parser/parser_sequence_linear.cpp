@@ -698,11 +698,10 @@ struct ParserSeqLinearHelpers {
 // §16.10 and §16.13.7: the assertion_variable_declarations at the head of
 // a named property's body, `logic v = e;`, read as a sequence body's are;
 // false where one is malformed.
-bool Parser::ParsePropertyLocalDecls(std::vector<SeqLocalDecl>& locals) {
+bool ParserPropertySpecHelpers::ParsePropertyLocalDecls(
+    Parser& p, std::vector<SeqLocalDecl>& locals) {
   SeqLinearBody body;
-  if (!ParserSeqLinearHelpers::ParseLinearSeqLocalDecls(*this, body)) {
-    return false;
-  }
+  if (!ParserSeqLinearHelpers::ParseLinearSeqLocalDecls(p, body)) return false;
   locals = std::move(body.locals);
   return true;
 }
