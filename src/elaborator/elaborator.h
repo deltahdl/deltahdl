@@ -271,6 +271,11 @@ class Elaborator : public ElaboratorClassRules {
   void RunPostItemValidations(const ModuleDecl* decl, RtlirModule* mod);
 
   void ElaborateModuleInst(ModuleItem* item, RtlirModule* mod);
+  // The child module of an instance elaborated under the instance's parameter
+  // overrides and type parameters, its nested declarations in scope.
+  void ElaborateChildInstance(RtlirModuleInst& inst, const ModuleItem* item,
+                              ModuleDecl* child_decl, RtlirModule* mod,
+                              const ScopeMap& parent_scope);
   // The three checks on an instance's port connections once they are bound.
   void CheckInstancePorts(const RtlirModuleInst& inst, const ModuleItem* item,
                           RtlirModule* mod);
@@ -400,11 +405,6 @@ class Elaborator : public ElaboratorClassRules {
   void ElaborateGenerateCase(ModuleItem* item, RtlirModule* mod,
                              const ScopeMap& scope);
 
-  // §27.5: elaborate the one generate block a conditional generate construct
-  // selected, opening the scope that block creates. `block_name` is the name
-  // the block carries, which §27.6 has already supplied where the source wrote
-  // none, and `has_begin_end` says whether the block was written with the
-  // `begin` and `end` keywords, which decides whether it is directly nested.
   // §27.5: one generate block of a conditional generate construct, which the
   // construct "selects at most one of" and this elaborates. The then-branch,
   // each case item and the final else are the same entity written three ways,

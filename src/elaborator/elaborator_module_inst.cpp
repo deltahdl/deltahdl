@@ -797,32 +797,8 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
     return;
   }
 
-  auto saved_nested = nested_module_decls_;
-  Elaborator::ParamList child_params;
   auto parent_scope = BuildParamScope(mod);
-
-  ResolveInstParams(item, child_decl, parent_scope, child_params, diag_);
-
-  // A configuration may override (or reset) this instance's parameters on top
-  // of whatever the instantiation specified (§33.4.3).
-  std::vector<std::string_view> config_locked;
-  ApplyConfigParamOverrides(child_decl, child_params, parent_scope,
-                            config_locked);
-
-  // §6.20.3/§23.10: publish the child's type-parameter substitutions into the
-  // shared typedef map so its dependent declarations resolve against the chosen
-  // types, then restore the map once the child has been elaborated.
-  auto saved_type_params =
-      ApplyChildTypeParams(item, child_decl, typedefs_, unit_, diag_);
-  // §16.15: the default disable iff extends to a nested declaration and not
-  // into an instance of a module declared elsewhere.
-  if (inst.is_nested_decl)
-    nested_default_disable_iff_ = mod->default_disable_iff;
-  inst.resolved = ElaborateModule(child_decl, child_params);
-  RestoreChildTypeParams(typedefs_, saved_type_params);
-  nested_module_decls_ = std::move(saved_nested);
-
-  MarkConfigLockedParams(inst, config_locked);
+  ElaborateChildInstance(inst, item, child_decl, mod, parent_scope);
   BindPorts(inst, item, mod, child_decl);
 
   std::vector<uint32_t> inst_dim_sizes;
@@ -851,6 +827,37 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
   InstArrayDistribCtx dctx{arena_, mod, var_array_info_, parent_scope};
   AppendModuleInstOrArray(dctx, mod, inst, item, parent_scope);
   current_inst_path_ = std::move(saved_inst_path);
+}
+
+void Elaborator::ElaborateChildInstance(RtlirModuleInst& inst,
+                                        const ModuleItem* item,
+                                        ModuleDecl* child_decl,
+                                        RtlirModule* mod,
+                                        const ScopeMap& parent_scope) {
+  auto saved_nested = nested_module_decls_;
+  Elaborator::ParamList child_params;
+  ResolveInstParams(item, child_decl, parent_scope, child_params, diag_);
+
+  // A configuration may override (or reset) this instance's parameters on top
+  // of whatever the instantiation specified (§33.4.3).
+  std::vector<std::string_view> config_locked;
+  ApplyConfigParamOverrides(child_decl, child_params, parent_scope,
+                            config_locked);
+
+  // §6.20.3/§23.10: publish the child's type-parameter substitutions into the
+  // shared typedef map so its dependent declarations resolve against the chosen
+  // types, then restore the map once the child has been elaborated.
+  auto saved_type_params =
+      ApplyChildTypeParams(item, child_decl, typedefs_, unit_, diag_);
+  // §16.15: the default disable iff extends to a nested declaration and not
+  // into an instance of a module declared elsewhere.
+  if (inst.is_nested_decl) {
+    nested_default_disable_iff_ = mod->default_disable_iff;
+  }
+  inst.resolved = ElaborateModule(child_decl, child_params);
+  RestoreChildTypeParams(typedefs_, saved_type_params);
+  nested_module_decls_ = std::move(saved_nested);
+  MarkConfigLockedParams(inst, config_locked);
 }
 
 void Elaborator::CheckInstancePorts(const RtlirModuleInst& inst,
