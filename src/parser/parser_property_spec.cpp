@@ -70,6 +70,17 @@ bool ParserPropertySpecHelpers::AheadHoldsRepetition(Parser& p) {
   return found;
 }
 
+// §16.9.6, §16.9.8, §16.9.9 and §16.9.10: whether the tokens ahead hold a
+// sequence operator no boolean has, intersect, within, throughout or
+// first_match, which makes the operand a sequence where no cycle delay or
+// repetition does.
+bool ParserPropertySpecHelpers::AheadHoldsSequenceOperator(Parser& p) {
+  return p.Check(TokenKind::kKwFirstMatch) ||
+         AheadHolds(p, TokenKind::kKwIntersect, true) ||
+         AheadHolds(p, TokenKind::kKwWithin, true) ||
+         AheadHolds(p, TokenKind::kKwThroughout, true);
+}
+
 // The expression standing for a property_spec the assertion does not carry
 // as one: a skipped spec, or a sequential property carried as a sequence.
 Expr* ParserPropertySpecHelpers::PropertySpecPlaceholder(Arena& arena,
@@ -492,7 +503,7 @@ PropertyExprNode* ParserPropertySpecHelpers::ParsePropertyTerm(Parser& p) {
   }
   bool wrapped = p.Check(TokenKind::kKwStrong) || p.Check(TokenKind::kKwWeak);
   if (wrapped || AheadHolds(p, TokenKind::kHashHash, true) ||
-      AheadHoldsRepetition(p)) {
+      AheadHoldsRepetition(p) || AheadHoldsSequenceOperator(p)) {
     auto* node = NewPropertyNode(p, PropertyExprNode::Kind::kSequence);
     node->sequence = TryParseSequenceSpec(p, node->strong, true);
     return node->sequence != nullptr ? node : nullptr;
@@ -628,7 +639,8 @@ bool ParserPropertySpecHelpers::ParseSimpleSpecBody(Parser& p,
   if (body.prop != nullptr) return true;
   // §16.9.2: a repetition makes the spec a sequence where no cycle delay
   // does, `a[*0:2]` as much as `a ##1 b`.
-  if (!p.BodyHasTemporalOperator() && !AheadHoldsRepetition(p)) {
+  if (!p.BodyHasTemporalOperator() && !AheadHoldsRepetition(p) &&
+      !AheadHoldsSequenceOperator(p)) {
     body.prop = p.ParseExpr();
     return body.prop != nullptr;
   }
