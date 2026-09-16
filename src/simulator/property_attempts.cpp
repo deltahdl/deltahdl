@@ -876,6 +876,34 @@ PropertyTreeState* CreatePropertyTreeState(
   return state;
 }
 
+// The attempts of one tick: the first `advanced`, already stepped at this
+// time step, are kept as they stand; the rest step, the last `beginning`
+// of them at their first tick, and each that is decided reaches its
+// verdict and leaves.
+static void StepAttempts(StepContext& sc, size_t beginning, size_t advanced,
+                         PropertyTick& tick) {
+  PropertyTreeState& state = sc.tree;
+  auto& samples = sc.ctx.AssertionSamples();
+  std::vector<NodeState*> kept;
+  for (size_t i = 0; i < state.attempts.size(); ++i) {
+    if (i < advanced) {
+      kept.push_back(state.attempts[i]);
+      continue;
+    }
+    bool first = i + beginning >= state.attempts.size();
+    // §16.14.6.1: the attempt reads the values its instance saved.
+    samples.SetInstanceBindings(state.attempts[i]->bindings);
+    Tri verdict = Step(state.root, *state.attempts[i], sc, first);
+    samples.SetInstanceBindings(nullptr);
+    if (verdict == Tri::kPending) {
+      kept.push_back(state.attempts[i]);
+    } else {
+      tick.verdicts.push_back(VerdictOf(state.root, *state.attempts[i]));
+    }
+  }
+  state.attempts = std::move(kept);
+}
+
 PropertyTick AdvancePropertyTree(PropertyTreeState& state, bool disabled,
                                  const AttemptInstances& instances,
                                  SimContext& ctx, Arena& arena) {
@@ -910,24 +938,7 @@ PropertyTick AdvancePropertyTree(PropertyTreeState& state, bool disabled,
     state.attempts.push_back(attempt);
   }
   StepContext sc{state, ctx, arena, ticked};
-  std::vector<NodeState*> kept;
-  for (size_t i = 0; i < state.attempts.size(); ++i) {
-    if (i < advanced) {
-      kept.push_back(state.attempts[i]);
-      continue;
-    }
-    bool first = i + beginning >= state.attempts.size();
-    // §16.14.6.1: the attempt reads the values its instance saved.
-    samples.SetInstanceBindings(state.attempts[i]->bindings);
-    Tri verdict = Step(state.root, *state.attempts[i], sc, first);
-    samples.SetInstanceBindings(nullptr);
-    if (verdict == Tri::kPending) {
-      kept.push_back(state.attempts[i]);
-    } else {
-      tick.verdicts.push_back(VerdictOf(state.root, *state.attempts[i]));
-    }
-  }
-  state.attempts = std::move(kept);
+  StepAttempts(sc, beginning, advanced, tick);
   samples.SetClockTicks(~0u);
   return tick;
 }

@@ -19,7 +19,8 @@
 // instance queued on the change of bar matures and fails in the Observed
 // region, and the instance queued after the program's assignment, in the
 // Active region that follows, passes in the same time step, too late to
-// prevent the report.
+// prevent the report. procedural_block_1 assigns foo under en alone, as
+// the clause writes it, which the tool notes may infer a latch (§9.2.2.2).
 module procedural_assertion_glitches;
   logic clk = 0;
   logic en = 1, foo = 0, bar = 0;
