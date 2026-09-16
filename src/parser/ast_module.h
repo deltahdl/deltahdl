@@ -399,6 +399,12 @@ struct SeqLinearBody {
   // at the end of each of those matches.
   bool first_match = false;
   std::vector<SeqMatchAssign> first_match_items;
+  // §16.13.1: the clocking event each operand of the chain is evaluated on
+  // where the chain writes one before an operand, `##1 @(posedge clk1) b`,
+  // the event in force from that operand on; parallel to the operands once
+  // any is written, an operand before the first one written carrying none,
+  // which is the leading clock's, and empty where the chain writes none.
+  std::vector<std::vector<EventExpr>> clocks;
 };
 
 struct ModuleItem {

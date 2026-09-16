@@ -26,6 +26,13 @@ struct LinearSequence {
   std::vector<std::vector<SeqMatchAssign>> match_items;
   // §16.9.2: the repetition each operand carries, parallel to the operands.
   std::vector<SeqRepetition> repetitions;
+  // §16.13.1: the clocking event each operand is evaluated on where the
+  // sequence names one before it, parallel to the operands once any does,
+  // an operand under none evaluated on the leading clock; and, once the
+  // property holding the sequence has numbered its clocks, the number of
+  // each operand's clock, 0 the leading clock's.
+  std::vector<std::vector<EventExpr>> operand_clocks;
+  std::vector<int> operand_clock_index;
   std::vector<SeqLocalDecl> locals;
   // §16.9.9: the conditions held throughout spans of the flattened chain.
   std::vector<SeqThroughout> throughouts;
@@ -77,6 +84,12 @@ void ForEachLinearSequenceExpr(const LinearSequence& body,
 
 bool FlattenLinearSequence(const ModuleItem* seq, SimContext& ctx, Arena& arena,
                            LinearSequence& out);
+
+// §16.13.1: the clock the operand at `pos` is evaluated on, empty for the
+// leading clock, and its number, 0 where the property has not numbered it.
+const std::vector<EventExpr>& OperandClock(const LinearSequence& body,
+                                           size_t pos);
+int OperandClockIndex(const LinearSequence& body, size_t pos);
 
 // §16.8 and §16.12: the actuals of `instance`, an instance of the named
 // sequence or property `decl` written as a call, bound to the declaration's

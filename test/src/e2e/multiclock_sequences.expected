@@ -1,0 +1,5 @@
+sig0 ##1 @(posedge clk1) sig1 passes 1 fails 7, passing at 27
+sig0 ##0 @(posedge clk1) sig1 passes 2 fails 6, passing at 27 45
+sig0 ##1 @(posedge clk0) sig1 passes 1 fails 7, passing at 25
+sig0 ##1 sig1 passes 1 fails 7, passing at 25
+$finish at time 80

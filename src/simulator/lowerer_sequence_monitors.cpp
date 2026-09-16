@@ -125,6 +125,10 @@ void Lowerer::LowerSequenceMonitor(const ModuleItem* seq,
   LinearSequence body;
   if (!FlattenLinearSequence(seq, ctx_, arena_, body)) return;
   if (body.clock.empty()) return;
+  // §16.13.1: a sequence whose operands name clocks of their own is matched
+  // where a property holds it, which tells the clocks apart; the monitor,
+  // on the leading clock alone, does not.
+  if (!body.operand_clocks.empty()) return;
   auto* p = arena_.Create<Process>();
   p->kind = ProcessKind::kAlways;
   p->id = next_id_++;

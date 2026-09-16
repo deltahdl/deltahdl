@@ -19,9 +19,12 @@ struct PropertyTreeState;
 
 // The state of one assertion statement's tree, its sequence operands
 // flattened; nullptr where an operand's sequence is not one the monitor
-// reads.
-PropertyTreeState* CreatePropertyTreeState(const PropertyExprNode* root,
-                                           SimContext& ctx, Arena& arena);
+// reads. §16.13: `leading_clock` is the assertion's clocking event, on
+// which every attempt begins, the clocks its sequences name beside being
+// told apart from it by watchers on their signals.
+PropertyTreeState* CreatePropertyTreeState(
+    const PropertyExprNode* root, const std::vector<EventExpr>& leading_clock,
+    SimContext& ctx, Arena& arena);
 
 // One tick: every attempt in flight advances and a new one begins, and each
 // whose tree is decided at this tick reaches its verdict, true or false, and

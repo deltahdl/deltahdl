@@ -540,7 +540,8 @@ static void ExecPropertyTreeTick(const Stmt* stmt, SimContext& ctx,
   if (proc == nullptr) return;
   PropertyTreeState*& state = proc->property_tree_states[stmt];
   if (state == nullptr) {
-    state = CreatePropertyTreeState(stmt->assert_property, ctx, arena);
+    state = CreatePropertyTreeState(stmt->assert_property, stmt->assert_clock,
+                                    ctx, arena);
     if (state == nullptr) return;
     auto* p = CreateAssertionChildProcess(ctx, arena, Region::kActive);
     p->kind = ProcessKind::kFinal;

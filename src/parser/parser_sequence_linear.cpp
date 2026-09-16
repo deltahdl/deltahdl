@@ -398,6 +398,8 @@ struct ParserSeqLinearHelpers {
     if (rep.kind == SeqRepetition::Kind::kNone) return true;
     if (rep.kind != SeqRepetition::Kind::kConsecutive) return false;
     if (rep.min != rep.max || rep.min == 0) return false;
+    // §16.13.1: a group naming a clock of its own is not unrolled.
+    if (!body.clocks.empty()) return false;
     size_t n = body.operands.size() - first;
     size_t guards = body.throughouts.size();
     for (uint32_t k = 1; k < rep.min; ++k) {
@@ -430,10 +432,11 @@ struct ParserSeqLinearHelpers {
   // adding to the group's leading delay, and its match items are attached to
   // its last operand.
   static bool ParseSequenceGroup(Parser& p, SeqLinearBody& body,
-                                 SeqCycleDelay before) {
+                                 SeqCycleDelay before,
+                                 const std::vector<EventExpr>& clock) {
     p.Expect(TokenKind::kLParen, Subclause("16.10"));
     size_t first = body.operands.size();
-    if (!ParseLinearSeqOperandChain(p, body, before)) return false;
+    if (!ParseLinearSeqOperandChain(p, body, before, clock)) return false;
     if (body.operands.size() == first) return false;
     if (!ParseSequenceMatchItems(p, body.match_items.back())) return false;
     if (!p.Match(TokenKind::kRParen)) return false;
@@ -478,12 +481,13 @@ struct ParserSeqLinearHelpers {
   // chain's end. The delay before and seq's leading delay are each one tick
   // count, the interval's start being told from the first operand's delay.
   static bool ParseThroughout(Parser& p, SeqLinearBody& body,
-                              SeqCycleDelay before, Expr* cond) {
+                              SeqCycleDelay before, Expr* cond,
+                              const std::vector<EventExpr>& clock) {
     if (before.min != before.max) return false;
     SeqThroughout guard;
     guard.cond = cond;
     guard.first = body.operands.size();
-    if (!ParseLinearSeqOperandChain(p, body, before)) return false;
+    if (!ParseLinearSeqOperandChain(p, body, before, clock)) return false;
     if (body.operands.size() == guard.first) return false;
     const SeqCycleDelay& lead = body.delays[guard.first];
     if (lead.min != lead.max) return false;
@@ -493,18 +497,44 @@ struct ParserSeqLinearHelpers {
     return true;
   }
 
-  // One operand of a chain with the delay owed before it: a group read into
-  // `body` as a chain of its own, or a Boolean expression or a sequence
-  // instance appended with no match items of its own.
+  // §16.13.1: the clock the operand just appended is evaluated on, kept
+  // parallel to the operands once any chain of the body writes one, the
+  // operands before the first written carrying none, the leading clock's.
+  static void PushOperandClock(SeqLinearBody& body,
+                               const std::vector<EventExpr>& clock) {
+    if (clock.empty() && body.clocks.empty()) return;
+    while (body.clocks.size() + 1 < body.operands.size()) {
+      body.clocks.emplace_back();
+    }
+    body.clocks.push_back(clock);
+  }
+
+  // §16.13.1: `@(event_list)` before an operand, the clock the operands
+  // from it on are evaluated on; answers false where the event is
+  // malformed, and leaves `clock` as it was where none is written.
+  static bool ParseOperandClock(Parser& p, std::vector<EventExpr>& clock) {
+    if (!p.Match(TokenKind::kAt)) return true;
+    if (!p.Match(TokenKind::kLParen)) return false;
+    clock = p.ParseEventList();
+    return p.Match(TokenKind::kRParen) && !clock.empty();
+  }
+
+  // One operand of a chain with the delay owed before it and the clock it
+  // is evaluated on: a group read into `body` as a chain of its own, or a
+  // Boolean expression or a sequence instance appended with no match items
+  // of its own.
   static bool ParseLinearSeqOperand(Parser& p, SeqLinearBody& body,
-                                    SeqCycleDelay before) {
-    if (AheadIsSequenceGroup(p)) return ParseSequenceGroup(p, body, before);
+                                    SeqCycleDelay before,
+                                    const std::vector<EventExpr>& clock) {
+    if (AheadIsSequenceGroup(p)) {
+      return ParseSequenceGroup(p, body, before, clock);
+    }
     Expr* op = AheadIsSequenceInstanceOperand(p)
                    ? ParseSequenceInstanceOperand(p)
                    : p.ParseExpr();
     if (!op) return false;
     if (p.Match(TokenKind::kKwThroughout)) {
-      return ParseThroughout(p, body, before, op);
+      return ParseThroughout(p, body, before, op, clock);
     }
     SeqRepetition rep;
     if (!ParseSequenceRepetition(p, rep)) return false;
@@ -512,21 +542,30 @@ struct ParserSeqLinearHelpers {
     body.delays.push_back(before);
     body.match_items.emplace_back();
     body.repetitions.push_back(rep);
+    PushOperandClock(body, clock);
     return true;
   }
 
-  static bool ParseLinearSeqOperandChain(Parser& p, SeqLinearBody& body,
-                                         SeqCycleDelay lead) {
+  // The chain's operands under `inherited`, the clock in force where the
+  // chain begins, each `@(event_list)` written before an operand, at the
+  // chain's start or after a delay, changing it for the operands after.
+  static bool ParseLinearSeqOperandChain(
+      Parser& p, SeqLinearBody& body, SeqCycleDelay lead,
+      const std::vector<EventExpr>& inherited = {}) {
+    std::vector<EventExpr> clock = inherited;
+    if (!ParseOperandClock(p, clock)) return false;
     SeqCycleDelay next = lead;
     if (p.Match(TokenKind::kHashHash)) {
       SeqCycleDelay written;
       if (!ParseLinearSeqCycleDelay(p, written)) return false;
       next = AddSeqDelays(lead, written);
+      if (!ParseOperandClock(p, clock)) return false;
     }
     while (!AtChainEnd(p)) {
-      if (!ParseLinearSeqOperand(p, body, next)) return false;
+      if (!ParseLinearSeqOperand(p, body, next, clock)) return false;
       if (!p.Match(TokenKind::kHashHash)) break;
       if (!ParseLinearSeqCycleDelay(p, next)) return false;
+      if (!ParseOperandClock(p, clock)) return false;
     }
     return true;
   }
@@ -586,6 +625,8 @@ struct ParserSeqLinearHelpers {
     if (!ParseLinearSeqOperandChain(p, body, none)) return false;
     if (body.operands.empty()) return false;
     if (p.Match(TokenKind::kKwWithin)) {
+      // §16.13.1: a chain naming a clock of its own is not wrapped.
+      if (!body.clocks.empty()) return false;
       WrapWithinOperand(p, body);
       body.intersects.emplace_back();
       SeqLinearBody& enclosing = body.intersects.back();

@@ -276,6 +276,13 @@ class AssertionSampleStore {
   void SetEvaluatingProperty(bool on) { evaluating_property_ = on; }
   bool EvaluatingProperty() const { return evaluating_property_; }
 
+  // §16.13.1: while a property of more than one clock is being evaluated,
+  // the clocks that ticked at the time step, a bit per clock in the order
+  // the property numbered them, the leading clock bit 0; every bit set
+  // outside such an evaluation, where every operand is on the one clock.
+  void SetClockTicks(uint32_t ticked) { clock_ticks_ = ticked; }
+  uint32_t ClockTicks() const { return clock_ticks_; }
+
   // §16.9.3: "When these functions are called at or before the simulation time
   // step in which the first clocking event occurs, the results are computed by
   // comparing the sampled value of the expression with its default sampled
@@ -360,6 +367,7 @@ class AssertionSampleStore {
   std::unordered_map<SiteKey, SiteHistory, SiteKeyHash> tick_history_;
   bool evaluating_property_ = false;
   bool reading_defaults_ = false;
+  uint32_t clock_ticks_ = ~0u;
 };
 
 }  // namespace delta

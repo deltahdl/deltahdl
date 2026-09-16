@@ -251,7 +251,25 @@ struct InstanceOperand {
   const Expr* instance;
   SeqCycleDelay before;
   SeqRepetition repetition;
+  std::vector<EventExpr> clock;
 };
+
+// §16.13.1: the clock of the operand just appended to `out`, kept parallel
+// to the operands once any operand names one.
+void PushOperandClock(LinearSequence& out,
+                      const std::vector<EventExpr>& clock) {
+  if (clock.empty() && out.operand_clocks.empty()) return;
+  while (out.operand_clocks.size() + 1 < out.operands.size()) {
+    out.operand_clocks.emplace_back();
+  }
+  out.operand_clocks.push_back(clock);
+}
+
+const std::vector<EventExpr>& BodyOperandClock(const SeqLinearBody& body,
+                                               size_t pos) {
+  static const std::vector<EventExpr> kNone;
+  return pos < body.clocks.size() ? body.clocks[pos] : kNone;
+}
 
 // §16.9.2: consecutive repetition of an instance by an exact count, unrolled
 // as the parser unrolls a group's, the operands from `first` on appended
@@ -274,6 +292,7 @@ bool UnrollInstanceRepetition(LinearSequence& out, size_t first,
       out.delays.push_back(delay);
       out.match_items.push_back(out.match_items[first + i]);
       out.repetitions.push_back(out.repetitions[first + i]);
+      PushOperandClock(out, OperandClock(out, first + i));
     }
   }
   return true;
@@ -428,6 +447,10 @@ bool ExpandInstance(const InstanceOperand& op, SimContext& ctx, Arena& arena,
     out.match_items.push_back(
         SubstituteMatchItems(body.match_items[j], actuals, arena));
     out.repetitions.push_back(body.repetitions[j]);
+    // §16.13.1: an operand of the instantiated body is evaluated on the
+    // clock it names, else on the one the instance stands under.
+    const std::vector<EventExpr>& own = OperandClock(body, j);
+    PushOperandClock(out, own.empty() ? op.clock : own);
   }
   // §16.9.9: a throughout of the instantiated body spans the same operands
   // where they now stand, its condition over the actuals.
@@ -551,7 +574,9 @@ bool FlattenChain(const SeqLinearBody& body, SimContext& ctx, Arena& arena,
       out.delays.push_back(before);
       out.match_items.push_back(body.match_items[i]);
       out.repetitions.push_back(body.repetitions[i]);
-    } else if (!ExpandInstance({inner, operand, before, body.repetitions[i]},
+      PushOperandClock(out, BodyOperandClock(body, i));
+    } else if (!ExpandInstance({inner, operand, before, body.repetitions[i],
+                                BodyOperandClock(body, i)},
                                ctx, arena, out, depth)) {
       return false;
     }
@@ -589,6 +614,17 @@ void ForEachLinearSequenceExpr(const LinearSequence& body,
   }
 }
 
+const std::vector<EventExpr>& OperandClock(const LinearSequence& body,
+                                           size_t pos) {
+  static const std::vector<EventExpr> kNone;
+  return pos < body.operand_clocks.size() ? body.operand_clocks[pos] : kNone;
+}
+
+int OperandClockIndex(const LinearSequence& body, size_t pos) {
+  return pos < body.operand_clock_index.size() ? body.operand_clock_index[pos]
+                                               : 0;
+}
+
 bool FlattenLinearSequence(const ModuleItem* seq, SimContext& ctx, Arena& arena,
                            LinearSequence& out) {
   out = LinearSequence{};
@@ -614,6 +650,7 @@ struct SubstitutedOperand {
   SeqCycleDelay delay;
   std::vector<SeqMatchAssign> items;
   SeqRepetition repetition;
+  std::vector<EventExpr> clock;
 };
 
 SubstitutedOperand SubstituteOperand(const LinearSequence& body, size_t j,
@@ -622,7 +659,7 @@ SubstitutedOperand SubstituteOperand(const LinearSequence& body, size_t j,
   return {SubstituteFormals(body.operands[j], actuals, arena),
           ResolveDelay(body.delays[j], actuals, ctx, arena),
           SubstituteMatchItems(body.match_items[j], actuals, arena),
-          body.repetitions[j]};
+          body.repetitions[j], OperandClock(body, j)};
 }
 
 // The substituted operand appended to `out`, or, where it references a
@@ -633,8 +670,8 @@ void AppendSubstitutedOperand(SubstitutedOperand sub, SimContext& ctx,
                               Arena& arena, LinearSequence& out) {
   size_t first = out.operands.size();
   if (const ModuleItem* inner = SequenceActual(sub.operand)) {
-    ExpandInstance({inner, sub.operand, sub.delay, sub.repetition}, ctx, arena,
-                   out, 0);
+    ExpandInstance({inner, sub.operand, sub.delay, sub.repetition, sub.clock},
+                   ctx, arena, out, 0);
     if (out.operands.size() > first) {
       out.match_items.back().insert(out.match_items.back().end(),
                                     sub.items.begin(), sub.items.end());
@@ -645,6 +682,7 @@ void AppendSubstitutedOperand(SubstitutedOperand sub, SimContext& ctx,
   out.delays.push_back(sub.delay);
   out.match_items.push_back(std::move(sub.items));
   out.repetitions.push_back(sub.repetition);
+  PushOperandClock(out, sub.clock);
 }
 
 }  // namespace
@@ -657,6 +695,8 @@ LinearSequence SubstituteLinearSequence(const LinearSequence& body,
   out.delays.clear();
   out.match_items.clear();
   out.repetitions.clear();
+  out.operand_clocks.clear();
+  out.operand_clock_index.clear();
   out.throughouts.clear();
   // Where each of the body's operands begins and ends among the substituted
   // ones, a sequence actual among them expanding to several.

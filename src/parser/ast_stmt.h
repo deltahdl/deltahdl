@@ -275,6 +275,11 @@ struct Stmt {
   // under or and and, set where the property_spec holds either operator;
   // the fields above then stand unset but for the placeholder.
   PropertyExprNode* assert_property = nullptr;
+  // §16.13: the leading clocking event the tree is evaluated on, which the
+  // elaborator copies from the assertion's sensitivity before adding the
+  // clocks the sequences name, so that the evaluation tells the ticks of
+  // that clock from the others'.
+  std::vector<EventExpr> assert_clock;
   Stmt* assert_pass_stmt = nullptr;
   Stmt* assert_fail_stmt = nullptr;
   bool is_deferred = false;

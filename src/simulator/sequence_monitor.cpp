@@ -18,6 +18,7 @@
 #include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
 #include "simulator/stmt_exec.h"
+#include "simulator/sva_engine_sampling.h"
 #include "simulator/variable.h"
 
 namespace delta {
@@ -38,7 +39,21 @@ struct LinearAttempt {
   // own rules rather than the operand's delay range.
   uint32_t count = 0;
   bool repeating = false;
+  // §16.13.1: the attempt has just crossed to an operand on another clock
+  // under `##0`, which is read at the nearest tick of that clock, the one
+  // coincident with the crossing where there is one and the next one
+  // otherwise, so the first tick of the new clock counts no wait.
+  bool crossed_zero = false;
 };
+
+// §16.13.1: whether the clock the operand at `pos` is evaluated on ticked at
+// this time step; every clock has where the property is on one clock.
+bool OperandClockTicked(const LinearSequence& body, size_t pos,
+                        SimContext& ctx) {
+  uint32_t ticked = ctx.AssertionSamples().ClockTicks();
+  int clock = OperandClockIndex(body, pos);
+  return clock >= 32 || ((ticked >> clock) & 1u) != 0;
+}
 
 // §16.10 and §6.8: the width and state of a local declared with a data type
 // keyword, and the value it holds before any assignment, x for a 4-state
@@ -204,7 +219,8 @@ void CarryAttempt(LinearAttempt attempt, const SeqCycleDelay& delay,
   if (attempt.locals.empty()) {
     for (const auto& kept : carry) {
       if (kept.pos == attempt.pos && kept.waited == attempt.waited &&
-          kept.count == attempt.count && kept.repeating == attempt.repeating) {
+          kept.count == attempt.count && kept.repeating == attempt.repeating &&
+          kept.crossed_zero == attempt.crossed_zero) {
         return;
       }
     }
@@ -240,7 +256,14 @@ void EndOperand(TickStep& step, LinearAttempt& advanced) {
     step.matched = true;
     return;
   }
-  step.pending.push_back({advanced.pos + 1, 0, advanced.locals});
+  LinearAttempt next{advanced.pos + 1, 0, advanced.locals};
+  // §16.13.1: `##0` to an operand on another clock reads it at the nearest
+  // tick of that clock, coincident or later.
+  const SeqCycleDelay& delay = step.body.delays[next.pos];
+  next.crossed_zero =
+      delay.max == 0 && OperandClockIndex(step.body, next.pos) !=
+                            OperandClockIndex(step.body, advanced.pos);
+  step.pending.push_back(std::move(next));
 }
 
 // Keeps an attempt inside a repetition for the next tick.
@@ -352,6 +375,12 @@ bool ThroughoutHolds(TickStep& step, LinearAttempt& attempt) {
 }
 
 void StepAttempt(TickStep& step, LinearAttempt attempt) {
+  // §16.13.1: an attempt at an operand on a clock that did not tick at this
+  // time step waits as it is for a tick of that clock.
+  if (!OperandClockTicked(step.body, attempt.pos, step.ctx)) {
+    step.carry.push_back(std::move(attempt));
+    return;
+  }
   const SeqCycleDelay& delay = step.body.delays[attempt.pos];
   const SeqRepetition& rep = step.body.repetitions[attempt.pos];
   if (!ThroughoutHolds(step, attempt)) return;
@@ -380,7 +409,16 @@ bool AdvanceLinearAttempts(const LinearSequence& body,
   std::vector<LinearAttempt> pending;
   pending.reserve(active.size() + 1);
   for (LinearAttempt attempt : active) {
-    ++attempt.waited;
+    // §16.13.1: a tick of the clock the attempt's operand is evaluated on
+    // is a tick of its wait, the first after crossing to it under `##0`
+    // counting none; a step at which that clock did not tick is none.
+    if (OperandClockTicked(body, attempt.pos, ctx)) {
+      if (attempt.crossed_zero) {
+        attempt.crossed_zero = false;
+      } else {
+        ++attempt.waited;
+      }
+    }
     pending.push_back(std::move(attempt));
   }
   // §16.10: a new attempt begins with a new copy of every local variable.

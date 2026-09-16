@@ -19,72 +19,24 @@
 #include "simulator/evaluation.h"
 #include "simulator/evaluation_internal.h"
 #include "simulator/expr_walk.h"
+#include "simulator/property_attempts_internal.h"
+#include "simulator/property_clocks.h"
 #include "simulator/sequence_flatten.h"
 #include "simulator/sequence_monitor.h"
 #include "simulator/sim_context.h"
 #include "simulator/variable.h"
 
 namespace delta {
-namespace {
-
-// The verdict of one operand or of the tree over it: decided true or false,
-// or not yet.
-enum class Tri : uint8_t { kPending, kTrue, kFalse };
-
-// The flattened sequence of each sequence node of the tree, an antecedent's
-// among them, keyed by the node; flattened once for every attempt.
-struct FlatSequence {
-  const PropertyExprNode* node;
-  LinearSequence body;
-};
-
-// The state of one node of the tree within one attempt: a leaf's verdict
-// once decided and a sequence's attempt while it is in flight; an
-// operator's operands' states; and, for an implication, the antecedent's
-// attempt with the consequent's states begun at its matches, one to begin
-// at the next tick where the implication is nonoverlapped, and whether the
-// antecedent can match no more.
-struct NodeState {
-  Tri verdict = Tri::kPending;
-  LinearSequenceAttempt* attempt = nullptr;
-  std::vector<NodeState*> operands;
-  std::vector<NodeState*> consequents;
-  bool spawn_next = false;
-  bool antecedent_done = false;
-  // §16.12.6: the condition as read at the attempt's tick.
-  bool condition = false;
-  // §16.12.10: the ticks a nexttime has still to wait before its operand
-  // begins, and whether the operand has begun; §16.12.11: the ticks an
-  // always has still to wait before its range, and the ticks of the range
-  // at which an operand attempt has still to begin, UINT64_MAX where the
-  // range is unbounded.
-  uint64_t wait = 0;
-  bool begun = false;
-  uint64_t remaining = 0;
-  // §16.12.12: an until's attempts of its second operand, one begun at each
-  // tick beside the first operand's in `consequents`, and the index of the
-  // first tick not yet decided in `wait`.
-  std::vector<NodeState*> seconds;
-  // §16.12.14: an abort's node, so that its condition becoming true between
-  // the ticks can be marked on the attempts in flight, and the mark.
-  const PropertyExprNode* abort_node = nullptr;
-  bool aborted = false;
-  // §16.12.16: the index of the case item selected at the attempt's tick,
-  // the count of the items where none was.
-  size_t selected = 0;
-  // §16.12.17: the body a boolean operand that instantiates a named
-  // property was expanded to when it began, the actuals substituted, its
-  // state the one operand's.
-  const PropertyExprNode* expansion = nullptr;
-};
-
-}  // namespace
 
 struct PropertyTreeState {
   const PropertyExprNode* root = nullptr;
   std::vector<FlatSequence> sequences;
   std::vector<const Expr*> past_sites;
   std::vector<NodeState*> attempts;
+  // §16.13: the clocks the sequences are evaluated on, the leading clock
+  // first, and the time step the tree last advanced at.
+  PropertyClocks clocks;
+  SimTime advanced_at{PropertyClocks::kNever};
 };
 
 namespace {
@@ -132,6 +84,16 @@ void WatchAsynchronousAbort(const PropertyExprNode* node,
   }
 }
 
+// §16.13.1: each operand of the flattened sequence given the number of its
+// clock among the property's, where the sequence names any.
+void NumberOperandClocks(LinearSequence& body, PropertyClocks& clocks) {
+  if (body.operand_clocks.empty()) return;
+  body.operand_clock_index.assign(body.operands.size(), 0);
+  for (size_t j = 0; j < body.operands.size(); ++j) {
+    body.operand_clock_index[j] = ClockIndexOf(clocks, OperandClock(body, j));
+  }
+}
+
 // The sequences of the tree flattened, each node's once, with the actuals
 // of the instance the tree is the expansion of substituted where `actuals`
 // holds any; answers false where a sequence is not readable.
@@ -152,6 +114,7 @@ bool CollectSequences(const PropertyExprNode* node, PropertyTreeState& state,
     if (!actuals.empty()) {
       flat.body = SubstituteLinearSequence(flat.body, actuals, ctx, arena);
     }
+    NumberOperandClocks(flat.body, state.clocks);
     ForEachLinearSequenceExpr(flat.body, [&state](const Expr* e) {
       CollectPastDirectedSites(e, state.past_sites);
     });
@@ -234,51 +197,6 @@ const LinearSequence& BodyOf(const PropertyTreeState& state,
   return state.sequences.front().body;
 }
 
-Tri Not(Tri t) {
-  if (t == Tri::kPending) return t;
-  return t == Tri::kTrue ? Tri::kFalse : Tri::kTrue;
-}
-
-bool Matched(SequenceStep step) {
-  return step == SequenceStep::kMatched || step == SequenceStep::kMatchedLast;
-}
-
-Tri FromStep(SequenceStep step) {
-  if (Matched(step)) return Tri::kTrue;
-  if (step == SequenceStep::kFailed) return Tri::kFalse;
-  return Tri::kPending;
-}
-
-Tri FromBool(bool b) { return b ? Tri::kTrue : Tri::kFalse; }
-
-// §16.12.4 and §16.12.5 over the operands' verdicts: or is true where any
-// operand is and false where every one is; and is false where any operand
-// is and true where every one is; else the junction is not yet decided.
-Tri Junction(bool is_or, const std::vector<Tri>& verdicts) {
-  Tri decisive = is_or ? Tri::kTrue : Tri::kFalse;
-  Tri result = is_or ? Tri::kFalse : Tri::kTrue;
-  for (Tri t : verdicts) {
-    if (t == decisive) result = decisive;
-    if (t == Tri::kPending && result != decisive) result = Tri::kPending;
-  }
-  return result;
-}
-
-// §16.12.8 over two operands' verdicts: implies is true where the first is
-// false or the second true, false where the first is true and the second
-// false; iff is true where both are decided alike and false where decided
-// apart; else not yet decided.
-Tri Implies(Tri first, Tri second) {
-  if (first == Tri::kFalse || second == Tri::kTrue) return Tri::kTrue;
-  if (first == Tri::kTrue && second == Tri::kFalse) return Tri::kFalse;
-  return Tri::kPending;
-}
-
-Tri Iff(Tri first, Tri second) {
-  if (first == Tri::kPending || second == Tri::kPending) return Tri::kPending;
-  return first == second ? Tri::kTrue : Tri::kFalse;
-}
-
 // The state of one attempt of the tree under `node`, its operators' operands
 // stood up with it and its sequences' attempts to be begun at the first
 // tick.
@@ -297,6 +215,10 @@ struct StepContext {
   PropertyTreeState& tree;
   SimContext& ctx;
   Arena& arena;
+  // §16.13: whether the time step is a tick of the leading clock, at which
+  // every operand advances; at a tick of another clock alone, only the
+  // sequences on it and the operators over them do.
+  bool leading = true;
 };
 
 // One tick of one attempt's node, `begin` where the tick is the one the
@@ -356,6 +278,7 @@ bool ExpandInstance(const PropertyExprNode* node, NodeState& state,
   if (!CollectSequences(body, sc.tree, sc.ctx, sc.arena, actuals)) {
     return false;
   }
+  InstallClockWatchers(sc.tree.clocks, sc.ctx, sc.arena);
   state.expansion = body;
   state.operands.push_back(NewNodeState(body, sc.arena));
   return true;
@@ -504,6 +427,7 @@ Tri StepNexttime(const PropertyExprNode* node, NodeState& state,
                      ? EvalExpr(node->boolean, sc.ctx, sc.arena).ToUint64()
                      : 1;
   } else if (!state.begun) {
+    if (!sc.leading) return Tri::kPending;
     --state.wait;
   }
   if (!state.begun && state.wait > 0) return Tri::kPending;
@@ -624,9 +548,41 @@ Tri StepAbort(const PropertyExprNode* node, NodeState& state, StepContext& sc,
   return Step(node->operands[0], *state.operands[0], sc, begin);
 }
 
+// §16.13: whether the node advances at a tick of a clock other than the
+// leading one: a sequence, which may be on that clock, and the operators
+// whose operands may hold one and count no ticks of their own.
+bool AdvancesOffTheLeadingClock(const PropertyExprNode* node,
+                                const NodeState& state) {
+  switch (node->kind) {
+    case PropertyExprNode::Kind::kSequence:
+    case PropertyExprNode::Kind::kImplication:
+    case PropertyExprNode::Kind::kNot:
+    case PropertyExprNode::Kind::kOr:
+    case PropertyExprNode::Kind::kAnd:
+    case PropertyExprNode::Kind::kIfElse:
+    case PropertyExprNode::Kind::kCase:
+      return true;
+    case PropertyExprNode::Kind::kBoolean:
+      return state.expansion != nullptr;
+    case PropertyExprNode::Kind::kNexttime:
+      return state.begun;
+    case PropertyExprNode::Kind::kImplies:
+    case PropertyExprNode::Kind::kIff:
+    case PropertyExprNode::Kind::kAlways:
+    case PropertyExprNode::Kind::kUntil:
+    case PropertyExprNode::Kind::kEventually:
+    case PropertyExprNode::Kind::kAbort:
+      return false;
+  }
+  return false;
+}
+
 Tri Step(const PropertyExprNode* node, NodeState& state, StepContext& sc,
          bool begin) {
   if (state.verdict != Tri::kPending) return state.verdict;
+  if (!sc.leading && !AdvancesOffTheLeadingClock(node, state)) {
+    return state.verdict;
+  }
   switch (node->kind) {
     case PropertyExprNode::Kind::kBoolean:
       state.verdict = StepBoolean(node, state, sc, begin);
@@ -677,146 +633,6 @@ Tri Step(const PropertyExprNode* node, NodeState& state, StepContext& sc,
   return state.verdict;
 }
 
-// The end of the run: a sequence still in flight reads by its strength, an
-// antecedent still in flight matches no more, and the rest follows.
-Tri Finish(const PropertyExprNode* node, NodeState& state);
-
-Tri FinishJunction(const PropertyExprNode* node, NodeState& state) {
-  std::vector<Tri> verdicts;
-  verdicts.reserve(node->operands.size());
-  for (size_t i = 0; i < node->operands.size(); ++i) {
-    verdicts.push_back(Finish(node->operands[i], *state.operands[i]));
-  }
-  return Junction(node->kind == PropertyExprNode::Kind::kOr, verdicts);
-}
-
-Tri FinishIfElse(const PropertyExprNode* node, NodeState& state) {
-  Tri then_branch = Finish(node->operands[0], *state.operands[0]);
-  Tri else_branch = node->operands.size() > 1
-                        ? Finish(node->operands[1], *state.operands[1])
-                        : Tri::kTrue;
-  return state.condition ? then_branch : else_branch;
-}
-
-// §16.12.16: the item selected is finished as itself; none selected, the
-// case holds.
-Tri FinishCase(const PropertyExprNode* node, NodeState& state) {
-  if (state.selected == node->operands.size()) return Tri::kTrue;
-  return Finish(node->operands[state.selected],
-                *state.operands[state.selected]);
-}
-
-Tri FinishImplication(const PropertyExprNode* node, NodeState& state) {
-  std::vector<Tri> verdicts;
-  verdicts.reserve(state.consequents.size());
-  for (NodeState* c : state.consequents) {
-    verdicts.push_back(Finish(node->operands[0], *c));
-  }
-  return Junction(false, verdicts);
-}
-
-Tri FinishPair(const PropertyExprNode* node, NodeState& state) {
-  Tri first = Finish(node->operands[0], *state.operands[0]);
-  Tri second = Finish(node->operands[1], *state.operands[1]);
-  return node->kind == PropertyExprNode::Kind::kImplies ? Implies(first, second)
-                                                        : Iff(first, second);
-}
-
-// §16.12.11 and §16.12.13: the operand attempts begun are finished as
-// themselves; ticks of the range the run never reached are no failure of
-// the weak forms and fail the strong, an eventually with a true operand
-// holding either way.
-Tri FinishAlways(const PropertyExprNode* node, NodeState& state) {
-  bool eventually = node->kind == PropertyExprNode::Kind::kEventually;
-  std::vector<Tri> verdicts;
-  verdicts.reserve(state.consequents.size());
-  for (NodeState* c : state.consequents) {
-    verdicts.push_back(Finish(node->operands[0], *c));
-  }
-  Tri joined = Junction(eventually, verdicts);
-  Tri decisive = eventually ? Tri::kTrue : Tri::kFalse;
-  if (joined == decisive) return decisive;
-  if (state.remaining > 0) return node->strong ? Tri::kFalse : Tri::kTrue;
-  return joined;
-}
-
-// §16.12.12: the ticks' operands are finished as themselves and the ticks
-// decided in order; an until whose every tick passed on is the weak form
-// holding and the strong failing, no tick having the second operand true.
-Tri FinishUntil(const PropertyExprNode* node, NodeState& state) {
-  std::vector<Tri> firsts;
-  std::vector<Tri> seconds;
-  firsts.reserve(state.consequents.size());
-  seconds.reserve(state.seconds.size());
-  for (size_t i = 0; i < state.consequents.size(); ++i) {
-    firsts.push_back(Finish(node->operands[0], *state.consequents[i]));
-    seconds.push_back(Finish(node->operands[1], *state.seconds[i]));
-  }
-  Tri decided = DecideUntil(node, state, firsts, seconds);
-  if (decided != Tri::kPending) return decided;
-  return node->strong ? Tri::kFalse : Tri::kTrue;
-}
-
-// §16.12.10: with no further tick the weak form holds and the strong fails;
-// an operand begun is finished as itself.
-Tri FinishNexttime(const PropertyExprNode* node, NodeState& state) {
-  if (state.begun) return Finish(node->operands[0], *state.operands[0]);
-  return node->strong ? Tri::kFalse : Tri::kTrue;
-}
-
-Tri Finish(const PropertyExprNode* node, NodeState& state) {
-  if (state.verdict != Tri::kPending) return state.verdict;
-  switch (node->kind) {
-    case PropertyExprNode::Kind::kBoolean:
-      // §16.12.17: an instance expanded is finished as its body; a boolean
-      // never stepped was never required.
-      if (state.expansion == nullptr) return Tri::kTrue;
-      state.verdict = Finish(state.expansion, *state.operands[0]);
-      break;
-    case PropertyExprNode::Kind::kSequence:
-      state.verdict = node->strong ? Tri::kFalse : Tri::kTrue;
-      break;
-    case PropertyExprNode::Kind::kNot:
-      state.verdict = Not(Finish(node->operands[0], *state.operands[0]));
-      break;
-    case PropertyExprNode::Kind::kOr:
-    case PropertyExprNode::Kind::kAnd:
-      state.verdict = FinishJunction(node, state);
-      break;
-    case PropertyExprNode::Kind::kIfElse:
-      state.verdict = FinishIfElse(node, state);
-      break;
-    case PropertyExprNode::Kind::kImplication:
-      state.verdict = FinishImplication(node, state);
-      break;
-    case PropertyExprNode::Kind::kNexttime:
-      state.verdict = FinishNexttime(node, state);
-      break;
-    case PropertyExprNode::Kind::kAlways:
-    case PropertyExprNode::Kind::kEventually:
-      state.verdict = FinishAlways(node, state);
-      break;
-    case PropertyExprNode::Kind::kUntil:
-      state.verdict = FinishUntil(node, state);
-      break;
-    case PropertyExprNode::Kind::kAbort:
-      // §16.12.14: an abort marked between the last tick and the end takes
-      // precedence; otherwise the property is its operand.
-      state.verdict = state.aborted
-                          ? (node->accept ? Tri::kTrue : Tri::kFalse)
-                          : Finish(node->operands[0], *state.operands[0]);
-      break;
-    case PropertyExprNode::Kind::kCase:
-      state.verdict = FinishCase(node, state);
-      break;
-    case PropertyExprNode::Kind::kImplies:
-    case PropertyExprNode::Kind::kIff:
-      state.verdict = FinishPair(node, state);
-      break;
-  }
-  return state.verdict;
-}
-
 }  // namespace
 
 void ForEachPropertyActual(
@@ -843,29 +659,42 @@ const ModuleItem* InstantiatedProperty(const Expr* instance, SimContext& ctx) {
   return decl;
 }
 
-PropertyTreeState* CreatePropertyTreeState(const PropertyExprNode* root,
-                                           SimContext& ctx, Arena& arena) {
+PropertyTreeState* CreatePropertyTreeState(
+    const PropertyExprNode* root, const std::vector<EventExpr>& leading_clock,
+    SimContext& ctx, Arena& arena) {
   auto* state = arena.Create<PropertyTreeState>();
   state->root = root;
+  state->clocks.clocks.push_back(leading_clock);
   if (!CollectSequences(root, *state, ctx, arena, ActualsByFormal{})) {
     return nullptr;
   }
+  InstallClockWatchers(state->clocks, ctx, arena);
   return state;
 }
 
 std::vector<bool> AdvancePropertyTree(PropertyTreeState& state, bool disabled,
                                       SimContext& ctx, Arena& arena) {
   std::vector<bool> verdicts;
+  // §16.13: which clocks ticked at this time step; a second wake at one
+  // time step, by another of the clocks, advances nothing again.
+  SimTime now = ctx.CurrentTime();
+  if (state.clocks.multiclock && state.advanced_at == now) return verdicts;
+  state.advanced_at = now;
+  uint32_t ticked = ClocksTicked(state.clocks, now);
+  if (ticked == 0) return verdicts;
+  bool leading = (ticked & 1u) != 0;
+  ctx.AssertionSamples().SetClockTicks(ticked);
   for (const Expr* site : state.past_sites) EvalExpr(site, ctx, arena);
   if (disabled) {
     state.attempts.clear();
+    ctx.AssertionSamples().SetClockTicks(~0u);
     return verdicts;
   }
-  state.attempts.push_back(NewNodeState(state.root, arena));
-  StepContext sc{state, ctx, arena};
+  if (leading) state.attempts.push_back(NewNodeState(state.root, arena));
+  StepContext sc{state, ctx, arena, leading};
   std::vector<NodeState*> kept;
   for (size_t i = 0; i < state.attempts.size(); ++i) {
-    bool begin = i + 1 == state.attempts.size();
+    bool begin = leading && i + 1 == state.attempts.size();
     Tri verdict = Step(state.root, *state.attempts[i], sc, begin);
     if (verdict == Tri::kPending) {
       kept.push_back(state.attempts[i]);
@@ -874,6 +703,7 @@ std::vector<bool> AdvancePropertyTree(PropertyTreeState& state, bool disabled,
     }
   }
   state.attempts = std::move(kept);
+  ctx.AssertionSamples().SetClockTicks(~0u);
   return verdicts;
 }
 

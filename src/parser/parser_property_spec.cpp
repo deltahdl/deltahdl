@@ -641,7 +641,18 @@ bool ParserPropertySpecHelpers::ParseSimpleSpecBody(Parser& p,
 // and a `not` before a property of operands negates the whole.
 Stmt* ParserPropertySpecHelpers::MakeSimplePropertyStmt(
     Parser& p, ModuleItem* item, StmtKind body_kind,
-    const SimpleSpecBody& body) {
+    const SimpleSpecBody& read) {
+  // §16.13.1: a sequence whose operands name clocks of their own is
+  // evaluated as a tree of one operand, where the ticks of each clock are
+  // told apart.
+  SimpleSpecBody body = read;
+  if (body.property == nullptr && body.sequence != nullptr &&
+      !body.sequence->seq_linear.clocks.empty()) {
+    body.strong = body.strong || body_kind == StmtKind::kCoverImmediate;
+    body.property = TreeOfSpecBody(p, body);
+    body.sequence = nullptr;
+    body.negated = false;
+  }
   auto* stmt = p.arena_.Create<Stmt>();
   stmt->kind = body_kind;
   stmt->range.start = item->loc;

@@ -135,6 +135,84 @@ EventExpr SubstituteClockEvent(EventExpr ev, const ActualsByFormal& actuals,
 // without arguments binds none; §16.12.1 puts substitution of actuals for
 // formals ahead of the check, and there are none to substitute.
 //
+// §16.13: `ev` appended to `clock` unless an event of the same edge over a
+// signal of the same spelling is there.
+void AppendClockOnce(std::vector<EventExpr>& clock, const EventExpr& ev) {
+  if (ev.signal == nullptr) return;
+  for (const EventExpr& have : clock) {
+    if (have.edge == ev.edge && have.signal != nullptr &&
+        have.signal->text == ev.signal->text) {
+      return;
+    }
+  }
+  clock.push_back(ev);
+}
+
+// §16.13.1: the clocks the operands of a sequence body name, the bodies of
+// the sequences it instantiates walked too, to a depth that reads a body
+// once.
+void CollectBodyClocks(const SeqLinearBody& body,
+                       const PropertyRegistry& registry,
+                       std::vector<EventExpr>& out, int depth) {
+  for (const auto& clock : body.clocks) {
+    for (const EventExpr& ev : clock) AppendClockOnce(out, ev);
+  }
+  for (const Expr* operand : body.operands) {
+    if (operand == nullptr || depth >= 4) continue;
+    if (operand->kind != ExprKind::kIdentifier &&
+        operand->kind != ExprKind::kCall) {
+      continue;
+    }
+    const ModuleItem* decl = registry.Find(
+        operand->kind == ExprKind::kCall ? operand->callee : operand->text);
+    if (decl != nullptr && decl->kind == ModuleItemKind::kSequenceDecl) {
+      CollectBodyClocks(decl->seq_linear, registry, out, depth + 1);
+    }
+  }
+  for (const SeqLinearBody& inner : body.intersects) {
+    CollectBodyClocks(inner, registry, out, depth);
+  }
+  for (const SeqLinearBody& inner : body.conjuncts) {
+    CollectBodyClocks(inner, registry, out, depth);
+  }
+  for (const SeqLinearBody& inner : body.alternatives) {
+    CollectBodyClocks(inner, registry, out, depth);
+  }
+}
+
+// §16.13: the clocks the sequences of the tree name, those of the bodies of
+// the properties it instantiates and of the sequences and properties its
+// instances take as actuals included, for the assertion's process to wake
+// on beside its leading clock.
+void CollectTreeClocks(const PropertyExprNode* node,
+                       const PropertyRegistry& registry,
+                       std::vector<EventExpr>& out, int depth) {
+  if (node == nullptr) return;
+  if (node->sequence != nullptr) {
+    CollectBodyClocks(node->sequence->seq_linear, registry, out, depth);
+  }
+  const Expr* instance = node->boolean;
+  if (instance != nullptr && depth < 4 &&
+      (instance->kind == ExprKind::kIdentifier ||
+       instance->kind == ExprKind::kCall)) {
+    const ModuleItem* decl = registry.Find(
+        instance->kind == ExprKind::kCall ? instance->callee : instance->text);
+    if (decl != nullptr && decl->kind == ModuleItemKind::kPropertyDecl) {
+      CollectTreeClocks(decl->prop_body_tree, registry, out, depth + 1);
+    }
+    if (instance->kind == ExprKind::kCall) {
+      for (const Expr* arg : instance->args) {
+        if (arg != nullptr) {
+          CollectTreeClocks(arg->property_actual, registry, out, depth);
+        }
+      }
+    }
+  }
+  for (const PropertyExprNode* operand : node->operands) {
+    CollectTreeClocks(operand, registry, out, depth);
+  }
+}
+
 // The body the statement of the instance `instance` of `decl` carries: the
 // boolean with the actuals substituted where the body is the clocked
 // boolean form and every actual an expression, and otherwise, §16.12.17, a
@@ -350,6 +428,16 @@ void Elaborator::ElaborateAssertPropertyItem(ModuleItem* item,
                                property_registry_, diag_);
     ValidateSequenceUsedAsProperty(item->body->assert_sequence, item->loc,
                                    property_registry_, diag_);
+    // §16.13: the statement keeps the leading clock, and the process wakes
+    // on the clocks the sequences name beside it; the item is shared by
+    // every instance of the module, so each clock is added once.
+    if (item->body->assert_clock.empty()) {
+      item->body->assert_clock = item->sensitivity;
+    }
+    std::vector<EventExpr> named;
+    CollectTreeClocks(item->body->assert_property, property_registry_, named,
+                      0);
+    for (const EventExpr& ev : named) AppendClockOnce(item->sensitivity, ev);
   }
   // §16.5.2: `assert property(@$global_clock a);` under a
   // `global clocking @clk; endclocking` declaration is logically equivalent to
