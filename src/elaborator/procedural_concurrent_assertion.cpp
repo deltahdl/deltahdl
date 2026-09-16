@@ -203,6 +203,22 @@ bool TakesInferredClock(Stmt* stmt, const std::vector<EventExpr>& inferred,
   return false;
 }
 
+// §16.14.6: the statement's clock is the one its spec or the declaration it
+// instantiates gave it, else `context`, the procedure's inferred clock or
+// the default clocking's; with none, the statement is reported.
+void ResolveProceduralClock(Stmt* stmt, const std::vector<EventExpr>& context,
+                            DiagEngine& diag) {
+  if (stmt->assert_clock.empty()) stmt->assert_clock = context;
+  if (!stmt->assert_clock.empty()) return;
+  diag.Error(stmt->range.start,
+             "no clock is inferred for the procedural concurrent assertion: "
+             "its property_spec opens with no clocking event, the procedure "
+             "gives it none, holding a blocking timing control, more or fewer "
+             "event controls than one or no unique event expression of the "
+             "form the clause names, and the scope has no default clocking",
+             Subclause("16.14.6"));
+}
+
 // The body, the disable condition and the clock of the property `decl` the
 // statement instantiates, with the actuals in the formals' places: the
 // boolean body substituted, any other as a tree whose root is the instance
@@ -298,16 +314,7 @@ void ElaborateProceduralConcurrentAssertions(ModuleItem* procedure,
     }
     PromoteSequenceInstances(stmt->assert_property, registry, arena);
     if (!TakesInferredClock(stmt, inferred, registry, diag)) continue;
-    if (stmt->assert_clock.empty()) stmt->assert_clock = at_instance.clock;
-    if (!stmt->assert_clock.empty()) continue;
-    diag.Error(stmt->range.start,
-               "no clock is inferred for the procedural concurrent assertion: "
-               "its property_spec opens with no clocking event, the procedure "
-               "gives it none, holding a blocking timing control, more or "
-               "fewer event controls than one or no unique event expression "
-               "of the form the clause names, and the scope has no default "
-               "clocking",
-               Subclause("16.14.6"));
+    ResolveProceduralClock(stmt, at_instance.clock, diag);
   }
 }
 

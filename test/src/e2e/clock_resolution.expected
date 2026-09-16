@@ -12,6 +12,6 @@ e2 covered at 30
 e3 covered at 30
 $finish at time 40
 cover property clock_resolution.u1.c1 (line 58): attempted 4, succeeded 1, succeeded vacuously 0
-cover property clock_resolution.u1.c2 (line 59): attempted 4, succeeded 1, succeeded vacuously 0
-cover property clock_resolution.u2.e2 (line 75): attempted 4, succeeded 1, succeeded vacuously 0
-cover property clock_resolution.u2.e3 (line 77): attempted 4, succeeded 1, succeeded vacuously 0
+cover property clock_resolution.u1.c2 (line 59): attempted 3, succeeded 1, succeeded vacuously 0
+cover property clock_resolution.u2.e2 (line 75): attempted 3, succeeded 1, succeeded vacuously 0
+cover property clock_resolution.u2.e3 (line 77): attempted 3, succeeded 1, succeeded vacuously 0

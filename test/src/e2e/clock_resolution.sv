@@ -13,8 +13,9 @@
 // 40, a is 1 across the ticks of 15 and 20 and b across those of 25 and
 // 30, so an attempt of a |=> !b at 15 fails at 25 and one at 20 at 30,
 // every other attempt holding vacuously, a ##1 b matches from 15 at 25 and
-// from 20 at 30, and the run ends at 40. The time an assertion fails or a
-// cover is covered names its clock: 25 for posedge clk, 30 for negedge.
+// from 20 at 30, and the run ends at 40, before the negedge of that time
+// begins an attempt. The time an assertion fails or a cover is covered
+// names its clock: 25 for posedge clk, 30 for negedge.
 //
 // In examples_with_default, whose default clocking is posedge_clk, d1
 // instantiates the unclocked q1 and d2 writes the unclocked spec, both on
