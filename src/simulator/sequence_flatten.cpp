@@ -544,18 +544,29 @@ const ModuleItem* BareInstance(const SeqLinearBody& body, SimContext& ctx) {
   return InstantiatedSequence(operand, ctx);
 }
 
+// A body that is one bare instance stands for the instantiated sequence
+// whole, under the body's own clock where it has one, the instantiated
+// sequence's otherwise.
+bool FlattenBareInstance(const ModuleItem* seq, const ModuleItem* inner,
+                         SimContext& ctx, Arena& arena, LinearSequence& out,
+                         int depth) {
+  if (!Flatten(inner, ctx, arena, out, depth + 1)) return false;
+  if (!seq->seq_clock.empty()) {
+    out.clock = seq->seq_clock;
+    out.declared_clock = seq->seq_clock;
+  }
+  out.first_match = out.first_match || seq->seq_linear.first_match;
+  AttachFirstMatchItems(seq->seq_linear, out);
+  return true;
+}
+
 bool Flatten(const ModuleItem* seq, SimContext& ctx, Arena& arena,
              LinearSequence& out, int depth) {
   if (seq == nullptr || seq->seq_linear.operands.empty()) return false;
   if (depth > kMaxInstanceDepth) return false;
   const SeqLinearBody& body = seq->seq_linear;
   if (const ModuleItem* inner = BareInstance(body, ctx)) {
-    if (!Flatten(inner, ctx, arena, out, depth + 1)) return false;
-    if (!seq->seq_clock.empty()) out.clock = seq->seq_clock;
-    if (!seq->seq_clock.empty()) out.declared_clock = seq->seq_clock;
-    out.first_match = out.first_match || body.first_match;
-    AttachFirstMatchItems(body, out);
-    return true;
+    return FlattenBareInstance(seq, inner, ctx, arena, out, depth);
   }
   out.clock = seq->seq_clock;
   out.declared_clock = seq->seq_clock;
