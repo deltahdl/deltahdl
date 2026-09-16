@@ -110,6 +110,40 @@ std::vector<EventExpr> Clocks(const PropertyExprNode* node,
   }
 }
 
+// Whether every clock in `named` is identical to `clock`.
+bool AllIdentical(const std::vector<EventExpr>& named,
+                  const std::vector<EventExpr>& clock) {
+  for (const EventExpr& ev : named) {
+    if (clock.empty() || !SameClock(ev, clock[0])) return false;
+  }
+  return true;
+}
+
+// Whether a sequence's own clock and the clocks on its operands are all
+// identical to `clock`.
+bool SequenceNamesOnlyClock(const ModuleItem* seq,
+                            const std::vector<EventExpr>& clock) {
+  if (seq == nullptr) return true;
+  if (!AllIdentical(seq->seq_clock, clock)) return false;
+  for (const auto& operand_clock : seq->seq_linear.clocks) {
+    if (!AllIdentical(operand_clock, clock)) return false;
+  }
+  return true;
+}
+
+// Whether the declaration an instance names, where it names one, is
+// clocked by `clock` alone.
+bool InstanceNamesOnlyClock(const Expr* instance,
+                            const std::vector<EventExpr>& clock,
+                            const PropertyRegistry& registry) {
+  const ModuleItem* decl =
+      InstantiatedDecl(instance, ModuleItemKind::kPropertyDecl, registry);
+  if (decl != nullptr && !AllIdentical(decl->prop_clock, clock)) return false;
+  return SequenceNamesOnlyClock(
+      InstantiatedDecl(instance, ModuleItemKind::kSequenceDecl, registry),
+      clock);
+}
+
 }  // namespace
 
 std::vector<EventExpr> SemanticLeadingClocks(
@@ -128,24 +162,11 @@ bool TreeNamesOnlyClock(const PropertyExprNode* node,
                         const std::vector<EventExpr>& clock,
                         const PropertyRegistry& registry) {
   if (node == nullptr) return true;
-  auto identical = [&](const std::vector<EventExpr>& named) {
-    for (const EventExpr& ev : named) {
-      if (clock.empty() || !SameClock(ev, clock[0])) return false;
-    }
-    return true;
-  };
-  if (!identical(node->clock)) return false;
-  if (node->sequence != nullptr) {
-    for (const auto& operand_clock : node->sequence->seq_linear.clocks) {
-      if (!identical(operand_clock)) return false;
-    }
+  if (!AllIdentical(node->clock, clock) ||
+      !SequenceNamesOnlyClock(node->sequence, clock) ||
+      !InstanceNamesOnlyClock(node->boolean, clock, registry)) {
+    return false;
   }
-  const ModuleItem* decl =
-      InstantiatedDecl(node->boolean, ModuleItemKind::kPropertyDecl, registry);
-  if (decl != nullptr && !identical(decl->prop_clock)) return false;
-  const ModuleItem* seq =
-      InstantiatedDecl(node->boolean, ModuleItemKind::kSequenceDecl, registry);
-  if (seq != nullptr && !identical(seq->seq_clock)) return false;
   for (const PropertyExprNode* operand : node->operands) {
     if (!TreeNamesOnlyClock(operand, clock, registry)) return false;
   }

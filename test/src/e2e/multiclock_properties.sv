@@ -19,7 +19,9 @@
 // clk0's third. sig0 is high at 1, 2, 5 and 7, sig1 at 3 and 5, b at 1, 3
 // and 6, s1 at 2 and 3 and s2 at 4 and 7.
 //
-// conj, the and of the two clocked booleans, begins at each tick of clk0:
+// conj, the and of the two clocked booleans as the consequent of 1 |->,
+// the and needing an antecedent so that the assertion has the unique
+// semantic leading clock §16.16 (e) requires, begins at each tick of clk0:
 // sig0 is read there and sig1 at the nearest tick of clk1, the same tick
 // at 45, so the attempts from 15 and 45 hold, at 27 and 45, the ones from
 // 5 and 65 fail at 12 and 72 with sig1 low, and the four with sig0 low
@@ -79,7 +81,7 @@ module multiclock_properties;
   assign s2 = tick inside {4, 7};
 
   conj: assert property (@(posedge clk0)
-                         (@(posedge clk0) sig0) and (@(posedge clk1) sig1))
+                         1 |-> (@(posedge clk0) sig0) and (@(posedge clk1) sig1))
     begin
       conj_pass++;
       conj_at = $sformatf("%s %0d", conj_at, $time);
@@ -106,7 +108,7 @@ module multiclock_properties;
 
   initial begin
     #80;
-    $display("(@(posedge clk0) sig0) and (@(posedge clk1) sig1) passes %0d fails %0d at%s",
+    $display("1 |-> (@(posedge clk0) sig0) and (@(posedge clk1) sig1) passes %0d fails %0d at%s",
              conj_pass, conj_fail, conj_at);
     $display("sig0 |=> @(posedge clk1) sig1 passes %0d fails %0d at%s",
              nonover_pass, nonover_fail, nonover_at);

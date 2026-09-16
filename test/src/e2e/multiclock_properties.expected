@@ -1,4 +1,4 @@
-(@(posedge clk0) sig0) and (@(posedge clk1) sig1) passes 2 fails 6 at 27 45
+1 |-> (@(posedge clk0) sig0) and (@(posedge clk1) sig1) passes 2 fails 6 at 27 45
 sig0 |=> @(posedge clk1) sig1 passes 5 fails 3 at 25 27 35 55 75
 sig0 |-> @(posedge clk1) sig1 passes 6 fails 2 at 25 27 35 45 55 75
 if (b) @(posedge clk1) s1 else @(posedge clk2) s2 passes 4 fails 4 at 12 27 38 70

@@ -75,10 +75,12 @@ MulticlockPropertyCounts CountsOfMulticlockProperty(const std::string& spec) {
 // §16.13.2: the and of two clocked booleans holds at a point where both
 // have matches beginning there, sig0 at the tick of clk0 and sig1 at the
 // nearest tick of clk1, the coincident one at 45: the attempts from 15 and
-// 45 hold, at 27 and 45, and the six others fail.
+// 45 hold, at 27 and 45, and the six others fail. The and is the
+// consequent of 1 |->, since as the maximal property of the assertion it
+// would have two semantic leading clocks, which §16.16 (e) forbids.
 TEST(MulticlockedProperty, AnAndOfClockedOperandsNeedsBothMatchesFromThePoint) {
   MulticlockPropertyCounts counts = CountsOfMulticlockProperty(
-      "(@(posedge clk0) sig0) and (@(posedge clk1) sig1)");
+      "1 |-> (@(posedge clk0) sig0) and (@(posedge clk1) sig1)");
   EXPECT_EQ(counts.passes, 2u);
   EXPECT_EQ(counts.fails, 6u);
   EXPECT_EQ(counts.pass_sum, 72u);
