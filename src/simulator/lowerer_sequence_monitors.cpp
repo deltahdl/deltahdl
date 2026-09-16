@@ -18,12 +18,13 @@
 namespace delta {
 namespace {
 
-// §16.9.11: whether the expression applies `triggered` to a named sequence,
-// as `e1.triggered` or `e2(ready, proc1, proc2).triggered`, and if so the
-// sequence's name.
+// §16.9.11 and §16.13.5: whether the expression applies `triggered` or
+// `matched` to a named sequence, as `e1.triggered` or `e2(ready, proc1,
+// proc2).matched`, and if so the sequence's name.
 std::string_view TriggeredSequenceName(const Expr* e, SimContext& ctx) {
   if (e->kind != ExprKind::kMemberAccess || e->lhs == nullptr ||
-      e->rhs == nullptr || e->rhs->text != "triggered") {
+      e->rhs == nullptr ||
+      (e->rhs->text != "triggered" && e->rhs->text != "matched")) {
     return {};
   }
   std::string_view name;

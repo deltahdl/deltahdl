@@ -16,6 +16,7 @@
 
 #include "simulator/sim_context_name_tables.h"
 
+#include <cstdint>
 #include <string>
 #include <string_view>
 
@@ -72,6 +73,19 @@ std::string_view DeclaredNameTables::FindSequenceInstanceEndpoint(
     const Expr* instance) const {
   auto it = sequence_instance_eps_.find(instance);
   return (it != sequence_instance_eps_.end()) ? it->second : std::string_view{};
+}
+
+bool DeclaredNameTables::ConsumeSequenceMatch(std::string_view ep_name,
+                                              uint64_t matched_ticks,
+                                              uint64_t now) {
+  if (matched_ticks == UINT64_MAX || matched_ticks > now) return false;
+  auto it = sequence_match_reads_.find(ep_name);
+  if (it != sequence_match_reads_.end() && it->second >= matched_ticks &&
+      it->second != now) {
+    return false;
+  }
+  sequence_match_reads_[ep_name] = now;
+  return true;
 }
 
 void DeclaredNameTables::RegisterRealVariable(std::string_view name) {

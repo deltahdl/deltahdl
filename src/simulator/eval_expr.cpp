@@ -382,6 +382,15 @@ static bool TryUnionTagMismatch(const MemberAccess& ma,
 }
 
 // Handles the named-event `.triggered` and named-sequence `.triggered`/`.ended`
+// §16.13.5: whether the end point named `ep_name` is matched as read now,
+// its match stored until the first tick of the reading clock after it.
+static bool SequenceMatched(std::string_view ep_name, SimContext& ctx) {
+  auto* ep = ctx.FindVariable(ep_name);
+  if (ep == nullptr) return false;
+  return ctx.ConsumeSequenceMatch(ep_name, ep->triggered_ticks,
+                                  ctx.CurrentTime().ticks);
+}
+
 // pseudo-methods. Returns true and fills `out` when `field_name` named one of
 // these and the base referred to a matching event/sequence.
 static bool TryEventSequenceMethod(const MemberAccess& ma, Logic4Vec& out) {
@@ -403,6 +412,14 @@ static bool TryEventSequenceMethod(const MemberAccess& ma, Logic4Vec& out) {
       ctx.FindSequenceDecl(base_name)) {
     std::string ep_name = std::string("__seq_") + std::string(base_name);
     out = MakeLogic4VecVal(arena, 1, ctx.IsEventTriggered(ep_name) ? 1u : 0u);
+    return true;
+  }
+  // §16.13.5: `matched` stores a match of the sequence until the first tick
+  // of the reading clock after it, where `triggered` is true at the time
+  // step of the match alone.
+  if (!base_var && field_name == "matched" && ctx.FindSequenceDecl(base_name)) {
+    std::string ep_name = std::string("__seq_") + std::string(base_name);
+    out = MakeLogic4VecVal(arena, 1, SequenceMatched(ep_name, ctx) ? 1u : 0u);
     return true;
   }
   if (!base_var && field_name == "ended" && ctx.FindSequenceDecl(base_name)) {
@@ -615,18 +632,21 @@ static bool TryParameterizedScopeParam(const Expr* expr, SimContext& ctx,
   return true;
 }
 
-// §16.9.11: `.triggered` applied to a sequence instance with arguments reads
-// the endpoint of the monitor the lowering gave that instance; answers false
-// where no monitor was made for it.
+// §16.9.11 and §16.13.5: `.triggered` or `.matched` applied to a sequence
+// instance with arguments reads the endpoint of the monitor the lowering
+// gave that instance; answers false where no monitor was made for it.
 static bool TryInstanceTriggered(const Expr* expr, SimContext& ctx,
                                  Arena& arena, Logic4Vec& out) {
   if (expr->lhs == nullptr || expr->lhs->kind != ExprKind::kCall ||
-      expr->rhs == nullptr || expr->rhs->text != "triggered" ||
+      expr->rhs == nullptr ||
+      (expr->rhs->text != "triggered" && expr->rhs->text != "matched") ||
       ctx.FindSequenceDecl(expr->lhs->callee) == nullptr) {
     return false;
   }
   std::string_view ep_name = ctx.FindSequenceInstanceEndpoint(expr->lhs);
-  bool triggered = !ep_name.empty() && ctx.IsEventTriggered(ep_name);
+  bool triggered = !ep_name.empty() && (expr->rhs->text == "matched"
+                                            ? SequenceMatched(ep_name, ctx)
+                                            : ctx.IsEventTriggered(ep_name));
   out = MakeLogic4VecVal(arena, 1, triggered ? 1u : 0u);
   return true;
 }

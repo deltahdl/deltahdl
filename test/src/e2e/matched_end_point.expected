@@ -1,0 +1,4 @@
+e2 with e1(ready, proc1, proc2).matched [->1] ends at 56 120
+e2 with e1(ready, proc1, proc2).triggered [->1] ends at
+e1_inst.matched ##1 e1_inst.matched ends at
+$finish at time 130
