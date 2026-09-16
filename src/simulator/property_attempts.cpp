@@ -448,8 +448,11 @@ bool ExpandInstance(const PropertyExprNode* node, NodeState& state,
   PropertyExprNode* body =
       SubstituteTree(decl->prop_body_tree, actuals, sc.arena);
   // §16.13.2: a property declared with a clock is evaluated on it, from its
-  // first tick at or after the instance begins.
-  if (body->clock.empty()) body->clock = decl->prop_clock;
+  // first tick at or after the instance begins, the actuals in the formals'
+  // places.
+  if (body->clock.empty()) {
+    body->clock = SubstituteClock(decl->prop_clock, actuals, sc.arena);
+  }
   if (!decl->prop_locals.empty()) {
     PlaceLocalCopies(body, decl->prop_locals, nullptr, sc.tree, sc.arena);
   }

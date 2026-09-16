@@ -111,6 +111,14 @@ bool NamesAnotherClock(const LinearSequence& body);
 // formals, by position for the leading actuals and by name for the
 // `.formal(actual)` ones, each cast as §16.8.1 has it for the formal's
 // type; empty for an instance written as a name alone.
+// §16.8.1 (b): an instantiated sequence's or property's clock with its
+// formals replaced by the actuals: an event actual supplies the edge and
+// the signal, an ordinary actual the signal alone under the edge the clock
+// wrote.
+std::vector<EventExpr> SubstituteClock(const std::vector<EventExpr>& clock,
+                                       const ActualsByFormal& actuals,
+                                       Arena& arena);
+
 ActualsByFormal BindInstanceActuals(const ModuleItem* decl,
                                     const Expr* instance, Arena& arena);
 

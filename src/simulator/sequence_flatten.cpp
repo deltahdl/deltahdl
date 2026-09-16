@@ -192,11 +192,6 @@ ActualsByFormal BindInstanceActuals(const ModuleItem* decl,
   return actuals;
 }
 
-namespace {
-
-// §16.8.1 (b): the instantiated sequence's clock with its formals replaced by
-// the actuals: an event actual supplies the edge and the signal, an ordinary
-// actual the signal alone under the edge the clock wrote.
 std::vector<EventExpr> SubstituteClock(const std::vector<EventExpr>& clock,
                                        const ActualsByFormal& actuals,
                                        Arena& arena) {
@@ -228,6 +223,8 @@ std::vector<EventExpr> SubstituteClock(const std::vector<EventExpr>& clock,
   }
   return out;
 }
+
+namespace {
 
 const ModuleItem* InstantiatedSequence(const Expr* operand, SimContext& ctx) {
   if (operand == nullptr) return nullptr;
