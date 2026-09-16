@@ -590,6 +590,11 @@ class ConstraintSolver {
 
   bool SolveIterative(const std::vector<ConstraintExpr>& extra,
                       bool include_soft);
+  // 18.4.2: whether every constraint naming the randc variable `name` holds
+  // under the values of the attempt just tried, so that its value is kept
+  // for the next attempt rather than passed over in its permutation.
+  bool RandcValueAdmissible(const std::string& name,
+                            const std::vector<ConstraintExpr>& extra) const;
 
   // 18.5.5: after the general draw, every implication whose antecedent holds
   // under the values drawn has each constraint of its consequent that does

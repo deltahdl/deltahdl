@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <functional>
+#include <iterator>
 #include <random>
 #include <string>
 #include <string_view>
@@ -824,6 +825,18 @@ bool ConstraintSolver::SolveIterative(const std::vector<ConstraintExpr>& extra,
   auto gen_real = [this](RandVariable& var) {
     return GenerateRandRealValue(var);
   };
+  // 18.4.2: a randc variable takes the next value of its permutation once
+  // per randomize(), whatever the attempts the other variables take, so the
+  // value is drawn once and kept across them while every constraint naming
+  // it holds; a value one of them refuses is passed over for the next.
+  std::unordered_map<std::string, int64_t> randc_drawn;
+  auto gen_randc = [&](RandVariable& var) {
+    auto it = randc_drawn.find(var.name);
+    if (it != randc_drawn.end()) return it->second;
+    int64_t v = GenerateRandValue(var);
+    randc_drawn[var.name] = v;
+    return v;
+  };
   // 18.5.11: when random variables are used as function arguments, the implied
   // priority is solved in layers — the higher-priority variables first, each
   // layer committed as state variables to the next without backtracking. This
@@ -875,7 +888,7 @@ bool ConstraintSolver::SolveIterative(const std::vector<ConstraintExpr>& extra,
     SeedInactiveVariables(variables_, values_, real_values_);
     ApplyDistConstraints();
     ApplyDirectConstraints(extra, include_soft);
-    DrawRandcVariables(variables_, values_, gen);
+    DrawRandcVariables(variables_, values_, gen_randc);
     DrawArraySizeVariables(variables_, values_, gen);
     AttemptPasses passes{priority_pass, ordered_pass, flat_pass};
     AttemptOutcome outcome =
@@ -884,8 +897,31 @@ bool ConstraintSolver::SolveIterative(const std::vector<ConstraintExpr>& extra,
     if (outcome == AttemptOutcome::kSolved) return true;
     // 18.5.12: an ERROR guard fails randomize() outright; do not retry it.
     if (outcome == AttemptOutcome::kAbort) return false;
+    for (auto it = randc_drawn.begin(); it != randc_drawn.end();) {
+      it = RandcValueAdmissible(it->first, extra) ? std::next(it)
+                                                  : randc_drawn.erase(it);
+    }
   }
   return false;
+}
+
+bool ConstraintSolver::RandcValueAdmissible(
+    const std::string& name, const std::vector<ConstraintExpr>& extra) const {
+  auto refuses = [&](const ConstraintExpr& c) {
+    return std::find(c.ref_vars.begin(), c.ref_vars.end(), name) !=
+               c.ref_vars.end() &&
+           !EvalConstraint(c);
+  };
+  for (const auto& block : blocks_) {
+    if (!block.enabled) continue;
+    for (const auto& c : block.constraints) {
+      if (refuses(c)) return false;
+    }
+  }
+  for (const auto& c : extra) {
+    if (refuses(c)) return false;
+  }
+  return true;
 }
 
 int64_t ConstraintSolver::GetValue(std::string_view name) const {
