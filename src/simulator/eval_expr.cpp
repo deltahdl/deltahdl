@@ -391,6 +391,22 @@ static bool SequenceMatched(std::string_view ep_name, SimContext& ctx) {
                                   ctx.CurrentTime().ticks);
 }
 
+// §16.9.11 and §16.13.5: `triggered` and `matched` on the named sequence
+// `base_name`, the first true at the time step of the match alone and the
+// second storing a match until the first tick of the reading clock after
+// it; false where `field_name` names neither.
+static bool TrySequenceEndPointMethod(std::string_view base_name,
+                                      std::string_view field_name,
+                                      SimContext& ctx, Arena& arena,
+                                      Logic4Vec& out) {
+  if (field_name != "triggered" && field_name != "matched") return false;
+  std::string ep_name = std::string("__seq_") + std::string(base_name);
+  bool reached = field_name == "matched" ? SequenceMatched(ep_name, ctx)
+                                         : ctx.IsEventTriggered(ep_name);
+  out = MakeLogic4VecVal(arena, 1, reached ? 1u : 0u);
+  return true;
+}
+
 // pseudo-methods. Returns true and fills `out` when `field_name` named one of
 // these and the base referred to a matching event/sequence.
 static bool TryEventSequenceMethod(const MemberAccess& ma, Logic4Vec& out) {
@@ -408,18 +424,8 @@ static bool TryEventSequenceMethod(const MemberAccess& ma, Logic4Vec& out) {
                                  ctx.IsEventTriggered(base_name) ? 1u : 0u);
     return true;
   }
-  if (!base_var && field_name == "triggered" &&
-      ctx.FindSequenceDecl(base_name)) {
-    std::string ep_name = std::string("__seq_") + std::string(base_name);
-    out = MakeLogic4VecVal(arena, 1, ctx.IsEventTriggered(ep_name) ? 1u : 0u);
-    return true;
-  }
-  // §16.13.5: `matched` stores a match of the sequence until the first tick
-  // of the reading clock after it, where `triggered` is true at the time
-  // step of the match alone.
-  if (!base_var && field_name == "matched" && ctx.FindSequenceDecl(base_name)) {
-    std::string ep_name = std::string("__seq_") + std::string(base_name);
-    out = MakeLogic4VecVal(arena, 1, SequenceMatched(ep_name, ctx) ? 1u : 0u);
+  if (!base_var && ctx.FindSequenceDecl(base_name) &&
+      TrySequenceEndPointMethod(base_name, field_name, ctx, arena, out)) {
     return true;
   }
   if (!base_var && field_name == "ended" && ctx.FindSequenceDecl(base_name)) {
