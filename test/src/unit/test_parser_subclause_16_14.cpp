@@ -59,7 +59,7 @@ TEST(ConcurrentAssertionEvaluationReporting,
      ATemporalAssumePropertyIsNotEvaluated) {
   auto r = Parse(
       "module m;\n"
-      "  assume property (@(posedge clk) a ##1 b dist {1 := 1});\n"
+      "  assume property (@(posedge clk) a ##1 b dist {default :/ 1});\n"
       "endmodule\n");
   EXPECT_TRUE(ReportedWarning(r.diags, "its property is temporal", 2, "16.14"));
 }
@@ -120,8 +120,9 @@ TEST(ConcurrentAssertionEvaluationReporting,
 
 // §16.12.7: |-> and |=> are the implication operators, which the evaluation
 // reads as a property of operands, so neither spec is reported. A dist
-// after a cycle delay, a constraint it does not read, is still the
-// temporal branch's.
+// with a default item after a cycle delay, §16.14.2 reading a dist as
+// inside and inside spelling no range for the values a default item
+// weights, is still the temporal branch's.
 TEST(ConcurrentAssertionEvaluationReporting, ImplicationsAreEvaluated) {
   auto overlapped = Parse(
       "module m;\n"
@@ -135,7 +136,7 @@ TEST(ConcurrentAssertionEvaluationReporting, ImplicationsAreEvaluated) {
   EXPECT_EQ(UnevaluatedReports(nonoverlapped), 0);
   auto under = Parse(
       "module m;\n"
-      "  assert property (@(posedge clk) a ##1 b dist {1 := 1});\n"
+      "  assert property (@(posedge clk) a ##1 b dist {default :/ 1});\n"
       "endmodule\n");
   EXPECT_TRUE(
       ReportedWarning(under.diags, "its property is temporal", 2, "16.14"));
@@ -144,8 +145,8 @@ TEST(ConcurrentAssertionEvaluationReporting, ImplicationsAreEvaluated) {
 // §16.7: ## is the cycle delay range, and §16.12.2 has a sequence_expr be a
 // sequential property, which the evaluation reads as weak in an assert; a
 // spec that holds a cycle delay and no property operator is reported by
-// nothing. One holding a cycle delay and a dist, a constraint the
-// evaluation does not read, is still the temporal branch's.
+// nothing. One holding a cycle delay and a dist with a default item,
+// which the evaluation does not read, is still the temporal branch's.
 TEST(ConcurrentAssertionEvaluationReporting,
      CycleDelayIsEvaluatedAsASequentialProperty) {
   auto r = Parse(
@@ -155,7 +156,7 @@ TEST(ConcurrentAssertionEvaluationReporting,
   EXPECT_EQ(UnevaluatedReports(r), 0);
   auto under = Parse(
       "module m;\n"
-      "  assert property (@(posedge clk) a ##1 b dist {1 := 1});\n"
+      "  assert property (@(posedge clk) a ##1 b dist {default :/ 1});\n"
       "endmodule\n");
   EXPECT_TRUE(
       ReportedWarning(under.diags, "its property is temporal", 2, "16.14"));
@@ -195,18 +196,20 @@ TEST(ConcurrentAssertionEvaluationReporting,
 }
 
 // A clocked assert whose property_spec is not exhausted by what the
-// evaluation reads: the dist of A.2.10's expression_or_dist is a constraint
-// the evaluation does not read, so the spec is not the whole of what stands
-// after the clock, and the report names this rather than the missing clock,
-// because the clock is present. `a and b`, `if (a) b else c`, `nexttime
-// b`, `s_always [1:3] b`, `eventually [1:3] b`, `accept_on (rst) b` and
-// `case (sel) 1: b; endcase` stood here until §16.12.5, §16.12.6,
-// §16.12.10, §16.12.11, §16.12.13, §16.12.14 and §16.12.16 were evaluated.
+// evaluation reads: a default item of A.8.3's dist_list weights the values
+// the other items leave out, which the inside a dist is read as spells no
+// range for, so the spec is not the whole of what stands after the clock,
+// and the report names this rather than the missing clock, because the
+// clock is present. `a and b`, `if (a) b else c`, `nexttime b`, `s_always
+// [1:3] b`, `eventually [1:3] b`, `accept_on (rst) b`, `case (sel) 1: b;
+// endcase` and `b dist {1 := 1}` stood here until §16.12.5, §16.12.6,
+// §16.12.10, §16.12.11, §16.12.13, §16.12.14, §16.12.16 and §16.14.2 were
+// evaluated.
 TEST(ConcurrentAssertionEvaluationReporting,
      ClockedNonBooleanPropertyIsNotEvaluated) {
   auto r = Parse(
       "module m;\n"
-      "  assert property (@(posedge clk) b dist {1 := 1});\n"
+      "  assert property (@(posedge clk) b dist {default :/ 1});\n"
       "endmodule\n");
   EXPECT_TRUE(ReportedWarning(
       r.diags, "holds more than the @(event) boolean_expression", 2, "16.14"));

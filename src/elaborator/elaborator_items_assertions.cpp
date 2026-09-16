@@ -320,11 +320,14 @@ void PromoteSequenceInstances(PropertyExprNode* node,
 
 // §16.13.3 and §16.13.4: the clock flowing into a property declared with
 // none: the clocking event its body's property_expr opens with, after the
-// disable condition where §16.14.1's `abc` writes one, or else the clock
-// of the sequence its body opens with, where that sequence, the body itself
-// or the antecedent of the implication it is, is one instance of a sequence
-// declared with a clock, `mult_s |=> mult_s` being on mult_s's; empty
-// otherwise.
+// disable condition where §16.14.1's `abc` writes one, on the root where
+// the body is a `not` and on the first operand of the sequence the body
+// opens with where the body is a sequence or an implication, §16.14.2's
+// `abc` writing its clock before the antecedent, from which it flows to the
+// consequent; or else the clock of the sequence its body opens with, where
+// that sequence, the body itself or the antecedent of the implication it
+// is, is one instance of a sequence declared with a clock, `mult_s |=>
+// mult_s` being on mult_s's; empty otherwise.
 const std::vector<EventExpr>& FlowedBodyClock(
     const ModuleItem* decl, const PropertyRegistry& registry) {
   static const std::vector<EventExpr> kNone;
@@ -335,6 +338,9 @@ const std::vector<EventExpr>& FlowedBodyClock(
   bool opens = root->kind == PropertyExprNode::Kind::kSequence ||
                root->kind == PropertyExprNode::Kind::kImplication;
   const SeqLinearBody& body = root->sequence->seq_linear;
+  if (opens && !body.clocks.empty() && !body.clocks[0].empty()) {
+    return body.clocks[0];
+  }
   if (!opens || body.operands.size() != 1) return kNone;
   const ModuleItem* seq = InstantiatedDecl(
       body.operands[0], ModuleItemKind::kSequenceDecl, registry);
@@ -360,6 +366,9 @@ bool SubstituteSequenceInstance(ModuleItem* item, const ModuleItem* decl,
                    ? StmtKind::kAssumeImmediate
                    : StmtKind::kAssertImmediate;
   stmt->range.start = item->loc;
+  // §16.14: the statement's label is a level of the name its action block
+  // reports, as the parser gives a body it makes itself.
+  stmt->label = item->name;
   stmt->assert_expr = item->assert_expr;
   stmt->assert_property = arena.Create<PropertyExprNode>();
   stmt->assert_property->kind = PropertyExprNode::Kind::kSequence;
@@ -478,6 +487,7 @@ void SubstitutePropertyInstance(ModuleItem* item, Arena& arena,
                    ? StmtKind::kAssumeImmediate
                    : StmtKind::kAssertImmediate;
   stmt->range.start = item->loc;
+  stmt->label = item->name;
   GiveInstanceBody(stmt, item->assert_expr, decl, actuals, arena);
   stmt->assert_disable_iff =
       SubstituteFormals(decl->prop_disable_iff, actuals, arena);

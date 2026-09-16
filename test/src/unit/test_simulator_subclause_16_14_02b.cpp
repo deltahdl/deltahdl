@@ -140,4 +140,19 @@ TEST(AssumeStatementRun, TheProtocolsAssumptionsHoldAndItsAssertionFails) {
   EXPECT_EQ(f.ctx.FindVariable("fails")->value.ToUint64(), 1u);
 }
 
+// §16.14: the label of an assertion whose property_spec is an instance of
+// a named property is a level of the name its action block reports, as a
+// labeled assertion writing its spec out is.
+TEST(AssumeStatementRun, TheLabelOfAnInstanceAssertionNamesItsReport) {
+  SimFixture f;
+  std::string out = RunCapture(
+      AssumeSource("  property pa1;\n"
+                   "    @(posedge clk) !reset_n || !req |-> !ack;\n"
+                   "  endproperty\n"
+                   "  assert_ack1: assert property (pa1)\n"
+                   "    else $display(\"%m failed at %0d\", $time);\n"),
+      f);
+  EXPECT_EQ(out, "t.assert_ack1 failed at 75\n$finish at time 90\n");
+}
+
 }  // namespace
