@@ -526,7 +526,7 @@ struct ParserSeqLinearHelpers {
     }
     Expr* op = AheadIsSequenceInstanceOperand(p)
                    ? ParseSequenceInstanceOperand(p)
-                   : p.ParseExpr();
+                   : ParserPropertySpecHelpers::ParseExpressionOrDist(p);
     if (!op) return false;
     if (p.Match(TokenKind::kKwThroughout)) {
       return ParseThroughout(p, body, before, op, clock);

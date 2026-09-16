@@ -321,13 +321,52 @@ Expr* ParserPropertySpecHelpers::TryParsePropertyInstance(Parser& p) {
   return nullptr;
 }
 
+// §16.14.2: the `[lo:hi]` item of a dist_list as the range an inside
+// expression holds, §11.4.13's bracketed pair.
+Expr* ParserPropertySpecHelpers::RangeOfDistItem(
+    Parser& p, const ConstraintDistItem& item) {
+  auto* range = p.arena_.Create<Expr>();
+  range->kind = ExprKind::kSelect;
+  range->range.start = item.lo->range.start;
+  range->index = item.lo;
+  range->index_end = item.hi;
+  return range;
+}
+
+// §A.8.3's expression_or_dist, `expression [ dist { dist_list } ]`, in an
+// assertion. §16.14.2 has a dist in an assert or cover statement be the
+// inside operator over the same values, its weights ignored, and has the
+// property an assume statement assumes hold the same with or without its
+// biasing, the weights only selecting among the values of a free
+// variable, which this tool leaves to the design; so a dist is read as the
+// inside expression over its items. A `default` item weights the values
+// the other items leave out, which inside holds no range for, so a
+// dist_list writing one is not read.
+Expr* ParserPropertySpecHelpers::ParseExpressionOrDist(Parser& p) {
+  Expr* expr = p.ParseExpr();
+  if (expr == nullptr || !p.Check(TokenKind::kKwDist)) return expr;
+  p.Consume();
+  if (!p.Match(TokenKind::kLBrace)) return nullptr;
+  auto* inside = p.arena_.Create<Expr>();
+  inside->kind = ExprKind::kInside;
+  inside->range.start = expr->range.start;
+  inside->lhs = expr;
+  do {
+    ConstraintDistItem item;
+    if (!p.ParseDistItem(item) || item.is_default) return nullptr;
+    inside->elements.push_back(item.is_range ? RangeOfDistItem(p, item)
+                                             : item.value);
+  } while (p.Match(TokenKind::kComma));
+  return p.Match(TokenKind::kRBrace) ? inside : nullptr;
+}
+
 // §16.12.6: `if ( expression_or_dist ) property_expr [ else property_expr
 // ]`, the if keyword consumed; Table 16-3 puts if-else below every other
 // operator, so each branch runs to the else or the end.
 PropertyExprNode* ParserPropertySpecHelpers::ParsePropertyIfElse(Parser& p) {
   auto* node = NewPropertyNode(p, PropertyExprNode::Kind::kIfElse);
   if (!p.Match(TokenKind::kLParen)) return nullptr;
-  node->boolean = p.ParseExpr();
+  node->boolean = ParseExpressionOrDist(p);
   if (node->boolean == nullptr || !p.Match(TokenKind::kRParen)) {
     return nullptr;
   }
@@ -373,8 +412,10 @@ bool ParserPropertySpecHelpers::ParsePropertyCaseItem(Parser& p,
 PropertyExprNode* ParserPropertySpecHelpers::ParsePropertyCase(Parser& p) {
   auto* node = NewPropertyNode(p, PropertyExprNode::Kind::kCase);
   if (!p.Match(TokenKind::kLParen)) return nullptr;
-  node->boolean = p.ParseExpr();
-  if (node->boolean == nullptr || !p.Match(TokenKind::kRParen)) return nullptr;
+  node->boolean = ParseExpressionOrDist(p);
+  if (node->boolean == nullptr || !p.Match(TokenKind::kRParen)) {
+    return nullptr;
+  }
   while (!p.Match(TokenKind::kKwEndcase)) {
     if (p.Check(TokenKind::kEof) || !ParsePropertyCaseItem(p, *node)) {
       return nullptr;
@@ -482,8 +523,10 @@ PropertyExprNode* ParserPropertySpecHelpers::ParsePropertyAbort(Parser& p) {
   node->synchronous =
       op == TokenKind::kKwSyncAcceptOn || op == TokenKind::kKwSyncRejectOn;
   if (!p.Match(TokenKind::kLParen)) return nullptr;
-  node->boolean = p.ParseExpr();
-  if (node->boolean == nullptr || !p.Match(TokenKind::kRParen)) return nullptr;
+  node->boolean = ParseExpressionOrDist(p);
+  if (node->boolean == nullptr || !p.Match(TokenKind::kRParen)) {
+    return nullptr;
+  }
   auto* operand = ParsePropertyImplication(p);
   if (operand == nullptr) return nullptr;
   node->operands.push_back(operand);
@@ -526,7 +569,7 @@ PropertyExprNode* ParserPropertySpecHelpers::ParsePropertyTerm(Parser& p) {
     return node->sequence != nullptr ? node : nullptr;
   }
   auto* node = NewPropertyNode(p, PropertyExprNode::Kind::kBoolean);
-  node->boolean = p.ParseExpr();
+  node->boolean = ParseExpressionOrDist(p);
   return node->boolean != nullptr ? node : nullptr;
 }
 
@@ -662,7 +705,7 @@ bool ParserPropertySpecHelpers::ParseSimpleSpecBody(Parser& p,
   // does, `a[*0:2]` as much as `a ##1 b`.
   if (!p.BodyHasTemporalOperator() && !AheadHoldsRepetition(p) &&
       !AheadHoldsSequenceOperator(p)) {
-    body.prop = p.ParseExpr();
+    body.prop = ParseExpressionOrDist(p);
     return body.prop != nullptr;
   }
   body.sequence = TryParseSequenceSpec(p, body.strong, false);

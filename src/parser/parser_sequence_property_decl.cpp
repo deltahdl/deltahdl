@@ -852,7 +852,8 @@ void Parser::CaptureClockedBooleanPropertyBody(ModuleItem* item) {
   // §16.12.3: each `not` before the boolean negates it once more.
   bool negated = false;
   while (ok && Match(TokenKind::kKwNot)) negated = !negated;
-  Expr* boolean = ok ? ParseExpr() : nullptr;
+  Expr* boolean =
+      ok ? ParserPropertySpecHelpers::ParseExpressionOrDist(*this) : nullptr;
   ok = boolean != nullptr && Match(TokenKind::kSemicolon) &&
        Check(TokenKind::kKwEndproperty);
   diag_.PopSuppress();

@@ -403,7 +403,7 @@ void Parser::WarnUnevaluatedConcurrentAssertion(SourceLoc loc) {
 bool Parser::TryParseDisableIff(Expr*& disable_iff) {
   if (!Match(TokenKind::kKwDisable)) return true;
   if (!Match(TokenKind::kKwIff) || !Match(TokenKind::kLParen)) return false;
-  disable_iff = ParseExpr();
+  disable_iff = ParserPropertySpecHelpers::ParseExpressionOrDist(*this);
   return disable_iff != nullptr && Match(TokenKind::kRParen);
 }
 

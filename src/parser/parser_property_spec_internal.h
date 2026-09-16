@@ -45,6 +45,8 @@ struct ParserPropertySpecHelpers {
   static bool ParseNamedActualPrefix(Parser& p, Expr* call, bool& named);
   static bool ParsePropertyActualList(Parser& p, Expr* call, bool& plain);
   static Expr* TryParsePropertyInstance(Parser& p);
+  static Expr* RangeOfDistItem(Parser& p, const ConstraintDistItem& item);
+  static Expr* ParseExpressionOrDist(Parser& p);
   static PropertyExprNode* ParsePropertyIfElse(Parser& p);
   static bool ParsePropertyCaseItem(Parser& p, PropertyExprNode& node);
   static PropertyExprNode* ParsePropertyCase(Parser& p);
