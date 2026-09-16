@@ -607,32 +607,44 @@ const ModuleItem* SequenceActual(const Expr* operand) {
   return tree->sequence;
 }
 
-// One operand of the body being substituted, appended to `out`: the operand
-// with the actuals in the formals' places or, where it references a formal
-// whose actual is a sequence_expr, that sequence's flattened operands, the
-// delay before the operand added to the first's and the operand's match
-// items carried by the last.
-void AppendSubstitutedOperand(const LinearSequence& body, size_t j,
-                              const ActualsByFormal& actuals, SimContext& ctx,
+// One operand of a body with the actuals in the formals' places: the
+// operand, the delay before it, its match items and its repetition.
+struct SubstitutedOperand {
+  Expr* operand;
+  SeqCycleDelay delay;
+  std::vector<SeqMatchAssign> items;
+  SeqRepetition repetition;
+};
+
+SubstitutedOperand SubstituteOperand(const LinearSequence& body, size_t j,
+                                     const ActualsByFormal& actuals,
+                                     SimContext& ctx, Arena& arena) {
+  return {SubstituteFormals(body.operands[j], actuals, arena),
+          ResolveDelay(body.delays[j], actuals, ctx, arena),
+          SubstituteMatchItems(body.match_items[j], actuals, arena),
+          body.repetitions[j]};
+}
+
+// The substituted operand appended to `out`, or, where it references a
+// formal whose actual is a sequence_expr, that sequence's flattened
+// operands, the delay before the operand added to the first's and the
+// operand's match items carried by the last.
+void AppendSubstitutedOperand(SubstitutedOperand sub, SimContext& ctx,
                               Arena& arena, LinearSequence& out) {
-  Expr* operand = SubstituteFormals(body.operands[j], actuals, arena);
-  SeqCycleDelay delay = ResolveDelay(body.delays[j], actuals, ctx, arena);
-  std::vector<SeqMatchAssign> items =
-      SubstituteMatchItems(body.match_items[j], actuals, arena);
   size_t first = out.operands.size();
-  if (const ModuleItem* inner = SequenceActual(operand)) {
-    ExpandInstance({inner, operand, delay, body.repetitions[j]}, ctx, arena,
+  if (const ModuleItem* inner = SequenceActual(sub.operand)) {
+    ExpandInstance({inner, sub.operand, sub.delay, sub.repetition}, ctx, arena,
                    out, 0);
     if (out.operands.size() > first) {
-      out.match_items.back().insert(out.match_items.back().end(), items.begin(),
-                                    items.end());
+      out.match_items.back().insert(out.match_items.back().end(),
+                                    sub.items.begin(), sub.items.end());
       return;
     }
   }
-  out.operands.push_back(operand);
-  out.delays.push_back(delay);
-  out.match_items.push_back(std::move(items));
-  out.repetitions.push_back(body.repetitions[j]);
+  out.operands.push_back(sub.operand);
+  out.delays.push_back(sub.delay);
+  out.match_items.push_back(std::move(sub.items));
+  out.repetitions.push_back(sub.repetition);
 }
 
 }  // namespace
@@ -652,7 +664,8 @@ LinearSequence SubstituteLinearSequence(const LinearSequence& body,
   std::vector<size_t> ends;
   for (size_t j = 0; j < body.operands.size(); ++j) {
     begins.push_back(out.operands.size());
-    AppendSubstitutedOperand(body, j, actuals, ctx, arena, out);
+    AppendSubstitutedOperand(SubstituteOperand(body, j, actuals, ctx, arena),
+                             ctx, arena, out);
     ends.push_back(out.operands.size() - 1);
   }
   for (SeqThroughout guard : body.throughouts) {

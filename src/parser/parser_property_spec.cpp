@@ -243,6 +243,17 @@ Expr* ParserPropertySpecHelpers::ParsePropertyActualArg(Parser& p,
   return holder;
 }
 
+// The `.formal(` opening an actual bound by name, where one is written,
+// the name recorded on `call`; `named` says one was, and the answer is
+// false where it is malformed.
+static bool ParseNamedActualPrefix(Parser& p, Expr* call, bool& named) {
+  named = p.Match(TokenKind::kDot);
+  if (!named) return true;
+  if (!p.Check(TokenKind::kIdentifier)) return false;
+  call->arg_names.push_back(p.Consume().text);
+  return p.Match(TokenKind::kLParen);
+}
+
 // The `( actuals )` of a property instance into `call`, each actual bound
 // by position or, as `.formal(actual)`, by name; false where the list is
 // malformed.
@@ -250,12 +261,8 @@ bool ParserPropertySpecHelpers::ParsePropertyActualList(Parser& p, Expr* call,
                                                         bool& plain) {
   if (!p.Match(TokenKind::kLParen)) return false;
   while (!p.Check(TokenKind::kRParen) && !p.AtEnd()) {
-    bool named = p.Match(TokenKind::kDot);
-    if (named) {
-      if (!p.Check(TokenKind::kIdentifier)) return false;
-      call->arg_names.push_back(p.Consume().text);
-      if (!p.Match(TokenKind::kLParen)) return false;
-    }
+    bool named = false;
+    if (!ParseNamedActualPrefix(p, call, named)) return false;
     Expr* actual = ParsePropertyActualArg(p, plain);
     if (actual == nullptr || (named && !p.Match(TokenKind::kRParen))) {
       return false;
