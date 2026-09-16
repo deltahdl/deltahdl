@@ -304,6 +304,40 @@ struct StepContext {
 Tri Step(const PropertyExprNode* node, NodeState& state, StepContext& sc,
          bool begin);
 
+// A literal holding `value`, its width and sign kept, for an expression
+// that reads the value as it stood.
+Expr* LiteralOfValue(const Logic4Vec& value, Arena& arena) {
+  std::string text = std::to_string(value.width) + "'" +
+                     (value.is_signed ? "s" : "") + "b" + value.ToString();
+  auto* literal = arena.Create<Expr>();
+  literal->kind = ExprKind::kIntegerLiteral;
+  literal->text = {arena.AllocString(text.data(), text.size()), text.size()};
+  literal->int_val = value.ToUint64();
+  return literal;
+}
+
+// §16.12.19 by way of §16.8.2: a local variable formal argument of a named
+// property, whose direction is input alone, is a local variable of the
+// instance, a new copy of it initialized from the actual when the attempt
+// begins, so the actual's value at that tick, sampled as the property reads
+// it and cast as §16.8.1 has it, stands in the formal's place for the
+// attempt where the actual is an expression.
+void CaptureLocalFormals(const ModuleItem* decl, ActualsByFormal& actuals,
+                         StepContext& sc) {
+  for (size_t i = 0;
+       i < decl->prop_formals.size() && i < decl->prop_formal_is_local.size();
+       ++i) {
+    if (!decl->prop_formal_is_local[i]) continue;
+    auto it = actuals.find(decl->prop_formals[i]);
+    if (it == actuals.end() || it->second == nullptr ||
+        it->second->property_actual != nullptr) {
+      continue;
+    }
+    it->second =
+        LiteralOfValue(EvalExpr(it->second, sc.ctx, sc.arena), sc.arena);
+  }
+}
+
 // §16.12.17: a boolean operand that instantiates a named property is, when
 // it begins, expanded to the property's body with the actuals substituted
 // for the formals, stood up as the operand's one operand and stepped from
@@ -316,6 +350,7 @@ bool ExpandInstance(const PropertyExprNode* node, NodeState& state,
   const ModuleItem* decl = InstantiatedProperty(node->boolean, sc.ctx);
   if (decl == nullptr) return false;
   ActualsByFormal actuals = BindInstanceActuals(decl, node->boolean, sc.arena);
+  CaptureLocalFormals(decl, actuals, sc);
   PropertyExprNode* body =
       SubstituteTree(decl->prop_body_tree, actuals, sc.arena);
   if (!CollectSequences(body, sc.tree, sc.ctx, sc.arena, actuals)) {

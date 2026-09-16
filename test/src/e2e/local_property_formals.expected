@@ -1,0 +1,4 @@
+p_local(data), lv local input, passes 7 fails 1 at 55
+p_inferred(data), lv local, passes 7 fails 1 at 55
+p_live(data), v not local, passes 7 fails 1 at 25
+$finish at time 80
