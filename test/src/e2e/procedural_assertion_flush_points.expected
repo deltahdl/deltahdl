@@ -3,4 +3,4 @@ a2 passed at 15
 a3 passed at 15
 a1 passes 3 fails 0
 $finish at time 50
-cover property procedural_assertion_flush_points.b3.c1 (line 63): attempted 3, succeeded 0, succeeded vacuously 0
+cover property procedural_assertion_flush_points.b3.c1 (line 62): attempted 3, succeeded 0, succeeded vacuously 0

@@ -434,9 +434,8 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   // Called at the three flush points defined by §16.4.2: a process resuming
   // after suspending on an event control or wait, an always_comb/always_latch
   // procedure resuming on a dependent-signal transition, and (via §16.4.4) the
-  // disabling of the process's outermost scope. §16.14.6.2 names the same
-  // points as the procedural assertion flush points, so the process's
-  // procedural assertion queue is flushed here too.
+  // disabling of the process's outermost scope; §16.14.6.2 names the same
+  // points, so the procedural assertion queue is flushed here too.
   void FlushPendingDeferredReports();
 
   // §16.4.2: the current process's deferred-report generation. A deferred

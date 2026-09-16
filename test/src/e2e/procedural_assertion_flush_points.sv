@@ -19,11 +19,11 @@
 // a3 stand either side of a delay in b2, always @(a2_a or a2_b): a2 is
 // queued at 10, when a2_a rises, with the values 1 and 0 saved, and
 // matures in the Observed region before the delay ends; a3 is queued at
-// 11, after it, with the same values, and c, which drives a2_b, is
-// assigned after it, so the procedure, back at its event control, resumes
-// at 11 on a2_b's transition, which flushes a3 before it matures, and
-// queues a2 with 1 and 1, then a3 with 1 and 1 at 12, so at 15 a2 fails
-// and passes and a3 passes once. The clause's c1 covers const'(cb) !=
+// 11, after it, with the same values, and a2_b is assigned a2_a after it,
+// nonblocking, so the procedure, back at its event control, resumes at 11
+// on a2_b's transition, which flushes a3 before it matures, and queues a2
+// with 1 and 1, then a3 with 1 and 1 at 12, so at 15 a2 fails and passes
+// and a3 passes once. The clause's c1 covers const'(cb) !=
 // const'(ca) in the always_comb b3 while both are driven from src, which
 // changes at 25 and 35: the procedure may run between the two assignments,
 // queueing a glitch, but the second assignment's transition flushes it and
@@ -32,12 +32,11 @@
 module procedural_assertion_flush_points;
   logic clk = 0;
   logic a = 0, not_a;
-  logic a2_a = 0, a2_b, c = 0;
+  logic a2_a = 0, a2_b = 0;
   logic src = 0, ca, cb;
   int a1_pass = 0, a1_fail = 0;
   always #5 clk = ~clk;
   assign not_a = !a;
-  assign a2_b = c;
   assign ca = src;
   assign cb = src;
 
@@ -56,7 +55,7 @@ module procedural_assertion_flush_points;
     a3: assert property (const'(a2_a) == const'(a2_b))
       $display("a3 passed at %0d", $time);
     else $display("a3 failed at %0d", $time);
-    c = a2_a;
+    a2_b <= a2_a;
   end
 
   always_comb begin : b3

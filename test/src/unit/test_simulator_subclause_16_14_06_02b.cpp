@@ -13,19 +13,18 @@ namespace {
 
 // A module around the procedures given, as
 // test/src/e2e/procedural_assertion_flush_points.sv is: clk rises at 5, 15,
-// ..., 45 and is the default clocking, not_a follows !a, a2_b follows c, ca
-// and cb follow src, a2_a rises at 10, a is 1 from 15 to 20 and src from 25
-// to 35, and the run ends at 50.
+// ..., 45 and is the default clocking, not_a follows !a, ca and cb follow
+// src, a2_a rises at 10, a is 1 from 15 to 20 and src from 25 to 35, and
+// the run ends at 50.
 std::string FlushSource(const std::string& procedures) {
   return "module t;\n"
          "  logic clk = 0;\n"
          "  logic a = 0, not_a;\n"
-         "  logic a2_a = 0, a2_b, c = 0;\n"
+         "  logic a2_a = 0, a2_b = 0;\n"
          "  logic src = 0, ca, cb;\n"
          "  int passes = 0, fails = 0;\n"
          "  always #5 clk = ~clk;\n"
          "  assign not_a = !a;\n"
-         "  assign a2_b = c;\n"
          "  assign ca = src;\n"
          "  assign cb = src;\n"
          "  default clocking @(posedge clk); endclocking\n" +
@@ -67,10 +66,10 @@ TEST(ProceduralAssertionFlushPointsRun,
 // §16.14.6.2: a process resuming after suspending at an event control is at
 // a flush point, where the end of a delay is none: the clause's a2, queued
 // before b2's delay, matures in the Observed region before the delay ends,
-// and a3, queued after it with c assigned behind it, is flushed when a2_b's
-// transition resumes the procedure at its event control, so at 15 a2 fails
-// with the values of 10 and passes with those of 11, and a3 passes once
-// with the values of 12.
+// and a3, queued after it with a2_b assigned a2_a behind it, nonblocking,
+// is flushed when a2_b's transition resumes the procedure at its event
+// control, so at 15 a2 fails with the values of 10 and passes with those
+// of 11, and a3 passes once with the values of 12.
 TEST(ProceduralAssertionFlushPointsRun,
      ResumingAtAnEventControlFlushesWhatADelayLetMature) {
   SimFixture f;
@@ -83,7 +82,7 @@ TEST(ProceduralAssertionFlushPointsRun,
                   "    a3: assert property (const'(a2_a) == const'(a2_b))\n"
                   "      $display(\"a3 passed at %0d\", $time);\n"
                   "    else $display(\"a3 failed at %0d\", $time);\n"
-                  "    c = a2_a;\n"
+                  "    a2_b <= a2_a;\n"
                   "  end\n"),
       f);
   EXPECT_EQ(out,
