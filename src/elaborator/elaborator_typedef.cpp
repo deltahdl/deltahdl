@@ -713,15 +713,16 @@ const PackageDecl* FindUnitPackage(const CompilationUnit* unit,
   return nullptr;
 }
 
-// Emits enum-literal backing variables for every enum typedef in `pkg` that the
-// importing module does not already define.
-void EmitPackageEnumLiterals(const PackageDecl* pkg, RtlirModule* mod,
-                             const ImportedEnumCtx& ctx) {
+// Emits enum-literal backing variables for every enum typedef among `items`,
+// a package's or the compilation unit's, that the module does not already
+// define.
+void EmitEnumLiteralsOfItems(const std::vector<ModuleItem*>& items,
+                             RtlirModule* mod, const ImportedEnumCtx& ctx) {
   // A package's enum members fold against the package's own constants, which
   // this path does not carry; an empty scope keeps it to the literal values it
   // already resolved.
   ScopeMap no_scope;
-  for (auto* pi : pkg->items) {
+  for (auto* pi : items) {
     if (pi->kind != ModuleItemKind::kTypedef) continue;
     if (pi->typedef_type.kind != DataTypeKind::kEnum) continue;
     if (mod->enum_types.count(pi->name) != 0) continue;
@@ -741,8 +742,12 @@ void RegisterImportedEnumLiterals(const ModuleDecl* decl, RtlirModule* mod,
     if (!item->import_item.is_wildcard) continue;
     const PackageDecl* pkg =
         FindUnitPackage(ctx.unit, item->import_item.package_name);
-    if (pkg) EmitPackageEnumLiterals(pkg, mod, ctx);
+    if (pkg) EmitEnumLiteralsOfItems(pkg->items, mod, ctx);
   }
+}
+
+void RegisterCuEnumLiterals(RtlirModule* mod, const ImportedEnumCtx& ctx) {
+  EmitEnumLiteralsOfItems(ctx.unit->cu_items, mod, ctx);
 }
 
 }  // namespace delta

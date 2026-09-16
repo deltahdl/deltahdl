@@ -833,6 +833,7 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
   ApplyHeaderImports(decl);
   ImportedEnumCtx enum_ctx{unit_, arena_, typedefs_, enum_member_names_};
   RegisterImportedEnumLiterals(decl, mod, enum_ctx);
+  RegisterCuEnumLiterals(mod, enum_ctx);
 
   ElaborateParamPortList(decl, params, mod);
 

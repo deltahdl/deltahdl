@@ -29,4 +29,26 @@ TEST(CompilationUnitSim, MultipleCuScopeFunctionsResolvedAtRuntime) {
   EXPECT_EQ(val, 8u);
 }
 
+// §3.12.1 and §6.19: an enumeration a typedef declares at compilation-unit
+// scope declares its literals for the modules of the unit, so a module reads
+// MID as 1 and a class method of the unit compares against JUMBO.
+TEST(CompilationUnitSim, CuScopeEnumLiteralsResolveInModulesAndClasses) {
+  auto val = RunAndGet(
+      "typedef enum {LOW, MID, HIGH} level_t;\n"
+      "class Reader;\n"
+      "  function int is_high(level_t l);\n"
+      "    return l == HIGH;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  int r;\n"
+      "  initial begin\n"
+      "    Reader o = new;\n"
+      "    r = MID + 10 * o.is_high(HIGH);\n"
+      "  end\n"
+      "endmodule\n",
+      "r");
+  EXPECT_EQ(val, 11u);
+}
+
 }  // namespace

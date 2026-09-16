@@ -54,6 +54,13 @@ struct ImportedEnumCtx {
 void RegisterImportedEnumLiterals(const ModuleDecl* decl, RtlirModule* mod,
                                   const ImportedEnumCtx& ctx);
 
+// §3.12.1 and §6.19: an enumeration declared by a typedef at compilation-unit
+// scope declares its literals for every module of the unit, so each is
+// emitted into `mod` as an imported package's are, a module's own typedef of
+// the same name taking its place when it is elaborated. Defined in
+// elaborator_typedef.cpp.
+void RegisterCuEnumLiterals(RtlirModule* mod, const ImportedEnumCtx& ctx);
+
 // Maps a net data-type kind to its RTLIR net type, defaulting to kWire for any
 // kind that is not a net type. Defined once in elaborator_decls.cpp and shared
 // by the translation units that lower net declarations and validate operations.
