@@ -270,4 +270,40 @@ TEST(ConstraintImplication, RandomizeFailsWhenForcedAntecedentImpossible) {
   EXPECT_EQ(RunAndGet(src, "ok"), 0u);
 }
 
+// 18.5.5: the consequent is satisfied wherever the antecedent holds, over a
+// domain as wide as an int's too: kind selects a range of a few values, one
+// value or an open bound of length, and every one of 40 randomize() calls
+// answers 1 with length as the implication for the kind drawn has it.
+TEST(ConstraintImplication, ConsequentOverAWideDomainIsSatisfied) {
+  const char* src =
+      "class C;\n"
+      "  rand bit [1:0] kind;\n"
+      "  rand int length;\n"
+      "  constraint c {\n"
+      "    kind == 0 -> length inside {[1:63]};\n"
+      "    kind == 1 -> length == 9000;\n"
+      "    kind == 2 -> length > 100000;\n"
+      "    kind == 3 -> length < -5;\n"
+      "  }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int good;\n"
+      "  initial begin\n"
+      "    int i;\n"
+      "    C o = new;\n"
+      "    good = 1;\n"
+      "    for (i = 0; i < 40; i = i + 1) begin\n"
+      "      if (o.randomize() == 0) good = 0;\n"
+      "      case (o.kind)\n"
+      "        0: if (o.length < 1 || o.length > 63) good = 0;\n"
+      "        1: if (o.length != 9000) good = 0;\n"
+      "        2: if (o.length <= 100000) good = 0;\n"
+      "        3: if (o.length >= -5) good = 0;\n"
+      "      endcase\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "good"), 1u);
+}
+
 }  // namespace

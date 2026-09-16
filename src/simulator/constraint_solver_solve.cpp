@@ -858,6 +858,7 @@ bool ConstraintSolver::SolveIterative(const std::vector<ConstraintExpr>& extra,
   // draws each legal value combination with uniform probability.
   auto flat_pass = [&] {
     DrawGeneralPass(variables_, values_, real_values_, gen, gen_real);
+    RepairConditionalConstraints(extra);
     return CheckAllConstraints(extra, include_soft);
   };
   for (int attempt = 0; attempt < kMaxAttempts; ++attempt) {

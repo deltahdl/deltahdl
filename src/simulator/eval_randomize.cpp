@@ -203,27 +203,6 @@ bool TryComparisonConstraint(const Expr* rel, std::vector<RandInfo>& rands,
   return true;
 }
 
-// Evaluate a non-foldable relation against candidate values: bind each rand
-// variable as a local so the expression reads the trial value.
-bool EvalCustomRelation(const Expr* rel, const std::vector<std::string>& names,
-                        RandomizeCtx& rc,
-                        const std::unordered_map<std::string, int64_t>& vals) {
-  rc.ctx.PushScope();
-  for (const auto& n : names) {
-    auto it = vals.find(n);
-    int64_t v = it != vals.end() ? it->second : 0;
-    rc.ctx.CreateLocalVariable(n, 32)->value =
-        MakeLogic4VecVal(rc.arena, 32, static_cast<uint64_t>(v));
-  }
-  bool truthy = false;
-  {
-    ConstraintEvalScope scope(rc.obj, rc.ctx);
-    truthy = EvalExpr(rel, rc.ctx, rc.arena).IsTruthy();
-  }
-  rc.ctx.PopScope();
-  return truthy;
-}
-
 ConstraintExpr MakeCustomConstraint(const Expr* rel,
                                     const std::vector<RandInfo>& rands,
                                     RandomizeCtx& rc) {
@@ -286,6 +265,27 @@ bool RefsRandVar(const Expr* e, std::vector<RandInfo>& rands) {
     if (RefsRandVar(sub, rands)) return true;
   }
   return AnyRefsRandVar(e->args, rands) || AnyRefsRandVar(e->elements, rands);
+}
+
+// Evaluate a non-foldable relation against candidate values: bind each rand
+// variable as a local so the expression reads the trial value.
+bool EvalCustomRelation(const Expr* rel, const std::vector<std::string>& names,
+                        RandomizeCtx& rc,
+                        const std::unordered_map<std::string, int64_t>& vals) {
+  rc.ctx.PushScope();
+  for (const auto& n : names) {
+    auto it = vals.find(n);
+    int64_t v = it != vals.end() ? it->second : 0;
+    rc.ctx.CreateLocalVariable(n, 32)->value =
+        MakeLogic4VecVal(rc.arena, 32, static_cast<uint64_t>(v));
+  }
+  bool truthy = false;
+  {
+    ConstraintEvalScope scope(rc.obj, rc.ctx);
+    truthy = EvalExpr(rel, rc.ctx, rc.arena).IsTruthy();
+  }
+  rc.ctx.PopScope();
+  return truthy;
 }
 
 // 18.9: match a constraint_mode() method call and pull out the object handle
@@ -653,6 +653,7 @@ ConstraintExpr TranslateRelation(const Expr* rel, std::vector<RandInfo>& rands,
   ConstraintExpr ce;
   if (TryComparisonConstraint(rel, rands, rc, ce, fold)) return ce;
   if (TrySetMembershipConstraint(rel, rands, rc, ce)) return ce;
+  if (TryImplicationConstraint(rel, rands, rc, ce)) return ce;
   return MakeCustomConstraint(rel, rands, rc);
 }
 

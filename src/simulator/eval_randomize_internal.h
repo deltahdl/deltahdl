@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
 #include "common/arena.h"
@@ -127,6 +128,17 @@ bool AnyRefsRandVar(const std::vector<Expr*>& list,
 // (eval_randomize_membership.cpp).
 bool TrySetMembershipConstraint(const Expr* rel, std::vector<RandInfo>& rands,
                                 RandomizeCtx& rc, ConstraintExpr& out);
+// 18.5.5: `rel` as `antecedent -> relation`, the parser's form of every
+// implication and if-else constraint, as the solver's implication over the
+// relation translated, which the solver applies where the antecedent holds;
+// answers false where the relation would be a tried one anyway
+// (eval_randomize_membership.cpp).
+bool TryImplicationConstraint(const Expr* rel, std::vector<RandInfo>& rands,
+                              RandomizeCtx& rc, ConstraintExpr& out);
+// Evaluates `rel` with each name in `names` bound to its value in `vals`.
+bool EvalCustomRelation(const Expr* rel, const std::vector<std::string>& names,
+                        RandomizeCtx& rc,
+                        const std::unordered_map<std::string, int64_t>& vals);
 void CollectRandVariables(const ClassTypeInfo* type, SimContext& ctx,
                           std::vector<RandInfo>& out);
 bool ComparisonKind(TokenKind op, ConstraintKind& out);

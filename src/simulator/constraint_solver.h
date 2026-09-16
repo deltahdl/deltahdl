@@ -585,6 +585,16 @@ class ConstraintSolver {
   bool SolveIterative(const std::vector<ConstraintExpr>& extra,
                       bool include_soft);
 
+  // 18.5.5: after the general draw, every implication whose antecedent holds
+  // under the values drawn has each constraint of its consequent that does
+  // not hold applied to the variable it constrains, an equality writing its
+  // constant, a set membership one of its members and a comparison a fresh
+  // draw from the narrowed domain, so that a consequent over a wide domain
+  // is met rather than waited for; the check that follows still decides
+  // (constraint_solver_implication.cpp).
+  void RepairConditionalConstraints(const std::vector<ConstraintExpr>& extra);
+  void ApplyConsequent(const ConstraintExpr& sub);
+
   // 18.6.3: publish the values of the static random variables into their shared
   // cells after a successful solve, so that the value this instance just drew
   // is the one every other instance of the class now observes. Called only when

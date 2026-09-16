@@ -1,6 +1,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -82,6 +83,31 @@ bool TrySetMembershipConstraint(const Expr* rel, std::vector<RandInfo>& rands,
   out.var_name = std::string(rel->lhs->text);
   out.set_values = std::move(values);
   out.ref_vars.push_back(out.var_name);
+  return true;
+}
+
+bool TryImplicationConstraint(const Expr* rel, std::vector<RandInfo>& rands,
+                              RandomizeCtx& rc, ConstraintExpr& out) {
+  if (rel == nullptr || rel->kind != ExprKind::kBinary ||
+      rel->op != TokenKind::kArrow || rel->lhs == nullptr ||
+      rel->rhs == nullptr) {
+    return false;
+  }
+  // The consequent's bounds hold only where the antecedent does, so none of
+  // them folds the variable's domain.
+  ConstraintExpr consequent =
+      TranslateRelation(rel->rhs, rands, rc, /*fold=*/false);
+  if (consequent.kind == ConstraintKind::kCustom) return false;
+  std::vector<std::string> names;
+  names.reserve(rands.size());
+  for (const auto& ri : rands) names.push_back(ri.name);
+  out.kind = ConstraintKind::kImplication;
+  out.ref_vars = names;
+  out.cond_fn = [antecedent = rel->lhs, names,
+                 &rc](const std::unordered_map<std::string, int64_t>& vals) {
+    return EvalCustomRelation(antecedent, names, rc, vals);
+  };
+  out.sub_constraints.push_back(std::move(consequent));
   return true;
 }
 

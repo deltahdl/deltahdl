@@ -381,6 +381,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     parser/parser_package_import_export.cpp
     parser/parser_udp.cpp
     simulator/constraint_solver_eval.cpp
+    simulator/constraint_solver_implication.cpp
     simulator/constraint_solver_solve.cpp
     simulator/coverage_bins.cpp
     simulator/coverage_cross.cpp
