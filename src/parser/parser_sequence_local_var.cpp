@@ -335,6 +335,7 @@ struct SequencePortScan {
     // §16.8: the formal starts out with no default; a following `= actual`
     // (handled in DispatchTopLevel) flips this entry to true.
     item->prop_formal_has_default.push_back(false);
+    item->prop_formal_inferred.push_back(InferredDefault::kNone);
     expect_formal_name = false;
   }
 
@@ -397,10 +398,16 @@ struct SequencePortScan {
   // clocking or disable function shall also be the entire default value
   // expression: a following token that is neither the formal separator ',' nor
   // the closing ')' means it is only part of a larger expression.
-  void HandleSystemDefaultValue(Lexer& lexer, DiagEngine& diag) {
+  void HandleSystemDefaultValue(Lexer& lexer, DiagEngine& diag,
+                                ModuleItem* item) {
     auto fn = lexer.Peek().text;
     auto fn_loc = lexer.Peek().loc;
     bool is_inferred = fn == "$inferred_clock" || fn == "$inferred_disable";
+    if (is_inferred && !item->prop_formal_inferred.empty()) {
+      item->prop_formal_inferred.back() = fn == "$inferred_clock"
+                                              ? InferredDefault::kClock
+                                              : InferredDefault::kDisable;
+    }
     if (fn == "$inferred_clock" && item_saw_explicit_type) {
       diag.Error(fn_loc,
                  "$inferred_clock default requires an untyped or event "
@@ -444,7 +451,7 @@ struct SequencePortScan {
       HandleDefaultEq(lexer, item);
     } else if (prev_kind == TokenKind::kEq &&
                LexerCheck(lexer, TokenKind::kSystemIdentifier)) {
-      HandleSystemDefaultValue(lexer, diag);
+      HandleSystemDefaultValue(lexer, diag, item);
     } else if (expect_formal_name &&
                LexerCheck(lexer, TokenKind::kIdentifier)) {
       HarvestFormalName(lexer, item);

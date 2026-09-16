@@ -1,9 +1,13 @@
 #include "elaborator/property_instance.h"
 
+#include <cstddef>
+#include <string_view>
 #include <vector>
 
 #include "common/arena.h"
+#include "common/source_loc.h"
 #include "elaborator/property_rewrite.h"
+#include "elaborator/rtlir.h"
 #include "lexer/token.h"
 #include "parser/ast.h"
 #include "parser/expr_substitute.h"
@@ -131,6 +135,76 @@ void PromoteSequenceInstances(PropertyExprNode* node,
   for (PropertyExprNode* operand : node->operands) {
     PromoteSequenceInstances(operand, registry, arena);
   }
+}
+
+// §16.14.7: the event expression of the inferred clock as an actual argument
+// of an event formal writes it, an edge keyword over the signal, or the
+// signal alone where the event names no edge; an iff, which no actual can
+// carry, is left behind.
+static Expr* ClockActual(const EventExpr& ev, Arena& arena) {
+  if (ev.edge == Edge::kNone) return ev.signal;
+  auto* actual = arena.Create<Expr>();
+  actual->kind = ExprKind::kUnary;
+  actual->op = ev.edge == Edge::kPosedge   ? TokenKind::kKwPosedge
+               : ev.edge == Edge::kNegedge ? TokenKind::kKwNegedge
+                                           : TokenKind::kKwEdge;
+  actual->lhs = ev.signal;
+  actual->range = ev.signal != nullptr ? ev.signal->range : SourceRange{};
+  return actual;
+}
+
+// §16.14.7: the disable condition $inferred_disable returns outside the
+// scope of any default disable iff declaration.
+static Expr* FalseLiteral(Arena& arena) {
+  static constexpr std::string_view kZero = "1'b0";
+  auto* literal = arena.Create<Expr>();
+  literal->kind = ExprKind::kIntegerLiteral;
+  literal->text = kZero;
+  literal->int_val = 0;
+  return literal;
+}
+
+void FillInferredDefaults(Expr* instance, const ModuleItem* decl,
+                          const InferredAtInstance& inferred, Arena& arena) {
+  if (instance == nullptr || decl == nullptr) return;
+  bool any = false;
+  for (InferredDefault kind : decl->prop_formal_inferred) {
+    if (kind != InferredDefault::kNone) any = true;
+  }
+  if (!any) return;
+  if (instance->kind == ExprKind::kIdentifier) {
+    instance->kind = ExprKind::kCall;
+    instance->callee = instance->text;
+  }
+  if (instance->kind != ExprKind::kCall) return;
+  for (size_t i = 0; i < decl->prop_formal_inferred.size(); ++i) {
+    if (instance->args.size() <= i) instance->args.push_back(nullptr);
+    if (instance->args[i] != nullptr) continue;
+    InferredDefault kind = decl->prop_formal_inferred[i];
+    if (kind == InferredDefault::kClock && !inferred.clock.empty()) {
+      instance->args[i] = ClockActual(inferred.clock[0], arena);
+    } else if (kind == InferredDefault::kDisable) {
+      instance->args[i] =
+          inferred.disable != nullptr ? inferred.disable : FalseLiteral(arena);
+    }
+  }
+}
+
+std::vector<EventExpr> DefaultClockingEvent(const RtlirModule* mod) {
+  std::string_view named;
+  if (mod == nullptr) return {};
+  for (const ModuleItem* item : mod->clocking_blocks) {
+    if (!item->is_default_clocking) continue;
+    if (!item->clocking_event.empty()) return item->clocking_event;
+    named = item->name;
+  }
+  for (const ModuleItem* item : mod->clocking_blocks) {
+    if (!named.empty() && item->name == named &&
+        !item->clocking_event.empty()) {
+      return item->clocking_event;
+    }
+  }
+  return {};
 }
 
 }  // namespace delta

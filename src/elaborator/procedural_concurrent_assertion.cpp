@@ -144,26 +144,6 @@ std::vector<EventExpr> InferredProcedureClock(const ModuleItem* procedure,
   return clock;
 }
 
-// §14.12: the clocking event of the default clocking of `mod`, declared
-// inline or named by a default clocking statement, among the clocking
-// blocks elaborated ahead of the procedure; empty where it has none.
-std::vector<EventExpr> DefaultClockingEvent(const RtlirModule* mod) {
-  std::string_view named;
-  if (mod == nullptr) return {};
-  for (const ModuleItem* item : mod->clocking_blocks) {
-    if (!item->is_default_clocking) continue;
-    if (!item->clocking_event.empty()) return item->clocking_event;
-    named = item->name;
-  }
-  for (const ModuleItem* item : mod->clocking_blocks) {
-    if (!named.empty() && item->name == named &&
-        !item->clocking_event.empty()) {
-      return item->clocking_event;
-    }
-  }
-  return {};
-}
-
 // §16.12.1 and §16.13.4, for a statement in procedural code: the body of
 // the named property or sequence the spec instantiates, as
 // SubstitutePropertyInstance and SubstituteSequenceInstance give a static
@@ -173,13 +153,24 @@ std::vector<EventExpr> DefaultClockingEvent(const RtlirModule* mod) {
 // operand; the declaration's clock, or the one flowing into it, is the
 // statement's where the spec opened with none.
 void SubstituteInstance(Stmt* stmt, const PropertyRegistry& registry,
-                        Arena& arena) {
+                        const InferredAtInstance& inferred, Arena& arena) {
   if (stmt->assert_property != nullptr || stmt->assert_sequence != nullptr) {
     return;
   }
   Expr* instance = stmt->assert_expr;
   const ModuleItem* seq =
       InstantiatedDecl(instance, ModuleItemKind::kSequenceDecl, registry);
+  // §16.14.7: the inferred functions among the defaults are replaced by
+  // what is inferred at the statement, the clock its spec opens with, the
+  // procedure's or the default clocking's.
+  InferredAtInstance here = inferred;
+  if (!stmt->assert_clock.empty()) here.clock = stmt->assert_clock;
+  FillInferredDefaults(
+      instance,
+      seq != nullptr
+          ? seq
+          : InstantiatedDecl(instance, ModuleItemKind::kPropertyDecl, registry),
+      here, arena);
   if (seq != nullptr) {
     stmt->assert_property = arena.Create<PropertyExprNode>();
     stmt->assert_property->kind = PropertyExprNode::Kind::kSequence;
@@ -222,9 +213,12 @@ void ElaborateProceduralConcurrentAssertions(ModuleItem* procedure,
   if (assertions.empty()) return;
   std::vector<EventExpr> inferred = InferredProcedureClock(procedure, mod);
   std::vector<EventExpr> fallback = DefaultClockingEvent(mod);
+  InferredAtInstance at_instance;
+  at_instance.clock = inferred.empty() ? fallback : inferred;
+  at_instance.disable = mod != nullptr ? mod->default_disable_iff : nullptr;
   for (Stmt* stmt : assertions) {
     if (!stmt->is_concurrent_clocked) continue;
-    SubstituteInstance(stmt, registry, arena);
+    SubstituteInstance(stmt, registry, at_instance, arena);
     PromoteSequenceInstances(stmt->assert_property, registry, arena);
     if (stmt->assert_clock.empty()) stmt->assert_clock = inferred;
     if (stmt->assert_clock.empty()) stmt->assert_clock = fallback;

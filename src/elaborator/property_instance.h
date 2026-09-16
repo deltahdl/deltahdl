@@ -9,6 +9,7 @@
 namespace delta {
 
 class PropertyRegistry;
+struct RtlirModule;
 
 // §16.12.1 and §16.13.4: what an instance of a named property or sequence,
 // written as a name or a call, gives the assertion that stands it as its
@@ -40,6 +41,31 @@ ModuleItem* SequenceInstanceBody(Expr* instance, Arena& arena);
 // sequence it opens with; empty otherwise.
 const std::vector<EventExpr>& FlowedBodyClock(const ModuleItem* decl,
                                               const PropertyRegistry& registry);
+
+// §16.14.7: what stands at an instance for the two inferred functions: the
+// clocking event that would be inferred there, the assertion's own, the
+// procedure's or the default clocking's, and the disable condition, the
+// default disable iff in scope or nullptr where none is.
+struct InferredAtInstance {
+  std::vector<EventExpr> clock;
+  Expr* disable = nullptr;
+};
+
+// §16.14.7: an inferred clocking or disable function call is replaced by the
+// inferred expression as determined at the point the property or sequence is
+// instantiated: each formal of `decl` the instance supplies no actual for and
+// whose default is $inferred_clock takes the clocking event, written as the
+// actual of an event formal is, an edge keyword over the signal, and each
+// whose default is $inferred_disable takes the disable condition, 1'b0 where
+// the instance is within the scope of no default disable iff; the instance is
+// written as a call from here on, its actuals holding what was inferred.
+void FillInferredDefaults(Expr* instance, const ModuleItem* decl,
+                          const InferredAtInstance& inferred, Arena& arena);
+
+// §14.12: the clocking event of the default clocking of `mod`, declared
+// inline or named by a default clocking statement, among the clocking blocks
+// elaborated so far; empty where it has none.
+std::vector<EventExpr> DefaultClockingEvent(const RtlirModule* mod);
 
 // §16.13.4: a boolean operand of the tree that is the bare name of a named
 // sequence, or a call of one, which the parser read as a boolean since a

@@ -43,6 +43,10 @@ struct PortDecl {
   SourceLoc loc;
 };
 
+// §16.14.7: the inferred clocking or disable function a formal argument of a
+// property or sequence is defaulted to, where it is one.
+enum class InferredDefault : uint8_t { kNone, kClock, kDisable };
+
 enum class ModuleItemKind : uint8_t {
   kNetDecl,
   kVarDecl,
@@ -643,6 +647,11 @@ struct ModuleItem {
   // argument declared (`formal = default_expression`). Used by the elaborator
   // to decide which formals an instance must supply an actual for.
   std::vector<bool> prop_formal_has_default;
+  // §16.14.7: parallel to prop_formals; which of the two inferred functions
+  // the formal's default value is, $inferred_clock or $inferred_disable, or
+  // neither, the elaborator putting the clocking event or the disable
+  // condition inferred at the instance in the formal's place.
+  std::vector<InferredDefault> prop_formal_inferred;
 
   // §16.8.1: parallel to prop_formals; the keyword of the type a formal was
   // declared with, applying to every formal that follows the keyword and

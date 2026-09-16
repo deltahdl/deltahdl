@@ -344,10 +344,16 @@ bool PropertyInstanceIsEvaluated(const ModuleItem* item, const ModuleItem* decl,
 // because it could not tell the two apart.
 void SubstitutePropertyInstance(ModuleItem* item, Arena& arena,
                                 const PropertyRegistry& registry,
+                                const InferredAtInstance& inferred,
                                 DiagEngine& diag) {
   if (item->prop_instance_name.empty() || item->body != nullptr) return;
   const ModuleItem* decl = registry.Find(item->prop_instance_name);
   std::string name(item->prop_instance_name);
+  // §16.14.7: the instance is the top-level property expression of the
+  // assertion statement, so the inferred functions among the defaults are
+  // replaced by what is inferred at the statement, the default clocking and
+  // the default disable iff in scope.
+  FillInferredDefaults(item->assert_expr, decl, inferred, arena);
   if (decl != nullptr && decl->kind == ModuleItemKind::kSequenceDecl) {
     SubstituteSequenceInstance(item, decl, arena, diag);
     return;
@@ -400,13 +406,14 @@ void SubstitutePropertyInstance(ModuleItem* item, Arena& arena,
 // so that the evaluator expands it, its recursion included; a `not` before
 // the instance negates the tree.
 void PromotePropertyInstanceBoolean(ModuleItem* item, Arena& arena,
-                                    const PropertyRegistry& registry) {
+                                    const PropertyRegistry& registry,
+                                    const InferredAtInstance& inferred) {
   Stmt* stmt = item->body;
   if (stmt == nullptr || stmt->assert_property != nullptr ||
       stmt->assert_sequence != nullptr || stmt->assert_expr == nullptr) {
     return;
   }
-  const Expr* instance = stmt->assert_expr;
+  Expr* instance = stmt->assert_expr;
   if (instance->kind != ExprKind::kIdentifier &&
       instance->kind != ExprKind::kCall) {
     return;
@@ -417,6 +424,11 @@ void PromotePropertyInstanceBoolean(ModuleItem* item, Arena& arena,
       decl->prop_body_tree == nullptr) {
     return;
   }
+  // §16.14.7: the clocking event the assertion opens with is what is
+  // inferred at the instance, and the default disable iff in scope.
+  InferredAtInstance here = inferred;
+  here.clock = item->sensitivity;
+  FillInferredDefaults(instance, decl, here, arena);
   // §16.12.18: an instance of the clocked boolean form is left as the
   // boolean it was read as unless an actual is a tree, which the boolean
   // does not read.
@@ -514,8 +526,11 @@ void Elaborator::ElaboratePropertyDeclItem(ModuleItem* item, RtlirModule* mod) {
 
 void Elaborator::ElaborateAssertPropertyItem(ModuleItem* item,
                                              RtlirModule* mod) {
-  SubstitutePropertyInstance(item, arena_, property_registry_, diag_);
-  PromotePropertyInstanceBoolean(item, arena_, property_registry_);
+  InferredAtInstance inferred;
+  inferred.clock = DefaultClockingEvent(mod);
+  inferred.disable = mod != nullptr ? mod->default_disable_iff : nullptr;
+  SubstitutePropertyInstance(item, arena_, property_registry_, inferred, diag_);
+  PromotePropertyInstanceBoolean(item, arena_, property_registry_, inferred);
   if (item->body != nullptr) {
     PromoteSequenceInstances(item->body->assert_property, property_registry_,
                              arena_);
@@ -644,9 +659,14 @@ bool Elaborator::ElaborateAssertionItem(ModuleItem* item, RtlirModule* mod) {
       // §14.10's clocking block event reach anything.
       if (mod != nullptr) mod->clocking_blocks.push_back(item);
       return true;
+    case ModuleItemKind::kDefaultDisableIff:
+      // §16.15: the declaration's condition is what §16.14.7's
+      // $inferred_disable returns to the instances in its scope.
+      if (mod != nullptr) mod->default_disable_iff = item->init_expr;
+      return true;
     default:
-      // §23.10.4 kDefparam, kExportDecl, kDefaultDisableIff, kNestedModuleDecl,
-      // and any remaining kind are no-ops at behavioral elaboration.
+      // §23.10.4 kDefparam, kExportDecl, kNestedModuleDecl, and any remaining
+      // kind are no-ops at behavioral elaboration.
       return true;
   }
 }

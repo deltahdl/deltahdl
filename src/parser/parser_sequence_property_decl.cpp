@@ -222,6 +222,7 @@ struct PropertyPortScan {
     item->prop_formal_type_kw.push_back(carry_type_kw);
     item->prop_formal_is_local.push_back(local_run);
     item->prop_formal_is_property.push_back(property_run);
+    item->prop_formal_inferred.push_back(InferredDefault::kNone);
     expect_formal_name = false;
     saw_local = false;
   }
@@ -307,10 +308,16 @@ struct PropertyPortScan {
   // be the entire default value expression: if any further token of the default
   // follows the call (the next token is neither the formal separator ',' nor
   // the port list's closing ')'), it is only part of a larger expression.
-  void HandleSystemDefaultValue(Lexer& lexer, DiagEngine& diag) {
+  void HandleSystemDefaultValue(Lexer& lexer, DiagEngine& diag,
+                                ModuleItem* item) {
     auto fn = lexer.Peek().text;
     auto fn_loc = lexer.Peek().loc;
     bool is_inferred = fn == "$inferred_clock" || fn == "$inferred_disable";
+    if (is_inferred && !item->prop_formal_inferred.empty()) {
+      item->prop_formal_inferred.back() = fn == "$inferred_clock"
+                                              ? InferredDefault::kClock
+                                              : InferredDefault::kDisable;
+    }
     if (fn == "$inferred_clock" && !clock_default_allowed) {
       diag.Error(fn_loc,
                  "$inferred_clock default requires an untyped or event "
@@ -354,7 +361,7 @@ struct PropertyPortScan {
       HandleInputDirection(lexer, diag);
     } else if (prev_kind == TokenKind::kEq &&
                LexerCheck(lexer, TokenKind::kSystemIdentifier)) {
-      HandleSystemDefaultValue(lexer, diag);
+      HandleSystemDefaultValue(lexer, diag, item);
     } else if (expect_formal_name &&
                LexerCheck(lexer, TokenKind::kIdentifier)) {
       HarvestFormalName(lexer, item);

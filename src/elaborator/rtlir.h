@@ -620,6 +620,10 @@ struct RtlirModule {
   // wants all three; elaboration validates them (Elaborator::
   // ValidateClockingBlock) and this is what lets the run have them at all.
   std::vector<ModuleItem*> clocking_blocks;
+  // §16.15: the condition of the module's default disable iff declaration,
+  // which §16.14.7's $inferred_disable returns within its scope; nullptr
+  // where the module declares none.
+  Expr* default_disable_iff = nullptr;
   std::vector<ModuleItem*> function_decls;
   std::vector<ModuleItem*> let_decls;
   // §35.5.4's imported subroutines, declared in this module. They are held
