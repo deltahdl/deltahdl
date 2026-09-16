@@ -360,60 +360,65 @@ static UniqueCaseResult ScanUniqueCaseItems(const Logic4Vec& sel,
   return result;
 }
 
-static ExecTask ExecUniqueCase(const Stmt* stmt, const Logic4Vec& sel,
-                               CaseQualifier qual, SimContext& ctx,
-                               Arena& arena) {
+// §12.5.3.1: the item a unique or unique0 case selects, the violations the
+// qualifier defines reported on the way: more than one matching item, and
+// for unique no matching item and no default.
+static const Stmt* SelectUniqueCaseBody(const Stmt* stmt, const Logic4Vec& sel,
+                                        CaseQualifier qual, SimContext& ctx,
+                                        Arena& arena) {
   auto info = ScanUniqueCaseItems(sel, stmt, ctx, arena);
-
   if (info.match_count > 1) {
     ctx.AddPendingViolation(stmt->range.start,
                             "unique case: multiple items matched",
                             Subclause("12.5.3.1"));
   }
-  if (info.first_match_body) {
-    co_return co_await ExecStmt(info.first_match_body, ctx, arena);
-  }
-  auto* default_body = FindCaseDefault(stmt);
-  if (default_body) co_return co_await ExecStmt(default_body, ctx, arena);
+  if (info.first_match_body) return info.first_match_body;
+  const Stmt* default_body = FindCaseDefault(stmt);
+  if (default_body) return default_body;
   if (!info.has_default && qual == CaseQualifier::kUnique) {
     ctx.AddPendingViolation(stmt->range.start,
                             "unique case: no matching item found",
                             Subclause("12.5.3.1"));
   }
-  co_return StmtResult::kDone;
+  return nullptr;
 }
 
-static ExecTask ExecStandardCase(const Stmt* stmt, const Logic4Vec& sel,
-                                 CaseQualifier qual, SimContext& ctx,
-                                 Arena& arena) {
+// §12.5: the item a case selects by the linear search, the first whose
+// pattern matches, else the default; §12.5.3.1 reports a priority case
+// that selects none.
+static const Stmt* SelectStandardCaseBody(const Stmt* stmt,
+                                          const Logic4Vec& sel,
+                                          CaseQualifier qual, SimContext& ctx,
+                                          Arena& arena) {
   for (const auto& item : stmt->case_items) {
     if (item.is_default) continue;
-    if (CaseItemHasMatch(sel, item, stmt, ctx, arena)) {
-      co_return co_await ExecStmt(item.body, ctx, arena);
-    }
+    if (CaseItemHasMatch(sel, item, stmt, ctx, arena)) return item.body;
   }
-  auto* default_body = FindCaseDefault(stmt);
-  if (default_body) co_return co_await ExecStmt(default_body, ctx, arena);
+  const Stmt* default_body = FindCaseDefault(stmt);
+  if (default_body) return default_body;
   if (qual == CaseQualifier::kPriority) {
     ctx.AddPendingViolation(stmt->range.start,
                             "priority case: no matching item found",
                             Subclause("12.5.3.1"));
   }
-  co_return StmtResult::kDone;
+  return nullptr;
+}
+
+const Stmt* SelectCaseBody(const Stmt* stmt, SimContext& ctx, Arena& arena) {
+  auto qual = stmt->qualifier;
+  auto sel = EvalExpr(stmt->condition, ctx, arena);
+  if (qual == CaseQualifier::kUnique || qual == CaseQualifier::kUnique0) {
+    return SelectUniqueCaseBody(stmt, sel, qual, ctx, arena);
+  }
+  return SelectStandardCaseBody(stmt, sel, qual, ctx, arena);
 }
 
 ExecTask ExecCase(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   bool labeled = !stmt->label.empty();
   if (labeled) ctx.PushStaticScope(stmt->label);
-  auto qual = stmt->qualifier;
-  auto sel = EvalExpr(stmt->condition, ctx, arena);
-
-  StmtResult r{};
-  if (qual == CaseQualifier::kUnique || qual == CaseQualifier::kUnique0) {
-    r = co_await ExecUniqueCase(stmt, sel, qual, ctx, arena);
-  } else {
-    r = co_await ExecStandardCase(stmt, sel, qual, ctx, arena);
-  }
+  const Stmt* body = SelectCaseBody(stmt, ctx, arena);
+  StmtResult r = StmtResult::kDone;
+  if (body != nullptr) r = co_await ExecStmt(body, ctx, arena);
   if (labeled) ctx.PopStaticScope(stmt->label);
   co_return r;
 }

@@ -279,4 +279,38 @@ TEST(FunctionSim, DeclaredLocalInitializedFromAnElementGetsItsOwnWords) {
   EXPECT_EQ(lifted->value.words[0].bval & 0xFFu, 0x00u);
 }
 
+// §13.4: a function body holds the statements a procedure does but the
+// timing controls, a case statement among them: a module function selects
+// its item by the case expression, a class method by a property, each
+// assigning the function's name, and a default item answers the rest.
+TEST(FunctionSim, CaseStatementInFunctionAndMethodBodies) {
+  auto val = RunAndGet(
+      "class C;\n"
+      "  int kind = 2;\n"
+      "  function int tens();\n"
+      "    case (kind)\n"
+      "      1: tens = 10;\n"
+      "      2: tens = 20;\n"
+      "      default: tens = 90;\n"
+      "    endcase\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  int r;\n"
+      "  function int units(int k);\n"
+      "    case (k)\n"
+      "      1: units = 1;\n"
+      "      2: units = 2;\n"
+      "      default: units = 9;\n"
+      "    endcase\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    C o = new;\n"
+      "    r = o.tens() + units(1) + 100 * units(7);\n"
+      "  end\n"
+      "endmodule\n",
+      "r");
+  EXPECT_EQ(val, 921u);
+}
+
 }  // namespace

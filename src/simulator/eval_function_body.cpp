@@ -12,6 +12,7 @@
 #include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
 #include "simulator/stmt_exec.h"
+#include "simulator/stmt_exec_internal.h"
 #include "simulator/vpi_design_attach.h"
 
 namespace delta {
@@ -562,6 +563,18 @@ static bool ExecFuncImmediateAssert(const Stmt* stmt, const FuncExecCtx& exec) {
   return returned;
 }
 
+// §13.4: a case statement in a function body selects its item as one in a
+// process does and runs the body here, synchronously; answers whether the
+// body returned.
+static bool ExecFuncCase(const Stmt* stmt, const FuncExecCtx& exec) {
+  bool labeled = !stmt->label.empty();
+  if (labeled) exec.ctx.PushStaticScope(stmt->label);
+  const Stmt* body = SelectCaseBody(stmt, exec.ctx, exec.arena);
+  bool returned = body != nullptr && ExecFuncStmt(body, exec);
+  if (labeled) exec.ctx.PopStaticScope(stmt->label);
+  return returned;
+}
+
 static bool ExecFuncStmt(const Stmt* stmt, const FuncExecCtx& exec) {
   if (!stmt) return false;
   switch (stmt->kind) {
@@ -588,6 +601,8 @@ static bool ExecFuncStmt(const Stmt* stmt, const FuncExecCtx& exec) {
       return false;
     case StmtKind::kIf:
       return ExecFuncIf(stmt, exec);
+    case StmtKind::kCase:
+      return ExecFuncCase(stmt, exec);
     case StmtKind::kBlock:
       return ExecFuncBlock(stmt, exec);
     case StmtKind::kFor:

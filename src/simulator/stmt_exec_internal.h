@@ -47,6 +47,12 @@ ExecTask ExecEventControl(const Stmt* stmt, SimContext& ctx, Arena& arena);
 ExecTask ExecBlock(const Stmt* stmt, SimContext& ctx, Arena& arena);
 ExecTask ExecIf(const Stmt* stmt, SimContext& ctx, Arena& arena);
 ExecTask ExecCase(const Stmt* stmt, SimContext& ctx, Arena& arena);
+// §12.5: the body of the item the case statement `stmt` selects, its case
+// expression evaluated once and the violations §12.5.3.1 defines for its
+// qualifier reported; nullptr where no item and no default matches. Shared
+// by the process executor above and the function body's (§13.4), which runs
+// the body synchronously (stmt_exec_control.cpp).
+const Stmt* SelectCaseBody(const Stmt* stmt, SimContext& ctx, Arena& arena);
 ExecTask ExecFor(const Stmt* stmt, SimContext& ctx, Arena& arena);
 ExecTask ExecForeach(const Stmt* stmt, SimContext& ctx, Arena& arena);
 ExecTask ExecWhile(const Stmt* stmt, SimContext& ctx, Arena& arena);
