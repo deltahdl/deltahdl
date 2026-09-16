@@ -77,11 +77,17 @@ struct PendingReportScope {
 // its own procedure into the region instead and resumes the statements after
 // the assertion with it, which §4.4.2.2's keeping ordinary procedural code in
 // the Active region makes the cost of that path.
-struct ObservedRegionAwaiter {
+//
+// §16.17 has the statement following an expect scheduled after the Observed
+// region in which its property completed, so the same awaiter carries a
+// process into the Reactive region, where §4.4.2.6 puts a concurrent
+// assertion's action block as well.
+struct RegionAwaiter {
   SimContext& ctx;
+  Region region = Region::kObserved;
 
   bool await_ready() const noexcept {
-    return ctx.GetScheduler().CurrentRegion() == Region::kObserved;
+    return ctx.GetScheduler().CurrentRegion() == region;
   }
 
   void await_suspend(std::coroutine_handle<> h) const {
@@ -93,8 +99,7 @@ struct ObservedRegionAwaiter {
       if (proc != nullptr) ctx_ptr->SetCurrentProcess(proc);
       h.resume();
     };
-    ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), Region::kObserved,
-                                     event);
+    ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), region, event);
   }
 
   void await_resume() const noexcept {}

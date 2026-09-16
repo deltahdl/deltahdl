@@ -66,17 +66,17 @@ TEST(ExpectStatementRun, BlocksUntilTheSequenceMatchesOrFails) {
 }
 
 // §16.17: with no else clause a failure is reported through $error, and
-// the process goes on past the statement: c is 0 at the posedge of 65,
-// the one following the statement reached at 55, so the failure counts
-// once and the statement after runs at 65.
+// the process goes on past the statement: a is 0 at the posedge of 55,
+// the one following the statement reached at 45, so the failure counts
+// once and the statement after runs at 55.
 TEST(ExpectStatementRun, AFailureWithoutAnElseClauseReportsAnError) {
   SimFixture f;
   std::string out =
       RunCapture(Design("    expect (@(posedge clk) a ##1 b ##1 c) ;\n"
-                        "    expect (@(posedge clk) c);\n"
+                        "    expect (@(posedge clk) a);\n"
                         "    $display(\"after at %0d\", $time);\n"),
                  f);
-  EXPECT_EQ(out, "after at 65\n$finish at time 210\n");
+  EXPECT_EQ(out, "after at 55\n$finish at time 210\n");
   EXPECT_EQ(f.ctx.AssertionFailCount(), 1);
 }
 

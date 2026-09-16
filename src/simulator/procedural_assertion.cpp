@@ -57,7 +57,7 @@ SimCoroutine MonitorCoroutine(const Stmt* stmt, ProceduralAssertionState* state,
                               SimContext& ctx, Arena& arena) {
   for (;;) {
     co_await EventAwaiter{ctx, stmt->assert_clock, arena};
-    co_await ObservedRegionAwaiter{ctx};
+    co_await RegionAwaiter{ctx, Region::kObserved};
     state->ticked_at = ctx.CurrentTime().ticks;
     if (!state->reached) continue;
     // The instances matured in earlier steps and the ones pending in this,

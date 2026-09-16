@@ -712,7 +712,7 @@ static SimCoroutine FutureGclkAttemptCoroutine(
   // that follows reads them as the tick before its own.
   uint64_t sampled_at = ctx.CurrentTime().ticks;
   co_await EventAwaiter{ctx, gclk_event, arena};
-  co_await ObservedRegionAwaiter{ctx};
+  co_await RegionAwaiter{ctx, Region::kObserved};
   auto& store = ctx.AssertionSamples();
   for (const auto& [site, at_tick] : *attempt.samples) {
     store.RecordTick(SampleSite{site, 0, sampled_at}, at_tick, 1, arena);
@@ -787,7 +787,8 @@ ExecTask ExecImmediateAssert(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   // region, whether the statement stands outside procedural code or inside it.
   // An immediate assertion (§16.3) is not marked and is evaluated where it
   // stands.
-  if (stmt->is_concurrent_clocked) co_await ObservedRegionAwaiter{ctx};
+  if (stmt->is_concurrent_clocked)
+    co_await RegionAwaiter{ctx, Region::kObserved};
 
   // §16.9.4: an attempt of a property naming one of the five future sampled
   // value functions is answered at the global clocking tick that follows this

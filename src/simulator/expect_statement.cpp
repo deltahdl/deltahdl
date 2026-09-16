@@ -1,4 +1,3 @@
-#include <coroutine>
 #include <cstdint>
 
 #include "common/arena.h"
@@ -14,35 +13,6 @@
 #include "simulator/sva_engine_queues.h"
 
 namespace delta {
-
-namespace {
-
-// §16.17: the statement following the expect is scheduled after the
-// Observed region in which the property completed its evaluation, so the
-// process resumes in the Reactive region of that time step, where §4.4.2.6
-// puts a concurrent assertion's action block as well.
-struct ReactiveRegionAwaiter {
-  SimContext& ctx;
-
-  bool await_ready() const noexcept { return false; }
-
-  void await_suspend(std::coroutine_handle<> h) const {
-    auto* proc = ctx.CurrentProcess();
-    auto* event = ctx.GetScheduler().GetEventPool().Acquire();
-    auto* ctx_ptr = &ctx;
-    event->callback = [h, proc, ctx_ptr]() mutable {
-      if (proc != nullptr && !proc->active) return;
-      if (proc != nullptr) ctx_ptr->SetCurrentProcess(proc);
-      h.resume();
-    };
-    ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), Region::kReactive,
-                                     event);
-  }
-
-  void await_resume() const noexcept {}
-};
-
-}  // namespace
 
 // §16.17: the expect statement starts a single thread of evaluation of its
 // property on the subsequent clocking event, the first evaluation taking
@@ -69,13 +39,13 @@ ExecTask ExecExpect(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   bool begun = false;
   while (!proc->expect_decided) {
     co_await EventAwaiter{ctx, stmt->assert_clock, arena};
-    co_await ObservedRegionAwaiter{ctx};
+    co_await RegionAwaiter{ctx, Region::kObserved};
     ExecConcurrentAssertionTick(
         stmt, begun ? AttemptInstances{} : AttemptInstances{nullptr}, ctx,
         arena);
     begun = true;
   }
-  co_await ReactiveRegionAwaiter{ctx};
+  co_await RegionAwaiter{ctx, Region::kReactive};
   const Stmt* action =
       proc->expect_holds ? stmt->assert_pass_stmt : stmt->assert_fail_stmt;
   if (action != nullptr) co_return co_await ExecStmt(action, ctx, arena);
