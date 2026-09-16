@@ -83,4 +83,34 @@ TEST(AssertionSemanticsParsing, AssertNullStatementActionBlock) {
   EXPECT_EQ(item->assert_fail_stmt, nullptr);
 }
 
+// §16.14.1: the clause's property abc writes its clocking event after its
+// disable condition, where §A.2.10 has the property_expr begin, so the
+// declaration is captured with no clock of its own and a body tree whose
+// root, the not, names the clock.
+TEST(AssertionSemanticsParsing,
+     AClockAfterTheDisableConditionIsTheBodyTreeRootsClock) {
+  auto r = Parse(
+      "module m;\n"
+      "  property abc(a, b, c);\n"
+      "    disable iff (a==2) @(posedge clk) not (b ##1 c);\n"
+      "  endproperty\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  const ModuleItem* decl = nullptr;
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kPropertyDecl) decl = item;
+  }
+  ASSERT_NE(decl, nullptr);
+  EXPECT_TRUE(decl->prop_clock.empty());
+  EXPECT_NE(decl->prop_disable_iff, nullptr);
+  ASSERT_NE(decl->prop_body_tree, nullptr);
+  EXPECT_EQ(decl->prop_body_tree->kind, PropertyExprNode::Kind::kNot);
+  ASSERT_EQ(decl->prop_body_tree->clock.size(), 1u);
+  EXPECT_EQ(decl->prop_body_tree->clock[0].edge, Edge::kPosedge);
+  ASSERT_EQ(decl->prop_body_tree->operands.size(), 1u);
+  EXPECT_EQ(decl->prop_body_tree->operands[0]->kind,
+            PropertyExprNode::Kind::kSequence);
+}
+
 }  // namespace

@@ -643,8 +643,12 @@ bool ParserPropertySpecHelpers::ParseSimpleSpecBody(Parser& p,
   // Table 16-3 has `not` bind tighter than `or` and `and`, so where the
   // spec is a property of operands a leading `not` is the first operand's,
   // read with the operands; a spec opening with an operand a keyword reads,
-  // after any nots and parentheses, is a property of operands as well.
-  if (BodyHasPropertyJunction(p) || AheadOpensKeywordTerm(p)) {
+  // after any nots and parentheses, is a property of operands as well, as
+  // is one opening with a clocking event, §16.14.1's `abc` writing its
+  // clock after its disable condition, where §A.2.10 has the property_expr
+  // begin.
+  if (BodyHasPropertyJunction(p) || AheadOpensKeywordTerm(p) ||
+      p.Check(TokenKind::kAt)) {
     body.property = ParsePropertyImplication(p);
     return body.property != nullptr;
   }
