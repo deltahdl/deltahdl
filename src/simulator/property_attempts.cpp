@@ -90,8 +90,14 @@ void WatchAsynchronousAbort(const PropertyExprNode* node,
 // flowing to the sequence, `inherited`.
 void NumberOperandClocks(LinearSequence& body, PropertyClocks& clocks,
                          int inherited) {
-  if (body.operand_clocks.empty() && inherited == 0) return;
-  body.operand_clock_index.assign(body.operands.size(), inherited);
+  // §16.13.3: a named sequence declared with a clock is evaluated on it,
+  // which flows no further than the sequence.
+  int own_clock =
+      body.clock.empty() ? inherited : ClockIndexOf(clocks, body.clock);
+  body.clock_out_index =
+      body.clock_out.empty() ? inherited : ClockIndexOf(clocks, body.clock_out);
+  if (body.operand_clocks.empty() && own_clock == 0) return;
+  body.operand_clock_index.assign(body.operands.size(), own_clock);
   for (size_t j = 0; j < body.operands.size(); ++j) {
     const std::vector<EventExpr>& own = OperandClock(body, j);
     if (!own.empty()) body.operand_clock_index[j] = ClockIndexOf(clocks, own);
@@ -427,15 +433,16 @@ bool StepAntecedent(const PropertyExprNode* node, NodeState& state,
 }
 
 // §16.13.2 and §16.13.3: the clock the consequent is evaluated on: its own
-// where it names one, else the clock flowing out of the antecedent, its
-// last operand's, else the implication's.
+// where it names one, else the clock flowing out of the antecedent's end,
+// which is the implication's where the antecedent names none outside
+// parentheses and instances.
 int ConsequentClock(const PropertyExprNode* node, const NodeState& state,
                     StepContext& sc) {
   int own = ClockOfNode(node->operands[0], sc.tree, -1);
   if (own >= 0) return own;
   const LinearSequence& antecedent = BodyOf(sc.tree, node);
   if (!antecedent.operand_clock_index.empty()) {
-    return antecedent.operand_clock_index.back();
+    return antecedent.clock_out_index;
   }
   return state.clock;
 }

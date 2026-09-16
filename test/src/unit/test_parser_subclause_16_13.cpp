@@ -51,4 +51,42 @@ TEST(MulticlockParsing, ASequenceOnOneClockRecordsNoClocks) {
   EXPECT_TRUE(item->body->assert_sequence->seq_linear.clocks.empty());
 }
 
+// The antecedent's linear body of the one assertion of `src`.
+const SeqLinearBody* AntecedentBody(ParseResult& r) {
+  auto* item = FindItemByKind(r, ModuleItemKind::kAssertProperty);
+  if (item == nullptr || item->body == nullptr) return nullptr;
+  const PropertyExprNode* root = item->body->assert_property;
+  if (root == nullptr || root->sequence == nullptr) return nullptr;
+  return &root->sequence->seq_linear;
+}
+
+// §16.13.3: the clock in force at the end of a chain flows out of it, so
+// a chain ending on the clock it names carries that clock out, and one
+// whose clock is named inside parentheses carries none, the clock flowing
+// into the parentheses and no further.
+TEST(MulticlockParsing,
+     TheClockAtAChainsEndFlowsOutOfItAndAParenthesisedOneDoesNot) {
+  auto named = Parse(
+      "module m;\n"
+      "  assert property (@(posedge clk0) x ##1 @(posedge clk1) y |=> z);\n"
+      "endmodule\n");
+  ASSERT_NE(named.cu, nullptr);
+  const SeqLinearBody* out = AntecedentBody(named);
+  ASSERT_NE(out, nullptr);
+  ASSERT_EQ(out->clock_out.size(), 1u);
+  EXPECT_EQ(out->clock_out[0].signal->text, "clk1");
+  auto grouped = Parse(
+      "module m;\n"
+      "  assert property (@(posedge clk0) w ##1 (x ##1 @(posedge clk1) y) "
+      "|=> z);\n"
+      "endmodule\n");
+  ASSERT_NE(grouped.cu, nullptr);
+  const SeqLinearBody* kept = AntecedentBody(grouped);
+  ASSERT_NE(kept, nullptr);
+  ASSERT_EQ(kept->operands.size(), 3u);
+  ASSERT_EQ(kept->clocks.size(), 3u);
+  EXPECT_EQ(kept->clocks[2][0].signal->text, "clk1");
+  EXPECT_TRUE(kept->clock_out.empty());
+}
+
 }  // namespace

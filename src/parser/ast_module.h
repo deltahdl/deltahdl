@@ -405,6 +405,11 @@ struct SeqLinearBody {
   // any is written, an operand before the first one written carrying none,
   // which is the leading clock's, and empty where the chain writes none.
   std::vector<std::vector<EventExpr>> clocks;
+  // §16.13.3: the clock in force at the end of the chain, which flows out
+  // of the sequence to what follows it, an implication's consequent among
+  // others; a clock named inside parentheses or an instance flows no
+  // further than them. Empty where the clock flowing in flows out.
+  std::vector<EventExpr> clock_out;
 };
 
 struct ModuleItem {

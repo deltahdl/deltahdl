@@ -518,10 +518,14 @@ struct ParserSeqLinearHelpers {
   // from it on are evaluated on; answers false where the event is
   // malformed, and leaves `clock` as it was where none is written.
   static bool ParseOperandClock(Parser& p, std::vector<EventExpr>& clock) {
-    if (!p.Match(TokenKind::kAt)) return true;
-    if (!p.Match(TokenKind::kLParen)) return false;
-    clock = p.ParseEventList();
-    return p.Match(TokenKind::kRParen) && !clock.empty();
+    // §16.13.3: of two clocking events juxtaposed the second nullifies the
+    // first, so the last written is the one in force.
+    while (p.Match(TokenKind::kAt)) {
+      if (!p.Match(TokenKind::kLParen)) return false;
+      clock = p.ParseEventList();
+      if (!p.Match(TokenKind::kRParen) || clock.empty()) return false;
+    }
+    return true;
   }
 
   // One operand of a chain with the delay owed before it and the clock it
@@ -572,6 +576,10 @@ struct ParserSeqLinearHelpers {
       if (!ParseLinearSeqCycleDelay(p, next)) return false;
       if (!ParseOperandClock(p, clock)) return false;
     }
+    // §16.13.3: the clock in force at the chain's end flows out of it; a
+    // group's chain is read before the rest of the chain around it, whose
+    // own end writes over this.
+    body.clock_out = clock;
     return true;
   }
 

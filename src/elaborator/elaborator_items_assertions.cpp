@@ -189,6 +189,8 @@ void CollectBodyClocks(const SeqLinearBody& body,
       const ModuleItem* decl =
           InstantiatedDecl(operand, ModuleItemKind::kSequenceDecl, registry);
       if (decl != nullptr) {
+        // §16.13.3: a sequence declared with a clock is evaluated on it.
+        for (const EventExpr& ev : decl->seq_clock) AppendClockOnce(out, ev);
         CollectBodyClocks(decl->seq_linear, registry, out, depth + 1);
       }
     }

@@ -447,10 +447,15 @@ bool ExpandInstance(const InstanceOperand& op, SimContext& ctx, Arena& arena,
     out.match_items.push_back(
         SubstituteMatchItems(body.match_items[j], actuals, arena));
     out.repetitions.push_back(body.repetitions[j]);
-    // §16.13.1: an operand of the instantiated body is evaluated on the
-    // clock it names, else on the one the instance stands under.
+    // §16.13.1 and §16.13.3: an operand of the instantiated body is
+    // evaluated on the clock it names, else on the declaration's own, else
+    // on the one flowing into the instance.
     const std::vector<EventExpr>& own = OperandClock(body, j);
-    PushOperandClock(out, own.empty() ? op.clock : own);
+    if (!own.empty()) {
+      PushOperandClock(out, own);
+    } else {
+      PushOperandClock(out, body.clock.empty() ? op.clock : body.clock);
+    }
   }
   // §16.9.9: a throughout of the instantiated body spans the same operands
   // where they now stand, its condition over the actuals.
@@ -541,6 +546,7 @@ bool Flatten(const ModuleItem* seq, SimContext& ctx, Arena& arena,
     return true;
   }
   out.clock = seq->seq_clock;
+  out.clock_out = body.clock_out;
   out.first_match = body.first_match;
   if (!FlattenConjunction(body, ctx, arena, out, depth)) return false;
   // §16.9.7: each `or` operand is flattened on its own.

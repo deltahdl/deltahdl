@@ -33,6 +33,10 @@ struct LinearSequence {
   // each operand's clock, 0 the leading clock's.
   std::vector<std::vector<EventExpr>> operand_clocks;
   std::vector<int> operand_clock_index;
+  // §16.13.3: the clock flowing out of the sequence's end, empty where the
+  // one flowing in does, and its number once numbered.
+  std::vector<EventExpr> clock_out;
+  int clock_out_index = 0;
   std::vector<SeqLocalDecl> locals;
   // §16.9.9: the conditions held throughout spans of the flattened chain.
   std::vector<SeqThroughout> throughouts;

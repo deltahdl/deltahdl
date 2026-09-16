@@ -1,0 +1,9 @@
+x |=> @(posedge clk0) y ##1 @(posedge clk1) z passes 7 fails 1 at 57
+x |=> y ##1 @(posedge clk1) z passes 7 fails 1 at 57
+x ##1 y |=> @(posedge clk1) z passes 7 fails 1 at 57
+x |=> y |=> @(posedge clk1) z passes 7 fails 1 at 57
+w ##1 (x2 ##1 @(posedge clk1) y2) |=> z2 passes 8 fails 0 at
+v |=> (w3 ##1 @(posedge clk1) x3) and (y3 ##1 z3) passes 8 fails 0 at
+xi |=> s_d ##1 zi passes 8 fails 0 at
+@(posedge clk1) @(posedge clk0) xj passes 2 fails 6 at 15 25 45 55 65 75
+$finish at time 80

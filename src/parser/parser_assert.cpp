@@ -418,14 +418,18 @@ bool Parser::TryParseSimpleConcurrentProperty(ModuleItem* item,
   if (!Check(TokenKind::kAt)) return false;
   auto saved = lexer_.SavePos();
   diag_.PushSuppress();
-  Consume();  // '@'
   std::vector<EventExpr> events;
   bool ok = true;
-  if (Match(TokenKind::kLParen)) {
-    events = ParseEventList();
-    if (!Match(TokenKind::kRParen)) ok = false;
-  } else {
-    events.push_back(ParseSingleEvent());
+  // §16.13.3: of two clocking events juxtaposed the second nullifies the
+  // first, so the last written is the spec's.
+  while (ok && Match(TokenKind::kAt)) {
+    events.clear();
+    if (Match(TokenKind::kLParen)) {
+      events = ParseEventList();
+      if (!Match(TokenKind::kRParen)) ok = false;
+    } else {
+      events.push_back(ParseSingleEvent());
+    }
   }
   SimpleSpecBody body;
   if (ok) ok = TryParseDisableIff(body.disable_iff);

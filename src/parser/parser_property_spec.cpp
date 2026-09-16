@@ -767,7 +767,9 @@ void ParserPropertySpecHelpers::CapturePropertyTreeBody(Parser& p,
   p.diag_.PushSuppress();
   std::vector<EventExpr> clock;
   bool ok = true;
-  if (p.Match(TokenKind::kAt)) {
+  // §16.13.3: of two clocking events juxtaposed the second nullifies the
+  // first, so the last written is the body's.
+  while (ok && p.Match(TokenKind::kAt)) {
     ok = p.Match(TokenKind::kLParen);
     if (ok) {
       clock = p.ParseEventList();
