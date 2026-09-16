@@ -18,14 +18,19 @@ struct Stmt;
 // of it here, the instances mature in the Observed region, and each begins
 // an evaluation attempt at the tick of the statement's leading clocking
 // event that the time step holds or, where the step holds none, at the
-// next, so `pending` holds the instances placed since the last tick, each
-// with the values it saved (§16.14.6.1), and every one of them begins an
-// attempt at the next, a statement a loop reaches several times in one step
-// beginning as many. The named scopes the statement was first reached in
-// are kept for its reports to name, as §21.2.1.5's %m names the statement
-// under the labels of the procedure.
+// next. `pending` holds the instances placed this time step that have not
+// matured, each with the values it saved (§16.14.6.1); §16.14.6.2: a
+// flush point of the process clears them, and the Observed region moves
+// the rest to `matured`, the matured assertion queue, where a flush reaches
+// them no more and every one of them begins an attempt at the next tick, a
+// statement a loop reaches several times in one step beginning as many.
+// The named scopes the statement was first reached in are kept for its
+// reports to name, as §21.2.1.5's %m names the statement under the labels
+// of the procedure.
 struct ProceduralAssertionState {
   std::vector<const InstanceBindings*> pending;
+  std::vector<const InstanceBindings*> matured;
+  bool maturing_scheduled = false;
   bool reached = false;
   std::vector<std::string_view> named_scopes;
 };
@@ -48,5 +53,14 @@ void StartProceduralAssertionMonitors(Process* proc, const Stmt* body,
 // where it stands.
 bool EnqueueProceduralAssertion(const Stmt* stmt, SimContext& ctx,
                                 Arena& arena);
+
+// §16.14.6.2: `proc` has reached a procedural assertion flush point, having
+// resumed after an event control or a wait statement, or as an always_comb
+// or always_latch on a transition of a dependent signal, or under a disable
+// of its outermost scope: its procedural assertion queue is cleared, every
+// pending instance of every statement embedded in it dropped, which no
+// longer matures unless the procedure queues it again; the instances that
+// matured in an earlier Observed region are kept.
+void FlushProceduralAssertionQueue(Process& proc);
 
 }  // namespace delta

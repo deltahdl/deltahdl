@@ -2,6 +2,7 @@
 #include <unordered_set>
 
 #include "common/diagnostic.h"
+#include "simulator/procedural_assertion.h"
 #include "simulator/process.h"
 #include "simulator/sim_context.h"
 
@@ -283,6 +284,10 @@ void SimContext::FlushPendingDeferredReports() {
   // the mismatch when their region fires and skip execution.
   if (current_process_) {
     current_process_->deferred_report_generation++;
+    // §16.14.6.2: the same points are the procedural assertion flush points,
+    // where the pending instances of the process's procedural concurrent
+    // assertions are cleared.
+    FlushProceduralAssertionQueue(*current_process_);
     // §16.4.4: a flush point discards every pending report anyway, so any
     // specific-assertion cancellations recorded during the just-ended
     // activation are now moot; reset them so a later activation's reports are

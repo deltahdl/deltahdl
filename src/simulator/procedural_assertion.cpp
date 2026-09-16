@@ -46,7 +46,12 @@ SimCoroutine MonitorCoroutine(const Stmt* stmt, ProceduralAssertionState* state,
     co_await EventAwaiter{ctx, stmt->assert_clock, arena};
     co_await ObservedRegionAwaiter{ctx};
     if (!state->reached) continue;
-    AttemptInstances instances = std::move(state->pending);
+    // The instances matured in earlier steps and the ones pending in this,
+    // which mature in this Observed region, all begin an attempt.
+    AttemptInstances instances = std::move(state->matured);
+    state->matured.clear();
+    instances.insert(instances.end(), state->pending.begin(),
+                     state->pending.end());
     state->pending.clear();
     std::vector<std::string_view> saved = ctx.ActiveNamedScopes();
     PendingReportScope::Replace(ctx, state->named_scopes);
@@ -119,6 +124,24 @@ const InstanceBindings* CaptureInstanceBindings(const Stmt* stmt,
   return bindings->values.empty() ? nullptr : bindings;
 }
 
+// §16.14.6: each pending instance matures in the Observed region of the
+// time step it was queued in, whether or not the step holds a tick of the
+// statement's clock; one maturing is scheduled per step per statement, the
+// first enqueue of the step scheduling it, and it moves what is pending by
+// then, what §16.14.6.2's flush points left, to the matured queue.
+void ScheduleMaturing(ProceduralAssertionState* state, SimContext& ctx) {
+  if (state->maturing_scheduled) return;
+  state->maturing_scheduled = true;
+  auto* ev = ctx.GetScheduler().GetEventPool().Acquire();
+  ev->callback = [state]() {
+    state->maturing_scheduled = false;
+    state->matured.insert(state->matured.end(), state->pending.begin(),
+                          state->pending.end());
+    state->pending.clear();
+  };
+  ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), Region::kObserved, ev);
+}
+
 }  // namespace
 
 void StartProceduralAssertionMonitors(Process* proc, const Stmt* body,
@@ -155,7 +178,14 @@ bool EnqueueProceduralAssertion(const Stmt* stmt, SimContext& ctx,
     state->named_scopes = ctx.ActiveNamedScopes();
   }
   state->pending.push_back(CaptureInstanceBindings(stmt, ctx, arena));
+  ScheduleMaturing(state, ctx);
   return true;
+}
+
+void FlushProceduralAssertionQueue(Process& proc) {
+  for (auto& entry : proc.procedural_assertions) {
+    entry.second->pending.clear();
+  }
 }
 
 }  // namespace delta
