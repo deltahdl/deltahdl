@@ -65,6 +65,13 @@ enum class Edge : uint8_t {
 
 struct ModuleItem;
 
+struct EventExpr {
+  Edge edge = Edge::kNone;
+  Expr* signal = nullptr;
+  Expr* iff_condition = nullptr;
+  bool is_sequence_event = false;
+};
+
 // §16.12: a property_expr built from the operands the evaluation reads --
 // a boolean, a sequence weak or strong (§16.12.2) -- under the operators
 // not (§16.12.3), or (§16.12.4), and (§16.12.5), if-else (§16.12.6),
@@ -126,13 +133,6 @@ struct PropertyExprNode {
   // clk1) sig1`, on which it is evaluated from its nearest tick; empty for
   // an operand on the clock flowing to it (§16.13.3).
   std::vector<EventExpr> clock;
-};
-
-struct EventExpr {
-  Edge edge = Edge::kNone;
-  Expr* signal = nullptr;
-  Expr* iff_condition = nullptr;
-  bool is_sequence_event = false;
 };
 
 struct CaseItem {
