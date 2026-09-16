@@ -12,6 +12,7 @@
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/property_rewrite.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/sequence_match_class.h"
 #include "lexer/token.h"
 #include "parser/ast.h"
 #include "parser/expr_substitute.h"
@@ -317,6 +318,10 @@ void Elaborator::CheckPropertyOperandInstances(const ModuleItem* item) {
 
 void Elaborator::ElaboratePropertyDeclItem(ModuleItem* item, RtlirModule* mod) {
   mod->property_decls.push_back(item);
+  // §16.12.22: the sequences the body uses as properties and as antecedents
+  // are checked where the body is declared, once for every instance.
+  ValidateSequenceDegeneracy(item->prop_body_tree, item->loc,
+                             property_registry_, diag_);
   // §16.12: nesting of disable iff (explicitly or via property instantiation)
   // is forbidden; the §F.4.1 flattened count catches both.
   if (property_registry_.FlattenedDisableIffCount(item) > 1) {
@@ -338,6 +343,14 @@ void Elaborator::ElaborateAssertPropertyItem(ModuleItem* item,
   SubstitutePropertyInstance(item, arena_, property_registry_, diag_);
   PromotePropertyInstanceBoolean(item, arena_, property_registry_);
   CheckConcurrentAssertionNoChandle(item, mod, diag_);
+  // §16.12.22: the sequences the property_spec uses as properties and as
+  // antecedents, a sequential property standing as the whole spec included.
+  if (item->body != nullptr) {
+    ValidateSequenceDegeneracy(item->body->assert_property, item->loc,
+                               property_registry_, diag_);
+    ValidateSequenceUsedAsProperty(item->body->assert_sequence, item->loc,
+                                   property_registry_, diag_);
+  }
   // §16.5.2: `assert property(@$global_clock a);` under a
   // `global clocking @clk; endclocking` declaration is logically equivalent to
   // `assert property(@clk a);`, so the assertion's leading clocking event is

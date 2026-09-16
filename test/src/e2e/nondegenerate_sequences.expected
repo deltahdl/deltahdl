@@ -1,0 +1,15 @@
+test/src/e2e/nondegenerate_sequences.sv:18:3: error: a sequence used as a property admits no match; it shall be nondegenerate and admit no empty match (§16.12.22)
+    assert property (@(posedge clk) 1'b1 intersect (1'b1 ##1 1'b1));
+    ^
+test/src/e2e/nondegenerate_sequences.sv:19:3: error: a sequence used as a property admits only empty matches; it shall be nondegenerate and admit no empty match (§16.12.22)
+    assert property (@(posedge clk) 1'b1[*0]);
+    ^
+test/src/e2e/nondegenerate_sequences.sv:20:3: error: a sequence used as a property admits an empty match; it shall be nondegenerate and admit no empty match (§16.12.22)
+    assert property (@(posedge clk) a[*0:2]);
+    ^
+test/src/e2e/nondegenerate_sequences.sv:21:3: error: the antecedent of |-> admits only empty matches; it shall be nondegenerate (§16.12.22)
+    assert property (@(posedge clk) 1'b1[*0] |-> b);
+    ^
+test/src/e2e/nondegenerate_sequences.sv:22:3: error: the antecedent of |=> admits no match; it shall admit at least one match (§16.12.22)
+    assert property (@(posedge clk) a ##1 never |=> b);
+    ^
