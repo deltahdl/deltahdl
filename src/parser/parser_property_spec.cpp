@@ -246,7 +246,8 @@ Expr* ParserPropertySpecHelpers::ParsePropertyActualArg(Parser& p,
 // The `.formal(` opening an actual bound by name, where one is written,
 // the name recorded on `call`; `named` says one was, and the answer is
 // false where it is malformed.
-static bool ParseNamedActualPrefix(Parser& p, Expr* call, bool& named) {
+bool ParserPropertySpecHelpers::ParseNamedActualPrefix(Parser& p, Expr* call,
+                                                       bool& named) {
   named = p.Match(TokenKind::kDot);
   if (!named) return true;
   if (!p.Check(TokenKind::kIdentifier)) return false;
