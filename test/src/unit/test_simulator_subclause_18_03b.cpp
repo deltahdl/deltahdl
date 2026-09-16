@@ -101,6 +101,56 @@ TEST(ConstrainedRandomConcepts, InLineConstraintsAndAlgebraAreSolved) {
   EXPECT_EQ(out, "3 10\n");
 }
 
+// §18.3: the clause's exercise_bus is a task taking the MyBus as an
+// argument, and its three in-line randomizations through the formal meet
+// their constraints as through the handle itself: each randomize() answers
+// 1 and each check holds, met counting three through the output argument.
+TEST(ConstrainedRandomConcepts, TheExerciseBusTaskMeetsItsConstraints) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class Bus;\n"
+      "  rand bit [15:0] addr;\n"
+      "  rand bit [31:0] data;\n"
+      "  constraint word_align { addr[1:0] == 2'b0; }\n"
+      "endclass\n"
+      "typedef enum {low, mid, high} AddrType;\n"
+      "class MyBus extends Bus;\n"
+      "  rand AddrType atype;\n"
+      "  constraint addr_range {\n"
+      "    (atype == low) -> addr inside { [0 : 15] };\n"
+      "    (atype == mid) -> addr inside { [16 : 127] };\n"
+      "    (atype == high) -> addr inside { [128 : 255] };\n"
+      "  }\n"
+      "endclass\n"
+      "module t;\n"
+      "  task exercise_bus(MyBus bus, output int met);\n"
+      "    int res;\n"
+      "    met = 0;\n"
+      "    res = bus.randomize() with {atype == low;};\n"
+      "    $display(\"%0d %0d %0d %0d\", res, bus.atype == low, "
+      "bus.addr <= 15, bus.addr[1:0] == 0);\n"
+      "    met += res && bus.atype == low && bus.addr <= 15 && "
+      "bus.addr[1:0] == 0;\n"
+      "    res = bus.randomize() with {10 <= addr && addr <= 20;};\n"
+      "    $display(\"%0d %0d %0d\", res, bus.addr >= 10 && bus.addr <= 20, "
+      "bus.addr[1:0] == 0);\n"
+      "    met += res && bus.addr >= 10 && bus.addr <= 20 && "
+      "bus.addr[1:0] == 0;\n"
+      "    res = bus.randomize() with {(data & (data - 1)) == 0;};\n"
+      "    $display(\"%0d %0d\", res, (bus.data & (bus.data - 1)) == 0);\n"
+      "    met += res && (bus.data & (bus.data - 1)) == 0;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    MyBus mybus = new;\n"
+      "    int met;\n"
+      "    exercise_bus(mybus, met);\n"
+      "    $display(\"met %0d\", met);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 1 1 1\n1 1 1\n1 1\nmet 3\n");
+}
+
 // §18.3: constraint_mode() disables a named constraint block, the clause's
 // exercise_illegal then randomizing with the low-order address bits forced
 // nonzero, and enables it again.

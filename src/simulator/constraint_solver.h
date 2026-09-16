@@ -610,6 +610,8 @@ class ConstraintSolver {
   // at random; the check that follows still decides.
   void RepairCustomConstraints(const std::vector<ConstraintExpr>& extra);
   void ApplyCustomRepair(const ConstraintExpr& c);
+  void RepairFromCandidates(const ConstraintExpr& c);
+  bool RepairMayWrite(const std::string& name) const;
   void RepairConstraints(const std::vector<ConstraintExpr>& extra) {
     RepairConditionalConstraints(extra);
     RepairCustomConstraints(extra);

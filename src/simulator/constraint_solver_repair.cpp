@@ -70,14 +70,8 @@ void ConstraintSolver::RepairConditionalConstraints(
 }
 
 void ConstraintSolver::ApplyConsequent(const ConstraintExpr& sub) {
-  // 18.8: a variable holding a state value is never written, and 18.4.2 a
-  // randc variable is drawn from its own cycle alone.
-  if (HoldsStateValue(sub.var_name) || EvalConstraint(sub)) return;
+  if (EvalConstraint(sub) || !RepairMayWrite(sub.var_name)) return;
   auto it = variables_.find(sub.var_name);
-  if (it == variables_.end() || !it->second.enabled || it->second.is_real ||
-      it->second.qualifier == RandQualifier::kRandc) {
-    return;
-  }
   if (sub.kind == ConstraintKind::kEqual) {
     values_[sub.var_name] = sub.lo;
   } else if (sub.kind == ConstraintKind::kSetMembership) {
@@ -97,7 +91,7 @@ void ConstraintSolver::ApplyConsequent(const ConstraintExpr& sub) {
 std::vector<int64_t> StructuredCandidates(const RandVariable& var) {
   std::vector<int64_t> out{0, var.min_val, var.max_val};
   for (uint32_t i = 0; i < var.width && i < 63; ++i) {
-    int64_t power = static_cast<int64_t>(uint64_t{1} << i);
+    auto power = static_cast<int64_t>(uint64_t{1} << i);
     out.push_back(power);
     out.push_back(power - 1);
     out.push_back(power + 1);
@@ -115,37 +109,43 @@ void ConstraintSolver::RepairCustomConstraints(
   for (const auto& c : extra) ApplyCustomRepair(c);
 }
 
+// Whether the variable `name` is one a repair may write: one the solver
+// holds, active, integral and, 18.4.2, not randc, which is drawn from its
+// own cycle alone, and, 18.8, holding no state value, which is never
+// written.
+bool ConstraintSolver::RepairMayWrite(const std::string& name) const {
+  if (HoldsStateValue(name)) return false;
+  auto it = variables_.find(name);
+  return it != variables_.end() && it->second.enabled && !it->second.is_real &&
+         it->second.qualifier != RandQualifier::kRandc;
+}
+
+void ConstraintSolver::RepairFromCandidates(const ConstraintExpr& c) {
+  const std::string& name = c.ref_vars[0];
+  const RandVariable& var = variables_.find(name)->second;
+  std::vector<int64_t> satisfying;
+  std::unordered_map<std::string, int64_t> trial = values_;
+  for (int64_t candidate : StructuredCandidates(var)) {
+    if (candidate < var.min_val || candidate > var.max_val) continue;
+    trial[name] = candidate;
+    if (c.eval_fn(trial)) satisfying.push_back(candidate);
+  }
+  if (satisfying.empty()) return;
+  std::uniform_int_distribution<size_t> pick(0, satisfying.size() - 1);
+  values_[name] = satisfying[pick(rng_)];
+}
+
 void ConstraintSolver::ApplyCustomRepair(const ConstraintExpr& c) {
   if (c.kind != ConstraintKind::kCustom || !c.eval_fn || c.eval_fn(values_)) {
     return;
   }
   if (c.derive_fn) {
-    if (HoldsStateValue(c.var_name)) return;
-    auto it = variables_.find(c.var_name);
-    if (it == variables_.end() || !it->second.enabled ||
-        it->second.qualifier == RandQualifier::kRandc) {
-      return;
-    }
-    values_[c.var_name] = c.derive_fn(values_);
+    if (RepairMayWrite(c.var_name)) values_[c.var_name] = c.derive_fn(values_);
     return;
   }
-  if (c.ref_vars.size() != 1 || HoldsStateValue(c.ref_vars[0])) return;
-  auto it = variables_.find(c.ref_vars[0]);
-  if (it == variables_.end() || !it->second.enabled || it->second.is_real ||
-      it->second.qualifier == RandQualifier::kRandc) {
-    return;
+  if (c.ref_vars.size() == 1 && RepairMayWrite(c.ref_vars[0])) {
+    RepairFromCandidates(c);
   }
-  const RandVariable& var = it->second;
-  std::vector<int64_t> satisfying;
-  std::unordered_map<std::string, int64_t> trial = values_;
-  for (int64_t candidate : StructuredCandidates(var)) {
-    if (candidate < var.min_val || candidate > var.max_val) continue;
-    trial[c.ref_vars[0]] = candidate;
-    if (c.eval_fn(trial)) satisfying.push_back(candidate);
-  }
-  if (satisfying.empty()) return;
-  std::uniform_int_distribution<size_t> pick(0, satisfying.size() - 1);
-  values_[c.ref_vars[0]] = satisfying[pick(rng_)];
 }
 
 }  // namespace delta
