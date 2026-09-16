@@ -865,7 +865,7 @@ bool ConstraintSolver::SolveIterative(const std::vector<ConstraintExpr>& extra,
   bool repair = false;
   auto flat_pass = [&] {
     DrawGeneralPass(variables_, values_, real_values_, gen, gen_real);
-    if (repair) RepairConditionalConstraints(extra);
+    if (repair) RepairConstraints(extra);
     return CheckAllConstraints(extra, include_soft);
   };
   for (int attempt = 0; attempt < kMaxAttempts; ++attempt) {

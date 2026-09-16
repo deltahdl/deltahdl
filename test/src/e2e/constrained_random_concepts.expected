@@ -1,0 +1,7 @@
+Bus: 50 of 50 randomized, 50 of 50 word aligned
+MyBus: 30 of 30 randomized, 30 of 30 word aligned, 30 of 30 in the range atype selects
+exercise_bus: 3 of 3 in-line constraints met
+PowerOfTwo: 10 of 10 have d == 1 << n
+word_align off: randomized 1, low bits nonzero 1
+word_align on: randomized 1, word aligned 1
+$finish at time 0

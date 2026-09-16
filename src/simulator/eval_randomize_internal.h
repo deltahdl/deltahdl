@@ -135,10 +135,30 @@ bool TrySetMembershipConstraint(const Expr* rel, std::vector<RandInfo>& rands,
 // (eval_randomize_membership.cpp).
 bool TryImplicationConstraint(const Expr* rel, std::vector<RandInfo>& rands,
                               RandomizeCtx& rc, ConstraintExpr& out);
-// Evaluates `rel` with each name in `names` bound to its value in `vals`.
+// Evaluates `rel` with each name in `names` bound to its value in `vals`,
+// as a truth or as the value it takes.
 bool EvalCustomRelation(const Expr* rel, const std::vector<std::string>& names,
                         RandomizeCtx& rc,
                         const std::unordered_map<std::string, int64_t>& vals);
+int64_t EvalCustomValue(const Expr* e, const std::vector<std::string>& names,
+                        RandomizeCtx& rc,
+                        const std::unordered_map<std::string, int64_t>& vals);
+// Whether `e` references the random variable `name`, bare or as this.name.
+bool RefsNamedRandVar(const Expr* e, std::string_view name);
+// 18.5: `rel` as the solver's kCustom relation, evaluated against the values
+// drawn, referencing the random variables it names and, where it is `x ==
+// expression` over the others, deriving x from them
+// (eval_randomize_custom.cpp).
+ConstraintExpr MakeCustomConstraint(const Expr* rel,
+                                    std::vector<RandInfo>& rands,
+                                    RandomizeCtx& rc);
+// 18.5: `rel` as `a && b`, which holds where both do, as the solver's
+// implication of both under an antecedent that always holds, each side
+// translated on its own so that a comparison among them folds the domain
+// as it would alone; answers false for any other shape
+// (eval_randomize_membership.cpp).
+bool TryConjunctionConstraint(const Expr* rel, std::vector<RandInfo>& rands,
+                              RandomizeCtx& rc, ConstraintExpr& out, bool fold);
 void CollectRandVariables(const ClassTypeInfo* type, SimContext& ctx,
                           std::vector<RandInfo>& out);
 bool ComparisonKind(TokenKind op, ConstraintKind& out);

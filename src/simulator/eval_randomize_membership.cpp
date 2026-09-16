@@ -111,4 +111,22 @@ bool TryImplicationConstraint(const Expr* rel, std::vector<RandInfo>& rands,
   return true;
 }
 
+bool TryConjunctionConstraint(const Expr* rel, std::vector<RandInfo>& rands,
+                              RandomizeCtx& rc, ConstraintExpr& out,
+                              bool fold) {
+  if (rel == nullptr || rel->kind != ExprKind::kBinary ||
+      rel->op != TokenKind::kAmpAmp || rel->lhs == nullptr ||
+      rel->rhs == nullptr) {
+    return false;
+  }
+  out.kind = ConstraintKind::kImplication;
+  for (const auto& ri : rands) out.ref_vars.push_back(ri.name);
+  out.cond_fn = [](const std::unordered_map<std::string, int64_t>&) {
+    return true;
+  };
+  out.sub_constraints.push_back(TranslateRelation(rel->lhs, rands, rc, fold));
+  out.sub_constraints.push_back(TranslateRelation(rel->rhs, rands, rc, fold));
+  return true;
+}
+
 }  // namespace delta

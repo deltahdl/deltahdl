@@ -190,6 +190,12 @@ struct ConstraintExpr {
   ConstraintExpr* inner = nullptr;
 
   std::function<bool(const std::unordered_map<std::string, int64_t>&)> eval_fn;
+  // A kCustom relation of the form `x == expression` over the other random
+  // variables, x in var_name: the value the expression takes over the values
+  // drawn, which the repair of a draw that does not satisfy the relation
+  // writes to x (constraint_solver_repair.cpp).
+  std::function<int64_t(const std::unordered_map<std::string, int64_t>&)>
+      derive_fn;
 
   // 18.5.11: the random variables this constraint references, used only by the
   // function-argument priority solve. When a function call gives a random
@@ -594,6 +600,20 @@ class ConstraintSolver {
   // (constraint_solver_implication.cpp).
   void RepairConditionalConstraints(const std::vector<ConstraintExpr>& extra);
   void ApplyConsequent(const ConstraintExpr& sub);
+  // 18.3: the solver handles algebraic factoring and mixed integer and bit
+  // expressions and finds a solution where one exists, which the draws tried
+  // against a relation over a wide domain do not: a relation that does not
+  // hold after the draw and derives one variable from the others has that
+  // variable written from them, and one over a single variable has the
+  // structured candidates of its domain tried, 0, the powers of two and their
+  // neighbours, the bounds and their negatives, one that satisfies it drawn
+  // at random; the check that follows still decides.
+  void RepairCustomConstraints(const std::vector<ConstraintExpr>& extra);
+  void ApplyCustomRepair(const ConstraintExpr& c);
+  void RepairConstraints(const std::vector<ConstraintExpr>& extra) {
+    RepairConditionalConstraints(extra);
+    RepairCustomConstraints(extra);
+  }
 
   // 18.6.3: publish the values of the static random variables into their shared
   // cells after a successful solve, so that the value this instance just drew

@@ -216,6 +216,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/eval_process_methods.cpp
     simulator/eval_randomize.cpp
     simulator/eval_randomize_blocks.cpp
+    simulator/eval_randomize_custom.cpp
     simulator/eval_randomize_joint.cpp
     simulator/eval_randomize_membership.cpp
     simulator/eval_randomize_mode.cpp
@@ -381,7 +382,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     parser/parser_package_import_export.cpp
     parser/parser_udp.cpp
     simulator/constraint_solver_eval.cpp
-    simulator/constraint_solver_implication.cpp
+    simulator/constraint_solver_repair.cpp
     simulator/constraint_solver_solve.cpp
     simulator/coverage_bins.cpp
     simulator/coverage_cross.cpp
