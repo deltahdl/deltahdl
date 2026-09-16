@@ -444,6 +444,12 @@ bool ExpandInstance(const PropertyExprNode* node, NodeState& state,
   Collection collection{sc.tree, sc.ctx, sc.arena, actuals, {}};
   if (!CollectSequences(body, collection, state.clock)) return false;
   InstallClockWatchers(sc.tree.clocks, sc.ctx, sc.arena);
+  // §16.13.2: a clock the expansion brings has not ticked at this time
+  // step, which the step's mask, read before the clock was met, would say
+  // of every clock, so the mask is read again for the operands on it to
+  // begin at its first tick.
+  sc.ticked = ClocksTicked(sc.tree.clocks, sc.ctx.CurrentTime());
+  sc.ctx.AssertionSamples().SetClockTicks(sc.ticked);
   state.expansion = body;
   state.operands.push_back(NewNodeState(body, sc.tree, state.clock, sc.arena));
   return true;

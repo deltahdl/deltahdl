@@ -689,12 +689,6 @@ struct ParserSeqLinearHelpers {
   }
 };
 
-// §16.13.6/§9.4.4: trial-parse the simple clocked linear body
-// `@(edge clk) b0 ##1 b1 ##1 ... bn` and record the clock + operands so the
-// simulator can fire the sequence endpoint on a match. Diagnostics are
-// suppressed and the lexer is rewound, so the harvest scan in
-// ParseSequenceDecl re-reads the same tokens unchanged; any other body shape
-// leaves the fields empty and no monitor is created.
 // §16.10 and §16.13.7: the assertion_variable_declarations at the head of
 // a named property's body, `logic v = e;`, read as a sequence body's are;
 // false where one is malformed.
@@ -706,6 +700,12 @@ bool ParserPropertySpecHelpers::ParsePropertyLocalDecls(
   return true;
 }
 
+// §16.13.6/§9.4.4: trial-parse the simple clocked linear body
+// `@(edge clk) b0 ##1 b1 ##1 ... bn` and record the clock + operands so the
+// simulator can fire the sequence endpoint on a match. Diagnostics are
+// suppressed and the lexer is rewound, so the harvest scan in
+// ParseSequenceDecl re-reads the same tokens unchanged; any other body shape
+// leaves the fields empty and no monitor is created.
 void Parser::CaptureLinearSequenceBody(ModuleItem* item) {
   auto saved = lexer_.SavePos();
   diag_.PushSuppress();
