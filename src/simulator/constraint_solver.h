@@ -595,6 +595,10 @@ class ConstraintSolver {
   // for the next attempt rather than passed over in its permutation.
   bool RandcValueAdmissible(const std::string& name,
                             const std::vector<ConstraintExpr>& extra) const;
+  std::function<int64_t(RandVariable&)> RandcOncePerSolve(
+      std::unordered_map<std::string, int64_t>& drawn);
+  void PruneRefusedRandcValues(std::unordered_map<std::string, int64_t>& drawn,
+                               const std::vector<ConstraintExpr>& extra) const;
 
   // 18.5.5: after the general draw, every implication whose antecedent holds
   // under the values drawn has each constraint of its consequent that does

@@ -825,18 +825,8 @@ bool ConstraintSolver::SolveIterative(const std::vector<ConstraintExpr>& extra,
   auto gen_real = [this](RandVariable& var) {
     return GenerateRandRealValue(var);
   };
-  // 18.4.2: a randc variable takes the next value of its permutation once
-  // per randomize(), whatever the attempts the other variables take, so the
-  // value is drawn once and kept across them while every constraint naming
-  // it holds; a value one of them refuses is passed over for the next.
   std::unordered_map<std::string, int64_t> randc_drawn;
-  auto gen_randc = [&](RandVariable& var) {
-    auto it = randc_drawn.find(var.name);
-    if (it != randc_drawn.end()) return it->second;
-    int64_t v = GenerateRandValue(var);
-    randc_drawn[var.name] = v;
-    return v;
-  };
+  auto gen_randc = RandcOncePerSolve(randc_drawn);
   // 18.5.11: when random variables are used as function arguments, the implied
   // priority is solved in layers — the higher-priority variables first, each
   // layer committed as state variables to the next without backtracking. This
@@ -897,10 +887,50 @@ bool ConstraintSolver::SolveIterative(const std::vector<ConstraintExpr>& extra,
     if (outcome == AttemptOutcome::kSolved) return true;
     // 18.5.12: an ERROR guard fails randomize() outright; do not retry it.
     if (outcome == AttemptOutcome::kAbort) return false;
-    for (auto it = randc_drawn.begin(); it != randc_drawn.end();) {
-      it = RandcValueAdmissible(it->first, extra) ? std::next(it)
-                                                  : randc_drawn.erase(it);
-    }
+    PruneRefusedRandcValues(randc_drawn, extra);
+  }
+  return false;
+}
+
+// 18.4.2: a randc variable takes the next value of its permutation once per
+// randomize(), whatever the attempts the other variables take, so the value
+// is drawn once into `drawn` and answered from there across them.
+std::function<int64_t(RandVariable&)> ConstraintSolver::RandcOncePerSolve(
+    std::unordered_map<std::string, int64_t>& drawn) {
+  return [this, &drawn](RandVariable& var) {
+    auto it = drawn.find(var.name);
+    if (it != drawn.end()) return it->second;
+    int64_t v = GenerateRandValue(var);
+    drawn[var.name] = v;
+    return v;
+  };
+}
+
+// 18.4.2: after an attempt found no solution, a randc value one of the
+// constraints naming it refuses is passed over for the next of its
+// permutation, and one every such constraint admits is kept.
+void ConstraintSolver::PruneRefusedRandcValues(
+    std::unordered_map<std::string, int64_t>& drawn,
+    const std::vector<ConstraintExpr>& extra) const {
+  for (auto it = drawn.begin(); it != drawn.end();) {
+    it = RandcValueAdmissible(it->first, extra) ? std::next(it)
+                                                : drawn.erase(it);
+  }
+}
+
+// Whether the constraint `c` names the variable `name`, as the variable it
+// constrains, among the ones it references, or in a constraint it guards.
+static bool ConstraintNames(const ConstraintExpr& c, const std::string& name) {
+  if (c.var_name == name) return true;
+  if (std::find(c.ref_vars.begin(), c.ref_vars.end(), name) !=
+      c.ref_vars.end()) {
+    return true;
+  }
+  for (const auto& sub : c.sub_constraints) {
+    if (ConstraintNames(sub, name)) return true;
+  }
+  for (const auto& sub : c.else_constraints) {
+    if (ConstraintNames(sub, name)) return true;
   }
   return false;
 }
@@ -908,9 +938,7 @@ bool ConstraintSolver::SolveIterative(const std::vector<ConstraintExpr>& extra,
 bool ConstraintSolver::RandcValueAdmissible(
     const std::string& name, const std::vector<ConstraintExpr>& extra) const {
   auto refuses = [&](const ConstraintExpr& c) {
-    return std::find(c.ref_vars.begin(), c.ref_vars.end(), name) !=
-               c.ref_vars.end() &&
-           !EvalConstraint(c);
+    return ConstraintNames(c, name) && !EvalConstraint(c);
   };
   for (const auto& block : blocks_) {
     if (!block.enabled) continue;
