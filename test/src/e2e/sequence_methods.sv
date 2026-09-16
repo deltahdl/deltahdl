@@ -10,9 +10,9 @@
 // ends. e2_with_arg takes the source sequence as a formal of type sequence
 // and applies triggered to the formal; e4 instantiates it with e1's body
 // as the actual, `@(posedge sysclk) $rose(a) ##1 b ##1 c`, and ends at 72
-// as e2 does. The program check, instantiated in the module, waits for
-// either of e1 and e2 to end, which e1 does first, and then, from the
-// labelled statement, for e2.
+// as e2 does. The program check, declared in the module, waits for either
+// of e1 and e2 to end, which e1 does first, and then, from the labelled
+// statement, for e2.
 module sequence_methods;
   logic clk = 0;
   logic sysclk = 0;
@@ -43,8 +43,6 @@ module sequence_methods;
     e2_with_arg(@(posedge sysclk) $rose(a) ##1 b ##1 c);
   endsequence
 
-  check chk();
-
   initial forever begin
     wait (e3.triggered);
     e3_ends = $sformatf("%s %0d", e3_ends, $time);
@@ -73,13 +71,13 @@ module sequence_methods;
     $display("e4 with subseq.triggered ends at%s", e4_ends);
     $finish;
   end
-endmodule
 
-program check;
-  initial begin
-    wait (e1.triggered || e2.triggered);
-    if (e1.triggered) $display("e1 passed at %0d", $time);
-    L2: wait (e2.triggered);
-    if (e2.triggered) $display("e2 passed at %0d", $time);
-  end
-endprogram
+  program check;
+    initial begin
+      wait (e1.triggered || e2.triggered);
+      if (e1.triggered) $display("e1 passed at %0d", $time);
+      L2: wait (e2.triggered);
+      if (e2.triggered) $display("e2 passed at %0d", $time);
+    end
+  endprogram
+endmodule
