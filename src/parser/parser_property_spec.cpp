@@ -193,7 +193,10 @@ PropertyExprNode* ParserPropertySpecHelpers::TryParsePropertyGroup(
   if (!p.Check(TokenKind::kLParen)) return nullptr;
   auto saved = p.lexer_.SavePos();
   p.Consume();
-  if (!BodyHasPropertyJunction(p) && !AheadOpensKeywordTerm(p)) {
+  // §16.13.2: a parenthesised operand opening with a clocking event of its
+  // own, `(@(posedge clk1) sig1)`, is a property operand as well.
+  if (!BodyHasPropertyJunction(p) && !AheadOpensKeywordTerm(p) &&
+      !p.Check(TokenKind::kAt)) {
     p.lexer_.RestorePos(saved);
     return nullptr;
   }
@@ -487,7 +490,21 @@ PropertyExprNode* ParserPropertySpecHelpers::ParsePropertyAbort(Parser& p) {
   return node;
 }
 
+// §16.13.2: `@(event_list)` before an operand, the clock the operand is
+// evaluated on from its nearest tick; the operand it reads is the term
+// after it, a sequence with the clock on its operands where the term is
+// one.
+PropertyExprNode* ParserPropertySpecHelpers::ParseClockedTerm(Parser& p) {
+  if (!p.Match(TokenKind::kLParen)) return nullptr;
+  std::vector<EventExpr> clock = p.ParseEventList();
+  if (!p.Match(TokenKind::kRParen) || clock.empty()) return nullptr;
+  auto* operand = ParsePropertyTerm(p);
+  if (operand != nullptr && operand->clock.empty()) operand->clock = clock;
+  return operand;
+}
+
 PropertyExprNode* ParserPropertySpecHelpers::ParsePropertyTerm(Parser& p) {
+  if (p.Match(TokenKind::kAt)) return ParseClockedTerm(p);
   bool read = false;
   auto* keyword = TryParseKeywordTerm(p, read);
   if (read) return keyword;

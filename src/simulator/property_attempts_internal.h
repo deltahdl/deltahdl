@@ -63,6 +63,11 @@ struct NodeState {
   // property was expanded to when it began, the actuals substituted, its
   // state the one operand's.
   const PropertyExprNode* expansion = nullptr;
+  // §16.13.2: the number of the clock the node is evaluated on, its own or
+  // the one flowing to it, and whether it is to begin at that clock's next
+  // tick, its parent having begun it at a tick of another.
+  int clock = 0;
+  bool awaiting = false;
 };
 
 // The verdict algebra: not over a verdict, a sequence's step as one, a

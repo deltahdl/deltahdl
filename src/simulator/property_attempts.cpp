@@ -85,21 +85,43 @@ void WatchAsynchronousAbort(const PropertyExprNode* node,
 }
 
 // §16.13.1: each operand of the flattened sequence given the number of its
-// clock among the property's, where the sequence names any.
-void NumberOperandClocks(LinearSequence& body, PropertyClocks& clocks) {
-  if (body.operand_clocks.empty()) return;
-  body.operand_clock_index.assign(body.operands.size(), 0);
+// clock among the property's, where the sequence names any or is evaluated
+// on a clock other than the leading, an operand naming none on the clock
+// flowing to the sequence, `inherited`.
+void NumberOperandClocks(LinearSequence& body, PropertyClocks& clocks,
+                         int inherited) {
+  if (body.operand_clocks.empty() && inherited == 0) return;
+  body.operand_clock_index.assign(body.operands.size(), inherited);
   for (size_t j = 0; j < body.operands.size(); ++j) {
-    body.operand_clock_index[j] = ClockIndexOf(clocks, OperandClock(body, j));
+    const std::vector<EventExpr>& own = OperandClock(body, j);
+    if (!own.empty()) body.operand_clock_index[j] = ClockIndexOf(clocks, own);
   }
 }
 
 // The sequences of the tree flattened, each node's once, with the actuals
 // of the instance the tree is the expansion of substituted where `actuals`
 // holds any; answers false where a sequence is not readable.
+// §16.13.2 and §16.13.3: the number of the clock the node is evaluated on,
+// its own where it names one, numbered where new, and otherwise the one
+// flowing to it from its parent, `inherited`; a sequence names its first
+// operand's.
+int ClockOfNode(const PropertyExprNode* node, PropertyTreeState& state,
+                int inherited) {
+  if (!node->clock.empty()) return ClockIndexOf(state.clocks, node->clock);
+  if (node->kind != PropertyExprNode::Kind::kSequence) return inherited;
+  for (const FlatSequence& flat : state.sequences) {
+    if (flat.node == node && !flat.body.operand_clock_index.empty()) {
+      return flat.body.operand_clock_index[0];
+    }
+  }
+  return inherited;
+}
+
 bool CollectSequences(const PropertyExprNode* node, PropertyTreeState& state,
                       SimContext& ctx, Arena& arena,
-                      const ActualsByFormal& actuals) {
+                      const ActualsByFormal& actuals, int inherited) {
+  int own =
+      node->clock.empty() ? inherited : ClockIndexOf(state.clocks, node->clock);
   if (node->boolean != nullptr) {
     CollectPastDirectedSites(node->boolean, state.past_sites);
   }
@@ -114,14 +136,16 @@ bool CollectSequences(const PropertyExprNode* node, PropertyTreeState& state,
     if (!actuals.empty()) {
       flat.body = SubstituteLinearSequence(flat.body, actuals, ctx, arena);
     }
-    NumberOperandClocks(flat.body, state.clocks);
+    NumberOperandClocks(flat.body, state.clocks, own);
     ForEachLinearSequenceExpr(flat.body, [&state](const Expr* e) {
       CollectPastDirectedSites(e, state.past_sites);
     });
     state.sequences.push_back(std::move(flat));
   }
   for (const PropertyExprNode* operand : node->operands) {
-    if (!CollectSequences(operand, state, ctx, arena, actuals)) return false;
+    if (!CollectSequences(operand, state, ctx, arena, actuals, own)) {
+      return false;
+    }
   }
   return true;
 }
@@ -200,11 +224,13 @@ const LinearSequence& BodyOf(const PropertyTreeState& state,
 // The state of one attempt of the tree under `node`, its operators' operands
 // stood up with it and its sequences' attempts to be begun at the first
 // tick.
-NodeState* NewNodeState(const PropertyExprNode* node, Arena& arena) {
+NodeState* NewNodeState(const PropertyExprNode* node, PropertyTreeState& tree,
+                        int inherited, Arena& arena) {
   auto* state = arena.Create<NodeState>();
   if (node->kind == PropertyExprNode::Kind::kAbort) state->abort_node = node;
+  state->clock = ClockOfNode(node, tree, inherited);
   for (const PropertyExprNode* operand : node->operands) {
-    state->operands.push_back(NewNodeState(operand, arena));
+    state->operands.push_back(NewNodeState(operand, tree, state->clock, arena));
   }
   return state;
 }
@@ -215,11 +241,14 @@ struct StepContext {
   PropertyTreeState& tree;
   SimContext& ctx;
   Arena& arena;
-  // §16.13: whether the time step is a tick of the leading clock, at which
-  // every operand advances; at a tick of another clock alone, only the
-  // sequences on it and the operators over them do.
-  bool leading = true;
+  // §16.13: the clocks that ticked at the time step, a bit per clock, on
+  // which each node advances where its own did.
+  uint32_t ticked = ~0u;
 };
+
+bool Ticked(const StepContext& sc, int clock) {
+  return clock >= 32 || ((sc.ticked >> clock) & 1u) != 0;
+}
 
 // One tick of one attempt's node, `begin` where the tick is the one the
 // attempt begins at, answering the node's verdict so far.
@@ -275,12 +304,13 @@ bool ExpandInstance(const PropertyExprNode* node, NodeState& state,
   CaptureLocalFormals(decl, actuals, sc);
   PropertyExprNode* body =
       SubstituteTree(decl->prop_body_tree, actuals, sc.arena);
-  if (!CollectSequences(body, sc.tree, sc.ctx, sc.arena, actuals)) {
+  if (!CollectSequences(body, sc.tree, sc.ctx, sc.arena, actuals,
+                        state.clock)) {
     return false;
   }
   InstallClockWatchers(sc.tree.clocks, sc.ctx, sc.arena);
   state.expansion = body;
-  state.operands.push_back(NewNodeState(body, sc.arena));
+  state.operands.push_back(NewNodeState(body, sc.tree, state.clock, sc.arena));
   return true;
 }
 
@@ -388,6 +418,20 @@ bool StepAntecedent(const PropertyExprNode* node, NodeState& state,
   return false;
 }
 
+// §16.13.2 and §16.13.3: the clock the consequent is evaluated on: its own
+// where it names one, else the clock flowing out of the antecedent, its
+// last operand's, else the implication's.
+int ConsequentClock(const PropertyExprNode* node, const NodeState& state,
+                    StepContext& sc) {
+  int own = ClockOfNode(node->operands[0], sc.tree, -1);
+  if (own >= 0) return own;
+  const LinearSequence& antecedent = BodyOf(sc.tree, node);
+  if (!antecedent.operand_clock_index.empty()) {
+    return antecedent.operand_clock_index.back();
+  }
+  return state.clock;
+}
+
 // §16.12.7: the antecedent's attempt is stepped until it can match no more,
 // and at each tick it matches at a consequent attempt begins, at that tick
 // for `|->` and at the next for `|=>`; the implication is false as soon as
@@ -401,11 +445,21 @@ Tri StepImplication(const PropertyExprNode* node, NodeState& state,
   for (NodeState* c : state.consequents) {
     verdicts.push_back(Step(consequent, *c, sc, false));
   }
-  bool spawn_now = state.spawn_next;
-  state.spawn_next = false;
-  if (StepAntecedent(node, state, sc, begin)) spawn_now = true;
+  // §16.13.2: a consequent on a clock of its own begins at that clock's
+  // nearest tick after the antecedent's end, the coincident one for `|->`
+  // and the strictly subsequent one for `|=>`.
+  int clock = ConsequentClock(node, state, sc);
+  bool spawn_now = state.spawn_next && Ticked(sc, clock);
+  if (spawn_now) state.spawn_next = false;
+  if (StepAntecedent(node, state, sc, begin)) {
+    if (Ticked(sc, clock)) {
+      spawn_now = true;
+    } else {
+      state.spawn_next = true;
+    }
+  }
   if (spawn_now) {
-    NodeState* c = NewNodeState(consequent, sc.arena);
+    NodeState* c = NewNodeState(consequent, sc.tree, clock, sc.arena);
     state.consequents.push_back(c);
     verdicts.push_back(Step(consequent, *c, sc, true));
   }
@@ -427,7 +481,6 @@ Tri StepNexttime(const PropertyExprNode* node, NodeState& state,
                      ? EvalExpr(node->boolean, sc.ctx, sc.arena).ToUint64()
                      : 1;
   } else if (!state.begun) {
-    if (!sc.leading) return Tri::kPending;
     --state.wait;
   }
   if (!state.begun && state.wait > 0) return Tri::kPending;
@@ -463,7 +516,7 @@ Tri StepAlways(const PropertyExprNode* node, NodeState& state, StepContext& sc,
     verdicts.push_back(Step(operand, *c, sc, false));
   }
   if (state.wait == 0 && state.remaining > 0) {
-    NodeState* c = NewNodeState(operand, sc.arena);
+    NodeState* c = NewNodeState(operand, sc.tree, state.clock, sc.arena);
     state.consequents.push_back(c);
     verdicts.push_back(Step(operand, *c, sc, true));
     if (!node->range_unbounded) --state.remaining;
@@ -486,8 +539,10 @@ Tri StepUntil(const PropertyExprNode* node, NodeState& state, StepContext& sc) {
     firsts.push_back(Step(node->operands[0], *state.consequents[i], sc, false));
     seconds.push_back(Step(node->operands[1], *state.seconds[i], sc, false));
   }
-  NodeState* first = NewNodeState(node->operands[0], sc.arena);
-  NodeState* second = NewNodeState(node->operands[1], sc.arena);
+  NodeState* first =
+      NewNodeState(node->operands[0], sc.tree, state.clock, sc.arena);
+  NodeState* second =
+      NewNodeState(node->operands[1], sc.tree, state.clock, sc.arena);
   state.consequents.push_back(first);
   state.seconds.push_back(second);
   firsts.push_back(Step(node->operands[0], *first, sc, true));
@@ -509,11 +564,10 @@ Tri StepAbort(const PropertyExprNode* node, NodeState& state, StepContext& sc,
   return Step(node->operands[0], *state.operands[0], sc, begin);
 }
 
-// §16.13: whether the node advances at a tick of a clock other than the
-// leading one: a sequence, which may be on that clock, and the operators
-// whose operands may hold one and count no ticks of their own.
-bool AdvancesOffTheLeadingClock(const PropertyExprNode* node,
-                                const NodeState& state) {
+// §16.13: whether the node advances at a tick of a clock other than its
+// own: a sequence, whose operands may be on that clock, and the operators
+// whose operands may be and which count no ticks of their own.
+bool AdvancesOffItsClock(const PropertyExprNode* node, const NodeState& state) {
   switch (node->kind) {
     case PropertyExprNode::Kind::kSequence:
     case PropertyExprNode::Kind::kImplication:
@@ -541,9 +595,21 @@ bool AdvancesOffTheLeadingClock(const PropertyExprNode* node,
 Tri Step(const PropertyExprNode* node, NodeState& state, StepContext& sc,
          bool begin) {
   if (state.verdict != Tri::kPending) return state.verdict;
-  if (!sc.leading && !AdvancesOffTheLeadingClock(node, state)) {
-    return state.verdict;
+  // §16.13.2: an operand on a clock of its own begins at that clock's
+  // nearest tick, the one it was begun at where the clock ticked there,
+  // and advances at its clock's ticks, and at the others' only where an
+  // operand of its own may be on them.
+  bool own_tick = Ticked(sc, state.clock);
+  if (begin && !own_tick) {
+    state.awaiting = true;
+    return Tri::kPending;
   }
+  if (state.awaiting) {
+    if (!own_tick) return Tri::kPending;
+    state.awaiting = false;
+    begin = true;
+  }
+  if (!own_tick && !AdvancesOffItsClock(node, state)) return state.verdict;
   switch (node->kind) {
     case PropertyExprNode::Kind::kBoolean:
       state.verdict = StepBoolean(node, state, sc, begin);
@@ -626,7 +692,7 @@ PropertyTreeState* CreatePropertyTreeState(
   auto* state = arena.Create<PropertyTreeState>();
   state->root = root;
   state->clocks.clocks.push_back(leading_clock);
-  if (!CollectSequences(root, *state, ctx, arena, ActualsByFormal{})) {
+  if (!CollectSequences(root, *state, ctx, arena, ActualsByFormal{}, 0)) {
     return nullptr;
   }
   InstallClockWatchers(state->clocks, ctx, arena);
@@ -651,8 +717,10 @@ std::vector<bool> AdvancePropertyTree(PropertyTreeState& state, bool disabled,
     ctx.AssertionSamples().SetClockTicks(~0u);
     return verdicts;
   }
-  if (leading) state.attempts.push_back(NewNodeState(state.root, arena));
-  StepContext sc{state, ctx, arena, leading};
+  if (leading) {
+    state.attempts.push_back(NewNodeState(state.root, state, 0, arena));
+  }
+  StepContext sc{state, ctx, arena, ticked};
   std::vector<NodeState*> kept;
   for (size_t i = 0; i < state.attempts.size(); ++i) {
     bool begin = leading && i + 1 == state.attempts.size();

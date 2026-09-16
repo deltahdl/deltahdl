@@ -122,6 +122,10 @@ struct PropertyExprNode {
   // the property of one property_case_item and the item's expressions at
   // the same index here, the default's none.
   std::vector<std::vector<Expr*>> case_values;
+  // §16.13.2: the clocking event written before the operand, `@(posedge
+  // clk1) sig1`, on which it is evaluated from its nearest tick; empty for
+  // an operand on the clock flowing to it (§16.13.3).
+  std::vector<EventExpr> clock;
 };
 
 struct EventExpr {

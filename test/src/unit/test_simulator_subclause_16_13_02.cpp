@@ -1,13 +1,125 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 #include <vector>
 
+#include "fixture_simulator.h"
 #include "simulator/sva_engine.h"
+#include "simulator/variable.h"
 
 using namespace delta;
 
 namespace {
+
+// The design of test/src/e2e/multiclock_properties.sv around one
+// assertion: clk0 rises at 5, 15, ..., 75 so that tick n of it is at 10n -
+// 5, clk1 at 12, 27, 45, 57 and 72, its tick at 45 together with clk0's
+// fifth, and clk2 at 8, 25, 38, 55, 70 and 78, its tick at 25 together
+// with clk0's third; sig0 is high at 1, 2, 5 and 7, sig1 at 3 and 5, b at
+// 1, 3 and 6, s1 at 2 and 3 and s2 at 4 and 7.
+std::string MulticlockPropertySource(const std::string& items) {
+  return "module t;\n"
+         "  logic clk0 = 0;\n"
+         "  logic clk1 = 0;\n"
+         "  logic clk2 = 0;\n"
+         "  int tick = 1;\n"
+         "  logic sig0, sig1, b, s1, s2;\n"
+         "  int passes = 0;\n"
+         "  int fails = 0;\n"
+         "  int pass_sum = 0;\n"
+         "  always #5 clk0 = ~clk0;\n"
+         "  always #10 tick = tick + 1;\n"
+         "  initial begin\n"
+         "    #12 clk1 = 1; #8 clk1 = 0; #7 clk1 = 1; #8 clk1 = 0;\n"
+         "    #10 clk1 = 1; #5 clk1 = 0; #7 clk1 = 1; #8 clk1 = 0;\n"
+         "    #7 clk1 = 1; #6 clk1 = 0;\n"
+         "  end\n"
+         "  initial begin\n"
+         "    #8 clk2 = 1; #8 clk2 = 0; #9 clk2 = 1; #7 clk2 = 0;\n"
+         "    #6 clk2 = 1; #8 clk2 = 0; #9 clk2 = 1; #7 clk2 = 0;\n"
+         "    #8 clk2 = 1; #4 clk2 = 0; #4 clk2 = 1; #1 clk2 = 0;\n"
+         "  end\n"
+         "  assign sig0 = tick inside {1, 2, 5, 7};\n"
+         "  assign sig1 = tick inside {3, 5};\n"
+         "  assign b = tick inside {1, 3, 6};\n"
+         "  assign s1 = tick inside {2, 3};\n"
+         "  assign s2 = tick inside {4, 7};\n" +
+         items +
+         "  initial #80 $finish;\n"
+         "endmodule\n";
+}
+
+// The pass and fail counts of the assertion over `spec`, clocked on clk0,
+// and the sum of the times of its passes, which tells the ticks apart.
+struct MulticlockPropertyCounts {
+  uint64_t passes;
+  uint64_t fails;
+  uint64_t pass_sum;
+};
+
+MulticlockPropertyCounts CountsOfMulticlockProperty(const std::string& spec) {
+  SimFixture f;
+  auto* passes = RunAndFindVar(
+      MulticlockPropertySource("  p: assert property (@(posedge clk0) " + spec +
+                               ") begin passes++; pass_sum += $time; end "
+                               "else fails++;\n"),
+      f, "passes");
+  if (passes == nullptr) return {~0ull, ~0ull, ~0ull};
+  Variable* fails = f.ctx.FindVariable("fails");
+  Variable* pass_sum = f.ctx.FindVariable("pass_sum");
+  return {passes->value.ToUint64(), fails->value.ToUint64(),
+          pass_sum->value.ToUint64()};
+}
+
+// §16.13.2: the and of two clocked booleans holds at a point where both
+// have matches beginning there, sig0 at the tick of clk0 and sig1 at the
+// nearest tick of clk1, the coincident one at 45: the attempts from 15 and
+// 45 hold, at 27 and 45, and the six others fail.
+TEST(MulticlockedProperty, AnAndOfClockedOperandsNeedsBothMatchesFromThePoint) {
+  MulticlockPropertyCounts counts = CountsOfMulticlockProperty(
+      "(@(posedge clk0) sig0) and (@(posedge clk1) sig1)");
+  EXPECT_EQ(counts.passes, 2u);
+  EXPECT_EQ(counts.fails, 6u);
+  EXPECT_EQ(counts.pass_sum, 72u);
+}
+
+// §16.13.2: |=> advances from the end of each match of the antecedent to
+// the nearest strictly subsequent tick of the consequent's clock, 57 for
+// the attempt from 45 though clk1 ticks at 45: the attempt from 15 holds
+// at 27, those from 5, 45 and 65 fail, and the four with sig0 low hold.
+TEST(MulticlockedProperty,
+     NonoverlappingImplicationAwaitsTheNextTickOfTheConsequentClock) {
+  MulticlockPropertyCounts counts =
+      CountsOfMulticlockProperty("sig0 |=> @(posedge clk1) sig1");
+  EXPECT_EQ(counts.passes, 5u);
+  EXPECT_EQ(counts.fails, 3u);
+  EXPECT_EQ(counts.pass_sum, 217u);
+}
+
+// §16.13.2: |-> checks the consequent immediately where its clock ticks at
+// the end of the antecedent, as at 45, and at the next tick of its clock
+// otherwise: the attempt from 45 holds there too.
+TEST(MulticlockedProperty,
+     OverlappingImplicationChecksAtACoincidentTickAtOnce) {
+  MulticlockPropertyCounts counts =
+      CountsOfMulticlockProperty("sig0 |-> @(posedge clk1) sig1");
+  EXPECT_EQ(counts.passes, 6u);
+  EXPECT_EQ(counts.fails, 2u);
+  EXPECT_EQ(counts.pass_sum, 262u);
+}
+
+// §16.13.2: if-else reads its condition at the property's clock and the
+// branch chosen at the nearest, possibly overlapping, tick of the branch's
+// clock: the attempts from 5, 25, 35 and 65 hold, at 12, 27, 38 and 70,
+// and those from 15, 45, 55 and 75 fail.
+TEST(MulticlockedProperty, IfElseReadsEachBranchAtItsClocksNearestTick) {
+  MulticlockPropertyCounts counts = CountsOfMulticlockProperty(
+      "if (b) @(posedge clk1) s1 else @(posedge clk2) s2");
+  EXPECT_EQ(counts.passes, 4u);
+  EXPECT_EQ(counts.fails, 4u);
+  EXPECT_EQ(counts.pass_sum, 147u);
+}
 
 // §16.13.2: a multiclocked sequence evaluated as a property is true iff there
 // is a match beginning at that point, and the verdict is always a definite true

@@ -88,4 +88,57 @@ TEST(AssertionParsing, MulticlockedImplicationWithBooleanAndConsequent) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// §16.13.2: a clocking event before a property operand, `@(posedge clk1)
+// sig1` as the consequent, is the clock the operand is evaluated on, which
+// the operand's node records, the tree carrying the implication.
+TEST(AssertionParsing, AClockBeforeAnOperandIsRecordedOnItsNode) {
+  auto r = Parse(
+      "module m;\n"
+      "  assert property (@(posedge clk0) sig0 |=> @(posedge clk1) sig1);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindItemByKind(r, ModuleItemKind::kAssertProperty);
+  ASSERT_NE(item, nullptr);
+  ASSERT_NE(item->body, nullptr);
+  const PropertyExprNode* root = item->body->assert_property;
+  ASSERT_NE(root, nullptr);
+  EXPECT_EQ(root->kind, PropertyExprNode::Kind::kImplication);
+  EXPECT_TRUE(root->strong);
+  ASSERT_EQ(root->operands.size(), 1u);
+  const PropertyExprNode* consequent = root->operands[0];
+  EXPECT_EQ(consequent->kind, PropertyExprNode::Kind::kBoolean);
+  ASSERT_EQ(consequent->clock.size(), 1u);
+  EXPECT_EQ(consequent->clock[0].edge, Edge::kPosedge);
+  ASSERT_NE(consequent->clock[0].signal, nullptr);
+  EXPECT_EQ(consequent->clock[0].signal->text, "clk1");
+  ASSERT_NE(consequent->boolean, nullptr);
+  EXPECT_EQ(consequent->boolean->text, "sig1");
+}
+
+// §16.13.2: a parenthesised operand opening with a clocking event of its
+// own is a property operand, so the clause's and of two clocked booleans
+// is an and over two operands, each on the clock it names.
+TEST(AssertionParsing, AParenthesisedClockedOperandIsAPropertyOperand) {
+  auto r = Parse(
+      "module m;\n"
+      "  assert property (@(posedge clk0)\n"
+      "    (@(posedge clk0) sig0) and (@(posedge clk1) sig1));\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindItemByKind(r, ModuleItemKind::kAssertProperty);
+  ASSERT_NE(item, nullptr);
+  ASSERT_NE(item->body, nullptr);
+  const PropertyExprNode* root = item->body->assert_property;
+  ASSERT_NE(root, nullptr);
+  EXPECT_EQ(root->kind, PropertyExprNode::Kind::kAnd);
+  ASSERT_EQ(root->operands.size(), 2u);
+  EXPECT_EQ(root->operands[0]->kind, PropertyExprNode::Kind::kBoolean);
+  ASSERT_EQ(root->operands[0]->clock.size(), 1u);
+  EXPECT_EQ(root->operands[0]->clock[0].signal->text, "clk0");
+  ASSERT_EQ(root->operands[1]->clock.size(), 1u);
+  EXPECT_EQ(root->operands[1]->clock[0].signal->text, "clk1");
+}
+
 }  // namespace

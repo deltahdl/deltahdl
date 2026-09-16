@@ -230,6 +230,8 @@ void CollectTreeClocks(const PropertyExprNode* node,
                        const PropertyRegistry& registry,
                        std::vector<EventExpr>& out, int depth) {
   if (node == nullptr) return;
+  // §16.13.2: an operand's own clock.
+  for (const EventExpr& ev : node->clock) AppendClockOnce(out, ev);
   if (node->sequence != nullptr) {
     CollectBodyClocks(node->sequence->seq_linear, registry, out, depth);
   }
