@@ -98,9 +98,6 @@ void NumberOperandClocks(LinearSequence& body, PropertyClocks& clocks,
   }
 }
 
-// The sequences of the tree flattened, each node's once, with the actuals
-// of the instance the tree is the expansion of substituted where `actuals`
-// holds any; answers false where a sequence is not readable.
 // §16.13.2 and §16.13.3: the number of the clock the node is evaluated on,
 // its own where it names one, numbered where new, and otherwise the one
 // flowing to it from its parent, `inherited`; a sequence names its first
@@ -117,24 +114,39 @@ int ClockOfNode(const PropertyExprNode* node, PropertyTreeState& state,
   return inherited;
 }
 
-bool CollectSequences(const PropertyExprNode* node, PropertyTreeState& state,
-                      SimContext& ctx, Arena& arena,
-                      const ActualsByFormal& actuals, int inherited) {
+// What a collection of the tree's sequences reads and writes: the tree's
+// state, the context and arena the sequences are flattened in, and the
+// actuals of the instance the tree is the expansion of.
+struct Collection {
+  PropertyTreeState& state;
+  SimContext& ctx;
+  Arena& arena;
+  const ActualsByFormal& actuals;
+};
+
+// The sequences of the tree flattened, each node's once, with the actuals
+// substituted where the collection holds any, each operand numbered by its
+// clock, `inherited` the clock flowing to the node; answers false where a
+// sequence is not readable.
+bool CollectSequences(const PropertyExprNode* node, Collection& in,
+                      int inherited) {
+  PropertyTreeState& state = in.state;
   int own =
       node->clock.empty() ? inherited : ClockIndexOf(state.clocks, node->clock);
   if (node->boolean != nullptr) {
     CollectPastDirectedSites(node->boolean, state.past_sites);
   }
   if (node->kind == PropertyExprNode::Kind::kAbort && !node->synchronous) {
-    WatchAsynchronousAbort(node, state, ctx, arena);
+    WatchAsynchronousAbort(node, state, in.ctx, in.arena);
   }
   if (node->sequence != nullptr) {
     FlatSequence flat{node, LinearSequence{}};
-    if (!FlattenLinearSequence(node->sequence, ctx, arena, flat.body)) {
+    if (!FlattenLinearSequence(node->sequence, in.ctx, in.arena, flat.body)) {
       return false;
     }
-    if (!actuals.empty()) {
-      flat.body = SubstituteLinearSequence(flat.body, actuals, ctx, arena);
+    if (!in.actuals.empty()) {
+      flat.body =
+          SubstituteLinearSequence(flat.body, in.actuals, in.ctx, in.arena);
     }
     NumberOperandClocks(flat.body, state.clocks, own);
     ForEachLinearSequenceExpr(flat.body, [&state](const Expr* e) {
@@ -143,9 +155,7 @@ bool CollectSequences(const PropertyExprNode* node, PropertyTreeState& state,
     state.sequences.push_back(std::move(flat));
   }
   for (const PropertyExprNode* operand : node->operands) {
-    if (!CollectSequences(operand, state, ctx, arena, actuals, own)) {
-      return false;
-    }
+    if (!CollectSequences(operand, in, own)) return false;
   }
   return true;
 }
@@ -304,10 +314,8 @@ bool ExpandInstance(const PropertyExprNode* node, NodeState& state,
   CaptureLocalFormals(decl, actuals, sc);
   PropertyExprNode* body =
       SubstituteTree(decl->prop_body_tree, actuals, sc.arena);
-  if (!CollectSequences(body, sc.tree, sc.ctx, sc.arena, actuals,
-                        state.clock)) {
-    return false;
-  }
+  Collection collection{sc.tree, sc.ctx, sc.arena, actuals};
+  if (!CollectSequences(body, collection, state.clock)) return false;
   InstallClockWatchers(sc.tree.clocks, sc.ctx, sc.arena);
   state.expansion = body;
   state.operands.push_back(NewNodeState(body, sc.tree, state.clock, sc.arena));
@@ -692,9 +700,9 @@ PropertyTreeState* CreatePropertyTreeState(
   auto* state = arena.Create<PropertyTreeState>();
   state->root = root;
   state->clocks.clocks.push_back(leading_clock);
-  if (!CollectSequences(root, *state, ctx, arena, ActualsByFormal{}, 0)) {
-    return nullptr;
-  }
+  const ActualsByFormal kNoActuals;
+  Collection collection{*state, ctx, arena, kNoActuals};
+  if (!CollectSequences(root, collection, 0)) return nullptr;
   InstallClockWatchers(state->clocks, ctx, arena);
   return state;
 }
