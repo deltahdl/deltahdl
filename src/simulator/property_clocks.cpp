@@ -53,19 +53,26 @@ Variable* SignalOf(const EventExpr& ev, SimContext& ctx) {
   return ctx.FindVariable(ev.signal->text);
 }
 
-// Watches one event of the clock numbered `clock`: at each change of its
-// signal, the edge the event names records the time step as a tick.
-void WatchEvent(PropertyClocks& clocks, int clock, size_t slot,
+// One event watched: the number of its clock, and its slot among the
+// events of every clock, where the signal's last reading is kept.
+struct WatchedEvent {
+  int clock;
+  size_t slot;
+};
+
+// Watches one event of a clock: at each change of its signal, the edge the
+// event names records the time step as a tick of the clock.
+void WatchEvent(PropertyClocks& clocks, WatchedEvent watched,
                 const EventExpr& ev, SimContext& ctx, Arena& arena) {
   Variable* var = SignalOf(ev, ctx);
   if (var == nullptr) return;
-  clocks.was_true[slot] = EvalExpr(ev.signal, ctx, arena).IsTruthy();
-  var->AddWatcher([&clocks, clock, slot, &ev, &ctx, &arena]() {
+  clocks.was_true[watched.slot] = EvalExpr(ev.signal, ctx, arena).IsTruthy();
+  var->AddWatcher([&clocks, watched, &ev, &ctx, &arena]() {
     bool now = EvalExpr(ev.signal, ctx, arena).IsTruthy();
-    bool was = clocks.was_true[slot];
-    clocks.was_true[slot] = now;
+    bool was = clocks.was_true[watched.slot];
+    clocks.was_true[watched.slot] = now;
     if (EdgeHappened(ev.edge, was, now)) {
-      clocks.ticked_at[clock] = ctx.CurrentTime();
+      clocks.ticked_at[watched.clock] = ctx.CurrentTime();
     }
     return false;
   });
@@ -84,17 +91,20 @@ int ClockIndexOf(PropertyClocks& clocks, const std::vector<EventExpr>& clock) {
 
 void InstallClockWatchers(PropertyClocks& clocks, SimContext& ctx,
                           Arena& arena) {
-  clocks.multiclock = clocks.clocks.size() > 1;
-  if (!clocks.multiclock) return;
-  clocks.installed_at = ctx.CurrentTime();
-  clocks.ticked_at.assign(clocks.clocks.size(), PropertyClocks::kNever);
-  size_t events = 0;
-  for (const auto& clock : clocks.clocks) events += clock.size();
-  clocks.was_true.assign(events, false);
-  size_t slot = 0;
-  for (size_t i = 0; i < clocks.clocks.size(); ++i) {
+  if (clocks.clocks.size() < 2) return;
+  if (!clocks.multiclock) {
+    clocks.multiclock = true;
+    clocks.installed_at = ctx.CurrentTime();
+  }
+  // The clocks not yet watched, from the first where the property has just
+  // met its second, so a clock an expansion brings is watched from then.
+  while (clocks.ticked_at.size() < clocks.clocks.size()) {
+    size_t i = clocks.ticked_at.size();
+    clocks.ticked_at.push_back(PropertyClocks::kNever);
     for (const EventExpr& ev : clocks.clocks[i]) {
-      WatchEvent(clocks, static_cast<int>(i), slot++, ev, ctx, arena);
+      clocks.was_true.push_back(false);
+      WatchEvent(clocks, {static_cast<int>(i), clocks.was_true.size() - 1}, ev,
+                 ctx, arena);
     }
   }
 }

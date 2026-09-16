@@ -148,6 +148,32 @@ void AppendClockOnce(std::vector<EventExpr>& clock, const EventExpr& ev) {
   clock.push_back(ev);
 }
 
+// The declaration `operand` instantiates where it names one of `kind`, an
+// identifier or a call naming a sequence or a property.
+const ModuleItem* InstantiatedDecl(const Expr* operand, ModuleItemKind kind,
+                                   const PropertyRegistry& registry) {
+  if (operand == nullptr) return nullptr;
+  if (operand->kind != ExprKind::kIdentifier &&
+      operand->kind != ExprKind::kCall) {
+    return nullptr;
+  }
+  const ModuleItem* decl = registry.Find(
+      operand->kind == ExprKind::kCall ? operand->callee : operand->text);
+  return decl != nullptr && decl->kind == kind ? decl : nullptr;
+}
+
+void CollectBodyClocks(const SeqLinearBody& body,
+                       const PropertyRegistry& registry,
+                       std::vector<EventExpr>& out, int depth);
+
+void CollectBodiesClocks(const std::vector<SeqLinearBody>& bodies,
+                         const PropertyRegistry& registry,
+                         std::vector<EventExpr>& out, int depth) {
+  for (const SeqLinearBody& inner : bodies) {
+    CollectBodyClocks(inner, registry, out, depth);
+  }
+}
+
 // §16.13.1: the clocks the operands of a sequence body name, the bodies of
 // the sequences it instantiates walked too, to a depth that reads a body
 // once.
@@ -157,26 +183,41 @@ void CollectBodyClocks(const SeqLinearBody& body,
   for (const auto& clock : body.clocks) {
     for (const EventExpr& ev : clock) AppendClockOnce(out, ev);
   }
-  for (const Expr* operand : body.operands) {
-    if (operand == nullptr || depth >= 4) continue;
-    if (operand->kind != ExprKind::kIdentifier &&
-        operand->kind != ExprKind::kCall) {
-      continue;
-    }
-    const ModuleItem* decl = registry.Find(
-        operand->kind == ExprKind::kCall ? operand->callee : operand->text);
-    if (decl != nullptr && decl->kind == ModuleItemKind::kSequenceDecl) {
-      CollectBodyClocks(decl->seq_linear, registry, out, depth + 1);
+  if (depth < 4) {
+    for (const Expr* operand : body.operands) {
+      const ModuleItem* decl =
+          InstantiatedDecl(operand, ModuleItemKind::kSequenceDecl, registry);
+      if (decl != nullptr) {
+        CollectBodyClocks(decl->seq_linear, registry, out, depth + 1);
+      }
     }
   }
-  for (const SeqLinearBody& inner : body.intersects) {
-    CollectBodyClocks(inner, registry, out, depth);
+  CollectBodiesClocks(body.intersects, registry, out, depth);
+  CollectBodiesClocks(body.conjuncts, registry, out, depth);
+  CollectBodiesClocks(body.alternatives, registry, out, depth);
+}
+
+void CollectTreeClocks(const PropertyExprNode* node,
+                       const PropertyRegistry& registry,
+                       std::vector<EventExpr>& out, int depth);
+
+// §16.13: the clocks an instance among the tree's booleans brings: those of
+// the body of the property it instantiates and of the sequences and
+// properties it takes as actuals.
+void CollectInstanceClocks(const Expr* instance,
+                           const PropertyRegistry& registry,
+                           std::vector<EventExpr>& out, int depth) {
+  if (instance == nullptr || depth >= 4) return;
+  const ModuleItem* decl =
+      InstantiatedDecl(instance, ModuleItemKind::kPropertyDecl, registry);
+  if (decl != nullptr) {
+    CollectTreeClocks(decl->prop_body_tree, registry, out, depth + 1);
   }
-  for (const SeqLinearBody& inner : body.conjuncts) {
-    CollectBodyClocks(inner, registry, out, depth);
-  }
-  for (const SeqLinearBody& inner : body.alternatives) {
-    CollectBodyClocks(inner, registry, out, depth);
+  if (instance->kind != ExprKind::kCall) return;
+  for (const Expr* arg : instance->args) {
+    if (arg != nullptr) {
+      CollectTreeClocks(arg->property_actual, registry, out, depth);
+    }
   }
 }
 
@@ -191,23 +232,7 @@ void CollectTreeClocks(const PropertyExprNode* node,
   if (node->sequence != nullptr) {
     CollectBodyClocks(node->sequence->seq_linear, registry, out, depth);
   }
-  const Expr* instance = node->boolean;
-  if (instance != nullptr && depth < 4 &&
-      (instance->kind == ExprKind::kIdentifier ||
-       instance->kind == ExprKind::kCall)) {
-    const ModuleItem* decl = registry.Find(
-        instance->kind == ExprKind::kCall ? instance->callee : instance->text);
-    if (decl != nullptr && decl->kind == ModuleItemKind::kPropertyDecl) {
-      CollectTreeClocks(decl->prop_body_tree, registry, out, depth + 1);
-    }
-    if (instance->kind == ExprKind::kCall) {
-      for (const Expr* arg : instance->args) {
-        if (arg != nullptr) {
-          CollectTreeClocks(arg->property_actual, registry, out, depth);
-        }
-      }
-    }
-  }
+  CollectInstanceClocks(node->boolean, registry, out, depth);
   for (const PropertyExprNode* operand : node->operands) {
     CollectTreeClocks(operand, registry, out, depth);
   }

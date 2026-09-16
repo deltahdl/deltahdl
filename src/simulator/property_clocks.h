@@ -34,9 +34,10 @@ struct PropertyClocks {
 // for an empty clock, the leading clock's.
 int ClockIndexOf(PropertyClocks& clocks, const std::vector<EventExpr>& clock);
 
-// Installs the watchers where the property is on more than one clock, at
-// the time step of its first evaluation, which is a tick of the leading
-// clock and reads as one.
+// Installs the watchers where the property is on more than one clock, for
+// the clocks not yet watched; the time step the first is installed at is
+// one of the property's evaluation, a tick of the leading clock, and reads
+// as one.
 void InstallClockWatchers(PropertyClocks& clocks, SimContext& ctx,
                           Arena& arena);
 

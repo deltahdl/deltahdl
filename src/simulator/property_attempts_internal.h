@@ -76,6 +76,13 @@ Tri Junction(bool is_or, const std::vector<Tri>& verdicts);
 Tri Implies(Tri first, Tri second);
 Tri Iff(Tri first, Tri second);
 
+// §16.12.12: an until decided from its operands' verdicts at the ticks in
+// order from the first not yet decided, which `wait` indexes; not yet
+// decided where every tick has passed on.
+Tri DecideUntil(const PropertyExprNode* node, NodeState& state,
+                const std::vector<Tri>& firsts,
+                const std::vector<Tri>& seconds);
+
 // The end of the run: a sequence still in flight reads by its strength, an
 // antecedent still in flight matches no more, and the rest follows.
 Tri Finish(const PropertyExprNode* node, NodeState& state);

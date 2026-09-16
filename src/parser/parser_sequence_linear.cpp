@@ -414,17 +414,22 @@ struct ParserSeqLinearHelpers {
         body.match_items.push_back(body.match_items[first + i]);
         body.repetitions.push_back(body.repetitions[first + i]);
       }
-      // §16.9.9: a throughout inside the group spans each copy as it did the
-      // first.
-      for (size_t g = 0; g < guards; ++g) {
-        SeqThroughout guard = body.throughouts[g];
-        if (guard.first < first) continue;
-        guard.first += n * k;
-        guard.last += n * k;
-        body.throughouts.push_back(guard);
-      }
+      CopyGroupGuards(body, first, guards, n * k);
     }
     return true;
+  }
+
+  // §16.9.9: a throughout inside the group, among the first `guards`, spans
+  // the copy of the group `shift` operands on as it did the first.
+  static void CopyGroupGuards(SeqLinearBody& body, size_t first, size_t guards,
+                              size_t shift) {
+    for (size_t g = 0; g < guards; ++g) {
+      SeqThroughout guard = body.throughouts[g];
+      if (guard.first < first) continue;
+      guard.first += shift;
+      guard.last += shift;
+      body.throughouts.push_back(guard);
+    }
   }
 
   // A parenthesised group, `( sequence_expr [, match_items] )`: its operands

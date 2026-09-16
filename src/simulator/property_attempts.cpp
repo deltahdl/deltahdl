@@ -475,45 +475,6 @@ Tri StepAlways(const PropertyExprNode* node, NodeState& state, StepContext& sc,
   return state.remaining == 0 ? joined : Tri::kPending;
 }
 
-// §16.12.12: what an until's tick says from its operands' verdicts there:
-// the until decided true or false, the tick passed on to the next, or not
-// yet known. The non-overlapping forms are true at a tick the second operand
-// holds at, whatever the first, and the overlapping forms need the first
-// there too; a tick the first operand fails at before that fails the until;
-// a tick the first holds at with the second false passes on.
-enum class UntilTick : uint8_t { kTrue, kFalse, kNext, kPending };
-
-UntilTick TickOfUntil(const PropertyExprNode* node, Tri first, Tri second) {
-  bool overlapping = node->range_unbounded;
-  if (!overlapping && second == Tri::kTrue) return UntilTick::kTrue;
-  if (first == Tri::kFalse) return UntilTick::kFalse;
-  if (first == Tri::kPending || second == Tri::kPending) {
-    return UntilTick::kPending;
-  }
-  return second == Tri::kTrue ? UntilTick::kTrue : UntilTick::kNext;
-}
-
-// The ticks in order from the first not yet decided, which `wait` indexes;
-// an until whose every tick has passed on is not yet decided.
-Tri DecideUntil(const PropertyExprNode* node, NodeState& state,
-                const std::vector<Tri>& firsts,
-                const std::vector<Tri>& seconds) {
-  while (state.wait < firsts.size()) {
-    switch (TickOfUntil(node, firsts[state.wait], seconds[state.wait])) {
-      case UntilTick::kTrue:
-        return Tri::kTrue;
-      case UntilTick::kFalse:
-        return Tri::kFalse;
-      case UntilTick::kPending:
-        return Tri::kPending;
-      case UntilTick::kNext:
-        ++state.wait;
-        break;
-    }
-  }
-  return Tri::kPending;
-}
-
 // One tick of an until: the operands' attempts of the ticks before step on,
 // a pair begins at this tick, and the ticks are decided in order.
 Tri StepUntil(const PropertyExprNode* node, NodeState& state, StepContext& sc) {
