@@ -39,7 +39,7 @@ src/elaborator/const_eval_func.cpp
 # at all. ForEachChildStmt hands the visitor a bare child with no way to tell
 # which field it came from, so this walk cannot use it and says so in a
 # comment, which is what the paragraph above ForEachChildStmt asks for.
-src/elaborator/elaborator_process.cpp
+src/elaborator/elaborator_process_validate.cpp
 
 # CheckJumpRules names for_body alone, and only to carry a changed JumpScope
 # into the loop body it opens. Every other link it descends through
