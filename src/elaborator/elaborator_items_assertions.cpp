@@ -134,6 +134,23 @@ EventExpr SubstituteClockEvent(EventExpr ev, const ActualsByFormal& actuals,
 // without arguments binds none; §16.12.1 puts substitution of actuals for
 // formals ahead of the check, and there are none to substitute.
 //
+// The body the statement of the instance `instance` of `decl` carries: the
+// boolean with the actuals substituted where the body is the clocked
+// boolean form and every actual an expression, and otherwise, §16.12.17, a
+// tree whose root is the instance, expanded at the run, its recursion
+// included, with the actuals substituted there.
+void GiveInstanceBody(Stmt* stmt, Expr* instance, const ModuleItem* decl,
+                      const ActualsByFormal& actuals, Arena& arena) {
+  if (decl->prop_body_expr != nullptr && !InstanceHasTreeActual(instance)) {
+    stmt->assert_expr = SubstituteFormals(decl->prop_body_expr, actuals, arena);
+    stmt->assert_negated = decl->prop_negated;
+    return;
+  }
+  stmt->assert_expr = instance;
+  stmt->assert_property = arena.Create<PropertyExprNode>();
+  stmt->assert_property->boolean = instance;
+}
+
 // The rewrite is made on `item`, which every instance of the module shares,
 // and it is made once: the property declaration is the same for every
 // instance, so the second instance finds the body already there. Reports the
@@ -200,18 +217,7 @@ void SubstitutePropertyInstance(ModuleItem* item, Arena& arena,
                    ? StmtKind::kAssumeImmediate
                    : StmtKind::kAssertImmediate;
   stmt->range.start = item->loc;
-  if (decl->prop_body_expr != nullptr &&
-      !InstanceHasTreeActual(item->assert_expr)) {
-    stmt->assert_expr = SubstituteFormals(decl->prop_body_expr, actuals, arena);
-    stmt->assert_negated = decl->prop_negated;
-  } else {
-    // §16.12.17: a body the tree evaluator reads is expanded at the run,
-    // its recursion included, so the statement carries the instance as
-    // the root of its tree, and the actuals are substituted there.
-    stmt->assert_expr = item->assert_expr;
-    stmt->assert_property = arena.Create<PropertyExprNode>();
-    stmt->assert_property->boolean = item->assert_expr;
-  }
+  GiveInstanceBody(stmt, item->assert_expr, decl, actuals, arena);
   stmt->assert_disable_iff =
       SubstituteFormals(decl->prop_disable_iff, actuals, arena);
   stmt->is_concurrent_clocked = true;

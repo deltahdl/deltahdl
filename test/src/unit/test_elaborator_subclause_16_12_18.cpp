@@ -99,4 +99,37 @@ TEST(TypedPropertyFormal, PropertyTypedRefLegalOnlyWherePropertyExprAllowed) {
       PropertyTypedFormalRefPlace::kOtherPosition));
 }
 
+// §16.12.18: an instance standing as the whole property_spec whose actual
+// is a property_expr is evaluated as the body's tree even where the body
+// is the clocked boolean form, since the boolean substitution does not
+// read such an actual: the statement carries a tree rooted at the
+// instance, with the actual's tree on its argument.
+TEST(TypedPropertyFormal, ATreeActualGivesABooleanBodysInstanceATree) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic clk, b, c;\n"
+      "  property p_not(property q);\n"
+      "    @(posedge clk) not q;\n"
+      "  endproperty\n"
+      "  assert property (p_not(b |-> c));\n"
+      "endmodule\n",
+      f, "m");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const RtlirProcess* p = TheAssertionProcess(design->top_modules[0]);
+  ASSERT_NE(p, nullptr);
+  ASSERT_NE(p->body, nullptr);
+  EXPECT_FALSE(p->body->assert_negated);
+  const PropertyExprNode* root = p->body->assert_property;
+  ASSERT_NE(root, nullptr);
+  EXPECT_EQ(root->kind, PropertyExprNode::Kind::kBoolean);
+  ASSERT_NE(root->boolean, nullptr);
+  EXPECT_EQ(root->boolean->kind, ExprKind::kCall);
+  ASSERT_EQ(root->boolean->args.size(), 1u);
+  const PropertyExprNode* actual = root->boolean->args[0]->property_actual;
+  ASSERT_NE(actual, nullptr);
+  EXPECT_EQ(actual->kind, PropertyExprNode::Kind::kImplication);
+}
+
 }  // namespace

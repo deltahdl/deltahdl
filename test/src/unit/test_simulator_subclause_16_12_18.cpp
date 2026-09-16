@@ -46,6 +46,12 @@ std::string TypedSource(const std::string& items) {
          "  property p_not(property q);\n"
          "    @(posedge clk) not q;\n"
          "  endproperty\n"
+         "  property p_id(property q);\n"
+         "    @(posedge clk) q;\n"
+         "  endproperty\n"
+         "  property p_not_or(property q);\n"
+         "    @(posedge clk) not q or 1'b0;\n"
+         "  endproperty\n"
          "  property p_seq(sequence s);\n"
          "    @(posedge clk) s |-> c;\n"
          "  endproperty\n" +
@@ -118,6 +124,31 @@ TEST(TypedPropertyFormals, APropertyMayBePassedToAPropertyFormal) {
 // at those four alone.
 TEST(TypedPropertyFormals, APropertyFormalMayStandUnderNot) {
   auto counts = CountsOfTyped("p_not(b |-> c)");
+  EXPECT_EQ(counts.first, 4u);
+  EXPECT_EQ(counts.second, 4u);
+}
+
+// §16.12.18: the same negation written after the assertion's own clock,
+// where the instance is read as a boolean the elaborator promotes to the
+// root of a tree.
+TEST(TypedPropertyFormals, APropertyFormalUnderNotAfterAClock) {
+  auto counts = CountsOfTyped("@(posedge clk) p_not(b |-> c)");
+  EXPECT_EQ(counts.first, 4u);
+  EXPECT_EQ(counts.second, 4u);
+}
+
+// §16.12.18: a body that is the formal alone stands for the actual: b |-> c
+// fails at 3, 6, 7 and 8.
+TEST(TypedPropertyFormals, APropertyFormalMayBeTheWholeBody) {
+  auto counts = CountsOfTyped("p_id(b |-> c)");
+  EXPECT_EQ(counts.first, 4u);
+  EXPECT_EQ(counts.second, 4u);
+}
+
+// §16.12.18: the negation under an or with a false operand, a property of
+// operands rather than the clocked boolean form, holds where not q does.
+TEST(TypedPropertyFormals, APropertyFormalUnderNotInAPropertyOfOperands) {
+  auto counts = CountsOfTyped("p_not_or(b |-> c)");
   EXPECT_EQ(counts.first, 4u);
   EXPECT_EQ(counts.second, 4u);
 }
