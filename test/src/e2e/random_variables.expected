@@ -1,0 +1,10 @@
+solved 40 of 40
+y within 0 to 255: 40 of 40
+randc c visited every value in each group of four: 10 of 10
+r within 0.0 to 2.0: 40 of 40
+e a named constant: 40 of 40
+s took a value its enum member does not name: 1
+in.v solved under its own constraint: 40 of 40
+w > in.v under the holder's constraint: 40 of 40
+handle in unmodified: 40 of 40
+$finish at time 0

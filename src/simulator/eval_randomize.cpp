@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -132,6 +133,16 @@ void AddRandMember(const ClassMember* m, const ClassTypeInfo* level,
   // every constraint requiring a negative value unsatisfiable.
   info.var.is_signed = DeclaredSignedness(m, level);
   info.var.BindDomainToDeclaredRange();
+  // 18.4.1: a real random variable is drawn uniformly over its range, which
+  // the relational constraints narrow; unconstrained it spans what an int
+  // does, a range with no bound being no range to draw from.
+  if (m->data_type.kind == DataTypeKind::kReal ||
+      m->data_type.kind == DataTypeKind::kShortreal ||
+      m->data_type.kind == DataTypeKind::kRealtime) {
+    info.var.is_real = true;
+    info.var.real_min = -2147483648.0;
+    info.var.real_max = 2147483648.0;
+  }
   out.push_back(std::move(info));
 }
 
@@ -147,6 +158,23 @@ void AddRandMember(const ClassMember* m, const ClassTypeInfo* level,
 // into those would read them as the rand variable whose name they share and
 // wrongly refuse to fold a relation that really is against a constant. `this.x`
 // is the one qualified form that does name the object's own member.
+// Folds the comparison of the rand variable `name` against the constant
+// `cv`, `c` as an integer, into its domain: 18.4.1 has a real variable's
+// range be what its relational constraints leave of it, the bound read as
+// the real it compares against, and an integral variable's bounds narrow
+// as FoldBound has them.
+void FoldComparison(std::vector<RandInfo>& rands, std::string_view name,
+                    ConstraintKind kind, const Logic4Vec& cv, int64_t c) {
+  auto* ri = FindRand(rands, name);
+  if (ri == nullptr) return;
+  if (ri->var.is_real) {
+    FoldRealBound(*ri, kind,
+                  cv.is_real ? RealVecToDouble(cv) : static_cast<double>(c));
+    return;
+  }
+  FoldBound(*ri, kind, c);
+}
+
 // 18.5: a comparison of a rand variable against a constant. Fills `out` with
 // the typed solver constraint, folds the variable's domain, and returns true;
 // other relation shapes return false for the kCustom fallback.
@@ -198,8 +226,7 @@ bool TryComparisonConstraint(const Expr* rel, std::vector<RandInfo>& rands,
   // did, a discarded soft preference would still constrain the variable,
   // biasing the result and narrowing the values the hard constraints still
   // allow.
-  if (fold)
-    if (auto* ri = FindRand(rands, var_side->text)) FoldBound(*ri, kind, c);
+  if (fold) FoldComparison(rands, var_side->text, kind, cv, c);
   return true;
 }
 
@@ -713,7 +740,11 @@ ClassObject* ResolveRandomizeTarget(SimContext& ctx,
 void WriteBackSolved(ClassObject* obj, std::vector<RandInfo>& rands,
                      ConstraintSolver& solver, Arena& arena) {
   for (auto& ri : rands) {
-    if (ri.var.is_real) continue;
+    if (ri.var.is_real) {
+      obj->SetProperty(ri.name, MakeRealVec(arena, solver.GetRealValue(ri.name),
+                                            ri.var.width == 32 ? 32 : 64));
+      continue;
+    }
     int64_t v = solver.GetValue(ri.name);
     Logic4Vec lv =
         MakeLogic4VecVal(arena, ri.var.width, static_cast<uint64_t>(v));
@@ -814,6 +845,25 @@ bool ComparisonKind(TokenKind op, ConstraintKind& out) {
 // end of it. The step to the neighbouring value of a strict relation is taken
 // in wrapping unsigned arithmetic for the same reason: at the top of the range
 // there is no next number for a signed int64_t to hold.
+void FoldRealBound(RandInfo& ri, ConstraintKind kind, double c) {
+  switch (kind) {
+    case ConstraintKind::kGreaterEqual:
+    case ConstraintKind::kGreaterThan:
+      ri.var.real_min = std::max(ri.var.real_min, c);
+      break;
+    case ConstraintKind::kLessEqual:
+    case ConstraintKind::kLessThan:
+      ri.var.real_max = std::min(ri.var.real_max, c);
+      break;
+    case ConstraintKind::kEqual:
+      ri.var.real_min = c;
+      ri.var.real_max = c;
+      break;
+    default:
+      break;
+  }
+}
+
 void FoldBound(RandInfo& ri, ConstraintKind kind, int64_t c) {
   switch (kind) {
     case ConstraintKind::kGreaterEqual:

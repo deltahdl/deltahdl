@@ -163,6 +163,9 @@ void CollectRandVariables(const ClassTypeInfo* type, SimContext& ctx,
                           std::vector<RandInfo>& out);
 bool ComparisonKind(TokenKind op, ConstraintKind& out);
 void FoldBound(RandInfo& ri, ConstraintKind kind, int64_t c);
+// 18.4.1: the same for a real variable's range, a bound on one side leaving
+// the other and an equality closing both on the value.
+void FoldRealBound(RandInfo& ri, ConstraintKind kind, double c);
 bool IsObjectConstraintActive(const ClassObject* obj, std::string_view name);
 bool IsObjectRandActive(const ClassObject* obj, std::string_view name);
 void InvokePostRandomize(ClassObject* obj, const Expr* expr, SimContext& ctx,
