@@ -884,6 +884,12 @@ PropertyTick AdvancePropertyTree(PropertyTreeState& state, bool disabled,
   // time step, by another of the clocks, advances nothing again.
   SimTime now = ctx.CurrentTime();
   if (state.clocks.multiclock && state.advanced_at == now) return tick;
+  // §16.14.6.3: a second pass of the Active region in one time step, after
+  // the Reactive region wrote what a procedure reads, may queue instances
+  // of a procedural assertion whose clock ticked earlier in the step; they
+  // begin at this tick, and the attempts already advanced at it advance no
+  // more.
+  bool again = state.advanced_at == now;
   state.advanced_at = now;
   uint32_t ticked = ClocksTicked(state.clocks, now);
   if (ticked == 0) return tick;
@@ -897,6 +903,7 @@ PropertyTick AdvancePropertyTree(PropertyTreeState& state, bool disabled,
     samples.SetClockTicks(~0u);
     return tick;
   }
+  size_t advanced = again ? state.attempts.size() : 0;
   for (size_t i = 0; i < beginning; ++i) {
     NodeState* attempt = NewNodeState(state.root, state, 0, arena);
     attempt->bindings = instances[i];
@@ -905,6 +912,10 @@ PropertyTick AdvancePropertyTree(PropertyTreeState& state, bool disabled,
   StepContext sc{state, ctx, arena, ticked};
   std::vector<NodeState*> kept;
   for (size_t i = 0; i < state.attempts.size(); ++i) {
+    if (i < advanced) {
+      kept.push_back(state.attempts[i]);
+      continue;
+    }
     bool first = i + beginning >= state.attempts.size();
     // §16.14.6.1: the attempt reads the values its instance saved.
     samples.SetInstanceBindings(state.attempts[i]->bindings);

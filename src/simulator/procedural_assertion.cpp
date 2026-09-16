@@ -35,16 +35,28 @@ void CollectQueuedAssertions(const Stmt* s, std::vector<const Stmt*>& out) {
       s, [&out](Stmt* const& sub) { CollectQueuedAssertions(sub, out); });
 }
 
+// One tick of the statement in the monitor's process, the current one,
+// beginning an attempt per instance given, the statement's reports naming
+// the scopes the procedure reached it in.
+void TickInstances(ProceduralAssertionState* state,
+                   const AttemptInstances& instances, SimContext& ctx,
+                   Arena& arena) {
+  std::vector<std::string_view> saved = ctx.ActiveNamedScopes();
+  PendingReportScope::Replace(ctx, state->named_scopes);
+  ExecConcurrentAssertionTick(state->stmt, instances, ctx, arena);
+  PendingReportScope::Replace(ctx, saved);
+}
+
 // §16.14.6: the life of one statement's monitor: at every occurrence of the
 // leading clocking event, in the Observed region, the attempts in flight
-// advance and one begins per pending instance, the statement's reports
-// naming the scopes the procedure reached it in. A tick before the
-// statement was ever reached has nothing in flight and nothing to begin.
+// advance and one begins per pending instance. A tick before the statement
+// was ever reached has nothing in flight and nothing to begin.
 SimCoroutine MonitorCoroutine(const Stmt* stmt, ProceduralAssertionState* state,
                               SimContext& ctx, Arena& arena) {
   for (;;) {
     co_await EventAwaiter{ctx, stmt->assert_clock, arena};
     co_await ObservedRegionAwaiter{ctx};
+    state->ticked_at = ctx.CurrentTime().ticks;
     if (!state->reached) continue;
     // The instances matured in earlier steps and the ones pending in this,
     // which mature in this Observed region, all begin an attempt.
@@ -53,10 +65,7 @@ SimCoroutine MonitorCoroutine(const Stmt* stmt, ProceduralAssertionState* state,
     instances.insert(instances.end(), state->pending.begin(),
                      state->pending.end());
     state->pending.clear();
-    std::vector<std::string_view> saved = ctx.ActiveNamedScopes();
-    PendingReportScope::Replace(ctx, state->named_scopes);
-    ExecConcurrentAssertionTick(stmt, instances, ctx, arena);
-    PendingReportScope::Replace(ctx, saved);
+    TickInstances(state, instances, ctx, arena);
   }
 }
 
@@ -129,15 +138,29 @@ const InstanceBindings* CaptureInstanceBindings(const Stmt* stmt,
 // statement's clock; one maturing is scheduled per step per statement, the
 // first enqueue of the step scheduling it, and it moves what is pending by
 // then, what §16.14.6.2's flush points left, to the matured queue.
-void ScheduleMaturing(ProceduralAssertionState* state, SimContext& ctx) {
+// §16.14.6.3: where the clock ticked earlier in the step, the monitor
+// having run in an earlier pass of the Observed region, the instances
+// begin their attempts here and then, in the monitor's process.
+void ScheduleMaturing(ProceduralAssertionState* state, SimContext& ctx,
+                      Arena& arena) {
   if (state->maturing_scheduled) return;
   state->maturing_scheduled = true;
   auto* ev = ctx.GetScheduler().GetEventPool().Acquire();
-  ev->callback = [state]() {
+  ev->callback = [state, &ctx, &arena]() {
     state->maturing_scheduled = false;
-    state->matured.insert(state->matured.end(), state->pending.begin(),
-                          state->pending.end());
+    if (state->pending.empty()) return;
+    if (state->ticked_at != ctx.CurrentTime().ticks) {
+      state->matured.insert(state->matured.end(), state->pending.begin(),
+                            state->pending.end());
+      state->pending.clear();
+      return;
+    }
+    AttemptInstances instances = std::move(state->pending);
     state->pending.clear();
+    Process* saved = ctx.CurrentProcess();
+    ctx.SetCurrentProcess(state->monitor);
+    TickInstances(state, instances, ctx, arena);
+    ctx.SetCurrentProcess(saved);
   };
   ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), Region::kObserved, ev);
 }
@@ -150,6 +173,7 @@ void StartProceduralAssertionMonitors(Process* proc, const Stmt* body,
   CollectQueuedAssertions(body, statements);
   for (const Stmt* stmt : statements) {
     auto* state = arena.Create<ProceduralAssertionState>();
+    state->stmt = stmt;
     proc->procedural_assertions[stmt] = state;
     // The monitor stands in the procedure's instance and generate blocks, as
     // the attempt of a static assertion stands in its process's, and it is
@@ -161,6 +185,7 @@ void StartProceduralAssertionMonitors(Process* proc, const Stmt* body,
     monitor->gen_block_name = proc->gen_block_name;
     monitor->program_block_id = proc->program_block_id;
     monitor->is_concurrent_clocked = true;
+    state->monitor = monitor;
     monitor->coro = MonitorCoroutine(stmt, state, ctx, arena).Release();
     ScheduleAssertionChildStart(monitor, Region::kActive, ctx);
   }
@@ -178,7 +203,7 @@ bool EnqueueProceduralAssertion(const Stmt* stmt, SimContext& ctx,
     state->named_scopes = ctx.ActiveNamedScopes();
   }
   state->pending.push_back(CaptureInstanceBindings(stmt, ctx, arena));
-  ScheduleMaturing(state, ctx);
+  ScheduleMaturing(state, ctx, arena);
   return true;
 }
 

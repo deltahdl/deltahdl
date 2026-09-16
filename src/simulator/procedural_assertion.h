@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <string_view>
 #include <vector>
 
@@ -27,11 +28,21 @@ struct Stmt;
 // The named scopes the statement was first reached in are kept for its
 // reports to name, as §21.2.1.5's %m names the statement under the labels
 // of the procedure.
+// §16.14.6.3: a procedure run again in a later pass of the Active region
+// of one time step, after the Reactive region wrote what it reads, may
+// queue an instance after the statement's clock ticked in that step; the
+// instance matures in the next Observed region and, the clocking event
+// having occurred in the step, begins its attempt there and then, which
+// `ticked_at`, the step the monitor last ticked in, tells, and `monitor`
+// is the process the attempt is evaluated in.
 struct ProceduralAssertionState {
+  const Stmt* stmt = nullptr;
+  Process* monitor = nullptr;
   std::vector<const InstanceBindings*> pending;
   std::vector<const InstanceBindings*> matured;
   bool maturing_scheduled = false;
   bool reached = false;
+  uint64_t ticked_at = ~static_cast<uint64_t>(0);
   std::vector<std::string_view> named_scopes;
 };
 

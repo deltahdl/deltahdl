@@ -762,6 +762,9 @@ struct SequencePropertyState {
   LinearSequence body;
   std::vector<const Expr*> past_sites;
   std::vector<FirstMatchAttempt> attempts;
+  // The time step the attempts last advanced at, §16.14.6.3's second pass
+  // of one step beginning attempts without advancing those again.
+  SimTime advanced_at{UINT64_MAX};
 };
 
 SequencePropertyState* CreateSequencePropertyState(const ModuleItem* seq,
@@ -784,6 +787,11 @@ std::vector<SequenceOutcome> AdvanceSequenceProperty(
     state.attempts.clear();
     return outcomes;
   }
+  // §16.14.6.3: at a second pass of one time step the attempts already
+  // advanced at it advance no more; the new ones begin.
+  SimTime now = ctx.CurrentTime();
+  size_t advanced = state.advanced_at == now ? state.attempts.size() : 0;
+  state.advanced_at = now;
   for (const InstanceBindings* bindings : tick.instances) {
     state.attempts.push_back(FreshFirstMatchAttempt(state.body));
     state.attempts.back().bindings = bindings;
@@ -791,6 +799,10 @@ std::vector<SequenceOutcome> AdvanceSequenceProperty(
   auto& samples = ctx.AssertionSamples();
   std::vector<FirstMatchAttempt> kept;
   for (size_t i = 0; i < state.attempts.size(); ++i) {
+    if (i < advanced) {
+      kept.push_back(std::move(state.attempts[i]));
+      continue;
+    }
     bool first = i + tick.instances.size() >= state.attempts.size();
     // §16.14.6.1: the attempt reads the values its instance saved.
     samples.SetInstanceBindings(state.attempts[i].bindings);
