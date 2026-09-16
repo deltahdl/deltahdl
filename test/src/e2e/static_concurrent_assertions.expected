@@ -1,0 +1,12 @@
+static_concurrent_assertions.prog.pr_c1 covered at 15
+static_concurrent_assertions.bus.if_a1 failed at 35
+static_concurrent_assertions.prog.pr_c1 covered at 45
+static_concurrent_assertions.prog.pr_c1 covered at 65
+a1 passes 7 fails 1
+always assert property passes 7 fails 1
+c1 covered 3 times
+always cover property covered 3 times
+$finish at time 80
+cover property static_concurrent_assertions.c1 (line 60): attempted 8, succeeded 3, succeeded vacuously 0
+cover property static_concurrent_assertions (line 61): attempted 8, succeeded 3, succeeded vacuously 0
+cover property static_concurrent_assertions.prog.pr_c1 (line 67): attempted 8, succeeded 3, succeeded vacuously 0
