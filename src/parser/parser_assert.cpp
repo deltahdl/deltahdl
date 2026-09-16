@@ -105,56 +105,40 @@ static void SkipBalancedPropertySpec(Lexer& lexer) {
   }
 }
 
-// §16.14.6: "a concurrent assertion may be embedded in procedural code", and
-// the clause evaluates one "as though it were a separate concurrent
-// assertion". A property written there with no clocking event of its own takes
-// the clocking of the procedure that reaches it, which for
-// `always @(posedge clk) assert property (a);` is the edge the procedure is
-// already waiting on -- so the statement standing where it stands is the
-// evaluation, and the boolean is what to keep.
-//
-// Reads that boolean into assert_expr when the property_spec is one, restores
-// the lexer and answers false otherwise, exactly as
-// TryParseSimpleConcurrentProperty does for the module-item form. The mark
-// travels with it: §16.5.1 evaluates a concurrent assertion's property on
-// sampled values, and is_concurrent_clocked is what the statement executor
-// raises that mode on.
-bool Parser::TryParseProceduralConcurrentBoolean(Stmt* stmt) {
-  if (stmt->kind != StmtKind::kAssertImmediate) return false;
-  // A property_spec opening with its own clocking event is evaluated on that
-  // event rather than where the statement stands, which is a process this does
-  // not build.
-  if (Check(TokenKind::kAt)) return false;
-  if (BodyHasTemporalOperator()) return false;
-  auto saved = lexer_.SavePos();
-  diag_.PushSuppress();
-  Expr* prop = ParseExpr();
-  // Accept only a boolean that consumes the whole spec, so the next token is
-  // the property's closing parenthesis.
-  if (prop == nullptr || !Check(TokenKind::kRParen)) {
-    diag_.PopSuppress();
-    lexer_.RestorePos(saved);
-    return false;
-  }
-  diag_.PopSuppress();
-  stmt->assert_expr = prop;
-  stmt->is_concurrent_clocked = true;
-  return true;
-}
-
+// §16.14.6: a concurrent assertion statement embedded in procedural code is
+// a pending instance of its property placed in the procedural assertion
+// queue of the process that reaches it, evaluated as a separate concurrent
+// assertion is once the instance matures, on the clocking event its spec
+// opens with or, where it opens with none, on the clock the elaborator
+// infers from the procedure, so the spec is read as the static statement's
+// is, the clock optional: the events the spec opens with go to assert_clock
+// and the body to the statement MakeSimplePropertyStmt makes, which the
+// evaluation reads on §16.5.1's sampled values. A cover sequence stands
+// beside the cover property. A spec of a form the static path does not read
+// is reported and skipped.
 Stmt* Parser::ParseProceduralConcurrentAssertLike(StmtKind kind) {
-  auto* stmt = arena_.Create<Stmt>();
-  stmt->kind = kind;
-  stmt->range.start = CurrentLoc();
-
-  stmt->is_procedural_concurrent = true;
-  Expect(TokenKind::kKwProperty, Subclause("16.14.6"));
+  auto* spec = arena_.Create<ModuleItem>();
+  spec->loc = CurrentLoc();
+  bool sequence = Match(TokenKind::kKwSequence);
+  if (!sequence) Expect(TokenKind::kKwProperty, Subclause("16.14.6"));
   Expect(TokenKind::kLParen, Subclause("16.14.6"));
-  stmt->assert_expr = nullptr;
-  if (!TryParseProceduralConcurrentBoolean(stmt)) {
-    WarnUnevaluatedProceduralAssertion(stmt->range.start, kind);
+  Stmt* stmt = nullptr;
+  if (TryParseSimpleConcurrentProperty(spec, kind)) {
+    stmt = spec->body;
+    stmt->assert_clock = spec->sensitivity;
+  } else {
+    stmt = arena_.Create<Stmt>();
+    stmt->kind = kind;
+    stmt->range.start = spec->loc;
+    diag_.Warning(spec->loc,
+                  "procedural concurrent assertion is not evaluated: its "
+                  "property_spec holds more than the forms this tool "
+                  "evaluates",
+                  Subclause("16.14.6"));
     SkipBalancedPropertySpec(lexer_);
   }
+  stmt->is_procedural_concurrent = true;
+  stmt->cover_sequence = sequence;
   Expect(TokenKind::kRParen, Subclause("16.14.6"));
 
   ParserAssertHelpers::ParseActionBlock(*this, stmt);
@@ -193,7 +177,7 @@ Stmt* Parser::ParseImmediateCover() {
   stmt->range.start = CurrentLoc();
   Expect(TokenKind::kKwCover, Subclause("16.3"));
 
-  if (Check(TokenKind::kKwProperty)) {
+  if (Check(TokenKind::kKwProperty) || Check(TokenKind::kKwSequence)) {
     return ParseProceduralConcurrentAssertLike(StmtKind::kCoverImmediate);
   }
 
@@ -320,47 +304,6 @@ bool Parser::BodyHasTemporalOperator() {
 // lets BodyHasTemporalOperator and the '@' test read the spec this reports on:
 // TryParseSimpleConcurrentProperty restores the lexer when it fails, and the
 // cover and restrict statements never attempt it.
-// Reports that a procedural concurrent assertion the source wrote will not be
-// evaluated, naming which reason applies. §16.14.6 asks for the evaluation and
-// the statement above serves one form of it; every other form was discarded
-// where it stood, so a design whose assertions were all discarded compiled
-// exactly like one whose assertions all held and no line said which it was.
-//
-// Called from the first token of the property_spec, which is where
-// BodyHasTemporalOperator and the clocking-event test below both read from.
-void Parser::WarnUnevaluatedProceduralAssertion(SourceLoc loc, StmtKind kind) {
-  std::string reason;
-  if (kind == StmtKind::kAssumeImmediate) {
-    reason =
-        "assume property is parsed and then discarded, this tool evaluating "
-        "only assert property";
-  } else if (kind == StmtKind::kCoverImmediate) {
-    reason =
-        "cover property is parsed and then discarded, this tool evaluating "
-        "only assert property";
-  } else if (BodyHasTemporalOperator()) {
-    reason =
-        "its property is temporal, using |->, |=> or ##, and this tool "
-        "evaluates only a boolean property";
-  } else if (Check(TokenKind::kAt)) {
-    // §16.14.6 gives a property with no clocking event of its own the clocking
-    // of the procedure that reaches it, which is the form served; one carrying
-    // its own event is evaluated on that event instead, which is a process
-    // rather than a statement.
-    reason =
-        "its property_spec carries a clocking event of its own, and this tool "
-        "evaluates a procedural concurrent assertion on the clocking of the "
-        "procedure that reaches it";
-  } else {
-    reason =
-        "its property_spec holds more than the boolean_expression this tool "
-        "evaluates";
-  }
-  diag_.Warning(loc,
-                "procedural concurrent assertion is not evaluated: " + reason,
-                Subclause("16.14.6"));
-}
-
 void Parser::WarnUnevaluatedConcurrentAssertion(SourceLoc loc) {
   // Named as §16.14 Syntax 16-18 writes the statement, so the report quotes
   // the source back rather than an internal enumerator name. An assert,
@@ -407,9 +350,12 @@ bool Parser::TryParseDisableIff(Expr*& disable_iff) {
   return disable_iff != nullptr && Match(TokenKind::kRParen);
 }
 
+// The clocking events are optional here, a procedural concurrent assertion
+// taking its clock from the procedure (§16.14.6); a static statement's
+// caller asks for the `@` before calling, its clock being the statement's
+// own.
 bool Parser::TryParseSimpleConcurrentProperty(ModuleItem* item,
                                               StmtKind body_kind) {
-  if (!Check(TokenKind::kAt)) return false;
   auto saved = lexer_.SavePos();
   diag_.PushSuppress();
   std::vector<EventExpr> events;
@@ -496,10 +442,11 @@ ModuleItem* Parser::ParsePropertyAssertLike(ModuleItemKind kind,
   // assert property statement's, and §16.14.2 has a simulator check an
   // assumption as it checks an assertion, so the clocked boolean form is read
   // for both; the body's kind keeps the directive for §20.11's controls.
-  bool simple_concurrent = TryParseSimpleConcurrentProperty(
-      item, kind == ModuleItemKind::kAssertProperty
-                ? StmtKind::kAssertImmediate
-                : StmtKind::kAssumeImmediate);
+  bool simple_concurrent =
+      Check(TokenKind::kAt) && TryParseSimpleConcurrentProperty(
+                                   item, kind == ModuleItemKind::kAssertProperty
+                                             ? StmtKind::kAssertImmediate
+                                             : StmtKind::kAssumeImmediate);
   if (!simple_concurrent && !TryParsePropertyInstanceSpec(item)) {
     // Before SkipPropertySpec, which moves the lexer off the property_spec the
     // reason is read from.
@@ -585,6 +532,7 @@ ModuleItem* Parser::ParseCoverProperty() {
   // and §16.14, is recorded for the elaborator as ParsePropertyAssertLike
   // records one, and a cover whose spec is neither has its spec skipped.
   bool simple_concurrent =
+      Check(TokenKind::kAt) &&
       TryParseSimpleConcurrentProperty(item, StmtKind::kCoverImmediate);
   if (!simple_concurrent && !TryParsePropertyInstanceSpec(item)) {
     WarnUnevaluatedConcurrentAssertion(item->loc);

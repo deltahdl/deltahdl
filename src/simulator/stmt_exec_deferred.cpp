@@ -20,6 +20,7 @@
 #include "simulator/cover_statement.h"
 #include "simulator/evaluation.h"
 #include "simulator/expr_walk.h"
+#include "simulator/procedural_assertion.h"
 #include "simulator/process.h"
 #include "simulator/property_attempts.h"
 #include "simulator/scheduler.h"
@@ -28,6 +29,7 @@
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"
 #include "simulator/stmt_exec.h"
+#include "simulator/stmt_exec_assertion_internal.h"
 #include "simulator/stmt_exec_internal.h"
 #include "simulator/sva_engine.h"
 #include "simulator/sva_engine_sampling.h"
@@ -104,45 +106,6 @@ static bool DeferredReportCancelled(const Process* proc,
   return proc && !label.empty() &&
          proc->cancelled_deferred_labels.count(label) != 0;
 }
-
-// §16.4.1: a pending assertion report is placed in the queue of the process
-// executing the assertion, and §20.10 has its severity message and §21.2.1.5
-// its %m name the hierarchical scope of the statement, which the labels the
-// process stands inside are part of. The report's event runs after the process
-// has moved on or suspended, with the context holding whatever ran last, so
-// the process and its named scopes are recorded when the report is queued and
-// stood back up around the report, then put back as they were.
-struct PendingReportScope {
-  Process* proc = nullptr;
-  std::vector<std::string_view> named_scopes;
-
-  static PendingReportScope Capture(const SimContext& ctx) {
-    return {ctx.CurrentProcess(), ctx.ActiveNamedScopes()};
-  }
-
-  // Stands the captured scopes up in the captured process's place, keeping
-  // in `saved` what Restore puts back: the process that was current, and
-  // the captured process's own scopes, which the switch brought in with it
-  // and which it keeps, the report's standing in their place only until
-  // the report is done.
-  void Install(SimContext& ctx, PendingReportScope& saved) const {
-    saved.proc = ctx.CurrentProcess();
-    ctx.SetCurrentProcess(proc);
-    saved.named_scopes = ctx.ActiveNamedScopes();
-    Replace(ctx, named_scopes);
-  }
-
-  static void Restore(SimContext& ctx, const PendingReportScope& saved) {
-    Replace(ctx, saved.named_scopes);
-    ctx.SetCurrentProcess(saved.proc);
-  }
-
-  static void Replace(SimContext& ctx,
-                      const std::vector<std::string_view>& scopes) {
-    while (!ctx.ActiveNamedScopes().empty()) ctx.PopActiveNamedScope();
-    for (std::string_view scope : scopes) ctx.PushActiveNamedScope(scope);
-  }
-};
 
 // §16.4.1 and §16.4.2: queues one pending assertion report -- an action
 // block's subroutine call, the default $error, or a deferred cover's result --
@@ -247,8 +210,8 @@ static SimCoroutine ConcurrentAssertActionCoroutine(
 // tick. §23.6 resolves the names it writes under the instance and generate
 // prefixes the assertion stands in, so the process carries the ones the
 // process that reached the assertion had.
-static Process* CreateAssertionChildProcess(SimContext& ctx, Arena& arena,
-                                            Region home_region) {
+Process* CreateAssertionChildProcess(SimContext& ctx, Arena& arena,
+                                     Region home_region) {
   auto* p = arena.Create<Process>();
   p->kind = ProcessKind::kInitial;
   p->home_region = home_region;
@@ -267,8 +230,7 @@ static Process* CreateAssertionChildProcess(SimContext& ctx, Arena& arena,
 
 // Starts the process at the current time in `region`, where its coroutine runs
 // to its first wait. A process disabled before that is left where it is.
-static void ScheduleAssertionChildStart(Process* p, Region region,
-                                        SimContext& ctx) {
+void ScheduleAssertionChildStart(Process* p, Region region, SimContext& ctx) {
   auto* ev = ctx.GetScheduler().GetEventPool().Acquire();
   ev->callback = [p, &ctx]() {
     if (!p->active) return;
@@ -300,46 +262,12 @@ static bool TryScheduleConcurrentAssertAction(const Stmt* action,
   return true;
 }
 
-// §16.5: "Concurrent assertions ... are evaluated in the Observed region", and
-// §16.14.6 has one embedded in procedural code "evaluated as though it were a
-// separate concurrent assertion", so where the statement is written does not
-// change the region its property is evaluated in. A module-item concurrent
-// assertion is carried by a process the scheduler already resumes there
-// (Process::is_concurrent_clocked, see ResumeMaybeReactive in
-// simulator/awaiters_event_control.h); one written inside a procedure is
-// reached in whatever region that procedure is running in, which for an
-// `always @(posedge clk)` is the Active region -- in the middle of the write
-// that assigned the clock.
-//
-// The procedure suspends into the Observed region and resumes there rather than
-// handing the property to a process of its own, because §16.14.6.1 evaluates
-// the assertion against the scope the statement stands in: a variable of that
-// procedure is reachable from this process and from no other. The statements
-// after the assertion resume with it, which is the cost of the choice; §4.4.2.2
-// keeps ordinary procedural code in the Active region, and a procedure with
-// code after a concurrent assertion pays for the assertion's region.
-struct ObservedRegionAwaiter {
-  SimContext& ctx;
+ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), Region::kObserved, event);
+}
 
-  bool await_ready() const noexcept {
-    return ctx.GetScheduler().CurrentRegion() == Region::kObserved;
-  }
-
-  void await_suspend(std::coroutine_handle<> h) const {
-    auto* proc = ctx.CurrentProcess();
-    auto* event = ctx.GetScheduler().GetEventPool().Acquire();
-    auto* ctx_ptr = &ctx;
-    event->callback = [h, proc, ctx_ptr]() mutable {
-      if (proc != nullptr && !proc->active) return;
-      if (proc != nullptr) ctx_ptr->SetCurrentProcess(proc);
-      h.resume();
-    };
-    ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), Region::kObserved,
-                                     event);
-  }
-
-  void await_resume() const noexcept {}
-};
+void await_resume() const noexcept {}
+}
+;
 
 // §16.3: records one evaluation of an immediate cover statement, succeeded
 // when the covered expression held, against the statement in the scope the
@@ -597,8 +525,8 @@ static SimCoroutine PropertyTreeFinalCoroutine(const Stmt* stmt,
   }
 }
 
-static void ExecPropertyTreeTick(const Stmt* stmt, SimContext& ctx,
-                                 Arena& arena) {
+static void ExecPropertyTreeTick(const Stmt* stmt, uint32_t begin,
+                                 SimContext& ctx, Arena& arena) {
   if (!ctx.AssertCheckingEnabled(ImmediateAssertionTypeBit(stmt),
                                  ImmediateDirectiveTypeBit(stmt))) {
     return;
@@ -620,16 +548,18 @@ static void ExecPropertyTreeTick(const Stmt* stmt, SimContext& ctx,
   auto& samples = ctx.AssertionSamples();
   bool outer_evaluating_property = samples.EvaluatingProperty();
   samples.SetEvaluatingProperty(true);
-  PropertyTick tick = AdvancePropertyTree(*state, disabled, ctx, arena);
+  PropertyTick tick = AdvancePropertyTree(*state, disabled, begin, ctx, arena);
   samples.SetEvaluatingProperty(outer_evaluating_property);
-  if (tick.attempted) RecordConcurrentCoverAttempt(stmt, ctx);
+  for (uint32_t i = 0; i < tick.attempted; ++i) {
+    RecordConcurrentCoverAttempt(stmt, ctx);
+  }
   for (PropertyVerdict verdict : tick.verdicts) {
     ConcludeAssertion(stmt, verdict, ctx, arena);
   }
 }
 
-static void ExecSequencePropertyTick(const Stmt* stmt, SimContext& ctx,
-                                     Arena& arena) {
+static void ExecSequencePropertyTick(const Stmt* stmt, uint32_t begin,
+                                     SimContext& ctx, Arena& arena) {
   uint32_t type_bit = ImmediateAssertionTypeBit(stmt);
   uint32_t directive_bit = ImmediateDirectiveTypeBit(stmt);
   if (!ctx.AssertCheckingEnabled(type_bit, directive_bit)) return;
@@ -645,7 +575,7 @@ static void ExecSequencePropertyTick(const Stmt* stmt, SimContext& ctx,
       RegisterStrongAttemptsFinal(stmt, state, ctx, arena);
     }
   }
-  RecordConcurrentCoverAttempt(stmt, ctx);
+  for (uint32_t i = 0; i < begin; ++i) RecordConcurrentCoverAttempt(stmt, ctx);
   bool disabled = stmt->assert_disable_iff != nullptr &&
                   EvalExpr(stmt->assert_disable_iff, ctx, arena).IsTruthy();
   auto& samples = ctx.AssertionSamples();
@@ -655,7 +585,7 @@ static void ExecSequencePropertyTick(const Stmt* stmt, SimContext& ctx,
   // match of it counted; a property, a cover property's among them, holds
   // at the first.
   std::vector<SequenceVerdict> verdicts = AdvanceSequenceProperty(
-      *state, disabled, stmt->cover_sequence, ctx, arena);
+      *state, disabled, stmt->cover_sequence, begin, ctx, arena);
   samples.SetEvaluatingProperty(outer_evaluating_property);
   for (SequenceVerdict verdict : verdicts) {
     bool matched = verdict == SequenceVerdict::kMatched;
@@ -773,7 +703,28 @@ static void StartFutureGclkAttempt(const Stmt* stmt, const Process& asserting,
   ScheduleAssertionChildStart(p, p->home_region, ctx);
 }
 
+void ExecConcurrentAssertionTick(const Stmt* stmt, uint32_t begin,
+                                 SimContext& ctx, Arena& arena) {
+  if (stmt->assert_property != nullptr) {
+    ExecPropertyTreeTick(stmt, begin, ctx, arena);
+  } else if (stmt->assert_sequence != nullptr) {
+    ExecSequencePropertyTick(stmt, begin, ctx, arena);
+  } else {
+    // A boolean property is decided at its own tick, so each attempt is one
+    // evaluation; its action block, a concurrent assertion's, is scheduled
+    // into the Reactive region rather than handed back.
+    for (uint32_t i = 0; i < begin; ++i) JudgeAssertion(stmt, ctx, arena);
+  }
+}
+
 ExecTask ExecImmediateAssert(const Stmt* stmt, SimContext& ctx, Arena& arena) {
+  // §16.14.6: a concurrent assertion embedded in procedural code is not
+  // evaluated where it is reached but placed in the procedural assertion
+  // queue of the process, to be evaluated at its leading clocking event.
+  if (stmt->is_procedural_concurrent && stmt->is_concurrent_clocked &&
+      !stmt->assert_clock.empty() && EnqueueProceduralAssertion(stmt, ctx)) {
+    co_return StmtResult::kDone;
+  }
   // §16.5: a concurrent assertion's property is evaluated in the Observed
   // region, whether the statement stands outside procedural code or inside it.
   // An immediate assertion (§16.3) is not marked and is evaluated where it
@@ -793,11 +744,11 @@ ExecTask ExecImmediateAssert(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   }
 
   if (stmt->assert_property != nullptr) {
-    ExecPropertyTreeTick(stmt, ctx, arena);
+    ExecPropertyTreeTick(stmt, 1, ctx, arena);
     co_return StmtResult::kDone;
   }
   if (stmt->assert_sequence != nullptr) {
-    ExecSequencePropertyTick(stmt, ctx, arena);
+    ExecSequencePropertyTick(stmt, 1, ctx, arena);
     co_return StmtResult::kDone;
   }
 

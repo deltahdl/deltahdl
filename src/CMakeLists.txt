@@ -101,6 +101,8 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/elaborator_items_udp.cpp
     elaborator/elaborator_items_scope.cpp
     elaborator/elaborator_items_assertions.cpp
+    elaborator/property_instance.cpp
+    elaborator/procedural_concurrent_assertion.cpp
     elaborator/interface_syntax.cpp
     elaborator/property_rewrite.cpp
     elaborator/rewrite_algorithm.cpp
@@ -247,6 +249,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/lowerer_udp.cpp
     simulator/lowerer_register.cpp
     simulator/lowerer_sequence_monitors.cpp
+    simulator/procedural_assertion.cpp
     simulator/property_attempts.cpp
     simulator/property_clocks.cpp
     simulator/property_finish.cpp

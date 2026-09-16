@@ -875,7 +875,8 @@ PropertyTreeState* CreatePropertyTreeState(
 }
 
 PropertyTick AdvancePropertyTree(PropertyTreeState& state, bool disabled,
-                                 SimContext& ctx, Arena& arena) {
+                                 uint32_t begin, SimContext& ctx,
+                                 Arena& arena) {
   PropertyTick tick;
   // §16.13: which clocks ticked at this time step; a second wake at one
   // time step, by another of the clocks, advances nothing again.
@@ -884,8 +885,8 @@ PropertyTick AdvancePropertyTree(PropertyTreeState& state, bool disabled,
   state.advanced_at = now;
   uint32_t ticked = ClocksTicked(state.clocks, now);
   if (ticked == 0) return tick;
-  bool leading = (ticked & 1u) != 0;
-  tick.attempted = leading;
+  uint32_t beginning = (ticked & 1u) != 0 ? begin : 0;
+  tick.attempted = beginning;
   ctx.AssertionSamples().SetClockTicks(ticked);
   for (const Expr* site : state.past_sites) EvalExpr(site, ctx, arena);
   if (disabled) {
@@ -893,14 +894,14 @@ PropertyTick AdvancePropertyTree(PropertyTreeState& state, bool disabled,
     ctx.AssertionSamples().SetClockTicks(~0u);
     return tick;
   }
-  if (leading) {
+  for (uint32_t i = 0; i < beginning; ++i) {
     state.attempts.push_back(NewNodeState(state.root, state, 0, arena));
   }
   StepContext sc{state, ctx, arena, ticked};
   std::vector<NodeState*> kept;
   for (size_t i = 0; i < state.attempts.size(); ++i) {
-    bool begin = leading && i + 1 == state.attempts.size();
-    Tri verdict = Step(state.root, *state.attempts[i], sc, begin);
+    bool first = i + beginning >= state.attempts.size();
+    Tri verdict = Step(state.root, *state.attempts[i], sc, first);
     if (verdict == Tri::kPending) {
       kept.push_back(state.attempts[i]);
     } else {

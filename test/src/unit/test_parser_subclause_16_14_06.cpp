@@ -168,24 +168,50 @@ TEST(EmbeddedConcurrentAssertion, ProceduralAssertKeepsItsBooleanProperty) {
   EXPECT_TRUE(found->is_concurrent_clocked);
 }
 
-// The form that is still discarded says so. §16.14.6 asked for the evaluation
-// whatever the property holds, and a temporal one is not the boolean this
-// evaluates, so the line the source wrote is named rather than passed over in
-// silence.
-TEST(EmbeddedConcurrentAssertion, ProceduralTemporalAssertIsReported) {
+// §16.14.6 evaluates the embedded assertion as a separate concurrent
+// assertion whatever its property_spec holds, so a temporal property is read
+// as a static statement's is, into the tree the evaluation reads, and one
+// opening with a clocking event of its own keeps that event as its leading
+// clock; a cover sequence stands beside the cover property.
+TEST(EmbeddedConcurrentAssertion, ProceduralSpecIsReadAsAStaticOnes) {
   auto result = Parse(
-      "module m(input logic clk, input logic a);\n"
-      "  always @(posedge clk) assert property (a |-> a);\n"
+      "module m(input logic clk, input logic a, input logic b);\n"
+      "  always @(posedge clk) begin\n"
+      "    assert property (a |-> b);\n"
+      "    assert property (@(posedge b) a);\n"
+      "    cover sequence (a ##1 b);\n"
+      "  end\n"
       "endmodule\n");
-  EXPECT_TRUE(ReportedWarning(result.diags,
-                              "procedural concurrent assertion is not "
-                              "evaluated: its property is temporal",
-                              2, "16.14.6"));
+  ASSERT_FALSE(result.has_errors);
+  EXPECT_TRUE(result.diags.empty());
+  ASSERT_NE(result.cu, nullptr);
+  ASSERT_FALSE(result.cu->modules.empty());
+  auto* mod = result.cu->modules.back();
+  Stmt* body = nullptr;
+  for (auto* it : mod->items) {
+    if (it->kind == ModuleItemKind::kAlwaysBlock) body = it->body;
+  }
+  ASSERT_NE(body, nullptr);
+  ASSERT_EQ(body->stmts.size(), 3u);
+  const Stmt* temporal = body->stmts[0];
+  EXPECT_TRUE(temporal->is_procedural_concurrent);
+  EXPECT_TRUE(temporal->assert_clock.empty());
+  ASSERT_NE(temporal->assert_property, nullptr);
+  EXPECT_EQ(temporal->assert_property->kind,
+            PropertyExprNode::Kind::kImplication);
+  const Stmt* clocked = body->stmts[1];
+  ASSERT_EQ(clocked->assert_clock.size(), 1u);
+  EXPECT_EQ(clocked->assert_clock[0].edge, Edge::kPosedge);
+  ASSERT_NE(clocked->assert_expr, nullptr);
+  EXPECT_EQ(clocked->assert_expr->text, "a");
+  const Stmt* sequence = body->stmts[2];
+  EXPECT_EQ(sequence->kind, StmtKind::kCoverImmediate);
+  EXPECT_TRUE(sequence->cover_sequence);
+  EXPECT_NE(sequence->assert_sequence, nullptr);
 }
 
-// The negative control: the form this tool does evaluate is not reported. A
-// report on it would be as wrong as the silence was, and without this case a
-// fix that warned unconditionally would satisfy the case above.
+// The negative control: the form this tool evaluates is not reported, so a
+// fix that warned unconditionally would not pass.
 TEST(EmbeddedConcurrentAssertion, ProceduralBooleanAssertIsNotReported) {
   auto result = Parse(
       "module m(input logic clk, input logic a);\n"

@@ -11,6 +11,7 @@
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "elaborator/design_scopes.h"
+#include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/global_clocking_sampled_value.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/sensitivity.h"
@@ -26,6 +27,7 @@
 #include "simulator/lowerer_register.h"
 #include "simulator/module_path_delay.h"
 #include "simulator/net.h"
+#include "simulator/procedural_assertion.h"
 #include "simulator/process.h"
 #include "simulator/sim_context.h"
 #include "simulator/specify.h"
@@ -453,23 +455,46 @@ static void CollectSampledFunctionArgsInStmt(
       stmt, [&out](const Expr* e) { CollectSampledFunctionArgs(e, out); });
 }
 
+// The names the concurrent assertion `stmt` carries read: its boolean's
+// operands and, §16.12.2, the names its flattened sequence reads, the
+// sequences it instantiates included, which are read sampled as a boolean
+// property is, and, §16.12.4 and §16.12.5, those of each operand of a
+// property of operands.
+static void CollectAssertionReadNames(const Stmt* stmt, SimContext& ctx,
+                                      Arena& arena,
+                                      std::unordered_set<std::string>& names) {
+  if (stmt->assert_expr != nullptr) {
+    CollectSampledOperandNames(stmt->assert_expr, names);
+  }
+  if (stmt->assert_sequence != nullptr) {
+    CollectSequenceReadNames(stmt->assert_sequence, ctx, arena, names);
+  }
+  if (stmt->assert_property != nullptr) {
+    CollectPropertyTreeReadNames(stmt->assert_property, ctx, arena, names);
+  }
+}
+
+// §16.14.6: a concurrent assertion embedded in procedural code is evaluated
+// as a separate concurrent assertion is, on §16.5.1's sampled values, so the
+// names each one in the procedure reads are enrolled as a static
+// assertion's are.
+static void CollectProceduralAssertionReadNames(
+    const Stmt* s, SimContext& ctx, Arena& arena,
+    std::unordered_set<std::string>& names) {
+  if (s == nullptr) return;
+  if (s->is_procedural_concurrent && s->is_concurrent_clocked) {
+    CollectAssertionReadNames(s, ctx, arena, names);
+  }
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
+    CollectProceduralAssertionReadNames(sub, ctx, arena, names);
+  });
+}
+
 void Lowerer::RecordAssertionSampleScope(const RtlirProcess& proc) {
   if (proc.body == nullptr) return;
   std::unordered_set<std::string> names;
-  if (proc.body->assert_expr != nullptr) {
-    CollectSampledOperandNames(proc.body->assert_expr, names);
-  }
-  // §16.12.2: a sequential property's operands are read sampled as a boolean
-  // property is, so the names its flattened sequence reads, the sequences it
-  // instantiates included, are enrolled with the assertion's; §16.12.4 and
-  // §16.12.5 likewise for each operand of a property of operands.
-  if (proc.body->assert_sequence != nullptr) {
-    CollectSequenceReadNames(proc.body->assert_sequence, ctx_, arena_, names);
-  }
-  if (proc.body->assert_property != nullptr) {
-    CollectPropertyTreeReadNames(proc.body->assert_property, ctx_, arena_,
-                                 names);
-  }
+  CollectAssertionReadNames(proc.body, ctx_, arena_, names);
+  CollectProceduralAssertionReadNames(proc.body, ctx_, arena_, names);
   CollectSampledFunctionArgsInStmt(proc.body, names);
   if (names.empty()) return;
   AssertionSampleScope scope;
@@ -599,6 +624,10 @@ void Lowerer::LowerProcess(const RtlirProcess& proc, bool from_program,
       return;
   }
 
+  // §16.14.6: the concurrent assertions the procedure embeds are evaluated
+  // by monitors of their own, armed on their clocking events before the
+  // procedure runs.
+  StartProceduralAssertionMonitors(p, proc.body, ctx_, arena_);
   ScheduleProcess(p, ctx_);
 }
 

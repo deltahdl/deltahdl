@@ -770,21 +770,23 @@ SequencePropertyState* CreateSequencePropertyState(const ModuleItem* seq,
 
 std::vector<SequenceVerdict> AdvanceSequenceProperty(
     SequencePropertyState& state, bool disabled, bool every_match,
-    SimContext& ctx, Arena& arena) {
+    uint32_t begin, SimContext& ctx, Arena& arena) {
   std::vector<SequenceVerdict> verdicts;
   for (const Expr* site : state.past_sites) EvalExpr(site, ctx, arena);
   // §16.12: a disable condition true at any tick of an attempt disables it,
-  // and the attempt beginning at this tick with it.
+  // and the attempts beginning at this tick with it.
   if (disabled) {
     state.attempts.clear();
     return verdicts;
   }
-  state.attempts.push_back(FreshFirstMatchAttempt(state.body));
+  for (uint32_t i = 0; i < begin; ++i) {
+    state.attempts.push_back(FreshFirstMatchAttempt(state.body));
+  }
   std::vector<FirstMatchAttempt> kept;
   for (size_t i = 0; i < state.attempts.size(); ++i) {
-    bool begin = i + 1 == state.attempts.size();
+    bool first = i + begin >= state.attempts.size();
     bool matched = AdvanceFirstMatchAttempt(state.body, state.attempts[i],
-                                            begin, ctx, arena);
+                                            first, ctx, arena);
     bool spent = FirstMatchAttemptIsSpent(state.attempts[i]);
     if (matched) {
       verdicts.push_back(SequenceVerdict::kMatched);

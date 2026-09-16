@@ -623,10 +623,6 @@ class Parser {
   bool TryParsePropertyInstanceSpec(ModuleItem* item);
   bool BodyHasTemporalOperator();
   void WarnUnevaluatedConcurrentAssertion(SourceLoc loc);
-  // §16.14.6: the report for a procedural concurrent assertion this tool does
-  // not evaluate, and the reader of the one form it does.
-  void WarnUnevaluatedProceduralAssertion(SourceLoc loc, StmtKind kind);
-  bool TryParseProceduralConcurrentBoolean(Stmt* stmt);
   ModuleItem* ParseCoverProperty();
   ModuleItem* ParseRestrictProperty();
   ModuleItem* ParsePropertyDecl();

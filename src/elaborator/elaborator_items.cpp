@@ -15,6 +15,7 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_items_internal.h"
+#include "elaborator/procedural_concurrent_assertion.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
@@ -802,6 +803,8 @@ bool Elaborator::ElaborateBehavioralItem(ModuleItem* item, RtlirModule* mod) {
       .global_clocking_event = module_global_clocking_event_};
   switch (item->kind) {
     case ModuleItemKind::kInitialBlock:
+      ElaborateProceduralConcurrentAssertions(item, mod, property_registry_,
+                                              arena_, diag_);
       AddProcess(RtlirProcessKind::kInitial, item, mod, kNoInferenceEnv);
       return true;
     case ModuleItemKind::kFinalBlock:
@@ -811,6 +814,11 @@ bool Elaborator::ElaborateBehavioralItem(ModuleItem* item, RtlirModule* mod) {
     case ModuleItemKind::kAlwaysCombBlock:
     case ModuleItemKind::kAlwaysFFBlock:
     case ModuleItemKind::kAlwaysLatchBlock:
+      // §16.14.6: the concurrent assertions the procedure embeds take their
+      // clock from it, or from the default clocking, before the process is
+      // built over its body.
+      ElaborateProceduralConcurrentAssertions(item, mod, property_registry_,
+                                              arena_, diag_);
       AddProcess(MapAlwaysKind(item->always_kind), item, mod, kEnv);
       return true;
     case ModuleItemKind::kGenerateIf:

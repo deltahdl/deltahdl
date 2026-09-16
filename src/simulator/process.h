@@ -104,6 +104,7 @@ struct WaitForkState {
   std::coroutine_handle<> waiter;
 };
 
+struct ProceduralAssertionState;
 struct PropertyTreeState;
 struct SequencePropertyState;
 
@@ -197,6 +198,12 @@ struct Process {
   // §16.12.4 and §16.12.5: likewise for each property of operands under or
   // and and.
   std::unordered_map<const Stmt*, PropertyTreeState*> property_tree_states;
+  // §16.14.6: the procedural assertion queue of each concurrent assertion
+  // embedded in this process, keyed by the statement; filled as the process
+  // reaches the statement and drained by the statement's monitor process at
+  // its leading clocking event (procedural_assertion.h).
+  std::unordered_map<const Stmt*, ProceduralAssertionState*>
+      procedural_assertions;
 
   std::string inst_prefix;
 
