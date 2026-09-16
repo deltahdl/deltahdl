@@ -17,6 +17,24 @@ TEST(AssertionStatementElaboration, AssertPropertyElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §16.14.5: a static concurrent assertion has always semantics, which the
+// elaborator models on an always_ff process, but its clocking event is any
+// event expression §16.5 allows, so one over a signal with no edge draws no
+// §9.2.2.4 warning about sequential logic.
+TEST(AssertionStatementElaboration,
+     AClockingEventWithoutAnEdgeDrawsNoAlwaysFfWarning) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic clkev, a;\n"
+      "  assert property (@(clkev) a);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+}
+
 // §16.14.5: the same statement can be used within an interface, again outside
 // any procedural context, so it elaborates as an interface item.
 TEST(AssertionStatementElaboration, AssertPropertyElaboratesInInterface) {

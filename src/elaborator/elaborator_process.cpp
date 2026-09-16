@@ -439,7 +439,12 @@ static void ValidateAlwaysFFProcess(ModuleItem* item, const RtlirProcess& proc,
       break;
     }
   }
-  if (!proc.sensitivity.empty() && !has_edge) {
+  // §16.14.5: a static concurrent assertion is modelled on an always_ff
+  // process for its always semantics, its clocking event any event
+  // expression §16.5 allows, so the edge §9.2.2.4 expects of sequential
+  // logic is not asked of it.
+  bool concurrent = proc.body != nullptr && proc.body->is_concurrent_clocked;
+  if (!proc.sensitivity.empty() && !has_edge && !concurrent) {
     diag.Warning(item->loc,
                  "always_ff has no edge-sensitive event; "
                  "may not represent sequential logic",
