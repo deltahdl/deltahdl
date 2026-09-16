@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <vector>
 
 #include "common/arena.h"
@@ -33,6 +34,12 @@ std::vector<bool> AdvancePropertyTree(PropertyTreeState& state, bool disabled,
 // written as a name or a call, of a named property whose body the tree
 // evaluator reads; nullptr for any other expression.
 const ModuleItem* InstantiatedProperty(const Expr* instance, SimContext& ctx);
+
+// §16.12.18: the sequence_expr or property_expr each actual argument of
+// `instance` that is one carries, handed to `fn` in turn.
+void ForEachPropertyActual(
+    const Expr* instance,
+    const std::function<void(const PropertyExprNode*)>& fn);
 
 // The end of the run: each attempt still in flight is decided with its
 // sequence operands still in flight read as §16.12.2 has them, a strong one

@@ -1,0 +1,10 @@
+p_untyped(v, w), x untyped, passes 7 fails 1 at ticks
+p_bit(v, w), x a bit, passes 8 fails 0 at ticks
+p_ev(posedge clk) passes 7 fails 1 at ticks
+p_sig(clk) passes 7 fails 1 at ticks
+p_prop(b), a boolean, passes 6 fails 2 at ticks
+p_prop(b ##1 c), a sequence, passes 5 fails 3 at ticks
+p_prop(b or nexttime c), a property, passes 7 fails 1 at ticks
+p_not(b |-> c) passes 4 fails 4 at ticks
+p_seq(go ##1 b) passes 6 fails 2 at ticks
+$finish at time 80

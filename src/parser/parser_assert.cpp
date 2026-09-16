@@ -459,8 +459,11 @@ bool Parser::TryParsePropertyInstanceSpec(ModuleItem* item) {
   auto saved = lexer_.SavePos();
   diag_.PushSuppress();
   // §16.12: an instance may carry actual arguments, `p(a, b)`, read as a
-  // call is; the elaborator binds them to the property's formals.
-  Expr* instance = ParseExpr();
+  // call is; the elaborator binds them to the property's formals. §16.12.18:
+  // an actual that is a sequence, a property or an event expression is read
+  // by the instance parse, since no expression holds one.
+  Expr* instance = ParserPropertySpecHelpers::TryParsePropertyInstance(*this);
+  if (instance == nullptr) instance = ParseExpr();
   diag_.PopSuppress();
   bool is_instance = instance != nullptr && Check(TokenKind::kRParen) &&
                      (instance->kind == ExprKind::kIdentifier ||

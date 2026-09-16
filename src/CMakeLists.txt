@@ -237,6 +237,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/statement_assign_object.cpp
     simulator/statement_assign_pattern.cpp
     simulator/statement_assign_nonblocking.cpp
+    simulator/assertion_read_names.cpp
     simulator/lowerer.cpp
     simulator/lowerer_child.cpp
     simulator/lowerer_clocking.cpp

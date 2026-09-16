@@ -20,6 +20,7 @@ struct ModuleDecl;
 struct SpecifyItem;
 struct BindDirective;
 struct ClassMember;
+struct PropertyExprNode;
 
 enum class ExprKind : uint8_t {
   kIntegerLiteral,
@@ -122,6 +123,13 @@ struct Expr {
   // the leading dot, so this flag is the only record that the identifier came
   // from a binding position.
   bool is_pattern_binding = false;
+
+  // §16.12.18: for an actual argument of a property instance that is a
+  // sequence_expr or a property_expr rather than an expression, passed to a
+  // formal of type sequence or property, the tree the parser read it into;
+  // the node is an identifier standing in the argument's place, and the
+  // substitution of the actuals for the formals reads the tree.
+  PropertyExprNode* property_actual = nullptr;
 };
 
 // §11.5: an operand is "simple" iff it is not parenthesized AND is a primary

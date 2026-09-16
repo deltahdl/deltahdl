@@ -192,6 +192,105 @@ PropertyExprNode* ParserPropertySpecHelpers::TryParsePropertyGroup(
   return nullptr;
 }
 
+// §16.12.18: one actual argument of a property instance: `$`, kept as an
+// identifier named `$`; an event expression opening with an edge keyword,
+// kept as the edge over its signal for a formal of type event; an
+// expression running to the comma or parenthesis ending the argument; or,
+// where the tokens are not one, a sequence_expr or a property_expr for a
+// formal of type sequence or property, read as a property and carried by
+// an identifier standing in the argument's place. `plain` is cleared where
+// the argument is not an expression.
+Expr* ParserPropertySpecHelpers::ParsePropertyActualArg(Parser& p,
+                                                        bool& plain) {
+  SourceLoc loc = p.CurrentLoc();
+  if (p.Check(TokenKind::kDollar)) {
+    Token tok = p.Consume();
+    auto* dollar = p.arena_.Create<Expr>();
+    dollar->kind = ExprKind::kIdentifier;
+    dollar->text = tok.text;
+    dollar->range.start = tok.loc;
+    return dollar;
+  }
+  if (p.Check(TokenKind::kKwPosedge) || p.Check(TokenKind::kKwNegedge) ||
+      p.Check(TokenKind::kKwEdge)) {
+    plain = false;
+    Token edge = p.Consume();
+    auto* event = p.arena_.Create<Expr>();
+    event->kind = ExprKind::kUnary;
+    event->op = edge.kind;
+    event->text = edge.text;
+    event->range.start = edge.loc;
+    event->lhs = p.ParseExpr();
+    return event->lhs != nullptr ? event : nullptr;
+  }
+  auto saved = p.lexer_.SavePos();
+  p.diag_.PushSuppress();
+  Expr* expr = p.ParseExpr();
+  bool ends = expr != nullptr &&
+              (p.Check(TokenKind::kComma) || p.Check(TokenKind::kRParen));
+  p.diag_.PopSuppress();
+  if (ends) return expr;
+  p.lexer_.RestorePos(saved);
+  plain = false;
+  PropertyExprNode* tree = ParsePropertyImplication(p);
+  if (tree == nullptr ||
+      (!p.Check(TokenKind::kComma) && !p.Check(TokenKind::kRParen))) {
+    return nullptr;
+  }
+  Expr* holder = PropertySpecPlaceholder(p.arena_, loc);
+  holder->text = "<property_actual>";
+  holder->property_actual = tree;
+  return holder;
+}
+
+// The `( actuals )` of a property instance into `call`, each actual bound
+// by position or, as `.formal(actual)`, by name; false where the list is
+// malformed.
+bool ParserPropertySpecHelpers::ParsePropertyActualList(Parser& p, Expr* call,
+                                                        bool& plain) {
+  if (!p.Match(TokenKind::kLParen)) return false;
+  while (!p.Check(TokenKind::kRParen) && !p.AtEnd()) {
+    bool named = p.Match(TokenKind::kDot);
+    if (named) {
+      if (!p.Check(TokenKind::kIdentifier)) return false;
+      call->arg_names.push_back(p.Consume().text);
+      if (!p.Match(TokenKind::kLParen)) return false;
+    }
+    Expr* actual = ParsePropertyActualArg(p, plain);
+    if (actual == nullptr || (named && !p.Match(TokenKind::kRParen))) {
+      return false;
+    }
+    call->args.push_back(actual);
+    if (!p.Match(TokenKind::kComma)) break;
+  }
+  return p.Match(TokenKind::kRParen);
+}
+
+// §16.12.1 and §16.12.18: `name ( actuals )` where an actual is a
+// sequence_expr, a property_expr or an event expression, which no
+// expression holds, read as an instance of a named property. The lexer is
+// left where it was, and nullptr answered, where the tokens are not that,
+// an instance whose actuals are all expressions included, which reads as a
+// call does.
+Expr* ParserPropertySpecHelpers::TryParsePropertyInstance(Parser& p) {
+  if (!p.Check(TokenKind::kIdentifier)) return nullptr;
+  auto saved = p.lexer_.SavePos();
+  p.diag_.PushSuppress();
+  Token name = p.Consume();
+  auto* call = p.arena_.Create<Expr>();
+  call->kind = ExprKind::kCall;
+  call->callee = name.text;
+  call->text = name.text;
+  call->range.start = name.loc;
+  bool plain = true;
+  bool ok =
+      p.Check(TokenKind::kLParen) && ParsePropertyActualList(p, call, plain);
+  p.diag_.PopSuppress();
+  if (ok && !plain) return call;
+  p.lexer_.RestorePos(saved);
+  return nullptr;
+}
+
 // §16.12.6: `if ( expression_or_dist ) property_expr [ else property_expr
 // ]`, the if keyword consumed; Table 16-3 puts if-else below every other
 // operator, so each branch runs to the else or the end.
@@ -368,6 +467,13 @@ PropertyExprNode* ParserPropertySpecHelpers::ParsePropertyTerm(Parser& p) {
   bool group = false;
   auto* inner = TryParsePropertyGroup(p, group);
   if (group) return inner;
+  // §16.12.18: an instance whose actuals hold a sequence or a property is
+  // read before the scans below, which its actuals would answer.
+  if (Expr* instance = TryParsePropertyInstance(p)) {
+    auto* node = NewPropertyNode(p, PropertyExprNode::Kind::kBoolean);
+    node->boolean = instance;
+    return node;
+  }
   bool wrapped = p.Check(TokenKind::kKwStrong) || p.Check(TokenKind::kKwWeak);
   if (wrapped || AheadHolds(p, TokenKind::kHashHash, true) ||
       AheadHoldsRepetition(p)) {
@@ -500,6 +606,10 @@ bool ParserPropertySpecHelpers::ParseSimpleSpecBody(Parser& p,
   }
   // §16.12.3: each `not` before the body negates it once more.
   while (p.Match(TokenKind::kKwNot)) body.negated = !body.negated;
+  // §16.12.18: an instance whose actuals hold a sequence or a property is
+  // read before the scan below, which its actuals would answer.
+  body.prop = TryParsePropertyInstance(p);
+  if (body.prop != nullptr) return true;
   if (!p.BodyHasTemporalOperator()) {
     body.prop = p.ParseExpr();
     return body.prop != nullptr;

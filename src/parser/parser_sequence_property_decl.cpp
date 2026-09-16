@@ -201,6 +201,11 @@ struct PropertyPortScan {
   // the same comma-run persistence as the type qualifiers above.
   bool clock_default_allowed = true;
   TokenKind prev_kind = TokenKind::kComma;
+  // §16.12.18 by way of §16.8.1: the type keyword in force for the formals
+  // that follow, kEof for untyped, cleared by `untyped` and by a type the
+  // keyword alone does not name, which a `[` or a type identifier after it
+  // shows; `property`, `sequence` and `event` are kept as themselves.
+  TokenKind carry_type_kw = TokenKind::kEof;
 
   // Handles the formal-name harvest branch (§16.12 formal_port_identifier).
   void HarvestFormalName(Lexer& lexer, ModuleItem* item) {
@@ -210,9 +215,11 @@ struct PropertyPortScan {
         !LexerCheck(lexer, TokenKind::kEq)) {
       if (LexerCheck(lexer, TokenKind::kIdentifier)) {
         name_tok = lexer.Next();
+        carry_type_kw = TokenKind::kEof;
       }
     }
     item->prop_formals.push_back(name_tok.text);
+    item->prop_formal_type_kw.push_back(carry_type_kw);
     item->prop_formal_is_local.push_back(local_run);
     item->prop_formal_is_property.push_back(property_run);
     expect_formal_name = false;
@@ -233,7 +240,9 @@ struct PropertyPortScan {
     // §16.14.7: a data-typed formal is neither untyped nor `event`, so it may
     // not be defaulted to $inferred_clock.
     clock_default_allowed = false;
-    lexer.Next();
+    TokenKind kind = lexer.Next().kind;
+    carry_type_kw =
+        LexerCheck(lexer, TokenKind::kLBracket) ? TokenKind::kEof : kind;
   }
 
   // §16.12.18: the `property` type keyword begins a run of one or more
@@ -246,7 +255,7 @@ struct PropertyPortScan {
     // §16.14.7: a `property`-typed formal is neither untyped nor `event`, so it
     // may not be defaulted to $inferred_clock.
     clock_default_allowed = false;
-    lexer.Next();
+    carry_type_kw = lexer.Next().kind;
   }
 
   // §16.12.18: the `sequence`, `event`, and `untyped` type keywords begin a
@@ -261,6 +270,7 @@ struct PropertyPortScan {
     property_run = false;
     local_run = false;
     saw_local = false;
+    carry_type_kw = kw == TokenKind::kKwUntyped ? TokenKind::kEof : kw;
     lexer.Next();
   }
 

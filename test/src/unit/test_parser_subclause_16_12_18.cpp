@@ -131,4 +131,104 @@ TEST(TypedPropertyFormalParsing, DataTypeFormalEndsPropertyRun) {
   ASSERT_NE(item, nullptr);
 }
 
+// §16.12.18 by way of §16.8.1: the type a formal is declared with is
+// recorded by its keyword for every formal the keyword reaches, `property`,
+// `sequence` and `event` as themselves, so that an instance's actuals are
+// cast and read as the types say.
+TEST(TypedPropertyFormalParsing, TheTypeKeywordOfEachFormalIsRecorded) {
+  auto r = Parse(
+      "module m;\n"
+      "  property p(bit x, y, event e, sequence s, property q, untyped u);\n"
+      "    @(e) x |-> y;\n"
+      "  endproperty\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindItemByKind(r, ModuleItemKind::kPropertyDecl);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->prop_formal_type_kw.size(), 6u);
+  EXPECT_EQ(item->prop_formal_type_kw[0], TokenKind::kKwBit);
+  EXPECT_EQ(item->prop_formal_type_kw[1], TokenKind::kKwBit);
+  EXPECT_EQ(item->prop_formal_type_kw[2], TokenKind::kKwEvent);
+  EXPECT_EQ(item->prop_formal_type_kw[3], TokenKind::kKwSequence);
+  EXPECT_EQ(item->prop_formal_type_kw[4], TokenKind::kKwProperty);
+  EXPECT_EQ(item->prop_formal_type_kw[5], TokenKind::kEof);
+}
+
+// §16.12.18: the actual for a formal of type property may be a
+// sequence_expr, which no expression holds, so the instance standing as
+// the whole property_spec is read with the actual as a sequence, carried
+// by the argument for the substitution to read.
+TEST(TypedPropertyFormalParsing, ASequenceActualIsReadAsASequence) {
+  auto r = Parse(
+      "module m;\n"
+      "  property p(property q);\n"
+      "    @(posedge clk) a |-> q;\n"
+      "  endproperty\n"
+      "  assert property (p(b ##1 c));\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindItemByKind(r, ModuleItemKind::kAssertProperty);
+  ASSERT_NE(item, nullptr);
+  ASSERT_NE(item->assert_expr, nullptr);
+  EXPECT_EQ(item->assert_expr->kind, ExprKind::kCall);
+  ASSERT_EQ(item->assert_expr->args.size(), 1u);
+  const PropertyExprNode* actual = item->assert_expr->args[0]->property_actual;
+  ASSERT_NE(actual, nullptr);
+  EXPECT_EQ(actual->kind, PropertyExprNode::Kind::kSequence);
+  ASSERT_NE(actual->sequence, nullptr);
+  EXPECT_EQ(actual->sequence->seq_linear.operands.size(), 2u);
+}
+
+// §16.12.18: the actual may be a property_expr of any form, read as the
+// tree an assertion's property is, here under the assertion's own clock; a
+// second actual that is an expression is read as one.
+TEST(TypedPropertyFormalParsing, APropertyActualIsReadAsATree) {
+  auto r = Parse(
+      "module m;\n"
+      "  property p(property q, r);\n"
+      "    @(posedge clk) a |-> q;\n"
+      "  endproperty\n"
+      "  assert property (@(posedge clk) p(b |-> nexttime c, d));\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindItemByKind(r, ModuleItemKind::kAssertProperty);
+  ASSERT_NE(item, nullptr);
+  ASSERT_NE(item->assert_expr, nullptr);
+  EXPECT_EQ(item->assert_expr->kind, ExprKind::kCall);
+  ASSERT_EQ(item->assert_expr->args.size(), 2u);
+  const PropertyExprNode* actual = item->assert_expr->args[0]->property_actual;
+  ASSERT_NE(actual, nullptr);
+  EXPECT_EQ(actual->kind, PropertyExprNode::Kind::kImplication);
+  ASSERT_EQ(actual->operands.size(), 1u);
+  EXPECT_EQ(actual->operands[0]->kind, PropertyExprNode::Kind::kNexttime);
+  EXPECT_EQ(item->assert_expr->args[1]->property_actual, nullptr);
+  EXPECT_EQ(item->assert_expr->args[1]->text, "d");
+}
+
+// §16.12.18 by way of §16.8.1: the actual for a formal of type event is an
+// event expression, read as the edge over its signal.
+TEST(TypedPropertyFormalParsing, AnEventActualIsReadAsTheEdgeOverItsSignal) {
+  auto r = Parse(
+      "module m;\n"
+      "  property p(event ev);\n"
+      "    @(ev) a |-> b;\n"
+      "  endproperty\n"
+      "  assert property (p(negedge clk));\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindItemByKind(r, ModuleItemKind::kAssertProperty);
+  ASSERT_NE(item, nullptr);
+  ASSERT_NE(item->assert_expr, nullptr);
+  ASSERT_EQ(item->assert_expr->args.size(), 1u);
+  const Expr* actual = item->assert_expr->args[0];
+  EXPECT_EQ(actual->kind, ExprKind::kUnary);
+  EXPECT_EQ(actual->op, TokenKind::kKwNegedge);
+  ASSERT_NE(actual->lhs, nullptr);
+  EXPECT_EQ(actual->lhs->text, "clk");
+}
+
 }  // namespace

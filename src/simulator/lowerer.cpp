@@ -10,15 +10,12 @@
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
-#include "elaborator/rtlir.h"
-#include "simulator/module_path_delay.h"
-#include "simulator/timing_check_driver.h"
-// CollectExprReads, the walk over the names an expression reads.
 #include "elaborator/design_scopes.h"
 #include "elaborator/global_clocking_sampled_value.h"
-#include "elaborator/sensitivity.h"
+#include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
+#include "simulator/assertion_read_names.h"
 #include "simulator/awaiters.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_string.h"
@@ -26,15 +23,15 @@
 #include "simulator/expr_walk.h"
 #include "simulator/lowerer_child.h"
 #include "simulator/lowerer_register.h"
+#include "simulator/module_path_delay.h"
 #include "simulator/net.h"
 #include "simulator/process.h"
-#include "simulator/property_attempts.h"
-#include "simulator/sequence_flatten.h"
 #include "simulator/sim_context.h"
 #include "simulator/specify.h"
 #include "simulator/specify_sdf.h"
 #include "simulator/statement_assign.h"
 #include "simulator/stmt_exec.h"
+#include "simulator/timing_check_driver.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_design_attach.h"
 #include "simulator/vpi_systf_build.h"
@@ -407,9 +404,9 @@ void Lowerer::LowerModule(const RtlirModule* mod) {
 // §16.5.1: the variables a concurrent assertion's property reads are enrolled
 // in the sampled-value store, so that the end of each time slot copies each
 // one's value and the property is evaluated against that copy rather than
-// against whatever stands at the clock tick. The functions below name what is
-// enrolled; Lowerer::RegisterDesignAssertionSampling is where the enrolment
-// happens.
+// against whatever stands at the clock tick. The functions below and those
+// of simulator/assertion_read_names.h name what is enrolled;
+// Lowerer::RegisterDesignAssertionSampling is where the enrolment happens.
 //
 // §16.9.3: "The use of these functions is not limited to assertion features;
 // they may be used as expressions in procedural code as well." Each reads the
@@ -421,44 +418,6 @@ static bool IsSampledValueFunction(std::string_view name) {
   return name == "$sampled" || name == "$past" || name == "$rose" ||
          name == "$fell" || name == "$stable" || name == "$changed" ||
          IsGlobalClockingSampledFunction(name);
-}
-
-// The dotted spelling of a hierarchical reference, appended to `out`, and
-// whether `e` is one. §23.6 writes a name that crosses an instance boundary as
-// `u.req`, and the child instance's variable is keyed under exactly that
-// spelling, so the whole reference is the name to look up rather than the
-// identifiers it is built from. Anything else the walk meets -- a select, a
-// call, a class scope resolution -- names no variable of its own, and is
-// reported false rather than half a name.
-static bool AppendHierarchicalName(const Expr* e, std::string& out) {
-  if (e == nullptr) return false;
-  if (e->kind == ExprKind::kIdentifier) {
-    out += e->text;
-    return true;
-  }
-  if (e->kind != ExprKind::kMemberAccess || e->is_scope_resolution) {
-    return false;
-  }
-  if (!AppendHierarchicalName(e->lhs, out)) return false;
-  out += '.';
-  return AppendHierarchicalName(e->rhs, out);
-}
-
-// The names an expression a sampled value is taken of reads. CollectExprReads
-// is the reader-name walk §9.2.2.2.1's implicit sensitivity list is built from,
-// which reaches the base and index of a select, the arguments of a call and the
-// operands of every subexpression; a hierarchical reference is added to what it
-// answers, because it holds `u.req` as a member access over two identifiers and
-// so contributes `u` and `req`, neither of which is the name the child's
-// variable is keyed under.
-static void CollectSampledOperandNames(const Expr* e,
-                                       std::unordered_set<std::string>& out) {
-  CollectExprReads(e, out);
-  ForEachSubExpr(e, [&out](const Expr* sub) {
-    if (sub->kind != ExprKind::kMemberAccess) return;
-    std::string name;
-    if (AppendHierarchicalName(sub, name)) out.insert(name);
-  });
 }
 
 // The names read by the argument of every sampled value function call anywhere
@@ -478,36 +437,6 @@ static void CollectSampledFunctionArgsInStmt(
   if (stmt == nullptr) return;
   ForEachStmtReadExpr(
       stmt, [&out](const Expr* e) { CollectSampledFunctionArgs(e, out); });
-}
-
-static void CollectSequenceReadNames(const ModuleItem* seq, SimContext& ctx,
-                                     Arena& arena,
-                                     std::unordered_set<std::string>& names) {
-  LinearSequence flat;
-  if (!FlattenLinearSequence(seq, ctx, arena, flat)) return;
-  ForEachLinearSequenceExpr(
-      flat, [&names](const Expr* e) { CollectSampledOperandNames(e, names); });
-}
-
-// §16.12.17: an instance of a named property reads what the body reads, so
-// the body is walked too, to a depth that reads a recursive body once.
-static void CollectPropertyTreeReadNames(const PropertyExprNode* node,
-                                         SimContext& ctx, Arena& arena,
-                                         std::unordered_set<std::string>& names,
-                                         int depth = 0) {
-  if (node->boolean != nullptr)
-    CollectSampledOperandNames(node->boolean, names);
-  const ModuleItem* decl = InstantiatedProperty(node->boolean, ctx);
-  if (decl != nullptr && depth < 4) {
-    CollectPropertyTreeReadNames(decl->prop_body_tree, ctx, arena, names,
-                                 depth + 1);
-  }
-  if (node->sequence != nullptr) {
-    CollectSequenceReadNames(node->sequence, ctx, arena, names);
-  }
-  for (const PropertyExprNode* operand : node->operands) {
-    CollectPropertyTreeReadNames(operand, ctx, arena, names, depth);
-  }
 }
 
 void Lowerer::RecordAssertionSampleScope(const RtlirProcess& proc) {

@@ -38,6 +38,9 @@ struct ParserPropertySpecHelpers {
   static PropertyExprNode* NewPropertyNode(Parser& p,
                                            PropertyExprNode::Kind kind);
   static PropertyExprNode* TryParsePropertyGroup(Parser& p, bool& group);
+  static Expr* ParsePropertyActualArg(Parser& p, bool& plain);
+  static bool ParsePropertyActualList(Parser& p, Expr* call, bool& plain);
+  static Expr* TryParsePropertyInstance(Parser& p);
   static PropertyExprNode* ParsePropertyIfElse(Parser& p);
   static bool ParsePropertyCaseItem(Parser& p, PropertyExprNode& node);
   static PropertyExprNode* ParsePropertyCase(Parser& p);

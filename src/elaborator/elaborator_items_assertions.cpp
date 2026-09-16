@@ -12,6 +12,7 @@
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/property_rewrite.h"
 #include "elaborator/rtlir.h"
+#include "lexer/token.h"
 #include "parser/ast.h"
 #include "parser/expr_substitute.h"
 
@@ -84,6 +85,31 @@ void CheckConcurrentAssertionNoChandle(const ModuleItem* item,
 
 bool IsStaticDeferredAssertion(const ModuleItem* item) {  // §16.4.3
   return item->body != nullptr && item->body->is_deferred;
+}
+
+// §16.12.18 by way of §16.8.1: one event of the instantiated property's
+// clock with the actuals in the formals' places: the actual of a formal of
+// type event, an edge keyword over a signal, supplies the edge and the
+// signal, and any other actual the signal under the edge the clock wrote.
+EventExpr SubstituteClockEvent(EventExpr ev, const ActualsByFormal& actuals,
+                               Arena& arena) {
+  ev.iff_condition = SubstituteFormals(ev.iff_condition, actuals, arena);
+  if (ev.signal != nullptr && ev.signal->kind == ExprKind::kIdentifier) {
+    auto it = actuals.find(ev.signal->text);
+    const Expr* actual = it == actuals.end() ? nullptr : it->second;
+    if (actual != nullptr && actual->kind == ExprKind::kUnary &&
+        (actual->op == TokenKind::kKwPosedge ||
+         actual->op == TokenKind::kKwNegedge ||
+         actual->op == TokenKind::kKwEdge)) {
+      ev.edge = actual->op == TokenKind::kKwPosedge   ? Edge::kPosedge
+                : actual->op == TokenKind::kKwNegedge ? Edge::kNegedge
+                                                      : Edge::kEdge;
+      ev.signal = actual->lhs;
+      return ev;
+    }
+  }
+  ev.signal = SubstituteFormals(ev.signal, actuals, arena);
+  return ev;
 }
 
 // §16.12.1: an instance of a named property can be used as a property_spec,
@@ -180,10 +206,8 @@ void SubstitutePropertyInstance(ModuleItem* item, Arena& arena,
   stmt->assert_pass_stmt = item->assert_pass_stmt;
   stmt->assert_fail_stmt = item->assert_fail_stmt;
   item->sensitivity.clear();
-  for (EventExpr ev : decl->prop_clock) {
-    ev.signal = SubstituteFormals(ev.signal, actuals, arena);
-    ev.iff_condition = SubstituteFormals(ev.iff_condition, actuals, arena);
-    item->sensitivity.push_back(ev);
+  for (const EventExpr& ev : decl->prop_clock) {
+    item->sensitivity.push_back(SubstituteClockEvent(ev, actuals, arena));
   }
   item->body = stmt;
 }

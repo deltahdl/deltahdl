@@ -1,10 +1,45 @@
 #include <gtest/gtest.h>
 
+#include "elaborator/rtlir.h"
 #include "elaborator/typed_property_formal.h"
+#include "fixture_elaborator.h"
+#include "parser/ast_stmt.h"
 
 using namespace delta;
 
 namespace {
+
+// The process the module's one static concurrent assertion is lowered to.
+const RtlirProcess* TheAssertionProcess(const RtlirModule* mod) {
+  for (const auto& p : mod->processes) {
+    if (p.kind == RtlirProcessKind::kAlwaysFF) return &p;
+  }
+  return nullptr;
+}
+
+// §16.12.18 by way of §16.8.1: an instance whose actual for a formal of
+// type event is an event expression is evaluated on that event, the edge
+// and the signal the actual names in the clock's place.
+TEST(TypedPropertyFormal, AnEventActualSuppliesTheInstancesClock) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic clk, a, b;\n"
+      "  property p_ev(event ev);\n"
+      "    @(ev) a |-> b;\n"
+      "  endproperty\n"
+      "  assert property (p_ev(negedge clk));\n"
+      "endmodule\n",
+      f, "m");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const RtlirProcess* p = TheAssertionProcess(design->top_modules[0]);
+  ASSERT_NE(p, nullptr);
+  ASSERT_EQ(p->sensitivity.size(), 1u);
+  EXPECT_EQ(p->sensitivity[0].edge, Edge::kNegedge);
+  ASSERT_NE(p->sensitivity[0].signal, nullptr);
+  EXPECT_EQ(p->sensitivity[0].signal->text, "clk");
+}
 
 TEST(TypedPropertyFormal, SequenceRulesCarryOverExceptOverriddenAspects) {
   // §16.12.18: the §16.8.1 typed-formal rules apply to named properties,
