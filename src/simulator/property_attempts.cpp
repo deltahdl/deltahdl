@@ -124,12 +124,12 @@ void NumberOperandClocks(LinearSequence& body, PropertyClocks& clocks,
 
 // §16.13.2 and §16.13.3: the number of the clock the node is evaluated on,
 // its own where it names one, numbered where new, and otherwise the one
-// flowing to it from its parent, `inherited`; a sequence names its first
-// operand's.
+// flowing to it from its parent, `inherited`; a sequence, an implication's
+// antecedent included, names its first operand's.
 int ClockOfNode(const PropertyExprNode* node, PropertyTreeState& state,
                 int inherited) {
   if (!node->clock.empty()) return ClockIndexOf(state.clocks, node->clock);
-  if (node->kind != PropertyExprNode::Kind::kSequence) return inherited;
+  if (node->sequence == nullptr) return inherited;
   for (const FlatSequence& flat : state.sequences) {
     if (flat.node == node && !flat.body.operand_clock_index.empty()) {
       return flat.body.operand_clock_index[0];
@@ -379,6 +379,15 @@ ActualsByFormal NewLocalCopies(const PropertyExprNode* node,
   return copies;
 }
 
+// §16.13.2: whether the node names a clock of its own, `@(posedge clk1)`
+// before it or before the first operand of the sequence it holds.
+bool NamesAClock(const PropertyExprNode* node) {
+  if (!node->clock.empty()) return true;
+  if (node->sequence == nullptr) return false;
+  const SeqLinearBody& body = node->sequence->seq_linear;
+  return !body.clocks.empty() && !body.clocks.front().empty();
+}
+
 // §16.13.7: a separate copy of each local of the property for each semantic
 // leading clock of the expansion, the clock a node names being one and the
 // clock flowing into the root another, each subtree reading the copy of the
@@ -390,7 +399,7 @@ void PlaceLocalCopies(PropertyExprNode* node,
                       const ActualsByFormal* in_force, PropertyTreeState& tree,
                       Arena& arena) {
   ActualsByFormal own;
-  if (in_force == nullptr || !node->clock.empty()) {
+  if (in_force == nullptr || NamesAClock(node)) {
     own = NewLocalCopies(node, locals, tree, arena);
     in_force = &own;
   }
@@ -438,6 +447,9 @@ bool ExpandInstance(const PropertyExprNode* node, NodeState& state,
   CaptureLocalFormals(decl, actuals, sc);
   PropertyExprNode* body =
       SubstituteTree(decl->prop_body_tree, actuals, sc.arena);
+  // §16.13.2: a property declared with a clock is evaluated on it, from its
+  // first tick at or after the instance begins.
+  if (body->clock.empty()) body->clock = decl->prop_clock;
   if (!decl->prop_locals.empty()) {
     PlaceLocalCopies(body, decl->prop_locals, nullptr, sc.tree, sc.arena);
   }

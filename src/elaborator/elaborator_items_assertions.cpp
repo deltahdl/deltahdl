@@ -214,6 +214,8 @@ void CollectInstanceClocks(const Expr* instance,
   const ModuleItem* decl =
       InstantiatedDecl(instance, ModuleItemKind::kPropertyDecl, registry);
   if (decl != nullptr) {
+    // §16.13.2: a property declared with a clock is evaluated on it.
+    for (const EventExpr& ev : decl->prop_clock) AppendClockOnce(out, ev);
     CollectTreeClocks(decl->prop_body_tree, registry, out, depth + 1);
   }
   if (instance->kind != ExprKind::kCall) return;
