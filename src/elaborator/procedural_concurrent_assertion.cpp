@@ -82,6 +82,7 @@ void CollectReferences(const Stmt* s, std::unordered_set<std::string>& out) {
 // two things §16.14.6 (c)(1) lets an event expression consist solely of
 // without an edge.
 bool NamesEventOrClockingBlock(std::string_view name, const RtlirModule* mod) {
+  if (mod == nullptr) return false;
   for (const ModuleItem* block : mod->clocking_blocks) {
     if (block->name == name) return true;
   }
@@ -148,6 +149,7 @@ std::vector<EventExpr> InferredProcedureClock(const ModuleItem* procedure,
 // blocks elaborated ahead of the procedure; empty where it has none.
 std::vector<EventExpr> DefaultClockingEvent(const RtlirModule* mod) {
   std::string_view named;
+  if (mod == nullptr) return {};
   for (const ModuleItem* item : mod->clocking_blocks) {
     if (!item->is_default_clocking) continue;
     if (!item->clocking_event.empty()) return item->clocking_event;
@@ -232,7 +234,7 @@ void ElaborateProceduralConcurrentAssertions(ModuleItem* procedure,
                "its property_spec opens with no clocking event, the procedure "
                "gives it none, holding a blocking timing control, more or "
                "fewer event controls than one or no unique event expression "
-               "of the form §16.14.6 names, and the scope has no default "
+               "of the form the clause names, and the scope has no default "
                "clocking",
                Subclause("16.14.6"));
   }

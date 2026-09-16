@@ -1,6 +1,5 @@
 #include "simulator/procedural_assertion.h"
 
-#include <coroutine>
 #include <cstdint>
 #include <vector>
 

@@ -92,25 +92,30 @@ struct ObservedRegionAwaiter {
       if (proc != nullptr) ctx_ptr->SetCurrentProcess(proc);
       h.resume();
     };
+    ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), Region::kObserved,
+                                     event);
+  }
 
-    // A process created by an assertion beside the one reaching it, an action
-    // block's or an attempt's, in `home_region`, standing in the asserting
-    // process's instance and named scopes with a random seed drawn from it.
-    Process* CreateAssertionChildProcess(SimContext & ctx, Arena & arena,
-                                         Region home_region);
+  void await_resume() const noexcept {}
+};
 
-    // Starts the process at the current time in `region`, where its coroutine
-    // runs to its first wait. A process disabled before that is left where it
-    // is.
-    void ScheduleAssertionChildStart(Process * p, Region region,
-                                     SimContext & ctx);
+// A process created by an assertion beside the one reaching it, an action
+// block's or an attempt's, in `home_region`, standing in the asserting
+// process's instance and named scopes with a random seed drawn from it.
+Process* CreateAssertionChildProcess(SimContext& ctx, Arena& arena,
+                                     Region home_region);
 
-    // One tick of the leading clock of the concurrent assertion `stmt` carries,
-    // in the current process, whose state the attempts in flight are kept on:
-    // every attempt in flight advances and `begin` new ones begin, the verdicts
-    // reached at the tick concluding the assertion, its action block scheduled
-    // into the Reactive region. Called in the Observed region of the tick.
-    void ExecConcurrentAssertionTick(const Stmt* stmt, uint32_t begin,
-                                     SimContext& ctx, Arena& arena);
+// Starts the process at the current time in `region`, where its coroutine
+// runs to its first wait. A process disabled before that is left where it
+// is.
+void ScheduleAssertionChildStart(Process* p, Region region, SimContext& ctx);
 
-  }  // namespace delta
+// One tick of the leading clock of the concurrent assertion `stmt` carries,
+// in the current process, whose state the attempts in flight are kept on:
+// every attempt in flight advances and `begin` new ones begin, the verdicts
+// reached at the tick concluding the assertion, its action block scheduled
+// into the Reactive region. Called in the Observed region of the tick.
+void ExecConcurrentAssertionTick(const Stmt* stmt, uint32_t begin,
+                                 SimContext& ctx, Arena& arena);
+
+}  // namespace delta

@@ -58,19 +58,27 @@ SequencePropertyState* CreateSequencePropertyState(const ModuleItem* seq,
 
 enum class SequenceVerdict : uint8_t { kMatched, kFailed };
 
-// One tick of the property: every attempt in flight advances and `begin`
-// new ones begin, one for a static assertion and, §16.14.6, one per matured
-// instance of a procedural one, each that matches at this tick or can no
-// longer match reaching its verdict and leaving; `disabled` says the
-// disable condition is true at this tick, which drops every attempt in
-// flight and begins none. The sampled value functions the sequence holds
-// are sampled at the tick first. §16.14.3: `every_match` keeps an attempt
-// that matched in flight while it can match again, so that each later
-// match of it is a verdict too, as a cover sequence counts every match of
-// an attempt; a property holds at the first.
+// What one tick of the property asks: `disabled` says the disable
+// condition is true at this tick, which drops every attempt in flight and
+// begins none; §16.14.3: `every_match` keeps an attempt that matched in
+// flight while it can match again, so that each later match of it is a
+// verdict too, as a cover sequence counts every match of an attempt, where
+// a property holds at the first; `begin` is the number of attempts
+// beginning at the tick, one for a static assertion and, §16.14.6, one per
+// matured instance of a procedural one.
+struct SequenceTick {
+  bool disabled = false;
+  bool every_match = false;
+  uint32_t begin = 1;
+};
+
+// One tick of the property: every attempt in flight advances and the new
+// ones begin, each that matches at this tick or can no longer match
+// reaching its verdict and leaving. The sampled value functions the
+// sequence holds are sampled at the tick first.
 std::vector<SequenceVerdict> AdvanceSequenceProperty(
-    SequencePropertyState& state, bool disabled, bool every_match,
-    uint32_t begin, SimContext& ctx, Arena& arena);
+    SequencePropertyState& state, const SequenceTick& tick, SimContext& ctx,
+    Arena& arena);
 
 // The attempts still in flight, which a strong property has fail when the
 // run ends.

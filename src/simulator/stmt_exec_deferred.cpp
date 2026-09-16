@@ -1,5 +1,4 @@
 #include <cmath>
-#include <coroutine>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -7,7 +6,6 @@
 #include <iostream>
 #include <string>
 #include <string_view>
-#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -261,13 +259,6 @@ static bool TryScheduleConcurrentAssertAction(const Stmt* action,
   ScheduleAssertionChildStart(p, p->home_region, ctx);
   return true;
 }
-
-ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), Region::kObserved, event);
-}
-
-void await_resume() const noexcept {}
-}
-;
 
 // §16.3: records one evaluation of an immediate cover statement, succeeded
 // when the covered expression held, against the statement in the scope the
@@ -576,16 +567,19 @@ static void ExecSequencePropertyTick(const Stmt* stmt, uint32_t begin,
     }
   }
   for (uint32_t i = 0; i < begin; ++i) RecordConcurrentCoverAttempt(stmt, ctx);
-  bool disabled = stmt->assert_disable_iff != nullptr &&
+  SequenceTick tick;
+  tick.disabled = stmt->assert_disable_iff != nullptr &&
                   EvalExpr(stmt->assert_disable_iff, ctx, arena).IsTruthy();
-  auto& samples = ctx.AssertionSamples();
-  bool outer_evaluating_property = samples.EvaluatingProperty();
-  samples.SetEvaluatingProperty(true);
   // §16.14.3: a cover sequence's attempt stays in flight past a match, every
   // match of it counted; a property, a cover property's among them, holds
   // at the first.
-  std::vector<SequenceVerdict> verdicts = AdvanceSequenceProperty(
-      *state, disabled, stmt->cover_sequence, begin, ctx, arena);
+  tick.every_match = stmt->cover_sequence;
+  tick.begin = begin;
+  auto& samples = ctx.AssertionSamples();
+  bool outer_evaluating_property = samples.EvaluatingProperty();
+  samples.SetEvaluatingProperty(true);
+  std::vector<SequenceVerdict> verdicts =
+      AdvanceSequenceProperty(*state, tick, ctx, arena);
   samples.SetEvaluatingProperty(outer_evaluating_property);
   for (SequenceVerdict verdict : verdicts) {
     bool matched = verdict == SequenceVerdict::kMatched;
