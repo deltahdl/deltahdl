@@ -1,0 +1,9 @@
+ctr 0 at 5: y = 17
+ctr 0 at 15: y = 17
+ctr 1 at 25: y = 7
+ctr 1 at 35: y = 7
+ctr 0 at 45: y = 17
+adds 3 subs 2
+$finish at time 50
+[25] ERROR restrict_statement.assumed (line 38): Assertion failed.
+[35] ERROR restrict_statement.assumed (line 38): Assertion failed.
