@@ -13,8 +13,8 @@ namespace {
 // constraints that determine their legal values, around the statements of
 // an initial.
 std::string Design(const std::string& body) {
-  return "class Packet;\n"
-         "  typedef enum {RUNT, PLAIN, JUMBO} kind_t;\n"
+  return "typedef enum {RUNT, PLAIN, JUMBO} kind_t;\n"
+         "class Packet;\n"
          "  rand kind_t kind;\n"
          "  rand int length;\n"
          "  rand bit tag;\n"

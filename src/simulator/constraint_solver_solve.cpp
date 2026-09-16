@@ -856,12 +856,20 @@ bool ConstraintSolver::SolveIterative(const std::vector<ConstraintExpr>& extra,
   };
   // With no ordering the default single pass is used unchanged; it already
   // draws each legal value combination with uniform probability.
+  // 18.5.9: with no ordering the draw is uniform over the legal value
+  // combinations, which the draws tried against the constraints give and a
+  // repaired consequent would skew, so the consequents of the implications
+  // are repaired only once that many draws have found no solution, as they
+  // do not over a domain as wide as an int's (18.5.5).
+  static constexpr int kRepairFromAttempt = 32;
+  bool repair = false;
   auto flat_pass = [&] {
     DrawGeneralPass(variables_, values_, real_values_, gen, gen_real);
-    RepairConditionalConstraints(extra);
+    if (repair) RepairConditionalConstraints(extra);
     return CheckAllConstraints(extra, include_soft);
   };
   for (int attempt = 0; attempt < kMaxAttempts; ++attempt) {
+    repair = attempt >= kRepairFromAttempt;
     values_.clear();
     real_values_.clear();
     SeedInactiveVariables(variables_, values_, real_values_);

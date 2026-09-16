@@ -14,8 +14,9 @@
 // calls yields legal values, every value is checked against the same
 // constraints and the count of those meeting them is printed, as is the
 // corner the constraints reach without a directed test naming it.
+typedef enum {RUNT, PLAIN, JUMBO} kind_t;
+
 class Packet;
-  typedef enum {RUNT, PLAIN, JUMBO} kind_t;
   rand kind_t kind;
   rand int length;
   rand bit tag;
