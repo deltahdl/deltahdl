@@ -818,12 +818,15 @@ void ParserPropertySpecHelpers::CapturePropertyTreeBody(Parser& p,
   std::vector<SeqLocalDecl> locals;
   bool ok = ParsePropertyLocalDecls(p, locals);
   // §16.13.3: of two clocking events juxtaposed the second nullifies the
-  // first, so the last written is the body's.
+  // first, so the last written is the body's; §16.13 writes the event as a
+  // parenthesized list or, `@clk`, as one identifier, a formal's among them.
   while (ok && p.Match(TokenKind::kAt)) {
-    ok = p.Match(TokenKind::kLParen);
-    if (ok) {
+    clock.clear();
+    if (p.Match(TokenKind::kLParen)) {
       clock = p.ParseEventList();
       ok = p.Match(TokenKind::kRParen);
+    } else {
+      clock.push_back(p.ParseSingleEvent());
     }
   }
   SimpleSpecBody body;

@@ -153,7 +153,8 @@ std::vector<EventExpr> InferredProcedureClock(const ModuleItem* procedure,
 // operand; the declaration's clock, or the one flowing into it, is the
 // statement's where the spec opened with none.
 void SubstituteInstance(Stmt* stmt, const PropertyRegistry& registry,
-                        const InferredAtInstance& inferred, Arena& arena) {
+                        const InferredAtInstance& inferred, Arena& arena,
+                        DiagEngine& diag) {
   if (stmt->assert_property != nullptr || stmt->assert_sequence != nullptr) {
     return;
   }
@@ -181,6 +182,16 @@ void SubstituteInstance(Stmt* stmt, const PropertyRegistry& registry,
   const ModuleItem* decl =
       InstantiatedDecl(instance, ModuleItemKind::kPropertyDecl, registry);
   if (decl == nullptr) return;
+  if (decl->prop_body_expr == nullptr && decl->prop_body_tree == nullptr) {
+    diag.Warning(stmt->range.start,
+                 "procedural concurrent assertion is not evaluated: the body "
+                 "of property \"" +
+                     std::string(decl->name) +
+                     "\" is not a form this tool evaluates",
+                 Subclause("16.14.6"));
+    stmt->is_concurrent_clocked = false;
+    return;
+  }
   ActualsByFormal actuals = BindActuals(decl->prop_formals, instance);
   if (decl->prop_body_expr != nullptr && !InstanceHasTreeActual(instance)) {
     stmt->assert_expr = SubstituteFormals(decl->prop_body_expr, actuals, arena);
@@ -218,7 +229,8 @@ void ElaborateProceduralConcurrentAssertions(ModuleItem* procedure,
   at_instance.disable = mod != nullptr ? mod->default_disable_iff : nullptr;
   for (Stmt* stmt : assertions) {
     if (!stmt->is_concurrent_clocked) continue;
-    SubstituteInstance(stmt, registry, at_instance, arena);
+    SubstituteInstance(stmt, registry, at_instance, arena, diag);
+    if (!stmt->is_concurrent_clocked) continue;
     PromoteSequenceInstances(stmt->assert_property, registry, arena);
     if (stmt->assert_clock.empty()) stmt->assert_clock = inferred;
     if (stmt->assert_clock.empty()) stmt->assert_clock = fallback;

@@ -164,14 +164,32 @@ static Expr* FalseLiteral(Arena& arena) {
   return literal;
 }
 
+// Whether any formal of `decl` is defaulted to an inferred function.
+static bool HasInferredDefault(const ModuleItem* decl) {
+  for (InferredDefault kind : decl->prop_formal_inferred) {
+    if (kind != InferredDefault::kNone) return true;
+  }
+  return false;
+}
+
+// The actual the inferred function `kind` is replaced by at an instance, or
+// nullptr where it is neither function or no clock is inferred there.
+static Expr* InferredActual(InferredDefault kind,
+                            const InferredAtInstance& inferred, Arena& arena) {
+  if (kind == InferredDefault::kClock && !inferred.clock.empty()) {
+    return ClockActual(inferred.clock[0], arena);
+  }
+  if (kind == InferredDefault::kDisable) {
+    return inferred.disable != nullptr ? inferred.disable : FalseLiteral(arena);
+  }
+  return nullptr;
+}
+
 void FillInferredDefaults(Expr* instance, const ModuleItem* decl,
                           const InferredAtInstance& inferred, Arena& arena) {
-  if (instance == nullptr || decl == nullptr) return;
-  bool any = false;
-  for (InferredDefault kind : decl->prop_formal_inferred) {
-    if (kind != InferredDefault::kNone) any = true;
+  if (instance == nullptr || decl == nullptr || !HasInferredDefault(decl)) {
+    return;
   }
-  if (!any) return;
   if (instance->kind == ExprKind::kIdentifier) {
     instance->kind = ExprKind::kCall;
     instance->callee = instance->text;
@@ -180,13 +198,8 @@ void FillInferredDefaults(Expr* instance, const ModuleItem* decl,
   for (size_t i = 0; i < decl->prop_formal_inferred.size(); ++i) {
     if (instance->args.size() <= i) instance->args.push_back(nullptr);
     if (instance->args[i] != nullptr) continue;
-    InferredDefault kind = decl->prop_formal_inferred[i];
-    if (kind == InferredDefault::kClock && !inferred.clock.empty()) {
-      instance->args[i] = ClockActual(inferred.clock[0], arena);
-    } else if (kind == InferredDefault::kDisable) {
-      instance->args[i] =
-          inferred.disable != nullptr ? inferred.disable : FalseLiteral(arena);
-    }
+    instance->args[i] =
+        InferredActual(decl->prop_formal_inferred[i], inferred, arena);
   }
 }
 
