@@ -1,0 +1,12 @@
+concurrent_assertion_statements.prog.pr_named failed at 5
+concurrent_assertion_statements.m_named failed at 15
+concurrent_assertion_statements unnamed failed at 25
+concurrent_assertion_statements.m_assume failed at 35
+concurrent_assertion_statements.gen.g_named failed at 45
+concurrent_assertion_statements.proc.p_named failed at 55
+concurrent_assertion_statements.bus.if_named failed at 65
+concurrent_assertion_statements.u_chk.chk_named failed at 75
+concurrent_assertion_statements.m_cover_seq covered at 85
+concurrent_assertion_statements.m_cover covered at 95
+concurrent_assertion_statements.init.i_named failed at 105
+$finish at time 110
