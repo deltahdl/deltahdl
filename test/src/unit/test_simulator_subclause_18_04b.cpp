@@ -163,4 +163,55 @@ TEST(RandomVariableRun, ALoneRandHandleIsSolvedWithTheHolder) {
             "8\n");
 }
 
+// The Inner of the design and a Lone holding a rand handle to it beside
+// `decl`, under the handle's global constraint and `constraint`.
+std::string WithHandle(const std::string& decl, const std::string& constraint) {
+  return "class Inner;\n"
+         "  rand int v;\n"
+         "  constraint cv { v inside {[1:3]}; }\n"
+         "endclass\n" +
+         Lone("  rand Inner in;\n  rand bit [3:0] w;\n" + decl +
+                  "  function new();\n    in = new;\n  endfunction\n",
+              "  constraint cw { w > in.v; }\n" + constraint);
+}
+
+// §18.4: a rand real beside a rand handle is solved with the handle's
+// object eight times over.
+TEST(RandomVariableRun, ARealBesideARandHandleIsDrawn) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(WithHandle("  rand real r;\n",
+                                  "  constraint cr { r > 0.0 && r < 2.0; }\n"),
+                       f),
+            "8\n");
+}
+
+// §18.4: a randc beside a rand handle is drawn eight times over.
+TEST(RandomVariableRun, ARandcBesideARandHandleIsDrawn) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(WithHandle("  randc bit [1:0] c;\n", ""), f), "8\n");
+}
+
+// §18.4: a rand enum and a rand packed structure beside a rand handle are
+// drawn eight times over.
+TEST(RandomVariableRun, AnEnumAndAPackedStructBesideARandHandleAreDrawn) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("typedef enum bit [1:0] {A = 2'b00, B = 2'b11} ab_e;\n"
+                 "typedef struct packed {\n"
+                 "  ab_e ValidAB;\n"
+                 "} VStructEnum;\n" +
+                     WithHandle("  rand ab_e e;\n  rand VStructEnum s;\n", ""),
+                 f),
+      "8\n");
+}
+
+// §18.4: a rand real beside a randc is drawn eight times over.
+TEST(RandomVariableRun, ARealBesideARandcIsDrawn) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(Lone("  rand real r;\n  randc bit [1:0] c;\n",
+                            "  constraint cr { r > 0.0 && r < 2.0; }\n"),
+                       f),
+            "8\n");
+}
+
 }  // namespace
