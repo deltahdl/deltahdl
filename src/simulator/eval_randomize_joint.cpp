@@ -9,6 +9,7 @@
 #include "common/arena.h"
 #include "common/types.h"
 #include "elaborator/type_eval.h"
+#include "lexer/token.h"
 #include "parser/ast.h"
 #include "simulator/class_object.h"
 #include "simulator/constraint_solver.h"
@@ -250,17 +251,20 @@ bool TryJointComparison(const Expr* rel, const JointVarScope& scope,
   if (vname.empty()) return false;
   if (mirror) ComparisonKind(MirrorComparison(rel->op), kind);
   rc.ctx.PushScope();
-  int64_t c = 0;
+  Logic4Vec cv;
   {
     ConstraintEvalScope eval_scope(scope.owner, rc.ctx);
-    c = static_cast<int64_t>(EvalExpr(const_side, rc.ctx, rc.arena).ToUint64());
+    cv = EvalExpr(const_side, rc.ctx, rc.arena);
   }
   rc.ctx.PopScope();
+  auto c = static_cast<int64_t>(cv.ToUint64());
   out.kind = kind;
   out.var_name = vname;
   out.lo = c;
   out.ref_vars.push_back(vname);
-  if (RandInfo* ri = FindRand(scope.rands, vname)) FoldBound(*ri, kind, c);
+  // 18.4.1: a real variable's bound narrows its real range as a single
+  // object's does.
+  FoldComparison(scope.rands, vname, kind, cv, c);
   return true;
 }
 
@@ -271,6 +275,23 @@ ConstraintExpr BuildJointRelation(const Expr* rel, const JointVarScope& scope,
                                   RandomizeCtx& rc) {
   ConstraintExpr out;
   if (TryJointComparison(rel, scope, rc, out)) return out;
+  // 18.5: `a && b` holds where both do, so each side is built on its own
+  // under an antecedent that always holds, a comparison among them folding
+  // the domain as it would alone; a real variable's range constraint is
+  // written so, and tried against as one relation it could never be met,
+  // the trial values carrying no real.
+  if (rel != nullptr && rel->kind == ExprKind::kBinary &&
+      rel->op == TokenKind::kAmpAmp && rel->lhs != nullptr &&
+      rel->rhs != nullptr) {
+    out.kind = ConstraintKind::kImplication;
+    out.ref_vars.assign(scope.names.begin(), scope.names.end());
+    out.cond_fn = [](const std::unordered_map<std::string, int64_t>&) {
+      return true;
+    };
+    out.sub_constraints.push_back(BuildJointRelation(rel->lhs, scope, rc));
+    out.sub_constraints.push_back(BuildJointRelation(rel->rhs, scope, rc));
+    return out;
+  }
   return MakeJointCustomConstraint(rel, scope, rc);
 }
 
@@ -374,13 +395,18 @@ void RegisterJointPreRandomize(const std::vector<JointObject>& objects,
 void WriteBackJointSolved(std::vector<RandInfo>& rands,
                           const ConstraintSolver& solver, Arena& arena) {
   for (auto& ri : rands) {
-    if (ri.var.is_real) continue;
-    int64_t v = solver.GetValue(ri.name);
-    Logic4Vec lv =
-        MakeLogic4VecVal(arena, ri.var.width, static_cast<uint64_t>(v));
-    // 6.11.3: the member's declared signedness belongs to the value stored in
-    // it, so a negative draw reads back as that negative number.
-    lv.is_signed = ri.var.is_signed;
+    Logic4Vec lv;
+    if (ri.var.is_real) {
+      // 18.4.1: the real drawn is written back as the real it is.
+      lv = MakeRealVec(arena, solver.GetRealValue(ri.name),
+                       ri.var.width == 32 ? 32 : 64);
+    } else {
+      int64_t v = solver.GetValue(ri.name);
+      lv = MakeLogic4VecVal(arena, ri.var.width, static_cast<uint64_t>(v));
+      // 6.11.3: the member's declared signedness belongs to the value stored
+      // in it, so a negative draw reads back as that negative number.
+      lv.is_signed = ri.var.is_signed;
+    }
     if (ri.is_static && ri.level != nullptr) {
       ri.level->static_properties[ri.member] = lv;
       continue;

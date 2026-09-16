@@ -158,23 +158,6 @@ void AddRandMember(const ClassMember* m, const ClassTypeInfo* level,
 // into those would read them as the rand variable whose name they share and
 // wrongly refuse to fold a relation that really is against a constant. `this.x`
 // is the one qualified form that does name the object's own member.
-// Folds the comparison of the rand variable `name` against the constant
-// `cv`, `c` as an integer, into its domain: 18.4.1 has a real variable's
-// range be what its relational constraints leave of it, the bound read as
-// the real it compares against, and an integral variable's bounds narrow
-// as FoldBound has them.
-void FoldComparison(std::vector<RandInfo>& rands, std::string_view name,
-                    ConstraintKind kind, const Logic4Vec& cv, int64_t c) {
-  auto* ri = FindRand(rands, name);
-  if (ri == nullptr) return;
-  if (ri->var.is_real) {
-    FoldRealBound(*ri, kind,
-                  cv.is_real ? RealVecToDouble(cv) : static_cast<double>(c));
-    return;
-  }
-  FoldBound(*ri, kind, c);
-}
-
 // 18.5: a comparison of a rand variable against a constant. Fills `out` with
 // the typed solver constraint, folds the variable's domain, and returns true;
 // other relation shapes return false for the kCustom fallback.
@@ -251,6 +234,23 @@ static const ClassTypeInfo* StaticConstraintOwner(const ClassObject* obj,
 }
 
 }  // namespace
+
+// Folds the comparison of the rand variable `name` against the constant
+// `cv`, `c` as an integer, into its domain: 18.4.1 has a real variable's
+// range be what its relational constraints leave of it, the bound read as
+// the real it compares against, and an integral variable's bounds narrow
+// as FoldBound has them.
+void FoldComparison(std::vector<RandInfo>& rands, std::string_view name,
+                    ConstraintKind kind, const Logic4Vec& cv, int64_t c) {
+  auto* ri = FindRand(rands, name);
+  if (ri == nullptr) return;
+  if (ri->var.is_real) {
+    FoldRealBound(*ri, kind,
+                  cv.is_real ? RealVecToDouble(cv) : static_cast<double>(c));
+    return;
+  }
+  FoldBound(*ri, kind, c);
+}
 
 // True when any expression in `list` references one of the random variables.
 bool AnyRefsRandVar(const std::vector<Expr*>& list,

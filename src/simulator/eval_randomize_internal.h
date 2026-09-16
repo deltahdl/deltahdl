@@ -166,6 +166,12 @@ void FoldBound(RandInfo& ri, ConstraintKind kind, int64_t c);
 // 18.4.1: the same for a real variable's range, a bound on one side leaving
 // the other and an equality closing both on the value.
 void FoldRealBound(RandInfo& ri, ConstraintKind kind, double c);
+// Folds the comparison of the rand variable `name` against the constant
+// `cv`, `c` as an integer, into its domain, a real one's range through
+// FoldRealBound and an integral one's bounds through FoldBound; a name that
+// is no rand variable folds nothing.
+void FoldComparison(std::vector<RandInfo>& rands, std::string_view name,
+                    ConstraintKind kind, const Logic4Vec& cv, int64_t c);
 bool IsObjectConstraintActive(const ClassObject* obj, std::string_view name);
 bool IsObjectRandActive(const ClassObject* obj, std::string_view name);
 void InvokePostRandomize(ClassObject* obj, const Expr* expr, SimContext& ctx,
