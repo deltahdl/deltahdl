@@ -4,6 +4,7 @@
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "common/arena.h"
@@ -146,34 +147,6 @@ void AddRandMember(const ClassMember* m, const ClassTypeInfo* level,
 // into those would read them as the rand variable whose name they share and
 // wrongly refuse to fold a relation that really is against a constant. `this.x`
 // is the one qualified form that does name the object's own member.
-bool RefsRandVar(const Expr* e, std::vector<RandInfo>& rands);
-
-// True when any expression in `list` references one of the random variables.
-bool AnyRefsRandVar(const std::vector<Expr*>& list,
-                    std::vector<RandInfo>& rands) {
-  for (const Expr* x : list) {
-    if (RefsRandVar(x, rands)) return true;
-  }
-  return false;
-}
-
-bool RefsRandVar(const Expr* e, std::vector<RandInfo>& rands) {
-  if (e == nullptr) return false;
-  if (e->kind == ExprKind::kIdentifier)
-    return FindRand(rands, e->text) != nullptr;
-  if (e->kind == ExprKind::kMemberAccess) {
-    return e->lhs != nullptr && e->lhs->kind == ExprKind::kIdentifier &&
-           e->lhs->text == "this" && e->rhs != nullptr &&
-           e->rhs->kind == ExprKind::kIdentifier &&
-           FindRand(rands, e->rhs->text) != nullptr;
-  }
-  for (const Expr* sub : {e->lhs, e->rhs, e->base, e->index, e->index_end,
-                          e->condition, e->true_expr, e->false_expr}) {
-    if (RefsRandVar(sub, rands)) return true;
-  }
-  return AnyRefsRandVar(e->args, rands) || AnyRefsRandVar(e->elements, rands);
-}
-
 // 18.5: a comparison of a rand variable against a constant. Fills `out` with
 // the typed solver constraint, folds the variable's domain, and returns true;
 // other relation shapes return false for the kCustom fallback.
@@ -288,6 +261,32 @@ static const ClassTypeInfo* StaticConstraintOwner(const ClassObject* obj,
 }
 
 }  // namespace
+
+// True when any expression in `list` references one of the random variables.
+bool AnyRefsRandVar(const std::vector<Expr*>& list,
+                    std::vector<RandInfo>& rands) {
+  for (const Expr* x : list) {
+    if (RefsRandVar(x, rands)) return true;
+  }
+  return false;
+}
+
+bool RefsRandVar(const Expr* e, std::vector<RandInfo>& rands) {
+  if (e == nullptr) return false;
+  if (e->kind == ExprKind::kIdentifier)
+    return FindRand(rands, e->text) != nullptr;
+  if (e->kind == ExprKind::kMemberAccess) {
+    return e->lhs != nullptr && e->lhs->kind == ExprKind::kIdentifier &&
+           e->lhs->text == "this" && e->rhs != nullptr &&
+           e->rhs->kind == ExprKind::kIdentifier &&
+           FindRand(rands, e->rhs->text) != nullptr;
+  }
+  for (const Expr* sub : {e->lhs, e->rhs, e->base, e->index, e->index_end,
+                          e->condition, e->true_expr, e->false_expr}) {
+    if (RefsRandVar(sub, rands)) return true;
+  }
+  return AnyRefsRandVar(e->args, rands) || AnyRefsRandVar(e->elements, rands);
+}
 
 // 18.9: match a constraint_mode() method call and pull out the object handle
 // name and, for the named form obj.constraint_id.constraint_mode(...), the
@@ -653,6 +652,7 @@ ConstraintExpr TranslateRelation(const Expr* rel, std::vector<RandInfo>& rands,
                                  RandomizeCtx& rc, bool fold) {
   ConstraintExpr ce;
   if (TryComparisonConstraint(rel, rands, rc, ce, fold)) return ce;
+  if (TrySetMembershipConstraint(rel, rands, rc, ce)) return ce;
   return MakeCustomConstraint(rel, rands, rc);
 }
 

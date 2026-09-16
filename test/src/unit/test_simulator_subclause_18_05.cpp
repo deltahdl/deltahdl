@@ -243,4 +243,56 @@ TEST(Constraint, OrderingBetweenTwoRandomVariablesHoldsFromSource) {
   EXPECT_EQ(RunAndGet(src, "good"), 1u);
 }
 
+// 18.5: the solver handles the set membership operator, and where a
+// solution exists it finds it: `x inside {[10:12]}` over an int, three
+// members among 2^32 values, is drawn from the set rather than tried
+// against, so every randomize() lands in the range and answers 1; a
+// negative range and a list of values are drawn the same way.
+TEST(Constraint, SetMembershipOverAWideDomainIsDrawnFromTheSet) {
+  const char* src =
+      "class C;\n"
+      "  rand int x;\n"
+      "  rand int y;\n"
+      "  rand int z;\n"
+      "  constraint c { x inside {[10:12]}; y inside {[-3:-1]}; "
+      "z inside {7, 70, 700}; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int good;\n"
+      "  initial begin\n"
+      "    int i;\n"
+      "    C o = new;\n"
+      "    good = 1;\n"
+      "    for (i = 0; i < 40; i = i + 1) begin\n"
+      "      if (o.randomize() == 0) good = 0;\n"
+      "      if (o.x < 10 || o.x > 12) good = 0;\n"
+      "      if (o.y < -3 || o.y > -1) good = 0;\n"
+      "      if (o.z != 7 && o.z != 70 && o.z != 700) good = 0;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "good"), 1u);
+}
+
+// 18.12.1: the same set membership in the with clause of a scope randomize
+// over an int scope variable.
+TEST(Constraint, ScopeRandomizeSetMembershipOverAnIntIsDrawnFromTheSet) {
+  const char* src =
+      "module t;\n"
+      "  int good;\n"
+      "  initial begin\n"
+      "    int i;\n"
+      "    int v;\n"
+      "    bit ok;\n"
+      "    good = 1;\n"
+      "    for (i = 0; i < 40; i = i + 1) begin\n"
+      "      ok = std::randomize(v) with { v inside {[10:12]}; };\n"
+      "      if (!ok) good = 0;\n"
+      "      if (v < 10 || v > 12) good = 0;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "good"), 1u);
+}
+
 }  // namespace

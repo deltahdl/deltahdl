@@ -116,6 +116,17 @@ struct JointVarScope {
 };
 
 RandInfo* FindRand(std::vector<RandInfo>& rands, std::string_view name);
+// Whether `e`, or any expression in `list`, references one of the random
+// variables.
+bool RefsRandVar(const Expr* e, std::vector<RandInfo>& rands);
+bool AnyRefsRandVar(const std::vector<Expr*>& list,
+                    std::vector<RandInfo>& rands);
+// 18.5.4: `rel` as `x inside { ... }` over a rand variable and items free of
+// random variables, a set membership the solver draws a member of; fills
+// `out` and answers true, any other shape answering false
+// (eval_randomize_membership.cpp).
+bool TrySetMembershipConstraint(const Expr* rel, std::vector<RandInfo>& rands,
+                                RandomizeCtx& rc, ConstraintExpr& out);
 void CollectRandVariables(const ClassTypeInfo* type, SimContext& ctx,
                           std::vector<RandInfo>& out);
 bool ComparisonKind(TokenKind op, ConstraintKind& out);
