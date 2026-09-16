@@ -12,7 +12,9 @@
 // as the actual, `@(posedge sysclk) $rose(a) ##1 b ##1 c`, and ends at 72
 // as e2 does. The program check, declared in the module, waits for either
 // of e1 and e2 to end, which e1 does first, and then, from the labelled
-// statement, for e2.
+// statement, for e2; it reports the other two sequences' end points at 90
+// and finishes there, the simulation ending when its initial block does
+// (§24.3.4).
 module sequence_methods;
   logic clk = 0;
   logic sysclk = 0;
@@ -66,10 +68,6 @@ module sequence_methods;
     #5 branch_back1 = 1;
     #5 branch_back = 0;
     #5 branch_back1 = 0;
-    #10;
-    $display("e3 with e1.matched ends at%s", e3_ends);
-    $display("e4 with subseq.triggered ends at%s", e4_ends);
-    $finish;
   end
 
   program check;
@@ -78,6 +76,10 @@ module sequence_methods;
       if (e1.triggered) $display("e1 passed at %0d", $time);
       L2: wait (e2.triggered);
       if (e2.triggered) $display("e2 passed at %0d", $time);
+      #18;
+      $display("e3 with e1.matched ends at%s", e3_ends);
+      $display("e4 with subseq.triggered ends at%s", e4_ends);
+      $finish;
     end
   endprogram
 endmodule
