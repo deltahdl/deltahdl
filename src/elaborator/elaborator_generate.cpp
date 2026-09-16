@@ -178,6 +178,11 @@ void Elaborator::ElaborateGenerateBlockItem(ModuleItem* item,
   ElaborateItem(item, mod);
   StampGenBlockInstance(mod->processes, first_proc, gen_loop_consts_,
                         gen_prefix_scopes_);
+  // §21.2.1.5: the block instances are levels of the name a process
+  // reports, so the path is stamped on the processes alone.
+  for (size_t i = first_proc; i < mod->processes.size(); ++i) {
+    mod->processes[i].gen_block_path = gen_block_path_;
+  }
   StampGenBlockInstance(mod->assigns, first_assign, gen_loop_consts_,
                         gen_prefix_scopes_);
   StampGenBlockInstance(mod->udp_insts, first_udp, gen_loop_consts_,

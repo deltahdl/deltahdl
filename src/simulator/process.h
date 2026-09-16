@@ -213,6 +213,10 @@ struct Process {
   // program, or checker boundary is encountered", so a name a nested block does
   // not declare is looked for in the block around it before the module.
   std::vector<std::string> gen_prefixes;
+  // §21.2.1.5 and §27.3: the generate block instances the process stands
+  // in as levels of a hierarchical name, `g[0].h`, for %m; empty for a
+  // process of the module itself.
+  std::string gen_block_name;
 
   // §13.3.2: a task may be enabled more than once concurrently, and every
   // variable of an automatic task (and, more generally, every block-scoped

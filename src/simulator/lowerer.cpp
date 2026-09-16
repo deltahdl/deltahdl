@@ -69,6 +69,19 @@ static SimCoroutine MakeAlwaysCoroutine(const Stmt* body, SimContext& ctx,
 // evaluated as the procedure resumes so that its sample for the tick is
 // recorded; the evaluation where the statement is reached records the same
 // value over it. $sampled looks back through nothing and is left out.
+// §21.2.1.5 and §27.3: the generate block instances of a path spelled as
+// the levels of a hierarchical name, a loop block's instance with its index
+// in brackets, `g[0].h`; empty for an empty path.
+static std::string GenBlockName(const HierPath& path) {
+  std::string name;
+  for (const HierStep& step : path) {
+    if (!name.empty()) name += '.';
+    name += std::string(step.name);
+    if (step.has_index) name += "[" + std::to_string(step.index) + "]";
+  }
+  return name;
+}
+
 static bool IsPastDirectedFunction(std::string_view name) {
   return name == "$past" || name == "$rose" || name == "$fell" ||
          name == "$stable" || name == "$changed";
@@ -528,6 +541,7 @@ void Lowerer::LowerProcess(const RtlirProcess& proc, bool from_program,
   p->rng_seed = ctx_.DrawSeedForChild();
   p->gen_prefixes.assign(proc.gen_block_prefixes.begin(),
                          proc.gen_block_prefixes.end());
+  p->gen_block_name = GenBlockName(proc.gen_block_path);
   InstallGenBlockConsts(proc.gen_block_consts, p);
 
   // §16.4.4: a `disable` naming the outermost scope of a procedure flushes its

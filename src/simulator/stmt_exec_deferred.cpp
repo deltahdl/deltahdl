@@ -118,17 +118,27 @@ struct PendingReportScope {
     return {ctx.CurrentProcess(), ctx.ActiveNamedScopes()};
   }
 
+  // Stands the captured scopes up in the captured process's place, keeping
+  // in `saved` what Restore puts back: the process that was current, and
+  // the captured process's own scopes, which the switch brought in with it
+  // and which it keeps, the report's standing in their place only until
+  // the report is done.
   void Install(SimContext& ctx, PendingReportScope& saved) const {
-    saved = Capture(ctx);
-    Swap(ctx, *this);
+    saved.proc = ctx.CurrentProcess();
+    ctx.SetCurrentProcess(proc);
+    saved.named_scopes = ctx.ActiveNamedScopes();
+    Replace(ctx, named_scopes);
   }
 
-  static void Swap(SimContext& ctx, const PendingReportScope& to) {
-    ctx.SetCurrentProcess(to.proc);
+  static void Restore(SimContext& ctx, const PendingReportScope& saved) {
+    Replace(ctx, saved.named_scopes);
+    ctx.SetCurrentProcess(saved.proc);
+  }
+
+  static void Replace(SimContext& ctx,
+                      const std::vector<std::string_view>& scopes) {
     while (!ctx.ActiveNamedScopes().empty()) ctx.PopActiveNamedScope();
-    for (std::string_view scope : to.named_scopes) {
-      ctx.PushActiveNamedScope(scope);
-    }
+    for (std::string_view scope : scopes) ctx.PushActiveNamedScope(scope);
   }
 };
 
@@ -154,7 +164,7 @@ static void SchedulePendingReport(bool is_final_deferred,
     PendingReportScope saved;
     scope.Install(ctx, saved);
     run();
-    PendingReportScope::Swap(ctx, saved);
+    PendingReportScope::Restore(ctx, saved);
   };
   ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), region, ev);
 }
@@ -227,7 +237,7 @@ static SimCoroutine ConcurrentAssertActionCoroutine(
   PendingReportScope saved;
   scope.Install(ctx, saved);
   co_await ExecStmt(action, ctx, arena);
-  PendingReportScope::Swap(ctx, saved);
+  PendingReportScope::Restore(ctx, saved);
 }
 
 // A process a concurrent assertion hands part of an attempt to: its action
@@ -669,7 +679,7 @@ static SimCoroutine FutureGclkAttemptCoroutine(
   PendingReportScope saved;
   attempt.scope.Install(ctx, saved);
   JudgeAssertion(attempt.stmt, ctx, arena);
-  PendingReportScope::Swap(ctx, saved);
+  PendingReportScope::Restore(ctx, saved);
 }
 
 // §16.9.4: starts the attempt above in a process of its own, so that the

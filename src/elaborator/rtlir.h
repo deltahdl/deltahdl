@@ -467,6 +467,10 @@ struct RtlirProcess {
   std::vector<ResolvedAttribute> attrs;
   GenBlockConsts gen_block_consts;
   GenBlockPrefixes gen_block_prefixes;
+  // §21.2.1.5 and §27.3: the generate block instances between the module
+  // and the process, outermost first, each a level of the hierarchical name
+  // %m reports from the process; empty for a process of the module itself.
+  HierPath gen_block_path;
 };
 
 struct RtlirParamDecl {

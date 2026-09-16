@@ -38,11 +38,11 @@ std::string RunAssertions(const std::string& items,
 // scope, so %m there names the module alone.
 TEST(ConcurrentAssertionStatements,
      ANamedStatementIsAScopeAndAnUnnamedOneIsNot) {
-  std::string out =
-      Run("  m_named: assert property (@(posedge clk) a)\n"
-          "    else $display(\"%m failed at %0d\", $time);\n"
-          "  assert property (@(posedge clk) a)\n"
-          "    else $display(\"%m unnamed failed at %0d\", $time);\n");
+  std::string out = RunAssertions(
+      "  m_named: assert property (@(posedge clk) a)\n"
+      "    else $display(\"%m failed at %0d\", $time);\n"
+      "  assert property (@(posedge clk) a)\n"
+      "    else $display(\"%m unnamed failed at %0d\", $time);\n");
   EXPECT_NE(out.find("t.m_named failed at 15\n"), std::string::npos);
   EXPECT_NE(out.find("t unnamed failed at 15\n"), std::string::npos);
 }
@@ -52,16 +52,16 @@ TEST(ConcurrentAssertionStatements,
 // sequence their pass statements where it holds or the sequence matches,
 // and restrict property nothing.
 TEST(ConcurrentAssertionStatements, TheFiveStatementKinds) {
-  std::string out =
-      Run("  m_assert: assert property (@(posedge clk) a)\n"
-          "    else $display(\"%m failed at %0d\", $time);\n"
-          "  m_assume: assume property (@(posedge clk) a)\n"
-          "    else $display(\"%m failed at %0d\", $time);\n"
-          "  m_cover: cover property (@(posedge clk) !a)\n"
-          "    $display(\"%m covered at %0d\", $time);\n"
-          "  m_cover_seq: cover sequence (@(posedge clk) a ##1 !a)\n"
-          "    $display(\"%m covered at %0d\", $time);\n"
-          "  m_restrict: restrict property (@(posedge clk) !a);\n");
+  std::string out = RunAssertions(
+      "  m_assert: assert property (@(posedge clk) a)\n"
+      "    else $display(\"%m failed at %0d\", $time);\n"
+      "  m_assume: assume property (@(posedge clk) a)\n"
+      "    else $display(\"%m failed at %0d\", $time);\n"
+      "  m_cover: cover property (@(posedge clk) !a)\n"
+      "    $display(\"%m covered at %0d\", $time);\n"
+      "  m_cover_seq: cover sequence (@(posedge clk) a ##1 !a)\n"
+      "    $display(\"%m covered at %0d\", $time);\n"
+      "  m_restrict: restrict property (@(posedge clk) !a);\n");
   EXPECT_NE(out.find("t.m_assert failed at 15\n"), std::string::npos);
   EXPECT_NE(out.find("t.m_assume failed at 15\n"), std::string::npos);
   EXPECT_NE(out.find("t.m_cover covered at 15\n"), std::string::npos);
@@ -72,12 +72,12 @@ TEST(ConcurrentAssertionStatements, TheFiveStatementKinds) {
 // §16.14: a property on its own is never evaluated: one declared and never
 // used in an assertion statement, false at every tick, reports nothing.
 TEST(ConcurrentAssertionStatements, APropertyOnItsOwnIsNeverEvaluated) {
-  std::string out =
-      Run("  property idle;\n"
-          "    @(posedge clk) 0;\n"
-          "  endproperty\n"
-          "  m_used: assert property (@(posedge clk) a)\n"
-          "    else $display(\"%m failed at %0d\", $time);\n");
+  std::string out = RunAssertions(
+      "  property idle;\n"
+      "    @(posedge clk) 0;\n"
+      "  endproperty\n"
+      "  m_used: assert property (@(posedge clk) a)\n"
+      "    else $display(\"%m failed at %0d\", $time);\n");
   EXPECT_EQ(out, "t.m_used failed at 15\n");
 }
 
@@ -86,27 +86,27 @@ TEST(ConcurrentAssertionStatements, APropertyOnItsOwnIsNeverEvaluated) {
 // hierarchical name its action block reports.
 TEST(ConcurrentAssertionStatements,
      AStatementStandsInAGenerateBlockAProcedureAnInterfaceAndAChecker) {
-  std::string out =
-      Run("  bus_if bus(clk, a);\n"
-          "  chk u_chk(clk, a);\n"
-          "  generate\n"
-          "    if (1) begin : gen\n"
-          "      g_named: assert property (@(posedge clk) a)\n"
-          "        else $display(\"%m failed at %0d\", $time);\n"
-          "    end\n"
-          "  endgenerate\n"
-          "  always @(posedge clk) begin : proc\n"
-          "    p_named: assert property (a)\n"
-          "      else $display(\"%m failed at %0d\", $time);\n"
-          "  end\n",
-          "interface bus_if(input logic clk, input logic f);\n"
-          "  if_named: assert property (@(posedge clk) f)\n"
-          "    else $display(\"%m failed at %0d\", $time);\n"
-          "endinterface\n"
-          "checker chk(input logic clk, input logic g);\n"
-          "  chk_named: assert property (@(posedge clk) g)\n"
-          "    else $display(\"%m failed at %0d\", $time);\n"
-          "endchecker\n");
+  std::string out = RunAssertions(
+      "  bus_if bus(clk, a);\n"
+      "  chk u_chk(clk, a);\n"
+      "  generate\n"
+      "    if (1) begin : gen\n"
+      "      g_named: assert property (@(posedge clk) a)\n"
+      "        else $display(\"%m failed at %0d\", $time);\n"
+      "    end\n"
+      "  endgenerate\n"
+      "  always @(posedge clk) begin : proc\n"
+      "    p_named: assert property (a)\n"
+      "      else $display(\"%m failed at %0d\", $time);\n"
+      "  end\n",
+      "interface bus_if(input logic clk, input logic f);\n"
+      "  if_named: assert property (@(posedge clk) f)\n"
+      "    else $display(\"%m failed at %0d\", $time);\n"
+      "endinterface\n"
+      "checker chk(input logic clk, input logic g);\n"
+      "  chk_named: assert property (@(posedge clk) g)\n"
+      "    else $display(\"%m failed at %0d\", $time);\n"
+      "endchecker\n");
   EXPECT_NE(out.find("t.gen.g_named failed at 15\n"), std::string::npos);
   EXPECT_NE(out.find("t.proc.p_named failed at 15\n"), std::string::npos);
   EXPECT_NE(out.find("t.bus.if_named failed at 15\n"), std::string::npos);
