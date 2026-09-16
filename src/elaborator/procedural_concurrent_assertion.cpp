@@ -144,6 +144,23 @@ std::vector<EventExpr> InferredProcedureClock(const ModuleItem* procedure,
   return clock;
 }
 
+// Whether the body of `decl` is one the run reads; a statement instantiating
+// a property whose body was not captured is reported unevaluated, as a
+// static one is, and left as no concurrent assertion.
+bool BodyIsRead(Stmt* stmt, const ModuleItem* decl, DiagEngine& diag) {
+  if (decl->prop_body_expr != nullptr || decl->prop_body_tree != nullptr) {
+    return true;
+  }
+  diag.Warning(stmt->range.start,
+               "procedural concurrent assertion is not evaluated: the body of "
+               "property \"" +
+                   std::string(decl->name) +
+                   "\" is not a form this tool evaluates",
+               Subclause("16.14.6"));
+  stmt->is_concurrent_clocked = false;
+  return false;
+}
+
 // §16.12.1 and §16.13.4, for a statement in procedural code: the body of
 // the named property or sequence the spec instantiates, as
 // SubstitutePropertyInstance and SubstituteSequenceInstance give a static
@@ -181,17 +198,7 @@ void SubstituteInstance(Stmt* stmt, const PropertyRegistry& registry,
   }
   const ModuleItem* decl =
       InstantiatedDecl(instance, ModuleItemKind::kPropertyDecl, registry);
-  if (decl == nullptr) return;
-  if (decl->prop_body_expr == nullptr && decl->prop_body_tree == nullptr) {
-    diag.Warning(stmt->range.start,
-                 "procedural concurrent assertion is not evaluated: the body "
-                 "of property \"" +
-                     std::string(decl->name) +
-                     "\" is not a form this tool evaluates",
-                 Subclause("16.14.6"));
-    stmt->is_concurrent_clocked = false;
-    return;
-  }
+  if (decl == nullptr || !BodyIsRead(stmt, decl, diag)) return;
   ActualsByFormal actuals = BindActuals(decl->prop_formals, instance);
   if (decl->prop_body_expr != nullptr && !InstanceHasTreeActual(instance)) {
     stmt->assert_expr = SubstituteFormals(decl->prop_body_expr, actuals, arena);

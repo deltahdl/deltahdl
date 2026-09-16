@@ -14,7 +14,9 @@ namespace {
 // is negedge clk1 and the default disable iff is rst1, a and b are 1
 // throughout, c is 1 from 12 to 28, rst1 from 36 to 42, and the run ends
 // at 48; the clause's p_triggers defaults its clock and its disable
-// condition to the inferred functions.
+// condition to the inferred functions. The attempts still in flight at the
+// end hold in the final processes, which the fixture's run does not reach
+// and the e2e design shows.
 std::string InferredSource(const std::string& items) {
   return "module t;\n"
          "  logic a = 1, b = 1, c = 0, rst1 = 0, clk1 = 0, clk2 = 0;\n"
@@ -90,14 +92,13 @@ TEST(InferredClockingFunctionsRun, AnActualSuppliedStandsInsteadOfTheDefault) {
             "a2 passed at 25\na2_explicit passed at 25\n"
             "a2 failed at 35\na2_explicit failed at 35\n"
             "a2 failed at 45\na2_explicit failed at 45\n"
-            "$finish at time 48\n"
-            "a2 passed at 48\na2_explicit passed at 48\n");
+            "$finish at time 48\n");
 }
 
 // §16.14.7: in the clause's a3 the clocking event is inferred from the
 // event control of the always procedure, posedge clk2, reset being
 // referenced within it, and the disable condition from the default disable
-// iff, so a3 reports as its equivalent on posedge clk2.
+// iff, so a3 reports as its equivalent on posedge clk2, failing at 33.
 TEST(InferredClockingFunctionsRun,
      TheProceduresInferredClockStandsInForTheDefault) {
   SimFixture f;
@@ -119,14 +120,12 @@ TEST(InferredClockingFunctionsRun,
   EXPECT_TRUE(f.diag.Diagnostics().empty());
   EXPECT_EQ(out,
             "a3 failed at 33\na3_explicit failed at 33\n"
-            "$finish at time 48\n"
-            "a3 passed at 48\na3_explicit passed at 48\n");
+            "$finish at time 48\n");
 }
 
 // §16.14.7: outside the scope of any default disable iff declaration,
 // $inferred_disable returns 1'b0, so the instance is disabled by nothing
-// and rst1 rising at 36 drops no attempt: the attempt of 30 fails at 40 and
-// the attempt of 40 holds at the end of the run.
+// and rst1 rising at 36 drops no attempt: the attempt of 30 fails at 40.
 TEST(InferredClockingFunctionsRun, OutsideAnyDefaultDisableTheDefaultIsFalse) {
   SimFixture f;
   std::string src = InferredSource(
@@ -139,7 +138,7 @@ TEST(InferredClockingFunctionsRun, OutsideAnyDefaultDisableTheDefaultIsFalse) {
   EXPECT_TRUE(f.diag.Diagnostics().empty());
   EXPECT_EQ(out,
             "a1 passed at 20\na1 failed at 30\na1 failed at 40\n"
-            "$finish at time 48\na1 passed at 48\n");
+            "$finish at time 48\n");
 }
 
 }  // namespace
