@@ -139,10 +139,13 @@ TEST(AssertionDeclElaboration, SequenceDeclWithCoverElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §16.16 (a): the declarations carry no clock, so the assertions take the
+// default clocking's.
 TEST(AssertionDeclElaboration, PropertyAndSequenceDeclsTogether) {
   ElabFixture f;
   auto* design = Elaborate(
       "module m;\n"
+      "  default clocking @(posedge clk); endclocking\n"
       "  property p; a; endproperty\n"
       "  sequence s; b; endsequence\n"
       "  assert property (p);\n"

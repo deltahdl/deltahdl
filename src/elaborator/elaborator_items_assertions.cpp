@@ -255,16 +255,9 @@ Stmt* NewInstanceStmt(const ModuleItem* item, Arena& arena) {
 // property_spec, `assert property (mult_s)`, is the sequential property the
 // sequence is, evaluated on the clock the sequence is declared with.
 bool SubstituteSequenceInstance(ModuleItem* item, const ModuleItem* decl,
-                                Arena& arena, DiagEngine& diag) {
-  if (decl->seq_clock.empty()) {
-    diag.Warning(item->loc,
-                 "concurrent assertion is not evaluated: the sequence \"" +
-                     std::string(decl->name) +
-                     "\" has no leading clocking event, and this tool infers "
-                     "none",
-                 Subclause("16.14"));
-    return false;
-  }
+                                Arena& arena) {
+  // §16.16: a sequence declared with no clock leaves the statement its
+  // clock to determine, the default clocking's or none.
   auto* stmt = NewInstanceStmt(item, arena);
   stmt->assert_expr = item->assert_expr;
   stmt->assert_property = arena.Create<PropertyExprNode>();
@@ -301,17 +294,8 @@ void GiveInstanceBody(Stmt* stmt, Expr* instance, const ModuleItem* decl,
 // property's own or the one flowing from its body; each want is reported
 // under the rule Parser::WarnUnevaluatedConcurrentAssertion states.
 bool PropertyInstanceIsEvaluated(const ModuleItem* item, const ModuleItem* decl,
-                                 const PropertyRegistry& registry,
                                  DiagEngine& diag) {
   std::string name(item->prop_instance_name);
-  if (decl == nullptr || decl->kind != ModuleItemKind::kPropertyDecl) {
-    diag.Warning(item->loc,
-                 "concurrent assertion is not evaluated: its property_spec "
-                 "has no leading clocking event, and \"" +
-                     name + "\" names no property whose body could supply one",
-                 Subclause("16.14"));
-    return false;
-  }
   if (decl->prop_body_expr == nullptr && decl->prop_body_tree == nullptr) {
     diag.Warning(item->loc,
                  "concurrent assertion is not evaluated: the body of property "
@@ -322,17 +306,21 @@ bool PropertyInstanceIsEvaluated(const ModuleItem* item, const ModuleItem* decl,
                  Subclause("16.14"));
     return false;
   }
-  if (decl->prop_clock.empty() && FlowedBodyClock(decl, registry).empty()) {
-    diag.Warning(item->loc,
-                 "concurrent assertion is not evaluated: the body of property "
-                 "\"" +
-                     name +
-                     "\" has no leading clocking event, and this tool infers "
-                     "none",
-                 Subclause("16.14"));
-    return false;
-  }
+  // §16.16: a property declared with no clock, and none flowing into it,
+  // leaves the statement its clock to determine.
   return true;
+}
+
+// §16.16 (a): a spec that is one name which names no property or sequence
+// is the boolean that name reads as, its clock the default clocking's; the
+// statement is made as the parser makes one for a clocked boolean.
+void SubstituteBooleanSpec(ModuleItem* item, Arena& arena) {
+  auto* stmt = NewInstanceStmt(item, arena);
+  stmt->assert_expr = item->assert_expr;
+  stmt->is_concurrent_clocked = true;
+  stmt->assert_pass_stmt = item->assert_pass_stmt;
+  stmt->assert_fail_stmt = item->assert_fail_stmt;
+  item->body = stmt;
 }
 
 // The rewrite is made on `item`, which every instance of the module shares,
@@ -355,10 +343,14 @@ void SubstitutePropertyInstance(ModuleItem* item, Arena& arena,
   // the default disable iff in scope.
   FillInferredDefaults(item->assert_expr, decl, inferred, arena);
   if (decl != nullptr && decl->kind == ModuleItemKind::kSequenceDecl) {
-    SubstituteSequenceInstance(item, decl, arena, diag);
+    SubstituteSequenceInstance(item, decl, arena);
     return;
   }
-  if (!PropertyInstanceIsEvaluated(item, decl, registry, diag)) return;
+  if (decl == nullptr || decl->kind != ModuleItemKind::kPropertyDecl) {
+    SubstituteBooleanSpec(item, arena);
+    return;
+  }
+  if (!PropertyInstanceIsEvaluated(item, decl, diag)) return;
   // §16.13.3 and §16.13.4: a property declared with no clock whose body is
   // a sequence declared with one is on that clock, `mult_p2` being
   // `mult_s`.
@@ -413,7 +405,7 @@ void PromotePropertyInstanceBoolean(ModuleItem* item, Arena& arena,
       stmt->assert_sequence != nullptr || stmt->assert_expr == nullptr) {
     return;
   }
-  Expr* instance = stmt->assert_expr;
+  Expr* instance = QualifiedInstance(stmt->assert_expr, registry, arena);
   if (instance->kind != ExprKind::kIdentifier &&
       instance->kind != ExprKind::kCall) {
     return;
@@ -531,6 +523,29 @@ void Elaborator::ElaboratePropertyDeclItem(ModuleItem* item, RtlirModule* mod) {
   ValidateClockingBlock(item, mod);
 }
 
+// §16.16: the leading clocking event of a static concurrent assertion
+// statement: (d) the one its spec opens with, or the one the instance its
+// maximal property is determines, its declaration's or the one flowing into
+// it; (a) else the default clocking event, as though written as the leading
+// clocking event; (f) else none applies, and the statement is illegal, its
+// maximal property being no instance for which a unique leading clocking
+// event is determined.
+void Elaborator::ResolveStaticAssertionClock(
+    ModuleItem* item, const std::vector<EventExpr>& default_clock) {
+  if (item->body == nullptr || !item->sensitivity.empty()) return;
+  if (!default_clock.empty()) {
+    item->sensitivity = default_clock;
+    return;
+  }
+  diag_.Error(item->loc,
+              "concurrent assertion has no leading clocking event: none is "
+              "written, no default clocking is in scope and the property is "
+              "no instance of a sequence or property declared with a unique "
+              "leading clocking event",
+              Subclause("16.16"));
+  item->body = nullptr;
+}
+
 void Elaborator::ElaborateAssertPropertyItem(ModuleItem* item,
                                              RtlirModule* mod) {
   InferredAtInstance inferred;
@@ -545,6 +560,7 @@ void Elaborator::ElaborateAssertPropertyItem(ModuleItem* item,
   if (item->body != nullptr && item->body->assert_disable_iff == nullptr) {
     item->body->assert_disable_iff = inferred.disable;
   }
+  ResolveStaticAssertionClock(item, inferred.clock);
   if (item->body != nullptr) {
     PromoteSequenceInstances(item->body->assert_property, property_registry_,
                              arena_);
@@ -671,7 +687,18 @@ bool Elaborator::ElaborateAssertionItem(ModuleItem* item, RtlirModule* mod) {
       // elaboration checks. Lowerer::LowerClockingBlocks registers it with the
       // ClockingManager, which is what makes §14.16's synchronous drive and
       // §14.10's clocking block event reach anything.
-      if (mod != nullptr) mod->clocking_blocks.push_back(item);
+      if (mod != nullptr) {
+        mod->clocking_blocks.push_back(item);
+        // §16.16 (b): the block's declarations are the module's for the run
+        // to expand, clocked by the block and named through it.
+        for (ModuleItem* decl : item->clocking_decls) {
+          if (decl->kind == ModuleItemKind::kPropertyDecl) {
+            mod->property_decls.push_back(decl);
+          } else {
+            mod->sequence_decls.push_back(decl);
+          }
+        }
+      }
       return true;
     default:
       // §23.10.4 kDefparam, kExportDecl, kNestedModuleDecl, and any remaining

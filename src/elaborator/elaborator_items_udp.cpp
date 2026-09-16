@@ -581,14 +581,44 @@ void ClassifyAndCheckItems(const ModuleDecl* decl,
   }
 }
 
+// §16.16 (b): every sequence and property declaration within a clocking
+// block is treated as though the block's clocking event had been written
+// as its leading clocking event, and an assertion instantiates it by the
+// name of the block and its own, `posedge_clk.q4`, which is the name the
+// registry keys it under, once, the declaration being shared by every
+// instance of the module.
+void RegisterClockingBlockDecls(const ModuleItem* block,
+                                PropertyRegistry& registry, Arena& arena) {
+  for (ModuleItem* decl : block->clocking_decls) {
+    if (decl->name.find('.') == std::string_view::npos) {
+      auto* qualified = arena.Create<std::string>(
+          std::string(block->name) + "." + std::string(decl->name));
+      decl->name = *qualified;
+    }
+    if (decl->kind == ModuleItemKind::kPropertyDecl &&
+        decl->prop_clock.empty()) {
+      decl->prop_clock = block->clocking_event;
+    }
+    if (decl->kind == ModuleItemKind::kSequenceDecl &&
+        decl->seq_clock.empty()) {
+      decl->seq_clock = block->clocking_event;
+    }
+    registry.Register(decl);
+  }
+}
+
 // §16.12/§F.4.1: registers every property/sequence decl of `decl` into
 // `registry` so a property may be referenced before its declaration.
-void BuildPropertyRegistry(const ModuleDecl* decl, PropertyRegistry& registry) {
+void BuildPropertyRegistry(const ModuleDecl* decl, PropertyRegistry& registry,
+                           Arena& arena) {
   registry = PropertyRegistry();
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kPropertyDecl ||
         item->kind == ModuleItemKind::kSequenceDecl) {
       registry.Register(item);
+    }
+    if (item->kind == ModuleItemKind::kClockingBlock) {
+      RegisterClockingBlockDecls(item, registry, arena);
     }
   }
 }
@@ -730,7 +760,7 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   std::vector<std::pair<std::string_view, ModuleDecl*>> local_nested_modules(
       nested_module_decls_.begin(), nested_module_decls_.end());
 
-  BuildPropertyRegistry(decl, property_registry_);
+  BuildPropertyRegistry(decl, property_registry_, arena_);
   PromoteSequenceInstancesInProperties(decl, property_registry_, arena_);
   // §16.15: the default disable iff of this scope, wherever it stands among
   // the items, or the enclosing declaration's where this is a nested

@@ -1,0 +1,17 @@
+d1 failed at 25
+d2 failed at 25
+d4 failed at 25
+p2 failed at 25
+c1 covered at 25
+d3 failed at 30
+d5 failed at 30
+p1 failed at 30
+c2 covered at 30
+e1 failed at 30
+e2 covered at 30
+e3 covered at 30
+$finish at time 40
+cover property clock_resolution.u1.c1 (line 58): attempted 4, succeeded 1, succeeded vacuously 0
+cover property clock_resolution.u1.c2 (line 59): attempted 4, succeeded 1, succeeded vacuously 0
+cover property clock_resolution.u2.e2 (line 75): attempted 4, succeeded 1, succeeded vacuously 0
+cover property clock_resolution.u2.e3 (line 77): attempted 4, succeeded 1, succeeded vacuously 0

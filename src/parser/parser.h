@@ -621,6 +621,7 @@ class Parser {
   bool ParseSequenceTermInto(ModuleItem* item);
   bool TryParseSimpleConcurrentProperty(ModuleItem* item, StmtKind body_kind);
   bool TryParsePropertyInstanceSpec(ModuleItem* item);
+  bool ReadStaticPropertySpec(ModuleItem* item, StmtKind body_kind);
   bool BodyHasTemporalOperator();
   void WarnUnevaluatedConcurrentAssertion(SourceLoc loc);
   ModuleItem* ParseCoverProperty();

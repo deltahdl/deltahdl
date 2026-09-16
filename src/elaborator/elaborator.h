@@ -216,6 +216,8 @@ class Elaborator : public ElaboratorClassRules {
   bool ElaborateDeclItem(ModuleItem* item, RtlirModule* mod);
   void ElaborateModuleClassDecl(ModuleItem* item, RtlirModule* mod);
   bool ElaborateBehavioralItem(ModuleItem* item, RtlirModule* mod);
+  void ResolveStaticAssertionClock(ModuleItem* item,
+                                   const std::vector<EventExpr>& default_clock);
   // Third-level dispatch for the §16 assertion/sequence/property/clocking
   // module items; returns true for those kinds and is a no-op (true) otherwise.
   bool ElaborateAssertionItem(ModuleItem* item, RtlirModule* mod);
@@ -271,8 +273,7 @@ class Elaborator : public ElaboratorClassRules {
   void RunPostItemValidations(const ModuleDecl* decl, RtlirModule* mod);
 
   void ElaborateModuleInst(ModuleItem* item, RtlirModule* mod);
-  // The child module of an instance elaborated under the instance's parameter
-  // overrides and type parameters, its nested declarations in scope.
+  // The child of an instance, under its parameter and type overrides.
   void ElaborateChildInstance(RtlirModuleInst& inst, const ModuleItem* item,
                               ModuleDecl* child_decl, RtlirModule* mod,
                               const ScopeMap& parent_scope);

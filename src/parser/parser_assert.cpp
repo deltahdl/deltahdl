@@ -312,29 +312,23 @@ void Parser::WarnUnevaluatedConcurrentAssertion(SourceLoc loc) {
   // restrict property never reaches here: §16.2 and §16.14.4 have a
   // simulator not check it, so its going unevaluated is the standard's rule
   // rather than this tool's gap.
+  // The spec, with a clocking event or, §16.16 (a), without, was not read
+  // into a body the evaluation reads; a spec with no clock at all is left to
+  // the elaborator, which has the default clocking, so no reason here names
+  // the clock.
   std::string reason;
   if (BodyHasTemporalOperator()) {
-    // Reason one: the property is temporal, so it is not the sampled boolean
-    // TryParseSimpleConcurrentProperty lowers. #2924 and #2927 cover the
-    // operators.
+    // Reason one: the property is temporal and holds what the evaluation
+    // does not read. #2924 and #2927 cover the operators.
     reason =
         "its property is temporal, using |->, |=> or ##, and this tool "
         "evaluates only a boolean property";
-  } else if (!Check(TokenKind::kAt)) {
-    // Reason two: an assert property whose property_spec does not open with
-    // a clocking event. §16.14.5 allows the clock to be inferred, which this
-    // tool does not do, so there is nothing to sample the boolean on.
-    reason =
-        "its property_spec has no leading clocking event, and this tool "
-        "evaluates only the clocked form @(event) boolean_expression";
   } else {
-    // Reason two by its other route: the spec opens with a clocking event
-    // but the boolean did not consume the rest of it.
+    // Reason two: the boolean did not consume the rest of the spec.
     reason =
         "its property_spec holds more than the @(event) boolean_expression "
         "this tool evaluates";
   }
-
   diag_.Warning(loc, "concurrent assertion is not evaluated: " + reason,
                 Subclause("16.14"));
 }
@@ -398,6 +392,28 @@ bool Parser::TryParseSimpleConcurrentProperty(ModuleItem* item,
 // body when it is the clocked boolean form and reports the assertion
 // unevaluated otherwise, so the parser reports nothing here. A spec of any
 // other shape leaves the lexer where it was and answers false.
+// §16.16 (b): an instance of a property or sequence declared in a clocking
+// block is named through the block, `posedge_clk.q4`, which the expression
+// parse reads as a member access; it is made the one identifier the
+// registry keys the declaration under.
+static Expr* QualifiedInstanceName(Expr* instance, Arena& arena) {
+  if (instance == nullptr || instance->kind != ExprKind::kMemberAccess ||
+      instance->is_scope_resolution || instance->lhs == nullptr ||
+      instance->rhs == nullptr ||
+      instance->lhs->kind != ExprKind::kIdentifier ||
+      instance->rhs->kind != ExprKind::kIdentifier) {
+    return instance;
+  }
+  auto* qualified =
+      arena.Create<std::string>(std::string(instance->lhs->text) + "." +
+                                std::string(instance->rhs->text));
+  instance->kind = ExprKind::kIdentifier;
+  instance->text = *qualified;
+  instance->lhs = nullptr;
+  instance->rhs = nullptr;
+  return instance;
+}
+
 bool Parser::TryParsePropertyInstanceSpec(ModuleItem* item) {
   if (!Check(TokenKind::kIdentifier)) return false;
   auto saved = lexer_.SavePos();
@@ -409,6 +425,7 @@ bool Parser::TryParsePropertyInstanceSpec(ModuleItem* item) {
   Expr* instance = ParserPropertySpecHelpers::TryParsePropertyInstance(*this);
   if (instance == nullptr) instance = ParseExpr();
   diag_.PopSuppress();
+  instance = QualifiedInstanceName(instance, arena_);
   bool is_instance = instance != nullptr && Check(TokenKind::kRParen) &&
                      (instance->kind == ExprKind::kIdentifier ||
                       instance->kind == ExprKind::kCall);
@@ -420,6 +437,22 @@ bool Parser::TryParsePropertyInstanceSpec(ModuleItem* item) {
       instance->kind == ExprKind::kCall ? instance->callee : instance->text;
   item->assert_expr = instance;
   return true;
+}
+
+// §16.16: the property_spec of a static concurrent assertion statement, in
+// the forms the evaluation reads: one opening with a clocking event, (d)
+// the statement's own; one that is an instance of a named property or
+// sequence, recorded for the elaborator, which (f) determines the clock from
+// the declaration; and, §16.16 (a), one opening with none, whose leading
+// clocking event the elaborator takes from the default clocking. Answers
+// whether the spec was read into a body; an instance answers false with
+// prop_instance_name set.
+bool Parser::ReadStaticPropertySpec(ModuleItem* item, StmtKind body_kind) {
+  if (Check(TokenKind::kAt)) {
+    return TryParseSimpleConcurrentProperty(item, body_kind);
+  }
+  if (TryParsePropertyInstanceSpec(item)) return false;
+  return TryParseSimpleConcurrentProperty(item, body_kind);
 }
 
 ModuleItem* Parser::ParsePropertyAssertLike(ModuleItemKind kind,
@@ -442,12 +475,11 @@ ModuleItem* Parser::ParsePropertyAssertLike(ModuleItemKind kind,
   // assert property statement's, and §16.14.2 has a simulator check an
   // assumption as it checks an assertion, so the clocked boolean form is read
   // for both; the body's kind keeps the directive for §20.11's controls.
-  bool simple_concurrent =
-      Check(TokenKind::kAt) && TryParseSimpleConcurrentProperty(
-                                   item, kind == ModuleItemKind::kAssertProperty
-                                             ? StmtKind::kAssertImmediate
-                                             : StmtKind::kAssumeImmediate);
-  if (!simple_concurrent && !TryParsePropertyInstanceSpec(item)) {
+  StmtKind body_kind = kind == ModuleItemKind::kAssertProperty
+                           ? StmtKind::kAssertImmediate
+                           : StmtKind::kAssumeImmediate;
+  bool simple_concurrent = ReadStaticPropertySpec(item, body_kind);
+  if (!simple_concurrent && item->prop_instance_name.empty()) {
     // Before SkipPropertySpec, which moves the lexer off the property_spec the
     // reason is read from.
     WarnUnevaluatedConcurrentAssertion(item->loc);
@@ -532,9 +564,8 @@ ModuleItem* Parser::ParseCoverProperty() {
   // and §16.14, is recorded for the elaborator as ParsePropertyAssertLike
   // records one, and a cover whose spec is neither has its spec skipped.
   bool simple_concurrent =
-      Check(TokenKind::kAt) &&
-      TryParseSimpleConcurrentProperty(item, StmtKind::kCoverImmediate);
-  if (!simple_concurrent && !TryParsePropertyInstanceSpec(item)) {
+      ReadStaticPropertySpec(item, StmtKind::kCoverImmediate);
+  if (!simple_concurrent && item->prop_instance_name.empty()) {
     WarnUnevaluatedConcurrentAssertion(item->loc);
     item->assert_expr = SkipPropertySpec(arena_, lexer_, CurrentLoc());
   }

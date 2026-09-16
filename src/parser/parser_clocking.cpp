@@ -292,11 +292,15 @@ void Parser::ParseClockingItem(ModuleItem* item) {
   }
 
   if (Check(TokenKind::kKwProperty)) {
-    CheckClockingBlockDecl(ParsePropertyDecl(), "property");
+    ModuleItem* decl = ParsePropertyDecl();
+    CheckClockingBlockDecl(decl, "property");
+    if (decl != nullptr) item->clocking_decls.push_back(decl);
     return;
   }
   if (Check(TokenKind::kKwSequence)) {
-    CheckClockingBlockDecl(ParseSequenceDecl(), "sequence");
+    ModuleItem* decl = ParseSequenceDecl();
+    CheckClockingBlockDecl(decl, "sequence");
+    if (decl != nullptr) item->clocking_decls.push_back(decl);
     return;
   }
   if (Check(TokenKind::kKwLet)) {

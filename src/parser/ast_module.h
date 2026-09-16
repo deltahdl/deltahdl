@@ -693,6 +693,10 @@ struct ModuleItem {
   int decl_clock_event_count = 0;
 
   std::vector<ClockingSignalDecl> clocking_signals;
+  // §16.16 (b): the property and sequence declarations of a clocking block,
+  // each clocked by the block's event and named through the block,
+  // `posedge_clk.q4`, where an assertion instantiates it.
+  std::vector<ModuleItem*> clocking_decls;
   bool is_default_clocking = false;
   bool is_global_clocking = false;
   Edge default_input_skew_edge = Edge::kNone;

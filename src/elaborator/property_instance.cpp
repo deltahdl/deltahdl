@@ -1,6 +1,7 @@
 #include "elaborator/property_instance.h"
 
 #include <cstddef>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -201,6 +202,26 @@ void FillInferredDefaults(Expr* instance, const ModuleItem* decl,
     instance->args[i] =
         InferredActual(decl->prop_formal_inferred[i], inferred, arena);
   }
+}
+
+Expr* QualifiedInstance(Expr* instance, const PropertyRegistry& registry,
+                        Arena& arena) {
+  if (instance == nullptr || instance->kind != ExprKind::kMemberAccess ||
+      instance->is_scope_resolution || instance->lhs == nullptr ||
+      instance->rhs == nullptr ||
+      instance->lhs->kind != ExprKind::kIdentifier ||
+      instance->rhs->kind != ExprKind::kIdentifier) {
+    return instance;
+  }
+  auto* qualified =
+      arena.Create<std::string>(std::string(instance->lhs->text) + "." +
+                                std::string(instance->rhs->text));
+  if (registry.Find(*qualified) == nullptr) return instance;
+  instance->kind = ExprKind::kIdentifier;
+  instance->text = *qualified;
+  instance->lhs = nullptr;
+  instance->rhs = nullptr;
+  return instance;
 }
 
 std::vector<EventExpr> DefaultClockingEvent(const RtlirModule* mod) {

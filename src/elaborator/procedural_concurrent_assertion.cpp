@@ -161,6 +161,30 @@ bool BodyIsRead(Stmt* stmt, const ModuleItem* decl, DiagEngine& diag) {
   return false;
 }
 
+// Whether the property tree names a clocking event of its own anywhere, on
+// an operand, in a sequence or in a property it instantiates, which makes
+// the property multiclocked under a leading clock from elsewhere.
+bool TreeNamesAClock(const PropertyExprNode* node,
+                     const PropertyRegistry& registry) {
+  if (node == nullptr) return false;
+  if (!node->clock.empty()) return true;
+  if (node->sequence != nullptr) {
+    for (const auto& clock : node->sequence->seq_linear.clocks) {
+      if (!clock.empty()) return true;
+    }
+  }
+  const ModuleItem* decl =
+      InstantiatedDecl(node->boolean, ModuleItemKind::kPropertyDecl, registry);
+  if (decl != nullptr && !decl->prop_clock.empty()) return true;
+  const ModuleItem* seq =
+      InstantiatedDecl(node->boolean, ModuleItemKind::kSequenceDecl, registry);
+  if (seq != nullptr && !seq->seq_clock.empty()) return true;
+  for (const PropertyExprNode* operand : node->operands) {
+    if (TreeNamesAClock(operand, registry)) return true;
+  }
+  return false;
+}
+
 // The body, the disable condition and the clock of the property `decl` the
 // statement instantiates, with the actuals in the formals' places: the
 // boolean body substituted, any other as a tree whose root is the instance
@@ -204,7 +228,7 @@ void SubstituteInstance(Stmt* stmt, const PropertyRegistry& registry,
   if (stmt->assert_property != nullptr || stmt->assert_sequence != nullptr) {
     return;
   }
-  Expr* instance = stmt->assert_expr;
+  Expr* instance = QualifiedInstance(stmt->assert_expr, registry, arena);
   const ModuleItem* seq =
       InstantiatedDecl(instance, ModuleItemKind::kSequenceDecl, registry);
   // §16.14.7: the inferred functions among the defaults are replaced by
@@ -255,6 +279,18 @@ void ElaborateProceduralConcurrentAssertions(ModuleItem* procedure,
       stmt->assert_disable_iff = at_instance.disable;
     }
     PromoteSequenceInstances(stmt->assert_property, registry, arena);
+    if (stmt->assert_clock.empty() && !inferred.empty() &&
+        TreeNamesAClock(stmt->assert_property, registry)) {
+      // §16.16 (c): the contextually inferred clocking event is treated as
+      // the leading clocking event of the assertion, which a multiclocked
+      // property may not take: the clause's a3.
+      diag.Error(stmt->range.start,
+                 "a multiclocked property may not take a contextually "
+                 "inferred leading clocking event",
+                 Subclause("16.16"));
+      stmt->is_concurrent_clocked = false;
+      continue;
+    }
     if (stmt->assert_clock.empty()) stmt->assert_clock = at_instance.clock;
     if (!stmt->assert_clock.empty()) continue;
     diag.Error(stmt->range.start,

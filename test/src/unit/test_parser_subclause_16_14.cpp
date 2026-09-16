@@ -162,21 +162,27 @@ TEST(ConcurrentAssertionEvaluationReporting,
       ReportedWarning(under.diags, "its property is temporal", 2, "16.14"));
 }
 
-// §16.14.5 allows a concurrent assertion outside procedural code to take its
-// clock from a default clocking block rather than from a leading clocking
-// event. deltahdl infers no clock, so an assert property written without one
-// has nothing to sample its boolean on and is skipped even though it is an
-// assert and even though its body is boolean. The boolean is two names joined
-// rather than one name, because one name alone is read as a property instance
-// (see the next case).
-TEST(ConcurrentAssertionEvaluationReporting,
-     AssertWithoutAClockIsNotEvaluated) {
+// §16.16 (a) has a concurrent assertion outside procedural code take its
+// clock from the default clocking where its spec opens with none, which the
+// elaborator has and the parser does not, so an assert property written
+// without a clock is read into a body with no clock and reported by
+// nothing here. The boolean is two names joined rather than one name,
+// because one name alone is read as a property instance (see the next
+// case).
+TEST(ConcurrentAssertionEvaluationReporting, AssertWithoutAClockIsRead) {
   auto r = Parse(
       "module m;\n"
       "  assert property (a && b);\n"
       "endmodule\n");
-  EXPECT_TRUE(ReportedWarning(
-      r.diags, "its property_spec has no leading clocking event", 2, "16.14"));
+  EXPECT_EQ(UnevaluatedReports(r), 0);
+  const ModuleItem* assertion = nullptr;
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kAssertProperty) assertion = item;
+  }
+  ASSERT_NE(assertion, nullptr);
+  EXPECT_TRUE(assertion->sensitivity.empty());
+  ASSERT_NE(assertion->body, nullptr);
+  EXPECT_TRUE(assertion->body->is_concurrent_clocked);
 }
 
 // §16.12.1 lets an instance of a named property stand as the property_spec,

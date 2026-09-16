@@ -243,10 +243,11 @@ TEST(PropertyInstantiation, InstanceAsPropertySpecIsTheBodysProcess) {
 }
 
 // A spec that is one name is an instance only when the name is a property's.
-// Here it is a variable's, so the assertion has no leading clocking event and
-// no property body to take one from, and the report says both, since the
-// parser left it to the elaborator to tell the two apart.
-TEST(PropertyInstantiation, ANameThatIsNoPropertysIsReportedUnevaluated) {
+// Here it is a variable's, so the spec is the boolean the name reads as,
+// and §16.16 (f) makes an assertion with no leading clocking event, no
+// default clocking in scope and no instance to determine one illegal; the
+// parser left it to the elaborator, which has the default clocking, to say.
+TEST(PropertyInstantiation, ANameThatIsNoPropertysIsABooleanWithoutAClock) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -255,11 +256,10 @@ TEST(PropertyInstantiation, ANameThatIsNoPropertysIsReportedUnevaluated) {
       "endmodule\n",
       f, "m");
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
-                              "its property_spec has no leading clocking "
-                              "event, and \"a\" names no property whose body "
-                              "could supply one",
-                              3, "16.14"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "concurrent assertion has no leading clocking "
+                            "event",
+                            3, "16.16"));
   EXPECT_EQ(AssertionProcess(design->top_modules[0]), nullptr);
 }
 
@@ -293,10 +293,9 @@ TEST(PropertyInstantiation, AnInstanceOfATemporalPropertyIsTheBodysProcess) {
 }
 
 // A body with no leading clocking event leaves an instance that is the
-// whole spec with no clock to evaluate on: §16.14.5 would infer one from a
-// default clocking, which this tool does not, so the instance is reported
-// unevaluated with the property named so the reader knows which body to
-// look at.
+// whole spec with no clock to evaluate on: §16.16 (a) would take the default
+// clocking, and with none in scope §16.16 (f) makes the assertion illegal,
+// so it is reported and no process is built.
 TEST(PropertyInstantiation, AnInstanceOfAnUnclockedPropertyIsReported) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -309,11 +308,10 @@ TEST(PropertyInstantiation, AnInstanceOfAnUnclockedPropertyIsReported) {
       "endmodule\n",
       f, "m");
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
-                              "the body of property \"p_base\" has no "
-                              "leading clocking event, and this tool infers "
-                              "none",
-                              6, "16.14"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "concurrent assertion has no leading clocking "
+                            "event",
+                            6, "16.16"));
   EXPECT_EQ(AssertionProcess(design->top_modules[0]), nullptr);
 }
 

@@ -67,6 +67,13 @@ void FillInferredDefaults(Expr* instance, const ModuleItem* decl,
 // elaborated so far; empty where it has none.
 std::vector<EventExpr> DefaultClockingEvent(const RtlirModule* mod);
 
+// §16.16 (b): a boolean that is a member access of two identifiers naming a
+// declaration of a clocking block through the block, `posedge_clk.q4`, is
+// made the one identifier the registry keys the declaration under; any
+// other expression is answered unchanged.
+Expr* QualifiedInstance(Expr* instance, const PropertyRegistry& registry,
+                        Arena& arena);
+
 // §16.13.4: a boolean operand of the tree that is the bare name of a named
 // sequence, or a call of one, which the parser read as a boolean since a
 // variable's name reads the same, is the sequence, a node the flattening
