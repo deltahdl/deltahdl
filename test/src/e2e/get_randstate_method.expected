@@ -1,0 +1,6 @@
+object: a string of length above 0: 1, two reads agree: 1, an object seeded alike agrees: 1
+object: moved by four draws: 1, the other object's state kept: 1
+object: the retrieved state installed again replays 4 of 4
+process: a string of length above 0: 1, two reads agree: 1
+process: moved by four draws: 1, the retrieved state installed again replays 4 of 4
+$finish at time 0
