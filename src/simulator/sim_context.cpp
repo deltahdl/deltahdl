@@ -181,10 +181,30 @@ bool SimContext::AssertCheckingEnabled(uint32_t type_bit,
          (assert_checking_off_dtype_ & directive_bit) == 0;
 }
 
+void SimContext::SetDeferredArgSnapshot(const Expr* arg, const Logic4Vec& val) {
+  deferred_arg_snapshots_[arg] = val;
+}
+
 const Logic4Vec* SimContext::FindDeferredArgSnapshot(const Expr* arg) const {
   auto it = deferred_arg_snapshots_.find(arg);
   if (it == deferred_arg_snapshots_.end()) return nullptr;
   return &it->second;
+}
+
+void SimContext::ClearDeferredArgSnapshot(const Expr* arg) {
+  deferred_arg_snapshots_.erase(arg);
+}
+
+void SimContext::PushMethodClass(const ClassTypeInfo* cls) {
+  method_class_stack_.push_back(cls);
+}
+
+void SimContext::PopMethodClass() {
+  if (!method_class_stack_.empty()) method_class_stack_.pop_back();
+}
+
+const ClassTypeInfo* SimContext::CurrentMethodClass() const {
+  return method_class_stack_.empty() ? nullptr : method_class_stack_.back();
 }
 
 Logic4Vec* SimContext::SetRsReturnSlot(Logic4Vec* slot) {

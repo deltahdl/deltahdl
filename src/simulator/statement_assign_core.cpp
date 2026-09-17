@@ -827,10 +827,20 @@ void ApplyCompoundAssignOp(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   }
 }
 
+// §7.5.1/§7.10: an assignment that sizes or rebuilds an array object rather
+// than writing a value: `new[]` to a dynamic array property, or any
+// assignment to a queue.
+static bool TryArrayObjectAssign(const Stmt* stmt, SimContext& ctx,
+                                 Arena& arena) {
+  return TryClassArrayNewAssign(stmt, ctx, arena) ||
+         TryQueueBlockingAssign(stmt, ctx, arena);
+}
+
 // Run the chain of special-case blocking-assignment handlers that do not need
 // the generic rhs value (virtual interfaces, class `new`, associative-array
-// copy/literal, streaming-to-queue, queue/event/slice/subarray, and compound
-// operators). Returns true when one of them fully handled the assignment.
+// copy/literal, streaming-to-queue, dynamic-array/queue/event/slice/subarray,
+// and compound operators). Returns true when one of them fully handled the
+// assignment.
 bool TryDispatchSpecialBlockingAssign(const Stmt* stmt, SimContext& ctx,
                                       Arena& arena) {
   if (TryVirtualInterfaceAssign(stmt, ctx)) return true;
@@ -842,8 +852,7 @@ bool TryDispatchSpecialBlockingAssign(const Stmt* stmt, SimContext& ctx,
   if (TryAssocCopyAssign(stmt, ctx)) return true;
   if (TryAssocLiteralAssign(stmt, ctx, arena)) return true;
   if (TryStreamingConcatToQueueTarget(stmt, ctx, arena)) return true;
-  if (TryClassArrayNewAssign(stmt, ctx, arena)) return true;
-  if (TryQueueBlockingAssign(stmt, ctx, arena)) return true;
+  if (TryArrayObjectAssign(stmt, ctx, arena)) return true;
   if (TryEventVarAssign(stmt, ctx)) return true;
   if (TryUnpackedSliceAssign(stmt, ctx, arena)) return true;
   if (TrySubarrayAssign(stmt, ctx, arena)) return true;

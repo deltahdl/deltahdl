@@ -99,6 +99,41 @@ TEST(ForeachIterativeConstraintsRun, APredicateGuardsTheConstraint) {
   EXPECT_EQ(out, "64 1\n");
 }
 
+// 18.5.7.1: a predicate over the loop variable alone guards a relation
+// between an element and the one before it out of the first element, whose
+// predecessor the array lacks, so over a fixed array of eight ints every one
+// of 32 draws is ascending, which the draws tried against the eight
+// relations as a whole would meet once in forty thousand.
+TEST(ForeachIterativeConstraintsRun, AGuardedRelationBetweenElementsHolds) {
+  SimFixture f;
+  std::string out = RunCapture(
+      Counting(
+          "  rand int A[8];\n"
+          "  constraint c { foreach (A[i]) (i > 0) -> A[i] > A[i - 1]; }\n",
+          32,
+          "o.A[1] > o.A[0] && o.A[2] > o.A[1] && o.A[3] > o.A[2] && "
+          "o.A[4] > o.A[3] && o.A[5] > o.A[4] && o.A[6] > o.A[5] && "
+          "o.A[7] > o.A[6]",
+          "o.A[7] > o.A[0]"),
+      f);
+  EXPECT_EQ(out, "32 1\n");
+}
+
+// 18.5.7.1: the same guard over an equality between an element and the one
+// before it, each held to one more than its predecessor, so that every draw
+// of a six-element array ends five above where it starts.
+TEST(ForeachIterativeConstraintsRun, AGuardedEqualityBetweenElementsHolds) {
+  SimFixture f;
+  std::string out = RunCapture(
+      Counting("  rand int A[6];\n"
+               "  constraint c { foreach (A[i]) (i > 0) -> A[i] == A[i - 1] + "
+               "1; }\n",
+               32, "o.A[5] == o.A[0] + 5 && o.A[3] == o.A[2] + 1",
+               "o.A[1] == o.A[0] + 1"),
+      f);
+  EXPECT_EQ(out, "32 1\n");
+}
+
 // 18.5.7.1: the size method is a state variable within the foreach block of
 // the array, solved ahead of the iterative constraints, so a foreach holding
 // each element to the size plus its index over an array held to 3 elements

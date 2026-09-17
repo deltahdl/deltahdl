@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -19,11 +20,14 @@ namespace {
 
 // The local a trial binds the random variable `n` to, made on the first
 // trial of the randomize() call and kept on `rc` for the rest: a real
-// variable's (18.4.1) 64 bits wide, an integral one's as the solver's
-// variable of the name is declared, since 6.11.3 has the value read in the
-// declared width and signedness, so that an int element drawn negative
+// variable's (18.4.1) 64 bits wide, an integral one's in the signedness the
+// solver's variable of the name is declared with, since 6.11.3 has the value
+// read as the type declares it, so that an int element drawn negative
 // compares below one drawn positive (18.5.7.1), which the value taken as 32
-// unsigned bits does not.
+// unsigned bits does not, and no narrower than the 32 bits of an int, the
+// width the operands of a relation over it take (11.6.1), so that a sum of
+// two 4-bit variables compared against an int is the sum and not its low
+// four bits.
 Variable* TrialLocal(const std::string& n, bool real, RandomizeCtx& rc) {
   auto it = rc.trial_locals.find(n);
   if (it != rc.trial_locals.end()) {
@@ -32,9 +36,7 @@ Variable* TrialLocal(const std::string& n, bool real, RandomizeCtx& rc) {
   }
   const RandVariable* var =
       rc.solver != nullptr && !real ? rc.solver->FindVariable(n) : nullptr;
-  uint32_t width = real                               ? 64
-                   : var != nullptr && var->width > 0 ? var->width
-                                                      : 32;
+  uint32_t width = real ? 64 : var != nullptr ? std::max(var->width, 32u) : 32;
   bool is_signed = !real && (var == nullptr || var->is_signed);
   Variable* local = rc.ctx.CreateLocalVariable(n, width, is_signed);
   rc.trial_locals[n] = local;

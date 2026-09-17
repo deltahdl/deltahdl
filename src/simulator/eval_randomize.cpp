@@ -291,10 +291,20 @@ bool AnyRefsRandVar(const std::vector<Expr*>& list,
   return false;
 }
 
+// 18.5.7: whether `name` is a rand member declared as an array, whose
+// elements are the random variables; a select of it names one of them.
+static bool IsRandArray(std::string_view name, std::vector<RandInfo>& rands) {
+  for (const auto& ri : rands) {
+    if (ri.array_base == name) return true;
+  }
+  return false;
+}
+
 bool RefsRandVar(const Expr* e, std::vector<RandInfo>& rands) {
   if (e == nullptr) return false;
-  if (e->kind == ExprKind::kIdentifier)
-    return FindRand(rands, e->text) != nullptr;
+  if (e->kind == ExprKind::kIdentifier) {
+    return FindRand(rands, e->text) != nullptr || IsRandArray(e->text, rands);
+  }
   if (e->kind == ExprKind::kMemberAccess) {
     return e->lhs != nullptr && e->lhs->kind == ExprKind::kIdentifier &&
            e->lhs->text == "this" && e->rhs != nullptr &&

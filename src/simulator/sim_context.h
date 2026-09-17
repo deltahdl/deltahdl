@@ -676,15 +676,9 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   // lexically enclosing class), so `super` resolves relative to that class
   // rather than the dynamic type of `this`. Without this, super.new() in a
   // mid-hierarchy constructor would re-resolve to the same level and recurse.
-  void PushMethodClass(const ClassTypeInfo* cls) {
-    method_class_stack_.push_back(cls);
-  }
-  void PopMethodClass() {
-    if (!method_class_stack_.empty()) method_class_stack_.pop_back();
-  }
-  const ClassTypeInfo* CurrentMethodClass() const {
-    return method_class_stack_.empty() ? nullptr : method_class_stack_.back();
-  }
+  void PushMethodClass(const ClassTypeInfo* cls);
+  void PopMethodClass();
+  const ClassTypeInfo* CurrentMethodClass() const;
 
   void IncrementAssertionFailCount() { ++assertion_fail_count_; }
   int AssertionFailCount() const { return assertion_fail_count_; }
@@ -744,13 +738,9 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   // context.
   class CoverageDB& CoverageData();
 
-  void SetDeferredArgSnapshot(const Expr* arg, const Logic4Vec& val) {
-    deferred_arg_snapshots_[arg] = val;
-  }
+  void SetDeferredArgSnapshot(const Expr* arg, const Logic4Vec& val);
   const Logic4Vec* FindDeferredArgSnapshot(const Expr* arg) const;
-  void ClearDeferredArgSnapshot(const Expr* arg) {
-    deferred_arg_snapshots_.erase(arg);
-  }
+  void ClearDeferredArgSnapshot(const Expr* arg);
 
   // §16.5.1: the sampled values the clocked concurrent assertions in this
   // design read. The store is owned here because the read that consults it is
