@@ -1,0 +1,4 @@
+the demo: success 64 of 64, z is x + y in 64, x below y in 64
+doit: success 64 of 64, f.x from 10 below 15 in 64
+F: success 64 of 64, obj.x below 20 in 64
+$finish at time 0
