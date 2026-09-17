@@ -1,0 +1,4 @@
+examples: within 0..7 in 256 of 256 with 8 values seen, minval omitted 256 with 8 seen, reversed 256 with 8 seen
+equal bounds return 5 in 32 of 32, a range above the largest int is kept in 32 of 32
+thread stable: the seeded thread replays 8 of 8 beside a busier neighbour
+$finish at time 0
