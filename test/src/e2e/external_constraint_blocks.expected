@@ -1,0 +1,4 @@
+both completed prototypes hold, x is 5 or 7: 32 of 32
+with proto1 off by its name x is at least 0: 32 of 32, and free of 5 and 7: 1
+an uncompleted implicit prototype is empty: randomize() succeeds 64 of 64 times, y takes more than one value: 1
+$finish at time 0
