@@ -1,0 +1,4 @@
+example: c1.x and c2.y with a $random, a $urandom and a std::randomize() between the calls agree with the run without in 2 of 2
+independence: c1.x after five calls on c2 agrees: 1, two instances seeded 3 draw alike in 4 of 4, c1 seeded 3 again replays in 4 of 4
+seed: an instance seeded by hand with the parent thread's next value draws as the one created there: 1
+$finish at time 0
