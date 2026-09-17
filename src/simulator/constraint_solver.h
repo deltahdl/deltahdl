@@ -299,6 +299,12 @@ struct RandVariable {
   // reaching above 2**63-1 whole rather than mistaking it for an inverted one
   // and collapsing it onto its bottom value.
   void CollapseEmptyDomain();
+  // 18.6.1: whether the bounds folded out of the constraints left the
+  // domain holding no value at all, which CollapseEmptyDomain records as it
+  // collapses the range: the constraints are then infeasible and the solve
+  // of an active variable so held fails rather than drawing the bound the
+  // range was collapsed onto, a value the declared range excludes.
+  bool domain_empty = false;
 
   // 18.4.2: how many values [min_val, max_val] holds, which is the length of
   // the permutation a randc variable cycles through. A range covering the whole
@@ -532,6 +538,8 @@ class ConstraintSolver {
   // 18.5.3: a dist operation shall not be applied to a randc variable. True if
   // any enabled constraint block applies a distribution to a randc variable.
   bool HasDistOnRandc() const;
+  // 18.6.1: whether an active variable's domain holds no value.
+  bool HasEmptyDomain() const;
 
   // 18.5.3: a dist expression requires that it contain at least one rand
   // variable. In the solver model a distribution names the single variable it

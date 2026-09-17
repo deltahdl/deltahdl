@@ -1,0 +1,4 @@
+SimpleSum: success 64 of 64, z is x + y in 64, x varies: 1
+Counted: success 8 of 8, pre_randomize 8, post_randomize 8
+infeasible: randomize returns 0, x and z retained: 1, pre_randomize 9, post_randomize 8
+$finish at time 0

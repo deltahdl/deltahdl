@@ -71,7 +71,9 @@ int64_t RandVariable::DomainMax(int64_t a, int64_t b) const {
 }
 
 void RandVariable::CollapseEmptyDomain() {
-  if (DomainLess(max_val, min_val)) max_val = min_val;
+  if (!DomainLess(max_val, min_val)) return;
+  domain_empty = true;
+  max_val = min_val;
 }
 
 uint64_t RandVariable::DomainSize() const {
@@ -329,6 +331,13 @@ double ConstraintSolver::GenerateRandRealValue(RandVariable& var) {
   if (!(var.real_min < var.real_max)) return var.real_min;
   std::uniform_real_distribution<double> dist(var.real_min, var.real_max);
   return dist(rng_);
+}
+
+bool ConstraintSolver::HasEmptyDomain() const {
+  for (const auto& [name, var] : variables_) {
+    if (var.enabled && var.domain_empty) return true;
+  }
+  return false;
 }
 
 bool ConstraintSolver::HasDistOnRandc() const {

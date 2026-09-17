@@ -269,6 +269,11 @@ bool ConstraintSolver::SolveWith(
 
   if (pre_randomize_) pre_randomize_();
 
+  // 18.6.1: the value of a state variable can render a constraint
+  // unsatisfiable; a bound folded from one that leaves an active variable
+  // no value fails the call, 18.6.3 without post_randomize().
+  if (HasEmptyDomain()) return false;
+
   // 18.6.3: if randomize() fails, the random variables retain their previous
   // values. The iterative solver overwrites the solved-value maps in place as
   // it searches, so capture them here and restore them should the solve fail,
