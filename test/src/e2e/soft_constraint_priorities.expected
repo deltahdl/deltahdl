@@ -1,0 +1,5 @@
+the clause's example: solved 16 of 16, y in {20, 30} in 16, y < p1.x < p2.x < 100 in 16, p3.x in [5:9] in 16
+inline over the class: solved 1, v is 20
+the external block at its prototype's place: solved 1, v is 2
+the container and the later handle: solved 1, e.v is 2, l.v is 2
+$finish at time 0

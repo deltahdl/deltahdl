@@ -148,9 +148,8 @@ const Expr* AddendSide(const Expr* rel, std::vector<RandInfo>& rands,
   return nullptr;
 }
 
-// The value `v` as the solver's variable `name` holds it, wrapped to the
-// variable's width in its signedness, so that x derived as 10 - y over a
-// pair of ints is the int whose sum with y is 10 at the width of an int.
+}  // namespace
+
 int64_t HeldToVariable(int64_t v, const std::string& name, RandomizeCtx& rc) {
   const RandVariable* var =
       rc.solver != nullptr ? rc.solver->FindVariable(name) : nullptr;
@@ -159,6 +158,8 @@ int64_t HeldToVariable(int64_t v, const std::string& name, RandomizeCtx& rc) {
   return var->is_signed ? SignExtend(bits, var->width)
                         : static_cast<int64_t>(bits);
 }
+
+namespace {
 
 // 18.5.12: sets `ce` to derive the random variable of the addend side of
 // `rel`, the clause's x+y == 10 deriving x as 10 - y: x + q and q + x

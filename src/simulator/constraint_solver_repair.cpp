@@ -10,8 +10,6 @@
 
 namespace delta {
 
-namespace {
-
 // The domain of `var` narrowed by the comparison `sub`, its bounds folded
 // as a comparison against a constant folds them before the draw.
 RandVariable Narrowed(const RandVariable& var, const ConstraintExpr& sub) {
@@ -52,8 +50,6 @@ bool IsComparison(ConstraintKind kind) {
          kind == ConstraintKind::kLessThan || kind == ConstraintKind::kRange;
 }
 
-}  // namespace
-
 void ConstraintSolver::RepairConstraints(
     const std::vector<ConstraintExpr>& extra) {
   for (const auto& block : blocks_) {
@@ -64,6 +60,16 @@ void ConstraintSolver::RepairConstraints(
 }
 
 void ConstraintSolver::RepairConstraint(const ConstraintExpr& c) {
+  // 18.5.13: a soft constraint still honored is repaired as its inner
+  // relation; one discarded, by its priority or by a 'disable soft'
+  // directive, is true and repairs nothing.
+  if (c.kind == ConstraintKind::kSoft) {
+    if (c.inner != nullptr && dropped_soft_.count(&c) == 0 &&
+        disabled_soft_.count(&c) == 0) {
+      RepairConstraint(*c.inner);
+    }
+    return;
+  }
   if (c.kind == ConstraintKind::kCustom) {
     ApplyCustomRepair(c);
     return;

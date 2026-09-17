@@ -643,6 +643,8 @@ class ConstraintSolver {
 
   // 18.5.13: seed the inner expression_or_dist of a soft constraint that is
   // being honored, so a satisfiable soft preference steers its variable.
+  void SeedSoftBounds(const std::vector<ConstraintExpr>& extra,
+                      bool include_soft);
   void SeedHonoredSoft(const ConstraintExpr& inner,
                        const std::vector<ConstraintExpr>& extra);
 

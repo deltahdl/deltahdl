@@ -138,14 +138,16 @@ bool TryEvalRandomizeMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
   // of its active random object members as a single whole, so global
   // constraints relating variables from different objects are solved
   // simultaneously. When the active random object set (rule a) has more than
-  // the root object, solve the tree jointly. The argument-list form (18.11),
-  // the null checker (18.11.1) and an inline (with) block keep the per-object
-  // path.
-  if (!null_checker && !has_inline_list && expr->inline_constraint == nullptr) {
+  // the root object, solve the tree jointly, an inline (with) block applied
+  // to the root (18.5.13.1). The argument-list form (18.11), the null
+  // checker (18.11.1) and a with clause restricting the variables it names
+  // (18.7) keep the per-object path.
+  if (!null_checker && !has_inline_list && !expr->with_has_parens) {
     std::vector<JointObject> objects;
     CollectActiveRandomObjects(obj, "", ctx, objects, visited);
     if (objects.size() > 1) {
-      bool ok = RandomizeObjectTree(ctx, arena, expr, objects);
+      bool ok = RandomizeObjectTree(ctx, arena, expr, objects,
+                                    expr->inline_constraint);
       out = MakeLogic4VecVal(arena, 32, ok ? 1 : 0);
       return true;
     }

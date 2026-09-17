@@ -392,6 +392,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/constraint_solver_randc.cpp
     simulator/constraint_solver_repair.cpp
     simulator/constraint_solver_sizes.cpp
+    simulator/constraint_solver_soft.cpp
     simulator/constraint_solver_solve.cpp
     simulator/coverage_bins.cpp
     simulator/coverage_cross.cpp

@@ -18,6 +18,23 @@ namespace delta {
 int64_t DrawUniformInRange(bool is_signed, int64_t lo, int64_t hi,
                            std::mt19937& rng);
 
+// The domain of `var` narrowed by the comparison `sub`, its bounds folded
+// as a comparison against a constant folds them before the draw, and
+// whether a constraint kind is such a comparison. Shared between
+// constraint_solver_repair.cpp (which defines them) and
+// constraint_solver_solve.cpp.
+RandVariable Narrowed(const RandVariable& var, const ConstraintExpr& sub);
+bool IsComparison(ConstraintKind kind);
+
+// Seeds a single concrete constraint directly into `values`: an equality
+// fixes the variable to its constant and a set membership picks one of the
+// listed values at random; a variable holding a state value is never
+// seeded. Shared between constraint_solver_solve.cpp (which defines it) and
+// constraint_solver_soft.cpp.
+void ApplyConcreteConstraint(const ConstraintExpr& c,
+                             std::unordered_map<std::string, int64_t>& values,
+                             std::mt19937& rng, bool holds_state_value);
+
 // 18.5.13.2: classify the active constraints into the hard relations to satisfy
 // and the soft preferences to honor, omitting 'disable soft' directives (which
 // are resolved separately). Walks every enabled block in declaration order and

@@ -195,6 +195,11 @@ bool RefsNamedRandVar(const Expr* e, std::string_view name);
 // a trial binds a local it made once to each value it evaluates over
 // (eval_randomize_custom.cpp).
 void SetLocalWords(Logic4Vec& value, int64_t v);
+// The value `v` as the solver's variable `name` holds it, wrapped to the
+// variable's width in its signedness, so that x derived as 10 - y over a
+// pair of ints is the int whose sum with y is 10 at the width of an int
+// (eval_randomize_custom.cpp).
+int64_t HeldToVariable(int64_t v, const std::string& name, RandomizeCtx& rc);
 // 18.5: `rel` as the solver's kCustom relation, evaluated against the values
 // drawn, referencing the random variables it names and, where it is `x ==
 // expression` over the others, deriving x from them
@@ -273,8 +278,20 @@ void CollectActiveRandomObjects(
     ClassObject* obj, const std::string& prefix, SimContext& ctx,
     std::vector<JointObject>& out,
     std::unordered_set<const ClassObject*>& visited);
+// 18.5.8: randomizes the active random object tree `objects`, the root
+// first, as one solve; 18.5.13.1: `inline_block`, the constraint member of
+// the call's with clause or null, is applied to the root with the highest
+// soft priority.
 bool RandomizeObjectTree(SimContext& ctx, Arena& arena, const Expr* expr,
-                         const std::vector<JointObject>& objects);
+                         const std::vector<JointObject>& objects,
+                         const ClassMember* inline_block);
+// 18.5.4: adds the values the items of an inside range list name, evaluated
+// in the scope of `owner`, to `out`: a single value, or every value of a
+// closed range of constants; answers false for an item this path does not
+// enumerate (eval_randomize_membership.cpp).
+bool EnumerateInsideItems(const std::vector<Expr*>& elements,
+                          ClassObject* owner, RandomizeCtx& rc,
+                          std::vector<int64_t>& out);
 
 bool BuildDistConstraint(const ConstraintDistRef& ref, RandomizeCtx& rc,
                          ConstraintExpr& out);

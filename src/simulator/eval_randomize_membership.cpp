@@ -58,14 +58,24 @@ bool EnumerateInsideItem(const Expr* elem, RandomizeCtx& rc,
   return out.size() <= kMaxEnumeratedMembers;
 }
 
+}  // namespace
+
+bool EnumerateInsideItems(const std::vector<Expr*>& elements,
+                          ClassObject* owner, RandomizeCtx& rc,
+                          std::vector<int64_t>& out) {
+  ConstraintEvalScope scope(owner, rc.ctx);
+  for (const Expr* elem : elements) {
+    if (!EnumerateInsideItem(elem, rc, out)) return false;
+  }
+  return true;
+}
+
 // 18.5.4: `x inside { ... }` over a rand variable and items free of random
 // variables is a set membership the solver draws a member of, which a
 // domain as wide as an int's needs: a draw tried against the relation
 // finds one of a few members among 2^32 values as good as never. Fills
 // `out` and answers true; any other shape answers false for the kCustom
 // path.
-}  // namespace
-
 bool TrySetMembershipConstraint(const Expr* rel, std::vector<RandInfo>& rands,
                                 RandomizeCtx& rc, ConstraintExpr& out) {
   if (rel == nullptr || rel->kind != ExprKind::kInside || rel->lhs == nullptr ||
@@ -74,11 +84,8 @@ bool TrySetMembershipConstraint(const Expr* rel, std::vector<RandInfo>& rands,
       AnyRefsRandVar(rel->elements, rands)) {
     return false;
   }
-  ConstraintEvalScope scope(rc.obj, rc.ctx);
   std::vector<int64_t> values;
-  for (const Expr* elem : rel->elements) {
-    if (!EnumerateInsideItem(elem, rc, values)) return false;
-  }
+  if (!EnumerateInsideItems(rel->elements, rc.obj, rc, values)) return false;
   out.kind = ConstraintKind::kSetMembership;
   out.var_name = std::string(rel->lhs->text);
   out.set_values = std::move(values);

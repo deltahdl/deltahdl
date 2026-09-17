@@ -617,6 +617,9 @@ static void CompleteOneExternalConstraint(ClassDecl* cls,
       m->constraint_exprs.insert(m->constraint_exprs.end(),
                                  ext.constraint_exprs.begin(),
                                  ext.constraint_exprs.end());
+      m->constraint_soft_exprs.insert(m->constraint_soft_exprs.end(),
+                                      ext.constraint_soft_exprs.begin(),
+                                      ext.constraint_soft_exprs.end());
     }
   }
 }

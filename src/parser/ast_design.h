@@ -115,6 +115,10 @@ struct ExternalConstraintBlock {
   // constraint block; a prototype left without a block keeps an empty set and
   // behaves as an empty constraint (equivalent to the constant expression 1).
   std::vector<Expr*> constraint_exprs;
+  // 18.5.13: the inner relation of each soft constraint of the body, carried
+  // to the prototype as its own soft constraints, whose priority (18.5.13.1)
+  // is the prototype's place in the class.
+  std::vector<Expr*> constraint_soft_exprs;
 };
 
 struct CompilationUnit {
