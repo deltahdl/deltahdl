@@ -253,6 +253,7 @@ class Parser {
   // within the braces.
   struct ImpliedRelation;
   Expr* ParseImpliedRelation(Expr* antecedent, bool& soft);
+  bool ParseImpliedSet(Expr* antecedent, std::vector<ImpliedRelation>& out);
   bool TryCaptureDist(ClassMember* member, bool is_soft = false);
   bool ParseDistItem(ConstraintDistItem& item);
   bool ParseDistRange(ConstraintDistItem& item);

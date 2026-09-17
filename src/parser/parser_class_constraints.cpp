@@ -163,6 +163,22 @@ Expr* Parser::ParseImpliedRelation(Expr* antecedent, bool& soft) {
   return impl;
 }
 
+// The implied relations of the braced set after the '->', through its
+// '}', into `out`; false where one does not parse.
+bool Parser::ParseImpliedSet(Expr* antecedent,
+                             std::vector<ImpliedRelation>& out) {
+  if (!Match(TokenKind::kLBrace)) return false;
+  while (!Check(TokenKind::kRBrace)) {
+    if (AtEnd()) return false;
+    bool soft = false;
+    Expr* impl = ParseImpliedRelation(antecedent, soft);
+    if (impl == nullptr) return false;
+    out.push_back({impl, soft});
+  }
+  Consume();  // '}'
+  return true;
+}
+
 bool Parser::TryCaptureBracedImplication(ClassMember* member) {
   // The implication operator '->' has the lowest infix binding power, so
   // parsing at a binding power just above it consumes the whole antecedent
@@ -177,26 +193,14 @@ bool Parser::TryCaptureBracedImplication(ClassMember* member) {
     Expr* impl = ParseImpliedRelation(antecedent, soft);
     if (impl == nullptr) return false;
     synthesized.push_back({impl, soft});
-  } else {
-    if (!Check(TokenKind::kLBrace))
-      return false;  // only the braced-set form here
-    Consume();       // '{'
-    while (!Check(TokenKind::kRBrace)) {
-      if (AtEnd()) return false;
-      bool soft = false;
-      Expr* impl = ParseImpliedRelation(antecedent, soft);
-      if (impl == nullptr) return false;
-      synthesized.push_back({impl, soft});
-    }
-    Consume();  // '}'
+  } else if (!ParseImpliedSet(antecedent, synthesized)) {
+    return false;  // only the braced-set form here
   }
-  if (member) {
-    for (const ImpliedRelation& r : synthesized) {
-      if (r.soft)
-        member->constraint_soft_exprs.push_back(r.impl);
-      else
-        member->constraint_exprs.push_back(r.impl);
-    }
+  if (member == nullptr) return true;
+  for (const ImpliedRelation& r : synthesized) {
+    std::vector<Expr*>& into =
+        r.soft ? member->constraint_soft_exprs : member->constraint_exprs;
+    into.push_back(r.impl);
   }
   return true;
 }
