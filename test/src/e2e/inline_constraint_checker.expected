@@ -1,0 +1,5 @@
+null with the relation true: returns 1, values kept: 1
+null with the relation false: returns 0, values kept: 1
+no random variables, p < q: returns 1, values kept: 1
+no random variables, p > q: returns 0, values kept: 1
+$finish at time 0
