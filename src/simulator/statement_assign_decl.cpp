@@ -376,21 +376,31 @@ static bool TryExecClassVarDecl(const Stmt* stmt, SimContext& ctx,
   return true;
 }
 
+// §6.11.3: a declaration in a procedural block or a task body carries its
+// declared signedness as a module-scope declaration does (Lowerer sets the
+// same flag there) and as a subroutine body local does (CreateFuncLocalVar),
+// so an `int` declared in a task is a signed operand, and a solver drawing
+// it (18.12) draws it over the signed range rather than the unsigned one.
 static Variable* CreateVarInScope(std::string_view name, uint32_t width,
-                                  SimContext& ctx) {
-  return ctx.HasLocalScope() ? ctx.CreateLocalVariable(name, width)
-                             : ctx.CreateVariable(name, width);
+                                  bool is_signed, SimContext& ctx) {
+  if (ctx.HasLocalScope())
+    return ctx.CreateLocalVariable(name, width, is_signed);
+  Variable* var = ctx.CreateVariable(name, width);
+  var->is_signed = is_signed;
+  var->value.is_signed = is_signed;
+  return var;
 }
 
 static void CreateDeclVariable(const Stmt* stmt, uint32_t width, bool is_real,
                                SimContext& ctx, Arena& arena) {
+  bool is_signed = DeclaredTypeIsSigned(stmt->var_decl_type, ctx);
   if (width == 0 && DeclaredTypeIsString(stmt->var_decl_type, ctx)) {
-    CreateVarInScope(stmt->var_name, 0, ctx);
+    CreateVarInScope(stmt->var_name, 0, is_signed, ctx);
     ctx.RegisterStringVariable(stmt->var_name);
   } else {
     if (width == 0) width = 32;
     if (is_real && width < 64) width = 64;
-    CreateVarInScope(stmt->var_name, width, ctx);
+    CreateVarInScope(stmt->var_name, width, is_signed, ctx);
     if (is_real) ctx.RegisterRealVariable(stmt->var_name);
     CreateDeclAggregate(stmt, width, ctx, arena);
   }
