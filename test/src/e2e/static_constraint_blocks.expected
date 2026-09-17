@@ -1,0 +1,8 @@
+bounded off through the other instance: 1
+bounded on again through the other instance: 1
+both instances below 10 and even: 64 of 64
+freed from the bound: 1, still even: 64 of 64
+bounded again: 64 of 64
+an instance's own block stays on: 1, below 10: 64 of 64
+the completed static block holds: 64 of 64, off through the other: 1
+$finish at time 0
