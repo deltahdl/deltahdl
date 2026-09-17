@@ -21,7 +21,7 @@ TEST(UrandomRun, TheSameSeedFromAnyIntegralExpressionReplaysTheSequence) {
       "  parameter int SEED = 254;\n"
       "  int unsigned a[8], b[8];\n"
       "  int i, sv = 254, same = 0, diverged = 0;\n"
-      "  function int agreeing();\n"
+      "  function automatic int agreeing();\n"
       "    int n = 0;\n"
       "    for (int j = 0; j < 8; j++) if (a[j] == b[j]) n++;\n"
       "    return n;\n"
