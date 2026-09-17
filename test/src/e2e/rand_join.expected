@@ -1,0 +1,4 @@
+example: 600 runs each produce one of the six orders keeping A before B and C before D: 1, all six seen: 1, each near a sixth: 1
+expression: with 0.0 A B C D and C D A B take more than half of 600: 1, with 1.0 the four interleaved orders take more than half: 1
+depth: the two items of a nonterminal inside S1 stay adjacent in all of 100: 1
+$finish at time 0
