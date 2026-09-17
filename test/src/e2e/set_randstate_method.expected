@@ -1,0 +1,4 @@
+object: the state installed again replays 4 of 4, installed on another object it continues the stream in 4 of 4
+object: the installed state reads back: 1, a third object's state kept: 1
+process: the state installed again replays 4 of 4, installed on a forked thread it continues the stream in 4 of 4, the process's own state kept: 1
+$finish at time 0
