@@ -137,6 +137,32 @@ void Parser::CaptureDisableSoftConstraint(ClassMember* member) {
 // form is recognized; on any mismatch it returns false and captures nothing, so
 // the caller falls back to the plain single-relation parse. Runs inside the
 // caller's suppressed, position-saved speculative scan.
+// 18.5.13: a consequent written `soft` is a soft constraint that the
+// antecedent gates, `p -> soft q` of 18.5.13.2, so its implication goes
+// among the soft relations rather than the hard ones.
+struct Parser::ImpliedRelation {
+  Expr* impl;
+  bool soft;
+};
+
+// One consequent relation of an implication, `soft` where it is written
+// so, through its ';', as the implication of it by `antecedent`; null where
+// the relation does not parse.
+Expr* Parser::ParseImpliedRelation(Expr* antecedent, bool& soft) {
+  soft = Match(TokenKind::kKwSoft);
+  Expr* consequent = ParseExpr();
+  if (consequent == nullptr || !Check(TokenKind::kSemicolon)) return nullptr;
+  Consume();  // ';'
+  Expr* impl = arena_.Create<Expr>();
+  impl->kind = ExprKind::kBinary;
+  impl->op = TokenKind::kArrow;
+  impl->lhs = antecedent;
+  impl->rhs = consequent;
+  impl->range.start = antecedent->range.start;
+  impl->range.end = consequent->range.end;
+  return impl;
+}
+
 bool Parser::TryCaptureBracedImplication(ClassMember* member) {
   // The implication operator '->' has the lowest infix binding power, so
   // parsing at a binding power just above it consumes the whole antecedent
@@ -144,27 +170,33 @@ bool Parser::TryCaptureBracedImplication(ClassMember* member) {
   Expr* antecedent = ParseExprBp(3);
   if (antecedent == nullptr || !Check(TokenKind::kArrow)) return false;
   Consume();  // '->'
-  if (!Check(TokenKind::kLBrace))
-    return false;  // only the braced-set form here
-  Consume();       // '{'
-  std::vector<Expr*> synthesized;
-  while (!Check(TokenKind::kRBrace)) {
-    if (AtEnd()) return false;
-    Expr* consequent = ParseExpr();
-    if (consequent == nullptr || !Check(TokenKind::kSemicolon)) return false;
-    Consume();  // ';'
-    Expr* impl = arena_.Create<Expr>();
-    impl->kind = ExprKind::kBinary;
-    impl->op = TokenKind::kArrow;
-    impl->lhs = antecedent;
-    impl->rhs = consequent;
-    impl->range.start = antecedent->range.start;
-    impl->range.end = consequent->range.end;
-    synthesized.push_back(impl);
+  std::vector<ImpliedRelation> synthesized;
+  if (Check(TokenKind::kKwSoft)) {
+    // 18.5.13.2: the unbraced `antecedent -> soft relation`.
+    bool soft = false;
+    Expr* impl = ParseImpliedRelation(antecedent, soft);
+    if (impl == nullptr) return false;
+    synthesized.push_back({impl, soft});
+  } else {
+    if (!Check(TokenKind::kLBrace))
+      return false;  // only the braced-set form here
+    Consume();       // '{'
+    while (!Check(TokenKind::kRBrace)) {
+      if (AtEnd()) return false;
+      bool soft = false;
+      Expr* impl = ParseImpliedRelation(antecedent, soft);
+      if (impl == nullptr) return false;
+      synthesized.push_back({impl, soft});
+    }
+    Consume();  // '}'
   }
-  Consume();  // '}'
   if (member) {
-    for (Expr* impl : synthesized) member->constraint_exprs.push_back(impl);
+    for (const ImpliedRelation& r : synthesized) {
+      if (r.soft)
+        member->constraint_soft_exprs.push_back(r.impl);
+      else
+        member->constraint_exprs.push_back(r.impl);
+    }
   }
   return true;
 }

@@ -122,6 +122,27 @@ bool TryImplicationConstraint(const Expr* rel, std::vector<RandInfo>& rands,
   return true;
 }
 
+ConstraintExpr SoftImplication(const Expr* rel, std::vector<RandInfo>& rands,
+                               RandomizeCtx& rc) {
+  ConstraintExpr consequent =
+      TranslateRelation(rel->rhs, rands, rc, /*fold=*/false);
+  std::vector<std::string> names;
+  names.reserve(rands.size());
+  for (const auto& ri : rands) names.push_back(ri.name);
+  ConstraintExpr out;
+  out.kind = ConstraintKind::kImplication;
+  // 18.5.13.2: the antecedent only gates the soft constraint, so the
+  // variables the soft constraint directly references, which a 'disable
+  // soft' directive discards it by, are the consequent's alone.
+  out.ref_vars = consequent.ref_vars;
+  out.cond_fn = [antecedent = rel->lhs, names,
+                 &rc](const std::unordered_map<std::string, int64_t>& vals) {
+    return EvalCustomRelation(antecedent, names, rc, vals);
+  };
+  out.sub_constraints.push_back(std::move(consequent));
+  return out;
+}
+
 bool TryConjunctionConstraint(const Expr* rel, std::vector<RandInfo>& rands,
                               RandomizeCtx& rc, ConstraintExpr& out,
                               bool fold) {

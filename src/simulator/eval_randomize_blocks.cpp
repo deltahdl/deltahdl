@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "elaborator/type_eval.h"
+#include "lexer/token.h"
 #include "parser/ast.h"
 #include "simulator/class_object.h"
 #include "simulator/constraint_solver.h"
@@ -46,8 +47,12 @@ static void AddSoftConstraints(const ClassMember* m,
                                std::vector<RandInfo>& rands, RandomizeCtx& rc,
                                ConstraintBlock& block) {
   for (const Expr* rel : m->constraint_soft_exprs) {
+    bool gated = rel->kind == ExprKind::kBinary &&
+                 rel->op == TokenKind::kArrow && rel->lhs != nullptr &&
+                 rel->rhs != nullptr;
     auto inner = std::make_unique<ConstraintExpr>(
-        TranslateRelation(rel, rands, rc, /*fold=*/false));
+        gated ? SoftImplication(rel, rands, rc)
+              : TranslateRelation(rel, rands, rc, /*fold=*/false));
     ConstraintExpr sc;
     sc.kind = ConstraintKind::kSoft;
     sc.var_name = inner->var_name;

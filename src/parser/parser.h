@@ -248,6 +248,11 @@ class Parser {
   void CaptureSoftConstraintRelation(ClassMember* member);
   void CaptureDisableSoftConstraint(ClassMember* member);
   bool TryCaptureBracedImplication(ClassMember* member);
+  // 18.5.13.2: an implied relation of a constraint set and whether it was
+  // written soft, and the parse of one from the token after the '->' or
+  // within the braces.
+  struct ImpliedRelation;
+  Expr* ParseImpliedRelation(Expr* antecedent, bool& soft);
   bool TryCaptureDist(ClassMember* member, bool is_soft = false);
   bool ParseDistItem(ConstraintDistItem& item);
   bool ParseDistRange(ConstraintDistItem& item);

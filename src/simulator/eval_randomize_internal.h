@@ -181,6 +181,14 @@ void AttachConstraintGuard(const Expr* rel,
                            const std::function<bool(const Expr*)>& refs_rand,
                            ClassObject* owner, RandomizeCtx& rc,
                            ConstraintExpr& out);
+// 18.5.13.2: `rel`, the parser's `antecedent -> relation` of a soft
+// consequent, `p -> soft q`, as the solver's implication over the relation
+// translated, referencing the relation's variables alone: the antecedent
+// gates the soft constraint rather than appearing in it, so a 'disable
+// soft' on its variable leaves the constraint in place
+// (eval_randomize_membership.cpp).
+ConstraintExpr SoftImplication(const Expr* rel, std::vector<RandInfo>& rands,
+                               RandomizeCtx& rc);
 // Evaluates `rel` with each name in `names` bound to its value in `vals`,
 // as a truth or as the value it takes.
 bool EvalCustomRelation(const Expr* rel, const std::vector<std::string>& names,

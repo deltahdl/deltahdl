@@ -1,0 +1,7 @@
+the clause's A: x in {1, 2} in 64 of 64, both drawn: 1
+A without A3: x is 3 in 0 of 64
+disable soft p: p set in some: 1, q set whenever p in 64 of 64
+disable soft q: p set in 64 of 64, q clear in some: 1
+the clause's B: x in {5, 8} in 64 of 64, 5 in near half: 1
+B without the directive: x is 5 in 64 of 64
+$finish at time 0
