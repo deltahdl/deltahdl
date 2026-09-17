@@ -181,12 +181,18 @@ void AddConstraintMember(const ClassMember* m, std::vector<RandInfo>& rands,
                          RandomizeCtx& rc, ConstraintSolver& solver) {
   ConstraintBlock block;
   block.name = std::string(m->name);
+  // 18.9: a block turned inactive by constraint_mode() is not considered by
+  // randomize(); it is created active, so an unset block stays enabled. Its
+  // relations are translated without folding a bound into the variable's
+  // domain, which the draw would then keep to with the block off.
+  block.enabled = IsObjectConstraintActive(rc.obj, m->name);
   block.constraints.reserve(
       m->constraint_exprs.size() + m->constraint_dist_refs.size() +
       m->constraint_soft_exprs.size() + m->constraint_soft_dist_refs.size() +
       m->constraint_disable_soft_refs.size());
   for (const Expr* rel : m->constraint_exprs) {
-    block.constraints.push_back(TranslateRelation(rel, rands, rc));
+    block.constraints.push_back(
+        TranslateRelation(rel, rands, rc, /*fold=*/block.enabled));
   }
   // 18.5.3: build each captured distribution as a weighted-value constraint.
   for (const auto& ref : m->constraint_dist_refs) {
@@ -200,9 +206,6 @@ void AddConstraintMember(const ClassMember* m, std::vector<RandInfo>& rands,
   AddSolveBeforeOrderings(m, rands, solver);
   AddFunctionArgPriorities(m, rands, solver);
 
-  // 18.9: a block turned inactive by constraint_mode() is not considered by
-  // randomize(); it is created active, so an unset block stays enabled.
-  block.enabled = IsObjectConstraintActive(rc.obj, m->name);
   solver.AddConstraintBlock(block);
 }
 

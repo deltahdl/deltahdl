@@ -228,7 +228,7 @@ ConstraintExpr MakeJointCustomConstraint(const Expr* rel,
 // its held value folded in as the constant. False means the relation ties two
 // joint variables together, or is not a plain comparison.
 bool TryJointComparison(const Expr* rel, const JointVarScope& scope,
-                        RandomizeCtx& rc, ConstraintExpr& out) {
+                        RandomizeCtx& rc, ConstraintExpr& out, bool fold) {
   if (rel == nullptr || rel->kind != ExprKind::kBinary || rel->lhs == nullptr ||
       rel->rhs == nullptr)
     return false;
@@ -263,8 +263,9 @@ bool TryJointComparison(const Expr* rel, const JointVarScope& scope,
   out.lo = c;
   out.ref_vars.push_back(vname);
   // 18.4.1: a real variable's bound narrows its real range as a single
-  // object's does.
-  FoldComparison(scope.rands, vname, kind, cv, c);
+  // object's does; 18.9, not one of a block turned off, whose relations are
+  // not considered.
+  if (fold) FoldComparison(scope.rands, vname, kind, cv, c);
   return true;
 }
 
@@ -272,9 +273,9 @@ bool TryJointComparison(const Expr* rel, const JointVarScope& scope,
 // Any relation the comparison fast path above does not take becomes a custom
 // joint constraint checked against trial values.
 ConstraintExpr BuildJointRelation(const Expr* rel, const JointVarScope& scope,
-                                  RandomizeCtx& rc) {
+                                  RandomizeCtx& rc, bool fold) {
   ConstraintExpr out;
-  if (TryJointComparison(rel, scope, rc, out)) return out;
+  if (TryJointComparison(rel, scope, rc, out, fold)) return out;
   // 18.5: `a && b` holds where both do, so each side is built on its own
   // under an antecedent that always holds, a comparison among them folding
   // the domain as it would alone; a real variable's range constraint is
@@ -288,8 +289,10 @@ ConstraintExpr BuildJointRelation(const Expr* rel, const JointVarScope& scope,
     out.cond_fn = [](const std::unordered_map<std::string, int64_t>&) {
       return true;
     };
-    out.sub_constraints.push_back(BuildJointRelation(rel->lhs, scope, rc));
-    out.sub_constraints.push_back(BuildJointRelation(rel->rhs, scope, rc));
+    out.sub_constraints.push_back(
+        BuildJointRelation(rel->lhs, scope, rc, fold));
+    out.sub_constraints.push_back(
+        BuildJointRelation(rel->rhs, scope, rc, fold));
     return out;
   }
   return MakeJointCustomConstraint(rel, scope, rc);
@@ -308,10 +311,13 @@ void AddJointConstraintBlock(const ClassMember* m, const JointObject& jo,
                              ConstraintSolver& solver) {
   ConstraintBlock block;
   block.name = std::string(m->name);
-  for (const Expr* rel : m->constraint_exprs)
-    block.constraints.push_back(BuildJointRelation(rel, scope, rc));
-  // 18.9: a block turned off by constraint_mode() is not considered.
+  // 18.9: a block turned off by constraint_mode() is not considered, so its
+  // relations fold no bound into the variables' domains.
   block.enabled = IsObjectConstraintActive(jo.obj, m->name);
+  for (const Expr* rel : m->constraint_exprs) {
+    block.constraints.push_back(
+        BuildJointRelation(rel, scope, rc, /*fold=*/block.enabled));
+  }
   solver.AddConstraintBlock(block);
 }
 

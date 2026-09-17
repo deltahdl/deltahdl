@@ -261,4 +261,36 @@ TEST(ConstraintModeRuntime, ConstraintModeThroughSubroutineArgument) {
   EXPECT_EQ(RunAndGet(src, "rv"), 3u);
 }
 
+// 18.9: a block turned off is not considered by randomize(), so a bound its
+// relation places on a variable does not confine the draw either: with the
+// block holding x to at least 200 off, 64 draws of an 8-bit x reach below
+// 200, and with it back on every one of the next 64 stays at or above it.
+TEST(ConstraintModeRuntime, ABoundOfAnInactiveBlockDoesNotConfineTheDraw) {
+  const char* src =
+      "class P;\n"
+      "  rand bit [7:0] x;\n"
+      "  constraint c_hi { x >= 200; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int below_off;\n"
+      "  int below_on;\n"
+      "  initial begin\n"
+      "    P p;\n"
+      "    p = new;\n"
+      "    p.c_hi.constraint_mode(0);\n"
+      "    repeat (64) begin\n"
+      "      void'(p.randomize());\n"
+      "      if (p.x < 200) below_off++;\n"
+      "    end\n"
+      "    p.c_hi.constraint_mode(1);\n"
+      "    repeat (64) begin\n"
+      "      void'(p.randomize());\n"
+      "      if (p.x < 200) below_on++;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_GT(RunAndGet(src, "below_off"), 0u);
+  EXPECT_EQ(RunAndGet(src, "below_on"), 0u);
+}
+
 }  // namespace
