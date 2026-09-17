@@ -58,14 +58,16 @@ TEST(SetRandstateRun, TheStateInstalledOnAnObjectSetsWhatItDrawsNext) {
 // the set_randstate() of the process, so a state read from the running
 // process and installed again replays the four $urandom draws that followed
 // the read, installed on a forked thread it makes the thread continue the
-// stream in all four draws, and the process's own state is kept, as the
+// stream in all four draws, and the install on the thread does not set the
+// parent: the fork seeds the thread with the parent's next value (18.14.1),
+// so the parent is left where a fork without the install leaves it, as the
 // design test/src/e2e/set_randstate_method.sv runs it.
 TEST(SetRandstateRun, TheStateInstalledOnTheProcessOrAThreadSetsWhatItDraws) {
   SimFixture f;
   std::string out = RunCapture(
       "module t;\n"
       "  process p;\n"
-      "  string s, t;\n"
+      "  string s, t, t2;\n"
       "  int i, k, replayed = 0, continued = 0, kept;\n"
       "  int unsigned ua[4], ur[4], uc[4];\n"
       "  initial begin\n"
@@ -85,7 +87,14 @@ TEST(SetRandstateRun, TheStateInstalledOnTheProcessOrAThreadSetsWhatItDraws) {
       "      end\n"
       "    join\n"
       "    for (i = 0; i < 4; i++) if (ua[i] == uc[i]) continued++;\n"
-      "    kept = p.get_randstate() == t;\n"
+      "    t2 = p.get_randstate();\n"
+      "    p.set_randstate(t);\n"
+      "    fork\n"
+      "      begin\n"
+      "        for (int j = 0; j < 4; j++) k = $urandom;\n"
+      "      end\n"
+      "    join\n"
+      "    kept = p.get_randstate() == t2;\n"
       "    $display(\"%0d %0d %0d\", replayed, continued, kept);\n"
       "  end\n"
       "endmodule\n",

@@ -7,7 +7,9 @@
 // makes that object continue the stream from the same place, the installed
 // state reads back, and an object not installed on keeps its own state; a
 // process is set the same way, a forked thread given the state continues the
-// stream, and the process it was read from keeps its own.
+// stream, and the install on the thread does not set the parent process: the
+// fork seeds the thread with the parent's next value (§18.14.1), so the parent
+// is left where a fork without the install leaves it.
 module set_randstate_method;
   class Packet;
     rand bit [15:0] payload;
@@ -15,7 +17,7 @@ module set_randstate_method;
 
   Packet a, b, c;
   process p;
-  string s, t;
+  string s, t, t2;
   int i, k;
   bit [15:0] seq_a[4], seq_r[4], seq_b[4];
   int unsigned u_a[4], u_r[4], u_c[4];
@@ -67,8 +69,15 @@ module set_randstate_method;
     join
     thread_continued = 0;
     for (i = 0; i < 4; i++) if (u_a[i] == u_c[i]) thread_continued++;
-    proc_kept = p.get_randstate() == t;
-    $display("process: the state installed again replays %0d of 4, installed on a forked thread it continues the stream in %0d of 4, the process's own state kept: %0d",
+    t2 = p.get_randstate();
+    p.set_randstate(t);
+    fork
+      begin
+        for (int j = 0; j < 4; j++) k = $urandom;
+      end
+    join
+    proc_kept = p.get_randstate() == t2;
+    $display("process: the state installed again replays %0d of 4, installed on a forked thread it continues the stream in %0d of 4, the parent left where a fork without the install leaves it: %0d",
              proc_replayed, thread_continued, proc_kept);
     $finish;
   end
