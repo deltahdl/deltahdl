@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <format>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -424,14 +425,33 @@ static bool IsEffectivelyStaticLocal(const Stmt* stmt,
   return f && f->is_static && !f->is_automatic;
 }
 
+// The static frame a static local lives in: its subroutine's, or, for a
+// declaration written static outside any subroutine, a frame of the
+// declaration's own named after where it is written. §6.21 makes such a
+// variable one cell for the whole simulation, shared by every activation of
+// the block that declares it, and §18.17 puts one in the code block of a
+// randsequence, an anonymous automatic scope that is pushed afresh for every
+// activation and so cannot keep the cell itself. The name is arena-persisted
+// because the frame store keys on string_view.
+static std::string_view StaticFrameOf(const Stmt* stmt,
+                                      std::string_view func_name,
+                                      SimContext& ctx) {
+  if (!func_name.empty()) return func_name;
+  auto* key = ctx.GetArena().Create<std::string>(
+      std::format("static@{}:{}:{}", stmt->range.start.file_id,
+                  stmt->range.start.line, stmt->range.start.column));
+  return *key;
+}
+
 // Returns true if the declaration resolves to an already-existing variable
-// (a static-func var to alias, or a local already present) and so needs no
-// fresh creation.
+// (a static var to alias, or a local already present) and so needs no fresh
+// creation.
 static bool TryReuseExistingDeclVar(const Stmt* stmt,
                                     std::string_view func_name,
                                     SimContext& ctx) {
-  if (IsEffectivelyStaticLocal(stmt, func_name, ctx) && !func_name.empty()) {
-    auto* existing = ctx.FindStaticFuncVar(func_name, stmt->var_name);
+  if (IsEffectivelyStaticLocal(stmt, func_name, ctx)) {
+    auto* existing = ctx.FindStaticFuncVar(StaticFrameOf(stmt, func_name, ctx),
+                                           stmt->var_name);
     if (existing) {
       ctx.AliasLocalVariable(stmt->var_name, existing);
       return true;
@@ -458,7 +478,7 @@ struct DeclaredObject {
 };
 
 // Applies 4-state coercion and the optional initializer to a freshly created
-// variable, then records it as a static-func var when applicable.
+// variable, then records it in its static frame when it is static.
 //
 // §6.8 executes a declaration's initializer "as if the assignment were made
 // from an initial procedure", which §10.8 makes an assignment-like context, so
@@ -507,8 +527,9 @@ static void InitializeDeclVariable(const Stmt* stmt, const DeclaredObject& obj,
     if (!var->is_4state) CoerceTo2State(var->value);
   }
 
-  if (IsEffectivelyStaticLocal(stmt, func_name, ctx) && !func_name.empty()) {
-    ctx.SaveStaticFuncVar(func_name, stmt->var_name, var);
+  if (IsEffectivelyStaticLocal(stmt, func_name, ctx)) {
+    ctx.SaveStaticFuncVar(StaticFrameOf(stmt, func_name, ctx), stmt->var_name,
+                          var);
   }
 }
 
