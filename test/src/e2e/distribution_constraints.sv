@@ -165,7 +165,7 @@ module distribution_constraints;
     $display("default weighs the rest of the domain, [100:102] to it at 3:1: %0d %0d",
              stated > 0 && rest > 0, stated > 2 * rest);
 
-    stated = 0; near = 0; rest = 0;
+    reset(); stated = 0; near = 0; rest = 0;
     repeat (200) begin
       void'(m.randomize());
       if (m.a == -100.0) stated++;

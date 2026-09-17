@@ -192,6 +192,27 @@ bool Parser::ParseDistWeight(ConstraintDistItem& item) {
   return false;
 }
 
+// The ends of a range item after its opening bracket, through its closing
+// one: either '[lo:hi]', or a value_range about a centre of 11.4.13,
+// '[centre +/- tol]' or '[centre +%- tol]', the form the clause's
+// [VALUE_NOM +%- 1.0] takes.
+bool Parser::ParseDistRange(ConstraintDistItem& item) {
+  item.lo = ParseExpr();
+  if (item.lo == nullptr) return false;
+  if (Check(TokenKind::kPlusSlashMinus) ||
+      Check(TokenKind::kPlusPercentMinus)) {
+    item.tolerance_relative = Check(TokenKind::kPlusPercentMinus);
+    Consume();
+    item.tolerance = ParseExpr();
+    if (item.tolerance == nullptr) return false;
+  } else {
+    if (!Match(TokenKind::kColon)) return false;
+    item.hi = ParseExpr();
+    if (item.hi == nullptr) return false;
+  }
+  return Match(TokenKind::kRBracket);
+}
+
 // 18.5.3: capture "expression dist { dist_list }". Parses the target
 // expression, then each dist_item — a single value, a '[lo:hi]' range, or the
 // 'default' item — with its optional dist_weight, recording them on the member
@@ -211,22 +232,7 @@ bool Parser::ParseDistItem(ConstraintDistItem& item) {
   }
   if (Match(TokenKind::kLBracket)) {
     item.is_range = true;
-    item.lo = ParseExpr();
-    if (item.lo == nullptr) return false;
-    // 11.4.13: a value_range about a centre, '[centre +/- tol]' or
-    // '[centre +%- tol]', the form the clause's [VALUE_NOM +%- 1.0] takes.
-    if (Check(TokenKind::kPlusSlashMinus) ||
-        Check(TokenKind::kPlusPercentMinus)) {
-      item.tolerance_relative = Check(TokenKind::kPlusPercentMinus);
-      Consume();
-      item.tolerance = ParseExpr();
-      if (item.tolerance == nullptr) return false;
-    } else {
-      if (!Match(TokenKind::kColon)) return false;
-      item.hi = ParseExpr();
-      if (item.hi == nullptr) return false;
-    }
-    if (!Match(TokenKind::kRBracket)) return false;
+    if (!ParseDistRange(item)) return false;
     if (!ParseDistWeight(item)) item.per_element = true;
     return true;
   }

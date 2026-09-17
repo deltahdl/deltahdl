@@ -250,6 +250,7 @@ class Parser {
   bool TryCaptureBracedImplication(ClassMember* member);
   bool TryCaptureDist(ClassMember* member, bool is_soft = false);
   bool ParseDistItem(ConstraintDistItem& item);
+  bool ParseDistRange(ConstraintDistItem& item);
   bool TryCaptureUnique(ClassMember* member);
   bool ParseDistWeight(ConstraintDistItem& item);
   bool TryCaptureIfElseConstraint(ClassMember* member);
