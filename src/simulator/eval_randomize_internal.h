@@ -41,6 +41,9 @@ class ConstraintEvalScope {
   ConstraintEvalScope(ClassObject* obj, SimContext& ctx)
       : ctx_(ctx), bound_(obj != nullptr && obj->type != nullptr) {
     if (!bound_) return;
+    // 18.7.1: the `this` in scope before the object is bound is the one
+    // local::this names in an inline constraint of the call.
+    caller_this_ = ctx_.SetConstraintCallerThis(ctx_.CurrentThis());
     ctx_.PushThis(obj);
     ctx_.PushMethodClass(obj->type);
   }
@@ -49,6 +52,7 @@ class ConstraintEvalScope {
     if (!bound_) return;
     ctx_.PopMethodClass();
     ctx_.PopThis();
+    ctx_.SetConstraintCallerThis(caller_this_);
   }
 
   ConstraintEvalScope(const ConstraintEvalScope&) = delete;
@@ -59,6 +63,7 @@ class ConstraintEvalScope {
  private:
   SimContext& ctx_;
   bool bound_;
+  ClassObject* caller_this_ = nullptr;
 };
 
 // A rand/randc variable discovered on the randomized object, paired with the

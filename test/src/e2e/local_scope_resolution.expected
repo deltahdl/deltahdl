@@ -1,0 +1,5 @@
+F: success 64 of 64, obj.x from 0 below the argument 40 in 64
+a local x: success 64 of 64, obj.x from 0 below the local 20 in 64
+an imported a: success 64 of 64, obj.x from 0 below the imported 30 in 64
+local::this: success 64 of 64, obj.x from 0 below the holder's 12 in 64
+$finish at time 0

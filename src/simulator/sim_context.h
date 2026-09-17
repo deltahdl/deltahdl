@@ -287,9 +287,7 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   }
 
   void EnterFunction() { ++function_depth_; }
-  void ExitFunction() {
-    if (function_depth_ > 0) --function_depth_;
-  }
+  void ExitFunction();
   bool InFunction() const { return function_depth_ > 0; }
 
   void PushQueueRefFrame();
@@ -367,10 +365,7 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   // svGetScope and svSetScope read and write, because the two answering
   // differently is two answers to the question of which instance of an exported
   // subroutine a call reaches.
-  void SetDpiRuntime(DpiRuntime* dpi) {
-    dpi_runtime_ = dpi;
-    DpiSetForeignRuntime(dpi);
-  }
+  void SetDpiRuntime(DpiRuntime* dpi);
   DpiRuntime* GetDpiRuntime() { return dpi_runtime_; }
 
   // §35.5.4: the registry a design's own import declarations are put in, made
@@ -646,6 +641,13 @@ class SimContext : public DeclaredNameTables, public RandomStability {
 
   void PushThis(ClassObject* obj);
   void PopThis();
+  // 18.7.1: the `this` of the scope containing a randomize() call while an
+  // inline constraint of it is evaluated with the randomized object as
+  // `this`, which local::this bypasses; null outside such an evaluation. The
+  // constraint evaluation scope sets it as it binds the object and restores
+  // it as it unbinds.
+  ClassObject* ConstraintCallerThis() const { return constraint_caller_this_; }
+  ClassObject* SetConstraintCallerThis(ClassObject* obj);
   ClassObject* CurrentThis() const;
   // The handle of the object CurrentThis returns, or kNullClassHandle when no
   // object is in scope. This is what a bare `this` evaluates to, §8.11 making
@@ -898,6 +900,7 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   int function_depth_ = 0;
 
   std::vector<ClassObject*> this_stack_;
+  ClassObject* constraint_caller_this_ = nullptr;
   std::vector<const ClassTypeInfo*> method_class_stack_;
 
   std::vector<std::vector<QueueRefBinding>> queue_ref_stack_;

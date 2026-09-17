@@ -216,6 +216,12 @@ WeakReference* SimContext::FindWeakReferenceByHandle(uint64_t handle) const {
 
 void SimContext::PushThis(ClassObject* obj) { this_stack_.push_back(obj); }
 
+ClassObject* SimContext::SetConstraintCallerThis(ClassObject* obj) {
+  ClassObject* previous = constraint_caller_this_;
+  constraint_caller_this_ = obj;
+  return previous;
+}
+
 void SimContext::PopThis() {
   if (!this_stack_.empty()) this_stack_.pop_back();
 }

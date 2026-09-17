@@ -709,6 +709,16 @@ Logic4Vec EvalMemberAccess(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (std::string_view(resolved).substr(0, kLocalScopePrefix.size()) ==
       kLocalScopePrefix) {
     resolved = resolved.substr(kLocalScopePrefix.size());
+    // §18.7.1: local::this binds to the scope containing the call, whose
+    // `this` the constraint evaluation keeps aside while the randomized
+    // object stands in scope as `this`.
+    constexpr std::string_view kThisPrefix = "this.";
+    ClassObject* caller = ctx.ConstraintCallerThis();
+    if (caller != nullptr && std::string_view(resolved).substr(
+                                 0, kThisPrefix.size()) == kThisPrefix) {
+      return ResolveClassFieldChain(
+          caller, nullptr, resolved.substr(kThisPrefix.size()), ctx, arena);
+    }
   }
   auto* var = ctx.FindVariable(resolved);
   if (var) {

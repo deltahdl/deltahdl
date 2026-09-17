@@ -446,6 +446,15 @@ void SimContext::SetCurrentProcess(Process* proc) {
   current_process_ = proc;
 }
 
+void SimContext::ExitFunction() {
+  if (function_depth_ > 0) --function_depth_;
+}
+
+void SimContext::SetDpiRuntime(DpiRuntime* dpi) {
+  dpi_runtime_ = dpi;
+  DpiSetForeignRuntime(dpi);
+}
+
 void SimContext::PushScope() { scope_stack_.emplace_back(); }
 
 void SimContext::BindLocalVariable(std::string_view name, Variable* var) {
