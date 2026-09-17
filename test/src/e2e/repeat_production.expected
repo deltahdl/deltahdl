@@ -1,0 +1,4 @@
+example: 100 runs of repeat($urandom_range(2, 6)) PUSH each generate 2 to 6 pushes: 1, 2 and 6 both seen: 1
+zero: repeat(0) generates nothing: 1, repeat(1 + 2) generates three: 1
+break: a break in the third of five pushes ends the whole block after 3 pushes, the production after the repeat ungenerated: 1
+$finish at time 0
