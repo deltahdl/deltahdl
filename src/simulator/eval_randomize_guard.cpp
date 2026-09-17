@@ -32,6 +32,30 @@ bool IsClassTypedProperty(const ClassTypeInfo* type, std::string_view name,
   return false;
 }
 
+bool HandleValue(const Expr* h, ClassObject* owner, RandomizeCtx& rc,
+                 uint64_t& out);
+
+// The handle the member access `h` names, `g.h` over the handle expression
+// `g`, read into `out`: a class-typed property of the object `g` names, or
+// of `owner` where `g` is this. Answers false where it names no handle,
+// and where `g` is null, which the dereference of `g` reports.
+bool MemberHandleValue(const Expr* h, ClassObject* owner, RandomizeCtx& rc,
+                       uint64_t& out) {
+  if (h->lhs == nullptr || h->rhs == nullptr ||
+      h->rhs->kind != ExprKind::kIdentifier) {
+    return false;
+  }
+  if (h->lhs->kind == ExprKind::kIdentifier && h->lhs->text == "this")
+    return HandleValue(h->rhs, owner, rc, out);
+  uint64_t through = kNullClassHandle;
+  if (!HandleValue(h->lhs, owner, rc, through)) return false;
+  ClassObject* obj = rc.ctx.GetClassObject(through);
+  if (obj == nullptr || !IsClassTypedProperty(obj->type, h->rhs->text, rc.ctx))
+    return false;
+  out = obj->GetProperty(h->rhs->text, rc.arena).ToUint64();
+  return true;
+}
+
 // The handle the expression `h` names, read into `out`: a class-typed
 // property of `owner`, bare or as this.h; a class-typed variable; or a
 // class-typed property of the object a handle expression names, `g.h`.
@@ -40,20 +64,8 @@ bool IsClassTypedProperty(const ClassTypeInfo* type, std::string_view name,
 bool HandleValue(const Expr* h, ClassObject* owner, RandomizeCtx& rc,
                  uint64_t& out) {
   if (h == nullptr) return false;
-  if (h->kind == ExprKind::kMemberAccess && !h->is_scope_resolution &&
-      h->lhs != nullptr && h->rhs != nullptr &&
-      h->rhs->kind == ExprKind::kIdentifier) {
-    if (h->lhs->kind == ExprKind::kIdentifier && h->lhs->text == "this")
-      return HandleValue(h->rhs, owner, rc, out);
-    uint64_t through = kNullClassHandle;
-    if (!HandleValue(h->lhs, owner, rc, through)) return false;
-    ClassObject* obj = rc.ctx.GetClassObject(through);
-    if (obj == nullptr ||
-        !IsClassTypedProperty(obj->type, h->rhs->text, rc.ctx))
-      return false;
-    out = obj->GetProperty(h->rhs->text, rc.arena).ToUint64();
-    return true;
-  }
+  if (h->kind == ExprKind::kMemberAccess && !h->is_scope_resolution)
+    return MemberHandleValue(h, owner, rc, out);
   if (h->kind != ExprKind::kIdentifier) return false;
   if (owner != nullptr && IsClassTypedProperty(owner->type, h->text, rc.ctx)) {
     out = owner->GetProperty(h->text, rc.arena).ToUint64();
