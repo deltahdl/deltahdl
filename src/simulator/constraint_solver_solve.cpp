@@ -535,9 +535,11 @@ void ConstraintSolver::RepairReadyWithin(
   std::vector<const ConstraintExpr*> soft;
   CollectConstraints(blocks_, extra, hard, soft);
   repair_scope_.insert(names.begin(), names.end());
+  repair_extra_ = &extra;
   for (const auto* c : hard) {
     if (ConstraintReady(*c, committed)) RepairConstraint(*c);
   }
+  repair_extra_ = nullptr;
   repair_scope_.clear();
 }
 
@@ -747,7 +749,11 @@ bool ConstraintSolver::SolveIterative(const std::vector<ConstraintExpr>& extra,
   // are repaired only once that many draws have found no solution, as they
   // do not over a domain as wide as an int's (18.5.5).
   bool repair = false;
+  // 18.5.13.1: once that many draws have failed, the variables are drawn
+  // within the intervals the comparisons among them leave, which a chain
+  // of them over ints, y below p1.x below p2.x below 100, needs.
   auto flat_pass = [&] {
+    if (repair) DrawPropagated(extra);
     DrawGeneralPass(variables_, values_, real_values_, gen, gen_real);
     if (repair) RepairConstraints(extra);
     return CheckAllConstraints(extra, include_soft);
@@ -759,7 +765,9 @@ bool ConstraintSolver::SolveIterative(const std::vector<ConstraintExpr>& extra,
     SeedInactiveVariables(variables_, values_, real_values_);
     ApplyDistConstraints(extra);
     ApplyDirectConstraints(extra, include_soft);
-    SeedSoftBounds(extra, include_soft);
+    // The soft bounds narrow the propagated draw with the other bounds
+    // once it runs; ahead of it they seed the variable alone.
+    if (!repair) SeedSoftBounds(extra, include_soft);
     HoldArraySizes(kSizes);
     DrawRandcVariables(variables_, values_, gen_randc);
     DrawArraySizeVariables(variables_, values_, gen);

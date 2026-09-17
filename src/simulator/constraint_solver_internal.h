@@ -25,6 +25,10 @@ int64_t DrawUniformInRange(bool is_signed, int64_t lo, int64_t hi,
 // constraint_solver_solve.cpp.
 RandVariable Narrowed(const RandVariable& var, const ConstraintExpr& sub);
 bool IsComparison(ConstraintKind kind);
+// The comparison `kind` as read from its other side, x < y read as y > x.
+// Shared between constraint_solver_propagate.cpp (which defines it) and
+// constraint_solver_repair.cpp.
+ConstraintKind MirrorComparisonKind(ConstraintKind kind);
 
 // Seeds a single concrete constraint directly into `values`: an equality
 // fixes the variable to its constant and a set membership picks one of the

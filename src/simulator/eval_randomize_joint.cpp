@@ -262,6 +262,7 @@ ConstraintExpr MakeJointCustomConstraint(const Expr* rel,
     const Expr* other = derived == rel->lhs ? rel->rhs : rel->lhs;
     ce.var_name = name;
     ce.derive_cmp = cmp;
+    ce.co_var_name = ResolveJointOperand(other, scope.prefix, scope.names);
     ce.derive_fn = [other, owner, jr, name,
                     &rc](const std::unordered_map<std::string, int64_t>& vals) {
       Logic4Vec value = EvalJointTrial(other, owner, *jr, rc, vals);

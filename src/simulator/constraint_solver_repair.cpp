@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <random>
@@ -52,11 +53,13 @@ bool IsComparison(ConstraintKind kind) {
 
 void ConstraintSolver::RepairConstraints(
     const std::vector<ConstraintExpr>& extra) {
+  repair_extra_ = &extra;
   for (const auto& block : blocks_) {
     if (!block.enabled) continue;
     for (const auto& c : block.constraints) RepairConstraint(c);
   }
   for (const auto& c : extra) RepairConstraint(c);
+  repair_extra_ = nullptr;
 }
 
 void ConstraintSolver::RepairConstraint(const ConstraintExpr& c) {
@@ -64,10 +67,7 @@ void ConstraintSolver::RepairConstraint(const ConstraintExpr& c) {
   // relation; one discarded, by its priority or by a 'disable soft'
   // directive, is true and repairs nothing.
   if (c.kind == ConstraintKind::kSoft) {
-    if (c.inner != nullptr && dropped_soft_.count(&c) == 0 &&
-        disabled_soft_.count(&c) == 0) {
-      RepairConstraint(*c.inner);
-    }
+    if (SoftHonored(c)) RepairConstraint(*c.inner);
     return;
   }
   if (c.kind == ConstraintKind::kCustom) {
@@ -155,27 +155,132 @@ void ConstraintSolver::RepairFromCandidates(const ConstraintExpr& c) {
   values_[name] = satisfying[pick(rng_)];
 }
 
-// The derived variable written from the others: the value the expression
-// takes where the relation is an equality, and a fresh draw from its domain
-// narrowed by the bound the expression gives it under any other comparison.
-void ConstraintSolver::ApplyDerived(const ConstraintExpr& c) {
-  if (!RepairMayWrite(c.var_name)) return;
-  int64_t derived = c.derive_fn(values_);
-  const RandVariable& var = variables_.find(c.var_name)->second;
-  if (c.derive_cmp == ConstraintKind::kEqual) {
-    // A value the variable's domain excludes is no repair: the draw stands,
-    // to be tried again, rather than a value outside the declared range
-    // being written back.
-    if (derived >= var.min_val && derived <= var.max_val)
-      values_[c.var_name] = derived;
+// `dom` narrowed to the values `kind` admits against `value`, an equality
+// to that value alone.
+static void NarrowBy(RandVariable& dom, ConstraintKind kind, int64_t value) {
+  ConstraintExpr bound;
+  bound.kind = kind == ConstraintKind::kEqual ? ConstraintKind::kRange : kind;
+  bound.lo = value;
+  bound.hi = value;
+  dom = Narrowed(dom, bound);
+}
+
+// 18.5.13: whether the soft constraint `c` is still honored, with an inner
+// relation, neither discarded by its priority nor by a 'disable soft'
+// directive.
+bool ConstraintSolver::SoftHonored(const ConstraintExpr& c) const {
+  return c.inner != nullptr && dropped_soft_.count(&c) == 0 &&
+         disabled_soft_.count(&c) == 0;
+}
+
+bool ConstraintSolver::AntecedentHolds(const ConstraintExpr& c) const {
+  if (c.cond_fn) return c.cond_fn(values_);
+  auto it = values_.find(c.cond_var);
+  return it != values_.end() && it->second == c.cond_value;
+}
+
+void ConstraintSolver::NarrowBoundAtValues(const ConstraintExpr& c,
+                                           const std::string& name,
+                                           RandVariable& dom) const {
+  if (c.kind == ConstraintKind::kCustom) {
+    if (!c.derive_fn) return;
+    if (c.var_name == name) {
+      NarrowBy(dom, c.derive_cmp, c.derive_fn(values_));
+    } else if (c.co_var_name == name) {
+      auto it = values_.find(c.var_name);
+      if (it != values_.end())
+        NarrowBy(dom, MirrorComparisonKind(c.derive_cmp), it->second);
+    }
     return;
   }
-  ConstraintExpr bound;
-  bound.kind = c.derive_cmp;
-  bound.lo = derived;
-  RandVariable narrowed = Narrowed(var, bound);
-  if (narrowed.min_val > narrowed.max_val) return;
-  values_[c.var_name] = GenerateRandValue(narrowed);
+  if (c.var_name != name) return;
+  if (c.kind == ConstraintKind::kEqual) {
+    NarrowBy(dom, ConstraintKind::kEqual, c.lo);
+  } else if (IsComparison(c.kind)) {
+    dom = Narrowed(dom, c);
+  }
+}
+
+// The members of the set membership `c` held, or the members already held
+// that it admits as well.
+static void IntersectMembers(const ConstraintExpr& c,
+                             std::vector<int64_t>& members, bool& has_members) {
+  if (!has_members) {
+    members = c.set_values;
+    has_members = true;
+    return;
+  }
+  auto absent = [&c](int64_t v) {
+    return std::find(c.set_values.begin(), c.set_values.end(), v) ==
+           c.set_values.end();
+  };
+  members.erase(std::remove_if(members.begin(), members.end(), absent),
+                members.end());
+}
+
+void ConstraintSolver::NarrowAtValues(const ConstraintExpr& c,
+                                      const std::string& name,
+                                      RandVariable& dom,
+                                      std::vector<int64_t>& members,
+                                      bool& has_members) const {
+  switch (c.kind) {
+    case ConstraintKind::kSoft:
+      if (SoftHonored(c))
+        NarrowAtValues(*c.inner, name, dom, members, has_members);
+      return;
+    case ConstraintKind::kImplication:
+      if (!AntecedentHolds(c)) return;
+      for (const auto& sub : c.sub_constraints)
+        NarrowAtValues(sub, name, dom, members, has_members);
+      return;
+    case ConstraintKind::kForeach: {
+      size_t count =
+          ClampCountToSize(c.sub_constraints.size(), c.size_var, values_);
+      for (size_t i = 0; i < count; ++i)
+        NarrowAtValues(c.sub_constraints[i], name, dom, members, has_members);
+      return;
+    }
+    case ConstraintKind::kSetMembership:
+      if (c.var_name == name) IntersectMembers(c, members, has_members);
+      return;
+    default:
+      NarrowBoundAtValues(c, name, dom);
+      return;
+  }
+}
+
+// The derived variable written from the others: drawn afresh from its
+// domain narrowed by every active constraint that bounds it at the values
+// drawn, the relation's own bound among them, so that a variable held
+// between two others, the clause's p1.x above y and below p2.x, is drawn
+// between them rather than under one bound alone, and one held to a set as
+// well from the members the bounds admit. A domain the bounds close is no
+// repair: the draw stands, to be tried again.
+void ConstraintSolver::ApplyDerived(const ConstraintExpr& c) {
+  if (!RepairMayWrite(c.var_name)) return;
+  RandVariable dom = variables_.find(c.var_name)->second;
+  std::vector<int64_t> members;
+  bool has_members = false;
+  for (const auto& block : blocks_) {
+    if (!block.enabled) continue;
+    for (const auto& k : block.constraints)
+      NarrowAtValues(k, c.var_name, dom, members, has_members);
+  }
+  if (repair_extra_ != nullptr) {
+    for (const auto& k : *repair_extra_)
+      NarrowAtValues(k, c.var_name, dom, members, has_members);
+  }
+  if (dom.min_val > dom.max_val) return;
+  if (!has_members) {
+    values_[c.var_name] = GenerateRandValue(dom);
+    return;
+  }
+  std::vector<int64_t> admitted;
+  for (int64_t v : members)
+    if (v >= dom.min_val && v <= dom.max_val) admitted.push_back(v);
+  if (admitted.empty()) return;
+  std::uniform_int_distribution<size_t> pick(0, admitted.size() - 1);
+  values_[c.var_name] = admitted[pick(rng_)];
 }
 
 // 18.5.7.2: the value the element `name` of the sum `c`, folded without a

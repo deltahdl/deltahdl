@@ -210,6 +210,12 @@ struct ConstraintExpr {
   std::function<int64_t(const std::unordered_map<std::string, int64_t>&)>
       derive_fn;
   ConstraintKind derive_cmp = ConstraintKind::kEqual;
+  // 18.5.13.1: where the expression x is derived from is another random
+  // variable y alone, the clause's y < p1.x, that variable, which the
+  // relation bounds the other way, y under the mirrored comparison against
+  // x, so that a repair of y draws it within the bound as well. Empty where
+  // the expression is no bare variable.
+  std::string co_var_name;
 
   // 18.5.11: the random variables this constraint references, used only by the
   // function-argument priority solve. When a function call gives a random
@@ -701,6 +707,26 @@ class ConstraintSolver {
                                 const std::string& name, int64_t candidate);
   void ApplyCustomRepair(const ConstraintExpr& c);
   void ApplyDerived(const ConstraintExpr& c);
+  // The domain of `name` narrowed by every active constraint that bounds it
+  // at the values drawn -- a bound derived from the others, a comparison
+  // against a constant, a set membership -- and, where a set membership
+  // holds it, the members the domain admits in `members`, `has_members`
+  // set; a constraint under an implication counts where its antecedent
+  // holds, a soft one where it is still honored.
+  void NarrowAtValues(const ConstraintExpr& c, const std::string& name,
+                      RandVariable& dom, std::vector<int64_t>& members,
+                      bool& has_members) const;
+  void NarrowBoundAtValues(const ConstraintExpr& c, const std::string& name,
+                           RandVariable& dom) const;
+  bool AntecedentHolds(const ConstraintExpr& c) const;
+  bool SoftHonored(const ConstraintExpr& c) const;
+  // 18.5.13.1: draws every active integral variable not yet drawn within
+  // its interval, the domain narrowed to a fixpoint by the comparisons
+  // against the other variables' intervals, the bounds against constants
+  // and, where a set membership holds it, the members the interval admits,
+  // each draw narrowing the rest; a variable whose interval the bounds
+  // close is left to the general draw (constraint_solver_propagate.cpp).
+  void DrawPropagated(const std::vector<ConstraintExpr>& extra);
   void RepairFromCandidates(const ConstraintExpr& c);
   bool RepairMayWrite(const std::string& name) const;
   // 18.5.9: repairs the active constraints writing the variables `names`
@@ -813,6 +839,9 @@ class ConstraintSolver {
   // its last set, which is that set alone; empty outside one, where a
   // repair may write any active variable.
   std::unordered_set<std::string> repair_scope_;
+  // The inline constraints of the solve a repair is running in, which bound
+  // the variables it writes as the blocks do; null outside a repair.
+  const std::vector<ConstraintExpr>* repair_extra_ = nullptr;
 
   // 18.5.13.1: the soft constraints the priority resolution has discarded for
   // the current solve. A discarded soft constraint is treated as true: its

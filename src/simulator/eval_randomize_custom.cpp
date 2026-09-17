@@ -262,6 +262,10 @@ ConstraintExpr MakeCustomConstraint(const Expr* rel,
                     &rc](const std::unordered_map<std::string, int64_t>& vals) {
       return EvalCustomValue(other, names, rc, vals);
     };
+    if (other->kind == ExprKind::kIdentifier &&
+        FindRand(rands, other->text) != nullptr) {
+      ce.co_var_name = std::string(other->text);
+    }
     return ce;
   }
   // 18.5.12: the clause's x+y == 10 derives x from y as well.
