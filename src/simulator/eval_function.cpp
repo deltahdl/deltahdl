@@ -19,6 +19,26 @@
 
 namespace delta {
 
+// Stores `val` as the initial value of `prop` on `obj`: §7.4.2 has a
+// property declared as an array hold its elements one by one, each
+// initialized as the one value would be; any other property is stored under
+// its bare and its class-scoped name.
+static void StoreClassPropertyDefault(const ClassTypeInfo* info,
+                                      const ClassTypeInfo::PropertyInfo& prop,
+                                      const Logic4Vec& val, ClassObject* obj,
+                                      Arena& arena) {
+  if (prop.array_size > 0) {
+    for (uint32_t i = 0; i < prop.array_size; ++i) {
+      obj->properties[ClassArrayElementKey(prop.name, prop.array_lo + i)] =
+          OwnRhsWords(val, arena);
+    }
+    return;
+  }
+  obj->properties[std::string(prop.name)] = val;
+  std::string scoped = std::string(info->name) + "::" + std::string(prop.name);
+  obj->properties[scoped] = val;
+}
+
 static void InitClassPropertyDefaults(const ClassTypeInfo* info,
                                       ClassObject* obj, SimContext& ctx,
                                       Arena& arena) {
@@ -45,19 +65,7 @@ static void InitClassPropertyDefaults(const ClassTypeInfo* info,
     } else {
       val = MakeLogic4VecVal(arena, prop.width, 0);
     }
-    // §7.4.2: a property declared as an array holds its elements one by one,
-    // each initialized as the one value would be.
-    if (prop.array_size > 0) {
-      for (uint32_t i = 0; i < prop.array_size; ++i) {
-        obj->properties[ClassArrayElementKey(prop.name, prop.array_lo + i)] =
-            OwnRhsWords(val, arena);
-      }
-      continue;
-    }
-    obj->properties[std::string(prop.name)] = val;
-    std::string scoped =
-        std::string(info->name) + "::" + std::string(prop.name);
-    obj->properties[scoped] = val;
+    StoreClassPropertyDefault(info, prop, val, obj, arena);
   }
 
   if (info->decl) {

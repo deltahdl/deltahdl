@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "parser/parser.h"
+#include "parser/parser_token_skips.h"
 
 namespace delta {
 

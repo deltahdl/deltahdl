@@ -647,7 +647,7 @@ void Parser::CheckForeachConstraintHeader(ClassMember* member) {
   }
   // bracket_depth: '['/']' nesting; slot: 1-based slot in view; loop_var_count:
   // index of the last slot that names a variable.
-  ForeachBracketScan scan{0, 0, 0};
+  ForeachBracketScan scan{0, 0, 0, {}};
   if (Match(TokenKind::kLBracket)) {
     scan.slot = 1;
     scan.bracket_depth = 1;

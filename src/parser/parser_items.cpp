@@ -2,6 +2,7 @@
 #include <string>
 
 #include "parser/parser.h"
+#include "parser/parser_token_skips.h"
 
 namespace delta {
 

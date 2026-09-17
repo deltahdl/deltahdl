@@ -173,6 +173,18 @@ static bool TryCompoundElementWrite(const Expr* lhs, const Logic4Vec& rhs_val,
   return absent_element;
 }
 
+// §11.5.1: `c.p[7:0] = v` targets bits of a class property, which lives in
+// the object's property map rather than in a variable, so no writer of
+// TrySelectBlockingAssign can reach it and ResolveLhsVariable answers null
+// for the name it rebuilds. §7.4.6: `c.a[2] = v`, or `a[2] = v` in a method,
+// targets an element of a class property declared as an array, held on the
+// object one by one.
+static bool TryWriteClassPropertyPart(const Expr* lhs, Logic4Vec& rhs_val,
+                                      SimContext& ctx, Arena& arena) {
+  return TryWriteClassArrayElement(lhs, rhs_val, ctx, arena) ||
+         TryWriteClassPropertyBits(lhs, rhs_val, ctx, arena);
+}
+
 bool TrySelectBlockingAssign(const Expr* lhs, Logic4Vec& rhs_val,
                              SimContext& ctx, Arena& arena) {
   if (auto* elem = TryResolveArrayElement(lhs, ctx)) {
@@ -186,13 +198,7 @@ bool TrySelectBlockingAssign(const Expr* lhs, Logic4Vec& rhs_val,
   // would otherwise fabricate a plain variable named "aa[3]" and divert the
   // write into it, leaving the array untouched.
   if (TryWriteAssocElementBits(lhs, rhs_val, ctx, arena)) return true;
-  // §11.5.1: `c.p[7:0] = v` targets bits of a class property, which lives in
-  // the object's property map rather than in a variable, so no writer below
-  // can reach it and ResolveLhsVariable answers null for the name it rebuilds.
-  // §7.4.6: `c.a[2] = v`, or `a[2] = v` in a method, targets an element of a
-  // class property declared as an array, held on the object one by one.
-  if (TryWriteClassArrayElement(lhs, rhs_val, ctx, arena)) return true;
-  if (TryWriteClassPropertyBits(lhs, rhs_val, ctx, arena)) return true;
+  if (TryWriteClassPropertyPart(lhs, rhs_val, ctx, arena)) return true;
   if (TryCompoundElementWrite(lhs, rhs_val, ctx, arena)) return true;
   auto* var = ResolveLhsVariable(lhs, ctx);
 

@@ -5,6 +5,7 @@
 #include "common/types.h"
 #include "parser/parser.h"
 #include "parser/parser_dpi_validate.h"
+#include "parser/parser_token_skips.h"
 
 namespace delta {
 

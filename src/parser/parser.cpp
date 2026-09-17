@@ -3,6 +3,7 @@
 #include <algorithm>
 
 #include "common/types.h"
+#include "parser/parser_token_skips.h"
 
 namespace delta {
 
