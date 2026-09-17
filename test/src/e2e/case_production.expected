@@ -1,0 +1,7 @@
+device 8 selects network
+device 9 selects disk
+device 10 selects disk
+device 11 selects memory
+device 16 selects network
+the first of two matching items wins: 1, no match and no default generates nothing: 1
+$finish at time 0
