@@ -1,0 +1,6 @@
+each of three iterations of y visits all four values: 1
+256 calls visit all 256 values of the 8-bit z: 1
+with hi off an iteration of c visits all four values: 1
+with hi on the recomputed permutation holds c to 2 and 3: 1
+a static randc cycles through one sequence across instances: 1
+$finish at time 0
