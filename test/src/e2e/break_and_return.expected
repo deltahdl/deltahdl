@@ -1,0 +1,5 @@
+flag == 0 ==> A B C A B C
+flag == 1 ==> A B C A
+flag == 2 ==> A C A C
+break: with the fifo full, COMMAND and DATA are not generated: 1, the next statement runs: 1; a break in a loop inside a code block ends the loop at 3 and generation goes on: 1
+$finish at time 0
