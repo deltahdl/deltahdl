@@ -374,13 +374,22 @@ bool ConstraintSolver::EvalArrayReduction(const ConstraintExpr& expr) const {
   return EvalComparison(expr.reduce_cmp, /*is_signed=*/true, acc, expr.lo);
 }
 
+// 18.5.4: no two members of the group hold the same value. A member of real
+// type holds its draw in real_values_ rather than values_, so it is compared
+// there; read from values_ alone a real member was never seen, and two reals
+// drawn alike passed as distinct.
 bool ConstraintSolver::EvalUnique(const ConstraintExpr& expr) const {
   std::unordered_set<int64_t> seen;
+  std::unordered_set<double> seen_real;
   for (const auto& vname : expr.unique_vars) {
+    auto rt = real_values_.find(vname);
+    if (rt != real_values_.end()) {
+      if (!seen_real.insert(rt->second).second) return false;
+      continue;
+    }
     auto it = values_.find(vname);
     if (it == values_.end()) continue;
-    if (seen.count(it->second)) return false;
-    seen.insert(it->second);
+    if (!seen.insert(it->second).second) return false;
   }
   return true;
 }
