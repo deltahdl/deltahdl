@@ -5,5 +5,5 @@ once: two weight calls evaluate the function 2 times
 stability: a forked thread seeded 3 selects the same 8 branches beside a thread drawing 100: 1
 $finish at time 0
 test/src/e2e/randcase_statement.sv:66:5: warning: randcase: all weights are zero; no branch selected (§18.16)
-    randcase
-    ^
+      randcase
+      ^
