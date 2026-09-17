@@ -1,0 +1,5 @@
+every block holds at once: range 64, order 64, spacing 64 of 64
+the state variable's current value bounds hi: 64 of 64
+with range off by name lo escapes 10 to 20: 1, order 64 and spacing 64 of 64 still hold
+another class's block named range is its own: 16 of 16
+$finish at time 0
