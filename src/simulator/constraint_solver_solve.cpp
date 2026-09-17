@@ -176,7 +176,8 @@ void DrawArraySizeVariables(
 
 // The default single (flat) general pass: draw every active variable not
 // already committed. 18.4.1 draws an active real variable from its uniform real
-// range; the already-committed randc/array-size integral variables are skipped.
+// range, unless a distribution (18.5.3) has already seeded it; the
+// already-committed randc/array-size integral variables are skipped.
 void DrawGeneralPass(std::unordered_map<std::string, RandVariable>& variables,
                      std::unordered_map<std::string, int64_t>& values,
                      std::unordered_map<std::string, double>& real_values,
@@ -185,7 +186,8 @@ void DrawGeneralPass(std::unordered_map<std::string, RandVariable>& variables,
   for (auto& [name, var] : variables) {
     if (!var.enabled) continue;
     if (var.is_real) {
-      real_values[name] = gen_real(var);
+      if (real_values.find(name) == real_values.end())
+        real_values[name] = gen_real(var);
       continue;
     }
     if (values.find(name) != values.end()) continue;
@@ -260,7 +262,8 @@ bool ConstraintSolver::SoftSeedApplies(const ConstraintExpr& c,
          disabled_soft_.count(&c) == 0;
 }
 
-void ConstraintSolver::SeedHonoredSoft(const ConstraintExpr& inner) {
+void ConstraintSolver::SeedHonoredSoft(
+    const ConstraintExpr& inner, const std::vector<ConstraintExpr>& extra) {
   // 18.5.13: a soft distribution is seeded by sampling it, exactly as a hard
   // dist is; the seeded value is then left untouched by the general draw, so an
   // honored soft dist steers its variable while a discarded one (not seeded at
@@ -269,8 +272,7 @@ void ConstraintSolver::SeedHonoredSoft(const ConstraintExpr& inner) {
     // 18.8: as for a hard dist, sampling a distribution into an inactive
     // variable would replace the state value it is required to hold, so an
     // inactive target is left at its current value.
-    if (!HoldsStateValue(inner.var_name))
-      values_[inner.var_name] = SampleDist(inner);
+    if (!HoldsStateValue(inner.var_name)) SeedDist(inner, extra);
     return;
   }
   ApplyConcreteConstraint(inner, values_, rng_,
@@ -290,7 +292,7 @@ void ConstraintSolver::ApplyDirectConstraints(
   // ApplyDistConstraints, and sampling it again here would draw it twice.
   auto seed = [&](const ConstraintExpr& c) {
     if (SoftSeedApplies(c, include_soft)) {
-      SeedHonoredSoft(*c.inner);
+      SeedHonoredSoft(*c.inner, extra);
       return;
     }
     ApplyConcreteConstraint(c, values_, rng_, HoldsStateValue(c.var_name));
@@ -476,7 +478,8 @@ bool ConstraintSolver::SolveBySoftPriority(
   return SolveIterative(extra, /*include_soft=*/true);
 }
 
-void ConstraintSolver::ApplyDistConstraints() {
+void ConstraintSolver::ApplyDistConstraints(
+    const std::vector<ConstraintExpr>& extra) {
   for (const auto& block : blocks_) {
     if (!block.enabled) continue;
     for (const auto& c : block.constraints) {
@@ -485,7 +488,7 @@ void ConstraintSolver::ApplyDistConstraints() {
         // targeting one is not sampled into it; it keeps the state value it
         // currently holds.
         if (HoldsStateValue(c.var_name)) continue;
-        values_[c.var_name] = SampleDist(c);
+        SeedDist(c, extra);
       }
     }
   }
@@ -718,13 +721,15 @@ bool ConstraintSolver::SolvePriorityLayers(
 // false otherwise. The caller still checks guard_error_ to decide whether the
 // outer attempt loop continues or aborts, exactly as before.
 // Real variables are committed first (as in the flat pass), so any ordered
-// integral group/layer is completed against them.
+// integral group/layer is completed against them; one a distribution (18.5.3)
+// has seeded keeps the value it was seeded with.
 static void CommitStagedRealVariables(
     std::unordered_map<std::string, RandVariable>& variables,
     std::unordered_map<std::string, double>& real_values,
     const std::function<double(RandVariable&)>& gen_real) {
   for (auto& [name, var] : variables) {
-    if (var.enabled && var.is_real) {
+    if (var.enabled && var.is_real &&
+        real_values.find(name) == real_values.end()) {
       real_values[name] = gen_real(var);
     }
   }
@@ -875,7 +880,7 @@ bool ConstraintSolver::SolveIterative(const std::vector<ConstraintExpr>& extra,
     values_.clear();
     real_values_.clear();
     SeedInactiveVariables(variables_, values_, real_values_);
-    ApplyDistConstraints();
+    ApplyDistConstraints(extra);
     ApplyDirectConstraints(extra, include_soft);
     DrawRandcVariables(variables_, values_, gen_randc);
     DrawArraySizeVariables(variables_, values_, gen);

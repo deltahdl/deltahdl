@@ -1,0 +1,12 @@
+a := set draws only its members, 300 the most and 100 the least: 1 1
+:/ weighs single values as := does: 1 1
+x != 200 leaves 100 and 300 at 1:5: 1 1
+:= weighs each element, [100:102] to 103 at 3:1: 1 1
+:/ weighs the range whole, [100:102] to 103 at 1:1: 1 1
+x > 101 leaves the range its whole weight, 102 to 103 at 3:1: 1 1
+a value in two items adds their weights, 101 at 1:2:1: 1 1
+a zero weight adds to a nonzero item's, 100 staying reachable: 1 1
+a value weighted zero in every item is excluded: 1
+default weighs the rest of the domain, [100:102] to it at 3:1: 1 1
+a real dist mixes -100 with real ranges, 3.3 within 1 percent at 13 of 20: 1 1
+$finish at time 0

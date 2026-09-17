@@ -322,13 +322,21 @@ Expr* ParserPropertySpecHelpers::TryParsePropertyInstance(Parser& p) {
 }
 
 // §16.14.2: the `[lo:hi]` item of a dist_list as the range an inside
-// expression holds, §11.4.13's bracketed pair.
+// expression holds, §11.4.13's bracketed pair; an item written about a centre,
+// `[centre +/- tol]` or `[centre +%- tol]`, is the pair inside reads that
+// form as, the tolerance operator marking it.
 Expr* ParserPropertySpecHelpers::RangeOfDistItem(
     Parser& p, const ConstraintDistItem& item) {
   auto* range = p.arena_.Create<Expr>();
   range->kind = ExprKind::kSelect;
   range->range.start = item.lo->range.start;
   range->index = item.lo;
+  if (item.tolerance != nullptr) {
+    range->op = item.tolerance_relative ? TokenKind::kPlusPercentMinus
+                                        : TokenKind::kPlusSlashMinus;
+    range->index_end = item.tolerance;
+    return range;
+  }
   range->index_end = item.hi;
   return range;
 }

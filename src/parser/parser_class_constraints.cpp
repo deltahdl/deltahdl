@@ -212,9 +212,21 @@ bool Parser::ParseDistItem(ConstraintDistItem& item) {
   if (Match(TokenKind::kLBracket)) {
     item.is_range = true;
     item.lo = ParseExpr();
-    if (item.lo == nullptr || !Match(TokenKind::kColon)) return false;
-    item.hi = ParseExpr();
-    if (item.hi == nullptr || !Match(TokenKind::kRBracket)) return false;
+    if (item.lo == nullptr) return false;
+    // 11.4.13: a value_range about a centre, '[centre +/- tol]' or
+    // '[centre +%- tol]', the form the clause's [VALUE_NOM +%- 1.0] takes.
+    if (Check(TokenKind::kPlusSlashMinus) ||
+        Check(TokenKind::kPlusPercentMinus)) {
+      item.tolerance_relative = Check(TokenKind::kPlusPercentMinus);
+      Consume();
+      item.tolerance = ParseExpr();
+      if (item.tolerance == nullptr) return false;
+    } else {
+      if (!Match(TokenKind::kColon)) return false;
+      item.hi = ParseExpr();
+      if (item.hi == nullptr) return false;
+    }
+    if (!Match(TokenKind::kRBracket)) return false;
     if (!ParseDistWeight(item)) item.per_element = true;
     return true;
   }

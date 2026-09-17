@@ -106,7 +106,7 @@ bool ConstraintSolver::EvalConstraint(const ConstraintExpr& expr) const {
 
 bool ConstraintSolver::ApplyConstraint(const ConstraintExpr& expr) {
   if (expr.kind == ConstraintKind::kDist) {
-    values_[expr.var_name] = SampleDist(expr);
+    SeedDist(expr, {});
     return true;
   }
   return EvalConstraint(expr);

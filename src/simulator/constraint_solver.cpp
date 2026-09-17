@@ -9,9 +9,9 @@
 #include <utility>
 #include <vector>
 
-namespace delta {
+#include "simulator/constraint_solver_internal.h"
 
-namespace {
+namespace delta {
 
 // 18.4.1: draw a value uniformly distributed over the inclusive range [lo, hi]
 // read in the order a type of the given signedness reads it. An unsigned range
@@ -30,8 +30,6 @@ int64_t DrawUniformInRange(bool is_signed, int64_t lo, int64_t hi,
                                                static_cast<uint64_t>(hi));
   return static_cast<int64_t>(dist(rng));
 }
-
-}  // namespace
 
 bool ValueLess(bool is_signed, int64_t a, int64_t b) {
   if (is_signed) return a < b;
@@ -325,105 +323,6 @@ double ConstraintSolver::GenerateRandRealValue(RandVariable& var) {
   if (!(var.real_min < var.real_max)) return var.real_min;
   std::uniform_real_distribution<double> dist(var.real_min, var.real_max);
   return dist(rng_);
-}
-
-namespace {
-
-// 18.5.3: the stage-1 weight of a distribution item. The ':=' operator on a
-// range assigns the weight to each element, so the range's total weight is the
-// per-element weight times the element count. A single value, or a range or
-// default weighted with ':/', contributes its weight as a whole.
-uint64_t DistItemWeight(const DistWeight& w) {
-  if (w.is_range && w.per_element) {
-    int64_t size = w.hi - w.lo + 1;
-    if (size <= 0) return 0;
-    return static_cast<uint64_t>(w.weight) * static_cast<uint64_t>(size);
-  }
-  return w.weight;
-}
-
-int64_t DistItemRepresentative(const DistWeight& w) {
-  return w.is_range ? w.lo : w.value;
-}
-
-// 18.5.3: a value is covered by the distribution's non-default items when it
-// equals a named single value or falls inside a named range. Default items name
-// no specific value, so they never cover anything here.
-// 6.11.3: a weighted range covers the values between its ends in the order the
-// constrained variable's declared type reads them, the same order the range is
-// drawn from, so a range in the top half of an unsigned domain covers what it
-// names rather than nothing.
-bool DistValueCovered(const std::vector<DistWeight>& weights, int64_t v,
-                      bool is_signed) {
-  for (const auto& w : weights) {
-    if (w.is_default) continue;
-    if (w.is_range) {
-      if (!ValueLess(is_signed, v, w.lo) && !ValueLess(is_signed, w.hi, v))
-        return true;
-    } else if (v == w.value) {
-      return true;
-    }
-  }
-  return false;
-}
-
-}  // namespace
-
-// 18.5.3: a value covered only by 'default :/ weight' is any domain value not
-// named by another item. Draw uniformly from [domain_lo, domain_hi], rejecting
-// values already covered by a non-default item.
-int64_t ConstraintSolver::SampleDefaultValue(
-    const std::vector<DistWeight>& weights, int64_t domain_lo,
-    int64_t domain_hi, bool is_signed) {
-  if (ValueLess(is_signed, domain_hi, domain_lo)) return domain_lo;
-  for (int attempt = 0; attempt < 1000; ++attempt) {
-    int64_t v = DrawUniformInRange(is_signed, domain_lo, domain_hi, rng_);
-    if (!DistValueCovered(weights, v, is_signed)) return v;
-  }
-  return domain_lo;
-}
-
-// 18.5.3: select a value from a distribution. Stage 1 chooses an item with
-// probability proportional to its (unsigned) weight; stage 2 resolves the
-// chosen item to a concrete value. Because the per-item probabilities add, a
-// value named by several items accumulates their weights, and a value carrying
-// a zero weight in one item is still reachable through another nonzero item.
-// Only values named by the set (or, with a default item, the rest of the
-// domain) are ever produced.
-int64_t ConstraintSolver::DistributionSample(
-    const std::vector<DistWeight>& weights, int64_t domain_lo,
-    int64_t domain_hi, bool is_signed) {
-  if (weights.empty()) return 0;
-  uint64_t total = 0;
-  for (const auto& w : weights) total += DistItemWeight(w);
-  if (total == 0) return DistItemRepresentative(weights.front());
-
-  std::uniform_int_distribution<uint64_t> select(0, total - 1);
-  uint64_t pick = select(rng_);
-  uint64_t accum = 0;
-  for (const auto& w : weights) {
-    accum += DistItemWeight(w);
-    if (pick < accum) {
-      if (w.is_default)
-        return SampleDefaultValue(weights, domain_lo, domain_hi, is_signed);
-      if (w.is_range) {
-        return DrawUniformInRange(is_signed, w.lo, w.hi, rng_);
-      }
-      return w.value;
-    }
-  }
-  return DistItemRepresentative(weights.back());
-}
-
-// 18.5.3: sample a distribution constraint, bounding a default item by the
-// target variable's declared domain when it is known. 6.11.3: the variable's
-// declared signedness travels with that domain, because it is what orders it.
-int64_t ConstraintSolver::SampleDist(const ConstraintExpr& c) {
-  auto it = variables_.find(c.var_name);
-  int64_t lo = it != variables_.end() ? it->second.min_val : 0;
-  int64_t hi = it != variables_.end() ? it->second.max_val : 0xFFFF;
-  bool is_signed = it != variables_.end() && it->second.is_signed;
-  return DistributionSample(c.dist_weights, lo, hi, is_signed);
 }
 
 bool ConstraintSolver::HasDistOnRandc() const {

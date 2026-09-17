@@ -381,6 +381,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     parser/expr_parser_literals.cpp
     parser/parser_package_import_export.cpp
     parser/parser_udp.cpp
+    simulator/constraint_solver_dist.cpp
     simulator/constraint_solver_eval.cpp
     simulator/constraint_solver_randc.cpp
     simulator/constraint_solver_repair.cpp

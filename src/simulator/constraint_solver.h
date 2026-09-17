@@ -74,11 +74,19 @@ enum class ArrayReductionOp : uint8_t {
 // single value) applies it to the item as a whole. is_default marks the single
 // 'default :/ weight' item, which stands for every domain value not named by
 // any other item.
+// A distribution set may mix real and integral items, and a distribution over
+// a real variable reads each item as the real it names: real_value for a
+// single value and [real_lo, real_hi] for a range, which takes its weight as a
+// whole whichever operator wrote it (a range of real values is written with
+// ':/').
 struct DistWeight {
   int64_t value = 0;
   uint32_t weight = 1;
   int64_t lo = 0;
   int64_t hi = 0;
+  double real_value = 0.0;
+  double real_lo = 0.0;
+  double real_hi = 0.0;
   bool is_range = false;
   bool per_element = false;
   bool is_default = false;
@@ -468,15 +476,40 @@ class ConstraintSolver {
   // any weighted range within it are read in. Without it a range reaching above
   // 2**63-1 -- the top half of an unsigned 64-bit domain -- is an inverted
   // interval rather than the values it names.
-  int64_t DistributionSample(const std::vector<DistWeight>& weights,
-                             int64_t domain_lo, int64_t domain_hi,
-                             bool is_signed);
+  int64_t DrawDistItem(const DistWeight& item,
+                       const std::vector<DistWeight>& weights,
+                       int64_t domain_lo, int64_t domain_hi, bool is_signed);
 
   int64_t SampleDefaultValue(const std::vector<DistWeight>& weights,
                              int64_t domain_lo, int64_t domain_hi,
                              bool is_signed);
 
-  int64_t SampleDist(const ConstraintExpr& c);
+  // 18.5.3: the weight of an item applies to the item as a whole, whatever
+  // other constraints exclude from it: the clause's x > 101 with the range
+  // [100:102] weighted 3 leaves x at 102 three times as often as at 103. An
+  // item is chosen by its weight and a value drawn within it that the
+  // constraints confined to the variable admit; an item none of whose draws
+  // they admit is passed over and another chosen.
+  int64_t SampleDist(const ConstraintExpr& c,
+                     const std::vector<ConstraintExpr>& extra);
+
+  // 18.5.3: the same over a real variable, whose items are read as reals and
+  // whose draw is admitted by the domain its relational constraints leave.
+  double DrawRealDistItem(const DistWeight& item,
+                          const std::vector<DistWeight>& weights,
+                          double domain_lo, double domain_hi);
+  double SampleRealDist(const ConstraintExpr& c);
+
+  // 18.5.3: sample the distribution `c` into the value store its variable is
+  // drawn in, the real one for a real variable.
+  void SeedDist(const ConstraintExpr& c,
+                const std::vector<ConstraintExpr>& extra);
+
+  // 18.5.3: whether the constraints that name the variable `name` and no
+  // other random variable hold under the value it was just given, which is
+  // what a draw within a distribution item is admitted by.
+  bool DistValueAdmissible(const std::string& name,
+                           const std::vector<ConstraintExpr>& extra) const;
 
   // 18.5.3: a dist operation shall not be applied to a randc variable. True if
   // any enabled constraint block applies a distribution to a randc variable.
@@ -565,7 +598,7 @@ class ConstraintSolver {
   // of the class is observed here before the constraints are evaluated.
   void RefreshStaticBlockState();
 
-  void ApplyDistConstraints();
+  void ApplyDistConstraints(const std::vector<ConstraintExpr>& extra);
 
   void ApplyDirectConstraints(const std::vector<ConstraintExpr>& extra,
                               bool include_soft);
@@ -578,7 +611,8 @@ class ConstraintSolver {
 
   // 18.5.13: seed the inner expression_or_dist of a soft constraint that is
   // being honored, so a satisfiable soft preference steers its variable.
-  void SeedHonoredSoft(const ConstraintExpr& inner);
+  void SeedHonoredSoft(const ConstraintExpr& inner,
+                       const std::vector<ConstraintExpr>& extra);
 
   // 18.8: an inactive variable "is treated the same as if it had not been
   // declared rand or randc", so its value is a state value the solve reads and

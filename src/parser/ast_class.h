@@ -92,11 +92,17 @@ struct ConstraintSoftVarRef {
 // opposed to
 // ':/' (or a single value), which applies the weight to the item as a whole; a
 // range with no explicit weight defaults to ':= 1', hence per_element.
+// 11.4.13: a value_range may also be written about a centre, '[lo +/- tol]' or
+// '[lo +%- tol]', the clause's [VALUE_NOM +%- 1.0] in a distribution: 'lo'
+// then holds the centre, 'tolerance' the tolerance, and tolerance_relative
+// records the percentage form, with 'hi' left null.
 struct ConstraintDistItem {
   Expr* value = nullptr;
   Expr* lo = nullptr;
   Expr* hi = nullptr;
+  Expr* tolerance = nullptr;
   Expr* weight = nullptr;
+  bool tolerance_relative = false;
   bool is_range = false;
   bool per_element = false;
   bool is_default = false;
