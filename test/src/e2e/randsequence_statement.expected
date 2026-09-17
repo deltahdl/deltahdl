@@ -1,0 +1,5 @@
+example: 200 runs produced add pop done, add push done, dec pop done and dec push done: 1 1 1 1, every run one of the four: 1
+recursion: a production naming itself ran one or more times and stopped: 1
+scope: a code block's static variable counted the activations: 3, its automatic variable started afresh each time: 1
+top: randsequence(second) ran only the second production: 1, unnamed it started at the first: 1
+$finish at time 0
