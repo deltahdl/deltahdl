@@ -1,0 +1,4 @@
+thread: seeded 11 and drawn from between draws of two objects, $urandom, $urandom_range, shuffle, randcase, randsequence and four more $urandom agree in 9 of 9; seeded 12 the first $urandom differs: 1
+thread: a forked thread seeded 3 beside a quiet thread and beside one drawing a hundred agrees in 9 of 9
+object: seeded 7 and randomized between draws of the thread and of another object, four randomize agree in 4 of 4; seeded 8 they differ: 1
+$finish at time 0
