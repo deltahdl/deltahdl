@@ -1,0 +1,3 @@
+push push pop push pop depth 1
+if without else and a false expression generates nothing: 1, a true expression of two operands generates its production: 1
+$finish at time 0
