@@ -631,7 +631,7 @@ TEST(StringSim, AStringInOneTaskDoesNotMakeALikeNamedVariableAStringElsewhere) {
                        "  end\n"
                        "endmodule\n",
                        f),
-            "        65\n");
+            "         65\n");
 }
 
 // The same rule for a block rather than a task, and for a name that no longer
@@ -655,7 +655,7 @@ TEST(StringSim, AStringDeclarationDoesNotOutliveTheBlockThatDeclaredIt) {
                        "  end\n"
                        "endmodule\n",
                        f),
-            "        66\n");
+            "         66\n");
 }
 
 // The leading spaces of each expectation are §21.2.1.2's auto-sized decimal
