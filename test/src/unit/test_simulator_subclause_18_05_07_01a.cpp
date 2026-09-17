@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "simulator/constraint_solver.h"
@@ -206,6 +207,79 @@ TEST(ForeachIterativeConstraint, ZeroSizeMakesForeachVacuous) {
 
   EXPECT_TRUE(solver.Solve());
   EXPECT_EQ(solver.GetValue("n"), 0);
+}
+
+// 18.5.7.1: the clause's sorted array, a foreach over a dynamic array of
+// ints holding each element above the one before it under the guard that
+// keeps the index below the size, which the size constraint draws from 1 to
+// 10: each consequent derives the bound its element is drawn above, so every
+// one of 128 solves is ascending over the size drawn, which the draws tried
+// against the relations as a whole meet as good as never, and every size
+// from 1 to 10 is drawn.
+TEST(ForeachIterativeConstraint, GuardedChainOverDrawnSizeIsRepaired) {
+  ConstraintSolver solver(3);
+  RandVariable n = MakeVar("n", 0, 10);
+  n.width = 32;
+  n.is_array_size = true;
+  solver.AddVariable(n);
+  for (int i = 0; i < 10; ++i) {
+    RandVariable e =
+        MakeVar("e" + std::to_string(i), -2147483648LL, 2147483647LL);
+    e.width = 32;
+    solver.AddVariable(e);
+  }
+  ConstraintBlock sb;
+  sb.name = "size_c";
+  ConstraintExpr sz;
+  sz.kind = ConstraintKind::kSetMembership;
+  sz.var_name = "n";
+  for (int i = 1; i <= 10; ++i) sz.set_values.push_back(i);
+  sz.ref_vars.push_back("n");
+  sb.constraints.push_back(sz);
+  solver.AddConstraintBlock(sb);
+  ConstraintBlock fb;
+  fb.name = "fc";
+  ConstraintExpr fe;
+  fe.kind = ConstraintKind::kForeach;
+  fe.size_var = "n";
+  for (int k = 0; k < 10; ++k) {
+    std::string lo = "e" + std::to_string(k);
+    std::string hi = "e" + std::to_string(k + 1);
+    ConstraintExpr rel;
+    rel.kind = ConstraintKind::kCustom;
+    rel.var_name = hi;
+    rel.ref_vars = {lo, hi};
+    rel.eval_fn = [lo, hi](const std::unordered_map<std::string, int64_t>& v) {
+      return v.at(hi) > v.at(lo);
+    };
+    rel.derive_fn = [lo](const std::unordered_map<std::string, int64_t>& v) {
+      return v.at(lo);
+    };
+    rel.derive_cmp = ConstraintKind::kGreaterThan;
+    ConstraintExpr imp;
+    imp.kind = ConstraintKind::kImplication;
+    imp.cond_fn = [k](const std::unordered_map<std::string, int64_t>& v) {
+      return k < v.at("n") - 1;
+    };
+    imp.sub_constraints.push_back(rel);
+    fe.sub_constraints.push_back(imp);
+  }
+  fb.constraints.push_back(fe);
+  solver.AddConstraintBlock(fb);
+
+  unsigned sizes_seen = 0;
+  for (int draw = 0; draw < 128; ++draw) {
+    ASSERT_TRUE(solver.Solve());
+    int64_t size = solver.GetValue("n");
+    ASSERT_GE(size, 1);
+    ASSERT_LE(size, 10);
+    sizes_seen |= 1u << size;
+    for (int64_t i = 1; i < size; ++i) {
+      EXPECT_GT(solver.GetValue("e" + std::to_string(i)),
+                solver.GetValue("e" + std::to_string(i - 1)));
+    }
+  }
+  EXPECT_EQ(sizes_seen, 0x7FEu);
 }
 
 }  // namespace

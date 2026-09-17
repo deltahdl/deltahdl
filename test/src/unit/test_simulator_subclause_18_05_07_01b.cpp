@@ -134,6 +134,61 @@ TEST(ForeachIterativeConstraintsRun, AGuardedEqualityBetweenElementsHolds) {
   EXPECT_EQ(out, "32 1\n");
 }
 
+// 18.5.7.1: the clause's guard over a dynamic array held to eight elements
+// by an equality on its size method, so that the guard reads the size as a
+// state variable of 8 and holds the first seven relations, every one of 16
+// draws ascending.
+TEST(ForeachIterativeConstraintsRun, AGuardOverTheSizeHoldsAtAFixedSize) {
+  SimFixture f;
+  std::string out = RunCapture(
+      Counting("  rand int A[];\n"
+               "  constraint c1 { A.size == 8; }\n"
+               "  constraint c2 { foreach (A[k]) (k < A.size - 1) -> A[k + 1] "
+               "> A[k]; }\n",
+               16,
+               "o.A[1] > o.A[0] && o.A[2] > o.A[1] && o.A[3] > o.A[2] && "
+               "o.A[4] > o.A[3] && o.A[5] > o.A[4] && o.A[6] > o.A[5] && "
+               "o.A[7] > o.A[6]",
+               "o.A.size()"),
+      f);
+  EXPECT_EQ(out, "16 8\n");
+}
+
+// 18.5.7.1: the same array under a guard over the loop variable alone, the
+// size held to eight by a set membership on the size method rather than an
+// equality, so that the size is drawn from the one member the set holds.
+TEST(ForeachIterativeConstraintsRun, AGuardOverTheIndexHoldsAtADrawnSize) {
+  SimFixture f;
+  std::string out = RunCapture(
+      Counting("  rand int A[];\n"
+               "  constraint c1 { A.size inside {[8:8]}; }\n"
+               "  constraint c2 { foreach (A[k]) (k < 7) -> A[k + 1] > A[k]; "
+               "}\n",
+               16,
+               "o.A[1] > o.A[0] && o.A[2] > o.A[1] && o.A[3] > o.A[2] && "
+               "o.A[4] > o.A[3] && o.A[5] > o.A[4] && o.A[6] > o.A[5] && "
+               "o.A[7] > o.A[6]",
+               "o.A.size()"),
+      f);
+  EXPECT_EQ(out, "16 8\n");
+}
+
+// 18.5.7.1: the clause's guard over the size method with an equality as the
+// consequent, each element one above the one before it, so that every draw
+// of an eight-element array ends seven above where it starts.
+TEST(ForeachIterativeConstraintsRun, AGuardOverTheSizeHoldsAnEquality) {
+  SimFixture f;
+  std::string out = RunCapture(
+      Counting("  rand int A[];\n"
+               "  constraint c1 { A.size == 8; }\n"
+               "  constraint c2 { foreach (A[k]) (k < A.size - 1) -> A[k + 1] "
+               "== A[k] + 1; }\n",
+               16, "o.A[7] == o.A[0] + 7 && o.A[4] == o.A[3] + 1",
+               "o.A.size()"),
+      f);
+  EXPECT_EQ(out, "16 8\n");
+}
+
 // 18.5.7.1: the size method is a state variable within the foreach block of
 // the array, solved ahead of the iterative constraints, so a foreach holding
 // each element to the size plus its index over an array held to 3 elements
