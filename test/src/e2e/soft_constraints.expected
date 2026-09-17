@@ -1,0 +1,7 @@
+default packets: solved 64 of 64, legal 64, mode 1 at 1024 in 64, both modes drawn: 1, 32 drawn: 1
+length 1512: solved 64 of 64, length held in 64, mode 0 in 64
+length 1512 and mode 1: solved 64 of 64, length held in 64, mode 1 in 64
+the hard size against 1512: randomize returns 0, alone: 1
+the preference alone: v is 3 in 64 of 64
+the preference overridden: v is 3 in 0 of 64, distinct values at least 8: 1
+$finish at time 0
