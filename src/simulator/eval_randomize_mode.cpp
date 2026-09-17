@@ -218,10 +218,31 @@ static bool RandomizeCall(const Expr* expr, ClassObject* obj,
       {expr, expr->inline_constraint, active_set, null_checker}, visited);
 }
 
+namespace {
+
+// 18.11: the arguments of randomize() are properties of the calling object,
+// and a local member can be named only where the call has access to it,
+// within its class; there the call is written bare, randomize(secret), and
+// names the built-in method of the object executing the method, as
+// this.randomize(secret) would (8.11).
+bool BareRandomizeInMethod(const Expr* expr, SimContext& ctx,
+                           MethodCallParts& parts) {
+  if (expr->lhs == nullptr || expr->lhs->kind != ExprKind::kIdentifier ||
+      expr->lhs->text != "randomize" || ctx.CurrentThis() == nullptr)
+    return false;
+  parts.var_name = "this";
+  parts.method_name = "randomize";
+  return true;
+}
+
+}  // namespace
+
 bool TryEvalRandomizeMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
                                 Logic4Vec& out) {
   MethodCallParts parts;
-  if (!ExtractMethodCallParts(expr, parts)) return false;
+  if (!ExtractMethodCallParts(expr, parts) &&
+      !BareRandomizeInMethod(expr, ctx, parts))
+    return false;
   if (parts.method_name != "randomize") return false;
   ClassObject* obj = ResolveRandomizeTarget(ctx, parts);
   if (!obj) return false;

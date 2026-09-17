@@ -1,0 +1,7 @@
+no arguments: x, y random and v, w state in 32 of 32
+x alone: x random, y held at 50 in 32 of 32
+v and w: v, w random and x, y held in 32 of 32, v moved in some: 1
+w and x: w, x random and y, v held in 32 of 32
+cyclic: named randc draws all four in 4 of 4 rounds, named bit repeats in some of 40: 1
+local member: named within the class in 32 of 32, secret above the lid in 32
+$finish at time 0
