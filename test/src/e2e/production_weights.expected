@@ -1,0 +1,6 @@
+example: 5000 runs of add := 3 | dec := (1 + 1) generate add near 60%: 1, dec near 40%: 1, every run one of them: 1
+default: 4000 runs of a | b := 3 generate a near 25%: 1, b near 75%: 1
+dynamic: with w = 10 x := w is taken in all of 100: 1, with w = 0 in none: 1, three picks with x zeroing w take x then y then y: 1
+parameter: 5000 runs with add := W3 generate add near 60%: 1
+single: a lone production list weighted 0 is still generated: 1
+$finish at time 0
