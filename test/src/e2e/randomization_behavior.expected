@@ -1,0 +1,4 @@
+static v: instances agree in 64 of 64 reads, a call on the other changed it in some: 1
+infeasible: randomize returns 0, x and y retained: 1, post_randomize 1
+seeded alike: the same draws in 8 of 8, seeded otherwise: other draws in some: 1
+$finish at time 0
