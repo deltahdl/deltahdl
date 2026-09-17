@@ -659,50 +659,59 @@ std::unordered_set<std::string> CommittedFromValues(
   return committed;
 }
 
-// Draw one priority layer up to 'attempts' times, returning true as soon as a
-// draw leaves the now-checkable constraints satisfied against 'committed' plus
-// this layer. 'draw_layer' redraws every variable in the layer; 'check' tests
-// the constraints against a committed set.
-bool DrawAndCheckPriorityLayer(
-    const std::vector<std::string>& layer,
-    const std::unordered_set<std::string>& committed, int attempts,
-    const std::function<void(const std::vector<std::string>&)>& draw_layer,
-    const std::function<bool(const std::unordered_set<std::string>&)>& check) {
-  for (int attempt = 0; attempt < attempts; ++attempt) {
-    draw_layer(layer);
-    std::unordered_set<std::string> with_layer = committed;
-    for (const auto& name : layer) with_layer.insert(name);
-    if (check(with_layer)) return true;
-  }
-  return false;
-}
-
 }  // namespace
 
-bool ConstraintSolver::SolvePriorityLayers(
-    const std::vector<std::vector<std::string>>& layers,
+void ConstraintSolver::RepairReadyWithin(
+    const std::vector<std::string>& names,
+    const std::unordered_set<std::string>& committed,
+    const std::vector<ConstraintExpr>& extra) {
+  std::vector<const ConstraintExpr*> hard;
+  std::vector<const ConstraintExpr*> soft;
+  CollectConstraints(blocks_, extra, hard, soft);
+  repair_scope_.insert(names.begin(), names.end());
+  for (const auto* c : hard) {
+    if (ConstraintReady(*c, committed)) RepairConstraint(*c);
+  }
+  repair_scope_.clear();
+}
+
+// 18.5.11: draws the priority layer `layer` up to kLayerAttempts times over
+// the variables `committed` before it, returning true as soon as a draw
+// leaves the constraints that have become checkable satisfied; a draw the
+// constraints refuse is repaired within the layer, over the checkable
+// constraints alone, once as many draws have been tried as the flat pass
+// tries before it repairs, so that a variable held to a function of an
+// argument drawn ahead of it is met over a domain as wide as an int's.
+bool ConstraintSolver::DrawPriorityLayer(
+    const std::vector<std::string>& layer,
+    const std::unordered_set<std::string>& committed,
     const std::vector<ConstraintExpr>& extra, bool include_soft) {
   static constexpr int kLayerAttempts = 200;
-  std::unordered_set<std::string> committed =
-      CommittedFromValues(values_, real_values_);
-  auto draw_layer = [this](const std::vector<std::string>& layer) {
+  std::unordered_set<std::string> with_layer = committed;
+  for (const auto& name : layer) with_layer.insert(name);
+  for (int attempt = 0; attempt < kLayerAttempts; ++attempt) {
     for (const auto& name : layer) {
       auto it = variables_.find(name);
       if (it == variables_.end()) continue;
       values_[name] = GenerateRandValue(it->second);
     }
-  };
-  auto check = [&](const std::unordered_set<std::string>& with_layer) {
-    return CheckCommittedConstraints(extra, include_soft, with_layer);
-  };
+    if (attempt >= kRepairFromAttempt)
+      RepairReadyWithin(layer, with_layer, extra);
+    if (CheckCommittedConstraints(extra, include_soft, with_layer)) return true;
+  }
+  return false;
+}
+
+bool ConstraintSolver::SolvePriorityLayers(
+    const std::vector<std::vector<std::string>>& layers,
+    const std::vector<ConstraintExpr>& extra, bool include_soft) {
+  std::unordered_set<std::string> committed =
+      CommittedFromValues(values_, real_values_);
   for (const auto& layer : layers) {
     // 18.5.11: an earlier, higher-priority layer is never reconsidered. If no
     // draw of this layer satisfies the constraints that have become checkable,
     // the overall solve fails — the subdivision can make the set unsolvable.
-    if (!DrawAndCheckPriorityLayer(layer, committed, kLayerAttempts, draw_layer,
-                                   check)) {
-      return false;
-    }
+    if (!DrawPriorityLayer(layer, committed, extra, include_soft)) return false;
     for (const auto& name : layer) committed.insert(name);
   }
   // Every layer committed: accept only if the complete assignment satisfies all

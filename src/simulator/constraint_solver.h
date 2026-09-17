@@ -705,6 +705,15 @@ class ConstraintSolver {
   // alone, the ordered sets drawn before them standing as drawn.
   void RepairWithin(const std::vector<std::string>& names,
                     const std::vector<ConstraintExpr>& extra);
+  // 18.5.11: repairs the hard constraints every variable of which is among
+  // `committed`, writing the variables `names` alone.
+  void RepairReadyWithin(const std::vector<std::string>& names,
+                         const std::unordered_set<std::string>& committed,
+                         const std::vector<ConstraintExpr>& extra);
+  bool DrawPriorityLayer(const std::vector<std::string>& layer,
+                         const std::unordered_set<std::string>& committed,
+                         const std::vector<ConstraintExpr>& extra,
+                         bool include_soft);
 
   // 18.6.3: publish the values of the static random variables into their shared
   // cells after a successful solve, so that the value this instance just drew
