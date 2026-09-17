@@ -28,7 +28,7 @@ module soft_constraints;
   Packet p;
   Strict s;
   Preferred q;
-  int ok, legal, implied, zeros, ones, small, held, distinct, i, j;
+  int ok, legal, implied, zeros, ones, narrow, held, distinct, i, j;
   bit [15:0] seen;
 
   initial begin
@@ -42,17 +42,17 @@ module soft_constraints;
     implied = 0;
     zeros = 0;
     ones = 0;
-    small = 0;
+    narrow = 0;
     for (i = 0; i < 64; i++) begin
       if (p.randomize()) ok++;
       if (p.length == 32 || p.length == 1024) legal++;
       if (!p.mode || p.length == 1024) implied++;
       if (p.mode) ones++;
       else zeros++;
-      if (p.length == 32) small++;
+      if (p.length == 32) narrow++;
     end
     $display("default packets: solved %0d of 64, legal %0d, mode 1 at 1024 in %0d, both modes drawn: %0d, 32 drawn: %0d",
-             ok, legal, implied, (zeros > 0) && (ones > 0), small > 0);
+             ok, legal, implied, (zeros > 0) && (ones > 0), narrow > 0);
 
     // The clause's first call: length == 1512 contradicts the soft size,
     // which is discarded, while the soft implication still holds, so mode
