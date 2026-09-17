@@ -17,6 +17,7 @@
 #include "parser/ast.h"
 #include "simulator/assoc_element.h"
 #include "simulator/eval_expr_internal.h"
+#include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"
@@ -68,7 +69,14 @@ static void WriteIncDecTarget(const Expr* lhs, Logic4Vec& new_val,
   }
   if (lhs->kind != ExprKind::kIdentifier) return;
   auto* var = ctx.FindVariable(lhs->text);
-  if (var == nullptr) return;
+  // §8.11: inside a method a bare name no local answers is a property of
+  // the class, which the increment writes as an assignment to it does; the
+  // read above resolved it there, and a write that went nowhere left a
+  // counter stepped in a method at its old value.
+  if (var == nullptr) {
+    TryFuncClassPropertyWrite(lhs, new_val, ctx, arena);
+    return;
+  }
   // §6.11.2 gives a 2-state type no x and no z, so an unknown result is coerced
   // before it is stored, as WriteVar and EvalCompoundAssign coerce theirs.
   // Nothing had to do this while the arithmetic could only produce known bits.
@@ -238,6 +246,10 @@ Logic4Vec EvalCompoundAssign(const Expr* expr, SimContext& ctx, Arena& arena) {
         var->value = result;
         var->NotifyWatchers();
       }
+    } else {
+      // §8.11, as in WriteIncDecTarget: a bare name no local answers inside
+      // a method is a property of the class.
+      TryFuncClassPropertyWrite(expr->lhs, result, ctx, arena);
     }
   } else if (expr->lhs->kind == ExprKind::kSelect) {
     // TrySelectBlockingAssign is what the statement form reaches, and it

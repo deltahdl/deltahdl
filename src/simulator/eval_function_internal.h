@@ -37,6 +37,14 @@ bool DeclaredTypeIs4State(const DataType& type);
 // eval_function_body_assign.cpp and called by the statement executor in
 // eval_function_body.cpp, which holds the declaration and control-flow forms.
 void ExecFuncBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena);
+// §8.11: writes `val` to the property the bare identifier `lhs` names
+// inside a method -- a static property of the class the method belongs to,
+// or the instance property of the object it was invoked on -- and answers
+// whether it did; false outside a method, where no object is in scope. It
+// is asked for a name no local answers, a local being the name's own
+// declaration (eval_function_body_assign.cpp).
+bool TryFuncClassPropertyWrite(const Expr* lhs, const Logic4Vec& val,
+                               SimContext& ctx, Arena& arena);
 
 // Shared between eval_system_task.cpp and eval_system_func.cpp. The system-task
 // helpers are defined once in eval_system_task.cpp; the system-function

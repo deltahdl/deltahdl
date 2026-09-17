@@ -86,8 +86,8 @@ static void WriteSelfProperty(ClassObject* self, std::string_view name,
 // Static storage takes precedence over an instance property of the same name.
 // A declared local shadows both, and that is the caller's test rather than this
 // one's: it asks only for a name no local answers.
-static bool TryFuncClassPropertyWrite(const Expr* lhs, const Logic4Vec& val,
-                                      SimContext& ctx, Arena& arena) {
+bool TryFuncClassPropertyWrite(const Expr* lhs, const Logic4Vec& val,
+                               SimContext& ctx, Arena& arena) {
   const ClassTypeInfo* method_cls = ctx.CurrentMethodClass();
   if (method_cls != nullptr) {
     auto it = method_cls->static_properties.find(std::string(lhs->text));
