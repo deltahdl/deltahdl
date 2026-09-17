@@ -85,9 +85,8 @@ bool DistRealCovered(const std::vector<DistWeight>& weights, double v) {
   return false;
 }
 
-// Whether the constraint `c` names the variable `name`, as the variable it
-// constrains or among the ones it references, and no other random variable,
-// so that it can be decided on that variable's value alone.
+}  // namespace
+
 bool ConfinedTo(const ConstraintExpr& c, const std::string& name) {
   bool names = c.var_name == name;
   if (!c.var_name.empty() && c.var_name != name) return false;
@@ -108,7 +107,7 @@ bool ConfinedTo(const ConstraintExpr& c, const std::string& name) {
   return names;
 }
 
-}  // namespace
+namespace {}  // namespace
 
 // 18.5.3: a value covered only by 'default :/ weight' is any domain value not
 // named by another item. Draw uniformly from [domain_lo, domain_hi], rejecting

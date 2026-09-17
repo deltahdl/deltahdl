@@ -615,6 +615,22 @@ class ConstraintSolver {
   void ApplyDirectConstraints(const std::vector<ConstraintExpr>& extra,
                               bool include_soft);
 
+  // 18.5.7.1: the size constraints are solved first and the iterative
+  // constraints next, so the array sizes are drawn once, ahead of the
+  // attempts, from what the size constraints seed and the domain they fold,
+  // and every attempt holds the sizes drawn while it solves the other
+  // variables. An attempt that drew the sizes afresh would end on the first
+  // size at which the draws of the elements happened to meet the iterative
+  // constraints, which a size of one or two reaches within a few attempts
+  // and a size of ten as good as never, so the sizes drawn would lean to the
+  // smallest the size constraints admit. The clause has this ordering fail
+  // the solve where the size drawn admits no solution for the rest.
+  std::unordered_map<std::string, int64_t> DrawArraySizesOnce(
+      const std::vector<ConstraintExpr>& extra, bool include_soft,
+      const std::function<int64_t(RandVariable&)>& gen);
+  bool SizeConstraintsHold(const std::vector<ConstraintExpr>& extra);
+  void HoldArraySizes(const std::unordered_map<std::string, int64_t>& sizes);
+
   // 18.5.13: true when `c` is a soft constraint whose inner expression_or_dist
   // is still to be seeded — the soft set is active for this attempt and the
   // constraint has been discarded neither by the 18.5.13.1 priority resolution

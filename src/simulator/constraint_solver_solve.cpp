@@ -120,12 +120,8 @@ std::unordered_map<std::string, int> ComputePriorityRanks(
   return prank;
 }
 
-// 18.8 / 18.5.8: an inactive variable (rand_mode() OFF) is not one of the
-// active random variables, so it is not randomized. The solver instead seeds
-// its current value as a constant before solving (the real value into
-// 'real_values', the integral value into 'values') so a global constraint
-// relating it to an active variable is evaluated against that fixed value
-// rather than dropped.
+}  // namespace
+
 void SeedInactiveVariables(
     std::unordered_map<std::string, RandVariable>& variables,
     std::unordered_map<std::string, int64_t>& values,
@@ -141,6 +137,8 @@ void SeedInactiveVariables(
   }
 }
 
+namespace {
+
 // 18.4.2: the cyclic (randc) variables shall be solved before the noncyclical
 // rand variables. Draw every still-uncommitted active randc value here so the
 // rand variables that follow are solved with the cyclic values already fixed
@@ -152,23 +150,6 @@ void DrawRandcVariables(
   for (auto& [name, var] : variables) {
     if (!var.enabled || var.is_real) continue;
     if (var.qualifier != RandQualifier::kRandc) continue;
-    if (values.find(name) != values.end()) continue;
-    values[name] = gen(var);
-  }
-}
-
-// 18.5.7.1: an array's size method is solved with the size constraints, ahead
-// of the iterative (foreach) constraints over that array. Commit every active,
-// non-randc, still-uncommitted array-size variable here so a foreach reading
-// the size sees the chosen value and treats it as a state variable.
-void DrawArraySizeVariables(
-    std::unordered_map<std::string, RandVariable>& variables,
-    std::unordered_map<std::string, int64_t>& values,
-    const std::function<int64_t(RandVariable&)>& gen) {
-  for (auto& [name, var] : variables) {
-    if (!var.enabled || var.is_real) continue;
-    if (!var.is_array_size) continue;
-    if (var.qualifier == RandQualifier::kRandc) continue;
     if (values.find(name) != values.end()) continue;
     values[name] = gen(var);
   }
@@ -826,6 +807,8 @@ bool ConstraintSolver::SolveIterative(const std::vector<ConstraintExpr>& extra,
   static constexpr int kMaxAttempts = 500;
   guard_error_ = false;
   auto gen = [this](RandVariable& var) { return GenerateRandValue(var); };
+  const std::unordered_map<std::string, int64_t> kSizes =
+      DrawArraySizesOnce(extra, include_soft, gen);
   auto gen_real = [this](RandVariable& var) {
     return GenerateRandRealValue(var);
   };
@@ -882,6 +865,7 @@ bool ConstraintSolver::SolveIterative(const std::vector<ConstraintExpr>& extra,
     SeedInactiveVariables(variables_, values_, real_values_);
     ApplyDistConstraints(extra);
     ApplyDirectConstraints(extra, include_soft);
+    HoldArraySizes(kSizes);
     DrawRandcVariables(variables_, values_, gen_randc);
     DrawArraySizeVariables(variables_, values_, gen);
     AttemptPasses passes{priority_pass, ordered_pass, flat_pass};

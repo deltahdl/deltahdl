@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <random>
 #include <string>
 #include <unordered_map>
@@ -27,6 +28,36 @@ void CollectConstraints(const std::vector<ConstraintBlock>& blocks,
                         const std::vector<ConstraintExpr>& extra,
                         std::vector<const ConstraintExpr*>& hard,
                         std::vector<const ConstraintExpr*>& soft);
+
+// 18.8 / 18.5.8: an inactive variable (rand_mode() OFF) is not one of the
+// active random variables, so it is not randomized. The solver instead seeds
+// its current value as a constant before solving (the real value into
+// 'real_values', the integral value into 'values') so a global constraint
+// relating it to an active variable is evaluated against that fixed value
+// rather than dropped. Shared between constraint_solver_solve.cpp (which
+// defines it) and constraint_solver_sizes.cpp.
+void SeedInactiveVariables(
+    std::unordered_map<std::string, RandVariable>& variables,
+    std::unordered_map<std::string, int64_t>& values,
+    std::unordered_map<std::string, double>& real_values);
+
+// 18.5.7.1: an array's size method is solved with the size constraints, ahead
+// of the iterative (foreach) constraints over that array. Commits every
+// active, non-randc, still-uncommitted array-size variable so a foreach
+// reading the size sees the chosen value and treats it as a state variable.
+// Shared between constraint_solver_sizes.cpp (which defines it) and
+// constraint_solver_solve.cpp.
+void DrawArraySizeVariables(
+    std::unordered_map<std::string, RandVariable>& variables,
+    std::unordered_map<std::string, int64_t>& values,
+    const std::function<int64_t(RandVariable&)>& gen);
+
+// Whether the constraint `c` names the variable `name`, as the variable it
+// constrains or among the ones it references, and no other random variable,
+// so that it can be decided on that variable's value alone. Shared between
+// constraint_solver_dist.cpp (which defines it) and
+// constraint_solver_solve.cpp.
+bool ConfinedTo(const ConstraintExpr& c, const std::string& name);
 
 // 18.5.7.1: the count of an array's elements that take part in an iterative
 // constraint over it: an array's size method is a state variable there, the
