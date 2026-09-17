@@ -27,7 +27,7 @@ TEST(InlineConstraintsRun, TheBlockResolvesInTheObjectThenTheCallersScope) {
       "  endfunction\n"
       "endclass\n"
       "module t;\n"
-      "  int success = 0, within = 0;\n"
+      "  int success = 0, held = 0;\n"
       "  initial begin\n"
       "    C1 f = new;\n"
       "    C2 c2 = new;\n"
@@ -35,9 +35,9 @@ TEST(InlineConstraintsRun, TheBlockResolvesInTheObjectThenTheCallersScope) {
       "    c2.y = 10;\n"
       "    repeat (32) begin\n"
       "      if (c2.doit(f, -1000, 5) == 1) success++;\n"
-      "      if (f.x >= 10 && f.x < 15) within++;\n"
+      "      if (f.x >= 10 && f.x < 15) held++;\n"
       "    end\n"
-      "    $display(\"%0d %0d\", success, within);\n"
+      "    $display(\"%0d %0d\", success, held);\n"
       "  end\n"
       "endmodule\n",
       f);
