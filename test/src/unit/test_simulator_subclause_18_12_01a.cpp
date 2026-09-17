@@ -210,8 +210,11 @@ TEST(ScopeRandomizeWith, IntArgumentsRandomizedAgainstStateValue) {
       "  endtask\n"
       "  initial run(6);\n"
       "endmodule\n";
-  EXPECT_EQ(RunAndGet(src, "okv"), 1u);   // a joint int solution below 6 exists
-  EXPECT_LT(RunAndGet(src, "sumv"), 6u);  // and the drawn int sum respects it
+  EXPECT_EQ(RunAndGet(src, "okv"), 1u);  // a joint int solution below 6 exists
+  // The sum is a signed int (§6.11.2), and a below 5 admits a negative a, so
+  // the sum is read as the int it is: its bit pattern as an unsigned value
+  // would rank a negative sum above 6.
+  EXPECT_LT(static_cast<int32_t>(RunAndGet(src, "sumv")), 6);
 }
 
 // 18.12.1: a non-argument operand a with-block reads as a state constant may be
