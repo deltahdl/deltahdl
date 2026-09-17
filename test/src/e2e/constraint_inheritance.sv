@@ -34,11 +34,11 @@ constraint Fixed::hi { x == 42; }
 
 virtual class Bounded;
   rand int v;
-  pure constraint within;
+  pure constraint bounds;
 endclass
 
 class Range extends Bounded;
-  constraint within { v inside {[1:3]}; }
+  constraint bounds { v inside {[1:3]}; }
 endclass
 
 class Sealed;
