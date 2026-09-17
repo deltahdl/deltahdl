@@ -1,0 +1,4 @@
+seeded: replayed by 254 in 8 of 8, by 250 + 4 in 8, by a variable in 8, changed by 255: 1
+unsigned 32-bit: a new number in 32 of 32 calls, upper 32 bits zero in 32 of 32, top bit seen: 1
+the example: upper half of addr seen: 1, number below 16 in 32 of 32
+$finish at time 0
