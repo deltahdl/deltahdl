@@ -9,6 +9,7 @@
 #include "common/types.h"
 #include "parser/ast.h"
 #include "simulator/class_object.h"
+#include "simulator/eval_array_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"
@@ -114,6 +115,43 @@ uint64_t Join(std::string_view method, uint64_t acc, uint64_t v) {
   return acc ^ v;
 }
 
+// §7.12.3: the value the with clause of the call `expr` maps the element
+// `elem` at `index` to, the iterator and its index bound as §7.12 names
+// them; the element itself where the call has no with clause.
+Logic4Vec WithValue(const Expr* expr, const Logic4Vec& elem, uint32_t index,
+                    SimContext& ctx, Arena& arena) {
+  if (expr->with_expr == nullptr) return elem;
+  IterNames names = ExtractIterNames(expr);
+  ctx.PushScope();
+  ctx.CreateLocalVariable(names.iter_name, elem.width, elem.is_signed)->value =
+      elem;
+  ctx.CreateLocalVariable(names.idx_var_name, 32)->value =
+      MakeLogic4VecVal(arena, 32, index);
+  Logic4Vec value = EvalExpr(expr->with_expr, ctx, arena);
+  ctx.PopScope();
+  return value;
+}
+
+// §7.12.3/§18.5.7.2: the elements of `ref` reduced by the method `method`,
+// each through the with clause of `expr` where it has one, into a result of
+// the element type, or of the with clause's expression, which the fold is
+// held to.
+Logic4Vec ReduceClassArray(const Expr* expr, const ClassArrayRef& ref,
+                           std::string_view method, SimContext& ctx,
+                           Arena& arena) {
+  uint64_t acc = 0;
+  ReductionIdentity(method, acc);
+  Logic4Vec result =
+      WithValue(expr, ElementDefault(*ref.prop, arena), 0, ctx, arena);
+  for (uint32_t i = 0; i < ref.size; ++i) {
+    Logic4Vec elem = ReadClassArrayElement(ref, ref.lo + i, ctx, arena);
+    acc = Join(method, acc, WithValue(expr, elem, i, ctx, arena).ToUint64());
+  }
+  Logic4Vec out = MakeLogic4VecVal(arena, result.width, acc);
+  out.is_signed = result.is_signed;
+  return out;
+}
+
 }  // namespace
 
 bool ResolveClassArray(const Expr* base, SimContext& ctx, Arena& arena,
@@ -186,7 +224,7 @@ bool TryEvalClassArrayMethodCall(const Expr* expr, SimContext& ctx,
                                  Arena& arena, Logic4Vec& out) {
   std::string_view method;
   const Expr* receiver = CallReceiver(expr, method);
-  if (receiver == nullptr || expr->with_expr != nullptr) return false;
+  if (receiver == nullptr) return false;
   ClassArrayRef ref;
   if (!ResolveClassArray(receiver, ctx, arena, ref)) return false;
   if (method == "size") {
@@ -200,13 +238,7 @@ bool TryEvalClassArrayMethodCall(const Expr* expr, SimContext& ctx,
   }
   uint64_t acc = 0;
   if (!ReductionIdentity(method, acc)) return false;
-  for (uint32_t i = 0; i < ref.size; ++i) {
-    acc = Join(method, acc,
-               ReadClassArrayElement(ref, ref.lo + i, ctx, arena).ToUint64());
-  }
-  // §7.12.3: the result is of the element type, which the fold is held to.
-  out = MakeLogic4VecVal(arena, ref.prop->width, acc);
-  out.is_signed = ref.prop->is_signed;
+  out = ReduceClassArray(expr, ref, method, ctx, arena);
   return true;
 }
 

@@ -1,5 +1,7 @@
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -10,9 +12,12 @@
 #include "parser/ast.h"
 #include "simulator/class_object.h"
 #include "simulator/constraint_solver.h"
+#include "simulator/eval_array_internal.h"
 #include "simulator/eval_class_array.h"
 #include "simulator/eval_randomize_internal.h"
 #include "simulator/evaluation.h"
+#include "simulator/sim_context.h"
+#include "simulator/variable.h"
 
 namespace delta {
 
@@ -208,16 +213,23 @@ std::vector<std::string> ElementNames(std::string_view array,
   return names;
 }
 
-// 18.5.7.2: `e` as a reduction method called with no argument and no with
-// clause on a rand array member, filling the method's operand and the
-// element variables; false for any other expression.
+// Whether every argument of the call `e` is an identifier, which is what
+// the iterator arguments of an array method call are (7.12).
+bool ArgsAreIteratorNames(const Expr* e) {
+  return std::all_of(e->args.begin(), e->args.end(), [](const Expr* arg) {
+    return arg != nullptr && arg->kind == ExprKind::kIdentifier;
+  });
+}
+
+// 18.5.7.2: `e` as a reduction method called on a rand array member, with a
+// with clause or without one, filling the method's operand and the element
+// variables; false for any other expression.
 bool ReductionCall(const Expr* e, std::vector<RandInfo>& rands,
                    ArrayReductionOp& op, std::vector<std::string>& elements) {
-  if (e == nullptr || e->kind != ExprKind::kCall || !e->args.empty() ||
-      e->with_expr != nullptr || e->lhs == nullptr ||
-      e->lhs->kind != ExprKind::kMemberAccess || e->lhs->is_scope_resolution ||
-      e->lhs->lhs == nullptr || e->lhs->rhs == nullptr ||
-      e->lhs->lhs->kind != ExprKind::kIdentifier ||
+  if (e == nullptr || e->kind != ExprKind::kCall || !ArgsAreIteratorNames(e) ||
+      e->lhs == nullptr || e->lhs->kind != ExprKind::kMemberAccess ||
+      e->lhs->is_scope_resolution || e->lhs->lhs == nullptr ||
+      e->lhs->rhs == nullptr || e->lhs->lhs->kind != ExprKind::kIdentifier ||
       e->lhs->rhs->kind != ExprKind::kIdentifier) {
     return false;
   }
@@ -233,6 +245,42 @@ int64_t BoundValue(const Expr* e, RandomizeCtx& rc) {
   Logic4Vec value = EvalExpr(e, rc.ctx, rc.arena);
   return value.is_signed ? SignExtend(value.ToUint64(), value.width)
                          : static_cast<int64_t>(value.ToUint64());
+}
+
+// 18.5.7.2: the with clause of the reduction call `call` as the function of
+// an element's value the solver folds, the iterator bound to the value in
+// the element type `elem` declares and the expression evaluated in the
+// object's scope, through one local made here and bound per evaluation, a
+// fold being evaluated some hundred times per solve. `result` receives the
+// value the clause maps the element type's zero to, whose width and
+// signedness are the clause's expression's, which the fold is held to.
+std::function<int64_t(int64_t)> WithFunction(const Expr* call,
+                                             const RandVariable& elem,
+                                             RandomizeCtx& rc,
+                                             Logic4Vec& result) {
+  IterNames names = ExtractIterNames(call);
+  std::string_view iter = names.iter_name;
+  rc.ctx.PushScope();
+  Variable* item = rc.ctx.CreateLocalVariable(iter, elem.width, elem.is_signed);
+  rc.ctx.PopScope();
+  auto evaluate = [call, iter, item, &rc](int64_t v) {
+    rc.ctx.PushScope();
+    rc.ctx.BindLocalVariable(iter, item);
+    SetLocalWords(item->value, v);
+    Logic4Vec value;
+    {
+      ConstraintEvalScope scope(rc.obj, rc.ctx);
+      value = EvalExpr(call->with_expr, rc.ctx, rc.arena);
+    }
+    rc.ctx.PopScope();
+    return value;
+  };
+  result = evaluate(0);
+  return [evaluate](int64_t v) {
+    Logic4Vec value = evaluate(v);
+    return value.is_signed ? SignExtend(value.ToUint64(), value.width)
+                           : static_cast<int64_t>(value.ToUint64());
+  };
 }
 
 }  // namespace
@@ -257,10 +305,17 @@ bool TryArrayReductionConstraint(const Expr* rel, std::vector<RandInfo>& rands,
   out.reduce_op = op;
   out.reduce_cmp = cmp;
   out.lo = BoundValue(other, rc);
-  // 18.5.7.2: the result is of the element type, so the fold is held to the
-  // element's width.
+  // 18.5.7.2: the result is of the element type, or, where the call carries
+  // a with clause, of the type of the clause's expression, so the fold is
+  // held to that type's width.
   const RandInfo* elem = FindRand(rands, elements.front());
   out.reduce_width = elem != nullptr ? elem->var.width : 32;
+  const Expr* call = call_on_left ? rel->lhs : rel->rhs;
+  if (call->with_expr != nullptr && elem != nullptr) {
+    Logic4Vec result;
+    out.reduce_with = WithFunction(call, elem->var, rc, result);
+    out.reduce_width = result.width;
+  }
   out.reduce_vars = elements;
   out.ref_vars = std::move(elements);
   // 18.5.7.2: over a dynamic array whose size is solved, the elements below

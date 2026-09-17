@@ -16,6 +16,14 @@
 
 namespace delta {
 
+void SetLocalWords(Logic4Vec& value, int64_t v) {
+  if (value.nwords == 0) return;
+  auto bits = static_cast<uint64_t>(v);
+  if (value.width < 64) bits &= (uint64_t{1} << value.width) - 1;
+  value.words[0].aval = bits;
+  value.words[0].bval = 0;
+}
+
 namespace {
 
 // The local a trial binds the random variable `n` to, made on the first
@@ -43,15 +51,6 @@ Variable* TrialLocal(const std::string& n, bool real, RandomizeCtx& rc) {
   return local;
 }
 
-// Writes the integral `v` into the words of `value`, held to its width.
-void SetWords(Logic4Vec& value, int64_t v) {
-  if (value.nwords == 0) return;
-  auto bits = static_cast<uint64_t>(v);
-  if (value.width < 64) bits &= (uint64_t{1} << value.width) - 1;
-  value.words[0].aval = bits;
-  value.words[0].bval = 0;
-}
-
 // Evaluates `e` with each name in `names` bound to its value in `vals`, a
 // rand variable as a local so the expression reads the trial value. A name
 // `vals` lacks is a real variable's (18.4.1), whose draw the solver keeps
@@ -69,7 +68,7 @@ Logic4Vec EvalBound(const Expr* e, const std::vector<std::string>& names,
       local->value = MakeRealVec(rc.arena, rc.solver->GetRealValue(n), 64);
       continue;
     }
-    SetWords(local->value, it != vals.end() ? it->second : 0);
+    SetLocalWords(local->value, it != vals.end() ? it->second : 0);
   }
   Logic4Vec value;
   {

@@ -325,7 +325,7 @@ size_t ClampCountToSize(
   return count;
 }
 
-bool ConstraintSolver::EvalArrayReduction(const ConstraintExpr& expr) const {
+int64_t ConstraintSolver::FoldReduction(const ConstraintExpr& expr) const {
   // 18.5.7.2: an array reduction method in a constraint is treated as an
   // expression iterated over each element of the array, joined by the relevant
   // operand for the method. Begin from the operand's identity so a fold over
@@ -354,14 +354,18 @@ bool ConstraintSolver::EvalArrayReduction(const ConstraintExpr& expr) const {
     uint64_t mask = (static_cast<uint64_t>(1) << expr.reduce_width) - 1;
     acc = static_cast<int64_t>(static_cast<uint64_t>(acc) & mask);
   }
+  return acc;
+}
 
+bool ConstraintSolver::EvalArrayReduction(const ConstraintExpr& expr) const {
   // 6.11.3: what the relation orders here is the reduction's own result, which
   // 18.5.7.2 types by the array element or the with-clause expression rather
   // than by any one variable's declaration. The fold leaves that result a
   // signed number -- a width below 64 is masked to a non-negative value and a
   // 64-bit one keeps the sign the fold gave it -- so it is compared in the
   // signed order.
-  return EvalComparison(expr.reduce_cmp, /*is_signed=*/true, acc, expr.lo);
+  return EvalComparison(expr.reduce_cmp, /*is_signed=*/true,
+                        FoldReduction(expr), expr.lo);
 }
 
 // 18.5.4: no two members of the group hold the same value. A member of real

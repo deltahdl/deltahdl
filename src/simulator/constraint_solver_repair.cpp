@@ -68,6 +68,10 @@ void ConstraintSolver::RepairConstraint(const ConstraintExpr& c) {
     ApplyCustomRepair(c);
     return;
   }
+  if (c.kind == ConstraintKind::kArrayReduction) {
+    RepairReduction(c);
+    return;
+  }
   if (c.kind == ConstraintKind::kForeach) {
     size_t count =
         ClampCountToSize(c.sub_constraints.size(), c.size_var, values_);
@@ -159,6 +163,111 @@ void ConstraintSolver::ApplyDerived(const ConstraintExpr& c) {
   RandVariable narrowed = Narrowed(variables_.find(c.var_name)->second, bound);
   if (narrowed.min_val > narrowed.max_val) return;
   values_[c.var_name] = GenerateRandValue(narrowed);
+}
+
+// 18.5.7.2: the value the element `name` of the sum `c`, folded without a
+// with clause, would have to hold for the fold to meet its bound exactly,
+// given the other elements below the size drawn: the bound less the sum of
+// the others, one past it under a strict comparison.
+static int64_t SumElementNeeded(
+    const ConstraintExpr& c, const std::string& name,
+    const std::unordered_map<std::string, int64_t>& values) {
+  int64_t rest = 0;
+  size_t count = ClampCountToSize(c.reduce_vars.size(), c.size_var, values);
+  for (size_t i = 0; i < count; ++i) {
+    if (c.reduce_vars[i] == name) continue;
+    auto it = values.find(c.reduce_vars[i]);
+    if (it != values.end()) rest += it->second;
+  }
+  int64_t target = c.lo;
+  if (c.reduce_cmp == ConstraintKind::kLessThan) target = c.lo - 1;
+  if (c.reduce_cmp == ConstraintKind::kGreaterThan) target = c.lo + 1;
+  return target - rest;
+}
+
+// How far the reduction `c` falls from its bound with the element `name` at
+// `candidate`, which is left written: 0 where the reduction holds, and the
+// distance of the fold from the bound otherwise, which a rewriting that
+// meets the bound with no one value lessens.
+int64_t ConstraintSolver::ReductionDistanceWith(const ConstraintExpr& c,
+                                                const std::string& name,
+                                                int64_t candidate) {
+  values_[name] = candidate;
+  if (EvalConstraint(c)) return 0;
+  int64_t fold = FoldReduction(c);
+  return fold > c.lo ? fold - c.lo : c.lo - fold;
+}
+
+// The values of the domain of `var` a rewriting may try: every one where
+// the domain holds no more than kScanDomain values, and the structured
+// candidates within it otherwise.
+static std::vector<int64_t> RewritingCandidates(const RandVariable& var) {
+  static constexpr uint64_t kScanDomain = 4096;
+  std::vector<int64_t> out;
+  if (var.DomainSize() <= kScanDomain) {
+    for (int64_t v = var.min_val;; ++v) {
+      out.push_back(v);
+      if (v == var.max_val) break;
+    }
+    return out;
+  }
+  for (int64_t candidate : StructuredCandidates(var)) {
+    if (!var.DomainLess(candidate, var.min_val) &&
+        !var.DomainLess(var.max_val, candidate)) {
+      out.push_back(candidate);
+    }
+  }
+  return out;
+}
+
+// 18.5.7.2: rewrites the element `name` so that the reduction `c` holds: a
+// sum without a with clause to the value that meets the bound exactly, and
+// any reduction to one of the candidate values of the element's domain that
+// meet it, drawn at random among them; false where none does, the element
+// then left at the candidate that brings the fold nearest the bound, which
+// the elements rewritten after it carry on from.
+bool ConstraintSolver::RepairReductionElement(const ConstraintExpr& c,
+                                              const std::string& name) {
+  const RandVariable& var = variables_.find(name)->second;
+  if (!c.reduce_with && c.reduce_op == ArrayReductionOp::kSum) {
+    int64_t needed = SumElementNeeded(c, name, values_);
+    if (!var.DomainLess(needed, var.min_val) &&
+        !var.DomainLess(var.max_val, needed) &&
+        ReductionDistanceWith(c, name, needed) == 0) {
+      return true;
+    }
+  }
+  std::vector<int64_t> satisfying;
+  int64_t nearest = values_[name];
+  int64_t least = -1;
+  for (int64_t candidate : RewritingCandidates(var)) {
+    int64_t distance = ReductionDistanceWith(c, name, candidate);
+    if (distance == 0) satisfying.push_back(candidate);
+    if (least < 0 || distance < least) {
+      least = distance;
+      nearest = candidate;
+    }
+  }
+  if (satisfying.empty()) {
+    values_[name] = nearest;
+    return false;
+  }
+  std::uniform_int_distribution<size_t> pick(0, satisfying.size() - 1);
+  values_[name] = satisfying[pick(rng_)];
+  return true;
+}
+
+// 18.5.7.2: a reduction that does not hold after the draw has its elements
+// below the size drawn rewritten one at a time, in index order, each
+// brought as near the bound as its domain allows, until one rewriting meets
+// it; the check that follows still decides.
+void ConstraintSolver::RepairReduction(const ConstraintExpr& c) {
+  if (EvalConstraint(c)) return;
+  size_t count = ClampCountToSize(c.reduce_vars.size(), c.size_var, values_);
+  for (size_t i = 0; i < count; ++i) {
+    const std::string& name = c.reduce_vars[i];
+    if (RepairMayWrite(name) && RepairReductionElement(c, name)) return;
+  }
 }
 
 void ConstraintSolver::ApplyCustomRepair(const ConstraintExpr& c) {

@@ -1,0 +1,6 @@
+five elements summing below 300 as an int: 256 of 256
+a sum above 100: 1
+three elements in range summing to 44 as a byte: 64 of 64
+the elements drawn summing to 100: 64 of 64, sizes vary: 1
+three elements in range multiplying to 8 as a nibble: 64 of 64
+$finish at time 0

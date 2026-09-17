@@ -179,6 +179,10 @@ int64_t EvalCustomValue(const Expr* e, const std::vector<std::string>& names,
                         const std::unordered_map<std::string, int64_t>& vals);
 // Whether `e` references the random variable `name`, bare or as this.name.
 bool RefsNamedRandVar(const Expr* e, std::string_view name);
+// Writes the integral `v` into the words of `value`, held to its width: how
+// a trial binds a local it made once to each value it evaluates over
+// (eval_randomize_custom.cpp).
+void SetLocalWords(Logic4Vec& value, int64_t v);
 // 18.5: `rel` as the solver's kCustom relation, evaluated against the values
 // drawn, referencing the random variables it names and, where it is `x ==
 // expression` over the others, deriving x from them

@@ -590,6 +590,10 @@ class ConstraintSolver {
 
   bool EvalConstraint(const ConstraintExpr& expr) const;
 
+  // 18.5.7.2: the value the array reduction `expr` folds to over the values
+  // drawn, held to the width of its result type.
+  int64_t FoldReduction(const ConstraintExpr& expr) const;
+
   bool EvalImplication(const ConstraintExpr& expr) const;
 
   bool EvalIfElse(const ConstraintExpr& expr) const;
@@ -680,9 +684,19 @@ class ConstraintSolver {
   // foreach over a dynamic array has the constraints of the elements below
   // its size repaired, in index order, so that a relation between an element
   // and the one before it is met element by element.
+  // 18.5.7.2: an array reduction that does not hold has one element below
+  // the size drawn rewritten to a value that meets it, a sum without a with
+  // clause to the value that meets the bound exactly and any reduction to
+  // the first value of the element's domain that does, so that a sum held
+  // to a value, or below one over a wide domain, is met rather than waited
+  // for.
   void RepairConstraints(const std::vector<ConstraintExpr>& extra);
   void RepairConstraint(const ConstraintExpr& c);
   void RepairConsequent(const ConstraintExpr& sub);
+  void RepairReduction(const ConstraintExpr& c);
+  bool RepairReductionElement(const ConstraintExpr& c, const std::string& name);
+  int64_t ReductionDistanceWith(const ConstraintExpr& c,
+                                const std::string& name, int64_t candidate);
   void ApplyCustomRepair(const ConstraintExpr& c);
   void ApplyDerived(const ConstraintExpr& c);
   void RepairFromCandidates(const ConstraintExpr& c);
