@@ -5,7 +5,6 @@
 #include "simulator/constraint_solver.h"
 #include "simulator/eval_randomize_internal.h"
 #include "simulator/evaluation.h"
-#include "simulator/sim_context.h"
 
 namespace delta {
 
