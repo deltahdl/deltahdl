@@ -61,4 +61,81 @@ TEST(ScopeRandomizeWithRun, TheSecondCallHoldsTheUnnamedLocal) {
   EXPECT_EQ(out, "32 32 32\n");
 }
 
+// 18.12.1: a relation between two arguments alone, a below b over whole
+// ints, holds on every one of 32 calls.
+TEST(ScopeRandomizeWithRun, ARelationBetweenTwoArgumentsHoldsOverInts) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  int a, b, ok = 0, held = 0;\n"
+      "  initial begin\n"
+      "    repeat (32) begin\n"
+      "      ok += std::randomize(a, b) with { a < b; };\n"
+      "      if (a < b) held++;\n"
+      "    end\n"
+      "    $display(\"%0d %0d\", ok, held);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "32 32\n");
+}
+
+// 18.12.1: a sum of two arguments bounded by the state length alone, over
+// whole ints, holds on every one of 32 calls.
+TEST(ScopeRandomizeWithRun, ASumBoundAgainstTheStateHoldsOverInts) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  int a, b, length = 50, ok = 0, held = 0;\n"
+      "  initial begin\n"
+      "    repeat (32) begin\n"
+      "      ok += std::randomize(a, b) with { a + b < length; };\n"
+      "      if (a + b < length) held++;\n"
+      "    end\n"
+      "    $display(\"%0d %0d\", ok, held);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "32 32\n");
+}
+
+// 18.12.1: the clause's two relations over 8-bit arguments hold on every
+// one of 32 calls.
+TEST(ScopeRandomizeWithRun, TwoRelationsOverNarrowArgumentsHold) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  bit [7:0] a, b;\n"
+      "  int length = 50, ok = 0, held = 0;\n"
+      "  initial begin\n"
+      "    repeat (32) begin\n"
+      "      ok += std::randomize(a, b) with { a < b; a + b < length; };\n"
+      "      if (a < b && a + b < length) held++;\n"
+      "    end\n"
+      "    $display(\"%0d %0d\", ok, held);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "32 32\n");
+}
+
+// 18.12.1: the clause's two relations over whole ints, the two arguments
+// they name alone, hold on every one of 32 calls.
+TEST(ScopeRandomizeWithRun, TwoRelationsOverTwoIntArgumentsHold) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  int a, b, length = 50, ok = 0, held = 0;\n"
+      "  initial begin\n"
+      "    repeat (32) begin\n"
+      "      ok += std::randomize(a, b) with { a < b; a + b < length; };\n"
+      "      if (a < b && a + b < length) held++;\n"
+      "    end\n"
+      "    $display(\"%0d %0d\", ok, held);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "32 32\n");
+}
+
 }  // namespace
