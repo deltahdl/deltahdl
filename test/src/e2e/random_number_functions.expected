@@ -1,0 +1,5 @@
+$urandom: replayed by its seed in 4 of 4, top bit seen: 1, upper half of addr seen: 1, number below 16 in 32 of 32
+$urandom_range: within 0..7 in 256, 256 and 256 of 256, both ends drawn: 1
+srandom: the object replays 4 of 4, the process replays 4 of 4
+randstate: the object replays 4 of 4, the process replays 4 of 4
+$finish at time 0
