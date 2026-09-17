@@ -1,0 +1,5 @@
+initially: filter1 1, ceiling 1
+filter1 off: filter1 0, source_value between 200 and 1000 in 0 of 32, at or below 200 in some: 1
+filter1 on: filter1 1, source_value between 200 and 1000 in 32 of 32
+all off: filter1 0, ceiling 0, source_value outside both in some: 1
+$finish at time 0
