@@ -80,6 +80,12 @@ struct RandInfo {
   // there.
   std::string member;
   ClassObject* owner = nullptr;
+
+  // 18.5.7: for an element of a rand member declared as an array, the name of
+  // that member, so a relation naming the array whole -- a reduction method
+  // over it, a select at an index the solver does not fold -- is read as
+  // referencing the element. Empty for a variable that is no element.
+  std::string array_base;
 };
 
 // State threaded through the randomize() build helpers; bundled to keep helper
@@ -158,6 +164,21 @@ bool RefsNamedRandVar(const Expr* e, std::string_view name);
 ConstraintExpr MakeCustomConstraint(const Expr* rel,
                                     std::vector<RandInfo>& rands,
                                     RandomizeCtx& rc);
+// 18.5.7: `rel` as an array reduction method over a rand array member --
+// sum, product, and, or or xor, with no with clause -- compared against a
+// value free of random variables, as the solver's reduction over the
+// element variables in index order; answers false for any other shape
+// (eval_randomize_iterative.cpp).
+bool TryArrayReductionConstraint(const Expr* rel, std::vector<RandInfo>& rands,
+                                 RandomizeCtx& rc, ConstraintExpr& out);
+// 18.5.7: build each foreach iterative constraint of the member `m` into
+// `block`: the relations of its constraint_set instanced once per element of
+// the array, the loop variable standing for the element's index and a select
+// of the array at the loop variable for the element's variable, each
+// translated as a relation written in the block would be
+// (eval_randomize_iterative.cpp).
+void AddForeachConstraints(const ClassMember* m, std::vector<RandInfo>& rands,
+                           RandomizeCtx& rc, ConstraintBlock& block);
 // 18.5: `rel` as `a && b`, which holds where both do, as the solver's
 // implication of both under an antecedent that always holds, each side
 // translated on its own so that a comparison among them folds the domain

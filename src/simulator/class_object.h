@@ -15,6 +15,7 @@ namespace delta {
 
 struct ClassDecl;
 struct ClassMember;
+struct ConstraintForeachRef;
 struct Expr;
 struct ModuleItem;
 class Arena;
@@ -89,6 +90,17 @@ struct ClassTypeInfo {
     // within it is a fact about `pair_t` rather than about the property, which
     // SimContext::FindStructType answers by that name.
     std::string_view type_name = {};
+    // §7.4.2: the element count of a property declared with one fixed unpacked
+    // dimension, and the lowest index that dimension declares. The object
+    // holds such a property's elements under the keys ClassArrayElementKey of
+    // src/simulator/eval_class_array.h forms, one per declared index, rather
+    // than under the property's own name, which holds nothing; `width` is then
+    // an element's width. Zero for a property that is no array, which is every
+    // property whose declaration wrote no unpacked dimension, and every one
+    // whose dimension the collector does not model -- a dynamic, queue or
+    // associative one, or a second dimension.
+    uint32_t array_size = 0;
+    int64_t array_lo = 0;
   };
   std::vector<PropertyInfo> properties;
 
@@ -120,6 +132,14 @@ struct ClassTypeInfo {
       static_randc_history;
 
   std::unordered_map<std::string, uint64_t> enum_members;
+
+  // §18.5.7: the relations each foreach iterative constraint of the class
+  // instances, once per element of the array it iterates, built the first time
+  // an object of the class is randomized and kept, the array's shape being a
+  // fact about the class. Keyed by the constraint as the parser recorded it;
+  // mutable like static_properties so a const ClassTypeInfo* can fill it.
+  mutable std::unordered_map<const ConstraintForeachRef*, std::vector<Expr*>>
+      foreach_instances;
 
   // §37.32: the class specializations that name this class definition as their
   // defining class; reported by the vpiClassTypespec iteration on a class defn.

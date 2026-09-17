@@ -1,3 +1,6 @@
+#include <utility>
+#include <vector>
+
 #include "parser/parser.h"
 
 namespace delta {
@@ -518,11 +521,13 @@ namespace {
 // 18.5.7.1: the running state of a scan over a foreach header's bracketed
 // loop_variables list. bracket_depth is the current '['/']' nesting; slot is
 // the 1-based index of the loop-variable slot in view; loop_var_count is the
-// index of the last slot that names a variable.
+// index of the last slot that names a variable, and loop_vars the name each
+// slot up to it gives, an omitted slot's empty.
 struct ForeachBracketScan {
   int bracket_depth;
   int slot;
   int loop_var_count;
+  std::vector<std::string_view> loop_vars;
 };
 
 // 18.5.7.1: handle one token of a foreach header's bracketed loop_variables
@@ -549,6 +554,8 @@ void HandleForeachBracketToken(DiagEngine& diag, const Token& t,
   }
   if (scan.bracket_depth == 1 && t.kind == TokenKind::kIdentifier) {
     scan.loop_var_count = scan.slot;
+    scan.loop_vars.resize(static_cast<size_t>(scan.slot));
+    scan.loop_vars.back() = t.text;
     if (!array_name.empty() && t.text == array_name) {
       diag.Error(t.loc,
                  std::string("foreach loop variable '") + std::string(t.text) +
@@ -561,20 +568,57 @@ void HandleForeachBracketToken(DiagEngine& diag, const Token& t,
 
 // 18.5.7.1: record a parsed foreach iterative constraint header on the member
 // so the elaborator can check the loop-variable count against the array's
-// dimensionality. Headers with no resolvable array name are dropped.
+// dimensionality, with the loop variables and the constraint_set's relations
+// the simulator instances per element (18.5.7). Headers with no resolvable
+// array name are dropped.
 void RecordForeachConstraintRef(ClassMember* member,
-                                std::string_view array_name, int loop_var_count,
+                                std::string_view array_name,
+                                const ForeachBracketScan& scan,
+                                std::vector<Expr*> body,
                                 SourceLoc foreach_loc) {
   if (member && !array_name.empty()) {
     ConstraintForeachRef ref;
     ref.array_name = array_name;
-    ref.loop_var_count = loop_var_count;
+    ref.loop_var_count = scan.loop_var_count;
+    ref.loop_vars = scan.loop_vars;
+    ref.body = std::move(body);
     ref.loc = foreach_loc;
     member->constraint_foreach_refs.push_back(ref);
   }
 }
 
 }  // namespace
+
+// 18.5.7: speculatively parse the constraint_set a foreach header governs --
+// the relations of a braced set, each ended by ';', or one relation ended by
+// ';' -- into `body`, so the simulator can instance it once per element of
+// the array. The trial parse suppresses diagnostics and rewinds, leaving the
+// outer token scan to consume the set as it does; a set holding a form the
+// plain expression parse does not read as a relation captures nothing, so the
+// foreach imposes nothing rather than a part of the set.
+void Parser::CaptureForeachConstraintBody(std::vector<Expr*>& body) {
+  auto saved = lexer_.SavePos();
+  diag_.PushSuppress();
+  std::vector<Expr*> items;
+  bool complete = true;
+  if (Match(TokenKind::kLBrace)) {
+    while (!Check(TokenKind::kRBrace) && !AtEnd()) {
+      Expr* rel = ParseExpr();
+      if (rel == nullptr || !Match(TokenKind::kSemicolon)) {
+        complete = false;
+        break;
+      }
+      items.push_back(rel);
+    }
+  } else {
+    Expr* rel = ParseExpr();
+    complete = rel != nullptr && Check(TokenKind::kSemicolon);
+    if (complete) items.push_back(rel);
+  }
+  diag_.PopSuppress();
+  lexer_.RestorePos(saved);
+  if (complete) body = std::move(items);
+}
 
 void Parser::CheckForeachConstraintHeader(ClassMember* member) {
   SourceLoc foreach_loc = CurrentLoc();
@@ -615,7 +659,9 @@ void Parser::CheckForeachConstraintHeader(ClassMember* member) {
     }
   }
   Match(TokenKind::kRParen);
-  RecordForeachConstraintRef(member, array_name, scan.loop_var_count,
+  std::vector<Expr*> body;
+  CaptureForeachConstraintBody(body);
+  RecordForeachConstraintRef(member, array_name, scan, std::move(body),
                              foreach_loc);
 }
 

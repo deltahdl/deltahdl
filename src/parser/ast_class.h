@@ -30,9 +30,17 @@ enum class ClassMemberKind : uint8_t {
 // the elaborator — which can resolve the array's declaration and therefore its
 // dimensionality — can enforce that the loop-variable count does not exceed the
 // array's number of dimensions.
+// 18.5.7: the simulator instances the constraint_set the header governs once
+// per element of the array, so loop_vars carries the loop variable of each
+// slot up to the last named one, an omitted slot as an empty name, and body the
+// relations of that constraint_set -- the relations of a braced set, or the
+// one relation of an unbraced one -- left empty where the set holds a form the
+// capture does not read as a relation.
 struct ConstraintForeachRef {
   std::string_view array_name;
   int loop_var_count = 0;
+  std::vector<std::string_view> loop_vars;
+  std::vector<Expr*> body;
   SourceLoc loc;
 };
 

@@ -194,6 +194,9 @@ void AddConstraintMember(const ClassMember* m, std::vector<RandInfo>& rands,
     block.constraints.push_back(
         TranslateRelation(rel, rands, rc, /*fold=*/block.enabled));
   }
+  // 18.5.7: build each foreach iterative constraint as its relations
+  // instanced over the array's elements.
+  AddForeachConstraints(m, rands, rc, block);
   // 18.5.3: build each captured distribution as a weighted-value constraint.
   for (const auto& ref : m->constraint_dist_refs) {
     ConstraintExpr ce;
@@ -222,6 +225,7 @@ void AddConstraintMember(const ClassMember* m, std::vector<RandInfo>& rands,
 // discards lower-priority soft constraints.
 static bool ConstraintMemberContributes(const ClassMember* m) {
   return !m->constraint_exprs.empty() || !m->constraint_dist_refs.empty() ||
+         !m->constraint_foreach_refs.empty() ||
          !m->constraint_soft_exprs.empty() ||
          !m->constraint_soft_dist_refs.empty() ||
          !m->constraint_unique_refs.empty() ||

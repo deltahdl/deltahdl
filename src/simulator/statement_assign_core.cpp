@@ -15,6 +15,7 @@
 #include "simulator/assoc_element.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_array.h"
+#include "simulator/eval_class_array.h"
 #include "simulator/eval_semaphore.h"
 #include "simulator/eval_string.h"
 #include "simulator/evaluation.h"
@@ -188,6 +189,9 @@ bool TrySelectBlockingAssign(const Expr* lhs, Logic4Vec& rhs_val,
   // §11.5.1: `c.p[7:0] = v` targets bits of a class property, which lives in
   // the object's property map rather than in a variable, so no writer below
   // can reach it and ResolveLhsVariable answers null for the name it rebuilds.
+  // §7.4.6: `c.a[2] = v`, or `a[2] = v` in a method, targets an element of a
+  // class property declared as an array, held on the object one by one.
+  if (TryWriteClassArrayElement(lhs, rhs_val, ctx, arena)) return true;
   if (TryWriteClassPropertyBits(lhs, rhs_val, ctx, arena)) return true;
   if (TryCompoundElementWrite(lhs, rhs_val, ctx, arena)) return true;
   auto* var = ResolveLhsVariable(lhs, ctx);

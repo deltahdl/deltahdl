@@ -1,7 +1,9 @@
+#include <cstdint>
 #include <string>
 
 #include "common/arena.h"
 #include "elaborator/type_eval.h"
+#include "lexer/token.h"
 #include "parser/ast.h"
 #include "simulator/class_object.h"
 #include "simulator/evaluation.h"
@@ -105,6 +107,54 @@ static void CollectClassMembers(ClassTypeInfo* info, const ClassDecl* cls) {
     } else if (member->kind == ClassMemberKind::kMethod && member->method) {
       std::string name(member->method->name);
       info->methods[name] = member->method;
+    }
+  }
+}
+
+// §7.4.2: the element count and lowest index the one unpacked dimension `dim`
+// of a class property declares, a literal `[N]` addressing 0 to N-1 and a
+// range `[a:b]` addressing the smaller of a and b to the larger. Zero elements
+// for a dimension of any other form -- a dynamic array's absent bound, a
+// queue's `$`, an associative array's index type, or an expression the
+// simulator does not fold here -- which the object then models as it did, one
+// value under the property's name.
+static uint32_t FixedDimensionSize(const Expr* dim, int64_t& lo,
+                                   SimContext& ctx, Arena& arena) {
+  if (dim == nullptr) return 0;
+  if (dim->kind == ExprKind::kIntegerLiteral) {
+    lo = 0;
+    return static_cast<uint32_t>(dim->int_val);
+  }
+  if (dim->kind != ExprKind::kBinary || dim->op != TokenKind::kColon ||
+      dim->lhs == nullptr || dim->rhs == nullptr) {
+    return 0;
+  }
+  auto left = static_cast<int64_t>(EvalExpr(dim->lhs, ctx, arena).ToUint64());
+  auto right = static_cast<int64_t>(EvalExpr(dim->rhs, ctx, arena).ToUint64());
+  lo = left < right ? left : right;
+  return static_cast<uint32_t>(left < right ? right - left + 1
+                                            : left - right + 1);
+}
+
+// §7.4.2/§18.5.7: mark each property declared with one fixed unpacked
+// dimension as the array it is, so the object holds its elements one by one
+// and a constraint can iterate over them or reduce them. A property with
+// more than one unpacked dimension is left as it was.
+static void RecordArrayProperties(ClassTypeInfo* info, const ClassDecl* cls,
+                                  SimContext& ctx, Arena& arena) {
+  for (const auto* member : cls->members) {
+    if (member->kind != ClassMemberKind::kProperty ||
+        member->unpacked_dims.size() != 1) {
+      continue;
+    }
+    int64_t lo = 0;
+    uint32_t size =
+        FixedDimensionSize(member->unpacked_dims[0], lo, ctx, arena);
+    if (size == 0) continue;
+    for (auto& prop : info->properties) {
+      if (prop.name != member->name) continue;
+      prop.array_size = size;
+      prop.array_lo = lo;
     }
   }
 }
@@ -222,6 +272,7 @@ void Lowerer::LowerClassDecl(const ClassDecl* cls) {
     if (iface) info->extended_interfaces.push_back(iface);
   }
   CollectClassMembers(info, cls);
+  RecordArrayProperties(info, cls, ctx_, arena_);
   BuildVTable(info, cls);
   InitStaticProperties(info, ctx_, arena_);
   InitClassParams(info, cls, ctx_, arena_);

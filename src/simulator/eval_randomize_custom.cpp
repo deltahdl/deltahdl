@@ -110,8 +110,14 @@ ConstraintExpr MakeCustomConstraint(const Expr* rel,
   for (const auto& ri : rands) names.push_back(ri.name);
   ConstraintExpr ce;
   ce.kind = ConstraintKind::kCustom;
+  // 18.5.7: a relation naming an array member whole -- a reduction method
+  // over it, or a select of it the expansion left as written -- references
+  // each of its elements.
   for (const auto& ri : rands) {
-    if (RefsNamedRandVar(rel, ri.name)) ce.ref_vars.push_back(ri.name);
+    if (RefsNamedRandVar(rel, ri.name) ||
+        (!ri.array_base.empty() && RefsNamedRandVar(rel, ri.array_base))) {
+      ce.ref_vars.push_back(ri.name);
+    }
   }
   ce.eval_fn = [rel, names,
                 &rc](const std::unordered_map<std::string, int64_t>& vals) {

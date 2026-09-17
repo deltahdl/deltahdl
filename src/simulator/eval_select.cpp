@@ -11,6 +11,7 @@
 #include "common/packed_range.h"
 #include "parser/ast.h"
 #include "simulator/eval_array.h"
+#include "simulator/eval_class_array.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign_internal.h"
@@ -644,6 +645,12 @@ Logic4Vec EvalSelect(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (TryArrayElementSelect(expr, idx, ctx, arena, result)) return result;
   if (TryCompoundArraySelect(expr, ctx, arena, result)) return result;
   if (TryArraySliceSelect(expr, ctx, arena, result)) return result;
+  // §7.4.2: an element of a class property declared as an array, which the
+  // object holds one by one rather than as a value under the property's name.
+  if (TryClassArrayElementSelect(expr, SelectBoundValue(idx_val), ctx, arena,
+                                 result)) {
+    return result;
+  }
   auto base_val = EvalExpr(expr->base, ctx, arena);
 
   if (base_val.is_string && !expr->index_end)

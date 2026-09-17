@@ -269,6 +269,7 @@ class Parser {
   bool PropertyBodyHasTemporalOperator();
   void CheckConstraintExprToken(const Token& tok);
   void CheckForeachConstraintHeader(ClassMember* member);
+  void CaptureForeachConstraintBody(std::vector<Expr*>& body);
   void CheckSolveBeforeConstraint(ClassMember* member);
   void ParseSolveBeforeList(std::vector<ConstraintSolveBeforeEntry>& out);
   void CheckDistSet();

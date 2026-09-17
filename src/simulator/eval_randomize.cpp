@@ -14,6 +14,7 @@
 #include "parser/ast.h"
 #include "simulator/class_object.h"
 #include "simulator/constraint_solver.h"
+#include "simulator/eval_class_array.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/eval_randomize_internal.h"
 #include "simulator/evaluation.h"
@@ -143,7 +144,21 @@ void AddRandMember(const ClassMember* m, const ClassTypeInfo* level,
     info.var.real_min = -2147483648.0;
     info.var.real_max = 2147483648.0;
   }
-  out.push_back(std::move(info));
+  // 18.5.7: a rand member declared as an array is one random variable per
+  // element, each named as its element's key and drawn over the element type's
+  // range, so that an iterative constraint can bind any one of them.
+  const auto* array = FindClassArrayProperty(level, m->name);
+  if (array == nullptr) {
+    out.push_back(std::move(info));
+    return;
+  }
+  for (uint32_t i = 0; i < array->array_size; ++i) {
+    RandInfo elem = info;
+    elem.name = ClassArrayElementKey(m->name, array->array_lo + i);
+    elem.var.name = elem.name;
+    elem.array_base = info.name;
+    out.push_back(std::move(elem));
+  }
 }
 
 // 18.5: true when any operand of `e` names one of the random variables being
@@ -610,6 +625,7 @@ ConstraintExpr TranslateRelation(const Expr* rel, std::vector<RandInfo>& rands,
   if (TrySetMembershipConstraint(rel, rands, rc, ce)) return ce;
   if (TryImplicationConstraint(rel, rands, rc, ce)) return ce;
   if (TryConjunctionConstraint(rel, rands, rc, ce, fold)) return ce;
+  if (TryArrayReductionConstraint(rel, rands, rc, ce)) return ce;
   return MakeCustomConstraint(rel, rands, rc);
 }
 

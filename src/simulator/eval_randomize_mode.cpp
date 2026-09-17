@@ -24,7 +24,14 @@ namespace delta {
 // means active; an explicit entry records the last rand_mode() setting.
 bool IsObjectRandActive(const ClassObject* obj, std::string_view name) {
   auto it = obj->rand_active.find(std::string(name));
-  return it == obj->rand_active.end() ? true : it->second;
+  if (it != obj->rand_active.end()) return it->second;
+  // 18.5.7/18.8: an element of a rand member declared as an array is named by
+  // its key, while rand_mode() is called on the member, so the element takes
+  // the member's state.
+  auto bracket = name.find('[');
+  if (bracket == std::string_view::npos) return true;
+  auto base = obj->rand_active.find(std::string(name.substr(0, bracket)));
+  return base == obj->rand_active.end() ? true : base->second;
 }
 
 // 18.6.2: post_randomize() is invoked by randomize() after the new random

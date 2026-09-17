@@ -9,6 +9,7 @@
 #include "parser/ast.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_array.h"
+#include "simulator/eval_class_array.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/eval_semaphore.h"
 #include "simulator/evaluation.h"
@@ -43,6 +44,15 @@ static void InitClassPropertyDefaults(const ClassTypeInfo* info,
       val = MakeAllX(arena, prop.width);
     } else {
       val = MakeLogic4VecVal(arena, prop.width, 0);
+    }
+    // §7.4.2: a property declared as an array holds its elements one by one,
+    // each initialized as the one value would be.
+    if (prop.array_size > 0) {
+      for (uint32_t i = 0; i < prop.array_size; ++i) {
+        obj->properties[ClassArrayElementKey(prop.name, prop.array_lo + i)] =
+            OwnRhsWords(val, arena);
+      }
+      continue;
     }
     obj->properties[std::string(prop.name)] = val;
     std::string scoped =
@@ -576,6 +586,7 @@ static bool TryBuiltinMethodCall(const Expr* expr, SimContext& ctx,
   if (TryEvalEnumMethodCall(expr, ctx, arena, out)) return true;
   if (TryEvalStringMethodCall(expr, ctx, arena, out)) return true;
   if (TryEvalArrayMethodCall(expr, ctx, arena, out)) return true;
+  if (TryEvalClassArrayMethodCall(expr, ctx, arena, out)) return true;
   if (TryEvalQueueMethodCall(expr, ctx, arena, out)) return true;
   return TryEvalAssocMethodCall(expr, ctx, arena, out);
 }

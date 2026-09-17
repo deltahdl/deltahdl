@@ -219,6 +219,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/eval_randomize_blocks.cpp
     simulator/eval_randomize_custom.cpp
     simulator/eval_randomize_dist.cpp
+    simulator/eval_randomize_iterative.cpp
     simulator/eval_randomize_joint.cpp
     simulator/eval_randomize_membership.cpp
     simulator/eval_randomize_mode.cpp
@@ -231,6 +232,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/eval_expr_cast.cpp
     simulator/eval_enum.cpp
     simulator/eval_array.cpp
+    simulator/eval_class_array.cpp
     simulator/assoc_element.cpp
     simulator/eval_array_assoc.cpp
     simulator/eval_string.cpp
