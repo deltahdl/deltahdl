@@ -21,7 +21,7 @@ const char* const kPackets =
     "  constraint even { size[0] == 0; }\n"
     "endclass\n"
     "class Oversized extends Packet;\n"
-    "  constraint large { size > 100; }\n"
+    "  constraint oversize { size > 100; }\n"
     "endclass\n";
 
 // 18.6.1: randomize() is a virtual method, so called through a Packet

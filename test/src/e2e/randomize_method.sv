@@ -18,7 +18,7 @@ endclass
 // A derived packet whose constraint contradicts the base's, rendering a
 // seemingly simple constraint set unsatisfiable.
 class Oversized extends Packet;
-  constraint large { size > 100; }
+  constraint oversize { size > 100; }
 endclass
 
 module randomize_method;
