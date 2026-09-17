@@ -718,6 +718,23 @@ class ConstraintSolver {
                       bool& has_members) const;
   void NarrowBoundAtValues(const ConstraintExpr& c, const std::string& name,
                            RandVariable& dom) const;
+  // The same over every constraint of the enabled blocks and of the inline
+  // constraints of the solve a repair is running in.
+  void NarrowByActive(const std::string& name, RandVariable& dom,
+                      std::vector<int64_t>& members, bool& has_members) const;
+  // Seeds one attempt of the iterative solve: the inactive variables at
+  // their state values, the distributions sampled, the concrete constraints
+  // and, ahead of the attempts that repair, the soft bounds seeded, the
+  // array sizes held at `sizes` and the randc variables drawn.
+  void SeedAttempt(const std::vector<ConstraintExpr>& extra, bool include_soft,
+                   bool repair,
+                   const std::unordered_map<std::string, int64_t>& sizes,
+                   const std::function<int64_t(RandVariable&)>& gen_randc);
+  // The flat pass of one attempt: every variable drawn, the draws repaired
+  // where `repair` is set, and the constraints checked.
+  bool FlatPass(const std::vector<ConstraintExpr>& extra, bool include_soft,
+                bool repair, const std::function<int64_t(RandVariable&)>& gen,
+                const std::function<double(RandVariable&)>& gen_real);
   bool AntecedentHolds(const ConstraintExpr& c) const;
   bool SoftHonored(const ConstraintExpr& c) const;
   // 18.5.13.1: draws every active integral variable not yet drawn within

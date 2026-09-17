@@ -699,6 +699,38 @@ AttemptOutcome RunAttemptPass(bool has_priority_edges, bool has_before_edges,
 
 }  // namespace
 
+void ConstraintSolver::SeedAttempt(
+    const std::vector<ConstraintExpr>& extra, bool include_soft, bool repair,
+    const std::unordered_map<std::string, int64_t>& sizes,
+    const std::function<int64_t(RandVariable&)>& gen_randc) {
+  auto gen = [this](RandVariable& var) { return GenerateRandValue(var); };
+  values_.clear();
+  real_values_.clear();
+  SeedInactiveVariables(variables_, values_, real_values_);
+  ApplyDistConstraints(extra);
+  ApplyDirectConstraints(extra, include_soft);
+  // The soft bounds narrow the propagated draw with the other bounds once
+  // it runs; ahead of it they seed the variable alone.
+  if (!repair) SeedSoftBounds(extra, include_soft);
+  HoldArraySizes(sizes);
+  DrawRandcVariables(variables_, values_, gen_randc);
+  DrawArraySizeVariables(variables_, values_, gen);
+}
+
+// 18.5.13.1: once as many draws have failed as the pass tries before it
+// repairs, the variables are drawn within the intervals the comparisons
+// among them leave, which a chain of them over ints, y below p1.x below
+// p2.x below 100, needs.
+bool ConstraintSolver::FlatPass(
+    const std::vector<ConstraintExpr>& extra, bool include_soft, bool repair,
+    const std::function<int64_t(RandVariable&)>& gen,
+    const std::function<double(RandVariable&)>& gen_real) {
+  if (repair) DrawPropagated(extra);
+  DrawGeneralPass(variables_, values_, real_values_, gen, gen_real);
+  if (repair) RepairConstraints(extra);
+  return CheckAllConstraints(extra, include_soft);
+}
+
 bool ConstraintSolver::SolveIterative(const std::vector<ConstraintExpr>& extra,
                                       bool include_soft) {
   static constexpr int kMaxAttempts = 500;
@@ -749,28 +781,12 @@ bool ConstraintSolver::SolveIterative(const std::vector<ConstraintExpr>& extra,
   // are repaired only once that many draws have found no solution, as they
   // do not over a domain as wide as an int's (18.5.5).
   bool repair = false;
-  // 18.5.13.1: once that many draws have failed, the variables are drawn
-  // within the intervals the comparisons among them leave, which a chain
-  // of them over ints, y below p1.x below p2.x below 100, needs.
   auto flat_pass = [&] {
-    if (repair) DrawPropagated(extra);
-    DrawGeneralPass(variables_, values_, real_values_, gen, gen_real);
-    if (repair) RepairConstraints(extra);
-    return CheckAllConstraints(extra, include_soft);
+    return FlatPass(extra, include_soft, repair, gen, gen_real);
   };
   for (int attempt = 0; attempt < kMaxAttempts; ++attempt) {
     repair = attempt >= kRepairFromAttempt;
-    values_.clear();
-    real_values_.clear();
-    SeedInactiveVariables(variables_, values_, real_values_);
-    ApplyDistConstraints(extra);
-    ApplyDirectConstraints(extra, include_soft);
-    // The soft bounds narrow the propagated draw with the other bounds
-    // once it runs; ahead of it they seed the variable alone.
-    if (!repair) SeedSoftBounds(extra, include_soft);
-    HoldArraySizes(kSizes);
-    DrawRandcVariables(variables_, values_, gen_randc);
-    DrawArraySizeVariables(variables_, values_, gen);
+    SeedAttempt(extra, include_soft, repair, kSizes, gen_randc);
     AttemptPasses passes{priority_pass, ordered_pass, flat_pass};
     AttemptOutcome outcome =
         RunAttemptPass(!function_arg_priority_edges_.empty(),

@@ -249,6 +249,29 @@ void ConstraintSolver::NarrowAtValues(const ConstraintExpr& c,
   }
 }
 
+// The members of `members` within the domain `dom`.
+static std::vector<int64_t> WithinDomain(const std::vector<int64_t>& members,
+                                         const RandVariable& dom) {
+  std::vector<int64_t> admitted;
+  for (int64_t v : members)
+    if (v >= dom.min_val && v <= dom.max_val) admitted.push_back(v);
+  return admitted;
+}
+
+void ConstraintSolver::NarrowByActive(const std::string& name,
+                                      RandVariable& dom,
+                                      std::vector<int64_t>& members,
+                                      bool& has_members) const {
+  for (const auto& block : blocks_) {
+    if (!block.enabled) continue;
+    for (const auto& k : block.constraints)
+      NarrowAtValues(k, name, dom, members, has_members);
+  }
+  if (repair_extra_ == nullptr) return;
+  for (const auto& k : *repair_extra_)
+    NarrowAtValues(k, name, dom, members, has_members);
+}
+
 // The derived variable written from the others: drawn afresh from its
 // domain narrowed by every active constraint that bounds it at the values
 // drawn, the relation's own bound among them, so that a variable held
@@ -261,23 +284,13 @@ void ConstraintSolver::ApplyDerived(const ConstraintExpr& c) {
   RandVariable dom = variables_.find(c.var_name)->second;
   std::vector<int64_t> members;
   bool has_members = false;
-  for (const auto& block : blocks_) {
-    if (!block.enabled) continue;
-    for (const auto& k : block.constraints)
-      NarrowAtValues(k, c.var_name, dom, members, has_members);
-  }
-  if (repair_extra_ != nullptr) {
-    for (const auto& k : *repair_extra_)
-      NarrowAtValues(k, c.var_name, dom, members, has_members);
-  }
+  NarrowByActive(c.var_name, dom, members, has_members);
   if (dom.min_val > dom.max_val) return;
   if (!has_members) {
     values_[c.var_name] = GenerateRandValue(dom);
     return;
   }
-  std::vector<int64_t> admitted;
-  for (int64_t v : members)
-    if (v >= dom.min_val && v <= dom.max_val) admitted.push_back(v);
+  std::vector<int64_t> admitted = WithinDomain(members, dom);
   if (admitted.empty()) return;
   std::uniform_int_distribution<size_t> pick(0, admitted.size() - 1);
   values_[c.var_name] = admitted[pick(rng_)];
