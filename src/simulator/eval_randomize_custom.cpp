@@ -18,13 +18,21 @@ namespace delta {
 namespace {
 
 // Evaluates `e` with each name in `names` bound to its value in `vals`, a
-// rand variable as a local so the expression reads the trial value.
+// rand variable as a local so the expression reads the trial value. A name
+// `vals` lacks is a real variable's (18.4.1), whose draw the solver keeps
+// among its real values, so the local is the real drawn there and an
+// expression over it reads the real (18.5.5).
 Logic4Vec EvalBound(const Expr* e, const std::vector<std::string>& names,
                     RandomizeCtx& rc,
                     const std::unordered_map<std::string, int64_t>& vals) {
   rc.ctx.PushScope();
   for (const auto& n : names) {
     auto it = vals.find(n);
+    if (it == vals.end() && rc.solver != nullptr) {
+      rc.ctx.CreateLocalVariable(n, 64)->value =
+          MakeRealVec(rc.arena, rc.solver->GetRealValue(n), 64);
+      continue;
+    }
     int64_t v = it != vals.end() ? it->second : 0;
     rc.ctx.CreateLocalVariable(n, 32)->value =
         MakeLogic4VecVal(rc.arena, 32, static_cast<uint64_t>(v));

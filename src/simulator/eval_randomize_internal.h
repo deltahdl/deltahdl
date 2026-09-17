@@ -88,6 +88,12 @@ struct RandomizeCtx {
   ClassObject* obj;
   SimContext& ctx;
   Arena& arena;
+  // 18.5.5: the solver the relations are built for, which a relation
+  // evaluated over a trial reads the real variables' draws from: the trial
+  // handed to it holds the integral draws alone, a real variable being drawn
+  // into the solver's real values (18.4.1), so an antecedent or relation
+  // written over a real variable read it as 0 without this.
+  const ConstraintSolver* solver = nullptr;
   // 18.5.13: stable storage for the inner relation of each soft constraint. A
   // kSoft ConstraintExpr points to its inner relation through a raw pointer, so
   // the inner must outlive the solve; owning it on the heap here keeps that

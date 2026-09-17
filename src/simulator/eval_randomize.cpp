@@ -504,6 +504,7 @@ bool RandomizeObject(ClassObject* obj, SimContext& ctx, Arena& arena,
   auto seed = static_cast<uint32_t>(ctx.ObjectRng(obj)());
   ConstraintSolver solver(seed);
   RandomizeCtx rc{obj, ctx, arena};
+  rc.solver = &solver;
 
   std::vector<RandInfo> rands;
   CollectRandVariables(obj->type, ctx, rands);

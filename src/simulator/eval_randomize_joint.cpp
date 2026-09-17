@@ -418,6 +418,7 @@ bool RandomizeObjectTree(SimContext& ctx, Arena& arena, const Expr* expr,
   auto seed = static_cast<uint32_t>(ctx.ObjectRng(root)());
   ConstraintSolver solver(seed);
   RandomizeCtx rc{root, ctx, arena};
+  rc.solver = &solver;
 
   std::vector<RandInfo> rands;
   CollectJointRandVariables(objects, ctx, rands);

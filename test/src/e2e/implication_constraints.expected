@@ -1,0 +1,6 @@
+mode implies len below 10, above 100 or unconstrained: 256 of 256, every mode drawn: 1
+len held to 50 leaves mode other: 64 of 64
+a == 0 implies b == 1: 4820 of 4820, a == 0 about a 241st of the time: 1
+a real expression implies k: 64 of 64, both reals drawn: 1
+an unnamed set holds whole wherever x is above 7: 1, some x above 7: 1
+$finish at time 0

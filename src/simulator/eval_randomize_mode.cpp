@@ -286,6 +286,7 @@ bool TryEvalScopeRandomizeCall(const Expr* expr, SimContext& ctx, Arena& arena,
   // receiver object, so the RandomizeCtx carries a null 'this' -- the
   // scope-variable reads it drives never need one.
   RandomizeCtx rc{nullptr, ctx, arena};
+  rc.solver = &solver;
   std::vector<ConstraintExpr> with_constraints =
       TranslateScopeWithBlock(expr, rands, rc);
 
