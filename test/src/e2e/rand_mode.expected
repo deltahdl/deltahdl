@@ -1,0 +1,6 @@
+initially: source_value 1, dest_value 1, arr[1] 1
+the example: source_value 1, dest_value 0, ret 0
+dest_value inactive at 41: source_value drawn 40 with dest_value kept in 32 of 32
+dest_value active again: moved from 41 in some: 1, the constraint held in 32 of 32
+arr[2] inactive: arr[2] 0, kept at 9 in 32 of 32, the others drawn in some: 1
+$finish at time 0

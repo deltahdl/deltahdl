@@ -338,8 +338,11 @@ void WriteBackSolved(ClassObject* obj, std::vector<RandInfo>& rands,
 
 bool ExtractConstraintModeParts(const Expr* expr, std::string_view& obj_name,
                                 std::string_view& constraint_name);
+// 18.8: the parts of a rand_mode() call: the object, the variable named or
+// none, and, for the element form on an unpacked array member, the select
+// naming the element, null otherwise (eval_randomize_mode.cpp).
 bool ExtractRandModeParts(const Expr* expr, std::string_view& obj_name,
-                          std::string_view& var_name);
+                          std::string_view& var_name, const Expr*& element);
 // 18.7/18.11/18.11.1: what one randomize() call adds on top of the object's own
 // declaration -- the call expression, the inline constraint block of a
 // `with { ... }` clause, the argument list naming the call's complete active

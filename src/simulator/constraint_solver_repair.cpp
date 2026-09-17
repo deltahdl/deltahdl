@@ -280,20 +280,25 @@ void ConstraintSolver::NarrowByActive(const std::string& name,
 // well from the members the bounds admit. A domain the bounds close is no
 // repair: the draw stands, to be tried again.
 void ConstraintSolver::ApplyDerived(const ConstraintExpr& c) {
-  if (!RepairMayWrite(c.var_name)) return;
-  RandVariable dom = variables_.find(c.var_name)->second;
+  // 18.8: the derived variable held as a state value is never written; the
+  // variable it is derived from alone, where the relation bounds it the
+  // other way, is drawn within the relation instead.
+  const std::string& name =
+      RepairMayWrite(c.var_name) ? c.var_name : c.co_var_name;
+  if (name.empty() || !RepairMayWrite(name)) return;
+  RandVariable dom = variables_.find(name)->second;
   std::vector<int64_t> members;
   bool has_members = false;
-  NarrowByActive(c.var_name, dom, members, has_members);
+  NarrowByActive(name, dom, members, has_members);
   if (dom.min_val > dom.max_val) return;
   if (!has_members) {
-    values_[c.var_name] = GenerateRandValue(dom);
+    values_[name] = GenerateRandValue(dom);
     return;
   }
   std::vector<int64_t> admitted = WithinDomain(members, dom);
   if (admitted.empty()) return;
   std::uniform_int_distribution<size_t> pick(0, admitted.size() - 1);
-  values_[c.var_name] = admitted[pick(rng_)];
+  values_[name] = admitted[pick(rng_)];
 }
 
 // 18.5.7.2: the value the element `name` of the sum `c`, folded without a

@@ -11,6 +11,7 @@
 #include "parser/ast.h"
 #include "simulator/class_object.h"
 #include "simulator/constraint_solver.h"
+#include "simulator/eval_class_array.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/eval_randomize_internal.h"
 #include "simulator/evaluation.h"
@@ -18,6 +19,83 @@
 #include "simulator/variable.h"
 
 namespace delta {
+
+// 18.9: match a constraint_mode() method call and pull out the object handle
+// name and, for the named form obj.constraint_id.constraint_mode(...), the
+// constraint block name. The no-name form obj.constraint_mode(...) leaves
+// constraint_name empty. Returns false for any other call so normal method
+// dispatch proceeds.
+bool ExtractConstraintModeParts(const Expr* expr, std::string_view& obj_name,
+                                std::string_view& constraint_name) {
+  if (!expr || expr->kind != ExprKind::kCall) return false;
+  const Expr* callee = expr->lhs;
+  if (!callee || callee->kind != ExprKind::kMemberAccess) return false;
+  if (!callee->rhs || callee->rhs->kind != ExprKind::kIdentifier) return false;
+  if (callee->rhs->text != "constraint_mode") return false;
+
+  const Expr* recv = callee->lhs;
+  if (!recv) return false;
+  // No-name form: the receiver is the object handle itself.
+  if (recv->kind == ExprKind::kIdentifier) {
+    obj_name = recv->text;
+    constraint_name = {};
+    return true;
+  }
+  // Named form: the receiver is object.constraint_id.
+  if (recv->kind == ExprKind::kMemberAccess && recv->lhs &&
+      recv->lhs->kind == ExprKind::kIdentifier && recv->rhs &&
+      recv->rhs->kind == ExprKind::kIdentifier) {
+    obj_name = recv->lhs->text;
+    constraint_name = recv->rhs->text;
+    return true;
+  }
+  return false;
+}
+
+// 18.8: match a rand_mode() method call and pull out the object handle name
+// and, for the named form obj.random_variable.rand_mode(...), the variable
+// name. The no-name form obj.rand_mode(...) leaves var_name empty. Returns
+// false for any other call so normal method dispatch proceeds.
+bool ExtractRandModeParts(const Expr* expr, std::string_view& obj_name,
+                          std::string_view& var_name, const Expr*& element) {
+  if (!expr || expr->kind != ExprKind::kCall) return false;
+  const Expr* callee = expr->lhs;
+  if (!callee || callee->kind != ExprKind::kMemberAccess) return false;
+  if (!callee->rhs || callee->rhs->kind != ExprKind::kIdentifier) return false;
+  if (callee->rhs->text != "rand_mode") return false;
+
+  const Expr* recv = callee->lhs;
+  if (!recv) return false;
+  element = nullptr;
+  // 18.8: the element form, object.array[index].rand_mode(...), names one
+  // element of an unpacked array member; the select is handed back for the
+  // caller to evaluate its index.
+  if (recv->kind == ExprKind::kSelect && recv->index != nullptr &&
+      recv->index_end == nullptr && recv->base != nullptr &&
+      recv->base->kind == ExprKind::kMemberAccess && recv->base->lhs &&
+      recv->base->lhs->kind == ExprKind::kIdentifier && recv->base->rhs &&
+      recv->base->rhs->kind == ExprKind::kIdentifier) {
+    obj_name = recv->base->lhs->text;
+    var_name = recv->base->rhs->text;
+    element = recv;
+    return true;
+  }
+  // No-name form: the receiver is the object handle itself.
+  if (recv->kind == ExprKind::kIdentifier) {
+    obj_name = recv->text;
+    var_name = {};
+    return true;
+  }
+  // Named form: the receiver is object.random_variable.
+  if (recv->kind == ExprKind::kMemberAccess && recv->lhs &&
+      recv->lhs->kind == ExprKind::kIdentifier && recv->rhs &&
+      recv->rhs->kind == ExprKind::kIdentifier) {
+    obj_name = recv->lhs->text;
+    var_name = recv->rhs->text;
+    return true;
+  }
+  return false;
+}
 
 // 18.8: report whether a random variable is active on this object. Every
 // rand/randc variable is active when the object is created, so an absent entry
@@ -450,11 +528,21 @@ bool TryEvalObjectRandMode(const Expr* expr, SimContext& ctx, Arena& arena,
                            Logic4Vec& out) {
   std::string_view obj_name;
   std::string_view var_name;
-  if (!ExtractRandModeParts(expr, obj_name, var_name)) return false;
+  const Expr* element = nullptr;
+  if (!ExtractRandModeParts(expr, obj_name, var_name, element)) return false;
   MethodCallParts parts;
   parts.var_name = obj_name;
   ClassObject* obj = ResolveRandomizeTarget(ctx, parts);
   if (!obj) return false;
+  // 18.8: an element of an unpacked array member is named by its key, the
+  // one the solver's variable for it carries.
+  std::string element_key;
+  if (element != nullptr) {
+    auto index =
+        static_cast<int64_t>(EvalExpr(element->index, ctx, arena).ToUint64());
+    element_key = ClassArrayElementKey(var_name, index);
+    var_name = element_key;
+  }
 
   // 18.8 nonvoid form: called with no argument, rand_mode() returns the current
   // active state of the named variable -- 1 (ON) when active, 0 (OFF) when

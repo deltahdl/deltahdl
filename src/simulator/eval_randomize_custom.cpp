@@ -85,7 +85,7 @@ Logic4Vec EvalBound(const Expr* e, const std::vector<std::string>& names,
 // is, or the relation is no comparison, or an inequality, which bounds
 // nothing.
 const Expr* DerivedSide(const Expr* rel, std::vector<RandInfo>& rands,
-                        ConstraintKind& cmp) {
+                        RandomizeCtx& rc, ConstraintKind& cmp) {
   if (rel->kind != ExprKind::kBinary || rel->lhs == nullptr ||
       rel->rhs == nullptr || rel->op == TokenKind::kBangEq ||
       !ComparisonKind(rel->op, cmp)) {
@@ -93,8 +93,11 @@ const Expr* DerivedSide(const Expr* rel, std::vector<RandInfo>& rands,
   }
   for (const Expr* side : {rel->lhs, rel->rhs}) {
     const Expr* other = side == rel->lhs ? rel->rhs : rel->lhs;
+    // 18.8: an inactive variable is a state variable the solver never
+    // writes, so it derives nothing; the other side may derive from it.
     if (side->kind == ExprKind::kIdentifier &&
         FindRand(rands, side->text) != nullptr &&
+        IsObjectRandActive(rc.obj, side->text) &&
         !RefsNamedRandVar(other, side->text)) {
       if (side == rel->rhs) ComparisonKind(MirrorComparison(rel->op), cmp);
       return side;
@@ -103,38 +106,40 @@ const Expr* DerivedSide(const Expr* rel, std::vector<RandInfo>& rands,
   return nullptr;
 }
 
-// Whether `side` is a sum or difference with a bare random variable, x + q,
-// q + x, x - q or q - x, the operand q and `other` free of x, filling
-// `term` with q and `subtrahend` with whether x is taken away from it.
-bool IsAddendForm(const Expr* side, const Expr* other,
-                  std::vector<RandInfo>& rands, const Expr*& term,
-                  bool& subtrahend) {
+// The bare random variable `side` is a sum or difference with, x + q, q +
+// x, x - q or q - x, x active and the operand q free of it, filling `term`
+// with q and `subtrahend` with whether x is taken away from it; nullptr
+// where `side` is no such form.
+const Expr* AddendOf(const Expr* side, std::vector<RandInfo>& rands,
+                     RandomizeCtx& rc, const Expr*& term, bool& subtrahend) {
   if (side->kind != ExprKind::kBinary || side->lhs == nullptr ||
       side->rhs == nullptr ||
       (side->op != TokenKind::kPlus && side->op != TokenKind::kMinus)) {
-    return false;
+    return nullptr;
   }
   for (const Expr* x : {side->lhs, side->rhs}) {
     const Expr* q = x == side->lhs ? side->rhs : side->lhs;
+    // 18.8: an inactive variable is a state variable the solver never
+    // writes, so it derives nothing.
     if (x->kind != ExprKind::kIdentifier ||
-        FindRand(rands, x->text) == nullptr || RefsNamedRandVar(q, x->text) ||
-        RefsNamedRandVar(other, x->text)) {
+        FindRand(rands, x->text) == nullptr ||
+        !IsObjectRandActive(rc.obj, x->text) || RefsNamedRandVar(q, x->text)) {
       continue;
     }
     term = q;
     subtrahend = side->op == TokenKind::kMinus && x == side->rhs;
-    return true;
+    return x;
   }
-  return false;
+  return nullptr;
 }
 
 // 18.5.12: the side of the comparison `rel` that is a sum or difference
 // with a bare random variable the other operand and the other side are free
 // of, the clause's x+y == 10 read as deriving x; nullptr where neither side
 // is, or the relation is no comparison, or an inequality, which bounds
-// nothing. Fills `term` and `subtrahend` as IsAddendForm does.
+// nothing. Fills `term` and `subtrahend` as AddendOf does.
 const Expr* AddendSide(const Expr* rel, std::vector<RandInfo>& rands,
-                       const Expr*& term, bool& subtrahend) {
+                       RandomizeCtx& rc, const Expr*& term, bool& subtrahend) {
   ConstraintKind cmp = ConstraintKind::kEqual;
   if (rel->kind != ExprKind::kBinary || rel->lhs == nullptr ||
       rel->rhs == nullptr || rel->op == TokenKind::kBangEq ||
@@ -143,7 +148,8 @@ const Expr* AddendSide(const Expr* rel, std::vector<RandInfo>& rands,
   }
   for (const Expr* side : {rel->lhs, rel->rhs}) {
     const Expr* other = side == rel->lhs ? rel->rhs : rel->lhs;
-    if (IsAddendForm(side, other, rands, term, subtrahend)) return side;
+    const Expr* x = AddendOf(side, rands, rc, term, subtrahend);
+    if (x != nullptr && !RefsNamedRandVar(other, x->text)) return side;
   }
   return nullptr;
 }
@@ -171,7 +177,7 @@ bool DeriveAddend(const Expr* rel, std::vector<RandInfo>& rands,
                   ConstraintExpr& ce) {
   const Expr* term = nullptr;
   bool subtrahend = false;
-  const Expr* side = AddendSide(rel, rands, term, subtrahend);
+  const Expr* side = AddendSide(rel, rands, rc, term, subtrahend);
   if (side == nullptr) return false;
   const Expr* x = term == side->lhs ? side->rhs : side->lhs;
   const Expr* other = side == rel->lhs ? rel->rhs : rel->lhs;
@@ -254,7 +260,7 @@ ConstraintExpr MakeCustomConstraint(const Expr* rel,
   // expression`, the clause's A[k+1] > A[k], derives the bound x is drawn
   // above.
   ConstraintKind cmp = ConstraintKind::kEqual;
-  if (const Expr* derived = DerivedSide(rel, rands, cmp)) {
+  if (const Expr* derived = DerivedSide(rel, rands, rc, cmp)) {
     const Expr* other = derived == rel->lhs ? rel->rhs : rel->lhs;
     ce.var_name = std::string(derived->text);
     ce.derive_cmp = cmp;

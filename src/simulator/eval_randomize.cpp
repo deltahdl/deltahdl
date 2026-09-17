@@ -318,69 +318,6 @@ bool RefsRandVar(const Expr* e, std::vector<RandInfo>& rands) {
   return AnyRefsRandVar(e->args, rands) || AnyRefsRandVar(e->elements, rands);
 }
 
-// 18.9: match a constraint_mode() method call and pull out the object handle
-// name and, for the named form obj.constraint_id.constraint_mode(...), the
-// constraint block name. The no-name form obj.constraint_mode(...) leaves
-// constraint_name empty. Returns false for any other call so normal method
-// dispatch proceeds.
-bool ExtractConstraintModeParts(const Expr* expr, std::string_view& obj_name,
-                                std::string_view& constraint_name) {
-  if (!expr || expr->kind != ExprKind::kCall) return false;
-  const Expr* callee = expr->lhs;
-  if (!callee || callee->kind != ExprKind::kMemberAccess) return false;
-  if (!callee->rhs || callee->rhs->kind != ExprKind::kIdentifier) return false;
-  if (callee->rhs->text != "constraint_mode") return false;
-
-  const Expr* recv = callee->lhs;
-  if (!recv) return false;
-  // No-name form: the receiver is the object handle itself.
-  if (recv->kind == ExprKind::kIdentifier) {
-    obj_name = recv->text;
-    constraint_name = {};
-    return true;
-  }
-  // Named form: the receiver is object.constraint_id.
-  if (recv->kind == ExprKind::kMemberAccess && recv->lhs &&
-      recv->lhs->kind == ExprKind::kIdentifier && recv->rhs &&
-      recv->rhs->kind == ExprKind::kIdentifier) {
-    obj_name = recv->lhs->text;
-    constraint_name = recv->rhs->text;
-    return true;
-  }
-  return false;
-}
-
-// 18.8: match a rand_mode() method call and pull out the object handle name
-// and, for the named form obj.random_variable.rand_mode(...), the variable
-// name. The no-name form obj.rand_mode(...) leaves var_name empty. Returns
-// false for any other call so normal method dispatch proceeds.
-bool ExtractRandModeParts(const Expr* expr, std::string_view& obj_name,
-                          std::string_view& var_name) {
-  if (!expr || expr->kind != ExprKind::kCall) return false;
-  const Expr* callee = expr->lhs;
-  if (!callee || callee->kind != ExprKind::kMemberAccess) return false;
-  if (!callee->rhs || callee->rhs->kind != ExprKind::kIdentifier) return false;
-  if (callee->rhs->text != "rand_mode") return false;
-
-  const Expr* recv = callee->lhs;
-  if (!recv) return false;
-  // No-name form: the receiver is the object handle itself.
-  if (recv->kind == ExprKind::kIdentifier) {
-    obj_name = recv->text;
-    var_name = {};
-    return true;
-  }
-  // Named form: the receiver is object.random_variable.
-  if (recv->kind == ExprKind::kMemberAccess && recv->lhs &&
-      recv->lhs->kind == ExprKind::kIdentifier && recv->rhs &&
-      recv->rhs->kind == ExprKind::kIdentifier) {
-    obj_name = recv->lhs->text;
-    var_name = recv->rhs->text;
-    return true;
-  }
-  return false;
-}
-
 // 18.6.1: randomize() sets all of an object's active random variables AND the
 // random objects it references to valid values, succeeding only when every one
 // is solved. Solve this object's own random variables subject to its active
@@ -593,7 +530,18 @@ void SetObjectConstraintActive(ClassObject* obj, std::string_view name,
 
 // 18.8 / Table 18-3: record a random variable's active (ON) or inactive (OFF)
 // state for this object, as set by a rand_mode() call.
+// 18.8: a call on an array member without an index affects all of its
+// elements, so the states its elements were given on their own are dropped
+// for the member's.
 void SetObjectRandActive(ClassObject* obj, std::string_view name, bool active) {
+  std::string prefix = std::string(name) + "[";
+  for (auto it = obj->rand_active.begin(); it != obj->rand_active.end();) {
+    if (it->first.compare(0, prefix.size(), prefix) == 0) {
+      it = obj->rand_active.erase(it);
+    } else {
+      ++it;
+    }
+  }
   obj->rand_active[std::string(name)] = active;
 }
 
