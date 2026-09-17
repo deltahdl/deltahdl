@@ -1,0 +1,6 @@
+Packet: success 64 of 64, size below 64 in 64, kind varies: 1
+Framed through a Packet handle: success 64 of 64, size below 64 in 64, even in 64
+kind inactive: success 64 of 64, kind kept at 7 in 64
+small inactive: size at or above 64 in some: 1
+Oversized: randomize returns 0, size kept: 1
+$finish at time 0
