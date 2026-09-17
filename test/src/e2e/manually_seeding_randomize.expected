@@ -1,0 +1,5 @@
+internal: two Packets created with seed 200 draw alike in 4 of 4, a $urandom and a $random before each draw change nothing in 4 of 4
+external: p re-seeded with 300 draws as a Packet created with seed 300 in 4 of 4
+new: a Packet randomized inside new() after srandom(200) holds the first draw of one created with 200: 1
+hierarchical: a Plain object seeded by hand with the creating thread's next value draws as one created there in 4 of 4
+$finish at time 0
