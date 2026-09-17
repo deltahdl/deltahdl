@@ -16,6 +16,11 @@ namespace delta {
 
 namespace {
 
+// 18.5.9: the draws a pass tries against the constraints before it repairs
+// one, the draws tried giving the uniform distribution over the legal value
+// combinations that a repaired consequent would skew.
+constexpr int kRepairFromAttempt = 32;
+
 // depth(v) = the longest chain of variables that must be solved after v in the
 // solve...before successor graph. Variables with nothing ordered after them
 // have depth 0; a variable solved before others has a strictly greater depth
@@ -506,6 +511,13 @@ std::vector<std::vector<std::string>> ConstraintSolver::ComputeSolveGroups(
   return groups;
 }
 
+void ConstraintSolver::RepairWithin(const std::vector<std::string>& names,
+                                    const std::vector<ConstraintExpr>& extra) {
+  repair_scope_.insert(names.begin(), names.end());
+  RepairConstraints(extra);
+  repair_scope_.clear();
+}
+
 bool ConstraintSolver::SolveOrderedGroups(
     const std::vector<std::vector<std::string>>& groups, size_t idx,
     const std::vector<ConstraintExpr>& extra, bool include_soft) {
@@ -513,12 +525,20 @@ bool ConstraintSolver::SolveOrderedGroups(
   // constraints hold against the fully populated value set.
   if (idx == groups.size()) return CheckAllConstraints(extra, include_soft);
   static constexpr int kGroupAttempts = 200;
+  const bool kLast = idx + 1 == groups.size();
   for (int attempt = 0; attempt < kGroupAttempts; ++attempt) {
     for (const auto& name : groups[idx]) {
       auto it = variables_.find(name);
       if (it == variables_.end()) continue;
       values_[name] = GenerateRandValue(it->second);
     }
+    // 18.5.9: the earlier sets stand as drawn, and the last set is drawn
+    // subject to them: a draw of it that the constraints refuse is repaired
+    // within the set, once as many draws have been tried as the flat pass
+    // tries before it repairs, so that the clause's d is held to zero under
+    // the s drawn true, which a draw of a 32-bit d meets as good as never.
+    if (kLast && attempt >= kRepairFromAttempt)
+      RepairWithin(groups[idx], extra);
     // Hold this group's draw fixed and try to complete the remaining groups.
     if (SolveOrderedGroups(groups, idx + 1, extra, include_soft)) return true;
     // 18.5.12: an ERROR guard fails randomize() outright; do not keep retrying.
@@ -851,7 +871,6 @@ bool ConstraintSolver::SolveIterative(const std::vector<ConstraintExpr>& extra,
   // repaired consequent would skew, so the consequents of the implications
   // are repaired only once that many draws have found no solution, as they
   // do not over a domain as wide as an int's (18.5.5).
-  static constexpr int kRepairFromAttempt = 32;
   bool repair = false;
   auto flat_pass = [&] {
     DrawGeneralPass(variables_, values_, real_values_, gen, gen_real);

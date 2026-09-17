@@ -1,0 +1,6 @@
+s set without ordering: 0 of 1024
+s set with ordering near half: 1, d zero whenever s is set: 1
+d drawn freely without s: 1, every ordered solve succeeds: 1024
+a set near half: 1, both implications hold: 1024 of 1024
+x at 0 below y on every solve: 64 of 64
+$finish at time 0

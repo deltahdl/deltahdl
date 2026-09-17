@@ -701,6 +701,10 @@ class ConstraintSolver {
   void ApplyDerived(const ConstraintExpr& c);
   void RepairFromCandidates(const ConstraintExpr& c);
   bool RepairMayWrite(const std::string& name) const;
+  // 18.5.9: repairs the active constraints writing the variables `names`
+  // alone, the ordered sets drawn before them standing as drawn.
+  void RepairWithin(const std::vector<std::string>& names,
+                    const std::vector<ConstraintExpr>& extra);
 
   // 18.6.3: publish the values of the static random variables into their shared
   // cells after a successful solve, so that the value this instance just drew
@@ -793,6 +797,11 @@ class ConstraintSolver {
   // 18.5.12: set when a guard evaluates to ERROR. An ERROR guard generates an
   // unconditional error, so the solve fails outright and is not retried.
   bool guard_error_ = false;
+
+  // 18.5.9: the variables a repair may write while an ordered solve repairs
+  // its last set, which is that set alone; empty outside one, where a
+  // repair may write any active variable.
+  std::unordered_set<std::string> repair_scope_;
 
   // 18.5.13.1: the soft constraints the priority resolution has discarded for
   // the current solve. A discarded soft constraint is treated as true: its

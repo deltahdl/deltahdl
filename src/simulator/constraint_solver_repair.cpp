@@ -124,9 +124,11 @@ std::vector<int64_t> StructuredCandidates(const RandVariable& var) {
 // Whether the variable `name` is one a repair may write: one the solver
 // holds, active, integral and, 18.4.2, not randc, which is drawn from its
 // own cycle alone, and, 18.8, holding no state value, which is never
-// written.
+// written, and, 18.5.9, one of the last ordered set while an ordered solve
+// repairs that set.
 bool ConstraintSolver::RepairMayWrite(const std::string& name) const {
   if (HoldsStateValue(name)) return false;
+  if (!repair_scope_.empty() && repair_scope_.count(name) == 0) return false;
   auto it = variables_.find(name);
   return it != variables_.end() && it->second.enabled && !it->second.is_real &&
          it->second.qualifier != RandQualifier::kRandc;
