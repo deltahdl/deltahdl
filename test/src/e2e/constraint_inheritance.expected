@@ -1,0 +1,7 @@
+the base's own blocks hold: 32 of 32 in 0 to 99, some at least 10: 1
+the derived's hi replaces the inherited one and even adds to lo: 32 of 32
+randomize() through a Base handle honors the Derived's constraints: 32 of 32
+a derived prototype completed outside the class replaces hi: 32 of 32
+the implementation of a pure constraint holds: 32 of 32
+an :initial :final block holds as any block does: 32 of 32
+$finish at time 0
