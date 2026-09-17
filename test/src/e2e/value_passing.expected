@@ -1,0 +1,5 @@
+arguments: 200 runs of the clause's gen each print a first word, a second word and the default done: 1
+example 1: operator is one of the three strings: 1, value[1] is the first value drawn: 1, value[2] the second: 2
+example 2: b1 is the count after one to three Cs: 1, c is b1 + 5 after the five repeated Cs: 1, b2 is c plus one to three: 1, with cond D[1] is D(5): 1, without cond D[2] is D(20): 1
+queue: the generated queue starts at low and ends at high: 1, every item is within them: 1, it holds three or more: 1
+$finish at time 0
