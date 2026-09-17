@@ -1,0 +1,6 @@
+gen_stim: succeeds in 32 of 32, addr moved in some: 1, data moved in some: 1, rd_wr both seen: 1
+stimc: succeeds in 32 of 32, addr and data copied in 32
+no argument, a < b: returns 1, values kept: 1
+no argument, a > b: returns 0, values kept: 1
+unsatisfiable: returns 0, value kept: 1
+$finish at time 0

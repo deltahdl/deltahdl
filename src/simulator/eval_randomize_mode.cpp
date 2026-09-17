@@ -294,6 +294,17 @@ bool IsScopeRandomizeForm(const Expr* expr, SimContext& ctx) {
   return false;
 }
 
+// 18.12: whether every expression of a scope randomize's constraint_block
+// is true on the current values of the scope's variables, the check the
+// call with no argument makes in place of a draw.
+uint64_t ScopeConstraintsHold(const Expr* expr, SimContext& ctx, Arena& arena) {
+  if (expr->inline_constraint == nullptr) return 1;
+  for (const Expr* rel : expr->inline_constraint->constraint_exprs) {
+    if (EvalExpr(rel, ctx, arena).ToUint64() == 0) return 0;
+  }
+  return 1;
+}
+
 }  // namespace
 
 // 18.12: each named scope variable is a rand variable whose domain spans its
@@ -375,13 +386,12 @@ bool TryEvalScopeRandomizeCall(const Expr* expr, SimContext& ctx, Arena& arena,
   }
 
   // 18.12: called with no argument, the scope randomize does not change the
-  // value of any variable and instead checks its constraints, returning 1 when
-  // all of them hold. Without a with constraint_block (that form is 18.12.1)
-  // there is no constraint expression to evaluate to false, so the checker
-  // takes the "otherwise" branch and returns 1, leaving every variable
-  // untouched.
+  // value of any variable and instead checks its constraints: every
+  // expression of its constraint_block is evaluated, and the call returns 0
+  // where one of them is false and 1 otherwise, so without a block (the
+  // 18.12.1 form) there is nothing to be false and it returns 1.
   if (targets.empty()) {
-    out = MakeLogic4VecVal(arena, 32, 1);
+    out = MakeLogic4VecVal(arena, 32, ScopeConstraintsHold(expr, ctx, arena));
     return true;
   }
 
