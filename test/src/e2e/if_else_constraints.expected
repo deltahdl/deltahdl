@@ -1,0 +1,6 @@
+mode selects len below 10, above 100 or unconstrained: 256 of 256, every mode drawn: 1
+len held to 50 leaves mode other: 64 of 64
+the else goes with the inner if: 256 of 256, every mode drawn: 1, big draws len at or below 100: 1
+a real expression selects k: 64 of 64, both reals drawn: 1
+an unnamed set holds whole above 7 and a relation below: 128 of 128, some x above 7: 1
+$finish at time 0
