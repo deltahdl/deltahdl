@@ -33,16 +33,18 @@ module random_number_functions;
     replayed = 0;
     for (i = 0; i < 4; i++) if (seq_a[i] == seq_b[i]) replayed++;
 
-    // §18.13.1: the number is unsigned and 32 bits wide, so its top bit is set
-    // in about half of the draws; the clause's example masks it to four bits
-    // and concatenates two into a 64-bit value.
+    // §18.13.1: the clause's example seeds the generator once, then takes a
+    // 64-bit value from two calls and a 4-bit one from a masked call. The
+    // number is unsigned and 32 bits wide, so over 32 further unseeded draws
+    // its top bit is set in some and the upper half of the concatenation is
+    // nonzero in some; a seed inside the loop would replay one value instead.
+    addr[32:1] = $urandom(254);
     high_seen = 0;
     upper_seen = 0;
     low_number = 0;
     for (i = 0; i < 32; i++) begin
       r = $urandom;
       if (r >= 32'h8000_0000) high_seen = 1;
-      addr[32:1] = $urandom(254);
       addr = {$urandom, $urandom};
       number = $urandom & 15;
       if (addr[64:33] != 0) upper_seen = 1;
