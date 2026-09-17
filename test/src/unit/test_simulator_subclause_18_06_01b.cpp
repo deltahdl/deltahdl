@@ -15,7 +15,7 @@ const char* const kPackets =
     "class Packet;\n"
     "  rand bit [7:0] kind;\n"
     "  rand bit [7:0] size;\n"
-    "  constraint small { size < 64; }\n"
+    "  constraint bounded { size < 64; }\n"
     "endclass\n"
     "class Framed extends Packet;\n"
     "  constraint even { size[0] == 0; }\n"

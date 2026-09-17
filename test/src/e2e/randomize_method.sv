@@ -5,7 +5,7 @@
 class Packet;
   rand bit [7:0] kind;
   rand bit [7:0] size;
-  constraint small { size < 64; }
+  constraint bounded { size < 64; }
 endclass
 
 // A derived packet adding a constraint over the base's variable, reached
@@ -45,7 +45,7 @@ module randomize_method;
              success, held, varied);
 
     // The virtual method through a base handle: the Framed's even holds
-    // beside the base's small on every draw.
+    // beside the base's bounded on every draw.
     fr = new;
     handle = fr;
     success = 0;
@@ -72,15 +72,15 @@ module randomize_method;
     $display("kind inactive: success %0d of 64, kind kept at 7 in %0d", success,
              kept);
 
-    // An inactive constraint block is not applied: with small turned off,
+    // An inactive constraint block is not applied: with bounded turned off,
     // size reaches 64 and above in some draw.
-    p.small.constraint_mode(0);
+    p.bounded.constraint_mode(0);
     held = 0;
     for (i = 0; i < 64; i++) begin
       void'(p.randomize());
       if (p.size >= 64) held++;
     end
-    $display("small inactive: size at or above 64 in some: %0d", held > 0);
+    $display("bounded inactive: size at or above 64 in some: %0d", held > 0);
 
     // The constraints of a derived class can render the base's
     // unsatisfiable: the Oversized's call returns 0 and its size keeps the
