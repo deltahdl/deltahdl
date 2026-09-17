@@ -50,14 +50,14 @@ TEST(RandModeRun, TheObjectCallTurnsEveryVariableOff) {
   std::string out =
       RunCapture(std::string(kPacket) +
                      "module t;\n"
-                     "  int before, ret;\n"
+                     "  int at_start, ret;\n"
                      "  initial begin\n"
                      "    Packet packet_a = new;\n"
-                     "    before = packet_a.dest_value.rand_mode();\n"
+                     "    at_start = packet_a.dest_value.rand_mode();\n"
                      "    packet_a.rand_mode(0);\n"
                      "    packet_a.source_value.rand_mode(1);\n"
                      "    ret = packet_a.dest_value.rand_mode();\n"
-                     "    $display(\"%0d %0d %0d %0d\", before, ret,\n"
+                     "    $display(\"%0d %0d %0d %0d\", at_start, ret,\n"
                      "             packet_a.source_value.rand_mode(), "
                      "packet_a.arr[1].rand_mode());\n"
                      "  end\n"

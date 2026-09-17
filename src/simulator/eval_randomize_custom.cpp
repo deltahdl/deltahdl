@@ -79,6 +79,13 @@ Logic4Vec EvalBound(const Expr* e, const std::vector<std::string>& names,
   return value;
 }
 
+// 18.8: whether the random variable `name` is active, so that the solver
+// writes it; a scope randomize (18.12) has no object and every variable of
+// it is active.
+bool RandIsActive(const RandomizeCtx& rc, std::string_view name) {
+  return rc.obj == nullptr || IsObjectRandActive(rc.obj, name);
+}
+
 // The side of the comparison `rel` that is a bare random variable the other
 // side does not reference, so that the other side derives it, filling `cmp`
 // with the comparison as read from that side; nullptr where neither side
@@ -97,8 +104,7 @@ const Expr* DerivedSide(const Expr* rel, std::vector<RandInfo>& rands,
     // writes, so it derives nothing; the other side may derive from it.
     if (side->kind == ExprKind::kIdentifier &&
         FindRand(rands, side->text) != nullptr &&
-        IsObjectRandActive(rc.obj, side->text) &&
-        !RefsNamedRandVar(other, side->text)) {
+        RandIsActive(rc, side->text) && !RefsNamedRandVar(other, side->text)) {
       if (side == rel->rhs) ComparisonKind(MirrorComparison(rel->op), cmp);
       return side;
     }
@@ -122,8 +128,8 @@ const Expr* AddendOf(const Expr* side, std::vector<RandInfo>& rands,
     // 18.8: an inactive variable is a state variable the solver never
     // writes, so it derives nothing.
     if (x->kind != ExprKind::kIdentifier ||
-        FindRand(rands, x->text) == nullptr ||
-        !IsObjectRandActive(rc.obj, x->text) || RefsNamedRandVar(q, x->text)) {
+        FindRand(rands, x->text) == nullptr || !RandIsActive(rc, x->text) ||
+        RefsNamedRandVar(q, x->text)) {
       continue;
     }
     term = q;
