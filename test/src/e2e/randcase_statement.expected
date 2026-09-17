@@ -1,0 +1,7 @@
+example: 8000 draws of weights 3, 1 and 4 take the first near 3/8: 1, the second near 1/8: 1, the third near 1/2: 1, every draw one branch: 1
+zero: a zero-weighted branch is never taken in 1000: 1, all weights zero takes no branch: 1
+expressions: with a = 1 and b = 1 the 12'h800 branch takes most of 1000: 1, the a - b branch none: 1; with a = 8'hFF and b = 1 the a + b branch, 0 in 8 bits, none: 1
+once: two weight calls evaluate the function 2 times
+stability: a forked thread seeded 3 selects the same 8 branches beside a thread drawing 100: 1
+$finish at time 0
+test/src/e2e/randcase_statement.sv:66:5: warning: randcase: all weights are zero; no branch selected (§18.16)
