@@ -1,0 +1,5 @@
+both global constraints hold: 128 of 128
+the leaves are drawn with the node: 1 1
+a heap node under a heap node holds its own: 64 of 64
+an inactive subtree is a state variable: 64 of 64
+$finish at time 0
