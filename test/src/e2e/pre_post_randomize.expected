@@ -1,0 +1,7 @@
+Base: solved 1, pre at step 1 saw x 200, post at step 2 saw the new x: 1, leaf pre 1 post 1
+leaf inactive: solved 1, leaf pre 1 post 1
+Inherits: solved 1, base pre 1 post 1
+Chains: solved 1, base pre 1 post 1, own pre 1 post 1
+Skips: solved 1, base pre 0 post 0, own pre 1 post 1
+Skips through a Base handle: solved 1, base pre 0 post 0, own pre 2 post 2
+$finish at time 0
