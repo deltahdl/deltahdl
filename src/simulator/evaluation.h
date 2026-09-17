@@ -310,6 +310,14 @@ bool TryEvalTypedConstructorNew(const Expr* expr, SimContext& ctx, Arena& arena,
 // overridden values. base_id is the identifier carrying the #(...) overrides in
 // its elements.
 struct ClassTypeInfo;
+// §6.19/§8.4: an enumeration declared in a class names its literals within
+// the class, so a bare literal in a method or a constraint of the class or
+// of a class derived from it reads as its value, found on the class the
+// enumeration was declared in by walking up from `cls`. Answers false where
+// no class of the chain declares the name.
+bool TryClassScopeEnumLiteral(std::string_view name, const ClassTypeInfo* cls,
+                              Arena& arena, Logic4Vec& out);
+
 void BindClassParams(const ClassTypeInfo* cls, const Expr* base_id,
                      SimContext& ctx, Arena& arena);
 

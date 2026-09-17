@@ -1,11 +1,25 @@
+#include <string>
 #include <string_view>
 
 #include "common/arena.h"
+#include "common/types.h"
 #include "parser/ast.h"
+#include "simulator/class_object.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 
 namespace delta {
+
+bool TryClassScopeEnumLiteral(std::string_view name, const ClassTypeInfo* cls,
+                              Arena& arena, Logic4Vec& out) {
+  for (; cls != nullptr; cls = cls->parent) {
+    auto it = cls->enum_members.find(std::string(name));
+    if (it == cls->enum_members.end()) continue;
+    out = MakeLogic4VecVal(arena, 32, it->second);
+    return true;
+  }
+  return false;
+}
 
 static Logic4Vec EnumFirst(const EnumTypeInfo& info, Arena& arena) {
   if (info.members.empty()) return MakeLogic4VecVal(arena, 32, 0);

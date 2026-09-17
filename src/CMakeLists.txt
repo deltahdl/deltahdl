@@ -212,6 +212,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/class_object.cpp
     simulator/evaluation.cpp
     simulator/evaluation_literal.cpp
+    simulator/eval_ternary.cpp
     simulator/eval_function.cpp
     simulator/eval_process_methods.cpp
     simulator/eval_randomize.cpp
