@@ -247,9 +247,8 @@ static std::vector<const ClassMember*> CollectLevelConstraints(
   return level_members;
 }
 
-void CollectConstraintBlocks(const ClassTypeInfo* type,
-                             std::vector<RandInfo>& rands, RandomizeCtx& rc,
-                             ConstraintSolver& solver) {
+std::vector<const ClassMember*> ConstraintMembersInOrder(
+    const ClassTypeInfo* type) {
   // Walk from the dynamic type up to its base classes so the first constraint
   // seen for a given name is the most-derived one (18.5.2: a same-named derived
   // constraint replaces the inherited one). Buffer the members to build per
@@ -271,8 +270,17 @@ void CollectConstraintBlocks(const ClassTypeInfo* type,
   // 18.5.11) are order-independent sets, so the solutions are unchanged. Within
   // a level the members keep their syntactic declaration order, which fixes
   // their relative priority.
+  std::vector<const ClassMember*> members;
   for (auto it = per_level.rbegin(); it != per_level.rend(); ++it)
-    for (const ClassMember* m : *it) AddConstraintMember(m, rands, rc, solver);
+    members.insert(members.end(), it->begin(), it->end());
+  return members;
+}
+
+void CollectConstraintBlocks(const ClassTypeInfo* type,
+                             std::vector<RandInfo>& rands, RandomizeCtx& rc,
+                             ConstraintSolver& solver) {
+  for (const ClassMember* m : ConstraintMembersInOrder(type))
+    AddConstraintMember(m, rands, rc, solver);
 }
 
 }  // namespace delta

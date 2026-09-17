@@ -269,14 +269,8 @@ bool ConstraintSolver::EvalForeach(const ConstraintExpr& expr) const {
   // imposes the per-element constraints only on the elements that exist, i.e.
   // those whose index is below that size. A foreach over a fixed-size array
   // leaves size_var empty, in which case every per-element constraint applies.
-  size_t count = expr.sub_constraints.size();
-  if (!expr.size_var.empty()) {
-    auto it = values_.find(expr.size_var);
-    if (it != values_.end()) {
-      int64_t sz = it->second < 0 ? 0 : it->second;
-      if (static_cast<size_t>(sz) < count) count = static_cast<size_t>(sz);
-    }
-  }
+  size_t count =
+      ClampCountToSize(expr.sub_constraints.size(), expr.size_var, values_);
   for (size_t i = 0; i < count; ++i) {
     if (!EvalConstraint(expr.sub_constraints[i])) return false;
   }
@@ -318,10 +312,8 @@ int64_t FoldReductionElement(ArrayReductionOp op, int64_t acc, int64_t v) {
   return acc;
 }
 
-// As with a foreach iterative constraint, an array's size method is a state
-// variable: the size constraints are solved first, so only the elements whose
-// index is below the committed size participate. An empty size_var (a
-// fixed-size array) leaves the natural count unchanged.
+}  // namespace
+
 size_t ClampCountToSize(
     size_t count, const std::string& size_var,
     const std::unordered_map<std::string, int64_t>& values) {
@@ -332,8 +324,6 @@ size_t ClampCountToSize(
   if (static_cast<size_t>(sz) < count) return static_cast<size_t>(sz);
   return count;
 }
-
-}  // namespace
 
 bool ConstraintSolver::EvalArrayReduction(const ConstraintExpr& expr) const {
   // 18.5.7.2: an array reduction method in a constraint is treated as an

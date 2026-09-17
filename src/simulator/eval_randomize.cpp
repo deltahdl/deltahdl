@@ -98,10 +98,12 @@ bool DeclaredSignedness(const ClassMember* m, const ClassTypeInfo* level) {
   return false;
 }
 
+}  // namespace
+
 // 18.4: build a solver variable for one rand/randc data member. The default
 // integral domain is later tightened by the relational constraints.
-void AddRandMember(const ClassMember* m, const ClassTypeInfo* level,
-                   SimContext& ctx, std::vector<RandInfo>& out) {
+RandInfo BuildRandMember(const ClassMember* m, const ClassTypeInfo* level,
+                         SimContext& ctx) {
   RandInfo info;
   info.name = std::string(m->name);
   info.level = level;
@@ -144,10 +146,22 @@ void AddRandMember(const ClassMember* m, const ClassTypeInfo* level,
     info.var.real_min = -2147483648.0;
     info.var.real_max = 2147483648.0;
   }
-  // 18.5.7: a rand member declared as an array is one random variable per
-  // element, each named as its element's key and drawn over the element type's
-  // range, so that an iterative constraint can bind any one of them.
+  return info;
+}
+
+namespace {
+
+// 18.4: the random variables of one rand/randc data member. 18.5.7: a member
+// declared as an array is one random variable per element, each named as its
+// element's key and drawn over the element type's range, so that an
+// iterative constraint can bind any one of them; one declared as a dynamic
+// array has its elements added by AddDynamicArrayVariables, their count
+// being the object's rather than the class's.
+void AddRandMember(const ClassMember* m, const ClassTypeInfo* level,
+                   SimContext& ctx, std::vector<RandInfo>& out) {
   const auto* array = FindClassArrayProperty(level, m->name);
+  if (array != nullptr && array->is_dynamic) return;
+  RandInfo info = BuildRandMember(m, level, ctx);
   if (array == nullptr) {
     out.push_back(std::move(info));
     return;
@@ -157,6 +171,7 @@ void AddRandMember(const ClassMember* m, const ClassTypeInfo* level,
     elem.name = ClassArrayElementKey(m->name, array->array_lo + i);
     elem.var.name = elem.name;
     elem.array_base = info.name;
+    elem.array_index = array->array_lo + static_cast<int64_t>(i);
     out.push_back(std::move(elem));
   }
 }
@@ -523,6 +538,7 @@ bool RandomizeObject(ClassObject* obj, SimContext& ctx, Arena& arena,
 
   std::vector<RandInfo> rands;
   CollectRandVariables(obj->type, ctx, rands);
+  AddDynamicArrayVariables(rands, rc);
   if (call.inline_random != nullptr)
     PromoteInlineRandomVariables(obj, ctx, *call.inline_random, rands);
   CollectConstraintBlocks(obj->type, rands, rc, solver);
@@ -621,6 +637,7 @@ bool IsClassHandleMember(const ClassMember* m, SimContext& ctx) {
 ConstraintExpr TranslateRelation(const Expr* rel, std::vector<RandInfo>& rands,
                                  RandomizeCtx& rc, bool fold) {
   ConstraintExpr ce;
+  rel = ResolveArraySizes(rel, rc);
   if (TryComparisonConstraint(rel, rands, rc, ce, fold)) return ce;
   if (TrySetMembershipConstraint(rel, rands, rc, ce)) return ce;
   if (TryImplicationConstraint(rel, rands, rc, ce)) return ce;
@@ -733,11 +750,27 @@ Logic4Vec SolvedValue(const RandInfo& ri, const ConstraintSolver& solver,
   return lv;
 }
 
+// 18.4: whether `ri` is an element of a dynamic array beyond the size the
+// solve drew for it, recorded in `sizes` under the array's name by the size
+// variable, which precedes the elements; the array is resized to that size,
+// so the element is dropped rather than written.
+static bool BeyondDrawnSize(
+    const RandInfo& ri, const std::unordered_map<std::string, int64_t>& sizes) {
+  if (ri.array_base.empty() || ri.var.is_array_size) return false;
+  auto it = sizes.find(ri.array_base);
+  return it != sizes.end() && ri.array_index >= it->second;
+}
+
 // 18.6.1: write each solved value back to the object, keeping the bare and
-// scoped ("Class::name") property aliases in sync so member reads see it.
+// scoped ("Class::name") property aliases in sync so member reads see it. A
+// dynamic array's size is written under its key, which sizes the array
+// (18.4), ahead of its elements.
 void WriteBackSolved(ClassObject* obj, std::vector<RandInfo>& rands,
                      ConstraintSolver& solver, Arena& arena) {
+  std::unordered_map<std::string, int64_t> sizes;
   for (auto& ri : rands) {
+    if (ri.var.is_array_size) sizes[ri.array_base] = solver.GetValue(ri.name);
+    if (BeyondDrawnSize(ri, sizes)) continue;
     Logic4Vec lv = SolvedValue(ri, solver, arena);
     // 18.6.3: a static random variable is a single storage shared by every
     // instance of the class, so a successful randomize() must publish the drawn

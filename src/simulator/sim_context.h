@@ -261,6 +261,13 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   // accepted a width alone; a new site would reach it the same way.
   Variable* CreateLocalVariable(std::string_view name, uint32_t width,
                                 bool is_signed = false);
+  // Makes `var`, a variable created earlier, the variable `name` names in
+  // the innermost scope, as CreateLocalVariable makes the one it creates:
+  // what a constraint's trial does with the locals it binds the random
+  // variables to, which it makes once per randomize() call and binds once per
+  // relation it evaluates (18.5). The caller must have pushed a scope, and
+  // `name` must outlive it.
+  void BindLocalVariable(std::string_view name, Variable* var);
 
   Variable* FindStaticFuncVar(std::string_view func_name,
                               std::string_view var_name);

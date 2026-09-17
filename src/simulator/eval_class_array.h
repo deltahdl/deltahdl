@@ -10,6 +10,7 @@
 namespace delta {
 
 struct Expr;
+struct Stmt;
 class SimContext;
 class Arena;
 
@@ -21,21 +22,44 @@ class Arena;
 // variable for the element and the local a trial binds it to carry this key.
 std::string ClassArrayElementKey(std::string_view name, int64_t index);
 
+// §7.5: a class property declared with a dynamic dimension holds its element
+// count on the object under the key this forms, spelled as the size method
+// of the property is written in a constraint, which is what lets a
+// randomize() that constrains the size solve it as a variable of that name
+// and a foreach read it as the state variable it is there (18.5.7.1).
+std::string ClassArraySizeKey(std::string_view name);
+
 // The array property named `name` on the class chain of `type`, or null where
 // the chain declares none of that name or the property is no array.
 const ClassTypeInfo::PropertyInfo* FindClassArrayProperty(
     const ClassTypeInfo* type, std::string_view name);
 
-// The array property an expression addresses, and the object holding it.
-// `bare` records that the expression named the property without a handle,
-// from within the object's own scope, which is where a local variable of an
-// element's key stands for the element: a constraint's trial binds each
-// element so (18.5.7), and nothing outside the object's scope does.
+// The array property an expression addresses, the object holding it, and
+// the elements it holds: `size` of them from the index `lo` up, the
+// declared dimension's for a fixed array and the object's count from 0 for a
+// dynamic one. `bare` records that the expression named the property without
+// a handle, from within the object's own scope, which is where a local
+// variable of an element's key stands for the element: a constraint's trial
+// binds each element so (18.5.7), and nothing outside the object's scope
+// does.
 struct ClassArrayRef {
   ClassObject* obj = nullptr;
   const ClassTypeInfo::PropertyInfo* prop = nullptr;
   bool bare = false;
+  uint32_t size = 0;
+  int64_t lo = 0;
 };
+
+// §7.5: the element count a dynamic array property holds on `obj`, 0 where
+// none has been set.
+uint32_t ClassArraySize(const ClassObject* obj,
+                        const ClassTypeInfo::PropertyInfo& prop);
+
+// §7.5.1: resizes the dynamic array `ref` to `size` elements, each taking the
+// element type's default, or, where `init` addresses an array, the value of
+// the element of the same index it holds, for the indexes it holds one.
+void ResizeClassArray(const ClassArrayRef& ref, uint32_t size,
+                      const ClassArrayRef* init, SimContext& ctx, Arena& arena);
 
 // §8.11/§7.4.2: the array property `base` names -- an unqualified name read
 // against the running method's object where no variable or array of the name
@@ -55,12 +79,18 @@ Logic4Vec ReadClassArrayElement(const ClassArrayRef& ref, int64_t index,
 bool TryClassArrayElementSelect(const Expr* expr, int64_t index,
                                 SimContext& ctx, Arena& arena, Logic4Vec& out);
 
-// §7.12: `expr` as a call of size() or of one of §7.12.3's reduction methods
-// sum, product, and, or and xor on an array property, read into `out`; false
-// where the receiver names no array property, or the method is another or
-// carries a with clause.
+// §7.12/§7.5.3: `expr` as a call of size() or of one of §7.12.3's reduction
+// methods sum, product, and, or and xor on an array property, read into
+// `out`, or of delete() on a dynamic one, which empties it; false where the
+// receiver names no array property, or the method is another or carries a
+// with clause.
 bool TryEvalClassArrayMethodCall(const Expr* expr, SimContext& ctx,
                                  Arena& arena, Logic4Vec& out);
+
+// §7.5.1: `stmt` as an assignment of `new[size]` or `new[size](init)` to a
+// dynamic array property, resized as ResizeClassArray does; false where its
+// target names no dynamic array property or its value is no `new[]`.
+bool TryClassArrayNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena);
 
 // §7.4.6: `lhs` as a single-index select of an array property, written with
 // `rhs_val` coerced as a write to the property is; false where its base names

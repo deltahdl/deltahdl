@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -13,6 +14,7 @@
 #include "simulator/constraint_solver.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
+#include "simulator/variable.h"
 
 namespace delta {
 
@@ -84,8 +86,13 @@ struct RandInfo {
   // 18.5.7: for an element of a rand member declared as an array, the name of
   // that member, so a relation naming the array whole -- a reduction method
   // over it, a select at an index the solver does not fold -- is read as
-  // referencing the element. Empty for a variable that is no element.
+  // referencing the element, and the element's index. 18.5.7.1: for the size
+  // of a rand member declared as a dynamic array, which `var.is_array_size`
+  // marks, the name of that member as well, so that rand_mode() on the
+  // member holds the size with the elements. Empty for a variable that is
+  // neither.
   std::string array_base;
+  int64_t array_index = 0;
 };
 
 // State threaded through the randomize() build helpers; bundled to keep helper
@@ -105,6 +112,12 @@ struct RandomizeCtx {
   // the inner must outlive the solve; owning it on the heap here keeps that
   // address stable even as the solver copies the block holding the kSoft.
   std::vector<std::unique_ptr<ConstraintExpr>> soft_inners = {};
+  // The locals a trial binds the random variables to, by name, made once
+  // per randomize() call and bound to each trial's values in place: a
+  // relation over a wide domain is evaluated some hundred times per call,
+  // and a local made per evaluation is arena storage the run never gets
+  // back (eval_randomize_custom.cpp).
+  std::unordered_map<std::string, Variable*> trial_locals = {};
 };
 
 // 18.5.8: one active random object taking part in a joint solve, paired with
@@ -127,6 +140,15 @@ struct JointVarScope {
   std::vector<RandInfo>& rands;
   const std::unordered_set<std::string>& names;
 };
+
+// A copy of an expression with the nodes `rewrite` answers for replaced by
+// its answer, the others copied over their rewritten children; a node the
+// rewrite answers null for is copied (eval_randomize_iterative.cpp).
+using ExprRewrite = std::function<Expr*(const Expr*)>;
+Expr* RewriteExpr(const Expr* e, const ExprRewrite& rewrite, Arena& arena);
+// An identifier node spelling `text`, the text held by the arena, placed
+// where `like` was (eval_randomize_iterative.cpp).
+Expr* IdentifierExpr(std::string_view text, const Expr* like, Arena& arena);
 
 RandInfo* FindRand(std::vector<RandInfo>& rands, std::string_view name);
 // Whether `e`, or any expression in `list`, references one of the random
@@ -188,6 +210,24 @@ bool TryConjunctionConstraint(const Expr* rel, std::vector<RandInfo>& rands,
                               RandomizeCtx& rc, ConstraintExpr& out, bool fold);
 void CollectRandVariables(const ClassTypeInfo* type, SimContext& ctx,
                           std::vector<RandInfo>& out);
+// 18.4: the solver variable for the rand/randc data member `m` declared at
+// `level`, drawn over the range its declared type admits; a member declared
+// as an array is built once and copied per element by the caller.
+RandInfo BuildRandMember(const ClassMember* m, const ClassTypeInfo* level,
+                         SimContext& ctx);
+// 18.4/18.5.7.1: add the random variables of each rand member of the object
+// declared as a dynamic array: where an active constraint block constrains
+// the member's size method, one variable for the size, drawn ahead of the
+// others, and one per element up to the largest size the size constraints
+// admit; otherwise one per element the array holds, its size being left as
+// it is (eval_randomize_dynamic.cpp).
+void AddDynamicArrayVariables(std::vector<RandInfo>& rands, RandomizeCtx& rc);
+// 18.5.7.1: `rel` with each size method call on a dynamic array property of
+// the object's class, `A.size` or `A.size()`, replaced by the identifier of
+// the key the size is held under, which is the size variable's name where
+// the size is solved and the object's own count where it is not; `rel`
+// itself where it holds no such call (eval_randomize_dynamic.cpp).
+const Expr* ResolveArraySizes(const Expr* rel, RandomizeCtx& rc);
 bool ComparisonKind(TokenKind op, ConstraintKind& out);
 void FoldBound(RandInfo& ri, ConstraintKind kind, int64_t c);
 // 18.4.1: the same for a real variable's range, a bound on one side leaving
@@ -230,6 +270,12 @@ ConstraintExpr TranslateRelation(const Expr* rel, std::vector<RandInfo>& rands,
                                  RandomizeCtx& rc, bool fold = true);
 void AddConstraintMember(const ClassMember* m, std::vector<RandInfo>& rands,
                          RandomizeCtx& rc, ConstraintSolver& solver);
+// 18.5/18.5.2/18.5.13.1: the constraint members of the class chain of `type`
+// with a body the solver can act on, a base class's ahead of a derived
+// one's and a same-named base one replaced by the derived one
+// (eval_randomize_blocks.cpp).
+std::vector<const ClassMember*> ConstraintMembersInOrder(
+    const ClassTypeInfo* type);
 void CollectConstraintBlocks(const ClassTypeInfo* type,
                              std::vector<RandInfo>& rands, RandomizeCtx& rc,
                              ConstraintSolver& solver);

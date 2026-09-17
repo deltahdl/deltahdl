@@ -428,6 +428,10 @@ void SimContext::SetCurrentProcess(Process* proc) {
 
 void SimContext::PushScope() { scope_stack_.emplace_back(); }
 
+void SimContext::BindLocalVariable(std::string_view name, Variable* var) {
+  if (!scope_stack_.empty()) scope_stack_.back().vars[name] = var;
+}
+
 void SimContext::PopScope() {
   if (!scope_stack_.empty()) scope_stack_.pop_back();
 }

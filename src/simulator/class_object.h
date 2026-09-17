@@ -97,10 +97,19 @@ struct ClassTypeInfo {
     // than under the property's own name, which holds nothing; `width` is then
     // an element's width. Zero for a property that is no array, which is every
     // property whose declaration wrote no unpacked dimension, and every one
-    // whose dimension the collector does not model -- a dynamic, queue or
-    // associative one, or a second dimension.
+    // whose dimension the collector does not model -- a queue or associative
+    // one, or a second dimension -- and for a dynamic one, whose count is a
+    // fact about the object rather than the class.
     uint32_t array_size = 0;
     int64_t array_lo = 0;
+    // §7.5: whether the property's one unpacked dimension is the dynamic `[]`.
+    // The object then holds the element count under the key
+    // ClassArraySizeKey forms, set by `new[]` (§7.5.1) and by a randomize()
+    // that constrains the size (§18.4), and its elements under the element
+    // keys from index 0 up to that count.
+    bool is_dynamic = false;
+
+    bool IsArray() const { return array_size > 0 || is_dynamic; }
   };
   std::vector<PropertyInfo> properties;
 
@@ -133,13 +142,27 @@ struct ClassTypeInfo {
 
   std::unordered_map<std::string, uint64_t> enum_members;
 
-  // §18.5.7: the relations each foreach iterative constraint of the class
+  // §18.5.7.1: the relations each foreach iterative constraint of the class
   // instances, once per element of the array it iterates, built the first time
-  // an object of the class is randomized and kept, the array's shape being a
-  // fact about the class. Keyed by the constraint as the parser recorded it;
-  // mutable like static_properties so a const ClassTypeInfo* can fill it.
-  mutable std::unordered_map<const ConstraintForeachRef*, std::vector<Expr*>>
+  // an object of the class is randomized over that many elements and kept
+  // with the count, a fixed array's shape being a fact about the class and a
+  // dynamic array's element count one about the randomize() call (§18.4),
+  // which rebuilds the relations when it differs. Keyed by the constraint as
+  // the parser recorded it; mutable like static_properties so a const
+  // ClassTypeInfo* can fill it.
+  struct ForeachInstances {
+    uint32_t count = 0;
+    std::vector<Expr*> relations;
+  };
+  mutable std::unordered_map<const ConstraintForeachRef*, ForeachInstances>
       foreach_instances;
+
+  // §18.5.7.1: each constraint relation of the class that names the size
+  // method of a dynamic array property, as the relation reads with the call
+  // replaced by the identifier of the key the size is held under, which is
+  // what a randomize() solves the size as; built on first use and kept, keyed
+  // by the relation as the parser recorded it.
+  mutable std::unordered_map<const Expr*, Expr*> size_resolved_relations;
 
   // §37.32: the class specializations that name this class definition as their
   // defining class; reported by the vpiClassTypespec iteration on a class defn.

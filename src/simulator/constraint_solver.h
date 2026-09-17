@@ -201,9 +201,15 @@ struct ConstraintExpr {
   // A kCustom relation of the form `x == expression` over the other random
   // variables, x in var_name: the value the expression takes over the values
   // drawn, which the repair of a draw that does not satisfy the relation
-  // writes to x (constraint_solver_repair.cpp).
+  // writes to x (constraint_solver_repair.cpp). 18.5.7.1: one of the form
+  // `x < expression`, or under any other comparison, derives a bound instead,
+  // derive_cmp being the comparison as read from x, which the repair draws x
+  // afresh under; the clause's array sorted through each element above the
+  // one before it is met that way, the draws tried over the whole domain of
+  // an int meeting it as good as never.
   std::function<int64_t(const std::unordered_map<std::string, int64_t>&)>
       derive_fn;
+  ConstraintKind derive_cmp = ConstraintKind::kEqual;
 
   // 18.5.11: the random variables this constraint references, used only by the
   // function-argument priority solve. When a function call gives a random
@@ -388,6 +394,12 @@ class ConstraintSolver {
   explicit ConstraintSolver(uint32_t seed = 0);
 
   void AddVariable(const RandVariable& var);
+
+  // The variable added under `name`, or null where none was: what a relation
+  // evaluated over a trial reads the variable's declared width and
+  // signedness from (6.11.3), so that its value is compared as the type the
+  // variable was declared with.
+  const RandVariable* FindVariable(std::string_view name) const;
 
   void AddConstraintBlock(const ConstraintBlock& block);
 
@@ -634,31 +646,31 @@ class ConstraintSolver {
   void PruneRefusedRandcValues(std::unordered_map<std::string, int64_t>& drawn,
                                const std::vector<ConstraintExpr>& extra) const;
 
-  // 18.5.5: after the general draw, every implication whose antecedent holds
-  // under the values drawn has each constraint of its consequent that does
+  // After the general draw, each active constraint that does not hold under
+  // the values drawn is repaired in declaration order, the check that follows
+  // still deciding (constraint_solver_repair.cpp). 18.5.5: an implication
+  // whose antecedent holds has each constraint of its consequent that does
   // not hold applied to the variable it constrains, an equality writing its
   // constant, a set membership one of its members and a comparison a fresh
   // draw from the narrowed domain, so that a consequent over a wide domain
-  // is met rather than waited for; the check that follows still decides
-  // (constraint_solver_implication.cpp).
-  void RepairConditionalConstraints(const std::vector<ConstraintExpr>& extra);
-  void ApplyConsequent(const ConstraintExpr& sub);
-  // 18.3: the solver handles algebraic factoring and mixed integer and bit
-  // expressions and finds a solution where one exists, which the draws tried
-  // against a relation over a wide domain do not: a relation that does not
-  // hold after the draw and derives one variable from the others has that
-  // variable written from them, and one over a single variable has the
-  // structured candidates of its domain tried, 0, the powers of two and their
-  // neighbours, the bounds and their negatives, one that satisfies it drawn
-  // at random; the check that follows still decides.
-  void RepairCustomConstraints(const std::vector<ConstraintExpr>& extra);
+  // is met rather than waited for. 18.3: the solver handles algebraic
+  // factoring and mixed integer and bit expressions and finds a solution
+  // where one exists, which the draws tried against a relation over a wide
+  // domain do not: a relation that derives one variable from the others has
+  // that variable written from them, or drawn afresh under the bound they
+  // give it, and one over a single variable has the structured candidates of
+  // its domain tried, 0, the powers of two and their neighbours, the bounds
+  // and their negatives, one that satisfies it drawn at random. 18.5.7.1: a
+  // foreach over a dynamic array has the constraints of the elements below
+  // its size repaired, in index order, so that a relation between an element
+  // and the one before it is met element by element.
+  void RepairConstraints(const std::vector<ConstraintExpr>& extra);
+  void RepairConstraint(const ConstraintExpr& c);
+  void RepairConsequent(const ConstraintExpr& sub);
   void ApplyCustomRepair(const ConstraintExpr& c);
+  void ApplyDerived(const ConstraintExpr& c);
   void RepairFromCandidates(const ConstraintExpr& c);
   bool RepairMayWrite(const std::string& name) const;
-  void RepairConstraints(const std::vector<ConstraintExpr>& extra) {
-    RepairConditionalConstraints(extra);
-    RepairCustomConstraints(extra);
-  }
 
   // 18.6.3: publish the values of the static random variables into their shared
   // cells after a successful solve, so that the value this instance just drew

@@ -5,12 +5,14 @@
 #include <string_view>
 
 #include "common/arena.h"
+#include "common/diagnostic.h"
 #include "common/types.h"
 #include "parser/ast.h"
 #include "simulator/class_object.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"
+#include "simulator/statement_assign_internal.h"
 #include "simulator/variable.h"
 
 namespace delta {
@@ -19,14 +21,26 @@ std::string ClassArrayElementKey(std::string_view name, int64_t index) {
   return std::string(name) + "[" + std::to_string(index) + "]";
 }
 
+std::string ClassArraySizeKey(std::string_view name) {
+  return std::string(name) + ".size";
+}
+
 const ClassTypeInfo::PropertyInfo* FindClassArrayProperty(
     const ClassTypeInfo* type, std::string_view name) {
   for (const auto* t = type; t != nullptr; t = t->parent) {
     for (const auto& prop : t->properties) {
-      if (prop.name == name) return prop.array_size > 0 ? &prop : nullptr;
+      if (prop.name == name) return prop.IsArray() ? &prop : nullptr;
     }
   }
   return nullptr;
+}
+
+uint32_t ClassArraySize(const ClassObject* obj,
+                        const ClassTypeInfo::PropertyInfo& prop) {
+  if (!prop.is_dynamic) return prop.array_size;
+  auto it = obj->properties.find(ClassArraySizeKey(prop.name));
+  if (it == obj->properties.end()) return 0;
+  return static_cast<uint32_t>(it->second.ToUint64());
 }
 
 namespace {
@@ -39,10 +53,25 @@ ClassObject* HandleSideObject(const Expr* side, SimContext& ctx, Arena& arena) {
   return ctx.GetClassObject(EvalExpr(side, ctx, arena).ToUint64());
 }
 
-// Whether `index` addresses an element of `prop`.
-bool IndexInRange(const ClassTypeInfo::PropertyInfo& prop, int64_t index) {
-  return index >= prop.array_lo &&
-         index < prop.array_lo + static_cast<int64_t>(prop.array_size);
+// Whether `index` addresses an element of the array `ref`.
+bool IndexInRange(const ClassArrayRef& ref, int64_t index) {
+  return index >= ref.lo && index < ref.lo + static_cast<int64_t>(ref.size);
+}
+
+// §7.4/§7.5.1: the value an element of `prop` holds before anything is
+// written to it, the element type's x or 0.
+Logic4Vec ElementDefault(const ClassTypeInfo::PropertyInfo& prop,
+                         Arena& arena) {
+  return prop.is_4state ? MakeAllX(arena, prop.width)
+                        : MakeLogic4VecVal(arena, prop.width, 0);
+}
+
+// The reference `obj` and `prop` make, with the elements the object holds.
+ClassArrayRef MakeRef(ClassObject* obj, const ClassTypeInfo::PropertyInfo* prop,
+                      bool bare) {
+  ClassArrayRef ref{obj, prop, bare, ClassArraySize(obj, *prop),
+                    prop->is_dynamic ? 0 : prop->array_lo};
+  return ref;
 }
 
 // The receiver and the method of a call `receiver.method(...)`, or null for a
@@ -99,7 +128,11 @@ bool ResolveClassArray(const Expr* base, SimContext& ctx, Arena& arena,
     if (self == nullptr) return false;
     const auto* prop = FindClassArrayProperty(self->type, base->text);
     if (prop == nullptr) return false;
-    out = {self, prop, /*bare=*/true};
+    out = MakeRef(self, prop, /*bare=*/true);
+    // 18.5.7.1: a constraint's trial binds a dynamic array's size as it binds
+    // its elements, so the size is the local's where one is in scope.
+    if (auto* size = ctx.FindVariable(ClassArraySizeKey(base->text)))
+      out.size = static_cast<uint32_t>(size->value.ToUint64());
     return true;
   }
   if (base->kind != ExprKind::kMemberAccess || base->is_scope_resolution ||
@@ -111,16 +144,28 @@ bool ResolveClassArray(const Expr* base, SimContext& ctx, Arena& arena,
   if (obj == nullptr) return false;
   const auto* prop = FindClassArrayProperty(obj->type, base->rhs->text);
   if (prop == nullptr) return false;
-  out = {obj, prop, /*bare=*/false};
+  out = MakeRef(obj, prop, /*bare=*/false);
   return true;
+}
+
+void ResizeClassArray(const ClassArrayRef& ref, uint32_t size,
+                      const ClassArrayRef* init, SimContext& ctx,
+                      Arena& arena) {
+  for (uint32_t i = 0; i < size; ++i) {
+    Logic4Vec val =
+        init != nullptr && i < init->size
+            ? OwnRhsWords(ReadClassArrayElement(*init, i, ctx, arena), arena)
+            : ElementDefault(*ref.prop, arena);
+    ref.obj->SetProperty(ClassArrayElementKey(ref.prop->name, i), val);
+  }
+  ref.obj->SetProperty(ClassArraySizeKey(ref.prop->name),
+                       MakeLogic4VecVal(arena, 32, size));
+  ctx.NotifyClassHandleWatchers(ref.obj->handle);
 }
 
 Logic4Vec ReadClassArrayElement(const ClassArrayRef& ref, int64_t index,
                                 SimContext& ctx, Arena& arena) {
-  if (!IndexInRange(*ref.prop, index)) {
-    return ref.prop->is_4state ? MakeAllX(arena, ref.prop->width)
-                               : MakeLogic4VecVal(arena, ref.prop->width, 0);
-  }
+  if (!IndexInRange(ref, index)) return ElementDefault(*ref.prop, arena);
   std::string key = ClassArrayElementKey(ref.prop->name, index);
   if (ref.bare) {
     if (auto* local = ctx.FindVariable(key)) return local->value;
@@ -145,15 +190,19 @@ bool TryEvalClassArrayMethodCall(const Expr* expr, SimContext& ctx,
   ClassArrayRef ref;
   if (!ResolveClassArray(receiver, ctx, arena, ref)) return false;
   if (method == "size") {
-    out = MakeLogic4VecVal(arena, 32, ref.prop->array_size);
+    out = MakeLogic4VecVal(arena, 32, ref.size);
+    return true;
+  }
+  if (method == "delete" && ref.prop->is_dynamic) {
+    ResizeClassArray(ref, 0, nullptr, ctx, arena);
+    out = MakeLogic4VecVal(arena, 1, 0);
     return true;
   }
   uint64_t acc = 0;
   if (!ReductionIdentity(method, acc)) return false;
-  for (uint32_t i = 0; i < ref.prop->array_size; ++i) {
+  for (uint32_t i = 0; i < ref.size; ++i) {
     acc = Join(method, acc,
-               ReadClassArrayElement(ref, ref.prop->array_lo + i, ctx, arena)
-                   .ToUint64());
+               ReadClassArrayElement(ref, ref.lo + i, ctx, arena).ToUint64());
   }
   // §7.12.3: the result is of the element type, which the fold is held to.
   out = MakeLogic4VecVal(arena, ref.prop->width, acc);
@@ -172,11 +221,36 @@ bool TryWriteClassArrayElement(const Expr* lhs, const Logic4Vec& rhs_val,
   Logic4Vec idx_val = EvalExpr(lhs->index, ctx, arena);
   if (HasUnknownBits(idx_val)) return true;
   auto index = static_cast<int64_t>(idx_val.ToUint64());
-  if (!IndexInRange(*ref.prop, index)) return true;
+  if (!IndexInRange(ref, index)) return true;
   Logic4Vec stored =
       CoerceToPropertyType(ref.obj->type, ref.prop->name, rhs_val, arena);
   ref.obj->SetProperty(ClassArrayElementKey(ref.prop->name, index), stored);
   ctx.NotifyClassHandleWatchers(ref.obj->handle);
+  return true;
+}
+
+bool TryClassArrayNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
+  const Expr* rhs = stmt->rhs;
+  if (rhs == nullptr || rhs->kind != ExprKind::kCall || rhs->text != "new" ||
+      rhs->args.empty()) {
+    return false;
+  }
+  ClassArrayRef ref;
+  if (!ResolveClassArray(stmt->lhs, ctx, arena, ref) || !ref.prop->is_dynamic)
+    return false;
+  Logic4Vec size_val = EvalExpr(rhs->args[0], ctx, arena);
+  int64_t size = SignExtend(size_val.ToUint64(), size_val.width);
+  if (size < 0) {
+    ctx.GetDiag().Error(rhs->args[0]->range.start,
+                        "dynamic array new[] size is negative",
+                        Subclause("7.5.1"));
+    return true;
+  }
+  ClassArrayRef init;
+  bool has_init =
+      rhs->args.size() > 1 && ResolveClassArray(rhs->args[1], ctx, arena, init);
+  ResizeClassArray(ref, static_cast<uint32_t>(size), has_init ? &init : nullptr,
+                   ctx, arena);
   return true;
 }
 

@@ -219,6 +219,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/eval_randomize_blocks.cpp
     simulator/eval_randomize_custom.cpp
     simulator/eval_randomize_dist.cpp
+    simulator/eval_randomize_dynamic.cpp
     simulator/eval_randomize_iterative.cpp
     simulator/eval_randomize_joint.cpp
     simulator/eval_randomize_membership.cpp

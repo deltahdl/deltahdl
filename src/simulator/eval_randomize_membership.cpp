@@ -94,10 +94,14 @@ bool TryImplicationConstraint(const Expr* rel, std::vector<RandInfo>& rands,
     return false;
   }
   // The consequent's bounds hold only where the antecedent does, so none of
-  // them folds the variable's domain.
+  // them folds the variable's domain. A consequent the solver would try as
+  // a whole is left to be tried with its antecedent, unless it derives one
+  // variable from the others, which the solver's repair of the implication
+  // applies where the antecedent holds (18.5.7.1).
   ConstraintExpr consequent =
       TranslateRelation(rel->rhs, rands, rc, /*fold=*/false);
-  if (consequent.kind == ConstraintKind::kCustom) return false;
+  if (consequent.kind == ConstraintKind::kCustom && !consequent.derive_fn)
+    return false;
   std::vector<std::string> names;
   names.reserve(rands.size());
   for (const auto& ri : rands) names.push_back(ri.name);

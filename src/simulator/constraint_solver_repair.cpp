@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "simulator/constraint_solver.h"
+#include "simulator/constraint_solver_internal.h"
 
 namespace delta {
 
@@ -53,23 +54,39 @@ bool IsComparison(ConstraintKind kind) {
 
 }  // namespace
 
-void ConstraintSolver::RepairConditionalConstraints(
+void ConstraintSolver::RepairConstraints(
     const std::vector<ConstraintExpr>& extra) {
-  auto visit = [&](const ConstraintExpr& c) {
-    if (c.kind != ConstraintKind::kImplication || !c.cond_fn ||
-        !c.cond_fn(values_)) {
-      return;
-    }
-    for (const ConstraintExpr& sub : c.sub_constraints) ApplyConsequent(sub);
-  };
   for (const auto& block : blocks_) {
     if (!block.enabled) continue;
-    for (const auto& c : block.constraints) visit(c);
+    for (const auto& c : block.constraints) RepairConstraint(c);
   }
-  for (const auto& c : extra) visit(c);
+  for (const auto& c : extra) RepairConstraint(c);
 }
 
-void ConstraintSolver::ApplyConsequent(const ConstraintExpr& sub) {
+void ConstraintSolver::RepairConstraint(const ConstraintExpr& c) {
+  if (c.kind == ConstraintKind::kCustom) {
+    ApplyCustomRepair(c);
+    return;
+  }
+  if (c.kind == ConstraintKind::kForeach) {
+    size_t count =
+        ClampCountToSize(c.sub_constraints.size(), c.size_var, values_);
+    for (size_t i = 0; i < count; ++i) RepairConstraint(c.sub_constraints[i]);
+    return;
+  }
+  if (c.kind != ConstraintKind::kImplication || !c.cond_fn ||
+      !c.cond_fn(values_)) {
+    return;
+  }
+  for (const ConstraintExpr& sub : c.sub_constraints) RepairConsequent(sub);
+}
+
+void ConstraintSolver::RepairConsequent(const ConstraintExpr& sub) {
+  if (sub.kind == ConstraintKind::kCustom ||
+      sub.kind == ConstraintKind::kImplication) {
+    RepairConstraint(sub);
+    return;
+  }
   if (EvalConstraint(sub) || !RepairMayWrite(sub.var_name)) return;
   auto it = variables_.find(sub.var_name);
   if (sub.kind == ConstraintKind::kEqual) {
@@ -100,15 +117,6 @@ std::vector<int64_t> StructuredCandidates(const RandVariable& var) {
   return out;
 }
 
-void ConstraintSolver::RepairCustomConstraints(
-    const std::vector<ConstraintExpr>& extra) {
-  for (const auto& block : blocks_) {
-    if (!block.enabled) continue;
-    for (const auto& c : block.constraints) ApplyCustomRepair(c);
-  }
-  for (const auto& c : extra) ApplyCustomRepair(c);
-}
-
 // Whether the variable `name` is one a repair may write: one the solver
 // holds, active, integral and, 18.4.2, not randc, which is drawn from its
 // own cycle alone, and, 18.8, holding no state value, which is never
@@ -135,12 +143,30 @@ void ConstraintSolver::RepairFromCandidates(const ConstraintExpr& c) {
   values_[name] = satisfying[pick(rng_)];
 }
 
+// The derived variable written from the others: the value the expression
+// takes where the relation is an equality, and a fresh draw from its domain
+// narrowed by the bound the expression gives it under any other comparison.
+void ConstraintSolver::ApplyDerived(const ConstraintExpr& c) {
+  if (!RepairMayWrite(c.var_name)) return;
+  int64_t derived = c.derive_fn(values_);
+  if (c.derive_cmp == ConstraintKind::kEqual) {
+    values_[c.var_name] = derived;
+    return;
+  }
+  ConstraintExpr bound;
+  bound.kind = c.derive_cmp;
+  bound.lo = derived;
+  RandVariable narrowed = Narrowed(variables_.find(c.var_name)->second, bound);
+  if (narrowed.min_val > narrowed.max_val) return;
+  values_[c.var_name] = GenerateRandValue(narrowed);
+}
+
 void ConstraintSolver::ApplyCustomRepair(const ConstraintExpr& c) {
   if (c.kind != ConstraintKind::kCustom || !c.eval_fn || c.eval_fn(values_)) {
     return;
   }
   if (c.derive_fn) {
-    if (RepairMayWrite(c.var_name)) values_[c.var_name] = c.derive_fn(values_);
+    ApplyDerived(c);
     return;
   }
   if (c.ref_vars.size() == 1 && RepairMayWrite(c.ref_vars[0])) {

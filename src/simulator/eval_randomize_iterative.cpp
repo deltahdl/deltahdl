@@ -1,3 +1,4 @@
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -19,27 +20,50 @@ namespace delta {
 // a loop variable and an indexing expression -- a foreach iterative constraint
 // (18.5.7.1) -- or through an array reduction method (18.5.7.2).
 
-namespace {
+Expr* RewriteExpr(const Expr* e, const ExprRewrite& rewrite, Arena& arena) {
+  if (e == nullptr) return nullptr;
+  if (Expr* replaced = rewrite(e)) return replaced;
+  auto* copy = arena.Create<Expr>(*e);
+  copy->lhs = RewriteExpr(e->lhs, rewrite, arena);
+  copy->rhs = RewriteExpr(e->rhs, rewrite, arena);
+  copy->condition = RewriteExpr(e->condition, rewrite, arena);
+  copy->true_expr = RewriteExpr(e->true_expr, rewrite, arena);
+  copy->false_expr = RewriteExpr(e->false_expr, rewrite, arena);
+  copy->base = RewriteExpr(e->base, rewrite, arena);
+  copy->index = RewriteExpr(e->index, rewrite, arena);
+  copy->index_end = RewriteExpr(e->index_end, rewrite, arena);
+  copy->with_expr = RewriteExpr(e->with_expr, rewrite, arena);
+  copy->repeat_count = RewriteExpr(e->repeat_count, rewrite, arena);
+  for (auto*& arg : copy->args) arg = RewriteExpr(arg, rewrite, arena);
+  for (auto*& elem : copy->elements) elem = RewriteExpr(elem, rewrite, arena);
+  for (auto*& key : copy->pattern_keys) key = RewriteExpr(key, rewrite, arena);
+  return copy;
+}
 
-// The substitution one instance of a foreach constraint_set makes: the loop
-// variable stands for `index`, and a select of `array` at the loop variable
-// names the element at that index.
-struct ForeachInstance {
-  std::string_view loop_var;
-  std::string_view array;
-  int64_t index;
-};
-
-Expr* Instance(const Expr* e, const ForeachInstance& inst, Arena& arena);
-
-// An identifier node spelling `text`, the text held by the arena.
-Expr* Identifier(std::string_view text, const Expr* like, Arena& arena) {
+Expr* IdentifierExpr(std::string_view text, const Expr* like, Arena& arena) {
   auto* id = arena.Create<Expr>();
   id->kind = ExprKind::kIdentifier;
   id->range = like->range;
   id->text = {arena.AllocString(text.data(), text.size()), text.size()};
   return id;
 }
+
+namespace {
+
+// The substitution one instance of a foreach constraint_set makes: the loop
+// variable stands for `index`, and a select of `array` at the loop variable,
+// or at any index expression free of names that reads as one of the `count`
+// indexes from `lo`, names the element at that index.
+struct ForeachInstance {
+  std::string_view loop_var;
+  std::string_view array;
+  int64_t index;
+  int64_t lo;
+  uint32_t count;
+  RandomizeCtx& rc;
+};
+
+Expr* Instance(const Expr* e, const ForeachInstance& inst);
 
 // A decimal literal of `value`, which the loop variable's index is.
 Expr* IndexLiteral(int64_t value, const Expr* like, Arena& arena) {
@@ -52,67 +76,106 @@ Expr* IndexLiteral(int64_t value, const Expr* like, Arena& arena) {
   return literal;
 }
 
-// Whether `e` is a select of the iterated array at the loop variable alone,
-// `A[i]`, which one instance reads as the element's own variable.
-bool SelectsElement(const Expr* e, const ForeachInstance& inst) {
+// Whether `e` is a single-index select of the iterated array.
+bool SelectsArray(const Expr* e, const ForeachInstance& inst) {
   return e->kind == ExprKind::kSelect && e->index_end == nullptr &&
          e->base != nullptr && e->base->kind == ExprKind::kIdentifier &&
-         e->base->text == inst.array && e->index != nullptr &&
-         e->index->kind == ExprKind::kIdentifier &&
-         e->index->text == inst.loop_var;
+         e->base->text == inst.array && e->index != nullptr;
 }
 
-// A copy of `e` whose subexpressions are instanced.
-Expr* CopyInstanced(const Expr* e, const ForeachInstance& inst, Arena& arena) {
-  auto* copy = arena.Create<Expr>(*e);
-  copy->lhs = Instance(e->lhs, inst, arena);
-  copy->rhs = Instance(e->rhs, inst, arena);
-  copy->condition = Instance(e->condition, inst, arena);
-  copy->true_expr = Instance(e->true_expr, inst, arena);
-  copy->false_expr = Instance(e->false_expr, inst, arena);
-  copy->base = Instance(e->base, inst, arena);
-  copy->index = Instance(e->index, inst, arena);
-  copy->index_end = Instance(e->index_end, inst, arena);
-  copy->with_expr = Instance(e->with_expr, inst, arena);
-  copy->repeat_count = Instance(e->repeat_count, inst, arena);
-  for (auto*& arg : copy->args) arg = Instance(arg, inst, arena);
-  for (auto*& elem : copy->elements) elem = Instance(elem, inst, arena);
-  for (auto*& key : copy->pattern_keys) key = Instance(key, inst, arena);
-  return copy;
+// Whether `e` is written over literals alone, so that it reads the same
+// whatever is in scope: a literal, or an operator over such operands.
+bool IsLiteralExpr(const Expr* e) {
+  if (e->kind == ExprKind::kIntegerLiteral) return true;
+  if (e->kind != ExprKind::kBinary && e->kind != ExprKind::kUnary) return false;
+  return (e->lhs == nullptr || IsLiteralExpr(e->lhs)) &&
+         (e->rhs == nullptr || IsLiteralExpr(e->rhs));
+}
+
+// 18.5.7.1: a select of the iterated array whose instanced index reads as
+// one of its elements -- `A[i]` and the clause's `A[k+1]` -- as the
+// identifier of that element's key, which the trial binds to the element's
+// variable; null for a select at an index over a name, a state variable's
+// or another array's, which the trial reads against the elements it binds,
+// or at one beyond the elements, which reads the element type's default.
+Expr* ElementSelect(const Expr* e, const ForeachInstance& inst) {
+  Expr* index = Instance(e->index, inst);
+  if (!IsLiteralExpr(index)) return nullptr;
+  Logic4Vec value = EvalExpr(index, inst.rc.ctx, inst.rc.arena);
+  int64_t at = value.is_signed ? SignExtend(value.ToUint64(), value.width)
+                               : static_cast<int64_t>(value.ToUint64());
+  if (at < inst.lo || at >= inst.lo + static_cast<int64_t>(inst.count))
+    return nullptr;
+  return IdentifierExpr(ClassArrayElementKey(inst.array, at), e, inst.rc.arena);
 }
 
 // 18.5.7.1: `e` as one instance of the constraint_set reads it: the loop
-// variable as the index, a select of the array at the loop variable as the
+// variable as the index, a select of the array at an element's index as the
 // element's variable, and anything else as written over instanced operands.
-// A select of the array at another index is left as the select it is, which
-// the trial reads against the elements it binds.
-Expr* Instance(const Expr* e, const ForeachInstance& inst, Arena& arena) {
-  if (e == nullptr) return nullptr;
-  if (e->kind == ExprKind::kIdentifier && e->text == inst.loop_var)
-    return IndexLiteral(inst.index, e, arena);
-  if (SelectsElement(e, inst))
-    return Identifier(ClassArrayElementKey(inst.array, inst.index), e, arena);
-  return CopyInstanced(e, inst, arena);
+Expr* Instance(const Expr* e, const ForeachInstance& inst) {
+  return RewriteExpr(
+      e,
+      [&inst](const Expr* n) -> Expr* {
+        if (n->kind == ExprKind::kIdentifier && n->text == inst.loop_var)
+          return IndexLiteral(inst.index, n, inst.rc.arena);
+        return SelectsArray(n, inst) ? ElementSelect(n, inst) : nullptr;
+      },
+      inst.rc.arena);
 }
 
-// 18.5.7.1: the relations `ref` instances over the array `array`, built once
-// per class and kept on it. A header naming more than one loop variable
+// 18.5.7.1: the relations `ref` instances over `count` elements of the array
+// `array` from the index `lo`, one instance of each relation of the
+// constraint_set per element in index order, built once per class and count
+// and kept on the class. A header naming more than one loop variable
 // iterates a dimension the object does not model, and instances nothing.
-const std::vector<Expr*>& ForeachInstances(
-    const ConstraintForeachRef& ref, const ClassTypeInfo::PropertyInfo& array,
-    RandomizeCtx& rc) {
-  auto& cache = rc.obj->type->foreach_instances;
-  auto it = cache.find(&ref);
-  if (it != cache.end()) return it->second;
-  std::vector<Expr*>& instances = cache[&ref];
-  if (ref.loop_vars.size() != 1 || ref.loop_vars[0].empty()) return instances;
-  for (uint32_t i = 0; i < array.array_size; ++i) {
-    ForeachInstance inst{ref.loop_vars[0], ref.array_name,
-                         array.array_lo + static_cast<int64_t>(i)};
-    for (const Expr* rel : ref.body)
-      instances.push_back(Instance(rel, inst, rc.arena));
+const std::vector<Expr*>& ForeachInstances(const ConstraintForeachRef& ref,
+                                           int64_t lo, uint32_t count,
+                                           RandomizeCtx& rc) {
+  auto& cached = rc.obj->type->foreach_instances[&ref];
+  if (cached.count == count && !cached.relations.empty()) {
+    return cached.relations;
   }
-  return instances;
+  cached.count = count;
+  cached.relations.clear();
+  if (ref.loop_vars.size() != 1 || ref.loop_vars[0].empty()) {
+    return cached.relations;
+  }
+  for (uint32_t i = 0; i < count; ++i) {
+    ForeachInstance inst{ref.loop_vars[0],
+                         ref.array_name,
+                         lo + static_cast<int64_t>(i),
+                         lo,
+                         count,
+                         rc};
+    for (const Expr* rel : ref.body)
+      cached.relations.push_back(Instance(rel, inst));
+  }
+  return cached.relations;
+}
+
+// 18.5.7.1: the elements of the array `array` a foreach iterates: the rand
+// element variables where the member is random, else the elements the
+// object holds; `size_var` names the variable holding a dynamic array's
+// size where a randomize() solves it, and stays empty where the size is a
+// fact about the object.
+struct IteratedElements {
+  int64_t lo = 0;
+  uint32_t count = 0;
+  std::string size_var;
+};
+
+IteratedElements ElementsOf(const ClassTypeInfo::PropertyInfo& array,
+                            std::vector<RandInfo>& rands, RandomizeCtx& rc) {
+  IteratedElements out;
+  out.lo = array.is_dynamic ? 0 : array.array_lo;
+  uint32_t rand_count = 0;
+  for (const auto& ri : rands) {
+    if (ri.array_base == array.name && !ri.var.is_array_size) ++rand_count;
+  }
+  out.count = rand_count > 0 ? rand_count : ClassArraySize(rc.obj, array);
+  if (array.is_dynamic && FindRand(rands, ClassArraySizeKey(array.name)))
+    out.size_var = ClassArraySizeKey(array.name);
+  return out;
 }
 
 // 18.5.7.2: the operand a reduction method named `method` joins the elements
@@ -139,7 +202,8 @@ std::vector<std::string> ElementNames(std::string_view array,
                                       std::vector<RandInfo>& rands) {
   std::vector<std::string> names;
   for (const auto& ri : rands) {
-    if (ri.array_base == array) names.push_back(ri.name);
+    if (ri.array_base == array && !ri.var.is_array_size)
+      names.push_back(ri.name);
   }
   return names;
 }
@@ -199,7 +263,44 @@ bool TryArrayReductionConstraint(const Expr* rel, std::vector<RandInfo>& rands,
   out.reduce_width = elem != nullptr ? elem->var.width : 32;
   out.reduce_vars = elements;
   out.ref_vars = std::move(elements);
+  // 18.5.7.2: over a dynamic array whose size is solved, the elements below
+  // the size drawn, the size constraints being solved first.
+  std::string size_var =
+      ClassArraySizeKey(elem != nullptr ? elem->array_base : std::string());
+  if (FindRand(rands, size_var) != nullptr) {
+    out.size_var = size_var;
+    out.ref_vars.push_back(size_var);
+  }
   return true;
+}
+
+// One foreach constraint being built into a block: its relations instanced
+// over the elements, `rel_count` of them per element in index order, the
+// elements iterated, and whether a relation folds its variable's domain.
+struct ForeachBuild {
+  const std::vector<Expr*>& instances;
+  size_t rel_count;
+  const IteratedElements& elems;
+  bool fold;
+};
+
+// 18.5.7.1: the relation at `rel` of a foreach constraint_set over a dynamic
+// array whose size is solved, as the solver's foreach over its instances in
+// index order, of which the ones below the size drawn are imposed, the size
+// being a state variable there.
+ConstraintExpr SizedForeach(const ForeachBuild& build, size_t rel,
+                            std::vector<RandInfo>& rands, RandomizeCtx& rc) {
+  ConstraintExpr ce;
+  ce.kind = ConstraintKind::kForeach;
+  ce.size_var = build.elems.size_var;
+  ce.ref_vars.push_back(build.elems.size_var);
+  for (size_t i = rel; i < build.instances.size(); i += build.rel_count) {
+    ConstraintExpr sub =
+        TranslateRelation(build.instances[i], rands, rc, build.fold);
+    for (const auto& name : sub.ref_vars) ce.ref_vars.push_back(name);
+    ce.sub_constraints.push_back(std::move(sub));
+  }
+  return ce;
 }
 
 void AddForeachConstraints(const ClassMember* m, std::vector<RandInfo>& rands,
@@ -208,9 +309,17 @@ void AddForeachConstraints(const ClassMember* m, std::vector<RandInfo>& rands,
     if (ref.body.empty()) continue;
     const auto* array = FindClassArrayProperty(rc.obj->type, ref.array_name);
     if (array == nullptr) continue;
-    for (const Expr* rel : ForeachInstances(ref, *array, rc)) {
+    IteratedElements elems = ElementsOf(*array, rands, rc);
+    ForeachBuild build{ForeachInstances(ref, elems.lo, elems.count, rc),
+                       ref.body.size(), elems, block.enabled};
+    if (!elems.size_var.empty()) {
+      for (size_t rel = 0; rel < ref.body.size(); ++rel)
+        block.constraints.push_back(SizedForeach(build, rel, rands, rc));
+      continue;
+    }
+    for (const Expr* rel : build.instances) {
       block.constraints.push_back(
-          TranslateRelation(rel, rands, rc, /*fold=*/block.enabled));
+          TranslateRelation(rel, rands, rc, /*fold=*/build.fold));
     }
   }
 }

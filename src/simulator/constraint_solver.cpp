@@ -104,6 +104,12 @@ void ConstraintSolver::AddVariable(const RandVariable& var) {
   variables_[var.name] = var;
 }
 
+const RandVariable* ConstraintSolver::FindVariable(
+    std::string_view name) const {
+  auto it = variables_.find(std::string(name));
+  return it == variables_.end() ? nullptr : &it->second;
+}
+
 void ConstraintSolver::AddConstraintBlock(const ConstraintBlock& block) {
   blocks_.push_back(block);
 }

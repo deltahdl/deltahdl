@@ -1,7 +1,10 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <random>
+#include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "simulator/constraint_solver.h"
@@ -24,5 +27,15 @@ void CollectConstraints(const std::vector<ConstraintBlock>& blocks,
                         const std::vector<ConstraintExpr>& extra,
                         std::vector<const ConstraintExpr*>& hard,
                         std::vector<const ConstraintExpr*>& soft);
+
+// 18.5.7.1: the count of an array's elements that take part in an iterative
+// constraint over it: an array's size method is a state variable there, the
+// size constraints being solved first, so only the elements whose index is
+// below the size committed in `values` under `size_var` do. An empty
+// size_var (a fixed-size array) leaves `count` unchanged. Shared between
+// constraint_solver_eval.cpp (which defines it) and
+// constraint_solver_repair.cpp.
+size_t ClampCountToSize(size_t count, const std::string& size_var,
+                        const std::unordered_map<std::string, int64_t>& values);
 
 }  // namespace delta

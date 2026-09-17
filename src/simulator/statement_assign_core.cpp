@@ -842,6 +842,7 @@ bool TryDispatchSpecialBlockingAssign(const Stmt* stmt, SimContext& ctx,
   if (TryAssocCopyAssign(stmt, ctx)) return true;
   if (TryAssocLiteralAssign(stmt, ctx, arena)) return true;
   if (TryStreamingConcatToQueueTarget(stmt, ctx, arena)) return true;
+  if (TryClassArrayNewAssign(stmt, ctx, arena)) return true;
   if (TryQueueBlockingAssign(stmt, ctx, arena)) return true;
   if (TryEventVarAssign(stmt, ctx)) return true;
   if (TryUnpackedSliceAssign(stmt, ctx, arena)) return true;

@@ -136,10 +136,10 @@ static uint32_t FixedDimensionSize(const Expr* dim, int64_t& lo,
                                             : left - right + 1);
 }
 
-// §7.4.2/§18.5.7: mark each property declared with one fixed unpacked
-// dimension as the array it is, so the object holds its elements one by one
-// and a constraint can iterate over them or reduce them. A property with
-// more than one unpacked dimension is left as it was.
+// §7.4.2/§7.5/§18.5.7: mark each property declared with one fixed or
+// dynamic unpacked dimension as the array it is, so the object holds its
+// elements one by one and a constraint can iterate over them or reduce them.
+// A property with more than one unpacked dimension is left as it was.
 static void RecordArrayProperties(ClassTypeInfo* info, const ClassDecl* cls,
                                   SimContext& ctx, Arena& arena) {
   for (const auto* member : cls->members) {
@@ -147,14 +147,17 @@ static void RecordArrayProperties(ClassTypeInfo* info, const ClassDecl* cls,
         member->unpacked_dims.size() != 1) {
       continue;
     }
+    const bool kDynamic = member->unpacked_dims[0] == nullptr;
     int64_t lo = 0;
     uint32_t size =
-        FixedDimensionSize(member->unpacked_dims[0], lo, ctx, arena);
-    if (size == 0) continue;
+        kDynamic ? 0
+                 : FixedDimensionSize(member->unpacked_dims[0], lo, ctx, arena);
+    if (size == 0 && !kDynamic) continue;
     for (auto& prop : info->properties) {
       if (prop.name != member->name) continue;
       prop.array_size = size;
       prop.array_lo = lo;
+      prop.is_dynamic = kDynamic;
     }
   }
 }

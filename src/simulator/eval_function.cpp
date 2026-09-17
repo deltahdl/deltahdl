@@ -21,12 +21,18 @@ namespace delta {
 
 // Stores `val` as the initial value of `prop` on `obj`: §7.4.2 has a
 // property declared as an array hold its elements one by one, each
-// initialized as the one value would be; any other property is stored under
-// its bare and its class-scoped name.
+// initialized as the one value would be, and §7.5 one declared with a
+// dynamic dimension hold no element until `new[]` sizes it; any other
+// property is stored under its bare and its class-scoped name.
 static void StoreClassPropertyDefault(const ClassTypeInfo* info,
                                       const ClassTypeInfo::PropertyInfo& prop,
                                       const Logic4Vec& val, ClassObject* obj,
                                       Arena& arena) {
+  if (prop.is_dynamic) {
+    obj->properties[ClassArraySizeKey(prop.name)] =
+        MakeLogic4VecVal(arena, 32, 0);
+    return;
+  }
   if (prop.array_size > 0) {
     for (uint32_t i = 0; i < prop.array_size; ++i) {
       obj->properties[ClassArrayElementKey(prop.name, prop.array_lo + i)] =

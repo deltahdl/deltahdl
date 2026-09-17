@@ -5,6 +5,7 @@
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
 #include "simulator/class_object.h"
+#include "simulator/eval_class_array.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
@@ -184,6 +185,9 @@ static bool TryFuncSpecialBlockingAssign(const Stmt* stmt, SimContext& ctx,
   // handle null. TryClassNewAssign declines unless the target has a known
   // class type.
   if (TryClassNewAssign(stmt, ctx, arena)) return true;
+  // §7.5.1: `new[]` assigned to a dynamic array property of the enclosing
+  // class, or of an object a handle names, resizes it.
+  if (TryClassArrayNewAssign(stmt, ctx, arena)) return true;
   // §7.10/§13.4: an assignment to a queue from a function body uses the queue
   // assignment path -- it rebuilds the element list, allocates fresh element
   // ids, and bumps the generation so prior references are outdated -- rather

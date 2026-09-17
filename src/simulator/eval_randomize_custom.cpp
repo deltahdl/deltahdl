@@ -17,6 +17,39 @@ namespace delta {
 
 namespace {
 
+// The local a trial binds the random variable `n` to, made on the first
+// trial of the randomize() call and kept on `rc` for the rest: a real
+// variable's (18.4.1) 64 bits wide, an integral one's as the solver's
+// variable of the name is declared, since 6.11.3 has the value read in the
+// declared width and signedness, so that an int element drawn negative
+// compares below one drawn positive (18.5.7.1), which the value taken as 32
+// unsigned bits does not.
+Variable* TrialLocal(const std::string& n, bool real, RandomizeCtx& rc) {
+  auto it = rc.trial_locals.find(n);
+  if (it != rc.trial_locals.end()) {
+    rc.ctx.BindLocalVariable(n, it->second);
+    return it->second;
+  }
+  const RandVariable* var =
+      rc.solver != nullptr && !real ? rc.solver->FindVariable(n) : nullptr;
+  uint32_t width = real                               ? 64
+                   : var != nullptr && var->width > 0 ? var->width
+                                                      : 32;
+  bool is_signed = !real && (var == nullptr || var->is_signed);
+  Variable* local = rc.ctx.CreateLocalVariable(n, width, is_signed);
+  rc.trial_locals[n] = local;
+  return local;
+}
+
+// Writes the integral `v` into the words of `value`, held to its width.
+void SetWords(Logic4Vec& value, int64_t v) {
+  if (value.nwords == 0) return;
+  auto bits = static_cast<uint64_t>(v);
+  if (value.width < 64) bits &= (uint64_t{1} << value.width) - 1;
+  value.words[0].aval = bits;
+  value.words[0].bval = 0;
+}
+
 // Evaluates `e` with each name in `names` bound to its value in `vals`, a
 // rand variable as a local so the expression reads the trial value. A name
 // `vals` lacks is a real variable's (18.4.1), whose draw the solver keeps
@@ -28,14 +61,13 @@ Logic4Vec EvalBound(const Expr* e, const std::vector<std::string>& names,
   rc.ctx.PushScope();
   for (const auto& n : names) {
     auto it = vals.find(n);
-    if (it == vals.end() && rc.solver != nullptr) {
-      rc.ctx.CreateLocalVariable(n, 64)->value =
-          MakeRealVec(rc.arena, rc.solver->GetRealValue(n), 64);
+    bool real = it == vals.end() && rc.solver != nullptr;
+    Variable* local = TrialLocal(n, real, rc);
+    if (real) {
+      local->value = MakeRealVec(rc.arena, rc.solver->GetRealValue(n), 64);
       continue;
     }
-    int64_t v = it != vals.end() ? it->second : 0;
-    rc.ctx.CreateLocalVariable(n, 32)->value =
-        MakeLogic4VecVal(rc.arena, 32, static_cast<uint64_t>(v));
+    SetWords(local->value, it != vals.end() ? it->second : 0);
   }
   Logic4Vec value;
   {
@@ -46,12 +78,16 @@ Logic4Vec EvalBound(const Expr* e, const std::vector<std::string>& names,
   return value;
 }
 
-// The side of the equality `rel` that is a bare random variable the other
-// side does not reference, so that the other side derives it; nullptr
-// where neither side is.
-const Expr* DerivedSide(const Expr* rel, std::vector<RandInfo>& rands) {
-  if (rel->kind != ExprKind::kBinary || rel->op != TokenKind::kEqEq ||
-      rel->lhs == nullptr || rel->rhs == nullptr) {
+// The side of the comparison `rel` that is a bare random variable the other
+// side does not reference, so that the other side derives it, filling `cmp`
+// with the comparison as read from that side; nullptr where neither side
+// is, or the relation is no comparison, or an inequality, which bounds
+// nothing.
+const Expr* DerivedSide(const Expr* rel, std::vector<RandInfo>& rands,
+                        ConstraintKind& cmp) {
+  if (rel->kind != ExprKind::kBinary || rel->lhs == nullptr ||
+      rel->rhs == nullptr || rel->op == TokenKind::kBangEq ||
+      !ComparisonKind(rel->op, cmp)) {
     return nullptr;
   }
   for (const Expr* side : {rel->lhs, rel->rhs}) {
@@ -59,6 +95,7 @@ const Expr* DerivedSide(const Expr* rel, std::vector<RandInfo>& rands) {
     if (side->kind == ExprKind::kIdentifier &&
         FindRand(rands, side->text) != nullptr &&
         !RefsNamedRandVar(other, side->text)) {
+      if (side == rel->rhs) ComparisonKind(MirrorComparison(rel->op), cmp);
       return side;
     }
   }
@@ -124,10 +161,14 @@ ConstraintExpr MakeCustomConstraint(const Expr* rel,
     return EvalCustomRelation(rel, names, rc, vals);
   };
   // 18.3: `x == expression` over the other random variables, the clause's
-  // data == 1 << n, derives x from them once they are drawn.
-  if (const Expr* derived = DerivedSide(rel, rands)) {
+  // data == 1 << n, derives x from them once they are drawn; 18.5.7.1: `x >
+  // expression`, the clause's A[k+1] > A[k], derives the bound x is drawn
+  // above.
+  ConstraintKind cmp = ConstraintKind::kEqual;
+  if (const Expr* derived = DerivedSide(rel, rands, cmp)) {
     const Expr* other = derived == rel->lhs ? rel->rhs : rel->lhs;
     ce.var_name = std::string(derived->text);
+    ce.derive_cmp = cmp;
     ce.derive_fn = [other, names,
                     &rc](const std::unordered_map<std::string, int64_t>& vals) {
       return EvalCustomValue(other, names, rc, vals);
