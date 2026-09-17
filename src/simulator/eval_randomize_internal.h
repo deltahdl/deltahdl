@@ -340,6 +340,14 @@ bool ExtractRandModeParts(const Expr* expr, std::string_view& obj_name,
 // `with { ... }` clause, the argument list naming the call's complete active
 // random set (null when the call takes no arguments), and whether this is the
 // randomize(null) inline constraint checker.
+// 18.7: binds, as locals of the scope the caller pushed, the members of
+// the object whose method contains the randomize() call `expr` that its
+// inline block names and neither the object being randomized `obj`, in an
+// unrestricted block, nor a local of the call answers
+// (eval_randomize_inline.cpp).
+void BindCallersMembers(const Expr* expr, ClassObject* obj, SimContext& ctx,
+                        Arena& arena);
+
 struct InlineRandomizeCall {
   const Expr* expr;
   const ClassMember* inline_block;

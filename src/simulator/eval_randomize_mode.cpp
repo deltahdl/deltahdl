@@ -106,6 +106,40 @@ InlineRandomArgs CollectInlineRandomArgs(const Expr* expr) {
   return args;
 }
 
+// The randomize() call `expr` on `obj` under the argument list `args`,
+// solved jointly with the object's active random object members where the
+// call admits it and on the object alone otherwise; whether it solved.
+static bool RandomizeCall(const Expr* expr, ClassObject* obj,
+                          const InlineRandomArgs& args, SimContext& ctx,
+                          Arena& arena) {
+  const std::unordered_set<std::string>& inline_random = args.names;
+  bool has_inline_list = args.has_list;
+  bool null_checker = args.null_checker;
+  std::unordered_set<const ClassObject*> visited;
+  // 18.5.8: the plain randomize() form randomizes the object together with all
+  // of its active random object members as a single whole, so global
+  // constraints relating variables from different objects are solved
+  // simultaneously. When the active random object set (rule a) has more than
+  // the root object, solve the tree jointly, an inline (with) block applied
+  // to the root (18.5.13.1). The argument-list form (18.11), the null
+  // checker (18.11.1) and a with clause restricting the variables it names
+  // (18.7) keep the per-object path.
+  if (!null_checker && !has_inline_list && !expr->with_has_parens) {
+    std::vector<JointObject> objects;
+    CollectActiveRandomObjects(obj, "", ctx, objects, visited);
+    if (objects.size() > 1) {
+      return RandomizeObjectTree(ctx, arena, expr, objects,
+                                 expr->inline_constraint);
+    }
+    visited.clear();
+  }
+  const std::unordered_set<std::string>* active_set =
+      (null_checker || has_inline_list) ? &inline_random : nullptr;
+  return RandomizeObject(
+      obj, ctx, arena,
+      {expr, expr->inline_constraint, active_set, null_checker}, visited);
+}
+
 bool TryEvalRandomizeMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
                                 Logic4Vec& out) {
   MethodCallParts parts;
@@ -129,35 +163,12 @@ bool TryEvalRandomizeMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
   // RandomizeObject, and the null_checker flag additionally holds any rand
   // sub-object as state.
   InlineRandomArgs args = CollectInlineRandomArgs(expr);
-  const std::unordered_set<std::string>& inline_random = args.names;
-  bool has_inline_list = args.has_list;
-  bool null_checker = args.null_checker;
-
-  std::unordered_set<const ClassObject*> visited;
-  // 18.5.8: the plain randomize() form randomizes the object together with all
-  // of its active random object members as a single whole, so global
-  // constraints relating variables from different objects are solved
-  // simultaneously. When the active random object set (rule a) has more than
-  // the root object, solve the tree jointly, an inline (with) block applied
-  // to the root (18.5.13.1). The argument-list form (18.11), the null
-  // checker (18.11.1) and a with clause restricting the variables it names
-  // (18.7) keep the per-object path.
-  if (!null_checker && !has_inline_list && !expr->with_has_parens) {
-    std::vector<JointObject> objects;
-    CollectActiveRandomObjects(obj, "", ctx, objects, visited);
-    if (objects.size() > 1) {
-      bool ok = RandomizeObjectTree(ctx, arena, expr, objects,
-                                    expr->inline_constraint);
-      out = MakeLogic4VecVal(arena, 32, ok ? 1 : 0);
-      return true;
-    }
-    visited.clear();
-  }
-  const std::unordered_set<std::string>* active_set =
-      (null_checker || has_inline_list) ? &inline_random : nullptr;
-  bool solved = RandomizeObject(
-      obj, ctx, arena,
-      {expr, expr->inline_constraint, active_set, null_checker}, visited);
+  // 18.7: the members of the caller's own object that the inline block
+  // names are bound as locals for the call, in a scope of their own.
+  ctx.PushScope();
+  BindCallersMembers(expr, obj, ctx, arena);
+  bool solved = RandomizeCall(expr, obj, args, ctx, arena);
+  ctx.PopScope();
   out = MakeLogic4VecVal(arena, 32, solved ? 1 : 0);
   return true;
 }
