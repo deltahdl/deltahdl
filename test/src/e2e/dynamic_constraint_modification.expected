@@ -1,0 +1,7 @@
+predicated: fast draws len in (3, 16) in 32 of 32, slow draws at or above 16 in 32 of 32
+constraint_mode: cap off, len at or above 200 in some of 64: 1
+constraint_mode: cap on, len at or above 200 in 0 of 64
+rand_mode: base held, top in (1000, 1008) in 32 of 32
+dist: weights 9:1 draw only 1 and 2: 1, ones outnumber twos: 1
+dist: weights 1:9 draw only 1 and 2: 1, twos outnumber ones: 1
+$finish at time 0
