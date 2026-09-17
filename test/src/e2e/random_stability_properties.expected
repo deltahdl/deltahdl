@@ -1,0 +1,5 @@
+initialization: the first static process of two instances draws alike: 1, so does the object their declarations create: 1, two static processes of one instance differ: 1
+thread: a forked thread seeded by hand with the parent's next value draws as one the fork seeded in 4 of 4, a thread added at the end of a fork leaves the earlier two agreeing in 2 of 2
+object: an object seeded by hand with the thread's next value draws as one new seeded in 4 of 4, objects created after it leave its draw agreeing: 1
+manual: the root thread seeded with 44 again replays two forked threads each creating and drawing from an object in 4 of 4
+$finish at time 1

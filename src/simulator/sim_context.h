@@ -69,7 +69,7 @@ class SimContext : public DeclaredNameTables, public RandomStability {
  public:
   SimContext(Scheduler& sched, Arena& arena, DiagEngine& diag,
              uint32_t seed = 0)
-      : scheduler_(sched), arena_(arena), diag_(diag), rng_(seed) {
+      : scheduler_(sched), arena_(arena), diag_(diag), default_seed_(seed) {
     // Wire the scheduler's back-reference so it can clear the executing process
     // when it goes idle (see Scheduler::Run).
     scheduler_.SetContext(this);
@@ -471,8 +471,8 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   void SeedUrandom(uint32_t seed);
   uint32_t UrandomRange(uint32_t min_val, uint32_t max_val);
 
-  // Returns the mt19937 stream that the running thread must draw from.
-  // Falls back to the context-wide generator when no thread is current.
+  // Returns the mt19937 stream that the running thread must draw from, or the
+  // §18.14.1 initialization RNG of the instance being built when none runs.
   std::mt19937& ActiveRng();
 
   // Pulls the next value from the active stream, the seed material a freshly
@@ -785,7 +785,7 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   Scheduler& scheduler_;
   Arena& arena_;
   DiagEngine& diag_;
-  std::mt19937 rng_;
+  uint32_t default_seed_;
   std::unordered_map<std::string_view, Variable*> variables_;
   std::unordered_map<std::string_view, Net*> nets_;
   std::vector<Scope> scope_stack_;

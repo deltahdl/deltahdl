@@ -5,20 +5,25 @@
 // §18.14.2 thread stability gives every process one, so ObjectRng,
 // SeedObjectRng and the §18.13.4/§18.13.5 get_randstate/set_randstate pair
 // read and write the stream on the ClassObject or the Process handed in and
-// touch nothing SimContext stores. The one state kept here is the seed of
-// $random, which is no generator at all: Table N.1 computes $random with the
-// §N.2 rtl_dist_uniform, whose whole state is the 32-bit seed it advances.
+// touch nothing SimContext stores. The generators kept here are the §18.14.1
+// initialization RNGs, one per module, interface or program instance, each
+// seeded with the default seed and drawn from to seed the instance's static
+// processes and the objects its static declaration initializers create; and
+// the seed of $random, which is no generator at all: Table N.1 computes
+// $random with the §N.2 rtl_dist_uniform, whose whole state is the 32-bit seed
+// it advances.
 //
-// The generator SimContext does hold -- the one seeded from its constructor's
-// seed argument, which $urandom draws from when no process is running --
-// stays with the rest of the context in src/simulator/sim_context.h, and so
-// do ActiveRng, DrawSeedForChild, Urandom32, SeedUrandom and UrandomRange,
-// each of which chooses between that generator and the running process's
-// stream. $random draws from none of them.
+// The default seed is the seed argument of SimContext's constructor and stays
+// with the rest of the context in src/simulator/sim_context.h, and so do
+// ActiveRng, DrawSeedForChild, Urandom32, SeedUrandom and UrandomRange, each
+// of which chooses between the initialization RNG of the instance being built
+// and the running process's stream. $random draws from none of them.
 
 #include <cstdint>
 #include <random>
 #include <string>
+#include <string_view>
+#include <unordered_map>
 
 #include "simulator/sim_context_types.h"
 
@@ -69,8 +74,19 @@ class RandomStability {
   // one the seedless form draws from.
   int32_t* RandomSeed() { return &random_seed_; }
 
+  // §18.14.1: each module, interface and program instance has an
+  // initialization RNG seeded with the default seed, from which its static
+  // processes and the objects its static declaration initializers create take
+  // their seeds. Hands back the one of the instance `prefix` names -- the
+  // top's prefix is empty -- creating it seeded with `default_seed` the first
+  // time the instance is named, so every instance starts from the same seed
+  // and the same static process of two instances of one module draws alike.
+  std::mt19937& InitializationRng(std::string_view prefix,
+                                  uint32_t default_seed);
+
  private:
   int32_t random_seed_ = 0;
+  std::unordered_map<std::string, std::mt19937> init_rngs_;
 };
 
 }  // namespace delta

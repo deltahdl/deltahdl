@@ -4,10 +4,11 @@
 // puts one on every Process, so each body reads or writes the stream on the
 // object or process handed in and nothing SimContext stores. The §18.13.4 and
 // §18.13.5 get_randstate/set_randstate pair serializes that stream through
-// mt19937's operator<< and operator>>.
+// mt19937's operator<< and operator>>. The §18.14.1 initialization RNGs are
+// the generators kept here, one per instance.
 //
-// The generator SimContext holds, and the draws that choose between it and the
-// running process's stream, are in src/simulator/sim_context.h and
+// The draws that choose between an initialization RNG and the running
+// process's stream are in src/simulator/sim_context.h and
 // src/simulator/sim_context.cpp.
 
 #include "simulator/sim_context_random_stability.h"
@@ -15,6 +16,7 @@
 #include <random>
 #include <sstream>
 #include <string>
+#include <string_view>
 
 #include "simulator/class_object.h"
 #include "simulator/process.h"
@@ -78,6 +80,16 @@ void RandomStability::SetRandState(ClassObject* obj, const std::string& state) {
   std::istringstream is(state);
   is >> gen;
   obj->rng_initialized = true;
+}
+
+std::mt19937& RandomStability::InitializationRng(std::string_view prefix,
+                                                 uint32_t default_seed) {
+  // §18.14.1: every initialization RNG is seeded with the default seed, so
+  // the instance's generator is created from that seed the first time the
+  // instance is named and kept from then on, its draws going in turn to the
+  // instance's static processes and static-initializer objects.
+  return init_rngs_.try_emplace(std::string(prefix), default_seed)
+      .first->second;
 }
 
 void RandomStability::SetRandState(Process* proc, const std::string& state) {

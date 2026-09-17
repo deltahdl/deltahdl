@@ -682,7 +682,10 @@ std::mt19937& SimContext::ActiveRng() {
     }
     return current_process_->rng;
   }
-  return rng_;
+  // §18.14.1: with no thread running the draw is being made while the design
+  // is built, and it seeds a static process or a static-initializer object of
+  // the instance being built, from that instance's own initialization RNG.
+  return InitializationRng(lowering_inst_prefix_, default_seed_);
 }
 
 uint32_t SimContext::DrawSeedForChild() {
@@ -700,7 +703,7 @@ void SimContext::SeedUrandom(uint32_t seed) {
     current_process_->rng_initialized = true;
     return;
   }
-  rng_.seed(seed);
+  InitializationRng(lowering_inst_prefix_, default_seed_).seed(seed);
 }
 
 uint32_t SimContext::UrandomRange(uint32_t min_val, uint32_t max_val) {

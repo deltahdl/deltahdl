@@ -14,8 +14,9 @@ uint64_t SimContext::AllocateClassObject(ClassObject* obj) {
   // value drawn from the active stream. While a thread is running this is the
   // creating thread's generator, so an object built with new inherits the next
   // value from that thread; with no thread current the draw comes from the
-  // context-wide initialization RNG, covering objects created by a static
-  // declaration initializer. Each object therefore receives its own stream.
+  // initialization RNG of the instance being built, covering objects created
+  // by a static declaration initializer. Each object therefore receives its
+  // own stream.
   obj->rng_seed = DrawSeedForChild();
   class_objects_[id] = obj;
   obj->handle = id;

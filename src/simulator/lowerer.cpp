@@ -571,9 +571,9 @@ void Lowerer::LowerProcess(const RtlirProcess& proc, bool from_program,
   // a design that uses neither.
   RecordAssertionSampleScope(proc);
   // §18.14.1: a static process is seeded with the next value from the
-  // enclosing initialization RNG. Lowering happens before any thread runs, so
-  // the active stream here is the context-wide generator, which embodies the
-  // module's initialization RNG for this test harness.
+  // initialization RNG of the enclosing instance. Lowering happens before any
+  // thread runs, so the active stream here is the initialization RNG of the
+  // instance being built, the one SetLoweringInstancePrefix last named.
   p->rng_seed = ctx_.DrawSeedForChild();
   p->gen_prefixes.assign(proc.gen_block_prefixes.begin(),
                          proc.gen_block_prefixes.end());
