@@ -1,0 +1,11 @@
+disjunction, a.x 5 and b null: solved 64 of 64, x + y is 10 in 64, x at or above y in some: 1
+disjunction, a null: randomize returns 0
+disjunction, a.x 10 and b.x 20, under x < y: solved 64 of 64, x + y is 10 in 64
+conjunction, a.x 6 and b null: solved 64 of 64, x + y is 10 in 0
+conjunction, a null: randomize returns 0
+conjunction, a.x 5 and b.x 2, under x < y: solved 64 of 64, x + y is 10 in 64
+nested, a.x 5 and b null, under x < y: solved 64 of 64, x + y is 10 in 64
+nested, a.x 8 and b null: randomize returns 0
+nested, a null: randomize returns 0
+the guarded sort: solved 32 of 32, ascending in 32, the tail above zero in some: 1
+$finish at time 0

@@ -103,6 +103,93 @@ const Expr* DerivedSide(const Expr* rel, std::vector<RandInfo>& rands,
   return nullptr;
 }
 
+// Whether `side` is a sum or difference with a bare random variable, x + q,
+// q + x, x - q or q - x, the operand q and `other` free of x, filling
+// `term` with q and `subtrahend` with whether x is taken away from it.
+bool IsAddendForm(const Expr* side, const Expr* other,
+                  std::vector<RandInfo>& rands, const Expr*& term,
+                  bool& subtrahend) {
+  if (side->kind != ExprKind::kBinary || side->lhs == nullptr ||
+      side->rhs == nullptr ||
+      (side->op != TokenKind::kPlus && side->op != TokenKind::kMinus)) {
+    return false;
+  }
+  for (const Expr* x : {side->lhs, side->rhs}) {
+    const Expr* q = x == side->lhs ? side->rhs : side->lhs;
+    if (x->kind != ExprKind::kIdentifier ||
+        FindRand(rands, x->text) == nullptr || RefsNamedRandVar(q, x->text) ||
+        RefsNamedRandVar(other, x->text)) {
+      continue;
+    }
+    term = q;
+    subtrahend = side->op == TokenKind::kMinus && x == side->rhs;
+    return true;
+  }
+  return false;
+}
+
+// 18.5.12: the side of the comparison `rel` that is a sum or difference
+// with a bare random variable the other operand and the other side are free
+// of, the clause's x+y == 10 read as deriving x; nullptr where neither side
+// is, or the relation is no comparison, or an inequality, which bounds
+// nothing. Fills `term` and `subtrahend` as IsAddendForm does.
+const Expr* AddendSide(const Expr* rel, std::vector<RandInfo>& rands,
+                       const Expr*& term, bool& subtrahend) {
+  ConstraintKind cmp = ConstraintKind::kEqual;
+  if (rel->kind != ExprKind::kBinary || rel->lhs == nullptr ||
+      rel->rhs == nullptr || rel->op == TokenKind::kBangEq ||
+      !ComparisonKind(rel->op, cmp)) {
+    return nullptr;
+  }
+  for (const Expr* side : {rel->lhs, rel->rhs}) {
+    const Expr* other = side == rel->lhs ? rel->rhs : rel->lhs;
+    if (IsAddendForm(side, other, rands, term, subtrahend)) return side;
+  }
+  return nullptr;
+}
+
+// The value `v` as the solver's variable `name` holds it, wrapped to the
+// variable's width in its signedness, so that x derived as 10 - y over a
+// pair of ints is the int whose sum with y is 10 at the width of an int.
+int64_t HeldToVariable(int64_t v, const std::string& name, RandomizeCtx& rc) {
+  const RandVariable* var =
+      rc.solver != nullptr ? rc.solver->FindVariable(name) : nullptr;
+  if (var == nullptr || var->width >= 64) return v;
+  auto bits = static_cast<uint64_t>(v) & ((uint64_t{1} << var->width) - 1);
+  return var->is_signed ? SignExtend(bits, var->width)
+                        : static_cast<int64_t>(bits);
+}
+
+// 18.5.12: sets `ce` to derive the random variable of the addend side of
+// `rel`, the clause's x+y == 10 deriving x as 10 - y: x + q and q + x
+// compared against the other side derive x from the other side less q, x -
+// q from the other side plus q, and q - x from q less the other side, under
+// the comparison as read from x. Answers false where `rel` has no such side.
+bool DeriveAddend(const Expr* rel, std::vector<RandInfo>& rands,
+                  const std::vector<std::string>& names, RandomizeCtx& rc,
+                  ConstraintExpr& ce) {
+  const Expr* term = nullptr;
+  bool subtrahend = false;
+  const Expr* side = AddendSide(rel, rands, term, subtrahend);
+  if (side == nullptr) return false;
+  const Expr* x = term == side->lhs ? side->rhs : side->lhs;
+  const Expr* other = side == rel->lhs ? rel->rhs : rel->lhs;
+  TokenKind op = side == rel->rhs ? MirrorComparison(rel->op) : rel->op;
+  if (subtrahend) op = MirrorComparison(op);
+  ce.var_name = std::string(x->text);
+  ComparisonKind(op, ce.derive_cmp);
+  bool subtract_term = side->op == TokenKind::kPlus;
+  ce.derive_fn = [other, term, subtrahend, subtract_term, names,
+                  name = ce.var_name,
+                  &rc](const std::unordered_map<std::string, int64_t>& vals) {
+    int64_t o = EvalCustomValue(other, names, rc, vals);
+    int64_t q = EvalCustomValue(term, names, rc, vals);
+    int64_t derived = subtrahend ? q - o : subtract_term ? o - q : o + q;
+    return HeldToVariable(derived, name, rc);
+  };
+  return true;
+}
+
 }  // namespace
 
 bool EvalCustomRelation(const Expr* rel, const std::vector<std::string>& names,
@@ -174,7 +261,10 @@ ConstraintExpr MakeCustomConstraint(const Expr* rel,
                     &rc](const std::unordered_map<std::string, int64_t>& vals) {
       return EvalCustomValue(other, names, rc, vals);
     };
+    return ce;
   }
+  // 18.5.12: the clause's x+y == 10 derives x from y as well.
+  DeriveAddend(rel, rands, names, rc, ce);
   return ce;
 }
 

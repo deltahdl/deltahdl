@@ -644,16 +644,28 @@ bool IsClassHandleMember(const ClassMember* m, SimContext& ctx) {
 
 // 18.5: translate one captured constraint relation into a solver
 // ConstraintExpr.
-ConstraintExpr TranslateRelation(const Expr* rel, std::vector<RandInfo>& rands,
-                                 RandomizeCtx& rc, bool fold) {
+static ConstraintExpr TranslateUnguarded(const Expr* rel,
+                                         std::vector<RandInfo>& rands,
+                                         RandomizeCtx& rc, bool fold) {
   ConstraintExpr ce;
-  rel = ResolveArraySizes(rel, rc);
   if (TryComparisonConstraint(rel, rands, rc, ce, fold)) return ce;
   if (TrySetMembershipConstraint(rel, rands, rc, ce)) return ce;
   if (TryImplicationConstraint(rel, rands, rc, ce)) return ce;
   if (TryConjunctionConstraint(rel, rands, rc, ce, fold)) return ce;
   if (TryArrayReductionConstraint(rel, rands, rc, ce)) return ce;
   return MakeCustomConstraint(rel, rands, rc);
+}
+
+// 18.5.12: an implication's antecedent is its constraint guard, resolved
+// before the relation is imposed, however the relation itself is built.
+ConstraintExpr TranslateRelation(const Expr* rel, std::vector<RandInfo>& rands,
+                                 RandomizeCtx& rc, bool fold) {
+  rel = ResolveArraySizes(rel, rc);
+  ConstraintExpr ce = TranslateUnguarded(rel, rands, rc, fold);
+  AttachConstraintGuard(
+      rel, [&rands](const Expr* e) { return RefsRandVar(e, rands); }, rc.obj,
+      rc, ce);
+  return ce;
 }
 
 // 18.11: locate a class property by name for the inline random control list,

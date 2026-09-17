@@ -155,14 +155,19 @@ void ConstraintSolver::RepairFromCandidates(const ConstraintExpr& c) {
 void ConstraintSolver::ApplyDerived(const ConstraintExpr& c) {
   if (!RepairMayWrite(c.var_name)) return;
   int64_t derived = c.derive_fn(values_);
+  const RandVariable& var = variables_.find(c.var_name)->second;
   if (c.derive_cmp == ConstraintKind::kEqual) {
-    values_[c.var_name] = derived;
+    // A value the variable's domain excludes is no repair: the draw stands,
+    // to be tried again, rather than a value outside the declared range
+    // being written back.
+    if (derived >= var.min_val && derived <= var.max_val)
+      values_[c.var_name] = derived;
     return;
   }
   ConstraintExpr bound;
   bound.kind = c.derive_cmp;
   bound.lo = derived;
-  RandVariable narrowed = Narrowed(variables_.find(c.var_name)->second, bound);
+  RandVariable narrowed = Narrowed(var, bound);
   if (narrowed.min_val > narrowed.max_val) return;
   values_[c.var_name] = GenerateRandValue(narrowed);
 }

@@ -169,6 +169,18 @@ bool TrySetMembershipConstraint(const Expr* rel, std::vector<RandInfo>& rands,
 // (eval_randomize_membership.cpp).
 bool TryImplicationConstraint(const Expr* rel, std::vector<RandInfo>& rands,
                               RandomizeCtx& rc, ConstraintExpr& out);
+// 18.5.12: where `rel` is an implication, the parser's form of every
+// implication and if-else constraint, sets on `out` the constraint guard its
+// antecedent is: the predicate whose four-state value the solver resolves
+// before it imposes `out` -- a FALSE one eliminating it, an ERROR one, an
+// evaluation error no operand sifts away, failing randomize(), and a TRUE or
+// RANDOM one generating it. `refs_rand` answers whether a subexpression
+// involves a random variable, which makes it RANDOM; any other is evaluated
+// in the scope of `owner`, whose members it names (eval_randomize_guard.cpp).
+void AttachConstraintGuard(const Expr* rel,
+                           const std::function<bool(const Expr*)>& refs_rand,
+                           ClassObject* owner, RandomizeCtx& rc,
+                           ConstraintExpr& out);
 // Evaluates `rel` with each name in `names` bound to its value in `vals`,
 // as a truth or as the value it takes.
 bool EvalCustomRelation(const Expr* rel, const std::vector<std::string>& names,

@@ -295,7 +295,17 @@ ConstraintExpr BuildJointRelation(const Expr* rel, const JointVarScope& scope,
         BuildJointRelation(rel->rhs, scope, rc, fold));
     return out;
   }
-  return MakeJointCustomConstraint(rel, scope, rc);
+  ConstraintExpr out_custom = MakeJointCustomConstraint(rel, scope, rc);
+  // 18.5.12: an implication's antecedent is its constraint guard, resolved
+  // before the relation is imposed; a subexpression over a joint variable is
+  // RANDOM, any other evaluated over the state in the owner's scope.
+  AttachConstraintGuard(
+      rel,
+      [&scope](const Expr* e) {
+        return RefsJointVar(e, scope.prefix, scope.names);
+      },
+      scope.owner, rc, out_custom);
+  return out_custom;
 }
 
 // 18.5.8 rule b: select the active constraints of every object in the tree.
