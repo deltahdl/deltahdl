@@ -520,8 +520,12 @@ Expr* Parser::MakeMemberAccess(Expr* base) {
   // §23.7 states the member select written with '.' and §23.7.1 the name
   // written after a package or class scope resolution operator, so which rule a
   // missing member name breaches depends on the operator that introduced it.
+  // §18.7.1: local::this names the this of the scope containing a
+  // randomize() call, so `this` is a member a scope resolution may name, as
+  // `super` is among the method keywords.
   auto member_tok =
-      IsMethodKeyword(CurrentToken().kind)
+      IsMethodKeyword(CurrentToken().kind) ||
+              (is_scope && Check(TokenKind::kKwThis))
           ? Consume()
           : ExpectIdentifier(Subclause(is_scope ? "23.7.1" : "23.7"));
   // §8.12: "It shall be illegal to use a typed constructor call for a shallow
