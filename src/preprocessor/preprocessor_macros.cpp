@@ -118,21 +118,52 @@ std::string Preprocessor::ExpandMacro(const MacroDef& macro,
   return SubstituteParams(macro.body, macro.params, resolved_views);
 }
 
-// Tracks nesting of the matched delimiter pairs (22.5.1) — parentheses, square
-// brackets, braces, and double-quoted strings — so a comma or right parenthesis
-// inside one of them is not treated as a separator or list terminator.
+// Whether the three characters at `i` are a triple quote, which opens or
+// closes A.8.8's triple_quoted_string.
+static bool AtTripleQuote(std::string_view text, size_t i) {
+  return text.substr(i, 3) == "\"\"\"";
+}
+
+// The index after the escaped identifier (5.6.1) opening at text[i], which
+// runs from its backslash to the next white space.
+static size_t EndOfEscapedIdentifier(std::string_view text, size_t i) {
+  while (i < text.size() &&
+         !std::isspace(static_cast<unsigned char>(text[i]))) {
+    ++i;
+  }
+  return i;
+}
+
+// Tracks the matched pairs §22.5.1 lists -- parentheses, square brackets,
+// braces, double quotes, triple quotes and an escaped identifier -- so that a
+// comma or right parenthesis inside one of them is not read as an argument
+// separator or the end of the list. Read consumes what stands at text[i] -- a
+// delimiter, one item of a string, or a whole escaped identifier -- and returns
+// the index of the next character to read; `inside` reports whether text[i]
+// stood inside a string, a triple-quoted string or an escaped identifier, where
+// a comma or parenthesis is text rather than punctuation.
 struct DelimiterTracker {
   int paren_depth = 0;
   int bracket_depth = 0;
   int brace_depth = 0;
   bool in_string = false;
+  bool in_triple = false;
 
-  bool Update(char c, char prev) {
-    if (c == '"' && prev != '\\') {
-      in_string = !in_string;
-      return true;
+  // One item of an open string, or the quote that closes it. A '"' that a
+  // backslash precedes is 5.9's escape sequence inside a quoted_string and
+  // closes nothing; a lone '"' inside a triple_quoted_string is an item of it
+  // (A.8.8), and only a `"""` closes it.
+  size_t ReadStringItem(std::string_view text, size_t i) {
+    if (in_triple) {
+      if (!AtTripleQuote(text, i)) return i + 1;
+      in_triple = false;
+      return i + 3;
     }
-    if (in_string) return true;
+    if (text[i] == '"' && text[i - 1] != '\\') in_string = false;
+    return i + 1;
+  }
+
+  void Nest(char c) {
     if (c == '(')
       ++paren_depth;
     else if (c == ')')
@@ -145,7 +176,23 @@ struct DelimiterTracker {
       ++brace_depth;
     else if (c == '}')
       --brace_depth;
-    return false;
+  }
+
+  size_t Read(std::string_view text, size_t i, bool& inside) {
+    inside = true;
+    if (in_triple || in_string) return ReadStringItem(text, i);
+    if (text[i] == '\\') return EndOfEscapedIdentifier(text, i);
+    if (AtTripleQuote(text, i)) {
+      in_triple = true;
+      return i + 3;
+    }
+    if (text[i] == '"') {
+      in_string = true;
+      return i + 1;
+    }
+    inside = false;
+    Nest(text[i]);
+    return i + 1;
   }
 
   bool AtTopLevel() const {
@@ -177,24 +224,17 @@ std::vector<std::string> Preprocessor::ParseMacroParams(
   std::vector<std::string> params;
   DelimiterTracker tracker;
   size_t start = 0;
-  for (size_t i = 0; i < param_list.size(); ++i) {
+  size_t i = 0;
+  while (i < param_list.size()) {
     // §22.5.1: a default may contain a comma inside a matched pair or an
-    // escaped identifier; such commas do not separate formal parameters. Skip
-    // an escaped identifier (runs to the next white space) whole.
-    if (!tracker.in_string && param_list[i] == '\\') {
-      while (i < param_list.size() &&
-             !std::isspace(static_cast<unsigned char>(param_list[i]))) {
-        ++i;
-      }
-      --i;
-      continue;
-    }
-    char prev = (i == 0) ? '\0' : param_list[i - 1];
-    if (tracker.Update(param_list[i], prev)) continue;
-    if (param_list[i] == ',' && tracker.AtTopLevel()) {
+    // escaped identifier; such commas do not separate formal parameters.
+    bool inside = false;
+    size_t next = tracker.Read(param_list, i, inside);
+    if (!inside && param_list[i] == ',' && tracker.AtTopLevel()) {
       AppendMacroParam(param_list.substr(start, i - start), params, defaults);
       start = i + 1;
     }
+    i = next;
   }
   AppendMacroParam(param_list.substr(start), params, defaults);
   return params;
@@ -202,43 +242,35 @@ std::vector<std::string> Preprocessor::ParseMacroParams(
 
 size_t Preprocessor::FindMacroParamListClose(std::string_view text) {
   DelimiterTracker tracker;
-  for (size_t i = 0; i < text.size(); ++i) {
-    if (!tracker.in_string && text[i] == '\\') {
-      while (i < text.size() &&
-             !std::isspace(static_cast<unsigned char>(text[i]))) {
-        ++i;
-      }
-      --i;
-      continue;
-    }
-    char prev = (i == 0) ? '\0' : text[i - 1];
-    tracker.Update(text[i], prev);
+  size_t i = 0;
+  while (i < text.size()) {
+    bool inside = false;
+    size_t next = tracker.Read(text, i, inside);
     // The list's own '(' is the sole reason paren_depth is nonzero; the first
     // ')' that returns every delimiter to top level (and is not inside a
-    // string) closes the parameter list.
-    if (text[i] == ')' && !tracker.in_string && tracker.AtTopLevel()) {
-      return i;
-    }
+    // string or an escaped identifier) closes the parameter list.
+    if (!inside && text[i] == ')' && tracker.AtTopLevel()) return i;
+    i = next;
   }
   return std::string_view::npos;
 }
 
+// The actual argument list opening at the first '(' of `text`, parentheses
+// included, or empty when the list is not closed within `text`. §22.5.1 lists
+// the matched pairs a right parenthesis is protected inside, so the ')' that
+// closes the list is the first one standing at top level of every pair.
 std::string_view Preprocessor::ExtractBalancedArgs(std::string_view text) {
   auto open = text.find('(');
   if (open == std::string_view::npos) return {};
-  int paren_depth = 0;
-  bool in_string = false;
-  for (size_t i = open; i < text.size(); ++i) {
-    if (text[i] == '"' && (i == 0 || text[i - 1] != '\\')) {
-      in_string = !in_string;
-      continue;
+  DelimiterTracker tracker;
+  size_t i = open;
+  while (i < text.size()) {
+    bool inside = false;
+    size_t next = tracker.Read(text, i, inside);
+    if (!inside && text[i] == ')' && tracker.AtTopLevel()) {
+      return text.substr(open, i - open + 1);
     }
-    if (in_string) continue;
-    if (text[i] == '(')
-      ++paren_depth;
-    else if (text[i] == ')')
-      --paren_depth;
-    if (paren_depth == 0) return text.substr(open, i - open + 1);
+    i = next;
   }
   return {};
 }
@@ -248,26 +280,17 @@ std::vector<std::string_view> Preprocessor::SplitMacroArgs(
   std::vector<std::string_view> args;
   DelimiterTracker tracker;
   size_t start = 0;
-  for (size_t i = 0; i < args_text.size(); ++i) {
-    // §22.5.1: an escaped identifier (5.6.1) counts as a matched pair for the
-    // purpose of argument splitting -- a comma or right parenthesis inside it
-    // is part of the identifier, not a separator. An escaped identifier runs
-    // from its leading backslash to the next white space, so skip the whole
-    // token.
-    if (!tracker.in_string && args_text[i] == '\\') {
-      while (i < args_text.size() &&
-             !std::isspace(static_cast<unsigned char>(args_text[i]))) {
-        ++i;
-      }
-      --i;
-      continue;
-    }
-    char prev = (i == 0) ? '\0' : args_text[i - 1];
-    if (tracker.Update(args_text[i], prev)) continue;
-    if (args_text[i] == ',' && tracker.AtTopLevel()) {
+  size_t i = 0;
+  while (i < args_text.size()) {
+    // §22.5.1: a comma inside a matched pair or an escaped identifier (5.6.1)
+    // is part of the argument, not a separator.
+    bool inside = false;
+    size_t next = tracker.Read(args_text, i, inside);
+    if (!inside && args_text[i] == ',' && tracker.AtTopLevel()) {
       args.push_back(Trim(args_text.substr(start, i - start)));
       start = i + 1;
     }
+    i = next;
   }
   args.push_back(Trim(args_text.substr(start)));
   return args;

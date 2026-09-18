@@ -230,3 +230,70 @@ TEST(Preprocessor, NameAloneBeforeALineOpeningNoListIsRejected) {
                             2, "22.5.1"));
   EXPECT_NE(result.find("\nint y;\n"), std::string::npos);
 }
+
+// §22.5.1 lists triple quotes among the matched pairs a comma is protected
+// inside, and A.8.8 makes a lone '"' an item of a triple_quoted_string rather
+// than its end, so the '"' and the ',' inside the first argument here are text
+// and the usage has two arguments, not three.
+TEST(Preprocessor, TripleQuotedArgumentKeepsItsQuoteAndComma) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define M(a, b) $display(a, b);\n"
+      "`M(\"\"\"say \"hi\", now\"\"\", 1)\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("$display(\"\"\"say \"hi\", now\"\"\", 1);"),
+            std::string::npos);
+}
+
+// The same pair protects a right parenthesis: the ')' inside the triple-quoted
+// argument does not end the list, which ends at the ')' after the second
+// argument.
+TEST(Preprocessor, TripleQuotedArgumentKeepsItsRightParenthesis) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define M(a, b) $display(a, b);\n"
+      "`M(\"\"\"a) b\"\"\", 2)\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("$display(\"\"\"a) b\"\"\", 2);"), std::string::npos);
+}
+
+// An escaped identifier (5.6.1) is also among the pairs, and runs to the next
+// white space, so the ')' inside \a)b is part of the identifier and the list
+// ends at the ')' after it.
+TEST(Preprocessor, EscapedIdentifierArgumentKeepsItsRightParenthesis) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define ID(x) x\n"
+      "assign `ID(\\a)b ) = 1;\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("assign \\a)b = 1;"), std::string::npos);
+}
+
+// A default text is protected by the same pairs as an actual argument, so a
+// triple-quoted default holding a comma and a right parenthesis is one default
+// and the formal list still closes at its own parenthesis.
+TEST(Preprocessor, TripleQuotedDefaultTextIsOneDefault) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define D(a = \"\"\"x,)y\"\"\") [a]\n"
+      "`D()\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("[\"\"\"x,)y\"\"\"]"), std::string::npos);
+}
+
+// A '"' preceded by a backslash inside a quoted_string is 5.9's escape
+// sequence and closes nothing, so the comma after it is still inside the
+// string and the usage has two arguments.
+TEST(Preprocessor, EscapedQuoteInsideAStringArgumentClosesNothing) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define M(a, b) $display(a, b);\n"
+      "`M(\"q\\\"x,y\", 1)\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("$display(\"q\\\"x,y\", 1);"), std::string::npos);
+}
