@@ -214,7 +214,12 @@ jobs:
             -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
       # The run itself is expected to print the transitive-use diagnostic for
       # most of the tree, so its exit status says nothing this job asks about
-      # and the report is read out of the output instead.
+      # and the report is read out of the output instead. That output goes to
+      # the log as it comes, through tee, so the step shows which translation
+      # units it ran the check over and what the check said about each; the
+      # step used to write it to tidy.log alone and print nothing at all when
+      # it found no dead include, which left a reader of a green run with no
+      # way to tell what had been checked.
       - name: Check for includes no symbol uses
         run: |
           run-clang-tidy -p build \
@@ -222,13 +227,14 @@ jobs:
             -config-file=etc/clang_tidy/dead_includes.yml \
             -extra-arg=-ferror-limit=0 \
             -extra-arg=-w \
-            '^(?!.*/test/).*\.cpp$' > tidy.log 2>&1 || true
+            '^(?!.*/test/).*\.cpp$' 2>&1 | tee tidy.log || true
           grep -E 'is not used directly' tidy.log | sort -u > dead.log || true
           if [ -s dead.log ]; then
             echo "::error ::includes no symbol uses; remove them"
             cat dead.log
             exit 1
           fi
+          echo "no translation unit under src/ includes a header no symbol in it uses"
   assert-no-duplicate-test-names:
     runs-on: ubuntu-latest
     steps:
