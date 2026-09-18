@@ -531,8 +531,7 @@ def main() -> None:
         sys.exit(1)
 
     if args.junit_xml:
-        elapsed = time.monotonic() - suite_start
-        write_junit_xml(results, elapsed, args.junit_xml)
+        write_junit_xml(results, time.monotonic() - suite_start, args.junit_xml)
         print(f"\nJUnit XML written to {args.junit_xml}", flush=True)
 
     sys.exit(min(failed, 1))
