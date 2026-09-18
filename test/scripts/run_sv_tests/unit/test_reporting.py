@@ -238,6 +238,7 @@ class TestMainBrokenPipe:
         with patch("sys.argv", argv), \
              patch.object(rst, "check_binary"), \
              patch.object(rst.glob, "glob", return_value=["/x/a.sv"]), \
+             patch.object(rst, "load_libraries", return_value={}), \
              patch.object(rst, "build_result", return_value=self._FAKE_RESULT), \
              patch.object(rst, "print_status", side_effect=BrokenPipeError), \
              patch.object(rst.os, "open", return_value=99), \

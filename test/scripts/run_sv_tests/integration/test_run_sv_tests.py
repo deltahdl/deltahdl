@@ -2,6 +2,7 @@ import subprocess
 from collections.abc import Callable
 from pathlib import Path
 from types import ModuleType
+from typing import Any
 from unittest.mock import MagicMock, patch
 from xml.etree import ElementTree as ET
 
@@ -182,17 +183,24 @@ def _all_passing_run(rst: ModuleType) -> Callable[[], None]:
     return run
 
 
-def _run_with_a_failing_pool(rst: ModuleType) -> Callable[[], None]:
+def _main_over_one_file(rst: ModuleType, **patches: Any) -> Callable[[], None]:
     def run() -> None:
         with patch("sys.argv", ["run_sv_tests.py"]), \
              patch.object(rst, "check_binary"), \
              patch.object(rst.glob, "glob", return_value=["/tests/chapter-5/a.sv"]), \
-             patch.object(rst, "load_libraries", return_value={}), \
-             patch.object(rst, "ThreadPoolExecutor") as mock_pool_cls:
-            mock_pool_cls.return_value.__enter__.return_value \
-                .map.side_effect = OSError("too many open files")
+             patch.multiple(rst, **patches):
             rst.main()
     return run
+
+
+def _run_with_a_failing_pool(rst: ModuleType) -> Callable[[], None]:
+    mock_pool_cls = MagicMock()
+    mock_pool_cls.return_value.__enter__.return_value \
+        .map.side_effect = OSError("too many open files")
+    return _main_over_one_file(
+        rst, load_libraries=MagicMock(return_value={}),
+        ThreadPoolExecutor=mock_pool_cls,
+    )
 
 
 def test_all_pass_exits_zero(
@@ -224,21 +232,16 @@ def test_no_tests_exits_one(
     assert get_exit_code(run) == 1
 
 
-def _run_with_a_library_not_checked_out(rst: ModuleType) -> Callable[[], None]:
-    def run() -> None:
-        with patch("sys.argv", ["run_sv_tests.py"]), \
-             patch.object(rst, "check_binary"), \
-             patch.object(rst.glob, "glob", return_value=["/tests/chapter-5/a.sv"]), \
-             patch.object(
-                 rst, "load_libraries",
-                 side_effect=FileNotFoundError(
-                     "library 'uvm' names /tp/uvm_pkg.sv, which is not checked out",
-                 ),
-             ), \
-             patch.object(rst.subprocess, "run") as mock_run:
-            rst.main()
-        assert mock_run.call_count == 0
-    return run
+def _run_with_a_library_not_checked_out(
+    rst: ModuleType, mock_pool_cls: MagicMock | None = None,
+) -> Callable[[], None]:
+    return _main_over_one_file(
+        rst,
+        load_libraries=MagicMock(side_effect=FileNotFoundError(
+            "library 'uvm' names /tp/uvm_pkg.sv, which is not checked out",
+        )),
+        ThreadPoolExecutor=mock_pool_cls or MagicMock(),
+    )
 
 
 def test_a_library_not_checked_out_exits_one(
@@ -248,7 +251,7 @@ def test_a_library_not_checked_out_exits_one(
     assert get_exit_code(_run_with_a_library_not_checked_out(rst)) == 1
 
 
-def test_a_library_not_checked_out_is_named_before_any_file_runs(
+def test_a_library_not_checked_out_is_named_on_stderr(
     rst: ModuleType,
     capsys: pytest.CaptureFixture[str],
     get_exit_code: Callable[[Callable[[], object]], int | str | None],
@@ -258,6 +261,15 @@ def test_a_library_not_checked_out_is_named_before_any_file_runs(
         "error: FileNotFoundError: library 'uvm' names /tp/uvm_pkg.sv"
         in capsys.readouterr().err
     )
+
+
+def test_a_library_not_checked_out_stops_the_run_before_any_file(
+    rst: ModuleType,
+    get_exit_code: Callable[[Callable[[], object]], int | str | None],
+) -> None:
+    mock_pool_cls = MagicMock()
+    get_exit_code(_run_with_a_library_not_checked_out(rst, mock_pool_cls))
+    assert mock_pool_cls.call_count == 0
 
 
 def test_pool_map_exception_still_exits(

@@ -325,14 +325,20 @@ def _rejection_matches_tag(stderr: str, clause: str) -> bool:
     return any(subclause_is_within(r, clause) for r in reported)
 
 
-def _score(
-    ok: bool, stderr: str, returncode: int, should_fail: bool, clause: str,
+def _run_and_score(
+    path: str, metadata: dict[str, str], library: Library,
 ) -> tuple[str, str, int, int]:
-    if should_fail:
+    ok, stderr, returncode = run_test(
+        path,
+        simulate="simulation" in metadata.get("type", "").split(),
+        defines=metadata.get("defines", "").split(),
+        library=library,
+    )
+    if metadata.get("should_fail_because"):
         ok = (
             returncode == 1
             and bool(stderr.strip())
-            and _rejection_matches_tag(stderr, clause)
+            and _rejection_matches_tag(stderr, tagged_clause(metadata))
         )
     return "pass" if ok else "fail", stderr, int(ok), returncode
 
@@ -356,20 +362,15 @@ def build_result(
     try:
         metadata = parse_metadata(path)
         name = _tag_prefixed(name, metadata)
-        simulate = "simulation" in metadata.get("type", "").split()
         should_fail = bool(metadata.get("should_fail_because"))
-        defines = metadata.get("defines", "").split()
         clause = tagged_clause(metadata)
         library = library_for(metadata, libraries or {})
 
         t0 = time.monotonic()
         returncode: int | None = None
         try:
-            ok, stderr, exit_code = run_test(
-                path, simulate=simulate, defines=defines, library=library,
-            )
-            status, stderr, ok_int, returncode = _score(
-                ok, stderr, exit_code, should_fail, clause,
+            status, stderr, ok_int, returncode = _run_and_score(
+                path, metadata, library,
             )
         except subprocess.TimeoutExpired:
             status, stderr, ok_int = "timeout", "", 0
@@ -452,6 +453,14 @@ def corpus_revision() -> str:
     return result.stdout.strip()
 
 
+def _libraries_or_exit() -> dict[str, Library]:
+    try:
+        return load_libraries()
+    except (OSError, ValueError, KeyError) as exc:
+        print(f"error: {type(exc).__name__}: {exc}", file=sys.stderr)
+        sys.exit(1)
+
+
 def main() -> None:
     args = parse_args()
 
@@ -462,11 +471,7 @@ def main() -> None:
         print(f"error: no .sv files found in {TEST_DIR}", file=sys.stderr)
         sys.exit(1)
 
-    try:
-        libraries = load_libraries()
-    except (OSError, ValueError, KeyError) as exc:
-        print(f"error: {type(exc).__name__}: {exc}", file=sys.stderr)
-        sys.exit(1)
+    libraries = _libraries_or_exit()
 
     results: list[dict[str, Any]] = []
     ok_flags: list[int] = []
@@ -474,8 +479,9 @@ def main() -> None:
 
     try:
         with ThreadPoolExecutor(max_workers=os.cpu_count()) as pool:
-            build = partial(build_result, libraries=libraries)
-            for result, ok in pool.map(build, tests):
+            for result, ok in pool.map(
+                partial(build_result, libraries=libraries), tests,
+            ):
                 results.append(result)
                 ok_flags.append(ok)
     except (OSError, subprocess.SubprocessError, RuntimeError) as exc:

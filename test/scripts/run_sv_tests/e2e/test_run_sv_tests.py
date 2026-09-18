@@ -224,7 +224,7 @@ def test_junit_xml_structure(tmp_path: Path) -> None:
 def _make_argv_recording_binary(tmp_path: Path, record: Path) -> Path:
     binary = tmp_path / "deltahdl"
     binary.write_text(
-        f"#!/usr/bin/env bash\nprintf '%s\\n' \"$@\" >> {record}\nexit 0\n"
+        f"#!/usr/bin/env bash\nprintf '%s\\n' \"$*\" >> {record}\nexit 0\n"
     )
     binary.chmod(binary.stat().st_mode | stat.S_IEXEC)
     return binary
@@ -249,10 +249,13 @@ def test_a_uvm_tagged_file_is_handed_the_corpus_library(tmp_path: Path) -> None:
     record = tmp_path / "argv.txt"
     binary = _make_argv_recording_binary(tmp_path, record)
     result = _run_over_tree(test_dir, binary)
-    argv = record.read_text().splitlines()
-    alpha = argv.index(str(test_dir / "chapter-5" / "alpha.sv"))
-    assert (result.returncode, argv[alpha - 2:alpha]) == (
-        0, [f"+incdir+{src}", str(uvm_pkg)],
+    alpha = str(test_dir / "chapter-5" / "alpha.sv")
+    argv = [
+        line.split(" ") for line in record.read_text().splitlines()
+        if line.endswith(alpha)
+    ]
+    assert (result.returncode, argv) == (
+        0, [["--lint-only", f"+incdir+{src}", str(uvm_pkg), alpha]],
     )
 
 
@@ -264,8 +267,9 @@ def test_a_library_the_corpus_names_but_lacks_stops_the_run(
     record = tmp_path / "argv.txt"
     binary = _make_argv_recording_binary(tmp_path, record)
     result = _run_over_tree(test_dir, binary)
-    assert (result.returncode, record.exists()) == (1, False)
-    assert "library 'uvm' names" in result.stderr
+    assert (
+        result.returncode, record.exists(), "library 'uvm' names" in result.stderr,
+    ) == (1, False, True)
 
 
 def test_summary_names_the_corpus_commit(tmp_path: Path) -> None:
