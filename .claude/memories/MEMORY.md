@@ -68,7 +68,7 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 
 ## Issues
 
-- [File what the session finds](filing-what-a-session-finds.md) — file it when you find it; do not describe it in a reply and ask.
+- [Solve what the session finds](solving-what-a-session-finds.md) — fix it in this session rather than filing it; a failing integration or e2e test in deltahdl.yml is the one exception.
 - [What does not get filed](what-does-not-get-filed.md) — nothing the commit in hand fixes, nothing an open issue already covers.
 - [Splitting what one reading found](splitting-what-one-reading-found.md) — a scope that could close alone gets its own issue.
 

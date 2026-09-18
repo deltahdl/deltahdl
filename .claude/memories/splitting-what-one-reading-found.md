@@ -11,4 +11,4 @@ One reading often turns up more than one scope. A scope that closes by finishing
 
 **Why:** An issue that would only close when a whole family did never closes cleanly: it sits open while most of its content is done, and nothing in the tracker says which part is left.
 
-**How to apply:** Deciding this is the work of filing, not an afterthought to it. Ask of each finding whether it could be finished and closed alone; where it could, give it its own issue. See [filing-what-a-session-finds](filing-what-a-session-finds.md).
+**How to apply:** Deciding this is the work of filing, not an afterthought to it. Ask of each finding whether it could be finished and closed alone; where it could, give it its own issue. Filing is the exception rather than the rule, per [solving-what-a-session-finds](solving-what-a-session-finds.md); this applies to what is filed regardless.

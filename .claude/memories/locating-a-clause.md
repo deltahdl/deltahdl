@@ -25,5 +25,7 @@ Locate a clause with the Read tool and nothing else: read the contents pages at 
 - §16.12 Declaring properties: 440. §16.12.1 Property instantiation: 444.
 - §16.13.6 Sequence methods: 472.
 - §16.14 Concurrent assertions: 476. §16.14.1 Assert statement: 477. §16.14.5 Outside procedural code: 481. §16.14.6 Embedding in procedural code: 482.
+- Contents page listing clauses 19.6 through 22.10: 17.
+- §22.5 `define, `undef, and `undefineall and §22.5.1 `define: 707, running to 709, where Syntax 22-3 gives the text macro usage. §22.12 `line and §22.13 `__FILE__ and `__LINE__: 721.
 
 Add a landmark here whenever a session resolves a clause it had to hunt for.

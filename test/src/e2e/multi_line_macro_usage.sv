@@ -5,9 +5,9 @@
 // its second argument written on the line after its first, `sum with its two
 // operands on two lines, `report again with a second argument that is a
 // concatenation opened on one line and closed on the next, as UVM's
-// uvm_misc.svh writes one, and `__LINE__ among the arguments of a usage
-// names the line the usage opened on (§22.13), which is line 23 whichever
-// line the argument itself stands on.
+// uvm_misc.svh writes one; and §22.13 has `__LINE__ expand to the current
+// input line number, which for an argument of a usage read as one construct
+// is the line the usage opened on, 23, not the line the argument stands on.
 module multi_line_macro_usage;
   `define report(id, msg) $display("%s: %s", id, msg);
   `define sum(a, b) (a + b)
