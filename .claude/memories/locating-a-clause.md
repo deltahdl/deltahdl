@@ -28,6 +28,7 @@ Locate a clause with the Read tool and nothing else: read the contents pages at 
 - Contents page listing clauses 4.10 through 7.1: 12; clauses 19.6 through 22.10: 17.
 - Contents page listing clauses 16.10 through 19.5: 16.
 - §18.5.3 Distribution: 532 to 535, with its limitations list (no `dist` on a `randc` variable, at least one `rand` variable) on 534; §18.5.4 Uniqueness constraints: 535.
+- §18.8 Disabling random variables with rand_mode(): 555; §18.9 Controlling constraints with constraint_mode(): 557 (contents page 16).
 - §5.1 General through §5.5 Operators, with §5.3 White space and §5.4 Comments: 74.
 - §21.2 Display system tasks, with §21.2.1's rules for string literal and expression arguments: 656.
 - §22.5 `define, `undef, and `undefineall and §22.5.1 `define: 707, running to 709, where Syntax 22-3 gives the text macro usage. §22.12 `line and §22.13 `__FILE__ and `__LINE__: 721.
