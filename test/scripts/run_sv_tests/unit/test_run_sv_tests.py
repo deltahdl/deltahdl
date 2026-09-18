@@ -116,6 +116,120 @@ def test_defines_passed_as_dash_d_flags(rst: ModuleType, capture_run_cmd: Captur
     assert _d_flag_values(cmd) == ["FOO", "BAR=2"]
 
 
+def test_library_incdirs_and_files_precede_the_file(
+    rst: ModuleType, capture_run_cmd: CaptureRunCmd,
+) -> None:
+    library = rst.Library(("/lib/uvm_pkg.sv",), ("/lib/src",))
+    cmd = capture_run_cmd(
+        rst, lambda: rst.run_test("/fake/test.sv", library=library),
+    )
+    assert cmd[-3:] == ["+incdir+/lib/src", "/lib/uvm_pkg.sv", "/fake/test.sv"]
+
+
+def test_no_library_adds_nothing_before_the_file(
+    rst: ModuleType, capture_run_cmd: CaptureRunCmd,
+) -> None:
+    cmd = capture_run_cmd(rst, lambda: rst.run_test("/fake/test.sv"))
+    assert cmd[-2:] == ["--lint-only", "/fake/test.sv"]
+
+
+def _write_corpus_libraries(
+    tmp_path: Path, libs_json: str, checked_out: tuple[str, ...] = (),
+) -> Path:
+    conf = tmp_path / "conf" / "runners"
+    conf.mkdir(parents=True)
+    (conf / "libs.json").write_text(libs_json)
+    for rel in checked_out:
+        path = tmp_path / "third_party" / rel
+        if rel.endswith(".sv"):
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("package uvm_pkg; endpackage\n")
+        else:
+            path.mkdir(parents=True, exist_ok=True)
+    return tmp_path / "tests"
+
+
+_UVM_LIBS_JSON = (
+    '{"uvm": {"files": ["tests/uvm/src/uvm_pkg.sv"],'
+    ' "incdirs": ["tests/uvm/src"]}}'
+)
+
+
+def test_load_libraries_resolves_paths_against_the_corpus_third_party(
+    rst: ModuleType, tmp_path: Path,
+) -> None:
+    test_dir = _write_corpus_libraries(
+        tmp_path, _UVM_LIBS_JSON,
+        ("tests/uvm/src/uvm_pkg.sv", "tests/uvm/src"),
+    )
+    with patch.object(rst, "TEST_DIR", test_dir):
+        libraries = rst.load_libraries()
+    third_party = tmp_path / "third_party" / "tests" / "uvm" / "src"
+    assert libraries == {
+        "uvm": rst.Library(
+            (str(third_party / "uvm_pkg.sv"),), (str(third_party),),
+        ),
+    }
+
+
+def test_load_libraries_raises_naming_a_library_not_checked_out(
+    rst: ModuleType, tmp_path: Path,
+) -> None:
+    test_dir = _write_corpus_libraries(
+        tmp_path, _UVM_LIBS_JSON, ("tests/uvm/src",),
+    )
+    with (
+        patch.object(rst, "TEST_DIR", test_dir),
+        pytest.raises(FileNotFoundError, match="library 'uvm' names .*uvm_pkg.sv"),
+    ):
+        rst.load_libraries()
+
+
+def test_load_libraries_raises_when_the_corpus_has_no_libs_json(
+    rst: ModuleType, tmp_path: Path,
+) -> None:
+    with (
+        patch.object(rst, "TEST_DIR", tmp_path / "tests"),
+        pytest.raises(FileNotFoundError),
+    ):
+        rst.load_libraries()
+
+
+_LIBRARIES = {
+    "uvm": ("/tp/tests/uvm/src/uvm_pkg.sv", "/tp/tests/uvm/src"),
+    "uvm-1.2": ("/tp/tests/uvm-1.2/src/uvm_pkg.sv", "/tp/tests/uvm-1.2/src"),
+}
+
+
+def _libraries(rst: ModuleType) -> dict[str, Any]:
+    return {
+        tag: rst.Library((file,), (incdir,))
+        for tag, (file, incdir) in _LIBRARIES.items()
+    }
+
+
+def test_library_for_picks_the_library_the_tags_name(rst: ModuleType) -> None:
+    library = rst.library_for({"tags": "uvm-random uvm"}, _libraries(rst))
+    assert library == rst.Library(
+        ("/tp/tests/uvm/src/uvm_pkg.sv",), ("/tp/tests/uvm/src",),
+    )
+
+
+def test_library_for_matches_a_tag_whole(rst: ModuleType) -> None:
+    library = rst.library_for({"tags": "uvm-1.2"}, _libraries(rst))
+    assert library == rst.Library(
+        ("/tp/tests/uvm-1.2/src/uvm_pkg.sv",), ("/tp/tests/uvm-1.2/src",),
+    )
+
+
+def test_library_for_is_empty_without_a_library_tag(rst: ModuleType) -> None:
+    assert rst.library_for({"tags": "18.5"}, _libraries(rst)) == rst.Library((), ())
+
+
+def test_library_for_is_empty_without_tags(rst: ModuleType) -> None:
+    assert rst.library_for({}, _libraries(rst)) == rst.Library((), ())
+
+
 def test_extracts_all_fields(rst: ModuleType, tmp_path: Path) -> None:
     sv = tmp_path / "test.sv"
     sv.write_text(
@@ -380,6 +494,39 @@ class TestBuildResult:
         )
         cmd = capture_run_cmd(rst, lambda: rst.build_result(str(sv)))
         assert _d_flag_values(cmd) == ["TEST_VAR", "VAR_1=2"]
+
+    def test_a_uvm_tagged_file_is_compiled_behind_its_library(
+        self,
+        rst: ModuleType,
+        tmp_path: Path,
+        capture_run_cmd: CaptureRunCmd,
+    ) -> None:
+        sv = tmp_path / "chapter-18" / "uvm.sv"
+        sv.parent.mkdir(parents=True)
+        sv.write_text(
+            "/*\n:name: uvm\n:tags: uvm-random uvm\n*/\n"
+            "`include \"uvm_macros.svh\"\nmodule m; endmodule\n"
+        )
+        cmd = capture_run_cmd(
+            rst, lambda: rst.build_result(str(sv), _libraries(rst)),
+        )
+        assert cmd[-3:] == [
+            "+incdir+/tp/tests/uvm/src", "/tp/tests/uvm/src/uvm_pkg.sv", str(sv),
+        ]
+
+    def test_a_file_without_a_library_tag_is_compiled_alone(
+        self,
+        rst: ModuleType,
+        tmp_path: Path,
+        capture_run_cmd: CaptureRunCmd,
+    ) -> None:
+        sv = tmp_path / "chapter-18" / "plain.sv"
+        sv.parent.mkdir(parents=True)
+        sv.write_text("/*\n:name: plain\n:tags: 18.5\n*/\nmodule m; endmodule\n")
+        cmd = capture_run_cmd(
+            rst, lambda: rst.build_result(str(sv), _libraries(rst)),
+        )
+        assert cmd[-2:] == ["--lint-only", str(sv)]
 
     def test_simulation_mode_used_for_simulation_type(
         self, rst: ModuleType, tmp_path: Path,

@@ -1,6 +1,7 @@
 import argparse
 import ast
 import glob
+import json
 import operator
 import os
 import re
@@ -9,8 +10,9 @@ import sys
 import time
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
+from functools import partial
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, NamedTuple
 from xml.etree import ElementTree as ET
 
 from lib.python.run_tests_common import (
@@ -18,6 +20,44 @@ from lib.python.run_tests_common import (
 )
 
 TEST_DIR = REPO_ROOT / "third_party" / "sv-tests" / "tests"
+
+
+class Library(NamedTuple):
+    files: tuple[str, ...]
+    incdirs: tuple[str, ...]
+
+
+def load_libraries() -> dict[str, Library]:
+    corpus = TEST_DIR.parent
+    entries = json.loads(
+        (corpus / "conf" / "runners" / "libs.json").read_text(encoding="utf-8"),
+    )
+    libraries: dict[str, Library] = {}
+    for tag, entry in entries.items():
+        files = [corpus / "third_party" / p for p in entry["files"]]
+        incdirs = [corpus / "third_party" / p for p in entry["incdirs"]]
+        for path in files + incdirs:
+            if not path.exists():
+                raise FileNotFoundError(
+                    f"library '{tag}' names {path}, which is not checked out",
+                )
+        libraries[tag] = Library(
+            tuple(str(p) for p in files), tuple(str(p) for p in incdirs),
+        )
+    return libraries
+
+
+def library_for(
+    metadata: dict[str, str], libraries: dict[str, Library],
+) -> Library:
+    tags = metadata.get("tags", "").split()
+    files: tuple[str, ...] = ()
+    incdirs: tuple[str, ...] = ()
+    for tag, entry in libraries.items():
+        if tag in tags:
+            files += entry.files
+            incdirs += entry.incdirs
+    return Library(files, incdirs)
 
 
 def parse_args() -> argparse.Namespace:
@@ -130,10 +170,14 @@ def run_test(
     path: str,
     simulate: bool = False,
     defines: tuple[str, ...] | list[str] = (),
+    library: Library = Library((), ()),
 ) -> tuple[bool, str, int]:
     cmd = [str(BINARY)] if simulate else [str(BINARY), "--lint-only"]
     for d in defines:
         cmd.extend(["-D", d])
+    for incdir in library.incdirs:
+        cmd.append(f"+incdir+{incdir}")
+    cmd.extend(library.files)
     cmd.append(path)
     result = subprocess.run(
         cmd,
@@ -281,14 +325,9 @@ def _rejection_matches_tag(stderr: str, clause: str) -> bool:
     return any(subclause_is_within(r, clause) for r in reported)
 
 
-def _run_and_score(
-    path: str,
-    simulate: bool,
-    defines: list[str],
-    should_fail: bool,
-    clause: str,
+def _score(
+    ok: bool, stderr: str, returncode: int, should_fail: bool, clause: str,
 ) -> tuple[str, str, int, int]:
-    ok, stderr, returncode = run_test(path, simulate=simulate, defines=defines)
     if should_fail:
         ok = (
             returncode == 1
@@ -305,7 +344,9 @@ def _tag_prefixed(name: str, metadata: dict[str, str]) -> str:
     return name
 
 
-def build_result(path: str) -> tuple[dict[str, Any], int]:
+def build_result(
+    path: str, libraries: dict[str, Library] | None = None,
+) -> tuple[dict[str, Any], int]:
     chapter = chapter_from_path(path)
     try:
         name = str(Path(path).relative_to(TEST_DIR / chapter))
@@ -319,12 +360,16 @@ def build_result(path: str) -> tuple[dict[str, Any], int]:
         should_fail = bool(metadata.get("should_fail_because"))
         defines = metadata.get("defines", "").split()
         clause = tagged_clause(metadata)
+        library = library_for(metadata, libraries or {})
 
         t0 = time.monotonic()
         returncode: int | None = None
         try:
-            status, stderr, ok_int, returncode = _run_and_score(
-                path, simulate, defines, should_fail, clause,
+            ok, stderr, exit_code = run_test(
+                path, simulate=simulate, defines=defines, library=library,
+            )
+            status, stderr, ok_int, returncode = _score(
+                ok, stderr, exit_code, should_fail, clause,
             )
         except subprocess.TimeoutExpired:
             status, stderr, ok_int = "timeout", "", 0
@@ -417,13 +462,20 @@ def main() -> None:
         print(f"error: no .sv files found in {TEST_DIR}", file=sys.stderr)
         sys.exit(1)
 
+    try:
+        libraries = load_libraries()
+    except (OSError, ValueError, KeyError) as exc:
+        print(f"error: {type(exc).__name__}: {exc}", file=sys.stderr)
+        sys.exit(1)
+
     results: list[dict[str, Any]] = []
     ok_flags: list[int] = []
     suite_start = time.monotonic()
 
     try:
         with ThreadPoolExecutor(max_workers=os.cpu_count()) as pool:
-            for result, ok in pool.map(build_result, tests):
+            build = partial(build_result, libraries=libraries)
+            for result, ok in pool.map(build, tests):
                 results.append(result)
                 ok_flags.append(ok)
     except (OSError, subprocess.SubprocessError, RuntimeError) as exc:

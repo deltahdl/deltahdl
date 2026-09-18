@@ -67,6 +67,9 @@ def _make_sv_tree(
     test_dir = _sv_tree_path(tmp_path)
     ch5 = test_dir / "chapter-5"
     ch5.mkdir(parents=True)
+    conf = test_dir.parent / "conf" / "runners"
+    conf.mkdir(parents=True)
+    (conf / "libs.json").write_text("{}\n")
     (ch5 / "alpha.sv").write_text(f"{metadata}module alpha; endmodule\n")
     (ch5 / "beta.sv").write_text(f"{metadata}module beta; endmodule\n")
     if git_init:
@@ -216,6 +219,53 @@ def test_junit_xml_structure(tmp_path: Path) -> None:
     assert (
         root.tag, root.attrib["tests"], root.attrib["failures"]
     ) == ("testsuite", "2", "0")
+
+
+def _make_argv_recording_binary(tmp_path: Path, record: Path) -> Path:
+    binary = tmp_path / "deltahdl"
+    binary.write_text(
+        f"#!/usr/bin/env bash\nprintf '%s\\n' \"$@\" >> {record}\nexit 0\n"
+    )
+    binary.chmod(binary.stat().st_mode | stat.S_IEXEC)
+    return binary
+
+
+def _make_uvm_corpus(tmp_path: Path) -> tuple[Path, Path, Path]:
+    test_dir = _make_sv_tree(
+        tmp_path, metadata="/*\n:name: t\n:tags: uvm-random uvm\n*/\n",
+    )
+    (test_dir.parent / "conf" / "runners" / "libs.json").write_text(
+        '{"uvm": {"files": ["tests/uvm/src/uvm_pkg.sv"],'
+        ' "incdirs": ["tests/uvm/src"]}}\n'
+    )
+    src = test_dir.parent / "third_party" / "tests" / "uvm" / "src"
+    src.mkdir(parents=True)
+    (src / "uvm_pkg.sv").write_text("package uvm_pkg; endpackage\n")
+    return test_dir, src / "uvm_pkg.sv", src
+
+
+def test_a_uvm_tagged_file_is_handed_the_corpus_library(tmp_path: Path) -> None:
+    test_dir, uvm_pkg, src = _make_uvm_corpus(tmp_path)
+    record = tmp_path / "argv.txt"
+    binary = _make_argv_recording_binary(tmp_path, record)
+    result = _run_over_tree(test_dir, binary)
+    argv = record.read_text().splitlines()
+    alpha = argv.index(str(test_dir / "chapter-5" / "alpha.sv"))
+    assert (result.returncode, argv[alpha - 2:alpha]) == (
+        0, [f"+incdir+{src}", str(uvm_pkg)],
+    )
+
+
+def test_a_library_the_corpus_names_but_lacks_stops_the_run(
+    tmp_path: Path,
+) -> None:
+    test_dir, uvm_pkg, _ = _make_uvm_corpus(tmp_path)
+    uvm_pkg.unlink()
+    record = tmp_path / "argv.txt"
+    binary = _make_argv_recording_binary(tmp_path, record)
+    result = _run_over_tree(test_dir, binary)
+    assert (result.returncode, record.exists()) == (1, False)
+    assert "library 'uvm' names" in result.stderr
 
 
 def test_summary_names_the_corpus_commit(tmp_path: Path) -> None:

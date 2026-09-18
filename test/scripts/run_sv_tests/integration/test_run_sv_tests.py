@@ -168,6 +168,7 @@ def _run_main_patched(
          patch.object(rst, "check_binary"), \
          patch.object(rst.glob, "glob", return_value=fake_paths), \
          patch.object(rst.subprocess, "run", return_value=mock_result), \
+         patch.object(rst, "load_libraries", return_value={}), \
          patch.object(rst, "parse_metadata", return_value={}):
         rst.main()
 
@@ -186,6 +187,7 @@ def _run_with_a_failing_pool(rst: ModuleType) -> Callable[[], None]:
         with patch("sys.argv", ["run_sv_tests.py"]), \
              patch.object(rst, "check_binary"), \
              patch.object(rst.glob, "glob", return_value=["/tests/chapter-5/a.sv"]), \
+             patch.object(rst, "load_libraries", return_value={}), \
              patch.object(rst, "ThreadPoolExecutor") as mock_pool_cls:
             mock_pool_cls.return_value.__enter__.return_value \
                 .map.side_effect = OSError("too many open files")
@@ -220,6 +222,42 @@ def test_no_tests_exits_one(
             rst.main()
 
     assert get_exit_code(run) == 1
+
+
+def _run_with_a_library_not_checked_out(rst: ModuleType) -> Callable[[], None]:
+    def run() -> None:
+        with patch("sys.argv", ["run_sv_tests.py"]), \
+             patch.object(rst, "check_binary"), \
+             patch.object(rst.glob, "glob", return_value=["/tests/chapter-5/a.sv"]), \
+             patch.object(
+                 rst, "load_libraries",
+                 side_effect=FileNotFoundError(
+                     "library 'uvm' names /tp/uvm_pkg.sv, which is not checked out",
+                 ),
+             ), \
+             patch.object(rst.subprocess, "run") as mock_run:
+            rst.main()
+        assert mock_run.call_count == 0
+    return run
+
+
+def test_a_library_not_checked_out_exits_one(
+    rst: ModuleType,
+    get_exit_code: Callable[[Callable[[], object]], int | str | None],
+) -> None:
+    assert get_exit_code(_run_with_a_library_not_checked_out(rst)) == 1
+
+
+def test_a_library_not_checked_out_is_named_before_any_file_runs(
+    rst: ModuleType,
+    capsys: pytest.CaptureFixture[str],
+    get_exit_code: Callable[[Callable[[], object]], int | str | None],
+) -> None:
+    get_exit_code(_run_with_a_library_not_checked_out(rst))
+    assert (
+        "error: FileNotFoundError: library 'uvm' names /tp/uvm_pkg.sv"
+        in capsys.readouterr().err
+    )
 
 
 def test_pool_map_exception_still_exits(
