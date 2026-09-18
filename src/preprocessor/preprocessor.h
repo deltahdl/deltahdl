@@ -84,6 +84,14 @@ enum class ProtectBlockKind : std::uint8_t {
   kDigest,
 };
 
+// Where the output and the origin table stood before one source line was
+// written, taken with Preprocessor::MarkOutput so that the output lines the
+// source line wrote can be counted and recorded afterwards.
+struct OutputMark {
+  size_t output_size = 0;
+  size_t origins_size = 0;
+};
+
 // What a text leaves unfinished of a function-like macro usage (22.5.1):
 // nothing, an actual argument list still open at the text's end, or the macro
 // name at the text's end with its list yet to open -- §22.5.1 allows white
@@ -120,12 +128,29 @@ class Preprocessor {
  private:
   std::string ProcessSource(std::string_view src, uint32_t file_id, int depth);
 
-  // Records that the output line just ended was written on line `line` of
-  // `file_id`. Called wherever a newline is appended to the output, which is
-  // the one place an output line is known to be complete. It does nothing while
-  // recording_origins_ is false, which is how text run for its definitions
-  // alone and appended to no output stays out of the table.
+  // Records that one output line was written on line `line` of `file_id`. It
+  // does nothing while recording_origins_ is false, which is how text run for
+  // its definitions alone and appended to no output stays out of the table.
   void NoteOutputLine(uint32_t file_id, uint32_t line);
+  // Where `output` and the table stand now, taken before a source line is
+  // written so NoteOutputLines can count what it wrote.
+  OutputMark MarkOutput(const std::string& output) const;
+  // Records every output line written to `output` since `mark` as written on
+  // line `line` of `file_id`, less the lines a nested run recorded meanwhile.
+  // Called wherever a source line's newline has been appended, which is the
+  // one place the lines it wrote are known to be complete. A source line can
+  // write more than one: §22.5.1 replaces a backslash-newline in a macro's
+  // text with a newline in the expansion, so a usage of such a macro writes a
+  // line per line of the body, and a table with one entry per source line
+  // would name the wrong line for everything after it. An `include's lines are
+  // the nested case: HandleInclude appends the included file's whole output,
+  // whose lines the nested run recorded against that file, before the
+  // directive's own line is ended.
+  void NoteOutputLines(uint32_t file_id, uint32_t line,
+                       const std::string& output, OutputMark mark);
+  // Reports every kKeywordMarker byte `src` holds against `file_id` and returns
+  // `src` with each replaced by a space, or an empty string when it holds none.
+  std::string WithoutKeywordMarkers(std::string_view src, uint32_t file_id);
 
   // Registers the file name the `line directive just read gave, and keeps its
   // id for the origins of the lines that follow. Defined in

@@ -191,9 +191,9 @@ static bool MayOpenList(std::string_view line) {
 // leaves either unfinished, the lines after it are read in until the usage is
 // complete, and the cursor is moved to the last of them. A space joins them
 // rather than the newline that stood there: between two lines of one usage the
-// newline is white space between tokens, and a space keeps the expansion on one
-// output line, which the table NoteOutputLine fills counts on, recording one
-// source line for each. Returns how many lines were added, which the loop adds
+// newline is white space between tokens, and an actual argument holding one
+// would carry it into every place the body writes that argument. Returns how
+// many lines were added, which the loop adds
 // to its line counter only after the usage is emitted: `__LINE__ (22.13) among
 // the arguments and a report about the expansion both name the line the usage
 // opened on. A list no later line closes is left as written, so that a mistyped

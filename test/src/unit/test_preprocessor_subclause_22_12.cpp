@@ -499,3 +499,45 @@ TEST(Preprocessor, ReportBelowALineDirectiveTakesTheNameAndNumberItSet) {
                             "expected top-level declaration", 2, "3.12.1"));
   EXPECT_EQ(FirstErrorLocation(f), "orig.v:3:1");
 }
+
+// The line, below the use of a macro whose text continues with a backslash.
+// §22.5.1 replaces the backslash-newline with a newline in the expansion, so
+// the use on line 3 writes two lines of output, and the offending line is the
+// fourth of the file and the fourth of the output only because the table
+// records both of them against line 3; a table with one entry per source line
+// ran out one short and reported a line of the preprocessed text instead.
+TEST(Preprocessor, ReportBelowAMultiLineExpansionStandsAtItsOwnLine) {
+  PreprocFixture f;
+  Arena arena;
+  PreprocessAndParseUnder("design.sv",
+                          "`define TWO module m; \\\n"
+                          "endmodule\n"
+                          "`TWO\n"
+                          "%\n",
+                          f, arena);
+
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "expected top-level declaration", 4, "3.12.1"));
+  EXPECT_EQ(FirstErrorLocation(f), "design.sv:4:1");
+}
+
+// The line, inside such an expansion. Every line the use writes was written
+// by the use, so a report about the second of them names the line of the use,
+// which is the line the user can open the file at and find the construct on.
+TEST(Preprocessor, ReportInsideAMultiLineExpansionStandsAtTheLineOfTheUse) {
+  PreprocFixture f;
+  Arena arena;
+  PreprocessAndParseUnder("design.sv",
+                          "`define BAD module m; \\\n"
+                          "endmodule \\\n"
+                          "%\n"
+                          "`BAD\n",
+                          f, arena);
+
+  // The joined definition leaves one output line, and the use writes three;
+  // the offending one is the last of those, line 4 of the preprocessed text,
+  // which a table of one entry per source line had no entry for at all.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "expected top-level declaration", 4, "3.12.1"));
+  EXPECT_EQ(FirstErrorLocation(f), "design.sv:4:1");
+}

@@ -1,5 +1,6 @@
 #include "preprocessor/preprocessor.h"
 
+#include <algorithm>
 #include <cctype>
 #include <cstdint>
 #include <functional>
@@ -124,6 +125,29 @@ void Preprocessor::NoteOutputLine(uint32_t file_id, uint32_t line) {
     if (line_file_override_id_ != 0) file_id = line_file_override_id_;
   }
   line_origins_.push_back({file_id, line});
+}
+
+OutputMark Preprocessor::MarkOutput(const std::string& output) const {
+  return {output.size(), line_origins_.size()};
+}
+
+void Preprocessor::NoteOutputLines(uint32_t file_id, uint32_t line,
+                                   const std::string& output, OutputMark mark) {
+  if (!recording_origins_) return;
+  auto written = std::string_view(output).substr(mark.output_size);
+  size_t newlines =
+      static_cast<size_t>(std::count(written.begin(), written.end(), '\n'));
+  size_t nested = line_origins_.size() - mark.origins_size;
+  for (size_t i = nested; i < newlines; ++i) NoteOutputLine(file_id, line);
+}
+
+std::string Preprocessor::WithoutKeywordMarkers(std::string_view src,
+                                                uint32_t file_id) {
+  if (src.find(kKeywordMarker) == std::string_view::npos) return {};
+  return BlankKeywordMarkers(src, [&](uint32_t line, uint32_t column) {
+    diag_.Error({file_id, line, column},
+                "unexpected character 0x01 in source text", Subclause("5.2"));
+  });
 }
 
 std::string_view Preprocessor::Trim(std::string_view s) {
@@ -471,11 +495,12 @@ static size_t FindMidLineDirective(std::string_view s) {
 bool Preprocessor::ProcessBlockCommentLine(std::string_view line,
                                            uint32_t file_id, uint32_t line_num,
                                            int depth, std::string& output) {
+  OutputMark mark = MarkOutput(output);
   auto close = line.find("*/");
   if (close == std::string_view::npos) {
     output.append(line);
     output.push_back('\n');
-    NoteOutputLine(file_id, line_num);
+    NoteOutputLines(file_id, line_num, output, mark);
     return true;
   }
   output.append(line.substr(0, close + 2));
@@ -489,13 +514,14 @@ bool Preprocessor::ProcessBlockCommentLine(std::string_view line,
     }
   }
   output.push_back('\n');
-  NoteOutputLine(file_id, line_num);
+  NoteOutputLines(file_id, line_num, output, mark);
   return true;
 }
 
 void Preprocessor::SkipBlockCommentLine(std::string_view line, uint32_t file_id,
                                         uint32_t line_num, int depth,
                                         std::string& output) {
+  OutputMark mark = MarkOutput(output);
   auto close = line.find("*/");
   if (close != std::string_view::npos) {
     in_block_comment_ = false;
@@ -510,7 +536,7 @@ void Preprocessor::SkipBlockCommentLine(std::string_view line, uint32_t file_id,
     }
   }
   output.push_back('\n');
-  NoteOutputLine(file_id, line_num);
+  NoteOutputLines(file_id, line_num, output, mark);
 }
 
 ActiveLineSplit ClassifyActiveLine(std::string_view stripped) {
@@ -563,9 +589,11 @@ struct PreprocLoopOps {
   std::function<MacroUsageEnd(std::string_view)> end_of_macro_usage;
   std::function<void(std::string_view)> emit_active_line;
   std::function<void(std::string_view)> note_ignored_line;
-  // Called once the newline ending an output line has been appended, which is
-  // where that line is known to be complete and which source line wrote it.
-  std::function<void()> note_output_line;
+  // Taken before a source line is written, and handed back once the newline
+  // ending it has been appended, which is where the output lines it wrote are
+  // known to be complete and which source line wrote them.
+  std::function<OutputMark()> mark_output;
+  std::function<void(OutputMark)> note_output_lines;
 };
 
 // Process one ordinary (non-block-comment) source line: a `define whose body
@@ -611,9 +639,10 @@ static void RunPreprocLoop(std::string_view src, uint32_t& line_num,
       ops.continue_block_comment(line);
     } else {
       LineCursor cursor{src, pos, eol, line_num};
+      OutputMark mark = ops.mark_output();
       uint32_t usage_lines = ProcessOrdinaryLine(line, cursor, ops);
       output.push_back('\n');
-      ops.note_output_line();
+      ops.note_output_lines(mark);
       line_num += usage_lines;
     }
     pos = eol + 1;
@@ -693,15 +722,8 @@ std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
   // src/preprocessor/preprocessor_protect_values.cpp hands over -- so this is
   // the one place that has to hold for the marker to mean what Lexer takes it
   // to mean.
-  std::string without_markers;
-  if (src.find(kKeywordMarker) != std::string_view::npos) {
-    without_markers = BlankKeywordMarkers(src, [&](uint32_t line,
-                                                   uint32_t column) {
-      diag_.Error({file_id, line, column},
-                  "unexpected character 0x01 in source text", Subclause("5.2"));
-    });
-    src = without_markers;
-  }
+  std::string without_markers = WithoutKeywordMarkers(src, file_id);
+  if (!without_markers.empty()) src = without_markers;
 
   uint32_t line_num = 0;
   std::string output;
@@ -758,11 +780,11 @@ std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
   ops.note_ignored_line = [&](std::string_view line) {
     StripComments(line, in_block_comment_, in_triple_string_);
   };
-  // The line just ended is this file's, at the number this frame is on. An
-  // `include has already recorded the included file's lines by the time this
-  // runs, because HandleInclude appends that file's whole output before the
-  // directive's own line is ended.
-  ops.note_output_line = [&] { NoteOutputLine(file_id, line_num); };
+  ops.mark_output = [&] { return MarkOutput(output); };
+  // The lines just ended are this file's, at the number this frame is on.
+  ops.note_output_lines = [&](OutputMark mark) {
+    NoteOutputLines(file_id, line_num, output, mark);
+  };
 
   RunPreprocLoop(src, line_num, ops, output);
   // A block whose lines ran to the end of this text is complete: there is no
