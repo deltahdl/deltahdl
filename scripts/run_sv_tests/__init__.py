@@ -471,7 +471,7 @@ def main() -> None:
         print(f"error: no .sv files found in {TEST_DIR}", file=sys.stderr)
         sys.exit(1)
 
-    libraries = _libraries_or_exit()
+    build = partial(build_result, libraries=_libraries_or_exit())
 
     results: list[dict[str, Any]] = []
     ok_flags: list[int] = []
@@ -479,9 +479,7 @@ def main() -> None:
 
     try:
         with ThreadPoolExecutor(max_workers=os.cpu_count()) as pool:
-            for result, ok in pool.map(
-                partial(build_result, libraries=libraries), tests,
-            ):
+            for result, ok in pool.map(build, tests):
                 results.append(result)
                 ok_flags.append(ok)
     except (OSError, subprocess.SubprocessError, RuntimeError) as exc:
