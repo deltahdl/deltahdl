@@ -154,3 +154,18 @@ TEST(Preprocessor, DirectiveLineAfterAnOpenUsageIsNotReadAsAnArgument) {
   EXPECT_NE(result.find("int x = `PAIR(1,\n"), std::string::npos);
   EXPECT_EQ(result.find("2);"), std::string::npos);
 }
+
+// A line inside a triple_quoted_string opened on an earlier line (A.8.8) is
+// the string's content, so what looks like an open usage on it starts no join
+// and the lines after it stay their own.
+TEST(Preprocessor, UsageInsideATripleQuotedStringIsNotJoined) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define PAIR(a, b) a b\n"
+      "string s = \"\"\"\n"
+      "`PAIR(1,\n"
+      "2)\"\"\";\n"
+      "int y;\n",
+      f);
+  EXPECT_NE(result.find("`PAIR(1,\n2)\"\"\";\nint y;\n"), std::string::npos);
+}
