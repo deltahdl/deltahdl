@@ -152,6 +152,11 @@ class Preprocessor {
                                  int depth, std::string& output);
   // True when an inline `ifdef…`endif resolves entirely on this line (22.6).
   bool HasInlineConditional(std::string_view line) const;
+  // True when `text` holds a usage of a function-like macro whose actual
+  // argument list is not closed by the end of the text (22.5.1), which is what
+  // the line loop in src/preprocessor/preprocessor.cpp asks before joining the
+  // next physical line onto it.
+  bool MacroUsageLeftOpen(std::string_view text) const;
   void OutputText(std::string_view text, uint32_t file_id, uint32_t line_num,
                   std::string& output);
   void OutputPreExpanded(std::string_view text, std::string& output);
@@ -783,6 +788,8 @@ class Preprocessor {
 };
 
 bool IsCompilerDirective(std::string_view name);
+// Every directive but `__FILE__ and `__LINE__, the two that stand for a value.
+bool IsDirectiveOtherThanValue(std::string_view name);
 bool HasUnterminatedString(std::string_view body);
 bool IsIdentChar(char c);
 

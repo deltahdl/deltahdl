@@ -177,6 +177,14 @@ bool IsCompilerDirective(std::string_view name) {
   return false;
 }
 
+// Every directive IsCompilerDirective names but `__FILE__ and `__LINE__
+// (22.13), the two that stand for a value where they are written. The rest read
+// the text after them, or change how the lines after them are read, so a scan
+// of ordinary text for macro usages stops at one of them.
+bool IsDirectiveOtherThanValue(std::string_view name) {
+  return IsCompilerDirective(name) && name != "__FILE__" && name != "__LINE__";
+}
+
 static bool SkipBacktickQuote(std::string_view body, size_t& i) {
   if (body[i] != '`') return false;
   if (i + 1 < body.size() && body[i + 1] == '"') {
@@ -328,7 +336,8 @@ static void AppendDefineLine(std::string_view line, std::string& joined) {
 // Per-line scan position over the source buffer driven by the preprocessing
 // loop (22.x): `src` is the whole file text, `pos` the start offset of the
 // current physical line, `eol` its end offset (advanced when a `define body is
-// joined across continuation lines), and `line_num` the 1-based line counter.
+// joined across continuation lines, or a macro usage across the lines its
+// argument list runs onto), and `line_num` the 1-based line counter.
 struct LineCursor {
   std::string_view src;
   size_t pos;
@@ -699,6 +708,13 @@ struct PreprocLoopOps {
   std::function<void(std::string_view)> continue_block_comment;
   std::function<bool(std::string_view)> run_directive;
   std::function<bool()> is_active;
+  // Whether a triple_quoted_string opened on an earlier line is still open, in
+  // which case the line is its content and no usage can start on it.
+  std::function<bool()> in_triple_string;
+  // Whether a function-like macro usage on the text leaves its argument list
+  // open at the end (22.5.1), which is what JoinMacroUsage reads lines ahead
+  // to close.
+  std::function<bool(std::string_view)> macro_usage_left_open;
   std::function<void(std::string_view)> emit_active_line;
   std::function<void(std::string_view)> note_ignored_line;
   // Called once the newline ending an output line has been appended, which is
@@ -706,22 +722,104 @@ struct PreprocLoopOps {
   std::function<void()> note_output_line;
 };
 
+// One physical line of a macro usage, comment-stripped as the loop strips a
+// line it emits, so the parentheses counted are the ones in code and never
+// one a comment holds. The marker of a blanked one-line comment goes as well:
+// the join puts another line after this one, and a marker left standing would
+// blank that line when the joined text is stripped again at emission.
+static void AppendUsageLine(std::string_view line, bool& in_block_comment,
+                            bool& in_triple_string, std::string& joined) {
+  auto stripped = StripComments(line, in_block_comment, in_triple_string);
+  joined += StripTrailingLineComment(stripped);
+}
+
+// Whether the line's first token is a directive other than a value one. A join
+// must not read such a line as part of an argument list: a conditional or an
+// `include standing there has to act, and would be lost into the arguments.
+static bool LeadsWithDirective(std::string_view line) {
+  auto trimmed = Preprocessor::Trim(line);
+  if (trimmed.empty() || trimmed[0] != '`') return false;
+  size_t end = 1;
+  while (end < trimmed.size() && IsIdentChar(trimmed[end])) ++end;
+  return IsDirectiveOtherThanValue(trimmed.substr(1, end - 1));
+}
+
+// §22.5.1 requires the actual arguments of a macro usage to be enclosed in
+// parentheses and separated by commas, and places them on no particular line,
+// so a list left open at the end of a physical line continues on the next one.
+// When the line at `cursor` leaves one open, the lines after it are read in
+// until the list closes, and the cursor is moved to the last of them. A space
+// joins them rather than the newline that stood there: between two lines of one
+// usage the newline is white space between tokens, and a space keeps the
+// expansion on one output line, which the table NoteOutputLine fills counts on,
+// recording one source line for each. Returns how many lines were added, which
+// the loop adds to its line counter only after the usage is emitted: `__LINE__
+// (22.13) among the arguments and a report about the expansion both name the
+// line the usage opened on. A list no later line closes is left as written, so
+// that a mistyped usage does not read the rest of the file as its arguments:
+// nothing is moved, and the loop processes the line alone as it did before this
+// join existed. A list whose lines run through a directive is left the same
+// way, since the directive has to act and could not from inside an argument.
+//
+// The strip state starts clear because an open block comment takes another
+// path, and an open triple_quoted_string stops the join before it begins.
+static uint32_t JoinMacroUsage(LineCursor& cursor, const PreprocLoopOps& ops,
+                               std::string& joined) {
+  std::string_view src = cursor.src;
+  std::string_view first_line = src.substr(cursor.pos, cursor.eol - cursor.pos);
+  if (first_line.find('`') == std::string_view::npos) return 0;
+  bool in_block_comment = false;
+  bool in_triple_string = false;
+  std::string acc;
+  AppendUsageLine(first_line, in_block_comment, in_triple_string, acc);
+  if (!ops.macro_usage_left_open(acc)) return 0;
+
+  size_t eol = cursor.eol;
+  uint32_t lines_added = 0;
+  while (eol < src.size()) {
+    size_t next_start = eol + 1;
+    eol = src.find('\n', next_start);
+    if (eol == std::string_view::npos) eol = src.size();
+    std::string_view next_line = src.substr(next_start, eol - next_start);
+    if (LeadsWithDirective(next_line)) return 0;
+    ++lines_added;
+    acc += ' ';
+    AppendUsageLine(next_line, in_block_comment, in_triple_string, acc);
+    if (!ops.macro_usage_left_open(acc)) {
+      cursor.eol = eol;
+      joined = std::move(acc);
+      return lines_added;
+    }
+  }
+  return 0;
+}
+
 // Process one ordinary (non-block-comment) source line: a `define whose body
-// spans multiple physical lines is first joined, then the line is run as a
+// spans multiple physical lines is first joined, as is a macro usage whose
+// argument list runs onto the lines after it, then the line is run as a
 // directive, emitted as active text, or (inside an ignored block) only scanned
-// so an opening block comment is tracked across lines (22.6).
-static void ProcessOrdinaryLine(std::string_view line, LineCursor& cursor,
-                                const PreprocLoopOps& ops) {
+// so an opening block comment is tracked across lines (22.6). Returns the
+// number of lines a usage join consumed beyond this one, for the loop's line
+// counter. A usage is joined only where its expansion will be emitted: inside
+// an ignored block the lines are not read, and a line an ignored block ends on
+// is a directive the join would otherwise swallow.
+static uint32_t ProcessOrdinaryLine(std::string_view line, LineCursor& cursor,
+                                    const PreprocLoopOps& ops) {
   std::string joined;
+  uint32_t usage_lines = 0;
   if (DefineSpansMultipleLines(line)) {
     joined = JoinDefineBody(cursor);
     line = joined;
+  } else if (ops.is_active() && !ops.in_triple_string()) {
+    usage_lines = JoinMacroUsage(cursor, ops, joined);
+    if (usage_lines > 0) line = joined;
   }
-  if (ops.run_directive(line)) return;
+  if (ops.run_directive(line)) return usage_lines;
   if (ops.is_active())
     ops.emit_active_line(line);
   else
     ops.note_ignored_line(line);
+  return usage_lines;
 }
 
 // Drive the per-line preprocessing loop (22.x). An open block comment continues
@@ -739,9 +837,10 @@ static void RunPreprocLoop(std::string_view src, uint32_t& line_num,
       ops.continue_block_comment(line);
     } else {
       LineCursor cursor{src, pos, eol, line_num};
-      ProcessOrdinaryLine(line, cursor, ops);
+      uint32_t usage_lines = ProcessOrdinaryLine(line, cursor, ops);
       output.push_back('\n');
       ops.note_output_line();
+      line_num += usage_lines;
     }
     pos = eol + 1;
   }
@@ -853,6 +952,10 @@ std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
   PreprocLoopOps ops;
   ops.in_block_comment = [&] { return in_block_comment_; };
   ops.is_active = [&] { return IsActive(); };
+  ops.in_triple_string = [&] { return in_triple_string_; };
+  ops.macro_usage_left_open = [&](std::string_view text) {
+    return MacroUsageLeftOpen(text);
+  };
   // An open block comment (22.6) emits or skips its text and handles its own
   // trailing newline; a directive may still follow the comment close.
   ops.continue_block_comment = [&](std::string_view line) {

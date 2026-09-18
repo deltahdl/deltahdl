@@ -188,6 +188,53 @@ static size_t ParseInlineMacroName(std::string_view line, size_t name_start) {
   return i;
 }
 
+// §22.5.1 requires the actual arguments of a usage to be enclosed in
+// parentheses and separated by commas, and places them on no particular line:
+// a list still open at the end of a physical line continues on the next one.
+// The usage read here is the one the expanders read -- the name as
+// ExpandSingleInlineMacro parses it and the list as ExtractBalancedArgs finds
+// it -- so a text this answers false for is one they expand whole. The list
+// has to open where the expander at the head of a line requires it to, at the
+// first character after the name, since a join reads lines ahead and a
+// parenthesis further along the line is not one this macro's arguments open.
+//
+// The scan ends at a backtick introducing a compiler directive, because the
+// text after one is the directive's operand and not a usage: a `define body in
+// particular is arbitrary text, and a list it leaves open is closed by whatever
+// usage the body is written to pair with, not by a later line of this file.
+// `__FILE__ and `__LINE__ (22.13) stand for a value and are stepped over.
+//
+// OpensArgumentList is the test ExpandUserDefinedMacro applies to a usage at
+// the head of a line: the character after the name, blanks aside, is the list's
+// own parenthesis.
+static bool OpensArgumentList(std::string_view after_name) {
+  size_t open = after_name.find_first_not_of(" \t");
+  return open != std::string_view::npos && after_name[open] == '(';
+}
+
+bool Preprocessor::MacroUsageLeftOpen(std::string_view text) const {
+  bool in_string = false;
+  size_t pos = FindNextBacktick(text, 0, in_string);
+  while (pos != std::string_view::npos) {
+    size_t name_start = pos + 1;
+    size_t name_end = ParseInlineMacroName(text, name_start);
+    auto name = text.substr(name_start, name_end - name_start);
+    if (IsDirectiveOtherThanValue(name)) return false;
+    pos = name_end;
+    const auto* def = macros_.Lookup(name);
+    auto after_name = text.substr(name_end);
+    if (def != nullptr && def->is_function_like &&
+        OpensArgumentList(after_name)) {
+      auto balanced = ExtractBalancedArgs(after_name);
+      if (balanced.empty()) return true;
+      pos = name_end + static_cast<size_t>(balanced.data() + balanced.size() -
+                                           after_name.data());
+    }
+    pos = FindNextBacktick(text, pos, in_string);
+  }
+  return false;
+}
+
 bool Preprocessor::TryExpandInlinePredefined(std::string_view name,
                                              uint32_t file_id,
                                              uint32_t line_num,
