@@ -183,3 +183,50 @@ TEST(Preprocessor, LineAmongTheArgumentsOfAOneLineUsageIsAnArgument) {
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_NE(result.find("int x = 1 2;"), std::string::npos);
 }
+
+// §22.5.1 allows white space between the text macro name and the left
+// parenthesis of a usage, and §5.3 makes a newline white space, so a name
+// ending one line and its argument list opening the next are one usage.
+TEST(Preprocessor, ArgumentListOpeningOnTheLineAfterTheName) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define PAIR(a, b) a b\n"
+      "int x = `PAIR\n"
+      "  (1, 2);\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("int x = 1 2;"), std::string::npos);
+}
+
+// Between the name and the parenthesis §5.3's white space and §5.4's one-line
+// comment are separators, not tokens, so a blank line and a comment line
+// between the two are read through to the list.
+TEST(Preprocessor, BlankAndCommentLinesBetweenTheNameAndItsList) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define PAIR(a, b) a b\n"
+      "int x = `PAIR // list below\n"
+      "\n"
+      "  // the list\n"
+      "  (1, 2);\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("int x = 1 2;"), std::string::npos);
+}
+
+// A name ending a line whose next line opens no list is a usage written without
+// its parentheses, which §22.5.1 requires: nothing is read ahead for it, the
+// usage is rejected where it stands, and the line after it stays its own.
+TEST(Preprocessor, NameAloneBeforeALineOpeningNoListIsRejected) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define FUNC(a=5) a\n"
+      "`FUNC\n"
+      "int y;\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "parentheses required for function-like macro "
+                            "'FUNC'",
+                            2, "22.5.1"));
+  EXPECT_NE(result.find("\nint y;\n"), std::string::npos);
+}

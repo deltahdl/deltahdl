@@ -84,6 +84,13 @@ enum class ProtectBlockKind : std::uint8_t {
   kDigest,
 };
 
+// What a text leaves unfinished of a function-like macro usage (22.5.1):
+// nothing, an actual argument list still open at the text's end, or the macro
+// name at the text's end with its list yet to open -- §22.5.1 allows white
+// space between the name and the left parenthesis, and §5.3 makes a newline
+// white space, so the list may open on the line after the name.
+enum class MacroUsageEnd : std::uint8_t { kComplete, kListOpen, kNameAlone };
+
 class Preprocessor {
  public:
   Preprocessor(SourceManager& src_mgr, DiagEngine& diag, PreprocConfig config);
@@ -152,11 +159,10 @@ class Preprocessor {
                                  int depth, std::string& output);
   // True when an inline `ifdef…`endif resolves entirely on this line (22.6).
   bool HasInlineConditional(std::string_view line) const;
-  // True when `text` holds a usage of a function-like macro whose actual
-  // argument list is not closed by the end of the text (22.5.1), which is what
-  // the line loop in src/preprocessor/preprocessor.cpp asks before joining the
-  // next physical line onto it.
-  bool MacroUsageLeftOpen(std::string_view text) const;
+  // What `text` leaves unfinished of a function-like macro usage (22.5.1),
+  // which is what the line loop in src/preprocessor/preprocessor.cpp asks
+  // before joining the next physical line onto it.
+  MacroUsageEnd EndOfMacroUsage(std::string_view text) const;
   void OutputText(std::string_view text, uint32_t file_id, uint32_t line_num,
                   std::string& output);
   void OutputPreExpanded(std::string_view text, std::string& output);

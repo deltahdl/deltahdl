@@ -558,10 +558,9 @@ struct PreprocLoopOps {
   std::function<void(std::string_view)> continue_block_comment;
   std::function<bool(std::string_view)> run_directive;
   std::function<bool()> is_active;
-  // Whether a function-like macro usage on the text leaves its argument list
-  // open at the end (22.5.1), which is what JoinMacroUsage reads lines ahead
-  // to close.
-  std::function<bool(std::string_view)> macro_usage_left_open;
+  // What a function-like macro usage on the text leaves unfinished at its end
+  // (22.5.1), which is what JoinMacroUsage reads lines ahead to finish.
+  std::function<MacroUsageEnd(std::string_view)> end_of_macro_usage;
   std::function<void(std::string_view)> emit_active_line;
   std::function<void(std::string_view)> note_ignored_line;
   // Called once the newline ending an output line has been appended, which is
@@ -586,7 +585,7 @@ static uint32_t ProcessOrdinaryLine(std::string_view line, LineCursor& cursor,
     joined = JoinDefineBody(cursor);
     line = joined;
   } else if (ops.is_active()) {
-    usage_lines = JoinMacroUsage(cursor, ops.macro_usage_left_open, joined);
+    usage_lines = JoinMacroUsage(cursor, ops.end_of_macro_usage, joined);
     if (usage_lines > 0) line = joined;
   }
   if (ops.run_directive(line)) return usage_lines;
@@ -731,8 +730,8 @@ std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
   // string's content, and no usage starts in it, so the join is stopped before
   // it begins: the text it was handed was stripped as if the line stood outside
   // the string, and answering without reading it is what makes that harmless.
-  ops.macro_usage_left_open = [&](std::string_view text) {
-    return !in_triple_string_ && MacroUsageLeftOpen(text);
+  ops.end_of_macro_usage = [&](std::string_view text) {
+    return in_triple_string_ ? MacroUsageEnd::kComplete : EndOfMacroUsage(text);
   };
   // An open block comment (22.6) emits or skips its text and handles its own
   // trailing newline; a directive may still follow the comment close.

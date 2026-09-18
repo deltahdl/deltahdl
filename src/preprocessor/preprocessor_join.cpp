@@ -173,29 +173,43 @@ static bool LeadsWithDirective(std::string_view line) {
   return IsDirectiveOtherThanValue(trimmed.substr(1, end - 1));
 }
 
+// Whether a line may carry on a usage whose name ended the line before it, with
+// the list yet to open: its first token is the left parenthesis, or it holds
+// nothing but white space and a one-line comment, which §5.3 and §5.4 make
+// separators between the name and the parenthesis rather than tokens of their
+// own.
+static bool MayOpenList(std::string_view line) {
+  auto probe = Preprocessor::Trim(StripTrailingLineComment(line));
+  return probe.empty() || probe[0] == '(';
+}
+
 // §22.5.1 requires the actual arguments of a macro usage to be enclosed in
-// parentheses and separated by commas, and places them on no particular line,
-// so a list left open at the end of a physical line continues on the next one.
-// When the line at `cursor` leaves one open, the lines after it are read in
-// until the list closes, and the cursor is moved to the last of them. A space
-// joins them rather than the newline that stood there: between two lines of one
-// usage the newline is white space between tokens, and a space keeps the
-// expansion on one output line, which the table NoteOutputLine fills counts on,
-// recording one source line for each. Returns how many lines were added, which
-// the loop adds to its line counter only after the usage is emitted: `__LINE__
-// (22.13) among the arguments and a report about the expansion both name the
-// line the usage opened on. A list no later line closes is left as written, so
-// that a mistyped usage does not read the rest of the file as its arguments:
-// nothing is moved, and the loop processes the line alone as it did before this
-// join existed. A list whose lines run through a directive is left the same
-// way, since the directive has to act and could not from inside an argument.
+// parentheses and separated by commas, allows white space between the name and
+// the left parenthesis, and places none of it on any particular line, so a list
+// left open at the end of a physical line continues on the next one and a name
+// ending a line has its list on a line after it. When the line at `cursor`
+// leaves either unfinished, the lines after it are read in until the usage is
+// complete, and the cursor is moved to the last of them. A space joins them
+// rather than the newline that stood there: between two lines of one usage the
+// newline is white space between tokens, and a space keeps the expansion on one
+// output line, which the table NoteOutputLine fills counts on, recording one
+// source line for each. Returns how many lines were added, which the loop adds
+// to its line counter only after the usage is emitted: `__LINE__ (22.13) among
+// the arguments and a report about the expansion both name the line the usage
+// opened on. A list no later line closes is left as written, so that a mistyped
+// usage does not read the rest of the file as its arguments: nothing is moved,
+// and the loop processes the line alone as it did before this join existed. A
+// list whose lines run through a directive is left the same way, since the
+// directive has to act and could not from inside an argument, and so is a name
+// alone whose next line opens no list, which the expander then rejects as a
+// usage written without its parentheses.
 //
 // The strip state starts clear because an open block comment takes another
-// path, and `macro_usage_left_open` answers false without reading the text
+// path, and `end_of_macro_usage` answers kComplete without reading the text
 // while a triple_quoted_string is open.
 uint32_t JoinMacroUsage(
     LineCursor& cursor,
-    const std::function<bool(std::string_view)>& macro_usage_left_open,
+    const std::function<MacroUsageEnd(std::string_view)>& end_of_macro_usage,
     std::string& joined) {
   std::string_view src = cursor.src;
   std::string_view first_line = src.substr(cursor.pos, cursor.eol - cursor.pos);
@@ -204,7 +218,8 @@ uint32_t JoinMacroUsage(
   bool in_triple_string = false;
   std::string acc;
   AppendUsageLine(first_line, in_block_comment, in_triple_string, acc);
-  if (!macro_usage_left_open(acc)) return 0;
+  MacroUsageEnd end = end_of_macro_usage(acc);
+  if (end == MacroUsageEnd::kComplete) return 0;
 
   size_t eol = cursor.eol;
   uint32_t lines_added = 0;
@@ -214,10 +229,12 @@ uint32_t JoinMacroUsage(
     if (eol == std::string_view::npos) eol = src.size();
     std::string_view next_line = src.substr(next_start, eol - next_start);
     if (LeadsWithDirective(next_line)) return 0;
+    if (end == MacroUsageEnd::kNameAlone && !MayOpenList(next_line)) return 0;
     ++lines_added;
     acc += ' ';
     AppendUsageLine(next_line, in_block_comment, in_triple_string, acc);
-    if (!macro_usage_left_open(acc)) {
+    end = end_of_macro_usage(acc);
+    if (end == MacroUsageEnd::kComplete) {
       cursor.eol = eol;
       joined = std::move(acc);
       return lines_added;

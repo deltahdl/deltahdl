@@ -189,14 +189,17 @@ static size_t ParseInlineMacroName(std::string_view line, size_t name_start) {
 }
 
 // §22.5.1 requires the actual arguments of a usage to be enclosed in
-// parentheses and separated by commas, and places them on no particular line:
-// a list still open at the end of a physical line continues on the next one.
-// The usage read here is the one the expanders read -- the name as
-// ExpandSingleInlineMacro parses it and the list as ExtractBalancedArgs finds
-// it -- so a text this answers false for is one they expand whole. The list
-// has to open where the expander at the head of a line requires it to, at the
-// first character after the name, since a join reads lines ahead and a
-// parenthesis further along the line is not one this macro's arguments open.
+// parentheses and separated by commas, allows white space between the name and
+// the left parenthesis, and places none of it on any particular line: a list
+// still open at the end of a physical line continues on the next one, and a
+// name ending a line has its list on a line after it, §5.3 making the newline
+// between them white space. The usage read here is the one the expanders read
+// -- the name as ExpandSingleInlineMacro parses it and the list as
+// ExtractBalancedArgs finds it -- so a text this answers kComplete for is one
+// they expand whole. The list has to open where the expander at the head of a
+// line requires it to, at the first character after the name, since a join
+// reads lines ahead and a parenthesis further along the line is not one this
+// macro's arguments open.
 //
 // The scan ends at a backtick introducing a compiler directive, because the
 // text after one is the directive's operand and not a usage: a `define body in
@@ -212,27 +215,30 @@ static bool OpensArgumentList(std::string_view after_name) {
   return open != std::string_view::npos && after_name[open] == '(';
 }
 
-bool Preprocessor::MacroUsageLeftOpen(std::string_view text) const {
+MacroUsageEnd Preprocessor::EndOfMacroUsage(std::string_view text) const {
   bool in_string = false;
   size_t pos = FindNextBacktick(text, 0, in_string);
   while (pos != std::string_view::npos) {
     size_t name_start = pos + 1;
     size_t name_end = ParseInlineMacroName(text, name_start);
     auto name = text.substr(name_start, name_end - name_start);
-    if (IsDirectiveOtherThanValue(name)) return false;
+    if (IsDirectiveOtherThanValue(name)) return MacroUsageEnd::kComplete;
     pos = name_end;
     const auto* def = macros_.Lookup(name);
     auto after_name = text.substr(name_end);
-    if (def != nullptr && def->is_function_like &&
-        OpensArgumentList(after_name)) {
+    bool function_like = def != nullptr && def->is_function_like;
+    if (function_like && Trim(after_name).empty()) {
+      return MacroUsageEnd::kNameAlone;
+    }
+    if (function_like && OpensArgumentList(after_name)) {
       auto balanced = ExtractBalancedArgs(after_name);
-      if (balanced.empty()) return true;
+      if (balanced.empty()) return MacroUsageEnd::kListOpen;
       pos = name_end + static_cast<size_t>(balanced.data() + balanced.size() -
                                            after_name.data());
     }
     pos = FindNextBacktick(text, pos, in_string);
   }
-  return false;
+  return MacroUsageEnd::kComplete;
 }
 
 bool Preprocessor::TryExpandInlinePredefined(std::string_view name,

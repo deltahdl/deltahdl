@@ -64,11 +64,11 @@ std::string StripComments(std::string_view line, bool& in_block_comment,
 bool DefineSpansMultipleLines(std::string_view line);
 std::string JoinDefineBody(LineCursor& cursor);
 // Returns the number of lines read beyond the first, or 0 when nothing was
-// joined; `macro_usage_left_open` is Preprocessor::MacroUsageLeftOpen, reached
+// joined; `end_of_macro_usage` is Preprocessor::EndOfMacroUsage, reached
 // through a callback because the macro table it reads is private.
 uint32_t JoinMacroUsage(
     LineCursor& cursor,
-    const std::function<bool(std::string_view)>& macro_usage_left_open,
+    const std::function<MacroUsageEnd(std::string_view)>& end_of_macro_usage,
     std::string& joined);
 
 // Whether `line` opens a `pragma directive. None of §34.5.9.2's coding schemes
