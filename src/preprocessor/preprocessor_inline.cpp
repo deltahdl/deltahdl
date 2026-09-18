@@ -53,15 +53,19 @@ bool Preprocessor::TryPredefinedMacro(std::string_view name,
   return false;
 }
 
+// The text_macro_identifier at the head of `macro_name` (Syntax 22-3): an
+// escaped identifier runs to the next white space (5.6.1), and a simple
+// identifier is its run of identifier characters (5.6), so whatever follows the
+// name -- a parenthesis, a space, a semicolon -- is not part of it.
 static std::string_view ExtractMacroName(std::string_view macro_name) {
   if (!macro_name.empty() && macro_name[0] == '\\') {
     auto ws = macro_name.find_first_of(" \t");
     return (ws != std::string_view::npos) ? macro_name.substr(0, ws)
                                           : macro_name;
   }
-  auto space_pos = macro_name.find_first_of(" \t(");
-  return (space_pos != std::string_view::npos) ? macro_name.substr(0, space_pos)
-                                               : macro_name;
+  size_t end = 0;
+  while (end < macro_name.size() && IsIdentChar(macro_name[end])) ++end;
+  return macro_name.substr(0, end);
 }
 
 bool Preprocessor::IsRecursiveExpansion(std::string_view name,
@@ -325,6 +329,18 @@ size_t Preprocessor::ExpandSingleInlineMacro(std::string_view line, size_t pos,
   }
 
   if (def->is_function_like) {
+    // §22.5.1: the parentheses are always required in the usage of a macro
+    // defined with arguments. A usage at the head of a line is reported by
+    // ExpandUserDefinedMacro; this is the same report for one after other
+    // text, which used to be left for the lexer to stumble on.
+    if (!OpensArgumentList(line.substr(i))) {
+      diag_.Error(loc,
+                  "parentheses required for function-like macro '" +
+                      std::string(name) + "'",
+                  Subclause("22.5.1"));
+      result.append(line.substr(pos, i - pos));
+      return i;
+    }
     size_t advance = ExpandInlineFunctionMacro(*def, line, i, loc, result);
     if (advance == 0) {
       result.append(line.substr(pos, i - pos));

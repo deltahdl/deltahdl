@@ -297,3 +297,18 @@ TEST(Preprocessor, EscapedQuoteInsideAStringArgumentClosesNothing) {
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_NE(result.find("$display(\"q\\\"x,y\", 1);"), std::string::npos);
 }
+
+// The same rejection after other text on the line: the inline expander used to
+// leave a function-like name without its list for the lexer to report as a
+// stray backtick, which named the character rather than the rule.
+TEST(Preprocessor, FunctionLikeMacroWithoutParenthesesAfterTextIsRejected) {
+  PreprocFixture f;
+  Preprocess(
+      "`define FUNC(a=5) a\n"
+      "int x = `FUNC + 1;\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "parentheses required for function-like macro "
+                            "'FUNC'",
+                            2, "22.5.1"));
+}
