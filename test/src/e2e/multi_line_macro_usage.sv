@@ -7,10 +7,11 @@
 // concatenation opened on one line and closed on the next, as UVM's
 // uvm_misc.svh writes one; and §22.13 has `__LINE__ expand to the current
 // input line number, which for an argument of a usage read as one construct
-// is the line the usage opened on, 23, not the line the argument stands on.
+// is the line the usage opened on, 24, not the line the argument stands on.
 module multi_line_macro_usage;
-  `define report(id, msg) $display("%s: %s", id, msg);
+  `define report(id, msg) begin id_s = id; msg_s = msg; $display("%s: %s", id_s, msg_s); end
   `define sum(a, b) (a + b)
+  string id_s, msg_s;
   int total;
   initial begin
     `report("split",
