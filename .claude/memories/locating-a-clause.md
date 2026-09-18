@@ -26,6 +26,8 @@ Locate a clause with the Read tool and nothing else: read the contents pages at 
 - §16.13.6 Sequence methods: 472.
 - §16.14 Concurrent assertions: 476. §16.14.1 Assert statement: 477. §16.14.5 Outside procedural code: 481. §16.14.6 Embedding in procedural code: 482.
 - Contents page listing clauses 4.10 through 7.1: 12; clauses 19.6 through 22.10: 17.
+- Contents page listing clauses 16.10 through 19.5: 16.
+- §18.5.3 Distribution: 532 to 535, with its limitations list (no `dist` on a `randc` variable, at least one `rand` variable) on 534; §18.5.4 Uniqueness constraints: 535.
 - §5.1 General through §5.5 Operators, with §5.3 White space and §5.4 Comments: 74.
 - §21.2 Display system tasks, with §21.2.1's rules for string literal and expression arguments: 656.
 - §22.5 `define, `undef, and `undefineall and §22.5.1 `define: 707, running to 709, where Syntax 22-3 gives the text macro usage. §22.12 `line and §22.13 `__FILE__ and `__LINE__: 721.
