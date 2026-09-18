@@ -169,3 +169,17 @@ TEST(Preprocessor, UsageInsideATripleQuotedStringIsNotJoined) {
       f);
   EXPECT_NE(result.find("`PAIR(1,\n2)\"\"\";\nint y;\n"), std::string::npos);
 }
+
+// §22.13's `__LINE__ stands for a value where it is written, so one among the
+// actual arguments of a usage on a single line is an argument and not a
+// directive the line is split at: the usage expands whole, with the line
+// number substituted for it.
+TEST(Preprocessor, LineAmongTheArgumentsOfAOneLineUsageIsAnArgument) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define AT(a, b) a b\n"
+      "int x = `AT(1, `__LINE__);\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("int x = 1 2;"), std::string::npos);
+}

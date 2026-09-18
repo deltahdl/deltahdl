@@ -439,12 +439,16 @@ static size_t FindDirectiveInStripped(std::string_view stripped) {
 // locates a directive that follows code, so the preceding element is emitted
 // and the directive still acts. Backticks inside string literals are not
 // directives, and a backtick that introduces a name absent from the directive
-// set is a macro usage rather than a directive, so both are skipped.
+// set is a macro usage rather than a directive, so both are skipped. So are
+// `__FILE__ and `__LINE__ (22.13): they stand for a value where they are
+// written and the inline expander substitutes it, so splitting the line at one
+// would cut the element it stands inside -- a macro usage taking `__LINE__ as
+// an argument was left unexpanded, its opening half emitted as text.
 static bool BacktickIntroducesDirective(std::string_view s, size_t i) {
   size_t start = i + 1;
   size_t end = start;
   while (end < s.size() && IsIdentChar(s[end])) ++end;
-  return end > start && IsCompilerDirective(s.substr(start, end - start));
+  return end > start && IsDirectiveOtherThanValue(s.substr(start, end - start));
 }
 
 static size_t FindMidLineDirective(std::string_view s) {
