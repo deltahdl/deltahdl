@@ -607,7 +607,9 @@ class TestBuildResult:
         assert "read error" in capsys.readouterr().err
 
 
-def test_rejection_naming_the_tagged_clause_evaluates_as_a_pass(rst: ModuleType, tmp_path: Path) -> None:
+def test_rejection_naming_the_tagged_clause_evaluates_as_a_pass(
+    rst: ModuleType, tmp_path: Path,
+) -> None:
     result, ok = _evaluate_expected_rejection(
         rst, tmp_path, 1,
         "xfail.sv:1:1: error: enum has an x assignment (§6.19)\n",
@@ -647,7 +649,9 @@ def test_rejection_for_a_file_with_no_clause_tag_evaluates_as_a_pass(
     assert (ok, result["status"]) == (1, "pass")
 
 
-def test_subclause_of_the_tagged_clause_evaluates_as_a_pass(rst: ModuleType, tmp_path: Path) -> None:
+def test_subclause_of_the_tagged_clause_evaluates_as_a_pass(
+    rst: ModuleType, tmp_path: Path,
+) -> None:
     result, ok = _evaluate_expected_rejection(
         rst, tmp_path, 1,
         "xfail.sv:1:1: error: bad randomize() call (§16.12.17)\n",
