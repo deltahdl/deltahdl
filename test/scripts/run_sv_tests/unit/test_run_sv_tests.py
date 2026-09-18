@@ -371,7 +371,7 @@ def test_string_equality_fallback_names_the_failure(rst: ModuleType) -> None:
     assert "Assertion failed" in detail
 
 
-def _score_expected_rejection(
+def _evaluate_expected_rejection(
     rst: ModuleType, tmp_path: Path, returncode: int, stderr: str,
     tags: str = "5.10",
 ) -> tuple[dict[str, Any], int]:
@@ -384,8 +384,8 @@ def _score_expected_rejection(
     )
     mock_result = MagicMock(returncode=returncode, stderr=stderr)
     with patch.object(rst.subprocess, "run", return_value=mock_result):
-        scored: tuple[dict[str, Any], int] = rst.build_result(str(sv))
-        return scored
+        evaluated: tuple[dict[str, Any], int] = rst.build_result(str(sv))
+        return evaluated
 
 
 def _build_result_over_a_simulation_file(
@@ -439,30 +439,30 @@ class TestBuildResult:
             result, ok = rst.build_result(str(sv))
         assert (ok, result["status"]) == (0, "timeout")
 
-    def test_clean_rejection_still_scores_a_pass_for_an_expected_rejection(
+    def test_clean_rejection_still_evaluates_as_a_pass_for_an_expected_rejection(
         self, rst: ModuleType, tmp_path: Path,
     ) -> None:
-        result, ok = _score_expected_rejection(
+        result, ok = _evaluate_expected_rejection(
             rst, tmp_path, 1, "xfail.sv:1:1: error: redeclaration of 'v'\n",
         )
         assert (ok, result["status"]) == (1, "pass")
 
-    def test_signal_death_does_not_score_a_pass_for_an_expected_rejection(
+    def test_signal_death_does_not_evaluate_as_a_pass_for_an_expected_rejection(
         self, rst: ModuleType, tmp_path: Path,
     ) -> None:
-        result, ok = _score_expected_rejection(rst, tmp_path, -11, "")
+        result, ok = _evaluate_expected_rejection(rst, tmp_path, -11, "")
         assert (ok, result["status"]) == (0, "fail")
 
-    def test_exit_one_with_no_diagnostic_does_not_score_a_pass(
+    def test_exit_one_with_no_diagnostic_does_not_evaluate_as_a_pass(
         self, rst: ModuleType, tmp_path: Path,
     ) -> None:
-        result, ok = _score_expected_rejection(rst, tmp_path, 1, "")
+        result, ok = _evaluate_expected_rejection(rst, tmp_path, 1, "")
         assert (ok, result["status"]) == (0, "fail")
 
-    def test_acceptance_does_not_score_a_pass_for_an_expected_rejection(
+    def test_acceptance_does_not_evaluate_as_a_pass_for_an_expected_rejection(
         self, rst: ModuleType, tmp_path: Path,
     ) -> None:
-        result, ok = _score_expected_rejection(rst, tmp_path, 0, "")
+        result, ok = _evaluate_expected_rejection(rst, tmp_path, 0, "")
         assert (ok, result["status"]) == (0, "fail")
 
     def test_expected_rejection_carries_should_fail_into_the_result(
@@ -534,7 +534,7 @@ class TestBuildResult:
         cmd = _build_result_over_a_simulation_file(rst, tmp_path)[2]
         assert "--lint-only" not in cmd
 
-    def test_a_simulated_file_whose_assertions_hold_scores_a_pass(
+    def test_a_simulated_file_whose_assertions_hold_evaluates_as_a_pass(
         self, rst: ModuleType, tmp_path: Path,
     ) -> None:
         result, ok, _ = _build_result_over_a_simulation_file(rst, tmp_path)
@@ -607,8 +607,8 @@ class TestBuildResult:
         assert "read error" in capsys.readouterr().err
 
 
-def test_rejection_naming_the_tagged_clause_scores_a_pass(rst: ModuleType, tmp_path: Path) -> None:
-    result, ok = _score_expected_rejection(
+def test_rejection_naming_the_tagged_clause_evaluates_as_a_pass(rst: ModuleType, tmp_path: Path) -> None:
+    result, ok = _evaluate_expected_rejection(
         rst, tmp_path, 1,
         "xfail.sv:1:1: error: enum has an x assignment (§6.19)\n",
         "6.19",
@@ -616,10 +616,10 @@ def test_rejection_naming_the_tagged_clause_scores_a_pass(rst: ModuleType, tmp_p
     assert (ok, result["status"]) == (1, "pass")
 
 
-def test_rejection_naming_a_different_clause_does_not_score_a_pass(
+def test_rejection_naming_a_different_clause_does_not_evaluate_as_a_pass(
     rst: ModuleType, tmp_path: Path,
 ) -> None:
-    result, ok = _score_expected_rejection(
+    result, ok = _evaluate_expected_rejection(
         rst, tmp_path, 1,
         "xfail.sv:1:1: error: net type mismatch (§7.3)\n",
         "6.19",
@@ -627,8 +627,8 @@ def test_rejection_naming_a_different_clause_does_not_score_a_pass(
     assert (ok, result["status"]) == (0, "fail")
 
 
-def test_rejection_naming_no_clause_scores_a_pass(rst: ModuleType, tmp_path: Path) -> None:
-    result, ok = _score_expected_rejection(
+def test_rejection_naming_no_clause_evaluates_as_a_pass(rst: ModuleType, tmp_path: Path) -> None:
+    result, ok = _evaluate_expected_rejection(
         rst, tmp_path, 1,
         "xfail.sv:1:1: error: cannot open include file 'x.svh'\n",
         "6.19",
@@ -636,10 +636,10 @@ def test_rejection_naming_no_clause_scores_a_pass(rst: ModuleType, tmp_path: Pat
     assert (ok, result["status"]) == (1, "pass")
 
 
-def test_rejection_for_a_file_with_no_clause_tag_scores_a_pass(
+def test_rejection_for_a_file_with_no_clause_tag_evaluates_as_a_pass(
     rst: ModuleType, tmp_path: Path,
 ) -> None:
-    result, ok = _score_expected_rejection(
+    result, ok = _evaluate_expected_rejection(
         rst, tmp_path, 1,
         "xfail.sv:1:1: error: net type mismatch (§7.3)\n",
         "",
@@ -647,8 +647,8 @@ def test_rejection_for_a_file_with_no_clause_tag_scores_a_pass(
     assert (ok, result["status"]) == (1, "pass")
 
 
-def test_subclause_of_the_tagged_clause_scores_a_pass(rst: ModuleType, tmp_path: Path) -> None:
-    result, ok = _score_expected_rejection(
+def test_subclause_of_the_tagged_clause_evaluates_as_a_pass(rst: ModuleType, tmp_path: Path) -> None:
+    result, ok = _evaluate_expected_rejection(
         rst, tmp_path, 1,
         "xfail.sv:1:1: error: bad randomize() call (§16.12.17)\n",
         "16.12",
@@ -657,7 +657,7 @@ def test_subclause_of_the_tagged_clause_scores_a_pass(rst: ModuleType, tmp_path:
 
 
 def test_the_tagged_clause_reaches_the_result(rst: ModuleType, tmp_path: Path) -> None:
-    result, _ = _score_expected_rejection(
+    result, _ = _evaluate_expected_rejection(
         rst, tmp_path, 1,
         "xfail.sv:1:1: error: enum has an x assignment (§6.19)\n",
         "6.19",

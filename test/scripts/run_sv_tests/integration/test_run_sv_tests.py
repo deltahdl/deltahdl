@@ -47,7 +47,7 @@ def test_reports_the_file_it_ran_and_what_the_run_said(rst: ModuleType) -> None:
     }
 
 
-def test_an_accepted_file_scores_a_pass(rst: ModuleType) -> None:
+def test_an_accepted_file_evaluates_as_a_pass(rst: ModuleType) -> None:
     assert _execute_one_passing_test(rst)[1] == 1
 
 
@@ -68,7 +68,7 @@ def test_timeout_names_the_file_that_did_not_finish(rst: ModuleType) -> None:
     assert result["name"] == "bar.sv"
 
 
-def test_timeout_scores_no_pass(rst: ModuleType) -> None:
+def test_timeout_does_not_evaluate_as_a_pass(rst: ModuleType) -> None:
     assert _execute_one_timing_out_test(rst)[1] == 0
 
 

@@ -325,7 +325,7 @@ def _rejection_matches_tag(stderr: str, clause: str) -> bool:
     return any(subclause_is_within(r, clause) for r in reported)
 
 
-def _run_and_score(
+def _run_and_evaluate(
     path: str, metadata: dict[str, str], library: Library,
 ) -> tuple[str, str, int, int]:
     ok, stderr, returncode = run_test(
@@ -369,7 +369,7 @@ def build_result(
         t0 = time.monotonic()
         returncode: int | None = None
         try:
-            status, stderr, ok_int, returncode = _run_and_score(
+            status, stderr, ok_int, returncode = _run_and_evaluate(
                 path, metadata, library,
             )
         except subprocess.TimeoutExpired:
