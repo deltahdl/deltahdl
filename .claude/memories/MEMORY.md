@@ -28,7 +28,7 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 ## The LRM
 
 - [The LRM is the source of truth](lrm-source-of-truth.md) — check every non-cosmetic change against the clause; the standard beats the linter.
-- [One edition only](single-edition-1800-2023.md) — IEEE 1800-2023 alone; another edition's numbering is translated to 2023 and never carried into the tool.
+- [One edition only](single-edition-1800-2023.md) — IEEE 1800-2023 alone; another edition's numbering is translated to 2023 and never carried into deltahdl.
 - [The LRM's text is copyrighted](lrm-text-is-copyrighted.md) — cite the clause number and paraphrase; never quote the standard's sentences verbatim.
 - [The standard guides structure](lrm-guides-structure.md) — mirror the entities the clause defines when grouping parameters into a struct.
 - [One LRM page per call](reading-the-lrm-one-page-per-call.md) — one `Read` page per tool call, waiting for each; batching blocks every result in the turn.
@@ -55,7 +55,7 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 - [Watching a run in the background](watching-a-run-in-the-background.md) — a background shell or a Monitor, never a foreground `gh run watch`.
 - [Fixing a red run](fixing-a-red-run.md) — fix it in the session that finds it, whoever caused it.
 - [Gate limits live in tracked files](gate-limits-live-in-tracked-files.md) — read the linter config or workflow threshold rather than running the gate.
-- [Read the sv-tests log first](reading-the-sv-tests-log-first.md) — the tool's own output is already under every FAIL line.
+- [Read the sv-tests log first](reading-the-sv-tests-log-first.md) — deltahdl's own output is already under every FAIL line.
 - [The sv-tests build exception](the-sv-tests-build-exception.md) — build only to run one already-failing file, only for the stdout the log drops.
 - [Fetching an sv-tests file](fetching-an-sv-tests-file.md) — `gh api` against `chipsalliance/sv-tests`, piped through `base64 -d`.
 

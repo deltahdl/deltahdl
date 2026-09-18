@@ -129,7 +129,7 @@ def test_prints_the_exit_code_when_an_expected_rejection_crashed(
         0,
     )
     assert (
-        "    tool exited -11 without rejecting the code\n"
+        "    deltahdl exited -11 without rejecting the code\n"
         in capsys.readouterr().out
     )
 
@@ -150,7 +150,7 @@ def test_prints_both_clauses_when_the_rejection_names_another(
 ) -> None:
     _print_status_for_a_clause_mismatch(rst)
     assert (
-        "    tool rejected the code under §7.3, but the test's tag names §6.19\n"
+        "    deltahdl rejected the code under §7.3, but the test's tag names §6.19\n"
         in capsys.readouterr().out
     )
 
