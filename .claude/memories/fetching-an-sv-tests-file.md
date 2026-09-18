@@ -7,7 +7,7 @@ metadata:
 
 # Fetching an sv-tests file
 
-The corpus lives in `chipsalliance/sv-tests`, and a failing file named by a CI run is fetched from it with:
+The suite lives in `chipsalliance/sv-tests`, and a failing file named by a CI run is fetched from it with:
 
 ```sh
 gh api repos/chipsalliance/sv-tests/contents/tests/chapter-N/<path>.sv \
