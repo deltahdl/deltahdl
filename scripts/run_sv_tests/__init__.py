@@ -28,14 +28,14 @@ class Library(NamedTuple):
 
 
 def load_libraries() -> dict[str, Library]:
-    corpus = TEST_DIR.parent
+    suite = TEST_DIR.parent
     entries = json.loads(
-        (corpus / "conf" / "runners" / "libs.json").read_text(encoding="utf-8"),
+        (suite / "conf" / "runners" / "libs.json").read_text(encoding="utf-8"),
     )
     libraries: dict[str, Library] = {}
     for tag, entry in entries.items():
-        files = [corpus / "third_party" / p for p in entry["files"]]
-        incdirs = [corpus / "third_party" / p for p in entry["incdirs"]]
+        files = [suite / "third_party" / p for p in entry["files"]]
+        incdirs = [suite / "third_party" / p for p in entry["incdirs"]]
         for path in files + incdirs:
             if not path.exists():
                 raise FileNotFoundError(
@@ -418,7 +418,7 @@ def print_reason(result: dict[str, Any]) -> None:
     ):
         print(
             f"    tool rejected the file under §{', §'.join(reported)}, but the"
-            f" corpus tags it §{clause}",
+            f" test's tag names §{clause}",
             flush=True,
         )
         return
@@ -437,7 +437,7 @@ def print_status(result: dict[str, Any], ok_int: int) -> None:
     print_reason(result)
 
 
-def corpus_revision() -> str:
+def suite_revision() -> str:
     try:
         result = subprocess.run(
             ["git", "-C", str(TEST_DIR), "rev-parse", "HEAD"],
@@ -500,7 +500,7 @@ def main() -> None:
 
         pct = 100.0 * passed / len(results) if results else 0.0
         print(
-            f"\nsv-tests corpus: {corpus_revision()}"
+            f"\nsv-tests revision: {suite_revision()}"
             f"\nsv-tests summary: {passed}/{len(results)} passed ({pct:.1f}%), "
             f"{failed} failed",
             flush=True,

@@ -1670,7 +1670,7 @@ jobs:
   #
   # The clone also checks out the two submodules conf/runners/libs.json
   # names, third_party/tests/uvm and third_party/tests/uvm-1.2: the
-  # corpus compiles a file tagged `uvm` or `uvm-1.2` behind that
+  # suite compiles a file tagged `uvm` or `uvm-1.2` behind that
   # library's uvm_pkg.sv with its src directory on the include path, and
   # scripts/run_sv_tests does the same, exiting before running anything
   # when a library the json names is not on disk. The key carries

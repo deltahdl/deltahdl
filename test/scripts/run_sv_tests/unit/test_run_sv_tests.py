@@ -133,7 +133,7 @@ def test_no_library_adds_nothing_before_the_file(
     assert cmd[-2:] == ["--lint-only", "/fake/test.sv"]
 
 
-def _write_corpus_libraries(
+def _write_suite_libraries(
     tmp_path: Path, libs_json: str, checked_out: tuple[str, ...] = (),
 ) -> Path:
     conf = tmp_path / "conf" / "runners"
@@ -155,10 +155,10 @@ _UVM_LIBS_JSON = (
 )
 
 
-def test_load_libraries_resolves_paths_against_the_corpus_third_party(
+def test_load_libraries_resolves_paths_against_the_suite_third_party(
     rst: ModuleType, tmp_path: Path,
 ) -> None:
-    test_dir = _write_corpus_libraries(
+    test_dir = _write_suite_libraries(
         tmp_path, _UVM_LIBS_JSON,
         ("tests/uvm/src/uvm_pkg.sv", "tests/uvm/src"),
     )
@@ -175,7 +175,7 @@ def test_load_libraries_resolves_paths_against_the_corpus_third_party(
 def test_load_libraries_raises_naming_a_library_not_checked_out(
     rst: ModuleType, tmp_path: Path,
 ) -> None:
-    test_dir = _write_corpus_libraries(
+    test_dir = _write_suite_libraries(
         tmp_path, _UVM_LIBS_JSON, ("tests/uvm/src",),
     )
     with (
@@ -185,7 +185,7 @@ def test_load_libraries_raises_naming_a_library_not_checked_out(
         rst.load_libraries()
 
 
-def test_load_libraries_raises_when_the_corpus_has_no_libs_json(
+def test_load_libraries_raises_when_the_suite_has_no_libs_json(
     rst: ModuleType, tmp_path: Path,
 ) -> None:
     with (

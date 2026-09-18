@@ -47,7 +47,7 @@ def _commit_sv_tree(test_dir: Path) -> None:
             "-c", "user.name=deltahdl tests",
             "-c", "commit.gpgsign=false",
             "-C", str(test_dir),
-            "commit", "-m", "sv-tests corpus",
+            "commit", "-m", "sv-tests suite",
         ],
         capture_output=True, text=True, timeout=30, check=True,
     )
@@ -230,7 +230,7 @@ def _make_argv_recording_binary(tmp_path: Path, record: Path) -> Path:
     return binary
 
 
-def _make_uvm_corpus(tmp_path: Path) -> tuple[Path, Path, Path]:
+def _make_uvm_suite(tmp_path: Path) -> tuple[Path, Path, Path]:
     test_dir = _make_sv_tree(
         tmp_path, metadata="/*\n:name: t\n:tags: uvm-random uvm\n*/\n",
     )
@@ -244,8 +244,8 @@ def _make_uvm_corpus(tmp_path: Path) -> tuple[Path, Path, Path]:
     return test_dir, src / "uvm_pkg.sv", src
 
 
-def test_a_uvm_tagged_file_is_handed_the_corpus_library(tmp_path: Path) -> None:
-    test_dir, uvm_pkg, src = _make_uvm_corpus(tmp_path)
+def test_a_uvm_tagged_file_is_handed_the_suite_library(tmp_path: Path) -> None:
+    test_dir, uvm_pkg, src = _make_uvm_suite(tmp_path)
     record = tmp_path / "argv.txt"
     binary = _make_argv_recording_binary(tmp_path, record)
     result = _run_over_tree(test_dir, binary)
@@ -259,10 +259,10 @@ def test_a_uvm_tagged_file_is_handed_the_corpus_library(tmp_path: Path) -> None:
     )
 
 
-def test_a_library_the_corpus_names_but_lacks_stops_the_run(
+def test_a_library_the_suite_names_but_lacks_stops_the_run(
     tmp_path: Path,
 ) -> None:
-    test_dir, uvm_pkg, _ = _make_uvm_corpus(tmp_path)
+    test_dir, uvm_pkg, _ = _make_uvm_suite(tmp_path)
     uvm_pkg.unlink()
     record = tmp_path / "argv.txt"
     binary = _make_argv_recording_binary(tmp_path, record)
@@ -272,15 +272,15 @@ def test_a_library_the_corpus_names_but_lacks_stops_the_run(
     ) == (1, False, True)
 
 
-def test_summary_names_the_corpus_commit(tmp_path: Path) -> None:
+def test_summary_names_the_suite_commit(tmp_path: Path) -> None:
     binary = _make_stub_binary(tmp_path, exit_code=0)
     test_dir = _make_sv_tree(tmp_path, git_init=True)
     result = _run_over_tree(test_dir, binary)
     assert _head_commit(tmp_path) in result.stdout
 
 
-def test_summary_reports_an_unknown_corpus_outside_a_repository(
+def test_summary_reports_an_unknown_suite_revision_outside_a_repository(
     tmp_path: Path,
 ) -> None:
     result = _run_sv_tests(tmp_path, exit_code=0)
-    assert "sv-tests corpus: unknown" in result.stdout
+    assert "sv-tests revision: unknown" in result.stdout

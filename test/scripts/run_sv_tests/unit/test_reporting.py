@@ -146,8 +146,10 @@ def test_prints_both_clauses_when_the_rejection_names_another(
     rst: ModuleType, capsys: pytest.CaptureFixture[str],
 ) -> None:
     _print_status_for_a_clause_mismatch(rst)
-    out = capsys.readouterr().out
-    assert all(clause in out for clause in ("7.3", "6.19"))
+    assert (
+        "    tool rejected the file under §7.3, but the test's tag names §6.19\n"
+        in capsys.readouterr().out
+    )
 
 
 def test_says_nothing_about_the_exit_code_when_the_clauses_disagree(
@@ -282,28 +284,28 @@ class TestMainBrokenPipe:
         assert not tmp_path.joinpath("pipe-report.xml").exists()
 
 
-class TestCorpusRevision:
+class TestSuiteRevision:
     _SHA = "3d9f0c47a1be82605fd3ca9b71e4d85216a8c3f2"
 
     def test_returns_the_commit_git_reports(self, rst: ModuleType) -> None:
         stub = MagicMock(returncode=0, stdout=f"  {self._SHA}\n  ")
         with patch.object(rst.subprocess, "run", return_value=stub):
-            assert rst.corpus_revision() == self._SHA
+            assert rst.suite_revision() == self._SHA
 
     def test_invokes_git_against_the_test_directory(
         self, rst: ModuleType, capture_run_cmd: CaptureRunCmd,
     ) -> None:
-        assert capture_run_cmd(rst, rst.corpus_revision) == [
+        assert capture_run_cmd(rst, rst.suite_revision) == [
             "git", "-C", str(rst.TEST_DIR), "rev-parse", "HEAD",
         ]
 
     def test_returns_unknown_when_git_fails(self, rst: ModuleType) -> None:
         stub = MagicMock(returncode=128, stdout="")
         with patch.object(rst.subprocess, "run", return_value=stub):
-            assert rst.corpus_revision() == "unknown"
+            assert rst.suite_revision() == "unknown"
 
     def test_returns_unknown_when_git_is_absent(self, rst: ModuleType) -> None:
         with patch.object(
             rst.subprocess, "run", side_effect=FileNotFoundError,
         ):
-            assert rst.corpus_revision() == "unknown"
+            assert rst.suite_revision() == "unknown"
