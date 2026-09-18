@@ -417,14 +417,14 @@ def print_reason(result: dict[str, Any]) -> None:
         subclause_is_within(r, clause) for r in reported
     ):
         print(
-            f"    tool rejected the file under §{', §'.join(reported)}, but the"
+            f"    tool rejected the code under §{', §'.join(reported)}, but the"
             f" test's tag names §{clause}",
             flush=True,
         )
         return
     if result.get("returncode") not in (0, None):
         print(
-            f"    tool exited {result['returncode']} without rejecting the file",
+            f"    tool exited {result['returncode']} without rejecting the code",
             flush=True,
         )
 

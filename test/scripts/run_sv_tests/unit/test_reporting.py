@@ -128,7 +128,10 @@ def test_prints_the_exit_code_when_an_expected_rejection_crashed(
          "stderr": "", "returncode": -11},
         0,
     )
-    assert "-11" in capsys.readouterr().out
+    assert (
+        "    tool exited -11 without rejecting the code\n"
+        in capsys.readouterr().out
+    )
 
 
 def test_says_nothing_extra_when_an_expected_rejection_was_accepted(
@@ -147,7 +150,7 @@ def test_prints_both_clauses_when_the_rejection_names_another(
 ) -> None:
     _print_status_for_a_clause_mismatch(rst)
     assert (
-        "    tool rejected the file under §7.3, but the test's tag names §6.19\n"
+        "    tool rejected the code under §7.3, but the test's tag names §6.19\n"
         in capsys.readouterr().out
     )
 
