@@ -21,7 +21,7 @@ Until 2026-09-18 this note also grew a landmark list by one entry per lookup, ea
 **How to apply:** Never import `pypdf` against `~/LRM.pdf`, not even for the outline. The contents pages, by physical page, each listing clauses to two levels:
 
 | Physical page | Lists |
-|---|---|
+| --- | --- |
 | 11 | §1 to §4.9 |
 | 12 | §4.10 to §7.1 |
 | 13 | §7.2 to §8.30 |
