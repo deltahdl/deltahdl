@@ -1,5 +1,12 @@
 #include <pthread.h>
-#include <sys/types.h>
+// glibc declares pthread_t and pthread_attr_t in <bits/pthreadtypes.h>, which
+// <pthread.h> reaches through <sys/types.h>; misc-include-cleaner asks for the
+// header that declares a name and names no public one for these two, so the
+// declaring header is included where it exists. Apple's SDK declares them in
+// <pthread.h>'s own tree and has no such file.
+#if __has_include(<bits/pthreadtypes.h>)
+#include <bits/pthreadtypes.h>
+#endif
 
 #include <cstddef>
 #include <cstdint>

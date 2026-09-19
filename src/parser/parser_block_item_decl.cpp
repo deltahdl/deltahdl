@@ -36,36 +36,38 @@ bool Parser::IsBlockVarDeclStart() {
   return result;
 }
 
+// The keywords that open a block-item declaration outright, with nothing
+// after them to look at: a lifetime, a parameter, `const`, a typedef, an
+// import, a let, an aggregate or enum type, `var`, and `virtual` -- A.2.2.1
+// lists `virtual [interface] interface_identifier` among data_type's
+// alternatives, so a block item opening with it is a §25.9 virtual interface
+// declaration wherever A.2.8 places one, the locals of a task or function body
+// and the head of a seq_block; no statement opens with the keyword, and
+// ParseDataType reads the type from it.
+static bool OpensBlockDeclOutright(TokenKind tk) {
+  switch (tk) {
+    case TokenKind::kKwAutomatic:
+    case TokenKind::kKwStatic:
+    case TokenKind::kKwParameter:
+    case TokenKind::kKwLocalparam:
+    case TokenKind::kKwConst:
+    case TokenKind::kKwTypedef:
+    case TokenKind::kKwImport:
+    case TokenKind::kKwLet:
+    case TokenKind::kKwStruct:
+    case TokenKind::kKwUnion:
+    case TokenKind::kKwEnum:
+    case TokenKind::kKwVar:
+    case TokenKind::kKwVirtual:
+      return true;
+    default:
+      return false;
+  }
+}
+
 bool Parser::IsBlockVarDeclStartCore() {
   auto tk = CurrentToken().kind;
-  if (tk == TokenKind::kKwAutomatic || tk == TokenKind::kKwStatic) {
-    return true;
-  }
-  if (tk == TokenKind::kKwParameter || tk == TokenKind::kKwLocalparam) {
-    return true;
-  }
-  if (tk == TokenKind::kKwConst) {
-    return true;
-  }
-  if (tk == TokenKind::kKwTypedef) {
-    return true;
-  }
-  if (tk == TokenKind::kKwImport) {
-    return true;
-  }
-  if (tk == TokenKind::kKwLet) {
-    return true;
-  }
-  if (tk == TokenKind::kKwStruct || tk == TokenKind::kKwUnion ||
-      tk == TokenKind::kKwEnum || tk == TokenKind::kKwVar) {
-    return true;
-  }
-  // A.2.2.1 lists `virtual [interface] interface_identifier` among data_type's
-  // alternatives, so a block item opening with `virtual` is a §25.9 virtual
-  // interface declaration wherever A.2.8 places one: the locals of a task or
-  // function body and the head of a seq_block. No statement opens with the
-  // keyword, and ParseDataType reads the type from it.
-  if (tk == TokenKind::kKwVirtual) return true;
+  if (OpensBlockDeclOutright(tk)) return true;
   if (IsDataTypeKeyword(tk)) {
     auto saved = lexer_.SavePos();
     Consume();
