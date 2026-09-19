@@ -13,9 +13,11 @@
 #include "simulator/class_object.h"
 #include "simulator/eval_array.h"
 #include "simulator/eval_array_class_assoc.h"
+#include "simulator/eval_array_class_queue.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
 #include "simulator/stmt_exec.h"
@@ -529,8 +531,18 @@ static std::vector<Logic4Vec> ForeachIndexValues(const Stmt* stmt,
   if (auto* aa = FindAssocArrayOfBase(stmt->expr, exec.ctx, exec.arena)) {
     return AssocIndexValues(aa, exec.arena);
   }
-  std::string name = GetForeachArrayName(stmt->expr);
-  uint32_t size = name.empty() ? 0 : ResolveForeachSize(name, exec.ctx);
+  // §12.7.3 with §7.10: a queue's one dimension holds as many elements as the
+  // queue does, whether the queue is a declared one or a property of an
+  // object (§8.5) named bare in the method or through a handle; a dynamic
+  // array is stored the same way and answers the same.
+  uint32_t size = 0;
+  if (const QueueObject* q =
+          FindQueueOfBase(stmt->expr, exec.ctx, exec.arena)) {
+    size = static_cast<uint32_t>(q->elements.size());
+  } else {
+    std::string name = GetForeachArrayName(stmt->expr);
+    size = name.empty() ? 0 : ResolveForeachSize(name, exec.ctx);
+  }
   std::vector<Logic4Vec> values;
   values.reserve(size);
   for (uint32_t i = 0; i < size; ++i) {

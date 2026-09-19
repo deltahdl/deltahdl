@@ -16,6 +16,7 @@
 #include "simulator/class_object.h"
 #include "simulator/clocking.h"
 #include "simulator/eval_array.h"
+#include "simulator/eval_array_class_queue.h"
 #include "simulator/eval_expr_internal.h"
 #include "simulator/eval_string.h"
 #include "simulator/evaluation.h"
@@ -684,7 +685,6 @@ static bool TryInstanceTriggered(const Expr* expr, SimContext& ctx,
 Logic4Vec EvalMemberAccess(const Expr* expr, SimContext& ctx, Arena& arena) {
   Logic4Vec instance_out;
   if (TryInstanceTriggered(expr, ctx, arena, instance_out)) return instance_out;
-
   Logic4Vec reduce_out;
   if (TryEvalArrayReductionWithClause(expr, ctx, arena, reduce_out))
     return reduce_out;
@@ -700,11 +700,13 @@ Logic4Vec EvalMemberAccess(const Expr* expr, SimContext& ctx, Arena& arena) {
   Logic4Vec vif_out;
   if (TryVirtualInterfaceMember(expr, ctx, arena, vif_out)) return vif_out;
 
-  // §7.8.7: `b[2].x` reads a member of an associative array element, which the
-  // name built below cannot reach because the select contributes nothing to it.
-  Logic4Vec assoc_member;
-  if (TryEvalAssocMemberField(expr, ctx, arena, assoc_member))
-    return assoc_member;
+  // §7.8.7: `b[2].x` reads a member of an associative array element, and
+  // §7.10/§8.4 `q[1].v` a property of the object a queue element refers to;
+  // the name built below reaches neither, the select contributing nothing.
+  Logic4Vec elem_member;
+  if (TryEvalAssocMemberField(expr, ctx, arena, elem_member) ||
+      TryEvalQueueElementMember(expr, ctx, arena, elem_member))
+    return elem_member;
 
   std::string name;
   BuildMemberName(expr, name);

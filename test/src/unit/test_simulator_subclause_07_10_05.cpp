@@ -8,6 +8,7 @@
 #include "common/types.h"
 #include "fixture_simulator.h"
 #include "helpers_reported_error.h"
+#include "helpers_scheduler.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "simulator/eval_array.h"
@@ -745,6 +746,31 @@ TEST(BoundedQueue, BlockScopedBoundWarningNames7_10_5) {
   EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
                               "bounded queue overflow in push_back", 6,
                               "7.10.5"));
+}
+
+// §7.10.5 with §8.5: a queue property declared `[$:2]` is a bounded queue of
+// the object, so a fourth push_back is discarded and the queue keeps three
+// elements, the last of them the third pushed.
+TEST(BoundedQueue, BoundedQueuePropertyDiscardsBeyondItsBound) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  int q[$:2];\n"
+                      "  function void push(int x);\n"
+                      "    q.push_back(x);\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int out;\n"
+                      "  initial begin\n"
+                      "    C c = new;\n"
+                      "    c.push(1);\n"
+                      "    c.push(2);\n"
+                      "    c.push(3);\n"
+                      "    c.push(4);\n"
+                      "    out = c.q.size() * 10 + c.q[$];\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "out"),
+            33u);
 }
 
 }  // namespace

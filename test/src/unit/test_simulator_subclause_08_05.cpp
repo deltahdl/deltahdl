@@ -646,4 +646,150 @@ TEST(ObjectPropertySim, AssociativePropertyElementWrittenThroughAHandle) {
             71u);
 }
 
+// §8.5 with §7.10: a property declared with a queue dimension is a queue of
+// the object. Three push_back calls in a method grow it to three elements,
+// which the module reads through the handle: size() as 3, the second element
+// and, §7.10 naming the last element `$`, the last.
+TEST(ObjectPropertySim, QueuePropertyPushedInAMethodReadThroughTheHandle) {
+  EXPECT_EQ(RunAndGet("class Bag;\n"
+                      "  int q[$];\n"
+                      "  function void add(int x);\n"
+                      "    q.push_back(x);\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int out;\n"
+                      "  initial begin\n"
+                      "    Bag b = new;\n"
+                      "    b.add(11);\n"
+                      "    b.add(21);\n"
+                      "    b.add(31);\n"
+                      "    out = b.q.size() * 1000 + b.q[1] * 10 + b.q[$];\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "out"),
+            3241u);
+}
+
+// §8.5 the other way round: elements pushed through the handle from the
+// module are what a method reads by the property's bare name (§8.11), and a
+// pop_front through the handle removes the first of them.
+TEST(ObjectPropertySim, QueuePropertyPushedThroughTheHandleReadInAMethod) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  int q[$];\n"
+                      "  function int first();\n"
+                      "    return q[0];\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int out;\n"
+                      "  initial begin\n"
+                      "    C c = new;\n"
+                      "    c.q.push_back(8);\n"
+                      "    c.q.push_back(9);\n"
+                      "    out = c.q.size() * 1000 + c.first() * 100;\n"
+                      "    void'(c.q.pop_front());\n"
+                      "    out = out + c.q.size() * 10 + c.first();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "out"),
+            2819u);
+}
+
+// §7.10.2.6 and §7.10.2.7: pop_back and pop_front on a queue property answer
+// the last and the first element and remove them, leaving the middle one.
+TEST(ObjectPropertySim, QueuePropertyPopBackAndPopFrontInMethods) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  int q[$];\n"
+                      "  function void fill();\n"
+                      "    q.push_back(4);\n"
+                      "    q.push_back(5);\n"
+                      "    q.push_back(6);\n"
+                      "  endfunction\n"
+                      "  function int take_back();\n"
+                      "    return q.pop_back();\n"
+                      "  endfunction\n"
+                      "  function int take_front();\n"
+                      "    return q.pop_front();\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int out;\n"
+                      "  initial begin\n"
+                      "    C c = new;\n"
+                      "    c.fill();\n"
+                      "    out = c.take_back() * 100 + c.take_front() * 10;\n"
+                      "    out = out + c.q.size();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "out"),
+            641u);
+}
+
+// §8.5 with §8.4: a queue property of a class type holds handles, so a member
+// select on an element, `b.q[1].v` through the handle and `q[i].v` in a
+// method's foreach (§12.7.3), reads the property of the object the element
+// refers to. Size 3, second element 21, total 63 and last 31.
+TEST(ObjectPropertySim, QueueOfHandlesPropertyElementMember) {
+  EXPECT_EQ(RunAndGet("class Item;\n"
+                      "  int v;\n"
+                      "  function new(int x);\n"
+                      "    v = x;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "class Bag;\n"
+                      "  Item q[$];\n"
+                      "  function void add(int x);\n"
+                      "    Item it = new(x);\n"
+                      "    q.push_back(it);\n"
+                      "  endfunction\n"
+                      "  function int total();\n"
+                      "    int s = 0;\n"
+                      "    foreach (q[i]) s += q[i].v;\n"
+                      "    return s;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int out;\n"
+                      "  initial begin\n"
+                      "    Bag b = new;\n"
+                      "    b.add(11);\n"
+                      "    b.add(21);\n"
+                      "    b.add(31);\n"
+                      "    out = (b.q.size() * 100 + b.q[1].v) * 100;\n"
+                      "    out = (out + b.total()) * 100 + b.q[$].v;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "out"),
+            3216331u);
+}
+
+// §7.10.1: an element of a queue property is written by index, through the
+// handle from the module and by the bare name in a method (§8.11), and each
+// write lands on the object's queue.
+TEST(ObjectPropertySim, QueuePropertyElementWrittenByIndex) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  int q[$];\n"
+                      "  function void fill();\n"
+                      "    q.push_back(1);\n"
+                      "    q.push_back(2);\n"
+                      "  endfunction\n"
+                      "  function void set_second(int x);\n"
+                      "    q[1] = x;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int out;\n"
+                      "  initial begin\n"
+                      "    C c = new;\n"
+                      "    c.fill();\n"
+                      "    c.q[0] = 9;\n"
+                      "    c.set_second(8);\n"
+                      "    out = c.q[0] * 10 + c.q[1];\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "out"),
+            98u);
+}
+
 }  // namespace

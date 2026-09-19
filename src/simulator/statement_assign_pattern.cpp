@@ -14,6 +14,7 @@
 #include "simulator/class_object.h"
 #include "simulator/eval_array.h"
 #include "simulator/eval_array_class_assoc.h"
+#include "simulator/eval_array_class_queue.h"
 #include "simulator/eval_expr_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/queue_bound.h"
@@ -537,12 +538,18 @@ bool TryAssocIndexedWrite(const Expr* lhs, const Logic4Vec& rhs_val,
   return true;
 }
 
+// §7.10.1: `q[i] = v` writes an element of a declared queue or, §8.5 putting
+// no restriction on a property's type, of a queue property of an object --
+// the running method's own by its bare name (§8.11) or any object's through a
+// handle, `b.q[0] = v` -- which FindQueueOfBase resolves, `owner` naming the
+// object whose watchers §9.4.2 has the write tell.
 bool TryQueueIndexedWrite(const Expr* lhs, const Logic4Vec& rhs_val,
                           SimContext& ctx, Arena&) {
-  if (!lhs->base || lhs->base->kind != ExprKind::kIdentifier) return false;
-  auto* q = ctx.FindQueue(lhs->base->text);
-  if (!q || !lhs->index) return false;
+  if (!lhs->base || !lhs->index) return false;
   auto& arena = ctx.GetArena();
+  ClassObject* owner = nullptr;
+  auto* q = FindQueueOfBase(lhs->base, ctx, arena, &owner);
+  if (!q) return false;
   bool idx_xz = false;
   auto idx = EvalQueueIndex(lhs->index, q, ctx, arena, &idx_xz);
 
@@ -569,7 +576,7 @@ bool TryQueueIndexedWrite(const Expr* lhs, const Logic4Vec& rhs_val,
     q->element_ids.push_back(q->AllocateId());
     ++q->generation;
     EnforceQueueBound(q, "indexed write", lhs->range.start, ctx);
-    NotifyOwningVar(ctx, lhs->base->text);
+    AnnounceQueueChange(lhs->base, owner, ctx);
     return true;
   }
   if (idx >= 0 && idx < sz) {
@@ -579,7 +586,7 @@ bool TryQueueIndexedWrite(const Expr* lhs, const Logic4Vec& rhs_val,
     // is nothing to announce.
     if (q->ElementIsDriven(static_cast<size_t>(idx))) return true;
     q->elements[static_cast<size_t>(idx)] = rhs_val;
-    NotifyOwningVar(ctx, lhs->base->text);
+    AnnounceQueueChange(lhs->base, owner, ctx);
     return true;
   }
 
@@ -619,8 +626,7 @@ static bool CollectFromQueueSlice(const Expr* expr, SimContext& ctx,
                                   Arena& arena, std::vector<Logic4Vec>& out) {
   if (expr->kind != ExprKind::kSelect || !expr->base || !expr->index_end)
     return false;
-  if (expr->base->kind != ExprKind::kIdentifier) return false;
-  auto* q = ctx.FindQueue(expr->base->text);
+  auto* q = FindQueueOfBase(expr->base, ctx, arena);
   if (!q) return false;
   bool lo_xz = false, hi_xz = false;
   auto lo = EvalQueueIndex(expr->index, q, ctx, arena, &lo_xz);
@@ -642,8 +648,7 @@ static bool CollectFromQueueElem(const Expr* expr, SimContext& ctx,
                                  Arena& arena, std::vector<Logic4Vec>& out) {
   if (expr->kind != ExprKind::kSelect || !expr->base || expr->index_end)
     return false;
-  if (expr->base->kind != ExprKind::kIdentifier) return false;
-  auto* q = ctx.FindQueue(expr->base->text);
+  auto* q = FindQueueOfBase(expr->base, ctx, arena);
   if (!q) return false;
   // §7.10.1: an invalid index -- a 4-state expression holding an x or z bit,
   // or a value outside 0...$ -- makes the read "return the value appropriate
@@ -693,17 +698,22 @@ static void CollectFixedArrayElements(std::string_view name,
 //
 // An item that names a queue or an unpacked array still contributes that
 // object's elements; it is the brace form alone that stops being expanded.
+// The queue is a declared one by its bare name or a property of an object
+// (§8.5), bare in a method or through a handle, so `q = {q, x}` in a method
+// of the class declaring `q` appends to the property.
 static void CollectQueueItem(const Expr* expr, SimContext& ctx, Arena& arena,
                              std::vector<Logic4Vec>& out) {
   if (CollectFromQueueSlice(expr, ctx, arena, out)) return;
   if (CollectFromQueueElem(expr, ctx, arena, out)) return;
-  if (expr->kind == ExprKind::kIdentifier) {
-    auto* q = ctx.FindQueue(expr->text);
+  if (expr->kind == ExprKind::kIdentifier ||
+      expr->kind == ExprKind::kMemberAccess) {
+    auto* q = FindQueueOfBase(expr, ctx, arena);
     if (q) {
       out.insert(out.end(), q->elements.begin(), q->elements.end());
       return;
     }
-
+  }
+  if (expr->kind == ExprKind::kIdentifier) {
     auto* ai = ctx.FindArrayInfo(expr->text);
     if (ai) {
       CollectFixedArrayElements(expr->text, *ai, ctx, out);
@@ -779,15 +789,33 @@ static void CopyNewInit(const Expr* rhs, QueueObject* q,
     q->elements[i] = OwnRhsWords(src_elems[i], arena);
 }
 
+// §9.4.2 names a change to an object's data members among what wakes a
+// waiting process, so a whole-queue assignment to a property, `owner` being
+// the object, is told to the watchers on the object. A declared queue's
+// assignment, `owner` null, announces what it announced before.
+static void AnnouncePropertyQueueChange(const Expr* lhs, ClassObject* owner,
+                                        SimContext& ctx) {
+  if (owner != nullptr) AnnounceQueueChange(lhs, owner, ctx);
+}
+
+// §7.10/§10.10: the target is a declared queue by its bare name or, §8.5
+// putting no restriction on a property's type, a queue property of an object
+// -- the running method's own by its bare name (§8.11), or any object's
+// through a handle, `b.q = {1, 2}` -- which FindQueueOfBase resolves.
 bool TryQueueBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
-  if (stmt->lhs->kind != ExprKind::kIdentifier) return false;
-  auto* q = ctx.FindQueue(stmt->lhs->text);
+  if (stmt->lhs->kind != ExprKind::kIdentifier &&
+      stmt->lhs->kind != ExprKind::kMemberAccess) {
+    return false;
+  }
+  ClassObject* owner = nullptr;
+  auto* q = FindQueueOfBase(stmt->lhs, ctx, arena, &owner);
   if (!q) return false;
   if (stmt->rhs->kind == ExprKind::kConcatenation &&
       stmt->rhs->elements.empty()) {
     q->elements.clear();
     q->element_ids.clear();
     ++q->generation;
+    AnnouncePropertyQueueChange(stmt->lhs, owner, ctx);
     return true;
   }
   if (stmt->rhs->kind == ExprKind::kCall && stmt->rhs->text == "new" &&
@@ -828,6 +856,7 @@ bool TryQueueBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   EnforceQueueBound(q, "assignment", stmt->rhs->range.start, ctx);
   q->AssignFreshIds();
   ++q->generation;
+  AnnouncePropertyQueueChange(stmt->lhs, owner, ctx);
   return true;
 }
 

@@ -473,4 +473,36 @@ TEST(ClassSim, TypeParameterIndexedPoolDeletesAndTraverses) {
             402u);
 }
 
+// §8.25 with §7.10: a queue property whose element type is a type parameter,
+// `T items[$]`, is a queue of the object in every specialization: the default
+// `stack` pops the 7 it pushed, and `stack #(bit [3:0])` pops the 4 pushed
+// last of two and then counts one element.
+TEST(ClassSim, TypeParameterQueuePropertyInEachSpecialization) {
+  EXPECT_EQ(RunAndGet("class stack #(type T = int);\n"
+                      "  local T items[$];\n"
+                      "  function void push(T a);\n"
+                      "    items.push_back(a);\n"
+                      "  endfunction\n"
+                      "  function T pop();\n"
+                      "    return items.pop_back();\n"
+                      "  endfunction\n"
+                      "  function int n();\n"
+                      "    return items.size();\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int out;\n"
+                      "  initial begin\n"
+                      "    stack is = new;\n"
+                      "    stack #(bit [3:0]) bs = new;\n"
+                      "    is.push(7);\n"
+                      "    bs.push(4'd12);\n"
+                      "    bs.push(4'd4);\n"
+                      "    out = is.pop() * 100 + bs.pop() * 10 + bs.n();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "out"),
+            741u);
+}
+
 }  // namespace

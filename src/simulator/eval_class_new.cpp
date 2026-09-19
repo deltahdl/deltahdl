@@ -12,6 +12,7 @@
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
 #include "simulator/class_object.h"
+#include "simulator/eval_array_class_queue.h"
 #include "simulator/eval_class_array.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
@@ -48,6 +49,39 @@ static void StoreClassPropertyDefault(const ClassTypeInfo* info,
   obj->properties[scoped] = val;
 }
 
+// §8.7: the property `prop` of the level `info` of `obj` initialized to its
+// explicit default if one is given, otherwise to its type's uninitialized
+// value — X for a 4-state type, 0 for a 2-state one — rather than being
+// forced to zero.
+static void InitClassPropertyDefault(const ClassTypeInfo* info,
+                                     const ClassTypeInfo::PropertyInfo& prop,
+                                     ClassObject* obj, SimContext& ctx,
+                                     Arena& arena) {
+  // §7.10/§8.7: a queue property with an initializer, `int q[$] = {1, 2}`,
+  // takes the initializer's elements as its own, and holds no value under
+  // its name. One without an initializer is left to ClassQueueProperty,
+  // which builds it empty on the first reference, once the specialization's
+  // parameters, which its bound may name (§8.25), are bound to the object.
+  if (prop.init_expr != nullptr &&
+      InitClassQueueProperty(obj, info, prop.name, prop.init_expr, ctx)) {
+    return;
+  }
+  Logic4Vec val;
+  if (prop.init_expr) {
+    // §6.8 executes a declaration's initializer as an assignment to the
+    // declared object, so it is coerced into the property exactly as a later
+    // write to it is. The two arms below already size from prop.width, which
+    // is what made this one's silence visible.
+    val = CoerceToPropertyType(info, prop.name,
+                               EvalExpr(prop.init_expr, ctx, arena), arena);
+  } else if (prop.is_4state) {
+    val = MakeAllX(arena, prop.width);
+  } else {
+    val = MakeLogic4VecVal(arena, prop.width, 0);
+  }
+  StoreClassPropertyDefault(info, prop, val, obj, arena);
+}
+
 static void InitClassPropertyDefaults(const ClassTypeInfo* info,
                                       ClassObject* obj, SimContext& ctx,
                                       Arena& arena) {
@@ -58,23 +92,7 @@ static void InitClassPropertyDefaults(const ClassTypeInfo* info,
     // shared storage. Leave static properties out of the instance map so reads
     // and writes fall through to the type's shared static_properties.
     if (prop.is_static) continue;
-    // §8.7: a property is initialized to its explicit default if one is given,
-    // otherwise to its type's uninitialized value — X for a 4-state type, 0 for
-    // a 2-state one — rather than being forced to zero.
-    Logic4Vec val;
-    if (prop.init_expr) {
-      // §6.8 executes a declaration's initializer as an assignment to the
-      // declared object, so it is coerced into the property exactly as a later
-      // write to it is. The two arms below already size from prop.width, which
-      // is what made this one's silence visible.
-      val = CoerceToPropertyType(info, prop.name,
-                                 EvalExpr(prop.init_expr, ctx, arena), arena);
-    } else if (prop.is_4state) {
-      val = MakeAllX(arena, prop.width);
-    } else {
-      val = MakeLogic4VecVal(arena, prop.width, 0);
-    }
-    StoreClassPropertyDefault(info, prop, val, obj, arena);
+    InitClassPropertyDefault(info, prop, obj, ctx, arena);
   }
 
   if (info->decl) {

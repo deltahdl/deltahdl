@@ -256,8 +256,13 @@ static bool CreateBlockQueue(const Stmt* stmt, uint32_t elem_width,
         static_cast<int64_t>(EvalExpr(dim->rhs, ctx, arena).ToUint64());
     if (auto size = QueueBoundMaxSize(bound)) max_size = *size;
   }
-  ctx.CreateQueue(stmt->var_name, elem_width, max_size,
-                  Is4stateType(stmt->var_decl_type.kind));
+  auto* q = ctx.CreateQueue(stmt->var_name, elem_width, max_size,
+                            Is4stateType(stmt->var_decl_type.kind));
+  // §8.4: a queue of a class type holds handles, so `q[i].v` names a property
+  // of the object an element refers to (TryEvalQueueElementMember in
+  // eval_array_class_queue.h).
+  q->holds_class_handles =
+      ctx.FindClassType(stmt->var_decl_type.type_name) != nullptr;
   return true;
 }
 

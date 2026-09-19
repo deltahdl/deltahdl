@@ -16,6 +16,7 @@
 namespace delta {
 
 struct AssocArrayObject;
+struct QueueObject;
 struct ClassDecl;
 struct ClassMember;
 struct ConstraintForeachRef;
@@ -144,6 +145,14 @@ struct ClassTypeInfo {
   mutable std::unordered_map<std::string, AssocArrayObject*>
       static_assoc_properties;
 
+  // §7.10/§8.9: the elements of each static property declared with a queue
+  // dimension, `static Reg all[$]`, keyed by the property's name and built on
+  // the first reference to it (ClassQueueProperty in
+  // src/simulator/eval_array_class_queue.h), §7.10 having a queue with no
+  // initial value start empty. Shared by every instance, as static_properties
+  // is, and mutable for the same reason.
+  mutable std::unordered_map<std::string, QueueObject*> static_queue_properties;
+
   // §18.5.10: a constraint block qualified 'static' has one active/inactive
   // state shared by every instance of the declaring class, rather than a
   // per-object state. constraint_mode() on such a block reads and writes this
@@ -213,6 +222,16 @@ struct ClassObject {
   // ShallowCopy copies the entries, a property being a variable of the object
   // (§8.12).
   std::unordered_map<std::string, AssocArrayObject*> assoc_properties;
+  // §7.10/§8.5: the elements of each property declared with a queue
+  // dimension, `Item q[$]` or `T fifo[$:DEPTH-1]`, keyed by the property's
+  // bare name. The queue is what §7.10.1's operators and §7.10.2's methods act
+  // on, and the object holds one per property, built on the first reference
+  // to the property by ClassQueueProperty in
+  // src/simulator/eval_array_class_queue.h, or at construction by
+  // InitClassQueueProperty where the declaration has an initializer (§8.7).
+  // ShallowCopy copies the elements, a property being a variable of the
+  // object (§8.12).
+  std::unordered_map<std::string, QueueObject*> queue_properties;
   // §8.25: the type each type parameter of the class is bound to in the
   // specialization this object was constructed as, keyed by the parameter's
   // name -- `KEY` to `string` for a `uvm_pool #(string, int)` -- as the

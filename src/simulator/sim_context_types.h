@@ -111,6 +111,12 @@ struct QueueObject {
   bool is_4state = true;
   int32_t max_size = -1;
   uint32_t generation = 0;
+  // §8.4: whether the element type is a class, so that each element is a
+  // handle and `q[i].v` names a property of the object the element refers
+  // to. Read by TryEvalQueueElementMember in
+  // src/simulator/eval_array_class_queue.h, which must not take an integral
+  // or structure element that happens to equal a live handle for one.
+  bool holds_class_handles = false;
 
   // §10.6: what a force or an assign standing on an element drives it from,
   // keyed by the identity §7.10.3 gives that element. The identity is what the

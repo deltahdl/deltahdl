@@ -13,11 +13,13 @@
 #include "parser/ast_stmt.h"
 #include "simulator/eval_array.h"
 #include "simulator/eval_array_class_assoc.h"
+#include "simulator/eval_array_class_queue.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/exec_task.h"
 #include "simulator/process.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
 #include "simulator/stmt_exec.h"
 #include "simulator/stmt_exec_internal.h"
@@ -722,6 +724,14 @@ static ForeachSetup ComputeForeachSetup(const Stmt* stmt, SimContext& ctx,
     setup.keys = AssocIndexValues(aa, arena);
     setup.string_keys = aa->is_string_key;
     setup.size = static_cast<uint32_t>(setup.keys.size());
+  } else if (const QueueObject* q = FindQueueOfBase(stmt->expr, ctx, arena)) {
+    // §12.7.3 with §7.10: a queue's one dimension holds as many elements as
+    // the queue does, 0 to $, whether the queue is a declared one or a
+    // property of an object (§8.5) named bare in a method or through a
+    // handle. A dynamic array is stored the same way and answers the same.
+    // Before this the loop ran over the variable under a declared queue's
+    // name, once per bit of one element, and over a property not at all.
+    setup.size = static_cast<uint32_t>(q->elements.size());
   } else {
     setup.size = GetArraySize(stmt, ctx);
   }

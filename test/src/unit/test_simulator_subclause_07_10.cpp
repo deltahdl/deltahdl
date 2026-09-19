@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_simulator.h"
+#include "helpers_scheduler.h"
 #include "simulator/eval_array.h"
 #include "simulator/evaluation.h"
 
@@ -143,6 +144,53 @@ TEST(QueueAccess, IndexedAppendWakesAnAlwaysCombThatReadsTheQueue) {
       f, "b");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 7u);
+}
+
+// §7.10 with §8.5: a queue property declared with an initializer holds the
+// initializer's elements once the object is constructed (§8.7), and a
+// whole-queue assignment in a method, `q = {q, x}` (§10.10), appends to it:
+// three elements, the first still 5 and the last the appended 7.
+TEST(QueueAccess, QueuePropertyInitializerAndWholeQueueAssignmentInAMethod) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  int q[$] = {5, 6};\n"
+                      "  function void grow(int x);\n"
+                      "    q = {q, x};\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int out;\n"
+                      "  initial begin\n"
+                      "    C c = new;\n"
+                      "    c.grow(7);\n"
+                      "    out = c.q.size() * 100 + c.q[0] * 10 + c.q[$];\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "out"),
+            357u);
+}
+
+// §7.10: a whole-queue assignment through a handle from the module, written
+// as an assignment pattern (§10.9), replaces the property's elements, and the
+// empty concatenation `{}` empties it.
+TEST(QueueAccess, QueuePropertyAssignedThroughAHandle) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  int q[$];\n"
+                      "  function int count();\n"
+                      "    return q.size();\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int out;\n"
+                      "  initial begin\n"
+                      "    C c = new;\n"
+                      "    c.q = '{3, 4, 5};\n"
+                      "    out = c.count() * 100 + c.q[2] * 10;\n"
+                      "    c.q = {};\n"
+                      "    out = out + c.count() + 1;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "out"),
+            351u);
 }
 
 }  // namespace

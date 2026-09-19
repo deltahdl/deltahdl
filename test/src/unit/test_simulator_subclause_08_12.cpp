@@ -637,4 +637,27 @@ TEST(ClassAssignRenameSim, E2eShallowCopyCarriesRngStream) {
   EXPECT_EQ(RunAndGet(src, "same"), 1u);
 }
 
+// §8.12 (shallow copy, step 2) with §7.10: a queue property is copied to the
+// new object, which then holds elements of its own: a push on the copy grows
+// the copy to three and leaves the source at two.
+TEST(ClassAssignRenameSim, E2eShallowCopyCopiesQueueProperty) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  int q[$];\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int out;\n"
+                      "  initial begin\n"
+                      "    C a = new;\n"
+                      "    C b;\n"
+                      "    a.q.push_back(1);\n"
+                      "    a.q.push_back(2);\n"
+                      "    b = new a;\n"
+                      "    b.q.push_back(3);\n"
+                      "    out = b.q.size() * 100 + a.q.size() * 10 + b.q[$];\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "out"),
+            323u);
+}
+
 }  // namespace

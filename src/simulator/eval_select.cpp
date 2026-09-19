@@ -14,6 +14,7 @@
 #include "parser/ast_expr.h"
 #include "simulator/eval_array.h"
 #include "simulator/eval_array_class_assoc.h"
+#include "simulator/eval_array_class_queue.h"
 #include "simulator/eval_class_array.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
@@ -46,11 +47,17 @@ static uint64_t ResolveQueueIdx(const Expr* idx_expr, QueueObject* q,
   return val.ToUint64();
 }
 
+// §7.10: the queue an element select reads is a declared one under its bare
+// name or, §8.5 restricting no property's type, a property of an object -- the
+// running method's own by its bare name (§8.11), any object's through a
+// handle, `b.q[1]`, or a static one as `C::all[0]` -- which FindQueueOfBase
+// resolves. Only the bare name of a declared queue was read here before, so
+// `q[0]` in a method of the class declaring `int q[$]` fell to a bit-select
+// of the property's scalar carrier and read 0 whatever the element held.
 static bool TryQueueSelect(const Expr* expr, SimContext& ctx, Arena& arena,
                            Logic4Vec& out) {
-  if (!expr->base || expr->base->kind != ExprKind::kIdentifier) return false;
-  if (expr->index_end) return false;
-  auto* q = ctx.FindQueue(expr->base->text);
+  if (!expr->base || expr->index_end) return false;
+  auto* q = FindQueueOfBase(expr->base, ctx, arena);
   if (!q) return false;
 
   // §7.10.1 makes two things an invalid index, and each needs a test of its

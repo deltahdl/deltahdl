@@ -7,7 +7,10 @@
 
 #include "common/arena.h"
 #include "common/types.h"
+#include "parser/ast_expr.h"
+#include "simulator/class_object.h"
 #include "simulator/eval_array.h"
+#include "simulator/eval_array_class_queue.h"
 #include "simulator/evaluation.h"
 #include "simulator/queue_bound.h"
 #include "simulator/sim_context.h"
@@ -154,55 +157,89 @@ void NotifyOwningVar(SimContext& ctx, std::string_view var_name) {
   if (auto* v = ctx.FindVariable(var_name)) v->NotifyWatchers();
 }
 
+// The queue the call `receiver.method(...)` is on, with the receiver
+// expression in `receiver`, the method in `method` and, for a property of an
+// object, the object in `owner`; null for a call of another shape or on a
+// receiver that names no queue. §7.10.2's methods are defined on the queue
+// whatever names it: a declared queue by its bare name, and, §8.5 putting no
+// restriction on a property's type, a property of an object -- the running
+// method's own by its bare name (§8.11), any object's through a handle,
+// `b.q.push_back(x)`, and a static one through `C::all.size()` (§8.9) --
+// which FindQueueOfBase resolves. Before it, only the bare name of a declared
+// queue was read here, so a queue property answered size 0 and kept nothing.
+struct QueueCall {
+  QueueObject* queue = nullptr;
+  const Expr* receiver = nullptr;
+  std::string_view method;
+  ClassObject* owner = nullptr;
+};
+
+static QueueCall ResolveQueueCall(const Expr* expr, SimContext& ctx,
+                                  Arena& arena) {
+  QueueCall call;
+  if (expr == nullptr || expr->lhs == nullptr ||
+      expr->lhs->kind != ExprKind::kMemberAccess) {
+    return call;
+  }
+  const Expr* access = expr->lhs;
+  if (access->is_scope_resolution || access->lhs == nullptr ||
+      access->rhs == nullptr || access->rhs->kind != ExprKind::kIdentifier) {
+    return call;
+  }
+  call.receiver = access->lhs;
+  call.method = access->rhs->text;
+  call.queue = FindQueueOfBase(access->lhs, ctx, arena, &call.owner);
+  return call;
+}
+
+// §7.12.2's ordering methods over the queue of `call`, which
+// TryExecQueuePropertyStmt performs by the receiver's bare name and so for
+// the queue a bare name resolves to: a declared one or the running method's
+// property.
+static bool ExecQueueOrdering(const QueueCall& call, SimContext& ctx,
+                              Arena& arena) {
+  return IsQueueOrderingMethod(call.method) &&
+         call.receiver->kind == ExprKind::kIdentifier &&
+         TryExecQueuePropertyStmt(call.receiver->text, call.method, ctx, arena);
+}
+
 bool TryEvalQueueMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
                             Logic4Vec& out) {
-  MethodCallParts parts;
-  if (!ExtractMethodCallParts(expr, parts)) return false;
-  auto* q = ctx.FindQueue(parts.var_name);
-  if (!q) return false;
-  if (DispatchQueueEval(parts.method_name, q, arena, out)) {
-    if (IsQueueMutator(parts.method_name)) NotifyOwningVar(ctx, parts.var_name);
+  QueueCall call = ResolveQueueCall(expr, ctx, arena);
+  if (call.queue == nullptr) return false;
+  if (DispatchQueueEval(call.method, call.queue, arena, out)) {
+    if (IsQueueMutator(call.method))
+      AnnounceQueueChange(call.receiver, call.owner, ctx);
     return true;
   }
 
-  if (DispatchQueuePush(parts.method_name, q, expr, ctx, arena)) {
+  if (DispatchQueuePush(call.method, call.queue, expr, ctx, arena) ||
+      DispatchQueueDelete(call.method, call.queue, expr, ctx, arena) ||
+      ExecQueueOrdering(call, ctx, arena)) {
     out = MakeLogic4VecVal(arena, 1, 0);
-    NotifyOwningVar(ctx, parts.var_name);
-    return true;
-  }
-  if (DispatchQueueDelete(parts.method_name, q, expr, ctx, arena)) {
-    out = MakeLogic4VecVal(arena, 1, 0);
-    NotifyOwningVar(ctx, parts.var_name);
-    return true;
-  }
-  if (IsQueueOrderingMethod(parts.method_name) &&
-      TryExecQueuePropertyStmt(parts.var_name, parts.method_name, ctx, arena)) {
-    out = MakeLogic4VecVal(arena, 1, 0);
-    NotifyOwningVar(ctx, parts.var_name);
+    AnnounceQueueChange(call.receiver, call.owner, ctx);
     return true;
   }
   return false;
 }
 
 bool TryExecQueueMethodStmt(const Expr* expr, SimContext& ctx, Arena& arena) {
-  MethodCallParts parts;
-  if (!ExtractMethodCallParts(expr, parts)) return false;
-  auto* q = ctx.FindQueue(parts.var_name);
-  if (!q) return false;
-  if (DispatchQueuePush(parts.method_name, q, expr, ctx, arena)) {
-    NotifyOwningVar(ctx, parts.var_name);
-    return true;
-  }
-  if (DispatchQueueDelete(parts.method_name, q, expr, ctx, arena)) {
-    NotifyOwningVar(ctx, parts.var_name);
+  QueueCall call = ResolveQueueCall(expr, ctx, arena);
+  if (call.queue == nullptr) return false;
+  if (DispatchQueuePush(call.method, call.queue, expr, ctx, arena) ||
+      DispatchQueueDelete(call.method, call.queue, expr, ctx, arena)) {
+    AnnounceQueueChange(call.receiver, call.owner, ctx);
     return true;
   }
   return false;
 }
 
+// §7.10.2.1 writes `Q.size` without parentheses, and the name on the left of
+// the dot is read as a call's receiver is: a declared queue, or the property
+// of the running method's object (§8.11).
 bool TryEvalQueueProperty(std::string_view var_name, std::string_view prop,
                           SimContext& ctx, Arena& arena, Logic4Vec& out) {
-  auto* q = ctx.FindQueue(var_name);
+  auto* q = FindQueueOfName(var_name, ctx);
   if (!q) return false;
 
   return DispatchQueueEval(prop, q, arena, out);
@@ -241,7 +278,7 @@ static void ShuffleQueueWithIds(QueueObject* q, SimContext& ctx) {
 
 bool TryExecQueuePropertyStmt(std::string_view var_name, std::string_view prop,
                               SimContext& ctx, Arena&) {
-  auto* q = ctx.FindQueue(var_name);
+  auto* q = FindQueueOfName(var_name, ctx);
   if (!q) return false;
   if (prop == "delete") {
     q->elements.clear();

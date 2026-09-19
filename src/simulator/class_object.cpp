@@ -166,6 +166,24 @@ static AssocArrayObject* CopyAssocArray(const AssocArrayObject* src,
   return dst;
 }
 
+// §8.12 (shallow copy, step 2) with §6.8: the copy's queue holds elements of
+// its own, each with its own words for the reason ShallowCopy gives, under
+// the width, state-ness and bound (§7.10.5) the declaration gave the property.
+// §7.10.3 gives the copy's elements identities of their own: a reference taken
+// on the source's element names the source's, not the copy's.
+static QueueObject* CopyQueue(const QueueObject* src, Arena& arena) {
+  auto* dst = arena.Create<QueueObject>();
+  dst->elem_width = src->elem_width;
+  dst->is_4state = src->is_4state;
+  dst->max_size = src->max_size;
+  dst->holds_class_handles = src->holds_class_handles;
+  dst->elements.reserve(src->elements.size());
+  for (const auto& elem : src->elements)
+    dst->elements.push_back(OwnRhsWords(elem, arena));
+  dst->AssignFreshIds();
+  return dst;
+}
+
 ClassObject* ClassObject::ShallowCopy(Arena& arena) const {
   auto* copy = arena.Create<ClassObject>();
   copy->type = type;
@@ -192,6 +210,11 @@ ClassObject* ClassObject::ShallowCopy(Arena& arena) const {
   // above, and the index type the declaration gave the property.
   for (const auto& [name, aa] : assoc_properties)
     copy->assoc_properties[name] = CopyAssocArray(aa, arena);
+  // §8.12 (shallow copy, step 2) once more for a property declared with a
+  // queue dimension: the copy's queue holds the source's elements at the time
+  // of the copy and grows and shrinks on its own after it (§7.10).
+  for (const auto& [name, q] : queue_properties)
+    copy->queue_properties[name] = CopyQueue(q, arena);
   // §8.12 has the copy be of the same class, which for a parameterized class
   // is the same specialization (§8.25), so it is bound to the same types.
   copy->type_param_actuals = type_param_actuals;

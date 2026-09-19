@@ -255,4 +255,29 @@ TEST(StaticClassPropertySim, VectorInitializerReadWithoutObject) {
             0xFFu);
 }
 
+// §8.9 with §7.10: a static property declared with a queue dimension is one
+// queue of the class, which every constructor's `all.push_back(this)` grows
+// and `Reg::all.size()` counts from the module: two objects, and the second
+// element the object whose id is 5 (§8.4, a queue of handles).
+TEST(StaticClassPropertySim, StaticQueuePropertyPushedFromConstructors) {
+  EXPECT_EQ(RunAndGet("class Reg;\n"
+                      "  static Reg all[$];\n"
+                      "  int id;\n"
+                      "  function new(int i);\n"
+                      "    id = i;\n"
+                      "    all.push_back(this);\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int out;\n"
+                      "  initial begin\n"
+                      "    Reg a = new(3);\n"
+                      "    Reg b = new(5);\n"
+                      "    out = Reg::all.size() * 10 + Reg::all[1].id;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "out"),
+            25u);
+}
+
 }  // namespace

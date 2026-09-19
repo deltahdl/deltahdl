@@ -628,6 +628,10 @@ void Lowerer::LowerVarAggregate(std::string_view name,
   if (var.is_queue) {
     auto* q =
         ctx_.CreateQueue(name, var.width, var.queue_max_size, var.is_4state);
+    // §8.4: a queue of a class type holds handles, so `q[i].v` names a
+    // property of the object an element refers to (TryEvalQueueElementMember
+    // in eval_array_class_queue.h).
+    q->holds_class_handles = !var.class_type_name.empty();
     // §7.10.1: a queue may be initialized from an assignment-pattern literal
     // (e.g. int q[$] = '{10, 20, 30}). Populate its elements like a dynamic
     // array; LowerDynArrayInit is a no-op when there is no initializer.

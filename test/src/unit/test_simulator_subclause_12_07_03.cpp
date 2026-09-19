@@ -579,4 +579,37 @@ TEST(LoopStatementSim, ForeachOverAStringKeyedPropertyInsideAMethod) {
   EXPECT_EQ(v, 321u);
 }
 
+// §12.7.3 with §7.10 and §8.5: a foreach over a queue property steps once per
+// element the queue holds, in a method by the property's bare name (§8.11)
+// and at module level through the handle: 4 + 5 + 6 twice, and the last loop
+// variable's value 2.
+TEST(LoopStatementSim, ForeachOverAQueuePropertyInAMethodAndThroughAHandle) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  int q[$];\n"
+                      "  function int total();\n"
+                      "    int s = 0;\n"
+                      "    foreach (q[i]) s += q[i];\n"
+                      "    return s;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int out;\n"
+                      "  int last;\n"
+                      "  initial begin\n"
+                      "    C c = new;\n"
+                      "    c.q.push_back(4);\n"
+                      "    c.q.push_back(5);\n"
+                      "    c.q.push_back(6);\n"
+                      "    out = 0;\n"
+                      "    foreach (c.q[i]) begin\n"
+                      "      out = out + c.q[i];\n"
+                      "      last = i;\n"
+                      "    end\n"
+                      "    out = (out + c.total()) * 10 + last;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "out"),
+            302u);
+}
+
 }  // namespace
