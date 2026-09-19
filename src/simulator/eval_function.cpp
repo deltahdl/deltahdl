@@ -107,16 +107,41 @@ static void InitClassPropertyDefaults(const ClassTypeInfo* info,
   }
 }
 
-static void RunConstructorForLevel(const ClassTypeInfo* info, ClassObject*,
-                                   const Expr* args_expr, SimContext& ctx,
-                                   Arena& arena) {
+// §8.7: the actuals of a `new(...)` call are the caller's expressions, so they
+// are bound with the caller's `this` and class in force, the object under
+// construction taken off the stack for the binding and put back after:
+// `next = new(depth - 1)` in a method of the class reads the method's own
+// object, where with the fresh object on top it read that object's `depth`,
+// still at its default, and constructed a chain that never ended.
+static void BindCallerConstructorArgs(const ModuleItem* ctor,
+                                      const Expr* args_expr, SimContext& ctx,
+                                      Arena& arena) {
+  ClassObject* constructed = ctx.CurrentThis();
+  ctx.PopThis();
+  BindFunctionArgs(ctor, args_expr, ctx, arena);
+  ctx.PushThis(constructed);
+}
+
+// Runs one level's constructor. `args_are_callers` says the actuals are the
+// `new` call's own, the caller's expressions; otherwise they are the
+// extends-specifier or forwarded arguments the level below synthesized, which
+// are expressions of the derived class and read the object under
+// construction.
+static void RunConstructorForLevel(const ClassTypeInfo* info,
+                                   const Expr* args_expr, bool args_are_callers,
+                                   SimContext& ctx, Arena& arena) {
   auto it = info->methods.find("new");
   if (it == info->methods.end() || !it->second) return;
   ctx.PushScope();
+  if (args_expr && args_are_callers) {
+    BindCallerConstructorArgs(it->second, args_expr, ctx, arena);
+  }
   // §8.15/§8.17: while this constructor body runs, `super` resolves relative to
   // `info` (the lexically enclosing class), not the dynamic type of the object.
   ctx.PushMethodClass(info);
-  if (args_expr) BindFunctionArgs(it->second, args_expr, ctx, arena);
+  if (args_expr && !args_are_callers) {
+    BindFunctionArgs(it->second, args_expr, ctx, arena);
+  }
   Variable dummy;
   ExecFunctionBody(it->second, &dummy, ctx, arena);
   ctx.PopMethodClass();
@@ -244,7 +269,7 @@ Logic4Vec EvalClassNew(std::string_view class_type, const Expr* new_expr,
     ctx.PopMethodClass();
     const Expr* args =
         ResolveConstructorArgsForLevel(chain, i, new_expr, arena);
-    RunConstructorForLevel(chain[i], obj, args, ctx, arena);
+    RunConstructorForLevel(chain[i], args, args == new_expr, ctx, arena);
   }
 
   ctx.PopThis();
@@ -313,10 +338,15 @@ Logic4Vec ExecInstanceMethodCall(ModuleItem* method, ClassObject* obj,
   ctx.PushQueueRefFrame();
   ctx.PushAssocRefFrame();
   ExecClassMethod({method}, expr, ctx, arena, out);
+  // §13.5.2: the actual an output argument is copied back to is an expression
+  // of the caller's, so the copy-out is made with the caller's `this` in
+  // scope: a method passing its own property, `other.get(vif)`, names a
+  // property of its own object, and with the callee's object still pushed the
+  // value landed on that object instead.
+  ctx.PopThis();
   WritebackOutputArgs(method, expr, ctx, arena);
   WritebackQueueRefs(ctx);
   WritebackAssocRefs(ctx);
-  ctx.PopThis();
   ctx.PopScope();
   return out;
 }
@@ -518,13 +548,17 @@ static bool TryEvalClassScopeCall(const Expr* expr, SimContext& ctx,
     ctx.PushMethodClass(info.cls);
   }
   ExecClassMethod({info.method}, expr, ctx, arena, out);
-  // §13.5.2: output and inout arguments are copied back to the caller on
-  // return. The instance-method path does this; the class-scope static path
-  // must too, or `Cls::task(out_arg)` silently drops its results.
-  WritebackOutputArgs(info.method, expr, ctx, arena);
   if (info.method->is_static) {
     ctx.PopMethodClass();
   }
+  // §13.5.2: output and inout arguments are copied back to the caller on
+  // return. The instance-method path does this; the class-scope static path
+  // must too, or `Cls::task(out_arg)` silently drops its results. The actual
+  // is the caller's expression, so the copy-out runs with the caller's class
+  // in force rather than the callee's: a property of the caller's object named
+  // as the actual is written against the class declaring it (§8.15), where
+  // under the callee's class it landed on the unscoped key alone.
+  WritebackOutputArgs(info.method, expr, ctx, arena);
   ctx.PopScope();
   return true;
 }

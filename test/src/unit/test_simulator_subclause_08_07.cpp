@@ -798,4 +798,35 @@ TEST(ClassConstructorSim,
             53u);
 }
 
+// §8.7: the arguments of a `new` call are the caller's expressions, so a
+// method constructing another object of its own class with `new(depth - 1)`
+// hands the constructor its own object's depth less one. With the object
+// under construction standing as `this` while the actuals were bound, `depth`
+// read that object's default of 0, the child got -1, and a chain built this
+// way never reached its end.
+TEST(ClassConstructorSim, NewArgumentsReadTheCallersObject) {
+  EXPECT_EQ(RunAndGet("class node;\n"
+                      "  int depth;\n"
+                      "  function new(int d);\n"
+                      "    depth = d;\n"
+                      "  endfunction\n"
+                      "  function node child();\n"
+                      "    node next;\n"
+                      "    next = new(depth - 1);\n"
+                      "    return next;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    node root, c;\n"
+                      "    root = new(4);\n"
+                      "    c = root.child();\n"
+                      "    result = c.depth * 10 + root.depth;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            34u);
+}
+
 }  // namespace
