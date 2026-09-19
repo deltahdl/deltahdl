@@ -266,6 +266,11 @@ struct RtlirVariable {
   uint32_t assoc_index_width = 32;
   std::string_view assoc_index_class_name;
   std::string_view class_type_name;
+  // §8.25: the declaration's own data type where it names a class, which is
+  // where a specialization's parameter value assignment stands, `G #(5) b`
+  // and `pool #(string, int) p`: the actuals the lowerer binds on the object
+  // the variable's `new` constructs. Null for a variable of any other type.
+  const DataType* class_data_type = nullptr;
   std::string_view enum_type_name;
   std::vector<ResolvedAttribute> attrs;
 

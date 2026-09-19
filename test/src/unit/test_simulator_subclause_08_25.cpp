@@ -529,4 +529,56 @@ TEST(ClassSim, NamedValueActualBindsTheParameterOfItsName) {
             21u);
 }
 
+// §8.25 (printed page 203 of ~/LRM.pdf): an object is instantiated with the
+// parameter override rules of §23.10, `vector #(10) vten;`, and inside its
+// methods a value parameter names what the specialization bound it to.
+// Declared at module scope, `G #(5) b = new;` constructed the class's default
+// specialization: the lowerer built the object without recording the
+// declaration's parameter value assignment, which only a declaration inside a
+// procedural block recorded, so a method of `b` read D as 3, whether as the
+// value or as the delay `#D`. The task reads D as a delay and as a value, so
+// the time and the value are both bound: a default-specialized object gives
+// 3 and 3 @ 3, the `#(5)` object 5 @ 8, packed as 5 * 100 + 8.
+TEST(ClassSim, ValueParameterOfAModuleScopeSpecializationReadInAMethod) {
+  EXPECT_EQ(RunAndGet("class G #(int D = 3);\n"
+                      "  int seen;\n"
+                      "  task run;\n"
+                      "    #D seen = D * 100 + $time;\n"
+                      "  endtask\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int out;\n"
+                      "  G #() a = new;\n"
+                      "  G #(5) b = new;\n"
+                      "  initial begin\n"
+                      "    a.run();\n"
+                      "    b.run();\n"
+                      "    out = a.seen * 10000 + b.seen;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "out"),
+            303u * 10000u + 508u);
+}
+
+// §8.25 with §23.10: the same at module scope where the handle is declared
+// with the specialization and constructed later in a procedural block,
+// `G #(5) b;` then `b = new;`, and the parameter is bound by name.
+TEST(ClassSim, ValueParameterOfAModuleScopeSpecializationConstructedLater) {
+  EXPECT_EQ(RunAndGet("class G #(int D = 3, int E = 1);\n"
+                      "  function int mul();\n"
+                      "    return D * E;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int out;\n"
+                      "  G #(.E(7)) b;\n"
+                      "  initial begin\n"
+                      "    b = new;\n"
+                      "    out = b.mul();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "out"),
+            21u);
+}
+
 }  // namespace

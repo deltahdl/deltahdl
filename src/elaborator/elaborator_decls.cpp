@@ -909,6 +909,7 @@ void Elaborator::SetVariableTypeInfo(const ModuleItem* item,
   if (item->data_type.kind == DataTypeKind::kNamed &&
       class_names_.count(item->data_type.type_name)) {
     var.class_type_name = item->data_type.type_name;
+    var.class_data_type = &item->data_type;
   }
   SetEnumTypeInfo(item, var, typedefs_, arena_);
   if (!var.dtype && (item->data_type.packed_dim_left != nullptr ||

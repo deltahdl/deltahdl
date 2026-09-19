@@ -723,11 +723,25 @@ static void MarkVirtualInterfaceVar(const RtlirVariable& var, Variable* v,
   v->value = MakeLogic4VecVal(arena, width, 0);
 }
 
+// §8.25: a class variable declared with a specialization, `G #(5) b`, has
+// the parameter value assignment recorded under its name before anything
+// constructs an object for it -- the declaration's own `= new` in
+// TryLowerClassNewVarInit, or a later `b = new` in a procedural block -- so
+// that either construction binds the actuals on the object. Does nothing for
+// a variable of any other type.
+static void RecordClassSpecialization(std::string_view name,
+                                      const RtlirVariable& var,
+                                      SimContext& ctx) {
+  if (var.class_data_type == nullptr) return;
+  RecordClassParamActuals(name, var.class_data_type->type_params, ctx);
+}
+
 void Lowerer::LowerVar(std::string_view name, const RtlirVariable& var) {
   uint32_t width = StorageWidth(var);
   auto* v = ctx_.CreateVariable(name, width);
   RecordPackedRange(var.dtype, v, ctx_, arena_);
   MarkVirtualInterfaceVar(var, v, width, ctx_, arena_);
+  RecordClassSpecialization(name, var, ctx_);
 
   if (!var.is_4state && !var.is_event && !var.is_string && !var.is_chandle) {
     v->value = MakeLogic4VecVal(arena_, width, 0);
@@ -765,15 +779,20 @@ void Lowerer::LowerVar(std::string_view name, const RtlirVariable& var) {
 // object as part of static initialization (before any initial/always block),
 // the same as a runtime `handle = new(args)` assignment. Generic EvalExpr
 // cannot do this because a bare `new` call carries no target class type; the
-// declared handle type supplies it. Returns true when it handled a class-new
-// initializer.
-static bool TryLowerClassNewVarInit(const RtlirVariable& var, Variable* v,
+// declared handle type supplies it. §8.25: the object is then bound to the
+// specialization the declaration wrote, `G #(5) b = new`, as the procedural
+// declaration path binds its own (TryExecClassVarDecl); built without it, a
+// method of `b` read every parameter as the class's default. Returns true
+// when it handled a class-new initializer.
+static bool TryLowerClassNewVarInit(std::string_view name,
+                                    const RtlirVariable& var, Variable* v,
                                     SimContext& ctx, Arena& arena) {
   if (var.class_type_name.empty() || var.init_expr->kind != ExprKind::kCall ||
       var.init_expr->text != "new")
     return false;
   v->value = EvalClassNew(var.class_type_name, var.init_expr, ctx, arena,
                           var.init_expr->range.start);
+  ApplyClassParamOverrides(name, v->value.ToUint64(), ctx, arena);
   return true;
 }
 
@@ -829,7 +848,7 @@ Logic4Vec Lowerer::CoerceVarInitValue(const RtlirVariable& var, Logic4Vec val,
 void Lowerer::LowerVarInit(std::string_view name, const RtlirVariable& var,
                            Variable* v, uint32_t width) {
   if (TryLowerEventVarInit(name, var, v, ctx_)) return;
-  if (TryLowerClassNewVarInit(var, v, ctx_, arena_)) return;
+  if (TryLowerClassNewVarInit(name, var, v, ctx_, arena_)) return;
   // §8.8: `C c = D::new;` at module scope constructs the specified type during
   // static initialization. The argument-less typed constructor is a bare
   // scope-resolved member access, not a `new` call, so route it to the typed

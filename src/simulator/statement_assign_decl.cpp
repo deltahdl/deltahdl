@@ -331,14 +331,9 @@ static bool TryExecWeakRefVarDecl(const Stmt* stmt, SimContext& ctx,
   return true;
 }
 
-// Records the class parameter overrides (if any) for the just-created class
-// variable `var_name`: the value expressions, and the actuals themselves as
-// the parser recorded them, since §8.25 lets an actual be a type -- `#(string,
-// int)` -- which is no expression and binds a type parameter of the class the
-// variable's `new` constructs.
-static void SetClassParamExprs(std::string_view var_name,
-                               const std::vector<DataType>& type_params,
-                               SimContext& ctx) {
+void RecordClassParamActuals(std::string_view var_name,
+                             const std::vector<DataType>& type_params,
+                             SimContext& ctx) {
   if (type_params.empty()) return;
   std::vector<Expr*> exprs;
   exprs.reserve(type_params.size());
@@ -371,7 +366,7 @@ static bool TryExecClassVarDecl(const Stmt* stmt, SimContext& ctx,
   ctx.CreateVariable(stmt->var_name, 64);
   ctx.SetVariableClassType(stmt->var_name, class_type);
 
-  SetClassParamExprs(stmt->var_name, stmt->var_decl_type.type_params, ctx);
+  RecordClassParamActuals(stmt->var_name, stmt->var_decl_type.type_params, ctx);
 
   if (!stmt->var_init) return true;
 

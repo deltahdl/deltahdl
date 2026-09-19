@@ -91,6 +91,18 @@ void ClearSelectIndices(const Expr* lhs, SimContext& ctx);
 void CreateDeclAggregate(const Stmt* stmt, uint32_t elem_width, SimContext& ctx,
                          Arena& arena);
 
+// Defined in statement_assign_decl.cpp; also used by the module-scope
+// declaration lowering in lowerer_var.cpp. §8.25: records the parameter value
+// assignment of the specialization the class variable `var_name` was declared
+// with, `G #(5) b` -- the value expressions, and the actuals themselves as the
+// parser recorded them, since an actual may be a type, `#(string, int)`, which
+// is no expression and binds a type parameter -- for ApplyClassParamOverrides
+// to bind on the object the variable's `new` constructs. Nothing is recorded
+// for a declaration that wrote no `#(...)`.
+void RecordClassParamActuals(std::string_view var_name,
+                             const std::vector<DataType>& type_params,
+                             SimContext& ctx);
+
 // Defined in statement_assign_decl.cpp; also used by the class-property
 // resolution in eval_array_class_assoc.cpp. §7.8: whether the unpacked
 // dimension `dim` is an index type -- a keyword type, the `*` wildcard, a
