@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 #include "helpers_child_instance.h"
 #include "helpers_reported_error.h"
@@ -607,6 +608,40 @@ TEST(ParameterOverride,
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "class 'Buf' has no parameter 'Nope'", 8,
                             "23.10.2.2"));
+}
+
+// A.4.1.1's ordered_parameter_assignment is a param_expression (printed page
+// 1194 of ~/LRM.pdf), which A.8.3 lets be a data_type, and a data type an
+// expression cannot spell -- A.2.2.1's signing after an integer type (printed
+// page 1182) -- reaches the child through the specialization the override
+// names. `int unsigned` on T2 makes elem_t unsigned where T2's default, int,
+// is signed; the width is 32 either way, so the signedness is what says the
+// written type arrived rather than the default.
+TEST(ParameterOverride,
+     TypeParameterOverriddenBySignedIntegerTypeInASpecialization) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "class Buf #(type T1 = int, type T2 = int);\n"
+      "  typedef T2 elem_t;\n"
+      "endclass\n"
+      "module child #(parameter type T = byte)();\n"
+      "  T data;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child #(.T(Buf#(.T2(int unsigned))::elem_t)) u0();\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* child = SoleChildInstance(design);
+  ASSERT_NE(child, nullptr);
+  const RtlirVariable* data = nullptr;
+  for (const auto& v : child->variables) {
+    if (v.name == "data") data = &v;
+  }
+  ASSERT_NE(data, nullptr);
+  EXPECT_EQ(data->width, 32u);
+  EXPECT_FALSE(data->is_signed);
 }
 
 }  // namespace

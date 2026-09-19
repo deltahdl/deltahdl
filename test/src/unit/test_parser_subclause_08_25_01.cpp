@@ -1,6 +1,11 @@
 #include <gtest/gtest.h>
 
 #include "fixture_parser.h"
+#include "helpers_parser_verify.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_module.h"
+#include "parser/ast_stmt.h"
+#include "parser/ast_type.h"
 
 using namespace delta;
 
@@ -123,6 +128,92 @@ TEST(ParameterizedScopeResolutionParsing, EmptyParamListWithMemberAccess) {
               "    b = C#()::q;\n"
               "  end\n"
               "endmodule\n"));
+}
+
+// A.4.1.1's ordered_parameter_assignment is a param_expression (printed page
+// 1194 of ~/LRM.pdf), which A.8.3 lets be a data_type, and A.2.2.1 gives an
+// integer type an optional signing and a virtual interface its `virtual`
+// keyword (printed page 1182). An expression reader spells a keyword type as
+// a bare name, so `int unsigned` stopped at `unsigned` and `virtual ifc` at
+// `virtual`, each reported as a missing `)` under §23.10.2; those elements
+// are now read as the data types they are and carried on the scope's node.
+TEST(ParameterizedScopeResolutionParsing, SignedIntegerTypeAsParameterValue) {
+  auto r = Parse(
+      "class C #(type T = int);\n"
+      "  static function T get();\n"
+      "    return 0;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  int x;\n"
+      "  initial x = C#(int unsigned)::get();\n"
+      "  initial void'(C#(byte signed)::get());\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  auto* call = stmt->rhs;
+  ASSERT_NE(call, nullptr);
+  ASSERT_EQ(call->kind, ExprKind::kCall);
+  auto* scope = call->lhs->lhs;
+  ASSERT_NE(scope, nullptr);
+  EXPECT_TRUE(scope->has_param_spec);
+  ASSERT_EQ(scope->elements.size(), 1u);
+  ASSERT_NE(scope->elements[0], nullptr);
+  ASSERT_EQ(scope->elements[0]->kind, ExprKind::kTypeRef);
+  ASSERT_NE(scope->elements[0]->type_value, nullptr);
+  EXPECT_EQ(scope->elements[0]->type_value->kind, DataTypeKind::kInt);
+  EXPECT_FALSE(scope->elements[0]->type_value->is_signed);
+}
+
+TEST(ParameterizedScopeResolutionParsing,
+     VirtualInterfaceTypeAsParameterValue) {
+  auto r = Parse(
+      "interface ifc;\n"
+      "endinterface\n"
+      "class C #(type T = int);\n"
+      "  static function void set(int v);\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  initial C#(virtual ifc)::set(1);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_EQ(stmt->kind, StmtKind::kExprStmt);
+  auto* scope = stmt->expr->lhs->lhs;
+  ASSERT_NE(scope, nullptr);
+  ASSERT_EQ(scope->elements.size(), 1u);
+  ASSERT_EQ(scope->elements[0]->kind, ExprKind::kTypeRef);
+  ASSERT_NE(scope->elements[0]->type_value, nullptr);
+  EXPECT_EQ(scope->elements[0]->type_value->kind,
+            DataTypeKind::kVirtualInterface);
+  EXPECT_EQ(scope->elements[0]->type_value->type_name, "ifc");
+}
+
+// A keyword type with no signing keeps the shape it had, a name the
+// elaborator reads as the type, so `logic [3:0]` still arrives as a select
+// on the name `logic`.
+TEST(ParameterizedScopeResolutionParsing, PlainKeywordTypeStaysAName) {
+  auto r = Parse(
+      "module m;\n"
+      "  int x;\n"
+      "  initial x = C#(logic [3:0])::get();\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  auto* scope = stmt->rhs->lhs->lhs;
+  ASSERT_NE(scope, nullptr);
+  ASSERT_EQ(scope->elements.size(), 1u);
+  ASSERT_EQ(scope->elements[0]->kind, ExprKind::kSelect);
+  EXPECT_EQ(scope->elements[0]->base->kind, ExprKind::kIdentifier);
+  EXPECT_EQ(scope->elements[0]->base->text, "logic");
 }
 
 }  // namespace

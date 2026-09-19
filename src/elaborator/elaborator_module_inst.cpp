@@ -196,6 +196,12 @@ static DataType OverrideHeadToDataType(const Expr* head,
                                        const CompilationUnit* unit,
                                        DiagEngine& diag, SourceLoc loc) {
   if (head == nullptr) return DataType{};
+  // A data_type an expression could not spell, `int unsigned` or `virtual
+  // ifc`, arrives as the type Parser::ParseParamValueAssignment read
+  // (src/parser/expr_parser.cpp).
+  if (head->kind == ExprKind::kTypeRef && head->type_value != nullptr) {
+    return *head->type_value;
+  }
   if (head->kind == ExprKind::kIdentifier) {
     DataType dt = TypeNameToDataType(head->text);
     // §8.25 (printed page 204): a specialization is the generic class combined

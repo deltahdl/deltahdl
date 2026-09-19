@@ -17,6 +17,7 @@ struct SpecifyItem;
 struct BindDirective;
 struct ClassMember;
 struct PropertyExprNode;
+struct DataType;
 
 enum class ExprKind : uint8_t {
   kIntegerLiteral,
@@ -126,6 +127,14 @@ struct Expr {
   // the node is an identifier standing in the argument's place, and the
   // substitution of the actuals for the formals reads the tree.
   PropertyExprNode* property_actual = nullptr;
+
+  // kTypeRef only, on an element of a parameter_value_assignment: the
+  // data_type A.8.3's param_expression admits, read by ParseDataType because
+  // an expression cannot spell it -- A.2.2.1's signing after an integer type,
+  // or a virtual interface type. A keyword type written alone stays the
+  // identifier node ParseCastOrTypedPattern makes, with its packed dimensions
+  // as selects, which is the shape the elaborator's override readers take.
+  DataType* type_value = nullptr;
 };
 
 // §11.5: an operand is "simple" iff it is not parenthesized AND is a primary

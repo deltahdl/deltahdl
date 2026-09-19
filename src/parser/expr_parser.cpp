@@ -596,44 +596,6 @@ Expr* Parser::ParseMemberAccessChain(Token tok) {
   return result;
 }
 
-// §6.20 / Syntax 8-2: a parameter_value_assignment may be ordered (a bare
-// expression) or named (".name(value)"). Captures one element of either form,
-// recording the name in arg_names (empty for the ordered form) and the value in
-// elements.
-void Parser::ParseParamValueAssignment(Expr* base) {
-  if (Check(TokenKind::kDot)) {
-    Consume();
-    auto name_tok = Expect(TokenKind::kIdentifier, Subclause("23.10.2.2"));
-    Expect(TokenKind::kLParen, Subclause("23.10.2.2"));
-    Expr* value = Check(TokenKind::kRParen) ? nullptr : ParseExpr();
-    Expect(TokenKind::kRParen, Subclause("23.10.2.2"));
-    base->arg_names.push_back(name_tok.text);
-    base->elements.push_back(value);
-    return;
-  }
-  base->arg_names.push_back({});
-  base->elements.push_back(ParseExpr());
-}
-
-Expr* Parser::ParseParameterizedScope(Expr* base) {
-  Consume();
-  if (!Check(TokenKind::kLParen)) return base;
-  base->has_param_spec = true;
-  Consume();
-  if (!Check(TokenKind::kRParen)) {
-    ParseParamValueAssignment(base);
-    while (Check(TokenKind::kComma)) {
-      Consume();
-      ParseParamValueAssignment(base);
-    }
-  }
-  Expect(TokenKind::kRParen, Subclause("23.10.2"));
-  while (Check(TokenKind::kDot) || Check(TokenKind::kColonColon)) {
-    base = MakeMemberAccess(base);
-  }
-  return base;
-}
-
 Expr* Parser::TryParseUserTypeCast(const Token& tok) {
   if (known_types_.count(tok.text) == 0) return nullptr;
 

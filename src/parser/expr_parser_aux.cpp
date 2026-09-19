@@ -1,7 +1,9 @@
 #include "common/diagnostic.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_type.h"
 #include "parser/parser.h"
+#include "parser/parser_token_skips.h"
 
 namespace delta {
 
@@ -162,6 +164,70 @@ Expr* Parser::ParseParenExpr() {
   }
   lhs->is_parenthesized = true;
   return lhs;
+}
+
+// §6.20 / Syntax 8-2: a parameter_value_assignment may be ordered (a bare
+// expression) or named (".name(value)"). Captures one element of either form,
+// recording the name in arg_names (empty for the ordered form) and the value in
+// elements.
+//
+// A.4.1.1 makes each element a param_expression (printed page 1194 of
+// ~/LRM.pdf), which A.8.3 lets be a data_type. ParseExpr spells a keyword type
+// as a name with its packed dimensions as selects, which the elaborator's
+// override readers take, but it cannot spell A.2.2.1's signing after an
+// integer type nor a virtual interface type (printed page 1182): `int
+// unsigned` stopped at `unsigned` and `virtual ifc` at `virtual`, each
+// reported as a missing `)`. An element that opens with `virtual`, or with a
+// type keyword that `signed` or `unsigned` follows, is read by ParseDataType
+// into a kTypeRef node carrying the type.
+void Parser::ParseParamValueAssignment(Expr* base) {
+  auto parse_value = [this]() -> Expr* {
+    bool opens_a_type = Check(TokenKind::kKwVirtual);
+    if (!opens_a_type && IsDataTypeKeyword(CurrentToken().kind)) {
+      auto saved = lexer_.SavePos();
+      Consume();
+      opens_a_type =
+          Check(TokenKind::kKwSigned) || Check(TokenKind::kKwUnsigned);
+      lexer_.RestorePos(saved);
+    }
+    if (!opens_a_type) return ParseExpr();
+    auto* ref = arena_.Create<Expr>();
+    ref->kind = ExprKind::kTypeRef;
+    ref->range.start = CurrentLoc();
+    ref->type_value = arena_.Create<DataType>(ParseDataType());
+    return ref;
+  };
+  if (Check(TokenKind::kDot)) {
+    Consume();
+    auto name_tok = Expect(TokenKind::kIdentifier, Subclause("23.10.2.2"));
+    Expect(TokenKind::kLParen, Subclause("23.10.2.2"));
+    Expr* value = Check(TokenKind::kRParen) ? nullptr : parse_value();
+    Expect(TokenKind::kRParen, Subclause("23.10.2.2"));
+    base->arg_names.push_back(name_tok.text);
+    base->elements.push_back(value);
+    return;
+  }
+  base->arg_names.push_back({});
+  base->elements.push_back(parse_value());
+}
+
+Expr* Parser::ParseParameterizedScope(Expr* base) {
+  Consume();
+  if (!Check(TokenKind::kLParen)) return base;
+  base->has_param_spec = true;
+  Consume();
+  if (!Check(TokenKind::kRParen)) {
+    ParseParamValueAssignment(base);
+    while (Check(TokenKind::kComma)) {
+      Consume();
+      ParseParamValueAssignment(base);
+    }
+  }
+  Expect(TokenKind::kRParen, Subclause("23.10.2"));
+  while (Check(TokenKind::kDot) || Check(TokenKind::kColonColon)) {
+    base = MakeMemberAccess(base);
+  }
+  return base;
 }
 
 }  // namespace delta
