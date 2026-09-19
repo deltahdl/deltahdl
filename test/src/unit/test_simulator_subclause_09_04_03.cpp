@@ -393,4 +393,50 @@ TEST(LevelSensitiveEventSimulation, WaitResumesOnAnIncrementOperatorWrite) {
   EXPECT_EQ(val, 64u);
 }
 
+// §9.4.3 with §8.6 and §8.11: inside a class task the condition may read the
+// object's own property, bare as `wait (go)`, as `wait (this.go)`, or in an
+// expression `wait (n == 2)`, and the statement stays blocked until another
+// process makes it true, here through a handle to the object. The property
+// names resolve to no variable of the design, so the awaiter armed nothing
+// and the three tasks never resumed, leaving the result at 0. Each task
+// records the time it resumed: `go` is set at 4, `this.go` reads the same
+// property, and `n` reaches 2 at 6, so the result is 4 * 100 + 4 * 10 + 6.
+TEST(LevelSensitiveEventSimulation, WaitOnAnOwnPropertyInsideAClassTask) {
+  auto val = RunAndGet(
+      "class C;\n"
+      "  bit go;\n"
+      "  int n;\n"
+      "  int woke_bare, woke_this, woke_expr;\n"
+      "  task wait_bare();\n"
+      "    wait (go) woke_bare = $time;\n"
+      "  endtask\n"
+      "  task wait_this();\n"
+      "    wait (this.go) woke_this = $time;\n"
+      "  endtask\n"
+      "  task wait_expr();\n"
+      "    wait (n == 2) woke_expr = $time;\n"
+      "  endtask\n"
+      "endclass\n"
+      "module t;\n"
+      "  C h;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    h = new;\n"
+      "    fork\n"
+      "      h.wait_bare();\n"
+      "      h.wait_this();\n"
+      "      h.wait_expr();\n"
+      "      begin\n"
+      "        #3 h.n = 1;\n"
+      "        #1 h.go = 1;\n"
+      "        #2 h.n = 2;\n"
+      "      end\n"
+      "    join\n"
+      "    result = h.woke_bare * 100 + h.woke_this * 10 + h.woke_expr;\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(val, 446u);
+}
+
 }  // namespace

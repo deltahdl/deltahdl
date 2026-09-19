@@ -27,6 +27,7 @@
 #include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
 #include "simulator/awaiters_event_control.h"
+#include "simulator/class_object.h"
 #include "simulator/clocking.h"
 #include "simulator/evaluation.h"
 #include "simulator/process.h"
@@ -434,6 +435,37 @@ struct AnyChangeAwaiter {
     });
   }
 
+  // §9.4.3 with §8.6 and §8.11: a name no variable of the design answers may
+  // be a property of the running method's object -- `wait (go)` or `wait
+  // (this.go)` inside a class task, the reads then naming `go` and `this` --
+  // whose writes reach the object's own watchers through
+  // SimContext::NotifyClassHandleWatchers. The watcher wakes the process
+  // without comparing values, as the arm for a class-typed variable does: the
+  // wait statement re-evaluates its condition in the process's own context
+  // once resumed, and parks again if it is still false. A name that is
+  // neither `this` nor a property of that object arms nothing, as before.
+  void AttachOwnPropertyWatcher(std::string_view name,
+                                std::coroutine_handle<> h, Process* proc,
+                                const std::shared_ptr<bool>& fin,
+                                const std::shared_ptr<bool>& consumed) {
+    auto* self = ctx.CurrentThis();
+    if (self == nullptr || self->type == nullptr) return;
+    if (name != "this" && self->type->FindProperty(name) == nullptr) return;
+    auto* ctx_ptr = &ctx;
+    self->AddWatcher([h, proc, ctx_ptr, fin, consumed]() mutable {
+      if (fin) {
+        if (*fin) return true;
+      } else if (h.done()) {
+        return true;
+      }
+      if (proc && !proc->active) return true;
+      if (*consumed) return true;
+      *consumed = true;
+      EventAwaiter::ResumeMaybeReactive(h, proc, *ctx_ptr);
+      return true;
+    });
+  }
+
   void await_suspend(std::coroutine_handle<> h) {
     auto* proc = ctx.CurrentProcess();
     auto fin = finished;
@@ -446,7 +478,10 @@ struct AnyChangeAwaiter {
     auto consumed = std::make_shared<bool>(false);
     for (auto name : var_names) {
       auto* var = ctx.FindVariable(name);
-      if (!var) continue;
+      if (!var) {
+        AttachOwnPropertyWatcher(name, h, proc, fin, consumed);
+        continue;
+      }
       // The name is in hand only here, and the decision it feeds is the same
       // for every notification the watcher will see, so it is made once per
       // name per suspension rather than in the watcher body.
