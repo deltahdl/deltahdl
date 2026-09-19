@@ -505,13 +505,19 @@ void RecordTaskFuncNames(
 
 // §6.21/§13.3.1: a task/function with no explicit lifetime inherits the
 // enclosing scope's lifetime (automatic if the scope is automatic, otherwise
-// static).
+// static). An out-of-block method body (§8.24), the item whose `method_class`
+// names its class, is left alone: §8.6 makes every method of a class automatic
+// and forbids a class method a static lifetime, so the scope's default is not
+// its to inherit. The simulator also reads ModuleItem::is_static on a method
+// as §8.10's static qualifier, so marking a body here made an instance method
+// of a package class run in class scope without `this`, its properties
+// unreachable.
 void DefaultSubroutineLifetimes(const std::vector<ModuleItem*>& items,
                                 bool scope_is_automatic) {
   for (auto* item : items) {
     if ((item->kind == ModuleItemKind::kFunctionDecl ||
          item->kind == ModuleItemKind::kTaskDecl) &&
-        !item->is_automatic && !item->is_static) {
+        item->method_class.empty() && !item->is_automatic && !item->is_static) {
       if (scope_is_automatic) {
         item->is_automatic = true;
       } else {

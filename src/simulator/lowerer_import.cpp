@@ -39,11 +39,40 @@ static std::string_view QualifiedClassKey(const PackageDecl* pkg,
   return *key;
 }
 
+void AttachMethodBody(ClassTypeInfo* cls, ModuleItem* body) {
+  std::string name(body->name);
+  auto existing = cls->methods.find(name);
+  if (existing != cls->methods.end() && existing->second->is_static) {
+    body->is_static = true;
+  }
+  cls->methods[name] = body;
+}
+
+// §8.24: an out-of-block declaration stands in the same scope as its class,
+// so a package class's bodies are the package's own function and task items
+// whose `C::` prefix names the class. Attached right after the class is
+// lowered, once, however the class is reached -- through an import or through
+// `p::C` (§26.3) -- so that each body replaces the in-class prototype it
+// matches.
+static void AttachPackageMethodBodies(const PackageDecl* pkg,
+                                      const ClassDecl* cls,
+                                      ClassTypeInfo* info) {
+  for (auto* item : pkg->items) {
+    if (item->kind != ModuleItemKind::kFunctionDecl &&
+        item->kind != ModuleItemKind::kTaskDecl)
+      continue;
+    if (item->method_class != cls->name) continue;
+    AttachMethodBody(info, item);
+  }
+}
+
 void Lowerer::LowerPackageClass(const PackageDecl* pkg, const ClassDecl* cls) {
   std::string_view key = QualifiedClassKey(pkg, cls, arena_);
   if (ctx_.FindClassType(key)) return;
   LowerClassDecl(cls);
-  ctx_.RegisterClassType(key, ctx_.FindClassType(cls->name));
+  ClassTypeInfo* info = ctx_.FindClassType(cls->name);
+  AttachPackageMethodBodies(pkg, cls, info);
+  ctx_.RegisterClassType(key, info);
 }
 
 void Lowerer::LowerPackageItem(const PackageDecl* pkg, ModuleItem* item) {
@@ -60,6 +89,9 @@ void Lowerer::LowerPackageItem(const PackageDecl* pkg, ModuleItem* item) {
     }
   } else if (item->kind == ModuleItemKind::kFunctionDecl ||
              item->kind == ModuleItemKind::kTaskDecl) {
+    // §8.24: an out-of-block method body is the class's, not a subroutine of
+    // the package; LowerPackageClass attaches it to the class.
+    if (!item->method_class.empty()) return;
     if (!ctx_.FindFunction(item->name)) {
       ctx_.RegisterFunction(item->name, item);
     }

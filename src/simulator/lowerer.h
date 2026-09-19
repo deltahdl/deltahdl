@@ -27,6 +27,7 @@ struct RtlirProcess;
 struct AssocArrayObject;
 struct QueueObject;
 struct ClassDecl;
+struct ClassTypeInfo;
 struct Expr;
 struct RtlirModuleInst;
 struct RtlirPortBinding;
@@ -42,6 +43,17 @@ struct Process;
 // src/simulator/lowerer.cpp defines it and src/simulator/lowerer_contassign.cpp
 // is its second caller.
 void ScheduleProcess(Process* proc, SimContext& ctx);
+
+// §8.24: makes `body`, an out-of-block method definition, the method of `cls`
+// its name selects, in place of the in-class prototype. The definition repeats
+// neither the lifetime nor the static qualifier of the prototype, so the body
+// item parses with is_static false; the static-ness is carried forward from
+// the prototype before the body replaces it, so that a call through the class
+// scope resolution operator of §8.23 still resolves it as static. Declared
+// here because two files attach bodies: src/simulator/lowerer.cpp for the
+// compilation unit's definitions and src/simulator/lowerer_import.cpp, which
+// defines it, for a package's.
+void AttachMethodBody(ClassTypeInfo* cls, ModuleItem* body);
 
 // The timing one module instance declares -- §30.3's specify blocks and §28.4's
 // gate instantiations -- with the instance they belong to. The prefix is what

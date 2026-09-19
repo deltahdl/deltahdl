@@ -177,6 +177,93 @@ TEST(ClassSim, MultipleOutOfBlockMethodsLinked) {
   EXPECT_EQ(obj->ResolveMethod("set")->kind, ModuleItemKind::kTaskDecl);
 }
 
+// §8.24 with §26.3: an out-of-block declaration stands in the same scope as
+// its class, so a class a package declares has its bodies among the package's
+// items, and they must be attached to the class whether it is reached through
+// a wildcard import or through `p::C`. Before the bodies were attached the
+// in-class prototype answered every call with 0, which each value below
+// differs from.
+TEST(ClassSim, PackageOutOfBlockStaticFunctionAfterWildcardImport) {
+  EXPECT_EQ(RunAndGet("package p;\n"
+                      "  class root;\n"
+                      "    extern static function int sget();\n"
+                      "  endclass\n"
+                      "  function int root::sget();\n"
+                      "    return 5;\n"
+                      "  endfunction\n"
+                      "endpackage\n"
+                      "import p::*;\n"
+                      "module t;\n"
+                      "  int a;\n"
+                      "  initial a = root::sget();\n"
+                      "endmodule\n",
+                      "a"),
+            5u);
+}
+
+TEST(ClassSim, PackageOutOfBlockInstanceMethodReadsProperty) {
+  EXPECT_EQ(RunAndGet("package p;\n"
+                      "  class root;\n"
+                      "    int tag = 7;\n"
+                      "    extern function int iget();\n"
+                      "  endclass\n"
+                      "  function int root::iget();\n"
+                      "    return tag;\n"
+                      "  endfunction\n"
+                      "endpackage\n"
+                      "import p::*;\n"
+                      "module t;\n"
+                      "  int b;\n"
+                      "  initial begin\n"
+                      "    root r = new;\n"
+                      "    b = r.iget();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "b"),
+            7u);
+}
+
+TEST(ClassSim, PackageOutOfBlockStaticFunctionThroughPackageScope) {
+  EXPECT_EQ(RunAndGet("package p;\n"
+                      "  class root;\n"
+                      "    extern static function int sget();\n"
+                      "  endclass\n"
+                      "  function int root::sget();\n"
+                      "    return 11;\n"
+                      "  endfunction\n"
+                      "endpackage\n"
+                      "module t;\n"
+                      "  int a;\n"
+                      "  initial a = p::root::sget();\n"
+                      "endmodule\n",
+                      "a"),
+            11u);
+}
+
+// §8.9 with §8.24: the static-ness of the prototype is carried onto the body,
+// so the body is called without an object and reads the static property
+// through the class, 3 added to its initial 40 where an unattached body or a
+// non-static one gives 0.
+TEST(ClassSim, PackageOutOfBlockStaticMethodReadsStaticProperty) {
+  EXPECT_EQ(RunAndGet("package p;\n"
+                      "  class cnt;\n"
+                      "    static int total = 40;\n"
+                      "    extern static function int bump();\n"
+                      "  endclass\n"
+                      "  function int cnt::bump();\n"
+                      "    total = total + 3;\n"
+                      "    return total;\n"
+                      "  endfunction\n"
+                      "endpackage\n"
+                      "import p::*;\n"
+                      "module t;\n"
+                      "  int a;\n"
+                      "  initial a = cnt::bump();\n"
+                      "endmodule\n",
+                      "a"),
+            43u);
+}
+
 TEST(ClassSim, UnresolvedMethodReturnsNull) {
   SimFixture f;
   auto* type = MakeClassType(f, "C", {});

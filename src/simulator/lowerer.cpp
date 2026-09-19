@@ -724,22 +724,16 @@ static void RegisterFreeCuFunctions(const RtlirDesign* design,
   }
 }
 
+// §8.24: the compilation unit's out-of-block method definitions, each attached
+// to the class its `C::` prefix names. A package's definitions are attached
+// when the package's class is lowered, in LowerPackageClass.
 static void AttachCuMethodsToClasses(const RtlirDesign* design,
                                      SimContext& ctx) {
   for (auto* item : design->cu_function_decls) {
     if (item->method_class.empty()) continue;
     auto* cls = ctx.FindClassType(item->method_class);
     if (!cls) continue;
-    std::string name(item->name);
-    // 8.24: the out-of-block definition repeats neither the lifetime nor the
-    // static qualifier, so the body item parses with is_static false. Carry the
-    // static-ness forward from the in-class prototype before the body replaces
-    // it, so a class-scoped call (C#()::f()) still resolves it as static.
-    auto existing = cls->methods.find(name);
-    if (existing != cls->methods.end() && existing->second->is_static) {
-      item->is_static = true;
-    }
-    cls->methods[name] = item;
+    AttachMethodBody(cls, item);
   }
 }
 
