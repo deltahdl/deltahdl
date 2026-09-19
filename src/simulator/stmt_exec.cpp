@@ -803,7 +803,7 @@ static ExecTask DispatchBlockingAssign(const Stmt* stmt, SimContext& ctx,
       return ExecBlockingAssignRepeatEvent(stmt, ctx, arena);
     return ExecBlockingAssignEvent(stmt, ctx, arena);
   }
-  return ExecTask::Immediate(ExecBlockingAssignImpl(stmt, ctx, arena));
+  return ExecTask::Immediate(ExecImmediateBlockingAssign(stmt, ctx, arena));
 }
 
 // Executes a kReturn statement: when inside a randsequence production with a

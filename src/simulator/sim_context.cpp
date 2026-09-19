@@ -441,16 +441,24 @@ void SimContext::SetCurrentProcess(Process* proc) {
   // storage is unaffected -- it lives in static_frames_, shared across
   // activations of the same instance.
   // §21.2.1.5: the named scopes travel with the process as its locals do.
+  // §8.11 and §8.15: the object and the class a suspended class task's body
+  // runs against travel with it too (Process::saved_this_stack).
   if (current_process_) {
     current_process_->saved_scope_stack = std::move(scope_stack_);
     current_process_->saved_named_scopes = std::move(active_scope_stack_);
+    current_process_->saved_this_stack = std::move(this_stack_);
+    current_process_->saved_method_class_stack = std::move(method_class_stack_);
   }
   if (proc) {
     scope_stack_ = std::move(proc->saved_scope_stack);
     active_scope_stack_ = std::move(proc->saved_named_scopes);
+    this_stack_ = std::move(proc->saved_this_stack);
+    method_class_stack_ = std::move(proc->saved_method_class_stack);
   } else {
     scope_stack_.clear();
     active_scope_stack_.clear();
+    this_stack_.clear();
+    method_class_stack_.clear();
   }
   current_process_ = proc;
 }

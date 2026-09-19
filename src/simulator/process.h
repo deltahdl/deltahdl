@@ -104,6 +104,8 @@ struct WaitForkState {
   std::coroutine_handle<> waiter;
 };
 
+struct ClassObject;
+struct ClassTypeInfo;
 struct ProceduralAssertionState;
 struct PropertyTreeState;
 struct SequencePropertyState;
@@ -249,6 +251,13 @@ struct Process {
   // parked while the process is suspended as saved_scope_stack is, so that
   // a label one process is inside is not reported by another.
   std::vector<std::string_view> saved_named_scopes;
+  // §8.6 and §13.3: a class task enabled through a handle may suspend on a
+  // timing control, and the object it runs on (§8.11's `this`) and the class
+  // its body resolves unqualified members against (§8.15) are this activation's
+  // alone, so both are parked while the process is suspended as its locals
+  // are, and another process running meanwhile sees neither.
+  std::vector<ClassObject*> saved_this_stack;
+  std::vector<const ClassTypeInfo*> saved_method_class_stack;
 
   ~Process() {
     if (coro) coro.destroy();

@@ -3,6 +3,7 @@
 #include <cstdint>
 
 #include "simulator/exec_task.h"
+#include "simulator/stmt_result.h"
 
 namespace delta {
 
@@ -45,6 +46,15 @@ struct Expr;
 struct InstanceMethodInfo;
 ExecTask ExecInstanceTaskCall(const InstanceMethodInfo& call, const Expr* expr,
                               SimContext& ctx, Arena& arena);
+// A blocking assignment with no intra-assignment timing control, executed at
+// once. Inside a class method -- an instance task enabled through a handle
+// runs its body here -- the assignment takes the forms §8.10 and §8.11 give a
+// method over its class's properties, `x = v` for a property x, `this.x`,
+// `super.x` and a `new` resolved against a property, through
+// ExecFuncBlockingAssign; anywhere else it is ExecBlockingAssignImpl. Defined
+// in stmt_exec_class_task.cpp.
+StmtResult ExecImmediateBlockingAssign(const Stmt* stmt, SimContext& ctx,
+                                       Arena& arena);
 
 ExecTask ExecWait(const Stmt* stmt, SimContext& ctx, Arena& arena);
 ExecTask ExecWaitOrder(const Stmt* stmt, SimContext& ctx, Arena& arena);

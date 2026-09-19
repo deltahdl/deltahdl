@@ -257,4 +257,36 @@ TEST(TaskSim, ClassTaskCalledThroughAHandleBindsItsArgumentAndThis) {
   EXPECT_EQ(val, 42u);
 }
 
+// §13.3 with §8.11: two activations of one class task on two objects, each
+// suspended on its delay while the other runs, each write their own object's
+// property when they resume -- the object a task runs on travels with the
+// process, parked while it is suspended as its locals are, so the activation
+// resuming first does not write through the other's `this`.
+TEST(TaskSim, TwoSuspendedClassTasksEachWriteTheirOwnObject) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  logic [31:0] x;\n"
+      "  class drv;\n"
+      "    int id, count;\n"
+      "    task run();\n"
+      "      #(10 * id);\n"
+      "      count = id * 100 + $time;\n"
+      "    endtask\n"
+      "  endclass\n"
+      "  initial begin\n"
+      "    drv a = new;\n"
+      "    drv b = new;\n"
+      "    a.id = 1;\n"
+      "    b.id = 2;\n"
+      "    fork\n"
+      "      a.run();\n"
+      "      b.run();\n"
+      "    join\n"
+      "    x = a.count * 1000 + b.count;\n"
+      "  end\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(val, 110220u);
+}
+
 }  // namespace
