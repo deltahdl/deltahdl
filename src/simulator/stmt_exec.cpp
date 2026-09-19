@@ -295,6 +295,14 @@ static Process* CreateForkChildProcess(SimContext& ctx, Arena& arena,
   // nothing.
   p->saved_this_stack = ctx.ThisStack();
   p->saved_method_class_stack = ctx.MethodClassStack();
+  // §9.3.2: the branch's statements are statements of the enclosing scope, so
+  // they read and write its automatic locals -- the loop variable a
+  // `for (int j ...)` declared, the `automatic int k = j` the fork itself
+  // declared before spawning, a class task's local -- and the copy taken here
+  // holds the same variables the spawning process's stack holds, so a write
+  // on either side is seen on the other. Without it the branch started with
+  // no scope, read every such name as 0 and wrote a variable of its own.
+  p->saved_scope_stack = ctx.ScopeStack();
   // §18.14.2: a new thread's RNG is initialized with the next random value
   // drawn from the thread that creates it. Each child therefore receives a
   // unique seed determined solely by the parent, and the per-child seed

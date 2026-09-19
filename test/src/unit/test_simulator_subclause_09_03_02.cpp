@@ -297,4 +297,61 @@ TEST(ParallelBlockSimulation, JoinNoneBranchInsideAClassTaskKeepsThis) {
   EXPECT_EQ(val, 42u);
 }
 
+// §9.3.2's own join_none example: a fork's block-item declaration,
+// `automatic int k = j`, initializes on entry to the fork, before the
+// processes are spawned, so each spawned copy holds the j of its own
+// iteration, while a variable declared in a nested block initializes when
+// the process runs, after the loop has left j at 4. The branches see the
+// enclosing scope's variables because a spawned process takes the scope
+// stack the spawning one had; with none, k and j read 0 in every branch. The
+// result sums k * 10 + m over the three branches: 14 + 24 + 34 = 72.
+TEST(ParallelBlockSimulation, ForkBranchSeesTheEnclosingScopesLocals) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    for (int j = 1; j <= 3; ++j)\n"
+      "      fork\n"
+      "        automatic int k = j;\n"
+      "        #k begin\n"
+      "          automatic int m = j;\n"
+      "          result = result + k * 10 + m;\n"
+      "        end\n"
+      "      join_none\n"
+      "    #5;\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(val, 72u);
+}
+
+// §9.3.2 with §13.3: a local of a class task is the variable a fork branch
+// inside the task writes, so the task reads the branch's write after the
+// join. A branch that started with no scope wrote a variable of its own and
+// the task read its 5 unchanged; with the scope shared it reads 7.
+TEST(ParallelBlockSimulation, ForkBranchWritesTheMethodsLocal) {
+  auto val = RunAndGet(
+      "class C;\n"
+      "  int seen;\n"
+      "  task run();\n"
+      "    int loc = 5;\n"
+      "    fork\n"
+      "      begin #1 loc = loc + 2; end\n"
+      "    join\n"
+      "    seen = loc;\n"
+      "  endtask\n"
+      "endclass\n"
+      "module t;\n"
+      "  int result;\n"
+      "  C h;\n"
+      "  initial begin\n"
+      "    h = new;\n"
+      "    h.run();\n"
+      "    result = h.seen;\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(val, 7u);
+}
+
 }  // namespace

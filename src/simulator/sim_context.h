@@ -651,6 +651,10 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   // process carries, handed whole to each branch a fork inside a method
   // spawns, so the branch runs on the object the method runs on.
   const std::vector<ClassObject*>& ThisStack() const { return this_stack_; }
+  // §9.3.2 with §13.3.2: the scope stack likewise, the automatic locals of
+  // the enclosing blocks and subroutine, which the branch shares by holding
+  // the same variables rather than copies of their values.
+  const std::vector<Scope>& ScopeStack() const { return scope_stack_; }
   const std::vector<const ClassTypeInfo*>& MethodClassStack() const {
     return method_class_stack_;
   }
