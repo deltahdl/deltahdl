@@ -26,10 +26,13 @@ CheckOptions:
   # and IgnoreHeaders is not set, because from 2026-09-18 every translation unit
   # and header under src/ and test/ satisfies both halves. The one include a
   # file may rely on for what it pulls in is vpi_user.h's include of
-  # vpi_compatibility.h: Annex L.1 has vpi_user.h include that file and forbids
-  # an application including it directly, and L.2 makes a direct include an
-  # error, so a translation unit that selects a compatibility mode reaches the
-  # renaming macros through vpi_user.h alone. Nothing else exports anything:
+  # vpi_compatibility.h: the source Annex K.2 prints has vpi_user.h include that
+  # file (printed page 1319), and K.1 has every simulator provide the file as
+  # printed, so the include is the standard's; Annex L.1 draws the consequence
+  # that an application is not to include the file directly, and L.2 makes a
+  # direct include an error, so a translation unit that selects a compatibility
+  # mode reaches the renaming macros through vpi_user.h alone. Nothing else
+  # exports anything:
   # vpi_user.h is Annex K.2's file and declares what it provides, and Annex
   # M's sv_vpi_user.h includes it as the annex does, with §36.7 telling an
   # application to include both.

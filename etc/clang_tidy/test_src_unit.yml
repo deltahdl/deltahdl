@@ -15,8 +15,8 @@ CheckOptions:
   # comment states why nothing is ignored: from 2026-09-18 every test file
   # includes the header that declares each symbol it uses and no header it uses
   # nothing from, with vpi_user.h's include of vpi_compatibility.h the one
-  # include a file relies on, because Annex L forbids including that file
-  # directly.
+  # include a file relies on, because the source Annex K.2 prints has
+  # vpi_user.h include that file and Annex L forbids including it directly.
   readability-function-cognitive-complexity.IgnoreMacros: true
   readability-function-cognitive-complexity.Threshold: 15
   # TEST OVERRIDE (src: 200)
