@@ -119,6 +119,9 @@ class Lowerer {
   // after searching its own scope. Applied once, ahead of the modules, from
   // the unit's own import declarations. Defined in lowerer_import.cpp.
   void LowerCompilationUnitImports();
+  // The unit's imports, then its own class declarations, in that order for
+  // the reason given at the definition. Defined in lowerer.cpp.
+  void LowerCompilationUnitClasses();
   // §26.3: `p::C` reaches a package's class whether or not the package was
   // imported, so every package class no import has lowered is lowered here and
   // bound under its qualified key, after the modules so that no unqualified
