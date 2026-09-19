@@ -1,4 +1,5 @@
 #include <optional>
+#include <string>
 #include <string_view>
 #include <unordered_set>
 
@@ -22,11 +23,11 @@ struct ImportScope {
 };
 
 // Register a single imported package item into a module's elaboration scopes:
-// typedefs become available by name, and const parameters are folded into the
+// typedefs become available by name, and const parameters are entered into the
 // compilation-unit parameter scope. Shared by the wildcard and named-import
 // branches of ApplyImport.
-void RegisterImportItem(const ModuleItem* pi, std::string_view name,
-                        ImportScope scope) {
+void RegisterImportItem(const ModuleItem* pi, std::string_view pkg_name,
+                        std::string_view name, ImportScope scope) {
   if (pi->kind == ModuleItemKind::kTypedef) {
     scope.typedefs[name] = pi->typedef_type;
     // §6.18: an import is what gives a package's typedef its bare name in this
@@ -34,6 +35,18 @@ void RegisterImportItem(const ModuleItem* pi, std::string_view name,
     // aggregate when the declaration carried unpacked dimensions.
     if (!pi->unpacked_dims.empty()) scope.aggregate_typedefs.insert(name);
   } else if (pi->kind == ModuleItemKind::kParamDecl && pi->init_expr) {
+    // RegisterPackageParams in elaborator_resolve.cpp folded the value where
+    // the declaration stands, against the package's own earlier parameters
+    // and the members of its enumerations (§6.19, §6.20.1), and recorded it
+    // under the "package.name" key. This scope holds none of those bare
+    // names, so the recorded value is read back rather than folded again; an
+    // initializer registration could not fold is folded here as before.
+    std::string qualified = std::string(pkg_name) + "." + std::string(pi->name);
+    auto it = scope.cu_param_scope.find(qualified);
+    if (it != scope.cu_param_scope.end()) {
+      scope.cu_param_scope[name] = it->second;
+      return;
+    }
     auto val = ConstEvalInt(pi->init_expr, scope.cu_param_scope);
     if (val) scope.cu_param_scope[name] = *val;
   }
@@ -51,7 +64,7 @@ const PackageDecl* FindPackageByName(const CompilationUnit* unit,
 // Register every named item of a wildcard-imported package.
 void RegisterWildcardImport(const PackageDecl* pkg, ImportScope scope) {
   for (const auto* pi : pkg->items) {
-    if (!pi->name.empty()) RegisterImportItem(pi, pi->name, scope);
+    if (!pi->name.empty()) RegisterImportItem(pi, pkg->name, pi->name, scope);
   }
 }
 
@@ -60,7 +73,7 @@ void RegisterNamedImport(const PackageDecl* pkg, std::string_view target,
                          ImportScope scope) {
   for (const auto* pi : pkg->items) {
     if (pi->name == target) {
-      RegisterImportItem(pi, target, scope);
+      RegisterImportItem(pi, pkg->name, target, scope);
       break;
     }
   }

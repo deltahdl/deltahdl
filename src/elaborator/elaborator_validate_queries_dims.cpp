@@ -11,6 +11,7 @@
 #include "common/diagnostic.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_enum_constants.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/rtlir.h"
@@ -778,13 +779,18 @@ void Elaborator::ValidateValueParams(const ModuleDecl* decl,
 // not a module and is not elaborated through Elaborator::ElaborateItems.
 void Elaborator::ValidatePackageValueParams() {
   for (const auto* pkg : unit_->packages) {
-    // RegisterPackageParams records a package parameter in cu_param_scope_
-    // under its "package.name" key alone (§26.3), so a declaration reading a
-    // bare name an earlier declaration in the same package introduced is not
+    // RegisterPackageParams records a package's constants in cu_param_scope_
+    // under their "package.name" keys alone (§26.3), so a declaration reading
+    // a bare name an earlier declaration in the same package introduced is not
     // constant against that scope by itself. Bind each name as the walk
     // reaches it, for the §6.20.1 reason the generate-body walk binds them.
+    // §6.19 declares an enumeration's members as constants of the package as
+    // well, so `parameter R = (DEEP | SHALLOW);` over members of an
+    // enumeration the package declared is a constant expression, and they are
+    // bound where the enumeration stands.
     ScopeMap scope = cu_param_scope_;
     for (const auto* item : pkg->items) {
+      BindEnumConstantsOfItem(item, scope, arena_);
       if (item->kind != ModuleItemKind::kParamDecl) continue;
       ValidateOneValueParam(item, scope, unit_, diag_, true);
       scope[item->name] = 0;

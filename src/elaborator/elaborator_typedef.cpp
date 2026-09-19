@@ -7,13 +7,13 @@
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
-#include <utility>
 #include <vector>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_enum_constants.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_items_internal.h"
 #include "elaborator/elaborator_validate_internal.h"
@@ -144,73 +144,6 @@ std::optional<uint32_t> ComputeFixedUnpackedWidth(ModuleItem* item,
   return std::nullopt;
 }
 
-// Shared state for expanding the members of one enum typedef into backing
-// variables and an ordered member list (§6.19 running-value semantics). Bundles
-// the otherwise-many parameters the per-member helpers need.
-struct EnumMemberBuilder {
-  uint32_t width;
-  Arena& arena;
-  RtlirModule* mod;
-  std::unordered_set<std::string_view>& enum_member_names;
-  // §11.2.1 counts parameters among a constant expression's operands, and a
-  // member value or range bound is a constant expression, so folding one needs
-  // the values declared where the enumeration is written.
-  const ScopeMap& scope;
-  int64_t next_val = 0;
-  std::vector<RtlirEnumMember> members = {};
-
-  // Records one enum member (name + current value), reserving its name and
-  // emitting a backing variable, then advances the running value.
-  void EmitMember(std::string_view name) {
-    enum_member_names.insert(name);
-    members.push_back({name, next_val});
-    RtlirVariable var;
-    var.name = name;
-    var.width = width;
-    var.is_4state = false;
-    // An enum element contributes its numeric value when read (§6.19.4); seed
-    // the backing variable with that value rather than the default zero.
-    auto* init = arena.Create<Expr>();
-    init->kind = ExprKind::kIntegerLiteral;
-    init->int_val = static_cast<uint64_t>(next_val);
-    var.init_expr = init;
-    mod->variables.push_back(var);
-    ++next_val;
-  }
-
-  // Builds an arena-owned "<base><index>" name and emits it as a member.
-  void EmitIndexedMember(std::string_view base, int64_t index) {
-    auto s = std::format("{}{}", base, index);
-    auto* p = arena.AllocString(s.c_str(), s.size());
-    EmitMember(std::string_view{p, s.size()});
-  }
-
-  // Expands a `name[range_start:range_end]` member into one indexed member per
-  // step from range_start toward range_end (inclusive).
-  void EmitInclusiveRange(std::string_view name, int64_t n, int64_t m) {
-    int step = (m >= n) ? 1 : -1;
-    for (auto i = n;; i += step) {
-      EmitIndexedMember(name, i);
-      if (i == m) break;
-    }
-  }
-
-  // Emits one declared enum member entry, expanding any `[range]` suffix.
-  void EmitDeclaredMember(const EnumMember& member) {
-    if (!member.range_start) {
-      EmitMember(member.name);
-      return;
-    }
-    auto n = ConstEvalInt(member.range_start, scope).value_or(0);
-    if (member.range_end) {
-      EmitInclusiveRange(member.name, n,
-                         ConstEvalInt(member.range_end, scope).value_or(0));
-    } else {
-      for (int64_t i = 0; i < n; ++i) EmitIndexedMember(member.name, i);
-    }
-  }
-};
-
 // Where an enumeration's named constants are declared: the scope its member
 // value expressions fold against, the arena its backing variables are allocated
 // from, the module they are declared in, and the set that keeps one name from
@@ -224,25 +157,32 @@ struct EnumMemberDeclCtx {
   std::unordered_set<std::string_view>& enum_member_names;
 };
 
-// Expands the members of an enumeration into backing variables and an ordered
-// member list, reserving each member name. Mirrors the running-value semantics
-// of §6.19 (explicit values, ranges, and implicit increments). Takes the member
-// list rather than the declaration holding it, because Syntax 6-5 makes the
-// enum form a data_type: the same members can be written in a typedef or
-// directly in a data declaration, and both declare the named constants.
+// Declares an enumeration's named constants in a module: reserves each member
+// name and emits a backing variable holding its value, since an enum element
+// contributes its numeric value when read (§6.19.4). The values themselves --
+// explicit values, ranges and implicit increments -- are folded by
+// FoldEnumMembers in elaborator_enum_constants.cpp, which the package and
+// compilation-unit scopes read as well. Takes the member list rather than the
+// declaration holding it, because Syntax 6-5 makes the enum form a data_type:
+// the same members can be written in a typedef or directly in a data
+// declaration, and both declare the named constants.
 std::vector<RtlirEnumMember> BuildEnumMembers(
     const std::vector<EnumMember>& decl_members, uint32_t width,
     const EnumMemberDeclCtx& ctx) {
-  EnumMemberBuilder builder{width, ctx.arena, ctx.mod, ctx.enum_member_names,
-                            ctx.scope};
-  for (const auto& member : decl_members) {
-    if (member.value) {
-      builder.next_val =
-          ConstEvalInt(member.value, ctx.scope).value_or(builder.next_val);
-    }
-    builder.EmitDeclaredMember(member);
+  auto members = FoldEnumMembers(decl_members, ctx.scope, ctx.arena);
+  for (const auto& member : members) {
+    ctx.enum_member_names.insert(member.name);
+    RtlirVariable var;
+    var.name = member.name;
+    var.width = width;
+    var.is_4state = false;
+    auto* init = ctx.arena.Create<Expr>();
+    init->kind = ExprKind::kIntegerLiteral;
+    init->int_val = static_cast<uint64_t>(member.value);
+    var.init_expr = init;
+    ctx.mod->variables.push_back(var);
   }
-  return std::move(builder.members);
+  return members;
 }
 
 }  // namespace

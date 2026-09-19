@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cstddef>
+#include <cstdint>
 #include <format>
 #include <optional>
 #include <string>
@@ -14,6 +15,7 @@
 #include "common/diagnostic.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_enum_constants.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/std_package.h"
 #include "elaborator/type_eval.h"
@@ -172,26 +174,59 @@ ModuleDecl* FindNonModuleDesign(std::string_view name, CompilationUnit* unit) {
   return nullptr;
 }
 
-// Records a single package value parameter in the compilation-unit parameter
-// scope under its fully qualified "package.name" key (§26.3), if it is a value
-// parameter with a constant-evaluable initializer.
-void RegisterOnePackageParam(std::string_view pkg_name, ModuleItem* item,
-                             ScopeMap& cu_param_scope, Arena& arena) {
-  if (item->kind != ModuleItemKind::kParamDecl || !item->init_expr) return;
-  auto val = ConstEvalInt(item->init_expr, cu_param_scope);
-  if (!val) return;
+// Records one constant a package declares in the compilation-unit parameter
+// scope under its fully qualified "package.name" key, which is the spelling
+// §26.3's package scope resolution operator reads and A.8.4 admits for a
+// parameter and an enum identifier alike. The key is arena-allocated because
+// ScopeMap keys are string_views.
+void RecordPackageConstant(std::string_view pkg_name, std::string_view name,
+                           int64_t value, ScopeMap& cu_param_scope,
+                           Arena& arena) {
   auto* qname = arena.Create<std::string>(std::string(pkg_name) + "." +
-                                          std::string(item->name));
-  cu_param_scope[*qname] = *val;
+                                          std::string(name));
+  cu_param_scope[*qname] = value;
 }
 
-// Records each package's value parameters in the compilation-unit parameter
-// scope under their fully qualified "package.name" key (§26.3).
+// The constants one package has declared so far, as registration walks its
+// items: `values` is the compilation-unit scope with the package's own
+// parameters and enumeration constants layered over it under their bare names,
+// which §6.20.1 lets a later declaration read, and `cu_param_scope` is where
+// each is recorded under its qualified key.
+struct PackageRegistration {
+  std::string_view pkg_name;
+  ScopeMap values;
+  ScopeMap& cu_param_scope;
+  Arena& arena;
+};
+
+// Records a single package value parameter, if it is a value parameter with a
+// constant-evaluable initializer. The initializer is folded against the
+// package's own constants, because §6.19 declares an enumeration's members as
+// constants of the scope the enumeration stands in and §6.20.1 lets a
+// parameter read an earlier one: `parameter R = (DEEP | SHALLOW);` names two
+// members of an enumeration the package declared, and folding it against the
+// compilation-unit scope alone left R unrecorded and `pkg::R` unresolved.
+void RegisterOnePackageParam(ModuleItem* item, PackageRegistration& reg) {
+  if (item->kind != ModuleItemKind::kParamDecl || !item->init_expr) return;
+  auto val = ConstEvalInt(item->init_expr, reg.values);
+  if (!val) return;
+  RecordPackageConstant(reg.pkg_name, item->name, *val, reg.cu_param_scope,
+                        reg.arena);
+  reg.values[item->name] = *val;
+}
+
+// Records each package's value parameters and enumeration constants in the
+// compilation-unit parameter scope under their fully qualified "package.name"
+// key (§26.3), each folded against what the package declared before it.
 void RegisterPackageParams(CompilationUnit* unit, ScopeMap& cu_param_scope,
                            Arena& arena) {
   for (auto* pkg : unit->packages) {
+    PackageRegistration reg{pkg->name, cu_param_scope, cu_param_scope, arena};
     for (auto* item : pkg->items) {
-      RegisterOnePackageParam(pkg->name, item, cu_param_scope, arena);
+      for (const auto& m : BindEnumConstantsOfItem(item, reg.values, arena))
+        RecordPackageConstant(pkg->name, m.name, m.value, cu_param_scope,
+                              arena);
+      RegisterOnePackageParam(item, reg);
     }
   }
 }
@@ -351,6 +386,7 @@ struct CuScope {
   std::unordered_set<std::string_view>& parameterized_classes;
   ScopeMap& param_scope;
   DiagEngine& diag;
+  Arena& arena;
 };
 
 // Classifies one compilation-unit item, recording it in the appropriate
@@ -358,6 +394,10 @@ struct CuScope {
 // or the constant parameter scope).
 void ClassifyCuScopeItem(ModuleItem* item, CuScope& scope) {
   if (!item->name.empty()) scope.names.insert(item->name);
+  // §6.19: an enumeration declared here, by a typedef or directly as a data
+  // declaration's type, declares its members as constants of the
+  // compilation-unit scope, which a later parameter declaration may read.
+  BindEnumConstantsOfItem(item, scope.param_scope, scope.arena);
   if (item->kind == ModuleItemKind::kTypedef) {
     scope.typedefs[item->name] = item->typedef_type;
     // §6.18: a compilation-unit typedef never runs Elaborator::ElaborateTypedef
@@ -515,7 +555,8 @@ void Elaborator::RegisterCuScopeItems() {
                    class_names_,
                    parameterized_class_names_,
                    cu_param_scope_,
-                   diag_};
+                   diag_,
+                   arena_};
   for (auto* item : unit_->cu_items) {
     ClassifyCuScopeItem(item, cu_scope);
   }

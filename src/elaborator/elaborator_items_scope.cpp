@@ -29,6 +29,17 @@ ScopeMap Elaborator::BuildParamScope(
     auto* key = arena_.Create<std::string>("$unit::" + std::string(name));
     scope[*key] = val;
   }
+  // §6.19 declares an enumeration's members as constants of the scope the
+  // enumeration is written in, and A.8.4 lists an enum identifier among the
+  // constant primaries, so `localparam X = RED | GREEN;` is a constant
+  // expression wherever RED and GREEN are members of an enumeration the module
+  // declares, or that a wildcard import brought in (§26.3). The module's
+  // enumerations are held in mod->enum_types, already folded, from
+  // Elaborator::ElaborateTypedef, EmitBareEnumMembers and
+  // RegisterImportedEnumLiterals.
+  for (const auto& entry : mod->enum_types) {
+    for (const auto& member : entry.second) scope[member.name] = member.value;
+  }
   // §23.9 makes a generate block "a new scope", so a parameter one declares is
   // read only by an expression written in that block or in one nested inside
   // it. Entering it under its bare name for every expression in the module

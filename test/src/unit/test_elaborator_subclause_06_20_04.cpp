@@ -2,6 +2,7 @@
 
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
+#include "helpers_rtlir_lookup.h"
 
 using namespace delta;
 
@@ -454,6 +455,115 @@ TEST(LocalparamElaboration, PackageLocalparamReadingAnEarlierOneIsAccepted) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
+}
+
+// §6.19 declares an enumeration's members as constants of the scope the
+// enumeration is written in, and A.8.4 lists an enum identifier among the
+// constant primaries, so a package parameter whose initializer ORs three of
+// them is a constant expression under §6.20.4. This is the shape of UVM's
+// `parameter UVM_RECURSION = (UVM_DEEP | UVM_SHALLOW | UVM_REFERENCE);` over an
+// enumeration whose base type is a typedef and whose members are shift
+// expressions. The check folded the initializer against the compilation-unit
+// scope, which holds no enumeration constant, and reported RECURSION.
+TEST(LocalparamElaboration,
+     PackageParameterOringMembersOfAPackageEnumIsAccepted) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "package p;\n"
+      "  typedef bit [7:0] flag_t;\n"
+      "  typedef enum flag_t {\n"
+      "    DEEP = (1 << 4), SHALLOW = (1 << 5), REFERENCE = (1 << 6)\n"
+      "  } policy_e;\n"
+      "  parameter RECURSION = (DEEP | SHALLOW | REFERENCE);\n"
+      "endpackage\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// The same rule for a package parameter declared with the enumeration as its
+// type and one member as its value, which is UVM's `parameter uvm_core_state
+// UVM_CORE_POST_INIT = UVM_CORE_INITIALIZED;`. The members carry no value
+// expression, so the case answers for the implicit increments of §6.19 as
+// well.
+TEST(LocalparamElaboration,
+     PackageParameterTypedByAPackageEnumTakingAMemberIsAccepted) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "package p;\n"
+      "  typedef enum {\n"
+      "    UNINITIALIZED, PRE_INIT, INITIALIZING, INITIALIZED, ABORTED\n"
+      "  } state_e;\n"
+      "  parameter state_e POST_INIT = INITIALIZED;\n"
+      "endpackage\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// A member of an enumeration written directly as a data declaration's type,
+// with no typedef, declares its constants in the package just the same (§6.19
+// gives `enum {red, yellow, green} light1, light2;` as its example).
+TEST(LocalparamElaboration,
+     PackageParameterReadingAMemberOfABareEnumDeclarationIsAccepted) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "package p;\n"
+      "  enum { LOW = 2, HIGH = 9 } level;\n"
+      "  parameter int TOP = HIGH;\n"
+      "endpackage\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// The same absence in a module: Elaborator::BuildParamScope held the module's
+// parameters and the compilation-unit scope, and not the members of the
+// enumerations the module declares, so `RED | GREEN` was reported and X left
+// unresolved. The values are chosen so that a fold reading the members'
+// ordinals (0 and 1) answers 1 where the declared values answer 7.
+TEST(LocalparamElaboration, ModuleLocalparamOringItsOwnEnumMembersFolds) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  typedef enum { RED = 3, GREEN = 5 } color_t;\n"
+      "  localparam int X = RED | GREEN;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* x = FindParam(design, "m", "X");
+  ASSERT_NE(x, nullptr);
+  EXPECT_TRUE(x->is_resolved);
+  EXPECT_EQ(x->resolved_value, 7);
+}
+
+// And at compilation-unit scope, the third scope §6.20.4 names, where
+// ClassifyCuScopeItem in src/elaborator/elaborator_resolve.cpp both reports
+// the breach and folds the value: the enumeration's members were in neither
+// scope, so X was reported and Y, which reads it, left unresolved.
+TEST(LocalparamElaboration,
+     CompilationUnitLocalparamOringEnumMembersFoldsAndIsAccepted) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "typedef enum { RED = 3, GREEN = 5 } color_t;\n"
+      "localparam int X = RED | GREEN;\n"
+      "module m;\n"
+      "  localparam int Y = X;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* y = FindParam(design, "m", "Y");
+  ASSERT_NE(y, nullptr);
+  EXPECT_TRUE(y->is_resolved);
+  EXPECT_EQ(y->resolved_value, 7);
 }
 
 }  // namespace

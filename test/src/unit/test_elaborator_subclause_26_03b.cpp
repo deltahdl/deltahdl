@@ -4,6 +4,7 @@
 
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
+#include "helpers_rtlir_lookup.h"
 
 namespace {
 
@@ -99,6 +100,140 @@ TEST(PackageImport, UnresolvedProcReadInARandsequenceWeightCodeBlock) {
       "        alt : { r = 1; };\n"
       "      endsequence\n"
       "    end");
+}
+
+// §26.3 lets a module read a package's declarations through the package scope
+// resolution operator, and A.8.4 makes a package-scoped parameter a constant
+// primary, so `p::RECURSION` sizes a packed dimension. RegisterPackageParams in
+// src/elaborator/elaborator_resolve.cpp folded each package parameter against
+// the compilation-unit scope alone, which holds no member of the package's
+// enumerations (§6.19), so RECURSION was never recorded under its qualified
+// key and the dimension did not fold. The members are (1 << 4), (1 << 5) and
+// (1 << 6), whose OR is 112; their ordinals OR to 3.
+TEST(PackageScopeReference,
+     PackageParameterOverPackageEnumMembersSizesTheVariable) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "package p;\n"
+      "  typedef bit [7:0] flag_t;\n"
+      "  typedef enum flag_t {\n"
+      "    DEEP = (1 << 4), SHALLOW = (1 << 5), REFERENCE = (1 << 6)\n"
+      "  } policy_e;\n"
+      "  parameter RECURSION = (DEEP | SHALLOW | REFERENCE);\n"
+      "endpackage\n"
+      "module m;\n"
+      "  logic [p::RECURSION-1:0] data;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* data = FindVar(design, "m", "data");
+  ASSERT_NE(data, nullptr);
+  EXPECT_EQ(data->width, 112u);
+}
+
+// The parameter declared with the enumeration as its type. INITIALIZED is the
+// fourth member and carries no value of its own, so §6.19's implicit increment
+// gives it 3 and `[p::POST_INIT:0]` four bits.
+TEST(PackageScopeReference,
+     PackageParameterTypedByAPackageEnumSizesTheVariable) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "package p;\n"
+      "  typedef enum {\n"
+      "    UNINITIALIZED, PRE_INIT, INITIALIZING, INITIALIZED, ABORTED\n"
+      "  } state_e;\n"
+      "  parameter state_e POST_INIT = INITIALIZED;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  logic [p::POST_INIT:0] data;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* data = FindVar(design, "m", "data");
+  ASSERT_NE(data, nullptr);
+  EXPECT_EQ(data->width, 4u);
+}
+
+// A.8.4 writes `[ package_scope ] enum_identifier` as a constant primary of
+// its own, so a member is read through the package scope resolution operator
+// without a parameter in between. GREEN is 5, so `[p::GREEN:0]` is six bits;
+// its ordinal would give two.
+TEST(PackageScopeReference, PackageEnumMemberSizesTheVariable) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "package p;\n"
+      "  typedef enum { RED = 3, GREEN = 5 } color_t;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  logic [p::GREEN:0] data;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* data = FindVar(design, "m", "data");
+  ASSERT_NE(data, nullptr);
+  EXPECT_EQ(data->width, 6u);
+}
+
+// The same parameter reached by a wildcard import rather than the operator.
+// RegisterImportItem in src/elaborator/elaborator_import.cpp folded the
+// imported parameter's initializer again, against a scope holding none of the
+// package's enumeration constants under their bare names, so K was left
+// unresolved; it now reads the value registration recorded. J reads two of the
+// imported literals directly, which Elaborator::BuildParamScope supplies from
+// the enumerations RegisterImportedEnumLiterals brought into the module.
+TEST(PackageImport, WildcardImportedParameterOverEnumMembersHoldsItsValue) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "package p;\n"
+      "  typedef bit [7:0] flag_t;\n"
+      "  typedef enum flag_t {\n"
+      "    DEEP = (1 << 4), SHALLOW = (1 << 5), REFERENCE = (1 << 6)\n"
+      "  } policy_e;\n"
+      "  parameter RECURSION = (DEEP | SHALLOW | REFERENCE);\n"
+      "endpackage\n"
+      "module m;\n"
+      "  import p::*;\n"
+      "  localparam int K = RECURSION;\n"
+      "  localparam int J = DEEP | REFERENCE;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* k = FindParam(design, "m", "K");
+  ASSERT_NE(k, nullptr);
+  EXPECT_TRUE(k->is_resolved);
+  EXPECT_EQ(k->resolved_value, 112);
+  const auto* j = FindParam(design, "m", "J");
+  ASSERT_NE(j, nullptr);
+  EXPECT_TRUE(j->is_resolved);
+  EXPECT_EQ(j->resolved_value, 80);
+}
+
+// §6.20.1 lets a package parameter read an earlier one by its bare name, and
+// the value the later one is recorded under its qualified key is what a module
+// then reads. Registration folded B against the compilation-unit scope, which
+// held A only as "p.A", so `p::B` did not fold; the validator alone bound the
+// bare name, and only to answer whether B was constant.
+TEST(PackageScopeReference,
+     PackageParameterReadingAnEarlierOneSizesTheVariable) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "package p;\n"
+      "  parameter int A = 5;\n"
+      "  parameter int B = A + 2;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  logic [p::B-1:0] data;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* data = FindVar(design, "m", "data");
+  ASSERT_NE(data, nullptr);
+  EXPECT_EQ(data->width, 7u);
 }
 
 }  // namespace
