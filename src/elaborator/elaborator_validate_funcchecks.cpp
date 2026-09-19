@@ -1,3 +1,4 @@
+#include <cstddef>
 #include <format>
 #include <string_view>
 #include <unordered_map>
@@ -91,6 +92,45 @@ static void CheckForeachVarsReadOnly(
                              root),
                  Subclause("12.7.3"));
     }
+  }
+  // §12.7.1 has a for loop that declares its control variables create an
+  // implicit block around itself, so a declared name that is a loop
+  // variable's is another variable in the loop's initialization, condition,
+  // step and body; UVM's uvm_reg.svh writes `for (int i = ...; i < top; i++)`
+  // inside `foreach (m_fields[i])`. A plain `for (i = 0; ...)` writes the
+  // loop variable and is reported through the generic walk below.
+  if (s->kind == StmtKind::kFor) {
+    auto inner = vars;
+    for (size_t k = 0; k < s->for_inits.size() && k < s->for_init_types.size();
+         ++k) {
+      if (s->for_init_types[k].kind == DataTypeKind::kImplicit) continue;
+      const Stmt* init = s->for_inits[k];
+      if (init && init->lhs && init->lhs->kind == ExprKind::kIdentifier)
+        inner.erase(init->lhs->text);
+    }
+    if (inner.size() != vars.size()) {
+      if (inner.empty()) return;
+      ForEachChildStmt(s, [&](Stmt* const& sub) {
+        CheckForeachVarsReadOnly(sub, inner, diag);
+      });
+      return;
+    }
+  }
+  // §6.21 makes a variable declared in a block local to it and to the blocks
+  // nested below, from its declaration on: a block-item declaration of a loop
+  // variable's name ends the rule for that name in the rest of the block.
+  if (s->kind == StmtKind::kBlock || s->kind == StmtKind::kFork) {
+    auto inner = vars;
+    auto walk_in_order = [&](const std::vector<Stmt*>& subs) {
+      for (const Stmt* sub : subs) {
+        if (sub && sub->kind == StmtKind::kVarDecl) inner.erase(sub->var_name);
+        if (inner.empty()) return;
+        CheckForeachVarsReadOnly(sub, inner, diag);
+      }
+    };
+    walk_in_order(s->stmts);
+    walk_in_order(s->fork_stmts);
+    return;
   }
   // Every member of Stmt that holds a statement, taken from ForEachChildStmt
   // in elaborator_validate_internal.h rather than listed again here. §12.7.3

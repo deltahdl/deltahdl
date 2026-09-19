@@ -175,6 +175,82 @@ TEST(LoopStatementElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
+// §12.7.1 has a for loop that declares its control variables create an
+// implicit block around itself, and §6.21 makes a variable declared in a block
+// local to it and the blocks nested below: an inner declaration of the loop
+// variable's name is another variable, and writes to that name inside its
+// scope are not writes to the loop variable. UVM's uvm_reg.svh writes
+// `for (int i = f.get_lsb_pos(); i < top; i++)` inside `foreach (m_fields[i])`.
+TEST(LoopStatementElaboration, ForeachLoopVarRedeclaredByInnerForLoopOk) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  int arr [4];\n"
+      "  initial begin\n"
+      "    foreach (arr[i]) for (int i = 0; i < 2; i++) arr[i] = 0;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(LoopStatementElaboration, ForeachLoopVarRedeclaredInInnerBlockOk) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  int arr [4];\n"
+      "  initial begin\n"
+      "    foreach (arr[i]) begin\n"
+      "      int i;\n"
+      "      i = 1;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// A for loop whose initialization assigns without declaring writes the loop
+// variable itself.
+TEST(LoopStatementElaboration, ForeachLoopVarAssignedByInnerForInitIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int arr [4];\n"
+      "  initial begin\n"
+      "    foreach (arr[i]) for (i = 0; i < 2; i++) arr[i] = 0;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "foreach loop variable 'i' is read-only and cannot "
+                            "be assigned",
+                            4, "12.7.3"));
+}
+
+// The inner for loop's variable is local to that loop: after it, the name is
+// the loop variable again.
+TEST(LoopStatementElaboration, ForeachLoopVarAssignedAfterInnerForLoopIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int arr [4];\n"
+      "  initial begin\n"
+      "    foreach (arr[i]) begin\n"
+      "      for (int i = 0; i < 2; i++) arr[i] = 0;\n"
+      "      i = 1;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "foreach loop variable 'i' is read-only and cannot "
+                            "be assigned",
+                            6, "12.7.3"));
+}
+
 // A bit-select of the loop variable itself is still a write to it.
 TEST(LoopStatementElaboration, ForeachLoopVarBitSelectAssignIsError) {
   ElabFixture f;
