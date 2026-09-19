@@ -52,6 +52,7 @@ inline bool IsDataTypeKeyword(TokenKind tk) {
     case TokenKind::kKwRealtime:
     case TokenKind::kKwTime:
     case TokenKind::kKwString:
+    case TokenKind::kKwChandle:
     // A.2.2.1 gives data_type the bare alternative `event`, so an event
     // declaration is a data_declaration and A.2.8's block_item_declaration
     // carries it wherever A.6.3's seq_block and par_block and A.2.6's and
