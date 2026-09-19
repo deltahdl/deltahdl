@@ -304,11 +304,15 @@ def reported_subclauses(stderr: str) -> list[str]:
     return _SUBCLAUSE_RE.findall(stderr)
 
 
-def tagged_clause(metadata: dict[str, str]) -> str:
+_CLAUSE_PREFIX_RE = re.compile(r"(\d+(?:\.\d+)*)--")
+
+
+def tagged_clause(metadata: dict[str, str], name: str) -> str:
     tags = metadata.get("tags", "").split()
     if tags and re.fullmatch(r"\d+(?:\.\d+)*", tags[0]):
         return tags[0]
-    return ""
+    prefix = _CLAUSE_PREFIX_RE.match(name)
+    return prefix.group(1) if prefix else ""
 
 
 _SUBCLAUSE_OF_TAG: dict[str, str] = {
@@ -367,7 +371,9 @@ def _run_and_evaluate(
         ok = (
             returncode == 1
             and bool(stderr.strip())
-            and _rejection_matches_tag(stderr, tagged_clause(metadata))
+            and _rejection_matches_tag(
+                stderr, tagged_clause(metadata, Path(path).name),
+            )
         )
     return "pass" if ok else "fail", stderr, int(ok), returncode
 
@@ -392,7 +398,7 @@ def build_result(
         metadata = parse_metadata(path)
         name = _tag_prefixed(name, metadata)
         should_fail = bool(metadata.get("should_fail_because"))
-        clause = tagged_clause(metadata)
+        clause = tagged_clause(metadata, Path(path).name)
         library = library_for(metadata, libraries or {})
 
         t0 = time.monotonic()

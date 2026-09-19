@@ -373,9 +373,9 @@ def test_string_equality_fallback_names_the_failure(rst: ModuleType) -> None:
 
 def _evaluate_expected_rejection(
     rst: ModuleType, tmp_path: Path, returncode: int, stderr: str,
-    tags: str = "5.10",
+    tags: str = "5.10", file_name: str = "xfail.sv",
 ) -> tuple[dict[str, Any], int]:
-    sv = tmp_path / "chapter-5" / "xfail.sv"
+    sv = tmp_path / "chapter-5" / file_name
     sv.parent.mkdir(parents=True)
     tag_line = f":tags: {tags}\n" if tags else ""
     sv.write_text(
@@ -647,6 +647,43 @@ def test_rejection_for_a_file_with_no_clause_tag_evaluates_as_a_pass(
         "",
     )
     assert (ok, result["status"]) == (1, "pass")
+
+
+def test_rejection_naming_the_clause_the_file_name_opens_with_evaluates_as_a_pass(
+    rst: ModuleType, tmp_path: Path,
+) -> None:
+    result, ok = _evaluate_expected_rejection(
+        rst, tmp_path, 1,
+        "x.sv:1:1: error: randomize() is built in and cannot be overridden"
+        " (§18.6.3)\n",
+        "uvm-random uvm",
+        "18.6.3--behavior-of-randomization-methods_5.sv",
+    )
+    assert (ok, result["status"]) == (1, "pass")
+
+
+def test_rejection_elsewhere_than_the_clause_the_file_name_opens_with_does_not_evaluate_as_a_pass(
+    rst: ModuleType, tmp_path: Path,
+) -> None:
+    result, ok = _evaluate_expected_rejection(
+        rst, tmp_path, 1,
+        "uvm_factory.svh:1185:30: error: expected ')', got '(' (§13.5)\n",
+        "uvm-random uvm",
+        "18.6.3--behavior-of-randomization-methods_5.sv",
+    )
+    assert (ok, result["status"]) == (0, "fail")
+
+
+def test_the_clause_the_file_name_opens_with_reaches_the_result(
+    rst: ModuleType, tmp_path: Path,
+) -> None:
+    result, _ = _evaluate_expected_rejection(
+        rst, tmp_path, 1,
+        "uvm_factory.svh:1185:30: error: expected ')', got '(' (§13.5)\n",
+        "uvm-random uvm",
+        "18.8--disabling-random-variables-with-rand_mode_5.sv",
+    )
+    assert result["clause"] == "18.8"
 
 
 def test_subclause_of_the_tagged_clause_evaluates_as_a_pass(
