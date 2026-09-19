@@ -3,7 +3,9 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
+#include "parser/ast_class.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
 
 using namespace delta;
@@ -281,6 +283,71 @@ TEST(LoopSyntaxParsing, ForeachArrayNameStartsAtItsRoot) {
   EXPECT_EQ(stmt->expr->kind, ExprKind::kMemberAccess);
   EXPECT_EQ(stmt->expr->range.start.line, 2u);
   EXPECT_EQ(stmt->expr->range.start.column, 20u);
+}
+
+// A.9.3's hierarchical_identifier is `{ identifier constant_bit_select . }
+// identifier` (printed page 1214 of ~/LRM.pdf), so the array a foreach names
+// may select an element before each `.`: `successors[s].m_predecessors` is
+// one hierarchical_array_identifier and `[pred]` alone is the loop_variables
+// list. The parser took the first bracket after the name for the loop
+// variables and asked for `)` at the `.`, reporting under §12.7.3.
+TEST(LoopSyntaxParsing, ForeachArrayMayBeAMemberOfASelectedElement) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial foreach (successors[s]) foreach "
+      "(successors[s].m_predecessors[pred]) x = pred;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* outer = FirstInitialStmt(r);
+  ASSERT_NE(outer, nullptr);
+  ASSERT_EQ(outer->kind, StmtKind::kForeach);
+  ASSERT_EQ(outer->foreach_vars.size(), 1u);
+  EXPECT_EQ(outer->foreach_vars[0], "s");
+  auto* inner = outer->body;
+  ASSERT_NE(inner, nullptr);
+  ASSERT_EQ(inner->kind, StmtKind::kForeach);
+  ASSERT_NE(inner->expr, nullptr);
+  ASSERT_EQ(inner->expr->kind, ExprKind::kMemberAccess);
+  ASSERT_NE(inner->expr->lhs, nullptr);
+  ASSERT_EQ(inner->expr->lhs->kind, ExprKind::kSelect);
+  ASSERT_NE(inner->expr->lhs->base, nullptr);
+  EXPECT_EQ(inner->expr->lhs->base->kind, ExprKind::kIdentifier);
+  EXPECT_EQ(inner->expr->lhs->base->text, "successors");
+  ASSERT_NE(inner->expr->lhs->index, nullptr);
+  EXPECT_EQ(inner->expr->lhs->index->text, "s");
+  ASSERT_NE(inner->expr->rhs, nullptr);
+  EXPECT_EQ(inner->expr->rhs->text, "m_predecessors");
+  ASSERT_EQ(inner->foreach_vars.size(), 1u);
+  EXPECT_EQ(inner->foreach_vars[0], "pred");
+}
+
+TEST(LoopSyntaxParsing, ForeachArrayMayBeSelectedThroughThis) {
+  auto r = Parse(
+      "class C;\n"
+      "  function void f();\n"
+      "    foreach (this.a[s].b[i, j]) x = i + j;\n"
+      "  endfunction\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  ASSERT_EQ(r.cu->classes[0]->members.size(), 1u);
+  auto* method = r.cu->classes[0]->members[0]->method;
+  ASSERT_NE(method, nullptr);
+  ASSERT_EQ(method->func_body_stmts.size(), 1u);
+  auto* stmt = method->func_body_stmts[0];
+  ASSERT_EQ(stmt->kind, StmtKind::kForeach);
+  ASSERT_NE(stmt->expr, nullptr);
+  ASSERT_EQ(stmt->expr->kind, ExprKind::kMemberAccess);
+  EXPECT_EQ(stmt->expr->rhs->text, "b");
+  ASSERT_NE(stmt->expr->lhs, nullptr);
+  ASSERT_EQ(stmt->expr->lhs->kind, ExprKind::kSelect);
+  EXPECT_EQ(stmt->expr->lhs->base->kind, ExprKind::kMemberAccess);
+  EXPECT_EQ(stmt->expr->lhs->base->rhs->text, "a");
+  ASSERT_EQ(stmt->foreach_vars.size(), 2u);
+  EXPECT_EQ(stmt->foreach_vars[0], "i");
+  EXPECT_EQ(stmt->foreach_vars[1], "j");
 }
 
 }  // namespace

@@ -55,11 +55,32 @@ Stmt* Parser::ParseRepeatStmt() {
 // shape the elaborator's and simulator's name walks take; the parser had
 // built a chain of its own shape that took '.' alone, so `pkg::arr`,
 // `this.arr` and `C::arr` were reported as a missing identifier or '['.
+//
+// A.9.3's hierarchical_identifier is `{ identifier constant_bit_select . }
+// identifier` (printed page 1214 of ~/LRM.pdf), so a segment before a '.'
+// may select an element: in `foreach (successors[s].m_predecessors[pred])`
+// the array is the member of the selected element and `[pred]` alone is the
+// loop_variables §12.7.3 puts after the array (printed page 331). A run of
+// bracket groups is a select when a '.' follows it and the loop_variables
+// when the `)` does; the parser had taken the first group for the loop
+// variables and asked for `)` at the '.'.
 Expr* Parser::ParseForeachArrayId() {
   Token head = Check(TokenKind::kKwThis) || Check(TokenKind::kKwSuper)
                    ? Consume()
                    : ExpectIdentifier(Subclause("12.7.3"));
-  return ParseMemberAccessChain(head);
+  Expr* result = ParseMemberAccessChain(head);
+  auto selects_before_a_member = [this] {
+    auto saved = lexer_.SavePos();
+    SkipBracketedDims();
+    bool before_member = Check(TokenKind::kDot);
+    lexer_.RestorePos(saved);
+    return before_member;
+  };
+  while (Check(TokenKind::kLBracket) && selects_before_a_member()) {
+    while (Check(TokenKind::kLBracket)) result = ParseSelectExpr(result);
+    while (Check(TokenKind::kDot)) result = MakeMemberAccess(result);
+  }
+  return result;
 }
 
 Stmt* Parser::ParseForeachStmt() {
