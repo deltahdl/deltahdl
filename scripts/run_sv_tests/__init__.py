@@ -498,6 +498,64 @@ def _libraries_or_exit() -> dict[str, Library]:
         sys.exit(1)
 
 
+def _run_all(
+    build: Callable[[str], tuple[dict[str, Any], int]], tests: list[str],
+) -> tuple[list[dict[str, Any]], list[int]]:
+    results: list[dict[str, Any]] = []
+    ok_flags: list[int] = []
+    try:
+        with ThreadPoolExecutor(max_workers=os.cpu_count()) as pool:
+            for result, ok in pool.map(build, tests):
+                results.append(result)
+                ok_flags.append(ok)
+                print_status(result, ok)
+    except BrokenPipeError:
+        raise
+    except (OSError, subprocess.SubprocessError, RuntimeError) as exc:
+        print(
+            f"\nerror: pool.map failed after {len(results)}/{len(tests)} "
+            f"results: {type(exc).__name__}: {exc}",
+            file=sys.stderr,
+            flush=True,
+        )
+    return results, ok_flags
+
+
+def _print_summary(results: list[dict[str, Any]], passed: int) -> None:
+    failed = len(results) - passed
+    pct = 100.0 * passed / len(results) if results else 0.0
+    print(
+        f"\nsv-tests revision: {suite_revision()}"
+        f"\nsv-tests summary: {passed}/{len(results)} passed ({pct:.1f}%), "
+        f"{failed} failed",
+        flush=True,
+    )
+    print_chapter_breakdown(results)
+    sys.stdout.flush()
+
+
+def _report_broken_pipe() -> None:
+    devnull = os.open(os.devnull, os.O_WRONLY)
+    os.dup2(devnull, sys.stdout.fileno())
+    os.close(devnull)
+    print(
+        "\nerror: stdout pipe broke — the GitHub Actions runner likely"
+        " killed the reader before output was fully drained."
+        "\nThis is a known runner bug: the .NET runtime sets"
+        " SIGPIPE=SIG_IGN (inherited by all child processes), and"
+        "\nProcessInvoker.cs has a 5-second hard timeout that kills"
+        " the process tree if stdout is not drained in time."
+        "\nOn macOS with 16 KB pipe buffers this deadline is"
+        " regularly missed."
+        "\nSee: https://github.com/actions/runner/issues/2684"
+        "\nSee: https://github.com/actions/runner/blob/main/src/"
+        "Runner.Worker/Handlers/NodeScriptActionHandler.cs"
+        " (ProcessInvoker)",
+        file=sys.stderr,
+        flush=True,
+    )
+
+
 def main() -> None:
     args = parse_args()
 
@@ -509,66 +567,18 @@ def main() -> None:
         sys.exit(1)
 
     build = partial(build_result, libraries=_libraries_or_exit())
-
-    results: list[dict[str, Any]] = []
-    ok_flags: list[int] = []
     suite_start = time.monotonic()
 
     try:
-        with ThreadPoolExecutor(max_workers=os.cpu_count()) as pool:
-            for result, ok in pool.map(build, tests):
-                results.append(result)
-                ok_flags.append(ok)
-    except (OSError, subprocess.SubprocessError, RuntimeError) as exc:
-        print(
-            f"\nerror: pool.map failed after {len(results)}/{len(tests)} "
-            f"results: {type(exc).__name__}: {exc}",
-            file=sys.stderr,
-            flush=True,
-        )
-
-    pairs = sorted(zip(results, ok_flags), key=lambda p: _natural_sort_key(p[0]["name"]))
-    passed = sum(ok for _, ok in pairs)
-    failed = len(results) - passed
-
-    try:
-        for result, ok in pairs:
-            print_status(result, ok)
-
-        pct = 100.0 * passed / len(results) if results else 0.0
-        print(
-            f"\nsv-tests revision: {suite_revision()}"
-            f"\nsv-tests summary: {passed}/{len(results)} passed ({pct:.1f}%), "
-            f"{failed} failed",
-            flush=True,
-        )
-
-        print_chapter_breakdown(results)
-        sys.stdout.flush()
+        results, ok_flags = _run_all(build, tests)
+        passed = sum(ok_flags)
+        _print_summary(results, passed)
     except BrokenPipeError:
-        devnull = os.open(os.devnull, os.O_WRONLY)
-        os.dup2(devnull, sys.stdout.fileno())
-        os.close(devnull)
-        print(
-            "\nerror: stdout pipe broke — the GitHub Actions runner likely"
-            " killed the reader before output was fully drained."
-            "\nThis is a known runner bug: the .NET runtime sets"
-            " SIGPIPE=SIG_IGN (inherited by all child processes), and"
-            "\nProcessInvoker.cs has a 5-second hard timeout that kills"
-            " the process tree if stdout is not drained in time."
-            "\nOn macOS with 16 KB pipe buffers this deadline is"
-            " regularly missed."
-            "\nSee: https://github.com/actions/runner/issues/2684"
-            "\nSee: https://github.com/actions/runner/blob/main/src/"
-            "Runner.Worker/Handlers/NodeScriptActionHandler.cs"
-            " (ProcessInvoker)",
-            file=sys.stderr,
-            flush=True,
-        )
+        _report_broken_pipe()
         sys.exit(1)
 
     if args.junit_xml:
         write_junit_xml(results, time.monotonic() - suite_start, args.junit_xml)
         print(f"\nJUnit XML written to {args.junit_xml}", flush=True)
 
-    sys.exit(min(failed, 1))
+    sys.exit(min(len(results) - passed, 1))

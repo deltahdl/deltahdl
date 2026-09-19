@@ -203,6 +203,49 @@ def _run_with_a_failing_pool(rst: ModuleType) -> Callable[[], None]:
     )
 
 
+def _pool_mapping_as_consumed() -> MagicMock:
+    mock_pool_cls = MagicMock()
+    mock_pool_cls.return_value.__enter__.return_value \
+        .map.side_effect = map
+    return mock_pool_cls
+
+
+def _events_of_a_run_over_two_files(rst: ModuleType) -> list[str]:
+    events: list[str] = []
+
+    def build(path: str, libraries: object = None) -> tuple[dict[str, Any], int]:
+        del libraries
+        events.append(f"build {Path(path).name}")
+        return {
+            "name": Path(path).name, "chapter": "chapter-5",
+            "status": "pass", "time": 0.0, "stderr": "",
+        }, 1
+
+    def show(result: dict[str, Any], ok: int) -> None:
+        del ok
+        events.append(f"print {result['name']}")
+
+    with patch("sys.argv", ["run_sv_tests.py"]), \
+         patch.object(rst, "check_binary"), \
+         patch.object(
+             rst.glob, "glob",
+             return_value=["/tests/chapter-5/a.sv", "/tests/chapter-5/b.sv"],
+         ), \
+         patch.object(rst, "load_libraries", return_value={}), \
+         patch.object(rst, "build_result", build), \
+         patch.object(rst, "print_status", show), \
+         patch.object(rst, "ThreadPoolExecutor", _pool_mapping_as_consumed()), \
+         pytest.raises(SystemExit):
+        rst.main()
+    return events
+
+
+def test_prints_each_result_before_the_next_file_is_built(rst: ModuleType) -> None:
+    assert _events_of_a_run_over_two_files(rst) == [
+        "build a.sv", "print a.sv", "build b.sv", "print b.sv",
+    ]
+
+
 def test_all_pass_exits_zero(
     rst: ModuleType,
     get_exit_code: Callable[[Callable[[], object]], int | str | None],
