@@ -116,6 +116,15 @@ struct InstanceMethodInfo {
 bool ResolveInstanceMethod(const MethodCallParts& parts, SimContext& ctx,
                            InstanceMethodInfo& info);
 
+// §8.7/§8.15: whether `call`, a `super.new(...)` call, is one the construction
+// of the object has already made -- the first statement of the constructor of
+// the class whose method is running, or §8.17's `super.new(default)`.
+// EvalClassNew, in eval_class_new.cpp, calls the base class constructor with
+// that statement's arguments before the body runs, so the statement itself
+// runs nothing when the body reaches it; the `super` dispatch in
+// eval_function.cpp asks here.
+bool IsSuperNewRunByConstruction(const Expr* call, SimContext& ctx);
+
 // Runs a resolved class method on a concrete object (sets `this`, binds args,
 // writes back). Defined in eval_function.cpp; reused by eval_randomize.cpp to
 // invoke pre_randomize()/post_randomize() on the randomized object.

@@ -1,4 +1,3 @@
-#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -8,7 +7,6 @@
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
-#include "common/source_loc.h"
 #include "common/types.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/type_eval.h"
@@ -24,257 +22,9 @@
 #include "simulator/eval_semaphore.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
-#include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
 
 namespace delta {
-
-// Stores `val` as the initial value of `prop` on `obj`: §7.4.2 has a
-// property declared as an array hold its elements one by one, each
-// initialized as the one value would be, and §7.5 one declared with a
-// dynamic dimension hold no element until `new[]` sizes it; any other
-// property is stored under its bare and its class-scoped name.
-static void StoreClassPropertyDefault(const ClassTypeInfo* info,
-                                      const ClassTypeInfo::PropertyInfo& prop,
-                                      const Logic4Vec& val, ClassObject* obj,
-                                      Arena& arena) {
-  if (prop.is_dynamic) {
-    obj->properties[ClassArraySizeKey(prop.name)] =
-        MakeLogic4VecVal(arena, 32, 0);
-    return;
-  }
-  if (prop.array_size > 0) {
-    for (uint32_t i = 0; i < prop.array_size; ++i) {
-      obj->properties[ClassArrayElementKey(prop.name, prop.array_lo + i)] =
-          OwnRhsWords(val, arena);
-    }
-    return;
-  }
-  obj->properties[std::string(prop.name)] = val;
-  std::string scoped = std::string(info->name) + "::" + std::string(prop.name);
-  obj->properties[scoped] = val;
-}
-
-static void InitClassPropertyDefaults(const ClassTypeInfo* info,
-                                      ClassObject* obj, SimContext& ctx,
-                                      Arena& arena) {
-  for (const auto& prop : info->properties) {
-    // §8.9: a static property is one shared copy that lives on the class type,
-    // created and initialized once. Constructing an object must not give it a
-    // private per-instance copy, or instance-qualified access would shadow the
-    // shared storage. Leave static properties out of the instance map so reads
-    // and writes fall through to the type's shared static_properties.
-    if (prop.is_static) continue;
-    // §8.7: a property is initialized to its explicit default if one is given,
-    // otherwise to its type's uninitialized value — X for a 4-state type, 0 for
-    // a 2-state one — rather than being forced to zero.
-    Logic4Vec val;
-    if (prop.init_expr) {
-      // §6.8 executes a declaration's initializer as an assignment to the
-      // declared object, so it is coerced into the property exactly as a later
-      // write to it is. The two arms below already size from prop.width, which
-      // is what made this one's silence visible.
-      val = CoerceToPropertyType(info, prop.name,
-                                 EvalExpr(prop.init_expr, ctx, arena), arena);
-    } else if (prop.is_4state) {
-      val = MakeAllX(arena, prop.width);
-    } else {
-      val = MakeLogic4VecVal(arena, prop.width, 0);
-    }
-    StoreClassPropertyDefault(info, prop, val, obj, arena);
-  }
-
-  if (info->decl) {
-    for (const auto& [pname, pexpr] : info->decl->params) {
-      if (pexpr) {
-        // §6.8 makes the object's stored parameter and whatever the default
-        // expression read two data storage elements, each storing "a value
-        // from one assignment to the next". EvalExpr on a bare identifier
-        // answers with the variable's own vector (evaluation.cpp), and a
-        // Logic4Vec copy carries the words pointer rather than the words
-        // (src/common/types.h), so storing it as it arrived left the two as
-        // one buffer. The property arm above reaches the same copy through
-        // CoerceToPropertyType; this arm coerces nothing, so it takes it here.
-        // The bare and the scoped key are two names for the one parameter and
-        // every writer sets both, so they share the one copy as they do above.
-        auto val = OwnRhsWords(EvalExpr(pexpr, ctx, arena), arena);
-        obj->properties[std::string(pname)] = val;
-        std::string scoped =
-            std::string(info->name) + "::" + std::string(pname);
-        obj->properties[scoped] = val;
-      }
-    }
-  }
-}
-
-// §8.7: the actuals of a `new(...)` call are the caller's expressions, so they
-// are bound with the caller's `this` and class in force, the object under
-// construction taken off the stack for the binding and put back after:
-// `next = new(depth - 1)` in a method of the class reads the method's own
-// object, where with the fresh object on top it read that object's `depth`,
-// still at its default, and constructed a chain that never ended.
-static void BindCallerConstructorArgs(const ModuleItem* ctor,
-                                      const Expr* args_expr, SimContext& ctx,
-                                      Arena& arena) {
-  ClassObject* constructed = ctx.CurrentThis();
-  ctx.PopThis();
-  BindFunctionArgs(ctor, args_expr, ctx, arena);
-  ctx.PushThis(constructed);
-}
-
-// Runs one level's constructor. `args_are_callers` says the actuals are the
-// `new` call's own, the caller's expressions; otherwise they are the
-// extends-specifier or forwarded arguments the level below synthesized, which
-// are expressions of the derived class and read the object under
-// construction.
-static void RunConstructorForLevel(const ClassTypeInfo* info,
-                                   const Expr* args_expr, bool args_are_callers,
-                                   SimContext& ctx, Arena& arena) {
-  auto it = info->methods.find("new");
-  if (it == info->methods.end() || !it->second) return;
-  ctx.PushScope();
-  if (args_expr && args_are_callers) {
-    BindCallerConstructorArgs(it->second, args_expr, ctx, arena);
-  }
-  // §8.15/§8.17: while this constructor body runs, `super` resolves relative to
-  // `info` (the lexically enclosing class), not the dynamic type of the object.
-  ctx.PushMethodClass(info);
-  if (args_expr && !args_are_callers) {
-    BindFunctionArgs(it->second, args_expr, ctx, arena);
-  }
-  Variable dummy;
-  ExecFunctionBody(it->second, &dummy, ctx, arena);
-  ctx.PopMethodClass();
-  ctx.PopScope();
-}
-
-static size_t FindFirstDefaultArgPos(const ModuleItem* method) {
-  for (size_t j = 0; j < method->func_args.size(); ++j) {
-    if (method->func_args[j].is_default) {
-      return j;
-    }
-  }
-  return 0;
-}
-
-static size_t FindChildNewDefaultPos(const ClassDecl* child_decl) {
-  for (const auto* m : child_decl->members) {
-    if (m->kind == ClassMemberKind::kMethod && m->method &&
-        m->method->name == "new") {
-      return FindFirstDefaultArgPos(m->method);
-    }
-  }
-  return 0;
-}
-
-static const Expr* SynthDefaultExtendsArgs(const ClassTypeInfo* base,
-                                           const ClassDecl* child_decl,
-                                           const Expr* new_expr, Arena& arena) {
-  size_t default_pos = FindChildNewDefaultPos(child_decl);
-
-  size_t base_argc = 0;
-  auto base_it = base->methods.find("new");
-  if (base_it != base->methods.end() && base_it->second) {
-    base_argc = base_it->second->func_args.size();
-  }
-  auto* synth = arena.Create<Expr>();
-  synth->kind = ExprKind::kCall;
-  for (size_t j = 0; j < base_argc && default_pos + j < new_expr->args.size();
-       ++j) {
-    synth->args.push_back(new_expr->args[default_pos + j]);
-  }
-  return synth;
-}
-
-// §8.17: whether the child class's own 'new' constructor argument list uses the
-// 'default' keyword. When it does, the trailing actuals of the derived-most
-// new() call expand to the superclass constructor's argument list.
-static bool ChildNewUsesDefaultArg(const ClassDecl* child_decl) {
-  for (const auto* m : child_decl->members) {
-    if (m->kind == ClassMemberKind::kMethod && m->method &&
-        m->method->name == "new") {
-      for (const auto& a : m->method->func_args) {
-        if (a.is_default) return true;
-      }
-      return false;
-    }
-  }
-  return false;
-}
-
-static const Expr* ResolveConstructorArgsForLevel(
-    const std::vector<const ClassTypeInfo*>& chain, size_t i,
-    const Expr* new_expr, Arena& arena) {
-  const Expr* args = (i == chain.size() - 1) ? new_expr : nullptr;
-  if (args || i + 1 >= chain.size() || !chain[i + 1]->decl) return args;
-
-  const auto* child_decl = chain[i + 1]->decl;
-  if (!child_decl->extends_args.empty()) {
-    auto* synth = arena.Create<Expr>();
-    synth->kind = ExprKind::kCall;
-    synth->args = child_decl->extends_args;
-    return synth;
-  }
-  // §8.17: 'default' expands to the superclass constructor arguments, whether
-  // it appears in the extends specifier (Base(default)) or in the subclass
-  // constructor's own argument list (new(..., default)). Either way the
-  // trailing actuals of the new() call are forwarded to this base level. This
-  // also realizes the compiler-inserted super.new(default) when the subclass
-  // body provides no explicit call.
-  if ((child_decl->extends_has_default || ChildNewUsesDefaultArg(child_decl)) &&
-      new_expr) {
-    return SynthDefaultExtendsArgs(chain[i], child_decl, new_expr, arena);
-  }
-  return args;
-}
-
-Logic4Vec EvalClassNew(std::string_view class_type, const Expr* new_expr,
-                       SimContext& ctx, Arena& arena, SourceLoc loc) {
-  auto* info = ctx.FindClassType(class_type);
-  if (!info) return MakeLogic4VecVal(arena, 64, kNullClassHandle);
-  if (info->is_abstract) {
-    ctx.GetDiag().Error(loc,
-                        "cannot construct object of abstract class '" +
-                            std::string(class_type) + "'",
-                        Subclause("8.21"));
-    return MakeLogic4VecVal(arena, 64, kNullClassHandle);
-  }
-  if (info->is_interface) {
-    ctx.GetDiag().Error(loc,
-                        "cannot construct object of interface class '" +
-                            std::string(class_type) + "'",
-                        Subclause("8.26.5"));
-    return MakeLogic4VecVal(arena, 64, kNullClassHandle);
-  }
-  auto* obj = arena.Create<ClassObject>();
-  obj->type = info;
-
-  std::vector<const ClassTypeInfo*> chain;
-  for (const auto* cur = info; cur; cur = cur->parent) chain.push_back(cur);
-  std::reverse(chain.begin(), chain.end());
-
-  auto handle = ctx.AllocateClassObject(obj);
-  ctx.PushThis(obj);
-
-  for (size_t i = 0; i < chain.size(); ++i) {
-    // §8.7: a property's default expression belongs to the class declaring it,
-    // so unqualified names resolve as they do in that class's methods -- the
-    // reason the constructor body below runs under the same enclosing class.
-    // Without it the read takes the object's most-derived view of the name,
-    // which only a write from the most-derived class refreshes, so a base
-    // constructor's assignment is left behind and a derived property
-    // initialized from a base one sees the base's declared default instead.
-    ctx.PushMethodClass(chain[i]);
-    InitClassPropertyDefaults(chain[i], obj, ctx, arena);
-    ctx.PopMethodClass();
-    const Expr* args =
-        ResolveConstructorArgsForLevel(chain, i, new_expr, arena);
-    RunConstructorForLevel(chain[i], args, args == new_expr, ctx, arena);
-  }
-
-  ctx.PopThis();
-  return MakeLogic4VecVal(arena, 64, handle);
-}
 
 void ApplyClassParamOverrides(std::string_view var_name, uint64_t handle,
                               SimContext& ctx, Arena& arena) {
@@ -285,12 +35,13 @@ void ApplyClassParamOverrides(std::string_view var_name, uint64_t handle,
   const auto& params = obj->type->decl->params;
   for (size_t i = 0; i < params.size() && i < param_exprs.size(); ++i) {
     if (param_exprs[i]) {
-      // §6.8, as in the default arm of InitClassPropertyDefaults above: the
-      // object's stored parameter and whatever the override expression read
-      // are two data storage elements, and a Logic4Vec copy carries the words
-      // pointer rather than the words, so `C #(.W(n)) c;` stored as it arrived
-      // left the object and the variable n as one buffer. One copy serves both
-      // keys, which are two names for the one parameter.
+      // §6.8, as in the default arm of InitClassPropertyDefaults in
+      // eval_class_new.cpp: the object's stored parameter and whatever the
+      // override expression read are two data storage elements, and a
+      // Logic4Vec copy carries the words pointer rather than the words, so
+      // `C #(.W(n)) c;` stored as it arrived left the object and the variable
+      // n as one buffer. One copy serves both keys, which are two names for
+      // the one parameter.
       auto val = OwnRhsWords(EvalExpr(param_exprs[i], ctx, arena), arena);
       obj->properties[std::string(params[i].first)] = val;
       std::string scoped =
@@ -356,15 +107,15 @@ static bool TryEvalSuperMethodCall(const Expr* expr, SimContext& ctx,
   MethodCallParts parts;
   if (!ExtractMethodCallParts(expr, parts)) return false;
   if (parts.var_name != "super") return false;
-  // §8.17: super.new(default) forwards the constructor's default-expanded
-  // arguments to the superclass. The flattened constructor chain already ran
-  // the superclass constructor once with those forwarded actuals (see
-  // ResolveConstructorArgsForLevel), so the explicit call here is satisfied
-  // without a second base-constructor invocation -- which would otherwise bind
-  // the literal 'default' token as an ordinary argument value.
-  if (parts.method_name == "new" && expr->args.size() == 1 && expr->args[0] &&
-      expr->args[0]->kind == ExprKind::kIdentifier &&
-      expr->args[0]->text == "default") {
+  // §8.7/§8.15: the `super.new(...)` that opens a constructor body is the
+  // base constructor call the construction of the object has already made,
+  // with these arguments, before this body began (EvalClassNew in
+  // eval_class_new.cpp), and §8.17's `super.new(default)` forwarded the
+  // expanded actuals the same way; reaching the statement runs nothing more,
+  // where running the base constructor a second time ran it once with no
+  // arguments first -- uvm_component::new saw the name "" instead of
+  // "__top__" and built a second root.
+  if (parts.method_name == "new" && IsSuperNewRunByConstruction(expr, ctx)) {
     out = MakeLogic4VecVal(arena, 1, 0);
     return true;
   }

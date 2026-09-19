@@ -332,4 +332,81 @@ TEST(ChainedConstructorSimulation, DefaultBeforeOwnArgForwards) {
             1020u);
 }
 
+// §8.17: the first action of a subclass's new() is to invoke the superclass
+// constructor, once, and the general approach is the explicit super.new(5) at
+// the head of the subclass constructor, the clause's own example. The base
+// counts its constructor runs and keeps the argument the first run was given:
+// a construction that ran the base constructor with no arguments before the
+// subclass body and then again from the statement counted 2 with a first
+// argument of 0; the one call counts 1 with 5.
+TEST(ChainedConstructorSimulation, SuperNewWithArgsRunsTheBaseConstructorOnce) {
+  EXPECT_EQ(
+      RunAndGet("class Base;\n"
+                "  static int runs = 0;\n"
+                "  static int first = 0;\n"
+                "  int x;\n"
+                "  function new(int v);\n"
+                "    runs = runs + 1;\n"
+                "    if (runs == 1) first = v;\n"
+                "    x = v;\n"
+                "  endfunction\n"
+                "endclass\n"
+                "class Derived extends Base;\n"
+                "  function new();\n"
+                "    super.new(5);\n"
+                "  endfunction\n"
+                "endclass\n"
+                "module t;\n"
+                "  int result;\n"
+                "  initial begin\n"
+                "    Derived d;\n"
+                "    d = new;\n"
+                "    result = Base::runs * 100 + Base::first * 10 + d.x;\n"
+                "  end\n"
+                "endmodule\n",
+                "result"),
+      155u);
+}
+
+// §8.17 and §8.15: super.new(...) passes the subclass constructor's own
+// formals to the superclass constructor, so the actuals are evaluated with
+// those formals bound, and the superclass constructor sees them the one time
+// it runs. Three levels chain this way, each handing its argument up one
+// level, and each base level counts its runs.
+TEST(ChainedConstructorSimulation, SuperNewFormalsReachEachLevelOnce) {
+  EXPECT_EQ(RunAndGet("class A;\n"
+                      "  static int a_runs = 0;\n"
+                      "  int a_val;\n"
+                      "  function new(int v);\n"
+                      "    a_runs = a_runs + 1;\n"
+                      "    a_val = v;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "class B extends A;\n"
+                      "  static int b_runs = 0;\n"
+                      "  int b_val;\n"
+                      "  function new(int v);\n"
+                      "    super.new(v + 1);\n"
+                      "    b_runs = b_runs + 1;\n"
+                      "    b_val = v;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "class C extends B;\n"
+                      "  function new(int v);\n"
+                      "    super.new(v + 1);\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    C c;\n"
+                      "    c = new(1);\n"
+                      "    result = A::a_runs * 1000 + B::b_runs * 100 +\n"
+                      "             c.a_val * 10 + c.b_val;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            1132u);
+}
+
 }  // namespace
