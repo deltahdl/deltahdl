@@ -34,6 +34,7 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 - [The standard guides structure](lrm-guides-structure.md) — mirror the entities the clause defines when grouping parameters into a struct.
 - [One LRM page per call](reading-the-lrm-one-page-per-call.md) — one `Read` page per tool call, waiting for each; batching blocks every result in the turn.
 - [Never convert the LRM to text](not-converting-the-lrm-to-text.md) — `extract_text()` spends the same budget, and `pdftotext` loses the structure.
+- [Standard names listed explicitly](standard-names-listed-explicitly.md) — every name the standard mandates, listed and matched exactly; never a pattern for a closed set, and never a decision to put to the user.
 - [Locating a clause](locating-a-clause.md) — the Read tool alone, never `pypdf`; the contents pages at physical 11 to 27, then printed page plus one.
 - [Zooming on a formula](zooming-on-a-formula.md) — rasterize a crop with `pdftoppm` at 300 dpi when a glyph is ambiguous in the page rendering.
 - [Oversized tool output](oversized-tool-output.md) — read large files in bounded windows; one huge result truncates everything after it.
