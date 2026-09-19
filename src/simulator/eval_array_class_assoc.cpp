@@ -31,6 +31,16 @@ bool DimNamesTypeParam(const Expr* dim, const ClassDecl* decl) {
          decl->type_param_names.count(dim->text) != 0;
 }
 
+// §8.5/§7.8: whether the property declaration `member` of `decl` is an
+// associative array: one unpacked dimension that is an index type or names a
+// type parameter of the class (§8.25).
+bool DeclaresAssocProperty(const ClassMember* member, const ClassDecl* decl,
+                           SimContext& ctx) {
+  if (member->is_param || member->unpacked_dims.size() != 1) return false;
+  const Expr* dim = member->unpacked_dims[0];
+  return IsAssocIndexDim(dim, ctx) || DimNamesTypeParam(dim, decl);
+}
+
 // §8.5/§7.8: the declaration of the property `name` on the class chain from
 // `type` whose one unpacked dimension is an index type, and the class that
 // declares it in `declaring`. The nearest declaration is the one that answers
@@ -44,10 +54,7 @@ const ClassMember* FindAssocPropertyDecl(const ClassTypeInfo* type,
     for (const auto* member : t->decl->members) {
       if (member->kind != ClassMemberKind::kProperty || member->name != name)
         continue;
-      if (member->is_param || member->unpacked_dims.size() != 1) return nullptr;
-      const Expr* dim = member->unpacked_dims[0];
-      if (!IsAssocIndexDim(dim, ctx) && !DimNamesTypeParam(dim, t->decl))
-        return nullptr;
+      if (!DeclaresAssocProperty(member, t->decl, ctx)) return nullptr;
       declaring = t;
       return member;
     }
@@ -83,29 +90,36 @@ DataType ResolveNamedType(const DataType& type) {
   return TypeNameToDataType(type.type_ref_expr->text);
 }
 
-// §7.8: the index-type attributes of the property `member` of `declaring` on
-// `obj`, and whether the index is a string: the type the dimension names, or,
-// where it names a type parameter (§8.25), the type the object's
-// specialization binds that parameter to.
-AssocArraySpec PropertyIndexSpec(const ClassTypeInfo* declaring,
-                                 const ClassMember* member,
-                                 const ClassObject* obj, bool elem_4state,
-                                 SimContext& ctx, bool& string_key) {
+// §7.8: the index type of the property `member` of `decl` on `obj`: the type
+// the dimension names, or, where it names a type parameter (§8.25), the type
+// the object's specialization binds that parameter to, else the default the
+// class declares. A parameter the class gives no default and the
+// specialization no actual stands for no type at all; the array is still
+// keyed, as an int would key it, rather than left at the width of nothing.
+DataType PropertyIndexType(const ClassMember* member, const ClassDecl* decl,
+                           const ClassObject* obj) {
   const Expr* dim = member->unpacked_dims[0];
-  if (!DimNamesTypeParam(dim, declaring->decl)) {
-    string_key = dim->text == "string";
-    return AssocIndexSpec(dim, elem_4state, ctx);
-  }
-  const DataType* bound = TypeParamActual(obj, declaring->decl, dim->text);
+  if (!DimNamesTypeParam(dim, decl)) return TypeNameToDataType(dim->text);
+  const DataType* bound = TypeParamActual(obj, decl, dim->text);
   DataType index_type =
       bound != nullptr ? ResolveNamedType(*bound) : TypeNameToDataType("int");
-  // A parameter the class gives no default and the specialization no actual
-  // stands for no type at all; the array is still keyed, as an int would key
-  // it, rather than left at the width of nothing.
   if (index_type.kind == DataTypeKind::kImplicit)
     index_type = TypeNameToDataType("int");
-  string_key = index_type.kind == DataTypeKind::kString;
-  return AssocIndexSpecOfType(index_type, elem_4state, ctx);
+  return index_type;
+}
+
+// §7.8: the index-type attributes of the property `member` of `decl` on
+// `obj`: read off the dimension itself where it names a type, which carries
+// the wildcard and the dimension's own signing, and off the bound type where
+// it names a type parameter.
+AssocArraySpec PropertyIndexSpec(const ClassMember* member,
+                                 const ClassDecl* decl, const ClassObject* obj,
+                                 bool elem_4state, SimContext& ctx) {
+  const Expr* dim = member->unpacked_dims[0];
+  if (!DimNamesTypeParam(dim, decl))
+    return AssocIndexSpec(dim, elem_4state, ctx);
+  return AssocIndexSpecOfType(PropertyIndexType(member, decl, obj), elem_4state,
+                              ctx);
 }
 
 // §7.8: the array the declaration `member` of class `declaring` asks for on
@@ -119,12 +133,12 @@ AssocArrayObject* MakeAssocProperty(const ClassTypeInfo* declaring,
   const auto* prop = declaring->FindProperty(member->name);
   uint32_t elem_width = prop != nullptr ? prop->width : 32;
   bool elem_4state = prop != nullptr && prop->is_4state;
-  bool string_key = false;
-  AssocArraySpec spec =
-      PropertyIndexSpec(declaring, member, obj, elem_4state, ctx, string_key);
+  const ClassDecl* decl = declaring->decl;
+  AssocArraySpec spec = PropertyIndexSpec(member, decl, obj, elem_4state, ctx);
   auto* aa = ctx.GetArena().Create<AssocArrayObject>();
   aa->elem_width = elem_width;
-  aa->is_string_key = string_key;
+  aa->is_string_key =
+      PropertyIndexType(member, decl, obj).kind == DataTypeKind::kString;
   aa->is_wildcard = spec.is_wildcard;
   aa->index_width = spec.index_width;
   aa->is_4state = spec.is_4state;
