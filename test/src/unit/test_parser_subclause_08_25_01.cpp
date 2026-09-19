@@ -3,7 +3,6 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "parser/ast_expr.h"
-#include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
 
