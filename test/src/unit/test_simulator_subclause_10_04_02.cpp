@@ -624,4 +624,67 @@ TEST(NonblockingAssignSim, ClassHandleInTheTargetIsResolvedAtScheduleTime) {
   LowerRunAndCheck(f, design, {{"r", 0xA5u}, {"seen", 0x22u}});
 }
 
+// §10.4.2 with §8.6 and §8.11: inside a method a nonblocking assignment may
+// name the object's own property bare, `x <= 71`, or as `this.y <= 72`, and
+// §10.4.2 has both land in the NBA region of the time step, so the values are
+// read back through the handle at time 1. The bare name resolved to no
+// variable and was dropped without an event; `this.y` was deposited under the
+// property's bare key alone, while every read inside a method consults the
+// `Type::name` key the object's construction wrote first, so 72 sat unseen
+// beside the stale 0. The module variable written from the same method, `mv
+// <= 73`, always landed, which is why it stands beside them: 71 * 10000 + 72
+// * 100 + 73 reads every one.
+TEST(NonblockingAssignSim, PropertyNamedBareOrThroughThisInAMethod) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  int mv;\n"
+      "  int result;\n"
+      "  class C;\n"
+      "    int x, y;\n"
+      "    function void f();\n"
+      "      x <= 71;\n"
+      "      this.y <= 72;\n"
+      "      mv <= 73;\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "  C h;\n"
+      "  initial begin\n"
+      "    h = new;\n"
+      "    h.f();\n"
+      "    #1 result = h.x * 10000 + h.y * 100 + mv;\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(val, 717273u);
+}
+
+// §10.4.2 with §13.3: the same two forms inside a class task, one with the
+// intra-assignment delay `<= #2`, the task itself reading its property back
+// after the delay -- 5 at time 1, and the delayed 9 at time 2 -- and the
+// module reading both through the handle at time 3.
+TEST(NonblockingAssignSim, PropertyNamedInAClassTaskWithAndWithoutADelay) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  int result;\n"
+      "  class C;\n"
+      "    int z, w;\n"
+      "    int seen;\n"
+      "    task run();\n"
+      "      this.z <= 5;\n"
+      "      w <= #2 9;\n"
+      "      #1 seen = z * 10 + w;\n"
+      "      #1 seen = seen * 10 + w;\n"
+      "    endtask\n"
+      "  endclass\n"
+      "  C h;\n"
+      "  initial begin\n"
+      "    h = new;\n"
+      "    h.run();\n"
+      "    #1 result = h.seen * 100 + h.z * 10 + h.w;\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(val, 50959u);
+}
+
 }  // namespace

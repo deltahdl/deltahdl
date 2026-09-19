@@ -640,6 +640,11 @@ static bool TryScheduleClockvarDrive(const Expr* lhs, const Logic4Vec& rhs_val,
   return true;
 }
 
+static void ScheduleResolvedFieldNba(const FieldTarget& target,
+                                     const Logic4Vec& rhs_val,
+                                     uint64_t delay_ticks, SimContext& ctx,
+                                     Arena& arena);
+
 static void ScheduleFieldNba(const Expr* lhs, const Logic4Vec& rhs_val,
                              uint64_t delay_ticks, SimContext& ctx,
                              Arena& arena) {
@@ -647,6 +652,15 @@ static void ScheduleFieldNba(const Expr* lhs, const Logic4Vec& rhs_val,
   // blocking form gates the same fallback on (AssignToScalarLhs and
   // PerformBlockingAssign both ask WriteStructField on that kind alone), so the
   // two forms reach it on the same left-hand sides and no others.
+  // §8.6: a bare name inside a method that no variable answers may be a
+  // property of the object the method runs on, `x <= 71` in a method of the
+  // class declaring x; ResolveBarePropertyTarget answers it, on the object
+  // resolved here as §10.4.2 asks, else nothing.
+  if (lhs->kind == ExprKind::kIdentifier) {
+    ScheduleResolvedFieldNba(ResolveBarePropertyTarget(lhs->text, ctx), rhs_val,
+                             delay_ticks, ctx, arena);
+    return;
+  }
   if (lhs->kind != ExprKind::kMemberAccess) return;
   // §14.16: a clockvar names a clocking block's output rather than a member of
   // an object, and it is asked first because ResolveFieldTarget takes `cb` for
@@ -654,7 +668,16 @@ static void ScheduleFieldNba(const Expr* lhs, const Logic4Vec& rhs_val,
   // same reason -- a dotted left-hand side that is no key in the variable table
   // -- so this is where the two are told apart.
   if (TryScheduleClockvarDrive(lhs, rhs_val, ctx)) return;
-  FieldTarget target = ResolveFieldTarget(lhs, ctx);
+  ScheduleResolvedFieldNba(ResolveFieldTarget(lhs, ctx), rhs_val, delay_ticks,
+                           ctx, arena);
+}
+
+// Defers the deposit into a target resolved where the statement executed to
+// the NBA region; a target that names no storage costs no event.
+static void ScheduleResolvedFieldNba(const FieldTarget& target,
+                                     const Logic4Vec& rhs_val,
+                                     uint64_t delay_ticks, SimContext& ctx,
+                                     Arena& arena) {
   if (!target.HasDeposit()) return;
   auto* event = ctx.GetScheduler().GetEventPool().Acquire();
   event->kind = EventKind::kUpdate;

@@ -170,6 +170,12 @@ struct FieldTarget {
 // handle -- as §10.4.2 requires of the moment the statement executes.
 FieldTarget ResolveFieldTarget(const Expr* lhs, SimContext& ctx);
 
+// §8.6: the property `name` of the object the running method runs on, named
+// bare inside the method, as the method's class declares it; kNone where no
+// method is running or its object's class declares no such property, which
+// leaves the name to whatever else it may denote.
+FieldTarget ResolveBarePropertyTarget(std::string_view name, SimContext& ctx);
+
 // Deposits `rhs_val` in already-resolved storage. Nothing is re-resolved here,
 // so this is what a nonblocking assignment runs in the update region.
 void WriteResolvedField(const FieldTarget& target, const Logic4Vec& rhs_val,

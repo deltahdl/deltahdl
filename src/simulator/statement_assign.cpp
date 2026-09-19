@@ -348,6 +348,32 @@ static FieldTarget ResolveClassObjectField(Variable* base_var,
   return target;
 }
 
+// §8.11 with §8.15: the property `field_name` of the object the running
+// method runs on, as the method's class declares it -- what a bare name in
+// the same method names -- else null where no method is running. The
+// declaring type scopes the deposit: a property is kept under a `Type::name`
+// key beside its bare key, and every read inside a method consults the
+// scoped key first, so a deposit under the bare key alone -- what a `this.x`
+// nonblocking assignment made -- sat unseen beside the stale scoped value.
+static FieldTarget ResolveOwnPropertyTarget(std::string_view field_name,
+                                            SimContext& ctx) {
+  auto* self = ctx.CurrentThis();
+  if (!self) return {};
+  FieldTarget target;
+  target.kind = FieldTarget::Kind::kProperty;
+  target.obj = self;
+  target.type = ctx.CurrentMethodClass();
+  target.field = std::string(field_name);
+  return target;
+}
+
+FieldTarget ResolveBarePropertyTarget(std::string_view name, SimContext& ctx) {
+  auto* self = ctx.CurrentThis();
+  if (!self || !self->type || self->type->FindProperty(name) == nullptr)
+    return {};
+  return ResolveOwnPropertyTarget(name, ctx);
+}
+
 // The field of the current `this` object. *handled is set true when base_name
 // names `this`; the target answered is then the whole answer.
 static FieldTarget ResolveThisField(std::string_view base_name,
@@ -356,13 +382,7 @@ static FieldTarget ResolveThisField(std::string_view base_name,
   *handled = false;
   if (base_name != "this") return {};
   *handled = true;
-  auto* self = ctx.CurrentThis();
-  if (!self) return {};
-  FieldTarget target;
-  target.kind = FieldTarget::Kind::kProperty;
-  target.obj = self;
-  target.field = std::string(field_name);
-  return target;
+  return ResolveOwnPropertyTarget(field_name, ctx);
 }
 
 // The field of the parent slice of the current `this` object, reached through
