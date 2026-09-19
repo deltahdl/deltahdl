@@ -4,7 +4,7 @@ concurrency:
   group: documentation-${{ github.ref }}
 jobs:
   jsonlint:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - name: Install tools
@@ -17,7 +17,7 @@ jobs:
           find docs -name '*.json' -print0 \
             | xargs -0 -n1 jsonlint --quiet
   markdownlint:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - name: Restore pip cache
@@ -67,7 +67,7 @@ jobs:
         name: Lint Markdown
         run: markdownlint '**/*.md' --dot --disable MD013
   yamllint:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - name: Restore pip cache

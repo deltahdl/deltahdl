@@ -4,7 +4,7 @@ concurrency:
   group: scripts-${{ github.head_ref || github.ref_name }}
 jobs:
   assert-every-dataclass-field-is-read:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - name: Restore pip cache
@@ -25,7 +25,7 @@ jobs:
           ${{ github.workspace }}/lib/python/
           ${{ github.workspace }}/scripts/
   assert-no-comments:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - name: Restore pip cache
@@ -49,7 +49,7 @@ jobs:
           ${{ github.workspace }}/test/lib/python/
           ${{ github.workspace }}/test/scripts/
   assert-no-inline-directives:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - name: Restore pip cache
@@ -70,7 +70,7 @@ jobs:
           --verbose
           ${{ github.workspace }}
   assert-no-linter-config-files:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - name: Restore pip cache
@@ -91,7 +91,7 @@ jobs:
           --verbose
           ${{ github.workspace }}
   assert-no-pytest-plugin-declarations:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - name: Restore pip cache
@@ -113,7 +113,7 @@ jobs:
           ${{ github.workspace }}/test/lib/python/
           ${{ github.workspace }}/test/scripts/
   assert-one-assert-per-pytest:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - name: Restore pip cache
@@ -134,7 +134,7 @@ jobs:
           ${{ github.workspace }}/test/lib/python/
           ${{ github.workspace }}/test/scripts/
   assert-pytest-class-holds-state:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - name: Restore pip cache
@@ -155,7 +155,7 @@ jobs:
           ${{ github.workspace }}/test/lib/python/
           ${{ github.workspace }}/test/scripts/
   assert-pytest-fixture-name-is-needed:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - name: Restore pip cache
@@ -177,7 +177,7 @@ jobs:
           ${{ github.workspace }}/test/lib/python/
           ${{ github.workspace }}/test/scripts/
   assert-python-definition-is-used:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - name: Restore pip cache
@@ -212,7 +212,7 @@ jobs:
           --search-in ${{ github.workspace }}/test/scripts/
           ${{ github.workspace }}/scripts/
   copy-paste-source:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - name: Install jscpd
@@ -222,7 +222,7 @@ jobs:
           jscpd --pattern "**/*.py" --threshold 0
           --reporters console lib/python/ scripts/
   copy-paste-tests:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - name: Install jscpd
@@ -232,7 +232,7 @@ jobs:
           jscpd --pattern "**/*.py" --threshold 0
           --reporters console lib/python/ test/scripts/ test/lib/python/
   mypy-source:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - name: Restore pip cache
@@ -251,7 +251,7 @@ jobs:
           PYTHONPATH=.:scripts python3 -m mypy --strict
           lib/python/ scripts/
   mypy-tests:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - name: Restore pip cache
@@ -271,7 +271,7 @@ jobs:
           python3 -m mypy --strict --explicit-package-bases
           lib/python/ test/scripts/ test/lib/python/
   pylint-source:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - name: Restore pip cache
@@ -294,7 +294,7 @@ jobs:
           --disable=missing-module-docstring
           --fail-on=C,R,W --fail-under=10.0
   pylint-tests:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - name: Restore pip cache
@@ -318,7 +318,7 @@ jobs:
           --disable=missing-module-docstring
           --fail-on=C,R,W --fail-under=10.0
   test-assert-no-duplicate-type-definitions:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - name: Restore pip cache
@@ -341,7 +341,7 @@ jobs:
           --cov-report=term-missing
           --cov-fail-under=100
   test-assert-subclause-citations:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - name: Restore pip cache
@@ -368,7 +368,7 @@ jobs:
       - test-lib-cli
       - test-lib-lrm
       - test-lib-lrm-subclause-dependencies
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - name: Restore pip cache
@@ -399,7 +399,7 @@ jobs:
           PYTHONPATH=.:scripts python3 -m pytest
           test/scripts/generate_lrm_subclause_dependencies/e2e/ -v
   test-lib-claude-cli-streaming:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - name: Restore pip cache
@@ -421,7 +421,7 @@ jobs:
           --cov-report=term-missing
           --cov-fail-under=100
   test-lib-cli:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - name: Restore pip cache
@@ -443,7 +443,7 @@ jobs:
           --cov-report=term-missing
           --cov-fail-under=100
   test-lib-github:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - name: Restore pip cache
@@ -465,7 +465,7 @@ jobs:
           --cov-report=term-missing
           --cov-fail-under=100
   test-lib-lrm:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - name: Restore pip cache
@@ -490,7 +490,7 @@ jobs:
     needs:
       - test-lib-claude-cli-streaming
       - test-lib-lrm
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - name: Restore pip cache
@@ -512,7 +512,7 @@ jobs:
           --cov-report=term-missing
           --cov-fail-under=100
   test-lib-retry:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - name: Restore pip cache
@@ -534,7 +534,7 @@ jobs:
           --cov-report=term-missing
           --cov-fail-under=100
   test-lib-run-tests-common:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - name: Restore pip cache
@@ -556,7 +556,7 @@ jobs:
           --cov-report=term-missing
           --cov-fail-under=100
   test-lib-subclause:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - name: Restore pip cache
@@ -578,7 +578,7 @@ jobs:
           --cov-report=term-missing
           --cov-fail-under=100
   test-lib-test-fixtures:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - name: Restore pip cache
@@ -600,7 +600,7 @@ jobs:
           --cov-report=term-missing
           --cov-fail-under=100
   test-lib-test-utils:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - name: Restore pip cache
@@ -623,7 +623,7 @@ jobs:
           --cov-fail-under=100
   test-next-subclause:
     needs: test-lib-github
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - name: Restore pip cache
@@ -655,7 +655,7 @@ jobs:
           test/scripts/next_subclause/e2e/ -v
   test-run-sim-tests:
     needs: test-lib-run-tests-common
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - name: Restore pip cache
@@ -679,7 +679,7 @@ jobs:
           --cov-fail-under=100
   test-run-sv-tests:
     needs: test-lib-run-tests-common
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - name: Restore pip cache
@@ -702,7 +702,7 @@ jobs:
           --cov-report=term-missing
           --cov-fail-under=100
   yamllint:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - name: Restore pip cache
