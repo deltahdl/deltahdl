@@ -69,6 +69,14 @@ bool SetupInstanceTaskCall(const Expr* expr, SimContext& ctx, Arena& arena,
   }
   ctx.PushMethodClass(call.owner);
   ctx.PushScope();
+  // §8.25: a static task named through a specialization, `C#(42)::t(...)`,
+  // runs with the class's parameters bound to the specialization's actuals,
+  // as the evaluator's class-scope call binds them (BindClassParams).
+  const Expr* scope = expr->lhs != nullptr ? expr->lhs->lhs : nullptr;
+  if (call.obj == nullptr && scope != nullptr &&
+      scope->kind == ExprKind::kIdentifier && !scope->elements.empty()) {
+    BindClassParams(call.owner, scope, ctx, arena);
+  }
   if (call.obj != nullptr) ctx.PushThis(call.obj);
   ctx.PushQueueRefFrame();
   ctx.PushAssocRefFrame();

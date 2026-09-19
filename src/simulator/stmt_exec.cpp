@@ -286,9 +286,7 @@ static Process* CreateForkChildProcess(SimContext& ctx, Arena& arena,
     p->home_region = spawning_proc->home_region;
     p->program_block_id = spawning_proc->program_block_id;
   }
-  // §9.3.2: the branch runs on the spawning method's object and in its scope
-  // (SimContext::CopyCarriedStacksTo says what and why).
-  ctx.CopyCarriedStacksTo(*p);
+  ctx.CopyCarriedStacksTo(*p);  // §9.3.2: the spawning method's object, scope.
   // §18.14.2: a new thread's RNG is initialized with the next random value
   // drawn from the thread that creates it. Each child therefore receives a
   // unique seed determined solely by the parent, and the per-child seed
