@@ -279,17 +279,8 @@ void ApplyClassParamOverrides(std::string_view var_name, uint64_t handle,
 // eval_function_internal.h (so eval_static_method.cpp can run a method body
 // without a `this`); the definition is below.
 
-struct InstanceMethodInfo {
-  ClassObject* obj = nullptr;
-  ModuleItem* method = nullptr;
-  // The class in which `method` is defined, so its body resolves unqualified
-  // members against that level (§8.15 member shadowing across a base/derived
-  // hierarchy).
-  const ClassTypeInfo* owner = nullptr;
-};
-
-static bool ResolveInstanceMethod(const MethodCallParts& parts, SimContext& ctx,
-                                  InstanceMethodInfo& info) {
+bool ResolveInstanceMethod(const MethodCallParts& parts, SimContext& ctx,
+                           InstanceMethodInfo& info) {
   auto class_type = ctx.GetVariableClassType(parts.var_name);
   if (class_type.empty()) return false;
   auto* var = ctx.FindVariable(parts.var_name);

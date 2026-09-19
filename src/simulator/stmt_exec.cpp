@@ -17,6 +17,8 @@
 #include "parser/ast_expr.h"
 #include "simulator/awaiters.h"
 #include "simulator/awaiters_event_control.h"
+#include "simulator/eval_function_internal.h"
+#include "simulator/eval_instance_task.h"
 #include "simulator/eval_semaphore.h"
 #include "simulator/evaluation.h"
 #include "simulator/exec_task.h"
@@ -524,6 +526,12 @@ static ExecTask ExecInlineTaskCall(const Stmt* stmt, SimContext& ctx,
   if (auto* sem = SemaphoreCallTarget(expr, ctx, "get")) {
     co_await SemaphoreGetAwaiter{*sem, SemaphoreKeyArg(expr, ctx, arena, 1)};
     co_return StmtResult::kDone;
+  }
+  // §13.3 with §8.6: a task enabled through an object handle runs as a
+  // coroutine too, so its timing controls suspend this process.
+  InstanceMethodInfo instance_call;
+  if (SetupInstanceTaskCall(expr, ctx, arena, instance_call)) {
+    co_return co_await ExecInstanceTaskCall(instance_call, expr, ctx, arena);
   }
   auto* func = SetupTaskCall(expr, ctx, arena);
   if (!func) {

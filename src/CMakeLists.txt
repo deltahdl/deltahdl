@@ -231,6 +231,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/eval_randomize_joint.cpp
     simulator/eval_randomize_membership.cpp
     simulator/eval_randomize_mode.cpp
+    simulator/eval_instance_task.cpp
     simulator/eval_static_method.cpp
     simulator/sequence_flatten.cpp
     simulator/sequence_monitor.cpp
@@ -454,6 +455,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/timing_check_stability.cpp
     simulator/stmt_exec_randsequence.cpp
     simulator/stmt_exec_randsequence_values.cpp
+    simulator/stmt_exec_class_task.cpp
     simulator/stmt_exec_wait.cpp
     simulator/sva_engine_properties.cpp
     simulator/sva_engine_sampling.cpp

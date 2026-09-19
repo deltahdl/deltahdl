@@ -37,6 +37,15 @@ ExecTask ExecRandcase(const Stmt* stmt, SimContext& ctx, Arena& arena);
 ExecTask ExecRandsequence(const Stmt* stmt, SimContext& ctx, Arena& arena);
 
 // Defined in stmt_exec_wait.cpp.
+// §13.3 with §8.6: runs the body of an instance task enabled through a
+// handle, `h.t(...)`, whose frame SetupInstanceTaskCall (eval_instance_task.h)
+// has pushed, and tears the frame down when the body has completed. Defined in
+// stmt_exec_class_task.cpp.
+struct Expr;
+struct InstanceMethodInfo;
+ExecTask ExecInstanceTaskCall(const InstanceMethodInfo& call, const Expr* expr,
+                              SimContext& ctx, Arena& arena);
+
 ExecTask ExecWait(const Stmt* stmt, SimContext& ctx, Arena& arena);
 ExecTask ExecWaitOrder(const Stmt* stmt, SimContext& ctx, Arena& arena);
 ExecTask ExecCycleDelay(const Stmt* stmt, SimContext& ctx, Arena& arena);

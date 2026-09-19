@@ -157,4 +157,104 @@ TEST(TaskSim, FormalArgInheritedTypeRoundTripsFullWidth) {
   EXPECT_EQ(val, 0x5Au);
 }
 
+// §13.2 and §13.3 (printed page 335): a task may contain time-controlling
+// statements, and control returns to the enabling process only when the task
+// has completed, so the time of the return may differ from the time of the
+// call; §8.6 (printed page 183) has an object's task enabled through its
+// handle, `d.run();`, as any of its methods is. A class task's delay was run
+// without consuming time, the call going to the function interpreter, so the
+// read of $time after it gave 0 rather than 50.
+TEST(TaskSim, ClassTaskCalledThroughAHandleConsumesItsDelay) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  logic [31:0] x;\n"
+      "  class drv;\n"
+      "    task run();\n"
+      "      #50;\n"
+      "      x = $time;\n"
+      "    endtask\n"
+      "  endclass\n"
+      "  initial begin\n"
+      "    drv d = new;\n"
+      "    x = 0;\n"
+      "    d.run();\n"
+      "  end\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(val, 50u);
+}
+
+// §13.3: control comes back to the enabling process after the task's delay,
+// so the statement after the call runs at the time the task ended.
+TEST(TaskSim, ClassTaskCalledThroughAHandleReturnsAfterItsDelay) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  logic [31:0] y;\n"
+      "  class drv;\n"
+      "    task run();\n"
+      "      #70;\n"
+      "    endtask\n"
+      "  endclass\n"
+      "  initial begin\n"
+      "    drv d = new;\n"
+      "    d.run();\n"
+      "    y = $time;\n"
+      "  end\n"
+      "endmodule\n",
+      "y");
+  EXPECT_EQ(val, 70u);
+}
+
+// §13.3 with §9.4.2: an event control inside the class task suspends the
+// enabling process until the edge, here the posedge another process drives
+// at time 30.
+TEST(TaskSim, ClassTaskCalledThroughAHandleWaitsForAnEdge) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  logic [31:0] x;\n"
+      "  logic clk;\n"
+      "  class drv;\n"
+      "    task run();\n"
+      "      @(posedge clk);\n"
+      "      x = $time;\n"
+      "    endtask\n"
+      "  endclass\n"
+      "  initial begin\n"
+      "    drv d = new;\n"
+      "    x = 0;\n"
+      "    d.run();\n"
+      "  end\n"
+      "  initial begin\n"
+      "    clk = 0;\n"
+      "    #30 clk = 1;\n"
+      "  end\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(val, 30u);
+}
+
+// §13.3: a class task's input argument binds for the body, and a property of
+// the object the handle refers to is written by it (§8.6), after the delay.
+TEST(TaskSim, ClassTaskCalledThroughAHandleBindsItsArgumentAndThis) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  logic [31:0] x;\n"
+      "  class drv;\n"
+      "    int count;\n"
+      "    task run(input int n);\n"
+      "      #10;\n"
+      "      count = n + 1;\n"
+      "    endtask\n"
+      "  endclass\n"
+      "  initial begin\n"
+      "    drv d = new;\n"
+      "    x = 0;\n"
+      "    d.run(41);\n"
+      "    x = d.count;\n"
+      "  end\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(val, 42u);
+}
+
 }  // namespace

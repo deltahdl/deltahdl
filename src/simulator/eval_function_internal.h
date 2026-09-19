@@ -98,14 +98,30 @@ struct ActualBindingCtx {
 // evaluator's Logic4Vec and the DpiArgValue the registry speaks lives.
 Logic4Vec EvalDpiCall(const Expr* expr, SimContext& ctx, Arena& arena);
 
+struct ClassTypeInfo;
+struct MethodCallParts;
+
+// The object and method a call through a handle names, `h.m(...)`, with the
+// class the method is defined in, so its body resolves unqualified members
+// against that level (§8.15 member shadowing across a base/derived hierarchy).
+// Resolved by ResolveInstanceMethod, defined in eval_function.cpp, which
+// answers false when the variable holds no object or the object has no such
+// method; shared with eval_instance_task.cpp, which runs a task so named as a
+// coroutine.
+struct InstanceMethodInfo {
+  ClassObject* obj = nullptr;
+  ModuleItem* method = nullptr;
+  const ClassTypeInfo* owner = nullptr;
+};
+bool ResolveInstanceMethod(const MethodCallParts& parts, SimContext& ctx,
+                           InstanceMethodInfo& info);
+
 // Runs a resolved class method on a concrete object (sets `this`, binds args,
 // writes back). Defined in eval_function.cpp; reused by eval_randomize.cpp to
 // invoke pre_randomize()/post_randomize() on the randomized object.
 Logic4Vec ExecInstanceMethodCall(ModuleItem* method, ClassObject* obj,
                                  const Expr* expr, SimContext& ctx,
                                  Arena& arena);
-
-struct ClassTypeInfo;
 
 // 8.10: target of a class-method invocation -- the method plus, for a
 // parameterized class, its bound type so the return width resolves. Shared so
