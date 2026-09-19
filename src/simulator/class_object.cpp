@@ -61,6 +61,9 @@ void ClassObject::SetProperty(std::string_view name, const Logic4Vec& val) {
     auto it = type->static_properties.find(key);
     if (it != type->static_properties.end()) {
       it->second = val;
+      // §8.9: the storage written is the class's, not this object's, so the
+      // processes watching the class (§9.4.2, `@(C::n)`) are the ones told.
+      type->NotifyStaticWatchers();
       return;
     }
   }

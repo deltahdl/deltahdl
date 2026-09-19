@@ -94,6 +94,10 @@ bool TryFuncClassPropertyWrite(const Expr* lhs, const Logic4Vec& val,
     auto it = method_cls->static_properties.find(std::string(lhs->text));
     if (it != method_cls->static_properties.end()) {
       it->second = val;
+      // §9.4.2 with §8.9: the write lands in the class's own storage, so the
+      // processes watching the class are the ones told (`@(C::n)` from a
+      // module, the bare `@(n)` from a method of C).
+      method_cls->NotifyStaticWatchers();
       return true;
     }
   }
@@ -130,6 +134,7 @@ static bool TryStaticClassNewAssign(const Stmt* stmt,
   Logic4Vec handle =
       EvalClassNew(field_type, stmt->rhs, ctx, arena, stmt->rhs->range.start);
   method_cls->static_properties[key] = handle;
+  method_cls->NotifyStaticWatchers();
   return true;
 }
 

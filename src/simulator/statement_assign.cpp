@@ -597,6 +597,10 @@ void WriteResolvedField(const FieldTarget& target, const Logic4Vec& rhs_val,
     case FieldTarget::Kind::kStatic:
       *target.slot =
           CoerceToPropertyType(target.type, target.field, rhs_val, arena);
+      // §9.4.2 with §8.9: the storage is the class's own, which no object's
+      // watchers see written, so the write is announced on the class, where
+      // an event control or a wait on `C::n` armed.
+      target.type->NotifyStaticWatchers();
       return;
     case FieldTarget::Kind::kNone:
     case FieldTarget::Kind::kNoOp:

@@ -15,8 +15,10 @@
 #include "parser/ast_stmt.h"
 #include "simulator/awaiters.h"
 #include "simulator/awaiters_event_control.h"
+#include "simulator/class_object.h"
 #include "simulator/evaluation.h"
 #include "simulator/exec_task.h"
+#include "simulator/expr_walk.h"
 #include "simulator/sim_context.h"
 #include "simulator/stmt_exec.h"
 #include "simulator/stmt_exec_internal.h"
@@ -49,6 +51,30 @@ void SubstituteSequenceEndpoints(std::unordered_set<std::string>& reads,
   }
   for (const auto& r : seq_removes) reads.erase(r);
   for (auto& a : seq_adds) reads.insert(a);
+}
+
+// §9.4.3 with §8.9: the static properties the wait condition reads through
+// the class scope operator, each added to `reads` as `C::n`, which is the
+// name AnyChangeAwaiter::AttachStaticPropertyWatcher arms on the class by.
+// CollectExprReads descends a scope resolution into its two identifiers, `C`
+// and `n`, and neither names the class's own storage: a class is not a
+// variable, and a wait on `C::n == 2` therefore armed nothing and waited for
+// ever. The two are left in the set, harmless where they name nothing and
+// dropped by the awaiter if they do not.
+void CollectStaticPropertyReads(const Expr* cond, SimContext& ctx,
+                                std::unordered_set<std::string>& reads) {
+  ForEachSubExpr(cond, [&](const Expr* e) {
+    if (e->kind != ExprKind::kMemberAccess || !e->is_scope_resolution ||
+        e->lhs == nullptr || e->lhs->kind != ExprKind::kIdentifier ||
+        e->rhs == nullptr || e->rhs->kind != ExprKind::kIdentifier)
+      return;
+    const ClassTypeInfo* cls = ctx.FindClassType(e->lhs->text);
+    if (cls == nullptr) return;
+    std::string member(e->rhs->text);
+    if (cls->static_properties.find(member) == cls->static_properties.end())
+      return;
+    reads.insert(std::string(e->lhs->text) + "::" + member);
+  });
 }
 
 struct WaitOrderStepAwaiter {
@@ -96,6 +122,7 @@ ExecTask ExecWait(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (labeled) ctx.PushStaticScope(stmt->label);
   std::unordered_set<std::string> reads;
   CollectExprReads(stmt->condition, reads);
+  CollectStaticPropertyReads(stmt->condition, ctx, reads);
 
   SubstituteSequenceEndpoints(reads, ctx);
   std::vector<std::string_view> read_vars(reads.begin(), reads.end());

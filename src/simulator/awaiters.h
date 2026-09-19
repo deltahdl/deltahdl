@@ -18,6 +18,7 @@
 #include <algorithm>
 #include <coroutine>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -451,8 +452,54 @@ struct AnyChangeAwaiter {
     auto* self = ctx.CurrentThis();
     if (self == nullptr || self->type == nullptr) return;
     if (name != "this" && self->type->FindProperty(name) == nullptr) return;
+    self->AddWatcher(WakeOnceWatcher(h, proc, fin, consumed));
+  }
+
+  // §9.4.3 with §8.9: a static property of a class is the class's own
+  // storage, which no object's watchers see written, so a wait on one arms
+  // on the class, where ClassTypeInfo::NotifyStaticWatchers announces every
+  // write to that storage. The name is `C::n` as ExecWait in
+  // src/simulator/stmt_exec_wait.cpp collects a class-scoped read, or the
+  // bare name of a static property of the running method's class, which
+  // §8.10 lets a method name unqualified. It is asked before the own-property
+  // arm: inside an instance method ClassTypeInfo::FindProperty finds the
+  // static property too, and arming on the object there would miss every
+  // write made through `C::n` or from a static method. Answers whether it
+  // armed. Before this `wait (C::n == 2)` collected the names `C` and `n`,
+  // neither a variable nor a property of any object in hand, armed nothing
+  // and waited for ever.
+  bool AttachStaticPropertyWatcher(std::string_view name,
+                                   std::coroutine_handle<> h, Process* proc,
+                                   const std::shared_ptr<bool>& fin,
+                                   const std::shared_ptr<bool>& consumed) {
+    const ClassTypeInfo* cls = ctx.CurrentMethodClass();
+    std::string_view member = name;
+    auto scope = name.find("::");
+    if (scope != std::string_view::npos) {
+      cls = ctx.FindClassType(name.substr(0, scope));
+      member = name.substr(scope + 2);
+    }
+    if (cls == nullptr || cls->static_properties.find(std::string(member)) ==
+                              cls->static_properties.end())
+      return false;
+    cls->AddStaticWatcher(WakeOnceWatcher(h, proc, fin, consumed));
+    return true;
+  }
+
+  // The watcher body the two class arms above share: it wakes the process
+  // without comparing values, as the arm for a class-typed variable does,
+  // since the wait statement re-evaluates its condition in the process's own
+  // context once resumed and parks again if it is still false. The liveness
+  // guards are those of AttachChangeWatcher: the shared `fin` when the frame
+  // may already be freed, else the frame's own done() flag, then the
+  // process, then the guard a sibling arm of the same suspension may have
+  // set.
+  std::function<bool()> WakeOnceWatcher(std::coroutine_handle<> h,
+                                        Process* proc,
+                                        const std::shared_ptr<bool>& fin,
+                                        const std::shared_ptr<bool>& consumed) {
     auto* ctx_ptr = &ctx;
-    self->AddWatcher([h, proc, ctx_ptr, fin, consumed]() mutable {
+    return [h, proc, ctx_ptr, fin, consumed]() mutable {
       if (fin) {
         if (*fin) return true;
       } else if (h.done()) {
@@ -463,7 +510,7 @@ struct AnyChangeAwaiter {
       *consumed = true;
       EventAwaiter::ResumeMaybeReactive(h, proc, *ctx_ptr);
       return true;
-    });
+    };
   }
 
   void await_suspend(std::coroutine_handle<> h) {
@@ -483,7 +530,8 @@ struct AnyChangeAwaiter {
       auto* var =
           NameDenotesVariable(name, ctx) ? ctx.FindVariable(name) : nullptr;
       if (!var) {
-        AttachOwnPropertyWatcher(name, h, proc, fin, consumed);
+        if (!AttachStaticPropertyWatcher(name, h, proc, fin, consumed))
+          AttachOwnPropertyWatcher(name, h, proc, fin, consumed);
         continue;
       }
       // The name is in hand only here, and the decision it feeds is the same

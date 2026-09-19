@@ -199,6 +199,28 @@ struct ClassTypeInfo {
   // defining class; reported by the vpiClassTypespec iteration on a class defn.
   std::vector<const ClassTypespecInfo*> direct_specializations;
 
+  // §9.4.2 with §8.9: the processes waiting on a change of a static property
+  // of the class -- an event control or a wait whose operand is `C::n`, or the
+  // bare `n` inside a method of C. A static property is the class's own
+  // storage, static_properties above, which no object's watchers see written:
+  // a write to it announces itself here through NotifyStaticWatchers, from
+  // every path that stores into that map. The convention is Variable's and
+  // ClassObject's: a watcher answering true is retired, one answering false
+  // stays armed. mutable as static_properties is, the type descriptor being
+  // referenced as const while the watch is armed and fired.
+  mutable std::vector<std::function<bool()>> static_watchers;
+
+  void AddStaticWatcher(std::function<bool()> cb) const {
+    static_watchers.push_back(std::move(cb));
+  }
+
+  void NotifyStaticWatchers() const {
+    auto pending = std::move(static_watchers);
+    for (auto& cb : pending) {
+      if (!cb()) static_watchers.push_back(std::move(cb));
+    }
+  }
+
   int FindVTableIndex(std::string_view mname) const;
 
   bool IsA(const ClassTypeInfo* other) const;

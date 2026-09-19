@@ -74,6 +74,17 @@ struct MemberOperand {
   const std::shared_ptr<bool>& consumed;
 };
 
+// §9.4.2 with §8.9: the per-operand watch state for an event control on a
+// static property of a class: the class (see ResolveStaticPropertyClass), the
+// property's name, the baseline the change is measured from, and the guard
+// the operands of one event control share.
+struct StaticPropertyOperand {
+  const ClassTypeInfo* cls;
+  std::string_view member;
+  const std::shared_ptr<Logic4Snapshot>& prev;
+  const std::shared_ptr<bool>& consumed;
+};
+
 // The shared per-operand watch state for a compound (non-identifier) event
 // expression operand: the previous evaluated value, the once-only consumed
 // guard shared across sibling operand watchers, and the signal expression to
@@ -249,6 +260,32 @@ inline uint64_t ResolveMemberObjectHandle(const Expr* signal, SimContext& ctx,
       obj->type->FindProperty(member) == nullptr)
     return kNullClassHandle;
   return obj->handle;
+}
+
+// §9.4.2 with §8.9 and §8.10: the class whose static property the operand
+// names, and the property, when the operand is one -- `C::n` through the
+// class scope operator, or the bare `n` inside a method of C, which §8.10
+// lets a method name unqualified -- else null. A static property is the
+// class's own storage, one for every object and for no object at all, so what
+// a process waiting on it has to arm on is the class, not an object: a write
+// through `C::n` reaches no object's watchers, and a static method has no
+// `this` to arm on in the first place.
+inline const ClassTypeInfo* ResolveStaticPropertyClass(
+    const Expr* signal, SimContext& ctx, std::string_view& member) {
+  const ClassTypeInfo* cls = nullptr;
+  if (signal->kind == ExprKind::kIdentifier) {
+    member = signal->text;
+    cls = ctx.CurrentMethodClass();
+  } else if (signal->kind == ExprKind::kMemberAccess &&
+             signal->is_scope_resolution && signal->lhs != nullptr &&
+             signal->lhs->kind == ExprKind::kIdentifier) {
+    member = MemberAccessField(signal);
+    cls = ctx.FindClassType(signal->lhs->text);
+  }
+  if (cls == nullptr || cls->static_properties.find(std::string(member)) ==
+                            cls->static_properties.end())
+    return nullptr;
+  return cls;
 }
 
 struct EventAwaiter {
@@ -572,6 +609,20 @@ struct EventAwaiter {
     const ClassObject* obj = target.ctx.GetClassObject(op.handle);
     if (obj == nullptr) return true;
     Logic4Vec cur = obj->GetProperty(op.member, target.ctx.GetArena());
+    return ResumeOnReadBack(
+        h, cur, CompoundOperand{op.prev, op.consumed, nullptr}, spec, target);
+  }
+
+  // The gates a watcher that reads its operand back on each notification
+  // applies to the value read, `cur`: §9.4.2's change of value against the
+  // baseline, the edge on the LSB where one is asked for, and §9.4.2.3's iff
+  // condition. On a genuine trigger it marks the shared guard consumed and
+  // resumes the process once; the answer is the AddWatcher convention. The
+  // operand bundle carries only the baseline and the guard here; its signal
+  // is unused, the caller having read the value itself.
+  static bool ResumeOnReadBack(std::coroutine_handle<> h, const Logic4Vec& cur,
+                               const CompoundOperand& op, const EdgeSpec& spec,
+                               ResumeTarget target) {
     if (Logic4VecBitsEqual(cur, op.prev->Get())) return false;
     bool edge_passes = spec.edge == Edge::kNone ||
                        CheckEdgeOnValues(op.prev->Get(), cur, spec.edge);
@@ -585,9 +636,56 @@ struct EventAwaiter {
     return true;
   }
 
+  // §9.4.2 with §8.9: the watcher body for a static property of a class. It
+  // is armed on the class, which every write to the class's own storage
+  // reaches through ClassTypeInfo::NotifyStaticWatchers, and reads the
+  // property back from that storage at each notification. Before this
+  // `@(C::n)` resolved to no variable and no object, so the operand was
+  // skipped and the process waited for ever.
+  static bool EvalStaticPropertyWatcher(std::coroutine_handle<> h,
+                                        const StaticPropertyOperand& op,
+                                        const EdgeSpec& spec,
+                                        ResumeTarget target) {
+    if (*op.consumed) return true;
+    if (target.proc && !target.proc->active) return true;
+    if (target.proc && target.proc->is_suspended) return false;
+    auto it = op.cls->static_properties.find(std::string(op.member));
+    if (it == op.cls->static_properties.end()) return true;
+    return ResumeOnReadBack(h, it->second,
+                            CompoundOperand{op.prev, op.consumed, nullptr},
+                            spec, target);
+  }
+
+  // Arms on the class when the operand names a static property, answering
+  // whether it did. It is asked before the object form: inside an instance
+  // method the bare name of a static property is also found by
+  // ClassTypeInfo::FindProperty, and arming on the object there would miss
+  // every write made through `C::n` or from a static method.
+  bool AttachStaticPropertyWatcher(const EventExpr& ev,
+                                   std::coroutine_handle<> h, Process* proc,
+                                   const std::shared_ptr<bool>& consumed) {
+    std::string_view member;
+    const ClassTypeInfo* cls =
+        ResolveStaticPropertyClass(ev.signal, ctx, member);
+    if (cls == nullptr) return false;
+    auto prev = std::make_shared<Logic4Snapshot>();
+    prev->Capture(cls->static_properties.at(std::string(member)));
+    auto* ctx_ptr = &ctx;
+    const Expr* iff_cond = ev.iff_condition;
+    Edge edge = ev.edge;
+    cls->AddStaticWatcher([h, cls, member, prev, consumed, edge, iff_cond,
+                           ctx_ptr, proc]() mutable {
+      return EvalStaticPropertyWatcher(
+          h, StaticPropertyOperand{cls, member, prev, consumed},
+          EdgeSpec{edge, iff_cond}, ResumeTarget{*ctx_ptr, proc});
+    });
+    return true;
+  }
+
   void AttachClassMemberWatcher(const EventExpr& ev, std::coroutine_handle<> h,
                                 Process* proc,
                                 const std::shared_ptr<bool>& consumed) {
+    if (AttachStaticPropertyWatcher(ev, h, proc, consumed)) return;
     std::string_view member;
     uint64_t handle = ResolveMemberObjectHandle(ev.signal, ctx, member);
     if (handle == kNullClassHandle) return;

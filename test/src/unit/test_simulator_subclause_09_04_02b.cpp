@@ -8,7 +8,10 @@
 // to a third writer, the increment and decrement operators, whose store
 // notified nobody at all: the bare `i++` statement, the prefix and decrement
 // spellings, a for-loop step, and a target held by force, which has to suppress
-// the notification along with the store.
+// the notification along with the store. The last three cases read it against
+// a fourth storage, a static class property (§8.9), whose writes through the
+// class scope operator and from a static method announced themselves to no
+// watcher at all.
 
 #include <gtest/gtest.h>
 
@@ -295,6 +298,104 @@ TEST(EventControlSim, OwnPropertyInsideAMethodWakesAnEventControl) {
       f, "result");
   ASSERT_NE(result, nullptr);
   EXPECT_EQ(result->value.ToUint64(), 336u);
+}
+
+// §9.4.2 with §8.9: a static property is one storage for the whole class,
+// named through the class scope operator, and an event control on `C::n`
+// wakes when another process writes it through the same operator. The
+// property is neither a variable nor a member of any object in hand, so the
+// operand resolved to nothing and the process never woke, leaving the
+// sentinel in place; the fix arms on the class, whose storage every static
+// write announces. The wake is at time 2 with the value just written, and
+// 21 is what neither the sentinel nor a wake on the second write gives.
+TEST(EventControlSim, StaticPropertyThroughTheClassScopeWakesAnEventControl) {
+  SimFixture f;
+  auto* woke = RunAndFindVar(
+      "class C;\n"
+      "  static int n;\n"
+      "endclass\n"
+      "module t;\n"
+      "  int woke;\n"
+      "  initial begin\n"
+      "    woke = 99;\n"
+      "    @(C::n) woke = $time * 10 + C::n;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    #2 C::n = 1;\n"
+      "    #2 C::n = 2;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "woke");
+  ASSERT_NE(woke, nullptr);
+  EXPECT_EQ(woke->value.ToUint64(), 21u);
+}
+
+// §9.4.3 with §8.9: the wait statement's condition reads the static property
+// through the class scope operator, and the process resumes when a write
+// makes the condition true. The read set of the condition held `C` and `n`
+// as two bare names, neither of which designates the class's storage, so
+// nothing was armed and the sentinel stayed. The condition is false at the
+// first write and true at the second, so 4 is the one answer of a wait that
+// both wakes and re-evaluates.
+TEST(EventControlSim, WaitOnAStaticPropertyThroughTheClassScopeResumes) {
+  SimFixture f;
+  auto* waited = RunAndFindVar(
+      "class C;\n"
+      "  static int n;\n"
+      "endclass\n"
+      "module t;\n"
+      "  int waited;\n"
+      "  initial begin\n"
+      "    waited = 99;\n"
+      "    wait (C::n == 2) waited = $time;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    #2 C::n = 1;\n"
+      "    #2 C::n = 2;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "waited");
+  ASSERT_NE(waited, nullptr);
+  EXPECT_EQ(waited->value.ToUint64(), 4u);
+}
+
+// §9.4.2 with §8.9 and §8.10: the write comes from a static method of the
+// class, which names the property by its bare name, and it wakes both a
+// module-level `@(C::n)` and a bare `@(n)` inside an instance method of the
+// same class. The bare form used to arm on the object the method runs on,
+// which a static write never announces to; the static form armed on nothing.
+// The module-level wake records 3 * 10 + 5 and the method's wake the time 3,
+// so 3503 is reached only when both arms are on the class's storage: a
+// stranded static form leaves 3, a stranded bare form 3500.
+TEST(EventControlSim, StaticPropertyWrittenFromAStaticMethodWakesBothForms) {
+  SimFixture f;
+  auto* result = RunAndFindVar(
+      "class C;\n"
+      "  static int n;\n"
+      "  int woke_bare;\n"
+      "  static function void set(int v);\n"
+      "    n = v;\n"
+      "  endfunction\n"
+      "  task watch();\n"
+      "    @(n) woke_bare = $time;\n"
+      "  endtask\n"
+      "endclass\n"
+      "module t;\n"
+      "  C c;\n"
+      "  int woke_scope, result;\n"
+      "  initial begin\n"
+      "    c = new;\n"
+      "    fork\n"
+      "      c.watch();\n"
+      "      @(C::n) woke_scope = $time * 10 + C::n;\n"
+      "      #3 C::set(5);\n"
+      "    join\n"
+      "    result = woke_scope * 100 + c.woke_bare;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "result");
+  ASSERT_NE(result, nullptr);
+  EXPECT_EQ(result->value.ToUint64(), 3503u);
 }
 
 }  // namespace
