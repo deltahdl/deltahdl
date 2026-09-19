@@ -662,8 +662,9 @@ TEST(NonblockingAssignSim, PropertyNamedBareOrThroughThisInAMethod) {
 // intra-assignment delay `<= #2`. The task reads its properties back at times
 // 1 and 2 in the Active region: z holds 5 from the NBA region of time 0, and
 // w still 0 at time 2, its update landing in that step's NBA region after the
-// statement that reads it (§4.4.2.3) -- so seen is 50 then 500. The module
-// reads both through the handle at time 3, where w is 9.
+// statement that reads it (the NBA region of §4.4.2.4 follows the Active region
+// of §4.4.2.2) -- so seen is 50 then 500. The module reads both through the
+// handle at time 3, where w is 9.
 TEST(NonblockingAssignSim, PropertyNamedInAClassTaskWithAndWithoutADelay) {
   auto val = RunAndGet(
       "module t;\n"
