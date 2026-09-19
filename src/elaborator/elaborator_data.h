@@ -226,6 +226,10 @@ class ElaboratorData {
   PropertyRegistry property_registry_;
 
   std::unordered_map<std::string_view, const ModuleItem*> func_decls_;
+  // §6.14 with §35.5.5: the functions of the module declared to return a
+  // chandle, native and imported, whose call is a chandle for the assignment
+  // rules ValidateChandleOps holds; filled by it for each module.
+  std::unordered_set<std::string_view> chandle_result_funcs_;
   std::unordered_map<std::string_view, std::string_view> var_named_types_;
   std::set<std::pair<std::string_view, std::string_view>> alias_pairs_;
   // §10.11: flag a bit-level alias correspondence specified more than once

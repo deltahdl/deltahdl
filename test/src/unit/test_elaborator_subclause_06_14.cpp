@@ -497,4 +497,64 @@ TEST(ChandleDataType, ChandleAdditionInRandsequenceCodeBlock_Error) {
                             "operator is not allowed on chandle", 6, "6.14"));
 }
 
+// §6.14 (printed page 111 of ~/LRM.pdf): a chandle is assigned from another
+// chandle, and chandles are returned from functions; §35.5.5 (printed 979)
+// admits chandle as an imported function's result. The result of a call to a
+// function declared `chandle` is therefore a chandle, and `keep = give();`
+// is an assignment between chandles. The check knew a chandle by a variable's
+// name alone, so the call was "not a chandle" and the assignment was refused.
+TEST(ChandleDataType, ChandleAssignedFromAnImportedFunctionResult_Ok) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  import \"DPI-C\" function chandle give();\n"
+      "  chandle keep;\n"
+      "  initial keep = give();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "chandle can only be assigned from another "
+                             "chandle or null",
+                             4, "6.14"));
+}
+
+// §6.14: the same for a native function declared to return a chandle.
+TEST(ChandleDataType, ChandleAssignedFromANativeFunctionResult_Ok) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  chandle keep;\n"
+      "  function chandle mk();\n"
+      "    return null;\n"
+      "  endfunction\n"
+      "  initial keep = mk();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "chandle can only be assigned from another "
+                             "chandle or null",
+                             6, "6.14"));
+}
+
+// §6.14: and the other direction the same knowledge settles -- a chandle
+// result assigned to a variable of another type is the assignment the
+// subclause forbids, which the call's opacity had let through.
+TEST(ChandleDataType, ImportedFunctionChandleResultAssignedToInt_Error) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  import \"DPI-C\" function chandle give();\n"
+      "  chandle keep;\n"
+      "  int r;\n"
+      "  initial r = give();\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "chandle cannot be assigned to a non-chandle "
+                            "variable",
+                            5, "6.14"));
+}
+
 }  // namespace

@@ -138,13 +138,24 @@ static bool YieldsChandle(
          arrays.find(ExprIdent(e->base)) != arrays.end();
 }
 
+// §6.14 has chandles returned from functions and §35.5.5 admits chandle as
+// an imported function's result, so a call to a function declared `chandle`
+// yields a chandle: `keep = give();` is an assignment between chandles, and
+// `r = give();` into an int is the assignment to another type §6.14 forbids.
+static bool CallYieldsChandle(
+    const Expr* e, const std::unordered_set<std::string_view>& chandle_funcs) {
+  return e != nullptr && e->kind == ExprKind::kCall &&
+         chandle_funcs.count(e->callee) != 0;
+}
+
 void Elaborator::WalkStmtsForChandleOps(const Stmt* s) {
   if (!s) return;
   if ((s->kind == StmtKind::kBlockingAssign ||
        s->kind == StmtKind::kNonblockingAssign) &&
       s->lhs && s->rhs) {
     bool lhs_ch = YieldsChandle(s->lhs, var_types_, var_array_info_);
-    bool rhs_ch = YieldsChandle(s->rhs, var_types_, var_array_info_);
+    bool rhs_ch = YieldsChandle(s->rhs, var_types_, var_array_info_) ||
+                  CallYieldsChandle(s->rhs, chandle_result_funcs_);
     // §10.10: a concatenation assigned to a chandle array or queue is an
     // unpacked array concatenation, not a scalar chandle assignment; its
     // per-element null legality is checked in CheckNullItemInArrayConcatAssign,
@@ -189,6 +200,14 @@ void Elaborator::ValidateChandleOps(const ModuleDecl* decl) {
     }
   }
   if (!has_chandle) return;
+  chandle_result_funcs_.clear();
+  for (const auto* item : decl->items) {
+    bool is_func = item->kind == ModuleItemKind::kFunctionDecl ||
+                   item->kind == ModuleItemKind::kDpiImport;
+    if (is_func && item->return_type.kind == DataTypeKind::kChandle) {
+      chandle_result_funcs_.insert(item->name);
+    }
+  }
   for (const auto* item : decl->items) {
     bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body) {
