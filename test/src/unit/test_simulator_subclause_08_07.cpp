@@ -583,4 +583,74 @@ TEST(ClassConstructorSim, InitializerOfAnUnsizedTypeIsOwnedUnderTheScopedKey) {
   EXPECT_EQ(var->value.ToString(), "10101010xxxx1011");
 }
 
+// A.2.4 gives class_new a list_of_arguments, and A.8.2 lets that list bind an
+// argument by the formal's name. The named values below are written in the
+// reverse of the formals' order, and the second call carries one of them after
+// an ordered one, so a binding that took them by position answers 3*10+5 = 35
+// and 4*10+9 = 49 rather than 53 and 94.
+TEST(ClassConstructorSim, NewCallBindsArgumentsByName) {
+  EXPECT_EQ(RunAndGet("class Packet;\n"
+                      "  int command;\n"
+                      "  int address;\n"
+                      "  function new(int cmd, int addr);\n"
+                      "    command = cmd;\n"
+                      "    address = addr;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    Packet p;\n"
+                      "    p = new(.addr(3), .cmd(5));\n"
+                      "    result = p.command * 10 + p.address;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            53u);
+}
+
+TEST(ClassConstructorSim, NewCallBindsAnOrderedThenANamedArgument) {
+  EXPECT_EQ(RunAndGet("class Packet;\n"
+                      "  int command;\n"
+                      "  int address;\n"
+                      "  function new(int cmd, int addr = 4);\n"
+                      "    command = cmd;\n"
+                      "    address = addr;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    Packet p;\n"
+                      "    p = new(9, .addr(4));\n"
+                      "    result = p.command * 10 + p.address;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            94u);
+}
+
+// §13.5.4: a named argument written with no value takes the formal's default,
+// so `.addr()` leaves addr at 7 while `.cmd(2)` beside it is bound.
+TEST(ClassConstructorSim, NewCallNamedArgumentWithoutAValueTakesTheDefault) {
+  EXPECT_EQ(RunAndGet("class Packet;\n"
+                      "  int command;\n"
+                      "  int address;\n"
+                      "  function new(int cmd, int addr = 7);\n"
+                      "    command = cmd;\n"
+                      "    address = addr;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    Packet p;\n"
+                      "    p = new(.addr(), .cmd(2));\n"
+                      "    result = p.command * 10 + p.address;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            27u);
+}
+
 }  // namespace

@@ -284,7 +284,11 @@ Expr* Parser::ParseNewExpr() {
     Expect(TokenKind::kRBracket, Subclause("7.5.1"));
     if (Check(TokenKind::kLParen)) ParseParenList(expr->args);
   } else if (Check(TokenKind::kLParen)) {
-    ParseParenList(expr->args);
+    // A.2.4 gives class_new a list_of_arguments, the same production a
+    // subroutine call takes, so the named forms A.8.2 spells are read here as
+    // ParseCallExpr reads them; the dynamic_array_new branch above keeps its
+    // single parenthesized expression.
+    ParseListOfArguments(expr);
   }
 
   if (StartsShallowCopySource()) expr->lhs = ParseExpr();
@@ -799,20 +803,12 @@ void Parser::ParseCallArgs(Expr* call) {
 }
 
 Expr* Parser::ParseCallExpr(Expr* callee) {
-  Expect(TokenKind::kLParen, Subclause("13.5"));
   auto* call = arena_.Create<Expr>();
   call->kind = ExprKind::kCall;
   call->callee = callee->text;
   call->lhs = callee;
   call->range.start = callee->range.start;
-  if (!Check(TokenKind::kRParen)) {
-    if (Check(TokenKind::kDot)) {
-      ParseTrailingNamedArgs(call);
-    } else {
-      ParseCallArgs(call);
-    }
-  }
-  Expect(TokenKind::kRParen, Subclause("13.5"));
+  ParseListOfArguments(call);
   CheckRandomizeArgList(call);
   return call;
 }

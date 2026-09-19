@@ -62,6 +62,22 @@ Expr* Parser::ParseStreamingConcat(TokenKind dir) {
   return sc;
 }
 
+// A.8.2's `( list_of_arguments )` of a subroutine call or a class_new: the
+// list is ordered and then named, or named from its first element, and either
+// may be empty. Each argument lands in call->args, and a named one records its
+// name in call->arg_names as well.
+void Parser::ParseListOfArguments(Expr* call) {
+  Expect(TokenKind::kLParen, Subclause("13.5"));
+  if (!Check(TokenKind::kRParen)) {
+    if (Check(TokenKind::kDot)) {
+      ParseTrailingNamedArgs(call);
+    } else {
+      ParseCallArgs(call);
+    }
+  }
+  Expect(TokenKind::kRParen, Subclause("13.5"));
+}
+
 void Parser::ParseNamedArg(Expr* call) {
   Expect(TokenKind::kDot, Subclause("13.5.4"));
   auto name_tok = Expect(TokenKind::kIdentifier, Subclause("13.5.4"));

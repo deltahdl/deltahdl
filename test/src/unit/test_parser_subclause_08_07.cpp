@@ -3,6 +3,7 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
+#include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
 
 using namespace delta;
@@ -144,6 +145,80 @@ TEST(ClassConstructorParsing, DeclarationClassNewNoArgs) {
       "endclass\n"
       "module m;\n"
       "  C c = new;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// A.2.4 spells class_new `[ class_scope ] new [ ( list_of_arguments ) ]`, and
+// A.8.2 gives list_of_arguments a form that is named from its first element
+// and a form that is ordered and then named. The three tests below read a
+// `new` call of each form, and the fourth one whose named argument carries no
+// value, which A.8.2 allows as `. identifier ( )`.
+TEST(ClassConstructorParsing, NewCallNamedFromTheFirstArgument) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin obj = new(.orig_type(t), .full_inst_path(p)); end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kCall);
+  EXPECT_EQ(stmt->rhs->text, "new");
+  ASSERT_EQ(stmt->rhs->arg_names.size(), 2u);
+  EXPECT_EQ(stmt->rhs->arg_names[0], "orig_type");
+  EXPECT_EQ(stmt->rhs->arg_names[1], "full_inst_path");
+  ASSERT_EQ(stmt->rhs->args.size(), 2u);
+  ASSERT_NE(stmt->rhs->args[0], nullptr);
+  EXPECT_EQ(stmt->rhs->args[0]->text, "t");
+  ASSERT_NE(stmt->rhs->args[1], nullptr);
+  EXPECT_EQ(stmt->rhs->args[1]->text, "p");
+}
+
+TEST(ClassConstructorParsing, NewCallOrderedThenNamed) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin obj = new(1, 2, .c(3)); end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kCall);
+  EXPECT_EQ(stmt->rhs->args.size(), 3u);
+  ASSERT_EQ(stmt->rhs->arg_names.size(), 1u);
+  EXPECT_EQ(stmt->rhs->arg_names[0], "c");
+}
+
+TEST(ClassConstructorParsing, NewCallNamedArgumentWithoutAValue) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin obj = new(.a(), .b(1)); end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kCall);
+  ASSERT_EQ(stmt->rhs->arg_names.size(), 2u);
+  ASSERT_EQ(stmt->rhs->args.size(), 2u);
+  EXPECT_EQ(stmt->rhs->args[0], nullptr);
+  ASSERT_NE(stmt->rhs->args[1], nullptr);
+}
+
+TEST(ClassConstructorParsing, DeclarationNewCallNamedArguments) {
+  auto r = Parse(
+      "class C;\n"
+      "  function new(int a, int b);\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  C c = new(.b(2), .a(1));\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);

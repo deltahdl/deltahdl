@@ -673,6 +673,7 @@ class Parser {
   void WarnSizedOverflow(const Token& tok);
   Expr* ParseCallExpr(Expr* callee);
   void CheckRandomizeArgList(const Expr* call);
+  void ParseListOfArguments(Expr* call);
   void ParseCallArgs(Expr* call);
   void ParseNamedArg(Expr* call);
   void ParseTrailingNamedArgs(Expr* call);
