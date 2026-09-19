@@ -1774,14 +1774,16 @@ jobs:
   # the step, and one that does not compile on its own fails it the same way.
   #
   # src/simulator/vpi_user.h is the one header both finds leave out. It is the
-  # C include file Annex K.2 of IEEE 1800-2023 prints, and the annex has it
-  # include <stdint.h> for the int64_t and uint64_t its PLI_INT64 and
-  # PLI_UINT64 are typedefs of; read as C++, which -x c++ makes every header
-  # here, the tool names <cstdint> as the provider of those two names and asks
-  # for an include the annex does not print. The file's includes are the
-  # standard's, and assert-vpi-user-compiles-as-c is the check on them: it
-  # compiles the file as the C the annex writes it in, where <stdint.h> is
-  # where int64_t comes from.
+  # C include file Annex K.2 of IEEE 1800-2023 prints, and the annex's
+  # portability help (printed page 1306) selects by platform the header that
+  # provides the int64_t and uint64_t its PLI_INT64 and PLI_UINT64 are
+  # typedefs of: <stdint.h> under __MINGW32__, <inttypes.h> under __linux,
+  # <sys/types.h> otherwise, and MSVC's own typedefs. Read as C++, which
+  # -x c++ makes every header here, the tool names <cstdint> as the provider
+  # of those two names and asks for an include the annex does not print. The
+  # file's includes are the standard's, and assert-vpi-user-compiles-as-c is
+  # the check on them: it compiles the file as the C the annex writes it in,
+  # on Linux, where <inttypes.h> is where int64_t comes from.
   clang-include-cleaner-headers:
     needs: [cache-googletest]
     runs-on: ubuntu-latest
