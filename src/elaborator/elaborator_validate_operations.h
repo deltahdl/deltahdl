@@ -128,6 +128,13 @@ class ElaboratorOperationRules : public ElaboratorData {
 
   void ValidateUnsizedInConcat(const ModuleDecl* decl);
   void CheckVarInitUnsizedInConcat(const ModuleItem* item);
+  // §10.10 with §7.10.4: whether `lhs` designates an unpacked array, so that
+  // a `{...}` assigned to it is an unpacked array concatenation and not the
+  // vector concatenation §11.4.12 keeps an unsized constant out of. A declared
+  // array by its bare name, a property of an object through a handle (`h.q`,
+  // §8.5 putting no restriction on a property's type) and a static property
+  // through its class (`C::s`, §8.9) each answer yes.
+  bool IsUnpackedArrayConcatTarget(const Expr* lhs) const;
   void WalkExprForUnsizedInConcat(const Expr* expr);
   void WalkStmtsForUnsizedInConcat(const Stmt* s);
 

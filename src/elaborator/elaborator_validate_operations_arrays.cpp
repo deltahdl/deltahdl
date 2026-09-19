@@ -1,13 +1,17 @@
 #include <cstdint>
+#include <string_view>
 #include <unordered_map>
 
 #include "common/diagnostic.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/elaborator_validate_operations.h"
 #include "elaborator/type_eval.h"
 #include "lexer/token.h"
+#include "parser/ast_class.h"
+#include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
@@ -512,15 +516,68 @@ void ElaboratorOperationRules::WalkExprForUnsizedInConcat(const Expr* expr) {
   for (auto* arg : expr->args) WalkExprForUnsizedInConcat(arg);
 }
 
+// §8.13: a property a base class declares is a property of the derived class,
+// so `name` is looked for from `cls` up the chain, the nearest declaration
+// winning as ordinary member lookup has it. A parameter is carried as a
+// property member too (ClassMember::is_param) and is no property.
+static const ClassMember* FindClassProperty(const ClassDecl* cls,
+                                            std::string_view name,
+                                            const CompilationUnit* unit) {
+  for (const auto* c = cls; c != nullptr;
+       c = c->base_class.empty() ? nullptr
+                                 : FindClassDecl(c->base_class, unit)) {
+    for (const auto* m : c->members) {
+      if (m->kind == ClassMemberKind::kProperty && !m->is_param &&
+          m->name == name) {
+        return m;
+      }
+    }
+  }
+  return nullptr;
+}
+
+// The elaborator classified a `{...}` right-hand side by its target and knew a
+// bare name alone, so `h.q = {4, 5}` and `C::s = {5, 15, 25}` on a queue
+// property were reported as vector concatenations of unsized constants where
+// the same `q = {q, 6}` on a declared queue was admitted. The handle's class is
+// what class_var_types_ records for the name, a module-scope handle's from
+// ValidateVarDeclTypes and a block-local one's from WalkStmtsForClassHandleOps,
+// which runs earlier in the validation order; `C::s` names the class itself.
+// The member is then read off the class's declaration: a property with an
+// unpacked dimension -- a queue's `[$]` among them -- is an unpacked array.
+bool ElaboratorOperationRules::IsUnpackedArrayConcatTarget(
+    const Expr* lhs) const {
+  if (lhs == nullptr) return false;
+  if (lhs->kind == ExprKind::kIdentifier) {
+    return var_array_info_.count(lhs->text) > 0;
+  }
+  if (lhs->kind != ExprKind::kMemberAccess || lhs->lhs == nullptr ||
+      lhs->rhs == nullptr || lhs->lhs->kind != ExprKind::kIdentifier ||
+      lhs->rhs->kind != ExprKind::kIdentifier) {
+    return false;
+  }
+  std::string_view cls_name;
+  if (lhs->is_scope_resolution) {
+    if (class_names_.count(lhs->lhs->text) == 0) return false;
+    cls_name = lhs->lhs->text;
+  } else {
+    auto it = class_var_types_.find(lhs->lhs->text);
+    if (it == class_var_types_.end()) return false;
+    cls_name = it->second;
+  }
+  const ClassMember* prop =
+      FindClassProperty(FindClassDecl(cls_name, unit_), lhs->rhs->text, unit_);
+  return prop != nullptr && !prop->unpacked_dims.empty();
+}
+
 void ElaboratorOperationRules::WalkStmtsForUnsizedInConcat(const Stmt* s) {
   if (!s) return;
 
   bool is_array_concat_rhs = s->rhs &&
                              s->rhs->kind == ExprKind::kConcatenation &&
-                             s->lhs && s->lhs->kind == ExprKind::kIdentifier &&
                              (s->kind == StmtKind::kBlockingAssign ||
                               s->kind == StmtKind::kNonblockingAssign) &&
-                             var_array_info_.count(s->lhs->text);
+                             IsUnpackedArrayConcatTarget(s->lhs);
   if (is_array_concat_rhs) {
     for (auto* elem : s->rhs->elements) WalkExprForUnsizedInConcat(elem);
   } else {

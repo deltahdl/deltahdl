@@ -9,6 +9,7 @@
 #include "helpers_lower_run.h"
 #include "helpers_queue.h"
 #include "helpers_queue_assign_assert.h"
+#include "helpers_scheduler.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "simulator/lowerer.h"
@@ -642,6 +643,77 @@ TEST(QueueAssign, SourceConcatItemNamingArrayGivesQueueItsOwnElementWords) {
   ASSERT_EQ(q->elements.size(), 2u);
   ASSERT_NO_FATAL_FAILURE(ExpectOwnWordsCopy(a0->value, q->elements[0]));
   EXPECT_EQ(q->elements[0].words[0].aval, 0xA5u);
+}
+
+// §7.10.4 with §8.5: the target of a whole-queue assignment may be a queue
+// property reached through a handle from the module, and §10.10 makes the
+// `{4, 5}` assigned to it an unpacked array concatenation, where an unsized
+// literal is an element and not the §11.4.12 operand a vector concatenation
+// forbids. The elaborator classified the concatenation by its target and knew
+// only a bare name as a queue, so `h.q = {4, 5}` was refused as a vector
+// concatenation of unsized constants; RunAndGet fails on that report. The
+// value reads the count and both elements: 2, 4 and 5 make 245.
+TEST(QueueAssign, ConcatOfUnsizedLiteralsThroughAHandleFillsTheProperty) {
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  class C;\n"
+                      "    int q[$];\n"
+                      "  endclass\n"
+                      "  C h;\n"
+                      "  int out;\n"
+                      "  initial begin\n"
+                      "    h = new;\n"
+                      "    h.q = {4, 5};\n"
+                      "    out = h.q.size() * 100 + h.q[0] * 10 + h.q[1];\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "out"),
+            245u);
+}
+
+// §7.10.4: `h.q = {h.q, 6}` appends to the property through the handle, the
+// item naming the queue contributing its elements (§10.10) and the unsized 6
+// contributing one more. The elaborator refused this shape with the same
+// §11.4.12 report. After a fill of 7, 2 and 9 in a method the queue holds 4
+// elements, 7 first and 6 last: 476.
+TEST(QueueAssign, ConcatNamingThePropertyThroughAHandleAppendsToIt) {
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  class C;\n"
+                      "    int q[$];\n"
+                      "    function void fill();\n"
+                      "      q = {7, 2, 9};\n"
+                      "    endfunction\n"
+                      "  endclass\n"
+                      "  C h;\n"
+                      "  int out;\n"
+                      "  initial begin\n"
+                      "    h = new;\n"
+                      "    h.fill();\n"
+                      "    h.q = {h.q, 6};\n"
+                      "    out = h.q.size() * 100 + h.q[0] * 10 + h.q[3];\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "out"),
+            476u);
+}
+
+// §8.9 with §7.10.4: a static queue property is assigned through the class
+// scope operator, `C::s = {5, 15, 25}`, and the same unpacked array
+// concatenation rule admits the unsized literals. The elaborator did not know
+// the `C::s` target as a queue and refused it. The value reads 3 for the size,
+// 5 for the first element and 25 for the last: 3075.
+TEST(QueueAssign, ConcatToAStaticQueuePropertyThroughTheClassScope) {
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  class C;\n"
+                      "    static int s[$];\n"
+                      "  endclass\n"
+                      "  int out;\n"
+                      "  initial begin\n"
+                      "    C::s = {5, 15, 25};\n"
+                      "    out = C::s.size() * 1000 + C::s[0] * 10 + C::s[2];\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "out"),
+            3075u);
 }
 
 }  // namespace
