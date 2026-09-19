@@ -1,0 +1,24 @@
+---
+name: reminders
+description: Turn on or off five standing reminders, one rule each, that fire once in every ten-minute period. Use when the user says "reminders on", "/reminders", or "reminders off". Takes "on" or "off"; no argument means "on".
+---
+
+# Reminders
+
+## On
+
+Call `CronList`. For each row below whose prompt is not already scheduled, call `CronCreate` with that `cron` and `prompt`, `recurring: true`. The offsets are staggered so the five never fire together.
+
+| Cron | Prompt |
+| --- | --- |
+| `1,11,21,31,41,51 * * * *` | `REMINDER: ~/LRM.pdf is the source of truth.` |
+| `3,13,23,33,43,53 * * * *` | `REMINDER: Work through a set of indivisible tasks, written down with TaskCreate before the work starts and marked with TaskUpdate as each one starts and finishes.` |
+| `5,15,25,35,45,55 * * * *` | `REMINDER: Keep the task list itself current, not only the marks on it: a task that arises is added the moment it does, a task that turns out unneeded is removed, and a task whose shape changed is rewritten, so that the list always says what is left to do.` |
+| `7,17,27,37,47,57 * * * *` | `REMINDER: Ensure every task on the list is indivisible, whether it was written with TaskCreate or rewritten with TaskUpdate.` |
+| `9,19,29,39,49,59 * * * *` | `REMINDER: When you come up against a problem in this repo, solve it. Do not file a GitHub issue about it and move on — a problem you met is a problem you fix, in the same session, under the same standing rules as the issue you were working on.` |
+
+Report which were created and which were already running, then carry on with whatever the session was doing.
+
+## Off
+
+Call `CronList`, then `CronDelete` for each job whose prompt is one of the five above and no other. Report how many were deleted.
