@@ -1,3 +1,6 @@
+#include <pthread.h>
+
+#include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 #include <fstream>
@@ -365,6 +368,49 @@ int RunSimulation(const delta::CliOptions& opts, delta::CompilationUnit* cu,
   return diag.HasErrors() ? 1 : 0;
 }
 
+// The arguments RunSimulation takes and the status it answers, carried across
+// the thread boundary below.
+struct SimulationJob {
+  const delta::CliOptions& opts;
+  delta::CompilationUnit* cu;
+  delta::DiagEngine& diag;
+  delta::Arena& arena;
+  int status = 1;
+};
+
+void* RunSimulationJob(void* arg) {
+  auto* job = static_cast<SimulationJob*>(arg);
+  job->status = RunSimulation(job->opts, job->cu, job->diag, job->arena);
+  return nullptr;
+}
+
+// §13.3 has a task enable other tasks with no limit on how many are enabled,
+// and §13.4 lets a function call functions and itself, so a design's call
+// chain is as deep as it writes it; the interpreter spends a native frame on
+// every statement and call along it, and UVM's `run_test` stands ninety-odd
+// frames deep before its root object exists, which outran the 8 MiB a main
+// thread has on macOS and segfaulted. The simulation therefore runs on a
+// thread of its own with a stack of 1 GiB, address space reserved and paged
+// in only as far as the run goes, the main thread waiting for its status; a
+// system that refuses the thread gets the run on the main thread as before.
+int RunSimulationOnDeepStack(const delta::CliOptions& opts,
+                             delta::CompilationUnit* cu,
+                             delta::DiagEngine& diag, delta::Arena& arena) {
+  SimulationJob job{opts, cu, diag, arena};
+  constexpr std::size_t kStackBytes = std::size_t{1} << 30;
+  pthread_attr_t attr;
+  if (pthread_attr_init(&attr) != 0 ||
+      pthread_attr_setstacksize(&attr, kStackBytes) != 0) {
+    return RunSimulation(opts, cu, diag, arena);
+  }
+  pthread_t thread;
+  int created = pthread_create(&thread, &attr, RunSimulationJob, &job);
+  pthread_attr_destroy(&attr);
+  if (created != 0) return RunSimulation(opts, cu, diag, arena);
+  pthread_join(thread, nullptr);
+  return job.status;
+}
+
 }  // namespace
 
 // §34.3.1's encrypting mode over the sources named on the command line: each
@@ -551,5 +597,5 @@ int main(int argc, char* argv[]) {
   if (opts.synth_mode) {
     return RunSynthesis(opts, cu, diag, elab_arena);
   }
-  return RunSimulation(opts, cu, diag, elab_arena);
+  return RunSimulationOnDeepStack(opts, cu, diag, elab_arena);
 }
