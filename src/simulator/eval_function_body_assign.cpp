@@ -206,8 +206,8 @@ static bool TryFuncClassTargetWrite(const Expr* lhs, const Logic4Vec& val,
 static bool TryFuncCompoundOnClassTarget(const Stmt* stmt, SimContext& ctx,
                                          Arena& arena) {
   const Expr* lhs = stmt->lhs;
-  bool declared = lhs->kind == ExprKind::kIdentifier &&
-                  ctx.FindVariable(lhs->text) != nullptr;
+  bool declared =
+      lhs->kind == ExprKind::kIdentifier && NameDenotesVariable(lhs->text, ctx);
   if (declared || (lhs->kind != ExprKind::kIdentifier &&
                    lhs->kind != ExprKind::kMemberAccess)) {
     return false;
@@ -242,7 +242,7 @@ static bool TryFuncSpecialBlockingAssign(const Stmt* stmt, SimContext& ctx,
   // defers to the ordinary variable path when one exists; `this.field` names
   // the property whether or not it is shadowed.
   if (stmt->lhs->kind == ExprKind::kIdentifier &&
-      ctx.FindVariable(stmt->lhs->text) == nullptr &&
+      !NameDenotesVariable(stmt->lhs->text, ctx) &&
       TrySelfClassNewAssign(stmt, stmt->lhs->text, ctx, arena))
     return true;
   if (IsMemberAccessOn(stmt->lhs, "this") && stmt->lhs->rhs &&
@@ -303,9 +303,10 @@ static bool TryFuncClassTargetWrite(const Expr* lhs, const Logic4Vec& val,
     return true;
   }
   // A local of the same name is the name's own declaration and shadows the
-  // property, so the property write is asked for only where no local answers.
+  // property, so the property write is asked for only where no local answers;
+  // a variable of the module enclosing the class does not shadow it (§23.9).
   if (lhs->kind == ExprKind::kIdentifier &&
-      ctx.FindVariable(lhs->text) == nullptr) {
+      !NameDenotesVariable(lhs->text, ctx)) {
     return TryFuncClassPropertyWrite(lhs, val, ctx, arena);
   }
   return false;

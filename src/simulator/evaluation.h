@@ -60,6 +60,15 @@ bool DeclaredTypeIsString(const DataType& type, const SimContext& ctx);
 bool DeclaredTypeIsSigned(const DataType& type, const SimContext& ctx);
 
 bool HasUnknownBits(const Logic4Vec& v);
+
+// §23.9 with §8.6 and §8.13: whether a bare `name` denotes a variable -- a
+// local of the running subroutine (a formal or a body declaration), which
+// shadows the class scope, or a variable of the enclosing scope where the
+// class scope declares no such name -- rather than a property or a static of
+// the class whose method is running, which is searched before the scope
+// enclosing the class. Outside a method every declared name denotes a
+// variable. Defined in evaluation.cpp.
+bool NameDenotesVariable(std::string_view name, SimContext& ctx);
 Logic4Vec MakeAllX(Arena& arena, uint32_t width);
 
 // §28.12: a value every bit of which is high impedance, for a source that

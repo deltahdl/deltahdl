@@ -477,7 +477,11 @@ struct AnyChangeAwaiter {
     // need one that stays set.
     auto consumed = std::make_shared<bool>(false);
     for (auto name : var_names) {
-      auto* var = ctx.FindVariable(name);
+      // §23.9: a name the running method's class declares is the property,
+      // not a same-named variable of the enclosing module
+      // (NameDenotesVariable).
+      auto* var =
+          NameDenotesVariable(name, ctx) ? ctx.FindVariable(name) : nullptr;
       if (!var) {
         AttachOwnPropertyWatcher(name, h, proc, fin, consumed);
         continue;

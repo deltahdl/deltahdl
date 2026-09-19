@@ -69,6 +69,12 @@ static bool ClassScopeDeclares(std::string_view name, SimContext& ctx) {
   return scope != nullptr && scope->FindProperty(name) != nullptr;
 }
 
+bool NameDenotesVariable(std::string_view name, SimContext& ctx) {
+  if (ctx.FindVariable(name) == nullptr) return false;
+  if (ctx.FindLocalVariable(name) != nullptr) return true;
+  return !ClassScopeDeclares(name, ctx);
+}
+
 // §25.9: an interface instance named where a value is wanted -- the right
 // side of an assignment to a virtual interface, an argument to a subroutine or
 // to new(), an operand of == -- is the handle of that instance, the value a
@@ -129,7 +135,14 @@ static Logic4Vec EvalIdentifier(const Expr* expr, SimContext& ctx,
     rooted_name += expr->text;
     lookup_name = rooted_name;
   }
-  auto* var = ctx.FindVariable(lookup_name);
+  // §23.9 with §8.6: the class scope is searched before the scope enclosing
+  // the class, so a property named bare in a method is read as the property
+  // even where the instantiating module declares a variable of that name; a
+  // local of the method shadows both. Before this the module's variable won
+  // and the method read and wrote the wrong object.
+  auto* var = NameDenotesVariable(lookup_name, ctx)
+                  ? ctx.FindVariable(lookup_name)
+                  : nullptr;
   if (!var) {
     // §11.12 — a no-argument let referenced without parentheses appears here
     // as a bare identifier. Expand its body at each use (re-evaluated, not

@@ -187,4 +187,59 @@ TEST(ObjectMethodSim, TaskMethodLifetimeIsAutomatic) {
   LowerRunAndCheck(f, design, {{"a", 1u}, {"b", 1u}, {"c", 1u}});
 }
 
+// §8.6 with §23.9: a bare name inside a method resolves against the class
+// scope before the scope enclosing the class, so `sum = 5` and the loop
+// variable `i` of a method write the object's properties even when the
+// instantiating module declares variables of the same names; the module's
+// stay 0. Before the fix the method wrote the module's `sum` and `i` and the
+// properties stayed 0 -- the result reads h.sum * 1000 + h.i * 100 + t.sum
+// * 10 + t.i, 5300 rather than 53.
+TEST(ObjectMethodSim, BarePropertyNameBeatsTheModulesSameNamedVariable) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  int sum, i;\n"
+                      "  function void run();\n"
+                      "    sum = 5;\n"
+                      "    for (i = 0; i < 3; i = i + 1) ;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  C h;\n"
+                      "  int sum, i;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    h = new;\n"
+                      "    h.run();\n"
+                      "    result = h.sum * 1000 + h.i * 100 + sum * 10 + i;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            5300u);
+}
+
+// §8.6 with §23.9, the read side and the local that shadows both: a method
+// reading its bare `tag` reads the property (7), not the module's `tag` (9),
+// and a method declaring its own `tag` local reads that (4) before either.
+TEST(ObjectMethodSim,
+     BarePropertyReadBeatsTheModulesVariableAndALocalBeatsBoth) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  int tag = 7;\n"
+                      "  function int prop(); return tag; endfunction\n"
+                      "  function int local_one();\n"
+                      "    int tag = 4;\n"
+                      "    return tag;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int tag = 9;\n"
+                      "  C h;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    h = new;\n"
+                      "    result = h.prop() * 10 + h.local_one();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            74u);
+}
+
 }  // namespace
