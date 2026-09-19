@@ -5,6 +5,15 @@
  * beside svdpi.h rather than in it, so that svdpi.h stays the file Annex I
  * shows; an SV3.1a-compatible application includes this file after it.
  *
+ * Two things in the deprecated portion Annex I.3 prints are not as this file
+ * has them. svBitVec32 is uint32_t here as §H.14.2 spells it, where the
+ * portion spells it unsigned int, one type on every platform this file
+ * supports. And the portion also declares sixteen functions that copy a
+ * packed array between the canonical representation and an element of an
+ * open array, svPutBitArrElemVec32 and svGetLogicArrElem3Vec32 among them,
+ * which §H.14.2 does not list and this simulator does not provide; §H.14.1
+ * leaves an implementation free to provide none of the portion.
+ *
  * Under §H.14 a packed data argument of a declaration annotated "DPI" crosses
  * as an opaque handle to the actual vendor representation, which for this
  * simulator is the canonical representation itself: a bit array is an array of

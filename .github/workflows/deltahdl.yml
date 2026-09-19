@@ -964,6 +964,13 @@ jobs:
   # lists, and compiles it as strict C99 with every warning an error. The
   # translation unit is C, not C++, which is what the unit tests, being C++,
   # cannot check.
+  #
+  # -Wno-shift-negative-value is there for one line of the header: Annex I.3
+  # (printed page 1294) spells SV_MASK(N) as the complement of -1 shifted
+  # left by N, and the application's SV_GET_UNSIGNED_BITS expands to it. A
+  # left shift of a negative value is undefined in C99, so gcc's -Wextra
+  # warns on it in C99 mode and -Werror would fail the step; the file is the
+  # standard's, so the flag yields rather than the line.
   assert-svdpi-compiles-as-c:
     runs-on: ubuntu-latest
     steps:
@@ -993,7 +1000,7 @@ jobs:
           }
           EOF
           cc -std=c99 -Wall -Wextra -pedantic -Werror -fsyntax-only \
-            -Isrc "$app"
+            -Wno-shift-negative-value -Isrc "$app"
   # Annex H.3 has every name the DPI C layer introduces follow one of its
   # four conventions, and svdpi.h is where the layer introduces them, so this
   # job reads that header and fails on a function or type name that is not sv

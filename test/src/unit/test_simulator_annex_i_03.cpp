@@ -12,9 +12,10 @@ namespace {
 // Annex I.3 lists the source code of svdpi.h, and this file is that source:
 // the cases below observe the listing's structure in it -- its guard, its
 // linkage macros and what becomes of them at the file's end, the types its
-// canonical representation and time value are built on and the constants
-// that go with them -- beside the names test_simulator_annex_h_03.cpp counts
-// and the contents test_simulator_annex_h_10_01.cpp reads.
+// canonical representation and time value are built on, the constants
+// that go with them and the spelling of its mask macro -- beside the names
+// test_simulator_annex_h_03.cpp counts and the contents
+// test_simulator_annex_h_10_01.cpp reads.
 
 // §I.3: the file is guarded by INCLUDED_SVDPI.
 TEST(SvdpiSourceCode, TheFileIsGuardedByIncludedSvdpi) {
@@ -89,6 +90,23 @@ TEST(SvdpiSourceCode, TheTimeValueAndItsCodesAreTheListings) {
   const bool kTimeGuarded = false;
 #endif
   EXPECT_TRUE(kTimeGuarded);
+}
+
+// §I.3: the listing spells SV_MASK(N) as the complement of -1 shifted left
+// by N, so the mask is an int, the low N bits set; a spelling that shifts
+// an unsigned zero's complement instead gives the same bits in an unsigned
+// int, which is what the file carried before it was the listing's text.
+// The two macros built on the mask keep their values at both ends of the
+// width, where N is 0, 31 and the 32 the macros pass the value through at.
+TEST(SvdpiSourceCode, TheMaskMacroIsTheListingsSignedOne) {
+  EXPECT_TRUE((std::is_same<decltype(SV_MASK(4)), int>::value));
+  EXPECT_EQ(SV_MASK(0), 0);
+  EXPECT_EQ(SV_MASK(4), 0xF);
+  EXPECT_EQ(SV_MASK(31), 0x7FFFFFFF);
+  EXPECT_EQ(SV_GET_UNSIGNED_BITS(0xFFFFFFFFu, 31), 0x7FFFFFFFu);
+  EXPECT_EQ(SV_GET_UNSIGNED_BITS(0xFFFFFFFFu, 32), 0xFFFFFFFFu);
+  EXPECT_EQ(static_cast<uint32_t>(SV_GET_SIGNED_BITS(0x10, 4)), 0xFFFFFFF0u);
+  EXPECT_EQ(static_cast<uint32_t>(SV_GET_SIGNED_BITS(0x0F, 4)), 0x0000000Fu);
 }
 
 // §I.3: the scope and open array handles are void pointers, and the version

@@ -48,9 +48,9 @@ CheckOptions:
   readability-identifier-naming.MethodIgnoredRegexp: 'get_return_object|initial_suspend|final_suspend|return_void|return_value|unhandled_exception|await_ready|await_suspend|await_resume|push_back|begin|end|size|empty|data'
   readability-identifier-naming.NamespaceCase: lower_case
   readability-identifier-naming.ParameterCase: lower_case
-  # IEEE 1800-2023 Annex K.2: the parameter names vpi_user.h's prototypes
-  # carry as the annex prints them
-  readability-identifier-naming.ParameterIgnoredRegexp: 'refHandle|refHandle1|refHandle2|numOfBytes|dataLoc|fileName'
+  # IEEE 1800-2023 Annex K.2 and Annex I.3: the parameter names the
+  # prototypes of vpi_user.h and svdpi.h carry as the annexes print them
+  readability-identifier-naming.ParameterIgnoredRegexp: 'refHandle|refHandle1|refHandle2|numOfBytes|dataLoc|fileName|scopeName|userKey|userData|lineNumber'
   readability-identifier-naming.PrivateMemberCase: lower_case
   readability-identifier-naming.PrivateMemberSuffix: '_'
   readability-identifier-naming.ProtectedMemberCase: lower_case
