@@ -581,4 +581,32 @@ TEST(ClassSim, ValueParameterOfAModuleScopeSpecializationConstructedLater) {
             21u);
 }
 
+// §8.25's own generic class, `class vector #(int size = 1); bit [size-1:0]
+// a;` (printed page 203 of ~/LRM.pdf), sizes a property by the class's value
+// parameter, which §6.20.1 declares in the class's parameter port list or
+// its body (printed 125). The lowerer sized every property with no
+// parameter in scope, so `logic [W-1:0] v` was one bit wide: `c.v = '1`
+// stored 1 and `$bits(c.v)` answered 1. Here v is sized by the header
+// parameter and u by a body localparam derived from it, so the write of all
+// ones reads 255 and the widths 8 and 16: 255 + 16 * 1000 + 8 * 100000.
+TEST(ClassSim, PropertyWidthNamesTheClassParameters) {
+  EXPECT_EQ(
+      RunAndGet("class C #(int W = 8);\n"
+                "  localparam int N = W * 2;\n"
+                "  logic [W-1:0] v;\n"
+                "  logic [N-1:0] u;\n"
+                "endclass\n"
+                "module t;\n"
+                "  int out;\n"
+                "  initial begin\n"
+                "    C c;\n"
+                "    c = new;\n"
+                "    c.v = '1;\n"
+                "    out = c.v + $bits(c.u) * 1000 + $bits(c.v) * 100000;\n"
+                "  end\n"
+                "endmodule\n",
+                "out"),
+      255u + 16u * 1000u + 8u * 100000u);
+}
+
 }  // namespace

@@ -6,6 +6,7 @@
 
 #include "common/arena.h"
 #include "common/types.h"
+#include "elaborator/const_eval.h"
 #include "elaborator/type_eval.h"
 #include "lexer/token.h"
 #include "parser/ast_class.h"
@@ -142,10 +143,36 @@ static void AttachScopeMethodBodies(
   }
 }
 
+// §8.25: the value parameters a property's packed dimension may name, `bit
+// [size-1:0] a` in the subclause's `vector #(int size = 1)`, each at the
+// default the class declares for it -- the header parameters in order, a
+// later default free to name an earlier one, then the parameters and
+// localparams of the class body (§6.20.1), which may name the header's. A
+// type parameter stands for no value and is left out, as is a default that
+// does not fold to a constant. The widths this sizes are those of the default
+// specialization (§8.25.1).
+static ScopeMap ClassParamScope(const ClassDecl* cls) {
+  ScopeMap scope;
+  for (const auto& [pname, pexpr] : cls->params) {
+    if (pexpr == nullptr || cls->type_param_names.count(pname) != 0) continue;
+    if (auto v = ConstEvalInt(pexpr, scope)) scope[pname] = *v;
+  }
+  for (const auto* member : cls->members) {
+    if (member->kind != ClassMemberKind::kProperty || !member->is_param ||
+        member->init_expr == nullptr) {
+      continue;
+    }
+    if (auto v = ConstEvalInt(member->init_expr, scope))
+      scope[member->name] = *v;
+  }
+  return scope;
+}
+
 static void CollectClassMembers(ClassTypeInfo* info, const ClassDecl* cls) {
+  ScopeMap params = ClassParamScope(cls);
   for (auto* member : cls->members) {
     if (member->kind == ClassMemberKind::kProperty) {
-      uint32_t w = EvalTypeWidth(member->data_type, {});
+      uint32_t w = EvalTypeWidth(member->data_type, {}, params);
       bool sized = w != 0;
       if (w == 0) w = 32;
       info->properties.push_back(
