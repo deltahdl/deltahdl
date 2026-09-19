@@ -37,10 +37,7 @@ typedef signed __int32 int32_t;
 typedef signed __int8 int8_t;
 #elif defined(__MINGW32__)
 #include <stdint.h>
-#elif defined(__linux) || defined(__APPLE__)
-/* K.1 has every simulator provide this file, and the annex's <sys/types.h>
- * fallback declares no uint64_t on macOS, so macOS takes <inttypes.h> as
- * Linux does: the one departure from the text K.2 prints. */
+#elif defined(__linux)
 #include <inttypes.h>
 #else
 #include <sys/types.h>

@@ -33,6 +33,17 @@ endif()
 
 add_compile_options(-Wall -Wextra -Wpedantic -Werror)
 
+# src/simulator/vpi_user.h is Annex K.2's file as the standard prints it and is
+# not edited. Its portability help takes the sized types from <inttypes.h> on
+# Linux and from <sys/types.h> on any platform it does not name, and Apple's
+# SDK declares int64_t and u_int64_t there but no uint64_t, so the annex's
+# `typedef uint64_t PLI_UINT64;` fails on macOS in every translation unit that
+# reads the file before <cstdint>. Each translation unit therefore begins with
+# <stdint.h> on macOS, which is what <inttypes.h> gives the annex on Linux.
+if(APPLE)
+    add_compile_options(-include stdint.h)
+endif()
+
 add_subdirectory(src)
 
 include(CTest)
