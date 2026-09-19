@@ -7,6 +7,7 @@
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "simulator/assertion_api.h"
+#include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"

@@ -29,7 +29,7 @@ struct SingleRead {
 };
 
 inline int ReadOnceCb(s_cb_data* cb) {
-  auto* p = static_cast<SingleRead*>(cb->user_data);
+  auto* p = reinterpret_cast<SingleRead*>(cb->user_data);
   p->returned = vpi_get_data(p->id, p->buf, p->request);
   return 0;
 }
@@ -46,7 +46,7 @@ struct DoubleRead {
 };
 
 inline int ReadTwiceCb(s_cb_data* cb) {
-  auto* p = static_cast<DoubleRead*>(cb->user_data);
+  auto* p = reinterpret_cast<DoubleRead*>(cb->user_data);
   p->ret1 = vpi_get_data(p->id, p->buf1, p->req1);
   p->ret2 = vpi_get_data(p->id, p->buf2, p->req2);
   return 0;

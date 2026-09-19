@@ -223,8 +223,8 @@ TEST_F(TaskFuncCall, ProtectedCallStillIteratesArguments) {
   bool saw_arg1 = false;
   while (vpiHandle h = vpi_scan(it)) {
     ++count;
-    if (h == &arg0) saw_arg0 = true;
-    if (h == &arg1) saw_arg1 = true;
+    if (VpiObjectOf(h) == &arg0) saw_arg0 = true;
+    if (VpiObjectOf(h) == &arg1) saw_arg1 = true;
   }
   EXPECT_EQ(count, 2);  // the non-argument child is excluded
   EXPECT_TRUE(saw_arg0);

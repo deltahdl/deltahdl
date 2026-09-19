@@ -256,23 +256,24 @@ static PLI_INT32 VpiAssertionControlWithArgs(PLI_INT32 operation, va_list args,
   *handled = true;
   if (delta::VpiIsAssertionSysControl(operation)) {
     vpiHandle scope = va_arg(args, vpiHandle);
-    return delta::VpiAssertionSysControl(operation, scope);
+    return delta::VpiAssertionSysControl(operation, delta::VpiObjectOf(scope));
   }
   if (delta::VpiIsAssertionControl(operation)) {
     vpiHandle assertion = va_arg(args, vpiHandle);
-    return delta::VpiAssertionControl(operation, assertion);
+    return delta::VpiAssertionControl(operation, delta::VpiObjectOf(assertion));
   }
   if (delta::VpiIsAssertionAttemptControl(operation)) {
     vpiHandle assertion = va_arg(args, vpiHandle);
     s_vpi_time* attempt = va_arg(args, s_vpi_time*);
-    return delta::VpiAssertionAttemptControl(operation, assertion, attempt);
+    return delta::VpiAssertionAttemptControl(
+        operation, delta::VpiObjectOf(assertion), attempt);
   }
   if (delta::VpiIsAssertionStepControl(operation)) {
     vpiHandle assertion = va_arg(args, vpiHandle);
     s_vpi_time* attempt = va_arg(args, s_vpi_time*);
     int step_control = va_arg(args, int);
-    return delta::VpiAssertionStepControl(operation, assertion, attempt,
-                                          step_control);
+    return delta::VpiAssertionStepControl(
+        operation, delta::VpiObjectOf(assertion), attempt, step_control);
   }
   *handled = false;
   return 0;
@@ -304,7 +305,8 @@ PLI_INT32 VpiControlWithArgs(PLI_INT32 operation, va_list args) {
     }
     case delta::kVpiSetInteractiveScope: {
       vpiHandle scope = va_arg(args, vpiHandle);
-      result = delta::GetGlobalVpiContext().Control(operation, 0, 0, 0, scope);
+      result = delta::GetGlobalVpiContext().Control(operation, 0, 0, 0,
+                                                    delta::VpiObjectOf(scope));
       break;
     }
     case vpiCoverageStart:
@@ -318,7 +320,7 @@ PLI_INT32 VpiControlWithArgs(PLI_INT32 operation, va_list args) {
       int coverage_type = va_arg(args, int);
       vpiHandle handle = va_arg(args, vpiHandle);
       result = delta::GetGlobalVpiContext().ControlCoverage(
-          operation, coverage_type, handle, std::string());
+          operation, coverage_type, delta::VpiObjectOf(handle), std::string());
       break;
     }
     case vpiCoverageSave:

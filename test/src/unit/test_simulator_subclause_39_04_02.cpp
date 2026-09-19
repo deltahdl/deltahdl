@@ -86,10 +86,10 @@ TEST(AssertionCallback, PlaceReturnsHandleAndRemovesByHandle) {
   EXPECT_NE(h, 0u);
   EXPECT_EQ(api.PlacedCallbackCount(), 1u);
 
-  EXPECT_TRUE(api.RemoveAssertionCallback(VpiObjectOf(h)));
+  EXPECT_TRUE(api.RemoveAssertionCallback(h));
   EXPECT_EQ(api.PlacedCallbackCount(), 0u);
   // Removing an already-removed handle reports no removal.
-  EXPECT_FALSE(api.RemoveAssertionCallback(VpiObjectOf(h)));
+  EXPECT_FALSE(api.RemoveAssertionCallback(h));
 
   // An empty handle is an error: the NULL handle is returned.
   EXPECT_EQ(api.PlaceAssertionCallback(cbAssertionStart, "", vpiAssert, noop_cb,
@@ -190,7 +190,7 @@ TEST(AssertionCallback, FiresPerAssertionUntilRemoved) {
   EXPECT_EQ(count, 2);
 
   // Once removed it is no longer called.
-  api.RemoveAssertionCallback(VpiObjectOf(h));
+  api.RemoveAssertionCallback(h);
   api.DeliverAssertionEvent(kA, cbAssertionStart, 14, info);
   EXPECT_EQ(count, 2);
 }

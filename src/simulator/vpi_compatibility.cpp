@@ -208,7 +208,7 @@ vpiHandle vpi_handle_by_multi_index_1364v1995(vpiHandle parent,
                                               PLI_INT32* index_array) {
   return vpi_handle_by_multi_index(parent, num_index, index_array);
 }
-vpiHandle vpi_handle_by_name_1364v1995(const char* name, vpiHandle scope) {
+vpiHandle vpi_handle_by_name_1364v1995(PLI_BYTE8* name, vpiHandle scope) {
   return vpi_handle_by_name(name, scope);
 }
 vpiHandle vpi_handle_multi_1364v1995(PLI_INT32 type, vpiHandle ref1,
@@ -266,7 +266,7 @@ vpiHandle vpi_handle_by_multi_index_1364v2001(vpiHandle parent,
                                               PLI_INT32* index_array) {
   return vpi_handle_by_multi_index(parent, num_index, index_array);
 }
-vpiHandle vpi_handle_by_name_1364v2001(const char* name, vpiHandle scope) {
+vpiHandle vpi_handle_by_name_1364v2001(PLI_BYTE8* name, vpiHandle scope) {
   return vpi_handle_by_name(name, scope);
 }
 vpiHandle vpi_handle_multi_1364v2001(PLI_INT32 type, vpiHandle ref1,
@@ -324,7 +324,7 @@ vpiHandle vpi_handle_by_multi_index_1364v2005(vpiHandle parent,
                                               PLI_INT32* index_array) {
   return vpi_handle_by_multi_index(parent, num_index, index_array);
 }
-vpiHandle vpi_handle_by_name_1364v2005(const char* name, vpiHandle scope) {
+vpiHandle vpi_handle_by_name_1364v2005(PLI_BYTE8* name, vpiHandle scope) {
   return vpi_handle_by_name(name, scope);
 }
 vpiHandle vpi_handle_multi_1364v2005(PLI_INT32 type, vpiHandle ref1,
@@ -379,7 +379,7 @@ vpiHandle vpi_handle_by_multi_index_1800v2005(vpiHandle parent,
                                               PLI_INT32* index_array) {
   return vpi_handle_by_multi_index(parent, num_index, index_array);
 }
-vpiHandle vpi_handle_by_name_1800v2005(const char* name, vpiHandle scope) {
+vpiHandle vpi_handle_by_name_1800v2005(PLI_BYTE8* name, vpiHandle scope) {
   return vpi_handle_by_name(name, scope);
 }
 vpiHandle vpi_handle_multi_1800v2005(PLI_INT32 type, vpiHandle ref1,
@@ -432,7 +432,7 @@ vpiHandle vpi_handle_by_multi_index_1800v2009(vpiHandle parent,
                                               PLI_INT32* index_array) {
   return vpi_handle_by_multi_index(parent, num_index, index_array);
 }
-vpiHandle vpi_handle_by_name_1800v2009(const char* name, vpiHandle scope) {
+vpiHandle vpi_handle_by_name_1800v2009(PLI_BYTE8* name, vpiHandle scope) {
   return vpi_handle_by_name(name, scope);
 }
 vpiHandle vpi_handle_multi_1800v2009(PLI_INT32 type, vpiHandle ref1,
@@ -485,7 +485,7 @@ vpiHandle vpi_handle_by_multi_index_1800v2012(vpiHandle parent,
                                               PLI_INT32* index_array) {
   return vpi_handle_by_multi_index(parent, num_index, index_array);
 }
-vpiHandle vpi_handle_by_name_1800v2012(const char* name, vpiHandle scope) {
+vpiHandle vpi_handle_by_name_1800v2012(PLI_BYTE8* name, vpiHandle scope) {
   return vpi_handle_by_name(name, scope);
 }
 vpiHandle vpi_handle_multi_1800v2012(PLI_INT32 type, vpiHandle ref1,

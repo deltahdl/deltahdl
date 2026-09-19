@@ -1,12 +1,7 @@
 #include <gtest/gtest.h>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
-#include "simulator/sim_context.h"
-#include "simulator/vpi_context.h"
-#include "simulator/vpi_globals.h"
-#include "simulator/vpi_internal.h"
+#include "helpers_vpi_error_fixture.h"
+#include "simulator/scheduler.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -29,28 +24,7 @@ namespace {
 // of the rule through the public entry points: routines that were given no
 // argument, and the routines whose own definitions say that is allowed.
 
-class VpiArgumentConventions : public ::testing::Test {
- protected:
-  void SetUp() override { SetGlobalVpiContext(&vpi_ctx_); }
-  void TearDown() override { SetGlobalVpiContext(nullptr); }
-
-  // §38.2: drive a VPI routine into its error path so an error status is
-  // pending. vpi_register_systf() rejects a name that does not begin with a
-  // dollar sign and records a vpiError-level error (§36.9.1 / §38.37.1).
-  void RaiseError() {
-    s_vpi_systf_data data = {};
-    data.type = vpiSysTask;
-    data.tfname = VpiText("missing_dollar");
-    vpi_register_systf(&data);
-  }
-
-  SourceManager mgr_;
-  Arena arena_;
-  Scheduler scheduler_{arena_};
-  DiagEngine diag_{mgr_};
-  SimContext sim_ctx_{scheduler_, arena_, diag_};
-  VpiContext vpi_ctx_;
-};
+using VpiArgumentConventions = VpiErrorRaisingFixture;
 
 // The rule: an argument no definition notes otherwise about is mandatory, so a
 // call that omits one reports its failure return - a null handle, or zero -

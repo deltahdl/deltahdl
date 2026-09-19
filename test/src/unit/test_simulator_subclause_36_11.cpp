@@ -2,7 +2,6 @@
 
 #include <type_traits>
 
-#include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_user.h"
 
 namespace {
@@ -104,7 +103,7 @@ static_assert(
     std::is_same_v<decltype(vpi_iterate), vpiHandle(PLI_INT32, vpiHandle)>,
     "§38.23: vpi_iterate takes a PLI_INT32 type");
 static_assert(std::is_same_v<decltype(vpi_handle_multi),
-                             vpiHandle(PLI_INT32, vpiHandle, vpiHandle)>,
+                             vpiHandle(PLI_INT32, vpiHandle, vpiHandle, ...)>,
               "§38.22: vpi_handle_multi takes a PLI_INT32 type");
 static_assert(std::is_same_v<decltype(vpi_handle_by_index),
                              vpiHandle(vpiHandle, PLI_INT32)>,

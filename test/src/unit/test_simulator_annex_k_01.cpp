@@ -69,7 +69,7 @@ static_assert(
     std::is_same_v<decltype(vpi_get_value), void(vpiHandle, s_vpi_value*)>,
     "vpi_user.h must provide vpi_get_value");
 static_assert(std::is_same_v<decltype(vpi_handle_by_name),
-                             vpiHandle(const char*, vpiHandle)>,
+                             vpiHandle(PLI_BYTE8*, vpiHandle)>,
               "vpi_user.h must provide vpi_handle_by_name");
 
 TEST(VpiUserHeaderProvided, IncludeFileIsPresentAndGuarded) {

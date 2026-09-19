@@ -3,6 +3,7 @@
 #include <string_view>
 #include <vector>
 
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 // Internal helpers shared between the vpi.cpp translation units. These are file

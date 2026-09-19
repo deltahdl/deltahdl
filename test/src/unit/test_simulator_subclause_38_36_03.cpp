@@ -33,7 +33,7 @@ int RecordingCb(s_cb_data* data) {
   if (data) {
     g_seen_reason = data->reason;
     g_seen_user_data = data->user_data;
-    g_seen_obj = data->obj;
+    g_seen_obj = VpiObjectOf(data->obj);
     g_sequence.push_back(data->reason);
   }
   return 0;

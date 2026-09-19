@@ -11,7 +11,6 @@
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
 #include "parser/parser.h"
-#include "simulator/vpi_user.h"
 
 using namespace delta;
 

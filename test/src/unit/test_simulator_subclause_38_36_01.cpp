@@ -144,7 +144,7 @@ int RecordDelivery(s_cb_data* data) {
     g_delivered_time = data->time;
     g_delivered_value = data->value;
     g_delivered_user_data = data->user_data;
-    g_delivered_obj = data->obj;
+    g_delivered_obj = VpiObjectOf(data->obj);
   }
   return 0;
 }

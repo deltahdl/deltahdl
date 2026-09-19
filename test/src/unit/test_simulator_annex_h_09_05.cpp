@@ -8,7 +8,6 @@
 #include "simulator/dpi_arg_value.h"
 #include "simulator/dpi_context.h"
 #include "simulator/dpi_runtime.h"
-#include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_object.h"

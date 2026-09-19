@@ -332,8 +332,8 @@ PLI_INT32 InspectFrameCalltf(PLI_BYTE8*) {
   if (frame == nullptr) return 0;
   g_frame_type = vpi_get(vpiType, frame);
   g_frame_is_active = vpi_get(vpiActive, frame);
-  g_frame_has_a_thread = VpiFrameThread(frame) != nullptr;
-  g_frame_has_a_parent_frame = VpiFrameParent(frame) != nullptr;
+  g_frame_has_a_thread = VpiFrameThread(VpiObjectOf(frame)) != nullptr;
+  g_frame_has_a_parent_frame = VpiFrameParent(VpiObjectOf(frame)) != nullptr;
   return 0;
 }
 

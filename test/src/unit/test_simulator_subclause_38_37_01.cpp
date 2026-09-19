@@ -293,7 +293,7 @@ TEST(VpiSystfCallbacksSim, InvokePassesUserDataAsSingleArgument) {
 TEST(VpiSystfCallbacksSim, InvokeSkipsNullCallback) {
   int payload = 0;
   // One or more of the routine fields may be left null when not needed.
-  EXPECT_EQ(VpiSystfInvoke(nullptr, &payload), 0);
+  EXPECT_EQ(VpiSystfInvoke(nullptr, reinterpret_cast<PLI_BYTE8*>(&payload)), 0);
 }
 
 TEST(VpiSystfCallbacksSim, CallbackFiringTimes) {

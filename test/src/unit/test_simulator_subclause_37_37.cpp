@@ -144,7 +144,7 @@ double g_path_fall = -1.0;
 vpiHandle PortOfInstance(const char* inst, const char* port) {
   vpiHandle mod = vpi_handle_by_name(VpiText(inst), nullptr);
   if (mod == nullptr) return nullptr;
-  vpiHandle ports = vpi_iterate(vpiPort, VpiHandleOf(mod));
+  vpiHandle ports = vpi_iterate(vpiPort, mod);
   if (ports == nullptr) return nullptr;
 
   vpiHandle found = nullptr;
@@ -159,8 +159,7 @@ vpiHandle PortOfInstance(const char* inst, const char* port) {
 // detail names. §38.22 has that handle name the path itself, so it is what an
 // application goes on to use.
 vpiHandle PathBetween(vpiHandle port1, vpiHandle port2) {
-  return vpi_handle_multi(vpiInterModPath, VpiHandleOf(port1),
-                          VpiHandleOf(port2));
+  return vpi_handle_multi(vpiInterModPath, port1, port2);
 }
 
 void RecordPathPorts(vpiHandle path) {
@@ -203,7 +202,7 @@ PLI_INT32 WalkPathsCalltf(PLI_BYTE8*) {
   g_unrelated_reached =
       vpi_handle_multi(vpiInterModPath, a_o, d_i) == nullptr ? 0 : 1;
 
-  vpiHandle path = PathBetween(VpiObjectOf(a_o), VpiObjectOf(b_i));
+  vpiHandle path = PathBetween(a_o, b_i);
   g_path_reached = path == nullptr ? 0 : 1;
   if (path == nullptr) return 0;
   RecordPathPorts(path);

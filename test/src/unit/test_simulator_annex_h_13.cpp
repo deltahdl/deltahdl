@@ -8,6 +8,7 @@
 #include "simulator/scheduler.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 // Annex H.13 functions under test. They belong to the DPI C layer (svdpi.cpp)

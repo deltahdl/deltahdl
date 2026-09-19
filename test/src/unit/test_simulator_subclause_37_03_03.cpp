@@ -3,7 +3,6 @@
 #include <string>
 
 #include "fixture_simulator.h"
-#include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_internal.h"

@@ -49,7 +49,7 @@ void VpiCallAssertionRoutine(vpi_assertion_callback_func* cb_rtn,
         VpiAssertionCallbackTime(args.info->attempt_start_time);
     info_p = &info;
   }
-  cb_rtn(args.reason, &cb_time, assertion, info_p,
+  cb_rtn(args.reason, &cb_time, VpiHandleOf(assertion), info_p,
          static_cast<PLI_BYTE8*>(args.user_data));
 }
 

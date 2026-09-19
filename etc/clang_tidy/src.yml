@@ -61,6 +61,9 @@ CheckOptions:
   readability-identifier-naming.MethodIgnoredRegexp: 'get_return_object|initial_suspend|final_suspend|return_void|return_value|unhandled_exception|await_ready|await_suspend|await_resume|push_back|begin|end|size|empty|data'
   readability-identifier-naming.NamespaceCase: lower_case
   readability-identifier-naming.ParameterCase: lower_case
+  # IEEE 1800-2023 Annex K.2: the parameter names vpi_user.h's prototypes
+  # carry as the annex prints them
+  readability-identifier-naming.ParameterIgnoredRegexp: 'refHandle|refHandle1|refHandle2|numOfBytes|dataLoc|fileName'
   readability-identifier-naming.PrivateMemberCase: lower_case
   readability-identifier-naming.PrivateMemberSuffix: '_'
   readability-identifier-naming.ProtectedMemberCase: lower_case
@@ -74,16 +77,15 @@ CheckOptions:
   readability-identifier-naming.StaticConstantCase: CamelCase
   readability-identifier-naming.StaticConstantPrefix: k
   # C++23 coroutine promise_type [coroutine.handle]
-  # IEEE 1800-2023 Annex I/K/L/M C struct tags (t_vpi_*, s_vpi_*)
+  # IEEE 1800-2023 Annex I/K/L/M C struct tags (t_vpi_*, s_vpi_*, t_cb_data)
   readability-identifier-naming.StructCase: CamelCase
-  readability-identifier-naming.StructIgnoredRegexp: 'promise_type|t_vpi_.*|s_vpi_.*'
+  readability-identifier-naming.StructIgnoredRegexp: 'promise_type|t_vpi_.*|s_vpi_.*|t_cb_data'
   readability-identifier-naming.TemplateParameterCase: CamelCase
   readability-identifier-naming.TypeAliasCase: CamelCase
-  # IEEE 1800-2023 §36 + Annex I/K/L/M: VPI/DPI C-API type aliases
-  readability-identifier-naming.TypeAliasIgnoredRegexp: 'vpiHandle|s_vpi_.*|s_cb_data|SVpi.*|PLI_.*'
   readability-identifier-naming.TypedefCase: CamelCase
-  # IEEE 1800-2023 Annex I/K/L/M: VPI/DPI C-API typedefs and struct tags
-  readability-identifier-naming.TypedefIgnoredRegexp: 's_vpi_.*|s_cb_data|p_cb_data|sv[A-Z].*|t_vpi_.*|p_vpi_.*|vpi_assertion_callback_func'
+  # IEEE 1800-2023 Annex I/K/L/M: VPI/DPI C-API typedefs and struct tags,
+  # with Annex K.2's vpiHandle and PLI_ sized types
+  readability-identifier-naming.TypedefIgnoredRegexp: 's_vpi_.*|s_cb_data|p_cb_data|sv[A-Z].*|t_vpi_.*|p_vpi_.*|vpi_assertion_callback_func|vpiHandle|PLI_.*'
   readability-identifier-naming.VariableCase: lower_case
 # Disabled checks (only valid exceptions, see header rule 4):
 # - bugprone-random-generator-seed: IEEE 1800-2023 18.13/18.14 require

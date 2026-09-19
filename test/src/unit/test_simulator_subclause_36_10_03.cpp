@@ -35,7 +35,7 @@ class TraversingExpressions : public ::testing::Test {
     vpiHandle sub_expr_i = vpi_iterate(vpiOperand, expr);
     if (sub_expr_i == nullptr) return;  // else it is of op type vpiNullOp
     while (vpiHandle sub_expr_h = vpi_scan(sub_expr_i)) {
-      TraverseExpr(VpiObjectOf(sub_expr_h));
+      TraverseExpr(sub_expr_h);
     }
   }
 
@@ -46,7 +46,7 @@ class TraversingExpressions : public ::testing::Test {
   // limit clang-tidy holds a test function under leaves room for.
   void TraverseExpr(vpiHandle expr) {
     if (vpi_get(vpiType, expr) == vpiOperation) {
-      TraverseOperands(VpiObjectOf(expr));
+      TraverseOperands(expr);
       return;
     }
     leaves_.push_back(expr);  // do whatever to the leaf object
@@ -97,7 +97,7 @@ TEST_F(TraversingExpressions, TheClausesRoutineArrivesAtEveryLeaf) {
   outer.op_type = vpiMultOp;
   outer.children = {&inner, &c};
 
-  TraverseExpr(&outer);
+  TraverseExpr(VpiHandleOf(&outer));
 
   ASSERT_EQ(leaves_.size(), 3u);
   EXPECT_EQ(VpiObjectOf(leaves_[0]), &a);
@@ -116,7 +116,7 @@ TEST_F(TraversingExpressions, ANullOperationTakesNoOperands) {
   EXPECT_EQ(vpi_get(vpiOpType, VpiHandleOf(&null_op)), vpiNullOp);
   EXPECT_EQ(vpi_iterate(vpiOperand, VpiHandleOf(&null_op)), nullptr);
 
-  TraverseExpr(&null_op);
+  TraverseExpr(VpiHandleOf(&null_op));
   EXPECT_TRUE(leaves_.empty());
 }
 

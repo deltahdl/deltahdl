@@ -3,6 +3,7 @@
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
@@ -167,14 +168,14 @@ TEST_F(VpiHandleReleaseSim, RemovingACallbackReleasesItsHandle) {
   data.cb_rtn = nullptr;
   vpiHandle cb = vpi_register_cb(&data);
   ASSERT_NE(cb, nullptr);
-  EXPECT_FALSE(cb->released);
+  EXPECT_FALSE(VpiObjectOf(cb)->released);
 
-  EXPECT_EQ(vpi_remove_cb(VpiHandleOf(cb)), 1);
-  EXPECT_TRUE(cb->released);
+  EXPECT_EQ(vpi_remove_cb(cb), 1);
+  EXPECT_TRUE(VpiObjectOf(cb)->released);
 
   // §38.39: the handle is no longer valid, so a second removal through it
   // fails rather than reporting success again.
-  EXPECT_EQ(vpi_remove_cb(VpiHandleOf(cb)), 0);
+  EXPECT_EQ(vpi_remove_cb(cb), 0);
 }
 
 // §37.2.2 (list item a): the release is of the handle the call was given. A

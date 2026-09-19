@@ -103,7 +103,7 @@ TEST_F(ClassVariablesAndObjects,
 
   vpiHandle it = vpi_iterate(vpiWaitingProcesses, VpiHandleOf(&class_obj));
   ASSERT_NE(it, nullptr);
-  std::vector<vpiHandle> seen = ScanAll(VpiObjectOf(it));
+  std::vector<vpiHandle> seen = ScanAll(it);
 
   ASSERT_EQ(seen.size(), 2u);
   EXPECT_EQ(VpiObjectOf(seen[0]), &waiter_a);
@@ -127,7 +127,7 @@ TEST_F(ClassVariablesAndObjects, MessagesIterationReturnsMailboxMessages) {
 
   vpiHandle it = vpi_iterate(vpiMessages, VpiHandleOf(&mailbox));
   ASSERT_NE(it, nullptr);
-  std::vector<vpiHandle> seen = ScanAll(VpiObjectOf(it));
+  std::vector<vpiHandle> seen = ScanAll(it);
 
   ASSERT_EQ(seen.size(), 2u);
   EXPECT_EQ(VpiObjectOf(seen[0]), &message_a);
@@ -207,7 +207,7 @@ TEST_F(ClassVariablesAndObjects,
 
   vpiHandle it = vpi_iterate(vpiMethods, VpiHandleOf(&class_obj));
   ASSERT_NE(it, nullptr);
-  std::vector<vpiHandle> seen = ScanAll(VpiObjectOf(it));
+  std::vector<vpiHandle> seen = ScanAll(it);
 
   ASSERT_EQ(seen.size(), 2u);
   EXPECT_EQ(VpiObjectOf(seen[0]), &static_method);
@@ -234,7 +234,7 @@ TEST_F(ClassVariablesAndObjects,
 
   vpiHandle it = vpi_iterate(vpiVariables, VpiHandleOf(&class_obj));
   ASSERT_NE(it, nullptr);
-  std::vector<vpiHandle> seen = ScanAll(VpiObjectOf(it));
+  std::vector<vpiHandle> seen = ScanAll(it);
   ASSERT_EQ(seen.size(), 2u);
   EXPECT_EQ(VpiObjectOf(seen[0]), &static_var);
   EXPECT_EQ(VpiObjectOf(seen[1]), &automatic_var);
@@ -262,14 +262,14 @@ TEST_F(ClassVariablesAndObjects,
 
   vpiHandle ev_it = vpi_iterate(vpiNamedEvent, VpiHandleOf(&class_obj));
   ASSERT_NE(ev_it, nullptr);
-  std::vector<vpiHandle> events = ScanAll(VpiObjectOf(ev_it));
+  std::vector<vpiHandle> events = ScanAll(ev_it);
   ASSERT_EQ(events.size(), 2u);
   EXPECT_EQ(VpiObjectOf(events[0]), &static_event);
   EXPECT_EQ(VpiObjectOf(events[1]), &automatic_event);
 
   vpiHandle arr_it = vpi_iterate(vpiNamedEventArray, VpiHandleOf(&class_obj));
   ASSERT_NE(arr_it, nullptr);
-  std::vector<vpiHandle> arrays = ScanAll(VpiObjectOf(arr_it));
+  std::vector<vpiHandle> arrays = ScanAll(arr_it);
   ASSERT_EQ(arrays.size(), 1u);
   EXPECT_EQ(VpiObjectOf(arrays[0]), &event_array);
 }
@@ -297,7 +297,7 @@ TEST_F(ClassVariablesAndObjects,
   vpiHandle vif_it =
       vpi_iterate(vpiVirtualInterfaceVar, VpiHandleOf(&class_obj));
   ASSERT_NE(vif_it, nullptr);
-  std::vector<vpiHandle> vifs = ScanAll(VpiObjectOf(vif_it));
+  std::vector<vpiHandle> vifs = ScanAll(vif_it);
   ASSERT_EQ(vifs.size(), 3u);
   EXPECT_EQ(VpiObjectOf(vifs[0]), &scalar_vif);
   EXPECT_EQ(VpiObjectOf(vifs[1]), &vif_elem0);
@@ -305,7 +305,7 @@ TEST_F(ClassVariablesAndObjects,
 
   vpiHandle var_it = vpi_iterate(vpiVariables, VpiHandleOf(&class_obj));
   ASSERT_NE(var_it, nullptr);
-  std::vector<vpiHandle> vars = ScanAll(VpiObjectOf(var_it));
+  std::vector<vpiHandle> vars = ScanAll(var_it);
   // The scalar virtual interface var comes back beside the array, §37.17
   // drawing `virtual interface var` inside the `variables` class enclosure this
   // relation is drawn to (§37.4.1); the array is the one reported whole.
@@ -333,7 +333,7 @@ TEST_F(ClassVariablesAndObjects,
 
   vpiHandle it = vpi_iterate(vpiParameter, VpiHandleOf(&class_obj));
   ASSERT_NE(it, nullptr);
-  std::vector<vpiHandle> seen = ScanAll(VpiObjectOf(it));
+  std::vector<vpiHandle> seen = ScanAll(it);
   ASSERT_EQ(seen.size(), 2u);
   EXPECT_EQ(VpiObjectOf(seen[0]), &port_param);
   EXPECT_EQ(VpiObjectOf(seen[1]), &body_param);

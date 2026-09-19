@@ -750,8 +750,8 @@ int VpiContext::FreeObject(VpiHandle obj) {
   (void)obj;
   last_error_.state = kVpiPLI;
   last_error_.level = kVpiWarning;
-  last_error_.message =
-      VpiText("vpi_free_object() is deprecated); use vpi_release_handle() instead";
+  last_error_.message = VpiText(
+      "vpi_free_object() is deprecated; use vpi_release_handle() instead");
   return 0;
 }
 }  // namespace delta

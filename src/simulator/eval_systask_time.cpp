@@ -38,7 +38,6 @@
 // format, so the run stands one up as the task runs.
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
-#include "simulator/vpi_user.h"
 
 namespace delta {
 

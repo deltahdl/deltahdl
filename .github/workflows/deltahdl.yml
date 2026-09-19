@@ -1094,6 +1094,8 @@ jobs:
             step.stateFrom = vpiAssertion;
             step.stateTo = vpiAssertion;
             if (h != (vpiHandle)0) {
+              h = vpi_register_cb(&cb);
+              h = vpi_register_systf(&task);
               return (int)vpi_get(vpiType, h);
             }
             return (int)(value.value.integer + time.type + step.stateFrom) - 793;

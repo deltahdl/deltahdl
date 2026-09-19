@@ -40,7 +40,7 @@ int g_seen = 0;
 PLI_INT32 ReadRCalltf(PLI_BYTE8*) {
   s_vpi_value val = {};
   val.format = vpiIntVal;
-  vpi_get_value(vpi_handle_by_name("r", nullptr), &val);
+  vpi_get_value(vpi_handle_by_name(VpiText("r"), nullptr), &val);
   g_seen = val.value.integer;
   return 0;
 }
@@ -51,7 +51,8 @@ PLI_INT32 WriteRCalltf(PLI_BYTE8*) {
   s_vpi_value val = {};
   val.format = vpiIntVal;
   val.value.integer = 42;
-  vpi_put_value(vpi_handle_by_name("r", nullptr), &val, nullptr, vpiNoDelay);
+  vpi_put_value(vpi_handle_by_name(VpiText("r"), nullptr), &val, nullptr,
+                vpiNoDelay);
   return 0;
 }
 

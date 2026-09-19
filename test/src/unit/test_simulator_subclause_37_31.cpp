@@ -72,7 +72,7 @@ TEST_F(ClassDefinition, ClassMethodsIterationExcludesImplicitBuiltins) {
 
   vpiHandle it = vpi_iterate(vpiMethods, VpiHandleOf(&class_defn));
   ASSERT_NE(it, nullptr);
-  std::vector<vpiHandle> seen = ScanAll(VpiObjectOf(it));
+  std::vector<vpiHandle> seen = ScanAll(it);
 
   ASSERT_EQ(seen.size(), 2u);
   EXPECT_EQ(VpiObjectOf(seen[0]), &declared_func);
@@ -183,7 +183,7 @@ TEST_F(ClassDefinition, ConstraintIterationExcludesInlineConstraints) {
 
   vpiHandle it = vpi_iterate(vpiConstraint, VpiHandleOf(&class_defn));
   ASSERT_NE(it, nullptr);
-  std::vector<vpiHandle> seen = ScanAll(VpiObjectOf(it));
+  std::vector<vpiHandle> seen = ScanAll(it);
 
   ASSERT_EQ(seen.size(), 2u);
   EXPECT_EQ(VpiObjectOf(seen[0]), &normal_a);
@@ -207,7 +207,7 @@ TEST_F(ClassDefinition, DerivedClassesIterationReturnsDerivedClassDefns) {
 
   vpiHandle it = vpi_iterate(vpiDerivedClasses, VpiHandleOf(&base));
   ASSERT_NE(it, nullptr);
-  std::vector<vpiHandle> seen = ScanAll(VpiObjectOf(it));
+  std::vector<vpiHandle> seen = ScanAll(it);
 
   ASSERT_EQ(seen.size(), 2u);
   EXPECT_EQ(VpiObjectOf(seen[0]), &derived_a);
@@ -237,7 +237,7 @@ TEST_F(ClassDefinition, ParameterIterationReportsPortAndBodyWithLocalParam) {
 
   vpiHandle it = vpi_iterate(vpiParameter, VpiHandleOf(&class_defn));
   ASSERT_NE(it, nullptr);
-  std::vector<vpiHandle> seen = ScanAll(VpiObjectOf(it));
+  std::vector<vpiHandle> seen = ScanAll(it);
 
   ASSERT_EQ(seen.size(), 2u);
   EXPECT_EQ(VpiObjectOf(seen[0]), &port_param);
@@ -272,7 +272,7 @@ TEST_F(ClassDefinition, ExtendsArgumentIterationReturnsChainingExpressions) {
 
   vpiHandle it = vpi_iterate(vpiArgument, VpiHandleOf(&extends));
   ASSERT_NE(it, nullptr);
-  std::vector<vpiHandle> seen = ScanAll(VpiObjectOf(it));
+  std::vector<vpiHandle> seen = ScanAll(it);
 
   ASSERT_EQ(seen.size(), 2u);
   EXPECT_EQ(VpiObjectOf(seen[0]), &arg_a);

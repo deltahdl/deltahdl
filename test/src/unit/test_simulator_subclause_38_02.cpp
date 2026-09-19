@@ -1,42 +1,13 @@
 #include <gtest/gtest.h>
 
-#include <string>
-
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
-#include "simulator/net.h"
-#include "simulator/sim_context.h"
-#include "simulator/vpi_context.h"
-#include "simulator/vpi_globals.h"
+#include "helpers_vpi_error_fixture.h"
 #include "simulator/vpi_internal.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
 namespace {
 
-class VpiErrorCheckSim : public ::testing::Test {
- protected:
-  void SetUp() override { SetGlobalVpiContext(&vpi_ctx_); }
-  void TearDown() override { SetGlobalVpiContext(nullptr); }
-
-  // §38.2: drive a VPI routine into its error path so an error status is
-  // pending. vpi_register_systf() rejects a name that does not begin with a
-  // dollar sign and records a vpiError-level error (see §36.9.1 / §38.37.1).
-  void RaiseError() {
-    s_vpi_systf_data data = {};
-    data.type = vpiSysTask;
-    data.tfname = VpiText("missing_dollar");
-    vpi_register_systf(&data);
-  }
-
-  SourceManager mgr_;
-  Arena arena_;
-  Scheduler scheduler_{arena_};
-  DiagEngine diag_{mgr_};
-  SimContext sim_ctx_{scheduler_, arena_, diag_};
-  VpiContext vpi_ctx_;
-};
+using VpiErrorCheckSim = VpiErrorRaisingFixture;
 
 // §38.2 (R2): with no preceding error, vpi_chk_error() returns 0 (false) and
 // leaves the supplied structure's severity level at zero.

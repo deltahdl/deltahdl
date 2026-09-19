@@ -4,7 +4,6 @@
 #include <vector>
 
 #include "fixture_simulator.h"
-#include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_internal.h"
@@ -17,10 +16,10 @@ namespace {
 // §37.62 Event statement: the object model diagram draws the event statement
 // object traversing to the named event it triggers, and gives the event
 // statement one property access edge - "-> blocking", bool: vpiBlocking. The
-// event-stmt->named-event edge is the generic one-to-one traversal already
-// provided by the data model (and the named event object is owned by §37.27);
-// the clause's only owned content is the Boolean property. These tests observe
-// the production code apply that property through the public
+// event-VpiObjectOf(stmt)->named-event edge is the generic one-to-one traversal
+// already provided by the data model (and the named event object is owned by
+// §37.27); the clause's only owned content is the Boolean property. These tests
+// observe the production code apply that property through the public
 // vpi_get(vpiBlocking) dispatch path - both the value it reports for an event
 // statement and the vpiUndefined it returns for an object kind the property is
 // not drawn on.

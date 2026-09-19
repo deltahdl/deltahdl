@@ -792,9 +792,9 @@ bool VpiContext::RoutineIsUnavailableNow(VpiRoutine routine) {
   if (VpiRoutineAvailableInStartup(routine)) return false;
   last_error_.state = kVpiPLI;
   last_error_.level = kVpiError;
-  last_error_.message =
-      VpiText("VPI routine is not available until cbEndOfCompile); only "
-      "vpi_register_systf() and vpi_register_cb() may be called before then";
+  last_error_.message = VpiText(
+      "VPI routine is not available until cbEndOfCompile; only "
+      "vpi_register_systf() and vpi_register_cb() may be called before then");
   return true;
 }
 

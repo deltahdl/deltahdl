@@ -58,7 +58,7 @@ TEST_F(VpiIterateSim, IterateRegsOfAScopeAfterAttach) {
   vpiHandle mod = vpi_handle_by_name(VpiText("m1"), nullptr);
   ASSERT_NE(mod, nullptr);
 
-  vpiHandle iter = vpi_iterate(vpiReg, VpiHandleOf(mod));
+  vpiHandle iter = vpi_iterate(vpiReg, mod);
   ASSERT_NE(iter, nullptr);
 
   int count = 0;
@@ -136,7 +136,7 @@ int g_widest_net_size = 0;
 PLI_INT32 DisplayNetsCalltf(PLI_BYTE8*) {
   vpiHandle mod = vpi_handle_by_name(VpiText("m1"), nullptr);
   if (mod == nullptr) return 0;
-  vpiHandle itr = vpi_iterate(vpiNet, VpiHandleOf(mod));
+  vpiHandle itr = vpi_iterate(vpiNet, mod);
   if (itr == nullptr) return 0;
   for (vpiHandle net = vpi_scan(itr); net != nullptr; net = vpi_scan(itr)) {
     ++g_nets_seen;

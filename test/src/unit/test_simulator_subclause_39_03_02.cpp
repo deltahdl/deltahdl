@@ -97,10 +97,12 @@ TEST_F(AssertionStaticInformationItems, NameInstanceAndModuleDefinition) {
             &first_instance);
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiInstance, VpiHandleOf(&in_second))),
             &second_instance);
-  EXPECT_STREQ(vpi_get_str(vpiDefName, vpi_handle(vpiInstance, &in_first)),
-               "handshake");
-  EXPECT_STREQ(vpi_get_str(vpiDefName, vpi_handle(vpiInstance, &in_second)),
-               "handshake");
+  EXPECT_STREQ(
+      vpi_get_str(vpiDefName, vpi_handle(vpiInstance, VpiHandleOf(&in_first))),
+      "handshake");
+  EXPECT_STREQ(
+      vpi_get_str(vpiDefName, vpi_handle(vpiInstance, VpiHandleOf(&in_second))),
+      "handshake");
 }
 
 // §39.3.2, "assertion source information: the file, line, and column where the

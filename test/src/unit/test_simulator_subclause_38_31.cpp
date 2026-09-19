@@ -5,7 +5,6 @@
 
 #include "helpers_vpi_save_restore_probe.h"
 #include "simulator/vpi_constants.h"
-#include "simulator/vpi_data_structs.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -28,14 +27,14 @@ struct SingleWrite {
 };
 
 int WriteOnceCb(s_cb_data* cb) {
-  auto* p = static_cast<SingleWrite*>(cb->user_data);
+  auto* p = reinterpret_cast<SingleWrite*>(cb->user_data);
   p->returned = vpi_put_data(p->id, const_cast<char*>(p->data), p->len);
   return 0;
 }
 
 // A vpi_put_data() call made with a null source buffer.
 int WriteFromNullCb(s_cb_data* cb) {
-  auto* p = static_cast<SingleWrite*>(cb->user_data);
+  auto* p = reinterpret_cast<SingleWrite*>(cb->user_data);
   p->returned = vpi_put_data(p->id, nullptr, p->len);
   return 0;
 }
@@ -57,7 +56,7 @@ struct MultiWrite {
 };
 
 int WriteInterleavedCb(s_cb_data* cb) {
-  auto* p = static_cast<MultiWrite*>(cb->user_data);
+  auto* p = reinterpret_cast<MultiWrite*>(cb->user_data);
   p->ret_a1 = vpi_put_data(p->id_a, const_cast<char*>(p->a1), p->a1_len);
   p->ret_b = vpi_put_data(p->id_b, const_cast<char*>(p->b), p->b_len);
   p->ret_a2 = vpi_put_data(p->id_a, const_cast<char*>(p->a2), p->a2_len);
@@ -76,7 +75,7 @@ struct DoubleWrite {
 };
 
 int WriteTwiceCb(s_cb_data* cb) {
-  auto* p = static_cast<DoubleWrite*>(cb->user_data);
+  auto* p = reinterpret_cast<DoubleWrite*>(cb->user_data);
   p->ret1 = vpi_put_data(p->id, const_cast<char*>(p->first), p->first_len);
   p->ret2 = vpi_put_data(p->id, const_cast<char*>(p->second), p->second_len);
   return 0;

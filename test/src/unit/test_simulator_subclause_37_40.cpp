@@ -3,7 +3,6 @@
 #include <string>
 
 #include "fixture_simulator.h"
-#include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_internal.h"
@@ -121,10 +120,10 @@ TEST_F(TimingCheck, ExprIterationReturnsTermsAndExpressions) {
   bool saw_notifier = false;
   while (vpiHandle h = vpi_scan(it)) {
     ++count;
-    if (h == &ref_term) saw_ref = true;
-    if (h == &data_term) saw_data = true;
-    if (h == &limit) saw_limit = true;
-    if (h == &notifier) saw_notifier = true;
+    if (VpiObjectOf(h) == &ref_term) saw_ref = true;
+    if (VpiObjectOf(h) == &data_term) saw_data = true;
+    if (VpiObjectOf(h) == &limit) saw_limit = true;
+    if (VpiObjectOf(h) == &notifier) saw_notifier = true;
   }
 
   EXPECT_EQ(count, 3);
@@ -187,7 +186,7 @@ void ReadOneTimingCheck(vpiHandle tchk) {
   g_tchk_type = vpi_get(vpiTchkType, tchk);
 
   vpiHandle ref = vpi_handle(vpiTchkRefTerm, tchk);
-  g_ref_term_name = NameOf(VpiObjectOf(ref));
+  g_ref_term_name = NameOf(ref);
   g_ref_term_edge = ref == nullptr ? -1 : vpi_get(vpiEdge, ref);
   g_data_term_name = NameOf(vpi_handle(vpiTchkDataTerm, tchk));
   g_notifier_name = NameOf(vpi_handle(vpiTchkNotifier, tchk));

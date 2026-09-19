@@ -1,9 +1,7 @@
 #include <gtest/gtest.h>
 
-#include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_object.h"
-#include "simulator/vpi_user.h"
 
 namespace delta {
 namespace {

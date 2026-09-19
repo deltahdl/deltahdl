@@ -91,8 +91,8 @@ TEST_F(Module, TopModulesReachedByNullReferenceIteration) {
   bool saw_nested = false;
   while (vpiHandle h = vpi_scan(it)) {
     ++count;
-    if (h == top) saw_top = true;
-    if (h == nested) saw_nested = true;
+    if (VpiObjectOf(h) == top) saw_top = true;
+    if (VpiObjectOf(h) == nested) saw_nested = true;
   }
   EXPECT_EQ(count, 1);
   EXPECT_TRUE(saw_top);
@@ -151,7 +151,7 @@ TEST_F(Module, ModuleIterationOverParentScopeIsNotFilteredByTopLevel) {
   bool saw_nested = false;
   while (vpiHandle h = vpi_scan(it)) {
     ++count;
-    if (h == nested) saw_nested = true;
+    if (VpiObjectOf(h) == nested) saw_nested = true;
   }
   EXPECT_EQ(count, 1);
   EXPECT_TRUE(saw_nested);

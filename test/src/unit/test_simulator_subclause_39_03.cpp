@@ -83,7 +83,7 @@ TEST_F(AssertionStaticInformation,
   ASSERT_EQ(VpiObjectOf(assertion), &assertion_);
   ASSERT_EQ(vpi_scan(it), nullptr);
 
-  StaticAssertionInfo info = ReadStaticInfo(VpiObjectOf(assertion));
+  StaticAssertionInfo info = ReadStaticInfo(assertion);
   EXPECT_EQ(info.name, "handshake_p");
   EXPECT_EQ(info.type, vpiAssert);
   EXPECT_EQ(info.instance, &dut_);
@@ -97,7 +97,7 @@ TEST_F(AssertionStaticInformation,
 // dynamic side moves under it every time - and the name, type, instance, file
 // and line it reports afterwards are the ones it reported before any of it.
 TEST_F(AssertionStaticInformation, TheInformationDoesNotMoveWhileTheRunDoes) {
-  StaticAssertionInfo before = ReadStaticInfo(&assertion_);
+  StaticAssertionInfo before = ReadStaticInfo(VpiHandleOf(&assertion_));
 
   api_.NoteAssertionAttemptStarted("handshake_p", 10);
   api_.NoteAssertionAttemptStarted("handshake_p", 20);
@@ -110,7 +110,7 @@ TEST_F(AssertionStaticInformation, TheInformationDoesNotMoveWhileTheRunDoes) {
   // The dynamic side did move: the assertion is no longer enabled.
   ASSERT_FALSE(api_.AssertionEnabled("handshake_p"));
 
-  StaticAssertionInfo after = ReadStaticInfo(&assertion_);
+  StaticAssertionInfo after = ReadStaticInfo(VpiHandleOf(&assertion_));
   EXPECT_EQ(after.name, before.name);
   EXPECT_EQ(after.type, before.type);
   EXPECT_EQ(after.instance, before.instance);

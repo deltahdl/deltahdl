@@ -283,13 +283,13 @@ typedef PLI_UINT32* vpiHandle;
 /********************************* PROPERTIES *********************************/
 /************************** generic object properties *************************/
 
-#define vpiUndefined -1 /* undefined property */
-#define vpiType 1       /* type of object */
-#define vpiName 2       /* local name of object */
-#define vpiFullName 3   /* full hierarchical name */
-#define vpiSize 4       /* size of gate, net, port, etc. */
-#define vpiFile 5       /* File name in which the object is used*/
-#define vpiLineNo 6     /* line number where the object is used */
+#define vpiUndefined (-1) /* undefined property */
+#define vpiType 1         /* type of object */
+#define vpiName 2         /* local name of object */
+#define vpiFullName 3     /* full hierarchical name */
+#define vpiSize 4         /* size of gate, net, port, etc. */
+#define vpiFile 5         /* File name in which the object is used*/
+#define vpiLineNo 6       /* line number where the object is used */
 
 /****************************** module properties *****************************/
 
