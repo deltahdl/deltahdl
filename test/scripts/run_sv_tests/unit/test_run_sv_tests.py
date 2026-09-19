@@ -371,10 +371,7 @@ def test_string_equality_fallback_names_the_failure(rst: ModuleType) -> None:
     assert "Assertion failed" in detail
 
 
-def _evaluate_expected_rejection(
-    rst: ModuleType, tmp_path: Path, returncode: int, stderr: str,
-    tags: str = "5.10", file_name: str = "xfail.sv",
-) -> tuple[dict[str, Any], int]:
+def _write_expected_rejection(tmp_path: Path, tags: str, file_name: str) -> Path:
     sv = tmp_path / "chapter-5" / file_name
     sv.parent.mkdir(parents=True)
     tag_line = f":tags: {tags}\n" if tags else ""
@@ -382,10 +379,24 @@ def _evaluate_expected_rejection(
         f"/*\n:name: xfail\n{tag_line}"
         ":should_fail_because: bad code\n*/\nmodule m; endmodule\n"
     )
+    return sv
+
+
+def _evaluate_rejection_of_file(
+    rst: ModuleType, sv: Path, returncode: int, stderr: str,
+) -> tuple[dict[str, Any], int]:
     mock_result = MagicMock(returncode=returncode, stderr=stderr)
     with patch.object(rst.subprocess, "run", return_value=mock_result):
         evaluated: tuple[dict[str, Any], int] = rst.build_result(str(sv))
         return evaluated
+
+
+def _evaluate_expected_rejection(
+    rst: ModuleType, tmp_path: Path, returncode: int, stderr: str,
+    tags: str = "5.10",
+) -> tuple[dict[str, Any], int]:
+    sv = _write_expected_rejection(tmp_path, tags, "xfail.sv")
+    return _evaluate_rejection_of_file(rst, sv, returncode, stderr)
 
 
 def _build_result_over_a_simulation_file(
@@ -652,12 +663,14 @@ def test_rejection_for_a_file_with_no_clause_tag_evaluates_as_a_pass(
 def test_rejection_naming_the_clause_the_file_name_opens_with_evaluates_as_a_pass(
     rst: ModuleType, tmp_path: Path,
 ) -> None:
-    result, ok = _evaluate_expected_rejection(
-        rst, tmp_path, 1,
+    result, ok = _evaluate_rejection_of_file(
+        rst,
+        _write_expected_rejection(
+            tmp_path, "uvm-random uvm", "18.6.3--behavior-of-randomization-methods_5.sv",
+        ),
+        1,
         "x.sv:1:1: error: randomize() is built in and cannot be overridden"
         " (§18.6.3)\n",
-        "uvm-random uvm",
-        "18.6.3--behavior-of-randomization-methods_5.sv",
     )
     assert (ok, result["status"]) == (1, "pass")
 
@@ -665,11 +678,13 @@ def test_rejection_naming_the_clause_the_file_name_opens_with_evaluates_as_a_pas
 def test_rejection_elsewhere_than_the_clause_the_file_name_opens_with_does_not_evaluate_as_a_pass(
     rst: ModuleType, tmp_path: Path,
 ) -> None:
-    result, ok = _evaluate_expected_rejection(
-        rst, tmp_path, 1,
+    result, ok = _evaluate_rejection_of_file(
+        rst,
+        _write_expected_rejection(
+            tmp_path, "uvm-random uvm", "18.6.3--behavior-of-randomization-methods_5.sv",
+        ),
+        1,
         "uvm_factory.svh:1185:30: error: expected ')', got '(' (§13.5)\n",
-        "uvm-random uvm",
-        "18.6.3--behavior-of-randomization-methods_5.sv",
     )
     assert (ok, result["status"]) == (0, "fail")
 
@@ -677,11 +692,13 @@ def test_rejection_elsewhere_than_the_clause_the_file_name_opens_with_does_not_e
 def test_the_clause_the_file_name_opens_with_reaches_the_result(
     rst: ModuleType, tmp_path: Path,
 ) -> None:
-    result, _ = _evaluate_expected_rejection(
-        rst, tmp_path, 1,
+    result, _ = _evaluate_rejection_of_file(
+        rst,
+        _write_expected_rejection(
+            tmp_path, "uvm-random uvm", "18.8--disabling-random-variables-with-rand_mode_5.sv",
+        ),
+        1,
         "uvm_factory.svh:1185:30: error: expected ')', got '(' (§13.5)\n",
-        "uvm-random uvm",
-        "18.8--disabling-random-variables-with-rand_mode_5.sv",
     )
     assert result["clause"] == "18.8"
 
