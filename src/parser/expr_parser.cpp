@@ -392,10 +392,6 @@ Expr* MakeTextCast(Arena& arena, std::string_view type_text, SourceLoc start,
   return cast;
 }
 
-namespace {
-
-// Builds a postfix increment/decrement node wrapping an already-parsed operand,
-// using the already-consumed operator's kind. Pure node construction.
 Expr* MakePostfixUnary(Arena& arena, TokenKind op, Expr* operand) {
   auto* post = arena.Create<Expr>();
   post->kind = ExprKind::kPostfixUnary;
@@ -404,6 +400,8 @@ Expr* MakePostfixUnary(Arena& arena, TokenKind op, Expr* operand) {
   post->range.start = operand->range.start;
   return post;
 }
+
+namespace {
 
 // Builds the placeholder integer-literal node returned after an "expected
 // expression" diagnostic, so parsing can continue past the offending token.

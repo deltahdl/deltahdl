@@ -4,6 +4,7 @@
 #include <string_view>
 
 #include "common/source_loc.h"
+#include "lexer/token.h"
 
 namespace delta {
 
@@ -36,5 +37,12 @@ Expr* MakeIdentifierNode(Arena& arena, std::string_view text, SourceLoc loc);
 // A.6.9 void cast statement in parser_stmt.cpp.
 Expr* MakeTextCast(Arena& arena, std::string_view type_text, SourceLoc start,
                    Expr* value);
+
+// Builds a postfix increment/decrement node wrapping an already-parsed operand,
+// using the already-consumed operator's kind. Pure node construction; defined
+// in expr_parser.cpp after the primaries that use it, ParseThisOrSuperExpr and
+// ParseIdentifierExpr, which is why it is declared here rather than in the
+// file's anonymous namespace.
+Expr* MakePostfixUnary(Arena& arena, TokenKind op, Expr* operand);
 
 }  // namespace delta
