@@ -60,6 +60,7 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 - [Read the sv-tests log first](reading-the-sv-tests-log-first.md) — deltahdl's own output is already under every FAIL line.
 - [The sv-tests build exception](the-sv-tests-build-exception.md) — build only to run one already-failing file, only for the stdout the log drops.
 - [Fetching an sv-tests file](fetching-an-sv-tests-file.md) — `gh api` against `chipsalliance/sv-tests`, piped through `base64 -d`.
+- [sv-tests is a suite](sv-tests-is-a-suite-not-a-corpus.md) — write suite, revision, deltahdl and evaluate; never corpus, runner, score or the tool.
 
 ## Scripts and CI mechanisms
 
