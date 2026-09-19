@@ -156,6 +156,15 @@ Checks: >-
   readability-redundant-smartptr-get,
   readability-simplify-boolean-expr,
   clang-diagnostic-unused-function
+# The six files the standard prints and this repository transcribes --
+# src/simulator/vpi_user.h (Annex K.2), sv_vpi_user.h (M.2),
+# vpi_compatibility.h (L.2), svdpi.h (I.3), svdpi_src.h (H.14.3) and
+# svdpi_sv31a.h (H.14.2) -- carry the annex's text and are not rewritten for a
+# check's sake: d724ab738 had written vpiUndefined as (-1) for
+# bugprone-macro-parentheses where K.2 prints -1. A diagnostic inside one of
+# them is therefore not reported; assert-lrm-mandated-files in
+# .github/workflows/deltahdl.yml is what holds their text to the annex.
+ExcludeHeaderFilterRegex: 'src/simulator/(vpi_user|sv_vpi_user|vpi_compatibility|svdpi|svdpi_src|svdpi_sv31a)\.h$'
 # lib/cpp is named because the fixtures, helpers and models every unit test is
 # built on live there and nothing else reads them. A diagnostic raised inside a
 # header is reported only where the header's path matches this expression, and
@@ -174,12 +183,3 @@ Checks: >-
 # test/ matches no header today, the test tree holding none. It stays because a
 # header added under test/src/unit/ is to be checked from the day it is written.
 HeaderFilterRegex: '(src|test|lib/cpp)/.*\.h$'
-# The six files the standard prints and this repository transcribes --
-# src/simulator/vpi_user.h (Annex K.2), sv_vpi_user.h (M.2),
-# vpi_compatibility.h (L.2), svdpi.h (I.3), svdpi_src.h (H.14.3) and
-# svdpi_sv31a.h (H.14.2) -- carry the annex's text and are not rewritten for a
-# check's sake: d724ab738 had written vpiUndefined as (-1) for
-# bugprone-macro-parentheses where K.2 prints -1. A diagnostic inside one of
-# them is therefore not reported; assert-lrm-mandated-files in
-# .github/workflows/deltahdl.yml is what holds their text to the annex.
-ExcludeHeaderFilterRegex: 'src/simulator/(vpi_user|sv_vpi_user|vpi_compatibility|svdpi|svdpi_src|svdpi_sv31a)\.h$'

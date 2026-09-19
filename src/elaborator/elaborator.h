@@ -143,10 +143,9 @@ class Elaborator : public ElaboratorClassRules {
   void ValidateHierRefToImportedName(const ModuleDecl* decl,
                                      const RtlirModule* mod);
 
+  // §26.3: the three places an import is applied from, in reaching order.
   void ApplyCompilationUnitImports(RtlirModule* mod);
-
   void ApplyHeaderImports(const ModuleDecl* decl);
-
   void ApplyBodyImport(const ImportItem& import_item);
 
   void ValidateModports();
