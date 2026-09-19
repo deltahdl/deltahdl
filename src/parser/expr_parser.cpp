@@ -336,9 +336,21 @@ Expr* Parser::ParseThisOrSuperExpr() {
       }
     }
   }
-  if (Check(TokenKind::kLParen)) result = ParseCallExpr(result);
-  if (AtSelectBracket()) result = ParseSelectExpr(result);
-  return ParseWithClause(result);
+  // §8.11 makes `this` a handle to the object the method runs in (printed
+  // page 187 of ~/LRM.pdf), and a name reached through it takes the postfix
+  // chain any name takes -- A.8.4's method_call and A.8.6's select run on --
+  // so `this.m[k].kill()` is read here as `m[k].kill()` is, through the loop
+  // ParseIdentifierExpr uses. Reading one call and one select then stopping
+  // left the `.` before kill unread, and the statement was reported as
+  // missing its ';'.
+  result = ParseIdentifierPostfixChain(result);
+  if (Check(TokenKind::kPlusPlus) || Check(TokenKind::kMinusMinus)) {
+    auto op_tok = Consume();
+    return MakePostfixUnary(arena_, op_tok.kind, result);
+  }
+  result = ParseWithClause(result);
+  if (!result->with_expr) return result;
+  return ParseWithClauseTail(result);
 }
 
 // Declared in parser/expr_parser_internal.h, because the literal parsing in
