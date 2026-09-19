@@ -1,4 +1,5 @@
 #include <pthread.h>
+#include <sys/types.h>
 
 #include <cstddef>
 #include <cstdint>
@@ -403,7 +404,7 @@ int RunSimulationOnDeepStack(const delta::CliOptions& opts,
       pthread_attr_setstacksize(&attr, kStackBytes) != 0) {
     return RunSimulation(opts, cu, diag, arena);
   }
-  pthread_t thread;
+  pthread_t thread{};
   int created = pthread_create(&thread, &attr, RunSimulationJob, &job);
   pthread_attr_destroy(&attr);
   if (created != 0) return RunSimulation(opts, cu, diag, arena);
