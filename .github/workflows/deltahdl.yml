@@ -162,6 +162,42 @@ jobs:
             fail=1
           done
           exit $fail
+  # DO NOT edit one of the files below to satisfy a check, a compiler or a
+  # platform. Each is text IEEE 1800-2023 prints, transcribed and verified
+  # against the printed pages named beside it, and the standard is the source of
+  # truth: what a platform needs ahead of one is given by the build (the
+  # top-level CMakeLists.txt gives macOS <stdint.h> ahead of vpi_user.h), and a
+  # check the annex's text trips is excluded from the file
+  # (ExcludeHeaderFilterRegex in etc/clang_tidy/src.yml and
+  # test_src_unit.yml). CI holds no copy of the standard, so the verified text
+  # is pinned here by its SHA-256, and this job fails when a file's content no
+  # longer matches its pin. A departure the annex itself allows, or that the
+  # file's own comment names as the one it makes, is part of the pinned text.
+  # A change to one of these files is a re-verification against the annex and
+  # a new pin in the same commit, and nothing else.
+  assert-lrm-mandated-files:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Assert each LRM-mandated file matches its verified pin
+        run: |
+          set -euo pipefail
+          fail=0
+          while read -r sum path annex; do
+            actual=$(sha256sum "$path" | cut -d' ' -f1)
+            if [ "$actual" != "$sum" ]; then
+              echo "::error file=$path::$path no longer holds the text $annex prints (pinned $sum, now $actual)"
+              fail=1
+            fi
+          done <<'PINS'
+          d9b8dddebfb58a512aed9fa3cc084b05d4f8bab5546fd366f12c17574e4519a0 src/simulator/vpi_user.h Annex-K.2-(printed-pages-1306-1322)
+          f3c132bc44110ec80b876eac03ab24e256a30adf76159748b002852e924dfcbf src/simulator/sv_vpi_user.h Annex-M.2
+          9c58411f60106775e53f630ce815e258d3de141f5fe8f639d86932763f34b995 src/simulator/vpi_compatibility.h Annex-L.2
+          7f4679d41191b156e98c810b48cc14b7be4c9befb9e1bd21037270ad2e72cefa src/simulator/svdpi.h Annex-I.3
+          83dddf8e6f653dd27adfc54424811dba4d5620ed8714172970796e7235c952e7 src/simulator/svdpi_src.h Annex-H.14.3
+          49b4915aa0bb9ecbe08937d6b3cb4fe6d402913813d773507e0e6161b5e08ea8 src/simulator/svdpi_sv31a.h Annex-H.14.2
+          PINS
+          exit $fail
   # Each unit test source compiles into an executable of its own, and
   # gtest_discover_tests registers every case into CTest under the bare
   # Suite.Name with no binary to qualify it. Two files declaring one name

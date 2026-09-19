@@ -184,3 +184,12 @@ Checks: >-
 # that is the tier whose thresholds those headers answer to. No .cpp under src/
 # includes one, so naming it here would check nothing.
 HeaderFilterRegex: '(src|test)/.*\.h$'
+# The six files the standard prints and this repository transcribes --
+# src/simulator/vpi_user.h (Annex K.2), sv_vpi_user.h (M.2),
+# vpi_compatibility.h (L.2), svdpi.h (I.3), svdpi_src.h (H.14.3) and
+# svdpi_sv31a.h (H.14.2) -- carry the annex's text and are not rewritten for a
+# check's sake: d724ab738 had written vpiUndefined as (-1) for
+# bugprone-macro-parentheses where K.2 prints -1. A diagnostic inside one of
+# them is therefore not reported; assert-lrm-mandated-files in
+# .github/workflows/deltahdl.yml is what holds their text to the annex.
+ExcludeHeaderFilterRegex: 'src/simulator/(vpi_user|sv_vpi_user|vpi_compatibility|svdpi|svdpi_src|svdpi_sv31a)\.h$'
