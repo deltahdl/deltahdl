@@ -11,6 +11,8 @@
 #include "common/types.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
+#include "parser/ast_design.h"
+#include "parser/ast_module.h"
 #include "simulator/class_object.h"
 #include "simulator/dpi_arg_value.h"
 #include "simulator/dpi_runtime.h"
@@ -161,15 +163,40 @@ void RegisterModuleSubroutines(const RtlirModule* mod, SimContext& ctx) {
   }
 }
 
-void RegisterModuleDpiImports(const RtlirModule* mod, SimContext& ctx) {
-  if (mod->dpi_import_decls.empty()) return;
-  // §35.5.4 declares an imported subroutine in the scope that writes the
-  // declaration, and §35.6 has a call to one written exactly as a call to a
-  // native subroutine. The registry is what a call reaches the declaration
-  // through, so a design's declarations are put in it as the design is lowered;
-  // a design that declares no import never asks for one.
-  DpiRuntime& dpi = ctx.AcquireDpiRuntime();
-  for (const auto* item : mod->dpi_import_decls) {
+// §26.3: a package's subroutine is referenced through the package scope
+// resolution operator, `pk::f(x)`, from any scope, imported or not, so each
+// one is registered under its "pk::f" key, the key a scoped call resolves by
+// (SubroutineKey in eval_function.cpp). An import binds the bare name as
+// well, in LowerPackageItem. §8.24 keeps an out-of-block method body out of
+// the package's own subroutines.
+void RegisterPackageScopedSubroutines(const RtlirDesign* design,
+                                      SimContext& ctx, Arena& arena) {
+  for (auto* pkg : design->packages) {
+    for (auto* item : pkg->items) {
+      bool is_subroutine = item->kind == ModuleItemKind::kFunctionDecl ||
+                           item->kind == ModuleItemKind::kTaskDecl;
+      if (!is_subroutine || !item->method_class.empty()) continue;
+      auto* key = arena.Create<std::string>(std::string(pkg->name) +
+                                            "::" + std::string(item->name));
+      ctx.RegisterFunction(*key, item);
+    }
+  }
+}
+
+// §35.5.4 declares an imported subroutine in the scope that writes the
+// declaration, and §35.6 has a call to one written exactly as a call to a
+// native subroutine. The registry is what a call reaches the declaration
+// through, so a design's declarations are put in it as the design is lowered;
+// a design that declares no import never asks for one. The registry holds one
+// entry per SystemVerilog name, and a module instantiated twice registers its
+// declarations once: the second instance's are the same declarations.
+static void RegisterDpiImportDecls(const std::vector<ModuleItem*>& decls,
+                                   SimContext& ctx) {
+  DpiRuntime* dpi = nullptr;
+  for (const auto* item : decls) {
+    if (item->kind != ModuleItemKind::kDpiImport) continue;
+    if (dpi == nullptr) dpi = &ctx.AcquireDpiRuntime();
+    if (dpi->HasImport(item->name)) continue;
     DpiRtFunction func;
     func.sv_name = item->name;
     // §35.4: "If a global name is not explicitly given, it shall be the same as
@@ -220,7 +247,20 @@ void RegisterModuleDpiImports(const RtlirModule* mod, SimContext& ctx) {
       formal.type_name = arg.data_type.type_name;
       func.args.push_back(formal);
     }
-    dpi.RegisterImport(std::move(func));
+    dpi->RegisterImport(std::move(func));
+  }
+}
+
+void RegisterModuleDpiImports(const RtlirModule* mod, SimContext& ctx) {
+  RegisterDpiImportDecls(mod->dpi_import_decls, ctx);
+}
+
+void RegisterDesignScopeDpiImports(const RtlirDesign* design, SimContext& ctx) {
+  for (const auto* pkg : design->packages) {
+    RegisterDpiImportDecls(pkg->items, ctx);
+  }
+  if (design->compilation_unit != nullptr) {
+    RegisterDpiImportDecls(design->compilation_unit->cu_items, ctx);
   }
 }
 

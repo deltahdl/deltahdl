@@ -127,6 +127,10 @@ void Lowerer::LowerChildModules(const RtlirModule* mod) {
     // its own body resolves (and %m composes the instance + subroutine path);
     // LowerModule registers these for the top only.
     RegisterModuleSubroutines(child.resolved, ctx_);
+    // §35.5.4: an import declaration defines the subroutine in the scope
+    // that writes it, an instantiated module, interface or program as much as
+    // the top; the top's are registered by LowerModule.
+    RegisterModuleDpiImports(child.resolved, ctx_);
     RecordSubroutineAssertionSampleScopes(child.resolved);
     // §16.12.1: an assertion of the instance that instantiates a property or
     // sequence the instance's module declares expands it at the run, so the

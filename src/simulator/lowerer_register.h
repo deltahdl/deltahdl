@@ -72,6 +72,15 @@ void RegisterModuleSubroutines(const RtlirModule* mod, SimContext& ctx);
 // registry is acquired on the first module that declares an import, so a design
 // that declares none never makes one.
 void RegisterModuleDpiImports(const RtlirModule* mod, SimContext& ctx);
+// §35.5.4: the same for the declarations written in the scopes that are no
+// module instance -- each package's body and the compilation unit -- which a
+// call reaches through an import, the package scope resolution operator or
+// the bare name.
+void RegisterDesignScopeDpiImports(const RtlirDesign* design, SimContext& ctx);
+// §26.3: each package's subroutines under their "pk::name" keys, the keys a
+// call through the package scope resolution operator resolves by.
+void RegisterPackageScopedSubroutines(const RtlirDesign* design,
+                                      SimContext& ctx, Arena& arena);
 // §16.8 and §16.12: the module's named sequence and property declarations,
 // which an instance of one is expanded from at the run.
 void RegisterModuleSequenceDecls(const RtlirModule* mod, SimContext& ctx);

@@ -128,4 +128,120 @@ TEST(DpiImportLowering, ACallToAnUnresolvedImportIsReported) {
       "35.5.4"));
 }
 
+// §35.5.4 (printed page 977 of ~/LRM.pdf): an import declaration defines a
+// subroutine of that name in the scope the declaration is written in, and
+// the standard puts no scope off limits -- a package, an interface, a
+// program, a module that is not the top and the compilation unit each hold
+// one. Only the top module's declarations reached the registry, so a call
+// to any other's found no import and read a silent 0. Each case below has the
+// declaration registered and the call reach it: with no foreign
+// implementation bound, reaching it is what the §35.5.4 report shows.
+TEST(DpiImportLowering, AnImportDeclaredInAPackageIsRegistered) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "package p;\n"
+      "  import \"DPI-C\" function int p_add(input int a, input int b);\n"
+      "endpackage\n"
+      "module t;\n"
+      "  import p::*;\n"
+      "  int r;\n"
+      "  initial r = p_add(50, 8);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* dpi = f.ctx.GetDpiRuntime();
+  ASSERT_NE(dpi, nullptr);
+  EXPECT_TRUE(dpi->HasImport("p_add"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "imported subroutine 'p_add' is bound to no foreign implementation", 7,
+      "35.5.4"));
+}
+
+// §26.3 reaches the package's declaration through the package scope
+// resolution operator, `p::p_mul(7, 8)`, with no import written.
+TEST(DpiImportLowering, AnImportDeclaredInAPackageIsReachedThroughItsScope) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "package p;\n"
+      "  import \"DPI-C\" function int p_mul(input int a, input int b);\n"
+      "endpackage\n"
+      "module t;\n"
+      "  int r;\n"
+      "  initial r = p::p_mul(7, 8);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "imported subroutine 'p_mul' is bound to no foreign implementation", 6,
+      "35.5.4"));
+}
+
+TEST(DpiImportLowering, AnImportDeclaredInAChildModuleIsRegistered) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  import \"DPI-C\" function int m_get(input int a);\n"
+      "  int r;\n"
+      "  initial r = m_get(3);\n"
+      "endmodule\n"
+      "module t;\n"
+      "  m u1();\n"
+      "  m u2();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* dpi = f.ctx.GetDpiRuntime();
+  ASSERT_NE(dpi, nullptr);
+  EXPECT_TRUE(dpi->HasImport("m_get"));
+  EXPECT_EQ(dpi->ImportCount(), 1u);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "imported subroutine 'm_get' is bound to no foreign implementation", 4,
+      "35.5.4"));
+}
+
+TEST(DpiImportLowering, AnImportDeclaredInAnInterfaceIsRegistered) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "interface ifc;\n"
+      "  import \"DPI-C\" function int i_sub(input int a);\n"
+      "  int r;\n"
+      "  initial r = i_sub(42);\n"
+      "endinterface\n"
+      "module t;\n"
+      "  ifc i();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* dpi = f.ctx.GetDpiRuntime();
+  ASSERT_NE(dpi, nullptr);
+  EXPECT_TRUE(dpi->HasImport("i_sub"));
+}
+
+TEST(DpiImportLowering, AnImportDeclaredInTheCompilationUnitIsRegistered) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "import \"DPI-C\" function int unit_add(input int a);\n"
+      "module t;\n"
+      "  int r;\n"
+      "  initial r = unit_add(10);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* dpi = f.ctx.GetDpiRuntime();
+  ASSERT_NE(dpi, nullptr);
+  EXPECT_TRUE(dpi->HasImport("unit_add"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "imported subroutine 'unit_add' is bound to no foreign implementation", 4,
+      "35.5.4"));
+}
+
 }  // namespace

@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <cstring>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "common/arena.h"
@@ -397,10 +398,27 @@ void WritebackDpiChangedArgs(const DpiRtFunction* import,
 
 }  // namespace
 
+// §35.5.4: the name the call reaches its import declaration by -- the
+// callee text of a bare call, or, for a package's declaration named through
+// §26.3's package scope resolution operator, `p::p_mul(7, 8)`, which parses
+// as a call with no callee text and the scoped name as its base, the member
+// side of that name: the registry keys a declaration by its subroutine name.
+static std::string_view DpiCalleeName(const Expr* expr) {
+  if (!expr->callee.empty()) return expr->callee;
+  const Expr* scoped = expr->lhs;
+  if (scoped == nullptr || scoped->kind != ExprKind::kMemberAccess ||
+      !scoped->is_scope_resolution || scoped->rhs == nullptr ||
+      scoped->rhs->kind != ExprKind::kIdentifier) {
+    return {};
+  }
+  return scoped->rhs->text;
+}
+
 Logic4Vec EvalDpiCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   auto* dpi = ctx.GetDpiRuntime();
+  std::string_view callee = DpiCalleeName(expr);
   const DpiRtFunction* import =
-      dpi == nullptr ? nullptr : dpi->FindImport(expr->callee);
+      dpi == nullptr ? nullptr : dpi->FindImport(callee);
   if (import == nullptr) return MakeLogic4VecVal(arena, 1, 0);
   // §35.4 makes an imported subroutine's declaration a reference to a global
   // symbol the foreign side defines, and §35.5.4 leaves the binding of that
@@ -411,7 +429,7 @@ Logic4Vec EvalDpiCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   // foreign function that returned zero.
   if (!import->impl && !import->arg_impl) {
     ctx.GetDiag().Error(expr->range.start,
-                        "imported subroutine '" + std::string(expr->callee) +
+                        "imported subroutine '" + std::string(callee) +
                             "' is bound to no foreign implementation",
                         Subclause("35.5.4"));
     return MakeLogic4VecVal(arena, 1, 0);
@@ -431,19 +449,19 @@ Logic4Vec EvalDpiCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   // stands in is not carried here: a design's declarations reach the registry
   // by name, and which instance of a module declared one is a question
   // §35.5.3's scope chain asks that this does not yet answer.
-  dpi->EnterDeclaredImportCall(expr->callee, DpiScope{});
+  dpi->EnterDeclaredImportCall(callee, DpiScope{});
 
   DpiArgValue result;
   if (import->is_pure) {
     // §35.5.2: a pure function's call "can be ... replaced with the value
     // previously computed for the same values of the input arguments", and a
     // pure function has no output or inout formals for a copy-back to carry.
-    result = dpi->CallImportReusingPureResult(expr->callee, args);
+    result = dpi->CallImportReusingPureResult(callee, args);
   } else {
     // §35.5.1.2 and §35.6.1 copy the written formals back into the actuals;
     // §35.6.2 says which of those actuals the call actually changed.
     std::vector<DpiArgValueChange> changes;
-    result = dpi->CallImportDetectingChanges(expr->callee, args, changes);
+    result = dpi->CallImportDetectingChanges(callee, args, changes);
     WritebackDpiChangedArgs(import, binding, args, changes);
   }
 
