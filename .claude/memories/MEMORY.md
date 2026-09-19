@@ -76,6 +76,8 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 - [Solve what the session finds](solving-what-a-session-finds.md) — fix it in this session rather than filing it; a failing integration or e2e test in deltahdl.yml is the one exception.
 - [What does not get filed](what-does-not-get-filed.md) — nothing the commit in hand fixes, nothing an open issue already covers.
 - [One indivisible problem per issue](one-indivisible-problem-per-issue.md) — one defect, one fix per issue; an issue found holding two is split there and then.
+- [Research lives in issues](research-lives-in-issues.md) — a plan that outlives the session, and each finding it yields, is filed as it arises; the task list and scratchpad are not durable.
+- [Issues have no fixed form](issues-have-no-fixed-form.md) — no house style; write each so a fresh session can act on it alone.
 
 ## The notes themselves
 
