@@ -31,6 +31,18 @@ struct ParamPortList {
   std::vector<DataType>* param_types;
 };
 
+// What one parameter_port_declaration of A.1.3's parameter_port_list hands to
+// the element after the comma. A.2.1.1's `parameter` and `localparam` each
+// open a declaration whose list_of_param_assignments or
+// list_of_type_assignments (A.2.3) runs on past commas, and `type` opens the
+// second kind of list (printed pages 1174, 1181 and 1184 of ~/LRM.pdf): an
+// element written with neither keyword nor a data type is another member of
+// the list before it, and is a type parameter when that list is one of types.
+struct ParamPortGroup {
+  bool is_localparam = false;
+  bool is_type = false;
+};
+
 // The pieces of port parsing that more than one of Parser's port entry points
 // needs, gathered so that neither the ANSI nor the non-ANSI path repeats them.
 struct ParserPortHelpers {
@@ -438,6 +450,51 @@ struct ParserPortHelpers {
     p.known_types_.insert(name.text);
   }
 
+  // True at the type_identifier of a type_assignment (A.2.4) that continues
+  // the list_of_type_assignments before it: a bare identifier -- a name the
+  // parse knows as a type would open A.1.3's `data_type
+  // list_of_param_assignments` instead -- followed by `=`, `,` or `)`, since
+  // a type_assignment has no dimensions.
+  static bool AtContinuedTypeAssignment(Parser& p) {
+    if (!p.CheckIdentifier() ||
+        p.known_types_.count(p.CurrentToken().text) != 0) {
+      return false;
+    }
+    auto saved = p.lexer_.SavePos();
+    p.Consume();
+    bool continues = p.Check(TokenKind::kEq) || p.Check(TokenKind::kComma) ||
+                     p.Check(TokenKind::kRParen);
+    p.lexer_.RestorePos(saved);
+    return continues;
+  }
+
+  // One element of A.1.3's parameter_port_list. `parameter`, `localparam`,
+  // `type` and a data type each open a new parameter_port_declaration; a bare
+  // identifier continues the list the element before it belongs to, so the
+  // `T = uvm_void` of `#(type KEY = int, T = uvm_void)` declares a second type
+  // parameter rather than a value parameter named T, and `T pool[KEY];` in
+  // the body reads T as a type.
+  static void ParseParamPortDecl(Parser& p, ParamPortList& out,
+                                 ParamPortGroup& group) {
+    if (p.Match(TokenKind::kKwLocalparam)) {
+      group.is_localparam = true;
+      group.is_type = false;
+    } else if (p.Match(TokenKind::kKwParameter)) {
+      group.is_localparam = false;
+      group.is_type = false;
+    }
+    if (p.Match(TokenKind::kKwType)) {
+      group.is_type = true;
+    } else if (group.is_type && !AtContinuedTypeAssignment(p)) {
+      group.is_type = false;
+    }
+    if (group.is_type) {
+      ParseTypeParamPortDecl(p, out, group.is_localparam);
+    } else {
+      ParseValueParamPortDecl(p, out, group.is_localparam);
+    }
+  }
+
   // A value parameter declaration in a parameter_port_list.
   static void ParseValueParamPortDecl(Parser& p, ParamPortList& out,
                                       bool is_localparam_group) {
@@ -506,24 +563,21 @@ static Direction TokenToDirection(TokenKind kind) {
   }
 }
 
-void Parser::ParseParamPortDecl(
+// The parameter_port_declarations between the parentheses of A.1.3's
+// parameter_port_list, which may be none; the caller reads the parentheses,
+// whose subclause is its own.
+void Parser::ParseParamPortDecls(
     std::vector<std::pair<std::string_view, Expr*>>& params,
     std::unordered_set<std::string_view>& type_param_names,
     std::unordered_set<std::string_view>& localparam_port_names,
-    bool& is_localparam_group, std::vector<DataType>* param_types) {
-  if (Match(TokenKind::kKwLocalparam)) {
-    is_localparam_group = true;
-  } else if (Match(TokenKind::kKwParameter)) {
-    is_localparam_group = false;
-  }
-
+    std::vector<DataType>* param_types) {
+  if (Check(TokenKind::kRParen)) return;
   ParamPortList out{params, type_param_names, localparam_port_names,
                     param_types};
-  if (Match(TokenKind::kKwType)) {
-    ParserPortHelpers::ParseTypeParamPortDecl(*this, out, is_localparam_group);
-    return;
-  }
-  ParserPortHelpers::ParseValueParamPortDecl(*this, out, is_localparam_group);
+  ParamPortGroup group;
+  do {
+    ParserPortHelpers::ParseParamPortDecl(*this, out, group);
+  } while (Match(TokenKind::kComma));
 }
 
 void Parser::ParseParamsPortsAndSemicolon(ModuleDecl& decl) {
@@ -549,17 +603,8 @@ void Parser::ParseParamsPortsAndSemicolon(ModuleDecl& decl) {
     Consume();
     Expect(TokenKind::kLParen, Subclause("23.2.3"));
     decl.has_param_port_list = true;
-    if (!Check(TokenKind::kRParen)) {
-      bool is_lp_group = false;
-      ParseParamPortDecl(decl.params, decl.type_param_names,
-                         decl.localparam_port_names, is_lp_group,
-                         &decl.param_types);
-      while (Match(TokenKind::kComma)) {
-        ParseParamPortDecl(decl.params, decl.type_param_names,
-                           decl.localparam_port_names, is_lp_group,
-                           &decl.param_types);
-      }
-    }
+    ParseParamPortDecls(decl.params, decl.type_param_names,
+                        decl.localparam_port_names, &decl.param_types);
     Expect(TokenKind::kRParen, Subclause("23.2.3"));
   }
   if (Check(TokenKind::kLParen)) {

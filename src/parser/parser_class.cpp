@@ -239,13 +239,8 @@ ClassDecl* Parser::ParseClassDecl() {
   if (Check(TokenKind::kHash)) {
     Consume();
     Expect(TokenKind::kLParen, Subclause("8.25"));
-    bool is_lp_group = false;
-    while (!Check(TokenKind::kRParen) && !AtEnd()) {
-      ParseParamPortDecl(decl->params, decl->type_param_names,
-                         decl->localparam_port_names, is_lp_group,
-                         &decl->param_types);
-      Match(TokenKind::kComma);
-    }
+    ParseParamPortDecls(decl->params, decl->type_param_names,
+                        decl->localparam_port_names, &decl->param_types);
     Expect(TokenKind::kRParen, Subclause("8.25"));
   }
 

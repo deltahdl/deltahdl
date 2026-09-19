@@ -2,6 +2,9 @@
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "parser/ast_class.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_type.h"
 
 using namespace delta;
 namespace {
@@ -328,6 +331,63 @@ TEST(ParameterizedClassParsing, StaticMemberInParameterizedClass) {
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->classes.size(), 1u);
   ASSERT_GE(r.cu->classes[0]->members.size(), 2u);
+}
+
+// A.1.3's parameter_port_declaration opens with `parameter`, `localparam`,
+// `type` or a data type (printed page 1174 of ~/LRM.pdf), so the `T = int`
+// after the comma in `#(type KEY = int, T = int)` is no new declaration: it is
+// the second type_assignment of A.2.1.1's one type_parameter_declaration,
+// `type [ forward_type ] list_of_type_assignments` (printed pages 1181 and
+// 1184), and T is a type parameter as KEY is. Read as a value parameter
+// instead, T is not a type name in the body, and `T pool[KEY];` is reported
+// at `pool`.
+TEST(ParameterizedClassParsing, TypeGroupContinuesPastTheComma) {
+  auto r = Parse(
+      "class C #(type KEY = int, T = int);\n"
+      "  T pool[KEY];\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  auto* cls = r.cu->classes[0];
+  ASSERT_EQ(cls->params.size(), 2u);
+  EXPECT_EQ(cls->params[1].first, "T");
+  EXPECT_TRUE(cls->type_param_names.count("KEY"));
+  EXPECT_TRUE(cls->type_param_names.count("T"));
+  ASSERT_EQ(cls->param_types.size(), 2u);
+  EXPECT_EQ(cls->param_types[1].kind, DataTypeKind::kInt);
+  ASSERT_EQ(cls->members.size(), 1u);
+  EXPECT_EQ(cls->members[0]->name, "pool");
+  EXPECT_EQ(cls->members[0]->data_type.kind, DataTypeKind::kNamed);
+  EXPECT_EQ(cls->members[0]->data_type.type_name, "T");
+  ASSERT_EQ(cls->members[0]->unpacked_dims.size(), 1u);
+  EXPECT_EQ(cls->members[0]->unpacked_dims[0]->kind, ExprKind::kIdentifier);
+  EXPECT_EQ(cls->members[0]->unpacked_dims[0]->text, "KEY");
+}
+
+// The type group ends where a parameter_port_declaration opens: at a data
+// type, the type parameter just declared included, since `T dflt = 0` is
+// A.1.3's `data_type list_of_param_assignments`, whose list the `U = 1` after
+// it then continues.
+TEST(ParameterizedClassParsing, TypeGroupEndsAtADataType) {
+  auto r = Parse(
+      "class C #(type T = int, T dflt = 0, U = 1, int W = 4);\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  auto* cls = r.cu->classes[0];
+  ASSERT_EQ(cls->params.size(), 4u);
+  EXPECT_EQ(cls->params[1].first, "dflt");
+  EXPECT_EQ(cls->params[2].first, "U");
+  EXPECT_EQ(cls->params[3].first, "W");
+  EXPECT_TRUE(cls->type_param_names.count("T"));
+  EXPECT_FALSE(cls->type_param_names.count("dflt"));
+  EXPECT_FALSE(cls->type_param_names.count("U"));
+  EXPECT_FALSE(cls->type_param_names.count("W"));
+  ASSERT_EQ(cls->param_types.size(), 4u);
+  EXPECT_EQ(cls->param_types[1].kind, DataTypeKind::kNamed);
+  EXPECT_EQ(cls->param_types[1].type_name, "T");
 }
 
 }  // namespace
