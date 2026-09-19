@@ -5,6 +5,7 @@
 
 #include "common/arena.h"
 #include "common/types.h"
+#include "parser/ast_expr.h"
 #include "simulator/class_object.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
@@ -138,19 +139,57 @@ void RecordVariableEnumType(std::string_view var_name, const DataType& type,
   ctx.SetVariableEnumType(var_name, type.type_name);
 }
 
+// §6.19.5.1 through §6.19.5.4 give first(), last(), next() and prev() the
+// enumeration's own type as their result, so a call written as `e.m()` with
+// `e` one of those calls is itself an enum method call on that type.
+static bool ReturnsTheEnumType(std::string_view method) {
+  return method == "first" || method == "last" || method == "next" ||
+         method == "prev";
+}
+
+// The enumeration type an expression standing as the base of an enum method
+// call carries: a variable declared with the type, or a call of one of the
+// methods of §6.19.5 that return the type, whose own base decides it in turn,
+// as deep as the chain is written (`s.first().next().name()`).
+static const EnumTypeInfo* EnumTypeOfBase(const Expr* base, SimContext& ctx) {
+  if (!base) return nullptr;
+  if (base->kind == ExprKind::kIdentifier) {
+    return ctx.GetVariableEnumType(base->text);
+  }
+  if (base->kind != ExprKind::kCall) return nullptr;
+  const auto* access = base->lhs;
+  if (!access || access->kind != ExprKind::kMemberAccess) return nullptr;
+  if (!access->rhs || access->rhs->kind != ExprKind::kIdentifier)
+    return nullptr;
+  if (!ReturnsTheEnumType(access->rhs->text)) return nullptr;
+  return EnumTypeOfBase(access->lhs, ctx);
+}
+
+// The value the method starts from: the variable's own for a bare name, and
+// for a chained call the value that call yields, evaluated through this same
+// dispatch.
+static uint64_t CurrentValueOfBase(const Expr* base, SimContext& ctx,
+                                   Arena& arena) {
+  if (base->kind == ExprKind::kIdentifier) {
+    auto* var = ctx.FindVariable(base->text);
+    return var ? var->value.ToUint64() : 0;
+  }
+  return EvalExpr(base, ctx, arena).ToUint64();
+}
+
 bool TryEvalEnumMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
                            Logic4Vec& out) {
-  MethodCallParts parts;
-  if (!ExtractMethodCallParts(expr, parts)) return false;
+  if (!expr->lhs || expr->lhs->kind != ExprKind::kMemberAccess) return false;
+  const auto* access = expr->lhs;
+  if (!access->rhs || access->rhs->kind != ExprKind::kIdentifier) return false;
 
-  const auto* info = ctx.GetVariableEnumType(parts.var_name);
+  const auto* info = EnumTypeOfBase(access->lhs, ctx);
   if (!info) return false;
 
-  auto* var = ctx.FindVariable(parts.var_name);
-  uint64_t current = var ? var->value.ToUint64() : 0;
+  uint64_t current = CurrentValueOfBase(access->lhs, ctx, arena);
 
   EnumMethodArgs args{*info, current, expr, ctx, arena};
-  return DispatchEnumMethod(parts.method_name, args, out);
+  return DispatchEnumMethod(access->rhs->text, args, out);
 }
 
 bool TryEvalEnumProperty(std::string_view var_name, std::string_view method,

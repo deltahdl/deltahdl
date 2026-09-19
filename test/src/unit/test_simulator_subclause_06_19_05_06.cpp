@@ -13,6 +13,10 @@
 //       value the given enumeration variable currently holds.
 //   R2  if that value is not a member of the enumeration, name() returns the
 //       empty string "".
+//   R1 also reaches a base that is itself a call of first(), last(), next() or
+//       prev(), since §6.19.5.1 through §6.19.5.4 give those the enumeration's
+//       own type as their result; name() then reports the member that result
+//       is.
 //
 // Which string name() yields is decided entirely by how the enumeration is
 // declared (which names map to which values, §6.19) and by how the variable
@@ -287,6 +291,210 @@ module m;
 endmodule
 )";
   EXPECT_EQ(RunAndGet(src, "r"), 0u);
+}
+
+// R1, base written as an enum method call: §6.19.5.3 gives next() the
+// enumeration's own type as its result, so name() applies to that result and
+// reports the member after the variable's own. Read back through the variable
+// itself the name would be GREEN; the empty string of a call that never
+// resolved compares false.
+TEST(EnumNameMethod, NameOfNextCallResult) {
+  const char* src = R"(
+module m;
+  typedef enum { RED, GREEN, BLUE } color_t;
+  color_t c;
+  int r;
+  initial begin
+    c = GREEN;
+    r = (c.next().name() == "BLUE");
+  end
+endmodule
+)";
+  EXPECT_EQ(RunAndGet(src, "r"), 1u);
+}
+
+// R1, base written as last() (§6.19.5.2): the name reported is the last
+// member's whatever the variable holds, here the first member.
+TEST(EnumNameMethod, NameOfLastCallResult) {
+  const char* src = R"(
+module m;
+  typedef enum { RED, GREEN, BLUE } color_t;
+  color_t c;
+  int r;
+  initial begin
+    c = RED;
+    r = (c.last().name() == "BLUE");
+  end
+endmodule
+)";
+  EXPECT_EQ(RunAndGet(src, "r"), 1u);
+}
+
+// R1, base written as first() (§6.19.5.1) on a variable holding the last
+// member: the name is the first member's, not the variable's own.
+TEST(EnumNameMethod, NameOfFirstCallResultOnLastMember) {
+  const char* src = R"(
+module m;
+  typedef enum { RED, GREEN, BLUE } color_t;
+  color_t c;
+  int r;
+  initial begin
+    c = BLUE;
+    r = (c.first().name() == "RED");
+  end
+endmodule
+)";
+  EXPECT_EQ(RunAndGet(src, "r"), 1u);
+}
+
+// R1, base written as prev() (§6.19.5.4): the name is the member before the
+// variable's own.
+TEST(EnumNameMethod, NameOfPrevCallResult) {
+  const char* src = R"(
+module m;
+  typedef enum { RED, GREEN, BLUE } color_t;
+  color_t c;
+  int r;
+  initial begin
+    c = BLUE;
+    r = (c.prev().name() == "GREEN");
+  end
+endmodule
+)";
+  EXPECT_EQ(RunAndGet(src, "r"), 1u);
+}
+
+// R1, base written as next(N) with a step count (§6.19.5.3): the name is the
+// member two past the variable's own, which is neither the variable's own nor
+// the one a default step would give.
+TEST(EnumNameMethod, NameOfNextCallResultWithStepCount) {
+  const char* src = R"(
+module m;
+  typedef enum { RED, GREEN, BLUE, YELLOW } color_t;
+  color_t c;
+  int r;
+  initial begin
+    c = RED;
+    r = (c.next(2).name() == "BLUE");
+  end
+endmodule
+)";
+  EXPECT_EQ(RunAndGet(src, "r"), 1u);
+}
+
+// R1, a chain of two enum-typed calls under name(): first() yields the
+// enumeration type, next() applies to that result, and name() to the next's.
+TEST(EnumNameMethod, NameOfFirstThenNextChain) {
+  const char* src = R"(
+module m;
+  typedef enum { RED, GREEN, BLUE } color_t;
+  color_t c;
+  int r;
+  initial begin
+    c = BLUE;
+    r = (c.first().next().name() == "GREEN");
+  end
+endmodule
+)";
+  EXPECT_EQ(RunAndGet(src, "r"), 1u);
+}
+
+// §6.19.5.3, chained on itself: next() applied to the result of next() steps
+// twice from the variable's value.
+TEST(EnumNameMethod, NextChainedOnNextResult) {
+  const char* src = R"(
+module m;
+  typedef enum { RED, GREEN, BLUE, YELLOW } color_t;
+  color_t c;
+  int r;
+  initial begin
+    c = GREEN;
+    r = (c.next().next() == YELLOW);
+  end
+endmodule
+)";
+  EXPECT_EQ(RunAndGet(src, "r"), 1u);
+}
+
+// R1, inside a class method, on a local of a package-declared enumeration
+// type: name() of the next() result reports the member after the local's.
+TEST(EnumNameMethod, NameOfNextCallResultInClassMethod) {
+  const char* src = R"(
+package p;
+  typedef enum { UVM_INFO, UVM_WARNING, UVM_ERROR, UVM_FATAL } uvm_severity;
+endpackage
+import p::*;
+class rep;
+  function int check();
+    uvm_severity s;
+    s = s.first();
+    return (s.next().name() == "UVM_WARNING");
+  endfunction
+endclass
+module m;
+  int r;
+  initial begin
+    rep h;
+    h = new;
+    r = h.check();
+  end
+endmodule
+)";
+  EXPECT_EQ(RunAndGet(src, "r"), 1u);
+}
+
+// R1, inside a class method: name() of the last() result reports the last
+// member while the local holds the first.
+TEST(EnumNameMethod, NameOfLastCallResultInClassMethod) {
+  const char* src = R"(
+package p;
+  typedef enum { UVM_INFO, UVM_WARNING, UVM_ERROR, UVM_FATAL } uvm_severity;
+endpackage
+import p::*;
+class rep;
+  function int check();
+    uvm_severity s;
+    s = s.first();
+    return (s.last().name() == "UVM_FATAL");
+  endfunction
+endclass
+module m;
+  int r;
+  initial begin
+    rep h;
+    h = new;
+    r = h.check();
+  end
+endmodule
+)";
+  EXPECT_EQ(RunAndGet(src, "r"), 1u);
+}
+
+// R1, inside a class method, with a step count: name() of next(2) reports
+// the member two past the local's value.
+TEST(EnumNameMethod, NameOfNextCallResultWithStepCountInClassMethod) {
+  const char* src = R"(
+package p;
+  typedef enum { UVM_INFO, UVM_WARNING, UVM_ERROR, UVM_FATAL } uvm_severity;
+endpackage
+import p::*;
+class rep;
+  function int check();
+    uvm_severity sev;
+    sev = UVM_WARNING;
+    return (sev.next(2).name() == "UVM_FATAL");
+  endfunction
+endclass
+module m;
+  int r;
+  initial begin
+    rep h;
+    h = new;
+    r = h.check();
+  end
+endmodule
+)";
+  EXPECT_EQ(RunAndGet(src, "r"), 1u);
 }
 
 }  // namespace
