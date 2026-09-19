@@ -1,12 +1,14 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <random>
 #include <string>
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "common/types.h"
@@ -220,6 +222,27 @@ struct ClassObject {
   // (ClassDecl::param_types), which is §8.25.1's default specialization. The
   // pointed-to types live in the AST, which outlives the run.
   std::unordered_map<std::string, const DataType*> type_param_actuals;
+  // §9.4.2: the processes waiting on a change of this object's state -- an
+  // event control whose operand is a member of the object, `@(p.status)`
+  // through a handle or `@(status)` inside a method. A member write announces
+  // itself through SimContext::NotifyClassHandleWatchers, which notifies the
+  // variables designating the object and then these, so a process that
+  // reached the object through `this` alone, with no variable naming it, is
+  // woken too. The convention is Variable's: a watcher answering true is
+  // retired, one answering false stays armed.
+  std::vector<std::function<bool()>> watchers;
+
+  void AddWatcher(std::function<bool()> cb) {
+    watchers.push_back(std::move(cb));
+  }
+
+  void NotifyWatchers() {
+    auto pending = std::move(watchers);
+    for (auto& cb : pending) {
+      if (!cb()) watchers.push_back(std::move(cb));
+    }
+  }
+
   uint32_t ref_count = 0;
 
   // The handle SimContext::AllocateClassObject issued for this object, which is

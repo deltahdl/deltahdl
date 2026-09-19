@@ -215,4 +215,86 @@ TEST(EventControlSim, ForcedTargetIncrementWakesNoEventControl) {
   EXPECT_EQ(p->value.ToUint64(), 5u);
 }
 
+// §9.4.2 detects an implicit event on any change in the value of the
+// expression, and a member of an object reached through a handle is an
+// expression like any other. The member is written through a second handle
+// to the same object, once with the value it already holds (no change, so no
+// event) and once with a new one, so the wake-up time reads 4 rather than 2,
+// and the value read after the wake-up is the new one. Before the fix the
+// operand resolved to no variable and the process waited for ever, leaving
+// woke at 0.
+TEST(EventControlSim, MemberOfAnObjectThroughAHandleWakesAnEventControl) {
+  SimFixture f;
+  auto* woke = RunAndFindVar(
+      "class Packet;\n"
+      "  int status = 1;\n"
+      "endclass\n"
+      "module t;\n"
+      "  Packet p, q;\n"
+      "  int woke;\n"
+      "  initial begin\n"
+      "    p = new;\n"
+      "    q = p;\n"
+      "    #2 q.status = 1;\n"
+      "    #2 q.status = 2;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    #1;\n"
+      "    @(p.status) woke = $time * 10 + p.status;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "woke");
+  ASSERT_NE(woke, nullptr);
+  EXPECT_EQ(woke->value.ToUint64(), 42u);
+}
+
+// §9.4.2 with §8.6 and §8.11: inside a class task the object's own property
+// is named bare or as `this.x`, and an event control on it wakes when another
+// process writes the property through a handle. Each task records the time
+// of its wake-up; `posedge` on a one-bit property is an edge event (Table
+// 9-2), detected on the 0-to-1 transition at time 6 and not on the 1-to-0 at
+// time 4. The three tasks are enabled from module-level fork branches, each
+// call binding `this` (§13.3 with §8.6). Before the fix none of the controls
+// ever woke and the result stayed 0.
+TEST(EventControlSim, OwnPropertyInsideAMethodWakesAnEventControl) {
+  SimFixture f;
+  auto* result = RunAndFindVar(
+      "class Mon;\n"
+      "  int status;\n"
+      "  bit flag;\n"
+      "  int woke_bare, woke_this, woke_edge;\n"
+      "  task wait_bare();\n"
+      "    @(status) woke_bare = $time;\n"
+      "  endtask\n"
+      "  task wait_this();\n"
+      "    @(this.status) woke_this = $time;\n"
+      "  endtask\n"
+      "  task wait_edge();\n"
+      "    @(posedge flag) woke_edge = $time;\n"
+      "  endtask\n"
+      "endclass\n"
+      "module t;\n"
+      "  Mon m;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    m = new;\n"
+      "    m.flag = 1;\n"
+      "    fork\n"
+      "      m.wait_bare();\n"
+      "      m.wait_this();\n"
+      "      m.wait_edge();\n"
+      "      begin\n"
+      "        #3 m.status = 7;\n"
+      "        #1 m.flag = 0;\n"
+      "        #2 m.flag = 1;\n"
+      "      end\n"
+      "    join\n"
+      "    result = m.woke_bare * 100 + m.woke_this * 10 + m.woke_edge;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "result");
+  ASSERT_NE(result, nullptr);
+  EXPECT_EQ(result->value.ToUint64(), 336u);
+}
+
 }  // namespace

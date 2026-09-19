@@ -184,6 +184,10 @@ void SimContext::NotifyClassHandleWatchers(uint64_t handle) {
   for (const auto& [func, frame] : static_frames_) {
     for (const auto& [name, var] : frame) notify_if_designates(name, var);
   }
+  // §9.4.2: and the processes watching the object itself, which an event
+  // control on one of its members armed there (EventAwaiter in
+  // src/simulator/awaiters_event_control.h).
+  if (auto* obj = GetClassObject(handle)) obj->NotifyWatchers();
 }
 
 void SimContext::CollectGarbage() {

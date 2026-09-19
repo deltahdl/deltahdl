@@ -29,6 +29,7 @@
 #include "common/types.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
+#include "simulator/class_object.h"
 #include "simulator/clocking.h"
 #include "simulator/evaluation.h"
 #include "simulator/process.h"
@@ -60,6 +61,17 @@ struct EdgeSpec {
 struct ResumeTarget {
   SimContext& ctx;
   Process* proc;
+};
+
+// §9.4.2 with §8: the per-operand watch state for an event control on a
+// member of a class object: the object by its handle (see
+// ResolveMemberObjectHandle), the member's name, the baseline the change is
+// measured from, and the guard the operands of one event control share.
+struct MemberOperand {
+  uint64_t handle;
+  std::string_view member;
+  const std::shared_ptr<Logic4Snapshot>& prev;
+  const std::shared_ptr<bool>& consumed;
 };
 
 // The shared per-operand watch state for a compound (non-identifier) event
@@ -194,6 +206,51 @@ inline Variable* ResolveSignalToVariable(const Expr* signal, SimContext& ctx) {
   return nullptr;
 }
 
+// §9.4.2 with §8: whether the operand's base denotes a class object -- `this`
+// or `super` inside a method, a class-typed variable, a class-typed property
+// of the running method's object, or a member access down such a base. Only
+// such a base is evaluated to a handle below, so a hierarchical name that
+// resolved to nothing stays as it was, skipped, rather than evaluated for a
+// diagnostic it never raised.
+inline bool DenotesAClassObject(const Expr* base, SimContext& ctx) {
+  if (base == nullptr) return false;
+  if (base->kind == ExprKind::kIdentifier) {
+    if (base->text == "this" || base->text == "super")
+      return ctx.CurrentThis() != nullptr;
+    if (!ctx.GetVariableClassType(base->text).empty()) return true;
+    auto* self = ctx.CurrentThis();
+    return self != nullptr && self->type != nullptr &&
+           self->type->FindProperty(base->text) != nullptr;
+  }
+  return base->kind == ExprKind::kMemberAccess && !base->is_scope_resolution &&
+         DenotesAClassObject(base->lhs, ctx);
+}
+
+// §9.4.2 with §8.5, §8.6 and §8.11: the object whose member the event-control
+// operand names, and the member, when the operand is one -- `p.status`
+// through a handle or a chain of them, `this.status`, or the bare `status`
+// of the running method's object -- else null. The object is answered by its
+// handle rather than a pointer, since the garbage collector of §8.4 may sweep
+// it while a process still waits, and the waiter then finds nothing to read.
+inline uint64_t ResolveMemberObjectHandle(const Expr* signal, SimContext& ctx,
+                                          std::string_view& member) {
+  const ClassObject* obj = nullptr;
+  if (signal->kind == ExprKind::kIdentifier) {
+    member = signal->text;
+    obj = ctx.CurrentThis();
+  } else if (signal->kind == ExprKind::kMemberAccess &&
+             !signal->is_scope_resolution &&
+             DenotesAClassObject(signal->lhs, ctx)) {
+    member = MemberAccessField(signal);
+    Logic4Vec base = EvalExpr(signal->lhs, ctx, ctx.GetArena());
+    obj = ctx.GetClassObject(base.ToUint64());
+  }
+  if (obj == nullptr || obj->type == nullptr ||
+      obj->type->FindProperty(member) == nullptr)
+    return kNullClassHandle;
+  return obj->handle;
+}
+
 struct EventAwaiter {
   SimContext& ctx;
   const std::vector<EventExpr>& events;
@@ -282,7 +339,10 @@ struct EventAwaiter {
         continue;
       }
       Variable* var = ResolveSignalToVariable(ev.signal, ctx);
-      if (!var) continue;
+      if (!var) {
+        AttachClassMemberWatcher(ev, h, proc, consumed);
+        continue;
+      }
       if (var->is_event) {
         AttachEventVarWatcher(var, ev.iff_condition, h, ResumeTarget{ctx, proc},
                               consumed);
@@ -492,6 +552,58 @@ struct EventAwaiter {
     if (!trigger.resume) return trigger.removed;
     ResumeMaybeReactive(h, target.proc, target.ctx, spec.edge == Edge::kNone);
     return true;
+  }
+
+  // §9.4.2: an implicit event on a member of a class object is detected on a
+  // change of that member's value, and an edge event on its LSB, as for any
+  // other expression. The operand resolves to no variable -- the member is a
+  // slot of the object, not a Variable -- so this arms on the object itself,
+  // which every member write reaches through
+  // SimContext::NotifyClassHandleWatchers, and reads the member back from the
+  // object at each notification. Before this the operand was skipped and the
+  // process waited for ever: `@(p.status)` at module scope, `@(status)` and
+  // `@(this.status)` inside a method, `@(posedge h.flag)`.
+  static bool EvalMemberWatcher(std::coroutine_handle<> h,
+                                const MemberOperand& op, const EdgeSpec& spec,
+                                ResumeTarget target) {
+    if (*op.consumed) return true;
+    if (target.proc && !target.proc->active) return true;
+    if (target.proc && target.proc->is_suspended) return false;
+    const ClassObject* obj = target.ctx.GetClassObject(op.handle);
+    if (obj == nullptr) return true;
+    Logic4Vec cur = obj->GetProperty(op.member, target.ctx.GetArena());
+    if (Logic4VecBitsEqual(cur, op.prev->Get())) return false;
+    bool edge_passes = spec.edge == Edge::kNone ||
+                       CheckEdgeOnValues(op.prev->Get(), cur, spec.edge);
+    op.prev->Capture(cur);
+    if (!edge_passes) return false;
+    if (spec.iff_cond &&
+        !EvalExpr(spec.iff_cond, target.ctx, target.ctx.GetArena()).IsTruthy())
+      return false;
+    *op.consumed = true;
+    ResumeMaybeReactive(h, target.proc, target.ctx, spec.edge == Edge::kNone);
+    return true;
+  }
+
+  void AttachClassMemberWatcher(const EventExpr& ev, std::coroutine_handle<> h,
+                                Process* proc,
+                                const std::shared_ptr<bool>& consumed) {
+    std::string_view member;
+    uint64_t handle = ResolveMemberObjectHandle(ev.signal, ctx, member);
+    if (handle == kNullClassHandle) return;
+    auto prev = std::make_shared<Logic4Snapshot>();
+    prev->Capture(
+        ctx.GetClassObject(handle)->GetProperty(member, ctx.GetArena()));
+    auto* ctx_ptr = &ctx;
+    const Expr* iff_cond = ev.iff_condition;
+    Edge edge = ev.edge;
+    ctx.GetClassObject(handle)->AddWatcher([h, handle, member, prev, consumed,
+                                            edge, iff_cond, ctx_ptr,
+                                            proc]() mutable {
+      return EvalMemberWatcher(h, MemberOperand{handle, member, prev, consumed},
+                               EdgeSpec{edge, iff_cond},
+                               ResumeTarget{*ctx_ptr, proc});
+    });
   }
 
   void AttachCompoundWatchers(const EventExpr& ev, std::coroutine_handle<> h,
