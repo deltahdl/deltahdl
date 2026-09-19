@@ -65,35 +65,68 @@ CheckOptions:
   readability-identifier-naming.LocalConstantCase: CamelCase
   readability-identifier-naming.LocalConstantPrefix: k
   readability-identifier-naming.MethodCase: CamelCase
-  # C++ standard: coroutine promise/awaitable + container concept methods
-  readability-identifier-naming.MethodIgnoredRegexp: 'get_return_object|initial_suspend|final_suspend|return_void|return_value|unhandled_exception|await_ready|await_suspend|await_resume|push_back|begin|end|size|empty|data'
+  # C++ standard: coroutine promise/awaitable + container concept methods.
+  # Parenthesized for the reason FunctionIgnoredRegexp's comment gives: bare,
+  # the check's ^…$ anchors bind to the first and last alternatives alone,
+  # and an append_item passed on end.
+  readability-identifier-naming.MethodIgnoredRegexp: '(get_return_object|initial_suspend|final_suspend|return_void|return_value|unhandled_exception|await_ready|await_suspend|await_resume|push_back|begin|end|size|empty|data)'
   readability-identifier-naming.NamespaceCase: lower_case
   readability-identifier-naming.ParameterCase: lower_case
-  # IEEE 1800-2023 Annex K.2 and Annex I.3: the parameter names the
-  # prototypes of vpi_user.h and svdpi.h carry as the annexes print them
-  readability-identifier-naming.ParameterIgnoredRegexp: 'refHandle|refHandle1|refHandle2|numOfBytes|dataLoc|fileName|scopeName|userKey|userData|lineNumber'
+  # IEEE 1800-2023: the parameter names the prototypes of vpi_user.h and
+  # svdpi.h carry as the annexes print them, each in the order printed: the
+  # six of Annex K.2, refHandle, refHandle1 and refHandle2 on printed page
+  # 1320 and fileName, dataLoc and numOfBytes on page 1321, then the four of
+  # Annex I.3, scopeName, userKey and userData on page 1297 and lineNumber on
+  # page 1298, where fileName is printed a second time. Parenthesized for the
+  # reason FunctionIgnoredRegexp's comment gives.
+  readability-identifier-naming.ParameterIgnoredRegexp: '(refHandle|refHandle1|refHandle2|fileName|dataLoc|numOfBytes|scopeName|userKey|userData|lineNumber)'
   readability-identifier-naming.PrivateMemberCase: lower_case
   readability-identifier-naming.PrivateMemberSuffix: '_'
   readability-identifier-naming.ProtectedMemberCase: lower_case
   readability-identifier-naming.ProtectedMemberSuffix: '_'
   readability-identifier-naming.PublicMemberCase: lower_case
-  # IEEE 1800-2023 Annex M: the members of s_vpi_assertion_step_info and
-  # s_vpi_attempt_info as the annex spells them
-  readability-identifier-naming.PublicMemberIgnoredRegexp: 'stateFrom|stateTo|failExpr|attemptStartTime'
+  # IEEE 1800-2023 Annex M.2: the members of s_vpi_assertion_step_info and
+  # s_vpi_attempt_info as the annex spells them on printed page 1335, in the
+  # order printed. Parenthesized for the reason FunctionIgnoredRegexp's
+  # comment gives.
+  readability-identifier-naming.PublicMemberIgnoredRegexp: '(stateFrom|stateTo|failExpr|attemptStartTime)'
   readability-identifier-naming.ScopedEnumConstantCase: CamelCase
   readability-identifier-naming.ScopedEnumConstantPrefix: k
   readability-identifier-naming.StaticConstantCase: CamelCase
   readability-identifier-naming.StaticConstantPrefix: k
-  # C++23 coroutine promise_type [coroutine.handle]
-  # IEEE 1800-2023 Annex I/K/L/M C struct tags (t_vpi_*, s_vpi_*, t_cb_data)
   readability-identifier-naming.StructCase: CamelCase
-  readability-identifier-naming.StructIgnoredRegexp: 'promise_type|t_vpi_.*|s_vpi_.*|t_cb_data'
+  # C++23 coroutine promise_type [coroutine.handle]
+  # IEEE 1800-2023: every struct tag the C API's include files print, each in
+  # the order printed: the ten of Annex K.2's vpi_user.h, t_vpi_time and
+  # t_vpi_delay on printed page 1315, t_vpi_vecval, t_vpi_strengthval,
+  # t_vpi_value and t_vpi_arrayvalue on pages 1315 to 1316, t_vpi_systf_data,
+  # t_vpi_vlog_info, t_vpi_error_info and t_cb_data on page 1318; and the two
+  # of Annex M.2's sv_vpi_user.h, t_vpi_assertion_step_info and
+  # t_vpi_attempt_info on page 1335. Annex I.3's svdpi.h repeats t_vpi_vecval
+  # and t_vpi_time on pages 1293 to 1294 and prints no tag of its own, and
+  # Annex L.2's vpi_compatibility.h prints none. Parenthesized for the reason
+  # FunctionIgnoredRegexp's comment gives.
+  readability-identifier-naming.StructIgnoredRegexp: '(promise_type|t_vpi_time|t_vpi_delay|t_vpi_vecval|t_vpi_strengthval|t_vpi_value|t_vpi_arrayvalue|t_vpi_systf_data|t_vpi_vlog_info|t_vpi_error_info|t_cb_data|t_vpi_assertion_step_info|t_vpi_attempt_info)'
   readability-identifier-naming.TemplateParameterCase: CamelCase
   readability-identifier-naming.TypeAliasCase: CamelCase
   readability-identifier-naming.TypedefCase: CamelCase
-  # IEEE 1800-2023 Annex I/K/L/M: VPI/DPI C-API typedefs and struct tags,
-  # with Annex K.2's vpiHandle and PLI_ sized types
-  readability-identifier-naming.TypedefIgnoredRegexp: 's_vpi_.*|s_cb_data|p_cb_data|sv[A-Z].*|t_vpi_.*|p_vpi_.*|vpi_assertion_callback_func|vpiHandle|PLI_.*'
+  # IEEE 1800-2023: every typedef name the C API's include files print, each
+  # in the order printed. Annex K.2's vpi_user.h: the six sized types of the
+  # portability help's _MSC_VER branch, uint64_t through int8_t, on printed
+  # page 1306; PLI_INT64 through PLI_UBYTE8 on page 1307; vpiHandle on page
+  # 1308; the s_vpi_ and p_vpi_ names of each struct, s_vpi_time and
+  # p_vpi_time through p_vpi_error_info, on pages 1315 to 1318; and
+  # s_cb_data and p_cb_data on page 1319. Annex M.2's sv_vpi_user.h:
+  # s_vpi_assertion_step_info through p_vpi_attempt_info and
+  # vpi_assertion_callback_func on page 1335. Annex I.3's svdpi.h: svScalar,
+  # svBit, svLogic, svLogicVecVal and svBitVecVal on page 1293, svTimeVal,
+  # svScope and svOpenArrayHandle on page 1294, and, in the deprecated
+  # portion, svBitVec32, svLogicVec32, svBitPackedArrRef and
+  # svLogicPackedArrRef on page 1299; its sized types, s_vpi_vecval,
+  # p_vpi_vecval, s_vpi_time and p_vpi_time repeat Annex K.2's. Annex L.2's
+  # vpi_compatibility.h prints none. Parenthesized for the reason
+  # FunctionIgnoredRegexp's comment gives.
+  readability-identifier-naming.TypedefIgnoredRegexp: '(uint64_t|uint32_t|uint8_t|int64_t|int32_t|int8_t|PLI_INT64|PLI_UINT64|PLI_INT32|PLI_UINT32|PLI_INT16|PLI_UINT16|PLI_BYTE8|PLI_UBYTE8|vpiHandle|s_vpi_time|p_vpi_time|s_vpi_delay|p_vpi_delay|s_vpi_vecval|p_vpi_vecval|s_vpi_strengthval|p_vpi_strengthval|s_vpi_value|p_vpi_value|s_vpi_arrayvalue|p_vpi_arrayvalue|s_vpi_systf_data|p_vpi_systf_data|s_vpi_vlog_info|p_vpi_vlog_info|s_vpi_error_info|p_vpi_error_info|s_cb_data|p_cb_data|s_vpi_assertion_step_info|p_vpi_assertion_step_info|s_vpi_attempt_info|p_vpi_attempt_info|vpi_assertion_callback_func|svScalar|svBit|svLogic|svLogicVecVal|svBitVecVal|svTimeVal|svScope|svOpenArrayHandle|svBitVec32|svLogicVec32|svBitPackedArrRef|svLogicPackedArrRef)'
   readability-identifier-naming.VariableCase: lower_case
 # bugprone-random-generator-seed disabled: IEEE 1800-2023 18.13/18.14
 # randomization tests use fixed seeds on purpose to assert reproducible
