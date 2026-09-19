@@ -44,6 +44,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     preprocessor/preprocessor.cpp
     preprocessor/preprocessor_lines.cpp
     preprocessor/preprocessor_inline.cpp
+    preprocessor/preprocessor_inline_cond.cpp
     preprocessor/preprocessor_directives.cpp
     preprocessor/preprocessor_macros.cpp
     preprocessor/preprocessor_protect_in_effect.cpp

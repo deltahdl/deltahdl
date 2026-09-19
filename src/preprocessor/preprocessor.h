@@ -232,6 +232,8 @@ class Preprocessor {
   std::string ExpandInlineConditionals(std::string_view line);
   std::string ExpandInlineMacros(std::string_view line, uint32_t file_id,
                                  uint32_t line_num);
+  std::string ExpandSubstitutedBody(std::string_view body, uint32_t file_id,
+                                    uint32_t line_num);
   size_t ExpandSingleInlineMacro(std::string_view line, size_t pos,
                                  uint32_t file_id, uint32_t line_num,
                                  std::string& result);
