@@ -181,6 +181,11 @@ VpiHandle VpiIterateInCompatibilityMode(int type, VpiHandle ref, int mode) {
 
 }  // namespace delta
 
+// The variants are the names Annex L.2's macros give the routines Annex K.2
+// declares inside extern "C", so an application that selected a mode calls
+// each with C linkage, and the definitions carry the same linkage.
+extern "C" {
+
 // IEEE Std 1364-1995.
 PLI_INT32 vpi_compare_objects_1364v1995(vpiHandle obj1, vpiHandle obj2) {
   return vpi_compare_objects(obj1, obj2);
@@ -512,3 +517,5 @@ vpiHandle vpi_iterate_1800v2012(PLI_INT32 type, vpiHandle ref) {
       type, delta::VpiObjectOf(ref),
       delta::GetGlobalVpiContext().EffectiveCompatibilityMode(true, 0)));
 }
+
+}  // extern "C"
