@@ -36,12 +36,15 @@
 // integer array was a vpiRegArray under every version, and vpiArray was the
 // unknown property under the IEEE 1364 modes it is defined for.
 
-// The compile-based variants, declared as vpi_compatibility.cpp defines them
+// The compile-based variants, declared as vpi_compatibility.cpp defines them,
+// with the C linkage Annex K.2 gives the prototypes Annex L.2 renames to these,
 // so that one translation unit can ask each version without selecting one
 // before the headers, which admits a single version per unit.
+extern "C" {
 PLI_INT32 vpi_get_1364v1995(PLI_INT32 property, vpiHandle obj);
 PLI_INT32 vpi_get_1364v2001(PLI_INT32 property, vpiHandle obj);
 PLI_INT32 vpi_get_1364v2005(PLI_INT32 property, vpiHandle obj);
+}
 
 namespace delta {
 namespace {
