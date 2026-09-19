@@ -124,6 +124,28 @@ void ValidateNameSpacePackages(const CompilationUnit* unit, DiagEngine& diag) {
   }
 }
 
+// True where a compilation-unit item declares a name of the unit's scope that
+// §3.13(c) holds to one declaration. An import or export declares none; an
+// item an anonymous program contributed is that program's; §6.18's forward
+// typedef (`typedef interface class IC;`, carried as a kTypedef with an
+// implicit aliased type) is a forward declaration and not a definition, so it
+// does not redeclare the eventual class or typedef of the same name, an
+// unresolved one being reported separately; and §8.24's out-of-block method
+// body, the item whose method_class names its class, declares its name in the
+// class's scope and none in the unit's, so `Base::compute` and
+// `Derived::compute` standing together are two methods and no redeclaration,
+// a class's own duplicate members being the class checks' to report.
+static bool DeclaresACuScopeName(const ModuleItem* item) {
+  if (item->kind == ModuleItemKind::kImportDecl ||
+      item->kind == ModuleItemKind::kExportDecl)
+    return false;
+  if (item->from_anonymous_program) return false;
+  if (item->kind == ModuleItemKind::kTypedef &&
+      item->typedef_type.kind == DataTypeKind::kImplicit)
+    return false;
+  return item->method_class.empty();
+}
+
 void ValidateNameSpaceCompilationUnit(const CompilationUnit* unit,
                                       DiagEngine& diag) {
   // The library a declaration belongs to is part of what identifies it.
@@ -147,24 +169,7 @@ void ValidateNameSpaceCompilationUnit(const CompilationUnit* unit,
     }
   };
   for (auto* item : unit->cu_items) {
-    if (item->kind == ModuleItemKind::kImportDecl ||
-        item->kind == ModuleItemKind::kExportDecl)
-      continue;
-    if (item->from_anonymous_program) continue;
-    // §6.18: a forward typedef (e.g. `typedef interface class IC;`, carried as
-    // a kTypedef with an implicit aliased type) is a forward declaration, not a
-    // definition; it does not redeclare the eventual class or typedef of the
-    // same name. An unresolved forward typedef is reported separately.
-    if (item->kind == ModuleItemKind::kTypedef &&
-        item->typedef_type.kind == DataTypeKind::kImplicit)
-      continue;
-    // §8.24: an out-of-block method body, the item whose method_class names
-    // its class, declares its name in the class's scope and none in the
-    // compilation unit's, so `Base::compute` and `Derived::compute` standing
-    // together are two methods and no redeclaration; a class's own duplicate
-    // members are the class checks' to report.
-    if (!item->method_class.empty()) continue;
-    check_cu({}, item->name, item->loc);
+    if (DeclaresACuScopeName(item)) check_cu({}, item->name, item->loc);
   }
   for (auto* cls : unit->classes) check_cu({}, cls->name, cls->range.start);
   // §3.2 counts a checker a design element and §33.2.1 counts a design element
