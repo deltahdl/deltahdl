@@ -653,4 +653,149 @@ TEST(ClassConstructorSim, NewCallNamedArgumentWithoutAValueTakesTheDefault) {
             27u);
 }
 
+// §8.7 has the target of an assignment decide what a `new` written without a
+// class name constructs, and §8.9 makes a static property one storage shared by
+// the class, which §8.10 lets a static method name bare. The singleton below is
+// UVM's own shape (`if (m_inst == null) m_inst = new;`), and a static method
+// has no `this` to resolve the name against: an evaluator that answered the
+// `new` only for a variable or for a property of the invoking object stored a
+// null handle in m_inst, so the call returned null and `a.tag` never read 7.
+// The second call has to find the first call's object, so the two handles are
+// compared and a null one answers 0.
+TEST(ClassConstructorSim,
+     StaticMethodConstructsTheStaticHandlePropertyItTests) {
+  EXPECT_EQ(RunAndGet("class root;\n"
+                      "  static root m_inst;\n"
+                      "  int tag = 7;\n"
+                      "  static function root in_direct();\n"
+                      "    if (m_inst == null) m_inst = new();\n"
+                      "    return m_inst;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    root a, b;\n"
+                      "    a = root::in_direct();\n"
+                      "    b = root::in_direct();\n"
+                      "    result = (a != null && a == b) ? a.tag : 0;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            7u);
+}
+
+// §8.24: the body of an extern static method is written outside the class with
+// the class name as its scope, and §8.10 still gives it the class's static
+// properties by bare name, so the `new` in it is resolved against the same
+// declared type as one written in the class body.
+TEST(ClassConstructorSim,
+     OutOfBlockStaticMethodConstructsAStaticHandleProperty) {
+  EXPECT_EQ(RunAndGet("class root;\n"
+                      "  static root m_inst;\n"
+                      "  int tag = 23;\n"
+                      "  extern static function root out_direct();\n"
+                      "endclass\n"
+                      "function root root::out_direct();\n"
+                      "  m_inst = new();\n"
+                      "  return m_inst;\n"
+                      "endfunction\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    root c;\n"
+                      "    c = root::out_direct();\n"
+                      "    result = (c == null) ? 0 : c.tag;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            23u);
+}
+
+// §8.10 has a static method reach the class's own storage, and it keeps doing
+// so when an instance method is the caller: the caller's object is still the
+// running `this` while the static method executes, and the `new` has to land
+// in the class's static property rather than on that object. The module reads
+// the static back through §8.9's scope form, which a handle stored on the
+// caller's object never reaches, so that mistake answers 0.
+TEST(ClassConstructorSim,
+     StaticMethodReachedFromAnInstanceConstructsTheClassesStorage) {
+  EXPECT_EQ(RunAndGet("class leaf;\n"
+                      "  int q = 41;\n"
+                      "endclass\n"
+                      "class root;\n"
+                      "  static leaf m_inst;\n"
+                      "  static function void build();\n"
+                      "    m_inst = new;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "class caller;\n"
+                      "  function void go();\n"
+                      "    root::build();\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    caller c = new;\n"
+                      "    leaf l;\n"
+                      "    c.go();\n"
+                      "    l = root::m_inst;\n"
+                      "    result = (l == null) ? 0 : l.q;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            41u);
+}
+
+// §8.7 with the argument list written out: `new()` and `new` are the one
+// constructor call, and an instance method's bare property name resolves the
+// type to construct from the property's declaration.
+TEST(ClassConstructorSim,
+     InstanceMethodConstructsAHandlePropertyWithParenthesizedNew) {
+  EXPECT_EQ(RunAndGet("class Inner;\n"
+                      "  int q = 29;\n"
+                      "endclass\n"
+                      "class Outer;\n"
+                      "  Inner child;\n"
+                      "  function void build();\n"
+                      "    child = new();\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    Outer o = new;\n"
+                      "    o.build();\n"
+                      "    result = (o.child == null) ? 0 : o.child.q;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            29u);
+}
+
+// §8.9's `C::x` names a static property from outside the class, and §8.7 gives
+// a `new` assigned to it the property's declared type, with no object of C and
+// no method of C involved.
+TEST(ClassConstructorSim,
+     ClassScopedStaticHandlePropertyConstructedFromAModule) {
+  EXPECT_EQ(RunAndGet("class leaf;\n"
+                      "  int q = 53;\n"
+                      "endclass\n"
+                      "class root;\n"
+                      "  static leaf m_inst;\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    leaf l;\n"
+                      "    root::m_inst = new;\n"
+                      "    l = root::m_inst;\n"
+                      "    result = (l == null) ? 0 : l.q;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            53u);
+}
+
 }  // namespace

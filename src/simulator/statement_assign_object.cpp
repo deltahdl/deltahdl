@@ -5,10 +5,10 @@
 // another array, by assigning the result of §7.12.5's map(), or from an
 // '{index:value} literal -- and §8.3 has `new` construct a class object and
 // return the handle the target then holds, in the bare, the shallow-copy, the
-// class-scope `C::new` and the `obj.field = new` forms. Neither family sizes a
-// right-hand value against the width of its target the way §10.7 does for a
-// vector, so each is answered whole before the generic path evaluates an rhs
-// at all, and all of them are reached from one run of
+// class-scope `C::new`, the `obj.field = new` and the `C::field = new` forms.
+// Neither family sizes a right-hand value against the width of its target the
+// way §10.7 does for a vector, so each is answered whole before the generic
+// path evaluates an rhs at all, and all of them are reached from one run of
 // TryDispatchSpecialBlockingAssign.
 //
 // That dispatch, and the vector-target writers around it, stay in
@@ -199,11 +199,31 @@ bool TryTypedClassNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   return true;
 }
 
-// §8.4 / §8.12: `obj.field = new` where field is a class handle. The bare `new`
+// The class whose property `field = new` names: the declared class of the
+// variable `base` when it is a class handle, and otherwise, when `base` is
+// itself a class name and the class has a static property of that name, the
+// class -- §8.9's `C::x` form, which §8.7 gives the same right to a bare `new`
+// as any other target. Null when the base is neither.
+static const ClassTypeInfo* MemberNewBaseClass(std::string_view base,
+                                               std::string_view field,
+                                               SimContext& ctx) {
+  auto base_type = ctx.GetVariableClassType(base);
+  if (!base_type.empty()) return ctx.FindClassType(base_type);
+  const auto* cls = ctx.FindClassType(base);
+  if (cls == nullptr) return nullptr;
+  if (cls->static_properties.find(std::string(field)) ==
+      cls->static_properties.end())
+    return nullptr;
+  return cls;
+}
+
+// §8.4 / §8.12: `obj.field = new` where field is a class handle, and §8.9's
+// `C::field = new` where field is a static class handle of C. The bare `new`
 // carries no type context, so resolve field's declared class type from the AST,
 // construct the object, and store the resulting handle through the member chain
 // (WriteStructField reaches the real nested handle, so a later shallow copy
-// shares it rather than falling back to a flat "field.x" key).
+// shares it rather than falling back to a flat "field.x" key, and reaches the
+// class's own storage for the static form).
 bool TryMemberClassNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (!stmt->rhs || stmt->rhs->kind != ExprKind::kCall) return false;
   if (stmt->rhs->text != "new") return false;
@@ -212,9 +232,8 @@ bool TryMemberClassNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     return false;
   if (!stmt->lhs->rhs || stmt->lhs->rhs->kind != ExprKind::kIdentifier)
     return false;
-  auto base_type = ctx.GetVariableClassType(stmt->lhs->lhs->text);
-  if (base_type.empty()) return false;
-  const auto* cls = ctx.FindClassType(base_type);
+  const auto* cls =
+      MemberNewBaseClass(stmt->lhs->lhs->text, stmt->lhs->rhs->text, ctx);
   if (cls == nullptr) return false;
   auto field_type = MemberClassTypeName(cls, stmt->lhs->rhs->text);
   if (field_type.empty() || ctx.FindClassType(field_type) == nullptr)

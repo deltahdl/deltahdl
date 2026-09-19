@@ -103,6 +103,36 @@ bool TryFuncClassPropertyWrite(const Expr* lhs, const Logic4Vec& val,
   return true;
 }
 
+// §8.7 and §8.9: the target of the `new` is a static property of the running
+// method's class, named by its bare name as §8.10 lets a static method name it,
+// and its declared class type is what is constructed. The storage is the
+// class's own, shared by every instance and by a static method running with no
+// instance at all, so the handle is written where TryFuncClassPropertyWrite
+// writes any other value of the property: before `this` is consulted, because
+// a static method reached from an instance method still has that method's
+// object on the stack, and the write belongs to the class rather than to it.
+// Returns false when the class has no static property of the name or the
+// property is not class-typed.
+static bool TryStaticClassNewAssign(const Stmt* stmt,
+                                    std::string_view field_name,
+                                    SimContext& ctx, Arena& arena) {
+  const ClassTypeInfo* method_cls = ctx.CurrentMethodClass();
+  if (method_cls == nullptr) return false;
+  std::string key(field_name);
+  if (method_cls->static_properties.find(key) ==
+      method_cls->static_properties.end())
+    return false;
+  auto field_type = MemberClassTypeName(method_cls, field_name);
+  if (field_type.empty() || ctx.FindClassType(field_type) == nullptr)
+    return false;
+  // The constructor runs before the slot is looked up again: it may write the
+  // same property itself, and the map is not iterated across that run.
+  Logic4Vec handle =
+      EvalClassNew(field_type, stmt->rhs, ctx, arena, stmt->rhs->range.start);
+  method_cls->static_properties[key] = handle;
+  return true;
+}
+
 // §8.7: `new` has no type of its own -- "the left-hand side of the assignment
 // determines the return type" -- so a bare `new` reaches evaluation with
 // nothing to say what to construct, and evaluating it as an ordinary expression
@@ -113,12 +143,19 @@ bool TryFuncClassPropertyWrite(const Expr* lhs, const Logic4Vec& val,
 // property being written, which is the bare identifier itself or the field of a
 // `this.field` target.
 //
+// A static property is answered first, by TryStaticClassNewAssign: a static
+// method has no `this` (§8.10), and without that arm `m_inst = new;` inside
+// `if (m_inst == null)` -- the singleton every UVM core service is built on --
+// fell through to the ordinary path, which evaluated the `new` to a null handle
+// and stored that.
+//
 // Returns false when the target is not a class-handle property, leaving every
 // other assignment to the ordinary path.
 static bool TrySelfClassNewAssign(const Stmt* stmt, std::string_view field_name,
                                   SimContext& ctx, Arena& arena) {
   if (!stmt->rhs || stmt->rhs->kind != ExprKind::kCall) return false;
   if (stmt->rhs->text != "new") return false;
+  if (TryStaticClassNewAssign(stmt, field_name, ctx, arena)) return true;
   auto* self = ctx.CurrentThis();
   if (self == nullptr) return false;
   const ClassTypeInfo* enclosing = ctx.CurrentMethodClass();
