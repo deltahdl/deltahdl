@@ -25,6 +25,7 @@
 #include <string_view>
 #include <vector>
 
+#include "common/diagnostic.h"
 #include "common/types.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
@@ -70,22 +71,86 @@ struct CompoundOperand {
   const Expr* signal;
 };
 
+// The member a member-access event-control operand names: `clk` in `v.clk`.
+// The parser leaves the name either in the rhs identifier or in the node's
+// own text, as TryVirtualInterfaceMember in src/simulator/eval_expr.cpp reads
+// it, so both places are looked at here.
+inline std::string_view MemberAccessField(const Expr* signal) {
+  if (signal->rhs && signal->rhs->kind == ExprKind::kIdentifier)
+    return signal->rhs->text;
+  return signal->text;
+}
+
+// The name of the bound instance's component that a member access through a
+// virtual interface variable denotes, `top.dif.clk` for `v.clk` with `v` bound
+// to `top.dif`, written to `name`. Answers true when the base is a virtual
+// interface variable, leaving `name` empty for an unbound one; false for any
+// other base, with `name` untouched. Unlike ResolveVirtualInterfaceSignal it
+// reports nothing: it serves the compound-operand path, where the expression
+// is also evaluated as a whole and that evaluation reports an unbound base.
+inline bool CollectVirtualInterfaceMember(const Expr* signal, SimContext& ctx,
+                                          std::string& name) {
+  if (!signal->lhs || signal->lhs->kind != ExprKind::kIdentifier) return false;
+  auto* base = ctx.FindVariable(signal->lhs->text);
+  if (!ctx.IsVirtualInterfaceVar(base)) return false;
+  name.clear();
+  if (!ctx.VirtualInterfaceIsBound(base)) return true;
+  name = ctx.VirtualInterfaceBinding(base);
+  name += ".";
+  name += MemberAccessField(signal);
+  return true;
+}
+
+// §25.9: a virtual interface variable represents an interface instance, and
+// once it is initialized every component of that instance is reached through
+// it by the dot notation -- the clause's own transactor waits on
+// `@(posedge bus.grant)` with `bus` such a variable. The variable an event
+// control has to watch is therefore the bound instance's own, which is what a
+// read through the variable reaches (TryVirtualInterfaceMember in
+// src/simulator/eval_expr.cpp) and what a write reaches
+// (ResolveVirtualInterfaceField in src/simulator/statement_assign.cpp).
+//
+// Answers true when the operand's base names a virtual interface variable,
+// bound or not, and then leaves in *out the instance's variable for the
+// member, or nullptr where the base is unbound. §25.9 makes a reference
+// through an unbound virtual interface a fatal run-time error, so that case
+// is reported here as the read path reports it rather than left to arm no
+// watcher and wait for nothing. Answers false for any other base, which the
+// caller then resolves as before.
+//
+// Before this, `@(posedge v.clk)` fell through to the flattened name `v.clk`,
+// which SimContext::FindVariable does not hold -- the virtual interface
+// variable has no component of its own, the instance has them -- so the
+// operand was skipped and the process was never resumed.
+inline bool ResolveVirtualInterfaceSignal(const Expr* signal, SimContext& ctx,
+                                          Variable** out) {
+  *out = nullptr;
+  std::string target;
+  if (!CollectVirtualInterfaceMember(signal, ctx, target)) return false;
+  if (target.empty()) {
+    ctx.GetDiag().Error(signal->range.start,
+                        "reference through a null virtual interface",
+                        Subclause("25.9"));
+    return true;
+  }
+  *out = ctx.FindVariable(target);
+  return true;
+}
+
 // Resolves a member-access event-control signal down to a Variable*. Tries a
-// clocking-block member first, then falls back to a flattened hierarchical
-// name lookup. Returns nullptr when neither resolves.
+// clocking-block member first, then a component reached through a virtual
+// interface variable, then falls back to a flattened hierarchical name
+// lookup. Returns nullptr when none resolves.
 inline Variable* ResolveMemberAccessSignal(const Expr* signal,
                                            SimContext& ctx) {
   Variable* var = nullptr;
   if (signal->lhs && signal->lhs->kind == ExprKind::kIdentifier) {
     auto* mgr = ctx.GetClockingManager();
-    std::string_view member;
-    if (signal->rhs && signal->rhs->kind == ExprKind::kIdentifier)
-      member = signal->rhs->text;
-    else if (!signal->text.empty())
-      member = signal->text;
+    std::string_view member = MemberAccessField(signal);
     if (mgr && !member.empty())
       var = mgr->ResolveClockingMember(signal->lhs->text, member, ctx);
   }
+  if (!var && ResolveVirtualInterfaceSignal(signal, ctx, &var)) return var;
   if (!var) {
     std::string hier_name;
     BuildLhsName(signal, hier_name);
@@ -301,6 +366,15 @@ struct EventAwaiter {
   // on the node's shape is what keeps every method call on that path without
   // this walk having to enumerate them.
   //
+  // §25.9: `vif.a` in `@(vif.a & vif.b)` is a component of the interface
+  // instance the virtual interface variable is bound to, so what is watched
+  // is that instance's variable under its own name, the one the direct path
+  // resolves through ResolveVirtualInterfaceSignal. The flattened `vif.a`
+  // names nothing, and descending to `vif` watched a handle no component
+  // write ever touches. An unbound base contributes no name; the evaluation
+  // of the whole expression that AttachCompoundWatchers makes before
+  // collecting reports the §25.9 error for it.
+  //
   // The arena owns the flattened name, the collected names being string_views
   // that outlive this call in the watcher closures.
   static void CollectExprIdentifiers(const Expr* e, SimContext& ctx,
@@ -312,6 +386,10 @@ struct EventAwaiter {
     }
     if (e->kind == ExprKind::kMemberAccess && !e->is_scope_resolution) {
       auto* flattened = ctx.GetArena().Create<std::string>();
+      if (CollectVirtualInterfaceMember(e, ctx, *flattened)) {
+        if (!flattened->empty()) out.push_back(*flattened);
+        return;
+      }
       BuildLhsName(e, *flattened);
       if (!flattened->empty() && ctx.FindVariable(*flattened) != nullptr) {
         out.push_back(*flattened);
@@ -415,11 +493,15 @@ struct EventAwaiter {
   void AttachCompoundWatchers(const EventExpr& ev, std::coroutine_handle<> h,
                               Process* proc,
                               const std::shared_ptr<bool>& consumed) {
+    // The baseline is taken before the names are collected: this evaluation
+    // is what reports a §25.9 reference through an unbound virtual interface
+    // in the operand, and it has to run even when that leaves no name to
+    // watch.
+    auto prev = std::make_shared<Logic4Snapshot>();
+    prev->Capture(EvalExpr(ev.signal, ctx, ctx.GetArena()));
     std::vector<std::string_view> names;
     CollectExprIdentifiers(ev.signal, ctx, names);
     if (names.empty()) return;
-    auto prev = std::make_shared<Logic4Snapshot>();
-    prev->Capture(EvalExpr(ev.signal, ctx, ctx.GetArena()));
     auto* ctx_ptr = &ctx;
     const Expr* signal = ev.signal;
     const Expr* iff_cond = ev.iff_condition;

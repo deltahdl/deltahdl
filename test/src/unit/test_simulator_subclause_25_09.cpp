@@ -2,6 +2,7 @@
 
 #include "fixture_simulator.h"
 #include "helpers_reported_error.h"
+#include "helpers_scheduler.h"
 #include "simulator/lowerer.h"
 
 using namespace delta;
@@ -322,6 +323,172 @@ TEST(VirtualInterfaceSim, WriteThroughNullVirtualInterfaceIsReported) {
   LowerAndRun(design, f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "reference through a null virtual interface", 12,
+                            "25.9"));
+}
+
+// §25.9: once a virtual interface variable is initialized, every component of
+// the interface instance it represents is reached through it by the dot
+// notation, and the clause's own transactor waits on a posedge of one that
+// way. §9.4.2 then detects the posedge on the instance's variable as on any
+// other. The process resumes at the edge, so `x` records 30, the time of the
+// 0-to-1 transition. Recording 10 would mean the negedge at 10 resumed it, a
+// level wait rather than a posedge one; 0 that nothing resumed it before the
+// watchdog ended the run, which is what an event control that resolved `v.clk`
+// to nothing did.
+TEST(VirtualInterfaceSim, EventControlPosedgeThroughVirtualInterface) {
+  EXPECT_EQ(RunAndGet("interface bus_if; logic clk; endinterface\n"
+                      "module top;\n"
+                      "  bus_if dif();\n"
+                      "  virtual bus_if v;\n"
+                      "  integer x;\n"
+                      "  initial begin\n"
+                      "    x = 0;\n"
+                      "    dif.clk = 1;\n"
+                      "    v = dif;\n"
+                      "    @(posedge v.clk);\n"
+                      "    x = $time;\n"
+                      "  end\n"
+                      "  initial begin\n"
+                      "    #10 dif.clk = 0;\n"
+                      "    #20 dif.clk = 1;\n"
+                      "  end\n"
+                      "  initial #200 $finish;\n"
+                      "endmodule\n",
+                      "top.x"),
+            30u);
+}
+
+// §9.4.2: a non-edge implicit event is detected on any change of the
+// expression, so `@(v.clk)` resumes on the 1-to-0 transition at 20, which a
+// posedge wait would let pass; 60, the later posedge, is what such a wait
+// would record, and 0 what an unarmed one leaves.
+TEST(VirtualInterfaceSim, EventControlLevelThroughVirtualInterface) {
+  EXPECT_EQ(RunAndGet("interface bus_if; logic clk; endinterface\n"
+                      "module top;\n"
+                      "  bus_if dif();\n"
+                      "  virtual bus_if v;\n"
+                      "  integer x;\n"
+                      "  initial begin\n"
+                      "    x = 0;\n"
+                      "    dif.clk = 1;\n"
+                      "    v = dif;\n"
+                      "    @(v.clk);\n"
+                      "    x = $time;\n"
+                      "  end\n"
+                      "  initial begin\n"
+                      "    #20 dif.clk = 0;\n"
+                      "    #40 dif.clk = 1;\n"
+                      "  end\n"
+                      "  initial #200 $finish;\n"
+                      "endmodule\n",
+                      "top.x"),
+            20u);
+}
+
+// §9.4.2: every operand of an `or` list is watched, so a change on `v.b`
+// alone resumes the process at 35. Recording 70, when `v.a` changes, would
+// mean only the first operand reached the instance.
+TEST(VirtualInterfaceSim, OrListEventControlThroughVirtualInterface) {
+  EXPECT_EQ(RunAndGet("interface bus_if; logic a, b; endinterface\n"
+                      "module top;\n"
+                      "  bus_if dif();\n"
+                      "  virtual bus_if v;\n"
+                      "  integer x;\n"
+                      "  initial begin\n"
+                      "    x = 0;\n"
+                      "    dif.a = 0;\n"
+                      "    dif.b = 0;\n"
+                      "    v = dif;\n"
+                      "    @(v.a or v.b);\n"
+                      "    x = $time;\n"
+                      "  end\n"
+                      "  initial begin\n"
+                      "    #35 dif.b = 1;\n"
+                      "    #35 dif.a = 1;\n"
+                      "  end\n"
+                      "  initial #200 $finish;\n"
+                      "endmodule\n",
+                      "top.x"),
+            35u);
+}
+
+// §9.4.2: a change in an operand of the expression without a change in its
+// result is not an event, so `@(v.a & v.b)` lets the change of `v.a` at 15
+// pass and resumes when `v.b` makes the conjunction 1 at 40. Recording 15
+// would mean the operands were watched as two bare names rather than as the
+// one expression; 0 that the names were collected from the handle rather
+// than from the instance and nothing resumed the process.
+TEST(VirtualInterfaceSim, CompoundEventControlThroughVirtualInterface) {
+  EXPECT_EQ(RunAndGet("interface bus_if; logic a, b; endinterface\n"
+                      "module top;\n"
+                      "  bus_if dif();\n"
+                      "  virtual bus_if v;\n"
+                      "  integer x;\n"
+                      "  initial begin\n"
+                      "    x = 0;\n"
+                      "    dif.a = 0;\n"
+                      "    dif.b = 0;\n"
+                      "    v = dif;\n"
+                      "    @(v.a & v.b);\n"
+                      "    x = $time;\n"
+                      "  end\n"
+                      "  initial begin\n"
+                      "    #15 dif.a = 1;\n"
+                      "    #25 dif.b = 1;\n"
+                      "  end\n"
+                      "  initial #200 $finish;\n"
+                      "endmodule\n",
+                      "top.x"),
+            40u);
+}
+
+// §25.9: an event control names a component through the virtual interface
+// exactly as a read does, so waiting on one through an unbound variable is
+// the same fatal run-time error a read through it is, reported at the wait
+// rather than left as a process that nothing will ever resume. Line 7 is the
+// `@(posedge v.clk);`.
+TEST(VirtualInterfaceSim, EventControlThroughNullVirtualInterfaceIsReported) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "interface bus_if; logic clk; endinterface\n"
+      "module top;\n"
+      "  bus_if dif();\n"
+      "  virtual bus_if v;\n"
+      "  initial begin\n"
+      "    v = null;\n"
+      "    @(posedge v.clk);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "reference through a null virtual interface", 7,
+                            "25.9"));
+}
+
+// §25.9: the same violation in a compound operand. The operands of
+// `v.a & v.b` are reached through an unbound variable, and the expression is
+// evaluated when the wait arms whatever names it yields to watch, so the
+// error is reported at line 6, the `@(v.a & v.b);`, whether or not any
+// watcher was armed.
+TEST(VirtualInterfaceSim,
+     CompoundEventControlThroughNullVirtualInterfaceIsReported) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "interface bus_if; logic a, b; endinterface\n"
+      "module top;\n"
+      "  bus_if dif();\n"
+      "  virtual bus_if v;\n"
+      "  initial begin\n"
+      "    @(v.a & v.b);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "reference through a null virtual interface", 6,
                             "25.9"));
 }
 
