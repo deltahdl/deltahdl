@@ -49,6 +49,42 @@ static void StoreClassPropertyDefault(const ClassTypeInfo* info,
   obj->properties[scoped] = val;
 }
 
+// §8.12: the object `new src` copies, the one `src` names, shallow-copied as
+// TryExecClassShallowCopy in statement_assign_decl.cpp copies it for a
+// variable; null where the initializer names no source or no object.
+static ClassObject* ShallowCopyOfNewSource(const Expr* init, SimContext& ctx,
+                                           Arena& arena) {
+  if (!init->lhs || init->lhs->kind != ExprKind::kIdentifier) return nullptr;
+  auto* src = ctx.GetClassObject(EvalExpr(init->lhs, ctx, arena).ToUint64());
+  return src ? src->ShallowCopy(arena) : nullptr;
+}
+
+// §8.7: the `new` initializer of a class-typed property -- `baseA a = new;`,
+// `= new(7)` or §8.12's `= new src` -- constructs an object of the property's
+// declared class, or shallow-copies the one `src` names, and answers its
+// handle through `out`. A bare `new` names no class of its own, so evaluating
+// it as an ordinary expression constructs nothing and left the property a
+// null handle; the declared type supplies the class, as TryLowerClassNewVarInit
+// in lowerer_var.cpp and TryExecClassVarDecl in statement_assign_decl.cpp do
+// for a variable. The actuals are bound with the enclosing object as `this`
+// (BindCallerConstructorArgs), so `= new(i)` reads the enclosing object's `i`.
+// False for any other initializer, or for a property of no class type.
+static bool TryInitClassPropertyNew(const ClassTypeInfo::PropertyInfo& prop,
+                                    SimContext& ctx, Arena& arena,
+                                    Logic4Vec& out) {
+  const Expr* init = prop.init_expr;
+  if (init->kind != ExprKind::kCall || init->text != "new") return false;
+  if (prop.type_name.empty() || !ctx.FindClassType(prop.type_name)) {
+    return false;
+  }
+  if (ClassObject* copy = ShallowCopyOfNewSource(init, ctx, arena)) {
+    out = MakeLogic4VecVal(arena, 64, ctx.AllocateClassObject(copy));
+    return true;
+  }
+  out = EvalClassNew(prop.type_name, init, ctx, arena, init->range.start);
+  return true;
+}
+
 // §8.7: the property `prop` of the level `info` of `obj` initialized to its
 // explicit default if one is given, otherwise to its type's uninitialized
 // value — X for a 4-state type, 0 for a 2-state one — rather than being
@@ -67,6 +103,10 @@ static void InitClassPropertyDefault(const ClassTypeInfo* info,
     return;
   }
   Logic4Vec val;
+  if (prop.init_expr && TryInitClassPropertyNew(prop, ctx, arena, val)) {
+    StoreClassPropertyDefault(info, prop, val, obj, arena);
+    return;
+  }
   if (prop.init_expr) {
     // §6.8 executes a declaration's initializer as an assignment to the
     // declared object, so it is coerced into the property exactly as a later

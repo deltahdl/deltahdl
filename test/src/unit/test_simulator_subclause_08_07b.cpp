@@ -200,4 +200,88 @@ TEST(ClassConstructorSim, LocalDeclarationAheadOfLeadingSuperNew) {
             73u);
 }
 
+// §8.7: a class-typed property with the declaration initializer `= new` holds
+// an object constructed when the enclosing object is, with that object's own
+// initializers run -- §8.12's example, `baseA a = new;` in B, where baseA's j
+// is 5. The result packs `b1.a.j` and `b1.i`; an initializer that constructed
+// nothing read j as 0, giving 1 where 51 is expected.
+TEST(ClassConstructorSim, ClassTypedPropertyNewInitializerConstructsItsObject) {
+  EXPECT_EQ(RunAndGet("class baseA;\n"
+                      "  int j = 5;\n"
+                      "endclass\n"
+                      "class B;\n"
+                      "  int i = 1;\n"
+                      "  baseA a = new;\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    B b1;\n"
+                      "    b1 = new;\n"
+                      "    result = b1.a.j * 10 + b1.i;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            51u);
+}
+
+// §8.7: the arguments of a property's `= new(...)` initializer are passed to
+// the constructor of the property's class, and that class's own property
+// initializers have run when its constructor body reads them: `new(7)` adds
+// 7 to the 5 baseA's j starts at. A construction that dropped the argument
+// would read 5, one that skipped the constructor body 5, and one that ran the
+// body before the initializers 7.
+TEST(ClassConstructorSim, ClassTypedPropertyNewInitializerBindsItsArguments) {
+  EXPECT_EQ(RunAndGet("class baseA;\n"
+                      "  int j = 5;\n"
+                      "  function new(int v);\n"
+                      "    j = j + v;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "class B;\n"
+                      "  baseA a = new(7);\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    B b1;\n"
+                      "    b1 = new;\n"
+                      "    result = b1.a.j;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            12u);
+}
+
+// §8.12: a shallow copy `b2 = new b1` copies b1's handles and not the objects
+// they name, so the baseA that b1's property initializer constructed is the
+// one object behind both `b1.a` and `b2.a`: writing `b2.a.j = 50` is seen
+// through `b1.a.j`, the two handles compare equal, and b1's own `i` keeps 1
+// beside b2's 10. The result packs `b1.a.j`, `b1.i` and the comparison; an
+// initializer that constructed nothing left the write unseen, giving 11.
+TEST(ClassConstructorSim,
+     ShallowCopySharesTheObjectAPropertyInitializerConstructed) {
+  EXPECT_EQ(
+      RunAndGet("class baseA;\n"
+                "  int j = 5;\n"
+                "endclass\n"
+                "class B;\n"
+                "  int i = 1;\n"
+                "  baseA a = new;\n"
+                "endclass\n"
+                "module t;\n"
+                "  int result;\n"
+                "  initial begin\n"
+                "    B b1, b2;\n"
+                "    b1 = new;\n"
+                "    b2 = new b1;\n"
+                "    b2.i = 10;\n"
+                "    b2.a.j = 50;\n"
+                "    result = b1.a.j * 100 + b1.i * 10 + (b1.a == b2.a);\n"
+                "  end\n"
+                "endmodule\n",
+                "result"),
+      5011u);
+}
+
 }  // namespace
