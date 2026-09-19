@@ -10,9 +10,11 @@
 #include "helpers_scheduler.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
+#include "parser/ast_type.h"
 #include "simulator/class_object.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
+#include "simulator/statement_assign_internal.h"
 
 using namespace delta;
 
@@ -94,7 +96,13 @@ ClassObject* ConstructWithParamOverride(SimFixture& f, Expr* override_expr) {
   auto* obj = f.arena.Create<ClassObject>();
   obj->type = type;
   auto handle = f.ctx.AllocateClassObject(obj);
-  f.ctx.SetVariableClassParamExprs("c", {override_expr});
+  // The actuals as the parser records a declaration's `#(...)`: a value
+  // actual is an implicit type carrying its expression.
+  auto* actuals = f.arena.Create<std::vector<DataType>>();
+  DataType actual;
+  actual.type_ref_expr = override_expr;
+  actuals->push_back(actual);
+  RecordClassParamActuals("c", *actuals, f.ctx);
   ApplyClassParamOverrides("c", handle, f.ctx, f.arena);
   return obj;
 }

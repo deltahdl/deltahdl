@@ -11,6 +11,7 @@
 #include "common/types.h"
 #include "elaborator/type_eval.h"
 #include "lexer/token.h"
+#include "parser/ast_class.h"
 #include "parser/ast_expr.h"
 #include "simulator/class_object.h"
 #include "simulator/evaluation_internal.h"
@@ -29,14 +30,33 @@ namespace delta {
 // instance method reads it as a property of `this`, resolved against the class
 // in which the running method is defined so a base method reads the base field
 // even when a derived class shadows the name.
+// §8.25: whether `name` is a value parameter of the class `decl` declares,
+// one of its parameter port list.
+static bool DeclaresValueParam(const ClassDecl* decl, std::string_view name) {
+  if (decl == nullptr) return false;
+  for (const auto& [pname, pexpr] : decl->params) {
+    if (pname == name) return decl->type_param_names.count(name) == 0;
+  }
+  return false;
+}
+
 static Logic4Vec EvalIdentifierClassScope(const Expr* expr, SimContext& ctx,
                                           Arena& arena) {
   const ClassTypeInfo* method_cls = ctx.CurrentMethodClass();
+  auto* self = ctx.CurrentThis();
+  // §8.25: a value parameter read inside a method of a specialized class is
+  // the value the object's specialization bound it to, held on the object
+  // (ApplyClassParamOverrides), and the class's own storage holds the
+  // default alone, so the object is asked first where there is one.
+  if (self != nullptr && method_cls != nullptr &&
+      DeclaresValueParam(method_cls->decl, expr->text)) {
+    auto it = self->properties.find(std::string(expr->text));
+    if (it != self->properties.end()) return it->second;
+  }
   if (method_cls) {
     auto it = method_cls->static_properties.find(std::string(expr->text));
     if (it != method_cls->static_properties.end()) return it->second;
   }
-  auto* self = ctx.CurrentThis();
   // §6.19: a literal of an enumeration the class declares, tried before the
   // property read, which answers a value for an unknown name all the same.
   const ClassTypeInfo* scope = method_cls ? method_cls
