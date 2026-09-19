@@ -155,8 +155,9 @@ XXTERN void svGetPartselBit(svBitVecVal* d, const svBitVecVal* s, int i, int w);
 XXTERN void svGetPartselLogic(svLogicVecVal* d, const svLogicVecVal* s, int i,
                               int w);
 
-XXTERN void svPutPartselBit(svBitVecVal* d, svBitVecVal s, int i, int w);
-XXTERN void svPutPartselLogic(svLogicVecVal* d, svLogicVecVal s, int i, int w);
+XXTERN void svPutPartselBit(svBitVecVal* d, const svBitVecVal s, int i, int w);
+XXTERN void svPutPartselLogic(svLogicVecVal* d, const svLogicVecVal s, int i,
+                              int w);
 
 /*
  * Open array querying functions
