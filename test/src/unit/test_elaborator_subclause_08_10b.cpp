@@ -114,9 +114,9 @@ TEST(StaticMethodExprPositions, BlockLocalInAForConditionIsAccepted) {
 
 // A.2.4 gives `variable_decl_assignment ::= variable_identifier
 // { variable_dimension } [ = expression ]`, and Parser::ParseBlockDataDecl puts
-// that expression in Stmt::var_init (src/parser/parser_stmt.cpp:400). This is
-// the position #3321 opens with, because naming a property in the initializer
-// of a local is the plainest way there is to write the access.
+// that expression in Stmt::var_init (src/parser/parser_block_item_decl.cpp).
+// This is the position #3321 opens with, because naming a property in the
+// initializer of a local is the plainest way there is to write the access.
 TEST(StaticMethodExprPositions, PropertyInAVariableInitializerIsReported) {
   ExpectPropertyAccessReported("int j = i;");
 }
@@ -203,13 +203,14 @@ TEST(StaticMethodExprPositions, BlockLocalInAnEventIffConditionIsAccepted) {
 // are named events rather than arbitrary expressions, so the source declares
 // two, and both are non-static properties standing in the same position.
 //
-// This position has no accepting counterpart. An `event` cannot be declared
-// inside the method body to shadow the property: Parser::IsDataTypeKeyword
-// (src/parser/parser_stmt.cpp:91) omits TokenKind::kKwEvent, so
-// Parser::IsBlockVarDeclStartCore refuses the line and it is read as an
+// This position has no accepting counterpart. An `event` could not be declared
+// inside the method body to shadow the property when this case was written:
+// IsDataTypeKeyword, then in src/parser/parser_stmt.cpp and now in
+// src/parser/parser_token_skips.h, omitted TokenKind::kKwEvent, so
+// Parser::IsBlockVarDeclStartCore refused the line and it was read as an
 // expression statement. A.2.1.3 and A.2.2.1 admit `event` in a
-// data_declaration, so that is a defect in the parser rather than a rule; #3322
-// records it.
+// data_declaration, so that was a defect in the parser rather than a rule;
+// #3322 recorded it and is closed, and the case stands as it was written.
 TEST(StaticMethodExprPositions, PropertyInAWaitOrderListIsReported) {
   ElabFixture f;
   std::string src =

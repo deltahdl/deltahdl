@@ -184,11 +184,13 @@ TEST(EventComparisonElaborator, OperatorKindsReportDistinguishably) {
 // src/elaborator/elaborator_validate_internal.h, and each case below rewrites
 // that addition in one newly reached position.
 //
-// Parser::IsDataTypeKeyword in src/parser/parser_stmt.cpp omits
-// TokenKind::kKwEvent, so an event variable cannot be declared inside a
-// begin/end block, a fork arm or a subroutine body (issue #3322). Every case
-// below therefore declares the event as a module item and writes only the
-// offending operation in the new position, which is what the rule is about.
+// When these cases were written, IsDataTypeKeyword, then in
+// src/parser/parser_stmt.cpp and now in src/parser/parser_token_skips.h,
+// omitted TokenKind::kKwEvent, so an event variable could not be declared
+// inside a begin/end block, a fork arm or a subroutine body (#3322, since
+// closed). Every case below therefore declares the event as a module item and
+// writes only the offending operation in the new position, which is what the
+// rule is about.
 
 // A.6.3 gives `par_block ::= fork [ : block_identifier ] {
 // block_item_declaration } { statement_or_null } join_keyword`, whose
