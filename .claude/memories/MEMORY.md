@@ -74,7 +74,7 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 
 - [Solve what the session finds](solving-what-a-session-finds.md) — fix it in this session rather than filing it; a failing integration or e2e test in deltahdl.yml is the one exception.
 - [What does not get filed](what-does-not-get-filed.md) — nothing the commit in hand fixes, nothing an open issue already covers.
-- [Splitting what one reading found](splitting-what-one-reading-found.md) — a scope that could close alone gets its own issue.
+- [One indivisible problem per issue](one-indivisible-problem-per-issue.md) — one defect, one fix per issue; an issue found holding two is split there and then.
 
 ## The notes themselves
 
