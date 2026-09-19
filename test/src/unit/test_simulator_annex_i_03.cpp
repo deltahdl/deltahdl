@@ -98,6 +98,9 @@ TEST(SvdpiSourceCode, TheTimeValueAndItsCodesAreTheListings) {
 // int, which is what the file carried before it was the listing's text.
 // The two macros built on the mask keep their values at both ends of the
 // width, where N is 0, 31 and the 32 the macros pass the value through at.
+// The signed macro reads its values from variables, as the run-time values
+// it is written for are: handed a literal, its and of the value with the
+// sign bit folds to the literal and is reported as an ineffective operation.
 TEST(SvdpiSourceCode, TheMaskMacroIsTheListingsSignedOne) {
   EXPECT_TRUE((std::is_same<decltype(SV_MASK(4)), int>::value));
   EXPECT_EQ(SV_MASK(0), 0);
@@ -105,8 +108,12 @@ TEST(SvdpiSourceCode, TheMaskMacroIsTheListingsSignedOne) {
   EXPECT_EQ(SV_MASK(31), 0x7FFFFFFF);
   EXPECT_EQ(SV_GET_UNSIGNED_BITS(0xFFFFFFFFu, 31), 0x7FFFFFFFu);
   EXPECT_EQ(SV_GET_UNSIGNED_BITS(0xFFFFFFFFu, 32), 0xFFFFFFFFu);
-  EXPECT_EQ(static_cast<uint32_t>(SV_GET_SIGNED_BITS(0x10, 4)), 0xFFFFFFF0u);
-  EXPECT_EQ(static_cast<uint32_t>(SV_GET_SIGNED_BITS(0x0F, 4)), 0x0000000Fu);
+  int sign_bit_set = 0x10;
+  int sign_bit_clear = 0x0F;
+  EXPECT_EQ(static_cast<uint32_t>(SV_GET_SIGNED_BITS(sign_bit_set, 4)),
+            0xFFFFFFF0u);
+  EXPECT_EQ(static_cast<uint32_t>(SV_GET_SIGNED_BITS(sign_bit_clear, 4)),
+            0x0000000Fu);
 }
 
 // §I.3: the scope and open array handles are void pointers, and the version
