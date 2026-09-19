@@ -660,6 +660,42 @@ def test_subclause_of_the_tagged_clause_evaluates_as_a_pass(
     assert (ok, result["status"]) == (1, "pass")
 
 
+def test_rejection_under_the_2023_number_of_a_renumbered_tag_evaluates_as_a_pass(
+    rst: ModuleType, tmp_path: Path,
+) -> None:
+    result, ok = _evaluate_expected_rejection(
+        rst, tmp_path, 1,
+        "xfail.sv:1:1: error: randc variable 'b2' is not allowed in a"
+        " solve...before ordering constraint (§18.5.9)\n",
+        "18.5.10",
+    )
+    assert (ok, result["status"]) == (1, "pass")
+
+
+def test_rejection_within_the_2023_number_of_a_renumbered_tag_evaluates_as_a_pass(
+    rst: ModuleType, tmp_path: Path,
+) -> None:
+    result, ok = _evaluate_expected_rejection(
+        rst, tmp_path, 1,
+        "xfail.sv:1:1: error: a soft constraint may not be specified on"
+        " randc variable 'b' (§18.5.13.1)\n",
+        "18.5.14",
+    )
+    assert (ok, result["status"]) == (1, "pass")
+
+
+def test_rejection_under_the_number_a_renumbered_tag_prints_does_not_evaluate_as_a_pass(
+    rst: ModuleType, tmp_path: Path,
+) -> None:
+    result, ok = _evaluate_expected_rejection(
+        rst, tmp_path, 1,
+        "xfail.sv:1:1: error: a static constraint block may not be"
+        " declared here (§18.5.10)\n",
+        "18.5.10",
+    )
+    assert (ok, result["status"]) == (0, "fail")
+
+
 def test_the_tagged_clause_reaches_the_result(rst: ModuleType, tmp_path: Path) -> None:
     result, _ = _evaluate_expected_rejection(
         rst, tmp_path, 1,

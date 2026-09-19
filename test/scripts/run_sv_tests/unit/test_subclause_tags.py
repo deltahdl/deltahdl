@@ -40,3 +40,31 @@ def test_a_clause_does_not_contain_a_longer_number(rst: ModuleType) -> None:
 
 def test_a_clause_does_not_contain_the_clause_above_it(rst: ModuleType) -> None:
     assert rst.subclause_is_within("16", "16.12") is False
+
+
+def test_a_tag_the_suite_numbers_as_1800_2017_does_names_the_1800_2023_subclause(
+    rst: ModuleType,
+) -> None:
+    assert rst.subclause_of_tag("18.5.10") == "18.5.9"
+
+
+def test_a_tag_below_a_renumbered_subclause_is_renumbered_with_it(
+    rst: ModuleType,
+) -> None:
+    assert rst.subclause_of_tag("18.5.14.1") == "18.5.13.1"
+
+
+def test_a_tag_of_a_subclause_moved_to_another_clause_names_its_new_home(
+    rst: ModuleType,
+) -> None:
+    assert rst.subclause_of_tag("18.5.3") == "11.4.13"
+
+
+def test_a_tag_the_two_editions_number_alike_is_kept(rst: ModuleType) -> None:
+    assert rst.subclause_of_tag("6.19") == "6.19"
+
+
+def test_a_tag_that_disagrees_with_its_own_file_rather_than_the_edition_is_kept(
+    rst: ModuleType,
+) -> None:
+    assert rst.subclause_of_tag("18.8") == "18.8"

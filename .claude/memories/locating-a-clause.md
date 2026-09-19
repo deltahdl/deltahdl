@@ -47,5 +47,11 @@ The contents stop at the second level, so a deeper subclause or a particular lis
 - §18.5.3 Distribution: 532 to 535, with its limitations list (no `dist` on a `randc` variable, at least one `rand` variable) on 534. §18.5.4 Uniqueness constraints: 535.
 - §21.2.1's rules for string literal and expression arguments: 656.
 - §22.5.1 `define: 707 to 709, where Syntax 22-3 gives the text macro usage.
+- §6.6.8 Generic interconnect: 100. §7.3.2 Tagged unions: 152. §7.4.3 Memories and §7.4.4 Multidimensional arrays: 155. §7.4.6 Operations on arrays: 158. §7.8.5 to §7.8.7: 166. §7.10.3 and §7.10.4: 173. §7.12.3 Array reduction methods: 177.
+- §8.26.6.1 Method name conflict resolution: 213. §8.26.6.2 and §8.26.6.3: 214.
+- §9.3.3: 229. §9.3.4: 230. §9.3.5: 231. §9.4.2.1: 234. §9.4.2.3 and §9.4.2.4: 236. §9.4.3 and §9.4.4: 237. §10.6.1 and §10.6.2: 258.
+- §11.3.5 and §11.3.6: 275. §11.4.5 Equality operators: 280. §11.4.10 Shift operators: 285. §11.4.12 Concatenation operators: 287. §11.4.12.2 and §11.4.13: 289. §11.4.14 Streaming operators: 291, with §11.4.14.2 and §11.4.14.3 on 293. §11.10.1 and §11.10.2: 306.
+- §12.4.1: 317. §12.4.2: 318. §12.5.1 and §12.5.2: 323. §12.5.4: 325. §12.6.2: 329. §12.6.3 and §12.7: 330. §12.7.1: 331. §12.7.4 to §12.7.6: 334. §13.3.1: 340. §13.4.1: 343. §13.4.3: 346.
+- §18.4.1 and §18.4.2: 528. §18.5.2: 531. §18.5.6: 537. §18.5.7 and §18.5.7.1: 538. §18.5.12 Constraint guards: 544. §18.5.13.2 Disabling soft constraints: 550. §18.17.4 and §18.17.5: 570. §18.17.7: 572. §22.5.2 and §22.5.3: 713.
 
 Add to that list only what the contents cannot give — a subclause below the second level, or a located list, table or syntax box — and only when reaching it took more than one page read after the contents page. A clause a contents page resolves is never recorded. An entry that qualifies goes into the commit of the work it served, as a trailing clause of that subject, never as a commit of its own.

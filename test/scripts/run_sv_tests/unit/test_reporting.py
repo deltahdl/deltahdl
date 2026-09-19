@@ -155,6 +155,22 @@ def test_prints_both_clauses_when_the_rejection_names_another(
     )
 
 
+def test_prints_the_tag_and_its_2023_subclause_when_the_tag_is_renumbered(
+    rst: ModuleType, capsys: pytest.CaptureFixture[str],
+) -> None:
+    rst.print_status(
+        {"name": "y.sv", "status": "fail", "should_fail": True,
+         "stderr": "y.sv:4:2: error: static constraint block (§18.5.10)",
+         "returncode": 1, "clause": "18.5.10"},
+        0,
+    )
+    assert (
+        "    deltahdl rejected the code under §18.5.10, but the test's tag"
+        " 18.5.10 names §18.5.9\n"
+        in capsys.readouterr().out
+    )
+
+
 def test_says_nothing_about_the_exit_code_when_the_clauses_disagree(
     rst: ModuleType, capsys: pytest.CaptureFixture[str],
 ) -> None:

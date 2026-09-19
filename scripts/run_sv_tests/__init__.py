@@ -311,17 +311,46 @@ def tagged_clause(metadata: dict[str, str]) -> str:
     return ""
 
 
+_SUBCLAUSE_OF_TAG: dict[str, str] = {
+    "7.4.3": "7.4.6",
+    "7.4.4": "7.4.3",
+    "7.4.5": "7.4.4",
+    "18.5.3": "11.4.13",
+    "18.5.4": "18.5.3",
+    "18.5.5": "18.5.4",
+    "18.5.6": "18.5.5",
+    "18.5.7": "18.5.6",
+    "18.5.8.1": "18.5.7.1",
+    "18.5.8.2": "18.5.7.2",
+    "18.5.9": "18.5.8",
+    "18.5.10": "18.5.9",
+    "18.5.11": "18.5.10",
+    "18.5.12": "18.5.11",
+    "18.5.13": "18.5.12",
+    "18.5.14": "18.5.13",
+    "18.5.14.1": "18.5.13.1",
+    "18.5.14.2": "18.5.13.2",
+    "20.14": "20.13",
+    "20.15": "20.14",
+}
+
+
+def subclause_of_tag(tag: str) -> str:
+    return _SUBCLAUSE_OF_TAG.get(tag, tag)
+
+
 def subclause_is_within(reported: str, clause: str) -> bool:
     clause_parts = clause.split(".")
     return reported.split(".")[: len(clause_parts)] == clause_parts
 
 
-def _rejection_matches_tag(stderr: str, clause: str) -> bool:
-    if not clause:
+def _rejection_matches_tag(stderr: str, tag: str) -> bool:
+    if not tag:
         return True
     reported = reported_subclauses(stderr)
     if not reported:
         return True
+    clause = subclause_of_tag(tag)
     return any(subclause_is_within(r, clause) for r in reported)
 
 
@@ -411,14 +440,16 @@ def print_reason(result: dict[str, Any]) -> None:
         print(f"    {line}", flush=True)
     if not result.get("should_fail") or result["status"] != "fail":
         return
-    clause = result.get("clause", "")
+    tag = result.get("clause", "")
+    clause = subclause_of_tag(tag)
     reported = reported_subclauses(result.get("stderr", ""))
-    if clause and reported and not any(
+    if tag and reported and not any(
         subclause_is_within(r, clause) for r in reported
     ):
+        named = f"tag {tag} names" if clause != tag else "tag names"
         print(
             f"    deltahdl rejected the code under §{', §'.join(reported)}, but the"
-            f" test's tag names §{clause}",
+            f" test's {named} §{clause}",
             flush=True,
         )
         return
