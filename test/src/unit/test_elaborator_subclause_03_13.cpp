@@ -194,6 +194,47 @@ TEST(NameSpaceElaboration, DuplicateCuScopeFunction) {
       "redeclaration of 'helper' in compilation-unit scope", 2, "3.13"));
 }
 
+// §8.24 has an out-of-block method body declare its name in its class's scope,
+// so two classes' bodies of one method name standing together in the
+// compilation unit are two methods, not a §3.13 redeclaration; the check took
+// each body's bare name for the unit's and reported the second.
+TEST(NameSpaceElaboration, OutOfBlockBodiesOfTwoClassesShareANameUnreported) {
+  ElabFixture f;
+  EXPECT_TRUE(
+      ElabOk("class Base;\n"
+             "  extern virtual function int compute();\n"
+             "endclass\n"
+             "function int Base::compute(); return 12; endfunction\n"
+             "class Derived extends Base;\n"
+             "  extern virtual function int compute();\n"
+             "endclass\n"
+             "function int Derived::compute(); return 21; endfunction\n"
+             "module m; endmodule\n",
+             f));
+  EXPECT_FALSE(ReportedError(
+      f.diag.Diagnostics(),
+      "redeclaration of 'compute' in compilation-unit scope", 8, "3.13"));
+}
+
+// §3.13 still holds a free function of the unit to one declaration where a
+// class body of the same name stands beside it: the body is the class's, the
+// function the unit's, and a second free function is the redeclaration.
+TEST(NameSpaceElaboration, FreeFunctionBesideAnOutOfBlockBodyStillChecked) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("class Base;\n"
+             "  extern function int compute();\n"
+             "endclass\n"
+             "function int Base::compute(); return 12; endfunction\n"
+             "function int compute(); return 1; endfunction\n"
+             "function int compute(); return 2; endfunction\n"
+             "module m; endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "redeclaration of 'compute' in compilation-unit scope", 6, "3.13"));
+}
+
 TEST(NameSpaceElaboration, CuScopeTypedefAndVarSameName) {
   ElabFixture f;
   EXPECT_FALSE(

@@ -158,6 +158,12 @@ void ValidateNameSpaceCompilationUnit(const CompilationUnit* unit,
     if (item->kind == ModuleItemKind::kTypedef &&
         item->typedef_type.kind == DataTypeKind::kImplicit)
       continue;
+    // §8.24: an out-of-block method body, the item whose method_class names
+    // its class, declares its name in the class's scope and none in the
+    // compilation unit's, so `Base::compute` and `Derived::compute` standing
+    // together are two methods and no redeclaration; a class's own duplicate
+    // members are the class checks' to report.
+    if (!item->method_class.empty()) continue;
     check_cu({}, item->name, item->loc);
   }
   for (auto* cls : unit->classes) check_cu({}, cls->name, cls->range.start);
