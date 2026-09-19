@@ -5,8 +5,10 @@
 namespace delta {
 
 struct AssocArrayObject;
+struct ClassDecl;
 struct ClassObject;
 struct ClassTypeInfo;
+struct DataType;
 struct Expr;
 class SimContext;
 class Arena;
@@ -50,5 +52,24 @@ AssocArrayObject* FindAssocArrayOfName(std::string_view name, SimContext& ctx,
 AssocArrayObject* FindAssocArrayOfBase(const Expr* base, SimContext& ctx,
                                        Arena& arena,
                                        ClassObject** owner = nullptr);
+
+// §8.25: the type the type parameter `pname` of `decl` stands for on `obj`:
+// the actual the object's specialization bound it to, else the default the
+// class declares for it (§8.25.1's default specialization), else null for a
+// parameter the class gives no default. Shared with the queue property of
+// src/simulator/eval_array_class_queue.h, whose element type may name one.
+const DataType* TypeParamActual(const ClassObject* obj, const ClassDecl* decl,
+                                std::string_view pname);
+
+// Whether `expr` is a path of names to an object -- an identifier, `this`
+// among them, or a member access down such a path -- which is evaluated to a
+// handle without running anything. A call or a select on the way is not, and
+// is left to the paths that own it rather than evaluated here and again there.
+bool IsHandlePath(const Expr* expr);
+
+// The object a member access's handle side names: the running method's object
+// for `this` (§8.11), else the object the handle the side evaluates to refers
+// to; null for a side that is no handle path or a null handle.
+ClassObject* HandleSideObject(const Expr* side, SimContext& ctx, Arena& arena);
 
 }  // namespace delta

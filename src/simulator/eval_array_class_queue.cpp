@@ -15,6 +15,7 @@
 #include "parser/ast_type.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_array.h"
+#include "simulator/eval_array_class_assoc.h"
 #include "simulator/evaluation.h"
 #include "simulator/queue_bound.h"
 #include "simulator/sim_context.h"
@@ -64,23 +65,6 @@ std::string_view TypeNameOf(const DataType& type) {
     return type.type_ref_expr->text;
   }
   return {};
-}
-
-// §8.25: the type the type parameter `pname` of `decl` stands for on `obj`:
-// the actual the object's specialization bound it to, else the default the
-// class declares for it (§8.25.1's default specialization), else null for a
-// parameter the class gives no default.
-const DataType* TypeParamActual(const ClassObject* obj, const ClassDecl* decl,
-                                std::string_view pname) {
-  if (obj != nullptr) {
-    auto it = obj->type_param_actuals.find(std::string(pname));
-    if (it != obj->type_param_actuals.end()) return it->second;
-  }
-  for (size_t i = 0; i < decl->params.size() && i < decl->param_types.size();
-       ++i) {
-    if (decl->params[i].first == pname) return &decl->param_types[i];
-  }
-  return nullptr;
 }
 
 // §8.4: whether the element type of the property `member` of `decl` on `obj`
@@ -139,28 +123,6 @@ QueueObject* MakeQueueProperty(const ClassTypeInfo* declaring,
   q->holds_class_handles =
       ElementTypeIsClass(member, declaring->decl, obj, ctx);
   return q;
-}
-
-// Whether `expr` is a path of names to an object -- an identifier, `this`
-// among them, or a member access down such a path -- which is evaluated to a
-// handle without running anything. A call or a select on the way is not, and
-// is left to the paths that own it rather than evaluated here and again there.
-bool IsHandlePath(const Expr* expr) {
-  if (expr == nullptr) return false;
-  if (expr->kind == ExprKind::kIdentifier) return true;
-  return expr->kind == ExprKind::kMemberAccess && !expr->is_scope_resolution &&
-         expr->rhs != nullptr && expr->rhs->kind == ExprKind::kIdentifier &&
-         IsHandlePath(expr->lhs);
-}
-
-// The object a member access's handle side names: the running method's object
-// for `this` (§8.11), else the object the handle the side evaluates to refers
-// to; null for a side that is no handle path or a null handle.
-ClassObject* HandleSideObject(const Expr* side, SimContext& ctx, Arena& arena) {
-  if (!IsHandlePath(side)) return nullptr;
-  if (side->kind == ExprKind::kIdentifier && side->text == "this")
-    return ctx.CurrentThis();
-  return ctx.GetClassObject(EvalExpr(side, ctx, arena).ToUint64());
 }
 
 // The queue ClassQueueProperty answers, with `owner` set to the object whose

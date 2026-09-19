@@ -19,6 +19,45 @@
 
 namespace delta {
 
+// §8.25: the type the type parameter `pname` of `decl` stands for on `obj`:
+// the actual the object's specialization bound it to, else the default the
+// class declares for it (§8.25.1's default specialization), else null for a
+// parameter the class gives no default.
+const DataType* TypeParamActual(const ClassObject* obj, const ClassDecl* decl,
+                                std::string_view pname) {
+  if (obj != nullptr) {
+    auto it = obj->type_param_actuals.find(std::string(pname));
+    if (it != obj->type_param_actuals.end()) return it->second;
+  }
+  for (size_t i = 0; i < decl->params.size() && i < decl->param_types.size();
+       ++i) {
+    if (decl->params[i].first == pname) return &decl->param_types[i];
+  }
+  return nullptr;
+}
+
+// Whether `expr` is a path of names to an object -- an identifier, `this`
+// among them, or a member access down such a path -- which is evaluated to a
+// handle without running anything. A call or a select on the way is not, and
+// is left to the paths that own it rather than evaluated here and again there.
+bool IsHandlePath(const Expr* expr) {
+  if (expr == nullptr) return false;
+  if (expr->kind == ExprKind::kIdentifier) return true;
+  return expr->kind == ExprKind::kMemberAccess && !expr->is_scope_resolution &&
+         expr->rhs != nullptr && expr->rhs->kind == ExprKind::kIdentifier &&
+         IsHandlePath(expr->lhs);
+}
+
+// The object a member access's handle side names: the running method's object
+// for `this` (§8.11), else the object the handle the side evaluates to refers
+// to; null for a side that is no handle path or a null handle.
+ClassObject* HandleSideObject(const Expr* side, SimContext& ctx, Arena& arena) {
+  if (!IsHandlePath(side)) return nullptr;
+  if (side->kind == ExprKind::kIdentifier && side->text == "this")
+    return ctx.CurrentThis();
+  return ctx.GetClassObject(EvalExpr(side, ctx, arena).ToUint64());
+}
+
 namespace {
 
 // §8.25: whether the dimension `dim` names a type parameter of the class
@@ -58,23 +97,6 @@ const ClassMember* FindAssocPropertyDecl(const ClassTypeInfo* type,
       declaring = t;
       return member;
     }
-  }
-  return nullptr;
-}
-
-// §8.25: the type the type parameter `pname` of `decl` stands for on `obj`:
-// the actual the object's specialization bound it to, else the default the
-// class declares for it (§8.25.1's default specialization), else null for a
-// parameter the class gives no default.
-const DataType* TypeParamActual(const ClassObject* obj, const ClassDecl* decl,
-                                std::string_view pname) {
-  if (obj != nullptr) {
-    auto it = obj->type_param_actuals.find(std::string(pname));
-    if (it != obj->type_param_actuals.end()) return it->second;
-  }
-  for (size_t i = 0; i < decl->params.size() && i < decl->param_types.size();
-       ++i) {
-    if (decl->params[i].first == pname) return &decl->param_types[i];
   }
   return nullptr;
 }
@@ -144,28 +166,6 @@ AssocArrayObject* MakeAssocProperty(const ClassTypeInfo* declaring,
   aa->is_4state = spec.is_4state;
   aa->is_index_signed = spec.is_index_signed;
   return aa;
-}
-
-// Whether `expr` is a path of names to an object -- an identifier, `this`
-// among them, or a member access down such a path -- which is evaluated to a
-// handle without running anything. A call or a select on the way is not, and
-// is left to the paths that own it rather than evaluated here and again there.
-bool IsHandlePath(const Expr* expr) {
-  if (expr == nullptr) return false;
-  if (expr->kind == ExprKind::kIdentifier) return true;
-  return expr->kind == ExprKind::kMemberAccess && !expr->is_scope_resolution &&
-         expr->rhs != nullptr && expr->rhs->kind == ExprKind::kIdentifier &&
-         IsHandlePath(expr->lhs);
-}
-
-// The object a member access's handle side names: the running method's object
-// for `this` (§8.11), else the object the handle the side evaluates to refers
-// to; null for a side that is no handle path or a null handle.
-ClassObject* HandleSideObject(const Expr* side, SimContext& ctx, Arena& arena) {
-  if (!IsHandlePath(side)) return nullptr;
-  if (side->kind == ExprKind::kIdentifier && side->text == "this")
-    return ctx.CurrentThis();
-  return ctx.GetClassObject(EvalExpr(side, ctx, arena).ToUint64());
 }
 
 // The array ClassAssocProperty answers, with `owner` set to the object whose
