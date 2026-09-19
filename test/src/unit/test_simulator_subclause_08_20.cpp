@@ -232,4 +232,93 @@ TEST(ClassSim, ImplicitOverrideWithoutVirtualKeywordDispatches) {
             2u);
 }
 
+// §8.20 with §8.24: a virtual method whose body is declared out of the class
+// block is still the one a call through a base-typed handle reaches, in the
+// derived class that overrides it and in one that inherits it. The vtable
+// entry has to hold the body and not the `extern` prototype, and the derived
+// class copies the base's entries when it is lowered, so the base's body must
+// be in place by then; a prototype in either place answers 0.
+TEST(ClassSim, ExternVirtualBodyDispatchedThroughBaseHandle) {
+  EXPECT_EQ(RunAndGet("class Base;\n"
+                      "  extern virtual function int compute();\n"
+                      "endclass\n"
+                      "function int Base::compute();\n"
+                      "  return 12;\n"
+                      "endfunction\n"
+                      "class Derived extends Base;\n"
+                      "  extern virtual function int compute();\n"
+                      "endclass\n"
+                      "function int Derived::compute();\n"
+                      "  return 21;\n"
+                      "endfunction\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    Base b;\n"
+                      "    Derived d;\n"
+                      "    d = new;\n"
+                      "    b = d;\n"
+                      "    result = b.compute();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            21u);
+}
+
+TEST(ClassSim, ExternVirtualBodyInheritedByDerivedVTable) {
+  EXPECT_EQ(RunAndGet("class Base;\n"
+                      "  extern virtual function int compute();\n"
+                      "endclass\n"
+                      "function int Base::compute();\n"
+                      "  return 12;\n"
+                      "endfunction\n"
+                      "class Derived extends Base;\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    Base b;\n"
+                      "    Derived d;\n"
+                      "    d = new;\n"
+                      "    b = d;\n"
+                      "    result = b.compute();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            12u);
+}
+
+// §8.20 with §8.24 and §26.3: the same dispatch for classes a package
+// declares, whose out-of-block bodies are the package's own items, reached
+// through a wildcard import.
+TEST(ClassSim, PackageExternVirtualBodyDispatchedThroughBaseHandle) {
+  EXPECT_EQ(RunAndGet("package p;\n"
+                      "  class Base;\n"
+                      "    extern virtual function int compute();\n"
+                      "  endclass\n"
+                      "  function int Base::compute();\n"
+                      "    return 12;\n"
+                      "  endfunction\n"
+                      "  class Derived extends Base;\n"
+                      "    extern virtual function int compute();\n"
+                      "  endclass\n"
+                      "  function int Derived::compute();\n"
+                      "    return 21;\n"
+                      "  endfunction\n"
+                      "endpackage\n"
+                      "import p::*;\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    Base b;\n"
+                      "    Derived d;\n"
+                      "    d = new;\n"
+                      "    b = d;\n"
+                      "    result = b.compute();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            21u);
+}
+
 }  // namespace

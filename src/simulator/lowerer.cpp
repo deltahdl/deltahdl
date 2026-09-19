@@ -393,7 +393,7 @@ void Lowerer::LowerModule(const RtlirModule* mod) {
   // class-handle declaration with a `new` static initializer (e.g.
   // `C h = new(42);`) can construct its object during static initialization.
   for (auto* cls : mod->class_decls) {
-    LowerClassDecl(cls);
+    LowerClassDecl(cls, mod->function_decls);
   }
   for (const auto& var : mod->variables) LowerVar(var.name, var);
   RegisterModulePorts(mod, ctx_, arena_);
@@ -724,19 +724,6 @@ static void RegisterFreeCuFunctions(const RtlirDesign* design,
   }
 }
 
-// §8.24: the compilation unit's out-of-block method definitions, each attached
-// to the class its `C::` prefix names. A package's definitions are attached
-// when the package's class is lowered, in LowerPackageClass.
-static void AttachCuMethodsToClasses(const RtlirDesign* design,
-                                     SimContext& ctx) {
-  for (auto* item : design->cu_function_decls) {
-    if (item->method_class.empty()) continue;
-    auto* cls = ctx.FindClassType(item->method_class);
-    if (!cls) continue;
-    AttachMethodBody(cls, item);
-  }
-}
-
 // §30.3, §32.4.1 and §6.20.5: the timing every module instance declared,
 // registered into the manager the run reads. Separate from Lower because it is
 // one step of it that grew its own paragraphs.
@@ -851,7 +838,8 @@ void Lowerer::LowerCompilationUnitClasses() {
   LowerCompilationUnitImports();
   std::unordered_set<std::string_view> unit_class_names;
   for (auto* cls : design_->cu_class_decls) {
-    if (unit_class_names.insert(cls->name).second) LowerClassDecl(cls);
+    if (unit_class_names.insert(cls->name).second)
+      LowerClassDecl(cls, design_->cu_function_decls);
   }
 }
 
@@ -911,8 +899,6 @@ void Lowerer::Lower(const RtlirDesign* design) {
   for (auto* let_decl : design->cu_let_decls) {
     ctx_.RegisterLetDecl(let_decl->name, let_decl);
   }
-
-  AttachCuMethodsToClasses(design, ctx_);
 
   // §36.6: the design is put within reach of the PLI applications here, ahead
   // of the build period below and of every event after it, because a routine

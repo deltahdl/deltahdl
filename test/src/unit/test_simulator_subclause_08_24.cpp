@@ -264,6 +264,45 @@ TEST(ClassSim, PackageOutOfBlockStaticMethodReadsStaticProperty) {
             43u);
 }
 
+// §8.24 with §23.9: a class declared inside a module has its out-of-block
+// bodies among the module's items, the scope the class is declared in, and
+// they are attached to the class as the compilation unit's and a package's
+// are. An instance body reads a property and a static one is called through
+// the class; the prototype alone gives 0 for each.
+TEST(ClassSim, ModuleClassOutOfBlockInstanceMethodReadsProperty) {
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  class root;\n"
+                      "    int tag = 7;\n"
+                      "    extern function int iget();\n"
+                      "  endclass\n"
+                      "  function int root::iget();\n"
+                      "    return tag;\n"
+                      "  endfunction\n"
+                      "  int b;\n"
+                      "  initial begin\n"
+                      "    root r = new;\n"
+                      "    b = r.iget();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "b"),
+            7u);
+}
+
+TEST(ClassSim, ModuleClassOutOfBlockStaticFunctionThroughClassScope) {
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  class root;\n"
+                      "    extern static function int sget();\n"
+                      "  endclass\n"
+                      "  function int root::sget();\n"
+                      "    return 5;\n"
+                      "  endfunction\n"
+                      "  int a;\n"
+                      "  initial a = root::sget();\n"
+                      "endmodule\n",
+                      "a"),
+            5u);
+}
+
 TEST(ClassSim, UnresolvedMethodReturnsNull) {
   SimFixture f;
   auto* type = MakeClassType(f, "C", {});

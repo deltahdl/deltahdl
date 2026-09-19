@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "common/arena.h"
 #include "common/types.h"
@@ -9,6 +10,7 @@
 #include "lexer/token.h"
 #include "parser/ast_class.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_module.h"
 #include "simulator/class_object.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
@@ -16,10 +18,22 @@
 
 namespace delta {
 
+// §8.20: the method a virtual call through this class reaches. Taken from
+// info->methods rather than from the member, because §8.24 lets the member be
+// an `extern` prototype whose body stands outside the class, and by the time
+// the vtable is built AttachScopeMethodBodies has put that body in the map;
+// a class derived later copies the entry with the body in it.
+static ModuleItem* VTableMethodOf(const ClassTypeInfo* info,
+                                  const ClassMember* member) {
+  if (member->is_pure_virtual) return nullptr;
+  auto it = info->methods.find(std::string(member->method->name));
+  return it == info->methods.end() ? member->method : it->second;
+}
+
 static void AddOrUpdateVTableEntry(ClassTypeInfo* info,
                                    const ClassMember* member) {
   int idx = info->FindVTableIndex(member->method->name);
-  auto* method_ptr = member->is_pure_virtual ? nullptr : member->method;
+  auto* method_ptr = VTableMethodOf(info, member);
   if (idx >= 0) {
     info->vtable[static_cast<size_t>(idx)].method = method_ptr;
     info->vtable[static_cast<size_t>(idx)].owner = info;
@@ -94,6 +108,38 @@ static void InitStaticProperties(ClassTypeInfo* info, SimContext& ctx,
 static bool IsRealKind(DataTypeKind kind) {
   return kind == DataTypeKind::kReal || kind == DataTypeKind::kShortreal ||
          kind == DataTypeKind::kRealtime;
+}
+
+// §8.24: makes `body`, an out-of-block method definition, the method of `cls`
+// its name selects, in place of the in-class prototype. The definition repeats
+// neither the lifetime nor the static qualifier of the prototype, so the body
+// item parses with is_static false; the static-ness is carried forward from
+// the prototype before the body replaces it, so that a call through the class
+// scope resolution operator of §8.23 still resolves it as static.
+static void AttachMethodBody(ClassTypeInfo* cls, ModuleItem* body) {
+  std::string name(body->name);
+  auto existing = cls->methods.find(name);
+  if (existing != cls->methods.end() && existing->second->is_static) {
+    body->is_static = true;
+  }
+  cls->methods[name] = body;
+}
+
+// §8.24: an out-of-block declaration stands in the same scope as its class,
+// so the bodies of `cls` are the function and task items of `scope_items`,
+// the items of the compilation unit, package or module declaring the class,
+// whose `C::` prefix names it. Each replaces the prototype CollectClassMembers
+// took from the class body.
+static void AttachScopeMethodBodies(
+    ClassTypeInfo* info, const ClassDecl* cls,
+    const std::vector<ModuleItem*>& scope_items) {
+  for (auto* item : scope_items) {
+    if (item->kind != ModuleItemKind::kFunctionDecl &&
+        item->kind != ModuleItemKind::kTaskDecl)
+      continue;
+    if (item->method_class != cls->name) continue;
+    AttachMethodBody(info, item);
+  }
 }
 
 static void CollectClassMembers(ClassTypeInfo* info, const ClassDecl* cls) {
@@ -261,7 +307,8 @@ static void LowerNestedClass(const ClassDecl* outer, const ClassMember* member,
   ctx.RegisterClassType(nested_info->name, nested_info);
 }
 
-void Lowerer::LowerClassDecl(const ClassDecl* cls) {
+void Lowerer::LowerClassDecl(const ClassDecl* cls,
+                             const std::vector<ModuleItem*>& scope_items) {
   auto* info = arena_.Create<ClassTypeInfo>();
   info->name = cls->name;
   info->decl = cls;
@@ -279,6 +326,7 @@ void Lowerer::LowerClassDecl(const ClassDecl* cls) {
     if (iface) info->extended_interfaces.push_back(iface);
   }
   CollectClassMembers(info, cls);
+  AttachScopeMethodBodies(info, cls, scope_items);
   RecordArrayProperties(info, cls, ctx_, arena_);
   BuildVTable(info, cls);
   InitStaticProperties(info, ctx_, arena_);

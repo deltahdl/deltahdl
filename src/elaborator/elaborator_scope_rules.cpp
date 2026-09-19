@@ -659,7 +659,11 @@ void ReportDeclInitUnresolved(const ModuleDecl* decl, Pred declared,
 // §23.9 lists a task and a function among the scopes an identifier is searched
 // upward from, and rules that the search "shall stop at a module boundary" when
 // the item is a variable, so a subroutine body is held to the boundary exactly
-// as a procedural block of the same module is.
+// as a procedural block of the same module is. An out-of-block method body
+// (§8.24), the item whose `method_class` names its class, is not held to it:
+// §8.24 has the body read every declaration of its class, the properties it
+// inherits under §8.13 included, none of which the module declares, so it is
+// left to the class rules as a body of the compilation unit's class is.
 template <typename Pred>
 void ReportSubroutineUnresolved(const ModuleDecl* decl, Pred declared,
                                 DiagEngine& diag) {
@@ -668,6 +672,7 @@ void ReportSubroutineUnresolved(const ModuleDecl* decl, Pred declared,
         item->kind != ModuleItemKind::kFunctionDecl) {
       continue;
     }
+    if (!item->method_class.empty()) continue;
     std::unordered_set<std::string_view> locals;
     CollectSubroutineLocalNames(item, locals);
     std::vector<const Expr*> refs;

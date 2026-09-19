@@ -150,6 +150,10 @@ void RegisterModulePorts(const RtlirModule* mod, SimContext& ctx,
 
 void RegisterModuleSubroutines(const RtlirModule* mod, SimContext& ctx) {
   for (auto* func : mod->function_decls) {
+    // §8.24: an out-of-block method body among the module's items is a
+    // method of the class its `C::` prefix names, which LowerClassDecl
+    // attaches, and not a subroutine of the module under its bare name.
+    if (!func->method_class.empty()) continue;
     ctx.RegisterFunction(func->name, func);
   }
   for (auto* let_decl : mod->let_decls) {
