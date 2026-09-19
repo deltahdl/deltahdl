@@ -184,6 +184,21 @@ TEST(ClassScopeResolutionParsing, NestedClassDeclaration) {
 // ParseNamedType then met the call's `(` where a variable name should stand
 // and reported it under §6.8.
 
+// The one statement of module m's function f, read from a parse that reported
+// nothing, is an expression statement holding a call: the shape a scoped call
+// written as a statement takes, where a declaration would be a kVarDecl.
+void ExpectSoleStatementOfFIsACall(ParseResult& r) {
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  auto* f = FindItemByName(r.cu->modules[0]->items, "f");
+  ASSERT_NE(f, nullptr);
+  ASSERT_EQ(f->func_body_stmts.size(), 1u);
+  EXPECT_EQ(f->func_body_stmts[0]->kind, StmtKind::kExprStmt);
+  ASSERT_NE(f->func_body_stmts[0]->expr, nullptr);
+  EXPECT_EQ(f->func_body_stmts[0]->expr->kind, ExprKind::kCall);
+}
+
 TEST(ClassScopeResolutionParsing,
      ParameterizedScopedCallInFunctionBodyIsAStatement) {
   auto r = Parse(
@@ -196,15 +211,7 @@ TEST(ClassScopeResolutionParsing,
       "    C#(bit)::set(1);\n"
       "  endfunction\n"
       "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  auto* f = FindItemByName(r.cu->modules[0]->items, "f");
-  ASSERT_NE(f, nullptr);
-  ASSERT_EQ(f->func_body_stmts.size(), 1u);
-  EXPECT_EQ(f->func_body_stmts[0]->kind, StmtKind::kExprStmt);
-  ASSERT_NE(f->func_body_stmts[0]->expr, nullptr);
-  EXPECT_EQ(f->func_body_stmts[0]->expr->kind, ExprKind::kCall);
+  ExpectSoleStatementOfFIsACall(r);
 }
 
 TEST(ClassScopeResolutionParsing,
@@ -244,15 +251,7 @@ TEST(ClassScopeResolutionParsing,
       "    D#(8)::set(3);\n"
       "  endfunction\n"
       "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  auto* f = FindItemByName(r.cu->modules[0]->items, "f");
-  ASSERT_NE(f, nullptr);
-  ASSERT_EQ(f->func_body_stmts.size(), 1u);
-  EXPECT_EQ(f->func_body_stmts[0]->kind, StmtKind::kExprStmt);
-  ASSERT_NE(f->func_body_stmts[0]->expr, nullptr);
-  EXPECT_EQ(f->func_body_stmts[0]->expr->kind, ExprKind::kCall);
+  ExpectSoleStatementOfFIsACall(r);
 }
 
 TEST(ClassScopeResolutionParsing,
