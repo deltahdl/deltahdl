@@ -463,6 +463,23 @@ void SimContext::SetCurrentProcess(Process* proc) {
   current_process_ = proc;
 }
 
+// §9.3.2 with §8.6 and §13.3.2: a branch spawned inside a method runs on the
+// object and in the class the method runs on, and its statements are
+// statements of the enclosing scope, so they read and write its automatic
+// locals -- the loop variable a `for (int j ...)` declared, the `automatic int
+// k = j` the fork itself declared before spawning, a class task's local. The
+// stacks are the spawning process's, live here while it runs, and the branch
+// takes a copy of each as the state SetCurrentProcess installs when it first
+// resumes; a scope maps names to the variables themselves, so the copy holds
+// the same variables and a write on either side is seen on the other. Without
+// this the branch started with no object and no scope: every property and
+// local read 0 and a write reached nothing or a variable of the branch's own.
+void SimContext::CopyCarriedStacksTo(Process& child) const {
+  child.saved_this_stack = this_stack_;
+  child.saved_method_class_stack = method_class_stack_;
+  child.saved_scope_stack = scope_stack_;
+}
+
 void SimContext::ExitFunction() {
   if (function_depth_ > 0) --function_depth_;
 }
