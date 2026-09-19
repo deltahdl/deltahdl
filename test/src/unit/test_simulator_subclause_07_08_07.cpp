@@ -587,4 +587,94 @@ TEST(AssocArrayAllocation, StoredElementInitialValueOwnsItsWords) {
   ASSERT_NO_FATAL_FAILURE(ExpectOwnWordsCopy(model->value, aa->elem_init));
 }
 
+// §7.8.7 on a class property (§8.5 restricts no property's type): the entry a
+// method's assignment allocates is the entry the method's later read of the
+// same key finds. Before the property was an array of the object the write
+// went nowhere and the read fell to a bit-select of the property's scalar
+// carrier, so this read 0.
+TEST(AssocArrayAllocation, ClassPropertyWriteThenReadOfTheSameKeyInAMethod) {
+  auto v = RunAndGet(
+      "class C;\n"
+      "  int aa[int];\n"
+      "  function int round_trip();\n"
+      "    aa[7] = 42;\n"
+      "    return aa[7];\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    C c = new;\n"
+      "    result = c.round_trip();\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 42u);
+}
+
+// §7.8.7: an increment of a nonexistent element of the property allocates it
+// with its initial value, 0 for an int, before the read, so three increments
+// in a method leave the entry at 3. This is uvm_report_server's
+// incr_severity_count. A read of the carrier answered 0 each time and the
+// write went nowhere, so the entry never moved past 1.
+TEST(AssocArrayAllocation, ClassPropertyIncrementedThreeTimesInAMethod) {
+  auto v = RunAndGet(
+      "package p;\n"
+      "  typedef enum { UVM_INFO, UVM_WARNING, UVM_ERROR, UVM_FATAL }\n"
+      "    uvm_severity;\n"
+      "  class srv;\n"
+      "    int m_severity_count[uvm_severity];\n"
+      "    function void incr_severity_count(uvm_severity s);\n"
+      "      if (m_severity_count.exists(s)) m_severity_count[s]++;\n"
+      "      else m_severity_count[s] = 1;\n"
+      "    endfunction\n"
+      "    function int get_severity_count(uvm_severity s);\n"
+      "      return m_severity_count[s];\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "endpackage\n"
+      "import p::*;\n"
+      "module t;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    srv o = new;\n"
+      "    o.incr_severity_count(UVM_ERROR);\n"
+      "    o.incr_severity_count(UVM_ERROR);\n"
+      "    o.incr_severity_count(UVM_ERROR);\n"
+      "    o.incr_severity_count(UVM_WARNING);\n"
+      "    result = o.get_severity_count(UVM_ERROR);\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 3u);
+}
+
+// §7.8.7 for the compound assignment: `aa[k] += 1` in a method allocates the
+// string-keyed entry at 0 and adds to it, so three of them read 3.
+TEST(AssocArrayAllocation, ClassPropertyCompoundAddAssignedInAMethod) {
+  auto v = RunAndGet(
+      "class C;\n"
+      "  int aa[string];\n"
+      "  function void bump(string k);\n"
+      "    aa[k] += 1;\n"
+      "  endfunction\n"
+      "  function int get(string k);\n"
+      "    return aa[k];\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    C c = new;\n"
+      "    c.bump(\"x\");\n"
+      "    c.bump(\"x\");\n"
+      "    c.bump(\"x\");\n"
+      "    c.bump(\"y\");\n"
+      "    result = c.get(\"x\");\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 3u);
+}
+
 }  // namespace

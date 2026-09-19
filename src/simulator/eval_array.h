@@ -68,6 +68,15 @@ bool TryEvalAssocProperty(std::string_view var_name, std::string_view prop,
 bool TryExecAssocPropertyStmt(std::string_view var_name, std::string_view prop,
                               SimContext& ctx, Arena& arena);
 
+// §12.7.3: the index values a foreach loop over the associative array `aa`
+// steps through, in the array's own order -- §7.8.2's lexicographical order of
+// string keys, each as the string value, and §7.8.4's numerical order of
+// integral keys, each at the index type's width. Defined in
+// eval_array_assoc.cpp, beside the traversal methods that hand out the same
+// values one at a time.
+std::vector<Logic4Vec> AssocIndexValues(const AssocArrayObject* aa,
+                                        Arena& arena);
+
 bool TryCollectLocatorResult(const Expr* expr, SimContext& ctx, Arena& arena,
                              std::vector<Logic4Vec>& out);
 

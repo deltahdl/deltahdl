@@ -6,7 +6,9 @@
 #include "common/arena.h"
 #include "common/types.h"
 #include "parser/ast_expr.h"
+#include "simulator/class_object.h"
 #include "simulator/eval_array.h"
+#include "simulator/eval_array_class_assoc.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
@@ -49,16 +51,34 @@ Logic4Vec AssocAllocValue(const AssocArrayObject* aa, Arena& arena) {
 
 // The associative array `sel` selects an element of, or null when its base
 // does not name one. A select of anything else — a queue, a fixed-size array,
-// a vector — reaches this on the same dispatch and is declined here.
-static AssocArrayObject* AssocOfSelect(const Expr* sel, SimContext& ctx) {
+// a vector — reaches this on the same dispatch and is declined here. The base
+// is a declared array's bare name or, §8.5 restricting no property's type, a
+// property of an object named bare in a method (§8.11) or through a handle,
+// which FindAssocArrayOfBase resolves; `owner` receives the object whose
+// property it is, null for a declared array, so the writers below know which
+// watchers §9.4.2 has them tell.
+static AssocArrayObject* AssocOfSelect(const Expr* sel, SimContext& ctx,
+                                       Arena& arena,
+                                       ClassObject** owner = nullptr) {
   if (!sel || sel->kind != ExprKind::kSelect) return nullptr;
-  if (!sel->base || sel->base->kind != ExprKind::kIdentifier) return nullptr;
-  if (!sel->index || sel->index_end) return nullptr;
-  return ctx.FindAssocArray(sel->base->text);
+  if (!sel->base || !sel->index || sel->index_end) return nullptr;
+  return FindAssocArrayOfBase(sel->base, ctx, arena, owner);
+}
+
+// §9.4.2's announcement of a change to an element of the array `sel` selects
+// from: to the watchers on the variable under a declared array's name, or to
+// those on the variables designating the object whose property it is.
+static void AnnounceElementChange(const Expr* sel, ClassObject* owner,
+                                  SimContext& ctx) {
+  if (owner != nullptr) {
+    ctx.NotifyClassHandleWatchers(owner->handle);
+  } else if (sel->base->kind == ExprKind::kIdentifier) {
+    NotifyOwningVar(ctx, sel->base->text);
+  }
 }
 
 Logic4Vec* AssocEntryForWrite(const Expr* sel, SimContext& ctx, Arena& arena) {
-  auto* aa = AssocOfSelect(sel, ctx);
+  auto* aa = AssocOfSelect(sel, ctx, arena);
   if (!aa) return nullptr;
   auto idx = EvalExpr(sel->index, ctx, arena);
   if (aa->is_string_key) {
@@ -108,7 +128,8 @@ static bool ResolveAssocMember(const Expr* expr, SimContext& ctx,
                                uint32_t* bit_offset, uint32_t* width) {
   if (!expr || expr->kind != ExprKind::kMemberAccess) return false;
   auto* sel = expr->lhs;
-  if (!AssocOfSelect(sel, ctx)) return false;
+  if (!AssocOfSelect(sel, ctx, ctx.GetArena())) return false;
+  if (sel->base->kind != ExprKind::kIdentifier) return false;
   const auto* info = ctx.GetVariableStructType(sel->base->text);
   if (!info) return false;
   std::string path;
@@ -143,7 +164,8 @@ bool TryEvalAssocMemberField(const Expr* expr, SimContext& ctx, Arena& arena,
 bool TryWriteAssocElementBits(const Expr* lhs, const Logic4Vec& rhs_val,
                               SimContext& ctx, Arena& arena) {
   if (!lhs || lhs->kind != ExprKind::kSelect) return false;
-  auto* aa = AssocOfSelect(lhs->base, ctx);
+  ClassObject* owner = nullptr;
+  auto* aa = AssocOfSelect(lhs->base, ctx, arena, &owner);
   if (!aa) return false;
   auto* entry = AssocEntryForWrite(lhs->base, ctx, arena);
   if (!entry) return true;
@@ -155,7 +177,12 @@ bool TryWriteAssocElementBits(const Expr* lhs, const Logic4Vec& rhs_val,
   Variable elem;
   elem.value = *entry;
   elem.is_4state = aa->is_4state;
-  if (auto* decl = ctx.FindVariable(lhs->base->base->text)) {
+  // A property has no such variable: its width and state-ness are the
+  // array's own, set from the declaration when the array was built.
+  const Variable* decl = nullptr;
+  if (owner == nullptr && lhs->base->base->kind == ExprKind::kIdentifier)
+    decl = ctx.FindVariable(lhs->base->base->text);
+  if (decl != nullptr) {
     elem.is_4state = decl->is_4state;
     elem.is_signed = decl->is_signed;
     elem.packed_elem_width = decl->packed_elem_width;
@@ -169,7 +196,7 @@ bool TryWriteAssocElementBits(const Expr* lhs, const Logic4Vec& rhs_val,
   // empty and the entry it is copied back into is a bare vector. The array's
   // own variable -- the one looked up a few lines above for that range -- is
   // where the watchers are.
-  NotifyOwningVar(ctx, lhs->base->base->text);
+  AnnounceElementChange(lhs->base, owner, ctx);
   return true;
 }
 

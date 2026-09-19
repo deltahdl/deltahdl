@@ -13,6 +13,7 @@
 #include "common/types.h"
 #include "parser/ast_expr.h"
 #include "simulator/eval_array.h"
+#include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_class_array.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
@@ -463,15 +464,24 @@ static Logic4Vec AssocReadInt(AssocArrayObject* aa, const Expr* idx_expr,
   return AssocDefault(aa, arena);
 }
 
+// §7.8: the array an element select reads is a declared one under its bare
+// name or, §8.5 restricting no property's type, a property of an object -- the
+// running method's own by its bare name (§8.11) or any object's through a
+// handle, `o.count[k]` -- which FindAssocArrayOfBase resolves. Only the bare
+// name of a declared array was read here before, so `m_severity_count[s]` in a
+// method of UVM's uvm_report_server fell to a bit-select of the property's
+// scalar carrier and read 0 whatever the entry held. The name a §7.8.6 report
+// gives is the property's own for a property.
 static bool TryAssocSelect(const Expr* expr, SimContext& ctx, Arena& arena,
                            Logic4Vec& out) {
-  if (!expr->base || expr->base->kind != ExprKind::kIdentifier) return false;
-  if (expr->index_end) return false;
-  auto* aa = ctx.FindAssocArray(expr->base->text);
+  if (!expr->base || expr->index_end) return false;
+  auto* aa = FindAssocArrayOfBase(expr->base, ctx, arena);
   if (!aa) return false;
-  out = aa->is_string_key
-            ? AssocReadStr(aa, expr->index, expr->base->text, ctx, arena)
-            : AssocReadInt(aa, expr->index, expr->base->text, ctx, arena);
+  std::string_view name = expr->base->kind == ExprKind::kIdentifier
+                              ? expr->base->text
+                              : expr->base->rhs->text;
+  out = aa->is_string_key ? AssocReadStr(aa, expr->index, name, ctx, arena)
+                          : AssocReadInt(aa, expr->index, name, ctx, arena);
   return true;
 }
 

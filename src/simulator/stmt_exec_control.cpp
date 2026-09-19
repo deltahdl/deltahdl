@@ -11,6 +11,8 @@
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
+#include "simulator/eval_array.h"
+#include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/exec_task.h"
@@ -658,22 +660,18 @@ static uint32_t GetArraySize(const Stmt* stmt, SimContext& ctx) {
 }
 
 // §12.7.3: foreach is illegal on a wildcard-indexed associative array. Reports
-// the diagnostic and returns true when the named array is such a wildcard
-// array, signalling that ExecForeach must abandon the loop.
-// `loc` is where the loop was written, which the report names: the array is
-// found by the name the loop spells rather than by an expression.
-static bool ForeachOnWildcardAssoc(const std::string& arr_name, SimContext& ctx,
+// the diagnostic and returns true when `aa` is such a wildcard array,
+// signalling that ExecForeach must abandon the loop. `loc` is where the loop
+// was written, which the report names along with the name the loop spells.
+static bool ForeachOnWildcardAssoc(const AssocArrayObject* aa,
+                                   const std::string& arr_name, SimContext& ctx,
                                    SourceLoc loc) {
-  if (arr_name.empty()) return false;
-  auto* aa = ctx.FindAssocArray(arr_name);
-  if (aa && aa->is_wildcard) {
-    ctx.GetDiag().Error(
-        loc,
-        "foreach not allowed on wildcard associative array '" + arr_name + "'",
-        Subclause("7.8.1"));
-    return true;
-  }
-  return false;
+  if (aa == nullptr || !aa->is_wildcard) return false;
+  ctx.GetDiag().Error(
+      loc,
+      "foreach not allowed on wildcard associative array '" + arr_name + "'",
+      Subclause("7.8.1"));
+  return true;
 }
 
 // §12.7.3: maps a zero-based iteration counter to the array's declared index
@@ -688,25 +686,45 @@ static uint32_t ForeachIndexForIteration(const ArrayInfo* info, uint32_t size,
 // Result of the non-coroutine prologue of ExecForeach: the array name, its
 // iteration count, and whether the loop should run at all. `bail` is set when
 // the loop must terminate immediately (wildcard associative array, or a
-// zero-length iteration domain) without entering the body.
+// zero-length iteration domain) without entering the body. For an associative
+// array `keys` holds the index values the loop variable steps through, one per
+// iteration, and `string_keys` whether they are strings.
 struct ForeachSetup {
   std::string arr_name;
   uint32_t size = 0;
   bool bail = false;
+  std::vector<Logic4Vec> keys;
+  bool string_keys = false;
 };
 
 // §12.7.3: resolves the array being iterated and how many iterations it
 // implies, reporting the wildcard-associative-array error as a side effect.
 // Pure prologue computation kept out of the ExecForeach coroutine so the
 // coroutine body stays small.
-static ForeachSetup ComputeForeachSetup(const Stmt* stmt, SimContext& ctx) {
+//
+// An associative array is iterated over the indices it holds (§12.7.3: each
+// loop variable corresponds to one dimension, and the array's dimension is its
+// set of indices), in the array's own order, and the array is a declared one
+// or, §8.5 restricting no property's type, a property of an object -- named
+// through a handle, `o.count`, or bare in a method (§8.11) -- which
+// FindAssocArrayOfBase resolves. Before that an associative array was
+// iterated as the variable under its name, elem_width times from 0.
+static ForeachSetup ComputeForeachSetup(const Stmt* stmt, SimContext& ctx,
+                                        Arena& arena) {
   ForeachSetup setup;
   setup.arr_name = GetForeachArrayName(stmt->expr);
-  if (ForeachOnWildcardAssoc(setup.arr_name, ctx, stmt->range.start)) {
+  const AssocArrayObject* aa = FindAssocArrayOfBase(stmt->expr, ctx, arena);
+  if (ForeachOnWildcardAssoc(aa, setup.arr_name, ctx, stmt->range.start)) {
     setup.bail = true;
     return setup;
   }
-  setup.size = GetArraySize(stmt, ctx);
+  if (aa != nullptr) {
+    setup.keys = AssocIndexValues(aa, arena);
+    setup.string_keys = aa->is_string_key;
+    setup.size = static_cast<uint32_t>(setup.keys.size());
+  } else {
+    setup.size = GetArraySize(stmt, ctx);
+  }
   if (setup.size == 0) setup.bail = true;
   return setup;
 }
@@ -720,13 +738,21 @@ static std::string_view ForeachIterName(const Stmt* stmt) {
   return {};
 }
 
-// Assigns the loop variable for iteration `i`, mapping the zero-based counter
+// Assigns the loop variable for iteration `i`: the i-th index the associative
+// array holds, where the loop is over one, else the zero-based counter mapped
 // onto the array's declared index range. A no-op when the dimension is
-// unnamed (`iter_var` is null).
+// unnamed (`iter_var` is null). §12.7.3 types the loop variable after the
+// index type, so a string index makes the variable a string.
 static void SetForeachIterVar(Variable* iter_var, const ArrayInfo* info,
-                              uint32_t size, uint32_t i, Arena& arena) {
+                              const ForeachSetup& setup, uint32_t i,
+                              Arena& arena) {
   if (!iter_var) return;
-  uint32_t index = ForeachIndexForIteration(info, size, i);
+  if (!setup.keys.empty()) {
+    iter_var->value = setup.keys[i];
+    iter_var->is_string = setup.string_keys;
+    return;
+  }
+  uint32_t index = ForeachIndexForIteration(info, setup.size, i);
   iter_var->value = MakeLogic4VecVal(arena, 32, index);
 }
 
@@ -807,7 +833,7 @@ static ExecTask ExecForeachMultiDim(const Stmt* stmt, SimContext& ctx,
 ExecTask ExecForeach(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   bool labeled = !stmt->label.empty();
   EnterLoopLabelScope(stmt, ctx, labeled);
-  ForeachSetup setup = ComputeForeachSetup(stmt, ctx);
+  ForeachSetup setup = ComputeForeachSetup(stmt, ctx, arena);
   if (setup.bail) {
     ExitLoopLabelScope(stmt, ctx, labeled);
     co_return StmtResult::kDone;
@@ -838,7 +864,7 @@ ExecTask ExecForeach(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   }
 
   for (uint32_t i = 0; i < size && !ctx.StopRequested(); ++i) {
-    SetForeachIterVar(iter_var, info, size, i, arena);
+    SetForeachIterVar(iter_var, info, setup, i, arena);
     auto result = co_await ExecStmt(stmt->body, ctx, arena);
     auto action = ClassifyLoopBodyResult(result);
     if (action == LoopAction::kBreakLoop) break;

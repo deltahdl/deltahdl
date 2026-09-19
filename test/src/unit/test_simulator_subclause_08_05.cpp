@@ -600,4 +600,50 @@ TEST(ObjectPropertySim, AssociativePropertyIsCopiedByAShallowCopy) {
             23u);
 }
 
+// §8.5: an element of the associative property is read through the instance
+// as any property is, `o.aa[k]`, and what it reads is the entry a method of
+// the object wrote. The read fell to a bit-select of the property's scalar
+// carrier before, answering 0.
+TEST(ObjectPropertySim, AssociativePropertyElementReadThroughAHandle) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  int aa[int];\n"
+                      "  function void put(int k, int v);\n"
+                      "    aa[k] = v;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int out;\n"
+                      "  initial begin\n"
+                      "    C c = new;\n"
+                      "    c.put(3, 5);\n"
+                      "    c.put(4, 9);\n"
+                      "    out = c.aa[3] * 10 + c.aa[4];\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "out"),
+            59u);
+}
+
+// §8.5 the other way round: an element written through the instance from the
+// module is the entry a method of the object reads by the property's bare
+// name (§8.11).
+TEST(ObjectPropertySim, AssociativePropertyElementWrittenThroughAHandle) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  int aa[int];\n"
+                      "  function int get(int k);\n"
+                      "    return aa[k];\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int out;\n"
+                      "  initial begin\n"
+                      "    C c = new;\n"
+                      "    c.aa[3] = 71;\n"
+                      "    out = c.get(3);\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "out"),
+            71u);
+}
+
 }  // namespace

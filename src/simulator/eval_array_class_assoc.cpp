@@ -128,16 +128,18 @@ AssocArrayObject* FindAssocArrayOfName(std::string_view name, SimContext& ctx,
                                        ClassObject** owner) {
   if (owner != nullptr) *owner = nullptr;
   if (auto* aa = ctx.FindAssocArray(name)) return aa;
+  // Outside a method there is no class scope to resolve the name in, and this
+  // is asked of every element select, so that is settled before the lookups.
+  ClassObject* self = ctx.CurrentThis();
+  const ClassTypeInfo* from = ctx.CurrentMethodClass();
+  if (from == nullptr && self != nullptr) from = self->type;
+  if (from == nullptr) return nullptr;
   // A local of the same name is the name's own declaration and shadows the
   // property, so the property is asked for only where no local answers.
   if (ctx.FindVariable(name) != nullptr || ctx.FindQueue(name) != nullptr ||
       ctx.FindArrayInfo(name) != nullptr) {
     return nullptr;
   }
-  ClassObject* self = ctx.CurrentThis();
-  const ClassTypeInfo* from = ctx.CurrentMethodClass();
-  if (from == nullptr && self != nullptr) from = self->type;
-  if (from == nullptr) return nullptr;
   return ResolveOn(self, from, name, ctx, owner);
 }
 

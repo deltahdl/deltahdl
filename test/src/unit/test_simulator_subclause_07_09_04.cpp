@@ -165,4 +165,33 @@ TEST(AssocArrayFirstMethod, IfConditionTakesBranchWhenNonEmpty) {
   EXPECT_EQ(v, 9u);
 }
 
+// §7.9.4 on a class property (§8.5 restricts no property's type), from a
+// method of the class: first() assigns the smallest index the property holds
+// to the local and returns 1. It found no array under the name before and
+// answered 0, leaving the local untouched.
+TEST(AssocArrayFirstMethod, IntKeyAssignsSmallestIndexOfAClassProperty) {
+  uint64_t v = RunAndGet(
+      "class C;\n"
+      "  int map[int];\n"
+      "  function int smallest();\n"
+      "    int k = 99;\n"
+      "    int found;\n"
+      "    map[40] = 1;\n"
+      "    map[12] = 2;\n"
+      "    map[75] = 3;\n"
+      "    found = map.first(k);\n"
+      "    return k * 10 + found;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    C c = new;\n"
+      "    result = c.smallest();\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 121u);
+}
+
 }  // namespace

@@ -308,4 +308,36 @@ TEST(AssocArrayNextMethod, DoWhileTraversalVisitsEveryEntry) {
   EXPECT_EQ(v, 60u);
 }
 
+// The same traversal over a class property (§8.5 restricts no property's
+// type), driven from a method of the class by the property's bare name: first()
+// seeds the local, next() steps it, and the sum of the visited entries is the
+// sum of what the method stored. Neither method knew the property as an array
+// before, so first() answered 0 and the loop read the carrier's bits.
+TEST(AssocArrayNextMethod, DoWhileTraversalVisitsEveryEntryOfAClassProperty) {
+  uint64_t v = RunAndGet(
+      "class C;\n"
+      "  int map[int];\n"
+      "  function int total();\n"
+      "    int k;\n"
+      "    int sum = 0;\n"
+      "    map[1] = 10;\n"
+      "    map[2] = 20;\n"
+      "    map[3] = 30;\n"
+      "    if (map.first(k))\n"
+      "      do sum = sum + map[k];\n"
+      "      while (map.next(k));\n"
+      "    return sum;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    C c = new;\n"
+      "    result = c.total();\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 60u);
+}
+
 }  // namespace

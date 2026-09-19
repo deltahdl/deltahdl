@@ -11,6 +11,8 @@
 #include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
 #include "simulator/class_object.h"
+#include "simulator/eval_array.h"
+#include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
@@ -519,12 +521,31 @@ static uint32_t ResolveForeachSize(std::string_view name, SimContext& ctx) {
   return var ? var->value.width : 0;
 }
 
-// Runs the iteration loop of a foreach over an array of `size` elements,
-// pushing a scope that holds the (optional) loop index variable. §12.8: a
-// `continue` goes on to the next element, a `break` leaves the loop and a
-// `return` leaves the subroutine.
-static FuncFlow ExecFuncForeachLoop(const Stmt* stmt, uint32_t size,
-                                    const FuncExecCtx& exec) {
+// The index values a foreach in a subroutine body steps through: the keys of
+// an associative array, §12.7.3 giving the loop variable the index type and
+// the traversal the array's own order, or 0 to size-1 for any other array.
+static std::vector<Logic4Vec> ForeachIndexValues(const Stmt* stmt,
+                                                 const FuncExecCtx& exec) {
+  if (auto* aa = FindAssocArrayOfBase(stmt->expr, exec.ctx, exec.arena)) {
+    return AssocIndexValues(aa, exec.arena);
+  }
+  std::string name = GetForeachArrayName(stmt->expr);
+  uint32_t size = name.empty() ? 0 : ResolveForeachSize(name, exec.ctx);
+  std::vector<Logic4Vec> values;
+  values.reserve(size);
+  for (uint32_t i = 0; i < size; ++i) {
+    values.push_back(MakeLogic4VecVal(exec.arena, 32, i));
+  }
+  return values;
+}
+
+// Runs the iteration loop of a foreach over the index values `keys`, pushing
+// a scope that holds the (optional) loop index variable. §12.8: a `continue`
+// goes on to the next element, a `break` leaves the loop and a `return`
+// leaves the subroutine.
+static FuncFlow ExecFuncForeachLoop(const Stmt* stmt,
+                                    const std::vector<Logic4Vec>& keys,
+                                    bool string_keys, const FuncExecCtx& exec) {
   std::string_view iter_name;
   if (!stmt->foreach_vars.empty() && !stmt->foreach_vars[0].empty()) {
     iter_name = stmt->foreach_vars[0];
@@ -534,13 +555,12 @@ static FuncFlow ExecFuncForeachLoop(const Stmt* stmt, uint32_t size,
   Variable* iter_var = nullptr;
   if (!iter_name.empty()) {
     iter_var = exec.ctx.CreateLocalVariable(iter_name, 32);
+    iter_var->is_string = string_keys;
   }
 
   FuncFlow flow = FuncFlow::kNext;
-  for (uint32_t i = 0; i < size; ++i) {
-    if (iter_var) {
-      iter_var->value = MakeLogic4VecVal(exec.arena, 32, i);
-    }
+  for (const auto& key : keys) {
+    if (iter_var) iter_var->value = key;
     flow = ExecFuncStmt(stmt->body, exec);
     if (!LoopGoesOn(flow)) break;
   }
@@ -552,11 +572,12 @@ static FuncFlow ExecFuncForeachLoop(const Stmt* stmt, uint32_t size,
 static FuncFlow ExecFuncForeach(const Stmt* stmt, const FuncExecCtx& exec) {
   bool labeled = !stmt->label.empty();
   if (labeled) exec.ctx.PushStaticScope(stmt->label);
-  std::string name = GetForeachArrayName(stmt->expr);
-  uint32_t size = name.empty() ? 0 : ResolveForeachSize(name, exec.ctx);
+  auto* aa = FindAssocArrayOfBase(stmt->expr, exec.ctx, exec.arena);
+  std::vector<Logic4Vec> keys = ForeachIndexValues(stmt, exec);
   FuncFlow flow = FuncFlow::kNext;
-  if (size != 0) {
-    flow = ExecFuncForeachLoop(stmt, size, exec);
+  if (!keys.empty()) {
+    flow = ExecFuncForeachLoop(stmt, keys, aa != nullptr && aa->is_string_key,
+                               exec);
   }
   if (labeled) exec.ctx.PopStaticScope(stmt->label);
   return flow;

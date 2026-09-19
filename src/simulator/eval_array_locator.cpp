@@ -10,6 +10,7 @@
 #include "common/types.h"
 #include "parser/ast_expr.h"
 #include "simulator/eval_array.h"
+#include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_array_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
@@ -242,6 +243,38 @@ static bool ExtractLocatorParts(const Expr* expr, MethodCallParts& out) {
   }
 
   return ExtractMethodCallParts(expr, out);
+}
+
+// The receiver of the locator call `expr`, in either of its spellings -- the
+// call `recv.method(...)` and the bare member access `recv.method with (...)`
+// -- or null for an expression of another shape.
+static const Expr* LocatorReceiver(const Expr* expr) {
+  const Expr* access = expr->kind == ExprKind::kCall ? expr->lhs : expr;
+  if (access == nullptr || access->kind != ExprKind::kMemberAccess ||
+      access->is_scope_resolution || access->rhs == nullptr ||
+      access->rhs->kind != ExprKind::kIdentifier) {
+    return nullptr;
+  }
+  return access->lhs;
+}
+
+// §7.12: the associative array a locator or map call is on, whatever names it
+// -- a declared array by its bare name, or a property of an object (§8.5): the
+// running method's own by its bare name (§8.11) or any object's through a
+// handle -- as FindAssocArrayOfBase resolves it. `parts` receives the method
+// name, and the receiver's name where the receiver is a bare one. Null where
+// the method is no locator, so that no receiver of another method is
+// evaluated here, or the receiver names no associative array.
+static AssocArrayObject* LocatorAssocReceiver(const Expr* expr,
+                                              MethodCallParts& parts,
+                                              SimContext& ctx, Arena& arena) {
+  const Expr* receiver = LocatorReceiver(expr);
+  if (receiver == nullptr) return nullptr;
+  parts.method_name =
+      (expr->kind == ExprKind::kCall ? expr->lhs : expr)->rhs->text;
+  if (!IsLocatorMethod(parts.method_name)) return nullptr;
+  if (receiver->kind == ExprKind::kIdentifier) parts.var_name = receiver->text;
+  return FindAssocArrayOfBase(receiver, ctx, arena);
 }
 
 // Holds the per-entry state shared by the associative-array locator helpers:
@@ -600,7 +633,10 @@ static void DispatchIndexedLocator(std::string_view method,
 bool TryCollectLocatorResult(const Expr* expr, SimContext& ctx, Arena& arena,
                              std::vector<Logic4Vec>& out) {
   MethodCallParts parts;
-  if (!ExtractLocatorParts(expr, parts)) return false;
+  // A property reached through a handle has no bare name to extract, so the
+  // associative receiver is asked for first, by expression.
+  AssocArrayObject* aa = LocatorAssocReceiver(expr, parts, ctx, arena);
+  if (aa == nullptr && !ExtractLocatorParts(expr, parts)) return false;
   if (!IsLocatorMethod(parts.method_name)) return false;
 
   if (!expr->args.empty() && !expr->with_expr) {
@@ -610,14 +646,14 @@ bool TryCollectLocatorResult(const Expr* expr, SimContext& ctx, Arena& arena,
     return false;
   }
 
+  // Associative arrays are stored separately and honor index-type returns
+  // and key ordering through a dedicated path.
+  if (aa != nullptr)
+    return TryCollectAssocLocatorResult(LocatorEnv{expr, ctx, arena}, parts,
+                                        *aa, out);
   auto* info = ctx.FindArrayInfo(parts.var_name);
   ArrayInfo queue_info;
   if (!info) {
-    // Associative arrays are stored separately and honor index-type returns
-    // and key ordering through a dedicated path.
-    if (auto* aa = ctx.FindAssocArray(parts.var_name))
-      return TryCollectAssocLocatorResult(LocatorEnv{expr, ctx, arena}, parts,
-                                          *aa, out);
     if (!DescribeQueueAsArray(parts.var_name, ctx, queue_info)) return false;
     info = &queue_info;
   }
@@ -695,10 +731,9 @@ static void MapIntKeyedAssoc(const LocatorEnv& env, const LocatorCtx& lc,
 bool TryCollectAssocMapResult(const Expr* expr, SimContext& ctx, Arena& arena,
                               AssocArrayObject& out) {
   MethodCallParts parts;
-  if (!ExtractLocatorParts(expr, parts)) return false;
-  if (parts.method_name != "map") return false;
-  auto* aa = ctx.FindAssocArray(parts.var_name);
+  auto* aa = LocatorAssocReceiver(expr, parts, ctx, arena);
   if (!aa) return false;
+  if (parts.method_name != "map") return false;
   if (!expr->with_expr) {
     ctx.GetDiag().Error(expr->range.start,
                         "array method 'map' requires a 'with' clause",

@@ -23,6 +23,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
@@ -202,6 +203,26 @@ static bool AssocIntTraversal(AssocArrayObject* aa, std::string_view method,
   auto r = WriteTraversalKey(ref_var, it->first, aa->index_width, arena);
   out = MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(r));
   return true;
+}
+
+std::vector<Logic4Vec> AssocIndexValues(const AssocArrayObject* aa,
+                                        Arena& arena) {
+  std::vector<Logic4Vec> keys;
+  if (aa->is_string_key) {
+    keys.reserve(aa->str_data.size());
+    for (const auto& [key, val] : aa->str_data)
+      keys.push_back(Str2Vec(key, arena));
+    return keys;
+  }
+  keys.reserve(aa->int_data.size());
+  uint32_t width = aa->index_width == 0 ? 32 : aa->index_width;
+  for (const auto& [key, val] : aa->int_data) {
+    Logic4Vec index =
+        MakeLogic4VecVal(arena, width, static_cast<uint64_t>(key));
+    index.is_signed = aa->is_index_signed;
+    keys.push_back(index);
+  }
+  return keys;
 }
 
 static Variable* ResolveTraversalRef(const Expr* expr, SimContext& ctx) {

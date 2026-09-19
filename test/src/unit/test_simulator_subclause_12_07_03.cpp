@@ -1,10 +1,12 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
 #include <string_view>
 
 #include "builders_ast.h"
 #include "common/types.h"
 #include "fixture_simulator.h"
+#include "helpers_scheduler.h"
 #include "helpers_stmt_exec.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
@@ -450,6 +452,131 @@ TEST(LoopStatementSim, ForeachNamedByLabelIsDisableTarget) {
       f, "cnt");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 2u);
+}
+
+// §12.7.3: a foreach over an associative array steps its loop variable
+// through the indices the array holds, in the array's order (§7.8.4:
+// numerical for an integral index). The loop ran over the variable under the
+// array's name before -- elem_width iterations from 0 -- so the keys 3 and 10
+// summed as 0 through 31 do.
+TEST(LoopStatementSim, ForeachOverAnAssociativeArrayVisitsItsIndices) {
+  uint64_t v = RunAndGet(
+      "module t;\n"
+      "  int aa[int];\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    aa[10] = 100;\n"
+      "    aa[3] = 30;\n"
+      "    result = 0;\n"
+      "    foreach (aa[k]) result = result + k + aa[k];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 143u);
+}
+
+// §12.7.3 with §7.8.2: a string index orders its keys lexicographically and
+// the loop variable is the key itself, so the entries are visited a, b, c
+// whatever order they were written in.
+TEST(LoopStatementSim, ForeachOverAStringKeyedAssociativeArrayVisitsItsKeys) {
+  uint64_t v = RunAndGet(
+      "module t;\n"
+      "  int sa[string];\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    sa[\"c\"] = 3;\n"
+      "    sa[\"a\"] = 1;\n"
+      "    sa[\"b\"] = 2;\n"
+      "    result = 0;\n"
+      "    foreach (sa[k]) result = result * 10 + sa[k];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 123u);
+}
+
+// §12.7.3 over a class property (§8.5 restricts no property's type) reached
+// through a handle: the loop visits the entries a method of the object wrote
+// and reads each through the same handle.
+TEST(LoopStatementSim, ForeachOverAnAssociativePropertySumsWhatAMethodWrote) {
+  uint64_t v = RunAndGet(
+      "class C;\n"
+      "  int m[int];\n"
+      "  function void fill();\n"
+      "    m[1] = 10;\n"
+      "    m[2] = 20;\n"
+      "    m[3] = 30;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    C c = new;\n"
+      "    c.fill();\n"
+      "    result = 0;\n"
+      "    foreach (c.m[k]) result = result + c.m[k];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 60u);
+}
+
+// §12.7.3 inside a method: a foreach over the object's own associative
+// property, named bare, steps through the keys a method wrote, each loop
+// variable value a key rather than a count; the function interpreter stepped
+// a counter from 0 to a size no variable answered, so the sum stayed 0.
+TEST(LoopStatementSim, ForeachOverAnAssociativePropertyInsideAMethod) {
+  uint64_t v = RunAndGet(
+      "class C;\n"
+      "  int m[int];\n"
+      "  function int total();\n"
+      "    int sum = 0;\n"
+      "    m[4] = 10;\n"
+      "    m[9] = 20;\n"
+      "    m[16] = 30;\n"
+      "    foreach (m[k]) sum = sum + k * 100 + m[k];\n"
+      "    return sum;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    C c = new;\n"
+      "    result = c.total();\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 2960u);
+}
+
+// §12.7.3 with §7.8.2: a string-keyed property's foreach inside a method hands
+// the loop variable each key as a string, in lexicographical order.
+TEST(LoopStatementSim, ForeachOverAStringKeyedPropertyInsideAMethod) {
+  uint64_t v = RunAndGet(
+      "class C;\n"
+      "  int m[string];\n"
+      "  function int weighted();\n"
+      "    int sum = 0;\n"
+      "    int pos = 1;\n"
+      "    m[\"b\"] = 2;\n"
+      "    m[\"a\"] = 1;\n"
+      "    m[\"c\"] = 3;\n"
+      "    foreach (m[k]) begin\n"
+      "      sum = sum + pos * m[k];\n"
+      "      pos = pos * 10;\n"
+      "    end\n"
+      "    return sum;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    C c = new;\n"
+      "    result = c.weighted();\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 321u);
 }
 
 }  // namespace
