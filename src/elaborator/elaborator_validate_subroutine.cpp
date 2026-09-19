@@ -118,6 +118,48 @@ void Elaborator::WalkStmtsForDpiArgs(const Stmt* s) {
   ForEachChildStmt(s, [this](Stmt* const& sub) { WalkStmtsForDpiArgs(sub); });
 }
 
+// §13.3 enables a task from a statement, and §13.2 admits a nonvoid function
+// alone as an operand of an expression: a task returns no value, so a call
+// to one anywhere but as the statement itself, `x = t(1);`, has nothing to
+// yield and is reported. task_names_ holds the module's tasks and its
+// imported ones (RecordTaskFuncNames), so an imported task (§35.2.1) is
+// caught with a native one. `root` is the expression that is the statement,
+// the one call position that is an enable.
+void Elaborator::WalkExprForTaskOperands(const Expr* e, const Expr* root) {
+  if (e == nullptr) return;
+  if (e->kind == ExprKind::kCall && e != root &&
+      task_names_.count(e->callee) != 0) {
+    diag_.Error(e->range.start,
+                std::format("task '{}' is enabled from a statement and cannot "
+                            "be an operand of an expression",
+                            e->callee),
+                Subclause("13.3"));
+  }
+  for (const Expr* sub : {e->lhs, e->rhs, e->condition, e->true_expr,
+                          e->false_expr, e->base, e->index, e->index_end}) {
+    WalkExprForTaskOperands(sub, root);
+  }
+  for (auto* a : e->args) WalkExprForTaskOperands(a, root);
+  for (auto* el : e->elements) WalkExprForTaskOperands(el, root);
+}
+
+void Elaborator::WalkStmtsForTaskOperands(const Stmt* s) {
+  if (!s) return;
+  const Expr* root = s->kind == StmtKind::kExprStmt ? s->expr : nullptr;
+  ForEachChildExpr(
+      s, [this, root](Expr* const& e) { WalkExprForTaskOperands(e, root); });
+  ForEachChildStmt(s,
+                   [this](Stmt* const& sub) { WalkStmtsForTaskOperands(sub); });
+}
+
+void Elaborator::ValidateTaskCallsInExpressions(const ModuleDecl* decl) {
+  if (task_names_.empty()) return;
+  for (const auto* item : decl->items) {
+    if (item->body) WalkStmtsForTaskOperands(item->body);
+    for (auto* s : item->func_body_stmts) WalkStmtsForTaskOperands(s);
+  }
+}
+
 void Elaborator::ValidateDpiOpenArrayArgs(const ModuleDecl* decl) {
   dpi_import_decls_.clear();
   for (const auto* item : decl->items) {

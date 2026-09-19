@@ -675,6 +675,7 @@ void Elaborator::RunPostItemValidations(const ModuleDecl* decl,
   ValidateSyncDriveForm(decl);
   ValidateConstantFunctionCalls(decl);
   ValidateDpiOpenArrayArgs(decl);
+  ValidateTaskCallsInExpressions(decl);
   ValidateBackgroundFuncCallContext(decl);
   ValidateParameterizedMailboxCalls(decl);
   ValidateStdClassMethodCalls(decl);

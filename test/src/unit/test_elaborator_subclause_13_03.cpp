@@ -212,4 +212,63 @@ TEST(TaskElaboration, ValueReturningProductionInATaskOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §13.3 (printed page 335 of ~/LRM.pdf) enables a task from a statement, and
+// §13.2 lets a nonvoid function alone stand as an operand of an expression:
+// a task returns no value, so `x = t(1);` has no value to assign. No pass
+// asked whether a call's callee is a task, so the misuse of an imported task
+// (§35.2.1, printed 970) reached the run masked by the §35.5.4 binding report
+// and that of a native task ran unreported.
+TEST(TaskElaboration, ImportedTaskAsAnExpressionOperandIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  import \"DPI-C\" task t(input int a);\n"
+      "  int x;\n"
+      "  initial x = t(1);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "task 't' is enabled from a statement and cannot "
+                            "be an operand of an expression",
+                            4, "13.3"));
+}
+
+TEST(TaskElaboration, NativeTaskAsAnExpressionOperandIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  task t(input int a);\n"
+      "  endtask\n"
+      "  int x;\n"
+      "  initial x = t(1) + 2;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "task 't' is enabled from a statement and cannot "
+                            "be an operand of an expression",
+                            5, "13.3"));
+}
+
+// §13.3: the enabling statement itself, `t(1);`, and a function call in the
+// same expression position are what the rule admits.
+TEST(TaskElaboration, TaskEnabledAsAStatementBesideAFunctionOperandOk) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  task t(input int a);\n"
+      "  endtask\n"
+      "  function int g(input int a);\n"
+      "    return a;\n"
+      "  endfunction\n"
+      "  int x;\n"
+      "  initial begin\n"
+      "    t(1);\n"
+      "    x = g(1);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace
