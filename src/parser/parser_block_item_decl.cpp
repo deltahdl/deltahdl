@@ -95,12 +95,32 @@ bool Parser::AtScopedTypeName() {
   return scoped;
 }
 
+// A.2.2.1's class_type (printed page 1183) lets a parameter_value_assignment
+// follow the class identifier before each `::`, and §8.25.1 (printed page 205)
+// has a use of the class scope resolution operator outside a parameterized
+// class name its specialization, so `C#(bit)::set(1);` is the same statement as
+// `C::set(1);` and is told from the declaration `C#(bit) v;` by what follows
+// the `#(...)`. The walk below skips the group at each name; before it did,
+// the walk stopped at `#`, took the line for a declaration, and ParseNamedType
+// met the call's `(` where §6.8 puts a variable name.
 bool Parser::IsScopedCallOrAssignStmt() {
   auto saved = lexer_.SavePos();
+  auto skip_param_values = [this] {
+    if (!Check(TokenKind::kHash)) return;
+    auto at_hash = lexer_.SavePos();
+    Consume();
+    if (Check(TokenKind::kLParen)) {
+      SkipBalancedParens();
+    } else {
+      lexer_.RestorePos(at_hash);
+    }
+  };
   Consume();  // the known type name
+  skip_param_values();
   if (Match(TokenKind::kColonColon)) {
     while (CheckIdentifier()) {
       Consume();
+      skip_param_values();
       if (!Match(TokenKind::kColonColon)) break;
     }
   }

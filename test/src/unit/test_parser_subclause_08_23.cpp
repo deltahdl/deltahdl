@@ -1,7 +1,11 @@
 #include <gtest/gtest.h>
 
 #include "fixture_parser.h"
+#include "helpers_parser_verify.h"
 #include "parser/ast_class.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_module.h"
+#include "parser/ast_stmt.h"
 
 using namespace delta;
 namespace {
@@ -169,6 +173,110 @@ TEST(ClassScopeResolutionParsing, NestedClassDeclaration) {
   ASSERT_EQ(r.cu->classes[0]->members.size(), 1u);
   EXPECT_EQ(r.cu->classes[0]->members[0]->kind, ClassMemberKind::kClassDecl);
   EXPECT_EQ(r.cu->classes[0]->members[0]->nested_class->name, "Inner");
+}
+
+// A.2.2.1's class_type (printed page 1183 of the LRM) lets a
+// parameter_value_assignment follow the class identifier before each `::`, and
+// §8.25.1 (printed page 205) has a use of the scope resolution operator outside
+// a parameterized class name its specialization, `C#(bit)::set(1)`. The block
+// item predicate walked the `::` path of a known type name without reading the
+// `#(...)`, so it stopped at `#`, took the line for a declaration, and
+// ParseNamedType then met the call's `(` where a variable name should stand
+// and reported it under §6.8.
+
+TEST(ClassScopeResolutionParsing,
+     ParameterizedScopedCallInFunctionBodyIsAStatement) {
+  auto r = Parse(
+      "class C #(type T = int);\n"
+      "  static function void set(int v);\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  function void f();\n"
+      "    C#(bit)::set(1);\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  auto* f = FindItemByName(r.cu->modules[0]->items, "f");
+  ASSERT_NE(f, nullptr);
+  ASSERT_EQ(f->func_body_stmts.size(), 1u);
+  EXPECT_EQ(f->func_body_stmts[0]->kind, StmtKind::kExprStmt);
+  ASSERT_NE(f->func_body_stmts[0]->expr, nullptr);
+  EXPECT_EQ(f->func_body_stmts[0]->expr->kind, ExprKind::kCall);
+}
+
+TEST(ClassScopeResolutionParsing,
+     ParameterizedScopedCallInInitialBlockIsAStatement) {
+  auto r = Parse(
+      "class C #(type T = int);\n"
+      "  static function void set(int v);\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  initial begin\n"
+      "    C#(bit)::set(1);\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* init = FirstItem(r, ModuleItemKind::kInitialBlock);
+  ASSERT_NE(init, nullptr);
+  ASSERT_NE(init->body, nullptr);
+  ASSERT_EQ(init->body->kind, StmtKind::kBlock);
+  ASSERT_EQ(init->body->stmts.size(), 1u);
+  EXPECT_EQ(init->body->stmts[0]->kind, StmtKind::kExprStmt);
+  ASSERT_NE(init->body->stmts[0]->expr, nullptr);
+  EXPECT_EQ(init->body->stmts[0]->expr->kind, ExprKind::kCall);
+}
+
+TEST(ClassScopeResolutionParsing,
+     ForwardTypedefParameterizedScopedCallIsAStatement) {
+  auto r = Parse(
+      "typedef class D;\n"
+      "class D #(int W = 4);\n"
+      "  static function void set(int v);\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  function void f();\n"
+      "    D#(8)::set(3);\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  auto* f = FindItemByName(r.cu->modules[0]->items, "f");
+  ASSERT_NE(f, nullptr);
+  ASSERT_EQ(f->func_body_stmts.size(), 1u);
+  EXPECT_EQ(f->func_body_stmts[0]->kind, StmtKind::kExprStmt);
+  ASSERT_NE(f->func_body_stmts[0]->expr, nullptr);
+  EXPECT_EQ(f->func_body_stmts[0]->expr->kind, ExprKind::kCall);
+}
+
+TEST(ClassScopeResolutionParsing,
+     ParameterizedSpecializationStillDeclaresAVariable) {
+  auto r = Parse(
+      "class C #(type T = int);\n"
+      "  static function void set(int v);\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  function void f();\n"
+      "    C#(bit) v;\n"
+      "    C#(bit)::set(1);\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  auto* f = FindItemByName(r.cu->modules[0]->items, "f");
+  ASSERT_NE(f, nullptr);
+  ASSERT_EQ(f->func_body_stmts.size(), 2u);
+  EXPECT_EQ(f->func_body_stmts[0]->kind, StmtKind::kVarDecl);
+  EXPECT_EQ(f->func_body_stmts[0]->var_name, "v");
+  EXPECT_EQ(f->func_body_stmts[1]->kind, StmtKind::kExprStmt);
 }
 
 }  // namespace
