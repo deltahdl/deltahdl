@@ -320,4 +320,61 @@ TEST(DpiImportFormalTypedefType,
   EXPECT_FALSE(f.has_errors);
 }
 
+// §35.5.6 (printed page 979 of ~/LRM.pdf) lists the only types a formal
+// argument of an import or export subroutine may have, and among the
+// unpacked kinds it admits the unpacked array (with §35.5.6.1's open array
+// for imports); a queue (§7.10) and an associative array (§7.8) are not among
+// them and the foreign side has no representation of either. Both formals
+// were accepted: the check judged the formal's data type alone, and a `[$]`
+// or `[string]` dimension is written on the formal's unpacked dimensions.
+TEST(DpiImportFormalType, ImportedFunctionWithQueueFormalIsError) {
+  ElabFixture f;
+  Elaborate(R"(
+    module m;
+      import "DPI-C" function int f(input int a [$]);
+      int q [$];
+      initial $display("%0d", f(q));
+    endmodule
+  )",
+            f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "formal argument 'a' of a DPI imported subroutine "
+                            "has a queue dimension, which is not a permitted "
+                            "formal argument type",
+                            3, "35.5.6"));
+}
+
+TEST(DpiImportFormalType, ImportedFunctionWithAssociativeFormalIsError) {
+  ElabFixture f;
+  Elaborate(R"(
+    module m;
+      import "DPI-C" function int f(input int a [string]);
+      int aa [string];
+      initial $display("%0d", f(aa));
+    endmodule
+  )",
+            f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "formal argument 'a' of a DPI imported subroutine "
+                            "has an associative dimension, which is not a "
+                            "permitted formal argument type",
+                            3, "35.5.6"));
+}
+
+// §35.5.6 with §35.5.6.1: a sized unpacked dimension, one sized by a
+// parameter, and an open array are the permitted unpacked forms, and none is
+// reported.
+TEST(DpiImportFormalType, ImportedFunctionWithSizedAndOpenFormalsIsOk) {
+  ElabFixture f;
+  Elaborate(R"(
+    module m;
+      parameter int N = 4;
+      import "DPI-C" function int f(input int a [8], input int b [N],
+                                    input int c []);
+    endmodule
+  )",
+            f, "m");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace

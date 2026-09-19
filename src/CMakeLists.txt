@@ -336,6 +336,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/elaborator_decls.cpp
     elaborator/elaborator_decls_var.cpp
     elaborator/elaborator_dpi.cpp
+    elaborator/elaborator_dpi_formals.cpp
     elaborator/elaborator_dpi_names.cpp
     elaborator/elaborator_dpi_signature.cpp
     elaborator/elaborator_generate.cpp

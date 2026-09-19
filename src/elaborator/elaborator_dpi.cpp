@@ -10,6 +10,7 @@
 #include "common/source_loc.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_dpi_formals.h"
 #include "elaborator/elaborator_dpi_names.h"
 #include "elaborator/elaborator_dpi_signature.h"
 #include "elaborator/let_construct.h"
@@ -165,13 +166,6 @@ void CheckExportDynamicArrayArguments(const ModuleItem* callable,
   }
 }
 
-// §35.5.6: an imported subroutine's formal argument written as a typedef name
-// is permitted only where the type behind the name is. The parser holds every
-// such formal as a kNamed type and has no typedef table to look it up in, so
-// the rule is enforced here, over the names the enclosing scope resolves. A
-// name that does not resolve is left alone. The report names the typedef the
-// source wrote, which is what a reader has in front of them, and one import
-// reports once however many of its formals are at fault.
 // §35.5.5: an imported function's result written as a typedef name is
 // permitted only where the type behind the name is. The parser holds such a
 // result as a kNamed type and has no typedef table to look it up in, so
@@ -206,43 +200,6 @@ void CheckImportResultTypedefType(const ModuleItem* item,
                   "values",
                   item->name, item->return_type.type_name),
       Subclause("35.5.5"));
-}
-
-void CheckImportFormalTypedefTypes(const ModuleItem* item,
-                                   const TypedefMap& typedefs,
-                                   const DpiClassNames& classes,
-                                   DiagEngine& diag) {
-  for (const auto& arg : item->func_args) {
-    if (arg.data_type.kind != DataTypeKind::kNamed) continue;
-    if (NamesAClass(arg.data_type, typedefs, classes)) {
-      diag.Error(item->loc,
-                 std::format("formal argument '{}' has a class type, which "
-                             "cannot be passed through the DPI",
-                             arg.name),
-                 Subclause("35.5.4"));
-      continue;
-    }
-    DataType resolved = ResolveDpiTypeName(arg.data_type, typedefs);
-    if (resolved.kind == DataTypeKind::kNamed) continue;
-    DpiFormalTypeVerdict verdict = ClassifyDpiFormalType(resolved);
-    if (verdict == DpiFormalTypeVerdict::kPermitted) continue;
-    if (verdict == DpiFormalTypeVerdict::kUnpackedUnion) {
-      diag.Error(
-          item->loc,
-          std::format("formal argument '{}' has type '{}', an unpacked union, "
-                      "which is not permitted for a DPI imported subroutine; "
-                      "only the packed form of a union is allowed",
-                      arg.name, arg.data_type.type_name),
-          Subclause("35.5.6"));
-    } else {
-      diag.Error(item->loc,
-                 std::format("formal argument '{}' has type '{}', which is not "
-                             "permitted for a DPI imported subroutine",
-                             arg.name, arg.data_type.type_name),
-                 Subclause("35.5.6"));
-    }
-    break;
-  }
 }
 
 // §35.5.6: "The following SystemVerilog types are the only permitted types for
@@ -548,6 +505,7 @@ void ProcessDpiGlobalNameItem(const ModuleItem* item, ExportScopeContext& scope,
 
   if (item->kind == ModuleItemKind::kDpiImport) {
     CheckImportFormalTypedefTypes(item, scope.typedefs, scope.classes, diag);
+    CheckImportFormalUnpackedDims(item, scope.typedefs, scope.classes, diag);
     CheckImportResultTypedefType(item, scope.typedefs, scope.classes, diag);
   }
 
