@@ -578,6 +578,8 @@ ModuleItem* Parser::ParseFunctionDecl(bool prototype_only) {
   if (!item->is_automatic) item->is_static = Match(TokenKind::kKwStatic);
 
   ParseFuncName(item);
+  if (!item->method_class.empty())
+    AdoptMethodClassTypeNames(item->method_class);
 
   if (Check(TokenKind::kLParen)) {
     item->func_args = ParseFunctionArgs(!prototype_only, item->name == "new");
@@ -618,6 +620,8 @@ ModuleItem* Parser::ParseTaskDecl(bool prototype_only) {
     item->method_class = item->name;
     item->name = Expect(TokenKind::kIdentifier, Subclause("8.24")).text;
   }
+  if (!item->method_class.empty())
+    AdoptMethodClassTypeNames(item->method_class);
 
   if (Check(TokenKind::kLParen)) {
     item->func_args = ParseFunctionArgs(!prototype_only);

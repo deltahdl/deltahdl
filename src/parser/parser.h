@@ -771,8 +771,10 @@ class Parser {
   // Applies one package_import_item to what the parser reads as a type name.
   void ApplyImportedTypeNames(const ImportItem& item);
   // Makes the type names of the classes `decl` derives from type names in its
-  // own body.
+  // own body, and those of the class named `class_name`, when this parse
+  // declared it, type names in the out-of-block method the parser stands in.
   void AdoptBaseClassTypeNames(const ClassDecl* decl);
+  void AdoptMethodClassTypeNames(std::string_view class_name);
 
   Lexer& lexer_;
   Arena& arena_;

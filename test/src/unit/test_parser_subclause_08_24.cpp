@@ -1,8 +1,10 @@
 #include <gtest/gtest.h>
 
 #include "fixture_parser.h"
+#include "helpers_parser_verify.h"
 #include "parser/ast_class.h"
 #include "parser/ast_module.h"
+#include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
 
 using namespace delta;
@@ -245,6 +247,97 @@ TEST(OutOfBlockDeclParsing, RegularTaskNoMethodClass) {
     }
   }
   EXPECT_TRUE(found);
+}
+
+// §8.24 has an out-of-block method declaration access every declaration of the
+// class whose prototype it implements, its example resolving the `T` of
+// `function void C::f(T x)` to `C::T` (printed pages 202 and 203 of ~/LRM.pdf).
+// The parser decides whether an identifier opens a declaration by the type
+// names it knows where it stands, and the class's own names leave at
+// `endclass`, so the method's argument list and body have to be given them
+// back: before that, `pair_t p;` was read as an expression statement and
+// reported "expected ';', got identifier".
+TEST(OutOfBlockDeclParsing, BodyReadsTheClassTypedefAsAType) {
+  auto r = Parse(
+      "class C;\n"
+      "  typedef struct { int a; } pair_t;\n"
+      "  extern function void f();\n"
+      "endclass\n"
+      "function void C::f();\n"
+      "  pair_t p;\n"
+      "  p.a = 1;\n"
+      "endfunction\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* f = FindItemByName(r.cu->cu_items, "f");
+  ASSERT_NE(f, nullptr);
+  ASSERT_EQ(f->func_body_stmts.size(), 2u);
+  EXPECT_EQ(f->func_body_stmts[0]->kind, StmtKind::kVarDecl);
+  EXPECT_EQ(f->func_body_stmts[0]->var_name, "p");
+  EXPECT_EQ(f->func_body_stmts[0]->var_decl_type.kind, DataTypeKind::kNamed);
+  EXPECT_EQ(f->func_body_stmts[0]->var_decl_type.type_name, "pair_t");
+}
+
+TEST(OutOfBlockDeclParsing, ArgumentListReadsTheClassTypedefAsAType) {
+  auto r = Parse(
+      "class C;\n"
+      "  typedef struct { int a; } pair_t;\n"
+      "  extern function int g(pair_t p);\n"
+      "endclass\n"
+      "function int C::g(pair_t p);\n"
+      "  return p.a;\n"
+      "endfunction\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* g = FindItemByName(r.cu->cu_items, "g");
+  ASSERT_NE(g, nullptr);
+  ASSERT_EQ(g->func_args.size(), 1u);
+  EXPECT_EQ(g->func_args[0].name, "p");
+  EXPECT_EQ(g->func_args[0].data_type.kind, DataTypeKind::kNamed);
+  EXPECT_EQ(g->func_args[0].data_type.type_name, "pair_t");
+}
+
+TEST(OutOfBlockDeclParsing, TaskBodyReadsTheClassTypedefAsAType) {
+  auto r = Parse(
+      "class C;\n"
+      "  typedef struct { int a; } pair_t;\n"
+      "  extern task t(pair_t q);\n"
+      "endclass\n"
+      "task C::t(pair_t q);\n"
+      "  pair_t p;\n"
+      "  p = q;\n"
+      "endtask\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* t = FindItemByName(r.cu->cu_items, "t");
+  ASSERT_NE(t, nullptr);
+  ASSERT_EQ(t->func_args.size(), 1u);
+  EXPECT_EQ(t->func_args[0].data_type.type_name, "pair_t");
+  ASSERT_EQ(t->func_body_stmts.size(), 2u);
+  EXPECT_EQ(t->func_body_stmts[0]->kind, StmtKind::kVarDecl);
+  EXPECT_EQ(t->func_body_stmts[0]->var_decl_type.type_name, "pair_t");
+}
+
+// §23.9 makes the function its own scope, so the class's names given to the
+// method leave with it at `endfunction`: A.10.3 lets `data_type_or_implicit`
+// be empty, so the `localparam pair_t = 1` after it is a value parameter named
+// pair_t, which a leaked type name would read as a type and report at `=`.
+TEST(OutOfBlockDeclParsing, ClassTypedefLeavesWithTheMethod) {
+  auto r = Parse(
+      "class C;\n"
+      "  typedef struct { int a; } pair_t;\n"
+      "  extern function void f();\n"
+      "endclass\n"
+      "function void C::f();\n"
+      "  pair_t p;\n"
+      "endfunction\n"
+      "localparam pair_t = 1;\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindItemByName(r.cu->cu_items, "pair_t");
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kParamDecl);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kImplicit);
 }
 
 }  // namespace

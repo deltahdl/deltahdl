@@ -195,6 +195,23 @@ void Parser::AdoptBaseClassTypeNames(const ClassDecl* decl) {
   for (const auto& iface : decl->implements_types) adopt(iface.name);
 }
 
+// §8.24 has an out-of-block method declaration access every declaration of the
+// class whose prototype it implements: its example resolves the `T` of
+// `function void C::f(T x)` to `C::T` rather than to the compilation unit's T
+// (printed page 203 of ~/LRM.pdf). The class's own type names left
+// known_types_ at its `endclass`, so the method's tf_port_list and body are
+// given them back from class_types_, inside the guard ParseFunctionDecl or
+// ParseTaskDecl opened, which takes them out again at the method's end. The
+// return type is not read here: §8.24 has a return type the class defines
+// written with the class scope resolution operator, `function C::T C::f()`,
+// which reaches the name without it. A name class_types_ has no entry for --
+// a class declared in a file this parse never saw, or the interface name of
+// §25.7's `task ifc.method` -- adopts nothing.
+void Parser::AdoptMethodClassTypeNames(std::string_view class_name) {
+  auto it = class_types_.find(class_name);
+  if (it != class_types_.end()) AdoptTypeNames(it->second);
+}
+
 ClassDecl* Parser::ParseClassDecl() {
   auto* decl = arena_.Create<ClassDecl>();
   decl->range.start = CurrentLoc();
