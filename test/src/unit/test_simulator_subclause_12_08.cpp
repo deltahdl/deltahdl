@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_simulator.h"
+#include "helpers_scheduler.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 
@@ -465,6 +466,210 @@ TEST(LoopStatementSim, NestedLoopInnerContinue) {
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 9u);
+}
+
+// §12.8: a break jumps out of the loop, and §13.4 lets a function body hold
+// the loop. The loop is bounded by a return at 99 so that a break the
+// interpreter passed over gives 99 rather than a run that never ends; with
+// the break acted on the count is 4.
+TEST(JumpStatementSim, BreakEndsForeverLoopInFunction) {
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  int r;\n"
+                      "  function int count_to_four();\n"
+                      "    int n = 0;\n"
+                      "    forever begin\n"
+                      "      n = n + 1;\n"
+                      "      if (n == 4) break;\n"
+                      "      if (n == 99) return n;\n"
+                      "    end\n"
+                      "    return n;\n"
+                      "  endfunction\n"
+                      "  initial r = count_to_four();\n"
+                      "endmodule\n",
+                      "r"),
+            4u);
+}
+
+// A break in a for loop of a function body leaves the loop before the step:
+// the values 0 to 4 are summed, 10, where a loop the break did not end sums
+// 0 to 9, 45.
+TEST(JumpStatementSim, BreakEndsForLoopInFunction) {
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  int r;\n"
+                      "  function int sum_below_five();\n"
+                      "    int sum = 0;\n"
+                      "    for (int i = 0; i < 10; i = i + 1) begin\n"
+                      "      if (i == 5) break;\n"
+                      "      sum = sum + i;\n"
+                      "    end\n"
+                      "    return sum;\n"
+                      "  endfunction\n"
+                      "  initial r = sum_below_five();\n"
+                      "endmodule\n",
+                      "r"),
+            10u);
+}
+
+// A break in a while loop of a function body: the counter stops at 6 where
+// the condition alone would run it to 10.
+TEST(JumpStatementSim, BreakEndsWhileLoopInFunction) {
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  int r;\n"
+                      "  function int count_to_six();\n"
+                      "    int i = 0;\n"
+                      "    while (i < 10) begin\n"
+                      "      i = i + 1;\n"
+                      "      if (i == 6) break;\n"
+                      "    end\n"
+                      "    return i;\n"
+                      "  endfunction\n"
+                      "  initial r = count_to_six();\n"
+                      "endmodule\n",
+                      "r"),
+            6u);
+}
+
+// A break in a do-while loop of a function body leaves before the condition
+// is read again: the counter stops at 3 where the condition alone runs it to
+// 10.
+TEST(JumpStatementSim, BreakEndsDoWhileLoopInFunction) {
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  int r;\n"
+                      "  function int count_to_three();\n"
+                      "    int i = 0;\n"
+                      "    do begin\n"
+                      "      i = i + 1;\n"
+                      "      if (i == 3) break;\n"
+                      "    end while (i < 10);\n"
+                      "    return i;\n"
+                      "  endfunction\n"
+                      "  initial r = count_to_three();\n"
+                      "endmodule\n",
+                      "r"),
+            3u);
+}
+
+// A break in a foreach loop of a function body jumps out of the whole loop:
+// three elements are counted before the index reaches 3, where a loop the
+// break did not end counts all eight.
+TEST(JumpStatementSim, BreakEndsForeachLoopInFunction) {
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  int arr[8];\n"
+                      "  int r;\n"
+                      "  function int count_to_index_three();\n"
+                      "    int cnt = 0;\n"
+                      "    foreach (arr[k]) begin\n"
+                      "      if (k == 3) break;\n"
+                      "      cnt = cnt + 1;\n"
+                      "    end\n"
+                      "    return cnt;\n"
+                      "  endfunction\n"
+                      "  initial r = count_to_index_three();\n"
+                      "endmodule\n",
+                      "r"),
+            3u);
+}
+
+// §12.8: a continue jumps to the end of the loop body and the loop control
+// then runs, so the for loop's step is what carries it past the odd values:
+// the even values below 10 sum to 20, where a continue that skipped nothing
+// sums every value to 45, and one that skipped the step never reaches 10.
+TEST(JumpStatementSim, ContinueRunsForStepInFunction) {
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  int r;\n"
+                      "  function int sum_evens();\n"
+                      "    int sum = 0;\n"
+                      "    for (int i = 0; i < 10; i = i + 1) begin\n"
+                      "      if (i % 2 == 1) continue;\n"
+                      "      sum = sum + i;\n"
+                      "    end\n"
+                      "    return sum;\n"
+                      "  endfunction\n"
+                      "  initial r = sum_evens();\n"
+                      "endmodule\n",
+                      "r"),
+            20u);
+}
+
+// The shape of uvm_report_server::reset_severity_counts: a class method
+// walks an enumeration from first() to last() with next() (§6.19.5) in a
+// forever loop that breaks at the last member. Four members are visited;
+// the guard at 99 turns a break the method did not act on into 99 rather
+// than a run that never ends.
+TEST(JumpStatementSim, BreakEndsEnumForeverInClassMethod) {
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  typedef enum { INFO, WARNING, ERROR, FATAL } sev_t;\n"
+                      "  class server;\n"
+                      "    int visited;\n"
+                      "    function void reset_counts();\n"
+                      "      sev_t s;\n"
+                      "      visited = 0;\n"
+                      "      s = s.first();\n"
+                      "      forever begin\n"
+                      "        visited = visited + 1;\n"
+                      "        if (s == s.last()) break;\n"
+                      "        if (visited == 99) return;\n"
+                      "        s = s.next();\n"
+                      "      end\n"
+                      "    endfunction\n"
+                      "  endclass\n"
+                      "  int r;\n"
+                      "  initial begin\n"
+                      "    server srv;\n"
+                      "    srv = new;\n"
+                      "    srv.reset_counts();\n"
+                      "    r = srv.visited;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "r"),
+            4u);
+}
+
+// The break stands in a begin-end block inside an if inside the loop, and
+// each of the block and the if hands it up to the loop: the count stops at 7,
+// where a break the block or the if consumed gives 99.
+TEST(JumpStatementSim, BreakInsideNestedBlockInFunctionLoop) {
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  int r;\n"
+                      "  function int count_to_seven();\n"
+                      "    int n = 0;\n"
+                      "    forever begin\n"
+                      "      n = n + 1;\n"
+                      "      if (n > 2) begin\n"
+                      "        if (n == 7) begin\n"
+                      "          break;\n"
+                      "        end\n"
+                      "      end\n"
+                      "      if (n == 99) return n;\n"
+                      "    end\n"
+                      "    return n;\n"
+                      "  endfunction\n"
+                      "  initial r = count_to_seven();\n"
+                      "endmodule\n",
+                      "r"),
+            7u);
+}
+
+// A labeled loop in a function body (§9.3.5) is left by a break as an
+// unlabeled one is, and the statement after it runs: the count stops at 5
+// and the return past the loop adds 100, so 105 where the loop ended at the
+// 99 guard would give 199.
+TEST(JumpStatementSim, BreakEndsLabeledForeverInFunction) {
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  int r;\n"
+                      "  function int count_to_five();\n"
+                      "    int n = 0;\n"
+                      "    scan : forever begin\n"
+                      "      n = n + 1;\n"
+                      "      if (n == 5) break;\n"
+                      "      if (n == 99) break;\n"
+                      "    end\n"
+                      "    return n + 100;\n"
+                      "  endfunction\n"
+                      "  initial r = count_to_five();\n"
+                      "endmodule\n",
+                      "r"),
+            105u);
 }
 
 }  // namespace

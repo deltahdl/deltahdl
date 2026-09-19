@@ -26,7 +26,8 @@ namespace delta {
 // body does not run on the scheduler the way a procedural block does: it runs
 // to completion within the caller's evaluation, so it needs its own execution
 // of every statement form -- declarations, conditionals and loops -- that
-// returns as soon as a `return` is reached. Those live here;
+// returns as soon as a `return` is reached and takes a `break` or a `continue`
+// to the loop it belongs to (§12.8). Those live here;
 // eval_function_body_assign.cpp holds the assignment forms the same executor
 // dispatches to, and eval_function_args.cpp the argument binding and
 // write-back that surround a call.
@@ -49,8 +50,34 @@ struct FuncExecCtx {
   uint32_t ret_width;
 };
 
-static bool ExecFuncStmt(const Stmt* stmt, const FuncExecCtx& exec);
-static bool ExecFuncBlock(const Stmt* stmt, const FuncExecCtx& exec);
+// Where control goes once a statement of the body has run (§12.8): on to
+// the statement after it, out of the innermost enclosing loop (`break`), to
+// the end of the innermost enclosing loop's body (`continue`), or out of the
+// subroutine (`return`). Every executor here answers one of these; a block,
+// a conditional and a case hand up whatever the statement they ran answered,
+// a loop consumes kBreak and kContinue and hands up kReturn, and
+// ExecFunctionBody stops at anything but kNext. Before this the executors
+// answered a bool meaning "a return ran", and a break or continue reached
+// nothing that acted on it: uvm_report_server::reset_severity_counts, a
+// `forever` over an enumeration that breaks at its last member, never ended.
+enum class FuncFlow : uint8_t { kNext, kBreak, kContinue, kReturn };
+
+static FuncFlow ExecFuncStmt(const Stmt* stmt, const FuncExecCtx& exec);
+static FuncFlow ExecFuncBlock(const Stmt* stmt, const FuncExecCtx& exec);
+
+// §12.8: a loop goes on to its next iteration when its body ran to the end or
+// reached a `continue`; a `break` or a `return` ends the iterating.
+static bool LoopGoesOn(FuncFlow flow) {
+  return flow == FuncFlow::kNext || flow == FuncFlow::kContinue;
+}
+
+// What a loop answers once it has stopped iterating, given what its body
+// answered last: a `return` leaves the subroutine and so passes through, and
+// a `break`, a `continue` or a body that ran to the end is consumed by the
+// loop, which is then followed by the statement after it.
+static FuncFlow LoopExitFlow(FuncFlow last) {
+  return last == FuncFlow::kReturn ? FuncFlow::kReturn : FuncFlow::kNext;
+}
 
 // Returns the trailing unconditional else of an if/else-if chain, or null when
 // the chain has no final else.
@@ -91,9 +118,10 @@ static UniqueIfScan ScanUniqueIfChain(const Stmt* stmt, SimContext& ctx,
 // Runs the branch selected by a unique-if scan: the first matching arm, else
 // the trailing unconditional else, reporting a no-match violation for a plain
 // `unique` chain that has no final else.
-static bool ExecFuncUniqueIfBranch(const Stmt* stmt, const UniqueIfScan& scan,
-                                   CaseQualifier qual,
-                                   const FuncExecCtx& exec) {
+static FuncFlow ExecFuncUniqueIfBranch(const Stmt* stmt,
+                                       const UniqueIfScan& scan,
+                                       CaseQualifier qual,
+                                       const FuncExecCtx& exec) {
   if (scan.first_match) {
     return ExecFuncStmt(scan.first_match->then_branch, exec);
   }
@@ -105,7 +133,7 @@ static bool ExecFuncUniqueIfBranch(const Stmt* stmt, const UniqueIfScan& scan,
                                  "unique if: no condition matched",
                                  Subclause("12.4.2.1"));
   }
-  return false;
+  return FuncFlow::kNext;
 }
 
 // A unique/unique0/priority if encountered while running a function or task
@@ -114,8 +142,8 @@ static bool ExecFuncUniqueIfBranch(const Stmt* stmt, const UniqueIfScan& scan,
 // the report through AddPendingViolation attributes it to whichever process
 // invoked the subroutine; separate callers therefore accumulate and flush
 // independently.
-static bool ExecFuncUniqueIf(const Stmt* stmt, CaseQualifier qual,
-                             const FuncExecCtx& exec) {
+static FuncFlow ExecFuncUniqueIf(const Stmt* stmt, CaseQualifier qual,
+                                 const FuncExecCtx& exec) {
   UniqueIfScan scan = ScanUniqueIfChain(stmt, exec.ctx, exec.arena);
   if (scan.match_count > 1) {
     exec.ctx.AddPendingViolation(stmt->range.start,
@@ -125,7 +153,7 @@ static bool ExecFuncUniqueIf(const Stmt* stmt, CaseQualifier qual,
   return ExecFuncUniqueIfBranch(stmt, scan, qual, exec);
 }
 
-static bool ExecFuncPriorityIf(const Stmt* stmt, const FuncExecCtx& exec) {
+static FuncFlow ExecFuncPriorityIf(const Stmt* stmt, const FuncExecCtx& exec) {
   bool has_final_else = false;
   for (const Stmt* cur = stmt; cur && cur->kind == StmtKind::kIf;
        cur = cur->else_branch) {
@@ -144,15 +172,15 @@ static bool ExecFuncPriorityIf(const Stmt* stmt, const FuncExecCtx& exec) {
                                  "priority if: no condition matched",
                                  Subclause("12.4.2.1"));
   }
-  return false;
+  return FuncFlow::kNext;
 }
 
-static bool ExecFuncIf(const Stmt* stmt, const FuncExecCtx& exec) {
+static FuncFlow ExecFuncIf(const Stmt* stmt, const FuncExecCtx& exec) {
   bool labeled = !stmt->label.empty();
   if (labeled) exec.ctx.PushStaticScope(stmt->label);
 
   auto qual = stmt->qualifier;
-  bool r = false;
+  FuncFlow r = FuncFlow::kNext;
   if (qual == CaseQualifier::kUnique || qual == CaseQualifier::kUnique0) {
     r = ExecFuncUniqueIf(stmt, qual, exec);
   } else if (qual == CaseQualifier::kPriority) {
@@ -163,8 +191,6 @@ static bool ExecFuncIf(const Stmt* stmt, const FuncExecCtx& exec) {
       r = ExecFuncStmt(stmt->then_branch, exec);
     } else if (stmt->else_branch) {
       r = ExecFuncStmt(stmt->else_branch, exec);
-    } else {
-      r = false;
     }
   }
 
@@ -172,17 +198,19 @@ static bool ExecFuncIf(const Stmt* stmt, const FuncExecCtx& exec) {
   return r;
 }
 
-static bool ExecFuncBlock(const Stmt* stmt, const FuncExecCtx& exec) {
+// §9.3.1: the statements of a begin-end block run in order, and control that
+// leaves one of them -- a break, a continue or a return -- leaves the block
+// with it, for the enclosing loop or the body to act on.
+static FuncFlow ExecFuncBlock(const Stmt* stmt, const FuncExecCtx& exec) {
   bool named = !stmt->label.empty();
   if (named) exec.ctx.PushStaticScope(stmt->label);
+  FuncFlow flow = FuncFlow::kNext;
   for (auto* c : stmt->stmts) {
-    if (ExecFuncStmt(c, exec)) {
-      if (named) exec.ctx.PopStaticScope(stmt->label);
-      return true;
-    }
+    flow = ExecFuncStmt(c, exec);
+    if (flow != FuncFlow::kNext) break;
   }
   if (named) exec.ctx.PopStaticScope(stmt->label);
-  return false;
+  return flow;
 }
 
 // True when any for-loop init declares a new variable (has an explicit type),
@@ -243,29 +271,31 @@ static void ExecFuncForInits(const Stmt* stmt, const FuncExecCtx& exec) {
   }
 }
 
-// Runs the condition/body/step iterations of a for-loop. Returns true when the
-// body executed a return (so the caller should propagate it).
-static bool ExecFuncForLoop(const Stmt* stmt, const FuncExecCtx& exec) {
+// Runs the condition/body/step iterations of a for-loop. §12.8: a `continue`
+// jumps to the end of the body and the loop's step runs as it does after a
+// body that ran to the end; a `break` leaves the loop without the step, and
+// a `return` leaves the subroutine.
+static FuncFlow ExecFuncForLoop(const Stmt* stmt, const FuncExecCtx& exec) {
+  FuncFlow flow = FuncFlow::kNext;
   while (stmt->for_cond &&
          EvalExpr(stmt->for_cond, exec.ctx, exec.arena).IsTruthy()) {
-    if (stmt->for_body && ExecFuncStmt(stmt->for_body, exec)) {
-      return true;
-    }
+    flow = ExecFuncStmt(stmt->for_body, exec);
+    if (!LoopGoesOn(flow)) break;
     for (auto* step : stmt->for_steps) ExecFuncStmt(step, exec);
   }
-  return false;
+  return LoopExitFlow(flow);
 }
 
-static bool ExecFuncFor(const Stmt* stmt, const FuncExecCtx& exec) {
+static FuncFlow ExecFuncFor(const Stmt* stmt, const FuncExecCtx& exec) {
   bool labeled = !stmt->label.empty();
   if (labeled) exec.ctx.PushStaticScope(stmt->label);
   bool scoped = ForInitNeedsScope(stmt);
   if (scoped) exec.ctx.PushScope();
   ExecFuncForInits(stmt, exec);
-  bool returned = ExecFuncForLoop(stmt, exec);
+  FuncFlow flow = ExecFuncForLoop(stmt, exec);
   if (scoped) exec.ctx.PopScope();
   if (labeled) exec.ctx.PopStaticScope(stmt->label);
-  return returned;
+  return flow;
 }
 
 bool DeclaredTypeIs4State(const DataType& type) {
@@ -434,45 +464,50 @@ static std::string GetForeachArrayName(const Expr* expr) {
   return {};
 }
 
-static bool ExecFuncWhile(const Stmt* stmt, const FuncExecCtx& exec) {
+// §12.7.6/§12.8: the body runs while the condition holds; a `continue` goes
+// back to the condition, a `break` leaves the loop and a `return` leaves the
+// subroutine.
+static FuncFlow ExecFuncWhile(const Stmt* stmt, const FuncExecCtx& exec) {
   bool labeled = !stmt->label.empty();
   if (labeled) exec.ctx.PushStaticScope(stmt->label);
+  FuncFlow flow = FuncFlow::kNext;
   while (stmt->condition &&
          EvalExpr(stmt->condition, exec.ctx, exec.arena).IsTruthy()) {
-    if (stmt->body && ExecFuncStmt(stmt->body, exec)) {
-      if (labeled) exec.ctx.PopStaticScope(stmt->label);
-      return true;
-    }
+    flow = ExecFuncStmt(stmt->body, exec);
+    if (!LoopGoesOn(flow)) break;
   }
   if (labeled) exec.ctx.PopStaticScope(stmt->label);
-  return false;
+  return LoopExitFlow(flow);
 }
 
-static bool ExecFuncDoWhile(const Stmt* stmt, const FuncExecCtx& exec) {
+// §12.7.7/§12.8: the body runs once before the condition is first read; a
+// `continue` jumps to the end of the body, so the condition is read after it
+// as after a body that ran to the end.
+static FuncFlow ExecFuncDoWhile(const Stmt* stmt, const FuncExecCtx& exec) {
   bool labeled = !stmt->label.empty();
   if (labeled) exec.ctx.PushStaticScope(stmt->label);
+  FuncFlow flow = FuncFlow::kNext;
   do {
-    if (stmt->body && ExecFuncStmt(stmt->body, exec)) {
-      if (labeled) exec.ctx.PopStaticScope(stmt->label);
-      return true;
-    }
+    flow = ExecFuncStmt(stmt->body, exec);
+    if (!LoopGoesOn(flow)) break;
   } while (stmt->condition &&
            EvalExpr(stmt->condition, exec.ctx, exec.arena).IsTruthy());
   if (labeled) exec.ctx.PopStaticScope(stmt->label);
-  return false;
+  return LoopExitFlow(flow);
 }
 
-static bool ExecFuncForever(const Stmt* stmt, const FuncExecCtx& exec) {
+// §12.7.2/§12.8: a `forever` in a subroutine body ends only through a `break`
+// or a `return` of its body; there is no timing control to suspend it (§13.4).
+static FuncFlow ExecFuncForever(const Stmt* stmt, const FuncExecCtx& exec) {
   bool labeled = !stmt->label.empty();
   if (labeled) exec.ctx.PushStaticScope(stmt->label);
+  FuncFlow flow = FuncFlow::kNext;
   for (;;) {
-    if (stmt->body && ExecFuncStmt(stmt->body, exec)) {
-      if (labeled) exec.ctx.PopStaticScope(stmt->label);
-      return true;
-    }
+    flow = ExecFuncStmt(stmt->body, exec);
+    if (!LoopGoesOn(flow)) break;
   }
   if (labeled) exec.ctx.PopStaticScope(stmt->label);
-  return false;
+  return LoopExitFlow(flow);
 }
 
 // Resolves the iteration count for a foreach over the named array: the array's
@@ -485,10 +520,11 @@ static uint32_t ResolveForeachSize(std::string_view name, SimContext& ctx) {
 }
 
 // Runs the iteration loop of a foreach over an array of `size` elements,
-// pushing a scope that holds the (optional) loop index variable. Returns true
-// when the body executed a return.
-static bool ExecFuncForeachLoop(const Stmt* stmt, uint32_t size,
-                                const FuncExecCtx& exec) {
+// pushing a scope that holds the (optional) loop index variable. §12.8: a
+// `continue` goes on to the next element, a `break` leaves the loop and a
+// `return` leaves the subroutine.
+static FuncFlow ExecFuncForeachLoop(const Stmt* stmt, uint32_t size,
+                                    const FuncExecCtx& exec) {
   std::string_view iter_name;
   if (!stmt->foreach_vars.empty() && !stmt->foreach_vars[0].empty()) {
     iter_name = stmt->foreach_vars[0];
@@ -500,31 +536,30 @@ static bool ExecFuncForeachLoop(const Stmt* stmt, uint32_t size,
     iter_var = exec.ctx.CreateLocalVariable(iter_name, 32);
   }
 
+  FuncFlow flow = FuncFlow::kNext;
   for (uint32_t i = 0; i < size; ++i) {
     if (iter_var) {
       iter_var->value = MakeLogic4VecVal(exec.arena, 32, i);
     }
-    if (stmt->body && ExecFuncStmt(stmt->body, exec)) {
-      exec.ctx.PopScope();
-      return true;
-    }
+    flow = ExecFuncStmt(stmt->body, exec);
+    if (!LoopGoesOn(flow)) break;
   }
 
   exec.ctx.PopScope();
-  return false;
+  return LoopExitFlow(flow);
 }
 
-static bool ExecFuncForeach(const Stmt* stmt, const FuncExecCtx& exec) {
+static FuncFlow ExecFuncForeach(const Stmt* stmt, const FuncExecCtx& exec) {
   bool labeled = !stmt->label.empty();
   if (labeled) exec.ctx.PushStaticScope(stmt->label);
   std::string name = GetForeachArrayName(stmt->expr);
   uint32_t size = name.empty() ? 0 : ResolveForeachSize(name, exec.ctx);
-  bool returned = false;
+  FuncFlow flow = FuncFlow::kNext;
   if (size != 0) {
-    returned = ExecFuncForeachLoop(stmt, size, exec);
+    flow = ExecFuncForeachLoop(stmt, size, exec);
   }
   if (labeled) exec.ctx.PopStaticScope(stmt->label);
-  return returned;
+  return flow;
 }
 
 // Carries out a `return <expr>;`. §13.4.1: the function definition implicitly
@@ -562,60 +597,63 @@ static void ExecFuncReturn(const Stmt* stmt, const FuncExecCtx& exec) {
   if (!exec.ret_var->is_4state) CoerceTo2State(exec.ret_var->value);
 }
 
-static bool ExecFuncStmt(const Stmt* stmt, const FuncExecCtx& exec);
-
 // §16.4.5: a deferred immediate assertion inside a function is evaluated and
 // its report scheduled against the calling process, so each process that calls
 // the function reports independently. §16.3: a simple immediate assertion runs
 // its pass or fail statement where it stands, and that statement is a
 // statement of the function body, a return included. §21.2.1.5: the label is
 // a hierarchy level while the statement runs, so a report under it names it.
-static bool ExecFuncImmediateAssert(const Stmt* stmt, const FuncExecCtx& exec) {
+static FuncFlow ExecFuncImmediateAssert(const Stmt* stmt,
+                                        const FuncExecCtx& exec) {
   bool labeled = !stmt->label.empty();
   if (labeled) exec.ctx.PushActiveNamedScope(stmt->label);
   const Stmt* action =
       ExecImmediateAssertInFunction(stmt, exec.ctx, exec.arena);
-  bool returned = action != nullptr && ExecFuncStmt(action, exec);
+  FuncFlow flow = ExecFuncStmt(action, exec);
   if (labeled) exec.ctx.PopActiveNamedScope();
-  return returned;
+  return flow;
 }
 
 // §13.4: a case statement in a function body selects its item as one in a
-// process does and runs the body here, synchronously; answers whether the
-// body returned.
-static bool ExecFuncCase(const Stmt* stmt, const FuncExecCtx& exec) {
+// process does and runs the body here, synchronously; answers where control
+// went from the body.
+static FuncFlow ExecFuncCase(const Stmt* stmt, const FuncExecCtx& exec) {
   bool labeled = !stmt->label.empty();
   if (labeled) exec.ctx.PushStaticScope(stmt->label);
   const Stmt* body = SelectCaseBody(stmt, exec.ctx, exec.arena);
-  bool returned = body != nullptr && ExecFuncStmt(body, exec);
+  FuncFlow flow = ExecFuncStmt(body, exec);
   if (labeled) exec.ctx.PopStaticScope(stmt->label);
-  return returned;
+  return flow;
 }
 
-static bool ExecFuncStmt(const Stmt* stmt, const FuncExecCtx& exec) {
-  if (!stmt) return false;
+static FuncFlow ExecFuncStmt(const Stmt* stmt, const FuncExecCtx& exec) {
+  if (!stmt) return FuncFlow::kNext;
   switch (stmt->kind) {
     case StmtKind::kReturn:
       if (stmt->expr) ExecFuncReturn(stmt, exec);
-      return true;
+      return FuncFlow::kReturn;
+    case StmtKind::kBreak:
+      return FuncFlow::kBreak;
+    case StmtKind::kContinue:
+      return FuncFlow::kContinue;
     case StmtKind::kBlockingAssign:
       ExecFuncBlockingAssign(stmt, exec.ctx, exec.arena);
-      return false;
+      return FuncFlow::kNext;
     case StmtKind::kNonblockingAssign:
       // §13.4.4: a nonblocking assignment is legal in a function body; it
       // schedules into the NBA region just as it does in a process, rather
       // than being dropped. The enclosing call runs inside a process, so the
       // scheduler is active to drain the update.
       ExecNonblockingAssignImpl(stmt, exec.ctx, exec.arena);
-      return false;
+      return FuncFlow::kNext;
     case StmtKind::kExprStmt:
       if (!TryExecSystemCallTask(stmt->expr, exec.ctx, exec.arena)) {
         EvalExpr(stmt->expr, exec.ctx, exec.arena);
       }
-      return false;
+      return FuncFlow::kNext;
     case StmtKind::kVarDecl:
       ExecFuncVarDecl(stmt, exec);
-      return false;
+      return FuncFlow::kNext;
     case StmtKind::kIf:
       return ExecFuncIf(stmt, exec);
     case StmtKind::kCase:
@@ -640,19 +678,19 @@ static bool ExecFuncStmt(const Stmt* stmt, const FuncExecCtx& exec) {
       // its update event as they would in a process; left to the default they
       // did nothing, and a process waiting on the event never woke.
       ExecEventTriggerInFunction(stmt, exec.ctx, exec.arena);
-      return false;
+      return FuncFlow::kNext;
     case StmtKind::kFork:
       // §13.4.4: a function may fork off background processes with join_none
       // (join/join_any would block and are illegal here). Spawn the children
       // and continue; the function itself does not wait.
       SpawnForkJoinNone(stmt, exec.ctx, exec.arena);
-      return false;
+      return FuncFlow::kNext;
     case StmtKind::kAssertImmediate:
     case StmtKind::kAssumeImmediate:
     case StmtKind::kCoverImmediate:
       return ExecFuncImmediateAssert(stmt, exec);
     default:
-      return false;
+      return FuncFlow::kNext;
   }
 }
 
@@ -672,8 +710,12 @@ void ExecFunctionBody(const ModuleItem* func, Variable* ret_var,
   uint32_t ret_width =
       DeclaredTypeWidth(func->return_type, ctx) == 0 ? 0 : ret_var->value.width;
   FuncExecCtx exec{ret_var, func->name, ctx, arena, ret_width};
+  // §12.8 allows a break or a continue only inside a loop, so one that reaches
+  // the body's own statement list has no loop to act on it; the body ends
+  // there, as it does at a return, rather than going on as if the statement
+  // had not been written.
   for (auto* s : func->func_body_stmts) {
-    if (ExecFuncStmt(s, exec)) return;
+    if (ExecFuncStmt(s, exec) != FuncFlow::kNext) return;
   }
 }
 
