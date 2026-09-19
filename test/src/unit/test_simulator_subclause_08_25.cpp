@@ -505,4 +505,28 @@ TEST(ClassSim, TypeParameterQueuePropertyInEachSpecialization) {
             741u);
 }
 
+// §8.25 (printed page 203 of ~/LRM.pdf) instantiates an object under the
+// parameter override rules of §23.10, whose §23.10.2.2 binds an actual
+// written `.name(value)` to the parameter of that name whatever its
+// position. The value actuals were bound by position alone, so `#(.E(7))`
+// on a class whose first parameter is D wrote 7 into D and left E at its
+// default: mul() gave 7 * 1 rather than 3 * 7.
+TEST(ClassSim, NamedValueActualBindsTheParameterOfItsName) {
+  EXPECT_EQ(RunAndGet("class G #(int D = 3, int E = 1);\n"
+                      "  function int mul();\n"
+                      "    return D * E;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int out;\n"
+                      "  initial begin\n"
+                      "    G #(.E(7)) b;\n"
+                      "    b = new;\n"
+                      "    out = b.mul();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "out"),
+            21u);
+}
+
 }  // namespace

@@ -63,25 +63,30 @@ void ApplyClassParamOverrides(std::string_view var_name, uint64_t handle,
                               SimContext& ctx, Arena& arena) {
   auto* obj = ctx.GetClassObject(handle);
   if (!obj || !obj->type || !obj->type->decl) return;
-  BindTypeParamActuals(obj, ctx.FindVariableClassTypeParams(var_name));
-  const auto& param_exprs = ctx.GetVariableClassParamExprs(var_name);
-  if (param_exprs.empty()) return;
+  const std::vector<DataType>* actuals =
+      ctx.FindVariableClassTypeParams(var_name);
+  BindTypeParamActuals(obj, actuals);
+  if (actuals == nullptr) return;
   const auto& params = obj->type->decl->params;
-  for (size_t i = 0; i < params.size() && i < param_exprs.size(); ++i) {
-    if (param_exprs[i]) {
-      // §6.8, as in the default arm of InitClassPropertyDefaults in
-      // eval_class_new.cpp: the object's stored parameter and whatever the
-      // override expression read are two data storage elements, and a
-      // Logic4Vec copy carries the words pointer rather than the words, so
-      // `C #(.W(n)) c;` stored as it arrived left the object and the variable
-      // n as one buffer. One copy serves both keys, which are two names for
-      // the one parameter.
-      auto val = OwnRhsWords(EvalExpr(param_exprs[i], ctx, arena), arena);
-      obj->properties[std::string(params[i].first)] = val;
-      std::string scoped =
-          std::string(obj->type->name) + "::" + std::string(params[i].first);
-      obj->properties[scoped] = val;
-    }
+  for (size_t i = 0; i < params.size(); ++i) {
+    // §23.10.2.2 through §8.25: a value actual is matched to its parameter
+    // as a type actual is, by the name it was written with or else by its
+    // position; a type actual carries no expression and is left to
+    // BindTypeParamActuals above.
+    const DataType* actual = ActualForParam(*actuals, i, params[i].first);
+    if (actual == nullptr || actual->type_ref_expr == nullptr) continue;
+    // §6.8, as in the default arm of InitClassPropertyDefaults in
+    // eval_class_new.cpp: the object's stored parameter and whatever the
+    // override expression read are two data storage elements, and a
+    // Logic4Vec copy carries the words pointer rather than the words, so
+    // `C #(.W(n)) c;` stored as it arrived left the object and the variable
+    // n as one buffer. One copy serves both keys, which are two names for
+    // the one parameter.
+    auto val = OwnRhsWords(EvalExpr(actual->type_ref_expr, ctx, arena), arena);
+    obj->properties[std::string(params[i].first)] = val;
+    std::string scoped =
+        std::string(obj->type->name) + "::" + std::string(params[i].first);
+    obj->properties[scoped] = val;
   }
 }
 
