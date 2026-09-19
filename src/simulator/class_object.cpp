@@ -110,6 +110,23 @@ Logic4Vec ClassObject::GetPropertyForType(std::string_view name,
   return GetProperty(name, arena);
 }
 
+// Whether the bare key of `name` on this object is the storage `owner`
+// declares: it is unless a class between the object's own type and `owner`,
+// exclusive, declares `name` again and so shadows it (§8.15).
+bool ClassObject::BareNameIsDeclaredBy(std::string_view name,
+                                       const ClassTypeInfo* owner) const {
+  for (const auto* t = type; t != nullptr && t != owner; t = t->parent) {
+    std::string scoped = std::string(t->name) + "::" + std::string(name);
+    if (properties.find(scoped) != properties.end()) return false;
+  }
+  return true;
+}
+
+// §8.15: a write from a method of `declared_type` lands on the declaration
+// that class sees, its own or the nearest base's. The bare key, what a read
+// through a handle answers, is kept in step whenever it names that same
+// storage: a base constructor writing `v` on a derived object was reaching the
+// scoped key alone, and `child.v` read the bare default of 0 afterwards.
 void ClassObject::SetPropertyForType(std::string_view name,
                                      const ClassTypeInfo* declared_type,
                                      const Logic4Vec& val) {
@@ -118,8 +135,7 @@ void ClassObject::SetPropertyForType(std::string_view name,
     auto it = properties.find(scoped);
     if (it != properties.end()) {
       it->second = val;
-
-      if (declared_type == type) properties[std::string(name)] = val;
+      if (BareNameIsDeclaredBy(name, t)) properties[std::string(name)] = val;
       return;
     }
   }

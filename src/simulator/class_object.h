@@ -266,6 +266,8 @@ struct ClassObject {
                                const ClassTypeInfo* declared_type,
                                Arena& arena) const;
 
+  bool BareNameIsDeclaredBy(std::string_view name,
+                            const ClassTypeInfo* owner) const;
   void SetPropertyForType(std::string_view name,
                           const ClassTypeInfo* declared_type,
                           const Logic4Vec& val);

@@ -180,4 +180,72 @@ TEST(SuperSimulation, ImplicitSuperNewInitializesBase) {
             7u);
 }
 
+// §8.15: a base class's method writes the property the base declares, and a
+// read of that name through a handle to the derived object, from a method of
+// another class, answers the same storage: no class between the object's type
+// and the base declares the name again. The base constructor's write reached
+// the base-scoped copy alone and the bare copy a handle read kept its default,
+// so `child.v` read 0 where the constructor had stored 3.
+TEST(SuperSim, BaseConstructorWriteReadThroughHandleFromAnotherClass) {
+  EXPECT_EQ(RunAndGet("class InnerBase;\n"
+                      "  int v;\n"
+                      "  function new(int a);\n"
+                      "    v = a;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "class Inner extends InnerBase;\n"
+                      "  int k;\n"
+                      "  function new();\n"
+                      "    super.new(3);\n"
+                      "    k = 9;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "class Plain;\n"
+                      "  Inner child;\n"
+                      "  int seen;\n"
+                      "  function new();\n"
+                      "    child = new;\n"
+                      "    seen = child.v * 10 + child.k;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    Plain p;\n"
+                      "    p = new;\n"
+                      "    result = p.seen * 100 + p.child.v;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            3903u);
+}
+
+// §8.15: where the derived class declares the name again, the base's write
+// stays the base's own -- the bare copy a handle read answers is the derived
+// declaration's, which the base constructor's write leaves alone.
+TEST(SuperSim, BaseWriteLeavesAShadowingDerivedPropertyAlone) {
+  EXPECT_EQ(RunAndGet("class Base;\n"
+                      "  int v;\n"
+                      "  function new(int a);\n"
+                      "    v = a;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "class Der extends Base;\n"
+                      "  int v = 7;\n"
+                      "  function new();\n"
+                      "    super.new(3);\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    Der d;\n"
+                      "    d = new;\n"
+                      "    result = d.v;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            7u);
+}
+
 }  // namespace

@@ -247,6 +247,38 @@ static ConstructorActuals BaseConstructorActuals(const ClassTypeInfo* info,
   return {};
 }
 
+// Binds the level's constructor formals in a scope of their own, from the
+// caller's actuals or from the ones the level below handed up.
+static void BindLevelFormals(const ModuleItem* ctor, ConstructorActuals actuals,
+                             SimContext& ctx, Arena& arena) {
+  ctx.PushScope();
+  if (!actuals.args) return;
+  if (actuals.are_callers) {
+    BindCallerConstructorArgs(ctor, actuals.args, ctx, arena);
+  } else {
+    BindFunctionArgs(ctor, actuals.args, ctx, arena);
+  }
+}
+
+static void ConstructLevel(const ClassTypeInfo* info, ClassObject* obj,
+                           ConstructorActuals actuals, const Expr* new_expr,
+                           SimContext& ctx, Arena& arena);
+
+// The base of `info`, constructed with the actuals its constructor names for
+// it, then the level's own properties initialized; the whole of the implicit
+// constructor and the head of an explicit one.
+static void ConstructBaseThenDefaults(const ClassTypeInfo* info,
+                                      ClassObject* obj, const ModuleItem* ctor,
+                                      const Expr* new_expr, SimContext& ctx,
+                                      Arena& arena) {
+  if (info->parent) {
+    ConstructLevel(info->parent, obj,
+                   BaseConstructorActuals(info, ctor, new_expr, arena),
+                   new_expr, ctx, arena);
+  }
+  InitClassPropertyDefaults(info, obj, ctx, arena);
+}
+
 // Constructs the `info` level of `obj` in the order §8.7 gives: the level's
 // constructor formals are bound, its base class is constructed with the
 // actuals BaseConstructorActuals answers, then the level's own properties are
@@ -261,21 +293,9 @@ static void ConstructLevel(const ClassTypeInfo* info, ClassObject* obj,
                            ConstructorActuals actuals, const Expr* new_expr,
                            SimContext& ctx, Arena& arena) {
   const ModuleItem* ctor = ClassConstructor(info);
-  if (ctor) {
-    ctx.PushScope();
-    if (actuals.args && actuals.are_callers) {
-      BindCallerConstructorArgs(ctor, actuals.args, ctx, arena);
-    } else if (actuals.args) {
-      BindFunctionArgs(ctor, actuals.args, ctx, arena);
-    }
-  }
+  if (ctor) BindLevelFormals(ctor, actuals, ctx, arena);
   ctx.PushMethodClass(info);
-  if (info->parent) {
-    ConstructLevel(info->parent, obj,
-                   BaseConstructorActuals(info, ctor, new_expr, arena),
-                   new_expr, ctx, arena);
-  }
-  InitClassPropertyDefaults(info, obj, ctx, arena);
+  ConstructBaseThenDefaults(info, obj, ctor, new_expr, ctx, arena);
   if (ctor) {
     Variable dummy;
     ExecFunctionBody(ctor, &dummy, ctx, arena);
