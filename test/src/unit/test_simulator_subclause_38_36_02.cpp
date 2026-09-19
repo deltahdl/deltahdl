@@ -307,7 +307,7 @@ TEST_F(VpiSimTimeCallbacks, RoutineIsPassedTheCurrentTimeAndItsOwnStructure) {
   EXPECT_EQ(g_delivered.time_type, vpiSimTime);
   EXPECT_EQ(g_delivered.time_low, 40u);
   EXPECT_EQ(g_delivered.time_high, 0u);
-  EXPECT_EQ(g_delivered.user_data, &user_object);
+  EXPECT_EQ(g_delivered.user_data, reinterpret_cast<PLI_BYTE8*>(&user_object));
 
   // The structure the routine saw is not the one registration was given, and
   // the request it was given is left as it was written.

@@ -85,7 +85,7 @@ TEST_F(VpiSystfRegistrationSim, RegisterSystfPreservesFigure3818Fields) {
   EXPECT_EQ(stored.calltf, &SystfStubCall);
   EXPECT_EQ(stored.compiletf, &SystfStubCompile);
   EXPECT_EQ(stored.sizetf, &SystfStubSize);
-  EXPECT_EQ(stored.user_data, &user_payload);
+  EXPECT_EQ(stored.user_data, reinterpret_cast<PLI_BYTE8*>(&user_payload));
 }
 
 TEST_F(VpiSystfRegistrationSim, RegisterSystfNullptrDoesNotCrash) {

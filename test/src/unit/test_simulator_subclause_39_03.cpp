@@ -86,7 +86,7 @@ TEST_F(AssertionStaticInformation,
   StaticAssertionInfo info = ReadStaticInfo(assertion);
   EXPECT_EQ(info.name, "handshake_p");
   EXPECT_EQ(info.type, vpiAssert);
-  EXPECT_EQ(info.instance, &dut_);
+  EXPECT_EQ(VpiObjectOf(info.instance), &dut_);
   EXPECT_EQ(info.file, "dut.sv");
   EXPECT_EQ(info.line, 42);
 }

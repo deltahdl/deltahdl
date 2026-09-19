@@ -129,7 +129,7 @@ TEST_F(VpiActionFeatureCallbacks, MinimalFieldsSufficeForRegistration) {
 
   const s_cb_data& stored = vpi_ctx_.RegisteredCallbacks().back();
   EXPECT_EQ(stored.reason, cbStartOfSimulation);
-  EXPECT_EQ(stored.user_data, &payload);
+  EXPECT_EQ(stored.user_data, reinterpret_cast<PLI_BYTE8*>(&payload));
   EXPECT_EQ(stored.obj, nullptr);
   EXPECT_EQ(stored.time, nullptr);
   EXPECT_EQ(stored.value, nullptr);

@@ -1772,6 +1772,16 @@ jobs:
   # precompiled header. Each header prints one line saying its includes match
   # its uses; a header that fails prints what the tool would change and fails
   # the step, and one that does not compile on its own fails it the same way.
+  #
+  # src/simulator/vpi_user.h is the one header both finds leave out. It is the
+  # C include file Annex K.2 of IEEE 1800-2023 prints, and the annex has it
+  # include <stdint.h> for the int64_t and uint64_t its PLI_INT64 and
+  # PLI_UINT64 are typedefs of; read as C++, which -x c++ makes every header
+  # here, the tool names <cstdint> as the provider of those two names and asks
+  # for an include the annex does not print. The file's includes are the
+  # standard's, and assert-vpi-user-compiles-as-c is the check on them: it
+  # compiles the file as the C the annex writes it in, where <stdint.h> is
+  # where int64_t comes from.
   clang-include-cleaner-headers:
     needs: [cache-googletest]
     runs-on: ubuntu-latest
@@ -1802,12 +1812,14 @@ jobs:
                     command: (($tu.command | sub(" -o \\S+ -c \\S+$"; ""))
                               + " -x c++ -c " + .) } ]
           ' build/compile_commands.json \
-            --args $(find src lib/cpp -name '*.h' | sort | sed "s#^#$PWD/#") \
+            --args $(find src lib/cpp -name '*.h' \
+                       -not -path src/simulator/vpi_user.h | sort | sed "s#^#$PWD/#") \
             > build/headers/compile_commands.json
           jq length build/headers/compile_commands.json
       - name: Check every header includes what it uses and only that
         run: |
-          find src lib/cpp -name '*.h' | sort | xargs -P "$(nproc)" -n 1 sh -c '
+          find src lib/cpp -name '*.h' -not -path src/simulator/vpi_user.h |
+            sort | xargs -P "$(nproc)" -n 1 sh -c '
             out=$(clang-include-cleaner -p build/headers --print=changes "$0" 2>&1)
             status=$?
             if [ -n "$out" ] || [ "$status" -ne 0 ]; then

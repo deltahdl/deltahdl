@@ -47,7 +47,7 @@ TEST_F(VpiGetSystfInfoSim, FillsStructFromSystfCallbackHandle) {
   EXPECT_EQ(out.calltf, &InfoStubCall);
   EXPECT_EQ(out.compiletf, &InfoStubCompile);
   EXPECT_EQ(out.sizetf, &InfoStubSize);
-  EXPECT_EQ(out.user_data, &payload);
+  EXPECT_EQ(out.user_data, reinterpret_cast<PLI_BYTE8*>(&payload));
 }
 
 // §38.12 shall #1: each registered callback is reported on its own; asking
@@ -197,7 +197,7 @@ TEST_F(VpiGetSystfInfoSim, TheRegistrationIsReportedAsOftenAsItIsAsked) {
   EXPECT_STREQ(out.tfname, "$probe");
   EXPECT_EQ(out.sysfunctype, vpiIntFunc);
   EXPECT_EQ(out.calltf, &InfoStubCall);
-  EXPECT_EQ(out.user_data, &payload);
+  EXPECT_EQ(out.user_data, reinterpret_cast<PLI_BYTE8*>(&payload));
 }
 
 }  // namespace

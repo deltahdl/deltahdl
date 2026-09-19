@@ -150,8 +150,8 @@ TEST_F(LetExprIteration, TheArgumentIterationReachesTheActualsInFormalOrder) {
   std::vector<vpiHandle> args =
       ScanAll(vpi_iterate(vpiArgument, VpiHandleOf(&let_expr)));
   ASSERT_EQ(args.size(), 2u);
-  EXPECT_EQ(args[0], &a0);
-  EXPECT_EQ(args[1], &a1);
+  EXPECT_EQ(VpiObjectOf(args[0]), &a0);
+  EXPECT_EQ(VpiObjectOf(args[1]), &a1);
 }
 
 // §37.57 detail 1: "If a formal has a default value, that value shall appear as
@@ -184,8 +184,8 @@ TEST_F(LetExprIteration, AnOmittedArgumentComesBackAsItsFormalsDefault) {
   std::vector<vpiHandle> args =
       ScanAll(vpi_iterate(vpiArgument, VpiHandleOf(&let_expr)));
   ASSERT_EQ(args.size(), 2u);
-  EXPECT_EQ(args[0], &default0);
-  EXPECT_EQ(args[1], &a1);
+  EXPECT_EQ(VpiObjectOf(args[0]), &default0);
+  EXPECT_EQ(VpiObjectOf(args[1]), &a1);
 }
 
 // §37.57 detail 1: the correspondence is with the formals, so an instantiation
@@ -214,8 +214,8 @@ TEST_F(LetExprIteration, ATrailingFormalIsFilledFromItsDefault) {
   std::vector<vpiHandle> args =
       ScanAll(vpi_iterate(vpiArgument, VpiHandleOf(&let_expr)));
   ASSERT_EQ(args.size(), 2u);
-  EXPECT_EQ(args[0], &a0);
-  EXPECT_EQ(args[1], &default1);
+  EXPECT_EQ(VpiObjectOf(args[0]), &a0);
+  EXPECT_EQ(VpiObjectOf(args[1]), &default1);
 }
 
 // §37.57 (figure): the let declaration a let expression instantiates is reached

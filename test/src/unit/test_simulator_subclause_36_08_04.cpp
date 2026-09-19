@@ -111,7 +111,7 @@ TEST_F(SystfApplicationRoutineArguments,
 
   s_vpi_systf_data read_back = {};
   vpi_ctx_.GetSystfInfo(handle, &read_back);
-  ASSERT_EQ(read_back.user_data, &payload);
+  ASSERT_EQ(read_back.user_data, reinterpret_cast<PLI_BYTE8*>(&payload));
 
   ResetArgProbes();
   VpiSystfInvoke(read_back.sizetf, read_back.user_data);

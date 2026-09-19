@@ -1,7 +1,6 @@
 #include <gtest/gtest.h>
 
 #include "helpers_vpi_error_fixture.h"
-#include "simulator/scheduler.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {

@@ -6,7 +6,6 @@
 // assertion model of simulator/dpi_runtime.h, so the reading of the arguments
 // stands here between vpi_control() and that model.
 
-#include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 

@@ -50,7 +50,7 @@ TEST_F(VpiGetCbInfoSim, ReportsRegisteredCallbackInfo) {
   EXPECT_EQ(out.reason, cbValueChange);
   EXPECT_EQ(out.cb_rtn, SampleCbRtn);
   EXPECT_EQ(out.index, 7);
-  EXPECT_EQ(out.user_data, &marker);
+  EXPECT_EQ(out.user_data, reinterpret_cast<PLI_BYTE8*>(&marker));
 }
 
 // §38.8: the routine reports the callback's trigger object as well, so a handle
@@ -170,7 +170,7 @@ TEST_F(VpiGetCbInfoSim, ReportsTheRegistrationAfterTheCallbackHasFired) {
   vpi_get_cb_info(cb, &out);
   EXPECT_EQ(out.reason, cbAfterDelay);
   EXPECT_EQ(out.time, &cb_time);
-  EXPECT_EQ(out.user_data, &marker);
+  EXPECT_EQ(out.user_data, reinterpret_cast<PLI_BYTE8*>(&marker));
   EXPECT_EQ(cb_time.low, 15u);
 }
 
