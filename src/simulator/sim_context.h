@@ -647,6 +647,13 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   ClassObject* ConstraintCallerThis() const { return constraint_caller_this_; }
   ClassObject* SetConstraintCallerThis(ClassObject* obj);
   ClassObject* CurrentThis() const;
+  // §9.3.2 with §13.3.2: the object and method-class stacks the running
+  // process carries, handed whole to each branch a fork inside a method
+  // spawns, so the branch runs on the object the method runs on.
+  const std::vector<ClassObject*>& ThisStack() const { return this_stack_; }
+  const std::vector<const ClassTypeInfo*>& MethodClassStack() const {
+    return method_class_stack_;
+  }
   // The handle of the object CurrentThis returns, or kNullClassHandle when no
   // object is in scope. This is what a bare `this` evaluates to, §8.11 making
   // the keyword "a predefined object handle".

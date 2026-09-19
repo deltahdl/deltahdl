@@ -233,4 +233,68 @@ TEST(ParallelBlockSimulation, ForkJoinNoneAllChildrenComplete) {
   EXPECT_EQ(c->value.ToUint64(), 3u);
 }
 
+// §9.3.2 with §8.6 and §8.11: a fork inside a class task spawns its branches
+// as processes of the same method, so a branch reads and writes the object's
+// properties, bare and as `this.a`, as the task itself does. Each branch is a
+// process of its own, and a process carries its `this` with it across a
+// suspension (§13.3.2); a spawned branch started with none, so `a` read 0 and
+// the writes to `a` and `b` reached no object. With a = 11 to start, the
+// first branch makes a 12 at time 2 and the second makes b 120 at time 3, so
+// the task's own reading after the join is 12 * 1000 + 120 = 12120; a branch
+// with no object left it at 11000 or 0.
+TEST(ParallelBlockSimulation, ForkBranchInsideAClassTaskKeepsThis) {
+  auto val = RunAndGet(
+      "class C;\n"
+      "  int a = 11, b;\n"
+      "  int seen;\n"
+      "  task run();\n"
+      "    fork\n"
+      "      begin #2 this.a = a + 1; end\n"
+      "      begin #3 b = a * 10; end\n"
+      "    join\n"
+      "    seen = a * 1000 + b;\n"
+      "  endtask\n"
+      "endclass\n"
+      "module t;\n"
+      "  int result;\n"
+      "  C h;\n"
+      "  initial begin\n"
+      "    h = new;\n"
+      "    h.run();\n"
+      "    result = h.seen;\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(val, 12120u);
+}
+
+// §9.3.2's join_none inside a class task, the shape of a component's
+// run-phase forking a monitor: the parent goes on and the branch, started
+// once the parent blocks, still runs on the parent's object. The branch
+// doubles the property after `#1`; the parent reads it after `#2`.
+TEST(ParallelBlockSimulation, JoinNoneBranchInsideAClassTaskKeepsThis) {
+  auto val = RunAndGet(
+      "class C;\n"
+      "  int v = 21;\n"
+      "  int seen;\n"
+      "  task run();\n"
+      "    fork\n"
+      "      begin #1 v = v * 2; end\n"
+      "    join_none\n"
+      "    #2 seen = v;\n"
+      "  endtask\n"
+      "endclass\n"
+      "module t;\n"
+      "  int result;\n"
+      "  C h;\n"
+      "  initial begin\n"
+      "    h = new;\n"
+      "    h.run();\n"
+      "    result = h.seen;\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(val, 42u);
+}
+
 }  // namespace
