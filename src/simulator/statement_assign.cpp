@@ -402,12 +402,11 @@ static FieldTarget ResolveStaticClassField(std::string_view base_name,
   return target;
 }
 
-// The component field_name of the interface instance the virtual interface
-// variable base_name is bound to. §25.9: "Once a virtual interface has been
-// initialized, all the components of the underlying interface instance are
-// directly available to the virtual interface via the dot notation. These
-// components can only be used in procedural statements", and an assignment is
-// such a statement -- the clause's own example writes `bus.req <= 1'b1`. The
+// The component the member access `lhs` names of the interface instance its
+// base is bound to. §25.9 has every component of the instance a virtual
+// interface represents reachable through it by the dot notation once it is
+// initialized, in procedural statements alone, and an assignment is such a
+// statement -- the clause's own example writes `bus.req <= 1'b1`. The
 // component belongs to the instance, so the path names that instance's own
 // variable and the write lands there.
 //
@@ -415,37 +414,42 @@ static FieldTarget ResolveStaticClassField(std::string_view base_name,
 // one through WriteStructField, which resolves and deposits at the one moment,
 // and the nonblocking one through ScheduleFieldNba, which asks this alone when
 // the statement executes and defers only the deposit. That is also where
-// §10.4.2 wants a "virtual interface reference" in an lvalue evaluated, "at the
-// same time as the expression on the right-hand side", so the binding read
-// here is the one in force when the statement ran, not the one in the update
-// region.
+// §10.4.2 wants a virtual interface reference in an lvalue evaluated, at the
+// same time as the right-hand side, so the binding read here is the one in
+// force when the statement ran, not the one in the update region.
 //
-// *handled is set true when base_name names a virtual interface, bound or
-// not: a variable declared so, or a property declared so of the class whose
-// method is running, which is how the clause's transactor writes `bus.req`
-// (ResolveVirtualInterfaceBase). An unbound one is the null reference §25.9
-// makes a runtime error -- the same one a read through it raises -- reported
-// here and resolved to storage that takes no value, so the caller sees a
-// handled path rather than an unwritten one it would report again or drop in
-// silence.
-static FieldTarget ResolveVirtualInterfaceField(std::string_view base_name,
-                                                std::string_view field_name,
-                                                SimContext& ctx, SourceLoc loc,
+// *handled is set true when the base names a virtual interface, bound or
+// not: a variable declared so, a property declared so of the class whose
+// method is running, which is how the clause's transactor writes `bus.req`,
+// or a property declared so of the object a handle expression denotes,
+// `this.vif.a <= 1` in a method and `d.vif.a <= 1` from the module or
+// another object (ResolveVirtualInterfaceBaseExpr). An unbound one is the
+// null reference §25.9 makes a runtime error -- the same one a read through
+// it raises -- reported here and resolved to storage that takes no value, so
+// the caller sees a handled path rather than an unwritten one it would report
+// again or drop in silence.
+static FieldTarget ResolveVirtualInterfaceField(const Expr* lhs,
+                                                SimContext& ctx,
                                                 bool* handled) {
   *handled = false;
+  if (lhs->kind != ExprKind::kMemberAccess || lhs->is_scope_resolution ||
+      lhs->rhs == nullptr || lhs->rhs->kind != ExprKind::kIdentifier) {
+    return {};
+  }
   VirtualInterfaceBase base =
-      ResolveVirtualInterfaceBase(base_name, ctx, ctx.GetArena());
+      ResolveVirtualInterfaceBaseExpr(lhs->lhs, ctx, ctx.GetArena());
   if (!base.is_virtual_interface) return {};
   *handled = true;
   if (base.handle == kNullVirtualInterface) {
-    ctx.GetDiag().Error(loc, "reference through a null virtual interface",
+    ctx.GetDiag().Error(lhs->range.start,
+                        "reference through a null virtual interface",
                         Subclause("25.9"));
     FieldTarget target;
     target.kind = FieldTarget::Kind::kNoOp;
     return target;
   }
   auto* component = ctx.FindVariable(
-      VirtualInterfaceComponentName(base.handle, field_name, ctx));
+      VirtualInterfaceComponentName(base.handle, lhs->rhs->text, ctx));
   if (!component) return {};
   FieldTarget target;
   target.kind = FieldTarget::Kind::kVariable;
@@ -481,6 +485,17 @@ static FieldTarget ResolveVariableField(std::string_view base_name,
 }
 
 FieldTarget ResolveFieldTarget(const Expr* lhs, SimContext& ctx) {
+  // A virtual interface base is asked first, on the expression rather than
+  // the flattened name: `this.vif.a` splits to `this` and `vif.a`, which
+  // ResolveThisField would take for a property named by the flat key, and
+  // `d.vif.a` to `d` and `vif.a`, which ResolveVariableField would follow
+  // into the object `d` and take the interface handle for a class handle. A
+  // bare `this`, `super` or class type name resolves to no virtual interface,
+  // so those bases still reach their own resolvers below.
+  bool handled = false;
+  FieldTarget target = ResolveVirtualInterfaceField(lhs, ctx, &handled);
+  if (handled) return target;
+
   std::string name;
   BuildLhsName(lhs, name);
   auto dot = name.find('.');
@@ -488,20 +503,11 @@ FieldTarget ResolveFieldTarget(const Expr* lhs, SimContext& ctx) {
   auto base_name = std::string_view(name).substr(0, dot);
   auto field_name = std::string_view(name).substr(dot + 1);
 
-  bool handled = false;
-  FieldTarget target = ResolveThisField(base_name, field_name, ctx, &handled);
+  target = ResolveThisField(base_name, field_name, ctx, &handled);
   if (handled) return target;
   target = ResolveSuperField(base_name, field_name, ctx, &handled);
   if (handled) return target;
   target = ResolveStaticClassField(base_name, field_name, ctx, &handled);
-  if (handled) return target;
-  // A virtual interface base is a plain variable name, so it is asked after
-  // the bases that are not -- `this`, `super`, a class type name -- which it
-  // would otherwise shadow, and before ResolveVariableField, which would take
-  // the virtual interface variable for a packed object or a class handle, find
-  // neither, and answer that the path names no storage.
-  target = ResolveVirtualInterfaceField(base_name, field_name, ctx,
-                                        lhs->range.start, &handled);
   if (handled) return target;
   return ResolveVariableField(base_name, field_name, ctx, lhs->range.start);
 }

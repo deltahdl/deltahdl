@@ -568,14 +568,17 @@ static Logic4Vec ResolveMemberByType(std::string_view base_name,
 // bound interface instance. Referencing a component of an unbound (null or
 // uninitialized) virtual interface is a fatal runtime error. Returns true and
 // fills `out` when `expr` accessed a member through a virtual interface: a
-// variable declared so, or a property declared so of the class whose method
-// is running, which ResolveVirtualInterfaceBase tells apart from any other
-// base.
+// variable declared so, a property declared so of the class whose method is
+// running, or, `this.vif.a` and `d.vif.a`, a property declared so of the
+// object a handle expression denotes, which ResolveVirtualInterfaceBaseExpr
+// tells apart from any other base. Before the base was resolved as an
+// expression, `d.vif.a` fell to the class field chain, which took the
+// interface handle for a class handle, found no object, and read a flattened
+// key the class never declared.
 static bool TryVirtualInterfaceMember(const Expr* expr, SimContext& ctx,
                                       Arena& arena, Logic4Vec& out) {
-  if (!expr->lhs || expr->lhs->kind != ExprKind::kIdentifier) return false;
   VirtualInterfaceBase base =
-      ResolveVirtualInterfaceBase(expr->lhs->text, ctx, arena);
+      ResolveVirtualInterfaceBaseExpr(expr->lhs, ctx, arena);
   if (!base.is_virtual_interface) return false;
   if (base.handle == kNullVirtualInterface) {
     ctx.GetDiag().Error(expr->range.start,

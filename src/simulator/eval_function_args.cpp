@@ -25,6 +25,7 @@
 #include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
 #include "simulator/stmt_exec.h"
+#include "simulator/virtual_interface.h"
 
 namespace delta {
 
@@ -414,10 +415,11 @@ static uint32_t EvalFormalArgWidth(const DataType& dt, SimContext& ctx,
                                    Arena& arena) {
   if (!dt.packed_dim_left || !dt.packed_dim_right) {
     if (!dt.type_name.empty() && ctx.FindClassType(dt.type_name)) return 0;
-    // §25.9: a virtual interface formal holds the handle of the instance it
-    // represents, as wide as Lowerer::LowerVar makes a variable declared so,
-    // which is what an output formal is sized to before the body assigns it.
-    if (dt.kind == DataTypeKind::kVirtualInterface) return 64;
+    // §25.9: a virtual interface formal, declared by the type or by a typedef
+    // name standing for it, holds the handle of the instance it represents,
+    // as wide as Lowerer::LowerVar makes a variable declared so, which is
+    // what an output formal is sized to before the body assigns it.
+    if (DeclaresAVirtualInterface(dt, ctx)) return 64;
     return DeclaredTypeWidth(dt, ctx);
   }
   auto span = [&](const Expr* l, const Expr* r) -> uint32_t {
@@ -564,7 +566,7 @@ static void BindValueArg(const FunctionArg& param, const ActualArgRef& actual,
   // §25.9 has a virtual interface passed as an argument to a task, function or
   // method; the formal is then a virtual interface of its own, and a member
   // the body reaches through it is a component of the instance it holds.
-  var->is_virtual_interface = dt.kind == DataTypeKind::kVirtualInterface;
+  var->is_virtual_interface = DeclaresAVirtualInterface(dt, ctx);
   var->value = val;
   var->value.is_signed = var->is_signed;
   if (!var->is_4state) CoerceTo2State(var->value);

@@ -18,6 +18,7 @@
 #include "simulator/statement_assign_internal.h"
 #include "simulator/stmt_exec.h"
 #include "simulator/stmt_exec_internal.h"
+#include "simulator/virtual_interface.h"
 #include "simulator/vpi_design_attach.h"
 
 namespace delta {
@@ -280,6 +281,15 @@ static Variable* CreateFuncLocalVar(std::string_view name, const DataType& type,
   // such as `p.suspend()` dispatch -- module-scope decls do this via
   // TryExecClassVarDecl, but function-body locals take this path instead.
   bool is_class = !type.type_name.empty() && ctx.FindClassType(type.type_name);
+  // §25.9: a virtual interface declared in a function body, by the type or
+  // by a typedef name standing for it, holds the handle of the instance it
+  // represents, as wide as Lowerer::LowerVar makes a variable declared so and
+  // as a formal declared so is bound, and is flagged so that a member the
+  // body reaches through it, `v.clk` after `v = dif`, is a component of that
+  // instance (ResolveVirtualInterfaceBase). Before this, such a local was a
+  // 32-bit vector no reader took for a virtual interface, and `v.clk` named
+  // nothing.
+  bool is_virtual_interface = DeclaresAVirtualInterface(type, ctx);
   // §6.18: a local declared with a user-defined type name is an object of the
   // type that name stands for, so `nib v` is as wide as `nib` is.
   // DeclaredTypeWidth is what reaches that width; the one-argument
@@ -288,7 +298,8 @@ static Variable* CreateFuncLocalVar(std::string_view name, const DataType& type,
   // site a subroutine body's declaration takes -- the statement executor's own
   // ExecVarDeclImpl serves a declaration outside a subroutine -- so the two
   // have to reach the typedef table separately.
-  uint32_t declared = is_class ? 64 : DeclaredTypeWidth(type, ctx);
+  uint32_t declared =
+      is_class || is_virtual_interface ? 64 : DeclaredTypeWidth(type, ctx);
   // §6.16: a string has no declared width and starts as "", so it is created
   // with none rather than at the carrier width below, and marked so that what
   // reads a string reads the flag rather than a width. A declaration outside a
@@ -305,6 +316,7 @@ static Variable* CreateFuncLocalVar(std::string_view name, const DataType& type,
   // `integer` local is a signed operand rather than an unsigned one.
   auto* v = ctx.CreateLocalVariable(name, w, DeclaredTypeIsSigned(type, ctx));
   v->is_4state = DeclaredTypeIs4State(type);
+  v->is_virtual_interface = is_virtual_interface;
   if (is_string) v->is_string = true;
   if (is_class) ctx.SetVariableClassType(name, type.type_name);
   RecordVariableEnumType(name, type, ctx);

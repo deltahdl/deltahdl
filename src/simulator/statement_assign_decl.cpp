@@ -24,6 +24,7 @@
 #include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
 #include "simulator/stmt_result.h"
+#include "simulator/virtual_interface.h"
 
 namespace delta {
 
@@ -555,7 +556,22 @@ StmtResult ExecVarDeclImpl(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   // answers 0 and still reaches that fallback, and a string (§6.16) still
   // reaches the branch above it, because DeclaredTypeWidth answers 0 for a
   // string typedef as well as for a bare one.
-  uint32_t width = DeclaredTypeWidth(stmt->var_decl_type, ctx);
+  //
+  // §25.9: a virtual interface declared in a task body or a begin-end block,
+  // by the type or by a typedef name standing for it, holds the handle of the
+  // instance it represents, as wide as Lowerer::LowerVar makes a variable
+  // declared so and as CreateFuncLocalVar makes a function-body local
+  // declared so, and is flagged so that a member the block reaches through
+  // it, `v.clk` after `v = dif`, is a component of that instance
+  // (ResolveVirtualInterfaceBase). It holds the null handle
+  // before it is initialized, as the clause says and as Lowerer::LowerVar
+  // sets, rather than the x a 4-state declaration starts at. DeclaredTypeWidth
+  // answers 0 for the type, so before this such a local took the 32-bit
+  // carrier and no reader took it for a virtual interface.
+  bool is_virtual_interface =
+      DeclaresAVirtualInterface(stmt->var_decl_type, ctx);
+  uint32_t width =
+      is_virtual_interface ? 64 : DeclaredTypeWidth(stmt->var_decl_type, ctx);
   bool is_real = (stmt->var_decl_type.kind == DataTypeKind::kReal ||
                   stmt->var_decl_type.kind == DataTypeKind::kShortreal ||
                   stmt->var_decl_type.kind == DataTypeKind::kRealtime);
@@ -563,6 +579,8 @@ StmtResult ExecVarDeclImpl(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   RecordVariableEnumType(stmt->var_name, stmt->var_decl_type, ctx);
   auto* var = ctx.FindVariable(stmt->var_name);
   if (var) {
+    var->is_virtual_interface = is_virtual_interface;
+    if (is_virtual_interface) var->value = MakeLogic4VecVal(arena, width, 0);
     InitializeDeclVariable(stmt, {var, width, is_real}, func_name, ctx, arena);
   }
   return StmtResult::kDone;

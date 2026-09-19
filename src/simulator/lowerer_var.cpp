@@ -692,22 +692,38 @@ static void CreateSemaphoreForVar(std::string_view name,
   }
 }
 
+// §25.9: whether the declaration wrote a virtual interface type, whose
+// variable holds the handle of the interface instance it represents.
+static bool IsVirtualInterfaceDecl(const RtlirVariable& var) {
+  return var.elem_type_kind == DataTypeKind::kVirtualInterface;
+}
+
+// The width of the variable's storage: a class handle (§8.3) and a virtual
+// interface handle (§25.9) are 64 bits wide whatever the declaration's own
+// width says, and every other declaration is as wide as it was elaborated.
+static uint32_t StorageWidth(const RtlirVariable& var) {
+  if (!var.class_type_name.empty() || IsVirtualInterfaceDecl(var)) return 64;
+  return var.width;
+}
+
+// §25.9: a virtual interface variable holds the handle of the interface
+// instance it represents, 64 bits wide as a class handle is, and holds the
+// null handle before it is initialized; marking it is what makes a member
+// reached through it a component of that instance. Does nothing for a
+// variable of any other type.
+static void MarkVirtualInterfaceVar(const RtlirVariable& var, Variable* v,
+                                    uint32_t width, SimContext& ctx,
+                                    Arena& arena) {
+  if (!IsVirtualInterfaceDecl(var)) return;
+  ctx.RegisterVirtualInterfaceVar(v);
+  v->value = MakeLogic4VecVal(arena, width, 0);
+}
+
 void Lowerer::LowerVar(std::string_view name, const RtlirVariable& var) {
-  bool is_virtual_interface =
-      var.elem_type_kind == DataTypeKind::kVirtualInterface;
-  uint32_t width =
-      var.class_type_name.empty() && !is_virtual_interface ? var.width : 64;
+  uint32_t width = StorageWidth(var);
   auto* v = ctx_.CreateVariable(name, width);
   RecordPackedRange(var.dtype, v, ctx_, arena_);
-
-  // §25.9: a virtual interface variable holds the handle of the interface
-  // instance it represents, 64 bits wide as a class handle is, and holds the
-  // null handle before it is initialized; marking it is what makes a member
-  // reached through it a component of that instance.
-  if (is_virtual_interface) {
-    ctx_.RegisterVirtualInterfaceVar(v);
-    v->value = MakeLogic4VecVal(arena_, width, 0);
-  }
+  MarkVirtualInterfaceVar(var, v, width, ctx_, arena_);
 
   if (!var.is_4state && !var.is_event && !var.is_string && !var.is_chandle) {
     v->value = MakeLogic4VecVal(arena_, width, 0);
