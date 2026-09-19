@@ -4,7 +4,7 @@
 // parameters, the enumeration and structure types with the type each variable
 // was declared of, the width recorded for a named type, the type of each
 // module instance, the §26.3 imported names, the §23.4 nested declaration
-// scopes and the §25.9 virtual interface bindings. Each records one entry or
+// scopes and the §25.9 virtual interface handles. Each records one entry or
 // answers one lookup.
 //
 // ResolveStructFieldPath stands here too, with the structure types it reads.
@@ -240,32 +240,37 @@ std::string_view DeclaredNameTables::FindInstanceType(
                                        : std::string_view{};
 }
 
-void DeclaredNameTables::RegisterVirtualInterfaceVar(const Variable* v) {
-  if (v) vi_vars_.insert(v);
+uint64_t DeclaredNameTables::VirtualInterfaceHandle(std::string_view scope) {
+  auto it = vi_instance_handles_.find(std::string(scope));
+  if (it != vi_instance_handles_.end()) return it->second;
+  vi_instance_scopes_.emplace_back(scope);
+  uint64_t handle = vi_instance_scopes_.size();
+  vi_instance_handles_[std::string(scope)] = handle;
+  return handle;
+}
+
+std::string_view DeclaredNameTables::VirtualInterfaceScope(
+    uint64_t handle) const {
+  if (handle == 0 || handle > vi_instance_scopes_.size()) return {};
+  return vi_instance_scopes_[handle - 1];
+}
+
+void DeclaredNameTables::RegisterVirtualInterfaceVar(Variable* v) {
+  if (v) v->is_virtual_interface = true;
 }
 
 bool DeclaredNameTables::IsVirtualInterfaceVar(const Variable* v) const {
-  return v && vi_vars_.count(v) != 0;
-}
-
-void DeclaredNameTables::BindVirtualInterface(const Variable* v,
-                                              std::string_view scope) {
-  if (v) vi_bindings_[v] = std::string(scope);
-}
-
-void DeclaredNameTables::UnbindVirtualInterface(const Variable* v) {
-  vi_bindings_.erase(v);
+  return v && v->is_virtual_interface;
 }
 
 bool DeclaredNameTables::VirtualInterfaceIsBound(const Variable* v) const {
-  return vi_bindings_.find(v) != vi_bindings_.end();
+  return !VirtualInterfaceBinding(v).empty();
 }
 
 std::string_view DeclaredNameTables::VirtualInterfaceBinding(
     const Variable* v) const {
-  auto it = vi_bindings_.find(v);
-  return (it != vi_bindings_.end()) ? std::string_view(it->second)
-                                    : std::string_view{};
+  if (!IsVirtualInterfaceVar(v)) return {};
+  return VirtualInterfaceScope(v->value.ToUint64());
 }
 
 }  // namespace delta

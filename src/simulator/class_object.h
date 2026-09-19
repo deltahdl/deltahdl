@@ -90,6 +90,15 @@ struct ClassTypeInfo {
     // within it is a fact about `pair_t` rather than about the property, which
     // SimContext::FindStructType answers by that name.
     std::string_view type_name = {};
+    // §25.9: whether the declaration wrote `virtual interface`, so that the
+    // value the property holds is the handle of the interface instance it
+    // represents (SimContext::VirtualInterfaceHandle), 0 before it is
+    // initialized, and a member reached through it by the dot notation is a
+    // component of that instance. It is what makes `vif.clk` in a method of
+    // the class -- read, written, or waited on -- the instance's own `clk`
+    // rather than a member of a value that has none, as
+    // Variable::is_virtual_interface does for a variable.
+    bool is_virtual_interface = false;
     // §7.4.2: the element count of a property declared with one fixed unpacked
     // dimension, and the lowest index that dimension declares. The object
     // holds such a property's elements under the keys ClassArrayElementKey of
@@ -171,6 +180,10 @@ struct ClassTypeInfo {
   int FindVTableIndex(std::string_view mname) const;
 
   bool IsA(const ClassTypeInfo* other) const;
+
+  // §8.13: the property `name` declares in this class or in one it inherits
+  // from, the nearest declaration first, or nullptr where none declares it.
+  const PropertyInfo* FindProperty(std::string_view name) const;
 };
 
 inline constexpr uint64_t kNullClassHandle = 0;

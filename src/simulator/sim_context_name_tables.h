@@ -7,7 +7,7 @@
 // variable was declared of; the width recorded for a named type; the type of
 // each module instance; the names a package import makes visible (§26.3) and
 // the scopes a nested module declaration opens (§23.4); and the §25.9 virtual
-// interface bindings. Every declaration keeps the comment it carried in
+// interface handles. Every declaration keeps the comment it carried in
 // src/simulator/sim_context.h.
 //
 // Each body here records one entry or answers one lookup, reading no running
@@ -23,6 +23,7 @@
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
 #include "parser/ast_type.h"
 #include "simulator/sim_context_types.h"
@@ -116,15 +117,25 @@ class DeclaredNameTables {
   void RegisterInstanceType(std::string_view prefix, std::string_view type);
   std::string_view FindInstanceType(std::string_view prefix) const;
 
-  // §25.9 virtual interface runtime. A virtual interface variable carries a
-  // binding to the scope of the interface instance it currently refers to, or
-  // is unbound (the null state, which is also the value before initialization).
-  // Bindings are keyed by the variable object, so no name re-resolution is
-  // needed when the binding is later consulted.
-  void RegisterVirtualInterfaceVar(const Variable* v);
+  // §25.9 virtual interface runtime. A virtual interface is a value: the
+  // handle of the interface instance it represents, held in the 64-bit
+  // Logic4Vec of whatever declares it -- a module variable, a subroutine
+  // formal, a class property, an element of a container -- as a class handle
+  // is held, so that an assignment, an argument, a property write and a copy
+  // of an object carry it with no table to keep in step. The handle is the
+  // 1-based position of the instance's scope in vi_instance_scopes_, issued
+  // the first time the instance is asked for; 0 is the null of §25.9, which
+  // is also what every declaration holds before it is initialized.
+  uint64_t VirtualInterfaceHandle(std::string_view scope);
+  // The scope of the instance `handle` denotes; empty for 0 and for a number
+  // no instance was issued.
+  std::string_view VirtualInterfaceScope(uint64_t handle) const;
+
+  // The three questions asked of a variable declared `virtual interface` --
+  // whether it is one, whether it holds an instance, and which -- answered
+  // from Variable::is_virtual_interface and the value it holds.
+  void RegisterVirtualInterfaceVar(Variable* v);
   bool IsVirtualInterfaceVar(const Variable* v) const;
-  void BindVirtualInterface(const Variable* v, std::string_view scope);
-  void UnbindVirtualInterface(const Variable* v);
   bool VirtualInterfaceIsBound(const Variable* v) const;
   std::string_view VirtualInterfaceBinding(const Variable* v) const;
 
@@ -160,10 +171,11 @@ class DeclaredNameTables {
 
   std::unordered_map<std::string, std::string> instance_types_;
 
-  // §25.9: virtual interface variables and their current interface-instance
-  // scope bindings (absence of a binding means null / uninitialized).
-  std::unordered_set<const Variable*> vi_vars_;
-  std::unordered_map<const Variable*, std::string> vi_bindings_;
+  // §25.9: the scope of each interface instance a virtual interface handle
+  // has been issued for, at handle minus one, and the handle each scope was
+  // issued.
+  std::vector<std::string> vi_instance_scopes_;
+  std::unordered_map<std::string, uint64_t> vi_instance_handles_;
 };
 
 }  // namespace delta

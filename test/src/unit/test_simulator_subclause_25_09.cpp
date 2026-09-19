@@ -492,4 +492,267 @@ TEST(VirtualInterfaceSim,
                             "25.9"));
 }
 
+// §25.9: a virtual interface can be declared as a class property, and once it
+// is initialized every component of the instance it represents is reached
+// through it by the dot notation. The module binds the property from outside,
+// `d.vif = dif`, and the method reads `vif.a` by the property's bare name; the
+// read reaches the instance's own `a`, which the module wrote 0x35 into. A
+// property bound to nothing reports a null reference and reads 0.
+TEST(VirtualInterfaceSim, ClassPropertyBoundFromModuleReadsInstanceComponent) {
+  EXPECT_EQ(RunAndGet("interface bus_if; logic [7:0] a; endinterface\n"
+                      "class drv;\n"
+                      "  virtual bus_if vif;\n"
+                      "  function bit [7:0] rd();\n"
+                      "    return vif.a;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module top;\n"
+                      "  bus_if dif();\n"
+                      "  drv d;\n"
+                      "  logic [7:0] x;\n"
+                      "  initial begin\n"
+                      "    dif.a = 8'h35;\n"
+                      "    d = new;\n"
+                      "    d.vif = dif;\n"
+                      "    x = d.rd();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "top.x"),
+            0x35u);
+}
+
+// §25.9: the clause's own transactor writes `bus.req <= 1'b1` through its
+// property. A nonblocking write through the property lands on the instance's
+// own variable, which the module reads back by its hierarchical name; an
+// unbound property would leave `dif.a` at its uninitialized value.
+TEST(VirtualInterfaceSim, ClassTaskWritesInstanceComponentThroughProperty) {
+  EXPECT_EQ(RunAndGet("interface bus_if; logic [7:0] a; endinterface\n"
+                      "class drv;\n"
+                      "  virtual bus_if vif;\n"
+                      "  task run();\n"
+                      "    vif.a <= 8'h35;\n"
+                      "  endtask\n"
+                      "endclass\n"
+                      "module top;\n"
+                      "  bus_if dif();\n"
+                      "  drv d;\n"
+                      "  initial begin\n"
+                      "    d = new;\n"
+                      "    d.vif = dif;\n"
+                      "    d.run();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "top.dif.a"),
+            0x35u);
+}
+
+// §25.9: the transactor's wait_for_bus waits on `@(posedge bus.grant)` with
+// `bus` a property. The event control arms on the instance's own `clk`, so the
+// task ends at 30, when another process drives the edge, and the enabling
+// process records that time; 0 is what a wait that armed nothing would leave,
+// the watchdog ending the run.
+TEST(VirtualInterfaceSim, ClassTaskWaitsOnEdgeThroughProperty) {
+  EXPECT_EQ(RunAndGet("interface bus_if; logic clk; endinterface\n"
+                      "class drv;\n"
+                      "  virtual bus_if vif;\n"
+                      "  task run();\n"
+                      "    @(posedge vif.clk);\n"
+                      "  endtask\n"
+                      "endclass\n"
+                      "module top;\n"
+                      "  bus_if dif();\n"
+                      "  drv d;\n"
+                      "  integer x;\n"
+                      "  initial begin\n"
+                      "    x = 0;\n"
+                      "    dif.clk = 0;\n"
+                      "    d = new;\n"
+                      "    d.vif = dif;\n"
+                      "    d.run();\n"
+                      "    x = $time;\n"
+                      "  end\n"
+                      "  initial #30 dif.clk = 1;\n"
+                      "  initial #200 $finish;\n"
+                      "endmodule\n",
+                      "top.x"),
+            30u);
+}
+
+// §25.9: a virtual interface property can be initialized by an argument to
+// new(), which is how the clause's SBusTransactor is built, `bus = s` in its
+// constructor. The instance passed to new() is what the property represents
+// afterwards, so the read through it answers the instance's 0x5C.
+TEST(VirtualInterfaceSim, ClassPropertyInitializedThroughNewArgument) {
+  EXPECT_EQ(RunAndGet("interface bus_if; logic [7:0] a; endinterface\n"
+                      "class drv;\n"
+                      "  virtual bus_if vif;\n"
+                      "  function new(virtual bus_if v);\n"
+                      "    vif = v;\n"
+                      "  endfunction\n"
+                      "  function bit [7:0] rd();\n"
+                      "    return vif.a;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module top;\n"
+                      "  bus_if dif();\n"
+                      "  drv d;\n"
+                      "  logic [7:0] x;\n"
+                      "  initial begin\n"
+                      "    dif.a = 8'h5C;\n"
+                      "    d = new(dif);\n"
+                      "    x = d.rd();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "top.x"),
+            0x5Cu);
+}
+
+// §25.9: a virtual interface may be passed as an argument to a task. The
+// formal is a virtual interface of its own, so `v.a` in the body is the
+// component of the instance the call passed, 0x47.
+TEST(VirtualInterfaceSim, TaskFormalReceivesInterfaceInstance) {
+  EXPECT_EQ(RunAndGet("interface bus_if; logic [7:0] a; endinterface\n"
+                      "module top;\n"
+                      "  bus_if dif();\n"
+                      "  logic [7:0] x;\n"
+                      "  task t(virtual bus_if v);\n"
+                      "    x = v.a;\n"
+                      "  endtask\n"
+                      "  initial begin\n"
+                      "    dif.a = 8'h47;\n"
+                      "    t(dif);\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "top.x"),
+            0x47u);
+}
+
+// §25.9 and §13.5.2: an output formal declared `virtual bus_if` is copied to
+// its actual when the function returns, and the actual is a class property
+// named from the module, `get(d.vif)`. The property then represents the
+// instance the function assigned, and a read through it answers 0x63.
+TEST(VirtualInterfaceSim, OutputArgumentWritesClassProperty) {
+  EXPECT_EQ(RunAndGet("interface bus_if; logic [7:0] a; endinterface\n"
+                      "class drv;\n"
+                      "  virtual bus_if vif;\n"
+                      "  function bit [7:0] rd();\n"
+                      "    return vif.a;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module top;\n"
+                      "  bus_if dif();\n"
+                      "  drv d;\n"
+                      "  logic [7:0] x;\n"
+                      "  function void get(output virtual bus_if v);\n"
+                      "    v = dif;\n"
+                      "  endfunction\n"
+                      "  initial begin\n"
+                      "    dif.a = 8'h63;\n"
+                      "    d = new;\n"
+                      "    get(d.vif);\n"
+                      "    x = d.rd();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "top.x"),
+            0x63u);
+}
+
+// §25.9 and §13.5.2, the copy-out reaching a property named by its bare name:
+// a method of the class passes its own property as the actual of a static
+// method of another class, `db::get(vif, src)`, which is how a component asks
+// a resource database for its interface, and the instance arrives through the
+// method's own virtual interface formal. The copy-out writes the property of
+// the object the method runs on, against that object's class rather than the
+// database's, and the read that follows it in the same method answers the
+// instance's 0x6E.
+TEST(VirtualInterfaceSim, OutputArgumentWritesPropertyNamedInsideMethod) {
+  EXPECT_EQ(RunAndGet("interface bus_if; logic [7:0] a; endinterface\n"
+                      "class db;\n"
+                      "  static function void get(output virtual bus_if v,\n"
+                      "                           input virtual bus_if src);\n"
+                      "    v = src;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "class drv;\n"
+                      "  virtual bus_if vif;\n"
+                      "  function bit [7:0] fetch(virtual bus_if src);\n"
+                      "    db::get(vif, src);\n"
+                      "    return vif.a;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module top;\n"
+                      "  bus_if dif();\n"
+                      "  drv d;\n"
+                      "  logic [7:0] x;\n"
+                      "  initial begin\n"
+                      "    dif.a = 8'h6E;\n"
+                      "    d = new;\n"
+                      "    x = d.fetch(dif);\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "top.x"),
+            0x6Eu);
+}
+
+// §25.9: a virtual interface is assigned from another virtual interface, so
+// one held as a property of a container object, `bx.v`, is read back and
+// assigned to the transactor's own property, which then represents the same
+// instance and reads its 0x7B.
+TEST(VirtualInterfaceSim, PropertyReadBackFromContainerObject) {
+  EXPECT_EQ(RunAndGet("interface bus_if; logic [7:0] a; endinterface\n"
+                      "class box;\n"
+                      "  virtual bus_if v;\n"
+                      "endclass\n"
+                      "class drv;\n"
+                      "  virtual bus_if vif;\n"
+                      "  function bit [7:0] rd();\n"
+                      "    return vif.a;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module top;\n"
+                      "  bus_if dif();\n"
+                      "  box bx;\n"
+                      "  drv d;\n"
+                      "  logic [7:0] x;\n"
+                      "  initial begin\n"
+                      "    dif.a = 8'h7B;\n"
+                      "    bx = new;\n"
+                      "    bx.v = dif;\n"
+                      "    d = new;\n"
+                      "    d.vif = bx.v;\n"
+                      "    x = d.rd();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "top.x"),
+            0x7Bu);
+}
+
+// §25.9: a virtual interface property has the value null before it is
+// initialized and compares equal to null then, and unequal once it represents
+// an instance. The two comparisons are packed as {before, after}, so 2 is the
+// answer; 3 would mean the binding was not seen, 0 that the null state was
+// not.
+TEST(VirtualInterfaceSim, ClassPropertyComparesWithNullBeforeAndAfterBinding) {
+  EXPECT_EQ(RunAndGet("interface bus_if; logic [7:0] a; endinterface\n"
+                      "class drv;\n"
+                      "  virtual bus_if vif;\n"
+                      "  function bit is_null();\n"
+                      "    return vif == null;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module top;\n"
+                      "  bus_if dif();\n"
+                      "  drv d;\n"
+                      "  bit [1:0] x;\n"
+                      "  initial begin\n"
+                      "    d = new;\n"
+                      "    x[1] = d.is_null();\n"
+                      "    d.vif = dif;\n"
+                      "    x[0] = d.is_null();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "top.x"),
+            2u);
+}
+
 }  // namespace

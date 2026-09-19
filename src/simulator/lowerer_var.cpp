@@ -693,14 +693,20 @@ static void CreateSemaphoreForVar(std::string_view name,
 }
 
 void Lowerer::LowerVar(std::string_view name, const RtlirVariable& var) {
-  uint32_t width = var.class_type_name.empty() ? var.width : 64;
+  bool is_virtual_interface =
+      var.elem_type_kind == DataTypeKind::kVirtualInterface;
+  uint32_t width =
+      var.class_type_name.empty() && !is_virtual_interface ? var.width : 64;
   auto* v = ctx_.CreateVariable(name, width);
   RecordPackedRange(var.dtype, v, ctx_, arena_);
 
-  // §25.9: track virtual interface variables so assignments bind them to an
-  // interface instance and component access redirects through that binding.
-  if (var.elem_type_kind == DataTypeKind::kVirtualInterface) {
+  // §25.9: a virtual interface variable holds the handle of the interface
+  // instance it represents, 64 bits wide as a class handle is, and holds the
+  // null handle before it is initialized; marking it is what makes a member
+  // reached through it a component of that instance.
+  if (is_virtual_interface) {
     ctx_.RegisterVirtualInterfaceVar(v);
+    v->value = MakeLogic4VecVal(arena_, width, 0);
   }
 
   if (!var.is_4state && !var.is_event && !var.is_string && !var.is_chandle) {

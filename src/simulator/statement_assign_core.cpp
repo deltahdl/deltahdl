@@ -16,6 +16,7 @@
 #include "simulator/class_object.h"
 #include "simulator/eval_array.h"
 #include "simulator/eval_class_array.h"
+#include "simulator/eval_function_internal.h"
 #include "simulator/eval_semaphore.h"
 #include "simulator/eval_string.h"
 #include "simulator/evaluation.h"
@@ -709,38 +710,6 @@ static void AssignToScalarLhs(const Stmt* stmt, Logic4Vec rhs_val,
   }
 }
 
-// §25.9: assignment to a virtual interface variable. The right-hand side is
-// another virtual interface, an interface instance, or null; bind, copy, or
-// clear the target's interface-instance binding accordingly.
-static bool TryVirtualInterfaceAssign(const Stmt* stmt, SimContext& ctx) {
-  if (!stmt->lhs || stmt->lhs->kind != ExprKind::kIdentifier) return false;
-  auto* lhs_var = ctx.FindVariable(stmt->lhs->text);
-  if (!ctx.IsVirtualInterfaceVar(lhs_var)) return false;
-  const Expr* rhs = stmt->rhs;
-  if (!rhs || rhs->kind != ExprKind::kIdentifier) return false;
-
-  if (rhs->text == "null") {
-    ctx.UnbindVirtualInterface(lhs_var);
-    return true;
-  }
-  auto* rhs_var = ctx.FindVariable(rhs->text);
-  if (ctx.IsVirtualInterfaceVar(rhs_var)) {
-    if (ctx.VirtualInterfaceIsBound(rhs_var)) {
-      std::string src(ctx.VirtualInterfaceBinding(rhs_var));
-      ctx.BindVirtualInterface(lhs_var, src);
-    } else {
-      ctx.UnbindVirtualInterface(lhs_var);
-    }
-    return true;
-  }
-  std::string scope = ctx.ResolveInstanceScope(rhs->text);
-  if (!scope.empty()) {
-    ctx.BindVirtualInterface(lhs_var, scope);
-    return true;
-  }
-  return false;
-}
-
 // §6.18: assignment between named event variables. `e = null` nullifies the
 // event; `e1 = e2` (both events) aliases the lhs to the rhs trigger.
 static bool TryEventVarAssign(const Stmt* stmt, SimContext& ctx) {
@@ -838,13 +807,15 @@ static bool TryArrayObjectAssign(const Stmt* stmt, SimContext& ctx,
 }
 
 // Run the chain of special-case blocking-assignment handlers that do not need
-// the generic rhs value (virtual interfaces, class `new`, associative-array
-// copy/literal, streaming-to-queue, dynamic-array/queue/event/slice/subarray,
-// and compound operators). Returns true when one of them fully handled the
-// assignment.
+// the generic rhs value (class `new`, associative-array copy/literal,
+// streaming-to-queue, dynamic-array/queue/event/slice/subarray, and compound
+// operators). Returns true when one of them fully handled the assignment. A
+// §25.9 virtual interface takes the generic store: it is a value, the handle
+// of the instance it represents, which an interface instance name, another
+// virtual interface and `null` each evaluate to (EvalIdentifier in
+// evaluation.cpp), so no arm has to bind it.
 bool TryDispatchSpecialBlockingAssign(const Stmt* stmt, SimContext& ctx,
                                       Arena& arena) {
-  if (TryVirtualInterfaceAssign(stmt, ctx)) return true;
   if (TrySemaphoreNewAssign(stmt, ctx, arena)) return true;
   if (TryClassNewAssign(stmt, ctx, arena)) return true;
   if (TryTypedClassNewAssign(stmt, ctx, arena)) return true;
@@ -940,6 +911,13 @@ void PerformBlockingAssign(const Expr* lhs, const Logic4Vec& rhs_val,
     var->NotifyWatchers();
   } else if (lhs->kind == ExprKind::kMemberAccess) {
     WriteStructField(lhs, owned, ctx);
+  } else if (lhs->kind == ExprKind::kIdentifier) {
+    // §8.11: inside a method a bare name no variable answers is a property of
+    // the object the method runs on, and §13.5.2's copy-out of an output
+    // argument names one whenever a method passes its own property as the
+    // actual -- `get(vif)` from a method of the class declaring `vif`. Left to
+    // the two arms above, the value went nowhere.
+    TryFuncClassPropertyWrite(lhs, owned, ctx, arena);
   }
 }
 

@@ -204,6 +204,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/scheduler.cpp
     simulator/process.cpp
     simulator/variable.cpp
+    simulator/virtual_interface.cpp
     simulator/eval_semaphore.cpp
     simulator/queue_bound.cpp
     simulator/sim_context.cpp

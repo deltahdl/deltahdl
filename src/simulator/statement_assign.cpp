@@ -22,6 +22,7 @@
 #include "simulator/sim_context_types.h"
 #include "simulator/statement_assign_internal.h"
 #include "simulator/variable.h"
+#include "simulator/virtual_interface.h"
 
 namespace delta {
 
@@ -419,30 +420,32 @@ static FieldTarget ResolveStaticClassField(std::string_view base_name,
 // here is the one in force when the statement ran, not the one in the update
 // region.
 //
-// *handled is set true when base_name names a virtual interface variable,
-// bound or not. An unbound one is the null reference §25.9 makes a runtime
-// error -- the same one a read through it raises -- reported here and resolved
-// to storage that takes no value, so the caller sees a handled path rather
-// than an unwritten one it would report again or drop in silence.
+// *handled is set true when base_name names a virtual interface, bound or
+// not: a variable declared so, or a property declared so of the class whose
+// method is running, which is how the clause's transactor writes `bus.req`
+// (ResolveVirtualInterfaceBase). An unbound one is the null reference §25.9
+// makes a runtime error -- the same one a read through it raises -- reported
+// here and resolved to storage that takes no value, so the caller sees a
+// handled path rather than an unwritten one it would report again or drop in
+// silence.
 static FieldTarget ResolveVirtualInterfaceField(std::string_view base_name,
                                                 std::string_view field_name,
                                                 SimContext& ctx, SourceLoc loc,
                                                 bool* handled) {
   *handled = false;
-  auto* base_var = ctx.FindVariable(base_name);
-  if (!ctx.IsVirtualInterfaceVar(base_var)) return {};
+  VirtualInterfaceBase base =
+      ResolveVirtualInterfaceBase(base_name, ctx, ctx.GetArena());
+  if (!base.is_virtual_interface) return {};
   *handled = true;
-  if (!ctx.VirtualInterfaceIsBound(base_var)) {
+  if (base.handle == kNullVirtualInterface) {
     ctx.GetDiag().Error(loc, "reference through a null virtual interface",
                         Subclause("25.9"));
     FieldTarget target;
     target.kind = FieldTarget::Kind::kNoOp;
     return target;
   }
-  std::string name(ctx.VirtualInterfaceBinding(base_var));
-  name += ".";
-  name += field_name;
-  auto* component = ctx.FindVariable(name);
+  auto* component = ctx.FindVariable(
+      VirtualInterfaceComponentName(base.handle, field_name, ctx));
   if (!component) return {};
   FieldTarget target;
   target.kind = FieldTarget::Kind::kVariable;

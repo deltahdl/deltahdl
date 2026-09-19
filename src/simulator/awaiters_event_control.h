@@ -36,6 +36,7 @@
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"
 #include "simulator/variable.h"
+#include "simulator/virtual_interface.h"
 
 namespace delta {
 
@@ -82,22 +83,23 @@ inline std::string_view MemberAccessField(const Expr* signal) {
 }
 
 // The name of the bound instance's component that a member access through a
-// virtual interface variable denotes, `top.dif.clk` for `v.clk` with `v` bound
-// to `top.dif`, written to `name`. Answers true when the base is a virtual
-// interface variable, leaving `name` empty for an unbound one; false for any
-// other base, with `name` untouched. Unlike ResolveVirtualInterfaceSignal it
-// reports nothing: it serves the compound-operand path, where the expression
-// is also evaluated as a whole and that evaluation reports an unbound base.
+// virtual interface denotes, `top.dif.clk` for `v.clk` with `v` bound to
+// `top.dif`, written to `name`. Answers true when the base is a virtual
+// interface -- a variable declared so, or a property declared so of the class
+// whose method the waiting process is running, which is the clause's own
+// transactor waiting on `@(posedge bus.grant)` -- leaving `name` empty for an
+// unbound one; false for any other base, with `name` untouched. Unlike
+// ResolveVirtualInterfaceSignal it reports nothing: it serves the
+// compound-operand path, where the expression is also evaluated as a whole
+// and that evaluation reports an unbound base.
 inline bool CollectVirtualInterfaceMember(const Expr* signal, SimContext& ctx,
                                           std::string& name) {
   if (!signal->lhs || signal->lhs->kind != ExprKind::kIdentifier) return false;
-  auto* base = ctx.FindVariable(signal->lhs->text);
-  if (!ctx.IsVirtualInterfaceVar(base)) return false;
-  name.clear();
-  if (!ctx.VirtualInterfaceIsBound(base)) return true;
-  name = ctx.VirtualInterfaceBinding(base);
-  name += ".";
-  name += MemberAccessField(signal);
+  VirtualInterfaceBase base =
+      ResolveVirtualInterfaceBase(signal->lhs->text, ctx, ctx.GetArena());
+  if (!base.is_virtual_interface) return false;
+  name = VirtualInterfaceComponentName(base.handle, MemberAccessField(signal),
+                                       ctx);
   return true;
 }
 

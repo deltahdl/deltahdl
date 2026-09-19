@@ -12,6 +12,7 @@
 #include "elaborator/type_eval.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
+#include "simulator/class_object.h"
 #include "simulator/evaluation_internal.h"
 #include "simulator/instance_bindings.h"
 #include "simulator/sim_context.h"
@@ -48,6 +49,39 @@ static Logic4Vec EvalIdentifierClassScope(const Expr* expr, SimContext& ctx,
   if (method_cls)
     return self->GetPropertyForType(expr->text, method_cls, arena);
   return self->GetProperty(expr->text, arena);
+}
+
+// §8.13: whether the class scope a bare name inside a method resolves against
+// declares `name`, as a static property of the running method's class or as a
+// property of the object's class or one it inherits from. The class scope is
+// searched before the scope enclosing the class, so a name it declares is
+// never the instance of the same name in the enclosing module.
+static bool ClassScopeDeclares(std::string_view name, SimContext& ctx) {
+  const ClassTypeInfo* method_cls = ctx.CurrentMethodClass();
+  if (method_cls != nullptr &&
+      method_cls->static_properties.count(std::string(name)) != 0) {
+    return true;
+  }
+  const ClassObject* self = ctx.CurrentThis();
+  const ClassTypeInfo* scope = method_cls != nullptr ? method_cls
+                               : self != nullptr     ? self->type
+                                                     : nullptr;
+  return scope != nullptr && scope->FindProperty(name) != nullptr;
+}
+
+// §25.9: an interface instance named where a value is wanted -- the right
+// side of an assignment to a virtual interface, an argument to a subroutine or
+// to new(), an operand of == -- is the handle of that instance, the value a
+// virtual interface holds to represent it. It is answered only for a name no
+// variable, let or class scope declares, since an instance name is visible
+// from the module instantiating it and from the classes declared there alone.
+static bool TryInterfaceInstanceHandle(std::string_view name, SimContext& ctx,
+                                       Arena& arena, Logic4Vec& out) {
+  if (ClassScopeDeclares(name, ctx)) return false;
+  std::string scope = ctx.ResolveInstanceScope(name);
+  if (scope.empty()) return false;
+  out = MakeLogic4VecVal(arena, 64, ctx.VirtualInterfaceHandle(scope));
+  return true;
 }
 
 // §16.14.6.1: the value the instance of a procedural concurrent assertion
@@ -104,6 +138,9 @@ static Logic4Vec EvalIdentifier(const Expr* expr, SimContext& ctx,
         let_decl && let_decl->func_args.empty()) {
       return EvalLetExpansion(let_decl, expr, ctx, arena);
     }
+    Logic4Vec instance;
+    if (TryInterfaceInstanceHandle(expr->text, ctx, arena, instance))
+      return instance;
     return EvalIdentifierClassScope(expr, ctx, arena);
   }
   if (var->is_event)

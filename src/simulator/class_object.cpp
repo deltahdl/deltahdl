@@ -33,6 +33,16 @@ bool ClassTypeInfo::IsA(const ClassTypeInfo* other) const {
   return false;
 }
 
+const ClassTypeInfo::PropertyInfo* ClassTypeInfo::FindProperty(
+    std::string_view name) const {
+  for (const auto* t = this; t != nullptr; t = t->parent) {
+    for (const auto& prop : t->properties) {
+      if (prop.name == name) return &prop;
+    }
+  }
+  return nullptr;
+}
+
 Logic4Vec ClassObject::GetProperty(std::string_view name, Arena& arena) const {
   std::string key(name);
   auto it = properties.find(key);

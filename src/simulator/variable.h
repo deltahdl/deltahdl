@@ -66,6 +66,16 @@ struct Variable {
   // it by the same lookup the mark now hangs off.
   bool is_string = false;
 
+  // §25.9: whether this variable was declared `virtual interface`, so that its
+  // value is the handle of the interface instance it represents -- the number
+  // SimContext::VirtualInterfaceHandle issues for the instance's scope, 0 for
+  // the null it holds before initialization -- and a member reached through it
+  // by the dot notation is a component of that instance rather than of this
+  // variable, which has none. A module-scope declaration and a subroutine's
+  // formal alike carry it; a class property declared so is marked on its
+  // ClassTypeInfo::PropertyInfo, since an object holds no Variable.
+  bool is_virtual_interface = false;
+
   // §30.5.3: the simulation time this variable's value last changed, in ticks.
   // "Active specify paths are those whose input has transitioned most recently
   // in time", and choosing among the module paths reaching one output is the

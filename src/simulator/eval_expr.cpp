@@ -23,6 +23,7 @@
 #include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
+#include "simulator/virtual_interface.h"
 
 namespace delta {
 
@@ -566,13 +567,17 @@ static Logic4Vec ResolveMemberByType(std::string_view base_name,
 // §25.9: a component referenced through a virtual interface redirects to the
 // bound interface instance. Referencing a component of an unbound (null or
 // uninitialized) virtual interface is a fatal runtime error. Returns true and
-// fills `out` when `expr` accessed a member through a virtual interface var.
+// fills `out` when `expr` accessed a member through a virtual interface: a
+// variable declared so, or a property declared so of the class whose method
+// is running, which ResolveVirtualInterfaceBase tells apart from any other
+// base.
 static bool TryVirtualInterfaceMember(const Expr* expr, SimContext& ctx,
                                       Arena& arena, Logic4Vec& out) {
   if (!expr->lhs || expr->lhs->kind != ExprKind::kIdentifier) return false;
-  auto* base = ctx.FindVariable(expr->lhs->text);
-  if (!ctx.IsVirtualInterfaceVar(base)) return false;
-  if (!ctx.VirtualInterfaceIsBound(base)) {
+  VirtualInterfaceBase base =
+      ResolveVirtualInterfaceBase(expr->lhs->text, ctx, arena);
+  if (!base.is_virtual_interface) return false;
+  if (base.handle == kNullVirtualInterface) {
     ctx.GetDiag().Error(expr->range.start,
                         "reference through a null virtual interface",
                         Subclause("25.9"));
@@ -583,9 +588,8 @@ static bool TryVirtualInterfaceMember(const Expr* expr, SimContext& ctx,
       (expr->rhs && expr->rhs->kind == ExprKind::kIdentifier)
           ? expr->rhs->text
           : std::string_view(expr->text);
-  std::string target =
-      std::string(ctx.VirtualInterfaceBinding(base)) + "." + std::string(field);
-  auto* tv = ctx.FindVariable(target);
+  auto* tv =
+      ctx.FindVariable(VirtualInterfaceComponentName(base.handle, field, ctx));
   out = tv ? tv->value : MakeLogic4Vec(arena, 1);
   return true;
 }

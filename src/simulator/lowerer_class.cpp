@@ -153,7 +153,8 @@ static void CollectClassMembers(ClassTypeInfo* info, const ClassDecl* cls) {
            member->is_protected, member->is_const, member->init_expr,
            Is4stateType(member->data_type, {}), sized,
            IsRealKind(member->data_type.kind),
-           IsSignedType(member->data_type, {}), member->data_type.type_name});
+           IsSignedType(member->data_type, {}), member->data_type.type_name,
+           member->data_type.kind == DataTypeKind::kVirtualInterface});
     } else if (member->kind == ClassMemberKind::kMethod && member->method) {
       std::string name(member->method->name);
       info->methods[name] = member->method;
