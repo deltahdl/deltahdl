@@ -135,4 +135,56 @@ TEST(StaticMethodSimulation, StaticMethodSharedAcrossInstances) {
             3u);
 }
 
+// §8.10: a static method is called with no object of its class, and §8.21 has
+// an abstract class that can never have one; a wildcard import in the
+// compilation-unit scope (§3.12.1, §26.3) makes the package's class visible to
+// the module by its bare name. The call through the class scope resolution
+// operator yields the method's 7, where a lookup that misses the class yields
+// the zero of an unresolved call.
+TEST(StaticMethodSimulation, AbstractPackageClassStaticMethodCalledByBareName) {
+  EXPECT_EQ(RunAndGet("package p;\n"
+                      "  virtual class base_t;\n"
+                      "    static function int get();\n"
+                      "      return 7;\n"
+                      "    endfunction\n"
+                      "  endclass\n"
+                      "endpackage\n"
+                      "import p::*;\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    result = base_t::get();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            7u);
+}
+
+// §8.10: a static method reads and writes the static properties of its class,
+// of which §8.9 keeps one copy. The class is named by its bare name through the
+// module's import and by `p::cnt_t` through the package scope resolution
+// operator of §26.3; both calls reach the one copy of `total`, so the second
+// answers 38, where a class lowered once per spelling would answer 34.
+TEST(StaticMethodSimulation, PackageClassStaticMethodSharesOneStaticProperty) {
+  EXPECT_EQ(RunAndGet("package p;\n"
+                      "  class cnt_t;\n"
+                      "    static int total = 30;\n"
+                      "    static function int bump();\n"
+                      "      total = total + 4;\n"
+                      "      return total;\n"
+                      "    endfunction\n"
+                      "  endclass\n"
+                      "endpackage\n"
+                      "module t;\n"
+                      "  import p::*;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    void'(cnt_t::bump());\n"
+                      "    result = p::cnt_t::bump();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            38u);
+}
+
 }  // namespace

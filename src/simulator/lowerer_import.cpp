@@ -2,10 +2,13 @@
 #include <string>
 #include <string_view>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "common/arena.h"
 #include "elaborator/rtlir.h"
+#include "parser/ast_class.h"
+#include "parser/ast_design.h"
 #include "parser/ast_module.h"
 #include "simulator/class_object.h"
 #include "simulator/evaluation.h"
@@ -25,10 +28,35 @@ PackageDecl* Lowerer::FindPackage(std::string_view name) const {
   return nullptr;
 }
 
-void Lowerer::LowerPackageItem(ModuleItem* item) {
+// The key SimContext holds package `pkg`'s class `cls` under for a reference
+// through the package scope resolution operator (§26.3), spelled as the source
+// spells it. The evaluator builds the same key from `p::C` in
+// ResolveClassScope (src/simulator/eval_function.cpp).
+static std::string_view QualifiedClassKey(const PackageDecl* pkg,
+                                          const ClassDecl* cls, Arena& arena) {
+  auto* key = arena.Create<std::string>(std::string(pkg->name) +
+                                        "::" + std::string(cls->name));
+  return *key;
+}
+
+void Lowerer::LowerPackageClass(const PackageDecl* pkg, const ClassDecl* cls) {
+  std::string_view key = QualifiedClassKey(pkg, cls, arena_);
+  if (ctx_.FindClassType(key)) return;
+  LowerClassDecl(cls);
+  ctx_.RegisterClassType(key, ctx_.FindClassType(cls->name));
+}
+
+void Lowerer::LowerPackageItem(const PackageDecl* pkg, ModuleItem* item) {
   if (item->kind == ModuleItemKind::kClassDecl && item->class_decl) {
-    if (!ctx_.FindClassType(item->class_decl->name)) {
-      LowerClassDecl(item->class_decl);
+    // §26.5: a declaration of the importing scope, or an earlier import, has
+    // already bound the bare name and keeps it.
+    if (ctx_.FindClassType(item->class_decl->name)) return;
+    ClassTypeInfo* lowered =
+        ctx_.FindClassType(QualifiedClassKey(pkg, item->class_decl, arena_));
+    if (lowered) {
+      ctx_.RegisterClassType(item->class_decl->name, lowered);
+    } else {
+      LowerPackageClass(pkg, item->class_decl);
     }
   } else if (item->kind == ModuleItemKind::kFunctionDecl ||
              item->kind == ModuleItemKind::kTaskDecl) {
@@ -77,7 +105,7 @@ void Lowerer::LowerImportedName(
     std::unordered_set<const PackageDecl*>& visited) {
   if (!visited.insert(pkg).second) return;
   if (auto* found = FindNamedPackageItem(pkg, name)) {
-    LowerPackageItem(found);
+    LowerPackageItem(pkg, found);
     // §26.6: an `export pkg::name` makes the given declaration available to a
     // downstream import following the same rules as a direct import. When that
     // declaration is a parameter or variable, its downstream visibility comes
@@ -159,7 +187,7 @@ void Lowerer::LowerAllImported(
   if (!visited.insert(pkg).second) return;
   for (auto* item : pkg->items) {
     if (IsImportOrExportDecl(item)) continue;
-    LowerPackageItem(item);
+    LowerPackageItem(pkg, item);
     // §26.6: mirror the named-import path -- a data declaration reached by
     // lowering all of a (possibly re-exported) package must also be aliased
     // from this package so a wildcard consumer of a re-exported constant or
@@ -223,18 +251,26 @@ void Lowerer::AliasNamedPackageDataItem(const PackageDecl* pkg,
   }
 }
 
+void Lowerer::LowerOneImport(const ImportItem& imp) {
+  auto* pkg = FindPackage(imp.package_name);
+  if (!pkg) return;
+  std::unordered_set<const PackageDecl*> visited;
+  if (imp.is_wildcard) {
+    LowerAllImported(pkg, visited);
+    AliasAllPackageDataItems(pkg);
+  } else {
+    LowerImportedName(pkg, imp.item_name, visited);
+    AliasNamedPackageDataItem(pkg, imp.item_name);
+  }
+}
+
 void Lowerer::LowerImports(const RtlirModule* mod) {
   auto apply_import = [&](const RtlirImport& imp) {
-    auto* pkg = FindPackage(imp.package_name);
-    if (!pkg) return;
-    std::unordered_set<const PackageDecl*> visited;
-    if (imp.is_wildcard) {
-      LowerAllImported(pkg, visited);
-      AliasAllPackageDataItems(pkg);
-    } else {
-      LowerImportedName(pkg, imp.item_name, visited);
-      AliasNamedPackageDataItem(pkg, imp.item_name);
-    }
+    ImportItem item;
+    item.package_name = imp.package_name;
+    item.item_name = imp.item_name;
+    item.is_wildcard = imp.is_wildcard;
+    LowerOneImport(item);
   };
 
   // §26.5: an explicit import of a name takes precedence over a wildcard import
@@ -247,6 +283,45 @@ void Lowerer::LowerImports(const RtlirModule* mod) {
     if (!imp.is_wildcard) apply_import(imp);
   for (const auto& imp : mod->imports)
     if (imp.is_wildcard) apply_import(imp);
+}
+
+void Lowerer::LowerCompilationUnitImports() {
+  if (!design_ || !design_->compilation_unit) return;
+  const auto& items = design_->compilation_unit->cu_items;
+  // §26.5's precedence of an explicit import over a wildcard one holds in the
+  // compilation-unit scope as in a module, so the explicit imports bind first.
+  for (const auto* item : items) {
+    if (item->kind != ModuleItemKind::kImportDecl) continue;
+    if (!item->import_item.is_wildcard) LowerOneImport(item->import_item);
+  }
+  for (const auto* item : items) {
+    if (item->kind != ModuleItemKind::kImportDecl) continue;
+    if (item->import_item.is_wildcard) LowerOneImport(item->import_item);
+  }
+}
+
+void Lowerer::LowerUnimportedClassesOf(const PackageDecl* pkg) {
+  // LowerClassDecl binds the bare name while it lowers, and a class of the
+  // package that extends an earlier one resolves its base through that
+  // binding (§8.13), so the bare names are left in place until the whole
+  // package is done and only then given back to whatever held them before: a
+  // declaration or an import of a scope that this pass must not displace
+  // (§26.5). A bare name nothing held stays bound to the package's class.
+  std::vector<std::pair<std::string_view, ClassTypeInfo*>> displaced;
+  for (const auto* item : pkg->items) {
+    if (item->kind != ModuleItemKind::kClassDecl || !item->class_decl) continue;
+    const ClassDecl* cls = item->class_decl;
+    if (ctx_.FindClassType(QualifiedClassKey(pkg, cls, arena_))) continue;
+    if (ClassTypeInfo* held = ctx_.FindClassType(cls->name))
+      displaced.emplace_back(cls->name, held);
+    LowerPackageClass(pkg, cls);
+  }
+  for (const auto& [name, held] : displaced) ctx_.RegisterClassType(name, held);
+}
+
+void Lowerer::LowerUnimportedPackageClasses() {
+  if (!design_) return;
+  for (const auto* pkg : design_->packages) LowerUnimportedClassesOf(pkg);
 }
 
 }  // namespace delta

@@ -889,16 +889,21 @@ void Lowerer::Lower(const RtlirDesign* design) {
   ctx_.GetScheduler().AddPostTimestepCallback(
       [ctx = &ctx_]() { ctx->AssertionSamples().Refill(ctx->GetArena()); });
 
+  // §3.12.1: the unit's imports are visible to its own class declarations and
+  // to every module, and §26.5 has a declaration of the scope take the name
+  // over an import, so the imports bind first and a unit class rebinds its
+  // name over them; the first of two unit classes of one name keeps it.
+  LowerCompilationUnitImports();
+  std::unordered_set<std::string_view> unit_class_names;
   for (auto* cls : design->cu_class_decls) {
-    if (!ctx_.FindClassType(cls->name)) {
-      LowerClassDecl(cls);
-    }
+    if (unit_class_names.insert(cls->name).second) LowerClassDecl(cls);
   }
 
   RegisterFreeCuFunctions(design, ctx_);
   for (auto* mod : design->top_modules) {
     LowerModule(mod);
   }
+  LowerUnimportedPackageClasses();
 
   AttachDesignClocking();
 

@@ -356,4 +356,103 @@ TEST(PackageScopeReferenceSim, PackageScopedTypedefMakesBlockLocalAString) {
   EXPECT_EQ(val, 5u);
 }
 
+// §26.3: a wildcard import written in the module makes the package's class
+// visible by its bare name, and §8.10 has its static method called through
+// that name with no object. The call answers the method's 8; a class the
+// import did not bind answers the zero of an unresolved call.
+TEST(PackageImportSim, WildcardImportedClassStaticMethodCalledByBareName) {
+  EXPECT_EQ(RunAndGet("package p;\n"
+                      "  class plain_t;\n"
+                      "    static function int get();\n"
+                      "      return 8;\n"
+                      "    endfunction\n"
+                      "  endclass\n"
+                      "endpackage\n"
+                      "module t;\n"
+                      "  import p::*;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    result = plain_t::get();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            8u);
+}
+
+// §3.12.1: a name a module does not declare is searched for in the
+// compilation-unit scope, including the names a package import there made
+// visible; §26.3 has a wildcard import bring every name of the package. The
+// import stands outside the module, so the module's own import list is empty
+// and the class is bound only if the unit's import was applied.
+TEST(PackageImportSim, UnitScopeWildcardImportBindsPackageClass) {
+  EXPECT_EQ(RunAndGet("package p;\n"
+                      "  class plain_t;\n"
+                      "    static function int get();\n"
+                      "      return 8;\n"
+                      "    endfunction\n"
+                      "  endclass\n"
+                      "endpackage\n"
+                      "import p::*;\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    result = plain_t::get();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            8u);
+}
+
+// §26.3: the package scope resolution operator reaches a package's declaration
+// with no import at all, and §8.23 has the class so reached prefix a static
+// method call. Nothing imports `p`, so `p::pk_t::get()` answers 9 only if the
+// package's class is lowered and bound under its qualified name regardless of
+// any import.
+TEST(PackageScopeReferenceSim, PackageQualifiedClassStaticMethodCall) {
+  EXPECT_EQ(RunAndGet("package p;\n"
+                      "  class pk_t;\n"
+                      "    static function int get();\n"
+                      "      return 9;\n"
+                      "    endfunction\n"
+                      "  endclass\n"
+                      "endpackage\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    result = p::pk_t::get();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            9u);
+}
+
+// §26.3 and §26.5: a class declared in the compilation-unit scope keeps its
+// name over a same-named class that a wildcard import there would bring in,
+// while the package's class stays reachable through its qualified name. The
+// two static methods answer 8 and 9, so a lowering that bound either name to
+// the other class is told apart from one that bound each to its own.
+TEST(PackageScopeReferenceSim, UnitClassKeepsNameOverImportedPackageClass) {
+  EXPECT_EQ(RunAndGet("package p;\n"
+                      "  class same_t;\n"
+                      "    static function int get();\n"
+                      "      return 9;\n"
+                      "    endfunction\n"
+                      "  endclass\n"
+                      "endpackage\n"
+                      "import p::*;\n"
+                      "class same_t;\n"
+                      "  static function int get();\n"
+                      "    return 8;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    result = same_t::get() * 10 + p::same_t::get();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            89u);
+}
+
 }  // namespace

@@ -16,6 +16,7 @@ namespace delta {
 class Arena;
 class DiagEngine;
 class SimContext;
+struct ImportItem;
 struct ModuleItem;
 struct RtlirContAssign;
 struct RtlirUdpInst;
@@ -113,7 +114,29 @@ class Lowerer {
   void LowerSequenceMonitor(const ModuleItem* seq, std::string_view ep_name);
   void LowerClassDecl(const ClassDecl* cls);
   void LowerImports(const RtlirModule* mod);
-  void LowerPackageItem(ModuleItem* item);
+  // §3.12.1: an import written in the compilation-unit scope makes the
+  // package's names visible to every module of the unit, which reaches them
+  // after searching its own scope. Applied once, ahead of the modules, from
+  // the unit's own import declarations. Defined in lowerer_import.cpp.
+  void LowerCompilationUnitImports();
+  // §26.3: `p::C` reaches a package's class whether or not the package was
+  // imported, so every package class no import has lowered is lowered here and
+  // bound under its qualified key, after the modules so that no unqualified
+  // binding an import or a declaration made is displaced by it. Defined in
+  // lowerer_import.cpp.
+  void LowerUnimportedPackageClasses();
+  void LowerUnimportedClassesOf(const PackageDecl* pkg);
+  // Lowers the class `cls` that package `pkg` declares and binds it under
+  // "pkg::name" as well as under the bare name LowerClassDecl gives it, once:
+  // a second call for the same class finds the qualified key and does nothing,
+  // so that the static properties of §8.9 have one copy however the class is
+  // named. Defined in lowerer_import.cpp.
+  void LowerPackageClass(const PackageDecl* pkg, const ClassDecl* cls);
+  void LowerPackageItem(const PackageDecl* pkg, ModuleItem* item);
+  // §26.3: applies one import declaration, wildcard or explicit, to the scope
+  // inst_prefix_ names; LowerImports and LowerCompilationUnitImports both go
+  // through it. Defined in lowerer_import.cpp.
+  void LowerOneImport(const ImportItem& imp);
   PackageDecl* FindPackage(std::string_view name) const;
 
   void LowerImportedName(PackageDecl* pkg, std::string_view name,

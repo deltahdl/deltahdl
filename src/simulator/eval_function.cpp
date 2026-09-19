@@ -2,6 +2,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <unordered_set>
 #include <vector>
 
@@ -420,20 +421,40 @@ void BindClassParams(const ClassTypeInfo* cls, const Expr* base_id,
 
 struct ClassScopeInfo {
   const Expr* access;
+  // The class as the call named it: a bare `C` or, through the package scope
+  // resolution operator of §26.3, `p::C`, the key the lowerer binds a package's
+  // class under whether or not the package was imported.
+  std::string_view class_name;
   ClassTypeInfo* cls;
   ModuleItem* method;
   bool is_void;
 };
 
-static bool ResolveClassScope(const Expr* expr, SimContext& ctx,
+// §8.23 has the left operand of `::` name a class or a package, and §26.3
+// reaches a package's class through `p::C`, so the operand of `p::C::m` is
+// itself a scope resolution of two identifiers. Answers the key under which
+// SimContext holds the class for either shape, or an empty view for another.
+static std::string_view ScopedClassKey(const Expr* scope, Arena& arena) {
+  if (!scope) return {};
+  if (scope->kind == ExprKind::kIdentifier) return scope->text;
+  if (scope->kind != ExprKind::kMemberAccess || !scope->is_scope_resolution)
+    return {};
+  if (!scope->lhs || scope->lhs->kind != ExprKind::kIdentifier) return {};
+  if (!scope->rhs || scope->rhs->kind != ExprKind::kIdentifier) return {};
+  auto* key = arena.Create<std::string>(std::string(scope->lhs->text) +
+                                        "::" + std::string(scope->rhs->text));
+  return *key;
+}
+
+static bool ResolveClassScope(const Expr* expr, SimContext& ctx, Arena& arena,
                               ClassScopeInfo& info) {
   if (!expr->lhs || expr->lhs->kind != ExprKind::kMemberAccess) return false;
   info.access = expr->lhs;
-  if (!info.access->lhs || info.access->lhs->kind != ExprKind::kIdentifier)
-    return false;
+  info.class_name = ScopedClassKey(info.access->lhs, arena);
+  if (info.class_name.empty()) return false;
   if (!info.access->rhs || info.access->rhs->kind != ExprKind::kIdentifier)
     return false;
-  info.cls = ctx.FindClassType(info.access->lhs->text);
+  info.cls = ctx.FindClassType(info.class_name);
   if (!info.cls) return false;
   auto it = info.cls->methods.find(std::string(info.access->rhs->text));
   if (it == info.cls->methods.end()) return false;
@@ -491,12 +512,11 @@ void ExecClassMethod(ClassMethodTarget target, const Expr* expr,
 static bool TryEvalClassScopeCall(const Expr* expr, SimContext& ctx,
                                   Arena& arena, Logic4Vec& out) {
   ClassScopeInfo info;
-  if (!ResolveClassScope(expr, ctx, info)) return false;
+  if (!ResolveClassScope(expr, ctx, arena, info)) return false;
   if (!info.access->lhs->elements.empty()) return false;
 
   if (info.access->rhs->text == "new") {
-    out = EvalClassNew(info.access->lhs->text, expr, ctx, arena,
-                       expr->range.start);
+    out = EvalClassNew(info.class_name, expr, ctx, arena, expr->range.start);
     return true;
   }
   ctx.PushScope();
@@ -521,14 +541,13 @@ static bool TryEvalClassScopeCall(const Expr* expr, SimContext& ctx,
 static bool TryEvalParameterizedScopeCall(const Expr* expr, SimContext& ctx,
                                           Arena& arena, Logic4Vec& out) {
   ClassScopeInfo info;
-  if (!ResolveClassScope(expr, ctx, info)) return false;
+  if (!ResolveClassScope(expr, ctx, arena, info)) return false;
   if (info.access->lhs->elements.empty()) return false;
   ctx.PushScope();
   BindClassParams(info.cls, info.access->lhs, ctx, arena);
 
   if (info.access->rhs->text == "new") {
-    out = EvalClassNew(info.access->lhs->text, expr, ctx, arena,
-                       expr->range.start);
+    out = EvalClassNew(info.class_name, expr, ctx, arena, expr->range.start);
     ctx.PopScope();
     return true;
   }
