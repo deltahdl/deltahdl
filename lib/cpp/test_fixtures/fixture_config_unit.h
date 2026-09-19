@@ -10,6 +10,7 @@
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/rtlir.h"
 #include "lexer/lexer.h"
 #include "parser/library_map.h"
 #include "parser/parser.h"

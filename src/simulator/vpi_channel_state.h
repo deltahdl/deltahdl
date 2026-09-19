@@ -45,8 +45,11 @@ struct VpiChannelState {
   // Test hook that drives vpi_mcd_flush() down its failure return.
   bool mcd_flush_should_fail = false;
   // Returned by the channel accessors when a channel has no buffered or flushed
-  // text, so they can hand back a reference without inserting an entry.
-  const std::string empty_mcd_buffer;
+  // text, so they can hand back a reference without inserting an entry. Nothing
+  // writes to it; it is not declared const because a const data member would
+  // fall under readability-identifier-naming's constant rule and need a k
+  // prefix, which no other member of this struct carries.
+  std::string empty_mcd_buffer;
 
   // §38.26: the single buffer vpi_mcd_name() reuses for its result, so each
   // call overwrites the previous returned value. Separate from get_str_buffer_.
