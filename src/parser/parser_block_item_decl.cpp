@@ -60,6 +60,12 @@ bool Parser::IsBlockVarDeclStartCore() {
       tk == TokenKind::kKwEnum || tk == TokenKind::kKwVar) {
     return true;
   }
+  // A.2.2.1 lists `virtual [interface] interface_identifier` among data_type's
+  // alternatives, so a block item opening with `virtual` is a §25.9 virtual
+  // interface declaration wherever A.2.8 places one: the locals of a task or
+  // function body and the head of a seq_block. No statement opens with the
+  // keyword, and ParseDataType reads the type from it.
+  if (tk == TokenKind::kKwVirtual) return true;
   if (IsDataTypeKeyword(tk)) {
     auto saved = lexer_.SavePos();
     Consume();

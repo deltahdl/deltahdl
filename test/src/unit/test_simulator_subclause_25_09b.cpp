@@ -368,4 +368,26 @@ TEST(VirtualInterfaceSim, ClassTaskLocalWaitsOnInstanceEdge) {
             30u);
 }
 
+// §25.9 with A.2.2.1: the local written directly as `virtual bus_if v;`, no
+// typedef between, once IsBlockVarDeclStartCore takes `virtual` as opening a
+// declaration; it reads the instance's `a`, 0x69, as the typedef form does.
+TEST(VirtualInterfaceSim, ModuleTaskDirectLocalReadsInstanceComponent) {
+  EXPECT_EQ(RunAndGet("interface bus_if; logic [7:0] a; endinterface\n"
+                      "module top;\n"
+                      "  bus_if dif();\n"
+                      "  logic [7:0] x;\n"
+                      "  task t();\n"
+                      "    virtual bus_if v;\n"
+                      "    v = dif;\n"
+                      "    x = v.a;\n"
+                      "  endtask\n"
+                      "  initial begin\n"
+                      "    dif.a = 8'h69;\n"
+                      "    t();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "top.x"),
+            0x69u);
+}
+
 }  // namespace

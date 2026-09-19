@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
 #include "fixture_parser.h"
+#include "helpers_parser_verify.h"
 #include "parser/ast_module.h"
+#include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
 
 using namespace delta;
@@ -180,6 +182,70 @@ TEST(InterfaceParsing, VirtualInterfaceInequalityExpression) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
+}
+
+// §25.9 lets a virtual interface be declared wherever a variable is, and
+// A.2.2.1 (printed page 1182) lists `virtual [interface] interface_identifier`
+// among data_type's alternatives, so a block item opening with `virtual` is a
+// data_declaration wherever A.2.8 places one: the locals of a task or function
+// body and the head of a seq_block. IsBlockVarDeclStartCore did not take the
+// keyword as opening a declaration, so the parser read the line as a statement
+// and reported it.
+TEST(InterfaceParsing, VirtualInterfaceFirstLocalOfTask) {
+  auto r = Parse(
+      "module m;\n"
+      "  task t();\n"
+      "    virtual simple_bus v;\n"
+      "  endtask\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* t = FindItemByName(r.cu->modules[0]->items, "t");
+  ASSERT_NE(t, nullptr);
+  ASSERT_GE(t->func_body_stmts.size(), 1u);
+  EXPECT_EQ(t->func_body_stmts[0]->kind, StmtKind::kVarDecl);
+  EXPECT_EQ(t->func_body_stmts[0]->var_decl_type.kind,
+            DataTypeKind::kVirtualInterface);
+  EXPECT_EQ(t->func_body_stmts[0]->var_decl_type.type_name, "simple_bus");
+  EXPECT_EQ(t->func_body_stmts[0]->var_name, "v");
+}
+
+TEST(InterfaceParsing, VirtualInterfaceWithKeywordFirstLocalOfFunction) {
+  auto r = Parse(
+      "module m;\n"
+      "  function void f();\n"
+      "    virtual interface simple_bus v;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* f = FindItemByName(r.cu->modules[0]->items, "f");
+  ASSERT_NE(f, nullptr);
+  ASSERT_GE(f->func_body_stmts.size(), 1u);
+  EXPECT_EQ(f->func_body_stmts[0]->kind, StmtKind::kVarDecl);
+  EXPECT_EQ(f->func_body_stmts[0]->var_decl_type.kind,
+            DataTypeKind::kVirtualInterface);
+  EXPECT_EQ(f->func_body_stmts[0]->var_name, "v");
+}
+
+TEST(InterfaceParsing, VirtualInterfaceFirstItemOfSeqBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    virtual simple_bus v;\n"
+      "    v = null;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* body = FirstInitialBody(r);
+  ASSERT_NE(body, nullptr);
+  ASSERT_EQ(body->kind, StmtKind::kBlock);
+  ASSERT_EQ(body->stmts.size(), 2u);
+  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
+  EXPECT_EQ(body->stmts[0]->var_decl_type.kind,
+            DataTypeKind::kVirtualInterface);
+  EXPECT_EQ(body->stmts[0]->var_name, "v");
 }
 
 }  // namespace
