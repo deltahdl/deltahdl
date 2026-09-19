@@ -134,6 +134,64 @@ TEST(LoopStatementElaboration, ForeachLoopVarNonblockingAssignIsError) {
 }
 
 // §12.7.3 — a loop variable may not reuse the array's identifier.
+// §12.7.3 gives a loop variable over an associative array indexed by a
+// specific type that index type, and a class handle is a reference to an
+// object: a write to a member reached through the handle writes the object,
+// so the read-only rule is not touched. UVM's uvm_phase.svh writes
+// `pred.m_successors[begin_node] = 1;` inside `foreach (m_predecessors[pred])`.
+TEST(LoopStatementElaboration, ForeachLoopVarMemberWriteThroughHandleOk) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "class node;\n"
+      "  int count;\n"
+      "endclass\n"
+      "module m;\n"
+      "  bit preds [node];\n"
+      "  initial begin\n"
+      "    foreach (preds[p]) p.count = 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(LoopStatementElaboration,
+     ForeachLoopVarMemberElementWriteThroughHandleOk) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "class node;\n"
+      "  bit succ [node];\n"
+      "endclass\n"
+      "module m;\n"
+      "  bit preds [node];\n"
+      "  node q;\n"
+      "  initial begin\n"
+      "    foreach (preds[p]) p.succ[q] = 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// A bit-select of the loop variable itself is still a write to it.
+TEST(LoopStatementElaboration, ForeachLoopVarBitSelectAssignIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int arr [4];\n"
+      "  initial begin\n"
+      "    foreach (arr[i]) i[0] = 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "foreach loop variable 'i' is read-only and cannot "
+                            "be assigned",
+                            4, "12.7.3"));
+}
+
 TEST(LoopStatementElaboration, ForeachLoopVarSameNameAsArrayIsError) {
   ElabFixture f;
   ElaborateSrc(

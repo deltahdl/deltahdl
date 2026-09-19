@@ -18,9 +18,15 @@ namespace delta {
 
 namespace {
 
-// §12.7.3 — the leftmost identifier reached by descending an lvalue through
-// index selects, member accesses, and increment/decrement operators. Names
-// the object an assignment ultimately writes.
+// §12.7.3 — the identifier reached by descending an lvalue through index
+// selects and increment/decrement operators: the variable an assignment
+// writes, whole or in part. A member access ends the descent with no name,
+// since §12.7.3 gives a loop variable over an associative array indexed by a
+// specific type that index type, and through a class handle a member write
+// reaches the object the handle refers to, not the handle (§8.3); UVM's
+// uvm_phase.svh writes `pred.m_successors[begin_node] = 1;` inside
+// `foreach (m_predecessors[pred])`. A struct-typed index whose member is
+// written goes unreported here, the check naming variables without types.
 static std::string_view LvalueRootName(const Expr* e) {
   while (e) {
     switch (e->kind) {
@@ -28,9 +34,6 @@ static std::string_view LvalueRootName(const Expr* e) {
         return e->text;
       case ExprKind::kSelect:
         e = e->base;
-        break;
-      case ExprKind::kMemberAccess:
-        e = e->lhs;
         break;
       case ExprKind::kUnary:
       case ExprKind::kPostfixUnary:
