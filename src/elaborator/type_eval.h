@@ -58,6 +58,14 @@ uint32_t EvalStructMemberWidth(const StructMember& m,
 uint32_t TaggedUnionTagWidth(const DataType& dtype);
 uint32_t TaggedUnionTagBitOffset(const DataType& dtype);
 
+// The typedef a named type denotes, looked up under its "Scope::name" key
+// where the name was written with a class or package prefix (§8.23, §26.3)
+// and under the bare name otherwise; null for an unnamed type or a name the
+// table does not hold. A prefixed name never falls back to the bare one:
+// that would take the layout from a different type.
+const DataType* FindNamedType(const DataType& dtype,
+                              const TypedefMap& typedefs);
+
 uint32_t EvalTypeWidth(const DataType& dtype, const TypedefMap& typedefs);
 
 uint32_t EvalTypeWidth(const DataType& dtype, const TypedefMap& typedefs,

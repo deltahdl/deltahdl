@@ -338,8 +338,8 @@ DataType TypeNameToDataType(std::string_view name) {
 // RegisterClassTypedefs in src/elaborator/elaborator_resolve.cpp record, and
 // misses rather than falling back to whatever unqualified name happens to
 // match: falling back would size the declared object from a different type.
-static const DataType* ResolveNamed(const DataType& dtype,
-                                    const TypedefMap& typedefs) {
+const DataType* FindNamedType(const DataType& dtype,
+                              const TypedefMap& typedefs) {
   if (dtype.kind != DataTypeKind::kNamed) return nullptr;
   if (!dtype.scope_name.empty()) {
     std::string qualified =
@@ -403,7 +403,7 @@ static uint32_t PackedDimProduct(const DataType& dtype, const ScopeMap& scope) {
 }
 
 uint32_t EvalTypeWidth(const DataType& dtype, const TypedefMap& typedefs) {
-  const auto* resolved = ResolveNamed(dtype, typedefs);
+  const auto* resolved = FindNamedType(dtype, typedefs);
   if (resolved) {
     uint32_t base = EvalTypeWidth(*resolved, typedefs);
     // §7.4.4: packed dimensions written where a typedef is used stack on top of
@@ -424,7 +424,7 @@ uint32_t EvalTypeWidth(const DataType& dtype, const TypedefMap& typedefs) {
 
 uint32_t EvalTypeWidth(const DataType& dtype, const TypedefMap& typedefs,
                        const ScopeMap& scope) {
-  const auto* resolved = ResolveNamed(dtype, typedefs);
+  const auto* resolved = FindNamedType(dtype, typedefs);
   if (resolved) {
     uint32_t base = EvalTypeWidth(*resolved, typedefs, scope);
     // §7.4.4: use-site packed dimensions stack on top of the typedef's own
@@ -467,13 +467,13 @@ static bool Is4statePackedAggregate(const DataType& dtype) {
 }
 
 bool IsStringType(const DataType& dtype, const TypedefMap& typedefs) {
-  const auto* resolved = ResolveNamed(dtype, typedefs);
+  const auto* resolved = FindNamedType(dtype, typedefs);
   if (resolved) return IsStringType(*resolved, typedefs);
   return dtype.kind == DataTypeKind::kString;
 }
 
 bool Is4stateType(const DataType& dtype, const TypedefMap& typedefs) {
-  const auto* resolved = ResolveNamed(dtype, typedefs);
+  const auto* resolved = FindNamedType(dtype, typedefs);
   if (resolved) return Is4stateType(*resolved, typedefs);
 
   if (dtype.kind == DataTypeKind::kEnum) return Is4stateEnum(dtype, typedefs);
@@ -488,7 +488,7 @@ bool Is4stateType(const DataType& dtype, const TypedefMap& typedefs) {
 }
 
 bool IsSignedType(const DataType& dtype, const TypedefMap& typedefs) {
-  const auto* resolved = ResolveNamed(dtype, typedefs);
+  const auto* resolved = FindNamedType(dtype, typedefs);
   return resolved ? IsSignedType(*resolved, typedefs) : dtype.is_signed;
 }
 
@@ -507,7 +507,7 @@ bool IsVector(const DataType& dtype) {
 }
 
 bool IsVector(const DataType& dtype, const TypedefMap& typedefs) {
-  const auto* resolved = ResolveNamed(dtype, typedefs);
+  const auto* resolved = FindNamedType(dtype, typedefs);
   return resolved ? IsVector(*resolved, typedefs) : IsVector(dtype);
 }
 
@@ -520,7 +520,7 @@ bool IsAggregateType(const DataType& dtype) {
 bool IsSingularType(const DataType& dtype) { return !IsAggregateType(dtype); }
 
 bool IsAggregateType(const DataType& dtype, const TypedefMap& typedefs) {
-  const auto* resolved = ResolveNamed(dtype, typedefs);
+  const auto* resolved = FindNamedType(dtype, typedefs);
   return resolved ? IsAggregateType(*resolved, typedefs)
                   : IsAggregateType(dtype);
 }

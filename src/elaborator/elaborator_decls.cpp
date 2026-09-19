@@ -858,11 +858,11 @@ static void SetEnumTypeInfo(const ModuleItem* item, RtlirVariable& var,
     return;
   }
   if (item->data_type.kind != DataTypeKind::kNamed) return;
-  auto it = typedefs.find(item->data_type.type_name);
-  if (it != typedefs.end() && it->second.kind == DataTypeKind::kEnum) {
+  const DataType* bound = FindNamedType(item->data_type, typedefs);
+  if (bound != nullptr && bound->kind == DataTypeKind::kEnum) {
     var.enum_type_name = item->data_type.type_name;
 
-    var.dtype = arena.Create<DataType>(it->second);
+    var.dtype = arena.Create<DataType>(*bound);
   }
 }
 
@@ -876,14 +876,18 @@ static void SetStructTypeInfo(const ModuleItem* item, RtlirVariable& var,
     return;
   }
   if (item->data_type.kind != DataTypeKind::kNamed) return;
-  auto td = typedefs.find(item->data_type.type_name);
-  if (td == typedefs.end()) return;
-  if (td->second.kind != DataTypeKind::kStruct &&
-      td->second.kind != DataTypeKind::kUnion) {
+  // §26.3 with §7.2.1: a package-scoped name, `pk::rec_t`, denotes the
+  // package's typedef, held under its "pk::rec_t" key; looked up by the bare
+  // name it denoted nothing, so the variable was sized but its members were
+  // never laid out and every member write was dropped.
+  const DataType* bound = FindNamedType(item->data_type, typedefs);
+  if (bound == nullptr) return;
+  if (bound->kind != DataTypeKind::kStruct &&
+      bound->kind != DataTypeKind::kUnion) {
     return;
   }
 
-  auto* copy = arena.Create<DataType>(td->second);
+  auto* copy = arena.Create<DataType>(*bound);
   ResolveNestedAggregateTypes(*copy, typedefs, arena);
   var.dtype = copy;
 }

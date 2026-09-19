@@ -455,4 +455,35 @@ TEST(PackageScopeReferenceSim, UnitClassKeepsNameOverImportedPackageClass) {
             89u);
 }
 
+// §26.3 with §23.2.4 and §7.2.1: a module variable declared with a
+// package-scoped struct type, `pk::rec_t r;`, is a variable of that struct,
+// so a member write lands in the member's bits and a member read after a
+// whole-variable write reads them. The elaborator sized the variable through
+// the `pk::rec_t` key but took its struct layout from the bare name, which
+// the module's typedef table does not hold, so the members were never laid
+// out: `r.id = 7` was dropped and `r.id` read 0. The result packs the whole
+// value after the member writes (07012c) with the id read after the whole
+// write (7): 24'h07012c * 16 + 7.
+TEST(PackageScopeReferenceSim, PackageScopedStructVariableHasItsMembers) {
+  EXPECT_EQ(RunAndGet("package pk;\n"
+                      "  typedef struct packed {\n"
+                      "    logic [7:0] id;\n"
+                      "    logic [15:0] val;\n"
+                      "  } rec_t;\n"
+                      "endpackage\n"
+                      "module t;\n"
+                      "  pk::rec_t r;\n"
+                      "  logic [31:0] result;\n"
+                      "  initial begin\n"
+                      "    r.id = 7;\n"
+                      "    r.val = 300;\n"
+                      "    result = r * 16;\n"
+                      "    r = 24'h07012c;\n"
+                      "    result = result + r.id;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            0x07012c * 16u + 7u);
+}
+
 }  // namespace
