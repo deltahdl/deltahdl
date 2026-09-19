@@ -190,12 +190,45 @@ static bool TrySelfClassNewAssign(const Stmt* stmt, std::string_view field_name,
 // `( operator_assignment )` as a primary, so `x = (y += 2)` assigns x from an
 // expression that assigns y, and its target is the rhs's own lhs rather than
 // the statement's. TryDispatchSpecialBlockingAssign draws the same line.
+static bool TryFuncClassTargetWrite(const Expr* lhs, const Logic4Vec& val,
+                                    SimContext& ctx, Arena& arena);
+
+// §11.4.1 x §8.6: the target of a compound assignment in a method may be a
+// property of the running method's object or class -- named bare (§8.10,
+// §8.11), as `this.x` or `super.x` (§8.15) -- or a hierarchical name (§23.7).
+// ApplyCompoundAssignOp resolves a bare name among the declared variables
+// alone and takes a member access for a struct field, so such a target was
+// read as nothing and written nowhere, while `x = x + v` beside it landed.
+// The read here is the expression evaluator's, which answers every one of
+// those names inside a method, and the write is the one the plain assignment
+// makes. A declared variable and a select stay with ApplyCompoundAssignOp,
+// which keeps the once-only index the exception covers.
+static bool TryFuncCompoundOnClassTarget(const Stmt* stmt, SimContext& ctx,
+                                         Arena& arena) {
+  const Expr* lhs = stmt->lhs;
+  bool declared = lhs->kind == ExprKind::kIdentifier &&
+                  ctx.FindVariable(lhs->text) != nullptr;
+  if (declared || (lhs->kind != ExprKind::kIdentifier &&
+                   lhs->kind != ExprKind::kMemberAccess)) {
+    return false;
+  }
+  Logic4Vec current = EvalExpr(lhs, ctx, arena);
+  Logic4Vec operand = EvalExpr(stmt->rhs->rhs, ctx, arena);
+  Logic4Vec val = OwnRhsWords(EvalBinaryOp(CompoundAssignBaseOp(stmt->rhs->op),
+                                           current, operand, arena),
+                              arena);
+  if (!TryFuncClassTargetWrite(lhs, val, ctx, arena))
+    ApplyGenericBlockingAssign(stmt, val, ctx, arena);
+  return true;
+}
+
 static bool TryFuncCompoundAssign(const Stmt* stmt, SimContext& ctx,
                                   Arena& arena) {
   if (stmt->rhs == nullptr || stmt->rhs->kind != ExprKind::kBinary ||
       !IsCompoundAssignOp(stmt->rhs->op) || stmt->rhs->is_parenthesized) {
     return false;
   }
+  if (TryFuncCompoundOnClassTarget(stmt, ctx, arena)) return true;
   ApplyCompoundAssignOp(stmt, ctx, arena);
   return true;
 }

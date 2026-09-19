@@ -243,6 +243,79 @@ TEST(LvalueSim, CompoundAssignInAFunctionBodyWritesTheTargetOnce) {
   EXPECT_EQ(calls->value.ToUint64(), 1u);
 }
 
+// §11.4.1 makes `a += 10` one blocking assignment to a, and §8.6 lets a method
+// name the object's own properties unqualified, as `this.b` (§8.11) and, for a
+// static one, by its bare name too (§8.10). ApplyCompoundAssignOp resolved a
+// bare name among the declared variables alone and took a member access for a
+// struct field, so a property was read as nothing and written nowhere, while
+// `c = c + 10` beside it landed. Each property packs into one result: a is 10,
+// b starts at 4 and is tripled to 12, c is 10, and the static s is 7, so the
+// result is 10 * 1000000 + 12 * 10000 + 10 * 100 + 7; a dropped write leaves
+// its digits at 0 (b at 4).
+TEST(LvalueSim, CompoundAssignOnAPropertyInsideAMethod) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class C;\n"
+      "  int a, c;\n"
+      "  int b = 4;\n"
+      "  static int s;\n"
+      "  function void f();\n"
+      "    a += 10;\n"
+      "    this.b *= 3;\n"
+      "    c = c + 10;\n"
+      "    s += 7;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  int result;\n"
+      "  C h;\n"
+      "  initial begin\n"
+      "    h = new;\n"
+      "    h.f();\n"
+      "    result = h.a * 1000000 + h.b * 10000 + h.c * 100 + C::s;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* result = f.ctx.FindVariable("result");
+  ASSERT_NE(result, nullptr);
+  EXPECT_EQ(result->value.ToUint64(), 10121007u);
+}
+
+// §11.4.1 x §23.7: the target of a compound assignment inside a method may be
+// a hierarchical name, `t.total += 1`, and §13.3 lets a class task write a
+// property after a delay. Both went through the same dropped path as the bare
+// property. The task adds 5 to the property after `#1` and 1 to the module's
+// total, so the result read at time 1 is 5 * 10 + 1.
+TEST(LvalueSim, CompoundAssignOnAHierarchicalNameAndAfterADelayInAMethod) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class C;\n"
+      "  int a;\n"
+      "  task run();\n"
+      "    t.total += 1;\n"
+      "    #1 a += 5;\n"
+      "  endtask\n"
+      "endclass\n"
+      "module t;\n"
+      "  int total;\n"
+      "  int result;\n"
+      "  C h;\n"
+      "  initial begin\n"
+      "    h = new;\n"
+      "    h.run();\n"
+      "    result = h.a * 10 + total;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* result = f.ctx.FindVariable("result");
+  ASSERT_NE(result, nullptr);
+  EXPECT_EQ(result->value.ToUint64(), 51u);
+}
+
 // §11.4.1's once-only left-hand index rule read through the subroutine
 // executor. The index is fixed here, so the target ends at 15 however many
 // times the statement wrote it and the call count is the whole reading. Before
