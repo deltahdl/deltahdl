@@ -709,7 +709,8 @@ bool ParserPropertySpecHelpers::ParsePropertyLocalDecls(
 // simulator can fire the sequence endpoint on a match. Diagnostics are
 // suppressed and the lexer is rewound, so the harvest scan in
 // ParseSequenceDecl re-reads the same tokens unchanged; any other body shape
-// leaves the fields empty and no monitor is created.
+// leaves the operands empty and no monitor is created, the leading clock
+// kept all the same.
 void Parser::CaptureLinearSequenceBody(ModuleItem* item) {
   auto saved = lexer_.SavePos();
   diag_.PushSuppress();
@@ -727,6 +728,12 @@ void Parser::CaptureLinearSequenceBody(ModuleItem* item) {
       ok = Match(TokenKind::kRParen);
     }
   }
+  // §16.16 (f): the clocking event the body opens with is the sequence's own
+  // leading clocking event, the one an assertion instantiating the sequence
+  // resolves to, whatever sequence_expr follows it; §16.7's grammar admits
+  // shapes the linear form does not hold, a parenthesised `and` before a
+  // `##0`, say, so the clock read whole is kept where the operands are not.
+  bool clock_read = ok;
   if (ok) ok = ParserSeqLinearHelpers::ParseLinearSeqOperands(*this, item);
   // The sequence_expr is terminated by ';' before `endsequence`.
   if (ok) Match(TokenKind::kSemicolon);
@@ -735,11 +742,8 @@ void Parser::CaptureLinearSequenceBody(ModuleItem* item) {
   in_sequence_body_ = false;
   diag_.PopSuppress();
   lexer_.RestorePos(saved);
-  if (ok) {
-    item->seq_clock = std::move(clock);
-  } else {
-    item->seq_linear = SeqLinearBody{};
-  }
+  if (clock_read) item->seq_clock = std::move(clock);
+  if (!ok) item->seq_linear = SeqLinearBody{};
 }
 
 // §16.12.2: the sequence_expr of a concurrent assertion's property_spec read

@@ -111,4 +111,58 @@ TEST(ClockResolutionElaboration, TheDefaultAndTheBlockClockTheRest) {
   EXPECT_TRUE(f.diag.Diagnostics().empty());
 }
 
+// §16.16 (f) and §16.9.5: a sequence declared with posedge clk over a
+// parenthesised `and` of two concatenations, the composite ending at the
+// later end point, followed by `##0 e`, a shape the linear monitor does not
+// read, still determines a unique leading clocking event, so an assertion
+// whose maximal property is an instance of it is legal.
+TEST(ClockResolutionElaboration,
+     AnInstanceOfAConjunctionThenZeroDelayDeterminesTheClock) {
+  ElabFixture f;
+  Elaborate(
+      "module m(input logic a, b, c, d, e, clk);\n"
+      "  sequence s;\n"
+      "    @(posedge clk) ((a ##5 b) and (c ##8 d)) ##0 e;\n"
+      "  endsequence\n"
+      "  assert property (s);\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kNoClockReport, 5, "16.16"));
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §16.16 (f) and §16.7: the same with each concatenation over a
+// cycle_delay_range, `##[1:6]` and `##[1:9]`.
+TEST(ClockResolutionElaboration,
+     AnInstanceOfARangedConjunctionThenZeroDelayDeterminesTheClock) {
+  ElabFixture f;
+  Elaborate(
+      "module m(input logic a, b, c, d, e, clk);\n"
+      "  sequence s;\n"
+      "    @(posedge clk) ((a ##[1:6] b) and (c ##[1:9] d)) ##0 e;\n"
+      "  endsequence\n"
+      "  assert property (s);\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kNoClockReport, 5, "16.16"));
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §16.16 (f): the same body declared with no clocking event, under no
+// default clocking, determines none, so the assertion instantiating it is
+// reported.
+TEST(ClockResolutionElaboration,
+     AnInstanceOfAnUnclockedConjunctionThenZeroDelayIsIllegal) {
+  ElabFixture f;
+  Elaborate(
+      "module m(input logic a, b, c, d, e, clk);\n"
+      "  sequence s;\n"
+      "    ((a ##5 b) and (c ##8 d)) ##0 e;\n"
+      "  endsequence\n"
+      "  assert property (s);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kNoClockReport, 5, "16.16"));
+}
+
 }  // namespace

@@ -1,7 +1,12 @@
 #include <gtest/gtest.h>
 
+#include <string_view>
+
 #include "fixture_parser.h"
 #include "helpers_reported_error.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_module.h"
+#include "parser/ast_stmt.h"
 
 using namespace delta;
 
@@ -170,6 +175,60 @@ TEST(ClockResolutionParse, ClockingBlockSequenceWithTwoClocksIsRejected) {
   EXPECT_TRUE(ReportedError(
       r.diags, "a multiclocked sequence is not allowed in a clocking block", 4,
       "16.16"));
+}
+
+// The one named sequence the module declares.
+const ModuleItem* NamedSequence(const ParseResult& r, std::string_view name) {
+  for (const auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kSequenceDecl && item->name == name) {
+      return item;
+    }
+  }
+  return nullptr;
+}
+
+// §16.16 (f) and §16.7: a sequence declared with a leading clocking event
+// over a body of a shape the linear capture does not hold, a parenthesised
+// `and` of two concatenations followed by `##0`, keeps that event as its
+// own, which an assertion instantiating it resolves to; only the linear
+// operands are left empty.
+TEST(ClockResolutionParse,
+     ASequenceKeepsItsLeadingClockWhereItsBodyIsNotLinear) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic a, b, c, d, e, clk;\n"
+      "  sequence s;\n"
+      "    @(posedge clk) ((a ##5 b) and (c ##8 d)) ##0 e;\n"
+      "  endsequence\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  const ModuleItem* s = NamedSequence(r, "s");
+  ASSERT_NE(s, nullptr);
+  ASSERT_EQ(s->seq_clock.size(), 1u);
+  EXPECT_EQ(s->seq_clock[0].edge, Edge::kPosedge);
+  ASSERT_NE(s->seq_clock[0].signal, nullptr);
+  EXPECT_EQ(s->seq_clock[0].signal->text, "clk");
+  EXPECT_TRUE(s->seq_linear.operands.empty());
+}
+
+// §16.16 (f): the same body declared with no clocking event has none of its
+// own, so an assertion instantiating it is left to the default clocking or
+// to the report.
+TEST(ClockResolutionParse, ASequenceWithoutALeadingClockRecordsNone) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic a, b, c, d, e, clk;\n"
+      "  sequence s;\n"
+      "    ((a ##[1:6] b) and (c ##[1:9] d)) ##0 e;\n"
+      "  endsequence\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  const ModuleItem* s = NamedSequence(r, "s");
+  ASSERT_NE(s, nullptr);
+  EXPECT_TRUE(s->seq_clock.empty());
+  EXPECT_TRUE(s->seq_linear.operands.empty());
 }
 
 }  // namespace
