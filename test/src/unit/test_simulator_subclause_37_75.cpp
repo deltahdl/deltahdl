@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -58,7 +60,8 @@ TEST_F(DoWhileForeach, DoWhileReachesConditionAmongConditionAndBody) {
   do_while.type = vpiDoWhile;
   do_while.children = {&body, &condition};
 
-  EXPECT_EQ(vpi_handle(vpiCondition, &do_while), &condition);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiCondition, VpiHandleOf(&do_while))),
+            &condition);
 }
 
 // Do-while condition reports no expression when the statement carries no
@@ -72,7 +75,7 @@ TEST_F(DoWhileForeach, DoWhileWithoutConditionReportsNoCondition) {
   do_while.type = vpiDoWhile;
   do_while.children = {&body};
 
-  EXPECT_EQ(vpi_handle(vpiCondition, &do_while), nullptr);
+  EXPECT_EQ(vpi_handle(vpiCondition, VpiHandleOf(&do_while)), nullptr);
 }
 
 // Do-while condition gating: the do-while condition relation is scoped to the
@@ -88,7 +91,7 @@ TEST_F(DoWhileForeach, DoWhileConditionRelationIsScopedToDoWhile) {
   not_a_do_while.type = vpiBegin;  // not a do-while statement
   not_a_do_while.children = {&expr};
 
-  EXPECT_EQ(vpi_handle(vpiCondition, &not_a_do_while), nullptr);
+  EXPECT_EQ(vpi_handle(vpiCondition, VpiHandleOf(&not_a_do_while)), nullptr);
 }
 
 // Do-while body edge (the diagram's unlabeled arrow to `stmt`): a do-while
@@ -105,7 +108,7 @@ TEST_F(DoWhileForeach, DoWhileReachesBodyThroughVpiStmt) {
   do_while.type = vpiDoWhile;
   do_while.children = {&condition, &body};
 
-  EXPECT_EQ(vpi_handle(vpiStmt, &do_while), &body);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiStmt, VpiHandleOf(&do_while))), &body);
 }
 
 // D1: a foreach statement's vpiVariables relation reaches the variable that
@@ -122,7 +125,8 @@ TEST_F(DoWhileForeach, ForeachStatementVariablesReachesIndexedArray) {
   foreach
     .foreach_array = &array;
 
-  EXPECT_EQ(vpi_handle(vpiVariables, &foreach), &array);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiVariables, VpiHandleOf(&foreach))),
+            &array);
 }
 
 // D1: the relation reports NULL when no indexed variable is attached. The
@@ -133,7 +137,7 @@ TEST_F(DoWhileForeach, ForeachStatementVariablesReportsNoVariableWhenAbsent) {
   foreach
     .type = vpiForeachStmt;  // no indexed variable attached
 
-  EXPECT_EQ(vpi_handle(vpiVariables, &foreach), nullptr);
+  EXPECT_EQ(vpi_handle(vpiVariables, VpiHandleOf(&foreach)), nullptr);
 }
 
 // D1: the foreach-statement vpiVariables case is specific to a foreach
@@ -151,7 +155,8 @@ TEST_F(DoWhileForeach, ForeachStatementVariablesIsScopedToForeachStatements) {
   not_a_foreach.foreach_array = &distractor_array;  // must be ignored here
   not_a_foreach.children = {&vars_child};
 
-  EXPECT_EQ(vpi_handle(vpiVariables, &not_a_foreach), &vars_child);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiVariables, VpiHandleOf(&not_a_foreach))),
+            &vars_child);
 }
 
 // D2: the vpiLoopVars iteration returns the foreach statement's index variables
@@ -173,16 +178,17 @@ TEST_F(DoWhileForeach, ForeachStatementSkippedIndexIsNullOpPlaceholder) {
   foreach
     .loop_vars = {&var_i, nullptr, &var_k};  // middle index skipped
 
-  vpiHandle it = vpi_iterate(vpiLoopVars, &foreach);
+  vpiHandle it = vpi_iterate(vpiLoopVars, VpiHandleOf(&foreach));
   ASSERT_NE(it, nullptr);
-  EXPECT_EQ(vpi_scan(it), &var_i);
+  EXPECT_EQ(VpiObjectOf(vpi_scan(it)), &var_i);
   vpiHandle skipped = vpi_scan(it);
   ASSERT_NE(skipped, nullptr);
-  EXPECT_NE(skipped, &var_i);  // the skipped slot is a fresh placeholder
-  EXPECT_NE(skipped, &var_k);
+  EXPECT_NE(VpiObjectOf(skipped),
+            &var_i);  // the skipped slot is a fresh placeholder
+  EXPECT_NE(VpiObjectOf(skipped), &var_k);
   EXPECT_EQ(vpi_get(vpiType, skipped), vpiOperation);
   EXPECT_EQ(vpi_get(vpiOpType, skipped), vpiNullOp);
-  EXPECT_EQ(vpi_scan(it), &var_k);
+  EXPECT_EQ(VpiObjectOf(vpi_scan(it)), &var_k);
   EXPECT_EQ(vpi_scan(it), nullptr);
 }
 
@@ -203,7 +209,7 @@ TEST_F(DoWhileForeach,
   foreach
     .loop_vars = {nullptr, &var_j, nullptr};  // leading and trailing skip
 
-  vpiHandle it = vpi_iterate(vpiLoopVars, &foreach);
+  vpiHandle it = vpi_iterate(vpiLoopVars, VpiHandleOf(&foreach));
   ASSERT_NE(it, nullptr);
 
   vpiHandle first_skip = vpi_scan(it);
@@ -211,7 +217,8 @@ TEST_F(DoWhileForeach,
   EXPECT_EQ(vpi_get(vpiType, first_skip), vpiOperation);
   EXPECT_EQ(vpi_get(vpiOpType, first_skip), vpiNullOp);
 
-  EXPECT_EQ(vpi_scan(it), &var_j);  // the named index keeps its middle slot
+  EXPECT_EQ(VpiObjectOf(vpi_scan(it)),
+            &var_j);  // the named index keeps its middle slot
 
   vpiHandle last_skip = vpi_scan(it);
   ASSERT_NE(last_skip, nullptr);
@@ -242,7 +249,7 @@ TEST_F(DoWhileForeach, ForeachStatementReachesBodyThroughVpiStmt) {
   foreach
     .children = {&body};
 
-  EXPECT_EQ(vpi_handle(vpiStmt, &foreach), &body);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiStmt, VpiHandleOf(&foreach))), &body);
 }
 
 // D2: the loop-var iteration is scoped to the foreach statement kind. A
@@ -259,7 +266,7 @@ TEST_F(DoWhileForeach,
   not_a_foreach.type = vpiBegin;       // not a foreach statement
   not_a_foreach.loop_vars = {&var_i};  // must not be walked here
 
-  EXPECT_EQ(vpi_iterate(vpiLoopVars, &not_a_foreach), nullptr);
+  EXPECT_EQ(vpi_iterate(vpiLoopVars, VpiHandleOf(&not_a_foreach)), nullptr);
 }
 
 // Body edge: both loops reach a body whatever kind it is written as - a lone
@@ -276,7 +283,7 @@ TEST_F(DoWhileForeach, EachKindABodyCarriesIsReachedByBothLoopKinds) {
       loop.type = loop_kind;
       loop.children = {&body};
 
-      EXPECT_EQ(vpi_handle(vpiStmt, &loop), &body)
+      EXPECT_EQ(VpiObjectOf(vpi_handle(vpiStmt, VpiHandleOf(&loop))), &body)
           << "loop kind " << loop_kind << ", body kind " << body_kind;
     }
   }
@@ -293,7 +300,7 @@ TEST_F(DoWhileForeach, NeitherLoopReportsABodyWhenItCarriesNoStatement) {
   do_while.type = vpiDoWhile;
   do_while.children = {&condition};
 
-  EXPECT_EQ(vpi_handle(vpiStmt, &do_while), nullptr);
+  EXPECT_EQ(vpi_handle(vpiStmt, VpiHandleOf(&do_while)), nullptr);
 
   VpiObject array;
   array.type = vpiPackedArrayVar;
@@ -304,7 +311,7 @@ TEST_F(DoWhileForeach, NeitherLoopReportsABodyWhenItCarriesNoStatement) {
   foreach
     .foreach_array = &array;
 
-  EXPECT_EQ(vpi_handle(vpiStmt, &foreach), nullptr);
+  EXPECT_EQ(vpi_handle(vpiStmt, VpiHandleOf(&foreach)), nullptr);
 }
 
 }  // namespace

@@ -6,7 +6,11 @@
 #include "common/arena.h"
 #include "fixture_simulator.h"
 #include "simulator/scheduler.h"
+#include "simulator/vpi_constants.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -53,7 +57,9 @@ TEST_F(IntermodulePathModel, ReachedByHandleMultiFromTwoPorts) {
   port1->children.push_back(path);
   port2->children.push_back(path);
 
-  EXPECT_EQ(vpi_handle_multi(vpiInterModPath, port1, port2), path);
+  EXPECT_EQ(VpiObjectOf(vpi_handle_multi(vpiInterModPath, VpiHandleOf(port1),
+                                         VpiHandleOf(port2))),
+            path);
 }
 
 // §37.37 Detail 1 (negative): when the two ports have no intermodule path
@@ -63,7 +69,9 @@ TEST_F(IntermodulePathModel, NoPathBetweenUnconnectedPorts) {
   auto* port1 = vpi_ctx_.CreatePort("q1", kVpiInput, mod);
   auto* port2 = vpi_ctx_.CreatePort("q2", kVpiOutput, mod);
 
-  EXPECT_EQ(vpi_handle_multi(vpiInterModPath, port1, port2), nullptr);
+  EXPECT_EQ(
+      vpi_handle_multi(vpiInterModPath, VpiHandleOf(port1), VpiHandleOf(port2)),
+      nullptr);
 }
 
 // §37.37 (delay property): the inter mod path object carries delays that the
@@ -81,7 +89,7 @@ TEST_F(IntermodulePathModel, DelayPropertyRoundTrips) {
   put.da = in;
   put.no_of_delays = 2;
   put.time_type = vpiScaledRealTime;
-  vpi_put_delays(path, &put);
+  vpi_put_delays(VpiHandleOf(path), &put);
   EXPECT_EQ(vpi_ctx_.LastError().level, 0);
 
   s_vpi_time out[2] = {};
@@ -89,7 +97,7 @@ TEST_F(IntermodulePathModel, DelayPropertyRoundTrips) {
   get.da = out;
   get.no_of_delays = 2;
   get.time_type = vpiScaledRealTime;
-  vpi_get_delays(path, &get);
+  vpi_get_delays(VpiHandleOf(path), &get);
   EXPECT_DOUBLE_EQ(out[0].real, 5.0);
   EXPECT_DOUBLE_EQ(out[1].real, 9.0);
 }
@@ -106,14 +114,14 @@ TEST_F(IntermodulePathModel, TraversesToItsPorts) {
   path->children.push_back(port1);
   path->children.push_back(port2);
 
-  vpiHandle iter = vpi_iterate(vpiPort, path);
+  vpiHandle iter = vpi_iterate(vpiPort, VpiHandleOf(path));
   ASSERT_NE(iter, nullptr);
 
   std::vector<vpiHandle> seen;
   while (vpiHandle p = vpi_scan(iter)) seen.push_back(p);
   EXPECT_EQ(static_cast<int>(seen.size()), 2);
-  EXPECT_EQ(seen[0], port1);
-  EXPECT_EQ(seen[1], port2);
+  EXPECT_EQ(VpiObjectOf(seen[0]), port1);
+  EXPECT_EQ(VpiObjectOf(seen[1]), port2);
 }
 
 // -----------------------------------------------------------------------------
@@ -134,9 +142,9 @@ double g_path_fall = -1.0;
 // application reaches one: the instance by name, then the ports it declares.
 // The scan runs to exhaustion, which is what releases the iterator (§37.2.1).
 vpiHandle PortOfInstance(const char* inst, const char* port) {
-  vpiHandle mod = vpi_handle_by_name(inst, nullptr);
+  vpiHandle mod = vpi_handle_by_name(VpiText(inst), nullptr);
   if (mod == nullptr) return nullptr;
-  vpiHandle ports = vpi_iterate(vpiPort, mod);
+  vpiHandle ports = vpi_iterate(vpiPort, VpiHandleOf(mod));
   if (ports == nullptr) return nullptr;
 
   vpiHandle found = nullptr;
@@ -151,7 +159,8 @@ vpiHandle PortOfInstance(const char* inst, const char* port) {
 // detail names. §38.22 has that handle name the path itself, so it is what an
 // application goes on to use.
 vpiHandle PathBetween(vpiHandle port1, vpiHandle port2) {
-  return vpi_handle_multi(vpiInterModPath, port1, port2);
+  return vpi_handle_multi(vpiInterModPath, VpiHandleOf(port1),
+                          VpiHandleOf(port2));
 }
 
 void RecordPathPorts(vpiHandle path) {
@@ -184,7 +193,7 @@ void RecordPathDelays(vpiHandle path) {
   g_path_fall = out[1].real;
 }
 
-int WalkPathsCalltf(const char*) {
+PLI_INT32 WalkPathsCalltf(PLI_BYTE8*) {
   vpiHandle a_o = PortOfInstance("a", "o");
   vpiHandle b_i = PortOfInstance("b", "i");
   vpiHandle d_i = PortOfInstance("d", "i");
@@ -194,7 +203,7 @@ int WalkPathsCalltf(const char*) {
   g_unrelated_reached =
       vpi_handle_multi(vpiInterModPath, a_o, d_i) == nullptr ? 0 : 1;
 
-  vpiHandle path = PathBetween(a_o, b_i);
+  vpiHandle path = PathBetween(VpiObjectOf(a_o), VpiObjectOf(b_i));
   g_path_reached = path == nullptr ? 0 : 1;
   if (path == nullptr) return 0;
   RecordPathPorts(path);
@@ -212,7 +221,7 @@ void RegisterPathProbe() {
 
   s_vpi_systf_data data = {};
   data.type = vpiSysTask;
-  data.tfname = "$probe";
+  data.tfname = VpiText("$probe");
   data.calltf = &WalkPathsCalltf;
   ASSERT_NE(vpi_register_systf(&data), nullptr);
 }

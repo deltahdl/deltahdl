@@ -9,6 +9,9 @@
 #include "simulator/net.h"
 #include "simulator/scheduler.h"
 #include "simulator/variable.h"
+#include "simulator/vpi_constants.h"
+#include "simulator/vpi_context.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 using namespace delta;
@@ -190,7 +193,7 @@ TEST(PliPreActiveSim, VpiPutValueFromPreActiveTakesEffectAndIsNotFlagged) {
 
   auto* pre_active = sched.GetEventPool().Acquire();
   pre_active->callback = [&]() {
-    VpiValue value{};
+    s_vpi_value value{};
     value.format = kVpiIntVal;
     value.value.integer = 77;
     vpi.PutValue(&obj, &value, nullptr, 0);
@@ -200,7 +203,7 @@ TEST(PliPreActiveSim, VpiPutValueFromPreActiveTakesEffectAndIsNotFlagged) {
   int seen_in_active = -1;
   auto* active = sched.GetEventPool().Acquire();
   active->callback = [&]() {
-    VpiValue out{};
+    s_vpi_value out{};
     out.format = kVpiIntVal;
     vpi.GetValue(&obj, &out);
     seen_in_active = out.value.integer;

@@ -7,7 +7,14 @@
 // §37.10 detail 3: the package/interface/program instance kinds are defined in
 // the SystemVerilog VPI header alongside the §37.10 vpiInstance relation.
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_constants.h"
+#include "simulator/vpi_context.h"
+#include "simulator/vpi_data_structs.h"
 #include "simulator/vpi_internal.h"
+#include "simulator/vpi_model_helpers1.h"
+#include "simulator/vpi_model_helpers2.h"
+#include "simulator/vpi_model_helpers3.h"
+#include "simulator/vpi_object.h"
 
 namespace delta {
 
@@ -196,7 +203,7 @@ struct VpiIterateStores {
   std::vector<VpiObject*>& all_objects;
   const std::vector<VpiTimeQueueSlot>& time_queue_slots;
   const std::vector<VpiHandle>& cb_handles;
-  const std::vector<VpiCbData>& callbacks;
+  const std::vector<s_cb_data>& callbacks;
 };
 
 // §37.42 / §37.27: classify the tf-call argument and named-event special
@@ -885,7 +892,7 @@ VpiHandle VpiContext::Iterate(int type, VpiHandle ref, int compatibility_mode) {
   if (unsupported != nullptr) {
     last_error_.state = kVpiPLI;
     last_error_.level = kVpiError;
-    last_error_.message = unsupported;
+    last_error_.message = VpiText(unsupported);
   }
   return iter;
 }
@@ -905,8 +912,9 @@ VpiHandle VpiContext::Scan(VpiHandle iterator) {
   if (iterator->type != vpiIterator) {
     last_error_.state = kVpiPLI;
     last_error_.level = kVpiError;
-    last_error_.message =
-        "vpi_scan(): the handle is not an iterator returned from vpi_iterate()";
+    last_error_.message = VpiText(
+        "vpi_scan(): the handle is not an iterator returned from "
+        "vpi_iterate()");
     return nullptr;
   }
   // §38.40: when the objects are exhausted there is nothing more to return.

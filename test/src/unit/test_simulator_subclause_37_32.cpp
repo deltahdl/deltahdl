@@ -4,7 +4,9 @@
 
 #include "simulator/class_object.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -159,7 +161,7 @@ TEST(ClassTypespec, DeclaredLifetimeReusesAutomaticModel) {
   obj.type = vpiClassTypespec;
   obj.automatic = automatic_spec.automatic;
 
-  EXPECT_EQ(vpi_get(vpiAutomatic, &obj), 1);
+  EXPECT_EQ(vpi_get(vpiAutomatic, VpiHandleOf(&obj)), 1);
 }
 
 // C3: vpiRhs of a parameter assignment is the explicit argument when supplied,

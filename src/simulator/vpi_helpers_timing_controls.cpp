@@ -5,6 +5,8 @@
 // §37.4.1's `stmt` class predicate, which tells the statement a control guards
 // from its other children, is declared here.
 #include "simulator/vpi_internal.h"
+#include "simulator/vpi_model_helpers1.h"
+#include "simulator/vpi_object.h"
 
 namespace delta {
 

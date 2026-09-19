@@ -4,7 +4,9 @@
 #include <vector>
 
 #include "fixture_simulator.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -31,17 +33,17 @@ namespace {
 // record that it ran and when relative to the other two.
 std::vector<std::string> g_order;
 
-int LoggingSizetf(const char*) {
+PLI_INT32 LoggingSizetf(PLI_BYTE8*) {
   g_order.emplace_back("sizetf");
   return 8;
 }
 
-int LoggingCompiletf(const char*) {
+PLI_INT32 LoggingCompiletf(PLI_BYTE8*) {
   g_order.emplace_back("compiletf");
   return 0;
 }
 
-int LoggingCalltf(const char*) {
+PLI_INT32 LoggingCalltf(PLI_BYTE8*) {
   g_order.emplace_back("calltf");
   return 0;
 }
@@ -55,7 +57,7 @@ void RegisterProbe() {
   s_vpi_systf_data data = {};
   data.type = vpiSysFunc;
   data.sysfunctype = vpiSizedFunc;
-  data.tfname = "$probe";
+  data.tfname = VpiText("$probe");
   data.sizetf = &LoggingSizetf;
   data.compiletf = &LoggingCompiletf;
   data.calltf = &LoggingCalltf;

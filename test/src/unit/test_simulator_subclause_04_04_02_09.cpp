@@ -13,7 +13,10 @@
 #include "simulator/lowerer.h"
 #include "simulator/scheduler.h"
 #include "simulator/variable.h"
+#include "simulator/vpi_constants.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 using namespace delta;
@@ -236,7 +239,7 @@ TEST(PostponedRegionSim, VpiPutValueFromPostponedRecordsWriteViolation) {
 
   auto* postponed = sched.GetEventPool().Acquire();
   postponed->callback = [&]() {
-    VpiValue value{};
+    s_vpi_value value{};
     value.format = kVpiIntVal;
     value.value.integer = 42;
     vpi.PutValue(&obj, &value, nullptr, 0);
@@ -266,7 +269,7 @@ TEST(PostponedRegionSim, MultipleIllegalWritesAreEachCounted) {
   auto* postponed = sched.GetEventPool().Acquire();
   postponed->callback = [&]() {
     for (int i = 0; i < 4; ++i) {
-      VpiValue value{};
+      s_vpi_value value{};
       value.format = kVpiIntVal;
       value.value.integer = i;
       vpi.PutValue(&obj, &value, nullptr, 0);

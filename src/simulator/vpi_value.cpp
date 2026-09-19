@@ -20,11 +20,16 @@
 // the SystemVerilog VPI header alongside the §37.10 vpiInstance relation.
 #include "simulator/sv_vpi_user.h"
 #include "simulator/variable.h"
+#include "simulator/vpi_constants.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_internal.h"
+#include "simulator/vpi_model_helpers1.h"
+#include "simulator/vpi_model_helpers2.h"
+#include "simulator/vpi_object.h"
 
 namespace delta {
 
-static void GetValueBinStr(const Logic4Vec& v, VpiValue* value,
+static void GetValueBinStr(const Logic4Vec& v, s_vpi_value* value,
                            std::vector<std::string>& pool) {
   uint64_t aval = v.words[0].aval;
   uint64_t bval = v.words[0].bval;
@@ -41,7 +46,7 @@ static void GetValueBinStr(const Logic4Vec& v, VpiValue* value,
     }
   }
   pool.push_back(std::move(result));
-  value->value.str = pool.back().c_str();
+  value->value.str = VpiText(pool.back().c_str());
 }
 
 static char HexDigitFromBits(uint8_t nibble) {
@@ -67,7 +72,7 @@ static char UnknownGroupChar(uint8_t a_bits, uint8_t b_bits, uint8_t mask) {
   return all_z ? 'z' : 'Z';
 }
 
-static void GetValueHexStr(const Logic4Vec& v, VpiValue* value,
+static void GetValueHexStr(const Logic4Vec& v, s_vpi_value* value,
                            std::vector<std::string>& pool) {
   uint64_t aval = v.words[0].aval;
   uint64_t bval = v.words[0].bval;
@@ -87,10 +92,10 @@ static void GetValueHexStr(const Logic4Vec& v, VpiValue* value,
     }
   }
   pool.push_back(std::move(result));
-  value->value.str = pool.back().c_str();
+  value->value.str = VpiText(pool.back().c_str());
 }
 
-static void GetValueOctStr(const Logic4Vec& v, VpiValue* value,
+static void GetValueOctStr(const Logic4Vec& v, s_vpi_value* value,
                            std::vector<std::string>& pool) {
   uint64_t aval = v.words[0].aval;
   uint64_t bval = v.words[0].bval;
@@ -110,7 +115,7 @@ static void GetValueOctStr(const Logic4Vec& v, VpiValue* value,
     }
   }
   pool.push_back(std::move(result));
-  value->value.str = pool.back().c_str();
+  value->value.str = VpiText(pool.back().c_str());
 }
 
 static int ScalarFromBits(uint64_t aval, uint64_t bval) {
@@ -118,13 +123,13 @@ static int ScalarFromBits(uint64_t aval, uint64_t bval) {
   return aval ? kVpiX : kVpiZ;  // x=(1,1), z=(0,1)
 }
 
-static void GetValueVector(const Logic4Vec& v, VpiValue* value,
-                           std::vector<std::vector<VpiVectorVal>>& pool) {
+static void GetValueVector(const Logic4Vec& v, s_vpi_value* value,
+                           std::vector<std::vector<s_vpi_vecval>>& pool) {
   int width = static_cast<int>(v.width);
   // §38.15: the vector value occupies an array of s_vpi_vecval whose size is
   // ((vector_size - 1) / 32 + 1), one element per 32 bits of the vector.
   int array_size = width > 0 ? ((width - 1) / 32 + 1) : 1;
-  std::vector<VpiVectorVal> vec(static_cast<size_t>(array_size));
+  std::vector<s_vpi_vecval> vec(static_cast<size_t>(array_size));
   for (int i = 0; i < array_size; ++i) {
     // Internal four-state words are 64 bits wide, so two vecval elements map
     // onto each word: the LSB of the vector lands in element 0, bit 33 in the
@@ -147,12 +152,13 @@ static void GetValueVector(const Logic4Vec& v, VpiValue* value,
   value->value.vector = pool.back().data();
 }
 
-static void GetValueStrength(const Logic4Vec& v, VpiValue* value,
-                             std::vector<std::vector<VpiStrengthVal>>& pool) {
+static void GetValueStrength(
+    const Logic4Vec& v, s_vpi_value* value,
+    std::vector<std::vector<s_vpi_strengthval>>& pool) {
   int width = static_cast<int>(v.width);
   if (width < 1) width = 1;
   // §38.15: the strength arm holds one descriptor per bit of the vector.
-  std::vector<VpiStrengthVal> arr(static_cast<size_t>(width));
+  std::vector<s_vpi_strengthval> arr(static_cast<size_t>(width));
   for (int i = 0; i < width; ++i) {
     int word_idx = i / 64;
     int bit = i % 64;
@@ -171,7 +177,7 @@ static void GetValueStrength(const Logic4Vec& v, VpiValue* value,
   value->value.strength = pool.back().data();
 }
 
-static void GetValueStringVal(const Logic4Vec& v, VpiValue* value,
+static void GetValueStringVal(const Logic4Vec& v, s_vpi_value* value,
                               std::vector<std::string>& pool) {
   uint64_t val = v.ToUint64();
   std::string s;
@@ -180,10 +186,10 @@ static void GetValueStringVal(const Logic4Vec& v, VpiValue* value,
     if (ch != 0) s += ch;
   }
   pool.push_back(std::move(s));
-  value->value.str = pool.back().c_str();
+  value->value.str = VpiText(pool.back().c_str());
 }
 
-static void GetValueIntVal(const Logic4Vec& v, VpiValue* value) {
+static void GetValueIntVal(const Logic4Vec& v, s_vpi_value* value) {
   // §38.15, Table 38-3: any x or z bit of the object maps to a 0 in the
   // returned integer, so drop every unknown bit before handing it back.
   uint64_t aval = v.words[0].aval;
@@ -197,8 +203,8 @@ static void GetValueIntVal(const Logic4Vec& v, VpiValue* value) {
 // object carries off its width.
 static double ObjectRealValue(const Logic4Vec& v) { return RealVecToDouble(v); }
 
-static void GetValueObjType(const Logic4Vec& v, VpiValue* value,
-                            std::vector<std::vector<VpiVectorVal>>& pool) {
+static void GetValueObjType(const Logic4Vec& v, s_vpi_value* value,
+                            std::vector<std::vector<s_vpi_vecval>>& pool) {
   // §38.15: fill in the value and rewrite the format field to the closest
   // format for the object's type. A real object reports vpiRealVal, a
   // single-bit object is a scalar, and anything wider is a vector.
@@ -332,17 +338,17 @@ bool VpiSourceExprHasSideEffects(const Expr* expr) {
   return false;
 }
 
-static void RecordVpiError(VpiErrorInfo& error, const char* message) {
+static void RecordVpiError(s_vpi_error_info& error, const char* message) {
   error.state = kVpiPLI;
   error.level = kVpiError;
-  error.message = message;
+  error.message = VpiText(message);
 }
 
 // Applies the §37.31/§37.26/§37.36 read-side restrictions. Returns true (with
 // last_error recorded) when the read must be refused and the value buffer left
 // untouched.
-static bool GetValueIsRefused(VpiHandle obj, VpiValue* value,
-                              VpiErrorInfo& error) {
+static bool GetValueIsRefused(VpiHandle obj, s_vpi_value* value,
+                              s_vpi_error_info& error) {
   // §37.31 detail 2: vpi_get_value() is not allowed for variable and event
   // handles obtained from a class defn handle. Such a handle denotes a class
   // member rather than a free-standing object, so the read is refused, an error
@@ -383,9 +389,9 @@ static bool GetValueIsRefused(VpiHandle obj, VpiValue* value,
 }
 
 static void DispatchIntegerFormat(
-    const Logic4Vec& v, VpiValue* value, std::vector<std::string>& str_pool,
-    std::vector<std::vector<VpiVectorVal>>& vec_pool,
-    std::vector<std::vector<VpiStrengthVal>>& strength_pool) {
+    const Logic4Vec& v, s_vpi_value* value, std::vector<std::string>& str_pool,
+    std::vector<std::vector<s_vpi_vecval>>& vec_pool,
+    std::vector<std::vector<s_vpi_strengthval>>& strength_pool) {
   // §38.15, Table 38-3: fill the value buffer according to the requested
   // format. Each arm is the format-specific conversion; most delegate to a
   // dedicated helper, while the scalar/real/time arms are short inline reads.
@@ -430,9 +436,9 @@ static void DispatchIntegerFormat(
 }
 
 static void DispatchGetValueByFormat(
-    VpiHandle obj, VpiValue* value, std::vector<std::string>& str_pool,
-    std::vector<std::vector<VpiVectorVal>>& vec_pool,
-    std::vector<std::vector<VpiStrengthVal>>& strength_pool) {
+    VpiHandle obj, s_vpi_value* value, std::vector<std::string>& str_pool,
+    std::vector<std::vector<s_vpi_vecval>>& vec_pool,
+    std::vector<std::vector<s_vpi_strengthval>>& strength_pool) {
   const Logic4Vec& v = obj->var->value;
   if (v.is_real) {
     // §38.15: a real object is read as its floating-point value only in the
@@ -455,7 +461,7 @@ static void DispatchGetValueByFormat(
       char buf[64];
       std::snprintf(buf, sizeof(buf), "%.16g", d);
       str_pool.emplace_back(buf);
-      value->value.str = str_pool.back().c_str();
+      value->value.str = VpiText(str_pool.back().c_str());
       return;
     }
     // §6.12.1 rounding: nearest integer, ties away from zero.
@@ -471,7 +477,7 @@ static void DispatchGetValueByFormat(
   DispatchIntegerFormat(v, value, str_pool, vec_pool, strength_pool);
 }
 
-void VpiContext::GetValue(VpiHandle obj, VpiValue* value) {
+void VpiContext::GetValue(VpiHandle obj, s_vpi_value* value) {
   if (!obj || !value) return;
   // §37.3.5: applying vpi_get_value() to an expression with side effects shall
   // fully evaluate the expression together with its side effects. Reading the
@@ -489,7 +495,7 @@ void VpiContext::GetValue(VpiHandle obj, VpiValue* value) {
 // Applies the §37.31/§37.26/§37.35/§37.3.5 target-kind restrictions that hold
 // regardless of the requested delay mode. Returns true (with error recorded)
 // when the put must be refused and the target left unchanged.
-static bool PutValueTargetIsRejected(VpiHandle obj, VpiErrorInfo& error) {
+static bool PutValueTargetIsRejected(VpiHandle obj, s_vpi_error_info& error) {
   // §37.31 detail 2: vpi_put_value() is not allowed for variable and event
   // handles obtained from a class defn handle, the write side of the same
   // restriction vpi_get_value() observes. The put is rejected, an error is
@@ -561,8 +567,8 @@ static bool PutValueTargetIsRejected(VpiHandle obj, VpiErrorInfo& error) {
 // Applies the §38.34 format-legality checks for the (now known) target
 // variable. Returns true (with error recorded) when the requested format is not
 // legal for the object and the put must be refused.
-static bool PutValueFormatIsRejected(VpiHandle obj, const VpiValue* value,
-                                     VpiErrorInfo& error) {
+static bool PutValueFormatIsRejected(VpiHandle obj, const s_vpi_value* value,
+                                     s_vpi_error_info& error) {
   // §38.34: it is illegal to give the value the vpiStringVal format when the
   // target is a real object. Record the error and leave the object unchanged.
   if (value->format == kVpiStringVal && obj->var->value.is_real) {
@@ -587,7 +593,7 @@ static bool PutValueFormatIsRejected(VpiHandle obj, const VpiValue* value,
 // §38.34: stores the supplied scalar/integer/real value into the target
 // variable's first four-state word. Formats with no direct word encoding here
 // (e.g. string/vector) are left for the caller's other paths and are ignored.
-static void PutValueWriteWord(VpiHandle obj, const VpiValue* value) {
+static void PutValueWriteWord(VpiHandle obj, const s_vpi_value* value) {
   if (value->format == kVpiIntVal) {
     auto new_val = static_cast<uint64_t>(value->value.integer);
     obj->var->value.words[0].aval = new_val;
@@ -629,7 +635,7 @@ static bool PutValueResolveWritableTarget(VpiHandle obj, Scheduler* scheduler) {
 // §38.34: notes the write attempt, stores the supplied value into the target,
 // and, for vpiForceFlag, latches it as the held forced value. This is the
 // committed-write phase reached once every legality check has passed.
-static void PutValueApplyWriteAndForce(VpiHandle obj, const VpiValue* value,
+static void PutValueApplyWriteAndForce(VpiHandle obj, const s_vpi_value* value,
                                        int mode, Scheduler* scheduler) {
   if (scheduler) scheduler->NoteWriteAttempt();
 
@@ -646,7 +652,7 @@ static void PutValueApplyWriteAndForce(VpiHandle obj, const VpiValue* value,
 // §38.34: vpiNoDelay, vpiForceFlag, and vpiReleaseFlag all act immediately and
 // ignore time_p; every other mode takes its delay from time_p, where a delay is
 // present when a nonzero time is supplied.
-static bool PutValueHasDelay(int mode, const VpiTime* time) {
+static bool PutValueHasDelay(int mode, const s_vpi_time* time) {
   bool immediate =
       (mode == vpiNoDelay || mode == vpiForceFlag || mode == vpiReleaseFlag);
   return !immediate && time &&
@@ -657,7 +663,7 @@ static bool PutValueHasDelay(int mode, const VpiTime* time) {
 // written with vpiNoDelay; no delayed put on an automatic variable). Returns
 // true (with error recorded) when the put must be refused.
 static bool PutValueDelayModeIsRejected(VpiHandle obj, int mode, bool has_delay,
-                                        VpiErrorInfo& error) {
+                                        s_vpi_error_info& error) {
   // §38.34: a sequential UDP is always set with no delay, no matter what delay
   // the primitive instance carries, so a value may be put to it only with the
   // vpiNoDelay flag. Supplying one of the scheduled delay modes instead is an
@@ -684,8 +690,8 @@ static bool PutValueDelayModeIsRejected(VpiHandle obj, int mode, bool has_delay,
   return false;
 }
 
-VpiHandle VpiContext::PutValue(VpiHandle obj, VpiValue* value, VpiTime* time,
-                               int flags) {
+VpiHandle VpiContext::PutValue(VpiHandle obj, s_vpi_value* value,
+                               s_vpi_time* time, int flags) {
   if (!obj) return nullptr;
 
   if (PutValueTargetIsRejected(obj, last_error_)) return nullptr;

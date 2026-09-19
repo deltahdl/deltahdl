@@ -10,7 +10,14 @@
 // §37.10 detail 3: the package/interface/program instance kinds are defined in
 // the SystemVerilog VPI header alongside the §37.10 vpiInstance relation.
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_constants.h"
+#include "simulator/vpi_context.h"
+#include "simulator/vpi_data_structs.h"
 #include "simulator/vpi_internal.h"
+#include "simulator/vpi_model_helpers1.h"
+#include "simulator/vpi_model_helpers2.h"
+#include "simulator/vpi_model_helpers3.h"
+#include "simulator/vpi_object.h"
 
 namespace delta {
 
@@ -18,10 +25,10 @@ namespace {
 
 // Records a VPI error (state, level, and message) on the supplied error slot,
 // matching the §38.2 convention used throughout the handle-resolution routines.
-void SetVpiHandleError(VpiErrorInfo& err, const char* message) {
+void SetVpiHandleError(s_vpi_error_info& err, const char* message) {
   err.state = kVpiPLI;
   err.level = kVpiError;
-  err.message = message;
+  err.message = VpiText(message);
 }
 
 // §38.21: one position in a hierarchical-name walk. A hierarchical name is
@@ -82,7 +89,7 @@ VpiHandle ResolveNamePathComponent(
 VpiHandle ResolveNamePathStep(
     const NamePathStep& step,
     const std::unordered_map<std::string_view, VpiObject*>& object_map,
-    VpiErrorInfo& err) {
+    s_vpi_error_info& err) {
   VpiHandle next = ResolveNamePathComponent(step, object_map);
   if (next == nullptr) return nullptr;
 

@@ -3,7 +3,10 @@
 #include <vector>
 
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_model_helpers2.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -254,8 +257,8 @@ TEST(PackedArrayVarPublic, PackedIsAlwaysTrueForAPackedArrayAndItsElements) {
   element.parent = &array;
   array.children = {&element};
 
-  EXPECT_EQ(vpi_get(vpiPacked, &array), 1);
-  EXPECT_EQ(vpi_get(vpiPacked, &element), 1);
+  EXPECT_EQ(vpi_get(vpiPacked, VpiHandleOf(&array)), 1);
+  EXPECT_EQ(vpi_get(vpiPacked, VpiHandleOf(&element)), 1);
 
   SetGlobalVpiContext(nullptr);
 }
@@ -269,12 +272,12 @@ TEST(PackedArrayVarPublic, PackedStillReportsTheFlagForAnythingElse) {
 
   VpiObject unpacked;
   unpacked.type = vpiStructVar;
-  EXPECT_EQ(vpi_get(vpiPacked, &unpacked), 0);
+  EXPECT_EQ(vpi_get(vpiPacked, VpiHandleOf(&unpacked)), 0);
 
   VpiObject packed;
   packed.type = vpiStructVar;
   packed.packed = true;
-  EXPECT_EQ(vpi_get(vpiPacked, &packed), 1);
+  EXPECT_EQ(vpi_get(vpiPacked, VpiHandleOf(&packed)), 1);
 
   SetGlobalVpiContext(nullptr);
 }
@@ -293,11 +296,11 @@ TEST(PackedArrayVarPublic, ASubelementReachesThePackedArrayItBelongsTo) {
   element.parent = &array;
   array.children = {&element};
 
-  EXPECT_EQ(vpi_handle(vpiParent, &element), &array);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiParent, VpiHandleOf(&element))), &array);
 
   VpiObject loose;
   loose.type = vpiEnumVar;
-  EXPECT_EQ(vpi_handle(vpiParent, &loose), nullptr);
+  EXPECT_EQ(vpi_handle(vpiParent, VpiHandleOf(&loose)), nullptr);
 
   SetGlobalVpiContext(nullptr);
 }

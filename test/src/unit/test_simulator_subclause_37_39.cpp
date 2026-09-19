@@ -3,7 +3,10 @@
 #include "common/arena.h"
 #include "simulator/scheduler.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_constants.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -44,7 +47,7 @@ TEST_F(ModulePathModel, ModuleReachedFromPathInModule) {
   path->parent = mod;
   mod->children.push_back(path);
 
-  VpiHandle reached = vpi_handle(kVpiModule, path);
+  VpiHandle reached = VpiObjectOf(vpi_handle(kVpiModule, VpiHandleOf(path)));
   EXPECT_EQ(reached, mod);
 }
 
@@ -63,7 +66,7 @@ TEST_F(ModulePathModel, ModuleIsNullForInterfaceNestedInModule) {
   path->parent = iface;
   iface->children.push_back(path);
 
-  EXPECT_EQ(vpi_handle(kVpiModule, path), nullptr);
+  EXPECT_EQ(vpi_handle(kVpiModule, VpiHandleOf(path)), nullptr);
 }
 
 // §37.39 detail 1 (scope guard): the NULL carve-out is specific to mod paths.
@@ -75,7 +78,7 @@ TEST_F(ModulePathModel, CarveOutAppliesOnlyToModPath) {
   other->parent = mod;
   mod->children.push_back(other);
 
-  EXPECT_EQ(vpi_handle(kVpiModule, other), mod);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(kVpiModule, VpiHandleOf(other))), mod);
 }
 
 // §37.39 detail 1 (edge): vpiModule walks the full ancestry of a mod path, not
@@ -88,7 +91,7 @@ TEST_F(ModulePathModel, ModuleIsNullWhenNoInstanceEncloses) {
   path->parent = scope;
   scope->children.push_back(path);
 
-  EXPECT_EQ(vpi_handle(kVpiModule, path), nullptr);
+  EXPECT_EQ(vpi_handle(kVpiModule, VpiHandleOf(path)), nullptr);
 }
 
 // -----------------------------------------------------------------------------
@@ -111,18 +114,18 @@ TEST_F(ModulePathModel, AModulePathReportsItsOwnProperties) {
   path.data_polarity = vpiNegative;
   path.mod_path_has_if_none = true;
 
-  EXPECT_EQ(vpi_get(vpiPathType, &path), vpiPathParallel);
-  EXPECT_EQ(vpi_get(vpiPolarity, &path), vpiPositive);
-  EXPECT_EQ(vpi_get(vpiDataPolarity, &path), vpiNegative);
-  EXPECT_EQ(vpi_get(vpiModPathHasIfNone, &path), 1);
+  EXPECT_EQ(vpi_get(vpiPathType, VpiHandleOf(&path)), vpiPathParallel);
+  EXPECT_EQ(vpi_get(vpiPolarity, VpiHandleOf(&path)), vpiPositive);
+  EXPECT_EQ(vpi_get(vpiDataPolarity, VpiHandleOf(&path)), vpiNegative);
+  EXPECT_EQ(vpi_get(vpiModPathHasIfNone, VpiHandleOf(&path)), 1);
 
   // A full-connection path written without an ifnone reports the other kind and
   // a false flag, so neither value is whatever the field happened to hold.
   VpiObject full;
   full.type = vpiModPath;
   full.path_type = vpiPathFull;
-  EXPECT_EQ(vpi_get(vpiPathType, &full), vpiPathFull);
-  EXPECT_EQ(vpi_get(vpiModPathHasIfNone, &full), 0);
+  EXPECT_EQ(vpi_get(vpiPathType, VpiHandleOf(&full)), vpiPathFull);
+  EXPECT_EQ(vpi_get(vpiModPathHasIfNone, VpiHandleOf(&full)), 0);
 }
 
 // Diagram (path term properties): a path term reports the edge it is sensitive
@@ -133,8 +136,8 @@ TEST_F(ModulePathModel, APathTermReportsItsEdgeAndDirection) {
   term.direction = kVpiInput;
   term.edge = vpiEdge01;
 
-  EXPECT_EQ(vpi_get(vpiEdge, &term), vpiEdge01);
-  EXPECT_EQ(vpi_get(kVpiDirection, &term), kVpiInput);
+  EXPECT_EQ(vpi_get(vpiEdge, VpiHandleOf(&term)), vpiEdge01);
+  EXPECT_EQ(vpi_get(kVpiDirection, VpiHandleOf(&term)), kVpiInput);
 }
 
 // Diagram (mod path -> path term, three relations): the output terms come back
@@ -159,19 +162,19 @@ TEST_F(ModulePathModel, TheThreeTermRelationsReachTheirOwnTerms) {
   path.type = vpiModPath;
   path.children = {&in_term, &data_term, &out_term, &not_a_term};
 
-  vpiHandle ins = vpi_iterate(vpiModPathIn, &path);
+  vpiHandle ins = vpi_iterate(vpiModPathIn, VpiHandleOf(&path));
   ASSERT_NE(ins, nullptr);
-  EXPECT_EQ(vpi_scan(ins), &in_term);
+  EXPECT_EQ(VpiObjectOf(vpi_scan(ins)), &in_term);
   EXPECT_EQ(vpi_scan(ins), nullptr);
 
-  vpiHandle datas = vpi_iterate(vpiModDataPathIn, &path);
+  vpiHandle datas = vpi_iterate(vpiModDataPathIn, VpiHandleOf(&path));
   ASSERT_NE(datas, nullptr);
-  EXPECT_EQ(vpi_scan(datas), &data_term);
+  EXPECT_EQ(VpiObjectOf(vpi_scan(datas)), &data_term);
   EXPECT_EQ(vpi_scan(datas), nullptr);
 
-  vpiHandle outs = vpi_iterate(vpiModPathOut, &path);
+  vpiHandle outs = vpi_iterate(vpiModPathOut, VpiHandleOf(&path));
   ASSERT_NE(outs, nullptr);
-  EXPECT_EQ(vpi_scan(outs), &out_term);
+  EXPECT_EQ(VpiObjectOf(vpi_scan(outs)), &out_term);
   EXPECT_EQ(vpi_scan(outs), nullptr);
 }
 
@@ -186,9 +189,9 @@ TEST_F(ModulePathModel, ARelationWithNoTermOfItsRoleReachesNone) {
   path.type = vpiModPath;
   path.children = {&out_term};
 
-  EXPECT_EQ(vpi_iterate(vpiModPathIn, &path), nullptr);
-  EXPECT_EQ(vpi_iterate(vpiModDataPathIn, &path), nullptr);
-  EXPECT_NE(vpi_iterate(vpiModPathOut, &path), nullptr);
+  EXPECT_EQ(vpi_iterate(vpiModPathIn, VpiHandleOf(&path)), nullptr);
+  EXPECT_EQ(vpi_iterate(vpiModDataPathIn, VpiHandleOf(&path)), nullptr);
+  EXPECT_NE(vpi_iterate(vpiModPathOut, VpiHandleOf(&path)), nullptr);
 }
 
 }  // namespace

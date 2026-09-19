@@ -8,7 +8,9 @@
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -69,14 +71,14 @@ TEST_F(ConstraintDistribution, ConstraintItemIterationReturnsItemsInOrder) {
   constraint.type = vpiConstraint;
   constraint.children = {&ordering, &not_item, &expr};
 
-  vpiHandle it = vpi_iterate(vpiConstraintItem, &constraint);
+  vpiHandle it = vpi_iterate(vpiConstraintItem, VpiHandleOf(&constraint));
   ASSERT_NE(it, nullptr);
   std::vector<vpiHandle> seen;
   while (vpiHandle h = vpi_scan(it)) seen.push_back(h);
 
-  ASSERT_EQ(seen.size(), 2u);     // the non-item child is excluded
-  EXPECT_EQ(seen[0], &ordering);  // occurrence order is preserved
-  EXPECT_EQ(seen[1], &expr);
+  ASSERT_EQ(seen.size(), 2u);                  // the non-item child is excluded
+  EXPECT_EQ(VpiObjectOf(seen[0]), &ordering);  // occurrence order is preserved
+  EXPECT_EQ(VpiObjectOf(seen[1]), &expr);
 }
 
 // D4: the vpiConstraint iteration returns a class's constraints in syntactic
@@ -97,15 +99,15 @@ TEST_F(ConstraintDistribution, ConstraintIterationReturnsDeclarationOrder) {
   class_obj.type = vpiClassDefn;
   class_obj.children = {&c0, &other, &c1, &c2};
 
-  vpiHandle it = vpi_iterate(vpiConstraint, &class_obj);
+  vpiHandle it = vpi_iterate(vpiConstraint, VpiHandleOf(&class_obj));
   ASSERT_NE(it, nullptr);
   std::vector<vpiHandle> seen;
   while (vpiHandle h = vpi_scan(it)) seen.push_back(h);
 
-  ASSERT_EQ(seen.size(), 3u);  // the non-constraint child is excluded
-  EXPECT_EQ(seen[0], &c0);     // declaration order is preserved
-  EXPECT_EQ(seen[1], &c1);
-  EXPECT_EQ(seen[2], &c2);
+  ASSERT_EQ(seen.size(), 3u);            // the non-constraint child is excluded
+  EXPECT_EQ(VpiObjectOf(seen[0]), &c0);  // declaration order is preserved
+  EXPECT_EQ(VpiObjectOf(seen[1]), &c1);
+  EXPECT_EQ(VpiObjectOf(seen[2]), &c2);
 }
 
 // D4 (second sentence): the position of a constraint declared extern is
@@ -127,17 +129,18 @@ TEST_F(ConstraintDistribution, ExternConstraintKeepsPrototypePosition) {
   class_obj.type = vpiClassDefn;
   class_obj.children = {&c0, &c_extern, &c2};
 
-  vpiHandle it = vpi_iterate(vpiConstraint, &class_obj);
+  vpiHandle it = vpi_iterate(vpiConstraint, VpiHandleOf(&class_obj));
   ASSERT_NE(it, nullptr);
   std::vector<vpiHandle> seen;
   while (vpiHandle h = vpi_scan(it)) seen.push_back(h);
 
   ASSERT_EQ(seen.size(), 3u);
-  EXPECT_EQ(seen[0], &c0);
-  EXPECT_EQ(seen[1], &c_extern);  // the extern constraint holds its slot
-  EXPECT_EQ(seen[2], &c2);
+  EXPECT_EQ(VpiObjectOf(seen[0]), &c0);
+  EXPECT_EQ(VpiObjectOf(seen[1]),
+            &c_extern);  // the extern constraint holds its slot
+  EXPECT_EQ(VpiObjectOf(seen[2]), &c2);
   // Its extern-ness is what the ordering had to preserve past, confirmed here.
-  EXPECT_EQ(vpi_get(vpiAccessType, &c_extern), vpiExternAcc);
+  EXPECT_EQ(vpi_get(vpiAccessType, VpiHandleOf(&c_extern)), vpiExternAcc);
 }
 
 // D3: a constraint's vpiAccessType reports vpiExternAcc when it is declared
@@ -149,18 +152,19 @@ TEST_F(ConstraintDistribution, AccessTypeIsExternAccOrZero) {
   VpiObject extern_constraint;
   extern_constraint.type = vpiConstraint;
   extern_constraint.access_type = vpiExternAcc;
-  EXPECT_EQ(vpi_get(vpiAccessType, &extern_constraint), vpiExternAcc);
+  EXPECT_EQ(vpi_get(vpiAccessType, VpiHandleOf(&extern_constraint)),
+            vpiExternAcc);
 
   VpiObject local_constraint;
   local_constraint.type = vpiConstraint;
   local_constraint.access_type = 0;
-  EXPECT_EQ(vpi_get(vpiAccessType, &local_constraint), 0);
+  EXPECT_EQ(vpi_get(vpiAccessType, VpiHandleOf(&local_constraint)), 0);
 
   // Any other stored value collapses to zero for a constraint.
   VpiObject odd_constraint;
   odd_constraint.type = vpiConstraint;
   odd_constraint.access_type = 99;  // not vpiExternAcc
-  EXPECT_EQ(vpi_get(vpiAccessType, &odd_constraint), 0);
+  EXPECT_EQ(vpi_get(vpiAccessType, VpiHandleOf(&odd_constraint)), 0);
 
   // The clamp is scoped to constraints: another object the property is drawn
   // on keeps its own rule. §37.41 draws it on the task func enclosure, where a
@@ -168,7 +172,7 @@ TEST_F(ConstraintDistribution, AccessTypeIsExternAccOrZero) {
   VpiObject non_constraint;
   non_constraint.type = vpiFunction;
   non_constraint.access_type = 99;
-  EXPECT_EQ(vpi_get(vpiAccessType, &non_constraint), 99);
+  EXPECT_EQ(vpi_get(vpiAccessType, VpiHandleOf(&non_constraint)), 99);
 }
 
 // D1: for a constraint, vpiAutomatic reflects the keyword written on the
@@ -178,12 +182,12 @@ TEST_F(ConstraintDistribution, AutomaticReflectsKeywordNotLifetime) {
   VpiObject static_constraint;
   static_constraint.type = vpiConstraint;
   static_constraint.automatic = false;  // declared static
-  EXPECT_EQ(vpi_get(vpiAutomatic, &static_constraint), 0);
+  EXPECT_EQ(vpi_get(vpiAutomatic, VpiHandleOf(&static_constraint)), 0);
 
   VpiObject automatic_constraint;
   automatic_constraint.type = vpiConstraint;
   automatic_constraint.automatic = true;  // declared with the automatic keyword
-  EXPECT_EQ(vpi_get(vpiAutomatic, &automatic_constraint), 1);
+  EXPECT_EQ(vpi_get(vpiAutomatic, VpiHandleOf(&automatic_constraint)), 1);
 }
 
 // The diagram's int/bool constraint and dist-item properties: vpiVirtual and
@@ -194,18 +198,18 @@ TEST_F(ConstraintDistribution, ScalarPropertiesAreReported) {
   constraint.type = vpiConstraint;
   constraint.is_virtual = true;
   constraint.constraint_enabled = true;
-  EXPECT_EQ(vpi_get(vpiVirtual, &constraint), 1);
-  EXPECT_EQ(vpi_get(vpiIsConstraintEnabled, &constraint), 1);
+  EXPECT_EQ(vpi_get(vpiVirtual, VpiHandleOf(&constraint)), 1);
+  EXPECT_EQ(vpi_get(vpiIsConstraintEnabled, VpiHandleOf(&constraint)), 1);
 
   VpiObject plain_constraint;
   plain_constraint.type = vpiConstraint;
-  EXPECT_EQ(vpi_get(vpiVirtual, &plain_constraint), 0);
-  EXPECT_EQ(vpi_get(vpiIsConstraintEnabled, &plain_constraint), 0);
+  EXPECT_EQ(vpi_get(vpiVirtual, VpiHandleOf(&plain_constraint)), 0);
+  EXPECT_EQ(vpi_get(vpiIsConstraintEnabled, VpiHandleOf(&plain_constraint)), 0);
 
   VpiObject dist_item;
   dist_item.type = vpiDistItem;
   dist_item.dist_type = vpiDivDist;
-  EXPECT_EQ(vpi_get(vpiDistType, &dist_item), vpiDivDist);
+  EXPECT_EQ(vpi_get(vpiDistType, VpiHandleOf(&dist_item)), vpiDivDist);
 }
 
 }  // namespace

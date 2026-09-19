@@ -23,8 +23,10 @@
 #include <vector>
 
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_internal.h"
+#include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
@@ -160,12 +162,12 @@ int VpiGetInCompatibilityMode(int property, VpiHandle obj, int mode) {
   return value;
 }
 
-vpiHandle VpiIterateInCompatibilityMode(int type, VpiHandle ref, int mode) {
+VpiHandle VpiIterateInCompatibilityMode(int type, VpiHandle ref, int mode) {
   // The iterator the current routine builds, with the objects an application
   // of `mode` does not expect dropped. An iteration left with nothing is the
   // NULL §38.23 gives one that reaches no object, so the emptied iterator is
   // released rather than handed back.
-  vpiHandle iterator = delta::GetGlobalVpiContext().Iterate(type, ref, mode);
+  VpiHandle iterator = delta::GetGlobalVpiContext().Iterate(type, ref, mode);
   if (iterator == nullptr || !VpiModeIs1364(mode)) return iterator;
   std::vector<delta::VpiObject*> kept;
   for (auto* object : iterator->children) {
@@ -173,7 +175,7 @@ vpiHandle VpiIterateInCompatibilityMode(int type, VpiHandle ref, int mode) {
   }
   iterator->children = kept;
   if (!iterator->children.empty()) return iterator;
-  vpi_release_handle(iterator);
+  vpi_release_handle(delta::VpiHandleOf(iterator));
   return nullptr;
 }
 
@@ -185,7 +187,7 @@ PLI_INT32 vpi_compare_objects_1364v1995(vpiHandle obj1, vpiHandle obj2) {
 }
 PLI_INT32 vpi_get_1364v1995(PLI_INT32 property, vpiHandle obj) {
   return delta::VpiGetInCompatibilityMode(
-      property, obj,
+      property, delta::VpiObjectOf(obj),
       delta::GetGlobalVpiContext().EffectiveCompatibilityMode(
           true, vpiMode1364v1995));
 }
@@ -231,10 +233,10 @@ PLI_INT32 vpi_control_1364v1995(PLI_INT32 operation, ...) {
 vpiHandle vpi_iterate_1364v1995(PLI_INT32 type, vpiHandle ref) {
   // §36.12.2.2: an application using Mechanism 1 is governed by the mode
   // compiled into it, whatever default the run was given.
-  return delta::VpiIterateInCompatibilityMode(
-      type, ref,
+  return delta::VpiHandleOf(delta::VpiIterateInCompatibilityMode(
+      type, delta::VpiObjectOf(ref),
       delta::GetGlobalVpiContext().EffectiveCompatibilityMode(
-          true, vpiMode1364v1995));
+          true, vpiMode1364v1995)));
 }
 
 // IEEE Std 1364-2001.
@@ -243,7 +245,7 @@ PLI_INT32 vpi_compare_objects_1364v2001(vpiHandle obj1, vpiHandle obj2) {
 }
 PLI_INT32 vpi_get_1364v2001(PLI_INT32 property, vpiHandle obj) {
   return delta::VpiGetInCompatibilityMode(
-      property, obj,
+      property, delta::VpiObjectOf(obj),
       delta::GetGlobalVpiContext().EffectiveCompatibilityMode(
           true, vpiMode1364v2001));
 }
@@ -289,10 +291,10 @@ PLI_INT32 vpi_control_1364v2001(PLI_INT32 operation, ...) {
 vpiHandle vpi_iterate_1364v2001(PLI_INT32 type, vpiHandle ref) {
   // §36.12.2.2: an application using Mechanism 1 is governed by the mode
   // compiled into it, whatever default the run was given.
-  return delta::VpiIterateInCompatibilityMode(
-      type, ref,
+  return delta::VpiHandleOf(delta::VpiIterateInCompatibilityMode(
+      type, delta::VpiObjectOf(ref),
       delta::GetGlobalVpiContext().EffectiveCompatibilityMode(
-          true, vpiMode1364v2001));
+          true, vpiMode1364v2001)));
 }
 
 // IEEE Std 1364-2005.
@@ -301,7 +303,7 @@ PLI_INT32 vpi_compare_objects_1364v2005(vpiHandle obj1, vpiHandle obj2) {
 }
 PLI_INT32 vpi_get_1364v2005(PLI_INT32 property, vpiHandle obj) {
   return delta::VpiGetInCompatibilityMode(
-      property, obj,
+      property, delta::VpiObjectOf(obj),
       delta::GetGlobalVpiContext().EffectiveCompatibilityMode(
           true, vpiMode1364v2005));
 }
@@ -347,10 +349,10 @@ PLI_INT32 vpi_control_1364v2005(PLI_INT32 operation, ...) {
 vpiHandle vpi_iterate_1364v2005(PLI_INT32 type, vpiHandle ref) {
   // §36.12.2.2: an application using Mechanism 1 is governed by the mode
   // compiled into it, whatever default the run was given.
-  return delta::VpiIterateInCompatibilityMode(
-      type, ref,
+  return delta::VpiHandleOf(delta::VpiIterateInCompatibilityMode(
+      type, delta::VpiObjectOf(ref),
       delta::GetGlobalVpiContext().EffectiveCompatibilityMode(
-          true, vpiMode1364v2005));
+          true, vpiMode1364v2005)));
 }
 
 // IEEE Std 1800-2005.
@@ -400,10 +402,10 @@ PLI_INT32 vpi_control_1800v2005(PLI_INT32 operation, ...) {
   return result;
 }
 vpiHandle vpi_iterate_1800v2005(PLI_INT32 type, vpiHandle ref) {
-  return delta::VpiIterateInCompatibilityMode(
-      type, ref,
+  return delta::VpiHandleOf(delta::VpiIterateInCompatibilityMode(
+      type, delta::VpiObjectOf(ref),
       delta::GetGlobalVpiContext().EffectiveCompatibilityMode(
-          true, vpiMode1800v2005));
+          true, vpiMode1800v2005)));
 }
 
 // IEEE Std 1800-2009.
@@ -453,10 +455,10 @@ PLI_INT32 vpi_control_1800v2009(PLI_INT32 operation, ...) {
   return result;
 }
 vpiHandle vpi_iterate_1800v2009(PLI_INT32 type, vpiHandle ref) {
-  return delta::VpiIterateInCompatibilityMode(
-      type, ref,
+  return delta::VpiHandleOf(delta::VpiIterateInCompatibilityMode(
+      type, delta::VpiObjectOf(ref),
       delta::GetGlobalVpiContext().EffectiveCompatibilityMode(
-          true, vpiMode1800v2009));
+          true, vpiMode1800v2009)));
 }
 
 // IEEE Std 1800-2012.
@@ -506,7 +508,7 @@ PLI_INT32 vpi_control_1800v2012(PLI_INT32 operation, ...) {
   return result;
 }
 vpiHandle vpi_iterate_1800v2012(PLI_INT32 type, vpiHandle ref) {
-  return delta::VpiIterateInCompatibilityMode(
-      type, ref,
-      delta::GetGlobalVpiContext().EffectiveCompatibilityMode(true, 0));
+  return delta::VpiHandleOf(delta::VpiIterateInCompatibilityMode(
+      type, delta::VpiObjectOf(ref),
+      delta::GetGlobalVpiContext().EffectiveCompatibilityMode(true, 0)));
 }

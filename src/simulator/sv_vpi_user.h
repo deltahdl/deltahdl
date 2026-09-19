@@ -31,13 +31,12 @@
  * the annex leaves unused, so that an application following the diagram can
  * write the iteration the diagram draws.
  *
- * The IWYU pragma on the include marks vpi_user.h as this file's export: the
- * annex has this file bring the base file with it, so clang-tidy's
- * misc-include-cleaner counts this file as providing the base declarations to
- * a translation unit that names only this one.
+ * The annex has this file include vpi_user.h, and §36.7 has an application
+ * include both, so a translation unit that uses a base declaration names
+ * vpi_user.h itself: the include is the annex's and not an export.
  */
 
-#include "simulator/vpi_user.h"  // IWYU pragma: export
+#include "vpi_user.h"
 
 #ifdef __cplusplus
 extern "C" {

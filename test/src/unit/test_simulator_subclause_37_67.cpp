@@ -1,7 +1,10 @@
 #include <gtest/gtest.h>
 
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_model_helpers1.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -49,7 +52,8 @@ TEST_F(Waits, WaitReachesExpressionCondition) {
   wait_stmt.children = {&condition, &body};
 
   EXPECT_EQ(VpiWaitConditionExpr(&wait_stmt), &condition);
-  EXPECT_EQ(vpi_handle(vpiCondition, &wait_stmt), &condition);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiCondition, VpiHandleOf(&wait_stmt))),
+            &condition);
 }
 
 // vpiCondition edge: an ordered wait reaches a sequence-instance condition.
@@ -64,7 +68,8 @@ TEST_F(Waits, OrderedWaitReachesSequenceInstanceCondition) {
   ordered_wait.children = {&condition};
 
   EXPECT_EQ(VpiWaitConditionExpr(&ordered_wait), &condition);
-  EXPECT_EQ(vpi_handle(vpiCondition, &ordered_wait), &condition);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiCondition, VpiHandleOf(&ordered_wait))),
+            &condition);
 }
 
 // vpiCondition edge: the condition is found even when a non-condition child
@@ -99,7 +104,7 @@ TEST_F(Waits, ConditionNullWhenAbsentOrHandleNull) {
   EXPECT_EQ(VpiWaitConditionExpr(&wait_fork), nullptr);
   // The wait-statement gate admits a wait fork, but it draws no condition edge,
   // so the public dispatch reports null rather than mistaking the body for one.
-  EXPECT_EQ(vpi_handle(vpiCondition, &wait_fork), nullptr);
+  EXPECT_EQ(vpi_handle(vpiCondition, VpiHandleOf(&wait_fork)), nullptr);
 }
 
 // The "waits" grouping: the predicate admits the three wait kinds the diagram
@@ -129,7 +134,7 @@ TEST_F(Waits, BodyStatementReachedByTheKindTheStmtClassGroups) {
     wait_stmt.type = wait_kind;
     wait_stmt.children = {&condition, &body};
 
-    EXPECT_EQ(vpi_handle(vpiStmt, &wait_stmt), &body)
+    EXPECT_EQ(VpiObjectOf(vpi_handle(vpiStmt, VpiHandleOf(&wait_stmt))), &body)
         << "wait kind " << wait_kind;
   }
 }
@@ -154,8 +159,10 @@ TEST_F(Waits, ElseStatementOfAnOrderedWaitIsTheSecondStatement) {
   ordered_wait.type = vpiOrderedWait;
   ordered_wait.children = {&condition, &body, &else_stmt};
 
-  EXPECT_EQ(vpi_handle(vpiStmt, &ordered_wait), &body);
-  EXPECT_EQ(vpi_handle(vpiElseStmt, &ordered_wait), &else_stmt);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiStmt, VpiHandleOf(&ordered_wait))),
+            &body);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiElseStmt, VpiHandleOf(&ordered_wait))),
+            &else_stmt);
   EXPECT_EQ(VpiOrderedWaitElseStmt(&ordered_wait), &else_stmt);
 }
 
@@ -170,7 +177,7 @@ TEST_F(Waits, ElseStatementIsNullWhenTheOrderedWaitHasOnlyABody) {
   ordered_wait.type = vpiOrderedWait;
   ordered_wait.children = {&body};
 
-  EXPECT_EQ(vpi_handle(vpiElseStmt, &ordered_wait), nullptr);
+  EXPECT_EQ(vpi_handle(vpiElseStmt, VpiHandleOf(&ordered_wait)), nullptr);
   EXPECT_EQ(VpiOrderedWaitElseStmt(nullptr), nullptr);
 
   VpiObject wait_fork;

@@ -6,7 +6,9 @@
 
 #include "simulator/assertion_api.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 using namespace delta;
@@ -249,10 +251,10 @@ class GlobalClockingFutureCallbackEntry : public ::testing::Test {
 // the time the application would otherwise have no way of learning once the
 // execution had moved on to a later tick.
 TEST_F(GlobalClockingFutureCallbackEntry, TheRoutineIsHandedTheEventTime) {
-  vpiHandle assertion = vpi_ctx_.CreateAssertion(kA, vpiAssert);
+  VpiHandle assertion = vpi_ctx_.CreateAssertion(kA, vpiAssert);
   api_.SetGlobalClockTicks({10, 11, 12, 13});
   api_.MarkAssertionUsesGlobalClockingFuture(kA);
-  ASSERT_NE(vpi_register_assertion_cb(assertion, cbAssertionKill,
+  ASSERT_NE(vpi_register_assertion_cb(VpiHandleOf(assertion), cbAssertionKill,
                                       &RecordDeferredCall, nullptr),
             nullptr);
 
@@ -282,12 +284,13 @@ TEST_F(GlobalClockingFutureCallbackEntry, TheRoutineIsHandedTheEventTime) {
 // makes the attempt's unique identifier survives the wait rather than being
 // re-read at the later tick.
 TEST_F(GlobalClockingFutureCallbackEntry, TheDeferredCallKeepsItsAttempt) {
-  vpiHandle assertion = vpi_ctx_.CreateAssertion(kA, vpiAssert);
+  VpiHandle assertion = vpi_ctx_.CreateAssertion(kA, vpiAssert);
   api_.SetGlobalClockTicks({10, 11, 12, 13});
   api_.MarkAssertionUsesGlobalClockingFuture(kA);
-  ASSERT_NE(vpi_register_assertion_cb(assertion, cbAssertionFailure,
-                                      &RecordDeferredCall, nullptr),
-            nullptr);
+  ASSERT_NE(
+      vpi_register_assertion_cb(VpiHandleOf(assertion), cbAssertionFailure,
+                                &RecordDeferredCall, nullptr),
+      nullptr);
 
   AssertionAttemptInfo info;
   info.attempt_start_time = 10;

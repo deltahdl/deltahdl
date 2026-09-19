@@ -5,7 +5,10 @@
 
 #include "fixture_simulator.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -61,7 +64,7 @@ TEST_F(ClassVariablesAndObjects, ClassObjectReportsItsObjectId) {
   class_obj.type = vpiClassObj;
   class_obj.obj_id = 42;
 
-  EXPECT_EQ(vpi_get(vpiObjId, &class_obj), 42);
+  EXPECT_EQ(vpi_get(vpiObjId, VpiHandleOf(&class_obj)), 42);
 }
 
 // D2: a class variable does not carry its own identifier - it reports the
@@ -75,11 +78,11 @@ TEST_F(ClassVariablesAndObjects, ClassVariableReportsReferencedObjectId) {
   VpiObject referencing_var;
   referencing_var.type = vpiClassVar;
   referencing_var.referenced_object = &class_obj;
-  EXPECT_EQ(vpi_get(vpiObjId, &referencing_var), 7);
+  EXPECT_EQ(vpi_get(vpiObjId, VpiHandleOf(&referencing_var)), 7);
 
   VpiObject null_var;
   null_var.type = vpiClassVar;  // references nothing
-  EXPECT_EQ(vpi_get(vpiObjId, &null_var), 0);
+  EXPECT_EQ(vpi_get(vpiObjId, VpiHandleOf(&null_var)), 0);
 }
 
 // D3: a class object's vpiWaitingProcesses iteration reaches the thread objects
@@ -98,13 +101,13 @@ TEST_F(ClassVariablesAndObjects,
   class_obj.type = vpiClassObj;
   class_obj.children = {&waiter_a, &not_a_thread, &waiter_b};
 
-  vpiHandle it = vpi_iterate(vpiWaitingProcesses, &class_obj);
+  vpiHandle it = vpi_iterate(vpiWaitingProcesses, VpiHandleOf(&class_obj));
   ASSERT_NE(it, nullptr);
-  std::vector<vpiHandle> seen = ScanAll(it);
+  std::vector<vpiHandle> seen = ScanAll(VpiObjectOf(it));
 
   ASSERT_EQ(seen.size(), 2u);
-  EXPECT_EQ(seen[0], &waiter_a);
-  EXPECT_EQ(seen[1], &waiter_b);
+  EXPECT_EQ(VpiObjectOf(seen[0]), &waiter_a);
+  EXPECT_EQ(VpiObjectOf(seen[1]), &waiter_b);
 }
 
 // D4: a class object's vpiMessages iteration reaches the messages a mailbox
@@ -122,13 +125,13 @@ TEST_F(ClassVariablesAndObjects, MessagesIterationReturnsMailboxMessages) {
   mailbox.type = vpiClassObj;
   mailbox.children = {&message_a, &not_a_message, &message_b};
 
-  vpiHandle it = vpi_iterate(vpiMessages, &mailbox);
+  vpiHandle it = vpi_iterate(vpiMessages, VpiHandleOf(&mailbox));
   ASSERT_NE(it, nullptr);
-  std::vector<vpiHandle> seen = ScanAll(it);
+  std::vector<vpiHandle> seen = ScanAll(VpiObjectOf(it));
 
   ASSERT_EQ(seen.size(), 2u);
-  EXPECT_EQ(seen[0], &message_a);
-  EXPECT_EQ(seen[1], &message_b);
+  EXPECT_EQ(VpiObjectOf(seen[0]), &message_a);
+  EXPECT_EQ(VpiObjectOf(seen[1]), &message_b);
 }
 
 // D5: vpiClassObj of a class variable reaches the object it references. A class
@@ -141,11 +144,12 @@ TEST_F(ClassVariablesAndObjects, ClassObjRelationReachesReferencedObject) {
   VpiObject referencing_var;
   referencing_var.type = vpiClassVar;
   referencing_var.referenced_object = &class_obj;
-  EXPECT_EQ(vpi_handle(vpiClassObj, &referencing_var), &class_obj);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiClassObj, VpiHandleOf(&referencing_var))),
+            &class_obj);
 
   VpiObject null_var;
   null_var.type = vpiClassVar;  // references nothing
-  EXPECT_EQ(vpi_handle(vpiClassObj, &null_var), nullptr);
+  EXPECT_EQ(vpi_handle(vpiClassObj, VpiHandleOf(&null_var)), nullptr);
 }
 
 // D5: vpiClassTypespec of a class variable is the type the variable was
@@ -171,10 +175,10 @@ TEST_F(ClassVariablesAndObjects, ClassTypespecDiffersBetweenVariableAndObject) {
   class_var.children = {&declared_typespec};
   class_var.referenced_object = &class_obj;
 
-  vpiHandle from_var = vpi_handle(vpiClassTypespec, &class_var);
-  vpiHandle from_obj = vpi_handle(vpiClassTypespec, &class_obj);
-  ASSERT_EQ(from_var, &declared_typespec);
-  ASSERT_EQ(from_obj, &created_typespec);
+  vpiHandle from_var = vpi_handle(vpiClassTypespec, VpiHandleOf(&class_var));
+  vpiHandle from_obj = vpi_handle(vpiClassTypespec, VpiHandleOf(&class_obj));
+  ASSERT_EQ(VpiObjectOf(from_var), &declared_typespec);
+  ASSERT_EQ(VpiObjectOf(from_obj), &created_typespec);
   EXPECT_NE(from_var, from_obj);
 }
 
@@ -201,13 +205,13 @@ TEST_F(ClassVariablesAndObjects,
   class_obj.children = {&static_method, &member_var, &implicit_builtin,
                         &automatic_method};
 
-  vpiHandle it = vpi_iterate(vpiMethods, &class_obj);
+  vpiHandle it = vpi_iterate(vpiMethods, VpiHandleOf(&class_obj));
   ASSERT_NE(it, nullptr);
-  std::vector<vpiHandle> seen = ScanAll(it);
+  std::vector<vpiHandle> seen = ScanAll(VpiObjectOf(it));
 
   ASSERT_EQ(seen.size(), 2u);
-  EXPECT_EQ(seen[0], &static_method);
-  EXPECT_EQ(seen[1], &automatic_method);
+  EXPECT_EQ(VpiObjectOf(seen[0]), &static_method);
+  EXPECT_EQ(VpiObjectOf(seen[1]), &automatic_method);
 }
 
 // D6: a class object's vpiVariables iteration returns the class's data members
@@ -228,12 +232,12 @@ TEST_F(ClassVariablesAndObjects,
   class_obj.type = vpiClassObj;
   class_obj.children = {&static_var, &automatic_var};
 
-  vpiHandle it = vpi_iterate(vpiVariables, &class_obj);
+  vpiHandle it = vpi_iterate(vpiVariables, VpiHandleOf(&class_obj));
   ASSERT_NE(it, nullptr);
-  std::vector<vpiHandle> seen = ScanAll(it);
+  std::vector<vpiHandle> seen = ScanAll(VpiObjectOf(it));
   ASSERT_EQ(seen.size(), 2u);
-  EXPECT_EQ(seen[0], &static_var);
-  EXPECT_EQ(seen[1], &automatic_var);
+  EXPECT_EQ(VpiObjectOf(seen[0]), &static_var);
+  EXPECT_EQ(VpiObjectOf(seen[1]), &automatic_var);
 }
 
 // D6: the same lifetime-agnostic rule covers the class object's named events.
@@ -256,18 +260,18 @@ TEST_F(ClassVariablesAndObjects,
   class_obj.type = vpiClassObj;
   class_obj.children = {&static_event, &event_array, &automatic_event};
 
-  vpiHandle ev_it = vpi_iterate(vpiNamedEvent, &class_obj);
+  vpiHandle ev_it = vpi_iterate(vpiNamedEvent, VpiHandleOf(&class_obj));
   ASSERT_NE(ev_it, nullptr);
-  std::vector<vpiHandle> events = ScanAll(ev_it);
+  std::vector<vpiHandle> events = ScanAll(VpiObjectOf(ev_it));
   ASSERT_EQ(events.size(), 2u);
-  EXPECT_EQ(events[0], &static_event);
-  EXPECT_EQ(events[1], &automatic_event);
+  EXPECT_EQ(VpiObjectOf(events[0]), &static_event);
+  EXPECT_EQ(VpiObjectOf(events[1]), &automatic_event);
 
-  vpiHandle arr_it = vpi_iterate(vpiNamedEventArray, &class_obj);
+  vpiHandle arr_it = vpi_iterate(vpiNamedEventArray, VpiHandleOf(&class_obj));
   ASSERT_NE(arr_it, nullptr);
-  std::vector<vpiHandle> arrays = ScanAll(arr_it);
+  std::vector<vpiHandle> arrays = ScanAll(VpiObjectOf(arr_it));
   ASSERT_EQ(arrays.size(), 1u);
-  EXPECT_EQ(arrays[0], &event_array);
+  EXPECT_EQ(VpiObjectOf(arrays[0]), &event_array);
 }
 
 // D7: vpiVirtualInterfaceVar from a class object returns the virtual interface
@@ -290,23 +294,24 @@ TEST_F(ClassVariablesAndObjects,
   class_obj.type = vpiClassObj;
   class_obj.children = {&scalar_vif, &vif_array};
 
-  vpiHandle vif_it = vpi_iterate(vpiVirtualInterfaceVar, &class_obj);
+  vpiHandle vif_it =
+      vpi_iterate(vpiVirtualInterfaceVar, VpiHandleOf(&class_obj));
   ASSERT_NE(vif_it, nullptr);
-  std::vector<vpiHandle> vifs = ScanAll(vif_it);
+  std::vector<vpiHandle> vifs = ScanAll(VpiObjectOf(vif_it));
   ASSERT_EQ(vifs.size(), 3u);
-  EXPECT_EQ(vifs[0], &scalar_vif);
-  EXPECT_EQ(vifs[1], &vif_elem0);
-  EXPECT_EQ(vifs[2], &vif_elem1);
+  EXPECT_EQ(VpiObjectOf(vifs[0]), &scalar_vif);
+  EXPECT_EQ(VpiObjectOf(vifs[1]), &vif_elem0);
+  EXPECT_EQ(VpiObjectOf(vifs[2]), &vif_elem1);
 
-  vpiHandle var_it = vpi_iterate(vpiVariables, &class_obj);
+  vpiHandle var_it = vpi_iterate(vpiVariables, VpiHandleOf(&class_obj));
   ASSERT_NE(var_it, nullptr);
-  std::vector<vpiHandle> vars = ScanAll(var_it);
+  std::vector<vpiHandle> vars = ScanAll(VpiObjectOf(var_it));
   // The scalar virtual interface var comes back beside the array, §37.17
   // drawing `virtual interface var` inside the `variables` class enclosure this
   // relation is drawn to (§37.4.1); the array is the one reported whole.
   ASSERT_EQ(vars.size(), 2u);
-  EXPECT_EQ(vars[0], &scalar_vif);
-  EXPECT_EQ(vars[1], &vif_array);
+  EXPECT_EQ(VpiObjectOf(vars[0]), &scalar_vif);
+  EXPECT_EQ(VpiObjectOf(vars[1]), &vif_array);
 }
 
 // D8: a class object's vpiParameter iteration returns both the parameters from
@@ -326,15 +331,15 @@ TEST_F(ClassVariablesAndObjects,
   class_obj.type = vpiClassObj;
   class_obj.children = {&port_param, &body_param};
 
-  vpiHandle it = vpi_iterate(vpiParameter, &class_obj);
+  vpiHandle it = vpi_iterate(vpiParameter, VpiHandleOf(&class_obj));
   ASSERT_NE(it, nullptr);
-  std::vector<vpiHandle> seen = ScanAll(it);
+  std::vector<vpiHandle> seen = ScanAll(VpiObjectOf(it));
   ASSERT_EQ(seen.size(), 2u);
-  EXPECT_EQ(seen[0], &port_param);
-  EXPECT_EQ(seen[1], &body_param);
+  EXPECT_EQ(VpiObjectOf(seen[0]), &port_param);
+  EXPECT_EQ(VpiObjectOf(seen[1]), &body_param);
 
-  EXPECT_EQ(vpi_get(vpiLocalParam, &body_param), 1);
-  EXPECT_EQ(vpi_get(vpiLocalParam, &port_param), 0);
+  EXPECT_EQ(vpi_get(vpiLocalParam, VpiHandleOf(&body_param)), 1);
+  EXPECT_EQ(vpi_get(vpiLocalParam, VpiHandleOf(&port_param)), 0);
 }
 
 // D9: vpi_handle_by_name() accepts a full name down to a non-static data
@@ -361,7 +366,8 @@ TEST_F(ClassVariablesAndObjects, HandleByNameReachesNonStaticDataMember) {
   top.children = {&class_var};
 
   // Resolved relative to top, "p.Id" reaches the member through the variable.
-  EXPECT_EQ(vpi_handle_by_name("p.Id", &top), &data_member);
+  EXPECT_EQ(VpiObjectOf(vpi_handle_by_name(VpiText("p.Id"), VpiHandleOf(&top))),
+            &data_member);
 }
 
 // What the application found. A calltf is a plain C function with no return
@@ -371,8 +377,8 @@ std::string g_class_var_name;
 int g_declared_type = 0;
 bool g_variables_class_reached_it = false;
 
-int ProbeClassVarsCalltf(const char*) {
-  vpiHandle mod = vpi_handle_by_name("m1", nullptr);
+PLI_INT32 ProbeClassVarsCalltf(PLI_BYTE8*) {
+  vpiHandle mod = vpi_handle_by_name(VpiText("m1"), nullptr);
   if (mod == nullptr) return 0;
 
   vpiHandle itr = vpi_iterate(vpiClassVar, mod);
@@ -412,7 +418,7 @@ TEST(ClassVariablesDesign, ADeclaredClassVariableIsAClassVarObject) {
 
   s_vpi_systf_data data = {};
   data.type = vpiSysTask;
-  data.tfname = "$probe";
+  data.tfname = VpiText("$probe");
   data.calltf = &ProbeClassVarsCalltf;
   ASSERT_NE(vpi_register_systf(&data), nullptr);
 

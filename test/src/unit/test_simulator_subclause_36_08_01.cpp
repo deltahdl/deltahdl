@@ -2,7 +2,10 @@
 
 #include "fixture_simulator.h"
 #include "simulator/variable.h"
+#include "simulator/vpi_context.h"
+#include "simulator/vpi_data_structs.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -12,8 +15,8 @@ namespace {
 // function's return value is. These stubs return distinct widths so a test can
 // observe that the value the sizetf returns - not a fixed constant - becomes
 // the reported width.
-int SizetfReturning12(const char*) { return 12; }
-int SizetfReturning64(const char*) { return 64; }
+PLI_INT32 SizetfReturning12(PLI_BYTE8*) { return 12; }
+PLI_INT32 SizetfReturning64(PLI_BYTE8*) { return 64; }
 
 // -----------------------------------------------------------------------------
 // §36.8.1: "The value returned by the sizetf routine shall be the number of
@@ -23,7 +26,7 @@ int SizetfReturning64(const char*) { return 64; }
 // -----------------------------------------------------------------------------
 
 TEST(SizetfApplicationRoutine, ReturnValueIsTheFunctionReturnWidth) {
-  VpiSystfData sized = {};
+  s_vpi_systf_data sized = {};
   sized.type = kVpiSysFunc;
   sized.sysfunctype = kVpiSizedFunc;
   sized.sizetf = &SizetfReturning12;
@@ -43,7 +46,7 @@ TEST(SizetfApplicationRoutine, ReturnValueIsTheFunctionReturnWidth) {
 // -----------------------------------------------------------------------------
 
 TEST(SizetfApplicationRoutine, NoSizetfSpecifiedDefaultsTo32Bits) {
-  VpiSystfData sized = {};
+  s_vpi_systf_data sized = {};
   sized.type = kVpiSysFunc;
   sized.sysfunctype = kVpiSizedFunc;
   sized.sizetf = nullptr;  // no sizetf application supplied
@@ -60,7 +63,7 @@ TEST(SizetfApplicationRoutine, NoSizetfSpecifiedDefaultsTo32Bits) {
 // -----------------------------------------------------------------------------
 
 TEST(SizetfApplicationRoutine, NotCalledForSystemTask) {
-  VpiSystfData task = {};
+  s_vpi_systf_data task = {};
   task.type = kVpiSysTask;
   task.sizetf = &SizetfReturning12;  // present, but must not be consulted
 
@@ -68,7 +71,7 @@ TEST(SizetfApplicationRoutine, NotCalledForSystemTask) {
 }
 
 TEST(SizetfApplicationRoutine, NotCalledForRealValuedFunction) {
-  VpiSystfData real_func = {};
+  s_vpi_systf_data real_func = {};
   real_func.type = kVpiSysFunc;
   real_func.sysfunctype = kVpiRealFunc;
   real_func.sizetf = &SizetfReturning12;  // present, but must not be consulted
@@ -81,12 +84,12 @@ TEST(SizetfApplicationRoutine, NotCalledForRealValuedFunction) {
 // it.
 int g_sizetf_runs = 0;
 
-int CountingSizetfReturning17(const char*) {
+PLI_INT32 CountingSizetfReturning17(PLI_BYTE8*) {
   ++g_sizetf_runs;
   return 17;
 }
 
-int PutsFortyTwoCalltf(const char*) {
+PLI_INT32 PutsFortyTwoCalltf(PLI_BYTE8*) {
   s_vpi_value value = {};
   value.format = vpiIntVal;
   value.value.integer = 42;
@@ -113,11 +116,11 @@ TEST_F(SizetfInARun, ASizetfRunsOncePerRegistration) {
   s_vpi_systf_data sized = {};
   sized.type = vpiSysFunc;
   sized.sysfunctype = vpiSizedFunc;
-  sized.tfname = "$sized_once";
+  sized.tfname = VpiText("$sized_once");
   sized.sizetf = &CountingSizetfReturning17;
   ASSERT_NE(vpi_register_systf(&sized), nullptr);
 
-  const VpiSystfData* registered = vpi_ctx_.ResolveSystf("$sized_once");
+  const s_vpi_systf_data* registered = vpi_ctx_.ResolveSystf("$sized_once");
   ASSERT_NE(registered, nullptr);
 
   EXPECT_EQ(vpi_ctx_.SystfResultSizeBits(*registered), 17);
@@ -134,7 +137,7 @@ TEST_F(SizetfInARun, ASizetfRunsBecauseTheFunctionAppearsInTheDesign) {
   s_vpi_systf_data sized = {};
   sized.type = vpiSysFunc;
   sized.sysfunctype = vpiSizedFunc;
-  sized.tfname = "$sized_once";
+  sized.tfname = VpiText("$sized_once");
   sized.sizetf = &CountingSizetfReturning17;
   sized.calltf = &PutsFortyTwoCalltf;
   ASSERT_NE(vpi_register_systf(&sized), nullptr);
@@ -161,7 +164,7 @@ TEST_F(SizetfInARun, TheCallsResultIsAsWideAsTheSizetfSaid) {
   s_vpi_systf_data sized = {};
   sized.type = vpiSysFunc;
   sized.sysfunctype = vpiSizedFunc;
-  sized.tfname = "$sized_once";
+  sized.tfname = VpiText("$sized_once");
   sized.sizetf = &CountingSizetfReturning17;
   sized.calltf = &PutsFortyTwoCalltf;
   ASSERT_NE(vpi_register_systf(&sized), nullptr);
@@ -176,7 +179,7 @@ TEST_F(SizetfInARun, TheCallsResultIsAsWideAsTheSizetfSaid) {
 
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
-  const VpiSystfData* registered = vpi_ctx_.ResolveSystf("$sized_once");
+  const s_vpi_systf_data* registered = vpi_ctx_.ResolveSystf("$sized_once");
   ASSERT_NE(registered, nullptr);
   EXPECT_EQ(vpi_ctx_.SystfResultSizeBits(*registered), 17);
   EXPECT_EQ(g_sizetf_runs, 1);

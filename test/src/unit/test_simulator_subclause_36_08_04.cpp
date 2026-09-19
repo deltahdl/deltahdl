@@ -1,7 +1,11 @@
 #include <gtest/gtest.h>
 
 #include "fixture_simulator.h"
+#include "simulator/vpi_context.h"
+#include "simulator/vpi_data_structs.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -17,17 +21,17 @@ const char* g_sizetf_arg = nullptr;
 const char* g_compiletf_arg = nullptr;
 const char* g_calltf_arg = nullptr;
 
-int RecordingSizetf(const char* arg) {
+PLI_INT32 RecordingSizetf(PLI_BYTE8* arg) {
   g_sizetf_arg = arg;
   return 0;
 }
 
-int RecordingCompiletf(const char* arg) {
+PLI_INT32 RecordingCompiletf(PLI_BYTE8* arg) {
   g_compiletf_arg = arg;
   return 0;
 }
 
-int RecordingCalltf(const char* arg) {
+PLI_INT32 RecordingCalltf(PLI_BYTE8* arg) {
   g_calltf_arg = arg;
   return 0;
 }
@@ -60,14 +64,14 @@ TEST_F(SystfApplicationRoutineArguments,
        AllThreeRoutinesTakeTheOneUserDataArgument) {
   int payload = 0;
 
-  VpiSystfData data = {};
+  s_vpi_systf_data data = {};
   data.type = kVpiSysFunc;
   data.sysfunctype = kVpiSizedFunc;
-  data.tfname = "$probe";
+  data.tfname = VpiText("$probe");
   data.sizetf = &RecordingSizetf;
   data.compiletf = &RecordingCompiletf;
   data.calltf = &RecordingCalltf;
-  data.user_data = &payload;
+  data.user_data = reinterpret_cast<PLI_BYTE8*>(&payload);
 
   ResetArgProbes();
   VpiSystfInvoke(data.sizetf, data.user_data);
@@ -93,19 +97,19 @@ TEST_F(SystfApplicationRoutineArguments,
        RegisteredUserDataIsPassedToEachRoutine) {
   int payload = 0;
 
-  VpiSystfData data = {};
+  s_vpi_systf_data data = {};
   data.type = kVpiSysFunc;
   data.sysfunctype = kVpiSizedFunc;
-  data.tfname = "$probe";
+  data.tfname = VpiText("$probe");
   data.sizetf = &RecordingSizetf;
   data.compiletf = &RecordingCompiletf;
   data.calltf = &RecordingCalltf;
-  data.user_data = &payload;
+  data.user_data = reinterpret_cast<PLI_BYTE8*>(&payload);
 
   VpiHandle handle = vpi_ctx_.RegisterSystf(&data);
   ASSERT_NE(handle, nullptr);
 
-  VpiSystfData read_back = {};
+  s_vpi_systf_data read_back = {};
   vpi_ctx_.GetSystfInfo(handle, &read_back);
   ASSERT_EQ(read_back.user_data, &payload);
 
@@ -132,15 +136,15 @@ TEST_F(SystfApplicationRoutineArguments,
   int payload_a = 0;
   int payload_b = 0;
 
-  VpiSystfData task = {};
+  s_vpi_systf_data task = {};
   task.type = kVpiSysTask;
   task.calltf = &RecordingCalltf;
-  task.user_data = &payload_a;
+  task.user_data = reinterpret_cast<PLI_BYTE8*>(&payload_a);
 
-  VpiSystfData func = {};
+  s_vpi_systf_data func = {};
   func.type = kVpiSysFunc;
   func.calltf = &RecordingCalltf;
-  func.user_data = &payload_b;
+  func.user_data = reinterpret_cast<PLI_BYTE8*>(&payload_b);
 
   ResetArgProbes();
   VpiSystfInvoke(task.calltf, task.user_data);
@@ -159,7 +163,7 @@ TEST_F(SystfApplicationRoutineArguments,
 // -----------------------------------------------------------------------------
 
 TEST_F(SystfApplicationRoutineArguments, NullUserDataIsPassedThroughUnchanged) {
-  VpiSystfData data = {};
+  s_vpi_systf_data data = {};
   data.type = kVpiSysFunc;
   data.sysfunctype = kVpiSizedFunc;
   data.sizetf = &RecordingSizetf;
@@ -208,19 +212,19 @@ bool g_run_sizetf_ran = false;
 bool g_run_compiletf_ran = false;
 bool g_run_calltf_ran = false;
 
-int RunSizetf(const char* arg) {
+PLI_INT32 RunSizetf(PLI_BYTE8* arg) {
   g_run_sizetf_arg = arg;
   g_run_sizetf_ran = true;
   return 8;
 }
 
-int RunCompiletf(const char* arg) {
+PLI_INT32 RunCompiletf(PLI_BYTE8* arg) {
   g_run_compiletf_arg = arg;
   g_run_compiletf_ran = true;
   return 0;
 }
 
-int RunCalltf(const char* arg) {
+PLI_INT32 RunCalltf(PLI_BYTE8* arg) {
   g_run_calltf_arg = arg;
   g_run_calltf_ran = true;
   return 0;
@@ -243,11 +247,11 @@ s_vpi_systf_data ProbeRegistration(void* user_data) {
   s_vpi_systf_data data = {};
   data.type = vpiSysFunc;
   data.sysfunctype = vpiSizedFunc;
-  data.tfname = "$probe";
+  data.tfname = VpiText("$probe");
   data.sizetf = &RunSizetf;
   data.compiletf = &RunCompiletf;
   data.calltf = &RunCalltf;
-  data.user_data = user_data;
+  data.user_data = static_cast<PLI_BYTE8*>(user_data);
   return data;
 }
 

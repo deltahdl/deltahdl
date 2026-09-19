@@ -14,8 +14,9 @@ CheckOptions:
   # misc-include-cleaner runs whole here as in etc/clang_tidy/src.yml, where the
   # comment states why nothing is ignored: from 2026-09-18 every test file
   # includes the header that declares each symbol it uses and no header it uses
-  # nothing from, with the three VPI include files of §36.7 exporting what they
-  # pull in.
+  # nothing from, with vpi_user.h's include of vpi_compatibility.h the one
+  # include a file relies on, because Annex L forbids including that file
+  # directly.
   readability-function-cognitive-complexity.IgnoreMacros: true
   readability-function-cognitive-complexity.Threshold: 15
   # TEST OVERRIDE (src: 200)

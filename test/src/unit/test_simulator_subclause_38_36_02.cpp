@@ -9,7 +9,9 @@
 #include "simulator/net.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -27,9 +29,9 @@ const int kSimTimeReasons[] = {
 // it runs from within a cbAtStartOfSimTime callback.
 bool g_inner_called = false;
 vpiHandle g_inner_handle = nullptr;
-int RegisterZeroDelayWithinCallback(VpiCbData*) {
+int RegisterZeroDelayWithinCallback(s_cb_data*) {
   g_inner_called = true;
-  static VpiTime t = {};
+  static s_vpi_time t = {};
   t.type = vpiSimTime;  // low/high/real all zero -> zero delay
   s_cb_data inner = {};
   inner.reason = cbAtStartOfSimTime;
@@ -43,7 +45,7 @@ int RegisterZeroDelayWithinCallback(VpiCbData*) {
 // argument - a pointer to an s_cb_data that is not the one registration was
 // given - so the pointer itself is recorded alongside the fields.
 struct DeliveredCbData {
-  const VpiCbData* structure = nullptr;
+  const s_cb_data* structure = nullptr;
   bool had_time = false;
   int time_type = 0;
   uint32_t time_low = 0;
@@ -53,7 +55,7 @@ struct DeliveredCbData {
   void* user_data = nullptr;
 };
 DeliveredCbData g_delivered;
-int RecordDelivery(VpiCbData* data) {
+int RecordDelivery(s_cb_data* data) {
   g_delivered.structure = data;
   g_delivered.had_time = data->time != nullptr;
   if (data->time != nullptr) {
@@ -99,7 +101,7 @@ class VpiSimTimeCallbacks : public ::testing::Test {
 // registered through vpi_register_cb() when given a valid time structure.
 TEST_F(VpiSimTimeCallbacks, AllSimTimeReasonsRegisterWithValidTime) {
   for (int reason : kSimTimeReasons) {
-    VpiTime t = {};
+    s_vpi_time t = {};
     t.type = vpiSimTime;
     t.low = 1;
     s_cb_data cb = {};
@@ -123,7 +125,7 @@ TEST_F(VpiSimTimeCallbacks, NullTimeStructureIsRejected) {
 // §38.36.2: a time->type of vpiSuppressTime is explicitly an error for a
 // simulation-time callback.
 TEST_F(VpiSimTimeCallbacks, SuppressTimeTypeIsRejected) {
-  VpiTime t = {};
+  s_vpi_time t = {};
   t.type = vpiSuppressTime;
   s_cb_data cb = {};
   cb.reason = cbNBASynch;
@@ -147,7 +149,7 @@ TEST_F(VpiSimTimeCallbacks, NonSimTimeReasonIgnoresTimeRequirement) {
 TEST_F(VpiSimTimeCallbacks, ZeroDelayAtStartOfSimTimeRejectedAfterTimeSlice) {
   vpi_ctx_.SetSimulationProgressedIntoTimeSlice(true);
 
-  VpiTime t = {};
+  s_vpi_time t = {};
   t.type = vpiSimTime;  // zero delay
   s_cb_data cb = {};
   cb.reason = cbAtStartOfSimTime;
@@ -160,7 +162,7 @@ TEST_F(VpiSimTimeCallbacks, ZeroDelayAtStartOfSimTimeRejectedAfterTimeSlice) {
 TEST_F(VpiSimTimeCallbacks, NonZeroDelayAtStartOfSimTimeAllowedAfterTimeSlice) {
   vpi_ctx_.SetSimulationProgressedIntoTimeSlice(true);
 
-  VpiTime t = {};
+  s_vpi_time t = {};
   t.type = vpiSimTime;
   t.low = 1;  // non-zero delay
   s_cb_data cb = {};
@@ -174,7 +176,7 @@ TEST_F(VpiSimTimeCallbacks, NonZeroDelayAtStartOfSimTimeAllowedAfterTimeSlice) {
 // e.g. at time zero - a zero-delay cbAtStartOfSimTime callback is accepted.
 TEST_F(VpiSimTimeCallbacks, ZeroDelayAtStartOfSimTimeAllowedBeforeTimeSlice) {
   // SetSimulationProgressedIntoTimeSlice is left at its default of false.
-  VpiTime t = {};
+  s_vpi_time t = {};
   t.type = vpiSimTime;  // zero delay
   s_cb_data cb = {};
   cb.reason = cbAtStartOfSimTime;
@@ -190,7 +192,7 @@ TEST_F(VpiSimTimeCallbacks, ZeroDelayAtStartOfSimTimeAllowedBeforeTimeSlice) {
 TEST_F(VpiSimTimeCallbacks, ZeroDelayAtStartOfSimTimeAllowedWithinCallback) {
   vpi_ctx_.SetSimulationProgressedIntoTimeSlice(true);
 
-  VpiTime outer_t = {};
+  s_vpi_time outer_t = {};
   outer_t.type = vpiSimTime;
   outer_t.low = 1;  // non-zero delay so the outer callback itself registers
   s_cb_data outer = {};
@@ -211,7 +213,7 @@ TEST_F(VpiSimTimeCallbacks, ZeroDelayAtStartOfSimTimeAllowedWithinCallback) {
 TEST_F(VpiSimTimeCallbacks, ZeroDelayReadWriteSynchRejectedAtReadOnlySynch) {
   vpi_ctx_.SetAtReadOnlySynchTime(true);
 
-  VpiTime t = {};
+  s_vpi_time t = {};
   t.type = vpiSimTime;  // zero delay
   s_cb_data cb = {};
   cb.reason = cbReadWriteSynch;
@@ -222,7 +224,7 @@ TEST_F(VpiSimTimeCallbacks, ZeroDelayReadWriteSynchRejectedAtReadOnlySynch) {
 // §38.36.2: the same zero-delay cbReadWriteSynch placement is permitted when
 // the simulation is not at read-only synch time.
 TEST_F(VpiSimTimeCallbacks, ZeroDelayReadWriteSynchAllowedWhenNotReadOnly) {
-  VpiTime t = {};
+  s_vpi_time t = {};
   t.type = vpiSimTime;  // zero delay, but not at read-only synch
   s_cb_data cb = {};
   cb.reason = cbReadWriteSynch;
@@ -235,7 +237,7 @@ TEST_F(VpiSimTimeCallbacks, ZeroDelayReadWriteSynchAllowedWhenNotReadOnly) {
 TEST_F(VpiSimTimeCallbacks, NonZeroDelayReadWriteSynchAllowedAtReadOnlySynch) {
   vpi_ctx_.SetAtReadOnlySynchTime(true);
 
-  VpiTime t = {};
+  s_vpi_time t = {};
   t.type = vpiSimTime;
   t.low = 1;  // non-zero delay
   s_cb_data cb = {};
@@ -251,7 +253,7 @@ TEST_F(VpiSimTimeCallbacks, NonZeroDelayReadWriteSynchAllowedAtReadOnlySynch) {
 TEST_F(VpiSimTimeCallbacks, HighWordDelayCountsAsNonZeroForAtStartOfSimTime) {
   vpi_ctx_.SetSimulationProgressedIntoTimeSlice(true);
 
-  VpiTime t = {};
+  s_vpi_time t = {};
   t.type = vpiSimTime;
   t.low = 0;
   t.high = 1;  // non-zero delay carried entirely in the high word
@@ -267,7 +269,7 @@ TEST_F(VpiSimTimeCallbacks, HighWordDelayCountsAsNonZeroForAtStartOfSimTime) {
 TEST_F(VpiSimTimeCallbacks, RealDelayCountsAsNonZeroForAtStartOfSimTime) {
   vpi_ctx_.SetSimulationProgressedIntoTimeSlice(true);
 
-  VpiTime t = {};
+  s_vpi_time t = {};
   t.type = vpiScaledRealTime;
   t.low = 0;
   t.high = 0;
@@ -290,14 +292,14 @@ TEST_F(VpiSimTimeCallbacks, RoutineIsPassedTheCurrentTimeAndItsOwnStructure) {
   AdvanceTo(40);
 
   int user_object = 7;
-  VpiTime requested = {};
+  s_vpi_time requested = {};
   requested.type = vpiSimTime;
   requested.low = 5;  // the delay asked for, not the time of the firing
   s_cb_data cb = {};
   cb.reason = cbAfterDelay;
   cb.time = &requested;
   cb.cb_rtn = RecordDelivery;
-  cb.user_data = &user_object;
+  cb.user_data = reinterpret_cast<PLI_BYTE8*>(&user_object);
   ASSERT_NE(vpi_register_cb(&cb), nullptr);
 
   EXPECT_EQ(vpi_ctx_.DispatchCallbacks(cbAfterDelay), 1);
@@ -324,7 +326,7 @@ TEST_F(VpiSimTimeCallbacks, EveryReasonDeliversTheCurrentTimeAndNoValue) {
 
     s_vpi_value value = {};
     value.format = vpiIntVal;
-    VpiTime requested = {};
+    s_vpi_time requested = {};
     requested.type = vpiSimTime;
     requested.low = 900;
     s_cb_data cb = {};
@@ -352,13 +354,13 @@ TEST_F(VpiSimTimeCallbacks, ScaledRealTimeIsScaledToTheObjFieldsTimeUnit) {
   VpiHandle scope = vpi_ctx_.CreateModule("m", "m");
   scope->time_unit = -9;  // and this object is written in nanoseconds
 
-  VpiTime requested = {};
+  s_vpi_time requested = {};
   requested.type = vpiScaledRealTime;
   requested.real = 1.0;
   s_cb_data cb = {};
   cb.reason = cbReadOnlySynch;
   cb.time = &requested;
-  cb.obj = scope;
+  cb.obj = VpiHandleOf(scope);
   cb.cb_rtn = RecordDelivery;
   ASSERT_NE(vpi_register_cb(&cb), nullptr);
 
@@ -376,7 +378,7 @@ TEST_F(VpiSimTimeCallbacks, ScaledRealTimeIsScaledToTheObjFieldsTimeUnit) {
 TEST_F(VpiSimTimeCallbacks, NextSimTimeIgnoresTheTimeItWasRegisteredWith) {
   AdvanceTo(8);
 
-  VpiTime requested = {};
+  s_vpi_time requested = {};
   requested.type = vpiSimTime;
   requested.low = 0xFFFFFFFFu;
   requested.high = 0xFFFFFFFFu;
@@ -401,7 +403,7 @@ TEST_F(VpiSimTimeCallbacks, ANonSimTimeReasonKeepsTheTimeItWasRegisteredWith) {
 
   s_vpi_value value = {};
   value.format = vpiIntVal;
-  VpiTime requested = {};
+  s_vpi_time requested = {};
   requested.type = vpiSimTime;
   requested.low = 900;
   s_cb_data cb = {};

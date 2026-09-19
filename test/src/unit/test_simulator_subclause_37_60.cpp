@@ -1,7 +1,10 @@
 #include <gtest/gtest.h>
 
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_model_helpers1.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -76,7 +79,7 @@ TEST_F(AtomicStatement, LabeledStatementReportsItsLabel) {
   VpiObject stmt;
   stmt.type = vpiIf;
   stmt.name = "check_it";  // the statement label
-  EXPECT_STREQ(vpi_get_str(vpiName, &stmt), "check_it");
+  EXPECT_STREQ(vpi_get_str(vpiName, VpiHandleOf(&stmt)), "check_it");
 }
 
 // D1: when no label was given, vpiName is NULL rather than the empty string -
@@ -88,7 +91,7 @@ TEST_F(AtomicStatement, EmptyLabelIsTreatedAsNoLabel) {
   VpiObject stmt;
   stmt.type = vpiWhile;
   stmt.name = "";  // explicitly empty
-  EXPECT_EQ(vpi_get_str(vpiName, &stmt), nullptr);
+  EXPECT_EQ(vpi_get_str(vpiName, VpiHandleOf(&stmt)), nullptr);
 }
 
 // D1 scope guard: the empty-label-becomes-NULL conversion is specific to atomic
@@ -100,7 +103,7 @@ TEST_F(AtomicStatement, EmptyNameNullingDoesNotApplyToNonAtomicObjects) {
   VpiObject non_stmt;
   non_stmt.type = vpiModule;  // not an atomic statement
   non_stmt.name = "";         // empty, same as the unlabeled case above
-  const char* result = vpi_get_str(vpiName, &non_stmt);
+  const char* result = vpi_get_str(vpiName, VpiHandleOf(&non_stmt));
   ASSERT_NE(result, nullptr);
   EXPECT_STREQ(result, "");
 }

@@ -5,7 +5,10 @@
 #include "common/source_mgr.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
+#include "simulator/vpi_constants.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -28,9 +31,9 @@ TEST_F(VpiHandleSim, HandleReturnsParentModule) {
   auto* mod = vpi_ctx_.CreateModule("top", "top");
   auto* port = vpi_ctx_.CreatePort("clk", kVpiInput, mod);
 
-  vpiHandle result = vpi_handle(vpiModule, port);
+  vpiHandle result = vpi_handle(vpiModule, VpiHandleOf(port));
   ASSERT_NE(result, nullptr);
-  EXPECT_EQ(result, mod);
+  EXPECT_EQ(VpiObjectOf(result), mod);
 }
 
 // §38.18: vpi_handle() returns the object of the requested type associated
@@ -40,9 +43,9 @@ TEST_F(VpiHandleSim, HandleReturnsChildPort) {
   auto* mod = vpi_ctx_.CreateModule("top", "top");
   auto* port = vpi_ctx_.CreatePort("clk", kVpiInput, mod);
 
-  vpiHandle result = vpi_handle(vpiPort, mod);
+  vpiHandle result = vpi_handle(vpiPort, VpiHandleOf(mod));
   ASSERT_NE(result, nullptr);
-  EXPECT_EQ(result, port);
+  EXPECT_EQ(VpiObjectOf(result), port);
 }
 
 TEST_F(VpiHandleSim, HandleReturnsNullptrForNullRef) {
@@ -53,7 +56,7 @@ TEST_F(VpiHandleSim, HandleReturnsNullptrForNullRef) {
 TEST_F(VpiHandleSim, HandleReturnsNullptrForNoMatch) {
   auto* mod = vpi_ctx_.CreateModule("top", "top");
 
-  vpiHandle result = vpi_handle(vpiNet, mod);
+  vpiHandle result = vpi_handle(vpiNet, VpiHandleOf(mod));
   EXPECT_EQ(result, nullptr);
 }
 
@@ -65,10 +68,10 @@ TEST_F(VpiHandleSim, HandleProtectedObjectIsAnError) {
   vpi_ctx_.CreatePort("clk", kVpiInput, mod);
   mod->is_protected = true;
 
-  vpiHandle result = vpi_handle(vpiPort, mod);
+  vpiHandle result = vpi_handle(vpiPort, VpiHandleOf(mod));
   EXPECT_EQ(result, nullptr);
 
-  SVpiErrorInfo info = {};
+  s_vpi_error_info info = {};
   EXPECT_EQ(vpi_chk_error(&info), vpiError);
   EXPECT_EQ(info.level, vpiError);
 }

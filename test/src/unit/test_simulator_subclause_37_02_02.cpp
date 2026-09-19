@@ -4,7 +4,9 @@
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "simulator/sim_context.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -55,7 +57,7 @@ TEST_F(VpiHandleReleaseSim, ReleasingOneHandleLeavesDistinctHandleUsable) {
   EXPECT_TRUE(vpi_ctx_.HandleReleased(mod));
   EXPECT_FALSE(vpi_ctx_.HandleReleased(other));
   // The distinct handle still refers to the same object.
-  EXPECT_EQ(vpi_compare_objects(other, mod), 1);
+  EXPECT_EQ(vpi_compare_objects(VpiHandleOf(other), VpiHandleOf(mod)), 1);
 }
 
 // §37.2.2: a null handle names nothing to release, and releasing a handle more
@@ -76,15 +78,15 @@ TEST_F(VpiHandleReleaseSim, ReleasingNullIsHarmlessAndReleaseIsIdempotent) {
 // restart-callback handles surviving while an ordinary callback handle and an
 // ordinary object handle are released.
 TEST_F(VpiHandleReleaseSim, RestartReleasesAllButRestartCallbackHandles) {
-  VpiCbData start{};
+  s_cb_data start{};
   start.reason = cbStartOfRestart;
   auto* start_cb = vpi_ctx_.RegisterCb(&start);
 
-  VpiCbData end{};
+  s_cb_data end{};
   end.reason = cbEndOfRestart;
   auto* end_cb = vpi_ctx_.RegisterCb(&end);
 
-  VpiCbData ordinary{};
+  s_cb_data ordinary{};
   ordinary.reason = cbValueChange;  // obj left null - not a restart reason
   auto* ordinary_cb = vpi_ctx_.RegisterCb(&ordinary);
 
@@ -108,9 +110,9 @@ TEST_F(VpiHandleReleaseSim, FreeingFrameObjectReleasesSubelementsAndCallbacks) {
   auto* subelement = vpi_ctx_.CreateModule("f.s", "f.s");
   frame_obj->children.push_back(subelement);
 
-  VpiCbData cb_data{};
+  s_cb_data cb_data{};
   cb_data.reason = cbValueChange;
-  cb_data.obj = subelement;  // a callback placed on the subelement
+  cb_data.obj = VpiHandleOf(subelement);  // a callback placed on the subelement
   auto* cb = vpi_ctx_.RegisterCb(&cb_data);
 
   vpi_ctx_.ReleaseFrameOrThreadObject(frame_obj);
@@ -139,9 +141,9 @@ TEST_F(VpiHandleReleaseSim, ReclaimingClassObjectReleasesAutomaticNotStatic) {
   class_obj->children.push_back(automatic_member);
   class_obj->children.push_back(static_member);
 
-  VpiCbData cb_data{};
+  s_cb_data cb_data{};
   cb_data.reason = cbStmt;  // a callback placed on the automatic member
-  cb_data.obj = automatic_member;
+  cb_data.obj = VpiHandleOf(automatic_member);
   auto* cb = vpi_ctx_.RegisterCb(&cb_data);
 
   vpi_ctx_.ReleaseClassObject(class_obj);
@@ -167,12 +169,12 @@ TEST_F(VpiHandleReleaseSim, RemovingACallbackReleasesItsHandle) {
   ASSERT_NE(cb, nullptr);
   EXPECT_FALSE(cb->released);
 
-  EXPECT_EQ(vpi_remove_cb(cb), 1);
+  EXPECT_EQ(vpi_remove_cb(VpiHandleOf(cb)), 1);
   EXPECT_TRUE(cb->released);
 
   // §38.39: the handle is no longer valid, so a second removal through it
   // fails rather than reporting success again.
-  EXPECT_EQ(vpi_remove_cb(cb), 0);
+  EXPECT_EQ(vpi_remove_cb(VpiHandleOf(cb)), 0);
 }
 
 // §37.2.2 (list item a): the release is of the handle the call was given. A
@@ -192,8 +194,8 @@ TEST_F(VpiHandleReleaseSim, RemovingOneCallbackLeavesAnotherHandleLive) {
 
   EXPECT_EQ(vpi_remove_cb(removed), 1);
 
-  EXPECT_TRUE(removed->released);
-  EXPECT_FALSE(kept->released);
+  EXPECT_TRUE(VpiObjectOf(removed)->released);
+  EXPECT_FALSE(VpiObjectOf(kept)->released);
 }
 
 }  // namespace

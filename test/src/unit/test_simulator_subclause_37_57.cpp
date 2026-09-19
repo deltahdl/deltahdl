@@ -3,7 +3,10 @@
 #include <vector>
 
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_model_helpers1.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -41,9 +44,10 @@ TEST(LetExprModel, ArgumentsFollowFormalOrderAndFillDefaults) {
 
   auto args = VpiLetExprArguments(formals, provided);
   ASSERT_EQ(args.size(), 3u);
-  EXPECT_EQ(args[0], &a0);
-  EXPECT_EQ(args[1], &def1);  // default substituted, declaration order kept
-  EXPECT_EQ(args[2], &a2);
+  EXPECT_EQ(VpiObjectOf(args[0]), &a0);
+  EXPECT_EQ(VpiObjectOf(args[1]),
+            &def1);  // default substituted, declaration order kept
+  EXPECT_EQ(VpiObjectOf(args[2]), &a2);
 }
 
 // §37.57 detail 1 (the "should the instantiation not provide a value" clause
@@ -61,8 +65,8 @@ TEST(LetExprModel, OmittedArgumentWithoutDefaultIsNull) {
 
   auto args = VpiLetExprArguments(formals, provided);
   ASSERT_EQ(args.size(), 2u);
-  EXPECT_EQ(args[0], nullptr);  // no actual and no default
-  EXPECT_EQ(args[1], &a2);      // position preserved
+  EXPECT_EQ(args[0], nullptr);           // no actual and no default
+  EXPECT_EQ(VpiObjectOf(args[1]), &a2);  // position preserved
 }
 
 // §37.57 detail 1: the result always has one argument per formal even when the
@@ -80,8 +84,9 @@ TEST(LetExprModel, FewerProvidedThanFormalsUsesDefaults) {
 
   auto args = VpiLetExprArguments(formals, provided);
   ASSERT_EQ(args.size(), 2u);
-  EXPECT_EQ(args[0], &a0);
-  EXPECT_EQ(args[1], &def1);  // trailing formal filled from its default
+  EXPECT_EQ(VpiObjectOf(args[0]), &a0);
+  EXPECT_EQ(VpiObjectOf(args[1]),
+            &def1);  // trailing formal filled from its default
 }
 
 // §37.57 detail 1 (edge): a let with no formals has no arguments, whatever the
@@ -142,10 +147,11 @@ TEST_F(LetExprIteration, TheArgumentIterationReachesTheActualsInFormalOrder) {
   let_expr.type = vpiLetExpr;
   let_expr.children = {&decl, &a0, &a1};
 
-  std::vector<vpiHandle> args = ScanAll(vpi_iterate(vpiArgument, &let_expr));
+  std::vector<vpiHandle> args =
+      ScanAll(vpi_iterate(vpiArgument, VpiHandleOf(&let_expr)));
   ASSERT_EQ(args.size(), 2u);
-  EXPECT_EQ(args[0], &a0);
-  EXPECT_EQ(args[1], &a1);
+  EXPECT_EQ(VpiObjectOf(args[0]), &a0);
+  EXPECT_EQ(VpiObjectOf(args[1]), &a1);
 }
 
 // §37.57 detail 1: "If a formal has a default value, that value shall appear as
@@ -175,10 +181,11 @@ TEST_F(LetExprIteration, AnOmittedArgumentComesBackAsItsFormalsDefault) {
   let_expr.type = vpiLetExpr;
   let_expr.children = {&decl, &omitted, &a1};
 
-  std::vector<vpiHandle> args = ScanAll(vpi_iterate(vpiArgument, &let_expr));
+  std::vector<vpiHandle> args =
+      ScanAll(vpi_iterate(vpiArgument, VpiHandleOf(&let_expr)));
   ASSERT_EQ(args.size(), 2u);
-  EXPECT_EQ(args[0], &default0);
-  EXPECT_EQ(args[1], &a1);
+  EXPECT_EQ(VpiObjectOf(args[0]), &default0);
+  EXPECT_EQ(VpiObjectOf(args[1]), &a1);
 }
 
 // §37.57 detail 1: the correspondence is with the formals, so an instantiation
@@ -204,10 +211,11 @@ TEST_F(LetExprIteration, ATrailingFormalIsFilledFromItsDefault) {
   let_expr.type = vpiLetExpr;
   let_expr.children = {&decl, &a0};
 
-  std::vector<vpiHandle> args = ScanAll(vpi_iterate(vpiArgument, &let_expr));
+  std::vector<vpiHandle> args =
+      ScanAll(vpi_iterate(vpiArgument, VpiHandleOf(&let_expr)));
   ASSERT_EQ(args.size(), 2u);
-  EXPECT_EQ(args[0], &a0);
-  EXPECT_EQ(args[1], &default1);
+  EXPECT_EQ(VpiObjectOf(args[0]), &a0);
+  EXPECT_EQ(VpiObjectOf(args[1]), &default1);
 }
 
 // §37.57 (figure): the let declaration a let expression instantiates is reached
@@ -222,9 +230,9 @@ TEST_F(LetExprIteration, TheLetExpressionReachesTheDeclarationItInstantiates) {
   let_expr.type = vpiLetExpr;
   let_expr.children = {&decl};
 
-  EXPECT_EQ(vpi_handle(vpiLetDecl, &let_expr), &decl);
-  EXPECT_STREQ(vpi_get_str(vpiName, &decl), "in_range");
-  EXPECT_EQ(vpi_iterate(vpiArgument, &let_expr), nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiLetDecl, VpiHandleOf(&let_expr))), &decl);
+  EXPECT_STREQ(vpi_get_str(vpiName, VpiHandleOf(&decl)), "in_range");
+  EXPECT_EQ(vpi_iterate(vpiArgument, VpiHandleOf(&let_expr)), nullptr);
 }
 
 }  // namespace

@@ -4,7 +4,10 @@
 
 #include "simulator/assertion_api.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -25,7 +28,7 @@ PLI_INT32 AssertionRoutine(PLI_INT32, s_vpi_time*, vpiHandle,
   return 0;
 }
 
-int SimulationCallback(VpiCbData*) { return 0; }
+int SimulationCallback(s_cb_data*) { return 0; }
 
 class AssertionApiGeneral : public ::testing::Test {
  protected:
@@ -48,10 +51,10 @@ class AssertionApiGeneral : public ::testing::Test {
 // callback on an assertion through it and is answered with a handle to the
 // callback (§39.4.2).
 TEST_F(AssertionApiGeneral, TheAssertionApiIsReachedThroughItsOwnRoutine) {
-  vpiHandle assertion = vpi_ctx_.CreateAssertion("handshake_p", vpiAssert);
+  VpiHandle assertion = vpi_ctx_.CreateAssertion("handshake_p", vpiAssert);
 
-  vpiHandle cb = vpi_register_assertion_cb(assertion, cbAssertionStart,
-                                           &AssertionRoutine, nullptr);
+  vpiHandle cb = vpi_register_assertion_cb(
+      VpiHandleOf(assertion), cbAssertionStart, &AssertionRoutine, nullptr);
 
   ASSERT_NE(cb, nullptr);
   EXPECT_EQ(api_.PlacedCallbackCount(), 1u);
@@ -63,16 +66,17 @@ TEST_F(AssertionApiGeneral, TheAssertionApiIsReachedThroughItsOwnRoutine) {
 // every assertion in the design, and the name the assertion was written under
 // resolves to the same object.
 TEST_F(AssertionApiGeneral, AssertionHandlesAreObtainable) {
-  vpiHandle assertion = vpi_ctx_.CreateAssertion("handshake_p", vpiAssert);
+  VpiHandle assertion = vpi_ctx_.CreateAssertion("handshake_p", vpiAssert);
 
   vpiHandle it = vpi_iterate(vpiAssertion, nullptr);
   ASSERT_NE(it, nullptr);
   std::vector<vpiHandle> walked;
   while (vpiHandle h = vpi_scan(it)) walked.push_back(h);
   ASSERT_EQ(walked.size(), 1u);
-  EXPECT_EQ(walked[0], assertion);
+  EXPECT_EQ(VpiObjectOf(walked[0]), assertion);
 
-  EXPECT_EQ(vpi_handle_by_name("handshake_p", nullptr), assertion);
+  EXPECT_EQ(VpiObjectOf(vpi_handle_by_name(VpiText("handshake_p"), nullptr)),
+            assertion);
 }
 
 // §39.1, third item - assertions system callbacks. These are the §39.4.1

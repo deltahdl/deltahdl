@@ -4,7 +4,12 @@
 
 #include "fixture_simulator.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_constants.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
+#include "simulator/vpi_model_helpers1.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -65,7 +70,8 @@ TEST_F(DynamicPrefixing, PrefixReachesEachPrefixTargetKind) {
     part_select.type = vpiPartSelect;
     part_select.prefix = &prefix;
 
-    EXPECT_EQ(vpi_handle(vpiPrefix, &part_select), &prefix)
+    EXPECT_EQ(VpiObjectOf(vpi_handle(vpiPrefix, VpiHandleOf(&part_select))),
+              &prefix)
         << "prefix kind " << prefix_kind;
   }
 }
@@ -81,7 +87,7 @@ TEST_F(DynamicPrefixing, PrefixIsNullWhenObjectIsNotPrefixed) {
   simple_expr.type = vpiRefObj;  // a simple expression, not prefixed
   simple_expr.children = {&child};
 
-  EXPECT_EQ(vpi_handle(vpiPrefix, &simple_expr), nullptr);
+  EXPECT_EQ(vpi_handle(vpiPrefix, VpiHandleOf(&simple_expr)), nullptr);
 }
 
 // D2: an object reached through a class var or virtual interface var prefix
@@ -99,14 +105,16 @@ TEST_F(DynamicPrefixing, AllocSchemeFollowsClassVarAndVifPrefix) {
     part_select.alloc_scheme = kVpiOtherScheme;  // its own scheme, overridden
     part_select.prefix = &prefix;
 
-    EXPECT_EQ(vpi_get(vpiAllocScheme, &part_select), kVpiAutomaticScheme)
+    EXPECT_EQ(vpi_get(vpiAllocScheme, VpiHandleOf(&part_select)),
+              kVpiAutomaticScheme)
         << "prefix kind " << prefix_kind;
   }
 
   VpiObject unprefixed;
   unprefixed.type = vpiPartSelect;
   unprefixed.alloc_scheme = kVpiDynamicScheme;
-  EXPECT_EQ(vpi_get(vpiAllocScheme, &unprefixed), kVpiDynamicScheme);
+  EXPECT_EQ(vpi_get(vpiAllocScheme, VpiHandleOf(&unprefixed)),
+            kVpiDynamicScheme);
 }
 
 // D2 edge: the shared-scheme rule names only a class var or virtual interface
@@ -122,7 +130,8 @@ TEST_F(DynamicPrefixing, AllocSchemeIgnoresClockingBlockPrefix) {
   part_select.alloc_scheme = kVpiOtherScheme;
   part_select.prefix = &prefix;
 
-  EXPECT_EQ(vpi_get(vpiAllocScheme, &part_select), kVpiOtherScheme);
+  EXPECT_EQ(vpi_get(vpiAllocScheme, VpiHandleOf(&part_select)),
+            kVpiOtherScheme);
 }
 
 // D3 applied through the public dispatch: vpi_get(vpiHasActual) on a source
@@ -142,11 +151,11 @@ TEST_F(DynamicPrefixing, HasActualThroughVpiGet) {
   VpiObject sim_bound;
   sim_bound.type = vpiNamedEvent;
   sim_bound.actual = &actual;
-  EXPECT_EQ(vpi_get(vpiHasActual, &sim_bound), 1);
+  EXPECT_EQ(vpi_get(vpiHasActual, VpiHandleOf(&sim_bound)), 1);
 
   VpiObject sim_unbound;
   sim_unbound.type = vpiNamedEvent;
-  EXPECT_EQ(vpi_get(vpiHasActual, &sim_unbound), 0);
+  EXPECT_EQ(vpi_get(vpiHasActual, VpiHandleOf(&sim_unbound)), 0);
 
   // Provenances that always have an actual report TRUE even with no live
   // binding: a statically declared object in an elaborated context, and an
@@ -155,7 +164,8 @@ TEST_F(DynamicPrefixing, HasActualThroughVpiGet) {
     VpiObject obj;
     obj.type = vpiRefObj;
     obj.actual_origin = origin;  // no `actual` bound, yet reports TRUE
-    EXPECT_EQ(vpi_get(vpiHasActual, &obj), 1) << "origin " << origin;
+    EXPECT_EQ(vpi_get(vpiHasActual, VpiHandleOf(&obj)), 1)
+        << "origin " << origin;
   }
 
   // Provenances that never have an actual report FALSE even when an actual is
@@ -168,7 +178,8 @@ TEST_F(DynamicPrefixing, HasActualThroughVpiGet) {
     obj.type = vpiRefObj;
     obj.actual = &actual;  // bound, yet the provenance pins FALSE
     obj.actual_origin = origin;
-    EXPECT_EQ(vpi_get(vpiHasActual, &obj), 0) << "origin " << origin;
+    EXPECT_EQ(vpi_get(vpiHasActual, VpiHandleOf(&obj)), 0)
+        << "origin " << origin;
   }
 }
 
@@ -178,7 +189,7 @@ TEST_F(DynamicPrefixing, HasActualThroughVpiGet) {
 TEST_F(DynamicPrefixing, HasActualIsUndefinedForNonSourceKind) {
   VpiObject module;
   module.type = vpiModule;
-  EXPECT_EQ(vpi_get(vpiHasActual, &module), vpiUndefined);
+  EXPECT_EQ(vpi_get(vpiHasActual, VpiHandleOf(&module)), vpiUndefined);
 }
 
 // The clause against a described design. Everything above drives the rules over
@@ -200,7 +211,7 @@ int g_arg_has_actual = -1;
 int g_prefix_type = 0;
 bool g_second_arg_has_prefix = true;
 
-int ReadPrefixCalltf(const char*) {
+PLI_INT32 ReadPrefixCalltf(PLI_BYTE8*) {
   // §37.42: the call the application is running for, and the arguments the call
   // site wrote.
   vpiHandle call = vpi_handle(vpiSysTfCall, nullptr);
@@ -248,7 +259,7 @@ class DynamicPrefixingOfADesign : public ::testing::Test {
   void Probe(const char* src) {
     s_vpi_systf_data data = {};
     data.type = vpiSysTask;
-    data.tfname = "$probe";
+    data.tfname = VpiText("$probe");
     data.calltf = &ReadPrefixCalltf;
     ASSERT_NE(vpi_register_systf(&data), nullptr);
 

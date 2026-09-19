@@ -6,6 +6,8 @@
 #include <cstdint>
 
 #include "simulator/dpi.h"
+#include "simulator/vpi_constants.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_user.h"
 
@@ -19,7 +21,7 @@ namespace delta {
 // unit, keeping the VPI headers out of svdpi.cpp.
 void DpiGetSimTime(bool want_scaled_real, uint32_t* high, uint32_t* low,
                    double* real) {
-  VpiTime t = {};
+  s_vpi_time t = {};
   // GetTime selects the result form from t.type: a scaled real, or the raw
   // 64-bit simulation-time count. A null object means "the whole design", which
   // GetTime reads in the simulation time unit.
@@ -44,7 +46,7 @@ double DpiGetSimTimeScaledTo(int32_t time_unit) {
   // unit, and the exponent difference to the requested unit is the power of
   // ten between the two -- the rule VpiContext::GetTime applies to an object
   // read in its own timescale.
-  VpiTime t = {};
+  s_vpi_time t = {};
   t.type = kVpiSimTime;
   GetGlobalVpiContext().GetTime(nullptr, &t);
   const uint64_t kTicks = (static_cast<uint64_t>(t.high) << 32) | t.low;

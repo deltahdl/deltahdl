@@ -3,7 +3,9 @@
 #include <cstdint>
 
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -29,12 +31,12 @@ TEST_F(VpiGet64Sim, ReturnsSixtyFourBitPropertyAtFullWidth) {
   class_obj.type = vpiClassObj;
   class_obj.obj_id = static_cast<int64_t>(0x1'0000'0002);  // > INT32_MAX
 
-  EXPECT_EQ(vpi_get64(vpiObjId, &class_obj),
+  EXPECT_EQ(vpi_get64(vpiObjId, VpiHandleOf(&class_obj)),
             static_cast<PLI_INT64>(0x1'0000'0002));
   // The 32-bit reader cannot carry the full value, so the 64-bit path is what
   // preserves it.
-  EXPECT_NE(static_cast<PLI_INT64>(vpi_get(vpiObjId, &class_obj)),
-            vpi_get64(vpiObjId, &class_obj));
+  EXPECT_NE(static_cast<PLI_INT64>(vpi_get(vpiObjId, VpiHandleOf(&class_obj))),
+            vpi_get64(vpiObjId, VpiHandleOf(&class_obj)));
 }
 
 // §38.7: querying a protected object is an error, and on an error vpi_get64()
@@ -45,10 +47,10 @@ TEST_F(VpiGet64Sim, ProtectedObjectQueryReturnsVpiUndefined) {
   locked.obj_id = 5;
   locked.is_protected = true;
 
-  EXPECT_EQ(vpi_get64(vpiObjId, &locked), vpiUndefined);
+  EXPECT_EQ(vpi_get64(vpiObjId, VpiHandleOf(&locked)), vpiUndefined);
 
   // The refused query is recorded as an error.
-  SVpiErrorInfo info = {};
+  s_vpi_error_info info = {};
   EXPECT_NE(vpi_chk_error(&info), 0);
   EXPECT_NE(info.level, 0);
 }
@@ -64,8 +66,8 @@ TEST_F(VpiGet64Sim, TheProtectedRuleKeepsTheExceptionsSpecifiedElsewhere) {
   locked.type = vpiClassObj;
   locked.is_protected = true;
 
-  EXPECT_EQ(vpi_get64(vpiType, &locked), vpiClassObj);
-  EXPECT_EQ(vpi_get64(vpiIsProtected, &locked), 1);
+  EXPECT_EQ(vpi_get64(vpiType, VpiHandleOf(&locked)), vpiClassObj);
+  EXPECT_EQ(vpi_get64(vpiIsProtected, VpiHandleOf(&locked)), 1);
 
   // §37.59 detail 8: a protected expression still reports its size.
   VpiObject locked_expr;
@@ -73,7 +75,7 @@ TEST_F(VpiGet64Sim, TheProtectedRuleKeepsTheExceptionsSpecifiedElsewhere) {
   locked_expr.is_protected = true;
   locked_expr.size = 16;
 
-  EXPECT_EQ(vpi_get64(vpiSize, &locked_expr), 16);
+  EXPECT_EQ(vpi_get64(vpiSize, VpiHandleOf(&locked_expr)), 16);
 }
 
 // §38.6: "For object property vpiTimeUnit or vpiTimePrecision, if the object is

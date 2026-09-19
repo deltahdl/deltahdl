@@ -4,7 +4,9 @@
 
 #include "fixture_simulator.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -51,8 +53,8 @@ TEST_F(ActiveTimeFormat, ReachesTheTimeformatCallThatSetTheFormat) {
 
   vpiHandle reached = vpi_handle(vpiActiveTimeFormat, nullptr);
   ASSERT_NE(reached, nullptr);
-  EXPECT_EQ(reached->type, vpiSysTaskCall);
-  EXPECT_EQ(reached->name, "$timeformat");
+  EXPECT_EQ(VpiObjectOf(reached)->type, vpiSysTaskCall);
+  EXPECT_EQ(VpiObjectOf(reached)->name, "$timeformat");
 }
 
 // §20.4.3 has a later $timeformat replace the configuration, so the call the
@@ -81,7 +83,8 @@ TEST_F(ActiveTimeFormat, DoesNotReachTheTimeformatCallFromANonNullReference) {
   VpiObject some_object;
   some_object.type = vpiSysTaskCall;
 
-  EXPECT_NE(vpi_handle(vpiActiveTimeFormat, &some_object), recorded);
+  EXPECT_NE(vpi_handle(vpiActiveTimeFormat, VpiHandleOf(&some_object)),
+            recorded);
 }
 
 // End to end: a design that calls $timeformat leaves the run with the call the
@@ -105,8 +108,8 @@ TEST(ActiveTimeFormatSim, ADesignsTimeformatCallIsWhatTheEdgeReaches) {
 
   vpiHandle reached = vpi_handle(vpiActiveTimeFormat, nullptr);
   ASSERT_NE(reached, nullptr);
-  EXPECT_EQ(reached->type, vpiSysTaskCall);
-  EXPECT_EQ(reached->name, "$timeformat");
+  EXPECT_EQ(VpiObjectOf(reached)->type, vpiSysTaskCall);
+  EXPECT_EQ(VpiObjectOf(reached)->name, "$timeformat");
 
   SetGlobalVpiContext(nullptr);
 }

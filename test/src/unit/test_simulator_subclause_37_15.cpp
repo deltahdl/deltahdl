@@ -1,7 +1,10 @@
 #include <gtest/gtest.h>
 
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_model_helpers3.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -31,11 +34,12 @@ TEST_F(RefObjContext, ActualReturnsBoundObject) {
   VpiObject ref_obj;
   ref_obj.type = vpiRefObj;
   ref_obj.actual = &variable;
-  EXPECT_EQ(vpi_handle(vpiActual, &ref_obj), &variable);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiActual, VpiHandleOf(&ref_obj))),
+            &variable);
 
   VpiObject unbound;
   unbound.type = vpiRefObj;
-  EXPECT_EQ(vpi_handle(vpiActual, &unbound), nullptr);
+  EXPECT_EQ(vpi_handle(vpiActual, VpiHandleOf(&unbound)), nullptr);
 }
 
 // D4: vpiParent traverses from a ref obj that is a subelement of a ref obj up
@@ -56,9 +60,9 @@ TEST_F(RefObjContext, ParentTraversesSubelementRefObj) {
   r0.parent = &r;
   r0.actual = &var_bit_a0;
 
-  EXPECT_EQ(vpi_handle(vpiParent, &r0), &r);
-  EXPECT_EQ(vpi_handle(vpiActual, &r0), &var_bit_a0);
-  EXPECT_EQ(vpi_handle(vpiActual, &r), &var_a);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiParent, VpiHandleOf(&r0))), &r);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiActual, VpiHandleOf(&r0))), &var_bit_a0);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiActual, VpiHandleOf(&r))), &var_a);
 }
 
 // D5: vpiGeneric is TRUE for a reference to a generic interface, FALSE for a
@@ -81,7 +85,7 @@ TEST_F(RefObjContext, GenericPropertyByReferenceKind) {
   generic_ref.type = vpiRefObj;
   generic_ref.actual = &generic_iface;
   generic_ref.generic_interface = true;
-  EXPECT_EQ(vpi_get(vpiGeneric, &generic_ref), 1);
+  EXPECT_EQ(vpi_get(vpiGeneric, VpiHandleOf(&generic_ref)), 1);
 
   // A ref obj to a non-generic interface.
   VpiObject plain_iface;
@@ -89,7 +93,7 @@ TEST_F(RefObjContext, GenericPropertyByReferenceKind) {
   VpiObject plain_ref;
   plain_ref.type = vpiRefObj;
   plain_ref.actual = &plain_iface;
-  EXPECT_EQ(vpi_get(vpiGeneric, &plain_ref), 0);
+  EXPECT_EQ(vpi_get(vpiGeneric, VpiHandleOf(&plain_ref)), 0);
 
   // A ref obj to something that is not an interface -> vpiUndefined.
   VpiObject net;
@@ -97,7 +101,7 @@ TEST_F(RefObjContext, GenericPropertyByReferenceKind) {
   VpiObject net_ref;
   net_ref.type = vpiRefObj;
   net_ref.actual = &net;
-  EXPECT_EQ(vpi_get(vpiGeneric, &net_ref), vpiUndefined);
+  EXPECT_EQ(vpi_get(vpiGeneric, VpiHandleOf(&net_ref)), vpiUndefined);
 }
 
 // D5 (input form): an interface array is one of the vpiActual kinds the ref obj
@@ -110,14 +114,14 @@ TEST_F(RefObjContext, GenericPropertyForInterfaceArrayActual) {
   generic_ref.type = vpiRefObj;
   generic_ref.actual = &generic_iface_array;
   generic_ref.generic_interface = true;
-  EXPECT_EQ(vpi_get(vpiGeneric, &generic_ref), 1);
+  EXPECT_EQ(vpi_get(vpiGeneric, VpiHandleOf(&generic_ref)), 1);
 
   VpiObject plain_iface_array;
   plain_iface_array.type = vpiInterfaceArray;
   VpiObject plain_ref;
   plain_ref.type = vpiRefObj;
   plain_ref.actual = &plain_iface_array;
-  EXPECT_EQ(vpi_get(vpiGeneric, &plain_ref), 0);
+  EXPECT_EQ(vpi_get(vpiGeneric, VpiHandleOf(&plain_ref)), 0);
 }
 
 // D6: vpiDefName for a ref obj whose actual is an interface or modport returns
@@ -130,7 +134,7 @@ TEST_F(RefObjContext, DefNameForInterfaceAndModportActual) {
   iface_ref.type = vpiRefObj;
   iface_ref.actual = &iface;
   EXPECT_STREQ(VpiRefObjDefName(&iface_ref), "simple");
-  EXPECT_STREQ(vpi_get_str(vpiDefName, &iface_ref), "simple");
+  EXPECT_STREQ(vpi_get_str(vpiDefName, VpiHandleOf(&iface_ref)), "simple");
 
   VpiObject modport;
   modport.type = vpiModport;
@@ -138,7 +142,7 @@ TEST_F(RefObjContext, DefNameForInterfaceAndModportActual) {
   VpiObject modport_ref;
   modport_ref.type = vpiRefObj;
   modport_ref.actual = &modport;
-  EXPECT_STREQ(vpi_get_str(vpiDefName, &modport_ref), "initiator");
+  EXPECT_STREQ(vpi_get_str(vpiDefName, VpiHandleOf(&modport_ref)), "initiator");
 
   // A ref obj whose actual is a net is neither an interface nor a modport.
   VpiObject net;
@@ -146,7 +150,7 @@ TEST_F(RefObjContext, DefNameForInterfaceAndModportActual) {
   VpiObject net_ref;
   net_ref.type = vpiRefObj;
   net_ref.actual = &net;
-  EXPECT_EQ(vpi_get_str(vpiDefName, &net_ref), nullptr);
+  EXPECT_EQ(vpi_get_str(vpiDefName, VpiHandleOf(&net_ref)), nullptr);
 }
 
 // D6 (input form): an interface array actual - the third interface-bearing
@@ -159,7 +163,7 @@ TEST_F(RefObjContext, DefNameForInterfaceArrayActual) {
   VpiObject array_ref;
   array_ref.type = vpiRefObj;
   array_ref.actual = &iface_array;
-  EXPECT_STREQ(vpi_get_str(vpiDefName, &array_ref), "simple");
+  EXPECT_STREQ(vpi_get_str(vpiDefName, VpiHandleOf(&array_ref)), "simple");
 }
 
 // D7: vpiTypespec returns NULL for a ref obj whose actual is not a net,
@@ -175,7 +179,8 @@ TEST_F(RefObjContext, TypespecGatedOnActualKind) {
   net_ref.actual = &net;
   net_ref.children.push_back(&typespec);
   EXPECT_EQ(VpiRefObjTypespec(&net_ref), &typespec);
-  EXPECT_EQ(vpi_handle(vpiTypespec, &net_ref), &typespec);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiTypespec, VpiHandleOf(&net_ref))),
+            &typespec);
 
   // A part-select actual also exposes the typespec.
   VpiObject part_select;
@@ -184,7 +189,8 @@ TEST_F(RefObjContext, TypespecGatedOnActualKind) {
   ps_ref.type = vpiRefObj;
   ps_ref.actual = &part_select;
   ps_ref.children.push_back(&typespec);
-  EXPECT_EQ(vpi_handle(vpiTypespec, &ps_ref), &typespec);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiTypespec, VpiHandleOf(&ps_ref))),
+            &typespec);
 
   // An interface actual is none of net/variable/part select -> NULL, even
   // though a typespec child is present.
@@ -195,7 +201,7 @@ TEST_F(RefObjContext, TypespecGatedOnActualKind) {
   iface_ref.actual = &iface;
   iface_ref.children.push_back(&typespec);
   EXPECT_EQ(VpiRefObjTypespec(&iface_ref), nullptr);
-  EXPECT_EQ(vpi_handle(vpiTypespec, &iface_ref), nullptr);
+  EXPECT_EQ(vpi_handle(vpiTypespec, VpiHandleOf(&iface_ref)), nullptr);
 }
 
 // D7 (the variable arm, through the vpi_handle dispatch path): a ref obj whose
@@ -211,7 +217,8 @@ TEST_F(RefObjContext, TypespecExposedForVariableActual) {
   var_ref.type = vpiRefObj;
   var_ref.actual = &variable;
   var_ref.children.push_back(&typespec);
-  EXPECT_EQ(vpi_handle(vpiTypespec, &var_ref), &typespec);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiTypespec, VpiHandleOf(&var_ref))),
+            &typespec);
 }
 
 }  // namespace

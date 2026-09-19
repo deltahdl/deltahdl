@@ -4,7 +4,9 @@
 
 #include "fixture_simulator.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -32,7 +34,7 @@ namespace {
 std::vector<int> g_reasons;
 std::vector<vpiHandle> g_objects;
 
-int RecordTransientEvent(VpiCbData* data) {
+int RecordTransientEvent(s_cb_data* data) {
   g_reasons.push_back(data->reason);
   g_objects.push_back(data->obj);
   return 0;
@@ -69,7 +71,7 @@ TEST_F(TransientObjectCallbacks, FreeingAFrameDeliversEndOfFrame) {
 
   ASSERT_EQ(g_reasons.size(), 1u);
   EXPECT_EQ(g_reasons[0], cbEndOfFrame);
-  EXPECT_EQ(g_objects[0], &frame);
+  EXPECT_EQ(VpiObjectOf(g_objects[0]), &frame);
 }
 
 // The thread half of the same rule. The two reasons are told apart by the kind
@@ -84,7 +86,7 @@ TEST_F(TransientObjectCallbacks, FreeingAThreadDeliversEndOfThreadOnly) {
 
   ASSERT_EQ(g_reasons.size(), 1u);
   EXPECT_EQ(g_reasons[0], cbEndOfThread);
-  EXPECT_EQ(g_objects[0], &thread);
+  EXPECT_EQ(VpiObjectOf(g_objects[0]), &thread);
 }
 
 // Reclaiming a class object is the end of that object's life, and the list
@@ -101,8 +103,8 @@ TEST_F(TransientObjectCallbacks, ReclaimingAClassObjectDeliversBothReasons) {
   ASSERT_EQ(g_reasons.size(), 2u);
   EXPECT_EQ(g_reasons[0], cbReclaimObj);
   EXPECT_EQ(g_reasons[1], cbEndOfObject);
-  EXPECT_EQ(g_objects[0], &class_object);
-  EXPECT_EQ(g_objects[1], &class_object);
+  EXPECT_EQ(VpiObjectOf(g_objects[0]), &class_object);
+  EXPECT_EQ(VpiObjectOf(g_objects[1]), &class_object);
 }
 
 // An application that registered for none of these life events is not called by

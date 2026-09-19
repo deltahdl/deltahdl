@@ -5,8 +5,10 @@
 
 #include "simulator/assertion_api.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_coverage.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -67,10 +69,11 @@ class AssertionCapabilities : public ::testing::Test {
 // raised, and reacting to it is the routine running with the event in hand -
 // which assertion, which reason, and at what time.
 TEST_F(AssertionCapabilities, UserCCodeReactsToAnAssertionEvent) {
-  vpiHandle assertion = vpi_ctx_.CreateAssertion("handshake_p", vpiAssert);
-  ASSERT_NE(vpi_register_assertion_cb(assertion, cbAssertionFailure,
-                                      &DumpAssertionEvent, nullptr),
-            nullptr);
+  VpiHandle assertion = vpi_ctx_.CreateAssertion("handshake_p", vpiAssert);
+  ASSERT_NE(
+      vpi_register_assertion_cb(VpiHandleOf(assertion), cbAssertionFailure,
+                                &DumpAssertionEvent, nullptr),
+      nullptr);
 
   AssertionAttemptInfo attempt;
   attempt.attempt_start_time = 10;
@@ -81,7 +84,7 @@ TEST_F(AssertionCapabilities, UserCCodeReactsToAnAssertionEvent) {
 
   ASSERT_EQ(g_dump.size(), 1u);
   EXPECT_EQ(g_dump[0].reason, cbAssertionFailure);
-  EXPECT_EQ(g_dump[0].assertion, assertion);
+  EXPECT_EQ(VpiObjectOf(g_dump[0].assertion), assertion);
   EXPECT_EQ(g_dump[0].time_low, 14u);
 }
 
@@ -91,13 +94,14 @@ TEST_F(AssertionCapabilities, UserCCodeReactsToAnAssertionEvent) {
 // time what identifies it, and the callback carries it with every event. Two
 // attempts start here before either finishes, and the trace keeps them apart.
 TEST_F(AssertionCapabilities, WaveformDumpingSeparatesOverlappingAttempts) {
-  vpiHandle assertion = vpi_ctx_.CreateAssertion("handshake_p", vpiAssert);
-  ASSERT_NE(vpi_register_assertion_cb(assertion, cbAssertionStart,
+  VpiHandle assertion = vpi_ctx_.CreateAssertion("handshake_p", vpiAssert);
+  ASSERT_NE(vpi_register_assertion_cb(VpiHandleOf(assertion), cbAssertionStart,
                                       &DumpAssertionEvent, nullptr),
             nullptr);
-  ASSERT_NE(vpi_register_assertion_cb(assertion, cbAssertionSuccess,
-                                      &DumpAssertionEvent, nullptr),
-            nullptr);
+  ASSERT_NE(
+      vpi_register_assertion_cb(VpiHandleOf(assertion), cbAssertionSuccess,
+                                &DumpAssertionEvent, nullptr),
+      nullptr);
 
   AssertionAttemptInfo first;
   first.attempt_start_time = 10;

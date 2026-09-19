@@ -7,7 +7,10 @@
 #include "common/source_mgr.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -71,8 +74,8 @@ class VpiStmtCallbackByType : public ::testing::Test {
   vpiHandle MakeHandleOfType(const char* name, int type) {
     sim_ctx_.CreateVariable(name, 1);
     vpi_ctx_.Attach(sim_ctx_);
-    vpiHandle h = vpi_handle_by_name(name, nullptr);
-    if (h) h->type = type;
+    vpiHandle h = vpi_handle_by_name(VpiText(name), nullptr);
+    if (h) VpiObjectOf(h)->type = type;
     return h;
   }
 
@@ -118,7 +121,7 @@ TEST_F(VpiStmtCallbackByType, ObjectOutsideTheStatementClassDoesNotQualify) {
   cb.obj = reg;
   EXPECT_EQ(vpi_register_cb(&cb), nullptr);
 
-  SVpiErrorInfo info = {};
+  s_vpi_error_info info = {};
   EXPECT_EQ(vpi_chk_error(&info), vpiError);
 }
 

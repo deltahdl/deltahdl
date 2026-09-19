@@ -1,7 +1,10 @@
 #include <gtest/gtest.h>
 
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_model_helpers1.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -78,12 +81,13 @@ TEST_F(DelayControl, RuleAppliesThroughPublicVpiHandleDispatch) {
   on_assignment.type = vpiDelayControl;
   on_assignment.parent = &assignment;
   on_assignment.children = {&guarded};
-  EXPECT_EQ(vpi_handle(vpiStmt, &on_assignment), nullptr);
+  EXPECT_EQ(vpi_handle(vpiStmt, VpiHandleOf(&on_assignment)), nullptr);
 
   VpiObject standalone;
   standalone.type = vpiDelayControl;
   standalone.children = {&guarded};
-  EXPECT_EQ(vpi_handle(vpiStmt, &standalone), &guarded);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiStmt, VpiHandleOf(&standalone))),
+            &guarded);
 }
 
 // vpiDelay: a delay control reaches its "#" delay expression through vpiDelay.
@@ -103,7 +107,8 @@ TEST_F(DelayControl, DelayControlReachesItsDelayExpressionThroughVpiDelay) {
   // the scan selects on expression kind, not on position.
   delay_control.children = {&guarded, &delay_expr};
 
-  EXPECT_EQ(vpi_handle(vpiDelay, &delay_control), &delay_expr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiDelay, VpiHandleOf(&delay_control))),
+            &delay_expr);
   EXPECT_EQ(VpiDelayControlDelayExpr(&delay_control), &delay_expr);
 }
 
@@ -123,9 +128,10 @@ TEST_F(DelayControl, IntraAssignmentDelayStillReachesItsDelayExpression) {
   on_assignment.children = {&delay_expr};
 
   // Detail 1: no guarded statement for the assignment-associated delay control.
-  EXPECT_EQ(vpi_handle(vpiStmt, &on_assignment), nullptr);
+  EXPECT_EQ(vpi_handle(vpiStmt, VpiHandleOf(&on_assignment)), nullptr);
   // ... but the vpiDelay edge is unaffected by that carve-out.
-  EXPECT_EQ(vpi_handle(vpiDelay, &on_assignment), &delay_expr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiDelay, VpiHandleOf(&on_assignment))),
+            &delay_expr);
 }
 
 // vpiDelay edge cases: a null handle and a delay control with no expression
@@ -154,7 +160,8 @@ TEST_F(DelayControl, ComputedDelayExpressionReachedThroughVpiDelay) {
   delay_control.type = vpiDelayControl;
   delay_control.children = {&delay_expr};
 
-  EXPECT_EQ(vpi_handle(vpiDelay, &delay_control), &delay_expr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiDelay, VpiHandleOf(&delay_control))),
+            &delay_expr);
   EXPECT_EQ(VpiDelayControlDelayExpr(&delay_control), &delay_expr);
 }
 
@@ -172,7 +179,7 @@ TEST_F(DelayControl, StatementScanSkipsDelayExpressionChild) {
   delay_control.type = vpiDelayControl;
   delay_control.children = {&delay_expr};
 
-  EXPECT_EQ(vpi_handle(vpiStmt, &delay_control), nullptr);
+  EXPECT_EQ(vpi_handle(vpiStmt, VpiHandleOf(&delay_control)), nullptr);
   EXPECT_EQ(VpiDelayControlStmt(&delay_control), nullptr);
 }
 

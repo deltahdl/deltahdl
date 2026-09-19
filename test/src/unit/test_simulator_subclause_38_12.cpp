@@ -1,14 +1,17 @@
 #include <gtest/gtest.h>
 
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
 namespace {
 
-int InfoStubCall(const char*) { return 0; }
-int InfoStubCompile(const char*) { return 0; }
-int InfoStubSize(const char*) { return 0; }
+PLI_INT32 InfoStubCall(PLI_BYTE8*) { return 0; }
+PLI_INT32 InfoStubCompile(PLI_BYTE8*) { return 0; }
+PLI_INT32 InfoStubSize(PLI_BYTE8*) { return 0; }
 
 class VpiGetSystfInfoSim : public ::testing::Test {
  protected:
@@ -26,11 +29,11 @@ TEST_F(VpiGetSystfInfoSim, FillsStructFromSystfCallbackHandle) {
   s_vpi_systf_data registered = {};
   registered.type = vpiSysFunc;
   registered.sysfunctype = vpiSysFunc;
-  registered.tfname = "$probe";
+  registered.tfname = VpiText("$probe");
   registered.calltf = &InfoStubCall;
   registered.compiletf = &InfoStubCompile;
   registered.sizetf = &InfoStubSize;
-  registered.user_data = &payload;
+  registered.user_data = reinterpret_cast<PLI_BYTE8*>(&payload);
 
   vpiHandle h = vpi_register_systf(&registered);
   ASSERT_NE(h, nullptr);
@@ -52,11 +55,11 @@ TEST_F(VpiGetSystfInfoSim, FillsStructFromSystfCallbackHandle) {
 TEST_F(VpiGetSystfInfoSim, ReportsTheCallbackNamedByTheHandle) {
   s_vpi_systf_data first = {};
   first.type = vpiSysTask;
-  first.tfname = "$first";
+  first.tfname = VpiText("$first");
 
   s_vpi_systf_data second = {};
   second.type = vpiSysFunc;
-  second.tfname = "$second";
+  second.tfname = VpiText("$second");
 
   vpiHandle h1 = vpi_register_systf(&first);
   vpiHandle h2 = vpi_register_systf(&second);
@@ -78,7 +81,7 @@ TEST_F(VpiGetSystfInfoSim, ReportsTheCallbackNamedByTheHandle) {
 TEST_F(VpiGetSystfInfoSim, WritesIntoApplicationAllocatedMemory) {
   s_vpi_systf_data registered = {};
   registered.type = vpiSysTask;
-  registered.tfname = "$measure";
+  registered.tfname = VpiText("$measure");
 
   vpiHandle h = vpi_register_systf(&registered);
   ASSERT_NE(h, nullptr);
@@ -98,12 +101,12 @@ TEST_F(VpiGetSystfInfoSim, WritesIntoApplicationAllocatedMemory) {
 TEST_F(VpiGetSystfInfoSim, NullArgumentsAreSafe) {
   s_vpi_systf_data registered = {};
   registered.type = vpiSysTask;
-  registered.tfname = "$safe";
+  registered.tfname = VpiText("$safe");
   vpiHandle h = vpi_register_systf(&registered);
   ASSERT_NE(h, nullptr);
 
   s_vpi_systf_data out = {};
-  out.tfname = "untouched";
+  out.tfname = VpiText("untouched");
 
   vpi_get_systf_info(nullptr, &out);  // no handle
   vpi_get_systf_info(h, nullptr);     // no destination
@@ -124,7 +127,7 @@ TEST_F(VpiGetSystfInfoSim, NonSystfCallbackLeavesDestinationUnchanged) {
   ASSERT_NE(cb_handle, nullptr);
 
   s_vpi_systf_data out = {};
-  out.tfname = "untouched";
+  out.tfname = VpiText("untouched");
   vpi_get_systf_info(cb_handle, &out);
 
   EXPECT_STREQ(out.tfname, "untouched");
@@ -134,12 +137,12 @@ TEST_F(VpiGetSystfInfoSim, NonSystfCallbackLeavesDestinationUnchanged) {
 // handle to an object that is not a callback at all (here a module instance)
 // names no s_vpi_systf_data, so the destination is left untouched.
 TEST_F(VpiGetSystfInfoSim, NonCallbackHandleLeavesDestinationUnchanged) {
-  vpiHandle module = vpi_ctx_.CreateModule("top", "top");
+  VpiHandle module = vpi_ctx_.CreateModule("top", "top");
   ASSERT_NE(module, nullptr);
 
   s_vpi_systf_data out = {};
-  out.tfname = "untouched";
-  vpi_get_systf_info(module, &out);
+  out.tfname = VpiText("untouched");
+  vpi_get_systf_info(VpiHandleOf(module), &out);
 
   EXPECT_STREQ(out.tfname, "untouched");
 }
@@ -153,7 +156,7 @@ TEST_F(VpiGetSystfInfoSim, NonCallbackHandleLeavesDestinationUnchanged) {
 TEST_F(VpiGetSystfInfoSim, ASystemTaskCallIsNotTheCallbackTheRoutineReports) {
   s_vpi_systf_data registered = {};
   registered.type = vpiSysTask;
-  registered.tfname = "$measure";
+  registered.tfname = VpiText("$measure");
   ASSERT_NE(vpi_register_systf(&registered), nullptr);
 
   VpiObject call;
@@ -161,8 +164,8 @@ TEST_F(VpiGetSystfInfoSim, ASystemTaskCallIsNotTheCallbackTheRoutineReports) {
   call.name = "$measure";
 
   s_vpi_systf_data out = {};
-  out.tfname = "untouched";
-  vpi_get_systf_info(&call, &out);
+  out.tfname = VpiText("untouched");
+  vpi_get_systf_info(VpiHandleOf(&call), &out);
 
   EXPECT_STREQ(out.tfname, "untouched");
 }
@@ -175,9 +178,9 @@ TEST_F(VpiGetSystfInfoSim, TheRegistrationIsReportedAsOftenAsItIsAsked) {
   s_vpi_systf_data registered = {};
   registered.type = vpiSysFunc;
   registered.sysfunctype = vpiIntFunc;
-  registered.tfname = "$probe";
+  registered.tfname = VpiText("$probe");
   registered.calltf = &InfoStubCall;
-  registered.user_data = &payload;
+  registered.user_data = reinterpret_cast<PLI_BYTE8*>(&payload);
 
   vpiHandle h = vpi_register_systf(&registered);
   ASSERT_NE(h, nullptr);
@@ -186,7 +189,7 @@ TEST_F(VpiGetSystfInfoSim, TheRegistrationIsReportedAsOftenAsItIsAsked) {
   vpi_get_systf_info(h, &out);
   ASSERT_STREQ(out.tfname, "$probe");
 
-  out.tfname = "overwritten";
+  out.tfname = VpiText("overwritten");
   out.calltf = nullptr;
   out.user_data = nullptr;
   vpi_get_systf_info(h, &out);

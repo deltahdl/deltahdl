@@ -16,7 +16,7 @@
 #include "simulator/vpi_data_structs.h"
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_object.h"
-#include "simulator/vpi_pli_types.h"
+#include "simulator/vpi_user.h"
 
 namespace delta {
 
@@ -40,7 +40,7 @@ class VpiContext {
 
   void SetScheduler(Scheduler* sched) { scheduler_ = sched; }
 
-  VpiHandle RegisterSystf(VpiSystfData* data);
+  VpiHandle RegisterSystf(s_vpi_systf_data* data);
 
   // §38.37.1: "Callbacks to the application pointed to by the calltf routine
   // shall occur each time the system task or system function is invoked during
@@ -84,7 +84,7 @@ class VpiContext {
   // check nothing. `call_site` is the expression the source wrote, and its
   // arguments are hung on the call unevaluated, this period standing before the
   // first event.
-  void CallCompiletfForSourceCall(const VpiSystfData& data,
+  void CallCompiletfForSourceCall(const s_vpi_systf_data& data,
                                   const Expr* call_site, SimContext& ctx,
                                   Arena& arena);
 
@@ -96,7 +96,7 @@ class VpiContext {
   // null result) does the built-in stand. When several registrations share the
   // name the most recent one wins, so a later user application overrides an
   // earlier one.
-  const VpiSystfData* ResolveSystf(const char* name) const;
+  const s_vpi_systf_data* ResolveSystf(const char* name) const;
 
   // §38.12: report the registration of the system task or system function
   // callback denoted by `obj` into the application-allocated structure
@@ -104,13 +104,13 @@ class VpiContext {
   // only writes the stored s_vpi_systf_data fields into it. A null handle, a
   // null destination, or a handle that does not name a registered system
   // task/function callback leaves the destination untouched.
-  void GetSystfInfo(VpiHandle obj, VpiSystfData* systf_data_p);
+  void GetSystfInfo(VpiHandle obj, s_vpi_systf_data* systf_data_p);
 
   // §38.8: report the registration of the simulation-related callback denoted
   // by `obj` into the application-allocated structure `cb_data_p`, which
   // belongs to the caller. What leaves it untouched is written where this is
   // defined; a system task/function callback goes to GetSystfInfo instead.
-  void GetCbInfo(VpiHandle obj, VpiCbData* cb_data_p);
+  void GetCbInfo(VpiHandle obj, s_cb_data* cb_data_p);
 
   // §38.13: write the relevant simulation time into the application-allocated
   // structure `time_p`. The caller selects the form through `time_p->type`:
@@ -120,7 +120,7 @@ class VpiContext {
   // next future event, also in the simulation time unit. The structure's memory
   // belongs to the caller, so the routine only fills it and never allocates. A
   // null `time_p` leaves nothing to do.
-  void GetTime(VpiHandle obj, VpiTime* time_p);
+  void GetTime(VpiHandle obj, s_vpi_time* time_p);
 
   // §38.10: retrieve the delays or pulse limits of `obj` into the
   // application-allocated structure `delay_p`. delay_p->no_of_delays selects
@@ -131,7 +131,7 @@ class VpiContext {
   // structure and its da array belong to the caller, so the routine only fills
   // them. A null delay_p, a null obj, or a null da leaves nothing to do; an
   // illegal no_of_delays records an error and writes nothing.
-  void GetDelays(VpiHandle obj, VpiDelay* delay_p);
+  void GetDelays(VpiHandle obj, s_vpi_delay* delay_p);
 
   // §38.32: set the delays or timing limits of `obj` from the
   // application-allocated `delay_p`, the write counterpart of GetDelays().
@@ -143,7 +143,7 @@ class VpiContext {
   // so when pulsere_flag is clear the pulse limits keep their prior values. A
   // null delay_p, a null obj, or a null da changes nothing; an illegal
   // no_of_delays records an error (§38.2) and changes nothing.
-  void PutDelays(VpiHandle obj, VpiDelay* delay_p);
+  void PutDelays(VpiHandle obj, s_vpi_delay* delay_p);
 
   // §38.9: retrieve up to `num_of_bytes` of data saved under the save/restart
   // `id` into the caller-allocated buffer `data_loc`, returning the number of
@@ -236,12 +236,13 @@ class VpiContext {
   VpiHandle Handle(int type, VpiHandle ref);
   VpiHandle Iterate(int type, VpiHandle ref, int compatibility_mode = 0);
   VpiHandle Scan(VpiHandle iterator);
-  void GetValue(VpiHandle obj, VpiValue* value);
-  VpiHandle PutValue(VpiHandle obj, VpiValue* value, VpiTime* time, int flags);
-  VpiHandle RegisterCb(VpiCbData* data);
+  void GetValue(VpiHandle obj, s_vpi_value* value);
+  VpiHandle PutValue(VpiHandle obj, s_vpi_value* value, s_vpi_time* time,
+                     int flags);
+  VpiHandle RegisterCb(s_cb_data* data);
   int RemoveCb(VpiHandle cb_handle);
   int ExecuteCallback(VpiHandle cb_handle);
-  void RegisterCbValueChange(const VpiCbData& data);
+  void RegisterCbValueChange(const s_cb_data& data);
 
   // §38.36.3: deliver every active callback registered for the given action or
   // feature reason. Each routine receives a copy of its s_cb_data whose reason
@@ -311,7 +312,7 @@ class VpiContext {
   // rather than keeping a second one. Written in vpi_control.cpp.
   CoverageControlState& GetCoverageControlState();
 
-  bool ChkError(VpiErrorInfo* info);
+  bool ChkError(s_vpi_error_info* info);
 
   // §38.17: capture the simulator's invocation command line. Following the
   // standard argv convention, entry zero is the tool's own name and the
@@ -324,7 +325,7 @@ class VpiContext {
   // §38.17: fill the result structure with the invocation option count (argc),
   // the option values (argv), and the product and version strings. Returns true
   // on success and false when the information cannot be supplied.
-  bool GetVlogInfo(VpiVlogInfo* info);
+  bool GetVlogInfo(s_vpi_vlog_info* info);
 
   // §38.5: flush the output buffers for the simulator's output channel and the
   // current log file. Each channel accumulates written text in an in-memory
@@ -597,8 +598,8 @@ class VpiContext {
   // arrayvalue_p selects the element encoding and flags; index_p gives the
   // starting element's coordinate (one entry per unpacked dimension); num is
   // how many consecutive elements to set. Applies vpiNoDelay semantics only.
-  void PutValueArray(VpiHandle obj, VpiArrayValue* arrayvalue_p, int* index_p,
-                     unsigned int num);
+  void PutValueArray(VpiHandle obj, s_vpi_arrayvalue* arrayvalue_p,
+                     int* index_p, unsigned int num);
 
   // §38.16: read values from contiguous elements of a static unpacked array.
   // arrayvalue_p->format selects the element encoding written back; index_p
@@ -607,10 +608,12 @@ class VpiContext {
   // dimension varying fastest. By default the values land in VPI-owned storage
   // pointed to by the value arm; with vpiUserAllocFlag the caller's own buffer
   // is filled instead. On any error the value arm is set to NULL.
-  void GetValueArray(VpiHandle obj, VpiArrayValue* arrayvalue_p, int* index_p,
-                     unsigned int num);
+  void GetValueArray(VpiHandle obj, s_vpi_arrayvalue* arrayvalue_p,
+                     int* index_p, unsigned int num);
 
-  const std::vector<VpiSystfData>& RegisteredSystfs() const { return systfs_; }
+  const std::vector<s_vpi_systf_data>& RegisteredSystfs() const {
+    return systfs_;
+  }
 
   // §36.8.1: the number of bits "that the calltf routine shall provide as the
   // return value for the system function". VpiSystfResultSizeBits computes it,
@@ -622,9 +625,9 @@ class VpiContext {
   // A record that is not one of this context's registrations -- a caller's own
   // s_vpi_systf_data, which the free function is happy to measure -- has no
   // registration to remember the answer against, so it is measured each time.
-  int SystfResultSizeBits(const VpiSystfData& data);
+  int SystfResultSizeBits(const s_vpi_systf_data& data);
 
-  const std::vector<VpiCbData>& RegisteredCallbacks() const;
+  const std::vector<s_cb_data>& RegisteredCallbacks() const;
 
   // §36.9.1: the registration of system tasks shall occur prior to elaboration
   // or the resolution of references. Marking elaboration as started closes the
@@ -716,7 +719,7 @@ class VpiContext {
     return save_restart_location_;
   }
 
-  const VpiErrorInfo& LastError() const { return last_error_; }
+  const s_vpi_error_info& LastError() const { return last_error_; }
 
   // §38.2: the error status is reset by any VPI routine call except
   // vpi_chk_error(). The C entry points clear the pending error here on entry
@@ -747,9 +750,9 @@ class VpiContext {
 
   // §37.42: the object standing for one system task or system function call.
   // Written in vpi_systf.cpp, where what `evaluate_args` separates is set out.
-  VpiHandle MakeSystfCallObject(const VpiSystfData& data, const Expr* call_site,
-                                SimContext& ctx, Arena& arena,
-                                bool evaluate_args);
+  VpiHandle MakeSystfCallObject(const s_vpi_systf_data& data,
+                                const Expr* call_site, SimContext& ctx,
+                                Arena& arena, bool evaluate_args);
 
   // §36.10: the object one component of a flat design name stands for, and the
   // object a whole such name stands for with the instance scopes above it made
@@ -790,12 +793,12 @@ class VpiContext {
   // and class-reclaim release rules.
   void ReleaseHandleSubtree(VpiObject* root);
 
-  std::vector<VpiSystfData> systfs_;
+  std::vector<s_vpi_systf_data> systfs_;
   // §36.8.1: what each registration's sizetf returned, keyed by its position in
   // systfs_, which is stable because registrations are appended and never
   // removed. Absent until the first ask, which is the run the clause allows.
   std::unordered_map<size_t, int> systf_result_bits_;
-  std::vector<VpiCbData> callbacks_;
+  std::vector<s_cb_data> callbacks_;
   std::vector<VpiHandle> cb_handles_;
   std::unordered_map<std::string_view, VpiObject*> object_map_;
   std::vector<VpiObject*> all_objects_;
@@ -844,7 +847,7 @@ class VpiContext {
   // descriptor state, declared in simulator/vpi_channel_state.h.
   VpiChannelState channels_;
 
-  VpiErrorInfo last_error_ = {};
+  s_vpi_error_info last_error_ = {};
 
   // §38.9: the reason of the callback whose application routine is currently
   // executing, or -1 when no callback is running. vpi_get_data() consults this
@@ -880,7 +883,7 @@ class VpiContext {
   // handed back as argv, which GetVlogInfo rebuilds from both on each query.
   std::vector<std::string> invocation_args_;
   std::vector<std::string> invocation_file_args_;
-  std::vector<const char*> invocation_argv_;
+  std::vector<PLI_BYTE8*> invocation_argv_;
 
   std::vector<std::string> str_pool_;
 
@@ -916,11 +919,11 @@ class VpiContext {
   // union; each retrieval keeps its s_vpi_vecval array alive here until the
   // context is torn down. Inner vectors own their own storage, so growing the
   // outer pool never invalidates a previously handed-out array pointer.
-  std::vector<std::vector<VpiVectorVal>> vec_pool_;
+  std::vector<std::vector<s_vpi_vecval>> vec_pool_;
 
   // §38.15: likewise the routine owns the s_vpi_strengthval array handed back
   // for the strength arm of the value union.
-  std::vector<std::vector<VpiStrengthVal>> strength_pool_;
+  std::vector<std::vector<s_vpi_strengthval>> strength_pool_;
 
   // §38.16: by default vpi_get_value_array() returns the retrieved section in
   // VPI-allocated, read-only storage. One reusable buffer backs the value arm;

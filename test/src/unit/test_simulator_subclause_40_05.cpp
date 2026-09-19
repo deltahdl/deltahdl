@@ -28,7 +28,9 @@
 #include "simulator/coverage_control.h"
 #include "simulator/evaluation.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -123,8 +125,8 @@ TEST_F(VpiCoverageExtensions, TheVpiQueryReportsTheCoverageTheLanguageReports) {
   Cov().SetCoveredItems("top.dut", kSvCovStatement, 7);
   VpiHandle dut = vpi_ctx_.CreateModule("dut", "top.dut");
 
-  EXPECT_EQ(vpi_get(vpiStatementCoverage, dut), 7);
-  EXPECT_EQ(vpi_get(vpiStatementCoverage, dut),
+  EXPECT_EQ(vpi_get(vpiStatementCoverage, VpiHandleOf(dut)), 7);
+  EXPECT_EQ(vpi_get(vpiStatementCoverage, VpiHandleOf(dut)),
             RunCoverageGet(f_, kSvCovStatement, "top.dut"));
 }
 
@@ -139,11 +141,11 @@ TEST_F(VpiCoverageExtensions, TheVpiControlResetsWhatTheVpiQueryReports) {
   Cov().SetCoverableItems("top.dut", kSvCovStatement, 12);
   Cov().SetCoveredItems("top.dut", kSvCovStatement, 7);
   VpiHandle dut = vpi_ctx_.CreateModule("dut", "top.dut");
-  ASSERT_EQ(vpi_get(vpiStatementCoverage, dut), 7);
+  ASSERT_EQ(vpi_get(vpiStatementCoverage, VpiHandleOf(dut)), 7);
 
   ASSERT_EQ(vpi_control(vpiCoverageReset, vpiStatementCoverage, dut), kOk);
 
-  EXPECT_EQ(vpi_get(vpiStatementCoverage, dut), kNoCov);
+  EXPECT_EQ(vpi_get(vpiStatementCoverage, VpiHandleOf(dut)), kNoCov);
   EXPECT_EQ(RunCoverageGet(f_, kSvCovStatement, "top.dut"), kNoCov);
 }
 

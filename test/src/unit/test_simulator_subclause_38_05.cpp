@@ -4,7 +4,9 @@
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "simulator/sim_context.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -113,7 +115,8 @@ TEST_F(VpiFlushSim, WhatAPrintLeftPendingIsWhatTheFlushCommits) {
 TEST_F(VpiFlushSim, AFlushResetsThePendingErrorStatus) {
   s_vpi_systf_data data = {};
   data.type = vpiSysTask;
-  data.tfname = "missing_dollar";  // §36.9.1: a name with no dollar sign
+  data.tfname =
+      VpiText("missing_dollar");  // §36.9.1: a name with no dollar sign
   ASSERT_EQ(vpi_register_systf(&data), nullptr);
   ASSERT_EQ(vpi_chk_error(nullptr), vpiError);
 

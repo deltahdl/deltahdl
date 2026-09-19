@@ -5,7 +5,9 @@
 #include <type_traits>
 
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -44,7 +46,7 @@ TEST_F(VpiObjectAccess, GetDerivesIntegerPropertiesAsPliInt32) {
   net.type = vpiNet;
   net.size = 8;
 
-  EXPECT_EQ(vpi_get(vpiSize, &net), 8);
+  EXPECT_EQ(vpi_get(vpiSize, VpiHandleOf(&net)), 8);
 }
 
 // Claim: the routine vpi_get64() returns 64-bit integer properties as type
@@ -65,9 +67,10 @@ TEST_F(VpiObjectAccess, Get64DerivesSixtyFourBitPropertiesAsPliInt64) {
   obj.obj_id = (std::int64_t{1} << 32) | 7;
 
   // The full 64-bit width survives vpi_get64()...
-  EXPECT_EQ(vpi_get64(vpiObjId, &obj), (std::int64_t{1} << 32) | 7);
+  EXPECT_EQ(vpi_get64(vpiObjId, VpiHandleOf(&obj)),
+            (std::int64_t{1} << 32) | 7);
   // ...while vpi_get() narrows the very same property to its 32-bit result.
-  EXPECT_EQ(vpi_get(vpiObjId, &obj), 7);
+  EXPECT_EQ(vpi_get(vpiObjId, VpiHandleOf(&obj)), 7);
 }
 
 // Claim: string properties shall be accessed with vpi_get_str() and shall be of
@@ -82,7 +85,7 @@ TEST_F(VpiObjectAccess, GetStrAccessesStringPropertiesAsPliByte8) {
   mod.name = "m1";
   mod.full_name = "top.m1";
 
-  const char* full_name = vpi_get_str(vpiFullName, &mod);
+  const char* full_name = vpi_get_str(vpiFullName, VpiHandleOf(&mod));
   ASSERT_NE(full_name, nullptr);
   EXPECT_EQ(std::string(full_name), "top.m1");
 }
@@ -102,7 +105,7 @@ TEST_F(VpiObjectAccess, HandleTraversesOneToOneRelationship) {
   net.type = vpiNet;
   net.parent = &mod;
 
-  EXPECT_EQ(vpi_handle(vpiModule, &net), &mod);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiModule, VpiHandleOf(&net))), &mod);
 }
 
 // Claim: one-to-many relationships are traversed with an iteration mechanism -
@@ -122,14 +125,14 @@ TEST_F(VpiObjectAccess, IterateAndScanTraverseOneToManyRelationship) {
   mod.children.push_back(&w1);
   mod.children.push_back(&w2);
 
-  vpiHandle iter = vpi_iterate(vpiNet, &mod);
+  vpiHandle iter = vpi_iterate(vpiNet, VpiHandleOf(&mod));
   ASSERT_NE(iter, nullptr);
   // The created object's own type is vpiIterator (the requested type only
   // selects which related objects it walks).
   EXPECT_EQ(vpi_get(vpiType, iter), vpiIterator);
 
-  EXPECT_EQ(vpi_scan(iter), &w1);
-  EXPECT_EQ(vpi_scan(iter), &w2);
+  EXPECT_EQ(VpiObjectOf(vpi_scan(iter)), &w1);
+  EXPECT_EQ(VpiObjectOf(vpi_scan(iter)), &w2);
   // Exhausting the iteration reports null and retires the iterator handle.
   EXPECT_EQ(vpi_scan(iter), nullptr);
 }
@@ -145,19 +148,19 @@ TEST_F(VpiObjectAccess, GetEncodesEveryBooleanPropertyAsOneOrZero) {
   vectored_net.type = vpiNet;
   vectored_net.is_vectored = true;
   // A derived Boolean: a vectored net is reported unexpanded (FALSE -> 0).
-  EXPECT_EQ(vpi_get(vpiExpanded, &vectored_net), 0);
+  EXPECT_EQ(vpi_get(vpiExpanded, VpiHandleOf(&vectored_net)), 0);
 
   VpiObject plain_net;
   plain_net.type = vpiNet;
   // The same derived Boolean is TRUE -> 1 for a net with no vector keyword.
-  EXPECT_EQ(vpi_get(vpiExpanded, &plain_net), 1);
+  EXPECT_EQ(vpi_get(vpiExpanded, VpiHandleOf(&plain_net)), 1);
 
   VpiObject scalared_net;
   scalared_net.type = vpiNet;
   scalared_net.is_scalared = true;
   // A stored Boolean: TRUE -> 1, FALSE -> 0.
-  EXPECT_EQ(vpi_get(vpiExplicitScalared, &scalared_net), 1);
-  EXPECT_EQ(vpi_get(vpiExplicitScalared, &plain_net), 0);
+  EXPECT_EQ(vpi_get(vpiExplicitScalared, VpiHandleOf(&scalared_net)), 1);
+  EXPECT_EQ(vpi_get(vpiExplicitScalared, VpiHandleOf(&plain_net)), 0);
 }
 
 // Edge of the string-property rule: vpi_get_str() accesses string properties
@@ -169,11 +172,11 @@ TEST_F(VpiObjectAccess, GetStrAccessesNamePropertyAndFullNameFallback) {
   net.type = vpiNet;
   net.name = "w1";  // no separate full_name stored
 
-  const char* name = vpi_get_str(vpiName, &net);
+  const char* name = vpi_get_str(vpiName, VpiHandleOf(&net));
   ASSERT_NE(name, nullptr);
   EXPECT_EQ(std::string(name), "w1");
 
-  const char* full_name = vpi_get_str(vpiFullName, &net);
+  const char* full_name = vpi_get_str(vpiFullName, VpiHandleOf(&net));
   ASSERT_NE(full_name, nullptr);
   EXPECT_EQ(std::string(full_name), "w1");
 }
@@ -185,7 +188,7 @@ TEST_F(VpiObjectAccess, HandleReturnsNoHandleForAbsentRelationship) {
   VpiObject net;
   net.type = vpiNet;
 
-  EXPECT_EQ(vpi_handle(vpiModule, &net), nullptr);
+  EXPECT_EQ(vpi_handle(vpiModule, VpiHandleOf(&net)), nullptr);
 }
 
 }  // namespace

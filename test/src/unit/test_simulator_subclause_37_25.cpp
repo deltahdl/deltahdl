@@ -4,7 +4,10 @@
 
 #include "helpers_vpi_two_fixed_unpacked_dims.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_model_helpers2.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -108,8 +111,9 @@ TEST(Typespec, AliasInheritsUnderlyingType) {
   VpiObject my_time;               // typedef time my_time;
   my_time.type = vpiTimeTypespec;  // inherits the underlying type
 
-  EXPECT_EQ(vpi_get(vpiType, &my_time), vpiTimeTypespec);
-  EXPECT_EQ(vpi_get(vpiType, &aliased), vpi_get(vpiType, &my_time));
+  EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(&my_time)), vpiTimeTypespec);
+  EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(&aliased)),
+            vpi_get(vpiType, VpiHandleOf(&my_time)));
 
   SetGlobalVpiContext(nullptr);
 }

@@ -2,7 +2,11 @@
 
 #include "fixture_simulator.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
+#include "simulator/vpi_model_helpers1.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -166,9 +170,9 @@ int g_two_delay_type = 0;
 int g_two_delay_op_type = 0;
 int g_two_delay_operands = 0;
 
-int ProbeSourceDelaysCalltf(const char*) {
-  vpiHandle one = vpi_handle_by_name("m1.s", nullptr);
-  vpiHandle two = vpi_handle_by_name("m1.w", nullptr);
+PLI_INT32 ProbeSourceDelaysCalltf(PLI_BYTE8*) {
+  vpiHandle one = vpi_handle_by_name(VpiText("m1.s"), nullptr);
+  vpiHandle two = vpi_handle_by_name(VpiText("m1.w"), nullptr);
   if (one == nullptr || two == nullptr) return 0;
 
   if (vpiHandle expr = vpi_handle(vpiDelay, one)) {
@@ -191,7 +195,7 @@ void RegisterSourceDelayProbe() {
   g_two_delay_operands = 0;
   s_vpi_systf_data data = {};
   data.type = vpiSysTask;
-  data.tfname = "$probe";
+  data.tfname = VpiText("$probe");
   data.calltf = &ProbeSourceDelaysCalltf;
   ASSERT_NE(vpi_register_systf(&data), nullptr);
 }

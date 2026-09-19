@@ -3,142 +3,25 @@
 #include <cstdint>
 
 #include "simulator/vpi_object.h"
+#include "simulator/vpi_user.h"
 
 namespace delta {
 
-struct VpiVectorVal {
-  uint32_t aval;
-  uint32_t bval;
-};
-
-// §38.15 (Figure 38-9 element): one strength descriptor per vector bit. logic
-// carries the vpi0/vpi1/vpiX/vpiZ value; s0 and s1 carry the drive/charge
-// strength of the 0 and 1 components.
-struct VpiStrengthVal {
-  int logic = 0;
-  int s0 = 0;
-  int s1 = 0;
-};
-
-struct VpiTime;
-
-// §K.2 (s_vpi_value): the format names which arm of the union is live. The
-// annex gives the union eight arms; time is the one a vpiTimeVal read fills
-// and misc the one the annex leaves for any other value.
-struct VpiValue {
-  int format = 0;
-  union {
-    int integer;
-    double real;
-    const char* str;
-    int scalar;
-    VpiTime* time;
-    VpiVectorVal* vector;
-    VpiStrengthVal* strength;
-    char* misc;
-  } value = {};
-};
-
-struct VpiTime {
-  int type = 0;
-  uint32_t high = 0;
-  uint32_t low = 0;
-  double real = 0.0;
-};
-
-// §38.35 (s_vpi_arrayvalue): the aggregate that carries the values
-// vpi_put_value_array() writes into a static unpacked array. format selects
-// which arm of the union is live and how each element is encoded; flags carries
-// vpiOneValue/vpiPropagateOff. Every arm is a pointer to caller-allocated
-// storage holding one entry per element (the raw arms hold packed aval/bval
-// bytes instead). The public spellings s_vpi_arrayvalue/p_vpi_arrayvalue alias
-// this type below.
-struct VpiArrayValue {
-  uint32_t format = 0;
-  uint32_t flags = 0;
-  union {
-    int32_t* integers;
-    int16_t* shortints;
-    int64_t* longints;
-    char* rawvals;
-    VpiVectorVal* vectors;
-    VpiTime* times;
-    double* reals;
-    float* shortreals;
-  } value = {};
-};
-
-// §38.10 (Figure 38-3): the delay structure exchanged with vpi_get_delays()
-// (and vpi_put_delays()). `da` is an application-allocated array of VpiTime
-// entries the routine fills with delay values; no_of_delays selects how many
-// of the object's delays to retrieve; time_type selects the form of each value
-// written into da; mtm_flag and pulsere_flag together select how many entries
-// each delay occupies and what they hold (see Table 38-2). append_flag is only
-// meaningful when putting delays.
-struct VpiDelay {
-  VpiTime* da = nullptr;
-  int no_of_delays = 0;
-  int time_type = 0;
-  int mtm_flag = 0;
-  int append_flag = 0;
-  int pulsere_flag = 0;
-};
-
-struct VpiCbData {
-  int reason = 0;
-  // §38.36 (Figure 38-17): the application routine the simulator invokes when
-  // it executes the callback; it is passed a pointer to this s_cb_data
-  // structure.
-  int (*cb_rtn)(VpiCbData*) = nullptr;
-  VpiHandle obj = nullptr;
-  VpiTime* time = nullptr;
-  VpiValue* value = nullptr;
-  int index = 0;
-  void* user_data = nullptr;
-};
-
-struct VpiErrorInfo {
-  int state = 0;
-  int level = 0;
-  const char* message = nullptr;
-  const char* product = nullptr;
-  const char* code = nullptr;
-  const char* file = nullptr;
-  int line = 0;
-};
-
-struct VpiVlogInfo {
-  int argc = 0;
-  const char** argv = nullptr;
-  const char* product = nullptr;
-  const char* version = nullptr;
-};
-
-constexpr int kVpiSysTask = 1;
-constexpr int kVpiSysFunc = 2;
+constexpr int kVpiSysTask = vpiSysTask;
+constexpr int kVpiSysFunc = vpiSysFunc;
 
 // §38.37.1: the value kinds a system function may declare through the
 // sysfunctype field. Only one of these may be named, and only when the system
 // task/function was registered as a vpiSysFunc.
-constexpr int kVpiIntFunc = 1;
-constexpr int kVpiRealFunc = 2;
-constexpr int kVpiTimeFunc = 3;
-constexpr int kVpiSizedFunc = 4;
-constexpr int kVpiSizedSignedFunc = 5;
+constexpr int kVpiIntFunc = vpiIntFunc;
+constexpr int kVpiRealFunc = vpiRealFunc;
+constexpr int kVpiTimeFunc = vpiTimeFunc;
+constexpr int kVpiSizedFunc = vpiSizedFunc;
+constexpr int kVpiSizedSignedFunc = vpiSizedSignedFunc;
 
 // §38.37.1: a sized system function (vpiSizedFunc/vpiSizedSignedFunc) whose
 // registration supplies no sizetf application returns a value 32 bits wide.
 constexpr int kVpiDefaultSizedFuncBits = 32;
-
-struct VpiSystfData {
-  int type = 0;
-  int sysfunctype = 0;
-  const char* tfname = nullptr;
-  int (*calltf)(const char*) = nullptr;
-  int (*compiletf)(const char*) = nullptr;
-  int (*sizetf)(const char*) = nullptr;
-  void* user_data = nullptr;
-};
 
 // §38.37.1: the three points in the tool's lifetime that drive the callback
 // applications named in a s_vpi_systf_data record.
@@ -156,7 +39,7 @@ bool VpiSystfNameIsValid(const char* tfname);
 // system function. sysfunctype is meaningful only when the record was
 // registered as a vpiSysFunc; for a system task it does not apply, so this
 // reports 0 (no return-value kind) regardless of the stored field.
-int VpiSystfReturnType(const VpiSystfData& data);
+int VpiSystfReturnType(const s_vpi_systf_data& data);
 
 // §38.37.1: whether a given callback application fires while the simulation
 // data structure is being compiled or built (true for compiletf and sizetf)
@@ -168,19 +51,19 @@ bool VpiSystfCallbackFiresAtBuild(VpiSystfCallback callback);
 // receives exactly one argument - the registration's user_data field, passed as
 // a PLI_BYTE8 * - and a null function pointer (a field left unused) is simply
 // skipped, returning 0.
-int VpiSystfInvoke(int (*routine)(const char*), void* user_data);
+int VpiSystfInvoke(PLI_INT32 (*routine)(PLI_BYTE8*), PLI_BYTE8* user_data);
 
 // §38.37.1 (sizetf rule): whether the sizetf application is to be called for a
 // registration. It is called only for a system function (vpiSysFunc) whose
 // sysfunctype is vpiSizedFunc or vpiSizedSignedFunc; for anything else sizetf
 // is never invoked.
-bool VpiSystfSizetfIsCalled(const VpiSystfData& data);
+bool VpiSystfSizetfIsCalled(const s_vpi_systf_data& data);
 
 // §38.37.1: the bit width a sized system function reports. When sizetf is to be
 // called and a sizetf application is present it supplies the width (receiving
 // user_data as its PLI_BYTE8 * argument); a sized function with no sizetf
 // defaults to 32 bits.
-int VpiSystfResultSizeBits(const VpiSystfData& data);
+int VpiSystfResultSizeBits(const s_vpi_systf_data& data);
 
 // §36.10.2: the tool-lifecycle phases that gate which VPI routines a PLI
 // application may call. kStartup is the window in which the

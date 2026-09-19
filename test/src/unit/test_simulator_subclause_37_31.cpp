@@ -3,7 +3,10 @@
 #include <vector>
 
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_constants.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -67,13 +70,13 @@ TEST_F(ClassDefinition, ClassMethodsIterationExcludesImplicitBuiltins) {
   class_defn.children = {&declared_func, &member_var, &implicit_builtin,
                          &declared_task};
 
-  vpiHandle it = vpi_iterate(vpiMethods, &class_defn);
+  vpiHandle it = vpi_iterate(vpiMethods, VpiHandleOf(&class_defn));
   ASSERT_NE(it, nullptr);
-  std::vector<vpiHandle> seen = ScanAll(it);
+  std::vector<vpiHandle> seen = ScanAll(VpiObjectOf(it));
 
   ASSERT_EQ(seen.size(), 2u);
-  EXPECT_EQ(seen[0], &declared_func);
-  EXPECT_EQ(seen[1], &declared_task);
+  EXPECT_EQ(VpiObjectOf(seen[0]), &declared_func);
+  EXPECT_EQ(VpiObjectOf(seen[1]), &declared_task);
 }
 
 // D2: vpi_get_value() and vpi_put_value() are not allowed for a variable or
@@ -96,15 +99,16 @@ TEST_F(ClassDefinition, ValueRoutinesDeniedForClassDefnMembers) {
     value.format = vpiIntVal;
     value.value.integer = 0x5eed;  // sentinel the get must not overwrite
 
-    vpi_get_value(member, &value);
-    SVpiErrorInfo get_info = {};
+    vpi_get_value(VpiHandleOf(member), &value);
+    s_vpi_error_info get_info = {};
     EXPECT_EQ(vpi_chk_error(&get_info), vpiError)
         << "get, type " << member->type;
     EXPECT_EQ(value.value.integer, 0x5eed) << "get, type " << member->type;
 
-    vpiHandle ret = vpi_put_value(member, &value, nullptr, vpiNoDelay);
+    vpiHandle ret =
+        vpi_put_value(VpiHandleOf(member), &value, nullptr, vpiNoDelay);
     EXPECT_EQ(ret, nullptr) << "put, type " << member->type;
-    SVpiErrorInfo put_info = {};
+    s_vpi_error_info put_info = {};
     EXPECT_EQ(vpi_chk_error(&put_info), vpiError)
         << "put, type " << member->type;
   }
@@ -126,12 +130,12 @@ TEST_F(ClassDefinition, ValueRestrictionScopedToClassDefnParent) {
   s_vpi_value value = {};
   value.format = vpiIntVal;
 
-  vpi_get_value(&free_var, &value);
-  SVpiErrorInfo get_info = {};
+  vpi_get_value(VpiHandleOf(&free_var), &value);
+  s_vpi_error_info get_info = {};
   EXPECT_EQ(vpi_chk_error(&get_info), 0);
 
-  vpi_put_value(&free_var, &value, nullptr, vpiNoDelay);
-  SVpiErrorInfo put_info = {};
+  vpi_put_value(VpiHandleOf(&free_var), &value, nullptr, vpiNoDelay);
+  s_vpi_error_info put_info = {};
   EXPECT_EQ(vpi_chk_error(&put_info), 0);
 }
 
@@ -152,12 +156,12 @@ TEST_F(ClassDefinition, ValueRestrictionAppliesOnlyToVariableAndEventMembers) {
   s_vpi_value value = {};
   value.format = vpiIntVal;
 
-  vpi_get_value(&member_constraint, &value);
-  SVpiErrorInfo get_info = {};
+  vpi_get_value(VpiHandleOf(&member_constraint), &value);
+  s_vpi_error_info get_info = {};
   EXPECT_EQ(vpi_chk_error(&get_info), 0);
 
-  vpi_put_value(&member_constraint, &value, nullptr, vpiNoDelay);
-  SVpiErrorInfo put_info = {};
+  vpi_put_value(VpiHandleOf(&member_constraint), &value, nullptr, vpiNoDelay);
+  s_vpi_error_info put_info = {};
   EXPECT_EQ(vpi_chk_error(&put_info), 0);
 }
 
@@ -177,13 +181,13 @@ TEST_F(ClassDefinition, ConstraintIterationExcludesInlineConstraints) {
   class_defn.type = vpiClassDefn;
   class_defn.children = {&normal_a, &inline_c, &normal_b};
 
-  vpiHandle it = vpi_iterate(vpiConstraint, &class_defn);
+  vpiHandle it = vpi_iterate(vpiConstraint, VpiHandleOf(&class_defn));
   ASSERT_NE(it, nullptr);
-  std::vector<vpiHandle> seen = ScanAll(it);
+  std::vector<vpiHandle> seen = ScanAll(VpiObjectOf(it));
 
   ASSERT_EQ(seen.size(), 2u);
-  EXPECT_EQ(seen[0], &normal_a);
-  EXPECT_EQ(seen[1], &normal_b);
+  EXPECT_EQ(VpiObjectOf(seen[0]), &normal_a);
+  EXPECT_EQ(VpiObjectOf(seen[1]), &normal_b);
 }
 
 // D5: a class defn's vpiDerivedClasses iteration returns the class defns
@@ -201,13 +205,13 @@ TEST_F(ClassDefinition, DerivedClassesIterationReturnsDerivedClassDefns) {
   base.type = vpiClassDefn;
   base.children = {&derived_a, &not_a_class, &derived_b};
 
-  vpiHandle it = vpi_iterate(vpiDerivedClasses, &base);
+  vpiHandle it = vpi_iterate(vpiDerivedClasses, VpiHandleOf(&base));
   ASSERT_NE(it, nullptr);
-  std::vector<vpiHandle> seen = ScanAll(it);
+  std::vector<vpiHandle> seen = ScanAll(VpiObjectOf(it));
 
   ASSERT_EQ(seen.size(), 2u);
-  EXPECT_EQ(seen[0], &derived_a);
-  EXPECT_EQ(seen[1], &derived_b);
+  EXPECT_EQ(VpiObjectOf(seen[0]), &derived_a);
+  EXPECT_EQ(VpiObjectOf(seen[1]), &derived_b);
 }
 
 // D7: a class defn's vpiParameter iteration returns both the parameters of the
@@ -231,18 +235,18 @@ TEST_F(ClassDefinition, ParameterIterationReportsPortAndBodyWithLocalParam) {
   class_defn.type = vpiClassDefn;
   class_defn.children = {&port_param, &not_a_param, &body_param};
 
-  vpiHandle it = vpi_iterate(vpiParameter, &class_defn);
+  vpiHandle it = vpi_iterate(vpiParameter, VpiHandleOf(&class_defn));
   ASSERT_NE(it, nullptr);
-  std::vector<vpiHandle> seen = ScanAll(it);
+  std::vector<vpiHandle> seen = ScanAll(VpiObjectOf(it));
 
   ASSERT_EQ(seen.size(), 2u);
-  EXPECT_EQ(seen[0], &port_param);
-  EXPECT_EQ(seen[1], &body_param);
+  EXPECT_EQ(VpiObjectOf(seen[0]), &port_param);
+  EXPECT_EQ(VpiObjectOf(seen[1]), &body_param);
 
   // vpiLocalParam is FALSE for the port-list parameter and TRUE for the
   // body-declared one.
-  EXPECT_EQ(vpi_get(vpiLocalParam, &port_param), 0);
-  EXPECT_EQ(vpi_get(vpiLocalParam, &body_param), 1);
+  EXPECT_EQ(vpi_get(vpiLocalParam, VpiHandleOf(&port_param)), 0);
+  EXPECT_EQ(vpi_get(vpiLocalParam, VpiHandleOf(&body_param)), 1);
 }
 
 // D6: the vpiArgument iteration from an extends object returns the expressions
@@ -266,13 +270,13 @@ TEST_F(ClassDefinition, ExtendsArgumentIterationReturnsChainingExpressions) {
   extends.type = vpiExtends;
   extends.children = {&arg_a, &not_an_expr, &arg_b};
 
-  vpiHandle it = vpi_iterate(vpiArgument, &extends);
+  vpiHandle it = vpi_iterate(vpiArgument, VpiHandleOf(&extends));
   ASSERT_NE(it, nullptr);
-  std::vector<vpiHandle> seen = ScanAll(it);
+  std::vector<vpiHandle> seen = ScanAll(VpiObjectOf(it));
 
   ASSERT_EQ(seen.size(), 2u);
-  EXPECT_EQ(seen[0], &arg_a);
-  EXPECT_EQ(seen[1], &arg_b);
+  EXPECT_EQ(VpiObjectOf(seen[0]), &arg_a);
+  EXPECT_EQ(VpiObjectOf(seen[1]), &arg_b);
 }
 
 }  // namespace

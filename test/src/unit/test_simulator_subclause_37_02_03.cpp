@@ -3,7 +3,9 @@
 #include <vector>
 
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -43,7 +45,7 @@ TEST_F(VpiHandleComparison, DistinctHandlesToOneObjectAreEquivalent) {
   VpiHandle other = ctx_.CreateHandleFor(mod);
 
   ASSERT_NE(mod, other);
-  EXPECT_EQ(vpi_compare_objects(mod, other), 1);
+  EXPECT_EQ(vpi_compare_objects(VpiHandleOf(mod), VpiHandleOf(other)), 1);
 }
 
 // §37.2.3 applied to §37.80's callback iteration: a callback is placed on an
@@ -55,14 +57,15 @@ TEST_F(VpiHandleComparison, ACallbackIsFoundThroughAnyHandleToItsObject) {
 
   s_cb_data data = {};
   data.reason = cbValueChange;
-  data.obj = mod;
+  data.obj = VpiHandleOf(mod);
   vpiHandle cb = vpi_register_cb(&data);
   ASSERT_NE(cb, nullptr);
 
-  ASSERT_EQ(ScanAll(vpi_iterate(vpiCallback, mod)).size(), 1u);
+  ASSERT_EQ(ScanAll(vpi_iterate(vpiCallback, VpiHandleOf(mod))).size(), 1u);
 
   VpiHandle other = ctx_.CreateHandleFor(mod);
-  std::vector<vpiHandle> seen = ScanAll(vpi_iterate(vpiCallback, other));
+  std::vector<vpiHandle> seen =
+      ScanAll(vpi_iterate(vpiCallback, VpiHandleOf(other)));
   ASSERT_EQ(seen.size(), 1u);
   EXPECT_EQ(seen[0], cb);
 }
@@ -75,10 +78,10 @@ TEST_F(VpiHandleComparison, ACallbackIsNotFoundThroughAnotherObject) {
 
   s_cb_data data = {};
   data.reason = cbValueChange;
-  data.obj = watched;
+  data.obj = VpiHandleOf(watched);
   ASSERT_NE(vpi_register_cb(&data), nullptr);
 
-  EXPECT_EQ(vpi_iterate(vpiCallback, unwatched), nullptr);
+  EXPECT_EQ(vpi_iterate(vpiCallback, VpiHandleOf(unwatched)), nullptr);
 }
 
 // §37.2.2 items 2 and 3 release "handles to callbacks placed on these objects",
@@ -90,15 +93,15 @@ TEST_F(VpiHandleComparison, ReleasingAnObjectReleasesItsCallbacksAnyHandle) {
 
   s_cb_data data = {};
   data.reason = cbValueChange;
-  data.obj = other;  // registered through the second handle
+  data.obj = VpiHandleOf(other);  // registered through the second handle
   vpiHandle cb = vpi_register_cb(&data);
   ASSERT_NE(cb, nullptr);
-  ASSERT_FALSE(cb->released);
+  ASSERT_FALSE(VpiObjectOf(cb)->released);
 
   ctx_.ReleaseFrameOrThreadObject(mod);
 
   EXPECT_TRUE(mod->released);
-  EXPECT_TRUE(cb->released);
+  EXPECT_TRUE(VpiObjectOf(cb)->released);
 }
 
 }  // namespace

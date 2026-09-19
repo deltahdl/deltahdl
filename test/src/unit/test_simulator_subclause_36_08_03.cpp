@@ -3,7 +3,11 @@
 #include <cstdint>
 
 #include "fixture_simulator.h"
+#include "simulator/vpi_context.h"
+#include "simulator/vpi_data_structs.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -17,7 +21,7 @@ namespace {
 const char* g_calltf_arg = nullptr;
 int g_calltf_calls = 0;
 
-int RecordingCalltf(const char* arg) {
+PLI_INT32 RecordingCalltf(PLI_BYTE8* arg) {
   g_calltf_arg = arg;
   ++g_calltf_calls;
   return 0;
@@ -63,11 +67,11 @@ TEST_F(CalltfApplicationRoutine, RunsAtExecutionTimeNotAtBuild) {
 TEST_F(CalltfApplicationRoutine, IsCalledOncePerExecution) {
   int payload = 0;
 
-  VpiSystfData get_vector = {};
+  s_vpi_systf_data get_vector = {};
   get_vector.type = kVpiSysTask;
-  get_vector.tfname = "$get_vector";
+  get_vector.tfname = VpiText("$get_vector");
   get_vector.calltf = &RecordingCalltf;
-  get_vector.user_data = &payload;
+  get_vector.user_data = reinterpret_cast<PLI_BYTE8*>(&payload);
 
   ResetCalltfProbe();
   // Model the @(posedge clk) $get_vector(...) loop: each of the 1024 executions
@@ -90,15 +94,15 @@ TEST_F(CalltfApplicationRoutine, IsCalledOncePerExecution) {
 TEST_F(CalltfApplicationRoutine, RunsForBothSystemTaskAndSystemFunction) {
   int payload = 0;
 
-  VpiSystfData task = {};
+  s_vpi_systf_data task = {};
   task.type = kVpiSysTask;
   task.calltf = &RecordingCalltf;
-  task.user_data = &payload;
+  task.user_data = reinterpret_cast<PLI_BYTE8*>(&payload);
 
-  VpiSystfData func = {};
+  s_vpi_systf_data func = {};
   func.type = kVpiSysFunc;
   func.calltf = &RecordingCalltf;
-  func.user_data = &payload;
+  func.user_data = reinterpret_cast<PLI_BYTE8*>(&payload);
 
   ResetCalltfProbe();
   VpiSystfInvoke(task.calltf, task.user_data);
@@ -122,16 +126,16 @@ TEST_F(CalltfApplicationRoutine, RunsForBothSystemTaskAndSystemFunction) {
 TEST_F(CalltfApplicationRoutine, SuppliedRoutineRoundTripsAndReceivesUserData) {
   int payload = 0;
 
-  VpiSystfData with_calltf = {};
+  s_vpi_systf_data with_calltf = {};
   with_calltf.type = kVpiSysFunc;
-  with_calltf.tfname = "$get_vector";
+  with_calltf.tfname = VpiText("$get_vector");
   with_calltf.calltf = &RecordingCalltf;
-  with_calltf.user_data = &payload;
+  with_calltf.user_data = reinterpret_cast<PLI_BYTE8*>(&payload);
 
   VpiHandle handle = vpi_ctx_.RegisterSystf(&with_calltf);
   ASSERT_NE(handle, nullptr);
 
-  VpiSystfData read_back = {};
+  s_vpi_systf_data read_back = {};
   vpi_ctx_.GetSystfInfo(handle, &read_back);
   ASSERT_EQ(read_back.calltf, &RecordingCalltf);
 
@@ -165,7 +169,7 @@ uint64_t g_arg_total = 0;
 // one. The total is what separates one execution from many even where the count
 // does not: a run that built the call once and reused it adds the same value
 // every time.
-int CountingCalltf(const char*) {
+PLI_INT32 CountingCalltf(PLI_BYTE8*) {
   ++g_calltf_runs;
   vpiHandle call = vpi_handle(vpiSysTfCall, nullptr);
   if (call == nullptr) return 0;
@@ -180,7 +184,7 @@ int CountingCalltf(const char*) {
   return 0;
 }
 
-int CountingCompiletf(const char*) {
+PLI_INT32 CountingCompiletf(PLI_BYTE8*) {
   ++g_compiletf_runs;
   return 0;
 }
@@ -195,7 +199,7 @@ void RegisterCountingProbe() {
   g_arg_total = 0;
   s_vpi_systf_data data = {};
   data.type = vpiSysTask;
-  data.tfname = "$probe";
+  data.tfname = VpiText("$probe");
   data.calltf = &CountingCalltf;
   data.compiletf = &CountingCompiletf;
   ASSERT_NE(vpi_register_systf(&data), nullptr);

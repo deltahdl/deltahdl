@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
 #include "fixture_simulator.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -35,7 +37,7 @@ int g_seen = 0;
 // answer a null handle by leaving the value alone -- so a run that put the
 // design nowhere leaves `g_seen` at what it was rather than crashing, and the
 // case reports the difference as a value.
-int ReadRCalltf(const char*) {
+PLI_INT32 ReadRCalltf(PLI_BYTE8*) {
   s_vpi_value val = {};
   val.format = vpiIntVal;
   vpi_get_value(vpi_handle_by_name("r", nullptr), &val);
@@ -45,7 +47,7 @@ int ReadRCalltf(const char*) {
 
 // The other direction of "interact dynamically": the application writes into
 // the design's `r`, and the design reads the write back afterwards.
-int WriteRCalltf(const char*) {
+PLI_INT32 WriteRCalltf(PLI_BYTE8*) {
   s_vpi_value val = {};
   val.format = vpiIntVal;
   val.value.integer = 42;
@@ -57,11 +59,11 @@ int WriteRCalltf(const char*) {
 // system function because §36.5 makes a task the type that "can read and modify
 // the arguments of the task, but does not return any value", and a value the
 // call site would take is not what any case here is about.
-void RegisterProbe(int (*calltf)(const char*)) {
+void RegisterProbe(PLI_INT32 (*calltf)(PLI_BYTE8*)) {
   g_seen = 0;
   s_vpi_systf_data data = {};
   data.type = vpiSysTask;
-  data.tfname = "$probe";
+  data.tfname = VpiText("$probe");
   data.calltf = calltf;
   ASSERT_NE(vpi_register_systf(&data), nullptr);
 }
@@ -141,7 +143,7 @@ TEST_F(PliApplicationDesignAccess, ARunWithNoApplicationAttachesNothing) {
   ASSERT_NE(design, nullptr);
   LowerAndRun(design, f);
 
-  EXPECT_EQ(vpi_handle_by_name("r", nullptr), nullptr);
+  EXPECT_EQ(vpi_handle_by_name(VpiText("r"), nullptr), nullptr);
 }
 
 }  // namespace

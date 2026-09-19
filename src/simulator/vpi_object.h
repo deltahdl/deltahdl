@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "simulator/vpi_constants.h"
+#include "simulator/vpi_user.h"
 
 namespace delta {
 
@@ -739,7 +740,20 @@ struct VpiObject {
   VpiObject* nettype_with = nullptr;
 };
 
+// The simulator's handle is a pointer to the object it models. Annex K's
+// vpiHandle is a PLI_UINT32*, an opaque pointer a PLI application cannot look
+// through, and the two conversions below are the whole of the relation between
+// them: a vpi_ routine takes a vpiHandle and hands VpiObjectOf(it) to the
+// context, and hands back VpiHandleOf(what the context returned).
 using VpiHandle = VpiObject*;
+
+inline vpiHandle VpiHandleOf(VpiObject* object) {
+  return reinterpret_cast<vpiHandle>(object);
+}
+
+inline VpiObject* VpiObjectOf(vpiHandle handle) {
+  return reinterpret_cast<VpiObject*>(handle);
+}
 
 // §37.3.7: the categories an allocator can place an object into, used to derive
 // its vpiAllocScheme. Keeping this separate from the scheme return values lets

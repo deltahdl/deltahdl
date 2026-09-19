@@ -6,7 +6,10 @@
 #include "common/types.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/variable.h"
+#include "simulator/vpi_constants.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -45,7 +48,7 @@ class VpiPropertyAccess : public ::testing::Test {
 // Claim: "Integer and Boolean properties are accessed with the routine
 // vpi_get()." These are the clause's two example lines, run unchanged.
 TEST_F(VpiPropertyAccess, IntegerAndBooleanPropertiesComeFromVpiGet) {
-  vpiHandle obj_h = ObjH();
+  vpiHandle obj_h = VpiHandleOf(ObjH());
 
   PLI_INT32 vect_flag = vpi_get(vpiVector, obj_h);
   PLI_INT32 size = vpi_get(vpiSize, obj_h);
@@ -60,7 +63,7 @@ TEST_F(VpiPropertyAccess, IntegerAndBooleanPropertiesComeFromVpiGet) {
 // answering in some other width would leave it doing a conversion the clause
 // does not write.
 TEST_F(VpiPropertyAccess, AnIntegerPropertyIsOfTypePliInt32) {
-  vpiHandle obj_h = ObjH();
+  vpiHandle obj_h = VpiHandleOf(ObjH());
 
   static_assert(std::is_same_v<decltype(vpi_get(vpiSize, obj_h)), PLI_INT32>);
   EXPECT_EQ(sizeof(vpi_get(vpiSize, obj_h)), sizeof(PLI_INT32));
@@ -72,7 +75,7 @@ TEST_F(VpiPropertyAccess, AnIntegerPropertyIsOfTypePliInt32) {
 // pointer to const cannot be stored in a PLI_BYTE8 *, so a routine handing one
 // back is not answering with the type the clause gives a string property.
 TEST_F(VpiPropertyAccess, AStringPropertyComesFromVpiGetStrAsPliByte8) {
-  vpiHandle obj_h = ObjH();
+  vpiHandle obj_h = VpiHandleOf(ObjH());
 
   PLI_BYTE8* name = vpi_get_str(vpiName, obj_h);
 
@@ -87,7 +90,7 @@ TEST_F(VpiPropertyAccess, AStringPropertyComesFromVpiGetStrAsPliByte8) {
 // string property is not a number, so each is read through the routine
 // §37.4.2 names for it.
 TEST_F(VpiPropertyAccess, EachKindIsReadThroughItsOwnRoutine) {
-  vpiHandle obj_h = ObjH();
+  vpiHandle obj_h = VpiHandleOf(ObjH());
 
   // vpiSize is drawn `int:`, so vpi_get() is what carries its value; asking
   // vpi_get_str() for it yields no string.
@@ -110,7 +113,7 @@ TEST_F(VpiPropertyAccess, AComplexValuePropertyComesFromItsOwnRoutine) {
 
   s_vpi_value value = {};
   value.format = vpiIntVal;
-  vpi_get_value(&var, &value);
+  vpi_get_value(VpiHandleOf(&var), &value);
 
   EXPECT_EQ(value.value.integer, 7);
 }

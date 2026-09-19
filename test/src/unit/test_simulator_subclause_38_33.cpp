@@ -2,7 +2,10 @@
 
 #include "common/arena.h"
 #include "simulator/scheduler.h"
+#include "simulator/vpi_constants.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -15,9 +18,9 @@ namespace {
 VpiHandle g_restored_call = nullptr;
 int g_restored_value = 0;
 bool g_restore_ran = false;
-int RestoreUserData(VpiCbData*) {
+int RestoreUserData(s_cb_data*) {
   g_restore_ran = true;
-  vpi_put_userdata(g_restored_call, &g_restored_value);
+  vpi_put_userdata(VpiHandleOf(g_restored_call), &g_restored_value);
   return 0;
 }
 
@@ -52,8 +55,8 @@ TEST_F(VpiPutUserDataSim, AssociatesUserDataWithFunctionCall) {
   VpiHandle call = MakeCall(vpiSysFuncCall);
   int marker = 0;
 
-  EXPECT_EQ(vpi_put_userdata(call, &marker), 1);
-  EXPECT_EQ(vpi_get_userdata(call), &marker);
+  EXPECT_EQ(vpi_put_userdata(VpiHandleOf(call), &marker), 1);
+  EXPECT_EQ(vpi_get_userdata(VpiHandleOf(call)), &marker);
   EXPECT_EQ(vpi_ctx_.LastError().level, 0);
 }
 
@@ -64,8 +67,8 @@ TEST_F(VpiPutUserDataSim, AssociatesUserDataWithFunctionCall) {
 TEST_F(VpiPutUserDataSim, NullUserDataValueStillSucceeds) {
   VpiHandle call = MakeCall(vpiSysFuncCall);
 
-  EXPECT_EQ(vpi_put_userdata(call, nullptr), 1);
-  EXPECT_EQ(vpi_get_userdata(call), nullptr);
+  EXPECT_EQ(vpi_put_userdata(VpiHandleOf(call), nullptr), 1);
+  EXPECT_EQ(vpi_get_userdata(VpiHandleOf(call)), nullptr);
   EXPECT_EQ(vpi_ctx_.LastError().level, 0);
 }
 
@@ -85,10 +88,11 @@ TEST_F(VpiPutUserDataSim, NonCallHandleIsRejected) {
   VpiHandle module = MakeCall(kVpiModule);
   int marker = 0;
 
-  EXPECT_EQ(vpi_put_userdata(module, &marker), 0);
+  EXPECT_EQ(vpi_put_userdata(VpiHandleOf(module), &marker), 0);
   EXPECT_EQ(vpi_ctx_.LastError().level, kVpiError);
   // §38.14 reads the same storage, and a module has none to have been written.
-  EXPECT_EQ(vpi_get_userdata(module), nullptr);  // left unassociated
+  EXPECT_EQ(vpi_get_userdata(VpiHandleOf(module)),
+            nullptr);  // left unassociated
 }
 
 // §38.33 (the lone 'shall'): after a restart, a vpi_get_userdata() shall return
@@ -97,12 +101,12 @@ TEST_F(VpiPutUserDataSim, NonCallHandleIsRejected) {
 TEST_F(VpiPutUserDataSim, RestartClearsUserData) {
   VpiHandle call = MakeCall(vpiSysFuncCall);
   int marker = 0;
-  ASSERT_EQ(vpi_put_userdata(call, &marker), 1);
-  ASSERT_EQ(vpi_get_userdata(call), &marker);
+  ASSERT_EQ(vpi_put_userdata(VpiHandleOf(call), &marker), 1);
+  ASSERT_EQ(vpi_get_userdata(VpiHandleOf(call)), &marker);
 
   vpi_ctx_.DispatchRestart();
 
-  EXPECT_EQ(vpi_get_userdata(call), nullptr);
+  EXPECT_EQ(vpi_get_userdata(VpiHandleOf(call)), nullptr);
 }
 
 // §38.33 (the lone 'shall'): a reset clears the user-data association the same
@@ -110,12 +114,12 @@ TEST_F(VpiPutUserDataSim, RestartClearsUserData) {
 TEST_F(VpiPutUserDataSim, ResetClearsUserData) {
   VpiHandle call = MakeCall(vpiSysTaskCall);
   int marker = 0;
-  ASSERT_EQ(vpi_put_userdata(call, &marker), 1);
-  ASSERT_EQ(vpi_get_userdata(call), &marker);
+  ASSERT_EQ(vpi_put_userdata(VpiHandleOf(call), &marker), 1);
+  ASSERT_EQ(vpi_get_userdata(VpiHandleOf(call)), &marker);
 
   vpi_ctx_.DispatchReset();
 
-  EXPECT_EQ(vpi_get_userdata(call), nullptr);
+  EXPECT_EQ(vpi_get_userdata(VpiHandleOf(call)), nullptr);
 }
 
 // §38.33's last sentence: "The user-data field can be set up again during or
@@ -126,7 +130,7 @@ TEST_F(VpiPutUserDataSim, ResetClearsUserData) {
 TEST_F(VpiPutUserDataSim, TheFieldCanBeSetUpAgainFromAnEndOfRestartCallback) {
   VpiHandle call = MakeCall(vpiSysTaskCall);
   int before_restart = 0;
-  ASSERT_EQ(vpi_put_userdata(call, &before_restart), 1);
+  ASSERT_EQ(vpi_put_userdata(VpiHandleOf(call), &before_restart), 1);
 
   g_restored_call = call;
   s_cb_data cb = {};
@@ -139,8 +143,8 @@ TEST_F(VpiPutUserDataSim, TheFieldCanBeSetUpAgainFromAnEndOfRestartCallback) {
   // The value the callback put there is what a later read finds - not the one
   // from before the restart, which the clear dropped, and not null.
   ASSERT_TRUE(g_restore_ran);
-  EXPECT_EQ(vpi_get_userdata(call), &g_restored_value);
-  EXPECT_NE(vpi_get_userdata(call), &before_restart);
+  EXPECT_EQ(vpi_get_userdata(VpiHandleOf(call)), &g_restored_value);
+  EXPECT_NE(vpi_get_userdata(VpiHandleOf(call)), &before_restart);
 }
 
 }  // namespace

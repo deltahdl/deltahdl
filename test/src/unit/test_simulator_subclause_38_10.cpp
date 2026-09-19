@@ -5,7 +5,11 @@
 
 #include "fixture_simulator.h"
 #include "helpers_vpi_delays_fixture.h"
+#include "simulator/vpi_constants.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -30,7 +34,7 @@ TEST_F(VpiGetDelaysSim, RetrievesDelaysInSourceOrder) {
   delay.da = da;
   delay.no_of_delays = 3;
   delay.time_type = vpiScaledRealTime;
-  vpi_get_delays(prim, &delay);
+  vpi_get_delays(VpiHandleOf(prim), &delay);
 
   EXPECT_DOUBLE_EQ(da[0].real, 11.0);
   EXPECT_DOUBLE_EQ(da[1].real, 22.0);
@@ -50,7 +54,7 @@ TEST_F(VpiGetDelaysSim, TimeTypeControlsFormat) {
   real_delay.da = as_real;
   real_delay.no_of_delays = 2;
   real_delay.time_type = vpiScaledRealTime;
-  vpi_get_delays(prim, &real_delay);
+  vpi_get_delays(VpiHandleOf(prim), &real_delay);
   EXPECT_DOUBLE_EQ(as_real[0].real, 7.0);
   EXPECT_EQ(as_real[0].low, 0u);
 
@@ -59,7 +63,7 @@ TEST_F(VpiGetDelaysSim, TimeTypeControlsFormat) {
   sim_delay.da = as_sim;
   sim_delay.no_of_delays = 2;
   sim_delay.time_type = vpiSimTime;
-  vpi_get_delays(prim, &sim_delay);
+  vpi_get_delays(VpiHandleOf(prim), &sim_delay);
   EXPECT_EQ(as_sim[0].low, 7u);
   EXPECT_DOUBLE_EQ(as_sim[0].real, 0.0);
 }
@@ -77,7 +81,7 @@ TEST_F(VpiGetDelaysSim, SuppressTimeTypeYieldsNoTimeValue) {
   delay.da = da;
   delay.no_of_delays = 2;
   delay.time_type = vpiSuppressTime;
-  vpi_get_delays(prim, &delay);
+  vpi_get_delays(VpiHandleOf(prim), &delay);
 
   EXPECT_EQ(da[0].type, vpiSuppressTime);
   EXPECT_DOUBLE_EQ(da[0].real, 0.0);  // suppressed despite the stored 7.0
@@ -100,7 +104,7 @@ TEST_F(VpiGetDelaysSim, IgnoresInputEntryTypeFlag) {
   delay.da = da;
   delay.no_of_delays = 2;
   delay.time_type = vpiScaledRealTime;
-  vpi_get_delays(prim, &delay);
+  vpi_get_delays(VpiHandleOf(prim), &delay);
 
   EXPECT_EQ(da[0].type, vpiScaledRealTime);
   EXPECT_EQ(da[1].type, vpiScaledRealTime);
@@ -123,7 +127,7 @@ TEST_F(VpiGetDelaysSim, MtmFlagExpandsToMinTypMax) {
   delay.no_of_delays = 2;  // legal for a primitive (2 or 3)
   delay.time_type = vpiScaledRealTime;
   delay.mtm_flag = 1;
-  vpi_get_delays(prim, &delay);
+  vpi_get_delays(VpiHandleOf(prim), &delay);
 
   EXPECT_DOUBLE_EQ(wide[0].real, 1.0);
   EXPECT_DOUBLE_EQ(wide[1].real, 2.0);
@@ -148,7 +152,7 @@ TEST_F(VpiGetDelaysSim, PulsereFlagExpandsToDelayRejectError) {
   delay.no_of_delays = 1;
   delay.time_type = vpiScaledRealTime;
   delay.pulsere_flag = 1;
-  vpi_get_delays(path, &delay);
+  vpi_get_delays(VpiHandleOf(path), &delay);
 
   EXPECT_DOUBLE_EQ(da[0].real, 10.0);
   EXPECT_DOUBLE_EQ(da[1].real, 4.0);
@@ -178,7 +182,7 @@ TEST_F(VpiGetDelaysSim, MtmAndPulsereExpandToNineElements) {
   delay.time_type = vpiScaledRealTime;
   delay.mtm_flag = 1;
   delay.pulsere_flag = 1;
-  vpi_get_delays(path, &delay);
+  vpi_get_delays(VpiHandleOf(path), &delay);
 
   for (int i = 0; i < 9; ++i) {
     EXPECT_DOUBLE_EQ(da[i].real, static_cast<double>(i + 1)) << "entry " << i;
@@ -199,7 +203,7 @@ TEST_F(VpiGetDelaysSim, IllegalNoOfDelaysForPrimitiveIsRejected) {
   delay.da = da;
   delay.no_of_delays = 4;  // not 2 or 3 -> illegal for a primitive
   delay.time_type = vpiScaledRealTime;
-  vpi_get_delays(prim, &delay);
+  vpi_get_delays(VpiHandleOf(prim), &delay);
 
   EXPECT_EQ(vpi_ctx_.LastError().level, kVpiError);
   EXPECT_DOUBLE_EQ(da[0].real, -1.0);  // untouched
@@ -220,7 +224,7 @@ TEST_F(VpiGetDelaysSim, TimingCheckNoOfDelaysMatchesLimitCount) {
   delay.da = da;
   delay.no_of_delays = 2;  // matches the two limits
   delay.time_type = vpiScaledRealTime;
-  vpi_get_delays(tchk, &delay);
+  vpi_get_delays(VpiHandleOf(tchk), &delay);
 
   EXPECT_EQ(vpi_ctx_.LastError().level, 0);
   EXPECT_DOUBLE_EQ(da[0].real, 2.0);
@@ -233,7 +237,7 @@ TEST_F(VpiGetDelaysSim, TimingCheckNoOfDelaysMatchesLimitCount) {
   bad_delay.da = bad;
   bad_delay.no_of_delays = 3;
   bad_delay.time_type = vpiScaledRealTime;
-  vpi_get_delays(tchk, &bad_delay);
+  vpi_get_delays(VpiHandleOf(tchk), &bad_delay);
   EXPECT_EQ(vpi_ctx_.LastError().level, kVpiError);
 }
 
@@ -251,7 +255,7 @@ TEST_F(VpiGetDelaysSim, IntermodulePathAcceptsTwoOrThree) {
   delay.da = da;
   delay.no_of_delays = 2;
   delay.time_type = vpiScaledRealTime;
-  vpi_get_delays(imp, &delay);
+  vpi_get_delays(VpiHandleOf(imp), &delay);
 
   EXPECT_EQ(vpi_ctx_.LastError().level, 0);
   EXPECT_DOUBLE_EQ(da[0].real, 12.0);
@@ -276,7 +280,7 @@ TEST_F(VpiGetDelaysSim, ModulePathLegalSetAcceptsSixRejectsFour) {
   delay.da = da;
   delay.no_of_delays = 6;  // in {1,2,3,6,12} -> legal for a module path
   delay.time_type = vpiScaledRealTime;
-  vpi_get_delays(path, &delay);
+  vpi_get_delays(VpiHandleOf(path), &delay);
 
   EXPECT_EQ(vpi_ctx_.LastError().level, 0);
   for (int i = 0; i < 6; ++i) {
@@ -291,7 +295,7 @@ TEST_F(VpiGetDelaysSim, ModulePathLegalSetAcceptsSixRejectsFour) {
   bad_delay.da = bad;
   bad_delay.no_of_delays = 4;
   bad_delay.time_type = vpiScaledRealTime;
-  vpi_get_delays(path, &bad_delay);
+  vpi_get_delays(VpiHandleOf(path), &bad_delay);
 
   EXPECT_EQ(vpi_ctx_.LastError().level, kVpiError);
   EXPECT_DOUBLE_EQ(bad[0].real, -1.0);  // untouched
@@ -305,12 +309,12 @@ TEST_F(VpiGetDelaysSim, NullArgumentsAreSafe) {
   d.delay = 1.0;
   VpiHandle prim = MakeDelayObject(vpiPrimitive, {d, d});
 
-  vpi_get_delays(prim, nullptr);  // null structure
+  vpi_get_delays(VpiHandleOf(prim), nullptr);  // null structure
 
   s_vpi_delay no_array = {};
   no_array.no_of_delays = 2;
   no_array.time_type = vpiScaledRealTime;
-  vpi_get_delays(prim, &no_array);  // null da
+  vpi_get_delays(VpiHandleOf(prim), &no_array);  // null da
 
   s_vpi_time da[2] = {};
   s_vpi_delay delay = {};
@@ -340,8 +344,8 @@ int g_paths_seen = 0;
 uint64_t g_smallest_delay = 0;
 uint64_t g_largest_delay = 0;
 
-int DisplayPathDelaysCalltf(const char*) {
-  vpiHandle mod = vpi_handle_by_name("m1", nullptr);
+PLI_INT32 DisplayPathDelaysCalltf(PLI_BYTE8*) {
+  vpiHandle mod = vpi_handle_by_name(VpiText("m1"), nullptr);
   if (mod == nullptr) return 0;
   vpiHandle paths = vpi_iterate(vpiModPath, mod);
   if (paths == nullptr) return 0;
@@ -379,7 +383,7 @@ void RegisterPathDelayProbe() {
 
   s_vpi_systf_data data = {};
   data.type = vpiSysTask;
-  data.tfname = "$probe";
+  data.tfname = VpiText("$probe");
   data.calltf = &DisplayPathDelaysCalltf;
   ASSERT_NE(vpi_register_systf(&data), nullptr);
 }

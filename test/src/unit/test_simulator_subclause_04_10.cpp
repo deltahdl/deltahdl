@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "common/types.h"
+#include "simulator/vpi_constants.h"
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_user.h"
 

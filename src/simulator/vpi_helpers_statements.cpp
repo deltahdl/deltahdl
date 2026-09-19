@@ -11,6 +11,10 @@
 // the SystemVerilog VPI header alongside the §37.10 vpiInstance relation.
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_internal.h"
+#include "simulator/vpi_model_helpers1.h"
+#include "simulator/vpi_model_helpers2.h"
+#include "simulator/vpi_model_helpers3.h"
+#include "simulator/vpi_object.h"
 
 namespace delta {
 

@@ -7,7 +7,10 @@
 #include "helpers_scheduler_event.h"
 #include "simulator/scheduler.h"
 #include "simulator/variable.h"
+#include "simulator/vpi_constants.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 using namespace delta;
@@ -51,7 +54,7 @@ TEST(PliPostponedSim, PliWriteFromPostponedRecordsWriteViolation) {
 
   auto* pli_cb = sched.GetEventPool().Acquire();
   pli_cb->callback = [&]() {
-    VpiValue value{};
+    s_vpi_value value{};
     value.format = kVpiIntVal;
     value.value.integer = 7;
     vpi.PutValue(&obj, &value, nullptr, 0);

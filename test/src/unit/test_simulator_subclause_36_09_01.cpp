@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -20,7 +22,7 @@ class UserDefinedSystfRegistration : public ::testing::Test {
 TEST_F(UserDefinedSystfRegistration, NameWithoutDollarIsRejected) {
   s_vpi_systf_data data = {};
   data.type = vpiSysTask;
-  data.tfname = "missing_dollar";
+  data.tfname = VpiText("missing_dollar");
 
   vpiHandle h = vpi_register_systf(&data);
 
@@ -33,7 +35,7 @@ TEST_F(UserDefinedSystfRegistration, NameWithoutDollarIsRejected) {
 TEST_F(UserDefinedSystfRegistration, NameWithDollarIsAccepted) {
   s_vpi_systf_data data = {};
   data.type = vpiSysTask;
-  data.tfname = "$get_vector";
+  data.tfname = VpiText("$get_vector");
 
   vpiHandle h = vpi_register_systf(&data);
 
@@ -62,7 +64,7 @@ TEST_F(UserDefinedSystfRegistration, NullNameIsRejected) {
 TEST_F(UserDefinedSystfRegistration, RegistrationBeforeElaborationSucceeds) {
   s_vpi_systf_data data = {};
   data.type = vpiSysTask;
-  data.tfname = "$early";
+  data.tfname = VpiText("$early");
 
   vpiHandle h = vpi_register_systf(&data);
 
@@ -78,7 +80,7 @@ TEST_F(UserDefinedSystfRegistration, RegistrationAfterElaborationIsRejected) {
 
   s_vpi_systf_data data = {};
   data.type = vpiSysTask;
-  data.tfname = "$late";
+  data.tfname = VpiText("$late");
 
   vpiHandle h = vpi_register_systf(&data);
 
@@ -94,11 +96,11 @@ TEST_F(UserDefinedSystfRegistration,
        RegistrationDistinguishesFunctionFromTask) {
   s_vpi_systf_data task = {};
   task.type = vpiSysTask;
-  task.tfname = "$as_task";
+  task.tfname = VpiText("$as_task");
 
   s_vpi_systf_data func = {};
   func.type = vpiSysFunc;
-  func.tfname = "$as_func";
+  func.tfname = VpiText("$as_func");
 
   ASSERT_NE(vpi_register_systf(&task), nullptr);
   ASSERT_NE(vpi_register_systf(&func), nullptr);
@@ -113,14 +115,14 @@ namespace {
 void StartupRoutineRegistersTask() {
   s_vpi_systf_data data = {};
   data.type = vpiSysTask;
-  data.tfname = "$startup_task";
+  data.tfname = VpiText("$startup_task");
   vpi_register_systf(&data);
 }
 
 void StartupRoutineRegistersFunc() {
   s_vpi_systf_data data = {};
   data.type = vpiSysFunc;
-  data.tfname = "$startup_func";
+  data.tfname = VpiText("$startup_func");
   vpi_register_systf(&data);
 }
 

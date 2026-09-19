@@ -4,7 +4,9 @@
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "simulator/sim_context.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -38,7 +40,7 @@ class VpiArgumentConventions : public ::testing::Test {
   void RaiseError() {
     s_vpi_systf_data data = {};
     data.type = vpiSysTask;
-    data.tfname = "missing_dollar";
+    data.tfname = VpiText("missing_dollar");
     vpi_register_systf(&data);
   }
 
@@ -79,7 +81,7 @@ TEST_F(VpiArgumentConventions, AnOmittedMandatoryArgumentMakesTheCallFail) {
 TEST_F(VpiArgumentConventions, TheExceptionSection38_2NotesIsHonoured) {
   RaiseError();
 
-  SVpiErrorInfo info = {};
+  s_vpi_error_info info = {};
   int with_structure = vpi_chk_error(&info);
   ASSERT_EQ(with_structure, vpiError);
 

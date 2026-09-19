@@ -10,7 +10,9 @@
 #include "fixture_simulator.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -26,7 +28,7 @@ void* g_seen_user_data = nullptr;
 VpiHandle g_seen_obj = nullptr;
 std::vector<int> g_sequence;
 
-int RecordingCb(VpiCbData* data) {
+int RecordingCb(s_cb_data* data) {
   ++g_invocations;
   if (data) {
     g_seen_reason = data->reason;
@@ -121,11 +123,11 @@ TEST_F(VpiActionFeatureCallbacks, MinimalFieldsSufficeForRegistration) {
   s_cb_data cb = {};
   cb.reason = cbStartOfSimulation;
   cb.cb_rtn = &RecordingCb;
-  cb.user_data = &payload;
+  cb.user_data = reinterpret_cast<PLI_BYTE8*>(&payload);
   vpiHandle h = vpi_register_cb(&cb);
   ASSERT_NE(h, nullptr);
 
-  const VpiCbData& stored = vpi_ctx_.RegisteredCallbacks().back();
+  const s_cb_data& stored = vpi_ctx_.RegisteredCallbacks().back();
   EXPECT_EQ(stored.reason, cbStartOfSimulation);
   EXPECT_EQ(stored.user_data, &payload);
   EXPECT_EQ(stored.obj, nullptr);
@@ -153,11 +155,11 @@ TEST_F(VpiActionFeatureCallbacks, ExecutingCallbackDeliversUserData) {
   s_cb_data cb = {};
   cb.reason = cbEndOfSimulation;
   cb.cb_rtn = &RecordingCb;
-  cb.user_data = &payload;
+  cb.user_data = reinterpret_cast<PLI_BYTE8*>(&payload);
   vpiHandle h = vpi_register_cb(&cb);
   ASSERT_NE(h, nullptr);
 
-  vpi_ctx_.ExecuteCallback(h);
+  vpi_ctx_.ExecuteCallback(VpiObjectOf(h));
   EXPECT_EQ(g_seen_user_data, &payload);
 }
 
@@ -172,7 +174,7 @@ TEST_F(VpiActionFeatureCallbacks, SignalCallbackPreservesSignalNumber) {
   vpiHandle h = vpi_register_cb(&cb);
   ASSERT_NE(h, nullptr);
 
-  const VpiCbData& stored = vpi_ctx_.RegisteredCallbacks().back();
+  const s_cb_data& stored = vpi_ctx_.RegisteredCallbacks().back();
   EXPECT_EQ(stored.reason, cbSignal);
   EXPECT_EQ(stored.index, 15);
 }
@@ -255,7 +257,7 @@ TEST_F(VpiActionFeatureCallbacks,
   // every other reason has been removed (RemoveCb clears the reason to -1), and
   // both restart reasons remain present.
   std::multiset<int> survivors;
-  for (const VpiCbData& cb : vpi_ctx_.RegisteredCallbacks()) {
+  for (const s_cb_data& cb : vpi_ctx_.RegisteredCallbacks()) {
     if (cb.reason != -1) survivors.insert(cb.reason);
   }
   std::multiset<int> expected{cbStartOfRestart, cbEndOfRestart};
@@ -320,17 +322,17 @@ TEST_F(VpiActionFeatureCallbacks, RemovedCallbackIsNotDispatched) {
 // rather than together is the sequence.
 std::vector<int> g_action_order;
 
-int RecordEndOfCompile(VpiCbData*) {
+int RecordEndOfCompile(s_cb_data*) {
   g_action_order.push_back(cbEndOfCompile);
   return 0;
 }
 
-int RecordStartOfSimulation(VpiCbData*) {
+int RecordStartOfSimulation(s_cb_data*) {
   g_action_order.push_back(cbStartOfSimulation);
   return 0;
 }
 
-int RecordEndOfSimulation(VpiCbData*) {
+int RecordEndOfSimulation(s_cb_data*) {
   g_action_order.push_back(cbEndOfSimulation);
   return 0;
 }

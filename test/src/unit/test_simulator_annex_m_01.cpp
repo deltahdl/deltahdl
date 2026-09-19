@@ -17,6 +17,7 @@
 // and struct layout of the listing) belong to §M.2 and are exercised by its own
 // canonical test; §M.1's lane is provision of the file itself.
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_user.h"
 
 // Deliberately include the provided header a second time. A normative include
 // file must be safe to pull in more than once; the production

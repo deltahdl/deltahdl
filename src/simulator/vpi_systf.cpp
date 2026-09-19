@@ -23,11 +23,17 @@
 // there with them.
 #include "simulator/sv_vpi_user.h"
 #include "simulator/variable.h"
+#include "simulator/vpi_constants.h"
+#include "simulator/vpi_context.h"
+#include "simulator/vpi_data_structs.h"
 #include "simulator/vpi_internal.h"
+#include "simulator/vpi_model_helpers1.h"
+#include "simulator/vpi_model_helpers3.h"
+#include "simulator/vpi_object.h"
 
 namespace delta {
 
-VpiHandle VpiContext::RegisterSystf(VpiSystfData* data) {
+VpiHandle VpiContext::RegisterSystf(s_vpi_systf_data* data) {
   if (!data) return nullptr;
 
   // §38.37.1: "The type field shall be an integer constant of vpiSysTask or
@@ -45,9 +51,9 @@ VpiHandle VpiContext::RegisterSystf(VpiSystfData* data) {
   if (data->type != kVpiSysTask && data->type != kVpiSysFunc) {
     last_error_.state = kVpiPLI;
     last_error_.level = kVpiError;
-    last_error_.message =
+    last_error_.message = VpiText(
         "system task or function registration must carry a type of vpiSysTask "
-        "or vpiSysFunc";
+        "or vpiSysFunc");
     return nullptr;
   }
 
@@ -59,9 +65,9 @@ VpiHandle VpiContext::RegisterSystf(VpiSystfData* data) {
   if (!VpiSystfNameIsValid(data->tfname)) {
     last_error_.state = kVpiPLI;
     last_error_.level = kVpiError;
-    last_error_.message =
+    last_error_.message = VpiText(
         "system task or function name must be '$' followed by one or more "
-        "identifier characters";
+        "identifier characters");
     return nullptr;
   }
 
@@ -79,11 +85,11 @@ VpiHandle VpiContext::RegisterSystf(VpiSystfData* data) {
     last_error_.state = kVpiPLI;
     last_error_.level = kVpiError;
     // The message names the rule rather than the number, both because
-    // VpiErrorInfo::message is a const char* with nowhere to keep a built
+    // s_vpi_error_info::message is a const char* with nowhere to keep a built
     // string and because the rule is that the two maxima agree, not that either
     // is 1024.
-    last_error_.message =
-        "system task or function name exceeds the maximum identifier length";
+    last_error_.message = VpiText(
+        "system task or function name exceeds the maximum identifier length");
     return nullptr;
   }
 
@@ -93,8 +99,8 @@ VpiHandle VpiContext::RegisterSystf(VpiSystfData* data) {
   if (elaboration_started_) {
     last_error_.state = kVpiPLI;
     last_error_.level = kVpiError;
-    last_error_.message =
-        "system task or function registration must precede elaboration";
+    last_error_.message = VpiText(
+        "system task or function registration must precede elaboration");
     return nullptr;
   }
 
@@ -112,7 +118,7 @@ VpiHandle VpiContext::RegisterSystf(VpiSystfData* data) {
   return systf_obj;
 }
 
-const VpiSystfData* VpiContext::ResolveSystf(const char* name) const {
+const s_vpi_systf_data* VpiContext::ResolveSystf(const char* name) const {
   // §36.3.2: Clause 20 and Clause 21 built-in system tasks/functions, and any
   // tool-specific ones, share the same '$'-prefixed namespace as user-defined
   // names. If a user-provided PLI application is associated (through the PLI
@@ -294,7 +300,7 @@ void FillPrefixedArgument(VpiObject* arg, VpiObject* prefix, const Expr* actual,
 // periods that call a PLI application build one, and `evaluate_args` is the
 // whole of the difference between them: an execution-time call reads each
 // actual's value, a build-period call has none to read.
-VpiHandle VpiContext::MakeSystfCallObject(const VpiSystfData& data,
+VpiHandle VpiContext::MakeSystfCallObject(const s_vpi_systf_data& data,
                                           const Expr* call_site,
                                           SimContext& ctx, Arena& arena,
                                           bool evaluate_args) {
@@ -350,7 +356,7 @@ VpiHandle VpiContext::MakeSystfCallObject(const VpiSystfData& data,
 bool VpiContext::CallRegisteredSystf(const char* name, const Expr* call_site,
                                      SimContext& ctx, Logic4Vec& result,
                                      Arena& arena) {
-  const VpiSystfData* data = ResolveSystf(name);
+  const s_vpi_systf_data* data = ResolveSystf(name);
   if (data == nullptr) return false;
 
   VpiHandle call = MakeSystfCallObject(*data, call_site, ctx, arena,
@@ -361,7 +367,7 @@ bool VpiContext::CallRegisteredSystf(const char* name, const Expr* call_site,
   VpiHandle outer_call = CurrentSystfCall();
   SetCurrentSystfCall(call);
   if (data->calltf != nullptr) {
-    data->calltf(static_cast<const char*>(data->user_data));
+    data->calltf(data->user_data);
   }
   SetCurrentSystfCall(outer_call);
 
@@ -369,7 +375,7 @@ bool VpiContext::CallRegisteredSystf(const char* name, const Expr* call_site,
   return true;
 }
 
-void VpiContext::CallCompiletfForSourceCall(const VpiSystfData& data,
+void VpiContext::CallCompiletfForSourceCall(const s_vpi_systf_data& data,
                                             const Expr* call_site,
                                             SimContext& ctx, Arena& arena) {
   // §36.8.2: "Providing a compiletf routine is optional." A registration that
@@ -389,7 +395,7 @@ void VpiContext::CallCompiletfForSourceCall(const VpiSystfData& data,
   SetCurrentSystfCall(outer_call);
 }
 
-void VpiContext::GetSystfInfo(VpiHandle obj, VpiSystfData* systf_data_p) {
+void VpiContext::GetSystfInfo(VpiHandle obj, s_vpi_systf_data* systf_data_p) {
   // §38.12 / §38.1: the handle and the destination are both mandatory. With no
   // structure to fill, or no callback to read, there is nothing to report.
   if (obj == nullptr || systf_data_p == nullptr) return;
@@ -405,7 +411,7 @@ void VpiContext::GetSystfInfo(VpiHandle obj, VpiSystfData* systf_data_p) {
   *systf_data_p = systfs_[idx];
 }
 
-void VpiContext::GetCbInfo(VpiHandle obj, VpiCbData* cb_data_p) {
+void VpiContext::GetCbInfo(VpiHandle obj, s_cb_data* cb_data_p) {
   // §38.8: the destination structure is allocated by the application. With no
   // structure to fill, or no callback to read, there is nothing to report; the
   // routine never allocates that memory itself.
@@ -446,7 +452,7 @@ VpiHandle VpiContext::CreateTimeQueue() {
   return obj;
 }
 
-void VpiContext::GetTime(VpiHandle obj, VpiTime* time_p) {
+void VpiContext::GetTime(VpiHandle obj, s_vpi_time* time_p) {
   // §38.13 / §38.1: the destination is mandatory and its memory belongs to the
   // application. With nowhere to write, there is nothing to do; the routine
   // never allocates the structure itself.
@@ -521,13 +527,15 @@ namespace {
 
 // §38.10 / §38.32: a position-tracking cursor over the delay structure's da[]
 // array. The min:typ:max triple and per-delay run helpers all walk one
-// VpiDelay::da[] in source order, advancing a shared index `k` and forming each
-// entry under one `time_type`. Bundling the three together names that single
-// entity - a cursor into the da[] array - rather than threading them apart.
+// s_vpi_delay::da[] in source order, advancing a shared index `k` and forming
+// each entry under one `time_type`. Bundling the three together names that
+// single entity - a cursor into the da[] array - rather than threading them
+// apart.
 struct DelayCursor {
-  VpiDelay* delay_p;  // the application-allocated delay structure being walked
-  int k;              // current write/read position within delay_p->da[]
-  int time_type;      // the form (vpiScaledRealTime/vpiSimTime/...) of entries
+  s_vpi_delay*
+      delay_p;    // the application-allocated delay structure being walked
+  int k;          // current write/read position within delay_p->da[]
+  int time_type;  // the form (vpiScaledRealTime/vpiSimTime/...) of entries
 };
 
 // §38.10: whether `n` is a legal number of delays to request for an object of
@@ -549,7 +557,7 @@ bool VpiNoOfDelaysLegal(int type, int n, size_t available) {
 // field is ignored on input and overwritten with time_type. vpiScaledRealTime
 // delivers a real; vpiSimTime delivers the value as a 64-bit count split across
 // high/low; vpiSuppressTime asks for no time and leaves the value cleared.
-void VpiWriteDelayValue(VpiTime* slot, int time_type, double value) {
+void VpiWriteDelayValue(s_vpi_time* slot, int time_type, double value) {
   slot->type = time_type;
   slot->high = 0;
   slot->low = 0;
@@ -568,7 +576,7 @@ void VpiWriteDelayValue(VpiTime* slot, int time_type, double value) {
 // time_type: vpiScaledRealTime carries the value in the real field; vpiSimTime
 // carries it as a 64-bit count split across high/low; vpiSuppressTime carries
 // no time, so the value is zero.
-double VpiReadDelayValue(const VpiTime& slot, int time_type) {
+double VpiReadDelayValue(const s_vpi_time& slot, int time_type) {
   if (time_type == vpiScaledRealTime) return slot.real;
   if (time_type == vpiSimTime) {
     uint64_t ticks = (static_cast<uint64_t>(slot.high) << 32) | slot.low;
@@ -663,7 +671,7 @@ void VpiReadDelayRun(DelayCursor& cur, bool mtm, bool pulsere,
 
 }  // namespace
 
-void VpiContext::GetDelays(VpiHandle obj, VpiDelay* delay_p) {
+void VpiContext::GetDelays(VpiHandle obj, s_vpi_delay* delay_p) {
   // §38.10 / §38.1: the structure and its da array are application-allocated.
   // With nothing to fill, or no object to read delays from, there is nothing
   // to do; the routine never allocates anything itself.
@@ -675,8 +683,8 @@ void VpiContext::GetDelays(VpiHandle obj, VpiDelay* delay_p) {
   if (obj->type == vpiPort && !VpiPortDelaysApplicable(obj->port_type)) {
     last_error_.state = kVpiPLI;
     last_error_.level = kVpiError;
-    last_error_.message =
-        "vpi_get_delays(): delays are not applicable to an interface port";
+    last_error_.message = VpiText(
+        "vpi_get_delays(): delays are not applicable to an interface port");
     return;
   }
 
@@ -687,9 +695,9 @@ void VpiContext::GetDelays(VpiHandle obj, VpiDelay* delay_p) {
                           obj->delays.size())) {
     last_error_.state = kVpiPLI;
     last_error_.level = kVpiError;
-    last_error_.message =
+    last_error_.message = VpiText(
         "vpi_get_delays(): the requested number of delays is not legal for "
-        "this object";
+        "this object");
     return;
   }
 
@@ -711,7 +719,7 @@ void VpiContext::GetDelays(VpiHandle obj, VpiDelay* delay_p) {
   }
 }
 
-void VpiContext::PutDelays(VpiHandle obj, VpiDelay* delay_p) {
+void VpiContext::PutDelays(VpiHandle obj, s_vpi_delay* delay_p) {
   // §38.32 / §38.1: the structure and its da array are application-allocated.
   // With no source values or no target object there is nothing to set; the
   // routine never allocates the caller's memory itself.
@@ -722,8 +730,8 @@ void VpiContext::PutDelays(VpiHandle obj, VpiDelay* delay_p) {
   if (obj->type == vpiPort && !VpiPortDelaysApplicable(obj->port_type)) {
     last_error_.state = kVpiPLI;
     last_error_.level = kVpiError;
-    last_error_.message =
-        "vpi_put_delays(): delays are not applicable to an interface port";
+    last_error_.message = VpiText(
+        "vpi_put_delays(): delays are not applicable to an interface port");
     return;
   }
 
@@ -734,9 +742,9 @@ void VpiContext::PutDelays(VpiHandle obj, VpiDelay* delay_p) {
                           obj->delays.size())) {
     last_error_.state = kVpiPLI;
     last_error_.level = kVpiError;
-    last_error_.message =
+    last_error_.message = VpiText(
         "vpi_put_delays(): the requested number of delays is not legal for "
-        "this object";
+        "this object");
     return;
   }
 
@@ -782,9 +790,9 @@ int VpiContext::GetData(int id, char* data_loc, int num_of_bytes) {
       current_callback_reason_ != kCbEndOfRestart) {
     last_error_.state = kVpiPLI;
     last_error_.level = kVpiError;
-    last_error_.message =
+    last_error_.message = VpiText(
         "vpi_get_data() may only be called from a cbStartOfRestart or "
-        "cbEndOfRestart application routine";
+        "cbEndOfRestart application routine");
     return 0;
   }
 
@@ -794,7 +802,8 @@ int VpiContext::GetData(int id, char* data_loc, int num_of_bytes) {
   if (data_loc == nullptr || num_of_bytes <= 0 || it == save_data_.end()) {
     last_error_.state = kVpiPLI;
     last_error_.level = kVpiError;
-    last_error_.message = "vpi_get_data() could not retrieve saved data";
+    last_error_.message =
+        VpiText("vpi_get_data() could not retrieve saved data");
     return 0;
   }
 
@@ -813,8 +822,8 @@ int VpiContext::GetData(int id, char* data_loc, int num_of_bytes) {
     cursor += kAvailable;
     last_error_.state = kVpiPLI;
     last_error_.level = kVpiWarning;
-    last_error_.message =
-        "vpi_get_data() requested more data than were saved for this id";
+    last_error_.message = VpiText(
+        "vpi_get_data() requested more data than were saved for this id");
     return kRetrieved;
   }
 
@@ -834,9 +843,9 @@ int VpiContext::PutData(int id, const char* data_loc, int num_of_bytes) {
       current_callback_reason_ != kCbEndOfSave) {
     last_error_.state = kVpiPLI;
     last_error_.level = kVpiError;
-    last_error_.message =
+    last_error_.message = VpiText(
         "vpi_put_data() may only be called from a cbStartOfSave or "
-        "cbEndOfSave application routine";
+        "cbEndOfSave application routine");
     return 0;
   }
 
@@ -846,8 +855,8 @@ int VpiContext::PutData(int id, const char* data_loc, int num_of_bytes) {
   if (data_loc == nullptr || num_of_bytes <= 0) {
     last_error_.state = kVpiPLI;
     last_error_.level = kVpiError;
-    last_error_.message =
-        "vpi_put_data() requires a non-null source and a positive byte count";
+    last_error_.message = VpiText(
+        "vpi_put_data() requires a non-null source and a positive byte count");
     return 0;
   }
 
@@ -870,9 +879,9 @@ int VpiContext::PutUserData(VpiHandle obj, void* userdata) {
       (obj->type != vpiSysTaskCall && obj->type != vpiSysFuncCall)) {
     last_error_.state = kVpiPLI;
     last_error_.level = kVpiError;
-    last_error_.message =
+    last_error_.message = VpiText(
         "vpi_put_userdata() requires a system task or system function call "
-        "handle";
+        "handle");
     return 0;
   }
 
@@ -891,9 +900,9 @@ void* VpiContext::GetUserData(VpiHandle obj) {
       (obj->type != vpiSysTaskCall && obj->type != vpiSysFuncCall)) {
     last_error_.state = kVpiPLI;
     last_error_.level = kVpiError;
-    last_error_.message =
+    last_error_.message = VpiText(
         "vpi_get_userdata() requires a system task or system function call "
-        "handle";
+        "handle");
     return nullptr;
   }
 

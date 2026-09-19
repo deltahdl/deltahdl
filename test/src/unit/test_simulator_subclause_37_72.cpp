@@ -1,7 +1,10 @@
 #include <gtest/gtest.h>
 
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_model_helpers1.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -37,15 +40,15 @@ TEST_F(CasePattern, CaseStatementReportsCaseTypeAndQualifier) {
   case_stmt.case_type = vpiCaseZ;
   case_stmt.qualifier = vpiUniqueQualifier | vpiPriorityQualifier;
 
-  EXPECT_EQ(vpi_get(vpiCaseType, &case_stmt), vpiCaseZ);
-  EXPECT_EQ(vpi_get(vpiQualifier, &case_stmt),
+  EXPECT_EQ(vpi_get(vpiCaseType, VpiHandleOf(&case_stmt)), vpiCaseZ);
+  EXPECT_EQ(vpi_get(vpiQualifier, VpiHandleOf(&case_stmt)),
             vpiUniqueQualifier | vpiPriorityQualifier);
 
   // A case statement written with no qualifier reports the "none" sentinel.
   VpiObject plain_case;
   plain_case.type = vpiCase;
   plain_case.case_type = vpiCaseExact;
-  EXPECT_EQ(vpi_get(vpiQualifier, &plain_case), vpiNoQualifier);
+  EXPECT_EQ(vpi_get(vpiQualifier, VpiHandleOf(&plain_case)), vpiNoQualifier);
 }
 
 // Diagram (case item -> vpiExpr -> pattern|expr): the classifier recognizes the
@@ -87,7 +90,7 @@ TEST_F(CasePattern, CaseItemGroupsConditionsBranchingToOneStatement) {
   EXPECT_EQ(conditions[1], &c1);
 
   // The statement is reached as the item's stmt, not as one of the conditions.
-  EXPECT_EQ(vpi_handle(vpiStmt, &item), &stmt);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiStmt, VpiHandleOf(&item))), &stmt);
 }
 
 // Detail 1 (via the public iteration): iterating the vpiExpr edge over a case
@@ -157,7 +160,8 @@ TEST_F(CasePattern, DefaultCaseItemStillReachesItsStatement) {
   default_item.children = {&stmt};
 
   EXPECT_EQ(ctx_.Iterate(vpiExpr, &default_item), nullptr);  // no conditions
-  EXPECT_EQ(vpi_handle(vpiStmt, &default_item), &stmt);      // stmt still there
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiStmt, VpiHandleOf(&default_item))),
+            &stmt);  // stmt still there
 }
 
 // Diagram scope (edge case): the vpiExpr edge that reaches patterns is the case
@@ -202,7 +206,8 @@ TEST_F(CasePattern, CaseStatementReachesTheExpressionItSelectsOn) {
   case_stmt.type = vpiCase;
   case_stmt.children = {&item, &selector};
 
-  EXPECT_EQ(vpi_handle(vpiCondition, &case_stmt), &selector);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiCondition, VpiHandleOf(&case_stmt))),
+            &selector);
 }
 
 // Diagram edge: a case statement written with no selector expression reaches
@@ -215,7 +220,7 @@ TEST_F(CasePattern, CaseStatementWithNoSelectorReachesNoCondition) {
   case_stmt.type = vpiCase;
   case_stmt.children = {&item};
 
-  EXPECT_EQ(vpi_handle(vpiCondition, &case_stmt), nullptr);
+  EXPECT_EQ(vpi_handle(vpiCondition, VpiHandleOf(&case_stmt)), nullptr);
 }
 
 // Diagram (pattern class membership): `pattern` is a class enclosure, so the
@@ -245,9 +250,10 @@ TEST_F(CasePattern, ATaggedPatternReachesThePatternItTags) {
   tagged.name = "kind";
   tagged.children = {&typespec, &inner};
 
-  EXPECT_EQ(vpi_handle(vpiPattern, &tagged), &inner);
-  EXPECT_EQ(vpi_handle(vpiTypespec, &tagged), &typespec);
-  EXPECT_STREQ(vpi_get_str(vpiName, &tagged), "kind");
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiPattern, VpiHandleOf(&tagged))), &inner);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiTypespec, VpiHandleOf(&tagged))),
+            &typespec);
+  EXPECT_STREQ(vpi_get_str(vpiName, VpiHandleOf(&tagged)), "kind");
 }
 
 // Diagram (struct pattern -> pattern): a struct pattern reaches the pattern of
@@ -260,11 +266,12 @@ TEST_F(CasePattern, AStructPatternReachesItsMemberPattern) {
   struct_pattern.type = vpiStructPattern;
   struct_pattern.children = {&member};
 
-  EXPECT_EQ(vpi_handle(vpiPattern, &struct_pattern), &member);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiPattern, VpiHandleOf(&struct_pattern))),
+            &member);
 
   VpiObject leaf;
   leaf.type = vpiAnyPattern;
-  EXPECT_EQ(vpi_handle(vpiPattern, &leaf), nullptr);
+  EXPECT_EQ(vpi_handle(vpiPattern, VpiHandleOf(&leaf)), nullptr);
 }
 
 }  // namespace

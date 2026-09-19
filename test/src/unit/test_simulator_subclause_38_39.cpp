@@ -5,7 +5,9 @@
 #include "common/source_mgr.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_user.h"
 
 // §38.39 vpi_remove_cb(): removes a simulation-related callback that was
@@ -18,13 +20,13 @@ namespace delta {
 namespace {
 
 int g_38_39_fired = 0;
-int CountingCb(VpiCbData*) {
+int CountingCb(s_cb_data*) {
   ++g_38_39_fired;
   return 0;
 }
 
 int g_38_39_fired_other = 0;
-int OtherCountingCb(VpiCbData*) {
+int OtherCountingCb(s_cb_data*) {
   ++g_38_39_fired_other;
   return 0;
 }
@@ -98,7 +100,7 @@ TEST_F(VpiRemoveCbSim, NonCallbackHandleReturnsZero) {
   sim_ctx_.CreateVariable("n", 8);
   vpi_ctx_.Attach(sim_ctx_);
 
-  vpiHandle net = vpi_handle_by_name("n", nullptr);
+  vpiHandle net = vpi_handle_by_name(VpiText("n"), nullptr);
   ASSERT_NE(net, nullptr);
 
   EXPECT_EQ(vpi_remove_cb(net), 0);

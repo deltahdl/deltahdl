@@ -9,7 +9,10 @@
 #include "simulator/net.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -27,12 +30,12 @@ namespace {
 // Recorder for the contents of the s_cb_data structure the simulator hands to a
 // cbStmt routine, so a test can observe the dispatch-time field guarantees.
 int g_stmt_calls = 0;
-VpiValue* g_stmt_value = reinterpret_cast<VpiValue*>(1);
+s_vpi_value* g_stmt_value = reinterpret_cast<s_vpi_value*>(1);
 int g_stmt_index = -1;
-VpiTime* g_stmt_time = reinterpret_cast<VpiTime*>(1);
-VpiTime g_stmt_time_seen = {};
+s_vpi_time* g_stmt_time = reinterpret_cast<s_vpi_time*>(1);
+s_vpi_time g_stmt_time_seen = {};
 
-int RecordStmtCb(VpiCbData* data) {
+int RecordStmtCb(s_cb_data* data) {
   ++g_stmt_calls;
   if (data) {
     g_stmt_value = data->value;
@@ -47,10 +50,10 @@ class VpiStmtCallback : public ::testing::Test {
  protected:
   void SetUp() override {
     g_stmt_calls = 0;
-    g_stmt_value = reinterpret_cast<VpiValue*>(1);
+    g_stmt_value = reinterpret_cast<s_vpi_value*>(1);
     g_stmt_index = -1;
-    g_stmt_time = reinterpret_cast<VpiTime*>(1);
-    g_stmt_time_seen = VpiTime{};
+    g_stmt_time = reinterpret_cast<s_vpi_time*>(1);
+    g_stmt_time_seen = s_vpi_time{};
     vpi_ctx_.SetScheduler(&scheduler_);
     SetGlobalVpiContext(&vpi_ctx_);
   }
@@ -71,10 +74,10 @@ class VpiStmtCallback : public ::testing::Test {
   vpiHandle MakeStatementHandle(const char* name, bool protect) {
     sim_ctx_.CreateVariable(name, 1);
     vpi_ctx_.Attach(sim_ctx_);
-    vpiHandle h = vpi_handle_by_name(name, nullptr);
+    vpiHandle h = vpi_handle_by_name(VpiText(name), nullptr);
     if (h) {
-      h->type = vpiNamedBegin;
-      h->is_protected = protect;
+      VpiObjectOf(h)->type = vpiNamedBegin;
+      VpiObjectOf(h)->is_protected = protect;
     }
     return h;
   }
@@ -99,7 +102,7 @@ TEST_F(VpiStmtCallback, ProtectedStatementRejected) {
   cb.obj = stmt;
   EXPECT_EQ(vpi_register_cb(&cb), nullptr);
 
-  SVpiErrorInfo info = {};
+  s_vpi_error_info info = {};
   EXPECT_EQ(vpi_chk_error(&info), vpiError);
 }
 
@@ -150,7 +153,7 @@ TEST_F(VpiStmtCallback,
 // always NULL and the index field is always 0, regardless of what was supplied
 // at registration.
 TEST_F(VpiStmtCallback, DispatchedDataHasNullValueAndZeroIndex) {
-  VpiValue supplied_value = {};
+  s_vpi_value supplied_value = {};
   s_cb_data cb = {};
   cb.reason = cbStmt;
   cb.cb_rtn = &RecordStmtCb;
@@ -169,7 +172,7 @@ TEST_F(VpiStmtCallback, DispatchedDataHasNullValueAndZeroIndex) {
 // type, no time is passed to the routine - the time pointer in the delivered
 // s_cb_data is set to NULL.
 TEST_F(VpiStmtCallback, SuppressTimeNullsDispatchedTimePointer) {
-  VpiTime t = {};
+  s_vpi_time t = {};
   t.type = vpiSuppressTime;
   s_cb_data cb = {};
   cb.reason = cbStmt;
@@ -195,7 +198,7 @@ TEST_F(VpiStmtCallback, SuppressTimeNullsDispatchedTimePointer) {
 TEST_F(VpiStmtCallback, DispatchedTimeCarriesTheCurrentSimulationTime) {
   AdvanceTo(37);
 
-  VpiTime t = {};
+  s_vpi_time t = {};
   t.type = vpiSimTime;
   t.low = 5;  // not a time of anything: at registration only the type is used
   s_cb_data cb = {};

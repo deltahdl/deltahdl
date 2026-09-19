@@ -7,7 +7,9 @@
 #include "common/source_mgr.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -24,7 +26,7 @@ class VpiErrorCheckSim : public ::testing::Test {
   void RaiseError() {
     s_vpi_systf_data data = {};
     data.type = vpiSysTask;
-    data.tfname = "missing_dollar";
+    data.tfname = VpiText("missing_dollar");
     vpi_register_systf(&data);
   }
 
@@ -39,7 +41,7 @@ class VpiErrorCheckSim : public ::testing::Test {
 // §38.2 (R2): with no preceding error, vpi_chk_error() returns 0 (false) and
 // leaves the supplied structure's severity level at zero.
 TEST_F(VpiErrorCheckSim, ChkErrorNoErrorReturnsZero) {
-  SVpiErrorInfo info = {};
+  s_vpi_error_info info = {};
   int result = vpi_chk_error(&info);
   EXPECT_EQ(result, 0);
   EXPECT_EQ(info.level, 0);
@@ -73,7 +75,7 @@ TEST_F(VpiErrorCheckSim, SeverityConstantsAreOrderedLowestToHighest) {
 TEST_F(VpiErrorCheckSim, ChkErrorReturnsSeverityLevelAfterError) {
   RaiseError();
 
-  SVpiErrorInfo info = {};
+  s_vpi_error_info info = {};
   int result = vpi_chk_error(&info);
 
   EXPECT_EQ(result, vpiError);
@@ -89,7 +91,7 @@ TEST_F(VpiErrorCheckSim, OtherRoutineCallResetsErrorStatus) {
   ASSERT_EQ(vpi_chk_error(nullptr), vpiError);
 
   // A different, successful VPI routine call resets the pending error status.
-  SVpiVlogInfo vlog = {};
+  s_vpi_vlog_info vlog = {};
   vpi_get_vlog_info(&vlog);
 
   EXPECT_EQ(vpi_chk_error(nullptr), 0);
@@ -105,7 +107,8 @@ TEST_F(VpiErrorCheckSim, SuccessfulRoutineCallClearsPriorError) {
 
   s_vpi_systf_data data = {};
   data.type = vpiSysTask;
-  data.tfname = "$ok";  // valid name: registration succeeds, records no error
+  data.tfname =
+      VpiText("$ok");  // valid name: registration succeeds, records no error
   vpi_register_systf(&data);
 
   EXPECT_EQ(vpi_chk_error(nullptr), 0);
@@ -117,7 +120,7 @@ TEST_F(VpiErrorCheckSim, ChkErrorDoesNotResetErrorStatus) {
   RaiseError();
 
   EXPECT_EQ(vpi_chk_error(nullptr), vpiError);
-  SVpiErrorInfo info = {};
+  s_vpi_error_info info = {};
   EXPECT_EQ(vpi_chk_error(&info), vpiError);
   EXPECT_EQ(info.level, vpiError);
 }
@@ -132,7 +135,7 @@ TEST_F(VpiErrorCheckSim, ChkErrorDoesNotResetErrorStatus) {
 TEST_F(VpiErrorCheckSim, TheStateNamesTheActivityAndTheLevelTheSeverity) {
   RaiseError();
 
-  SVpiErrorInfo info = {};
+  s_vpi_error_info info = {};
   ASSERT_EQ(vpi_chk_error(&info), vpiError);
 
   // The routine itself is what raised this, so the activity is the PLI.
@@ -149,7 +152,7 @@ TEST_F(VpiErrorCheckSim, TheStateNamesTheActivityAndTheLevelTheSeverity) {
 TEST_F(VpiErrorCheckSim, TheStateIsTheSameWhateverTheSeverity) {
   vpi_free_object(nullptr);
 
-  SVpiErrorInfo info = {};
+  s_vpi_error_info info = {};
   ASSERT_EQ(vpi_chk_error(&info), vpiWarning);
 
   EXPECT_EQ(info.state, vpiPLI);

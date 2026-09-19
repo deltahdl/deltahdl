@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -54,7 +56,8 @@ TEST_F(Expect, ExpectStatementReachesItsPropertySpecification) {
   expect_stmt.type = vpiExpectStmt;
   expect_stmt.children = {&incidental, &spec};
 
-  EXPECT_EQ(vpi_handle(vpiPropertySpec, &expect_stmt), &spec);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiPropertySpec, VpiHandleOf(&expect_stmt))),
+            &spec);
 }
 
 // Pass and fail actions: an expect statement reaches the action a passing
@@ -76,8 +79,9 @@ TEST_F(Expect, PassAndFailActionsAreTheFirstAndSecondStatements) {
   expect_stmt.type = vpiExpectStmt;
   expect_stmt.children = {&spec, &pass, &fail};
 
-  EXPECT_EQ(vpi_handle(vpiStmt, &expect_stmt), &pass);
-  EXPECT_EQ(vpi_handle(vpiElseStmt, &expect_stmt), &fail);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiStmt, VpiHandleOf(&expect_stmt))), &pass);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiElseStmt, VpiHandleOf(&expect_stmt))),
+            &fail);
 }
 
 // Both actions are reached whatever kind they are written as, including the
@@ -96,9 +100,11 @@ TEST_F(Expect, EachKindAnActionCarriesIsReachedByItsOwnRelation) {
     expect_stmt.type = vpiExpectStmt;
     expect_stmt.children = {&pass, &fail};
 
-    EXPECT_EQ(vpi_handle(vpiStmt, &expect_stmt), &pass)
+    EXPECT_EQ(VpiObjectOf(vpi_handle(vpiStmt, VpiHandleOf(&expect_stmt))),
+              &pass)
         << "action kind " << action_kind;
-    EXPECT_EQ(vpi_handle(vpiElseStmt, &expect_stmt), &fail)
+    EXPECT_EQ(VpiObjectOf(vpi_handle(vpiElseStmt, VpiHandleOf(&expect_stmt))),
+              &fail)
         << "action kind " << action_kind;
   }
 }
@@ -116,8 +122,8 @@ TEST_F(Expect, FailActionIsNullWhenTheExpectStatementHasOnlyAPassAction) {
   expect_stmt.type = vpiExpectStmt;
   expect_stmt.children = {&spec, &pass};
 
-  EXPECT_EQ(vpi_handle(vpiStmt, &expect_stmt), &pass);
-  EXPECT_EQ(vpi_handle(vpiElseStmt, &expect_stmt), nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiStmt, VpiHandleOf(&expect_stmt))), &pass);
+  EXPECT_EQ(vpi_handle(vpiElseStmt, VpiHandleOf(&expect_stmt)), nullptr);
 }
 
 // Edge: each of the three relations reports no handle when the expect statement
@@ -127,9 +133,9 @@ TEST_F(Expect, ExpectStatementWithoutBodyReportsNullThroughEachRelation) {
   VpiObject expect_stmt;
   expect_stmt.type = vpiExpectStmt;
 
-  EXPECT_EQ(vpi_handle(vpiPropertySpec, &expect_stmt), nullptr);
-  EXPECT_EQ(vpi_handle(vpiStmt, &expect_stmt), nullptr);
-  EXPECT_EQ(vpi_handle(vpiElseStmt, &expect_stmt), nullptr);
+  EXPECT_EQ(vpi_handle(vpiPropertySpec, VpiHandleOf(&expect_stmt)), nullptr);
+  EXPECT_EQ(vpi_handle(vpiStmt, VpiHandleOf(&expect_stmt)), nullptr);
+  EXPECT_EQ(vpi_handle(vpiElseStmt, VpiHandleOf(&expect_stmt)), nullptr);
 
   VpiObject expr;
   expr.type = vpiOperation;
@@ -138,8 +144,8 @@ TEST_F(Expect, ExpectStatementWithoutBodyReportsNullThroughEachRelation) {
   spec_only.type = vpiExpectStmt;
   spec_only.children = {&expr};
 
-  EXPECT_EQ(vpi_handle(vpiStmt, &spec_only), nullptr);
-  EXPECT_EQ(vpi_handle(vpiElseStmt, &spec_only), nullptr);
+  EXPECT_EQ(vpi_handle(vpiStmt, VpiHandleOf(&spec_only)), nullptr);
+  EXPECT_EQ(vpi_handle(vpiElseStmt, VpiHandleOf(&spec_only)), nullptr);
 }
 
 }  // namespace

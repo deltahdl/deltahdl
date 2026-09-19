@@ -3,7 +3,9 @@
 #include "common/types.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/variable.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -50,7 +52,8 @@ TEST_F(Attribute, ParentReachesTheOwningObject) {
   attr.type = vpiAttribute;
   attr.parent = &owning_net;
 
-  EXPECT_EQ(vpi_handle(vpiParent, &attr), &owning_net);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiParent, VpiHandleOf(&attr))),
+            &owning_net);
 }
 
 // Figure property (-> name): an attribute reports its name through the generic
@@ -60,7 +63,7 @@ TEST_F(Attribute, NameReportsTheAttributeName) {
   attr.type = vpiAttribute;
   attr.name = "keep";
 
-  EXPECT_STREQ(vpi_get_str(vpiName, &attr), "keep");
+  EXPECT_STREQ(vpi_get_str(vpiName, VpiHandleOf(&attr)), "keep");
 }
 
 // Figure property (-> On definition): an attribute reports through
@@ -71,12 +74,12 @@ TEST_F(Attribute, OnDefinitionFlagReportedThroughVpiGet) {
   VpiObject on_definition;
   on_definition.type = vpiAttribute;
   on_definition.def_attribute = true;
-  EXPECT_EQ(vpi_get(vpiDefAttribute, &on_definition), 1);
+  EXPECT_EQ(vpi_get(vpiDefAttribute, VpiHandleOf(&on_definition)), 1);
 
   VpiObject on_instance;
   on_instance.type = vpiAttribute;
   on_instance.def_attribute = false;
-  EXPECT_EQ(vpi_get(vpiDefAttribute, &on_instance), 0);
+  EXPECT_EQ(vpi_get(vpiDefAttribute, VpiHandleOf(&on_instance)), 0);
 }
 
 // Figure property guard: vpiDefAttribute is drawn only on the attribute object,
@@ -86,7 +89,8 @@ TEST_F(Attribute, OnDefinitionFlagReportedThroughVpiGet) {
 TEST_F(Attribute, OnDefinitionFlagIsUndefinedForNonAttribute) {
   VpiObject not_an_attribute;
   not_an_attribute.type = vpiNet;
-  EXPECT_EQ(vpi_get(vpiDefAttribute, &not_an_attribute), vpiUndefined);
+  EXPECT_EQ(vpi_get(vpiDefAttribute, VpiHandleOf(&not_an_attribute)),
+            vpiUndefined);
 }
 
 // Figure property (-> definition location, file): an attribute reports the
@@ -97,11 +101,11 @@ TEST_F(Attribute, DefinitionFileReportedThroughVpiGetStr) {
   VpiObject attr;
   attr.type = vpiAttribute;
   attr.def_file = "rtl/top.sv";
-  EXPECT_STREQ(vpi_get_str(vpiDefFile, &attr), "rtl/top.sv");
+  EXPECT_STREQ(vpi_get_str(vpiDefFile, VpiHandleOf(&attr)), "rtl/top.sv");
 
   VpiObject no_file;
   no_file.type = vpiAttribute;
-  EXPECT_EQ(vpi_get_str(vpiDefFile, &no_file), nullptr);
+  EXPECT_EQ(vpi_get_str(vpiDefFile, VpiHandleOf(&no_file)), nullptr);
 }
 
 // Figure property (-> definition location, line): an attribute reports the
@@ -110,7 +114,7 @@ TEST_F(Attribute, DefinitionLineReportedThroughVpiGet) {
   VpiObject attr;
   attr.type = vpiAttribute;
   attr.def_line_no = 42;
-  EXPECT_EQ(vpi_get(vpiDefLineNo, &attr), 42);
+  EXPECT_EQ(vpi_get(vpiDefLineNo, VpiHandleOf(&attr)), 42);
 }
 
 // Figure property guard: the definition-location properties are drawn only on
@@ -120,8 +124,9 @@ TEST_F(Attribute, DefinitionLineReportedThroughVpiGet) {
 TEST_F(Attribute, DefinitionLocationPropertiesGuardedToAttribute) {
   VpiObject not_an_attribute;
   not_an_attribute.type = vpiModule;
-  EXPECT_EQ(vpi_get_str(vpiDefFile, &not_an_attribute), nullptr);
-  EXPECT_EQ(vpi_get(vpiDefLineNo, &not_an_attribute), vpiUndefined);
+  EXPECT_EQ(vpi_get_str(vpiDefFile, VpiHandleOf(&not_an_attribute)), nullptr);
+  EXPECT_EQ(vpi_get(vpiDefLineNo, VpiHandleOf(&not_an_attribute)),
+            vpiUndefined);
 }
 
 // The untagged double arrow into `attribute`: an object reaches the attributes
@@ -148,14 +153,16 @@ TEST_F(Attribute, AnObjectIteratesTheAttributesItCarries) {
 
   owning_module.children = {&keep, &a_net, &dont_touch};
 
-  vpiHandle it = vpi_iterate(vpiAttribute, &owning_module);
+  vpiHandle it = vpi_iterate(vpiAttribute, VpiHandleOf(&owning_module));
   ASSERT_NE(it, nullptr);
-  EXPECT_EQ(vpi_scan(it), &keep);
-  EXPECT_EQ(vpi_scan(it), &dont_touch);
+  EXPECT_EQ(VpiObjectOf(vpi_scan(it)), &keep);
+  EXPECT_EQ(VpiObjectOf(vpi_scan(it)), &dont_touch);
   EXPECT_EQ(vpi_scan(it), nullptr);
 
-  EXPECT_EQ(vpi_handle(vpiParent, &keep), &owning_module);
-  EXPECT_EQ(vpi_handle(vpiParent, &dont_touch), &owning_module);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiParent, VpiHandleOf(&keep))),
+            &owning_module);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiParent, VpiHandleOf(&dont_touch))),
+            &owning_module);
 }
 
 // The double arrow's empty outcome: an object carrying no attribute iterates
@@ -168,7 +175,7 @@ TEST_F(Attribute, AnObjectWithNoAttributeIteratesNone) {
   owning_module.type = vpiModule;
   owning_module.children = {&a_net};
 
-  EXPECT_EQ(vpi_iterate(vpiAttribute, &owning_module), nullptr);
+  EXPECT_EQ(vpi_iterate(vpiAttribute, VpiHandleOf(&owning_module)), nullptr);
 }
 
 // Figure property (-> value): an attribute reports the value it was written
@@ -187,9 +194,9 @@ TEST_F(Attribute, ValueReportedThroughVpiGetValue) {
   attr.name = "priority";
   attr.var = &var;
 
-  VpiValue value{};
+  s_vpi_value value{};
   value.format = vpiIntVal;
-  vpi_get_value(&attr, &value);
+  vpi_get_value(VpiHandleOf(&attr), &value);
   EXPECT_EQ(value.value.integer, 7);
 
   // An attribute written with no value has none to read, so the request leaves
@@ -197,10 +204,10 @@ TEST_F(Attribute, ValueReportedThroughVpiGetValue) {
   VpiObject no_value;
   no_value.type = vpiAttribute;
 
-  VpiValue untouched{};
+  s_vpi_value untouched{};
   untouched.format = vpiIntVal;
   untouched.value.integer = 99;
-  vpi_get_value(&no_value, &untouched);
+  vpi_get_value(VpiHandleOf(&no_value), &untouched);
   EXPECT_EQ(untouched.value.integer, 99);
 }
 

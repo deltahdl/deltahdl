@@ -24,12 +24,15 @@ CheckOptions:
   # misc-include-cleaner runs whole: a file includes the header that declares
   # each symbol it uses and no header it uses nothing from. Nothing is ignored,
   # and IgnoreHeaders is not set, because from 2026-09-18 every translation unit
-  # and header under src/ and test/ satisfies both halves. The only headers a
-  # file may rely on for what they pull in are the three §36.7 names, vpi_user.h
-  # and sv_vpi_user.h and, under them, vpi_compatibility.h: Annexes K, L and M
-  # give their contents, so each carries an IWYU pragma marking its includes as
-  # exports, which is how the check is told that the standard's file provides
-  # what this repository stores in sub-headers.
+  # and header under src/ and test/ satisfies both halves. The one include a
+  # file may rely on for what it pulls in is vpi_user.h's include of
+  # vpi_compatibility.h: Annex L.1 has vpi_user.h include that file and forbids
+  # an application including it directly, and L.2 makes a direct include an
+  # error, so a translation unit that selects a compatibility mode reaches the
+  # renaming macros through vpi_user.h alone. Nothing else exports anything:
+  # vpi_user.h is Annex K.2's file and declares what it provides, and Annex
+  # M's sv_vpi_user.h includes it as the annex does, with §36.7 telling an
+  # application to include both.
   readability-function-cognitive-complexity.Threshold: 15
   readability-function-size.LineThreshold: 200
   readability-function-size.NestingThreshold: 4

@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -47,14 +49,16 @@ TEST_F(DelayTerminals, InAndOutTermsAreReached) {
   device.in_term = &in_term;
   device.out_term = &out_term;
 
-  VpiHandle reached_in = vpi_handle(vpiInTerm, &device);
-  VpiHandle reached_out = vpi_handle(vpiOutTerm, &device);
+  VpiHandle reached_in =
+      VpiObjectOf(vpi_handle(vpiInTerm, VpiHandleOf(&device)));
+  VpiHandle reached_out =
+      VpiObjectOf(vpi_handle(vpiOutTerm, VpiHandleOf(&device)));
   EXPECT_EQ(reached_in, &in_term);
   EXPECT_EQ(reached_out, &out_term);
 
   // The handles returned for the terminals have the delay term type.
-  EXPECT_EQ(vpi_get(vpiType, reached_in), vpiDelayTerm);
-  EXPECT_EQ(vpi_get(vpiType, reached_out), vpiDelayTerm);
+  EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(reached_in)), vpiDelayTerm);
+  EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(reached_out)), vpiDelayTerm);
 }
 
 // vpiInTerm / vpiOutTerm (edge): a delay device that has no designated terminal
@@ -64,8 +68,8 @@ TEST_F(DelayTerminals, TermRelationsAreNullWhenAbsent) {
   device.type = vpiDelayDevice;
   // in_term and out_term left null.
 
-  EXPECT_EQ(vpi_handle(vpiInTerm, &device), nullptr);
-  EXPECT_EQ(vpi_handle(vpiOutTerm, &device), nullptr);
+  EXPECT_EQ(vpi_handle(vpiInTerm, VpiHandleOf(&device)), nullptr);
+  EXPECT_EQ(vpi_handle(vpiOutTerm, VpiHandleOf(&device)), nullptr);
 }
 
 // vpiInTerm / vpiOutTerm (scope): the terminal relations are specific to a
@@ -81,8 +85,8 @@ TEST_F(DelayTerminals, TermRelationsApplyOnlyToDelayDevices) {
   not_a_device.in_term = &stray_term;   // ignored: object is not a delay device
   not_a_device.out_term = &stray_term;  // ignored: object is not a delay device
 
-  EXPECT_EQ(vpi_handle(vpiInTerm, &not_a_device), nullptr);
-  EXPECT_EQ(vpi_handle(vpiOutTerm, &not_a_device), nullptr);
+  EXPECT_EQ(vpi_handle(vpiInTerm, VpiHandleOf(&not_a_device)), nullptr);
+  EXPECT_EQ(vpi_handle(vpiOutTerm, VpiHandleOf(&not_a_device)), nullptr);
 }
 
 // vpiDelayType: a delay device and a delay term both report their delay-type
@@ -91,16 +95,16 @@ TEST_F(DelayTerminals, DelayTypeIsReported) {
   VpiObject device;
   device.type = vpiDelayDevice;
   device.delay_type = 3;
-  EXPECT_EQ(vpi_get(vpiDelayType, &device), 3);
+  EXPECT_EQ(vpi_get(vpiDelayType, VpiHandleOf(&device)), 3);
 
   VpiObject term;
   term.type = vpiDelayTerm;
   term.delay_type = 5;
-  EXPECT_EQ(vpi_get(vpiDelayType, &term), 5);
+  EXPECT_EQ(vpi_get(vpiDelayType, VpiHandleOf(&term)), 5);
 
   VpiObject other;
   other.type = vpiModule;
-  EXPECT_EQ(vpi_get(vpiDelayType, &other), 0);
+  EXPECT_EQ(vpi_get(vpiDelayType, VpiHandleOf(&other)), 0);
 }
 
 // module -- delay device: a delay device is enclosed by a module, reached
@@ -113,11 +117,12 @@ TEST_F(DelayTerminals, ModuleRelationReachesEnclosingModule) {
   VpiObject device;
   device.type = vpiDelayDevice;
   device.parent = &module_scope;
-  EXPECT_EQ(vpi_handle(vpiModule, &device), &module_scope);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiModule, VpiHandleOf(&device))),
+            &module_scope);
 
   VpiObject orphan;
   orphan.type = vpiDelayDevice;
-  EXPECT_EQ(vpi_handle(vpiModule, &orphan), nullptr);
+  EXPECT_EQ(vpi_handle(vpiModule, VpiHandleOf(&orphan)), nullptr);
 }
 
 // The figure's vpiDriver edge, drawn from a delay terminal to the `net drivers`
@@ -137,9 +142,9 @@ TEST_F(DelayTerminals, DriverFromATerminalReachesTheNetDriverKinds) {
   in_term.type = vpiDelayTerm;
   in_term.children = {&prim_term, &assign_stmt};
 
-  vpiHandle itr = vpi_iterate(vpiDriver, &in_term);
+  vpiHandle itr = vpi_iterate(vpiDriver, VpiHandleOf(&in_term));
   ASSERT_NE(itr, nullptr);
-  EXPECT_EQ(vpi_scan(itr), &prim_term);
+  EXPECT_EQ(VpiObjectOf(vpi_scan(itr)), &prim_term);
   EXPECT_EQ(vpi_scan(itr), nullptr);
 }
 
@@ -156,9 +161,9 @@ TEST_F(DelayTerminals, LoadFromATerminalReachesTheNetLoadKinds) {
   out_term.type = vpiDelayTerm;
   out_term.children = {&assign_stmt, &port};
 
-  vpiHandle itr = vpi_iterate(vpiLoad, &out_term);
+  vpiHandle itr = vpi_iterate(vpiLoad, VpiHandleOf(&out_term));
   ASSERT_NE(itr, nullptr);
-  EXPECT_EQ(vpi_scan(itr), &assign_stmt);
+  EXPECT_EQ(VpiObjectOf(vpi_scan(itr)), &assign_stmt);
   EXPECT_EQ(vpi_scan(itr), nullptr);
 }
 

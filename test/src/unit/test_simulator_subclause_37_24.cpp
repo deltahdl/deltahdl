@@ -5,7 +5,10 @@
 
 #include "fixture_simulator.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -203,8 +206,8 @@ int g_interconnect_nets = 0;
 std::string g_interconnect_net_name;
 bool g_reached_from_the_port = false;
 
-int ProbeInterconnectCalltf(const char*) {
-  vpiHandle mod = vpi_handle_by_name("m1", nullptr);
+PLI_INT32 ProbeInterconnectCalltf(PLI_BYTE8*) {
+  vpiHandle mod = vpi_handle_by_name(VpiText("m1"), nullptr);
   if (mod == nullptr) return 0;
 
   vpiHandle itr = vpi_iterate(vpiInterconnectNet, mod);
@@ -245,7 +248,7 @@ TEST(GenericInterconnectDesign, AnInterconnectPortStandsUpAnInterconnectNet) {
 
   s_vpi_systf_data data = {};
   data.type = vpiSysTask;
-  data.tfname = "$probe";
+  data.tfname = VpiText("$probe");
   data.calltf = &ProbeInterconnectCalltf;
   ASSERT_NE(vpi_register_systf(&data), nullptr);
 

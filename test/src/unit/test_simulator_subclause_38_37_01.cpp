@@ -4,7 +4,10 @@
 #include <string_view>
 
 #include "common/lexical_limits.h"
+#include "simulator/vpi_context.h"
+#include "simulator/vpi_data_structs.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -16,13 +19,13 @@ namespace {
 const char* g_seen_arg = nullptr;
 int g_call_count = 0;
 
-int RecordingCalltf(const char* arg) {
+PLI_INT32 RecordingCalltf(PLI_BYTE8* arg) {
   g_seen_arg = arg;
   ++g_call_count;
   return 0;
 }
 
-int SizetfReturning17(const char* arg) {
+PLI_INT32 SizetfReturning17(PLI_BYTE8* arg) {
   g_seen_arg = arg;
   ++g_call_count;
   return 17;
@@ -69,7 +72,7 @@ class VpiSystfCallbacksRegistration : public ::testing::Test {
 TEST_F(VpiSystfCallbacksRegistration, RejectsBareDollarName) {
   s_vpi_systf_data data = {};
   data.type = vpiSysTask;
-  data.tfname = "$";
+  data.tfname = VpiText("$");
 
   EXPECT_EQ(vpi_register_systf(&data), nullptr);
   EXPECT_TRUE(vpi_ctx_.RegisteredSystfs().empty());
@@ -78,7 +81,7 @@ TEST_F(VpiSystfCallbacksRegistration, RejectsBareDollarName) {
 TEST_F(VpiSystfCallbacksRegistration, RejectsIllegalCharacterName) {
   s_vpi_systf_data data = {};
   data.type = vpiSysTask;
-  data.tfname = "$bad-name";
+  data.tfname = VpiText("$bad-name");
 
   EXPECT_EQ(vpi_register_systf(&data), nullptr);
   EXPECT_TRUE(vpi_ctx_.RegisteredSystfs().empty());
@@ -99,7 +102,7 @@ TEST_F(VpiSystfCallbacksRegistration, RejectsNullName) {
 TEST_F(VpiSystfCallbacksRegistration, AcceptsWellFormedName) {
   s_vpi_systf_data data = {};
   data.type = vpiSysTask;
-  data.tfname = "$good_name";
+  data.tfname = VpiText("$good_name");
 
   EXPECT_NE(vpi_register_systf(&data), nullptr);
   ASSERT_EQ(vpi_ctx_.RegisteredSystfs().size(), 1u);
@@ -138,7 +141,7 @@ TEST_F(VpiSystfCallbacksRegistration, RejectsANameBeyondTheIdentifierMaximum) {
   EXPECT_EQ(vpi_register_systf(&data), nullptr);
   EXPECT_TRUE(vpi_ctx_.RegisteredSystfs().empty());
 
-  SVpiErrorInfo info = {};
+  s_vpi_error_info info = {};
   EXPECT_NE(vpi_chk_error(&info), 0);
   EXPECT_STREQ(info.message,
                "system task or function name exceeds the maximum identifier "
@@ -152,11 +155,11 @@ TEST_F(VpiSystfCallbacksRegistration, RejectsANameBeyondTheIdentifierMaximum) {
 TEST_F(VpiSystfCallbacksRegistration, TypeFieldStoresTaskOrFunc) {
   s_vpi_systf_data task = {};
   task.type = vpiSysTask;
-  task.tfname = "$as_task";
+  task.tfname = VpiText("$as_task");
 
   s_vpi_systf_data func = {};
   func.type = vpiSysFunc;
-  func.tfname = "$as_func";
+  func.tfname = VpiText("$as_func");
 
   vpi_register_systf(&task);
   vpi_register_systf(&func);
@@ -172,7 +175,7 @@ TEST_F(VpiSystfCallbacksRegistration, TypeFieldStoresTaskOrFunc) {
 // -----------------------------------------------------------------------------
 
 TEST(VpiSystfCallbacksSim, ReturnTypeReportedForSystemFunction) {
-  VpiSystfData func = {};
+  s_vpi_systf_data func = {};
   func.type = kVpiSysFunc;
   func.sysfunctype = kVpiRealFunc;
 
@@ -182,7 +185,7 @@ TEST(VpiSystfCallbacksSim, ReturnTypeReportedForSystemFunction) {
 TEST(VpiSystfCallbacksSim, ReturnTypeNotReportedForSystemTask) {
   // sysfunctype shall only be used when type is vpiSysFunc, so a task reports
   // no return-value kind even if the field happens to be populated.
-  VpiSystfData task = {};
+  s_vpi_systf_data task = {};
   task.type = kVpiSysTask;
   task.sysfunctype = kVpiIntFunc;
 
@@ -195,24 +198,24 @@ TEST(VpiSystfCallbacksSim, ReturnTypeNotReportedForSystemTask) {
 // -----------------------------------------------------------------------------
 
 TEST(VpiSystfCallbacksSim, SizetfCalledOnlyForSizedFunction) {
-  VpiSystfData sized = {};
+  s_vpi_systf_data sized = {};
   sized.type = kVpiSysFunc;
   sized.sysfunctype = kVpiSizedFunc;
   EXPECT_TRUE(VpiSystfSizetfIsCalled(sized));
 
-  VpiSystfData sized_signed = {};
+  s_vpi_systf_data sized_signed = {};
   sized_signed.type = kVpiSysFunc;
   sized_signed.sysfunctype = kVpiSizedSignedFunc;
   EXPECT_TRUE(VpiSystfSizetfIsCalled(sized_signed));
 
-  VpiSystfData int_func = {};
+  s_vpi_systf_data int_func = {};
   int_func.type = kVpiSysFunc;
   int_func.sysfunctype = kVpiIntFunc;
   EXPECT_FALSE(VpiSystfSizetfIsCalled(int_func));
 
   // A system task never calls sizetf, even if a sized kind is left in the
   // field.
-  VpiSystfData task = {};
+  s_vpi_systf_data task = {};
   task.type = kVpiSysTask;
   task.sysfunctype = kVpiSizedFunc;
   EXPECT_FALSE(VpiSystfSizetfIsCalled(task));
@@ -223,11 +226,11 @@ TEST(VpiSystfCallbacksSim, SizedFunctionWithSizetfUsesItsWidth) {
   g_call_count = 0;
   int payload = 0;
 
-  VpiSystfData sized = {};
+  s_vpi_systf_data sized = {};
   sized.type = kVpiSysFunc;
   sized.sysfunctype = kVpiSizedFunc;
   sized.sizetf = &SizetfReturning17;
-  sized.user_data = &payload;
+  sized.user_data = reinterpret_cast<PLI_BYTE8*>(&payload);
 
   EXPECT_EQ(VpiSystfResultSizeBits(sized), 17);
   EXPECT_EQ(g_call_count, 1);
@@ -236,7 +239,7 @@ TEST(VpiSystfCallbacksSim, SizedFunctionWithSizetfUsesItsWidth) {
 }
 
 TEST(VpiSystfCallbacksSim, SizedFunctionWithoutSizetfDefaultsTo32) {
-  VpiSystfData sized = {};
+  s_vpi_systf_data sized = {};
   sized.type = kVpiSysFunc;
   sized.sysfunctype = kVpiSizedFunc;
   sized.sizetf = nullptr;
@@ -247,7 +250,7 @@ TEST(VpiSystfCallbacksSim, SizedFunctionWithoutSizetfDefaultsTo32) {
 TEST(VpiSystfCallbacksSim, SignedSizedFunctionWithoutSizetfDefaultsTo32) {
   // The default-width rule names both sized kinds, so a vpiSizedSignedFunc with
   // no sizetf application reports 32 bits just as the unsigned sized kind does.
-  VpiSystfData sized_signed = {};
+  s_vpi_systf_data sized_signed = {};
   sized_signed.type = kVpiSysFunc;
   sized_signed.sysfunctype = kVpiSizedSignedFunc;
   sized_signed.sizetf = nullptr;
@@ -260,7 +263,7 @@ TEST(VpiSystfCallbacksSim, NonSizedFunctionDoesNotCallSizetf) {
 
   // sizetf is provided but the function is not a sized kind, so it must not be
   // called; the width falls through to the default.
-  VpiSystfData int_func = {};
+  s_vpi_systf_data int_func = {};
   int_func.type = kVpiSysFunc;
   int_func.sysfunctype = kVpiIntFunc;
   int_func.sizetf = &SizetfReturning17;

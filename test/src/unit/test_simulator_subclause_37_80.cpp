@@ -4,7 +4,9 @@
 #include <cstddef>
 
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -59,7 +61,7 @@ TEST_F(Callback, NullReferenceIterationReachesRegisteredCallback) {
 
   vpiHandle reached = vpi_scan(it);
   ASSERT_NE(reached, nullptr);
-  EXPECT_EQ(reached->type, vpiCallback);
+  EXPECT_EQ(VpiObjectOf(reached)->type, vpiCallback);
   EXPECT_EQ(reached, registered);
 
   // Exactly one callback was registered, so the next scan retires the iterator.
@@ -100,17 +102,17 @@ void ExpectCallbackReachedFromObject(int object_type) {
 
   s_cb_data cb = {};
   cb.reason = cbValueChange;
-  cb.obj = &object;
+  cb.obj = VpiHandleOf(&object);
   vpiHandle registered = vpi_register_cb(&cb);
   ASSERT_NE(registered, nullptr);
 
-  EXPECT_EQ(vpi_handle(vpiCallback, &object), registered);
+  EXPECT_EQ(vpi_handle(vpiCallback, VpiHandleOf(&object)), registered);
 
-  vpiHandle it = vpi_iterate(vpiCallback, &object);
+  vpiHandle it = vpi_iterate(vpiCallback, VpiHandleOf(&object));
   ASSERT_NE(it, nullptr);
   vpiHandle reached = vpi_scan(it);
   ASSERT_NE(reached, nullptr);
-  EXPECT_EQ(reached->type, vpiCallback);
+  EXPECT_EQ(VpiObjectOf(reached)->type, vpiCallback);
   EXPECT_EQ(reached, registered);
   EXPECT_EQ(vpi_scan(it), nullptr);
 
@@ -145,13 +147,13 @@ TEST_F(Callback, CallbackIterationFromObjectIsScopedToThatObject) {
 
   s_cb_data on_target = {};
   on_target.reason = cbValueChange;
-  on_target.obj = &target;
+  on_target.obj = VpiHandleOf(&target);
   vpiHandle target_cb = vpi_register_cb(&on_target);
   ASSERT_NE(target_cb, nullptr);
 
   s_cb_data on_other = {};
   on_other.reason = cbValueChange;
-  on_other.obj = &other;
+  on_other.obj = VpiHandleOf(&other);
   ASSERT_NE(vpi_register_cb(&on_other), nullptr);
 
   // A callback unrelated to any object must not surface from an object ref.
@@ -159,7 +161,7 @@ TEST_F(Callback, CallbackIterationFromObjectIsScopedToThatObject) {
   unrelated.reason = cbEndOfSimulation;
   ASSERT_NE(vpi_register_cb(&unrelated), nullptr);
 
-  vpiHandle it = vpi_iterate(vpiCallback, &target);
+  vpiHandle it = vpi_iterate(vpiCallback, VpiHandleOf(&target));
   ASSERT_NE(it, nullptr);
   vpiHandle reached = vpi_scan(it);
   ASSERT_NE(reached, nullptr);
@@ -183,10 +185,10 @@ TEST_F(Callback, IterationFromObjectWithoutCallbackYieldsNoIterator) {
 
   s_cb_data cb = {};
   cb.reason = cbValueChange;
-  cb.obj = &with_callback;
+  cb.obj = VpiHandleOf(&with_callback);
   ASSERT_NE(vpi_register_cb(&cb), nullptr);
 
-  EXPECT_EQ(vpi_iterate(vpiCallback, &without_callback), nullptr);
+  EXPECT_EQ(vpi_iterate(vpiCallback, VpiHandleOf(&without_callback)), nullptr);
 }
 
 // The single arrow is drawn from four kinds, and the `expr` and `stmt` ones are
@@ -208,13 +210,13 @@ TEST_F(Callback, TheSingleArrowIsDrawnFromEveryKindTheTwoClassesGroup) {
 
     s_cb_data cb = {};
     cb.reason = cbValueChange;
-    cb.obj = &objects[i];
+    cb.obj = VpiHandleOf(&objects[i]);
     registered[i] = vpi_register_cb(&cb);
     ASSERT_NE(registered[i], nullptr) << "host kind " << kHostKinds[i];
   }
 
   for (size_t i = 0; i < kHostKinds.size(); ++i) {
-    EXPECT_EQ(vpi_handle(vpiCallback, &objects[i]), registered[i])
+    EXPECT_EQ(vpi_handle(vpiCallback, VpiHandleOf(&objects[i])), registered[i])
         << "host kind " << kHostKinds[i];
   }
 }
@@ -226,17 +228,17 @@ TEST_F(Callback, TheSingleArrowIsDrawnFromEveryKindTheTwoClassesGroup) {
 TEST_F(Callback, TheSingleArrowReachesNothingWhereTheDiagramDrawsNone) {
   VpiObject without_callback;
   without_callback.type = vpiAssignStmt;
-  EXPECT_EQ(vpi_handle(vpiCallback, &without_callback), nullptr);
+  EXPECT_EQ(vpi_handle(vpiCallback, VpiHandleOf(&without_callback)), nullptr);
 
   VpiObject module;
   module.type = vpiModule;
 
   s_cb_data cb = {};
   cb.reason = cbValueChange;
-  cb.obj = &module;
+  cb.obj = VpiHandleOf(&module);
   ASSERT_NE(vpi_register_cb(&cb), nullptr);
 
-  EXPECT_EQ(vpi_handle(vpiCallback, &module), nullptr);
+  EXPECT_EQ(vpi_handle(vpiCallback, VpiHandleOf(&module)), nullptr);
 }
 
 // Detail 2: "To get callback objects not related to the above objects, the
@@ -252,13 +254,13 @@ TEST_F(Callback, NullReferenceIterationReachesOnlyTheUnrelatedCallbacks) {
 
   s_cb_data on_stmt = {};
   on_stmt.reason = cbValueChange;
-  on_stmt.obj = &statement;
+  on_stmt.obj = VpiHandleOf(&statement);
   vpiHandle stmt_cb = vpi_register_cb(&on_stmt);
   ASSERT_NE(stmt_cb, nullptr);
 
   s_cb_data on_module = {};
   on_module.reason = cbValueChange;
-  on_module.obj = &module;
+  on_module.obj = VpiHandleOf(&module);
   vpiHandle module_cb = vpi_register_cb(&on_module);
   ASSERT_NE(module_cb, nullptr);
 
@@ -275,7 +277,7 @@ TEST_F(Callback, NullReferenceIterationReachesOnlyTheUnrelatedCallbacks) {
 
   // It is reached from the statement instead, which is the arrow the diagram
   // does draw.
-  EXPECT_EQ(vpi_handle(vpiCallback, &statement), stmt_cb);
+  EXPECT_EQ(vpi_handle(vpiCallback, VpiHandleOf(&statement)), stmt_cb);
 }
 
 // §37.2.2 has vpi_remove_cb() release the callback's handle, so the object that
@@ -287,13 +289,13 @@ TEST_F(Callback, TheSingleArrowReachesNothingOnceTheCallbackIsRemoved) {
 
   s_cb_data cb = {};
   cb.reason = cbValueChange;
-  cb.obj = &statement;
+  cb.obj = VpiHandleOf(&statement);
   vpiHandle registered = vpi_register_cb(&cb);
   ASSERT_NE(registered, nullptr);
-  ASSERT_EQ(vpi_handle(vpiCallback, &statement), registered);
+  ASSERT_EQ(vpi_handle(vpiCallback, VpiHandleOf(&statement)), registered);
 
   EXPECT_EQ(vpi_remove_cb(registered), 1);
-  EXPECT_EQ(vpi_handle(vpiCallback, &statement), nullptr);
+  EXPECT_EQ(vpi_handle(vpiCallback, VpiHandleOf(&statement)), nullptr);
 }
 
 }  // namespace

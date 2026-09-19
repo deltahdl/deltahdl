@@ -8,7 +8,9 @@
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -63,7 +65,8 @@ TEST_F(ConstraintExpression, ForeachVariablesReachesIndexedArray) {
   foreach
     .foreach_array = &array;
 
-  EXPECT_EQ(vpi_handle(vpiVariables, &foreach), &array);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiVariables, VpiHandleOf(&foreach))),
+            &array);
 }
 
 // D1: the relation is specific to a foreach constraint and reports NULL when no
@@ -74,7 +77,7 @@ TEST_F(ConstraintExpression, ForeachVariablesIsScopedAndNullWhenAbsent) {
   VpiObject foreach;
   foreach
     .type = vpiConstrForEach;  // no array attached
-  EXPECT_EQ(vpi_handle(vpiVariables, &foreach), nullptr);
+  EXPECT_EQ(vpi_handle(vpiVariables, VpiHandleOf(&foreach)), nullptr);
 
   // The foreach Handle case does not fire for a different object kind: an
   // implication leaves vpiVariables to the generic traversal, which finds a
@@ -84,7 +87,8 @@ TEST_F(ConstraintExpression, ForeachVariablesIsScopedAndNullWhenAbsent) {
   VpiObject implication;
   implication.type = vpiImplication;
   implication.children = {&vars_child};
-  EXPECT_EQ(vpi_handle(vpiVariables, &implication), &vars_child);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiVariables, VpiHandleOf(&implication))),
+            &vars_child);
 }
 
 // D2: the vpiLoopVars iteration returns the foreach index variables in
@@ -105,16 +109,17 @@ TEST_F(ConstraintExpression, LoopVarsIterationOrdersVarsWithNullOpPlaceholder) {
   foreach
     .loop_vars = {&var_i, nullptr, &var_k};
 
-  vpiHandle it = vpi_iterate(vpiLoopVars, &foreach);
+  vpiHandle it = vpi_iterate(vpiLoopVars, VpiHandleOf(&foreach));
   ASSERT_NE(it, nullptr);
   std::vector<vpiHandle> seen;
   while (vpiHandle h = vpi_scan(it)) seen.push_back(h);
 
   ASSERT_EQ(seen.size(), 3u);  // every position is reported, in order
-  EXPECT_EQ(seen[0], &var_i);  // left-to-right order is preserved
-  EXPECT_EQ(seen[2], &var_k);
-  EXPECT_NE(seen[1], &var_i);  // the skipped slot is a fresh placeholder
-  EXPECT_NE(seen[1], &var_k);
+  EXPECT_EQ(VpiObjectOf(seen[0]), &var_i);  // left-to-right order is preserved
+  EXPECT_EQ(VpiObjectOf(seen[2]), &var_k);
+  EXPECT_NE(VpiObjectOf(seen[1]),
+            &var_i);  // the skipped slot is a fresh placeholder
+  EXPECT_NE(VpiObjectOf(seen[1]), &var_k);
   EXPECT_EQ(vpi_get(vpiType, seen[1]), vpiOperation);
   EXPECT_EQ(vpi_get(vpiOpType, seen[1]), vpiNullOp);
 }
@@ -132,14 +137,14 @@ TEST_F(ConstraintExpression, LoopVarsIterationWithoutSkipsAndWhenEmpty) {
   foreach
     .loop_vars = {&var_i};
 
-  vpiHandle it = vpi_iterate(vpiLoopVars, &foreach);
+  vpiHandle it = vpi_iterate(vpiLoopVars, VpiHandleOf(&foreach));
   ASSERT_NE(it, nullptr);
-  EXPECT_EQ(vpi_scan(it), &var_i);
+  EXPECT_EQ(VpiObjectOf(vpi_scan(it)), &var_i);
   EXPECT_EQ(vpi_scan(it), nullptr);
 
   VpiObject empty_foreach;
   empty_foreach.type = vpiConstrForEach;  // no loop vars
-  EXPECT_EQ(vpi_iterate(vpiLoopVars, &empty_foreach), nullptr);
+  EXPECT_EQ(vpi_iterate(vpiLoopVars, VpiHandleOf(&empty_foreach)), nullptr);
 }
 
 // D2: every skipped index position is represented independently. With two
@@ -156,14 +161,14 @@ TEST_F(ConstraintExpression, LoopVarsIterationRepresentsEachSkipIndependently) {
   foreach
     .loop_vars = {nullptr, &var_j, nullptr};
 
-  vpiHandle it = vpi_iterate(vpiLoopVars, &foreach);
+  vpiHandle it = vpi_iterate(vpiLoopVars, VpiHandleOf(&foreach));
   ASSERT_NE(it, nullptr);
   std::vector<vpiHandle> seen;
   while (vpiHandle h = vpi_scan(it)) seen.push_back(h);
 
   ASSERT_EQ(seen.size(), 3u);
-  EXPECT_EQ(seen[1], &var_j);   // the present index keeps its slot
-  EXPECT_NE(seen[0], seen[2]);  // each skip is its own placeholder
+  EXPECT_EQ(VpiObjectOf(seen[1]), &var_j);  // the present index keeps its slot
+  EXPECT_NE(seen[0], seen[2]);              // each skip is its own placeholder
   EXPECT_EQ(vpi_get(vpiType, seen[0]), vpiOperation);
   EXPECT_EQ(vpi_get(vpiOpType, seen[0]), vpiNullOp);
   EXPECT_EQ(vpi_get(vpiType, seen[2]), vpiOperation);
@@ -186,15 +191,15 @@ TEST_F(ConstraintExpression, ConstraintExprIterationReturnsBodyInOrder) {
   implication.type = vpiImplication;
   implication.constraint_exprs = {&e0, &e1, &e2};
 
-  vpiHandle it = vpi_iterate(vpiConstraintExpr, &implication);
+  vpiHandle it = vpi_iterate(vpiConstraintExpr, VpiHandleOf(&implication));
   ASSERT_NE(it, nullptr);
   std::vector<vpiHandle> seen;
   while (vpiHandle h = vpi_scan(it)) seen.push_back(h);
 
   ASSERT_EQ(seen.size(), 3u);
-  EXPECT_EQ(seen[0], &e0);  // occurrence order is preserved
-  EXPECT_EQ(seen[1], &e1);
-  EXPECT_EQ(seen[2], &e2);
+  EXPECT_EQ(VpiObjectOf(seen[0]), &e0);  // occurrence order is preserved
+  EXPECT_EQ(VpiObjectOf(seen[1]), &e1);
+  EXPECT_EQ(VpiObjectOf(seen[2]), &e2);
 }
 
 // D3: the body walk fires for every container kind the Detail names - an
@@ -210,9 +215,9 @@ TEST_F(ConstraintExpression, ConstraintExprIterationFiresForEachContainerKind) {
     container.type = kind;
     container.constraint_exprs = {&body};
 
-    vpiHandle it = vpi_iterate(vpiConstraintExpr, &container);
+    vpiHandle it = vpi_iterate(vpiConstraintExpr, VpiHandleOf(&container));
     ASSERT_NE(it, nullptr) << "container kind " << kind;
-    EXPECT_EQ(vpi_scan(it), &body) << "container kind " << kind;
+    EXPECT_EQ(VpiObjectOf(vpi_scan(it)), &body) << "container kind " << kind;
     EXPECT_EQ(vpi_scan(it), nullptr) << "container kind " << kind;
   }
 }
@@ -230,7 +235,8 @@ TEST_F(ConstraintExpression, ConstraintExprIterationScopedToContainerKinds) {
   // A body list on a non-container is ignored: the special walk does not fire.
   distribution.constraint_exprs = {&stray_body};
 
-  EXPECT_EQ(vpi_iterate(vpiConstraintExpr, &distribution), nullptr);
+  EXPECT_EQ(vpi_iterate(vpiConstraintExpr, VpiHandleOf(&distribution)),
+            nullptr);
 }
 
 // D3: a container that holds no body expressions has nothing to walk, so its
@@ -242,7 +248,7 @@ TEST_F(ConstraintExpression,
   implication.type =
       vpiImplication;  // a container kind, but with an empty body
 
-  EXPECT_EQ(vpi_iterate(vpiConstraintExpr, &implication), nullptr);
+  EXPECT_EQ(vpi_iterate(vpiConstraintExpr, VpiHandleOf(&implication)), nullptr);
 }
 
 // The figure's vpiCondition edge. An implication, a constraint if and a
@@ -262,7 +268,8 @@ TEST_F(ConstraintExpression, ConditionReachesTheGuardingExpression) {
     guarded.children = {&condition};
     guarded.constraint_exprs = {&body};
 
-    EXPECT_EQ(vpi_handle(vpiCondition, &guarded), &condition)
+    EXPECT_EQ(VpiObjectOf(vpi_handle(vpiCondition, VpiHandleOf(&guarded))),
+              &condition)
         << "constraint kind " << kind;
   }
 }
@@ -277,7 +284,7 @@ TEST_F(ConstraintExpression, ConditionIsScopedToTheGuardedKinds) {
   dist.type = vpiDistribution;
   dist.children = {&expr};
 
-  EXPECT_EQ(vpi_handle(vpiCondition, &dist), nullptr);
+  EXPECT_EQ(vpi_handle(vpiCondition, VpiHandleOf(&dist)), nullptr);
 }
 
 // The figure's vpiElseConst edge. A constraint if-else has two branches, and
@@ -297,17 +304,17 @@ TEST_F(ConstraintExpression, ElseConstReachesTheElseBranchInOrder) {
   if_else.constraint_exprs = {&then_expr};
   if_else.else_constraint_exprs = {&else_first, &else_second};
 
-  vpiHandle itr = vpi_iterate(vpiElseConst, &if_else);
+  vpiHandle itr = vpi_iterate(vpiElseConst, VpiHandleOf(&if_else));
   ASSERT_NE(itr, nullptr);
-  EXPECT_EQ(vpi_scan(itr), &else_first);
-  EXPECT_EQ(vpi_scan(itr), &else_second);
+  EXPECT_EQ(VpiObjectOf(vpi_scan(itr)), &else_first);
+  EXPECT_EQ(VpiObjectOf(vpi_scan(itr)), &else_second);
   EXPECT_EQ(vpi_scan(itr), nullptr);
 
   // D3 is unchanged by it: vpiConstraintExpr still reaches the then branch
   // alone, which is what makes the two branches two sets of expressions.
-  vpiHandle body = vpi_iterate(vpiConstraintExpr, &if_else);
+  vpiHandle body = vpi_iterate(vpiConstraintExpr, VpiHandleOf(&if_else));
   ASSERT_NE(body, nullptr);
-  EXPECT_EQ(vpi_scan(body), &then_expr);
+  EXPECT_EQ(VpiObjectOf(vpi_scan(body)), &then_expr);
   EXPECT_EQ(vpi_scan(body), nullptr);
 }
 
@@ -321,7 +328,7 @@ TEST_F(ConstraintExpression, ElseConstIsScopedToTheIfElse) {
   constr_if.type = vpiConstrIf;
   constr_if.else_constraint_exprs = {&branch};
 
-  vpiHandle itr = vpi_iterate(vpiElseConst, &constr_if);
+  vpiHandle itr = vpi_iterate(vpiElseConst, VpiHandleOf(&constr_if));
   EXPECT_TRUE(itr == nullptr || vpi_scan(itr) == nullptr);
 }
 

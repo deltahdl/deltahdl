@@ -13,7 +13,10 @@
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -65,7 +68,7 @@ class UdpModel : public ::testing::Test {
 // - through vpi_get_str(vpiDefName).
 TEST_F(UdpModel, DefinitionNameReportsUdpName) {
   VpiHandle defn = MakeObject(vpiUdpDefn, "latch_udp");
-  EXPECT_STREQ(vpi_get_str(vpiDefName, defn), "latch_udp");
+  EXPECT_STREQ(vpi_get_str(vpiDefName, VpiHandleOf(defn)), "latch_udp");
 }
 
 // C2: a udp defn reports its number of inputs through vpiSize, which the shared
@@ -73,7 +76,7 @@ TEST_F(UdpModel, DefinitionNameReportsUdpName) {
 TEST_F(UdpModel, SizeReportsNumberOfInputs) {
   VpiHandle defn = MakeObject(vpiUdpDefn, "mux_udp");
   defn->size = 3;  // a three-input UDP
-  EXPECT_EQ(vpi_get(vpiSize, defn), 3);
+  EXPECT_EQ(vpi_get(vpiSize, VpiHandleOf(defn)), 3);
 }
 
 // C3: a udp defn carries the vpiProtected Boolean (§37.3.6), TRUE when it
@@ -81,25 +84,25 @@ TEST_F(UdpModel, SizeReportsNumberOfInputs) {
 // through even for a protected object.
 TEST_F(UdpModel, ProtectedFlagReported) {
   VpiHandle open_defn = MakeObject(vpiUdpDefn, "open_udp");
-  EXPECT_EQ(vpi_get(vpiIsProtected, open_defn), 0);
+  EXPECT_EQ(vpi_get(vpiIsProtected, VpiHandleOf(open_defn)), 0);
 
   VpiHandle sealed_defn = MakeObject(vpiUdpDefn, "sealed_udp");
   sealed_defn->is_protected = true;
-  EXPECT_EQ(vpi_get(vpiIsProtected, sealed_defn), 1);
+  EXPECT_EQ(vpi_get(vpiIsProtected, VpiHandleOf(sealed_defn)), 1);
 }
 
 // C4 / Detail 2: a sequential UDP reports vpiSeqPrim through vpiPrimType.
 TEST_F(UdpModel, PrimTypeReportsSequentialUdp) {
   VpiHandle defn = MakeObject(vpiUdpDefn, "ff_udp");
   defn->prim_type = vpiSeqPrim;
-  EXPECT_EQ(vpi_get(vpiPrimType, defn), vpiSeqPrim);
+  EXPECT_EQ(vpi_get(vpiPrimType, VpiHandleOf(defn)), vpiSeqPrim);
 }
 
 // C4 / Detail 2: a combinational UDP reports vpiCombPrim through vpiPrimType.
 TEST_F(UdpModel, PrimTypeReportsCombinationalUdp) {
   VpiHandle defn = MakeObject(vpiUdpDefn, "and_udp");
   defn->prim_type = vpiCombPrim;
-  EXPECT_EQ(vpi_get(vpiPrimType, defn), vpiCombPrim);
+  EXPECT_EQ(vpi_get(vpiPrimType, VpiHandleOf(defn)), vpiCombPrim);
 }
 
 // C5: iterating vpiIODecl from a udp defn walks its io decl children (the UDP's
@@ -113,14 +116,14 @@ TEST_F(UdpModel, TraversesToIoDecls) {
   defn->children.push_back(in0);
   defn->children.push_back(in1);
 
-  vpiHandle iter = vpi_iterate(vpiIODecl, defn);
+  vpiHandle iter = vpi_iterate(vpiIODecl, VpiHandleOf(defn));
   ASSERT_NE(iter, nullptr);
   std::vector<vpiHandle> seen;
   while (vpiHandle d = vpi_scan(iter)) seen.push_back(d);
   ASSERT_EQ(static_cast<int>(seen.size()), 3);
-  EXPECT_EQ(seen[0], out);
-  EXPECT_EQ(seen[1], in0);
-  EXPECT_EQ(seen[2], in1);
+  EXPECT_EQ(VpiObjectOf(seen[0]), out);
+  EXPECT_EQ(VpiObjectOf(seen[1]), in0);
+  EXPECT_EQ(VpiObjectOf(seen[2]), in1);
 }
 
 // C6: iterating vpiTableEntry from a udp defn walks the rows of its state
@@ -132,13 +135,13 @@ TEST_F(UdpModel, TraversesToTableEntries) {
   defn->children.push_back(row0);
   defn->children.push_back(row1);
 
-  vpiHandle iter = vpi_iterate(vpiTableEntry, defn);
+  vpiHandle iter = vpi_iterate(vpiTableEntry, VpiHandleOf(defn));
   ASSERT_NE(iter, nullptr);
   std::vector<vpiHandle> seen;
   while (vpiHandle r = vpi_scan(iter)) seen.push_back(r);
   ASSERT_EQ(static_cast<int>(seen.size()), 2);
-  EXPECT_EQ(seen[0], row0);
-  EXPECT_EQ(seen[1], row1);
+  EXPECT_EQ(VpiObjectOf(seen[0]), row0);
+  EXPECT_EQ(VpiObjectOf(seen[1]), row1);
 }
 
 // C7: vpi_handle(vpiInitial, defn) reaches a sequential UDP's initial statement
@@ -156,7 +159,7 @@ TEST_F(UdpModel, TraversesToInitial) {
 TEST_F(UdpModel, TableEntrySizeReportsSymbolEntryCount) {
   VpiHandle row = MakeObject(vpiTableEntry, "row");
   row->size = 4;  // four symbols in this table row
-  EXPECT_EQ(vpi_get(vpiSize, row), 4);
+  EXPECT_EQ(vpi_get(vpiSize, VpiHandleOf(row)), 4);
 }
 
 // C9 / Detail 1: a table entry's value is obtainable as a string (its
@@ -169,9 +172,9 @@ TEST_F(UdpModel, TableEntryValueAllowsStringFormat) {
 
   s_vpi_value v = {};
   v.format = vpiStringVal;
-  vpi_get_value(row, &v);
+  vpi_get_value(VpiHandleOf(row), &v);
 
-  SVpiErrorInfo info = {};
+  s_vpi_error_info info = {};
   EXPECT_EQ(vpi_chk_error(&info), 0);
   EXPECT_STREQ(v.value.str, "AB");
 }
@@ -186,9 +189,9 @@ TEST_F(UdpModel, TableEntryValueAllowsVectorFormat) {
 
   s_vpi_value v = {};
   v.format = vpiVectorVal;
-  vpi_get_value(row, &v);
+  vpi_get_value(VpiHandleOf(row), &v);
 
-  SVpiErrorInfo info = {};
+  s_vpi_error_info info = {};
   EXPECT_EQ(vpi_chk_error(&info), 0);
   ASSERT_NE(v.value.vector, nullptr);
   EXPECT_EQ(v.value.vector[0].aval, 0x4142u);
@@ -206,9 +209,9 @@ TEST_F(UdpModel, TableEntryValueRejectsOtherFormats) {
   s_vpi_value v = {};
   v.format = vpiIntVal;
   v.value.integer = 0x7777;  // sentinel that must survive the refused read
-  vpi_get_value(row, &v);
+  vpi_get_value(VpiHandleOf(row), &v);
 
-  SVpiErrorInfo info = {};
+  s_vpi_error_info info = {};
   EXPECT_EQ(vpi_chk_error(&info), vpiError);
   EXPECT_EQ(v.value.integer, 0x7777);
 }
@@ -230,9 +233,9 @@ TEST_F(UdpModel, TableEntryValueRejectsStringLikeAndNumericFormats) {
   for (int format : kRefused) {
     s_vpi_value v = {};
     v.format = format;
-    vpi_get_value(row, &v);
+    vpi_get_value(VpiHandleOf(row), &v);
 
-    SVpiErrorInfo info = {};
+    s_vpi_error_info info = {};
     EXPECT_EQ(vpi_chk_error(&info), vpiError) << "format " << format;
   }
 }
@@ -245,7 +248,7 @@ int g_udp_inputs = 0;
 int g_udp_prim_type = 0;
 int g_udp_table_entries = 0;
 
-int ProbeUdpDefnsCalltf(const char*) {
+PLI_INT32 ProbeUdpDefnsCalltf(PLI_BYTE8*) {
   // §37.4.3: the udp defn is drawn from a circle, so the iteration that reaches
   // the design's definitions is traversed with NULL for the ref_h.
   vpiHandle itr = vpi_iterate(vpiUdpDefn, nullptr);
@@ -279,7 +282,7 @@ TEST(UdpDesign, ADesignsUdpDeclarationIsAUdpDefnObject) {
 
   s_vpi_systf_data data = {};
   data.type = vpiSysTask;
-  data.tfname = "$probe";
+  data.tfname = VpiText("$probe");
   data.calltf = &ProbeUdpDefnsCalltf;
   ASSERT_NE(vpi_register_systf(&data), nullptr);
 

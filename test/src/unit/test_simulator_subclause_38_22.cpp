@@ -5,7 +5,10 @@
 #include "common/source_mgr.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
+#include "simulator/vpi_constants.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -45,7 +48,9 @@ TEST_F(VpiHandleMultiSim, ReturnsTheObjectBothReferencesReach) {
   auto* in_port = vpi_ctx_.CreatePort("i", kVpiInput, mod);
   VpiHandle path = SharedObject(vpiInterModPath, out_port, in_port);
 
-  EXPECT_EQ(vpi_handle_multi(vpiInterModPath, out_port, in_port), path);
+  EXPECT_EQ(VpiObjectOf(vpi_handle_multi(vpiInterModPath, VpiHandleOf(out_port),
+                                         VpiHandleOf(in_port))),
+            path);
 }
 
 // §38.22: the handle names the object itself, so what an application does to
@@ -57,7 +62,8 @@ TEST_F(VpiHandleMultiSim, TheReturnedHandleIsTheObjectItself) {
   auto* in_port = vpi_ctx_.CreatePort("i", kVpiInput, mod);
   VpiHandle path = SharedObject(vpiInterModPath, out_port, in_port);
 
-  vpiHandle h = vpi_handle_multi(vpiInterModPath, out_port, in_port);
+  vpiHandle h = vpi_handle_multi(vpiInterModPath, VpiHandleOf(out_port),
+                                 VpiHandleOf(in_port));
   ASSERT_NE(h, nullptr);
 
   s_vpi_time in[2] = {};
@@ -74,7 +80,7 @@ TEST_F(VpiHandleMultiSim, TheReturnedHandleIsTheObjectItself) {
   get.da = out;
   get.no_of_delays = 2;
   get.time_type = vpiScaledRealTime;
-  vpi_get_delays(path, &get);
+  vpi_get_delays(VpiHandleOf(path), &get);
   EXPECT_DOUBLE_EQ(out[0].real, 4.0);
   EXPECT_DOUBLE_EQ(out[1].real, 6.0);
 }
@@ -90,7 +96,8 @@ TEST_F(VpiHandleMultiSim, NoHandleForAnObjectOnlyOneReferenceReaches) {
   auto* mod2 = vpi_ctx_.CreateModule("m2", "m2");
   vpi_ctx_.CreatePort("p2", kVpiOutput, mod2);
 
-  EXPECT_EQ(vpi_handle_multi(vpiPort, mod1, mod2), nullptr);
+  EXPECT_EQ(vpi_handle_multi(vpiPort, VpiHandleOf(mod1), VpiHandleOf(mod2)),
+            nullptr);
 }
 
 // §38.22 Arguments: the routine is given handles to reference objects. A
@@ -106,7 +113,7 @@ TEST_F(VpiHandleMultiSim, HandleMultiOneNullReturnsNull) {
   auto* mod = vpi_ctx_.CreateModule("solo", "solo");
   vpi_ctx_.CreatePort("p", kVpiInput, mod);
 
-  EXPECT_EQ(vpi_handle_multi(vpiPort, mod, nullptr), nullptr);
+  EXPECT_EQ(vpi_handle_multi(vpiPort, VpiHandleOf(mod), nullptr), nullptr);
 }
 
 // §38.22: for a vpiInterModPath request the two reference objects are the
@@ -121,7 +128,8 @@ TEST_F(VpiHandleMultiSim, InterModPathRejectsDifferentlySizedPorts) {
   in_port->size = 4;
   SharedObject(vpiInterModPath, out_port, in_port);
 
-  vpiHandle h = vpi_handle_multi(vpiInterModPath, out_port, in_port);
+  vpiHandle h = vpi_handle_multi(vpiInterModPath, VpiHandleOf(out_port),
+                                 VpiHandleOf(in_port));
   EXPECT_EQ(h, nullptr);
   EXPECT_EQ(vpi_ctx_.LastError().level, kVpiError);
 }
@@ -137,7 +145,9 @@ TEST_F(VpiHandleMultiSim, SizeMismatchIgnoredForNonInterModPathType) {
   mod2->size = 4;
   VpiHandle shared = SharedObject(vpiPort, mod1, mod2);
 
-  EXPECT_EQ(vpi_handle_multi(vpiPort, mod1, mod2), shared);
+  EXPECT_EQ(VpiObjectOf(vpi_handle_multi(vpiPort, VpiHandleOf(mod1),
+                                         VpiHandleOf(mod2))),
+            shared);
   EXPECT_EQ(vpi_ctx_.LastError().level, 0);
 }
 
@@ -153,7 +163,9 @@ TEST_F(VpiHandleMultiSim, InterModPathAcceptsSameSizedPortsAcrossHierarchy) {
   in_port->size = 16;
   VpiHandle path = SharedObject(vpiInterModPath, out_port, in_port);
 
-  EXPECT_EQ(vpi_handle_multi(vpiInterModPath, out_port, in_port), path);
+  EXPECT_EQ(VpiObjectOf(vpi_handle_multi(vpiInterModPath, VpiHandleOf(out_port),
+                                         VpiHandleOf(in_port))),
+            path);
   EXPECT_EQ(vpi_ctx_.LastError().level, 0);
 }
 
@@ -165,7 +177,9 @@ TEST_F(VpiHandleMultiSim, NoHandleWhenTheSharedObjectIsOfAnotherType) {
   auto* in_port = vpi_ctx_.CreatePort("i", kVpiInput, mod);
   SharedObject(vpiPort, out_port, in_port);
 
-  EXPECT_EQ(vpi_handle_multi(vpiInterModPath, out_port, in_port), nullptr);
+  EXPECT_EQ(vpi_handle_multi(vpiInterModPath, VpiHandleOf(out_port),
+                             VpiHandleOf(in_port)),
+            nullptr);
 }
 
 }  // namespace

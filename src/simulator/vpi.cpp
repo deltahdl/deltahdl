@@ -16,6 +16,10 @@
 // §37.10 detail 3: the package/interface/program instance kinds are defined in
 // the SystemVerilog VPI header alongside the §37.10 vpiInstance relation.
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_constants.h"
+#include "simulator/vpi_context.h"
+#include "simulator/vpi_data_structs.h"
+#include "simulator/vpi_object.h"
 
 namespace {
 
@@ -43,32 +47,33 @@ class VpiRoutineErrorScope {
 
 vpiHandle vpi_register_systf(s_vpi_systf_data* data) {
   VpiRoutineErrorScope error_scope;
-  return delta::GetGlobalVpiContext().RegisterSystf(data);
+  return delta::VpiHandleOf(delta::GetGlobalVpiContext().RegisterSystf(data));
 }
 
 void vpi_get_systf_info(vpiHandle obj, s_vpi_systf_data* systf_data_p) {
   VpiRoutineErrorScope error_scope;
-  delta::GetGlobalVpiContext().GetSystfInfo(obj, systf_data_p);
+  delta::GetGlobalVpiContext().GetSystfInfo(delta::VpiObjectOf(obj),
+                                            systf_data_p);
 }
 
 void vpi_get_cb_info(vpiHandle obj, s_cb_data* cb_data_p) {
   VpiRoutineErrorScope error_scope;
-  delta::GetGlobalVpiContext().GetCbInfo(obj, cb_data_p);
+  delta::GetGlobalVpiContext().GetCbInfo(delta::VpiObjectOf(obj), cb_data_p);
 }
 
 void vpi_get_time(vpiHandle obj, s_vpi_time* time_p) {
   VpiRoutineErrorScope error_scope;
-  delta::GetGlobalVpiContext().GetTime(obj, time_p);
+  delta::GetGlobalVpiContext().GetTime(delta::VpiObjectOf(obj), time_p);
 }
 
 void vpi_get_delays(vpiHandle obj, p_vpi_delay delay_p) {
   VpiRoutineErrorScope error_scope;
-  delta::GetGlobalVpiContext().GetDelays(obj, delay_p);
+  delta::GetGlobalVpiContext().GetDelays(delta::VpiObjectOf(obj), delay_p);
 }
 
 void vpi_put_delays(vpiHandle obj, p_vpi_delay delay_p) {
   VpiRoutineErrorScope error_scope;
-  delta::GetGlobalVpiContext().PutDelays(obj, delay_p);
+  delta::GetGlobalVpiContext().PutDelays(delta::VpiObjectOf(obj), delay_p);
 }
 
 PLI_INT32 vpi_get_data(PLI_INT32 id, PLI_BYTE8* data_loc,
@@ -85,44 +90,51 @@ PLI_INT32 vpi_put_data(PLI_INT32 id, PLI_BYTE8* data_loc,
 
 PLI_INT32 vpi_put_userdata(vpiHandle obj, void* userdata) {
   VpiRoutineErrorScope error_scope;
-  return delta::GetGlobalVpiContext().PutUserData(obj, userdata);
+  return delta::GetGlobalVpiContext().PutUserData(delta::VpiObjectOf(obj),
+                                                  userdata);
 }
 
 void* vpi_get_userdata(vpiHandle obj) {
   VpiRoutineErrorScope error_scope;
-  return delta::GetGlobalVpiContext().GetUserData(obj);
+  return delta::GetGlobalVpiContext().GetUserData(delta::VpiObjectOf(obj));
 }
 
 vpiHandle vpi_handle(PLI_INT32 type, vpiHandle ref) {
   VpiRoutineErrorScope error_scope;
-  return delta::GetGlobalVpiContext().Handle(type, ref);
+  return delta::VpiHandleOf(
+      delta::GetGlobalVpiContext().Handle(type, delta::VpiObjectOf(ref)));
 }
 
-vpiHandle vpi_handle_by_name(const char* name, vpiHandle scope) {
+vpiHandle vpi_handle_by_name(PLI_BYTE8* name, vpiHandle scope) {
   VpiRoutineErrorScope error_scope;
-  return delta::GetGlobalVpiContext().HandleByName(name, scope);
+  return delta::VpiHandleOf(delta::GetGlobalVpiContext().HandleByName(
+      name, delta::VpiObjectOf(scope)));
 }
 
 vpiHandle vpi_handle_by_index(vpiHandle parent, PLI_INT32 index) {
   VpiRoutineErrorScope error_scope;
-  return delta::GetGlobalVpiContext().HandleByIndex(index, parent);
+  return delta::VpiHandleOf(delta::GetGlobalVpiContext().HandleByIndex(
+      index, delta::VpiObjectOf(parent)));
 }
 
 vpiHandle vpi_handle_by_multi_index(vpiHandle parent, PLI_INT32 num_index,
                                     PLI_INT32* index_array) {
   VpiRoutineErrorScope error_scope;
-  return delta::GetGlobalVpiContext().HandleByMultiIndex(num_index, index_array,
-                                                         parent);
+  return delta::VpiHandleOf(delta::GetGlobalVpiContext().HandleByMultiIndex(
+      num_index, index_array, delta::VpiObjectOf(parent)));
 }
 
-vpiHandle vpi_handle_multi(PLI_INT32 type, vpiHandle ref1, vpiHandle ref2) {
+vpiHandle vpi_handle_multi(PLI_INT32 type, vpiHandle ref1, vpiHandle ref2,
+                           ...) {
   VpiRoutineErrorScope error_scope;
-  return delta::GetGlobalVpiContext().HandleMulti(type, ref1, ref2);
+  return delta::VpiHandleOf(delta::GetGlobalVpiContext().HandleMulti(
+      type, delta::VpiObjectOf(ref1), delta::VpiObjectOf(ref2)));
 }
 
 PLI_INT32 vpi_compare_objects(vpiHandle obj1, vpiHandle obj2) {
   VpiRoutineErrorScope error_scope;
-  return delta::GetGlobalVpiContext().CompareObjects(obj1, obj2);
+  return delta::GetGlobalVpiContext().CompareObjects(delta::VpiObjectOf(obj1),
+                                                     delta::VpiObjectOf(obj2));
 }
 
 vpiHandle vpi_iterate(PLI_INT32 type, vpiHandle ref) {
@@ -139,14 +151,15 @@ vpiHandle vpi_iterate(PLI_INT32 type, vpiHandle ref) {
   // this entry point is one of those - the compile-based scheme renames its
   // calls to the variants in vpi_compatibility.cpp instead. The mode was
   // recorded and read by nothing, so it determined no behavior at all.
-  return delta::VpiIterateInCompatibilityMode(
-      type, ref,
-      delta::GetGlobalVpiContext().EffectiveCompatibilityMode(false, 0));
+  return delta::VpiHandleOf(delta::VpiIterateInCompatibilityMode(
+      type, delta::VpiObjectOf(ref),
+      delta::GetGlobalVpiContext().EffectiveCompatibilityMode(false, 0)));
 }
 
 vpiHandle vpi_scan(vpiHandle iterator) {
   VpiRoutineErrorScope error_scope;
-  return delta::GetGlobalVpiContext().Scan(iterator);
+  return delta::VpiHandleOf(
+      delta::GetGlobalVpiContext().Scan(delta::VpiObjectOf(iterator)));
 }
 
 void vpi_get_value(vpiHandle obj, s_vpi_value* value) {
@@ -157,7 +170,7 @@ void vpi_get_value(vpiHandle obj, s_vpi_value* value) {
           delta::VpiRoutine::kGetValue)) {
     return;
   }
-  delta::GetGlobalVpiContext().GetValue(obj, value);
+  delta::GetGlobalVpiContext().GetValue(delta::VpiObjectOf(obj), value);
 }
 
 vpiHandle vpi_put_value(vpiHandle obj, s_vpi_value* value, s_vpi_time* time,
@@ -169,24 +182,27 @@ vpiHandle vpi_put_value(vpiHandle obj, s_vpi_value* value, s_vpi_time* time,
           delta::VpiRoutine::kPutValue)) {
     return nullptr;
   }
-  return delta::GetGlobalVpiContext().PutValue(obj, value, time, flags);
+  return delta::VpiHandleOf(delta::GetGlobalVpiContext().PutValue(
+      delta::VpiObjectOf(obj), value, time, flags));
 }
 
 void vpi_put_value_array(vpiHandle obj, p_vpi_arrayvalue arrayvalue_p,
                          PLI_INT32* index_p, PLI_UINT32 num) {
   VpiRoutineErrorScope error_scope;
-  delta::GetGlobalVpiContext().PutValueArray(obj, arrayvalue_p, index_p, num);
+  delta::GetGlobalVpiContext().PutValueArray(delta::VpiObjectOf(obj),
+                                             arrayvalue_p, index_p, num);
 }
 
 void vpi_get_value_array(vpiHandle obj, p_vpi_arrayvalue arrayvalue_p,
                          PLI_INT32* index_p, PLI_UINT32 num) {
   VpiRoutineErrorScope error_scope;
-  delta::GetGlobalVpiContext().GetValueArray(obj, arrayvalue_p, index_p, num);
+  delta::GetGlobalVpiContext().GetValueArray(delta::VpiObjectOf(obj),
+                                             arrayvalue_p, index_p, num);
 }
 
 vpiHandle vpi_register_cb(s_cb_data* data) {
   VpiRoutineErrorScope error_scope;
-  return delta::GetGlobalVpiContext().RegisterCb(data);
+  return delta::VpiHandleOf(delta::GetGlobalVpiContext().RegisterCb(data));
 }
 
 PLI_INT32 vpi_remove_cb(vpiHandle cb_handle) {
@@ -195,8 +211,8 @@ PLI_INT32 vpi_remove_cb(vpiHandle cb_handle) {
   // to remove the callback via vpi_remove_cb()", and what it names is a
   // placement in the assertion model rather than a row of the simulation
   // callback table, so it is removed there. Every other handle is §38.39's.
-  if (delta::VpiRemoveAssertionCb(cb_handle)) return 1;
-  return delta::GetGlobalVpiContext().RemoveCb(cb_handle);
+  if (delta::VpiRemoveAssertionCb(delta::VpiObjectOf(cb_handle))) return 1;
+  return delta::GetGlobalVpiContext().RemoveCb(delta::VpiObjectOf(cb_handle));
 }
 
 PLI_INT32 vpi_get(PLI_INT32 property, vpiHandle obj) {
@@ -204,28 +220,29 @@ PLI_INT32 vpi_get(PLI_INT32 property, vpiHandle obj) {
   // §36.12.2.2: as for vpi_iterate, an application reaching this entry point
   // is governed by the default mode the run was given.
   return delta::VpiGetInCompatibilityMode(
-      property, obj,
+      property, delta::VpiObjectOf(obj),
       delta::GetGlobalVpiContext().EffectiveCompatibilityMode(false, 0));
 }
 
 PLI_INT64 vpi_get64(PLI_INT32 property, vpiHandle obj) {
   VpiRoutineErrorScope error_scope;
-  return delta::GetGlobalVpiContext().Get64(property, obj);
+  return delta::GetGlobalVpiContext().Get64(property, delta::VpiObjectOf(obj));
 }
 
 PLI_BYTE8* vpi_get_str(PLI_INT32 property, vpiHandle obj) {
   VpiRoutineErrorScope error_scope;
-  return delta::GetGlobalVpiContext().GetStr(property, obj);
+  return delta::GetGlobalVpiContext().GetStr(property, delta::VpiObjectOf(obj));
 }
 
 PLI_INT32 vpi_free_object(vpiHandle obj) {
   VpiRoutineErrorScope error_scope;
-  return delta::GetGlobalVpiContext().FreeObject(obj);
+  return delta::GetGlobalVpiContext().FreeObject(delta::VpiObjectOf(obj));
 }
 
 PLI_INT32 vpi_release_handle(vpiHandle obj) {
   VpiRoutineErrorScope error_scope;
-  return delta::GetGlobalVpiContext().ReleaseHandleStatus(obj);
+  return delta::GetGlobalVpiContext().ReleaseHandleStatus(
+      delta::VpiObjectOf(obj));
 }
 
 // §39.5: the assertion controls read their own argument lists - a scope handle
@@ -334,7 +351,7 @@ PLI_INT32 vpi_control(PLI_INT32 operation, ...) {
   return result;
 }
 
-PLI_INT32 vpi_chk_error(SVpiErrorInfo* info) {
+PLI_INT32 vpi_chk_error(s_vpi_error_info* info) {
   // §38.2: vpi_chk_error() returns the severity level (a Table 38-1 constant)
   // of the error left by the previous VPI routine call, or 0 (false) when that
   // call did not result in an error. When info is non-null the error detail is
@@ -345,7 +362,7 @@ PLI_INT32 vpi_chk_error(SVpiErrorInfo* info) {
   return ctx.LastError().level;
 }
 
-PLI_INT32 vpi_get_vlog_info(SVpiVlogInfo* info) {
+PLI_INT32 vpi_get_vlog_info(s_vpi_vlog_info* info) {
   VpiRoutineErrorScope error_scope;
   // §38.17: return 1 (true) on success and 0 (false) when the information
   // cannot be supplied.

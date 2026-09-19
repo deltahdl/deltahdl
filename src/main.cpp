@@ -32,6 +32,7 @@
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/vcd_writer.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_user.h"
 #include "synthesizer/aig_opt.h"

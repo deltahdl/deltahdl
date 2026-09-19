@@ -5,7 +5,9 @@
 #include "common/source_mgr.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -37,7 +39,7 @@ TEST_F(VpiReleaseHandleSim, ReleasesAValidHandleAndReportsSuccess) {
   obj.type = vpiModule;
   ASSERT_FALSE(vpi_ctx_.HandleReleased(&obj));
 
-  EXPECT_EQ(vpi_release_handle(&obj), 1);
+  EXPECT_EQ(vpi_release_handle(VpiHandleOf(&obj)), 1);
   EXPECT_TRUE(vpi_ctx_.HandleReleased(&obj));
 }
 
@@ -48,9 +50,9 @@ TEST_F(VpiReleaseHandleSim, FailsWhenTheHandleIsAlreadyInvalid) {
   VpiObject obj;
   obj.type = vpiModule;
 
-  EXPECT_EQ(vpi_release_handle(&obj), 1);
+  EXPECT_EQ(vpi_release_handle(VpiHandleOf(&obj)), 1);
   ASSERT_TRUE(vpi_ctx_.HandleReleased(&obj));
-  EXPECT_EQ(vpi_release_handle(&obj), 0);
+  EXPECT_EQ(vpi_release_handle(VpiHandleOf(&obj)), 0);
 }
 
 // Shall (not called on an invalid handle), null edge: a null handle names no
@@ -70,7 +72,7 @@ TEST_F(VpiReleaseHandleSim, FailsWhenTheObjectNoLongerExists) {
   obj.object_exists = false;
 
   ASSERT_FALSE(vpi_ctx_.HandleReleased(&obj));
-  EXPECT_EQ(vpi_release_handle(&obj), 0);
+  EXPECT_EQ(vpi_release_handle(VpiHandleOf(&obj)), 0);
 }
 
 // Iterator paragraph: vpi_release_handle() may free the memory of an iterator
@@ -88,11 +90,11 @@ TEST_F(VpiReleaseHandleSim, FreesAnIteratorReleasedBeforeExhaustion) {
   scope.type = vpiModule;
   scope.children = {&first_child, &second_child};
 
-  vpiHandle iter = vpi_iterate(vpiModule, &scope);
+  vpiHandle iter = vpi_iterate(vpiModule, VpiHandleOf(&scope));
   ASSERT_NE(iter, nullptr);
 
   // Advance once, then break out of the traversal before it is exhausted.
-  ASSERT_EQ(vpi_scan(iter), &first_child);
+  ASSERT_EQ(VpiObjectOf(vpi_scan(iter)), &first_child);
 
   EXPECT_EQ(vpi_release_handle(iter), 1);
 }
@@ -115,20 +117,20 @@ TEST_F(VpiReleaseHandleSim,
   scope.type = vpiModule;
   scope.children = {&first_child, &second_child};
 
-  vpiHandle iter = vpi_iterate(vpiModule, &scope);
+  vpiHandle iter = vpi_iterate(vpiModule, VpiHandleOf(&scope));
   ASSERT_NE(iter, nullptr);
-  ASSERT_EQ(vpi_scan(iter), &first_child);
+  ASSERT_EQ(VpiObjectOf(vpi_scan(iter)), &first_child);
   ASSERT_EQ(vpi_release_handle(iter), 1);
 
   EXPECT_FALSE(vpi_ctx_.HandleReleased(&first_child));
   EXPECT_FALSE(vpi_ctx_.HandleReleased(&second_child));
   EXPECT_FALSE(vpi_ctx_.HandleReleased(&scope));
-  EXPECT_EQ(vpi_get(vpiType, &first_child), vpiModule);
+  EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(&first_child)), vpiModule);
 
-  vpiHandle again = vpi_iterate(vpiModule, &scope);
+  vpiHandle again = vpi_iterate(vpiModule, VpiHandleOf(&scope));
   ASSERT_NE(again, nullptr);
-  EXPECT_EQ(vpi_scan(again), &first_child);
-  EXPECT_EQ(vpi_scan(again), &second_child);
+  EXPECT_EQ(VpiObjectOf(vpi_scan(again)), &first_child);
+  EXPECT_EQ(VpiObjectOf(vpi_scan(again)), &second_child);
   EXPECT_EQ(vpi_scan(again), nullptr);
 }
 
@@ -151,15 +153,15 @@ TEST_F(VpiReleaseHandleSim, AnExhaustedIteratorIsFreedWithoutARelease) {
   scope.type = vpiModule;
   scope.children = {&first_child, &second_child};
 
-  vpiHandle iter = vpi_iterate(vpiModule, &scope);
+  vpiHandle iter = vpi_iterate(vpiModule, VpiHandleOf(&scope));
   ASSERT_NE(iter, nullptr);
-  EXPECT_EQ(vpi_scan(iter), &first_child);
-  EXPECT_EQ(vpi_scan(iter), &second_child);
+  EXPECT_EQ(VpiObjectOf(vpi_scan(iter)), &first_child);
+  EXPECT_EQ(VpiObjectOf(vpi_scan(iter)), &second_child);
   EXPECT_EQ(vpi_scan(iter), nullptr);
 
-  vpiHandle again = vpi_iterate(vpiModule, &scope);
+  vpiHandle again = vpi_iterate(vpiModule, VpiHandleOf(&scope));
   ASSERT_NE(again, nullptr);
-  EXPECT_EQ(vpi_scan(again), &first_child);
+  EXPECT_EQ(VpiObjectOf(vpi_scan(again)), &first_child);
   EXPECT_EQ(vpi_release_handle(again), 1);
 }
 
@@ -174,9 +176,9 @@ TEST_F(VpiReleaseHandleSim, AHandleThatIsNeverReleasedStaysValid) {
   obj.type = vpiModule;
 
   EXPECT_TRUE(vpi_ctx_.HandleValid(&obj));
-  EXPECT_EQ(vpi_get(vpiType, &obj), vpiModule);
+  EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(&obj)), vpiModule);
 
-  EXPECT_EQ(vpi_release_handle(&obj), 1);
+  EXPECT_EQ(vpi_release_handle(VpiHandleOf(&obj)), 1);
 }
 
 }  // namespace

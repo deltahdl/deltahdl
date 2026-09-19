@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <vector>
 
+#include "simulator/vpi_context.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 using namespace delta;

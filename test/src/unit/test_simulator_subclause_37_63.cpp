@@ -1,7 +1,10 @@
 #include <gtest/gtest.h>
 
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_constants.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -38,7 +41,7 @@ TEST_F(Process, ProcessReportsItsAlwaysTypeThroughVpiGet) {
     VpiObject process;
     process.type = vpiAlways;
     process.always_type = always_type;
-    EXPECT_EQ(vpi_get(vpiAlwaysType, &process), always_type)
+    EXPECT_EQ(vpi_get(vpiAlwaysType, VpiHandleOf(&process)), always_type)
         << "always_type constant " << always_type;
   }
 }
@@ -52,12 +55,13 @@ TEST_F(Process, ProcessReportsItsAlwaysTypeThroughVpiGet) {
 TEST_F(Process, ProcessWithoutALegalAlwaysTypeReportsUndefined) {
   VpiObject initial_process;
   initial_process.type = vpiInitial;  // not an always procedure; always_type 0
-  EXPECT_EQ(vpi_get(vpiAlwaysType, &initial_process), vpiUndefined);
+  EXPECT_EQ(vpi_get(vpiAlwaysType, VpiHandleOf(&initial_process)),
+            vpiUndefined);
 
   VpiObject bad_process;
   bad_process.type = vpiAlways;
   bad_process.always_type = vpiInitial;  // a value outside the four
-  EXPECT_EQ(vpi_get(vpiAlwaysType, &bad_process), vpiUndefined);
+  EXPECT_EQ(vpi_get(vpiAlwaysType, VpiHandleOf(&bad_process)), vpiUndefined);
 }
 
 // -----------------------------------------------------------------------------
@@ -82,7 +86,7 @@ TEST_F(Process, AProcessReachesTheStatementItExecutes) {
   process.type = vpiAlways;
   process.children = {&body};
 
-  EXPECT_EQ(vpi_handle(vpiStmt, &process), &body);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiStmt, VpiHandleOf(&process))), &body);
 }
 
 // §37.63 (figure): the same edge is drawn on all three procedure kinds, and a
@@ -96,7 +100,7 @@ TEST_F(Process, AnInitialReachesAnAtomicStatementBody) {
   process.type = vpiInitial;
   process.children = {&body};
 
-  EXPECT_EQ(vpi_handle(vpiStmt, &process), &body);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiStmt, VpiHandleOf(&process))), &body);
 }
 
 // §37.63 (figure, stmt -> process): the arrow carries a head at each end, so a
@@ -117,8 +121,9 @@ TEST_F(Process, AStatementReachesTheProcedureRunningIt) {
   nested.parent = &body;
   body.children = {&nested};
 
-  EXPECT_EQ(vpi_handle(vpiProcess, &body), &process);
-  EXPECT_EQ(vpi_handle(vpiProcess, &nested), &process);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiProcess, VpiHandleOf(&body))), &process);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiProcess, VpiHandleOf(&nested))),
+            &process);
 }
 
 // §37.63 (figure): a statement standing under no procedure names none, rather
@@ -132,7 +137,7 @@ TEST_F(Process, AStatementOutsideAProcedureReachesNone) {
   stmt.parent = &mod;
   mod.children = {&stmt};
 
-  EXPECT_EQ(vpi_handle(vpiProcess, &stmt), nullptr);
+  EXPECT_EQ(vpi_handle(vpiProcess, VpiHandleOf(&stmt)), nullptr);
 }
 
 }  // namespace

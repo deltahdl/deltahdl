@@ -3,7 +3,9 @@
 #include "fixture_simulator.h"
 #include "helpers_reported_error.h"
 #include "simulator/variable.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -35,7 +37,7 @@ class DefiningSystfNames : public ::testing::Test {
 // counter is where it can record that it ran.
 int g_user_task_calls = 0;
 
-int UserTaskCalltf(const char*) {
+PLI_INT32 UserTaskCalltf(PLI_BYTE8*) {
   ++g_user_task_calls;
   return 0;
 }
@@ -49,7 +51,7 @@ TEST_F(DefiningSystfNames, RegisteredTaskIsCalledFromADesign) {
   g_user_task_calls = 0;
   s_vpi_systf_data task = {};
   task.type = vpiSysTask;
-  task.tfname = "$my_task";
+  task.tfname = VpiText("$my_task");
   task.calltf = UserTaskCalltf;
   ASSERT_NE(vpi_register_systf(&task), nullptr);
 
@@ -69,7 +71,7 @@ TEST_F(DefiningSystfNames, RegisteredTaskIsCalledFromADesign) {
 // application: vpi_handle(vpiSysTfCall, NULL) names the call being made, and
 // vpi_put_value writes the value the function answers with. The design assigns
 // the call to a variable, so what is asserted is the value the source sees.
-int UserFuncCalltf(const char*) {
+PLI_INT32 UserFuncCalltf(PLI_BYTE8*) {
   s_vpi_value value = {};
   value.format = vpiIntVal;
   value.value.integer = 42;
@@ -81,7 +83,7 @@ TEST_F(DefiningSystfNames, RegisteredFunctionReturnsItsValueToTheDesign) {
   s_vpi_systf_data func = {};
   func.type = vpiSysFunc;
   func.sysfunctype = vpiSizedFunc;
-  func.tfname = "$my_func";
+  func.tfname = VpiText("$my_func");
   func.calltf = UserFuncCalltf;
   ASSERT_NE(vpi_register_systf(&func), nullptr);
 
@@ -125,7 +127,7 @@ TEST_F(DefiningSystfNames, ADefinedNameIsCaseSensitive) {
   g_user_task_calls = 0;
   s_vpi_systf_data task = {};
   task.type = vpiSysTask;
-  task.tfname = "$My_Task";
+  task.tfname = VpiText("$My_Task");
   task.calltf = UserTaskCalltf;
   ASSERT_NE(vpi_register_systf(&task), nullptr);
 

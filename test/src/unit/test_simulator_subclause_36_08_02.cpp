@@ -3,7 +3,11 @@
 #include <string>
 
 #include "fixture_simulator.h"
+#include "simulator/vpi_context.h"
+#include "simulator/vpi_data_structs.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -16,7 +20,7 @@ namespace {
 const char* g_compiletf_arg = nullptr;
 int g_compiletf_calls = 0;
 
-int RecordingCompiletf(const char* arg) {
+PLI_INT32 RecordingCompiletf(PLI_BYTE8* arg) {
   g_compiletf_arg = arg;
   ++g_compiletf_calls;
   return 0;
@@ -68,15 +72,15 @@ TEST_F(CompiletfApplicationRoutine, IsACompileTimeRoutineUnlikeCalltf) {
 TEST_F(CompiletfApplicationRoutine, RunsForBothSystemTaskAndSystemFunction) {
   int payload = 0;
 
-  VpiSystfData task = {};
+  s_vpi_systf_data task = {};
   task.type = kVpiSysTask;
   task.compiletf = &RecordingCompiletf;
-  task.user_data = &payload;
+  task.user_data = reinterpret_cast<PLI_BYTE8*>(&payload);
 
-  VpiSystfData func = {};
+  s_vpi_systf_data func = {};
   func.type = kVpiSysFunc;
   func.compiletf = &RecordingCompiletf;
-  func.user_data = &payload;
+  func.user_data = reinterpret_cast<PLI_BYTE8*>(&payload);
 
   ResetCompiletfProbe();
   VpiSystfInvoke(task.compiletf, task.user_data);
@@ -99,15 +103,15 @@ TEST_F(CompiletfApplicationRoutine, RunsForBothSystemTaskAndSystemFunction) {
 // -----------------------------------------------------------------------------
 
 TEST_F(CompiletfApplicationRoutine, IsOptional) {
-  VpiSystfData no_compiletf = {};
+  s_vpi_systf_data no_compiletf = {};
   no_compiletf.type = kVpiSysTask;
-  no_compiletf.tfname = "$check_args";
+  no_compiletf.tfname = VpiText("$check_args");
   no_compiletf.compiletf = nullptr;  // omitted - allowed
 
   VpiHandle handle = vpi_ctx_.RegisterSystf(&no_compiletf);
   ASSERT_NE(handle, nullptr);
 
-  VpiSystfData read_back = {};
+  s_vpi_systf_data read_back = {};
   vpi_ctx_.GetSystfInfo(handle, &read_back);
   EXPECT_EQ(read_back.compiletf, nullptr);
 
@@ -127,16 +131,16 @@ TEST_F(CompiletfApplicationRoutine,
        SuppliedRoutineRoundTripsAndReceivesUserData) {
   int payload = 0;
 
-  VpiSystfData with_compiletf = {};
+  s_vpi_systf_data with_compiletf = {};
   with_compiletf.type = kVpiSysFunc;
-  with_compiletf.tfname = "$get_vector";
+  with_compiletf.tfname = VpiText("$get_vector");
   with_compiletf.compiletf = &RecordingCompiletf;
-  with_compiletf.user_data = &payload;
+  with_compiletf.user_data = reinterpret_cast<PLI_BYTE8*>(&payload);
 
   VpiHandle handle = vpi_ctx_.RegisterSystf(&with_compiletf);
   ASSERT_NE(handle, nullptr);
 
-  VpiSystfData read_back = {};
+  s_vpi_systf_data read_back = {};
   vpi_ctx_.GetSystfInfo(handle, &read_back);
   ASSERT_EQ(read_back.compiletf, &RecordingCompiletf);
 
@@ -168,7 +172,7 @@ int g_args_seen_at_compile = -1;
 std::string g_call_name_seen;
 std::string g_first_arg_name_seen;
 
-int InspectingCompiletf(const char*) {
+PLI_INT32 InspectingCompiletf(PLI_BYTE8*) {
   g_call_type_seen = 0;
   g_args_seen_at_compile = -1;
   g_call_name_seen.clear();
@@ -199,7 +203,7 @@ int InspectingCompiletf(const char*) {
 void RegisterInspectingProbe(int type) {
   s_vpi_systf_data data = {};
   data.type = type;
-  data.tfname = "$probe";
+  data.tfname = VpiText("$probe");
   data.compiletf = &InspectingCompiletf;
   ASSERT_NE(vpi_register_systf(&data), nullptr);
 }

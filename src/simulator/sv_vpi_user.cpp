@@ -4,6 +4,8 @@
 
 #include "simulator/vpi_assertion_cb.h"
 #include "simulator/vpi_coverage.h"
+#include "simulator/vpi_object.h"
+#include "simulator/vpi_user.h"
 
 vpiHandle vpi_register_assertion_cb(vpiHandle assertion, PLI_INT32 reason,
                                     vpi_assertion_callback_func* cb_rtn,
@@ -13,7 +15,8 @@ vpiHandle vpi_register_assertion_cb(vpiHandle assertion, PLI_INT32 reason,
   // four arguments and dropped every one of them, answering NULL whatever was
   // asked, so no PLI application could place an assertion callback at all
   // through the one entry point §39.1 puts the assertion API behind.
-  return delta::VpiRegisterAssertionCb(assertion, reason, cb_rtn, user_data);
+  return delta::VpiHandleOf(delta::VpiRegisterAssertionCb(
+      delta::VpiObjectOf(assertion), reason, cb_rtn, user_data));
 }
 
 namespace delta {

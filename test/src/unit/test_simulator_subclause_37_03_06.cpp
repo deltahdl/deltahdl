@@ -3,7 +3,9 @@
 #include <string>
 
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -32,7 +34,7 @@ TEST_F(VpiObjectProtection, GetIsProtectedReportsFalseForOrdinaryObject) {
   VpiObject net;
   net.type = vpiNet;
   // default-constructed objects are not protected
-  EXPECT_EQ(vpi_get(vpiIsProtected, &net), 0);
+  EXPECT_EQ(vpi_get(vpiIsProtected, VpiHandleOf(&net)), 0);
 }
 
 // Claim: access to the vpiType property of a protected object shall be
@@ -43,9 +45,9 @@ TEST_F(VpiObjectProtection, GetTypeIsPermittedOnProtectedObject) {
   mod.type = vpiModule;
   mod.is_protected = true;
 
-  EXPECT_EQ(vpi_get(vpiType, &mod), vpiModule);
+  EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(&mod)), vpiModule);
 
-  SVpiErrorInfo info = {};
+  s_vpi_error_info info = {};
   EXPECT_EQ(vpi_chk_error(&info), 0);
 }
 
@@ -57,9 +59,9 @@ TEST_F(VpiObjectProtection, GetIsProtectedIsPermittedOnProtectedObject) {
   mod.type = vpiModule;
   mod.is_protected = true;
 
-  EXPECT_EQ(vpi_get(vpiIsProtected, &mod), 1);
+  EXPECT_EQ(vpi_get(vpiIsProtected, VpiHandleOf(&mod)), 1);
 
-  SVpiErrorInfo info = {};
+  s_vpi_error_info info = {};
   EXPECT_EQ(vpi_chk_error(&info), 0);
 }
 
@@ -72,9 +74,9 @@ TEST_F(VpiObjectProtection, GetOtherPropertyOnProtectedObjectIsAnError) {
   reg.size = 32;
   reg.is_protected = true;
 
-  EXPECT_EQ(vpi_get(vpiSize, &reg), vpiUndefined);
+  EXPECT_EQ(vpi_get(vpiSize, VpiHandleOf(&reg)), vpiUndefined);
 
-  SVpiErrorInfo info = {};
+  s_vpi_error_info info = {};
   EXPECT_NE(vpi_chk_error(&info), 0);
   EXPECT_NE(info.level, 0);
 }
@@ -87,11 +89,11 @@ TEST_F(VpiObjectProtection, GetStrTypeIsPermittedOnProtectedObject) {
   mod.type = vpiModule;
   mod.is_protected = true;
 
-  const char* type_name = vpi_get_str(vpiType, &mod);
+  const char* type_name = vpi_get_str(vpiType, VpiHandleOf(&mod));
   ASSERT_NE(type_name, nullptr);
   EXPECT_EQ(std::string(type_name), "vpiModule");
 
-  SVpiErrorInfo info = {};
+  s_vpi_error_info info = {};
   EXPECT_EQ(vpi_chk_error(&info), 0);
 }
 
@@ -104,9 +106,9 @@ TEST_F(VpiObjectProtection, GetStrOtherPropertyOnProtectedObjectIsAnError) {
   mod.name = "locked";
   mod.is_protected = true;
 
-  EXPECT_EQ(vpi_get_str(vpiName, &mod), nullptr);
+  EXPECT_EQ(vpi_get_str(vpiName, VpiHandleOf(&mod)), nullptr);
 
-  SVpiErrorInfo info = {};
+  s_vpi_error_info info = {};
   EXPECT_NE(vpi_chk_error(&info), 0);
   EXPECT_NE(info.level, 0);
 }
@@ -122,9 +124,9 @@ TEST_F(VpiObjectProtection, GetStrIsProtectedIsPermittedOnProtectedObject) {
   mod.type = vpiModule;
   mod.is_protected = true;
 
-  EXPECT_EQ(vpi_get_str(vpiIsProtected, &mod), nullptr);
+  EXPECT_EQ(vpi_get_str(vpiIsProtected, VpiHandleOf(&mod)), nullptr);
 
-  SVpiErrorInfo info = {};
+  s_vpi_error_info info = {};
   EXPECT_EQ(vpi_chk_error(&info), 0);
 }
 
@@ -143,8 +145,8 @@ TEST_F(VpiObjectProtection, RelationshipAccessOnProtectedObjectIsAnError) {
   open_mod.type = vpiModule;
   open_mod.children.push_back(&child);
   // The contained-net relationship resolves from an unprotected reference.
-  EXPECT_EQ(vpi_handle(vpiNet, &open_mod), &child);
-  SVpiErrorInfo ok = {};
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiNet, VpiHandleOf(&open_mod))), &child);
+  s_vpi_error_info ok = {};
   EXPECT_EQ(vpi_chk_error(&ok), 0);
 
   VpiObject locked_mod;
@@ -152,9 +154,9 @@ TEST_F(VpiObjectProtection, RelationshipAccessOnProtectedObjectIsAnError) {
   locked_mod.children.push_back(&child);
   locked_mod.is_protected = true;
   // ...but the same traversal is refused once the reference is protected.
-  EXPECT_EQ(vpi_handle(vpiNet, &locked_mod), nullptr);
+  EXPECT_EQ(vpi_handle(vpiNet, VpiHandleOf(&locked_mod)), nullptr);
 
-  SVpiErrorInfo info = {};
+  s_vpi_error_info info = {};
   EXPECT_NE(vpi_chk_error(&info), 0);
   EXPECT_NE(info.level, 0);
 }
@@ -169,9 +171,9 @@ TEST_F(VpiObjectProtection, GetNonExceptionPropertyOnOrdinaryObjectSucceeds) {
   reg.size = 16;
   // not protected
 
-  EXPECT_EQ(vpi_get(vpiSize, &reg), 16);
+  EXPECT_EQ(vpi_get(vpiSize, VpiHandleOf(&reg)), 16);
 
-  SVpiErrorInfo info = {};
+  s_vpi_error_info info = {};
   EXPECT_EQ(vpi_chk_error(&info), 0);
 }
 

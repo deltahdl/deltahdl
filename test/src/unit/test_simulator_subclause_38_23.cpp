@@ -8,7 +8,11 @@
 #include "fixture_simulator.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
+#include "simulator/vpi_constants.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -32,7 +36,7 @@ TEST_F(VpiIterateSim, IterateModuleChildPorts) {
   vpi_ctx_.CreatePort("p0", kVpiInput, mod);
   vpi_ctx_.CreatePort("p1", kVpiOutput, mod);
 
-  vpiHandle iter = vpi_iterate(vpiPort, mod);
+  vpiHandle iter = vpi_iterate(vpiPort, VpiHandleOf(mod));
   ASSERT_NE(iter, nullptr);
 
   int count = 0;
@@ -51,10 +55,10 @@ TEST_F(VpiIterateSim, IterateRegsOfAScopeAfterAttach) {
   sim_ctx_.CreateVariable("m1.v2", 16);
   vpi_ctx_.Attach(sim_ctx_);
 
-  vpiHandle mod = vpi_handle_by_name("m1", nullptr);
+  vpiHandle mod = vpi_handle_by_name(VpiText("m1"), nullptr);
   ASSERT_NE(mod, nullptr);
 
-  vpiHandle iter = vpi_iterate(vpiReg, mod);
+  vpiHandle iter = vpi_iterate(vpiReg, VpiHandleOf(mod));
   ASSERT_NE(iter, nullptr);
 
   int count = 0;
@@ -74,7 +78,7 @@ TEST_F(VpiIterateSim, IteratorHandleTypeIsIterator) {
   auto* mod = vpi_ctx_.CreateModule("top", "top");
   vpi_ctx_.CreatePort("p0", kVpiInput, mod);
 
-  vpiHandle iter = vpi_iterate(vpiPort, mod);
+  vpiHandle iter = vpi_iterate(vpiPort, VpiHandleOf(mod));
   ASSERT_NE(iter, nullptr);
   EXPECT_EQ(vpi_get(vpiType, iter), vpiIterator);
 }
@@ -85,9 +89,9 @@ TEST_F(VpiIterateSim, HandleVpiUseReturnsReferenceObject) {
   auto* mod = vpi_ctx_.CreateModule("top", "top");
   vpi_ctx_.CreatePort("p0", kVpiInput, mod);
 
-  vpiHandle iter = vpi_iterate(vpiPort, mod);
+  vpiHandle iter = vpi_iterate(vpiPort, VpiHandleOf(mod));
   ASSERT_NE(iter, nullptr);
-  EXPECT_EQ(vpi_handle(vpiUse, iter), mod);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiUse, iter)), mod);
 }
 
 // §38.23: unless otherwise specified, iterating a protected object is an error,
@@ -97,7 +101,7 @@ TEST_F(VpiIterateSim, IterateProtectedObjectReturnsNull) {
   vpi_ctx_.CreatePort("p0", kVpiInput, mod);
   mod->is_protected = true;
 
-  EXPECT_EQ(vpi_iterate(vpiPort, mod), nullptr);
+  EXPECT_EQ(vpi_iterate(vpiPort, VpiHandleOf(mod)), nullptr);
 }
 
 // §38.23: when no objects of the requested type are associated with the
@@ -106,7 +110,7 @@ TEST_F(VpiIterateSim, IterateNoMatchingObjectsReturnsNull) {
   auto* mod = vpi_ctx_.CreateModule("top", "top");
   vpi_ctx_.CreatePort("p0", kVpiInput, mod);
 
-  EXPECT_EQ(vpi_iterate(vpiParameter, mod), nullptr);
+  EXPECT_EQ(vpi_iterate(vpiParameter, VpiHandleOf(mod)), nullptr);
 }
 
 // -----------------------------------------------------------------------------
@@ -129,10 +133,10 @@ std::string g_first_net_name;
 std::string g_second_net_name;
 int g_widest_net_size = 0;
 
-int DisplayNetsCalltf(const char*) {
-  vpiHandle mod = vpi_handle_by_name("m1", nullptr);
+PLI_INT32 DisplayNetsCalltf(PLI_BYTE8*) {
+  vpiHandle mod = vpi_handle_by_name(VpiText("m1"), nullptr);
   if (mod == nullptr) return 0;
-  vpiHandle itr = vpi_iterate(vpiNet, mod);
+  vpiHandle itr = vpi_iterate(vpiNet, VpiHandleOf(mod));
   if (itr == nullptr) return 0;
   for (vpiHandle net = vpi_scan(itr); net != nullptr; net = vpi_scan(itr)) {
     ++g_nets_seen;
@@ -154,7 +158,7 @@ void RegisterNetProbe() {
 
   s_vpi_systf_data data = {};
   data.type = vpiSysTask;
-  data.tfname = "$probe";
+  data.tfname = VpiText("$probe");
   data.calltf = &DisplayNetsCalltf;
   ASSERT_NE(vpi_register_systf(&data), nullptr);
 }

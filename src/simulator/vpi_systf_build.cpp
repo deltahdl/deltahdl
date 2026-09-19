@@ -10,6 +10,7 @@
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_data_structs.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_user.h"
 
 namespace delta {
 namespace {
@@ -48,7 +49,7 @@ struct BuildPeriod {
 void CallBuildPeriodRoutinesForCall(const Expr* call, BuildPeriod& period) {
   if (call == nullptr || call->kind != ExprKind::kSystemCall) return;
   if (!period.called.insert(call).second) return;
-  const VpiSystfData* data =
+  const s_vpi_systf_data* data =
       period.vpi.ResolveSystf(std::string(call->callee).c_str());
   if (data == nullptr) return;
 

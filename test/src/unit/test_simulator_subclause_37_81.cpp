@@ -3,7 +3,9 @@
 #include <vector>
 
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -48,10 +50,10 @@ TEST_F(TimeQueue, ObjectsAreReturnedInIncreasingTimeOrder) {
   ASSERT_NE(b, nullptr);
   ASSERT_NE(c, nullptr);
 
-  EXPECT_EQ(a->type, vpiTimeQueue);
-  EXPECT_EQ(a->time_queue_time, 10u);
-  EXPECT_EQ(b->time_queue_time, 20u);
-  EXPECT_EQ(c->time_queue_time, 30u);
+  EXPECT_EQ(VpiObjectOf(a)->type, vpiTimeQueue);
+  EXPECT_EQ(VpiObjectOf(a)->time_queue_time, 10u);
+  EXPECT_EQ(VpiObjectOf(b)->time_queue_time, 20u);
+  EXPECT_EQ(VpiObjectOf(c)->time_queue_time, 30u);
 
   // The queue holds exactly three slots, so the next scan retires the iterator.
   EXPECT_EQ(vpi_scan(it), nullptr);
@@ -77,8 +79,8 @@ TEST_F(TimeQueue, CurrentSlotIsIncludedWithEventsBeforeReadOnlySync) {
 
   vpiHandle slot = vpi_scan(it);
   ASSERT_NE(slot, nullptr);
-  EXPECT_EQ(slot->type, vpiTimeQueue);
-  EXPECT_EQ(slot->time_queue_time, 5u);
+  EXPECT_EQ(VpiObjectOf(slot)->type, vpiTimeQueue);
+  EXPECT_EQ(VpiObjectOf(slot)->time_queue_time, 5u);
   EXPECT_EQ(vpi_scan(it), nullptr);
 }
 
@@ -95,7 +97,7 @@ TEST_F(TimeQueue, FutureSlotContributesWhileCurrentSlotIsFiltered) {
 
   vpiHandle only = vpi_scan(it);
   ASSERT_NE(only, nullptr);
-  EXPECT_EQ(only->time_queue_time, 8u);
+  EXPECT_EQ(VpiObjectOf(only)->time_queue_time, 8u);
   EXPECT_EQ(vpi_scan(it), nullptr);
 }
 

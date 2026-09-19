@@ -4,7 +4,9 @@
 
 #include "fixture_simulator.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -31,7 +33,7 @@ bool g_reached_instance = false;
 bool g_reached_net = false;
 int g_instance_is_top = 0;
 
-int WalkFromTheTopCalltf(const char*) {
+PLI_INT32 WalkFromTheTopCalltf(PLI_BYTE8*) {
   vpiHandle tops = vpi_iterate(vpiModule, nullptr);
   if (tops == nullptr) return 0;
   vpiHandle top = nullptr;
@@ -69,7 +71,7 @@ void RegisterWalkProbe() {
 
   s_vpi_systf_data data = {};
   data.type = vpiSysTask;
-  data.tfname = "$probe";
+  data.tfname = VpiText("$probe");
   data.calltf = &WalkFromTheTopCalltf;
   ASSERT_NE(vpi_register_systf(&data), nullptr);
 }

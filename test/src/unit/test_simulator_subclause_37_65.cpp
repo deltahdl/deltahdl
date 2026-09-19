@@ -1,7 +1,10 @@
 #include <gtest/gtest.h>
 
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_model_helpers1.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -78,12 +81,13 @@ TEST_F(EventControl, RuleAppliesThroughPublicVpiHandleDispatch) {
   on_assignment.type = vpiEventControl;
   on_assignment.parent = &assignment;
   on_assignment.children = {&guarded};
-  EXPECT_EQ(vpi_handle(vpiStmt, &on_assignment), nullptr);
+  EXPECT_EQ(vpi_handle(vpiStmt, VpiHandleOf(&on_assignment)), nullptr);
 
   VpiObject standalone;
   standalone.type = vpiEventControl;
   standalone.children = {&guarded};
-  EXPECT_EQ(vpi_handle(vpiStmt, &standalone), &guarded);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiStmt, VpiHandleOf(&standalone))),
+            &guarded);
 }
 
 // C1 (vpiCondition): the event control diagram draws a vpiCondition edge to an
@@ -98,7 +102,8 @@ TEST_F(EventControl, ConditionRelationReachesEachEventOperandKind) {
   VpiObject on_expr;
   on_expr.type = vpiEventControl;
   on_expr.children = {&expr_cond};
-  EXPECT_EQ(vpi_handle(vpiCondition, &on_expr), &expr_cond);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiCondition, VpiHandleOf(&on_expr))),
+            &expr_cond);
 
   // "@(seq)": a sequence instance operand.
   VpiObject seq_cond;
@@ -106,7 +111,8 @@ TEST_F(EventControl, ConditionRelationReachesEachEventOperandKind) {
   VpiObject on_seq;
   on_seq.type = vpiEventControl;
   on_seq.children = {&seq_cond};
-  EXPECT_EQ(vpi_handle(vpiCondition, &on_seq), &seq_cond);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiCondition, VpiHandleOf(&on_seq))),
+            &seq_cond);
 
   // "@ev": a named event operand.
   VpiObject named_cond;
@@ -114,7 +120,8 @@ TEST_F(EventControl, ConditionRelationReachesEachEventOperandKind) {
   VpiObject on_named;
   on_named.type = vpiEventControl;
   on_named.children = {&named_cond};
-  EXPECT_EQ(vpi_handle(vpiCondition, &on_named), &named_cond);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiCondition, VpiHandleOf(&on_named))),
+            &named_cond);
 }
 
 // C1 (negative): the condition scan admits only the three operand kinds, so an
@@ -129,7 +136,7 @@ TEST_F(EventControl, ConditionRelationIgnoresGuardedStatement) {
   event_control.type = vpiEventControl;
   event_control.children = {&body};
 
-  EXPECT_EQ(vpi_handle(vpiCondition, &event_control), nullptr);
+  EXPECT_EQ(vpi_handle(vpiCondition, VpiHandleOf(&event_control)), nullptr);
 }
 
 }  // namespace

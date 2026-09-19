@@ -4,7 +4,10 @@
 
 #include "fixture_simulator.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -54,11 +57,12 @@ TEST_F(VpiCompatibility, ARegIterationOnAnArrayRetrievesElementsOfEveryKind) {
   array.type = vpiRegArray;
   array.children = {&reg_word, &integer_word, &time_word};
 
-  std::vector<vpiHandle> seen = ScanAll(vpi_iterate(vpiReg, &array));
+  std::vector<vpiHandle> seen =
+      ScanAll(vpi_iterate(vpiReg, VpiHandleOf(&array)));
   ASSERT_EQ(seen.size(), 3u);
-  EXPECT_EQ(seen[0], &reg_word);
-  EXPECT_EQ(seen[1], &integer_word);
-  EXPECT_EQ(seen[2], &time_word);
+  EXPECT_EQ(VpiObjectOf(seen[0]), &reg_word);
+  EXPECT_EQ(VpiObjectOf(seen[1]), &integer_word);
+  EXPECT_EQ(VpiObjectOf(seen[2]), &time_word);
 }
 
 // Row 6 scope: the row is about an iteration on an array object. A scope's own
@@ -74,9 +78,10 @@ TEST_F(VpiCompatibility, ARegIterationOnAScopeIsUnaffected) {
   scope.type = vpiModule;
   scope.children = {&reg, &int_var};
 
-  std::vector<vpiHandle> seen = ScanAll(vpi_iterate(vpiReg, &scope));
+  std::vector<vpiHandle> seen =
+      ScanAll(vpi_iterate(vpiReg, VpiHandleOf(&scope)));
   ASSERT_EQ(seen.size(), 1u);
-  EXPECT_EQ(seen[0], &reg);
+  EXPECT_EQ(VpiObjectOf(seen[0]), &reg);
 }
 
 // Row 5 (Y): "vpiVariables iterations include vpiReg and vpiRegArray." In the
@@ -92,10 +97,11 @@ TEST_F(VpiCompatibility, AVariablesIterationIncludesRegsAndRegArrays) {
   scope.type = vpiModule;
   scope.children = {&reg, &array};
 
-  std::vector<vpiHandle> seen = ScanAll(vpi_iterate(vpiVariables, &scope));
+  std::vector<vpiHandle> seen =
+      ScanAll(vpi_iterate(vpiVariables, VpiHandleOf(&scope)));
   ASSERT_EQ(seen.size(), 2u);
-  EXPECT_EQ(seen[0], &reg);
-  EXPECT_EQ(seen[1], &array);
+  EXPECT_EQ(VpiObjectOf(seen[0]), &reg);
+  EXPECT_EQ(VpiObjectOf(seen[1]), &array);
 }
 
 // Row 7 (Y): "vpiRegArray iterations include variable array objects." The
@@ -119,10 +125,11 @@ TEST_F(VpiCompatibility, ARegArrayIterationIncludesArraysOfEveryVariable) {
   scope.type = vpiModule;
   scope.children = {&int_array, &real_array};
 
-  std::vector<vpiHandle> seen = ScanAll(vpi_iterate(vpiRegArray, &scope));
+  std::vector<vpiHandle> seen =
+      ScanAll(vpi_iterate(vpiRegArray, VpiHandleOf(&scope)));
   ASSERT_EQ(seen.size(), 2u);
-  EXPECT_EQ(seen[0], &int_array);
-  EXPECT_EQ(seen[1], &real_array);
+  EXPECT_EQ(VpiObjectOf(seen[0]), &int_array);
+  EXPECT_EQ(VpiObjectOf(seen[1]), &real_array);
 }
 
 // Rows 1 and 2 (N): vpiMemory and vpiMemoryWord no longer exist as objects.
@@ -140,14 +147,16 @@ TEST_F(VpiCompatibility, MemoryAndMemoryWordAreRelationsRatherThanObjects) {
   scope.type = vpiModule;
   scope.children = {&memory};
 
-  std::vector<vpiHandle> memories = ScanAll(vpi_iterate(vpiMemory, &scope));
+  std::vector<vpiHandle> memories =
+      ScanAll(vpi_iterate(vpiMemory, VpiHandleOf(&scope)));
   ASSERT_EQ(memories.size(), 1u);
-  EXPECT_EQ(memories[0], &memory);
+  EXPECT_EQ(VpiObjectOf(memories[0]), &memory);
   EXPECT_EQ(vpi_get(vpiType, memories[0]), vpiRegArray);
 
-  std::vector<vpiHandle> words = ScanAll(vpi_iterate(vpiMemoryWord, &memory));
+  std::vector<vpiHandle> words =
+      ScanAll(vpi_iterate(vpiMemoryWord, VpiHandleOf(&memory)));
   ASSERT_EQ(words.size(), 1u);
-  EXPECT_EQ(words[0], &word);
+  EXPECT_EQ(VpiObjectOf(words[0]), &word);
   EXPECT_EQ(vpi_get(vpiType, words[0]), vpiReg);
 }
 
@@ -158,17 +167,17 @@ int g_real_kind = 0;
 int g_reg_kind = 0;
 int g_arrays_seen = 0;
 
-int InspectKindsCalltf(const char*) {
-  vpiHandle mod = vpi_handle_by_name("m1", nullptr);
+PLI_INT32 InspectKindsCalltf(PLI_BYTE8*) {
+  vpiHandle mod = vpi_handle_by_name(VpiText("m1"), nullptr);
   if (mod == nullptr) return 0;
 
-  vpiHandle mem = vpi_handle_by_name("m1.mem", nullptr);
+  vpiHandle mem = vpi_handle_by_name(VpiText("m1.mem"), nullptr);
   if (mem != nullptr) g_array_kind = vpi_get(vpiType, mem);
-  vpiHandle i = vpi_handle_by_name("m1.i", nullptr);
+  vpiHandle i = vpi_handle_by_name(VpiText("m1.i"), nullptr);
   if (i != nullptr) g_integer_kind = vpi_get(vpiType, i);
-  vpiHandle r = vpi_handle_by_name("m1.r", nullptr);
+  vpiHandle r = vpi_handle_by_name(VpiText("m1.r"), nullptr);
   if (r != nullptr) g_real_kind = vpi_get(vpiType, r);
-  vpiHandle b = vpi_handle_by_name("m1.b", nullptr);
+  vpiHandle b = vpi_handle_by_name(VpiText("m1.b"), nullptr);
   if (b != nullptr) g_reg_kind = vpi_get(vpiType, b);
 
   vpiHandle it = vpi_iterate(vpiRegArray, mod);
@@ -186,7 +195,7 @@ void RegisterKindProbe() {
 
   s_vpi_systf_data data = {};
   data.type = vpiSysTask;
-  data.tfname = "$probe";
+  data.tfname = VpiText("$probe");
   data.calltf = &InspectKindsCalltf;
   ASSERT_NE(vpi_register_systf(&data), nullptr);
 }

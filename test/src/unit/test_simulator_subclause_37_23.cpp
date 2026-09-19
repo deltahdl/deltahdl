@@ -4,7 +4,10 @@
 
 #include "fixture_simulator.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -87,8 +90,8 @@ std::string g_resolved_nettype_name;
 bool g_plain_with_is_null = false;
 std::string g_resolution_function_name;
 
-int ProbeNettypeDeclsCalltf(const char*) {
-  vpiHandle mod = vpi_handle_by_name("m1", nullptr);
+PLI_INT32 ProbeNettypeDeclsCalltf(PLI_BYTE8*) {
+  vpiHandle mod = vpi_handle_by_name(VpiText("m1"), nullptr);
   if (mod == nullptr) return 0;
   vpiHandle itr = vpi_iterate(vpiNetTypedef, mod);
   if (itr == nullptr) return 0;
@@ -128,7 +131,7 @@ TEST(NettypeDeclarationDesign, ADesignsNettypeDeclarationsAreObjects) {
 
   s_vpi_systf_data data = {};
   data.type = vpiSysTask;
-  data.tfname = "$probe";
+  data.tfname = VpiText("$probe");
   data.calltf = &ProbeNettypeDeclsCalltf;
   ASSERT_NE(vpi_register_systf(&data), nullptr);
 

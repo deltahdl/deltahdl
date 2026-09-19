@@ -23,10 +23,14 @@
 // §37.44's vpiThread is defined in the SystemVerilog VPI header.
 #include "simulator/sv_vpi_user.h"
 #include "simulator/variable.h"
+#include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_design_walk.h"
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_internal.h"
+#include "simulator/vpi_model_helpers3.h"
+#include "simulator/vpi_object.h"
+#include "simulator/vpi_user.h"
 
 namespace delta {
 

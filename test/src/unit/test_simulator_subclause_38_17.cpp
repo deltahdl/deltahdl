@@ -8,6 +8,7 @@
 #include "helpers_temp_file.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_user.h"
 
@@ -31,7 +32,7 @@ class VpiVlogInfoSim : public ::testing::Test {
 // reports 1 (true) on success. With no invocation options recorded there are
 // zero argv entries.
 TEST_F(VpiVlogInfoSim, GetVlogInfoReturnsProductAndVersion) {
-  SVpiVlogInfo info = {};
+  s_vpi_vlog_info info = {};
   EXPECT_EQ(vpi_get_vlog_info(&info), 1);
   ASSERT_NE(info.product, nullptr);
   ASSERT_NE(info.version, nullptr);
@@ -52,7 +53,7 @@ TEST_F(VpiVlogInfoSim, GetVlogInfoReturnsZeroOnFailure) {
 TEST_F(VpiVlogInfoSim, GetVlogInfoReportsInvocationCommandLine) {
   vpi_ctx_.SetInvocationArguments("delta-sim", {"-top", "dut", "+define+FOO"});
 
-  SVpiVlogInfo info = {};
+  s_vpi_vlog_info info = {};
   EXPECT_EQ(vpi_get_vlog_info(&info), 1);
 
   // There shall be argc entries in argv (tool name plus three options).
@@ -73,7 +74,7 @@ TEST_F(VpiVlogInfoSim, GetVlogInfoReportsInvocationCommandLine) {
 TEST_F(VpiVlogInfoSim, GetVlogInfoReportsToolNameWhenNoOptions) {
   vpi_ctx_.SetInvocationArguments("delta-sim", {});
 
-  SVpiVlogInfo info = {};
+  s_vpi_vlog_info info = {};
   EXPECT_EQ(vpi_get_vlog_info(&info), 1);
 
   ASSERT_EQ(info.argc, 1);
@@ -97,7 +98,7 @@ TEST_F(VpiVlogInfoSim, AnOptionsFileIsReportedAsAnArrayOfItsParsedContents) {
 
   vpi_ctx_.SetInvocationArguments("deltahdl", {"-f", options, "-o", "a"});
 
-  SVpiVlogInfo info = {};
+  s_vpi_vlog_info info = {};
   ASSERT_EQ(vpi_get_vlog_info(&info), 1);
 
   // The command line's own entries: the file name is not among them, the
@@ -129,7 +130,7 @@ TEST_F(VpiVlogInfoSim, AnOptionsFileThatNamesAnotherNestsTheSameWay) {
 
   vpi_ctx_.SetInvocationArguments("deltahdl", {"-f", outer});
 
-  SVpiVlogInfo info = {};
+  s_vpi_vlog_info info = {};
   ASSERT_EQ(vpi_get_vlog_info(&info), 1);
   ASSERT_EQ(info.argc, 3);
 
@@ -153,7 +154,7 @@ TEST_F(VpiVlogInfoSim, AnOptionsFileThatNamesAnotherNestsTheSameWay) {
 TEST_F(VpiVlogInfoSim, TheVendorOptionWrittenLastNamesNoFile) {
   vpi_ctx_.SetInvocationArguments("deltahdl", {"-f"});
 
-  SVpiVlogInfo info = {};
+  s_vpi_vlog_info info = {};
   ASSERT_EQ(vpi_get_vlog_info(&info), 1);
   ASSERT_EQ(info.argc, 2);
   EXPECT_STREQ(info.argv[1], "-f");

@@ -3,7 +3,9 @@
 #include <string>
 
 #include "fixture_simulator.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -39,8 +41,8 @@ int g_bus_size = 0;
 int g_bus_vector = -1;
 int g_scalar_vector = -1;
 
-int Figure371Calltf(const char*) {
-  vpiHandle mod = vpi_handle_by_name("m1", nullptr);
+PLI_INT32 Figure371Calltf(PLI_BYTE8*) {
+  vpiHandle mod = vpi_handle_by_name(VpiText("m1"), nullptr);
   if (mod == nullptr) return 0;
 
   // The one-to-many relation, which §38.23 walks with an iterator.
@@ -80,7 +82,7 @@ void RegisterFigureProbe() {
 
   s_vpi_systf_data data = {};
   data.type = vpiSysTask;
-  data.tfname = "$probe";
+  data.tfname = VpiText("$probe");
   data.calltf = &Figure371Calltf;
   ASSERT_NE(vpi_register_systf(&data), nullptr);
 }

@@ -4,7 +4,10 @@
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "simulator/sim_context.h"
+#include "simulator/vpi_context.h"
+#include "simulator/vpi_data_structs.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -12,7 +15,7 @@ namespace {
 
 // A stand-in application callback routine. vpi_get_cb_info() reports the stored
 // cb_rtn pointer; it is never invoked by these tests.
-int SampleCbRtn(VpiCbData*) { return 0; }
+int SampleCbRtn(s_cb_data*) { return 0; }
 
 class VpiGetCbInfoSim : public ::testing::Test {
  protected:
@@ -35,7 +38,7 @@ TEST_F(VpiGetCbInfoSim, ReportsRegisteredCallbackInfo) {
   reg.reason = cbValueChange;
   reg.cb_rtn = SampleCbRtn;
   reg.index = 7;
-  reg.user_data = &marker;
+  reg.user_data = reinterpret_cast<PLI_BYTE8*>(&marker);
 
   vpiHandle cb = vpi_register_cb(&reg);
   ASSERT_NE(cb, nullptr);
@@ -54,7 +57,7 @@ TEST_F(VpiGetCbInfoSim, ReportsRegisteredCallbackInfo) {
 TEST_F(VpiGetCbInfoSim, ReportsTriggerObject) {
   sim_ctx_.CreateVariable("sig", 8);
   vpi_ctx_.Attach(sim_ctx_);
-  vpiHandle obj = vpi_handle_by_name("sig", nullptr);
+  vpiHandle obj = vpi_handle_by_name(VpiText("sig"), nullptr);
   ASSERT_NE(obj, nullptr);
 
   s_cb_data reg = {};
@@ -73,8 +76,8 @@ TEST_F(VpiGetCbInfoSim, ReportsTriggerObject) {
 // §38.8: the reported s_cb_data carries the callback's time and value pointers
 // too (Figure 38-2 fields), so they round-trip back through vpi_get_cb_info().
 TEST_F(VpiGetCbInfoSim, ReportsTimeAndValuePointers) {
-  VpiTime cb_time = {};
-  VpiValue cb_value = {};
+  s_vpi_time cb_time = {};
+  s_vpi_value cb_value = {};
   s_cb_data reg = {};
   reg.reason = cbAtEndOfSimTime;
   reg.cb_rtn = SampleCbRtn;
@@ -116,7 +119,7 @@ TEST_F(VpiGetCbInfoSim, NullHandleLeavesDestinationUntouched) {
 TEST_F(VpiGetCbInfoSim, SystfCallbackHandleLeavesDestinationUntouched) {
   s_vpi_systf_data systf = {};
   systf.type = kVpiSysTask;
-  systf.tfname = "$mytask";
+  systf.tfname = VpiText("$mytask");
   vpiHandle systf_cb = vpi_register_systf(&systf);
   ASSERT_NE(systf_cb, nullptr);
 
@@ -132,7 +135,7 @@ TEST_F(VpiGetCbInfoSim, SystfCallbackHandleLeavesDestinationUntouched) {
 TEST_F(VpiGetCbInfoSim, NonCallbackHandleLeavesDestinationUntouched) {
   sim_ctx_.CreateVariable("v", 8);
   vpi_ctx_.Attach(sim_ctx_);
-  vpiHandle var = vpi_handle_by_name("v", nullptr);
+  vpiHandle var = vpi_handle_by_name(VpiText("v"), nullptr);
   ASSERT_NE(var, nullptr);
 
   s_cb_data out = {};
@@ -147,7 +150,7 @@ TEST_F(VpiGetCbInfoSim, NonCallbackHandleLeavesDestinationUntouched) {
 // still there to be read back afterwards - the same time pointer, with the
 // delay it was written with.
 TEST_F(VpiGetCbInfoSim, ReportsTheRegistrationAfterTheCallbackHasFired) {
-  VpiTime cb_time = {};
+  s_vpi_time cb_time = {};
   cb_time.type = vpiSimTime;
   cb_time.low = 15;  // the delay asked for
 
@@ -156,7 +159,7 @@ TEST_F(VpiGetCbInfoSim, ReportsTheRegistrationAfterTheCallbackHasFired) {
   reg.reason = cbAfterDelay;
   reg.cb_rtn = SampleCbRtn;
   reg.time = &cb_time;
-  reg.user_data = &marker;
+  reg.user_data = reinterpret_cast<PLI_BYTE8*>(&marker);
   vpiHandle cb = vpi_register_cb(&reg);
   ASSERT_NE(cb, nullptr);
 

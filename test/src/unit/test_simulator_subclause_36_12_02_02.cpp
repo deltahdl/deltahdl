@@ -5,7 +5,9 @@
 #include "common/source_mgr.h"
 #include "simulator/sim_context.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 // §36.12.2.2 -- Mechanism 2: selection of the default VPI compatibility
@@ -129,17 +131,17 @@ TEST_F(VpiDefaultCompatibilityMode, TheDefaultGovernsAnApplicationsIteration) {
   scope.children = {&reg, &int_var};
 
   // With no default selected the run behaves as this standard describes.
-  vpiHandle current = vpi_iterate(vpiVariables, &scope);
+  vpiHandle current = vpi_iterate(vpiVariables, VpiHandleOf(&scope));
   ASSERT_NE(current, nullptr);
-  EXPECT_EQ(vpi_scan(current), &reg);
-  EXPECT_EQ(vpi_scan(current), &int_var);
+  EXPECT_EQ(VpiObjectOf(vpi_scan(current)), &reg);
+  EXPECT_EQ(VpiObjectOf(vpi_scan(current)), &int_var);
   EXPECT_EQ(vpi_scan(current), nullptr);
 
   ASSERT_TRUE(vpi_ctx_.SetDefaultCompatibilityMode(vpiMode1364v2001));
 
-  vpiHandle older = vpi_iterate(vpiVariables, &scope);
+  vpiHandle older = vpi_iterate(vpiVariables, VpiHandleOf(&scope));
   ASSERT_NE(older, nullptr);
-  EXPECT_EQ(vpi_scan(older), &int_var);
+  EXPECT_EQ(VpiObjectOf(vpi_scan(older)), &int_var);
   EXPECT_EQ(vpi_scan(older), nullptr);
 }
 
@@ -156,9 +158,9 @@ TEST_F(VpiDefaultCompatibilityMode, An1800DefaultLeavesTheBehaviorAsItIs) {
 
   ASSERT_TRUE(vpi_ctx_.SetDefaultCompatibilityMode(vpiMode1800v2009));
 
-  vpiHandle it = vpi_iterate(vpiVariables, &scope);
+  vpiHandle it = vpi_iterate(vpiVariables, VpiHandleOf(&scope));
   ASSERT_NE(it, nullptr);
-  EXPECT_EQ(vpi_scan(it), &reg);
+  EXPECT_EQ(VpiObjectOf(vpi_scan(it)), &reg);
   EXPECT_EQ(vpi_scan(it), nullptr);
 }
 

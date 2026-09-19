@@ -526,6 +526,16 @@ jobs:
   # the job enforces and a file reaching it is red rather than noted. The 50
   # lines the band used to hold are still there to write a split in; what has
   # changed is that they are spent before the limit rather than after it.
+  #
+  # src/simulator/vpi_user.h is the one file the find leaves out. Annex K.1 of
+  # IEEE 1800-2023 says every SystemVerilog simulator shall provide the file and
+  # K.2 prints its source, about 1,000 lines of it, so its length is the
+  # standard's and not this repository's to split: the file is what the annex
+  # prints and nothing else, and a second file it pulled in to get under the
+  # limit would be the umbrella the include check exists to refuse. The
+  # exemption names the one file rather than a pattern, because Annex M's
+  # sv_vpi_user.h and Annex L's vpi_compatibility.h fit under the limit as
+  # printed and stay under it.
   assert-no-oversized-source-files:
     runs-on: ubuntu-latest
     steps:
@@ -533,7 +543,8 @@ jobs:
       - name: Check file line limits
         run: |
           fail=0
-          for f in $(find src test lib/cpp -name '*.cpp' -o -name '*.h')
+          for f in $(find src test lib/cpp \( -name '*.cpp' -o -name '*.h' \) \
+                       -not -path src/simulator/vpi_user.h)
           do
             lines=$(wc -l < "$f")
             if [ "$lines" -ge 950 ]; then
@@ -1022,6 +1033,76 @@ jobs:
             fi
           done
           exit $fail
+  # §36.7 has vpi_user.h and sv_vpi_user.h be the C include files a PLI
+  # application that uses the VPI includes, Annex K.1 has every simulator
+  # provide the first and Annexes K.2, L.2 and M.2 print the three files, so
+  # this job writes a C application that includes the two the clause names,
+  # under the names the clause gives them, and uses a handle, a value, a time,
+  # a callback record with its routine, a system task record with its routine,
+  # a constant of each of the object, property, callback and value-format
+  # kinds, an edge macro, an Annex M name and a routine call, and compiles it as
+  # strict C99 with every warning an error. It compiles the same application a
+  # second time with one VPI_COMPATIBILITY_VERSION_ symbol defined, which is
+  # how §36.12.2.1 has an application select a mode and what has vpi_user.h
+  # read vpi_compatibility.h to effect. The translation unit is C, not C++,
+  # which is what the unit tests, being C++, cannot check, and it is the check
+  # that the file is the C include file the clause names rather than a C++
+  # header under the same name.
+  assert-vpi-user-compiles-as-c:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Compile a C application against vpi_user.h and sv_vpi_user.h
+        run: |
+          set -euo pipefail
+          app=$(mktemp --suffix=.c)
+          cat > "$app" <<'EOF'
+          #include "vpi_user.h"
+          #include "sv_vpi_user.h"
+          static PLI_INT32 on_change(struct t_cb_data *cb) {
+            return cb->reason == cbValueChange ? 1 : 0;
+          }
+          static PLI_INT32 my_task(PLI_BYTE8 *user_data) {
+            return user_data == (PLI_BYTE8 *)0 ? 0 : 1;
+          }
+          int main(void) {
+            vpiHandle h = (vpiHandle)0;
+            s_vpi_value value;
+            s_vpi_time time;
+            s_cb_data cb;
+            s_vpi_systf_data task;
+            s_vpi_assertion_step_info step;
+            p_vpi_value value_p = &value;
+            value.format = vpiIntVal;
+            value.value.integer = vpiModule + vpiName + vpiPosedge;
+            time.type = vpiSimTime;
+            time.high = 0u;
+            time.low = 0u;
+            cb.reason = cbValueChange;
+            cb.cb_rtn = &on_change;
+            cb.obj = h;
+            cb.time = &time;
+            cb.value = value_p;
+            cb.user_data = (PLI_BYTE8 *)0;
+            task.type = vpiSysTask;
+            task.sysfunctype = 0;
+            task.tfname = (PLI_BYTE8 *)"$my_task";
+            task.calltf = &my_task;
+            task.compiletf = (PLI_INT32 (*)(PLI_BYTE8 *))0;
+            task.sizetf = (PLI_INT32 (*)(PLI_BYTE8 *))0;
+            task.user_data = (PLI_BYTE8 *)0;
+            step.stateFrom = vpiAssertion;
+            step.stateTo = vpiAssertion;
+            if (h != (vpiHandle)0) {
+              return (int)vpi_get(vpiType, h);
+            }
+            return (int)(value.value.integer + time.type + step.stateFrom) - 793;
+          }
+          EOF
+          cc -std=c99 -Wall -Wextra -pedantic -Werror -fsyntax-only \
+            -Isrc/simulator "$app"
+          cc -std=c99 -Wall -Wextra -pedantic -Werror -fsyntax-only \
+            -DVPI_COMPATIBILITY_VERSION_1800v2012=1 -Isrc/simulator "$app"
   build-asan-ubsan:
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache

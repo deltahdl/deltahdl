@@ -9,6 +9,7 @@
 #include "simulator/assertion_api.h"
 #include "simulator/sim_context.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_user.h"
 
@@ -77,7 +78,7 @@ class AssertionSysCallbackPlacement : public ::testing::Test {
 namespace {
 int g_seen_reason = 0;
 void* g_seen_user_data = nullptr;
-int RecordSysCb(VpiCbData* data) {
+int RecordSysCb(s_cb_data* data) {
   if (data) {
     g_seen_reason = data->reason;
     g_seen_user_data = data->user_data;
@@ -109,7 +110,7 @@ TEST_F(AssertionSysCallbackPlacement, DeliveryCarriesReasonAndUserData) {
   s_cb_data cb = {};
   cb.reason = cbAssertionSysOn;
   cb.cb_rtn = &RecordSysCb;
-  cb.user_data = &payload;
+  cb.user_data = reinterpret_cast<PLI_BYTE8*>(&payload);
   vpiHandle h = vpi_register_cb(&cb);
   ASSERT_NE(h, nullptr);
 

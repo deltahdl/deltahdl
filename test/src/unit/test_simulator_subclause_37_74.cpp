@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -53,7 +55,8 @@ TEST_F(For, ForStatementReachesConditionAmongItsChildren) {
   for_stmt.type = vpiFor;
   for_stmt.children = {&body, &condition};
 
-  EXPECT_EQ(vpi_handle(vpiCondition, &for_stmt), &condition);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiCondition, VpiHandleOf(&for_stmt))),
+            &condition);
 }
 
 // Condition edge reports no expression when the for statement has no condition
@@ -67,7 +70,7 @@ TEST_F(For, ForWithoutConditionReportsNoCondition) {
   for_stmt.type = vpiFor;
   for_stmt.children = {&body};
 
-  EXPECT_EQ(vpi_handle(vpiCondition, &for_stmt), nullptr);
+  EXPECT_EQ(vpi_handle(vpiCondition, VpiHandleOf(&for_stmt)), nullptr);
 }
 
 // Condition gating: the for-condition relation is scoped to the for statement
@@ -82,7 +85,7 @@ TEST_F(For, ForConditionRelationIsScopedToForStatements) {
   not_a_for.type = vpiBegin;  // not a for statement
   not_a_for.children = {&expr};
 
-  EXPECT_EQ(vpi_handle(vpiCondition, &not_a_for), nullptr);
+  EXPECT_EQ(vpi_handle(vpiCondition, VpiHandleOf(&not_a_for)), nullptr);
 }
 
 // Initialization double arrow: a for statement whose header writes a comma list
@@ -156,8 +159,10 @@ TEST_F(For, SingleArrowsReachTheFirstStatementOfEachPartOfTheHeader) {
   for_stmt.for_init_stmts = {&init0, &init1};
   for_stmt.for_inc_stmts = {&increment0, &increment1};
 
-  EXPECT_EQ(vpi_handle(vpiForInitStmt, &for_stmt), &init0);
-  EXPECT_EQ(vpi_handle(vpiForIncStmt, &for_stmt), &increment0);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiForInitStmt, VpiHandleOf(&for_stmt))),
+            &init0);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiForIncStmt, VpiHandleOf(&for_stmt))),
+            &increment0);
 }
 
 // Both relations report nothing for a header that writes neither part: the
@@ -173,8 +178,8 @@ TEST_F(For, AHeaderThatWritesNeitherPartReachesNothingByEitherRelation) {
 
   EXPECT_EQ(ctx_.Iterate(vpiForInitStmt, &for_stmt), nullptr);
   EXPECT_EQ(ctx_.Iterate(vpiForIncStmt, &for_stmt), nullptr);
-  EXPECT_EQ(vpi_handle(vpiForInitStmt, &for_stmt), nullptr);
-  EXPECT_EQ(vpi_handle(vpiForIncStmt, &for_stmt), nullptr);
+  EXPECT_EQ(vpi_handle(vpiForInitStmt, VpiHandleOf(&for_stmt)), nullptr);
+  EXPECT_EQ(vpi_handle(vpiForIncStmt, VpiHandleOf(&for_stmt)), nullptr);
 }
 
 // The header relations are scoped to the for statement: an object of another
@@ -188,7 +193,7 @@ TEST_F(For, HeaderRelationsAreScopedToForStatements) {
   not_a_for.type = vpiWhile;
   not_a_for.children = {&body};
 
-  EXPECT_EQ(vpi_handle(vpiForInitStmt, &not_a_for), nullptr);
+  EXPECT_EQ(vpi_handle(vpiForInitStmt, VpiHandleOf(&not_a_for)), nullptr);
   EXPECT_EQ(ctx_.Iterate(vpiForInitStmt, &not_a_for), nullptr);
 }
 
@@ -209,7 +214,7 @@ TEST_F(For, ForStatementReachesBodyByTheKindTheStmtClassGroups) {
   for_stmt.children = {&condition, &body};
   for_stmt.for_init_stmts = {&init};
 
-  EXPECT_EQ(vpi_handle(vpiStmt, &for_stmt), &body);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiStmt, VpiHandleOf(&for_stmt))), &body);
 }
 
 // Body edge: the body is reached whatever kind it is written as - a lone
@@ -224,7 +229,7 @@ TEST_F(For, EachKindABodyCarriesIsReached) {
     for_stmt.type = vpiFor;
     for_stmt.children = {&body};
 
-    EXPECT_EQ(vpi_handle(vpiStmt, &for_stmt), &body)
+    EXPECT_EQ(VpiObjectOf(vpi_handle(vpiStmt, VpiHandleOf(&for_stmt))), &body)
         << "body kind " << body_kind;
   }
 }
@@ -246,7 +251,7 @@ TEST_F(For, ForWithoutBodyReportsNoStatement) {
   for_stmt.for_init_stmts = {&init};
   for_stmt.for_inc_stmts = {&increment};
 
-  EXPECT_EQ(vpi_handle(vpiStmt, &for_stmt), nullptr);
+  EXPECT_EQ(vpi_handle(vpiStmt, VpiHandleOf(&for_stmt)), nullptr);
 }
 
 }  // namespace

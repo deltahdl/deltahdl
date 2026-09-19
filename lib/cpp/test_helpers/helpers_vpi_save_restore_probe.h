@@ -6,6 +6,7 @@
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "simulator/sim_context.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_user.h"
 
@@ -27,7 +28,7 @@ struct SingleRead {
   char buf[64] = {};
 };
 
-inline int ReadOnceCb(VpiCbData* cb) {
+inline int ReadOnceCb(s_cb_data* cb) {
   auto* p = static_cast<SingleRead*>(cb->user_data);
   p->returned = vpi_get_data(p->id, p->buf, p->request);
   return 0;
@@ -44,7 +45,7 @@ struct DoubleRead {
   char buf2[64] = {};
 };
 
-inline int ReadTwiceCb(VpiCbData* cb) {
+inline int ReadTwiceCb(s_cb_data* cb) {
   auto* p = static_cast<DoubleRead*>(cb->user_data);
   p->ret1 = vpi_get_data(p->id, p->buf1, p->req1);
   p->ret2 = vpi_get_data(p->id, p->buf2, p->req2);
@@ -60,11 +61,11 @@ class VpiSaveRestoreSim : public ::testing::Test {
   void TearDown() override { SetGlobalVpiContext(nullptr); }
 
   // Register `cb_rtn` for `reason`, carrying `probe`, then deliver it.
-  void DispatchWith(int reason, int (*cb_rtn)(VpiCbData*), void* probe) {
+  void DispatchWith(int reason, int (*cb_rtn)(s_cb_data*), void* probe) {
     s_cb_data reg = {};
     reg.reason = reason;
     reg.cb_rtn = cb_rtn;
-    reg.user_data = probe;
+    reg.user_data = static_cast<PLI_BYTE8*>(probe);
     ASSERT_NE(vpi_register_cb(&reg), nullptr);
     vpi_ctx_.DispatchCallbacks(reason);
   }

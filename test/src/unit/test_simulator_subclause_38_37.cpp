@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -17,11 +19,11 @@ class VpiSystfRegistrationSim : public ::testing::Test {
 TEST_F(VpiSystfRegistrationSim, RegisterMultipleSystfs) {
   s_vpi_systf_data data1 = {};
   data1.type = vpiSysTask;
-  data1.tfname = "$task_a";
+  data1.tfname = VpiText("$task_a");
 
   s_vpi_systf_data data2 = {};
   data2.type = vpiSysFunc;
-  data2.tfname = "$func_b";
+  data2.tfname = VpiText("$func_b");
 
   vpi_register_systf(&data1);
   vpi_register_systf(&data2);
@@ -35,11 +37,11 @@ TEST_F(VpiSystfRegistrationSim, RegisterMultipleSystfs) {
 TEST_F(VpiSystfRegistrationSim, RegisterSystfReturnsDistinctHandles) {
   s_vpi_systf_data task = {};
   task.type = vpiSysTask;
-  task.tfname = "$first";
+  task.tfname = VpiText("$first");
 
   s_vpi_systf_data func = {};
   func.type = vpiSysFunc;
-  func.tfname = "$second";
+  func.tfname = VpiText("$second");
 
   vpiHandle h1 = vpi_register_systf(&task);
   vpiHandle h2 = vpi_register_systf(&func);
@@ -54,9 +56,9 @@ TEST_F(VpiSystfRegistrationSim, RegisterSystfReturnsDistinctHandles) {
 }
 
 namespace {
-int SystfStubCall(const char*) { return 0; }
-int SystfStubCompile(const char*) { return 0; }
-int SystfStubSize(const char*) { return 0; }
+PLI_INT32 SystfStubCall(PLI_BYTE8*) { return 0; }
+PLI_INT32 SystfStubCompile(PLI_BYTE8*) { return 0; }
+PLI_INT32 SystfStubSize(PLI_BYTE8*) { return 0; }
 }  // namespace
 
 TEST_F(VpiSystfRegistrationSim, RegisterSystfPreservesFigure3818Fields) {
@@ -64,11 +66,11 @@ TEST_F(VpiSystfRegistrationSim, RegisterSystfPreservesFigure3818Fields) {
   s_vpi_systf_data data = {};
   data.type = vpiSysFunc;
   data.sysfunctype = vpiSysFunc;
-  data.tfname = "$measure";
+  data.tfname = VpiText("$measure");
   data.calltf = &SystfStubCall;
   data.compiletf = &SystfStubCompile;
   data.sizetf = &SystfStubSize;
-  data.user_data = &user_payload;
+  data.user_data = reinterpret_cast<PLI_BYTE8*>(&user_payload);
 
   vpi_register_systf(&data);
 

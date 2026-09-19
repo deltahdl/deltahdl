@@ -5,6 +5,7 @@
 
 #include "simulator/assertion_api.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -14,7 +15,7 @@ namespace {
 // s_vpi_time structure, and the model keeps an attempt's start as the one
 // 64-bit count the two halves of that structure spell. A caller that passed no
 // structure named no attempt, which is the zero attempt the model rejects.
-std::uint64_t VpiAssertionAttemptStart(const VpiTime* time) {
+std::uint64_t VpiAssertionAttemptStart(const s_vpi_time* time) {
   if (time == nullptr) return 0;
   return (static_cast<std::uint64_t>(time->high) << 32) |
          static_cast<std::uint64_t>(time->low);
@@ -95,7 +96,7 @@ PLI_INT32 VpiAssertionControl(int operation, VpiHandle assertion) {
 }
 
 PLI_INT32 VpiAssertionAttemptControl(int operation, VpiHandle assertion,
-                                     const VpiTime* attempt_start_time) {
+                                     const s_vpi_time* attempt_start_time) {
   std::string_view name;
   if (!VpiAssertionControlTarget(assertion, name)) return 0;
   return GetGlobalAssertionApi().ControlAttempt(
@@ -105,7 +106,7 @@ PLI_INT32 VpiAssertionAttemptControl(int operation, VpiHandle assertion,
 }
 
 PLI_INT32 VpiAssertionStepControl(int operation, VpiHandle assertion,
-                                  const VpiTime* attempt_start_time,
+                                  const s_vpi_time* attempt_start_time,
                                   int step_control) {
   std::string_view name;
   if (!VpiAssertionControlTarget(assertion, name)) return 0;

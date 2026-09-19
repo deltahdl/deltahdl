@@ -9,6 +9,7 @@
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_data_structs.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_user.h"
 
 namespace delta {
 
@@ -20,8 +21,8 @@ namespace delta {
 // "function calls may be used as expressions unless of type void, which are
 // statements". So this is the position a task-typed registration is called
 // from, and the expression evaluator refuses the same name there.
-static const VpiSystfData* ResolveSystfTask(const Expr* expr) {
-  const VpiSystfData* data =
+static const s_vpi_systf_data* ResolveSystfTask(const Expr* expr) {
+  const s_vpi_systf_data* data =
       GetGlobalVpiContext().ResolveSystf(std::string(expr->callee).c_str());
   return data != nullptr && data->type == kVpiSysTask ? data : nullptr;
 }
@@ -59,7 +60,7 @@ bool TryExecSystemCallTask(const Expr* expr, SimContext& ctx, Arena& arena) {
   // expression evaluator is what lets that evaluator report the same name as a
   // task standing where a value is wanted; a dispatch that served both
   // positions could tell them apart nowhere.
-  const VpiSystfData* task = ResolveSystfTask(expr);
+  const s_vpi_systf_data* task = ResolveSystfTask(expr);
   if (task != nullptr) {
     Logic4Vec dropped;
     GetGlobalVpiContext().CallRegisteredSystf(task->tfname, expr, ctx, dropped,

@@ -2,6 +2,7 @@
 
 #include "fixture_program.h"
 #include "parser/ast_module.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_user.h"
 

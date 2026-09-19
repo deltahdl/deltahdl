@@ -4,7 +4,9 @@
 
 #include "simulator/assertion_api.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -22,7 +24,7 @@ namespace {
 
 int g_system_calls = 0;
 
-int RecordSystemCallback(VpiCbData*) {
+int RecordSystemCallback(s_cb_data*) {
   ++g_system_calls;
   return 0;
 }
@@ -66,13 +68,13 @@ class AssertionDynamicInformation : public ::testing::Test {
 // assertion does the reverse. Placing both and raising one at a time is what
 // tells them apart.
 TEST_F(AssertionDynamicInformation, TheSystemAndAssertionCallbacksStayApart) {
-  vpiHandle assertion = vpi_ctx_.CreateAssertion("handshake_p", vpiAssert);
+  VpiHandle assertion = vpi_ctx_.CreateAssertion("handshake_p", vpiAssert);
 
   s_cb_data system_cb = {};
   system_cb.reason = cbAssertionSysOff;
   system_cb.cb_rtn = &RecordSystemCallback;
   ASSERT_NE(vpi_register_cb(&system_cb), nullptr);
-  ASSERT_NE(vpi_register_assertion_cb(assertion, cbAssertionStart,
+  ASSERT_NE(vpi_register_assertion_cb(VpiHandleOf(assertion), cbAssertionStart,
                                       &RecordAssertionEvent, nullptr),
             nullptr);
 
@@ -99,14 +101,15 @@ TEST_F(AssertionDynamicInformation, TheSystemAndAssertionCallbacksStayApart) {
 // reaches it. Here one placement sees an attempt start, fail, and be killed,
 // each at its own time.
 TEST_F(AssertionDynamicInformation, WhatAPlacedCallbackReportsMovesWithTheRun) {
-  vpiHandle assertion = vpi_ctx_.CreateAssertion("handshake_p", vpiAssert);
-  ASSERT_NE(vpi_register_assertion_cb(assertion, cbAssertionStart,
+  VpiHandle assertion = vpi_ctx_.CreateAssertion("handshake_p", vpiAssert);
+  ASSERT_NE(vpi_register_assertion_cb(VpiHandleOf(assertion), cbAssertionStart,
                                       &RecordAssertionEvent, nullptr),
             nullptr);
-  ASSERT_NE(vpi_register_assertion_cb(assertion, cbAssertionFailure,
-                                      &RecordAssertionEvent, nullptr),
-            nullptr);
-  ASSERT_NE(vpi_register_assertion_cb(assertion, cbAssertionKill,
+  ASSERT_NE(
+      vpi_register_assertion_cb(VpiHandleOf(assertion), cbAssertionFailure,
+                                &RecordAssertionEvent, nullptr),
+      nullptr);
+  ASSERT_NE(vpi_register_assertion_cb(VpiHandleOf(assertion), cbAssertionKill,
                                       &RecordAssertionEvent, nullptr),
             nullptr);
 

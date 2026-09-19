@@ -5,7 +5,10 @@
 
 #include "fixture_simulator.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -39,12 +42,12 @@ TEST_F(EventStatement, EventStatementReportsBlockingFlagThroughVpiGet) {
   VpiObject blocking_trigger;
   blocking_trigger.type = vpiEventStmt;
   blocking_trigger.blocking = true;
-  EXPECT_EQ(vpi_get(vpiBlocking, &blocking_trigger), 1);
+  EXPECT_EQ(vpi_get(vpiBlocking, VpiHandleOf(&blocking_trigger)), 1);
 
   VpiObject nonblocking_trigger;
   nonblocking_trigger.type = vpiEventStmt;
   nonblocking_trigger.blocking = false;
-  EXPECT_EQ(vpi_get(vpiBlocking, &nonblocking_trigger), 0);
+  EXPECT_EQ(vpi_get(vpiBlocking, VpiHandleOf(&nonblocking_trigger)), 0);
 }
 
 // Applied through the public dispatch: vpiBlocking is drawn only on the event
@@ -55,7 +58,8 @@ TEST_F(EventStatement, EventStatementReportsBlockingFlagThroughVpiGet) {
 TEST_F(EventStatement, BlockingIsUndefinedForNonEventStatement) {
   VpiObject not_an_event_stmt;
   not_an_event_stmt.type = vpiAssignment;
-  EXPECT_EQ(vpi_get(vpiBlocking, &not_an_event_stmt), vpiUndefined);
+  EXPECT_EQ(vpi_get(vpiBlocking, VpiHandleOf(&not_an_event_stmt)),
+            vpiUndefined);
 }
 
 // The clause against a described design. Everything above drives the property
@@ -71,8 +75,8 @@ std::vector<int> g_stmt_blocking;
 std::vector<std::string> g_triggered_event_names;
 std::vector<int> g_triggered_event_types;
 
-int ReadEventStatementsCalltf(const char*) {
-  vpiHandle mod = vpi_handle_by_name("top", nullptr);
+PLI_INT32 ReadEventStatementsCalltf(PLI_BYTE8*) {
+  vpiHandle mod = vpi_handle_by_name(VpiText("top"), nullptr);
   if (mod == nullptr) return 0;
   vpiHandle itr = vpi_iterate(vpiEventStmt, mod);
   if (itr == nullptr) return 0;
@@ -110,7 +114,7 @@ class EventStatementOfADesign : public ::testing::Test {
 TEST_F(EventStatementOfADesign, BothTriggerFormsAreReadBackFromTheDesign) {
   s_vpi_systf_data data = {};
   data.type = vpiSysTask;
-  data.tfname = "$probe";
+  data.tfname = VpiText("$probe");
   data.calltf = &ReadEventStatementsCalltf;
   ASSERT_NE(vpi_register_systf(&data), nullptr);
 
@@ -147,7 +151,7 @@ TEST_F(EventStatementOfADesign, BothTriggerFormsAreReadBackFromTheDesign) {
 TEST_F(EventStatementOfADesign, ATriggerNestedInABlockIsFound) {
   s_vpi_systf_data data = {};
   data.type = vpiSysTask;
-  data.tfname = "$probe";
+  data.tfname = VpiText("$probe");
   data.calltf = &ReadEventStatementsCalltf;
   ASSERT_NE(vpi_register_systf(&data), nullptr);
 

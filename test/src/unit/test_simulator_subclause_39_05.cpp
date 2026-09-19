@@ -2,6 +2,7 @@
 
 #include "simulator/assertion_api.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_user.h"
 
@@ -38,7 +39,7 @@ class AssertionControlFunctions : public ::testing::Test {
 // regardless of scope." Turning the system off through the routine stops
 // assertions starting, and the handle is what says how far the control reaches.
 TEST_F(AssertionControlFunctions, TheSystemIsControlledThroughVpiControl) {
-  vpiHandle scope = vpi_ctx_.CreateModule("dut", "dut");
+  VpiHandle scope = vpi_ctx_.CreateModule("dut", "dut");
 
   EXPECT_EQ(vpi_control(vpiAssertionSysOff, static_cast<vpiHandle>(nullptr)),
             1);
@@ -54,7 +55,7 @@ TEST_F(AssertionControlFunctions, TheSystemIsControlledThroughVpiControl) {
 // control reaches that assertion. Disabling one leaves the other enabled: the
 // handle is what the control is aimed by.
 TEST_F(AssertionControlFunctions, AnAssertionIsControlledThroughVpiControl) {
-  vpiHandle first = vpi_ctx_.CreateAssertion("handshake_p", vpiAssert);
+  VpiHandle first = vpi_ctx_.CreateAssertion("handshake_p", vpiAssert);
   vpi_ctx_.CreateAssertion("overflow_p", vpiAssert);
 
   EXPECT_EQ(vpi_control(vpiAssertionDisable, first), 1);
@@ -69,8 +70,8 @@ TEST_F(AssertionControlFunctions, AnAssertionIsControlledThroughVpiControl) {
 // property instances." A handle that is neither an assertion statement nor a
 // handle at all controls nothing, and the routine reports that it did not.
 TEST_F(AssertionControlFunctions, OnlyAnAssertionStatementHandleIsValid) {
-  vpiHandle sequence = vpi_ctx_.CreateAssertion("handshake_s", vpiSequenceInst);
-  vpiHandle property = vpi_ctx_.CreateAssertion("handshake_q", vpiPropertyInst);
+  VpiHandle sequence = vpi_ctx_.CreateAssertion("handshake_s", vpiSequenceInst);
+  VpiHandle property = vpi_ctx_.CreateAssertion("handshake_q", vpiPropertyInst);
 
   EXPECT_EQ(vpi_control(vpiAssertionDisable, sequence), 0);
   EXPECT_EQ(vpi_control(vpiAssertionDisable, property), 0);
@@ -86,7 +87,7 @@ TEST_F(AssertionControlFunctions, OnlyAnAssertionStatementHandleIsValid) {
 // structure)". vpiAssertionKill discards the attempt that started at that time,
 // and the attempt is named by the time rather than by the assertion alone.
 TEST_F(AssertionControlFunctions, AnAttemptIsNamedByItsStartTime) {
-  vpiHandle assertion = vpi_ctx_.CreateAssertion("handshake_p", vpiAssert);
+  VpiHandle assertion = vpi_ctx_.CreateAssertion("handshake_p", vpiAssert);
   api_.NoteAssertionAttemptStarted("handshake_p", 10);
   api_.NoteAssertionAttemptStarted("handshake_p", 20);
   ASSERT_EQ(api_.AssertionAttemptsInProgress("handshake_p"), 2u);
@@ -106,7 +107,7 @@ TEST_F(AssertionControlFunctions, AnAttemptIsNamedByItsStartTime) {
 // which is the attempt the third argument names, and vpiAssertionClockSteps is
 // the constant that says on what basis they occur.
 TEST_F(AssertionControlFunctions, SteppingIsEnabledForTheNamedAttempt) {
-  vpiHandle assertion = vpi_ctx_.CreateAssertion("handshake_p", vpiAssert);
+  VpiHandle assertion = vpi_ctx_.CreateAssertion("handshake_p", vpiAssert);
 
   // §39.5.2: "The stepping mode of any particular attempt cannot be modified
   // after the assertion attempt in question has started", so the attempt this

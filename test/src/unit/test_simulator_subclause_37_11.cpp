@@ -4,7 +4,11 @@
 
 #include "helpers_vpi_two_fixed_unpacked_dims.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_model_helpers2.h"
+#include "simulator/vpi_model_helpers3.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -249,10 +253,10 @@ TEST(InstanceArrayPublic, AModuleIteratesTheInstanceArraysItHolds) {
   mod.type = vpiModule;
   mod.children = {&module_array, &single, &gate_array};
 
-  vpiHandle it = vpi_iterate(vpiInstanceArray, &mod);
+  vpiHandle it = vpi_iterate(vpiInstanceArray, VpiHandleOf(&mod));
   ASSERT_NE(it, nullptr);
-  EXPECT_EQ(vpi_scan(it), &module_array);
-  EXPECT_EQ(vpi_scan(it), &gate_array);
+  EXPECT_EQ(VpiObjectOf(vpi_scan(it)), &module_array);
+  EXPECT_EQ(VpiObjectOf(vpi_scan(it)), &gate_array);
   EXPECT_EQ(vpi_scan(it), nullptr);
 
   SetGlobalVpiContext(nullptr);
@@ -276,10 +280,10 @@ TEST(InstanceArrayPublic, ThePrimitiveArrayEdgeReachesOnlyPrimitiveArrays) {
   mod.type = vpiModule;
   mod.children = {&module_array, &switch_array, &udp_array};
 
-  vpiHandle it = vpi_iterate(vpiPrimitiveArray, &mod);
+  vpiHandle it = vpi_iterate(vpiPrimitiveArray, VpiHandleOf(&mod));
   ASSERT_NE(it, nullptr);
-  EXPECT_EQ(vpi_scan(it), &switch_array);
-  EXPECT_EQ(vpi_scan(it), &udp_array);
+  EXPECT_EQ(VpiObjectOf(vpi_scan(it)), &switch_array);
+  EXPECT_EQ(VpiObjectOf(vpi_scan(it)), &udp_array);
   EXPECT_EQ(vpi_scan(it), nullptr);
 
   SetGlobalVpiContext(nullptr);
@@ -298,8 +302,8 @@ TEST(InstanceArrayPublic, AModuleWithNoArraysIteratesToNone) {
   mod.type = vpiModule;
   mod.children = {&single};
 
-  EXPECT_EQ(vpi_iterate(vpiInstanceArray, &mod), nullptr);
-  EXPECT_EQ(vpi_iterate(vpiPrimitiveArray, &mod), nullptr);
+  EXPECT_EQ(vpi_iterate(vpiInstanceArray, VpiHandleOf(&mod)), nullptr);
+  EXPECT_EQ(vpi_iterate(vpiPrimitiveArray, VpiHandleOf(&mod)), nullptr);
 
   SetGlobalVpiContext(nullptr);
 }

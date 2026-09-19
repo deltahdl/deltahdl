@@ -9,7 +9,9 @@
 #include "common/types.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -33,7 +35,7 @@ TEST_F(VpiGetValueSim, GetValueIntFormat) {
   var->value = MakeLogic4VecVal(arena_, 32, 123);
   vpi_ctx_.Attach(sim_ctx_);
 
-  vpiHandle h = vpi_handle_by_name("x", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("x"), nullptr);
   ASSERT_NE(h, nullptr);
 
   s_vpi_value val = {};
@@ -47,7 +49,7 @@ TEST_F(VpiGetValueSim, GetValueRealFormat) {
   var->value = MakeLogic4VecVal(arena_, 32, 42);
   vpi_ctx_.Attach(sim_ctx_);
 
-  vpiHandle h = vpi_handle_by_name("r", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("r"), nullptr);
   ASSERT_NE(h, nullptr);
 
   s_vpi_value val = {};
@@ -61,7 +63,7 @@ TEST_F(VpiGetValueSim, GetValueScalarFormatZero) {
   var->value = MakeLogic4VecVal(arena_, 1, 0);
   vpi_ctx_.Attach(sim_ctx_);
 
-  vpiHandle h = vpi_handle_by_name("s", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("s"), nullptr);
   ASSERT_NE(h, nullptr);
 
   s_vpi_value val = {};
@@ -75,7 +77,7 @@ TEST_F(VpiGetValueSim, GetValueScalarFormatOne) {
   var->value = MakeLogic4VecVal(arena_, 1, 1);
   vpi_ctx_.Attach(sim_ctx_);
 
-  vpiHandle h = vpi_handle_by_name("s1", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("s1"), nullptr);
   ASSERT_NE(h, nullptr);
 
   s_vpi_value val = {};
@@ -92,7 +94,7 @@ TEST_F(VpiGetValueSim, GetValueScalarFormatX) {
   var->value.words[0].bval = 1;  // a=1,b=1 -> x
   vpi_ctx_.Attach(sim_ctx_);
 
-  vpiHandle h = vpi_handle_by_name("sx", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("sx"), nullptr);
   ASSERT_NE(h, nullptr);
 
   s_vpi_value val = {};
@@ -107,7 +109,7 @@ TEST_F(VpiGetValueSim, GetValueScalarFormatZ) {
   var->value.words[0].bval = 1;  // a=0,b=1 -> z
   vpi_ctx_.Attach(sim_ctx_);
 
-  vpiHandle h = vpi_handle_by_name("sz", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("sz"), nullptr);
   ASSERT_NE(h, nullptr);
 
   s_vpi_value val = {};
@@ -121,7 +123,7 @@ TEST_F(VpiGetValueSim, GetValueBinStrFormat) {
   var->value = MakeLogic4VecVal(arena_, 4, 0b1010);
   vpi_ctx_.Attach(sim_ctx_);
 
-  vpiHandle h = vpi_handle_by_name("b", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("b"), nullptr);
   ASSERT_NE(h, nullptr);
 
   s_vpi_value val = {};
@@ -139,7 +141,7 @@ TEST_F(VpiGetValueSim, GetValueBinStrFormatUnknownBits) {
   var->value.words[0].bval = 0b0110;
   vpi_ctx_.Attach(sim_ctx_);
 
-  vpiHandle h = vpi_handle_by_name("bxz", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("bxz"), nullptr);
   ASSERT_NE(h, nullptr);
 
   s_vpi_value val = {};
@@ -154,7 +156,7 @@ TEST_F(VpiGetValueSim, GetValueHexStrFormat) {
   var->value = MakeLogic4VecVal(arena_, 8, 0xAB);
   vpi_ctx_.Attach(sim_ctx_);
 
-  vpiHandle h = vpi_handle_by_name("hx", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("hx"), nullptr);
   ASSERT_NE(h, nullptr);
 
   s_vpi_value val = {};
@@ -173,7 +175,7 @@ TEST_F(VpiGetValueSim, GetValueHexStrFormatUnknownBits) {
   var->value.words[0].bval = 0xF1;
   vpi_ctx_.Attach(sim_ctx_);
 
-  vpiHandle h = vpi_handle_by_name("hxz", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("hxz"), nullptr);
   ASSERT_NE(h, nullptr);
 
   s_vpi_value val = {};
@@ -192,7 +194,7 @@ TEST_F(VpiGetValueSim, GetValueHexStrFormatAllXLowercase) {
   var->value.words[0].bval = 0x0F;  // low nibble a=F,b=F -> all x
   vpi_ctx_.Attach(sim_ctx_);
 
-  vpiHandle h = vpi_handle_by_name("hax", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("hax"), nullptr);
   ASSERT_NE(h, nullptr);
 
   s_vpi_value val = {};
@@ -210,7 +212,7 @@ TEST_F(VpiGetValueSim, GetValueHexStrFormatSomeXUppercase) {
   var->value.words[0].bval = 0x01;  // low nibble {0,0,0,x} -> some x
   vpi_ctx_.Attach(sim_ctx_);
 
-  vpiHandle h = vpi_handle_by_name("hsx", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("hsx"), nullptr);
   ASSERT_NE(h, nullptr);
 
   s_vpi_value val = {};
@@ -225,7 +227,7 @@ TEST_F(VpiGetValueSim, GetValueOctStrFormat) {
   var->value = MakeLogic4VecVal(arena_, 6, 075);
   vpi_ctx_.Attach(sim_ctx_);
 
-  vpiHandle h = vpi_handle_by_name("oc", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("oc"), nullptr);
   ASSERT_NE(h, nullptr);
 
   s_vpi_value val = {};
@@ -244,7 +246,7 @@ TEST_F(VpiGetValueSim, GetValueOctStrFormatUnknownBits) {
   var->value.words[0].bval = 0b000111;  // low octal digit is all z (a=0,b=1)
   vpi_ctx_.Attach(sim_ctx_);
 
-  vpiHandle h = vpi_handle_by_name("ocz", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("ocz"), nullptr);
   ASSERT_NE(h, nullptr);
 
   s_vpi_value val = {};
@@ -263,7 +265,7 @@ TEST_F(VpiGetValueSim, GetValueOctStrFormatSomeZReportsUppercaseZ) {
   var->value.words[0].bval = 0b000001;
   vpi_ctx_.Attach(sim_ctx_);
 
-  vpiHandle h = vpi_handle_by_name("ocz2", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("ocz2"), nullptr);
   ASSERT_NE(h, nullptr);
 
   s_vpi_value val = {};
@@ -281,7 +283,7 @@ TEST_F(VpiGetValueSim, GetValueOctStrFormatAllXReportsLowercaseX) {
   var->value.words[0].bval = 0b000111;  // low digit a=7,b=7 -> all x
   vpi_ctx_.Attach(sim_ctx_);
 
-  vpiHandle h = vpi_handle_by_name("ocax", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("ocax"), nullptr);
   ASSERT_NE(h, nullptr);
 
   s_vpi_value val = {};
@@ -299,7 +301,7 @@ TEST_F(VpiGetValueSim, GetValueOctStrFormatSomeXReportsUppercaseX) {
   var->value.words[0].bval = 0b000001;  // low digit {0,0,x} -> some x
   vpi_ctx_.Attach(sim_ctx_);
 
-  vpiHandle h = vpi_handle_by_name("ocsx", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("ocsx"), nullptr);
   ASSERT_NE(h, nullptr);
 
   s_vpi_value val = {};
@@ -315,7 +317,7 @@ TEST_F(VpiGetValueSim, GetValueStringFormat) {
   var->value = MakeLogic4VecVal(arena_, 32, 0x00004142);
   vpi_ctx_.Attach(sim_ctx_);
 
-  vpiHandle h = vpi_handle_by_name("sv", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("sv"), nullptr);
   ASSERT_NE(h, nullptr);
 
   s_vpi_value val = {};
@@ -330,7 +332,7 @@ TEST_F(VpiGetValueSim, GetValueTimeFormat) {
   var->value = MakeLogic4VecVal(arena_, 32, 500);
   vpi_ctx_.Attach(sim_ctx_);
 
-  vpiHandle h = vpi_handle_by_name("t", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("t"), nullptr);
   ASSERT_NE(h, nullptr);
 
   s_vpi_value val = {};
@@ -348,7 +350,7 @@ TEST_F(VpiGetValueSim, GetValueIntFormatMapsUnknownBitsToZero) {
   var->value.words[0].bval = 0b0100;
   vpi_ctx_.Attach(sim_ctx_);
 
-  vpiHandle h = vpi_handle_by_name("xz", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("xz"), nullptr);
   ASSERT_NE(h, nullptr);
 
   s_vpi_value val = {};
@@ -365,7 +367,7 @@ TEST_F(VpiGetValueSim, GetValueVectorFormatTwoWords) {
   var->value = MakeLogic4VecVal(arena_, 40, 0x123456789Aull);
   vpi_ctx_.Attach(sim_ctx_);
 
-  vpiHandle h = vpi_handle_by_name("v", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("v"), nullptr);
   ASSERT_NE(h, nullptr);
 
   s_vpi_value val = {};
@@ -387,7 +389,7 @@ TEST_F(VpiGetValueSim, GetValueVectorFormatSingleWordBoundary) {
   var->value = MakeLogic4VecVal(arena_, 32, 0xDEADBEEFull);
   vpi_ctx_.Attach(sim_ctx_);
 
-  vpiHandle h = vpi_handle_by_name("vw", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("vw"), nullptr);
   ASSERT_NE(h, nullptr);
 
   s_vpi_value val = {};
@@ -407,7 +409,7 @@ TEST_F(VpiGetValueSim, GetValueVectorFormatEncodesUnknownBits) {
   var->value.words[0].bval = 0b0100;  // bit 2 is z (a=0,b=1)
   vpi_ctx_.Attach(sim_ctx_);
 
-  vpiHandle h = vpi_handle_by_name("vz", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("vz"), nullptr);
   ASSERT_NE(h, nullptr);
 
   s_vpi_value val = {};
@@ -429,7 +431,7 @@ TEST_F(VpiGetValueSim, GetValueVectorFormatEncodesXBit) {
   var->value.words[0].bval = 0b0100;  // bit 2 is x (a=1,b=1)
   vpi_ctx_.Attach(sim_ctx_);
 
-  vpiHandle h = vpi_handle_by_name("vx", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("vx"), nullptr);
   ASSERT_NE(h, nullptr);
 
   s_vpi_value val = {};
@@ -449,7 +451,7 @@ TEST_F(VpiGetValueSim, GetValueStrengthFormat) {
   var->value = MakeLogic4VecVal(arena_, 4, 0b1010);
   vpi_ctx_.Attach(sim_ctx_);
 
-  vpiHandle h = vpi_handle_by_name("st", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("st"), nullptr);
   ASSERT_NE(h, nullptr);
 
   s_vpi_value val = {};
@@ -475,7 +477,7 @@ TEST_F(VpiGetValueSim, GetValueStrengthFormatUnknownBits) {
   var->value.words[0].bval = 0b1100;  // bit 2 x, bit 3 z
   vpi_ctx_.Attach(sim_ctx_);
 
-  vpiHandle h = vpi_handle_by_name("stu", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("stu"), nullptr);
   ASSERT_NE(h, nullptr);
 
   s_vpi_value val = {};
@@ -498,7 +500,7 @@ TEST_F(VpiGetValueSim, GetValueObjTypeVectorObject) {
   var->value = MakeLogic4VecVal(arena_, 8, 0xAB);
   vpi_ctx_.Attach(sim_ctx_);
 
-  vpiHandle h = vpi_handle_by_name("ot", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("ot"), nullptr);
   ASSERT_NE(h, nullptr);
 
   s_vpi_value val = {};
@@ -516,7 +518,7 @@ TEST_F(VpiGetValueSim, GetValueObjTypeScalarObject) {
   var->value = MakeLogic4VecVal(arena_, 1, 1);
   vpi_ctx_.Attach(sim_ctx_);
 
-  vpiHandle h = vpi_handle_by_name("ot1", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("ot1"), nullptr);
   ASSERT_NE(h, nullptr);
 
   s_vpi_value val = {};
@@ -543,7 +545,7 @@ TEST_F(VpiGetValueSim, GetValueObjTypeRealObject) {
   SetRealValue(var, arena_, 42.0);
   vpi_ctx_.Attach(sim_ctx_);
 
-  vpiHandle h = vpi_handle_by_name("otr", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("otr"), nullptr);
   ASSERT_NE(h, nullptr);
 
   s_vpi_value val = {};
@@ -561,7 +563,7 @@ TEST_F(VpiGetValueSim, GetValueRealObjectRealFormat) {
   SetRealValue(var, arena_, 3.5);
   vpi_ctx_.Attach(sim_ctx_);
 
-  vpiHandle h = vpi_handle_by_name("rr", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("rr"), nullptr);
   ASSERT_NE(h, nullptr);
 
   s_vpi_value val = {};
@@ -579,7 +581,7 @@ TEST_F(VpiGetValueSim, GetValueRealObjectIntFormatRoundsHalfAwayFromZero) {
   SetRealValue(var, arena_, 2.5);
   vpi_ctx_.Attach(sim_ctx_);
 
-  vpiHandle h = vpi_handle_by_name("ri", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("ri"), nullptr);
   ASSERT_NE(h, nullptr);
 
   s_vpi_value val = {};
@@ -595,7 +597,7 @@ TEST_F(VpiGetValueSim, GetValueRealObjectIntFormatNegativeRounding) {
   SetRealValue(var, arena_, -2.5);
   vpi_ctx_.Attach(sim_ctx_);
 
-  vpiHandle h = vpi_handle_by_name("rin", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("rin"), nullptr);
   ASSERT_NE(h, nullptr);
 
   s_vpi_value val = {};
@@ -612,7 +614,7 @@ TEST_F(VpiGetValueSim, GetValueRealObjectStringFormat) {
   SetRealValue(var, arena_, 3.5);
   vpi_ctx_.Attach(sim_ctx_);
 
-  vpiHandle h = vpi_handle_by_name("rs", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("rs"), nullptr);
   ASSERT_NE(h, nullptr);
 
   s_vpi_value val = {};
@@ -631,7 +633,7 @@ TEST_F(VpiGetValueSim, GetValueStringBufferDistinctFromGetStr) {
   var->value = MakeLogic4VecVal(arena_, 32, 0x00004142);  // packs to "AB"
   vpi_ctx_.Attach(sim_ctx_);
 
-  vpiHandle h = vpi_handle_by_name("nm", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("nm"), nullptr);
   ASSERT_NE(h, nullptr);
 
   // Hold the pointer returned by vpi_get_str(vpiName, ...).

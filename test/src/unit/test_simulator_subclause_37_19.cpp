@@ -3,7 +3,10 @@
 #include <vector>
 
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_model_helpers2.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -79,7 +82,7 @@ class VariableSelectObject : public ::testing::Test {
 // Detail 1, all three conditions met on the object: a constant index into a
 // static unpacked array whose own lifetime is static.
 TEST_F(VariableSelectObject, AConstantIndexIntoAStaticArrayIsAConstantSelect) {
-  EXPECT_EQ(vpi_get(vpiConstantSelect, &select_), 1);
+  EXPECT_EQ(vpi_get(vpiConstantSelect, VpiHandleOf(&select_)), 1);
 }
 
 // Detail 1, first condition: an index expression that is not an
@@ -87,7 +90,7 @@ TEST_F(VariableSelectObject, AConstantIndexIntoAStaticArrayIsAConstantSelect) {
 TEST_F(VariableSelectObject, ANonConstantIndexMakesTheSelectNonConstant) {
   index_.type = vpiOperation;
 
-  EXPECT_EQ(vpi_get(vpiConstantSelect, &select_), 0);
+  EXPECT_EQ(vpi_get(vpiConstantSelect, VpiHandleOf(&select_)), 0);
 }
 
 // Detail 1, second condition: an array whose bounds are not static - a queue,
@@ -95,7 +98,7 @@ TEST_F(VariableSelectObject, ANonConstantIndexMakesTheSelectNonConstant) {
 TEST_F(VariableSelectObject, ADynamicallyBoundedParentMakesItNonConstant) {
   array_.array_type = vpiDynamicArray;
 
-  EXPECT_EQ(vpi_get(vpiConstantSelect, &select_), 0);
+  EXPECT_EQ(vpi_get(vpiConstantSelect, VpiHandleOf(&select_)), 0);
 }
 
 // Detail 1, third condition: the parent has to be a constant select itself, and
@@ -103,7 +106,7 @@ TEST_F(VariableSelectObject, ADynamicallyBoundedParentMakesItNonConstant) {
 TEST_F(VariableSelectObject, AnAutomaticParentMakesItNonConstant) {
   array_.automatic = true;
 
-  EXPECT_EQ(vpi_get(vpiConstantSelect, &select_), 0);
+  EXPECT_EQ(vpi_get(vpiConstantSelect, VpiHandleOf(&select_)), 0);
 }
 
 // Detail 1 read down a chain of selects. The second condition names what the
@@ -120,14 +123,14 @@ TEST_F(VariableSelectObject, ASelectOfASelectIsNotAConstantSelect) {
 
   select_.parent = &outer;
 
-  EXPECT_EQ(vpi_get(vpiConstantSelect, &outer), 1);
-  EXPECT_EQ(vpi_get(vpiConstantSelect, &select_), 0);
+  EXPECT_EQ(vpi_get(vpiConstantSelect, VpiHandleOf(&outer)), 1);
+  EXPECT_EQ(vpi_get(vpiConstantSelect, VpiHandleOf(&select_)), 0);
 }
 
 // The property belongs to the var select. An object of another kind reports 0
 // here, its own clause owning what a constant selection means for it.
 TEST_F(VariableSelectObject, TheRuleAnswersForAVarSelectAlone) {
-  EXPECT_EQ(vpi_get(vpiConstantSelect, &array_), 0);
+  EXPECT_EQ(vpi_get(vpiConstantSelect, VpiHandleOf(&array_)), 0);
 }
 
 // The figure's vpiIndex relation, which §37.4.3 walks with vpi_iterate() and
@@ -140,10 +143,11 @@ TEST_F(VariableSelectObject,
   second.type = vpiOperation;
   select_.children = {&index_, &second};
 
-  std::vector<vpiHandle> seen = ScanAll(vpi_iterate(vpiIndex, &select_));
+  std::vector<vpiHandle> seen =
+      ScanAll(vpi_iterate(vpiIndex, VpiHandleOf(&select_)));
   ASSERT_EQ(seen.size(), 2u);
-  EXPECT_EQ(seen[0], &index_);
-  EXPECT_EQ(seen[1], &second);
+  EXPECT_EQ(VpiObjectOf(seen[0]), &index_);
+  EXPECT_EQ(VpiObjectOf(seen[1]), &second);
 }
 
 }  // namespace

@@ -1,7 +1,10 @@
 #include <gtest/gtest.h>
 
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_model_helpers1.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -41,7 +44,8 @@ TEST_F(WhileRepeat, WhileStatementReachesConditionThroughVpiCondition) {
   while_stmt.type = vpiWhile;
   while_stmt.children = {&condition, &body};
 
-  EXPECT_EQ(vpi_handle(vpiCondition, &while_stmt), &condition);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiCondition, VpiHandleOf(&while_stmt))),
+            &condition);
 }
 
 // vpiCondition edge: a repeat statement reaches its condition expression the
@@ -54,7 +58,8 @@ TEST_F(WhileRepeat, RepeatStatementReachesConditionThroughVpiCondition) {
   repeat_stmt.type = vpiRepeat;
   repeat_stmt.children = {&condition};
 
-  EXPECT_EQ(vpi_handle(vpiCondition, &repeat_stmt), &condition);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiCondition, VpiHandleOf(&repeat_stmt))),
+            &condition);
 }
 
 // vpiCondition edge: the condition is found even when a non-expression child
@@ -71,7 +76,8 @@ TEST_F(WhileRepeat, ConditionFoundWhenItFollowsTheBodyChild) {
   while_stmt.type = vpiWhile;
   while_stmt.children = {&body, &condition};
 
-  EXPECT_EQ(vpi_handle(vpiCondition, &while_stmt), &condition);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiCondition, VpiHandleOf(&while_stmt))),
+            &condition);
 }
 
 // vpiCondition edge: a null handle and a loop with no expression child both
@@ -102,7 +108,7 @@ TEST_F(WhileRepeat, VpiConditionIsScopedToLoopStatements) {
   forever_stmt.type = vpiForever;
   forever_stmt.children = {&condition};
 
-  EXPECT_EQ(vpi_handle(vpiCondition, &forever_stmt), nullptr);
+  EXPECT_EQ(vpi_handle(vpiCondition, VpiHandleOf(&forever_stmt)), nullptr);
 }
 
 // Body edge (the diagram's untagged arrow to `stmt`): a while statement reaches
@@ -123,7 +129,7 @@ TEST_F(WhileRepeat, LoopBodyReachedByTheKindTheStmtClassGroups) {
   while_stmt.type = vpiWhile;
   while_stmt.children = {&condition, &body};
 
-  EXPECT_EQ(vpi_handle(vpiStmt, &while_stmt), &body);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiStmt, VpiHandleOf(&while_stmt))), &body);
 
   VpiObject repeat_body;
   repeat_body.type = vpiAssignment;
@@ -132,7 +138,8 @@ TEST_F(WhileRepeat, LoopBodyReachedByTheKindTheStmtClassGroups) {
   repeat_stmt.type = vpiRepeat;
   repeat_stmt.children = {&condition, &repeat_body};
 
-  EXPECT_EQ(vpi_handle(vpiStmt, &repeat_stmt), &repeat_body);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiStmt, VpiHandleOf(&repeat_stmt))),
+            &repeat_body);
 }
 
 // Body edge: the condition expression is not the body. A loop whose only child
@@ -146,8 +153,9 @@ TEST_F(WhileRepeat, TheConditionExpressionIsNotTakenForTheBody) {
   while_stmt.type = vpiWhile;
   while_stmt.children = {&condition};
 
-  EXPECT_EQ(vpi_handle(vpiStmt, &while_stmt), nullptr);
-  EXPECT_EQ(vpi_handle(vpiCondition, &while_stmt), &condition);
+  EXPECT_EQ(vpi_handle(vpiStmt, VpiHandleOf(&while_stmt)), nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiCondition, VpiHandleOf(&while_stmt))),
+            &condition);
 }
 
 }  // namespace

@@ -7,7 +7,10 @@
 #include "common/source_mgr.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
+#include "simulator/vpi_context.h"
+#include "simulator/vpi_data_structs.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -20,7 +23,7 @@ bool g_routine_systf_registered = false;
 bool g_routine_allowed_cb_registered = false;
 bool g_routine_illegal_cb_registered = false;
 
-int NoopCb(VpiCbData*) { return 0; }
+int NoopCb(s_cb_data*) { return 0; }
 
 void StartupRoutine() {
   g_phase_during_routine = GetGlobalVpiContext().ToolPhase();
@@ -28,7 +31,7 @@ void StartupRoutine() {
   // Both registration routines are available in the startup phase.
   s_vpi_systf_data systf = {};
   systf.type = vpiSysTask;
-  systf.tfname = "$my_task";
+  systf.tfname = VpiText("$my_task");
   g_routine_systf_registered = vpi_register_systf(&systf) != nullptr;
 
   // A callback for an early-phase reason is accepted...
@@ -171,7 +174,7 @@ TEST_F(VpiFunctionAvailability, IterateIsRefusedDuringStartup) {
 
   EXPECT_EQ(vpi_iterate(vpiModule, nullptr), nullptr);
 
-  SVpiErrorInfo info = {};
+  s_vpi_error_info info = {};
   EXPECT_NE(vpi_chk_error(&info), 0);
   EXPECT_STREQ(info.message,
                "VPI routine is not available until cbEndOfCompile; only "

@@ -6,7 +6,10 @@
 #include "common/types.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -16,11 +19,11 @@ namespace {
 // a pointer to the s_cb_data structure. This recorder lets a test observe the
 // production code applying that contract.
 int g_cb_invocations = 0;
-const VpiCbData* g_cb_seen_data = nullptr;
+const s_cb_data* g_cb_seen_data = nullptr;
 int g_cb_seen_reason = 0;
 void* g_cb_seen_user_data = nullptr;
 
-int RecordingCb(VpiCbData* data) {
+int RecordingCb(s_cb_data* data) {
   ++g_cb_invocations;
   g_cb_seen_data = data;
   if (data) {
@@ -32,7 +35,7 @@ int RecordingCb(VpiCbData* data) {
 
 // A routine that returns a recognizable value, so a test can confirm the
 // simulator propagates the cb_rtn result back from executing the callback.
-int ReturningCb(VpiCbData*) { return 42; }
+int ReturningCb(s_cb_data*) { return 42; }
 
 class VpiCallbackSim : public ::testing::Test {
  protected:
@@ -112,7 +115,7 @@ TEST_F(VpiCallbackSim, ExecuteCallbackInvokesCbRtnWithCbData) {
   vpiHandle h = vpi_register_cb(&cb);
   ASSERT_NE(h, nullptr);
 
-  vpi_ctx_.ExecuteCallback(h);
+  vpi_ctx_.ExecuteCallback(VpiObjectOf(h));
 
   EXPECT_EQ(g_cb_invocations, 1);
   EXPECT_NE(g_cb_seen_data, nullptr);
@@ -126,7 +129,7 @@ TEST_F(VpiCallbackSim, ExecuteCallbackWithoutCbRtnDoesNothing) {
   cb.reason = cbEndOfSimulation;
   vpiHandle h = vpi_register_cb(&cb);
   ASSERT_NE(h, nullptr);
-  EXPECT_EQ(vpi_ctx_.ExecuteCallback(h), 0);
+  EXPECT_EQ(vpi_ctx_.ExecuteCallback(VpiObjectOf(h)), 0);
 }
 
 // §38.36: the cb_rtn returns a value to the simulator; executing the callback
@@ -137,7 +140,7 @@ TEST_F(VpiCallbackSim, ExecuteCallbackPropagatesCbRtnResult) {
   cb.cb_rtn = &ReturningCb;
   vpiHandle h = vpi_register_cb(&cb);
   ASSERT_NE(h, nullptr);
-  EXPECT_EQ(vpi_ctx_.ExecuteCallback(h), 42);
+  EXPECT_EQ(vpi_ctx_.ExecuteCallback(VpiObjectOf(h)), 42);
 }
 
 // §38.36: the structure passed to the callback routine is the one supplied at
@@ -150,11 +153,11 @@ TEST_F(VpiCallbackSim, ExecuteCallbackPassesRegisteredUserData) {
   s_cb_data cb = {};
   cb.reason = cbEndOfSimulation;
   cb.cb_rtn = &RecordingCb;
-  cb.user_data = &payload;
+  cb.user_data = reinterpret_cast<PLI_BYTE8*>(&payload);
   vpiHandle h = vpi_register_cb(&cb);
   ASSERT_NE(h, nullptr);
 
-  vpi_ctx_.ExecuteCallback(h);
+  vpi_ctx_.ExecuteCallback(VpiObjectOf(h));
   EXPECT_EQ(g_cb_seen_user_data, &payload);
 }
 
@@ -170,9 +173,9 @@ TEST_F(VpiCallbackSim, ExecuteCallbackNonCallbackHandleReturnsZero) {
   sim_ctx_.CreateVariable("sig", 1);
   vpi_ctx_.Attach(sim_ctx_);
 
-  vpiHandle var_handle = vpi_handle_by_name("sig", nullptr);
+  vpiHandle var_handle = vpi_handle_by_name(VpiText("sig"), nullptr);
   ASSERT_NE(var_handle, nullptr);
-  EXPECT_EQ(vpi_ctx_.ExecuteCallback(var_handle), 0);
+  EXPECT_EQ(vpi_ctx_.ExecuteCallback(VpiObjectOf(var_handle)), 0);
 }
 
 TEST_F(VpiCallbackSim, CbValueChangeWithWatcherFires) {
@@ -180,14 +183,14 @@ TEST_F(VpiCallbackSim, CbValueChangeWithWatcherFires) {
   var->value = MakeLogic4VecVal(arena_, 1, 0);
   vpi_ctx_.Attach(sim_ctx_);
 
-  vpiHandle h = vpi_handle_by_name("sig", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("sig"), nullptr);
   ASSERT_NE(h, nullptr);
 
   bool fired = false;
   s_cb_data cb = {};
   cb.reason = cbValueChange;
   cb.obj = h;
-  cb.user_data = &fired;
+  cb.user_data = reinterpret_cast<PLI_BYTE8*>(&fired);
   vpi_ctx_.RegisterCbValueChange(cb);
 
   var->value = MakeLogic4VecVal(arena_, 1, 1);

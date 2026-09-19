@@ -6,7 +6,11 @@
 #include "common/types.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
+#include "simulator/vpi_constants.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -27,13 +31,13 @@ class VpiGetPropertySim : public ::testing::Test {
 
 TEST_F(VpiGetPropertySim, GetTypeForModule) {
   auto* mod = vpi_ctx_.CreateModule("m", "m");
-  EXPECT_EQ(vpi_get(vpiType, mod), vpiModule);
+  EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(mod)), vpiModule);
 }
 
 TEST_F(VpiGetPropertySim, GetDirectionForPort) {
   auto* mod = vpi_ctx_.CreateModule("m", "m");
   auto* port = vpi_ctx_.CreatePort("din", kVpiInput, mod);
-  EXPECT_EQ(vpi_get(vpiDirection, port), vpiInput);
+  EXPECT_EQ(vpi_get(vpiDirection, VpiHandleOf(port)), vpiInput);
 }
 
 TEST_F(VpiGetPropertySim, GetSizeForVariable) {
@@ -41,7 +45,7 @@ TEST_F(VpiGetPropertySim, GetSizeForVariable) {
   var->value = MakeLogic4VecVal(arena_, 32, 0);
   vpi_ctx_.Attach(sim_ctx_);
 
-  vpiHandle h = vpi_handle_by_name("wide", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("wide"), nullptr);
   ASSERT_NE(h, nullptr);
   EXPECT_EQ(vpi_get(vpiSize, h), 32);
 }
@@ -54,18 +58,18 @@ TEST_F(VpiGetPropertySim, GetReturnsZeroForNullHandle) {
 TEST_F(VpiGetPropertySim, BooleanPropertyReportsOneForTrue) {
   sim_ctx_.CreateVariable("loc", 8);
   vpi_ctx_.Attach(sim_ctx_);
-  vpiHandle h = vpi_handle_by_name("loc", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("loc"), nullptr);
   ASSERT_NE(h, nullptr);
-  h->automatic = true;
+  VpiObjectOf(h)->automatic = true;
   EXPECT_EQ(vpi_get(vpiAutomatic, h), 1);
 }
 
 TEST_F(VpiGetPropertySim, BooleanPropertyReportsZeroForFalse) {
   sim_ctx_.CreateVariable("stat", 8);
   vpi_ctx_.Attach(sim_ctx_);
-  vpiHandle h = vpi_handle_by_name("stat", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("stat"), nullptr);
   ASSERT_NE(h, nullptr);
-  h->automatic = false;
+  VpiObjectOf(h)->automatic = false;
   EXPECT_EQ(vpi_get(vpiAutomatic, h), 0);
 }
 
@@ -88,13 +92,13 @@ TEST_F(VpiGetPropertySim, ProtectedObjectQueryReturnsVpiUndefined) {
   mod->is_protected = true;
 
   // §37.3.6: vpiType stays accessible on a protected object.
-  EXPECT_EQ(vpi_get(vpiType, mod), vpiModule);
+  EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(mod)), vpiModule);
 
   // C8: a refused (non-exempt) query makes vpi_get() yield vpiUndefined.
-  EXPECT_EQ(vpi_get(vpiSize, mod), vpiUndefined);
+  EXPECT_EQ(vpi_get(vpiSize, VpiHandleOf(mod)), vpiUndefined);
 
   // C7: the protected-object query is recorded as an error.
-  SVpiErrorInfo info = {};
+  s_vpi_error_info info = {};
   EXPECT_NE(vpi_chk_error(&info), 0);
   EXPECT_NE(info.level, 0);
 }
@@ -110,11 +114,11 @@ TEST_F(VpiGetPropertySim, ProtectedObjectStillReportsIsProtectedAsBooleanTrue) {
   mod->is_protected = true;
 
   // Boolean TRUE reported as 1, and the query is permitted (not refused).
-  EXPECT_EQ(vpi_get(vpiIsProtected, mod), 1);
+  EXPECT_EQ(vpi_get(vpiIsProtected, VpiHandleOf(mod)), 1);
 
   // No error is recorded: the exempted property does not trip the protection
   // refusal that a non-exempt query would.
-  SVpiErrorInfo info = {};
+  s_vpi_error_info info = {};
   EXPECT_EQ(vpi_chk_error(&info), 0);
 }
 

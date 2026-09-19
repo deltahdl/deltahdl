@@ -3,7 +3,9 @@
 #include <vector>
 
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -33,7 +35,7 @@ class TraversingExpressions : public ::testing::Test {
     vpiHandle sub_expr_i = vpi_iterate(vpiOperand, expr);
     if (sub_expr_i == nullptr) return;  // else it is of op type vpiNullOp
     while (vpiHandle sub_expr_h = vpi_scan(sub_expr_i)) {
-      TraverseExpr(sub_expr_h);
+      TraverseExpr(VpiObjectOf(sub_expr_h));
     }
   }
 
@@ -44,7 +46,7 @@ class TraversingExpressions : public ::testing::Test {
   // limit clang-tidy holds a test function under leaves room for.
   void TraverseExpr(vpiHandle expr) {
     if (vpi_get(vpiType, expr) == vpiOperation) {
-      TraverseOperands(expr);
+      TraverseOperands(VpiObjectOf(expr));
       return;
     }
     leaves_.push_back(expr);  // do whatever to the leaf object
@@ -68,10 +70,10 @@ TEST_F(TraversingExpressions, AnOperationReachesItsOperands) {
   sum.op_type = vpiAddOp;
   sum.children = {&left, &right};
 
-  vpiHandle it = vpi_iterate(vpiOperand, &sum);
+  vpiHandle it = vpi_iterate(vpiOperand, VpiHandleOf(&sum));
   ASSERT_NE(it, nullptr);
-  EXPECT_EQ(vpi_scan(it), &left);
-  EXPECT_EQ(vpi_scan(it), &right);
+  EXPECT_EQ(VpiObjectOf(vpi_scan(it)), &left);
+  EXPECT_EQ(VpiObjectOf(vpi_scan(it)), &right);
   EXPECT_EQ(vpi_scan(it), nullptr);
 }
 
@@ -98,9 +100,9 @@ TEST_F(TraversingExpressions, TheClausesRoutineArrivesAtEveryLeaf) {
   TraverseExpr(&outer);
 
   ASSERT_EQ(leaves_.size(), 3u);
-  EXPECT_EQ(leaves_[0], &a);
-  EXPECT_EQ(leaves_[1], &b);
-  EXPECT_EQ(leaves_[2], &c);
+  EXPECT_EQ(VpiObjectOf(leaves_[0]), &a);
+  EXPECT_EQ(VpiObjectOf(leaves_[1]), &b);
+  EXPECT_EQ(VpiObjectOf(leaves_[2]), &c);
 }
 
 // §36.10.3: "To determine how many operands, access the property vpiOpType." A
@@ -111,8 +113,8 @@ TEST_F(TraversingExpressions, ANullOperationTakesNoOperands) {
   null_op.type = vpiOperation;
   null_op.op_type = vpiNullOp;
 
-  EXPECT_EQ(vpi_get(vpiOpType, &null_op), vpiNullOp);
-  EXPECT_EQ(vpi_iterate(vpiOperand, &null_op), nullptr);
+  EXPECT_EQ(vpi_get(vpiOpType, VpiHandleOf(&null_op)), vpiNullOp);
+  EXPECT_EQ(vpi_iterate(vpiOperand, VpiHandleOf(&null_op)), nullptr);
 
   TraverseExpr(&null_op);
   EXPECT_TRUE(leaves_.empty());
@@ -129,7 +131,7 @@ TEST_F(TraversingExpressions, TheRelationIsTheOperationsOwn) {
   leaf.type = vpiRefObj;
   leaf.children = {&child};
 
-  EXPECT_EQ(vpi_iterate(vpiOperand, &leaf), nullptr);
+  EXPECT_EQ(vpi_iterate(vpiOperand, VpiHandleOf(&leaf)), nullptr);
 }
 
 }  // namespace

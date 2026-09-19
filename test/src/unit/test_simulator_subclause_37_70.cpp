@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -44,7 +46,8 @@ TEST_F(Forever, ForeverStatementReachesBodyByTheKindTheStmtClassGroups) {
   forever_stmt.type = vpiForever;
   forever_stmt.children = {&body};
 
-  EXPECT_EQ(vpi_handle(vpiStmt, &forever_stmt), &body);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiStmt, VpiHandleOf(&forever_stmt))),
+            &body);
 }
 
 // Body edge: the kinds the `stmt` class groups are reached whatever the body is
@@ -61,7 +64,8 @@ TEST_F(Forever, ForeverBodyIsReachedForEachKindAStatementCarries) {
     forever_stmt.type = vpiForever;
     forever_stmt.children = {&body};
 
-    EXPECT_EQ(vpi_handle(vpiStmt, &forever_stmt), &body)
+    EXPECT_EQ(VpiObjectOf(vpi_handle(vpiStmt, VpiHandleOf(&forever_stmt))),
+              &body)
         << "body kind " << body_kind;
   }
 }
@@ -81,7 +85,8 @@ TEST_F(Forever, ForeverBodyFoundAmongOtherChildren) {
   forever_stmt.type = vpiForever;
   forever_stmt.children = {&other, &body};
 
-  EXPECT_EQ(vpi_handle(vpiStmt, &forever_stmt), &body);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiStmt, VpiHandleOf(&forever_stmt))),
+            &body);
 }
 
 // Body edge reports no statement when the forever object carries none: a
@@ -91,7 +96,7 @@ TEST_F(Forever, ForeverWithoutBodyReportsNoStatement) {
   VpiObject forever_stmt;
   forever_stmt.type = vpiForever;
 
-  EXPECT_EQ(vpi_handle(vpiStmt, &forever_stmt), nullptr);
+  EXPECT_EQ(vpi_handle(vpiStmt, VpiHandleOf(&forever_stmt)), nullptr);
 
   VpiObject other;
   other.type = vpiOperation;
@@ -100,7 +105,7 @@ TEST_F(Forever, ForeverWithoutBodyReportsNoStatement) {
   forever_with_no_stmt.type = vpiForever;
   forever_with_no_stmt.children = {&other};
 
-  EXPECT_EQ(vpi_handle(vpiStmt, &forever_with_no_stmt), nullptr);
+  EXPECT_EQ(vpi_handle(vpiStmt, VpiHandleOf(&forever_with_no_stmt)), nullptr);
 }
 
 // The clause draws no other edge: a forever has no controlling condition, so
@@ -117,8 +122,9 @@ TEST_F(Forever, ForeverDrawsNoConditionEdge) {
   forever_stmt.type = vpiForever;
   forever_stmt.children = {&expr, &body};
 
-  EXPECT_EQ(vpi_handle(vpiCondition, &forever_stmt), nullptr);
-  EXPECT_EQ(vpi_handle(vpiStmt, &forever_stmt), &body);
+  EXPECT_EQ(vpi_handle(vpiCondition, VpiHandleOf(&forever_stmt)), nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiStmt, VpiHandleOf(&forever_stmt))),
+            &body);
 }
 
 }  // namespace

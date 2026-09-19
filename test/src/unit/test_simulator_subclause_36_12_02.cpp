@@ -19,6 +19,9 @@
 #include <vector>
 
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
+#include "simulator/vpi_object.h"
+#include "simulator/vpi_user.h"
 
 namespace delta {
 namespace {
@@ -54,9 +57,10 @@ TEST_F(VpiCompatibilityEmulation, AVariablesIterationExcludesRegsAndRegArrays) {
   scope.type = vpiModule;
   scope.children = {&reg, &int_var, &array};
 
-  std::vector<vpiHandle> seen = ScanAll(vpi_iterate(vpiVariables, &scope));
+  std::vector<vpiHandle> seen =
+      ScanAll(vpi_iterate(vpiVariables, VpiHandleOf(&scope)));
   ASSERT_EQ(seen.size(), 1u);
-  EXPECT_EQ(seen[0], &int_var);
+  EXPECT_EQ(VpiObjectOf(seen[0]), &int_var);
 }
 
 // Row 6 is N for the same standard: a vpiReg iteration on an array retrieves
@@ -72,9 +76,10 @@ TEST_F(VpiCompatibilityEmulation, ARegIterationOnAnArrayRetrievesOnlyRegs) {
   array.type = vpiRegArray;
   array.children = {&reg_word, &int_word};
 
-  std::vector<vpiHandle> seen = ScanAll(vpi_iterate(vpiReg, &array));
+  std::vector<vpiHandle> seen =
+      ScanAll(vpi_iterate(vpiReg, VpiHandleOf(&array)));
   ASSERT_EQ(seen.size(), 1u);
-  EXPECT_EQ(seen[0], &reg_word);
+  EXPECT_EQ(VpiObjectOf(seen[0]), &reg_word);
 }
 
 // Row 7 is N for the same standard: "IEEE Std 1364-2001 and IEEE Std 1364-2005,
@@ -97,9 +102,10 @@ TEST_F(VpiCompatibilityEmulation, ARegArrayIterationReachesOnlyArraysOfRegs) {
   scope.type = vpiModule;
   scope.children = {&reg_array, &int_array};
 
-  std::vector<vpiHandle> seen = ScanAll(vpi_iterate(vpiRegArray, &scope));
+  std::vector<vpiHandle> seen =
+      ScanAll(vpi_iterate(vpiRegArray, VpiHandleOf(&scope)));
   ASSERT_EQ(seen.size(), 1u);
-  EXPECT_EQ(seen[0], &reg_array);
+  EXPECT_EQ(VpiObjectOf(seen[0]), &reg_array);
 }
 
 // An iteration the emulation empties reaches no object, which §38.23 reports as
@@ -112,7 +118,7 @@ TEST_F(VpiCompatibilityEmulation, AnIterationLeftWithNothingIsNoIterator) {
   scope.type = vpiModule;
   scope.children = {&reg};
 
-  EXPECT_EQ(vpi_iterate(vpiVariables, &scope), nullptr);
+  EXPECT_EQ(vpi_iterate(vpiVariables, VpiHandleOf(&scope)), nullptr);
 }
 
 // The rest of the interface is the current one. The mechanism renames every
@@ -127,10 +133,10 @@ TEST_F(VpiCompatibilityEmulation, TheOtherEntryPointsResolveAndAreUnchanged) {
   port.parent = &mod;
   mod.children = {&port};
 
-  EXPECT_EQ(vpi_get(vpiType, &mod), vpiModule);
-  EXPECT_STREQ(vpi_get_str(vpiName, &mod), "top");
-  EXPECT_EQ(vpi_handle(vpiModule, &port), &mod);
-  EXPECT_EQ(vpi_compare_objects(&mod, &mod), 1);
+  EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(&mod)), vpiModule);
+  EXPECT_STREQ(vpi_get_str(vpiName, VpiHandleOf(&mod)), "top");
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiModule, VpiHandleOf(&port))), &mod);
+  EXPECT_EQ(vpi_compare_objects(VpiHandleOf(&mod), VpiHandleOf(&mod)), 1);
 }
 
 }  // namespace

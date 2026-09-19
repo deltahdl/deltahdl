@@ -6,8 +6,7 @@
 #include "helpers_vpi_value_array.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_object.h"
-#include "simulator/vpi_pli_types.h"
-#include "simulator/vpi_user_macros.h"
+#include "simulator/vpi_user.h"
 
 namespace delta {
 namespace {
@@ -29,9 +28,9 @@ TEST_F(VpiGetValueArraySim, NonStaticArrayIsError) {
   av.format = vpiIntVal;
   av.value.integers = sentinel;  // non-NULL going in
   PLI_INT32 index[1] = {0};
-  vpi_get_value_array(arr, &av, index, 2);
+  vpi_get_value_array(VpiHandleOf(arr), &av, index, 2);
 
-  SVpiErrorInfo info = {};
+  s_vpi_error_info info = {};
   EXPECT_EQ(vpi_chk_error(&info), vpiError);
   EXPECT_EQ(av.value.integers, nullptr);  // value arm overwritten to NULL
 }
@@ -49,7 +48,7 @@ TEST_F(VpiGetValueArraySim, MultiDimensionReadFollowsFastestVaryingIndex) {
   s_vpi_arrayvalue av = {};
   av.format = vpiIntVal;  // value arm starts NULL (no application buffer)
   PLI_INT32 index[2] = {1, 4};
-  vpi_get_value_array(arr, &av, index, 5);
+  vpi_get_value_array(VpiHandleOf(arr), &av, index, 5);
 
   ASSERT_NE(av.value.integers, nullptr);  // VPI allocated the storage
   EXPECT_EQ(av.value.integers[0], 4);     // a[1][4]
@@ -70,7 +69,7 @@ TEST_F(VpiGetValueArraySim, RawFourStateValEncodesAvalAndBval) {
   s_vpi_arrayvalue av = {};
   av.format = vpiRawFourStateVal;
   PLI_INT32 index[1] = {0};
-  vpi_get_value_array(arr, &av, index, 2);
+  vpi_get_value_array(VpiHandleOf(arr), &av, index, 2);
 
   ASSERT_NE(av.value.rawvals, nullptr);
   const auto* raw = reinterpret_cast<const unsigned char*>(av.value.rawvals);
@@ -91,7 +90,7 @@ TEST_F(VpiGetValueArraySim, RawFourStateValZeroesBvalForTwoStateArray) {
   s_vpi_arrayvalue av = {};
   av.format = vpiRawFourStateVal;
   PLI_INT32 index[1] = {0};
-  vpi_get_value_array(arr, &av, index, 1);
+  vpi_get_value_array(VpiHandleOf(arr), &av, index, 1);
 
   ASSERT_NE(av.value.rawvals, nullptr);
   const auto* raw = reinterpret_cast<const unsigned char*>(av.value.rawvals);
@@ -109,7 +108,7 @@ TEST_F(VpiGetValueArraySim, RawTwoStateValOmitsBvalGroup) {
   s_vpi_arrayvalue av = {};
   av.format = vpiRawTwoStateVal;
   PLI_INT32 index[1] = {0};
-  vpi_get_value_array(arr, &av, index, 2);
+  vpi_get_value_array(VpiHandleOf(arr), &av, index, 2);
 
   ASSERT_NE(av.value.rawvals, nullptr);
   const auto* raw = reinterpret_cast<const unsigned char*>(av.value.rawvals);
@@ -128,7 +127,7 @@ TEST_F(VpiGetValueArraySim, RawFourStateValStoresBytesLeastSignificantFirst) {
   s_vpi_arrayvalue av = {};
   av.format = vpiRawFourStateVal;
   PLI_INT32 index[1] = {0};
-  vpi_get_value_array(arr, &av, index, 1);
+  vpi_get_value_array(VpiHandleOf(arr), &av, index, 1);
 
   ASSERT_NE(av.value.rawvals, nullptr);
   const auto* raw = reinterpret_cast<const unsigned char*>(av.value.rawvals);
@@ -150,9 +149,9 @@ TEST_F(VpiGetValueArraySim, UnsupportedFormatIsErrorAndNullsValuePointer) {
   av.format = vpiBinStrVal;  // a get-only string format, not supported here
   av.value.rawvals = sentinel;
   PLI_INT32 index[1] = {0};
-  vpi_get_value_array(arr, &av, index, 2);
+  vpi_get_value_array(VpiHandleOf(arr), &av, index, 2);
 
-  SVpiErrorInfo info = {};
+  s_vpi_error_info info = {};
   EXPECT_EQ(vpi_chk_error(&info), vpiError);
   EXPECT_EQ(av.value.rawvals, nullptr);  // value pointer overwritten to NULL
 }
@@ -171,7 +170,7 @@ TEST_F(VpiGetValueArraySim, UserAllocFlagFillsCallerBuffer) {
   av.flags = vpiUserAllocFlag;
   av.value.integers = buffer;
   PLI_INT32 index[1] = {0};
-  vpi_get_value_array(arr, &av, index, 2);
+  vpi_get_value_array(VpiHandleOf(arr), &av, index, 2);
 
   EXPECT_EQ(av.value.integers, buffer);  // still the caller's own buffer
   EXPECT_EQ(buffer[0], 41);
@@ -187,7 +186,7 @@ TEST_F(VpiGetValueArraySim, VectorValReturnsAvalAndBvalGroups) {
   s_vpi_arrayvalue av = {};
   av.format = vpiVectorVal;
   PLI_INT32 index[1] = {0};
-  vpi_get_value_array(arr, &av, index, 1);
+  vpi_get_value_array(VpiHandleOf(arr), &av, index, 1);
 
   ASSERT_NE(av.value.vectors, nullptr);
   EXPECT_EQ(av.value.vectors[0].aval, 0xABCDu);
@@ -205,7 +204,7 @@ TEST_F(VpiGetValueArraySim, LongIntValReturnsSixtyFourBitElements) {
   s_vpi_arrayvalue av = {};
   av.format = vpiLongIntVal;
   PLI_INT32 index[1] = {0};
-  vpi_get_value_array(arr, &av, index, 1);
+  vpi_get_value_array(VpiHandleOf(arr), &av, index, 1);
 
   ASSERT_NE(av.value.longints, nullptr);
   EXPECT_EQ(av.value.longints[0], 0x1122334455667788ll);
@@ -222,7 +221,7 @@ TEST_F(VpiGetValueArraySim, ShortIntValReturnsShortsPerElement) {
   s_vpi_arrayvalue av = {};
   av.format = vpiShortIntVal;
   PLI_INT32 index[1] = {0};
-  vpi_get_value_array(arr, &av, index, 2);
+  vpi_get_value_array(VpiHandleOf(arr), &av, index, 2);
 
   ASSERT_NE(av.value.shortints, nullptr);
   EXPECT_EQ(av.value.shortints[0], 0x0102);
@@ -240,7 +239,7 @@ TEST_F(VpiGetValueArraySim, ShortRealValReturnsFloatsPerElement) {
   s_vpi_arrayvalue av = {};
   av.format = vpiShortRealVal;
   PLI_INT32 index[1] = {0};
-  vpi_get_value_array(arr, &av, index, 2);
+  vpi_get_value_array(VpiHandleOf(arr), &av, index, 2);
 
   ASSERT_NE(av.value.shortreals, nullptr);
   EXPECT_FLOAT_EQ(av.value.shortreals[0], 42.0f);
@@ -257,7 +256,7 @@ TEST_F(VpiGetValueArraySim, RealValReturnsDoublesPerElement) {
   s_vpi_arrayvalue av = {};
   av.format = vpiRealVal;
   PLI_INT32 index[1] = {0};
-  vpi_get_value_array(arr, &av, index, 2);
+  vpi_get_value_array(VpiHandleOf(arr), &av, index, 2);
 
   ASSERT_NE(av.value.reals, nullptr);
   EXPECT_DOUBLE_EQ(av.value.reals[0], 123.0);
@@ -276,9 +275,9 @@ TEST_F(VpiGetValueArraySim, MissingStartingIndexIsError) {
   s_vpi_arrayvalue av = {};
   av.format = vpiIntVal;
   av.value.integers = sentinel;  // non-NULL going in
-  vpi_get_value_array(arr, &av, /*index_p=*/nullptr, 2);
+  vpi_get_value_array(VpiHandleOf(arr), &av, /*index_p=*/nullptr, 2);
 
-  SVpiErrorInfo info = {};
+  s_vpi_error_info info = {};
   EXPECT_EQ(vpi_chk_error(&info), vpiError);
   EXPECT_EQ(av.value.integers, nullptr);  // value arm overwritten to NULL
 }
@@ -296,9 +295,9 @@ TEST_F(VpiGetValueArraySim, OutOfRangeStartingIndexIsError) {
   av.format = vpiIntVal;
   av.value.integers = sentinel;  // non-NULL going in
   PLI_INT32 index[1] = {5};      // no element with declared index 5 exists
-  vpi_get_value_array(arr, &av, index, 2);
+  vpi_get_value_array(VpiHandleOf(arr), &av, index, 2);
 
-  SVpiErrorInfo info = {};
+  s_vpi_error_info info = {};
   EXPECT_EQ(vpi_chk_error(&info), vpiError);
   EXPECT_EQ(av.value.integers, nullptr);  // value arm overwritten to NULL
 }
@@ -312,7 +311,7 @@ TEST_F(VpiGetValueArraySim, TimeValReturnsTimeWordsPerElement) {
   s_vpi_arrayvalue av = {};
   av.format = vpiTimeVal;
   PLI_INT32 index[1] = {0};
-  vpi_get_value_array(arr, &av, index, 1);
+  vpi_get_value_array(VpiHandleOf(arr), &av, index, 1);
 
   ASSERT_NE(av.value.times, nullptr);
   EXPECT_EQ(av.value.times[0].high, 2u);
@@ -338,9 +337,9 @@ TEST_F(VpiGetValueArraySim, AFormatTheElementTypeDoesNotSupportIsAnError) {
     av.format = static_cast<PLI_UINT32>(format);
     av.value.integers = sentinel;  // non-NULL going in
     PLI_INT32 index[1] = {0};
-    vpi_get_value_array(arr, &av, index, 2);
+    vpi_get_value_array(VpiHandleOf(arr), &av, index, 2);
 
-    SVpiErrorInfo info = {};
+    s_vpi_error_info info = {};
     EXPECT_EQ(vpi_chk_error(&info), vpiError) << "format " << format;
     EXPECT_EQ(av.value.integers, nullptr) << "format " << format;
   }
@@ -360,9 +359,9 @@ TEST_F(VpiGetValueArraySim, TheRawAndVectorFormatsSuitEveryElementType) {
     s_vpi_arrayvalue av = {};
     av.format = static_cast<PLI_UINT32>(format);
     PLI_INT32 index[1] = {0};
-    vpi_get_value_array(arr, &av, index, 1);
+    vpi_get_value_array(VpiHandleOf(arr), &av, index, 1);
 
-    SVpiErrorInfo info = {};
+    s_vpi_error_info info = {};
     EXPECT_EQ(vpi_chk_error(&info), 0) << "format " << format;
     if (format == vpiVectorVal) {
       EXPECT_NE(av.value.vectors, nullptr) << "format " << format;

@@ -2,6 +2,8 @@
 
 #include <vector>
 
+#include "simulator/vpi_model_helpers2.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 using namespace delta;

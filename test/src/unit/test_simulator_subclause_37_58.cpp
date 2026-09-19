@@ -3,7 +3,10 @@
 #include <vector>
 
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_model_helpers1.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -107,14 +110,14 @@ class BitSelectObject : public ::testing::Test {
 // Detail 3, both conditions met: a constant index into a vector of static
 // lifetime.
 TEST_F(BitSelectObject, AConstantIndexIntoAStaticVectorIsAConstantSelect) {
-  EXPECT_EQ(vpi_get(vpiConstantSelect, &select_), 1);
+  EXPECT_EQ(vpi_get(vpiConstantSelect, VpiHandleOf(&select_)), 1);
 }
 
 // Detail 3, first condition: an index that is not an elaboration-time constant.
 TEST_F(BitSelectObject, ANonConstantIndexMakesTheSelectNonConstant) {
   index_.type = vpiOperation;
 
-  EXPECT_EQ(vpi_get(vpiConstantSelect, &select_), 0);
+  EXPECT_EQ(vpi_get(vpiConstantSelect, VpiHandleOf(&select_)), 0);
 }
 
 // Detail 3, second condition: the prefix has to be a constant select itself,
@@ -122,7 +125,7 @@ TEST_F(BitSelectObject, ANonConstantIndexMakesTheSelectNonConstant) {
 TEST_F(BitSelectObject, AnAutomaticPrefixMakesTheSelectNonConstant) {
   vector_.automatic = true;
 
-  EXPECT_EQ(vpi_get(vpiConstantSelect, &select_), 0);
+  EXPECT_EQ(vpi_get(vpiConstantSelect, VpiHandleOf(&select_)), 0);
 }
 
 // The figure's vpiParent edge, drawn from the bit select to the class grouping
@@ -130,7 +133,8 @@ TEST_F(BitSelectObject, AnAutomaticPrefixMakesTheSelectNonConstant) {
 // vpiParent is a tag no object's type is, so the traversal the relation fell
 // through to reached the vector from none of its bit-selects.
 TEST_F(BitSelectObject, ParentReachesTheVectorSelectedInto) {
-  EXPECT_EQ(vpi_handle(vpiParent, &select_), &vector_);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiParent, VpiHandleOf(&select_))),
+            &vector_);
 }
 
 // The figure's vpiIndex edge, drawn from the bit select to expr and walked with
@@ -138,9 +142,10 @@ TEST_F(BitSelectObject, ParentReachesTheVectorSelectedInto) {
 // of this kind, so the index a select was written with was reachable from it by
 // nothing.
 TEST_F(BitSelectObject, IndexReachesTheSelectsIndexExpression) {
-  std::vector<vpiHandle> seen = ScanAll(vpi_iterate(vpiIndex, &select_));
+  std::vector<vpiHandle> seen =
+      ScanAll(vpi_iterate(vpiIndex, VpiHandleOf(&select_)));
   ASSERT_EQ(seen.size(), 1u);
-  EXPECT_EQ(seen[0], &index_);
+  EXPECT_EQ(VpiObjectOf(seen[0]), &index_);
 }
 
 }  // namespace

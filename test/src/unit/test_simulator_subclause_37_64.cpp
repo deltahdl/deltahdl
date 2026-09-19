@@ -1,7 +1,10 @@
 #include <gtest/gtest.h>
 
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_model_helpers1.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -61,12 +64,12 @@ TEST_F(Assignment, AssignmentObjectReportsComputedOpTypeThroughDispatch) {
   VpiObject normal;
   normal.type = vpiAssignment;
   normal.op_type = VpiAssignmentOpType("<=");
-  EXPECT_EQ(vpi_get(vpiOpType, &normal), vpiAssignmentOp);
+  EXPECT_EQ(vpi_get(vpiOpType, VpiHandleOf(&normal)), vpiAssignmentOp);
 
   VpiObject compound;
   compound.type = vpiAssignment;
   compound.op_type = VpiAssignmentOpType("+=");
-  EXPECT_EQ(vpi_get(vpiOpType, &compound), vpiAddOp);
+  EXPECT_EQ(vpi_get(vpiOpType, VpiHandleOf(&compound)), vpiAddOp);
 }
 
 // D1 default (negative) form: the rule recognizes exactly the normal "="/"<="
@@ -81,7 +84,7 @@ TEST_F(Assignment, UnrecognizedOperatorSpellingFallsBackToVpiAssignmentOp) {
   VpiObject fallback;
   fallback.type = vpiAssignment;
   fallback.op_type = VpiAssignmentOpType("==");
-  EXPECT_EQ(vpi_get(vpiOpType, &fallback), vpiAssignmentOp);
+  EXPECT_EQ(vpi_get(vpiOpType, VpiHandleOf(&fallback)), vpiAssignmentOp);
 }
 
 }  // namespace

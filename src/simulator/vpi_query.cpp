@@ -3,10 +3,18 @@
 #include <optional>
 
 #include "simulator/vpi_coverage.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_user.h"
 // §37.10 detail 3: the package/interface/program instance kinds are defined in
 // the SystemVerilog VPI header alongside the §37.10 vpiInstance relation.
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_constants.h"
+#include "simulator/vpi_context.h"
+#include "simulator/vpi_data_structs.h"
+#include "simulator/vpi_model_helpers1.h"
+#include "simulator/vpi_model_helpers2.h"
+#include "simulator/vpi_model_helpers3.h"
+#include "simulator/vpi_object.h"
 
 namespace delta {
 
@@ -639,7 +647,8 @@ int VpiContext::Get(int property, VpiHandle obj) {
   if (VpiGetProtectedRefused(property, obj)) {
     last_error_.state = kVpiPLI;
     last_error_.level = kVpiError;
-    last_error_.message = "vpi_get() on a protected object is an error";
+    last_error_.message =
+        VpiText("vpi_get() on a protected object is an error");
     return vpiUndefined;
   }
   // §37.3.5: it is an error to ask for a property of an expression when the
@@ -653,9 +662,9 @@ int VpiContext::Get(int property, VpiHandle obj) {
   if (obj->property_needs_side_effect_eval && property != kVpiType) {
     last_error_.state = kVpiPLI;
     last_error_.level = kVpiError;
-    last_error_.message =
+    last_error_.message = VpiText(
         "vpi_get(): this property cannot be determined without evaluating an "
-        "expression with side effects";
+        "expression with side effects");
     return vpiUndefined;
   }
   // §40.5.2: "To obtain coverage information, the vpi_get() function is
@@ -709,7 +718,8 @@ PLI_INT64 VpiContext::Get64(int property, VpiHandle obj) {
       (property != kVpiSize || !VpiIsExprType(obj->type))) {
     last_error_.state = kVpiPLI;
     last_error_.level = kVpiError;
-    last_error_.message = "vpi_get64() on a protected object is an error";
+    last_error_.message =
+        VpiText("vpi_get64() on a protected object is an error");
     return vpiUndefined;
   }
   switch (property) {
@@ -741,7 +751,7 @@ int VpiContext::FreeObject(VpiHandle obj) {
   last_error_.state = kVpiPLI;
   last_error_.level = kVpiWarning;
   last_error_.message =
-      "vpi_free_object() is deprecated; use vpi_release_handle() instead";
+      VpiText("vpi_free_object() is deprecated); use vpi_release_handle() instead";
   return 0;
 }
 }  // namespace delta

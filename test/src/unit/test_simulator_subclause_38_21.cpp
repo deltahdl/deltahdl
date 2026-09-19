@@ -5,7 +5,11 @@
 #include "common/source_mgr.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
+#include "simulator/vpi_constants.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -26,7 +30,7 @@ class VpiHandleByNameSim : public ::testing::Test {
 
 TEST_F(VpiHandleByNameSim, HandleByNameFindsModule) {
   vpi_ctx_.CreateModule("dut", "dut");
-  vpiHandle h = vpi_handle_by_name("dut", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("dut"), nullptr);
   ASSERT_NE(h, nullptr);
   EXPECT_EQ(vpi_get(vpiType, h), vpiModule);
 }
@@ -41,42 +45,44 @@ TEST_F(VpiHandleByNameSim, HandleByNameNullReturnsNullptr) {
 // that is not within the scope is not found via that scope.
 TEST_F(VpiHandleByNameSim, ScopeConfinesSearch) {
   vpi_ctx_.CreateModule("alpha", "alpha");  // top-level, outside `top`
-  vpiHandle top = vpi_ctx_.CreateModule("top", "top");
-  vpiHandle beta = vpi_ctx_.CreatePort("beta", kVpiInput, top);
+  VpiHandle top = vpi_ctx_.CreateModule("top", "top");
+  VpiHandle beta = vpi_ctx_.CreatePort("beta", kVpiInput, top);
 
-  EXPECT_EQ(vpi_handle_by_name("beta", top), beta);
-  EXPECT_EQ(vpi_handle_by_name("alpha", top), nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle_by_name(VpiText("beta"), VpiHandleOf(top))),
+            beta);
+  EXPECT_EQ(vpi_handle_by_name(VpiText("alpha"), VpiHandleOf(top)), nullptr);
 }
 
 // §38.21 C4: the name may be hierarchical. A dotted path is walked component by
 // component, descending from the top-level scope into its children.
 TEST_F(VpiHandleByNameSim, HierarchicalNameResolves) {
-  vpiHandle top = vpi_ctx_.CreateModule("top", "top");
-  vpiHandle beta = vpi_ctx_.CreatePort("beta", kVpiInput, top);
+  VpiHandle top = vpi_ctx_.CreateModule("top", "top");
+  VpiHandle beta = vpi_ctx_.CreatePort("beta", kVpiInput, top);
 
-  EXPECT_EQ(vpi_handle_by_name("top.beta", nullptr), beta);
+  EXPECT_EQ(VpiObjectOf(vpi_handle_by_name(VpiText("top.beta"), nullptr)),
+            beta);
 }
 
 // §38.21 C7: calling vpi_handle_by_name() for a protected scope object is an
 // error - no handle is returned and the error is recorded.
 TEST_F(VpiHandleByNameSim, ProtectedScopeIsError) {
-  vpiHandle locked = vpi_ctx_.CreateModule("sec", "sec");
+  VpiHandle locked = vpi_ctx_.CreateModule("sec", "sec");
   locked->is_protected = true;
   vpi_ctx_.CreatePort("inner", kVpiInput, locked);
 
-  EXPECT_EQ(vpi_handle_by_name("inner", locked), nullptr);
+  EXPECT_EQ(vpi_handle_by_name(VpiText("inner"), VpiHandleOf(locked)), nullptr);
   EXPECT_EQ(vpi_ctx_.LastError().level, kVpiError);
 }
 
 // §38.21 C8: a hierarchical name that passes through a protected scope is an
 // error; the protected intermediate scope cannot be descended into.
 TEST_F(VpiHandleByNameSim, HierarchicalThroughProtectedScopeIsError) {
-  vpiHandle root = vpi_ctx_.CreateModule("root", "root");
-  vpiHandle mid = vpi_ctx_.CreatePort("mid", kVpiInput, root);
+  VpiHandle root = vpi_ctx_.CreateModule("root", "root");
+  VpiHandle mid = vpi_ctx_.CreatePort("mid", kVpiInput, root);
   mid->is_protected = true;
   vpi_ctx_.CreatePort("deep", kVpiInput, mid);
 
-  EXPECT_EQ(vpi_handle_by_name("root.mid.deep", nullptr), nullptr);
+  EXPECT_EQ(vpi_handle_by_name(VpiText("root.mid.deep"), nullptr), nullptr);
   EXPECT_EQ(vpi_ctx_.LastError().level, kVpiError);
 }
 
@@ -87,7 +93,7 @@ TEST_F(VpiHandleByNameSim, HierarchicalThroughProtectedScopeIsError) {
 TEST_F(VpiHandleByNameSim, NameMatchingNoObjectReturnsNull) {
   vpi_ctx_.CreateModule("present", "present");
 
-  EXPECT_EQ(vpi_handle_by_name("absent", nullptr), nullptr);
+  EXPECT_EQ(vpi_handle_by_name(VpiText("absent"), nullptr), nullptr);
   EXPECT_EQ(vpi_ctx_.LastError().level, 0);
 }
 
@@ -100,7 +106,7 @@ TEST_F(VpiHandleByNameSim, HandleByNameFindsRuntimeVariable) {
   sim_ctx_.CreateVariable("counter", 8);
   vpi_ctx_.Attach(sim_ctx_);
 
-  vpiHandle h = vpi_handle_by_name("counter", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("counter"), nullptr);
   ASSERT_NE(h, nullptr);
   EXPECT_EQ(vpi_get(vpiType, h), vpiReg);
 }

@@ -1,7 +1,11 @@
 #include <gtest/gtest.h>
 
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_constants.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_model_helpers1.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -40,12 +44,12 @@ TEST_F(ContinuousAssignment, ContAssignBitSizeIsAlwaysScalar) {
   VpiObject bit;
   bit.type = vpiContAssignBit;
   bit.size = 8;  // a deliberately non-scalar stored width
-  EXPECT_EQ(vpi_get(vpiSize, &bit), 1);
+  EXPECT_EQ(vpi_get(vpiSize, VpiHandleOf(&bit)), 1);
 
   VpiObject assign;
   assign.type = vpiContAssign;
   assign.size = 4;
-  EXPECT_EQ(vpi_get(vpiSize, &assign), 4);
+  EXPECT_EQ(vpi_get(vpiSize, VpiHandleOf(&assign)), 4);
 }
 
 // Detail 3: vpiOffset shall return zero for the LSB. The offset is measured
@@ -55,12 +59,12 @@ TEST_F(ContinuousAssignment, LsbContAssignBitReportsZeroOffset) {
   VpiObject lsb;
   lsb.type = vpiContAssignBit;
   lsb.offset = 0;
-  EXPECT_EQ(vpi_get(vpiOffset, &lsb), 0);
+  EXPECT_EQ(vpi_get(vpiOffset, VpiHandleOf(&lsb)), 0);
 
   VpiObject higher;
   higher.type = vpiContAssignBit;
   higher.offset = 3;
-  EXPECT_EQ(vpi_get(vpiOffset, &higher), 3);
+  EXPECT_EQ(vpi_get(vpiOffset, VpiHandleOf(&higher)), 3);
 }
 
 // Diagram property: a continuous assignment reports through vpiNetDeclAssign
@@ -70,11 +74,11 @@ TEST_F(ContinuousAssignment, ReportsNetDeclAssign) {
   VpiObject net_decl;
   net_decl.type = vpiContAssign;
   net_decl.net_decl_assign = true;
-  EXPECT_EQ(vpi_get(vpiNetDeclAssign, &net_decl), 1);
+  EXPECT_EQ(vpi_get(vpiNetDeclAssign, VpiHandleOf(&net_decl)), 1);
 
   VpiObject standalone;
   standalone.type = vpiContAssign;
-  EXPECT_EQ(vpi_get(vpiNetDeclAssign, &standalone), 0);
+  EXPECT_EQ(vpi_get(vpiNetDeclAssign, VpiHandleOf(&standalone)), 0);
 }
 
 // Diagram property: a continuous assignment reports the drive strengths it
@@ -84,8 +88,8 @@ TEST_F(ContinuousAssignment, ReportsDriveStrengths) {
   assign.type = vpiContAssign;
   assign.strength0 = vpiPullDrive;
   assign.strength1 = vpiStrongDrive;
-  EXPECT_EQ(vpi_get(vpiStrength0, &assign), vpiPullDrive);
-  EXPECT_EQ(vpi_get(vpiStrength1, &assign), vpiStrongDrive);
+  EXPECT_EQ(vpi_get(vpiStrength0, VpiHandleOf(&assign)), vpiPullDrive);
+  EXPECT_EQ(vpi_get(vpiStrength1, VpiHandleOf(&assign)), vpiStrongDrive);
 }
 
 // Detail 2: a value change callback may be placed onto a cont assign or onto a
@@ -94,16 +98,16 @@ TEST_F(ContinuousAssignment, ReportsDriveStrengths) {
 TEST_F(ContinuousAssignment, ValueChangeCallbackAllowedOnContAssignAndBit) {
   VpiObject assign;
   assign.type = vpiContAssign;
-  VpiCbData on_assign = {};
+  s_cb_data on_assign = {};
   on_assign.reason = cbValueChange;
-  on_assign.obj = &assign;
+  on_assign.obj = VpiHandleOf(&assign);
   EXPECT_NE(ctx_.RegisterCb(&on_assign), nullptr);
 
   VpiObject bit;
   bit.type = vpiContAssignBit;
-  VpiCbData on_bit = {};
+  s_cb_data on_bit = {};
   on_bit.reason = cbValueChange;
-  on_bit.obj = &bit;
+  on_bit.obj = VpiHandleOf(&bit);
   EXPECT_NE(ctx_.RegisterCb(&on_bit), nullptr);
 }
 
@@ -132,8 +136,8 @@ TEST_F(ContinuousAssignment, AContinuousAssignmentReachesItsTwoSides) {
   assign.lhs = &target;
   assign.rhs = &source;
 
-  EXPECT_EQ(vpi_handle(vpiLhs, &assign), &target);
-  EXPECT_EQ(vpi_handle(vpiRhs, &assign), &source);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiLhs, VpiHandleOf(&assign))), &target);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiRhs, VpiHandleOf(&assign))), &source);
 }
 
 // §37.47 (figure): the two edges are drawn on the enclosure, so a cont assign
@@ -149,8 +153,8 @@ TEST_F(ContinuousAssignment, AContAssignBitReachesTheSameTwoSides) {
   bit.lhs = &target;
   bit.rhs = &source;
 
-  EXPECT_EQ(vpi_handle(vpiLhs, &bit), &target);
-  EXPECT_EQ(vpi_handle(vpiRhs, &bit), &source);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiLhs, VpiHandleOf(&bit))), &target);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiRhs, VpiHandleOf(&bit))), &source);
 }
 
 // §37.47 (figure, vpiDelay): the delay edge is drawn on the same enclosure, so
@@ -166,7 +170,7 @@ TEST_F(ContinuousAssignment, AContAssignBitReachesItsSourceDelay) {
   bit.type = vpiContAssignBit;
   bit.delay_expr = &delay_expr;
 
-  EXPECT_EQ(vpi_handle(vpiDelay, &bit), &delay_expr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiDelay, VpiHandleOf(&bit))), &delay_expr);
 }
 
 // §37.47 (figure): an assignment written with no delay reaches none, and the
@@ -179,9 +183,9 @@ TEST_F(ContinuousAssignment, TheEdgesStayDistinctAndReportNoneWhenAbsent) {
   assign.type = vpiContAssign;
   assign.lhs = &target;
 
-  EXPECT_EQ(vpi_handle(vpiLhs, &assign), &target);
-  EXPECT_EQ(vpi_handle(vpiRhs, &assign), nullptr);
-  EXPECT_EQ(vpi_handle(vpiDelay, &assign), nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiLhs, VpiHandleOf(&assign))), &target);
+  EXPECT_EQ(vpi_handle(vpiRhs, VpiHandleOf(&assign)), nullptr);
+  EXPECT_EQ(vpi_handle(vpiDelay, VpiHandleOf(&assign)), nullptr);
 }
 
 }  // namespace

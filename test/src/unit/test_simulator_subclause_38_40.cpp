@@ -7,7 +7,10 @@
 #include "common/source_mgr.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
+#include "simulator/vpi_constants.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -31,10 +34,10 @@ class VpiScanSim : public ::testing::Test {
 // type. Each call hands back the next object, in iteration order.
 TEST_F(VpiScanSim, ScanReturnsObjectsDirectedByIterator) {
   auto* mod = vpi_ctx_.CreateModule("top", "top");
-  vpiHandle p0 = vpi_ctx_.CreatePort("p0", kVpiInput, mod);
-  vpiHandle p1 = vpi_ctx_.CreatePort("p1", kVpiOutput, mod);
+  VpiHandle p0 = vpi_ctx_.CreatePort("p0", kVpiInput, mod);
+  VpiHandle p1 = vpi_ctx_.CreatePort("p1", kVpiOutput, mod);
 
-  vpiHandle iter = vpi_iterate(vpiPort, mod);
+  vpiHandle iter = vpi_iterate(vpiPort, VpiHandleOf(mod));
   ASSERT_NE(iter, nullptr);
 
   std::vector<vpiHandle> scanned;
@@ -44,8 +47,8 @@ TEST_F(VpiScanSim, ScanReturnsObjectsDirectedByIterator) {
   }
 
   ASSERT_EQ(scanned.size(), 2u);
-  EXPECT_EQ(scanned[0], p0);
-  EXPECT_EQ(scanned[1], p1);
+  EXPECT_EQ(VpiObjectOf(scanned[0]), p0);
+  EXPECT_EQ(VpiObjectOf(scanned[1]), p1);
 }
 
 // §38.40: once the iterator's objects are exhausted vpi_scan() returns NULL.
@@ -56,7 +59,7 @@ TEST_F(VpiScanSim, ScanReturnsNullWhenExhausted) {
   auto* mod = vpi_ctx_.CreateModule("top", "top");
   vpi_ctx_.CreatePort("p0", kVpiInput, mod);
 
-  vpiHandle iter = vpi_iterate(vpiPort, mod);
+  vpiHandle iter = vpi_iterate(vpiPort, VpiHandleOf(mod));
   ASSERT_NE(iter, nullptr);
 
   EXPECT_NE(vpi_scan(iter), nullptr);  // the single port
@@ -77,13 +80,13 @@ TEST_F(VpiScanSim, FreshIteratorScansIndependently) {
   vpi_ctx_.CreatePort("p0", kVpiInput, mod);
   vpi_ctx_.CreatePort("p1", kVpiOutput, mod);
 
-  vpiHandle first = vpi_iterate(vpiPort, mod);
+  vpiHandle first = vpi_iterate(vpiPort, VpiHandleOf(mod));
   ASSERT_NE(first, nullptr);
   int first_count = 0;
   while (vpi_scan(first) != nullptr) ++first_count;
   EXPECT_EQ(first_count, 2);
 
-  vpiHandle second = vpi_iterate(vpiPort, mod);
+  vpiHandle second = vpi_iterate(vpiPort, VpiHandleOf(mod));
   ASSERT_NE(second, nullptr);
   int second_count = 0;
   while (vpi_scan(second) != nullptr) ++second_count;
@@ -98,7 +101,7 @@ TEST_F(VpiScanSim, ScanRefusesAHandleThatIsNotAnIterator) {
   auto* mod = vpi_ctx_.CreateModule("top", "top");
   vpi_ctx_.CreatePort("p0", kVpiInput, mod);
 
-  EXPECT_EQ(vpi_scan(mod), nullptr);
+  EXPECT_EQ(vpi_scan(VpiHandleOf(mod)), nullptr);
   EXPECT_EQ(vpi_ctx_.LastError().level, kVpiError);
 }
 
@@ -112,12 +115,12 @@ TEST_F(VpiScanSim, ARefusedScanLeavesTheObjectInPlace) {
 
   // Enough calls to walk past both ports, which is where an iterator would be
   // retired and its storage returned.
-  EXPECT_EQ(vpi_scan(mod), nullptr);
-  EXPECT_EQ(vpi_scan(mod), nullptr);
-  EXPECT_EQ(vpi_scan(mod), nullptr);
+  EXPECT_EQ(vpi_scan(VpiHandleOf(mod)), nullptr);
+  EXPECT_EQ(vpi_scan(VpiHandleOf(mod)), nullptr);
+  EXPECT_EQ(vpi_scan(VpiHandleOf(mod)), nullptr);
 
-  EXPECT_EQ(vpi_get(vpiType, mod), vpiModule);
-  vpiHandle iter = vpi_iterate(vpiPort, mod);
+  EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(mod)), vpiModule);
+  vpiHandle iter = vpi_iterate(vpiPort, VpiHandleOf(mod));
   ASSERT_NE(iter, nullptr);
   int count = 0;
   while (vpi_scan(iter) != nullptr) ++count;

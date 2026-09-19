@@ -3,7 +3,9 @@
 #include <vector>
 
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -108,9 +110,9 @@ TEST(MemoryPublic, MemoryIterationReturnsRegArrayObjects) {
   scope.type = vpiModule;
   scope.children = {&plain, &memory};
 
-  vpiHandle it = vpi_iterate(vpiMemory, &scope);
+  vpiHandle it = vpi_iterate(vpiMemory, VpiHandleOf(&scope));
   ASSERT_NE(it, nullptr);
-  EXPECT_EQ(vpi_scan(it), &memory);
+  EXPECT_EQ(VpiObjectOf(vpi_scan(it)), &memory);
   EXPECT_EQ(vpi_scan(it), nullptr);
 
   SetGlobalVpiContext(nullptr);
@@ -129,7 +131,7 @@ TEST(MemoryPublic, MemoryIterationIsNullWhenTheScopeHasNoArray) {
   scope.type = vpiModule;
   scope.children = {&plain};
 
-  EXPECT_EQ(vpi_iterate(vpiMemory, &scope), nullptr);
+  EXPECT_EQ(vpi_iterate(vpiMemory, VpiHandleOf(&scope)), nullptr);
 
   SetGlobalVpiContext(nullptr);
 }
@@ -146,18 +148,18 @@ TEST(MemoryPublic, IsMemoryDistinguishesARegArrayFromAnyOtherArray) {
   VpiObject memory;
   memory.type = vpiRegArray;
   memory.children = {&reg_word};
-  EXPECT_EQ(vpi_get(vpiIsMemory, &memory), 1);
+  EXPECT_EQ(vpi_get(vpiIsMemory, VpiHandleOf(&memory)), 1);
 
   VpiObject int_word;
   int_word.type = vpiIntVar;
   VpiObject int_array;
   int_array.type = vpiArrayVar;
   int_array.children = {&int_word};
-  EXPECT_EQ(vpi_get(vpiIsMemory, &int_array), 0);
+  EXPECT_EQ(vpi_get(vpiIsMemory, VpiHandleOf(&int_array)), 0);
 
   VpiObject not_an_array;
   not_an_array.type = vpiReg;
-  EXPECT_EQ(vpi_get(vpiIsMemory, &not_an_array), 0);
+  EXPECT_EQ(vpi_get(vpiIsMemory, VpiHandleOf(&not_an_array)), 0);
 
   SetGlobalVpiContext(nullptr);
 }

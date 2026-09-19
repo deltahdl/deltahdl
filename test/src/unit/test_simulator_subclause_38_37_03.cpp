@@ -3,7 +3,9 @@
 #include <cstring>
 #include <vector>
 
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -21,13 +23,13 @@ namespace {
 // observe the tool answering each structure separately, stopping at the zero,
 // and refusing the zero as a registration.
 
-int MyTaskCalltf(const char*) { return 0; }
-int MyTaskComptf(const char*) { return 0; }
-int MyIntFuncCalltf(const char*) { return 0; }
-int MyIntFuncComptf(const char*) { return 0; }
-int MySizedFuncCalltf(const char*) { return 0; }
-int MySizedFuncComptf(const char*) { return 0; }
-int MySizedFuncSizetf(const char*) { return 8; }
+PLI_INT32 MyTaskCalltf(PLI_BYTE8*) { return 0; }
+PLI_INT32 MyTaskComptf(PLI_BYTE8*) { return 0; }
+PLI_INT32 MyIntFuncCalltf(PLI_BYTE8*) { return 0; }
+PLI_INT32 MyIntFuncComptf(PLI_BYTE8*) { return 0; }
+PLI_INT32 MySizedFuncCalltf(PLI_BYTE8*) { return 0; }
+PLI_INT32 MySizedFuncComptf(PLI_BYTE8*) { return 0; }
+PLI_INT32 MySizedFuncSizetf(PLI_BYTE8*) { return 8; }
 
 // §38.37.3's example list: a system task, an integer system function and a
 // sized system function, with a zero final element ending the array. The
@@ -40,19 +42,19 @@ struct SystfTestList {
 SystfTestList MakeSystfTestList() {
   SystfTestList list;
   list.entries[0].type = vpiSysTask;
-  list.entries[0].tfname = "$my_task";
+  list.entries[0].tfname = VpiText("$my_task");
   list.entries[0].calltf = &MyTaskCalltf;
   list.entries[0].compiletf = &MyTaskComptf;
 
   list.entries[1].type = vpiSysFunc;
   list.entries[1].sysfunctype = vpiIntFunc;
-  list.entries[1].tfname = "$my_int_func";
+  list.entries[1].tfname = VpiText("$my_int_func");
   list.entries[1].calltf = &MyIntFuncCalltf;
   list.entries[1].compiletf = &MyIntFuncComptf;
 
   list.entries[2].type = vpiSysFunc;
   list.entries[2].sysfunctype = vpiSizedFunc;
-  list.entries[2].tfname = "$my_sized_func";
+  list.entries[2].tfname = VpiText("$my_sized_func");
   list.entries[2].calltf = &MySizedFuncCalltf;
   list.entries[2].compiletf = &MySizedFuncComptf;
   list.entries[2].sizetf = &MySizedFuncSizetf;
@@ -133,7 +135,7 @@ TEST_F(VpiMultipleSystfRegistration, LoopStopsAtTheZeroFinalElement) {
   RegisterFromList(list);
 
   ASSERT_EQ(vpi_ctx_.RegisteredSystfs().size(), 3u);
-  for (const VpiSystfData& registered : vpi_ctx_.RegisteredSystfs()) {
+  for (const s_vpi_systf_data& registered : vpi_ctx_.RegisteredSystfs()) {
     ASSERT_NE(registered.tfname, nullptr);
     EXPECT_NE(std::strcmp(registered.tfname, ""), 0);
   }
@@ -151,7 +153,7 @@ TEST_F(VpiMultipleSystfRegistration, ZeroFinalElementIsRefusedAsARegistration) {
   EXPECT_EQ(vpi_register_systf(&list.entries[3]), nullptr);
   EXPECT_TRUE(vpi_ctx_.RegisteredSystfs().empty());
 
-  SVpiErrorInfo info = {};
+  s_vpi_error_info info = {};
   EXPECT_EQ(vpi_chk_error(&info), vpiError);
   EXPECT_STREQ(info.message,
                "system task or function registration must carry a type of "
@@ -165,7 +167,7 @@ TEST_F(VpiMultipleSystfRegistration, ZeroFinalElementIsRefusedAsARegistration) {
 TEST_F(VpiMultipleSystfRegistration, TypeOutsideTheTwoConstantsIsRefused) {
   s_vpi_systf_data data = {};
   data.type = vpiSysFuncCall;
-  data.tfname = "$neither";
+  data.tfname = VpiText("$neither");
   data.calltf = &MyTaskCalltf;
   data.compiletf = &MyTaskComptf;
 
@@ -183,14 +185,14 @@ TEST_F(VpiMultipleSystfRegistration,
        SeparateStructuresRegisterWhatTheArrayDid) {
   SystfTestList list = MakeSystfTestList();
   RegisterFromList(list);
-  std::vector<VpiSystfData> by_array = vpi_ctx_.RegisteredSystfs();
+  std::vector<s_vpi_systf_data> by_array = vpi_ctx_.RegisteredSystfs();
 
   VpiContext separate_ctx;
   SetGlobalVpiContext(&separate_ctx);
 
   s_vpi_systf_data task = {};
   task.type = vpiSysTask;
-  task.tfname = "$my_task";
+  task.tfname = VpiText("$my_task");
   task.calltf = &MyTaskCalltf;
   task.compiletf = &MyTaskComptf;
   ASSERT_NE(vpi_register_systf(&task), nullptr);
@@ -198,7 +200,7 @@ TEST_F(VpiMultipleSystfRegistration,
   s_vpi_systf_data int_func = {};
   int_func.type = vpiSysFunc;
   int_func.sysfunctype = vpiIntFunc;
-  int_func.tfname = "$my_int_func";
+  int_func.tfname = VpiText("$my_int_func");
   int_func.calltf = &MyIntFuncCalltf;
   int_func.compiletf = &MyIntFuncComptf;
   ASSERT_NE(vpi_register_systf(&int_func), nullptr);
@@ -206,13 +208,13 @@ TEST_F(VpiMultipleSystfRegistration,
   s_vpi_systf_data sized_func = {};
   sized_func.type = vpiSysFunc;
   sized_func.sysfunctype = vpiSizedFunc;
-  sized_func.tfname = "$my_sized_func";
+  sized_func.tfname = VpiText("$my_sized_func");
   sized_func.calltf = &MySizedFuncCalltf;
   sized_func.compiletf = &MySizedFuncComptf;
   sized_func.sizetf = &MySizedFuncSizetf;
   ASSERT_NE(vpi_register_systf(&sized_func), nullptr);
 
-  const std::vector<VpiSystfData>& by_structure =
+  const std::vector<s_vpi_systf_data>& by_structure =
       separate_ctx.RegisteredSystfs();
   ASSERT_EQ(by_structure.size(), by_array.size());
   for (size_t i = 0; i < by_array.size(); ++i) {

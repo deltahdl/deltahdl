@@ -3,7 +3,10 @@
 #include <vector>
 
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_model_helpers2.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -172,7 +175,8 @@ TEST(NamedEventModel, ANamedEventReachesItsEventTypespec) {
   event.type = vpiNamedEvent;
   event.children = {&waiter, &typespec};
 
-  EXPECT_EQ(vpi_handle(vpiTypespec, &event), &typespec);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiTypespec, VpiHandleOf(&event))),
+            &typespec);
 
   SetGlobalVpiContext(nullptr);
 }
@@ -193,7 +197,8 @@ TEST(NamedEventModel, ANamedEventArrayReachesItsArrayTypespec) {
   array.type = vpiNamedEventArray;
   array.children = {&range, &typespec};
 
-  EXPECT_EQ(vpi_handle(vpiTypespec, &array), &typespec);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiTypespec, VpiHandleOf(&array))),
+            &typespec);
 
   SetGlobalVpiContext(nullptr);
 }
@@ -211,7 +216,7 @@ TEST(NamedEventModel, ANamedEventWithNoTypespecReachesNone) {
   event.type = vpiNamedEvent;
   event.children = {&waiter};
 
-  EXPECT_EQ(vpi_handle(vpiTypespec, &event), nullptr);
+  EXPECT_EQ(vpi_handle(vpiTypespec, VpiHandleOf(&event)), nullptr);
 
   SetGlobalVpiContext(nullptr);
 }

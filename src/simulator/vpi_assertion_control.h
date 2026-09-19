@@ -7,6 +7,8 @@
 // stands here between vpi_control() and that model.
 
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_object.h"
+#include "simulator/vpi_user.h"
 
 namespace delta {
 
@@ -35,13 +37,13 @@ PLI_INT32 VpiAssertionControl(int operation, VpiHandle assertion);
 // a correctly initialized s_vpi_time structure" - vpiAssertionKill, which
 // discards the given attempt, and vpiAssertionDisableStep.
 PLI_INT32 VpiAssertionAttemptControl(int operation, VpiHandle assertion,
-                                     const VpiTime* attempt_start_time);
+                                     const s_vpi_time* attempt_start_time);
 
 // §39.5.2: vpiAssertionEnableStep, whose fourth argument "shall be a step
 // control constant" - vpiAssertionClockSteps, the per-assertion/clock-tick
 // stepping the clause defines.
 PLI_INT32 VpiAssertionStepControl(int operation, VpiHandle assertion,
-                                  const VpiTime* attempt_start_time,
+                                  const s_vpi_time* attempt_start_time,
                                   int step_control);
 
 }  // namespace delta

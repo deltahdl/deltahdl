@@ -8,7 +8,9 @@
 #include "common/source_mgr.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -29,14 +31,15 @@ namespace {
 int g_calls = 0;
 std::vector<vpiHandle> g_objs;
 
-int RecordCb(VpiCbData* data) {
+int RecordCb(s_cb_data* data) {
   ++g_calls;
   if (data) g_objs.push_back(data->obj);
   return 0;
 }
 
 bool Fired(vpiHandle stmt) {
-  return std::find(g_objs.begin(), g_objs.end(), stmt) != g_objs.end();
+  return std::find(g_objs.begin(), g_objs.end(), VpiObjectOf(stmt)) !=
+         g_objs.end();
 }
 
 class VpiModuleWideCallback : public ::testing::Test {
@@ -53,11 +56,11 @@ class VpiModuleWideCallback : public ::testing::Test {
   // protected portion of the code.
   vpiHandle AddStmt(vpiHandle module, const char* name, int type,
                     bool protect = false) {
-    vpiHandle h = vpi_ctx_.CreateModule(name, name);
+    VpiHandle h = vpi_ctx_.CreateModule(name, name);
     h->type = type;
     h->is_protected = protect;
-    module->children.push_back(h);
-    return h;
+    VpiObjectOf(module)->children.push_back(h);
+    return VpiHandleOf(h);
   }
 
   // Register a cbStmt callback whose obj is the given module instance.
@@ -92,18 +95,18 @@ class VpiModuleWideCallback : public ::testing::Test {
 // module and dispatching cbStmt fires the routine on each statement - including
 // one nested inside a block - and never on the module itself.
 TEST_F(VpiModuleWideCallback, PlacesCallbackOnEveryStatementIncludingNested) {
-  vpiHandle module = vpi_ctx_.CreateModule("m", "m");
+  VpiHandle module = vpi_ctx_.CreateModule("m", "m");
   vpiHandle flat = AddStmt(module, "m.a", vpiAssignment);
   vpiHandle block = AddStmt(module, "m.blk", vpiNamedBegin);
-  vpiHandle nested = AddStmt(block, "m.blk.s", vpiWhile);
+  vpiHandle nested = AddStmt(VpiObjectOf(block), "m.blk.s", vpiWhile);
 
   ASSERT_NE(RegisterModuleWide(module), nullptr);
   vpi_ctx_.DispatchCallbacks(cbStmt);
 
   EXPECT_EQ(g_calls, 3);
-  EXPECT_TRUE(Fired(flat));
-  EXPECT_TRUE(Fired(block));
-  EXPECT_TRUE(Fired(nested));
+  EXPECT_TRUE(Fired(VpiObjectOf(flat)));
+  EXPECT_TRUE(Fired(VpiObjectOf(block)));
+  EXPECT_TRUE(Fired(VpiObjectOf(nested)));
   EXPECT_FALSE(Fired(module));
 }
 
@@ -111,7 +114,7 @@ TEST_F(VpiModuleWideCallback, PlacesCallbackOnEveryStatementIncludingNested) {
 // is not a statement-class object (here a net) is left out of the module-wide
 // fan-out.
 TEST_F(VpiModuleWideCallback, NonStatementChildrenGetNoCallback) {
-  vpiHandle module = vpi_ctx_.CreateModule("m", "m");
+  VpiHandle module = vpi_ctx_.CreateModule("m", "m");
   vpiHandle stmt = AddStmt(module, "m.s", vpiAssignment);
   vpiHandle net = AddStmt(module, "m.n", vpiNet);
 
@@ -119,15 +122,15 @@ TEST_F(VpiModuleWideCallback, NonStatementChildrenGetNoCallback) {
   vpi_ctx_.DispatchCallbacks(cbStmt);
 
   EXPECT_EQ(g_calls, 1);
-  EXPECT_TRUE(Fired(stmt));
-  EXPECT_FALSE(Fired(net));
+  EXPECT_TRUE(Fired(VpiObjectOf(stmt)));
+  EXPECT_FALSE(Fired(VpiObjectOf(net)));
 }
 
 // §38.36.1.3: statements that reside in protected portions of the code shall
 // not have callbacks placed on them. A protected statement in the module is
 // skipped, while an unprotected sibling still fires.
 TEST_F(VpiModuleWideCallback, ProtectedStatementsGetNoCallback) {
-  vpiHandle module = vpi_ctx_.CreateModule("m", "m");
+  VpiHandle module = vpi_ctx_.CreateModule("m", "m");
   vpiHandle open = AddStmt(module, "m.open", vpiAssignment, /*protect=*/false);
   vpiHandle sealed = AddStmt(module, "m.sealed", vpiWhile, /*protect=*/true);
 
@@ -135,17 +138,17 @@ TEST_F(VpiModuleWideCallback, ProtectedStatementsGetNoCallback) {
   vpi_ctx_.DispatchCallbacks(cbStmt);
 
   EXPECT_EQ(g_calls, 1);
-  EXPECT_TRUE(Fired(open));
-  EXPECT_FALSE(Fired(sealed));
+  EXPECT_TRUE(Fired(VpiObjectOf(open)));
+  EXPECT_FALSE(Fired(VpiObjectOf(sealed)));
 }
 
 // §38.36.1.3: module-wide registration applies to the module instance. The walk
 // does not cross into a nested module instance, which owns its own statements;
 // a statement inside the sub-instance does not fire.
 TEST_F(VpiModuleWideCallback, NestedModuleInstanceIsNotReached) {
-  vpiHandle module = vpi_ctx_.CreateModule("m", "m");
+  VpiHandle module = vpi_ctx_.CreateModule("m", "m");
   vpiHandle own = AddStmt(module, "m.s", vpiAssignment);
-  vpiHandle sub = vpi_ctx_.CreateModule("m.sub", "m.sub");
+  VpiHandle sub = vpi_ctx_.CreateModule("m.sub", "m.sub");
   module->children.push_back(sub);
   vpiHandle sub_stmt = AddStmt(sub, "m.sub.s", vpiAssignment);
 
@@ -153,8 +156,8 @@ TEST_F(VpiModuleWideCallback, NestedModuleInstanceIsNotReached) {
   vpi_ctx_.DispatchCallbacks(cbStmt);
 
   EXPECT_EQ(g_calls, 1);
-  EXPECT_TRUE(Fired(own));
-  EXPECT_FALSE(Fired(sub_stmt));
+  EXPECT_TRUE(Fired(VpiObjectOf(own)));
+  EXPECT_FALSE(Fired(VpiObjectOf(sub_stmt)));
 }
 
 // §38.36.1.3: "every statement that can have a callback" is the empty set when
@@ -163,7 +166,7 @@ TEST_F(VpiModuleWideCallback, NestedModuleInstanceIsNotReached) {
 // module-wide record is consumed by the fan-out and never delivers a callback
 // on the module itself.
 TEST_F(VpiModuleWideCallback, ModuleWithNoStatementsFiresNothing) {
-  vpiHandle module = vpi_ctx_.CreateModule("m", "m");
+  VpiHandle module = vpi_ctx_.CreateModule("m", "m");
 
   ASSERT_NE(RegisterModuleWide(module), nullptr);
   vpi_ctx_.DispatchCallbacks(cbStmt);
@@ -177,7 +180,7 @@ TEST_F(VpiModuleWideCallback, ModuleWithNoStatementsFiresNothing) {
 // statement in the module instance. After removal, dispatching cbStmt fires
 // nothing.
 TEST_F(VpiModuleWideCallback, SingleHandleRemovesCallbackFromEveryStatement) {
-  vpiHandle module = vpi_ctx_.CreateModule("m", "m");
+  VpiHandle module = vpi_ctx_.CreateModule("m", "m");
   AddStmt(module, "m.a", vpiAssignment);
   AddStmt(module, "m.b", vpiWhile);
 
@@ -187,7 +190,7 @@ TEST_F(VpiModuleWideCallback, SingleHandleRemovesCallbackFromEveryStatement) {
   vpi_ctx_.DispatchCallbacks(cbStmt);
   EXPECT_EQ(g_calls, 2);
 
-  EXPECT_EQ(vpi_ctx_.RemoveCb(cb), 1);
+  EXPECT_EQ(vpi_ctx_.RemoveCb(VpiObjectOf(cb)), 1);
   g_calls = 0;
   g_objs.clear();
   vpi_ctx_.DispatchCallbacks(cbStmt);
@@ -202,15 +205,15 @@ TEST_F(VpiModuleWideCallback, SingleHandleRemovesCallbackFromEveryStatement) {
 // registered against.
 TEST_F(VpiModuleWideCallback,
        StatementAboutToExecuteGetsTheCallbackPlacedOnIt) {
-  vpiHandle module = vpi_ctx_.CreateModule("m", "m");
+  VpiHandle module = vpi_ctx_.CreateModule("m", "m");
   vpiHandle first = AddStmt(module, "m.a", vpiAssignment);
   AddStmt(module, "m.b", vpiWhile);
 
   ASSERT_NE(RegisterModuleWide(module), nullptr);
-  EXPECT_EQ(vpi_ctx_.DispatchCallbacks(cbStmt, first), 1);
+  EXPECT_EQ(vpi_ctx_.DispatchCallbacks(cbStmt, VpiObjectOf(first)), 1);
 
   EXPECT_EQ(g_calls, 1);
-  EXPECT_TRUE(Fired(first));
+  EXPECT_TRUE(Fired(VpiObjectOf(first)));
   EXPECT_FALSE(Fired(module));
 }
 
@@ -220,16 +223,16 @@ TEST_F(VpiModuleWideCallback,
 // the registration against the first instance is passed over rather than
 // delivered for a statement it never reached.
 TEST_F(VpiModuleWideCallback, StatementOfAnotherInstanceCallsNothing) {
-  vpiHandle module = vpi_ctx_.CreateModule("m", "m");
+  VpiHandle module = vpi_ctx_.CreateModule("m", "m");
   AddStmt(module, "m.s", vpiAssignment);
-  vpiHandle other = vpi_ctx_.CreateModule("n", "n");
+  VpiHandle other = vpi_ctx_.CreateModule("n", "n");
   vpiHandle outside = AddStmt(other, "n.s", vpiAssignment);
 
   ASSERT_NE(RegisterModuleWide(module), nullptr);
-  EXPECT_EQ(vpi_ctx_.DispatchCallbacks(cbStmt, outside), 0);
+  EXPECT_EQ(vpi_ctx_.DispatchCallbacks(cbStmt, VpiObjectOf(outside)), 0);
 
   EXPECT_EQ(g_calls, 0);
-  EXPECT_FALSE(Fired(outside));
+  EXPECT_FALSE(Fired(VpiObjectOf(outside)));
 }
 
 // §38.36.1.3: statements that reside in protected portions of the code shall
@@ -237,14 +240,14 @@ TEST_F(VpiModuleWideCallback, StatementOfAnotherInstanceCallsNothing) {
 // calls nothing when it executes - the rule holds at the statement the
 // dispatch names, not only over the fan-out that names them all.
 TEST_F(VpiModuleWideCallback, ProtectedStatementAboutToExecuteCallsNothing) {
-  vpiHandle module = vpi_ctx_.CreateModule("m", "m");
+  VpiHandle module = vpi_ctx_.CreateModule("m", "m");
   vpiHandle sealed = AddStmt(module, "m.sealed", vpiWhile, /*protect=*/true);
 
   ASSERT_NE(RegisterModuleWide(module), nullptr);
-  EXPECT_EQ(vpi_ctx_.DispatchCallbacks(cbStmt, sealed), 0);
+  EXPECT_EQ(vpi_ctx_.DispatchCallbacks(cbStmt, VpiObjectOf(sealed)), 0);
 
   EXPECT_EQ(g_calls, 0);
-  EXPECT_FALSE(Fired(sealed));
+  EXPECT_FALSE(Fired(VpiObjectOf(sealed)));
 }
 
 // §38.36.1.3 is what a module instance in the obj field is for: placing the
@@ -252,17 +255,17 @@ TEST_F(VpiModuleWideCallback, ProtectedStatementAboutToExecuteCallsNothing) {
 // instead places it on that statement alone, so a sibling statement of the
 // same module executes with no callback of that registration on it.
 TEST_F(VpiModuleWideCallback, RegistrationOnOneStatementReachesNoSibling) {
-  vpiHandle module = vpi_ctx_.CreateModule("m", "m");
+  VpiHandle module = vpi_ctx_.CreateModule("m", "m");
   vpiHandle named = AddStmt(module, "m.a", vpiAssignment);
   vpiHandle sibling = AddStmt(module, "m.b", vpiWhile);
 
-  ASSERT_NE(RegisterOnStatement(named), nullptr);
-  EXPECT_EQ(vpi_ctx_.DispatchCallbacks(cbStmt, sibling), 0);
+  ASSERT_NE(RegisterOnStatement(VpiObjectOf(named)), nullptr);
+  EXPECT_EQ(vpi_ctx_.DispatchCallbacks(cbStmt, VpiObjectOf(sibling)), 0);
   EXPECT_EQ(g_calls, 0);
 
-  EXPECT_EQ(vpi_ctx_.DispatchCallbacks(cbStmt, named), 1);
+  EXPECT_EQ(vpi_ctx_.DispatchCallbacks(cbStmt, VpiObjectOf(named)), 1);
   EXPECT_EQ(g_calls, 1);
-  EXPECT_TRUE(Fired(named));
+  EXPECT_TRUE(Fired(VpiObjectOf(named)));
 }
 
 }  // namespace

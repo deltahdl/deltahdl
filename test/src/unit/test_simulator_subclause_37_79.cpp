@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -44,7 +46,8 @@ TEST_F(AssignDeassignForceRelease, AssignStatementReachesLhsTarget) {
   assign_stmt.type = vpiAssignStmt;
   assign_stmt.lhs = &target;
 
-  EXPECT_EQ(vpi_handle(vpiLhs, &assign_stmt), &target);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiLhs, VpiHandleOf(&assign_stmt))),
+            &target);
 }
 
 // Rhs edge of an assign statement (vpiRhs -> expr): the value driven onto the
@@ -57,7 +60,7 @@ TEST_F(AssignDeassignForceRelease, AssignStatementReachesRhsValue) {
   assign_stmt.type = vpiAssignStmt;
   assign_stmt.rhs = &value;
 
-  EXPECT_EQ(vpi_handle(vpiRhs, &assign_stmt), &value);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiRhs, VpiHandleOf(&assign_stmt))), &value);
 }
 
 // Lhs and rhs edges of a force (vpiLhs/vpiRhs -> expr): the target the force
@@ -76,8 +79,8 @@ TEST_F(AssignDeassignForceRelease, ForceReachesRhsValueDistinctFromLhs) {
   force.lhs = &target;
   force.rhs = &value;
 
-  EXPECT_EQ(vpi_handle(vpiRhs, &force), &value);
-  EXPECT_EQ(vpi_handle(vpiLhs, &force), &target);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiRhs, VpiHandleOf(&force))), &value);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiLhs, VpiHandleOf(&force))), &target);
 }
 
 // Lhs edge of a deassign (vpiLhs -> expr): the target whose procedural
@@ -90,7 +93,7 @@ TEST_F(AssignDeassignForceRelease, DeassignReachesLhsTarget) {
   deassign.type = vpiDeassign;
   deassign.lhs = &target;
 
-  EXPECT_EQ(vpi_handle(vpiLhs, &deassign), &target);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiLhs, VpiHandleOf(&deassign))), &target);
 }
 
 // Lhs edge of a release (vpiLhs -> expr): the target whose force is removed.
@@ -102,7 +105,7 @@ TEST_F(AssignDeassignForceRelease, ReleaseReachesLhsTarget) {
   release.type = vpiRelease;
   release.lhs = &target;
 
-  EXPECT_EQ(vpi_handle(vpiLhs, &release), &target);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiLhs, VpiHandleOf(&release))), &target);
 }
 
 // The diagram draws no vpiRhs edge from a deassign or a release: they name a
@@ -122,8 +125,8 @@ TEST_F(AssignDeassignForceRelease, DeassignAndReleaseDrawNoRhsEdge) {
   release.type = vpiRelease;
   release.rhs = &value;
 
-  EXPECT_EQ(vpi_handle(vpiRhs, &deassign), nullptr);
-  EXPECT_EQ(vpi_handle(vpiRhs, &release), nullptr);
+  EXPECT_EQ(vpi_handle(vpiRhs, VpiHandleOf(&deassign)), nullptr);
+  EXPECT_EQ(vpi_handle(vpiRhs, VpiHandleOf(&release)), nullptr);
 }
 
 // Lhs gating: the lhs relation is scoped to the four procedural continuous
@@ -138,7 +141,7 @@ TEST_F(AssignDeassignForceRelease, LhsRelationIsScopedToTheAssignmentFamily) {
   not_in_family.type = vpiBegin;  // not an assign/force/deassign/release
   not_in_family.lhs = &target;
 
-  EXPECT_EQ(vpi_handle(vpiLhs, &not_in_family), nullptr);
+  EXPECT_EQ(vpi_handle(vpiLhs, VpiHandleOf(&not_in_family)), nullptr);
 }
 
 // Both edges reach whatever expression kind the target or the value is written
@@ -159,8 +162,10 @@ TEST_F(AssignDeassignForceRelease, EachExpressionKindIsReachedByBothEdges) {
     force.lhs = &target;
     force.rhs = &value;
 
-    EXPECT_EQ(vpi_handle(vpiLhs, &force), &target) << "kind " << expr_kind;
-    EXPECT_EQ(vpi_handle(vpiRhs, &force), &value) << "kind " << expr_kind;
+    EXPECT_EQ(VpiObjectOf(vpi_handle(vpiLhs, VpiHandleOf(&force))), &target)
+        << "kind " << expr_kind;
+    EXPECT_EQ(VpiObjectOf(vpi_handle(vpiRhs, VpiHandleOf(&force))), &value)
+        << "kind " << expr_kind;
   }
 }
 
@@ -177,7 +182,8 @@ TEST_F(AssignDeassignForceRelease, EachKindReportsNoExpressionWhenNoneIsSet) {
     stmt.type = stmt_kind;
     stmt.children = {&stray};
 
-    EXPECT_EQ(vpi_handle(vpiLhs, &stmt), nullptr) << "kind " << stmt_kind;
+    EXPECT_EQ(vpi_handle(vpiLhs, VpiHandleOf(&stmt)), nullptr)
+        << "kind " << stmt_kind;
   }
 
   // The two that do draw vpiRhs report none when no value is attached either.
@@ -186,7 +192,8 @@ TEST_F(AssignDeassignForceRelease, EachKindReportsNoExpressionWhenNoneIsSet) {
     stmt.type = stmt_kind;
     stmt.children = {&stray};
 
-    EXPECT_EQ(vpi_handle(vpiRhs, &stmt), nullptr) << "kind " << stmt_kind;
+    EXPECT_EQ(vpi_handle(vpiRhs, VpiHandleOf(&stmt)), nullptr)
+        << "kind " << stmt_kind;
   }
 }
 

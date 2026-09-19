@@ -2,6 +2,7 @@
 
 #include "simulator/assertion_api.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_user.h"
 
@@ -177,7 +178,7 @@ class DeferredAssertionQueueThroughVpiControl : public ::testing::Test {
 // Called on the assertion's handle, it takes the attempt and the queued reports
 // together.
 TEST_F(DeferredAssertionQueueThroughVpiControl, ResetFlushesWhatIsQueued) {
-  vpiHandle assertion = vpi_ctx_.CreateAssertion(kA, vpiAssert);
+  VpiHandle assertion = vpi_ctx_.CreateAssertion(kA, vpiAssert);
   api_.NoteAssertionAttemptStarted(kA, 10);
   api_.QueuePendingAssertionReport(kA);
   api_.QueuePendingAssertionReport(kA);
@@ -193,7 +194,7 @@ TEST_F(DeferredAssertionQueueThroughVpiControl, ResetFlushesWhatIsQueued) {
 // stops new attempts starting and leaves the ones in progress, so the reports
 // already queued "may still mature and be reported".
 TEST_F(DeferredAssertionQueueThroughVpiControl, DisableLeavesTheQueueStanding) {
-  vpiHandle assertion = vpi_ctx_.CreateAssertion(kA, vpiAssert);
+  VpiHandle assertion = vpi_ctx_.CreateAssertion(kA, vpiAssert);
   api_.NoteAssertionAttemptStarted(kA, 10);
   api_.QueuePendingAssertionReport(kA);
 

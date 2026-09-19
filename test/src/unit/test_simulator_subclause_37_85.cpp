@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -66,7 +68,7 @@ TEST_F(Generates, SizeCountsGenScopeElements) {
   array.size = 99;  // a stored width must not be reported in place of the count
   array.children = {&elem0, &not_an_element, &elem1};
 
-  EXPECT_EQ(vpi_get(vpiSize, &array), 2);
+  EXPECT_EQ(vpi_get(vpiSize, VpiHandleOf(&array)), 2);
 }
 
 // Property (-> size, int: vpiSize), detail 1, boundary: a gen scope array that
@@ -78,7 +80,7 @@ TEST_F(Generates, SizeIsZeroForEmptyGenScopeArray) {
   array.type = vpiGenScopeArray;
   array.size = 7;  // a stale stored width must not surface for an empty array
 
-  EXPECT_EQ(vpi_get(vpiSize, &array), 0);
+  EXPECT_EQ(vpi_get(vpiSize, VpiHandleOf(&array)), 0);
 }
 
 // Edge (-> access by index, vpi_handle_by_index()): a gen scope array is a
@@ -96,9 +98,9 @@ TEST_F(Generates, ElementsAccessedByIndex) {
   array.type = vpiGenScopeArray;
   array.children = {&elem0, &elem1};
 
-  EXPECT_EQ(vpi_handle_by_index(&array, 0), &elem0);
-  EXPECT_EQ(vpi_handle_by_index(&array, 1), &elem1);
-  EXPECT_EQ(vpi_handle_by_index(&array, 2), nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle_by_index(VpiHandleOf(&array), 0)), &elem0);
+  EXPECT_EQ(VpiObjectOf(vpi_handle_by_index(VpiHandleOf(&array), 1)), &elem1);
+  EXPECT_EQ(vpi_handle_by_index(VpiHandleOf(&array), 2), nullptr);
 }
 
 // Edge (-> access by index, vpi_handle_by_multi_index()): the diagram draws the
@@ -118,7 +120,9 @@ TEST_F(Generates, ElementSelectedByMultiIndex) {
   array.children = {&elem0, &elem1};
 
   int indices[] = {1};
-  EXPECT_EQ(vpi_handle_by_multi_index(&array, 1, indices), &elem1);
+  EXPECT_EQ(
+      VpiObjectOf(vpi_handle_by_multi_index(VpiHandleOf(&array), 1, indices)),
+      &elem1);
 }
 
 // Edge (vpiIndex -> expr): an array-member gen scope reaches the index
@@ -132,7 +136,8 @@ TEST_F(Generates, IndexReachesArrayMemberIndexExpression) {
   gen_scope.array_member = true;
   gen_scope.index_expr = &index_expr;
 
-  EXPECT_EQ(vpi_handle(vpiIndex, &gen_scope), &index_expr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiIndex, VpiHandleOf(&gen_scope))),
+            &index_expr);
 }
 
 // Edge (vpiIndex -> expr), gate: a gen scope that is not an element of a gen
@@ -147,7 +152,7 @@ TEST_F(Generates, IndexIsNullWhenGenScopeIsNotAnArrayMember) {
   gen_scope.array_member = false;
   gen_scope.index_expr = &stray_expr;  // present but not a locating index
 
-  EXPECT_EQ(vpi_handle(vpiIndex, &gen_scope), nullptr);
+  EXPECT_EQ(vpi_handle(vpiIndex, VpiHandleOf(&gen_scope)), nullptr);
 }
 
 // Property (-> is implicitly declared, bool: vpiImplicitDecl), detail 2: the
@@ -158,12 +163,12 @@ TEST_F(Generates, ImplicitlyDeclaredScopeReportsTrue) {
   VpiObject implicit_scope;
   implicit_scope.type = vpiGenScope;
   implicit_scope.implicit_decl = true;
-  EXPECT_EQ(vpi_get(vpiImplicitDecl, &implicit_scope), 1);
+  EXPECT_EQ(vpi_get(vpiImplicitDecl, VpiHandleOf(&implicit_scope)), 1);
 
   VpiObject named_scope;
   named_scope.type = vpiGenScope;
   named_scope.implicit_decl = false;
-  EXPECT_EQ(vpi_get(vpiImplicitDecl, &named_scope), 0);
+  EXPECT_EQ(vpi_get(vpiImplicitDecl, VpiHandleOf(&named_scope)), 0);
 }
 
 // Detail 4: a parameter declared within a gen scope is treated as a local
@@ -180,7 +185,7 @@ TEST_F(Generates, ParameterInAGenScopeIsALocalParameter) {
   plain_parameter.local_param = false;  // written as a plain parameter
   plain_parameter.parent = &gen_scope;
 
-  EXPECT_EQ(vpi_get(vpiLocalParam, &plain_parameter), 1);
+  EXPECT_EQ(vpi_get(vpiLocalParam, VpiHandleOf(&plain_parameter)), 1);
 
   // The same declaration outside a gen scope is what it was written as.
   VpiObject module;
@@ -191,7 +196,7 @@ TEST_F(Generates, ParameterInAGenScopeIsALocalParameter) {
   outside.local_param = false;
   outside.parent = &module;
 
-  EXPECT_EQ(vpi_get(vpiLocalParam, &outside), 0);
+  EXPECT_EQ(vpi_get(vpiLocalParam, VpiHandleOf(&outside)), 0);
 }
 
 // Detail 3: a reference to a gen var within the gen scope is treated as a local
@@ -209,7 +214,7 @@ TEST_F(Generates, GenVarReferenceInAGenScopeIsALocalParameter) {
   gen_var_ref.actual = &gen_var;
   gen_var_ref.parent = &gen_scope;
 
-  EXPECT_EQ(vpi_get(vpiLocalParam, &gen_var_ref), 1);
+  EXPECT_EQ(vpi_get(vpiLocalParam, VpiHandleOf(&gen_var_ref)), 1);
 
   VpiObject a_net;
   a_net.type = vpiNet;
@@ -219,7 +224,7 @@ TEST_F(Generates, GenVarReferenceInAGenScopeIsALocalParameter) {
   net_ref.actual = &a_net;
   net_ref.parent = &gen_scope;
 
-  EXPECT_EQ(vpi_get(vpiLocalParam, &net_ref), 0);
+  EXPECT_EQ(vpi_get(vpiLocalParam, VpiHandleOf(&net_ref)), 0);
 }
 
 }  // namespace

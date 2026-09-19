@@ -1,7 +1,10 @@
 #include <gtest/gtest.h>
 
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_model_helpers1.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -47,7 +50,7 @@ TEST_F(Disables, DisableReachesTaskTargetThroughVpiExpr) {
   disable.type = vpiDisable;
   disable.children = {&task};
 
-  EXPECT_EQ(vpi_handle(vpiExpr, &disable), &task);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiExpr, VpiHandleOf(&disable))), &task);
 }
 
 // vpiExpr edge, function target: the same edge reaches a disabled function.
@@ -59,7 +62,7 @@ TEST_F(Disables, DisableReachesFunctionTargetThroughVpiExpr) {
   disable.type = vpiDisable;
   disable.children = {&function};
 
-  EXPECT_EQ(vpi_handle(vpiExpr, &disable), &function);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiExpr, VpiHandleOf(&disable))), &function);
 }
 
 // vpiExpr edge, named begin target: the edge reaches a disabled named begin
@@ -73,7 +76,8 @@ TEST_F(Disables, DisableReachesNamedBeginTargetThroughVpiExpr) {
   disable.type = vpiDisable;
   disable.children = {&named_begin};
 
-  EXPECT_EQ(vpi_handle(vpiExpr, &disable), &named_begin);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiExpr, VpiHandleOf(&disable))),
+            &named_begin);
 }
 
 // vpiExpr edge, named fork target: the edge reaches a disabled named fork
@@ -86,7 +90,8 @@ TEST_F(Disables, DisableReachesNamedForkTargetThroughVpiExpr) {
   disable.type = vpiDisable;
   disable.children = {&named_fork};
 
-  EXPECT_EQ(vpi_handle(vpiExpr, &disable), &named_fork);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiExpr, VpiHandleOf(&disable))),
+            &named_fork);
 }
 
 // The edge is target-kind-directed: when the disable object also carries an
@@ -103,7 +108,8 @@ TEST_F(Disables, DisableTargetFoundAmongOtherChildren) {
   disable.type = vpiDisable;
   disable.children = {&other, &named_begin};
 
-  EXPECT_EQ(vpi_handle(vpiExpr, &disable), &named_begin);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiExpr, VpiHandleOf(&disable))),
+            &named_begin);
 }
 
 // The edge reports no scope when the disable object has no disable-target
@@ -112,7 +118,7 @@ TEST_F(Disables, DisableWithoutTargetReportsNull) {
   VpiObject disable;
   disable.type = vpiDisable;
 
-  EXPECT_EQ(vpi_handle(vpiExpr, &disable), nullptr);
+  EXPECT_EQ(vpi_handle(vpiExpr, VpiHandleOf(&disable)), nullptr);
 }
 
 // The vpiExpr relation belongs to the plain disable statement only. A disable
@@ -127,7 +133,7 @@ TEST_F(Disables, DisableForkHasNoVpiExprTarget) {
   disable_fork.type = vpiDisableFork;
   disable_fork.children = {&named_fork};
 
-  EXPECT_EQ(vpi_handle(vpiExpr, &disable_fork), nullptr);
+  EXPECT_EQ(vpi_handle(vpiExpr, VpiHandleOf(&disable_fork)), nullptr);
 }
 
 // The class: the predicate admits the two kinds the diagram draws inside the
@@ -163,7 +169,8 @@ TEST_F(Disables, EitherKindIsReachedAsTheBodyOfALoop) {
     forever_stmt.type = vpiForever;
     forever_stmt.children = {&body};
 
-    EXPECT_EQ(vpi_handle(vpiStmt, &forever_stmt), &body)
+    EXPECT_EQ(VpiObjectOf(vpi_handle(vpiStmt, VpiHandleOf(&forever_stmt))),
+              &body)
         << "disable kind " << disable_kind;
   }
 }

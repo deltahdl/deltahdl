@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -47,8 +49,8 @@ TEST_F(VpiCompatibilityLimits, AConsistentDesignRaisesNothing) {
 
   ASSERT_TRUE(vpi_ctx_.SetDefaultCompatibilityMode(vpiMode1364v2001));
 
-  ASSERT_NE(vpi_iterate(vpiVariables, &scope), nullptr);
-  SVpiErrorInfo info = {};
+  ASSERT_NE(vpi_iterate(vpiVariables, VpiHandleOf(&scope)), nullptr);
+  s_vpi_error_info info = {};
   EXPECT_EQ(vpi_chk_error(&info), 0);
 }
 
@@ -65,14 +67,14 @@ TEST_F(VpiCompatibilityLimits, AnInconsistentConstructIsReported) {
 
   ASSERT_TRUE(vpi_ctx_.SetDefaultCompatibilityMode(vpiMode1364v2001));
 
-  vpiHandle it = vpi_iterate(vpiVariables, &scope);
-  SVpiErrorInfo info = {};
+  vpiHandle it = vpi_iterate(vpiVariables, VpiHandleOf(&scope));
+  s_vpi_error_info info = {};
   EXPECT_EQ(vpi_chk_error(&info), vpiError);
 
   // §36.12.2: the mechanism does not emulate an older behavior for a construct
   // that has none, so the object the application reached is still handed back.
   ASSERT_NE(it, nullptr);
-  EXPECT_EQ(vpi_scan(it), &string_var);
+  EXPECT_EQ(VpiObjectOf(vpi_scan(it)), &string_var);
   EXPECT_EQ(vpi_scan(it), nullptr);
 }
 
@@ -87,8 +89,8 @@ TEST_F(VpiCompatibilityLimits, TheCurrentStandardReportsNothing) {
   scope.type = vpiModule;
   scope.children = {&string_var};
 
-  ASSERT_NE(vpi_iterate(vpiVariables, &scope), nullptr);
-  SVpiErrorInfo info = {};
+  ASSERT_NE(vpi_iterate(vpiVariables, VpiHandleOf(&scope)), nullptr);
+  s_vpi_error_info info = {};
   EXPECT_EQ(vpi_chk_error(&info), 0);
 }
 

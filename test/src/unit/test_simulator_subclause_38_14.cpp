@@ -2,7 +2,10 @@
 
 #include "common/arena.h"
 #include "simulator/scheduler.h"
+#include "simulator/vpi_constants.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -17,10 +20,10 @@ VpiHandle g_reset_call = nullptr;
 void* g_seen_during_reset = nullptr;
 int g_value_set_during_reset = 0;
 bool g_reset_routine_ran = false;
-int ReadAndRestoreUserData(VpiCbData*) {
+int ReadAndRestoreUserData(s_cb_data*) {
   g_reset_routine_ran = true;
-  g_seen_during_reset = vpi_get_userdata(g_reset_call);
-  vpi_put_userdata(g_reset_call, &g_value_set_during_reset);
+  g_seen_during_reset = vpi_get_userdata(VpiHandleOf(g_reset_call));
+  vpi_put_userdata(VpiHandleOf(g_reset_call), &g_value_set_during_reset);
   return 0;
 }
 
@@ -54,9 +57,9 @@ class VpiGetUserDataSim : public ::testing::Test {
 TEST_F(VpiGetUserDataSim, ReturnsValueAssociatedByPut) {
   VpiHandle call = MakeCall(vpiSysFuncCall);
   int marker = 0;
-  ASSERT_EQ(vpi_put_userdata(call, &marker), 1);
+  ASSERT_EQ(vpi_put_userdata(VpiHandleOf(call), &marker), 1);
 
-  EXPECT_EQ(vpi_get_userdata(call), &marker);
+  EXPECT_EQ(vpi_get_userdata(VpiHandleOf(call)), &marker);
   EXPECT_EQ(vpi_ctx_.LastError().level, 0);
 }
 
@@ -66,7 +69,7 @@ TEST_F(VpiGetUserDataSim, ReturnsValueAssociatedByPut) {
 TEST_F(VpiGetUserDataSim, ReturnsNullWhenNothingAssociated) {
   VpiHandle call = MakeCall(vpiSysTaskCall);
 
-  EXPECT_EQ(vpi_get_userdata(call), nullptr);
+  EXPECT_EQ(vpi_get_userdata(VpiHandleOf(call)), nullptr);
 }
 
 // §38.14 (the second 'shall', failure case): a null handle has no storage
@@ -83,7 +86,7 @@ TEST_F(VpiGetUserDataSim, ReturnsNullForNullHandle) {
 TEST_F(VpiGetUserDataSim, ReturnsNullForNonCallHandle) {
   VpiHandle module = MakeCall(kVpiModule);
 
-  EXPECT_EQ(vpi_get_userdata(module), nullptr);
+  EXPECT_EQ(vpi_get_userdata(VpiHandleOf(module)), nullptr);
   EXPECT_EQ(vpi_ctx_.LastError().level, kVpiError);
 }
 
@@ -93,12 +96,12 @@ TEST_F(VpiGetUserDataSim, ReturnsNullForNonCallHandle) {
 TEST_F(VpiGetUserDataSim, ReturnsNullAfterRestart) {
   VpiHandle call = MakeCall(vpiSysFuncCall);
   int marker = 0;
-  ASSERT_EQ(vpi_put_userdata(call, &marker), 1);
-  ASSERT_EQ(vpi_get_userdata(call), &marker);
+  ASSERT_EQ(vpi_put_userdata(VpiHandleOf(call), &marker), 1);
+  ASSERT_EQ(vpi_get_userdata(VpiHandleOf(call)), &marker);
 
   vpi_ctx_.DispatchRestart();
 
-  EXPECT_EQ(vpi_get_userdata(call), nullptr);
+  EXPECT_EQ(vpi_get_userdata(VpiHandleOf(call)), nullptr);
 }
 
 // §38.14 (the third 'shall', reset case): after a reset, a vpi_get_userdata()
@@ -107,12 +110,12 @@ TEST_F(VpiGetUserDataSim, ReturnsNullAfterRestart) {
 TEST_F(VpiGetUserDataSim, ReturnsNullAfterReset) {
   VpiHandle call = MakeCall(vpiSysFuncCall);
   int marker = 0;
-  ASSERT_EQ(vpi_put_userdata(call, &marker), 1);
-  ASSERT_EQ(vpi_get_userdata(call), &marker);
+  ASSERT_EQ(vpi_put_userdata(VpiHandleOf(call), &marker), 1);
+  ASSERT_EQ(vpi_get_userdata(VpiHandleOf(call)), &marker);
 
   vpi_ctx_.DispatchReset();
 
-  EXPECT_EQ(vpi_get_userdata(call), nullptr);
+  EXPECT_EQ(vpi_get_userdata(VpiHandleOf(call)), nullptr);
 }
 
 // §38.14's last sentence: "The user-data field can be set up again during or
@@ -123,7 +126,7 @@ TEST_F(VpiGetUserDataSim, ReturnsNullAfterReset) {
 TEST_F(VpiGetUserDataSim, AReadDuringEndOfResetStartsFromNullAndCanBeSetAgain) {
   VpiHandle call = MakeCall(vpiSysTaskCall);
   int before_reset = 0;
-  ASSERT_EQ(vpi_put_userdata(call, &before_reset), 1);
+  ASSERT_EQ(vpi_put_userdata(VpiHandleOf(call), &before_reset), 1);
 
   g_reset_call = call;
   s_cb_data cb = {};
@@ -135,8 +138,8 @@ TEST_F(VpiGetUserDataSim, AReadDuringEndOfResetStartsFromNullAndCanBeSetAgain) {
 
   ASSERT_TRUE(g_reset_routine_ran);
   EXPECT_EQ(g_seen_during_reset, nullptr);  // the clear came first
-  EXPECT_EQ(vpi_get_userdata(call), &g_value_set_during_reset);
-  EXPECT_NE(vpi_get_userdata(call), &before_reset);
+  EXPECT_EQ(vpi_get_userdata(VpiHandleOf(call)), &g_value_set_during_reset);
+  EXPECT_NE(vpi_get_userdata(VpiHandleOf(call)), &before_reset);
 }
 
 }  // namespace

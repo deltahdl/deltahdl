@@ -1,7 +1,11 @@
 #include <gtest/gtest.h>
 
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
+#include "simulator/vpi_model_helpers1.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -62,14 +66,14 @@ TEST_F(TaskFuncCall, MethodPrefixReachesAppliedObject) {
   send.type = vpiMethodFuncCall;
   send.tf_prefix = &packet;
 
-  EXPECT_EQ(vpi_handle(vpiPrefix, &send), &packet);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiPrefix, VpiHandleOf(&send))), &packet);
 
   // A plain function call is not a method call: vpiPrefix does not apply, even
   // when a prefix object happens to be set, so the gating reports NULL.
   VpiObject func;
   func.type = vpiFuncCall;
   func.tf_prefix = &packet;
-  EXPECT_EQ(vpi_handle(vpiPrefix, &func), nullptr);
+  EXPECT_EQ(vpi_handle(vpiPrefix, VpiHandleOf(&func)), nullptr);
 }
 
 // Detail 1: the vpiWith relation is available only for the methods that accept
@@ -84,7 +88,8 @@ TEST_F(TaskFuncCall, WithRelationAvailableOnlyForWithMethods) {
   randomize.type = vpiMethodFuncCall;
   randomize.tf_with = &with_expr;
   randomize.tf_with_method = true;  // a randomize/array-locator method
-  EXPECT_EQ(vpi_handle(vpiWith, &randomize), &with_expr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiWith, VpiHandleOf(&randomize))),
+            &with_expr);
 
   // An ordinary method call does not accept a with clause: the relation is
   // unavailable, so vpiWith reports NULL despite the attached object.
@@ -92,7 +97,7 @@ TEST_F(TaskFuncCall, WithRelationAvailableOnlyForWithMethods) {
   ordinary.type = vpiMethodFuncCall;
   ordinary.tf_with = &with_expr;
   ordinary.tf_with_method = false;
-  EXPECT_EQ(vpi_handle(vpiWith, &ordinary), nullptr);
+  EXPECT_EQ(vpi_handle(vpiWith, VpiHandleOf(&ordinary)), nullptr);
 }
 
 // Detail 1 (figure, second target form): the vpiWith relation admits two kinds
@@ -108,7 +113,8 @@ TEST_F(TaskFuncCall, WithRelationReachesConstraintClause) {
   randomize.type = vpiMethodFuncCall;
   randomize.tf_with = &with_constraint;
   randomize.tf_with_method = true;
-  EXPECT_EQ(vpi_handle(vpiWith, &randomize), &with_constraint);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiWith, VpiHandleOf(&randomize))),
+            &with_constraint);
 }
 
 // Detail 3: the system task or function that invoked the application is reached
@@ -118,7 +124,7 @@ TEST_F(TaskFuncCall, InvokingSystemTfCallReachedWithNullRef) {
   call.type = vpiSysTaskCall;
   ctx_.SetCurrentSystfCall(&call);
 
-  EXPECT_EQ(vpi_handle(vpiSysTfCall, nullptr), &call);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiSysTfCall, nullptr)), &call);
 
   // With no system tf call active the relation reports NULL.
   ctx_.SetCurrentSystfCall(nullptr);
@@ -131,13 +137,13 @@ TEST_F(TaskFuncCall, InvokingSystemTfCallReachedWithNullRef) {
 TEST_F(TaskFuncCall, UserSystfsRetrievedByIteration) {
   s_vpi_systf_data task = {};
   task.type = vpiSysTask;
-  task.tfname = "$as_task";
+  task.tfname = VpiText("$as_task");
   vpiHandle task_h = vpi_register_systf(&task);
   ASSERT_NE(task_h, nullptr);
 
   s_vpi_systf_data func = {};
   func.type = vpiSysFunc;
-  func.tfname = "$as_func";
+  func.tfname = VpiText("$as_func");
   vpiHandle func_h = vpi_register_systf(&func);
   ASSERT_NE(func_h, nullptr);
 
@@ -172,13 +178,13 @@ TEST_F(TaskFuncCall, UserSystfIterationIsNullWhenNoneRegistered) {
 TEST_F(TaskFuncCall, EmptyAndNullArgumentsHaveDistinctRepresentations) {
   VpiObject empty;
   VpiMakeEmptyArgument(&empty);
-  EXPECT_EQ(vpi_get(vpiType, &empty), vpiOperation);
-  EXPECT_EQ(vpi_get(vpiOpType, &empty), vpiNullOp);
+  EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(&empty)), vpiOperation);
+  EXPECT_EQ(vpi_get(vpiOpType, VpiHandleOf(&empty)), vpiNullOp);
 
   VpiObject null_arg;
   VpiMakeNullArgument(&null_arg);
-  EXPECT_EQ(vpi_get(vpiType, &null_arg), vpiConstant);
-  EXPECT_EQ(vpi_get(vpiConstType, &null_arg), vpiNullConst);
+  EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(&null_arg)), vpiConstant);
+  EXPECT_EQ(vpi_get(vpiConstType, VpiHandleOf(&null_arg)), vpiNullConst);
 
   // The vpiArgument relation reaches exprs, an interface expr, a scope, a
   // primitive, and named events; a statement or a module is not an argument.
@@ -210,7 +216,7 @@ TEST_F(TaskFuncCall, ProtectedCallStillIteratesArguments) {
   call.is_protected = true;
   call.children = {&arg0, &not_arg, &arg1};
 
-  vpiHandle it = vpi_iterate(vpiArgument, &call);
+  vpiHandle it = vpi_iterate(vpiArgument, VpiHandleOf(&call));
   ASSERT_NE(it, nullptr);
   int count = 0;
   bool saw_arg0 = false;
@@ -226,7 +232,7 @@ TEST_F(TaskFuncCall, ProtectedCallStillIteratesArguments) {
 
   // Iterating any other relation of the protected call is still an error - no
   // iterator is produced.
-  EXPECT_EQ(vpi_iterate(vpiTypespec, &call), nullptr);
+  EXPECT_EQ(vpi_iterate(vpiTypespec, VpiHandleOf(&call)), nullptr);
 }
 
 // Detail 11: a built-in method func call has no user function object, so
@@ -240,7 +246,7 @@ TEST_F(TaskFuncCall, BuiltinMethodHasNoFunctionOrTask) {
   VpiObject fn_obj;  // would be the function were this user-defined
   fn_obj.type = vpiFunction;
   builtin_fn.children = {&fn_obj};
-  EXPECT_EQ(vpi_handle(vpiFunction, &builtin_fn), nullptr);
+  EXPECT_EQ(vpi_handle(vpiFunction, VpiHandleOf(&builtin_fn)), nullptr);
 
   // A user-defined method func call reaches its function object.
   VpiObject user_fn;
@@ -249,7 +255,8 @@ TEST_F(TaskFuncCall, BuiltinMethodHasNoFunctionOrTask) {
   VpiObject user_fn_obj;
   user_fn_obj.type = vpiFunction;
   user_fn.children = {&user_fn_obj};
-  EXPECT_EQ(vpi_handle(vpiFunction, &user_fn), &user_fn_obj);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiFunction, VpiHandleOf(&user_fn))),
+            &user_fn_obj);
 
   // The same rule governs a built-in method task call through vpiTask.
   VpiObject builtin_task;
@@ -258,7 +265,7 @@ TEST_F(TaskFuncCall, BuiltinMethodHasNoFunctionOrTask) {
   VpiObject task_obj;
   task_obj.type = vpiTask;
   builtin_task.children = {&task_obj};
-  EXPECT_EQ(vpi_handle(vpiTask, &builtin_task), nullptr);
+  EXPECT_EQ(vpi_handle(vpiTask, VpiHandleOf(&builtin_task)), nullptr);
 }
 
 // Diagram property (-> type): a func call and a sys func call report their
@@ -269,19 +276,19 @@ TEST_F(TaskFuncCall, FuncTypeReportedForFunctionCalls) {
   VpiObject func;
   func.type = vpiFuncCall;
   func.func_type = vpiIntFunc;
-  EXPECT_EQ(vpi_get(vpiFuncType, &func), vpiIntFunc);
+  EXPECT_EQ(vpi_get(vpiFuncType, VpiHandleOf(&func)), vpiIntFunc);
 
   // A system function call reports through the same property (vpiSysFuncType is
   // #defined equal to vpiFuncType).
   VpiObject sys_func;
   sys_func.type = vpiSysFuncCall;
   sys_func.func_type = vpiRealFunc;
-  EXPECT_EQ(vpi_get(vpiSysFuncType, &sys_func), vpiRealFunc);
+  EXPECT_EQ(vpi_get(vpiSysFuncType, VpiHandleOf(&sys_func)), vpiRealFunc);
 
   // A call that stored no function type reports zero.
   VpiObject untyped;
   untyped.type = vpiFuncCall;
-  EXPECT_EQ(vpi_get(vpiFuncType, &untyped), 0);
+  EXPECT_EQ(vpi_get(vpiFuncType, VpiHandleOf(&untyped)), 0);
 }
 
 // Detail 5 (property): a method call and a system task/function call report
@@ -291,12 +298,12 @@ TEST_F(TaskFuncCall, UserDefnReportedForCalls) {
   VpiObject user_sys;
   user_sys.type = vpiSysTaskCall;
   user_sys.user_defined = true;
-  EXPECT_EQ(vpi_get(vpiUserDefn, &user_sys), 1);
+  EXPECT_EQ(vpi_get(vpiUserDefn, VpiHandleOf(&user_sys)), 1);
 
   VpiObject builtin_sys;
   builtin_sys.type = vpiSysFuncCall;
   builtin_sys.user_defined = false;
-  EXPECT_EQ(vpi_get(vpiUserDefn, &builtin_sys), 0);
+  EXPECT_EQ(vpi_get(vpiUserDefn, VpiHandleOf(&builtin_sys)), 0);
 }
 
 // Detail 5 / figure (method-call position): vpiUserDefn is drawn on the method
@@ -307,12 +314,12 @@ TEST_F(TaskFuncCall, UserDefnReportedForMethodCalls) {
   VpiObject user_method;
   user_method.type = vpiMethodFuncCall;
   user_method.user_defined = true;
-  EXPECT_EQ(vpi_get(vpiUserDefn, &user_method), 1);
+  EXPECT_EQ(vpi_get(vpiUserDefn, VpiHandleOf(&user_method)), 1);
 
   VpiObject builtin_method;
   builtin_method.type = vpiMethodTaskCall;
   builtin_method.user_defined = false;
-  EXPECT_EQ(vpi_get(vpiUserDefn, &builtin_method), 0);
+  EXPECT_EQ(vpi_get(vpiUserDefn, VpiHandleOf(&builtin_method)), 0);
 }
 
 // Detail 9: a system task or function call reports, through the vpiDecompile
@@ -323,19 +330,19 @@ TEST_F(TaskFuncCall, DecompileReportedForSystemCalls) {
   VpiObject call;
   call.type = vpiSysTaskCall;
   call.decompile = "$strobe(a, b)";
-  EXPECT_STREQ(vpi_get_str(vpiDecompile, &call), "$strobe(a, b)");
+  EXPECT_STREQ(vpi_get_str(vpiDecompile, VpiHandleOf(&call)), "$strobe(a, b)");
 
   // A system call with no stored decompiled form reports null.
   VpiObject bare;
   bare.type = vpiSysFuncCall;
-  EXPECT_EQ(vpi_get_str(vpiDecompile, &bare), nullptr);
+  EXPECT_EQ(vpi_get_str(vpiDecompile, VpiHandleOf(&bare)), nullptr);
 
   // The property is drawn only on system calls: an ordinary method call reports
   // null even when a decompiled string is attached.
   VpiObject method;
   method.type = vpiMethodTaskCall;
   method.decompile = "packet.send()";
-  EXPECT_EQ(vpi_get_str(vpiDecompile, &method), nullptr);
+  EXPECT_EQ(vpi_get_str(vpiDecompile, VpiHandleOf(&method)), nullptr);
 }
 
 }  // namespace

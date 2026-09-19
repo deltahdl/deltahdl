@@ -4,7 +4,9 @@
 
 #include "fixture_simulator.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -45,10 +47,10 @@ int g_module_type = 0;
 int g_nets_scanned = 0;
 bool g_iteration_found_the_net = false;
 
-int ReadFigureOneCalltf(const char*) {
+PLI_INT32 ReadFigureOneCalltf(PLI_BYTE8*) {
   // §37.4.3: an untagged one-to-one relation drawn from `net` to `module` is
   // walked with vpi_handle() and the type is the enclosure's word.
-  vpiHandle net = vpi_handle_by_name("t.m1.w", nullptr);
+  vpiHandle net = vpi_handle_by_name(VpiText("t.m1.w"), nullptr);
   if (net == nullptr) return 0;
   vpiHandle mod = vpi_handle(vpiModule, net);
   if (mod == nullptr) return 0;
@@ -108,7 +110,7 @@ class VpiDataModelDiagramKeys : public ::testing::Test {
 TEST_F(VpiDataModelDiagramKeys, FigureOneIsReadByTheThreeKeys) {
   s_vpi_systf_data data = {};
   data.type = vpiSysTask;
-  data.tfname = "$probe";
+  data.tfname = VpiText("$probe");
   data.calltf = &ReadFigureOneCalltf;
   ASSERT_NE(vpi_register_systf(&data), nullptr);
 

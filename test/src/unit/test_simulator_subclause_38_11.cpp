@@ -9,7 +9,10 @@
 #include "fixture_simulator.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -30,7 +33,7 @@ class VpiGetStringSim : public ::testing::Test {
 
 TEST_F(VpiGetStringSim, GetStrNameForModule) {
   vpi_ctx_.CreateModule("top_mod", "lib.top_mod");
-  vpiHandle h = vpi_handle_by_name("top_mod", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("top_mod"), nullptr);
   ASSERT_NE(h, nullptr);
 
   const char* name = vpi_get_str(vpiName, h);
@@ -40,7 +43,7 @@ TEST_F(VpiGetStringSim, GetStrNameForModule) {
 
 TEST_F(VpiGetStringSim, GetStrFullNameForModule) {
   vpi_ctx_.CreateModule("top_mod", "lib.top_mod");
-  vpiHandle h = vpi_handle_by_name("top_mod", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("top_mod"), nullptr);
   ASSERT_NE(h, nullptr);
 
   const char* full = vpi_get_str(vpiFullName, h);
@@ -50,7 +53,7 @@ TEST_F(VpiGetStringSim, GetStrFullNameForModule) {
 
 TEST_F(VpiGetStringSim, GetStrDefNameForModule) {
   vpi_ctx_.CreateModule("dut", "dut");
-  vpiHandle h = vpi_handle_by_name("dut", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("dut"), nullptr);
   ASSERT_NE(h, nullptr);
   const char* def = vpi_get_str(vpiDefName, h);
   ASSERT_NE(def, nullptr);
@@ -67,8 +70,8 @@ TEST_F(VpiGetStringSim, GetStrReturnsNullForNullHandle) {
 TEST_F(VpiGetStringSim, ResultBufferIsReusedByEveryCall) {
   vpi_ctx_.CreateModule("aaa", "lib.aaa");
   vpi_ctx_.CreateModule("bbb", "lib.bbb");
-  vpiHandle a = vpi_handle_by_name("aaa", nullptr);
-  vpiHandle b = vpi_handle_by_name("bbb", nullptr);
+  vpiHandle a = vpi_handle_by_name(VpiText("aaa"), nullptr);
+  vpiHandle b = vpi_handle_by_name(VpiText("bbb"), nullptr);
   ASSERT_NE(a, nullptr);
   ASSERT_NE(b, nullptr);
 
@@ -94,7 +97,7 @@ TEST_F(VpiGetStringSim, ValueStringUsesADifferentBufferFromGetStr) {
   var->value = MakeLogic4VecVal(arena_, 16, 0x4869);  // encodes "Hi"
   vpi_ctx_.Attach(sim_ctx_);
 
-  vpiHandle h = vpi_handle_by_name("v", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("v"), nullptr);
   ASSERT_NE(h, nullptr);
 
   const char* name = vpi_get_str(vpiName, h);
@@ -120,9 +123,9 @@ TEST_F(VpiGetStringSim, ProtectedObjectIsAnError) {
   mod.type = vpiModule;
   mod.is_protected = true;
 
-  EXPECT_EQ(vpi_get_str(vpiName, &mod), nullptr);
+  EXPECT_EQ(vpi_get_str(vpiName, VpiHandleOf(&mod)), nullptr);
 
-  SVpiErrorInfo info = {};
+  s_vpi_error_info info = {};
   EXPECT_NE(vpi_chk_error(&info), 0);
   EXPECT_NE(info.level, 0);
 }
@@ -152,8 +155,8 @@ TEST_F(VpiGetStringSim, ProtectedObjectIsAnError) {
 std::string g_instance_name;
 std::string g_definition_name;
 
-int ReadInstanceNamesCalltf(const char*) {
-  vpiHandle mod = vpi_handle_by_name("m1", nullptr);
+PLI_INT32 ReadInstanceNamesCalltf(PLI_BYTE8*) {
+  vpiHandle mod = vpi_handle_by_name(VpiText("m1"), nullptr);
   if (mod == nullptr) return 0;
   const char* name = vpi_get_str(vpiName, mod);
   if (name != nullptr) g_instance_name = name;
@@ -168,7 +171,7 @@ void RegisterNameProbe() {
 
   s_vpi_systf_data data = {};
   data.type = vpiSysTask;
-  data.tfname = "$probe";
+  data.tfname = VpiText("$probe");
   data.calltf = &ReadInstanceNamesCalltf;
   ASSERT_NE(vpi_register_systf(&data), nullptr);
 }

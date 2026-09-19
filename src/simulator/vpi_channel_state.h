@@ -3,7 +3,7 @@
 #include <string>
 #include <unordered_map>
 
-#include "simulator/vpi_pli_types.h"
+#include "simulator/vpi_user.h"
 
 namespace delta {
 

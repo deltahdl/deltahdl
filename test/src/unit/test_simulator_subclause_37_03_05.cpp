@@ -2,7 +2,11 @@
 
 #include "fixture_simulator.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
+#include "simulator/vpi_model_helpers1.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -45,10 +49,10 @@ TEST_F(ExpressionsWithSideEffects, GetValueEvaluatesTheSideEffect) {
   s_vpi_value value = {};
   value.format = vpiIntVal;
 
-  vpi_get_value(&call, &value);
+  vpi_get_value(VpiHandleOf(&call), &value);
   EXPECT_EQ(call.side_effect_count, 1);
 
-  vpi_get_value(&call, &value);
+  vpi_get_value(VpiHandleOf(&call), &value);
   EXPECT_EQ(call.side_effect_count, 2);
 }
 
@@ -63,7 +67,7 @@ TEST_F(ExpressionsWithSideEffects,
   s_vpi_value value = {};
   value.format = vpiIntVal;
 
-  vpi_get_value(&expr, &value);
+  vpi_get_value(VpiHandleOf(&expr), &value);
   EXPECT_EQ(expr.side_effect_count, 0);
   EXPECT_FALSE(VpiExpressionHasSideEffects(&expr));
 }
@@ -77,9 +81,9 @@ TEST_F(ExpressionsWithSideEffects, GetPropertyNeedingSideEffectEvalIsAnError) {
   call.type = vpiFuncCall;
   call.property_needs_side_effect_eval = true;
 
-  EXPECT_EQ(vpi_get(vpiSize, &call), vpiUndefined);
+  EXPECT_EQ(vpi_get(vpiSize, VpiHandleOf(&call)), vpiUndefined);
 
-  SVpiErrorInfo info = {};
+  s_vpi_error_info info = {};
   EXPECT_EQ(vpi_chk_error(&info), vpiError);
   // The side effect was not triggered: the query was refused, not evaluated.
   EXPECT_EQ(call.side_effect_count, 0);
@@ -93,9 +97,9 @@ TEST_F(ExpressionsWithSideEffects, GetTypeIsAllowedOnSuchAnExpression) {
   call.type = vpiFuncCall;
   call.property_needs_side_effect_eval = true;
 
-  EXPECT_EQ(vpi_get(vpiType, &call), vpiFuncCall);
+  EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(&call)), vpiFuncCall);
 
-  SVpiErrorInfo info = {};
+  s_vpi_error_info info = {};
   EXPECT_EQ(vpi_chk_error(&info), 0);
 }
 
@@ -109,9 +113,9 @@ TEST_F(ExpressionsWithSideEffects,
   call.type = vpiFuncCall;
   call.property_needs_side_effect_eval = true;
 
-  EXPECT_EQ(vpi_handle(vpiExpr, &call), nullptr);
+  EXPECT_EQ(vpi_handle(vpiExpr, VpiHandleOf(&call)), nullptr);
 
-  SVpiErrorInfo info = {};
+  s_vpi_error_info info = {};
   EXPECT_EQ(vpi_chk_error(&info), vpiError);
 }
 
@@ -131,9 +135,10 @@ TEST_F(ExpressionsWithSideEffects, PutValueWithSideEffectingIndexIsAnError) {
   value.format = vpiIntVal;
   value.value.integer = 1;
 
-  EXPECT_EQ(vpi_put_value(&select, &value, nullptr, vpiNoDelay), nullptr);
+  EXPECT_EQ(vpi_put_value(VpiHandleOf(&select), &value, nullptr, vpiNoDelay),
+            nullptr);
 
-  SVpiErrorInfo info = {};
+  s_vpi_error_info info = {};
   EXPECT_EQ(vpi_chk_error(&info), vpiError);
   // The refused write never evaluated the side-effecting index expression.
   EXPECT_EQ(post_inc.side_effect_count, 0);
@@ -162,9 +167,10 @@ TEST_F(ExpressionsWithSideEffects,
   value.format = vpiIntVal;
   value.value.integer = 1;
 
-  EXPECT_EQ(vpi_put_value(&select, &value, nullptr, vpiNoDelay), nullptr);
+  EXPECT_EQ(vpi_put_value(VpiHandleOf(&select), &value, nullptr, vpiNoDelay),
+            nullptr);
 
-  SVpiErrorInfo info = {};
+  s_vpi_error_info info = {};
   EXPECT_EQ(vpi_chk_error(&info), vpiError);
   EXPECT_EQ(pre_dec.side_effect_count, 0);
 }
@@ -185,9 +191,9 @@ TEST_F(ExpressionsWithSideEffects, PutValueWithPlainIndexIsNotRefused) {
   value.format = vpiIntVal;
   value.value.integer = 1;
 
-  vpi_put_value(&select, &value, nullptr, vpiNoDelay);
+  vpi_put_value(VpiHandleOf(&select), &value, nullptr, vpiNoDelay);
 
-  SVpiErrorInfo info = {};
+  s_vpi_error_info info = {};
   EXPECT_EQ(vpi_chk_error(&info), 0);
 }
 
@@ -218,7 +224,7 @@ TEST(SideEffectClassification, TheFormsTheSubclauseLists) {
 bool g_arg_has_side_effects = false;
 int g_arg_side_effect_count = -1;
 
-int ProbeArgumentCalltf(const char*) {
+PLI_INT32 ProbeArgumentCalltf(PLI_BYTE8*) {
   vpiHandle call = vpi_handle(vpiSysTfCall, nullptr);
   if (call == nullptr) return 0;
   vpiHandle itr = vpi_iterate(vpiArgument, call);
@@ -226,11 +232,11 @@ int ProbeArgumentCalltf(const char*) {
   vpiHandle arg = vpi_scan(itr);
   if (arg == nullptr) return 0;
 
-  g_arg_has_side_effects = VpiExpressionHasSideEffects(arg);
+  g_arg_has_side_effects = VpiExpressionHasSideEffects(VpiObjectOf(arg));
   s_vpi_value value = {};
   value.format = vpiIntVal;
   vpi_get_value(arg, &value);
-  g_arg_side_effect_count = arg->side_effect_count;
+  g_arg_side_effect_count = VpiObjectOf(arg)->side_effect_count;
   return 0;
 }
 
@@ -248,7 +254,7 @@ TEST(SideEffectClassification, ASystemTaskArgumentCarriesItsSideEffects) {
 
   s_vpi_systf_data data = {};
   data.type = vpiSysTask;
-  data.tfname = "$probe";
+  data.tfname = VpiText("$probe");
   data.calltf = &ProbeArgumentCalltf;
   ASSERT_NE(vpi_register_systf(&data), nullptr);
 

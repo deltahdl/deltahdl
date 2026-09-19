@@ -4,7 +4,11 @@
 #include <vector>
 
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_model_helpers2.h"
+#include "simulator/vpi_model_helpers3.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -169,18 +173,19 @@ TEST_F(NetContext, ImplicitNetDeclarationAndLineNumber) {
   VpiObject implicit_net;
   implicit_net.type = vpiNet;
   implicit_net.implicit_decl = true;
-  EXPECT_EQ(vpi_get(vpiImplicitDecl, &implicit_net), 1);
+  EXPECT_EQ(vpi_get(vpiImplicitDecl, VpiHandleOf(&implicit_net)), 1);
   EXPECT_EQ(VpiNetLineNo(true, 42), 0);
 
   // An implicit net has no declaration line, but it still maps to source text:
   // vpiFile reports the file where it is first referenced (the file recorded on
   // the net), observed through the public vpi_get_str entry point.
   implicit_net.file = "first_ref.sv";
-  EXPECT_EQ(std::string(vpi_get_str(vpiFile, &implicit_net)), "first_ref.sv");
+  EXPECT_EQ(std::string(vpi_get_str(vpiFile, VpiHandleOf(&implicit_net))),
+            "first_ref.sv");
 
   VpiObject explicit_net;
   explicit_net.type = vpiNet;
-  EXPECT_EQ(vpi_get(vpiImplicitDecl, &explicit_net), 0);
+  EXPECT_EQ(vpi_get(vpiImplicitDecl, VpiHandleOf(&explicit_net)), 0);
   EXPECT_EQ(VpiNetLineNo(false, 42), 42);
 }
 
@@ -245,14 +250,14 @@ TEST_F(NetContext, ExpandedOnNetBitReadsParentNet) {
   VpiObject bit_of_vectored;
   bit_of_vectored.type = vpiNetBit;
   bit_of_vectored.parent = &vectored_net;
-  EXPECT_EQ(vpi_get(vpiExpanded, &bit_of_vectored), 0);
+  EXPECT_EQ(vpi_get(vpiExpanded, VpiHandleOf(&bit_of_vectored)), 0);
 
   VpiObject plain_net;
   plain_net.type = vpiNet;  // neither vectored nor scalared -> expanded
   VpiObject bit_of_plain;
   bit_of_plain.type = vpiNetBit;
   bit_of_plain.parent = &plain_net;
-  EXPECT_EQ(vpi_get(vpiExpanded, &bit_of_plain), 1);
+  EXPECT_EQ(vpi_get(vpiExpanded, VpiHandleOf(&bit_of_plain)), 1);
 }
 
 // D23: vpiConstantSelect is TRUE for a net with no parent, or for a select with
@@ -396,15 +401,18 @@ TEST_F(NetContext, TypeStringForAliasedNetKinds) {
 
   VpiObject logic_net;
   logic_net.type = vpiNet;
-  EXPECT_EQ(std::string(vpi_get_str(vpiType, &logic_net)), "vpiNet");
+  EXPECT_EQ(std::string(vpi_get_str(vpiType, VpiHandleOf(&logic_net))),
+            "vpiNet");
 
   VpiObject array_net;
   array_net.type = vpiNetArray;
-  EXPECT_EQ(std::string(vpi_get_str(vpiType, &array_net)), "vpiNetArray");
+  EXPECT_EQ(std::string(vpi_get_str(vpiType, VpiHandleOf(&array_net))),
+            "vpiNetArray");
 
   VpiObject struct_net;
   struct_net.type = vpiStructNet;
-  EXPECT_EQ(std::string(vpi_get_str(vpiType, &struct_net)), "vpiStructNet");
+  EXPECT_EQ(std::string(vpi_get_str(vpiType, VpiHandleOf(&struct_net))),
+            "vpiStructNet");
 }
 
 // D28: a bit/logic net with no packed dimension and a net bit are scalars; an

@@ -36,6 +36,7 @@
 #include "simulator/sim_context.h"
 // §37.82: the VPI model reaches the $timeformat() call that set the active time
 // format, so the run stands one up as the task runs.
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_user.h"
 

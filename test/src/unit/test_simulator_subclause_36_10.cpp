@@ -3,7 +3,9 @@
 #include <cstdint>
 
 #include "fixture_simulator.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -31,13 +33,13 @@ int g_wire_type = 0;
 uint64_t g_m1_value = 0;
 uint64_t g_m2_value = 0;
 
-int InspectCalltf(const char*) {
-  vpiHandle m1_r = vpi_handle_by_name("m1.r", nullptr);
-  vpiHandle m2_r = vpi_handle_by_name("m2.r", nullptr);
+PLI_INT32 InspectCalltf(PLI_BYTE8*) {
+  vpiHandle m1_r = vpi_handle_by_name(VpiText("m1.r"), nullptr);
+  vpiHandle m2_r = vpi_handle_by_name(VpiText("m2.r"), nullptr);
   g_m1_found = m1_r != nullptr;
   g_m2_found = m2_r != nullptr;
 
-  vpiHandle m1_w = vpi_handle_by_name("m1.w", nullptr);
+  vpiHandle m1_w = vpi_handle_by_name(VpiText("m1.w"), nullptr);
   g_wire_found = m1_w != nullptr;
   if (m1_w != nullptr) g_wire_type = vpi_get(vpiType, m1_w);
 
@@ -73,7 +75,7 @@ void RegisterProbe() {
 
   s_vpi_systf_data data = {};
   data.type = vpiSysTask;
-  data.tfname = "$probe";
+  data.tfname = VpiText("$probe");
   data.calltf = &InspectCalltf;
   ASSERT_NE(vpi_register_systf(&data), nullptr);
 }

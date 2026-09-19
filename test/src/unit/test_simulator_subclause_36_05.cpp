@@ -4,7 +4,9 @@
 
 #include "fixture_simulator.h"
 #include "helpers_reported_error.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -41,7 +43,7 @@ class SystfTypes : public ::testing::Test {
 // that was made.
 int g_dual_calls = 0;
 
-int DualCalltf(const char*) {
+PLI_INT32 DualCalltf(PLI_BYTE8*) {
   ++g_dual_calls;
   return 0;
 }
@@ -54,7 +56,7 @@ void RunDual(int type, const std::string& src, SimFixture& f) {
   // one registration serves both runs and the type stays the only difference
   // between them.
   data.sysfunctype = vpiSizedFunc;
-  data.tfname = "$dual";
+  data.tfname = VpiText("$dual");
   data.calltf = DualCalltf;
   ASSERT_NE(vpi_register_systf(&data), nullptr);
 
@@ -126,7 +128,7 @@ int g_put_error_level = 0;
 // §37.42 gives the application the call it is running under, and writing a
 // value through that handle is how a system function delivers its result. This
 // application does it from a task.
-int PutThroughTheCallCalltf(const char*) {
+PLI_INT32 PutThroughTheCallCalltf(PLI_BYTE8*) {
   s_vpi_value value = {};
   value.format = vpiIntVal;
   value.value.integer = 42;
@@ -148,7 +150,7 @@ TEST_F(SystfTypes, ATaskCallRefusesAValuePutThroughIt) {
   g_put_error_level = 0;
   s_vpi_systf_data data = {};
   data.type = vpiSysTask;
-  data.tfname = "$put_from_task";
+  data.tfname = VpiText("$put_from_task");
   data.calltf = PutThroughTheCallCalltf;
   ASSERT_NE(vpi_register_systf(&data), nullptr);
 

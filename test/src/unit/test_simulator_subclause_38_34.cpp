@@ -6,7 +6,10 @@
 #include "common/types.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -32,7 +35,7 @@ TEST_F(VpiPutValueSim, PutValueNoDelay) {
   var->value = MakeLogic4VecVal(arena_, 32, 0);
   vpi_ctx_.Attach(sim_ctx_);
 
-  vpiHandle h = vpi_handle_by_name("d", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("d"), nullptr);
   ASSERT_NE(h, nullptr);
 
   s_vpi_value val = {};
@@ -49,7 +52,7 @@ TEST_F(VpiPutValueSim, PutValueInertialDelay) {
   var->value = MakeLogic4VecVal(arena_, 32, 0);
   vpi_ctx_.Attach(sim_ctx_);
 
-  vpiHandle h = vpi_handle_by_name("di", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("di"), nullptr);
   s_vpi_value val = {};
   val.format = vpiIntVal;
   val.value.integer = 88;
@@ -67,7 +70,7 @@ TEST_F(VpiPutValueSim, PutValueRealFormat) {
   var->value = MakeLogic4VecVal(arena_, 32, 0);
   vpi_ctx_.Attach(sim_ctx_);
 
-  vpiHandle h = vpi_handle_by_name("rf", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("rf"), nullptr);
   s_vpi_value val = {};
   val.format = vpiRealVal;
   val.value.real = 7.0;
@@ -82,7 +85,7 @@ TEST_F(VpiPutValueSim, PutValueScalarFormat) {
   var->value = MakeLogic4VecVal(arena_, 1, 0);
   vpi_ctx_.Attach(sim_ctx_);
 
-  vpiHandle h = vpi_handle_by_name("sf", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("sf"), nullptr);
   s_vpi_value val = {};
   val.format = vpiScalarVal;
   val.value.scalar = vpi1;
@@ -99,7 +102,7 @@ TEST_F(VpiPutValueSim, ReturnEventWithDelayReturnsSchedEventHandle) {
   var->value = MakeLogic4VecVal(arena_, 32, 0);
   vpi_ctx_.Attach(sim_ctx_);
 
-  vpiHandle h = vpi_handle_by_name("re", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("re"), nullptr);
   s_vpi_value val = {};
   val.format = vpiIntVal;
   val.value.integer = 12;
@@ -120,7 +123,7 @@ TEST_F(VpiPutValueSim, ReturnEventWithoutDelayReturnsNull) {
   var->value = MakeLogic4VecVal(arena_, 32, 0);
   vpi_ctx_.Attach(sim_ctx_);
 
-  vpiHandle h = vpi_handle_by_name("rn", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("rn"), nullptr);
   s_vpi_value val = {};
   val.format = vpiIntVal;
   val.value.integer = 3;
@@ -136,7 +139,7 @@ TEST_F(VpiPutValueSim, DelayWithoutReturnEventReturnsNull) {
   var->value = MakeLogic4VecVal(arena_, 32, 0);
   vpi_ctx_.Attach(sim_ctx_);
 
-  vpiHandle h = vpi_handle_by_name("dn", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("dn"), nullptr);
   s_vpi_value val = {};
   val.format = vpiIntVal;
   val.value.integer = 6;
@@ -155,7 +158,7 @@ TEST_F(VpiPutValueSim, PutValuePureTransportDelay) {
   var->value = MakeLogic4VecVal(arena_, 32, 0);
   vpi_ctx_.Attach(sim_ctx_);
 
-  vpiHandle h = vpi_handle_by_name("dp", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("dp"), nullptr);
   s_vpi_value val = {};
   val.format = vpiIntVal;
   val.value.integer = 55;
@@ -177,7 +180,7 @@ TEST_F(VpiPutValueSim, PutValueTransportDelay) {
   var->value = MakeLogic4VecVal(arena_, 32, 0);
   vpi_ctx_.Attach(sim_ctx_);
 
-  vpiHandle h = vpi_handle_by_name("dt", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("dt"), nullptr);
   s_vpi_value val = {};
   val.format = vpiIntVal;
   val.value.integer = 99;
@@ -199,13 +202,13 @@ TEST_F(VpiPutValueSim, NetPutOverridesResolvedValueUntilDriverChanges) {
   ASSERT_NE(net, nullptr);
   ASSERT_NE(net->resolved, nullptr);
 
-  vpiHandle h = vpi_ctx_.CreateNetObj("nw", net, 32);
+  VpiHandle h = vpi_ctx_.CreateNetObj("nw", net, 32);
   ASSERT_NE(h, nullptr);
 
   s_vpi_value val = {};
   val.format = vpiIntVal;
   val.value.integer = 123;
-  vpi_put_value(h, &val, nullptr, vpiNoDelay);
+  vpi_put_value(VpiHandleOf(h), &val, nullptr, vpiNoDelay);
   // The supplied value overrides the resolved value of the net.
   EXPECT_EQ(net->resolved->value.ToUint64(), 123u);
 
@@ -224,7 +227,7 @@ TEST_F(VpiPutValueSim, CancelEventClearsScheduled) {
   var->value = MakeLogic4VecVal(arena_, 32, 0);
   vpi_ctx_.Attach(sim_ctx_);
 
-  vpiHandle h = vpi_handle_by_name("ce", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("ce"), nullptr);
   s_vpi_value val = {};
   val.format = vpiIntVal;
   val.value.integer = 1;
@@ -248,7 +251,7 @@ TEST_F(VpiPutValueSim, CancelAlreadyOccurredIsNotError) {
   var->value = MakeLogic4VecVal(arena_, 32, 0);
   vpi_ctx_.Attach(sim_ctx_);
 
-  vpiHandle h = vpi_handle_by_name("co", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("co"), nullptr);
   s_vpi_value val = {};
   val.format = vpiIntVal;
   val.value.integer = 1;
@@ -262,7 +265,7 @@ TEST_F(VpiPutValueSim, CancelAlreadyOccurredIsNotError) {
   // Cancel once (the event leaves the queue), then cancel again: still no
   // error.
   vpi_put_value(ev, nullptr, nullptr, vpiCancelEvent);
-  SVpiErrorInfo info = {};
+  s_vpi_error_info info = {};
   vpi_put_value(ev, nullptr, nullptr, vpiCancelEvent);
   EXPECT_EQ(vpi_chk_error(&info), 0);
   EXPECT_EQ(vpi_get(vpiScheduled, ev), 0);
@@ -276,7 +279,7 @@ TEST_F(VpiPutValueSim, ForceFlagForcesValue) {
   var->value = MakeLogic4VecVal(arena_, 32, 0);
   vpi_ctx_.Attach(sim_ctx_);
 
-  vpiHandle h = vpi_handle_by_name("ff", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("ff"), nullptr);
   s_vpi_value val = {};
   val.format = vpiIntVal;
   val.value.integer = 42;
@@ -294,7 +297,7 @@ TEST_F(VpiPutValueSim, ReleaseFlagReleasesAndUpdatesValue) {
   var->value = MakeLogic4VecVal(arena_, 32, 0);
   vpi_ctx_.Attach(sim_ctx_);
 
-  vpiHandle h = vpi_handle_by_name("rl", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("rl"), nullptr);
   s_vpi_value forced = {};
   forced.format = vpiIntVal;
   forced.value.integer = 9;
@@ -318,7 +321,7 @@ TEST_F(VpiPutValueSim, NamedEventToggleAcceptsNullValue) {
   vpi_ctx_.Attach(sim_ctx_);
   vpi_ctx_.SetScheduler(&scheduler_);
 
-  vpiHandle h = vpi_handle_by_name("ne", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("ne"), nullptr);
   ASSERT_NE(h, nullptr);
 
   vpiHandle ret = vpi_put_value(h, nullptr, nullptr, vpiNoDelay);
@@ -334,13 +337,13 @@ TEST_F(VpiPutValueSim, StringFormatToRealIsIllegal) {
   var->value.is_real = true;
   vpi_ctx_.Attach(sim_ctx_);
 
-  vpiHandle h = vpi_handle_by_name("sr", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("sr"), nullptr);
   s_vpi_value val = {};
   val.format = vpiStringVal;
-  val.value.str = "hi";
+  val.value.str = VpiText("hi");
   vpi_put_value(h, &val, nullptr, vpiNoDelay);
 
-  SVpiErrorInfo info = {};
+  s_vpi_error_info info = {};
   EXPECT_EQ(vpi_chk_error(&info), vpiError);
 }
 
@@ -351,12 +354,12 @@ TEST_F(VpiPutValueSim, StrengthFormatToVectorIsIllegal) {
   var->value = MakeLogic4VecVal(arena_, 32, 0);
   vpi_ctx_.Attach(sim_ctx_);
 
-  vpiHandle h = vpi_handle_by_name("sv", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("sv"), nullptr);
   s_vpi_value val = {};
   val.format = vpiStrengthVal;
   vpi_put_value(h, &val, nullptr, vpiNoDelay);
 
-  SVpiErrorInfo info = {};
+  s_vpi_error_info info = {};
   EXPECT_EQ(vpi_chk_error(&info), vpiError);
 }
 
@@ -367,12 +370,12 @@ TEST_F(VpiPutValueSim, StrengthFormatToScalarIsNotIllegal) {
   var->value = MakeLogic4VecVal(arena_, 1, 0);
   vpi_ctx_.Attach(sim_ctx_);
 
-  vpiHandle h = vpi_handle_by_name("ss", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("ss"), nullptr);
   s_vpi_value val = {};
   val.format = vpiStrengthVal;
   vpi_put_value(h, &val, nullptr, vpiNoDelay);
 
-  SVpiErrorInfo info = {};
+  s_vpi_error_info info = {};
   EXPECT_EQ(vpi_chk_error(&info), 0);
 }
 
@@ -383,13 +386,13 @@ TEST_F(VpiPutValueSim, StringFormatToNonRealIsNotIllegal) {
   var->value = MakeLogic4VecVal(arena_, 32, 0);
   vpi_ctx_.Attach(sim_ctx_);
 
-  vpiHandle h = vpi_handle_by_name("sn", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("sn"), nullptr);
   s_vpi_value val = {};
   val.format = vpiStringVal;
-  val.value.str = "hi";
+  val.value.str = VpiText("hi");
   vpi_put_value(h, &val, nullptr, vpiNoDelay);
 
-  SVpiErrorInfo info = {};
+  s_vpi_error_info info = {};
   EXPECT_EQ(vpi_chk_error(&info), 0);
 }
 
@@ -400,13 +403,13 @@ TEST_F(VpiPutValueSim, CancelOnNonSchedEventHandleIsNoError) {
   var->value = MakeLogic4VecVal(arena_, 32, 7);
   vpi_ctx_.Attach(sim_ctx_);
 
-  vpiHandle h = vpi_handle_by_name("cn", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("cn"), nullptr);
   ASSERT_NE(h, nullptr);
 
   vpiHandle ret = vpi_put_value(h, nullptr, nullptr, vpiCancelEvent);
   EXPECT_EQ(ret, nullptr);
 
-  SVpiErrorInfo info = {};
+  s_vpi_error_info info = {};
   EXPECT_EQ(vpi_chk_error(&info), 0);
   EXPECT_EQ(var->value.ToUint64(), 7u);
 }
@@ -418,9 +421,9 @@ TEST_F(VpiPutValueSim, SequentialUdpRejectsDelayMode) {
   var->value = MakeLogic4VecVal(arena_, 1, 0);
   vpi_ctx_.Attach(sim_ctx_);
 
-  vpiHandle h = vpi_handle_by_name("up", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("up"), nullptr);
   ASSERT_NE(h, nullptr);
-  h->type = vpiSeqPrim;
+  VpiObjectOf(h)->type = vpiSeqPrim;
 
   s_vpi_value val = {};
   val.format = vpiScalarVal;
@@ -430,7 +433,7 @@ TEST_F(VpiPutValueSim, SequentialUdpRejectsDelayMode) {
   time.low = 3;
   vpi_put_value(h, &val, &time, vpiTransportDelay);
 
-  SVpiErrorInfo info = {};
+  s_vpi_error_info info = {};
   EXPECT_EQ(vpi_chk_error(&info), vpiError);
   // The rejected put left the object unchanged.
   EXPECT_EQ(var->value.words[0].aval & 1, 0u);
@@ -445,9 +448,9 @@ TEST_F(VpiPutValueSim, SequentialUdpRejectsPureTransportDelay) {
   var->value = MakeLogic4VecVal(arena_, 1, 0);
   vpi_ctx_.Attach(sim_ctx_);
 
-  vpiHandle h = vpi_handle_by_name("uq", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("uq"), nullptr);
   ASSERT_NE(h, nullptr);
-  h->type = vpiSeqPrim;
+  VpiObjectOf(h)->type = vpiSeqPrim;
 
   s_vpi_value val = {};
   val.format = vpiScalarVal;
@@ -457,7 +460,7 @@ TEST_F(VpiPutValueSim, SequentialUdpRejectsPureTransportDelay) {
   time.low = 3;
   vpi_put_value(h, &val, &time, vpiPureTransportDelay);
 
-  SVpiErrorInfo info = {};
+  s_vpi_error_info info = {};
   EXPECT_EQ(vpi_chk_error(&info), vpiError);
   EXPECT_EQ(var->value.words[0].aval & 1, 0u);
 }
@@ -471,9 +474,9 @@ TEST_F(VpiPutValueSim, SequentialUdpRejectsInertialDelay) {
   var->value = MakeLogic4VecVal(arena_, 1, 0);
   vpi_ctx_.Attach(sim_ctx_);
 
-  vpiHandle h = vpi_handle_by_name("ui", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("ui"), nullptr);
   ASSERT_NE(h, nullptr);
-  h->type = vpiSeqPrim;
+  VpiObjectOf(h)->type = vpiSeqPrim;
 
   s_vpi_value val = {};
   val.format = vpiScalarVal;
@@ -483,7 +486,7 @@ TEST_F(VpiPutValueSim, SequentialUdpRejectsInertialDelay) {
   time.low = 3;
   vpi_put_value(h, &val, &time, vpiInertialDelay);
 
-  SVpiErrorInfo info = {};
+  s_vpi_error_info info = {};
   EXPECT_EQ(vpi_chk_error(&info), vpiError);
   EXPECT_EQ(var->value.words[0].aval & 1, 0u);
 }
@@ -495,16 +498,16 @@ TEST_F(VpiPutValueSim, SequentialUdpAcceptsNoDelay) {
   var->value = MakeLogic4VecVal(arena_, 1, 0);
   vpi_ctx_.Attach(sim_ctx_);
 
-  vpiHandle h = vpi_handle_by_name("ua", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("ua"), nullptr);
   ASSERT_NE(h, nullptr);
-  h->type = vpiSeqPrim;
+  VpiObjectOf(h)->type = vpiSeqPrim;
 
   s_vpi_value val = {};
   val.format = vpiScalarVal;
   val.value.scalar = vpi1;
   vpi_put_value(h, &val, nullptr, vpiNoDelay);
 
-  SVpiErrorInfo info = {};
+  s_vpi_error_info info = {};
   EXPECT_EQ(vpi_chk_error(&info), 0);
   EXPECT_EQ(var->value.words[0].aval & 1, 1u);
 }

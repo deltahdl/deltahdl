@@ -5,7 +5,9 @@
 #include "common/arena.h"
 #include "common/types.h"
 #include "simulator/scheduler.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -82,13 +84,13 @@ TEST_F(VpiGetTimeSim, ScaledRealUsesObjectTimescale) {
   vpi_ctx_.SetSimTimeUnit(-12);  // simulation counts in 1 ps
   AdvanceTo(1000);
 
-  vpiHandle obj = vpi_ctx_.CreateModule("top", "top");
+  VpiHandle obj = vpi_ctx_.CreateModule("top", "top");
   ASSERT_NE(obj, nullptr);
   obj->time_unit = -9;  // object's timescale is 1 ns
 
   s_vpi_time out = {};
   out.type = vpiScaledRealTime;
-  vpi_get_time(obj, &out);
+  vpi_get_time(VpiHandleOf(obj), &out);
 
   EXPECT_DOUBLE_EQ(out.real, 1.0);
 }
@@ -118,12 +120,12 @@ TEST_F(VpiGetTimeSim, TimeQueueReportsNextFutureEvent) {
   vpi_get_time(nullptr, &now);
   EXPECT_EQ(now.low, 0u);
 
-  vpiHandle tq = vpi_ctx_.CreateTimeQueue();
+  VpiHandle tq = vpi_ctx_.CreateTimeQueue();
   ASSERT_NE(tq, nullptr);
 
   s_vpi_time future = {};
   future.type = vpiSimTime;
-  vpi_get_time(tq, &future);
+  vpi_get_time(VpiHandleOf(tq), &future);
   EXPECT_EQ(future.low, 50u);
 }
 
@@ -133,12 +135,12 @@ TEST_F(VpiGetTimeSim, TimeQueueUsesSimulationTimeUnit) {
   vpi_ctx_.SetSimTimeUnit(-12);
   SchedulePendingAt(1000);
 
-  vpiHandle tq = vpi_ctx_.CreateTimeQueue();
+  VpiHandle tq = vpi_ctx_.CreateTimeQueue();
   ASSERT_NE(tq, nullptr);
 
   s_vpi_time out = {};
   out.type = vpiScaledRealTime;
-  vpi_get_time(tq, &out);
+  vpi_get_time(VpiHandleOf(tq), &out);
 
   EXPECT_DOUBLE_EQ(out.real, 1000.0);
 }

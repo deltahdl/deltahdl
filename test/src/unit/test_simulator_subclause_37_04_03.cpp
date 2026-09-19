@@ -3,7 +3,10 @@
 #include <vector>
 
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_constants.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -40,7 +43,7 @@ TEST_F(VpiRelationTraversal, AOneToOneRelationIsWalkedWithVpiHandle) {
   VpiHandle mod = ctx_.CreateModule("top", "top");
   VpiHandle port = ctx_.CreatePort("p", kVpiInput, mod);
 
-  EXPECT_EQ(vpi_handle(vpiModule, port), mod);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiModule, VpiHandleOf(port))), mod);
 }
 
 // Claim (double arrow): a one-to-many relationship is walked with the iterator
@@ -51,10 +54,10 @@ TEST_F(VpiRelationTraversal, AOneToManyRelationIsWalkedWithVpiScan) {
   VpiHandle p0 = ctx_.CreatePort("p0", kVpiInput, mod);
   VpiHandle p1 = ctx_.CreatePort("p1", kVpiOutput, mod);
 
-  std::vector<vpiHandle> seen = ScanAll(vpi_iterate(vpiPort, mod));
+  std::vector<vpiHandle> seen = ScanAll(vpi_iterate(vpiPort, VpiHandleOf(mod)));
   ASSERT_EQ(seen.size(), 2u);
-  EXPECT_EQ(seen[0], p0);
-  EXPECT_EQ(seen[1], p1);
+  EXPECT_EQ(VpiObjectOf(seen[0]), p0);
+  EXPECT_EQ(VpiObjectOf(seen[1]), p1);
 }
 
 // Claim (circle, one-to-many): a relationship drawn from a circle is traversed
@@ -66,7 +69,7 @@ TEST_F(VpiRelationTraversal, ARelationFromACircleIsTraversedWithANullRef) {
 
   std::vector<vpiHandle> seen = ScanAll(vpi_iterate(vpiModule, nullptr));
   ASSERT_EQ(seen.size(), 1u);
-  EXPECT_EQ(seen[0], top);
+  EXPECT_EQ(VpiObjectOf(seen[0]), top);
 }
 
 // Claim: NULL is what a circle means, and a relationship no circle originates
@@ -81,7 +84,7 @@ TEST_F(VpiRelationTraversal, ARelationFromNoCircleIsNotTraversedFromNull) {
   mod->children.push_back(&reg);
 
   // The relationship itself is there, walked from the scope it is drawn from.
-  ASSERT_EQ(ScanAll(vpi_iterate(kVpiReg, mod)).size(), 1u);
+  ASSERT_EQ(ScanAll(vpi_iterate(kVpiReg, VpiHandleOf(mod))).size(), 1u);
 
   EXPECT_EQ(vpi_iterate(kVpiReg, nullptr), nullptr);
 }

@@ -5,8 +5,7 @@
 #include "helpers_vpi_value_array.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_object.h"
-#include "simulator/vpi_pli_types.h"
-#include "simulator/vpi_user_macros.h"
+#include "simulator/vpi_user.h"
 
 namespace delta {
 namespace {
@@ -29,7 +28,7 @@ TEST_F(VpiPutValueArraySim, MultiDimensionFillFollowsFastestVaryingIndex) {
   av.format = vpiIntVal;
   av.value.integers = ints;
   PLI_INT32 index[2] = {1, 4};
-  vpi_put_value_array(arr, &av, index, 5);
+  vpi_put_value_array(VpiHandleOf(arr), &av, index, 5);
 
   EXPECT_EQ(elems_[4]->value.words[0].aval, 11u);  // a[1][4]
   EXPECT_EQ(elems_[5]->value.words[0].aval, 12u);  // a[1][5]
@@ -56,7 +55,7 @@ TEST_F(VpiPutValueArraySim, RawFourStateValDecodesAvalAndBval) {
   av.format = vpiRawFourStateVal;
   av.value.rawvals = raw;
   PLI_INT32 index[1] = {0};
-  vpi_put_value_array(arr, &av, index, 2);
+  vpi_put_value_array(VpiHandleOf(arr), &av, index, 2);
 
   EXPECT_EQ(elems_[0]->value.words[0].aval, 0xA5u);
   EXPECT_EQ(elems_[0]->value.words[0].bval, 0x0Fu);
@@ -76,7 +75,7 @@ TEST_F(VpiPutValueArraySim, RawFourStateValIgnoresBvalForTwoStateArray) {
   av.format = vpiRawFourStateVal;
   av.value.rawvals = raw;
   PLI_INT32 index[1] = {0};
-  vpi_put_value_array(arr, &av, index, 1);
+  vpi_put_value_array(VpiHandleOf(arr), &av, index, 1);
 
   EXPECT_EQ(elems_[0]->value.words[0].aval, 0xF0u);
   EXPECT_EQ(elems_[0]->value.words[0].bval, 0x00u);  // bvalbits ignored
@@ -94,7 +93,7 @@ TEST_F(VpiPutValueArraySim, RawTwoStateValAssumesBvalZeroForFourStateArray) {
   av.format = vpiRawTwoStateVal;
   av.value.rawvals = raw;
   PLI_INT32 index[1] = {0};
-  vpi_put_value_array(arr, &av, index, 2);
+  vpi_put_value_array(VpiHandleOf(arr), &av, index, 2);
 
   EXPECT_EQ(elems_[0]->value.words[0].aval, 0x55u);
   EXPECT_EQ(elems_[0]->value.words[0].bval, 0x00u);
@@ -113,7 +112,7 @@ TEST_F(VpiPutValueArraySim, OneValueBroadcastsSingleElement) {
   av.flags = vpiOneValue;
   av.value.integers = ints;
   PLI_INT32 index[1] = {0};
-  vpi_put_value_array(arr, &av, index, 3);
+  vpi_put_value_array(VpiHandleOf(arr), &av, index, 3);
 
   EXPECT_EQ(elems_[0]->value.words[0].aval, 99u);
   EXPECT_EQ(elems_[1]->value.words[0].aval, 99u);
@@ -131,9 +130,9 @@ TEST_F(VpiPutValueArraySim, PropagateOffFlagIsAccepted) {
   av.flags = vpiPropagateOff;
   av.value.integers = ints;
   PLI_INT32 index[1] = {0};
-  vpi_put_value_array(arr, &av, index, 2);
+  vpi_put_value_array(VpiHandleOf(arr), &av, index, 2);
 
-  SVpiErrorInfo info = {};
+  s_vpi_error_info info = {};
   EXPECT_EQ(vpi_chk_error(&info), 0);
   EXPECT_EQ(elems_[0]->value.words[0].aval, 5u);
   EXPECT_EQ(elems_[1]->value.words[0].aval, 6u);
@@ -159,7 +158,7 @@ TEST_F(VpiPutValueArraySim, FanoutsOfTheWrittenElementsAreToldValuesChanged) {
   av.format = vpiIntVal;
   av.value.integers = ints;
   PLI_INT32 index[1] = {0};
-  vpi_put_value_array(arr, &av, index, 2);
+  vpi_put_value_array(VpiHandleOf(arr), &av, index, 2);
 
   EXPECT_EQ(notified[0], 1);
   EXPECT_EQ(notified[1], 1);
@@ -187,7 +186,7 @@ TEST_F(VpiPutValueArraySim, PropagateOffWithholdsThatNotificationFromThem) {
   av.flags = vpiPropagateOff;
   av.value.integers = ints;
   PLI_INT32 index[1] = {0};
-  vpi_put_value_array(arr, &av, index, 3);
+  vpi_put_value_array(VpiHandleOf(arr), &av, index, 3);
 
   EXPECT_EQ(notified, 0);
   EXPECT_EQ(elems_[0]->value.words[0].aval, 1u);
@@ -202,9 +201,9 @@ TEST_F(VpiPutValueArraySim, UnsupportedFormatIsError) {
   s_vpi_arrayvalue av = {};
   av.format = vpiBinStrVal;  // a get-only string format, not allowed here
   PLI_INT32 index[1] = {0};
-  vpi_put_value_array(arr, &av, index, 2);
+  vpi_put_value_array(VpiHandleOf(arr), &av, index, 2);
 
-  SVpiErrorInfo info = {};
+  s_vpi_error_info info = {};
   EXPECT_EQ(vpi_chk_error(&info), vpiError);
   EXPECT_EQ(elems_[0]->value.words[0].bval,
             0xFFFFFFFFu);  // unchanged (initial x masked to 32-bit width)
@@ -221,9 +220,9 @@ TEST_F(VpiPutValueArraySim, IllegalFlagIsError) {
   av.flags = vpiUserAllocFlag;  // not one of the permitted flags
   av.value.integers = ints;
   PLI_INT32 index[1] = {0};
-  vpi_put_value_array(arr, &av, index, 2);
+  vpi_put_value_array(VpiHandleOf(arr), &av, index, 2);
 
-  SVpiErrorInfo info = {};
+  s_vpi_error_info info = {};
   EXPECT_EQ(vpi_chk_error(&info), vpiError);
   EXPECT_EQ(elems_[0]->value.words[0].bval,
             0xFFFFFFFFu);  // unchanged (initial x masked to 32-bit width)
@@ -239,9 +238,9 @@ TEST_F(VpiPutValueArraySim, NonStaticArrayIsError) {
   av.format = vpiIntVal;
   av.value.integers = ints;
   PLI_INT32 index[1] = {0};
-  vpi_put_value_array(arr, &av, index, 2);
+  vpi_put_value_array(VpiHandleOf(arr), &av, index, 2);
 
-  SVpiErrorInfo info = {};
+  s_vpi_error_info info = {};
   EXPECT_EQ(vpi_chk_error(&info), vpiError);
   EXPECT_EQ(elems_[0]->value.words[0].bval,
             0xFFFFFFFFu);  // unchanged (initial x masked to 32-bit width)
@@ -262,7 +261,7 @@ TEST_F(VpiPutValueArraySim, RawFourStateValLoadsBytesLeastSignificantFirst) {
   av.format = vpiRawFourStateVal;
   av.value.rawvals = raw;
   PLI_INT32 index[1] = {0};
-  vpi_put_value_array(arr, &av, index, 1);
+  vpi_put_value_array(VpiHandleOf(arr), &av, index, 1);
 
   EXPECT_EQ(elems_[0]->value.words[0].aval, 0x1234u);
   EXPECT_EQ(elems_[0]->value.words[0].bval, 0x0000u);
@@ -282,9 +281,9 @@ TEST_F(VpiPutValueArraySim, NetArrayTargetOverridesElementValues) {
   av.format = vpiIntVal;
   av.value.integers = ints;
   PLI_INT32 index[1] = {1};
-  vpi_put_value_array(arr, &av, index, 2);
+  vpi_put_value_array(VpiHandleOf(arr), &av, index, 2);
 
-  SVpiErrorInfo info = {};
+  s_vpi_error_info info = {};
   EXPECT_EQ(vpi_chk_error(&info), 0);
   EXPECT_EQ(elems_[1]->value.words[0].aval, 44u);
   EXPECT_EQ(elems_[2]->value.words[0].aval, 55u);
@@ -302,7 +301,7 @@ TEST_F(VpiPutValueArraySim, ShortIntValWritesShortsToElements) {
   av.format = vpiShortIntVal;
   av.value.shortints = shorts;
   PLI_INT32 index[1] = {0};
-  vpi_put_value_array(arr, &av, index, 2);
+  vpi_put_value_array(VpiHandleOf(arr), &av, index, 2);
 
   EXPECT_EQ(elems_[0]->value.words[0].aval, 0x0102u);
   EXPECT_EQ(elems_[1]->value.words[0].aval, 0x0304u);
@@ -318,7 +317,7 @@ TEST_F(VpiPutValueArraySim, LongIntValWritesLongsToElements) {
   av.format = vpiLongIntVal;
   av.value.longints = longs;
   PLI_INT32 index[1] = {0};
-  vpi_put_value_array(arr, &av, index, 1);
+  vpi_put_value_array(VpiHandleOf(arr), &av, index, 1);
 
   EXPECT_EQ(elems_[0]->value.words[0].aval, 0x1122334455667788ull);
 }
@@ -333,7 +332,7 @@ TEST_F(VpiPutValueArraySim, ShortRealValWritesFloatsToElements) {
   av.format = vpiShortRealVal;
   av.value.shortreals = shortreals;
   PLI_INT32 index[1] = {0};
-  vpi_put_value_array(arr, &av, index, 2);
+  vpi_put_value_array(VpiHandleOf(arr), &av, index, 2);
 
   EXPECT_EQ(elems_[0]->value.words[0].aval, 42u);
   EXPECT_EQ(elems_[1]->value.words[0].aval, 7u);
@@ -349,7 +348,7 @@ TEST_F(VpiPutValueArraySim, RealValWritesRealsToElements) {
   av.format = vpiRealVal;
   av.value.reals = reals;
   PLI_INT32 index[1] = {0};
-  vpi_put_value_array(arr, &av, index, 2);
+  vpi_put_value_array(VpiHandleOf(arr), &av, index, 2);
 
   EXPECT_EQ(elems_[0]->value.words[0].aval, 123u);
   EXPECT_EQ(elems_[1]->value.words[0].aval, 9u);
@@ -367,7 +366,7 @@ TEST_F(VpiPutValueArraySim, TimeValWritesTimeWordsToElements) {
   av.format = vpiTimeVal;
   av.value.times = times;
   PLI_INT32 index[1] = {0};
-  vpi_put_value_array(arr, &av, index, 1);
+  vpi_put_value_array(VpiHandleOf(arr), &av, index, 1);
 
   EXPECT_EQ(elems_[0]->value.words[0].aval, (uint64_t{2} << 32) | 5u);
 }
@@ -384,7 +383,7 @@ TEST_F(VpiPutValueArraySim, VectorValWritesVecvalGroupsToElements) {
   av.format = vpiVectorVal;
   av.value.vectors = vecs;
   PLI_INT32 index[1] = {0};
-  vpi_put_value_array(arr, &av, index, 1);
+  vpi_put_value_array(VpiHandleOf(arr), &av, index, 1);
 
   EXPECT_EQ(elems_[0]->value.words[0].aval, 0xABCDu);
   EXPECT_EQ(elems_[0]->value.words[0].bval, 0x00F0u);

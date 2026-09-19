@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -60,8 +62,8 @@ TEST_F(AliasStatement, LhsAndRhsAreDistinctEdges) {
   alias_stmt.lhs = &lhs;
   alias_stmt.rhs = &rhs;
 
-  EXPECT_EQ(vpi_handle(vpiLhs, &alias_stmt), &lhs);
-  EXPECT_EQ(vpi_handle(vpiRhs, &alias_stmt), &rhs);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiLhs, VpiHandleOf(&alias_stmt))), &lhs);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiRhs, VpiHandleOf(&alias_stmt))), &rhs);
 }
 
 // Gating: the alias statement's vpiLhs / vpiRhs branches are scoped to the
@@ -80,8 +82,8 @@ TEST_F(AliasStatement, EdgesAreScopedToTheAliasStatement) {
   not_alias.lhs = &lhs;
   not_alias.rhs = &rhs;
 
-  EXPECT_EQ(vpi_handle(vpiLhs, &not_alias), nullptr);
-  EXPECT_EQ(vpi_handle(vpiRhs, &not_alias), nullptr);
+  EXPECT_EQ(vpi_handle(vpiLhs, VpiHandleOf(&not_alias)), nullptr);
+  EXPECT_EQ(vpi_handle(vpiRhs, VpiHandleOf(&not_alias)), nullptr);
 }
 
 // The untagged single arrow to `instance`: an alias statement reaches the
@@ -101,7 +103,8 @@ TEST_F(AliasStatement, AliasStatementReachesTheInstanceItIsWrittenIn) {
   alias_stmt.type = vpiAliasStmt;
   alias_stmt.parent = &block;
 
-  EXPECT_EQ(vpi_handle(vpiInstance, &alias_stmt), &module);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiInstance, VpiHandleOf(&alias_stmt))),
+            &module);
 
   // An alias statement written in a package reaches that package: the arrow is
   // drawn to the class, so every kind it groups answers it.
@@ -112,13 +115,14 @@ TEST_F(AliasStatement, AliasStatementReachesTheInstanceItIsWrittenIn) {
   package_alias.type = vpiAliasStmt;
   package_alias.parent = &package;
 
-  EXPECT_EQ(vpi_handle(vpiInstance, &package_alias), &package);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiInstance, VpiHandleOf(&package_alias))),
+            &package);
 
   // One enclosed by no instance at all reaches none.
   VpiObject orphan;
   orphan.type = vpiAliasStmt;
 
-  EXPECT_EQ(vpi_handle(vpiInstance, &orphan), nullptr);
+  EXPECT_EQ(vpi_handle(vpiInstance, VpiHandleOf(&orphan)), nullptr);
 }
 
 // The untagged double arrow back from `instance`: an instance reaches every
@@ -157,21 +161,21 @@ TEST_F(AliasStatement, InstanceIteratesTheAliasStatementsItHolds) {
   module.type = vpiModule;
   module.children = {&alias_a, &net, &alias_b, &alias_c};
 
-  vpiHandle it = vpi_iterate(vpiAliasStmt, &module);
+  vpiHandle it = vpi_iterate(vpiAliasStmt, VpiHandleOf(&module));
   ASSERT_NE(it, nullptr);
-  EXPECT_EQ(vpi_scan(it), &alias_a);
-  EXPECT_EQ(vpi_scan(it), &alias_b);
-  EXPECT_EQ(vpi_scan(it), &alias_c);
+  EXPECT_EQ(VpiObjectOf(vpi_scan(it)), &alias_a);
+  EXPECT_EQ(VpiObjectOf(vpi_scan(it)), &alias_b);
+  EXPECT_EQ(VpiObjectOf(vpi_scan(it)), &alias_c);
   EXPECT_EQ(vpi_scan(it), nullptr);
 
   // The example's right-hand side is one expression for all three, and each
   // statement keeps its own left-hand side.
-  EXPECT_EQ(vpi_handle(vpiRhs, &alias_a), &d);
-  EXPECT_EQ(vpi_handle(vpiRhs, &alias_b), &d);
-  EXPECT_EQ(vpi_handle(vpiRhs, &alias_c), &d);
-  EXPECT_EQ(vpi_handle(vpiLhs, &alias_a), &a);
-  EXPECT_EQ(vpi_handle(vpiLhs, &alias_b), &b);
-  EXPECT_EQ(vpi_handle(vpiLhs, &alias_c), &c);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiRhs, VpiHandleOf(&alias_a))), &d);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiRhs, VpiHandleOf(&alias_b))), &d);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiRhs, VpiHandleOf(&alias_c))), &d);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiLhs, VpiHandleOf(&alias_a))), &a);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiLhs, VpiHandleOf(&alias_b))), &b);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiLhs, VpiHandleOf(&alias_c))), &c);
 }
 
 // An instance holding no alias statement iterates none: the relation reports
@@ -184,7 +188,7 @@ TEST_F(AliasStatement, InstanceWithNoAliasStatementIteratesNone) {
   module.type = vpiModule;
   module.children = {&net};
 
-  EXPECT_EQ(vpi_iterate(vpiAliasStmt, &module), nullptr);
+  EXPECT_EQ(vpi_iterate(vpiAliasStmt, VpiHandleOf(&module)), nullptr);
 }
 
 }  // namespace

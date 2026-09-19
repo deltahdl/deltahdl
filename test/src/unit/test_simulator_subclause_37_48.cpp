@@ -1,7 +1,11 @@
 #include <gtest/gtest.h>
 
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_constants.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_model_helpers3.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -42,7 +46,7 @@ TEST_F(ClockingBlock, PrefixReachesVirtualInterfacePrefix) {
   block.children = {&vif};
 
   EXPECT_EQ(VpiClockingBlockPrefix(&block), &vif);
-  EXPECT_EQ(vpi_handle(vpiPrefix, &block), &vif);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiPrefix, VpiHandleOf(&block))), &vif);
 }
 
 // D2: a clocking block that is not a virtual-interface-prefixed expression has
@@ -57,7 +61,7 @@ TEST_F(ClockingBlock, PrefixIsNullWhenNotVirtualInterfacePrefixed) {
   block.children = {&event_ctrl};
 
   EXPECT_EQ(VpiClockingBlockPrefix(&block), nullptr);
-  EXPECT_EQ(vpi_handle(vpiPrefix, &block), nullptr);
+  EXPECT_EQ(vpi_handle(vpiPrefix, VpiHandleOf(&block)), nullptr);
 }
 
 // D3: vpiActual of a clocking block reaches the concrete clocking block
@@ -81,7 +85,7 @@ TEST_F(ClockingBlock, ActualReachesResolvedClockingBlockWhenPrefixHasValue) {
   block.actual = &resolved;
 
   EXPECT_EQ(VpiClockingBlockActual(&block), &resolved);
-  EXPECT_EQ(vpi_handle(vpiActual, &block), &resolved);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiActual, VpiHandleOf(&block))), &resolved);
 }
 
 // D3: when the prefix is a virtual interface that has no value at the current
@@ -101,7 +105,7 @@ TEST_F(ClockingBlock, ActualIsNullWhenVirtualInterfacePrefixHasNoValue) {
   block.actual = &resolved;  // present, but suppressed by the empty prefix
 
   EXPECT_EQ(VpiClockingBlockActual(&block), nullptr);
-  EXPECT_EQ(vpi_handle(vpiActual, &block), nullptr);
+  EXPECT_EQ(vpi_handle(vpiActual, VpiHandleOf(&block)), nullptr);
 }
 
 // D3 edge: the no-value suppression is gated on a virtual interface prefix. A
@@ -116,7 +120,7 @@ TEST_F(ClockingBlock, ActualReachesActualWhenNotVirtualInterfacePrefixed) {
   block.actual = &resolved;
 
   EXPECT_EQ(VpiClockingBlockActual(&block), &resolved);
-  EXPECT_EQ(vpi_handle(vpiActual, &block), &resolved);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiActual, VpiHandleOf(&block))), &resolved);
 }
 
 // Figure (clocking io decl -> nets / variables / ref obj): the io-decl expr
@@ -144,7 +148,7 @@ TEST_F(ClockingBlock, IODeclExprReachesNamedRefObj) {
   io_decl.children = {&ref};
 
   EXPECT_EQ(VpiClockingIODeclExpr(&io_decl), &ref);
-  EXPECT_EQ(vpi_handle(vpiExpr, &io_decl), &ref);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiExpr, VpiHandleOf(&io_decl))), &ref);
 }
 
 // D4: a clocking io decl whose only children are its skews names no expression,
@@ -158,7 +162,7 @@ TEST_F(ClockingBlock, IODeclExprIsNullWhenNothingNamed) {
   io_decl.children = {&skew};
 
   EXPECT_EQ(VpiClockingIODeclExpr(&io_decl), nullptr);
-  EXPECT_EQ(vpi_handle(vpiExpr, &io_decl), nullptr);
+  EXPECT_EQ(vpi_handle(vpiExpr, VpiHandleOf(&io_decl)), nullptr);
 }
 
 // D4 input form (figure clocking io decl -> nets): the named target need not be
@@ -177,7 +181,7 @@ TEST_F(ClockingBlock, IODeclExprReachesNamedNet) {
   io_decl.children = {&skew, &net};
 
   EXPECT_EQ(VpiClockingIODeclExpr(&io_decl), &net);
-  EXPECT_EQ(vpi_handle(vpiExpr, &io_decl), &net);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiExpr, VpiHandleOf(&io_decl))), &net);
 }
 
 // D4 input form (figure clocking io decl -> variables): the named target may be
@@ -194,7 +198,7 @@ TEST_F(ClockingBlock, IODeclExprReachesNamedVariable) {
   io_decl.children = {&var};
 
   EXPECT_EQ(VpiClockingIODeclExpr(&io_decl), &var);
-  EXPECT_EQ(vpi_handle(vpiExpr, &io_decl), &var);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiExpr, VpiHandleOf(&io_decl))), &var);
 }
 
 // D4 input form (figure clocking io decl -> variables grouping): the named
@@ -211,7 +215,7 @@ TEST_F(ClockingBlock, IODeclExprReachesVariablesGrouping) {
   io_decl.children = {&var};
 
   EXPECT_EQ(VpiClockingIODeclExpr(&io_decl), &var);
-  EXPECT_EQ(vpi_handle(vpiExpr, &io_decl), &var);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiExpr, VpiHandleOf(&io_decl))), &var);
 }
 
 // Figure (clocking block -> event control via vpiClockingEvent): the clocking
@@ -228,7 +232,8 @@ TEST_F(ClockingBlock, ClockingEventReachesEventControl) {
   block.children = {&event_ctrl};
 
   EXPECT_EQ(VpiClockingBlockClockingEvent(&block), &event_ctrl);
-  EXPECT_EQ(vpi_handle(vpiClockingEvent, &block), &event_ctrl);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiClockingEvent, VpiHandleOf(&block))),
+            &event_ctrl);
 }
 
 // Figure (clocking block -> event control): a clocking block that carries no
@@ -243,7 +248,7 @@ TEST_F(ClockingBlock, ClockingEventIsNullWhenNoEventControl) {
   block.children = {&vif};
 
   EXPECT_EQ(VpiClockingBlockClockingEvent(&block), nullptr);
-  EXPECT_EQ(vpi_handle(vpiClockingEvent, &block), nullptr);
+  EXPECT_EQ(vpi_handle(vpiClockingEvent, VpiHandleOf(&block)), nullptr);
 }
 
 // Edge: each clocking-block helper speaks only for its own object kind, so an

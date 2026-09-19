@@ -1,7 +1,10 @@
 #include <gtest/gtest.h>
 
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_model_helpers1.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -43,7 +46,8 @@ TEST_F(Program, IndexTransitionReachesArrayIndex) {
   member.array_member = true;
   member.index_expr = &index_expr;
 
-  EXPECT_EQ(vpi_handle(vpiIndex, &member), &index_expr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiIndex, VpiHandleOf(&member))),
+            &index_expr);
 }
 
 // D1: for a program that is not part of an instance array, the vpiIndex
@@ -59,7 +63,7 @@ TEST_F(Program, IndexTransitionIsNullWhenNotAnArrayElement) {
   standalone.index_expr = &stray_expr;  // present but must not be reported
   standalone.children.push_back(&stray_expr);
 
-  EXPECT_EQ(vpi_handle(vpiIndex, &standalone), nullptr);
+  EXPECT_EQ(vpi_handle(vpiIndex, VpiHandleOf(&standalone)), nullptr);
 }
 
 // -----------------------------------------------------------------------------
@@ -102,11 +106,11 @@ TEST_F(Program, AProgramIteratesTheProceduresItDeclares) {
   program.type = vpiProgram;
   program.children = {&initial, &assign, &always, &final_proc};
 
-  vpiHandle it = vpi_iterate(vpiProcess, &program);
+  vpiHandle it = vpi_iterate(vpiProcess, VpiHandleOf(&program));
   ASSERT_NE(it, nullptr);
-  EXPECT_EQ(vpi_scan(it), &initial);
-  EXPECT_EQ(vpi_scan(it), &always);
-  EXPECT_EQ(vpi_scan(it), &final_proc);
+  EXPECT_EQ(VpiObjectOf(vpi_scan(it)), &initial);
+  EXPECT_EQ(VpiObjectOf(vpi_scan(it)), &always);
+  EXPECT_EQ(VpiObjectOf(vpi_scan(it)), &final_proc);
   EXPECT_EQ(vpi_scan(it), nullptr);
 }
 
@@ -125,14 +129,14 @@ TEST_F(Program, EveryAlwaysFormIsReachedByTheOneEdge) {
   program.type = vpiProgram;
   program.children = {&comb, &latch};
 
-  vpiHandle it = vpi_iterate(vpiProcess, &program);
+  vpiHandle it = vpi_iterate(vpiProcess, VpiHandleOf(&program));
   ASSERT_NE(it, nullptr);
-  EXPECT_EQ(vpi_scan(it), &comb);
-  EXPECT_EQ(vpi_scan(it), &latch);
+  EXPECT_EQ(VpiObjectOf(vpi_scan(it)), &comb);
+  EXPECT_EQ(VpiObjectOf(vpi_scan(it)), &latch);
   EXPECT_EQ(vpi_scan(it), nullptr);
 
-  EXPECT_EQ(vpi_get(vpiAlwaysType, &comb), vpiAlwaysComb);
-  EXPECT_EQ(vpi_get(vpiAlwaysType, &latch), vpiAlwaysLatch);
+  EXPECT_EQ(vpi_get(vpiAlwaysType, VpiHandleOf(&comb)), vpiAlwaysComb);
+  EXPECT_EQ(vpi_get(vpiAlwaysType, VpiHandleOf(&latch)), vpiAlwaysLatch);
 }
 
 // §37.9 (figure): a program that declares no procedure reaches none, which
@@ -145,7 +149,7 @@ TEST_F(Program, AProgramOfNoProceduresIteratesToNone) {
   program.type = vpiProgram;
   program.children = {&assign};
 
-  EXPECT_EQ(vpi_iterate(vpiProcess, &program), nullptr);
+  EXPECT_EQ(vpi_iterate(vpiProcess, VpiHandleOf(&program)), nullptr);
 }
 
 }  // namespace

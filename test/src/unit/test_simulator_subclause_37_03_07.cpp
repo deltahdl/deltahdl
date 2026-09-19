@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -20,8 +22,8 @@ TEST(ObjectLifetimes, DefaultObjectIsStaticWithOtherScheme) {
   SetGlobalVpiContext(&ctx);
 
   VpiObject obj;
-  EXPECT_EQ(vpi_get(vpiAutomatic, &obj), 0);
-  EXPECT_EQ(vpi_get(vpiAllocScheme, &obj), vpiOtherScheme);
+  EXPECT_EQ(vpi_get(vpiAutomatic, VpiHandleOf(&obj)), 0);
+  EXPECT_EQ(vpi_get(vpiAllocScheme, VpiHandleOf(&obj)), vpiOtherScheme);
 }
 
 // L8 (true => non-static) + L12 (frame/thread => Automatic scheme): an object
@@ -34,8 +36,8 @@ TEST(ObjectLifetimes, AutomaticObjectReportsAutomaticScheme) {
   obj.automatic = true;
   obj.alloc_scheme = VpiAllocSchemeFor(VpiAllocKind::kFrameOrThread);
 
-  EXPECT_EQ(vpi_get(vpiAutomatic, &obj), 1);
-  EXPECT_EQ(vpi_get(vpiAllocScheme, &obj), vpiAutomaticScheme);
+  EXPECT_EQ(vpi_get(vpiAutomatic, VpiHandleOf(&obj)), 1);
+  EXPECT_EQ(vpi_get(vpiAllocScheme, VpiHandleOf(&obj)), vpiAutomaticScheme);
 }
 
 // L13 (dynamic memory / class object => Dynamic scheme): an object allocated
@@ -48,7 +50,7 @@ TEST(ObjectLifetimes, DynamicObjectReportsDynamicScheme) {
   obj.automatic = true;
   obj.alloc_scheme = VpiAllocSchemeFor(VpiAllocKind::kDynamic);
 
-  EXPECT_EQ(vpi_get(vpiAllocScheme, &obj), vpiDynamicScheme);
+  EXPECT_EQ(vpi_get(vpiAllocScheme, VpiHandleOf(&obj)), vpiDynamicScheme);
 }
 
 // L11 (exactly three schemes) + L12/L13/L14: the classification helper maps
@@ -76,13 +78,14 @@ TEST(ObjectLifetimes, AutomaticIsAlsoAContainerAndClassProperty) {
     VpiObject automatic_container;
     automatic_container.type = kind;
     automatic_container.automatic = true;
-    EXPECT_EQ(vpi_get(vpiAutomatic, &automatic_container), 1)
+    EXPECT_EQ(vpi_get(vpiAutomatic, VpiHandleOf(&automatic_container)), 1)
         << "kind=" << kind;
 
     VpiObject static_container;
     static_container.type = kind;
     static_container.automatic = false;
-    EXPECT_EQ(vpi_get(vpiAutomatic, &static_container), 0) << "kind=" << kind;
+    EXPECT_EQ(vpi_get(vpiAutomatic, VpiHandleOf(&static_container)), 0)
+        << "kind=" << kind;
   }
 }
 

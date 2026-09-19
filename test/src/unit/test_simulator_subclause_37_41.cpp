@@ -1,7 +1,11 @@
 #include <gtest/gtest.h>
 
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_model_helpers1.h"
+#include "simulator/vpi_model_helpers2.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -57,8 +61,8 @@ TEST_F(TaskFuncDeclaration, FunctionReturnReachesReturnCaptureVariable) {
   fn.size = 32;       // detail 1: same size as the function
   fn.return_var = &ret;
 
-  vpiHandle reached = vpi_handle(vpiReturn, &fn);
-  ASSERT_EQ(reached, &ret);
+  vpiHandle reached = vpi_handle(vpiReturn, VpiHandleOf(&fn));
+  ASSERT_EQ(VpiObjectOf(reached), &ret);
   // Detail 3: the reached object is a variable; detail 2: its type is readable
   // off the handle, which is how a user-defined return type is inspected.
   EXPECT_EQ(vpi_get(vpiType, reached), vpiIntVar);
@@ -78,7 +82,7 @@ TEST_F(TaskFuncDeclaration, ReturnRelationIsGatedToFunctions) {
   VpiObject task;
   task.type = vpiTask;
   task.return_var = &ret;
-  EXPECT_EQ(vpi_handle(vpiReturn, &task), nullptr);
+  EXPECT_EQ(vpi_handle(vpiReturn, VpiHandleOf(&task)), nullptr);
 }
 
 // Detail 4: a task or function that is not a class member reports vpiPublicVis;
@@ -106,14 +110,15 @@ TEST_F(TaskFuncDeclaration, FullNameQualifiedByPackageOrClass) {
   pkg_fn.type = vpiFunction;
   pkg_fn.name = "crc";
   pkg_fn.full_name = VpiPackageMemberFullName("pkg", "crc");
-  EXPECT_EQ(std::string(vpi_get_str(vpiFullName, &pkg_fn)), "pkg::crc");
+  EXPECT_EQ(std::string(vpi_get_str(vpiFullName, VpiHandleOf(&pkg_fn))),
+            "pkg::crc");
 
   VpiObject class_fn;
   class_fn.type = vpiFunction;
   class_fn.name = "run";
   class_fn.full_name =
       VpiClassMemberFullName(/*is_static=*/true, "top", "Driver", "run");
-  EXPECT_EQ(std::string(vpi_get_str(vpiFullName, &class_fn)),
+  EXPECT_EQ(std::string(vpi_get_str(vpiFullName, VpiHandleOf(&class_fn))),
             "top.Driver::run");
 }
 
@@ -124,18 +129,18 @@ TEST_F(TaskFuncDeclaration, DpiAccessTypeReportsImportAndExport) {
   import_fn.type = vpiFunction;
   import_fn.is_dpi = true;
   import_fn.dpi_export = false;
-  EXPECT_EQ(vpi_get(vpiAccessType, &import_fn), vpiDPIImportAcc);
+  EXPECT_EQ(vpi_get(vpiAccessType, VpiHandleOf(&import_fn)), vpiDPIImportAcc);
 
   VpiObject export_task;
   export_task.type = vpiTask;
   export_task.is_dpi = true;
   export_task.dpi_export = true;
-  EXPECT_EQ(vpi_get(vpiAccessType, &export_task), vpiDPIExportAcc);
+  EXPECT_EQ(vpi_get(vpiAccessType, VpiHandleOf(&export_task)), vpiDPIExportAcc);
 
   // A plain function is not a DPI tf, so it falls through to its stored value.
   VpiObject plain_fn;
   plain_fn.type = vpiFunction;
-  EXPECT_EQ(vpi_get(vpiAccessType, &plain_fn), 0);
+  EXPECT_EQ(vpi_get(vpiAccessType, VpiHandleOf(&plain_fn)), 0);
 }
 
 // Detail 7: vpiDPIPure reports TRUE for a pure DPI import function and FALSE
@@ -145,12 +150,12 @@ TEST_F(TaskFuncDeclaration, DpiPureReportedForPureImportFunction) {
   pure_fn.type = vpiFunction;
   pure_fn.is_dpi = true;
   pure_fn.dpi_pure = true;
-  EXPECT_EQ(vpi_get(vpiDPIPure, &pure_fn), 1);
+  EXPECT_EQ(vpi_get(vpiDPIPure, VpiHandleOf(&pure_fn)), 1);
 
   VpiObject impure_fn;
   impure_fn.type = vpiFunction;
   impure_fn.is_dpi = true;
-  EXPECT_EQ(vpi_get(vpiDPIPure, &impure_fn), 0);
+  EXPECT_EQ(vpi_get(vpiDPIPure, VpiHandleOf(&impure_fn)), 0);
 }
 
 // Detail 8: vpiDPIContext reports TRUE for a context import DPI task or
@@ -160,12 +165,12 @@ TEST_F(TaskFuncDeclaration, DpiContextReportedForContextImport) {
   ctx_fn.type = vpiFunction;
   ctx_fn.is_dpi = true;
   ctx_fn.dpi_context = true;
-  EXPECT_EQ(vpi_get(vpiDPIContext, &ctx_fn), 1);
+  EXPECT_EQ(vpi_get(vpiDPIContext, VpiHandleOf(&ctx_fn)), 1);
 
   VpiObject plain_fn;
   plain_fn.type = vpiFunction;
   plain_fn.is_dpi = true;
-  EXPECT_EQ(vpi_get(vpiDPIContext, &plain_fn), 0);
+  EXPECT_EQ(vpi_get(vpiDPIContext, VpiHandleOf(&plain_fn)), 0);
 }
 
 // Detail 9: vpiDPICStr reports vpiDPIC for a "DPI-C" tf and vpiDPI for a "DPI"
@@ -175,17 +180,17 @@ TEST_F(TaskFuncDeclaration, DpiCStrDistinguishesDpiAndDpiC) {
   dpi_c.type = vpiFunction;
   dpi_c.is_dpi = true;
   dpi_c.is_dpi_c = true;
-  EXPECT_EQ(vpi_get(vpiDPICStr, &dpi_c), vpiDPIC);
+  EXPECT_EQ(vpi_get(vpiDPICStr, VpiHandleOf(&dpi_c)), vpiDPIC);
 
   VpiObject dpi;
   dpi.type = vpiFunction;
   dpi.is_dpi = true;
   dpi.is_dpi_c = false;
-  EXPECT_EQ(vpi_get(vpiDPICStr, &dpi), vpiDPI);
+  EXPECT_EQ(vpi_get(vpiDPICStr, VpiHandleOf(&dpi)), vpiDPI);
 
   VpiObject not_dpi;
   not_dpi.type = vpiFunction;
-  EXPECT_EQ(vpi_get(vpiDPICStr, &not_dpi), 0);
+  EXPECT_EQ(vpi_get(vpiDPICStr, VpiHandleOf(&not_dpi)), 0);
 }
 
 // Detail 10: vpiDPICIdentifier reports the C linkage name of a DPI tf, and null
@@ -195,11 +200,12 @@ TEST_F(TaskFuncDeclaration, DpiCIdentifierReportsCLinkageName) {
   fn.type = vpiFunction;
   fn.is_dpi = true;
   fn.dpi_c_identifier = "c_crc32";
-  EXPECT_EQ(std::string(vpi_get_str(vpiDPICIdentifier, &fn)), "c_crc32");
+  EXPECT_EQ(std::string(vpi_get_str(vpiDPICIdentifier, VpiHandleOf(&fn))),
+            "c_crc32");
 
   VpiObject no_id;
   no_id.type = vpiFunction;
-  EXPECT_EQ(vpi_get_str(vpiDPICIdentifier, &no_id), nullptr);
+  EXPECT_EQ(vpi_get_str(vpiDPICIdentifier, VpiHandleOf(&no_id)), nullptr);
 }
 
 // Detail 12: vpiSize of a function equals the vpiSize of its return variable
@@ -236,8 +242,8 @@ TEST_F(TaskFuncDeclaration, MethodIsTrueForATaskOrFunctionOfAClass) {
   task_method.type = vpiTask;
   task_method.parent = &cls;
 
-  EXPECT_EQ(vpi_get(vpiMethod, &method), 1);
-  EXPECT_EQ(vpi_get(vpiMethod, &task_method), 1);
+  EXPECT_EQ(vpi_get(vpiMethod, VpiHandleOf(&method)), 1);
+  EXPECT_EQ(vpi_get(vpiMethod, VpiHandleOf(&task_method)), 1);
 }
 
 // The same property on a task or function declared outside a class, and on an
@@ -250,8 +256,8 @@ TEST_F(TaskFuncDeclaration, MethodIsFalseOutsideAClass) {
   fn.type = vpiFunction;
   fn.parent = &module;
 
-  EXPECT_EQ(vpi_get(vpiMethod, &fn), 0);
-  EXPECT_EQ(vpi_get(vpiMethod, &module), 0);
+  EXPECT_EQ(vpi_get(vpiMethod, VpiHandleOf(&fn)), 0);
+  EXPECT_EQ(vpi_get(vpiMethod, VpiHandleOf(&module)), 0);
 }
 
 // The figure's "-> sign / bool: vpiSigned" on the function. Detail 1 makes the
@@ -272,8 +278,8 @@ TEST_F(TaskFuncDeclaration, SignedFollowsTheReturnVariablesType) {
   unsigned_fn.type = vpiFunction;
   unsigned_fn.return_var = &unsigned_ret;
 
-  EXPECT_EQ(vpi_get(vpiSigned, &signed_fn), 1);
-  EXPECT_EQ(vpi_get(vpiSigned, &unsigned_fn), 0);
+  EXPECT_EQ(vpi_get(vpiSigned, VpiHandleOf(&signed_fn)), 1);
+  EXPECT_EQ(vpi_get(vpiSigned, VpiHandleOf(&unsigned_fn)), 0);
 }
 
 // A task returns nothing, so it has no return object to take a sign from, and
@@ -284,8 +290,8 @@ TEST_F(TaskFuncDeclaration, SignedIsFalseWithoutAReturnVariable) {
   VpiObject void_fn;
   void_fn.type = vpiFunction;  // no return_var: a void function
 
-  EXPECT_EQ(vpi_get(vpiSigned, &task), 0);
-  EXPECT_EQ(vpi_get(vpiSigned, &void_fn), 0);
+  EXPECT_EQ(vpi_get(vpiSigned, VpiHandleOf(&task)), 0);
+  EXPECT_EQ(vpi_get(vpiSigned, VpiHandleOf(&void_fn)), 0);
 }
 
 }  // namespace

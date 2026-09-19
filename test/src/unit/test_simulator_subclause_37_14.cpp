@@ -4,7 +4,11 @@
 
 #include "fixture_simulator.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
+#include "simulator/vpi_model_helpers3.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -52,7 +56,7 @@ TEST_F(PortContext, PortTypeReportedThroughVpiGet) {
   VpiObject port;
   port.type = vpiPort;
   port.port_type = vpiModportPort;
-  EXPECT_EQ(vpi_get(vpiPortType, &port), vpiModportPort);
+  EXPECT_EQ(vpi_get(vpiPortType, VpiHandleOf(&port)), vpiModportPort);
 }
 
 // D2: the delay routines are not applicable to an interface port.
@@ -67,9 +71,9 @@ TEST_F(PortContext, GetDelaysOnInterfacePortIsAnError) {
   iface_port.type = vpiPort;
   iface_port.port_type = vpiInterfacePort;
 
-  VpiDelay delay = {};
+  s_vpi_delay delay = {};
   delay.no_of_delays = 1;
-  vpi_get_delays(&iface_port, &delay);
+  vpi_get_delays(VpiHandleOf(&iface_port), &delay);
   // The interface-port guard fires first; its message identifies the ground for
   // the error, distinguishing it from the generic no-of-delays legality check.
   EXPECT_NE(ctx_.LastError().level, 0);
@@ -87,21 +91,21 @@ TEST_F(PortContext, HighConnAndLowConnReachDesignatedConnections) {
   port.type = vpiPort;
   port.high_conn = &high;
   port.low_conn = &low;
-  EXPECT_EQ(vpi_handle(vpiHighConn, &port), &high);
-  EXPECT_EQ(vpi_handle(vpiLowConn, &port), &low);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiHighConn, VpiHandleOf(&port))), &high);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiLowConn, VpiHandleOf(&port))), &low);
 
   // D10: an instance with no connection to the port -> NULL highConn.
   VpiObject unconnected;
   unconnected.type = vpiPort;
   unconnected.low_conn = &low;
-  EXPECT_EQ(vpi_handle(vpiHighConn, &unconnected), nullptr);
+  EXPECT_EQ(vpi_handle(vpiHighConn, VpiHandleOf(&unconnected)), nullptr);
 
   // D10: a null port -> NULL lowConn, even if a stored pointer were present.
   VpiObject null_port;
   null_port.type = vpiPort;
   null_port.null_port = true;
   null_port.low_conn = &low;
-  EXPECT_EQ(vpi_handle(vpiLowConn, &null_port), nullptr);
+  EXPECT_EQ(vpi_handle(vpiLowConn, VpiHandleOf(&null_port)), nullptr);
   EXPECT_EQ(VpiLowConn(&null_port), nullptr);
 }
 
@@ -145,14 +149,14 @@ TEST_F(PortContext, ScalarAndVectorFollowPortWidth) {
   VpiObject scalar_port;
   scalar_port.type = vpiPort;
   scalar_port.size = 1;
-  EXPECT_EQ(vpi_get(vpiScalar, &scalar_port), 1);
-  EXPECT_EQ(vpi_get(vpiVector, &scalar_port), 0);
+  EXPECT_EQ(vpi_get(vpiScalar, VpiHandleOf(&scalar_port)), 1);
+  EXPECT_EQ(vpi_get(vpiVector, VpiHandleOf(&scalar_port)), 0);
 
   VpiObject vector_port;
   vector_port.type = vpiPort;
   vector_port.size = 16;
-  EXPECT_EQ(vpi_get(vpiScalar, &vector_port), 0);
-  EXPECT_EQ(vpi_get(vpiVector, &vector_port), 1);
+  EXPECT_EQ(vpi_get(vpiScalar, VpiHandleOf(&vector_port)), 0);
+  EXPECT_EQ(vpi_get(vpiVector, VpiHandleOf(&vector_port)), 1);
 }
 
 // D7: vpiPortIndex and vpiName apply to a whole port but not to a port bit.
@@ -164,8 +168,8 @@ TEST_F(PortContext, PortIndexAndNameDoNotApplyToPortBit) {
   port_bit.type = vpiPortBit;
   port_bit.index = 3;
   port_bit.name = "b";
-  EXPECT_EQ(vpi_get(vpiPortIndex, &port_bit), vpiUndefined);
-  EXPECT_EQ(vpi_get_str(vpiName, &port_bit), nullptr);
+  EXPECT_EQ(vpi_get(vpiPortIndex, VpiHandleOf(&port_bit)), vpiUndefined);
+  EXPECT_EQ(vpi_get_str(vpiName, VpiHandleOf(&port_bit)), nullptr);
 }
 
 // D8: an explicitly named port returns its explicit name; failing that, an
@@ -181,8 +185,8 @@ TEST_F(PortContext, ExplicitNameResolution) {
   named_port.type = vpiPort;
   named_port.name = "p";
   named_port.explicit_name = true;
-  EXPECT_EQ(vpi_get(vpiExplicitName, &named_port), 1);
-  EXPECT_STREQ(vpi_get_str(vpiName, &named_port), "p");
+  EXPECT_EQ(vpi_get(vpiExplicitName, VpiHandleOf(&named_port)), 1);
+  EXPECT_STREQ(vpi_get_str(vpiName, VpiHandleOf(&named_port)), "p");
 }
 
 // D8 (remaining arms, through the vpi_get_str dispatch path): a port that was
@@ -194,13 +198,13 @@ TEST_F(PortContext, PortNameThroughVpiGetStrForInferredAndUnnamed) {
   inferred_port.type = vpiPort;
   inferred_port.name = "q";
   inferred_port.explicit_name = false;
-  EXPECT_EQ(vpi_get(vpiExplicitName, &inferred_port), 0);
-  EXPECT_STREQ(vpi_get_str(vpiName, &inferred_port), "q");
+  EXPECT_EQ(vpi_get(vpiExplicitName, VpiHandleOf(&inferred_port)), 0);
+  EXPECT_STREQ(vpi_get_str(vpiName, VpiHandleOf(&inferred_port)), "q");
 
   // No name at all -> NULL.
   VpiObject unnamed_port;
   unnamed_port.type = vpiPort;  // name left empty
-  EXPECT_EQ(vpi_get_str(vpiName, &unnamed_port), nullptr);
+  EXPECT_EQ(vpi_get_str(vpiName, VpiHandleOf(&unnamed_port)), nullptr);
 }
 
 // D9: vpiPortIndex gives the port order; the first port has index zero. The
@@ -211,9 +215,9 @@ TEST_F(PortContext, PortIndexGivesDeclarationOrder) {
   VpiHandle first = ctx_.CreatePort("a", vpiInput, &parent);
   VpiHandle second = ctx_.CreatePort("b", vpiOutput, &parent);
   VpiHandle third = ctx_.CreatePort("c", vpiInput, &parent);
-  EXPECT_EQ(vpi_get(vpiPortIndex, first), 0);
-  EXPECT_EQ(vpi_get(vpiPortIndex, second), 1);
-  EXPECT_EQ(vpi_get(vpiPortIndex, third), 2);
+  EXPECT_EQ(vpi_get(vpiPortIndex, VpiHandleOf(first)), 0);
+  EXPECT_EQ(vpi_get(vpiPortIndex, VpiHandleOf(second)), 1);
+  EXPECT_EQ(vpi_get(vpiPortIndex, VpiHandleOf(third)), 2);
 }
 
 // D11: vpiSize for a null port is 0; any other port reports its bit width.
@@ -225,12 +229,12 @@ TEST_F(PortContext, NullPortSizeIsZero) {
   null_port.type = vpiPort;
   null_port.null_port = true;
   null_port.size = 8;  // ignored for a null port
-  EXPECT_EQ(vpi_get(vpiSize, &null_port), 0);
+  EXPECT_EQ(vpi_get(vpiSize, VpiHandleOf(&null_port)), 0);
 
   VpiObject sized_port;
   sized_port.type = vpiPort;
   sized_port.size = 8;
-  EXPECT_EQ(vpi_get(vpiSize, &sized_port), 8);
+  EXPECT_EQ(vpi_get(vpiSize, VpiHandleOf(&sized_port)), 8);
 }
 
 // -----------------------------------------------------------------------------
@@ -250,8 +254,8 @@ int g_wide_port_vector = -1;
 int g_wide_port_size = 0;
 int g_narrow_port_scalar = -1;
 
-int WalkPortsCalltf(const char*) {
-  vpiHandle mod = vpi_handle_by_name("m1", nullptr);
+PLI_INT32 WalkPortsCalltf(PLI_BYTE8*) {
+  vpiHandle mod = vpi_handle_by_name(VpiText("m1"), nullptr);
   if (mod == nullptr) return 0;
   vpiHandle ports = vpi_iterate(vpiPort, mod);
   if (ports == nullptr) return 0;
@@ -287,7 +291,7 @@ void RegisterPortProbe() {
 
   s_vpi_systf_data data = {};
   data.type = vpiSysTask;
-  data.tfname = "$probe";
+  data.tfname = VpiText("$probe");
   data.calltf = &WalkPortsCalltf;
   ASSERT_NE(vpi_register_systf(&data), nullptr);
 }

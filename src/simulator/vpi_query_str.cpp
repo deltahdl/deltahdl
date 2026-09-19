@@ -18,7 +18,12 @@
 #include <string>
 
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_constants.h"
+#include "simulator/vpi_context.h"
+#include "simulator/vpi_internal.h"
+#include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_model_helpers3.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -416,7 +421,8 @@ const char* VpiContext::GetStrRaw(int property, VpiHandle obj) {
   if (obj->is_protected && property != kVpiType && property != vpiIsProtected) {
     last_error_.state = kVpiPLI;
     last_error_.level = kVpiError;
-    last_error_.message = "vpi_get_str() on a protected object is an error";
+    last_error_.message =
+        VpiText("vpi_get_str() on a protected object is an error");
     return nullptr;
   }
   return VpiGetStrRawProperty(property, obj);

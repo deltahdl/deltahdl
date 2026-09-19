@@ -2,7 +2,9 @@
 
 #include <type_traits>
 
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -35,16 +37,16 @@ namespace {
 void RegisterTaskAndFunction() {
   s_vpi_systf_data task = {};
   task.type = vpiSysTask;
-  task.tfname = "$list_nets";
+  task.tfname = VpiText("$list_nets");
   vpi_register_systf(&task);
 
   s_vpi_systf_data func = {};
   func.type = vpiSysFunc;
-  func.tfname = "$my_random";
+  func.tfname = VpiText("$my_random");
   vpi_register_systf(&func);
 }
 
-int ReportCpuAtEnd(VpiCbData*) { return 0; }
+int ReportCpuAtEnd(s_cb_data*) { return 0; }
 
 // A routine that performs "any other desired task" rather than registering a
 // system task or function: it installs an end-of-simulation callback, mirroring

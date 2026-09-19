@@ -16,12 +16,17 @@
 #include "simulator/sim_context.h"
 #include "simulator/vpi_coverage.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_user.h"
 // §37.10 detail 3: the package/interface/program instance kinds are defined in
 // the SystemVerilog VPI header alongside the §37.10 vpiInstance relation.
 #include "simulator/sv_vpi_user.h"
 #include "simulator/variable.h"
+#include "simulator/vpi_constants.h"
+#include "simulator/vpi_context.h"
+#include "simulator/vpi_data_structs.h"
+#include "simulator/vpi_object.h"
 
 namespace delta {
 
@@ -178,7 +183,7 @@ int VpiContext::ControlCoverage(int operation, int coverage_type,
   }
 }
 
-bool VpiContext::ChkError(VpiErrorInfo* info) {
+bool VpiContext::ChkError(s_vpi_error_info* info) {
   if (!info) return last_error_.level != 0;
   *info = last_error_;
   return last_error_.level != 0;
@@ -274,9 +279,9 @@ int VpiBuildArgvArray(const std::vector<std::string>& words, int depth,
 // in the NULL the clause requires, so it is one longer than its entries. The
 // pointer a vendor file option is followed by is left for VpiLinkArgvArrays,
 // which needs every array's place before it can name one.
-void VpiPlaceArgvArrays(const std::vector<std::string>& pool,
+void VpiPlaceArgvArrays(std::vector<std::string>& pool,
                         std::vector<VpiArgvArray>* arrays,
-                        std::vector<const char*>* argv) {
+                        std::vector<PLI_BYTE8*>* argv) {
   size_t offset = 0;
   for (size_t k = 0; k < arrays->size(); ++k) {
     (*arrays)[k].offset = offset;
@@ -286,7 +291,7 @@ void VpiPlaceArgvArrays(const std::vector<std::string>& pool,
   for (const VpiArgvArray& array : *arrays) {
     size_t at = array.offset;
     for (const VpiArgvEntry& entry : array.entries) {
-      if (entry.nested_array < 0) (*argv)[at] = pool[entry.word].c_str();
+      if (entry.nested_array < 0) (*argv)[at] = pool[entry.word].data();
       ++at;
     }
   }
@@ -296,15 +301,15 @@ void VpiPlaceArgvArrays(const std::vector<std::string>& pool,
 // NULL-terminated array of pointers to characters" - the pointer is written
 // here, once the array it reaches has a place of its own in the report.
 void VpiLinkArgvArrays(const std::vector<VpiArgvArray>& arrays,
-                       std::vector<const char*>* argv) {
+                       std::vector<PLI_BYTE8*>* argv) {
   for (const VpiArgvArray& array : arrays) {
     size_t at = array.offset;
     for (const VpiArgvEntry& entry : array.entries) {
       if (entry.nested_array >= 0) {
-        const char** nested =
+        PLI_BYTE8** nested =
             argv->data() +
             arrays[static_cast<size_t>(entry.nested_array)].offset;
-        (*argv)[at] = reinterpret_cast<const char*>(nested);
+        (*argv)[at] = reinterpret_cast<PLI_BYTE8*>(nested);
       }
       ++at;
     }
@@ -313,7 +318,7 @@ void VpiLinkArgvArrays(const std::vector<VpiArgvArray>& arrays,
 
 }  // namespace
 
-bool VpiContext::GetVlogInfo(VpiVlogInfo* info) {
+bool VpiContext::GetVlogInfo(s_vpi_vlog_info* info) {
   // §38.17: a null result structure cannot receive the information, so the
   // routine fails.
   if (!info) return false;
@@ -334,8 +339,8 @@ bool VpiContext::GetVlogInfo(VpiVlogInfo* info) {
 
   info->argc = static_cast<int>(arrays.empty() ? 0 : arrays[0].entries.size());
   info->argv = invocation_argv_.empty() ? nullptr : invocation_argv_.data();
-  info->product = product_.c_str();
-  info->version = version_.c_str();
+  info->product = VpiText(product_.data());
+  info->version = version_.data();
   return true;
 }
 
@@ -390,9 +395,9 @@ VpiHandle VpiContext::HandleMulti(int type, VpiHandle ref1, VpiHandle ref2) {
   if (InterModPathSizeMismatch(type, ref1, ref2)) {
     last_error_.state = kVpiPLI;
     last_error_.level = kVpiError;
-    last_error_.message =
+    last_error_.message = VpiText(
         "vpi_handle_multi(): the two ports of an intermodule path must be of "
-        "the same size";
+        "the same size");
     return nullptr;
   }
 
@@ -561,7 +566,7 @@ void VpiContext::ReleaseHandleWithCallbacks(VpiObject* object) {
   object->released = true;
   for (VpiObject* cb : cb_handles_) {
     if (cb->index >= 0 && cb->index < static_cast<int>(callbacks_.size()) &&
-        CompareObjects(callbacks_[cb->index].obj, object) != 0) {
+        CompareObjects(VpiObjectOf(callbacks_[cb->index].obj), object) != 0) {
       cb->released = true;
     }
   }
@@ -788,7 +793,7 @@ bool VpiContext::RoutineIsUnavailableNow(VpiRoutine routine) {
   last_error_.state = kVpiPLI;
   last_error_.level = kVpiError;
   last_error_.message =
-      "VPI routine is not available until cbEndOfCompile; only "
+      VpiText("VPI routine is not available until cbEndOfCompile); only "
       "vpi_register_systf() and vpi_register_cb() may be called before then";
   return true;
 }
@@ -848,7 +853,7 @@ bool VpiSystfNameIsValid(const char* tfname) {
   return true;
 }
 
-int VpiSystfReturnType(const VpiSystfData& data) {
+int VpiSystfReturnType(const s_vpi_systf_data& data) {
   // §38.37.1: sysfunctype shall only be used when type is set to vpiSysFunc, so
   // it names a return-value kind only for a system function; a system task has
   // no return-value kind.
@@ -864,22 +869,22 @@ bool VpiSystfCallbackFiresAtBuild(VpiSystfCallback callback) {
          callback == VpiSystfCallback::kSizetf;
 }
 
-int VpiSystfInvoke(int (*routine)(const char*), void* user_data) {
+int VpiSystfInvoke(PLI_INT32 (*routine)(PLI_BYTE8*), PLI_BYTE8* user_data) {
   // §38.37.1: the only argument passed to a compiletf/sizetf/calltf routine is
   // the user_data field, typed as PLI_BYTE8 * (char *). One or more of the
   // routine fields may be null when not needed, so a null pointer is skipped.
   if (routine == nullptr) return 0;
-  return routine(static_cast<const char*>(user_data));
+  return routine(user_data);
 }
 
-bool VpiSystfSizetfIsCalled(const VpiSystfData& data) {
+bool VpiSystfSizetfIsCalled(const s_vpi_systf_data& data) {
   // §38.37.1: the sizetf application shall only be called if the type is
   // vpiSysFunc and the sysfunctype is vpiSizedFunc or vpiSizedSignedFunc.
   return data.type == kVpiSysFunc && (data.sysfunctype == kVpiSizedFunc ||
                                       data.sysfunctype == kVpiSizedSignedFunc);
 }
 
-int VpiContext::SystfResultSizeBits(const VpiSystfData& data) {
+int VpiContext::SystfResultSizeBits(const s_vpi_systf_data& data) {
   // The registration this record is, if it is one of ours. Compared by address
   // rather than by content: two registrations may carry identical fields, and
   // §36.8.1 counts sizetf calls per registration.
@@ -894,7 +899,7 @@ int VpiContext::SystfResultSizeBits(const VpiSystfData& data) {
   return VpiSystfResultSizeBits(data);
 }
 
-int VpiSystfResultSizeBits(const VpiSystfData& data) {
+int VpiSystfResultSizeBits(const s_vpi_systf_data& data) {
   // §38.37.1: a sized system function takes its width from the sizetf
   // application when one is provided; with no sizetf it returns 32 bits.
   if (VpiSystfSizetfIsCalled(data) && data.sizetf != nullptr) {

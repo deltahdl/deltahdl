@@ -4,7 +4,11 @@
 
 #include "fixture_simulator.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
+#include "simulator/vpi_model_helpers2.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -153,14 +157,15 @@ int g_non_threads_seen = 0;
 int g_threads_with_a_parent = 0;
 int g_spawned_total = 0;
 
-int InspectThreadsCalltf(const char*) {
+PLI_INT32 InspectThreadsCalltf(PLI_BYTE8*) {
   vpiHandle threads = vpi_iterate(vpiThread, nullptr);
   if (threads == nullptr) return 0;
   for (vpiHandle t = vpi_scan(threads); t != nullptr; t = vpi_scan(threads)) {
     ++g_threads_seen;
     if (vpi_get(vpiType, t) != vpiThread) ++g_non_threads_seen;
-    if (VpiThreadParent(t) != nullptr) ++g_threads_with_a_parent;
-    g_spawned_total += static_cast<int>(VpiThreadThreads(t).size());
+    if (VpiThreadParent(VpiObjectOf(t)) != nullptr) ++g_threads_with_a_parent;
+    g_spawned_total +=
+        static_cast<int>(VpiThreadThreads(VpiObjectOf(t)).size());
   }
   return 0;
 }
@@ -173,7 +178,7 @@ void RegisterThreadProbe() {
 
   s_vpi_systf_data data = {};
   data.type = vpiSysTask;
-  data.tfname = "$probe";
+  data.tfname = VpiText("$probe");
   data.calltf = &InspectThreadsCalltf;
   ASSERT_NE(vpi_register_systf(&data), nullptr);
 }

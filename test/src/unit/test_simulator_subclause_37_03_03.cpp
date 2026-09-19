@@ -4,7 +4,11 @@
 
 #include "fixture_simulator.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
+#include "simulator/vpi_model_helpers3.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -36,7 +40,7 @@ TEST_F(VpiFileAndLineProperty, GetLineNoReturnsTheObjectsSourceLine) {
   net.type = vpiNet;
   net.line_no = 42;
 
-  EXPECT_EQ(vpi_get(vpiLineNo, &net), 42);
+  EXPECT_EQ(vpi_get(vpiLineNo, VpiHandleOf(&net)), 42);
 }
 
 // Claim: an object that corresponds to source text reports its source file
@@ -46,7 +50,7 @@ TEST_F(VpiFileAndLineProperty, GetStrFileReturnsTheObjectsSourceFile) {
   reg.type = vpiReg;
   reg.file = "design.sv";
 
-  const char* file = vpi_get_str(vpiFile, &reg);
+  const char* file = vpi_get_str(vpiFile, VpiHandleOf(&reg));
   ASSERT_NE(file, nullptr);
   EXPECT_EQ(std::string(file), "design.sv");
 }
@@ -63,7 +67,7 @@ TEST_F(VpiFileAndLineProperty, ExceptedKindsHaveNoLineNo) {
     obj.type = type;
     obj.line_no =
         99;  // present in the model, but not a valid query for this kind
-    EXPECT_EQ(vpi_get(vpiLineNo, &obj), vpiUndefined)
+    EXPECT_EQ(vpi_get(vpiLineNo, VpiHandleOf(&obj)), vpiUndefined)
         << "object type " << type << " must not report a vpiLineNo";
   }
 }
@@ -79,7 +83,7 @@ TEST_F(VpiFileAndLineProperty, ExceptedKindsHaveNoFile) {
     VpiObject obj;
     obj.type = type;
     obj.file = "ignored.sv";  // stored, yet not reportable for this kind
-    EXPECT_EQ(vpi_get_str(vpiFile, &obj), nullptr)
+    EXPECT_EQ(vpi_get_str(vpiFile, VpiHandleOf(&obj)), nullptr)
         << "object type " << type << " must not report a vpiFile";
     EXPECT_FALSE(VpiHasLocationProperties(type));
   }
@@ -104,19 +108,19 @@ int g_var_line = 0;
 int g_top_net_line = 0;
 int g_port_line = 0;
 
-int ReadLocationsCalltf(const char*) {
-  vpiHandle net = vpi_handle_by_name("m1.w", nullptr);
+PLI_INT32 ReadLocationsCalltf(PLI_BYTE8*) {
+  vpiHandle net = vpi_handle_by_name(VpiText("m1.w"), nullptr);
   if (net != nullptr) {
     g_net_line = vpi_get(vpiLineNo, net);
     const char* file = vpi_get_str(vpiFile, net);
     if (file != nullptr) g_net_file = file;
   }
-  vpiHandle var = vpi_handle_by_name("m1.r", nullptr);
+  vpiHandle var = vpi_handle_by_name(VpiText("m1.r"), nullptr);
   if (var != nullptr) g_var_line = vpi_get(vpiLineNo, var);
-  vpiHandle top_net = vpi_handle_by_name("top_sig", nullptr);
+  vpiHandle top_net = vpi_handle_by_name(VpiText("top_sig"), nullptr);
   if (top_net != nullptr) g_top_net_line = vpi_get(vpiLineNo, top_net);
 
-  vpiHandle mod = vpi_handle_by_name("m1", nullptr);
+  vpiHandle mod = vpi_handle_by_name(VpiText("m1"), nullptr);
   if (mod == nullptr) return 0;
   vpiHandle itr = vpi_iterate(vpiPort, mod);
   if (itr == nullptr) return 0;
@@ -136,7 +140,7 @@ void RegisterLocationProbe() {
 
   s_vpi_systf_data data = {};
   data.type = vpiSysTask;
-  data.tfname = "$probe";
+  data.tfname = VpiText("$probe");
   data.calltf = &ReadLocationsCalltf;
   ASSERT_NE(vpi_register_systf(&data), nullptr);
 }

@@ -6,7 +6,12 @@
 #include "common/types.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
+#include "simulator/vpi_constants.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
+#include "simulator/vpi_model_helpers3.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -53,12 +58,12 @@ TEST_F(PrimitivePrimTerm, SizeReportsNumberOfInputs) {
   VpiObject prim;
   prim.type = vpiPrimitive;
   prim.size = 3;  // a three-input primitive
-  EXPECT_EQ(vpi_get(vpiSize, &prim), 3);
+  EXPECT_EQ(vpi_get(vpiSize, VpiHandleOf(&prim)), 3);
 
   VpiObject gate;
   gate.type = vpiGate;
   gate.size = 2;
-  EXPECT_EQ(vpi_get(vpiSize, &gate), 2);
+  EXPECT_EQ(vpi_get(vpiSize, VpiHandleOf(&gate)), 2);
 }
 
 // D3: a prim term reports its terminal index through vpiTermIndex, which fixes
@@ -76,9 +81,9 @@ TEST_F(PrimitivePrimTerm, TermIndexReportsTerminalOrder) {
   third.index = 2;
 
   // The first terminal has term index zero.
-  EXPECT_EQ(vpi_get(vpiTermIndex, &first), 0);
-  EXPECT_EQ(vpi_get(vpiTermIndex, &second), 1);
-  EXPECT_EQ(vpi_get(vpiTermIndex, &third), 2);
+  EXPECT_EQ(vpi_get(vpiTermIndex, VpiHandleOf(&first)), 0);
+  EXPECT_EQ(vpi_get(vpiTermIndex, VpiHandleOf(&second)), 1);
+  EXPECT_EQ(vpi_get(vpiTermIndex, VpiHandleOf(&third)), 2);
 }
 
 // D4: vpiIndex from a primitive that is an element of a primitive array reaches
@@ -92,7 +97,8 @@ TEST_F(PrimitivePrimTerm, IndexTransitionReachesArrayIndex) {
   member.array_member = true;
   member.index_expr = &index_expr;
 
-  EXPECT_EQ(vpi_handle(vpiIndex, &member), &index_expr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiIndex, VpiHandleOf(&member))),
+            &index_expr);
 }
 
 // D4: for a primitive that is not part of a primitive array, the vpiIndex
@@ -108,7 +114,7 @@ TEST_F(PrimitivePrimTerm, IndexTransitionIsNullWhenNotAnArrayElement) {
   standalone.index_expr = &stray_expr;  // present but must not be reported
   standalone.children.push_back(&stray_expr);
 
-  EXPECT_EQ(vpi_handle(vpiIndex, &standalone), nullptr);
+  EXPECT_EQ(vpi_handle(vpiIndex, VpiHandleOf(&standalone)), nullptr);
 }
 
 // D2: vpi_put_value() applied to a primitive that is not a sequential UDP - a
@@ -123,10 +129,11 @@ TEST_F(PrimitivePrimTerm, PutValueRejectedOnNonSequentialPrimitive) {
     s_vpi_value val = {};
     val.format = vpiScalarVal;
     val.value.scalar = vpi1;
-    vpiHandle ret = vpi_put_value(&prim, &val, nullptr, vpiNoDelay);
+    vpiHandle ret =
+        vpi_put_value(VpiHandleOf(&prim), &val, nullptr, vpiNoDelay);
     EXPECT_EQ(ret, nullptr) << "kind " << kind;
 
-    SVpiErrorInfo info = {};
+    s_vpi_error_info info = {};
     EXPECT_EQ(vpi_chk_error(&info), vpiError) << "kind " << kind;
   }
 }
@@ -139,16 +146,16 @@ TEST_F(PrimitivePrimTerm, PutValueAcceptedOnSequentialUdp) {
   var->value = MakeLogic4VecVal(arena_, 1, 0);
   vpi_ctx_.Attach(sim_ctx_);
 
-  vpiHandle h = vpi_handle_by_name("seq", nullptr);
+  vpiHandle h = vpi_handle_by_name(VpiText("seq"), nullptr);
   ASSERT_NE(h, nullptr);
-  h->type = vpiSeqPrim;
+  VpiObjectOf(h)->type = vpiSeqPrim;
 
   s_vpi_value val = {};
   val.format = vpiScalarVal;
   val.value.scalar = vpi1;
   vpi_put_value(h, &val, nullptr, vpiNoDelay);
 
-  SVpiErrorInfo info = {};
+  s_vpi_error_info info = {};
   EXPECT_EQ(vpi_chk_error(&info), 0);
   EXPECT_EQ(var->value.words[0].aval & 1, 1u);
 }
@@ -193,11 +200,11 @@ TEST_F(PrimitivePrimTerm, AModuleIteratesThePrimitivesItInstantiates) {
   mod.type = kVpiModule;
   mod.children = {&gate, &net, &switch_prim, &udp};
 
-  vpiHandle it = vpi_iterate(vpiPrimitive, &mod);
+  vpiHandle it = vpi_iterate(vpiPrimitive, VpiHandleOf(&mod));
   ASSERT_NE(it, nullptr);
-  EXPECT_EQ(vpi_scan(it), &gate);
-  EXPECT_EQ(vpi_scan(it), &switch_prim);
-  EXPECT_EQ(vpi_scan(it), &udp);
+  EXPECT_EQ(VpiObjectOf(vpi_scan(it)), &gate);
+  EXPECT_EQ(VpiObjectOf(vpi_scan(it)), &switch_prim);
+  EXPECT_EQ(VpiObjectOf(vpi_scan(it)), &udp);
   EXPECT_EQ(vpi_scan(it), nullptr);
 }
 
@@ -213,7 +220,7 @@ TEST_F(PrimitivePrimTerm, APrimTermReachesThePrimitiveItBelongsTo) {
   term.parent = &udp;
   udp.children.push_back(&term);
 
-  EXPECT_EQ(vpi_handle(vpiPrimitive, &term), &udp);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiPrimitive, VpiHandleOf(&term))), &udp);
 }
 
 // §37.35 (figure): an object standing in no such relationship reaches no
@@ -226,8 +233,8 @@ TEST_F(PrimitivePrimTerm, AnObjectWithNoPrimitiveReachesNone) {
   mod.type = kVpiModule;
   mod.children = {&net};
 
-  EXPECT_EQ(vpi_handle(vpiPrimitive, &mod), nullptr);
-  EXPECT_EQ(vpi_iterate(vpiPrimitive, &mod), nullptr);
+  EXPECT_EQ(vpi_handle(vpiPrimitive, VpiHandleOf(&mod)), nullptr);
+  EXPECT_EQ(vpi_iterate(vpiPrimitive, VpiHandleOf(&mod)), nullptr);
 }
 
 }  // namespace

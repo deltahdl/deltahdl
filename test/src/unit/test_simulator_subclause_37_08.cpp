@@ -1,7 +1,10 @@
 #include <gtest/gtest.h>
 
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_constants.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -35,7 +38,7 @@ TEST_F(InterfaceTfDecl, ForkJoinAccessTypeReportedVerbatim) {
   tf_decl.type = vpiInterfaceTfDecl;
   tf_decl.access_type = vpiForkJoinAcc;
 
-  EXPECT_EQ(vpi_get(vpiAccessType, &tf_decl), vpiForkJoinAcc);
+  EXPECT_EQ(vpi_get(vpiAccessType, VpiHandleOf(&tf_decl)), vpiForkJoinAcc);
 }
 
 // D2: an extern access type is the other legal value and is also reported back
@@ -45,7 +48,7 @@ TEST_F(InterfaceTfDecl, ExternAccessTypeReportedVerbatim) {
   tf_decl.type = vpiInterfaceTfDecl;
   tf_decl.access_type = vpiExternAcc;
 
-  EXPECT_EQ(vpi_get(vpiAccessType, &tf_decl), vpiExternAcc);
+  EXPECT_EQ(vpi_get(vpiAccessType, VpiHandleOf(&tf_decl)), vpiExternAcc);
 }
 
 // D2: any other stored value is not a legal access type for an interface tf
@@ -55,12 +58,12 @@ TEST_F(InterfaceTfDecl, OutOfDomainAccessTypeCollapsesToUndefined) {
   VpiObject odd;
   odd.type = vpiInterfaceTfDecl;
   odd.access_type = 99;  // neither vpiForkJoinAcc nor vpiExternAcc
-  EXPECT_EQ(vpi_get(vpiAccessType, &odd), vpiUndefined);
+  EXPECT_EQ(vpi_get(vpiAccessType, VpiHandleOf(&odd)), vpiUndefined);
 
   VpiObject unset;
   unset.type = vpiInterfaceTfDecl;
   unset.access_type = 0;  // default, still not a legal access type
-  EXPECT_EQ(vpi_get(vpiAccessType, &unset), vpiUndefined);
+  EXPECT_EQ(vpi_get(vpiAccessType, VpiHandleOf(&unset)), vpiUndefined);
 }
 
 // D2 scope guard: the interface-tf-decl clamp is keyed on the object type, so
@@ -71,7 +74,7 @@ TEST_F(InterfaceTfDecl, ClampIsScopedToInterfaceTfDecl) {
   VpiObject task;
   task.type = vpiTask;
   task.access_type = 99;  // would be clamped if the guard were not type-keyed
-  EXPECT_EQ(vpi_get(vpiAccessType, &task), 99);
+  EXPECT_EQ(vpi_get(vpiAccessType, VpiHandleOf(&task)), 99);
 }
 
 // The property is drawn on the interface tf decl, on §37.34's constraint and on
@@ -82,7 +85,7 @@ TEST_F(InterfaceTfDecl, AnObjectDrawnWithNoAccessTypeReportsNone) {
   VpiObject net;
   net.type = kVpiNet;
   net.access_type = 99;
-  EXPECT_EQ(vpi_get(vpiAccessType, &net), vpiUndefined);
+  EXPECT_EQ(vpi_get(vpiAccessType, VpiHandleOf(&net)), vpiUndefined);
 }
 
 }  // namespace

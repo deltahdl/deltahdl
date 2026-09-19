@@ -1,7 +1,10 @@
 #include <gtest/gtest.h>
 
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_model_helpers1.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -50,7 +53,8 @@ TEST_F(IfIfElse, IfStatementReachesConditionThroughVpiCondition) {
   if_stmt.type = vpiIf;
   if_stmt.children = {&condition, &then_body};
 
-  EXPECT_EQ(vpi_handle(vpiCondition, &if_stmt), &condition);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiCondition, VpiHandleOf(&if_stmt))),
+            &condition);
 }
 
 // vpiCondition edge: an if-else statement reaches its condition the same way -
@@ -69,7 +73,8 @@ TEST_F(IfIfElse, IfElseStatementReachesConditionThroughVpiCondition) {
   if_else.type = vpiIfElse;
   if_else.children = {&condition, &then_body, &else_body};
 
-  EXPECT_EQ(vpi_handle(vpiCondition, &if_else), &condition);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiCondition, VpiHandleOf(&if_else))),
+            &condition);
 }
 
 // vpiCondition edge: the condition is found even when a body statement precedes
@@ -86,7 +91,8 @@ TEST_F(IfIfElse, ConditionFoundWhenItFollowsABodyChild) {
   if_stmt.type = vpiIf;
   if_stmt.children = {&then_body, &condition};
 
-  EXPECT_EQ(vpi_handle(vpiCondition, &if_stmt), &condition);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiCondition, VpiHandleOf(&if_stmt))),
+            &condition);
 }
 
 // vpiCondition edge is scoped to the conditional statements: asking some other
@@ -101,7 +107,7 @@ TEST_F(IfIfElse, VpiConditionIsScopedToConditionalStatements) {
   other.type = vpiRepeatControl;
   other.children = {&expr};
 
-  EXPECT_EQ(vpi_handle(vpiCondition, &other), nullptr);
+  EXPECT_EQ(vpi_handle(vpiCondition, VpiHandleOf(&other)), nullptr);
 }
 
 // vpiCondition edge, no-condition edge case: a conditional statement that
@@ -117,8 +123,9 @@ TEST_F(IfIfElse, ConditionIsNullWhenNoExpressionChild) {
   if_stmt.type = vpiIf;
   if_stmt.children = {&then_body};
 
-  EXPECT_EQ(vpi_handle(vpiStmt, &if_stmt), &then_body);
-  EXPECT_EQ(vpi_handle(vpiCondition, &if_stmt), nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiStmt, VpiHandleOf(&if_stmt))),
+            &then_body);
+  EXPECT_EQ(vpi_handle(vpiCondition, VpiHandleOf(&if_stmt)), nullptr);
 }
 
 // Then-branch edge (the enclosure's unlabeled arrow to `stmt`): an if-else
@@ -139,7 +146,8 @@ TEST_F(IfIfElse, ThenBodyReachedByTheKindTheStmtClassGroups) {
   if_else.type = vpiIfElse;
   if_else.children = {&condition, &then_body, &else_body};
 
-  EXPECT_EQ(vpi_handle(vpiStmt, &if_else), &then_body);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiStmt, VpiHandleOf(&if_else))),
+            &then_body);
 }
 
 // Then-branch edge: the arrow is drawn from the enclosure, so a plain if
@@ -158,7 +166,8 @@ TEST_F(IfIfElse, PlainIfReachesEachKindAThenBranchCarries) {
     if_stmt.type = vpiIf;
     if_stmt.children = {&condition, &then_body};
 
-    EXPECT_EQ(vpi_handle(vpiStmt, &if_stmt), &then_body)
+    EXPECT_EQ(VpiObjectOf(vpi_handle(vpiStmt, VpiHandleOf(&if_stmt))),
+              &then_body)
         << "then-branch kind " << body_kind;
   }
 }
@@ -180,8 +189,10 @@ TEST_F(IfIfElse, IfElseStatementReachesElseBranchThroughVpiElseStmt) {
   if_else.type = vpiIfElse;
   if_else.children = {&condition, &then_body, &else_body};
 
-  EXPECT_EQ(vpi_handle(vpiStmt, &if_else), &then_body);
-  EXPECT_EQ(vpi_handle(vpiElseStmt, &if_else), &else_body);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiStmt, VpiHandleOf(&if_else))),
+            &then_body);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiElseStmt, VpiHandleOf(&if_else))),
+            &else_body);
 }
 
 // vpiElseStmt edge: an else-branch written as a nested if - the else-if chain
@@ -202,8 +213,10 @@ TEST_F(IfIfElse, ElseBranchWrittenAsANestedConditionalIsTheSecondStatement) {
   if_else.type = vpiIfElse;
   if_else.children = {&condition, &then_body, &else_body};
 
-  EXPECT_EQ(vpi_handle(vpiStmt, &if_else), &then_body);
-  EXPECT_EQ(vpi_handle(vpiElseStmt, &if_else), &else_body);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiStmt, VpiHandleOf(&if_else))),
+            &then_body);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiElseStmt, VpiHandleOf(&if_else))),
+            &else_body);
 }
 
 // vpiElseStmt is drawn only from the if-else: a plain if reports no else branch
@@ -223,7 +236,7 @@ TEST_F(IfIfElse, PlainIfReportsNoElseStatement) {
   if_stmt.type = vpiIf;
   if_stmt.children = {&condition, &then_body, &second_body};
 
-  EXPECT_EQ(vpi_handle(vpiElseStmt, &if_stmt), nullptr);
+  EXPECT_EQ(vpi_handle(vpiElseStmt, VpiHandleOf(&if_stmt)), nullptr);
 }
 
 // vpiElseStmt edge: an if-else carrying only a then branch reports no else
@@ -240,7 +253,7 @@ TEST_F(IfIfElse, ElseStatementIsNullWhenNoElseBranch) {
   if_else.type = vpiIfElse;
   if_else.children = {&condition, &then_body};
 
-  EXPECT_EQ(vpi_handle(vpiElseStmt, &if_else), nullptr);
+  EXPECT_EQ(vpi_handle(vpiElseStmt, VpiHandleOf(&if_else)), nullptr);
   EXPECT_EQ(VpiIfElseStmt(nullptr), nullptr);
 }
 
@@ -252,17 +265,17 @@ TEST_F(IfIfElse, ConditionalStatementReportsQualifier) {
   VpiObject if_stmt;
   if_stmt.type = vpiIf;
   if_stmt.qualifier = vpiUniqueQualifier;
-  EXPECT_EQ(vpi_get(vpiQualifier, &if_stmt), vpiUniqueQualifier);
+  EXPECT_EQ(vpi_get(vpiQualifier, VpiHandleOf(&if_stmt)), vpiUniqueQualifier);
 
   VpiObject if_else;
   if_else.type = vpiIfElse;
   if_else.qualifier = vpiPriorityQualifier;
-  EXPECT_EQ(vpi_get(vpiQualifier, &if_else), vpiPriorityQualifier);
+  EXPECT_EQ(vpi_get(vpiQualifier, VpiHandleOf(&if_else)), vpiPriorityQualifier);
 
   // An if statement written with no qualifier reports the "none" sentinel.
   VpiObject plain_if;
   plain_if.type = vpiIf;
-  EXPECT_EQ(vpi_get(vpiQualifier, &plain_if), vpiNoQualifier);
+  EXPECT_EQ(vpi_get(vpiQualifier, VpiHandleOf(&plain_if)), vpiNoQualifier);
 }
 
 }  // namespace

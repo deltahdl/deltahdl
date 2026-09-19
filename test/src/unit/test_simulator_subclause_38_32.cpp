@@ -2,7 +2,11 @@
 
 #include "fixture_simulator.h"
 #include "helpers_vpi_delays_fixture.h"
+#include "simulator/vpi_constants.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -25,7 +29,7 @@ TEST_F(VpiPutDelaysSim, SetsDelaysInSourceOrder) {
   delay.da = da;
   delay.no_of_delays = 3;
   delay.time_type = vpiScaledRealTime;
-  vpi_put_delays(prim, &delay);
+  vpi_put_delays(VpiHandleOf(prim), &delay);
 
   // Read the stored delays back via vpi_get_delays() to confirm they landed in
   // order.
@@ -34,7 +38,7 @@ TEST_F(VpiPutDelaysSim, SetsDelaysInSourceOrder) {
   get.da = out;
   get.no_of_delays = 3;
   get.time_type = vpiScaledRealTime;
-  vpi_get_delays(prim, &get);
+  vpi_get_delays(VpiHandleOf(prim), &get);
   EXPECT_DOUBLE_EQ(out[0].real, 11.0);
   EXPECT_DOUBLE_EQ(out[1].real, 22.0);
   EXPECT_DOUBLE_EQ(out[2].real, 33.0);
@@ -55,14 +59,14 @@ TEST_F(VpiPutDelaysSim, TimeTypeControlsSourceFormat) {
   delay.da = da;
   delay.no_of_delays = 2;
   delay.time_type = vpiSimTime;
-  vpi_put_delays(prim, &delay);
+  vpi_put_delays(VpiHandleOf(prim), &delay);
 
   s_vpi_time out[2] = {};
   s_vpi_delay get = {};
   get.da = out;
   get.no_of_delays = 2;
   get.time_type = vpiScaledRealTime;
-  vpi_get_delays(prim, &get);
+  vpi_get_delays(VpiHandleOf(prim), &get);
   EXPECT_DOUBLE_EQ(out[0].real, 7.0);
   EXPECT_DOUBLE_EQ(out[1].real, 9.0);
 }
@@ -84,7 +88,7 @@ TEST_F(VpiPutDelaysSim, DelayOnlyPutPreservesPulseLimits) {
   delay.da = da;
   delay.no_of_delays = 1;
   delay.time_type = vpiScaledRealTime;
-  vpi_put_delays(path, &delay);
+  vpi_put_delays(VpiHandleOf(path), &delay);
 
   // Read back with pulsere set: delay updated, reject/error unchanged.
   s_vpi_time out[3] = {};
@@ -93,7 +97,7 @@ TEST_F(VpiPutDelaysSim, DelayOnlyPutPreservesPulseLimits) {
   get.no_of_delays = 1;
   get.time_type = vpiScaledRealTime;
   get.pulsere_flag = 1;
-  vpi_get_delays(path, &get);
+  vpi_get_delays(VpiHandleOf(path), &get);
   EXPECT_DOUBLE_EQ(out[0].real, 99.0);  // delay altered
   EXPECT_DOUBLE_EQ(out[1].real, 40.0);  // reject limit retained
   EXPECT_DOUBLE_EQ(out[2].real, 80.0);  // error limit retained
@@ -113,7 +117,7 @@ TEST_F(VpiPutDelaysSim, MtmFlagConsumesMinTypMax) {
   delay.no_of_delays = 2;
   delay.time_type = vpiScaledRealTime;
   delay.mtm_flag = 1;
-  vpi_put_delays(prim, &delay);
+  vpi_put_delays(VpiHandleOf(prim), &delay);
 
   s_vpi_time out[6] = {};
   s_vpi_delay get = {};
@@ -121,7 +125,7 @@ TEST_F(VpiPutDelaysSim, MtmFlagConsumesMinTypMax) {
   get.no_of_delays = 2;
   get.time_type = vpiScaledRealTime;
   get.mtm_flag = 1;
-  vpi_get_delays(prim, &get);
+  vpi_get_delays(VpiHandleOf(prim), &get);
   for (int i = 0; i < 6; ++i)
     EXPECT_DOUBLE_EQ(out[i].real, static_cast<double>(i + 1)) << "entry " << i;
 }
@@ -140,7 +144,7 @@ TEST_F(VpiPutDelaysSim, MtmAndPulsereConsumeNineElements) {
   delay.time_type = vpiScaledRealTime;
   delay.mtm_flag = 1;
   delay.pulsere_flag = 1;
-  vpi_put_delays(path, &delay);
+  vpi_put_delays(VpiHandleOf(path), &delay);
 
   s_vpi_time out[9] = {};
   s_vpi_delay get = {};
@@ -149,7 +153,7 @@ TEST_F(VpiPutDelaysSim, MtmAndPulsereConsumeNineElements) {
   get.time_type = vpiScaledRealTime;
   get.mtm_flag = 1;
   get.pulsere_flag = 1;
-  vpi_get_delays(path, &get);
+  vpi_get_delays(VpiHandleOf(path), &get);
   for (int i = 0; i < 9; ++i)
     EXPECT_DOUBLE_EQ(out[i].real, static_cast<double>(i + 1)) << "entry " << i;
 }
@@ -169,7 +173,7 @@ TEST_F(VpiPutDelaysSim, IllegalNoOfDelaysIsRejected) {
   delay.da = da;
   delay.no_of_delays = 4;  // not 2 or 3 -> illegal for a primitive
   delay.time_type = vpiScaledRealTime;
-  vpi_put_delays(prim, &delay);
+  vpi_put_delays(VpiHandleOf(prim), &delay);
 
   EXPECT_EQ(vpi_ctx_.LastError().level, kVpiError);
 
@@ -179,7 +183,7 @@ TEST_F(VpiPutDelaysSim, IllegalNoOfDelaysIsRejected) {
   get.da = out;
   get.no_of_delays = 3;
   get.time_type = vpiScaledRealTime;
-  vpi_get_delays(prim, &get);
+  vpi_get_delays(VpiHandleOf(prim), &get);
   EXPECT_DOUBLE_EQ(out[0].real, 5.0);  // unchanged seed
 }
 
@@ -191,12 +195,12 @@ TEST_F(VpiPutDelaysSim, NullArgumentsAreSafe) {
   d.delay = 1.0;
   VpiHandle prim = MakeDelayObject(vpiPrimitive, {d, d});
 
-  vpi_put_delays(prim, nullptr);  // null structure
+  vpi_put_delays(VpiHandleOf(prim), nullptr);  // null structure
 
   s_vpi_delay no_array = {};
   no_array.no_of_delays = 2;
   no_array.time_type = vpiScaledRealTime;
-  vpi_put_delays(prim, &no_array);  // null da
+  vpi_put_delays(VpiHandleOf(prim), &no_array);  // null da
 
   s_vpi_time da[2] = {};
   s_vpi_delay delay = {};
@@ -224,7 +228,7 @@ TEST_F(VpiPutDelaysSim, PulsereOnlyPutConsumesDelayRejectError) {
   delay.no_of_delays = 1;
   delay.time_type = vpiScaledRealTime;
   delay.pulsere_flag = 1;
-  vpi_put_delays(path, &delay);
+  vpi_put_delays(VpiHandleOf(path), &delay);
 
   s_vpi_time out[3] = {};
   s_vpi_delay get = {};
@@ -232,7 +236,7 @@ TEST_F(VpiPutDelaysSim, PulsereOnlyPutConsumesDelayRejectError) {
   get.no_of_delays = 1;
   get.time_type = vpiScaledRealTime;
   get.pulsere_flag = 1;
-  vpi_get_delays(path, &get);
+  vpi_get_delays(VpiHandleOf(path), &get);
   EXPECT_DOUBLE_EQ(out[0].real, 10.0);
   EXPECT_DOUBLE_EQ(out[1].real, 4.0);
   EXPECT_DOUBLE_EQ(out[2].real, 8.0);
@@ -257,7 +261,7 @@ TEST_F(VpiPutDelaysSim, TimingCheckRequiresMatchingLimitCount) {
   delay.da = da;
   delay.no_of_delays = 2;
   delay.time_type = vpiScaledRealTime;
-  vpi_put_delays(tchk, &delay);
+  vpi_put_delays(VpiHandleOf(tchk), &delay);
   EXPECT_EQ(vpi_ctx_.LastError().level, 0);
 
   s_vpi_time out[2] = {};
@@ -265,7 +269,7 @@ TEST_F(VpiPutDelaysSim, TimingCheckRequiresMatchingLimitCount) {
   get.da = out;
   get.no_of_delays = 2;
   get.time_type = vpiScaledRealTime;
-  vpi_get_delays(tchk, &get);
+  vpi_get_delays(VpiHandleOf(tchk), &get);
   EXPECT_DOUBLE_EQ(out[0].real, 20.0);
   EXPECT_DOUBLE_EQ(out[1].real, 40.0);
 
@@ -277,7 +281,7 @@ TEST_F(VpiPutDelaysSim, TimingCheckRequiresMatchingLimitCount) {
   bad_delay.da = bad;
   bad_delay.no_of_delays = 3;  // does not match the two limits
   bad_delay.time_type = vpiScaledRealTime;
-  vpi_put_delays(tchk, &bad_delay);
+  vpi_put_delays(VpiHandleOf(tchk), &bad_delay);
   EXPECT_EQ(vpi_ctx_.LastError().level, kVpiError);
 
   // The earlier values survive the rejected request.
@@ -287,7 +291,7 @@ TEST_F(VpiPutDelaysSim, TimingCheckRequiresMatchingLimitCount) {
   after_get.da = after;
   after_get.no_of_delays = 2;
   after_get.time_type = vpiScaledRealTime;
-  vpi_get_delays(tchk, &after_get);
+  vpi_get_delays(VpiHandleOf(tchk), &after_get);
   EXPECT_DOUBLE_EQ(after[0].real, 20.0);
   EXPECT_DOUBLE_EQ(after[1].real, 40.0);
 }
@@ -305,7 +309,7 @@ TEST_F(VpiPutDelaysSim, IntermodulePathAcceptsTwoOrThree) {
   delay.da = da;
   delay.no_of_delays = 2;
   delay.time_type = vpiScaledRealTime;
-  vpi_put_delays(imp, &delay);
+  vpi_put_delays(VpiHandleOf(imp), &delay);
   EXPECT_EQ(vpi_ctx_.LastError().level, 0);
 
   s_vpi_time out[2] = {};
@@ -313,7 +317,7 @@ TEST_F(VpiPutDelaysSim, IntermodulePathAcceptsTwoOrThree) {
   get.da = out;
   get.no_of_delays = 2;
   get.time_type = vpiScaledRealTime;
-  vpi_get_delays(imp, &get);
+  vpi_get_delays(VpiHandleOf(imp), &get);
   EXPECT_DOUBLE_EQ(out[0].real, 12.0);
   EXPECT_DOUBLE_EQ(out[1].real, 34.0);
 }
@@ -344,8 +348,8 @@ bool g_path_written = false;
 double g_rise_read_back = 0.0;
 double g_fall_read_back = 0.0;
 
-int SetPathRiseFallDelaysCalltf(const char*) {
-  vpiHandle mod = vpi_handle_by_name("m1", nullptr);
+PLI_INT32 SetPathRiseFallDelaysCalltf(PLI_BYTE8*) {
+  vpiHandle mod = vpi_handle_by_name(VpiText("m1"), nullptr);
   if (mod == nullptr) return 0;
   vpiHandle paths = vpi_iterate(vpiModPath, mod);
   if (paths == nullptr) return 0;
@@ -385,7 +389,7 @@ void RegisterPathWriteProbe() {
 
   s_vpi_systf_data data = {};
   data.type = vpiSysTask;
-  data.tfname = "$probe";
+  data.tfname = VpiText("$probe");
   data.calltf = &SetPathRiseFallDelaysCalltf;
   ASSERT_NE(vpi_register_systf(&data), nullptr);
 }

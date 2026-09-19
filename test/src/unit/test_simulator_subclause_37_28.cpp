@@ -4,7 +4,10 @@
 #include "common/types.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/variable.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_model_helpers3.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -43,20 +46,20 @@ TEST_F(Parameter, LocalParamAndConnByNameProperties) {
   VpiObject local_param;
   local_param.type = vpiParameter;
   local_param.local_param = true;
-  EXPECT_EQ(vpi_get(vpiLocalParam, &local_param), 1);
+  EXPECT_EQ(vpi_get(vpiLocalParam, VpiHandleOf(&local_param)), 1);
 
   VpiObject plain_param;
   plain_param.type = vpiParameter;  // not a localparam
-  EXPECT_EQ(vpi_get(vpiLocalParam, &plain_param), 0);
+  EXPECT_EQ(vpi_get(vpiLocalParam, VpiHandleOf(&plain_param)), 0);
 
   VpiObject by_name;
   by_name.type = vpiParamAssign;
   by_name.conn_by_name = true;
-  EXPECT_EQ(vpi_get(vpiConnByName, &by_name), 1);
+  EXPECT_EQ(vpi_get(vpiConnByName, VpiHandleOf(&by_name)), 1);
 
   VpiObject by_position;
   by_position.type = vpiParamAssign;  // connects by position
-  EXPECT_EQ(vpi_get(vpiConnByName, &by_position), 0);
+  EXPECT_EQ(vpi_get(vpiConnByName, VpiHandleOf(&by_position)), 0);
 }
 
 // Figure input form: the vpiLocalParam property attaches to the whole
@@ -68,11 +71,11 @@ TEST_F(Parameter, LocalParamPropertyAppliesToTypeParameter) {
   VpiObject local_type_param;
   local_type_param.type = vpiTypeParameter;
   local_type_param.local_param = true;  // e.g. `localparam type T = int;`
-  EXPECT_EQ(vpi_get(vpiLocalParam, &local_type_param), 1);
+  EXPECT_EQ(vpi_get(vpiLocalParam, VpiHandleOf(&local_type_param)), 1);
 
   VpiObject plain_type_param;
   plain_type_param.type = vpiTypeParameter;  // a non-local `parameter type`
-  EXPECT_EQ(vpi_get(vpiLocalParam, &plain_type_param), 0);
+  EXPECT_EQ(vpi_get(vpiLocalParam, VpiHandleOf(&plain_type_param)), 0);
 }
 
 // D1: vpi_get_value() of a value parameter returns the value the parameter
@@ -89,7 +92,7 @@ TEST_F(Parameter, ValueParameterValueIsReadable) {
 
   s_vpi_value value = {};
   value.format = vpiIntVal;
-  vpi_get_value(&param, &value);
+  vpi_get_value(VpiHandleOf(&param), &value);
   EXPECT_EQ(value.value.integer, 0xABCD);
 }
 
@@ -116,12 +119,15 @@ TEST_F(Parameter, TypeParameterTypespecReturnedWithoutAliasResolution) {
 
   // The alias is returned as-is, not resolved to its underlying type.
   EXPECT_EQ(VpiTypeParameterTypespec(&type_param), &alias_ts);
-  EXPECT_EQ(vpi_handle(vpiTypespec, &type_param), &alias_ts);
-  EXPECT_NE(vpi_handle(vpiTypespec, &type_param), &resolved_ts);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiTypespec, VpiHandleOf(&type_param))),
+            &alias_ts);
+  EXPECT_NE(VpiObjectOf(vpi_handle(vpiTypespec, VpiHandleOf(&type_param))),
+            &resolved_ts);
 
   // vpiTypespec (detail 2) and vpiExpr (detail 3) are distinct relations
   // reaching distinct typespecs.
-  EXPECT_EQ(vpi_handle(vpiExpr, &type_param), &default_ts);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiExpr, VpiHandleOf(&type_param))),
+            &default_ts);
 }
 
 // D2 edge: the typespec helper speaks only for a type parameter. A value
@@ -138,7 +144,8 @@ TEST_F(Parameter, TypespecHelperOnlyForTypeParameter) {
   EXPECT_EQ(VpiTypeParameterTypespec(&value_param), nullptr);
   EXPECT_EQ(VpiTypeParameterTypespec(nullptr), nullptr);
   // The generic walk still serves a value parameter's vpiTypespec child.
-  EXPECT_EQ(vpi_handle(vpiTypespec, &value_param), &ts);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiTypespec, VpiHandleOf(&value_param))),
+            &ts);
 }
 
 // D3: vpiExpr of a value parameter reaches its default value expression.
@@ -152,7 +159,8 @@ TEST_F(Parameter, ValueParameterExprReachesDefaultExpression) {
   param.param_default = &default_expr;
 
   EXPECT_EQ(VpiParameterDefaultExpr(&param), &default_expr);
-  EXPECT_EQ(vpi_handle(vpiExpr, &param), &default_expr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiExpr, VpiHandleOf(&param))),
+            &default_expr);
 }
 
 // D3 edge: a parameter carrying no default reports null for vpiExpr, and the
@@ -161,7 +169,7 @@ TEST_F(Parameter, ParameterExprIsNullWithoutDefault) {
   VpiObject param;
   param.type = vpiParameter;  // no default recorded
   EXPECT_EQ(VpiParameterDefaultExpr(&param), nullptr);
-  EXPECT_EQ(vpi_handle(vpiExpr, &param), nullptr);
+  EXPECT_EQ(vpi_handle(vpiExpr, VpiHandleOf(&param)), nullptr);
 
   VpiObject other;
   other.type = vpiModule;
@@ -181,14 +189,16 @@ TEST_F(Parameter, ParamAssignLhsReachesOverriddenParameter) {
   value_assign.type = vpiParamAssign;
   value_assign.children = {&value_rhs, &overridden_value};
   EXPECT_EQ(VpiParamAssignLhs(&value_assign), &overridden_value);
-  EXPECT_EQ(vpi_handle(vpiLhs, &value_assign), &overridden_value);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiLhs, VpiHandleOf(&value_assign))),
+            &overridden_value);
 
   VpiObject overridden_type;
   overridden_type.type = vpiTypeParameter;
   VpiObject type_assign;
   type_assign.type = vpiParamAssign;
   type_assign.children = {&overridden_type};
-  EXPECT_EQ(vpi_handle(vpiLhs, &type_assign), &overridden_type);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiLhs, VpiHandleOf(&type_assign))),
+            &overridden_type);
 }
 
 // D4 edge: a param assign with no parameter-kind child reaches no lhs, and the
@@ -201,7 +211,7 @@ TEST_F(Parameter, ParamAssignLhsIsNullWithoutParameterChild) {
   assign.type = vpiParamAssign;
   assign.children = {&rhs};  // only an rhs expression, no overridden parameter
   EXPECT_EQ(VpiParamAssignLhs(&assign), nullptr);
-  EXPECT_EQ(vpi_handle(vpiLhs, &assign), nullptr);
+  EXPECT_EQ(vpi_handle(vpiLhs, VpiHandleOf(&assign)), nullptr);
 
   VpiObject not_assign;
   not_assign.type = vpiParameter;
@@ -215,8 +225,8 @@ TEST_F(Parameter, UnrangedValueParameterReportsNullRanges) {
   param.type = vpiParameter;  // explicit_param_range stays false
   EXPECT_EQ(VpiParameterLeftRange(&param), nullptr);
   EXPECT_EQ(VpiParameterRightRange(&param), nullptr);
-  EXPECT_EQ(vpi_handle(vpiLeftRange, &param), nullptr);
-  EXPECT_EQ(vpi_handle(vpiRightRange, &param), nullptr);
+  EXPECT_EQ(vpi_handle(vpiLeftRange, VpiHandleOf(&param)), nullptr);
+  EXPECT_EQ(vpi_handle(vpiRightRange, VpiHandleOf(&param)), nullptr);
 }
 
 // D5: a value parameter with an explicit range reaches its range-bound
@@ -233,8 +243,10 @@ TEST_F(Parameter, RangedValueParameterReachesRangeBounds) {
   param.param_left_range = &left_bound;
   param.param_right_range = &right_bound;
 
-  EXPECT_EQ(vpi_handle(vpiLeftRange, &param), &left_bound);
-  EXPECT_EQ(vpi_handle(vpiRightRange, &param), &right_bound);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiLeftRange, VpiHandleOf(&param))),
+            &left_bound);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiRightRange, VpiHandleOf(&param))),
+            &right_bound);
 
   VpiObject other;
   other.type = vpiNet;

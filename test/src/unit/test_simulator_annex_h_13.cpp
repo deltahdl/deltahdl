@@ -6,6 +6,7 @@
 #include "common/types.h"
 #include "simulator/dpi_runtime.h"
 #include "simulator/scheduler.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_user.h"
 
@@ -13,10 +14,10 @@
 // and are declared in svdpi.h, which this translation unit does not include:
 // its svScope is a pointer to non-const, and the scopes this test registers
 // are const. H.13 states that svTimeVal is "fully equivalent to s_vpi_time",
-// so the layout-identical delta::VpiTime stands in for svTimeVal across the C
+// so the layout-identical s_vpi_time stands in for svTimeVal across the C
 // ABI; driving svGetTime through it also exercises that equivalence.
 extern "C" {
-int svGetTime(const void* scope, delta::VpiTime* time);
+int svGetTime(const void* scope, s_vpi_time* time);
 int svGetTimeUnit(const void* scope, int32_t* time_unit);
 int svGetTimePrecision(const void* scope, int32_t* time_precision);
 }
@@ -61,7 +62,7 @@ TEST_F(SvGetTimeSim, NullScopeRetrievesCurrentSimulationTime) {
   const uint64_t kTicks = (static_cast<uint64_t>(3) << 32) | 5u;
   AdvanceTo(kTicks);
 
-  VpiTime t = {};
+  s_vpi_time t = {};
   t.type = kSvSimTime;
   EXPECT_EQ(svGetTime(nullptr, &t), 0);
   EXPECT_EQ(t.high, 3u);
@@ -75,13 +76,13 @@ TEST_F(SvGetTimeSim, NullScopeRetrievesCurrentSimulationTime) {
 TEST_F(SvGetTimeSim, TypeFieldSelectsSimVersusScaledReal) {
   AdvanceTo(7);
 
-  VpiTime as_sim = {};
+  s_vpi_time as_sim = {};
   as_sim.type = kSvSimTime;
   EXPECT_EQ(svGetTime(nullptr, &as_sim), 0);
   EXPECT_EQ(as_sim.low, 7u);
   EXPECT_DOUBLE_EQ(as_sim.real, 0.0);
 
-  VpiTime as_real = {};
+  s_vpi_time as_real = {};
   as_real.type = kSvScaledRealTime;
   EXPECT_EQ(svGetTime(nullptr, &as_real), 0);
   EXPECT_DOUBLE_EQ(as_real.real, 7.0);
@@ -96,7 +97,7 @@ TEST_F(SvGetTimeSim, NullScopeScalesToSimulationTimeUnit) {
   vpi_ctx_.SetSimTimeUnit(-12);  // simulation counts in 1 ps
   AdvanceTo(1000);
 
-  VpiTime t = {};
+  s_vpi_time t = {};
   t.type = kSvScaledRealTime;
   EXPECT_EQ(svGetTime(nullptr, &t), 0);
   EXPECT_DOUBLE_EQ(t.real, 1000.0);
@@ -106,7 +107,7 @@ TEST_F(SvGetTimeSim, NullScopeScalesToSimulationTimeUnit) {
 // and the value it returns is equivalent to vpi_get(vpiTimeUnit) for the
 // design.
 TEST_F(SvGetTimeSim, TimeUnitMatchesVpiGetForNullScope) {
-  vpiHandle top = vpi_ctx_.CreateModule("top", "top");
+  VpiHandle top = vpi_ctx_.CreateModule("top", "top");
   ASSERT_NE(top, nullptr);
   top->time_precision = -9;
 
@@ -118,7 +119,7 @@ TEST_F(SvGetTimeSim, TimeUnitMatchesVpiGetForNullScope) {
 // §H.13: svGetTimePrecision with a null scope behaves likewise, returning a
 // value equivalent to vpi_get(vpiTimePrecision) for the design.
 TEST_F(SvGetTimeSim, TimePrecisionMatchesVpiGetForNullScope) {
-  vpiHandle top = vpi_ctx_.CreateModule("top", "top");
+  VpiHandle top = vpi_ctx_.CreateModule("top", "top");
   ASSERT_NE(top, nullptr);
   top->time_precision = -12;
 
@@ -141,11 +142,11 @@ TEST_F(SvGetTimeSim, NonNullScopeRetrievesCurrentSimulationTime) {
   const void* scope =
       &marker;  // non-null svScope; no per-scope timescale bound
 
-  VpiTime with_scope = {};
+  s_vpi_time with_scope = {};
   with_scope.type = kSvSimTime;
   EXPECT_EQ(svGetTime(scope, &with_scope), 0);
 
-  VpiTime null_scope = {};
+  s_vpi_time null_scope = {};
   null_scope.type = kSvSimTime;
   EXPECT_EQ(svGetTime(nullptr, &null_scope), 0);
 
@@ -160,7 +161,7 @@ TEST_F(SvGetTimeSim, NonNullScopeRetrievesCurrentSimulationTime) {
 // non-null scope yields the same unit and precision the null scope does;
 // exercising the non-null path confirms both routines honor the scope argument.
 TEST_F(SvGetTimeSim, NonNullScopeUnitAndPrecisionMatchNullScope) {
-  vpiHandle top = vpi_ctx_.CreateModule("top", "top");
+  VpiHandle top = vpi_ctx_.CreateModule("top", "top");
   ASSERT_NE(top, nullptr);
   top->time_precision = -9;
 
@@ -187,7 +188,7 @@ TEST_F(SvGetTimeSim, NonNullScopeUnitAndPrecisionMatchNullScope) {
 // counting picoseconds, reads 2500 ps as 2.5 ns, and reports -9 and -12 where
 // the NULL scope reports the simulation's own.
 TEST_F(SvGetTimeSim, AScopeWithATimescaleScalesToItsOwnUnit) {
-  vpiHandle top = vpi_ctx_.CreateModule("top", "top");
+  VpiHandle top = vpi_ctx_.CreateModule("top", "top");
   ASSERT_NE(top, nullptr);
   top->time_precision = -12;
   vpi_ctx_.SetSimTimeUnit(-12);  // simulation counts in 1 ps
@@ -197,12 +198,12 @@ TEST_F(SvGetTimeSim, AScopeWithATimescaleScalesToItsOwnUnit) {
   ASSERT_NE(scope, nullptr);
   DpiSetScopeTimescale(scope, -9, -12);
 
-  VpiTime scaled = {};
+  s_vpi_time scaled = {};
   scaled.type = kSvScaledRealTime;
   EXPECT_EQ(svGetTime(scope, &scaled), 0);
   EXPECT_DOUBLE_EQ(scaled.real, 2.5);
 
-  VpiTime sim = {};
+  s_vpi_time sim = {};
   sim.type = kSvScaledRealTime;
   EXPECT_EQ(svGetTime(nullptr, &sim), 0);
   EXPECT_DOUBLE_EQ(sim.real, 2500.0);
@@ -228,12 +229,12 @@ TEST_F(SvGetTimeSim, AScopeWithoutATimescaleReadsAsTheNullScope) {
   const DpiScope* bound = DpiRegisterScope("top.u_bound_h_13");
   DpiSetScopeTimescale(bound, -9, -12);
 
-  VpiTime raw = {};
+  s_vpi_time raw = {};
   raw.type = kSvSimTime;
   EXPECT_EQ(svGetTime(bound, &raw), 0);
   EXPECT_EQ(raw.low, 7u);
 
-  VpiTime unbound = {};
+  s_vpi_time unbound = {};
   unbound.type = kSvScaledRealTime;
   EXPECT_EQ(svGetTime(scope, &unbound), 0);
   EXPECT_DOUBLE_EQ(unbound.real, 7.0);

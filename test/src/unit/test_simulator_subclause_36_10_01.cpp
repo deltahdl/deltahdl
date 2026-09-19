@@ -5,13 +5,15 @@
 #include "common/source_mgr.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
 namespace {
 
-int ErrorCb(VpiCbData*) { return 0; }
+int ErrorCb(s_cb_data*) { return 0; }
 
 class VpiErrorHandling : public ::testing::Test {
  protected:
@@ -24,7 +26,7 @@ class VpiErrorHandling : public ::testing::Test {
   void CallVpiRoutineThatErrors() {
     s_vpi_systf_data data = {};
     data.type = vpiSysTask;
-    data.tfname = "no_dollar_prefix";
+    data.tfname = VpiText("no_dollar_prefix");
     vpi_register_systf(&data);
   }
 
@@ -32,7 +34,7 @@ class VpiErrorHandling : public ::testing::Test {
   void CallVpiRoutineThatSucceeds() {
     s_vpi_systf_data data = {};
     data.type = vpiSysTask;
-    data.tfname = "$ok";
+    data.tfname = VpiText("$ok");
     vpi_register_systf(&data);
   }
 
@@ -71,7 +73,7 @@ TEST_F(VpiErrorHandling, ChkErrorTracksMostRecentRoutineNotAnyPriorError) {
 TEST_F(VpiErrorHandling, ChkErrorProvidesDetailedInformation) {
   CallVpiRoutineThatErrors();
 
-  SVpiErrorInfo info = {};
+  s_vpi_error_info info = {};
   int result = vpi_chk_error(&info);
 
   EXPECT_NE(result, 0);
@@ -105,7 +107,7 @@ int g_pli_error_calls = 0;
 int g_error_calls = 0;
 int g_level_seen_in_callback = 0;
 
-int CountingPliErrorCb(VpiCbData*) {
+int CountingPliErrorCb(s_cb_data*) {
   ++g_pli_error_calls;
   // §38.36.3: "On a cbError callback, the routine vpi_chk_error() can be called
   // to retrieve error information." vpi_chk_error() is the one routine that
@@ -115,7 +117,7 @@ int CountingPliErrorCb(VpiCbData*) {
   return 0;
 }
 
-int CountingErrorCb(VpiCbData*) {
+int CountingErrorCb(s_cb_data*) {
   ++g_error_calls;
   return 0;
 }
@@ -167,13 +169,13 @@ TEST_F(VpiErrorHandling, NoCallbackOccursWhenTheRoutineSucceeds) {
 // What the re-entrant application below recorded.
 int g_nested_calls = 0;
 
-int ReentrantPliErrorCb(VpiCbData*) {
+int ReentrantPliErrorCb(s_cb_data*) {
   ++g_nested_calls;
   // A callback is free to call VPI routines of its own, and this one calls the
   // routine that records an error.
   s_vpi_systf_data data = {};
   data.type = vpiSysTask;
-  data.tfname = "still_no_dollar_prefix";
+  data.tfname = VpiText("still_no_dollar_prefix");
   vpi_register_systf(&data);
   return 0;
 }

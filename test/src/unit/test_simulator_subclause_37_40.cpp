@@ -4,7 +4,10 @@
 
 #include "fixture_simulator.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -44,14 +47,16 @@ TEST_F(TimingCheck, RefAndDataTermsAreReached) {
   tchk.tchk_ref_term = &ref_term;
   tchk.tchk_data_term = &data_term;
 
-  VpiHandle reached_ref = vpi_handle(vpiTchkRefTerm, &tchk);
-  VpiHandle reached_data = vpi_handle(vpiTchkDataTerm, &tchk);
+  VpiHandle reached_ref =
+      VpiObjectOf(vpi_handle(vpiTchkRefTerm, VpiHandleOf(&tchk)));
+  VpiHandle reached_data =
+      VpiObjectOf(vpi_handle(vpiTchkDataTerm, VpiHandleOf(&tchk)));
   EXPECT_EQ(reached_ref, &ref_term);
   EXPECT_EQ(reached_data, &data_term);
 
   // The handles returned for the events have the tchk term type.
-  EXPECT_EQ(vpi_get(vpiType, reached_ref), vpiTchkTerm);
-  EXPECT_EQ(vpi_get(vpiType, reached_data), vpiTchkTerm);
+  EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(reached_ref)), vpiTchkTerm);
+  EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(reached_data)), vpiTchkTerm);
 }
 
 // Detail 1 ("if any"): a timing check that has no data event reports NULL for
@@ -65,8 +70,9 @@ TEST_F(TimingCheck, DataTermIsNullWhenCheckHasNoDataEvent) {
   tchk.tchk_ref_term = &ref_term;
   // tchk_data_term left null: this check has no data event.
 
-  EXPECT_EQ(vpi_handle(vpiTchkRefTerm, &tchk), &ref_term);
-  EXPECT_EQ(vpi_handle(vpiTchkDataTerm, &tchk), nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiTchkRefTerm, VpiHandleOf(&tchk))),
+            &ref_term);
+  EXPECT_EQ(vpi_handle(vpiTchkDataTerm, VpiHandleOf(&tchk)), nullptr);
 }
 
 // Detail 1 (scope): the vpiTchkRefTerm/vpiTchkDataTerm relations are specific
@@ -81,8 +87,8 @@ TEST_F(TimingCheck, TermRelationsApplyOnlyToTimingChecks) {
   not_a_tchk.type = vpiModule;
   not_a_tchk.children = {&stray_term};
 
-  EXPECT_EQ(vpi_handle(vpiTchkRefTerm, &not_a_tchk), nullptr);
-  EXPECT_EQ(vpi_handle(vpiTchkDataTerm, &not_a_tchk), nullptr);
+  EXPECT_EQ(vpi_handle(vpiTchkRefTerm, VpiHandleOf(&not_a_tchk)), nullptr);
+  EXPECT_EQ(vpi_handle(vpiTchkDataTerm, VpiHandleOf(&not_a_tchk)), nullptr);
 }
 
 // Detail 2: iterating vpiExpr over a timing check returns its arguments - the
@@ -105,7 +111,7 @@ TEST_F(TimingCheck, ExprIterationReturnsTermsAndExpressions) {
   tchk.tchk_data_term = &data_term;
   tchk.children = {&ref_term, &notifier, &data_term, &limit};
 
-  vpiHandle it = vpi_iterate(vpiExpr, &tchk);
+  vpiHandle it = vpi_iterate(vpiExpr, VpiHandleOf(&tchk));
   ASSERT_NE(it, nullptr);
 
   int count = 0;
@@ -129,9 +135,9 @@ TEST_F(TimingCheck, ExprIterationReturnsTermsAndExpressions) {
 
   // The event arguments are returned with the tchk term type; the other
   // argument keeps the type of its expression.
-  EXPECT_EQ(vpi_get(vpiType, &ref_term), vpiTchkTerm);
-  EXPECT_EQ(vpi_get(vpiType, &data_term), vpiTchkTerm);
-  EXPECT_EQ(vpi_get(vpiType, &limit), vpiOperation);
+  EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(&ref_term)), vpiTchkTerm);
+  EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(&data_term)), vpiTchkTerm);
+  EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(&limit)), vpiOperation);
 }
 
 // Detail 2 (edge): a timing check whose only children are non-argument objects
@@ -145,7 +151,7 @@ TEST_F(TimingCheck, ExprIterationIsNullWhenNoArguments) {
   tchk.type = vpiTchk;
   tchk.children = {&notifier};
 
-  EXPECT_EQ(vpi_iterate(vpiExpr, &tchk), nullptr);
+  EXPECT_EQ(vpi_iterate(vpiExpr, VpiHandleOf(&tchk)), nullptr);
 }
 
 // What the application found. A calltf is a plain C function with no return
@@ -181,15 +187,15 @@ void ReadOneTimingCheck(vpiHandle tchk) {
   g_tchk_type = vpi_get(vpiTchkType, tchk);
 
   vpiHandle ref = vpi_handle(vpiTchkRefTerm, tchk);
-  g_ref_term_name = NameOf(ref);
+  g_ref_term_name = NameOf(VpiObjectOf(ref));
   g_ref_term_edge = ref == nullptr ? -1 : vpi_get(vpiEdge, ref);
   g_data_term_name = NameOf(vpi_handle(vpiTchkDataTerm, tchk));
   g_notifier_name = NameOf(vpi_handle(vpiTchkNotifier, tchk));
   g_limit = LimitOf(tchk);
 }
 
-int ProbeTimingChecksCalltf(const char*) {
-  vpiHandle mod = vpi_handle_by_name("m1", nullptr);
+PLI_INT32 ProbeTimingChecksCalltf(PLI_BYTE8*) {
+  vpiHandle mod = vpi_handle_by_name(VpiText("m1"), nullptr);
   if (mod == nullptr) return 0;
   vpiHandle itr = vpi_iterate(vpiTchk, mod);
   if (itr == nullptr) return 0;
@@ -214,7 +220,7 @@ TEST(TimingCheckDesign, ADeclaredTimingCheckIsATchkObject) {
 
   s_vpi_systf_data data = {};
   data.type = vpiSysTask;
-  data.tfname = "$probe";
+  data.tfname = VpiText("$probe");
   data.calltf = &ProbeTimingChecksCalltf;
   ASSERT_NE(vpi_register_systf(&data), nullptr);
 

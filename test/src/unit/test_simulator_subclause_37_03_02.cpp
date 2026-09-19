@@ -3,7 +3,9 @@
 #include <string>
 
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -31,11 +33,11 @@ class VpiObjectTypeProperty : public ::testing::Test {
 TEST_F(VpiObjectTypeProperty, GetTypeReturnsTheObjectTypeConstant) {
   VpiObject net;
   net.type = vpiNet;
-  EXPECT_EQ(vpi_get(vpiType, &net), vpiNet);
+  EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(&net)), vpiNet);
 
   VpiObject mod;
   mod.type = vpiModule;
-  EXPECT_EQ(vpi_get(vpiType, &mod), vpiModule);
+  EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(&mod)), vpiModule);
 }
 
 // Claim: vpi_get_str(vpiType, handle) returns a pointer to a string holding the
@@ -44,13 +46,13 @@ TEST_F(VpiObjectTypeProperty, GetTypeReturnsTheObjectTypeConstant) {
 TEST_F(VpiObjectTypeProperty, GetStrTypeReturnsTheTypeConstantName) {
   VpiObject net;
   net.type = vpiNet;
-  const char* net_name = vpi_get_str(vpiType, &net);
+  const char* net_name = vpi_get_str(vpiType, VpiHandleOf(&net));
   ASSERT_NE(net_name, nullptr);
   EXPECT_EQ(std::string(net_name), "vpiNet");
 
   VpiObject mod;
   mod.type = vpiModule;
-  const char* mod_name = vpi_get_str(vpiType, &mod);
+  const char* mod_name = vpi_get_str(vpiType, VpiHandleOf(&mod));
   ASSERT_NE(mod_name, nullptr);
   EXPECT_EQ(std::string(mod_name), "vpiModule");
 }
@@ -66,9 +68,9 @@ TEST_F(VpiObjectTypeProperty, GetStrTypeYieldsNoNameForUnmodelledType) {
       vpiMemory;  // a valid object type, but one with no modelled spelling
 
   // The integer type is still reported faithfully...
-  EXPECT_EQ(vpi_get(vpiType, &mem), vpiMemory);
+  EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(&mem)), vpiMemory);
   // ...while the string form has no name to hand back.
-  EXPECT_EQ(vpi_get_str(vpiType, &mem), nullptr);
+  EXPECT_EQ(vpi_get_str(vpiType, VpiHandleOf(&mem)), nullptr);
 }
 
 // Claim: some objects expose additional type properties shown in the data model
@@ -81,7 +83,7 @@ TEST_F(VpiObjectTypeProperty, GetReturnsAnAdditionalTypePropertyConstant) {
   op.type = vpiOperation;
   op.op_type = vpiAddOp;
 
-  EXPECT_EQ(vpi_get(vpiOpType, &op), vpiAddOp);
+  EXPECT_EQ(vpi_get(vpiOpType, VpiHandleOf(&op)), vpiAddOp);
 }
 
 // Claim D, second input form: vpiPrimType is another of the additional type
@@ -93,12 +95,12 @@ TEST_F(VpiObjectTypeProperty, GetReturnsThePrimTypeAdditionalProperty) {
   VpiObject seq;
   seq.type = vpiPrimitive;
   seq.prim_type = vpiSeqPrim;
-  EXPECT_EQ(vpi_get(vpiPrimType, &seq), vpiSeqPrim);
+  EXPECT_EQ(vpi_get(vpiPrimType, VpiHandleOf(&seq)), vpiSeqPrim);
 
   VpiObject comb;
   comb.type = vpiPrimitive;
   comb.prim_type = vpiCombPrim;
-  EXPECT_EQ(vpi_get(vpiPrimType, &comb), vpiCombPrim);
+  EXPECT_EQ(vpi_get(vpiPrimType, VpiHandleOf(&comb)), vpiCombPrim);
 }
 
 // Claim D, third input form: vpiDelayType is likewise one of the additional
@@ -108,12 +110,13 @@ TEST_F(VpiObjectTypeProperty, GetReturnsTheDelayTypeAdditionalProperty) {
   VpiObject mod_path;
   mod_path.type = vpiModPath;
   mod_path.delay_type = vpiModPathDelay;
-  EXPECT_EQ(vpi_get(vpiDelayType, &mod_path), vpiModPathDelay);
+  EXPECT_EQ(vpi_get(vpiDelayType, VpiHandleOf(&mod_path)), vpiModPathDelay);
 
   VpiObject inter_mod;
   inter_mod.type = vpiInterModPath;
   inter_mod.delay_type = vpiInterModPathDelay;
-  EXPECT_EQ(vpi_get(vpiDelayType, &inter_mod), vpiInterModPathDelay);
+  EXPECT_EQ(vpi_get(vpiDelayType, VpiHandleOf(&inter_mod)),
+            vpiInterModPathDelay);
 }
 
 // Claim: the constant names of the types returned for the additional type
@@ -125,8 +128,8 @@ TEST_F(VpiObjectTypeProperty, GetStrReturnsAnAdditionalTypePropertyName) {
   VpiObject add;
   add.type = vpiOperation;
   add.op_type = vpiAddOp;
-  EXPECT_EQ(vpi_get(vpiOpType, &add), vpiAddOp);
-  const char* add_name = vpi_get_str(vpiOpType, &add);
+  EXPECT_EQ(vpi_get(vpiOpType, VpiHandleOf(&add)), vpiAddOp);
+  const char* add_name = vpi_get_str(vpiOpType, VpiHandleOf(&add));
   ASSERT_NE(add_name, nullptr);
   EXPECT_EQ(std::string(add_name), "vpiAddOp");
 
@@ -135,7 +138,7 @@ TEST_F(VpiObjectTypeProperty, GetStrReturnsAnAdditionalTypePropertyName) {
   VpiObject shift;
   shift.type = vpiOperation;
   shift.op_type = vpiLShiftOp;
-  const char* shift_name = vpi_get_str(vpiOpType, &shift);
+  const char* shift_name = vpi_get_str(vpiOpType, VpiHandleOf(&shift));
   ASSERT_NE(shift_name, nullptr);
   EXPECT_EQ(std::string(shift_name), "vpiLShiftOp");
 }
@@ -151,8 +154,8 @@ TEST_F(VpiObjectTypeProperty,
   op.type = vpiOperation;
   op.op_type = 0;  // no operator constant carries value 0
 
-  EXPECT_EQ(vpi_get(vpiOpType, &op), 0);
-  EXPECT_EQ(vpi_get_str(vpiOpType, &op), nullptr);
+  EXPECT_EQ(vpi_get(vpiOpType, VpiHandleOf(&op)), 0);
+  EXPECT_EQ(vpi_get_str(vpiOpType, VpiHandleOf(&op)), nullptr);
 }
 
 }  // namespace

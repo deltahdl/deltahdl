@@ -38,6 +38,8 @@ constexpr bool kSvFileBroughtTheBaseFile = false;
 // after the SV file has already pulled it in is the repeat a normative include
 // file has to survive: this translation unit compiling at all is the
 // observation for that, and the guard is read again below.
+#include "simulator/vpi_context.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_user.h"
 
 namespace {
@@ -139,7 +141,7 @@ TEST_F(PliIncludeFileLibrary, AnApplicationIncludingTheFilesReachesTheLibrary) {
   // structure the include file laid out, filled from what the registry kept.
   s_vpi_systf_data data = {};
   data.type = vpiSysTask;
-  data.tfname = "$probe";
+  data.tfname = VpiText("$probe");
 
   vpiHandle systf = vpi_register_systf(&data);
   ASSERT_NE(systf, nullptr);

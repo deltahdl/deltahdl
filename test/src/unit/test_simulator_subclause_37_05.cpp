@@ -1,7 +1,10 @@
 #include <gtest/gtest.h>
 
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_constants.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -51,7 +54,8 @@ TEST_F(Module, IndexTransitionReachesArrayIndex) {
   member.array_member = true;
   member.index_expr = &index_expr;
 
-  EXPECT_EQ(vpi_handle(vpiIndex, &member), &index_expr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiIndex, VpiHandleOf(&member))),
+            &index_expr);
 }
 
 // D2: for a module that is not part of a module array, the vpiIndex transition
@@ -67,7 +71,7 @@ TEST_F(Module, IndexTransitionIsNullWhenNotAnArrayElement) {
   standalone.index_expr = &stray_expr;  // present but must not be reported
   standalone.children.push_back(&stray_expr);
 
-  EXPECT_EQ(vpi_handle(vpiIndex, &standalone), nullptr);
+  EXPECT_EQ(vpi_handle(vpiIndex, VpiHandleOf(&standalone)), nullptr);
 }
 
 // D1: iterating vpiModule with a NULL reference object reaches the top-level
@@ -101,12 +105,12 @@ TEST_F(Module, TopModulePropertyReportsTopLevelStatus) {
   VpiObject top;
   top.type = vpiModule;
   top.top_module = true;
-  EXPECT_EQ(vpi_get(vpiTopModule, &top), 1);
+  EXPECT_EQ(vpi_get(vpiTopModule, VpiHandleOf(&top)), 1);
 
   VpiObject nested;
   nested.type = vpiModule;
   nested.top_module = false;
-  EXPECT_EQ(vpi_get(vpiTopModule, &nested), 0);
+  EXPECT_EQ(vpi_get(vpiTopModule, VpiHandleOf(&nested)), 0);
 }
 
 // vpiDefDecayTime: a module reports its default net decay time as an integer
@@ -115,7 +119,7 @@ TEST_F(Module, DefaultDecayTimeReported) {
   VpiObject mod;
   mod.type = vpiModule;
   mod.def_decay_time = 5;
-  EXPECT_EQ(vpi_get(vpiDefDecayTime, &mod), 5);
+  EXPECT_EQ(vpi_get(vpiDefDecayTime, VpiHandleOf(&mod)), 5);
 }
 
 // D1 (edge): when the design contains modules but none is top-level, the
@@ -141,7 +145,7 @@ TEST_F(Module, ModuleIterationOverParentScopeIsNotFilteredByTopLevel) {
   nested->top_module = false;
   parent->children.push_back(nested);
 
-  vpiHandle it = vpi_iterate(vpiModule, parent);
+  vpiHandle it = vpi_iterate(vpiModule, VpiHandleOf(parent));
   ASSERT_NE(it, nullptr);
   int count = 0;
   bool saw_nested = false;
@@ -178,8 +182,10 @@ TEST_F(Module, AModuleReachesTheClockingBlocksItNamed) {
   mod.type = kVpiModule;
   mod.children = {&ordinary, &global_block, &default_block};
 
-  EXPECT_EQ(vpi_handle(vpiDefaultClocking, &mod), &default_block);
-  EXPECT_EQ(vpi_handle(vpiGlobalClocking, &mod), &global_block);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiDefaultClocking, VpiHandleOf(&mod))),
+            &default_block);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiGlobalClocking, VpiHandleOf(&mod))),
+            &global_block);
 }
 
 // Figure: a module that named neither reaches neither, rather than whichever
@@ -192,8 +198,8 @@ TEST_F(Module, AModuleThatNamedNoClockingBlockReachesNone) {
   mod.type = kVpiModule;
   mod.children = {&ordinary};
 
-  EXPECT_EQ(vpi_handle(vpiDefaultClocking, &mod), nullptr);
-  EXPECT_EQ(vpi_handle(vpiGlobalClocking, &mod), nullptr);
+  EXPECT_EQ(vpi_handle(vpiDefaultClocking, VpiHandleOf(&mod)), nullptr);
+  EXPECT_EQ(vpi_handle(vpiGlobalClocking, VpiHandleOf(&mod)), nullptr);
 }
 
 // Figure (vpiDefaultDisableIff): the edge is drawn to an enclosure with no name
@@ -208,19 +214,22 @@ TEST_F(Module, AModuleReachesItsDefaultDisableIff) {
   VpiObject mod;
   mod.type = kVpiModule;
   mod.children = {&block, &condition};
-  EXPECT_EQ(vpi_handle(vpiDefaultDisableIff, &mod), &condition);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiDefaultDisableIff, VpiHandleOf(&mod))),
+            &condition);
 
   VpiObject dist;
   dist.type = vpiDistribution;
   VpiObject with_dist;
   with_dist.type = kVpiModule;
   with_dist.children = {&dist};
-  EXPECT_EQ(vpi_handle(vpiDefaultDisableIff, &with_dist), &dist);
+  EXPECT_EQ(
+      VpiObjectOf(vpi_handle(vpiDefaultDisableIff, VpiHandleOf(&with_dist))),
+      &dist);
 
   VpiObject plain;
   plain.type = kVpiModule;
   plain.children = {&block};
-  EXPECT_EQ(vpi_handle(vpiDefaultDisableIff, &plain), nullptr);
+  EXPECT_EQ(vpi_handle(vpiDefaultDisableIff, VpiHandleOf(&plain)), nullptr);
 }
 
 }  // namespace

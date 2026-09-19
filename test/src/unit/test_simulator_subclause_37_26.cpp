@@ -1,7 +1,10 @@
 #include <gtest/gtest.h>
 
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_constants.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -41,11 +44,11 @@ TEST_F(StructuresAndUnions, PackedPropertyReportsDeclaredFlag) {
   VpiObject packed_struct;
   packed_struct.type = vpiStructVar;
   packed_struct.packed = true;
-  EXPECT_EQ(vpi_get(vpiPacked, &packed_struct), 1);
+  EXPECT_EQ(vpi_get(vpiPacked, VpiHandleOf(&packed_struct)), 1);
 
   VpiObject unpacked_struct;
   unpacked_struct.type = vpiStructVar;  // packed defaults false
-  EXPECT_EQ(vpi_get(vpiPacked, &unpacked_struct), 0);
+  EXPECT_EQ(vpi_get(vpiPacked, VpiHandleOf(&unpacked_struct)), 0);
 }
 
 // Figure: a union object reports whether it is a tagged union through the
@@ -54,11 +57,11 @@ TEST_F(StructuresAndUnions, TaggedPropertyReportsDeclaredFlag) {
   VpiObject tagged_union;
   tagged_union.type = vpiUnionVar;
   tagged_union.tagged = true;
-  EXPECT_EQ(vpi_get(vpiTagged, &tagged_union), 1);
+  EXPECT_EQ(vpi_get(vpiTagged, VpiHandleOf(&tagged_union)), 1);
 
   VpiObject plain_union;
   plain_union.type = vpiUnionVar;
-  EXPECT_EQ(vpi_get(vpiTagged, &plain_union), 0);
+  EXPECT_EQ(vpi_get(vpiTagged, VpiHandleOf(&plain_union)), 0);
 }
 
 // Figure: a packed union reports whether it is a soft-packed union through the
@@ -68,12 +71,12 @@ TEST_F(StructuresAndUnions, SoftPropertyReportsDeclaredFlag) {
   soft_union.type = vpiUnionVar;
   soft_union.packed = true;
   soft_union.soft = true;
-  EXPECT_EQ(vpi_get(vpiSoft, &soft_union), 1);
+  EXPECT_EQ(vpi_get(vpiSoft, VpiHandleOf(&soft_union)), 1);
 
   VpiObject hard_union;
   hard_union.type = vpiUnionVar;
   hard_union.packed = true;
-  EXPECT_EQ(vpi_get(vpiSoft, &hard_union), 0);
+  EXPECT_EQ(vpi_get(vpiSoft, VpiHandleOf(&hard_union)), 0);
 }
 
 // D1: vpi_get_value() cannot read the value of an entire unpacked structure or
@@ -88,9 +91,9 @@ TEST_F(StructuresAndUnions, GetValueRejectsEntireUnpackedStructOrUnion) {
     value.format = vpiIntVal;
     value.value.integer = 0x5eed;  // sentinel the routine must not overwrite
 
-    vpi_get_value(&aggregate, &value);
+    vpi_get_value(VpiHandleOf(&aggregate), &value);
 
-    SVpiErrorInfo info = {};
+    s_vpi_error_info info = {};
     EXPECT_EQ(vpi_chk_error(&info), vpiError) << "kind " << kind;
     EXPECT_EQ(value.value.integer, 0x5eed) << "kind " << kind;
   }
@@ -108,10 +111,11 @@ TEST_F(StructuresAndUnions, PutValueRejectsEntireUnpackedStructOrUnion) {
     value.format = vpiIntVal;
     value.value.integer = 1;
 
-    vpiHandle ret = vpi_put_value(&aggregate, &value, nullptr, vpiNoDelay);
+    vpiHandle ret =
+        vpi_put_value(VpiHandleOf(&aggregate), &value, nullptr, vpiNoDelay);
     EXPECT_EQ(ret, nullptr) << "kind " << kind;
 
-    SVpiErrorInfo info = {};
+    s_vpi_error_info info = {};
     EXPECT_EQ(vpi_chk_error(&info), vpiError) << "kind " << kind;
   }
 }
@@ -130,12 +134,12 @@ TEST_F(StructuresAndUnions, PackedStructOrUnionValueIsNotRefused) {
     value.format = vpiIntVal;
     value.value.integer = 0;
 
-    vpi_get_value(&aggregate, &value);
-    SVpiErrorInfo get_info = {};
+    vpi_get_value(VpiHandleOf(&aggregate), &value);
+    s_vpi_error_info get_info = {};
     EXPECT_EQ(vpi_chk_error(&get_info), 0) << "get, kind " << kind;
 
-    vpi_put_value(&aggregate, &value, nullptr, vpiNoDelay);
-    SVpiErrorInfo put_info = {};
+    vpi_put_value(VpiHandleOf(&aggregate), &value, nullptr, vpiNoDelay);
+    s_vpi_error_info put_info = {};
     EXPECT_EQ(vpi_chk_error(&put_info), 0) << "put, kind " << kind;
   }
 }
@@ -152,12 +156,12 @@ TEST_F(StructuresAndUnions, RestrictionDoesNotApplyToOrdinaryObjects) {
     s_vpi_value value = {};
     value.format = vpiIntVal;
 
-    vpi_get_value(&obj, &value);
-    SVpiErrorInfo get_info = {};
+    vpi_get_value(VpiHandleOf(&obj), &value);
+    s_vpi_error_info get_info = {};
     EXPECT_EQ(vpi_chk_error(&get_info), 0) << "get, kind " << kind;
 
-    vpi_put_value(&obj, &value, nullptr, vpiNoDelay);
-    SVpiErrorInfo put_info = {};
+    vpi_put_value(VpiHandleOf(&obj), &value, nullptr, vpiNoDelay);
+    s_vpi_error_info put_info = {};
     EXPECT_EQ(vpi_chk_error(&put_info), 0) << "put, kind " << kind;
   }
 }
@@ -189,10 +193,10 @@ TEST_F(StructuresAndUnions, AStructVariableReachesTheVariablesItHolds) {
   typespec.parent = &aggregate;
   aggregate.children = {&first, &typespec, &second};
 
-  vpiHandle it = vpi_iterate(vpiMember, &aggregate);
+  vpiHandle it = vpi_iterate(vpiMember, VpiHandleOf(&aggregate));
   ASSERT_NE(it, nullptr);
-  EXPECT_EQ(vpi_scan(it), &first);
-  EXPECT_EQ(vpi_scan(it), &second);
+  EXPECT_EQ(VpiObjectOf(vpi_scan(it)), &first);
+  EXPECT_EQ(VpiObjectOf(vpi_scan(it)), &second);
   EXPECT_EQ(vpi_scan(it), nullptr);
 }
 
@@ -207,9 +211,9 @@ TEST_F(StructuresAndUnions, AUnionVariableReachesItsMembers) {
   nested.parent = &aggregate;
   aggregate.children = {&nested};
 
-  vpiHandle it = vpi_iterate(vpiMember, &aggregate);
+  vpiHandle it = vpi_iterate(vpiMember, VpiHandleOf(&aggregate));
   ASSERT_NE(it, nullptr);
-  EXPECT_EQ(vpi_scan(it), &nested);
+  EXPECT_EQ(VpiObjectOf(vpi_scan(it)), &nested);
   EXPECT_EQ(vpi_scan(it), nullptr);
 }
 
@@ -224,9 +228,9 @@ TEST_F(StructuresAndUnions, AStructNetReachesTheNetsItHolds) {
   member.parent = &aggregate;
   aggregate.children = {&member};
 
-  vpiHandle it = vpi_iterate(vpiMember, &aggregate);
+  vpiHandle it = vpi_iterate(vpiMember, VpiHandleOf(&aggregate));
   ASSERT_NE(it, nullptr);
-  EXPECT_EQ(vpi_scan(it), &member);
+  EXPECT_EQ(VpiObjectOf(vpi_scan(it)), &member);
   EXPECT_EQ(vpi_scan(it), nullptr);
 }
 
@@ -236,7 +240,7 @@ TEST_F(StructuresAndUnions, AStructNetReachesTheNetsItHolds) {
 TEST_F(StructuresAndUnions, AnAggregateWithNoMembersReachesNone) {
   VpiObject empty;
   empty.type = vpiStructVar;
-  EXPECT_EQ(vpi_iterate(vpiMember, &empty), nullptr);
+  EXPECT_EQ(vpi_iterate(vpiMember, VpiHandleOf(&empty)), nullptr);
 
   VpiObject plain;
   plain.type = vpiLogicVar;
@@ -244,7 +248,7 @@ TEST_F(StructuresAndUnions, AnAggregateWithNoMembersReachesNone) {
   child.type = vpiLogicVar;
   child.parent = &plain;
   plain.children = {&child};
-  EXPECT_EQ(vpi_iterate(vpiMember, &plain), nullptr);
+  EXPECT_EQ(vpi_iterate(vpiMember, VpiHandleOf(&plain)), nullptr);
 }
 
 }  // namespace

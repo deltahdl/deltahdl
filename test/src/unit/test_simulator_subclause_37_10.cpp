@@ -4,7 +4,11 @@
 #include <vector>
 
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
+#include "simulator/vpi_model_helpers1.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -101,7 +105,7 @@ TEST(InstanceModel, HandleVpiInstanceReachesImmediateEnclosingInstance) {
   net.type = vpiNet;
   net.parent = &block;
 
-  EXPECT_EQ(vpi_handle(vpiInstance, &net), &module);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiInstance, VpiHandleOf(&net))), &module);
 
   // The immediate instance need not be a module: an object directly inside an
   // interface resolves to that interface through the same entry point.
@@ -110,12 +114,13 @@ TEST(InstanceModel, HandleVpiInstanceReachesImmediateEnclosingInstance) {
   VpiObject iface_net;
   iface_net.type = vpiNet;
   iface_net.parent = &iface;
-  EXPECT_EQ(vpi_handle(vpiInstance, &iface_net), &iface);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiInstance, VpiHandleOf(&iface_net))),
+            &iface);
 
   // With no enclosing instance the relation resolves to no handle.
   VpiObject orphan;
   orphan.type = vpiNet;
-  EXPECT_EQ(vpi_handle(vpiInstance, &orphan), nullptr);
+  EXPECT_EQ(vpi_handle(vpiInstance, VpiHandleOf(&orphan)), nullptr);
 }
 
 // D2: vpiModule returns the nearest enclosing module, and null when the object
@@ -191,9 +196,9 @@ TEST(InstanceModel, HandleByNameEntryPointEnforcesAccessibility) {
   VpiHandle in_unit = ctx.CreateModule("unit_obj", "$unit::unit_obj");
   in_unit->in_compilation_unit = true;
 
-  EXPECT_EQ(vpi_handle_by_name("plain", nullptr), ok);
-  EXPECT_EQ(vpi_handle_by_name("imported", nullptr), nullptr);
-  EXPECT_EQ(vpi_handle_by_name("unit_obj", nullptr), nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle_by_name(VpiText("plain"), nullptr)), ok);
+  EXPECT_EQ(vpi_handle_by_name(VpiText("imported"), nullptr), nullptr);
+  EXPECT_EQ(vpi_handle_by_name(VpiText("unit_obj"), nullptr), nullptr);
 }
 
 // D7: the pure smallest-precision helper takes the minimum, with an empty
@@ -325,7 +330,7 @@ TEST(InstanceModel, HandleByNameRejectsNullAndUnknownNames) {
   SetGlobalVpiContext(&ctx);
 
   EXPECT_EQ(vpi_handle_by_name(nullptr, nullptr), nullptr);
-  EXPECT_EQ(vpi_handle_by_name("never_registered", nullptr), nullptr);
+  EXPECT_EQ(vpi_handle_by_name(VpiText("never_registered"), nullptr), nullptr);
 }
 
 // D7 edge: a design with no modules reports a zero smallest precision, and a

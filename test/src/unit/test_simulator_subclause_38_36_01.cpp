@@ -6,7 +6,10 @@
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -27,8 +30,8 @@ class VpiSimEventCb : public ::testing::Test {
   vpiHandle MakeBitSelectHandle(const char* name) {
     sim_ctx_.CreateVariable(name, 1);
     vpi_ctx_.Attach(sim_ctx_);
-    vpiHandle h = vpi_handle_by_name(name, nullptr);
-    if (h) h->type = vpiBitSelect;
+    vpiHandle h = vpi_handle_by_name(VpiText(name), nullptr);
+    if (h) VpiObjectOf(h)->type = vpiBitSelect;
     return h;
   }
 
@@ -51,7 +54,7 @@ TEST_F(VpiSimEventCb, ForceCallbackOnBitSelectRejected) {
   cb.obj = bit;
   EXPECT_EQ(vpi_register_cb(&cb), nullptr);
 
-  SVpiErrorInfo info = {};
+  s_vpi_error_info info = {};
   EXPECT_EQ(vpi_chk_error(&info), vpiError);
 }
 
@@ -65,7 +68,7 @@ TEST_F(VpiSimEventCb, ReleaseCallbackOnBitSelectRejected) {
   cb.obj = bit;
   EXPECT_EQ(vpi_register_cb(&cb), nullptr);
 
-  SVpiErrorInfo info = {};
+  s_vpi_error_info info = {};
   EXPECT_EQ(vpi_chk_error(&info), vpiError);
 }
 
@@ -79,7 +82,7 @@ TEST_F(VpiSimEventCb, DisableCallbackOnBitSelectRejected) {
   cb.obj = bit;
   EXPECT_EQ(vpi_register_cb(&cb), nullptr);
 
-  SVpiErrorInfo info = {};
+  s_vpi_error_info info = {};
   EXPECT_EQ(vpi_chk_error(&info), vpiError);
 }
 
@@ -89,7 +92,7 @@ TEST_F(VpiSimEventCb, DisableCallbackOnBitSelectRejected) {
 TEST_F(VpiSimEventCb, ForceCallbackOnWholeVariableAccepted) {
   sim_ctx_.CreateVariable("whole", 1);
   vpi_ctx_.Attach(sim_ctx_);
-  vpiHandle var = vpi_handle_by_name("whole", nullptr);
+  vpiHandle var = vpi_handle_by_name(VpiText("whole"), nullptr);
   ASSERT_NE(var, nullptr);
 
   s_cb_data cb = {};
@@ -126,14 +129,14 @@ TEST_F(VpiSimEventCb, ValueChangeCallbackOnBitSelectAccepted) {
 // is handed a pointer to an s_cb_data structure (not the one supplied at
 // registration) whose fields the simulator has shaped for the reason.
 int g_deliver_calls = 0;
-VpiCbData* g_delivered_ptr = nullptr;
+s_cb_data* g_delivered_ptr = nullptr;
 int g_delivered_reason = 0;
-VpiTime* g_delivered_time = nullptr;
-VpiValue* g_delivered_value = nullptr;
+s_vpi_time* g_delivered_time = nullptr;
+s_vpi_value* g_delivered_value = nullptr;
 void* g_delivered_user_data = nullptr;
 VpiHandle g_delivered_obj = nullptr;
 
-int RecordDelivery(VpiCbData* data) {
+int RecordDelivery(s_cb_data* data) {
   ++g_deliver_calls;
   g_delivered_ptr = data;
   if (data) {
@@ -174,7 +177,7 @@ class VpiSimEventCbDelivery : public ::testing::Test {
 // the time field passed to the routine is NULL - even though a time structure
 // with a concrete type was supplied at registration.
 TEST_F(VpiSimEventCbDelivery, ReclaimObjCallbackDeliveredWithoutTime) {
-  VpiTime requested = {};
+  s_vpi_time requested = {};
   requested.type = vpiSimTime;
 
   s_cb_data cb = {};
@@ -195,7 +198,7 @@ TEST_F(VpiSimEventCbDelivery, ReclaimObjCallbackDeliveredWithoutTime) {
 // §38.36.1: for cbEndOfObject as well, time information is not passed to the
 // callback routine, so the delivered time pointer is NULL.
 TEST_F(VpiSimEventCbDelivery, EndOfObjectCallbackDeliveredWithoutTime) {
-  VpiTime requested = {};
+  s_vpi_time requested = {};
   requested.type = vpiScaledRealTime;
 
   s_cb_data cb = {};
@@ -214,7 +217,7 @@ TEST_F(VpiSimEventCbDelivery, EndOfObjectCallbackDeliveredWithoutTime) {
 // cbReclaimObj and cbEndOfObject. A different simulation-event reason keeps the
 // time structure the application requested, so the routine still sees it.
 TEST_F(VpiSimEventCbDelivery, ValueChangeCallbackKeepsRequestedTime) {
-  VpiTime requested = {};
+  s_vpi_time requested = {};
   requested.type = vpiSimTime;
 
   s_cb_data cb = {};
@@ -239,7 +242,7 @@ TEST_F(VpiSimEventCbDelivery,
   s_cb_data cb = {};
   cb.reason = cbValueChange;
   cb.cb_rtn = &RecordDelivery;
-  cb.user_data = &payload;
+  cb.user_data = reinterpret_cast<PLI_BYTE8*>(&payload);
   ASSERT_NE(vpi_register_cb(&cb), nullptr);
 
   int fired = vpi_ctx_.DispatchCallbacks(cbValueChange);
@@ -340,7 +343,7 @@ TEST_F(VpiSimEventCbDelivery, DisableCallbackDeliversDisabledConstructHandle) {
 TEST_F(VpiSimEventCbDelivery, ValueChangeOnNamedEventDeliversNullValue) {
   VpiObject named_event;
   named_event.type = vpiNamedEvent;
-  VpiValue requested = {};
+  s_vpi_value requested = {};
 
   s_cb_data cb = {};
   cb.reason = cbValueChange;
@@ -359,7 +362,7 @@ TEST_F(VpiSimEventCbDelivery, ValueChangeOnNamedEventDeliversNullValue) {
 TEST_F(VpiSimEventCbDelivery, ValueChangeOnEventStatementDeliversNullValue) {
   VpiObject event_stmt;
   event_stmt.type = vpiEventStmt;
-  VpiValue requested = {};
+  s_vpi_value requested = {};
 
   s_cb_data cb = {};
   cb.reason = cbValueChange;
@@ -380,7 +383,7 @@ TEST_F(VpiSimEventCbDelivery, ValueChangeOnEventStatementDeliversNullValue) {
 TEST_F(VpiSimEventCbDelivery, ValueChangeOnClassVarDeliversNullValue) {
   VpiObject class_var;
   class_var.type = vpiClassVar;
-  VpiValue requested = {};
+  s_vpi_value requested = {};
 
   s_cb_data cb = {};
   cb.reason = cbValueChange;
@@ -401,9 +404,9 @@ TEST_F(VpiSimEventCbDelivery, ValueChangeOnClassVarDeliversNullValue) {
 TEST_F(VpiSimEventCbDelivery, ValueChangeOnOrdinaryVariableKeepsValue) {
   sim_ctx_.CreateVariable("ord", 1);
   vpi_ctx_.Attach(sim_ctx_);
-  vpiHandle var = vpi_handle_by_name("ord", nullptr);
+  vpiHandle var = vpi_handle_by_name(VpiText("ord"), nullptr);
   ASSERT_NE(var, nullptr);
-  VpiValue requested = {};
+  s_vpi_value requested = {};
 
   s_cb_data cb = {};
   cb.reason = cbValueChange;
@@ -411,7 +414,7 @@ TEST_F(VpiSimEventCbDelivery, ValueChangeOnOrdinaryVariableKeepsValue) {
   cb.value = &requested;
   ASSERT_NE(vpi_register_cb(&cb), nullptr);
 
-  int fired = vpi_ctx_.DispatchCallbacks(cbValueChange, var);
+  int fired = vpi_ctx_.DispatchCallbacks(cbValueChange, VpiObjectOf(var));
 
   EXPECT_EQ(fired, 1);
   EXPECT_EQ(g_delivered_value, &requested);

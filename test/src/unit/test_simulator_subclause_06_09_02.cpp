@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -22,9 +24,9 @@ TEST(VectorNetAccessibility, ScalaredNetIsExpandedToPli) {
   obj.type = vpiNet;
   obj.is_scalared = true;
 
-  EXPECT_EQ(vpi_get(vpiExplicitScalared, &obj), 1);
-  EXPECT_EQ(vpi_get(vpiExplicitVectored, &obj), 0);
-  EXPECT_EQ(vpi_get(vpiExpanded, &obj), 1);
+  EXPECT_EQ(vpi_get(vpiExplicitScalared, VpiHandleOf(&obj)), 1);
+  EXPECT_EQ(vpi_get(vpiExplicitVectored, VpiHandleOf(&obj)), 0);
+  EXPECT_EQ(vpi_get(vpiExpanded, VpiHandleOf(&obj)), 1);
 }
 
 // A vectored net is reported with the explicit vectored property set and is
@@ -37,9 +39,9 @@ TEST(VectorNetAccessibility, VectoredNetIsUnexpandedToPli) {
   obj.type = vpiNet;
   obj.is_vectored = true;
 
-  EXPECT_EQ(vpi_get(vpiExplicitVectored, &obj), 1);
-  EXPECT_EQ(vpi_get(vpiExplicitScalared, &obj), 0);
-  EXPECT_EQ(vpi_get(vpiExpanded, &obj), 0);
+  EXPECT_EQ(vpi_get(vpiExplicitVectored, VpiHandleOf(&obj)), 1);
+  EXPECT_EQ(vpi_get(vpiExplicitScalared, VpiHandleOf(&obj)), 0);
+  EXPECT_EQ(vpi_get(vpiExpanded, VpiHandleOf(&obj)), 0);
 }
 
 // A net declared with neither keyword carries no explicit accessibility and
@@ -51,9 +53,9 @@ TEST(VectorNetAccessibility, PlainNetDefaultsToExpanded) {
   VpiObject obj;
   obj.type = vpiNet;
 
-  EXPECT_EQ(vpi_get(vpiExplicitScalared, &obj), 0);
-  EXPECT_EQ(vpi_get(vpiExplicitVectored, &obj), 0);
-  EXPECT_EQ(vpi_get(vpiExpanded, &obj), 1);
+  EXPECT_EQ(vpi_get(vpiExplicitScalared, VpiHandleOf(&obj)), 0);
+  EXPECT_EQ(vpi_get(vpiExplicitVectored, VpiHandleOf(&obj)), 0);
+  EXPECT_EQ(vpi_get(vpiExpanded, VpiHandleOf(&obj)), 1);
 }
 
 }  // namespace

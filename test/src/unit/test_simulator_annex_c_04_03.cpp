@@ -1,7 +1,10 @@
 #include <gtest/gtest.h>
 
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_object.h"
+#include "simulator/vpi_user.h"
 
 // Annex C.4.3: VPI definitions.
 //
@@ -92,29 +95,29 @@ class VpiDeprecatedDefinitions : public ::testing::Test {
 // characterized".
 TEST_F(VpiDeprecatedDefinitions, MemoryAndItsWordAreObjectsUnderThe1995Mode) {
   ASSERT_TRUE(ctx_.SetDefaultCompatibilityMode(vpiMode1364v1995));
-  EXPECT_EQ(vpi_get(vpiType, &memory_), vpiMemory);
-  EXPECT_EQ(vpi_get(vpiType, &word_), vpiMemoryWord);
-  EXPECT_EQ(vpi_get_1364v1995(vpiType, &memory_), vpiMemory);
+  EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(&memory_)), vpiMemory);
+  EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(&word_)), vpiMemoryWord);
+  EXPECT_EQ(vpi_get_1364v1995(vpiType, VpiHandleOf(&memory_)), vpiMemory);
 }
 
 // Rows 1 and 2, D for IEEE Std 1364-2001: the objects are "present, but use
 // discouraged", so an application compiled for that version still meets them.
 TEST_F(VpiDeprecatedDefinitions, MemoryAndItsWordAreObjectsUnderThe2001Mode) {
-  EXPECT_EQ(vpi_get_1364v2001(vpiType, &memory_), vpiMemory);
-  EXPECT_EQ(vpi_get_1364v2001(vpiType, &word_), vpiMemoryWord);
+  EXPECT_EQ(vpi_get_1364v2001(vpiType, VpiHandleOf(&memory_)), vpiMemory);
+  EXPECT_EQ(vpi_get_1364v2001(vpiType, VpiHandleOf(&word_)), vpiMemoryWord);
 }
 
 // Rows 1 and 2, N from IEEE Std 1364-2005 on: the memory is the vpiRegArray
 // that "replaced" the object type and its word the vpiReg, in that mode and in
 // this standard's own behavior alike.
 TEST_F(VpiDeprecatedDefinitions, MemoryIsAnArrayOfRegsFrom2005On) {
-  EXPECT_EQ(vpi_get_1364v2005(vpiType, &memory_), vpiRegArray);
-  EXPECT_EQ(vpi_get_1364v2005(vpiType, &word_), vpiReg);
-  EXPECT_EQ(vpi_get(vpiType, &memory_), vpiRegArray);
-  EXPECT_EQ(vpi_get(vpiType, &word_), vpiReg);
+  EXPECT_EQ(vpi_get_1364v2005(vpiType, VpiHandleOf(&memory_)), vpiRegArray);
+  EXPECT_EQ(vpi_get_1364v2005(vpiType, VpiHandleOf(&word_)), vpiReg);
+  EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(&memory_)), vpiRegArray);
+  EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(&word_)), vpiReg);
   ASSERT_TRUE(ctx_.SetDefaultCompatibilityMode(vpiMode1800v2009));
-  EXPECT_EQ(vpi_get(vpiType, &memory_), vpiRegArray);
-  EXPECT_EQ(vpi_get(vpiType, &word_), vpiReg);
+  EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(&memory_)), vpiRegArray);
+  EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(&word_)), vpiReg);
 }
 
 // Row 1 has "unpacked unidimensional reg arrays" as the memories; an array of
@@ -123,7 +126,7 @@ TEST_F(VpiDeprecatedDefinitions, MemoryIsAnArrayOfRegsFrom2005On) {
 TEST_F(VpiDeprecatedDefinitions, AMultidimensionalRegArrayIsNoMemoryObject) {
   memory_.array_dim_indices = {{0, 1}, {0, 1}};
   ASSERT_TRUE(ctx_.SetDefaultCompatibilityMode(vpiMode1364v1995));
-  EXPECT_EQ(vpi_get(vpiType, &memory_), vpiRegArray);
+  EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(&memory_)), vpiRegArray);
 }
 
 // A reg that is no element of a memory, one declared in the module, is a
@@ -136,9 +139,9 @@ TEST_F(VpiDeprecatedDefinitions, ARegOutsideAMemoryIsARegUnderThe1995Mode) {
   VpiObject stray;
   stray.type = vpiReg;
   ASSERT_TRUE(ctx_.SetDefaultCompatibilityMode(vpiMode1364v1995));
-  EXPECT_EQ(vpi_get(vpiType, &reg), vpiReg);
-  EXPECT_EQ(vpi_get(vpiType, &stray), vpiReg);
-  EXPECT_EQ(vpi_get(vpiType, &module_), vpiModule);
+  EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(&reg)), vpiReg);
+  EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(&stray)), vpiReg);
+  EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(&module_)), vpiModule);
 }
 
 // Item 3 with rows 3 and 4, Y for every IEEE 1364 standard: under such a mode
@@ -148,25 +151,26 @@ TEST_F(VpiDeprecatedDefinitions, ARegOutsideAMemoryIsARegUnderThe1995Mode) {
 TEST_F(VpiDeprecatedDefinitions,
        IntegerAndTimeArraysAreVariablesWithVpiArrayUnderThe1364Modes) {
   ASSERT_TRUE(ctx_.SetDefaultCompatibilityMode(vpiMode1364v1995));
-  EXPECT_EQ(vpi_get(vpiType, &integer_array_), vpiIntegerVar);
-  EXPECT_EQ(vpi_get(vpiArray, &integer_array_), 1);
-  EXPECT_EQ(vpi_get(vpiType, &time_array_), vpiTimeVar);
-  EXPECT_EQ(vpi_get(vpiArray, &time_array_), 1);
-  EXPECT_EQ(vpi_get(vpiType, &integer_), vpiIntegerVar);
-  EXPECT_EQ(vpi_get(vpiArray, &integer_), 0);
-  EXPECT_EQ(vpi_get_1364v2005(vpiType, &integer_array_), vpiIntegerVar);
-  EXPECT_EQ(vpi_get_1364v2005(vpiArray, &integer_array_), 1);
+  EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(&integer_array_)), vpiIntegerVar);
+  EXPECT_EQ(vpi_get(vpiArray, VpiHandleOf(&integer_array_)), 1);
+  EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(&time_array_)), vpiTimeVar);
+  EXPECT_EQ(vpi_get(vpiArray, VpiHandleOf(&time_array_)), 1);
+  EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(&integer_)), vpiIntegerVar);
+  EXPECT_EQ(vpi_get(vpiArray, VpiHandleOf(&integer_)), 0);
+  EXPECT_EQ(vpi_get_1364v2005(vpiType, VpiHandleOf(&integer_array_)),
+            vpiIntegerVar);
+  EXPECT_EQ(vpi_get_1364v2005(vpiArray, VpiHandleOf(&integer_array_)), 1);
 }
 
 // Row 4, N for IEEE Std 1364-1995 and Y for 1364-2001 and 1364-2005: an
 // unpacked array of reals is a vpiRealVar with vpiArray TRUE under the two
 // later modes and the array object it is here under the first.
 TEST_F(VpiDeprecatedDefinitions, ARealArrayIsARealVarFrom2001To2005) {
-  EXPECT_EQ(vpi_get_1364v2001(vpiType, &real_array_), vpiRealVar);
-  EXPECT_EQ(vpi_get_1364v2001(vpiArray, &real_array_), 1);
-  EXPECT_EQ(vpi_get_1364v2005(vpiType, &real_array_), vpiRealVar);
-  EXPECT_EQ(vpi_get_1364v1995(vpiType, &real_array_), vpiRegArray);
-  EXPECT_EQ(vpi_get_1364v1995(vpiArray, &real_array_), 0);
+  EXPECT_EQ(vpi_get_1364v2001(vpiType, VpiHandleOf(&real_array_)), vpiRealVar);
+  EXPECT_EQ(vpi_get_1364v2001(vpiArray, VpiHandleOf(&real_array_)), 1);
+  EXPECT_EQ(vpi_get_1364v2005(vpiType, VpiHandleOf(&real_array_)), vpiRealVar);
+  EXPECT_EQ(vpi_get_1364v1995(vpiType, VpiHandleOf(&real_array_)), vpiRegArray);
+  EXPECT_EQ(vpi_get_1364v1995(vpiArray, VpiHandleOf(&real_array_)), 0);
 }
 
 // Item 3: vpiArray "indicated when vpiReg types represented elements of
@@ -176,8 +180,8 @@ TEST_F(VpiDeprecatedDefinitions, ARegElementOfAnArrayReportsVpiArrayUnder2005) {
   VpiObject reg;
   reg.type = vpiReg;
   reg.parent = &module_;
-  EXPECT_EQ(vpi_get_1364v2005(vpiArray, &word_), 1);
-  EXPECT_EQ(vpi_get_1364v2005(vpiArray, &reg), 0);
+  EXPECT_EQ(vpi_get_1364v2005(vpiArray, VpiHandleOf(&word_)), 1);
+  EXPECT_EQ(vpi_get_1364v2005(vpiArray, VpiHandleOf(&reg)), 0);
 }
 
 // An array of a kind no IEEE 1364 standard read as a variable, int variables
@@ -192,9 +196,9 @@ TEST_F(VpiDeprecatedDefinitions, AnArrayOfAnotherKindStaysAnArrayObject) {
   VpiObject empty_array;
   empty_array.type = vpiRegArray;
   ASSERT_TRUE(ctx_.SetDefaultCompatibilityMode(vpiMode1364v2001));
-  EXPECT_EQ(vpi_get(vpiType, &int_array), vpiRegArray);
-  EXPECT_EQ(vpi_get(vpiArray, &int_array), 0);
-  EXPECT_EQ(vpi_get(vpiType, &empty_array), vpiRegArray);
+  EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(&int_array)), vpiRegArray);
+  EXPECT_EQ(vpi_get(vpiArray, VpiHandleOf(&int_array)), 0);
+  EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(&empty_array)), vpiRegArray);
 }
 
 // Item 3: in this standard "the vpiArrayMember property is now used, thus
@@ -203,12 +207,12 @@ TEST_F(VpiDeprecatedDefinitions, AnArrayOfAnotherKindStaysAnArrayObject) {
 // the vpiRegArray (vpiArrayVar) of §37.17, under the native behavior and an
 // IEEE 1800 mode alike.
 TEST_F(VpiDeprecatedDefinitions, VpiArrayIsNoPropertyOfThisStandard) {
-  EXPECT_EQ(vpi_get(vpiType, &integer_array_), vpiRegArray);
-  EXPECT_EQ(vpi_get(vpiArray, &integer_array_), 0);
-  EXPECT_EQ(vpi_get(vpiArray, &word_), 0);
+  EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(&integer_array_)), vpiRegArray);
+  EXPECT_EQ(vpi_get(vpiArray, VpiHandleOf(&integer_array_)), 0);
+  EXPECT_EQ(vpi_get(vpiArray, VpiHandleOf(&word_)), 0);
   ASSERT_TRUE(ctx_.SetDefaultCompatibilityMode(vpiMode1800v2009));
-  EXPECT_EQ(vpi_get(vpiType, &integer_array_), vpiRegArray);
-  EXPECT_EQ(vpi_get(vpiArray, &integer_array_), 0);
+  EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(&integer_array_)), vpiRegArray);
+  EXPECT_EQ(vpi_get(vpiArray, VpiHandleOf(&integer_array_)), 0);
 }
 
 // The property that replaced it, §37.17 detail 2's and §37.16 detail 2's
@@ -223,9 +227,9 @@ TEST_F(VpiDeprecatedDefinitions, VpiArrayMemberTellsAnElementFromAVariable) {
   net.type = vpiNet;
   net.parent = &net_array;
   net_array.children = {&net};
-  EXPECT_EQ(vpi_get(vpiArrayMember, &word_), 1);
-  EXPECT_EQ(vpi_get(vpiArrayMember, &net), 1);
-  EXPECT_EQ(vpi_get(vpiArrayMember, &integer_), 0);
+  EXPECT_EQ(vpi_get(vpiArrayMember, VpiHandleOf(&word_)), 1);
+  EXPECT_EQ(vpi_get(vpiArrayMember, VpiHandleOf(&net)), 1);
+  EXPECT_EQ(vpi_get(vpiArrayMember, VpiHandleOf(&integer_)), 0);
 }
 
 // A mode changes the object type and vpiArray property and nothing else: the
@@ -233,7 +237,7 @@ TEST_F(VpiDeprecatedDefinitions, VpiArrayMemberTellsAnElementFromAVariable) {
 // the 1995 mode, and a null handle gets the answer it gets under this standard.
 TEST_F(VpiDeprecatedDefinitions, EveryOtherPropertyIsTheCurrentOne) {
   ASSERT_TRUE(ctx_.SetDefaultCompatibilityMode(vpiMode1364v1995));
-  EXPECT_EQ(vpi_get(vpiIsMemory, &memory_), 1);
+  EXPECT_EQ(vpi_get(vpiIsMemory, VpiHandleOf(&memory_)), 1);
   EXPECT_EQ(vpi_get(vpiType, nullptr), 0);
 }
 
@@ -243,8 +247,8 @@ TEST_F(VpiDeprecatedDefinitions, EveryOtherPropertyIsTheCurrentOne) {
 TEST_F(VpiDeprecatedDefinitions, AnErrorTheCurrentRoutineRecordsIsKept) {
   integer_array_.is_protected = true;
   ASSERT_TRUE(ctx_.SetDefaultCompatibilityMode(vpiMode1364v1995));
-  EXPECT_EQ(vpi_get(vpiArray, &integer_array_), vpiUndefined);
-  EXPECT_EQ(vpi_get(vpiType, &integer_array_), vpiIntegerVar);
+  EXPECT_EQ(vpi_get(vpiArray, VpiHandleOf(&integer_array_)), vpiUndefined);
+  EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(&integer_array_)), vpiIntegerVar);
 }
 
 }  // namespace

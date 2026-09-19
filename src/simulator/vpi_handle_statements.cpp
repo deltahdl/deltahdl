@@ -2,6 +2,8 @@
 // The statement-class predicates and the for-header helper these resolvers ask
 // are declared here.
 #include "simulator/vpi_internal.h"
+#include "simulator/vpi_model_helpers1.h"
+#include "simulator/vpi_object.h"
 
 namespace delta {
 

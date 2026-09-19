@@ -4,6 +4,9 @@
 
 #include "helpers_vpi_driver_load_iter.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_constants.h"
+#include "simulator/vpi_context.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -143,7 +146,8 @@ TEST(NetDriversAndLoads,
   EXPECT_TRUE(VpiIterationContains(loads, &port));
 
   // Shall #2: the complex expression is reached through the port's vpiHighConn.
-  EXPECT_EQ(vpi_handle(vpiHighConn, &port), &complex_expr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiHighConn, VpiHandleOf(&port))),
+            &complex_expr);
 }
 
 // Detail 1 (concatenation carve-out): a concatenation on an input port does not

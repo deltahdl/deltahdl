@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -50,7 +52,8 @@ TEST_F(ReturnStatement, ReturnReachesReturnedValueAmongOtherChildren) {
   return_stmt.type = vpiReturnStmt;
   return_stmt.children = {&other, &value};
 
-  EXPECT_EQ(vpi_handle(vpiCondition, &return_stmt), &value);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiCondition, VpiHandleOf(&return_stmt))),
+            &value);
 }
 
 // Condition edge: the value is reached whatever expression kind it is written
@@ -67,7 +70,8 @@ TEST_F(ReturnStatement, EachExpressionKindAValueCarriesIsReached) {
     return_stmt.type = vpiReturnStmt;
     return_stmt.children = {&value};
 
-    EXPECT_EQ(vpi_handle(vpiCondition, &return_stmt), &value)
+    EXPECT_EQ(VpiObjectOf(vpi_handle(vpiCondition, VpiHandleOf(&return_stmt))),
+              &value)
         << "value kind " << value_kind;
   }
 }
@@ -79,7 +83,7 @@ TEST_F(ReturnStatement, VoidReturnReportsNoValue) {
   VpiObject return_stmt;
   return_stmt.type = vpiReturnStmt;
 
-  EXPECT_EQ(vpi_handle(vpiCondition, &return_stmt), nullptr);
+  EXPECT_EQ(vpi_handle(vpiCondition, VpiHandleOf(&return_stmt)), nullptr);
 }
 
 // Condition gating: the return-value relation is scoped to the return statement
@@ -95,7 +99,7 @@ TEST_F(ReturnStatement, ReturnConditionRelationIsScopedToReturnStatements) {
   not_a_return.type = vpiBegin;  // not a return statement
   not_a_return.children = {&expr};
 
-  EXPECT_EQ(vpi_handle(vpiCondition, &not_a_return), nullptr);
+  EXPECT_EQ(vpi_handle(vpiCondition, VpiHandleOf(&not_a_return)), nullptr);
 }
 
 }  // namespace

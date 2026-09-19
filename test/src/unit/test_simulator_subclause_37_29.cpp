@@ -1,7 +1,11 @@
 #include <gtest/gtest.h>
 
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_constants.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_model_helpers3.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -49,7 +53,7 @@ TEST_F(VirtualInterface, ExprReachesAssignedInterfaceInstance) {
   vif.children = {&iface};
 
   EXPECT_EQ(VpiVirtualInterfaceExpr(&vif), &iface);
-  EXPECT_EQ(vpi_handle(vpiExpr, &vif), &iface);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiExpr, VpiHandleOf(&vif))), &iface);
 }
 
 // D1: a virtual interface var whose declaration assigned no interface reports
@@ -59,7 +63,7 @@ TEST_F(VirtualInterface, ExprIsNullWhenNoInterfaceAssigned) {
   vif.type = vpiVirtualInterfaceVar;  // no children -> no assignment
 
   EXPECT_EQ(VpiVirtualInterfaceExpr(&vif), nullptr);
-  EXPECT_EQ(vpi_handle(vpiExpr, &vif), nullptr);
+  EXPECT_EQ(vpi_handle(vpiExpr, VpiHandleOf(&vif)), nullptr);
 }
 
 // D1 edge: the helper only speaks for a virtual interface var; any other handle
@@ -150,7 +154,7 @@ TEST_F(VirtualInterface, ExprSkipsRefObjThatFailsDetail2) {
   vif.children = {&ref_to_net};
 
   EXPECT_EQ(VpiVirtualInterfaceExpr(&vif), nullptr);
-  EXPECT_EQ(vpi_handle(vpiExpr, &vif), nullptr);
+  EXPECT_EQ(vpi_handle(vpiExpr, VpiHandleOf(&vif)), nullptr);
 }
 
 // D1 (modport operand): the figure's vpiExpr group admits a modport, so a
@@ -165,7 +169,7 @@ TEST_F(VirtualInterface, ExprReachesAssignedModport) {
   vif.children = {&modport};
 
   EXPECT_EQ(VpiVirtualInterfaceExpr(&vif), &modport);
-  EXPECT_EQ(vpi_handle(vpiExpr, &vif), &modport);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiExpr, VpiHandleOf(&vif))), &modport);
 }
 
 // D1 (virtual-interface-var operand): the figure's vpiExpr group admits another
@@ -180,7 +184,7 @@ TEST_F(VirtualInterface, ExprReachesAssignedNestedVirtualInterface) {
   vif.children = {&source_vif};
 
   EXPECT_EQ(VpiVirtualInterfaceExpr(&vif), &source_vif);
-  EXPECT_EQ(vpi_handle(vpiExpr, &vif), &source_vif);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiExpr, VpiHandleOf(&vif))), &source_vif);
 }
 
 // D1 + D2 (ref-obj operand, accepting form): the figure's vpiExpr group admits
@@ -199,7 +203,7 @@ TEST_F(VirtualInterface, ExprReachesAssignedRefObjPassedThroughPort) {
   vif.children = {&ref_to_iface};
 
   EXPECT_EQ(VpiVirtualInterfaceExpr(&vif), &ref_to_iface);
-  EXPECT_EQ(vpi_handle(vpiExpr, &vif), &ref_to_iface);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiExpr, VpiHandleOf(&vif))), &ref_to_iface);
 }
 
 // D1 + D2 (constant operand): the figure's vpiExpr group admits a constant, and
@@ -216,7 +220,7 @@ TEST_F(VirtualInterface, ExprReachesAssignedNullConstant) {
   vif.children = {&null_const};
 
   EXPECT_EQ(VpiVirtualInterfaceExpr(&vif), &null_const);
-  EXPECT_EQ(vpi_handle(vpiExpr, &vif), &null_const);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiExpr, VpiHandleOf(&vif))), &null_const);
 }
 
 // Example 2: vpiActual of a virtual interface var reaches the interface
@@ -230,7 +234,7 @@ TEST_F(VirtualInterface, ActualReachesHeldInterfaceInstance) {
   vif.type = vpiVirtualInterfaceVar;
   vif.actual = &iface;
 
-  EXPECT_EQ(vpi_handle(vpiActual, &vif), &iface);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiActual, VpiHandleOf(&vif))), &iface);
 }
 
 // Figure (vpiActual -> modport arm): a virtual interface var declared over a
@@ -246,7 +250,7 @@ TEST_F(VirtualInterface, ActualReachesHeldModport) {
   vif.is_modport = true;
   vif.actual = &modport;
 
-  EXPECT_EQ(vpi_handle(vpiActual, &vif), &modport);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiActual, VpiHandleOf(&vif))), &modport);
 }
 
 // Example 2: vpiActual returns NULL while the virtual interface is
@@ -255,7 +259,7 @@ TEST_F(VirtualInterface, ActualIsNullWhileUninitialized) {
   VpiObject vif;
   vif.type = vpiVirtualInterfaceVar;  // no actual bound yet
 
-  EXPECT_EQ(vpi_handle(vpiActual, &vif), nullptr);
+  EXPECT_EQ(vpi_handle(vpiActual, VpiHandleOf(&vif)), nullptr);
 }
 
 // Figure properties: the virtual interface var carries vpiName/vpiFullName and
@@ -268,9 +272,10 @@ TEST_F(VirtualInterface, NameAndIsModPortProperties) {
   vif.full_name = "SBusTransactor.bus";
   vif.is_modport = false;
 
-  EXPECT_STREQ(vpi_get_str(vpiName, &vif), "bus");
-  EXPECT_STREQ(vpi_get_str(vpiFullName, &vif), "SBusTransactor.bus");
-  EXPECT_EQ(vpi_get(vpiIsModPort, &vif), 0);
+  EXPECT_STREQ(vpi_get_str(vpiName, VpiHandleOf(&vif)), "bus");
+  EXPECT_STREQ(vpi_get_str(vpiFullName, VpiHandleOf(&vif)),
+               "SBusTransactor.bus");
+  EXPECT_EQ(vpi_get(vpiIsModPort, VpiHandleOf(&vif)), 0);
 }
 
 // Figure property (vpiIsModPort true arm): a virtual interface var declared
@@ -283,7 +288,7 @@ TEST_F(VirtualInterface, IsModPortTrueForModportQualifiedVar) {
   vif.name = "V32_Array";
   vif.is_modport = true;
 
-  EXPECT_EQ(vpi_get(vpiIsModPort, &vif), 1);
+  EXPECT_EQ(vpi_get(vpiIsModPort, VpiHandleOf(&vif)), 1);
 }
 
 }  // namespace

@@ -76,7 +76,10 @@
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
 #include "simulator/sim_context.h"
+#include "simulator/vpi_constants.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 using namespace delta;
@@ -659,9 +662,9 @@ TEST(LibraryBindingDisplay, VpiGetStrCApiReadsBindingProperties) {
   mod->library_name = "rtlLib";
   mod->cell_name = "adder";
   mod->config_name = "work.cfg1";
-  EXPECT_STREQ(vpi_get_str(vpiLibrary, mod), "rtlLib");
-  EXPECT_STREQ(vpi_get_str(vpiCell, mod), "adder");
-  EXPECT_STREQ(vpi_get_str(vpiConfig, mod), "work.cfg1");
+  EXPECT_STREQ(vpi_get_str(vpiLibrary, VpiHandleOf(mod)), "rtlLib");
+  EXPECT_STREQ(vpi_get_str(vpiCell, VpiHandleOf(mod)), "adder");
+  EXPECT_STREQ(vpi_get_str(vpiConfig, VpiHandleOf(mod)), "work.cfg1");
   SetGlobalVpiContext(nullptr);
 }
 

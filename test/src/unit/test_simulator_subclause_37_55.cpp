@@ -4,7 +4,10 @@
 #include <vector>
 
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_model_helpers1.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -112,8 +115,10 @@ TEST(ImmediateAssertionModel, EachKindReachesExpressionAndPassStatement) {
 
     // The figure's edges through the public routine, which is where an
     // application reads them.
-    EXPECT_EQ(vpi_handle(vpiExpr, &assertion), &expr) << "kind=" << kind;
-    EXPECT_EQ(vpi_handle(vpiStmt, &assertion), &pass) << "kind=" << kind;
+    EXPECT_EQ(VpiObjectOf(vpi_handle(vpiExpr, VpiHandleOf(&assertion))), &expr)
+        << "kind=" << kind;
+    EXPECT_EQ(VpiObjectOf(vpi_handle(vpiStmt, VpiHandleOf(&assertion))), &pass)
+        << "kind=" << kind;
   }
 
   EXPECT_EQ(VpiImmediateAssertionExpr(nullptr), nullptr);
@@ -145,8 +150,9 @@ TEST(ImmediateAssertionModel, AssertReachesElseStatementCoverDoesNot) {
   VpiObject els;
   els.type = vpiAssignment;
   assertion.children = {&pass, &els};
-  EXPECT_EQ(vpi_handle(vpiStmt, &assertion), &pass);
-  EXPECT_EQ(vpi_handle(vpiElseStmt, &assertion), &els);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiStmt, VpiHandleOf(&assertion))), &pass);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiElseStmt, VpiHandleOf(&assertion))),
+            &els);
 
   // The figure draws no vpiElseStmt edge from the cover box, so a cover reaches
   // no else action however many statements it was written with.
@@ -157,8 +163,8 @@ TEST(ImmediateAssertionModel, AssertReachesElseStatementCoverDoesNot) {
   VpiObject cover_second;
   cover_second.type = vpiAssignment;
   cover.children = {&cover_pass, &cover_second};
-  EXPECT_EQ(vpi_handle(vpiStmt, &cover), &cover_pass);
-  EXPECT_EQ(vpi_handle(vpiElseStmt, &cover), nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiStmt, VpiHandleOf(&cover))), &cover_pass);
+  EXPECT_EQ(vpi_handle(vpiElseStmt, VpiHandleOf(&cover)), nullptr);
 
   EXPECT_EQ(VpiImmediateAssertionElseStmt(nullptr), nullptr);
   SetGlobalVpiContext(nullptr);

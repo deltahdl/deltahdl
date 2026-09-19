@@ -5,7 +5,7 @@
 #include "helpers_vpi_save_restore_probe.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_data_structs.h"
-#include "simulator/vpi_user_macros.h"
+#include "simulator/vpi_user.h"
 
 namespace delta {
 namespace {
@@ -24,7 +24,7 @@ struct SingleWrite {
   int len = 0;
 };
 
-inline int WriteOnceCb(VpiCbData* cb) {
+inline int WriteOnceCb(s_cb_data* cb) {
   auto* p = static_cast<SingleWrite*>(cb->user_data);
   vpi_put_data(p->id, p->data, p->len);
   return 0;
@@ -32,7 +32,7 @@ inline int WriteOnceCb(VpiCbData* cb) {
 
 // Reads with a null destination buffer, modeling an application that failed to
 // provide the allocated storage the routine requires.
-int ReadIntoNullCb(VpiCbData* cb) {
+int ReadIntoNullCb(s_cb_data* cb) {
   auto* p = static_cast<SingleRead*>(cb->user_data);
   p->returned = vpi_get_data(p->id, nullptr, p->request);
   return 0;

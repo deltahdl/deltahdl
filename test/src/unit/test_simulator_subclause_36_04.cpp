@@ -5,7 +5,9 @@
 
 #include "fixture_simulator.h"
 #include "simulator/variable.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -48,7 +50,7 @@ bool g_user_data_was_read = false;
 
 // Walks the call's arguments the way §36.4 says an application has to: through
 // the PLI routines, off the call handle, rather than out of its own parameter.
-int ReadArgsCalltf(const char* user_data) {
+PLI_INT32 ReadArgsCalltf(PLI_BYTE8* user_data) {
   g_user_data_seen = user_data;
   g_user_data_was_read = true;
   g_args_seen = 0;
@@ -71,7 +73,7 @@ int ReadArgsCalltf(const char* user_data) {
 
 // Writes through the second argument, which is what §36.4's "write to the
 // task/function arguments" names.
-int WriteArgCalltf(const char*) {
+PLI_INT32 WriteArgCalltf(PLI_BYTE8*) {
   vpiHandle call = vpi_handle(vpiSysTfCall, nullptr);
   if (call == nullptr) return 0;
   vpiHandle args = vpi_iterate(vpiArgument, call);
@@ -90,10 +92,11 @@ int WriteArgCalltf(const char*) {
 // Registers $get_vector under `calltf` and runs the clause's own call site,
 // with `input_bus` holding `bus`. Returns the value the variable holds once the
 // run is over, so a case that wrote through an argument can read it back.
-uint64_t RunGetVector(int (*calltf)(const char*), uint64_t bus, SimFixture& f) {
+uint64_t RunGetVector(PLI_INT32 (*calltf)(PLI_BYTE8*), uint64_t bus,
+                      SimFixture& f) {
   s_vpi_systf_data task = {};
   task.type = vpiSysTask;
-  task.tfname = "$get_vector";
+  task.tfname = VpiText("$get_vector");
   task.calltf = calltf;
   task.user_data = g_user_data;
   if (vpi_register_systf(&task) == nullptr) return 0;

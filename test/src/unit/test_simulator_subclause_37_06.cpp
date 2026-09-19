@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -45,7 +47,8 @@ TEST_F(Interface, IndexTransitionReachesArrayIndex) {
   member.array_member = true;
   member.index_expr = &index_expr;
 
-  EXPECT_EQ(vpi_handle(vpiIndex, &member), &index_expr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiIndex, VpiHandleOf(&member))),
+            &index_expr);
 }
 
 // D1: for an interface that is not part of an instance array, the vpiIndex
@@ -61,7 +64,7 @@ TEST_F(Interface, IndexTransitionIsNullWhenNotAnArrayElement) {
   standalone.index_expr = &stray_expr;  // present but must not be reported
   standalone.children.push_back(&stray_expr);
 
-  EXPECT_EQ(vpi_handle(vpiIndex, &standalone), nullptr);
+  EXPECT_EQ(vpi_handle(vpiIndex, VpiHandleOf(&standalone)), nullptr);
 }
 
 // D1 edge: an interface marked as an array element but carrying no recorded
@@ -78,7 +81,7 @@ TEST_F(Interface, IndexTransitionIsNullForArrayElementWithoutIndexExpr) {
   member.index_expr = nullptr;  // array element, but no index recorded
   member.children.push_back(&child_expr);  // must not be reported via vpiIndex
 
-  EXPECT_EQ(vpi_handle(vpiIndex, &member), nullptr);
+  EXPECT_EQ(vpi_handle(vpiIndex, VpiHandleOf(&member)), nullptr);
 }
 
 }  // namespace

@@ -6,7 +6,10 @@
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_constants.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -30,9 +33,9 @@ TEST_F(VpiHandleByIndexSim, HandleByIndexReturnCorrectChild) {
   vpi_ctx_.CreatePort("a", kVpiInput, mod);
   auto* port_b = vpi_ctx_.CreatePort("b", kVpiOutput, mod);
 
-  vpiHandle result = vpi_handle_by_index(mod, 1);
+  vpiHandle result = vpi_handle_by_index(VpiHandleOf(mod), 1);
   ASSERT_NE(result, nullptr);
-  EXPECT_EQ(result, port_b);
+  EXPECT_EQ(VpiObjectOf(result), port_b);
 }
 
 TEST_F(VpiHandleByIndexSim, HandleByIndexNullParentReturnsNullptr) {
@@ -44,7 +47,7 @@ TEST_F(VpiHandleByIndexSim, HandleByIndexNullParentReturnsNullptr) {
 // select expression, so the routine returns a null handle.
 TEST_F(VpiHandleByIndexSim, HandleByIndexOutOfRangeReturnsNullptr) {
   auto* mod = vpi_ctx_.CreateModule("top", "top");
-  vpiHandle result = vpi_handle_by_index(mod, 99);
+  vpiHandle result = vpi_handle_by_index(VpiHandleOf(mod), 99);
   EXPECT_EQ(result, nullptr);
 }
 
@@ -56,10 +59,10 @@ TEST_F(VpiHandleByIndexSim, HandleByIndexProtectedObjectIsAnError) {
   vpi_ctx_.CreatePort("a", kVpiInput, mod);
   mod->is_protected = true;
 
-  vpiHandle result = vpi_handle_by_index(mod, 0);
+  vpiHandle result = vpi_handle_by_index(VpiHandleOf(mod), 0);
   EXPECT_EQ(result, nullptr);
 
-  SVpiErrorInfo info = {};
+  s_vpi_error_info info = {};
   EXPECT_EQ(vpi_chk_error(&info), vpiError);
   EXPECT_EQ(info.level, vpiError);
 }
@@ -72,7 +75,7 @@ TEST_F(VpiHandleByIndexSim,
   auto* param = vpi_ctx_.CreateParameter("p", 0);
   vpi_ctx_.CreatePort("a", kVpiInput, param);  // gives param a child at index 0
 
-  vpiHandle result = vpi_handle_by_index(param, 0);
+  vpiHandle result = vpi_handle_by_index(VpiHandleOf(param), 0);
   EXPECT_EQ(result, nullptr);
 }
 
@@ -87,14 +90,14 @@ TEST_F(VpiHandleByIndexSim, HandleByIndexSelectsRegArrayElement) {
   auto* array =
       vpi_ctx_.CreateRegArray("mem", vpiStaticArray, {{0, 1, 2}}, {e0, e1, e2});
 
-  vpiHandle result = vpi_handle_by_index(array, 1);
+  vpiHandle result = vpi_handle_by_index(VpiHandleOf(array), 1);
   ASSERT_NE(result, nullptr);
-  EXPECT_EQ(result, array->children[1]);
+  EXPECT_EQ(VpiObjectOf(result), array->children[1]);
   EXPECT_EQ(vpi_get(vpiType, result), vpiReg);
 
   // An element index past the last array element names no sub-object, so the
   // selection is not a legal index select expression and the handle is null.
-  EXPECT_EQ(vpi_handle_by_index(array, 3), nullptr);
+  EXPECT_EQ(vpi_handle_by_index(VpiHandleOf(array), 3), nullptr);
 }
 
 // §38.19: the LRM's first example names a net as a reference object whose index
@@ -116,13 +119,13 @@ TEST_F(VpiHandleByIndexSim, HandleByIndexSelectsNetBit) {
   bit3.index = 3;
   net.children = {&bit0, &bit1, &bit2, &bit3};
 
-  vpiHandle result = vpi_handle_by_index(&net, 2);
+  vpiHandle result = vpi_handle_by_index(VpiHandleOf(&net), 2);
   ASSERT_NE(result, nullptr);
-  EXPECT_EQ(result, &bit2);
+  EXPECT_EQ(VpiObjectOf(result), &bit2);
 
   // A bit index beyond the net width names no sub-object, so no legal index
   // select is formed and the handle is null.
-  EXPECT_EQ(vpi_handle_by_index(&net, 4), nullptr);
+  EXPECT_EQ(vpi_handle_by_index(VpiHandleOf(&net), 4), nullptr);
 }
 
 }  // namespace

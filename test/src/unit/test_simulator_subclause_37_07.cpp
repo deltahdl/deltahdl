@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -43,7 +45,7 @@ TEST_F(Modport, ReportsItsNameViaVpiName) {
   modport.type = vpiModport;
   modport.name = "phy";
 
-  EXPECT_STREQ(vpi_get_str(vpiName, &modport), "phy");
+  EXPECT_STREQ(vpi_get_str(vpiName, VpiHandleOf(&modport)), "phy");
 }
 
 // Edge interface <-> modport, both directions. Forward: the enclosing interface
@@ -61,13 +63,14 @@ TEST_F(Modport, InterfaceAndModportTraverseBothWays) {
   iface.children = {&modport};
 
   // Forward: interface iterates to the modport it groups.
-  vpiHandle iter = vpi_iterate(vpiModport, &iface);
+  vpiHandle iter = vpi_iterate(vpiModport, VpiHandleOf(&iface));
   ASSERT_NE(iter, nullptr);
-  EXPECT_EQ(vpi_scan(iter), &modport);
+  EXPECT_EQ(VpiObjectOf(vpi_scan(iter)), &modport);
   EXPECT_EQ(vpi_scan(iter), nullptr);
 
   // Reverse: the modport reaches its enclosing interface.
-  EXPECT_EQ(vpi_handle(vpiInterface, &modport), &iface);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiInterface, VpiHandleOf(&modport))),
+            &iface);
 }
 
 // Edge modport <-> io decl, both directions. Forward: the modport iterates to
@@ -86,14 +89,15 @@ TEST_F(Modport, ModportAndIoDeclTraverseBothWays) {
   modport.children = {&in_decl, &out_decl};
 
   // Forward: the modport iterates to the io declarations it groups.
-  vpiHandle iter = vpi_iterate(vpiIODecl, &modport);
+  vpiHandle iter = vpi_iterate(vpiIODecl, VpiHandleOf(&modport));
   ASSERT_NE(iter, nullptr);
   int count = 0;
   while (vpi_scan(iter) != nullptr) ++count;
   EXPECT_EQ(count, 2);
 
   // Reverse: an io decl reaches its enclosing modport.
-  EXPECT_EQ(vpi_handle(vpiModport, &in_decl), &modport);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiModport, VpiHandleOf(&in_decl))),
+            &modport);
 }
 
 // Edge for C3 forward: a modport that groups no io declarations yields no
@@ -104,7 +108,7 @@ TEST_F(Modport, ModportWithNoIoDeclsIteratesToNone) {
   VpiObject modport;
   modport.type = vpiModport;
 
-  EXPECT_EQ(vpi_iterate(vpiIODecl, &modport), nullptr);
+  EXPECT_EQ(vpi_iterate(vpiIODecl, VpiHandleOf(&modport)), nullptr);
 }
 
 // Edge for C2 reverse: a modport with no enclosing interface reaches none
@@ -115,7 +119,7 @@ TEST_F(Modport, ModportWithoutEnclosingInterfaceReachesNone) {
   VpiObject modport;
   modport.type = vpiModport;
 
-  EXPECT_EQ(vpi_handle(vpiInterface, &modport), nullptr);
+  EXPECT_EQ(vpi_handle(vpiInterface, VpiHandleOf(&modport)), nullptr);
 }
 
 // Edge for C2 forward negative: an interface that groups no modports yields no
@@ -127,7 +131,7 @@ TEST_F(Modport, InterfaceWithNoModportsIteratesToNone) {
   VpiObject iface;
   iface.type = vpiInterface;
 
-  EXPECT_EQ(vpi_iterate(vpiModport, &iface), nullptr);
+  EXPECT_EQ(vpi_iterate(vpiModport, VpiHandleOf(&iface)), nullptr);
 }
 
 // Edge for C3 reverse negative: an io decl with no enclosing modport reaches
@@ -139,7 +143,7 @@ TEST_F(Modport, IoDeclWithoutEnclosingModportReachesNone) {
   VpiObject io_decl;
   io_decl.type = vpiIODecl;
 
-  EXPECT_EQ(vpi_handle(vpiModport, &io_decl), nullptr);
+  EXPECT_EQ(vpi_handle(vpiModport, VpiHandleOf(&io_decl)), nullptr);
 }
 
 }  // namespace

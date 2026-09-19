@@ -9,6 +9,9 @@
 #include "simulator/net.h"
 #include "simulator/scheduler.h"
 #include "simulator/variable.h"
+#include "simulator/vpi_constants.h"
+#include "simulator/vpi_context.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 using namespace delta;
@@ -213,7 +216,7 @@ TEST(PliPreObservedSim, VpiPutValueFromPreObservedRecordsWriteViolation) {
 
   auto* pre_obs = sched.GetEventPool().Acquire();
   pre_obs->callback = [&]() {
-    VpiValue value{};
+    s_vpi_value value{};
     value.format = kVpiIntVal;
     value.value.integer = 42;
     vpi.PutValue(&obj, &value, nullptr, 0);
@@ -243,7 +246,7 @@ TEST(PliPreObservedSim, MultipleIllegalWritesFromPreObservedAreEachCounted) {
   auto* pre_obs = sched.GetEventPool().Acquire();
   pre_obs->callback = [&]() {
     for (int i = 0; i < 4; ++i) {
-      VpiValue value{};
+      s_vpi_value value{};
       value.format = kVpiIntVal;
       value.value.integer = i;
       vpi.PutValue(&obj, &value, nullptr, 0);
@@ -274,7 +277,7 @@ TEST(PliPreObservedSim, VpiPutValueFromPostNbaIsNotFlaggedAgainstPreObserved) {
 
   auto* post_nba = sched.GetEventPool().Acquire();
   post_nba->callback = [&]() {
-    VpiValue value{};
+    s_vpi_value value{};
     value.format = kVpiIntVal;
     value.value.integer = 7;
     vpi.PutValue(&obj, &value, nullptr, 0);
@@ -323,7 +326,7 @@ TEST(PliPreObservedSim, VpiPutValueOnNetFromPreObservedRecordsWriteViolation) {
 
   auto* pre_obs = sched.GetEventPool().Acquire();
   pre_obs->callback = [&]() {
-    VpiValue value{};
+    s_vpi_value value{};
     value.format = kVpiIntVal;
     value.value.integer = 1;
     vpi.PutValue(&obj, &value, nullptr, 0);

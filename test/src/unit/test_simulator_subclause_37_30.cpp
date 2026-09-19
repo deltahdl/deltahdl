@@ -1,7 +1,11 @@
 #include <gtest/gtest.h>
 
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_model_helpers2.h"
+#include "simulator/vpi_model_helpers3.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -41,7 +45,7 @@ TEST_F(InterfaceTypespec, DefNameOfModportIsModportIdentifier) {
   modport_ts.def_name = "phy";  // the modport's identifier
 
   EXPECT_STREQ(VpiInterfaceTypespecDefName(&modport_ts), "phy");
-  EXPECT_STREQ(vpi_get_str(vpiDefName, &modport_ts), "phy");
+  EXPECT_STREQ(vpi_get_str(vpiDefName, VpiHandleOf(&modport_ts)), "phy");
 }
 
 // D1: the vpiDefName of an interface typespec that represents an interface is
@@ -55,9 +59,9 @@ TEST_F(InterfaceTypespec, DefNameOfInterfaceIsInterfaceDeclarationIdentifier) {
   iface_ts.def_name = "SBus";  // the interface declaration's identifier
 
   EXPECT_STREQ(VpiInterfaceTypespecDefName(&iface_ts), "SBus");
-  EXPECT_STREQ(vpi_get_str(vpiDefName, &iface_ts), "SBus");
+  EXPECT_STREQ(vpi_get_str(vpiDefName, VpiHandleOf(&iface_ts)), "SBus");
   // The typedef name is the typespec's vpiName, distinct from the def name.
-  EXPECT_STREQ(vpi_get_str(vpiName, &iface_ts), "SB16");
+  EXPECT_STREQ(vpi_get_str(vpiName, VpiHandleOf(&iface_ts)), "SB16");
 }
 
 // D1 edge: the def-name helper only speaks for an interface typespec; any other
@@ -80,7 +84,7 @@ TEST_F(InterfaceTypespec, DefNameOfInterfaceTypespecWithoutRecordedNameIsNull) {
   iface_ts.name = "SB16";  // has a vpiName, but no definition name recorded
 
   EXPECT_EQ(VpiInterfaceTypespecDefName(&iface_ts), nullptr);
-  EXPECT_EQ(vpi_get_str(vpiDefName, &iface_ts), nullptr);
+  EXPECT_EQ(vpi_get_str(vpiDefName, VpiHandleOf(&iface_ts)), nullptr);
 }
 
 // D2: for an interface typespec that represents a modport, vpiParent returns
@@ -97,7 +101,8 @@ TEST_F(InterfaceTypespec, ParentOfModportIsItsInterfaceTypespec) {
   modport_ts.parent = &iface_ts;
 
   EXPECT_EQ(VpiInterfaceTypespecParent(&modport_ts), &iface_ts);
-  EXPECT_EQ(vpi_handle(vpiParent, &modport_ts), &iface_ts);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiParent, VpiHandleOf(&modport_ts))),
+            &iface_ts);
 }
 
 // D2: for an interface typespec that represents an interface, vpiParent returns
@@ -113,7 +118,7 @@ TEST_F(InterfaceTypespec, ParentOfInterfaceIsNull) {
       &enclosing;  // an interface typespec still reports no parent
 
   EXPECT_EQ(VpiInterfaceTypespecParent(&iface_ts), nullptr);
-  EXPECT_EQ(vpi_handle(vpiParent, &iface_ts), nullptr);
+  EXPECT_EQ(vpi_handle(vpiParent, VpiHandleOf(&iface_ts)), nullptr);
 }
 
 // D2 edge: the parent helper only speaks for an interface typespec; any other
@@ -136,8 +141,8 @@ TEST_F(InterfaceTypespec, IsModPortProperty) {
   iface_ts.type = vpiInterfaceTypespec;
   iface_ts.is_modport = false;
 
-  EXPECT_EQ(vpi_get(vpiIsModPort, &modport_ts), 1);
-  EXPECT_EQ(vpi_get(vpiIsModPort, &iface_ts), 0);
+  EXPECT_EQ(vpi_get(vpiIsModPort, VpiHandleOf(&modport_ts)), 1);
+  EXPECT_EQ(vpi_get(vpiIsModPort, VpiHandleOf(&iface_ts)), 0);
 }
 
 // Figure relation: an interface typespec reaches its param assigns through the
@@ -154,7 +159,7 @@ TEST_F(InterfaceTypespec, ParamAssignIterationWalksParamAssigns) {
   pa_other.type = vpiParamAssign;
   iface_ts.children = {&pa_width, &pa_other};
 
-  vpiHandle iter = vpi_iterate(vpiParamAssign, &iface_ts);
+  vpiHandle iter = vpi_iterate(vpiParamAssign, VpiHandleOf(&iface_ts));
   ASSERT_NE(iter, nullptr);
   int count = 0;
   while (vpi_scan(iter) != nullptr) ++count;
@@ -175,7 +180,7 @@ TEST_F(InterfaceTypespec, ParamAssignIterationOfParameterlessInterfaceIsNull) {
   unrelated.type = vpiModport;
   iface_ts.children = {&unrelated};
 
-  EXPECT_EQ(vpi_iterate(vpiParamAssign, &iface_ts), nullptr);
+  EXPECT_EQ(vpi_iterate(vpiParamAssign, VpiHandleOf(&iface_ts)), nullptr);
 }
 
 }  // namespace

@@ -11,6 +11,16 @@
 // part of the public VPI surface declared in vpi_user.h.
 namespace delta {
 
+// Annex K types the text members of its structures, s_vpi_error_info's message
+// and s_vpi_value's str among them, as PLI_BYTE8 *, a char * with no const, as
+// the C of the interface writes a pointer to text the callee does not modify.
+// What the simulator stores in them is a string literal or a std::string's
+// buffer, and nothing writes through the member, so the const is removed here,
+// in one place, rather than at each site that stores text.
+inline PLI_BYTE8* VpiText(const char* text) {
+  return const_cast<PLI_BYTE8*>(text);
+}
+
 // Defined in vpi_helpers_statements.cpp, used by vpi_callbacks.cpp.
 bool VpiIsScopeBodyStmtType(int type);
 
@@ -50,7 +60,7 @@ bool VpiIsCallbackHostType(int type);
 // vpi_iterate.cpp.
 void VpiCollectCallbackObjects(VpiHandle ref,
                                const std::vector<VpiHandle>& cb_handles,
-                               const std::vector<VpiCbData>& callbacks,
+                               const std::vector<s_cb_data>& callbacks,
                                VpiHandle iter);
 
 // Defined in vpi_helpers_statements.cpp, used by vpi_iterate.cpp.
@@ -76,7 +86,7 @@ const char* VpiCompatibilityUnsupportedConstruct(
 // current one, with the objects that mode's applications do not expect dropped.
 // Defined in vpi_compatibility.cpp, used by vpi.cpp for the run-wide default
 // and by the compile-based variants for the mode compiled into them.
-vpiHandle VpiIterateInCompatibilityMode(int type, VpiHandle ref, int mode);
+VpiHandle VpiIterateInCompatibilityMode(int type, VpiHandle ref, int mode);
 
 // §36.12.2.2 with §36.12.1 Table 36-10 rows 1 through 4: the property a
 // compatibility mode gives an application - the current one, with the object

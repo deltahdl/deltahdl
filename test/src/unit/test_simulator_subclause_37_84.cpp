@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -47,11 +49,11 @@ TEST_F(Iterator, IteratorTypeReportsTheWalkedKind) {
   scope.type = vpiModule;
   scope.children = {&child_module, &child_port};
 
-  vpiHandle module_iter = vpi_iterate(vpiModule, &scope);
+  vpiHandle module_iter = vpi_iterate(vpiModule, VpiHandleOf(&scope));
   ASSERT_NE(module_iter, nullptr);
   EXPECT_EQ(vpi_get(vpiIteratorType, module_iter), vpiModule);
 
-  vpiHandle port_iter = vpi_iterate(vpiPort, &scope);
+  vpiHandle port_iter = vpi_iterate(vpiPort, VpiHandleOf(&scope));
   ASSERT_NE(port_iter, nullptr);
   EXPECT_EQ(vpi_get(vpiIteratorType, port_iter), vpiPort);
 }
@@ -68,9 +70,9 @@ TEST_F(Iterator, UseRecoversTheReferenceHandle) {
   scope.type = vpiModule;
   scope.children = {&child_module};
 
-  vpiHandle iter = vpi_iterate(vpiModule, &scope);
+  vpiHandle iter = vpi_iterate(vpiModule, VpiHandleOf(&scope));
   ASSERT_NE(iter, nullptr);
-  EXPECT_EQ(vpi_handle(vpiUse, iter), &scope);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiUse, iter)), &scope);
 }
 
 // Edge (vpiUse), detail 2: an iterator may have been created over a NULL
@@ -99,8 +101,8 @@ TEST_F(Iterator, TheTypeAndTheEdgeAreDrawnOnTheIteratorAlone) {
   VpiObject scope;
   scope.type = vpiModule;
 
-  EXPECT_EQ(vpi_get(vpiIteratorType, &scope), vpiUndefined);
-  EXPECT_EQ(vpi_handle(vpiUse, &scope), nullptr);
+  EXPECT_EQ(vpi_get(vpiIteratorType, VpiHandleOf(&scope)), vpiUndefined);
+  EXPECT_EQ(vpi_handle(vpiUse, VpiHandleOf(&scope)), nullptr);
 }
 
 }  // namespace

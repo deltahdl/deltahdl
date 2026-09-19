@@ -10,7 +10,12 @@
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_constants.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
+#include "simulator/vpi_model_helpers2.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -234,17 +239,17 @@ TEST(FrameModel, ValueChangeCallbackOnAutomaticVariableIsRejected) {
   VpiObject automatic_var;
   automatic_var.type = vpiLogicVar;
   automatic_var.automatic = true;
-  VpiCbData on_automatic = {};
+  s_cb_data on_automatic = {};
   on_automatic.reason = cbValueChange;
-  on_automatic.obj = &automatic_var;
+  on_automatic.obj = VpiHandleOf(&automatic_var);
   EXPECT_EQ(ctx.RegisterCb(&on_automatic), nullptr);
   EXPECT_EQ(ctx.LastError().level, kVpiError);
 
   VpiObject static_var;
   static_var.type = vpiLogicVar;
-  VpiCbData on_static = {};
+  s_cb_data on_static = {};
   on_static.reason = cbValueChange;
-  on_static.obj = &static_var;
+  on_static.obj = VpiHandleOf(&static_var);
   EXPECT_NE(ctx.RegisterCb(&on_static), nullptr);
 }
 
@@ -272,10 +277,10 @@ TEST_F(FrameSim, PutValueWithDelayOnAutomaticVariableIsRejected) {
   ASSERT_NE(h, nullptr);
   h->automatic = true;
 
-  VpiValue val = {};
+  s_vpi_value val = {};
   val.format = kVpiIntVal;
   val.value.integer = 55;
-  VpiTime time = {};
+  s_vpi_time time = {};
   time.low = 10;
   vpi_ctx_.PutValue(h, &val, &time, vpiInertialDelay);
 
@@ -294,7 +299,7 @@ TEST_F(FrameSim, PutValueWithoutDelayOnAutomaticVariableIsApplied) {
   ASSERT_NE(h, nullptr);
   h->automatic = true;
 
-  VpiValue val = {};
+  s_vpi_value val = {};
   val.format = kVpiIntVal;
   val.value.integer = 55;
   vpi_ctx_.PutValue(h, &val, nullptr, vpiNoDelay);
@@ -321,7 +326,7 @@ int g_frame_is_active = 0;
 bool g_frame_has_a_thread = false;
 bool g_frame_has_a_parent_frame = false;
 
-int InspectFrameCalltf(const char*) {
+PLI_INT32 InspectFrameCalltf(PLI_BYTE8*) {
   vpiHandle frame = vpi_handle(vpiFrame, nullptr);
   g_frame_found = frame != nullptr;
   if (frame == nullptr) return 0;
@@ -341,7 +346,7 @@ void RegisterFrameProbe() {
 
   s_vpi_systf_data data = {};
   data.type = vpiSysTask;
-  data.tfname = "$probe";
+  data.tfname = VpiText("$probe");
   data.calltf = &InspectFrameCalltf;
   ASSERT_NE(vpi_register_systf(&data), nullptr);
 }

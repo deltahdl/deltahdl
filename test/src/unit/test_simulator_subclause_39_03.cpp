@@ -5,7 +5,9 @@
 
 #include "simulator/assertion_api.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -75,13 +77,13 @@ class AssertionStaticInformation : public ::testing::Test {
 // written on - is read through that handle and through nothing else.
 TEST_F(AssertionStaticInformation,
        TheHandleIsWhatTheStaticInformationIsReadFrom) {
-  vpiHandle it = vpi_iterate(vpiAssertion, &dut_);
+  vpiHandle it = vpi_iterate(vpiAssertion, VpiHandleOf(&dut_));
   ASSERT_NE(it, nullptr);
   vpiHandle assertion = vpi_scan(it);
-  ASSERT_EQ(assertion, &assertion_);
+  ASSERT_EQ(VpiObjectOf(assertion), &assertion_);
   ASSERT_EQ(vpi_scan(it), nullptr);
 
-  StaticAssertionInfo info = ReadStaticInfo(assertion);
+  StaticAssertionInfo info = ReadStaticInfo(VpiObjectOf(assertion));
   EXPECT_EQ(info.name, "handshake_p");
   EXPECT_EQ(info.type, vpiAssert);
   EXPECT_EQ(info.instance, &dut_);
