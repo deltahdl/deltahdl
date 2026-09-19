@@ -33,4 +33,15 @@ void CheckImportFormalUnpackedDims(const ModuleItem* item,
                                    const DpiClassNames& classes,
                                    DiagEngine& diag);
 
+// §35.5.6 with §35.7: the same for an exported subroutine, `callable` being
+// the SystemVerilog function or task the export declaration `item` names,
+// whose formals the export holds to the import's restrictions; the dynamic
+// array's absent dimension is the separate rule of the same subclause,
+// reported by CheckExportDynamicArrayArguments in elaborator_dpi.cpp.
+void CheckExportFormalUnpackedDims(const ModuleItem* callable,
+                                   const ModuleItem* item,
+                                   const TypedefMap& typedefs,
+                                   const DpiClassNames& classes,
+                                   DiagEngine& diag);
+
 }  // namespace delta

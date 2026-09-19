@@ -377,4 +377,46 @@ TEST(DpiImportFormalType, ImportedFunctionWithSizedAndOpenFormalsIsOk) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// §35.5.6 (printed page 979 of ~/LRM.pdf) names imports and exports together
+// when it lists the permitted formal argument types, and §35.7 (printed 982)
+// holds an exported subroutine to the same restrictions; a queue or an
+// associative array is not among them. The export path looked for the
+// dynamic array's absent dimension alone and let a `[$]` or `[string]`
+// dimension through, and the type check read the data type, where `int`
+// is permitted.
+TEST(DpiExportFormalType, ExportedFunctionWithQueueFormalIsError) {
+  ElabFixture f;
+  Elaborate(R"(
+    module m;
+      function int f(input int a [$]);
+        return a.size();
+      endfunction
+      export "DPI-C" function f;
+    endmodule
+  )",
+            f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "SystemVerilog function 'f' has a formal argument "
+                            "'a' with a queue dimension, which is not a "
+                            "permitted formal argument type for DPI",
+                            6, "35.5.6"));
+}
+
+TEST(DpiExportFormalType, ExportedTaskWithAssociativeFormalIsError) {
+  ElabFixture f;
+  Elaborate(R"(
+    module m;
+      task t(input int a [string]);
+      endtask
+      export "DPI-C" task t;
+    endmodule
+  )",
+            f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "SystemVerilog task 't' has a formal argument 'a' "
+                            "with an associative dimension, which is not a "
+                            "permitted formal argument type for DPI",
+                            5, "35.5.6"));
+}
+
 }  // namespace

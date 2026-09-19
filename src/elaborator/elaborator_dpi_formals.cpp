@@ -71,31 +71,57 @@ void CheckImportFormalTypedefTypes(const ModuleItem* item,
   }
 }
 
+// §35.5.6: the name of the unpacked dimension kind that keeps `dim` from
+// being a formal argument of a DPI subroutine -- "queue" for `[$]` (§7.10)
+// and "associative" for an index type (§7.8) -- or empty for a sized
+// dimension, which the subclause's unpacked array permits.
+static std::string_view UnpermittedDimKind(const Expr* dim,
+                                           const TypedefMap& typedefs,
+                                           const DpiClassNames& classes) {
+  if (dim == nullptr) return {};
+  if (dim->kind == ExprKind::kIdentifier && dim->text == "$") return "queue";
+  if (IsAssocIndexDimension(dim, typedefs, classes)) return "associative";
+  return {};
+}
+
 void CheckImportFormalUnpackedDims(const ModuleItem* item,
                                    const TypedefMap& typedefs,
                                    const DpiClassNames& classes,
                                    DiagEngine& diag) {
   for (const auto& arg : item->func_args) {
     for (const Expr* dim : arg.unpacked_dims) {
-      if (dim == nullptr) continue;
-      if (dim->kind == ExprKind::kIdentifier && dim->text == "$") {
-        diag.Error(item->loc,
-                   std::format("formal argument '{}' of a DPI imported "
-                               "subroutine has a queue dimension, which is "
-                               "not a permitted formal argument type",
-                               arg.name),
-                   Subclause("35.5.6"));
-        return;
-      }
-      if (IsAssocIndexDimension(dim, typedefs, classes)) {
-        diag.Error(item->loc,
-                   std::format("formal argument '{}' of a DPI imported "
-                               "subroutine has an associative dimension, "
-                               "which is not a permitted formal argument type",
-                               arg.name),
-                   Subclause("35.5.6"));
-        return;
-      }
+      std::string_view kind = UnpermittedDimKind(dim, typedefs, classes);
+      if (kind.empty()) continue;
+      diag.Error(item->loc,
+                 std::format("formal argument '{}' of a DPI imported "
+                             "subroutine has {} {} dimension, which is not a "
+                             "permitted formal argument type",
+                             arg.name, kind == "queue" ? "a" : "an", kind),
+                 Subclause("35.5.6"));
+      return;
+    }
+  }
+}
+
+void CheckExportFormalUnpackedDims(const ModuleItem* callable,
+                                   const ModuleItem* item,
+                                   const TypedefMap& typedefs,
+                                   const DpiClassNames& classes,
+                                   DiagEngine& diag) {
+  std::string_view what =
+      callable->kind == ModuleItemKind::kTaskDecl ? "task" : "function";
+  for (const auto& arg : callable->func_args) {
+    for (const Expr* dim : arg.unpacked_dims) {
+      std::string_view kind = UnpermittedDimKind(dim, typedefs, classes);
+      if (kind.empty()) continue;
+      diag.Error(item->loc,
+                 std::format("SystemVerilog {} '{}' has a formal argument "
+                             "'{}' with {} {} dimension, which is not a "
+                             "permitted formal argument type for DPI",
+                             what, item->name, arg.name,
+                             kind == "queue" ? "a" : "an", kind),
+                 Subclause("35.5.6"));
+      return;
     }
   }
 }

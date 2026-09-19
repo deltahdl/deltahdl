@@ -404,6 +404,8 @@ void ValidateExportDeclaration(
   CheckExportRefArguments(callable, item, diag);
   CheckExportDynamicArrayArguments(callable, item, diag);
   CheckExportFormalTypes(callable, item, scope.typedefs, scope.classes, diag);
+  CheckExportFormalUnpackedDims(callable, item, scope.typedefs, scope.classes,
+                                diag);
   CheckExportResultType(callable, item, scope.typedefs, diag);
   CheckExportSignatureEquivalence(callable, link_name, item, export_signatures,
                                   diag);
