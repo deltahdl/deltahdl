@@ -14,6 +14,7 @@
 #include "simulator/eval_array.h"
 #include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_array_class_queue.h"
+#include "simulator/eval_class_array.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/exec_task.h"
@@ -678,10 +679,11 @@ static bool ForeachOnWildcardAssoc(const AssocArrayObject* aa,
 
 // §12.7.3: maps a zero-based iteration counter to the array's declared index
 // value. With array-info present the index walks the declared range, counting
-// down for a descending dimension; otherwise it stays zero-based.
+// down for a descending dimension; otherwise it counts up from `lo`, the
+// lowest declared index of an array property or 0.
 static uint32_t ForeachIndexForIteration(const ArrayInfo* info, uint32_t size,
-                                         uint32_t i) {
-  if (!info) return i;
+                                         int64_t lo, uint32_t i) {
+  if (!info) return static_cast<uint32_t>(lo + i);
   return info->is_descending ? (info->lo + size - 1 - i) : (info->lo + i);
 }
 
@@ -690,10 +692,13 @@ static uint32_t ForeachIndexForIteration(const ArrayInfo* info, uint32_t size,
 // the loop must terminate immediately (wildcard associative array, or a
 // zero-length iteration domain) without entering the body. For an associative
 // array `keys` holds the index values the loop variable steps through, one per
-// iteration, and `string_keys` whether they are strings.
+// iteration, and `string_keys` whether they are strings. `lo` is the index
+// the first iteration takes where the array carries no array-info entry: the
+// lowest declared index of a fixed-size array property, 0 otherwise.
 struct ForeachSetup {
   std::string arr_name;
   uint32_t size = 0;
+  int64_t lo = 0;
   bool bail = false;
   std::vector<Logic4Vec> keys;
   bool string_keys = false;
@@ -728,10 +733,20 @@ static ForeachSetup ComputeForeachSetup(const Stmt* stmt, SimContext& ctx,
     // §12.7.3 with §7.10: a queue's one dimension holds as many elements as
     // the queue does, 0 to $, whether the queue is a declared one or a
     // property of an object (§8.5) named bare in a method or through a
-    // handle. A dynamic array is stored the same way and answers the same.
-    // Before this the loop ran over the variable under a declared queue's
-    // name, once per bit of one element, and over a property not at all.
+    // handle. A declared dynamic array is stored the same way and answers the
+    // same. Before this the loop ran over the variable under a declared
+    // queue's name, once per bit of one element, and over a property not at
+    // all.
     setup.size = static_cast<uint32_t>(q->elements.size());
+  } else if (ClassArrayRef ref;
+             ResolveClassArray(stmt->expr, ctx, arena, ref)) {
+    // §12.7.3 with §7.4.2 and §7.5: a fixed-size or dynamic array property
+    // (§8.5) holds its elements on the object, the declared dimension's count
+    // from its lowest index for a fixed one and the object's count from 0 for
+    // a dynamic one. Before this the property was looked up as a variable of
+    // its name, which it is not, and the loop ran no times.
+    setup.size = ref.size;
+    setup.lo = ref.lo;
   } else {
     setup.size = GetArraySize(stmt, ctx);
   }
@@ -762,7 +777,7 @@ static void SetForeachIterVar(Variable* iter_var, const ArrayInfo* info,
     iter_var->is_string = setup.string_keys;
     return;
   }
-  uint32_t index = ForeachIndexForIteration(info, setup.size, i);
+  uint32_t index = ForeachIndexForIteration(info, setup.size, setup.lo, i);
   iter_var->value = MakeLogic4VecVal(arena, 32, index);
 }
 

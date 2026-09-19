@@ -612,4 +612,129 @@ TEST(LoopStatementSim, ForeachOverAQueuePropertyInAMethodAndThroughAHandle) {
             302u);
 }
 
+// §12.7.3 with §7.4 and §8.5: a foreach over a fixed-size unpacked array
+// property named bare in a method (§8.11) steps once per declared index, so
+// the sum of 12, 14, 16 and 18 a for loop wrote is 60. Before this the loop
+// found no array of the name and ran its body no times, answering 0.
+TEST(LoopStatementSim, ForeachOverAFixedSizeArrayPropertyInsideAMethod) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  int a[4];\n"
+                      "  function void fill(int base);\n"
+                      "    for (int i = 0; i < 4; i++) a[i] = base + i * 2;\n"
+                      "  endfunction\n"
+                      "  function int sum();\n"
+                      "    int s = 0;\n"
+                      "    foreach (a[i]) s += a[i];\n"
+                      "    return s;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    C c = new;\n"
+                      "    c.fill(12);\n"
+                      "    result = c.sum();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            60u);
+}
+
+// §12.7.3 with §7.4.2: the loop variable takes the dimension's own indices,
+// so a property declared `[2:5]` iterated through the handle at module level
+// hands the body 2, 3, 4 and 5 in turn, and nothing else: 2345.
+TEST(LoopStatementSim,
+     ForeachOverAFixedSizeArrayPropertyStepsItsDeclaredIndices) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  int b[2:5];\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    C c = new;\n"
+                      "    result = 0;\n"
+                      "    foreach (c.b[i]) result = result * 10 + i;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            2345u);
+}
+
+// §12.7.3 with §7.5 and §8.5: a foreach over a dynamic array property sized 5
+// by `new[n]` in the same method steps 0 to 4, so `d[i] = i * 3` leaves d[3]
+// holding 9. Before this the loop ran no times and d[3] stayed 0.
+TEST(LoopStatementSim, ForeachOverADynamicArrayPropertyWritesEachElement) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  int d[];\n"
+                      "  function void alloc(int n);\n"
+                      "    d = new[n];\n"
+                      "    foreach (d[i]) d[i] = i * 3;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    C c = new;\n"
+                      "    c.alloc(5);\n"
+                      "    result = c.d[3];\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            9u);
+}
+
+// §12.7.3 with §7.5.1: the elements a foreach wrote survive a `new[8](d)`
+// that grows the property, so d[3] is still 9 beside the new size 8: 98.
+TEST(LoopStatementSim, ForeachWrittenDynamicArrayPropertySurvivesAResize) {
+  EXPECT_EQ(
+      RunAndGet("class C;\n"
+                "  int d[];\n"
+                "  function void alloc(int n);\n"
+                "    d = new[n];\n"
+                "    foreach (d[i]) d[i] = i * 3;\n"
+                "  endfunction\n"
+                "  function void grow(int n); d = new[n](d); endfunction\n"
+                "endclass\n"
+                "module t;\n"
+                "  int result;\n"
+                "  initial begin\n"
+                "    C c = new;\n"
+                "    c.alloc(5);\n"
+                "    c.grow(8);\n"
+                "    result = c.d[3] * 10 + c.d.size();\n"
+                "  end\n"
+                "endmodule\n",
+                "result"),
+      98u);
+}
+
+// §12.7.3 with §8.5 and §13.3: the same loop inside a class task called
+// through a handle, which the scheduler runs statement by statement, with a
+// delay in the body so each element is visited in its own time step: 5 + 8 +
+// 11 + 14 is 38, read after the task's four steps have passed.
+TEST(LoopStatementSim, ForeachOverAFixedSizeArrayPropertyInsideAClassTask) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  int a[4];\n"
+                      "  int total;\n"
+                      "  task run();\n"
+                      "    for (int i = 0; i < 4; i++) a[i] = 5 + i * 3;\n"
+                      "    total = 0;\n"
+                      "    foreach (a[i]) begin\n"
+                      "      #1 total = total + a[i];\n"
+                      "    end\n"
+                      "  endtask\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  C c;\n"
+                      "  initial begin\n"
+                      "    c = new;\n"
+                      "    c.run();\n"
+                      "    #1 result = c.total;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            38u);
+}
+
 }  // namespace
