@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "common/diagnostic.h"
+#include "common/source_loc.h"
 #include "lexer/token.h"
 #include "parser/ast_class.h"
 #include "parser/ast_expr.h"
@@ -606,9 +607,22 @@ void Parser::ParseClassMembers(std::vector<ClassMember*>& members) {
   ParseAttributes();
 
   if (Check(TokenKind::kKwImport)) {
-    diag_.Error(CurrentLoc(),
-                "package import declaration is not allowed in class scope",
-                Subclause("26.3"));
+    SourceLoc import_loc = CurrentLoc();
+    Consume();
+    // §35.5.4 with A.1.9 and H.9.2: a DPI import declaration, told from a
+    // package import by the dpi_spec_string after the keyword, is an item of
+    // a module, interface, program, package, generate block or compilation
+    // unit and of no class, so it is reported as the DPI import it is; the
+    // package form keeps §26.3's report.
+    if (Check(TokenKind::kStringLiteral)) {
+      diag_.Error(import_loc,
+                  "DPI import declaration is not allowed in class scope",
+                  Subclause("35.5.4"));
+    } else {
+      diag_.Error(import_loc,
+                  "package import declaration is not allowed in class scope",
+                  Subclause("26.3"));
+    }
     while (!Check(TokenKind::kSemicolon) && !AtEnd()) Consume();
     Match(TokenKind::kSemicolon);
     return;
