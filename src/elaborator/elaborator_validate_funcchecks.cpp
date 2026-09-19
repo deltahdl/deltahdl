@@ -65,73 +65,86 @@ static bool IsIncDecExpr(const Expr* e) {
   return e->op == TokenKind::kPlusPlus || e->op == TokenKind::kMinusMinus;
 }
 
-// §12.7.3 — foreach loop variables are read-only. Reports every statement in
-// the loop body that assigns to (or increments/decrements) one of `vars`.
-static void CheckForeachVarsReadOnly(
-    const Stmt* s, const std::unordered_set<std::string_view>& vars,
-    DiagEngine& diag) {
-  if (!s) return;
-  const Expr* target = nullptr;
+using LoopVarSet = std::unordered_set<std::string_view>;
+
+// §12.7.3 — the lvalue a statement writes as a whole assignment or an
+// increment/decrement, or null where it writes none.
+static const Expr* WrittenLvalue(const Stmt* s) {
   switch (s->kind) {
     case StmtKind::kBlockingAssign:
     case StmtKind::kNonblockingAssign:
-      target = s->lhs;
-      break;
+      return s->lhs;
     case StmtKind::kExprStmt:
-      if (IsIncDecExpr(s->expr)) target = s->expr;
-      break;
+      return IsIncDecExpr(s->expr) ? s->expr : nullptr;
     default:
-      break;
+      return nullptr;
   }
-  if (target) {
-    auto root = LvalueRootName(target);
-    if (!root.empty() && vars.count(root)) {
-      diag.Error(s->range.start,
-                 std::format("foreach loop variable '{}' is read-only and "
-                             "cannot be assigned",
-                             root),
-                 Subclause("12.7.3"));
-    }
+}
+
+// §12.7.3 — reports statement `s` where the lvalue it writes is one of `vars`.
+static void ReportWriteToLoopVar(const Stmt* s, const LoopVarSet& vars,
+                                 DiagEngine& diag) {
+  const Expr* target = WrittenLvalue(s);
+  if (!target) return;
+  auto root = LvalueRootName(target);
+  if (root.empty() || !vars.count(root)) return;
+  diag.Error(s->range.start,
+             std::format("foreach loop variable '{}' is read-only and "
+                         "cannot be assigned",
+                         root),
+             Subclause("12.7.3"));
+}
+
+// §12.7.1 — the names a for loop declares as its control variables, removed
+// from `vars`: the loop creates an implicit block around itself, so a declared
+// name that is a loop variable's is another variable in the loop's
+// initialization, condition, step and body; UVM's uvm_reg.svh writes
+// `for (int i = ...; i < top; i++)` inside `foreach (m_fields[i])`. A plain
+// `for (i = 0; ...)` declares nothing and writes the loop variable.
+static LoopVarSet WithoutDeclaredForVars(const Stmt* s,
+                                         const LoopVarSet& vars) {
+  LoopVarSet inner = vars;
+  for (size_t k = 0; k < s->for_inits.size() && k < s->for_init_types.size();
+       ++k) {
+    if (s->for_init_types[k].kind == DataTypeKind::kImplicit) continue;
+    const Stmt* init = s->for_inits[k];
+    if (init && init->lhs && init->lhs->kind == ExprKind::kIdentifier)
+      inner.erase(init->lhs->text);
   }
-  // §12.7.1 has a for loop that declares its control variables create an
-  // implicit block around itself, so a declared name that is a loop
-  // variable's is another variable in the loop's initialization, condition,
-  // step and body; UVM's uvm_reg.svh writes `for (int i = ...; i < top; i++)`
-  // inside `foreach (m_fields[i])`. A plain `for (i = 0; ...)` writes the
-  // loop variable and is reported through the generic walk below.
-  if (s->kind == StmtKind::kFor) {
-    auto inner = vars;
-    for (size_t k = 0; k < s->for_inits.size() && k < s->for_init_types.size();
-         ++k) {
-      if (s->for_init_types[k].kind == DataTypeKind::kImplicit) continue;
-      const Stmt* init = s->for_inits[k];
-      if (init && init->lhs && init->lhs->kind == ExprKind::kIdentifier)
-        inner.erase(init->lhs->text);
-    }
-    if (inner.size() != vars.size()) {
-      if (inner.empty()) return;
-      ForEachChildStmt(s, [&](Stmt* const& sub) {
-        CheckForeachVarsReadOnly(sub, inner, diag);
-      });
-      return;
-    }
+  return inner;
+}
+
+static void CheckForeachVarsReadOnly(const Stmt* s, const LoopVarSet& vars,
+                                     DiagEngine& diag);
+
+// §6.21 — walks a block's statements in order: a variable declared in a block
+// is local to it and to the blocks nested below, from its declaration on, so
+// a block-item declaration of a loop variable's name ends the rule for that
+// name in the rest of the block.
+static void CheckBlockStmtsInOrder(const std::vector<Stmt*>& subs,
+                                   LoopVarSet& vars, DiagEngine& diag) {
+  for (const Stmt* sub : subs) {
+    if (sub && sub->kind == StmtKind::kVarDecl) vars.erase(sub->var_name);
+    if (vars.empty()) return;
+    CheckForeachVarsReadOnly(sub, vars, diag);
   }
-  // §6.21 makes a variable declared in a block local to it and to the blocks
-  // nested below, from its declaration on: a block-item declaration of a loop
-  // variable's name ends the rule for that name in the rest of the block.
+}
+
+// §12.7.3 — foreach loop variables are read-only. Reports every statement in
+// the loop body that assigns to (or increments/decrements) one of `vars`.
+static void CheckForeachVarsReadOnly(const Stmt* s, const LoopVarSet& vars,
+                                     DiagEngine& diag) {
+  if (!s) return;
+  ReportWriteToLoopVar(s, vars, diag);
   if (s->kind == StmtKind::kBlock || s->kind == StmtKind::kFork) {
-    auto inner = vars;
-    auto walk_in_order = [&](const std::vector<Stmt*>& subs) {
-      for (const Stmt* sub : subs) {
-        if (sub && sub->kind == StmtKind::kVarDecl) inner.erase(sub->var_name);
-        if (inner.empty()) return;
-        CheckForeachVarsReadOnly(sub, inner, diag);
-      }
-    };
-    walk_in_order(s->stmts);
-    walk_in_order(s->fork_stmts);
+    LoopVarSet inner = vars;
+    CheckBlockStmtsInOrder(s->stmts, inner, diag);
+    CheckBlockStmtsInOrder(s->fork_stmts, inner, diag);
     return;
   }
+  LoopVarSet inner =
+      s->kind == StmtKind::kFor ? WithoutDeclaredForVars(s, vars) : vars;
+  if (inner.empty()) return;
   // Every member of Stmt that holds a statement, taken from ForEachChildStmt
   // in elaborator_validate_internal.h rather than listed again here. §12.7.3
   // makes the loop variable read-only for the whole of the loop body, so a
@@ -139,7 +152,7 @@ static void CheckForeachVarsReadOnly(
   // unreported. Nothing stops early: the clause is broken once per write, and
   // each write is reported where it stands.
   ForEachChildStmt(
-      s, [&](Stmt* const& sub) { CheckForeachVarsReadOnly(sub, vars, diag); });
+      s, [&](Stmt* const& sub) { CheckForeachVarsReadOnly(sub, inner, diag); });
 }
 
 static bool IsIntegralVectorKind(DataTypeKind k) {
