@@ -1,6 +1,5 @@
 #include "simulator/eval_array_class_queue.h"
 
-#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <string_view>
