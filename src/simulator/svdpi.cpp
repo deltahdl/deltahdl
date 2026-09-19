@@ -156,7 +156,7 @@ void svPutPartselLogic(svLogicVecVal* d, svLogicVecVal s, int i, int w) {
 // greater than 0 name the unpacked part. Each function resolves the requested
 // dimension's declared bounds from the handle's descriptor and then derives the
 // queried quantity exactly as 20.7 prescribes.
-static const SvOpenArrayDimRange* svResolveDim(svOpenArrayHandle h, int d) {
+static const SvOpenArrayDimRange* ResolveDim(svOpenArrayHandle h, int d) {
   if (h == nullptr) return nullptr;
   const auto* desc = static_cast<const SvOpenArrayDesc*>(h);
   if (desc->ranges == nullptr || d < 0 || d >= desc->n_dims) return nullptr;
@@ -164,32 +164,32 @@ static const SvOpenArrayDimRange* svResolveDim(svOpenArrayHandle h, int d) {
 }
 
 int svLeft(svOpenArrayHandle h, int d) {
-  const SvOpenArrayDimRange* r = svResolveDim(h, d);
+  const SvOpenArrayDimRange* r = ResolveDim(h, d);
   return r ? r->left : 0;
 }
 int svRight(svOpenArrayHandle h, int d) {
-  const SvOpenArrayDimRange* r = svResolveDim(h, d);
+  const SvOpenArrayDimRange* r = ResolveDim(h, d);
   return r ? r->right : 0;
 }
 int svLow(svOpenArrayHandle h, int d) {
-  const SvOpenArrayDimRange* r = svResolveDim(h, d);
+  const SvOpenArrayDimRange* r = ResolveDim(h, d);
   if (!r) return 0;
   return r->left < r->right ? r->left : r->right;
 }
 int svHigh(svOpenArrayHandle h, int d) {
-  const SvOpenArrayDimRange* r = svResolveDim(h, d);
+  const SvOpenArrayDimRange* r = ResolveDim(h, d);
   if (!r) return 0;
   return r->left > r->right ? r->left : r->right;
 }
 int svIncrement(svOpenArrayHandle h, int d) {
-  const SvOpenArrayDimRange* r = svResolveDim(h, d);
+  const SvOpenArrayDimRange* r = ResolveDim(h, d);
   if (!r) return 0;
   // 20.7: $increment is 1 when the left bound is greater than or equal to the
   // right bound, and -1 otherwise.
   return r->left >= r->right ? 1 : -1;
 }
 int svSize(svOpenArrayHandle h, int d) {
-  const SvOpenArrayDimRange* r = svResolveDim(h, d);
+  const SvOpenArrayDimRange* r = ResolveDim(h, d);
   if (!r) return 0;
   int low = r->left < r->right ? r->left : r->right;
   int high = r->left > r->right ? r->left : r->right;
@@ -226,13 +226,13 @@ namespace {
 // Number of canonical 32-bit words occupied by one packed element. Dimension 0
 // of the descriptor describes the array's single packed part (H.12.2); its bit
 // width fixes the per-element word count for both bit and logic arrays.
-int svPackedElemWords(const SvOpenArrayDesc* desc) {
+int PackedElemWords(const SvOpenArrayDesc* desc) {
   const SvOpenArrayDimRange& p = desc->ranges[0];
   int width = (p.left > p.right ? p.left - p.right : p.right - p.left) + 1;
   return (width + 31) / 32;
 }
 
-int svUnpackedExtent(const SvOpenArrayDimRange& r) {
+int UnpackedExtent(const SvOpenArrayDimRange& r) {
   int low = r.left < r.right ? r.left : r.right;
   int high = r.left > r.right ? r.left : r.right;
   return high - low + 1;
@@ -243,7 +243,7 @@ int svUnpackedExtent(const SvOpenArrayDimRange& r) {
 // The element at the left bound occupies position 0 and positions advance
 // toward the right bound, independent of range direction. Returns false when
 // the index falls outside the dimension's original range.
-bool svUnpackedPos(const SvOpenArrayDimRange& r, int idx, int* pos) {
+bool UnpackedPos(const SvOpenArrayDimRange& r, int idx, int* pos) {
   int low = r.left < r.right ? r.left : r.right;
   int high = r.left > r.right ? r.left : r.right;
   if (idx < low || idx > high) return false;
@@ -257,8 +257,8 @@ bool svUnpackedPos(const SvOpenArrayDimRange& r, int idx, int* pos) {
 // Returns nullptr when the handle is unusable, the index count does not match
 // the unpacked dimensionality, or any index is out of its original range, so
 // callers leave both operands untouched in those cases.
-void* svElemBase(svOpenArrayHandle h, const int* idx, int n_idx,
-                 size_t word_size, int* words) {
+void* ElemBase(svOpenArrayHandle h, const int* idx, int n_idx, size_t word_size,
+               int* words) {
   if (h == nullptr) return nullptr;
   const auto* desc = static_cast<const SvOpenArrayDesc*>(h);
   if (desc->data == nullptr || desc->ranges == nullptr) return nullptr;
@@ -267,10 +267,10 @@ void* svElemBase(svOpenArrayHandle h, const int* idx, int n_idx,
   for (int k = 0; k < n_idx; ++k) {
     const SvOpenArrayDimRange& r = desc->ranges[k + 1];
     int pos = 0;
-    if (!svUnpackedPos(r, idx[k], &pos)) return nullptr;
-    linear = linear * svUnpackedExtent(r) + pos;
+    if (!UnpackedPos(r, idx[k], &pos)) return nullptr;
+    linear = linear * UnpackedExtent(r) + pos;
   }
-  *words = svPackedElemWords(desc);
+  *words = PackedElemWords(desc);
   return static_cast<char*>(desc->data) + (linear * *words) * word_size;
 }
 
@@ -286,7 +286,7 @@ void* svElemBase(svOpenArrayHandle h, const int* idx, int n_idx,
 // contract. A zero elem_size signals that an element's representation differs
 // from that of an individual value of the same type, for which H.12.4 also
 // requires nullptr.
-void* svElemAddr(svOpenArrayHandle h, const int* idx, int n_idx) {
+void* ElemAddr(svOpenArrayHandle h, const int* idx, int n_idx) {
   if (h == nullptr) return nullptr;
   const auto* desc = static_cast<const SvOpenArrayDesc*>(h);
   if (desc->data == nullptr || desc->ranges == nullptr) return nullptr;
@@ -296,42 +296,42 @@ void* svElemAddr(svOpenArrayHandle h, const int* idx, int n_idx) {
   for (int k = 0; k < n_idx; ++k) {
     const SvOpenArrayDimRange& r = desc->ranges[k + 1];
     int pos = 0;
-    if (!svUnpackedPos(r, idx[k], &pos)) return nullptr;
-    linear = linear * svUnpackedExtent(r) + pos;
+    if (!UnpackedPos(r, idx[k], &pos)) return nullptr;
+    linear = linear * UnpackedExtent(r) + pos;
   }
   return static_cast<char*>(desc->data) + linear * desc->elem_size;
 }
 
-void svPutBitElem(svOpenArrayHandle d, const svBitVecVal* s, const int* idx,
-                  int n) {
+void PutBitElem(svOpenArrayHandle d, const svBitVecVal* s, const int* idx,
+                int n) {
   int words = 0;
-  void* base = svElemBase(d, idx, n, sizeof(svBitVecVal), &words);
+  void* base = ElemBase(d, idx, n, sizeof(svBitVecVal), &words);
   if (base == nullptr) return;
   auto* dst = static_cast<svBitVecVal*>(base);
   for (int w = 0; w < words; ++w) dst[w] = s[w];
 }
 
-void svGetBitElem(svBitVecVal* d, svOpenArrayHandle s, const int* idx, int n) {
+void GetBitElem(svBitVecVal* d, svOpenArrayHandle s, const int* idx, int n) {
   int words = 0;
-  void* base = svElemBase(s, idx, n, sizeof(svBitVecVal), &words);
+  void* base = ElemBase(s, idx, n, sizeof(svBitVecVal), &words);
   if (base == nullptr) return;
   const auto* src = static_cast<const svBitVecVal*>(base);
   for (int w = 0; w < words; ++w) d[w] = src[w];
 }
 
-void svPutLogicElem(svOpenArrayHandle d, const svLogicVecVal* s, const int* idx,
-                    int n) {
+void PutLogicElem(svOpenArrayHandle d, const svLogicVecVal* s, const int* idx,
+                  int n) {
   int words = 0;
-  void* base = svElemBase(d, idx, n, sizeof(svLogicVecVal), &words);
+  void* base = ElemBase(d, idx, n, sizeof(svLogicVecVal), &words);
   if (base == nullptr) return;
   auto* dst = static_cast<svLogicVecVal*>(base);
   for (int w = 0; w < words; ++w) dst[w] = s[w];
 }
 
-void svGetLogicElem(svLogicVecVal* d, svOpenArrayHandle s, const int* idx,
-                    int n) {
+void GetLogicElem(svLogicVecVal* d, svOpenArrayHandle s, const int* idx,
+                  int n) {
   int words = 0;
-  void* base = svElemBase(s, idx, n, sizeof(svLogicVecVal), &words);
+  void* base = ElemBase(s, idx, n, sizeof(svLogicVecVal), &words);
   if (base == nullptr) return;
   const auto* src = static_cast<const svLogicVecVal*>(base);
   for (int w = 0; w < words; ++w) d[w] = src[w];
@@ -345,18 +345,17 @@ void svGetLogicElem(svLogicVecVal* d, svOpenArrayHandle s, const int* idx,
 // or write only bit 0. An unusable handle, a mismatched index count, or an
 // index outside its original range resolves no element, so a read returns
 // sv_0/0 and a write is a no-op, matching the guard the H.12.5 helpers apply.
-svBit svGetBitScalarElem(svOpenArrayHandle s, const int* idx, int n) {
+svBit GetBitScalarElem(svOpenArrayHandle s, const int* idx, int n) {
   int words = 0;
-  void* base = svElemBase(s, idx, n, sizeof(svBitVecVal), &words);
+  void* base = ElemBase(s, idx, n, sizeof(svBitVecVal), &words);
   (void)words;
   if (base == nullptr) return 0;
   return static_cast<const svBitVecVal*>(base)[0] & 1u;
 }
 
-void svPutBitScalarElem(svOpenArrayHandle d, svBit value, const int* idx,
-                        int n) {
+void PutBitScalarElem(svOpenArrayHandle d, svBit value, const int* idx, int n) {
   int words = 0;
-  void* base = svElemBase(d, idx, n, sizeof(svBitVecVal), &words);
+  void* base = ElemBase(d, idx, n, sizeof(svBitVecVal), &words);
   (void)words;
   if (base == nullptr) return;
   auto* dst = static_cast<svBitVecVal*>(base);
@@ -367,9 +366,9 @@ void svPutBitScalarElem(svOpenArrayHandle d, svBit value, const int* idx,
   }
 }
 
-svLogic svGetLogicScalarElem(svOpenArrayHandle s, const int* idx, int n) {
+svLogic GetLogicScalarElem(svOpenArrayHandle s, const int* idx, int n) {
   int words = 0;
-  void* base = svElemBase(s, idx, n, sizeof(svLogicVecVal), &words);
+  void* base = ElemBase(s, idx, n, sizeof(svLogicVecVal), &words);
   (void)words;
   if (base == nullptr) return 0;
   const auto* src = static_cast<const svLogicVecVal*>(base);
@@ -382,10 +381,10 @@ svLogic svGetLogicScalarElem(svOpenArrayHandle s, const int* idx, int n) {
   return a_bit ? sv_x : sv_z;
 }
 
-void svPutLogicScalarElem(svOpenArrayHandle d, svLogic value, const int* idx,
-                          int n) {
+void PutLogicScalarElem(svOpenArrayHandle d, svLogic value, const int* idx,
+                        int n) {
   int words = 0;
-  void* base = svElemBase(d, idx, n, sizeof(svLogicVecVal), &words);
+  void* base = ElemBase(d, idx, n, sizeof(svLogicVecVal), &words);
   (void)words;
   if (base == nullptr) return;
   auto* dst = static_cast<svLogicVecVal*>(base);
@@ -419,15 +418,15 @@ void svPutLogicScalarElem(svOpenArrayHandle d, svLogic value, const int* idx,
 // from an individual value of the same type.
 void* svGetArrElemPtr1(svOpenArrayHandle h, int indx1) {
   int idx[1] = {indx1};
-  return svElemAddr(h, idx, 1);
+  return ElemAddr(h, idx, 1);
 }
 void* svGetArrElemPtr2(svOpenArrayHandle h, int indx1, int indx2) {
   int idx[2] = {indx1, indx2};
-  return svElemAddr(h, idx, 2);
+  return ElemAddr(h, idx, 2);
 }
 void* svGetArrElemPtr3(svOpenArrayHandle h, int indx1, int indx2, int indx3) {
   int idx[3] = {indx1, indx2, indx3};
-  return svElemAddr(h, idx, 3);
+  return ElemAddr(h, idx, 3);
 }
 
 // General element-address function for an arbitrary number of unpacked indices.
@@ -444,14 +443,14 @@ void* svGetArrElemPtr(svOpenArrayHandle h, int indx1, ...) {
   va_start(ap, indx1);
   for (int k = 1; k < n; ++k) idx.push_back(va_arg(ap, int));
   va_end(ap);
-  return svElemAddr(h, idx.data(), n);
+  return ElemAddr(h, idx.data(), n);
 }
 
 // §H.12.3 and §H.12.5: the variable argument list forms take as many indices
 // as the array has unpacked dimensions, indx1 first and the rest from the
 // list; a handle with no unpacked dimension gives them none to take.
-static std::vector<int> svIndicesOfVariadicCall(svOpenArrayHandle h, int indx1,
-                                                va_list ap) {
+static std::vector<int> IndicesOfVariadicCall(svOpenArrayHandle h, int indx1,
+                                              va_list ap) {
   std::vector<int> idx;
   int n = svDimensions(h) - 1;
   if (n < 1) return idx;
@@ -465,96 +464,96 @@ void svPutBitArrElemVecVal(svOpenArrayHandle d, const svBitVecVal* s, int indx1,
                            ...) {
   va_list ap;
   va_start(ap, indx1);
-  const std::vector<int> kIdx = svIndicesOfVariadicCall(d, indx1, ap);
+  const std::vector<int> kIdx = IndicesOfVariadicCall(d, indx1, ap);
   va_end(ap);
   if (kIdx.empty()) return;
-  svPutBitElem(d, s, kIdx.data(), static_cast<int>(kIdx.size()));
+  PutBitElem(d, s, kIdx.data(), static_cast<int>(kIdx.size()));
 }
 void svPutBitArrElem1VecVal(svOpenArrayHandle d, const svBitVecVal* s,
                             int indx1) {
   int idx[1] = {indx1};
-  svPutBitElem(d, s, idx, 1);
+  PutBitElem(d, s, idx, 1);
 }
 void svPutBitArrElem2VecVal(svOpenArrayHandle d, const svBitVecVal* s,
                             int indx1, int indx2) {
   int idx[2] = {indx1, indx2};
-  svPutBitElem(d, s, idx, 2);
+  PutBitElem(d, s, idx, 2);
 }
 void svPutBitArrElem3VecVal(svOpenArrayHandle d, const svBitVecVal* s,
                             int indx1, int indx2, int indx3) {
   int idx[3] = {indx1, indx2, indx3};
-  svPutBitElem(d, s, idx, 3);
+  PutBitElem(d, s, idx, 3);
 }
 void svPutLogicArrElemVecVal(svOpenArrayHandle d, const svLogicVecVal* s,
                              int indx1, ...) {
   va_list ap;
   va_start(ap, indx1);
-  const std::vector<int> kIdx = svIndicesOfVariadicCall(d, indx1, ap);
+  const std::vector<int> kIdx = IndicesOfVariadicCall(d, indx1, ap);
   va_end(ap);
   if (kIdx.empty()) return;
-  svPutLogicElem(d, s, kIdx.data(), static_cast<int>(kIdx.size()));
+  PutLogicElem(d, s, kIdx.data(), static_cast<int>(kIdx.size()));
 }
 void svPutLogicArrElem1VecVal(svOpenArrayHandle d, const svLogicVecVal* s,
                               int indx1) {
   int idx[1] = {indx1};
-  svPutLogicElem(d, s, idx, 1);
+  PutLogicElem(d, s, idx, 1);
 }
 void svPutLogicArrElem2VecVal(svOpenArrayHandle d, const svLogicVecVal* s,
                               int indx1, int indx2) {
   int idx[2] = {indx1, indx2};
-  svPutLogicElem(d, s, idx, 2);
+  PutLogicElem(d, s, idx, 2);
 }
 void svPutLogicArrElem3VecVal(svOpenArrayHandle d, const svLogicVecVal* s,
                               int indx1, int indx2, int indx3) {
   int idx[3] = {indx1, indx2, indx3};
-  svPutLogicElem(d, s, idx, 3);
+  PutLogicElem(d, s, idx, 3);
 }
 void svGetBitArrElemVecVal(svBitVecVal* d, svOpenArrayHandle s, int indx1,
                            ...) {
   va_list ap;
   va_start(ap, indx1);
-  const std::vector<int> kIdx = svIndicesOfVariadicCall(s, indx1, ap);
+  const std::vector<int> kIdx = IndicesOfVariadicCall(s, indx1, ap);
   va_end(ap);
   if (kIdx.empty()) return;
-  svGetBitElem(d, s, kIdx.data(), static_cast<int>(kIdx.size()));
+  GetBitElem(d, s, kIdx.data(), static_cast<int>(kIdx.size()));
 }
 void svGetBitArrElem1VecVal(svBitVecVal* d, svOpenArrayHandle s, int indx1) {
   int idx[1] = {indx1};
-  svGetBitElem(d, s, idx, 1);
+  GetBitElem(d, s, idx, 1);
 }
 void svGetBitArrElem2VecVal(svBitVecVal* d, svOpenArrayHandle s, int indx1,
                             int indx2) {
   int idx[2] = {indx1, indx2};
-  svGetBitElem(d, s, idx, 2);
+  GetBitElem(d, s, idx, 2);
 }
 void svGetBitArrElem3VecVal(svBitVecVal* d, svOpenArrayHandle s, int indx1,
                             int indx2, int indx3) {
   int idx[3] = {indx1, indx2, indx3};
-  svGetBitElem(d, s, idx, 3);
+  GetBitElem(d, s, idx, 3);
 }
 void svGetLogicArrElemVecVal(svLogicVecVal* d, svOpenArrayHandle s, int indx1,
                              ...) {
   va_list ap;
   va_start(ap, indx1);
-  const std::vector<int> kIdx = svIndicesOfVariadicCall(s, indx1, ap);
+  const std::vector<int> kIdx = IndicesOfVariadicCall(s, indx1, ap);
   va_end(ap);
   if (kIdx.empty()) return;
-  svGetLogicElem(d, s, kIdx.data(), static_cast<int>(kIdx.size()));
+  GetLogicElem(d, s, kIdx.data(), static_cast<int>(kIdx.size()));
 }
 void svGetLogicArrElem1VecVal(svLogicVecVal* d, svOpenArrayHandle s,
                               int indx1) {
   int idx[1] = {indx1};
-  svGetLogicElem(d, s, idx, 1);
+  GetLogicElem(d, s, idx, 1);
 }
 void svGetLogicArrElem2VecVal(svLogicVecVal* d, svOpenArrayHandle s, int indx1,
                               int indx2) {
   int idx[2] = {indx1, indx2};
-  svGetLogicElem(d, s, idx, 2);
+  GetLogicElem(d, s, idx, 2);
 }
 void svGetLogicArrElem3VecVal(svLogicVecVal* d, svOpenArrayHandle s, int indx1,
                               int indx2, int indx3) {
   int idx[3] = {indx1, indx2, indx3};
-  svGetLogicElem(d, s, idx, 3);
+  GetLogicElem(d, s, idx, 3);
 }
 
 // Annex H.12.6: read or write a single scalar (bit or logic) element of an open
@@ -564,15 +563,15 @@ void svGetLogicArrElem3VecVal(svLogicVecVal* d, svOpenArrayHandle s, int indx1,
 // packed dimension 0 excepted) before forwarding, mirroring svGetArrElemPtr.
 svBit svGetBitArrElem1(svOpenArrayHandle s, int indx1) {
   int idx[1] = {indx1};
-  return svGetBitScalarElem(s, idx, 1);
+  return GetBitScalarElem(s, idx, 1);
 }
 svBit svGetBitArrElem2(svOpenArrayHandle s, int indx1, int indx2) {
   int idx[2] = {indx1, indx2};
-  return svGetBitScalarElem(s, idx, 2);
+  return GetBitScalarElem(s, idx, 2);
 }
 svBit svGetBitArrElem3(svOpenArrayHandle s, int indx1, int indx2, int indx3) {
   int idx[3] = {indx1, indx2, indx3};
-  return svGetBitScalarElem(s, idx, 3);
+  return GetBitScalarElem(s, idx, 3);
 }
 svBit svGetBitArrElem(svOpenArrayHandle s, int indx1, ...) {
   int n = svDimensions(s) - 1;
@@ -584,20 +583,20 @@ svBit svGetBitArrElem(svOpenArrayHandle s, int indx1, ...) {
   va_start(ap, indx1);
   for (int k = 1; k < n; ++k) idx.push_back(va_arg(ap, int));
   va_end(ap);
-  return svGetBitScalarElem(s, idx.data(), n);
+  return GetBitScalarElem(s, idx.data(), n);
 }
 svLogic svGetLogicArrElem1(svOpenArrayHandle s, int indx1) {
   int idx[1] = {indx1};
-  return svGetLogicScalarElem(s, idx, 1);
+  return GetLogicScalarElem(s, idx, 1);
 }
 svLogic svGetLogicArrElem2(svOpenArrayHandle s, int indx1, int indx2) {
   int idx[2] = {indx1, indx2};
-  return svGetLogicScalarElem(s, idx, 2);
+  return GetLogicScalarElem(s, idx, 2);
 }
 svLogic svGetLogicArrElem3(svOpenArrayHandle s, int indx1, int indx2,
                            int indx3) {
   int idx[3] = {indx1, indx2, indx3};
-  return svGetLogicScalarElem(s, idx, 3);
+  return GetLogicScalarElem(s, idx, 3);
 }
 svLogic svGetLogicArrElem(svOpenArrayHandle s, int indx1, ...) {
   int n = svDimensions(s) - 1;
@@ -609,21 +608,21 @@ svLogic svGetLogicArrElem(svOpenArrayHandle s, int indx1, ...) {
   va_start(ap, indx1);
   for (int k = 1; k < n; ++k) idx.push_back(va_arg(ap, int));
   va_end(ap);
-  return svGetLogicScalarElem(s, idx.data(), n);
+  return GetLogicScalarElem(s, idx.data(), n);
 }
 void svPutLogicArrElem1(svOpenArrayHandle d, svLogic value, int indx1) {
   int idx[1] = {indx1};
-  svPutLogicScalarElem(d, value, idx, 1);
+  PutLogicScalarElem(d, value, idx, 1);
 }
 void svPutLogicArrElem2(svOpenArrayHandle d, svLogic value, int indx1,
                         int indx2) {
   int idx[2] = {indx1, indx2};
-  svPutLogicScalarElem(d, value, idx, 2);
+  PutLogicScalarElem(d, value, idx, 2);
 }
 void svPutLogicArrElem3(svOpenArrayHandle d, svLogic value, int indx1,
                         int indx2, int indx3) {
   int idx[3] = {indx1, indx2, indx3};
-  svPutLogicScalarElem(d, value, idx, 3);
+  PutLogicScalarElem(d, value, idx, 3);
 }
 void svPutLogicArrElem(svOpenArrayHandle d, svLogic value, int indx1, ...) {
   int n = svDimensions(d) - 1;
@@ -635,20 +634,20 @@ void svPutLogicArrElem(svOpenArrayHandle d, svLogic value, int indx1, ...) {
   va_start(ap, indx1);
   for (int k = 1; k < n; ++k) idx.push_back(va_arg(ap, int));
   va_end(ap);
-  svPutLogicScalarElem(d, value, idx.data(), n);
+  PutLogicScalarElem(d, value, idx.data(), n);
 }
 void svPutBitArrElem1(svOpenArrayHandle d, svBit value, int indx1) {
   int idx[1] = {indx1};
-  svPutBitScalarElem(d, value, idx, 1);
+  PutBitScalarElem(d, value, idx, 1);
 }
 void svPutBitArrElem2(svOpenArrayHandle d, svBit value, int indx1, int indx2) {
   int idx[2] = {indx1, indx2};
-  svPutBitScalarElem(d, value, idx, 2);
+  PutBitScalarElem(d, value, idx, 2);
 }
 void svPutBitArrElem3(svOpenArrayHandle d, svBit value, int indx1, int indx2,
                       int indx3) {
   int idx[3] = {indx1, indx2, indx3};
-  svPutBitScalarElem(d, value, idx, 3);
+  PutBitScalarElem(d, value, idx, 3);
 }
 void svPutBitArrElem(svOpenArrayHandle d, svBit value, int indx1, ...) {
   int n = svDimensions(d) - 1;
@@ -660,7 +659,7 @@ void svPutBitArrElem(svOpenArrayHandle d, svBit value, int indx1, ...) {
   va_start(ap, indx1);
   for (int k = 1; k < n; ++k) idx.push_back(va_arg(ap, int));
   va_end(ap);
-  svPutBitScalarElem(d, value, idx.data(), n);
+  PutBitScalarElem(d, value, idx.data(), n);
 }
 
 svScope svGetScope(void) {
