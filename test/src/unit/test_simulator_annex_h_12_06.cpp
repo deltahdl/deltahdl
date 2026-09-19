@@ -1,9 +1,8 @@
 #include <gtest/gtest.h>
 
-#include <cstdint>
 #include <type_traits>
 
-#include "parser/ast.h"
+#include "parser/ast_type.h"
 #include "simulator/dpi_c_type.h"
 #include "simulator/svdpi.h"
 #include "simulator/svdpi_open_array.h"

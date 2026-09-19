@@ -1,5 +1,7 @@
 #include "parser/sequence_operator_precedence.h"
 
+#include "lexer/token.h"
+
 namespace delta {
 
 int SequenceOperatorPrecedence(SequenceOperator op) {

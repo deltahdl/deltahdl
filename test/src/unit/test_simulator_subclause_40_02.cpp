@@ -6,11 +6,11 @@
 
 #include "builders_systask.h"
 #include "fixture_simulator.h"
-#include "parser/ast.h"
 #include "simulator/coverage_control.h"
 #include "simulator/evaluation.h"
 #include "simulator/sv_vpi_user.h"
-#include "simulator/vpi.h"
+#include "simulator/vpi_globals.h"
+#include "simulator/vpi_user.h"
 
 using namespace delta;
 

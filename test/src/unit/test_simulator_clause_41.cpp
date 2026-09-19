@@ -1,10 +1,9 @@
 #include <gtest/gtest.h>
 
-#include <cstdint>
 #include <string>
 #include <vector>
 
-#include "simulator/dpi_runtime.h"
+#include "simulator/assertion_api.h"
 
 using namespace delta;
 

@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include "common/types.h"
 #include "fixture_preprocessor_timescale.h"
 #include "helpers_reported_error.h"
 

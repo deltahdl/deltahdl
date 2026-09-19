@@ -1,23 +1,29 @@
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <format>
 #include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "common/arena.h"
+#include "common/types.h"
 #include "elaborator/queue_dim.h"
 #include "elaborator/type_eval.h"
-#include "parser/ast.h"
+#include "lexer/token.h"
+#include "parser/ast_expr.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
+#include "simulator/stmt_result.h"
 
 namespace delta {
 

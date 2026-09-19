@@ -13,6 +13,8 @@
 // (parse -> elaborate -> lower -> run), observing the dumped file text and the
 // round trip through the matching read task — the two faces of "identical
 // treatment" — rather than hand-building array state on a bare context.
+#include <gtest/gtest.h>
+
 #include <cstdio>
 #include <string>
 

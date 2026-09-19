@@ -1,5 +1,14 @@
+#include <gtest/gtest.h>
+
+#include <string>
+#include <string_view>
+
+#include "common/types.h"
+#include "elaborator/elaborator.h"
+#include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 #include "helpers_include_test_dir.h"
+#include "preprocessor/preprocessor.h"
 
 using namespace delta;
 

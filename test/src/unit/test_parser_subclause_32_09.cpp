@@ -1,9 +1,13 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <string>
 
 #include "fixture_parser.h"
 #include "helpers_reported_error.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_module.h"
+#include "parser/ast_stmt.h"
 
 using namespace delta;
 

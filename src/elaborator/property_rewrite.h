@@ -3,10 +3,9 @@
 #include <cstddef>
 #include <string_view>
 #include <unordered_map>
-#include <vector>
 
 #include "elaborator/sampled_value.h"
-#include "parser/ast.h"
+#include "parser/ast_module.h"
 
 namespace delta {
 

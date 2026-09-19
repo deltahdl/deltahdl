@@ -1,6 +1,8 @@
+#include <gtest/gtest.h>
+
 #include "elaborator/type_eval.h"
+#include "fixture_elaborator.h"
 #include "fixture_simulator.h"
-#include "parser/ast.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 

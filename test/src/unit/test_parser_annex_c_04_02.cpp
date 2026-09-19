@@ -12,9 +12,12 @@
 // procedure: the parser reports it under C.4.2 at its keyword and reads on to
 // the ';' so that the items behind it are still read.
 
+#include <gtest/gtest.h>
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
+#include "parser/ast_module.h"
 
 using namespace delta;
 

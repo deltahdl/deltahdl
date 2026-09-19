@@ -1,9 +1,14 @@
 #pragma once
 
+#include <gtest/gtest.h>
+
 #include <cstdint>
 #include <string>
 
+#include "elaborator/elaborator.h"
 #include "fixture_simulator.h"
+#include "lexer/lexer.h"
+#include "parser/parser.h"
 #include "preprocessor/preprocessor.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"

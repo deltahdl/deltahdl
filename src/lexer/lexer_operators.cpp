@@ -1,6 +1,10 @@
 #include <cctype>
+#include <cstdint>
+#include <string>
 
+#include "common/diagnostic.h"
 #include "lexer/lexer.h"
+#include "lexer/token.h"
 
 namespace delta {
 

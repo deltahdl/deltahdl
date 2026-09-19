@@ -1,10 +1,19 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
 #include <string>
 
+#include "elaborator/elaborator.h"
+#include "elaborator/rtlir.h"
 #include "fixture_simulator.h"
 #include "helpers_reported_error.h"
+#include "lexer/lexer.h"
+#include "parser/ast_design.h"
+#include "parser/ast_module.h"
+#include "parser/ast_specify.h"
+#include "parser/parser.h"
 #include "simulator/specify.h"
+#include "simulator/specify_timing_check.h"
 
 using namespace delta;
 

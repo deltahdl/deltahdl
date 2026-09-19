@@ -17,6 +17,8 @@
 // std-package class name), and each prototype method elaborates with the
 // documented default arguments omitted at the call site.
 
+#include <gtest/gtest.h>
+
 #include "elaborator/std_package.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"

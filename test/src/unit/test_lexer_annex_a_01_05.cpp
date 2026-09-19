@@ -7,7 +7,10 @@
 // one of these keywords at all.) Each test confirms the spelling is lexed as
 // its reserved-word token rather than a plain identifier. Syntax 33-4 restates
 // this same production, so these tests stand for both.
+#include <gtest/gtest.h>
+
 #include "fixture_lexer.h"
+#include "lexer/token.h"
 
 using namespace delta;
 

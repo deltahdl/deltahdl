@@ -12,16 +12,19 @@
 // Preprocessor::ReadEncodedProtectValue turns the characters into bytes under
 // the coding scheme in effect and spends the byte count that scheme stated.
 
+#include <cstdint>
 #include <string>
 #include <string_view>
 #include <utility>
 
 #include "common/diagnostic.h"
+#include "common/source_loc.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/preprocessor_internal.h"
 #include "preprocessor/protect_digest_block.h"
 #include "preprocessor/protect_digest_key.h"
 #include "preprocessor/protect_encoding.h"
+#include "preprocessor/protect_envelope.h"
 #include "preprocessor/protect_envelope_output.h"
 #include "preprocessor/protect_key_method.h"
 #include "preprocessor/protect_keywords.h"

@@ -1,8 +1,7 @@
 #pragma once
 
-#include <gtest/gtest.h>
-
 #include <string>
+#include <utility>
 
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"

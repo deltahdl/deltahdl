@@ -51,12 +51,16 @@
 // case here does -- each needs a target holding x or z, or one wider than a
 // 64-bit word, which is what those files' targets are defined not to be.
 
+#include <gtest/gtest.h>
+
+#include <cstdint>
 #include <string>
 
 #include "builders_ast.h"
+#include "common/types.h"
 #include "fixture_simulator.h"
 #include "helpers_eval_op.h"
-#include "parser/ast.h"
+#include "parser/ast_expr.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"

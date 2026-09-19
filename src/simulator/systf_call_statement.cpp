@@ -2,12 +2,13 @@
 
 #include "common/diagnostic.h"
 #include "common/types.h"
-#include "parser/ast.h"
+#include "parser/ast_expr.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/stmt_exec.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_data_structs.h"
+#include "simulator/vpi_globals.h"
 
 namespace delta {
 

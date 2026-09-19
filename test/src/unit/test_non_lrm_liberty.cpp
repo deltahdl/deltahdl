@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <string_view>
 
 #include "synthesizer/liberty.h"

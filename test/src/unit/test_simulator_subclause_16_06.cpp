@@ -4,7 +4,7 @@
 #include <limits>
 
 #include "fixture_simulator.h"
-#include "simulator/sva_engine.h"
+#include "simulator/sva_engine_sampling.h"
 
 using namespace delta;
 

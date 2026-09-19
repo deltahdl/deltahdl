@@ -19,6 +19,7 @@
 // to Copy so the log holds it too.
 
 #include <fstream>
+#include <ios>
 #include <ostream>
 #include <streambuf>
 #include <string>

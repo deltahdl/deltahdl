@@ -12,12 +12,10 @@
 // variable requires an explicit cast". One elaborator path enforces both, and
 // it names §6.19.3, so that is the subclause the rejections below read back.
 
-#include "common/types.h"
-#include "elaborator/sensitivity.h"
-#include "elaborator/type_eval.h"
+#include <gtest/gtest.h>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
-#include "lexer/token.h"
 
 using namespace delta;
 

@@ -1,7 +1,6 @@
 #include "elaborator/cross_set_expression.h"
 
 #include "elaborator/type_eval.h"
-#include "parser/ast.h"
 
 namespace delta {
 

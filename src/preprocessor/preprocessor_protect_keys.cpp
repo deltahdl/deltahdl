@@ -2,6 +2,7 @@
 #include <vector>
 
 #include "common/diagnostic.h"
+#include "common/source_loc.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_digest_block.h"
 #include "preprocessor/protect_digest_key.h"

@@ -10,9 +10,14 @@
 // §23.2.4, because a statement is not one of the things a module body may
 // hold; §12.2 is the clause that says which constructs put one back in reach.
 
+#include <gtest/gtest.h>
+
+#include <cstdint>
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
+#include "parser/ast_module.h"
 
 using namespace delta;
 

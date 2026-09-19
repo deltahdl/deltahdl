@@ -1,3 +1,5 @@
+#include <gtest/gtest.h>
+
 #include <cstddef>
 #include <iterator>
 #include <string>
@@ -10,6 +12,8 @@
 #include "helpers_reported_error.h"
 #include "model_identifier_positions.h"
 #include "model_keyword_tables.h"
+#include "parser/ast_module.h"
+#include "parser/ast_type.h"
 
 using namespace delta;
 

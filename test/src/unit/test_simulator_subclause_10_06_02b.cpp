@@ -12,6 +12,8 @@
 // a function body. The release companions among them are what say the decline
 // is bounded by the release rather than standing for the rest of the run.
 
+#include <gtest/gtest.h>
+
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"

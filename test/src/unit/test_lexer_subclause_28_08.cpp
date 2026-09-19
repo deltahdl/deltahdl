@@ -4,6 +4,7 @@
 
 #include "fixture_lexer.h"
 #include "helpers_gate_instantiation_tokens.h"
+#include "lexer/token.h"
 
 using namespace delta;
 

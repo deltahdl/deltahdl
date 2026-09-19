@@ -23,7 +23,6 @@
 
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
-#include "fixture_program.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_keywords.h"
 

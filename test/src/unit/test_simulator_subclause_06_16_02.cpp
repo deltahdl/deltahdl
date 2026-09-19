@@ -17,6 +17,8 @@
 // than hand-constructing a string variable. Only the len()-based length probe
 // leans on the 6.16.1 dependency, which this pass may use freely.
 
+#include <gtest/gtest.h>
+
 #include "helpers_scheduler.h"
 
 using namespace delta;

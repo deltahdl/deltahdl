@@ -2,8 +2,8 @@
 
 #include <cstdint>
 #include <utility>
+#include <vector>
 
-#include "parser/ast.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/stmt_exec.h"

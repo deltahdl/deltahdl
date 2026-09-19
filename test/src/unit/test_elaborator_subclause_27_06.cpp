@@ -1,5 +1,7 @@
-#include "fixture_elaborator.h"
+#include <gtest/gtest.h>
+
 #include "helpers_generate_elab.h"
+#include "parser/ast_module.h"
 
 using namespace delta;
 

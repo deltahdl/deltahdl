@@ -14,6 +14,8 @@
 // module through the full pipeline (parse -> elaborate -> lower -> run),
 // reading the loaded elements back with $display — rather than hand-building
 // container objects in an isolated evaluator.
+#include <gtest/gtest.h>
+
 #include <cstdio>
 #include <fstream>
 #include <string>

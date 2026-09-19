@@ -8,7 +8,8 @@
 // §K.1 General makes a single normative claim: vpi_user.h is a normative
 // include file that every SystemVerilog simulator shall provide. The simulator
 // stage carries that obligation through the VPI access header pulled in below
-// (it in turn includes simulator/vpi.h, which declares the VPI routine set).
+// (it in turn includes simulator/vpi_user.h, which declares the VPI routine
+// set).
 // These tests observe that the header is genuinely provided: includable, guard-
 // protected, supplying the canonical VPI types and resolvable access routines.
 // The exhaustive contents (constant values, struct layouts) belong to §K.2 and

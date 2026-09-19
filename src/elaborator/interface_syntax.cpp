@@ -1,5 +1,7 @@
 #include "elaborator/interface_syntax.h"
 
+#include <vector>
+
 namespace delta {
 
 bool InterfacePortHierRefIsLegal(

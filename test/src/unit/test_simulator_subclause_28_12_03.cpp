@@ -10,13 +10,16 @@
 
 #include <gtest/gtest.h>
 
+#include <cstdint>
 #include <initializer_list>
 #include <string>
 
 #include "common/arena.h"
+#include "common/types.h"
 #include "fixture_simulator.h"
 #include "helpers_net_strength.h"
 #include "model_strength.h"
+#include "model_val4.h"
 #include "simulator/evaluation.h"
 #include "simulator/net.h"
 #include "simulator/scheduler.h"

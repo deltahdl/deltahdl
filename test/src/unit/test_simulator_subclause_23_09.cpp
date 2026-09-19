@@ -35,6 +35,8 @@
 // value -- or a pair of 4-state variables both left at x -- yield the answer
 // §23.9 requires even when the initializer read the wrong scope.
 
+#include <gtest/gtest.h>
+
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/sim_context_types.h"

@@ -2,7 +2,7 @@
 
 #include "common/diagnostic.h"
 #include "elaborator/rtlir.h"
-#include "parser/ast.h"
+#include "parser/ast_module.h"
 
 namespace delta {
 

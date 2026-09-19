@@ -18,6 +18,8 @@
 // class type, and the prototype's constructor, instance methods, and static
 // get_id() elaborate at their call sites.
 
+#include <gtest/gtest.h>
+
 #include "elaborator/std_package.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"

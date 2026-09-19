@@ -1,3 +1,5 @@
+#include <gtest/gtest.h>
+
 #include <filesystem>
 #include <string_view>
 #include <vector>
@@ -5,13 +7,16 @@
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "common/types.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 #include "fixture_scratch_dir.h"
 #include "helpers_reported_error.h"
 #include "helpers_rtlir_lookup.h"
-#include "parser/ast.h"
+#include "parser/ast_class.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_module.h"
 #include "parser/library_map.h"
 #include "parser/single_pass_compile.h"
 

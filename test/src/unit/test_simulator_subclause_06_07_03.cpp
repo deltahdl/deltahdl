@@ -1,9 +1,11 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <cstdint>
 #include <vector>
 
 #include "common/arena.h"
+#include "common/types.h"
 #include "fixture_simulator.h"
 #include "helpers_switch_network.h"
 #include "simulator/lowerer.h"

@@ -9,7 +9,6 @@
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "fixture_preprocessor.h"
-#include "lexer/keywords.h"
 #include "lexer/lexer.h"
 #include "lexer/token.h"
 

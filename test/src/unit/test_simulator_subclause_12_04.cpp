@@ -1,5 +1,11 @@
+#include <gtest/gtest.h>
+
+#include <cstdint>
+
+#include "common/types.h"
 #include "fixture_simulator.h"
-#include "parser/ast.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_stmt.h"
 #include "simulator/compiled_sim.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"

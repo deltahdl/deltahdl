@@ -8,6 +8,8 @@
 // (parse → elaborate → lower → run) rather than hand-pushing frames. The rules
 // live in stmt_exec.cpp (task form) and eval_system_func.cpp (function form /
 // BuildStackTraceReport).
+#include <gtest/gtest.h>
+
 #include <string>
 
 #include "fixture_simulator.h"

@@ -7,7 +7,8 @@
 #include <vector>
 
 #include "common/source_loc.h"
-#include "parser/ast.h"
+#include "parser/ast_design.h"
+#include "parser/ast_module.h"
 
 namespace delta {
 

@@ -1,11 +1,19 @@
+#include <gtest/gtest.h>
+
+#include <cstdint>
+
+#include "common/types.h"
 #include "fixture_simulator.h"
 #include "helpers_assoc.h"
 #include "helpers_assoc_multikey.h"
 #include "helpers_reported_error.h"
 #include "helpers_scheduler.h"
-#include "parser/ast.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_stmt.h"
 #include "simulator/eval_array.h"
 #include "simulator/evaluation.h"
+#include "simulator/lowerer.h"
+#include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
 
 using namespace delta;

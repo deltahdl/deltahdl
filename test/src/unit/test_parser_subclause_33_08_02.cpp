@@ -75,20 +75,14 @@
 #include <gtest/gtest.h>
 
 #include <array>
-#include <cstdint>
 #include <filesystem>
 #include <string>
 #include <string_view>
 
-#include "common/arena.h"
 #include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "fixture_scratch_dir.h"
 #include "fixture_tagged_file.h"
-#include "lexer/lexer.h"
-#include "parser/ast.h"
 #include "parser/library_map.h"
-#include "parser/parser.h"
 
 using namespace delta;
 namespace fs = std::filesystem;

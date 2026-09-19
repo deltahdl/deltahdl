@@ -1,6 +1,9 @@
+#include <gtest/gtest.h>
+
 #include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
+#include "lexer/token.h"
 #include "simulator/evaluation.h"
 
 using namespace delta;

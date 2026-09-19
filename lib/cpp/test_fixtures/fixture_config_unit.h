@@ -11,7 +11,6 @@
 #include "common/source_mgr.h"
 #include "elaborator/elaborator.h"
 #include "lexer/lexer.h"
-#include "parser/ast.h"
 #include "parser/library_map.h"
 #include "parser/parser.h"
 

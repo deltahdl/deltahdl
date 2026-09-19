@@ -30,12 +30,15 @@
 // src/simulator/statement_assign.h directly, which is the one way to hold the
 // two writers of a select to the same answer within one case.
 
+#include <gtest/gtest.h>
+
 #include <string>
 
 #include "builders_ast.h"
+#include "common/types.h"
 #include "fixture_simulator.h"
 #include "helpers_eval_op.h"
-#include "parser/ast.h"
+#include "parser/ast_expr.h"
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"
 

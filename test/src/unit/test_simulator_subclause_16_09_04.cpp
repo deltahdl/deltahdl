@@ -14,7 +14,8 @@
 #include "simulator/evaluation.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
-#include "simulator/sva_engine.h"
+#include "simulator/sva_engine_queues.h"
+#include "simulator/sva_engine_sequences.h"
 #include "simulator/variable.h"
 
 using namespace delta;

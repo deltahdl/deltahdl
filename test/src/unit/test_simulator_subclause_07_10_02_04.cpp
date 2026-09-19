@@ -19,6 +19,8 @@
 // NonexistentQueueElement). The nonexistent-element value it returns is the
 // §7.4.5 machinery this pass depends on.
 
+#include <gtest/gtest.h>
+
 #include "helpers_scheduler.h"
 
 using namespace delta;

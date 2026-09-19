@@ -1,5 +1,7 @@
 #include "elaborator/eventually_range.h"
 
+#include <cstdint>
+
 namespace delta {
 
 // §16.12.13: only an unbounded (`$`) upper bound is constrained by this

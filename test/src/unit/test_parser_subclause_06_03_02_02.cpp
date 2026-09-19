@@ -9,8 +9,11 @@
 // (weak0 is 2, pull1 is 3), so a reading that swapped the two fields, or
 // filled both from one keyword, is a failure rather than a coincidence.
 
+#include <gtest/gtest.h>
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "parser/ast_module.h"
 
 using namespace delta;
 

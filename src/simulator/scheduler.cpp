@@ -4,8 +4,11 @@
 #include <cstdlib>
 
 #include "common/arena.h"
+#include "common/types.h"
 #include "simulator/sim_context.h"
+#include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
+#include "simulator/vpi_globals.h"
 
 namespace delta {
 

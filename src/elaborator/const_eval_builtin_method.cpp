@@ -16,7 +16,7 @@
 #include "elaborator/const_eval.h"
 #include "elaborator/const_eval_internal.h"
 #include "elaborator/rtlir.h"
-#include "parser/ast.h"
+#include "parser/ast_expr.h"
 
 namespace delta {
 namespace {

@@ -1,12 +1,14 @@
+#include <cstddef>
+#include <cstdint>
 #include <string>
 #include <string_view>
 
 #include "common/arena.h"
 #include "common/types.h"
-#include "parser/ast.h"
 #include "simulator/class_object.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_types.h"
 
 namespace delta {
 

@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-#include "parser/ast.h"
+#include "parser/ast_expr.h"
 
 namespace delta {
 

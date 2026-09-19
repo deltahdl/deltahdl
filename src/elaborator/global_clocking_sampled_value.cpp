@@ -1,5 +1,7 @@
 #include "elaborator/global_clocking_sampled_value.h"
 
+#include <string_view>
+
 namespace delta {
 
 bool ClassifyGlobalClockingSampledFunction(std::string_view name,

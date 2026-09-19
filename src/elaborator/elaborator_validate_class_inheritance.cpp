@@ -1,7 +1,9 @@
 #include <algorithm>
+#include <cstddef>
 #include <format>
 #include <functional>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -10,9 +12,13 @@
 #include "common/diagnostic.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_helpers.h"
+#include "elaborator/elaborator_validate_classes.h"
 #include "elaborator/elaborator_validate_classes_internal.h"
 #include "elaborator/type_eval.h"
-#include "parser/ast.h"
+#include "parser/ast_class.h"
+#include "parser/ast_design.h"
+#include "parser/ast_module.h"
 
 namespace delta {
 

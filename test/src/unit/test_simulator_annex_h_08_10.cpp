@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-#include "parser/ast.h"
+#include "parser/ast_type.h"
 #include "simulator/dpi_arg_value.h"
 #include "simulator/dpi_c_type.h"
 #include "simulator/dpi_runtime.h"

@@ -1,3 +1,5 @@
+#include <gtest/gtest.h>
+
 #include "elaborator/type_eval.h"
 #include "fixture_parser.h"
 

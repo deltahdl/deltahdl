@@ -6,7 +6,7 @@
 
 #include "common/arena.h"
 #include "elaborator/rtlir.h"
-#include "parser/ast.h"
+#include "parser/ast_module.h"
 #include "simulator/class_object.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"

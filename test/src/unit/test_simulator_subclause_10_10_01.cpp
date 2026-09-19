@@ -1,5 +1,10 @@
 
 
+#include <gtest/gtest.h>
+
+#include <cstdint>
+#include <string>
+
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 

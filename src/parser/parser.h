@@ -1,17 +1,27 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
+#include "common/source_loc.h"
 #include "lexer/lexer.h"
-#include "parser/ast.h"
+#include "lexer/token.h"
+#include "parser/ast_class.h"
+#include "parser/ast_design.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_module.h"
+#include "parser/ast_specify.h"
+#include "parser/ast_stmt.h"
+#include "parser/ast_type.h"
 #include "parser/scope_type_names.h"
 
 namespace delta {

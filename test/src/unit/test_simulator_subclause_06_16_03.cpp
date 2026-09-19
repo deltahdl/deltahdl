@@ -20,7 +20,10 @@
 // produced, so it is pinned with a single-stage evaluation whose Logic4Vec
 // width is directly observable.
 
-#include "builders_ast.h"
+#include <gtest/gtest.h>
+
+#include <cstdint>
+
 #include "fixture_string.h"
 #include "helpers_scheduler.h"
 #include "simulator/evaluation.h"

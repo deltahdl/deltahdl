@@ -16,8 +16,15 @@
 // constructs (constant_range/constant_expression from §A.8.3, data_type from
 // §A.2.2.1) are produced by genuine source syntax.
 
+#include <gtest/gtest.h>
+
+#include <string_view>
+
 #include "fixture_parser.h"
 #include "helpers_reported_error.h"
+#include "lexer/token.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_module.h"
 
 using namespace delta;
 

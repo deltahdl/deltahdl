@@ -6,7 +6,6 @@
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "fixture_preprocessor.h"
-#include "fixture_program.h"
 #include "helpers_protect_keyword_value.h"
 #include "helpers_reported_error.h"
 #include "preprocessor/preprocessor.h"

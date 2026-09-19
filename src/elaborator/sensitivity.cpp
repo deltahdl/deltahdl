@@ -1,12 +1,16 @@
 #include "elaborator/sensitivity.h"
 
 #include <functional>
+#include <string>
 #include <unordered_set>
+#include <utility>
+#include <vector>
 
 #include "common/arena.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator_validate_internal.h"
-#include "parser/ast.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_stmt.h"
 
 namespace delta {
 

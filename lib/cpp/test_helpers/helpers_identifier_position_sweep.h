@@ -12,6 +12,7 @@
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
 #include "model_identifier_positions.h"
+#include "parser/ast_module.h"
 
 using namespace delta;
 

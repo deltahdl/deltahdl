@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
 #include "fixture_program.h"
-#include "simulator/vpi.h"
+#include "parser/ast_module.h"
+#include "simulator/vpi_globals.h"
+#include "simulator/vpi_user.h"
 
 namespace delta {
 namespace {

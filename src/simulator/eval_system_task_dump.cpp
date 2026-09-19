@@ -1,15 +1,21 @@
+#include <sys/unistd.h>
 #include <unistd.h>
 
 #include <algorithm>
+#include <cstdint>
 #include <cstdlib>
 #include <cstring>
 #include <optional>
 #include <string>
+#include <string_view>
+#include <utility>
 #include <vector>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
-#include "parser/ast.h"
+#include "common/source_loc.h"
+#include "common/types.h"
+#include "parser/ast_expr.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/process.h"

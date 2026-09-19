@@ -1,5 +1,11 @@
 #include <cctype>
+#include <cstddef>
+#include <string>
+#include <string_view>
+#include <vector>
 
+#include "common/source_loc.h"
+#include "preprocessor/macro_table.h"
 #include "preprocessor/preprocessor.h"
 
 namespace delta {

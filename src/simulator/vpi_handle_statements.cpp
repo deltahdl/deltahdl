@@ -1,4 +1,4 @@
-#include "simulator/vpi.h"
+#include "simulator/vpi_user.h"
 // The statement-class predicates and the for-header helper these resolvers ask
 // are declared here.
 #include "simulator/vpi_internal.h"

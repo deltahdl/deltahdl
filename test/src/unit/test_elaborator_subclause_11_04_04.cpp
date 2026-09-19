@@ -1,12 +1,10 @@
 #include <gtest/gtest.h>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
+#include <cstdint>
+
+#include "elaborator/const_eval.h"
 #include "fixture_evaluator.h"
 #include "fixture_simulator.h"
-#include "lexer/lexer.h"
-#include "parser/parser.h"
 
 using namespace delta;
 

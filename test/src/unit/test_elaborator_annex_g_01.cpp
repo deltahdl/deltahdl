@@ -10,6 +10,8 @@
 // elaboration without a user definition, where a name the list does not hold
 // is not.
 
+#include <gtest/gtest.h>
+
 #include <optional>
 #include <string_view>
 

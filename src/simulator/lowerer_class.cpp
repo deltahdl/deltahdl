@@ -1,10 +1,14 @@
+#include <cstddef>
 #include <cstdint>
 #include <string>
+#include <utility>
 
 #include "common/arena.h"
+#include "common/types.h"
 #include "elaborator/type_eval.h"
 #include "lexer/token.h"
-#include "parser/ast.h"
+#include "parser/ast_class.h"
+#include "parser/ast_expr.h"
 #include "simulator/class_object.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"

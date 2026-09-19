@@ -8,6 +8,10 @@
 
 #include <vector>
 
+#include "common/diagnostic.h"
+#include "lexer/token.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_type.h"
 #include "parser/parser.h"
 
 namespace delta {

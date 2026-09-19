@@ -1,26 +1,30 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <optional>
-#include <set>
 #include <string>
 #include <string_view>
-#include <tuple>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "common/source_loc.h"
+#include "common/types.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator_bind_scope.h"
 #include "elaborator/elaborator_data.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_classes.h"
 #include "elaborator/elaborator_validate_operations.h"
-#include "elaborator/property_rewrite.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
-#include "parser/ast.h"
+#include "parser/ast_design.h"
+#include "parser/ast_module.h"
+#include "parser/ast_specify.h"
+#include "parser/ast_stmt.h"
+#include "parser/ast_type.h"
 
 namespace delta {
 

@@ -1,10 +1,14 @@
+#include <cstddef>
+#include <cstdint>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
-#include "parser/ast.h"
+#include "common/types.h"
+#include "parser/ast_expr.h"
 #include "simulator/eval_array.h"
 #include "simulator/eval_array_internal.h"
 #include "simulator/evaluation.h"

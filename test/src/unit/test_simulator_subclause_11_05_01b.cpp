@@ -27,6 +27,8 @@
 // wrote its answer into, so the declared range reaches the select the way a
 // design reaches it rather than through a hand-set field.
 
+#include <gtest/gtest.h>
+
 #include <string>
 
 #include "fixture_simulator.h"

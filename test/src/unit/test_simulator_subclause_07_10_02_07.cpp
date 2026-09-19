@@ -24,6 +24,8 @@
 // Production rule: src/simulator/eval_array_queue.cpp (QueuePushBack,
 // dispatched through DispatchQueuePush).
 
+#include <gtest/gtest.h>
+
 #include "helpers_scheduler.h"
 
 using namespace delta;

@@ -18,6 +18,8 @@
 // dimension — the declaration parser rejects the un-typedef'd vector index
 // form (upstream §7.8 territory); the typedef'd spelling below covers the
 // vector-index input form.
+#include <gtest/gtest.h>
+
 #include <cstdio>
 #include <fstream>
 #include <string>

@@ -1,5 +1,8 @@
+#include <gtest/gtest.h>
+
 #include "fixture_lexer.h"
 #include "helpers_assignment_pattern_lex.h"
+#include "lexer/token.h"
 
 using namespace delta;
 

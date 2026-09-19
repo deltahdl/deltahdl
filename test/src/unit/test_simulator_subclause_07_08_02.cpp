@@ -1,5 +1,6 @@
+#include <gtest/gtest.h>
+
 #include <string>
-#include <vector>
 
 #include "fixture_simulator.h"
 #include "helpers_assoc.h"

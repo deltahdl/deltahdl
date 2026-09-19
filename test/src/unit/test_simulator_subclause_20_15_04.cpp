@@ -14,6 +14,8 @@
 // lower → run), and read $q_full's return value back by assigning it into a
 // declared integer variable and printing it — rather than hand-building a
 // system-call node and calling the evaluator in isolation.
+#include <gtest/gtest.h>
+
 #include <string>
 #include <vector>
 

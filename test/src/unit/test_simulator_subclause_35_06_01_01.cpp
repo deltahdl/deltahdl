@@ -1,9 +1,7 @@
 #include <gtest/gtest.h>
 
-#include <cstdint>
-#include <vector>
-
 #include "helpers_dpi_take_int.h"
+#include "simulator/dpi_arg_value.h"
 #include "simulator/dpi_runtime.h"
 
 using namespace delta;

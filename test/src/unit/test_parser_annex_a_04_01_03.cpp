@@ -1,7 +1,11 @@
+#include <gtest/gtest.h>
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
 #include "helpers_three_comma_instances.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_module.h"
 
 using namespace delta;
 

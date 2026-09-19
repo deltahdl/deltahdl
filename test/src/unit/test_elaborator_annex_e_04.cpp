@@ -1,5 +1,8 @@
+#include <gtest/gtest.h>
+
 #include <string_view>
 
+#include "common/types.h"
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 

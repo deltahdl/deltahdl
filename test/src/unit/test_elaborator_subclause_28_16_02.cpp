@@ -1,3 +1,5 @@
+#include <gtest/gtest.h>
+
 #include "fixture_elaborator.h"
 #include "helpers_rtlir_lookup.h"
 

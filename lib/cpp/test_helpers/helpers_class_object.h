@@ -6,7 +6,9 @@
 #include <utility>
 #include <vector>
 
+#include "common/types.h"
 #include "fixture_simulator.h"
+#include "simulator/class_object.h"
 
 using namespace delta;
 

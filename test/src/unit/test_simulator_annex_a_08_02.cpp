@@ -10,6 +10,8 @@
 // literal/parameter/localparam argument forms are observed at that stage in
 // test_elaborator_annex_a_08_02.cpp.)
 
+#include <gtest/gtest.h>
+
 #include "helpers_scheduler.h"
 
 using namespace delta;

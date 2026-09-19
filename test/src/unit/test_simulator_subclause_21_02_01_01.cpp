@@ -1,8 +1,14 @@
+#include <gtest/gtest.h>
+
+#include <cstdint>
 #include <cstring>
 #include <iostream>
 #include <sstream>
 #include <streambuf>
+#include <string>
+#include <vector>
 
+#include "common/types.h"
 #include "fixture_simulator.h"
 #include "helpers_reported_error.h"
 #include "simulator/evaluation.h"

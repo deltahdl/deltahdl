@@ -1,5 +1,9 @@
 #include "simulator/checker_variable_randomization.h"
 
+#include <cstdint>
+
+#include "common/types.h"
+#include "simulator/checker_instance_scheduling.h"
 #include "simulator/sva_engine_sampling.h"
 
 namespace delta {

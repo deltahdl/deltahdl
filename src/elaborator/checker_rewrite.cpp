@@ -1,5 +1,11 @@
 #include "elaborator/checker_rewrite.h"
 
+#include <cstddef>
+#include <string_view>
+
+#include "parser/ast_module.h"
+#include "parser/ast_type.h"
+
 namespace delta {
 
 void CheckerRegistry::Register(const ModuleDecl* decl) {

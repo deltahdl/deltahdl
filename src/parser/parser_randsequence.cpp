@@ -13,6 +13,9 @@
 
 #include <vector>
 
+#include "common/diagnostic.h"
+#include "lexer/token.h"
+#include "parser/ast_stmt.h"
 #include "parser/parser.h"
 
 namespace delta {

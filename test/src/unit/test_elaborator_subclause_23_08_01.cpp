@@ -1,4 +1,10 @@
+#include <gtest/gtest.h>
+
+#include <string_view>
+
+#include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
+#include "parser/ast_module.h"
 
 using namespace delta;
 

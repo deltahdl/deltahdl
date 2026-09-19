@@ -10,6 +10,8 @@
 // lower -> run), observing the loaded words with $display or reading back the
 // dumped file — never hand-registering array metadata on a bare simulation
 // context. The data files are real scratch files written before each run.
+#include <gtest/gtest.h>
+
 #include <cstdio>
 #include <fstream>
 #include <string>

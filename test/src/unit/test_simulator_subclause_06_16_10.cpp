@@ -19,6 +19,8 @@
 // (parse -> elaborate -> lower -> run), storing the real result into a real
 // variable and reading its bit pattern back.
 
+#include <gtest/gtest.h>
+
 #include "helpers_scheduler.h"
 
 using namespace delta;

@@ -1,3 +1,5 @@
+#include <gtest/gtest.h>
+
 #include <string>
 
 #include "fixture_vcd_dump_from_source.h"

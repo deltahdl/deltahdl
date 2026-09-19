@@ -1,10 +1,21 @@
+#include <cstdint>
+#include <string>
+#include <string_view>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
+#include <vector>
 
+#include "common/arena.h"
 #include "common/diagnostic.h"
+#include "common/source_loc.h"
+#include "common/types.h"
+#include "simulator/class_object.h"
 #include "simulator/procedural_assertion.h"
 #include "simulator/process.h"
+#include "simulator/scope.h"
 #include "simulator/sim_context.h"
+#include "simulator/variable.h"
 
 namespace delta {
 

@@ -2,7 +2,6 @@
 
 #include <cctype>
 #include <string>
-#include <vector>
 
 #include "fixture_simulator.h"
 #include "fixture_vcd_dump_run.h"

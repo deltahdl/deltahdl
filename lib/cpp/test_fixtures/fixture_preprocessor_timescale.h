@@ -8,7 +8,7 @@
 #include "common/source_mgr.h"
 #include "common/types.h"
 #include "lexer/lexer.h"
-#include "parser/ast.h"
+#include "parser/ast_design.h"
 #include "parser/parser.h"
 #include "preprocessor/preprocessor.h"
 

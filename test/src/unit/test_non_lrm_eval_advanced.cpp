@@ -1,9 +1,9 @@
-#include "fixture_simulator.h"
-#include "lexer/token.h"
-#include "parser/ast.h"
+#include <gtest/gtest.h>
+
+#include "common/arena.h"
+#include "common/types.h"
 #include "simulator/adv_sim.h"
 #include "simulator/evaluation.h"
-#include "simulator/sim_context.h"
 
 using namespace delta;
 

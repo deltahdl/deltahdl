@@ -13,7 +13,8 @@
 #include "simulator/lowerer.h"
 #include "simulator/scheduler.h"
 #include "simulator/variable.h"
-#include "simulator/vpi.h"
+#include "simulator/vpi_globals.h"
+#include "simulator/vpi_user.h"
 
 using namespace delta;
 

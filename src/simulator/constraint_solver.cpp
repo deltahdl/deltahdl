@@ -1,5 +1,6 @@
 #include "simulator/constraint_solver.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <random>
 #include <string>

@@ -1,5 +1,7 @@
 #include "elaborator/sequence_composition.h"
 
+#include "elaborator/sequence_method.h"
+
 namespace delta {
 
 bool IsSequenceCompositionMethodValid(SequenceCompositionMethod method) {

@@ -1,7 +1,8 @@
 #include <cstdint>
 #include <string>
 
-#include "parser/ast.h"
+#include "parser/ast_class.h"
+#include "parser/ast_expr.h"
 #include "simulator/constraint_solver.h"
 #include "simulator/eval_randomize_internal.h"
 #include "simulator/evaluation.h"

@@ -1,4 +1,5 @@
 #include <format>
+#include <string_view>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -7,7 +8,11 @@
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_validate_internal.h"
-#include "parser/ast.h"
+#include "lexer/token.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_module.h"
+#include "parser/ast_stmt.h"
+#include "parser/ast_type.h"
 
 namespace delta {
 

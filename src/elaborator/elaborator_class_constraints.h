@@ -5,7 +5,8 @@
 
 #include "common/diagnostic.h"
 #include "elaborator/type_eval.h"
-#include "parser/ast.h"
+#include "parser/ast_class.h"
+#include "parser/ast_design.h"
 
 namespace delta {
 

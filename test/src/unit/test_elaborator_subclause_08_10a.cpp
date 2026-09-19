@@ -10,6 +10,8 @@
 // in test_elaborator_subclause_08_10b.cpp, which the 1000-line cap in
 // .github/workflows/deltahdl.yml separated this file from.
 
+#include <gtest/gtest.h>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 

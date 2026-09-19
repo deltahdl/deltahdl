@@ -2,6 +2,7 @@
 
 #include <optional>
 #include <string>
+#include <vector>
 
 #include "elaborator/multiclock_sequence.h"
 #include "fixture_elaborator.h"

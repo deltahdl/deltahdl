@@ -19,6 +19,10 @@
 // src/parser/parser_class.cpp, which they would take to 969 lines, inside the
 // band assert-no-oversized-source-files warns at.
 
+#include "common/diagnostic.h"
+#include "common/source_loc.h"
+#include "lexer/token.h"
+#include "parser/ast_module.h"
 #include "parser/parser.h"
 
 namespace delta {

@@ -1,6 +1,10 @@
+#include <gtest/gtest.h>
+
 #include "elaborator/property_rewrite.h"
+#include "elaborator/sampled_value.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
+#include "parser/ast_module.h"
 
 using namespace delta;
 

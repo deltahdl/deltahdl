@@ -4,8 +4,10 @@
 #include <string>
 #include <vector>
 
+#include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 #include "simulator/coverage.h"
+#include "simulator/coverage_types.h"
 #include "simulator/lowerer.h"
 
 using namespace delta;

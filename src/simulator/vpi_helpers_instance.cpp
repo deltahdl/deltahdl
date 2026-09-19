@@ -1,23 +1,23 @@
 #include <algorithm>
 #include <cctype>
-#include <cmath>
 #include <cstdarg>
 #include <cstddef>
 #include <cstdint>
-#include <cstdio>
 #include <deque>
 #include <string>
 #include <string_view>
 #include <vector>
 
 #include "elaborator/rtlir.h"
+#include "parser/ast_expr.h"
 #include "parser/ast_specify.h"
 #include "parser/ast_stmt.h"
 #include "simulator/sim_context.h"
 #include "simulator/specify.h"
+#include "simulator/specify_path_delay.h"
 #include "simulator/specify_timing_check.h"
-#include "simulator/vpi.h"
 #include "simulator/vpi_design_walk.h"
+#include "simulator/vpi_user.h"
 // §37.10 detail 3: the package/interface/program instance kinds are defined in
 // the SystemVerilog VPI header alongside the §37.10 vpiInstance relation.
 #include "simulator/sv_vpi_user.h"

@@ -1,3 +1,7 @@
+#include <gtest/gtest.h>
+
+#include "common/types.h"
+#include "elaborator/elaborator_helpers.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 

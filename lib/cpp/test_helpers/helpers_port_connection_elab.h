@@ -4,9 +4,9 @@
 
 #include <string>
 
-#include "common/types.h"
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
+#include "parser/ast_type.h"
 
 using namespace delta;
 

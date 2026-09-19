@@ -1,5 +1,10 @@
+#include <gtest/gtest.h>
+
+#include <cstdint>
+
 #include "fixture_parser.h"
 #include "helpers_reported_error.h"
+#include "parser/ast_module.h"
 
 using namespace delta;
 

@@ -2,8 +2,11 @@
 // Each test observes the parser applying one BNF production of the config
 // grammar. Semantic rules from descendant subclauses (§33.4.1.1 etc.) are not
 // exercised here.
+#include <gtest/gtest.h>
+
 #include "fixture_parser.h"
 #include "helpers_reported_error.h"
+#include "parser/ast_design.h"
 
 using namespace delta;
 

@@ -9,6 +9,7 @@
 #include "common/types.h"
 // GenBlockConsts, the §27.4 loop-index values a lowered thread carries.
 #include "elaborator/rtlir.h"
+#include "parser/ast_stmt.h"
 
 namespace delta {
 

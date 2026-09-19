@@ -13,7 +13,7 @@
 #include "elaborator/rtlir.h"
 #include "fixture_scratch_dir.h"
 #include "lexer/lexer.h"
-#include "parser/ast.h"
+#include "parser/ast_design.h"
 #include "parser/library_map.h"
 #include "parser/parser.h"
 

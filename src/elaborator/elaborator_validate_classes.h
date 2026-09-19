@@ -7,7 +7,11 @@
 #include "common/source_loc.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator_validate_operations.h"
-#include "parser/ast.h"
+#include "parser/ast_class.h"
+#include "parser/ast_design.h"
+#include "parser/ast_module.h"
+#include "parser/ast_stmt.h"
+#include "parser/ast_type.h"
 
 namespace delta {
 

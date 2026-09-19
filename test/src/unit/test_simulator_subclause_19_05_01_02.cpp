@@ -1,7 +1,5 @@
 #include <gtest/gtest.h>
 
-#include <cstdint>
-
 #include "simulator/coverage.h"
 
 using namespace delta;

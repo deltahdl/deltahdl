@@ -1,9 +1,10 @@
+#include <gtest/gtest.h>
+
 #include "builders_ast.h"
-#include "fixture_evaluator.h"
+#include "common/types.h"
 #include "fixture_simulator.h"
 #include "helpers_eval_op.h"
 #include "helpers_scheduler.h"
-#include "parser/ast.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"

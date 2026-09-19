@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
+#include <cstdint>
+
 #include "synthesizer/adv_synth.h"
 #include "synthesizer/aig.h"
 #include "synthesizer/aig_opt.h"

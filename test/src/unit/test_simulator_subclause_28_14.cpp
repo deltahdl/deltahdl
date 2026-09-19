@@ -5,15 +5,12 @@
 #include <cstdint>
 #include <vector>
 
-#include "common/arena.h"
 #include "common/types.h"
-#include "fixture_elaborator.h"
 #include "fixture_simulator.h"
 #include "helpers_switch_network.h"
 #include "model_strength.h"
 #include "simulator/net.h"
 #include "simulator/switch_network.h"
-#include "simulator/variable.h"
 
 using namespace delta;
 

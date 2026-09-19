@@ -4,7 +4,7 @@
 #include <string_view>
 #include <unordered_map>
 
-#include "parser/ast.h"
+#include "parser/ast_module.h"
 
 namespace delta {
 

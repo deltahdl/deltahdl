@@ -1,7 +1,8 @@
 #include <functional>
 #include <string_view>
 
-#include "parser/ast.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_stmt.h"
 #include "simulator/property_attempts.h"
 #include "simulator/sim_context.h"
 

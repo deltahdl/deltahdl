@@ -11,6 +11,8 @@
 #include <vector>
 
 #include "common/arg_origin.h"
+#include "common/types.h"
+#include "preprocessor/protect_cli.h"
 #include "simulator/foreign_code.h"
 
 namespace delta {

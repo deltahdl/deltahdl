@@ -29,13 +29,15 @@
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
-#include "parser/ast.h"
+#include "common/types.h"
+#include "parser/ast_expr.h"
 #include "simulator/eval_systask_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 // §37.82: the VPI model reaches the $timeformat() call that set the active time
 // format, so the run stands one up as the task runs.
-#include "simulator/vpi.h"
+#include "simulator/vpi_globals.h"
+#include "simulator/vpi_user.h"
 
 namespace delta {
 

@@ -5,6 +5,7 @@
 
 // svdpi_sv31a.h is the companion of svdpi.h, so this file includes it alone
 // as the svdpi.h cases do: the two redefine VPI names vpi.h spells otherwise.
+#include "simulator/svdpi.h"
 #include "simulator/svdpi_sv31a.h"
 
 namespace {

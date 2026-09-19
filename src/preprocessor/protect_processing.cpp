@@ -3,7 +3,6 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
-#include <vector>
 
 #include "common/diagnostic.h"
 #include "common/source_loc.h"

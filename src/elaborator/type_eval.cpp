@@ -1,15 +1,18 @@
 #include "elaborator/type_eval.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <cstdlib>
 #include <string>
+#include <string_view>
 #include <unordered_set>
+#include <utility>
 
 #include "common/arena.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "lexer/token.h"
-#include "parser/ast.h"
+#include "parser/ast_expr.h"
 
 namespace delta {
 

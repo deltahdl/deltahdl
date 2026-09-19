@@ -1,3 +1,8 @@
+#include <gtest/gtest.h>
+
+#include <cstdint>
+#include <string>
+
 #include "fixture_simulator.h"
 #include "helpers_reported_error.h"
 #include "helpers_stream_unpack_ab.h"

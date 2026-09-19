@@ -1,6 +1,5 @@
 #include <gtest/gtest.h>
 
-#include <cstdint>
 #include <string>
 
 #include "common/arena.h"
@@ -11,7 +10,7 @@
 #include "helpers_reported_error.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
-#include "simulator/sva_engine.h"
+#include "simulator/sva_engine_queues.h"
 
 // §16.4.2 "Deferred assertion flush points" defines when a process reaches a
 // deferred assertion flush point: (1) it resumes after suspending on an event

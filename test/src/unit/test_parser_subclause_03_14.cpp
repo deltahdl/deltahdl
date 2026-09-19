@@ -1,5 +1,9 @@
+#include <gtest/gtest.h>
+
+#include <cstdint>
 #include <string_view>
 
+#include "common/types.h"
 #include "fixture_parser.h"
 #include "helpers_reported_error.h"
 #include "parser/time_resolve.h"

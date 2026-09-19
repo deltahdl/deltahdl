@@ -13,7 +13,10 @@
 #include "helpers_reported_error.h"
 #include "model_keyword_table_sweeps.h"
 #include "model_keyword_tables.h"
-#include "parser/ast.h"
+#include "parser/ast_design.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_module.h"
+#include "parser/ast_type.h"
 
 using namespace delta;
 

@@ -8,6 +8,7 @@
 #include "helpers_fsm_pragma_lexing.h"
 #include "helpers_reported_error.h"
 #include "lexer/lexer.h"
+#include "lexer/token.h"
 
 using namespace delta;
 

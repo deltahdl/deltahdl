@@ -17,9 +17,11 @@
 #include <string_view>
 
 #include "common/diagnostic.h"
+#include "common/source_loc.h"
 #include "common/types.h"
 #include "lexer/token.h"
-#include "parser/ast.h"
+#include "parser/ast_design.h"
+#include "parser/ast_module.h"
 #include "parser/parser.h"
 #include "parser/time_resolve.h"
 

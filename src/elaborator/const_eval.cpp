@@ -1,15 +1,16 @@
 #include "elaborator/const_eval.h"
 
 #include <algorithm>
-#include <cmath>
+#include <cstdint>
 #include <cstring>
 #include <optional>
 #include <string>
 
+#include "common/packed_range.h"
 #include "elaborator/const_eval_internal.h"
 #include "elaborator/rtlir.h"
 #include "lexer/token.h"
-#include "parser/ast.h"
+#include "parser/ast_expr.h"
 
 namespace delta {
 

@@ -1,9 +1,15 @@
 #include "synthesizer/mem_infer.h"
 
+#include <cstdint>
 #include <string>
+#include <string_view>
 #include <unordered_map>
+#include <utility>
+#include <vector>
 
 #include "elaborator/rtlir.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_stmt.h"
 
 namespace delta {
 

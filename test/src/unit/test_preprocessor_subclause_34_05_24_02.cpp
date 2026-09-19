@@ -58,9 +58,11 @@
 
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <span>
 #include <string>
 #include <string_view>
+#include <utility>
 
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"

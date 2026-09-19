@@ -5,6 +5,8 @@
 // The cases over what §23.9 says about a parameter declared inside a generate
 // block are in test_elaborator_subclause_23_09b.cpp.
 
+#include <gtest/gtest.h>
+
 #include <string>
 
 #include "fixture_elaborator.h"

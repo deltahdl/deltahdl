@@ -12,7 +12,7 @@
 
 #include "common/arena.h"
 #include "common/string_methods.h"
-#include "parser/ast.h"
+#include "common/types.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/variable.h"

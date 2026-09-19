@@ -1,5 +1,9 @@
 
 
+#include <gtest/gtest.h>
+
+#include "common/diagnostic.h"
+#include "common/source_loc.h"
 #include "fixture_simulator.h"
 #include "helpers_lower_run.h"
 #include "helpers_reported_error.h"

@@ -2,6 +2,7 @@
 
 #include <cstdint>
 
+#include "elaborator/rtlir.h"
 #include "fixture_synthesizer.h"
 #include "helpers_aig_eval.h"
 #include "synthesizer/synth_lower.h"

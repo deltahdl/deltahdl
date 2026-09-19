@@ -1,5 +1,7 @@
 #include "parser/assertion_control_task.h"
 
+#include <string_view>
+
 namespace delta {
 
 AssertionControlTaskCategory ClassifyAssertionControlTask(

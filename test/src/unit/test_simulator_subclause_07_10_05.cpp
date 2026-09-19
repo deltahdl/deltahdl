@@ -1,7 +1,15 @@
+#include <gtest/gtest.h>
+
+#include <cstdint>
+#include <utility>
+#include <vector>
+
 #include "builders_ast.h"
+#include "common/types.h"
 #include "fixture_simulator.h"
-#include "helpers_queue.h"
 #include "helpers_reported_error.h"
+#include "lexer/token.h"
+#include "parser/ast_expr.h"
 #include "simulator/eval_array.h"
 #include "simulator/statement_assign.h"
 

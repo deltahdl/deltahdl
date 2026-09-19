@@ -1,4 +1,5 @@
 #include <coroutine>
+#include <cstddef>
 #include <cstdint>
 #include <iostream>
 #include <memory>
@@ -10,12 +11,16 @@
 #include "common/arena.h"
 #include "common/types.h"
 #include "elaborator/sensitivity.h"
-#include "parser/ast.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_stmt.h"
 #include "simulator/awaiters.h"
+#include "simulator/awaiters_event_control.h"
 #include "simulator/evaluation.h"
+#include "simulator/exec_task.h"
 #include "simulator/sim_context.h"
 #include "simulator/stmt_exec.h"
 #include "simulator/stmt_exec_internal.h"
+#include "simulator/stmt_result.h"
 
 namespace delta {
 namespace {

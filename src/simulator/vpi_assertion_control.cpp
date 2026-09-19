@@ -3,7 +3,9 @@
 #include <cstdint>
 #include <string_view>
 
-#include "simulator/vpi.h"
+#include "simulator/assertion_api.h"
+#include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_user.h"
 
 namespace delta {
 namespace {

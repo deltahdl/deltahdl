@@ -1,6 +1,5 @@
 #include <gtest/gtest.h>
 
-#include "common/arena.h"
 #include "helpers_scheduler.h"
 #include "simulator/net.h"
 

@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
 #include "elaborator/covergroup_in_checker.h"
+#include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
+#include "parser/ast_module.h"
 
 using namespace delta;
 

@@ -4,7 +4,8 @@
 
 #include "common/diagnostic.h"
 #include "lexer/lexer.h"
-#include "parser/ast.h"
+#include "lexer/token.h"
+#include "parser/ast_module.h"
 
 namespace delta {
 

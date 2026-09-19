@@ -16,11 +16,11 @@
 // procedures and §10.3's assignments are started the same way.
 
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <string>
 #include <unordered_set>
-#include <utility>
 #include <vector>
 
 #include "common/arena.h"
@@ -28,17 +28,20 @@
 #include "common/types.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/sensitivity.h"
-#include "parser/ast.h"
+#include "parser/ast_expr.h"
 #include "simulator/awaiters.h"
 #include "simulator/evaluation.h"
+#include "simulator/exec_task.h"
 #include "simulator/lowerer.h"
 #include "simulator/module_path_delay.h"
 #include "simulator/net.h"
 #include "simulator/process.h"
 #include "simulator/sim_context.h"
 #include "simulator/specify.h"
+#include "simulator/specify_sdf.h"
 #include "simulator/statement_assign.h"
 #include "simulator/stmt_exec.h"
+#include "simulator/stmt_result.h"
 #include "simulator/variable.h"
 
 namespace delta {

@@ -72,6 +72,7 @@
 
 #include "fixture_preprocessor.h"
 #include "helpers_reported_error.h"
+#include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_encoding.h"
 #include "preprocessor/protect_processing.h"
 

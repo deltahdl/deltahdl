@@ -1,3 +1,7 @@
+#include <gtest/gtest.h>
+
+#include <cstdint>
+
 #include "fixture_simulator.h"
 #include "helpers_eval_op.h"
 #include "simulator/lowerer.h"

@@ -14,14 +14,15 @@
 // §6.20 is a rule of its own and its checks call nothing else in that file.
 
 #include <format>
-#include <string>
 
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "common/string_methods.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_validate_internal.h"
-#include "parser/ast.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_module.h"
+#include "parser/ast_stmt.h"
 
 namespace delta {
 

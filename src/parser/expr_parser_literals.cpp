@@ -22,8 +22,9 @@
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
+#include "common/types.h"
 #include "lexer/token.h"
-#include "parser/ast.h"
+#include "parser/ast_expr.h"
 #include "parser/expr_parser_internal.h"
 #include "parser/parser.h"
 

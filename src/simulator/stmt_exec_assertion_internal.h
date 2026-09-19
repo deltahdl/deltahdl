@@ -1,11 +1,11 @@
 #pragma once
 
 #include <coroutine>
-#include <cstdint>
 #include <string_view>
 #include <vector>
 
 #include "common/arena.h"
+#include "common/types.h"
 #include "simulator/process.h"
 #include "simulator/property_attempts.h"
 #include "simulator/scheduler.h"

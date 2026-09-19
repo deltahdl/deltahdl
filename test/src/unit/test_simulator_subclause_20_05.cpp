@@ -1,9 +1,12 @@
+#include <gtest/gtest.h>
+
+#include <cstdint>
 #include <cstring>
 
 #include "builders_systask.h"
-#include "helpers_eval_op.h"
+#include "fixture_simulator.h"
 #include "helpers_scheduler.h"
-#include "parser/ast.h"
+#include "parser/ast_expr.h"
 #include "simulator/evaluation.h"
 
 using namespace delta;

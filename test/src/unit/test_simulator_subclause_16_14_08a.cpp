@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "simulator/sva_engine.h"
+#include "simulator/sva_engine_properties.h"
 
 using namespace delta;
 

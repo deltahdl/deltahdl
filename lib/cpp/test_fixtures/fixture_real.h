@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <cstring>
 #include <string_view>
 
@@ -7,10 +8,11 @@
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "common/types.h"
-#include "parser/ast.h"
+#include "parser/ast_expr.h"
 #include "simulator/evaluation.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
+#include "simulator/variable.h"
 
 using namespace delta;
 

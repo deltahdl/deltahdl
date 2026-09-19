@@ -1,8 +1,11 @@
+#include <gtest/gtest.h>
+
 #include <iostream>
 #include <sstream>
 #include <streambuf>
 #include <string>
 
+#include "common/types.h"
 #include "fixture_simulator.h"
 #include "simulator/sim_context.h"
 

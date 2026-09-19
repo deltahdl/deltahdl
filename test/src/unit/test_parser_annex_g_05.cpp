@@ -14,6 +14,8 @@
 // member access and a select -- where the class method's list admits the last
 // two.
 
+#include <gtest/gtest.h>
+
 #include "fixture_parser.h"
 #include "helpers_reported_error.h"
 

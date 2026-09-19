@@ -6,11 +6,11 @@
 #include <string>
 #include <string_view>
 
-#include "builders_ast.h"
-#include "builders_systask.h"
+#include "common/types.h"
 #include "fixture_simulator.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
+#include "simulator/variable.h"
 
 using namespace delta;
 

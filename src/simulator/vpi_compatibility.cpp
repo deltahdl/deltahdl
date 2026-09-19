@@ -23,9 +23,10 @@
 #include <vector>
 
 #include "simulator/sv_vpi_user.h"
-#include "simulator/vpi.h"
+#include "simulator/vpi_globals.h"
 #include "simulator/vpi_internal.h"
 #include "simulator/vpi_object.h"
+#include "simulator/vpi_user.h"
 
 // The reader §38.4's entry point starts an argument list for; the vpi_control
 // variants below start their own and hand it to the same one.

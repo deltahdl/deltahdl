@@ -1,6 +1,6 @@
+#include <gtest/gtest.h>
+
 #include <string>
-#include <utility>
-#include <vector>
 
 // Completes the CoverageDB type that sim_context.h only forward-declares;
 // included ahead of the fixtures so SimContext's inline constructor (whose
@@ -8,10 +8,7 @@
 #include "fixture_simulator.h"
 #include "fixture_vcd_dump_run.h"
 #include "helpers_vcd_dump.h"
-#include "simulator/coverage.h"
 #include "simulator/lowerer.h"
-#include "simulator/variable.h"
-#include "simulator/vcd_writer.h"
 
 namespace delta {
 namespace {

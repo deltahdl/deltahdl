@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <string>
+#include <string_view>
 
 #include "common/arena.h"
 #include "elaborator/rtlir.h"
@@ -10,6 +11,7 @@
 #include "simulator/lowerer_register.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_types.h"
 
 namespace delta {
 

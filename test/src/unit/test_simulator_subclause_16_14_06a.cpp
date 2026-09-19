@@ -1,8 +1,11 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_simulator.h"
 #include "simulator/sim_context.h"
-#include "simulator/sva_engine.h"
+#include "simulator/sva_engine_queues.h"
+#include "simulator/sva_engine_sampling.h"
 
 using namespace delta;
 

@@ -2,6 +2,7 @@
 
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
+#include "elaborator/rtlir.h"
 #include "fixture_synthesizer.h"
 #include "helpers_reported_error.h"
 #include "parser/ast_stmt.h"

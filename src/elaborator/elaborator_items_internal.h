@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
@@ -7,11 +8,13 @@
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
+#include "common/types.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/property_rewrite.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
-#include "parser/ast.h"
+#include "parser/ast_design.h"
+#include "parser/ast_module.h"
 
 namespace delta {
 

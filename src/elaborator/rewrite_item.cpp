@@ -1,5 +1,7 @@
 #include "elaborator/rewrite_item.h"
 
+#include "parser/ast_expr.h"
+
 namespace delta {
 
 ItemExpr ItemExpr::Wrap(const Expr* e, ItemOperandKind kind) {

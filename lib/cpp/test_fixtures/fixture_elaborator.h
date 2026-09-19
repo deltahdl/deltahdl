@@ -1,14 +1,22 @@
 #pragma once
 
+#include <gtest/gtest.h>
+
 #include <cstdint>
 #include <functional>
 #include <string>
 #include <string_view>
 
+#include "common/diagnostic.h"
+#include "common/source_mgr.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
-#include "fixture_parser.h"
+#include "lexer/lexer.h"
+#include "parser/ast_design.h"
+#include "parser/parser.h"
 #include "preprocessor/preprocessor.h"
+
+using namespace delta;
 
 struct ElabFixture {
   SourceManager mgr;

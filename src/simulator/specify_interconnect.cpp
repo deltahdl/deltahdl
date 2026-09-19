@@ -21,8 +21,13 @@
 #include <utility>
 #include <vector>
 
+#include "parser/ast_design.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_module.h"
+#include "parser/ast_type.h"
 #include "simulator/specify.h"
 #include "simulator/specify_internal.h"
+#include "simulator/specify_sdf.h"
 
 namespace delta {
 

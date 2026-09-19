@@ -3,7 +3,6 @@
 #include <vector>
 
 #include "fixture_parser.h"
-#include "parser/ast.h"
 #include "simulator/udp_eval.h"
 
 using namespace delta;

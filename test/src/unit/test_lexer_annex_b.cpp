@@ -1,11 +1,13 @@
 #include <gtest/gtest.h>
 
 #include <cctype>
+#include <cstddef>
 #include <set>
 #include <string>
 
 #include "fixture_lexer.h"
 #include "lexer/keywords.h"
+#include "lexer/token.h"
 
 using namespace delta;
 

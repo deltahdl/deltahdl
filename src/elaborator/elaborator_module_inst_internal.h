@@ -3,7 +3,7 @@
 #include "common/diagnostic.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
-#include "parser/ast.h"
+#include "parser/ast_module.h"
 
 // Internal helpers shared between the translation units that elaborate module
 // instantiations (elaborator_module_inst.cpp) and the other elaborator

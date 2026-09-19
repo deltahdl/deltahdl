@@ -1,6 +1,7 @@
 #include "simulator/mt_sim.h"
 
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <string_view>
 #include <thread>

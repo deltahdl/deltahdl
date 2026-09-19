@@ -10,11 +10,15 @@
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
-#include "parser/ast.h"
+#include "common/source_loc.h"
+#include "common/types.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_type.h"
 #include "simulator/eval_string.h"
 #include "simulator/eval_systask_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
 #include "simulator/variable.h"
 

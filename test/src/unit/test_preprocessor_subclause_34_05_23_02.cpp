@@ -53,8 +53,10 @@
 
 #include <gtest/gtest.h>
 
+#include <cstdint>
 #include <string>
 #include <string_view>
+#include <utility>
 
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"

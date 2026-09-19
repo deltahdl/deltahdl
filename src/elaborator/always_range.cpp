@@ -1,5 +1,7 @@
 #include "elaborator/always_range.h"
 
+#include <cstdint>
+
 namespace delta {
 
 namespace {

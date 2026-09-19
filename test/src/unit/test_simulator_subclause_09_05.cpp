@@ -1,5 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <utility>
+
+#include "common/types.h"
+#include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 #include "simulator/lowerer.h"
 #include "simulator/process.h"

@@ -1,9 +1,11 @@
-#include "builders_ast.h"
-#include "fixture_program.h"
+#include <gtest/gtest.h>
+
+#include <cstdint>
+
+#include "fixture_elaborator.h"
 #include "fixture_simulator.h"
 #include "helpers_reported_error.h"
 #include "simulator/lowerer.h"
-#include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/variable.h"
 

@@ -5,7 +5,8 @@
 #include <vector>
 
 #include "fixture_simulator.h"
-#include "parser/ast.h"
+#include "parser/ast_type.h"
+#include "simulator/dpi_arg_value.h"
 #include "simulator/dpi_runtime.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"

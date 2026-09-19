@@ -6,9 +6,15 @@
 #include <cstdint>
 #include <initializer_list>
 #include <string_view>
+#include <utility>
 #include <vector>
 
+#include "common/types.h"
 #include "fixture_simulator.h"
+#include "parser/ast_module.h"
+#include "parser/ast_stmt.h"
+#include "parser/ast_type.h"
+#include "simulator/sim_context_types.h"
 
 using namespace delta;
 

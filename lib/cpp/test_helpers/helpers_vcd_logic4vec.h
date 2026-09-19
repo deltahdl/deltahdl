@@ -3,7 +3,7 @@
 #include <cstdint>
 
 #include "common/arena.h"
-#include "simulator/variable.h"
+#include "common/types.h"
 
 using namespace delta;
 

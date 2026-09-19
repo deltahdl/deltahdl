@@ -2,6 +2,7 @@
 
 #include <set>
 #include <string>
+#include <utility>
 
 #include "elaborator/annex_f_grammar.h"
 #include "elaborator/annex_f_tight_satisfaction.h"

@@ -1,3 +1,5 @@
+#include <gtest/gtest.h>
+
 #include "helpers_preprocess_and_get.h"
 
 // §22.10 (C5) states that `celldefine and `endcelldefine may appear anywhere

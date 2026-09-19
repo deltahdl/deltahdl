@@ -14,6 +14,7 @@
 // simulator/sdf_parser.h because AnnotateSdfCellEntry is their only caller.
 
 #include <cstddef>
+#include <cstdint>
 #include <string>
 #include <string_view>
 #include <vector>

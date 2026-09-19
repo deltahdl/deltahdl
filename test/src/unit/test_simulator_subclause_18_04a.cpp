@@ -5,7 +5,6 @@
 #include <unordered_set>
 #include <vector>
 
-#include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 #include "simulator/constraint_solver.h"
 

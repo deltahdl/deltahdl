@@ -15,7 +15,6 @@
 #include "elaborator/separate_compilation_bind.h"
 #include "fixture_scratch_dir.h"
 #include "helpers_reported_error.h"
-#include "parser/ast.h"
 #include "parser/library_map.h"
 #include "parser/precompiled_library.h"
 #include "parser/single_pass_compile.h"

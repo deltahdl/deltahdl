@@ -1,6 +1,7 @@
 #include "simulator/driver_update.h"
 
 #include "common/arena.h"
+#include "common/types.h"
 
 namespace delta {
 

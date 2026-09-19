@@ -25,6 +25,8 @@
 // (parse -> elaborate -> lower -> run), storing the integer result in a
 // variable and reading it out.
 
+#include <gtest/gtest.h>
+
 #include "helpers_scheduler.h"
 
 using namespace delta;

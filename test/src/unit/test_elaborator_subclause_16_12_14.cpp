@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "elaborator/abort_property.h"
+#include "elaborator/sampled_value.h"
 
 using namespace delta;
 

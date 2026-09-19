@@ -7,6 +7,7 @@
 
 #include "helpers_coverage_point_setup.h"
 #include "simulator/coverage.h"
+#include "simulator/coverage_types.h"
 
 using namespace delta;
 

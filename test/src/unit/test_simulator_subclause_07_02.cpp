@@ -1,8 +1,16 @@
+#include <gtest/gtest.h>
+
+#include <cstddef>
+#include <cstdint>
+
 #include "builders_ast.h"
+#include "common/types.h"
 #include "fixture_simulator.h"
-#include "parser/ast.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_type.h"
 #include "simulator/eval_array.h"
 #include "simulator/evaluation.h"
+#include "simulator/sim_context_types.h"
 
 using namespace delta;
 

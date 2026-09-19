@@ -4,13 +4,14 @@
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "common/arena.h"
 #include "common/types.h"
 #include "elaborator/type_eval.h"
 #include "lexer/token.h"
-#include "parser/ast.h"
+#include "parser/ast_expr.h"
 #include "simulator/class_object.h"
 #include "simulator/constraint_solver.h"
 #include "simulator/eval_function_internal.h"

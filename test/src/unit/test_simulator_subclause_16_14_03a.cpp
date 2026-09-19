@@ -9,7 +9,6 @@
 
 #include <gtest/gtest.h>
 
-#include <cstdint>
 #include <vector>
 
 #include "common/types.h"

@@ -1,8 +1,12 @@
 #include <algorithm>
+#include <cstddef>
+#include <cstdint>
 #include <format>
 #include <optional>
+#include <string_view>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
@@ -12,7 +16,10 @@
 #include "elaborator/elaborator_validate_specify_internal.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
-#include "parser/ast.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_module.h"
+#include "parser/ast_specify.h"
+#include "parser/ast_type.h"
 
 namespace delta {
 

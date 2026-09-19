@@ -2,7 +2,6 @@
 
 #include "common/arena.h"
 #include "common/types.h"
-#include "parser/ast.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"

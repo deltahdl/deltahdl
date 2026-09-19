@@ -7,6 +7,7 @@
 
 #include "fixture_preprocessor.h"
 #include "helpers_reported_error.h"
+#include "preprocessor/preprocessor.h"
 
 using namespace delta;
 

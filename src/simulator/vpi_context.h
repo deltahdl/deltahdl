@@ -1,9 +1,12 @@
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
 #include <deque>
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "common/types.h"

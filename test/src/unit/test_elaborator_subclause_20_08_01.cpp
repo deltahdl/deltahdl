@@ -1,8 +1,8 @@
-#include "builders_ast.h"
+#include <gtest/gtest.h>
+
+#include "elaborator/const_eval.h"
 #include "fixture_elaborator.h"
 #include "fixture_evaluator.h"
-#include "fixture_simulator.h"
-#include "simulator/evaluation.h"
 
 using namespace delta;
 

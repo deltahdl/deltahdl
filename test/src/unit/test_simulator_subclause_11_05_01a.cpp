@@ -20,11 +20,15 @@
 // can show -- is covered in
 // test/src/unit/test_simulator_subclause_11_05_01b.cpp.
 
+#include <gtest/gtest.h>
+
 #include "builders_ast.h"
+#include "common/types.h"
 #include "fixture_simulator.h"
 #include "helpers_eval_op.h"
 #include "helpers_reported_error.h"
-#include "parser/ast.h"
+#include "lexer/token.h"
+#include "parser/ast_expr.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
 #include "simulator/sim_context.h"

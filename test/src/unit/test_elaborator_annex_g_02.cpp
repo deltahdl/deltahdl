@@ -10,6 +10,8 @@
 // that when the elaborator rejects a use of a std type it does so under the
 // subclause §G.2 points to for that type, or one beneath it.
 
+#include <gtest/gtest.h>
+
 #include <string_view>
 
 #include "elaborator/std_package.h"

@@ -1,4 +1,6 @@
 
+#include <gtest/gtest.h>
+
 #include "fixture_simulator.h"
 #include "helpers_lower_run.h"
 #include "helpers_nonblocking_swap.h"

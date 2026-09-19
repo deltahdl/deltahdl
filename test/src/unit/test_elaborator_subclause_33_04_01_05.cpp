@@ -2,6 +2,7 @@
 
 #include <string>
 #include <string_view>
+#include <utility>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
@@ -9,7 +10,7 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "lexer/lexer.h"
-#include "parser/ast.h"
+#include "parser/ast_design.h"
 #include "parser/parser.h"
 
 using namespace delta;

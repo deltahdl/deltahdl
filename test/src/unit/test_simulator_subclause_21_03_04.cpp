@@ -1,11 +1,14 @@
+#include <gtest/gtest.h>
+
+#include <cstdint>
 #include <cstdio>
 #include <fstream>
 #include <ios>
 
 #include "builders_systask.h"
+#include "common/types.h"
 #include "fixture_simulator.h"
 #include "helpers_temp_file.h"
-#include "parser/ast.h"
 #include "simulator/evaluation.h"
 
 using namespace delta;

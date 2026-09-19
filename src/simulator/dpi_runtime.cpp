@@ -10,7 +10,10 @@
 #include <utility>
 #include <vector>
 
+#include "parser/ast_type.h"
 #include "simulator/assertion_api.h"
+#include "simulator/coverage_control.h"
+#include "simulator/dpi_arg_value.h"
 
 namespace delta {
 

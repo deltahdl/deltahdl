@@ -1,3 +1,7 @@
+#include <gtest/gtest.h>
+
+#include <string>
+
 #include "helpers_scheduler.h"
 
 using namespace delta;

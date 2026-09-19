@@ -25,6 +25,8 @@
 // -- the class is declared `:final` (it cannot be extended) and it has no
 // new() constructor (it cannot be built with `new`).
 
+#include <gtest/gtest.h>
+
 #include <cstddef>
 #include <string_view>
 #include <vector>

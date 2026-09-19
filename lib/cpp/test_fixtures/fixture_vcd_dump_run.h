@@ -15,7 +15,6 @@
 // unwind path destroys the owned coverage database) is well-formed in this TU.
 #include "fixture_simulator.h"
 #include "fixture_vcd.h"
-#include "simulator/coverage.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 #include "simulator/vcd_writer.h"

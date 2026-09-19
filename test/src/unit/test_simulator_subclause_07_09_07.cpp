@@ -13,7 +13,10 @@
 // integral keys, narrow integral keys, and string keys. prev() is the reverse
 // polarity of next() (clause 7.9.6); the two share one production path.
 
-#include "fixture_simulator.h"
+#include <gtest/gtest.h>
+
+#include <cstdint>
+
 #include "helpers_scheduler.h"
 
 using namespace delta;

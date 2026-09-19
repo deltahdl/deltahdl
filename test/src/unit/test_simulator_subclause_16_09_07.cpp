@@ -14,7 +14,8 @@
 #include "helpers_sequence_ticks.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
-#include "simulator/sva_engine.h"
+#include "simulator/sva_engine_queues.h"
+#include "simulator/sva_engine_sequences.h"
 
 using namespace delta;
 

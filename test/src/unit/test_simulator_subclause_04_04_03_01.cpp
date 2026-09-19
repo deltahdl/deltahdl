@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
-#include <string>
+#include <cstddef>
+#include <cstdint>
 #include <vector>
 
 #include "common/arena.h"
@@ -9,7 +10,7 @@
 #include "simulator/net.h"
 #include "simulator/scheduler.h"
 #include "simulator/variable.h"
-#include "simulator/vpi.h"
+#include "simulator/vpi_user.h"
 
 using namespace delta;
 

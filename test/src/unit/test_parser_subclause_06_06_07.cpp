@@ -1,7 +1,10 @@
-#include "elaborator/type_eval.h"
+#include <gtest/gtest.h>
+
+#include <string_view>
+
 #include "fixture_parser.h"
-#include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
+#include "parser/ast_module.h"
 
 using namespace delta;
 static ModuleItem* FindNettypeDecl(ParseResult& r, std::string_view name = "") {

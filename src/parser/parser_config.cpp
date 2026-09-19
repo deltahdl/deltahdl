@@ -1,5 +1,9 @@
 #include <format>
 
+#include "common/diagnostic.h"
+#include "lexer/token.h"
+#include "parser/ast_design.h"
+#include "parser/ast_expr.h"
 #include "parser/parser.h"
 
 namespace delta {

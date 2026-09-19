@@ -1,5 +1,11 @@
+#include <gtest/gtest.h>
+
+#include "elaborator/elaborator.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
+#include "lexer/lexer.h"
+#include "parser/ast_class.h"
+#include "parser/parser.h"
 
 using namespace delta;
 

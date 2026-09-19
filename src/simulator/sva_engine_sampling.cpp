@@ -8,6 +8,7 @@
 #include "common/arena.h"
 #include "common/types.h"
 #include "simulator/sim_context_types.h"
+#include "simulator/sva_engine_sequences.h"
 #include "simulator/variable.h"
 
 namespace delta {

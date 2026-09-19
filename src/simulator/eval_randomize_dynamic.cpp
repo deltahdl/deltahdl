@@ -5,7 +5,8 @@
 #include <utility>
 #include <vector>
 
-#include "parser/ast.h"
+#include "parser/ast_class.h"
+#include "parser/ast_expr.h"
 #include "simulator/class_object.h"
 #include "simulator/constraint_solver.h"
 #include "simulator/eval_class_array.h"

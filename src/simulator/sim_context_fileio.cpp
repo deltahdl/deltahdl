@@ -1,10 +1,16 @@
 #include <cstdint>
 #include <cstdio>
 #include <string>
+#include <string_view>
 #include <utility>
+#include <vector>
 
+#include "parser/ast_expr.h"
+#include "simulator/class_object.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_types.h"
+#include "simulator/sync_objects.h"
 #include "simulator/vcd_writer.h"
 
 namespace delta {

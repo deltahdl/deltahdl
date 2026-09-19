@@ -1,5 +1,7 @@
 #include "elaborator/clock_flow.h"
 
+#include <vector>
+
 namespace delta {
 
 std::vector<ClockScope> ResolveOperandClocks(

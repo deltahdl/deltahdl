@@ -1,7 +1,13 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
+#include "elaborator/elaborator.h"
+#include "elaborator/rtlir.h"
 #include "fixture_synthesizer.h"
 #include "helpers_reported_error.h"
+#include "lexer/lexer.h"
+#include "parser/parser.h"
 #include "preprocessor/preprocessor.h"
 #include "synthesizer/synth_lower.h"
 

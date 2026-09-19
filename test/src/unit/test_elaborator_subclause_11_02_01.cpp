@@ -1,5 +1,9 @@
+#include <gtest/gtest.h>
+
 #include <optional>
 
+#include "elaborator/const_eval.h"
+#include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 #include "fixture_evaluator.h"
 #include "helpers_reported_error.h"

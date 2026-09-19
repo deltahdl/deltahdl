@@ -5,6 +5,7 @@
 
 #include "fixture_simulator.h"
 #include "model_gate_logic.h"
+#include "model_val4.h"
 
 using namespace delta;
 

@@ -1,10 +1,12 @@
 #include <gtest/gtest.h>
 
 #include "fixture_simulator.h"
+#include "parser/ast_specify.h"
 #include "simulator/sim_context.h"
 #include "simulator/specify.h"
 #include "simulator/specify_timing_check.h"
-#include "simulator/vpi.h"
+#include "simulator/vpi_globals.h"
+#include "simulator/vpi_user.h"
 
 namespace delta {
 namespace {

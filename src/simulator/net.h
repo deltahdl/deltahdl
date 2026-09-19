@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <string_view>
 #include <vector>
 
 #include "common/types.h"

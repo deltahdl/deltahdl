@@ -5,7 +5,7 @@
 #include "fixture_preprocessor.h"
 #include "helpers_begin_keywords_token_kind.h"
 #include "lexer/keywords.h"
-#include "lexer/lexer.h"
+#include "lexer/token.h"
 
 using namespace delta;
 

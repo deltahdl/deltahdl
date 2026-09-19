@@ -1,7 +1,9 @@
 #pragma once
 
+#include "common/types.h"
 #include "fixture_simulator.h"
 #include "gtest/gtest.h"
+#include "simulator/sim_context_types.h"
 
 using namespace delta;
 

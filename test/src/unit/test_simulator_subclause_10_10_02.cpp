@@ -1,5 +1,7 @@
 
 
+#include <gtest/gtest.h>
+
 #include "fixture_simulator.h"
 #include "helpers_string_var.h"
 #include "simulator/lowerer.h"

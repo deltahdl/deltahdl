@@ -12,6 +12,8 @@
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
+#include "common/packed_range.h"
+#include "common/source_loc.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
@@ -19,7 +21,9 @@
 #include "elaborator/elaborator_port_binding_internal.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
-#include "parser/ast.h"
+#include "parser/ast_design.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_module.h"
 
 namespace delta {
 

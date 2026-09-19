@@ -14,21 +14,26 @@
 // is called from here alone.
 
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
+#include "common/types.h"
 #include "elaborator/type_eval.h"
-#include "parser/ast.h"
+#include "parser/ast_stmt.h"
 #include "simulator/eval_string.h"
 #include "simulator/evaluation.h"
+#include "simulator/exec_task.h"
 #include "simulator/scope.h"
 #include "simulator/sim_context.h"
 #include "simulator/stmt_exec.h"
 #include "simulator/stmt_exec_internal.h"
 #include "simulator/stmt_exec_randsequence_internal.h"
+#include "simulator/stmt_result.h"
 
 namespace delta {
 

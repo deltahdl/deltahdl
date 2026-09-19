@@ -1,5 +1,10 @@
 #include "lexer/string_escape.h"
 
+#include <cstddef>
+#include <string>
+#include <string_view>
+#include <utility>
+
 namespace delta {
 namespace {
 

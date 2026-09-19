@@ -1,6 +1,13 @@
-#include "fixture_elaborator.h"
-#include "helpers_parser_verify.h"
+#include <gtest/gtest.h>
+
+#include <vector>
+
+#include "fixture_parser.h"
 #include "helpers_reported_error.h"
+#include "parser/ast_class.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_module.h"
+#include "parser/ast_type.h"
 
 using namespace delta;
 

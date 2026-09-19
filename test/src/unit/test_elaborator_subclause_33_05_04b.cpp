@@ -52,6 +52,7 @@
 #include <string>
 #include <vector>
 
+#include "common/types.h"
 #include "driver/cli_options.h"
 #include "fixture_scratch_dir.h"
 #include "helpers_command_line.h"

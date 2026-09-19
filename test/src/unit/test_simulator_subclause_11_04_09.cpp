@@ -1,7 +1,11 @@
+#include <gtest/gtest.h>
+
+#include <cstdint>
+
 #include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "helpers_eval_op.h"
-#include "parser/ast.h"
+#include "lexer/token.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
 

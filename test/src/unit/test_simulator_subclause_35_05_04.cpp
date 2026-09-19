@@ -1,11 +1,12 @@
 #include <gtest/gtest.h>
 
-#include <cstdint>
 #include <string>
 #include <vector>
 
 #include "fixture_simulator.h"
 #include "helpers_reported_error.h"
+#include "parser/ast_type.h"
+#include "simulator/dpi_arg_value.h"
 #include "simulator/dpi_runtime.h"
 
 using namespace delta;

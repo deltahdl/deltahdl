@@ -6,7 +6,9 @@
 
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
-#include "parser/ast.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_module.h"
+#include "parser/ast_specify.h"
 
 namespace delta {
 

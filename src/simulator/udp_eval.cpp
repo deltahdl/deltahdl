@@ -1,6 +1,10 @@
 #include "simulator/udp_eval.h"
 
-#include "parser/ast.h"
+#include <cstddef>
+#include <cstdint>
+#include <vector>
+
+#include "parser/ast_specify.h"
 
 namespace delta {
 

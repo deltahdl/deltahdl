@@ -1,5 +1,11 @@
+#include <gtest/gtest.h>
+
+#include "fixture_simulator.h"
 #include "helpers_preprocess_and_get.h"
 #include "helpers_reported_error.h"
+#include "lexer/lexer.h"
+#include "parser/parser.h"
+#include "preprocessor/preprocessor.h"
 
 TEST(CompilerDirectiveSimulation, DirectivePersistsInCompilationUnit) {
   auto result = PreprocessAndGet(

@@ -1,3 +1,5 @@
+#include <gtest/gtest.h>
+
 #include "fixture_parser.h"
 
 using namespace delta;

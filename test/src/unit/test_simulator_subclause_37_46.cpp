@@ -4,7 +4,7 @@
 
 #include "helpers_vpi_driver_load_iter.h"
 #include "simulator/sv_vpi_user.h"
-#include "simulator/vpi.h"
+#include "simulator/vpi_user.h"
 
 namespace delta {
 namespace {

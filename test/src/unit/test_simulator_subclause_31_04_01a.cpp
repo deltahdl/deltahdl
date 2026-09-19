@@ -1,7 +1,10 @@
-#include "fixture_simulator.h"
-#include "simulator/lowerer.h"
+#include <gtest/gtest.h>
+
+#include <cstdint>
+
+#include "parser/ast_specify.h"
 #include "simulator/specify.h"
-#include "simulator/variable.h"
+#include "simulator/specify_timing_check.h"
 
 using namespace delta;
 

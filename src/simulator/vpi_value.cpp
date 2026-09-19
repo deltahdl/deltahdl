@@ -6,15 +6,16 @@
 #include <cstdint>
 #include <cstdio>
 #include <string>
-#include <string_view>
+#include <utility>
 #include <vector>
 
 #include "common/types.h"
+#include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "simulator/evaluation.h"
 #include "simulator/net.h"
 #include "simulator/scheduler.h"
-#include "simulator/vpi.h"
+#include "simulator/vpi_user.h"
 // §37.10 detail 3: the package/interface/program instance kinds are defined in
 // the SystemVerilog VPI header alongside the §37.10 vpiInstance relation.
 #include "simulator/sv_vpi_user.h"

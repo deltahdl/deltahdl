@@ -1,6 +1,5 @@
 #include <gtest/gtest.h>
 
-#include <string>
 #include <vector>
 
 #include "common/arena.h"
@@ -8,7 +7,8 @@
 #include "helpers_scheduler_event.h"
 #include "simulator/scheduler.h"
 #include "simulator/variable.h"
-#include "simulator/vpi.h"
+#include "simulator/vpi_globals.h"
+#include "simulator/vpi_user.h"
 
 using namespace delta;
 

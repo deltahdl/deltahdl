@@ -1,8 +1,10 @@
-#include <cstdint>
+#include <gtest/gtest.h>
+
 #include <string>
 
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
+#include "simulator/lowerer.h"
 
 using namespace delta;
 

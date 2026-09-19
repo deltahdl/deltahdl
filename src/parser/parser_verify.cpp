@@ -1,3 +1,4 @@
+#include <cstdint>
 #include <format>
 #include <functional>
 #include <optional>
@@ -7,6 +8,12 @@
 #include <utility>
 #include <vector>
 
+#include "common/diagnostic.h"
+#include "lexer/lexer.h"
+#include "lexer/token.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_module.h"
+#include "parser/ast_type.h"
 #include "parser/parser.h"
 
 namespace delta {

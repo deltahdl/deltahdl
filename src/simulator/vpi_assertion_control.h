@@ -6,7 +6,6 @@
 // assertion model of simulator/dpi_runtime.h, so the reading of the arguments
 // stands here between vpi_control() and that model.
 
-#include "simulator/dpi_runtime.h"
 #include "simulator/sv_vpi_user.h"
 
 namespace delta {

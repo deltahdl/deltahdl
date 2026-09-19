@@ -1,5 +1,8 @@
-#include "fixture_parser.h"
+#include <gtest/gtest.h>
+
 #include "fixture_program.h"
+#include "parser/ast_module.h"
+#include "parser/ast_type.h"
 
 using namespace delta;
 

@@ -1,4 +1,6 @@
 
+#include <gtest/gtest.h>
+
 #include "fixture_synthesizer.h"
 #include "helpers_reported_error.h"
 #include "synthesizer/synth_lower.h"

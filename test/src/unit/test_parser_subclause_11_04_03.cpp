@@ -1,9 +1,12 @@
 
 
-#include "fixture_evaluator.h"
+#include <gtest/gtest.h>
+
 #include "fixture_parser.h"
-#include "fixture_simulator.h"
 #include "helpers_parser_verify.h"
+#include "lexer/token.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_stmt.h"
 #include "simulator/evaluation.h"
 
 using namespace delta;

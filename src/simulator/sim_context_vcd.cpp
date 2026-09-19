@@ -14,6 +14,7 @@
 #include "parser/ast_type.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_types.h"
 #include "simulator/variable.h"
 #include "simulator/vcd_writer.h"
 

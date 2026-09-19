@@ -1,6 +1,9 @@
+#include <gtest/gtest.h>
+
+#include <string>
+
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
-#include "parser/ast.h"
 #include "simulator/class_object.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"

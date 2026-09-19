@@ -23,6 +23,8 @@
 // source writes an event control in a for header and neither Stmt::for_inits
 // nor Stmt::for_steps takes a case.
 
+#include <gtest/gtest.h>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 

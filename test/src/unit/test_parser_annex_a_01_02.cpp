@@ -1,6 +1,11 @@
+#include <gtest/gtest.h>
+
+#include "common/types.h"
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_reported_error.h"
+#include "parser/ast_module.h"
+#include "parser/ast_type.h"
 
 using namespace delta;
 

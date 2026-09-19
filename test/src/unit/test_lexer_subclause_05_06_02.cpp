@@ -1,8 +1,11 @@
 
 
+#include <gtest/gtest.h>
+
 #include <string>
 
 #include "fixture_lexer.h"
+#include "lexer/token.h"
 
 using namespace delta;
 

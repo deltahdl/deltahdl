@@ -13,8 +13,11 @@
 // primitive parses down the same path as one naming a module. That claim is
 // observed where the kind actually decides something, in the elaborator file
 // for this subclause.
+#include <gtest/gtest.h>
+
 #include "fixture_parser.h"
 #include "helpers_reported_error.h"
+#include "parser/ast_design.h"
 
 using namespace delta;
 

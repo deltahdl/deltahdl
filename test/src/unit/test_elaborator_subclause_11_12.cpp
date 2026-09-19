@@ -1,3 +1,5 @@
+#include <gtest/gtest.h>
+
 #include "elaborator/let_construct.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"

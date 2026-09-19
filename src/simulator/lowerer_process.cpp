@@ -1,4 +1,4 @@
-#include <string_view>
+#include <cstdint>
 #include <utility>
 
 #include "common/arena.h"
@@ -6,6 +6,7 @@
 #include "elaborator/rtlir.h"
 #include "simulator/lowerer.h"
 #include "simulator/process.h"
+#include "simulator/scope.h"
 #include "simulator/sim_context.h"
 #include "simulator/variable.h"
 

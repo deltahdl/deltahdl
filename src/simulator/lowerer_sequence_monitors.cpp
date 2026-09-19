@@ -5,9 +5,11 @@
 #include <vector>
 
 #include "common/arena.h"
+#include "common/types.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/sensitivity.h"
-#include "parser/ast.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_module.h"
 #include "simulator/expr_walk.h"
 #include "simulator/lowerer.h"
 #include "simulator/process.h"

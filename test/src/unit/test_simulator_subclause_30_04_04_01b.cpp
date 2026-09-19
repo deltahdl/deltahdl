@@ -68,6 +68,7 @@
 #include "simulator/sdf_parser.h"
 #include "simulator/specify.h"
 #include "simulator/specify_internal.h"
+#include "simulator/specify_path_delay.h"
 
 using namespace delta;
 

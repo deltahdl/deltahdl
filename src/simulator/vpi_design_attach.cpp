@@ -25,6 +25,7 @@
 #include "simulator/variable.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_design_walk.h"
+#include "simulator/vpi_globals.h"
 #include "simulator/vpi_internal.h"
 
 namespace delta {

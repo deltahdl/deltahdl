@@ -5,7 +5,6 @@
 
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
-#include "fixture_program.h"
 #include "helpers_protect_keyword_value.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_keywords.h"

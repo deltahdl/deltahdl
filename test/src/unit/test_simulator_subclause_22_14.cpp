@@ -1,9 +1,14 @@
+#include <gtest/gtest.h>
 #include <unistd.h>
 
 #include <filesystem>
 #include <fstream>
+#include <string>
+#include <utility>
 
+#include "fixture_simulator.h"
 #include "helpers_preprocess_and_get.h"
+#include "preprocessor/preprocessor.h"
 
 namespace fs = std::filesystem;
 

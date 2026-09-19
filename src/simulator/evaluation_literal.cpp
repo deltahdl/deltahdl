@@ -1,11 +1,12 @@
-#include <cmath>
+#include <cstdint>
 #include <cstring>
 #include <string>
 #include <vector>
 
 #include "common/arena.h"
+#include "common/types.h"
 #include "elaborator/type_eval.h"
-#include "parser/ast.h"
+#include "parser/ast_expr.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 

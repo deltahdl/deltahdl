@@ -1,8 +1,16 @@
+#include <gtest/gtest.h>
+
+#include <cstddef>
+#include <utility>
+#include <vector>
+
 #include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "helpers_lower_run.h"
 #include "helpers_queue.h"
 #include "helpers_queue_assign_assert.h"
+#include "lexer/token.h"
+#include "parser/ast_expr.h"
 #include "simulator/lowerer.h"
 #include "simulator/statement_assign.h"
 

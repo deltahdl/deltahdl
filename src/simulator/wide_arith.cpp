@@ -1,5 +1,6 @@
 #include "simulator/wide_arith.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <vector>
 

@@ -1,12 +1,10 @@
+#include <gtest/gtest.h>
+
 #include <cstdint>
 #include <string_view>
 
-#include "common/types.h"
-#include "elaborator/sensitivity.h"
-#include "elaborator/type_eval.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
-#include "lexer/token.h"
 
 using namespace delta;
 

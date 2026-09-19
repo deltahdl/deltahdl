@@ -21,6 +21,8 @@
 // std-package class name), and each prototype method elaborates at the call
 // site, including the documented default new() argument omitted.
 
+#include <gtest/gtest.h>
+
 #include <cstddef>
 #include <optional>
 #include <string_view>

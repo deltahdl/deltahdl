@@ -1,21 +1,23 @@
 #include <cctype>
 #include <cstdarg>
 #include <cstddef>
-#include <cstdint>
 #include <cstdio>
 #include <fstream>
 #include <optional>
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "common/types.h"
+#include "simulator/coverage_control.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
-#include "simulator/vpi.h"
 #include "simulator/vpi_coverage.h"
+#include "simulator/vpi_globals.h"
 #include "simulator/vpi_model_helpers1.h"
+#include "simulator/vpi_user.h"
 // §37.10 detail 3: the package/interface/program instance kinds are defined in
 // the SystemVerilog VPI header alongside the §37.10 vpiInstance relation.
 #include "simulator/sv_vpi_user.h"

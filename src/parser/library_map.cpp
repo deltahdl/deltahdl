@@ -1,18 +1,23 @@
 #include "parser/library_map.h"
 
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
+#include <string>
+#include <string_view>
 #include <system_error>
 #include <unordered_set>
+#include <utility>
+#include <vector>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
+#include "common/source_loc.h"
 #include "common/source_mgr.h"
 #include "lexer/lexer.h"
-#include "parser/ast.h"
 #include "parser/parser.h"
 
 namespace delta {

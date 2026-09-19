@@ -3,7 +3,6 @@
 #include <cstdint>
 #include <string>
 
-#include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 
 using namespace delta;

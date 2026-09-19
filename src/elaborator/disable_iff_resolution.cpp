@@ -1,8 +1,10 @@
 #include "elaborator/disable_iff_resolution.h"
 
+#include <vector>
+
 #include "common/diagnostic.h"
 #include "elaborator/elaborator.h"
-#include "parser/ast.h"
+#include "parser/ast_module.h"
 
 namespace delta {
 

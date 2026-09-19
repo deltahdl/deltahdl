@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "simulator/coverage.h"
+#include "simulator/coverage_types.h"
 
 namespace delta {
 

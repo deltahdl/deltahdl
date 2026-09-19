@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include "simulator/vpi_globals.h"
+
 // §36.12.2: "In order to ease the transition to the latest VPI standard for
 // older applications, capability shall be provided to emulate the incompatible
 // VPI behaviors where they conflict with the current standard. This allows

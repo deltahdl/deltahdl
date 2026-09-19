@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -6,8 +7,9 @@
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
+#include "common/types.h"
 #include "lexer/token.h"
-#include "parser/ast.h"
+#include "parser/ast_expr.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_array.h"
 #include "simulator/eval_expr_internal.h"

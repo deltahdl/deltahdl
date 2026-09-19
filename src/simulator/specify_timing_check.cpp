@@ -19,11 +19,16 @@
 // that place an InterconnectDelay -- stand in
 // src/simulator/specify_interconnect.cpp, which was split out of this file.
 
+#include "simulator/specify_timing_check.h"
+
+#include <cstdint>
 #include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
 
+#include "common/types.h"
+#include "parser/ast_specify.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/specify.h"

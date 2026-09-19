@@ -1,9 +1,13 @@
 #include "elaborator/property_rewrite.h"
 
+#include <cstddef>
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
+
+#include "elaborator/sampled_value.h"
+#include "parser/ast_module.h"
 
 namespace delta {
 

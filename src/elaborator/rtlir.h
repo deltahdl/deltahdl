@@ -10,7 +10,13 @@
 
 #include "common/source_loc.h"
 #include "common/types.h"
-#include "parser/ast.h"
+#include "parser/ast_class.h"
+#include "parser/ast_design.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_module.h"
+#include "parser/ast_specify.h"
+#include "parser/ast_stmt.h"
+#include "parser/ast_type.h"
 
 namespace delta {
 

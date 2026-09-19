@@ -1,3 +1,5 @@
+#include <gtest/gtest.h>
+
 #include "helpers_preprocess_and_get.h"
 
 TEST(CompilerDirectiveSimulation, DirectiveCanBeOverridden) {

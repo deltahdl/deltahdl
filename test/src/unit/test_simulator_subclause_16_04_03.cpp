@@ -1,7 +1,5 @@
 #include <gtest/gtest.h>
 
-#include <cstdint>
-
 #include "fixture_simulator.h"
 
 // §16.4.3 "Deferred assertions outside procedural code".

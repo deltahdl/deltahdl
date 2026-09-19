@@ -1,3 +1,6 @@
+#include <gtest/gtest.h>
+
+#include "common/diagnostic.h"
 #include "fixture_elaborator.h"
 #include "fixture_simulator.h"
 #include "helpers_reported_error.h"

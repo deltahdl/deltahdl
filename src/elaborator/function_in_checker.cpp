@@ -1,5 +1,7 @@
 #include "elaborator/function_in_checker.h"
 
+#include "elaborator/concurrent_assertion_expr.h"
+
 namespace delta {
 
 bool CheckerFunctionFreeVariableAllowed(

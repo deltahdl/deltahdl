@@ -16,6 +16,7 @@
 // failure was raised without failing the case that checks it.
 
 #include <gtest/gtest-spi.h>
+#include <gtest/gtest.h>
 
 #include "fixture_elaborator.h"
 

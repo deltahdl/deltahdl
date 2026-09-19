@@ -3,7 +3,8 @@
 #include <cstdint>
 #include <string_view>
 
-#include "parser/ast.h"
+#include "common/types.h"
+#include "parser/ast_expr.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/sync_objects.h"

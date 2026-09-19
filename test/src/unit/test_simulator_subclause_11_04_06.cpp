@@ -1,7 +1,8 @@
+#include <gtest/gtest.h>
+
 #include "builders_ast.h"
 #include "fixture_simulator.h"
-#include "helpers_eval_op.h"
-#include "simulator/eval_array.h"
+#include "lexer/token.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
 

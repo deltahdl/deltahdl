@@ -5,10 +5,11 @@
 
 #include "elaborator/rtlir.h"
 #include "elaborator/sensitivity.h"
-#include "parser/ast.h"
+#include "parser/ast_expr.h"
 #include "simulator/expr_walk.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_data_structs.h"
+#include "simulator/vpi_globals.h"
 
 namespace delta {
 namespace {

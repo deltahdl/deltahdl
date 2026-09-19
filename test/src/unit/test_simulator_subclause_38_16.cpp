@@ -1,8 +1,13 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
 #include <vector>
 
 #include "helpers_vpi_value_array.h"
+#include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_object.h"
+#include "simulator/vpi_pli_types.h"
+#include "simulator/vpi_user_macros.h"
 
 namespace delta {
 namespace {

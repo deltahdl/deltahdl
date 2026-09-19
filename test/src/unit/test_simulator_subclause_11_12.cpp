@@ -1,7 +1,17 @@
+#include <gtest/gtest.h>
+
+#include <string_view>
+#include <utility>
+#include <vector>
+
 #include "builders_ast.h"
+#include "common/types.h"
 #include "fixture_simulator.h"
 #include "helpers_reported_error.h"
-#include "parser/ast.h"
+#include "lexer/token.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_module.h"
+#include "parser/ast_type.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 

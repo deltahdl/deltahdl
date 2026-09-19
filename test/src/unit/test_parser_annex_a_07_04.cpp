@@ -11,9 +11,16 @@
 //   t*_path_delay_expression ::= path_delay_expression
 //   path_delay_expression ::= constant_mintypmax_expression   (DEP §A.8.3)
 
+#include <gtest/gtest.h>
+
+#include <vector>
+
 #include "fixture_parser.h"
 #include "helpers_reported_error.h"
-#include "parser/ast.h"
+#include "parser/ast_design.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_module.h"
+#include "parser/ast_specify.h"
 
 using namespace delta;
 

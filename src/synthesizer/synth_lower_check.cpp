@@ -5,8 +5,13 @@
 // netlist being returned over a construct nothing examined.
 
 #include <string>
+#include <vector>
 
-#include "parser/ast.h"
+#include "common/diagnostic.h"
+#include "elaborator/rtlir.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_stmt.h"
+#include "parser/ast_type.h"
 #include "synthesizer/synth_lower.h"
 
 namespace delta {

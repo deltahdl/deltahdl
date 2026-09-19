@@ -5,6 +5,7 @@
 #include <type_traits>
 
 #include "simulator/coverage.h"
+#include "simulator/coverage_types.h"
 
 using namespace delta;
 

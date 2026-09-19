@@ -11,6 +11,7 @@
 // is the one a declaration actually put in a library.
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -22,7 +23,6 @@
 #include "elaborator/rtlir.h"
 #include "helpers_reported_error.h"
 #include "lexer/lexer.h"
-#include "parser/ast.h"
 #include "parser/parser.h"
 
 using namespace delta;

@@ -17,7 +17,6 @@
 // parse-then-tag pipeline rather than hand-constructing AST nodes.
 
 #include <gtest/gtest.h>
-#include <unistd.h>
 
 #include <cstdint>
 #include <filesystem>
@@ -28,7 +27,6 @@
 #include "common/source_mgr.h"
 #include "fixture_scratch_dir.h"
 #include "lexer/lexer.h"
-#include "parser/ast.h"
 #include "parser/library_map.h"
 #include "parser/parser.h"
 

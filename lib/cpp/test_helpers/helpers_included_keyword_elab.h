@@ -2,13 +2,17 @@
 
 #include <gtest/gtest.h>
 
+#include <cstdint>
 #include <string>
 
+#include "common/types.h"
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 #include "helpers_keyword_version.h"
 #include "helpers_reported_error.h"
 #include "helpers_rtlir_lookup.h"
+#include "parser/ast_module.h"
+#include "parser/ast_type.h"
 
 using namespace delta;
 

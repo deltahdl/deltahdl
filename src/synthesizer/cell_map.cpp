@@ -1,7 +1,9 @@
 #include "synthesizer/cell_map.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "synthesizer/aig.h"

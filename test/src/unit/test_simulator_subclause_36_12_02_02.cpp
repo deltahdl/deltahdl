@@ -5,7 +5,8 @@
 #include "common/source_mgr.h"
 #include "simulator/sim_context.h"
 #include "simulator/sv_vpi_user.h"
-#include "simulator/vpi.h"
+#include "simulator/vpi_globals.h"
+#include "simulator/vpi_user.h"
 
 // §36.12.2.2 -- Mechanism 2: selection of the default VPI compatibility
 // mode run by the host simulator. These tests observe the simulator runtime

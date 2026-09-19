@@ -3,10 +3,7 @@
 #include <string>
 #include <vector>
 
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "helpers_fsm_pragma_lexing.h"
-#include "lexer/lexer.h"
 
 using namespace delta;
 

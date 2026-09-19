@@ -1,9 +1,8 @@
 
 
+#include <gtest/gtest.h>
+
 #include "fixture_elaborator.h"
-#include "fixture_simulator.h"
-#include "simulator/lowerer.h"
-#include "simulator/variable.h"
 
 using namespace delta;
 

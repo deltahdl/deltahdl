@@ -4,15 +4,20 @@
 #include <cstring>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
-#include "parser/ast.h"
+#include "common/source_loc.h"
+#include "common/types.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_type.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_systask_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_types.h"
 #include "simulator/variable.h"
 
 namespace delta {

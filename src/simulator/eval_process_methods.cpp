@@ -1,9 +1,12 @@
+#include <cstdint>
 #include <string>
 #include <vector>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
-#include "parser/ast.h"
+#include "common/source_loc.h"
+#include "common/types.h"
+#include "parser/ast_expr.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/process.h"

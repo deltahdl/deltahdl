@@ -2,12 +2,11 @@
 
 #include <cstdint>
 #include <optional>
-#include <string>
+#include <string_view>
 #include <vector>
 
-#include "common/types.h"
+#include "common/packed_range.h"
 #include "elaborator/const_eval.h"
-#include "parser/ast.h"
 
 namespace delta {
 

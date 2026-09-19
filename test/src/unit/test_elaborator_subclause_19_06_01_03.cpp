@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <vector>
+
 #include "elaborator/cross_automatic_types.h"
 
 using namespace delta;

@@ -2,8 +2,6 @@
 
 #include <string_view>
 
-#include "elaborator/sequence_method.h"
-
 namespace delta {
 
 // §16.13.5 covers detecting and using the end point of a sequence in a

@@ -6,6 +6,7 @@
 #include <string>
 #include <string_view>
 
+#include "common/types.h"
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/scheduler.h"

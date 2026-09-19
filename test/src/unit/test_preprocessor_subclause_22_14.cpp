@@ -1,14 +1,20 @@
 #include <gtest/gtest.h>
 #include <unistd.h>
 
+#include <cstddef>
 #include <filesystem>
 #include <fstream>
 #include <string>
+#include <utility>
+#include <vector>
 
+#include "common/source_mgr.h"
 #include "fixture_preprocessor.h"
 #include "helpers_reported_error.h"
 #include "lexer/keywords.h"
 #include "lexer/lexer.h"
+#include "lexer/token.h"
+#include "preprocessor/preprocessor.h"
 
 using namespace delta;
 

@@ -6,7 +6,7 @@
 
 #include "common/arena.h"
 #include "common/types.h"
-#include "parser/ast.h"
+#include "parser/ast_stmt.h"
 
 namespace delta {
 

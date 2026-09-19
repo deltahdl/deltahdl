@@ -1,8 +1,10 @@
 #include <gtest/gtest.h>
 
+#include "common/types.h"
 #include "fixture_simulator.h"
 #include "helpers_lower_run.h"
 #include "helpers_stmt_exec.h"
+#include "parser/ast_expr.h"
 #include "simulator/lowerer.h"
 #include "simulator/process.h"
 #include "simulator/stmt_exec.h"

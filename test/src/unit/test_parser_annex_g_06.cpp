@@ -23,7 +23,10 @@
 // so declarations, the static self() call, the state-enum scope members, and
 // the full prototype method surface parse without any user `class process`.
 
+#include <gtest/gtest.h>
+
 #include "fixture_parser.h"
+#include "parser/ast_module.h"
 
 using namespace delta;
 

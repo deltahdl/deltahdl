@@ -10,7 +10,8 @@
 #include "common/diagnostic.h"
 #include "elaborator/elaborator_items_internal.h"
 #include "elaborator/elaborator_validate_internal.h"
-#include "parser/ast.h"
+#include "parser/ast_module.h"
+#include "parser/ast_stmt.h"
 
 namespace delta {
 

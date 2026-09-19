@@ -1,19 +1,21 @@
 #include "simulator/evaluation.h"
 
 #include <algorithm>
-#include <cmath>
+#include <cstdint>
 #include <cstring>
 #include <string>
 #include <string_view>
 #include <vector>
 
 #include "common/arena.h"
+#include "common/types.h"
 #include "elaborator/type_eval.h"
 #include "lexer/token.h"
-#include "parser/ast.h"
+#include "parser/ast_expr.h"
 #include "simulator/evaluation_internal.h"
 #include "simulator/instance_bindings.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
 // AssertionSampleStore, the §16.5.1 sampled values a concurrent assertion
 // reads.

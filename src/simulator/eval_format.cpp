@@ -1,11 +1,12 @@
 #include <cstdint>
 #include <cstdio>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "common/diagnostic.h"
+#include "common/source_loc.h"
 #include "common/types.h"
-#include "parser/ast.h"
 #include "simulator/evaluation.h"
 #include "simulator/process.h"
 #include "simulator/scope_hier_name.h"

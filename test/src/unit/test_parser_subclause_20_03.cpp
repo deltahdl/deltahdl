@@ -9,8 +9,11 @@
 // alternatives as a system function call primary (ExprKind::kSystemCall),
 // carrying the corresponding callee name, in the bare argument-less form the
 // syntax shows and as an operand inside a larger expression.
+#include <gtest/gtest.h>
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "parser/ast_expr.h"
 
 using namespace delta;
 namespace {

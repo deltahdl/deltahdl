@@ -1,6 +1,7 @@
 #include "simulator/lowerer.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <cstring>
 #include <string>
 #include <string_view>
@@ -10,15 +11,19 @@
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
+#include "common/types.h"
 #include "elaborator/design_scopes.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/global_clocking_sampled_value.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"
-#include "parser/ast.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_module.h"
+#include "parser/ast_type.h"
 #include "simulator/assertion_read_names.h"
 #include "simulator/awaiters.h"
+#include "simulator/awaiters_event_control.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_string.h"
 #include "simulator/evaluation.h"
@@ -29,14 +34,20 @@
 #include "simulator/net.h"
 #include "simulator/procedural_assertion.h"
 #include "simulator/process.h"
+#include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_types.h"
 #include "simulator/specify.h"
 #include "simulator/specify_sdf.h"
 #include "simulator/statement_assign.h"
 #include "simulator/stmt_exec.h"
+#include "simulator/stmt_result.h"
 #include "simulator/timing_check_driver.h"
+#include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
+#include "simulator/vpi_data_structs.h"
 #include "simulator/vpi_design_attach.h"
+#include "simulator/vpi_globals.h"
 #include "simulator/vpi_systf_build.h"
 
 namespace delta {

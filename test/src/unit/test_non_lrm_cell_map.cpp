@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <string>
+#include <utility>
 
 #include "synthesizer/aig.h"
 #include "synthesizer/cell_map.h"

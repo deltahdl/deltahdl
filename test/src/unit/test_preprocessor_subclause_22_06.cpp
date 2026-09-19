@@ -1,8 +1,12 @@
 #include <gtest/gtest.h>
 
+#include <utility>
+
 #include "fixture_parser.h"
 #include "fixture_preprocessor.h"
 #include "helpers_parser_verify.h"
+#include "parser/ast_module.h"
+#include "preprocessor/preprocessor.h"
 
 using namespace delta;
 

@@ -1,5 +1,6 @@
 #include "simulator/checker_scheduling_semantics.h"
 
+#include "common/types.h"
 #include "simulator/scheduler.h"
 
 namespace delta {

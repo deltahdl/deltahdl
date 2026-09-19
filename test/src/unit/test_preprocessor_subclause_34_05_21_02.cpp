@@ -71,6 +71,7 @@
 
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <span>
 #include <string>
 #include <string_view>

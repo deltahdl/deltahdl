@@ -15,6 +15,10 @@
 // parse -> elaborate -> lower -> run, observing the array/queue the method
 // produces rather than hand-building the iterator scope.
 
+#include <gtest/gtest.h>
+
+#include <cstddef>
+#include <cstdint>
 #include <string>
 
 #include "fixture_simulator.h"

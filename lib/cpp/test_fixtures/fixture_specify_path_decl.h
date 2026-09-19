@@ -5,7 +5,8 @@
 #include "elaborator/elaborator.h"
 #include "fixture_simulator.h"
 #include "lexer/lexer.h"
-#include "parser/ast.h"
+#include "parser/ast_module.h"
+#include "parser/ast_specify.h"
 #include "parser/parser.h"
 
 using namespace delta;

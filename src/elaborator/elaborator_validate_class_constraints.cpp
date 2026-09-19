@@ -1,4 +1,5 @@
 #include <format>
+#include <string_view>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -6,7 +7,12 @@
 #include "common/diagnostic.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_class_constraints.h"
-#include "parser/ast.h"
+#include "elaborator/elaborator_helpers.h"
+#include "elaborator/type_eval.h"
+#include "parser/ast_class.h"
+#include "parser/ast_design.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_type.h"
 
 namespace delta {
 

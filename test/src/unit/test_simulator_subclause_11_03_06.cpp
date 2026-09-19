@@ -1,5 +1,11 @@
-#include <initializer_list>
+#include <gtest/gtest.h>
 
+#include <cstdint>
+#include <initializer_list>
+#include <string>
+#include <utility>
+
+#include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 
 using namespace delta;

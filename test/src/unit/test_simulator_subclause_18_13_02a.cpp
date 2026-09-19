@@ -1,8 +1,11 @@
+#include <gtest/gtest.h>
+
+#include <cstdint>
+
 #include "builders_systask.h"
 #include "fixture_simulator.h"
 #include "helpers_fork_urandom_programs.h"
 #include "helpers_seeded_run.h"
-#include "parser/ast.h"
 #include "simulator/evaluation.h"
 
 using namespace delta;

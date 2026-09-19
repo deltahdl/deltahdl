@@ -2,6 +2,8 @@
 
 #include "lexer/token.h"
 
+using namespace delta;
+
 // The reserved-keyword tables of §22.14, transcribed once. A version_specifier
 // given to `begin_keywords names one of these tables, and each table is defined
 // as what it adds to the ones it includes, so a test for a later version reads

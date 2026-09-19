@@ -9,6 +9,8 @@
 // pipeline (parse -> elaborate -> lower -> run), then inspect the file on disk
 // or the round-tripped values — never hand-registering array state on a bare
 // simulation context.
+#include <gtest/gtest.h>
+
 #include <cstdio>
 #include <fstream>
 #include <string>

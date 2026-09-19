@@ -6,6 +6,7 @@
 #include "preprocessor/protect_digest_block.h"
 #include "preprocessor/protect_encoding.h"
 #include "preprocessor/protect_key_block.h"
+#include "preprocessor/protect_keywords.h"
 
 namespace delta {
 

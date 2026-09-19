@@ -1,6 +1,9 @@
+#include <gtest/gtest.h>
+
 #include <algorithm>
 #include <string>
 
+#include "common/diagnostic.h"
 #include "fixture_parser.h"
 #include "helpers_reported_error.h"
 

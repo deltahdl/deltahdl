@@ -1,3 +1,6 @@
+#include <gtest/gtest.h>
+
+#include <cstdint>
 #include <cstdio>
 #include <fstream>
 #include <ios>

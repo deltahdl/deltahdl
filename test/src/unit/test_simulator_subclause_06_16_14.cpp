@@ -22,6 +22,8 @@
 // -- for the explicit inverse-of-atobin claim -- scanned back with atobin and
 // the integer read out.
 
+#include <gtest/gtest.h>
+
 #include "helpers_scheduler.h"
 
 using namespace delta;

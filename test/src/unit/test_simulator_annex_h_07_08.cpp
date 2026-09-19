@@ -4,7 +4,7 @@
 #include <utility>
 #include <vector>
 
-#include "parser/ast.h"
+#include "parser/ast_type.h"
 #include "simulator/dpi_c_type.h"
 
 using namespace delta;

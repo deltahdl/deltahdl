@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
+
 #include "common/arena.h"
 #include "common/types.h"
 #include "simulator/driver_update.h"

@@ -2,7 +2,9 @@
 
 #include <string_view>
 
-#include "parser/ast.h"
+#include "common/types.h"
+#include "parser/ast_design.h"
+#include "parser/ast_module.h"
 
 namespace delta {
 

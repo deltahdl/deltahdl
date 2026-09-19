@@ -1,3 +1,5 @@
+#include <gtest/gtest.h>
+
 #include <cstddef>
 #include <iterator>
 #include <string>
@@ -5,12 +7,13 @@
 #include "fixture_parser.h"
 #include "helpers_identifier_position_sweep.h"
 #include "helpers_included_keyword_parse.h"
-#include "helpers_keyword_sweep_skips.h"
 #include "helpers_keyword_version.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
-#include "model_identifier_positions.h"
-#include "model_keyword_tables.h"
+#include "model_keyword_table_sweeps.h"
+#include "parser/ast_module.h"
+#include "parser/ast_stmt.h"
+#include "parser/ast_type.h"
 
 using namespace delta;
 

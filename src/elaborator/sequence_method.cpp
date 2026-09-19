@@ -1,5 +1,7 @@
 #include "elaborator/sequence_method.h"
 
+#include <cstddef>
+#include <utility>
 #include <vector>
 
 namespace delta {

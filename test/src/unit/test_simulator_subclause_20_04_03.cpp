@@ -1,9 +1,16 @@
+#include <gtest/gtest.h>
+
 #include <cstdio>
 #include <string>
 
+#include "elaborator/elaborator.h"
+#include "elaborator/rtlir.h"
 #include "fixture_simulator.h"
 #include "helpers_reported_error.h"
 #include "helpers_temp_file.h"
+#include "lexer/lexer.h"
+#include "parser/parser.h"
+#include "preprocessor/preprocessor.h"
 
 using namespace delta;
 

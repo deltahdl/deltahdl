@@ -11,7 +11,10 @@
 #include "common/arena.h"
 #include "common/types.h"
 #include "elaborator/type_eval.h"
-#include "parser/ast.h"
+#include "lexer/token.h"
+#include "parser/ast_class.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_type.h"
 #include "simulator/class_object.h"
 #include "simulator/constraint_solver.h"
 #include "simulator/eval_class_array.h"
@@ -19,6 +22,7 @@
 #include "simulator/eval_randomize_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_types.h"
 #include "simulator/variable.h"
 
 namespace delta {

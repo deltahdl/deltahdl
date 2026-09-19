@@ -9,7 +9,7 @@
 #include "common/source_mgr.h"
 #include "fixture_scratch_dir.h"
 #include "helpers_reported_error.h"
-#include "parser/ast.h"
+#include "parser/ast_design.h"
 #include "parser/library_map.h"
 #include "parser/single_pass_compile.h"
 

@@ -1,8 +1,12 @@
+#include <gtest/gtest.h>
+
 #include "builders_ast.h"
 #include "fixture_elaborator.h"
 #include "fixture_simulator.h"
 #include "helpers_reported_error.h"
-#include "parser/ast.h"
+#include "parser/ast_module.h"
+#include "parser/ast_stmt.h"
+#include "parser/ast_type.h"
 #include "simulator/evaluation.h"
 
 using namespace delta;

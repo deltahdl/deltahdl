@@ -1,14 +1,24 @@
+#include <gtest/gtest.h>
+
 #include <cstdint>
 #include <random>
 #include <string>
 #include <vector>
 
+#include "common/diagnostic.h"
+#include "common/source_mgr.h"
+#include "elaborator/elaborator.h"
 #include "fixture_simulator.h"
 #include "helpers_fork_urandom_programs.h"
 #include "helpers_scheduler.h"
 #include "helpers_seeded_run.h"
+#include "lexer/lexer.h"
+#include "parser/parser.h"
 #include "simulator/class_object.h"
+#include "simulator/lowerer.h"
 #include "simulator/process.h"
+#include "simulator/scheduler.h"
+#include "simulator/sim_context.h"
 
 using namespace delta;
 

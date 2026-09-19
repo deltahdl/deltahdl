@@ -1,4 +1,3 @@
-#include <cmath>
 #include <cstdint>
 #include <cstring>
 #include <string>
@@ -9,8 +8,9 @@
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/packed_range.h"
+#include "common/types.h"
 #include "elaborator/type_eval.h"
-#include "parser/ast.h"
+#include "parser/ast_expr.h"
 #include "simulator/class_object.h"
 #include "simulator/clocking.h"
 #include "simulator/eval_array.h"
@@ -21,6 +21,7 @@
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
+#include "simulator/stmt_result.h"
 
 namespace delta {
 

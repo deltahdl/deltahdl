@@ -4,13 +4,14 @@
 // two were one file until it reached the 1000-line maximum
 // assert-no-oversized-source-files enforces.
 
+#include <string>
 #include <string_view>
 #include <unordered_set>
 #include <vector>
 
 #include "elaborator/const_eval.h"
 #include "elaborator/const_eval_internal.h"
-#include "parser/ast.h"
+#include "parser/ast_expr.h"
 
 namespace delta {
 

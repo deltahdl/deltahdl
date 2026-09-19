@@ -1,6 +1,12 @@
 #include "parser/time_resolve.h"
 
 #include <cctype>
+#include <cstddef>
+#include <string_view>
+
+#include "common/types.h"
+#include "parser/ast_design.h"
+#include "parser/ast_module.h"
 
 namespace delta {
 

@@ -7,7 +7,7 @@
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/rtlir.h"
 #include "lexer/token.h"
-#include "parser/ast.h"
+#include "parser/ast_expr.h"
 
 // §28.16's net delay and §10.3.3's rule for adding it to the drivers of the net
 // it was declared on. The delay a driver writes and the delay its net writes

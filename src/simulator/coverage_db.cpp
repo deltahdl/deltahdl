@@ -3,9 +3,12 @@
 #include <fstream>
 #include <istream>
 #include <string>
+#include <string_view>
+#include <utility>
 #include <vector>
 
 #include "simulator/coverage.h"
+#include "simulator/coverage_types.h"
 
 namespace delta {
 

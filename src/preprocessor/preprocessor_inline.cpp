@@ -1,8 +1,17 @@
 #include <algorithm>
 #include <cctype>
+#include <cstddef>
+#include <cstdint>
 #include <fstream>
 #include <sstream>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
 
+#include "common/diagnostic.h"
+#include "common/source_loc.h"
+#include "preprocessor/macro_table.h"
 #include "preprocessor/preprocessor.h"
 
 namespace delta {

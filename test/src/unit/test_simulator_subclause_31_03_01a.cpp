@@ -1,6 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+
+#include "parser/ast_specify.h"
 #include "simulator/specify.h"
+#include "simulator/specify_timing_check.h"
 
 using namespace delta;
 

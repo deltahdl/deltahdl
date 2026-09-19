@@ -5,6 +5,7 @@
 #include <fstream>
 
 #include "fixture_preprocessor.h"
+#include "preprocessor/preprocessor.h"
 
 using namespace delta;
 

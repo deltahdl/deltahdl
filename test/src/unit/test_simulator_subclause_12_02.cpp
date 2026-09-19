@@ -8,6 +8,8 @@
 // reads the variable it wrote. The parser-stage file for this subclause covers
 // the other half, that a procedural statement outside all eight is rejected.
 
+#include <gtest/gtest.h>
+
 #include "helpers_scheduler.h"
 
 using namespace delta;

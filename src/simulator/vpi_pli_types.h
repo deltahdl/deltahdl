@@ -7,7 +7,7 @@
 // DeltaHDL realization of those typedefs. They live in the global namespace
 // because the PLI/VPI C API names them globally, and are kept in this small
 // standalone header so headers that are pulled in early (e.g. vpi_context.h,
-// included before vpi_user_macros.h by vpi.h) can name them.
+// included before vpi_user_macros.h by vpi_user.h) can name them.
 //
 // §K.2 guards the 64-bit pair with SVPI_TYPES and the rest with PLI_TYPES, so
 // that a file which has defined either set already -- an older PLI include

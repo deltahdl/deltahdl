@@ -1,10 +1,12 @@
 #pragma once
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdlib>
 #include <cstring>
 #include <memory>
 #include <type_traits>
+#include <utility>
 #include <vector>
 
 namespace delta {

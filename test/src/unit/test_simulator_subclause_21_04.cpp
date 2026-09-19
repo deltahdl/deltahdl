@@ -19,10 +19,11 @@
 // default initial value -- and every memory here is declared `reg`, which
 // Table 6-7 gives 'x. Such an address therefore displays as x, and an
 // expectation of zero would be asserting that the load had touched it.
+#include <gtest/gtest.h>
+
 #include <cstdio>
 #include <fstream>
 #include <string>
-#include <vector>
 
 #include "fixture_simulator.h"
 #include "helpers_reported_error.h"

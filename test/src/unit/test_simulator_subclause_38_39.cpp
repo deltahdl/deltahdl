@@ -5,7 +5,8 @@
 #include "common/source_mgr.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
-#include "simulator/vpi.h"
+#include "simulator/vpi_globals.h"
+#include "simulator/vpi_user.h"
 
 // §38.39 vpi_remove_cb(): removes a simulation-related callback that was
 // registered with vpi_register_cb(). Its argument shall be a handle to the

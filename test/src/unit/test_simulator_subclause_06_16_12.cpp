@@ -21,6 +21,8 @@
 // for the explicit inverse-of-atohex claim -- scanned back with atohex and the
 // integer read out.
 
+#include <gtest/gtest.h>
+
 #include "helpers_scheduler.h"
 
 using namespace delta;

@@ -4,9 +4,10 @@
 #include <iterator>
 #include <string>
 
-#include "fixture_lexer.h"
 #include "helpers_keyword_table_partition.h"
 #include "lexer/keywords.h"
+#include "lexer/token.h"
+#include "model_keyword_table_sweeps.h"
 #include "model_keyword_tables.h"
 
 using namespace delta;

@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
 #include "common/types.h"
+#include "parser/ast_specify.h"
 #include "simulator/specify.h"
+#include "simulator/specify_timing_check.h"
 
 using namespace delta;
 

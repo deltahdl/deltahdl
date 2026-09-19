@@ -1,5 +1,7 @@
 #include "elaborator/sampled_value.h"
 
+#include <string_view>
+
 namespace delta {
 
 bool ClassifySampledValueFunction(std::string_view name,

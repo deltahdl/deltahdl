@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include "elaborator/concurrent_assertion_expr.h"
 #include "elaborator/function_in_checker.h"
 #include "fixture_elaborator.h"
 

@@ -201,8 +201,8 @@ runs:
         # A tool a caller did not ask for is absent rather than fatal, which
         # is what lets a caller name a subset.
         for tool in clang clang++ clang-cpp clang-tidy clang-format \
-          clang-apply-replacements run-clang-tidy lld ld.lld llvm-cov \
-          llvm-profdata; do
+          clang-apply-replacements clang-include-cleaner run-clang-tidy lld \
+          ld.lld llvm-cov llvm-profdata; do
           if [ -x "/usr/bin/${tool}-${major}" ]; then
             sudo ln -sf "/usr/bin/${tool}-${major}" "/usr/bin/${tool}"
           fi

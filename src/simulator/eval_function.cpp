@@ -1,12 +1,21 @@
 #include <algorithm>
+#include <cstddef>
+#include <cstdint>
 #include <string>
 #include <unordered_set>
 #include <vector>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
+#include "common/source_loc.h"
+#include "common/types.h"
+#include "elaborator/const_eval.h"
 #include "elaborator/type_eval.h"
-#include "parser/ast.h"
+#include "parser/ast_class.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_module.h"
+#include "parser/ast_stmt.h"
+#include "parser/ast_type.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_array.h"
 #include "simulator/eval_class_array.h"

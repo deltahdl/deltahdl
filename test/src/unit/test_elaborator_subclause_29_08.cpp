@@ -1,11 +1,15 @@
+#include <gtest/gtest.h>
+
 #include <algorithm>
 #include <cstdint>
 #include <set>
 #include <string>
 
+#include "common/diagnostic.h"
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
+#include "parser/ast_expr.h"
 
 using namespace delta;
 

@@ -8,6 +8,8 @@
 // precedence of `iff` over `or` written the way the clause writes it, and a
 // procedural `@` statement rather than an `always` block.
 
+#include <gtest/gtest.h>
+
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"

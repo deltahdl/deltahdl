@@ -1,8 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <cstdint>
 
 #include "simulator/svdpi_src.h"
+#include "simulator/svdpi_sv31a.h"
 
 namespace {
 

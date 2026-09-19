@@ -1,8 +1,14 @@
+#include <gtest/gtest.h>
+
+#include <cstddef>
 #include <iterator>
+#include <string>
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
+#include "parser/ast_module.h"
+#include "parser/ast_specify.h"
 #include "simulator/udp_eval.h"
 
 using namespace delta;

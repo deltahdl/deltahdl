@@ -1,10 +1,7 @@
-#include "builders_ast.h"
+#include <gtest/gtest.h>
+
 #include "fixture_simulator.h"
-#include "helpers_eval_op.h"
 #include "helpers_scheduler.h"
-#include "parser/ast.h"
-#include "simulator/evaluation.h"
-#include "simulator/sim_context.h"
 
 using namespace delta;
 

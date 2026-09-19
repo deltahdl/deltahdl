@@ -1,6 +1,10 @@
+#include <gtest/gtest.h>
+
+#include "common/types.h"
 #include "fixture_simulator.h"
 #include "helpers_stmt_exec.h"
-#include "simulator/awaiters.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_stmt.h"
 #include "simulator/clocking.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"

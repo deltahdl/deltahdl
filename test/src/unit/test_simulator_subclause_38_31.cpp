@@ -4,6 +4,9 @@
 #include <string>
 
 #include "helpers_vpi_save_restore_probe.h"
+#include "simulator/vpi_constants.h"
+#include "simulator/vpi_data_structs.h"
+#include "simulator/vpi_user_macros.h"
 
 namespace delta {
 namespace {

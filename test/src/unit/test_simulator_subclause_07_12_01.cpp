@@ -1,13 +1,18 @@
+#include <gtest/gtest.h>
+
 #include <cstdint>
 #include <string>
-#include <utility>
+#include <string_view>
+#include <vector>
 
 #include "builders_ast.h"
+#include "common/types.h"
 #include "fixture_simulator.h"
 #include "helpers_array_locator.h"
 #include "helpers_queue.h"
 #include "helpers_reported_error.h"
 #include "helpers_scheduler.h"
+#include "lexer/token.h"
 #include "simulator/eval_array.h"
 #include "simulator/evaluation.h"
 

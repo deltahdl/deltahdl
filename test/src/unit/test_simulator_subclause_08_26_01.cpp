@@ -1,5 +1,6 @@
+#include <gtest/gtest.h>
+
 #include "fixture_simulator.h"
-#include "parser/ast.h"
 #include "simulator/class_object.h"
 
 using namespace delta;

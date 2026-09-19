@@ -1,7 +1,5 @@
 #pragma once
 
-#include <cstdint>
-
 namespace delta {
 
 // §16.12.10: the indexed nexttime property forms

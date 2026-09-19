@@ -1,16 +1,24 @@
 #include <cmath>
+#include <cstddef>
+#include <cstdint>
 #include <format>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
 #include "common/diagnostic.h"
+#include "common/source_loc.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/type_eval.h"
-#include "parser/ast.h"
+#include "lexer/token.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_stmt.h"
 
 namespace delta {
 

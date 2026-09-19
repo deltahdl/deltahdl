@@ -8,9 +8,12 @@
 // descendant subclause §6.3.2.1, and the drive-strength rule is observed at the
 // elaborator stage.
 
+#include <gtest/gtest.h>
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
+#include "parser/ast_type.h"
 
 using namespace delta;
 

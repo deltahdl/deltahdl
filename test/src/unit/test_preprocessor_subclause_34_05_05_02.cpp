@@ -60,10 +60,10 @@
 #include "common/source_mgr.h"
 #include "helpers_protect_region.h"
 #include "helpers_reported_error.h"
+#include "helpers_text_lines.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_envelope.h"
 #include "preprocessor/protect_keywords.h"
-#include "preprocessor/protect_processing.h"
 
 using namespace delta;
 

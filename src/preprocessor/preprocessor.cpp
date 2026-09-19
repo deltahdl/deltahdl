@@ -2,9 +2,18 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <string>
+#include <string_view>
+#include <utility>
 
+#include "common/diagnostic.h"
+#include "common/source_loc.h"
+#include "common/source_mgr.h"
+#include "lexer/keywords.h"
+#include "preprocessor/macro_table.h"
 #include "preprocessor/preprocessor_internal.h"
 
 namespace delta {

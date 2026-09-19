@@ -47,18 +47,12 @@
 #include <cstddef>
 #include <string>
 #include <string_view>
-#include <vector>
 
 #include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "fixture_protect_read.h"
 #include "helpers_protect_sealed_model.h"
 #include "helpers_reported_error.h"
 #include "helpers_text_lines.h"
-#include "preprocessor/preprocessor.h"
-#include "preprocessor/protect_envelope.h"
-#include "preprocessor/protect_keywords.h"
-#include "preprocessor/protect_processing.h"
 
 using namespace delta;
 

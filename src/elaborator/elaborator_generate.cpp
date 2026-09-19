@@ -1,3 +1,4 @@
+#include <cstddef>
 #include <cstdint>
 #include <format>
 #include <optional>
@@ -13,9 +14,13 @@
 #include "elaborator/disable_iff_resolution.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_items_internal.h"
+#include "elaborator/property_rewrite.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
-#include "parser/ast.h"
+#include "lexer/token.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_module.h"
+#include "parser/ast_stmt.h"
 
 namespace delta {
 

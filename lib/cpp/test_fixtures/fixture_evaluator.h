@@ -1,9 +1,15 @@
 #pragma once
 
+#include <gtest/gtest.h>
+
 #include <string>
 
+#include "common/arena.h"
+#include "common/diagnostic.h"
+#include "common/source_mgr.h"
 #include "elaborator/const_eval.h"
-#include "fixture_parser.h"
+#include "lexer/lexer.h"
+#include "parser/parser.h"
 
 using namespace delta;
 

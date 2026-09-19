@@ -5,10 +5,9 @@
 // end to end (parse, elaborate, run) so the behavior reflects real block source
 // rather than a hand-built process state. Join-type semantics, start/finish
 // timing, and naming belong to the descendant subclauses §9.3.1-§9.3.5.
-#include "fixture_simulator.h"
+#include <gtest/gtest.h>
+
 #include "helpers_scheduler.h"
-#include "simulator/lowerer.h"
-#include "simulator/variable.h"
 
 using namespace delta;
 

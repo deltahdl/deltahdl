@@ -1,9 +1,14 @@
+#include <gtest/gtest.h>
+
+#include <cstdint>
+#include <string>
 #include <vector>
 
 #include "common/types.h"
 #include "fixture_simulator.h"
 #include "helpers_scheduler_event.h"
 #include "simulator/lowerer.h"
+#include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 
 using namespace delta;

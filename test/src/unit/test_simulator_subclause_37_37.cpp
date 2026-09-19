@@ -6,7 +6,8 @@
 #include "common/arena.h"
 #include "fixture_simulator.h"
 #include "simulator/scheduler.h"
-#include "simulator/vpi.h"
+#include "simulator/vpi_globals.h"
+#include "simulator/vpi_user.h"
 
 namespace delta {
 namespace {

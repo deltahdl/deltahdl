@@ -12,6 +12,7 @@
 #include <string_view>
 
 #include "common/diagnostic.h"
+#include "common/source_loc.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_keywords.h"
 

@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cctype>
+#include <cstddef>
 #include <string>
 
 #include "fixture_preprocessor.h"

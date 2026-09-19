@@ -1,8 +1,13 @@
 #include <algorithm>
+#include <cstdint>
 #include <string>
 #include <string_view>
 #include <utility>
 
+#include "common/diagnostic.h"
+#include "lexer/token.h"
+#include "parser/ast_expr.h"
+#include "synthesizer/aig.h"
 #include "synthesizer/synth_lower.h"
 #include "synthesizer/synth_pattern.h"
 

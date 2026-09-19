@@ -6,8 +6,12 @@
 // qualifier productions) point at clarification list elements in Annex A.10, a
 // separate subclause, so they are not A.1.9's own requirements.
 
+#include <gtest/gtest.h>
+
 #include "fixture_parser.h"
 #include "helpers_reported_error.h"
+#include "parser/ast_class.h"
+#include "parser/ast_module.h"
 
 using namespace delta;
 

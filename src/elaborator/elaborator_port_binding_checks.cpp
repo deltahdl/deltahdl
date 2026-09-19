@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <format>
 #include <string_view>
@@ -7,10 +8,14 @@
 #include <vector>
 
 #include "common/diagnostic.h"
+#include "common/source_loc.h"
+#include "common/types.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_port_binding_internal.h"
 #include "elaborator/rtlir.h"
-#include "parser/ast.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_module.h"
+#include "parser/ast_type.h"
 
 namespace delta {
 

@@ -16,6 +16,8 @@
 // the full pipeline (parse → elaborate → lower → run), reading the outputs back
 // through $display — rather than hand-building a system-call node and calling
 // the evaluator in isolation.
+#include <gtest/gtest.h>
+
 #include <string>
 #include <vector>
 

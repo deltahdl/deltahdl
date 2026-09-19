@@ -1,9 +1,21 @@
+#include <gtest/gtest.h>
+
+#include <cstddef>
+#include <cstdint>
 #include <string>
 #include <vector>
 
+#include "common/types.h"
+#include "elaborator/elaborator.h"
+#include "elaborator/rtlir.h"
 #include "fixture_simulator.h"
+#include "lexer/lexer.h"
+#include "parser/ast_module.h"
+#include "parser/ast_specify.h"
+#include "parser/parser.h"
 #include "simulator/evaluation.h"
 #include "simulator/specify.h"
+#include "simulator/specify_path_delay.h"
 
 using namespace delta;
 

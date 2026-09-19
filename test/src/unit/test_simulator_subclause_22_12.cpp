@@ -1,3 +1,5 @@
+#include <gtest/gtest.h>
+
 #include "helpers_preprocess_and_get.h"
 
 // §22.12: the `line directive shall set the line number of the following line.

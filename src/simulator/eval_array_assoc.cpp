@@ -18,14 +18,16 @@
 // associative array too, and both this file's method dispatch and its num()
 // have to offer them before falling through to §7.9's own.
 
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <string>
 #include <string_view>
 
 #include "common/arena.h"
+#include "common/diagnostic.h"
 #include "common/types.h"
-#include "parser/ast.h"
+#include "parser/ast_expr.h"
 #include "simulator/eval_array.h"
 #include "simulator/eval_array_internal.h"
 #include "simulator/evaluation.h"

@@ -6,7 +6,6 @@
 
 #include "common/arena.h"
 #include "common/types.h"
-#include "parser/ast.h"
 #include "simulator/sim_context_types.h"
 
 namespace delta {

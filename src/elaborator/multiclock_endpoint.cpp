@@ -1,5 +1,9 @@
 #include "elaborator/multiclock_endpoint.h"
 
+#include <string_view>
+
+#include "elaborator/sequence_method.h"
+
 namespace delta {
 
 bool TriggeredEndingClockMatchesContext(std::string_view ending_clock,

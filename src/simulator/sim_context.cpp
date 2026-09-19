@@ -1,17 +1,26 @@
 #include "simulator/sim_context.h"
 
 #include <algorithm>
+#include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <random>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <utility>
 #include <vector>
 
+#include "common/types.h"
+#include "parser/ast_expr.h"
+#include "simulator/class_object.h"
+#include "simulator/clocking.h"
 #include "simulator/coverage.h"
 #include "simulator/dpi_runtime.h"
 #include "simulator/net.h"
 #include "simulator/process.h"
+#include "simulator/scope.h"
+#include "simulator/sim_context_types.h"
 #include "simulator/specify.h"
 
 namespace delta {

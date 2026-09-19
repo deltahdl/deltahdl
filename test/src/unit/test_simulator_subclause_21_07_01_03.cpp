@@ -1,6 +1,7 @@
+#include <gtest/gtest.h>
+
 #include <string>
 #include <string_view>
-#include <utility>
 #include <vector>
 
 #include "fixture_simulator.h"
@@ -8,8 +9,6 @@
 #include "helpers_text_lines.h"
 #include "helpers_vcd_dump.h"
 #include "simulator/lowerer.h"
-#include "simulator/variable.h"
-#include "simulator/vcd_writer.h"
 
 namespace delta {
 namespace {

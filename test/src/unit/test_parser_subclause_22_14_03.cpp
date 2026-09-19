@@ -1,3 +1,5 @@
+#include <gtest/gtest.h>
+
 #include <cstddef>
 #include <string>
 
@@ -7,6 +9,8 @@
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
 #include "model_keyword_tables.h"
+#include "parser/ast_module.h"
+#include "parser/ast_stmt.h"
 
 using namespace delta;
 

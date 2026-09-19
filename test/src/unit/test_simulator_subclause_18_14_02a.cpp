@@ -1,7 +1,9 @@
-#include "fixture_simulator.h"
+#include <gtest/gtest.h>
+
+#include <cstdint>
+
 #include "helpers_fork_urandom_programs.h"
 #include "helpers_seeded_run.h"
-#include "simulator/process.h"
 
 using namespace delta;
 

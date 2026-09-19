@@ -1,13 +1,9 @@
 #include <gtest/gtest.h>
 
-#include "common/arena.h"
 #include "common/types.h"
 #include "fixture_parser.h"
-#include "fixture_preprocessor.h"
 #include "fixture_preprocessor_timescale.h"
 #include "helpers_reported_error.h"
-#include "lexer/lexer.h"
-#include "parser/parser.h"
 
 using namespace delta;
 

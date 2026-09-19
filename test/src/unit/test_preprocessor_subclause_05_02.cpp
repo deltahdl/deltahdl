@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <string>
+#include <utility>
 
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -9,6 +10,8 @@
 #include "helpers_reported_error.h"
 #include "lexer/keywords.h"
 #include "lexer/lexer.h"
+#include "lexer/token.h"
+#include "preprocessor/preprocessor.h"
 
 using namespace delta;
 

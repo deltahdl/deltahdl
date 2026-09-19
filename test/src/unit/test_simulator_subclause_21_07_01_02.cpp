@@ -1,10 +1,14 @@
+#include <gtest/gtest.h>
+
 #include <string>
 
+#include "common/types.h"
 #include "fixture_simulator.h"
 #include "fixture_vcd.h"
 #include "fixture_vcd_dump_from_source.h"
 #include "fixture_vcd_dump_run.h"
 #include "helpers_reported_error.h"
+#include "simulator/lowerer.h"
 #include "simulator/variable.h"
 #include "simulator/vcd_writer.h"
 

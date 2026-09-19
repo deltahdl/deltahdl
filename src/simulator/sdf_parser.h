@@ -6,7 +6,9 @@
 #include <string_view>
 #include <vector>
 
-#include "parser/ast.h"
+#include "common/types.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_specify.h"
 
 namespace delta {
 

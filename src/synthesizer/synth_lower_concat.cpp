@@ -1,8 +1,13 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <string_view>
 
+#include "common/diagnostic.h"
+#include "elaborator/const_eval.h"
 #include "elaborator/type_eval.h"
+#include "parser/ast_expr.h"
+#include "synthesizer/aig.h"
 #include "synthesizer/synth_lower.h"
 
 namespace delta {

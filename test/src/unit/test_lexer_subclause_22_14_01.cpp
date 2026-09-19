@@ -1,13 +1,16 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "fixture_preprocessor.h"
 #include "lexer/lexer.h"
+#include "lexer/token.h"
 
 using namespace delta;
 

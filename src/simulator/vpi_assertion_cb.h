@@ -9,7 +9,6 @@
 // which callbacks may be placed and what a placed callback is handed are
 // written.
 
-#include "simulator/dpi_runtime.h"
 #include "simulator/sv_vpi_user.h"
 
 namespace delta {

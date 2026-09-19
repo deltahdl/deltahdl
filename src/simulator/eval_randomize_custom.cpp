@@ -7,7 +7,7 @@
 
 #include "common/types.h"
 #include "lexer/token.h"
-#include "parser/ast.h"
+#include "parser/ast_expr.h"
 #include "simulator/constraint_solver.h"
 #include "simulator/eval_randomize_internal.h"
 #include "simulator/evaluation.h"

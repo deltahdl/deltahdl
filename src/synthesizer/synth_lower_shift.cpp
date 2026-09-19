@@ -1,7 +1,11 @@
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <vector>
 
+#include "lexer/token.h"
+#include "parser/ast_expr.h"
+#include "synthesizer/aig.h"
 #include "synthesizer/synth_lower.h"
 
 namespace delta {

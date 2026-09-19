@@ -10,7 +10,10 @@
 // The sized integer types the same section fixes are in vpi_pli_types.h,
 // which this header reads first for the same reason the annex puts them
 // first: PLI_INT32 and its siblings are what every declaration below the
-// portability help is written in.
+// portability help is written in. The IWYU pragma on that include marks it as
+// this header's export, so that clang-tidy's misc-include-cleaner counts a
+// file including vpi_user.h as already provided with the types the annex puts
+// in it.
 //
 // vpi_user.h undefines PLI_EXTERN, PLI_VEXTERN and, where this header rather
 // than the includer defined them, the two DLL specifications and the
@@ -18,7 +21,7 @@
 // them only between the two ends of that file, and a definition it made
 // itself before the include is left where it was.
 
-#include "simulator/vpi_pli_types.h"
+#include "simulator/vpi_pli_types.h"  // IWYU pragma: export
 
 /* Use to import a symbol */
 

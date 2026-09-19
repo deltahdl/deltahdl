@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include <cstdint>
+#include <string_view>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
@@ -9,7 +9,7 @@
 #include "fixture_simulator.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
-#include "simulator/sva_engine.h"
+#include "simulator/sva_engine_queues.h"
 
 using namespace delta;
 

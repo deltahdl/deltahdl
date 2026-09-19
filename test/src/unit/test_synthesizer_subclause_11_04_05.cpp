@@ -2,8 +2,11 @@
 
 #include <cstdint>
 
+#include "fixture_synthesizer.h"
+#include "helpers_aig_eval.h"
 #include "helpers_synth_assign.h"
 #include "synthesizer/aig.h"
+#include "synthesizer/synth_lower.h"
 
 using namespace delta;
 

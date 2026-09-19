@@ -1,12 +1,16 @@
 #pragma once
 
+#include <cstdint>
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
 #include "common/diagnostic.h"
+#include "common/types.h"
 #include "elaborator/rtlir.h"
-#include "parser/ast.h"
+#include "parser/ast_module.h"
+#include "parser/ast_type.h"
 
 // Internal helpers shared between the port-binding translation units
 // (elaborator_port_binding.cpp and elaborator_port_binding_checks.cpp). These

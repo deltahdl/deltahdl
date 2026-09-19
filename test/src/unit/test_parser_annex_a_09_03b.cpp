@@ -1,10 +1,15 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/lexer.h"
-#include "parser/ast.h"
+#include "parser/ast_class.h"
+#include "parser/ast_design.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_module.h"
 #include "parser/parser.h"
 
 using namespace delta;

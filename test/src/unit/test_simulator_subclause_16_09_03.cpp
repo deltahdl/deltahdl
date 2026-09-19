@@ -1,10 +1,5 @@
 #include <gtest/gtest.h>
 
-#include <cstdint>
-
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "fixture_simulator.h"
 #include "simulator/assertion.h"
 #include "simulator/sim_context.h"

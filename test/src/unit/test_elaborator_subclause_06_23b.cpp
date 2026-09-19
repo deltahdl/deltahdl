@@ -1,5 +1,8 @@
+#include <gtest/gtest.h>
+
 #include <string>
 
+#include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 #include "helpers_generate_elab.h"
 #include "helpers_reported_error.h"

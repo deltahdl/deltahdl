@@ -8,8 +8,12 @@
 // has.
 
 #include <cctype>
+#include <cstdint>
 
+#include "common/diagnostic.h"
+#include "common/source_loc.h"
 #include "lexer/lexer.h"
+#include "lexer/token.h"
 
 namespace delta {
 

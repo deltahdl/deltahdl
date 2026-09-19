@@ -1,11 +1,15 @@
+#include <cstddef>
 #include <cstdint>
 #include <string_view>
 #include <utility>
 #include <vector>
 
 #include "common/arena.h"
+#include "common/diagnostic.h"
 #include "lexer/token.h"
-#include "parser/ast.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_module.h"
+#include "parser/ast_stmt.h"
 #include "parser/parser.h"
 #include "parser/parser_property_spec_internal.h"
 #include "parser/parser_sequence_property_decl_internal.h"

@@ -25,6 +25,8 @@
 // read, and they stand here rather than in test_elaborator_subclause_08_10a.cpp
 // because that file is already the larger half of the split.
 
+#include <gtest/gtest.h>
+
 #include <string>
 
 #include "fixture_elaborator.h"

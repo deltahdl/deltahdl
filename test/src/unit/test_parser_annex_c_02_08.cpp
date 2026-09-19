@@ -10,11 +10,14 @@
 // on to the ';' that ended the declaration, and records no bind directive for
 // it; a bind directive with a target is what §23.11 keeps.
 
+#include <gtest/gtest.h>
+
 #include <string>
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
+#include "parser/ast_module.h"
 
 using namespace delta;
 

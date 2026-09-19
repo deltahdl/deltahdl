@@ -1,8 +1,10 @@
 #include <gtest/gtest.h>
 
 #include "elaborator/clock_resolution.h"
+#include "elaborator/rtlir.h"
 #include "elaborator/semantic_leading_clock.h"
 #include "fixture_elaborator.h"
+#include "parser/ast_stmt.h"
 
 using namespace delta;
 

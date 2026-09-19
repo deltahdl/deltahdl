@@ -1,16 +1,14 @@
 #pragma once
 
 #include <cstdint>
-#include <functional>
 #include <string>
 #include <string_view>
-#include <unordered_map>
-#include <utility>
 #include <vector>
 
-#include "common/types.h"
-#include "parser/ast.h"
-#include "simulator/specify_timing_check.h"
+#include "parser/ast_design.h"
+#include "parser/ast_module.h"
+#include "parser/ast_specify.h"
+#include "parser/ast_type.h"
 
 namespace delta {
 

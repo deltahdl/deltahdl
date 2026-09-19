@@ -17,6 +17,8 @@
 // returned the position it selected, or one that folded nothing at all, answer
 // a case that asked for the minimum.
 
+#include <gtest/gtest.h>
+
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -27,6 +29,7 @@
 #include "fixture_elaborator.h"
 #include "fixture_evaluator.h"
 #include "helpers_rtlir_lookup.h"
+#include "parser/ast_expr.h"
 
 using namespace delta;
 

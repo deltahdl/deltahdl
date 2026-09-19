@@ -1,10 +1,9 @@
 #pragma once
 
 #include <cstdarg>
-#include <cstdint>
 
-#include "simulator/vpi_context.h"
-#include "simulator/vpi_model_helpers3.h"
+#include "simulator/vpi_data_structs.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_pli_types.h"
 #include "simulator/vpi_portability.h"
 

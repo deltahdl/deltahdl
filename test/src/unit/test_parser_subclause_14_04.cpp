@@ -5,6 +5,8 @@
 // test_elaborator_subclause_14_04 and test_simulator_subclause_14_04 and no
 // parser counterpart at all.
 
+#include <gtest/gtest.h>
+
 #include "fixture_parser.h"
 #include "helpers_reported_error.h"
 

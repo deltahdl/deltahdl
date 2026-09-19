@@ -1,7 +1,12 @@
+#include <gtest/gtest.h>
+
+#include <cstdint>
+
+#include "common/types.h"
 #include "fixture_simulator.h"
 #include "helpers_reported_error.h"
 #include "helpers_string_var.h"
-#include "parser/ast.h"
+#include "parser/ast_expr.h"
 #include "simulator/eval_array.h"
 #include "simulator/evaluation.h"
 

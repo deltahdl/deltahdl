@@ -2,9 +2,12 @@
 
 #include <cstdint>
 #include <functional>
+#include <utility>
 #include <vector>
 
 #include "common/arena.h"
+#include "common/types.h"
+#include "simulator/dpi_arg_value.h"
 #include "simulator/dpi_runtime.h"
 #include "simulator/scheduler.h"
 

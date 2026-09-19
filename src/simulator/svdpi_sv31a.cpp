@@ -7,6 +7,8 @@
 
 #include <cstdint>
 
+#include "simulator/svdpi.h"
+
 namespace {
 
 int Chunks(int width) { return width <= 0 ? 0 : SV_CANONICAL_SIZE(width); }

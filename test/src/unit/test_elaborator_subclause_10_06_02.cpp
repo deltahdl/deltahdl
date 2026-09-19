@@ -1,12 +1,7 @@
 #include <gtest/gtest.h>
 
-#include <cstdint>
-
-#include "common/arena.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
-#include "simulator/net.h"
-#include "simulator/variable.h"
 
 using namespace delta;
 namespace {

@@ -9,7 +9,7 @@
 #include "common/source_loc.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
-#include "parser/ast.h"
+#include "parser/ast_design.h"
 
 namespace delta {
 

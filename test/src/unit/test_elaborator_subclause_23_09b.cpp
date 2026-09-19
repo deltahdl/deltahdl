@@ -11,10 +11,13 @@
 // scope, and the upward search stopping at a module boundary -- are in
 // test_elaborator_subclause_23_09a.cpp.
 
+#include <gtest/gtest.h>
+
 #include <cstdint>
 #include <string>
 #include <string_view>
 
+#include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 
 using namespace delta;

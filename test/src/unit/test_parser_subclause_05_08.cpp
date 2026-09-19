@@ -1,6 +1,11 @@
+#include <gtest/gtest.h>
+
+#include "common/types.h"
 #include "fixture_parser.h"
 #include "fixture_preprocessor_timescale.h"
 #include "helpers_parser_verify.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_stmt.h"
 
 using namespace delta;
 

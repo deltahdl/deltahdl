@@ -1,8 +1,21 @@
 #include "parser/parser.h"
 
 #include <algorithm>
+#include <cstddef>
+#include <utility>
+#include <vector>
 
+#include "common/arena.h"
+#include "common/diagnostic.h"
 #include "common/types.h"
+#include "lexer/lexer.h"
+#include "lexer/token.h"
+#include "parser/ast_class.h"
+#include "parser/ast_design.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_module.h"
+#include "parser/ast_specify.h"
+#include "parser/ast_type.h"
 #include "parser/parser_token_skips.h"
 
 namespace delta {

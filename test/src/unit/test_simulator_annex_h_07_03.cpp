@@ -1,9 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <cstdint>
 
 #include "helpers_open_array_natural_order.h"
-#include "parser/ast.h"
+#include "parser/ast_type.h"
 #include "simulator/dpi_arg_value.h"
 #include "simulator/dpi_c_type.h"
 #include "simulator/svdpi.h"

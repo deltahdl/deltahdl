@@ -2,8 +2,9 @@
 #include <string_view>
 
 #include "common/arena.h"
+#include "common/types.h"
 #include "elaborator/type_eval.h"
-#include "parser/ast.h"
+#include "parser/ast_expr.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_class_array.h"
 #include "simulator/eval_function_internal.h"

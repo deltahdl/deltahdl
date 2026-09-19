@@ -7,6 +7,7 @@
 // §8.10 and §8.11 are in elaborator_validate_static_methods.cpp, which the
 // 1000-line cap in .github/workflows/deltahdl.yml separated from this file.
 
+#include <cstddef>
 #include <format>
 #include <optional>
 #include <string_view>
@@ -15,10 +16,15 @@
 
 #include "common/diagnostic.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_helpers.h"
+#include "elaborator/elaborator_validate_classes.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/std_package.h"
 #include "elaborator/type_eval.h"
-#include "parser/ast.h"
+#include "parser/ast_class.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_module.h"
+#include "parser/ast_stmt.h"
 
 namespace delta {
 

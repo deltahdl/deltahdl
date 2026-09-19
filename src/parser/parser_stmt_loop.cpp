@@ -4,6 +4,12 @@
 // file-local to that translation unit. The split keeps both files inside the
 // 1000-line limit assert-no-oversized-source-files enforces.
 
+#include <vector>
+
+#include "common/diagnostic.h"
+#include "lexer/token.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_stmt.h"
 #include "parser/parser.h"
 
 namespace delta {

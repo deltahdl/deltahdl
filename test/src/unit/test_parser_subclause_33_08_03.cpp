@@ -79,7 +79,6 @@
 
 #include <gtest/gtest.h>
 
-#include <cstdint>
 #include <filesystem>
 #include <string>
 #include <string_view>
@@ -91,10 +90,7 @@
 #include "fixture_scratch_dir.h"
 #include "fixture_tagged_file.h"
 #include "helpers_reported_error.h"
-#include "lexer/lexer.h"
-#include "parser/ast.h"
 #include "parser/library_map.h"
-#include "parser/parser.h"
 #include "parser/single_pass_compile.h"
 
 using namespace delta;

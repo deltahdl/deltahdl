@@ -1,9 +1,15 @@
+#include <gtest/gtest.h>
+
+#include <cstdint>
+#include <string_view>
+
 #include "builders_ast.h"
+#include "common/types.h"
 #include "fixture_simulator.h"
 #include "helpers_array.h"
 #include "helpers_lower_run.h"
 #include "helpers_scheduler.h"
-#include "parser/ast.h"
+#include "parser/ast_expr.h"
 #include "simulator/eval_array.h"
 #include "simulator/evaluation.h"
 

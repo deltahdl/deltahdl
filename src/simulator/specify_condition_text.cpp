@@ -18,7 +18,8 @@
 #include <string>
 #include <string_view>
 
-#include "parser/ast.h"
+#include "lexer/token.h"
+#include "parser/ast_expr.h"
 #include "simulator/specify_internal.h"
 
 namespace delta {

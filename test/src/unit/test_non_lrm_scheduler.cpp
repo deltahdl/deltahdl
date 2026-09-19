@@ -1,14 +1,14 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <vector>
+
 #include "common/arena.h"
 #include "common/types.h"
-#include "fixture_lexer.h"
-#include "fixture_parser.h"
 #include "fixture_simulator.h"
 #include "simulator/adv_sim.h"
 #include "simulator/compiled_sim.h"
 #include "simulator/mt_sim.h"
-#include "simulator/process.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 

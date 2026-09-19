@@ -1,12 +1,18 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
 #include <string>
 #include <vector>
 
 #include "fixture_sdf_design.h"
 #include "fixture_simulator.h"
+#include "parser/ast_module.h"
+#include "parser/ast_specify.h"
 #include "simulator/sdf_parser.h"
 #include "simulator/specify.h"
+#include "simulator/specify_path_delay.h"
+#include "simulator/specify_timing_check.h"
+#include "simulator/variable.h"
 
 using namespace delta;
 

@@ -1,12 +1,14 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <string>
 
 #include "fixture_lexer.h"
 #include "helpers_reported_error.h"
 #include "lexer/keywords.h"
+#include "lexer/token.h"
 
 using namespace delta;
 

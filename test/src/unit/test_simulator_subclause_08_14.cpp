@@ -1,9 +1,10 @@
-#include "builders_ast.h"
-#include "builders_systask.h"
+#include <gtest/gtest.h>
+
+#include "common/types.h"
 #include "fixture_simulator.h"
 #include "helpers_class_object.h"
 #include "helpers_scheduler.h"
-#include "parser/ast.h"
+#include "parser/ast_module.h"
 #include "simulator/class_object.h"
 #include "simulator/evaluation.h"
 

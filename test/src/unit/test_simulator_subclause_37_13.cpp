@@ -1,9 +1,11 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <vector>
 
 #include "simulator/sv_vpi_user.h"
-#include "simulator/vpi.h"
+#include "simulator/vpi_globals.h"
+#include "simulator/vpi_user.h"
 
 namespace delta {
 namespace {

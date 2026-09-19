@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "common/arena.h"
+#include "common/types.h"
 #include "fixture_simulator.h"
 #include "helpers_logic4vec_z.h"
 #include "simulator/net.h"

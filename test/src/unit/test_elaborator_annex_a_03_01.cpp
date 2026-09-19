@@ -1,5 +1,9 @@
+#include <gtest/gtest.h>
+
 #include "fixture_elaborator.h"
 #include "helpers_ninput_gate_elab.h"
+#include "lexer/token.h"
+#include "parser/ast_expr.h"
 
 using namespace delta;
 

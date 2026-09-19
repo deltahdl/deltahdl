@@ -1,3 +1,5 @@
+#include <gtest/gtest.h>
+
 #include <string>
 #include <string_view>
 
@@ -6,6 +8,8 @@
 #include "fixture_elaborator.h"
 #include "fixture_program.h"
 #include "helpers_reported_error.h"
+#include "lexer/lexer.h"
+#include "parser/parser.h"
 
 using namespace delta;
 

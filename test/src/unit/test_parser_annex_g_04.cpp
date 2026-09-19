@@ -6,6 +6,8 @@
 // declarations and the prototype's method calls parse without any user
 // `class mailbox` definition. The prototype's semantics belong to clause 15.4.
 
+#include <gtest/gtest.h>
+
 #include "fixture_parser.h"
 
 using namespace delta;

@@ -1,8 +1,12 @@
 #include "simulator/vcd_dump_state.h"
 
+#include <cstdint>
 #include <string>
 #include <string_view>
 #include <utility>
+
+#include "parser/ast_type.h"
+#include "simulator/vcd_writer.h"
 
 namespace delta {
 

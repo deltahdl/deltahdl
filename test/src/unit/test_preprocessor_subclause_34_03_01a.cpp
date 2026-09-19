@@ -44,7 +44,6 @@
 #include "common/source_mgr.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_envelope.h"
-#include "preprocessor/protect_keywords.h"
 #include "preprocessor/protect_processing.h"
 
 using namespace delta;

@@ -1,3 +1,5 @@
+#include <gtest/gtest.h>
+
 #include "helpers_preprocess_and_get.h"
 
 // §22.5.3 `undefineall, observed after the full preprocess -> parse ->

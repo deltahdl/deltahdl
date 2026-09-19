@@ -1,13 +1,16 @@
+#include <cstdint>
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
+#include "common/source_loc.h"
 #include "common/source_mgr.h"
 #include "common/types.h"
 #include "driver/cli_options.h"
@@ -17,6 +20,7 @@
 #include "elaborator/rtlir.h"
 #include "elaborator/separate_compilation_bind.h"
 #include "lexer/lexer.h"
+#include "parser/ast_design.h"
 #include "parser/library_map.h"
 #include "parser/parser.h"
 #include "parser/precompiled_library.h"
@@ -27,7 +31,9 @@
 #include "simulator/lowerer.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
-#include "simulator/vpi.h"
+#include "simulator/vcd_writer.h"
+#include "simulator/vpi_globals.h"
+#include "simulator/vpi_user.h"
 #include "synthesizer/aig_opt.h"
 #include "synthesizer/synth_lower.h"
 

@@ -1,3 +1,8 @@
+#include <gtest/gtest.h>
+
+#include <vector>
+
+#include "common/types.h"
 #include "fixture_simulator.h"
 #include "simulator/evaluation.h"
 

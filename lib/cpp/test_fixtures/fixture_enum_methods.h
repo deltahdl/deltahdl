@@ -1,9 +1,9 @@
 #pragma once
 
-#include <gtest/gtest.h>
-
+#include <cstdint>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "common/arena.h"
@@ -11,10 +11,12 @@
 #include "common/source_mgr.h"
 #include "common/types.h"
 #include "helpers_method_call.h"
-#include "parser/ast.h"
+#include "parser/ast_expr.h"
 #include "simulator/evaluation.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_types.h"
+#include "simulator/variable.h"
 
 using namespace delta;
 

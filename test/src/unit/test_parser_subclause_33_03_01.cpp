@@ -7,6 +7,7 @@
 #include <fstream>
 #include <initializer_list>
 #include <string>
+#include <string_view>
 #include <system_error>
 #include <vector>
 
@@ -14,7 +15,6 @@
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/lexer.h"
-#include "parser/ast.h"
 #include "parser/library_map.h"
 #include "parser/parser.h"
 

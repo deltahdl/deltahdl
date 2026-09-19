@@ -1,7 +1,11 @@
 #include "synthesizer/aig_opt.h"
 
+#include <cstddef>
 #include <cstdint>
+#include <utility>
 #include <vector>
+
+#include "synthesizer/aig.h"
 
 namespace delta {
 

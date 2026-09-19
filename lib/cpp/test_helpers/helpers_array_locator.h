@@ -1,12 +1,15 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
 
+#include "common/types.h"
 #include "fixture_simulator.h"
+#include "simulator/sim_context_types.h"
 
 using namespace delta;
 

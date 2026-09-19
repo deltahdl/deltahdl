@@ -7,6 +7,8 @@
 // distinguishes the two: an integer-only representation resolves it to
 // something, or fails to resolve it at all, and either way the fraction is gone
 // before any process can read it.
+#include <gtest/gtest.h>
+
 #include "fixture_simulator.h"
 
 using namespace delta;

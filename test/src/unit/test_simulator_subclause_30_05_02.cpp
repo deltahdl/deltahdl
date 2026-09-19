@@ -1,6 +1,10 @@
+#include <gtest/gtest.h>
+
+#include <cstdint>
+
 #include "fixture_simulator.h"
 #include "fixture_specify_path_decl.h"
-#include "simulator/specify.h"
+#include "simulator/specify_path_delay.h"
 
 using namespace delta;
 

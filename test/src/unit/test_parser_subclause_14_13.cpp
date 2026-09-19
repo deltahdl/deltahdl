@@ -1,5 +1,12 @@
+#include <gtest/gtest.h>
+
+#include <cstddef>
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_module.h"
+#include "parser/ast_type.h"
 
 using namespace delta;
 

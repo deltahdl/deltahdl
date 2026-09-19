@@ -1,6 +1,10 @@
 #include <cstdint>
 #include <optional>
 
+#include "common/diagnostic.h"
+#include "lexer/token.h"
+#include "parser/ast_expr.h"
+#include "synthesizer/aig.h"
 #include "synthesizer/synth_lower.h"
 
 namespace delta {

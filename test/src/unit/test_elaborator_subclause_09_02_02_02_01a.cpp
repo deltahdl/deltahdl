@@ -5,17 +5,21 @@
 // test_elaborator_subclause_09_02_02_02_01b.cpp, which the 1000-line cap in
 // .github/workflows/deltahdl.yml separated this file from.
 
+#include <gtest/gtest.h>
+
 #include <string_view>
 #include <unordered_set>
 
 #include "builders_ast.h"
 #include "builders_sensitivity.h"
 #include "common/arena.h"
-#include "common/types.h"
+#include "elaborator/rtlir.h"
 #include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"
 #include "fixture_elaborator.h"
 #include "helpers_sensitivity_assert.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_stmt.h"
 
 using namespace delta;
 

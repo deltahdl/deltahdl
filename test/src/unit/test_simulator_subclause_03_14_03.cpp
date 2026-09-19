@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "fixture_lexer.h"
+#include "common/types.h"
 #include "fixture_simulator.h"
 
 using namespace delta;

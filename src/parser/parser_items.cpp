@@ -1,6 +1,16 @@
+#include <cstddef>
 #include <optional>
 #include <string>
+#include <string_view>
+#include <vector>
 
+#include "common/diagnostic.h"
+#include "common/source_loc.h"
+#include "common/types.h"
+#include "lexer/token.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_module.h"
+#include "parser/ast_type.h"
 #include "parser/parser.h"
 #include "parser/parser_token_skips.h"
 

@@ -1,9 +1,9 @@
-#include "fixture_simulator.h"
+#include <gtest/gtest.h>
+
 #include "fixture_specify.h"
-#include "helpers_scheduler.h"
-#include "simulator/lowerer.h"
+#include "parser/ast_specify.h"
 #include "simulator/specify.h"
-#include "simulator/variable.h"
+#include "simulator/specify_path_delay.h"
 
 using namespace delta;
 

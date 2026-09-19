@@ -2,13 +2,21 @@
 
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <initializer_list>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
 #include "fixture_parser.h"
-#include "parser/ast.h"
+#include "lexer/token.h"
+#include "parser/ast_class.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_module.h"
+#include "parser/ast_specify.h"
+#include "parser/ast_stmt.h"
+#include "parser/ast_type.h"
 
 using namespace delta;
 

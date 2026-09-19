@@ -5,6 +5,8 @@
 // sides, argument positions, and inside task bodies. The first argument may
 // be a string literal or a variable; $value$plusargs takes a second,
 // destination-variable argument.
+#include <gtest/gtest.h>
+
 #include "fixture_parser.h"
 #include "helpers_reported_error.h"
 

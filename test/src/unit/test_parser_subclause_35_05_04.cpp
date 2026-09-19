@@ -1,13 +1,17 @@
+#include <gtest/gtest.h>
+
 #include <string>
 
+#include "common/source_mgr.h"
 #include "elaborator/elaborator.h"
-#include "elaborator/rtlir.h"
-#include "fixture_config.h"
 #include "fixture_parser.h"
 #include "fixture_program.h"
-#include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
-#include "simulator/vpi.h"
+#include "lexer/lexer.h"
+#include "parser/ast_module.h"
+#include "parser/ast_type.h"
+#include "parser/parser.h"
+#include "simulator/vpi_user.h"
 
 using namespace delta;
 

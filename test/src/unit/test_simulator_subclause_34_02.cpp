@@ -20,7 +20,9 @@
 #include <string>
 #include <vector>
 
+#include "fixture_simulator.h"
 #include "helpers_preprocess_and_get.h"
+#include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_envelope.h"
 
 namespace {

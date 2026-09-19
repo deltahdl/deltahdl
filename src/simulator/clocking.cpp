@@ -10,7 +10,8 @@
 #include <vector>
 
 #include "common/types.h"
-#include "parser/ast.h"
+#include "parser/ast_stmt.h"
+#include "simulator/net.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/variable.h"

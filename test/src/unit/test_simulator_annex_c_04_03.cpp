@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_globals.h"
 
 // Annex C.4.3: VPI definitions.
 //

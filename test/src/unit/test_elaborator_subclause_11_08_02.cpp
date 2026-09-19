@@ -1,3 +1,6 @@
+#include <gtest/gtest.h>
+
+#include "elaborator/const_eval.h"
 #include "fixture_evaluator.h"
 
 using namespace delta;

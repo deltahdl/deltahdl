@@ -1,5 +1,14 @@
+#include <gtest/gtest.h>
+
+#include "common/arena.h"
+#include "common/diagnostic.h"
+#include "common/source_mgr.h"
+#include "elaborator/elaborator.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
+#include "lexer/lexer.h"
+#include "parser/parser.h"
+#include "preprocessor/preprocessor.h"
 
 namespace {
 

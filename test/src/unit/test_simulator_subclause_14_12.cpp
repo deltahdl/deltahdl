@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "common/types.h"
-#include "parser/ast.h"
+#include "parser/ast_stmt.h"
 #include "simulator/clocking.h"
 
 using namespace delta;

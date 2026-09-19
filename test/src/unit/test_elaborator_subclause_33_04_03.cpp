@@ -1,5 +1,15 @@
+#include <gtest/gtest.h>
+
+#include <cstdint>
+#include <string>
+#include <string_view>
+
+#include "elaborator/elaborator.h"
+#include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
+#include "lexer/lexer.h"
+#include "parser/parser.h"
 
 namespace {
 

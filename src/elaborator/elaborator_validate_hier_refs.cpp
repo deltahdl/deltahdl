@@ -13,6 +13,7 @@
 // line cap and a checker is not a program. HierRefLeftmost, which both halves
 // read a name through, moved to elaborator_validate_internal.h.
 
+#include <cstddef>
 #include <string_view>
 #include <unordered_set>
 #include <vector>
@@ -20,8 +21,12 @@
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_internal.h"
-#include "parser/ast.h"
+#include "parser/ast_class.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_module.h"
+#include "parser/ast_stmt.h"
 
 namespace delta {
 

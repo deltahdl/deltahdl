@@ -1,6 +1,9 @@
+#include <gtest/gtest.h>
+
 #include <cstdio>
 #include <string>
 
+#include "common/types.h"
 #include "fixture_simulator.h"
 #include "helpers_reported_error.h"
 #include "helpers_temp_file.h"

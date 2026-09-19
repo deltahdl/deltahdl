@@ -3,10 +3,11 @@
 #include <vector>
 
 #include "common/arena.h"
+#include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
-#include "parser/ast.h"
+#include "parser/ast_expr.h"
 
 namespace delta {
 

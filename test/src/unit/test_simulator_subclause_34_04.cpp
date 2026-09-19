@@ -28,7 +28,9 @@
 #include <fstream>
 #include <string>
 
+#include "fixture_simulator.h"
 #include "helpers_preprocess_and_get.h"
+#include "preprocessor/preprocessor.h"
 
 namespace fs = std::filesystem;
 

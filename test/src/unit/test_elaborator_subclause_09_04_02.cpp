@@ -1,10 +1,12 @@
 
 
+#include <gtest/gtest.h>
+
+#include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
-#include "fixture_simulator.h"
 #include "helpers_reported_error.h"
+#include "parser/ast_stmt.h"
 #include "simulator/lowerer.h"
-#include "simulator/variable.h"
 
 using namespace delta;
 

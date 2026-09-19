@@ -19,17 +19,21 @@
 // §18.17.6 gives break and return -- and is the only caller of the six
 // functions named above.
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "common/arena.h"
+#include "common/types.h"
 #include "elaborator/type_eval.h"
-#include "parser/ast.h"
+#include "parser/ast_stmt.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
 #include "simulator/stmt_exec_randsequence_internal.h"
 

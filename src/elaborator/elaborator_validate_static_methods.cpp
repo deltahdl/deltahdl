@@ -8,13 +8,19 @@
 // .github/workflows/deltahdl.yml separated this file from. No symbol crosses
 // the cut.
 
+#include <cstddef>
 #include <string_view>
 #include <unordered_set>
 
 #include "common/diagnostic.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_validate_classes.h"
 #include "elaborator/elaborator_validate_internal.h"
-#include "parser/ast.h"
+#include "parser/ast_class.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_module.h"
+#include "parser/ast_stmt.h"
+#include "parser/ast_type.h"
 
 namespace delta {
 

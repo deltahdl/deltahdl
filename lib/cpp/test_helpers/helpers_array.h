@@ -4,6 +4,7 @@
 #include <string>
 #include <string_view>
 
+#include "common/types.h"
 #include "fixture_simulator.h"
 
 using namespace delta;

@@ -7,7 +7,7 @@
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/types.h"
-#include "parser/ast.h"
+#include "parser/ast_expr.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_array_internal.h"
 #include "simulator/evaluation.h"

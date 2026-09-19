@@ -1,6 +1,9 @@
+#include <gtest/gtest.h>
+
 #include <cstddef>
 #include <string>
 
+#include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 
 using namespace delta;

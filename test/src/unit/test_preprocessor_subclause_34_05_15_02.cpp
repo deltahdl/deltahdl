@@ -42,7 +42,6 @@
 #include "helpers_protect_block_lines.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_digest_block.h"
-#include "preprocessor/protect_encoding.h"
 #include "preprocessor/protect_processing.h"
 
 using namespace delta;

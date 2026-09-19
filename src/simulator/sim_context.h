@@ -17,8 +17,6 @@
 #include <array>
 #include <cstdint>
 #include <cstdio>
-#include <deque>
-#include <map>
 #include <memory>
 #include <optional>
 #include <ostream>
@@ -33,7 +31,6 @@
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "common/types.h"
-#include "parser/ast.h"
 #include "simulator/class_object.h"
 #include "simulator/cover_results.h"
 #include "simulator/coverage.h"
@@ -57,6 +54,7 @@
 #include "simulator/sync_objects.h"
 #include "simulator/variable.h"
 #include "simulator/vcd_dump_state.h"
+#include "simulator/vcd_writer.h"
 
 namespace delta {
 

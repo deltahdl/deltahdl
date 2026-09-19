@@ -10,11 +10,11 @@
 // reads rather than writes.
 
 #include <cstdint>
-#include <string>
 
 #include "common/arena.h"
+#include "common/types.h"
 #include "lexer/token.h"
-#include "parser/ast.h"
+#include "parser/ast_expr.h"
 #include "simulator/assoc_element.h"
 #include "simulator/eval_expr_internal.h"
 #include "simulator/eval_function_internal.h"

@@ -5,7 +5,7 @@
 #include "common/arena.h"
 #include "common/types.h"
 #include "lexer/token.h"
-#include "parser/ast.h"
+#include "parser/ast_expr.h"
 #include "simulator/evaluation.h"
 #include "simulator/evaluation_internal.h"
 #include "simulator/statement_assign.h"

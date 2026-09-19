@@ -1,6 +1,5 @@
 #include <gtest/gtest.h>
 
-#include "elaborator/semantic_leading_clock.h"
 #include "elaborator/sequence_admits_empty.h"
 
 using namespace delta;

@@ -1,7 +1,8 @@
+#include <gtest/gtest.h>
+
 #include <string_view>
 
 #include "fixture_simulator.h"
-#include "parser/ast.h"
 #include "simulator/lowerer.h"
 #include "simulator/stmt_exec.h"
 #include "simulator/variable.h"

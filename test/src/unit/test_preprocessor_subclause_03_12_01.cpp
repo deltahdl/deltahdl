@@ -4,9 +4,17 @@
 #include <filesystem>
 #include <fstream>
 #include <string>
+#include <vector>
 
+#include "common/arena.h"
+#include "common/diagnostic.h"
+#include "common/source_mgr.h"
 #include "fixture_parser.h"
 #include "helpers_reported_error.h"
+#include "lexer/lexer.h"
+#include "parser/ast_module.h"
+#include "parser/parser.h"
+#include "preprocessor/preprocessor.h"
 
 using namespace delta;
 

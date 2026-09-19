@@ -1,9 +1,11 @@
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <cstring>
 #include <string>
 
 #include "common/arena.h"
+#include "common/types.h"
 #include "lexer/token.h"
 #include "simulator/evaluation.h"
 #include "simulator/evaluation_internal.h"

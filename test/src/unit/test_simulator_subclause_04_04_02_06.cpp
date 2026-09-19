@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <vector>
 
 #include "common/arena.h"
@@ -8,7 +9,7 @@
 #include "helpers_scheduler_event.h"
 #include "simulator/checker_scheduling_semantics.h"
 #include "simulator/scheduler.h"
-#include "simulator/sva_engine.h"
+#include "simulator/sva_engine_queues.h"
 #include "simulator/variable.h"
 
 using namespace delta;

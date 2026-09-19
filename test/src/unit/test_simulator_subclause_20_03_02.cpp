@@ -8,6 +8,8 @@
 // build that time unit from real source and drive the module through the full
 // pipeline (parse → elaborate → lower → run), reading back what $stime prints
 // rather than stubbing the timescale or hand-scheduling a tick.
+#include <gtest/gtest.h>
+
 #include "fixture_simulator.h"
 
 using namespace delta;

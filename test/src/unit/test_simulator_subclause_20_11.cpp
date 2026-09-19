@@ -1,10 +1,15 @@
+#include <gtest/gtest.h>
+
+#include <cstdint>
+
 #include "builders_systask.h"
+#include "common/source_mgr.h"
+#include "common/types.h"
 #include "fixture_simulator.h"
-#include "parser/ast.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
-#include "simulator/sva_engine.h"
-#include "simulator/variable.h"
+#include "simulator/scheduler.h"
+#include "simulator/sva_engine_queues.h"
 
 using namespace delta;
 

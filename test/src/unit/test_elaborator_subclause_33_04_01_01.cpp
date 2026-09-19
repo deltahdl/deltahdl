@@ -18,9 +18,8 @@
 // drive it through the full parse-then-tag-then-elaborate pipeline rather than
 // hand-assigning the config's `library` field.
 
-#include <unistd.h>
+#include <gtest/gtest.h>
 
-#include <cstdint>
 #include <filesystem>
 #include <string>
 

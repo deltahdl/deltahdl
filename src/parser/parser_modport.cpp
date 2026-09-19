@@ -6,6 +6,10 @@
 
 #include <vector>
 
+#include "common/diagnostic.h"
+#include "lexer/token.h"
+#include "parser/ast_module.h"
+#include "parser/ast_type.h"
 #include "parser/parser.h"
 #include "parser/parser_token_skips.h"
 

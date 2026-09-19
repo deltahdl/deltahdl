@@ -6,9 +6,11 @@
 #include <utility>
 #include <vector>
 
+#include "common/types.h"
 #include "fixture_simulator.h"
 #include "helpers_dpi_bump_import.h"
-#include "parser/ast.h"
+#include "parser/ast_type.h"
+#include "simulator/dpi_arg_value.h"
 #include "simulator/dpi_runtime.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"

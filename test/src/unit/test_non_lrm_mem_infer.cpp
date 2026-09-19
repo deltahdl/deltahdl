@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_synthesizer.h"
+#include "parser/ast_stmt.h"
 #include "synthesizer/mem_infer.h"
 
 using namespace delta;

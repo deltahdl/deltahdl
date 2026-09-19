@@ -10,6 +10,8 @@
 // in the m1 that m instantiates, reaches m's instance n. These cases observe
 // the elaborator supporting each placement.
 
+#include <gtest/gtest.h>
+
 #include <cstdint>
 #include <string_view>
 

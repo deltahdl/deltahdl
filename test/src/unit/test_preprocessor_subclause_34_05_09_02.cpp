@@ -78,10 +78,11 @@
 #include <string>
 #include <string_view>
 
+#include "fixture_preprocessor.h"
 #include "fixture_protect_encoding.h"
 #include "helpers_reported_error.h"
+#include "helpers_text_lines.h"
 #include "preprocessor/protect_encoding.h"
-#include "preprocessor/protect_keywords.h"
 #include "preprocessor/protect_processing.h"
 
 using namespace delta;

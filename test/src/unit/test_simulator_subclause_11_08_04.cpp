@@ -1,3 +1,8 @@
+#include <gtest/gtest.h>
+
+#include <string>
+
+#include "common/types.h"
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/sim_context.h"

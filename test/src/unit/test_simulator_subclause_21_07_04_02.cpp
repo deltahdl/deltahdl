@@ -1,11 +1,10 @@
+#include <gtest/gtest.h>
+
 #include <cstdint>
 #include <string>
 
-#include "fixture_simulator.h"
-#include "fixture_vcd.h"
+#include "common/types.h"
 #include "fixture_vcd_dump_run.h"
-#include "helpers_vcd_logic4vec.h"
-#include "simulator/coverage.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 #include "simulator/vcd_writer.h"

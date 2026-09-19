@@ -1,3 +1,5 @@
+#include <gtest/gtest.h>
+
 #include "fixture_parser.h"
 
 // §A.9.4 white_space ::= space | tab | newline | formfeed | eof

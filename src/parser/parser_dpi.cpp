@@ -2,7 +2,10 @@
 #include <format>
 #include <string_view>
 
+#include "common/diagnostic.h"
 #include "common/types.h"
+#include "lexer/token.h"
+#include "parser/ast_module.h"
 #include "parser/parser.h"
 #include "parser/parser_dpi_validate.h"
 

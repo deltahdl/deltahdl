@@ -2,7 +2,9 @@
 
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
+#include "lexer/token.h"
 #include "model_gate_declaration.h"
+#include "parser/ast_expr.h"
 
 namespace {
 

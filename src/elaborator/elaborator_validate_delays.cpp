@@ -1,11 +1,12 @@
 #include <cmath>
+#include <cstdint>
 #include <format>
 #include <optional>
 
 #include "common/diagnostic.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator_helpers.h"
-#include "parser/ast.h"
+#include "parser/ast_expr.h"
 
 namespace delta {
 

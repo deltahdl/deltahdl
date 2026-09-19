@@ -1,8 +1,16 @@
+#include <cstddef>
 #include <format>
 #include <string_view>
 #include <unordered_set>
+#include <utility>
+#include <vector>
 
+#include "common/diagnostic.h"
 #include "common/types.h"
+#include "lexer/token.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_module.h"
+#include "parser/ast_type.h"
 #include "parser/parser.h"
 #include "parser/parser_dpi_validate.h"
 #include "parser/parser_token_skips.h"

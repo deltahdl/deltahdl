@@ -20,17 +20,22 @@
 // src/simulator/specify_timing_violation.cpp.
 
 #include <algorithm>
+#include <cstdint>
 #include <functional>
 #include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
 
+#include "common/types.h"
 #include "simulator/evaluation.h"
 #include "simulator/instance_prefix_override.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/specify.h"
+#include "simulator/specify_path_delay.h"
+#include "simulator/specify_sdf.h"
+#include "simulator/specify_timing_check.h"
 #include "simulator/variable.h"
 
 namespace delta {

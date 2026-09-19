@@ -3,7 +3,8 @@
 #include <vector>
 
 #include "elaborator/property_instance.h"
-#include "parser/ast.h"
+#include "parser/ast_module.h"
+#include "parser/ast_stmt.h"
 
 namespace delta {
 

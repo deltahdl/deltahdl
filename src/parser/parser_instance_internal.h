@@ -1,5 +1,7 @@
 #pragma once
 
+#include "parser/ast_expr.h"
+#include "parser/ast_module.h"
 #include "parser/parser.h"
 
 namespace delta {

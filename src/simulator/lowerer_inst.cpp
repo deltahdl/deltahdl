@@ -3,7 +3,8 @@
 
 #include "common/arena.h"
 #include "elaborator/rtlir.h"
-#include "parser/ast.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_type.h"
 #include "simulator/lowerer.h"
 #include "simulator/sim_context.h"
 

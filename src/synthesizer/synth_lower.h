@@ -5,6 +5,7 @@
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "common/arena.h"
@@ -12,6 +13,9 @@
 #include "common/packed_range.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/rtlir.h"
+#include "lexer/token.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_stmt.h"
 #include "synthesizer/aig.h"
 #include "synthesizer/synth_pattern.h"
 

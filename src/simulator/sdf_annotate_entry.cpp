@@ -22,14 +22,18 @@
 #include <algorithm>
 #include <array>
 #include <cstddef>
+#include <cstdint>
 #include <initializer_list>
 #include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
 
+#include "parser/ast_specify.h"
 #include "simulator/sdf_parser.h"
 #include "simulator/specify.h"
+#include "simulator/specify_path_delay.h"
+#include "simulator/specify_sdf.h"
 
 namespace delta {
 

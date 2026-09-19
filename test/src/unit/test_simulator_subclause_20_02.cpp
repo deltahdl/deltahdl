@@ -1,10 +1,12 @@
+#include <gtest/gtest.h>
+
 #include <iostream>
 #include <sstream>
 #include <streambuf>
+#include <string>
 
 #include "builders_systask.h"
 #include "fixture_simulator.h"
-#include "parser/ast.h"
 #include "simulator/evaluation.h"
 #include "simulator/variable.h"
 

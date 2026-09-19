@@ -6,6 +6,7 @@
 
 #include "simulator/assertion_api.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/sva_engine_sequences.h"
 
 namespace delta {
 

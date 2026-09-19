@@ -8,11 +8,19 @@
 #include <sstream>
 #include <streambuf>
 #include <string>
+#include <string_view>
 
-#include "fixture_elaborator.h"
+#include "common/diagnostic.h"
+#include "common/source_mgr.h"
+#include "common/types.h"
+#include "elaborator/elaborator.h"
+#include "lexer/lexer.h"
+#include "parser/parser.h"
 #include "simulator/lowerer.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
+
+using namespace delta;
 
 struct SimFixture {
   SourceManager mgr;

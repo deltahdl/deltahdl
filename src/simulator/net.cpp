@@ -1,8 +1,12 @@
 #include "simulator/net.h"
 
 #include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <vector>
 
 #include "common/arena.h"
+#include "common/types.h"
 #include "simulator/scheduler.h"
 #include "simulator/variable.h"
 

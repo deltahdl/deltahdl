@@ -1,9 +1,7 @@
 #pragma once
 
 #include <cstdint>
-#include <vector>
 
-#include "simulator/vpi_constants.h"
 #include "simulator/vpi_object.h"
 
 namespace delta {

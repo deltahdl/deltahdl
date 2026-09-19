@@ -1,8 +1,12 @@
+#include <gtest/gtest.h>
+
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
 
+#include "fixture_simulator.h"
 #include "helpers_preprocess_and_get.h"
+#include "preprocessor/preprocessor.h"
 
 TEST(FileAndLineMacroSimulation, LineExpandsToCorrectValue) {
   auto result = PreprocessAndGet(

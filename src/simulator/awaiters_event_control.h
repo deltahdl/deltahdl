@@ -26,7 +26,8 @@
 #include <vector>
 
 #include "common/types.h"
-#include "parser/ast.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_stmt.h"
 #include "simulator/clocking.h"
 #include "simulator/evaluation.h"
 #include "simulator/process.h"

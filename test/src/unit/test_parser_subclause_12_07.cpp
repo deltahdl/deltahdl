@@ -4,9 +4,14 @@
 // for_step_assignment) and loop_variables. The per-loop semantics live in the
 // descendant subclauses §12.7.1–§12.7.6 and are tested in their own files.
 // These tests observe the parser building the Syntax 12-5 grammar into the AST.
+#include <gtest/gtest.h>
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_stmt.h"
+#include "parser/ast_type.h"
 
 using namespace delta;
 namespace {

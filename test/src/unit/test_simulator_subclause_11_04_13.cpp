@@ -1,11 +1,15 @@
+#include <gtest/gtest.h>
+
+#include <cstdint>
+
 #include "builders_ast.h"
+#include "common/types.h"
 #include "fixture_simulator.h"
-#include "helpers_array.h"
 #include "helpers_eval_op.h"
 #include "helpers_lower_run.h"
 #include "helpers_queue.h"
-#include "parser/ast.h"
-#include "simulator/adv_sim.h"
+#include "lexer/token.h"
+#include "parser/ast_expr.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
 #include "simulator/sim_context.h"

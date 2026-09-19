@@ -1,15 +1,11 @@
-#include <cstdint>
+#include <gtest/gtest.h>
+
 #include <string>
 #include <vector>
 
-#include "fixture_simulator.h"
-#include "fixture_vcd.h"
 #include "fixture_vcd_dump_from_source.h"
 #include "fixture_vcd_dump_run.h"
 #include "helpers_text_lines.h"
-#include "simulator/coverage.h"
-#include "simulator/lowerer.h"
-#include "simulator/vcd_writer.h"
 
 namespace delta {
 namespace {

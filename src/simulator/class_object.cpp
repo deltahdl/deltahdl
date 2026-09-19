@@ -1,11 +1,17 @@
 #include "simulator/class_object.h"
 
 #include <algorithm>
+#include <cstddef>
+#include <cstdint>
 #include <memory>
+#include <string>
+#include <string_view>
 #include <unordered_set>
+#include <vector>
 
 #include "common/arena.h"
-#include "parser/ast.h"
+#include "common/types.h"
+#include "parser/ast_class.h"
 #include "simulator/statement_assign_internal.h"
 
 namespace delta {

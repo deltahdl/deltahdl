@@ -8,11 +8,12 @@
 
 #include "common/arena.h"
 #include "common/types.h"
-#include "parser/ast.h"
+#include "parser/ast_expr.h"
 #include "simulator/eval_string.h"
 #include "simulator/eval_systask_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
 
 namespace delta {

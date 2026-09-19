@@ -1,13 +1,14 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
 #include <string>
 
 #include "common/types.h"
-#include "fixture_elaborator.h"
 #include "fixture_simulator.h"
 #include "helpers_switch_settle.h"
-#include "model_gate_logic.h"
 #include "model_switch_eval.h"
+#include "model_val4.h"
+#include "simulator/lowerer.h"
 
 using namespace delta;
 

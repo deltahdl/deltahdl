@@ -1,11 +1,13 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "common/types.h"
 #include "fixture_preprocessor.h"
 #include "fixture_preprocessor_timescale.h"
-#include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
 #include "parser/time_resolve.h"
+#include "preprocessor/preprocessor.h"
 
 using namespace delta;
 

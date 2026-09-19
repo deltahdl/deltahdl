@@ -2,7 +2,6 @@
 
 #include <cstdint>
 #include <string>
-#include <utility>
 
 #include "fixture_simulator.h"
 #include "simulator/variable.h"

@@ -21,6 +21,8 @@
 // boolean is read out, or -- for the explicit inverse-of-atooct claim --
 // scanned back with atooct and the integer read out.
 
+#include <gtest/gtest.h>
+
 #include "helpers_scheduler.h"
 
 using namespace delta;

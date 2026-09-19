@@ -1,5 +1,7 @@
+#include <gtest/gtest.h>
+
+#include "common/types.h"
 #include "fixture_parser.h"
-#include "helpers_parser_verify.h"
 
 using namespace delta;
 

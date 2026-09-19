@@ -9,13 +9,12 @@
 // sv_vpi_user.h (listed in Annex M). PLI applications that use the VPI routines
 // shall include these files."
 //
-// The name is the whole of what this file adds. Every declaration below was
-// already compiled into the tool and already reachable, under the repository's
-// own spelling simulator/vpi.h, so what an application following the clause to
-// the letter was missing was not the library but the file the clause tells it
-// to include: a `#include "vpi_user.h"` found nothing, and the one file of the
-// two that did exist, simulator/sv_vpi_user.h, opened by including
-// simulator/vpi.h rather than the base file Annex M has it include.
+// This file is the one every translation unit that reaches the VPI includes,
+// under the name the clause gives it. Until 2026-09-18 the tool's own code
+// reached the same declarations through simulator/vpi.h, a one-line alias of
+// this file, and an application following the clause to the letter found
+// nothing under `#include "vpi_user.h"`; the alias is gone and the clause's
+// name is the only spelling.
 //
 // The two files divide the interface rather than repeating it, and each annex
 // says where its own half stops: Annex K reserves the constant values 1 through
@@ -54,7 +53,15 @@
 // Do not reorder the includes - each depends on types the ones above it
 // declare, and the PLI typedefs and macros come last, after the delta::
 // declarations they alias.
+//
+// The IWYU pragma marks the includes as this file's exports: Annex K makes
+// every declaration below part of vpi_user.h, and the sub-headers are only how
+// this repository stores that one file. clang-tidy's misc-include-cleaner,
+// which otherwise asks each translation unit to include the header that
+// declares each symbol it uses, reads the pragma and counts this file as
+// providing them.
 
+// IWYU pragma: begin_exports
 #include "simulator/vpi_compatibility.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
@@ -65,6 +72,7 @@
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_portability.h"
 #include "simulator/vpi_user_macros.h"
+// IWYU pragma: end_exports
 
 // §K.2: the file ends by taking back the portability macros it defined for
 // itself. PLI_EXTERN and PLI_VEXTERN go unconditionally; the two DLL

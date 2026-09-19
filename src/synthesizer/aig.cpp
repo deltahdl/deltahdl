@@ -1,6 +1,8 @@
 #include "synthesizer/aig.h"
 
 #include <algorithm>
+#include <cstddef>
+#include <cstdint>
 
 namespace delta {
 

@@ -4,10 +4,12 @@
 
 #include <cstdint>
 
-#include "fixture_simulator.h"
-#include "parser/ast.h"
+#include "common/types.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_stmt.h"
 #include "simulator/clocking.h"
 #include "simulator/evaluation.h"
+#include "simulator/variable.h"
 
 using namespace delta;
 

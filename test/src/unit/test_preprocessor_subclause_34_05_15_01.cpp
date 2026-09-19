@@ -22,17 +22,16 @@
 
 #include <string>
 #include <string_view>
+#include <utility>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "fixture_preprocessor.h"
-#include "fixture_program.h"
 #include "helpers_reported_error.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
 #include "preprocessor/preprocessor.h"
-#include "preprocessor/protect_keywords.h"
 #include "preprocessor/protect_processing.h"
 
 using namespace delta;

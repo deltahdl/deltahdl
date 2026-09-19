@@ -1,9 +1,13 @@
 #include "synthesizer/lut_map.h"
 
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <unordered_set>
+#include <utility>
 #include <vector>
+
+#include "synthesizer/aig.h"
 
 namespace delta {
 namespace {

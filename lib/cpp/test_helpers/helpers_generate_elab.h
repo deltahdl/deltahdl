@@ -5,7 +5,13 @@
 #include <string>
 #include <string_view>
 
+#include "elaborator/elaborator.h"
+#include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
+#include "lexer/lexer.h"
+#include "parser/ast_design.h"
+#include "parser/ast_module.h"
+#include "parser/parser.h"
 
 using namespace delta;
 

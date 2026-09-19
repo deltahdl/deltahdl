@@ -30,9 +30,14 @@
  * iteration. It is kept here after the methods the annex lists, at a number
  * the annex leaves unused, so that an application following the diagram can
  * write the iteration the diagram draws.
+ *
+ * The IWYU pragma on the include marks vpi_user.h as this file's export: the
+ * annex has this file bring the base file with it, so clang-tidy's
+ * misc-include-cleaner counts this file as providing the base declarations to
+ * a translation unit that names only this one.
  */
 
-#include "simulator/vpi_user.h"
+#include "simulator/vpi_user.h"  // IWYU pragma: export
 
 #ifdef __cplusplus
 extern "C" {

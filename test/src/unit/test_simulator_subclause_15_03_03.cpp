@@ -2,9 +2,7 @@
 
 #include <vector>
 
-#include "fixture_simulator.h"
 #include "helpers_semaphore_blocking_getter.h"
-#include "simulator/awaiters.h"
 #include "simulator/sync_objects.h"
 
 namespace {

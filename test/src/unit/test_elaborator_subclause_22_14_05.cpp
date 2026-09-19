@@ -1,7 +1,10 @@
+#include <gtest/gtest.h>
+
 #include <cstddef>
 #include <iterator>
 #include <string>
 
+#include "common/types.h"
 #include "fixture_elaborator.h"
 #include "helpers_included_keyword_elab.h"
 #include "helpers_keyword_sweep_skips.h"
@@ -9,6 +12,7 @@
 #include "helpers_reported_error.h"
 #include "helpers_rtlir_lookup.h"
 #include "model_keyword_tables.h"
+#include "parser/ast_type.h"
 
 using namespace delta;
 

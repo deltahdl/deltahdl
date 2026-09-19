@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "elaborator/rewrite_item.h"
-#include "parser/ast.h"
+#include "parser/ast_expr.h"
 
 using namespace delta;
 

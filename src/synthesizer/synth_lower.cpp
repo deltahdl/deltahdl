@@ -1,10 +1,19 @@
 #include "synthesizer/synth_lower.h"
 
+#include <cstdint>
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <vector>
 
+#include "common/diagnostic.h"
 #include "elaborator/elaborator_helpers.h"
+#include "elaborator/rtlir.h"
+#include "lexer/token.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_stmt.h"
+#include "parser/ast_type.h"
+#include "synthesizer/aig.h"
 #include "synthesizer/synth_pattern.h"
 
 namespace delta {

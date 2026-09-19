@@ -25,6 +25,7 @@
 #include <string_view>
 #include <unordered_map>
 
+#include "simulator/class_object.h"
 #include "simulator/sim_context_types.h"
 
 namespace delta {

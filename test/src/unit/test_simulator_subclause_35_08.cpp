@@ -1,7 +1,8 @@
+#include <gtest/gtest.h>
+
 #include <vector>
 
-#include "fixture_simulator.h"
-#include "parser/ast.h"
+#include "simulator/dpi_arg_value.h"
 #include "simulator/dpi_runtime.h"
 
 using namespace delta;

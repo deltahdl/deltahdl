@@ -4,7 +4,7 @@
 #include <cstdint>
 
 #include "model_val4.h"
-#include "parser/ast.h"
+#include "parser/ast_module.h"
 
 using delta::GateKind;
 

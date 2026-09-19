@@ -1,16 +1,19 @@
+#include <cstdint>
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
+#include "common/types.h"
 #include "elaborator/global_clocking_sampled_value.h"
 #include "elaborator/type_eval.h"
 #include "parser/assertion_control_task.h"
-#include "parser/ast.h"
+#include "parser/ast_expr.h"
 #include "simulator/coverage.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/eval_systask_internal.h"
@@ -18,9 +21,11 @@
 #include "simulator/process.h"
 #include "simulator/sdf_parser.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
 #include "simulator/vcd_writer.h"
 #include "simulator/vpi_context.h"
+#include "simulator/vpi_globals.h"
 
 namespace delta {
 

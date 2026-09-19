@@ -1,4 +1,10 @@
+#include <gtest/gtest.h>
+
+#include <cstdint>
+#include <string>
+
 #include "builders_ast.h"
+#include "common/types.h"
 #include "fixture_simulator.h"
 #include "simulator/evaluation.h"
 

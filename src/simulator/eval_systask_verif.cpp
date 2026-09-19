@@ -1,3 +1,4 @@
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -6,14 +7,17 @@
 #include <vector>
 
 #include "common/arena.h"
+#include "common/types.h"
 #include "parser/assertion_control_task.h"
-#include "parser/ast.h"
+#include "parser/ast_expr.h"
 #include "simulator/coverage_control.h"
 #include "simulator/eval_systask_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/expr_walk.h"
 #include "simulator/sim_context.h"
-#include "simulator/sva_engine.h"
+#include "simulator/sim_context_types.h"
+#include "simulator/sva_engine_queues.h"
+#include "simulator/sva_engine_sampling.h"
 #include "simulator/variable.h"
 
 namespace delta {

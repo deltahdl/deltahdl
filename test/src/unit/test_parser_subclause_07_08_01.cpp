@@ -1,5 +1,6 @@
+#include <gtest/gtest.h>
+
 #include "elaborator/elaborator.h"
-#include "elaborator/rtlir.h"
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 

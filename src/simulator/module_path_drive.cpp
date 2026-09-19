@@ -25,7 +25,6 @@
 #include <cstdint>
 
 #include "common/types.h"
-#include "parser/ast.h"
 #include "simulator/awaiters.h"
 #include "simulator/evaluation.h"
 #include "simulator/exec_task.h"

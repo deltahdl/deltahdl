@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 
 #include "elaborator/checker_rewrite.h"
+#include "parser/ast_module.h"
+#include "parser/ast_type.h"
 
 using namespace delta;
 

@@ -6,12 +6,9 @@
 #include <string>
 #include <string_view>
 
-#include "common/arena.h"
 #include "elaborator/elaborator.h"
-#include "elaborator/rtlir.h"
 #include "fixture_library_design.h"
 #include "fixture_scratch_dir.h"
-#include "parser/ast.h"
 #include "simulator/lowerer.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"

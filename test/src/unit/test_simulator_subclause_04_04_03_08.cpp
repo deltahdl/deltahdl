@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include <string>
+#include <cstdint>
 #include <vector>
 
 #include "common/arena.h"
@@ -8,10 +8,8 @@
 #include "fixture_simulator.h"
 #include "helpers_region_callback.h"
 #include "helpers_scheduler_event.h"
-#include "simulator/coverage.h"
 #include "simulator/lowerer.h"
 #include "simulator/scheduler.h"
-#include "simulator/variable.h"
 
 using namespace delta;
 

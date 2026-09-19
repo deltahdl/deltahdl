@@ -1,5 +1,12 @@
+#include <gtest/gtest.h>
+
+#include <cstdint>
+#include <string>
+
+#include "fixture_simulator.h"
 #include "helpers_include_test_dir.h"
 #include "helpers_preprocess_and_get.h"
+#include "preprocessor/preprocessor.h"
 
 static uint64_t PreprocessAndGet(IncludeTestDir& tmp,
                                  const std::string& main_src,

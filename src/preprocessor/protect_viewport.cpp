@@ -2,7 +2,6 @@
 
 #include <string>
 #include <string_view>
-#include <vector>
 
 #include "preprocessor/protect_keywords.h"
 #include "preprocessor/protect_pragma_line.h"

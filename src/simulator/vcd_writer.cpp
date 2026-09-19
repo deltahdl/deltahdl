@@ -1,9 +1,15 @@
 #include "simulator/vcd_writer.h"
 
+#include <cstdint>
 #include <cstdio>
 #include <ctime>
 #include <iosfwd>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
 
+#include "common/types.h"
 #include "parser/ast_type.h"
 #include "simulator/evaluation.h"
 #include "simulator/net.h"

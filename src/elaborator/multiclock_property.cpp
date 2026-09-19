@@ -1,5 +1,9 @@
 #include "elaborator/multiclock_property.h"
 
+#include <string>
+#include <string_view>
+#include <vector>
+
 namespace delta {
 
 bool IsMulticlockedProperty(std::string_view property_clock,

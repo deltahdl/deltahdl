@@ -5,8 +5,6 @@
 #include <string_view>
 #include <vector>
 
-#include "simulator/vpi_constants.h"
-#include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_object.h"
 
 namespace delta {

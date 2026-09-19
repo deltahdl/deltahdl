@@ -1,17 +1,13 @@
 #include <gtest/gtest.h>
 
-#include <cstdint>
-#include <string_view>
-#include <vector>
-
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
-#include "common/types.h"
-#include "fixture_simulator.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
-#include "simulator/sva_engine.h"
+#include "simulator/sva_engine_properties.h"
+#include "simulator/sva_engine_queues.h"
+#include "simulator/sva_engine_sequences.h"
 
 using namespace delta;
 

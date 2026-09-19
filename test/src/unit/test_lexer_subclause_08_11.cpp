@@ -4,6 +4,7 @@
 
 #include "fixture_lexer.h"
 #include "lexer/keywords.h"
+#include "lexer/token.h"
 
 using namespace delta;
 

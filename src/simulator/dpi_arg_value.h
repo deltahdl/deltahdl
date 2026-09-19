@@ -7,8 +7,8 @@
 #include <string_view>
 #include <vector>
 
-#include "common/types.h"
-#include "parser/ast.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_type.h"
 
 namespace delta {
 

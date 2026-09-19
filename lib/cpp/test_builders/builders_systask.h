@@ -3,10 +3,12 @@
 #include <cstdint>
 #include <cstring>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "common/arena.h"
-#include "parser/ast.h"
+#include "common/types.h"
+#include "parser/ast_expr.h"
 
 using namespace delta;
 

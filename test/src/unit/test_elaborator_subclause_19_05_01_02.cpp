@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "elaborator/coverpoint_bin_set_expression.h"
-#include "parser/ast.h"
+#include "parser/ast_type.h"
 
 using namespace delta;
 

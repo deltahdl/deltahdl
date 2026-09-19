@@ -8,11 +8,9 @@
 #include "fixture_preprocessor.h"
 #include "helpers_protect_keyword_value.h"
 #include "helpers_reported_error.h"
-#include "helpers_text_lines.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_keywords.h"
 #include "preprocessor/protect_license.h"
-#include "preprocessor/protect_processing.h"
 
 using namespace delta;
 

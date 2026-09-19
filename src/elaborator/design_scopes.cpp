@@ -5,7 +5,8 @@
 #include <vector>
 
 #include "elaborator/elaborator_validate_internal.h"
-#include "parser/ast.h"
+#include "elaborator/rtlir.h"
+#include "parser/ast_stmt.h"
 
 namespace delta {
 

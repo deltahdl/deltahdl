@@ -1,5 +1,7 @@
 #include "elaborator/inferred_clock_disable.h"
 
+#include <string_view>
+
 namespace delta {
 
 InferredFunction ClassifyInferredFunction(

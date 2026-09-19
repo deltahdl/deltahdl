@@ -1,7 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+
 #include "common/types.h"
-#include "fixture_lexer.h"
 
 using namespace delta;
 

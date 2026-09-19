@@ -19,14 +19,21 @@
 // eval_array.cpp; whole-queue assignment discarding all ids lives in
 // statement_assign.cpp / statement_assign_core.cpp.
 
+#include <gtest/gtest.h>
+
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
+#include <utility>
 #include <vector>
 
 #include "builders_ast.h"
+#include "common/types.h"
 #include "fixture_simulator.h"
 #include "helpers_queue.h"
-#include "parser/ast.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_stmt.h"
+#include "parser/ast_type.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
 

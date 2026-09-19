@@ -2,6 +2,8 @@
 
 #include <gtest/gtest.h>
 
+#include <cstdint>
+
 #include "common/types.h"
 
 using namespace delta;

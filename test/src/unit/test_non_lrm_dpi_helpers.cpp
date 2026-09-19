@@ -1,11 +1,11 @@
 #include <gtest/gtest.h>
 
-#include <cstdint>
 #include <string>
 #include <vector>
 
+#include "parser/ast_type.h"
+#include "simulator/dpi_arg_value.h"
 #include "simulator/dpi_runtime.h"
-#include "simulator/svdpi.h"
 
 using namespace delta;
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
@@ -10,7 +11,6 @@
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/lexer.h"
-#include "parser/ast.h"
 #include "parser/library_map.h"
 #include "parser/parser.h"
 

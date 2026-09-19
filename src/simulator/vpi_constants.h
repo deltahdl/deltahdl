@@ -1,14 +1,6 @@
 #pragma once
 
 #include <cstdarg>
-#include <cstdint>
-#include <string>
-#include <string_view>
-#include <unordered_map>
-#include <vector>
-
-#include "common/types.h"
-#include "simulator/coverage_control.h"
 
 namespace delta {
 

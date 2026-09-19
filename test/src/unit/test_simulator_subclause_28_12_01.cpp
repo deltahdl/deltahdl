@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "common/arena.h"
+#include "common/types.h"
 #include "fixture_simulator.h"
 #include "simulator/net.h"
 #include "simulator/scheduler.h"

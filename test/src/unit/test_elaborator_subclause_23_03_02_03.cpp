@@ -1,10 +1,11 @@
-#include "common/types.h"
+#include <gtest/gtest.h>
+
 #include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"
 #include "fixture_elaborator.h"
 #include "helpers_port_connection_elab.h"
 #include "helpers_reported_error.h"
-#include "lexer/token.h"
+#include "parser/ast_expr.h"
 
 using namespace delta;
 

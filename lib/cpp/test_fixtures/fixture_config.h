@@ -8,7 +8,7 @@
 #include "common/source_mgr.h"
 #include "gtest/gtest.h"
 #include "lexer/lexer.h"
-#include "parser/ast.h"
+#include "parser/ast_design.h"
 #include "parser/parser.h"
 
 using namespace delta;

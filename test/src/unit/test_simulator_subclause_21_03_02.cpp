@@ -1,3 +1,6 @@
+#include <gtest/gtest.h>
+
+#include <cstdint>
 #include <cstdio>
 #include <fstream>
 #include <sstream>
@@ -6,9 +9,7 @@
 #include "builders_ast.h"
 #include "builders_systask.h"
 #include "fixture_simulator.h"
-#include "helpers_parser_verify.h"
 #include "simulator/evaluation.h"
-#include "simulator/sim_context.h"
 
 using namespace delta;
 namespace {

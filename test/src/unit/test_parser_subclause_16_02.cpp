@@ -8,6 +8,8 @@
 // property left unchecked draws no report, since leaving it unchecked is what
 // the clause specifies rather than a shortfall of the tool.
 
+#include <gtest/gtest.h>
+
 #include "fixture_parser.h"
 #include "helpers_reported_error.h"
 

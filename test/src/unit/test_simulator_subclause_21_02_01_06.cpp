@@ -3,8 +3,6 @@
 #include <string>
 
 #include "fixture_simulator.h"
-#include "simulator/evaluation.h"
-#include "simulator/sim_context.h"
 
 using namespace delta;
 

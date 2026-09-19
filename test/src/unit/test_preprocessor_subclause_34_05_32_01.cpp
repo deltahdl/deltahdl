@@ -9,7 +9,6 @@
 #include "helpers_protect_viewport.h"
 #include "helpers_reported_error.h"
 #include "preprocessor/preprocessor.h"
-#include "preprocessor/protect_viewport.h"
 
 using namespace delta;
 

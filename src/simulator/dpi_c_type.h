@@ -7,6 +7,7 @@
 #include <string_view>
 #include <vector>
 
+#include "parser/ast_type.h"
 #include "simulator/dpi_arg_value.h"
 #include "simulator/svdpi_open_array.h"
 

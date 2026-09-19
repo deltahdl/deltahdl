@@ -1,19 +1,14 @@
-#include <cstdint>
+#include <gtest/gtest.h>
+
 #include <string>
 #include <string_view>
 
 #include "builders_ast.h"
-#include "common/types.h"
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 #include "helpers_stmt_exec.h"
-#include "parser/ast.h"
-#include "simulator/awaiters.h"
-#include "simulator/exec_task.h"
-#include "simulator/process.h"
 #include "simulator/stmt_exec.h"
 #include "simulator/stmt_result.h"
-#include "simulator/variable.h"
 
 using namespace delta;
 

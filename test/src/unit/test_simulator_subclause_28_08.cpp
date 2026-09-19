@@ -1,8 +1,15 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <vector>
+
+#include "common/types.h"
 #include "helpers_switch_network.h"
 #include "model_switch_eval.h"
+#include "simulator/net.h"
 #include "simulator/scheduler.h"
+#include "simulator/switch_network.h"
+#include "simulator/variable.h"
 
 namespace {
 

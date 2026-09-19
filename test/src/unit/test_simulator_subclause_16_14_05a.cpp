@@ -1,7 +1,5 @@
 #include <gtest/gtest.h>
 
-#include <cstdint>
-
 #include "fixture_simulator.h"
 
 // §16.14.5 "Using concurrent assertion statements outside procedural code".

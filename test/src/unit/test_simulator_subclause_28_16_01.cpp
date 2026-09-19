@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <string>
 
+#include "common/types.h"
 #include "fixture_simulator.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"

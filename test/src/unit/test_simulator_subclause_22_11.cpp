@@ -7,7 +7,11 @@
 // lower -> simulate pipeline, and check the simulated values are the ones the
 // pragma-free source produces.
 
+#include <gtest/gtest.h>
+
+#include "fixture_simulator.h"
 #include "helpers_preprocess_and_get.h"
+#include "preprocessor/preprocessor.h"
 
 namespace {
 

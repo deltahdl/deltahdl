@@ -1,8 +1,12 @@
+#include <gtest/gtest.h>
+
 #include <string>
+#include <string_view>
 
 #include "builders_systask.h"
+#include "common/types.h"
 #include "fixture_simulator.h"
-#include "parser/ast.h"
+#include "parser/ast_expr.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 

@@ -20,13 +20,13 @@
 
 #include <gtest/gtest.h>
 
+#include <cstdint>
 #include <string>
 #include <string_view>
 
 #include "builders_systask.h"
 #include "fixture_simulator.h"
 #include "helpers_coverage_syscall.h"
-#include "parser/ast.h"
 #include "simulator/coverage_control.h"
 #include "simulator/evaluation.h"
 

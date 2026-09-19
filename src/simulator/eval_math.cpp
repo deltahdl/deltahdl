@@ -1,15 +1,17 @@
 #include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <string>
 #include <string_view>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/types.h"
-#include "parser/ast.h"
+#include "parser/ast_expr.h"
 #include "simulator/evaluation.h"
 #include "simulator/probabilistic_distribution.h"
 #include "simulator/sim_context.h"
+#include "simulator/variable.h"
 
 namespace delta {
 

@@ -3,6 +3,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <utility>
 
 #include "elaborator/annex_f_derived_forms.h"
 #include "elaborator/annex_f_grammar.h"

@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_elaborator.h"
+#include "parser/ast_stmt.h"
 
 using namespace delta;
 

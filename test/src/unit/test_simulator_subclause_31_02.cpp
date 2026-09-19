@@ -60,6 +60,7 @@
 #include <string_view>
 
 #include "fixture_simulator.h"
+#include "parser/ast_specify.h"
 #include "simulator/lowerer.h"
 #include "simulator/sim_context.h"
 #include "simulator/specify.h"

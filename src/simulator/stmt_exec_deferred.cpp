@@ -1,4 +1,3 @@
-#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -10,13 +9,16 @@
 #include <vector>
 
 #include "common/arena.h"
+#include "common/types.h"
 #include "elaborator/global_clocking_sampled_value.h"
 #include "elaborator/type_eval.h"
-#include "parser/ast.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_stmt.h"
 #include "simulator/awaiters_event_control.h"
 #include "simulator/cover_results.h"
 #include "simulator/cover_statement.h"
 #include "simulator/evaluation.h"
+#include "simulator/exec_task.h"
 #include "simulator/expr_walk.h"
 #include "simulator/instance_bindings.h"
 #include "simulator/procedural_assertion.h"
@@ -30,7 +32,8 @@
 #include "simulator/stmt_exec.h"
 #include "simulator/stmt_exec_assertion_internal.h"
 #include "simulator/stmt_exec_internal.h"
-#include "simulator/sva_engine.h"
+#include "simulator/stmt_result.h"
+#include "simulator/sva_engine_queues.h"
 #include "simulator/sva_engine_sampling.h"
 
 namespace delta {

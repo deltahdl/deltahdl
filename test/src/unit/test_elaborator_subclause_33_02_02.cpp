@@ -36,10 +36,14 @@
 // The decoy cell of each pair is declared first throughout, so a binding that
 // ignored the library named by the clause under test would fall to the
 // first-declared copy and the expected library would never come out.
+#include <gtest/gtest.h>
+
 #include <string>
 #include <string_view>
 #include <vector>
 
+#include "elaborator/elaborator.h"
+#include "elaborator/rtlir.h"
 #include "fixture_config_unit.h"
 #include "fixture_library_design.h"
 #include "fixture_scratch_dir.h"

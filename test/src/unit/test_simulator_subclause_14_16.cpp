@@ -1,9 +1,14 @@
+#include <gtest/gtest.h>
+
+#include <cstdint>
 #include <string>
 
 #include "common/types.h"
 #include "fixture_simulator.h"
 #include "helpers_clocking.h"
+#include "parser/ast_stmt.h"
 #include "simulator/clocking.h"
+#include "simulator/net.h"
 #include "simulator/variable.h"
 
 using namespace delta;

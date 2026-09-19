@@ -15,7 +15,8 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/rtlir.h"
-#include "parser/ast.h"
+#include "parser/ast_design.h"
+#include "parser/ast_module.h"
 #include "parser/precompiled_library.h"
 
 namespace delta {

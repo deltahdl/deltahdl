@@ -23,6 +23,10 @@
 // operands from real source and drives them through the full pipeline (parse ->
 // elaborate -> lower -> run).
 
+#include <gtest/gtest.h>
+
+#include <cstdint>
+
 #include "helpers_scheduler.h"
 
 using namespace delta;

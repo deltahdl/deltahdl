@@ -1,12 +1,19 @@
 #include "lexer/lexer.h"
 
 #include <cctype>
+#include <cstddef>
+#include <cstdint>
 #include <format>
 #include <limits>
 #include <string>
+#include <string_view>
+#include <vector>
 
+#include "common/diagnostic.h"
 #include "common/lexical_limits.h"
+#include "common/source_loc.h"
 #include "lexer/keywords.h"
+#include "lexer/token.h"
 
 namespace delta {
 

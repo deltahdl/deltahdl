@@ -3,9 +3,11 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <vector>
 
-#include "parser/ast.h"
-#include "simulator/specify.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_specify.h"
+#include "simulator/specify_timing_check.h"
 
 namespace delta {
 

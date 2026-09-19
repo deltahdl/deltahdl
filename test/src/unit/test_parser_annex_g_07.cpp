@@ -17,6 +17,8 @@
 // instance and static method calls all parse without any user
 // `class weak_reference` definition.
 
+#include <gtest/gtest.h>
+
 #include "fixture_parser.h"
 
 using namespace delta;

@@ -1,3 +1,5 @@
+#include <gtest/gtest.h>
+
 #include "elaborator/sequence_method.h"
 #include "fixture_elaborator.h"
 

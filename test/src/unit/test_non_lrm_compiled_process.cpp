@@ -1,9 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
-#include "parser/ast.h"
+#include "parser/ast_stmt.h"
 #include "simulator/compiled_sim.h"
 #include "simulator/sim_context.h"
 

@@ -4,7 +4,11 @@
 #include <unordered_set>
 #include <vector>
 
-#include "parser/ast.h"
+#include "elaborator/type_eval.h"
+#include "parser/ast_class.h"
+#include "parser/ast_design.h"
+#include "parser/ast_module.h"
+#include "parser/ast_type.h"
 
 namespace delta {
 

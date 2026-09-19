@@ -23,7 +23,9 @@
 #include <string>
 #include <string_view>
 
+#include "fixture_simulator.h"
 #include "helpers_preprocess_and_get.h"
+#include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_processing.h"
 
 namespace {

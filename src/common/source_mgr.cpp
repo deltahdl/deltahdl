@@ -1,6 +1,13 @@
 #include "common/source_mgr.h"
 
+#include <cstdint>
 #include <format>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
+
+#include "common/source_loc.h"
 
 namespace delta {
 

@@ -1,7 +1,12 @@
+#include <gtest/gtest.h>
+
+#include <cstdint>
 #include <string>
 
 #include "builders_ast.h"
+#include "common/types.h"
 #include "fixture_simulator.h"
+#include "lexer/token.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"

@@ -4,9 +4,9 @@
 #include <string_view>
 
 #include "common/arena.h"
+#include "common/diagnostic.h"
 #include "common/packed_range.h"
 #include "common/types.h"
-#include "parser/ast.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"

@@ -5,7 +5,8 @@
 #include <vector>
 
 #include "fixture_simulator.h"
-#include "simulator/sva_engine.h"
+#include "simulator/sva_engine_properties.h"
+#include "simulator/sva_engine_sequences.h"
 #include "simulator/variable.h"
 
 using namespace delta;

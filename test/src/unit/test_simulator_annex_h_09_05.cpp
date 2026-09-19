@@ -4,11 +4,13 @@
 #include <string_view>
 #include <vector>
 
+#include "parser/ast_type.h"
 #include "simulator/dpi_arg_value.h"
 #include "simulator/dpi_context.h"
 #include "simulator/dpi_runtime.h"
 #include "simulator/sv_vpi_user.h"
-#include "simulator/vpi.h"
+#include "simulator/vpi_globals.h"
+#include "simulator/vpi_user.h"
 
 using namespace delta;
 

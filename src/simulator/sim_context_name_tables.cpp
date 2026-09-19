@@ -20,7 +20,9 @@
 #include <string>
 #include <string_view>
 
+#include "parser/ast_type.h"
 #include "simulator/sim_context_types.h"
+#include "simulator/variable.h"
 
 namespace delta {
 

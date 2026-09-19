@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <string>
@@ -7,13 +8,17 @@
 
 #include "common/arena.h"
 #include "common/packed_range.h"
-#include "parser/ast.h"
+#include "common/types.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_stmt.h"
 #include "simulator/eval_array.h"
 #include "simulator/evaluation.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
+#include "simulator/stmt_result.h"
 #include "simulator/variable.h"
 
 namespace delta {

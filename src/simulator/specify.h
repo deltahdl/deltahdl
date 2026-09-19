@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <string>
@@ -9,8 +10,11 @@
 #include <vector>
 
 #include "common/types.h"
-#include "parser/ast.h"
+#include "parser/ast_module.h"
+#include "parser/ast_specify.h"
+#include "simulator/specify_path_delay.h"
 #include "simulator/specify_sdf.h"
+#include "simulator/specify_timing_check.h"
 
 namespace delta {
 

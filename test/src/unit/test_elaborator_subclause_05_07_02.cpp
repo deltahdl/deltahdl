@@ -1,6 +1,11 @@
+#include <gtest/gtest.h>
+
+#include <cstdint>
+
 #include "elaborator/type_eval.h"
 #include "fixture_elaborator.h"
 #include "fixture_evaluator.h"
+#include "parser/ast_expr.h"
 
 using namespace delta;
 

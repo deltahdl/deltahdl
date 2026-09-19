@@ -1,13 +1,18 @@
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
-#include "parser/ast.h"
+#include "common/types.h"
+#include "lexer/token.h"
+#include "parser/ast_expr.h"
+#include "simulator/class_object.h"
 #include "simulator/evaluation.h"
 #include "simulator/queue_bound.h"
 #include "simulator/sim_context.h"

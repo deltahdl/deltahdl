@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "common/types.h"
+#include "simulator/checker_instance_scheduling.h"
 #include "simulator/checker_variable_randomization.h"
 
 using namespace delta;

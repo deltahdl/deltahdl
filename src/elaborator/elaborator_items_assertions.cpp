@@ -10,6 +10,7 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_internal.h"
+#include "elaborator/global_clocking_sampled_value.h"
 #include "elaborator/multiclock_sequence_rules.h"
 #include "elaborator/property_instance.h"
 #include "elaborator/property_rewrite.h"
@@ -17,7 +18,9 @@
 #include "elaborator/semantic_leading_clocks.h"
 #include "elaborator/sequence_match_class.h"
 #include "lexer/token.h"
-#include "parser/ast.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_module.h"
+#include "parser/ast_stmt.h"
 #include "parser/expr_substitute.h"
 
 namespace delta {

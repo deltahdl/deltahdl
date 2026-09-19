@@ -9,8 +9,9 @@
 // built from the real `int aa[*];` declaration syntax (dependency §7.8/§7.8.1)
 // and driven through the elaborator, rather than hand-building the rejection.
 
+#include <gtest/gtest.h>
+
 #include "elaborator/elaborator.h"
-#include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 

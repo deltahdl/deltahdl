@@ -1,12 +1,12 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <vector>
 
-#include "common/arena.h"
 #include "fixture_simulator.h"
 #include "helpers_vpi_delays_fixture.h"
-#include "simulator/scheduler.h"
-#include "simulator/vpi.h"
+#include "simulator/vpi_globals.h"
+#include "simulator/vpi_user.h"
 
 namespace delta {
 namespace {

@@ -1,17 +1,22 @@
+#include <cstdint>
 #include <cstdlib>
 #include <format>
 #include <functional>
 #include <optional>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
+#include "common/types.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/rtlir.h"
-#include "parser/ast.h"
+#include "lexer/token.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_module.h"
 
 namespace delta {
 

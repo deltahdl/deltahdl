@@ -3,6 +3,8 @@
 #include "simulator/svdpi.h"
 
 #include <cstdarg>
+#include <cstddef>
+#include <cstdint>
 #include <map>
 #include <utility>
 #include <vector>

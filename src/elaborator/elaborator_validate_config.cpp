@@ -1,5 +1,5 @@
 #include <algorithm>
-#include <cmath>
+#include <cstddef>
 #include <format>
 #include <map>
 #include <string>
@@ -15,7 +15,9 @@
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
-#include "parser/ast.h"
+#include "parser/ast_design.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_module.h"
 
 namespace delta {
 

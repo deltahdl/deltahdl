@@ -1,8 +1,7 @@
-#include "fixture_simulator.h"
-#include "helpers_clocking.h"
-#include "helpers_eval_op.h"
+#include <gtest/gtest.h>
+
+#include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
-#include "helpers_scheduler.h"
 
 using namespace delta;
 

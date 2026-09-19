@@ -1,4 +1,15 @@
+#include <gtest/gtest.h>
+
+#include <string>
+#include <string_view>
+
+#include "common/diagnostic.h"
 #include "fixture_parser.h"
+#include "lexer/lexer.h"
+#include "parser/ast_design.h"
+#include "parser/ast_module.h"
+#include "parser/parser.h"
+#include "preprocessor/preprocessor.h"
 
 using namespace delta;
 

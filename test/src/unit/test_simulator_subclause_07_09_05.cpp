@@ -9,7 +9,10 @@
 // object. The index type is supplied through each dependency's real key syntax:
 // integral keys (7.8.4) and string keys (7.8.2).
 
-#include "fixture_simulator.h"
+#include <gtest/gtest.h>
+
+#include <cstdint>
+
 #include "helpers_scheduler.h"
 
 using namespace delta;

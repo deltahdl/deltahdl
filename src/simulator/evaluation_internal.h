@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 #include "common/types.h"
 #include "lexer/token.h"
 

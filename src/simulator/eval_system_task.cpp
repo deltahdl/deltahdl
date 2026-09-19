@@ -6,12 +6,15 @@
 #include <optional>
 #include <ostream>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/packed_range.h"
-#include "parser/ast.h"
+#include "common/types.h"
+#include "lexer/token.h"
+#include "parser/ast_expr.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/net.h"
@@ -19,6 +22,7 @@
 #include "simulator/process.h"
 #include "simulator/scope_hier_name.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
 #include "simulator/variable.h"
 #include "simulator/vcd_writer.h"

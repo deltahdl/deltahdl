@@ -1,3 +1,5 @@
+#include <gtest/gtest.h>
+
 #include "fixture_parser.h"
 #include "helpers_assoc_array_index_dim.h"
 

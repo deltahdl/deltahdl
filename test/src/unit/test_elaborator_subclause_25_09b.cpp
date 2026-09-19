@@ -44,6 +44,8 @@
 // far would bar a call argument in a procedural statement, which the same
 // sentence permits, and a call carrying no virtual interface at all.
 
+#include <gtest/gtest.h>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 

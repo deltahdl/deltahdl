@@ -15,8 +15,11 @@
 // initializer, so the literal / parameter / localparam value forms are each
 // exercised (they take different constant-evaluation paths).
 
+#include <gtest/gtest.h>
+
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
+#include "simulator/lowerer.h"
 
 using namespace delta;
 

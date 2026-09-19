@@ -14,8 +14,11 @@
 // makes both the value and its real-ness directly observable, and %g maps
 // straight to the C library's own formatting so a printed value that matches
 // the C function is exactly the "matches C" requirement.
+#include <gtest/gtest.h>
+
 #include <cmath>
 #include <cstdio>
+#include <string>
 
 #include "fixture_simulator.h"
 

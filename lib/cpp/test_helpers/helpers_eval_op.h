@@ -1,10 +1,12 @@
 #pragma once
 
+#include <cstdint>
 #include <cstring>
+#include <string_view>
 
-#include "builders_ast.h"
+#include "common/types.h"
 #include "fixture_simulator.h"
-#include "parser/ast.h"
+#include "simulator/variable.h"
 
 using namespace delta;
 

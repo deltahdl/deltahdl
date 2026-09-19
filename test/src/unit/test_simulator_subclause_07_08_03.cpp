@@ -1,9 +1,14 @@
+#include <gtest/gtest.h>
+
 #include <algorithm>
+#include <cstdint>
 #include <vector>
 
+#include "common/types.h"
 #include "fixture_simulator.h"
 #include "helpers_class_object.h"
 #include "simulator/class_object.h"
+#include "simulator/sim_context_types.h"
 
 using namespace delta;
 

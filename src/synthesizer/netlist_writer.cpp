@@ -1,10 +1,15 @@
 #include "synthesizer/netlist_writer.h"
 
 #include <algorithm>
+#include <cstddef>
+#include <cstdint>
 #include <initializer_list>
 #include <string>
+#include <string_view>
 #include <unordered_set>
 #include <vector>
+
+#include "synthesizer/aig.h"
 
 namespace delta {
 namespace {

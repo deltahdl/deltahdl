@@ -1,3 +1,11 @@
+#include <cstdint>
+#include <string_view>
+
+#include "common/diagnostic.h"
+#include "common/source_loc.h"
+#include "lexer/token.h"
+#include "parser/ast_module.h"
+#include "parser/ast_type.h"
 #include "parser/parser.h"
 #include "parser/parser_sequence_property_decl_internal.h"
 

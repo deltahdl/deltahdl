@@ -1,6 +1,8 @@
 #include "common/types.h"
 
 #include <cmath>
+#include <cstdint>
+#include <string>
 #include <string_view>
 #include <utility>
 

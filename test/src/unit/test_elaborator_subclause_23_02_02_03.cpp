@@ -1,6 +1,9 @@
 
+#include <gtest/gtest.h>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
+#include "parser/ast_type.h"
 
 namespace {
 

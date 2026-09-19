@@ -6,8 +6,11 @@
 // that spells parameters with '#(...)' is defined in 33.4.3, not here, so the
 // use_clause cases below exercise only the named_parameter_assignment list form
 // that this subclause's grammar defines.
+#include <gtest/gtest.h>
+
 #include "fixture_parser.h"
 #include "helpers_reported_error.h"
+#include "parser/ast_design.h"
 
 using namespace delta;
 

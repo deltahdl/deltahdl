@@ -4,7 +4,7 @@
 #include <unordered_set>
 #include <vector>
 
-#include "elaborator/elaborator_helpers.h"
+#include "elaborator/type_eval.h"
 #include "parser/ast_type.h"
 
 namespace delta {

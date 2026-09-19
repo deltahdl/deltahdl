@@ -1,5 +1,13 @@
+#include <gtest/gtest.h>
+
+#include <string>
+
+#include "common/diagnostic.h"
 #include "fixture_parser.h"
 #include "helpers_include_test_dir.h"
+#include "lexer/lexer.h"
+#include "parser/parser.h"
+#include "preprocessor/preprocessor.h"
 
 using namespace delta;
 

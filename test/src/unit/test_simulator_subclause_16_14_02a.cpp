@@ -1,10 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <cstdint>
 #include <vector>
 
-#include "common/types.h"
-#include "simulator/sva_engine.h"
+#include "simulator/sva_engine_queues.h"
 
 using namespace delta;
 

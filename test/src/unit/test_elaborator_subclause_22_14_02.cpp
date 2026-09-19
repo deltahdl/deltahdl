@@ -1,5 +1,9 @@
+#include <gtest/gtest.h>
+
+#include <cstdint>
 #include <string>
 
+#include "common/types.h"
 #include "fixture_elaborator.h"
 #include "helpers_keyword_version.h"
 #include "helpers_reported_error.h"

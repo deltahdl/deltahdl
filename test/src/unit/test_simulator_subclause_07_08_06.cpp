@@ -17,6 +17,11 @@
 // `integer`) can carry x/z into an index, so the x/z cases route the unknown
 // value through such a variable.
 
+#include <gtest/gtest.h>
+
+#include <cstdint>
+#include <string>
+
 #include "fixture_simulator.h"
 #include "helpers_reported_error.h"
 #include "helpers_scheduler.h"

@@ -1,6 +1,13 @@
 #include <cctype>
+#include <cstddef>
 #include <cstdint>
+#include <string>
+#include <string_view>
+#include <vector>
 
+#include "common/diagnostic.h"
+#include "common/source_loc.h"
+#include "common/types.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/preprocessor_internal.h"
 #include "preprocessor/protect_envelope.h"

@@ -1,4 +1,4 @@
-#include "simulator/vpi.h"
+#include "simulator/vpi_user.h"
 // §37.65 detail 1's named event and §37.69's repeat control are defined in the
 // SystemVerilog VPI header alongside the timing-control kinds themselves.
 #include "simulator/sv_vpi_user.h"

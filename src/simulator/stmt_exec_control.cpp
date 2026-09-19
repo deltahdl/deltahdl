@@ -1,3 +1,4 @@
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -7,14 +8,18 @@
 #include "common/diagnostic.h"
 #include "common/types.h"
 #include "elaborator/type_eval.h"
-#include "parser/ast.h"
+#include "lexer/token.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_stmt.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
+#include "simulator/exec_task.h"
 #include "simulator/process.h"
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"
 #include "simulator/stmt_exec.h"
 #include "simulator/stmt_exec_internal.h"
+#include "simulator/stmt_result.h"
 
 namespace delta {
 

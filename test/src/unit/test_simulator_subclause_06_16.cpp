@@ -1,12 +1,13 @@
-#include <cstdint>
+#include <gtest/gtest.h>
 
 #include "builders_ast.h"
 #include "common/types.h"
 #include "fixture_simulator.h"
 #include "helpers_string_var.h"
-#include "parser/ast.h"
+#include "lexer/token.h"
 #include "simulator/adv_sim.h"
 #include "simulator/evaluation.h"
+#include "simulator/lowerer.h"
 
 using namespace delta;
 

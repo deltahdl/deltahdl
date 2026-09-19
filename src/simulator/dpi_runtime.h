@@ -1,20 +1,15 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <deque>
-#include <functional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
-#include <unordered_set>
 #include <vector>
 
-#include "common/types.h"
-#include "parser/ast.h"
-#include "simulator/assertion_api.h"
-#include "simulator/coverage_control.h"
+#include "parser/ast_type.h"
 #include "simulator/dpi_arg_value.h"
-#include "simulator/sva_engine_sequences.h"
 
 namespace delta {
 

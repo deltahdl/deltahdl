@@ -1,6 +1,9 @@
 #include "elaborator/covergroup_inheritance.h"
 
 #include <algorithm>
+#include <cstdint>
+#include <string>
+#include <vector>
 
 namespace delta {
 

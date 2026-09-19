@@ -5,8 +5,10 @@
 #include <filesystem>
 #include <fstream>
 #include <string>
+#include <string_view>
 
 #include "fixture_preprocessor.h"
+#include "preprocessor/preprocessor.h"
 
 using namespace delta;
 namespace fs = std::filesystem;

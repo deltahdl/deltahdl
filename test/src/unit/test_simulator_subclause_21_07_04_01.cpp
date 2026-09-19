@@ -1,3 +1,5 @@
+#include <gtest/gtest.h>
+
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -7,14 +9,12 @@
 // Completes the CoverageDB type that sim_context.h only forward-declares;
 // included ahead of the fixtures so SimContext's inline constructor (whose
 // unwind path destroys the owned coverage database) is well-formed in this TU.
-#include "fixture_simulator.h"
-#include "fixture_vcd.h"
+#include "common/types.h"
 #include "fixture_vcd_dump_from_source.h"
 #include "fixture_vcd_dump_run.h"
 #include "helpers_text_lines.h"
 #include "helpers_vcd_logic4vec.h"
 #include "model_vcd_token_grammar.h"
-#include "simulator/coverage.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 #include "simulator/vcd_writer.h"

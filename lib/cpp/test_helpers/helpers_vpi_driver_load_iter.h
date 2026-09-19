@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <vector>
 
-#include "simulator/vpi.h"
+#include "simulator/vpi_user.h"
 
 using namespace delta;
 

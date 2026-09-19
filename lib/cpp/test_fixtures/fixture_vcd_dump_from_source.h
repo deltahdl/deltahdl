@@ -12,7 +12,6 @@
 #include "fixture_simulator.h"
 #include "gtest/gtest.h"
 #include "helpers_temp_file.h"
-#include "simulator/coverage.h"
 #include "simulator/vcd_writer.h"
 
 // A run whose dump file, if there is one, was created by the source and by

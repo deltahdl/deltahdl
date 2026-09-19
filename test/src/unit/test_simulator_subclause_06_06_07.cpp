@@ -1,10 +1,12 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <cstdint>
 #include <initializer_list>
 #include <vector>
 
 #include "common/arena.h"
+#include "common/types.h"
 #include "helpers_switch_network.h"
 #include "simulator/net.h"
 #include "simulator/variable.h"

@@ -3,8 +3,8 @@
 #include <cstddef>
 #include <iterator>
 
-#include "fixture_lexer.h"
 #include "lexer/keywords.h"
+#include "lexer/token.h"
 #include "model_keyword_tables.h"
 
 using namespace delta;

@@ -56,6 +56,7 @@
 #include <filesystem>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "common/arena.h"
@@ -65,7 +66,6 @@
 #include "elaborator/rtlir.h"
 #include "fixture_scratch_dir.h"
 #include "lexer/lexer.h"
-#include "parser/ast.h"
 #include "parser/library_map.h"
 #include "parser/parser.h"
 

@@ -28,7 +28,7 @@
 #include "common/types.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/sensitivity.h"
-#include "parser/ast.h"
+#include "parser/ast_expr.h"
 #include "simulator/awaiters.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"

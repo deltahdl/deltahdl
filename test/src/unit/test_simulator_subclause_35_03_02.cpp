@@ -5,7 +5,8 @@
 #include <string>
 #include <vector>
 
-#include "common/types.h"
+#include "parser/ast_type.h"
+#include "simulator/dpi_arg_value.h"
 #include "simulator/dpi_runtime.h"
 
 using namespace delta;

@@ -7,7 +7,6 @@
 #include <unordered_map>
 #include <vector>
 
-#include "common/packed_range.h"
 #include "common/types.h"
 
 namespace delta {

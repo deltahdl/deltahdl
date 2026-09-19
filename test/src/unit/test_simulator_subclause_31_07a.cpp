@@ -17,10 +17,11 @@
 #include <gtest/gtest.h>
 
 #include "common/types.h"
+#include "fixture_parser.h"
 #include "fixture_simulator.h"
 #include "helpers_parser_verify.h"
 #include "simulator/lowerer.h"
-#include "simulator/specify.h"
+#include "simulator/specify_timing_check.h"
 #include "simulator/variable.h"
 
 using namespace delta;

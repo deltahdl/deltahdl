@@ -1,7 +1,12 @@
+#include <gtest/gtest.h>
+
 #include "builders_ast.h"
+#include "common/types.h"
 #include "fixture_simulator.h"
 #include "helpers_queue.h"
 #include "helpers_reported_error.h"
+#include "lexer/token.h"
+#include "parser/ast_expr.h"
 #include "simulator/eval_array.h"
 #include "simulator/evaluation.h"
 #include "simulator/statement_assign.h"

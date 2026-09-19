@@ -14,7 +14,10 @@
 // assignment-compatibility half of the clause is a static rule exercised by the
 // elaborator tests in this pass's canonical elaborator file.
 
-#include "fixture_simulator.h"
+#include <gtest/gtest.h>
+
+#include <cstdint>
+
 #include "helpers_scheduler.h"
 
 using namespace delta;

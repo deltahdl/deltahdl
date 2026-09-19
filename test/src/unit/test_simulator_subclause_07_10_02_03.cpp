@@ -1,3 +1,5 @@
+#include <gtest/gtest.h>
+
 #include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "helpers_queue.h"

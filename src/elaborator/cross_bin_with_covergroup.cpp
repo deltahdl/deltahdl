@@ -1,5 +1,8 @@
 #include "elaborator/cross_bin_with_covergroup.h"
 
+#include <cstdint>
+#include <string_view>
+
 namespace delta {
 
 bool CrossIdentifierSelectIsLegal(std::string_view referenced_cross,

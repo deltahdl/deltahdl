@@ -1,6 +1,7 @@
 #include "elaborator/annex_f_property_rewrite.h"
 
 #include <memory>
+#include <utility>
 
 #include "elaborator/annex_f_grammar.h"
 #include "elaborator/annex_f_sequence_rewrite.h"

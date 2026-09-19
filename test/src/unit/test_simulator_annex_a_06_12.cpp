@@ -1,3 +1,5 @@
+#include <gtest/gtest.h>
+
 #include "fixture_simulator.h"
 #include "helpers_randseq_sim.h"
 #include "simulator/lowerer.h"

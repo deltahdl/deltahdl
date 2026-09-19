@@ -1,7 +1,16 @@
+#include <gtest/gtest.h>
+
+#include <cstdint>
+#include <string>
+#include <utility>
+#include <vector>
+
 #include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "helpers_reported_error.h"
+#include "parser/ast_expr.h"
 #include "simulator/lowerer.h"
+#include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
 
 using namespace delta;

@@ -1,6 +1,12 @@
-#include "common/types.h"
+#include <gtest/gtest.h>
+
+#include <string>
+
+#include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 #include "helpers_port_connection_elab.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_type.h"
 
 using namespace delta;
 

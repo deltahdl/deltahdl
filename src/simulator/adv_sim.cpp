@@ -5,6 +5,8 @@
 #include <utility>
 #include <vector>
 
+#include "common/types.h"
+
 namespace delta {
 
 bool TwoStateDetector::Is2State(const Logic4Vec& vec) {

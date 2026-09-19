@@ -1,5 +1,8 @@
 #include "simulator/switch_network.h"
 
+#include <cstdint>
+#include <vector>
+
 #include "common/arena.h"
 #include "common/types.h"
 #include "simulator/net.h"

@@ -1,3 +1,5 @@
+#include <gtest/gtest.h>
+
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 #include "simulator/evaluation.h"

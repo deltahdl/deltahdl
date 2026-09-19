@@ -1,8 +1,11 @@
 #pragma once
 
+#include <gtest/gtest.h>
+
 #include <string>
 
 #include "fixture_elaborator.h"
+#include "parser/ast_expr.h"
 
 using namespace delta;
 

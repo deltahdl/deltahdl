@@ -28,7 +28,6 @@
 
 #include "builders_systask.h"
 #include "fixture_simulator.h"
-#include "parser/ast.h"
 #include "simulator/coverage_control.h"
 #include "simulator/evaluation.h"
 

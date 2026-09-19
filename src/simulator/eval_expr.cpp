@@ -1,13 +1,17 @@
 #include <algorithm>
-#include <cmath>
+#include <cstddef>
+#include <cstdint>
 #include <string>
 #include <vector>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
+#include "common/source_loc.h"
+#include "common/types.h"
 #include "elaborator/type_eval.h"
 #include "lexer/token.h"
-#include "parser/ast.h"
+#include "parser/ast_class.h"
+#include "parser/ast_expr.h"
 #include "simulator/assoc_element.h"
 #include "simulator/class_object.h"
 #include "simulator/clocking.h"
@@ -16,6 +20,7 @@
 #include "simulator/eval_string.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
 

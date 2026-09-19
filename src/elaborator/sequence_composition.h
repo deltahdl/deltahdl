@@ -2,7 +2,6 @@
 
 #include <cstdint>
 
-#include "elaborator/multiclock_endpoint.h"
 #include "elaborator/sequence_method.h"
 
 namespace delta {

@@ -1,8 +1,12 @@
+#include <gtest/gtest.h>
+
 #include <iostream>
 #include <sstream>
 #include <streambuf>
 
+#include "common/types.h"
 #include "fixture_simulator.h"
+#include "simulator/lowerer.h"
 #include "simulator/scheduler.h"
 
 using namespace delta;

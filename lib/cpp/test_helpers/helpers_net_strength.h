@@ -3,6 +3,7 @@
 #include <cstdint>
 
 #include "common/arena.h"
+#include "common/types.h"
 #include "simulator/net.h"
 #include "simulator/variable.h"
 

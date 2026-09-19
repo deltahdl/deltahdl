@@ -8,13 +8,15 @@
 #include <fstream>
 #include <ios>
 #include <string>
+#include <string_view>
 #include <system_error>
+#include <utility>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/lexer.h"
-#include "parser/ast.h"
+#include "parser/ast_design.h"
 #include "parser/parser.h"
 
 namespace delta {

@@ -1,6 +1,9 @@
+#include <gtest/gtest.h>
+
 #include <cstddef>
 #include <vector>
 
+#include "common/diagnostic.h"
 #include "fixture_simulator.h"
 #include "helpers_class_object.h"
 #include "helpers_reported_error.h"

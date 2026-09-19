@@ -10,8 +10,6 @@
 
 #include <stddef.h>
 
-#include "simulator/svdpi.h"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

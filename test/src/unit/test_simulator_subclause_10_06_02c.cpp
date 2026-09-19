@@ -1,3 +1,5 @@
+#include <gtest/gtest.h>
+
 #include "fixture_simulator.h"
 
 // §10.6.2: the force statement's right-hand side is an expression assigned to

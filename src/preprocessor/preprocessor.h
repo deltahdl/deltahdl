@@ -1,13 +1,16 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "common/diagnostic.h"
+#include "common/source_loc.h"
 #include "common/source_mgr.h"
 #include "common/types.h"
 #include "lexer/keywords.h"

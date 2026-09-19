@@ -9,9 +9,15 @@
 // `default_nettype compiler directive." The rejections below therefore name
 // §22.8.
 
+#include <gtest/gtest.h>
+
 #include "common/types.h"
+#include "elaborator/elaborator.h"
+#include "elaborator/elaborator_helpers.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
+#include "lexer/lexer.h"
+#include "parser/parser.h"
 
 using namespace delta;
 

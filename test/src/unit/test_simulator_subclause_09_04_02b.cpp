@@ -10,6 +10,8 @@
 // spellings, a for-loop step, and a target held by force, which has to suppress
 // the notification along with the store.
 
+#include <gtest/gtest.h>
+
 #include "fixture_simulator.h"
 #include "simulator/variable.h"
 

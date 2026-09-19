@@ -1,8 +1,10 @@
+#include <gtest/gtest.h>
+
 #include "common/types.h"
 #include "elaborator/type_eval.h"
 #include "fixture_elaborator.h"
 #include "lexer/token.h"
-#include "parser/ast.h"
+#include "parser/ast_expr.h"
 
 using namespace delta;
 

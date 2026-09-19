@@ -10,12 +10,12 @@
 
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
-#include "helpers_keyword_sweep_skips.h"
 #include "helpers_keyword_version.h"
 #include "helpers_reported_error.h"
 #include "helpers_rtlir_lookup.h"
 #include "model_keyword_table_sweeps.h"
 #include "model_keyword_tables.h"
+#include "parser/ast_type.h"
 
 using namespace delta;
 

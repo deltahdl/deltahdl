@@ -1,9 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+
 #include "fixture_synthesizer.h"
 #include "helpers_reported_error.h"
 #include "synthesizer/aig.h"
-#include "synthesizer/aig_opt.h"
 #include "synthesizer/synth_lower.h"
 
 using namespace delta;

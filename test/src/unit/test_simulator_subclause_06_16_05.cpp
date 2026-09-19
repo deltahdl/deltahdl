@@ -19,6 +19,8 @@
 // Claim two (str unchanged) is checked by comparing the original variable
 // against its pre-call value after the method has run.
 
+#include <gtest/gtest.h>
+
 #include "helpers_scheduler.h"
 
 using namespace delta;

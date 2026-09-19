@@ -6,7 +6,8 @@
 #include <vector>
 
 #include "lexer/token.h"
-#include "parser/ast.h"
+#include "parser/ast_module.h"
+#include "parser/ast_stmt.h"
 #include "simulator/instance_bindings.h"
 #include "simulator/sequence_flatten.h"
 

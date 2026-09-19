@@ -4,6 +4,12 @@
 // out of parser.cpp, which the C.2.8 report took past the limit
 // assert-no-oversized-source-files enforces.
 
+#include <string>
+#include <utility>
+
+#include "common/diagnostic.h"
+#include "lexer/token.h"
+#include "parser/ast_design.h"
 #include "parser/parser.h"
 #include "parser/parser_token_skips.h"
 

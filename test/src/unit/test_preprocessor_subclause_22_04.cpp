@@ -4,9 +4,12 @@
 #include <filesystem>
 #include <fstream>
 #include <string>
+#include <utility>
 
+#include "common/types.h"
 #include "fixture_preprocessor.h"
 #include "helpers_reported_error.h"
+#include "preprocessor/preprocessor.h"
 
 using namespace delta;
 namespace fs = std::filesystem;

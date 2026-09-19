@@ -6,6 +6,7 @@
 // in exactly one .cpp; this header only carries the declarations needed where
 // one system-task file calls into another.
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <string_view>

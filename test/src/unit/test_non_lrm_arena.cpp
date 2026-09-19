@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <string_view>
+
 #include "common/arena.h"
-#include "common/types.h"
 
 using namespace delta;
 

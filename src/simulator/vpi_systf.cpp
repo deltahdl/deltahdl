@@ -11,12 +11,12 @@
 #include "common/arena.h"
 #include "common/lexical_limits.h"
 #include "common/types.h"
-#include "parser/ast.h"
+#include "parser/ast_expr.h"
 #include "simulator/evaluation.h"
 #include "simulator/net.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
-#include "simulator/vpi.h"
+#include "simulator/vpi_user.h"
 // §37.10 detail 3: the package/interface/program instance kinds are defined in
 // the SystemVerilog VPI header alongside the §37.10 vpiInstance relation, and
 // §37.59's vpiRefObj -- the reference an expression naming a variable is -- is

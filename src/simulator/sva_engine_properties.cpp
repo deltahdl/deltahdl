@@ -4,6 +4,8 @@
 #include <cstdint>
 #include <vector>
 
+#include "simulator/sva_engine_sequences.h"
+
 namespace delta {
 
 PropertyResult EvalImplication(bool antecedent, bool consequent,

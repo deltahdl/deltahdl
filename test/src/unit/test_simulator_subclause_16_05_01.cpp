@@ -1,10 +1,11 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
 #include <string>
 
 #include "common/types.h"
 #include "fixture_simulator.h"
-#include "simulator/sva_engine.h"
+#include "simulator/sva_engine_sampling.h"
 
 using namespace delta;
 

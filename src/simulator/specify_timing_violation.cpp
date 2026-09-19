@@ -19,13 +19,19 @@
 // functions were split out of.
 
 #include <cstddef>
+#include <cstdint>
 #include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
 
+#include "common/types.h"
+#include "lexer/token.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_specify.h"
 #include "simulator/specify.h"
 #include "simulator/specify_internal.h"
+#include "simulator/specify_timing_check.h"
 
 namespace delta {
 

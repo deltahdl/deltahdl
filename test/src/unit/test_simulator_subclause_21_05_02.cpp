@@ -17,6 +17,8 @@
 // constants evaluate to 0 even in a plain $display, an upstream §6.19 defect
 // that never reaches the write task. Typedef'd enums carry their ordinals
 // correctly and are the forms used below.
+#include <gtest/gtest.h>
+
 #include <cstdio>
 #include <string>
 

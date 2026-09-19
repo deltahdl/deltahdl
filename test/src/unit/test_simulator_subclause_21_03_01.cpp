@@ -1,3 +1,6 @@
+#include <gtest/gtest.h>
+
+#include <cstdint>
 #include <cstdio>
 #include <fstream>
 #include <iostream>
@@ -8,8 +11,8 @@
 
 #include "builders_ast.h"
 #include "builders_systask.h"
+#include "common/types.h"
 #include "fixture_simulator.h"
-#include "helpers_parser_verify.h"
 #include "helpers_temp_file.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"

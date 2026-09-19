@@ -6,6 +6,7 @@
 #include <string>
 
 #include "fixture_preprocessor.h"
+#include "preprocessor/preprocessor.h"
 
 using namespace delta;
 namespace fs = std::filesystem;

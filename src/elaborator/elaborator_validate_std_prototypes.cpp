@@ -8,7 +8,10 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/std_package.h"
-#include "parser/ast.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_module.h"
+#include "parser/ast_stmt.h"
+#include "parser/ast_type.h"
 
 namespace delta {
 

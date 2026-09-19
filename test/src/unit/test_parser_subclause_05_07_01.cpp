@@ -1,6 +1,15 @@
+#include <gtest/gtest.h>
+
+#include "common/arena.h"
+#include "common/diagnostic.h"
+#include "common/source_mgr.h"
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
+#include "lexer/lexer.h"
+#include "lexer/token.h"
+#include "parser/ast_expr.h"
+#include "parser/parser.h"
 
 using namespace delta;
 

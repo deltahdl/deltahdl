@@ -8,6 +8,8 @@
 // declaration + indexed-assignment source and drives it through
 // parse -> elaborate -> lower -> run, observing the value the callee reads and
 // the value the caller retains after the call returns.
+#include <gtest/gtest.h>
+
 #include "helpers_scheduler.h"
 
 using namespace delta;

@@ -1,5 +1,15 @@
+#include <cstddef>
+#include <cstdint>
 #include <format>
+#include <string_view>
+#include <utility>
+#include <vector>
 
+#include "common/arena.h"
+#include "common/diagnostic.h"
+#include "lexer/token.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_module.h"
 #include "parser/parser.h"
 #include "parser/parser_property_spec_internal.h"
 

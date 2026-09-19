@@ -1,10 +1,13 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "helpers_coverage.h"
 #include "simulator/coverage.h"
+#include "simulator/coverage_types.h"
 
 using namespace delta;
 

@@ -3,7 +3,8 @@
 #include <cstring>
 #include <vector>
 
-#include "simulator/vpi.h"
+#include "simulator/vpi_globals.h"
+#include "simulator/vpi_user.h"
 
 namespace delta {
 namespace {

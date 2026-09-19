@@ -5,12 +5,11 @@
 #include <string>
 
 #include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "fixture_preprocessor.h"
 #include "helpers_keyword_version.h"
 #include "helpers_reported_error.h"
 #include "lexer/keywords.h"
-#include "lexer/lexer.h"
+#include "lexer/token.h"
 #include "model_keyword_tables.h"
 
 using namespace delta;

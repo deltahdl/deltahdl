@@ -1,9 +1,13 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
+#include <cstdint>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "simulator/coverage.h"
+#include "simulator/coverage_types.h"
 
 using namespace delta;
 

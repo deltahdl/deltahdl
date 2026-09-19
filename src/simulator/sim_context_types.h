@@ -1,26 +1,17 @@
 #pragma once
 
-#include <array>
 #include <cstdint>
 #include <cstdio>
 #include <deque>
 #include <map>
-#include <memory>
-#include <random>
 #include <string>
 #include <string_view>
-#include <unordered_map>
-#include <unordered_set>
 #include <vector>
 
-#include "common/arena.h"
 #include "common/types.h"
-#include "parser/ast.h"
+#include "parser/ast_type.h"
 #include "simulator/class_object.h"
-#include "simulator/coverage_control.h"
 #include "simulator/net.h"
-#include "simulator/scheduler.h"
-#include "simulator/sync_objects.h"
 #include "simulator/variable.h"
 
 namespace delta {

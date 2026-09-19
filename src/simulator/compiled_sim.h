@@ -2,11 +2,9 @@
 
 #include <cstdint>
 #include <functional>
-#include <string_view>
 #include <vector>
 
-#include "common/types.h"
-#include "parser/ast.h"
+#include "parser/ast_stmt.h"
 
 namespace delta {
 

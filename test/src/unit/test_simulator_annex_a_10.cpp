@@ -5,6 +5,8 @@
 // instance, and the parent reading the child's initial value through the
 // connection.
 
+#include <gtest/gtest.h>
+
 #include <string>
 
 #include "fixture_simulator.h"

@@ -18,6 +18,7 @@
 // SV half is still handed the base library; taking that half first is what lets
 // a case tell whether the base file arrived with it or was never there at all.
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_globals.h"
 
 namespace {
 

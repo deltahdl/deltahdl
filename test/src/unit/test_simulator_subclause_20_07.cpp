@@ -1,3 +1,9 @@
+#include <gtest/gtest.h>
+
+#include <cstdint>
+#include <string>
+
+#include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"

@@ -1,12 +1,7 @@
 #pragma once
 
+#include <cstddef>
 #include <string>
-
-#include "fixture_simulator.h"
-#include "simulator/variable.h"
-#include "simulator/vcd_writer.h"
-
-using namespace delta;
 
 // Counts the number of (non-overlapping) occurrences of `sub` in `s`. Used by
 // the §21.7 dump tests to assert how many checkpoint markers were emitted.

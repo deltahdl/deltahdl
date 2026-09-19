@@ -6,12 +6,12 @@
 #include <string>
 #include <vector>
 
+#include "common/types.h"
 #include "fixture_simulator.h"
 #include "helpers_reported_error.h"
 #include "simulator/evaluation.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
-#include "simulator/variable.h"
 
 using namespace delta;
 

@@ -1,9 +1,18 @@
+#include <gtest/gtest.h>
+
+#include <cstdint>
+
 #include "builders_ast.h"
+#include "common/types.h"
 #include "fixture_simulator.h"
 #include "helpers_queue.h"
 #include "helpers_queue_ref_method.h"
 #include "helpers_scheduler.h"
-#include "parser/ast.h"
+#include "lexer/token.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_module.h"
+#include "parser/ast_stmt.h"
+#include "parser/ast_type.h"
 #include "simulator/evaluation.h"
 #include "simulator/statement_assign.h"
 

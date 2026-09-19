@@ -18,14 +18,16 @@
 // positions instead of the member that was dropped; a set of names makes the
 // failure read as the member.
 
+#include <gtest/gtest.h>
+
 #include <set>
 #include <string>
 #include <string_view>
 #include <vector>
 
 #include "elaborator/elaborator_validate_internal.h"
-#include "fixture_elaborator.h"
-#include "parser/ast.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_stmt.h"
 
 using namespace delta;
 

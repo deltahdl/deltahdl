@@ -22,6 +22,7 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 ## Formatting and prose
 
 - [Formatting with clang-format](clang-format-style-flag.md) — `clang-format -i --style=google` on every touched file; the style flag is required.
+- [Include what you use](include-what-you-use.md) — name the header that declares each symbol used and none that is unused; no umbrella headers, and an include finding fails the job.
 - [Markdown opens with a heading](markdown-top-level-heading.md) — MD041 runs across `**/*.md` with `--dot`, so the notes are linted too.
 - [Accuracy over fitting a column](prose-length-over-column-fitting.md) — never buy a shorter line with a less accurate word; move the text instead.
 

@@ -11,12 +11,14 @@
 
 #include <gtest/gtest.h>
 
+#include <cstdint>
 #include <string>
 #include <vector>
 
 #include "fixture_sdf_design.h"
 #include "simulator/sdf_parser.h"
 #include "simulator/specify.h"
+#include "simulator/specify_sdf.h"
 
 using namespace delta;
 

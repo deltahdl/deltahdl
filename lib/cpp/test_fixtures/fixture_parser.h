@@ -1,7 +1,5 @@
 #pragma once
 
-#include <gtest/gtest.h>
-
 #include <string>
 #include <string_view>
 #include <vector>
@@ -10,6 +8,7 @@
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "lexer/lexer.h"
+#include "parser/ast_design.h"
 #include "parser/parser.h"
 #include "preprocessor/preprocessor.h"
 

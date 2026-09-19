@@ -1,14 +1,10 @@
 #pragma once
 
 #include <cstdint>
-#include <string>
 #include <string_view>
-#include <unordered_set>
-#include <utility>
 #include <vector>
 
 #include "common/source_loc.h"
-#include "common/types.h"
 #include "lexer/token.h"
 
 namespace delta {

@@ -57,13 +57,11 @@
 
 #include <string>
 #include <string_view>
-#include <vector>
 
 #include "elaborator/rtlir.h"
 #include "fixture_library_design.h"
 #include "fixture_scratch_dir.h"
 #include "helpers_reported_error.h"
-#include "parser/ast.h"
 
 using namespace delta;
 

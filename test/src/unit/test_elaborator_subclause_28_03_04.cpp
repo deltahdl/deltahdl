@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 
 #include "fixture_elaborator.h"
+#include "lexer/token.h"
+#include "parser/ast_expr.h"
 
 namespace {
 

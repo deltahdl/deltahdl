@@ -1,5 +1,9 @@
 #include "preprocessor/macro_table.h"
 
+#include <string>
+#include <string_view>
+#include <utility>
+
 namespace delta {
 
 void MacroTable::Define(MacroDef macro) {

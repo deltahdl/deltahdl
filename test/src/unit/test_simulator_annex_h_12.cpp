@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <string>
 
-#include "parser/ast.h"
+#include "parser/ast_type.h"
 #include "simulator/dpi_arg_value.h"
 #include "simulator/dpi_c_type.h"
 #include "simulator/svdpi_open_array.h"

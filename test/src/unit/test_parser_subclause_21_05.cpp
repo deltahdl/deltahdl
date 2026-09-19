@@ -3,7 +3,9 @@
 // start_addr / finish_addr pair. Each alternative parses as an ordinary
 // system-task statement, so the generic call grammar accepts every form of the
 // production.
-#include "helpers_parser_verify.h"
+#include <gtest/gtest.h>
+
+#include "fixture_parser.h"
 #include "helpers_reported_error.h"
 
 using namespace delta;

@@ -1,7 +1,5 @@
 #pragma once
 
-#include <gtest/gtest.h>
-
 #include <string>
 #include <string_view>
 #include <utility>
@@ -10,10 +8,14 @@
 #include "elaborator/elaborator.h"
 #include "fixture_simulator.h"
 #include "lexer/lexer.h"
-#include "parser/ast.h"
+#include "parser/ast_design.h"
+#include "parser/ast_module.h"
+#include "parser/ast_specify.h"
 #include "parser/parser.h"
 #include "simulator/evaluation.h"
 #include "simulator/specify.h"
+#include "simulator/specify_path_delay.h"
+#include "simulator/specify_sdf.h"
 
 using namespace delta;
 

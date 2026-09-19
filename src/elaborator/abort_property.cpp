@@ -1,5 +1,9 @@
 #include "elaborator/abort_property.h"
 
+#include <string_view>
+
+#include "elaborator/sampled_value.h"
+
 namespace delta {
 
 bool ClassifyAbortOperator(std::string_view keyword, AbortOperator& out) {

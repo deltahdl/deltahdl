@@ -38,12 +38,12 @@
 
 #include <string>
 #include <string_view>
+#include <utility>
 
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "fixture_preprocessor.h"
 #include "helpers_protect_keys.h"
-#include "helpers_protect_keyword_value.h"
 #include "helpers_reported_error.h"
 #include "helpers_text_lines.h"
 #include "preprocessor/preprocessor.h"

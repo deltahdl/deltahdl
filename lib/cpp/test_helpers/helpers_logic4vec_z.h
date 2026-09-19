@@ -3,7 +3,7 @@
 #include <cstdint>
 
 #include "common/arena.h"
-#include "fixture_simulator.h"
+#include "common/types.h"
 
 using namespace delta;
 

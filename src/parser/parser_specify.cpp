@@ -1,5 +1,14 @@
+#include <cstddef>
+#include <cstdint>
+#include <string_view>
 #include <utility>
+#include <vector>
 
+#include "common/diagnostic.h"
+#include "lexer/token.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_module.h"
+#include "parser/ast_specify.h"
 #include "parser/parser.h"
 #include "parser/parser_token_skips.h"
 

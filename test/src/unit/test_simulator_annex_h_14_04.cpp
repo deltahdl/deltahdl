@@ -1,8 +1,7 @@
 #include <gtest/gtest.h>
 
-#include <cstdint>
-
 #include "simulator/dpi_runtime.h"
+#include "simulator/svdpi.h"
 #include "simulator/svdpi_sv31a.h"
 
 using namespace delta;

@@ -13,6 +13,7 @@
 
 #include "simulator/sim_context_random_stability.h"
 
+#include <cstdint>
 #include <random>
 #include <sstream>
 #include <string>

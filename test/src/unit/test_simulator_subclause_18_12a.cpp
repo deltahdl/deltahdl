@@ -1,7 +1,5 @@
 #include <gtest/gtest.h>
 
-#include <cstdint>
-
 #include "helpers_scheduler.h"
 #include "simulator/constraint_solver.h"
 

@@ -3,6 +3,7 @@
 #include <gtest/gtest.h>
 
 #include <cstddef>
+#include <cstdint>
 #include <initializer_list>
 #include <string>
 #include <string_view>
@@ -10,7 +11,7 @@
 
 #include "common/arena.h"
 #include "fixture_simulator.h"
-#include "parser/ast.h"
+#include "parser/ast_expr.h"
 
 using namespace delta;
 

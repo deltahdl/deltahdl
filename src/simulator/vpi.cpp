@@ -1,19 +1,17 @@
-#include "simulator/vpi.h"
-
 #include <cctype>
-#include <cmath>
 #include <cstdarg>
 #include <cstddef>
-#include <cstdint>
 #include <cstdio>
 #include <string>
 #include <string_view>
 #include <unordered_map>
-#include <vector>
+#include <utility>
 
 #include "simulator/vpi_assertion_cb.h"
 #include "simulator/vpi_assertion_control.h"
+#include "simulator/vpi_globals.h"
 #include "simulator/vpi_internal.h"
+#include "simulator/vpi_user.h"
 
 // §37.10 detail 3: the package/interface/program instance kinds are defined in
 // the SystemVerilog VPI header alongside the §37.10 vpiInstance relation.

@@ -1,8 +1,9 @@
 #include <cstdint>
 
 #include "common/arena.h"
-#include "parser/ast.h"
+#include "common/types.h"
 #include "simulator/awaiters_event_control.h"
+#include "simulator/exec_task.h"
 #include "simulator/process.h"
 #include "simulator/property_attempts.h"
 #include "simulator/scheduler.h"
@@ -10,6 +11,7 @@
 #include "simulator/stmt_exec.h"
 #include "simulator/stmt_exec_assertion_internal.h"
 #include "simulator/stmt_exec_internal.h"
+#include "simulator/stmt_result.h"
 #include "simulator/sva_engine_queues.h"
 
 namespace delta {

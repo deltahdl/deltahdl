@@ -4,9 +4,9 @@
 // The subclause defines no BNF of its own (Syntax 21-12 belongs to §21.4);
 // these tests only pin down that each destination form reaches the parser as
 // an ordinary call operand alongside its real declaration syntax.
+#include <gtest/gtest.h>
+
 #include "fixture_program.h"
-#include "fixture_simulator.h"
-#include "helpers_parser_verify.h"
 
 using namespace delta;
 

@@ -1,6 +1,5 @@
 #include <gtest/gtest.h>
 
-#include <cstdint>
 #include <cstdlib>
 
 #include "simulator/dpi_runtime.h"

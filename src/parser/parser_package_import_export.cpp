@@ -1,4 +1,10 @@
+#include <vector>
+
+#include "common/diagnostic.h"
+#include "lexer/token.h"
+#include "parser/ast_module.h"
 #include "parser/parser.h"
+#include "parser/scope_type_names.h"
 
 namespace delta {
 

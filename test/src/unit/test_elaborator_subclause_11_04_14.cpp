@@ -1,7 +1,10 @@
+#include <gtest/gtest.h>
+
 #include "elaborator/type_eval.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
-#include "parser/ast.h"
+#include "lexer/token.h"
+#include "parser/ast_expr.h"
 
 using namespace delta;
 

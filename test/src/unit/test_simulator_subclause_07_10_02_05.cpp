@@ -21,6 +21,8 @@
 // §7.4.5 machinery this pass depends on. pop_back is the exact tail-end mirror
 // of pop_front (§7.10.2.4): same empty-queue rule, opposite removal end.
 
+#include <gtest/gtest.h>
+
 #include "helpers_scheduler.h"
 
 using namespace delta;

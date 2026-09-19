@@ -1,12 +1,14 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
 #include <string>
 #include <string_view>
 
 #include "fixture_simulator.h"
 #include "fixture_specify_manager.h"
-#include "simulator/lowerer.h"
+#include "parser/ast_specify.h"
 #include "simulator/specify.h"
+#include "simulator/specify_path_delay.h"
 
 using namespace delta;
 

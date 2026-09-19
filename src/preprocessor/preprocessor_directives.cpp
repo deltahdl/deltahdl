@@ -1,8 +1,14 @@
 #include <cctype>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <fstream>
+#include <string_view>
 
+#include "common/diagnostic.h"
+#include "common/source_loc.h"
+#include "common/types.h"
+#include "lexer/keywords.h"
 #include "preprocessor/preprocessor.h"
 
 namespace delta {

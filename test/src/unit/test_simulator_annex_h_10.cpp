@@ -5,6 +5,7 @@
 #include <type_traits>
 
 #include "simulator/dpi_c_type.h"
+#include "simulator/svdpi.h"
 
 using namespace delta;
 

@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
+
 #include "fixture_synthesizer.h"
 #include "synthesizer/aig.h"
 #include "synthesizer/synth_lower.h"

@@ -18,6 +18,8 @@
 // logic, such as if latched behavior can be inferred" -- read at one statement
 // position each. Those cases begin below the multiple-driver ones.
 
+#include <gtest/gtest.h>
+
 #include <string>
 
 #include "fixture_elaborator.h"

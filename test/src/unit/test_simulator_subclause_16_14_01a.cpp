@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
 #include "common/types.h"
-#include "simulator/sva_engine.h"
+#include "simulator/sva_engine_queues.h"
+#include "simulator/sva_engine_sampling.h"
+#include "simulator/sva_engine_sequences.h"
 
 using namespace delta;
 

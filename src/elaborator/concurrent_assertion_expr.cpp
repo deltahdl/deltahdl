@@ -1,7 +1,9 @@
 #include "elaborator/concurrent_assertion_expr.h"
 
+#include <string_view>
+
 #include "elaborator/rtlir.h"
-#include "parser/ast.h"
+#include "parser/ast_expr.h"
 
 namespace delta {
 

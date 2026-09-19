@@ -3,10 +3,9 @@
 #include <cstdint>
 #include <type_traits>
 
-#include "parser/ast.h"
+#include "parser/ast_type.h"
 #include "simulator/dpi_arg_value.h"
 #include "simulator/dpi_c_type.h"
-#include "simulator/dpi_runtime.h"
 #include "simulator/svdpi.h"
 
 // Annex H.7.7 - Canonical representation of packed arrays.

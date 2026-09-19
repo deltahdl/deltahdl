@@ -11,6 +11,8 @@
 // member values. Each test therefore declares the memory with real source
 // syntax and drives the module through the full pipeline (parse -> elaborate
 // -> lower -> run), reading the loaded elements back with $display.
+#include <gtest/gtest.h>
+
 #include <cstdio>
 #include <fstream>
 #include <string>

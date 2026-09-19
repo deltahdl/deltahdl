@@ -1,5 +1,6 @@
-#include "fixture_program.h"
-#include "fixture_simulator.h"
+#include <gtest/gtest.h>
+
+#include "fixture_parser.h"
 
 using namespace delta;
 

@@ -1,5 +1,10 @@
 #include "elaborator/clock_resolution.h"
 
+#include <string>
+#include <string_view>
+
+#include "elaborator/semantic_leading_clock.h"
+
 namespace delta {
 
 AssertionLeadingClock ResolveConcurrentAssertionClock(

@@ -21,6 +21,8 @@
 // expected literal and that boolean is read out, or -- for the explicit
 // inverse-of-atoi claim -- scanned back with atoi and the integer read out.
 
+#include <gtest/gtest.h>
+
 #include "helpers_scheduler.h"
 
 using namespace delta;

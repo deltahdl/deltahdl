@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_parser.h"
-#include "parser/ast.h"
+#include "parser/ast_design.h"
 
 using namespace delta;
 

@@ -17,8 +17,13 @@
 
 #include <gtest/gtest.h>
 
-#include "parser/ast.h"
+#include <cstdint>
+#include <utility>
+#include <vector>
+
+#include "parser/ast_specify.h"
 #include "simulator/specify.h"
+#include "simulator/specify_timing_check.h"
 
 using namespace delta;
 

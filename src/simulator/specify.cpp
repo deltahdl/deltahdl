@@ -2,15 +2,23 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <cstdint>
 #include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
 
+#include "common/types.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_module.h"
+#include "parser/ast_specify.h"
 #include "simulator/evaluation.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/specify_internal.h"
+#include "simulator/specify_path_delay.h"
+#include "simulator/specify_sdf.h"
+#include "simulator/specify_timing_check.h"
 #include "simulator/variable.h"
 
 namespace delta {

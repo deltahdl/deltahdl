@@ -1,8 +1,6 @@
 #include <gtest/gtest.h>
 
-#include <cstdint>
 #include <string>
-#include <vector>
 
 #include "simulator/dpi_context.h"
 #include "simulator/dpi_runtime.h"

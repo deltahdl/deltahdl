@@ -68,18 +68,16 @@
 #include <string_view>
 #include <vector>
 
+#include "common/types.h"
 #include "elaborator/elaborator.h"
-#include "elaborator/rtlir.h"
 #include "fixture_config_run.h"
-#include "fixture_library_design.h"
 #include "fixture_scratch_dir.h"
 #include "fixture_simulator.h"
-#include "parser/ast.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
-#include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
-#include "simulator/vpi.h"
+#include "simulator/vpi_globals.h"
+#include "simulator/vpi_user.h"
 
 using namespace delta;
 

@@ -1,8 +1,9 @@
 #include <gtest/gtest.h>
 
-#include "simulator/dpi_runtime.h"
+#include "simulator/assertion_api.h"
 #include "simulator/sv_vpi_user.h"
-#include "simulator/vpi.h"
+#include "simulator/vpi_globals.h"
+#include "simulator/vpi_user.h"
 
 using namespace delta;
 

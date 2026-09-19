@@ -4,7 +4,7 @@
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "fixture_scratch_dir.h"
-#include "parser/ast.h"
+#include "parser/ast_design.h"
 #include "parser/precompiled_library.h"
 
 using namespace delta;

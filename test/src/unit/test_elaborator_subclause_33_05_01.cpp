@@ -10,7 +10,6 @@
 #include "elaborator/rtlir.h"
 #include "fixture_scratch_dir.h"
 #include "helpers_reported_error.h"
-#include "parser/ast.h"
 #include "parser/library_map.h"
 #include "parser/single_pass_compile.h"
 

@@ -4,7 +4,8 @@
 
 #include "fixture_simulator.h"
 #include "helpers_reported_error.h"
-#include "simulator/vpi.h"
+#include "simulator/vpi_globals.h"
+#include "simulator/vpi_user.h"
 
 namespace delta {
 namespace {

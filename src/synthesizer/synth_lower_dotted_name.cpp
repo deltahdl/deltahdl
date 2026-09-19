@@ -1,5 +1,6 @@
 #include <string_view>
 
+#include "parser/ast_expr.h"
 #include "synthesizer/synth_lower.h"
 
 namespace delta {

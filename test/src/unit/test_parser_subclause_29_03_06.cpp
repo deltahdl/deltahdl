@@ -11,6 +11,8 @@
 //
 // The complementary symbol-matching semantics live in the simulator canonical
 // file for this subclause.
+#include <gtest/gtest.h>
+
 #include "fixture_parser.h"
 #include "helpers_reported_error.h"
 

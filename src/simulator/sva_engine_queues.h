@@ -11,7 +11,6 @@
 #include <vector>
 
 #include "common/types.h"
-#include "simulator/sva_engine_properties.h"
 #include "simulator/sva_engine_sampling.h"
 #include "simulator/sva_engine_sequences.h"
 

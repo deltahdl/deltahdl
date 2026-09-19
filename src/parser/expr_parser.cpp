@@ -1,7 +1,14 @@
 #include <charconv>
-#include <cmath>
+#include <cstdint>
 #include <cstdlib>
+#include <string>
+#include <string_view>
+#include <utility>
 
+#include "common/diagnostic.h"
+#include "lexer/token.h"
+#include "parser/ast_class.h"
+#include "parser/ast_expr.h"
 #include "parser/expr_parser_internal.h"
 #include "parser/parser.h"
 

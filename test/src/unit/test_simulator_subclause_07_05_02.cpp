@@ -1,4 +1,8 @@
+#include <gtest/gtest.h>
+
 #include "builders_ast.h"
+#include "common/types.h"
+#include "fixture_simulator.h"
 #include "helpers_queue.h"
 #include "helpers_scheduler.h"
 #include "simulator/eval_array.h"

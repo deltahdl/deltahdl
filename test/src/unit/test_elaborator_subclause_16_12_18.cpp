@@ -3,6 +3,7 @@
 #include "elaborator/rtlir.h"
 #include "elaborator/typed_property_formal.h"
 #include "fixture_elaborator.h"
+#include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
 
 using namespace delta;

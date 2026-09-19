@@ -5,9 +5,13 @@
 // and states the delimiter keywords for each. The per-kind characteristics,
 // start/finish timing, naming, and labels belong to the descendant subclauses
 // §9.3.1-§9.3.5 and are exercised by their own canonical files.
+#include <gtest/gtest.h>
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
+#include "lexer/token.h"
+#include "parser/ast_stmt.h"
 
 using namespace delta;
 

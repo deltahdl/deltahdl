@@ -1,11 +1,8 @@
-#include "fixture_real.h"
-#include "fixture_simulator.h"
-#include "helpers_eval_op.h"
+#include <gtest/gtest.h>
+
+#include <cstdint>
+
 #include "helpers_scheduler.h"
-#include "parser/ast.h"
-#include "simulator/evaluation.h"
-#include "simulator/lowerer.h"
-#include "simulator/variable.h"
 
 using namespace delta;
 

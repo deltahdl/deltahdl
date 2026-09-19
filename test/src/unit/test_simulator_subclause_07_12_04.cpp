@@ -12,7 +12,10 @@
 // reports, and 7.8/7.8.1 supply the associative index type whose value the
 // index method returns for an associative array.
 
-#include "fixture_simulator.h"
+#include <gtest/gtest.h>
+
+#include <cstdint>
+
 #include "helpers_scheduler.h"
 
 using namespace delta;

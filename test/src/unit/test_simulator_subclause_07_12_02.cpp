@@ -1,3 +1,5 @@
+#include <gtest/gtest.h>
+
 #include <algorithm>
 #include <array>
 #include <cstddef>
@@ -6,11 +8,13 @@
 #include <vector>
 
 #include "builders_ast.h"
+#include "common/types.h"
 #include "fixture_simulator.h"
 #include "helpers_queue.h"
 #include "helpers_queue_ref_method.h"
 #include "helpers_reported_error.h"
 #include "simulator/eval_array.h"
+#include "simulator/sim_context_types.h"
 
 using namespace delta;
 

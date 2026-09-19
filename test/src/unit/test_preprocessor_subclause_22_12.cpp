@@ -3,12 +3,16 @@
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
+#include <string>
+#include <utility>
 
 #include "common/arena.h"
+#include "common/diagnostic.h"
 #include "fixture_preprocessor.h"
 #include "helpers_reported_error.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
+#include "preprocessor/preprocessor.h"
 
 using namespace delta;
 

@@ -1,3 +1,4 @@
+#include <cstddef>
 #include <cstdint>
 #include <map>
 #include <string>
@@ -5,6 +6,7 @@
 
 #include "simulator/coverage.h"
 #include "simulator/coverage_internal.h"
+#include "simulator/coverage_types.h"
 
 namespace delta {
 

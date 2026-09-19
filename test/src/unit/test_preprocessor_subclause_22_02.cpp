@@ -1,7 +1,11 @@
 #include <gtest/gtest.h>
 
+#include <utility>
+
+#include "common/types.h"
 #include "fixture_preprocessor.h"
 #include "helpers_reported_error.h"
+#include "preprocessor/preprocessor.h"
 
 using namespace delta;
 

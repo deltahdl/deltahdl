@@ -23,6 +23,8 @@
 // for the explicit inverse-of-atoreal claim -- scanned back with atoreal
 // (§6.16.10) and the real value read out.
 
+#include <gtest/gtest.h>
+
 #include "helpers_scheduler.h"
 
 using namespace delta;

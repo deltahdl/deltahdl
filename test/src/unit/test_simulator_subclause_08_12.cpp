@@ -1,6 +1,10 @@
+#include <gtest/gtest.h>
+
+#include <cstdint>
 #include <memory>
 #include <unordered_set>
 
+#include "common/types.h"
 #include "fixture_simulator.h"
 #include "helpers_class_object.h"
 #include "helpers_scheduler.h"

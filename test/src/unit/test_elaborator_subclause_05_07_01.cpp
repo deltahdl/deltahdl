@@ -1,8 +1,14 @@
 
 
+#include <gtest/gtest.h>
+
+#include <cstdint>
+
+#include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
+#include "simulator/lowerer.h"
 
 using namespace delta;
 

@@ -15,12 +15,11 @@
 // VpiHasLocationProperties, the one name the two share, is declared in
 // simulator/vpi_model_helpers3.h and defined in simulator/vpi_helpers_nets.cpp.
 
-#include <cstdint>
 #include <string>
 
 #include "simulator/sv_vpi_user.h"
-#include "simulator/vpi.h"
 #include "simulator/vpi_model_helpers3.h"
+#include "simulator/vpi_user.h"
 
 namespace delta {
 

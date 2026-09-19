@@ -1,10 +1,17 @@
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <string_view>
 #include <utility>
 #include <vector>
 
+#include "common/diagnostic.h"
+#include "common/packed_range.h"
+#include "elaborator/const_eval.h"
+#include "elaborator/rtlir.h"
+#include "parser/ast_expr.h"
+#include "synthesizer/aig.h"
 #include "synthesizer/synth_lower.h"
 
 namespace delta {

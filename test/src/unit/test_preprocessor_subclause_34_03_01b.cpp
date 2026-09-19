@@ -34,6 +34,7 @@
 
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <initializer_list>
 #include <string>
 #include <vector>

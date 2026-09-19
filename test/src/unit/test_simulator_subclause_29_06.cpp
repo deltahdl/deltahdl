@@ -1,7 +1,6 @@
 #include <gtest/gtest.h>
 
 #include "fixture_parser.h"
-#include "parser/ast.h"
 #include "simulator/udp_eval.h"
 
 using namespace delta;

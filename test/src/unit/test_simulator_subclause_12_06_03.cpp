@@ -1,5 +1,7 @@
 
 
+#include <gtest/gtest.h>
+
 #include "fixture_simulator.h"
 #include "helpers_lower_run.h"
 #include "helpers_matches_short_circuit.h"

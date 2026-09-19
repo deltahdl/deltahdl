@@ -5,7 +5,8 @@
 
 #include "common/arena.h"
 #include "elaborator/sensitivity.h"
-#include "parser/ast.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_stmt.h"
 #include "simulator/expr_walk.h"
 #include "simulator/property_attempts.h"
 #include "simulator/sequence_flatten.h"

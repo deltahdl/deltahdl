@@ -6,7 +6,8 @@
 #include "common/types.h"
 #include "simulator/dpi_runtime.h"
 #include "simulator/scheduler.h"
-#include "simulator/vpi.h"
+#include "simulator/vpi_globals.h"
+#include "simulator/vpi_user.h"
 
 // Annex H.13 functions under test. They belong to the DPI C layer (svdpi.cpp)
 // and are declared in svdpi.h, which this translation unit does not include:

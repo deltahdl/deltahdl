@@ -8,6 +8,7 @@
 #include "common/source_mgr.h"
 #include "fixture_preprocessor.h"
 #include "lexer/lexer.h"
+#include "lexer/token.h"
 
 using namespace delta;
 

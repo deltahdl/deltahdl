@@ -1,11 +1,13 @@
 #pragma once
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <map>
 #include <memory>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "common/types.h"

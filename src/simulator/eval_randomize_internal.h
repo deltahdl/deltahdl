@@ -2,14 +2,17 @@
 
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "common/arena.h"
 #include "common/types.h"
-#include "parser/ast.h"
+#include "lexer/token.h"
+#include "parser/ast_class.h"
 #include "simulator/class_object.h"
 #include "simulator/constraint_solver.h"
 #include "simulator/evaluation.h"

@@ -7,7 +7,6 @@
 #include <unordered_set>
 #include <vector>
 
-#include "parser/ast.h"
 #include "simulator/vcd_writer.h"
 
 namespace delta {

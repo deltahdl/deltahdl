@@ -1,4 +1,4 @@
-#include <cstdint>
+#include <cstddef>
 #include <format>
 #include <string_view>
 #include <unordered_map>
@@ -7,12 +7,17 @@
 
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
+#include "common/types.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_bind_scope.h"
+#include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_items_internal.h"
 #include "elaborator/elaborator_port_binding_internal.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
-#include "parser/ast.h"
+#include "parser/ast_design.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_module.h"
 
 namespace delta {
 

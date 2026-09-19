@@ -7,6 +7,7 @@
 #include "elaborator/rewrite_algorithm.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
+#include "parser/ast_type.h"
 
 using namespace delta;
 

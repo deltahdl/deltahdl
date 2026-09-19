@@ -1,5 +1,9 @@
+#include <gtest/gtest.h>
+
+#include <cstdint>
 #include <filesystem>
 #include <string>
+#include <string_view>
 #include <system_error>
 
 #include "fixture_simulator.h"

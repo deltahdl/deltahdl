@@ -1,8 +1,6 @@
 #include <gtest/gtest.h>
 
-#include <cstdint>
-
-#include "simulator/specify.h"
+#include "simulator/specify_path_delay.h"
 
 using namespace delta;
 

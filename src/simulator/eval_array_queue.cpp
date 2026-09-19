@@ -1,10 +1,12 @@
 #include <algorithm>
-#include <string>
+#include <cstddef>
+#include <cstdint>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "common/arena.h"
-#include "parser/ast.h"
+#include "common/types.h"
 #include "simulator/eval_array.h"
 #include "simulator/evaluation.h"
 #include "simulator/queue_bound.h"

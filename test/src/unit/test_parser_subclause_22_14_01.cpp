@@ -1,3 +1,7 @@
+#include <gtest/gtest.h>
+
+#include <string>
+
 #include "fixture_parser.h"
 #include "helpers_keyword_version.h"
 #include "helpers_reported_error.h"

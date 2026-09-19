@@ -1,3 +1,8 @@
+#include <gtest/gtest.h>
+
+#include <cstddef>
+#include <string>
+
 #include "fixture_simulator.h"
 
 using namespace delta;

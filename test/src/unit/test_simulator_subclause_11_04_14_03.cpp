@@ -1,7 +1,8 @@
+#include <gtest/gtest.h>
+
 #include "fixture_simulator.h"
 #include "helpers_reported_error.h"
 #include "helpers_stream_unpack_ab.h"
-#include "parser/ast.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
 #include "simulator/sim_context.h"

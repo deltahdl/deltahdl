@@ -3,12 +3,12 @@
 #include <string_view>
 #include <vector>
 
-#include "simulator/vpi.h"
+#include "simulator/vpi_user.h"
 
 // Internal helpers shared between the vpi.cpp translation units. These are file
 // scoped helpers that were promoted from anonymous/static linkage so that the
 // definition in one translation unit can be reused by another. They are not
-// part of the public VPI surface declared in vpi.h.
+// part of the public VPI surface declared in vpi_user.h.
 namespace delta {
 
 // Defined in vpi_helpers_statements.cpp, used by vpi_callbacks.cpp.

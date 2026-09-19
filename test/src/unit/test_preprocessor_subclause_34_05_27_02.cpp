@@ -42,18 +42,16 @@
 
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <string>
 #include <string_view>
 
 #include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "fixture_protect_read.h"
 #include "helpers_protect_block_lines.h"
 #include "helpers_protect_keys.h"
 #include "helpers_text_lines.h"
-#include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_encoding.h"
-#include "preprocessor/protect_envelope_output.h"
 #include "preprocessor/protect_keywords.h"
 #include "preprocessor/protect_processing.h"
 

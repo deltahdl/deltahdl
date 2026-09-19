@@ -1,5 +1,8 @@
+#include <gtest/gtest.h>
+
 #include <optional>
 
+#include "elaborator/const_eval.h"
 #include "fixture_elaborator.h"
 #include "fixture_evaluator.h"
 

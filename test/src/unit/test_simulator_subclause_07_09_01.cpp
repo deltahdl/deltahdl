@@ -6,7 +6,10 @@
 // it through parse -> elaborate -> lower -> run, observing the value the method
 // hands back rather than hand-building the array object.
 
-#include "fixture_simulator.h"
+#include <gtest/gtest.h>
+
+#include <cstdint>
+
 #include "helpers_scheduler.h"
 
 using namespace delta;

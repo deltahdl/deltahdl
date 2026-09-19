@@ -1,8 +1,9 @@
 #include <gtest/gtest.h>
 
-#include "common/arena.h"
+#include "common/types.h"
 #include "fixture_simulator.h"
 #include "model_strength.h"
+#include "model_val4.h"
 #include "simulator/net.h"
 #include "simulator/scheduler.h"
 #include "simulator/variable.h"

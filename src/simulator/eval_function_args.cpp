@@ -1,13 +1,19 @@
 #include <algorithm>
+#include <cstddef>
+#include <cstdint>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
+#include "common/source_loc.h"
+#include "common/types.h"
 #include "elaborator/queue_dim.h"
 #include "elaborator/type_eval.h"
-#include "parser/ast.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_type.h"
 #include "simulator/assoc_element.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_array.h"
@@ -15,6 +21,7 @@
 #include "simulator/evaluation.h"
 #include "simulator/scope.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
 #include "simulator/stmt_exec.h"

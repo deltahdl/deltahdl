@@ -6,6 +6,8 @@
 // declarations and the prototype's method calls parse without any user
 // `class semaphore` definition. Semantics belong to clause 15.3.
 
+#include <gtest/gtest.h>
+
 #include "fixture_parser.h"
 
 using namespace delta;

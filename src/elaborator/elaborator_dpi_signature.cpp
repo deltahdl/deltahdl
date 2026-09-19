@@ -1,14 +1,15 @@
 #include "elaborator/elaborator_dpi_signature.h"
 
-#include <cstdint>
 #include <optional>
 #include <string_view>
 #include <utility>
 #include <vector>
 
 #include "elaborator/const_eval.h"
-#include "parser/ast.h"
+#include "lexer/token.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_module.h"
+#include "parser/ast_type.h"
 
 namespace delta {
 

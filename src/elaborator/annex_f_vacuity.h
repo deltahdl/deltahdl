@@ -1,5 +1,6 @@
 #pragma once
 
+#include "elaborator/annex_f_grammar.h"
 #include "elaborator/annex_f_neutral_satisfaction.h"
 #include "elaborator/annex_f_tight_satisfaction.h"
 
