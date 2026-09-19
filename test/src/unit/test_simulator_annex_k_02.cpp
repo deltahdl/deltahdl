@@ -4,13 +4,21 @@
 // below look for afterwards.
 #define PLI_DLLISPEC
 
+// §K.2's portability help is what defines the sized types the file's own
+// typedefs read, on every platform the annex names and on any other through
+// <sys/types.h>; the annex's file therefore comes first here, ahead of any
+// header that would bring <cstdint> along and hide a platform the help misses,
+// and the width the help promises is read while it is still the only header.
+#include "simulator/vpi_user.h"
+static_assert(sizeof(PLI_UINT64) == 8,
+              "K.2's portability help must define PLI_UINT64 on its own");
+
 #include <gtest/gtest.h>
 
 #include <type_traits>
 
 #include "simulator/sv_vpi_user.h"
 #include "simulator/svdpi.h"
-#include "simulator/vpi_user.h"
 
 namespace {
 
