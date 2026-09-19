@@ -282,4 +282,78 @@ TEST(PackageImportSim,
   EXPECT_EQ(yb->value.ToUint64(), 22u);
 }
 
+// §26.3 (printed page 808 of ~/LRM.pdf) references a package's declarations
+// through the package name whether or not the package was imported, and §6.18
+// (printed page 118) makes an object declared with a typedef's name an object
+// of the type the name stands for. A `pkg::nib_t v;` written as a block item
+// of a sequential block is sized at run time from the design's type_widths
+// table, which the elaborator keys by "pkg::nib_t" and which the simulator
+// looked up by "nib_t" alone, so v was created at the 32-bit carrier that
+// stands in for a type nothing could size: v = -1 read 4294967295 and $bits(v)
+// 32. The -1 is the discriminating value, since 15 and 4294967295 differ.
+TEST(PackageScopeReferenceSim, PackageScopedTypedefSizesBlockLocal) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "package pkg;\n"
+      "  typedef logic [3:0] nib_t;\n"
+      "endpackage\n"
+      "module t;\n"
+      "  logic [31:0] w, b;\n"
+      "  initial begin\n"
+      "    pkg::nib_t v;\n"
+      "    v = -1;\n"
+      "    w = v;\n"
+      "    b = $bits(v);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_EQ(f.ctx.FindVariable("w")->value.ToUint64(), 15u);
+  EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 4u);
+}
+
+// The same lookup answers whether the name stands for a signed type (§6.11.1),
+// which is what a relational operator reads. A block local declared with a
+// package typedef of `byte` and set to -1 is below zero only when the simulator
+// found the typedef behind its scoped name; created unsigned it reads 255.
+TEST(PackageScopeReferenceSim, PackageScopedTypedefKeepsBlockLocalSigned) {
+  auto val = RunAndGet(
+      "package pkg;\n"
+      "  typedef byte sb_t;\n"
+      "endpackage\n"
+      "module t;\n"
+      "  logic [31:0] y;\n"
+      "  initial begin\n"
+      "    pkg::sb_t s;\n"
+      "    s = -1;\n"
+      "    y = (s < 0) ? 1 : 2;\n"
+      "  end\n"
+      "endmodule\n",
+      "y");
+  EXPECT_EQ(val, 1u);
+}
+
+// The same lookup answers what kind of type the name stands for, which is how
+// a §6.16 string reached through a typedef is told from a bit vector. A block
+// local declared with a package typedef of `string` answers len() as a string
+// only when the simulator found the typedef behind its scoped name; as the
+// 32-bit carrier it holds the four characters "abcde" does not fit in.
+TEST(PackageScopeReferenceSim, PackageScopedTypedefMakesBlockLocalAString) {
+  auto val = RunAndGet(
+      "package pkg;\n"
+      "  typedef string str_t;\n"
+      "endpackage\n"
+      "module t;\n"
+      "  logic [31:0] n;\n"
+      "  initial begin\n"
+      "    pkg::str_t s;\n"
+      "    s = \"abcde\";\n"
+      "    n = s.len();\n"
+      "  end\n"
+      "endmodule\n",
+      "n");
+  EXPECT_EQ(val, 5u);
+}
+
 }  // namespace

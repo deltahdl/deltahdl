@@ -15,11 +15,29 @@ namespace delta {
 static bool IsXChar(char c) { return c == 'x' || c == 'X'; }
 static bool IsZChar(char c) { return c == 'z' || c == 'Z' || c == '?'; }
 
+// The key the type_widths, type_kinds and type_signed tables record a named
+// type under. The three are built by PopulateTypeWidths in
+// src/elaborator/elaborator.cpp from the elaborator's typedef table, and that
+// table enters a package's or a class's typedef under "Scope::name"
+// (RegisterScopedTypedef in src/elaborator/elaborator_resolve.cpp), since §26.3
+// references a package's declarations through the package name whether or not
+// the package was imported, and §8.23 makes a class-scoped name a different
+// name from the bare one. A DataType carries the two halves apart, in
+// scope_name and type_name, and every reader here asked the tables for the
+// type_name alone: `pkg::nib_t v;` declared as a block item found nothing
+// under "nib_t", and was created at the 32-bit carrier CreateDeclVariable
+// substitutes for a type nothing could size -- v = -1 read 4294967295 and
+// $bits(v) 32, where §6.18's "type the name stands for" is four bits wide.
+static std::string TypeTableKey(const DataType& type) {
+  if (type.scope_name.empty()) return std::string(type.type_name);
+  return std::string(type.scope_name) + "::" + std::string(type.type_name);
+}
+
 uint32_t DeclaredTypeWidth(const DataType& type, SimContext& ctx) {
   uint32_t width = EvalTypeWidth(type);
   if (width != 0) return width;
   if (type.kind != DataTypeKind::kNamed) return 0;
-  uint32_t base = ctx.FindTypeWidth(type.type_name);
+  uint32_t base = ctx.FindTypeWidth(TypeTableKey(type));
   if (base == 0) return 0;
   // §7.4.4: "Multiple packed dimensions can also be defined in stages with
   // typedef", and a dimension written where the name is used stacks on the ones
@@ -48,14 +66,14 @@ uint32_t DeclaredTypeWidth(const DataType& type, SimContext& ctx) {
 // disagreed about where the type came from until this followed it.
 bool DeclaredTypeIsSigned(const DataType& type, const SimContext& ctx) {
   if (type.kind == DataTypeKind::kNamed)
-    return ctx.FindTypeSigned(type.type_name);
+    return ctx.FindTypeSigned(TypeTableKey(type));
   return IsSignedType(type, {});
 }
 
 bool DeclaredTypeIsString(const DataType& type, const SimContext& ctx) {
   if (type.kind == DataTypeKind::kString) return true;
   return type.kind == DataTypeKind::kNamed &&
-         ctx.FindTypeKind(type.type_name) == DataTypeKind::kString;
+         ctx.FindTypeKind(TypeTableKey(type)) == DataTypeKind::kString;
 }
 
 uint32_t LiteralWidth(std::string_view text, uint64_t val) {
