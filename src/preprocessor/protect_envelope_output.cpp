@@ -1,6 +1,5 @@
 #include "preprocessor/protect_envelope_output.h"
 
-#include <cstddef>
 #include <string>
 #include <string_view>
 

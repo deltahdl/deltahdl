@@ -1,6 +1,5 @@
 #include "preprocessor/protect_key_block.h"
 
-#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <string_view>

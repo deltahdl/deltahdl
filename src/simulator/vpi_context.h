@@ -11,6 +11,7 @@
 
 #include "common/types.h"
 #include "simulator/coverage_control.h"
+#include "simulator/vpi_channel_state.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_data_structs.h"
 #include "simulator/vpi_globals.h"
@@ -336,20 +337,24 @@ class VpiContext {
   // channel; the buffer accessors report what is still pending and the flushed
   // accessors report what a flush has committed.
   void WriteOutputChannel(std::string_view text) {
-    output_channel_buffer_.append(text);
+    channels_.output_channel_buffer.append(text);
   }
-  void WriteLogFile(std::string_view text) { log_file_buffer_.append(text); }
+  void WriteLogFile(std::string_view text) {
+    channels_.log_file_buffer.append(text);
+  }
   const std::string& OutputChannelBuffer() const {
-    return output_channel_buffer_;
+    return channels_.output_channel_buffer;
   }
-  const std::string& LogFileBuffer() const { return log_file_buffer_; }
+  const std::string& LogFileBuffer() const { return channels_.log_file_buffer; }
   const std::string& OutputChannelFlushed() const {
-    return output_channel_flushed_;
+    return channels_.output_channel_flushed;
   }
-  const std::string& LogFileFlushed() const { return log_file_flushed_; }
+  const std::string& LogFileFlushed() const {
+    return channels_.log_file_flushed;
+  }
   // Forces the next Flush() down the failure path so the nonzero return can be
   // exercised.
-  void SetFlushShouldFail(bool fail) { flush_should_fail_ = fail; }
+  void SetFlushShouldFail(bool fail) { channels_.flush_should_fail = fail; }
 
   // §38.27: open a file for writing and return a multichannel descriptor (mcd)
   // naming it. A fresh descriptor selects a single channel drawn from the bits
@@ -377,17 +382,20 @@ class VpiContext {
   // accessors let a test observe which descriptor names a file; the failure
   // hook forces the next open down its error return.
   void RegisterFopenMcdFile(const std::string& filename, PLI_UINT32 mcd) {
-    mcd_open_files_[filename] = mcd;
-    mcd_allocated_channels_ |= mcd;
+    channels_.mcd_open_files[filename] = mcd;
+    channels_.mcd_allocated_channels |= mcd;
   }
   PLI_UINT32 McdForFile(const std::string& filename) const {
-    auto it = mcd_open_files_.find(filename);
-    return it == mcd_open_files_.end() ? 0u : it->second;
+    auto it = channels_.mcd_open_files.find(filename);
+    return it == channels_.mcd_open_files.end() ? 0u : it->second;
   }
   bool IsMcdFileOpen(const std::string& filename) const {
-    return mcd_open_files_.find(filename) != mcd_open_files_.end();
+    return channels_.mcd_open_files.find(filename) !=
+           channels_.mcd_open_files.end();
   }
-  void SetMcdOpenShouldFail(bool fail) { mcd_open_should_fail_ = fail; }
+  void SetMcdOpenShouldFail(bool fail) {
+    channels_.mcd_open_should_fail = fail;
+  }
 
   // §38.25: flush the output buffers for the file(s) named by a multichannel
   // descriptor. Because the channels are discrete bits of the integer mcd, one
@@ -430,14 +438,20 @@ class VpiContext {
   // failure hook forces the next flush down its nonzero return.
   void WriteMcdChannel(PLI_UINT32 channel, std::string_view text);
   const std::string& McdChannelBuffer(PLI_UINT32 channel) const {
-    auto it = mcd_channel_buffers_.find(channel);
-    return it == mcd_channel_buffers_.end() ? kEmptyMcdBuffer : it->second;
+    auto it = channels_.mcd_channel_buffers.find(channel);
+    return it == channels_.mcd_channel_buffers.end()
+               ? channels_.empty_mcd_buffer
+               : it->second;
   }
   const std::string& McdChannelFlushed(PLI_UINT32 channel) const {
-    auto it = mcd_channel_flushed_.find(channel);
-    return it == mcd_channel_flushed_.end() ? kEmptyMcdBuffer : it->second;
+    auto it = channels_.mcd_channel_flushed.find(channel);
+    return it == channels_.mcd_channel_flushed.end()
+               ? channels_.empty_mcd_buffer
+               : it->second;
   }
-  void SetMcdFlushShouldFail(bool fail) { mcd_flush_should_fail_ = fail; }
+  void SetMcdFlushShouldFail(bool fail) {
+    channels_.mcd_flush_should_fail = fail;
+  }
 
   VpiHandle HandleMulti(int type, VpiHandle ref1, VpiHandle ref2);
 
@@ -826,43 +840,9 @@ class VpiContext {
   int default_compat_mode_ = 0;
   bool default_compat_mode_selected_ = false;
 
-  // §38.5: the simulator's output channel and current log file each hold
-  // written text in an in-memory buffer until vpi_flush() commits it. A flush
-  // appends each buffer to its committed stream and clears the buffer.
-  std::string output_channel_buffer_;
-  std::string output_channel_flushed_;
-  std::string log_file_buffer_;
-  std::string log_file_flushed_;
-  // Test hook that drives vpi_flush() down its failure return.
-  bool flush_should_fail_ = false;
-
-  // §38.27: descriptors handed out by vpi_mcd_open(), keyed by file name so a
-  // repeated open of the same file returns the descriptor it already holds.
-  // mcd_allocated_channels_ marks every channel bit currently in use - both the
-  // ones this routine assigned and any seeded from $fopen - so a fresh open can
-  // pick an unused channel. Channel 1 (LSB) and channel 32 (MSB) are reserved
-  // and never selected.
-  std::unordered_map<std::string, PLI_UINT32> mcd_open_files_;
-  PLI_UINT32 mcd_allocated_channels_ = 0;
-  // Test hook that drives vpi_mcd_open() down its error return.
-  bool mcd_open_should_fail_ = false;
-
-  // §38.25: each open mcd channel holds the text written to its file in an
-  // in-memory buffer until vpi_mcd_flush() commits it. A flush appends each
-  // named channel's buffer to its committed stream and clears the buffer. Keyed
-  // by the single channel bit so one descriptor's several channels are flushed
-  // together.
-  std::unordered_map<PLI_UINT32, std::string> mcd_channel_buffers_;
-  std::unordered_map<PLI_UINT32, std::string> mcd_channel_flushed_;
-  // Test hook that drives vpi_mcd_flush() down its failure return.
-  bool mcd_flush_should_fail_ = false;
-  // Returned by the channel accessors when a channel has no buffered or flushed
-  // text, so they can hand back a reference without inserting an entry.
-  const std::string kEmptyMcdBuffer;
-
-  // §38.26: the single buffer vpi_mcd_name() reuses for its result, so each
-  // call overwrites the previous returned value. Separate from get_str_buffer_.
-  std::string mcd_name_buffer_;
+  // §38.5, §38.25 to §38.28: the output channel, log file and multichannel
+  // descriptor state, declared in simulator/vpi_channel_state.h.
+  VpiChannelState channels_;
 
   VpiErrorInfo last_error_ = {};
 

@@ -1,6 +1,5 @@
 #include <gtest/gtest.h>
 
-#include <cstddef>
 
 #include "simulator/dpi_c_type.h"
 #include "simulator/svdpi.h"

@@ -1728,7 +1728,7 @@ jobs:
             out=$(clang-include-cleaner -p build/headers --print=changes "$0" 2>&1)
             status=$?
             if [ -n "$out" ] || [ "$status" -ne 0 ]; then
-              echo "::error file=$0::includes do not match uses"
+              echo "::error file=$0::$0: includes do not match uses"
               echo "$out"
               exit 1
             fi

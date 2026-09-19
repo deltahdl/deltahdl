@@ -1,6 +1,5 @@
 #include "preprocessor/protect_digest_block.h"
 
-#include <cstddef>
 #include <string>
 #include <string_view>
 

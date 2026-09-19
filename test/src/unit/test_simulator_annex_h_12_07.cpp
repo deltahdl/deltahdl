@@ -1,7 +1,6 @@
 #include <gtest/gtest.h>
 
 #include <array>
-#include <cstddef>
 
 #include "parser/ast_type.h"
 #include "simulator/dpi_c_type.h"

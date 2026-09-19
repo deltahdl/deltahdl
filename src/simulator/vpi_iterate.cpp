@@ -1,7 +1,6 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdarg>
-#include <cstddef>
 #include <vector>
 
 #include "simulator/vpi_user.h"

@@ -31,11 +31,6 @@ namespace delta {
 class Arena;
 class DiagEngine;
 struct Expr;
-struct RtlirDesign;
-struct RtlirModule;
-struct RtlirVariable;
-struct RtlirModuleInst;
-struct RtlirParamDecl;
 
 // The elaborator: it reads the compilation unit the parser produced and builds
 // the RtlirDesign the simulator runs. Two groups of rules that turn on nothing

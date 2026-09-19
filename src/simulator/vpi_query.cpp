@@ -1,6 +1,5 @@
 #include <cctype>
 #include <cstdarg>
-#include <cstddef>
 #include <optional>
 
 #include "simulator/vpi_coverage.h"
