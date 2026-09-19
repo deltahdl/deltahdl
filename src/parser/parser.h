@@ -600,8 +600,12 @@ class Parser {
   Stmt* ParseReleaseStmt();
   bool IsBlockVarDeclStart();
   bool IsBlockVarDeclStartCore();
-  // True when a leading known-type name is actually a scoped statement
-  // (Class::method(...) call or Class::prop = ... assignment), not a
+  // True when the current identifier is followed by `::` and another
+  // identifier, the `pkg::t` or `Cls::t` spelling of A.2.2.1's scoped
+  // type_identifier. The lexer position is restored before returning.
+  bool AtScopedTypeName();
+  // True when a leading type name, known or scoped, is actually a scoped
+  // statement (Class::method(...) call or Class::prop = ... assignment), not a
   // scoped-type declaration. Assumes the current token is the type name.
   bool IsScopedCallOrAssignStmt();
   void ParseBlockVarDecls(std::vector<Stmt*>& stmts);

@@ -408,14 +408,31 @@ bool Parser::IsBlockVarDeclStartCore() {
     lexer_.RestorePos(saved);
     return is_decl;
   }
-  if (!Check(TokenKind::kIdentifier) ||
-      known_types_.count(CurrentToken().text) == 0) {
+  if (!Check(TokenKind::kIdentifier)) return false;
+  // A.2.2.1 lets a data_type be a type_identifier behind a package_scope or a
+  // class_scope, and A.2.8 admits any data_declaration as a block item, so an
+  // identifier followed by `::` opens a declaration whether or not the leading
+  // name is one this scope knows as a type: a package name never is, and
+  // ParseImplicitTypeOrInst reads the module-level `pkg::t v;` the same way.
+  // Only a bare name is held to known_types_; a bare unknown identifier at the
+  // head of a block item is a statement, and the undeclared-type reading
+  // LooksLikeUndeclaredTypeDecl explains belongs to the module-level path
+  // alone, where no statement can stand.
+  if (known_types_.count(CurrentToken().text) == 0 && !AtScopedTypeName()) {
     return false;
   }
   // A leading known type name usually begins a declaration (`Type v;`,
   // `pkg::Type v;`), but a scoped call or assignment is a statement, not a
   // declaration (§8.10/§8.23).
   return !IsScopedCallOrAssignStmt();
+}
+
+bool Parser::AtScopedTypeName() {
+  auto saved = lexer_.SavePos();
+  Consume();
+  bool scoped = Match(TokenKind::kColonColon) && CheckIdentifier();
+  lexer_.RestorePos(saved);
+  return scoped;
 }
 
 bool Parser::IsScopedCallOrAssignStmt() {
@@ -427,10 +444,17 @@ bool Parser::IsScopedCallOrAssignStmt() {
       if (!Match(TokenKind::kColonColon)) break;
     }
   }
-  // A known type name reached here either bare or after a `::` scope path. If
-  // it is immediately followed by a call `(`, an assignment operator, or the
-  // `'{` that opens a §10.9 assignment pattern, it is a statement rather than a
-  // declaration. The bare-assignment case covers an embedded covergroup
+  // A.2.2.1 lets packed dimensions follow the type_identifier, so what decides
+  // is the token after any `[...]` groups: `pkg::t [1:0] w;` reaches a variable
+  // name there and `pkg::arr[0] = 4;` an assignment operator.
+  SkipBracketedDims();
+  // A type name reached here either bare or after a `::` scope path. If it is
+  // immediately followed by a call `(`, an assignment operator, the `'{` that
+  // opens a §10.9 assignment pattern, a `.` member select or a `++`/`--`, it is
+  // a statement rather than a declaration: no data_declaration puts any of
+  // those after its type's dimensions, and A.2.2.1's one `.` inside a data_type
+  // follows `virtual interface`, a keyword and not an identifier. The
+  // bare-assignment case covers an embedded covergroup
   // (§19.4): `covergroup cg ... endgroup` implicitly declares both the type
   // `cg` and a variable `cg`, so `cg = new;` is an assignment to that variable,
   // not the start of a `cg <name>` declaration. The `'{` case covers §10.9's
@@ -440,10 +464,12 @@ bool Parser::IsScopedCallOrAssignStmt() {
   // name. It cannot be a declaration: §6.8 continues a data_declaration with a
   // list_of_variable_decl_assignments, which A.2.3 begins with a
   // variable_identifier, so no declaration puts a `'{` after its type.
-  bool is_stmt = Check(TokenKind::kLParen) || Check(TokenKind::kEq) ||
-                 Check(TokenKind::kLtEq) ||
-                 Check(TokenKind::kApostropheLBrace) ||
-                 IsCompoundAssignOp(CurrentToken().kind);
+  bool is_stmt =
+      Check(TokenKind::kLParen) || Check(TokenKind::kEq) ||
+      Check(TokenKind::kLtEq) || Check(TokenKind::kApostropheLBrace) ||
+      Check(TokenKind::kDot) || Check(TokenKind::kPlusPlus) ||
+      Check(TokenKind::kMinusMinus) || Check(TokenKind::kSemicolon) ||
+      IsCompoundAssignOp(CurrentToken().kind);
   lexer_.RestorePos(saved);
   return is_stmt;
 }
@@ -458,7 +484,19 @@ void Parser::ParseBlockDataDecl(std::vector<Stmt*>& stmts,
     is_automatic = Match(TokenKind::kKwAutomatic);
     is_static = !is_automatic && Match(TokenKind::kKwStatic);
   }
-  DataType dtype = ParseDataType();
+  // ParseDataType reads an identifier as a named type only when known_types_
+  // holds it, which a package name never is; the scoped form
+  // IsBlockVarDeclStartCore admitted is read here by ParseNamedType, whose
+  // `::` walk and `#(...)` parameters are what the leading known-type case
+  // reaches through ParseDataType.
+  DataType dtype;
+  if (Check(TokenKind::kIdentifier) &&
+      known_types_.count(CurrentToken().text) == 0 && AtScopedTypeName()) {
+    dtype = ParseNamedType();
+    ParsePackedDims(dtype);
+  } else {
+    dtype = ParseDataType();
+  }
   if (saw_var && dtype.kind == DataTypeKind::kImplicit &&
       Check(TokenKind::kLBracket)) {
     ParsePackedDims(dtype);

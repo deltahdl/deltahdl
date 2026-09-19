@@ -2,10 +2,13 @@
 
 #include <cstddef>
 #include <iterator>
+#include <string>
+#include <string_view>
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
+#include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
 
@@ -354,6 +357,137 @@ TEST(SequentialBlockParsing, MissingEndNames9_3_1) {
       "  initial begin\n"
       "    a = 1;");
   EXPECT_TRUE(ReportedError(r.diags, "expected 'end'", 3, "9.3.1"));
+}
+
+// A.2.2.1 lets a data_type be a type_identifier behind a package_scope, and
+// A.2.8 lets any data_declaration open a sequential block, so `pkg::t v;` is a
+// block item whatever the enclosing scope has imported. The package's type is
+// never imported here and `pkg` is a package name rather than a type name, so
+// the declaration is decided on the `::` alone: a predicate that first asked
+// whether the leading name is a known type read the line as an expression
+// statement and demanded a `;` where the variable name stands.
+static const char* const kScopedTypePackage =
+    "package pkg;\n"
+    "  typedef logic [3:0] nib_t;\n"
+    "  function automatic int f(int x); return x; endfunction\n"
+    "  task automatic t(); endtask\n"
+    "  int v;\n"
+    "  int arr[4];\n"
+    "endpackage\n";
+
+static void ExpectScopedNibDecl(const Stmt* s, std::string_view var_name) {
+  ASSERT_NE(s, nullptr);
+  EXPECT_EQ(s->kind, StmtKind::kVarDecl);
+  EXPECT_EQ(s->var_decl_type.kind, DataTypeKind::kNamed);
+  EXPECT_EQ(s->var_decl_type.scope_name, "pkg");
+  EXPECT_EQ(s->var_decl_type.type_name, "nib_t");
+  EXPECT_EQ(s->var_name, var_name);
+}
+
+TEST(BlockVarDeclParsing, PackageScopedTypeDeclInSeqBlock) {
+  auto r = Parse(std::string(kScopedTypePackage) +
+                 "module m;\n"
+                 "  initial begin\n"
+                 "    pkg::nib_t v;\n"
+                 "    v = 4'd3;\n"
+                 "  end\n"
+                 "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* body = InitialBody(r);
+  ASSERT_NE(body, nullptr);
+  ASSERT_EQ(body->stmts.size(), 2u);
+  ExpectScopedNibDecl(body->stmts[0], "v");
+  EXPECT_EQ(body->stmts[1]->kind, StmtKind::kBlockingAssign);
+}
+
+// The packed dimension A.2.2.1 lets follow the type_identifier: `[` after the
+// scoped name is not what makes the line a statement, the token after the
+// closing `]` is.
+TEST(BlockVarDeclParsing, PackageScopedTypeWithPackedDimDeclInSeqBlock) {
+  auto r = Parse(std::string(kScopedTypePackage) +
+                 "module m;\n"
+                 "  initial begin\n"
+                 "    pkg::nib_t [1:0] w;\n"
+                 "  end\n"
+                 "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* body = InitialBody(r);
+  ASSERT_NE(body, nullptr);
+  ASSERT_EQ(body->stmts.size(), 1u);
+  ExpectScopedNibDecl(body->stmts[0], "w");
+  EXPECT_NE(body->stmts[0]->var_decl_type.packed_dim_left, nullptr);
+}
+
+TEST(BlockVarDeclParsing, PackageScopedTypeDeclInForkBlock) {
+  auto r = Parse(std::string(kScopedTypePackage) +
+                 "module m;\n"
+                 "  initial\n"
+                 "    fork\n"
+                 "      pkg::nib_t v;\n"
+                 "      v = 4'd3;\n"
+                 "    join\n"
+                 "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* body = InitialBody(r);
+  ASSERT_NE(body, nullptr);
+  EXPECT_EQ(body->kind, StmtKind::kFork);
+  ASSERT_EQ(body->fork_stmts.size(), 2u);
+  ExpectScopedNibDecl(body->fork_stmts[0], "v");
+  EXPECT_EQ(body->fork_stmts[1]->kind, StmtKind::kBlockingAssign);
+}
+
+TEST(BlockVarDeclParsing, PackageScopedTypeDeclInFunctionBody) {
+  auto r = Parse(std::string(kScopedTypePackage) +
+                 "module m;\n"
+                 "  function automatic int g();\n"
+                 "    pkg::nib_t v;\n"
+                 "    v = 4'd3;\n"
+                 "    return v;\n"
+                 "  endfunction\n"
+                 "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* fn = FindFunc(r, "g");
+  ASSERT_NE(fn, nullptr);
+  ASSERT_EQ(fn->func_body_stmts.size(), 3u);
+  ExpectScopedNibDecl(fn->func_body_stmts[0], "v");
+  EXPECT_EQ(fn->func_body_stmts[1]->kind, StmtKind::kBlockingAssign);
+}
+
+// The same leading `pkg::` opens a statement when what follows the scoped name
+// is a call's `(`, an assignment operator, a select on the way to one, or the
+// `;` of a task call written without its argument list, so each of these stays
+// the statement it is with the leading name unknown as a type. `pkg::arr[0]`
+// is what tells the packed-dimension case above apart: after the `]` comes `=`
+// here and a variable name there.
+TEST(BlockVarDeclParsing, PackageScopedCallAndAssignStayStatements) {
+  auto r = Parse(std::string(kScopedTypePackage) +
+                 "module m;\n"
+                 "  initial begin\n"
+                 "    pkg::f(1);\n"
+                 "    pkg::v = 1;\n"
+                 "    pkg::v <= 2;\n"
+                 "    pkg::v += 3;\n"
+                 "    pkg::arr[0] = 4;\n"
+                 "    pkg::v++;\n"
+                 "    pkg::t;\n"
+                 "  end\n"
+                 "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* body = InitialBody(r);
+  ASSERT_NE(body, nullptr);
+  ASSERT_EQ(body->stmts.size(), 7u);
+  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kExprStmt);
+  EXPECT_EQ(body->stmts[6]->kind, StmtKind::kExprStmt);
+  EXPECT_EQ(body->stmts[1]->kind, StmtKind::kBlockingAssign);
+  EXPECT_EQ(body->stmts[2]->kind, StmtKind::kNonblockingAssign);
+  EXPECT_EQ(body->stmts[3]->kind, StmtKind::kBlockingAssign);
+  EXPECT_EQ(body->stmts[4]->kind, StmtKind::kBlockingAssign);
+  for (const Stmt* s : body->stmts) EXPECT_NE(s->kind, StmtKind::kVarDecl);
 }
 
 }  // namespace
