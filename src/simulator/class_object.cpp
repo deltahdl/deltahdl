@@ -192,6 +192,9 @@ ClassObject* ClassObject::ShallowCopy(Arena& arena) const {
   // above, and the index type the declaration gave the property.
   for (const auto& [name, aa] : assoc_properties)
     copy->assoc_properties[name] = CopyAssocArray(aa, arena);
+  // §8.12 has the copy be of the same class, which for a parameterized class
+  // is the same specialization (§8.25), so it is bound to the same types.
+  copy->type_param_actuals = type_param_actuals;
   // §8.12: a shallow copy carries over the source object's internal
   // randomization state. The per-instance RNG (its seed and live generator
   // state) is duplicated into the new object so it resumes from where the

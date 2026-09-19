@@ -117,6 +117,20 @@ class DeclaredNameTables {
   void RegisterInstanceType(std::string_view prefix, std::string_view type);
   std::string_view FindInstanceType(std::string_view prefix) const;
 
+  // §8.25: the parameter actuals the declaration of the class variable `var`
+  // wrote in its `#(...)`, as the parser recorded them, one DataType per
+  // actual in the order written (or with param_arg_name set for the named
+  // form). A type actual has no expression for
+  // SimContext::GetVariableClassParamExprs to carry -- `string` is a type, not
+  // a value -- so this is what binds a type parameter to the object a `new` on
+  // the variable constructs (ApplyClassParamOverrides in
+  // src/simulator/eval_function.cpp). The list lives in the declaration's AST,
+  // which outlives the run. Null for a variable declared with no `#(...)`.
+  void RegisterVariableClassTypeParams(std::string_view var,
+                                       const std::vector<DataType>* params);
+  const std::vector<DataType>* FindVariableClassTypeParams(
+      std::string_view var) const;
+
   // §25.9 virtual interface runtime. A virtual interface is a value: the
   // handle of the interface instance it represents, held in the 64-bit
   // Logic4Vec of whatever declares it -- a module variable, a subroutine
@@ -170,6 +184,8 @@ class DeclaredNameTables {
   std::unordered_map<std::string_view, bool> type_signed_;
 
   std::unordered_map<std::string, std::string> instance_types_;
+  std::unordered_map<std::string_view, const std::vector<DataType>*>
+      var_class_type_params_;
 
   // §25.9: the scope of each interface instance a virtual interface handle
   // has been issued for, at handle minus one, and the handle each scope was

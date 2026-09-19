@@ -26,10 +26,44 @@
 
 namespace delta {
 
+// §8.25: the actual the `#(...)` list `actuals` gives the parameter `pname`,
+// the i-th of the class's: by name where an actual was written `.name(type)`
+// (§23.10.2.2), else by position, and null where the list gives it none, which
+// leaves the parameter at the default the class declares.
+static const DataType* ActualForParam(const std::vector<DataType>& actuals,
+                                      size_t i, std::string_view pname) {
+  for (const auto& actual : actuals) {
+    if (actual.param_arg_name == pname) return &actual;
+  }
+  if (i < actuals.size() && actuals[i].param_arg_name.empty())
+    return &actuals[i];
+  return nullptr;
+}
+
+// §8.25: binds each type parameter of the object's class to the type the
+// variable's declaration wrote for it, so that a property declared with the
+// parameter as its type or as its associative index -- uvm_pool's `T
+// pool[KEY]` -- is read with the bound type rather than with the name. A type
+// actual is no expression, so the value loop below cannot carry it. Nothing
+// is bound for a variable declared with no `#(...)`, which is the default
+// specialization (§8.25.1) and reads the defaults.
+static void BindTypeParamActuals(ClassObject* obj,
+                                 const std::vector<DataType>* actuals) {
+  if (actuals == nullptr) return;
+  const ClassDecl& decl = *obj->type->decl;
+  for (size_t i = 0; i < decl.params.size(); ++i) {
+    std::string_view pname = decl.params[i].first;
+    if (decl.type_param_names.count(pname) == 0) continue;
+    if (const DataType* actual = ActualForParam(*actuals, i, pname))
+      obj->type_param_actuals[std::string(pname)] = actual;
+  }
+}
+
 void ApplyClassParamOverrides(std::string_view var_name, uint64_t handle,
                               SimContext& ctx, Arena& arena) {
   auto* obj = ctx.GetClassObject(handle);
   if (!obj || !obj->type || !obj->type->decl) return;
+  BindTypeParamActuals(obj, ctx.FindVariableClassTypeParams(var_name));
   const auto& param_exprs = ctx.GetVariableClassParamExprs(var_name);
   if (param_exprs.empty()) return;
   const auto& params = obj->type->decl->params;

@@ -65,18 +65,28 @@ bool IsAssocIndexDim(const Expr* dim, SimContext& ctx) {
 // module-level declaration; the width it would give is the product of the
 // declared dimensions, which the dimension expression carries in its own
 // elements.
-AssocArraySpec AssocIndexSpec(const Expr* dim, bool elem_4state,
-                              SimContext& ctx) {
+AssocArraySpec AssocIndexSpecOfType(const DataType& index_type,
+                                    bool elem_4state, SimContext& ctx) {
   AssocArraySpec spec;
-  spec.is_wildcard = dim->text == "*";
   spec.is_4state = elem_4state;
-  DataType index_type = TypeNameToDataType(dim->text);
   if (index_type.kind != DataTypeKind::kNamed) {
-    spec.index_width = EvalTypeWidth(index_type);
+    // A string has no width to key by (§7.8.2 keys it by value), so it keeps
+    // the default rather than the 0 EvalTypeWidth answers for it.
+    if (uint32_t width = EvalTypeWidth(index_type); width != 0)
+      spec.index_width = width;
     spec.is_index_signed = IsSignedType(index_type, {});
-  } else if (uint32_t named = ctx.FindTypeWidth(dim->text); named != 0) {
+  } else if (uint32_t named = ctx.FindTypeWidth(index_type.type_name);
+             named != 0) {
     spec.index_width = named;
   }
+  return spec;
+}
+
+AssocArraySpec AssocIndexSpec(const Expr* dim, bool elem_4state,
+                              SimContext& ctx) {
+  AssocArraySpec spec =
+      AssocIndexSpecOfType(TypeNameToDataType(dim->text), elem_4state, ctx);
+  spec.is_wildcard = dim->text == "*";
   // A.2.2.1 lets an integer type carry its own signing, and §7.8.4 keys an
   // entry off the index under it: the keys of a `byte unsigned` index order 0
   // to 255 rather than -128 to 127.
@@ -316,8 +326,11 @@ static bool TryExecWeakRefVarDecl(const Stmt* stmt, SimContext& ctx,
   return true;
 }
 
-// Records the class type-parameter override expressions (if any) for the
-// just-created class variable `var_name`.
+// Records the class parameter overrides (if any) for the just-created class
+// variable `var_name`: the value expressions, and the actuals themselves as
+// the parser recorded them, since §8.25 lets an actual be a type -- `#(string,
+// int)` -- which is no expression and binds a type parameter of the class the
+// variable's `new` constructs.
 static void SetClassParamExprs(std::string_view var_name,
                                const std::vector<DataType>& type_params,
                                SimContext& ctx) {
@@ -328,6 +341,7 @@ static void SetClassParamExprs(std::string_view var_name,
     exprs.push_back(tp.type_ref_expr);
   }
   ctx.SetVariableClassParamExprs(var_name, std::move(exprs));
+  ctx.RegisterVariableClassTypeParams(var_name, &type_params);
 }
 
 // Handles `T v = new src;` shallow-copy construction. Returns true if `init`

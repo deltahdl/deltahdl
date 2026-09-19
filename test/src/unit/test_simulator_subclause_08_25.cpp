@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 #include <vector>
 
 #include "common/types.h"
@@ -347,6 +348,129 @@ TEST(ClassSim, TypeParameterDefaultYieldsUsableProperty) {
                       "endmodule\n",
                       "out"),
             42u);
+}
+
+// uvm_pool's shape: a property whose associative index (§7.8) is a type
+// parameter of the class. §8.25 makes `pool #(string, int)` a specialization
+// binding KEY to string, so the property is a string-keyed array and the
+// entry add() writes is the one get() reads back through the class's own
+// methods.
+constexpr const char* kPoolClass =
+    "class pool #(type KEY = int, type T = int);\n"
+    "  protected T pool_[KEY];\n"
+    "  function void add(KEY key, T item);\n"
+    "    pool_[key] = item;\n"
+    "  endfunction\n"
+    "  function T get(KEY key);\n"
+    "    if (pool_.exists(key)) return pool_[key];\n"
+    "    return 0;\n"
+    "  endfunction\n"
+    "  function int has(KEY key);\n"
+    "    return pool_.exists(key);\n"
+    "  endfunction\n"
+    "  function int count();\n"
+    "    return pool_.num();\n"
+    "  endfunction\n"
+    "  function void drop(KEY key);\n"
+    "    pool_.delete(key);\n"
+    "  endfunction\n"
+    "  function int total();\n"
+    "    KEY k;\n"
+    "    int sum = 0;\n"
+    "    if (pool_.first(k))\n"
+    "      do sum = sum + pool_[k];\n"
+    "      while (pool_.next(k));\n"
+    "    return sum;\n"
+    "  endfunction\n"
+    "endclass\n";
+
+// Before the dimension naming a type parameter was read as one, IsAssocIndexDim
+// saw no width for KEY and the property was no array at all: add() went
+// nowhere and get() answered its 0.
+TEST(ClassSim, TypeParameterIndexedPoolBoundToStringKeysAddsAndGets) {
+  EXPECT_EQ(
+      RunAndGet(std::string(kPoolClass) + "module t;\n"
+                                          "  int out;\n"
+                                          "  initial begin\n"
+                                          "    pool #(string, int) p = new;\n"
+                                          "    p.add(\"answer\", 42);\n"
+                                          "    p.add(\"other\", 7);\n"
+                                          "    out = p.get(\"answer\");\n"
+                                          "  end\n"
+                                          "endmodule\n",
+                "out"),
+      0x2Au);
+}
+
+// §7.9.3 and §7.9.1 through the same specialization: the key add() wrote
+// exists, one it did not write does not, and num() counts the two entries.
+TEST(ClassSim, TypeParameterIndexedPoolBoundToStringKeysReportsExistsAndNum) {
+  EXPECT_EQ(RunAndGet(std::string(kPoolClass) +
+                          "module t;\n"
+                          "  int out;\n"
+                          "  initial begin\n"
+                          "    pool #(string, int) p = new;\n"
+                          "    p.add(\"answer\", 42);\n"
+                          "    p.add(\"other\", 7);\n"
+                          "    out = p.has(\"answer\") * 100 +\n"
+                          "          p.has(\"nope\") * 10 + p.count();\n"
+                          "  end\n"
+                          "endmodule\n",
+                      "out"),
+            102u);
+}
+
+// §8.25.1: the unadorned name denotes the default specialization, KEY its
+// default int, so the property is an int-keyed array.
+TEST(ClassSim, TypeParameterIndexedPoolDefaultsToIntKeys) {
+  EXPECT_EQ(RunAndGet(std::string(kPoolClass) + "module t;\n"
+                                                "  int out;\n"
+                                                "  initial begin\n"
+                                                "    pool p;\n"
+                                                "    p = new;\n"
+                                                "    p.add(5, 42);\n"
+                                                "    p.add(9, 1);\n"
+                                                "    out = p.get(5);\n"
+                                                "  end\n"
+                                                "endmodule\n",
+                      "out"),
+            0x2Au);
+}
+
+TEST(ClassSim, TypeParameterIndexedPoolDefaultKeysReportExistsAndNum) {
+  EXPECT_EQ(RunAndGet(std::string(kPoolClass) +
+                          "module t;\n"
+                          "  int out;\n"
+                          "  initial begin\n"
+                          "    pool p = new;\n"
+                          "    p.add(5, 42);\n"
+                          "    p.add(9, 1);\n"
+                          "    out = p.has(5) * 100 + p.has(6) * 10 +\n"
+                          "          p.count();\n"
+                          "  end\n"
+                          "endmodule\n",
+                      "out"),
+            102u);
+}
+
+// §7.9.2 and §7.9.4 through §7.9.6 on the default specialization: delete()
+// removes the one entry, and first()/next() over a local of the KEY type
+// visit the two that remain.
+TEST(ClassSim, TypeParameterIndexedPoolDeletesAndTraverses) {
+  EXPECT_EQ(RunAndGet(std::string(kPoolClass) +
+                          "module t;\n"
+                          "  int out;\n"
+                          "  initial begin\n"
+                          "    pool p = new;\n"
+                          "    p.add(1, 10);\n"
+                          "    p.add(2, 20);\n"
+                          "    p.add(3, 30);\n"
+                          "    p.drop(2);\n"
+                          "    out = p.total() * 10 + p.count();\n"
+                          "  end\n"
+                          "endmodule\n",
+                      "out"),
+            402u);
 }
 
 }  // namespace

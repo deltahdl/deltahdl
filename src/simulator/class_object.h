@@ -17,6 +17,7 @@ struct AssocArrayObject;
 struct ClassDecl;
 struct ClassMember;
 struct ConstraintForeachRef;
+struct DataType;
 struct Expr;
 struct ModuleItem;
 class Arena;
@@ -210,6 +211,15 @@ struct ClassObject {
   // ShallowCopy copies the entries, a property being a variable of the object
   // (§8.12).
   std::unordered_map<std::string, AssocArrayObject*> assoc_properties;
+  // §8.25: the type each type parameter of the class is bound to in the
+  // specialization this object was constructed as, keyed by the parameter's
+  // name -- `KEY` to `string` for a `uvm_pool #(string, int)` -- as the
+  // declaration of the variable the `new` was on wrote the actual
+  // (ApplyClassParamOverrides in src/simulator/eval_function.cpp binds it). A
+  // parameter absent here takes the default the class declares
+  // (ClassDecl::param_types), which is §8.25.1's default specialization. The
+  // pointed-to types live in the AST, which outlives the run.
+  std::unordered_map<std::string, const DataType*> type_param_actuals;
   uint32_t ref_count = 0;
 
   // The handle SimContext::AllocateClassObject issued for this object, which is

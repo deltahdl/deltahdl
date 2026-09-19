@@ -11,6 +11,7 @@ namespace delta {
 
 struct ArrayInfo;
 struct AssocArraySpec;
+struct DataType;
 struct Expr;
 struct Stmt;
 struct Variable;
@@ -103,6 +104,16 @@ bool IsAssocIndexDim(const Expr* dim, SimContext& ctx);
 // for, and whose element type is 4-state when `elem_4state` says so.
 AssocArraySpec AssocIndexSpec(const Expr* dim, bool elem_4state,
                               SimContext& ctx);
+
+// Defined in statement_assign_decl.cpp; also used by eval_array_class_assoc.cpp
+// for an index dimension naming a type parameter, whose type is what the
+// specialization bound it to (§8.25) rather than what the dimension spells.
+// §7.8: the index-type attributes of an associative array whose index type is
+// `index_type`, an integral type sized and signed as it declares and a named
+// type as the elaborated table sizes it; the wildcard is no type and is not
+// answered here.
+AssocArraySpec AssocIndexSpecOfType(const DataType& index_type,
+                                    bool elem_4state, SimContext& ctx);
 
 bool TrySelectBlockingAssign(const Expr* lhs, Logic4Vec& rhs_val,
                              SimContext& ctx, Arena& arena);

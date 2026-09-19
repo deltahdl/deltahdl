@@ -19,6 +19,7 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "parser/ast_type.h"
 #include "simulator/sim_context_types.h"
@@ -206,6 +207,17 @@ void DeclaredNameTables::RegisterTypeWidth(std::string_view name,
 uint32_t DeclaredNameTables::FindTypeWidth(std::string_view name) const {
   auto it = type_widths_.find(name);
   return (it != type_widths_.end()) ? it->second : 0;
+}
+
+void DeclaredNameTables::RegisterVariableClassTypeParams(
+    std::string_view var, const std::vector<DataType>* params) {
+  var_class_type_params_[var] = params;
+}
+
+const std::vector<DataType>* DeclaredNameTables::FindVariableClassTypeParams(
+    std::string_view var) const {
+  auto it = var_class_type_params_.find(var);
+  return (it != var_class_type_params_.end()) ? it->second : nullptr;
 }
 
 void DeclaredNameTables::RegisterTypeKind(std::string_view name,
