@@ -12,6 +12,7 @@
 #include "common/arena.h"
 #include "common/types.h"
 #include "parser/ast_class.h"
+#include "simulator/sim_context_types.h"
 #include "simulator/statement_assign_internal.h"
 
 namespace delta {
@@ -142,6 +143,29 @@ void ClassObject::SetPropertyForType(std::string_view name,
   SetProperty(name, val);
 }
 
+// §8.12: the entries and index type of `src` in an AssocArrayObject of the
+// copy's own, each entry's words its own as OwnRhsWords makes them.
+static AssocArrayObject* CopyAssocArray(const AssocArrayObject* src,
+                                        Arena& arena) {
+  auto* dst = arena.Create<AssocArrayObject>();
+  dst->elem_width = src->elem_width;
+  dst->index_width = src->index_width;
+  dst->is_string_key = src->is_string_key;
+  dst->is_wildcard = src->is_wildcard;
+  dst->is_4state = src->is_4state;
+  dst->is_index_signed = src->is_index_signed;
+  dst->has_default = src->has_default;
+  if (src->has_default)
+    dst->default_value = OwnRhsWords(src->default_value, arena);
+  dst->has_elem_init = src->has_elem_init;
+  if (src->has_elem_init) dst->elem_init = OwnRhsWords(src->elem_init, arena);
+  for (const auto& [key, val] : src->int_data)
+    dst->int_data[key] = OwnRhsWords(val, arena);
+  for (const auto& [key, val] : src->str_data)
+    dst->str_data[key] = OwnRhsWords(val, arena);
+  return dst;
+}
+
 ClassObject* ClassObject::ShallowCopy(Arena& arena) const {
   auto* copy = arena.Create<ClassObject>();
   copy->type = type;
@@ -162,6 +186,12 @@ ClassObject* ClassObject::ShallowCopy(Arena& arena) const {
   // the one object it refers to.
   for (const auto& [name, val] : properties)
     copy->properties[name] = OwnRhsWords(val, arena);
+  // §8.12 (shallow copy, step 2) again: a property declared with an
+  // associative dimension is a variable of the object like any other, so the
+  // copy takes entries of its own, each with its own words for the reason
+  // above, and the index type the declaration gave the property.
+  for (const auto& [name, aa] : assoc_properties)
+    copy->assoc_properties[name] = CopyAssocArray(aa, arena);
   // §8.12: a shallow copy carries over the source object's internal
   // randomization state. The per-instance RNG (its seed and live generator
   // state) is duplicated into the new object so it resumes from where the

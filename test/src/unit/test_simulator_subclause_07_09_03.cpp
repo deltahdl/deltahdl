@@ -223,4 +223,61 @@ TEST(AssocArrayExistsMethod, IfConditionTakesElseBranchWhenAbsent) {
   EXPECT_EQ(v, 7u);
 }
 
+// §7.9.3 on a class property (§8.5 restricts no property's type): the key a
+// method of the class wrote exists and one it did not write does not, read
+// in the method by the property's bare name. This is
+// uvm_report_server::get_severity_count's test before it reads the count.
+// Before the property was known as an array the write went nowhere and both
+// queries answered 0.
+TEST(AssocArrayExistsMethod, ReportsTheKeyAClassMethodWroteAndNotAnother) {
+  uint64_t v = RunAndGet(
+      "package p;\n"
+      "  typedef enum { UVM_INFO, UVM_WARNING, UVM_ERROR, UVM_FATAL }\n"
+      "    uvm_severity;\n"
+      "  class srv;\n"
+      "    int m_severity_count[uvm_severity];\n"
+      "    function int probe();\n"
+      "      m_severity_count[UVM_ERROR] = 1;\n"
+      "      return m_severity_count.exists(UVM_ERROR) * 10 +\n"
+      "             m_severity_count.exists(UVM_FATAL);\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "endpackage\n"
+      "import p::*;\n"
+      "module t;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    srv o = new;\n"
+      "    result = o.probe();\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 10u);
+}
+
+// §8.5: the same query through the instance from the module, `o.aa.exists(k)`,
+// sees the entry the method wrote and the one written through the handle.
+TEST(AssocArrayExistsMethod, ReportsThroughAHandleTheKeysAClassPropertyHolds) {
+  uint64_t v = RunAndGet(
+      "class C;\n"
+      "  int aa[string];\n"
+      "  function void fill();\n"
+      "    aa[\"hello\"] = 1;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    C c = new;\n"
+      "    c.fill();\n"
+      "    c.aa[\"world\"] = 2;\n"
+      "    result = c.aa.exists(\"hello\") * 100 + c.aa.exists(\"world\") * 10 "
+      "+\n"
+      "             c.aa.exists(\"sad\");\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 110u);
+}
+
 }  // namespace

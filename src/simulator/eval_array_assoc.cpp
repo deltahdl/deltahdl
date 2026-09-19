@@ -29,6 +29,7 @@
 #include "common/types.h"
 #include "parser/ast_expr.h"
 #include "simulator/eval_array.h"
+#include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_array_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
@@ -217,34 +218,56 @@ static bool AssocTraversal(AssocArrayObject* aa, std::string_view method,
   return AssocIntTraversal(aa, method, ref_var, arena, out);
 }
 
+// The associative array the call `receiver.method(...)` is on, and the method,
+// or null for a call of another shape or on a receiver that names no
+// associative array. §7.9's methods are defined on the array whatever names
+// it: a declared array by its bare name, and, §8.5 putting no restriction on
+// a property's type, a property of an object -- the running method's own by
+// its bare name (§8.11) or any object's through a handle, `o.count.size()` --
+// which FindAssocArrayOfBase resolves. Before it, only the bare name of a
+// declared array was read here, so `m_severity_count.size()` in a method of
+// UVM's uvm_report_server declined and read 0.
+static AssocArrayObject* CallReceiverAssoc(const Expr* expr,
+                                           std::string_view& method,
+                                           SimContext& ctx, Arena& arena) {
+  if (expr == nullptr || expr->lhs == nullptr ||
+      expr->lhs->kind != ExprKind::kMemberAccess) {
+    return nullptr;
+  }
+  const Expr* access = expr->lhs;
+  if (access->is_scope_resolution || access->lhs == nullptr ||
+      access->rhs == nullptr || access->rhs->kind != ExprKind::kIdentifier) {
+    return nullptr;
+  }
+  method = access->rhs->text;
+  return FindAssocArrayOfBase(access->lhs, ctx, arena);
+}
+
 bool TryEvalAssocMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
                             Logic4Vec& out) {
-  MethodCallParts parts;
-  if (!ExtractMethodCallParts(expr, parts)) return false;
-  auto* aa = ctx.FindAssocArray(parts.var_name);
+  std::string_view method;
+  auto* aa = CallReceiverAssoc(expr, method, ctx, arena);
   if (!aa) return false;
-  if (parts.method_name == "size" || parts.method_name == "num") {
+  if (method == "size" || method == "num") {
     out = MakeLogic4VecVal(arena, 32, aa->Size());
     return true;
   }
-  if (parts.method_name == "exists")
-    return AssocExists(aa, expr, ctx, arena, out);
-  if (parts.method_name == "delete") {
+  if (method == "exists") return AssocExists(aa, expr, ctx, arena, out);
+  if (method == "delete") {
     TryExecAssocMethodStmt(expr, ctx, arena);
     out = MakeLogic4VecVal(arena, 1, 0);
     return true;
   }
-  if (parts.method_name == "first" || parts.method_name == "last" ||
-      parts.method_name == "next" || parts.method_name == "prev") {
+  if (method == "first" || method == "last" || method == "next" ||
+      method == "prev") {
     auto* ref_var = ResolveTraversalRef(expr, ctx);
     if (!ref_var) {
       out = MakeLogic4VecVal(arena, 32, 0);
       return true;
     }
-    return AssocTraversal(aa, parts.method_name, ref_var, arena, out);
+    return AssocTraversal(aa, method, ref_var, arena, out);
   }
-  if (auto reduced =
-          TryAssocReduction(aa, parts.method_name, expr, ctx, arena)) {
+  if (auto reduced = TryAssocReduction(aa, method, expr, ctx, arena)) {
     out = *reduced;
     return true;
   }
@@ -269,18 +292,19 @@ static bool ExecAssocDelete(AssocArrayObject* aa, const Expr* expr,
 }
 
 bool TryExecAssocMethodStmt(const Expr* expr, SimContext& ctx, Arena& arena) {
-  MethodCallParts parts;
-  if (!ExtractMethodCallParts(expr, parts)) return false;
-  auto* aa = ctx.FindAssocArray(parts.var_name);
+  std::string_view method;
+  auto* aa = CallReceiverAssoc(expr, method, ctx, arena);
   if (!aa) return false;
-  if (parts.method_name == "delete")
-    return ExecAssocDelete(aa, expr, ctx, arena);
+  if (method == "delete") return ExecAssocDelete(aa, expr, ctx, arena);
   return false;
 }
 
+// §7.9.1 writes `imem.num` without parentheses, and the name on the left of
+// the dot is read as a call's receiver is: a declared array, or the property
+// of the running method's object (§8.11).
 bool TryEvalAssocProperty(std::string_view var_name, std::string_view prop,
                           SimContext& ctx, Arena& arena, Logic4Vec& out) {
-  auto* aa = ctx.FindAssocArray(var_name);
+  auto* aa = FindAssocArrayOfName(var_name, ctx);
   if (!aa) return false;
   if (prop == "size" || prop == "num") {
     out = MakeLogic4VecVal(arena, 32, aa->Size());
@@ -295,7 +319,7 @@ bool TryEvalAssocProperty(std::string_view var_name, std::string_view prop,
 
 bool TryExecAssocPropertyStmt(std::string_view var_name, std::string_view prop,
                               SimContext& ctx, Arena&) {
-  auto* aa = ctx.FindAssocArray(var_name);
+  auto* aa = FindAssocArrayOfName(var_name, ctx);
   if (!aa) return false;
   if (prop == "delete") {
     aa->int_data.clear();

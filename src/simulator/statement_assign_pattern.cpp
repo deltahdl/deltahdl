@@ -13,6 +13,7 @@
 #include "parser/ast_expr.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_array.h"
+#include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_expr_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/queue_bound.h"
@@ -455,11 +456,57 @@ bool TryArrayBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   return false;
 }
 
+// §10.7: the value an associative element is written takes the element's
+// width. A declared array's element is a variable the right-hand side was
+// already sized against as its context (EvalRhsWithStructContext); a class
+// property's is not, the property resolving to no variable, so the value
+// arrives at its own width and is sized here. A string or a real is not a
+// vector to resize (§6.16, §6.12).
+static Logic4Vec SizedAssocElementValue(const Expr* base,
+                                        const AssocArrayObject* aa,
+                                        const Logic4Vec& rhs_val,
+                                        SimContext& ctx, Arena& arena) {
+  const bool kDeclared = base->kind == ExprKind::kIdentifier &&
+                         ctx.FindAssocArray(base->text) == aa;
+  if (kDeclared || rhs_val.is_string || rhs_val.is_real) return rhs_val;
+  return ResizeToWidth(rhs_val, aa->elem_width, arena);
+}
+
+// §9.4.2: the element that changed is an aggregate element, which the clause
+// names among the changes that "shall cause the event expression to be
+// reevaluated", and it lives outside the variable registered under the
+// array's name -- the one an `@(aa[3])` and an `always_comb` reading `aa[3]`
+// both arm on. One statement wrote one entry, so it is announced once. An
+// element of an object's property is a change to "object data members",
+// which the same clause names, and the watchers that can see it sit on the
+// variables designating the object, which the handle finds.
+static void AnnounceAssocElementWrite(const Expr* base, ClassObject* owner,
+                                      SimContext& ctx) {
+  if (owner != nullptr) {
+    ctx.NotifyClassHandleWatchers(owner->handle);
+  } else if (base->kind == ExprKind::kIdentifier) {
+    NotifyOwningVar(ctx, base->text);
+  }
+}
+
+// §7.8: "An entry for a nonexistent associative array element shall be
+// allocated when it is used as the target of an assignment", and the array
+// the target names is a declared one under its bare name or, since §8.5 puts
+// no restriction on a property's type, a property of an object: the running
+// method's own by its bare name (§8.11), or any object's through a handle,
+// `o.count[k] = v`. FindAssocArrayOfBase reads both, and the class property
+// is what the resolution answers where FindAssocArray knows no array of the
+// name -- which is where such a write went before: every writer of
+// TrySelectBlockingAssign declined it and the value went nowhere, so UVM's
+// severity counts, `m_severity_count[s] = 0` in a method of
+// uvm_report_server, left the array at size 0.
 bool TryAssocIndexedWrite(const Expr* lhs, const Logic4Vec& rhs_val,
                           SimContext& ctx, Arena& arena) {
-  if (!lhs->base || lhs->base->kind != ExprKind::kIdentifier) return false;
-  auto* aa = ctx.FindAssocArray(lhs->base->text);
-  if (!aa || !lhs->index) return false;
+  if (!lhs->base || !lhs->index) return false;
+  ClassObject* owner = nullptr;
+  auto* aa = FindAssocArrayOfBase(lhs->base, ctx, arena, &owner);
+  if (!aa) return false;
+  Logic4Vec stored = SizedAssocElementValue(lhs->base, aa, rhs_val, ctx, arena);
   if (aa->is_string_key) {
     auto key = AssocStringKey(EvalExpr(lhs->index, ctx, arena));
     // §10.6.1 has an assign "override all procedural assignments to a
@@ -469,7 +516,7 @@ bool TryAssocIndexedWrite(const Expr* lhs, const Logic4Vec& rhs_val,
     // writer ignore one, and an ignored write changed nothing to announce.
     auto driven = aa->str_drives.find(key);
     if (driven != aa->str_drives.end() && driven->second.Drives()) return true;
-    aa->str_data[key] = rhs_val;
+    aa->str_data[key] = stored;
   } else {
     auto key_val = EvalExpr(lhs->index, ctx, arena);
     if (HasUnknownBits(key_val)) {
@@ -484,14 +531,9 @@ bool TryAssocIndexedWrite(const Expr* lhs, const Logic4Vec& rhs_val,
                            aa->is_index_signed);
     auto driven = aa->int_drives.find(key);
     if (driven != aa->int_drives.end() && driven->second.Drives()) return true;
-    aa->int_data[key] = rhs_val;
+    aa->int_data[key] = stored;
   }
-  // §9.4.2: the element that changed is an aggregate element, which the clause
-  // names among the changes that "shall cause the event expression to be
-  // reevaluated", and it lives outside the variable registered under the
-  // array's name -- the one an `@(aa[3])` and an `always_comb` reading `aa[3]`
-  // both arm on. One statement wrote one entry, so it is announced once.
-  NotifyOwningVar(ctx, lhs->base->text);
+  AnnounceAssocElementWrite(lhs->base, owner, ctx);
   return true;
 }
 

@@ -13,6 +13,7 @@
 
 namespace delta {
 
+struct AssocArrayObject;
 struct ClassDecl;
 struct ClassMember;
 struct ConstraintForeachRef;
@@ -131,6 +132,15 @@ struct ClassTypeInfo {
   // a const ClassTypeInfo* update the shared values.
   mutable std::unordered_map<std::string, Logic4Vec> static_properties;
 
+  // §7.8/§8.9: the entries of each static property declared with an
+  // associative dimension, keyed by the property's name and built on the first
+  // reference to it (ClassAssocProperty in
+  // src/simulator/eval_array_class_assoc.h), §7.8 allocating an associative
+  // array no storage until it is used. Shared by every instance, as
+  // static_properties is, and mutable for the same reason.
+  mutable std::unordered_map<std::string, AssocArrayObject*>
+      static_assoc_properties;
+
   // §18.5.10: a constraint block qualified 'static' has one active/inactive
   // state shared by every instance of the declaring class, rather than a
   // per-object state. constraint_mode() on such a block reads and writes this
@@ -191,6 +201,15 @@ inline constexpr uint64_t kNullClassHandle = 0;
 struct ClassObject {
   const ClassTypeInfo* type = nullptr;
   std::unordered_map<std::string, Logic4Vec> properties;
+  // §7.8/§8.5: the entries of each property declared with an associative
+  // dimension, keyed by the property's bare name. Such a property holds
+  // nothing under `properties`: its elements are allocated one by one as they
+  // are first written (§7.8), which is what an AssocArrayObject models, and
+  // the object holds one per property, built on the first reference to the
+  // property by ClassAssocProperty in src/simulator/eval_array_class_assoc.h.
+  // ShallowCopy copies the entries, a property being a variable of the object
+  // (§8.12).
+  std::unordered_map<std::string, AssocArrayObject*> assoc_properties;
   uint32_t ref_count = 0;
 
   // The handle SimContext::AllocateClassObject issued for this object, which is

@@ -539,4 +539,65 @@ TEST(ObjectPropertySim, SuperWriteLeavesTheXBitsOfWhatItRead) {
   EXPECT_EQ(held->value.ToUint64(), 3u);
 }
 
+// §8.5 puts no restriction on a property's data type, so a property declared
+// with an associative dimension (§7.8) is an associative array of the object:
+// an element written in a method by the property's bare name is an entry of
+// that object's array, and a second object of the class holds none of them.
+// The write went nowhere before the object held such an array, so both counts
+// read 0.
+TEST(ObjectPropertySim, AssociativePropertyBelongsToTheObjectAMethodWroteIt) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  int aa[int];\n"
+                      "  function void put(int k);\n"
+                      "    aa[k] = k * 2;\n"
+                      "  endfunction\n"
+                      "  function int count();\n"
+                      "    return aa.size();\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int out;\n"
+                      "  initial begin\n"
+                      "    C a = new;\n"
+                      "    C b = new;\n"
+                      "    a.put(1);\n"
+                      "    a.put(2);\n"
+                      "    a.put(3);\n"
+                      "    b.put(9);\n"
+                      "    out = a.count() * 10 + b.count();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "out"),
+            31u);
+}
+
+// §8.12: a shallow copy, `C c = new o`, copies the object's properties, the
+// associative one among them, so the copy starts with the source's entries and
+// an entry written to the copy afterwards is the copy's alone.
+TEST(ObjectPropertySim, AssociativePropertyIsCopiedByAShallowCopy) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  int aa[int];\n"
+                      "  function void put(int k);\n"
+                      "    aa[k] = k;\n"
+                      "  endfunction\n"
+                      "  function int count();\n"
+                      "    return aa.size();\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int out;\n"
+                      "  initial begin\n"
+                      "    C o = new;\n"
+                      "    C c;\n"
+                      "    o.put(1);\n"
+                      "    o.put(2);\n"
+                      "    c = new o;\n"
+                      "    c.put(3);\n"
+                      "    out = o.count() * 10 + c.count();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "out"),
+            23u);
+}
+
 }  // namespace

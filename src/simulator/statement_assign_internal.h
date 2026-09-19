@@ -10,6 +10,7 @@
 namespace delta {
 
 struct ArrayInfo;
+struct AssocArraySpec;
 struct Expr;
 struct Stmt;
 struct Variable;
@@ -88,6 +89,20 @@ void ClearSelectIndices(const Expr* lhs, SimContext& ctx);
 // outside one.
 void CreateDeclAggregate(const Stmt* stmt, uint32_t elem_width, SimContext& ctx,
                          Arena& arena);
+
+// Defined in statement_assign_decl.cpp; also used by the class-property
+// resolution in eval_array_class_assoc.cpp. §7.8: whether the unpacked
+// dimension `dim` is an index type -- a keyword type, the `*` wildcard, a
+// class, or a name the elaborated typedef table sizes -- and so declares an
+// associative array rather than a fixed-size one.
+bool IsAssocIndexDim(const Expr* dim, SimContext& ctx);
+
+// Defined in statement_assign_decl.cpp; also used by
+// eval_array_class_assoc.cpp. §7.8: the index-type attributes of an associative
+// array declared with the dimension `dim`, which IsAssocIndexDim has answered
+// for, and whose element type is 4-state when `elem_4state` says so.
+AssocArraySpec AssocIndexSpec(const Expr* dim, bool elem_4state,
+                              SimContext& ctx);
 
 bool TrySelectBlockingAssign(const Expr* lhs, Logic4Vec& rhs_val,
                              SimContext& ctx, Arena& arena);
