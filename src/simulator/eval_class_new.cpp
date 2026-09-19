@@ -260,48 +260,53 @@ static void BindLevelFormals(const ModuleItem* ctor, ConstructorActuals actuals,
   }
 }
 
-static void ConstructLevel(const ClassTypeInfo* info, ClassObject* obj,
-                           ConstructorActuals actuals, const Expr* new_expr,
-                           SimContext& ctx, Arena& arena);
+// §8.7's object under construction, with the `new` call that asked for it and
+// the run it is built in, carried through the levels of its class chain.
+struct Construction {
+  ClassObject* obj;
+  const Expr* new_expr;
+  SimContext& ctx;
+  Arena& arena;
+};
+
+static void ConstructLevel(const ClassTypeInfo* info,
+                           ConstructorActuals actuals, Construction& c);
 
 // The base of `info`, constructed with the actuals its constructor names for
 // it, then the level's own properties initialized; the whole of the implicit
 // constructor and the head of an explicit one.
 static void ConstructBaseThenDefaults(const ClassTypeInfo* info,
-                                      ClassObject* obj, const ModuleItem* ctor,
-                                      const Expr* new_expr, SimContext& ctx,
-                                      Arena& arena) {
+                                      const ModuleItem* ctor, Construction& c) {
   if (info->parent) {
-    ConstructLevel(info->parent, obj,
-                   BaseConstructorActuals(info, ctor, new_expr, arena),
-                   new_expr, ctx, arena);
+    ConstructLevel(info->parent,
+                   BaseConstructorActuals(info, ctor, c.new_expr, c.arena), c);
   }
-  InitClassPropertyDefaults(info, obj, ctx, arena);
+  InitClassPropertyDefaults(info, c.obj, c.ctx, c.arena);
 }
 
-// Constructs the `info` level of `obj` in the order §8.7 gives: the level's
-// constructor formals are bound, its base class is constructed with the
-// actuals BaseConstructorActuals answers, then the level's own properties are
-// initialized -- after the base constructor, so a default such as `d2 = c2`
-// reads what it wrote -- and then the rest of the constructor body runs, its
-// leading `super.new` doing nothing more (IsSuperNewRunByConstruction). A
-// level with no constructor has the implicit one: the base call and the
-// property initialization alone. The level's class is pushed while the base's
-// actuals are bound and the body runs, as §8.15 has `super` and the names of
-// shadowed members resolve against the lexically enclosing class.
-static void ConstructLevel(const ClassTypeInfo* info, ClassObject* obj,
-                           ConstructorActuals actuals, const Expr* new_expr,
-                           SimContext& ctx, Arena& arena) {
+// Constructs the `info` level of the object in the order §8.7 gives: the
+// level's constructor formals are bound, its base class is constructed with
+// the actuals BaseConstructorActuals answers, then the level's own properties
+// are initialized -- after the base constructor, so a default such as
+// `d2 = c2` reads what it wrote -- and then the rest of the constructor body
+// runs, its leading `super.new` doing nothing more
+// (IsSuperNewRunByConstruction). A level with no constructor has the implicit
+// one: the base call and the property initialization alone. The level's class
+// is pushed while the base's actuals are bound and the body runs, as §8.15 has
+// `super` and the names of shadowed members resolve against the lexically
+// enclosing class.
+static void ConstructLevel(const ClassTypeInfo* info,
+                           ConstructorActuals actuals, Construction& c) {
   const ModuleItem* ctor = ClassConstructor(info);
-  if (ctor) BindLevelFormals(ctor, actuals, ctx, arena);
-  ctx.PushMethodClass(info);
-  ConstructBaseThenDefaults(info, obj, ctor, new_expr, ctx, arena);
+  if (ctor) BindLevelFormals(ctor, actuals, c.ctx, c.arena);
+  c.ctx.PushMethodClass(info);
+  ConstructBaseThenDefaults(info, ctor, c);
   if (ctor) {
     Variable dummy;
-    ExecFunctionBody(ctor, &dummy, ctx, arena);
+    ExecFunctionBody(ctor, &dummy, c.ctx, c.arena);
   }
-  ctx.PopMethodClass();
-  if (ctor) ctx.PopScope();
+  c.ctx.PopMethodClass();
+  if (ctor) c.ctx.PopScope();
 }
 
 Logic4Vec EvalClassNew(std::string_view class_type, const Expr* new_expr,
@@ -326,7 +331,8 @@ Logic4Vec EvalClassNew(std::string_view class_type, const Expr* new_expr,
   obj->type = info;
   auto handle = ctx.AllocateClassObject(obj);
   ctx.PushThis(obj);
-  ConstructLevel(info, obj, {new_expr, true}, new_expr, ctx, arena);
+  Construction construction{obj, new_expr, ctx, arena};
+  ConstructLevel(info, {new_expr, true}, construction);
   ctx.PopThis();
   return MakeLogic4VecVal(arena, 64, handle);
 }
