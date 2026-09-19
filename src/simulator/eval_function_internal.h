@@ -116,6 +116,14 @@ struct InstanceMethodInfo {
 bool ResolveInstanceMethod(const MethodCallParts& parts, SimContext& ctx,
                            InstanceMethodInfo& info);
 
+// §8.23 has the left operand of `::` name a class or a package, and §26.3
+// reaches a package's class through `p::C`, so the operand of `p::C::m` is
+// itself a scope resolution of two identifiers. Answers the key under which
+// SimContext holds the class for either shape, or an empty view for another.
+// Defined in eval_function.cpp; shared with eval_instance_task.cpp, which
+// resolves a static task named through the class scope.
+std::string_view ScopedClassKey(const Expr* scope, Arena& arena);
+
 // §8.7/§8.15: whether `call`, a `super.new(...)` call, is one the construction
 // of the object has already made -- the first statement of the constructor of
 // the class whose method is running, or §8.17's `super.new(default)`.

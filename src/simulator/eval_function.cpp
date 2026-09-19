@@ -240,7 +240,7 @@ struct ClassScopeInfo {
 // reaches a package's class through `p::C`, so the operand of `p::C::m` is
 // itself a scope resolution of two identifiers. Answers the key under which
 // SimContext holds the class for either shape, or an empty view for another.
-static std::string_view ScopedClassKey(const Expr* scope, Arena& arena) {
+std::string_view ScopedClassKey(const Expr* scope, Arena& arena) {
   if (!scope) return {};
   if (scope->kind == ExprKind::kIdentifier) return scope->text;
   if (scope->kind != ExprKind::kMemberAccess || !scope->is_scope_resolution)

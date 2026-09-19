@@ -187,4 +187,63 @@ TEST(StaticMethodSimulation, PackageClassStaticMethodSharesOneStaticProperty) {
             38u);
 }
 
+// §8.10 with §13.3: a static task runs in class scope with no `this`, and a
+// delay in its body suspends the enabling process as any task's does, so the
+// static property it writes after `#3` is read at time 3 and the enabling
+// process goes on after it. A static task named through the class scope,
+// `Counter::run()`, and through a handle, `h.run()`, are the same call
+// (§8.10). Before the fix the call fell to the synchronous function path,
+// which drops a delay, so the write landed at time 0 or not at all: the
+// result reads the time of the write and the property, 3 * 100 + 6 + 3 * 10
+// + 6 for the two calls.
+TEST(StaticMethodSimulation, StaticTaskWithADelayConsumesTime) {
+  EXPECT_EQ(RunAndGet("class Counter;\n"
+                      "  static int s;\n"
+                      "  static int at;\n"
+                      "  static task run();\n"
+                      "    #3 s = s + 6;\n"
+                      "    at = at + $time;\n"
+                      "  endtask\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  Counter h;\n"
+                      "  initial begin\n"
+                      "    h = new;\n"
+                      "    Counter::run();\n"
+                      "    h.run();\n"
+                      "    result = Counter::at * 10 + Counter::s;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            102u);
+}
+
+// §8.10 with §9.3.2: a fork inside a static task, its branches writing a
+// static property after `#3` and the task's own local after `#1`, joined
+// before the task reads both at time 3 -- the Clause 9 discovery's probe 84.
+TEST(StaticMethodSimulation, StaticTaskForksAndJoins) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  static int s;\n"
+                      "  static int seen;\n"
+                      "  static task run();\n"
+                      "    int loc;\n"
+                      "    fork\n"
+                      "      #3 s = 6;\n"
+                      "      #1 loc = 9;\n"
+                      "    join\n"
+                      "    seen = s * 1000 + loc * 10 + $time;\n"
+                      "  endtask\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    C::run();\n"
+                      "    result = C::seen;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            6093u);
+}
+
 }  // namespace
