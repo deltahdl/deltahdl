@@ -358,6 +358,11 @@ bool ExtractRandModeParts(const Expr* expr, std::string_view& obj_name,
 // (eval_randomize_inline.cpp).
 void BindCallersMembers(const Expr* expr, ClassObject* obj, SimContext& ctx,
                         Arena& arena);
+// 18.7: an unlisted name of a restricted block that the object declares but
+// the calling scope holds as a variable, bound as a local of the call holding
+// the variable's value; defined in eval_randomize_inline.cpp.
+void BindCallersVariables(const Expr* expr, ClassObject* obj, SimContext& ctx,
+                          Arena& arena);
 
 struct InlineRandomizeCall {
   const Expr* expr;

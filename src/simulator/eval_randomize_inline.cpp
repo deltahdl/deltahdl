@@ -8,6 +8,7 @@
 #include "simulator/class_object.h"
 #include "simulator/eval_randomize_internal.h"
 #include "simulator/sim_context.h"
+#include "simulator/statement_assign_internal.h"
 #include "simulator/variable.h"
 
 namespace delta {
@@ -97,6 +98,36 @@ void BindCallersMembers(const Expr* expr, ClassObject* obj, SimContext& ctx,
     Variable* local =
         ctx.CreateLocalVariable(name, value.width, value.is_signed);
     local->value = value;
+  }
+}
+
+// 18.7: a name of a restricted block that is not listed resolves in the scope
+// containing the call whether or not the object declares it. The block is
+// evaluated with the object as `this`, and a bare name a method's class
+// declares resolves to the property before the enclosing scope's variable
+// (NameDenotesVariable, §23.9), so such a name would read the object's own
+// member: each unlisted name the object declares that a variable of the
+// calling scope answers, and no local of the call shadows, is bound here as a
+// local holding that variable's value, in the scope the caller pushed.
+void BindCallersVariables(const Expr* expr, ClassObject* obj, SimContext& ctx,
+                          Arena& arena) {
+  const ClassMember* block = expr->inline_constraint;
+  if (block == nullptr || !expr->with_has_parens || obj->type == nullptr) {
+    return;
+  }
+  std::unordered_set<std::string_view> listed(expr->with_restrict_ids.begin(),
+                                              expr->with_restrict_ids.end());
+  std::unordered_set<std::string_view> bound;
+  for (std::string_view name : InlineIdentifiers(block)) {
+    if (listed.count(name) != 0 || !DeclaresProperty(obj->type, name) ||
+        ctx.FindLocalVariable(name) != nullptr || !bound.insert(name).second) {
+      continue;
+    }
+    const Variable* var = ctx.FindVariable(name);
+    if (var == nullptr) continue;
+    Variable* local =
+        ctx.CreateLocalVariable(name, var->value.width, var->is_signed);
+    local->value = OwnRhsWords(var->value, arena);
   }
 }
 

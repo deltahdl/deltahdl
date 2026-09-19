@@ -269,6 +269,7 @@ bool TryEvalRandomizeMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
   // names are bound as locals for the call, in a scope of their own.
   ctx.PushScope();
   BindCallersMembers(expr, obj, ctx, arena);
+  BindCallersVariables(expr, obj, ctx, arena);
   bool solved = RandomizeCall(expr, obj, args, ctx, arena);
   ctx.PopScope();
   out = MakeLogic4VecVal(arena, 32, solved ? 1 : 0);

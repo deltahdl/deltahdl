@@ -273,9 +273,9 @@ static void RegisterForkChildScopes(const Stmt* s, Process* p,
   for (auto scope : ctx.ActiveNamedScopes()) ctx.RegisterNamedScope(scope, p);
 }
 
-// Allocates the child Process and copies the spawning process's execution
-// context (region/reactivity/program-block) and a freshly drawn per-child RNG
-// seed onto it, then links it into the spawning process's child list.
+// Allocates the child Process, copies the spawning process's execution context
+// (region, reactivity, program block, carried stacks) and a fresh RNG seed onto
+// it, and links it into the spawning process's child list.
 static Process* CreateForkChildProcess(SimContext& ctx, Arena& arena,
                                        Process* spawning_proc) {
   auto* p = arena.Create<Process>();
@@ -286,11 +286,10 @@ static Process* CreateForkChildProcess(SimContext& ctx, Arena& arena,
     p->home_region = spawning_proc->home_region;
     p->program_block_id = spawning_proc->program_block_id;
   }
-  ctx.CopyCarriedStacksTo(*p);  // §9.3.2: the spawning method's object, scope.
-  // §18.14.2: a new thread's RNG is initialized with the next random value
-  // drawn from the thread that creates it. Each child therefore receives a
-  // unique seed determined solely by the parent, and the per-child seed
-  // material is settled in fork order rather than execution order.
+  ctx.CopyCarriedStacksTo(*p);
+  // §18.14.2: a new thread's RNG is seeded with the next random value drawn
+  // from the thread that creates it, so each child's seed is the parent's
+  // alone and settled in fork order rather than execution order.
   p->rng_seed = ctx.DrawSeedForChild();
   return p;
 }
