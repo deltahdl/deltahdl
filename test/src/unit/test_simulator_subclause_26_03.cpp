@@ -486,4 +486,76 @@ TEST(PackageScopeReferenceSim, PackageScopedStructVariableHasItsMembers) {
             0x07012c * 16u + 7u);
 }
 
+// §26.3 (printed page 808 of ~/LRM.pdf): a declaration made in a package is
+// referenced through the package scope resolution operator, the subclause's
+// own example being a function call, `ComplexPkg::mul(a, b)`. A package
+// function called through its scoped name was looked up under the empty
+// callee a scoped call carries, found nothing and answered 0, while the same
+// function under an import ran. No import here, so the bare name is never
+// bound: the value comes through `pk::` alone. mix(6) is 6 * 6 + 1 = 37 and
+// mix(3) is 10, so a call answering 0 or the argument itself reads apart.
+TEST(PackageScopeReferenceSim, PackageFunctionCalledThroughItsScopedName) {
+  EXPECT_EQ(RunAndGet("package pk;\n"
+                      "  function automatic int mix(int n);\n"
+                      "    return n * n + 1;\n"
+                      "  endfunction\n"
+                      "endpackage\n"
+                      "module t;\n"
+                      "  logic [31:0] y;\n"
+                      "  initial y = pk::mix(6) * 100 + pk::mix(3);\n"
+                      "endmodule\n",
+                      "y"),
+            3710u);
+}
+
+// §26.3 with §13.4: the scoped call stands inside a class method's expression
+// as well, where the method interpreter evaluates it; the class is declared
+// at compilation-unit scope, outside every import.
+TEST(PackageScopeReferenceSim,
+     PackageFunctionCalledThroughItsScopedNameInAClassMethod) {
+  EXPECT_EQ(RunAndGet("package pk;\n"
+                      "  function automatic int mix(int n);\n"
+                      "    return n * n + 1;\n"
+                      "  endfunction\n"
+                      "endpackage\n"
+                      "class U;\n"
+                      "  function int via(int k);\n"
+                      "    return pk::mix(k) + 1000;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  logic [31:0] y;\n"
+                      "  initial begin\n"
+                      "    U u = new;\n"
+                      "    y = u.via(4);\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            1017u);
+}
+
+// §26.3 with §13.5.4: a package void function enabled as a statement through
+// the package scope, its output argument bound by name and then by position.
+// The statement was dropped whole, so the outputs stayed 0.
+TEST(PackageScopeReferenceSim,
+     PackageVoidFunctionEnabledThroughItsScopedNameWritesItsOutput) {
+  EXPECT_EQ(RunAndGet("package pk;\n"
+                      "  function automatic void pf(input int n = 1,\n"
+                      "                             output int r);\n"
+                      "    r = n * 3;\n"
+                      "  endfunction\n"
+                      "endpackage\n"
+                      "module t;\n"
+                      "  int a, b;\n"
+                      "  logic [31:0] y;\n"
+                      "  initial begin\n"
+                      "    pk::pf(.r(a), .n(9));\n"
+                      "    pk::pf(4, b);\n"
+                      "    y = a * 100 + b;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            2712u);
+}
+
 }  // namespace

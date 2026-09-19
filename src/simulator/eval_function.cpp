@@ -252,6 +252,22 @@ std::string_view ScopedClassKey(const Expr* scope, Arena& arena) {
   return *key;
 }
 
+// §26.3: a subroutine called through the package scope resolution operator,
+// `pk::f(x)`, parses as a call with no callee text and the scoped name as its
+// base; the lowerer registers every package subroutine under that "pk::f"
+// key (RegisterPackageScopedSubroutines), so the lookup goes by it. A class
+// scope never reaches this key: TryEvalClassScopeCall and the instance-task
+// path take those calls before the registry is asked.
+static std::string_view SubroutineKey(const Expr* call, Arena& arena) {
+  if (!call->callee.empty()) return call->callee;
+  const Expr* scoped = call->lhs;
+  if (!scoped || scoped->kind != ExprKind::kMemberAccess ||
+      !scoped->is_scope_resolution)
+    return {};
+  if (!scoped->lhs || !scoped->lhs->elements.empty()) return {};
+  return ScopedClassKey(scoped, arena);
+}
+
 static bool ResolveClassScope(const Expr* expr, SimContext& ctx, Arena& arena,
                               ClassScopeInfo& info) {
   if (!expr->lhs || expr->lhs->kind != ExprKind::kMemberAccess) return false;
@@ -491,7 +507,7 @@ Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   Logic4Vec result;
   if (TryDispatchMethodOrLet(expr, ctx, arena, result)) return result;
 
-  auto* func = ctx.FindFunction(expr->callee);
+  auto* func = ctx.FindFunction(SubroutineKey(expr, arena));
   if (!func) return EvalDpiCall(expr, ctx, arena);
 
   bool is_static = func->is_static && !func->is_automatic;
@@ -590,7 +606,7 @@ const ModuleItem* SetupTaskCall(const Expr* expr, SimContext& ctx,
     return SetupTaskCallFromIdentifier(expr, ctx, arena);
   }
   if (expr->kind != ExprKind::kCall) return nullptr;
-  auto* func = ctx.FindFunction(expr->callee);
+  auto* func = ctx.FindFunction(SubroutineKey(expr, arena));
   if (!func || func->kind != ModuleItemKind::kTaskDecl) return nullptr;
 
   PushTaskCallScope(func, ctx);

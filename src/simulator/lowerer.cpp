@@ -724,6 +724,26 @@ static void RegisterFreeCuFunctions(const RtlirDesign* design,
   }
 }
 
+// §26.3: a package's subroutine is referenced through the package scope
+// resolution operator, `pk::f(x)`, from any scope, imported or not, so each
+// one is registered under its "pk::f" key, the key a scoped call resolves by
+// (SubroutineKey in eval_function.cpp). An import binds the bare name as
+// well, in LowerPackageItem. §8.24 keeps an out-of-block method body out of
+// the package's own subroutines.
+static void RegisterPackageScopedSubroutines(const RtlirDesign* design,
+                                             SimContext& ctx, Arena& arena) {
+  for (auto* pkg : design->packages) {
+    for (auto* item : pkg->items) {
+      bool is_subroutine = item->kind == ModuleItemKind::kFunctionDecl ||
+                           item->kind == ModuleItemKind::kTaskDecl;
+      if (!is_subroutine || !item->method_class.empty()) continue;
+      auto* key = arena.Create<std::string>(std::string(pkg->name) +
+                                            "::" + std::string(item->name));
+      ctx.RegisterFunction(*key, item);
+    }
+  }
+}
+
 // §30.3, §32.4.1 and §6.20.5: the timing every module instance declared,
 // registered into the manager the run reads. Separate from Lower because it is
 // one step of it that grew its own paragraphs.
@@ -885,6 +905,7 @@ void Lowerer::Lower(const RtlirDesign* design) {
 
   LowerCompilationUnitClasses();
   RegisterFreeCuFunctions(design, ctx_);
+  RegisterPackageScopedSubroutines(design, ctx_, arena_);
   for (auto* mod : design->top_modules) {
     LowerModule(mod);
   }

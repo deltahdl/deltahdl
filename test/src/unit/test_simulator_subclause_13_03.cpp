@@ -289,4 +289,30 @@ TEST(TaskSim, TwoSuspendedClassTasksEachWriteTheirOwnObject) {
   EXPECT_EQ(val, 110220u);
 }
 
+// §13.3 (printed page 335): a task enabled as a statement runs to completion,
+// its timing controls consuming time, before the enabling process goes on;
+// §26.3 (printed page 808) references a package's declaration through the
+// package scope resolution operator. A package task enabled as `p::pause(9)`
+// was dropped whole, so the time read after it was the 6 of the imported
+// enable alone rather than 15.
+TEST(TaskSim, PackageTaskEnabledThroughItsScopedNameConsumesItsDelay) {
+  auto val = RunAndGet(
+      "package p;\n"
+      "  task pause(int d);\n"
+      "    #d;\n"
+      "  endtask\n"
+      "endpackage\n"
+      "module t;\n"
+      "  import p::*;\n"
+      "  logic [31:0] x;\n"
+      "  initial begin\n"
+      "    pause(6);\n"
+      "    p::pause(9);\n"
+      "    x = $time;\n"
+      "  end\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(val, 15u);
+}
+
 }  // namespace
