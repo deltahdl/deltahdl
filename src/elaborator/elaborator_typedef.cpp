@@ -681,15 +681,26 @@ void EmitEnumLiteralsOfItems(const std::vector<ModuleItem*>& items,
 
 }  // namespace
 
-void RegisterImportedEnumLiterals(const ModuleDecl* decl, RtlirModule* mod,
-                                  const ImportedEnumCtx& ctx) {
-  for (const auto* item : decl->items) {
+// The enumeration literals every wildcard import among `items` brings in.
+static void EmitWildcardImportEnumLiterals(
+    const std::vector<ModuleItem*>& items, RtlirModule* mod,
+    const ImportedEnumCtx& ctx) {
+  for (const auto* item : items) {
     if (item->kind != ModuleItemKind::kImportDecl) continue;
     if (!item->import_item.is_wildcard) continue;
     const PackageDecl* pkg =
         FindUnitPackage(ctx.unit, item->import_item.package_name);
     if (pkg) EmitEnumLiteralsOfItems(pkg->items, mod, ctx);
   }
+}
+
+// §26.3: a wildcard import brings a package's enumeration literals with it,
+// whether the import stands in the module or, per §3.12.1, in the
+// compilation-unit scope above it (Elaborator::ApplyCompilationUnitImports).
+void RegisterImportedEnumLiterals(const ModuleDecl* decl, RtlirModule* mod,
+                                  const ImportedEnumCtx& ctx) {
+  EmitWildcardImportEnumLiterals(ctx.unit->cu_items, mod, ctx);
+  EmitWildcardImportEnumLiterals(decl->items, mod, ctx);
 }
 
 void RegisterCuEnumLiterals(RtlirModule* mod, const ImportedEnumCtx& ctx) {

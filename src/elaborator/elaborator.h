@@ -143,6 +143,8 @@ class Elaborator : public ElaboratorClassRules {
   void ValidateHierRefToImportedName(const ModuleDecl* decl,
                                      const RtlirModule* mod);
 
+  void ApplyCompilationUnitImports(RtlirModule* mod);
+
   void ApplyHeaderImports(const ModuleDecl* decl);
 
   void ApplyBodyImport(const ImportItem& import_item);

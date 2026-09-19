@@ -236,4 +236,141 @@ TEST(PackageScopeReference,
   EXPECT_EQ(data->width, 7u);
 }
 
+// §26.3 (printed page 809) has an import make a package's identifiers
+// visible in the importing scope without the package qualifier, a wildcard
+// import every one of them and an explicit import the one it names, and puts
+// no condition on the expression the identifier then stands in; so a class the
+// package declares serves as the base of a `::` static method call by its bare
+// name, as it does qualified. The check that reports an unknown base consulted
+// the module's own names and the packages alone, so the wildcard-imported form
+// was reported while `p::pk_t::get()` was not.
+TEST(PackageScopeReference, WildcardImportedClassIsAScopeBase) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package p;\n"
+      "  class pk_t;\n"
+      "    static function int get(); return 7; endfunction\n"
+      "  endclass\n"
+      "endpackage\n"
+      "module m;\n"
+      "  import p::*;\n"
+      "  int c;\n"
+      "  initial c = pk_t::get();\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "reference to unresolved package or scope 'pk_t'",
+                             9, "26.3"));
+}
+
+TEST(PackageScopeReference, ExplicitlyImportedClassIsAScopeBase) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package p;\n"
+      "  class pk_t;\n"
+      "    static function int get(); return 7; endfunction\n"
+      "  endclass\n"
+      "endpackage\n"
+      "module m;\n"
+      "  import p::pk_t;\n"
+      "  int c;\n"
+      "  initial c = pk_t::get();\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "reference to unresolved package or scope 'pk_t'",
+                             9, "26.3"));
+}
+
+// §26.3: an explicit import brings in the one identifier it names, so a class
+// of the same package it does not name is no base without the qualifier.
+TEST(PackageScopeReference, AClassTheImportDoesNotNameIsNoScopeBase) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package p;\n"
+      "  class pk_t;\n"
+      "    static function int get(); return 7; endfunction\n"
+      "  endclass\n"
+      "  class other_t; endclass\n"
+      "endpackage\n"
+      "module m;\n"
+      "  import p::other_t;\n"
+      "  int c;\n"
+      "  initial c = pk_t::get();\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "reference to unresolved package or scope 'pk_t'",
+                            10, "26.3"));
+}
+
+// §3.12.1 makes the compilation-unit scope one the module's upward search
+// (§23.9) reaches, and §26.3 (printed page 809) has an import make the
+// package's identifiers visible within the scope it is written in; so a
+// wildcard import above the module makes a package's localparam readable by
+// its bare name inside the module, and its class a `::` base. The uvm-tagged
+// sv-tests files import uvm_pkg this way. Both reads were reported, the check
+// consulting the module's own imports alone.
+TEST(PackageImport, CompilationUnitWildcardImportResolvesABareRead) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package p;\n"
+      "  localparam int K = 5;\n"
+      "endpackage\n"
+      "import p::*;\n"
+      "module m;\n"
+      "  int c;\n"
+      "  initial c = K;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "reference to unresolved identifier 'K'", 7,
+                             "23.9"));
+}
+
+TEST(PackageImport, CompilationUnitWildcardImportedClassIsAScopeBase) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package p;\n"
+      "  class pk_t;\n"
+      "    static function int get(); return 7; endfunction\n"
+      "  endclass\n"
+      "endpackage\n"
+      "import p::*;\n"
+      "module m;\n"
+      "  int d;\n"
+      "  initial d = pk_t::get();\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "reference to unresolved package or scope 'pk_t'",
+                             9, "26.3"));
+}
+
+// §26.3: an explicit import at compilation-unit scope brings in the one name
+// it writes, no other.
+TEST(PackageImport, CompilationUnitExplicitImportResolvesItsNameAlone) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package p;\n"
+      "  localparam int K = 5;\n"
+      "  localparam int L = 6;\n"
+      "endpackage\n"
+      "import p::K;\n"
+      "module m;\n"
+      "  int c, d;\n"
+      "  initial begin\n"
+      "    c = K;\n"
+      "    d = L;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "reference to unresolved identifier 'K'", 9,
+                             "23.9"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "reference to unresolved identifier 'L'", 10,
+                            "23.9"));
+}
+
 }  // namespace

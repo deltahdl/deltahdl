@@ -859,12 +859,18 @@ void Elaborator::ValidateUnresolvedReferences(const ModuleDecl* decl,
   // §26.3: a `pkg::x` scope prefix must name a known package (or a class/type
   // for static-member / type-scope access). cu_scope_names_ holds packages,
   // classes, and interfaces; class_names_ and typedefs_ cover module-local
-  // classes and type names.
+  // classes and type names; and a class a package declares is visible by its
+  // bare name where an import, wildcard or explicit, has brought it in, so it
+  // stands as a base too -- `c = pk_t::get();` after `import p::*` was reported
+  // while `p::pk_t::get()` was not.
   ReportUnknownScopeBases(
       decl,
-      [this](std::string_view n) {
+      [this, &explicit_imported, &wildcard_packages](std::string_view n) {
         return IsKnownScopeBase(n, cu_scope_names_, class_names_, typedefs_,
-                                unit_);
+                                unit_) ||
+               explicit_imported.count(n) != 0 ||
+               AnyPackageProvidesName(unit_, pkg_provided_names_,
+                                      wildcard_packages, n);
       },
       diag_);
 }

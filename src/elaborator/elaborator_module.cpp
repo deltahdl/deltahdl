@@ -838,6 +838,7 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
   std::string saved_library = std::move(current_library_);
   current_library_.assign(decl->library.data(), decl->library.size());
 
+  ApplyCompilationUnitImports(mod);
   ApplyHeaderImports(decl);
   ImportedEnumCtx enum_ctx{unit_, arena_, typedefs_, enum_member_names_};
   RegisterImportedEnumLiterals(decl, mod, enum_ctx);

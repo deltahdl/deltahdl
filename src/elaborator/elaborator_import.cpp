@@ -5,6 +5,7 @@
 
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_design.h"
 #include "parser/ast_module.h"
@@ -93,6 +94,25 @@ void ApplyImport(const ImportItem& import_item, const CompilationUnit* unit,
 }
 
 }  // namespace
+
+// §3.12.1 makes the compilation-unit scope the one a module's upward search
+// (§23.9) ends in, and §26.3 has an import make a package's names visible in
+// the scope it is written in; so an import written outside every module, as the
+// uvm-tagged sv-tests files write `import uvm_pkg::*;` above their module, is
+// in force in each module of the unit. Each module takes the unit's imports as
+// it takes its own header imports, ahead of them so that a module's own
+// declarations and imports shadow the unit's (§23.9), and each is recorded on
+// the RTLIR module as a header import is, which is what the lowering reads.
+void Elaborator::ApplyCompilationUnitImports(RtlirModule* mod) {
+  for (const auto* item : unit_->cu_items) {
+    if (item->kind != ModuleItemKind::kImportDecl) continue;
+    const ImportItem& imp = item->import_item;
+    ApplyImport(imp, unit_,
+                {typedefs_, aggregate_typedef_names_, cu_param_scope_});
+    mod->imports.push_back(
+        RtlirImport{imp.package_name, imp.item_name, imp.is_wildcard});
+  }
+}
 
 // §26.4: an import written in the module header precedes every declaration in
 // the module, ports included, so these are applied before ports and before the
