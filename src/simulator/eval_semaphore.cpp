@@ -8,6 +8,7 @@
 #include "common/types.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
+#include "simulator/eval_class_sync.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
@@ -19,13 +20,21 @@ namespace delta {
 // found under the "p.sem" key ExtractHandleMethodCallParts answers, given the
 // context's arena as the key's lifetime since the signature carries none.
 // This is asked of every call statement, so the method's name is matched
-// before the key is made.
+// before the key is made. §8.7 with §15.3.1 (printed page 373 of ~/LRM.pdf):
+// a semaphore declared as a class property is each object's own, so a bare
+// `s` inside a method of the class, `this.s` and a handle's `c.s` name the
+// object's (ResolveSyncProperty) ahead of the run's tables, which hold no
+// object's; resolved by name alone, `s.get(1)` in a method reached no bucket.
 SemaphoreObject* SemaphoreCallTarget(const Expr* expr, SimContext& ctx,
                                      std::string_view method) {
   if (!expr || expr->kind != ExprKind::kCall) return nullptr;
   const auto* access = expr->lhs;
   if (!access || access->kind != ExprKind::kMemberAccess) return nullptr;
   if (!access->rhs || access->rhs->text != method) return nullptr;
+  SyncProperty prop = ResolveSyncProperty(access->lhs, ctx, ctx.GetArena());
+  if (prop.kind != SyncKind::kNone) {
+    return SemaphoreOfProperty(prop, method, access->rhs->range.start, ctx);
+  }
   MethodCallParts parts;
   if (!ExtractHandleMethodCallParts(expr, ctx.GetArena(), parts))
     return nullptr;
@@ -72,10 +81,18 @@ std::string_view ScopedOrBareTargetKey(const Expr* lhs, Arena& arena) {
                                     std::string(lhs->rhs->text));
 }
 
+// §8.7 with §15.3.1: the target may be a class property, `s = new(2)` in a
+// method or `c.s = new(2)` through a handle, whose bucket is the object's
+// alone (BuildSyncProperty).
 bool TrySemaphoreNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (!stmt->rhs || stmt->rhs->kind != ExprKind::kCall ||
       stmt->rhs->text != "new")
     return false;
+  SyncProperty prop = ResolveSyncProperty(stmt->lhs, ctx, arena);
+  if (prop.kind == SyncKind::kSemaphore) {
+    BuildSyncProperty(prop, stmt->rhs, ctx, arena);
+    return true;
+  }
   std::string_view key = ScopedOrBareTargetKey(stmt->lhs, arena);
   if (key.empty()) return false;
   auto* sem = ctx.FindSemaphore(key);

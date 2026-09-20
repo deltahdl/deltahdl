@@ -16,7 +16,9 @@
 namespace delta {
 
 struct AssocArrayObject;
+struct MailboxObject;
 struct QueueObject;
+struct SemaphoreObject;
 struct ClassDecl;
 struct ClassMember;
 struct ConstraintForeachRef;
@@ -275,6 +277,20 @@ struct ClassObject {
   // ShallowCopy copies the elements, a property being a variable of the
   // object (§8.12).
   std::unordered_map<std::string, QueueObject*> queue_properties;
+  // §15.3.1 and §15.4.1 with §8.7: the semaphore and the mailbox each
+  // property declared `semaphore s` or `mailbox mb` holds, keyed by the
+  // property's bare name. Either is a built-in class object the property is
+  // a handle to, built by the declaration's `new` when the object is
+  // constructed (TryInitClassSyncProperty in src/simulator/eval_class_sync.h)
+  // or by a later `s = new(2)` on the property, so each object has a bucket
+  // and a queue of its own; a property with no entry, or with a null one, is
+  // the null handle. ShallowCopy copies the entries as it copies a handle
+  // (§8.12), the copy naming the same semaphore or mailbox. Before these
+  // maps a property's `new` was evaluated as a value and every method on the
+  // property was resolved through the run's own tables by name alone, so a
+  // class's mailbox passed nothing and its semaphore held no keys.
+  std::unordered_map<std::string, SemaphoreObject*> semaphore_properties;
+  std::unordered_map<std::string, MailboxObject*> mailbox_properties;
   // §8.25: the type each type parameter of the class is bound to in the
   // specialization this object was constructed as, keyed by the parameter's
   // name -- `KEY` to `string` for a `uvm_pool #(string, int)` -- as the

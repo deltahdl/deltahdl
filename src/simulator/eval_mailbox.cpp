@@ -10,11 +10,13 @@
 #include "common/diagnostic.h"
 #include "common/types.h"
 #include "elaborator/type_eval.h"
+#include "parser/ast_class.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
 #include "simulator/awaiters.h"
 #include "simulator/class_object.h"
+#include "simulator/eval_class_sync.h"
 #include "simulator/eval_expr_internal.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/eval_semaphore.h"
@@ -34,13 +36,21 @@ namespace delta {
 // §26.3 admits a package-qualified mailbox as the receiver, `p::mbx.get(x)`,
 // found under the "p.mbx" key ExtractHandleMethodCallParts answers. This is
 // asked of every call statement, so the method's name is matched before the
-// key is made.
+// key is made. §8.7 with §15.4.1 (printed page 374 of ~/LRM.pdf): a mailbox
+// declared as a class property is each object's own, so a bare `mb` inside a
+// method of the class, `this.mb` and a handle's `c.mb` name the object's
+// (ResolveSyncProperty) ahead of the run's tables, which hold no object's;
+// resolved by name alone, `mb.put(v)` in a method reached no mailbox.
 MailboxObject* MailboxCallTarget(const Expr* expr, SimContext& ctx,
                                  Arena& arena, std::string_view method) {
   if (!expr || expr->kind != ExprKind::kCall) return nullptr;
   const auto* access = expr->lhs;
   if (!access || access->kind != ExprKind::kMemberAccess) return nullptr;
   if (!access->rhs || access->rhs->text != method) return nullptr;
+  SyncProperty prop = ResolveSyncProperty(access->lhs, ctx, arena);
+  if (prop.kind != SyncKind::kNone) {
+    return MailboxOfProperty(prop, method, access->rhs->range.start, ctx);
+  }
   MethodCallParts parts;
   if (!ExtractHandleMethodCallParts(expr, arena, parts)) return nullptr;
   return ctx.FindMailbox(parts.var_name);
@@ -59,18 +69,24 @@ int32_t MailboxBoundArg(const Expr* new_expr, SimContext& ctx, Arena& arena) {
 // find, and the messages of such a mailbox record no type. The declaration's
 // parameter list is recorded under the variable's own key by
 // RecordClassSpecialization, one of the keys the mailbox itself is found
-// under.
+// under; a class property's stands on its declaration (§8.7).
+static bool ElementTypeIsFixed(const std::vector<DataType>& params) {
+  if (params.empty()) return false;
+  const DataType& elem = params.front();
+  return elem.kind != DataTypeKind::kNamed || elem.type_name != "dynamic_type";
+}
+
 static bool IsParameterizedMailbox(const Expr* expr, SimContext& ctx,
                                    Arena& arena) {
+  SyncProperty prop = ResolveSyncProperty(expr->lhs->lhs, ctx, arena);
+  if (prop.kind == SyncKind::kMailbox) {
+    return ElementTypeIsFixed(prop.member->data_type.type_params);
+  }
   MethodCallParts parts;
   if (!ExtractHandleMethodCallParts(expr, arena, parts)) return false;
   for (const std::string& key : ctx.ScopedObjectKeys(parts.var_name)) {
     const std::vector<DataType>* params = ctx.FindVariableClassTypeParams(key);
-    if (params == nullptr) continue;
-    if (params->empty()) return false;
-    const DataType& elem = params->front();
-    return elem.kind != DataTypeKind::kNamed ||
-           elem.type_name != "dynamic_type";
+    if (params != nullptr) return ElementTypeIsFixed(*params);
   }
   return false;
 }
@@ -412,12 +428,20 @@ bool TryEvalMailboxMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
 
 // §26.3: the target may be a package's mailbox named through the package
 // scope resolution operator, `p::mbx = new(2)`, held under the "p.mbx" key
-// ScopedOrBareTargetKey answers; a package's mailbox is not created today,
-// so the scoped form finds none until it is.
+// ScopedOrBareTargetKey answers (CreatePackageSyncObject in
+// lowerer_package_data.cpp creates it). §8.7 with §15.4.1: it may be a class
+// property, `mb = new(1)` in a method or `c.mb = new(1)` through a handle,
+// built on the object alone (BuildSyncProperty); a semaphore property is
+// TrySemaphoreNewAssign's, asked first, so it is not reached here.
 bool TryMailboxNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (!stmt->rhs || stmt->rhs->kind != ExprKind::kCall ||
       stmt->rhs->text != "new")
     return false;
+  SyncProperty prop = ResolveSyncProperty(stmt->lhs, ctx, arena);
+  if (prop.kind == SyncKind::kMailbox) {
+    BuildSyncProperty(prop, stmt->rhs, ctx, arena);
+    return true;
+  }
   std::string_view key = ScopedOrBareTargetKey(stmt->lhs, arena);
   if (key.empty()) return false;
   auto* mbx = ctx.FindMailbox(key);

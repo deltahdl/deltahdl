@@ -5,6 +5,8 @@
 
 #include "common/types.h"
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
+#include "helpers_scheduler.h"
 #include "simulator/stmt_exec.h"
 #include "simulator/sync_objects.h"
 
@@ -187,6 +189,211 @@ TEST(MailboxSim, ChildInstanceQueueAnswersItsBareName) {
   auto* r = f.ctx.FindVariable("m.r");
   ASSERT_NE(r, nullptr);
   EXPECT_EQ(r->value.ToUint64(), 60u);
+}
+
+// §15.4.1 (printed page 374) with §8.7 (printed 184): a mailbox declared as
+// a class property with `= new` is built when the object is constructed, so
+// the object's methods pass messages through the object's own queue and
+// `c.mb.num()` from the module counts what is left in it: give(4) places 4,
+// take() retrieves it and num() reads 0, so y reads 41. The property's `new`
+// was evaluated as a value and built no mailbox, and a bare `mb` in a method
+// was resolved through the run's tables, which hold no object's, so put()
+// placed nothing, get() stored nothing and y read x.
+TEST(MailboxSim, ClassPropertyMailboxIsBuiltPerObject) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  mailbox mb = new;\n"
+                      "  semaphore s = new(1);\n"
+                      "  function void give(int v);\n"
+                      "    mb.put(v);\n"
+                      "  endfunction\n"
+                      "  function int take();\n"
+                      "    int v;\n"
+                      "    mb.get(v);\n"
+                      "    return v;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module top;\n"
+                      "  int y;\n"
+                      "  initial begin\n"
+                      "    C c = new;\n"
+                      "    c.give(4);\n"
+                      "    y = c.take() * 10 + c.mb.num();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            41u);
+}
+
+// §8.4 (printed page 181) with §15.4.1 (printed 374): each object's
+// properties are its own, so two objects of the class hold two mailboxes,
+// and what one is given the other does not hold: c1.take() retrieves the 1
+// c1 was given and c2.take() the 2, 12. One mailbox shared by both would
+// have handed c1's take() the 1 and c2's the 2 as well, 12 by luck of the
+// order, so the second object is given first: c2.give(2) then c1.give(1)
+// read 12 through two queues and 21 through one.
+TEST(MailboxSim, TwoObjectsHoldSeparateMailboxes) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  mailbox mb = new;\n"
+                      "  function void give(int v);\n"
+                      "    mb.put(v);\n"
+                      "  endfunction\n"
+                      "  function int take();\n"
+                      "    int v;\n"
+                      "    mb.get(v);\n"
+                      "    return v;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module top;\n"
+                      "  int y;\n"
+                      "  initial begin\n"
+                      "    C c1 = new;\n"
+                      "    C c2 = new;\n"
+                      "    c2.give(2);\n"
+                      "    c1.give(1);\n"
+                      "    y = c1.take() * 10 + c2.take();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            12u);
+}
+
+// §8.11 with §15.4.1 (printed page 374): `this.mb` inside a method names the
+// running object's mailbox as the bare name does, and `c.mb` from the module
+// the object the handle refers to, so two puts through `this.mb.put(v)` are
+// counted as 2 by `c.mb.num()` and the module's `c.mb.get(v)` retrieves the
+// first, 24. Neither receiver was taken by the mailbox paths, which took an
+// identifier alone, so num() answered nothing and get() stored nothing.
+TEST(MailboxSim, ThisAndHandleQualifiedPropertyMailboxReceivers) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  mailbox mb = new;\n"
+                      "  function void give(int v);\n"
+                      "    this.mb.put(v);\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module top;\n"
+                      "  int y, v;\n"
+                      "  initial begin\n"
+                      "    C c = new;\n"
+                      "    c.give(4);\n"
+                      "    c.give(5);\n"
+                      "    y = c.mb.num() * 10;\n"
+                      "    c.mb.get(v);\n"
+                      "    y = y + v;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            24u);
+}
+
+// §15.4.3 (printed page 375) with §15.4.1 (printed 374): a property's
+// `new(1)` bounds the object's queue to one message, so the class task's
+// second put() waits where it stands until the module's `c.mb.get(got)` at
+// time 5 makes room, and the fork branch that enabled the task records 5
+// once it completes: got reads 1 and at 5, 15. A put() that did not wait
+// would have recorded 0, and a queue built unbounded would have held both.
+TEST(MailboxSim, BoundedPropertyMailboxPutWaitsForTheModulesGet) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  mailbox mb = new(1);\n"
+                      "  task fill();\n"
+                      "    mb.put(1);\n"
+                      "    mb.put(2);\n"
+                      "  endtask\n"
+                      "endclass\n"
+                      "module top;\n"
+                      "  int got, at, r;\n"
+                      "  C c;\n"
+                      "  initial begin\n"
+                      "    c = new;\n"
+                      "    fork\n"
+                      "      begin\n"
+                      "        c.fill();\n"
+                      "        at = $time;\n"
+                      "      end\n"
+                      "      #5 c.mb.get(got);\n"
+                      "    join\n"
+                      "    r = got * 10 + at;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "r"),
+            15u);
+}
+
+// §15.4.4 (printed page 375) with §15.4.1 (printed 374): try_put() on the
+// object's bounded queue places its message while there is room and answers
+// 1, and answers 0 once the queue holds the one message its `new(1)` bounds
+// it to: 1 and 0 read as 10. A queue built unbounded, or none, would have
+// read 11 or 0.
+TEST(MailboxSim, TryPutOnAFullPropertyMailboxReadsZero) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  mailbox mb = new(1);\n"
+                      "  function int fill();\n"
+                      "    return mb.try_put(1) * 10 + mb.try_put(2);\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module top;\n"
+                      "  int y;\n"
+                      "  initial begin\n"
+                      "    C c = new;\n"
+                      "    y = c.fill();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            10u);
+}
+
+// §15.4.1 (printed page 374) with §8.7 (printed 184): a mailbox property may
+// be built by a later `mb = new(1)` in a method rather than by its
+// declaration, and a property declared with no initializer is the null
+// handle until then. Built in the constructor, the queue takes one try_put()
+// and refuses the second, 10; left to the generic store, the assignment
+// wrote the carrier and both try_puts were served by no mailbox.
+TEST(MailboxSim, PropertyMailboxBuiltByAssignmentInTheConstructor) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  mailbox mb;\n"
+                      "  function new();\n"
+                      "    mb = new(1);\n"
+                      "  endfunction\n"
+                      "  function int fill();\n"
+                      "    return mb.try_put(1) * 10 + mb.try_put(2);\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module top;\n"
+                      "  int y;\n"
+                      "  initial begin\n"
+                      "    C c = new;\n"
+                      "    y = c.fill();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            10u);
+}
+
+// §8.4 (printed page 181): a property declared `mailbox mb;` with no
+// initializer holds the null handle, and a method called through it is
+// illegal, reported at the call as a method of a user class called through
+// a null handle is. Resolved by name alone, the put() was served by no
+// mailbox and nothing was reported.
+TEST(MailboxSim, PutThroughANullPropertyMailboxIsReported) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class C;\n"
+      "  mailbox mb;\n"
+      "  function void give(int v);\n"
+      "    mb.put(v);\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module top;\n"
+      "  initial begin\n"
+      "    C c = new;\n"
+      "    c.give(4);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "method 'put' called through the null handle 'mb'",
+                            4, "8.4"));
 }
 
 }  // namespace

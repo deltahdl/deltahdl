@@ -19,6 +19,7 @@
 #include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_array_class_queue.h"
 #include "simulator/eval_class_array.h"
+#include "simulator/eval_class_sync.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
@@ -204,6 +205,17 @@ static void InitClassPropertyDefault(const ClassTypeInfo* info,
   // parameters, which its bound may name (§8.25), are bound to the object.
   if (prop.init_expr != nullptr &&
       InitClassQueueProperty(obj, info, prop.name, prop.init_expr, ctx)) {
+    return;
+  }
+  // §15.3.1 (printed page 373 of ~/LRM.pdf) and §15.4.1 (printed 374) with
+  // §8.7: a semaphore or mailbox property's `new` builds the object's own
+  // bucket or queue (ClassObject::semaphore_properties and
+  // mailbox_properties), the property's value staying the handle's carrier;
+  // evaluated as a value, the `new` built nothing and the property was a
+  // handle to no mailbox.
+  if (TryInitClassSyncProperty(obj, info, prop.name, prop.init_expr, ctx)) {
+    StoreClassPropertyDefault(
+        info, prop, MakeLogic4VecVal(arena, prop.width, 0), obj, arena);
     return;
   }
   Logic4Vec val;

@@ -227,6 +227,11 @@ ClassObject* ClassObject::ShallowCopy(Arena& arena) const {
   // of the copy and grows and shrinks on its own after it (§7.10).
   for (const auto& [name, q] : queue_properties)
     copy->queue_properties[name] = CopyQueue(q, arena);
+  // §8.12 (shallow copy, step 2) for a semaphore or mailbox property: the
+  // property is a handle to the built-in object (§15.3.1, §15.4.1), so the
+  // copy names the same bucket or queue, as a copied class handle does.
+  copy->semaphore_properties = semaphore_properties;
+  copy->mailbox_properties = mailbox_properties;
   // §8.12 has the copy be of the same class, which for a parameterized class
   // is the same specialization (§8.25), so it is bound to the same types.
   copy->type_param_actuals = type_param_actuals;
