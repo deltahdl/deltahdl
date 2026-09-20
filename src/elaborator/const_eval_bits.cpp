@@ -23,7 +23,6 @@
 #include "elaborator/type_eval.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
-#include "parser/ast_type.h"
 
 namespace delta {
 
