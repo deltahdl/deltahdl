@@ -364,4 +364,33 @@ TEST(SemaphoreSim, TypedefdSemaphorePropertyHoldsItsKeys) {
             10u);
 }
 
+// §8.9 (printed page 186) with §15.3.1 (printed 373): a static semaphore
+// property is one bucket shared by every object of the class, so the one
+// key c1's try_get(1) procures leaves c2's try_get(1) nothing, and the
+// module's `C::s.put(1)` returns it for c2's next try_get(1): 1, 0 and 1
+// read as 101. Two buckets would have read 111, and the run's tables, which
+// the static property was left to, held none.
+TEST(SemaphoreSim, StaticSemaphorePropertyIsSharedByEveryObject) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  static semaphore s = new(1);\n"
+                      "  function int take();\n"
+                      "    return s.try_get(1);\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module top;\n"
+                      "  int a, b, c, y;\n"
+                      "  initial begin\n"
+                      "    C c1 = new;\n"
+                      "    C c2 = new;\n"
+                      "    a = c1.take();\n"
+                      "    b = c2.take();\n"
+                      "    C::s.put(1);\n"
+                      "    c = c2.take();\n"
+                      "    y = a * 100 + b * 10 + c;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            101u);
+}
+
 }  // namespace

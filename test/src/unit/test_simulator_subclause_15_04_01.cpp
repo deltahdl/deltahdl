@@ -475,4 +475,58 @@ TEST(MailboxSim, TypedefOfATypedefdMailboxPropertyIsBuiltPerObject) {
       42u);
 }
 
+// §8.9 (printed page 186) with §15.4.1 (printed 374): a static mailbox
+// property is one copy shared by every object of the class, created once,
+// so what two objects' give() place lands in one queue: `C::mb.num()` from
+// the module counts both, and `c2.mb.num()` through a handle counts the same
+// queue, 22. Two queues would have counted 1 and 1, and the run's tables,
+// which the static property was left to, held none, so put() placed nothing
+// and `C::mb` named nothing.
+TEST(MailboxSim, StaticMailboxPropertyIsSharedByEveryObject) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  static mailbox mb = new;\n"
+                      "  function void give(int v);\n"
+                      "    mb.put(v);\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module top;\n"
+                      "  int y;\n"
+                      "  initial begin\n"
+                      "    C c1 = new;\n"
+                      "    C c2 = new;\n"
+                      "    c1.give(1);\n"
+                      "    c2.give(2);\n"
+                      "    y = C::mb.num() * 10 + c2.mb.num();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            22u);
+}
+
+// §8.10 (printed pages 186-187) with §8.9 (printed 186): a static method has
+// no object and reaches the class's static properties, so its put() places
+// into the one shared queue, which the module's `C::mb.get(v)` retrieves
+// from in the order placed (§15.4.3) and `C::mb.num()` counts: 3 taken and
+// 1 left, 31. Left to the run's tables, the static method's put() placed
+// nothing and the get() waited on nothing.
+TEST(MailboxSim, StaticMethodPutsIntoTheStaticMailboxProperty) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  static mailbox mb = new;\n"
+                      "  static function void give_all(int v);\n"
+                      "    mb.put(v);\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module top;\n"
+                      "  int v, y;\n"
+                      "  initial begin\n"
+                      "    C::give_all(3);\n"
+                      "    C::give_all(4);\n"
+                      "    C::mb.get(v);\n"
+                      "    y = v * 10 + C::mb.num();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            31u);
+}
+
 }  // namespace

@@ -169,6 +169,24 @@ struct ClassTypeInfo {
   // is, and mutable for the same reason.
   mutable std::unordered_map<std::string, QueueObject*> static_queue_properties;
 
+  // §15.3.1 and §15.4.1 with §8.9: the semaphore and the mailbox each static
+  // property declared `static semaphore s` or `static mailbox mb` holds,
+  // keyed by the property's name -- one copy shared by every object of the
+  // class, created once, which a method reaches by the bare name, a static
+  // method (§8.10) without an object, and the module by `C::mb` or through
+  // any handle. Built on the first reference to the property from the
+  // declaration's `new` (SemaphoreOfProperty and MailboxOfProperty in
+  // src/simulator/eval_class_sync.h) or by a `C::s = new(2)` on it, as
+  // static_assoc_properties is built on first use; a property with no entry,
+  // or with a null one, is the null handle. Shared as static_properties is,
+  // whose entry for the property is the handle's carrier, and mutable for
+  // the same reason. Before these maps a static property was left to the
+  // run's tables, which hold no class's, so its every method reached nothing.
+  mutable std::unordered_map<std::string, SemaphoreObject*>
+      static_semaphore_properties;
+  mutable std::unordered_map<std::string, MailboxObject*>
+      static_mailbox_properties;
+
   // §18.5.10: a constraint block qualified 'static' has one active/inactive
   // state shared by every instance of the declaring class, rather than a
   // per-object state. constraint_mode() on such a block reads and writes this

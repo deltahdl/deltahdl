@@ -5,6 +5,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <utility>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
@@ -42,49 +43,62 @@ SyncKind SyncKindOfType(const DataType& type, const SimContext& ctx) {
   return SyncKind::kNone;
 }
 
+// A property's declaration and the class that declares it, whose maps hold
+// the object where the property is static (§8.9).
+struct SyncMember {
+  const ClassMember* member = nullptr;
+  const ClassTypeInfo* declaring = nullptr;
+};
+
 // §8.13: the declaration of the property `name` nearest to `from` on its
 // base chain, the one a bare name in a method of `from` denotes, where that
-// declaration is an instance property of a semaphore or mailbox type with
-// no unpacked dimension; null where the nearest declaration is anything
-// else or none declares the name. A static one (§8.9) is the class's rather
-// than an object's and is left to the run's tables, which hold none today.
-static const ClassMember* SyncPropertyMember(const ClassTypeInfo* from,
-                                             std::string_view name,
-                                             const SimContext& ctx) {
+// declaration is a property of a semaphore or mailbox type with no unpacked
+// dimension, static (§8.9) or not; none where the nearest declaration is
+// anything else or none declares the name.
+static SyncMember SyncPropertyMember(const ClassTypeInfo* from,
+                                     std::string_view name,
+                                     const SimContext& ctx) {
   for (const ClassTypeInfo* t = from; t != nullptr; t = t->parent) {
     if (t->decl == nullptr) continue;
     for (const ClassMember* m : t->decl->members) {
       if (m->kind != ClassMemberKind::kProperty || m->name != name) continue;
-      bool held_per_object =
-          !m->is_static && !m->is_param && m->unpacked_dims.empty() &&
-          SyncKindOfType(m->data_type, ctx) != SyncKind::kNone;
-      return held_per_object ? m : nullptr;
+      bool is_sync = !m->is_param && m->unpacked_dims.empty() &&
+                     SyncKindOfType(m->data_type, ctx) != SyncKind::kNone;
+      return is_sync ? SyncMember{m, t} : SyncMember{};
     }
   }
-  return nullptr;
+  return {};
 }
 
-// The receiver as it was written, `c.mb` for a report to name.
+static SyncProperty MakeSyncProperty(const SyncMember& m, ClassObject* obj,
+                                     std::string spelling,
+                                     const SimContext& ctx) {
+  return {SyncKindOfType(m.member->data_type, ctx), obj, m.member, m.declaring,
+          std::move(spelling)};
+}
+
+// The receiver as it was written, `c.mb` or `C::mb`, for a report to name.
 static std::string SpellHandlePath(const Expr* expr) {
   if (expr->kind == ExprKind::kIdentifier) return std::string(expr->text);
-  return SpellHandlePath(expr->lhs) + "." + std::string(expr->rhs->text);
+  return SpellHandlePath(expr->lhs) + (expr->is_scope_resolution ? "::" : ".") +
+         std::string(expr->rhs->text);
 }
 
 // §8.11 with §8.13: the bare name `name` inside a method, resolved against
 // the lexically enclosing class or, in a property initializer or a
 // constructor with no class pushed, the running object's own. A local of
 // the method -- a formal named as the property is -- shadows the property
-// (§8.6), as it shadows a queue property in FindQueueOfName.
+// (§8.6), as it shadows a queue property in FindQueueOfName. A static
+// method has no object (§8.10) and reaches a static property all the same.
 static SyncProperty ResolveBareSyncProperty(std::string_view name,
                                             SimContext& ctx) {
   ClassObject* self = ctx.CurrentThis();
   const ClassTypeInfo* from = ctx.CurrentMethodClass();
   if (from == nullptr && self != nullptr) from = self->type;
   if (from == nullptr || ctx.FindLocalVariable(name) != nullptr) return {};
-  const ClassMember* member = SyncPropertyMember(from, name, ctx);
-  if (member == nullptr) return {};
-  return {SyncKindOfType(member->data_type, ctx), self, member,
-          std::string(name)};
+  SyncMember member = SyncPropertyMember(from, name, ctx);
+  if (member.member == nullptr) return {};
+  return MakeSyncProperty(member, self, std::string(name), ctx);
 }
 
 // §8.4: the class the handle side `side` of a member access is declared of,
@@ -108,23 +122,36 @@ static const ClassTypeInfo* DeclaredClassOfHandleSide(const Expr* side,
 // §8.4: `h.name` or `this.name`, the property of the object the handle side
 // refers to, or, where it refers to none, the property the handle's declared
 // class gives that name, so that the null handle is reported rather than the
-// receiver resolved through the run's tables to a variable of the name.
+// receiver resolved through the run's tables to a variable of the name; a
+// static one (§8.9) is the class's and is served through a null handle too.
 static SyncProperty ResolveSyncPropertyThroughHandle(const Expr* recv,
                                                      SimContext& ctx,
                                                      Arena& arena) {
   std::string_view name = recv->rhs->text;
   if (ClassObject* obj = HandleSideObject(recv->lhs, ctx, arena)) {
-    const ClassMember* member = SyncPropertyMember(obj->type, name, ctx);
-    if (member == nullptr) return {};
-    return {SyncKindOfType(member->data_type, ctx), obj, member,
-            SpellHandlePath(recv)};
+    SyncMember member = SyncPropertyMember(obj->type, name, ctx);
+    if (member.member == nullptr) return {};
+    return MakeSyncProperty(member, obj, SpellHandlePath(recv), ctx);
   }
   const ClassTypeInfo* cls = DeclaredClassOfHandleSide(recv->lhs, ctx);
-  const ClassMember* member =
-      cls != nullptr ? SyncPropertyMember(cls, name, ctx) : nullptr;
-  if (member == nullptr) return {};
-  return {SyncKindOfType(member->data_type, ctx), nullptr, member,
-          SpellHandlePath(recv->lhs)};
+  SyncMember member =
+      cls != nullptr ? SyncPropertyMember(cls, name, ctx) : SyncMember{};
+  if (member.member == nullptr) return {};
+  return MakeSyncProperty(member, nullptr, SpellHandlePath(recv->lhs), ctx);
+}
+
+// §8.9 (printed page 186) with §8.23: `C::name`, the static property `name`
+// of the class C, which needs no object. A package's `p::name` names no
+// class and is left to the run's tables.
+static SyncProperty ResolveScopedSyncProperty(const Expr* recv,
+                                              SimContext& ctx) {
+  if (recv->lhs == nullptr || recv->lhs->kind != ExprKind::kIdentifier)
+    return {};
+  const ClassTypeInfo* cls = ctx.FindClassType(recv->lhs->text);
+  if (cls == nullptr) return {};
+  SyncMember member = SyncPropertyMember(cls, recv->rhs->text, ctx);
+  if (member.member == nullptr || !member.member->is_static) return {};
+  return MakeSyncProperty(member, nullptr, SpellHandlePath(recv), ctx);
 }
 
 SyncProperty ResolveSyncProperty(const Expr* recv, SimContext& ctx,
@@ -133,11 +160,12 @@ SyncProperty ResolveSyncProperty(const Expr* recv, SimContext& ctx,
   if (recv->kind == ExprKind::kIdentifier && recv->text != "this") {
     return ResolveBareSyncProperty(recv->text, ctx);
   }
-  if (recv->kind != ExprKind::kMemberAccess || recv->is_scope_resolution ||
-      recv->rhs == nullptr || recv->rhs->kind != ExprKind::kIdentifier ||
-      !IsHandlePath(recv->lhs)) {
+  if (recv->kind != ExprKind::kMemberAccess || recv->rhs == nullptr ||
+      recv->rhs->kind != ExprKind::kIdentifier) {
     return {};
   }
+  if (recv->is_scope_resolution) return ResolveScopedSyncProperty(recv, ctx);
+  if (!IsHandlePath(recv->lhs)) return {};
   return ResolveSyncPropertyThroughHandle(recv, ctx, arena);
 }
 
@@ -155,23 +183,53 @@ static void ReportNullSyncProperty(const SyncProperty& prop,
                       Subclause("8.4"));
 }
 
-// The semaphore or mailbox the object holds under the property's name, or
-// null where the entry is absent or null.
+// §8.9 with §8.4: the map the property's object stands in -- the declaring
+// class's for a static property, the object's otherwise -- or null for an
+// instance property with no object, whose access is illegal.
+static std::unordered_map<std::string, SemaphoreObject*>* SemaphoreMapOf(
+    const SyncProperty& prop) {
+  if (prop.member->is_static)
+    return &prop.declaring->static_semaphore_properties;
+  return prop.obj == nullptr ? nullptr : &prop.obj->semaphore_properties;
+}
+
+static std::unordered_map<std::string, MailboxObject*>* MailboxMapOf(
+    const SyncProperty& prop) {
+  if (prop.member->is_static) return &prop.declaring->static_mailbox_properties;
+  return prop.obj == nullptr ? nullptr : &prop.obj->mailbox_properties;
+}
+
+static bool HasStorage(const SyncProperty& prop) {
+  return prop.member->is_static || prop.obj != nullptr;
+}
+
+static bool IsNewCall(const Expr* expr) {
+  return expr != nullptr && expr->kind == ExprKind::kCall &&
+         expr->text == "new";
+}
+
+// The semaphore or mailbox the property holds, or null where it holds none.
+// §8.9: a static property is created once, and its one copy is built here
+// on the first reference from the declaration's `new` where the map has no
+// entry for it yet -- an entry, null included, is what an assignment left.
 template <typename T>
-static T* HeldSyncObject(const std::unordered_map<std::string, T*>& held,
-                         std::string_view name) {
-  auto it = held.find(std::string(name));
-  return it == held.end() ? nullptr : it->second;
+static T* HeldSyncObject(std::unordered_map<std::string, T*>* held,
+                         const SyncProperty& prop, SimContext& ctx) {
+  if (held == nullptr) return nullptr;
+  std::string name(prop.member->name);
+  auto it = held->find(name);
+  if (it != held->end()) return it->second;
+  if (!prop.member->is_static || !IsNewCall(prop.member->init_expr))
+    return nullptr;
+  BuildSyncProperty(prop, prop.member->init_expr, ctx, ctx.GetArena());
+  return (*held)[name];
 }
 
 SemaphoreObject* SemaphoreOfProperty(const SyncProperty& prop,
                                      std::string_view method, SourceLoc loc,
                                      SimContext& ctx) {
   if (prop.kind != SyncKind::kSemaphore) return nullptr;
-  SemaphoreObject* sem =
-      prop.obj == nullptr
-          ? nullptr
-          : HeldSyncObject(prop.obj->semaphore_properties, prop.member->name);
+  SemaphoreObject* sem = HeldSyncObject(SemaphoreMapOf(prop), prop, ctx);
   if (sem == nullptr) ReportNullSyncProperty(prop, method, loc, ctx);
   return sem;
 }
@@ -180,24 +238,21 @@ MailboxObject* MailboxOfProperty(const SyncProperty& prop,
                                  std::string_view method, SourceLoc loc,
                                  SimContext& ctx) {
   if (prop.kind != SyncKind::kMailbox) return nullptr;
-  MailboxObject* mbx =
-      prop.obj == nullptr
-          ? nullptr
-          : HeldSyncObject(prop.obj->mailbox_properties, prop.member->name);
+  MailboxObject* mbx = HeldSyncObject(MailboxMapOf(prop), prop, ctx);
   if (mbx == nullptr) ReportNullSyncProperty(prop, method, loc, ctx);
   return mbx;
 }
 
 void BuildSyncProperty(const SyncProperty& prop, const Expr* new_expr,
                        SimContext& ctx, Arena& arena) {
-  if (prop.obj == nullptr) {
+  if (!HasStorage(prop)) {
     ReportNullSyncProperty(prop, "new", new_expr->range.start, ctx);
     return;
   }
   std::string name(prop.member->name);
   if (prop.kind == SyncKind::kSemaphore) {
     int32_t keys = SemaphoreKeyArg(new_expr, ctx, arena, 0);
-    SemaphoreObject*& slot = prop.obj->semaphore_properties[name];
+    SemaphoreObject*& slot = (*SemaphoreMapOf(prop))[name];
     if (slot == nullptr) {
       slot = ctx.GetArena().Create<SemaphoreObject>(keys);
     } else {
@@ -206,7 +261,7 @@ void BuildSyncProperty(const SyncProperty& prop, const Expr* new_expr,
     return;
   }
   int32_t bound = MailboxBoundArg(new_expr, ctx, arena);
-  MailboxObject*& slot = prop.obj->mailbox_properties[name];
+  MailboxObject*& slot = (*MailboxMapOf(prop))[name];
   if (slot == nullptr) {
     slot = ctx.GetArena().Create<MailboxObject>(bound);
   } else {
@@ -217,13 +272,11 @@ void BuildSyncProperty(const SyncProperty& prop, const Expr* new_expr,
 bool TryInitClassSyncProperty(ClassObject* obj, const ClassTypeInfo* info,
                               std::string_view name, const Expr* init,
                               SimContext& ctx) {
-  const ClassMember* member = SyncPropertyMember(info, name, ctx);
-  if (member == nullptr) return false;
-  if (init == nullptr || init->kind != ExprKind::kCall || init->text != "new")
-    return true;
-  SyncProperty prop{SyncKindOfType(member->data_type, ctx), obj, member,
-                    std::string(name)};
-  BuildSyncProperty(prop, init, ctx, ctx.GetArena());
+  SyncMember member = SyncPropertyMember(info, name, ctx);
+  if (member.member == nullptr || member.member->is_static) return false;
+  if (init == nullptr) return true;
+  SyncProperty prop = MakeSyncProperty(member, obj, std::string(name), ctx);
+  if (IsNewCall(init)) BuildSyncProperty(prop, init, ctx, ctx.GetArena());
   return true;
 }
 
