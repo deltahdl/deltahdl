@@ -263,7 +263,10 @@ struct AnyChangeAwaiter {
   // owning the queue while that variable's `value` stands still. The case that
   // reaches this awaiter is `wait (q[0] == 3)` woken by a `q.push_back(...)`
   // elsewhere -- CollectSelectReads (src/elaborator/sensitivity.cpp:48-50) puts
-  // the select's base identifier `q` into the read set.
+  // the select's base identifier `q` into the read set -- and `wait (q.size()
+  // != 0)`, whose receiver CollectMethodReceiverReads in
+  // src/simulator/stmt_exec_wait.cpp puts there, a call's callee being nothing
+  // CollectExprReads collects.
   //
   // A class handle's `value` is the handle, not the object: the kProperty arm
   // of WriteResolvedField (src/simulator/statement_assign.cpp) writes the field

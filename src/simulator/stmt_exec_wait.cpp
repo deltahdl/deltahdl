@@ -104,6 +104,35 @@ void CollectPackageScopedReads(const Expr* cond, SimContext& ctx,
   });
 }
 
+// §9.4.3 with §7.10.2 and §7.5.2: the condition may read a queue or a dynamic
+// array through a method call, `wait (q.size() != 0)`, and the methods that
+// answer about the array are defined on the object the receiver names, as are
+// the ones that change it. CollectExprReads gives a call its arguments alone,
+// a callee being no variable, so a call on a receiver contributed nothing to
+// `reads`: the set was empty, and ExecWait returned at once with the condition
+// still false -- `wait (q.size() != 0)` on an empty queue popped 0 at time 0
+// where the push at time 10 should have released it, and a class task's
+// `wait (m_queue.size() != 0)` called from a forever loop spun at time 0. The
+// receiver's own reads are what the call adds: a declared queue's or dynamic
+// array's name, which every mutating method announces through NotifyOwningVar
+// (eval_array_queue.cpp) while the variable's value stands still, and which
+// AnyChangeAwaiter therefore wakes on without comparing; a property's bare
+// name inside a method, which the awaiter's own-property arm arms on the
+// running method's object; and the handle a property is reached through,
+// `h.m_queue.size()`, which AnnounceQueueChange (eval_array_class_queue.cpp)
+// reaches through SimContext::NotifyClassHandleWatchers. A parenthesis-less
+// `q.size` is a member access, whose two sides CollectExprReads already
+// descends, which is why that spelling was released and the call was not.
+void CollectMethodReceiverReads(const Expr* cond,
+                                std::unordered_set<std::string>& reads) {
+  ForEachSubExpr(cond, [&](const Expr* e) {
+    if (e->kind != ExprKind::kCall || e->lhs == nullptr ||
+        e->lhs->kind != ExprKind::kMemberAccess || e->lhs->is_scope_resolution)
+      return;
+    CollectExprReads(e->lhs->lhs, reads);
+  });
+}
+
 struct WaitOrderStepAwaiter {
   SimContext& ctx;
   const std::vector<std::string_view>& event_names;
@@ -149,6 +178,7 @@ ExecTask ExecWait(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (labeled) ctx.PushStaticScope(stmt->label);
   std::unordered_set<std::string> reads;
   CollectExprReads(stmt->condition, reads);
+  CollectMethodReceiverReads(stmt->condition, reads);
   CollectStaticPropertyReads(stmt->condition, ctx, reads);
   CollectPackageScopedReads(stmt->condition, ctx, reads);
 

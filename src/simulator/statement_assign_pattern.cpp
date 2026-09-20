@@ -789,19 +789,18 @@ static void CopyNewInit(const Expr* rhs, QueueObject* q,
     q->elements[i] = OwnRhsWords(src_elems[i], arena);
 }
 
-// §9.4.2 names a change to an object's data members among what wakes a
-// waiting process, so a whole-queue assignment to a property, `owner` being
-// the object, is told to the watchers on the object. A declared queue's
-// assignment, `owner` null, announces what it announced before.
-static void AnnouncePropertyQueueChange(const Expr* lhs, ClassObject* owner,
-                                        SimContext& ctx) {
-  if (owner != nullptr) AnnounceQueueChange(lhs, owner, ctx);
-}
-
 // §7.10/§10.10: the target is a declared queue by its bare name or, §8.5
 // putting no restriction on a property's type, a queue property of an object
 // -- the running method's own by its bare name (§8.11), or any object's
 // through a handle, `b.q = {1, 2}` -- which FindQueueOfBase resolves.
+// §9.4.3 (printed page 236) has a wait on the queue's size() block until the
+// condition becomes true, and §9.4.2 names a change to an object's data
+// members among what wakes a waiter, so each arm announces the change
+// through AnnounceQueueChange: a property's to the object's watchers, a
+// declared queue's or dynamic array's to the watchers on its name, as every
+// mutating method does. Announced for a property alone, and not at all by
+// the new[] arm, `q = {}`, `q = {7}` and `d = new[3]` on a declared queue or
+// array left `wait (d.size() == 3)` parked for ever.
 bool TryQueueBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (stmt->lhs->kind != ExprKind::kIdentifier &&
       stmt->lhs->kind != ExprKind::kMemberAccess) {
@@ -815,7 +814,7 @@ bool TryQueueBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     q->elements.clear();
     q->element_ids.clear();
     ++q->generation;
-    AnnouncePropertyQueueChange(stmt->lhs, owner, ctx);
+    AnnounceQueueChange(stmt->lhs, owner, ctx);
     return true;
   }
   if (stmt->rhs->kind == ExprKind::kCall && stmt->rhs->text == "new" &&
@@ -847,6 +846,7 @@ bool TryQueueBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     EnforceQueueBound(q, "new[]", stmt->rhs->range.start, ctx);
     q->AssignFreshIds();
     ++q->generation;
+    AnnounceQueueChange(stmt->lhs, owner, ctx);
     return true;
   }
   std::vector<Logic4Vec> elems;
@@ -856,7 +856,7 @@ bool TryQueueBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   EnforceQueueBound(q, "assignment", stmt->rhs->range.start, ctx);
   q->AssignFreshIds();
   ++q->generation;
-  AnnouncePropertyQueueChange(stmt->lhs, owner, ctx);
+  AnnounceQueueChange(stmt->lhs, owner, ctx);
   return true;
 }
 

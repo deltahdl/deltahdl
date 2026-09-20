@@ -439,4 +439,114 @@ TEST(LevelSensitiveEventSimulation, WaitOnAnOwnPropertyInsideAClassTask) {
   EXPECT_EQ(val, 446u);
 }
 
+// §9.4.3 (printed page 236) with §7.10.2.1: the condition reads a declared
+// queue through its size() method, and the wait stays blocked until a push
+// from another process makes the size nonzero. CollectExprReads gives a call
+// its arguments alone, so `q.size()` contributed nothing to the read set,
+// ExecWait took the empty set for a condition nothing could change and
+// returned at once: `q.pop_front()` on the still-empty queue read 0 at time 0,
+// so `result` read 0. Released by the push at time 10, the pop reads 7 and
+// the sum reads 7 * 100 + 10.
+TEST(LevelSensitiveEventSimulation, WaitOnAQueueSizeCallIsReleasedByAPush) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  int q[$];\n"
+      "  int v, result;\n"
+      "  initial begin\n"
+      "    wait (q.size() != 0);\n"
+      "    v = q.pop_front();\n"
+      "    result = v * 100 + $time;\n"
+      "  end\n"
+      "  initial #10 q.push_back(7);\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(val, 710u);
+}
+
+// §9.4.3 with §7.5.1 and §7.5.2 (printed page 158): a dynamic array's size()
+// answers the size the last new[] gave it, so a wait on `d.size() == 3` is
+// released by `d = new[3]` in another process. As for the queue above, the
+// call contributed no read and the wait returned at once with the size still
+// 0, leaving `result` at 0 * 100 + 0; released at time 20 it reads 3 * 100 +
+// 20. The release also needs the new[] arm of TryQueueBlockingAssign
+// (statement_assign_pattern.cpp) to announce the resize to the array's
+// watchers, as every queue method announces its change.
+TEST(LevelSensitiveEventSimulation,
+     WaitOnADynamicArraySizeCallIsReleasedByNew) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  int d[];\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    wait (d.size() == 3);\n"
+      "    result = d.size() * 100 + $time;\n"
+      "  end\n"
+      "  initial #20 d = new[3];\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(val, 320u);
+}
+
+// §9.4.3 with §8.5 and §8.11: inside a class task the condition reads the
+// object's own queue property through size(), and a push through a handle
+// from another process releases it. This is the shape of a blocking get on a
+// queue-backed FIFO: the task is called from a forever loop, so a wait that
+// returned at once spun at time 0, each pop reading 0 from the empty queue.
+// The result records the value the first pop gave and the time it happened,
+// 7 * 100 + 10, and the second pop the same for the push at 20, 9 * 100 + 20,
+// where the spinning task left `first` at 0 and never reached the second.
+TEST(LevelSensitiveEventSimulation,
+     WaitOnAQueuePropertySizeCallInsideAClassTaskIsReleasedByAPush) {
+  auto val = RunAndGet(
+      "class H;\n"
+      "  int m_queue[$];\n"
+      "  int first, second;\n"
+      "  task get(output int v);\n"
+      "    wait (m_queue.size() != 0);\n"
+      "    v = m_queue.pop_front();\n"
+      "  endtask\n"
+      "  task run();\n"
+      "    int v;\n"
+      "    forever begin\n"
+      "      get(v);\n"
+      "      if (first == 0) first = v * 100 + $time;\n"
+      "      else second = v * 100 + $time;\n"
+      "    end\n"
+      "  endtask\n"
+      "endclass\n"
+      "module t;\n"
+      "  H h = new;\n"
+      "  int result;\n"
+      "  initial h.run();\n"
+      "  initial begin\n"
+      "    #10 h.m_queue.push_back(7);\n"
+      "    #10 h.m_queue.push_back(9);\n"
+      "    #1 result = h.first * 10000 + h.second;\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(val, 7100920u);
+}
+
+// §9.4.3: a condition that is already true when the wait is reached blocks
+// nothing, and the receiver's read added for the call above must not turn a
+// true condition into a suspension. The queue holds 3 when the wait is
+// evaluated, so the pop reads 3 at time 0 and `result` 3 * 100 + 0; a wait
+// that parked until the push at time 10 would read 3 * 100 + 10.
+TEST(LevelSensitiveEventSimulation, WaitOnANonEmptyQueueSizeCallDoesNotBlock) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  int q[$];\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    q.push_back(3);\n"
+      "    wait (q.size() != 0);\n"
+      "    result = q.pop_front() * 100 + $time;\n"
+      "  end\n"
+      "  initial #10 q.push_back(9);\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(val, 300u);
+}
+
 }  // namespace
