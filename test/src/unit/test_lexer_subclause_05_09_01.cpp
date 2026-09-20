@@ -3,6 +3,7 @@
 #include <string>
 
 #include "fixture_lexer.h"
+#include "helpers_reported_error.h"
 #include "lexer/string_escape.h"
 #include "lexer/token.h"
 
@@ -132,19 +133,63 @@ TEST(LexicalConventionLexing, TripleQuotedEscapeSequencesSupported) {
   EXPECT_EQ(InterpretStringEscapes(body), "a\nb\"c");
 }
 
-// An x or z (which are legal digits in numeric literals) is never accepted as a
-// digit of an octal escape, so it ends the octal run and stands as its own
-// character instead.
-TEST(LexicalConventionLexing, OctalEscapeExcludesXAndZDigits) {
-  EXPECT_EQ(InterpretStringEscapes(R"(\1x)"), std::string("\x01") + "x");
-  EXPECT_EQ(InterpretStringEscapes(R"(\1z)"), std::string("\x01") + "z");
+// Table 5-1 makes it illegal for a digit of an octal escape to be an x_digit
+// or a z_digit, and an escape of fewer than three digits may not be followed
+// by an octal_digit, which Syntax 5-2 has include x, X, z, Z and ?. The lexer
+// reports the sequence where the string is lexed, so the design is rejected
+// rather than printing the character and then the letter.
+TEST(LexicalConventionLexing, OctalEscapeWithZDigitIsRejected) {
+  auto diags = LexDiagnostics("\"\\1z\"");
+  EXPECT_TRUE(ReportedError(diags, "octal escape", 1, "5.9.1"));
 }
 
-// Likewise, an x or z is never accepted as a digit of a hex escape; it ends the
-// hex run and remains a literal character.
-TEST(LexicalConventionLexing, HexEscapeExcludesXAndZDigits) {
-  EXPECT_EQ(InterpretStringEscapes(R"(\x1x)"), std::string("\x01") + "x");
-  EXPECT_EQ(InterpretStringEscapes(R"(\x1z)"), std::string("\x01") + "z");
+TEST(LexicalConventionLexing, OctalEscapeWithQuestionMarkDigitIsRejected) {
+  auto diags = LexDiagnostics("\"\\1?\"");
+  EXPECT_TRUE(ReportedError(diags, "octal escape", 1, "5.9.1"));
+}
+
+TEST(LexicalConventionLexing, TwoDigitOctalEscapeWithXDigitIsRejected) {
+  auto diags = LexDiagnostics("\"\\77x\"");
+  EXPECT_TRUE(ReportedError(diags, "octal escape", 1, "5.9.1"));
+}
+
+// Likewise for a hex escape: its digits are hex_digits, which include the x
+// and z digits, and those are illegal in an escape.
+TEST(LexicalConventionLexing, HexEscapeWithXDigitIsRejected) {
+  auto diags = LexDiagnostics("\"\\x4x\"");
+  EXPECT_TRUE(ReportedError(diags, "hex escape", 1, "5.9.1"));
+}
+
+TEST(LexicalConventionLexing, HexEscapeWhoseFirstDigitIsZIsRejected) {
+  auto diags = LexDiagnostics("\"\\xZ\"");
+  EXPECT_TRUE(ReportedError(diags, "hex escape", 1, "5.9.1"));
+}
+
+// The report names the line the escape is on, which in a triple-quoted
+// literal spanning lines is not the line the literal opens on.
+TEST(LexicalConventionLexing, TripleQuotedEscapeWithZDigitIsRejectedOnItsLine) {
+  auto diags = LexDiagnostics("\"\"\"a\n\\1z\"\"\"");
+  EXPECT_TRUE(ReportedError(diags, "octal escape", 2, "5.9.1"));
+}
+
+// A full-length escape, an escape followed by a character that is not a digit
+// of its kind, and an escape that ends the string are the legal forms and
+// report nothing: three octal digits then a 9, two hex digits, one hex digit
+// then a g, and one octal digit then the closing quote.
+TEST(LexicalConventionLexing, LegalNumericEscapesReportNothing) {
+  EXPECT_TRUE(LexDiagnostics("\"\\1019\"").empty());
+  EXPECT_TRUE(LexDiagnostics("\"\\x41\"").empty());
+  EXPECT_TRUE(LexDiagnostics("\"\\x4g\"").empty());
+  EXPECT_TRUE(LexDiagnostics("\"\\7\"").empty());
+}
+
+// An x after a complete escape is an ordinary character, since the escape
+// took every digit it may: \101x is `A` then `x`, and \x41x is the same.
+TEST(LexicalConventionLexing, XAfterACompleteNumericEscapeIsACharacter) {
+  EXPECT_TRUE(LexDiagnostics("\"\\101x\"").empty());
+  EXPECT_TRUE(LexDiagnostics("\"\\x41x\"").empty());
+  EXPECT_EQ(InterpretStringEscapes(R"(\101x)"), "Ax");
+  EXPECT_EQ(InterpretStringEscapes(R"(\x41x)"), "Ax");
 }
 
 // A hex escape consumes at most two hex digits, so a third hex digit stands as

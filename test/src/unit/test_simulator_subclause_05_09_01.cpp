@@ -134,21 +134,22 @@ TEST(LexicalConventionSim, HexConsumesAtMostTwoDigits) {
   EXPECT_EQ(v, 0x4131u);
 }
 
-// x is a valid digit in a numeric literal (see 5.7) but is never a digit of an
-// octal escape, so it terminates the run and remains a literal character:
-// \1x is the byte 0x01 followed by 'x'.
-TEST(LexicalConventionSim, OctalEscapeExcludesXDigit) {
+// Table 5-1 makes an x illegal as a digit of an escape, and the lexer rejects
+// a short escape an x follows; after a complete three-digit octal escape the x
+// is an ordinary character, so \101x is 'A' followed by 'x'.
+TEST(LexicalConventionSim, XAfterACompleteOctalEscapeIsACharacter) {
   auto v = RunAndGet(
-      "module t;\n  bit [15:0] s;\n  initial s = \"\\1x\";\nendmodule\n", "s");
-  EXPECT_EQ(v, 0x0178u);
+      "module t;\n  bit [15:0] s;\n  initial s = \"\\101x\";\nendmodule\n",
+      "s");
+  EXPECT_EQ(v, 0x4178u);
 }
 
-// Likewise x is never a digit of a hex escape, so \x1x is the byte 0x01
-// followed by a literal 'x'.
-TEST(LexicalConventionSim, HexEscapeExcludesXDigit) {
+// Likewise after a complete two-digit hex escape: \x41x is 'A' then 'x'.
+TEST(LexicalConventionSim, XAfterACompleteHexEscapeIsACharacter) {
   auto v = RunAndGet(
-      "module t;\n  bit [15:0] s;\n  initial s = \"\\x1x\";\nendmodule\n", "s");
-  EXPECT_EQ(v, 0x0178u);
+      "module t;\n  bit [15:0] s;\n  initial s = \"\\x41x\";\nendmodule\n",
+      "s");
+  EXPECT_EQ(v, 0x4178u);
 }
 
 TEST(LexicalConventionSim, DoubleBackslashBeforeNewline) {

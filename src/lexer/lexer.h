@@ -133,6 +133,7 @@ class Lexer {
   Token LexStringLiteral();
   bool LexQuotedBody();
   bool LexTripleQuotedBody();
+  void CheckEscapeDigits();
   Token LexSystemIdentifier();
   Token LexEscapedIdentifier();
   Token LexApostrophe();

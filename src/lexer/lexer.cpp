@@ -185,6 +185,13 @@ bool PragmaAlreadyRecorded(const PragmaVec& recorded, SourceLoc loc) {
   return false;
 }
 
+// Whether c is a digit an escape of the kind may take: a hex_digit other than
+// an x_digit or z_digit for `\xdd`, one of 0 to 7 for `\ddd`.
+bool IsEscapeDigit(char c, bool hex) {
+  if (hex) return std::isxdigit(static_cast<unsigned char>(c)) != 0;
+  return c >= '0' && c <= '7';
+}
+
 }  // namespace
 
 Lexer::Lexer(std::string_view source, uint32_t file_id, DiagEngine& diag,
@@ -642,12 +649,45 @@ Token Lexer::LexStringLiteral() {
   return tok;
 }
 
+// §5.9.1 (Table 5-1): the digits of a `\ddd` escape are octal_digits and
+// those of a `\xdd` escape hex_digits, and it is illegal for either to be an
+// x_digit or a z_digit, which Syntax 5-2 has be x, X, z, Z and ?. An escape
+// that took fewer digits than its kind allows and is followed by one of those
+// letters is such an escape; one that took its full count is complete and the
+// letter after it is an ordinary character. pos_ is at the backslash, and the
+// report is placed there, on the escape's own line.
+void Lexer::CheckEscapeDigits() {
+  uint32_t p = pos_ + 1;
+  if (p >= source_.size()) return;
+  const bool kHex = source_[p] == 'x';
+  if (kHex) {
+    ++p;
+  } else if (!IsEscapeDigit(source_[p], false)) {
+    return;
+  }
+  const uint32_t kMax = kHex ? 2 : 3;
+  uint32_t taken = 0;
+  while (taken < kMax && p < source_.size() &&
+         IsEscapeDigit(source_[p], kHex)) {
+    ++p;
+    ++taken;
+  }
+  if (taken == kMax || p >= source_.size()) return;
+  const char c = source_[p];
+  if (c != 'x' && c != 'X' && c != 'z' && c != 'Z' && c != '?') return;
+  diag_.Error(MakeLoc(),
+              kHex ? "x or z digit in a hex escape of a string literal"
+                   : "x or z digit in an octal escape of a string literal",
+              Subclause("5.9.1"));
+}
+
 bool Lexer::LexQuotedBody() {
   while (!AtEnd() && Current() != '"') {
     if (Current() == '\n' || Current() == '\r') {
       return false;
     }
     if (Current() == '\\') {
+      CheckEscapeDigits();
       Advance();
 
       if (AtEnd()) return false;
@@ -669,6 +709,7 @@ bool Lexer::LexTripleQuotedBody() {
       return true;
     }
     if (Current() == '\\') {
+      CheckEscapeDigits();
       Advance();
     }
     Advance();
