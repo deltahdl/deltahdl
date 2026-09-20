@@ -28,12 +28,21 @@ void InheritRefQualifiers(const std::vector<FunctionArg>& args,
 // argument with an explicit direction (or following 'default') default to
 // logic; otherwise it inherits the previous argument's data type. Pure state
 // update.
+//
+// §13.3 (printed page 336): the implicit form of a tf_port_item's type is a
+// signing and packed dimensions with no type keyword, and a formal whose
+// data type is not declared is `logic`, so `input [7:0] a` is a logic vector
+// of the written dimension rather than a formal of no type carrying one --
+// the simulator sizes a formal by its declared type and left the actual's
+// nine bits in an eight-bit formal -- and the `b` that inherits from it
+// (printed page 337, mytask4) inherits `logic [7:0]`.
 void ResolveImplicitArgDataType(FunctionArg& arg,
                                 const DataType& prev_data_type,
                                 bool dir_explicit, bool first_arg,
                                 bool prev_was_default) {
-  if (arg.data_type.kind != DataTypeKind::kImplicit ||
-      arg.data_type.packed_dim_left != nullptr || arg.data_type.is_signed) {
+  if (arg.data_type.kind != DataTypeKind::kImplicit) return;
+  if (arg.data_type.packed_dim_left != nullptr || arg.data_type.is_signed) {
+    arg.data_type.kind = DataTypeKind::kLogic;
     return;
   }
   if (first_arg || dir_explicit || prev_was_default) {

@@ -531,4 +531,60 @@ TEST(TaskSim, BaseClassTaskWithAForkJoinEnabledThroughSuperJoinsFirst) {
   EXPECT_EQ(val, 232u);
 }
 
+// §13.3 (printed pages 336-337): a tf_port_item takes a data_type_or_implicit,
+// the implicit form being signing and packed dimensions alone, and a formal
+// whose data type is not explicitly declared is `logic`, so `input [7:0] a`
+// is an 8-bit logic vector and §13.5.1's copy-in takes the 9-bit actual's
+// low byte: 9'h1AB into it reads 171. The parser left the formal at the
+// implicit kind with its dimensions attached, and the bind sizes a formal of
+// a declared type alone, so the formal kept all nine bits and read 427.
+TEST(TaskSim, FormalWithAPackedDimensionAndNoTypeKeywordIsLogicOfThatWidth) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  int r;\n"
+      "  task tk(input [7:0] a); r = a; endtask\n"
+      "  initial tk(9'h1AB);\n"
+      "endmodule\n",
+      "r");
+  EXPECT_EQ(val, 171u);
+}
+
+// §13.3 (printed page 337): a formal with neither a type nor a direction
+// inherits the previous formal's data type, and the clause's mytask4 has a
+// `b` after `input [3:0][7:0] a` declared as an 8-bit-by-4 vector, so `b`
+// after `input [7:0] a` is `logic [7:0]` and 9'h1CD into it reads 205. The
+// inherited type was the unsized implicit one, so `b` kept 461.
+TEST(TaskSim, UntypedFormalInheritsThePrecedingFormalsPackedDimension) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  int r;\n"
+      "  task tk(input [7:0] a, b); r = a * 1000 + b; endtask\n"
+      "  initial tk(9'h1AB, 9'h1CD);\n"
+      "endmodule\n",
+      "r");
+  EXPECT_EQ(val, 171205u);
+}
+
+// §13.3 (printed page 337): the first formal with no type and no dimension
+// is a `logic` scalar, and an explicitly directed formal after a sized one
+// starts over at that scalar rather than inheriting the size, so `output yy`
+// after `output logic [15:0] uu, vv` holds one bit of the 3 written to it,
+// while `vv` takes the 16 bits of `uu`: 65535 * 10 + 1 with 2 in the middle
+// digit.
+TEST(TaskSim, FormalWithNeitherTypeNorDimensionIsAScalarLogic) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  logic [15:0] u, v; logic y; int r;\n"
+      "  task tk(input [7:0] a, b, output logic [15:0] uu, vv, output yy);\n"
+      "    uu = 16'hFFFF; vv = 2; yy = 3;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    tk(8'hAB, 9'h1CD, u, v, y);\n"
+      "    r = u * 100 + v * 10 + y;\n"
+      "  end\n"
+      "endmodule\n",
+      "r");
+  EXPECT_EQ(val, 6553521u);
+}
+
 }  // namespace

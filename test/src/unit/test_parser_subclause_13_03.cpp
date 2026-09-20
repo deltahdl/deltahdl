@@ -603,4 +603,28 @@ TEST(TaskAndFunctionParsing, FunctionFormalArgDataTypeInherited) {
   EXPECT_EQ(item->func_args[1].data_type.packed_dim_left->int_val, 3u);
 }
 
+// §13.3 (printed page 336): implicit_data_type is signing and packed
+// dimensions alone, and a formal with no explicit data type is `logic`, so
+// `input [7:0] a` is recorded as logic with the dimension it was written
+// with, and the untyped `b` after it inherits that same type (printed page
+// 337). Left at the implicit kind, the simulator's bind sized neither.
+TEST(TaskAndFunctionParsing, FormalWithAPackedDimensionAloneIsLogic) {
+  auto r = Parse(
+      "module m;\n"
+      "  task tk(input [7:0] a, b);\n"
+      "  endtask\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  ASSERT_EQ(item->func_args.size(), 2u);
+  for (size_t i = 0; i < 2; ++i) {
+    EXPECT_EQ(item->func_args[i].data_type.kind, DataTypeKind::kLogic);
+    ASSERT_NE(item->func_args[i].data_type.packed_dim_left, nullptr);
+    EXPECT_EQ(item->func_args[i].data_type.packed_dim_left->int_val, 7u);
+    ASSERT_NE(item->func_args[i].data_type.packed_dim_right, nullptr);
+    EXPECT_EQ(item->func_args[i].data_type.packed_dim_right->int_val, 0u);
+  }
+}
+
 }  // namespace
