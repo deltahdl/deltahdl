@@ -80,26 +80,43 @@ bool ConstValBit(const ConstVal& v, int64_t offset);
 // negative `lo` shifts the value up by -lo. Defined in const_eval_wide.cpp.
 uint64_t ConstValWindow(const ConstVal& v, int64_t lo);
 
+// §11.6.1's Table 11-21 (printed pages 299-300): whether the binary operator
+// `op` sizes its result by its left operand alone, the right being
+// self-determined -- the four shifts, their compound assignment forms and
+// the power -- rather than by the wider of the two. Defined in
+// const_eval.cpp; BitLengthRuleOf in const_eval_bits.cpp holds the same
+// rows of the table for $bits.
+bool SizedByLeftOperand(TokenKind op);
+
+// §11.8.1 (printed page 302): the signedness of the value the binary operator
+// `op` makes of `lhs` and `rhs` -- the left operand's where the right is
+// self-determined, and signed where both are otherwise. Defined in
+// const_eval.cpp.
+bool BinaryResultSigned(TokenKind op, const ConstVal& lhs, const ConstVal& rhs);
+
 // §11.4.10 with §11.4.8, §11.4.3, §11.4.4, §11.4.5 and §11.4.7: a shift, a
 // bitwise operator, an arithmetic operator, a relational, an equality or a
 // logical operator applied across every word of `lhs` and `rhs`, at width
-// `width`, for an operand that carries bits past 63; a comparison and a
-// logical operator answer one bit. Empty for any other operator -- the case
-// equality and wildcard operators -- which the 64-bit fold answers on the
-// low word, and for a quotient or a remainder by zero and a power §11.4.3
-// makes x. Defined in const_eval_wide.cpp.
+// `width` -- the result's, which ConstEvalBinaryFull sizes -- for an
+// operand that carries bits past 63, and for every shift and power whatever
+// their width, whose right operand is read across all of its words; a
+// comparison and a logical operator answer one bit. Empty for any other
+// operator -- the case equality and wildcard operators -- which the 64-bit
+// fold answers on the low word, and for a quotient or a remainder by zero
+// and a power §11.4.3 makes x. Defined in const_eval_wide.cpp.
 std::optional<ConstVal> EvalWideBinary(TokenKind op, const ConstVal& lhs,
                                        const ConstVal& rhs, uint32_t width);
 
 // §11.4.3 (printed pages 275-276) with §11.4.3.1: the product, the quotient,
 // the remainder or the power of `lhs` and `rhs` at width `width`, worked
 // across every word of them -- the quotient truncated toward zero, the
-// remainder with the sign of the first operand, the power by Table 11-4 --
-// and cut to the width as §11.6.1 cuts an arithmetic result. Empty for a
-// divisor of zero and for a base of zero under a negative exponent, which
-// the clause makes x, as the 64-bit fold answers them. `op` is one of the
-// four; 994404a79 folded each on the low word. Defined in
-// const_eval_wide_arith.cpp.
+// remainder with the sign of the first operand, the power by Table 11-4
+// with the exponent read across every word of `rhs` -- and cut to the width
+// as §11.6.1 cuts an arithmetic result, which is the wider operand's for
+// the first three and the base's for the power. Empty for a divisor of zero
+// and for a base of zero under a negative exponent, which the clause makes
+// x, as the 64-bit fold answers them. `op` is one of the four; 994404a79
+// folded each on the low word. Defined in const_eval_wide_arith.cpp.
 std::optional<ConstVal> EvalWideMultiplicative(TokenKind op,
                                                const ConstVal& lhs,
                                                const ConstVal& rhs,

@@ -266,11 +266,6 @@ static std::optional<BitLengthRule> BitLengthRuleOf(const Expr* a) {
       {TokenKind::kCaret, BitLengthRule::kMaxOfOperands},
       {TokenKind::kTildeCaret, BitLengthRule::kMaxOfOperands},
       {TokenKind::kCaretTilde, BitLengthRule::kMaxOfOperands},
-      {TokenKind::kLtLt, BitLengthRule::kLeftOperand},
-      {TokenKind::kLtLtLt, BitLengthRule::kLeftOperand},
-      {TokenKind::kGtGt, BitLengthRule::kLeftOperand},
-      {TokenKind::kGtGtGt, BitLengthRule::kLeftOperand},
-      {TokenKind::kPower, BitLengthRule::kLeftOperand},
       {TokenKind::kLt, BitLengthRule::kOneBit},
       {TokenKind::kGt, BitLengthRule::kOneBit},
       {TokenKind::kLtEq, BitLengthRule::kOneBit},
@@ -299,6 +294,11 @@ static std::optional<BitLengthRule> BitLengthRuleOf(const Expr* a) {
       {TokenKind::kCaretTilde, BitLengthRule::kOneBit},
       {TokenKind::kBang, BitLengthRule::kOneBit},
   };
+  // The shifts and the power take the left operand's length, the right being
+  // self-determined: the one rule the fold sizes by (SizedByLeftOperand in
+  // const_eval.cpp), so $bits and the folded value cannot disagree.
+  if (a->kind == ExprKind::kBinary && SizedByLeftOperand(a->op))
+    return BitLengthRule::kLeftOperand;
   const auto& rules = a->kind == ExprKind::kUnary ? kUnary : kBinary;
   auto it = rules.find(a->op);
   if (it == rules.end()) return std::nullopt;

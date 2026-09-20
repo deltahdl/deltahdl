@@ -16,20 +16,42 @@
 
 namespace delta {
 
-static std::optional<int64_t> EvalPower(int64_t base, int64_t exp) {
-  if (exp < 0) {
-    if (base == 0) return std::nullopt;
-    if (base == 1) return 1;
-    if (base == -1) return (exp % 2 == 0) ? 1 : -1;
-    return 0;
+// §11.6.1's Table 11-21 (printed pages 299-300) sizes a shift and a power by
+// their left operand alone, the right being self-determined; §11.4.10
+// (printed 284) and §11.4.3 (printed 276) say the same of the count and the
+// exponent. The compound assignment forms of the shifts are the shifts
+// themselves, which the parser folds into a binary expression. Every other
+// binary operator that makes a value takes the wider of its two operands.
+bool SizedByLeftOperand(TokenKind op) {
+  switch (op) {
+    case TokenKind::kLtLt:
+    case TokenKind::kLtLtEq:
+    case TokenKind::kLtLtLt:
+    case TokenKind::kLtLtLtEq:
+    case TokenKind::kGtGt:
+    case TokenKind::kGtGtEq:
+    case TokenKind::kGtGtGt:
+    case TokenKind::kGtGtGtEq:
+    case TokenKind::kPower:
+      return true;
+    default:
+      return false;
   }
-  int64_t result = 1;
-  for (int64_t i = 0; i < exp; ++i) {
-    result *= base;
-  }
-  return result;
 }
 
+// §11.8.1 (printed page 302): the result is unsigned where any operand that
+// is not self-determined is unsigned, and a self-determined operand's sign
+// is its own and never the expression's. A shift's count and a power's
+// exponent are self-determined, so those two take their left operand's
+// signedness, as §11.4.10 (printed 284) says of a shift outright; every
+// other binary operator is signed where both operands are.
+bool BinaryResultSigned(TokenKind op, const ConstVal& lhs,
+                        const ConstVal& rhs) {
+  return lhs.is_signed && (SizedByLeftOperand(op) || rhs.is_signed);
+}
+
+// The power is not folded here: WidePower in const_eval_wide_arith.cpp
+// raises a base of any width, the exponent read across every word of it.
 static std::optional<int64_t> EvalBinaryArith(TokenKind op, int64_t lhs,
                                               int64_t rhs) {
   switch (op) {
@@ -50,13 +72,14 @@ static std::optional<int64_t> EvalBinaryArith(TokenKind op, int64_t lhs,
     case TokenKind::kPercentEq:
       if (rhs == 0) return std::nullopt;
       return lhs % rhs;
-    case TokenKind::kPower:
-      return EvalPower(lhs, rhs);
     default:
       return std::nullopt;
   }
 }
 
+// The shifts are not folded here either: WideShift in const_eval_wide.cpp
+// shifts a left operand of any width by a count read across every word of
+// the right, where a C++ shift by 64 or more is undefined.
 static std::optional<int64_t> EvalBinaryBitwise(TokenKind op, int64_t lhs,
                                                 int64_t rhs) {
   switch (op) {
@@ -72,17 +95,6 @@ static std::optional<int64_t> EvalBinaryBitwise(TokenKind op, int64_t lhs,
     case TokenKind::kTildeCaret:
     case TokenKind::kCaretTilde:
       return ~(lhs ^ rhs);
-    case TokenKind::kLtLt:
-    case TokenKind::kLtLtLt:
-    case TokenKind::kLtLtEq:
-    case TokenKind::kLtLtLtEq:
-      return lhs << rhs;
-    case TokenKind::kGtGt:
-    case TokenKind::kGtGtEq:
-      return static_cast<int64_t>(static_cast<uint64_t>(lhs) >> rhs);
-    case TokenKind::kGtGtGt:
-    case TokenKind::kGtGtGtEq:
-      return lhs >> rhs;
     default:
       return std::nullopt;
   }
@@ -600,19 +612,28 @@ std::optional<ConstVal> ConstEvalBinaryFull(const Expr* expr,
   auto lhs = ConstEvalFull(expr->lhs, scope);
   auto rhs = ConstEvalFull(expr->rhs, scope);
   if (!lhs || !rhs) return std::nullopt;
-  uint32_t w = std::max(lhs->width, rhs->width);
-  // §11.6.1's Table 11-21 (printed page 299) sizes a shift by its left operand
-  // and a bitwise or an arithmetic operator by the wider of its two, so a
-  // result wider than 64 bits has words the int64 fold cannot hold, and a
+  // §11.6.1's Table 11-21 (printed pages 299-300) sizes a shift and a power
+  // by their left operand, the right being self-determined, and a bitwise or
+  // an arithmetic operator by the wider of its two. 64b2dfbe0 sized every
+  // one by the wider, so `8'd2 ** 32'd8` read 256 where the 8-bit result
+  // holds 0, `8'd1 << 32'd8` read 256 and `8'd1 << 96'd1` grew to 96 bits.
+  bool left_sized = SizedByLeftOperand(expr->op);
+  uint32_t w = left_sized ? lhs->width : std::max(lhs->width, rhs->width);
+  // A result wider than 64 bits has words the int64 fold cannot hold, and a
   // comparison or a logical operator reads every bit of operands that wide;
   // EvalWideBinary works those across every word, the four multiplicative
   // operators through const_eval_wide_arith.cpp, and declines the case
   // equality and wildcard operators alone, which fold below on the low word.
-  // A division by zero at that width is empty there and here alike.
-  if (w > 64) {
-    if (auto wide = EvalWideBinary(expr->op, *lhs, *rhs, w)) return wide;
+  // Every shift and power goes there whatever its width, since the count and
+  // the exponent are read across every word of a right operand wider than
+  // the result, and a count of 64 or more is a C++ shift the int64 fold
+  // could not make. A division by zero and `0 ** -1` are empty there and
+  // here alike.
+  if (left_sized || w > 64) {
+    auto wide = EvalWideBinary(expr->op, *lhs, *rhs, w);
+    if (wide || left_sized) return wide;
   }
-  bool s = lhs->is_signed && rhs->is_signed;
+  bool s = BinaryResultSigned(expr->op, *lhs, *rhs);
   int64_t lv = 0, rv = 0;
   NormalizeBinaryOperands(*lhs, *rhs, s, lv, rv);
   if (!s) {
@@ -622,15 +643,7 @@ std::optional<ConstVal> ConstEvalBinaryFull(const Expr* expr,
   }
   auto result = EvalBinary(expr->op, lv, rv);
   if (!result) return std::nullopt;
-  int64_t v = TruncateToWidth(*result, w);
-  // §11.4.10: the logical right shift (>>) zero-fills vacated high bits, so its
-  // result is never sign-extended even when the operand type is signed. Only
-  // arithmetic results (incl. the arithmetic right shift >>>) propagate the
-  // sign bit.
-  bool is_logical_rshift =
-      expr->op == TokenKind::kGtGt || expr->op == TokenKind::kGtGtEq;
-  if (s && !is_logical_rshift) v = SignExtendFromWidth(v, w);
-  return ConstVal{v, w, s};
+  return NormalizeConstVal(*result, w, s);
 }
 
 // The range the value `base` is addressed over. §11.5.1 lists a parameter among

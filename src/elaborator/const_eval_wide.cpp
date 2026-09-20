@@ -8,7 +8,11 @@
 // test it, §11.4.12 (printed 286-288) join it and §6.24.1 (printed 139) cast
 // it. This file is where those bits are produced from a literal's digits and
 // where they are read; const_eval_wide_arith.cpp multiplies, divides and
-// raises them over the word helpers this file defines.
+// raises them over the word helpers this file defines. Every shift folds
+// here whatever its width, since §11.4.10 reads the count as an unsigned
+// number of any size and §11.6.1's Table 11-21 (printed 299-300) sizes the
+// result by the left operand alone, so a count can be wider than the value
+// it shifts and larger than any C++ shift admits.
 
 #include <algorithm>
 #include <cstddef>
@@ -111,10 +115,12 @@ uint64_t WordAt(const ConstVal& v, size_t k) {
   return k - 1 < v.high_words.size() ? v.high_words[k - 1] : 0;
 }
 
-// The words of `v` as a vector, enough of them for `width` bits, so the wide
-// operators below can work word by word.
+// The words of `v` as a vector, enough of them for `width` bits and never
+// fewer than one, so the wide operators below can work word by word and
+// read a first word of a value of no bits, which a replication with a
+// multiplier of zero is (§11.4.12.1).
 std::vector<uint64_t> WordsOf(const ConstVal& v, uint32_t width) {
-  std::vector<uint64_t> words((width + 63) / 64, 0);
+  std::vector<uint64_t> words(std::max<size_t>(1, (width + 63) / 64), 0);
   for (size_t i = 0; i < words.size(); ++i) words[i] = WordAt(v, i);
   return words;
 }
@@ -164,23 +170,46 @@ void FillTopBits(std::vector<uint64_t>& words, uint32_t width, uint64_t n) {
   }
 }
 
+// §11.4.10 (printed 284): the count `rhs` gives a shift of a value `width`
+// bits wide, read as an unsigned number whatever its declaration and across
+// every word of it, and cut to the width, since a count of the width or more
+// leaves nothing of the value whichever it is: one with a bit set past its
+// first word is that large. 64b2dfbe0 read `value` alone, which for a signed
+// count under 64 bits carries its sign fill, and for one wider than 64 bits
+// is its low word.
+uint64_t ShiftCount(const ConstVal& rhs, uint32_t width) {
+  std::vector<uint64_t> words = ExtendedWords(rhs, rhs.width, false);
+  for (size_t i = 1; i < words.size(); ++i) {
+    if (words[i] != 0) return width;
+  }
+  return std::min(words[0], uint64_t{width});
+}
+
 // §11.4.10: the words of `lhs` shifted by `rhs`, which is self-determined and
 // read as an unsigned count whatever its width; a count of the width or more
-// leaves nothing of the operand, or the sign fill alone. Empty for an operator
-// that is not a shift.
+// leaves nothing of the operand, or the sign fill alone. The left operand is
+// read at its own width and no wider, `width` being that width by Table
+// 11-21, so the sign fill a signed value under 64 bits carries above its
+// width in `value` is not what a logical right shift brings down into it.
+// The compound assignment forms are the shifts themselves. Empty for an
+// operator that is not a shift.
 std::optional<std::vector<uint64_t>> WideShift(TokenKind op,
                                                const ConstVal& lhs,
                                                const ConstVal& rhs,
                                                uint32_t width) {
-  uint64_t n = std::min(static_cast<uint64_t>(rhs.value), uint64_t{width});
-  std::vector<uint64_t> words = WordsOf(lhs, width);
+  uint64_t n = ShiftCount(rhs, width);
+  std::vector<uint64_t> words = ExtendedWords(lhs, width, false);
   switch (op) {
     case TokenKind::kLtLt:
+    case TokenKind::kLtLtEq:
     case TokenKind::kLtLtLt:
+    case TokenKind::kLtLtLtEq:
       return ShiftWordsLeft(words, n);
     case TokenKind::kGtGt:
+    case TokenKind::kGtGtEq:
       return ShiftWordsRight(words, n);
-    case TokenKind::kGtGtGt: {
+    case TokenKind::kGtGtGt:
+    case TokenKind::kGtGtGtEq: {
       std::vector<uint64_t> shifted = ShiftWordsRight(words, n);
       if (lhs.is_signed && ConstValBit(lhs, lhs.width - 1))
         FillTopBits(shifted, width, n);
@@ -462,9 +491,11 @@ bool ConstValIsNonZero(const ConstVal& v) {
   return false;
 }
 
+// A shift's result is signed where its left operand is (§11.4.10, printed
+// 284), the count being self-determined; 64b2dfbe0 asked both operands.
 std::optional<ConstVal> EvalWideBinary(TokenKind op, const ConstVal& lhs,
                                        const ConstVal& rhs, uint32_t width) {
-  bool is_signed = lhs.is_signed && rhs.is_signed;
+  bool is_signed = BinaryResultSigned(op, lhs, rhs);
   switch (op) {
     case TokenKind::kStar:
     case TokenKind::kSlash:

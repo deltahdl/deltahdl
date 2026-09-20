@@ -5,10 +5,14 @@
 // and Table 11-4 fixes the power's answer by the signs and sizes of its
 // operands, the exponent self-determined. §11.4.3.1 (printed 277) has both
 // operands signed read as two's complement values and either unsigned read
-// as unsigned, and §11.6.1 (printed 299) sizes the result by the wider
-// operand. 994404a79 carried every other operator across
+// as unsigned, and §11.6.1's Table 11-21 (printed 299-300) sizes a product,
+// a quotient and a remainder by the wider operand and a power by its base,
+// whose signedness §11.8.1 (printed 302) makes the power's, the exponent
+// being self-determined. 994404a79 carried every other operator across
 // ConstVal::high_words and left these four on the low word, so `P * 2` over
-// a 96-bit P read 0 above bit 64.
+// a 96-bit P read 0 above bit 64; every power folds here now, whatever its
+// width, since the exponent may be wider than the base and the int64 fold
+// multiplied once per unit of it.
 
 #include <cstddef>
 #include <cstdint>
@@ -224,12 +228,14 @@ std::vector<uint64_t> PositivePower(std::vector<uint64_t> base,
 
 // §11.4.3's Table 11-4 (printed 276): `lhs` to the power `rhs` at `width`.
 // The exponent is self-determined, so it is negative by its own signedness
-// and sign alone, whatever the base's; a zero exponent answers 1 whatever
-// the base.
+// and sign alone, whatever the base's, and the base is -1 by its own
+// signedness alone, whatever the exponent's (§11.8.1); a zero exponent
+// answers 1 whatever the base. d6b1cda19 read the base as signed only where
+// the exponent was too.
 std::optional<std::vector<uint64_t>> WidePower(const ConstVal& lhs,
                                                const ConstVal& rhs,
                                                uint32_t width) {
-  bool is_signed = lhs.is_signed && rhs.is_signed;
+  bool is_signed = lhs.is_signed;
   std::vector<uint64_t> base = ExtendedWords(lhs, width, is_signed);
   std::vector<uint64_t> exponent = ExtendedWords(rhs, rhs.width, false);
   bool exp_neg =
@@ -266,7 +272,7 @@ std::optional<ConstVal> EvalWideMultiplicative(TokenKind op,
                                                uint32_t width) {
   auto words = MultiplicativeWords(op, lhs, rhs, width);
   if (!words) return std::nullopt;
-  return ConstValOfWords(*words, width, lhs.is_signed && rhs.is_signed);
+  return ConstValOfWords(*words, width, BinaryResultSigned(op, lhs, rhs));
 }
 
 }  // namespace delta
