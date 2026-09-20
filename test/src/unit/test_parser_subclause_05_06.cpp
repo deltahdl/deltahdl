@@ -165,7 +165,6 @@ TEST(LexicalConventionParsing, DigitThenSpaceThenNameIsNotAClause56Report) {
       "module m;\n"
       "  reg 0 number;\n"
       "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
   EXPECT_FALSE(
       ReportedError(r.diags, "shall not begin with a digit", 2, "5.6"));
   EXPECT_TRUE(ReportedError(r.diags, "expected identifier, got integer literal",

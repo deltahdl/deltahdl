@@ -13,6 +13,7 @@
 #include "parser/ast_specify.h"
 #include "parser/parser.h"
 #include "parser/parser_instance_internal.h"
+#include "parser/udp_ansi_port_entry.h"
 
 namespace delta {
 
