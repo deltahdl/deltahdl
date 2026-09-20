@@ -5,6 +5,7 @@
 #include "common/types.h"
 #include "fixture_simulator.h"
 #include "helpers_class_object.h"
+#include "helpers_reported_error.h"
 #include "helpers_scheduler.h"
 #include "lexer/token.h"
 #include "simulator/class_object.h"
@@ -397,6 +398,56 @@ TEST(ClassSim, NewConstructsHandleDeclaredInClassMethodBody) {
       "  end\n"
       "endmodule\n";
   EXPECT_EQ(RunAndGet(src, "rx"), 222u);
+}
+
+// §8.4 (printed page 182 of ~/LRM.pdf): accessing a non-static member or a
+// virtual method through a null object handle is illegal, the result
+// indeterminate, and an implementation may issue an error. `c.get()` on a
+// `C c;` never assigned answered 0 in silence, a value a testbench reads as
+// valid; it is reported at the call, and the 0 is what the call yields.
+TEST(ClassSim, MethodCalledThroughANullHandleIsReported) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class C;\n"
+      "  int v = 5;\n"
+      "  function int get();\n"
+      "    return v;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  int r = 99;\n"
+      "  C c;\n"
+      "  initial r = c.get();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "method 'get' called through the null handle 'c'",
+                            10, "8.4"));
+}
+
+// §8.10: a static method belongs to the class and is callable through a
+// handle whether or not it refers to an object, so the null handle raises no
+// report and the method runs.
+TEST(ClassSim, StaticMethodCalledThroughANullHandleRuns) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class C;\n"
+      "  static function int seven();\n"
+      "    return 7;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  int r = 99;\n"
+      "  C c;\n"
+      "  initial r = c.seven();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(f.ctx.FindVariable("r")->value.ToUint64(), 7u);
 }
 
 }  // namespace

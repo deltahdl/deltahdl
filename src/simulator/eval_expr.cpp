@@ -36,6 +36,7 @@ bool ExtractMethodCallParts(const Expr* expr, MethodCallParts& out) {
   if (!access->rhs || access->rhs->kind != ExprKind::kIdentifier) return false;
   out.var_name = access->lhs->text;
   out.method_name = access->rhs->text;
+  out.loc = access->rhs->range.start;
   return true;
 }
 

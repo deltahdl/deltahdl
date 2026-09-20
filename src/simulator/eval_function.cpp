@@ -95,6 +95,29 @@ void ApplyClassParamOverrides(std::string_view var_name, uint64_t handle,
 // eval_function_internal.h (so eval_static_method.cpp can run a method body
 // without a `this`); the definition is below.
 
+// §8.4: accessing a non-static member or a virtual method through a null
+// object handle is illegal, the result indeterminate, and an implementation
+// may issue an error -- this one does, at the call, so that the 0 the call
+// then yields is not read as a valid value. §8.10 lets a static method be
+// called through a handle referring to no object, so one is not reported.
+static void ReportNullHandleMethodCall(const MethodCallParts& parts,
+                                       std::string_view class_type,
+                                       SimContext& ctx) {
+  const ClassTypeInfo* cls = ctx.FindClassType(class_type);
+  if (cls == nullptr || !parts.loc.IsValid()) return;
+  const ModuleItem* method = nullptr;
+  for (const auto* t = cls; t != nullptr && method == nullptr; t = t->parent) {
+    auto it = t->methods.find(std::string(parts.method_name));
+    if (it != t->methods.end()) method = it->second;
+  }
+  if (method == nullptr || method->is_static) return;
+  ctx.GetDiag().Error(parts.loc,
+                      "method '" + std::string(parts.method_name) +
+                          "' called through the null handle '" +
+                          std::string(parts.var_name) + "'",
+                      Subclause("8.4"));
+}
+
 bool ResolveInstanceMethod(const MethodCallParts& parts, SimContext& ctx,
                            InstanceMethodInfo& info) {
   auto class_type = ctx.GetVariableClassType(parts.var_name);
@@ -102,7 +125,10 @@ bool ResolveInstanceMethod(const MethodCallParts& parts, SimContext& ctx,
   auto* var = ctx.FindVariable(parts.var_name);
   if (!var) return false;
   auto handle = var->value.ToUint64();
-  if (handle == kNullClassHandle) return false;
+  if (handle == kNullClassHandle) {
+    ReportNullHandleMethodCall(parts, class_type, ctx);
+    return false;
+  }
   info.obj = ctx.GetClassObject(handle);
   if (!info.obj) return false;
   info.method = info.obj->ResolveVirtualMethod(parts.method_name, &info.owner);

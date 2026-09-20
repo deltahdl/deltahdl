@@ -364,6 +364,9 @@ std::string Logic4VecToString(const Logic4Vec& vec);
 struct MethodCallParts {
   std::string_view var_name;
   std::string_view method_name;
+  // Where the method's name was written, for a report about the call; the
+  // no-location value where the parts were built from no expression.
+  SourceLoc loc = SourceLoc::None();
 };
 bool ExtractMethodCallParts(const Expr* expr, MethodCallParts& out);
 
