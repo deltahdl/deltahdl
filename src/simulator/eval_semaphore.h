@@ -33,6 +33,20 @@ int32_t SemaphoreKeyArg(const Expr* expr, SimContext& ctx, Arena& arena,
 bool TryEvalSemaphoreMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
                                 Logic4Vec& out);
 
+// §13.4 forbids a function to suspend the process that enables it, and
+// §15.3.3 has get() suspend it only while the bucket holds fewer keys than
+// the call asks for. So a get() reached in a function body is served where
+// it would not wait -- the keys are taken from the bucket as
+// SemaphoreGetAwaiter takes them before it would park the process -- and one
+// that would wait is reported as an error under §13.4 at the call, with the
+// bucket as it was. Returns whether the call was a semaphore's get(). put()
+// and try_get() complete where they stand and are answered by the expression
+// evaluator (TryEvalSemaphoreMethodCall) in a function as anywhere else.
+// Reached through the expression evaluator alone, a function's `s.get(1)`
+// took nothing.
+bool TryExecSemaphoreCallInFunction(const Expr* expr, SimContext& ctx,
+                                    Arena& arena);
+
 // §15.3.1 and §15.4.1 with §26.3: the key the target of `target = new(...)`
 // is held under -- an identifier's own text, or the "p.name" a package's
 // variable named through the package scope resolution operator, `p::name`,

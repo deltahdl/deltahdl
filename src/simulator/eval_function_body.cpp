@@ -20,6 +20,7 @@
 #include "simulator/eval_instance_task.h"
 #include "simulator/eval_mailbox.h"
 #include "simulator/eval_member_path.h"
+#include "simulator/eval_semaphore.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
@@ -820,11 +821,13 @@ static FuncFlow ExecFuncStmt(const Stmt* stmt, const FuncExecCtx& exec) {
       ExecNonblockingAssignImpl(stmt, exec.ctx, exec.arena);
       return FuncFlow::kNext;
     case StmtKind::kExprStmt:
-      // §15.4 with §13.4: a mailbox's put(), get() or peek() in a body is
-      // served here where it would not wait, since the expression evaluator
-      // below answers num() and the try_* forms alone.
+      // §15.4 and §15.3.3 with §13.4: a mailbox's put(), get() or peek()
+      // and a semaphore's get() in a body are served here where they would
+      // not wait, since the expression evaluator below answers num(), put()
+      // and the try_* forms alone.
       if (!TryExecSystemCallTask(stmt->expr, exec.ctx, exec.arena) &&
-          !TryExecMailboxCallInFunction(stmt->expr, exec.ctx, exec.arena)) {
+          !TryExecMailboxCallInFunction(stmt->expr, exec.ctx, exec.arena) &&
+          !TryExecSemaphoreCallInFunction(stmt->expr, exec.ctx, exec.arena)) {
         // §13.5.5: `p.m;` and a bare `m;` name a method as `p.m()` does.
         ExecCallStmtExpr(stmt->expr, exec.ctx, exec.arena);
       }

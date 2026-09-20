@@ -5,6 +5,7 @@
 #include <string_view>
 
 #include "common/arena.h"
+#include "common/diagnostic.h"
 #include "common/types.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
@@ -61,6 +62,37 @@ bool TryEvalSemaphoreMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
     return true;
   }
   return false;
+}
+
+// The receiver of a call as a report spells it: a bare `s`, a method's
+// `this.s`, a handle's `c.s` or a package's `p::s`, each as written.
+static std::string ReceiverSpelling(const Expr* recv) {
+  if (recv->kind != ExprKind::kMemberAccess) return std::string(recv->text);
+  return ReceiverSpelling(recv->lhs) +
+         (recv->is_scope_resolution ? "::" : ".") +
+         std::string(recv->rhs->text);
+}
+
+// §15.3.3 (printed page 373 of ~/LRM.pdf) inside a function body: get()
+// takes the keys where the bucket holds enough, as SemaphoreGetAwaiter does
+// before it would park the process, and a bucket with too few, on which it
+// would wait, is §13.4's report (printed 340) with the bucket as it was. The
+// receiver resolves through SemaphoreCallTarget, so a method's bare `s.get(1)`
+// on a class property reaches the object's bucket as a module's reaches the
+// module's. Served by the expression evaluator, which answers put() and
+// try_get() alone, a function's `s.get(1)` left the bucket full.
+bool TryExecSemaphoreCallInFunction(const Expr* expr, SimContext& ctx,
+                                    Arena& arena) {
+  auto* sem = SemaphoreCallTarget(expr, ctx, "get");
+  if (!sem) return false;
+  if (sem->Get(SemaphoreKeyArg(expr, ctx, arena, 1)) != SemGetStatus::kBlock)
+    return true;
+  ctx.GetDiag().Error(expr->range.start,
+                      "semaphore get(): '" + ReceiverSpelling(expr->lhs->lhs) +
+                          "' has too few keys, so the call would block "
+                          "inside a function",
+                      Subclause("13.4"));
+  return true;
 }
 
 // The scoped target is the scope resolution of two identifiers the parser
