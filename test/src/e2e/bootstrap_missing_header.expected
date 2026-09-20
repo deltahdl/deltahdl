@@ -1,0 +1,3 @@
+test/src/e2e/bootstrap_missing_header.bootstrap:1:1: error: the first line of a bootstrap file contains #!SV_LIBRARIES (§J.4.1)
+  not a header
+  ^

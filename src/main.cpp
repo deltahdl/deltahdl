@@ -8,6 +8,7 @@
 #include <bits/pthreadtypes.h>
 #endif
 
+#include <charconv>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
@@ -39,6 +40,7 @@
 #include "preprocessor/protect_cli.h"
 #include "preprocessor/protect_processing.h"
 #include "simulator/cover_results.h"
+#include "simulator/foreign_code.h"
 #include "simulator/lowerer.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
@@ -546,6 +548,46 @@ void RecordInvocationCommandLine(int argc, char* argv[]) {
 
 }  // namespace
 
+// §J.4.1: the bootstrap file -sv_liblist names has a syntax of its own -- the
+// first line holds #!SV_LIBRARIES, each later line one entry or a comment --
+// and a file that departs from it is reported at the line that does, before
+// anything the file lists would be loaded. ParseForeignCodeBootstrap's
+// description opens "line N: ", which the position of the report carries, so
+// the text after it is what is reported. False where any file is at fault.
+bool BootstrapFilesAreWellFormed(const delta::CliOptions& opts,
+                                 delta::SourceManager& src_mgr,
+                                 delta::DiagEngine& diag) {
+  bool ok = true;
+  for (const auto& liblist : opts.sv_liblists) {
+    std::ifstream ifs(liblist.path);
+    if (!ifs) {
+      diag.Error(delta::SourceLoc::None(),
+                 "cannot open bootstrap file '" + liblist.path + "'",
+                 delta::Subclause("J.4"));
+      ok = false;
+      continue;
+    }
+    std::ostringstream ss;
+    ss << ifs.rdbuf();
+    std::string content = ss.str();
+    delta::ForeignCodeBootstrap file =
+        delta::ParseForeignCodeBootstrap(content);
+    if (file.Ok()) continue;
+    uint32_t line = 1;
+    std::string message = file.error;
+    std::size_t colon = message.find(": ");
+    if (message.rfind("line ", 0) == 0 && colon != std::string::npos) {
+      std::from_chars(message.data() + 5, message.data() + colon, line);
+      message = message.substr(colon + 2);
+    }
+    uint32_t file_id = src_mgr.AddFile(liblist.path, std::move(content));
+    diag.Error(delta::SourceLoc{file_id, line, 1}, message,
+               delta::Subclause("J.4.1"));
+    ok = false;
+  }
+  return ok;
+}
+
 int main(int argc, char* argv[]) {
   RecordInvocationCommandLine(argc, argv);
 
@@ -576,6 +618,8 @@ int main(int argc, char* argv[]) {
   if (opts.werror) {
     diag.SetWarningsAsErrors(true);
   }
+
+  if (!BootstrapFilesAreWellFormed(opts, src_mgr, diag)) return 1;
 
   int mode_status = 0;
   if (RanStandaloneMode(opts, src_mgr, diag, mode_status)) return mode_status;
