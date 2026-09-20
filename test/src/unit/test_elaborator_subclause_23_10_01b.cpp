@@ -6,6 +6,7 @@
 
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 #include "helpers_rtlir_lookup.h"
 
 using namespace delta;
@@ -246,6 +247,115 @@ TEST(DefparamElaboration, WidensAnInstanceOverrideGivenInThePortList) {
   constexpr std::string_view kTop =
       "  c #(.W(96), .P(96'h1_0000_0003_0000_0005)) u();\n";
   ExpectEveryWordOfP(kTop);
+}
+
+// Whether the §23.10.1 report a defparam reaching outside its generate block
+// gets was made at `line`.
+::testing::AssertionResult EscapeReportedAt(const ElabFixture& f,
+                                            uint32_t line) {
+  return ReportedError(f.diag.Diagnostics(),
+                       "defparam in a generate block shall not change a "
+                       "parameter value outside that block",
+                       line, "23.10.1");
+}
+
+// §23.10.1 (printed page 764) forbids a defparam statement in a hierarchy in
+// or under a generate block instance from changing a parameter value outside
+// that hierarchy, and §23.8 lets a module-level statement name its target
+// from a top-level module: `module w; defparam top.u2.P = 5, top.Q = 6;`
+// with w instantiated inside top's block g reaches c's P and top's own Q
+// outside g and is refused as a statement written in the block is, P and Q
+// keeping their declarations' 1. The top-rooted reading was gated on the
+// statement's own position in its module alone, so w's instance standing
+// under g went unnoticed and P read 5.
+TEST(DefparamElaboration, ModuleUnderAGenerateBlockCannotEscapeIt) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module c;\n"
+      "  parameter int P = 1;\n"
+      "endmodule\n"
+      "module w;\n"
+      "  defparam top.u2.P = 5;\n"
+      "  defparam top.Q = 6;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  parameter int Q = 1;\n"
+      "  c u2();\n"
+      "  if (1) begin : g\n"
+      "    w u();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  const auto* p = FindParam(design, "c", "P");
+  ASSERT_NE(p, nullptr);
+  EXPECT_EQ(p->resolved_value, 1);
+  const auto* q = FindParam(design, "top", "Q");
+  ASSERT_NE(q, nullptr);
+  EXPECT_EQ(q->resolved_value, 1);
+  EXPECT_TRUE(EscapeReportedAt(f, 5));
+  EXPECT_TRUE(EscapeReportedAt(f, 6));
+}
+
+// The block instance a module stands under is the innermost one on the way
+// down to it, whichever module holds it, and a module instantiated at the
+// module level of one under a block stands under that block too: x, held by
+// w, held by mid's block g, held by top, names top's u2 outside g and is
+// refused, the walk from top passing u2 without ever leaving mid into g.
+TEST(DefparamElaboration, ModuleUnderANestedGenerateBlockCannotEscapeIt) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module c;\n"
+      "  parameter int P = 1;\n"
+      "endmodule\n"
+      "module x;\n"
+      "  defparam top.u2.P = 5;\n"
+      "endmodule\n"
+      "module w;\n"
+      "  x v();\n"
+      "endmodule\n"
+      "module mid;\n"
+      "  if (1) begin : g\n"
+      "    w u();\n"
+      "  end\n"
+      "endmodule\n"
+      "module top;\n"
+      "  c u2();\n"
+      "  mid m();\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  const auto* p = FindParam(design, "c", "P");
+  ASSERT_NE(p, nullptr);
+  EXPECT_EQ(p->resolved_value, 1);
+  EXPECT_TRUE(EscapeReportedAt(f, 5));
+}
+
+// The same statement naming a parameter inside the block that holds w's
+// instance, `defparam top.g.u3.P = 5` on the sibling instance u3, changes
+// nothing outside that hierarchy and is applied: P reads 5 with nothing
+// reported.
+TEST(DefparamElaboration, ModuleUnderAGenerateBlockReachesItsSibling) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module c;\n"
+      "  parameter int P = 1;\n"
+      "endmodule\n"
+      "module w;\n"
+      "  defparam top.g.u3.P = 5;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  if (1) begin : g\n"
+      "    c u3();\n"
+      "    w u();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  const auto* p = FindParam(design, "c", "P");
+  ASSERT_NE(p, nullptr);
+  EXPECT_EQ(p->resolved_value, 5);
+  EXPECT_FALSE(f.has_errors);
 }
 
 }  // namespace

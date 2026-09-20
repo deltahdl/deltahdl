@@ -689,6 +689,7 @@ RtlirDesign* Elaborator::ElaborateTops(
   applied_defparams_.clear();
   generate_defparams_.clear();
   defparam_top_roots_.clear();
+  defparam_writer_blocks_.clear();
 
   if (!ElaborateTopModules(top_decls, design)) return nullptr;
 

@@ -63,6 +63,22 @@ struct RtlirParamDecl;
 // --max-generate-iterations, which is what makes this a budget and not a limit.
 inline constexpr int64_t kDefaultMaxGenerateIterations = 262144;
 
+// §23.10.1 (printed page 764): the generate block instance a module's
+// instance stands in or under, for the defparam statements the module
+// writes -- the module holding the block and the block steps of the instance
+// that entered it, as RtlirModuleInst::gen_block_path records them -- which
+// the clause makes the hierarchy such a statement may not change a parameter
+// outside of. The innermost such block, since standing inside it is standing
+// inside every block around it. At namespace scope because
+// elaborator_defparam.cpp judges a target against it from a function outside
+// the class.
+struct DefparamWriterBlock {
+  RtlirModule* holder;
+  HierPath steps;
+};
+using DefparamWriterBlocks =
+    std::unordered_map<const RtlirModule*, DefparamWriterBlock>;
+
 // The elaborator's state, held apart from the methods that act on it so that
 // neither half outgrows the file line cap on its own. Elaborator derives from
 // this, so every member is reached unqualified exactly as before and no
@@ -484,6 +500,14 @@ class ElaboratorData {
       std::tuple<RtlirModule*, const ModuleItem*, size_t, std::string_view>>
       applied_defparams_;
 
+  // §23.10.1 (printed page 764): the generate block instance each
+  // instantiated module stands in or under, keyed by the module, for every
+  // module under one; a module under none is absent. Filled by
+  // Elaborator::ApplyDefparamsRecursively as it descends the instance tree,
+  // from RtlirModuleInst::gen_block_path, for ResolveDefparamFromTop to
+  // refuse a module-level statement whose top-rooted name reaches outside
+  // that block as a statement written in the block is refused.
+  DefparamWriterBlocks defparam_writer_blocks_;
   // §23.8: the top-level modules of the design being elaborated, which are
   // the roots a defparam's hierarchical name is read from once its leading
   // step names no scope of the writing module. Filled once the tops exist and
