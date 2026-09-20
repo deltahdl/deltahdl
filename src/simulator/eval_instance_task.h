@@ -20,9 +20,24 @@ struct Expr;
 // a handle holding no object. The body is then run by ExecInstanceTaskCall in
 // stmt_exec_class_task.cpp, and TeardownInstanceTaskCall writes the output
 // arguments back (§13.5.2) and pops what the setup pushed, in reverse.
+//
+// §13.5.5 makes the empty parentheses optional after the name of a class
+// method, so the statement `h.t;` is the call `h.t();` and a bare `t;` inside
+// a method of the object's class is `t();` (§8.13); either is set up here as
+// the parenthesised call is, the statement's expression standing as the call
+// with no actuals.
 bool SetupInstanceTaskCall(const Expr* expr, SimContext& ctx, Arena& arena,
                            InstanceMethodInfo& call);
 void TeardownInstanceTaskCall(const InstanceMethodInfo& call, const Expr* expr,
                               SimContext& ctx, Arena& arena);
+
+// §13.5.5 with §8.6: an expression statement that is a class method named
+// without the parentheses -- `h.m;` through a handle, or a bare `m;` inside a
+// method of the object's class (§8.13) -- calls the method, dispatched as the
+// parenthesised call is (a virtual method by the object's class, §8.20), and
+// discards its result; any other expression is evaluated as it stands. The
+// statement executor calls this for an expression statement that is no task
+// call, in place of evaluating the expression.
+void ExecCallStmtExpr(const Expr* expr, SimContext& ctx, Arena& arena);
 
 }  // namespace delta

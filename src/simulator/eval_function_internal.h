@@ -115,6 +115,14 @@ struct InstanceMethodInfo {
 };
 bool ResolveInstanceMethod(const MethodCallParts& parts, SimContext& ctx,
                            InstanceMethodInfo& info);
+// Runs the method ResolveInstanceMethod answered, `expr` the call whose
+// actuals bind its formals: a static method in class scope (§8.10), an
+// instance method on the object with the method's defining class as the
+// enclosing scope (§8.15). Defined in eval_function.cpp; shared with
+// eval_instance_task.cpp, which runs a method a statement names without the
+// parentheses (§13.5.5).
+Logic4Vec RunInstanceMethod(const InstanceMethodInfo& info, const Expr* expr,
+                            SimContext& ctx, Arena& arena);
 
 // §8.23 has the left operand of `::` name a class or a package, and §26.3
 // reaches a package's class through `p::C`, so the operand of `p::C::m` is

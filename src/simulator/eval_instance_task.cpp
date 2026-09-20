@@ -47,12 +47,49 @@ static bool ResolveStaticTaskByScope(const Expr* expr, SimContext& ctx,
   return true;
 }
 
+// §13.5.5: the method a statement names without the parentheses. `h.m` is a
+// member access of two identifiers, resolved on the handle's object as the
+// call `h.m(...)` is; a bare `m` inside an instance method is a method of the
+// running object's class or of one it inherits from (§8.13), the override the
+// object's class holds taken first (§8.20). False for any other expression,
+// for a member that is a property and for a name that is a variable.
+static bool ResolveMethodNamedBare(const Expr* expr, SimContext& ctx,
+                                   InstanceMethodInfo& call) {
+  if (expr->kind == ExprKind::kMemberAccess && !expr->is_scope_resolution &&
+      expr->lhs != nullptr && expr->lhs->kind == ExprKind::kIdentifier &&
+      expr->rhs != nullptr && expr->rhs->kind == ExprKind::kIdentifier) {
+    MethodCallParts parts{expr->lhs->text, expr->rhs->text};
+    return ResolveInstanceMethod(parts, ctx, call);
+  }
+  if (expr->kind != ExprKind::kIdentifier) return false;
+  ClassObject* self = ctx.CurrentThis();
+  const ClassTypeInfo* enclosing = ctx.CurrentMethodClass();
+  if (self == nullptr || enclosing == nullptr) return false;
+  call.obj = self;
+  call.method = self->ResolveVirtualMethod(expr->text, &call.owner);
+  if (call.method == nullptr) {
+    call.method =
+        self->ResolveMethodForType(expr->text, enclosing, &call.owner);
+  }
+  return call.method != nullptr;
+}
+
+// The method a statement's expression calls on an object: `h.m(...)` through
+// the handle, or the parenthesis-free forms above.
+static bool ResolveMethodOfStatement(const Expr* expr, SimContext& ctx,
+                                     InstanceMethodInfo& call) {
+  if (expr->kind != ExprKind::kCall) {
+    return ResolveMethodNamedBare(expr, ctx, call);
+  }
+  MethodCallParts parts;
+  return ExtractMethodCallParts(expr, parts) &&
+         ResolveInstanceMethod(parts, ctx, call);
+}
+
 bool SetupInstanceTaskCall(const Expr* expr, SimContext& ctx, Arena& arena,
                            InstanceMethodInfo& call) {
-  if (!expr || expr->kind != ExprKind::kCall) return false;
-  MethodCallParts parts;
-  bool through_handle = ExtractMethodCallParts(expr, parts) &&
-                        ResolveInstanceMethod(parts, ctx, call);
+  if (expr == nullptr) return false;
+  bool through_handle = ResolveMethodOfStatement(expr, ctx, call);
   if (!through_handle && !ResolveStaticTaskByScope(expr, ctx, arena, call))
     return false;
   if (call.method->kind != ModuleItemKind::kTaskDecl) return false;
@@ -98,6 +135,16 @@ void TeardownInstanceTaskCall(const InstanceMethodInfo& call, const Expr* expr,
   if (call.obj != nullptr) ctx.PopThis();
   ctx.PopScope();
   ctx.PopMethodClass();
+}
+
+void ExecCallStmtExpr(const Expr* expr, SimContext& ctx, Arena& arena) {
+  if (expr == nullptr) return;
+  InstanceMethodInfo call;
+  if (ResolveMethodNamedBare(expr, ctx, call)) {
+    RunInstanceMethod(call, expr, ctx, arena);
+    return;
+  }
+  EvalExpr(expr, ctx, arena);
 }
 
 }  // namespace delta

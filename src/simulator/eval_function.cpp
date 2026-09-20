@@ -179,18 +179,15 @@ static bool TryEvalSuperMethodCall(const Expr* expr, SimContext& ctx,
   return true;
 }
 
-static bool TryEvalClassMethodCall(const Expr* expr, SimContext& ctx,
-                                   Arena& arena, Logic4Vec& out) {
-  MethodCallParts parts;
-  if (!ExtractMethodCallParts(expr, parts)) return false;
-  InstanceMethodInfo info;
-  if (!ResolveInstanceMethod(parts, ctx, info)) return false;
+Logic4Vec RunInstanceMethod(const InstanceMethodInfo& info, const Expr* expr,
+                            SimContext& ctx, Arena& arena) {
+  Logic4Vec out;
   // §8.10/§8.9: a static method invoked through an instance handle shares the
   // class's single static storage; dispatch it in class scope (no `this`).
   if (info.method->is_static) {
     RunStaticMethodInClassScope({info.method, info.obj->type}, expr, ctx, arena,
                                 out);
-    return true;
+    return out;
   }
   // Run the body with its defining class as the enclosing scope so an
   // unqualified member resolves to that level even when a derived class
@@ -198,6 +195,16 @@ static bool TryEvalClassMethodCall(const Expr* expr, SimContext& ctx,
   ctx.PushMethodClass(info.owner);
   out = ExecInstanceMethodCall(info.method, info.obj, expr, ctx, arena);
   ctx.PopMethodClass();
+  return out;
+}
+
+static bool TryEvalClassMethodCall(const Expr* expr, SimContext& ctx,
+                                   Arena& arena, Logic4Vec& out) {
+  MethodCallParts parts;
+  if (!ExtractMethodCallParts(expr, parts)) return false;
+  InstanceMethodInfo info;
+  if (!ResolveInstanceMethod(parts, ctx, info)) return false;
+  out = RunInstanceMethod(info, expr, ctx, arena);
   return true;
 }
 

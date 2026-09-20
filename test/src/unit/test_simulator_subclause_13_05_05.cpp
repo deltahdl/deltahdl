@@ -79,4 +79,121 @@ TEST(ArgumentBindingSim, VoidFunctionAllDefaultsNoParens) {
   LowerRunAndCheck(f, design, {{"x", 99u}});
 }
 
+// §13.5.5 (printed page 351): the empty parentheses after the name of a class
+// function method with no arguments are optional, so the statement `p.bump;`
+// is the call `p.bump();`, and §8.6 (printed 183) has a method reached
+// through the handle of the object it belongs to. The statement was evaluated
+// as a read of a property called bump and the method never ran, so a read
+// after it gave 3, the property's initial value, rather than the 23 the
+// method leaves.
+TEST(ArgumentBindingSim, VoidMethodThroughAHandleNoParens) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  int x = 5;\n"
+      "  class P;\n"
+      "    int a = 3;\n"
+      "    function void bump;\n"
+      "      a = a * 7 + 2;\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "  P p = new;\n"
+      "  initial begin\n"
+      "    p.bump;\n"
+      "    x = p.a;\n"
+      "  end\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(val, 23u);
+}
+
+// §13.5.5 with §8.20 (printed page 196): the parenthesis-free call goes to
+// the same method the parenthesised one does, so a virtual method named
+// through a base-class handle runs the override of the object's class -- the
+// example of §8.20 writes every one of its calls this way. The base method
+// writes 11, the override 44, and a call that never ran leaves 0.
+TEST(ArgumentBindingSim,
+     VirtualMethodThroughABaseHandleNoParensRunsTheOverride) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  int x = 5;\n"
+      "  class B;\n"
+      "    int r = 0;\n"
+      "    virtual function void tag;\n"
+      "      r = 11;\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "  class D extends B;\n"
+      "    virtual function void tag;\n"
+      "      r = 44;\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "  B b;\n"
+      "  D d;\n"
+      "  initial begin\n"
+      "    d = new;\n"
+      "    b = d;\n"
+      "    b.tag;\n"
+      "    x = b.r;\n"
+      "  end\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(val, 44u);
+}
+
+// §13.5.5 makes the parentheses optional for a task too, and §13.3 (printed
+// page 335) has control return to the enabling process only when the task
+// has completed, so a class task with a delay called as `w.run;` suspends
+// the caller for the delay as `w.run();` does: the write the task makes is
+// seen after it, and $time read after the call is the task's 7, not the 0 of
+// a call run through the function interpreter with its delay skipped.
+TEST(ArgumentBindingSim, ClassTaskThroughAHandleNoParensConsumesItsDelay) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  int x = 5;\n"
+      "  class W;\n"
+      "    int v = 0;\n"
+      "    task run;\n"
+      "      #7;\n"
+      "      v = 9;\n"
+      "    endtask\n"
+      "  endclass\n"
+      "  W w = new;\n"
+      "  initial begin\n"
+      "    w.run;\n"
+      "    x = w.v * 100 + $time;\n"
+      "  end\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(val, 907u);
+}
+
+// §13.5.5 with §8.13 (printed page 190): a method of the running object named
+// by its bare name inside another of its methods is a call as `step();` is,
+// so a class task calling `step;` runs it on the same object. The step writes
+// 6 into the counter it finds at 0; a bare name read as a variable instead
+// leaves it at 0.
+TEST(ArgumentBindingSim, BareMethodNameInAClassTaskNoParensCallsIt) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  int x = 5;\n"
+      "  class K;\n"
+      "    int n = 0;\n"
+      "    function void step;\n"
+      "      n = n + 6;\n"
+      "    endfunction\n"
+      "    task go;\n"
+      "      #1;\n"
+      "      step;\n"
+      "    endtask\n"
+      "  endclass\n"
+      "  K k = new;\n"
+      "  initial begin\n"
+      "    k.go();\n"
+      "    x = k.n;\n"
+      "  end\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(val, 6u);
+}
+
 }  // namespace

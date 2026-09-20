@@ -16,6 +16,7 @@
 #include "simulator/eval_array_class_queue.h"
 #include "simulator/eval_class_array.h"
 #include "simulator/eval_function_internal.h"
+#include "simulator/eval_instance_task.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
@@ -695,7 +696,8 @@ static FuncFlow ExecFuncStmt(const Stmt* stmt, const FuncExecCtx& exec) {
       return FuncFlow::kNext;
     case StmtKind::kExprStmt:
       if (!TryExecSystemCallTask(stmt->expr, exec.ctx, exec.arena)) {
-        EvalExpr(stmt->expr, exec.ctx, exec.arena);
+        // §13.5.5: `p.m;` and a bare `m;` name a method as `p.m()` does.
+        ExecCallStmtExpr(stmt->expr, exec.ctx, exec.arena);
       }
       return FuncFlow::kNext;
     case StmtKind::kVarDecl:

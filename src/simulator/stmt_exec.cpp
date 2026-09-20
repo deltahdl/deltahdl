@@ -535,7 +535,7 @@ static ExecTask ExecInlineTaskCall(const Stmt* stmt, SimContext& ctx,
   }
   auto* func = SetupTaskCall(expr, ctx, arena);
   if (!func) {
-    EvalExpr(expr, ctx, arena);
+    ExecCallStmtExpr(expr, ctx, arena);
     co_return StmtResult::kDone;
   }
   bool has_name = !func->name.empty();
