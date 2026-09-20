@@ -208,6 +208,18 @@ void CheckCheckerBodyItemRules(const ModuleItem* item, const ModuleDecl* decl,
                            decl->name),
                Subclause("17.5"));
   }
+  // §17.2 (printed page 503): checker_or_generate_item_declaration admits a
+  // data, function, checker, assertion-item, covergroup, genvar or clocking
+  // declaration and the two defaults, and no class_declaration; the parser
+  // reads a checker's items as a module's, so the class arrives as an item
+  // and is reported here. Nothing named it, and a class inside a checker was
+  // accepted.
+  if (item->kind == ModuleItemKind::kClassDecl) {
+    diag.Error(item->loc,
+               std::format("a class cannot be declared inside checker '{}'",
+                           decl->name),
+               Subclause("17.2"));
+  }
   // §17.2: only further checkers may be declared inside a checker.
   if (item->kind == ModuleItemKind::kNestedModuleDecl &&
       item->nested_module_decl &&
