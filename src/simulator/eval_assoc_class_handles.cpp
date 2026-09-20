@@ -9,7 +9,6 @@
 #include "simulator/class_object.h"
 #include "simulator/eval_array.h"
 #include "simulator/eval_array_class_assoc.h"
-#include "simulator/eval_class_array_handles.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
@@ -146,11 +145,7 @@ bool TryEvalAssocElementMethodCall(const Expr* expr, SimContext& ctx,
                                    Arena& arena, Logic4Vec& out) {
   if (expr == nullptr || expr->kind != ExprKind::kCall) return false;
   InstanceMethodInfo info;
-  // §8.6 (printed page 183): an element of a declared array or of a queue is
-  // as much a handle to call through as an associative array's, and had no
-  // dispatch of its own.
-  if (!ResolveAssocElementMethod(expr->lhs, ctx, arena, info))
-    return TryEvalElementObjectMethodCall(expr, ctx, arena, out);
+  if (!ResolveAssocElementMethod(expr->lhs, ctx, arena, info)) return false;
   out = RunInstanceMethod(info, expr, ctx, arena);
   return true;
 }

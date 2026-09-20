@@ -21,6 +21,7 @@
 #include "simulator/eval_assoc_class_handles.h"
 #include "simulator/eval_call_result.h"
 #include "simulator/eval_class_array.h"
+#include "simulator/eval_class_array_handles.h"
 #include "simulator/eval_class_scope_types.h"
 #include "simulator/eval_function_hier.h"
 #include "simulator/eval_function_internal.h"
@@ -680,8 +681,9 @@ static bool TryDispatchMethodOrLet(const Expr* expr, SimContext& ctx,
   // runs on the object the first call returned; ExtractMethodCallParts above
   // takes a variable alone for the handle side.
   if (TryEvalCallResultMethodCall(expr, ctx, arena, out)) return true;
-  // §7.8/§8.4: and one called on an element of a declared associative array
-  // of handles, `m["a"].f()`, runs on the object the element refers to.
+  // §7.8/§8.4 with §8.6: and one called on an element of a container of
+  // handles, `arr[0].f()`, `q[0].f()` or `m["a"].f()`, runs on its object.
+  if (TryEvalElementObjectMethodCall(expr, ctx, arena, out)) return true;
   if (TryEvalAssocElementMethodCall(expr, ctx, arena, out)) return true;
   if (TryEvalWeakRefStaticCall(expr, ctx, arena, out)) return true;
   if (TryEvalProcessStaticCall(expr, ctx, arena, out)) return true;

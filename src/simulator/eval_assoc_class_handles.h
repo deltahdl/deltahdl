@@ -52,11 +52,9 @@ bool ResolveAssocElementMethod(const Expr* access, SimContext& ctx,
                                Arena& arena, InstanceMethodInfo& info);
 
 // `expr` as `m[k].f(...)`, the method ResolveAssocElementMethod names run
-// with the call's actuals. A call on an element of any other container of
-// handles -- a declared fixed-size or dynamic array, a queue -- is handed to
-// TryEvalElementObjectMethodCall (eval_class_array_handles.h), so the one
-// site the method-call evaluator asks (TryDispatchMethodOrLet in
-// eval_function.cpp) serves every element.
+// with the call's actuals; the method-call evaluator (TryDispatchMethodOrLet
+// in eval_function.cpp) asks this beside TryEvalElementObjectMethodCall
+// (eval_class_array_handles.h), which serves every other container.
 bool TryEvalAssocElementMethodCall(const Expr* expr, SimContext& ctx,
                                    Arena& arena, Logic4Vec& out);
 
