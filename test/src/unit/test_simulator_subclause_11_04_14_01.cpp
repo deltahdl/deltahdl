@@ -429,8 +429,8 @@ TEST(StreamExpressionConcat, ChildInstanceUnionStreamsFirstMemberOnly) {
 
 // §11.4.14.1: a struct streams member by member in declaration order, and
 // §11.4.14 packs 4-state data bit for bit, so a 96-bit member contributes all
-// 96 of its bits. big sits at bits [103:8] of the packed struct and small at
-// [7:0]; streamed big then small, the 104-bit stream is big:small and fills the
+// 96 of its bits. big sits at bits [103:8] of the packed struct and low8 at
+// [7:0]; streamed big then low8, the 104-bit stream is big:low8 and fills the
 // 104-bit target exactly: word 0 holds 0xABCDEF0F1E2D3CA5 and word 1 the top
 // 40 bits, 0x0123456789. Taken through a 64-bit integer the member came from
 // the struct's first word alone, so word 1 read 0 while word 0 was unchanged;
@@ -439,11 +439,11 @@ TEST(StreamExpressionConcat, WideStructMemberStreamsEveryWord) {
   SimFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"
-      "  struct packed { logic [95:0] big; logic [7:0] small; } s;\n"
+      "  struct packed { logic [95:0] big; logic [7:0] low8; } s;\n"
       "  logic [103:0] dst;\n"
       "  initial begin\n"
       "    s.big = 96'h0123_4567_89AB_CDEF_0F1E_2D3C;\n"
-      "    s.small = 8'hA5;\n"
+      "    s.low8 = 8'hA5;\n"
       "    dst = {>> {s}};\n"
       "  end\n"
       "endmodule\n",
