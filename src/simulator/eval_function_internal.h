@@ -331,6 +331,11 @@ void WritebackOutputArgs(const ModuleItem* func, const Expr* expr,
                          SimContext& ctx, Arena& arena);
 void ExecFunctionBody(const ModuleItem* func, Variable* ret_var,
                       SimContext& ctx, Arena& arena);
+// §13.4.1 with §6.16: marks a string-returning function's implicit variable
+// as the string its return type declares, with no width. Defined in
+// eval_function_body_assign.cpp; ExecFunctionBody asks it as the body starts.
+void ShapeStringReturnVariable(const ModuleItem* func, Variable* ret_var,
+                               SimContext& ctx, Arena& arena);
 void WritebackQueueRefs(SimContext& ctx);
 void WritebackAssocRefs(SimContext& ctx);
 

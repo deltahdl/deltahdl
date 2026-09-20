@@ -929,7 +929,8 @@ Logic4Vec ApplyStreamPackToTargetWidening(const Stmt* stmt, Logic4Vec rhs_val,
     return rhs_val;
   }
   auto* var = ResolveLhsVariable(stmt->lhs, ctx);
-  if (!var || var->value.width == 0) return rhs_val;
+  // §6.16: a string is dynamically sized, no fixed-size target to report on.
+  if (!var || var->is_string || var->value.width == 0) return rhs_val;
   uint32_t target_width = var->value.width;
   uint32_t stream_width = rhs_val.width;
   if (target_width == stream_width) return rhs_val;

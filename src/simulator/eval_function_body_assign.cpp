@@ -5,6 +5,7 @@
 #include "common/types.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_module.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_call_result.h"
@@ -14,6 +15,7 @@
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
+#include "simulator/variable.h"
 
 namespace delta {
 // The assignment half of the statement executor for a subroutine body (§13.4):
@@ -401,6 +403,25 @@ void ExecFuncBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
       OwnRhsWords(EvalRhsCarryingReturnedTag(stmt, ctx, arena), arena);
   if (TryFuncClassTargetWrite(stmt->lhs, val, ctx, arena)) return;
   ApplyGenericBlockingAssign(stmt, val, ctx, arena);
+}
+
+// §13.4.1 (printed page 342 of ~/LRM.pdf): the variable a function's own name
+// implicitly declares has the function's return type, and §6.16 (printed 112)
+// makes a string variable dynamic -- as long as the text last assigned to it,
+// with no declared width. EvalFunctionCall and ExecClassMethod create the
+// variable at the 32-bit carrier a return type nothing can size falls to, so
+// `f = "hello world"` kept four characters, `orld`; `f.len()` in the body
+// read 0, `$swrite(f, "%m")` kept the name's last four, and `f = {>>{q}}` on
+// a queue of strings was reported wider than a fixed-size target (§11.4.14).
+// Shaped here as CreateFuncLocalVar shapes a body's `string s;`: no width,
+// and the mark every reader of a string reads. A static function's retained
+// cell (§13.4.2) is shaped on the first call and keeps its text after that.
+void ShapeStringReturnVariable(const ModuleItem* func, Variable* ret_var,
+                               SimContext& ctx, Arena& arena) {
+  if (ret_var->is_string || !DeclaredTypeIsString(func->return_type, ctx))
+    return;
+  ret_var->is_string = true;
+  ret_var->value = MakeLogic4VecVal(arena, 0, 0);
 }
 
 }  // namespace delta

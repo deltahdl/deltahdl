@@ -917,6 +917,9 @@ void ExecFunctionBody(const ModuleItem* func, Variable* ret_var,
   // holds the width the name declares rather than the returned expression's.
   uint32_t ret_width =
       DeclaredTypeWidth(func->return_type, ctx) == 0 ? 0 : ret_var->value.width;
+  // §13.4.1 with §6.16: a string return type gives the implicit variable no
+  // width, shaped as a body local's (eval_function_body_assign.cpp).
+  ShapeStringReturnVariable(func, ret_var, ctx, arena);
   FuncExecCtx exec{ret_var, func->name, ctx, arena, ret_width};
   BindReturnStructLayout(func, ctx);
   // §12.8 allows a break or a continue only inside a loop, so one that reaches
