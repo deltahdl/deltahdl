@@ -181,7 +181,8 @@ void RegisterPackageScopedSubroutines(const RtlirDesign* design,
 // a semaphore (§15.3) with the bucket its methods operate on, holding the
 // keys its declaration's new() names -- so a write through the scope or an
 // import lands and a read through either sees it. The other initializers are
-// left for InitPackageDataVariables.
+// left for InitPackageDataVariables. Defined in
+// src/simulator/lowerer_package_data.cpp, as is InitPackageDataVariables.
 void CreatePackageDataVariables(const RtlirDesign* design, SimContext& ctx,
                                 Arena& arena);
 // §26.2: each package's declaration assignments, evaluated in the package's

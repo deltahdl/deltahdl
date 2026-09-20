@@ -279,6 +279,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/lowerer_contassign.cpp
     simulator/lowerer_udp.cpp
     simulator/lowerer_register.cpp
+    simulator/lowerer_package_data.cpp
     simulator/lowerer_sequence_monitors.cpp
     simulator/expect_statement.cpp
     simulator/procedural_assertion.cpp
