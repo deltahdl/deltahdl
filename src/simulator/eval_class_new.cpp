@@ -2,6 +2,8 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <unordered_map>
+#include <utility>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
@@ -11,7 +13,9 @@
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
+#include "parser/ast_type.h"
 #include "simulator/class_object.h"
+#include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_array_class_queue.h"
 #include "simulator/eval_class_array.h"
 #include "simulator/eval_function_internal.h"
@@ -85,14 +89,93 @@ static bool TryInitClassPropertyNew(const ClassTypeInfo::PropertyInfo& prop,
   return true;
 }
 
+// §8.25: the type each type parameter of one level of the object's class
+// chain is bound to on the object under construction, by the parameter's
+// name: the object's own level as TypeParamActual reads it (OwnTypeBindings),
+// a base level as the extends clause of the level below binds it
+// (BaseTypeBindings).
+using TypeBindings = std::unordered_map<std::string_view, const DataType*>;
+
+// §8.7's object under construction, with the `new` call that asked for it and
+// the run it is built in, carried through the levels of its class chain.
+struct Construction {
+  ClassObject* obj;
+  const Expr* new_expr;
+  SimContext& ctx;
+  Arena& arena;
+  // The bindings of the level being constructed, ConstructBaseThenDefaults
+  // swapping a base level's in for the base's construction and back after.
+  TypeBindings types;
+};
+
+// §8.25: the bindings of the object's own class -- the actual its
+// specialization bound each type parameter to, or the default the class
+// declares (§8.25.1).
+static TypeBindings OwnTypeBindings(const ClassObject* obj) {
+  TypeBindings bindings;
+  const ClassDecl* decl = obj->type->decl;
+  if (decl == nullptr) return bindings;
+  for (const auto& [pname, pexpr] : decl->params) {
+    if (decl->type_param_names.count(pname) == 0) continue;
+    if (const DataType* actual = TypeParamActual(obj, decl, pname))
+      bindings[pname] = actual;
+  }
+  return bindings;
+}
+
+// §8.25: the bindings of the base level `base` of a level declared by
+// `child`, whose extends clause binds the base's type parameters as a
+// specialization does -- `extends C` takes C's defaults, `extends C
+// #(integer)` binds integer, and `extends C #(P)` binds what the child's own
+// parameter P is bound to on this object (printed page 204 of ~/LRM.pdf), so
+// an actual naming one of the child's type parameters is read through the
+// child's bindings.
+static TypeBindings BaseTypeBindings(const ClassDecl* child,
+                                     const TypeBindings& child_types,
+                                     const ClassTypeInfo* base) {
+  TypeBindings bindings;
+  const ClassDecl* decl = base->decl;
+  if (decl == nullptr || child == nullptr) return bindings;
+  for (size_t i = 0; i < decl->params.size(); ++i) {
+    std::string_view pname = decl->params[i].first;
+    if (decl->type_param_names.count(pname) == 0) continue;
+    const DataType* actual =
+        ActualForParam(child->base_class_type_params, i, pname);
+    if (actual == nullptr) {
+      actual = TypeParamActual(nullptr, decl, pname);
+    } else if (actual->kind == DataTypeKind::kNamed) {
+      auto bound = child_types.find(actual->type_name);
+      if (bound != child_types.end()) actual = bound->second;
+    }
+    if (actual != nullptr) bindings[pname] = actual;
+  }
+  return bindings;
+}
+
+// §8.25: the width of the property `prop` of the level being constructed
+// where its declared type names a type parameter of that level, sized by the
+// type the parameter is bound to; the collector's width otherwise.
+// CollectClassMembers in lowerer_class.cpp sizes a property by the class's
+// declaration alone, so `T x` carries 32 bits whatever T is bound to.
+static uint32_t BoundPropertyWidth(const ClassTypeInfo::PropertyInfo& prop,
+                                   const Construction& c) {
+  if (prop.width_is_declared || prop.type_name.empty()) return prop.width;
+  auto bound = c.types.find(prop.type_name);
+  if (bound == c.types.end()) return prop.width;
+  uint32_t width = DeclaredTypeWidth(*bound->second, c.ctx);
+  return width != 0 ? width : prop.width;
+}
+
 // §8.7: the property `prop` of the level `info` of `obj` initialized to its
 // explicit default if one is given, otherwise to its type's uninitialized
 // value — X for a 4-state type, 0 for a 2-state one — rather than being
 // forced to zero.
 static void InitClassPropertyDefault(const ClassTypeInfo* info,
                                      const ClassTypeInfo::PropertyInfo& prop,
-                                     ClassObject* obj, SimContext& ctx,
-                                     Arena& arena) {
+                                     Construction& c) {
+  ClassObject* obj = c.obj;
+  SimContext& ctx = c.ctx;
+  Arena& arena = c.arena;
   // §7.10/§8.7: a queue property with an initializer, `int q[$] = {1, 2}`,
   // takes the initializer's elements as its own, and holds no value under
   // its name. One without an initializer is left to ClassQueueProperty,
@@ -115,16 +198,18 @@ static void InitClassPropertyDefault(const ClassTypeInfo* info,
     val = CoerceToPropertyType(info, prop.name,
                                EvalExpr(prop.init_expr, ctx, arena), arena);
   } else if (prop.is_4state) {
-    val = MakeAllX(arena, prop.width);
+    val = MakeAllX(arena, BoundPropertyWidth(prop, c));
   } else {
-    val = MakeLogic4VecVal(arena, prop.width, 0);
+    val = MakeLogic4VecVal(arena, BoundPropertyWidth(prop, c), 0);
   }
   StoreClassPropertyDefault(info, prop, val, obj, arena);
 }
 
 static void InitClassPropertyDefaults(const ClassTypeInfo* info,
-                                      ClassObject* obj, SimContext& ctx,
-                                      Arena& arena) {
+                                      Construction& c) {
+  ClassObject* obj = c.obj;
+  SimContext& ctx = c.ctx;
+  Arena& arena = c.arena;
   for (const auto& prop : info->properties) {
     // §8.9: a static property is one shared copy that lives on the class type,
     // created and initialized once. Constructing an object must not give it a
@@ -132,7 +217,7 @@ static void InitClassPropertyDefaults(const ClassTypeInfo* info,
     // shared storage. Leave static properties out of the instance map so reads
     // and writes fall through to the type's shared static_properties.
     if (prop.is_static) continue;
-    InitClassPropertyDefault(info, prop, obj, ctx, arena);
+    InitClassPropertyDefault(info, prop, c);
   }
 
   if (info->decl) {
@@ -341,15 +426,6 @@ static void WritebackLevelFormals(const ModuleItem* ctor,
   ctx.PushThis(constructed);
 }
 
-// §8.7's object under construction, with the `new` call that asked for it and
-// the run it is built in, carried through the levels of its class chain.
-struct Construction {
-  ClassObject* obj;
-  const Expr* new_expr;
-  SimContext& ctx;
-  Arena& arena;
-};
-
 static void ConstructLevel(const ClassTypeInfo* info,
                            ConstructorActuals actuals, Construction& c);
 
@@ -359,10 +435,13 @@ static void ConstructLevel(const ClassTypeInfo* info,
 static void ConstructBaseThenDefaults(const ClassTypeInfo* info,
                                       const ModuleItem* ctor, Construction& c) {
   if (info->parent) {
+    TypeBindings own = std::move(c.types);
+    c.types = BaseTypeBindings(info->decl, own, info->parent);
     ConstructLevel(info->parent,
                    BaseConstructorActuals(info, ctor, c.new_expr, c.arena), c);
+    c.types = std::move(own);
   }
-  InitClassPropertyDefaults(info, c.obj, c.ctx, c.arena);
+  InitClassPropertyDefaults(info, c);
 }
 
 // Constructs the `info` level of the object in the order §8.7 gives: the
@@ -414,7 +493,7 @@ Logic4Vec EvalClassNew(std::string_view class_type, const Expr* new_expr,
   obj->type = info;
   auto handle = ctx.AllocateClassObject(obj);
   ctx.PushThis(obj);
-  Construction construction{obj, new_expr, ctx, arena};
+  Construction construction{obj, new_expr, ctx, arena, OwnTypeBindings(obj)};
   ConstructLevel(info, {new_expr, true}, construction);
   ctx.PopThis();
   return MakeLogic4VecVal(arena, 64, handle);

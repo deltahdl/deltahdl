@@ -28,12 +28,8 @@
 
 namespace delta {
 
-// §8.25: the actual the `#(...)` list `actuals` gives the parameter `pname`,
-// the i-th of the class's: by name where an actual was written `.name(type)`
-// (§23.10.2.2), else by position, and null where the list gives it none, which
-// leaves the parameter at the default the class declares.
-static const DataType* ActualForParam(const std::vector<DataType>& actuals,
-                                      size_t i, std::string_view pname) {
+const DataType* ActualForParam(const std::vector<DataType>& actuals, size_t i,
+                               std::string_view pname) {
   for (const auto& actual : actuals) {
     if (actual.param_arg_name == pname) return &actual;
   }

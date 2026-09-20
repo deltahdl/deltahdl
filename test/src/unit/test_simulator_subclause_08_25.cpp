@@ -670,4 +670,55 @@ TEST(ClassSim, TypeParameterIndexedPropertyOfAModuleScopeSpecialization) {
             2u * 10000u + 31u * 100u + 42u);
 }
 
+// §8.25's own chain (printed page 204 of ~/LRM.pdf): a class extending a
+// parameterized class binds the base's type parameter as its extends clause
+// says -- `extends C` takes C's default bit, `extends C #(integer)` binds
+// integer, and `extends C #(P)` binds the derived class's own type parameter,
+// real by default -- so the inherited `T x` is 1, 32 and 64 bits wide through
+// the base's `$bits(x)`. The base's properties were sized by the base's
+// defaults alone, 32 in every case (bit fell to the 32-bit carrier), so d1
+// read 32 and d3 32 -- 1 * 100000 + 32 * 1000 + 64.
+TEST(ClassSim, BaseTypeParameterBoundThroughExtendsSizesTheProperty) {
+  EXPECT_EQ(RunAndGet("class C #(type T = bit);\n"
+                      "  T x;\n"
+                      "  function int w(); return $bits(x); endfunction\n"
+                      "endclass\n"
+                      "class D1 #(type P = real) extends C; endclass\n"
+                      "class D2 #(type P = real) extends C #(integer);\n"
+                      "endclass\n"
+                      "class D3 #(type P = real) extends C #(P); endclass\n"
+                      "module t;\n"
+                      "  int out;\n"
+                      "  D1 d1 = new; D2 d2 = new; D3 d3 = new;\n"
+                      "  initial out = d1.w() * 100000 + d2.w() * 1000 +\n"
+                      "                d3.w();\n"
+                      "endmodule\n",
+                      "out"),
+            1u * 100000u + 32u * 1000u + 64u);
+}
+
+// The binding reaches down two levels: E extends D3 #(bit [15:0]), whose P is
+// C's T, so E's inherited x is 16 bits; and a value written into the bound
+// property keeps the bound width, `x = 16'hFFFF` reading 65535 through the
+// base's method where a 1-bit x would read 1 -- 16 * 100000 + 65535.
+TEST(ClassSim, BaseTypeParameterBoundThroughTwoExtendsLevels) {
+  EXPECT_EQ(RunAndGet("class C #(type T = bit);\n"
+                      "  T x;\n"
+                      "  function int w(); return $bits(x); endfunction\n"
+                      "  function int rd(); return x; endfunction\n"
+                      "endclass\n"
+                      "class D3 #(type P = real) extends C #(P); endclass\n"
+                      "class E extends D3 #(bit [15:0]); endclass\n"
+                      "module t;\n"
+                      "  int out;\n"
+                      "  E e = new;\n"
+                      "  initial begin\n"
+                      "    e.x = 16'hFFFF;\n"
+                      "    out = e.w() * 100000 + e.rd();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "out"),
+            16u * 100000u + 65535u);
+}
+
 }  // namespace

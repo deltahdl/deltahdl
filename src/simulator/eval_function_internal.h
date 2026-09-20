@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <iosfwd>
 #include <string_view>
+#include <vector>
 
 #include "common/types.h"
 
@@ -108,6 +109,15 @@ struct MethodCallParts;
 // answers false when the variable holds no object or the object has no such
 // method; shared with eval_instance_task.cpp, which runs a task so named as a
 // coroutine.
+// §8.25: the actual the `#(...)` list `actuals` gives the parameter `pname`,
+// the i-th of the class's: by name where an actual was written `.name(type)`
+// (§23.10.2.2), else by position, and null where the list gives it none, which
+// leaves the parameter at the default the class declares. Defined in
+// eval_function.cpp; shared with the construction of a base level in
+// eval_class_new.cpp, whose extends clause is such a list.
+const DataType* ActualForParam(const std::vector<DataType>& actuals, size_t i,
+                               std::string_view pname);
+
 struct InstanceMethodInfo {
   ClassObject* obj = nullptr;
   ModuleItem* method = nullptr;
