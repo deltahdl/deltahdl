@@ -21,6 +21,7 @@
 #include "simulator/net.h"
 #include "simulator/process.h"
 #include "simulator/scope.h"
+#include "simulator/sim_context_name_tables.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/specify.h"
 
@@ -187,15 +188,14 @@ Variable* FindVariableByPrefixWalk(const NameLookup& lookup,
 // The blocks are tried innermost first because §23.9 rules that "If it is
 // declared locally, then the local item shall be used; if not, the search shall
 // continue upward until an item by that name is found or until a module,
-// interface, program, or checker boundary is encountered".
-// Process::gen_prefixes holds them outermost first, so the walk runs backwards
-// over it.
+// interface, program, or checker boundary is encountered", the order
+// GenerateBlockKeys (sim_context_name_tables.cpp) spells the keys in.
 Variable* SimContext::FindInGenerateBlock(const std::string& inst_prefix,
                                           std::string_view name) {
   if (!current_process_) return nullptr;
-  const std::vector<std::string>& prefixes = current_process_->gen_prefixes;
-  for (auto it = prefixes.rbegin(); it != prefixes.rend(); ++it) {
-    auto found = variables_.find(inst_prefix + *it + std::string(name));
+  for (const std::string& key :
+       GenerateBlockKeys(inst_prefix, current_process_->gen_prefixes, name)) {
+    auto found = variables_.find(key);
     if (found != variables_.end()) return found->second;
   }
   return nullptr;

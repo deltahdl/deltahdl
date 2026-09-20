@@ -375,13 +375,15 @@ void Lowerer::AliasImportedPackageName(std::string_view name,
                                        std::string_view qname) {
   // §26.3 with §27.5: an import written inside a generate block is the
   // block's own, and its names are bound under the prefix the elaborator gave
-  // it (RtlirImport::scope_prefix), which SimContext::FindInGenerateBlock
-  // searches for a process the block elaborated after the import, after the
-  // block's own declarations and before the module's. A declaration of the
-  // module does not shadow such an import, the block's candidate standing
-  // nearer the reference than the enclosing scope's declaration, and its key
-  // is never a module declaration's, so the check below is the module-level
-  // import's alone.
+  // it (RtlirImport::scope_prefix), one of the keys GenerateBlockKeys
+  // (sim_context_name_tables.cpp) spells for a process the block elaborated
+  // after the import, which SimContext::FindInGenerateBlock reads a variable
+  // by and ScopedObjectKeys lists for an array's shape, a queue and the other
+  // objects AliasVariableKinds copies, after the block's own declarations and
+  // before the module's. A declaration of the module does not shadow such an
+  // import, the block's candidate standing nearer the reference than the
+  // enclosing scope's declaration, and its key is never a module
+  // declaration's, so the check below is the module-level import's alone.
   bool block_import = !import_scope_prefix_.empty();
   // §26.5: a declaration of the importing scope shadows the import. The
   // module's imports are lowered before its variables, ports and nets exist,

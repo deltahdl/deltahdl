@@ -256,4 +256,18 @@ class DeclaredNameTables {
   std::unordered_map<std::string, uint64_t> vi_instance_handles_;
 };
 
+// §27.3 with §23.9 and §26.3: the keys a bare `name` may stand under in the
+// generate block instances a process is in, innermost first -- the block's
+// own declarations and the names an import written in it brings in, keyed
+// under the instance's prefix and the block's, "blk.a" for a declaration of
+// top's block `blk` and "blk.:import1:a" for its first import's
+// (RtlirImport::scope_prefix, which Lowerer::AliasImportedPackageName keys
+// by). `gen_prefixes` is the process's Process::gen_prefixes, outermost
+// first, so the keys come out in the reverse order. SimContext::FindVariable
+// reads a variable by them (FindInGenerateBlock) ahead of the instance's own
+// key, and the object lookups take them in the same place.
+std::vector<std::string> GenerateBlockKeys(
+    std::string_view inst_prefix, const std::vector<std::string>& gen_prefixes,
+    std::string_view name);
+
 }  // namespace delta

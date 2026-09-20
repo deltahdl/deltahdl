@@ -126,4 +126,106 @@ TEST(PackageImportSim, ExportedPackageFixedSizeArrayReadThroughTheExporter) {
             52u);
 }
 
+// §26.3 (printed page 810) with §27.3 (printed 818): an import written in a
+// generate block makes the package's names visible in the block, and the
+// block's process names the package's own `int a[2]` and `int q[$]` by their
+// bare names, so `a[1] = 7` writes the element p1's get(1) reads and the two
+// pushes fill the queue p1's qs() sizes: 7 * 10 + 2. The alias keyed the
+// array's shape, its elements and the queue under the block's import prefix
+// (AliasImportedPackageName in lowerer_import.cpp), which the process's
+// FindArrayInfo and FindQueue tried no key of: the write set bit 1 of the
+// carrier, so get(1) read 0, and the pushes reached no queue, so qs() read 0.
+TEST(PackageImportSim,
+     GenerateBlockImportedArrayElementAndQueueReadByThePackage) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  int a[2];\n"
+                      "  int q[$];\n"
+                      "  function int get(int i);\n"
+                      "    return a[i];\n"
+                      "  endfunction\n"
+                      "  function int qs();\n"
+                      "    return q.size();\n"
+                      "  endfunction\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  int y;\n"
+                      "  if (1) begin : blk\n"
+                      "    import p1::*;\n"
+                      "    initial begin\n"
+                      "      a[1] = 7;\n"
+                      "      q.push_back(2);\n"
+                      "      q.push_back(3);\n"
+                      "    end\n"
+                      "  end\n"
+                      "  initial #1 y = p1::get(1) * 10 + p1::qs();\n"
+                      "endmodule\n",
+                      "y"),
+            72u);
+}
+
+// §12.7.3 with §26.3 (printed page 810) and §27.3 (printed 818): foreach
+// over the name a generate block's import brings in reads the package
+// array's shape, three elements, so the loop runs three times. With the
+// shape found under no key of the block the loop ran once per bit of the
+// 32-bit carrier: 32.
+TEST(PackageImportSim, GenerateBlockImportedArrayCountedByForeach) {
+  EXPECT_EQ(RunAndGet("package p2;\n"
+                      "  int a[3];\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  int n = 0;\n"
+                      "  if (1) begin : g\n"
+                      "    import p2::*;\n"
+                      "    initial foreach (a[i]) n++;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "n"),
+            3u);
+}
+
+// §20.7 with §26.3 (printed page 810) and §27.3 (printed 818): $size of each
+// name a generate block's import brings in is that package array's element
+// count, 2 and 4: 2 * 10 + 4. With the shapes found under no key of the
+// block each query saw a 32-bit scalar and answered its width: 352.
+TEST(PackageImportSim, GenerateBlockImportedArraySizeQueried) {
+  EXPECT_EQ(RunAndGet("package p3;\n"
+                      "  int a[2];\n"
+                      "  int b[4];\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  int y;\n"
+                      "  if (1) begin : blk\n"
+                      "    import p3::*;\n"
+                      "    initial y = $size(a) * 10 + $size(b);\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            24u);
+}
+
+// §7.4.2 (printed page 154) with §26.3 (printed 810) and §27.3 (printed
+// 818): the block's own process writes two elements of the imported array
+// and reads them back through the same import: 7 * 10 + 3. With the shape
+// found under no key of the block each write set one bit of the carrier,
+// bit 1 to 7's low bit and bit 0 to 3's, and each read answered that bit:
+// 1 * 10 + 1.
+TEST(PackageImportSim, GenerateBlockImportedArrayElementReadInTheBlock) {
+  EXPECT_EQ(RunAndGet("package p4;\n"
+                      "  int a[2];\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  int y2;\n"
+                      "  if (1) begin : blk\n"
+                      "    import p4::*;\n"
+                      "    initial begin\n"
+                      "      a[1] = 7;\n"
+                      "      a[0] = 3;\n"
+                      "      y2 = a[1] * 10 + a[0];\n"
+                      "    end\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y2"),
+            73u);
+}
+
 }  // namespace

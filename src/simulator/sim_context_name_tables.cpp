@@ -155,6 +155,17 @@ std::vector<std::string> DeclaredNameTables::PackageScopedKeys(
   return keys;
 }
 
+std::vector<std::string> GenerateBlockKeys(
+    std::string_view inst_prefix, const std::vector<std::string>& gen_prefixes,
+    std::string_view name) {
+  std::vector<std::string> keys;
+  keys.reserve(gen_prefixes.size());
+  for (auto it = gen_prefixes.rbegin(); it != gen_prefixes.rend(); ++it) {
+    keys.push_back(std::string(inst_prefix) + *it + std::string(name));
+  }
+  return keys;
+}
+
 void DeclaredNameTables::RegisterNestedDeclScope(std::string_view prefix) {
   nested_decl_scopes_.insert(std::string(prefix));
 }

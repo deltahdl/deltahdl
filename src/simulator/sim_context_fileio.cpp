@@ -11,6 +11,7 @@
 #include "simulator/process.h"
 #include "simulator/scope.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_name_tables.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/sync_objects.h"
 #include "simulator/vcd_writer.h"
@@ -68,20 +69,35 @@ std::vector<std::string> SimContext::PackageFrameKeys(
 // the run-long tables rather than in a frame: the keys a bare `name` may
 // stand under, in the order the search tries them. A package subroutine's
 // body reads the package's own object or an import's first
-// (PackageFrameKeys); then, as FindVariable orders them, the object the
-// running instance declares, stored under the instance's prefix
-// (CreateChildModuleVariables in lowerer_child.cpp), and the bare key of the
-// enclosing scope, which stays the answer for a name that resolved by it
-// before. Without the package keys a bare `q.push_back(v)` or `m["k"] = v`
-// inside a package function reached no queue and no associative array: the
-// frames held none, no instance's key and no bare key matched, and "p1.q",
-// the key the package's object was created under (CreatePackageAggregate in
-// lowerer_register.cpp), was never tried, so the push ran on nothing and
-// `p1::q.size()` afterwards read 0.
+// (PackageFrameKeys); then, as FindVariable orders them, the generate block
+// instances the running process is in, innermost first (GenerateBlockKeys in
+// sim_context_name_tables.cpp), the object the running instance declares,
+// stored under the instance's prefix (CreateChildModuleVariables in
+// lowerer_child.cpp), and the bare key of the enclosing scope, which stays
+// the answer for a name that resolved by it before. Without the package keys
+// a bare `q.push_back(v)` or `m["k"] = v` inside a package function reached
+// no queue and no associative array: the frames held none, no instance's key
+// and no bare key matched, and "p1.q", the key the package's object was
+// created under (CreatePackageAggregate in lowerer_package_data.cpp), was
+// never tried, so the push ran on nothing and `p1::q.size()` afterwards read
+// 0. Without the block keys the shape, the elements and the queue an import
+// written in a generate block aliases under the block's prefix
+// (AliasImportedPackageName in lowerer_import.cpp) were reached by no
+// FindArrayInfo or FindQueue of the block's process, §27.3 and §26.3
+// notwithstanding: `a[1] = 7` after the block's `import p1::*` set bit 1 of
+// the carrier variable FindInGenerateBlock does answer, `foreach (a[i])` ran
+// once per bit of it, `$size(a)` answered its width and `q.push_back(2)`
+// reached no queue.
 std::vector<std::string> SimContext::ScopedObjectKeys(
     std::string_view name) const {
   std::vector<std::string> keys = PackageFrameKeys(name);
   std::string prefix = ActiveInstancePrefix();
+  if (current_process_ != nullptr) {
+    for (std::string& key :
+         GenerateBlockKeys(prefix, current_process_->gen_prefixes, name)) {
+      keys.push_back(std::move(key));
+    }
+  }
   if (!prefix.empty()) keys.push_back(prefix + std::string(name));
   keys.emplace_back(name);
   return keys;
