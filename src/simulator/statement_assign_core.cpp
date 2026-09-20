@@ -778,10 +778,14 @@ void AssignToScalarLhs(const Stmt* stmt, Logic4Vec rhs_val, SimContext& ctx,
 
     // §11.9 with §23.9: the tag is recorded under the key the target's
     // storage was created by (TagKeyOfName), the one a declaration
-    // initializer's tag already stands under, so both forms name one tag.
-    if (stmt->rhs && stmt->rhs->kind == ExprKind::kTagged && stmt->rhs->rhs)
-      ctx.SetVariableTag(TagKeyOfName(stmt->lhs->text, ctx),
-                         stmt->rhs->rhs->text);
+    // initializer's tag already stands under, so both forms name one tag. The
+    // tag table keeps the view it is given, so the key is interned in the
+    // arena rather than left in a string that ends with this statement.
+    if (stmt->rhs && stmt->rhs->kind == ExprKind::kTagged && stmt->rhs->rhs) {
+      ctx.SetVariableTag(
+          *arena.Create<std::string>(TagKeyOfName(stmt->lhs->text, ctx)),
+          stmt->rhs->rhs->text);
+    }
   } else if (stmt->lhs->kind == ExprKind::kMemberAccess) {
     WriteStructField(stmt->lhs, rhs_val, ctx);
   }
