@@ -779,6 +779,26 @@ static bool TryReuseStaticFormal(const FunctionArg& param,
   return true;
 }
 
+// §6.11 (Table 6-8): the integer data types, which §6.12.1's conversion of a
+// real takes as its target. A type reached through a name is left alone, as
+// what it stands for is not read here.
+static bool DeclaredKindIsIntegral(DataTypeKind kind) {
+  switch (kind) {
+    case DataTypeKind::kLogic:
+    case DataTypeKind::kReg:
+    case DataTypeKind::kBit:
+    case DataTypeKind::kByte:
+    case DataTypeKind::kShortint:
+    case DataTypeKind::kInt:
+    case DataTypeKind::kLongint:
+    case DataTypeKind::kInteger:
+    case DataTypeKind::kTime:
+      return true;
+    default:
+      return false;
+  }
+}
+
 static void BindValueArg(const FunctionArg& param, const ActualArgRef& actual,
                          const ModuleItem* func, SimContext& ctx,
                          Arena& arena) {
@@ -808,7 +828,14 @@ static void BindValueArg(const FunctionArg& param, const ActualArgRef& actual,
   const auto& dt = param.data_type;
   if (dt.kind != DataTypeKind::kImplicit) {
     uint32_t formal_width = EvalFormalArgWidth(dt, ctx, arena);
-    if (formal_width > 0 && formal_width != val.width)
+    // §10.8 makes passing a value to a subroutine argument an assignment-like
+    // context, and §6.12.1 converts a real assigned to an integer by rounding
+    // it to the nearest integer, a half away from zero: `fi(12.5)` into
+    // `input int x` reads 13 and `fb(-3.5)` into a byte -4. The real's 64-bit
+    // pattern was resized to the formal's width as any vector is, and read 0.
+    if (val.is_real && DeclaredKindIsIntegral(dt.kind) && formal_width > 0)
+      val = ConvertRealForKnownLhs(val, false, formal_width, arena);
+    else if (formal_width > 0 && formal_width != val.width)
       val = ResizeToWidth(val, formal_width, arena);
   }
   // 13.3.2/13.5.1: an output formal is not passed a value from the caller; only

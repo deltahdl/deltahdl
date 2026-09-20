@@ -312,4 +312,120 @@ TEST(RealConversion, BlockDeclInitIntToReal) {
   EXPECT_NEAR(VecToDouble(var->value), 5.0, 1e-10);
 }
 
+// §10.8 makes passing a value to a subroutine argument an assignment-like
+// context, so §6.12.1's rounding reaches a real actual passed to an int
+// formal: `fi(12.5)` reads 13.
+// The value's 64-bit pattern resized to the formal's 32 read 0.
+TEST(RealConversion, RealActualRoundsIntoAnIntFormal) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  function int fi(input int x); return x; endfunction\n"
+      "  int a;\n"
+      "  initial a = fi(12.5);\n"
+      "endmodule\n",
+      f, "a");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 13u);
+}
+
+// The same through a real variable rather than a literal.
+TEST(RealConversion, RealVariableActualRoundsIntoAnIntFormal) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  function int fi(input int x); return x; endfunction\n"
+      "  real r = 12.5;\n"
+      "  int a;\n"
+      "  initial a = fi(r);\n"
+      "endmodule\n",
+      f, "a");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 13u);
+}
+
+// §6.12.1 rounds a half away from zero, so -3.5 into a shortint formal is the
+// 16-bit -4, fffc.
+TEST(RealConversion, NegativeRealActualRoundsAwayIntoAShortintFormal) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  function shortint fs(input shortint x); return x; endfunction\n"
+      "  shortint a;\n"
+      "  initial a = fs(-3.5);\n"
+      "endmodule\n",
+      f, "a");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0xFFFCu);
+}
+
+// A longint formal is as wide as the real's pattern, so no resize stood
+// between them and the pattern itself was the formal's value.
+TEST(RealConversion, RealActualRoundsIntoALongintFormal) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  function longint fl(input longint x); return x; endfunction\n"
+      "  longint a;\n"
+      "  initial a = fl(12.5);\n"
+      "endmodule\n",
+      f, "a");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 13u);
+}
+
+// -3.5 into a byte formal is the 8-bit -4, fc.
+TEST(RealConversion, NegativeRealActualRoundsAwayIntoAByteFormal) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  function byte fb(input byte x); return x; endfunction\n"
+      "  byte a;\n"
+      "  initial a = fb(-3.5);\n"
+      "endmodule\n",
+      f, "a");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0xFCu);
+}
+
+// §8.7 binds a constructor's actuals as any subroutine's, so `new(6.5)` into
+// `input int v` stores 7.
+TEST(RealConversion, RealActualRoundsIntoAConstructorIntFormal) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  class C;\n"
+      "    int r;\n"
+      "    function new(input int v); r = v; endfunction\n"
+      "  endclass\n"
+      "  int a;\n"
+      "  initial begin\n"
+      "    C c = new(6.5);\n"
+      "    a = c.r;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "a");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 7u);
+}
+
+// A class method's formal takes the same conversion: `c.m(12.5)` returns 13.
+TEST(RealConversion, RealActualRoundsIntoAClassMethodIntFormal) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  class C;\n"
+      "    function int m(input int x); return x; endfunction\n"
+      "  endclass\n"
+      "  int a;\n"
+      "  initial begin\n"
+      "    C c = new;\n"
+      "    a = c.m(12.5);\n"
+      "  end\n"
+      "endmodule\n",
+      f, "a");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 13u);
+}
+
 }  // namespace
