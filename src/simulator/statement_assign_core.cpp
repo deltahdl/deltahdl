@@ -23,6 +23,7 @@
 #include "simulator/eval_expr_internal.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/eval_mailbox.h"
+#include "simulator/eval_member_path.h"
 #include "simulator/eval_semaphore.h"
 #include "simulator/eval_string.h"
 #include "simulator/evaluation.h"
@@ -292,16 +293,6 @@ bool IsConcatLhs(const Expr* lhs) {
 uint32_t LhsContextWidth(const Expr* lhs, SimContext& ctx, Arena& arena) {
   if (!lhs) return 0;
   return ConcatLhsElemWidth(lhs, ctx, arena);
-}
-
-// §11.9: the struct layout of the union member a tagged expression names, or
-// null when the union declares no such member with a layout of its own.
-static const StructTypeInfo* TaggedMemberLayout(const StructTypeInfo& sinfo,
-                                                std::string_view member) {
-  for (const auto& field : sinfo.fields) {
-    if (field.name == member && field.nested) return field.nested;
-  }
-  return nullptr;
 }
 
 Logic4Vec EvalRhsWithStructContext(const Stmt* stmt, SimContext& ctx,

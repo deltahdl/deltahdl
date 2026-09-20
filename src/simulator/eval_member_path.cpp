@@ -1,9 +1,12 @@
+#include "simulator/eval_member_path.h"
+
 #include <cstddef>
 #include <string>
 #include <string_view>
 
 #include "simulator/eval_expr_internal.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_types.h"
 
 namespace delta {
 
@@ -45,6 +48,14 @@ std::string TagKeyOfName(std::string_view name, SimContext& ctx) {
   std::string prefixed = ctx.ActiveInstancePrefix() + std::string(name);
   if (ctx.GetVariableStructType(prefixed) != nullptr) return prefixed;
   return std::string(name);
+}
+
+const StructTypeInfo* TaggedMemberLayout(const StructTypeInfo& sinfo,
+                                         std::string_view member) {
+  for (const auto& field : sinfo.fields) {
+    if (field.name == member && field.nested) return field.nested;
+  }
+  return nullptr;
 }
 
 }  // namespace delta

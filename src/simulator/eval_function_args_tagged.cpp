@@ -9,6 +9,7 @@
 #include "parser/ast_expr.h"
 #include "parser/ast_type.h"
 #include "simulator/eval_function_internal.h"
+#include "simulator/eval_member_path.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer_register.h"
 #include "simulator/sim_context.h"
@@ -66,17 +67,6 @@ static std::string_view FormalLayoutKey(const FunctionArg& param,
   if (!dt.type_name.empty() && ctx.FindStructType(dt.type_name) != nullptr)
     return dt.type_name;
   return InlineFormalLayoutKey(param, ctx);
-}
-
-// §11.9: the struct layout of the union member a tagged expression names, or
-// null when the union declares no such member with a layout of its own. The
-// assignment statement's copy stands in statement_assign_core.cpp.
-static const StructTypeInfo* TaggedMemberLayout(const StructTypeInfo& sinfo,
-                                                std::string_view member) {
-  for (const auto& field : sinfo.fields) {
-    if (field.name == member && field.nested) return field.nested;
-  }
-  return nullptr;
 }
 
 // §11.9 (printed page 304): the braces of a tagged union expression are a

@@ -18,6 +18,7 @@
 #include "simulator/eval_class_array.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/eval_instance_task.h"
+#include "simulator/eval_member_path.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
@@ -364,12 +365,12 @@ static void BindLocalAggregateLayout(std::string_view name,
 // the member's window found the wrong bits, where the statement `v = tagged
 // Add '{...}` is placed by the member's layout (EvalRhsWithStructContext) and
 // an actual `f(tagged Add '{...})` by the formal's (TryEvalPatternActual).
-// TaggedPatternMemberLayout answers the layout of the member the expression
-// names within the local's union, the layout its typedef name registers, and
-// null where the initializer is no tagged expression over a pattern, bare or
-// typed, the local's type names no layout, or the member has none of its
-// own; EvalLocalInitializer places the pattern by that layout and evaluates
-// any other initializer as it was.
+// TaggedPatternMemberLayout answers, through the TaggedMemberLayout those two
+// share, the member's layout within the union the local's typedef name
+// registers, and null where the initializer is no tagged expression over a
+// pattern, bare or typed, the type names no layout, or the member has none of
+// its own; EvalLocalInitializer places the pattern by that layout and
+// evaluates any other initializer as it was.
 static const StructTypeInfo* TaggedPatternMemberLayout(const DataType& type,
                                                        const Expr* init,
                                                        SimContext& ctx) {
@@ -378,9 +379,8 @@ static const StructTypeInfo* TaggedPatternMemberLayout(const DataType& type,
       UnwrapTypedPattern(init->lhs)->kind != ExprKind::kAssignmentPattern)
     return nullptr;
   const StructTypeInfo* layout = ctx.FindStructType(type.type_name);
-  if (layout == nullptr) return nullptr;
-  const StructFieldInfo* member = FindStructField(layout, init->rhs->text);
-  return member != nullptr ? member->nested : nullptr;
+  return layout != nullptr ? TaggedMemberLayout(*layout, init->rhs->text)
+                           : nullptr;
 }
 
 static Logic4Vec EvalLocalInitializer(const DataType& type, const Expr* init,
