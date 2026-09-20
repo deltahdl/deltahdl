@@ -267,4 +267,54 @@ TEST(PackageImportSim, PackageInitializerReadingAnExplicitlyImportedReExport) {
             7u);
 }
 
+// §15.3 (printed page 372) and §15.3.1 (printed 373) with §26.2 (printed
+// 808): a package's `semaphore s = new(2)` is a bucket holding two keys
+// before any procedure starts, so `p1::s.get(1)` procures one, the first
+// try_get(1) the last, and the second try_get(1) finds the bucket empty and
+// procures none: 1 * 10 + 0. The package's storage was a plain Variable, the
+// initializer evaluated into it and no SemaphoreObject made under "p1.s", so
+// the get() statement and both try_get() calls were served by no semaphore
+// and y read 0. A discriminating shape: two get() calls and a try_get()
+// would read 1 * 0 + 1 with and without the bucket alike.
+TEST(PackageImportSim, PackageSemaphoreInitializedByNewThroughTheQualifier) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  semaphore s = new(2);\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  int y;\n"
+                      "  initial begin\n"
+                      "    p1::s.get(1);\n"
+                      "    y = p1::s.try_get(1) * 10 + p1::s.try_get(1);\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            10u);
+}
+
+// §15.3.1 (printed page 373) and §15.3.2 (printed 373) with §26.2 (printed
+// 808): a package's `semaphore t` with no initializer is an empty bucket, as
+// a module's is (CreateSemaphoreForVar in lowerer_var.cpp), so `p1::t.put(3)`
+// leaves three keys in it, `p1::t.get(1)` procures one, and three try_get(1)
+// calls procure the two left and then none: 1 * 100 + 1 * 10 + 0. Under the
+// same defect no bucket stood under "p1.t", the put() and the get() reached
+// nothing and every try_get() answered 0.
+TEST(PackageImportSim,
+     PackageSemaphoreDeclaredWithoutInitializerThroughTheQualifier) {
+  EXPECT_EQ(
+      RunAndGet("package p1;\n"
+                "  semaphore t;\n"
+                "endpackage\n"
+                "module top;\n"
+                "  int y;\n"
+                "  initial begin\n"
+                "    p1::t.put(3);\n"
+                "    p1::t.get(1);\n"
+                "    y = p1::t.try_get(1) * 100 + p1::t.try_get(1) * 10 +\n"
+                "        p1::t.try_get(1);\n"
+                "  end\n"
+                "endmodule\n",
+                "y"),
+      110u);
+}
+
 }  // namespace

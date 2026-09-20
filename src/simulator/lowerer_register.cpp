@@ -23,6 +23,7 @@
 #include "simulator/dpi_arg_value.h"
 #include "simulator/dpi_runtime.h"
 #include "simulator/eval_function_internal.h"
+#include "simulator/eval_semaphore.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
 #include "simulator/net.h"
@@ -32,6 +33,7 @@
 #include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
 #include "simulator/stmt_exec.h"
+#include "simulator/sync_objects.h"
 #include "simulator/variable.h"
 
 namespace delta {
@@ -380,11 +382,46 @@ static void CreatePackageAggregate(const ModuleItem* item, std::string_view pkg,
   }
 }
 
+// §15.3 (printed page 372): whether the package variable `item` is declared
+// with the built-in semaphore class, which the parser leaves as a named type
+// spelled `semaphore`, the spelling CreateSemaphoreForVar (lowerer_var.cpp)
+// recognizes a module's by.
+static bool IsPackageSemaphoreDecl(const ModuleItem* item) {
+  return item->kind == ModuleItemKind::kVarDecl &&
+         item->data_type.kind == DataTypeKind::kNamed &&
+         item->data_type.type_name == "semaphore";
+}
+
+// §15.3 (printed page 372) with §26.2 (printed 808): a package's `semaphore
+// s` is the bucket of keys its get(), put() and try_get() operate on, made
+// under the "pk.name" key its carrier variable stands under, as
+// CreateSemaphoreForVar (lowerer_var.cpp) makes a module's, so that
+// SemaphoreCallTarget (eval_semaphore.cpp) finds it by the key a `p1::s`
+// receiver resolves to. §15.3.1 (printed 373): the declaration assignment is
+// a new() whose one argument is the number of keys the bucket starts with,
+// none when it is absent, and the argument is an expression of the package's
+// scope, evaluated in the package's frame as PackageQueueMaxSize evaluates a
+// queue's bound. A declaration with no initializer starts the bucket empty,
+// as a module's does. The carrier alone stood there, the new() evaluated
+// into it, so `p1::s.get()` and `p1::s.try_get()` ran on no semaphore.
+static void CreatePackageSemaphore(const ModuleItem* item, std::string_view pkg,
+                                   std::string_view qname, SimContext& ctx,
+                                   Arena& arena) {
+  SemaphoreObject* sem = ctx.CreateSemaphore(qname, 0);
+  const Expr* init = item->init_expr;
+  if (init == nullptr || init->kind != ExprKind::kCall || init->text != "new")
+    return;
+  ctx.PushScope(pkg);
+  sem->key_count = SemaphoreKeyArg(init, ctx, arena, 0);
+  ctx.PopScope();
+}
+
 // One package item's storage under its "pk.name" key: every variable
-// declaration at its declared type's shape, with the queue or associative
-// array its dimension declares, and a parameter with an initializer as a
-// 32-bit constant. The initializer is evaluated by InitPackageDataItem once
-// every package's storage exists.
+// declaration at its declared type's shape, with the semaphore, the queue or
+// the associative array its type or dimension declares, and a parameter with
+// an initializer as a 32-bit constant. The initializer is evaluated by
+// InitPackageDataItem once every package's storage exists, except a
+// semaphore's, which its bucket has already taken.
 static void CreatePackageDataItem(const ModuleItem* item, std::string_view pkg,
                                   SimContext& ctx, Arena& arena) {
   if (!DeclaresPackageData(item)) return;
@@ -392,6 +429,10 @@ static void CreatePackageDataItem(const ModuleItem* item, std::string_view pkg,
   auto* var = ctx.CreateVariable(*qname, PackageDataWidth(item, ctx));
   if (item->kind != ModuleItemKind::kVarDecl) return;
   ShapePackageVariable(item, var, *qname, ctx, arena);
+  if (IsPackageSemaphoreDecl(item)) {
+    CreatePackageSemaphore(item, pkg, *qname, ctx, arena);
+    return;
+  }
   CreatePackageAggregate(item, pkg, *qname, ctx, arena);
 }
 
@@ -405,10 +446,13 @@ void CreatePackageDataVariables(const RtlirDesign* design, SimContext& ctx,
 
 // One package item's initializer, evaluated into the storage
 // CreatePackageDataItem gave it; an item declaring no data, or none, has
-// nothing to evaluate.
+// nothing to evaluate. §15.3.1: a semaphore's initializer is the new() that
+// CreatePackageSemaphore has already read the bucket's key count from, and
+// it names no value the carrier variable holds, so it is left alone.
 static void InitPackageDataItem(const ModuleItem* item, std::string_view pkg,
                                 SimContext& ctx, Arena& arena) {
   if (!DeclaresPackageData(item) || item->init_expr == nullptr) return;
+  if (IsPackageSemaphoreDecl(item)) return;
   const auto& variables = ctx.GetVariables();
   auto found = variables.find(PackageDataKey(item, pkg));
   if (found == variables.end()) return;

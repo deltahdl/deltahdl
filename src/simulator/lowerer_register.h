@@ -129,9 +129,11 @@ void RegisterPackageScopedSubroutines(const RtlirDesign* design,
 // "pk.name" key -- the variable at its declared type's width, state and
 // signedness, a string or real registered as such, an integral variable
 // without an initializer at §6.8's default, a queue or an associative array
-// (§7.10, §7.8) with the object its methods and element selects operate on
-// -- so a write through the scope or an import lands and a read through
-// either sees it. The initializers are left for InitPackageDataVariables.
+// (§7.10, §7.8) with the object its methods and element selects operate on,
+// a semaphore (§15.3) with the bucket its methods operate on, holding the
+// keys its declaration's new() names -- so a write through the scope or an
+// import lands and a read through either sees it. The other initializers are
+// left for InitPackageDataVariables.
 void CreatePackageDataVariables(const RtlirDesign* design, SimContext& ctx,
                                 Arena& arena);
 // §26.2: each package's declaration assignments, evaluated in the package's
