@@ -605,9 +605,10 @@ std::optional<ConstVal> ConstEvalBinaryFull(const Expr* expr,
   // and a bitwise or an arithmetic operator by the wider of its two, so a
   // result wider than 64 bits has words the int64 fold cannot hold, and a
   // comparison or a logical operator reads every bit of operands that wide;
-  // EvalWideBinary works those across every word and declines a product, a
-  // quotient, a remainder and a power, which fold below on the low word as
-  // before.
+  // EvalWideBinary works those across every word, the four multiplicative
+  // operators through const_eval_wide_arith.cpp, and declines the case
+  // equality and wildcard operators alone, which fold below on the low word.
+  // A division by zero at that width is empty there and here alike.
   if (w > 64) {
     if (auto wide = EvalWideBinary(expr->op, *lhs, *rhs, w)) return wide;
   }

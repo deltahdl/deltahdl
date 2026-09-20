@@ -282,14 +282,13 @@ TEST(WideOperators, ConcatenationOperandContributesItsDeclaredWidth) {
   EXPECT_EQ(ParamValue(design, "Y"), 0xF0);
 }
 
-// §11.4.3 (printed page 275): a product of operands wider than 64 bits is
-// still folded on the low word -- the multi-word fold covers the additive,
-// comparison, logical, unary, cast, concatenation and replication operators
-// and not multiplication, division, modulus or power -- so `P * 2`, whose
-// word above bit 64 is 3, reads 0 there and the doubled low word below. This
-// pins the limit as d6a7eab50's TypedefNameIsLeftToTheRun pinned its own; a
-// fold that carries the product across the words will invert it.
-TEST(WideOperators, MultiplicationStaysOnTheLowWord) {
+// §11.4.3 (printed page 275): a product carries across every word, so
+// `P * 2`, P being 2^65 - 1, reads 3 above bit 64 and the doubled low word
+// below; §11.6.1 (printed 299) sizes it by the wider operand, so `P * P`,
+// which is 2^130 - 2^66 + 1, is cut to 96 bits and reads 0xFFFFFFFC above
+// bit 64 and 1 in the low word. 994404a79 folded a product on the low word
+// alone, which read 0 above bit 64 through both, and pinned that reading.
+TEST(WideOperators, MultiplicationCarriesAcrossTheWords) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -297,66 +296,147 @@ TEST(WideOperators, MultiplicationStaysOnTheLowWord) {
       "  localparam logic [95:0] MUL = P * 2;\n"
       "  localparam int MH = MUL[95:64];\n"
       "  localparam int ML = MUL[31:0];\n"
+      "  localparam logic [95:0] SQ = P * P;\n"
+      "  localparam int SQH = SQ[95:64];\n"
+      "  localparam int SQM = SQ[63:32];\n"
+      "  localparam int SQL = SQ[31:0];\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
-  EXPECT_EQ(ParamValue(design, "MH"), 0);
+  EXPECT_EQ(ParamValue(design, "MH"), 3);
   EXPECT_EQ(ParamValue(design, "ML"), 0xFFFFFFFE);
+  EXPECT_EQ(ParamValue(design, "SQH"), 0xFFFFFFFC);
+  EXPECT_EQ(ParamValue(design, "SQM"), 0);
+  EXPECT_EQ(ParamValue(design, "SQL"), 1);
 }
 
-// §6.20.2 (printed page 126): a parameter with a range specification has the
-// range of its declaration, whichever way the bounds are written, so `logic
-// [HI:1] V` under `localparam int HI = 8` is eight bits and `V[HI]` its top
-// one (§11.5.1, printed 296). RtlirParamDecl::decl_width is folded without
-// the earlier parameters in scope and is left at the vector's one bit where a
-// bound names one, and 64b2dfbe0's RegisteredParamValue read that width, so
-// V was cut to its low bit and `V[HI]` folded to 0; $bits(V) answered 1 from
-// the same field. The bounds themselves fold against the parameters already
-// elaborated, and the width is read from them now: 1 from `V[HI]`, 0 from
-// `V[HI-1]` and 8 from $bits(V).
-TEST(DeclaredWidth, RangeBoundWrittenAsAParameterSizesTheValue) {
+// §11.4.3 (printed page 275): the quotient truncates toward zero and the
+// remainder is what the division leaves, so over Q = 4 * 2^64 + 7 the
+// quotient by 3 is 2^64 + 0x5555_5555_5555_5557 -- 1 above bit 64,
+// 0x55555555 in the word below and 0x55555557 at the bottom -- and the
+// remainder is 2, since 2^64 leaves 1 by 3. A fold of the low word alone
+// divides 7 by 3 and reads 0, 0, 2 and a remainder of 1.
+TEST(WideOperators, DivisionAndRemainderReadEveryWord) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
-      "  localparam int HI = 8;\n"
-      "  localparam logic [HI:1] V = 8'b1010_0101;\n"
-      "  localparam W = V[HI];\n"
-      "  localparam W6 = V[HI-1];\n"
-      "  localparam int BV = $bits(V);\n"
+      "  localparam logic [95:0] Q = 96'h0000_0004_0000_0000_0000_0007;\n"
+      "  localparam logic [95:0] D = Q / 3;\n"
+      "  localparam int DH = D[95:64];\n"
+      "  localparam int DM = D[63:32];\n"
+      "  localparam int DL = D[31:0];\n"
+      "  localparam logic [95:0] R = Q % 3;\n"
+      "  localparam int RH = R[95:64];\n"
+      "  localparam int RL = R[31:0];\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
-  EXPECT_EQ(ParamValue(design, "W"), 1);
-  EXPECT_EQ(ParamValue(design, "W6"), 0);
-  EXPECT_EQ(ParamValue(design, "BV"), 8);
+  EXPECT_EQ(ParamValue(design, "DH"), 1);
+  EXPECT_EQ(ParamValue(design, "DM"), 0x55555555);
+  EXPECT_EQ(ParamValue(design, "DL"), 0x55555557);
+  EXPECT_EQ(ParamValue(design, "RH"), 0);
+  EXPECT_EQ(ParamValue(design, "RL"), 2);
 }
 
-// The same declaration past 64 bits: `logic [TOP:0] P` under `localparam int
-// TOP = 95` is 96 bits, and its words above bit 63 are read from the refold
-// of its value only where the declared width is known to reach them. With
-// the width read as one bit no refold was made, so `P[64]`, `P[TOP:64]` and
-// $bits(P) folded to 0, 0 and 1 where 1, 1 and 96 are right; `P[65]` is 0
-// either way and pins that the bit above the set one stays clear.
-TEST(DeclaredWidth, RangeBoundWrittenAsAParameterReachesTheWordsAboveBit63) {
+// §11.4.3 (printed page 275) with §11.4.3.1 (printed 277): two signed
+// operands divide as signed values, the quotient truncating toward zero and
+// the remainder taking the sign of the first operand. NQ is -(4 * 2^64 + 5),
+// so `NQ / 3` is -(2^64 + 0x5555_5555_5555_5557), whose 96 bits read
+// 0xFFFFFFFE above bit 64 and 0xAAAAAAA9 at the bottom, and `NQ % 3` is 0,
+// 4 * 2^64 + 5 being 6 by 3 and so a multiple of it. A fold of the low word
+// alone divides -5 by 3 and reads 0 in the quotient's word above 64 and a
+// remainder of -2.
+TEST(WideOperators, SignedDivisionTakesTheSignsAcrossTheWords) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
-      "  localparam int TOP = 95;\n"
-      "  localparam logic [TOP:0] P = 96'h0000_0001_FFFF_FFFF_FFFF_FFFF;\n"
-      "  localparam B64 = P[64];\n"
-      "  localparam B65 = P[65];\n"
-      "  localparam int PH = P[TOP:64];\n"
-      "  localparam int BP = $bits(P);\n"
+      "  localparam logic signed [95:0] NQ = "
+      "-96'sh0000_0004_0000_0000_0000_0005;\n"
+      "  localparam logic signed [95:0] SQ = NQ / 96'sd3;\n"
+      "  localparam int SQH = SQ[95:64];\n"
+      "  localparam int SQM = SQ[63:32];\n"
+      "  localparam int SQL = SQ[31:0];\n"
+      "  localparam logic signed [95:0] SR = NQ % 96'sd3;\n"
+      "  localparam int SRH = SR[95:64];\n"
+      "  localparam int SRL = SR[31:0];\n"
+      "  localparam logic signed [95:0] PR = 96'sd11 % (-96'sd3);\n"
+      "  localparam int PRL = PR[31:0];\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
-  EXPECT_EQ(ParamValue(design, "B64"), 1);
-  EXPECT_EQ(ParamValue(design, "B65"), 0);
-  EXPECT_EQ(ParamValue(design, "PH"), 1);
-  EXPECT_EQ(ParamValue(design, "BP"), 96);
+  EXPECT_EQ(ParamValue(design, "SQH"), 0xFFFFFFFE);
+  EXPECT_EQ(ParamValue(design, "SQM"), 0xAAAAAAAA);
+  EXPECT_EQ(ParamValue(design, "SQL"), 0xAAAAAAA9);
+  EXPECT_EQ(ParamValue(design, "SRH"), 0);
+  EXPECT_EQ(ParamValue(design, "SRL"), 0);
+  EXPECT_EQ(ParamValue(design, "PRL"), 2);
+}
+
+// §11.4.3's Table 11-4 (printed page 276): a positive exponent raises the
+// base that many times, cut to the width, so `96'd3 ** 50` reads 0x9805
+// above bit 64, 0x53F0DB2F in the word below and 0xD09DE3C9 at the bottom,
+// `96'd2 ** 95` sets bit 95 alone and `96'd2 ** 96` leaves nothing; a zero
+// exponent answers 1 whatever the base, and a negative one 1 for a base of
+// 1, -1 or 1 by its parity for a base of -1 and 0 for a larger base. A fold
+// of the low word alone reads 0 above bit 64 through the first two.
+TEST(WideOperators, PowerFollowsTableElevenFourAcrossTheWords) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  localparam logic [95:0] PW = 96'd3 ** 50;\n"
+      "  localparam int PWH = PW[95:64];\n"
+      "  localparam int PWM = PW[63:32];\n"
+      "  localparam int PWL = PW[31:0];\n"
+      "  localparam logic [95:0] TOP = 96'd2 ** 95;\n"
+      "  localparam int TOPH = TOP[95:64];\n"
+      "  localparam int TOPL = TOP[31:0];\n"
+      "  localparam logic [95:0] OVER = 96'd2 ** 96;\n"
+      "  localparam int OVERH = OVER[95:64];\n"
+      "  localparam logic [95:0] ZERO = 96'd7 ** 0;\n"
+      "  localparam int ZEROL = ZERO[31:0];\n"
+      "  localparam logic signed [95:0] ONE = 96'sd1 ** (-96'sd3);\n"
+      "  localparam int ONEL = ONE[31:0];\n"
+      "  localparam logic signed [95:0] ODD = (-96'sd1) ** (-96'sd3);\n"
+      "  localparam int ODDH = ODD[95:64];\n"
+      "  localparam logic signed [95:0] EVEN = (-96'sd1) ** (-96'sd2);\n"
+      "  localparam int EVENL = EVEN[31:0];\n"
+      "  localparam logic signed [95:0] BIG = 96'sd5 ** (-96'sd1);\n"
+      "  localparam int BIGL = BIG[31:0];\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(ParamValue(design, "PWH"), 0x9805);
+  EXPECT_EQ(ParamValue(design, "PWM"), 0x53F0DB2F);
+  EXPECT_EQ(ParamValue(design, "PWL"), 0xD09DE3C9);
+  EXPECT_EQ(ParamValue(design, "TOPH"), 0x80000000);
+  EXPECT_EQ(ParamValue(design, "TOPL"), 0);
+  EXPECT_EQ(ParamValue(design, "OVERH"), 0);
+  EXPECT_EQ(ParamValue(design, "ZEROL"), 1);
+  EXPECT_EQ(ParamValue(design, "ONEL"), 1);
+  EXPECT_EQ(ParamValue(design, "ODDH"), 0xFFFFFFFF);
+  EXPECT_EQ(ParamValue(design, "EVENL"), 1);
+  EXPECT_EQ(ParamValue(design, "BIGL"), 0);
+}
+
+// §11.4.3 (printed page 275): a division or a remainder by zero is x, which
+// no parameter value folds to, so each is left unresolved as the 64-bit fold
+// leaves them.
+TEST(WideOperators, DivisionByZeroFoldsToNothing) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  localparam logic [95:0] P = 96'h0000_0001_FFFF_FFFF_FFFF_FFFF;\n"
+      "  localparam logic [95:0] DZ = P / 96'd0;\n"
+      "  localparam logic [95:0] RZ = P % 96'd0;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(ParamUnresolved(design, "DZ"));
+  EXPECT_TRUE(ParamUnresolved(design, "RZ"));
 }
 
 }  // namespace

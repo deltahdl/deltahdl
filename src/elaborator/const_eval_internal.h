@@ -25,9 +25,9 @@ struct ConstVal {
   // that consults `value` alone reads what it always read. Filled by
   // ConstEvalLiteral for a literal past 64 bits and by ConstEvalIdentifierFull
   // for a parameter declared past them, and read through const_eval_wide.cpp
-  // by a select, a shift, a bitwise, an additive, a comparison, a logical and
-  // a unary operator, a cast, a concatenation and a replication; a product,
-  // a quotient, a remainder and a power still see `value` alone.
+  // by a select, a shift, a bitwise, an additive, a multiplicative, a
+  // comparison, a logical and a unary operator, a cast, a concatenation and
+  // a replication.
   std::vector<uint64_t> high_words = {};
 };
 
@@ -81,14 +81,64 @@ bool ConstValBit(const ConstVal& v, int64_t offset);
 uint64_t ConstValWindow(const ConstVal& v, int64_t lo);
 
 // §11.4.10 with §11.4.8, §11.4.3, §11.4.4, §11.4.5 and §11.4.7: a shift, a
-// bitwise operator, an addition, a subtraction, a relational, an equality or
-// a logical operator applied across every word of `lhs` and `rhs`, at width
+// bitwise operator, an arithmetic operator, a relational, an equality or a
+// logical operator applied across every word of `lhs` and `rhs`, at width
 // `width`, for an operand that carries bits past 63; a comparison and a
-// logical operator answer one bit. Empty for any other operator -- a product,
-// a quotient, a remainder and a power -- which the 64-bit fold answers on the
-// low word. Defined in const_eval_wide.cpp.
+// logical operator answer one bit. Empty for any other operator -- the case
+// equality and wildcard operators -- which the 64-bit fold answers on the
+// low word, and for a quotient or a remainder by zero and a power §11.4.3
+// makes x. Defined in const_eval_wide.cpp.
 std::optional<ConstVal> EvalWideBinary(TokenKind op, const ConstVal& lhs,
                                        const ConstVal& rhs, uint32_t width);
+
+// §11.4.3 (printed pages 275-276) with §11.4.3.1: the product, the quotient,
+// the remainder or the power of `lhs` and `rhs` at width `width`, worked
+// across every word of them -- the quotient truncated toward zero, the
+// remainder with the sign of the first operand, the power by Table 11-4 --
+// and cut to the width as §11.6.1 cuts an arithmetic result. Empty for a
+// divisor of zero and for a base of zero under a negative exponent, which
+// the clause makes x, as the 64-bit fold answers them. `op` is one of the
+// four; 994404a79 folded each on the low word. Defined in
+// const_eval_wide_arith.cpp.
+std::optional<ConstVal> EvalWideMultiplicative(TokenKind op,
+                                               const ConstVal& lhs,
+                                               const ConstVal& rhs,
+                                               uint32_t width);
+
+// The words of `v` at `width` as an operand of a binary operator or a cast
+// reads them: cut to v's own width, and the bits from there up to `width`
+// filled from v's sign bit where `sign_extend` asks, which is what §11.4.3.1
+// (printed 277), §11.4.4, §11.4.5 and §11.4.8 do to the narrower of two
+// signed operands and §6.24.1 to a value cast to a larger size. Word i holds
+// bits 64*i+63 down to 64*i, and there are enough words for `width` bits.
+// Defined in const_eval_wide.cpp.
+std::vector<uint64_t> ExtendedWords(const ConstVal& v, uint32_t width,
+                                    bool sign_extend);
+
+// The ConstVal `words`, laid out as ExtendedWords lays them, make at `width`
+// and `is_signed`: the first word read as NormalizeConstVal reads a value of
+// 64 bits or less, and the rest cut to the width and trimmed to
+// ConstVal::high_words' layout. Defined in const_eval_wide.cpp.
+ConstVal ConstValOfWords(const std::vector<uint64_t>& words, uint32_t width,
+                         bool is_signed);
+
+// `addend` added into `acc` word by word, both of one length, each word's
+// carry going into the next and the carry out of the top word dropped.
+// Defined in const_eval_wide.cpp.
+void AddWords(std::vector<uint64_t>& acc, const std::vector<uint64_t>& addend);
+
+// §11.4.3 (printed 277): the two's complement of `words` across every bit of
+// every word, which is what unary minus makes of its operand. Defined in
+// const_eval_wide.cpp.
+void NegateWords(std::vector<uint64_t>& words);
+
+// The bits of `words` at or above `width` cleared, so that a value read at a
+// width contributes nothing above it. Defined in const_eval_wide.cpp.
+void ClearBitsFrom(std::vector<uint64_t>& words, uint32_t width);
+
+// The words a value held as 32-bit halves, least significant first, makes.
+// Defined in const_eval_wide.cpp.
+std::vector<uint64_t> WordsOfHalves(const std::vector<uint32_t>& halves);
 
 // §11.4.3 with §11.4.8 and §11.4.7: unary plus, minus, bitwise negation and
 // logical negation applied across every word of `operand`, whose width is
