@@ -137,6 +137,10 @@ static std::optional<int64_t> EvalBinary(TokenKind op, int64_t lhs,
   return EvalBinaryCompare(op, lhs, rhs);
 }
 
+// §11.6.1's Table 11-21 (printed page 299) sizes unary `+ - ~` by their
+// operand, which is context-determined; `!` reads a self-determined operand
+// and answers one bit. The three are folded here at the operand's width, and
+// `!` separately in ConstEvalUnaryFull.
 static std::optional<int64_t> EvalUnary(TokenKind op, int64_t operand) {
   switch (op) {
     case TokenKind::kMinus:
@@ -145,11 +149,14 @@ static std::optional<int64_t> EvalUnary(TokenKind op, int64_t operand) {
       return operand;
     case TokenKind::kTilde:
       return ~operand;
-    case TokenKind::kBang:
-      return operand == 0 ? 1 : 0;
     default:
       return std::nullopt;
   }
+}
+
+static bool SizedByOperand(TokenKind op) {
+  return op == TokenKind::kMinus || op == TokenKind::kPlus ||
+         op == TokenKind::kTilde;
 }
 
 uint32_t ConstLiteralWidth(const Expr* expr) {
@@ -549,13 +556,22 @@ std::optional<ConstVal> ConstEvalStringLiteral(const Expr* expr) {
 }
 
 std::optional<ConstVal> ConstEvalUnaryFull(const Expr* expr,
-                                           const ScopeMap& scope) {
-  auto operand = ConstEvalFull(expr->lhs, scope);
+                                           const ScopeMap& scope,
+                                           FoldContext ctx) {
+  // §11.8.2 (printed page 302): the operand of `+ - ~` is context-determined,
+  // so it is folded in the context the expression stands in and the result is
+  // as wide; the operand of `!` is self-determined (Table 11-21, printed 299).
+  auto operand = ConstEvalFull(expr->lhs, scope,
+                               SizedByOperand(expr->op) ? ctx : FoldContext{});
   if (!operand) return std::nullopt;
+  // §11.4.7 (printed 280): `!` answers one bit from whether any bit of its
+  // operand is set, read across every word of it.
+  if (expr->op == TokenKind::kBang)
+    return ConstVal{ConstValIsNonZero(*operand) ? 0 : 1, 1, false};
   // §11.6.1's Table 11-21 (printed page 299) sizes unary `+ - ~` by their
   // operand, so a result wider than 64 bits has words the int64 fold cannot
-  // hold, and `!` reads every bit of its operand; EvalWideUnary works those
-  // across every word and declines the rest, which fold below as before.
+  // hold; EvalWideUnary works those across every word and declines the rest,
+  // which fold below as before.
   if (operand->width > 64) {
     if (auto wide = EvalWideUnary(expr->op, *operand)) return wide;
   }
@@ -608,17 +624,26 @@ static std::optional<ConstVal> EvalUnsignedDivMod(TokenKind op, int64_t lv,
 }
 
 std::optional<ConstVal> ConstEvalBinaryFull(const Expr* expr,
-                                            const ScopeMap& scope) {
-  auto lhs = ConstEvalFull(expr->lhs, scope);
-  auto rhs = ConstEvalFull(expr->rhs, scope);
-  if (!lhs || !rhs) return std::nullopt;
+                                            const ScopeMap& scope,
+                                            FoldContext ctx) {
+  // §11.8.2 (printed pages 302-303): each operand is folded in the context
+  // the expression propagates to it -- FoldBinaryOperands says which take
+  // the context and which are self-determined -- before the operator is
+  // applied, so an operand that is narrower than the expression, or than the
+  // target of the assignment the expression is the right-hand side of, is
+  // extended first and its own operator worked at that width. Folded at its
+  // own width and extended after, `8'hAB << 8` read 0 in a 16-bit target.
+  auto operands = FoldBinaryOperands(expr, scope, ctx);
+  if (!operands) return std::nullopt;
+  const ConstVal& lhs = operands->lhs;
+  const ConstVal& rhs = operands->rhs;
   // §11.6.1's Table 11-21 (printed pages 299-300) sizes a shift and a power
   // by their left operand, the right being self-determined, and a bitwise or
   // an arithmetic operator by the wider of its two. 64b2dfbe0 sized every
   // one by the wider, so `8'd2 ** 32'd8` read 256 where the 8-bit result
   // holds 0, `8'd1 << 32'd8` read 256 and `8'd1 << 96'd1` grew to 96 bits.
   bool left_sized = SizedByLeftOperand(expr->op);
-  uint32_t w = left_sized ? lhs->width : std::max(lhs->width, rhs->width);
+  uint32_t w = left_sized ? lhs.width : std::max(lhs.width, rhs.width);
   // A result wider than 64 bits has words the int64 fold cannot hold, and a
   // comparison or a logical operator reads every bit of operands that wide;
   // EvalWideBinary works those across every word, the four multiplicative
@@ -630,12 +655,12 @@ std::optional<ConstVal> ConstEvalBinaryFull(const Expr* expr,
   // could not make. A division by zero and `0 ** -1` are empty there and
   // here alike.
   if (left_sized || w > 64) {
-    auto wide = EvalWideBinary(expr->op, *lhs, *rhs, w);
+    auto wide = EvalWideBinary(expr->op, lhs, rhs, w);
     if (wide || left_sized) return wide;
   }
-  bool s = BinaryResultSigned(expr->op, *lhs, *rhs);
+  bool s = BinaryResultSigned(expr->op, lhs, rhs);
   int64_t lv = 0, rv = 0;
-  NormalizeBinaryOperands(*lhs, *rhs, s, lv, rv);
+  NormalizeBinaryOperands(lhs, rhs, s, lv, rv);
   if (!s) {
     bool handled = false;
     auto div_result = EvalUnsignedDivMod(expr->op, lv, rv, w, handled);
@@ -643,6 +668,10 @@ std::optional<ConstVal> ConstEvalBinaryFull(const Expr* expr,
   }
   auto result = EvalBinary(expr->op, lv, rv);
   if (!result) return std::nullopt;
+  // Table 11-21: a relational, an equality and a logical operator answer one
+  // bit, unsigned (§11.8.1, printed 302), whatever the width of their
+  // operands; sized by the wider operand, `8'd1 < 8'd2` was eight bits.
+  if (AnswersOneBit(expr->op)) return ConstVal{*result, 1, false};
   return NormalizeConstVal(*result, w, s);
 }
 

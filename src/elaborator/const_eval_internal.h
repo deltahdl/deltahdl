@@ -38,13 +38,117 @@ struct ConstVal {
 // to set. Defined in const_eval.cpp.
 ConstVal NormalizeConstVal(int64_t value, uint32_t width, bool is_signed);
 
+// §11.6.1 (printed pages 299-300) with §11.8.2 (printed 302-303): what the
+// expression an operand stands in has settled for it before it is folded.
+// `width` is the size propagated down to a context-determined operand -- an
+// operand of an arithmetic or a bitwise operator, the left operand of a
+// shift or a power, an arm of a conditional, the expression a cast converts
+// (§6.24.1, printed 139), the right-hand side of an assignment to a target
+// of a declared width -- and 0 where the operand is self-determined: a
+// shift's count, a power's exponent, an element of a concatenation, a
+// condition, an argument, the operands of a logical operator, and the value
+// of a parameter declared with neither type nor range (§6.20.2, printed
+// 126-127). `read_unsigned` says the expression is unsigned, which §11.8.1
+// (printed 302) makes it where any operand that is not self-determined is
+// unsigned, so a signed operand under it is the unsigned number its bits
+// make and is zero-extended rather than sign-extended (§11.8.2's last step,
+// printed 303). A default-constructed context is a self-determined operand's.
+struct FoldContext {
+  uint32_t width = 0;
+  bool read_unsigned = false;
+};
+
+// The value of `expr` against `scope` as the operand `ctx` describes: folded
+// at the size and type the context propagates and read as ReadInContext reads
+// it, so the answer is at least ctx.width wide. The two-argument forms fold a
+// self-determined expression.
+std::optional<ConstVal> ConstEvalFull(const Expr* expr, const ScopeMap& scope,
+                                      FoldContext ctx);
 std::optional<ConstVal> ConstEvalBinaryFull(const Expr* expr,
-                                            const ScopeMap& scope);
+                                            const ScopeMap& scope,
+                                            FoldContext ctx);
+std::optional<ConstVal> ConstEvalUnaryFull(const Expr* expr,
+                                           const ScopeMap& scope,
+                                           FoldContext ctx);
 std::optional<ConstVal> ConstEvalFull(const Expr* expr, const ScopeMap& scope);
 std::optional<ConstVal> ConstEvalLiteral(const Expr* expr);
 std::optional<ConstVal> ConstEvalStringLiteral(const Expr* expr);
-std::optional<ConstVal> ConstEvalUnaryFull(const Expr* expr,
-                                           const ScopeMap& scope);
+
+// §11.6.1's Table 11-21 (printed page 300): the value of the conditional
+// `expr`, the condition folded self-determined and the arm it selects folded
+// in `ctx`, which reaches the arm as it reaches an operand of an arithmetic
+// operator. The other arm is not folded: §13.4.3's constant functions
+// recurse through the arm a condition does not select, and folding it would
+// follow that recursion to the depth cap on every call. Defined in
+// const_eval_context.cpp.
+std::optional<ConstVal> ConstEvalTernaryFull(const Expr* expr,
+                                             const ScopeMap& scope,
+                                             FoldContext ctx);
+
+// §6.24.1 (printed page 139): the value of the cast `expr` -- a signing, a
+// const, a size or a type cast -- its operand folded as the right-hand side
+// of an assignment to a target of the cast's width and cut to it. Defined in
+// const_eval_context.cpp.
+std::optional<ConstVal> ConstEvalCastFull(const Expr* expr,
+                                          const ScopeMap& scope);
+
+// §11.8.2 (printed pages 302-303): `v` as the context `ctx` reads it --
+// extended to ctx.width where it is narrower, from its sign where it is
+// signed and the context does not read unsigned and with zeros otherwise,
+// and unsigned where the context reads unsigned; unchanged where it is as
+// wide and of a type the context admits, and always where the context is a
+// self-determined operand's. Defined in const_eval_context.cpp.
+ConstVal ReadInContext(const ConstVal& v, FoldContext ctx);
+
+// The two operands of a binary expression once each is folded in the context
+// §11.8.2 gives it.
+struct BinaryOperands {
+  ConstVal lhs;
+  ConstVal rhs;
+};
+
+// §11.6.1's Table 11-21 with §11.8.2: the operands of the binary expression
+// `expr` folded against `scope` under `ctx`. An operand of an arithmetic or
+// a bitwise operator and the left operand of a shift or a power take the
+// context; a shift's count and a power's exponent, the operands of a logical
+// operator and those of a relational or an equality operator, which are
+// sized to each other alone, are self-determined. The two operands of an
+// arithmetic, a bitwise, a relational or an equality operator are then
+// brought to one width, the wider, and one type, unsigned where either is
+// (§11.8.1): the one that folded narrower, or signed where the other is
+// unsigned, is folded again in that shared context, since an operand that is
+// itself an expression applied its operator at the width and type it had
+// then and the sum, the product or the shift inside it would keep the bits
+// that width cut. Empty where an operand does not fold. Defined in
+// const_eval_context.cpp.
+std::optional<BinaryOperands> FoldBinaryOperands(const Expr* expr,
+                                                 const ScopeMap& scope,
+                                                 FoldContext ctx);
+
+// §11.6.1's Table 11-21 (printed pages 299-300): whether the binary
+// operator `op` answers one bit whatever the width of its operands -- a
+// relational, an equality, a logical operator or an implication. Defined in
+// const_eval_context.cpp.
+bool AnswersOneBit(TokenKind op);
+
+// §6.20.2 (printed pages 126-127) with §11.6.1 (printed 299): the context the
+// declaration of `pd` gives the value assigned to it -- the declared width
+// where the declaration fixes one, by a range or by a type that is not
+// implicit, and a self-determined operand's where the parameter takes its
+// range from the value. Never read unsigned: §11.8.1 (printed 302) has the
+// type of the right-hand side depend on its operands and not on the target.
+// Defined in const_eval_bits.cpp.
+FoldContext DeclaredFoldContext(const RtlirParamDecl& pd);
+
+// §6.20.2 with §11.6.1 and §11.8.3 (printed page 303): the value `expr` folded
+// against `scope` gives the parameter `pd`: folded in DeclaredFoldContext(pd),
+// and cut to the declared width where there is one -- the bits above it
+// dropped, and the number read by the expression's own signedness, as
+// CastConstVal reads it -- so that `localparam [7:0] V = 16'h1234 + 0` holds
+// 0x34. Empty where the expression does not fold. Defined in
+// const_eval_bits.cpp.
+std::optional<int64_t> FoldParamValue(const RtlirParamDecl& pd,
+                                      const Expr* expr, const ScopeMap& scope);
 std::optional<int64_t> EvalConstSysCall(const Expr* expr,
                                         const ScopeMap& scope);
 

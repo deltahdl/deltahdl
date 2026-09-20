@@ -758,4 +758,41 @@ TEST(DefparamElaboration, RefoldsADefparamValueALaterDefparamWidens) {
   EXPECT_EQ(WideningParamUnder(kSetThenWiden, "M", fm), 3);
 }
 
+// §11.6.1 (printed page 299) with §23.10.1 (printed 764-765): a defparam's
+// right-hand side is assigned to the parameter, so its context-determined
+// operands are sized by the parameter's declared width before the operator
+// is applied, as a declaration's own value is (§11.8.2, printed 302).
+// Folded at the operands' own widths, `defparam u.P = 8'hAB << 8` over
+// `parameter [15:0] P` shifted at 8 bits and gave P 0, and `defparam u.X = 3
+// ** 50` over `parameter logic [95:0] X` raised 3 at 32 bits and left X's
+// word above bit 64, 0x9805 of 3^50 = 0x9805_53F0DB2F_D09DE3C9, reading 0.
+TEST(DefparamElaboration, SizesADefparamValueByTheParametersDeclaredWidth) {
+  constexpr std::string_view kItems =
+      "  parameter [15:0] P = 0;\n"
+      "  parameter logic [95:0] X = 0;\n"
+      "  localparam int XH = X[95:64];\n";
+  constexpr std::string_view kDefparams =
+      "  defparam u.P = 8'hAB << 8;\n"
+      "  defparam u.X = 3 ** 50;\n";
+  ElabFixture fp;
+  EXPECT_EQ(ParamOfMUnder(kItems, kDefparams, "P", fp), 0xAB00);
+  EXPECT_FALSE(fp.has_errors);
+  ElabFixture fx;
+  EXPECT_EQ(ParamOfMUnder(kItems, kDefparams, "XH", fx), 0x9805);
+}
+
+// A defparam on any parameter of m has the values of m's other parameters
+// folded again (RecomputeDependentParams), and that fold sizes a default by
+// the declared width as the first did: `parameter [15:0] W = 8'hFF + 8'h01`
+// keeps 0x100 under `defparam u.A = 2`, where a fold at the operands' 8 bits
+// dropped the carry and left W 0.
+TEST(DefparamElaboration, RefoldsAnotherParametersDefaultInItsDeclaredWidth) {
+  ElabFixture f;
+  EXPECT_EQ(ParamOfMUnder("  parameter A = 1;\n"
+                          "  parameter [15:0] W = 8'hFF + 8'h01;\n",
+                          "  defparam u.A = 2;\n", "W", f),
+            0x100);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

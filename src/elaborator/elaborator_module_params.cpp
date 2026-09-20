@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <format>
+#include <optional>
 #include <string_view>
 #include <unordered_set>
 #include <vector>
@@ -221,14 +222,18 @@ static bool TryResolveUnboundedParamValue(RtlirParamDecl& pd, const Expr* pval,
 
 // Fold a parameter's default expression into a concrete value: prefer an
 // integer constant, then (for integer-typed parameters) a real constant rounded
-// per §6.12.1.
+// per §6.12.1. §11.6.1 (printed page 299): the default is the right-hand side
+// of an assignment to the parameter, so its context-determined operands are
+// sized by the declared width and the value is cut to it (FoldParamValue), as
+// a parameter among the items has its value folded; folded self-determined,
+// `parameter logic [95:0] X = 3 ** 50` in a port list raised 3 at 32 bits.
 static void FoldParamConstantValue(RtlirParamDecl& pd, const Expr* pval,
                                    const ScopeMap& scope, bool has_param_type,
                                    const DataType* param_type) {
   if (has_param_type && param_type != nullptr &&
       TryFoldRealParamValue(pd, pval, *param_type, scope))
     return;
-  auto val = ConstEvalInt(pval, scope);
+  auto val = FoldParamValue(pd, pval, scope);
   if (val) {
     pd.resolved_value = *val;
     pd.is_resolved = true;
@@ -281,6 +286,28 @@ static void ResolveUnresolvedParamValue(RtlirParamDecl& pd,
                          val.param_type);
 }
 
+// §11.6.1 (printed page 299) with §23.10.2 (printed 766): the override's
+// expression is the right-hand side of an assignment to the parameter, so
+// its context-determined operands are sized by the declared width as a
+// declaration's own value's are. The instantiation site folded it
+// self-determined, knowing nothing of the parameter it was for, so `c
+// #(.P(8'hAB << 8)) u()` over `parameter [15:0] P` gave P 0. The expression
+// is folded again here in the declared context, against the instantiating
+// module's parameters as `assigns` took them, and only where a
+// self-determined fold against that same scope reproduces the value the
+// site folded: the site's scope may hold a name -- a generate block's
+// parameter, a compilation unit's -- this one does not, under which a value
+// the source did not write would be read. Empty where the declaration fixes
+// no width, and where the fold does not reproduce the site's value.
+static std::optional<int64_t> ContextOverrideValue(
+    const RtlirParamDecl& pd, const Elaborator::ParamOverride& ovr,
+    const ScopeMap& scope) {
+  if (DeclaredFoldContext(pd).width == 0) return std::nullopt;
+  auto self = ConstEvalInt(ovr.value_expr, scope);
+  if (!self || *self != ovr.value) return std::nullopt;
+  return FoldParamValue(pd, ovr.value_expr, scope);
+}
+
 // Apply an instantiation override (if any) to a parameter, coercing the value
 // to the declared width per §6.20.2. Returns true when an override was applied.
 //
@@ -318,8 +345,11 @@ bool ApplyParamOverride(RtlirParamDecl& pd,
   // replaced it. An expression that is the declaration's own initializer,
   // handed back by ResetAllConfigParams, stands in the declaring module and
   // is left to the refold there.
-  if (pd.override_expr != nullptr)
+  if (pd.override_expr != nullptr) {
+    if (auto in_context = ContextOverrideValue(pd, *ovr, assigns.scope))
+      pd.resolved_value = ConvertOverrideValue(*in_context, pd);
     RecordResolvedHighWords(pd, pd.override_expr, assigns.scope);
+  }
   RecordStringParamValue(pd, ovr->value_expr, dtype, arena);
   return true;
 }

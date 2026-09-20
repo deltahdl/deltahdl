@@ -261,7 +261,7 @@ static void ReconvertOverrideValue(RtlirParamDecl& p) {
     return;
   }
   ParamRangeRegistryGuard defparam_module_guard(p.defparam_module);
-  auto val = ConstEvalInt(p.defparam_value_expr, p.defparam_value_scope);
+  auto val = FoldParamValue(p, p.defparam_value_expr, p.defparam_value_scope);
   p.resolved_value = ConvertOverrideValue(val.value_or(p.resolved_value), p);
   RecordResolvedHighWords(p, p.defparam_value_expr, p.defparam_value_scope);
 }
@@ -316,7 +316,7 @@ void Elaborator::RecomputeDependentParams(RtlirModule* mod) {
     ResizeParamToRecomputedRange(p, kTypedefs, scope);
     if (p.from_override) continue;
     if (!p.default_value) continue;
-    auto val = ConstEvalInt(p.default_value, scope);
+    auto val = FoldParamValue(p, p.default_value, scope);
     if (val) {
       p.resolved_value = *val;
       p.is_resolved = true;
@@ -391,7 +391,7 @@ static std::optional<int64_t> EvalDefparamOverride(
     rec.applied.insert(rec.key);
     return std::nullopt;
   }
-  auto val = ConstEvalInt(ovr.val_expr, ovr.scope);
+  auto val = FoldParamValue(*ovr.param, ovr.val_expr, ovr.scope);
   if (!val) {
     // §23.10.1 states that the expression on the right-hand side of a defparam
     // assignment shall be a constant expression involving only numbers and

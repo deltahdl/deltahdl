@@ -13,7 +13,6 @@
 #include "elaborator/const_eval.h"
 #include "elaborator/const_eval_internal.h"
 #include "elaborator/rtlir.h"
-#include "elaborator/type_eval.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -610,49 +609,6 @@ static std::optional<ConstVal> ConstEvalIdentifierFull(const Expr* expr,
   return ConstVal{it->second, 32, true};
 }
 
-// §6.24.1: what a cast expression is worth. Each form decides the width and the
-// signedness the operand's bits are read by, which is what CastConstVal
-// applies, keeping the words above bit 63 of an operand or a size past 64
-// bits, which the NormalizeConstVal of 64b2dfbe0 dropped: a signing cast keeps
-// "the number of bits in the expression to be cast" and sets "the signedness
-// specified by the cast type"; a size cast takes "the cast size" and leaves
-// "the self-determined signedness of the expression inside the cast" alone; a
-// const cast lets "the type of the expression to be cast pass through
-// unchanged"; a cast to a predefined type takes both from that type; and a
-// void cast has no value to return.
-static std::optional<ConstVal> ConstEvalCastFull(const Expr* expr,
-                                                 const ScopeMap& scope) {
-  if (expr->text == "void") return std::nullopt;
-  auto operand = ConstEvalFull(expr->lhs, scope);
-  if (!operand) return std::nullopt;
-  if (expr->text == "const") return operand;
-  if (expr->text == "signed" || expr->text == "unsigned")
-    return CastConstVal(*operand, operand->width, expr->text == "signed");
-  // §6.24.1: "If the casting type is a constant expression with a positive
-  // integral value, the expression in parentheses shall be padded or truncated
-  // to the size specified." The parser gives such a cast its size as an
-  // expression on rhs rather than as a name on text -- MakeNodeCast in
-  // src/parser/expr_parser.cpp builds `4'(x)` and `(W)'(x)` alike -- so the
-  // size is folded here in the same scope the operand was.
-  if (expr->rhs) {
-    auto size = ConstEvalFull(expr->rhs, scope);
-    if (!size || size->value <= 0) return std::nullopt;
-    return CastConstVal(*operand, static_cast<uint32_t>(size->value),
-                        operand->is_signed);
-  }
-  uint32_t width = CastTargetWidth(expr->text);
-  // A cast to a user-defined type takes its width from the typedef map, which
-  // ConstEvalFull is not given: a ScopeMap is its only other argument. The
-  // operand's own width and signedness stand in, as InferCastWidth in
-  // src/elaborator/type_eval.cpp falls back to the operand's width for the same
-  // reason. CastTargetWidth answers 0 for a user-defined name and for `string`.
-  if (width == 0) return operand;
-  if (expr->text[0] >= '0' && expr->text[0] <= '9')
-    return CastConstVal(*operand, width, operand->is_signed);
-  return CastConstVal(*operand, width,
-                      TypeNameToDataType(expr->text).is_signed);
-}
-
 // §11.11 orders the three values "minimum, typical, and maximum", which
 // Parser::ParseMinTypMaxExpr in src/parser/expr_parser_patterns.cpp and
 // Parser::ParseParenExpr in src/parser/expr_parser_aux.cpp both record as
@@ -669,9 +625,13 @@ const Expr* SelectMinTypMaxMember(const Expr* expr) {
   return expr->condition;
 }
 
-std::optional<ConstVal> ConstEvalFull(const Expr* expr, const ScopeMap& scope) {
-  if (!expr) return std::nullopt;
-
+// The value of `expr` itself, before ReadInContext converts it to `ctx`. The
+// operator expressions and the conditional hand the context down to their
+// context-determined operands; every other form is self-determined in
+// itself, and its parts are.
+static std::optional<ConstVal> ConstEvalNode(const Expr* expr,
+                                             const ScopeMap& scope,
+                                             FoldContext ctx) {
   switch (expr->kind) {
     case ExprKind::kIntegerLiteral:
       return ConstEvalLiteral(expr);
@@ -680,15 +640,11 @@ std::optional<ConstVal> ConstEvalFull(const Expr* expr, const ScopeMap& scope) {
     case ExprKind::kIdentifier:
       return ConstEvalIdentifierFull(expr, scope);
     case ExprKind::kUnary:
-      return ConstEvalUnaryFull(expr, scope);
+      return ConstEvalUnaryFull(expr, scope, ctx);
     case ExprKind::kBinary:
-      return ConstEvalBinaryFull(expr, scope);
-    case ExprKind::kTernary: {
-      auto cond = ConstEvalFull(expr->condition, scope);
-      if (!cond) return std::nullopt;
-      return ConstEvalFull(cond->value ? expr->true_expr : expr->false_expr,
-                           scope);
-    }
+      return ConstEvalBinaryFull(expr, scope, ctx);
+    case ExprKind::kTernary:
+      return ConstEvalTernaryFull(expr, scope, ctx);
     case ExprKind::kConcatenation:
       return ConstEvalConcatFull(expr, scope);
     case ExprKind::kReplicate:
@@ -708,8 +664,9 @@ std::optional<ConstVal> ConstEvalFull(const Expr* expr, const ScopeMap& scope) {
       // the three folds is what ActiveDelayMode answers, and EvalMinTypMax in
       // src/simulator/evaluation.cpp selects by that same setting, so a
       // parameter folded at elaboration and a delay waited out during the run
-      // cannot disagree.
-      return ConstEvalFull(SelectMinTypMaxMember(expr), scope);
+      // cannot disagree. The member stands where the form stands, so the
+      // context reaches it.
+      return ConstEvalFull(SelectMinTypMaxMember(expr), scope, ctx);
     case ExprKind::kCall: {
       // §11.2.1: a constant built-in method call (§5.13) is evaluated at
       // elaboration time. It is tried first because a built-in method is not a
@@ -722,6 +679,21 @@ std::optional<ConstVal> ConstEvalFull(const Expr* expr, const ScopeMap& scope) {
     default:
       return std::nullopt;
   }
+}
+
+std::optional<ConstVal> ConstEvalFull(const Expr* expr, const ScopeMap& scope,
+                                      FoldContext ctx) {
+  if (!expr) return std::nullopt;
+  auto value = ConstEvalNode(expr, scope, ctx);
+  if (!value) return std::nullopt;
+  // §11.8.2 (printed page 303): an operand the propagation reaches is
+  // converted to the propagated size and type, extended from its sign only
+  // where that type is signed.
+  return ReadInContext(*value, ctx);
+}
+
+std::optional<ConstVal> ConstEvalFull(const Expr* expr, const ScopeMap& scope) {
+  return ConstEvalFull(expr, scope, FoldContext{});
 }
 
 std::optional<int64_t> ConstEvalInt(const Expr* expr, const ScopeMap& scope) {

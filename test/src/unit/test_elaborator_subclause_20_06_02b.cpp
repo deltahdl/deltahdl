@@ -427,6 +427,43 @@ TEST(WideOperators, PowerFollowsTableElevenFourAcrossTheWords) {
   EXPECT_EQ(ParamValue(design, "BIGL"), 0);
 }
 
+// §11.6.1 (printed page 299) with §11.8.2 (printed 302): the base of a power
+// is context-determined and the right-hand side of an assignment is sized
+// by the left-hand side among its operands, so the unsized 3 of `3 ** 50`
+// assigned to a 96-bit parameter is extended to 96 bits before it is
+// raised, and the power reads what `96'd3 ** 50` reads: 0x9805 above bit
+// 64, 0x53F0DB2F in the word below and 0xD09DE3C9 at the bottom -- 3^50 is
+// 717897987691852588770249, which needs 80 bits. The exponent is
+// self-determined (Table 11-21, printed 300) and stays 32 bits. Likewise
+// `32'hFFFF_FFFF + 1` assigned to 64 bits adds at 64 and carries into bit
+// 32, so Z[63:32] is 1 and Z[31:0] is 0. Folded at the operands' own widths,
+// X read 0 above bit 32 and Z read 0. $bits(3 ** 50) is the expression's
+// own self-determined size, 32 (§20.6.2, printed 629), whatever it is
+// assigned to.
+TEST(WideOperators, ContextDeterminedBaseIsRaisedAtTheTargetsWidth) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  localparam logic [95:0] X = 3 ** 50;\n"
+      "  localparam int XH = X[95:64];\n"
+      "  localparam int XM = X[63:32];\n"
+      "  localparam int XL = X[31:0];\n"
+      "  localparam logic [63:0] Z = 32'hFFFF_FFFF + 1;\n"
+      "  localparam int ZH = Z[63:32];\n"
+      "  localparam int ZL = Z[31:0];\n"
+      "  localparam int BX = $bits(3 ** 50);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(ParamValue(design, "XH"), 0x9805);
+  EXPECT_EQ(ParamValue(design, "XM"), 0x53F0DB2F);
+  EXPECT_EQ(ParamValue(design, "XL"), 0xD09DE3C9);
+  EXPECT_EQ(ParamValue(design, "ZH"), 1);
+  EXPECT_EQ(ParamValue(design, "ZL"), 0);
+  EXPECT_EQ(ParamValue(design, "BX"), 32);
+}
+
 // §11.4.3 (printed page 275): a division or a remainder by zero is x, which
 // no parameter value folds to, so each is left unresolved as the 64-bit fold
 // leaves them.
@@ -537,6 +574,37 @@ TEST(ParamOverride, DefparamValueReadsAboveBitSixtyFour) {
   EXPECT_EQ(ParamValueIn(design, "c", "H"), 0x01234567);
   EXPECT_EQ(ParamValueIn(design, "c", "L"), 0x00112233);
   EXPECT_EQ(ParamValueIn(design, "d", "H"), 2);
+}
+
+// §11.6.1 (printed page 299) with §23.10.2 (printed 766): an instance's
+// parameter value assignment assigns the parameter, so its expression is
+// sized by the parameter's declared width as a declaration's own value is,
+// in a parameter port list and among the items of a module without one
+// (§23.10, printed 763) alike: `8'hAB << 8` assigned to a 16-bit parameter
+// is 0xAB00, and `3 ** 50` assigned to a 96-bit one carries 0x9805 above
+// bit 64. Folded self-determined at the instantiation, the first gave 0 and
+// the second nothing above bit 32.
+TEST(ParamOverride, OverrideExpressionIsSizedByTheParametersDeclaredWidth) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module c #(parameter [15:0] P = 0, parameter logic [95:0] W = 0);\n"
+      "  localparam int PV = P;\n"
+      "  localparam int WH = W[95:64];\n"
+      "endmodule\n"
+      "module d;\n"
+      "  parameter [15:0] P = 0;\n"
+      "  localparam int PV = P;\n"
+      "endmodule\n"
+      "module t;\n"
+      "  c #(.P(8'hAB << 8), .W(3 ** 50)) u();\n"
+      "  d #(.P(8'hAB << 8)) v();\n"
+      "endmodule\n",
+      f, "t");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(ParamValueIn(design, "c", "PV"), 0xAB00);
+  EXPECT_EQ(ParamValueIn(design, "c", "WH"), 0x9805);
+  EXPECT_EQ(ParamValueIn(design, "d", "PV"), 0xAB00);
 }
 
 // §6.20.2 (printed page 126): a parameter with a range specification has the

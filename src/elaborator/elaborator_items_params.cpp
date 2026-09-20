@@ -265,6 +265,15 @@ void PopulateValueParamInfo(
 // value, and an integer-typed parameter initialized from a real constant rounds
 // to the nearest integer (ties away from zero). A parameter declared `string`
 // also keeps its characters, which `arena` owns (§6.16).
+//
+// §11.6.1 (printed page 299) with §11.8.2 (printed 302): the initializer is
+// the right-hand side of an assignment to the parameter, so its
+// context-determined operands are sized by the declared width as well as by
+// each other, and the value is cut to that width (FoldParamValue). Folded
+// self-determined, `localparam [15:0] Y = 8'hAB << 8` shifted at 8 bits and
+// read 0, and `localparam logic [63:0] Z = 32'hFFFF_FFFF + 1` read 0. A
+// parameter declared with neither type nor range takes the range of its
+// value (§6.20.2, printed 126), which is folded self-determined as before.
 void ResolveParamConstValue(RtlirParamDecl& pd, const ModuleItem* item,
                             bool is_type, const ScopeMap& scope, Arena& arena) {
   // The real fold comes first, because an integer fold of a real-typed
@@ -273,7 +282,7 @@ void ResolveParamConstValue(RtlirParamDecl& pd, const ModuleItem* item,
   if (!is_type &&
       TryFoldRealParamValue(pd, item->init_expr, item->data_type, scope))
     return;
-  auto val = ConstEvalInt(item->init_expr, scope);
+  auto val = FoldParamValue(pd, item->init_expr, scope);
   if (val) {
     pd.resolved_value = *val;
     pd.is_resolved = true;

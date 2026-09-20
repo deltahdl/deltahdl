@@ -327,14 +327,17 @@ TEST(Elaboration, ContextWidthZeroReturnsSelfDetermined) {
 // `8'd1 << 32'd8` the same 256 cut the same way; `16'd1 << 32'd8` keeps its
 // 256 in 16 bits; `8'd255 << 96'd1` is 0x1FE cut to 8 bits, 0xFE. A fold
 // sized by the wider operand read 256, 256 and 510 from the first, second
-// and last.
+// and last. Each parameter is declared with neither type nor range, so its
+// value is self-determined (§6.20.2, printed 126): under `int` the 32-bit
+// target would size the left operand (§11.6.1, printed 299) and the four
+// would read 256, 256, 256 and 510.
 TEST(ExpressionBitLength, ShiftAndPowerFoldAtTheLeftOperandsWidth) {
   ElabFixture f;
   auto* design = ElaborateLocalparams(
-      "  localparam int A = 8'd2 ** 32'd8;\n"
-      "  localparam int B = 8'd1 << 32'd8;\n"
-      "  localparam int C = 16'd1 << 32'd8;\n"
-      "  localparam int E = 8'd255 << 96'd1;\n",
+      "  localparam A = 8'd2 ** 32'd8;\n"
+      "  localparam B = 8'd1 << 32'd8;\n"
+      "  localparam C = 16'd1 << 32'd8;\n"
+      "  localparam E = 8'd255 << 96'd1;\n",
       f);
   EXPECT_EQ(ParamValue(design, "A"), 0);
   EXPECT_EQ(ParamValue(design, "B"), 0);
@@ -367,19 +370,105 @@ TEST(ExpressionBitLength, ShiftCountIsReadAcrossEveryWordOfTheRightOperand) {
 // 254, whose cube cut to 8 bits is 248. `-8'sd8 >> 1` is 8'hF8 shifted down
 // with a zero brought in, 8'h7C = 124, signed and positive; a fold reading
 // the sign-extended value at 32 bits shifted its fill into the field and
-// read 0xFFFFFFFC.
+// read 0xFFFFFFFC. R is declared with neither type nor range so that its
+// value is self-determined (§6.20.2, printed 126): under `int` the 32-bit
+// target sizes the shifted operand and the fill is in the field by right,
+// which ContextDeterminedOperandsAreSizedByTheTarget below reads.
 TEST(ExpressionBitLength, PowerAndShiftTakeTheLeftOperandsSignedness) {
   ElabFixture f;
   auto* design = ElaborateLocalparams(
       "  localparam int F = -8'sd2 ** 32'sd3;\n"
       "  localparam int G = 8'sd2 ** 8'd3;\n"
       "  localparam int H = -8'sd2 ** 8'd3;\n"
-      "  localparam int R = -8'sd8 >> 1;\n",
+      "  localparam R = -8'sd8 >> 1;\n",
       f);
   EXPECT_EQ(ParamValue(design, "F"), -8);
   EXPECT_EQ(ParamValue(design, "G"), 8);
   EXPECT_EQ(ParamValue(design, "H"), -8);
   EXPECT_EQ(ParamValue(design, "R"), 124);
+}
+
+// §11.6.1 (printed page 299) with §11.8.2 (printed 302): the right-hand side
+// of an assignment is context-determined, sized by the largest of its
+// operands and the left-hand side, and that size is propagated down to the
+// context-determined operands before the operator is applied. `8'hAB << 8`
+// assigned to a 16-bit target is 8'hAB extended to 16 bits, the count
+// self-determined (Table 11-21), then shifted: 0xAB00. `8'hFF + 8'h01` in
+// 16 bits keeps its carry, 0x100. `16'h1234 + 0` is 32 bits wide, the
+// unsized 0 being 32, and the sum 0x1234 is cut to the 8-bit target, 0x34
+// (§11.8.3, printed 303, and §6.20.2, printed 126). `-8'sd8 >> 1` in a
+// 32-bit signed target extends 8'hF8 by its sign to 0xFFFFFFF8 -- the
+// expression is signed, its one context-determined operand being signed
+// (§11.8.1, printed 302) -- and the logical shift brings a zero in above
+// it, 0x7FFFFFFC. Folded at the operands' own widths, the four read 0, 0,
+// 0x34 and 124.
+TEST(ExpressionBitLength, ContextDeterminedOperandsAreSizedByTheTarget) {
+  ElabFixture f;
+  auto* design = ElaborateLocalparams(
+      "  localparam [15:0] Y = 8'hAB << 8;\n"
+      "  localparam [15:0] W = 8'hFF + 8'h01;\n"
+      "  localparam [7:0] V = 16'h1234 + 0;\n"
+      "  localparam int R = -8'sd8 >> 1;\n",
+      f);
+  EXPECT_EQ(ParamValue(design, "Y"), 0xAB00);
+  EXPECT_EQ(ParamValue(design, "W"), 0x100);
+  EXPECT_EQ(ParamValue(design, "V"), 0x34);
+  EXPECT_EQ(ParamValue(design, "R"), 0x7FFFFFFC);
+}
+
+// §11.6.2 (printed page 300): the clause's own example. `(a + b) >> 1` over
+// 16-bit operands into a 16-bit target adds at 16 bits and loses the carry,
+// so 16'hFFFF + 16'h0001 is 0 and the shift reads 0; adding the unsized 0
+// makes the sum 32 bits wide, keeps the carry, and the shift reads 0x8000.
+// The condition of a conditional and the count of a shift are
+// self-determined (Table 11-21, printed 300), so the 16-bit target reaches
+// neither: 1'b1 stays one bit, and the count 1 sizes nothing.
+TEST(ExpressionBitLength, AddingAnUnsizedZeroWidensTheSumAsTheClauseSays) {
+  ElabFixture f;
+  auto* design = ElaborateLocalparams(
+      "  localparam [15:0] LOST = (16'hFFFF + 16'h0001) >> 1;\n"
+      "  localparam [15:0] KEPT = (16'hFFFF + 16'h0001 + 0) >> 1;\n"
+      "  localparam [15:0] SEL = 1'b1 ? (16'hFFFF + 16'h0001 + 0) >> 1 : 0;\n",
+      f);
+  EXPECT_EQ(ParamValue(design, "LOST"), 0);
+  EXPECT_EQ(ParamValue(design, "KEPT"), 0x8000);
+  EXPECT_EQ(ParamValue(design, "SEL"), 0x8000);
+}
+
+// §11.8.2 (printed page 303): the operands of a relational operator affect
+// each other as context-determined operands do and are sized to the larger
+// of the two, and to nothing outside -- Table 11-21 (printed 299) sizes them
+// to max(L(i), L(j)) and the operator's answer to one bit. So `8'hFF + 8'h01
+// > 8'h00` written in a 16-bit target adds at 8 bits, where the sum is 0,
+// and 0 > 0 is false: U takes the second arm, 2. Sized by the target, the
+// sum would be 0x100, the comparison true and U 1.
+TEST(ExpressionBitLength, ComparisonOperandsAreSizedToEachOtherAlone) {
+  ElabFixture f;
+  auto* design = ElaborateLocalparams(
+      "  localparam [15:0] U = (8'hFF + 8'h01 > 8'h00) ? 16'd1 : 16'd2;\n"
+      "  localparam [15:0] T = (8'hFF + 8'h01 + 0 > 8'h00) ? 16'd1 : 16'd2;\n",
+      f);
+  EXPECT_EQ(ParamValue(design, "U"), 2);
+  EXPECT_EQ(ParamValue(design, "T"), 1);
+}
+
+// §11.8.2 (printed page 303): an operand extended to the propagated size is
+// sign-extended if and only if the propagated type is signed, which §11.8.1
+// (printed 302) makes it where every context-determined operand is. Both
+// operands of `8'sh80 + 8'sd0` are signed, so 8'sh80 is extended by its sign
+// to the 16-bit target, 16'hFF80, and the sum read signed is -128. With an
+// unsigned operand beside it, `8'sh80 + 8'd0`, the expression is unsigned
+// and 8'sh80 is zero-extended, 16'h0080 = 128, whatever the target's own
+// signedness (§11.8.1: the type does not depend on the left-hand side). A
+// fold extending each operand by its own sign read -128 from both.
+TEST(ExpressionBitLength, SignedOperandsExtendBySignOnlyWhenAllAreSigned) {
+  ElabFixture f;
+  auto* design = ElaborateLocalparams(
+      "  localparam logic signed [15:0] S = 8'sh80 + 8'sd0;\n"
+      "  localparam logic signed [15:0] M = 8'sh80 + 8'd0;\n",
+      f);
+  EXPECT_EQ(ParamValue(design, "S"), -128);
+  EXPECT_EQ(ParamValue(design, "M"), 128);
 }
 
 }  // namespace

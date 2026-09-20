@@ -380,7 +380,13 @@ static std::optional<ConstVal> RefoldParamValue(const RtlirParamDecl& pd) {
   struct DepthGuard {
     ~DepthGuard() { --g_param_refold_depth; }
   } depth_guard;
-  return ConstEvalFull(value_expr, RegisteredModuleScope());
+  // §11.6.1 (printed page 299): the value is the right-hand side of an
+  // assignment to the parameter, whose declared width sizes its operands, so
+  // the refold reads the words the elaborator's own fold produced. Folded
+  // self-determined, `parameter logic [95:0] X = 3 ** 50` in a port list
+  // refolded at 32 bits and read 0 above bit 64.
+  return ConstEvalFull(value_expr, RegisteredModuleScope(),
+                       DeclaredFoldContext(pd));
 }
 
 // The words above bit 63 a parameter wider than 64 bits reads: the ones the
@@ -452,6 +458,26 @@ std::optional<ConstVal> RegisteredParamValue(std::string_view name,
   return v;
 }
 
+FoldContext DeclaredFoldContext(const RtlirParamDecl& pd) {
+  if (!HasDeclaredWidth(pd)) return {};
+  return {pd.decl_width, false};
+}
+
+// The cut keeps the expression's own signedness, as a ConstVal of the width
+// reads its bits, rather than the declaration's: what stands in
+// RtlirParamDecl::resolved_value is read again at the declared width and
+// signedness wherever the name is (RegisteredParamValue, the lowerer), and
+// `localparam int H = P[95:64]` over a select of all ones has always held
+// the 0xFFFFFFFF the unsigned select folds to.
+std::optional<int64_t> FoldParamValue(const RtlirParamDecl& pd,
+                                      const Expr* expr, const ScopeMap& scope) {
+  const FoldContext kCtx = DeclaredFoldContext(pd);
+  auto value = ConstEvalFull(expr, scope, kCtx);
+  if (!value) return std::nullopt;
+  if (kCtx.width == 0) return value->value;
+  return CastConstVal(*value, kCtx.width, value->is_signed).value;
+}
+
 // §6.20.2 (printed pages 126-127) with §23.10.2 (printed 766) and §23.10.1
 // (printed 764-765): an override value is converted to the type and range of
 // a parameter declared with either, which CastConstVal does to the fold at
@@ -475,7 +501,7 @@ void RecordResolvedHighWords(RtlirParamDecl& pd, const Expr* expr,
     return;
   bool declared = HasDeclaredWidth(pd);
   if (declared && pd.decl_width <= 64) return;
-  auto folded = ConstEvalFull(expr, scope);
+  auto folded = ConstEvalFull(expr, scope, DeclaredFoldContext(pd));
   if (!folded) return;
   uint32_t width = declared ? pd.decl_width : folded->width;
   bool is_signed = declared ? pd.decl_is_signed : folded->is_signed;
