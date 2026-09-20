@@ -12,6 +12,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -556,7 +557,8 @@ void RecordInvocationCommandLine(int argc, char* argv[]) {
 // the text after it is what is reported. False where any file is at fault.
 bool BootstrapFilesAreWellFormed(const delta::CliOptions& opts,
                                  delta::SourceManager& src_mgr,
-                                 delta::DiagEngine& diag) {
+                                 delta::DiagEngine& diag,
+                                 std::vector<std::string>& libraries) {
   bool ok = true;
   for (const auto& liblist : opts.sv_liblists) {
     std::ifstream ifs(liblist.path);
@@ -572,7 +574,16 @@ bool BootstrapFilesAreWellFormed(const delta::CliOptions& opts,
     std::string content = ss.str();
     delta::ForeignCodeBootstrap file =
         delta::ParseForeignCodeBootstrap(content);
-    if (file.Ok()) continue;
+    if (file.Ok()) {
+      // §J.4: the bootstrap file's entries are processed ahead of the -sv_lib
+      // switches, each resolved against the root in force when the switch
+      // naming the file was (§J.4.2 c).
+      for (auto& entry :
+           delta::ForeignCodeResolveBootstrapEntries(file, liblist.root)) {
+        libraries.push_back(std::move(entry));
+      }
+      continue;
+    }
     uint32_t line = 1;
     std::string message = file.error;
     std::size_t colon = message.find(": ");
@@ -585,6 +596,36 @@ bool BootstrapFilesAreWellFormed(const delta::CliOptions& opts,
                delta::Subclause("J.4.1"));
     ok = false;
   }
+  return ok;
+}
+
+// §J.4: each location an entry or an -sv_lib switch specifies names an
+// object code file, given without its extension, which the application
+// appends for the platform, and the compiled object code is provided as a
+// shared library of that name. A location naming no such file is a failure
+// of the run, reported against the location, rather than a condition the
+// run proceeds past with the imports the library was to bind unbound. The
+// report names the location as it was written, the extension being the
+// platform's. False where any file is missing.
+bool ForeignLibrariesArePresent(const std::vector<std::string>& bootstrap,
+                                const std::vector<std::string>& switches,
+                                delta::DiagEngine& diag) {
+  bool ok = true;
+  auto check = [&](const std::string& location, std::string_view named_by) {
+    if (std::filesystem::exists(
+            delta::ForeignCodeSharedLibraryFileName(location))) {
+      return;
+    }
+    diag.Error(delta::SourceLoc::None(),
+               "object code file '" + location + "', named by " +
+                   std::string(named_by) +
+                   ", is not there with the platform's shared library "
+                   "extension appended",
+               delta::Subclause("J.4"));
+    ok = false;
+  };
+  for (const auto& location : bootstrap) check(location, "a bootstrap entry");
+  for (const auto& location : switches) check(location, "-sv_lib");
   return ok;
 }
 
@@ -619,7 +660,11 @@ int main(int argc, char* argv[]) {
     diag.SetWarningsAsErrors(true);
   }
 
-  if (!BootstrapFilesAreWellFormed(opts, src_mgr, diag)) return 1;
+  std::vector<std::string> bootstrap_libraries;
+  if (!BootstrapFilesAreWellFormed(opts, src_mgr, diag, bootstrap_libraries) ||
+      !ForeignLibrariesArePresent(bootstrap_libraries, opts.sv_libs, diag)) {
+    return 1;
+  }
 
   int mode_status = 0;
   if (RanStandaloneMode(opts, src_mgr, diag, mode_status)) return mode_status;

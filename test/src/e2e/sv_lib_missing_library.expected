@@ -1,0 +1,1 @@
+<unknown location>: error: object code file 'test/src/e2e/no_such_library', named by -sv_lib, is not there with the platform's shared library extension appended (§J.4)
