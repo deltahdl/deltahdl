@@ -149,67 +149,108 @@ Variable* ResolveLhsVariable(const Expr* lhs, SimContext& ctx) {
   return nullptr;
 }
 
-// Checks the tag the tagged union keyed by `key` holds against the member
-// `member_path` is being written into: true, with the error emitted, where
-// the union holds a tag and it is another member. `union_name` is the union
-// as the target spelled it, the variable or the member path down to it, and
-// `loc` is where the target was written: the names arrive as text rebuilt
-// from the target expression, which carries the position they lost.
-static bool MismatchesUnionTag(std::string_view key,
-                               std::string_view union_name,
-                               std::string_view member_path, SimContext& ctx,
-                               SourceLoc loc) {
-  auto tag = ctx.GetVariableTag(key);
-  if (tag.empty()) return false;
-  if (tag == member_path.substr(0, member_path.find('.'))) return false;
-  ctx.GetDiag().Error(
-      loc,
-      "run-time error: assigning member '" + std::string(member_path) +
-          "' of tagged union '" + std::string(union_name) +
-          "' which currently has tag '" + std::string(tag) + "'",
-      Subclause("11.9"));
+// §7.3.2 (printed page 151) has a tagged union carry its tag wherever it
+// stands, a variable or a member of one, and a member's tag stands under the
+// variable's key followed by the member path (EvalRhsForTaggedMember), "s.u"
+// for `s.u = tagged Valid 9`. The walk a dotted member path takes down from a
+// variable's layout, one segment at a time: the tag key and the spelling of
+// the object the walk stands at, kept beside that object's layout and the
+// segments still to descend.
+struct MemberPathCursor {
+  std::string key;
+  std::string name;
+  std::string_view path;
+  const StructTypeInfo* layout = nullptr;
+};
+
+// The walk at `base_name` itself, its tag asked for by the key the variable's
+// storage was created under (§23.9, TagKeyOfName), as its layout is; by the
+// bare name, a union initialized in its declaration inside a child instance
+// was checked against no tag.
+static MemberPathCursor BeginMemberPath(std::string_view base_name,
+                                        const StructTypeInfo* info,
+                                        std::string_view field_name,
+                                        SimContext& ctx) {
+  return {TagKeyOfName(base_name, ctx), std::string(base_name), field_name,
+          info};
+}
+
+// Enters the member the path's next segment names. False, the cursor left as
+// it was, where the path is spent or the layout declares no such member.
+static bool DescendMemberPath(MemberPathCursor& c) {
+  if (c.path.empty() || c.layout == nullptr) return false;
+  size_t dot = c.path.find('.');
+  std::string_view seg = c.path.substr(0, dot);
+  const StructFieldInfo* field = FindStructField(c.layout, seg);
+  if (field == nullptr) return false;
+  c.key += '.';
+  c.key += seg;
+  c.name += '.';
+  c.name += seg;
+  c.path = dot == std::string_view::npos ? std::string_view{}
+                                         : c.path.substr(dot + 1);
+  c.layout = field->nested;
   return true;
+}
+
+UnionTagMismatch FindUnionTagMismatch(std::string_view base_name,
+                                      const StructTypeInfo* info,
+                                      std::string_view field_name,
+                                      SimContext& ctx) {
+  MemberPathCursor c = BeginMemberPath(base_name, info, field_name, ctx);
+  UnionTagMismatch found;
+  while (c.layout != nullptr && !c.path.empty()) {
+    if (c.layout->is_union) {
+      std::string_view tag = ctx.GetVariableTag(c.key);
+      if (!tag.empty() && tag != c.path.substr(0, c.path.find('.'))) {
+        found.union_name = c.name;
+        found.member = std::string(c.path);
+        found.tag = std::string(tag);
+        found.found = true;
+        return found;
+      }
+    }
+    if (!DescendMemberPath(c)) break;
+  }
+  return found;
+}
+
+MemberLayout ResolveMemberLayout(std::string_view base_name,
+                                 const StructTypeInfo* info,
+                                 std::string_view field_name, SimContext& ctx) {
+  MemberPathCursor c = BeginMemberPath(base_name, info, field_name, ctx);
+  while (!c.path.empty()) {
+    if (!DescendMemberPath(c)) return {};
+  }
+  MemberLayout member;
+  member.layout = c.layout;
+  if (c.layout != nullptr && c.layout->is_union) {
+    member.tag = std::string(ctx.GetVariableTag(c.key));
+  }
+  return member;
 }
 
 // §11.9 (printed page 304): a value assigned to a member of a tagged union
 // shall be consistent with the union's current tag, a run-time error
 // otherwise, and §7.3.2 (printed 151) makes that so for a tagged union
 // wherever it stands -- a variable, `u.Other = 3`, or a member of one,
-// `s.u.Other = 3`, whose tag `s.u = tagged Valid 9` set under the variable's
-// key followed by the member path (EvalRhsCarryingReturnedTag). The check
-// walks `field_name` down from the layout of `base_name`, asking each tagged
-// union on the way about the member the path enters next. Returns true, with
-// the error emitted, when a write targets a member inconsistent with a tag on
-// the way; the caller treats that as a handled no-op write. The tag is asked
-// for by the key the variable's storage was created under (§23.9,
-// TagKeyOfName), as its layout is; by the bare name, a union initialized in
-// its declaration inside a child instance was checked against no tag. A
-// member the layout does not declare ends the walk unreported: the window
-// resolution after it answers for that.
+// `s.u.Other = 3`. Returns true, with the error emitted, when a write targets
+// a member inconsistent with a tag on the way (FindUnionTagMismatch); the
+// caller treats that as a handled no-op write. `loc` is where the target was
+// written: the names arrive as text rebuilt from the target expression,
+// which carries the position they lost.
 static bool TaggedUnionTagMismatch(std::string_view base_name,
                                    const StructTypeInfo* info,
                                    std::string_view field_name, SimContext& ctx,
                                    SourceLoc loc) {
-  std::string key = TagKeyOfName(base_name, ctx);
-  std::string union_name(base_name);
-  std::string_view path = field_name;
-  for (const StructTypeInfo* layout = info; layout != nullptr;) {
-    if (layout->is_union &&
-        MismatchesUnionTag(key, union_name, path, ctx, loc)) {
-      return true;
-    }
-    size_t dot = path.find('.');
-    if (dot == std::string_view::npos) return false;
-    const StructFieldInfo* field = FindStructField(layout, path.substr(0, dot));
-    if (field == nullptr) return false;
-    key += '.';
-    key += path.substr(0, dot);
-    union_name += '.';
-    union_name += path.substr(0, dot);
-    path = path.substr(dot + 1);
-    layout = field->nested;
-  }
-  return false;
+  UnionTagMismatch m = FindUnionTagMismatch(base_name, info, field_name, ctx);
+  if (!m.found) return false;
+  ctx.GetDiag().Error(loc,
+                      "run-time error: assigning member '" + m.member +
+                          "' of tagged union '" + m.union_name +
+                          "' which currently has tag '" + m.tag + "'",
+                      Subclause("11.9"));
+  return true;
 }
 
 // Writes `field` onto class object `obj`, honoring declared-type scoping

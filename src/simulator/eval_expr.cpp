@@ -369,28 +369,24 @@ static bool TryThisSuperMember(std::string_view base_name,
   return false;
 }
 
-// §11.4.13 union access: if `sinfo` describes a tagged union with an active
-// tag that does not match the (top-level) field being read, reports the
-// runtime error and fills `out` with all-X. Returns true when the mismatch
-// fired and `out` was set.
+// §11.9 (printed page 304): a member read inconsistent with the tagged
+// union's current tag is a run-time error, and §7.3.2 (printed 151) makes
+// that so for a tagged union wherever it stands -- the variable `u.Other`
+// reads or the member `s.u.Other` reads, whose tag `s.u = tagged Valid 9`
+// set under the member's own key. The walk FindUnionTagMismatch shares with
+// the write side asks each tagged union on the path; this checked the base
+// variable's own layout alone, a structure, and so read `s.u.Other` against
+// no tag. Reports the error and fills `out` with all-X; true when it fired.
 static bool TryUnionTagMismatch(const MemberAccess& ma,
                                 const StructTypeInfo* sinfo, Logic4Vec& out) {
-  if (!sinfo->is_union) return false;
-  // §23.9: the tag is asked for by the key the union's storage was created
-  // under, as its layout is; by the bare name, a union initialized in its
-  // declaration inside a child instance was read against no tag.
-  auto tag = ma.ctx.GetVariableTag(TagKeyOfName(ma.base_name, ma.ctx));
-  if (tag.empty()) return false;
-  auto top = ma.field_name;
-  auto subdot = top.find('.');
-  if (subdot != std::string_view::npos) top = top.substr(0, subdot);
-  if (tag == top) return false;
-  ma.ctx.GetDiag().Error(
-      ma.loc,
-      "run-time error: accessing member '" + std::string(ma.field_name) +
-          "' of tagged union '" + std::string(ma.base_name) +
-          "' which currently has tag '" + std::string(tag) + "'",
-      Subclause("11.9"));
+  UnionTagMismatch m =
+      FindUnionTagMismatch(ma.base_name, sinfo, ma.field_name, ma.ctx);
+  if (!m.found) return false;
+  ma.ctx.GetDiag().Error(ma.loc,
+                         "run-time error: accessing member '" + m.member +
+                             "' of tagged union '" + m.union_name +
+                             "' which currently has tag '" + m.tag + "'",
+                         Subclause("11.9"));
   out = MakeAllX(ma.arena, sinfo->total_width);
   return true;
 }

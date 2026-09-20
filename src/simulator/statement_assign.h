@@ -13,6 +13,7 @@ namespace delta {
 
 struct Expr;
 struct Stmt;
+struct StructTypeInfo;
 struct Variable;
 struct ClassObject;
 struct ClassTypeInfo;
@@ -97,6 +98,47 @@ void ScheduleNonblockingAssign(const Stmt* stmt, const NbaSample& sample,
 
 void BuildLhsName(const Expr* expr, std::string& out);
 
+// §7.3.2 (printed page 151) has a tagged union carry its tag wherever it
+// stands, a variable or a member of one, and §11.9 (printed 304) makes an
+// access of a member inconsistent with the current tag a run-time error, a
+// read and a write alike. A member's tag stands under the variable's tag key
+// (TagKeyOfName) followed by the member path, "s.u" for `s.u = tagged Valid
+// 9`, so both sides walk `field_name` down from `info`, the layout of
+// `base_name`, asking each tagged union on the way about the member the path
+// enters next. `found` says the walk met a union holding a tag that is
+// another member: `union_name` is that union as the access spelled it, "u"
+// or "s.u", `member` the rest of the path, and `tag` the tag it holds. A
+// member the layout does not declare ends the walk unfound: the window
+// resolution after it answers for that. Defined in statement_assign.cpp and
+// asked by the write side there and the read side in eval_expr.cpp, which
+// checked the base variable's own layout alone and so let `y = s.u.Other`
+// through after `s.u = tagged Valid 9`.
+struct UnionTagMismatch {
+  std::string union_name;
+  std::string member;
+  std::string tag;
+  bool found = false;
+};
+UnionTagMismatch FindUnionTagMismatch(std::string_view base_name,
+                                      const StructTypeInfo* info,
+                                      std::string_view field_name,
+                                      SimContext& ctx);
+
+// The layout of the member `field_name` names within `base_name`'s layout
+// `info`, walked as FindUnionTagMismatch walks, and, where that member is a
+// tagged union, the tag it currently holds -- empty for one holding none, and
+// for every other member. `layout` is null where the path names no member or
+// a singular one. §21.2.1.6 (printed page 662) prints a tagged union under %p
+// as its tag beside the valid member's value, and a member that is one,
+// `s.u`, is printed by this rather than by the variable's own tag, which is
+// what printed the member as a number.
+struct MemberLayout {
+  const StructTypeInfo* layout = nullptr;
+  std::string tag;
+};
+MemberLayout ResolveMemberLayout(std::string_view base_name,
+                                 const StructTypeInfo* info,
+                                 std::string_view field_name, SimContext& ctx);
 Variable* TryResolveArrayElement(const Expr* lhs, SimContext& ctx);
 bool BuildCompoundLhsName(const Expr* expr, SimContext& ctx, Arena& arena,
                           std::string& name);

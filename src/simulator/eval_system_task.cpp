@@ -194,29 +194,33 @@ static std::string FormatAggElemForP(const Logic4Vec& val, DataTypeKind kind,
   return FormatSingularForP(val, kind);
 }
 
-// §21.2.1.6 (C4): a tagged union prints its currently valid member as
-// "tag:value". The active member's width and type come from the union type.
-// Returns the formatted text, or no value when the variable is not a tagged
-// union (the caller falls through to the next aggregate form).
+// §21.2.1.6 (C4, printed page 662): a tagged union prints its currently valid
+// member as "tag:value". The active member's width and type come from the
+// union's layout `st`, or the value's own width where none is registered.
+static std::string FormatTaggedUnionForP(std::string_view tag,
+                                         const StructTypeInfo* st,
+                                         const Logic4Vec& val, Arena& arena) {
+  DataTypeKind kind = DataTypeKind::kImplicit;
+  uint32_t width = val.width;
+  const StructFieldInfo* f = st ? FindStructField(st, tag) : nullptr;
+  if (f != nullptr) {
+    kind = f->type_kind;
+    width = f->width;
+  }
+  Logic4Vec slice = SliceField(val, 0, width, kind, arena);
+  return "'{" + std::string(tag) + ":" + FormatSingularForP(slice, kind) + "}";
+}
+
+// §21.2.1.6 (C4): the tagged form of the variable `name`. Returns no value
+// when the variable is not a tagged union holding a tag (the caller falls
+// through to the next aggregate form).
 static std::optional<std::string> BuildFormatPTaggedUnion(std::string_view name,
                                                           const Logic4Vec& val,
                                                           SimContext& ctx,
                                                           Arena& arena) {
   auto tag = ctx.GetVariableTag(TagKeyOfName(name, ctx));
   if (tag.empty()) return std::nullopt;
-  DataTypeKind kind = DataTypeKind::kImplicit;
-  uint32_t width = val.width;
-  if (const StructTypeInfo* st = StructLayoutOfName(name, ctx)) {
-    for (const auto& f : st->fields) {
-      if (f.name == tag) {
-        kind = f.type_kind;
-        width = f.width;
-        break;
-      }
-    }
-  }
-  Logic4Vec slice = SliceField(val, 0, width, kind, arena);
-  return "'{" + std::string(tag) + ":" + FormatSingularForP(slice, kind) + "}";
+  return FormatTaggedUnionForP(tag, StructLayoutOfName(name, ctx), val, arena);
 }
 
 // §21.2.1.6 (C2/C3/C7a): a struct prints every member as "name:value"; a
@@ -384,6 +388,35 @@ static std::optional<std::string> BuildFormatPNamed(std::string_view name,
   return BuildFormatPEnum(name, val, ctx);
 }
 
+// §21.2.1.6 (printed page 662) prints an aggregate wherever the argument names
+// one, and §7.3.2 (printed 151) has a tagged union carry its tag as a member
+// of a structure as it does as a variable: `s.u` after `s.u = tagged Valid 9`
+// prints '{Valid:9}, and a structure member prints its named members. The
+// member's layout and, for a tagged union, its current tag are walked to by
+// ResolveMemberLayout, under the member's own key; asked by the variable's
+// name alone, a member argument had no name and printed as one number.
+// Returns no value for an argument that is no member of a variable's layout.
+static std::optional<std::string> BuildFormatPMember(const Expr* arg,
+                                                     const Logic4Vec& val,
+                                                     SimContext& ctx,
+                                                     Arena& arena) {
+  if (arg->kind != ExprKind::kMemberAccess || arg->is_scope_resolution)
+    return std::nullopt;
+  std::string name;
+  BuildLhsName(arg, name);
+  size_t dot = MemberPathSplit(name, ctx);
+  if (dot == std::string::npos) return std::nullopt;
+  std::string_view base = std::string_view(name).substr(0, dot);
+  const StructTypeInfo* info = StructLayoutOfName(base, ctx);
+  if (info == nullptr) return std::nullopt;
+  MemberLayout member = ResolveMemberLayout(
+      base, info, std::string_view(name).substr(dot + 1), ctx);
+  if (member.layout == nullptr) return std::nullopt;
+  if (!member.tag.empty())
+    return FormatTaggedUnionForP(member.tag, member.layout, val, arena);
+  return FormatStructValueForP(*member.layout, val, arena);
+}
+
 static std::string BuildFormatP(const Expr* arg, const Logic4Vec& val,
                                 SimContext& ctx) {
   Arena& arena = ctx.GetArena();
@@ -392,6 +425,7 @@ static std::string BuildFormatP(const Expr* arg, const Logic4Vec& val,
                               : std::string_view{};
 
   if (auto named = BuildFormatPNamed(name, val, ctx, arena)) return *named;
+  if (auto member = BuildFormatPMember(arg, val, ctx, arena)) return *member;
 
   // §21.2.1.6 (C10): %p on a singular expression formats it as one element of
   // an aggregate would be formatted.
