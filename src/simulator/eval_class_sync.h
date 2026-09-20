@@ -15,6 +15,8 @@ struct DataType;
 struct Expr;
 struct MailboxObject;
 struct SemaphoreObject;
+struct Stmt;
+struct Variable;
 class Arena;
 class SimContext;
 
@@ -98,12 +100,63 @@ void BuildSyncProperty(const SyncProperty& prop, const Expr* new_expr,
 
 // §8.7: the property `name` of the level `info` of the object `obj` under
 // construction, where `info` declares it a semaphore or a mailbox: its
-// initializer `init`, a `new(...)`, builds the object's own; no initializer
-// leaves the property the null handle a class-typed property without a
-// `new` is. False, building nothing, for a property of any other type,
-// which the caller then initializes as a value.
+// initializer `init`, a `new(...)`, builds the object's own, and any other
+// initializer that names a semaphore or mailbox -- a module's `mailbox mb =
+// shared;` -- makes the property a handle to that object (§8.12, one object
+// under two names); an initializer naming none, or no initializer, leaves
+// the property the null handle a class-typed property without a `new` is.
+// False, building nothing, for a property of any other type, which the
+// caller then initializes as a value.
 bool TryInitClassSyncProperty(ClassObject* obj, const ClassTypeInfo* info,
                               std::string_view name, const Expr* init,
                               SimContext& ctx);
+
+// §15.4 (printed page 374 of ~/LRM.pdf) makes a mailbox variable a handle to
+// the mailbox object, §15.3 a semaphore's alike, and §8.12 (printed 188) has
+// a handle assigned to another variable leave one object under two names.
+// A blocking assignment whose target ResolveSyncProperty answers takes the
+// object its source is a handle to -- a module's, an instance's or a
+// package's by name (SimContext::FindMailbox and FindSemaphore), another
+// object's property, a formal bound to one (BindSyncFormal), or `null` --
+// into the object's map, the same object and not a copy. Answers whether the
+// assignment was one; an assignment to a property from a source that is no
+// handle is left to the caller. Left to the generic store, `mb = m` in a
+// constructor wrote the handle's carrier and the property stayed null.
+bool TrySyncHandleAssign(const Stmt* stmt, SimContext& ctx, Arena& arena);
+
+// The object an expression is a handle to: `kind` says which class, kNone
+// where the expression is a handle to neither; the object may be null for a
+// handle that holds none.
+struct SyncHandle {
+  SyncKind kind = SyncKind::kNone;
+  SemaphoreObject* sem = nullptr;
+  MailboxObject* mbx = nullptr;
+};
+
+// §13.5.1 (printed page 348) with §8.2 (printed 180): an object passed by
+// value is passed as its handle, so a formal declared `semaphore s` or
+// `mailbox m` -- `kind` says which, as SyncKindOfType answers for its
+// declared type -- is a handle to the object the actual `actual` names: a
+// module's, an instance's or a package's by name, another formal's, or an
+// object's property. The actual is the caller's expression and is read in
+// the caller's scope, which the binding sets the callee's aside for. The
+// answer keeps `kind` and holds the object, or null where the actual is a
+// handle to none or to the other class.
+SyncHandle ResolveSyncActual(SyncKind kind, const Expr* actual, SimContext& ctx,
+                             Arena& arena);
+
+// The formal's variable `var`, which the binding just created, made a handle
+// to the object `actual` holds (SimContext::BindMailboxHandle and
+// BindSemaphoreHandle) for the body's `m.put(v)` (MailboxOfFormal) and for a
+// property assignment `mb = m` (TrySyncHandleAssign) to find. Does nothing
+// for a formal of any other type, whose `actual` is of kind kNone.
+void BindSyncFormal(const SyncHandle& actual, Variable* var, SimContext& ctx);
+
+// §13.5.1 with §15.3 and §15.4: the semaphore or the mailbox the receiver
+// `recv`, a bare name, is a formal bound to (BindSyncFormal), or null where
+// `recv` names no such formal; the call paths ask this after the property
+// and before the run's tables, a formal's name shadowing a module's (§8.6).
+SemaphoreObject* SemaphoreOfFormal(const Expr* recv, SimContext& ctx);
+MailboxObject* MailboxOfFormal(const Expr* recv, SimContext& ctx);
 
 }  // namespace delta

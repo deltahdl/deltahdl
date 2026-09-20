@@ -393,4 +393,39 @@ TEST(SemaphoreSim, StaticSemaphorePropertyIsSharedByEveryObject) {
             101u);
 }
 
+// §15.3 (printed page 373) with §13.5.1 (printed 348) and §8.2 (printed
+// 180): a semaphore variable is a handle to the bucket, passed by value as
+// the handle, so a constructor's `s = sem` on a `semaphore sem` formal makes
+// the property a handle to the module's bucket and two objects built on it
+// share its one key: c1's try_get(1) procures it, c2's finds none, and the
+// module's `shared.put(1)` returns it for c2, 101. The assignment fell to
+// the generic store, so the property stayed null and take() was reported as
+// a call through a null handle.
+TEST(SemaphoreSim, ConstructorTakesTheModulesSemaphoreAsAHandle) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  semaphore s;\n"
+                      "  function new(semaphore sem);\n"
+                      "    s = sem;\n"
+                      "  endfunction\n"
+                      "  function int take();\n"
+                      "    return s.try_get(1);\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module top;\n"
+                      "  semaphore shared = new(1);\n"
+                      "  int a, b, c, y;\n"
+                      "  initial begin\n"
+                      "    C c1 = new(shared);\n"
+                      "    C c2 = new(shared);\n"
+                      "    a = c1.take();\n"
+                      "    b = c2.take();\n"
+                      "    shared.put(1);\n"
+                      "    c = c2.take();\n"
+                      "    y = a * 100 + b * 10 + c;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            101u);
+}
+
 }  // namespace

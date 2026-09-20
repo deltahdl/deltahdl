@@ -36,6 +36,9 @@ SemaphoreObject* SemaphoreCallTarget(const Expr* expr, SimContext& ctx,
   if (prop.kind != SyncKind::kNone) {
     return SemaphoreOfProperty(prop, method, access->rhs->range.start, ctx);
   }
+  // §13.5.1 (printed 348) with §8.2 (printed 180): a `semaphore s` formal is
+  // a handle to the actual's bucket (BindSyncFormal), asked next.
+  if (SemaphoreObject* sem = SemaphoreOfFormal(access->lhs, ctx)) return sem;
   MethodCallParts parts;
   if (!ExtractHandleMethodCallParts(expr, ctx.GetArena(), parts))
     return nullptr;

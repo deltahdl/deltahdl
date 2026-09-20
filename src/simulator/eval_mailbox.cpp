@@ -40,7 +40,10 @@ namespace delta {
 // declared as a class property is each object's own, so a bare `mb` inside a
 // method of the class, `this.mb` and a handle's `c.mb` name the object's
 // (ResolveSyncProperty) ahead of the run's tables, which hold no object's;
-// resolved by name alone, `mb.put(v)` in a method reached no mailbox.
+// resolved by name alone, `mb.put(v)` in a method reached no mailbox. §13.5.1
+// (printed 348) with §8.2 (printed 180): a formal declared `mailbox m` is a
+// handle to the actual's mailbox (BindSyncFormal), asked next
+// (MailboxOfFormal), the formal's name shadowing a module's.
 MailboxObject* MailboxCallTarget(const Expr* expr, SimContext& ctx,
                                  Arena& arena, std::string_view method) {
   if (!expr || expr->kind != ExprKind::kCall) return nullptr;
@@ -51,6 +54,7 @@ MailboxObject* MailboxCallTarget(const Expr* expr, SimContext& ctx,
   if (prop.kind != SyncKind::kNone) {
     return MailboxOfProperty(prop, method, access->rhs->range.start, ctx);
   }
+  if (MailboxObject* mbx = MailboxOfFormal(access->lhs, ctx)) return mbx;
   MethodCallParts parts;
   if (!ExtractHandleMethodCallParts(expr, arena, parts)) return nullptr;
   return ctx.FindMailbox(parts.var_name);

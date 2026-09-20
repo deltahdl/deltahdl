@@ -529,4 +529,123 @@ TEST(MailboxSim, StaticMethodPutsIntoTheStaticMailboxProperty) {
             31u);
 }
 
+// §15.4 (printed page 374) with §13.5.1 (printed 348) and §8.2 (printed
+// 180): a mailbox variable is a handle to the mailbox object, and an object
+// passed by value is passed as its handle, so a constructor's `mb = m` on a
+// `mailbox m` formal makes the property a handle to the module's mailbox,
+// and two objects built on it share the one queue (§8.12): c1.give(1) and
+// c2.give(2) are counted 2 by the module's own `shared.num()`, and
+// c1.take() retrieves the 1 placed first, 21. The assignment fell to the
+// generic store, which wrote the handle's carrier, so the property stayed
+// null and give() was reported as a call through a null handle.
+TEST(MailboxSim, ConstructorTakesTheModulesMailboxAsAHandle) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  mailbox mb;\n"
+                      "  function new(mailbox m);\n"
+                      "    mb = m;\n"
+                      "  endfunction\n"
+                      "  function void give(int v);\n"
+                      "    mb.put(v);\n"
+                      "  endfunction\n"
+                      "  function int take();\n"
+                      "    int v;\n"
+                      "    mb.get(v);\n"
+                      "    return v;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module top;\n"
+                      "  mailbox shared = new;\n"
+                      "  int n, v, y;\n"
+                      "  initial begin\n"
+                      "    C c1 = new(shared);\n"
+                      "    C c2 = new(shared);\n"
+                      "    c1.give(1);\n"
+                      "    c2.give(2);\n"
+                      "    n = shared.num();\n"
+                      "    v = c1.take();\n"
+                      "    y = n * 10 + v;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            21u);
+}
+
+// §8.12 (printed page 188) with §15.4.1 (printed 374): `c2.mb = c1.mb`
+// assigns a handle, leaving one mailbox under two properties rather than
+// copying it, so the two messages c2 gives are counted 2 by c1's queue as by
+// c2's, 22. Two queues would have read 02, and the generic store, which the
+// assignment fell to, wrote the carrier and left c2's own queue in place.
+TEST(MailboxSim, PropertyHandleAssignedFromAnotherObjectShares) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  mailbox mb = new;\n"
+                      "  function void give(int v);\n"
+                      "    mb.put(v);\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module top;\n"
+                      "  int y;\n"
+                      "  initial begin\n"
+                      "    C c1 = new;\n"
+                      "    C c2 = new;\n"
+                      "    c2.mb = c1.mb;\n"
+                      "    c2.give(5);\n"
+                      "    c2.give(6);\n"
+                      "    y = c1.mb.num() * 10 + c2.mb.num();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            22u);
+}
+
+// §8.7 (printed page 184) with §8.12 (printed 188): a property's declaration
+// initializer may name a mailbox rather than construct one, `mailbox mb =
+// shared;` in a class the module declares, and the property is then a handle
+// to the module's mailbox: the object's two gives reach it, the module's
+// `shared.get(v)` retrieves the 7 and num() counts the 8 left, 71. An
+// initializer that was no `new` left the property null.
+TEST(MailboxSim, PropertyInitializedFromTheModulesMailboxSharesIt) {
+  EXPECT_EQ(RunAndGet("module top;\n"
+                      "  mailbox shared = new;\n"
+                      "  class C;\n"
+                      "    mailbox mb = shared;\n"
+                      "    function void give(int v);\n"
+                      "      mb.put(v);\n"
+                      "    endfunction\n"
+                      "  endclass\n"
+                      "  int v, y;\n"
+                      "  initial begin\n"
+                      "    C c = new;\n"
+                      "    c.give(7);\n"
+                      "    c.give(8);\n"
+                      "    shared.get(v);\n"
+                      "    y = v * 10 + shared.num();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            71u);
+}
+
+// §13.5.1 (printed page 348) with §8.2 (printed 180): a `mailbox m` formal
+// is a handle to the actual's mailbox, so a function's `m.put(v)` places
+// into the module's queue: 9 and 8 placed, the 9 retrieved and the 8 left,
+// 91. The formal was a carrier bound to no object, so its put() reached no
+// mailbox.
+TEST(MailboxSim, PutThroughAMailboxFormalReachesTheActual) {
+  EXPECT_EQ(RunAndGet("module top;\n"
+                      "  mailbox shared = new;\n"
+                      "  int v, y;\n"
+                      "  function void send(mailbox m, int val);\n"
+                      "    m.put(val);\n"
+                      "  endfunction\n"
+                      "  initial begin\n"
+                      "    send(shared, 9);\n"
+                      "    send(shared, 8);\n"
+                      "    shared.get(v);\n"
+                      "    y = v * 10 + shared.num();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            91u);
+}
+
 }  // namespace

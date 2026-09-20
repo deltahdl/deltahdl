@@ -12,6 +12,7 @@
 #include "common/source_loc.h"
 #include "parser/ast_class.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_array_class_assoc.h"
@@ -269,6 +270,55 @@ void BuildSyncProperty(const SyncProperty& prop, const Expr* new_expr,
   }
 }
 
+static SyncHandle HandleOfProperty(const SyncProperty& prop, SimContext& ctx) {
+  if (prop.kind == SyncKind::kSemaphore) {
+    return {prop.kind, HeldSyncObject(SemaphoreMapOf(prop), prop, ctx),
+            nullptr};
+  }
+  return {prop.kind, nullptr, HeldSyncObject(MailboxMapOf(prop), prop, ctx)};
+}
+
+static SyncHandle HandleOfVariable(const Variable* var, const SimContext& ctx) {
+  if (SemaphoreObject* sem = ctx.SemaphoreOfHandle(var))
+    return {SyncKind::kSemaphore, sem, nullptr};
+  if (MailboxObject* mbx = ctx.MailboxOfHandle(var))
+    return {SyncKind::kMailbox, nullptr, mbx};
+  return {};
+}
+
+// §15.3 and §15.4 with §8.12: the semaphore or mailbox `expr` is a handle
+// to -- a property's (HandleOfProperty), a formal's (§13.5.1, a local of the
+// name shadowing the run's tables), or a module's, an instance's or a
+// package's by name or by `p::name` (ScopedOrBareTargetKey).
+static SyncHandle ResolveSyncHandle(const Expr* expr, SimContext& ctx,
+                                    Arena& arena) {
+  SyncProperty prop = ResolveSyncProperty(expr, ctx, arena);
+  if (prop.kind != SyncKind::kNone) return HandleOfProperty(prop, ctx);
+  if (expr->kind == ExprKind::kIdentifier) {
+    if (const Variable* local = ctx.FindLocalVariable(expr->text))
+      return HandleOfVariable(local, ctx);
+  }
+  std::string_view key = ScopedOrBareTargetKey(expr, arena);
+  if (key.empty()) return {};
+  if (SemaphoreObject* sem = ctx.FindSemaphore(key))
+    return {SyncKind::kSemaphore, sem, nullptr};
+  if (MailboxObject* mbx = ctx.FindMailbox(key))
+    return {SyncKind::kMailbox, nullptr, mbx};
+  return {};
+}
+
+// §8.12: the property `target` made a handle to the object `source` names,
+// the same object under two names.
+static void StoreSyncHandle(const SyncProperty& target,
+                            const SyncHandle& source) {
+  std::string name(target.member->name);
+  if (target.kind == SyncKind::kSemaphore) {
+    (*SemaphoreMapOf(target))[name] = source.sem;
+  } else {
+    (*MailboxMapOf(target))[name] = source.mbx;
+  }
+}
+
 bool TryInitClassSyncProperty(ClassObject* obj, const ClassTypeInfo* info,
                               std::string_view name, const Expr* init,
                               SimContext& ctx) {
@@ -276,8 +326,59 @@ bool TryInitClassSyncProperty(ClassObject* obj, const ClassTypeInfo* info,
   if (member.member == nullptr || member.member->is_static) return false;
   if (init == nullptr) return true;
   SyncProperty prop = MakeSyncProperty(member, obj, std::string(name), ctx);
-  if (IsNewCall(init)) BuildSyncProperty(prop, init, ctx, ctx.GetArena());
+  if (IsNewCall(init)) {
+    BuildSyncProperty(prop, init, ctx, ctx.GetArena());
+    return true;
+  }
+  SyncHandle source = ResolveSyncHandle(init, ctx, ctx.GetArena());
+  if (source.kind == prop.kind) StoreSyncHandle(prop, source);
   return true;
+}
+
+bool TrySyncHandleAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
+  if (stmt->rhs == nullptr) return false;
+  SyncProperty target = ResolveSyncProperty(stmt->lhs, ctx, arena);
+  if (target.kind == SyncKind::kNone || !HasStorage(target)) return false;
+  bool is_null =
+      stmt->rhs->kind == ExprKind::kIdentifier && stmt->rhs->text == "null";
+  SyncHandle source =
+      is_null ? SyncHandle{} : ResolveSyncHandle(stmt->rhs, ctx, arena);
+  if (!is_null && source.kind != target.kind) return false;
+  StoreSyncHandle(target, source);
+  return true;
+}
+
+SyncHandle ResolveSyncActual(SyncKind kind, const Expr* actual, SimContext& ctx,
+                             Arena& arena) {
+  SyncHandle handle;
+  handle.kind = kind;
+  if (kind == SyncKind::kNone || actual == nullptr) return handle;
+  SyncHandle source = ResolveSyncHandle(actual, ctx, arena);
+  if (source.kind == kind) return source;
+  return handle;
+}
+
+void BindSyncFormal(const SyncHandle& actual, Variable* var, SimContext& ctx) {
+  if (actual.kind == SyncKind::kSemaphore) {
+    ctx.BindSemaphoreHandle(var, actual.sem);
+  } else if (actual.kind == SyncKind::kMailbox) {
+    ctx.BindMailboxHandle(var, actual.mbx);
+  }
+}
+
+static const Variable* FormalOfReceiver(const Expr* recv, SimContext& ctx) {
+  if (recv == nullptr || recv->kind != ExprKind::kIdentifier) return nullptr;
+  return ctx.FindLocalVariable(recv->text);
+}
+
+SemaphoreObject* SemaphoreOfFormal(const Expr* recv, SimContext& ctx) {
+  const Variable* var = FormalOfReceiver(recv, ctx);
+  return var == nullptr ? nullptr : ctx.SemaphoreOfHandle(var);
+}
+
+MailboxObject* MailboxOfFormal(const Expr* recv, SimContext& ctx) {
+  const Variable* var = FormalOfReceiver(recv, ctx);
+  return var == nullptr ? nullptr : ctx.MailboxOfHandle(var);
 }
 
 }  // namespace delta

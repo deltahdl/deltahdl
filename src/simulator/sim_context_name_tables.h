@@ -34,6 +34,9 @@
 
 namespace delta {
 
+struct MailboxObject;
+struct SemaphoreObject;
+
 class DeclaredNameTables {
  public:
   void RegisterFunction(std::string_view name, ModuleItem* item);
@@ -171,6 +174,19 @@ class DeclaredNameTables {
   std::string_view FindTypeTarget(std::string_view name) const;
   size_t TypeTargetCount() const;
 
+  // §15.3 and §15.4 with §13.5.1: the semaphore or the mailbox the variable
+  // `var` holds a handle to -- a subroutine formal declared `semaphore s` or
+  // `mailbox m`, bound when the actual's object is copied in (BindSyncFormal
+  // in eval_class_sync.cpp). The run keys a module's, an instance's and a
+  // package's object by name, and a formal is a variable of the frame,
+  // created per call in the arena (SimContext::CreateLocalVariable), so its
+  // address is what it is known by and a later call's cell binds anew. Null
+  // for a variable nothing bound.
+  void BindSemaphoreHandle(const Variable* var, SemaphoreObject* sem);
+  SemaphoreObject* SemaphoreOfHandle(const Variable* var) const;
+  void BindMailboxHandle(const Variable* var, MailboxObject* mbx);
+  MailboxObject* MailboxOfHandle(const Variable* var) const;
+
   void RegisterInstanceType(std::string_view prefix, std::string_view type);
   std::string_view FindInstanceType(std::string_view prefix) const;
 
@@ -262,6 +278,10 @@ class DeclaredNameTables {
 
   // §6.18: see RegisterTypeTarget.
   std::unordered_map<std::string_view, std::string_view> type_targets_;
+  // §15.3 and §15.4 with §13.5.1: see BindSemaphoreHandle.
+  std::unordered_map<const Variable*, SemaphoreObject*> semaphore_handles_;
+  std::unordered_map<const Variable*, MailboxObject*> mailbox_handles_;
+
   std::unordered_map<std::string, std::string> instance_types_;
   std::unordered_set<std::string> top_module_names_;
   std::unordered_map<std::string_view, const std::vector<DataType>*>

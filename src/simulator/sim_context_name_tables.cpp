@@ -330,6 +330,27 @@ size_t DeclaredNameTables::TypeTargetCount() const {
   return type_targets_.size();
 }
 
+void DeclaredNameTables::BindSemaphoreHandle(const Variable* var,
+                                             SemaphoreObject* sem) {
+  semaphore_handles_[var] = sem;
+}
+
+SemaphoreObject* DeclaredNameTables::SemaphoreOfHandle(
+    const Variable* var) const {
+  auto it = semaphore_handles_.find(var);
+  return (it != semaphore_handles_.end()) ? it->second : nullptr;
+}
+
+void DeclaredNameTables::BindMailboxHandle(const Variable* var,
+                                           MailboxObject* mbx) {
+  mailbox_handles_[var] = mbx;
+}
+
+MailboxObject* DeclaredNameTables::MailboxOfHandle(const Variable* var) const {
+  auto it = mailbox_handles_.find(var);
+  return (it != mailbox_handles_.end()) ? it->second : nullptr;
+}
+
 void DeclaredNameTables::RegisterInstanceType(std::string_view prefix,
                                               std::string_view type) {
   instance_types_[std::string(prefix)] = std::string(type);

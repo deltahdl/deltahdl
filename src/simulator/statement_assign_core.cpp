@@ -20,6 +20,7 @@
 #include "simulator/eval_call_result.h"
 #include "simulator/eval_class_array.h"
 #include "simulator/eval_class_array_handles.h"
+#include "simulator/eval_class_sync.h"
 #include "simulator/eval_expr_internal.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/eval_mailbox.h"
@@ -820,17 +821,19 @@ static bool TryArrayObjectAssign(const Stmt* stmt, SimContext& ctx,
 }
 
 // Run the chain of special-case blocking-assignment handlers that do not need
-// the generic rhs value (class `new`, associative-array copy/literal,
-// streaming-to-queue, dynamic-array/queue/event/slice/subarray, and compound
-// operators). Returns true when one of them fully handled the assignment. A
-// §25.9 virtual interface takes the generic store: it is a value, the handle
-// of the instance it represents, which an interface instance name, another
-// virtual interface and `null` each evaluate to (EvalIdentifier in
-// evaluation.cpp), so no arm has to bind it.
+// the generic rhs value (class `new`, a semaphore or mailbox handle into a
+// property, associative-array copy/literal, streaming-to-queue,
+// dynamic-array/queue/event/slice/subarray, and compound operators). Returns
+// true when one of them fully handled the assignment. A §25.9 virtual interface
+// takes the generic store: it is a value, the handle of the instance it
+// represents, which an interface instance name, another virtual interface and
+// `null` each evaluate to (EvalIdentifier in evaluation.cpp), so no arm has to
+// bind it.
 bool TryDispatchSpecialBlockingAssign(const Stmt* stmt, SimContext& ctx,
                                       Arena& arena) {
   if (TrySemaphoreNewAssign(stmt, ctx, arena)) return true;
   if (TryMailboxNewAssign(stmt, ctx, arena)) return true;
+  if (TrySyncHandleAssign(stmt, ctx, arena)) return true;
   if (TryClassNewAssign(stmt, ctx, arena)) return true;
   if (TryTypedClassNewAssign(stmt, ctx, arena)) return true;
   if (TryMemberClassNewAssign(stmt, ctx, arena)) return true;

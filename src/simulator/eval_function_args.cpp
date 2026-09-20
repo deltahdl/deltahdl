@@ -18,6 +18,7 @@
 #include "simulator/class_object.h"
 #include "simulator/eval_array.h"
 #include "simulator/eval_call_result.h"
+#include "simulator/eval_class_sync.h"
 #include "simulator/eval_expr_internal.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
@@ -792,6 +793,13 @@ static void RegisterValueArgStructType(const FunctionArg& param,
   ctx.SetVariableTag(param.name, ActualTag(param, actual, ref, ctx));
 }
 
+// The actual `ref` names in the call, or null where the call passes none
+// for the formal.
+static const Expr* ActualExprOf(const ActualArgRef& ref) {
+  if (ref.index < 0) return nullptr;
+  return ref.expr->args[static_cast<size_t>(ref.index)];
+}
+
 // §13.3.2: the arguments of a static task/function are static storage that
 // retains its value between invocations. On a later call the formal already
 // exists in the static-frame store, so reuse that cell instead of a fresh
@@ -817,6 +825,25 @@ static bool TryReuseStaticFormal(const FunctionArg& param,
   RegisterValueArgStructType(param, actual, ctx);
   RegisterValueArgClassType(param, ctx);
   return true;
+}
+
+// §13.5.1 (printed page 348) with §8.2 (printed 180): an object passed by
+// value is passed as its handle, so the actual of a `mailbox m` or
+// `semaphore s` formal is read for the object it is a handle to
+// (ResolveSyncActual), in the caller's scope as ResolveArgValue reads its
+// value -- an actual named after a formal bound just before it would read
+// that formal. Of kind kNone, binding nothing, for a formal of any other
+// type; the value copied in is the carrier alone, which names no object, so
+// the body's `m.put(v)` and a constructor's `mb = m` reached no mailbox.
+static SyncHandle SyncActualOf(const FunctionArg& param,
+                               const ActualArgRef& ref, SimContext& ctx,
+                               Arena& arena) {
+  SyncHandle handle;
+  handle.kind = SyncKindOfType(param.data_type, ctx);
+  const Expr* actual = ActualExprOf(ref);
+  if (handle.kind == SyncKind::kNone || actual == nullptr) return handle;
+  CalleeScopeAside aside(ctx);
+  return ResolveSyncActual(handle.kind, actual, ctx, arena);
 }
 
 static void BindValueArg(const FunctionArg& param, const ActualArgRef& actual,
@@ -860,7 +887,11 @@ static void BindValueArg(const FunctionArg& param, const ActualArgRef& actual,
     val = MakeLogic4VecVal(arena, val.width, 0);
 
   bool is_static_sub = func && func->is_static && !func->is_automatic;
-  if (TryReuseStaticFormal(param, bound, val, func, ctx)) return;
+  SyncHandle sync = SyncActualOf(param, bound, ctx, arena);
+  if (TryReuseStaticFormal(param, bound, val, func, ctx)) {
+    BindSyncFormal(sync, ctx.FindLocalVariable(param.name), ctx);
+    return;
+  }
 
   // §6.11.3: a formal is an object declared with a type, so `integer a` is a
   // signed object however the actual arrived. Taking the signedness from the
@@ -889,6 +920,7 @@ static void BindValueArg(const FunctionArg& param, const ActualArgRef& actual,
   // for non-struct actuals.
   RegisterValueArgStructType(param, bound, ctx);
   RegisterValueArgClassType(param, ctx);
+  BindSyncFormal(sync, var, ctx);
 }
 
 void BindFunctionArgs(const ModuleItem* func, const Expr* expr, SimContext& ctx,
