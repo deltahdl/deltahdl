@@ -1,3 +1,4 @@
+#include <bit>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -175,6 +176,94 @@ bool DeclaredTypeIsString(const DataType& type, const SimContext& ctx) {
          ctx.FindTypeKind(TypeTableKey(type)) == DataTypeKind::kString;
 }
 
+static int BitsPerDigit(char base_letter) {
+  switch (base_letter) {
+    case 'h':
+    case 'H':
+      return 4;
+    case 'o':
+    case 'O':
+      return 3;
+    case 'b':
+    case 'B':
+      return 1;
+    default:
+      return 0;
+  }
+}
+
+static size_t ParseLiteralBase(std::string_view text, std::string& buf,
+                               int& bpd) {
+  buf.clear();
+  buf.reserve(text.size());
+  for (char c : text)
+    if (c != '_' && c != ' ' && c != '\t') buf.push_back(c);
+  auto tick = buf.find('\'');
+  if (tick == std::string::npos) return 0;
+  size_t i = tick + 1;
+  if (i < buf.size() && (buf[i] == 's' || buf[i] == 'S')) ++i;
+  bpd = (i < buf.size()) ? BitsPerDigit(buf[i]) : 0;
+  return i;
+}
+
+// §5.7.1: multiplies the magnitude `words` holds, least significant word
+// first, by 10 and adds `digit`, growing by a word when the product carries
+// out of the top one. Each word is multiplied in 32-bit halves so the carry
+// between them needs no integer wider than 64 bits.
+static void MulTenAdd(std::vector<uint64_t>& words, uint64_t digit) {
+  uint64_t carry = digit;
+  for (uint64_t& w : words) {
+    uint64_t lo = (w & 0xFFFFFFFFu) * 10 + carry;
+    uint64_t hi = (w >> 32) * 10 + (lo >> 32);
+    w = (hi << 32) | (lo & 0xFFFFFFFFu);
+    carry = hi >> 32;
+  }
+  if (carry != 0) words.push_back(carry);
+}
+
+// §5.7.1: the value the decimal `digits` form, as 64-bit words least
+// significant first, however many words the value needs. The digits are the
+// literal's third token with the `_` separators already dropped, so the fold
+// ends at the first character that is no decimal digit.
+static std::vector<uint64_t> DecimalDigitWords(std::string_view digits) {
+  std::vector<uint64_t> words{0};
+  for (char c : digits) {
+    if (c < '0' || c > '9') break;
+    MulTenAdd(words, static_cast<uint64_t>(c - '0'));
+  }
+  return words;
+}
+
+// The number of bits the magnitude `words` holds needs: the position of its
+// highest set bit plus one, or 0 for a zero value.
+static uint32_t WordsBitLength(const std::vector<uint64_t>& words) {
+  size_t n = words.size();
+  while (n > 0 && words[n - 1] == 0) --n;
+  if (n == 0) return 0;
+  return static_cast<uint32_t>((n - 1) * 64) +
+         static_cast<uint32_t>(std::bit_width(words[n - 1]));
+}
+
+// §5.7.1: the width of an unsized decimal literal whose value needs more than
+// 64 bits -- the value's bit length, plus the sign bit a signed number keeps
+// -- or 0 for any other literal. `2^70` written as a simple decimal is 72
+// bits, `'d` before the same digits 71. Expr::int_val holds the value's low
+// 64 bits alone, so the digits are what say whether there is more: a literal
+// whose text has fewer than 20 characters has at most 19 digits and is below
+// 10^19 < 2^64, and is answered without reading them.
+static uint32_t WideDecimalLiteralWidth(std::string_view text) {
+  if (text.size() < 20) return 0;
+  std::string buf;
+  int bpd = 0;
+  size_t i = ParseLiteralBase(text, buf, bpd);
+  if (bpd != 0) return 0;
+  if (i != 0) ++i;
+  uint32_t len =
+      WordsBitLength(DecimalDigitWords(std::string_view(buf).substr(i)));
+  if (len <= 64) return 0;
+  return IsSignedLiteral(text) ? len + 1 : len;
+}
+
 uint32_t LiteralWidth(std::string_view text, uint64_t val) {
   auto tick = text.find('\'');
   if (tick != std::string_view::npos && tick > 0) {
@@ -187,7 +276,10 @@ uint32_t LiteralWidth(std::string_view text, uint64_t val) {
   // An unsized number is at least 32 bits, widened to the minimum width that
   // holds its value. §5.7.1 additionally requires a signed unsized number to
   // keep a sign bit, so a value whose most significant magnitude bit would
-  // land on the sign position needs one extra bit to stay non-negative.
+  // land on the sign position needs one extra bit to stay non-negative. A
+  // decimal value past 64 bits is sized from its digits, `val` being the
+  // value's low 64 bits alone.
+  if (uint32_t wide = WideDecimalLiteralWidth(text); wide > 0) return wide;
   if (val > UINT32_MAX) return 64;
   if (IsSignedLiteral(text) && val > uint64_t{0x7FFFFFFF}) return 33;
   return 32;
@@ -211,22 +303,6 @@ static bool TextHasXZ(std::string_view text) {
   for (size_t i = tick + 1; i < text.size(); ++i)
     if (IsXChar(text[i]) || IsZChar(text[i])) return true;
   return false;
-}
-
-static int BitsPerDigit(char base_letter) {
-  switch (base_letter) {
-    case 'h':
-    case 'H':
-      return 4;
-    case 'o':
-    case 'O':
-      return 3;
-    case 'b':
-    case 'B':
-      return 1;
-    default:
-      return 0;
-  }
 }
 
 static int DigitValue(char c) {
@@ -265,19 +341,6 @@ static void FillXZ(Logic4Vec& vec, uint32_t start, uint32_t end, bool is_x) {
     vec.words[word].bval |= mask;
   }
 }
-static size_t ParseLiteralBase(std::string_view text, std::string& buf,
-                               int& bpd) {
-  buf.clear();
-  buf.reserve(text.size());
-  for (char c : text)
-    if (c != '_' && c != ' ' && c != '\t') buf.push_back(c);
-  auto tick = buf.find('\'');
-  if (tick == std::string::npos) return 0;
-  size_t i = tick + 1;
-  if (i < buf.size() && (buf[i] == 's' || buf[i] == 'S')) ++i;
-  bpd = (i < buf.size()) ? BitsPerDigit(buf[i]) : 0;
-  return i;
-}
 static Logic4Vec ParseBasedXZLiteral(std::string_view text, uint32_t width,
                                      Arena& arena) {
   auto vec = MakeLogic4Vec(arena, width);
@@ -301,6 +364,32 @@ static Logic4Vec ParseBasedXZLiteral(std::string_view text, uint32_t width,
     if (IsXChar(lm) || IsZChar(lm)) FillXZ(vec, bit_pos, width, IsXChar(lm));
   }
   return vec;
+}
+
+// §5.7.1: the value the decimal `digits` form, laid into a vector of `width`
+// bits. A value wider than the size constant is truncated from the left, so
+// each word is masked to the bits within the width, and a narrower one is
+// padded with the zeros the fresh vector holds.
+static Logic4Vec DecimalLiteralVec(std::string_view digits, uint32_t width,
+                                   Arena& arena) {
+  auto vec = MakeLogic4Vec(arena, width);
+  std::vector<uint64_t> words = DecimalDigitWords(digits);
+  for (uint32_t w = 0; w < vec.nwords && w < words.size(); ++w)
+    vec.words[w].aval = words[w] & WordMaskWithinWidth(width, w);
+  return vec;
+}
+
+// The whole value of a literal wider than 64 bits, read from its digits again
+// rather than from the 64 bits Expr::int_val holds:
+// `80'd1208925819614629174706177` (2^80 + 1) sets bit 80 as well as bit 0.
+static Logic4Vec EvalWideLiteral(std::string_view text, uint32_t width,
+                                 Arena& arena) {
+  std::string buf;
+  int bpd = 0;
+  size_t i = ParseLiteralBase(text, buf, bpd);
+  if (bpd != 0) return ParseBasedXZLiteral(text, width, arena);
+  if (i != 0) ++i;
+  return DecimalLiteralVec(std::string_view(buf).substr(i), width, arena);
 }
 
 static bool IsUnsizedLiteral(std::string_view text) {
@@ -331,21 +420,19 @@ Logic4Vec EvalIntLiteral(const Expr* expr, Arena& arena) {
     }
     return vec;
   }
-  // §5.7.1: a sized literal's value is formed from all its digits. A based
-  // hex/octal/binary literal wider than 64 bits cannot be carried by the
-  // single 64-bit expr->int_val the parser computes (its high words are lost
-  // and its low word is corrupted by the parser's overflow), so parse the
-  // digit string directly into a multi-word vector. ParseBasedXZLiteral
-  // handles plain numeric digits in addition to x/z (none present here).
+  // §5.7.1: a literal's value is formed from all its digits at the width the
+  // size constant states, or at the width the value needs when unsized. The
+  // parser's ParseIntText folds the digits into the 64 bits expr->int_val
+  // holds, so a literal up to 64 bits wide is carried whole and int_val is its
+  // low 64 bits beyond that; a wider literal is rebuilt from the digit string
+  // into a multi-word vector, a based hex, octal or binary one digit by digit
+  // through ParseBasedXZLiteral, which reads plain digits as well as x and z
+  // (none present here), and a decimal one by the multiply-and-add of
+  // DecimalLiteralVec.
   if (width > 64) {
-    std::string buf;
-    int bpd = 0;
-    ParseLiteralBase(expr->text, buf, bpd);
-    if (bpd != 0) {
-      auto vec = ParseBasedXZLiteral(expr->text, width, arena);
-      vec.is_signed = is_signed;
-      return vec;
-    }
+    auto vec = EvalWideLiteral(expr->text, width, arena);
+    vec.is_signed = is_signed;
+    return vec;
   }
   auto vec = MakeLogic4VecVal(arena, width, expr->int_val);
   vec.is_signed = is_signed;
