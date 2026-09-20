@@ -359,6 +359,7 @@ static RtlirParamDecl BuildParamDeclShell(const ModuleDecl* decl, size_t i,
   pd.is_type_param = decl->type_param_names.count(pname) > 0;
   pd.is_localparam = decl->localparam_port_names.count(pname) > 0;
   if (has_param_type) {
+    pd.decl_type = &decl->param_types[i];
     PopulateParamTypeInfo(pd, decl->param_types[i], ctx.typedefs, ctx.scope);
     RecordParamDeclRange(pd, decl->param_types[i], ctx.scope);
     if (IsRealType(decl->param_types[i].kind))

@@ -636,6 +636,15 @@ struct RtlirParamDecl {
   // range from the final value assigned to it rather than from a fixed declared
   // width (§6.20.2).
   bool decl_type_implicit = false;
+  // §6.20.2 (printed page 126) with §23.10.1 (printed 764-765): the data type
+  // the declaration was written with, whose packed range may name a parameter
+  // a defparam later makes over -- `parameter logic [TOP:0] P` under `defparam
+  // u.TOP = 7` -- so that Elaborator::RecomputeDependentParams can size the
+  // parameter again from it with TOP's new value in scope, as decl_width and
+  // the two bounds above were sized where it was declared. Null for a type
+  // parameter and for a parameter port declared with no type. The AST owns
+  // it.
+  const DataType* decl_type = nullptr;
 };
 
 struct RtlirPortBinding {

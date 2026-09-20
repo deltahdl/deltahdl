@@ -254,6 +254,7 @@ void PopulateValueParamInfo(
     RtlirParamDecl& pd, const ModuleItem* item,
     std::unordered_set<std::string_view>& real_param_names,
     const TypedefMap& typedefs, const ScopeMap& scope) {
+  pd.decl_type = &item->data_type;
   PopulateParamTypeInfo(pd, item->data_type, typedefs, scope);
   if (item->unpacked_dims.empty() && IsRealType(item->data_type.kind)) {
     real_param_names.insert(item->name);

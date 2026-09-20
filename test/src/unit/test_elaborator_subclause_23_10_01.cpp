@@ -5,6 +5,7 @@
 
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
+#include "helpers_param_value.h"
 #include "helpers_reported_error.h"
 
 using namespace delta;
@@ -604,6 +605,68 @@ TEST(DefparamElaboration, GeneratedNameOfAnUnnamedGenerateBlockIsNotAPathStep) {
   EXPECT_EQ(inner->params[0].resolved_value, 5);
   EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(), "defparam target not found",
                               10, "23.10.1"));
+}
+
+// m's parameter `name`, m declaring `parameter logic [TOP:0] P` after
+// `parameter int TOP = 15` among its items, Q set from P and B from $bits(P),
+// instantiated once in top as u with `defparams` as top's defparam statements.
+int64_t RangeDependentParamUnder(std::string_view defparams,
+                                 std::string_view name, ElabFixture& f) {
+  std::string src =
+      "module m;\n"
+      "  parameter int TOP = 15;\n"
+      "  parameter logic [TOP:0] P = 0;\n"
+      "  localparam int Q = P;\n"
+      "  localparam int B = $bits(P);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  m u();\n";
+  src += defparams;
+  src += "endmodule\n";
+  auto* design = ElaborateSrc(src, f, "top");
+  return design == nullptr ? -1 : ParamValue(design, name);
+}
+
+// §6.20.2 (printed page 126): a parameter with a range specification has the
+// range of its declaration, folded with the parameters in scope, and an
+// override value is converted to it; §23.10.1 (printed 764-765) has a
+// defparam's value take effect over the declaration's. `defparam u.TOP = 7`
+// makes `logic [TOP:0] P` eight bits, so `defparam u.P = 16'hABCD` gives P
+// 0xCD, which Q reads, and $bits(P) is 8. The defparam refolded the values of
+// the parameters depending on TOP and left their ranges as first sized, so P
+// stayed sixteen bits, Q read 0xABCD and B 16.
+TEST(DefparamElaboration, ResizesAParameterWhoseRangeNamesTheOverriddenOne) {
+  ElabFixture fq;
+  EXPECT_EQ(RangeDependentParamUnder(
+                "  defparam u.TOP = 7;\n  defparam u.P = 16'hABCD;\n", "Q", fq),
+            0xCD);
+  EXPECT_FALSE(fq.has_errors);
+  ElabFixture fb;
+  EXPECT_EQ(RangeDependentParamUnder(
+                "  defparam u.TOP = 7;\n  defparam u.P = 16'hABCD;\n", "B", fb),
+            8);
+}
+
+// The range alone made over: P keeps its declaration's own 0 and is eight
+// bits wide.
+TEST(DefparamElaboration, ResizesAParameterLeftAtItsDefault) {
+  ElabFixture fq;
+  EXPECT_EQ(RangeDependentParamUnder("  defparam u.TOP = 7;\n", "Q", fq), 0);
+  ElabFixture fb;
+  EXPECT_EQ(RangeDependentParamUnder("  defparam u.TOP = 7;\n", "B", fb), 8);
+  EXPECT_FALSE(fb.has_errors);
+}
+
+// §23.10.1 (printed page 765) has a parameter take the value of the last
+// defparam for it, and §6.20.2's conversion is to the range the parameter
+// finally has: P given 0xABCD at sixteen bits, and TOP made 7 after that, is
+// converted to the eight bits it now holds.
+TEST(DefparamElaboration, ConvertsAnEarlierValueToTheRangeALaterDefparamSets) {
+  ElabFixture f;
+  EXPECT_EQ(RangeDependentParamUnder(
+                "  defparam u.P = 16'hABCD;\n  defparam u.TOP = 7;\n", "Q", f),
+            0xCD);
+  EXPECT_FALSE(f.has_errors);
 }
 
 }  // namespace

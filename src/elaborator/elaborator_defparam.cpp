@@ -16,6 +16,7 @@
 #include "elaborator/rtlir.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
+#include "parser/ast_type.h"
 
 namespace delta {
 
@@ -207,6 +208,31 @@ RtlirParamDecl* Elaborator::ResolveDefparamFromTop(const HierPath& path,
   return nullptr;
 }
 
+// §6.20.2 (printed page 126): a parameter with a range specification has the
+// range of its declaration, and that range is folded with the parameters in
+// scope, so one written as `logic [TOP:0]` follows TOP's final value, which
+// §23.10.1 (printed 764-765) lets a defparam set. RecomputeDependentParams
+// refolded the values alone, so `defparam u.TOP = 7` over `parameter logic
+// [TOP:0] P` left P sixteen bits wide and `$bits(P)` reading 16, and
+// `defparam u.P = 16'hABCD` after it gave P 0xABCD where the eight-bit range
+// holds 0xCD. Sizes `p` again against `scope` where its declared type carries
+// a packed range, as PopulateValueParamInfo and BuildParamDeclShell sized it
+// at the declaration, and converts a value an override gave it to the range
+// it now has (§23.10, printed 763-764). A type written as a typedef name is
+// left as the declaration sized it: the declaring module's typedef table is
+// not in force here, and the typedef itself is not made over.
+static void ResizeParamToRecomputedRange(RtlirParamDecl& p,
+                                         const ScopeMap& scope) {
+  const DataType* dtype = p.decl_type;
+  if (dtype == nullptr || dtype->packed_dim_left == nullptr ||
+      dtype->kind == DataTypeKind::kNamed)
+    return;
+  PopulateParamTypeInfo(p, *dtype, {}, scope);
+  RecordParamDeclRange(p, *dtype, scope);
+  if (p.from_override)
+    p.resolved_value = ConvertOverrideValue(p.resolved_value, p);
+}
+
 // §23.10.2 (printed page 766): a parameter whose value depends on the one a
 // defparam redefined takes its new value too. Each such value expression is
 // written in `mod`, so `mod` is registered while it folds: the module
@@ -215,16 +241,20 @@ RtlirParamDecl* Elaborator::ResolveDefparamFromTop(const HierPath& path,
 // it a select on the redefined parameter read that parameter at 32 bits,
 // `localparam int H = P[95:64]` folding to 0 over a 96-bit P a defparam had
 // just given its words above 64. Those words are recorded on each parameter
-// made over as the value is, for a later read of it.
+// made over as the value is, for a later read of it. A parameter whose range
+// depends on the redefined one is sized again first, its own value included
+// where an override gave it, so that the parameters after it read it at the
+// range it now has.
 void Elaborator::RecomputeDependentParams(RtlirModule* mod) {
   if (!mod) return;
   ParamRangeRegistryGuard param_range_guard(mod);
   for (auto& p : mod->params) {
-    if (p.from_override) continue;
     if (p.is_type_param) continue;
     if (p.is_unbounded) continue;
-    if (!p.default_value) continue;
     auto scope = BuildParamScope(mod);
+    ResizeParamToRecomputedRange(p, scope);
+    if (p.from_override) continue;
+    if (!p.default_value) continue;
     auto val = ConstEvalInt(p.default_value, scope);
     if (val) {
       p.resolved_value = *val;
