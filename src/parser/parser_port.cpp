@@ -248,7 +248,10 @@ struct ParserPortHelpers {
       p.ParsePackedDims(dtype);
       return dtype;
     }
-    return p.ParseDataType();
+    // §23.2.2.2's port type is A.2.2.1's data_type, a type_identifier behind
+    // a package_scope among its forms (§26.3), so `input A::instruction_t a`
+    // reads the scoped type rather than taking `A` for the port's name.
+    return p.ParseDeclaredDataType();
   }
 
   // Syntax 23-4 writes the third net_port_type form as `interconnect

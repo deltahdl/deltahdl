@@ -407,8 +407,11 @@ void Parser::ParseOneFunctionArg(std::vector<FunctionArg>& args,
 
   InheritRefQualifiers(args, arg, dir_explicit);
   Match(TokenKind::kKwVar);
+  // A.2.2.1's data_type lets a type_identifier stand behind a package_scope
+  // (§26.3), so `ref p::pair_t x` reads the scoped type as a declaration's
+  // does.
   if (!TryParseInlineAggregateType(arg.data_type)) {
-    arg.data_type = ParseDataType();
+    arg.data_type = ParseDeclaredDataType();
   }
   // A.2.7's tf_port_item takes a data_type_or_implicit, and A.2.2.1's
   // implicit_data_type is `[ signing ] { packed_dimension }`: a port written

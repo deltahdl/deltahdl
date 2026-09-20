@@ -250,4 +250,46 @@ TEST(PackageImport, PackagePrecedesImport) {
       HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kImportDecl));
 }
 
+// §26.3 names a package's type through the package scope resolution operator
+// and A.2.2.1's data_type lets a type_identifier stand behind a package_scope,
+// which A.2.7's tf_port_item and §23.2.2.2's ANSI port declaration both take
+// as their data type. ParseFunctionArg and ParseAnsiPortDataType read the type
+// through ParseDataType, which takes an unknown identifier as an implicit type
+// without consuming it, so `p` became the formal's or the port's name and the
+// `::` drew "expected ')'".
+TEST(PackageScopeReference, PackageScopedTypeAsASubroutineFormalType) {
+  auto r = Parse(
+      "module t;\n"
+      "  function automatic void bump(ref p::pair_t x, input int n);\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ModuleItem* func = nullptr;
+  for (auto* it : r.cu->modules[0]->items) {
+    if (it->kind == ModuleItemKind::kFunctionDecl) func = it;
+  }
+  ASSERT_NE(func, nullptr);
+  ASSERT_EQ(func->func_args.size(), 2u);
+  EXPECT_EQ(func->func_args[0].name, "x");
+  EXPECT_EQ(func->func_args[0].direction, Direction::kRef);
+  EXPECT_EQ(func->func_args[0].data_type.kind, DataTypeKind::kNamed);
+  EXPECT_EQ(func->func_args[0].data_type.scope_name, "p");
+  EXPECT_EQ(func->func_args[0].data_type.type_name, "pair_t");
+  EXPECT_EQ(func->func_args[1].name, "n");
+}
+
+TEST(PackageScopeReference, PackageScopedTypeAsAnAnsiPortType) {
+  auto r = Parse(
+      "module M (input A::instruction_t a, output logic b);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  const auto& ports = r.cu->modules[0]->ports;
+  ASSERT_EQ(ports.size(), 2u);
+  EXPECT_EQ(ports[0].name, "a");
+  EXPECT_EQ(ports[0].data_type.kind, DataTypeKind::kNamed);
+  EXPECT_EQ(ports[0].data_type.scope_name, "A");
+  EXPECT_EQ(ports[0].data_type.type_name, "instruction_t");
+  EXPECT_EQ(ports[1].name, "b");
+}
+
 }  // namespace
