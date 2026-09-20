@@ -325,4 +325,87 @@ TEST(PackageExport, ExportOfClassNotDeclaredInSourceIsError) {
       "'Missing' is not a candidate for import from package 'p1'", 7, "26.6"));
 }
 
+// §26.6: what a package imports is, by default, not visible through a later
+// import of that package (printed page 815). p2 imports p1's x and exports
+// nothing, so `import p2::*` in the module brings in y alone, and the read of
+// x in the module's $display is §26.3's reference no identifier matches
+// (printed page 810), reported as §23.9's unresolved reference. Before the
+// fix the arguments of a display task were never collected, so the read was
+// not reported and the run printed 0.
+TEST(PackageExport, ImportedNameNotExportedIsUnresolvedThroughTheImporter) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("package p1;\n"
+             "  int x = 6;\n"
+             "endpackage\n"
+             "package p2;\n"
+             "  import p1::x;\n"
+             "  int y = x;\n"
+             "endpackage\n"
+             "module top;\n"
+             "  import p2::*;\n"
+             "  int r;\n"
+             "  initial $display(\"%0d\", x);\n"
+             "  initial r = y;\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "reference to unresolved identifier 'x'", 11,
+                            "23.9"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "reference to unresolved identifier 'y'", 12,
+                             "23.9"));
+}
+
+// §26.6: `export p1::x` makes the imported declaration available to an import
+// of p2, so the same two reads resolve. The set of names a wildcard import of
+// p2 provides (PopulatePackageProvidedNames in
+// src/elaborator/elaborator_scope_rules_names.cpp) followed no export before,
+// which would report x here as the test above expects it reported without
+// the export.
+TEST(PackageExport, ExplicitExportMakesTheImportedVariableVisible) {
+  ElabFixture f;
+  EXPECT_TRUE(
+      ElabOk("package p1;\n"
+             "  int x = 6;\n"
+             "endpackage\n"
+             "package p2;\n"
+             "  import p1::x;\n"
+             "  export p1::x;\n"
+             "  int y = x;\n"
+             "endpackage\n"
+             "module top;\n"
+             "  import p2::*;\n"
+             "  int r;\n"
+             "  initial $display(\"%0d\", x);\n"
+             "  initial r = x + y;\n"
+             "endmodule\n",
+             f));
+}
+
+// §26.6: `export *::*` exports every declaration imported from every package
+// p2 imports, x among them, and a chain of exports is followed: p3 imports
+// p2 by wildcard and exports p2::*, so a wildcard import of p3 reaches x too.
+TEST(PackageExport, StarStarExportMakesTheImportedVariableVisible) {
+  ElabFixture f;
+  EXPECT_TRUE(
+      ElabOk("package p1;\n"
+             "  int x = 6;\n"
+             "endpackage\n"
+             "package p2;\n"
+             "  import p1::x;\n"
+             "  export *::*;\n"
+             "endpackage\n"
+             "package p3;\n"
+             "  import p2::*;\n"
+             "  export p2::*;\n"
+             "endpackage\n"
+             "module top;\n"
+             "  import p3::*;\n"
+             "  int r;\n"
+             "  initial r = x;\n"
+             "endmodule\n",
+             f));
+}
+
 }  // namespace

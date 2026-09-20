@@ -244,42 +244,6 @@ bool PackageDeclared(const CompilationUnit* unit, std::string_view pkg_name) {
   return false;
 }
 
-// §26.5 / Table 26-1: the enumeration constants declared inside a package's
-// enum become directly visible through a wildcard import just like any other
-// package declaration (the FALSE/TRUE members of the clause's example package
-// p). Each member name is registered so that a name supplied by two
-// wildcard-imported packages is detected as ambiguous, not just the enum type
-// name itself.
-static void AddEnumMemberNames(const std::vector<EnumMember>& members,
-                               std::unordered_set<std::string_view>& names) {
-  for (const auto& em : members) {
-    if (!em.name.empty()) names.insert(em.name);
-  }
-}
-
-// The names one package item makes directly visible: its own name, the name of
-// a class it declares, and any enumeration constants it brings, which may sit
-// on a typedef's type or on a bare enum data declaration.
-static void AddPackageItemNames(const ModuleItem* pi,
-                                std::unordered_set<std::string_view>& names) {
-  if (!pi->name.empty()) names.insert(pi->name);
-  if (pi->kind == ModuleItemKind::kClassDecl && pi->class_decl &&
-      !pi->class_decl->name.empty()) {
-    names.insert(pi->class_decl->name);
-  }
-  AddEnumMemberNames(pi->typedef_type.enum_members, names);
-  AddEnumMemberNames(pi->data_type.enum_members, names);
-}
-
-void PopulatePackageProvidedNames(const CompilationUnit* unit,
-                                  std::string_view pkg_name,
-                                  std::unordered_set<std::string_view>& names) {
-  for (const auto* pkg : unit->packages) {
-    if (pkg->name != pkg_name) continue;
-    for (const auto* pi : pkg->items) AddPackageItemNames(pi, names);
-  }
-}
-
 bool PackageProvidesName(const CompilationUnit* unit,
                          ProvidedNameCache& provided_cache,
                          std::string_view pkg_name, std::string_view name) {

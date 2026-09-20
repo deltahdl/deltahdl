@@ -6,6 +6,8 @@
 
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/rtlir.h"
+#include "parser/ast_class.h"
+#include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
@@ -85,7 +87,141 @@ void CollectRandsequenceDeclaredNames(
   }
 }
 
+// §26.5 / Table 26-1: the enumeration constants declared inside a package's
+// enum become directly visible through a wildcard import just like any other
+// package declaration (the FALSE/TRUE members of the clause's example package
+// p). Each member name is registered so that a name supplied by two
+// wildcard-imported packages is detected as ambiguous, not just the enum type
+// name itself.
+void AddEnumMemberNames(const std::vector<EnumMember>& members,
+                        std::unordered_set<std::string_view>& names) {
+  for (const auto& em : members) {
+    if (!em.name.empty()) names.insert(em.name);
+  }
+}
+
+// The names one package item makes directly visible: its own name, the name of
+// a class it declares, and any enumeration constants it brings, which may sit
+// on a typedef's type or on a bare enum data declaration.
+void AddPackageItemNames(const ModuleItem* pi,
+                         std::unordered_set<std::string_view>& names) {
+  if (!pi->name.empty()) names.insert(pi->name);
+  if (pi->kind == ModuleItemKind::kClassDecl && pi->class_decl &&
+      !pi->class_decl->name.empty()) {
+    names.insert(pi->class_decl->name);
+  }
+  AddEnumMemberNames(pi->typedef_type.enum_members, names);
+  AddEnumMemberNames(pi->data_type.enum_members, names);
+}
+
+const PackageDecl* FindPackageDecl(const CompilationUnit* unit,
+                                   std::string_view pkg_name) {
+  for (const auto* pkg : unit->packages) {
+    if (pkg->name == pkg_name) return pkg;
+  }
+  return nullptr;
+}
+
+void AddPackageProvidedNames(const CompilationUnit* unit,
+                             const PackageDecl* pkg,
+                             std::unordered_set<std::string_view>& names,
+                             std::unordered_set<const PackageDecl*>& visited);
+
+// The names `pkg` imports from the package `src_name`, which an export of
+// that package hands on (§26.6): the one name of each explicit import, and
+// for a wildcard import every name the source package provides. §26.6 hands
+// on only what a wildcard import actually imported, which is decided by the
+// references the package makes; every candidate is taken instead, which can
+// only suppress a report, never raise one.
+void AddImportedNamesFrom(const CompilationUnit* unit, const PackageDecl* pkg,
+                          std::string_view src_name,
+                          std::unordered_set<std::string_view>& names,
+                          std::unordered_set<const PackageDecl*>& visited) {
+  for (const auto* item : pkg->items) {
+    if (item->kind != ModuleItemKind::kImportDecl) continue;
+    const ImportItem& imp = item->import_item;
+    if (imp.package_name != src_name) continue;
+    if (!imp.is_wildcard) {
+      names.insert(imp.item_name);
+    } else if (const PackageDecl* src = FindPackageDecl(unit, src_name)) {
+      AddPackageProvidedNames(unit, src, names, visited);
+    }
+  }
+}
+
+// §26.6: by default what a package imports is not visible through an import
+// of that package, so an import item of `pkg` adds no name of its own here;
+// an export declaration is what hands an imported name on. `export *::*`
+// hands on every import of the package, `export src::*` those from one
+// package, and `export src::name` the one name.
+void AddExportedNames(const CompilationUnit* unit, const PackageDecl* pkg,
+                      std::unordered_set<std::string_view>& names,
+                      std::unordered_set<const PackageDecl*>& visited) {
+  for (const auto* item : pkg->items) {
+    if (item->kind != ModuleItemKind::kExportDecl) continue;
+    const ImportItem& ex = item->import_item;
+    if (ex.package_name == "*") {
+      for (const auto* imp : pkg->items) {
+        if (imp->kind != ModuleItemKind::kImportDecl) continue;
+        AddImportedNamesFrom(unit, pkg, imp->import_item.package_name, names,
+                             visited);
+      }
+    } else if (ex.is_wildcard) {
+      AddImportedNamesFrom(unit, pkg, ex.package_name, names, visited);
+    } else {
+      names.insert(ex.item_name);
+    }
+  }
+}
+
+// The names `pkg` makes directly visible to a scope that imports it by
+// wildcard: its own declarations, and what its exports hand on of its
+// imports. A package reached twice along a chain of exports adds its names
+// once, which is also what ends a cycle of exports.
+void AddPackageProvidedNames(const CompilationUnit* unit,
+                             const PackageDecl* pkg,
+                             std::unordered_set<std::string_view>& names,
+                             std::unordered_set<const PackageDecl*>& visited) {
+  if (!visited.insert(pkg).second) return;
+  for (const auto* pi : pkg->items) AddPackageItemNames(pi, names);
+  AddExportedNames(unit, pkg, names, visited);
+}
+
+// §21.2's display and write tasks, §21.2.3's strobe and monitor tasks, the
+// file forms §21.3 gives each of them, and §20.10's severity tasks. Every
+// argument of one is a value read as an assignment's right side is, so a bare
+// identifier among them that names no declaration is §23.9's unresolved
+// reference; `$display("%0d", x)` read an undeclared x with nothing said. The
+// tasks that take a scope or a definition name, $dumpvars and the assertion
+// control tasks of §20.11 among them, are not here, an argument of theirs
+// naming no value.
+bool IsValueListSystemTask(const Expr* call) {
+  static constexpr std::string_view kTasks[] = {
+      "$display",   "$displayb",  "$displayo",  "$displayh",  "$write",
+      "$writeb",    "$writeo",    "$writeh",    "$strobe",    "$strobeb",
+      "$strobeo",   "$strobeh",   "$monitor",   "$monitorb",  "$monitoro",
+      "$monitorh",  "$fdisplay",  "$fdisplayb", "$fdisplayo", "$fdisplayh",
+      "$fwrite",    "$fwriteb",   "$fwriteo",   "$fwriteh",   "$fstrobe",
+      "$fstrobeb",  "$fstrobeo",  "$fstrobeh",  "$fmonitor",  "$fmonitorb",
+      "$fmonitoro", "$fmonitorh", "$error",     "$warning",   "$info",
+      "$fatal"};
+  if (call->kind != ExprKind::kSystemCall) return false;
+  for (std::string_view task : kTasks) {
+    if (call->callee == task) return true;
+  }
+  return false;
+}
+
 }  // namespace
+
+void PopulatePackageProvidedNames(const CompilationUnit* unit,
+                                  std::string_view pkg_name,
+                                  std::unordered_set<std::string_view>& names) {
+  const PackageDecl* pkg = FindPackageDecl(unit, pkg_name);
+  if (pkg == nullptr) return;
+  std::unordered_set<const PackageDecl*> visited;
+  AddPackageProvidedNames(unit, pkg, names, visited);
+}
 
 // The operands of `e` that a value read could name. Three kinds of node hold an
 // identifier-shaped child that names something other than a value, and each is
@@ -280,10 +416,17 @@ void CollectProcRhsIdents(const Stmt* s,
                           const std::unordered_set<std::string_view>& locals,
                           std::vector<const Expr*>& out) {
   if (!s) return;
+  const Expr* read = nullptr;
   if (s->kind == StmtKind::kBlockingAssign ||
       s->kind == StmtKind::kNonblockingAssign) {
+    read = s->rhs;
+  } else if (const Expr* call = SubroutineCallOfStmt(s);
+             call != nullptr && IsValueListSystemTask(call)) {
+    read = call;
+  }
+  if (read != nullptr) {
     std::vector<const Expr*> refs;
-    CollectBareIdents(s->rhs, refs);
+    CollectBareIdents(read, refs);
     for (const auto* r : refs) {
       if (locals.count(r->text) == 0) out.push_back(r);
     }

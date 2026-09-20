@@ -589,4 +589,48 @@ TEST(PackageImportSim, WildcardImportInATaskBodyOutlivesItsDelay) {
             303u);
 }
 
+// §26.6: `export p1::x` in p2 makes p1's x, which p2 imported explicitly,
+// available to a wildcard import of p2 (printed page 815), so the module
+// reads the original variable's 6 beside p2's own y of 7: 67. Without the
+// export the elaborator reports x, and a lowering that bound x to nothing
+// would read 7.
+TEST(PackageImportSim, ExplicitlyExportedVariableReadThroughAWildcardImport) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  int x = 6;\n"
+                      "endpackage\n"
+                      "package p2;\n"
+                      "  import p1::x;\n"
+                      "  export p1::x;\n"
+                      "  int y = x + 1;\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  import p2::*;\n"
+                      "  int out;\n"
+                      "  initial out = x * 10 + y;\n"
+                      "endmodule\n",
+                      "out"),
+            67u);
+}
+
+// §26.6: `export *::*` exports every declaration p2 imported, from every
+// package it imports; the explicitly imported x of p1 is one, so the same
+// read answers 67 through it.
+TEST(PackageImportSim, StarStarExportedVariableReadThroughAWildcardImport) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  int x = 6;\n"
+                      "endpackage\n"
+                      "package p2;\n"
+                      "  import p1::x;\n"
+                      "  export *::*;\n"
+                      "  int y = x + 1;\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  import p2::*;\n"
+                      "  int out;\n"
+                      "  initial out = x * 10 + y;\n"
+                      "endmodule\n",
+                      "out"),
+            67u);
+}
+
 }  // namespace

@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "elaborator/rtlir.h"
+#include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
@@ -37,6 +38,15 @@ namespace delta {
 // plain reads that must resolve to a declaration.
 void CollectBareIdents(const Expr* e, std::vector<const Expr*>& out);
 
+// The names the package `pkg_name` makes directly visible to a scope that
+// imports it by wildcard: every declaration of its own, with the members of
+// each enumeration it declares (§26.5), and what its export declarations hand
+// on of what it imports (§26.6); a name it imports without exporting is not
+// among them. Nothing is added for a package the unit does not declare.
+void PopulatePackageProvidedNames(const CompilationUnit* unit,
+                                  std::string_view pkg_name,
+                                  std::unordered_set<std::string_view>& names);
+
 // The packages a module imports by wildcard, whose declarations §26.3 makes
 // directly visible to a bare read.
 std::vector<std::string_view> WildcardImportedPackages(const RtlirModule* mod);
@@ -51,7 +61,8 @@ void CollectProcLocalNames(const Stmt* s,
                            std::unordered_set<std::string_view>& names);
 
 // Collects the bare identifier reads of every procedural assignment's right
-// side under `s`, dropping the ones `locals` names.
+// side under `s`, and of every argument of a display, write, strobe, monitor
+// or severity system task statement, dropping the ones `locals` names.
 void CollectProcRhsIdents(const Stmt* s,
                           const std::unordered_set<std::string_view>& locals,
                           std::vector<const Expr*>& out);
