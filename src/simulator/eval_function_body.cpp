@@ -14,6 +14,7 @@
 #include "simulator/eval_array.h"
 #include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_array_class_queue.h"
+#include "simulator/eval_call_result.h"
 #include "simulator/eval_class_array.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/eval_instance_task.h"
@@ -633,6 +634,14 @@ static void ExecFuncReturn(const Stmt* stmt, const FuncExecCtx& exec) {
   Logic4Vec val = OwnRhsWords(
       EvalExpr(stmt->expr, exec.ctx, exec.arena, exec.ret_var->value.width),
       exec.arena);
+  // §13.4.1 with §7.10, §7.5 and §7.4: a return type that is a queue or an
+  // array gives the implicit variable elements, which the vector above does
+  // not carry -- it is the one-element-wide variable the aggregate's name
+  // holds. The elements are copied out here, while the callee's storage still
+  // stands, for a `fq().size()` or `fa()[1]` that reads the call as that
+  // variable (eval_call_result.cpp); nothing is copied unless such a read is
+  // waiting.
+  RecordReturnedAggregate(stmt->expr, exec.ctx, exec.arena);
   if (exec.ret_width != 0) {
     val = ResizeToWidth(val, exec.ret_width, exec.arena);
     val.is_signed = exec.ret_var->is_signed;
@@ -771,6 +780,9 @@ void ExecFunctionBody(const ModuleItem* func, Variable* ret_var,
   // what leaves the frame that was active standing again however the body ends
   // -- a return out of the middle of it included.
   VpiActiveFrameScope frame;
+  // §13.4.1: the record a `return` of a queue or an array fills, handed to
+  // the evaluation of the call when the body completes (eval_call_result.cpp).
+  FunctionBodyResultScope result_scope;
   // A return type nothing can size -- void, a string, a class handle, a
   // parameterized method's type -- leaves the return statement to take the
   // expression's own vector, which is what it has always done. A typedef name

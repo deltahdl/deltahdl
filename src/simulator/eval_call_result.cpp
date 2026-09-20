@@ -1,14 +1,26 @@
 #include "simulator/eval_call_result.h"
 
+#include <cstddef>
+#include <cstdint>
+#include <optional>
 #include <string_view>
+#include <utility>
+#include <vector>
 
 #include "common/arena.h"
 #include "common/types.h"
+#include "elaborator/type_eval.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_module.h"
+#include "parser/ast_type.h"
 #include "simulator/class_object.h"
+#include "simulator/eval_array_class_queue.h"
+#include "simulator/eval_function_hier.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_types.h"
+#include "simulator/statement_assign_internal.h"
 
 namespace delta {
 
@@ -33,12 +45,6 @@ bool SelectsMemberOfCallResult(const Expr* expr) {
          expr->rhs->kind == ExprKind::kIdentifier && RootedAtCall(expr->lhs);
 }
 
-// The object the handle `side` evaluates to, running the call it starts at;
-// null where the result is the null handle.
-ClassObject* CallResultObject(const Expr* side, SimContext& ctx, Arena& arena) {
-  return ctx.GetClassObject(EvalExpr(side, ctx, arena).ToUint64());
-}
-
 // The method `name` of `obj` by the object's own type: a virtual one through
 // the vtable (§8.20), else the one the class or a base of it declares.
 ModuleItem* ResolveMethodOnObject(const ClassObject* obj, std::string_view name,
@@ -49,12 +55,171 @@ ModuleItem* ResolveMethodOnObject(const ClassObject* obj, std::string_view name,
   return method;
 }
 
+// §13.4.1's implicit variable for an aggregate return type has no storage of
+// its own: EvalFunctionCall and ExecClassMethod create it one element wide,
+// and a `return q` copies that variable's value, not q's elements, so the
+// elements a call returned reached the caller by no path at all. The callee's
+// queue or array lives in the callee's scope and goes with it, so the copy has
+// to be taken while the body runs, at the `return`, and handed over once the
+// call machinery has unwound. This register is that handover: one record per
+// running body, innermost last, which the body's `return` fills, and the
+// record the body that completed last left, which the evaluation that ran the
+// call takes. It is asked for only while such an evaluation is in progress,
+// so `x = fq()` copies nothing it did not before.
+//
+// The evaluation that ran the call is what takes the record because a body's
+// completion is the last thing the call does before its value comes back: the
+// bodies of the call's arguments and of the calls the body makes each complete
+// earlier and are overwritten, and a call answered without a body -- a DPI
+// import, a built-in -- completes none, which the reset before the call
+// leaves as no record.
+struct ReturnedAggregateRegister {
+  std::vector<std::optional<ReturnedAggregate>> bodies;
+  std::optional<ReturnedAggregate> completed;
+  int evaluations = 0;
+};
+
+// One register per thread, as eval_let.cpp keeps its expansion set: a body
+// never suspends (§13.4 lets a function consume no time), so the stack is
+// the running thread's own and needs no lock.
+ReturnedAggregateRegister& Register() {
+  static thread_local ReturnedAggregateRegister reg;
+  return reg;
+}
+
+// The queue, dynamic array or fixed-size unpacked array `returned` names,
+// its elements copied so the record outlives the callee's storage. A fixed
+// array of more than one unpacked dimension has no element list of the shape
+// a single index reads, so it records nothing, as does a name that is no
+// aggregate.
+std::optional<ReturnedAggregate> CaptureAggregate(const Expr* returned,
+                                                  SimContext& ctx,
+                                                  Arena& arena) {
+  if (returned == nullptr || (returned->kind != ExprKind::kIdentifier &&
+                              returned->kind != ExprKind::kMemberAccess)) {
+    return std::nullopt;
+  }
+  ReturnedAggregate agg;
+  if (const QueueObject* q = FindQueueOfBase(returned, ctx, arena)) {
+    agg.elem_width = q->elem_width;
+    agg.is_4state = q->is_4state;
+  } else {
+    if (returned->kind != ExprKind::kIdentifier) return std::nullopt;
+    const ArrayInfo* info = ctx.FindArrayInfo(returned->text);
+    if (info == nullptr || info->is_dynamic || info->is_queue ||
+        info->dim_los.size() > 1) {
+      return std::nullopt;
+    }
+    agg.elem_width = info->elem_width;
+    agg.is_4state = info->is_4state;
+    agg.lo = info->lo;
+    agg.is_descending = info->is_descending;
+  }
+  CollectQueueElements(returned, ctx, arena, agg.elements);
+  for (auto& elem : agg.elements) elem = OwnRhsWords(elem, arena);
+  return agg;
+}
+
+// §7.2 with §13.4.1: the layout of the structure the call `call` returns,
+// registered under the return type's name, or null where the call names no
+// declared function or its return type is no named structure.
+const StructTypeInfo* CallResultStructLayout(const Expr* call, SimContext& ctx,
+                                             Arena& arena) {
+  if (call->kind != ExprKind::kCall) return nullptr;
+  const ModuleItem* func = FindSubroutineTarget(call, ctx, arena).func;
+  if (func == nullptr || func->return_type.type_name.empty()) return nullptr;
+  return ctx.FindStructType(func->return_type.type_name);
+}
+
+// §7.2: the member `expr->rhs` of the structure `value` the call `expr->lhs`
+// returned, its window read off the layout, and §6.11.2 converting the
+// unknowns of a 2-state member's window to zeros as a read of the member of a
+// variable does. False where the call returns no named structure or the
+// layout has no such member.
+bool TryStructResultMember(const Expr* expr, const Logic4Vec& value,
+                           SimContext& ctx, Arena& arena, Logic4Vec& out) {
+  const StructTypeInfo* layout = CallResultStructLayout(expr->lhs, ctx, arena);
+  if (layout == nullptr) return false;
+  uint32_t bit_offset = 0;
+  uint32_t width = 0;
+  DataTypeKind kind = DataTypeKind::kLogic;
+  if (!ResolveStructFieldPath(layout, expr->rhs->text, &bit_offset, &width,
+                              &kind)) {
+    return false;
+  }
+  out = ExtractBitField(arena, value, bit_offset, width);
+  if (!Is4stateType(kind)) CoerceTo2State(out);
+  return true;
+}
+
+// §7.10.2.1 and §7.5.2: size() is the number of elements the queue or the
+// dynamic array holds, an `int`. No other method is answered on an aggregate
+// a call returned.
+bool TryReturnedAggregateMethod(const ReturnedAggregate& returned,
+                                std::string_view method, Arena& arena,
+                                Logic4Vec& out) {
+  if (method != "size") return false;
+  out = MakeLogic4VecVal(arena, 32, returned.elements.size());
+  out.is_signed = true;
+  return true;
+}
+
 }  // namespace
+
+FunctionBodyResultScope::FunctionBodyResultScope() {
+  Register().bodies.emplace_back();
+}
+
+FunctionBodyResultScope::~FunctionBodyResultScope() {
+  auto& reg = Register();
+  reg.completed = std::move(reg.bodies.back());
+  reg.bodies.pop_back();
+}
+
+void RecordReturnedAggregate(const Expr* returned, SimContext& ctx,
+                             Arena& arena) {
+  auto& reg = Register();
+  if (reg.evaluations == 0 || reg.bodies.empty()) return;
+  reg.bodies.back() = CaptureAggregate(returned, ctx, arena);
+}
+
+Logic4Vec EvalWithReturnedAggregate(
+    const Expr* expr, SimContext& ctx, Arena& arena,
+    std::optional<ReturnedAggregate>& returned) {
+  returned.reset();
+  if (expr == nullptr || expr->kind != ExprKind::kCall)
+    return EvalExpr(expr, ctx, arena);
+  auto& reg = Register();
+  ++reg.evaluations;
+  reg.completed.reset();
+  Logic4Vec value = EvalExpr(expr, ctx, arena);
+  --reg.evaluations;
+  returned = std::move(reg.completed);
+  reg.completed.reset();
+  return value;
+}
+
+Logic4Vec ElementOfReturnedAggregate(const ReturnedAggregate& returned,
+                                     int64_t idx, Arena& arena) {
+  auto size = static_cast<int64_t>(returned.elements.size());
+  int64_t lo = returned.lo;
+  int64_t pos = returned.is_descending ? lo + size - 1 - idx : idx - lo;
+  if (pos < 0 || pos >= size) {
+    return returned.is_4state ? MakeAllX(arena, returned.elem_width)
+                              : MakeLogic4VecVal(arena, returned.elem_width, 0);
+  }
+  return returned.elements[static_cast<size_t>(pos)];
+}
 
 bool TryEvalCallResultMember(const Expr* expr, SimContext& ctx, Arena& arena,
                              Logic4Vec& out) {
   if (!SelectsMemberOfCallResult(expr)) return false;
-  ClassObject* obj = CallResultObject(expr->lhs, ctx, arena);
+  // The base side is evaluated once, running the call it starts at, and read
+  // as the structure the call's return type names ahead of the handle read: a
+  // structure's bits are no handle, and a class's name registers no layout.
+  Logic4Vec value = EvalExpr(expr->lhs, ctx, arena);
+  if (TryStructResultMember(expr, value, ctx, arena, out)) return true;
+  ClassObject* obj = ctx.GetClassObject(value.ToUint64());
   if (obj == nullptr) return false;
   out = obj->GetProperty(expr->rhs->text, arena);
   return true;
@@ -67,8 +232,14 @@ bool TryEvalCallResultMethodCall(const Expr* expr, SimContext& ctx,
     return false;
   }
   const Expr* access = expr->lhs;
+  std::optional<ReturnedAggregate> returned;
+  Logic4Vec handle =
+      EvalWithReturnedAggregate(access->lhs, ctx, arena, returned);
+  if (returned) {
+    return TryReturnedAggregateMethod(*returned, access->rhs->text, arena, out);
+  }
   InstanceMethodInfo info;
-  info.obj = CallResultObject(access->lhs, ctx, arena);
+  info.obj = ctx.GetClassObject(handle.ToUint64());
   if (info.obj == nullptr) return false;
   info.method = ResolveMethodOnObject(info.obj, access->rhs->text, &info.owner);
   if (info.method == nullptr) return false;

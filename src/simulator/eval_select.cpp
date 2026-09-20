@@ -15,6 +15,7 @@
 #include "simulator/eval_array.h"
 #include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_array_class_queue.h"
+#include "simulator/eval_call_result.h"
 #include "simulator/eval_class_array.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
@@ -654,24 +655,14 @@ static std::optional<Logic4Vec> TryPackedElementSelect(
   return ExtractBitField(arena, base_val, static_cast<uint32_t>(off), w);
 }
 
-Logic4Vec EvalSelect(const Expr* expr, SimContext& ctx, Arena& arena) {
-  Logic4Vec result;
-  if (TryQueueSelect(expr, ctx, arena, result)) return result;
-  if (TryAssocSelect(expr, ctx, arena, result)) return result;
-  auto idx_val = EvalExpr(expr->index, ctx, arena);
-  if (HasUnknownBits(idx_val)) return EvalUnknownIndexSelect(expr, ctx, arena);
+// A select from the value `base_val` of a packed base: a byte of a string, a
+// part-select, an element of a packed array or one bit, the index `idx_val`
+// resolved against the base's declared range.
+static Logic4Vec SelectFromPackedValue(const Expr* expr,
+                                       const Logic4Vec& base_val,
+                                       const Logic4Vec& idx_val,
+                                       SimContext& ctx, Arena& arena) {
   uint64_t idx = idx_val.ToUint64();
-  if (TryArrayElementSelect(expr, idx, ctx, arena, result)) return result;
-  if (TryCompoundArraySelect(expr, ctx, arena, result)) return result;
-  if (TryArraySliceSelect(expr, ctx, arena, result)) return result;
-  // §7.4.2: an element of a class property declared as an array, which the
-  // object holds one by one rather than as a value under the property's name.
-  if (TryClassArrayElementSelect(expr, SelectBoundValue(idx_val), ctx, arena,
-                                 result)) {
-    return result;
-  }
-  auto base_val = EvalExpr(expr->base, ctx, arena);
-
   if (base_val.is_string && !expr->index_end)
     return EvalStringByteSelect(base_val, idx, arena);
   auto declared_idx = SelectBoundValue(idx_val);
@@ -691,6 +682,36 @@ Logic4Vec EvalSelect(const Expr* expr, SimContext& ctx, Arena& arena) {
   // other spelling of it and for the reasons set out there.
   auto off = static_cast<uint32_t>(range.OffsetOf(declared_idx));
   return ExtractBitField(arena, base_val, off, 1);
+}
+
+Logic4Vec EvalSelect(const Expr* expr, SimContext& ctx, Arena& arena) {
+  Logic4Vec result;
+  if (TryQueueSelect(expr, ctx, arena, result)) return result;
+  if (TryAssocSelect(expr, ctx, arena, result)) return result;
+  auto idx_val = EvalExpr(expr->index, ctx, arena);
+  if (HasUnknownBits(idx_val)) return EvalUnknownIndexSelect(expr, ctx, arena);
+  uint64_t idx = idx_val.ToUint64();
+  if (TryArrayElementSelect(expr, idx, ctx, arena, result)) return result;
+  if (TryCompoundArraySelect(expr, ctx, arena, result)) return result;
+  if (TryArraySliceSelect(expr, ctx, arena, result)) return result;
+  // §7.4.2: an element of a class property declared as an array, which the
+  // object holds one by one rather than as a value under the property's name.
+  if (TryClassArrayElementSelect(expr, SelectBoundValue(idx_val), ctx, arena,
+                                 result)) {
+    return result;
+  }
+  // §13.4.1: a call used as an expression is an implicit variable of its
+  // return type, so an index on a call that returned a queue, a dynamic array
+  // or a fixed-size unpacked array reads an element of it (§7.10.1, §7.4.5),
+  // where the vector the call hands back is one element's width and held the
+  // index itself as a bit-select. The call is run once, here; a slice of the
+  // aggregate is not read and takes the packed path as before.
+  std::optional<ReturnedAggregate> returned;
+  auto base_val = EvalWithReturnedAggregate(expr->base, ctx, arena, returned);
+  if (returned && expr->index_end == nullptr)
+    return ElementOfReturnedAggregate(*returned, SelectBoundValue(idx_val),
+                                      arena);
+  return SelectFromPackedValue(expr, base_val, idx_val, ctx, arena);
 }
 
 }  // namespace delta

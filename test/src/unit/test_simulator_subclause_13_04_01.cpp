@@ -744,4 +744,127 @@ TEST(FunctionReturnSim, ReturnOfTheFunctionNameCarriesItsWrittenMembers) {
   EXPECT_EQ(got->value.ToUint64(), 57u);
 }
 
+// §13.4.1 (printed pages 342-343): a nonvoid function call may be used as an
+// implicit variable of the return type within an expression, so a method
+// applies to a call returning a queue as to a queue variable, and §7.10.2.1
+// (printed 170) makes size() the number of its elements. The implicit
+// variable was one element wide and carried no elements, so the method read
+// 0 of a queue of three (#3807).
+TEST(FunctionReturnSim, SizeOfAQueueACallReturned) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  typedef int iq_t[$];\n"
+      "  function automatic iq_t fq();\n"
+      "    iq_t q;\n"
+      "    q.push_back(10);\n"
+      "    q.push_back(20);\n"
+      "    q.push_back(30);\n"
+      "    return q;\n"
+      "  endfunction\n"
+      "  int got;\n"
+      "  initial got = fq().size();\n"
+      "endmodule\n",
+      "got");
+  EXPECT_EQ(v, 3u);
+}
+
+// The same implicit variable indexed (§7.10.1, printed 170): `fq()[1]` is the
+// element at position 1, 20. The defect read the vector the call handed back
+// as a packed one and bit-selected it, answering the index itself, 1.
+TEST(FunctionReturnSim, IndexOfAQueueACallReturned) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  typedef int iq_t[$];\n"
+      "  function automatic iq_t fq();\n"
+      "    iq_t q;\n"
+      "    q.push_back(10);\n"
+      "    q.push_back(20);\n"
+      "    q.push_back(30);\n"
+      "    return q;\n"
+      "  endfunction\n"
+      "  int got;\n"
+      "  initial got = fq()[1];\n"
+      "endmodule\n",
+      "got");
+  EXPECT_EQ(v, 20u);
+}
+
+// A dynamic array returned (§7.5): §7.5.2 (printed 159) makes size() its
+// current size and §7.4.5 (printed 155) an index its element, so two elements
+// with 7 at position 1 combine to 27. The defect gave 0 for the size and 1,
+// the index, for the element, combining to 1.
+TEST(FunctionReturnSim, SizeAndIndexOfADynamicArrayACallReturned) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  typedef int ida_t[];\n"
+      "  int d[];\n"
+      "  function ida_t fd();\n"
+      "    d = new[2];\n"
+      "    d[1] = 7;\n"
+      "    return d;\n"
+      "  endfunction\n"
+      "  int got;\n"
+      "  initial got = fd().size() * 10 + fd()[1];\n"
+      "endmodule\n",
+      "got");
+  EXPECT_EQ(v, 27u);
+}
+
+// A fixed-size unpacked array returned, indexed at the call (§7.4.5, printed
+// 155): positions 1 and 2 of '{10, 20, 30} combine to 2030. The defect read
+// the index bits, 1 and 0, combining to 100; elements taken in the wrong
+// order read 2010.
+TEST(FunctionReturnSim, IndexOfAFixedArrayACallReturned) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  typedef int ia_t[3];\n"
+      "  function automatic ia_t fa();\n"
+      "    ia_t a;\n"
+      "    a[0] = 10;\n"
+      "    a[1] = 20;\n"
+      "    a[2] = 30;\n"
+      "    return a;\n"
+      "  endfunction\n"
+      "  int got;\n"
+      "  initial got = fa()[1] * 100 + fa()[2];\n"
+      "endmodule\n",
+      "got");
+  EXPECT_EQ(v, 2030u);
+}
+
+// A structure returned, its members selected on the call (§13.4.1 with §7.2,
+// printed 146): 3 and 4 combine to 34. The defect resolved `mk().a` to no
+// member and read 0; a member read at the other's window reads 43 or 44.
+TEST(FunctionReturnSim, MemberOfAnUnpackedStructACallReturned) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  typedef struct { int a; int b; } st_t;\n"
+      "  function st_t mk();\n"
+      "    mk.a = 3;\n"
+      "    mk.b = 4;\n"
+      "  endfunction\n"
+      "  int got;\n"
+      "  initial got = mk().a * 10 + mk().b;\n"
+      "endmodule\n",
+      "got");
+  EXPECT_EQ(v, 34u);
+}
+
+// The same over a packed structure (§7.2.1), whose members are windows of the
+// one vector the call hands back. 34 as above; 0 on the defect.
+TEST(FunctionReturnSim, MemberOfAPackedStructACallReturned) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  typedef struct packed { int a; int b; } st_t;\n"
+      "  function st_t mk();\n"
+      "    mk.a = 3;\n"
+      "    mk.b = 4;\n"
+      "  endfunction\n"
+      "  int got;\n"
+      "  initial got = mk().a * 10 + mk().b;\n"
+      "endmodule\n",
+      "got");
+  EXPECT_EQ(v, 34u);
+}
+
 }  // namespace
