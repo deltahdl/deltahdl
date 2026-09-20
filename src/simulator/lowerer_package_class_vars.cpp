@@ -16,6 +16,13 @@
 // name LowerVar records a module's under and every method path asks for; a
 // package's `process proc` and `weak_reference #(C) w` were recorded under
 // nothing, so `p1::proc.kill()` and `p1::w.get()` resolved no receiver.
+// §8.25 (printed 203) instantiates a parameterized class's object with §23.10's
+// parameter override rules, `G #(5) b`, and a method of the object reads the
+// value the specialization bound; LowerVar records a module variable's `#(...)`
+// through RecordClassParamActuals for ApplyClassParamOverrides to bind on the
+// object its `new` constructs, and a package variable's was recorded nowhere,
+// so `p1::b = new` built the default specialization and `p1::b.get_n()` read
+// the default. The actuals are recorded under the same "p1.b" key.
 
 #include <string>
 #include <string_view>
@@ -27,6 +34,7 @@
 #include "parser/ast_type.h"
 #include "simulator/lowerer_register.h"
 #include "simulator/sim_context.h"
+#include "simulator/statement_assign_internal.h"
 
 namespace delta {
 
@@ -122,6 +130,9 @@ void RegisterPackageClassVariables(const RtlirDesign* design, SimContext& ctx,
       auto* qname = arena.Create<std::string>(std::string(pkg->name) + "." +
                                               std::string(item->name));
       ctx.SetVariableClassType(*qname, *arena.Create<std::string>(key));
+      // §8.25: the specialization the declaration wrote, `G #(5) b`, bound on
+      // the object `p1::b = new` constructs; nothing for a bare `G b`.
+      RecordClassParamActuals(*qname, item->data_type.type_params, ctx);
     }
   }
 }

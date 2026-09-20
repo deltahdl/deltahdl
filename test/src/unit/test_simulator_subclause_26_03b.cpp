@@ -510,6 +510,39 @@ TEST(PackageScopeReferenceSim, ScopedPackageClassVariableConstructedWithNew) {
             351u * 100u + 27u);
 }
 
+// §8.25 (printed page 203 of ~/LRM.pdf) with §26.2 (printed 808): a package
+// variable declared with a specialization, `G #(5) b;`, is a handle of that
+// specialization, and the object `p1::b = new` constructs through the package
+// scope resolution operator binds N to 5, which a method of the object reads.
+// The lowerer recorded the package variable's class under "p1.b" and dropped
+// its `#(5)`, which only a module's declaration recorded, so the object was
+// built as the default specialization and get_n() read 1. A second variable
+// declared bare beside it reads the default, so the pair packs 5 * 10 + 1;
+// 11 would say the specialization was still dropped and 55 that the default
+// was bound wrongly.
+TEST(PackageScopeReferenceSim,
+     ScopedPackageClassVariableConstructedWithItsSpecialization) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  class G #(int N = 1);\n"
+                      "    function int get_n();\n"
+                      "      return N;\n"
+                      "    endfunction\n"
+                      "  endclass\n"
+                      "  G #(5) b;\n"
+                      "  G d;\n"
+                      "endpackage\n"
+                      "module t;\n"
+                      "  int y;\n"
+                      "  initial begin\n"
+                      "    p1::b = new;\n"
+                      "    p1::d = new;\n"
+                      "    y = p1::b.get_n() * 10 + p1::d.get_n();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            51u);
+}
+
 // §26.3 with A.2.8: a package import declaration is a block item declaration,
 // so a function body may open with one, and the import makes the package's
 // declarations visible in that body without a package name qualifier (printed
