@@ -703,4 +703,134 @@ TEST(UserDefinedTypeElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
+// §6.18 (printed page 118) ties a forward typedef's basic type to the
+// definition of the same scope, and §27.5 (printed 824) makes a generate block
+// a scope of its own, so the block's union pair_t is a declaration of another
+// scope than the module's forward struct pair_t and nothing is reported.
+TEST(UserDefinedTypeElaboration,
+     GenerateBlockTypedefIsNotJudgedByTheModuleForwardTypedef) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  typedef struct pair_t;\n"
+      "  typedef struct { int a; } pair_t;\n"
+      "  if (1) begin : g\n"
+      "    typedef union { int a; int b; } pair_t;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// The block's own forward typedef still judges the block's own definition:
+// reported at the definition's line.
+TEST(UserDefinedTypeElaboration,
+     GenerateBlockDefinitionNotConformingToTheBlockForwardTypedefIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  if (1) begin : g\n"
+      "    typedef struct pair_t;\n"
+      "    typedef union { int a; int b; } pair_t;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "typedef 'pair_t' does not conform to its forward declaration as struct",
+      4, "6.18"));
+}
+
+// A module definition below the block is judged by the module's own forward
+// typedef alone: the module's union pair_t is reported at its own line, and
+// the block's union pair_t, a scope of its own, is reported nowhere.
+TEST(UserDefinedTypeElaboration,
+     ModuleDefinitionBelowAGenerateBlockIsJudgedByTheModuleForwardTypedef) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  typedef struct pair_t;\n"
+      "  if (1) begin : g\n"
+      "    typedef union { int a; int b; } pair_t;\n"
+      "  end\n"
+      "  typedef union { int a; int b; } pair_t;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "typedef 'pair_t' does not conform to its forward declaration as struct",
+      6, "6.18"));
+  int reports = 0;
+  for (const auto& d : f.diag.Diagnostics()) {
+    if (d.message.find("does not conform") != std::string::npos) ++reports;
+  }
+  EXPECT_EQ(reports, 1);
+}
+
+// A block's forward typedef stayed in the table after the block, so a sibling
+// block's union pair_t, written in a scope of its own, was reported as not
+// conforming to g's forward struct; nothing is reported.
+TEST(UserDefinedTypeElaboration,
+     SiblingGenerateBlockForwardTypedefDoesNotJudgeALaterBlockDefinition) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  if (1) begin : g\n"
+      "    typedef struct pair_t;\n"
+      "    typedef struct { int a; } pair_t;\n"
+      "  end\n"
+      "  if (1) begin : h\n"
+      "    typedef union { int a; int b; } pair_t;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// The nested block h's forward enum stayed in the table after h, so g's own
+// struct pair_t below h was reported as not conforming to it; nothing is
+// reported, h's forward typedef being a declaration of h's scope.
+TEST(UserDefinedTypeElaboration,
+     NestedGenerateBlockForwardTypedefDoesNotJudgeTheEnclosingDefinition) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  if (1) begin : g\n"
+      "    if (1) begin : h\n"
+      "      typedef enum pair_t;\n"
+      "      typedef enum { A, B } pair_t;\n"
+      "    end\n"
+      "    typedef struct { int a; } pair_t;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// The enclosing block's forward typedef is back in place below the nested
+// block: g's forward struct judges g's union pair_t written below h, and h's
+// own struct pair_t, a scope of its own, is not what it is judged against.
+TEST(UserDefinedTypeElaboration,
+     EnclosingBlockForwardTypedefJudgesItsDefinitionBelowANestedBlock) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  if (1) begin : g\n"
+      "    typedef struct pair_t;\n"
+      "    if (1) begin : h\n"
+      "      typedef struct { int a; } pair_t;\n"
+      "    end\n"
+      "    typedef union { int a; int b; } pair_t;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "typedef 'pair_t' does not conform to its forward declaration as struct",
+      7, "6.18"));
+}
+
 }  // namespace

@@ -342,6 +342,14 @@ void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
   if (HandleForwardTypedef(item, typedefs_, forward_typedef_kinds_, diag_)) {
     return;
   }
+  // §6.18 (printed page 118) ties the forward typedef's basic type to the
+  // definition of the same scope, and §27.5 (printed 824) makes a generate
+  // block a scope of its own, so the table holds the forward kinds of the
+  // scope this definition stands in alone: TakeEnclosingTypedefs in
+  // src/elaborator/elaborator_generate.cpp takes the enclosing scope's out
+  // for a block's walk and erases the block's own after it. Until it did, a
+  // block's forward kind stayed in the table and judged a sibling block's or
+  // the enclosing block's definition of the name (found by b0ea40995's agent).
   auto it = forward_typedef_kinds_.find(item->name);
   if (it != forward_typedef_kinds_.end() &&
       it->second != item->typedef_type.kind) {

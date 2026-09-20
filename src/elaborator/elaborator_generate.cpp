@@ -221,45 +221,82 @@ void Elaborator::ElaborateGenerateBlockItem(ModuleItem* item,
 // (printed 761) has a name the block declares locally stand over the
 // enclosing scope's, and §6.18 (printed 118) introduces a forward typedef's
 // name in the scope it stands in, with the definition to follow in that same
-// scope. The block's items are walked with the enclosing scope's table, so a
-// name the block declares as a typedef met the enclosing scope's entry there:
-// the block's `typedef struct pair_t;` kept a module pair_t already in the
-// table, HandleForwardTypedef in src/elaborator/elaborator_typedef.cpp
-// admitting a forward typedef repeated after its own definition, and a
-// function of the block between that forward typedef and the definition was
-// resolved at its item to the module's one-member pair_t and kept, `g.f(tagged
-// A '{3, 4})` reading 30 for §7.2.1's 34; and a nested block's definition
-// stayed in the table after the nested block's items, so a function of g
-// written below h resolved pair_t to h's three-member one -- both
-// ccc8d1f7f's remainders, found by a2d48456a's agent. The enclosing entry of
-// every name a typedef item of the block declares, above or below any
-// subroutine, is taken out ahead of the walk and handed back for
-// RestoreEnclosingTypedefs to put in place once the block's items are done,
-// so the forward typedef installs its placeholder over nothing, the
-// definition writes over that, and the enclosing scope sees its own entry
-// again below the block. A name the enclosing scope has no entry for stays as
-// the block leaves it, since Elaborator::ProcessPendingGenerate folds the
-// block's typedefs into the design-wide table for §20.6.2's $bits and would
-// find nothing otherwise. A block declaring no typedef costs nothing here.
-using EnclosingTypedefs = std::vector<std::pair<std::string_view, DataType>>;
+// scope and its basic type conforming to the forward typedef's. The block's
+// items are walked with the enclosing scope's tables, so a name the block
+// declares as a typedef met the enclosing scope's entry there: the block's
+// `typedef struct pair_t;` kept a module pair_t already in the table,
+// HandleForwardTypedef in src/elaborator/elaborator_typedef.cpp admitting a
+// forward typedef repeated after its own definition, and a function of the
+// block between that forward typedef and the definition was resolved at its
+// item to the module's one-member pair_t and kept, `g.f(tagged A '{3, 4})`
+// reading 30 for §7.2.1's 34; and a nested block's definition stayed in the
+// table after the nested block's items, so a function of g written below h
+// resolved pair_t to h's three-member one -- both ccc8d1f7f's remainders,
+// found by a2d48456a's agent. The enclosing entry of every name a typedef
+// item of the block declares, above or below any subroutine, is taken out
+// ahead of the walk and handed back for RestoreEnclosingTypedefs to put in
+// place once the block's items are done, so the forward typedef installs its
+// placeholder over nothing, the definition writes over that, and the
+// enclosing scope sees its own entry again below the block. A name the
+// enclosing scope has no entry for stays as the block leaves it, since
+// Elaborator::ProcessPendingGenerate folds the block's typedefs into the
+// design-wide table for §20.6.2's $bits and would find nothing otherwise.
+//
+// The forward kinds Elaborator::ElaborateTypedef checks a definition against
+// take the same trip, and the block's own are erased on the way back: the
+// table was written by the block and read by whatever came after it, so a
+// block's `typedef struct pair_t;` reached a sibling block's `typedef union
+// {...} pair_t;`, written in a scope of its own, and a nested block's
+// `typedef enum pair_t;` reached the enclosing block's `typedef struct {...}
+// pair_t;` below the nested block, each reported as not conforming to a
+// forward typedef of another scope -- b0ea40995's remainder, found by its
+// agent. The block's own forward typedef is still recorded over nothing and
+// still judges the block's own definition, and the enclosing scope's forward
+// kind, back in place below the block, judges the enclosing scope's own
+// definition alone. A block declaring no typedef costs nothing here.
+struct EnclosingTypedefs {
+  // Every name a typedef item of the block declares, forward or definition,
+  // which is what the block's walk may have written into the forward kinds.
+  std::vector<std::string_view> block_names;
+  std::vector<std::pair<std::string_view, DataType>> typedefs;
+  std::vector<std::pair<std::string_view, DataTypeKind>> forward_kinds;
+};
+
+using ForwardTypedefKinds = std::unordered_map<std::string_view, DataTypeKind>;
+
+template <typename Map>
+static void TakeEnclosingEntry(
+    std::string_view name, Map& map,
+    std::vector<std::pair<std::string_view, typename Map::mapped_type>>&
+        taken) {
+  auto it = map.find(name);
+  if (it == map.end()) return;
+  taken.emplace_back(it->first, it->second);
+  map.erase(it);
+}
 
 static EnclosingTypedefs TakeEnclosingTypedefs(
-    const std::vector<ModuleItem*>& items, TypedefMap& typedefs) {
+    const std::vector<ModuleItem*>& items, TypedefMap& typedefs,
+    ForwardTypedefKinds& forward_kinds) {
   EnclosingTypedefs taken;
   for (const auto* item : items) {
     if (item->kind != ModuleItemKind::kTypedef) continue;
-    auto it = typedefs.find(item->name);
-    if (it == typedefs.end()) continue;
-    taken.emplace_back(it->first, it->second);
-    typedefs.erase(it);
+    taken.block_names.push_back(item->name);
+    TakeEnclosingEntry(item->name, typedefs, taken.typedefs);
+    TakeEnclosingEntry(item->name, forward_kinds, taken.forward_kinds);
   }
   return taken;
 }
 
 static void RestoreEnclosingTypedefs(const EnclosingTypedefs& taken,
-                                     TypedefMap& typedefs) {
-  for (const auto& [name, dtype] : taken) {
+                                     TypedefMap& typedefs,
+                                     ForwardTypedefKinds& forward_kinds) {
+  for (const auto& [name, dtype] : taken.typedefs) {
     typedefs.insert_or_assign(name, dtype);
+  }
+  for (auto name : taken.block_names) forward_kinds.erase(name);
+  for (const auto& [name, kind] : taken.forward_kinds) {
+    forward_kinds.insert_or_assign(name, kind);
   }
 }
 
@@ -285,11 +322,12 @@ void Elaborator::ElaborateGenerateItems(const std::vector<ModuleItem*>& items,
   // step to gen_prefix_scopes_ as the walk reaches it. The steps are the
   // block's and end with its items, so the list is put back as it was found.
   GenBlockPrefixes entry_prefix_scopes = gen_prefix_scopes_;
-  // §27.5 with §23.9 and §6.18: the enclosing scope's entries for the names
-  // these items declare as typedefs, out for the walk and back after it; see
+  // §27.5 with §23.9 and §6.18: the enclosing scope's typedefs and forward
+  // typedef kinds for the names these items declare as typedefs, out for the
+  // walk and back after it, the block's own forward kinds erased; see
   // TakeEnclosingTypedefs.
   EnclosingTypedefs enclosing_typedefs =
-      TakeEnclosingTypedefs(items, typedefs_);
+      TakeEnclosingTypedefs(items, typedefs_, forward_typedef_kinds_);
   // §27.2 rules that "all other module items, including other generate
   // constructs, are allowed in a generate block" once port declarations,
   // specify blocks and specparam declarations are excluded, so a function may
@@ -389,7 +427,8 @@ void Elaborator::ElaborateGenerateItems(const std::vector<ModuleItem*>& items,
   // the enclosing scope (§27.3), and a member resolved already resolves to
   // the same type again.
   ResolveModuleSubroutineFormalTypes(items, typedefs_, arena_);
-  RestoreEnclosingTypedefs(enclosing_typedefs, typedefs_);
+  RestoreEnclosingTypedefs(enclosing_typedefs, typedefs_,
+                           forward_typedef_kinds_);
   gen_prefix_scopes_ = std::move(entry_prefix_scopes);
   mod->default_disable_iff = enclosing_default_disable_iff;
   gen_const_scope_ = saved_gen_const_scope;
