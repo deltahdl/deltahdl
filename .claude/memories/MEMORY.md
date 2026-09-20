@@ -22,6 +22,7 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 ## Formatting and prose
 
 - [Formatting with clang-format](clang-format-style-flag.md) — `clang-format -i --style=google` on every touched file; the style flag is required.
+- [clang-format on C++ paths only](clang-format-only-cpp-paths.md) — filter the touched paths to `.cpp`/`.h`; a CMakeLists.txt fed to it is rewritten as C++ and stops parsing.
 - [Annex files are not edited](annex-files-are-not-edited.md) — `vpi_user.h` is Annex K.2's text byte for byte; a platform shim goes in the build, never in the file.
 - [Include what you use](include-what-you-use.md) — name the header that declares each symbol used and none that is unused; no umbrella headers, `vpi_user.h` is Annex K.2's one C file, and an include finding fails the job.
 - [Markdown opens with a heading](markdown-top-level-heading.md) — MD041 runs across `**/*.md` with `--dot`, so the notes are linted too.
@@ -74,7 +75,7 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 
 ## Issues
 
-- [Solve what the session finds](solving-what-a-session-finds.md) — fix it in this session rather than filing it; a failing integration or e2e test in deltahdl.yml is the one exception.
+- [Solve what the session finds](solving-what-a-session-finds.md) — fix it in this session rather than filing it; a failing integration test in deltahdl.yml is the one exception.
 - [What does not get filed](what-does-not-get-filed.md) — nothing the commit in hand fixes, nothing an open issue already covers.
 - [One indivisible problem per issue](one-indivisible-problem-per-issue.md) — one defect, one fix per issue; an issue found holding two is split there and then.
 - [Research lives in issues](research-lives-in-issues.md) — a plan that outlives the session, and each finding it yields, is filed as it arises; the task list and scratchpad are not durable.
