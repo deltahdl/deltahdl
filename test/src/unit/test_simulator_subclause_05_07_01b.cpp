@@ -829,4 +829,74 @@ TEST(IntegerLiteralSim, UnbasedUnsizedOneFillsAPackageParameterSizedByAnother) {
   EXPECT_EQ(result & 0xFFFFu, 0xFFFu);
 }
 
+// §5.7.1 (printed page 77, last paragraph): an unsized literal whose
+// high-order digit is x is extended with x to the size of the expression that
+// holds it, so `'bx1` in a declaration initializer is 32 bits of x over a 1
+// and the 8-bit object takes xxxxxxx1. The initializer's resize dropped every
+// x and left 00000001.
+TEST(IntegerLiteralSim, UnsizedBinaryXHighDigitExtendsWithXInAnInitializer) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] a = 'bx1;\n"
+      "  logic c;\n"
+      "  initial c = ($sformatf(\"%b\", a) == \"xxxxxxx1\");\n"
+      "endmodule\n",
+      "c");
+  EXPECT_EQ(result, 1u);
+}
+
+// §5.7.1: the same extension with z, `'bz10` in an 8-bit object being
+// zzzzzz10 rather than the 00000010 the dropped z bits left.
+TEST(IntegerLiteralSim, UnsizedBinaryZHighDigitExtendsWithZInAnInitializer) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] b = 'bz10;\n"
+      "  logic c;\n"
+      "  initial c = ($sformatf(\"%b\", b) == \"zzzzzz10\");\n"
+      "endmodule\n",
+      "c");
+  EXPECT_EQ(result, 1u);
+}
+
+// §5.7.1: an x digit in an octal literal sets three bits, and a leading 0
+// digit pads with zeros, so `'o0x1` is 000 xxx 001 and the 8-bit object takes
+// 00xxx001; the three x bits read as zeros before.
+TEST(IntegerLiteralSim,
+     UnsizedOctalXDigitBelowAZeroSetsThreeBitsInAnInitializer) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] o = 'o0x1;\n"
+      "  logic c;\n"
+      "  initial c = ($sformatf(\"%b\", o) == \"00xxx001\");\n"
+      "endmodule\n",
+      "c");
+  EXPECT_EQ(result, 1u);
+}
+
+// §5.7.1: `'hx` is at least 32 bits of x, so the 8-bit object it initializes
+// is all x; it read 00000000.
+TEST(IntegerLiteralSim, UnsizedHexXFillsAnEightBitInitializer) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] d = 'hx;\n"
+      "  logic c;\n"
+      "  initial c = ($sformatf(\"%b\", d) == \"xxxxxxxx\");\n"
+      "endmodule\n",
+      "c");
+  EXPECT_EQ(result, 1u);
+}
+
+// §5.7.1: extended past the literal's own 32 bits as well, `'hz` initializing
+// a 64-bit object sets all 64 to z, as the procedural `x = 'hz` already did.
+TEST(IntegerLiteralSim, UnsizedHexZExtendsASixtyFourBitInitializer) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [63:0] w = 'hz;\n"
+      "  logic c;\n"
+      "  initial c = ($sformatf(\"%h\", w) == \"zzzzzzzzzzzzzzzz\");\n"
+      "endmodule\n",
+      "c");
+  EXPECT_EQ(result, 1u);
+}
+
 }  // namespace
