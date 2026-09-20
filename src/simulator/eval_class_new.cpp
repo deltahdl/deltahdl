@@ -318,6 +318,29 @@ static void BindLevelFormals(const ModuleItem* ctor, ConstructorActuals actuals,
   }
 }
 
+// §8.7 and §13.5: a constructor's arguments follow the ordinary subroutine
+// conventions, so when the level's constructor returns each `output` or
+// `inout` formal is copied into the actual it was bound from, the level's
+// scope still on top for WritebackOutputArgs to take off. The caller's
+// actuals -- the `new` call's own, or the trailing ones §8.17's `default`
+// forwards to the base -- are the caller's expressions, so they are assigned
+// with the caller's `this` in force, as BindCallerConstructorArgs bound them;
+// a `super.new(oid)` actual is the derived constructor's own and is assigned
+// into its scope, from where the derived level copies it out in turn.
+static void WritebackLevelFormals(const ModuleItem* ctor,
+                                  ConstructorActuals actuals, SimContext& ctx,
+                                  Arena& arena) {
+  if (!actuals.args) return;
+  if (!actuals.are_callers) {
+    WritebackOutputArgs(ctor, actuals.args, ctx, arena);
+    return;
+  }
+  ClassObject* constructed = ctx.CurrentThis();
+  ctx.PopThis();
+  WritebackOutputArgs(ctor, actuals.args, ctx, arena);
+  ctx.PushThis(constructed);
+}
+
 // §8.7's object under construction, with the `new` call that asked for it and
 // the run it is built in, carried through the levels of its class chain.
 struct Construction {
@@ -348,7 +371,8 @@ static void ConstructBaseThenDefaults(const ClassTypeInfo* info,
 // are initialized -- after the base constructor, so a default such as
 // `d2 = c2` reads what it wrote -- and then the rest of the constructor body
 // runs, its leading `super.new` doing nothing more
-// (IsSuperNewRunByConstruction). A level with no constructor has the implicit
+// (IsSuperNewRunByConstruction), and its output formals are copied out
+// (WritebackLevelFormals). A level with no constructor has the implicit
 // one: the base call and the property initialization alone. The level's class
 // is pushed while the base's actuals are bound and the body runs, as §8.15 has
 // `super` and the names of shadowed members resolve against the lexically
@@ -362,6 +386,7 @@ static void ConstructLevel(const ClassTypeInfo* info,
   if (ctor) {
     Variable dummy;
     ExecFunctionBody(ctor, &dummy, c.ctx, c.arena);
+    WritebackLevelFormals(ctor, actuals, c.ctx, c.arena);
   }
   c.ctx.PopMethodClass();
   if (ctor) c.ctx.PopScope();

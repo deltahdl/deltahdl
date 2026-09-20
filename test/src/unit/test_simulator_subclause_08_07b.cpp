@@ -284,4 +284,134 @@ TEST(ClassConstructorSim,
       5011u);
 }
 
+// §8.7 gives a constructor's arguments the conventions of any other subroutine
+// call, and §13.5 has the return copy an output formal into the call's
+// variable: after `a = new(ia)` with the constructor writing `oid = m_id`, the
+// caller's `ia` holds what the object's `id` holds. The counter starts at 3 so
+// an output formal never copied out, which leaves `ia` at 0, reads 3 rather
+// than 33.
+TEST(ClassConstructorSim, OutputFormalOfNewIsCopiedOutToTheCallersVariable) {
+  EXPECT_EQ(RunAndGet("class Base;\n"
+                      "  static local int m_id = 3;\n"
+                      "  int id;\n"
+                      "  function new(output int oid);\n"
+                      "    oid = m_id;\n"
+                      "    id = m_id;\n"
+                      "    m_id++;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int ia;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    Base a;\n"
+                      "    a = new(ia);\n"
+                      "    result = ia * 10 + a.id;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            33u);
+}
+
+// §8.7 and §13.5: each `new(...)` call copies the output formal into its own
+// actual, so two constructions leave `ia` at 0 and `ib` at 1, the values of
+// `a.id` and `b.id`; the four are packed as one integer, and a copy-out that
+// never happened leaves `ib` at 0, reading 1 rather than 101.
+TEST(ClassConstructorSim, OutputFormalOfNewIsCopiedOutOnEachConstruction) {
+  EXPECT_EQ(RunAndGet("class Base;\n"
+                      "  static local int m_id = 0;\n"
+                      "  int id;\n"
+                      "  function new(output int oid);\n"
+                      "    oid = m_id;\n"
+                      "    id = m_id;\n"
+                      "    m_id++;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int ia, ib;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    Base a, b;\n"
+                      "    a = new(ia);\n"
+                      "    b = new(ib);\n"
+                      "    result = ia * 1000 + ib * 100 + a.id * 10 + b.id;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            101u);
+}
+
+// §8.7 and §8.15: a subclass constructor passing its own output formal to
+// `super.new(oid)` receives the base constructor's value in that formal when
+// the base returns, and copies it out to the caller in turn when it returns
+// itself, so `ic` reads the 5 the base counter held; the subclass adds 100 to
+// what came back before it returns, telling a copy made at the base level from
+// one made at the outer level alone. A chain copying out at neither level
+// leaves `ic` at 0, reading 5 rather than 1055.
+TEST(ClassConstructorSim,
+     OutputFormalOfNewIsCopiedOutThroughASubclassSuperNewCall) {
+  EXPECT_EQ(RunAndGet("class Base;\n"
+                      "  static local int m_id = 5;\n"
+                      "  int id;\n"
+                      "  function new(output int oid);\n"
+                      "    oid = m_id;\n"
+                      "    id = m_id;\n"
+                      "    m_id++;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "class D extends Base;\n"
+                      "  function new(output int oid);\n"
+                      "    super.new(oid);\n"
+                      "    oid = oid + 100;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int ic;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    D c;\n"
+                      "    c = new(ic);\n"
+                      "    result = ic * 10 + c.id;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            1055u);
+}
+
+// §8.17: a subclass constructor declared `new(default)` forwards the caller's
+// trailing actuals to the base constructor, so the base's output formal is
+// bound from the caller's `ic` and copied out to it when the base returns,
+// with the subclass's own scope still on the stack between them; the third
+// construction leaves `ic` at 2 beside `c.id`, reading 22 rather than 2.
+TEST(ClassConstructorSim,
+     OutputFormalOfNewIsCopiedOutThroughASubclassDefaultArgument) {
+  EXPECT_EQ(RunAndGet("class Base;\n"
+                      "  static local int m_id = 0;\n"
+                      "  int id;\n"
+                      "  function new(output int oid);\n"
+                      "    oid = m_id;\n"
+                      "    id = m_id;\n"
+                      "    m_id++;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "class A extends Base;\n"
+                      "  function new(default);\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int ia, ib, ic;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    Base a, b;\n"
+                      "    A c;\n"
+                      "    a = new(ia);\n"
+                      "    b = new(ib);\n"
+                      "    c = new(ic);\n"
+                      "    result = ic * 10 + c.id;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            22u);
+}
+
 }  // namespace
