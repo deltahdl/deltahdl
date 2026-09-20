@@ -306,4 +306,58 @@ TEST(WideOperators, MultiplicationStaysOnTheLowWord) {
   EXPECT_EQ(ParamValue(design, "ML"), 0xFFFFFFFE);
 }
 
+// §6.20.2 (printed page 126): a parameter with a range specification has the
+// range of its declaration, whichever way the bounds are written, so `logic
+// [HI:1] V` under `localparam int HI = 8` is eight bits and `V[HI]` its top
+// one (§11.5.1, printed 296). RtlirParamDecl::decl_width is folded without
+// the earlier parameters in scope and is left at the vector's one bit where a
+// bound names one, and 64b2dfbe0's RegisteredParamValue read that width, so
+// V was cut to its low bit and `V[HI]` folded to 0; $bits(V) answered 1 from
+// the same field. The bounds themselves fold against the parameters already
+// elaborated, and the width is read from them now: 1 from `V[HI]`, 0 from
+// `V[HI-1]` and 8 from $bits(V).
+TEST(DeclaredWidth, RangeBoundWrittenAsAParameterSizesTheValue) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  localparam int HI = 8;\n"
+      "  localparam logic [HI:1] V = 8'b1010_0101;\n"
+      "  localparam W = V[HI];\n"
+      "  localparam W6 = V[HI-1];\n"
+      "  localparam int BV = $bits(V);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(ParamValue(design, "W"), 1);
+  EXPECT_EQ(ParamValue(design, "W6"), 0);
+  EXPECT_EQ(ParamValue(design, "BV"), 8);
+}
+
+// The same declaration past 64 bits: `logic [TOP:0] P` under `localparam int
+// TOP = 95` is 96 bits, and its words above bit 63 are read from the refold
+// of its value only where the declared width is known to reach them. With
+// the width read as one bit no refold was made, so `P[64]`, `P[TOP:64]` and
+// $bits(P) folded to 0, 0 and 1 where 1, 1 and 96 are right; `P[65]` is 0
+// either way and pins that the bit above the set one stays clear.
+TEST(DeclaredWidth, RangeBoundWrittenAsAParameterReachesTheWordsAboveBit63) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  localparam int TOP = 95;\n"
+      "  localparam logic [TOP:0] P = 96'h0000_0001_FFFF_FFFF_FFFF_FFFF;\n"
+      "  localparam B64 = P[64];\n"
+      "  localparam B65 = P[65];\n"
+      "  localparam int PH = P[TOP:64];\n"
+      "  localparam int BP = $bits(P);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(ParamValue(design, "B64"), 1);
+  EXPECT_EQ(ParamValue(design, "B65"), 0);
+  EXPECT_EQ(ParamValue(design, "PH"), 1);
+  EXPECT_EQ(ParamValue(design, "BP"), 96);
+}
+
 }  // namespace

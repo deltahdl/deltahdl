@@ -95,6 +95,25 @@ static bool HasDeclaredWidth(const RtlirParamDecl& pd) {
   return pd.has_decl_range || (pd.has_decl_type && !pd.decl_type_implicit);
 }
 
+// §6.20.2 (printed page 126): the width a declaration with a range fixes is
+// the range's. RtlirParamDecl::decl_width is that width where both bounds
+// are literals, but it is folded without the earlier parameters in scope
+// (PopulateParamTypeInfo in elaborator_items.cpp), so a bound written as one
+// -- `logic [HI:1] V` under `localparam int HI = 8` -- does not fold there and
+// leaves decl_width at the vector type's one bit. The two bounds are folded
+// against the parameters already elaborated (RecordParamDeclRange), so the
+// range they span is the declaration's width wherever it exceeds decl_width.
+// 64b2dfbe0 read decl_width alone, which cut V to its low bit and made
+// `V[HI]` 0 and $bits(V) 1. A second packed dimension is not recorded with
+// the bounds, so `logic [HI:1][3:0]` still reads the first dimension's span.
+static uint32_t DeclaredParamWidth(const RtlirParamDecl& pd) {
+  if (!pd.has_decl_range || !pd.has_decl_range_bounds) return pd.decl_width;
+  int64_t left = pd.decl_range_left;
+  int64_t right = pd.decl_range_right;
+  int64_t span = (left >= right ? left - right : right - left) + 1;
+  return std::max(pd.decl_width, static_cast<uint32_t>(span));
+}
+
 // §23.10.2: the expression an instance override gave the parameter where it
 // is a literal, which names nothing and so reads the same in every scope.
 // Null for an override written as anything else, which stands in the
@@ -110,7 +129,7 @@ static const Expr* LiteralOverrideExpr(const RtlirParamDecl& pd) {
 // §6.20.2 (printed pages 126-127): the number of bits a value parameter holds.
 // A parameter declared with a range has the range of its declaration, and one
 // declared with a type and no range is of that type, so both answer from
-// RtlirParamDecl::decl_width. A parameter declared with neither, or with a
+// DeclaredParamWidth. A parameter declared with neither, or with a
 // bare `signed`, takes an implied range from the size of the final value
 // assigned to it, at least 32 bits when that value is unsized, which is the
 // width the fold of the value carries -- 8 for `localparam Q = 8'hFF` and 32
@@ -123,8 +142,9 @@ static std::optional<int64_t> ParamDeclBits(const RtlirParamDecl& pd) {
   if (pd.is_type_param || pd.is_real_value || pd.is_string_value)
     return std::nullopt;
   if (HasDeclaredWidth(pd)) {
-    if (pd.decl_width == 0) return std::nullopt;
-    return static_cast<int64_t>(pd.decl_width);
+    uint32_t width = DeclaredParamWidth(pd);
+    if (width == 0) return std::nullopt;
+    return static_cast<int64_t>(width);
   }
   if (pd.from_override) {
     const Expr* lit = LiteralOverrideExpr(pd);
@@ -395,9 +415,10 @@ std::optional<ConstVal> RegisteredParamValue(std::string_view name,
   const RtlirParamDecl* pd = RegisteredParamNamed(name);
   if (pd == nullptr || pd->resolved_value != value) return std::nullopt;
   bool declared = HasDeclaredWidth(*pd);
+  uint32_t decl_width = DeclaredParamWidth(*pd);
   std::optional<ConstVal> refold;
-  if (!declared || pd->decl_width > 64) refold = RefoldParamValue(*pd);
-  uint32_t width = declared ? pd->decl_width : refold ? refold->width : 32;
+  if (!declared || decl_width > 64) refold = RefoldParamValue(*pd);
+  uint32_t width = declared ? decl_width : refold ? refold->width : 32;
   bool is_signed = declared ? pd->decl_is_signed
                    : refold ? refold->is_signed
                             : true;
