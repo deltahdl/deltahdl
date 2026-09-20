@@ -133,6 +133,18 @@ AssocArrayObject* SimContext::FindAssocArray(std::string_view name) {
   return (it != assoc_arrays_.end()) ? it->second : nullptr;
 }
 
+void SimContext::AliasQueue(std::string_view alias_name,
+                            std::string_view target_name) {
+  auto it = queues_.find(target_name);
+  if (it != queues_.end()) queues_[alias_name] = it->second;
+}
+
+void SimContext::AliasAssocArray(std::string_view alias_name,
+                                 std::string_view target_name) {
+  auto it = assoc_arrays_.find(target_name);
+  if (it != assoc_arrays_.end()) assoc_arrays_[alias_name] = it->second;
+}
+
 // §23.9: a net declared inside a module instance is stored under that
 // instance's prefix (CreateChildModuleNets in lowerer_child.cpp), so the
 // prefixed name is what a bare reference from within the instance denotes and

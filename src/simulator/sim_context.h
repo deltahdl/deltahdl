@@ -118,9 +118,8 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   // stop that program completion (§24) raises through RequestStop(): that only
   // tells running processes to stop starting new work and lets the event
   // calendar drain naturally, so a program's own pending nonblocking assign
-  // still takes effect. RequestFinish() raises both so process loops that guard
-  // on StopRequested() still unwind, while the scheduler halts on
-  // FinishRequested().
+  // still takes effect. RequestFinish() raises both, so process loops guarding
+  // on StopRequested() unwind while the scheduler halts on FinishRequested().
   void RequestFinish();
   bool FinishRequested() const { return finish_requested_; }
 
@@ -154,9 +153,8 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   // modules, tasks, functions, and named blocks defined at the current scope
   // level (the interactive scope above), and with a nonzero integer argument
   // every one in or below it. HierarchicalScopesUnder answers that list from
-  // the registered names, in sorted order; RecordShowScopes remembers the
-  // scope shown and whether the listing recursed so the selection can be
-  // observed.
+  // the registered names, sorted; RecordShowScopes remembers the scope shown
+  // and whether the listing recursed, so the selection can be observed.
   std::vector<std::string> HierarchicalScopesUnder(std::string_view scope,
                                                    bool recursive) const;
   void RecordShowScopes(std::string_view scope, bool recursive);
@@ -168,9 +166,8 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   // above), every one with no argument and the named ones with a list, a
   // selection of a vector standing for the whole vector. RegisterScopeVariables
   // holds the names a module instance declares under its complete scope name;
-  // ScopeVariables answers them, null for a scope that is no module instance.
-  // RecordShowVars remembers the scope and the names given so the selection
-  // can be observed.
+  // ScopeVariables answers them, null for a scope that is no module instance,
+  // and RecordShowVars remembers the scope and the names given for observation.
   void RegisterScopeVariables(std::string_view scope, ScopeVariableSet set);
   const ScopeVariableSet* ScopeVariables(std::string_view scope) const;
   void RecordShowVars(std::string_view scope, std::vector<std::string> vars);
@@ -218,8 +215,7 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   void SetCurrentScopeName(std::string_view name);
   const std::string& CurrentScopeName() const { return current_scope_name_; }
 
-  // Timescale of the compilation unit, reported when the $unit argument is
-  // passed to $timeunit/$timeprecision.
+  // The compilation unit's timescale, what $timeunit($unit) reports.
   void SetCompUnitTimeScale(const TimeScale& ts) { compunit_timescale_ = ts; }
   const TimeScale& CompUnitTimeScale() const { return compunit_timescale_; }
 
@@ -244,9 +240,8 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   // §18.17.7: while a randsequence production with a non-void return type is
   // being generated, the engine points the return slot at the production's
   // return-value storage, and a 'return <expr>' anywhere in the production's
-  // code blocks evaluates into it. The slot is null outside randsequence value
-  // generation. The setter returns the previous slot so nested production
-  // generation can save and restore it.
+  // code blocks evaluates into it; null outside randsequence value generation.
+  // The setter answers the previous slot so nested generation restores it.
   Logic4Vec* SetRsReturnSlot(Logic4Vec* slot);
   Logic4Vec* RsReturnSlot() const { return rs_return_slot_; }
 
@@ -336,9 +331,8 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   VcdWriter* OpenVcdDumpFromTask(VcdFileType type);
   // §21.7.3.6.1: record the final simulation time and close both dumps, which
   // is what puts the buffered value changes on disk. A run ends with whatever
-  // dumps its source opened still open, and a source may have opened either or
-  // both. WriteVcdClose writes nothing on a 4-state dump, which §21.7.3.6
-  // gives no such keyword command.
+  // dumps its source opened still open, either or both. WriteVcdClose writes
+  // nothing on a 4-state dump, which §21.7.3.6 gives no such keyword command.
   void CloseVcdDump();
   // §21.7.3.6.1: close the extended dump alone, which is what $vcdclose
   // terminates. §21.7.3.6 adds the keyword to the extended format alone, so a
@@ -373,9 +367,8 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   // pure-result reuse, §35.5.3's call chain, §35.6.2's value changes, §35.9's
   // disable protocol -- are the rules a design's calls meet.
   // §35.5.3: installing a registry also makes it the one the C layer's
-  // svGetScope and svSetScope read and write, because the two answering
-  // differently is two answers to the question of which instance of an exported
-  // subroutine a call reaches.
+  // svGetScope and svSetScope read and write, so that only one answer exists
+  // to which instance of an exported subroutine a call reaches.
   void SetDpiRuntime(DpiRuntime* dpi);
   DpiRuntime* GetDpiRuntime() { return dpi_runtime_; }
 
@@ -392,10 +385,9 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   bool IsReactiveContext() const;
 
   // §23.9: a name written without a hierarchical path resolves within the
-  // module instance holding its declaration. A running process names the
-  // instance it belongs to, but a declaration initializer is evaluated before
-  // any process exists, so whatever builds an instance's declarations states
-  // the instance here instead.
+  // module instance holding its declaration. A running process names its own
+  // instance, but a declaration initializer is evaluated before any process
+  // exists, so whatever builds an instance's declarations states it here.
   void SetLoweringInstancePrefix(std::string_view prefix);
 
   // The instance a name written without a hierarchical path resolves within:
@@ -539,11 +531,19 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   QueueObject* CreateQueue(std::string_view name, uint32_t elem_width,
                            int32_t max_size = -1, bool is_4state = true);
   QueueObject* FindQueue(std::string_view name);
+  // §26.3: the queue `target_name` names, answered under `alias_name` too, as
+  // AliasVariable answers the variable, for an imported or re-exported package
+  // queue reached by its bare or its exporter's name. Nothing where no queue
+  // stands under the target. Defined in sim_context_fileio.cpp.
+  void AliasQueue(std::string_view alias_name, std::string_view target_name);
 
   AssocArrayObject* CreateAssocArray(std::string_view name, uint32_t elem_width,
                                      bool is_string_key,
                                      const AssocArraySpec& spec = {});
   AssocArrayObject* FindAssocArray(std::string_view name);
+  // The same for an associative array. Defined in sim_context_fileio.cpp.
+  void AliasAssocArray(std::string_view alias_name,
+                       std::string_view target_name);
 
   void SetVariableTag(std::string_view var_name, std::string_view tag);
   std::string_view GetVariableTag(std::string_view var_name) const;

@@ -283,13 +283,20 @@ static bool ModuleDeclaresName(const RtlirModule* mod, std::string_view name) {
 // own key before it constructs, so that `p2::h = new` through the exporter
 // and `h = new` after a module's `import p1::h` each found no class, built
 // nothing and left the handle null; and the real registration
-// ShapePackageVariable (lowerer_register.cpp) makes. A string's kind is a
-// flag of the Variable itself, which the alias already shares.
+// ShapePackageVariable (lowerer_register.cpp) makes; and the queue or the
+// associative array a package `int q[$]` or `int m[string]` declares
+// (CreatePackageAggregate in lowerer_register.cpp), which FindQueue and
+// FindAssocArray answer by their own keys, so that `q.push_back(4)` after
+// `import p1::q` and `p2::q.size()` through an exporter reached no object. A
+// string's kind is a flag of the Variable itself, which the alias already
+// shares.
 static void AliasVariableKinds(std::string_view key, std::string_view qname,
                                SimContext& ctx) {
   std::string_view cls = ctx.GetVariableClassType(qname);
   if (!cls.empty()) ctx.SetVariableClassType(key, cls);
   if (ctx.IsRealVariable(qname)) ctx.RegisterRealVariable(key);
+  ctx.AliasQueue(key, qname);
+  ctx.AliasAssocArray(key, qname);
 }
 
 // §26.3 makes the imported name visible under its unqualified spelling in the
