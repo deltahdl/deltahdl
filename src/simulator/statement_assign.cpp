@@ -211,6 +211,7 @@ PropertyFieldWindow ResolveClassPropertyField(const ClassTypeInfo* type,
     return window;
   }
   window.property = first;
+  window.total_width = info->total_width;
   window.valid = true;
   return window;
 }
@@ -299,17 +300,12 @@ static FieldTarget ResolveClassFieldTarget(ClassObject* obj,
   if (dot != std::string_view::npos) {
     auto& arena = ctx.GetArena();
     auto first = field_path.substr(0, dot);
-    Logic4Vec handle_val =
-        declared_type ? obj->GetPropertyForType(first, declared_type, arena)
-                      : obj->GetProperty(first, arena);
-    if (auto* next_obj = ctx.GetClassObject(handle_val.ToUint64())) {
-      return ResolveClassFieldTarget(next_obj, nullptr,
-                                     field_path.substr(dot + 1), ctx);
-    }
-    // §7.2.1: `first` holds a structure rather than a handle, so the rest of
-    // the path selects a member of it. The flattened key below would store the
-    // value under a name the class never declared and leave the property the
-    // path actually names untouched.
+    // §7.2.1: `first` declared with a structure's type holds that structure
+    // rather than a handle, so the rest of the path selects a member of it.
+    // Asked before the handle lookup, because a structure whose bits happen to
+    // equal a live handle's number is still a structure. The flattened key
+    // below would store the value under a name the class never declared and
+    // leave the property the path actually names untouched.
     PropertyFieldWindow window = ResolveClassPropertyField(
         declared_type ? declared_type : obj->type, field_path, ctx);
     if (window.valid) {
@@ -320,7 +316,15 @@ static FieldTarget ResolveClassFieldTarget(ClassObject* obj,
       bits.field = std::string(window.property);
       bits.bit_offset = window.bit_offset;
       bits.width = window.width;
+      bits.holder_width = window.total_width;
       return bits;
+    }
+    Logic4Vec handle_val =
+        declared_type ? obj->GetPropertyForType(first, declared_type, arena)
+                      : obj->GetProperty(first, arena);
+    if (auto* next_obj = ctx.GetClassObject(handle_val.ToUint64())) {
+      return ResolveClassFieldTarget(next_obj, nullptr,
+                                     field_path.substr(dot + 1), ctx);
     }
   }
   FieldTarget target;
@@ -365,6 +369,31 @@ static FieldTarget ResolveOwnPropertyTarget(std::string_view field_name,
   target.type = ctx.CurrentMethodClass();
   target.field = std::string(field_name);
   return target;
+}
+
+// §8.11 with §7.2: `p.f` written inside a method, where `p` names no variable
+// but a property of the running method's object. The member path is resolved
+// against that object exactly as `h.p.f` is against the object `h` names, so
+// the window of the structure `p` holds is what takes the value; a `p` that
+// holds a handle is followed into its object the same way. *handled is set
+// true when the name is such a property; a local of the name is its own
+// declaration and shadows the property (§8.11), so it is left to
+// ResolveVariableField, while a variable of the module enclosing the class
+// does not shadow it (§23.9), which NameDenotesVariable tells apart as
+// TryFuncClassTargetWrite does for the bare name.
+static FieldTarget ResolveOwnPropertyMemberTarget(std::string_view base_name,
+                                                  std::string_view field_name,
+                                                  SimContext& ctx,
+                                                  bool* handled) {
+  *handled = false;
+  auto* self = ctx.CurrentThis();
+  if (self == nullptr || NameDenotesVariable(base_name, ctx)) return {};
+  const ClassTypeInfo* enclosing = ctx.CurrentMethodClass();
+  const ClassTypeInfo* start = enclosing != nullptr ? enclosing : self->type;
+  if (FindPropertyInfo(start, base_name) == nullptr) return {};
+  *handled = true;
+  std::string path = std::string(base_name) + "." + std::string(field_name);
+  return ResolveClassFieldTarget(self, enclosing, path, ctx);
 }
 
 FieldTarget ResolveBarePropertyTarget(std::string_view name, SimContext& ctx) {
@@ -553,6 +582,8 @@ FieldTarget ResolveFieldTarget(const Expr* lhs, SimContext& ctx) {
   if (handled) return target;
   target = ResolveStaticClassField(base_name, field_name, ctx, &handled);
   if (handled) return target;
+  target = ResolveOwnPropertyMemberTarget(base_name, field_name, ctx, &handled);
+  if (handled) return target;
   return ResolveVariableField(base_name, field_name, ctx, lhs->range.start);
 }
 
@@ -576,6 +607,21 @@ static void WriteWholeVariable(Variable* var, const Logic4Vec& val,
   var->value = ResizeToWidth(val, var->value.width, arena);
   if (!var->is_4state) CoerceTo2State(var->value);
   var->NotifyWatchers();
+}
+
+// §7.2 with §6.8: the property holds the whole structure, so its value is as
+// wide as the structure's layout before a member is deposited into it.
+// CollectClassMembers sizes a property declared by a typedef name to a 32-bit
+// carrier, into which a member above bit 31 cannot be deposited -- `pair_t p`
+// with two int members lost `p.f`, the upper one, while `p.g` at the bottom
+// landed. The bits the widening exposes are the zeros the carrier was filled
+// with; the value is widened unsigned so no sign of the carrier's is extended
+// over them.
+static Logic4Vec WidenToHolder(Logic4Vec held, uint32_t holder_width,
+                               Arena& arena) {
+  if (held.width >= holder_width) return held;
+  held.is_signed = false;
+  return ResizeToWidth(held, holder_width, arena);
 }
 
 void WriteResolvedField(const FieldTarget& target, const Logic4Vec& rhs_val,
@@ -611,7 +657,8 @@ void WriteResolvedField(const FieldTarget& target, const Logic4Vec& rhs_val,
           target.type
               ? target.obj->GetPropertyForType(target.field, target.type, arena)
               : target.obj->GetProperty(target.field, arena);
-      Logic4Vec updated = OwnRhsWords(held, arena);
+      Logic4Vec updated =
+          WidenToHolder(OwnRhsWords(held, arena), target.holder_width, arena);
       DepositBitField(updated, target.bit_offset, rhs_val, target.width);
       SetClassField(target.obj, target.type, target.field, updated, arena);
       if (target.notify) target.notify->NotifyWatchers();

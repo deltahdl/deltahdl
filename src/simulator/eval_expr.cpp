@@ -20,6 +20,7 @@
 #include "simulator/eval_class_array_handles.h"
 #include "simulator/eval_expr_internal.h"
 #include "simulator/eval_string.h"
+#include "simulator/eval_struct_property.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
@@ -233,10 +234,10 @@ static Logic4Vec ReadClassField(ClassObject* obj,
 // shadowing context, so they are read by bare name. When `first` does not name
 // a live class handle, the chain falls back to reading the whole dotted path as
 // a single flattened key on `obj` (the legacy nested-handle storage scheme).
-static Logic4Vec ResolveClassFieldChain(ClassObject* obj,
-                                        const ClassTypeInfo* declared_type,
-                                        std::string_view field_path,
-                                        SimContext& ctx, Arena& arena) {
+Logic4Vec ResolveClassFieldChain(ClassObject* obj,
+                                 const ClassTypeInfo* declared_type,
+                                 std::string_view field_path, SimContext& ctx,
+                                 Arena& arena) {
   auto dot = field_path.find('.');
   if (dot == std::string_view::npos) {
     return ReadClassField(obj, declared_type, field_path, arena);
@@ -244,20 +245,20 @@ static Logic4Vec ResolveClassFieldChain(ClassObject* obj,
   auto first = field_path.substr(0, dot);
   auto rest = field_path.substr(dot + 1);
   Logic4Vec handle_val = ReadClassField(obj, declared_type, first, arena);
-  auto* next_obj = ctx.GetClassObject(handle_val.ToUint64());
-  if (!next_obj) {
-    // §7.2.1: `first` holds a structure rather than a handle, so the rest of
-    // the path selects a member of the value just read. The flattened key below
-    // names a property the class never declared, which answers what an earlier
-    // write to the same path left there and a known zero where there was none.
-    PropertyFieldWindow window = ResolveClassPropertyField(
-        declared_type ? declared_type : obj->type, field_path, ctx);
-    if (window.valid) {
-      return ExtractBitField(arena, handle_val, window.bit_offset,
-                             window.width);
-    }
-    return ReadClassField(obj, declared_type, field_path, arena);
+  // §7.2.1: `first` declared with a structure's type holds that structure
+  // rather than a handle, so the rest of the path selects a member of the
+  // value just read. Asked before the handle lookup, because a structure
+  // whose bits happen to equal a live handle's number is still a structure.
+  // The flattened key below names a property the class never declared, which
+  // answers what an earlier write to the same path left there and a known
+  // zero where there was none.
+  PropertyFieldWindow window = ResolveClassPropertyField(
+      declared_type ? declared_type : obj->type, field_path, ctx);
+  if (window.valid) {
+    return ExtractBitField(arena, handle_val, window.bit_offset, window.width);
   }
+  auto* next_obj = ctx.GetClassObject(handle_val.ToUint64());
+  if (!next_obj) return ReadClassField(obj, declared_type, field_path, arena);
   return ResolveClassFieldChain(next_obj, nullptr, rest, ctx, arena);
 }
 
@@ -497,34 +498,6 @@ static bool TryClockvarMemberAccess(std::string_view base_name,
   if (!sig_var) return false;
   uint64_t sampled = mgr->GetSampledValue(block->name, field_name);
   out = MakeLogic4VecVal(arena, sig_var->value.width, sampled);
-  return true;
-}
-
-// §8.11: inside a method, a class-handle property of the enclosing class may be
-// named without a `this.` prefix -- the clause resolves an unqualified name by
-// looking outward from the innermost scope, and notes that qualifying a member
-// with `this` "is usually unnecessary". So the base of a member access can be a
-// property rather than a variable -- `left.v` where `left` is a rand class
-// handle of the object being randomized. Every other resolution above starts
-// from a variable of that name and finds none, so without this the whole access
-// falls through to the unknown-name result and reads zero, silently, however
-// the referenced object's field is set.
-//
-// Tried last, so it only claims a name nothing else resolved, and only when
-// that name holds a live handle.
-static bool TryImplicitThisHandleMember(std::string_view base_name,
-                                        std::string_view field_name,
-                                        SimContext& ctx, Arena& arena,
-                                        Logic4Vec& out) {
-  auto* self = ctx.CurrentThis();
-  if (self == nullptr) return false;
-  const ClassTypeInfo* enclosing = ctx.CurrentMethodClass();
-  Logic4Vec handle = enclosing != nullptr
-                         ? self->GetPropertyForType(base_name, enclosing, arena)
-                         : self->GetProperty(base_name, arena);
-  auto* obj = ctx.GetClassObject(handle.ToUint64());
-  if (obj == nullptr) return false;
-  out = ResolveClassFieldChain(obj, nullptr, field_name, ctx, arena);
   return true;
 }
 

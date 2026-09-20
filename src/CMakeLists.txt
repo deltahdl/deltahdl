@@ -251,6 +251,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/eval_array_class_assoc.cpp
     simulator/eval_array_class_queue.cpp
     simulator/eval_string.cpp
+    simulator/eval_struct_property.cpp
     simulator/eval_math.cpp
     simulator/probabilistic_distribution.cpp
     simulator/eval_fileio.cpp

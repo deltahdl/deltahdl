@@ -104,6 +104,12 @@ struct PropertyFieldWindow {
   std::string_view property;
   uint32_t bit_offset = 0;
   uint32_t width = 0;
+  // The width of the whole structure the window sits in, which is the width
+  // the property's value has to have for the window to fit: a property
+  // declared by a typedef name is sized by CollectClassMembers to a 32-bit
+  // carrier, which holds a one-member structure and loses every member of a
+  // wider one above its top.
+  uint32_t total_width = 0;
   bool valid = false;
 };
 
@@ -137,6 +143,9 @@ struct FieldTarget {
   Variable* var = nullptr;
   uint32_t bit_offset = 0;
   uint32_t width = 0;
+  // kPropertyBits: the width of the whole value the window sits in, which the
+  // held value is widened to before the deposit where it is narrower.
+  uint32_t holder_width = 0;
 
   // kProperty: the object holding the field. A class object is arena-allocated
   // and the class garbage collector only unregisters it, so the pointer stays
