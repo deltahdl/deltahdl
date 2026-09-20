@@ -279,33 +279,37 @@ void InitPackageDataVariables(const RtlirDesign* design, SimContext& ctx,
 // RegisterPackageParams folds it: against the package's parameters and
 // constants declared before it, which §6.20.1 and §6.19 let a member's value
 // name, and at the width of the enumeration's base type.
+static void RegisterPackageItemEnumConstants(const ModuleItem* item,
+                                             std::string_view pkg_name,
+                                             ScopeMap& values, SimContext& ctx,
+                                             Arena& arena) {
+  if (item->kind == ModuleItemKind::kParamDecl && item->init_expr) {
+    if (auto v = ConstEvalInt(item->init_expr, values)) values[item->name] = *v;
+    return;
+  }
+  // Syntax 6-5 lets the enumeration stand as the type a typedef names or as
+  // the type of a data declaration, and the constants are the same.
+  auto members = BindEnumConstantsOfItem(item, values, arena);
+  if (members.empty()) return;
+  const DataType& type = item->kind == ModuleItemKind::kTypedef
+                             ? item->typedef_type
+                             : item->data_type;
+  uint32_t width = EvalTypeWidth(type, {});
+  if (width == 0) width = 32;
+  for (const auto& m : members) {
+    auto* qname = arena.Create<std::string>(std::string(pkg_name) + "." +
+                                            std::string(m.name));
+    auto* var = ctx.CreateVariable(*qname, width);
+    var->value = MakeLogic4VecVal(arena, width, static_cast<uint64_t>(m.value));
+  }
+}
+
 void RegisterPackageEnumConstants(const RtlirDesign* design, SimContext& ctx,
                                   Arena& arena) {
   for (auto* pkg : design->packages) {
     ScopeMap values;
-    for (auto* item : pkg->items) {
-      if (item->kind == ModuleItemKind::kParamDecl && item->init_expr) {
-        if (auto v = ConstEvalInt(item->init_expr, values))
-          values[item->name] = *v;
-        continue;
-      }
-      // Syntax 6-5 lets the enumeration stand as the type a typedef names or
-      // as the type of a data declaration, and the constants are the same.
-      auto members = BindEnumConstantsOfItem(item, values, arena);
-      if (members.empty()) continue;
-      const DataType& type = item->kind == ModuleItemKind::kTypedef
-                                 ? item->typedef_type
-                                 : item->data_type;
-      uint32_t width = EvalTypeWidth(type, {});
-      if (width == 0) width = 32;
-      for (const auto& m : members) {
-        auto* qname = arena.Create<std::string>(std::string(pkg->name) + "." +
-                                                std::string(m.name));
-        auto* var = ctx.CreateVariable(*qname, width);
-        var->value =
-            MakeLogic4VecVal(arena, width, static_cast<uint64_t>(m.value));
-      }
-    }
+    for (auto* item : pkg->items)
+      RegisterPackageItemEnumConstants(item, pkg->name, values, ctx, arena);
   }
 }
 
