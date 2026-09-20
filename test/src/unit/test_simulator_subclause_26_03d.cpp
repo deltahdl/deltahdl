@@ -53,6 +53,53 @@ TEST(PackageImportSim, ExplicitlyReExportedRangedLiteralThroughTheExporter) {
             21u);
 }
 
+// §6.19 (printed pages 119-120) with §7.2 (printed 146) and §26.6 (printed
+// 815): an enumeration written as the type of a structure member declares
+// its literals in the scope the structure is written in, so BUSY is a
+// constant of p1 valued 1, and a wildcard export hands it on under p2's
+// qualifier: 1 * 10 + 1 read through p2 and p1. The export walk read an
+// item's top-level enumeration alone, so "p2.BUSY" was bound to nothing. The
+// value depends on two registrations: the walk descending the member's
+// inline type here, and RegisterPackageItemEnumConstants
+// (lowerer_register.cpp) creating "p1.BUSY", without which both reads are 0.
+TEST(PackageImportSim, ReExportedStructMemberLiteralThroughAWildcardExport) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  typedef struct { enum {IDLE, BUSY} st; } s_t;\n"
+                      "endpackage\n"
+                      "package p2;\n"
+                      "  import p1::*;\n"
+                      "  export p1::*;\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  int y;\n"
+                      "  initial y = p2::BUSY * 10 + p1::BUSY;\n"
+                      "endmodule\n",
+                      "y"),
+            11u);
+}
+
+// §6.19 with §7.2 and §26.6 (printed 815): `export p1::BUSY` names the
+// literal of a structure member's enumeration, a declaration of p1, so
+// `p2::BUSY` is p1's 1: 1 * 10 + 1 read through p2 and p1. The walk matched a
+// named export against the items' top-level enumerations alone, so the
+// export bound nothing and the read through p2 was 0. Depends, as the
+// wildcard form does, on RegisterPackageItemEnumConstants creating "p1.BUSY".
+TEST(PackageImportSim, ReExportedStructMemberLiteralThroughAnExplicitExport) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  typedef struct { enum {IDLE, BUSY} st; } s_t;\n"
+                      "endpackage\n"
+                      "package p2;\n"
+                      "  import p1::*;\n"
+                      "  export p1::BUSY;\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  int y;\n"
+                      "  initial y = p2::BUSY * 10 + p1::BUSY;\n"
+                      "endmodule\n",
+                      "y"),
+            11u);
+}
+
 // §26.3 (printed page 810) with §8.7 (printed 184): `import p1::h` makes
 // p1's class-handle variable locally visible under its bare name, and `h =
 // new` constructs an object of the class it is declared with into p1's h, so

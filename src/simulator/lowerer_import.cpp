@@ -487,6 +487,14 @@ using PackageSet = std::unordered_set<const PackageDecl*>;
 // registration folds them (FoldEnumMembers against `values`, the package's
 // parameters and the constants before it, which a bound may name), each
 // bound in `values` for the members after it.
+//
+// §6.19 (printed pages 119-120) declares the literals as constants of the
+// scope the enumeration is written in, and §7.2 (printed 146) lets a
+// structure or union member's type be any data_type, the enum form among
+// them, so a literal of a member's inline enumeration is the package's as the
+// elaborator's provided-name walk holds it (AddEnumMemberNames in
+// elaborator_scope_rules_names.cpp): the members' inline types are descended
+// after the type's own literals.
 void CollectEnumConstantNames(const DataType& type, ScopeMap& values,
                               Arena& arena,
                               std::vector<std::string_view>& names) {
@@ -494,6 +502,10 @@ void CollectEnumConstantNames(const DataType& type, ScopeMap& values,
        FoldEnumMembers(type.enum_members, values, arena)) {
     values[m.name] = m.value;
     names.push_back(m.name);
+  }
+  for (const StructMember& sm : type.struct_members) {
+    if (sm.nested_type != nullptr)
+      CollectEnumConstantNames(*sm.nested_type, values, arena, names);
   }
 }
 
