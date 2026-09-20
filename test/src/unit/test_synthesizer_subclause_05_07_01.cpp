@@ -1,6 +1,11 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <string>
+
 #include "fixture_synthesizer.h"
+#include "helpers_aig_eval.h"
+#include "helpers_synth_input_sweep.h"
 #include "synthesizer/aig.h"
 #include "synthesizer/synth_lower.h"
 
@@ -231,6 +236,79 @@ TEST(IntegerLiteralSynthesis, UnsizedWideDecimalLiteralWritesBitSeventy) {
   EXPECT_EQ(aig->outputs[70], AigGraph::kConstTrue);
   EXPECT_EQ(aig->outputs[69], AigGraph::kConstFalse);
   EXPECT_EQ(aig->outputs[0], AigGraph::kConstFalse);
+}
+
+// The netlist `src` lowers to, or null where elaboration or lowering fails.
+// The cases below drive a constant literal into an output port, so the netlist
+// has no input and each output bit is an exact literal.
+static const AigGraph* LowerSrc(SynthFixture& f, const std::string& src) {
+  const auto* mod = ElaborateSrc(f, src);
+  if (mod == nullptr) return nullptr;
+  SynthLower synth(f.arena, f.diag);
+  return synth.Lower(mod);
+}
+
+// §5.7.1: an unsigned number wider than the size constant is truncated from
+// the left, so `8'hFFF` is the eight-bit 8'hFF and a 12-bit `y` reads 0x0FF.
+// `PatternBitValue` in src/synthesizer/synth_pattern.cpp answered whatever the
+// digits wrote, so bits 8 to 11 of `y` read the dropped digit's ones and `y`
+// read 0xFFF.
+TEST(IntegerLiteralSynthesis, SizedHexLiteralIsTruncatedFromTheLeftToItsSize) {
+  SynthFixture f;
+  const auto* aig = LowerSrc(f,
+                             "module m(output logic [11:0] y);\n"
+                             "  assign y = 8'hFFF;\n"
+                             "endmodule\n");
+  ASSERT_NE(aig, nullptr);
+  EXPECT_EQ(EvalAigOutputs(*aig, 0), 0x0FFu);
+}
+
+// §5.7.1's truncation reaches a based decimal as well: `8'd300` is 300 modulo
+// 256, which is 44, and bit 8 of `y` is clear.
+TEST(IntegerLiteralSynthesis,
+     SizedDecimalLiteralIsTruncatedFromTheLeftToItsSize) {
+  SynthFixture f;
+  const auto* aig = LowerSrc(f,
+                             "module m(output logic [11:0] y);\n"
+                             "  assign y = 8'd300;\n"
+                             "endmodule\n");
+  ASSERT_NE(aig, nullptr);
+  EXPECT_EQ(EvalAigOutputs(*aig, 0), 44u);
+}
+
+// §5.7.1: `80'd1208925819614629174706177` (2^80 + 1) is 81 bits wide and its
+// size constant is 80, so bit 80 is truncated away and bit 0 alone stands;
+// a 96-bit `y` reads bit 80 clear. The case names the outputs rather than
+// driving the netlist with `EvalAigOutputs`, which packs outputs into a
+// `uint64_t` and cannot describe 96 output bits.
+TEST(IntegerLiteralSynthesis, WideDecimalLiteralDropsBitAtItsSize) {
+  SynthFixture f;
+  const auto* aig = LowerSrc(f,
+                             "module m(output logic [95:0] y);\n"
+                             "  assign y = 80'd1208925819614629174706177;\n"
+                             "endmodule\n");
+  ASSERT_NE(aig, nullptr);
+  ASSERT_EQ(aig->outputs.size(), 96u);
+  EXPECT_EQ(aig->outputs[80], AigGraph::kConstFalse);
+  EXPECT_EQ(aig->outputs[0], AigGraph::kConstTrue);
+}
+
+// §5.7.1 truncates a don't-care digit the same way: `4'b?0000` is five digits
+// under a size constant of 4, so the `?` is dropped and the pattern is
+// `4'b0000`, which §12.5.1 matches at `sel == 0` alone once zero-extended to
+// the eight-bit selector. A pattern keeping the dropped digit's don't-care at
+// bit 4 would match `sel == 8'h10` as well.
+TEST(IntegerLiteralSynthesis, CasezPatternDigitAboveItsSizeIsTruncated) {
+  ExpectInputSweep(
+      "module m(input [7:0] sel, output logic y);\n"
+      "  always_comb begin\n"
+      "    casez (sel)\n"
+      "      4'b?0000: y = 1'b1;\n"
+      "      default: y = 1'b0;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      32, [](uint64_t sel) { return sel == 0 ? uint64_t{1} : uint64_t{0}; });
 }
 
 }  // namespace

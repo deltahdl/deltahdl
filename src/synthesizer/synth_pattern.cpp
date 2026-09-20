@@ -142,19 +142,37 @@ static void DecodePatternDigits(const std::string& buf, size_t i,
   }
 }
 
-PatternBits ParsePatternLiteral(std::string_view text, TokenKind case_kind) {
-  PatternBits result{};
-  std::string buf = StripPatternSeparators(text);
-  auto tick = buf.find('\'');
-  // §5.7.1's first form, a simple decimal number: every character is a digit.
-  if (tick == std::string::npos) {
-    DecodeDecimalDigits(buf, 0, result);
-    return result;
+// §5.7.1: the size constant written before the apostrophe at `tick`, the
+// unsigned decimal number of bits the literal has, or 0 for an unsized literal
+// whose apostrophe opens its text.
+static uint32_t PatternSizeConstant(const std::string& buf, size_t tick) {
+  uint32_t size = 0;
+  for (size_t j = 0; j < tick; ++j) {
+    size = size * 10 + static_cast<uint32_t>(buf[j] - '0');
   }
+  return size;
+}
 
+// §5.7.1: an unsigned number larger than the size constant is truncated from
+// the left, so nothing the digits wrote at or above `size` stands: `8'hFFF` is
+// 8'hFF, and `80'd1208925819614629174706177` (2^80 + 1) keeps bit 0 alone. A
+// don't-care digit is cut the same way, `4'b?0000` being 4'b0000. Size 0 is
+// an unsized literal, which is padded to the left rather than truncated, and
+// a number narrower than its size is already padded by the entries the
+// vectors hold no position for.
+static void TruncateToSize(PatternBits& result, uint32_t size) {
+  if (size == 0) return;
+  if (result.aval.size() > size) result.aval.resize(size);
+  if (result.dc_mask.size() > size) result.dc_mask.resize(size);
+}
+
+// §5.7.1's second form, a based literal: the base letter after the apostrophe
+// at `tick`, an optional s before it, and the digits after it.
+static void DecodeBasedLiteral(const std::string& buf, size_t tick,
+                               TokenKind case_kind, PatternBits& result) {
   size_t i = tick + 1;
   if (i < buf.size() && (buf[i] == 's' || buf[i] == 'S')) ++i;
-  if (i >= buf.size()) return result;
+  if (i >= buf.size()) return;
 
   int bits_per_digit = 0;
   switch (buf[i]) {
@@ -176,14 +194,28 @@ PatternBits ParsePatternLiteral(std::string_view text, TokenKind case_kind) {
       // from its digits, so a value past 64 bits keeps its high bits.
       if (!ScanDecimalForDontCare(buf, i + 1, case_kind, result))
         DecodeDecimalDigits(buf, i + 1, result);
-      return result;
+      return;
     default:
-      return result;
+      return;
   }
   ++i;
 
   result.has_digits = true;
   DecodePatternDigits(buf, i, bits_per_digit, case_kind, result);
+}
+
+PatternBits ParsePatternLiteral(std::string_view text, TokenKind case_kind) {
+  PatternBits result{};
+  std::string buf = StripPatternSeparators(text);
+  auto tick = buf.find('\'');
+  // §5.7.1's first form, a simple decimal number: every character is a digit,
+  // and there is no size constant to truncate to.
+  if (tick == std::string::npos) {
+    DecodeDecimalDigits(buf, 0, result);
+    return result;
+  }
+  DecodeBasedLiteral(buf, tick, case_kind, result);
+  TruncateToSize(result, PatternSizeConstant(buf, tick));
   return result;
 }
 
