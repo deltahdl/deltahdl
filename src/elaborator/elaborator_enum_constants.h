@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -47,6 +48,18 @@ void ForEachEnumTypeOfItem(const ModuleItem* item, const EnumTypeVisitor& fn);
 std::vector<RtlirEnumMember> FoldEnumMembers(
     const std::vector<EnumMember>& decl_members, const ScopeMap& scope,
     Arena& arena);
+
+// §6.19.2 (Table 6-10): the names one enumeration member declares as
+// constants of the enclosing scope. A member written as `name` declares that
+// name; a `name[N]` or `name[N:M]` member declares the constants it
+// generates, name0 through nameN-1 or nameN through nameM, and not the name
+// it is written with. The bounds are folded against `scope`, and a member
+// whose bound does not fold there -- one naming a parameter the scope does
+// not hold -- is answered under its written name, so that a walk without the
+// declaring scope's constants admits the member rather than dropping it. The
+// names are owned by the answer, for a caller keeping them past any arena.
+std::vector<std::string> EnumMemberDeclaredNames(const EnumMember& member,
+                                                 const ScopeMap& scope);
 
 // §6.19 makes an enumeration's members constants of the scope the enumeration
 // is written in rather than of the type, and A.8.4 lists an enum identifier

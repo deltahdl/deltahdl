@@ -1,9 +1,12 @@
 #include "elaborator/elaborator_scope_rules_names.h"
 
+#include <string>
 #include <string_view>
 #include <unordered_set>
 #include <vector>
 
+#include "elaborator/const_eval.h"
+#include "elaborator/elaborator_enum_constants.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/rtlir.h"
 #include "parser/ast_class.h"
@@ -102,10 +105,26 @@ void CollectRandsequenceDeclaredNames(
 // an enum written at the top of the declaration does. The member's type is
 // held by StructMember::nested_type, and a structure nested in a member is
 // descended into the same way; a member of a named type declares nothing.
+//
+// §6.19.2's Table 6-10 has a `name[N]` member generate name0 through nameN-1
+// and a `name[N:M]` member nameN through nameM, the written name itself naming
+// no constant, so each generated name is a name the package provides and the
+// written one is not: `p1::VAL` for `VAL[3]` names nothing p1 declares, and
+// `p2::VAL2` through p2's `export p1::*` names p1's constant. The bounds are
+// folded against no scope, this walk running on the syntax tree alone with
+// the package's parameters registered elsewhere (RegisterPackageParams in
+// elaborator_resolve.cpp); a bound naming a parameter does not fold, and
+// EnumMemberDeclaredNames then keeps the written name, which can only
+// suppress a report, never raise one. The generated names are spelled by no
+// declaration, which is why ProvidedNames owns its keys.
 void AddEnumMemberNames(const DataType& type, std::string_view origin,
                         ProvidedNames& names) {
+  const ScopeMap kNoScope;
   for (const auto& em : type.enum_members) {
-    if (!em.name.empty()) names.insert({em.name, origin});
+    if (em.name.empty()) continue;
+    for (const std::string& name : EnumMemberDeclaredNames(em, kNoScope)) {
+      names.emplace(name, origin);
+    }
   }
   for (const auto& sm : type.struct_members) {
     if (sm.nested_type != nullptr) {
@@ -123,10 +142,10 @@ void AddEnumMemberNames(const DataType& type, std::string_view origin,
 // has a declaration of the scope take the name over an import.
 void AddPackageItemNames(const PackageDecl* pkg, const ModuleItem* pi,
                          ProvidedNames& names) {
-  if (!pi->name.empty()) names.insert({pi->name, pkg->name});
+  if (!pi->name.empty()) names.emplace(pi->name, pkg->name);
   if (pi->kind == ModuleItemKind::kClassDecl && pi->class_decl &&
       !pi->class_decl->name.empty()) {
-    names.insert({pi->class_decl->name, pkg->name});
+    names.emplace(pi->class_decl->name, pkg->name);
   }
   AddEnumMemberNames(pi->typedef_type, pkg->name, names);
   AddEnumMemberNames(pi->data_type, pkg->name, names);
@@ -178,8 +197,8 @@ void AddImportedNamesFrom(const CompilationUnit* unit, const PackageDecl* pkg,
     const ImportItem& imp = item->import_item;
     if (imp.package_name != src_name) continue;
     if (!imp.is_wildcard) {
-      names.insert({imp.item_name, DeclaringPackageOf(unit, src_name,
-                                                      imp.item_name, visited)});
+      names.emplace(imp.item_name,
+                    DeclaringPackageOf(unit, src_name, imp.item_name, visited));
     } else if (const PackageDecl* src = FindPackageDecl(unit, src_name)) {
       AddPackageProvidedNames(unit, src, names, visited);
     }
@@ -206,8 +225,8 @@ void AddExportedNames(const CompilationUnit* unit, const PackageDecl* pkg,
     } else if (ex.is_wildcard) {
       AddImportedNamesFrom(unit, pkg, ex.package_name, names, visited);
     } else {
-      names.insert({ex.item_name, DeclaringPackageOf(unit, ex.package_name,
-                                                     ex.item_name, visited)});
+      names.emplace(ex.item_name, DeclaringPackageOf(unit, ex.package_name,
+                                                     ex.item_name, visited));
     }
   }
 }

@@ -1,5 +1,8 @@
 #pragma once
 
+#include <cstddef>
+#include <functional>
+#include <string>
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
@@ -39,20 +42,35 @@ namespace delta {
 // plain reads that must resolve to a declaration.
 void CollectBareIdents(const Expr* e, std::vector<const Expr*>& out);
 
+// The hash a ProvidedNames map is keyed by. It hashes a std::string_view and
+// is transparent, so the map is looked up with the string_view a reference
+// carries without a std::string being built for each lookup.
+struct ProvidedNameHash {
+  using is_transparent = void;
+  size_t operator()(std::string_view name) const noexcept {
+    return std::hash<std::string_view>{}(name);
+  }
+};
+
 // The names a package makes directly visible, each with the name of the
 // package that declares it: the package itself for its own declarations, and
 // the package at the end of the export chain for a name an export hands on.
 // §26.6 makes an import of a declaration reached through an export an import of
 // the original declaration, so two wildcard imports supplying one name are one
 // candidate where the declaring packages agree and §26.3's conflict where they
-// differ.
-using ProvidedNames = std::unordered_map<std::string_view, std::string_view>;
+// differ. The map owns its keys: the constants a `name[N]` member of §6.19.2
+// generates are spelled by no declaration, so a key is a std::string rather
+// than a view into the syntax tree, and the origin, a package's name, stays a
+// view of the declaration.
+using ProvidedNames = std::unordered_map<std::string, std::string_view,
+                                         ProvidedNameHash, std::equal_to<>>;
 
 // The names the package `pkg_name` makes directly visible to a scope that
-// imports it by wildcard: every declaration of its own, with the members of
-// each enumeration it declares (§26.5), and what its export declarations hand
-// on of what it imports (§26.6); a name it imports without exporting is not
-// among them. Nothing is added for a package the unit does not declare.
+// imports it by wildcard: every declaration of its own, with the constants of
+// each enumeration it declares (§26.5), a ranged member of §6.19.2 by the
+// names it generates, and what its export declarations hand on of what it
+// imports (§26.6); a name it imports without exporting is not among them.
+// Nothing is added for a package the unit does not declare.
 void PopulatePackageProvidedNames(const CompilationUnit* unit,
                                   std::string_view pkg_name,
                                   ProvidedNames& names);

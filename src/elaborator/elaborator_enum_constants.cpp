@@ -8,6 +8,7 @@
 
 #include "elaborator/elaborator_enum_constants.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <format>
 #include <functional>
@@ -25,6 +26,10 @@
 
 namespace delta {
 namespace {
+
+// The block EnumMemberDeclaredNames's scratch arena is created with: the
+// names of one member's constants, each a few characters, and nothing else.
+constexpr size_t kScratchBlockSize = 256;
 
 // The running value §6.19 assigns: a member's explicit value replaces it, and
 // each member emitted advances it by one for the member after.
@@ -127,6 +132,24 @@ std::vector<RtlirEnumMember> FoldEnumMembers(
     folder.EmitDeclared(member);
   }
   return std::move(folder.members);
+}
+
+std::vector<std::string> EnumMemberDeclaredNames(const EnumMember& member,
+                                                 const ScopeMap& scope) {
+  bool bounds_fold = member.range_start == nullptr ||
+                     (ConstEvalInt(member.range_start, scope).has_value() &&
+                      (member.range_end == nullptr ||
+                       ConstEvalInt(member.range_end, scope).has_value()));
+  if (!bounds_fold) return {std::string(member.name)};
+  // The generated names live in the folder's arena until they are copied out
+  // below; a block far smaller than the default is enough for one member.
+  Arena scratch(kScratchBlockSize);
+  EnumMemberFolder folder{scope, scratch};
+  folder.EmitDeclared(member);
+  std::vector<std::string> names;
+  names.reserve(folder.members.size());
+  for (const auto& m : folder.members) names.emplace_back(m.name);
+  return names;
 }
 
 std::vector<RtlirEnumMember> BindEnumConstantsOfItem(const ModuleItem* item,
