@@ -453,4 +453,100 @@ TEST(TaggedUnionEval, ChildInstanceDeclarationInitializerPrintsTagAndValue) {
   EXPECT_EQ(out, "'{Valid:-7}\n");
 }
 
+// §13.5.1 with §7.3.2 and §11.9: the actual is copied into the subroutine's
+// own variable, and a tagged union's value is its tag beside the member
+// value (§7.3.2, printed page 151), so the copy carries the tag and a member
+// access of the formal inside the body is checked against it. The formal
+// took the bits alone: `a.Valid` of a formal bound from a union holding
+// `tagged Invalid` was read against no tag and raised nothing. The same
+// function is called with the Valid union first so that a tag left standing
+// from an earlier call is told apart from the actual's own.
+TEST(TaggedUnionEval, ByValueFormalCarriesTheActualsTag) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef union tagged { void Invalid; int Valid; } u_t;\n"
+      "  u_t u = tagged Valid -7;\n"
+      "  u_t w = tagged Invalid;\n"
+      "  int x;\n"
+      "  int y;\n"
+      "  function int f(u_t a);\n"
+      "    return a.Valid;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    x = f(u);\n"
+      "    y = f(w);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  LowerAndRun(design, f);
+  auto* x = f.ctx.FindVariable("x");
+  ASSERT_NE(x, nullptr);
+  EXPECT_EQ(x->value.ToUint64(), 0xFFFFFFF9u);
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "tagged union 'a' which currently has tag 'Valid'",
+                             8, "11.9"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "tagged union 'a' which currently has tag 'Invalid'", 8, "11.9"));
+}
+
+// §13.5 (printed page 348): the return passes an output formal's value to
+// the caller's variable, tag and all, so `o = tagged Valid 4` inside the task
+// leaves the actual holding Valid: `u.Valid` is then consistent and
+// `u.Other`, the tag the actual held before the call, is the mismatch. Before
+// this the actual kept tag Other, so line 11 was reported and line 12 read
+// 1 unreported.
+TEST(TaggedUnionEval, OutputFormalCarriesItsTagBackToTheActual) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef union tagged { void Invalid; int Valid; int Other; } u_t;\n"
+      "  u_t u = tagged Other 1;\n"
+      "  int x;\n"
+      "  int y;\n"
+      "  task retag(output u_t o);\n"
+      "    o = tagged Valid 4;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    retag(u);\n"
+      "    x = u.Valid;\n"
+      "    y = u.Other;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  LowerAndRun(design, f);
+  auto* x = f.ctx.FindVariable("x");
+  ASSERT_NE(x, nullptr);
+  EXPECT_EQ(x->value.ToUint64(), 4u);
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "run-time error: accessing member", 11, "11.9"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "tagged union 'u' which currently has tag 'Valid'",
+                            12, "11.9"));
+}
+
+// §21.2.1.6 with §13.5.1: %p of the formal prints the tag the actual was
+// copied in with, "tag:value". With no tag on the formal the union fell to
+// the untagged form, which prints the first declared member.
+TEST(TaggedUnionEval, ByValueFormalPrintsTheActualsTagAndValue) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  typedef union tagged { void Invalid; int Valid; } u_t;\n"
+      "  u_t u = tagged Valid -7;\n"
+      "  function void show(u_t a);\n"
+      "    $display(\"%p\", a);\n"
+      "  endfunction\n"
+      "  initial show(u);\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(out, "'{Valid:-7}\n");
+}
+
 }  // namespace

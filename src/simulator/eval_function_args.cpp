@@ -721,6 +721,30 @@ static uint32_t EvalFormalArgWidth(const DataType& dt, SimContext& ctx,
   return width;
 }
 
+// §7.3.2 (printed page 151): a tagged union stores its tag beside the member
+// value, so the tag is part of what §13.5.1 (printed 348) copies into the
+// subroutine's own variable, and §11.9 (printed 304) checks a member access
+// of the formal inside the body against it. The formal took the bits alone:
+// `a.Valid` of a formal bound from a union holding `tagged Invalid` was read
+// against no tag and raised nothing, and %p of the formal printed the
+// untagged form. The actual's tag stands under the key its storage was
+// created by (TagKeyOfName), read with the callee's scope set aside as the
+// layout is; the formal's stands under its bare name, which TagKeyOfName
+// answers for a local, and which is what the body's reads and the copy-out
+// in eval_function_args_writeback.cpp ask by. §13.3 (printed 337) copies
+// nothing into an output formal, so its tag starts undefined. The tag table
+// is no frame of the call, so the formal's entry is written on every bind,
+// empty where nothing is copied in, rather than left holding the last call's.
+static void CopyUnionTagIn(const FunctionArg& param, const Expr* actual,
+                           SimContext& ctx) {
+  std::string tag;
+  if (param.direction != Direction::kOutput) {
+    CalleeScopeAside aside(ctx);
+    tag = std::string(ctx.GetVariableTag(TagKeyOfName(actual->text, ctx)));
+  }
+  ctx.SetVariableTag(param.name, tag);
+}
+
 // §7.2.2/§13.5.1: make member access (arg.field) work on a by-value struct
 // copy. struct_types_ is keyed by variable name, so a named-type formal -- e.g.
 // `input s_t arg` -- cannot find its layout by the type name `s_t` (a type name
@@ -751,6 +775,7 @@ static void RegisterValueArgStructType(const FunctionArg& param,
       StructTypeInfo copy = *sinfo;
       ctx.RegisterStructType(param.name, copy);
       ctx.SetVariableStructType(param.name, param.name);
+      if (copy.is_union) CopyUnionTagIn(param, actual, ctx);
       return;
     }
   }
