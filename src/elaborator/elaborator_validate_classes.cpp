@@ -379,6 +379,10 @@ void ElaboratorClassRules::ValidateParameterizedScopeResolution(
     if (item->kind == ModuleItemKind::kContAssign) {
       CheckParamScopeExpr(item->assign_rhs, parameterized_class_names_, diag_);
     }
+    // §8.25.1 names no place outside the class that is exempt, so a
+    // declaration's initializer, `int x = C::p;`, is held to it as a
+    // statement is.
+    CheckParamScopeExpr(item->init_expr, parameterized_class_names_, diag_);
     bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body) {
       WalkStmtsForParamScope(item->body, parameterized_class_names_, diag_);

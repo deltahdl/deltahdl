@@ -352,4 +352,40 @@ TEST(ParameterizedScopeResolutionElaboration,
       "used as scope resolution prefix for parameterized class", 8, "8.25.1"));
 }
 
+// §8.25.1 (printed page 205 of ~/LRM.pdf) makes the unadorned name of a
+// parameterized class illegal as the prefix of the class scope resolution
+// operator outside the class and its out-of-block declarations, wherever it
+// stands: a module-level variable declaration's initializer, `int x = C::p;`,
+// is such a place, and it was passed over -- the check walked the procedural
+// statements and the continuous assignments alone.
+TEST(ParameterizedScopeResolutionElaboration,
+     UnadornedScopeInAVariableDeclarationInitializerIsError) {
+  ElabFixture f;
+  ElabOk(
+      "class C #(int p = 1);\n"
+      "endclass\n"
+      "module m;\n"
+      "  int x = C::p;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "used as scope resolution prefix for parameterized class", 4, "8.25.1"));
+}
+
+// §8.25.1: the explicit default specialization, `C#()::p`, is the form the
+// subclause gives for the same initializer, and is accepted.
+TEST(ParameterizedScopeResolutionElaboration,
+     ExplicitDefaultSpecializationInAVariableDeclarationInitializerOk) {
+  ElabFixture f;
+  ElabOk(
+      "class C #(int p = 1);\n"
+      "endclass\n"
+      "module m;\n"
+      "  int x = C#()::p;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace
