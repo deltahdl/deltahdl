@@ -572,4 +572,87 @@ TEST(PackageExport, ScopedReferenceThroughTheExportingPackage) {
                             9, "26.3"));
 }
 
+// §6.19 (printed pages 119-121): an enumerated type declares a set of named
+// constants, and its literals are declarations of the scope holding the enum
+// -- two enums naming one literal cannot stand in one scope, as in C -- so
+// MID is a declaration of p1 as level_t is; §26.5's own package p declares
+// FALSE and TRUE that way (printed 813). §26.6 (printed 815) makes `export
+// p1::MID` legal where MID is a candidate for import from p1 and p2 imports
+// it, an import of the exported name being an import of p1's MID. The export
+// was reported as "'MID' is not a candidate for import from package 'p1'"
+// before, the candidate check counting p1's items by name and never the
+// literals of its enumerations; `import p1::MID;` alone was not reported.
+TEST(PackageExport, ExplicitExportOfAnEnumerationLiteral) {
+  EXPECT_TRUE(
+      ElabOk("package p1;\n"
+             "  typedef enum {LOW, MID = 6, HIGH} level_t;\n"
+             "endpackage\n"
+             "package p2;\n"
+             "  import p1::MID;\n"
+             "  export p1::MID;\n"
+             "endpackage\n"
+             "module top;\n"
+             "  int r;\n"
+             "  initial r = p2::MID;\n"
+             "endmodule\n"
+             "module m;\n"
+             "  import p2::MID;\n"
+             "  int r;\n"
+             "  initial r = MID;\n"
+             "endmodule\n"));
+}
+
+// §26.6 (printed 815): a name that p1 neither declares nor exports is no
+// candidate for import, so its export is the error the clause names, reported
+// at the export's line as before; counting the literals among the candidates
+// admits nothing else. `import p1::MID;` alone, no export following, was not
+// reported before and elaborates clean still.
+TEST(PackageExport, ExportOfANameThePackageNeverDeclaresStaysReported) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("package p1;\n"
+             "  typedef enum {LOW, MID, HIGH} level_t;\n"
+             "endpackage\n"
+             "package p2;\n"
+             "  import p1::*;\n"
+             "  export p1::NOPE;\n"
+             "endpackage\n"
+             "module top;\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "'NOPE' is not a candidate for import from package 'p1'", 6, "26.6"));
+  EXPECT_TRUE(
+      ElabOk("package p1;\n"
+             "  typedef enum {LOW, MID, HIGH} level_t;\n"
+             "endpackage\n"
+             "package p2;\n"
+             "  import p1::MID;\n"
+             "endpackage\n"
+             "module top;\n"
+             "endmodule\n"));
+}
+
+// §6.19 with §7.2: an enumeration written as the type of a structure member,
+// or as the type of a variable declaration rather than a typedef, declares its
+// literals in the scope holding the declaration, which is the package, so
+// each is a candidate for import from p1 and `export p1::name` of it is legal
+// under §26.6 (printed 815). The two exports were reported as no candidate
+// before, the check reading the members of a typedef's enumeration alone.
+TEST(PackageExport, ExplicitExportOfAStructMemberAndAVariableEnumLiteral) {
+  EXPECT_TRUE(
+      ElabOk("package p1;\n"
+             "  typedef struct { enum {IDLE, BUSY} st; int n; } rec_t;\n"
+             "  enum {RED, GREEN} light;\n"
+             "endpackage\n"
+             "package p2;\n"
+             "  import p1::*;\n"
+             "  export p1::BUSY;\n"
+             "  export p1::GREEN;\n"
+             "endpackage\n"
+             "module top;\n"
+             "endmodule\n"));
+}
+
 }  // namespace

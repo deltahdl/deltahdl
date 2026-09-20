@@ -218,6 +218,30 @@ struct PackageImportSet {
   std::unordered_set<std::string_view> wildcard_sources;
 };
 
+// §6.19: an enumerated type declares its literals as named constants of the
+// scope holding the enum -- two enumerations naming one literal cannot stand
+// in the same scope -- so a literal of an enumeration written in `type`, as
+// the type itself (Syntax 6-5) or as the type of a member of a structure or
+// union of it (§7.2), is a declaration of the scope as the type's own name is.
+// A `name[N]` literal of §6.19.2 is held under the name it is written with,
+// as the provided-name walk of elaborator_scope_rules_names.cpp holds it.
+bool TypeDeclaresEnumLiteral(const DataType& type, std::string_view name) {
+  for (const auto& em : type.enum_members) {
+    if (em.name == name) return true;
+  }
+  for (const auto& sm : type.struct_members) {
+    if (sm.nested_type != nullptr &&
+        TypeDeclaresEnumLiteral(*sm.nested_type, name))
+      return true;
+  }
+  return false;
+}
+
+// §26.6: the candidates for import from a package are the declarations the
+// package makes: each item by its name, a class by the class's name, and the
+// literals of the enumerations its typedefs and data declarations write
+// (§26.5's package p declares FALSE and TRUE as it declares BOOL). What the
+// package imports is no declaration of its own.
 bool PackageDeclaresName(const PackageDecl* src_pkg, std::string_view name) {
   for (const auto* it : src_pkg->items) {
     if (it->kind == ModuleItemKind::kImportDecl ||
@@ -227,6 +251,9 @@ bool PackageDeclaresName(const PackageDecl* src_pkg, std::string_view name) {
         it->class_decl->name == name)
       return true;
     if (!it->name.empty() && it->name == name) return true;
+    if (TypeDeclaresEnumLiteral(it->typedef_type, name) ||
+        TypeDeclaresEnumLiteral(it->data_type, name))
+      return true;
   }
   return false;
 }
