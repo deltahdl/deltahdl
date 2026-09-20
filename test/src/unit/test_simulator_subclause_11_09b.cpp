@@ -1,11 +1,34 @@
 #include <gtest/gtest.h>
 
+#include "elaborator/rtlir.h"
 #include "fixture_simulator.h"
 #include "helpers_reported_error.h"
 
 using namespace delta;
 
 namespace {
+
+// Runs a design whose initial block writes `s.u = tagged Valid 9` (or the
+// call returning it), reads y from s.u.Valid, writes s.u.Other = 3 at
+// `write_line`, and reads z from s.u.Valid: y and z both read 9, the
+// declined write leaving the 9, and the write is reported against Valid.
+void ExpectMemberTagKeptAndOtherWriteReported(RtlirDesign* design,
+                                              SimFixture& f, int write_line) {
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  LowerAndRun(design, f);
+  auto* y = f.ctx.FindVariable("y");
+  ASSERT_NE(y, nullptr);
+  EXPECT_EQ(y->value.ToUint64(), 9u);
+  auto* z = f.ctx.FindVariable("z");
+  ASSERT_NE(z, nullptr);
+  EXPECT_EQ(z->value.ToUint64(), 9u);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "assigning member 'Other' of tagged union 's.u' which currently has "
+      "tag 'Valid'",
+      write_line, "11.9"));
+}
 
 // §7.3.2 (printed page 151): a tagged union value carries its tag beside the
 // member's bits, and §13.4.1 (printed 342) gives the implicit variable of a
@@ -267,20 +290,7 @@ TEST(TaggedUnionEval, TaggedAssignmentToAMemberSetsTheMembersTag) {
       "  end\n"
       "endmodule\n",
       f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  LowerAndRun(design, f);
-  auto* y = f.ctx.FindVariable("y");
-  ASSERT_NE(y, nullptr);
-  EXPECT_EQ(y->value.ToUint64(), 9u);
-  auto* z = f.ctx.FindVariable("z");
-  ASSERT_NE(z, nullptr);
-  EXPECT_EQ(z->value.ToUint64(), 9u);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "assigning member 'Other' of tagged union 's.u' which currently has "
-      "tag 'Valid'",
-      9, "11.9"));
+  ExpectMemberTagKeptAndOtherWriteReported(design, f, 9);
 }
 
 // §13.4.1 (printed page 342) gives the implicit variable of `g()` the tagged
@@ -307,20 +317,7 @@ TEST(TaggedUnionEval, CallResultAssignedToAMemberSetsTheMembersTag) {
       "  end\n"
       "endmodule\n",
       f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  LowerAndRun(design, f);
-  auto* y = f.ctx.FindVariable("y");
-  ASSERT_NE(y, nullptr);
-  EXPECT_EQ(y->value.ToUint64(), 9u);
-  auto* z = f.ctx.FindVariable("z");
-  ASSERT_NE(z, nullptr);
-  EXPECT_EQ(z->value.ToUint64(), 9u);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "assigning member 'Other' of tagged union 's.u' which currently has "
-      "tag 'Valid'",
-      12, "11.9"));
+  ExpectMemberTagKeptAndOtherWriteReported(design, f, 12);
 }
 
 // §11.9 (printed page 304) lets a tagged union variable be initialized with

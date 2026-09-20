@@ -10,8 +10,7 @@
 
 namespace {
 
-// A 64-bit two-state message holding `v`, as the C++ cases below place one,
-// and the low word of a message read back out of the queue.
+// A 64-bit two-state message holding `v`, as the C++ cases below place one.
 Logic4Snapshot Msg(uint64_t v) {
   Logic4Word word{v, 0};
   Logic4Vec vec{64, 1, &word};
@@ -19,8 +18,6 @@ Logic4Snapshot Msg(uint64_t v) {
   snap.Capture(vec);
   return snap;
 }
-
-uint64_t Word(const Logic4Snapshot& msg) { return msg.Get().ToUint64(); }
 
 TEST(IpcSync, MailboxNewUnbounded) {
   MailboxObject mb;

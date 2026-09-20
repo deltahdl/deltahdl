@@ -49,7 +49,7 @@ struct BlockingPutter {
 
 inline BlockingPutter SpawnPutter(MailboxObject& mbx, uint64_t msg,
                                   std::vector<int>& ran, int id) {
-  co_await MailboxPutAwaiter{mbx, Msg(msg)};
+  co_await MailboxPutAwaiter{mbx, Msg(msg), {}};
   ran.push_back(id);
 }
 

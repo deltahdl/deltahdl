@@ -623,7 +623,7 @@ TEST(UserDefinedTypeElaboration, ImportedAggregateTypedefHasNoWidth) {
 TEST(UserDefinedTypeElaboration,
      ClassMethodFormalMemberNamingATypedefDefinedBelowIsReported) {
   ElabFixture f;
-  ElaborateSrc(
+  ElaborateSrcAllowingParseErrors(
       "module m;\n"
       "  class C;\n"
       "    function int f(union tagged { void N; pair_t A; } a);\n"
@@ -668,7 +668,7 @@ TEST(UserDefinedTypeElaboration,
 TEST(UserDefinedTypeElaboration,
      FormalStructMemberNamingAnUndeclaredTypeIsReportedOnce) {
   ElabFixture f;
-  ElaborateSrc(
+  ElaborateSrcAllowingParseErrors(
       "module m;\n"
       "  function int f(struct { nosuch_t m; int c; } a);\n"
       "    return a.c;\n"
