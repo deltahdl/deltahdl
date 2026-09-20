@@ -44,37 +44,50 @@ const ClassTypeInfo::PropertyInfo* ClassTypeInfo::FindProperty(
   return nullptr;
 }
 
-const ClassTypeInfo* ClassTypeInfo::StaticPropertyOwner(
+const ClassTypeInfo* ClassTypeInfo::StaticPropertyDeclarer(
     std::string_view name) const {
   std::string key(name);
-  for (const auto* t = this; t != nullptr; t = t->enclosing) {
+  for (const auto* t = this; t != nullptr; t = t->parent) {
     if (t->static_properties.find(key) != t->static_properties.end()) return t;
   }
   return nullptr;
 }
 
+const ClassTypeInfo* ClassTypeInfo::StaticPropertyOwner(
+    std::string_view name) const {
+  for (const auto* t = this; t != nullptr; t = t->enclosing) {
+    const ClassTypeInfo* declarer = t->StaticPropertyDeclarer(name);
+    if (declarer != nullptr) return declarer;
+  }
+  return nullptr;
+}
+
+// §8.13 (printed pages 189-190) with §8.9 (printed 186): a static property
+// read through a handle is the declaring class's one storage, C's for a D
+// object's `n` where D extends C, the same `c.n` through a C handle reads.
+// Asked of the object's own class alone, `d.n` read 0 after `C::n = 5`.
 Logic4Vec ClassObject::GetProperty(std::string_view name, Arena& arena) const {
   std::string key(name);
   auto it = properties.find(key);
   if (it != properties.end()) return it->second;
-  if (type) {
-    auto sit = type->static_properties.find(key);
-    if (sit != type->static_properties.end()) return sit->second;
-  }
+  const ClassTypeInfo* declarer =
+      type != nullptr ? type->StaticPropertyDeclarer(name) : nullptr;
+  if (declarer != nullptr) return declarer->static_properties.find(key)->second;
   return MakeLogic4VecVal(arena, 32, 0);
 }
 
 void ClassObject::SetProperty(std::string_view name, const Logic4Vec& val) {
   std::string key(name);
-  if (type) {
-    auto it = type->static_properties.find(key);
-    if (it != type->static_properties.end()) {
-      it->second = val;
-      // §8.9: the storage written is the class's, not this object's, so the
-      // processes watching the class (§9.4.2, `@(C::n)`) are the ones told.
-      type->NotifyStaticWatchers();
-      return;
-    }
+  // §8.13 with §8.9: the storage written is the declaring class's, C's for a
+  // D object's `n` where D extends C, so the processes watching that class
+  // (§9.4.2, `@(C::n)`) are the ones told. Asked of the object's own class
+  // alone, `d.n = 7` landed in the object's map and `C::n` read 0.
+  const ClassTypeInfo* declarer =
+      type != nullptr ? type->StaticPropertyDeclarer(name) : nullptr;
+  if (declarer != nullptr) {
+    declarer->static_properties[key] = val;
+    declarer->NotifyStaticWatchers();
+    return;
   }
   properties[key] = val;
 }

@@ -104,9 +104,12 @@ bool TryPackageClassStaticMember(const Expr* expr, SimContext& ctx,
   std::string_view member;
   const ClassTypeInfo* cls = PackageQualifiedClassOf(expr, ctx, member);
   if (cls == nullptr) return false;
-  auto it = cls->static_properties.find(std::string(member));
-  if (it != cls->static_properties.end()) {
-    out = it->second;
+  // §8.13 (printed pages 189-190): the property may be one a base declares,
+  // `p::D::n` where D extends C, read from C's one storage
+  // (ClassTypeInfo::StaticPropertyDeclarer); asked of D's own
+  // static_properties, it read 0.
+  if (const ClassTypeInfo* declarer = cls->StaticPropertyDeclarer(member)) {
+    out = declarer->static_properties.find(std::string(member))->second;
     return true;
   }
   // §8.26 with §26.7: an enum literal the class declares is reached the same

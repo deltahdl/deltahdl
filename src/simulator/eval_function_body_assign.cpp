@@ -98,7 +98,9 @@ bool TryFuncClassPropertyWrite(const Expr* lhs, const Logic4Vec& val,
                                SimContext& ctx, Arena& arena) {
   const ClassTypeInfo* method_cls = ctx.CurrentMethodClass();
   // §8.23: the static property may be the containing class's, which a nested
-  // class's method writes unqualified as the subclause's `outerStaticProp = 0`.
+  // class's method writes unqualified as the subclause's `outerStaticProp = 0`;
+  // §8.13 (printed pages 189-190): or a base class's, which D's method writes
+  // as the bare `n` where D extends C, and the storage written is C's own.
   const ClassTypeInfo* owner = method_cls != nullptr
                                    ? method_cls->StaticPropertyOwner(lhs->text)
                                    : nullptr;
@@ -124,26 +126,29 @@ bool TryFuncClassPropertyWrite(const Expr* lhs, const Logic4Vec& val,
 // writes any other value of the property: before `this` is consulted, because
 // a static method reached from an instance method still has that method's
 // object on the stack, and the write belongs to the class rather than to it.
-// Returns false when the class has no static property of the name or the
-// property is not class-typed.
+// §8.13 (printed pages 189-190): the class written is the one declaring the
+// property, C for the bare `m_inst = new` of D's method where D extends C
+// (ClassTypeInfo::StaticPropertyOwner), as TryFuncClassPropertyWrite writes
+// it; asked of D's own static_properties, the handle went to D's object or
+// nowhere. Returns false when no class in reach has a static property of
+// the name or the property is not class-typed.
 static bool TryStaticClassNewAssign(const Stmt* stmt,
                                     std::string_view field_name,
                                     SimContext& ctx, Arena& arena) {
   const ClassTypeInfo* method_cls = ctx.CurrentMethodClass();
-  if (method_cls == nullptr) return false;
-  std::string key(field_name);
-  if (method_cls->static_properties.find(key) ==
-      method_cls->static_properties.end())
-    return false;
-  auto field_type = MemberClassTypeName(method_cls, field_name);
+  const ClassTypeInfo* owner = method_cls != nullptr
+                                   ? method_cls->StaticPropertyOwner(field_name)
+                                   : nullptr;
+  if (owner == nullptr) return false;
+  auto field_type = MemberClassTypeName(owner, field_name);
   if (field_type.empty() || ctx.FindClassType(field_type) == nullptr)
     return false;
   // The constructor runs before the slot is looked up again: it may write the
   // same property itself, and the map is not iterated across that run.
   Logic4Vec handle =
       EvalClassNew(field_type, stmt->rhs, ctx, arena, stmt->rhs->range.start);
-  method_cls->static_properties[key] = handle;
-  method_cls->NotifyStaticWatchers();
+  owner->static_properties[std::string(field_name)] = handle;
+  owner->NotifyStaticWatchers();
   return true;
 }
 

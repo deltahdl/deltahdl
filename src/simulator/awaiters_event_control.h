@@ -262,21 +262,6 @@ inline uint64_t ResolveMemberObjectHandle(const Expr* signal, SimContext& ctx,
   return obj->handle;
 }
 
-// §8.13 (printed pages 189-190) with §8.9 (printed 186): the class on the
-// extends chain from `cls` whose own storage holds the static property
-// `member` -- the one declaring it, C for `D::n` where D extends C, the one
-// storage both names reach -- or null. A derived class's static_properties
-// holds its own declarations alone, so asked of D's, `wait (D::n == 2)` and
-// `@(D::n)` found no property, armed nothing and waited for ever.
-inline const ClassTypeInfo* StaticPropertyDeclarer(const ClassTypeInfo* cls,
-                                                   std::string_view member) {
-  std::string key(member);
-  for (const auto* t = cls; t != nullptr; t = t->parent) {
-    if (t->static_properties.find(key) != t->static_properties.end()) return t;
-  }
-  return nullptr;
-}
-
 // §9.4.2 with §8.9 and §8.10: the class whose own storage holds the static
 // property the operand names, and the property, when the operand is one --
 // `C::n` through the class scope operator, `p::C::n` for a package's class
@@ -285,8 +270,11 @@ inline const ClassTypeInfo* StaticPropertyDeclarer(const ClassTypeInfo* cls,
 // storage, one for every object and for no object at all, so what a process
 // waiting on it has to arm on is the class, not an object: a write through
 // `C::n` reaches no object's watchers, and a static method has no `this` to
-// arm on in the first place. §8.13: the class is the property's declarer, C
-// for `D::n` and for the bare `n` of D's method (StaticPropertyDeclarer).
+// arm on in the first place. §8.13 (printed pages 189-190): the class is the
+// property's declarer, C for `D::n` and for the bare `n` of D's method
+// (ClassTypeInfo::StaticPropertyDeclarer), the class every write to that
+// one storage notifies; asked of D's own static_properties, which hold D's
+// declarations alone, `@(D::n)` found no property and waited for ever.
 inline const ClassTypeInfo* ResolveStaticPropertyClass(
     const Expr* signal, SimContext& ctx, std::string_view& member) {
   const ClassTypeInfo* cls = nullptr;
@@ -302,7 +290,7 @@ inline const ClassTypeInfo* ResolveStaticPropertyClass(
       cls = PackageQualifiedClassOf(signal, ctx, member);
     }
   }
-  return cls == nullptr ? nullptr : StaticPropertyDeclarer(cls, member);
+  return cls == nullptr ? nullptr : cls->StaticPropertyDeclarer(member);
 }
 
 struct EventAwaiter {

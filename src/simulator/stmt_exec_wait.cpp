@@ -89,8 +89,9 @@ const ClassTypeInfo* ScopedClassOf(const Expr* e, SimContext& ctx,
 // 189-190): a derived class inherits its base's static properties, so `D::n`
 // and `D::all` name C's own storage where D extends C, and are added under
 // the written `D` for the awaiter to resolve to the declaring class
-// (StaticPropertyDeclarer); asked of D's own static_properties, which hold
-// D's declarations alone, neither was added and each waited for ever.
+// (ClassTypeInfo::StaticPropertyDeclarer); asked of D's own
+// static_properties, which hold D's declarations alone, neither was added
+// and each waited for ever.
 void CollectStaticPropertyReads(const Expr* cond, SimContext& ctx,
                                 std::unordered_set<std::string>& reads) {
   ForEachSubExpr(cond, [&](const Expr* e) {
@@ -102,7 +103,7 @@ void CollectStaticPropertyReads(const Expr* cond, SimContext& ctx,
     const ClassTypeInfo* cls = ScopedClassOf(e, ctx, scope);
     if (cls == nullptr) return;
     std::string member(e->rhs->text);
-    if (StaticPropertyDeclarer(cls, member) == nullptr) return;
+    if (cls->StaticPropertyDeclarer(member) == nullptr) return;
     reads.insert(scope + "::" + member);
   });
 }

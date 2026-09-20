@@ -264,11 +264,24 @@ struct ClassTypeInfo {
   // from, the nearest declaration first, or nullptr where none declares it.
   const PropertyInfo* FindProperty(std::string_view name) const;
 
+  // §8.13 (printed pages 189-190) with §8.9 (printed 186): the class on the
+  // extends chain from this one whose own storage holds the static property
+  // `name` -- the one declaring it, C for `D::n` where D extends C, since a
+  // derived class inherits the base's properties and a static property is
+  // one storage shared by every object of the class, so `C::n`, `D::n`, a D
+  // object's `n` and the bare `n` of D's methods all name C's. Nullptr where
+  // none of them declares `name`. Every read, write and watch of a static
+  // property goes through this class: static_properties holds a class's own
+  // declarations alone, so a site asking D's found no `n`, read 0, wrote
+  // nowhere and armed nothing.
+  const ClassTypeInfo* StaticPropertyDeclarer(std::string_view name) const;
+
   // §8.10 and §8.23: the class whose own storage holds the static property a
-  // method of this class names bare -- this class, or else the nearest class
-  // lexically containing it, a nested class having unqualified access to the
-  // containing class's static properties, local ones included. Nullptr where
-  // none of them declares `name`.
+  // method of this class names bare -- this class or a base it inherits it
+  // from (StaticPropertyDeclarer), or else the nearest class lexically
+  // containing it or a base of that one, a nested class having unqualified
+  // access to the containing class's static properties, local ones included.
+  // Nullptr where none of them declares `name`.
   const ClassTypeInfo* StaticPropertyOwner(std::string_view name) const;
 };
 

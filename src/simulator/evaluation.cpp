@@ -55,7 +55,10 @@ static Logic4Vec EvalIdentifierClassScope(const Expr* expr, SimContext& ctx,
     if (it != self->properties.end()) return it->second;
   }
   // §8.23: the class's own static property, or one of a class lexically
-  // containing it, which a nested class's method names unqualified.
+  // containing it, which a nested class's method names unqualified; §8.13
+  // (printed pages 189-190): or a base class's, read from that class's own
+  // storage, so D's method's bare `n` reads what `C::n = 4` wrote where D
+  // extends C, where asked of D's own static_properties it read 0.
   const ClassTypeInfo* owner =
       method_cls ? method_cls->StaticPropertyOwner(expr->text) : nullptr;
   if (owner)

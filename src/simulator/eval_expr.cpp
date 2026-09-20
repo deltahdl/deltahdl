@@ -327,12 +327,19 @@ static bool TryInterfaceStaticMember(const ClassTypeInfo* cls_type,
   return false;
 }
 
+// §8.13 (printed pages 189-190) with §8.9 (printed 186): `D::n` reads the
+// static property D declares or inherits, the nearest declaration first, so
+// where D extends C it reads C's one storage, what `C::n = 5` wrote. Read
+// from D's own static_properties alone, which hold D's declarations, it
+// answered 0.
 static bool TryStaticMemberAccess(std::string_view base_name,
                                   std::string_view field_name, SimContext& ctx,
                                   Arena& arena, Logic4Vec& out) {
   auto* cls_type = ctx.FindClassType(base_name);
   if (!cls_type) return false;
-  if (TryLocalStaticMember(cls_type, field_name, arena, out)) return true;
+  for (const auto* t = cls_type; t != nullptr; t = t->parent) {
+    if (TryLocalStaticMember(t, field_name, arena, out)) return true;
+  }
   if (cls_type->is_interface &&
       TryInterfaceStaticMember(cls_type, field_name, arena, out)) {
     return true;

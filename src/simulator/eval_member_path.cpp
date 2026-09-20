@@ -94,7 +94,10 @@ const StructTypeInfo* TaggedMemberLayout(const StructTypeInfo& sinfo,
 // The class whose static property the bare name `name` reads inside a method
 // (§8.10 for a static method, §8.23 for a nested class's), or the class the
 // scope `C::name` or `p::C::name` names; null for a name a local shadows or
-// a base of another shape.
+// a base of another shape. §8.13 (printed pages 189-190): the class answered
+// is the one declaring the property, C for `D::m_inst` where D extends C
+// (ClassTypeInfo::StaticPropertyDeclarer), whose one storage holds the
+// handle; asked of D's own static_properties, `D::m_inst.k` read x.
 static const ClassTypeInfo* StaticPropertyClassOf(const Expr* base,
                                                   SimContext& ctx, Arena& arena,
                                                   std::string_view& name) {
@@ -110,7 +113,9 @@ static const ClassTypeInfo* StaticPropertyClassOf(const Expr* base,
     return nullptr;
   }
   name = base->rhs->text;
-  return ctx.FindClassType(ScopedClassKey(base->lhs, arena));
+  const ClassTypeInfo* cls =
+      ctx.FindClassType(ScopedClassKey(base->lhs, arena));
+  return cls != nullptr ? cls->StaticPropertyDeclarer(name) : nullptr;
 }
 
 bool ResolveStaticPropertyBase(const Expr* base, SimContext& ctx, Arena& arena,

@@ -476,10 +476,10 @@ struct AnyChangeAwaiter {
   // member; split at the first, the class was looked for as `p`. §8.13
   // (printed pages 189-190): the class armed on is the one declaring the
   // property, C for `D::n` and `D::all` where D extends C and for the bare
-  // `n` of D's own static method (StaticPropertyDeclarer,
-  // awaiters_event_control.h), which is the class every write to that one
-  // storage notifies; asked of D's own static_properties, which hold D's
-  // declarations alone, each armed nothing and waited for ever.
+  // `n` of D's own static method (ClassTypeInfo::StaticPropertyDeclarer),
+  // which is the class every write to that one storage notifies; asked of
+  // D's own static_properties, which hold D's declarations alone, each armed
+  // nothing and waited for ever.
   bool AttachStaticPropertyWatcher(std::string_view name,
                                    std::coroutine_handle<> h, Process* proc,
                                    const std::shared_ptr<bool>& fin,
@@ -492,7 +492,7 @@ struct AnyChangeAwaiter {
       member = name.substr(scope + 2);
     }
     if (cls == nullptr) return false;
-    cls = StaticPropertyDeclarer(cls, member);
+    cls = cls->StaticPropertyDeclarer(member);
     if (cls == nullptr) return false;
     cls->AddStaticWatcher(WakeOnceWatcher(h, proc, fin, consumed));
     return true;

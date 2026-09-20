@@ -228,10 +228,12 @@ static uint64_t HeldPropertyHandle(const ClassObject* self,
   }
   auto it = self->properties.find(std::string(name));
   if (it != self->properties.end()) return it->second.ToUint64();
-  if (self->type == nullptr) return kNullClassHandle;
-  auto sit = self->type->static_properties.find(std::string(name));
-  return sit != self->type->static_properties.end() ? sit->second.ToUint64()
-                                                    : kNullClassHandle;
+  // §8.13 (printed 189-190): a base's static handle is the derived object's
+  // too, read from the declaring class's one storage; D's own read null.
+  const ClassTypeInfo* declarer =
+      self->type ? self->type->StaticPropertyDeclarer(name) : nullptr;
+  if (declarer == nullptr) return kNullClassHandle;
+  return declarer->static_properties.find(std::string(name))->second.ToUint64();
 }
 
 // §8.11 with §8.6: a call through a property of the running method's object,

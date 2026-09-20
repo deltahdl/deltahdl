@@ -534,6 +534,27 @@ static FieldTarget ResolveSuperField(std::string_view base_name,
   return target;
 }
 
+// §8.13 (printed pages 189-190) with §8.9 (printed 186): the static property
+// `field_name` of `cls` or of a base it inherits it from, as the storage of
+// the class declaring it -- C's for `D::n = 2` where D extends C, which is
+// what `C::n` reads and the class the deposit notifies, the one every wait
+// on the property is armed on (ClassTypeInfo::StaticPropertyDeclarer). No
+// target where no class on the chain declares it. Asked of D's own
+// static_properties, which hold D's declarations alone, the write found no
+// slot and landed nowhere.
+static FieldTarget StaticPropertyTarget(const ClassTypeInfo* cls,
+                                        std::string_view field_name) {
+  const ClassTypeInfo* declarer = cls->StaticPropertyDeclarer(field_name);
+  if (declarer == nullptr) return {};
+  FieldTarget target;
+  target.kind = FieldTarget::Kind::kStatic;
+  target.type = declarer;
+  target.slot =
+      &declarer->static_properties.find(std::string(field_name))->second;
+  target.field = std::string(field_name);
+  return target;
+}
+
 // The static property field_name of the class named base_name. *handled is set
 // true when base_name names a known class type.
 static FieldTarget ResolveStaticClassField(std::string_view base_name,
@@ -543,14 +564,7 @@ static FieldTarget ResolveStaticClassField(std::string_view base_name,
   auto* cls_type = ctx.FindClassType(base_name);
   if (!cls_type) return {};
   *handled = true;
-  auto sit = cls_type->static_properties.find(std::string(field_name));
-  if (sit == cls_type->static_properties.end()) return {};
-  FieldTarget target;
-  target.kind = FieldTarget::Kind::kStatic;
-  target.type = cls_type;
-  target.slot = &sit->second;
-  target.field = std::string(field_name);
-  return target;
+  return StaticPropertyTarget(cls_type, field_name);
 }
 
 // §8.9 (printed page 186) with §8.4 (printed 181-182): `C::m_inst.k = v`,
@@ -590,14 +604,7 @@ static FieldTarget ResolvePackageClassStaticField(const Expr* lhs,
   const ClassTypeInfo* cls = PackageQualifiedClassOf(lhs, ctx, member);
   if (cls == nullptr) return {};
   *handled = true;
-  auto sit = cls->static_properties.find(std::string(member));
-  if (sit == cls->static_properties.end()) return {};
-  FieldTarget target;
-  target.kind = FieldTarget::Kind::kStatic;
-  target.type = cls;
-  target.slot = &sit->second;
-  target.field = std::string(member);
-  return target;
+  return StaticPropertyTarget(cls, member);
 }
 
 // The component the member access `lhs` names of the interface instance its
@@ -823,7 +830,8 @@ void WriteResolvedField(const FieldTarget& target, const Logic4Vec& rhs_val,
           CoerceToPropertyType(target.type, target.field, rhs_val, arena);
       // §9.4.2 with §8.9: the storage is the class's own, which no object's
       // watchers see written, so the write is announced on the class, where
-      // an event control or a wait on `C::n` armed.
+      // an event control or a wait on `C::n` armed -- the declaring class,
+      // C for `D::n` (§8.13), the one storage both names reach.
       target.type->NotifyStaticWatchers();
       return;
     case FieldTarget::Kind::kNone:

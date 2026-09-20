@@ -223,4 +223,205 @@ TEST(InheritanceSimulation, DerivedOverridesBaseTask) {
   LowerRunAndCheck(f, design, {{"out", 2u}});
 }
 
+// §8.13 (printed pages 189-190) with §8.9 (printed 186): a derived class
+// inherits the base's properties, and a static property is one storage
+// shared by every object of its class, so `D::n` and `C::n` name C's one
+// storage. Written through D and read through both, 3 * 10 + 3; the write
+// found no slot in D's own static_properties and landed nowhere, and each
+// read 0.
+TEST(InheritanceSimulation, InheritedStaticWrittenThroughDerivedScope) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  static int n;\n"
+                      "endclass\n"
+                      "class D extends C;\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    D::n = 3;\n"
+                      "    result = C::n * 10 + D::n;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            33u);
+}
+
+// §8.13 with §8.9: the same storage the other way about -- written through
+// the base's scope and read through the derived one, 5 where `D::n` read 0
+// from D's own static_properties, which hold D's declarations alone.
+TEST(InheritanceSimulation, InheritedStaticReadThroughDerivedScope) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  static int n;\n"
+                      "endclass\n"
+                      "class D extends C;\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    C::n = 5;\n"
+                      "    result = D::n;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            5u);
+}
+
+// §8.13 with §8.10 (printed page 186): a static method of D names the
+// inherited static property bare, and both its write and its read are of
+// C's one storage: put(6) makes `C::n` 6 and get() reads it, 66; then
+// `C::n = 4` is what get() reads, 6604. The bare write landed nowhere and
+// the bare read gave 0, D's own static_properties holding no `n`.
+TEST(InheritanceSimulation, InheritedStaticNamedBareInDerivedStaticMethod) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  static int n;\n"
+                      "endclass\n"
+                      "class D extends C;\n"
+                      "  static function void put(int v);\n"
+                      "    n = v;\n"
+                      "  endfunction\n"
+                      "  static function int get();\n"
+                      "    return n;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    D::put(6);\n"
+                      "    result = C::n * 10 + D::get();\n"
+                      "    C::n = 4;\n"
+                      "    result = result * 100 + D::get();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            6604u);
+}
+
+// §8.13 with §8.9: `d.n` through a D handle and `c.n` through a C handle
+// read and write the one storage, as `C::n` does: `d.n = 7` read back as 77
+// through c.n and C::n, then `c.n = 8` read back as 8 through d.n, 7708. The
+// write through d landed in the D object's own map, where only d.n saw it.
+TEST(InheritanceSimulation, InheritedStaticSharedThroughBothHandles) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  static int n;\n"
+                      "endclass\n"
+                      "class D extends C;\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    C c;\n"
+                      "    D d;\n"
+                      "    c = new;\n"
+                      "    d = new;\n"
+                      "    d.n = 7;\n"
+                      "    result = c.n * 10 + C::n;\n"
+                      "    c.n = 8;\n"
+                      "    result = result * 100 + d.n;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            7708u);
+}
+
+// §8.13 with §8.9 and §8.4 (printed pages 181-182): a static handle C
+// declares is reached as `D::m_inst`, and a member through it is the
+// object's: after `d.k = 4` and `D::m_inst = d`, `D::m_inst.k` and
+// `C::m_inst.k` both read 4, 44; `D::m_inst.k = 5` writes d's k, 4405.
+// Asked of D's own static_properties, the base named no static property,
+// so the read gave x and the write went nowhere.
+TEST(InheritanceSimulation, InheritedStaticHandleReachesItsObject) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  int k = 9;\n"
+                      "  static C m_inst;\n"
+                      "endclass\n"
+                      "class D extends C;\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    D d;\n"
+                      "    d = new;\n"
+                      "    d.k = 4;\n"
+                      "    D::m_inst = d;\n"
+                      "    result = D::m_inst.k * 10 + C::m_inst.k;\n"
+                      "    D::m_inst.k = 5;\n"
+                      "    result = result * 100 + d.k;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            4405u);
+}
+
+// §8.13 with §8.9 and §26.3 (printed page 810): the same one storage for a
+// package's classes, written as `p::D::n` and read back through `p::C::n`
+// and `p::D::n`, 88 where each read 0.
+TEST(InheritanceSimulation, InheritedStaticThroughPackageQualifiedScope) {
+  EXPECT_EQ(RunAndGet("package p;\n"
+                      "  class C;\n"
+                      "    static int n;\n"
+                      "  endclass\n"
+                      "  class D extends C;\n"
+                      "  endclass\n"
+                      "endpackage\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    p::D::n = 8;\n"
+                      "    result = p::C::n * 10 + p::D::n;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            88u);
+}
+
+// §8.13 with §8.9 and §8.7 (printed page 184): `D::m_inst = new` constructs
+// into the static handle C declares, so `C::m_inst.k` reads the new object's
+// 9 and `D::m_inst == null` reads 0, 90; declined for D's own
+// static_properties, the handle stayed null and the read gave x.
+TEST(InheritanceSimulation, InheritedStaticHandleConstructedThroughDerived) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  int k = 9;\n"
+                      "  static C m_inst;\n"
+                      "endclass\n"
+                      "class D extends C;\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    D::m_inst = new;\n"
+                      "    result = C::m_inst.k * 10 + (D::m_inst == null);\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            90u);
+}
+
+// §8.13 with §8.10 and §8.6 (printed page 183): the bare `m_inst` of D's
+// instance method is the static handle C declares, so `m_inst.add(7)` runs
+// on the object `C::m_inst` holds and its k reads 16 through `C::m_inst.k`;
+// read from D's own static_properties, the bare name gave the null handle
+// and the call was reported.
+TEST(InheritanceSimulation, InheritedStaticHandleNamedBareInDerivedMethod) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  int k = 9;\n"
+                      "  static C m_inst;\n"
+                      "  function void add(int v); k = k + v; endfunction\n"
+                      "endclass\n"
+                      "class D extends C;\n"
+                      "  function void bump(); m_inst.add(7); endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    D d;\n"
+                      "    C::m_inst = new;\n"
+                      "    d = new;\n"
+                      "    d.bump();\n"
+                      "    result = C::m_inst.k;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            16u);
+}
+
 }  // namespace

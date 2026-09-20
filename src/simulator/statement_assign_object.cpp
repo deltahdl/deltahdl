@@ -275,10 +275,14 @@ static MemberNewBase MemberNewBaseClass(std::string_view base,
   }
   const auto* cls = ctx.FindClassType(base);
   if (cls == nullptr) return {};
-  if (cls->static_properties.find(std::string(field)) ==
-      cls->static_properties.end())
-    return {};
-  return {cls, nullptr};
+  // §8.13 (printed pages 189-190): `D::m_inst = new` names the static handle
+  // a base of D declares, constructed and stored on that class's one storage
+  // (ClassTypeInfo::StaticPropertyDeclarer); asked of D's own
+  // static_properties, the assignment was declined and the handle stayed
+  // null.
+  const ClassTypeInfo* declarer = cls->StaticPropertyDeclarer(field);
+  if (declarer == nullptr) return {};
+  return {declarer, nullptr};
 }
 
 // §8.4 / §8.12: `obj.field = new` where field is a class handle, and §8.9's

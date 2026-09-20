@@ -50,7 +50,10 @@ struct StaticPropertyRef {
 // scope names (ScopedClassKey), or a bare identifier the running method's
 // class, or one lexically enclosing it (§8.23), holds a static property by
 // (ClassTypeInfo::StaticPropertyOwner), where no local of the name shadows it
-// (NameDenotesVariable). False for a base of any other shape or name.
+// (NameDenotesVariable); the owner answered is the class declaring the
+// property, a base of the named one where that base declares it (§8.13,
+// ClassTypeInfo::StaticPropertyDeclarer). False for a base of any other
+// shape or name.
 bool ResolveStaticPropertyBase(const Expr* base, SimContext& ctx, Arena& arena,
                                StaticPropertyRef& out);
 
