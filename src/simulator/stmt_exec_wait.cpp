@@ -55,6 +55,25 @@ void SubstituteSequenceEndpoints(std::unordered_set<std::string>& reads,
   for (auto& a : seq_adds) reads.insert(a);
 }
 
+// §8.9 with §26.3: the class the scope resolution `e` names a member of --
+// `C` by one identifier, or `p::C`, the key the lowerer binds a package's
+// class under, which PackageQualifiedClassOf (eval_static_method.cpp) answers
+// for the doubly-qualified `p::C::all` -- and in `scope` the name the class
+// was written by. Null for a left side that is no class.
+const ClassTypeInfo* ScopedClassOf(const Expr* e, SimContext& ctx,
+                                   std::string& scope) {
+  if (e->lhs->kind == ExprKind::kIdentifier) {
+    scope = std::string(e->lhs->text);
+    return ctx.FindClassType(scope);
+  }
+  std::string_view member;
+  const ClassTypeInfo* cls = PackageQualifiedClassOf(e, ctx, member);
+  if (cls == nullptr) return nullptr;
+  scope =
+      std::string(e->lhs->lhs->text) + "::" + std::string(e->lhs->rhs->text);
+  return cls;
+}
+
 // §9.4.3 with §8.9: the static properties the wait condition reads through
 // the class scope operator, each added to `reads` as `C::n`, which is the
 // name AnyChangeAwaiter::AttachStaticPropertyWatcher arms on the class by.
@@ -62,20 +81,25 @@ void SubstituteSequenceEndpoints(std::unordered_set<std::string>& reads,
 // and `n`, and neither names the class's own storage: a class is not a
 // variable, and a wait on `C::n == 2` therefore armed nothing and waited for
 // ever. The two are left in the set, harmless where they name nothing and
-// dropped by the awaiter if they do not.
+// dropped by the awaiter if they do not. §26.3: a package's class is named
+// `p::C`, so `p::C::all` is added as `p::C::all`, which the awaiter splits at
+// its last scope operator; read for a class named by one identifier alone,
+// `wait (p::C::all.size() != 0)` collected `p`, `C` and `all`, none a
+// variable, armed nothing and waited for ever.
 void CollectStaticPropertyReads(const Expr* cond, SimContext& ctx,
                                 std::unordered_set<std::string>& reads) {
   ForEachSubExpr(cond, [&](const Expr* e) {
     if (e->kind != ExprKind::kMemberAccess || !e->is_scope_resolution ||
-        e->lhs == nullptr || e->lhs->kind != ExprKind::kIdentifier ||
-        e->rhs == nullptr || e->rhs->kind != ExprKind::kIdentifier)
+        e->lhs == nullptr || e->rhs == nullptr ||
+        e->rhs->kind != ExprKind::kIdentifier)
       return;
-    const ClassTypeInfo* cls = ctx.FindClassType(e->lhs->text);
+    std::string scope;
+    const ClassTypeInfo* cls = ScopedClassOf(e, ctx, scope);
     if (cls == nullptr) return;
     std::string member(e->rhs->text);
     if (cls->static_properties.find(member) == cls->static_properties.end())
       return;
-    reads.insert(std::string(e->lhs->text) + "::" + member);
+    reads.insert(scope + "::" + member);
   });
 }
 

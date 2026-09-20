@@ -471,14 +471,16 @@ struct AnyChangeAwaiter {
   // write made through `C::n` or from a static method. Answers whether it
   // armed. Before this `wait (C::n == 2)` collected the names `C` and `n`,
   // neither a variable nor a property of any object in hand, armed nothing
-  // and waited for ever.
+  // and waited for ever. §26.3: a package's class is bound under `p::C`, and
+  // `p::C::all` is split at its last scope operator into that key and the
+  // member; split at the first, the class was looked for as `p`.
   bool AttachStaticPropertyWatcher(std::string_view name,
                                    std::coroutine_handle<> h, Process* proc,
                                    const std::shared_ptr<bool>& fin,
                                    const std::shared_ptr<bool>& consumed) {
     const ClassTypeInfo* cls = ctx.CurrentMethodClass();
     std::string_view member = name;
-    auto scope = name.find("::");
+    auto scope = name.rfind("::");
     if (scope != std::string_view::npos) {
       cls = ctx.FindClassType(name.substr(0, scope));
       member = name.substr(scope + 2);

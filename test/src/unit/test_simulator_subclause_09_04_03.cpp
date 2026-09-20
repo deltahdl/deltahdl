@@ -549,4 +549,94 @@ TEST(LevelSensitiveEventSimulation, WaitOnANonEmptyQueueSizeCallDoesNotBlock) {
   EXPECT_EQ(val, 300u);
 }
 
+// §9.4.3 (printed page 236) with §8.9 (printed 186): the condition reads a
+// static queue property through the class scope operator, `C::all.size()`,
+// and a push through the same name from another process releases it. A
+// static property is the class's own storage, held by no object and named by
+// no variable, so AnnounceQueueChange (eval_array_class_queue.cpp), given no
+// owner and no declared queue's name, announced nothing and the wait, armed
+// on the class's static watchers, stayed parked for ever: `result` read 0.
+// Told to the class as a static value property's write is, the push at time
+// 15 releases the wait, and the pop reads 4 * 100 + 15.
+TEST(LevelSensitiveEventSimulation,
+     WaitOnAStaticQueuePropertySizeCallIsReleasedByAPush) {
+  auto val = RunAndGet(
+      "class C;\n"
+      "  static int all[$];\n"
+      "endclass\n"
+      "module t;\n"
+      "  int v, result;\n"
+      "  initial begin\n"
+      "    wait (C::all.size() != 0);\n"
+      "    v = C::all.pop_front();\n"
+      "    result = v * 100 + $time;\n"
+      "  end\n"
+      "  initial #15 C::all.push_back(4);\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(val, 415u);
+}
+
+// §9.4.3 with §8.9 and §8.10: inside a static task the condition names the
+// static queue bare, `all.size()`, and a static function of the same class
+// pushes to it bare from another process. Resolved to the class's queue but
+// announced under the bare name, which no variable stands for, the push told
+// nothing and the task stayed parked with `result` at 0; the wait returning
+// at once instead would have popped 0 at time 0, reading 0 as well. Released
+// by the push at time 20, the pop reads 9 * 100 + 20.
+TEST(LevelSensitiveEventSimulation,
+     WaitOnABareStaticQueueInAStaticTaskIsReleasedByAStaticFunctionsPush) {
+  auto val = RunAndGet(
+      "class C;\n"
+      "  static int all[$];\n"
+      "  static int result;\n"
+      "  static task get();\n"
+      "    int v;\n"
+      "    wait (all.size() != 0);\n"
+      "    v = all.pop_front();\n"
+      "    result = v * 100 + $time;\n"
+      "  endtask\n"
+      "  static function void put(int x);\n"
+      "    all.push_back(x);\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  int result;\n"
+      "  initial C::get();\n"
+      "  initial #20 C::put(9);\n"
+      "  initial #30 result = C::result;\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(val, 920u);
+}
+
+// §9.4.3 with §8.9 and §26.3: the class is declared in a package, and its
+// static queue is named `p::C::all` from the module. The lowerer binds the
+// class under `p::C`, which ScopeResolvedQueueProperty read as a class named
+// by one identifier, so the queue was never found: the push pushed nothing,
+// size() answered 0, and the wait, its condition collecting no static
+// property, parked on nothing for ever with `result` at 0. Found through
+// PackageQualifiedClassOf on both sides, the push at time 30 releases the
+// wait and the pop reads 5 * 100 + 30.
+TEST(LevelSensitiveEventSimulation,
+     WaitOnAPackageClassStaticQueueSizeCallIsReleasedByAPush) {
+  auto val = RunAndGet(
+      "package p;\n"
+      "  class C;\n"
+      "    static int all[$];\n"
+      "  endclass\n"
+      "endpackage\n"
+      "module t;\n"
+      "  int v, result;\n"
+      "  initial begin\n"
+      "    wait (p::C::all.size() != 0);\n"
+      "    v = p::C::all.pop_front();\n"
+      "    result = v * 100 + $time;\n"
+      "  end\n"
+      "  initial #30 p::C::all.push_back(5);\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(val, 530u);
+}
+
 }  // namespace

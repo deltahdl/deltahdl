@@ -170,17 +170,81 @@ std::string PackageQueueKey(const Expr* base) {
   return std::string(base->lhs->text) + "." + std::string(base->rhs->text);
 }
 
-// §8.23: `C::name` names the static property `name` of class C; §26.3:
-// `p::q` names the queue package p declares, under its "p.q" key. Resolved
-// as a static property alone, `p1::q.push_back(4)` found no class p1 and
-// pushed nothing.
+// §8.9 with §8.23 and §26.3: the class the scope resolution `base` names a
+// static property of, and in `member` the property: `C::all` names class C's,
+// and `p::C::all` names the class package p declares, which the lowerer binds
+// under "p::C" and PackageQualifiedClassOf answers. Null for a base of any
+// other shape or a name that is no class's, a package's own `p::q` included.
+// Read as `C::all` alone, `p::C::all.push_back(5)` found no class named
+// `p::C::all`'s left and pushed nothing, its size() answering 0.
+const ClassTypeInfo* ScopeResolvedClass(const Expr* base, SimContext& ctx,
+                                        std::string_view& member) {
+  if (base->lhs == nullptr) return nullptr;
+  if (base->lhs->kind == ExprKind::kMemberAccess)
+    return PackageQualifiedClassOf(base, ctx, member);
+  if (base->lhs->kind != ExprKind::kIdentifier) return nullptr;
+  member = base->rhs->text;
+  return ctx.FindClassType(base->lhs->text);
+}
+
+// §8.23: `C::name` names the static property `name` of class C, and §26.3's
+// `p::C::name` the one of a package's class; §26.3: `p::q` names the queue
+// package p declares, under its "p.q" key. Resolved as a static property
+// alone, `p1::q.push_back(4)` found no class p1 and pushed nothing.
 QueueObject* ScopeResolvedQueueProperty(const Expr* base, SimContext& ctx) {
-  if (base->lhs == nullptr || base->lhs->kind != ExprKind::kIdentifier)
-    return nullptr;
   if (auto* q = ctx.FindQueue(PackageQueueKey(base))) return q;
-  const ClassTypeInfo* cls = ctx.FindClassType(base->lhs->text);
+  std::string_view member;
+  const ClassTypeInfo* cls = ScopeResolvedClass(base, ctx, member);
   if (cls == nullptr) return nullptr;
-  return ResolveOn(nullptr, cls, base->rhs->text, ctx, nullptr);
+  return ResolveOn(nullptr, cls, member, ctx, nullptr);
+}
+
+// §8.10 and §8.11: the class a bare name inside a method is resolved in --
+// the running method's class, or the object's own where no method class is
+// in force -- and null outside a method, where there is no class scope to
+// resolve the name in.
+const ClassTypeInfo* MethodScopeClass(SimContext& ctx) {
+  const ClassTypeInfo* from = ctx.CurrentMethodClass();
+  ClassObject* self = ctx.CurrentThis();
+  if (from == nullptr && self != nullptr) from = self->type;
+  return from;
+}
+
+// A local of the same name is the name's own declaration and shadows a
+// property, so a property is asked for only where no local answers.
+bool LocalShadowsProperty(std::string_view name, SimContext& ctx) {
+  return ctx.FindVariable(name) != nullptr ||
+         ctx.FindArrayInfo(name) != nullptr ||
+         ctx.FindAssocArray(name) != nullptr;
+}
+
+// §8.9 (printed page 186): the class whose own storage holds the static queue
+// property `base` names -- `C::all` or `p::C::all` through the scope operator,
+// or the bare `all` a method of C names (§8.10), where no declared queue or
+// local of the name shadows it, resolved as FindQueueOfName resolves the
+// name -- else null. What names a static property is the class, not an
+// object, so this is what AnnounceQueueChange tells §9.4.2's watchers
+// through where FindQueueOfBase gave it no owner.
+const ClassTypeInfo* StaticQueuePropertyClass(const Expr* base,
+                                              SimContext& ctx) {
+  const ClassTypeInfo* from = nullptr;
+  std::string key;
+  std::string_view name;
+  if (base->kind == ExprKind::kIdentifier) {
+    key = DeclaredKindsKey(base);
+    name = key;
+    if (ctx.FindQueue(name) != nullptr || LocalShadowsProperty(name, ctx))
+      return nullptr;
+    from = MethodScopeClass(ctx);
+  } else if (base->kind == ExprKind::kMemberAccess &&
+             base->is_scope_resolution && base->rhs != nullptr &&
+             base->rhs->kind == ExprKind::kIdentifier) {
+    from = ScopeResolvedClass(base, ctx, name);
+  }
+  if (from == nullptr) return nullptr;
+  const ClassTypeInfo* declaring = nullptr;
+  const ClassMember* member = FindQueuePropertyDecl(from, name, declaring);
+  return member != nullptr && member->is_static ? declaring : nullptr;
 }
 
 }  // namespace
@@ -219,17 +283,9 @@ QueueObject* FindQueueOfName(std::string_view name, SimContext& ctx,
   if (auto* q = ctx.FindQueue(name)) return q;
   // Outside a method there is no class scope to resolve the name in, and this
   // is asked of every element select, so that is settled before the lookups.
-  ClassObject* self = ctx.CurrentThis();
-  const ClassTypeInfo* from = ctx.CurrentMethodClass();
-  if (from == nullptr && self != nullptr) from = self->type;
-  if (from == nullptr) return nullptr;
-  // A local of the same name is the name's own declaration and shadows the
-  // property, so the property is asked for only where no local answers.
-  if (ctx.FindVariable(name) != nullptr || ctx.FindArrayInfo(name) != nullptr ||
-      ctx.FindAssocArray(name) != nullptr) {
-    return nullptr;
-  }
-  return ResolveOn(self, from, name, ctx, owner);
+  const ClassTypeInfo* from = MethodScopeClass(ctx);
+  if (from == nullptr || LocalShadowsProperty(name, ctx)) return nullptr;
+  return ResolveOn(ctx.CurrentThis(), from, name, ctx, owner);
 }
 
 QueueObject* FindQueueOfBase(const Expr* base, SimContext& ctx, Arena& arena,
@@ -252,11 +308,26 @@ QueueObject* FindQueueOfBase(const Expr* base, SimContext& ctx, Arena& arena,
   return ResolveOn(obj, obj->type, base->rhs->text, ctx, owner);
 }
 
+// §9.4.3 (printed page 236) with §8.9 (printed 186): a static queue property
+// is the class's own storage, one for every object and for no object at all,
+// which no object's watchers see written and no variable's name stands for,
+// so its change is told to the class's static watchers -- those
+// AnyChangeAwaiter::AttachStaticPropertyWatcher (awaiters.h) arms a wait on
+// `C::all.size()`, `p::C::all.size()` or a static method's bare `all.size()`
+// on -- as every write to a static value property is
+// (ClassTypeInfo::NotifyStaticWatchers). With `owner` null and the base no
+// declared queue's name, `C::all.push_back(7)` announced nothing, and the
+// wait stayed parked for ever.
 void AnnounceQueueChange(const Expr* base, ClassObject* owner,
                          SimContext& ctx) {
   if (owner != nullptr) {
     ctx.NotifyClassHandleWatchers(owner->handle);
-  } else if (base != nullptr && base->kind == ExprKind::kIdentifier) {
+    return;
+  }
+  if (base == nullptr) return;
+  if (const ClassTypeInfo* cls = StaticQueuePropertyClass(base, ctx)) {
+    cls->NotifyStaticWatchers();
+  } else if (base->kind == ExprKind::kIdentifier) {
     NotifyOwningVar(ctx, DeclaredKindsKey(base));
   } else if (std::string key = PackageQueueKey(base); !key.empty()) {
     NotifyOwningVar(ctx, key);

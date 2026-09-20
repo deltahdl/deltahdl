@@ -62,7 +62,9 @@ QueueObject* FindQueueOfBase(const Expr* base, SimContext& ctx, Arena& arena,
 
 // §9.4.2's announcement of a change to the queue `base` designates: to the
 // watchers on the variables designating the object whose property it is,
-// `owner`, or to those on the variable under a declared queue's name.
+// `owner`; to the static watchers of the class whose static property it is
+// (§8.9), `C::all`, `p::C::all` or the bare `all` inside a method of C; or to
+// those on the variable under a declared queue's name.
 void AnnounceQueueChange(const Expr* base, ClassObject* owner, SimContext& ctx);
 
 // §8.4/§7.10: `q[1].v` reads the property `v` of the object the element
