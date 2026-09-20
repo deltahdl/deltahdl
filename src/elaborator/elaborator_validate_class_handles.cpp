@@ -709,7 +709,14 @@ void ElaboratorClassRules::WalkStmtsForClassHandleOps(const Stmt* s) {
   if (s->kind == StmtKind::kVarDecl &&
       s->var_decl_type.kind == DataTypeKind::kNamed &&
       class_names_.count(s->var_decl_type.type_name)) {
-    class_var_names_.insert(s->var_name);
+    // §7.4.2 (printed pages 153-154) and §7.5: a block item declaration with
+    // an unpacked dimension, `C arr[2]` or `C d[]`, is an array whose
+    // elements are handles, and a select of it is an element, not §8.4's
+    // (printed 181) bit-select of a handle, as ValidateVarDeclTypes already
+    // reads a module-scope declaration. Every block-declared variable of a
+    // class type was taken for one handle, so `arr[1] = new` and `arr[1].v`
+    // in an initial block were reported.
+    if (s->var_unpacked_dims.empty()) class_var_names_.insert(s->var_name);
     class_var_types_[s->var_name] = s->var_decl_type.type_name;
     CheckTypedConstructorDeclInitCompatibility(s, class_names_, unit_, diag_);
     CheckNewOnInterfaceDeclInit(s, unit_, diag_);

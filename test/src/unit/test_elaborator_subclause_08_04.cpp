@@ -657,4 +657,53 @@ TEST(ClassObjectElaboration, ElementSelectOfAnArrayOfHandlesIsNoBitSelect) {
                              "8.4"));
 }
 
+// §7.4.2 (printed pages 153-154): a fixed-size unpacked array is declared by
+// the dimension after the name, so a block's `C arr[2]` and a dynamic `C d[]`
+// (§7.5) are arrays whose elements are handles, and `arr[1]` and `d[0]` are
+// elements, not §8.4's (printed 181) bit-select of a handle. The module-scope
+// declaration read its unpacked dimensions (ValidateVarDeclTypes), but
+// WalkStmtsForClassHandleOps took every block item declaration of a class
+// type for one handle, so the write `arr[1] = new` and the read `arr[1].v`
+// were both reported.
+TEST(ClassObjectElaboration,
+     ElementSelectOfABlockDeclaredArrayOfHandlesIsNoBitSelect) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "class C; int v = 7; endclass\n"
+      "module m;\n"
+      "  int r;\n"
+      "  initial begin\n"
+      "    C arr[2];\n"
+      "    C d[];\n"
+      "    arr[1] = new;\n"
+      "    d = new[2];\n"
+      "    d[0] = new;\n"
+      "    r = arr[1].v * 10 + d[0].v;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// A block-declared handle with no unpacked dimension is one handle, and a
+// select of it stays §8.4's bit-select; the array exemption reads the
+// dimensions, not the block position.
+TEST(ClassObjectElaboration, BitSelectOfABlockDeclaredHandleIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class C; endclass\n"
+      "module m;\n"
+      "  initial begin\n"
+      "    automatic int r;\n"
+      "    C h;\n"
+      "    r = h[0];\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bit-select on class object handle is illegal", 6,
+                            "8.4"));
+}
+
 }  // namespace
