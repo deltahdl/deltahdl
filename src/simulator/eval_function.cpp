@@ -260,6 +260,17 @@ static bool ResolveMethodOnPropertyHandle(const MethodCallParts& parts,
                                       parts.method_name, ctx, info);
 }
 
+// §8.3 (printed page 180) makes a variable of a class type a handle, and
+// §7.10 (printed 169) and §7.8 give a queue and an associative array declared
+// with the class's name, `C q[$]` or `C m[string]`, methods of their own: such
+// a variable is an array of handles and no handle. The class record is entered
+// under the array's key as under a scalar's (LowerVar in lowerer_var.cpp,
+// RegisterPackageClassVariables for a package's), so the record alone cannot
+// tell the two apart; the object the key holds can.
+static bool NameDenotesArrayOfHandles(std::string_view name, SimContext& ctx) {
+  return ctx.FindQueue(name) != nullptr || ctx.FindAssocArray(name) != nullptr;
+}
+
 bool ResolveInstanceMethod(const MethodCallParts& parts, SimContext& ctx,
                            InstanceMethodInfo& info) {
   if (parts.var_name == "this")
@@ -268,6 +279,12 @@ bool ResolveInstanceMethod(const MethodCallParts& parts, SimContext& ctx,
   if (class_type.empty()) {
     return ResolveMethodOnPropertyHandle(parts, ctx, info);
   }
+  // A statement's `p1::q.push_back(c1)` is resolved here ahead of the queue
+  // path -- ExecInlineTaskCall (stmt_exec.cpp) asks SetupInstanceTaskCall
+  // before ExecCallStmtExpr reaches TryBuiltinMethodCall, where the same call
+  // in a function body reaches the queue first -- so the carrier's 0 was read
+  // as a null handle and §8.4's error reported for a queue that held handles.
+  if (NameDenotesArrayOfHandles(parts.var_name, ctx)) return false;
   auto* var = ctx.FindVariable(parts.var_name);
   if (!var) return false;
   auto handle = var->value.ToUint64();
