@@ -93,16 +93,31 @@ void CollectRandsequenceDeclaredNames(
 // p). Each member name is registered so that a name supplied by two
 // wildcard-imported packages is detected as ambiguous, not just the enum type
 // name itself. `origin` is the package declaring the enumeration.
-void AddEnumMemberNames(const std::vector<EnumMember>& members,
-                        std::string_view origin, ProvidedNames& names) {
-  for (const auto& em : members) {
+//
+// §6.19 has an enumerated type declare its literals as named constants of the
+// scope holding the enum, and §23.9 lists no structure or union among the
+// elements that define a scope, so an enum written as the type of a member of
+// a structure or union (§7.2's struct_union_member takes any data_type, the
+// enum form of Syntax 6-5 among them) declares its literals in the package as
+// an enum written at the top of the declaration does. The member's type is
+// held by StructMember::nested_type, and a structure nested in a member is
+// descended into the same way; a member of a named type declares nothing.
+void AddEnumMemberNames(const DataType& type, std::string_view origin,
+                        ProvidedNames& names) {
+  for (const auto& em : type.enum_members) {
     if (!em.name.empty()) names.insert({em.name, origin});
+  }
+  for (const auto& sm : type.struct_members) {
+    if (sm.nested_type != nullptr) {
+      AddEnumMemberNames(*sm.nested_type, origin, names);
+    }
   }
 }
 
 // The names one package item of `pkg` makes directly visible: its own name,
 // the name of a class it declares, and any enumeration constants it brings,
-// which may sit on a typedef's type or on a bare enum data declaration. Each is
+// which may sit on a typedef's type, on a bare enum data declaration, or on a
+// member of a structure or union either of those writes inline. Each is
 // declared by `pkg`. A name already in the map keeps its first origin: the
 // package's own items are added ahead of what its exports hand on, and §26.3
 // has a declaration of the scope take the name over an import.
@@ -113,8 +128,8 @@ void AddPackageItemNames(const PackageDecl* pkg, const ModuleItem* pi,
       !pi->class_decl->name.empty()) {
     names.insert({pi->class_decl->name, pkg->name});
   }
-  AddEnumMemberNames(pi->typedef_type.enum_members, pkg->name, names);
-  AddEnumMemberNames(pi->data_type.enum_members, pkg->name, names);
+  AddEnumMemberNames(pi->typedef_type, pkg->name, names);
+  AddEnumMemberNames(pi->data_type, pkg->name, names);
 }
 
 const PackageDecl* FindPackageDecl(const CompilationUnit* unit,

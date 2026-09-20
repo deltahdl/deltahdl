@@ -783,4 +783,122 @@ TEST(PackageImport, ModuleDeclarationAfterABlocksClaimIsIllegal) {
                              8, "26.3"));
 }
 
+// §6.19 (printed page 119) has an enumerated type declare its literals as
+// named constants, and printed 120 makes two enumerations naming one literal
+// illegal in one scope, so the literals stand in the scope holding the enum;
+// §7.2's Syntax 7-1 (printed 146) gives a structure member any data_type, the
+// enum form among them, and §23.9's list of the elements that define a scope
+// (printed 761) names no structure, so an enum written as a member's type
+// declares its literals in the package. §26.3 (printed 808) reaches such a
+// declaration through the package scope resolution operator. `p::A` was
+// reported "reference to 'p::A', which package 'p' neither declares nor
+// exports" before, the provided-name walk of
+// src/elaborator/elaborator_scope_rules_names.cpp reading the members of an
+// enum written at the top of a typedef or a data declaration alone.
+TEST(PackageImport, ScopedReferenceToAStructMemberEnumLiteral) {
+  EXPECT_TRUE(
+      ElabOk("package p;\n"
+             "  typedef struct { enum {A, B} e; int n; } s_t;\n"
+             "endpackage\n"
+             "module top;\n"
+             "  int r;\n"
+             "  initial r = p::A + p::B;\n"
+             "endmodule\n"));
+}
+
+// The same literals through a wildcard import: §26.3 (printed 809) makes every
+// identifier the package declares visible in the importing scope without the
+// qualifier, so the bare `B` resolves. It was reported "reference to
+// unresolved identifier 'B'" under §23.9 before, the wildcard-imported
+// package answering for none of the literals a structure member's enum
+// declares.
+TEST(PackageImport, WildcardImportSuppliesAStructMemberEnumLiteral) {
+  EXPECT_TRUE(
+      ElabOk("package p;\n"
+             "  typedef struct { enum {A, B} e; int n; } s_t;\n"
+             "endpackage\n"
+             "module top;\n"
+             "  import p::*;\n"
+             "  int r;\n"
+             "  initial r = B;\n"
+             "endmodule\n"));
+}
+
+// §7.2 (printed 146) gives struct_union_member to a union as to a structure,
+// and a member's type may itself be a structure holding an enum, so a literal
+// of a union member's enum, of an enum two members deep, and of one written
+// on the member of a structure-typed data declaration is each a declaration
+// of the package. `p::U1`, `p::D1` and `p::V1` were each reported as neither
+// declared nor exported before.
+TEST(PackageImport, UnionAndNestedStructMemberEnumLiteralsAreProvided) {
+  EXPECT_TRUE(
+      ElabOk("package p;\n"
+             "  typedef union { enum {U0, U1} tag; int n; } u_t;\n"
+             "  typedef struct {\n"
+             "    struct { enum {D0, D1 = 5} deep; int m; } inner;\n"
+             "    int n;\n"
+             "  } outer_t;\n"
+             "  struct { enum {V0, V1} v; } sv;\n"
+             "endpackage\n"
+             "module top;\n"
+             "  int r;\n"
+             "  initial r = p::U1 + p::D1 + p::V1;\n"
+             "endmodule\n"));
+}
+
+// §26.3 (printed 810) makes it illegal for the wildcard imports of two
+// packages to supply one identifier a reference matches, and the literal a
+// structure member's enum declares is such an identifier: p and q each
+// declare B that way, so the bare read on line 11 is ambiguous. It was
+// reported as an unresolved identifier under §23.9 before, neither package
+// counted as supplying B.
+TEST(PackageImport, StructMemberEnumLiteralsOfTwoImportsAreAmbiguous) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("package p;\n"
+             "  typedef struct { enum {A, B} e; } s_t;\n"
+             "endpackage\n"
+             "package q;\n"
+             "  typedef struct { enum {B, C} e; } t_t;\n"
+             "endpackage\n"
+             "module top;\n"
+             "  import p::*;\n"
+             "  import q::*;\n"
+             "  int r;\n"
+             "  initial r = B;\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "reference to 'B' is ambiguous between wildcard "
+                            "imports of packages 'p' and 'q'",
+                            11, "26.3"));
+}
+
+// Counting the literals of a structure member's enum admits nothing else:
+// `p::Z`, a name no enum of p at any depth declares and no export hands on,
+// stays reported under §26.3 at the reference's line, as 2bb77fd69 reports
+// `p5::x`; `p::e`, the member's own name, is a name of the structure's type
+// and no declaration of the package, and is reported the same way.
+TEST(PackageImport, ScopedReferenceToNoMemberOfTheStructStaysReported) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("package p;\n"
+             "  typedef struct { enum {A, B} e; int n; } s_t;\n"
+             "endpackage\n"
+             "module top;\n"
+             "  int r;\n"
+             "  initial r = p::Z;\n"
+             "  initial r = p::e;\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "reference to 'p::Z', which package 'p' neither "
+                            "declares nor exports",
+                            6, "26.3"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "reference to 'p::e', which package 'p' neither "
+                            "declares nor exports",
+                            7, "26.3"));
+}
+
 }  // namespace
