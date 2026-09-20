@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <string>
+#include <string_view>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -598,6 +601,84 @@ TEST(DataHidingElaboration, SiblingBlocksBindTheSameNameSeparately) {
                             "cannot access local member from outside its class",
                             14, "8.18"));
   EXPECT_EQ(f.diag.Diagnostics().size(), 1u);
+}
+
+// The cases below reach the member through a class-scoped static handle. §8.9
+// (printed page 186 of ~/LRM.pdf) holds a static property in one copy usable
+// with no object, reached as `C::m_inst`, and §8.4 (printed 181-182) reads a
+// member through whatever handle a variable holds; §8.18 (printed 194) confines
+// a local member to the methods of its class and a protected one to the class
+// and its subclasses, and a module's procedure is outside both.
+// CheckMemberAccessVisibility in src/elaborator/elaborator_validate_classes.cpp
+// read the handle's class from a variable's declared type alone, so
+// `C::m_inst.k` and `p::C::m_inst.k` resolved to no class and a local `k`
+// behind either was accepted where `c.k` through `C c;` was reported, and
+// `C::m_inst` itself, declared `static local`, was accepted for the same
+// reason: only a `.` access was ever read.
+//
+// `k_decl` declares the property the access reaches and `handle_decl` the
+// static handle it reaches it through, so a case can qualify either one.
+std::string StaticHandleClassSrc(const std::string& k_decl,
+                                 const std::string& handle_decl) {
+  return "class C;\n  " + k_decl + "\n  " + handle_decl + "\nendclass\n";
+}
+
+std::string StaticHandleModuleSrc(const std::string& stmt) {
+  return "module m;\n  int x;\n  C c;\n  initial " + stmt + "\nendmodule\n";
+}
+
+// The report stands at the access, which the module's one initial holds.
+void ExpectScopedAccessReported(const std::string& src,
+                                std::string_view message) {
+  ElabFixture f;
+  ElabOk(src, f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), message,
+                            LineHolding(src, "initial"), "8.18"));
+}
+
+TEST(ScopedStaticHandleHiding, LocalMemberBehindTheStaticHandleIsReported) {
+  ExpectScopedAccessReported(
+      StaticHandleClassSrc("local int k = 9;", "static C m_inst;") +
+          StaticHandleModuleSrc("x = C::m_inst.k;"),
+      "cannot access local member from outside its class");
+}
+
+TEST(ScopedStaticHandleHiding, ProtectedMemberBehindTheStaticHandleIsReported) {
+  ExpectScopedAccessReported(
+      StaticHandleClassSrc("protected int k = 9;", "static C m_inst;") +
+          StaticHandleModuleSrc("x = C::m_inst.k;"),
+      "cannot access protected member from outside its class hierarchy");
+}
+
+// The package form: §26.3 (printed 808) resolves `p::C` to the package's
+// class, and the handle's class is read through the same static property.
+TEST(ScopedStaticHandleHiding,
+     LocalMemberBehindThePackageClassStaticHandleIsReported) {
+  ExpectScopedAccessReported(
+      "package p;\n" +
+          StaticHandleClassSrc("local int k = 9;", "static C m_inst;") +
+          "endpackage\n"
+          "module m;\n"
+          "  int x;\n"
+          "  initial x = p::C::m_inst.k;\n"
+          "endmodule\n",
+      "cannot access local member from outside its class");
+}
+
+// The static handle itself, qualified: `C::m_inst` names the member with no
+// object, and the qualifier holds on it as on any member.
+TEST(ScopedStaticHandleHiding, LocalStaticHandleNamedByTheClassIsReported) {
+  ExpectScopedAccessReported(
+      StaticHandleClassSrc("int k = 9;", "static local C m_inst;") +
+          StaticHandleModuleSrc("c = C::m_inst;"),
+      "cannot access local member from outside its class");
+}
+
+// The pair's accepting half: a public handle's public member, which a check
+// reporting every scoped access would report too.
+TEST(ScopedStaticHandleHiding, PublicMemberBehindThePublicStaticHandleIsOk) {
+  EXPECT_TRUE(ElabOk(StaticHandleClassSrc("int k = 9;", "static C m_inst;") +
+                     StaticHandleModuleSrc("x = C::m_inst.k;")));
 }
 
 }  // namespace

@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "common/diagnostic.h"
+#include "common/source_loc.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_internal.h"
@@ -36,15 +37,106 @@ static const ClassMember* FindMemberInClass(const ClassDecl* cls,
   return nullptr;
 }
 
+// §8.18 (printed page 194 of ~/LRM.pdf): the report for a member reached from
+// outside the class its qualifier confines it to, at `loc`, where `m` is that
+// member; nothing for a public member or for no member at all.
+static void ReportHiddenMember(const ClassMember* m, SourceLoc loc,
+                               DiagEngine& diag) {
+  if (m && m->is_local) {
+    diag.Error(loc, "cannot access local member from outside its class",
+               Subclause("8.18"));
+  } else if (m && m->is_protected) {
+    diag.Error(loc,
+               "cannot access protected member from outside "
+               "its class hierarchy",
+               Subclause("8.18"));
+  }
+}
+
+// The class named `cls_name` among the items of the package named `pkg_name`,
+// or null where there is no such package or it declares no such class.
+static const ClassDecl* FindClassInPackage(std::string_view pkg_name,
+                                           std::string_view cls_name,
+                                           const CompilationUnit* unit) {
+  for (const auto* pkg : unit->packages) {
+    if (pkg->name != pkg_name) continue;
+    for (const auto* item : pkg->items) {
+      if (item->kind == ModuleItemKind::kClassDecl && item->class_decl &&
+          item->class_decl->name == cls_name) {
+        return item->class_decl;
+      }
+    }
+  }
+  return nullptr;
+}
+
+// The class the left operand of a `::` names: `C` by its bare name, or `p::C`
+// through the package §26.3 (printed 808) resolves the prefix to. Any other
+// prefix -- a package's own item, a typedef, a nested class two scopes deep --
+// answers null and leaves the access as silent as it was.
+static const ClassDecl* ClassOfScopePrefix(const Expr* prefix,
+                                           const CompilationUnit* unit) {
+  if (prefix->kind == ExprKind::kIdentifier) {
+    return FindClassDecl(prefix->text, unit);
+  }
+  if (prefix->kind == ExprKind::kMemberAccess && prefix->is_scope_resolution &&
+      prefix->lhs && prefix->lhs->kind == ExprKind::kIdentifier &&
+      prefix->rhs && prefix->rhs->kind == ExprKind::kIdentifier) {
+    return FindClassInPackage(prefix->lhs->text, prefix->rhs->text, unit);
+  }
+  return nullptr;
+}
+
+// The member a `::` access names: `m_inst` of `C::m_inst` or of
+// `p::C::m_inst`, found in the class the prefix names or in a base of it.
+static const ClassMember* ScopedClassMember(const Expr* e,
+                                            const CompilationUnit* unit) {
+  if (e->rhs->kind != ExprKind::kIdentifier) return nullptr;
+  const ClassDecl* cls = ClassOfScopePrefix(e->lhs, unit);
+  return cls ? FindMemberInClass(cls, e->rhs->text, unit) : nullptr;
+}
+
+// The class a property declared with `dt` holds a handle to: `C m_inst;` by
+// the bare name, `p::C m_inst;` through the package.
+static const ClassDecl* ClassOfDeclaredType(const DataType& dt,
+                                            const CompilationUnit* unit) {
+  if (dt.kind != DataTypeKind::kNamed) return nullptr;
+  if (dt.scope_name.empty()) return FindClassDecl(dt.type_name, unit);
+  return FindClassInPackage(dt.scope_name, dt.type_name, unit);
+}
+
+// The class the left side of a `.` access holds a handle to. A variable's is
+// the class `var_types` declares it with. A `::` access's is the class its
+// static property is declared with: §8.9 (printed 186) holds such a property
+// in one copy reachable as `C::m_inst` with no object, and §8.4 (printed
+// 181-182) reads a member through whatever handle it holds.
+//
+// This read a variable alone, so `C::m_inst.k` and `p::C::m_inst.k` reached
+// no class at all and a local `k` behind either was never reported, where
+// `c.k` through `C c;` was.
+static const ClassDecl* HandleClassOfBase(
+    const Expr* base,
+    const std::unordered_map<std::string_view, std::string_view>& var_types,
+    const CompilationUnit* unit) {
+  if (base->kind == ExprKind::kIdentifier) {
+    auto it = var_types.find(base->text);
+    return it == var_types.end() ? nullptr : FindClassDecl(it->second, unit);
+  }
+  if (base->kind != ExprKind::kMemberAccess || !base->is_scope_resolution ||
+      !base->lhs || !base->rhs) {
+    return nullptr;
+  }
+  const ClassMember* m = ScopedClassMember(base, unit);
+  if (!m || m->kind != ClassMemberKind::kProperty) return nullptr;
+  return ClassOfDeclaredType(m->data_type, unit);
+}
+
 static void CheckMemberAccessVisibility(
     const Expr* e,
     const std::unordered_map<std::string_view, std::string_view>& var_types,
     const CompilationUnit* unit, DiagEngine& diag) {
-  if (e->lhs->kind != ExprKind::kIdentifier) return;
-  auto it = var_types.find(e->lhs->text);
-  if (it == var_types.end()) return;
   if (e->rhs->kind != ExprKind::kIdentifier) return;
-  const auto* cls = FindClassDecl(it->second, unit);
+  const auto* cls = HandleClassOfBase(e->lhs, var_types, unit);
   if (!cls) return;
 
   if (cls->type_param_names.count(e->rhs->text) > 0) {
@@ -57,17 +149,20 @@ static void CheckMemberAccessVisibility(
                Subclause("8.5"));
     return;
   }
-  const auto* m = FindMemberInClass(cls, e->rhs->text, unit);
-  if (m && m->is_local) {
-    diag.Error(e->rhs->range.start,
-               "cannot access local member from outside its class",
-               Subclause("8.18"));
-  } else if (m && m->is_protected) {
-    diag.Error(e->rhs->range.start,
-               "cannot access protected member from outside "
-               "its class hierarchy",
-               Subclause("8.18"));
-  }
+  ReportHiddenMember(FindMemberInClass(cls, e->rhs->text, unit),
+                     e->rhs->range.start, diag);
+}
+
+// §8.18 (printed 194) confines a local member to the methods of its class and
+// a protected one to those of the class and its subclasses, and the walk this
+// serves reads a module's procedures alone, which are outside every class. A
+// `::` access names a static member with no object, so the member itself is
+// what the qualifier is checked on: `C::m_inst` with `static local C m_inst;`
+// was accepted from a module, since only a `.` access was ever read.
+static void CheckScopedMemberVisibility(const Expr* e,
+                                        const CompilationUnit* unit,
+                                        DiagEngine& diag) {
+  ReportHiddenMember(ScopedClassMember(e, unit), e->rhs->range.start, diag);
 }
 
 // 18.11: naming a property in randomize()'s inline argument list changes that
@@ -128,7 +223,11 @@ static void CheckVisibilityExpr(
     const CompilationUnit* unit, DiagEngine& diag) {
   if (!e) return;
   if (e->kind == ExprKind::kMemberAccess && e->lhs && e->rhs) {
-    CheckMemberAccessVisibility(e, var_types, unit, diag);
+    if (e->is_scope_resolution) {
+      CheckScopedMemberVisibility(e, unit, diag);
+    } else {
+      CheckMemberAccessVisibility(e, var_types, unit, diag);
+    }
   }
   if (e->kind == ExprKind::kCall) {
     CheckRandomizeArgVisibility(e, var_types, unit, diag);
