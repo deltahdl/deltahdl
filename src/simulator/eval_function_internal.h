@@ -11,6 +11,7 @@ namespace delta {
 
 struct DataType;
 struct Expr;
+struct FunctionArg;
 struct ModuleItem;
 struct Stmt;
 class SimContext;
@@ -85,6 +86,21 @@ void BindFunctionArgs(const ModuleItem* func, const Expr* expr, SimContext& ctx,
 // eval_function_args.cpp; the copy-out on return in
 // eval_function_args_writeback.cpp asks it for the same pairing.
 int ResolveArgIndex(const ModuleItem* func, const Expr* expr, size_t param_idx);
+// §11.9: a tagged union expression as the actual of a tagged-union formal.
+// TryEvalTaggedPatternActual evaluates one whose member value is a §10.9.2
+// structure assignment pattern against the layout of the member it names
+// within the formal's union, answering false where the actual has another
+// shape, so it is evaluated as any expression; TryBindTaggedActual binds the
+// union's layout and the member's tag to the formal, answering false where the
+// actual is no tagged expression or the formal's type has no layout. A formal
+// whose union is written inline has its layout built and registered under its
+// own name. Both are defined in eval_function_args_tagged.cpp and asked by the
+// by-value binding in eval_function_args.cpp.
+bool TryEvalTaggedPatternActual(const FunctionArg& param, const Expr* actual,
+                                SimContext& ctx, Arena& arena, Logic4Vec& out);
+bool TryBindTaggedActual(const FunctionArg& param, const Expr* actual,
+                         SimContext& ctx);
+
 // The actual arguments of one call, as §35.6.1 "Argument passing" and §11.12
 // "Let construct" each describe them: the call-site expression, the boundary
 // between the positional actuals and the named ones, and the environment the

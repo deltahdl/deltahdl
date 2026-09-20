@@ -646,4 +646,65 @@ TEST(TaggedUnionEval, TaggedExprActualNarrowMemberReadsItsOwnWindow) {
                              "run-time error: accessing member", 9, "11.9"));
 }
 
+// §11.9 (printed page 304): the braces of a tagged union expression are a
+// §10.9.2 structure assignment pattern, and §10.9.2 (printed 263) evaluates
+// each member expression in the context of an assignment to the member it
+// initializes, in declaration order. As an actual the pattern was evaluated
+// with no type to place it by, so `'{8'd1, 8'd2}` was concatenated at its
+// elements' self-determined widths, 16'h0102, and zero-extended into the
+// union: `u.Add.a` read 0 and `u.Add.b` read 258, the body 258 where §10.9.2
+// gives 12.
+TEST(TaggedUnionEval, TaggedPatternActualIsPlacedByMemberPosition) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef struct { int a, b; } pair_t;\n"
+      "  typedef union tagged { void None; pair_t Add; } u_t;\n"
+      "  int x;\n"
+      "  function int f(u_t u);\n"
+      "    return u.Add.a * 10 + u.Add.b;\n"
+      "  endfunction\n"
+      "  initial x = f(tagged Add '{8'd1, 8'd2});\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  LowerAndRun(design, f);
+  auto* x = f.ctx.FindVariable("x");
+  ASSERT_NE(x, nullptr);
+  EXPECT_EQ(x->value.ToUint64(), 12u);
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "run-time error: accessing member", 6, "11.9"));
+}
+
+// §10.9.2 (printed page 263): a structure assignment pattern may name its
+// members, in any order. Concatenated in written order, `'{b: 2, a: 1}` put
+// 2 where `a` lies and 1 where `b` lies, and the body read 21; placed by
+// member it reads 12.
+TEST(TaggedUnionEval, TaggedPatternActualIsPlacedByMemberName) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef struct { int a, b; } pair_t;\n"
+      "  typedef union tagged { void None; pair_t Add; } u_t;\n"
+      "  int x;\n"
+      "  function int f(u_t u);\n"
+      "    return u.Add.a * 10 + u.Add.b;\n"
+      "  endfunction\n"
+      "  initial x = f(tagged Add '{b: 2, a: 1});\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  LowerAndRun(design, f);
+  auto* x = f.ctx.FindVariable("x");
+  ASSERT_NE(x, nullptr);
+  EXPECT_EQ(x->value.ToUint64(), 12u);
+}
+
+// §13.3 (printed page 337) declares a formal with any data_type, a tagged
+// union written inline among them, and §11.9 (printed 304) has the tagged
+// expression's type known from the formal. An inline type names no
+// registered layout, so the formal was bound as a plain vector: `a.Valid`
+// was read through no member and answered 1 bit, not 5. The layout is built
 }  // namespace

@@ -441,11 +441,21 @@ void WritebackAssocRefs(SimContext& ctx) {
 // The actual is the caller's expression and is read with the callee's scope
 // set aside; §13.5.3 has a default argument evaluated in the scope of the
 // subroutine's declaration, so the default stays with the callee's scope up.
+//
+// §11.9 (printed page 304) has a tagged union expression's type known from
+// its context, here the formal, and its braces be a §10.9.2 structure
+// assignment pattern, so such an actual is placed member by member against
+// the named member's layout (TryEvalTaggedPatternActual) before the general
+// evaluation, which knows no type to place it by, is reached.
 static Logic4Vec ResolveArgValue(const FunctionArg& param, const Expr* expr,
                                  int arg_index, SimContext& ctx, Arena& arena) {
   if (arg_index >= 0 && expr->args[static_cast<size_t>(arg_index)] != nullptr) {
     CalleeScopeAside aside(ctx);
-    return EvalExpr(expr->args[static_cast<size_t>(arg_index)], ctx, arena);
+    const Expr* actual = expr->args[static_cast<size_t>(arg_index)];
+    Logic4Vec placed;
+    if (TryEvalTaggedPatternActual(param, actual, ctx, arena, placed))
+      return placed;
+    return EvalExpr(actual, ctx, arena);
   }
   if (param.default_value) return EvalExpr(param.default_value, ctx, arena);
   return MakeLogic4Vec(arena, 32);
@@ -743,30 +753,6 @@ static void CopyUnionTagIn(const FunctionArg& param, const Expr* actual,
     tag = std::string(ctx.GetVariableTag(TagKeyOfName(actual->text, ctx)));
   }
   ctx.SetVariableTag(param.name, tag);
-}
-
-// §11.9 (printed page 303): a tagged union expression names a member and
-// gives the value that tag, and (printed 304) its type is known from its
-// context -- for an actual, the formal it is bound to, whose declared type
-// names the union. §13.5.1 (printed 348) copies the value into the
-// subroutine's own variable, and §7.3.2 (printed 151) has that value carry the
-// tag beside the member's bits. RegisterValueArgStructType resolves the layout
-// and the tag from an identifier actual's storage, which a tagged expression
-// has none of, so `f(tagged Valid -7)` bound neither to the formal: `a.Valid`
-// inside the body was read through no member and `f(tagged Invalid)` raised
-// nothing. The layout is the one RegisterDesignTypeLayouts registers under
-// the typedef's name, bound as BindReturnStructLayout binds a return type's;
-// the tag is the member the expression names. False where the actual is no
-// tagged expression or the formal's type names no registered layout.
-static bool TryBindTaggedActual(const FunctionArg& param, const Expr* actual,
-                                SimContext& ctx) {
-  if (actual->kind != ExprKind::kTagged || actual->rhs == nullptr) return false;
-  std::string_view type_name = param.data_type.type_name;
-  if (type_name.empty() || ctx.FindStructType(type_name) == nullptr)
-    return false;
-  ctx.SetVariableStructType(param.name, type_name);
-  ctx.SetVariableTag(param.name, actual->rhs->text);
-  return true;
 }
 
 // §7.2.2/§13.5.1: make member access (arg.field) work on a by-value struct
