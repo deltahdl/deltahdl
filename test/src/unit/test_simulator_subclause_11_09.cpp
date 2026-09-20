@@ -753,4 +753,35 @@ TEST(TaggedUnionEval, TaggedExprActualOfInlineUnionFormalIsCheckedInTheBody) {
       "tagged union 'a' which currently has tag 'Invalid'", 4, "11.9"));
 }
 
+// §13.3 (printed page 337) declares a formal with any data_type, and §7.2.1
+// (printed 147) lays an inline union out member by member, `pair_t Add`
+// naming a typedef of a structure of its own. The elaborator resolved a
+// member's typedef for the typedef table and a declaration alone, so the
+// formal's own type carried none: the union was sized as if Add were a
+// scalar, its layout gave Add no members to place `'{3, 4}` by or to read
+// `a.Add.a` through, and the body answered 0 where §10.9.2 (printed 263)
+// places 3 into a and 4 into b, 34.
+TEST(TaggedUnionEval,
+     TaggedPatternActualOfInlineUnionFormalReadsANestedTypedefMember) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef struct { int a, b; } pair_t;\n"
+      "  int x;\n"
+      "  function int f(union tagged { void None; pair_t Add; } a);\n"
+      "    return a.Add.a * 10 + a.Add.b;\n"
+      "  endfunction\n"
+      "  initial x = f(tagged Add '{3, 4});\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  LowerAndRun(design, f);
+  auto* x = f.ctx.FindVariable("x");
+  ASSERT_NE(x, nullptr);
+  EXPECT_EQ(x->value.ToUint64(), 34u);
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "run-time error: accessing member", 5, "11.9"));
+}
+
 }  // namespace
