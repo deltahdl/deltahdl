@@ -646,4 +646,63 @@ TEST(CompilationUnitSim, CuScopeArrayElementThroughUnitPrefix) {
             71u);
 }
 
+// A design whose compilation-unit scope declares `string s = "unit";` and
+// then `unit_items`, and whose top declares its own `string s =
+// "modulestring";` and runs `body` in an initial procedure; answers y.
+static uint64_t UnitStringRead(const std::string& unit_items,
+                               const std::string& body) {
+  return RunAndGet("string s = \"unit\";\n" + unit_items +
+                       "module top;\n"
+                       "  string s = \"modulestring\";\n"
+                       "  int y;\n"
+                       "  initial " +
+                       body +
+                       "\n"
+                       "endmodule\n",
+                   "y");
+}
+
+// §3.12.1 (printed page 56) with §23.9 (printed 761): a function declared
+// outside every module is nested in the compilation-unit scope and never in
+// its caller's, so its bare s is the unit's "unit" and `len_s()` from a top
+// declaring its own `string s = "modulestring"` is 4. Registered under no
+// scope (RegisterFreeCuFunctions in lowerer.cpp), the function's frame fell
+// through to the calling instance's names and read the top's: 12.
+TEST(CompilationUnitSim, CuScopeFunctionReadsTheUnitsVariable) {
+  EXPECT_EQ(UnitStringRead("function int len_s();\n"
+                           "  return s.len();\n"
+                           "endfunction\n",
+                           "y = len_s();"),
+            4u);
+}
+
+// The same for a task (§13.3, printed 337), whose output formal carries the
+// unit's length out: 4, where the caller's own s gave 12.
+TEST(CompilationUnitSim, CuScopeTaskReadsTheUnitsVariable) {
+  EXPECT_EQ(UnitStringRead("task len_t(output int o);\n"
+                           "  o = s.len();\n"
+                           "endtask\n",
+                           "len_t(y);"),
+            4u);
+}
+
+// §3.12.1 with §23.9: a unit function's `s = "x"` writes the unit's s, so
+// the top's own s keeps its 12 characters and the unit function len_s
+// afterwards reads 1: `s.len() * 100 + len_s()` is 1201. Resolved in the
+// caller's scope, the write shortened the top's s to "x" and len_s read it
+// too: 101.
+TEST(CompilationUnitSim, CuScopeFunctionWritesTheUnitsVariable) {
+  EXPECT_EQ(UnitStringRead("function int len_s();\n"
+                           "  return s.len();\n"
+                           "endfunction\n"
+                           "function void set_s();\n"
+                           "  s = \"x\";\n"
+                           "endfunction\n",
+                           "begin\n"
+                           "    set_s();\n"
+                           "    y = s.len() * 100 + len_s();\n"
+                           "  end"),
+            1201u);
+}
+
 }  // namespace

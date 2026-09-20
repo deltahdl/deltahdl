@@ -671,11 +671,27 @@ static void RegisterScopeTimescales(const RtlirModule* mod, SimContext& ctx,
   }
 }
 
+// §3.12.1 (printed page 56) with §23.9 (printed 761): a function or task
+// declared outside every module is nested in the compilation-unit scope,
+// whose declarations its body reads by their bare names, never in the
+// calling module's, so each is recorded as a subroutine of the unit's scope
+// under the name the unit's storage is keyed by -- "$unit", kUnitScope in
+// lowerer_package_data.cpp, which no package can be named, `$` starting no
+// identifier -- as RegisterPackageScopedSubroutines (lowerer_register.cpp)
+// records a package's; the call's frame then carries it
+// (SimContext::EnterSubroutinePackage) and FindInPackageScope resolves a
+// bare s to "$unit.s" ahead of the caller's. Registered under no scope, the
+// unit's `function int len_s(); return s.len(); endfunction` beside a unit
+// `string s = "unit"` read the calling top's own `string s` through the
+// frame's fall-through to the instance's names, 12 for "modulestring", and
+// its `s = "x"` wrote the top's s for the unit's.
 static void RegisterFreeCuFunctions(const RtlirDesign* design,
                                     SimContext& ctx) {
+  static constexpr std::string_view kUnitScope = "$unit";
   for (auto* item : design->cu_function_decls) {
     if (!item->method_class.empty()) continue;
     ctx.RegisterFunction(item->name, item);
+    ctx.RegisterSubroutinePackage(item, kUnitScope);
   }
 }
 
