@@ -17,6 +17,7 @@
 #include "parser/ast_type.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_array.h"
+#include "simulator/eval_assoc_class_handles.h"
 #include "simulator/eval_call_result.h"
 #include "simulator/eval_class_array.h"
 #include "simulator/eval_function_internal.h"
@@ -150,18 +151,41 @@ static bool DeclarationIsVirtual(const ClassTypeInfo* defining,
 // later redeclares virtual and so put in the object's vtable. An
 // interface-class handle has no such declaration and resolves by the object
 // (§8.26.9).
-static ModuleItem* ResolveNonVirtualFromDeclared(const MethodCallParts& parts,
+static ModuleItem* ResolveNonVirtualFromDeclared(std::string_view method_name,
                                                  const ClassTypeInfo* declared,
                                                  InstanceMethodInfo& info) {
   if (declared == nullptr || declared->is_interface) return nullptr;
-  if (declared->FindVTableIndex(parts.method_name) >= 0) return nullptr;
+  if (declared->FindVTableIndex(method_name) >= 0) return nullptr;
   const ClassTypeInfo* defining = nullptr;
   ModuleItem* method =
-      info.obj->ResolveMethodForType(parts.method_name, declared, &defining);
-  if (method == nullptr || DeclarationIsVirtual(defining, parts.method_name))
+      info.obj->ResolveMethodForType(method_name, declared, &defining);
+  if (method == nullptr || DeclarationIsVirtual(defining, method_name))
     return nullptr;
   info.owner = defining;
   return method;
+}
+
+bool ResolveMethodByDeclaredClass(ClassObject* obj,
+                                  std::string_view declared_class,
+                                  std::string_view method_name, SimContext& ctx,
+                                  InstanceMethodInfo& info) {
+  info.obj = obj;
+  if (obj == nullptr) return false;
+  auto* declared_type = ctx.FindClassType(declared_class);
+  info.method = ResolveNonVirtualFromDeclared(method_name, declared_type, info);
+  if (!info.method)
+    info.method = info.obj->ResolveVirtualMethod(method_name, &info.owner);
+  if (!info.method) {
+    // §8.26.9: a non-interface declared type resolves against that type; an
+    // interface-class declared type (or no declared type at all) resolves via
+    // the object's dynamic type (the implementing class).
+    const ClassTypeInfo* from = (declared_type && !declared_type->is_interface)
+                                    ? declared_type
+                                    : info.obj->type;
+    info.method =
+        info.obj->ResolveMethodForType(method_name, from, &info.owner);
+  }
+  return info.method != nullptr;
 }
 
 bool ResolveInstanceMethod(const MethodCallParts& parts, SimContext& ctx,
@@ -174,24 +198,8 @@ bool ResolveInstanceMethod(const MethodCallParts& parts, SimContext& ctx,
   if (handle == kNullClassHandle) {
     return ResolveThroughNullHandle(parts, class_type, ctx, info);
   }
-  info.obj = ctx.GetClassObject(handle);
-  if (!info.obj) return false;
-  auto* declared_type = ctx.FindClassType(class_type);
-  info.method = ResolveNonVirtualFromDeclared(parts, declared_type, info);
-  if (!info.method)
-    info.method =
-        info.obj->ResolveVirtualMethod(parts.method_name, &info.owner);
-  if (!info.method) {
-    // §8.26.9: a non-interface declared type resolves against that type; an
-    // interface-class declared type (or no declared type at all) resolves via
-    // the object's dynamic type (the implementing class).
-    const ClassTypeInfo* from = (declared_type && !declared_type->is_interface)
-                                    ? declared_type
-                                    : info.obj->type;
-    info.method =
-        info.obj->ResolveMethodForType(parts.method_name, from, &info.owner);
-  }
-  return info.method != nullptr;
+  return ResolveMethodByDeclaredClass(ctx.GetClassObject(handle), class_type,
+                                      parts.method_name, ctx, info);
 }
 
 Logic4Vec ExecInstanceMethodCall(ModuleItem* method, ClassObject* obj,
@@ -576,6 +584,9 @@ static bool TryDispatchMethodOrLet(const Expr* expr, SimContext& ctx,
   // runs on the object the first call returned; ExtractMethodCallParts above
   // takes a variable alone for the handle side.
   if (TryEvalCallResultMethodCall(expr, ctx, arena, out)) return true;
+  // §7.8/§8.4: and one called on an element of a declared associative array
+  // of handles, `m["a"].f()`, runs on the object the element refers to.
+  if (TryEvalAssocElementMethodCall(expr, ctx, arena, out)) return true;
   if (TryEvalWeakRefStaticCall(expr, ctx, arena, out)) return true;
   if (TryEvalProcessStaticCall(expr, ctx, arena, out)) return true;
   if (TryEvalClassScopeCall(expr, ctx, arena, out)) return true;

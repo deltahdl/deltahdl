@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string_view>
+
 #include "common/types.h"
 
 namespace delta {
@@ -34,9 +36,18 @@ bool TryClassArrayElementNewAssign(const Stmt* stmt, SimContext& ctx,
 bool TryEvalClassArrayElementMember(const Expr* expr, SimContext& ctx,
                                     Arena& arena, Logic4Vec& out);
 
+// §8.4/§8.12: the handle the `new` expression `rhs` yields for an element
+// whose declared class is `class_type`: a shallow copy of the object `new src`
+// names, else the object the class's constructor makes with the call's
+// actuals. Shared with the associative array of handles
+// (eval_assoc_class_handles.h), whose element is constructed the same way.
+Logic4Vec ConstructElementObject(const Expr* rhs, std::string_view class_type,
+                                 SimContext& ctx, Arena& arena);
+
 // The member read through an element of a container of handles: a queue's
-// (TryEvalQueueElementMember) or an array property's, whichever the base of
-// the select names. False where neither answers.
+// (TryEvalQueueElementMember), an array property's, or a declared associative
+// array's (TryEvalAssocElementMember), whichever the base of the select names.
+// False where none answers.
 bool TryEvalElementObjectMember(const Expr* expr, SimContext& ctx, Arena& arena,
                                 Logic4Vec& out);
 

@@ -246,6 +246,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/eval_array.cpp
     simulator/eval_class_array.cpp
     simulator/eval_class_array_handles.cpp
+    simulator/eval_assoc_class_handles.cpp
     simulator/assoc_element.cpp
     simulator/eval_array_assoc.cpp
     simulator/eval_array_class_assoc.cpp

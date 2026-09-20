@@ -115,6 +115,18 @@ struct InstanceMethodInfo {
 };
 bool ResolveInstanceMethod(const MethodCallParts& parts, SimContext& ctx,
                            InstanceMethodInfo& info);
+// The method `method_name` called on `obj` through a handle whose declared
+// class is `declared_class`, the way ResolveInstanceMethod resolves one named
+// through a variable: §8.20 dispatches a method the declared class sees as
+// virtual by the object and one it holds non-virtually by the declared class,
+// and §8.26.9 resolves an interface-class handle by the object. Shared with
+// the containers of handles (eval_assoc_class_handles.h), whose element has no
+// variable to name it by. False for a null `obj` or a method the object's
+// class does not have. Defined in eval_function.cpp.
+bool ResolveMethodByDeclaredClass(ClassObject* obj,
+                                  std::string_view declared_class,
+                                  std::string_view method_name, SimContext& ctx,
+                                  InstanceMethodInfo& info);
 // Runs the method ResolveInstanceMethod answered, `expr` the call whose
 // actuals bind its formals: a static method in class scope (§8.10), an
 // instance method on the object with the method's defining class as the

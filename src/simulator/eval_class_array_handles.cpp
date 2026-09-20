@@ -9,6 +9,7 @@
 #include "parser/ast_stmt.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_array_class_queue.h"
+#include "simulator/eval_assoc_class_handles.h"
 #include "simulator/eval_class_array.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
@@ -38,11 +39,10 @@ const Expr* SingleIndexSelect(const Expr* expr) {
   return expr;
 }
 
-// §8.4/§8.12: the handle the `new` expression `rhs` yields for an element of
-// class `class_type`: a shallow copy of the object `new src` names, else the
-// object the class's constructor makes with the call's actuals.
-Logic4Vec ConstructElement(const Expr* rhs, std::string_view class_type,
-                           SimContext& ctx, Arena& arena) {
+}  // namespace
+
+Logic4Vec ConstructElementObject(const Expr* rhs, std::string_view class_type,
+                                 SimContext& ctx, Arena& arena) {
   if (rhs->lhs != nullptr && rhs->lhs->kind == ExprKind::kIdentifier) {
     auto* src = ctx.GetClassObject(EvalExpr(rhs->lhs, ctx, arena).ToUint64());
     if (src != nullptr) {
@@ -52,8 +52,6 @@ Logic4Vec ConstructElement(const Expr* rhs, std::string_view class_type,
   }
   return EvalClassNew(class_type, rhs, ctx, arena, rhs->range.start);
 }
-
-}  // namespace
 
 bool TryClassArrayElementNewAssign(const Stmt* stmt, SimContext& ctx,
                                    Arena& arena) {
@@ -75,7 +73,8 @@ bool TryClassArrayElementNewAssign(const Stmt* stmt, SimContext& ctx,
   int64_t index = SelectBoundValue(idx_val);
   if (index < ref.lo || index >= ref.lo + static_cast<int64_t>(ref.size))
     return true;
-  Logic4Vec handle = ConstructElement(rhs, ref.prop->type_name, ctx, arena);
+  Logic4Vec handle =
+      ConstructElementObject(rhs, ref.prop->type_name, ctx, arena);
   ref.obj->SetProperty(ClassArrayElementKey(ref.prop->name, index), handle);
   // §9.4.2: a change to an object's data member wakes a process waiting on
   // the object, as every other write to an element of the property tells it.
@@ -109,7 +108,8 @@ bool TryEvalClassArrayElementMember(const Expr* expr, SimContext& ctx,
 bool TryEvalElementObjectMember(const Expr* expr, SimContext& ctx, Arena& arena,
                                 Logic4Vec& out) {
   return TryEvalQueueElementMember(expr, ctx, arena, out) ||
-         TryEvalClassArrayElementMember(expr, ctx, arena, out);
+         TryEvalClassArrayElementMember(expr, ctx, arena, out) ||
+         TryEvalAssocElementMember(expr, ctx, arena, out);
 }
 
 }  // namespace delta

@@ -265,4 +265,76 @@ TEST(AssocArraySimulation, TheSameDeclarationAmongAModulesItemsStillBuildsOne) {
   EXPECT_EQ(v, 42u);
 }
 
+// §7.8 lets the element type be any type a fixed-size array may have, and
+// §8.4 has `new` construct an object whose handle the element then holds, so
+// `m["a"].v` is the property of the object constructed under "a". The second
+// entry holds a different value, so a read that reached the last object
+// constructed rather than the one under the key would answer 6.
+TEST(AssocArraySimulation,
+     AMemberSelectedOnAnElementOfADeclaredArrayOfHandlesReadsItsObject) {
+  auto v = RunAndGet(
+      "class C;\n"
+      "  int v;\n"
+      "  function new(int x); v = x; endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  C m[string];\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    m[\"a\"] = new(5);\n"
+      "    m[\"b\"] = new(6);\n"
+      "    result = m[\"a\"].v;\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 5u);
+}
+
+// The same element with a method selected on it: the method runs on the
+// object under the key, reading its own property. An answer of 8 would be the
+// other object's; 0 is no object at all.
+TEST(AssocArraySimulation,
+     AMethodCalledOnAnElementOfADeclaredArrayOfHandlesRunsOnItsObject) {
+  auto v = RunAndGet(
+      "class C;\n"
+      "  int v;\n"
+      "  function new(int x); v = x; endfunction\n"
+      "  function int m(); return v + 1; endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  C m[string];\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    m[\"a\"] = new(5);\n"
+      "    m[\"b\"] = new(7);\n"
+      "    result = m[\"a\"].m();\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 6u);
+}
+
+// An integral index keys the same way (§7.8.1): the property of the object
+// under 3 and the method of the one under 4, 70 + 10.
+TEST(AssocArraySimulation,
+     AnIntKeyedArrayOfHandlesReachesTheObjectUnderEachKey) {
+  auto v = RunAndGet(
+      "class C;\n"
+      "  int v;\n"
+      "  function new(int x); v = x; endfunction\n"
+      "  function int m(); return v + 1; endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  C q[int];\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    q[3] = new(7);\n"
+      "    q[4] = new(9);\n"
+      "    result = q[3].v * 10 + q[4].m();\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 80u);
+}
+
 }  // namespace
