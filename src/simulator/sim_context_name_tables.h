@@ -174,6 +174,21 @@ class DeclaredNameTables {
   std::string_view FindTypeTarget(std::string_view name) const;
   size_t TypeTargetCount() const;
 
+  // §6.18 with §15.4.9 (printed page 377 of ~/LRM.pdf): the type the typedef
+  // `name` was declared with, as the parser read it -- `mailbox #(int)` with
+  // its parameter list, or another typedef's name, one step of the chain --
+  // keyed as the type targets are, "pkg::name" for a package's typedef and
+  // the bare name for a module's or the unit's, and filled beside them by
+  // RegisterClassTypeAliases from the design's typedef items. The targets
+  // record the name at the end of the chain alone, so a property declared
+  // `mb_t mb` through `typedef mailbox #(int) mb_t` was known for a mailbox
+  // and not for one of int, and its put() of a string went unchecked. Null
+  // for a name nothing records; TypeDeclarationCount bounds a walk of the
+  // chain.
+  void RegisterTypeDeclaration(std::string_view name, const DataType* type);
+  const DataType* FindTypeDeclaration(std::string_view name) const;
+  size_t TypeDeclarationCount() const;
+
   // §15.3 and §15.4 with §13.5.1: the semaphore or the mailbox the variable
   // `var` holds a handle to -- a subroutine formal declared `semaphore s` or
   // `mailbox m`, bound when the actual's object is copied in (BindSyncFormal
@@ -278,6 +293,8 @@ class DeclaredNameTables {
 
   // §6.18: see RegisterTypeTarget.
   std::unordered_map<std::string_view, std::string_view> type_targets_;
+  // §6.18 with §15.4.9: see RegisterTypeDeclaration.
+  std::unordered_map<std::string_view, const DataType*> type_declarations_;
   // §15.3 and §15.4 with §13.5.1: see BindSemaphoreHandle.
   std::unordered_map<const Variable*, SemaphoreObject*> semaphore_handles_;
   std::unordered_map<const Variable*, MailboxObject*> mailbox_handles_;

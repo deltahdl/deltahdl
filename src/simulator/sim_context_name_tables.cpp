@@ -330,6 +330,21 @@ size_t DeclaredNameTables::TypeTargetCount() const {
   return type_targets_.size();
 }
 
+void DeclaredNameTables::RegisterTypeDeclaration(std::string_view name,
+                                                 const DataType* type) {
+  type_declarations_[name] = type;
+}
+
+const DataType* DeclaredNameTables::FindTypeDeclaration(
+    std::string_view name) const {
+  auto it = type_declarations_.find(name);
+  return (it != type_declarations_.end()) ? it->second : nullptr;
+}
+
+size_t DeclaredNameTables::TypeDeclarationCount() const {
+  return type_declarations_.size();
+}
+
 void DeclaredNameTables::BindSemaphoreHandle(const Variable* var,
                                              SemaphoreObject* sem) {
   semaphore_handles_[var] = sem;

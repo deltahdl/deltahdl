@@ -491,6 +491,48 @@ void RegisterModuleDpiImports(const RtlirModule* mod, SimContext& ctx) {
   RegisterDpiImportDecls(mod->dpi_import_decls, ctx);
 }
 
+// §6.18 with §15.4.9 (printed page 377): each typedef item among `items`,
+// the type it was declared with recorded under `prefix` plus its name
+// (SimContext::RegisterTypeDeclaration) -- the parameter list of a `typedef
+// mailbox #(int) mb_t` stands on this type and on no name the targets hold.
+// The items are the parser's and outlive the run, as a class declaration
+// does.
+static void RegisterTypedefItems(const std::vector<ModuleItem*>& items,
+                                 std::string_view prefix, SimContext& ctx) {
+  for (const ModuleItem* item : items) {
+    if (item->kind != ModuleItemKind::kTypedef) continue;
+    std::string_view key = item->name;
+    if (!prefix.empty()) {
+      key = *ctx.GetArena().Create<std::string>(std::string(prefix) +
+                                                "::" + std::string(item->name));
+    }
+    ctx.RegisterTypeDeclaration(key, &item->typedef_type);
+  }
+}
+
+static void RegisterScopeTypedefs(const std::vector<ModuleDecl*>& decls,
+                                  SimContext& ctx) {
+  for (const ModuleDecl* decl : decls)
+    RegisterTypedefItems(decl->items, {}, ctx);
+}
+
+// The typedef items of every scope of the design: a package's under
+// "pkg::name" (§26.3), as the elaborator keys its typedef table, and a
+// module's, an interface's, a program's and the compilation unit's under the
+// bare name, as the type targets are keyed. A design built with no parsed
+// unit behind it records none.
+static void RegisterTypeDeclarations(const RtlirDesign* design,
+                                     SimContext& ctx) {
+  const CompilationUnit* unit = design->compilation_unit;
+  if (unit == nullptr) return;
+  RegisterTypedefItems(unit->cu_items, {}, ctx);
+  for (const PackageDecl* pkg : unit->packages)
+    RegisterTypedefItems(pkg->items, pkg->name, ctx);
+  RegisterScopeTypedefs(unit->modules, ctx);
+  RegisterScopeTypedefs(unit->interfaces, ctx);
+  RegisterScopeTypedefs(unit->programs, ctx);
+}
+
 // §6.18 with §8.25.1: a typedef name whose chain ends in a class names that
 // class -- `typedef C T;` makes `T::p` the default specialization's `C#()::p`
 // -- so each such name is bound to the class it denotes, once every class of
@@ -502,7 +544,11 @@ void RegisterModuleDpiImports(const RtlirModule* mod, SimContext& ctx) {
 // record to bind the name to, and a class property declared through the
 // typedef is told to be one by SyncKindOfType (eval_class_sync.cpp) following
 // the chain in this table; with no table, `mb_t mb = new` built no mailbox.
+// The typedef items' own types are recorded beside them
+// (RegisterTypeDeclarations) for the parameter list a typedef of a
+// parameterized mailbox carries.
 void RegisterClassTypeAliases(const RtlirDesign* design, SimContext& ctx) {
+  RegisterTypeDeclarations(design, ctx);
   for (const auto& [alias, target] : design->type_targets) {
     ctx.RegisterTypeTarget(alias, target);
     if (ctx.FindClassType(alias) != nullptr) continue;

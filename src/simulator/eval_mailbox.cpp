@@ -69,22 +69,50 @@ int32_t MailboxBoundArg(const Expr* new_expr, SimContext& ctx, Arena& arena) {
 // §15.4.9: whether the call's receiver was declared `mailbox #(T)` with a
 // type other than dynamic_type. The compiler then verifies that every
 // transfer method's argument is of a type equivalent to T (the elaborator's
-// CheckMailboxCallExpr), so no mismatch is left for the run-time check to
-// find, and the messages of such a mailbox record no type. The declaration's
-// parameter list is recorded under the variable's own key by
-// RecordClassSpecialization, one of the keys the mailbox itself is found
-// under; a class property's stands on its declaration (§8.7).
+// CheckMailboxCallExpr for a module's variable, PropertyElementType below
+// for a class property, which the elaborator's walk of the module's items
+// never reaches), so no mismatch is left for the run-time check to find,
+// and the messages of such a mailbox record no type. A variable's parameter
+// list is recorded under its own key by RecordClassSpecialization, one of
+// the keys the mailbox itself is found under; a class property's stands on
+// its declaration (§8.7) or, through a typedef (§15.4.9's own `typedef
+// mailbox #(string) s_mbox`, §6.18), on the typedef's.
 static bool ElementTypeIsFixed(const std::vector<DataType>& params) {
   if (params.empty()) return false;
   const DataType& elem = params.front();
   return elem.kind != DataTypeKind::kNamed || elem.type_name != "dynamic_type";
 }
 
+// §6.18 with §26.3: the `#(...)` list of the `mailbox` the declared type
+// `type` stands for, followed through the typedef chain the run records
+// (SimContext::FindTypeDeclaration), a package's under "p::name", bounded by
+// the table's size; null where the chain ends in anything else. Read off
+// the property's own declaration alone, a `mb_t mb` carried no list and its
+// put() of a string, which the elaborator never sees, went unchecked.
+static const std::vector<DataType>* MailboxTypeParams(const DataType& type,
+                                                      const SimContext& ctx) {
+  const DataType* cur = &type;
+  for (size_t steps = 0; steps <= ctx.TypeDeclarationCount(); ++steps) {
+    if (cur->kind != DataTypeKind::kNamed) return nullptr;
+    if (cur->scope_name.empty() && cur->type_name == "mailbox")
+      return &cur->type_params;
+    std::string key =
+        cur->scope_name.empty()
+            ? std::string(cur->type_name)
+            : std::string(cur->scope_name) + "::" + std::string(cur->type_name);
+    cur = ctx.FindTypeDeclaration(key);
+    if (cur == nullptr) return nullptr;
+  }
+  return nullptr;
+}
+
 static bool IsParameterizedMailbox(const Expr* expr, SimContext& ctx,
                                    Arena& arena) {
   SyncProperty prop = ResolveSyncProperty(expr->lhs->lhs, ctx, arena);
   if (prop.kind == SyncKind::kMailbox) {
-    return ElementTypeIsFixed(prop.member->data_type.type_params);
+    const std::vector<DataType>* params =
+        MailboxTypeParams(prop.member->data_type, ctx);
+    return params != nullptr && ElementTypeIsFixed(*params);
   }
   MethodCallParts parts;
   if (!ExtractHandleMethodCallParts(expr, arena, parts)) return false;
@@ -339,6 +367,90 @@ static const Expr* MailboxArg(const Expr* expr) {
   return expr->args.empty() ? nullptr : expr->args[0];
 }
 
+// §15.4.9 (printed page 377) with §6.22.2: the type the element type T of a
+// class property's `mailbox #(T)` names, which every message of the mailbox
+// and every variable one is retrieved into is verified against: a string or
+// a real of its own built-in type, a class by the name the run knows it
+// under, and any other kind an integral of its width, signedness and number
+// of states, as a variable of the kind is typed. A named type that is no
+// class -- a typedef of an integral, which the run does not size here -- is
+// left of any type, verified by nothing.
+static MailboxMessageType ElementMessageType(const DataType& elem,
+                                             SimContext& ctx) {
+  if (elem.kind == DataTypeKind::kNamed) {
+    if (ctx.FindClassType(elem.type_name) == nullptr) return {};
+    return ClassMessageType(elem.type_name, ctx);
+  }
+  static const TypedefMap kNoTypedefs;
+  return DeclaredKindType(elem.kind, EvalTypeWidth(elem),
+                          IsSignedType(elem, kNoTypedefs));
+}
+
+// §15.4.9: the element type of the call's receiver where it is a class
+// property declared `mailbox #(T)`, on its declaration or through a typedef
+// (MailboxTypeParams), with T fixed; of any type for every other receiver
+// -- a module's variable, whose calls the elaborator verified.
+static MailboxMessageType PropertyElementType(const Expr* expr, SimContext& ctx,
+                                              Arena& arena) {
+  SyncProperty prop = ResolveSyncProperty(expr->lhs->lhs, ctx, arena);
+  if (prop.kind != SyncKind::kMailbox) return {};
+  const std::vector<DataType>* params =
+      MailboxTypeParams(prop.member->data_type, ctx);
+  if (params == nullptr || !ElementTypeIsFixed(*params)) return {};
+  return ElementMessageType(params->front(), ctx);
+}
+
+static std::string TargetSpelling(const Expr* arg, SimContext& ctx,
+                                  Arena& arena);
+
+// §8.16 with §6.22.2: a handle of a class is assigned to a variable of the
+// class or of one it is derived from, so an argument of a class related to
+// the element class by derivation either way -- a subclass handle put, a
+// message retrieved into a superclass handle -- is accepted alongside one
+// of an equivalent type.
+static bool RelatedClasses(const MailboxMessageType& a,
+                           const MailboxMessageType& b, SimContext& ctx) {
+  if (a.kind != MailboxMessageType::Kind::kClass ||
+      b.kind != MailboxMessageType::Kind::kClass)
+    return false;
+  const ClassTypeInfo* ca = ctx.FindClassType(a.class_name);
+  const ClassTypeInfo* cb = ctx.FindClassType(b.class_name);
+  return ca != nullptr && cb != nullptr && (ca->IsA(cb) || cb->IsA(ca));
+}
+
+// §15.4.9 (printed page 377): a parameterized mailbox's transfer methods
+// take a message, or retrieve into a variable, of a type equivalent to its
+// element type alone, which the compiler verifies; the elaborator's
+// CheckMailboxCallExpr does so for a module's variable and never walks a
+// class's methods, so a class property's call is verified here, at the call
+// and under the same wording, and refused: the message is not placed and
+// the variable is left as it was. Whether the call's argument, of the type
+// `actual`, is refused.
+static bool RefusesParameterizedArg(const Expr* expr,
+                                    const MailboxMessageType& actual,
+                                    SimContext& ctx, Arena& arena) {
+  MailboxMessageType elem = PropertyElementType(expr, ctx, arena);
+  if (actual.EquivalentTo(elem) || RelatedClasses(actual, elem, ctx))
+    return false;
+  ctx.GetDiag().Error(
+      expr->range.start,
+      "argument to mailbox method '" + std::string(expr->lhs->rhs->text) +
+          "' is not type-equivalent to the element type of parameterized "
+          "mailbox '" +
+          TargetSpelling(expr->lhs->lhs, ctx, arena) + "'",
+      Subclause("15.4.9"));
+  return true;
+}
+
+// §15.4.9 for get(), peek(), try_get() and try_peek(): whether the variable
+// the call retrieves into, of its declared type (TargetType), is refused.
+static bool RefusesRetrievalTarget(const Expr* expr, SimContext& ctx,
+                                   Arena& arena) {
+  const Expr* arg = MailboxArg(expr);
+  if (arg == nullptr) return false;
+  return RefusesParameterizedArg(expr, TargetType(arg, ctx, arena), ctx, arena);
+}
+
 // §15.4.5 through §15.4.8: the type the message must be equivalent to, that
 // of the left-hand expression the call names. A parameterized mailbox's
 // messages were verified by the compiler (§15.4.9), so its target expects
@@ -357,6 +469,9 @@ static MailboxMessageType RetrievalTargetType(const Expr* expr, SimContext& ctx,
 struct MailboxMessage {
   Logic4Snapshot value;
   MailboxMessageType type;
+  // §15.4.9: a message of a type the class property's element type refuses,
+  // reported by RefusesParameterizedArg and placed by no caller.
+  bool refused = false;
 };
 
 static MailboxMessage MailboxMessageArg(const Expr* expr, SimContext& ctx,
@@ -366,8 +481,10 @@ static MailboxMessage MailboxMessageArg(const Expr* expr, SimContext& ctx,
   if (arg == nullptr) return msg;
   Logic4Vec val = EvalExpr(arg, ctx, arena);
   msg.value.Capture(val);
-  msg.type = ActualMessageType(
-      arg, val, IsParameterizedMailbox(expr, ctx, arena), ctx, arena);
+  MailboxMessageType actual = ActualMessageType(arg, val, false, ctx, arena);
+  msg.refused = RefusesParameterizedArg(expr, actual, ctx, arena);
+  msg.type =
+      IsParameterizedMailbox(expr, ctx, arena) ? MailboxMessageType{} : actual;
   return msg;
 }
 
@@ -398,6 +515,8 @@ static void StoreMailboxMessage(const Expr* arg, const Logic4Vec& msg,
 static Logic4Vec EvalMailboxTryRetrieve(MailboxObject& mbx, bool remove,
                                         const Expr* expr, SimContext& ctx,
                                         Arena& arena) {
+  if (RefusesRetrievalTarget(expr, ctx, arena))
+    return MakeLogic4VecVal(arena, 32, 0);
   MailboxMessageType want = RetrievalTargetType(expr, ctx, arena);
   Logic4Snapshot msg;
   int32_t got = remove ? mbx.TryGet(msg, want) : mbx.TryPeek(msg, want);
@@ -415,7 +534,7 @@ bool TryEvalMailboxMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
   }
   if (auto* mbx = MailboxCallTarget(expr, ctx, arena, "try_put")) {
     MailboxMessage msg = MailboxMessageArg(expr, ctx, arena);
-    auto placed = mbx->TryPut(msg.value.Get(), msg.type);
+    auto placed = msg.refused ? 0 : mbx->TryPut(msg.value.Get(), msg.type);
     out = MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(placed));
     return true;
   }
@@ -542,6 +661,7 @@ static void ReportMailboxWouldBlock(const Expr* expr, std::string_view state,
 static void ExecMailboxRetrievalInFunction(MailboxObject& mbx, bool remove,
                                            const Expr* expr, SimContext& ctx,
                                            Arena& arena) {
+  if (RefusesRetrievalTarget(expr, ctx, arena)) return;
   if (mbx.Num() == 0) {
     ReportMailboxWouldBlock(expr, "empty", ctx, arena);
     return;
@@ -561,6 +681,7 @@ bool TryExecMailboxCallInFunction(const Expr* expr, SimContext& ctx,
                                   Arena& arena) {
   if (auto* mbx = MailboxCallTarget(expr, ctx, arena, "put")) {
     MailboxMessage msg = MailboxMessageArg(expr, ctx, arena);
+    if (msg.refused) return true;
     if (mbx->Put(msg.value.Get(), msg.type) == MbxPutStatus::kBlock) {
       ReportMailboxWouldBlock(expr, "full", ctx, arena);
     }
@@ -585,11 +706,13 @@ bool TryExecMailboxCallInFunction(const Expr* expr, SimContext& ctx,
 ExecTask ExecMailboxCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (auto* mbx = MailboxCallTarget(expr, ctx, arena, "put")) {
     MailboxMessage msg = MailboxMessageArg(expr, ctx, arena);
+    if (msg.refused) co_return StmtResult::kDone;
     MailboxMessageType type = msg.type;
     co_await MailboxPutAwaiter{*mbx, std::move(msg.value), type};
     co_return StmtResult::kDone;
   }
   if (auto* mbx = MailboxCallTarget(expr, ctx, arena, "get")) {
+    if (RefusesRetrievalTarget(expr, ctx, arena)) co_return StmtResult::kDone;
     MailboxGetAwaiter get{*mbx, RetrievalTargetType(expr, ctx, arena), {}};
     MbxGetStatus status = co_await get;
     FinishMailboxRetrieval(expr, get.msg.Get(),
@@ -597,6 +720,7 @@ ExecTask ExecMailboxCall(const Expr* expr, SimContext& ctx, Arena& arena) {
     co_return StmtResult::kDone;
   }
   if (auto* mbx = MailboxCallTarget(expr, ctx, arena, "peek")) {
+    if (RefusesRetrievalTarget(expr, ctx, arena)) co_return StmtResult::kDone;
     MailboxPeekAwaiter peek{*mbx, RetrievalTargetType(expr, ctx, arena), {}};
     MbxPeekStatus status = co_await peek;
     FinishMailboxRetrieval(expr, peek.msg.Get(),

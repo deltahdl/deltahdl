@@ -190,6 +190,80 @@ TEST(MailboxSim, PackageQualifiedTypedefdMailboxRejectsAGetOfAnotherType) {
                                  7);
 }
 
+// The source of the class property cases: `head` declares a typedef or
+// nothing, and the class declares its mailbox property `mb` through the
+// type `type` names and a method `go()` whose body is `body`, which the
+// module calls on a constructed object.
+std::string PropertyMailboxSrc(const std::string& head, const std::string& type,
+                               const std::string& body) {
+  return head + "class C;\n  " + type +
+         " mb = new;\n"
+         "  function void go();\n" +
+         body +
+         "  endfunction\n"
+         "endclass\n"
+         "module t;\n"
+         "  initial begin\n"
+         "    C c = new;\n"
+         "    c.go();\n"
+         "  end\n"
+         "endmodule\n";
+}
+
+// Runs `src` and expects the §15.4.9 report for the mailbox method
+// `method` at the line `line`.
+void ExpectPropertyCallReported(const std::string& src,
+                                const std::string& method, int line) {
+  SimFixture f;
+  auto* design = ElaborateSrc(src, f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "argument to mailbox method '" + method + "' is not type-equivalent",
+      line, "15.4.9"));
+}
+
+const char* const kPropertyTypedefHead = "typedef mailbox #(int) mb_t;\n";
+
+// §15.4.9 (printed page 377) with §6.18 (printed 118): a class property
+// declared through a typedef of `mailbox #(int)` is the parameterized
+// mailbox, which accepts messages of its element type alone, so the
+// method's put() of a string is reported at the call, as a module
+// variable's is above. The property's own declaration carries no `#(T)`,
+// so the run took the mailbox for a typeless one and the put() went
+// unreported.
+TEST(MailboxSim, TypedefdMailboxPropertyRejectsAPutOfAnotherType) {
+  ExpectPropertyCallReported(
+      PropertyMailboxSrc(kPropertyTypedefHead, "mb_t", "    mb.put(\"s\");\n"),
+      "put", 5);
+}
+
+// §15.4.9 (printed page 377) with §15.4.5 (printed 375): the parameterized
+// mailbox reached through the typedef hands its messages to a variable of
+// its element type alone, so get() into a string is reported at the call
+// under this subclause, as the module variable's is above, the 1 placed
+// before it left in the queue. Taken for a typeless mailbox, the get()
+// was left to the run's check, which reports under §15.4.5 and not here.
+TEST(MailboxSim, TypedefdMailboxPropertyRejectsAGetOfAnotherType) {
+  ExpectPropertyCallReported(PropertyMailboxSrc(kPropertyTypedefHead, "mb_t",
+                                                "    string s;\n"
+                                                "    mb.put(1);\n"
+                                                "    mb.get(s);\n"),
+                             "get", 7);
+}
+
+// §15.4.9 (printed page 377): the property declared `mailbox #(int) mb`
+// outright is the same parameterized mailbox, so its put() of a string is
+// reported at the call as the typedef'd one's is. The elaborator's check
+// walks a module's items and never a class's methods, so the call was
+// verified by nothing.
+TEST(MailboxSim, ParameterizedMailboxPropertyRejectsAPutOfAnotherType) {
+  ExpectPropertyCallReported(
+      PropertyMailboxSrc("", "mailbox #(int)", "    mb.put(\"s\");\n"), "put",
+      4);
+}
+
 // §15.3.1 (printed page 373) with §6.18: a semaphore declared through a
 // typedef, `typedef semaphore sem_t; sem_t s = new(2);`, is created with the
 // two keys its new() names. get(1) takes one, try_get(2) then finds one key
