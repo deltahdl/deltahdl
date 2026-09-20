@@ -165,8 +165,7 @@ class Elaborator : public ElaboratorClassRules {
   // cell held elsewhere is not the description the statement asked for. A
   // library the statement instead inherited from the configuration holding it
   // (§33.4.1.1) is where the search starts rather than where it ends, and an
-  // empty `library` confines the search not at all. Returns nullptr when no
-  // such cell exists.
+  // empty `library` confines the search not at all. Null when no cell exists.
   ModuleDecl* FindDesignCell(std::string_view library, std::string_view cell,
                              bool qualified_in_source) const;
 
@@ -337,8 +336,7 @@ class Elaborator : public ElaboratorClassRules {
   // §23.3.3.2: records every variable an output or inout port connection
   // drives, so a second output driving the same variable is rejected.
   void RecordOutputPortDrivenVariables(const Expr* conn_expr, SourceLoc loc);
-  // Synthesizes a connection for an unconnected input port
-  // (default/pull/highZ).
+  // Synthesizes the default, pull or highZ connection of an unconnected input.
   void SynthesizeExplicitDefault(const PortBindScope& scope,
                                  ExplicitPortBind& bind);
   // §25.5 header-vs-connection modport consistency for an interface port.
@@ -426,9 +424,8 @@ class Elaborator : public ElaboratorClassRules {
                                          RtlirModule* mod,
                                          const ScopeMap& scope);
 
-  // §27.4: a loop generate construct's genvar, once its header has been
-  // checked -- the genvar name and the constant value its control variable
-  // starts at.
+  // §27.4: a loop generate construct's genvar once its header has been checked
+  // -- the genvar name and the constant value its control variable starts at.
   struct GenerateForOpening {
     std::string_view genvar_name;
     int64_t init_value;
@@ -456,10 +453,9 @@ class Elaborator : public ElaboratorClassRules {
 
   // Every defparam statement belonging to `mod`: the ones ModuleDecl::items
   // holds directly, then the ones each generate block instance elaborated into
-  // `mod` contributed. Elaborator::ApplyDefparams and
-  // Elaborator::ReportUnresolvedDefparams both read this one list, so the keys
-  // they build out of it agree and a statement one applied is not one the other
-  // reports as having reached nothing.
+  // `mod` contributed. ApplyDefparams and ReportUnresolvedDefparams both read
+  // this one list, so the keys they build out of it agree and a statement one
+  // applied is not one the other reports as having reached nothing.
   std::vector<DefparamSite> CollectDefparamSites(RtlirModule* mod,
                                                  const ModuleDecl* decl) const;
 
@@ -879,10 +875,9 @@ class Elaborator : public ElaboratorClassRules {
   void WalkStmtsForSyncDriveForm(const Stmt* s);
   bool ExprTargetsWritableClockvar(const Expr* e) const;
 
-  // §14.16.2: true when `name` is a plain variable that is associated with an
-  // output (or inout) clockvar -- i.e. the underlying signal driven by a
-  // clocking-block output. Writing to such a variable by any external driver is
-  // illegal.
+  // §14.16.2: true when `name` is a plain variable associated with an output
+  // (or inout) clockvar -- the underlying signal driven by a clocking-block
+  // output -- which no external driver may write.
   bool IsOutputClockvarSignal(std::string_view name) const;
   // §14.16.2: it is illegal to drive a variable associated with an output
   // clockvar from a primitive (gate) output terminal.
