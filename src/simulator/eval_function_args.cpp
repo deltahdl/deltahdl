@@ -121,6 +121,116 @@ static bool TryBindRefArg(const Expr* expr, int arg_index,
   return true;
 }
 
+// Runs `bind` on the callee's scope, the top frame of the stack, with the
+// stack taken off the context for the duration and put back after. SimContext
+// registers a declaration of the innermost scope only through CreateQueue and
+// CreateAssocArray, each of which makes a new object; a ref formal needs the
+// frame to name the caller's own.
+template <typename Bind>
+static void InCalleeScope(SimContext& ctx, Bind bind) {
+  std::vector<Scope> stack = ctx.SwapScopeStack({});
+  if (!stack.empty()) bind(stack.back());
+  ctx.SwapScopeStack(std::move(stack));
+}
+
+// The storage a declared aggregate's name stands for in the caller: the
+// QueueObject of a queue or dynamic array, the AssocArrayObject of an
+// associative array, the shape of a fixed-size array, and the whole variable
+// Lowerer::LowerVar declares under the name before LowerVarAggregate gives
+// the aggregate any of these. Read with the callee's scope set aside, as
+// TryBindRefArg reads the actual, so a formal of the last call to a static
+// subroutine never answers for the caller's aggregate.
+struct AggregateStorage {
+  QueueObject* queue = nullptr;
+  AssocArrayObject* assoc = nullptr;
+  ArrayInfo* info = nullptr;
+  Variable* holder = nullptr;
+};
+
+static AggregateStorage FindAggregateStorage(std::string_view name,
+                                             SimContext& ctx) {
+  CalleeScopeAside aside(ctx);
+  AggregateStorage storage;
+  storage.queue = ctx.FindQueue(name);
+  storage.assoc = ctx.FindAssocArray(name);
+  storage.info = ctx.FindArrayInfo(name);
+  storage.holder = ctx.FindVariable(name);
+  return storage;
+}
+
+// Makes each element of the formal, `a[idx]` for every index of the shape,
+// the caller's element variable `arr[idx]`, which is how TryArrayElementSelect
+// and the select assignment reach an element of a fixed-size array. The
+// elements are read with the callee's scope set aside and the aliases made
+// with it back on top, one element at a time; the formal's names are interned
+// in the arena, which outlives the scope they are keys of.
+static void AliasFixedArrayElements(std::string_view actual,
+                                    std::string_view formal,
+                                    const ArrayInfo& info, SimContext& ctx,
+                                    Arena& arena) {
+  for (uint32_t j = 0; j < info.size; ++j) {
+    auto idx = std::to_string(info.lo + j);
+    Variable* src_var = nullptr;
+    {
+      CalleeScopeAside aside(ctx);
+      src_var = ctx.FindVariable(std::string(actual) + "[" + idx + "]");
+    }
+    if (!src_var) continue;
+    auto* dst =
+        arena.Create<std::string>(std::string(formal) + "[" + idx + "]");
+    ctx.AliasLocalVariable(*dst, src_var);
+  }
+}
+
+// Makes `formal` name, in the callee's scope, the objects the actual's name
+// stands for in the caller's: its QueueObject, its AssocArrayObject and the
+// whole variable declared under the name.
+static void AliasAggregateObjects(const AggregateStorage& storage,
+                                  std::string_view formal, SimContext& ctx) {
+  InCalleeScope(ctx, [&](Scope& frame) {
+    if (storage.queue) frame.queues[formal] = storage.queue;
+    if (storage.assoc) frame.assoc_arrays[formal] = storage.assoc;
+  });
+  if (storage.holder) ctx.AliasLocalVariable(formal, storage.holder);
+}
+
+// §13.5.2 (printed page 348): an argument passed by reference is not copied
+// into the subroutine area; the subroutine reaches the original through a
+// reference, and the clause's own example passes a fixed-size unpacked array
+// so. Lowerer::LowerVar declares a whole variable under every declaration's
+// name before LowerVarAggregate gives an aggregate its storage -- element
+// variables and an ArrayInfo, a QueueObject or an AssocArrayObject -- so
+// TryBindRefArg found that placeholder for `scale(arr)` and aliased the formal
+// to a scalar: `a[i]` in the body bit-selected the placeholder, `qq.push_front`
+// found no queue and `m["x"]` no associative array, and the caller's aggregate
+// stood as it was. Here the formal's name is made to stand in the callee's
+// scope for what the actual's name stands for in the caller's: the same
+// QueueObject or AssocArrayObject, or the actual's shape with each element
+// aliased under the formal's name, and the placeholder beside them, so a
+// write through the formal that announces itself by the aggregate's name
+// (NotifyOwningVar) reaches the watchers of the caller's declaration.
+//
+// A multidimensional fixed-size array holds its leaves under `arr[i][j]`
+// names this does not alias, so it is left to the bind that follows, as it
+// was.
+static bool TryBindRefAggregateArg(const Expr* call_arg,
+                                   const FunctionArg& param, SimContext& ctx,
+                                   Arena& arena) {
+  if (!call_arg || call_arg->kind != ExprKind::kIdentifier) return false;
+  AggregateStorage storage = FindAggregateStorage(call_arg->text, ctx);
+  if (!storage.queue && !storage.assoc && !storage.info) return false;
+  if (storage.info && !storage.info->dim_sizes.empty()) return false;
+  AliasAggregateObjects(storage, param.name, ctx);
+  if (storage.info) {
+    ctx.RegisterArrayInScope(param.name, *storage.info);
+    if (!storage.queue) {
+      AliasFixedArrayElements(call_arg->text, param.name, *storage.info, ctx,
+                              arena);
+    }
+  }
+  return true;
+}
+
 static bool TryBindQueueElementRef(const Expr* expr, int arg_index,
                                    const FunctionArg& param, SimContext& ctx,
                                    Arena& arena) {
@@ -394,12 +504,32 @@ static bool TryBindArrayArg(const Expr* call_arg, const FunctionArg& formal,
   return true;
 }
 
-// Attempts the ref-binding strategies (plain ref, queue element, assoc element)
-// for a ref-direction formal. Returns true when one of them bound the argument.
+static void RegisterValueArgStructType(const FunctionArg& param,
+                                       const Expr* expr, int arg_index,
+                                       SimContext& ctx);
+
+// Attempts the ref-binding strategies (whole aggregate, plain ref, queue
+// element, assoc element) for a ref-direction formal. Returns true when one of
+// them bound the argument. The aggregate bind stands first because a declared
+// aggregate's name also finds the whole variable the lowerer declares under
+// it, which the plain bind would take for the actual.
+//
+// A structure variable is one variable, so the plain bind aliases it whole;
+// what the formal still lacks is the layout, which SimContext keys by the
+// variable's name (RegisterStructInfo in lowerer_var.cpp) and so does not
+// follow the alias. RegisterValueArgStructType records the actual's layout
+// under the formal's name, as it does for a by-value structure formal; without
+// it `x.a = 8` through `ref st_t x` resolved to no member of anything.
 static bool TryBindRefDirectionArg(const Expr* expr, int arg_index,
                                    const FunctionArg& param, SimContext& ctx,
                                    Arena& arena) {
+  if (arg_index >= 0 &&
+      TryBindRefAggregateArg(expr->args[static_cast<size_t>(arg_index)], param,
+                             ctx, arena)) {
+    return true;
+  }
   if (TryBindRefArg(expr, arg_index, param.name, ctx)) {
+    RegisterValueArgStructType(param, expr, arg_index, ctx);
     RegisterValueArgClassType(param, ctx);
     return true;
   }

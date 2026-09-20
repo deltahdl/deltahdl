@@ -773,4 +773,119 @@ TEST(PassByRef, ClassTypedRefFormalOfAModuleTaskRebindsTheCallersHandle) {
   EXPECT_EQ(val, 75u);
 }
 
+// §13.5.2 (printed page 348): an argument passed by reference is not copied
+// into the subroutine area; the subroutine reaches the original through a
+// reference, and the clause's own example passes a fixed-size unpacked array
+// so. The task scales every element through the formal, and the caller reads
+// 5, 10 and 15 from its own array, packed as 51015. 10203 is what the run
+// left standing when the formal aliased the whole-array placeholder the
+// lowerer declares under the array's name: `a[i]` then bit-selected a scalar
+// and the caller's elements were never written.
+TEST(PassByRef, RefFormalOfAFixedArrayScalesTheCallersElements) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  int arr[3] = '{1, 2, 3};\n"
+      "  int res;\n"
+      "  task automatic scale(ref int a[3]);\n"
+      "    foreach (a[i]) a[i] = a[i] * 5;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    scale(arr);\n"
+      "    res = arr[0] * 10000 + arr[1] * 100 + arr[2];\n"
+      "  end\n"
+      "endmodule\n",
+      "res");
+  EXPECT_EQ(val, 51015u);
+}
+
+// §13.5.2 (printed page 349): the caller and the subroutine share one
+// representation of a ref argument, so a queue method run on the formal grows
+// the caller's queue. After push_front(3) and push_back(7) on a queue holding
+// 42 the caller reads three elements 3, 42, 7, packed with the size as
+// 334207. A formal bound to anything but the caller's QueueObject leaves the
+// queue at its one element: size 1 and 42 in front, 520000.
+TEST(PassByRef, RefFormalOfAQueueGrowsTheCallersQueue) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  int q[$] = '{42};\n"
+      "  int res;\n"
+      "  task automatic push(ref int qq[$]);\n"
+      "    qq.push_front(3); qq.push_back(7);\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    push(q);\n"
+      "    res = q.size() * 100000 + q[0] * 10000 + q[1] * 100 + q[2];\n"
+      "  end\n"
+      "endmodule\n",
+      "res");
+  EXPECT_EQ(val, 334207u);
+}
+
+// §13.5.2 (printed page 349), for an associative array: the entries the task
+// writes through the formal are the caller's, so the caller's array holds two
+// entries and reads 100 under "x", packed as 2100. An array the formal did not
+// reach stays empty and reads 0 for both.
+TEST(PassByRef, RefFormalOfAnAssocArrayFillsTheCallersArray) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  int aa[string];\n"
+      "  int res;\n"
+      "  task automatic fill(ref int m[string]);\n"
+      "    m[\"x\"] = 100; m[\"y\"] = 200;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    fill(aa);\n"
+      "    res = aa.size() * 1000 + aa[\"x\"];\n"
+      "  end\n"
+      "endmodule\n",
+      "res");
+  EXPECT_EQ(val, 2100u);
+}
+
+// §13.5.2 (printed page 349): a variable is a legal ref actual whatever its
+// type, and an unpacked structure passed so is written member by member in
+// the caller's storage. The caller reads 8 and 9 from its own members, packed
+// as 89; a formal that reached the variable without its layout resolved `x.a`
+// to no member at all and left both at 0.
+TEST(PassByRef, RefFormalOfAnUnpackedStructWritesTheCallersMembers) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  typedef struct { int a; int b; } st_t;\n"
+      "  st_t s;\n"
+      "  int res;\n"
+      "  task automatic fs(ref st_t x); x.a = 8; x.b = 9; endtask\n"
+      "  initial begin\n"
+      "    fs(s);\n"
+      "    res = s.a * 10 + s.b;\n"
+      "  end\n"
+      "endmodule\n",
+      "res");
+  EXPECT_EQ(val, 89u);
+}
+
+// §13.5.2 (printed page 350): a const ref formal is passed by reference and
+// read only, so the callee reads the caller's elements themselves, indexed
+// and through foreach. one(data) reads 20 from element 1 and total(data) sums
+// 10, 20, 5 and 25 to 60, packed as 2060. Bound to the scalar placeholder the
+// formal read bit 1 of an 8-bit variable and summed its 8 bits, nowhere near
+// the elements.
+TEST(PassByRef, ConstRefFormalOfAFixedArrayReadsTheCallersElements) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  byte data[4] = '{10, 20, 5, 25};\n"
+      "  int res;\n"
+      "  function automatic int one(const ref byte d[4]);\n"
+      "    return d[1];\n"
+      "  endfunction\n"
+      "  function automatic int total(const ref byte d[4]);\n"
+      "    int s = 0;\n"
+      "    foreach (d[i]) s += d[i];\n"
+      "    return s;\n"
+      "  endfunction\n"
+      "  initial res = one(data) * 100 + total(data);\n"
+      "endmodule\n",
+      "res");
+  EXPECT_EQ(val, 2060u);
+}
+
 }  // namespace
