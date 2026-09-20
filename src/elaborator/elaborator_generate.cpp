@@ -300,6 +300,54 @@ static void RestoreEnclosingTypedefs(const EnclosingTypedefs& taken,
   }
 }
 
+// §27.2 rules that "all other module items, including other generate
+// constructs, are allowed in a generate block" once port declarations,
+// specify blocks and specparam declarations are excluded, so a function may
+// be declared among these items. §13.4.3 has a constant function call
+// "evaluated at elaboration time", and the folder answers such a call from
+// the table a ConstFuncRegistryGuard installs. RecordTaskFuncNames in
+// src/elaborator/elaborator_items_udp.cpp fills the module's table by walking
+// ModuleDecl::items and does not descend into a generate construct, so a
+// function declared here is in no table until this site puts it in one.
+//
+// The table installed here is the one already registered, copied and added
+// to. §23.9 has the search for a directly referenced identifier "continue
+// upward until an item by that name is found or until a module, interface,
+// program, or checker boundary is encountered", and a generate block is not
+// one of those boundaries, so a call written in a nested block names a
+// function of the block enclosing it and a call written in any block names a
+// function of the module. A name these items declare overwrites the entry
+// they inherited, which is §23.9's identifier "declared locally".
+//
+// A sibling block names none of them, because the guard puts back what it
+// found when these items are done and each block's items are one call to this
+// function.
+//
+// Nothing is installed when these items declare no function, which leaves the
+// enclosing table registered and costs a body without functions no copy.
+//
+// ElaboratorData::task_names_, which RecordTaskFuncNames fills from the same
+// walk and which is short of a task declared here for the same reason, is not
+// given the same treatment. Elaborator::ValidateFunctionBody reads it to
+// enforce §13.4's bar on a function enabling a task, which is a check on a
+// name rather than a fold of a value, so it is left to whatever reaches it.
+//
+// Fills `decls` with the table for these items' walk and answers whether one
+// is to be installed at all; moved out of ElaborateGenerateItems, which
+// 559f37e6e's forward-kind restore took past the statement threshold.
+static bool CollectGenerateBlockFunctions(
+    const std::vector<ModuleItem*>& items,
+    std::unordered_map<std::string_view, const ModuleItem*>& decls) {
+  bool declares_function = false;
+  for (const auto* item : items)
+    declares_function |= item->kind == ModuleItemKind::kFunctionDecl;
+  if (!declares_function) return false;
+  if (const auto* outer = RegisteredConstFuncs()) decls = *outer;
+  for (const auto* item : items)
+    if (item->kind == ModuleItemKind::kFunctionDecl) decls[item->name] = item;
+  return true;
+}
+
 void Elaborator::ElaborateGenerateItems(const std::vector<ModuleItem*>& items,
                                         RtlirModule* mod,
                                         const ScopeMap& scope) {
@@ -328,47 +376,12 @@ void Elaborator::ElaborateGenerateItems(const std::vector<ModuleItem*>& items,
   // TakeEnclosingTypedefs.
   EnclosingTypedefs enclosing_typedefs =
       TakeEnclosingTypedefs(items, typedefs_, forward_typedef_kinds_);
-  // §27.2 rules that "all other module items, including other generate
-  // constructs, are allowed in a generate block" once port declarations,
-  // specify blocks and specparam declarations are excluded, so a function may
-  // be declared among these items. §13.4.3 has a constant function call
-  // "evaluated at elaboration time", and the folder answers such a call from
-  // the table a ConstFuncRegistryGuard installs. RecordTaskFuncNames in
-  // src/elaborator/elaborator_items_udp.cpp fills the module's table by walking
-  // ModuleDecl::items and does not descend into a generate construct, so a
-  // function declared here is in no table until this site puts it in one.
-  //
-  // The table installed here is the one already registered, copied and added
-  // to. §23.9 has the search for a directly referenced identifier "continue
-  // upward until an item by that name is found or until a module, interface,
-  // program, or checker boundary is encountered", and a generate block is not
-  // one of those boundaries, so a call written in a nested block names a
-  // function of the block enclosing it and a call written in any block names a
-  // function of the module. A name these items declare overwrites the entry
-  // they inherited, which is §23.9's identifier "declared locally".
-  //
-  // A sibling block names none of them, because the guard puts back what it
-  // found when these items are done and each block's items are one call to this
-  // function.
-  //
-  // Nothing is installed when these items declare no function, which leaves the
-  // enclosing table registered and costs a body without functions no copy.
-  //
-  // ElaboratorData::task_names_, which RecordTaskFuncNames fills from the same
-  // walk and which is short of a task declared here for the same reason, is not
-  // given the same treatment. Elaborator::ValidateFunctionBody reads it to
-  // enforce §13.4's bar on a function enabling a task, which is a check on a
-  // name rather than a fold of a value, so it is left to whatever reaches it.
+  // §27.2 with §13.4.3 and §23.9: the constant-function table for these
+  // items, installed only when they declare a function; see
+  // CollectGenerateBlockFunctions.
   std::unordered_map<std::string_view, const ModuleItem*> gen_func_decls;
   std::optional<ConstFuncRegistryGuard> gen_func_guard;
-  bool declares_function = false;
-  for (const auto* item : items)
-    declares_function |= item->kind == ModuleItemKind::kFunctionDecl;
-  if (declares_function) {
-    if (const auto* outer = RegisteredConstFuncs()) gen_func_decls = *outer;
-    for (const auto* item : items)
-      if (item->kind == ModuleItemKind::kFunctionDecl)
-        gen_func_decls[item->name] = item;
+  if (CollectGenerateBlockFunctions(items, gen_func_decls)) {
     gen_func_guard.emplace(&gen_func_decls);
   }
   // §16.15: a generate block with a default disable iff of its own applies
