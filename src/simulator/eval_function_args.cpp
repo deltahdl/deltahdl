@@ -745,6 +745,30 @@ static void CopyUnionTagIn(const FunctionArg& param, const Expr* actual,
   ctx.SetVariableTag(param.name, tag);
 }
 
+// §11.9 (printed page 303): a tagged union expression names a member and
+// gives the value that tag, and (printed 304) its type is known from its
+// context -- for an actual, the formal it is bound to, whose declared type
+// names the union. §13.5.1 (printed 348) copies the value into the
+// subroutine's own variable, and §7.3.2 (printed 151) has that value carry the
+// tag beside the member's bits. RegisterValueArgStructType resolves the layout
+// and the tag from an identifier actual's storage, which a tagged expression
+// has none of, so `f(tagged Valid -7)` bound neither to the formal: `a.Valid`
+// inside the body was read through no member and `f(tagged Invalid)` raised
+// nothing. The layout is the one RegisterDesignTypeLayouts registers under
+// the typedef's name, bound as BindReturnStructLayout binds a return type's;
+// the tag is the member the expression names. False where the actual is no
+// tagged expression or the formal's type names no registered layout.
+static bool TryBindTaggedActual(const FunctionArg& param, const Expr* actual,
+                                SimContext& ctx) {
+  if (actual->kind != ExprKind::kTagged || actual->rhs == nullptr) return false;
+  std::string_view type_name = param.data_type.type_name;
+  if (type_name.empty() || ctx.FindStructType(type_name) == nullptr)
+    return false;
+  ctx.SetVariableStructType(param.name, type_name);
+  ctx.SetVariableTag(param.name, actual->rhs->text);
+  return true;
+}
+
 // §7.2.2/§13.5.1: make member access (arg.field) work on a by-value struct
 // copy. struct_types_ is keyed by variable name, so a named-type formal -- e.g.
 // `input s_t arg` -- cannot find its layout by the type name `s_t` (a type name
@@ -763,6 +787,7 @@ static void RegisterValueArgStructType(const FunctionArg& param,
                                        SimContext& ctx) {
   const Expr* actual =
       (arg_index >= 0) ? expr->args[static_cast<size_t>(arg_index)] : nullptr;
+  if (actual && TryBindTaggedActual(param, actual, ctx)) return;
   if (actual && actual->kind == ExprKind::kIdentifier) {
     const StructTypeInfo* sinfo = nullptr;
     {

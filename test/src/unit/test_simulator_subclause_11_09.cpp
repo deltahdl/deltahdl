@@ -549,4 +549,101 @@ TEST(TaggedUnionEval, ByValueFormalPrintsTheActualsTagAndValue) {
   EXPECT_EQ(out, "'{Valid:-7}\n");
 }
 
+// §11.9 (printed page 303): a tagged union expression names a member and
+// gives the value that tag, and (printed 304) its type is known from its
+// context -- here the formal it is the actual of. §13.5.1 (printed 348)
+// copies the actual's value into the subroutine's own variable, and §7.3.2
+// (printed 151) has that value carry the tag beside the member's bits. The
+// binding resolved the layout and the tag from an identifier actual's
+// storage alone, which a tagged expression has none of, so `f(tagged Valid
+// -7)` bound neither to the formal and `a.Valid` inside the body was read
+// through no member.
+TEST(TaggedUnionEval, TaggedExprActualBindsTheFormalsLayoutAndTag) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef union tagged { void Invalid; int Valid; } u_t;\n"
+      "  int x;\n"
+      "  function int f(u_t a);\n"
+      "    return a.Valid;\n"
+      "  endfunction\n"
+      "  initial x = f(tagged Valid -7);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  LowerAndRun(design, f);
+  auto* x = f.ctx.FindVariable("x");
+  ASSERT_NE(x, nullptr);
+  EXPECT_EQ(x->value.ToUint64(), 0xFFFFFFF9u);
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "run-time error: accessing member", 5, "11.9"));
+}
+
+// §11.9 (printed page 304): a member access inconsistent with the current
+// tag is a run-time error, and the formal's tag is the member the actual
+// names. With no tag bound from a tagged-expression actual, `a.Valid` of a
+// formal passed `tagged Invalid` raised nothing.
+TEST(TaggedUnionEval, TaggedExprActualOfVoidMemberIsCheckedInTheBody) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef union tagged { void Invalid; int Valid; } u_t;\n"
+      "  int y;\n"
+      "  function int f(u_t a);\n"
+      "    return a.Valid;\n"
+      "  endfunction\n"
+      "  initial y = f(tagged Invalid);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  LowerAndRun(design, f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "tagged union 'a' which currently has tag 'Invalid'", 5, "11.9"));
+}
+
+// §7.2 with §11.9: a member of the formal is the window the union's layout
+// gives it, so `a.Small` of an 8-bit member is 8 bits wide and the
+// self-determined concatenation `{a.Small, a.Small}` (§11.4.12) is 16 wide,
+// 16'hABAB; read through no layout the member resolved to nothing, and read
+// as the union's whole 32 bits the concatenation would be 64 wide and the
+// int take its low 32, 32'h000000AB. `a.Other` reads the wider member's
+// value through the same layout.
+TEST(TaggedUnionEval, TaggedExprActualNarrowMemberReadsItsOwnWindow) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef union tagged { void Invalid; bit [7:0] Small; int Other; }"
+      " u_t;\n"
+      "  int z;\n"
+      "  int w;\n"
+      "  function int g(u_t a);\n"
+      "    return {a.Small, a.Small};\n"
+      "  endfunction\n"
+      "  function int h(u_t a);\n"
+      "    return a.Other;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    z = g(tagged Small 8'hAB);\n"
+      "    w = h(tagged Other 32'h12345678);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  LowerAndRun(design, f);
+  auto* z = f.ctx.FindVariable("z");
+  ASSERT_NE(z, nullptr);
+  EXPECT_EQ(z->value.ToUint64(), 0xABABu);
+  auto* w = f.ctx.FindVariable("w");
+  ASSERT_NE(w, nullptr);
+  EXPECT_EQ(w->value.ToUint64(), 0x12345678u);
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "run-time error: accessing member", 6, "11.9"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "run-time error: accessing member", 9, "11.9"));
+}
+
 }  // namespace
