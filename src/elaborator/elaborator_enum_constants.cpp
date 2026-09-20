@@ -10,6 +10,7 @@
 
 #include <cstdint>
 #include <format>
+#include <functional>
 #include <string>
 #include <string_view>
 #include <unordered_set>
@@ -72,16 +73,17 @@ struct EnumMemberFolder {
   }
 };
 
-// The members of the enumeration `item` declares, or null when it declares
-// none. Syntax 6-5 makes the enum form a data_type, so it stands either as the
-// type a typedef names or as the type of a data declaration.
-const std::vector<EnumMember>* EnumMembersDeclaredBy(const ModuleItem* item) {
-  if (item->kind == ModuleItemKind::kTypedef &&
-      item->typedef_type.kind == DataTypeKind::kEnum)
-    return &item->typedef_type.enum_members;
-  if (item->data_type.kind == DataTypeKind::kEnum)
-    return &item->data_type.enum_members;
-  return nullptr;
+// The walk behind ForEachEnumTypeIn, carrying the path of member names from
+// the outer type down to `type`.
+void VisitEnumTypes(const DataType& type, const std::string& path,
+                    const EnumTypeVisitor& fn) {
+  if (type.kind == DataTypeKind::kEnum) fn(path, type);
+  for (const auto& sm : type.struct_members) {
+    if (sm.nested_type == nullptr) continue;
+    std::string member_path =
+        path.empty() ? std::string(sm.name) : path + "." + std::string(sm.name);
+    VisitEnumTypes(*sm.nested_type, member_path, fn);
+  }
 }
 
 // The names `pkg` declares ahead of `until`: its parameters and the members
@@ -94,14 +96,24 @@ std::unordered_set<std::string_view> NamesDeclaredBefore(
   for (const auto* item : pkg->items) {
     if (item == until) break;
     if (item->kind == ModuleItemKind::kParamDecl) names.insert(item->name);
-    const auto* members = EnumMembersDeclaredBy(item);
-    if (members == nullptr) continue;
-    for (const auto& m : *members) names.insert(m.name);
+    ForEachEnumTypeOfItem(item, [&](std::string_view, const DataType& type) {
+      for (const auto& m : type.enum_members) names.insert(m.name);
+    });
   }
   return names;
 }
 
 }  // namespace
+
+void ForEachEnumTypeIn(const DataType& type, const EnumTypeVisitor& fn) {
+  VisitEnumTypes(type, "", fn);
+}
+
+void ForEachEnumTypeOfItem(const ModuleItem* item, const EnumTypeVisitor& fn) {
+  ForEachEnumTypeIn(item->kind == ModuleItemKind::kTypedef ? item->typedef_type
+                                                           : item->data_type,
+                    fn);
+}
 
 std::vector<RtlirEnumMember> FoldEnumMembers(
     const std::vector<EnumMember>& decl_members, const ScopeMap& scope,
@@ -120,11 +132,14 @@ std::vector<RtlirEnumMember> FoldEnumMembers(
 std::vector<RtlirEnumMember> BindEnumConstantsOfItem(const ModuleItem* item,
                                                      ScopeMap& scope,
                                                      Arena& arena) {
-  const auto* members = EnumMembersDeclaredBy(item);
-  if (members == nullptr) return {};
-  auto folded = FoldEnumMembers(*members, scope, arena);
-  for (const auto& m : folded) scope[m.name] = m.value;
-  return folded;
+  std::vector<RtlirEnumMember> bound;
+  ForEachEnumTypeOfItem(item, [&](std::string_view, const DataType& type) {
+    for (const auto& m : FoldEnumMembers(type.enum_members, scope, arena)) {
+      scope[m.name] = m.value;
+      bound.push_back(m);
+    }
+  });
+  return bound;
 }
 
 void BindPackageImportConstants(const PackageDecl* pkg, const ModuleItem* imp,

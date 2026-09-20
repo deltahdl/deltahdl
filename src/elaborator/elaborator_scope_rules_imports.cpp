@@ -9,12 +9,14 @@
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_enum_constants.h"
 #include "elaborator/elaborator_scope_rules_names.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
+#include "parser/ast_type.h"
 
 namespace delta {
 
@@ -412,13 +414,15 @@ void HandleImportRuleItem(ImportRuleCtx& ctx, const ModuleItem* item) {
       // enclosing scope, so those names participate in import-collision
       // detection just like the enum type name. Register members from both a
       // typedef enum and a bare enum data declaration, mirroring how a
-      // package's enum members are treated as wildcard-import candidates.
-      for (const auto& em : item->typedef_type.enum_members) {
-        TrackImportRuleDecl(ctx, em.name, item->loc);
-      }
-      for (const auto& em : item->data_type.enum_members) {
-        TrackImportRuleDecl(ctx, em.name, item->loc);
-      }
+      // package's enum members are treated as wildcard-import candidates, and
+      // from an enumeration written as the type of a structure or union member
+      // of either (§7.2), which §23.9 makes no scope of its own.
+      auto track_literals = [&](std::string_view, const DataType& type) {
+        for (const auto& em : type.enum_members)
+          TrackImportRuleDecl(ctx, em.name, item->loc);
+      };
+      ForEachEnumTypeIn(item->typedef_type, track_literals);
+      ForEachEnumTypeIn(item->data_type, track_literals);
       if (item->init_expr) {
         std::vector<const Expr*> refs;
         WalkExprIdents(item->init_expr, refs);

@@ -1,7 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
+#include "helpers_rtlir_lookup.h"
 
 using namespace delta;
 
@@ -320,6 +323,81 @@ TEST(EnumerationElaboration, EnumLocalparamInitializer_Ok) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// §6.19 (printed page 119) has an enumerated type declare its literals as
+// named constants, and printed 120 makes two enumerations naming one literal
+// illegal in one scope, so the literals stand in the scope holding the enum;
+// §7.2's Syntax 7-1 (printed 146) gives a structure member any data_type, the
+// enum form among them, and §23.9's list of the elements that define a scope
+// (printed 761) names no structure, so IDLE and BUSY are constants of p, read
+// through §26.3's package scope resolution operator into a localparam. K folds
+// to 1 * 10 + 0 = 10; a package that recorded neither constant left K
+// unresolved, the "p.BUSY" fold of RegisterPackageParams reading the members
+// of an enumeration written at the top of a typedef alone.
+TEST(EnumerationElaboration,
+     StructMemberEnumLiteralOfAPackageFoldsIntoALocalparam) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "package p;\n"
+      "  typedef struct { enum {IDLE, BUSY} st; int n; } s_t;\n"
+      "endpackage\n"
+      "module top;\n"
+      "  localparam int K = p::BUSY * 10 + p::IDLE;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* param = FindParam(design, "top", "K");
+  ASSERT_NE(param, nullptr);
+  EXPECT_TRUE(param->is_resolved);
+  EXPECT_EQ(param->resolved_value, 10);
+}
+
+// The same clauses for a module's own typedef: the member's enumeration
+// declares A and B in the module, and each enumeration numbers its literals
+// from 0 on its own (printed 120), so the second member's C is 0 again and
+// D 1, not a continuation of the first. K folds to 1 * 100 + 0 * 10 + 1 =
+// 101; before, ElaborateTypedef declared the constants of a typedef naming
+// the enum form alone, and `B` was reported an unresolved identifier.
+TEST(EnumerationElaboration,
+     StructMemberEnumLiteralOfAModuleFoldsIntoALocalparam) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  typedef struct { enum {A, B} e; enum {C, D} g; int n; } t;\n"
+      "  localparam int K = B * 100 + C * 10 + D;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* param = FindParam(design, "top", "K");
+  ASSERT_NE(param, nullptr);
+  EXPECT_TRUE(param->is_resolved);
+  EXPECT_EQ(param->resolved_value, 101);
+}
+
+// §7.2 (printed 146) gives struct_union_member to a union as to a structure,
+// and a member's value may be written (printed 120): a union member's
+// enumeration with `HI = 5` declares LO as 4 in the module, so K folds to
+// 5 * 10 + 4 = 54, and a data declaration of the union type declares the
+// constants a second time no more than `light1, light2` does. An enumeration
+// written on a union's member declared nothing before.
+TEST(EnumerationElaboration, UnionMemberEnumLiteralFoldsIntoALocalparam) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  typedef union { enum {LO = 4, HI} tag; int n; } u_t;\n"
+      "  u_t u;\n"
+      "  localparam int K = HI * 10 + LO;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* param = FindParam(design, "top", "K");
+  ASSERT_NE(param, nullptr);
+  EXPECT_TRUE(param->is_resolved);
+  EXPECT_EQ(param->resolved_value, 54);
 }
 
 }  // namespace

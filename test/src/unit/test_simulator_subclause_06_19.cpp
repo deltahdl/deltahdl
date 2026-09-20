@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_simulator.h"
+#include "helpers_scheduler.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 
@@ -89,6 +90,44 @@ TEST(EnumerationSimulation, SharedEnumDeclaresItsConstantsOnce) {
       f, "observed");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
+// §6.19 (printed page 119) has an enumerated type declare its literals as
+// named constants of the scope holding the enum, §7.2's Syntax 7-1 (printed
+// 146) gives a structure member any data_type, the enum form among them, and
+// §23.9's list of scope-defining elements (printed 761) names no structure,
+// so IDLE and BUSY are constants of p, read at run time through §26.3's
+// package scope resolution operator and by their bare names through the
+// wildcard import: 1 * 100 + 1 * 10 + 0 = 110. Before, the package's
+// run-time "p.BUSY" constant and the import's backing variable were each
+// created for an enumeration written at the top of a typedef alone, and
+// `p::BUSY` read 0.
+TEST(EnumerationSimulation, StructMemberEnumLiteralOfAPackageReadsAtRuntime) {
+  EXPECT_EQ(
+      RunAndGet("package p;\n"
+                "  typedef struct { enum {IDLE, BUSY} st; int n; } s_t;\n"
+                "endpackage\n"
+                "module top;\n"
+                "  import p::*;\n"
+                "  int observed;\n"
+                "  initial observed = p::BUSY * 100 + BUSY * 10 + p::IDLE;\n"
+                "endmodule\n",
+                "observed"),
+      110u);
+}
+
+// The same for a module's own typedef: the member's enumeration declares A
+// and B in the module, numbered from 0 (printed 120), so B * 10 + A is 10.
+// Before, `B` was reported an unresolved identifier, the module declaring the
+// constants of a typedef naming the enum form alone.
+TEST(EnumerationSimulation, StructMemberEnumLiteralOfAModuleReadsAtRuntime) {
+  EXPECT_EQ(RunAndGet("module top;\n"
+                      "  typedef struct { enum {A, B} e; int n; } t;\n"
+                      "  int observed;\n"
+                      "  initial observed = B * 10 + A;\n"
+                      "endmodule\n",
+                      "observed"),
+            10u);
 }
 
 }  // namespace

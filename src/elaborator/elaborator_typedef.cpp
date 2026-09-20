@@ -7,6 +7,7 @@
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "common/arena.h"
@@ -195,6 +196,32 @@ std::vector<RtlirEnumMember> BuildEnumMembers(
   return members;
 }
 
+// The key mod->enum_types holds an enumeration under: the name of the typedef
+// or variable declaring it, or, for an enumeration written as the type of a
+// structure or union member of that declaration (ForEachEnumTypeIn's
+// `member_path`), that name and the member's path joined with '.', which no
+// typedef or variable is named. A variable's enum_type_name reaches the first
+// form alone, so a variable of the structure's type is never taken for one of
+// the member's enumeration.
+std::string_view EnumTypeKey(std::string_view decl_name,
+                             std::string_view member_path, Arena& arena) {
+  if (member_path.empty()) return decl_name;
+  auto* key = arena.Create<std::string>(std::string(decl_name) + "." +
+                                        std::string(member_path));
+  return *key;
+}
+
+// Declares the constants of the one enumeration `type` under `key`, and binds
+// them in `scope` -- the map `ctx` folds against -- for an enumeration written
+// after it in the same declaration, whose value §6.19 lets name an earlier
+// enumeration's constant.
+void DeclareEnumType(const DataType& type, std::string_view key, uint32_t width,
+                     ScopeMap& scope, const EnumMemberDeclCtx& ctx) {
+  auto members = BuildEnumMembers(type.enum_members, width, ctx);
+  for (const auto& m : members) scope[m.name] = m.value;
+  ctx.mod->enum_types[key] = std::move(members);
+}
+
 }  // namespace
 
 // The shape rules a typedef's data type answers to wherever it is written: the
@@ -342,13 +369,18 @@ void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
   }
   ScopeMap scope = BuildParamScope(mod);
   ValidateTypedefShape(item->typedef_type, item->loc, &scope);
-  if (item->typedef_type.kind != DataTypeKind::kEnum) return;
-  ValidateEnumDecl(item->typedef_type, item->loc,
-                   /*declares_its_constants=*/true);
-  auto width = EvalTypeWidth(item->typedef_type, typedefs_);
-  mod->enum_types[item->name] =
-      BuildEnumMembers(item->typedef_type.enum_members, width,
-                       {scope, arena_, mod, enum_member_names_});
+  // §6.19 declares the constants in the scope holding the enumeration, whether
+  // the typedef names the enumeration itself or a structure or union with an
+  // enumeration written as a member's type (§7.2), which §23.9 makes no scope
+  // of its own; ForEachEnumTypeIn reaches both. Each is checked as an
+  // enumeration of the module and numbered on its own.
+  ForEachEnumTypeIn(
+      item->typedef_type, [&](std::string_view path, const DataType& type) {
+        ValidateEnumDecl(type, item->loc, /*declares_its_constants=*/true);
+        DeclareEnumType(type, EnumTypeKey(item->name, path, arena_),
+                        EvalTypeWidth(type, typedefs_), scope,
+                        {scope, arena_, mod, enum_member_names_});
+      });
 }
 
 // §6.19: "An enumerated type declares a set of integral named constants", and
@@ -361,15 +393,28 @@ void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
 // members), and each arrives here as its own item carrying its own copy of the
 // members. Emitting from the first declarator alone is what keeps one set of
 // constants from being declared once per name in the list.
+//
+// A structure or union written as the declaration's type declares the
+// constants of an enumeration written as a member's type the same way (§7.2,
+// §23.9), `struct { enum {A, B} e; } s;` declaring A and B; ForEachEnumTypeIn
+// reaches each. The enumeration written as the type itself is checked by
+// ValidateVarDeclTypes ahead of this, so only a member's is checked here.
 void Elaborator::EmitBareEnumMembers(const ModuleItem* item, RtlirModule* mod) {
-  if (item->data_type.kind != DataTypeKind::kEnum) return;
+  DataTypeKind kind = item->data_type.kind;
+  if (kind != DataTypeKind::kEnum && kind != DataTypeKind::kStruct &&
+      kind != DataTypeKind::kUnion)
+    return;
   if (!item->first_in_decl_list) return;
-  const auto& members = item->data_type.enum_members;
-  if (members.empty()) return;
-  auto width = EvalTypeWidth(item->data_type, typedefs_);
   ScopeMap scope = BuildParamScope(mod);
-  mod->enum_types[item->name] = BuildEnumMembers(
-      members, width, {scope, arena_, mod, enum_member_names_});
+  ForEachEnumTypeIn(
+      item->data_type, [&](std::string_view path, const DataType& type) {
+        if (type.enum_members.empty()) return;
+        if (!path.empty())
+          ValidateEnumDecl(type, item->loc, /*declares_its_constants=*/true);
+        DeclareEnumType(type, EnumTypeKey(item->name, path, arena_),
+                        EvalTypeWidth(type, typedefs_), scope,
+                        {scope, arena_, mod, enum_member_names_});
+      });
 }
 
 // §6.6.7: the data type of a user-defined nettype shall be a 4-state or 2-state
@@ -669,9 +714,10 @@ const PackageDecl* FindUnitPackage(const CompilationUnit* unit,
   return nullptr;
 }
 
-// Emits enum-literal backing variables for every enum typedef among `items`,
-// a package's or the compilation unit's, that the module does not already
-// define, leaving out the members `explicitly_imported` names (§26.5).
+// Emits enum-literal backing variables for every enumeration a typedef among
+// `items`, a package's or the compilation unit's, writes and the module does
+// not already define, leaving out the members `explicitly_imported` names
+// (§26.5).
 void EmitEnumLiteralsOfItems(
     const std::vector<ModuleItem*>& items, RtlirModule* mod,
     const ImportedEnumCtx& ctx,
@@ -682,13 +728,20 @@ void EmitEnumLiteralsOfItems(
   ScopeMap no_scope;
   for (auto* pi : items) {
     if (pi->kind != ModuleItemKind::kTypedef) continue;
-    if (pi->typedef_type.kind != DataTypeKind::kEnum) continue;
-    if (mod->enum_types.count(pi->name) != 0) continue;
-    uint32_t width = EvalTypeWidth(pi->typedef_type, ctx.typedefs);
-    mod->enum_types[pi->name] =
-        BuildEnumMembers(pi->typedef_type.enum_members, width,
-                         {no_scope, ctx.arena, mod, ctx.enum_member_names,
-                          &explicitly_imported});
+    // §6.19 with §7.2 and §23.9: an enumeration written as the type of a
+    // member of a structure or union the typedef names declares its literals
+    // in the package as one written at the top does, and the wildcard import
+    // brings each in; ForEachEnumTypeIn reaches both.
+    ForEachEnumTypeIn(
+        pi->typedef_type, [&](std::string_view path, const DataType& type) {
+          std::string_view key = EnumTypeKey(pi->name, path, ctx.arena);
+          if (mod->enum_types.count(key) != 0) return;
+          uint32_t width = EvalTypeWidth(type, ctx.typedefs);
+          mod->enum_types[key] =
+              BuildEnumMembers(type.enum_members, width,
+                               {no_scope, ctx.arena, mod, ctx.enum_member_names,
+                                &explicitly_imported});
+        });
   }
 }
 

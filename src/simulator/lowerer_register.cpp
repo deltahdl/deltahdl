@@ -364,20 +364,22 @@ static void RegisterPackageItemEnumConstants(const ModuleItem* item,
     return;
   }
   // Syntax 6-5 lets the enumeration stand as the type a typedef names or as
-  // the type of a data declaration, and the constants are the same.
-  auto members = BindEnumConstantsOfItem(item, values, arena);
-  if (members.empty()) return;
-  const DataType& type = item->kind == ModuleItemKind::kTypedef
-                             ? item->typedef_type
-                             : item->data_type;
-  uint32_t width = EvalTypeWidth(type, {});
-  if (width == 0) width = 32;
-  for (const auto& m : members) {
-    auto* qname = arena.Create<std::string>(std::string(pkg_name) + "." +
-                                            std::string(m.name));
-    auto* var = ctx.CreateVariable(*qname, width);
-    var->value = MakeLogic4VecVal(arena, width, static_cast<uint64_t>(m.value));
-  }
+  // the type of a data declaration, and §7.2 as the type of a member of a
+  // structure or union either writes, which §23.9 makes no scope of its own;
+  // the constants are the package's in each case, and each enumeration is
+  // numbered on its own at the width of its own base type.
+  ForEachEnumTypeOfItem(item, [&](std::string_view, const DataType& type) {
+    uint32_t width = EvalTypeWidth(type, {});
+    if (width == 0) width = 32;
+    for (const auto& m : FoldEnumMembers(type.enum_members, values, arena)) {
+      values[m.name] = m.value;
+      auto* qname = arena.Create<std::string>(std::string(pkg_name) + "." +
+                                              std::string(m.name));
+      auto* var = ctx.CreateVariable(*qname, width);
+      var->value =
+          MakeLogic4VecVal(arena, width, static_cast<uint64_t>(m.value));
+    }
+  });
 }
 
 void RegisterPackageEnumConstants(const RtlirDesign* design, SimContext& ctx,
