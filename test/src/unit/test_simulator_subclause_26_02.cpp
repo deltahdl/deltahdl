@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <string>
+
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 
@@ -231,6 +234,55 @@ TEST(PackageDeclarationSim,
   ASSERT_NE(design, nullptr);
   ASSERT_FALSE(f.has_errors);
   LowerRunAndCheck(f, design, {{"r", 50u}, {"k", 17u}});
+}
+
+// A design whose package p declares `int g = 5;` and then the class C of
+// `class_body`, and whose top declares its own `int g = 7;`, constructs a
+// `p::C` and reads `read * 10 + g` into y; answers y, in which the tens
+// digit is what the class read and the units the top's own g.
+static uint64_t PackageClassReadBesideTheTopsG(const std::string& class_body,
+                                               const std::string& read) {
+  return RunAndGet(
+      "package p;\n"
+      "  int g = 5;\n"
+      "  class C;\n" +
+          class_body +
+          "  endclass\n"
+          "endpackage\n"
+          "module top;\n"
+          "  int g = 7;\n"
+          "  int y;\n"
+          "  initial begin\n"
+          "    p::C c = new;\n"
+          "    y = " +
+          read +
+          " * 10 + g;\n"
+          "  end\n"
+          "endmodule\n",
+      "y");
+}
+
+// §26.2 (printed page 808) with §8.9 (printed 186): the package class's
+// `static int s = g;` is an expression of the package's scope, whose g is 5,
+// initialized once, so `p::C::s * 10 + g` in a top declaring its own `int g
+// = 7` is 57. Passes since a544a27b7, which lowers a class inside a frame of
+// its declaring scope; the initializer was evaluated in no frame before,
+// resolving g through no key: s read 0 and y 7.
+TEST(PackageDeclarationSim,
+     PackageClassStaticInitializerReadsPackageVariableBesideModulesOwn) {
+  EXPECT_EQ(
+      PackageClassReadBesideTheTopsG("    static int s = g;\n", "p::C::s"),
+      57u);
+}
+
+// §26.2 (printed page 808) with §8.7 (printed 184) and §23.9 (printed 761):
+// the package class's `int v = g;` default is read in the class's declaring
+// scope as the object is constructed, never in the constructing module's,
+// so `c.v * 10 + g` beside the top's own g is 57; a default resolving g
+// through the top's instance read 7: 77.
+TEST(PackageDeclarationSim,
+     PackageClassPropertyInitializerReadsPackageVariableBesideModulesOwn) {
+  EXPECT_EQ(PackageClassReadBesideTheTopsG("    int v = g;\n", "c.v"), 57u);
 }
 
 }  // namespace
