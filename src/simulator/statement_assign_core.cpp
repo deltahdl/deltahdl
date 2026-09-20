@@ -16,6 +16,7 @@
 #include "simulator/class_object.h"
 #include "simulator/eval_array.h"
 #include "simulator/eval_class_array.h"
+#include "simulator/eval_class_array_handles.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/eval_semaphore.h"
 #include "simulator/eval_string.h"
@@ -797,12 +798,14 @@ void ApplyCompoundAssignOp(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   }
 }
 
-// §7.5.1/§7.10: an assignment that sizes or rebuilds an array object rather
-// than writing a value: `new[]` to a dynamic array property, or any
-// assignment to a queue.
+// §7.5.1/§7.10/§8.4: an assignment that sizes or rebuilds an array object,
+// or constructs an object into an element, rather than writing a value:
+// `new[]` to a dynamic array property, `new` to an element of an array
+// property of class handles, or any assignment to a queue.
 static bool TryArrayObjectAssign(const Stmt* stmt, SimContext& ctx,
                                  Arena& arena) {
   return TryClassArrayNewAssign(stmt, ctx, arena) ||
+         TryClassArrayElementNewAssign(stmt, ctx, arena) ||
          TryQueueBlockingAssign(stmt, ctx, arena);
 }
 

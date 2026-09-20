@@ -792,4 +792,102 @@ TEST(ObjectPropertySim, QueuePropertyElementWrittenByIndex) {
             98u);
 }
 
+// §7.4.2 makes an unpacked array of any data type and §8.5 puts no restriction
+// on a property's type, so `Node kids[2]` holds two handles (§8.4); `kids[0] =
+// new(20)` in the constructor constructs a Node into the element, and
+// `tr.kids[1].v` from the module reads through the handle it holds.
+TEST(ObjectPropertySim,
+     HandleArrayPropertyElementConstructedAndReadFromModule) {
+  EXPECT_EQ(RunAndGet("class Node;\n"
+                      "  int v;\n"
+                      "  function new(int x);\n"
+                      "    v = x;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "class Tree;\n"
+                      "  Node kids[2];\n"
+                      "  function new();\n"
+                      "    kids[0] = new(20);\n"
+                      "    kids[1] = new(21);\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int out;\n"
+                      "  initial begin\n"
+                      "    Tree tr = new;\n"
+                      "    out = tr.kids[1].v * 100 + tr.kids[0].v;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "out"),
+            2120u);
+}
+
+// §8.11: the bare `kids[0].v` in a method of the class reads the property of
+// the object the element of the running method's own array property holds.
+TEST(ObjectPropertySim, HandleArrayPropertyElementMemberReadInAMethod) {
+  EXPECT_EQ(RunAndGet("class Node;\n"
+                      "  int v;\n"
+                      "  function new(int x);\n"
+                      "    v = x;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "class Tree;\n"
+                      "  Node kids[2];\n"
+                      "  function new();\n"
+                      "    kids[0] = new(7);\n"
+                      "    kids[1] = new(9);\n"
+                      "  endfunction\n"
+                      "  function int first();\n"
+                      "    return kids[0].v;\n"
+                      "  endfunction\n"
+                      "  function int second();\n"
+                      "    return kids[1].v;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int out;\n"
+                      "  initial begin\n"
+                      "    Tree tr = new;\n"
+                      "    out = tr.first() * 10 + tr.second();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "out"),
+            79u);
+}
+
+// §8.4: an element the constructor never wrote is the null handle, so a for
+// loop over the indices counting `kids[i] != null` counts the constructed
+// elements alone -- two of three, where a count of every element gives 3 and
+// elements holding no object give 0.
+TEST(ObjectPropertySim, HandleArrayPropertyNonNullElementsCountedInAMethod) {
+  EXPECT_EQ(RunAndGet("class Node;\n"
+                      "  int v;\n"
+                      "  function new(int x);\n"
+                      "    v = x;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "class Tree;\n"
+                      "  Node kids[3];\n"
+                      "  function new();\n"
+                      "    kids[0] = new(1);\n"
+                      "    kids[2] = new(3);\n"
+                      "  endfunction\n"
+                      "  function int count();\n"
+                      "    int n = 0;\n"
+                      "    for (int i = 0; i < 3; i++)\n"
+                      "      if (kids[i] != null) n++;\n"
+                      "    return n;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int out;\n"
+                      "  initial begin\n"
+                      "    Tree tr = new;\n"
+                      "    out = tr.count();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "out"),
+            2u);
+}
+
 }  // namespace

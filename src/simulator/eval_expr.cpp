@@ -16,8 +16,8 @@
 #include "simulator/class_object.h"
 #include "simulator/clocking.h"
 #include "simulator/eval_array.h"
-#include "simulator/eval_array_class_queue.h"
 #include "simulator/eval_call_result.h"
+#include "simulator/eval_class_array_handles.h"
 #include "simulator/eval_expr_internal.h"
 #include "simulator/eval_string.h"
 #include "simulator/evaluation.h"
@@ -697,12 +697,12 @@ Logic4Vec EvalMemberAccess(const Expr* expr, SimContext& ctx, Arena& arena) {
 
   if (TryVirtualInterfaceMember(expr, ctx, arena, out)) return out;
 
-  // §7.8.7: `b[2].x` reads a member of an associative array element, and
-  // §7.10/§8.4 `q[1].v` a property of the object a queue element refers to;
-  // the name built below reaches neither, the select contributing nothing.
+  // §7.8.7: `b[2].x` reads a member of an associative array element, and §8.4
+  // `q[1].v` or `a[1].v` a property of the object an element of a queue or of
+  // an array property (§7.4.2) refers to; the name built below reaches none.
   // §8.6: nor `n.self().v`, a property of the object a method call returned.
   if (TryEvalAssocMemberField(expr, ctx, arena, out) ||
-      TryEvalQueueElementMember(expr, ctx, arena, out) ||
+      TryEvalElementObjectMember(expr, ctx, arena, out) ||
       TryEvalCallResultMember(expr, ctx, arena, out))
     return out;
 
