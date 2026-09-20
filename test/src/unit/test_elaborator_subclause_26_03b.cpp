@@ -373,4 +373,90 @@ TEST(PackageImport, CompilationUnitExplicitImportResolvesItsNameAlone) {
                             "23.9"));
 }
 
+// §26.3 has an import make a package's declarations visible in the scope it is
+// written in, and §3.12.1 makes the compilation-unit scope the outermost one a
+// module's names resolve through, so a package class made visible by a
+// wildcard import written outside every module is a class type in a following
+// module: `B h;` declares a class variable, and §8.13 lets `h = d` assign a
+// subclass handle to it. RegisterImportItem in
+// src/elaborator/elaborator_import.cpp entered a package's typedefs and
+// parameters into the module's scopes and passed over its classes, so
+// ValidateVarDeclTypes never took `h` for a class variable and the assignment
+// was reported under §8.4 as a handle assigned to a non-class variable.
+TEST(PackageImport, CuScopeWildcardImportedPackageClassIsAClassType) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package pk;\n"
+      "  class B; int b = 3; endclass\n"
+      "endpackage\n"
+      "import pk::*;\n"
+      "class D extends B; endclass\n"
+      "module t;\n"
+      "  B h; D d = new;\n"
+      "  initial h = d;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(ReportedError(
+      f.diag.Diagnostics(),
+      "cannot assign class object handle to a non-class variable", 8, "8.4"));
+}
+
+// The same through a header import (§26.4) and an explicit import naming the
+// class, the two other positions RegisterImportItem serves.
+TEST(PackageImport, HeaderWildcardImportedPackageClassIsAClassType) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package pk;\n"
+      "  class B; int b = 3; endclass\n"
+      "endpackage\n"
+      "module t import pk::*; ();\n"
+      "  class D extends B; endclass\n"
+      "  B h; D d = new;\n"
+      "  initial h = d;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(ReportedError(
+      f.diag.Diagnostics(),
+      "cannot assign class object handle to a non-class variable", 7, "8.4"));
+}
+
+TEST(PackageImport, ExplicitlyImportedPackageClassIsAClassType) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package pk;\n"
+      "  class B; int b = 3; endclass\n"
+      "endpackage\n"
+      "module t;\n"
+      "  import pk::B;\n"
+      "  class D extends B; endclass\n"
+      "  B h; D d = new;\n"
+      "  initial h = d;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(ReportedError(
+      f.diag.Diagnostics(),
+      "cannot assign class object handle to a non-class variable", 8, "8.4"));
+}
+
+// A class the explicit import does not name stays out of the module's class
+// types, so the report the fix silences is still made for it.
+TEST(PackageImport, AClassTheImportDoesNotNameIsNoClassType) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package pk;\n"
+      "  class B; int b = 3; endclass\n"
+      "  class other_t; endclass\n"
+      "endpackage\n"
+      "module t;\n"
+      "  import pk::other_t;\n"
+      "  class D; endclass\n"
+      "  B h; D d = new;\n"
+      "  initial h = d;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "cannot assign class object handle to a non-class variable", 9, "8.4"));
+}
+
 }  // namespace

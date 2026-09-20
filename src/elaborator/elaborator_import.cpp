@@ -7,6 +7,7 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
+#include "parser/ast_class.h"
 #include "parser/ast_design.h"
 #include "parser/ast_module.h"
 
@@ -15,21 +16,32 @@ namespace {
 
 // §26.4: the scopes an import registers a package item into. The typedef table
 // and the set naming which of its entries stand for an unpacked aggregate are
-// filled by the same declaration and travel together, and the parameter scope
-// is the other half of what one import writes.
+// filled by the same declaration and travel together, the parameter scope is
+// another part of what one import writes, and the class-name sets are the
+// last: a package class the import makes visible is a class type in the
+// importing scope (§26.3), which is what makes `B h;` declare a handle and
+// lets `h = d` take a subclass handle (§8.13).
 struct ImportScope {
   TypedefMap& typedefs;
   std::unordered_set<std::string_view>& aggregate_typedefs;
   ScopeMap& cu_param_scope;
+  std::unordered_set<std::string_view>& class_names;
+  std::unordered_set<std::string_view>& parameterized_classes;
 };
 
 // Register a single imported package item into a module's elaboration scopes:
-// typedefs become available by name, and const parameters are entered into the
-// compilation-unit parameter scope. Shared by the wildcard and named-import
-// branches of ApplyImport.
+// typedefs become available by name, const parameters are entered into the
+// compilation-unit parameter scope, and classes into the class-name sets as
+// RecordClassDecl enters a module's own (§8.25 for the parameterized ones).
+// Shared by the wildcard and named-import branches of ApplyImport.
 void RegisterImportItem(const ModuleItem* pi, std::string_view pkg_name,
                         std::string_view name, ImportScope scope) {
-  if (pi->kind == ModuleItemKind::kTypedef) {
+  if (pi->kind == ModuleItemKind::kClassDecl && pi->class_decl) {
+    scope.class_names.insert(name);
+    if (!pi->class_decl->params.empty()) {
+      scope.parameterized_classes.insert(name);
+    }
+  } else if (pi->kind == ModuleItemKind::kTypedef) {
     scope.typedefs[name] = pi->typedef_type;
     // §6.18: an import is what gives a package's typedef its bare name in this
     // scope, and the name stands for whatever the package declared -- an
@@ -108,7 +120,8 @@ void Elaborator::ApplyCompilationUnitImports(RtlirModule* mod) {
     if (item->kind != ModuleItemKind::kImportDecl) continue;
     const ImportItem& imp = item->import_item;
     ApplyImport(imp, unit_,
-                {typedefs_, aggregate_typedef_names_, cu_param_scope_});
+                {typedefs_, aggregate_typedef_names_, cu_param_scope_,
+                 class_names_, parameterized_class_names_});
     mod->imports.push_back(
         RtlirImport{imp.package_name, imp.item_name, imp.is_wildcard});
   }
@@ -123,7 +136,8 @@ void Elaborator::ApplyHeaderImports(const ModuleDecl* decl) {
     if (item->kind != ModuleItemKind::kImportDecl) continue;
     if (!item->import_item.is_header) continue;
     ApplyImport(item->import_item, unit_,
-                {typedefs_, aggregate_typedef_names_, cu_param_scope_});
+                {typedefs_, aggregate_typedef_names_, cu_param_scope_,
+                 class_names_, parameterized_class_names_});
   }
 }
 
@@ -141,7 +155,8 @@ void Elaborator::ApplyHeaderImports(const ModuleDecl* decl) {
 void Elaborator::ApplyBodyImport(const ImportItem& import_item) {
   if (import_item.is_header) return;
   ApplyImport(import_item, unit_,
-              {typedefs_, aggregate_typedef_names_, cu_param_scope_});
+              {typedefs_, aggregate_typedef_names_, cu_param_scope_,
+               class_names_, parameterized_class_names_});
 }
 
 }  // namespace delta

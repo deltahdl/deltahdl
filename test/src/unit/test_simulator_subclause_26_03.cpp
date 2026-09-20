@@ -558,4 +558,31 @@ TEST(PackageScopeReferenceSim,
             2712u);
 }
 
+// §26.3 and §3.12.1: a package class made visible by a wildcard import written
+// at compilation-unit scope is a class type in the following class declaration
+// and module, so `B h` holds a handle, `h = d` assigns a subclass handle to it
+// (§8.13), and `h.who()` dispatches to D's override (§8.20) -- 2 * 10 + 3.
+TEST(PackageImportSim, CuScopeWildcardImportedClassAsBaseHandleType) {
+  auto val = RunAndGet(
+      "package pk;\n"
+      "  class B; int b = 3;\n"
+      "    virtual function int who(); return 1; endfunction\n"
+      "  endclass\n"
+      "endpackage\n"
+      "import pk::*;\n"
+      "class D extends B;\n"
+      "  virtual function int who(); return 2; endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  int r;\n"
+      "  B h; D d = new;\n"
+      "  initial begin\n"
+      "    h = d;\n"
+      "    r = h.who() * 10 + d.b;\n"
+      "  end\n"
+      "endmodule\n",
+      "r");
+  EXPECT_EQ(val, 23u);
+}
+
 }  // namespace
