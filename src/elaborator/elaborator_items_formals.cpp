@@ -51,6 +51,19 @@ void ResolveFormalAggregateTypes(ModuleItem* item, const TypedefMap& typedefs,
 // ElaborateItems calls it after the item loop, beside the class pass, and
 // ResolveScopeSubroutineFormalTypes takes a package's and the unit's
 // subroutines through it.
+//
+// §27.3 (printed page 818) has a generate block's items act as a module's own
+// would, the enclosing scope's declarations reached directly, and §27.5
+// (printed 824) makes each block a scope of its own, so a subroutine written
+// in a block between the module's forward typedef and its definition names
+// pair_t as a module subroutine does. Elaborator::ElaborateBehavioralItem
+// queues the block for Elaborator::ProcessPendingGenerate with the table as
+// it stood at the construct, the placeholder and no definition, and resolved
+// the block's subroutine once against that copy, so `g.f(tagged A '{3, 4})`
+// read 0 while the module's own `f` read 34 -- 84eea0a11's remainder. The
+// walk now descends into a conditional generate's body and each of its else
+// arms, a case generate's arms and a loop generate's body, before the pending
+// pass runs, and the pending pass then finds each member resolved.
 void ResolveModuleSubroutineFormalTypes(const std::vector<ModuleItem*>& items,
                                         const TypedefMap& typedefs,
                                         Arena& arena) {
@@ -58,6 +71,14 @@ void ResolveModuleSubroutineFormalTypes(const std::vector<ModuleItem*>& items,
     if (item->kind == ModuleItemKind::kFunctionDecl ||
         item->kind == ModuleItemKind::kTaskDecl) {
       ResolveFormalAggregateTypes(item, typedefs, arena);
+      continue;
+    }
+    ResolveModuleSubroutineFormalTypes(item->gen_body, typedefs, arena);
+    if (item->gen_else != nullptr) {
+      ResolveModuleSubroutineFormalTypes({item->gen_else}, typedefs, arena);
+    }
+    for (const auto& arm : item->gen_case_items) {
+      ResolveModuleSubroutineFormalTypes(arm.body, typedefs, arena);
     }
   }
 }

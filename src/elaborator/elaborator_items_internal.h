@@ -102,9 +102,11 @@ void ResolveModuleClassFormalTypes(const std::vector<ClassDecl*>& classes,
 
 // §6.18 with §13.3 and §23.9: the same again for every function and task
 // among `items`, a module's own, whose formal names a typedef the module
-// forward-declares above the subroutine and defines below it.
-// Elaborator::ElaborateItems calls it after the item loop beside the class
-// pass, with the module's items and its complete table.
+// forward-declares above the subroutine and defines below it, and (§27.3,
+// §27.5) for every one written in a generate block of the items, however
+// deeply the block nests, since the block's items reach the module's typedefs
+// directly. Elaborator::ElaborateItems calls it after the item loop beside
+// the class pass, with the module's items and its complete table.
 void ResolveModuleSubroutineFormalTypes(const std::vector<ModuleItem*>& items,
                                         const TypedefMap& typedefs,
                                         Arena& arena);
