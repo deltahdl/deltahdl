@@ -545,7 +545,7 @@ void SimContext::SetDpiRuntime(DpiRuntime* dpi) {
 }
 
 void SimContext::PushScope(std::string_view package) {
-  scope_stack_.push_back(Scope{{}, {}, {}, {}, package});
+  scope_stack_.push_back(Scope{{}, {}, {}, {}, package, {}});
 }
 
 // §26.2: a frame pushed without a package -- a class method's, pushed by the
@@ -608,8 +608,8 @@ void SimContext::PushStaticScope(std::string_view func_name,
   // §13.4.2's static frame carries the variables the function declared static;
   // the three maps beside them start empty, a queue or associative array of the
   // call being the call's own and a shape with it.
-  scope_stack_.push_back(
-      Scope{static_frames_[StaticFrameKey(func_name)], {}, {}, {}, package});
+  scope_stack_.push_back(Scope{
+      static_frames_[StaticFrameKey(func_name)], {}, {}, {}, package, {}});
 }
 
 void SimContext::PopStaticScope(std::string_view func_name) {

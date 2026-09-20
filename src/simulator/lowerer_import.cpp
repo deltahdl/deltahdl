@@ -328,24 +328,32 @@ static std::string_view SubroutineImportScopeKey(const RtlirModule* mod,
 // "p::five" through it and nothing under the key itself. The subroutine is
 // one declaration however many instances lower it, so a second instance
 // finds it recorded and leaves it.
+// The import declarations among a subroutine body's block items, in order.
+static std::vector<const ImportItem*> BodyImportItems(const ModuleItem* func) {
+  std::vector<const ImportItem*> imports;
+  for (const Stmt* stmt : func->func_body_stmts) {
+    if (stmt == nullptr || stmt->kind != StmtKind::kBlockItemDecl) continue;
+    const ModuleItem* decl = stmt->decl_item;
+    if (decl != nullptr && decl->kind == ModuleItemKind::kImportDecl) {
+      imports.push_back(&decl->import_item);
+    }
+  }
+  return imports;
+}
+
 static void LowerSubroutineBodyImports(const RtlirModule* mod, SimContext& ctx,
                                        Arena& arena) {
   for (const ModuleItem* func : mod->function_decls) {
     if (!func->method_class.empty()) continue;
     if (!ctx.SubroutinePackage(func).empty()) continue;
-    std::string_view key;
-    for (const Stmt* stmt : func->func_body_stmts) {
-      if (stmt == nullptr || stmt->kind != StmtKind::kBlockItemDecl) continue;
-      const ModuleItem* decl = stmt->decl_item;
-      if (decl == nullptr || decl->kind != ModuleItemKind::kImportDecl) {
-        continue;
-      }
-      if (key.empty()) key = SubroutineImportScopeKey(mod, func, arena);
-      const ImportItem& imp = decl->import_item;
-      ctx.RegisterPackageImport(key, imp.package_name,
-                                imp.is_wildcard ? "*" : imp.item_name);
+    std::vector<const ImportItem*> imports = BodyImportItems(func);
+    if (imports.empty()) continue;
+    std::string_view key = SubroutineImportScopeKey(mod, func, arena);
+    for (const ImportItem* imp : imports) {
+      ctx.RegisterPackageImport(key, imp->package_name,
+                                imp->is_wildcard ? "*" : imp->item_name);
     }
-    if (!key.empty()) ctx.RegisterSubroutinePackage(func, key);
+    ctx.RegisterSubroutinePackage(func, key);
   }
 }
 
