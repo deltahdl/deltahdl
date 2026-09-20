@@ -243,6 +243,13 @@ static void ShapePackageVariable(const ModuleItem* item, Variable* var,
 void InitPackageDataVariables(const RtlirDesign* design, SimContext& ctx,
                               Arena& arena) {
   for (auto* pkg : design->packages) {
+    // §26.2 with §26.3: the initializer is an expression of the package's
+    // scope, reading the package's earlier variables, its subroutines and
+    // those an import brings in by their bare names, which the frame a
+    // package subroutine's body runs in resolves
+    // (SimContext::FindInPackageScope and FindFunctionInPackageScope); the same
+    // frame serves here.
+    ctx.PushScope(pkg->name);
     for (auto* item : pkg->items) {
       bool is_param = item->kind == ModuleItemKind::kParamDecl;
       bool is_var = item->kind == ModuleItemKind::kVarDecl;
@@ -254,6 +261,7 @@ void InitPackageDataVariables(const RtlirDesign* design, SimContext& ctx,
       if (is_var) ShapePackageVariable(item, var, *qname, ctx, arena);
       if (item->init_expr) var->value = EvalExpr(item->init_expr, ctx, arena);
     }
+    ctx.PopScope();
   }
 }
 

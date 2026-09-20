@@ -250,16 +250,16 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   void PopStaticScope(std::string_view func_name);
   bool HasLocalScope() const { return !scope_stack_.empty(); }
   Variable* FindLocalVariable(std::string_view name);
-  // §26.3 with §13.4: see the definition in sim_context.cpp.
+  // §26.3 with §13.4: see the definitions in sim_context.cpp.
   Variable* FindInPackageScope(std::string_view name);
+  ModuleItem* FindFunctionInPackageScope(std::string_view name);
   // Creates a scope-local variable of `width` bits, signed when `is_signed`
-  // says the declaration it stands for was. §6.11.3: `byte`, `shortint`,
+  // says the declaration it stands for was (§6.11.3: `byte`, `shortint`,
   // `int`, `integer` and `longint` default to signed, and a `signed`/`unsigned`
   // qualifier settles the rest, so a caller that knows the declared type passes
-  // IsSignedType of it here. The parameter is defaulted because every caller
-  // with no declared type to consult -- a foreach iterator, a `$` bound, a
-  // per-element array copy -- wants the unsigned default, and a caller with
-  // one reached the wrong answer through a function taking a width alone.
+  // IsSignedType of it). The parameter is defaulted because every caller with
+  // no declared type to consult -- a foreach iterator, a `$` bound, a
+  // per-element array copy -- wants the unsigned default.
   Variable* CreateLocalVariable(std::string_view name, uint32_t width,
                                 bool is_signed = false);
   // Makes `var`, a variable created earlier, the variable `name` names in

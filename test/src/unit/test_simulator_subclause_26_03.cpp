@@ -767,4 +767,31 @@ TEST(PackageScopeReferenceSim, PackageVariableWithoutInitializerKeepsItsType) {
             510u);
 }
 
+// §26.2 performs a package variable's declaration assignment before any
+// initial procedure starts, and its initializer may call a function of the
+// package by its bare name or one a wildcard import brings in (§26.3): p's
+// `int v = sq(8)` and q's `int w = sq(8)` through `import p::*` both read 64.
+// The variables were initialized before the package's subroutines were
+// registered and with no package in scope for the bare name, so both read 0;
+// a later variable of the package reading an earlier one, `int u = v + 1`,
+// is covered beside them -- 64 * 10000 + 64 * 100 + 65.
+TEST(PackageScopeReferenceSim,
+     PackageVariableInitializedFromAPackageFunctionCall) {
+  EXPECT_EQ(RunAndGet("package p;\n"
+                      "  function int sq(int a); return a * a; endfunction\n"
+                      "  int v = sq(8);\n"
+                      "  int u = v + 1;\n"
+                      "endpackage\n"
+                      "package q;\n"
+                      "  import p::*;\n"
+                      "  int w = sq(8);\n"
+                      "endpackage\n"
+                      "module t;\n"
+                      "  int out;\n"
+                      "  initial out = p::v * 10000 + q::w * 100 + p::u;\n"
+                      "endmodule\n",
+                      "out"),
+            64u * 10000u + 64u * 100u + 65u);
+}
+
 }  // namespace

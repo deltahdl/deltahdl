@@ -264,6 +264,24 @@ Variable* SimContext::FindInPackageScope(std::string_view name) {
   return nullptr;
 }
 
+// §26.3 with §13.4, for a subroutine as FindInPackageScope for a variable: a
+// bare callee inside a package's frame is the package's own subroutine,
+// registered under "pkg::name" by RegisterPackageScopedSubroutines, or one an
+// import of the package brings in; null outside any package frame or where
+// no package holds the name.
+ModuleItem* SimContext::FindFunctionInPackageScope(std::string_view name) {
+  for (auto it = scope_stack_.rbegin(); it != scope_stack_.rend(); ++it) {
+    if (it->package.empty()) continue;
+    for (const std::string& key : PackageScopedKeys(it->package, name)) {
+      std::string scoped = key;
+      scoped.replace(scoped.find('.'), 1, "::");
+      if (ModuleItem* func = FindFunction(scoped)) return func;
+    }
+    return nullptr;
+  }
+  return nullptr;
+}
+
 Variable* SimContext::FindVariable(std::string_view name) {
   // §23.6: "The instance name $root refers to the top of the instantiated
   // design and is used to unambiguously gain access to the top of the design."

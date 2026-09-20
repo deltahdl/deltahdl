@@ -100,6 +100,12 @@ SubroutineTarget FindSubroutineTarget(const Expr* call, SimContext& ctx,
   // the caller stands, as it did before instances were registered by prefix.
   target.func = ctx.FindFunction(path);
   bool is_hierarchical = path.find('.') != std::string::npos;
+  // §26.2: a bare callee inside a package's frame -- a package variable's
+  // initializer or a package subroutine's body calling another of the
+  // package's, or one its import brings in -- is registered under the
+  // package's "pkg::name" key and under no bare one unless imported.
+  if (target.func == nullptr && !is_hierarchical)
+    target.func = ctx.FindFunctionInPackageScope(path);
   target.inst_prefix = is_hierarchical ? InstanceOfKey(path) : active;
   return target;
 }
