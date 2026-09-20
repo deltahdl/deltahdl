@@ -68,18 +68,39 @@ std::string_view TypeNameOf(const DataType& type) {
   return {};
 }
 
-// §8.4: whether the element type of the property `member` of `decl` on `obj`
-// is a class, so that each element is a handle: the type the declaration
-// names, or, where it names a type parameter (§8.25), the type the object's
-// specialization binds that parameter to, else the default the class
-// declares, as §8.26's `T myFifo[$:DEPTH-1]` on a `Fifo#(Item)`. §8.23
+// §8.23 (printed pages 200-201): a nested class's bare name is visible
+// throughout the containing class, so a property of Outer, or of a class
+// nested in Outer, declared `Inner q[$]` names the class the run holds under
+// `Outer::Inner`. Whether `name` names a class nested in `declaring` or in a
+// class enclosing it, innermost first -- the class that declares the
+// property, not the class of the running method: SimContext::FindClassType
+// resolves a bare nested name through the latter alone, so a queue property
+// built on its first reference from a module's initial block, where no
+// method runs, held plain values for `Inner q[$]` and `o.q[0].v` read 0.
+bool NamesClassNestedInScope(std::string_view name,
+                             const ClassTypeInfo* declaring, SimContext& ctx) {
+  for (const ClassTypeInfo* t = declaring; t != nullptr; t = t->enclosing) {
+    std::string key = std::string(t->name) + "::" + std::string(name);
+    if (ctx.FindClassType(key) != nullptr) return true;
+  }
+  return false;
+}
+
+// §8.4: whether the element type of the property `member` of `declaring` on
+// `obj` is a class, so that each element is a handle: the type the
+// declaration names, or, where it names a type parameter (§8.25), the type
+// the object's specialization binds that parameter to, else the default the
+// class declares, as §8.26's `T myFifo[$:DEPTH-1]` on a `Fifo#(Item)`. §8.23
 // (printed pages 200-201): a nested class is named `Outer::Inner` from
 // outside its container, the key DeclaredClassKey resolves the written type
-// to; asked by the bare `Inner` alone, `Outer::Inner q[$]` was a queue of
-// plain values and `h.q[0].v` read 0. A type written as a bare identifier
-// expression, which carries no type_name, is still asked for by that name.
-bool ElementTypeIsClass(const ClassMember* member, const ClassDecl* decl,
-                        const ClassObject* obj, SimContext& ctx) {
+// to, and bare within it (NamesClassNestedInScope); asked by the bare `Inner`
+// alone, `Outer::Inner q[$]` was a queue of plain values and `h.q[0].v` read
+// 0. A type written as a bare identifier expression, which carries no
+// type_name, is still asked for by that name.
+bool ElementTypeIsClass(const ClassMember* member,
+                        const ClassTypeInfo* declaring, const ClassObject* obj,
+                        SimContext& ctx) {
+  const ClassDecl* decl = declaring->decl;
   const DataType* type = &member->data_type;
   std::string_view name = TypeNameOf(*type);
   if (name.empty()) return false;
@@ -89,7 +110,8 @@ bool ElementTypeIsClass(const ClassMember* member, const ClassDecl* decl,
     name = TypeNameOf(*type);
   }
   if (!DeclaredClassKey(*type, ctx, ctx.GetArena()).empty()) return true;
-  return !name.empty() && ctx.FindClassType(name) != nullptr;
+  return !name.empty() && (ctx.FindClassType(name) != nullptr ||
+                           NamesClassNestedInScope(name, declaring, ctx));
 }
 
 // §7.10.5: the element count the dimension `dim` allows, N + 1 for `[$:N]`,
@@ -128,8 +150,7 @@ QueueObject* MakeQueueProperty(const ClassTypeInfo* declaring,
   q->elem_width = prop != nullptr ? prop->width : 32;
   q->is_4state = prop != nullptr && prop->is_4state;
   q->max_size = PropertyQueueBound(member->unpacked_dims[0], obj, ctx);
-  q->holds_class_handles =
-      ElementTypeIsClass(member, declaring->decl, obj, ctx);
+  q->holds_class_handles = ElementTypeIsClass(member, declaring, obj, ctx);
   return q;
 }
 

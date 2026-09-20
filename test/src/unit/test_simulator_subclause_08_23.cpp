@@ -571,4 +571,32 @@ TEST(ClassScopeResolutionSim, ProceduralFixedArrayOfANestedClassHoldsHandles) {
             97u);
 }
 
+// §8.23 (printed pages 200-201): the nested class's bare name is visible
+// throughout the containing class, so Outer's own property `Inner q[$]` is a
+// queue of Outer::Inner handles. The queue is built on its first reference,
+// here from the module's initial block, where no method of Outer is running:
+// ElementTypeIsClass (eval_array_class_queue.cpp) asked SimContext's lookup,
+// which resolves a bare nested name through the running method's class
+// alone, so the property held plain values and `o.q[0].v` read 0.
+TEST(ClassScopeResolutionSim,
+     BareNestedNameQueuePropertyFirstReferencedFromAModule) {
+  EXPECT_EQ(RunAndGet("class Outer;\n"
+                      "  class Inner;\n"
+                      "    int v = 7;\n"
+                      "  endclass\n"
+                      "  Inner q[$];\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  Outer o = new;\n"
+                      "  int y;\n"
+                      "  initial begin\n"
+                      "    Outer::Inner i = new;\n"
+                      "    o.q.push_back(i);\n"
+                      "    y = o.q[0].v;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            7u);
+}
+
 }  // namespace
