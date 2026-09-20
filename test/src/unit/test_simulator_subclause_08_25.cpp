@@ -617,4 +617,57 @@ TEST(ClassSim, PropertyWidthNamesTheClassParameters) {
       255u + 16u * 1000u + 8u * 100000u);
 }
 
+// §8.25: a specialization `stack #(bit [2:0])` binds the type parameter T to
+// `bit [2:0]` throughout the class body (printed pages 203-204 of ~/LRM.pdf),
+// so §20.6.2's `$bits(T)` in an instance method is 3, and the object of the
+// default specialization (§8.25.1) reads the default int's 32. EvalBits asked
+// the type table alone, which holds the class's default for the name, so the
+// specialized object read 32 too. The three objects are declared at module
+// scope, in a procedural block and with the actual bound by name.
+TEST(ClassSim, BitsOfATypeParameterReadsTheSpecializationsActual) {
+  EXPECT_EQ(RunAndGet("class stack #(type T = int);\n"
+                      "  function int bits();\n"
+                      "    return $bits(T);\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int out;\n"
+                      "  stack #(bit [2:0]) s3 = new;\n"
+                      "  stack s0 = new;\n"
+                      "  initial begin\n"
+                      "    stack #(.T(logic [6:0])) s7 = new;\n"
+                      "    out = s3.bits() * 10000 + s7.bits() * 100 +\n"
+                      "          s0.bits();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "out"),
+            3u * 10000u + 7u * 100u + 32u);
+}
+
+// §8.25 with §7.8: `table_c #(string, int)` declared at module scope makes
+// `V m[K]` a string-keyed associative array of int, so two puts give num() 2
+// and get("b") 31, and the int-keyed `table_c #(int, int)` gets 42 back for
+// key 5 -- 2 * 10000 + 31 * 100 + 42.
+TEST(ClassSim, TypeParameterIndexedPropertyOfAModuleScopeSpecialization) {
+  EXPECT_EQ(RunAndGet("class table_c #(type K = int, type V = int);\n"
+                      "  V m[K];\n"
+                      "  function void put(K k, V v); m[k] = v; endfunction\n"
+                      "  function V get(K k); return m[k]; endfunction\n"
+                      "  function int size(); return m.num(); endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int out;\n"
+                      "  table_c #(string, int) ts = new;\n"
+                      "  table_c #(int, int) ti = new;\n"
+                      "  initial begin\n"
+                      "    ts.put(\"a\", 30); ts.put(\"b\", 31);\n"
+                      "    ti.put(5, 42);\n"
+                      "    out = ts.size() * 10000 + ts.get(\"b\") * 100 +\n"
+                      "          ti.get(5);\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "out"),
+            2u * 10000u + 31u * 100u + 42u);
+}
+
 }  // namespace

@@ -11,9 +11,11 @@
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "common/types.h"
+#include "parser/ast_class.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_type.h"
 #include "simulator/class_object.h"
+#include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_systask_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
@@ -44,12 +46,29 @@ static Logic4Vec EvalClog2(const Expr* expr, SimContext& ctx, Arena& arena) {
   return MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(result));
 }
 
+// §8.25: the width of the type a type parameter of the running method's class
+// is bound to on the object -- the actual of the object's specialization, or
+// the default the class declares (§8.25.1) -- and 0 for a name that is no
+// type parameter of that class, for a call outside a method, or for a type
+// nothing sizes. The type table holds the class's default under the name, so
+// the object is asked before it.
+static uint32_t BoundTypeParamWidth(std::string_view name, SimContext& ctx) {
+  const ClassObject* self = ctx.CurrentThis();
+  if (self == nullptr || self->type == nullptr || self->type->decl == nullptr)
+    return 0;
+  const ClassDecl* decl = self->type->decl;
+  if (decl->type_param_names.count(name) == 0) return 0;
+  const DataType* actual = TypeParamActual(self, decl, name);
+  return actual != nullptr ? DeclaredTypeWidth(*actual, ctx) : 0;
+}
+
 static Logic4Vec EvalBits(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.empty()) return MakeLogic4VecVal(arena, 32, 0);
 
   auto* arg = expr->args[0];
   if (arg->kind == ExprKind::kIdentifier) {
-    uint32_t tw = ctx.FindTypeWidth(arg->text);
+    uint32_t tw = BoundTypeParamWidth(arg->text, ctx);
+    if (tw == 0) tw = ctx.FindTypeWidth(arg->text);
     if (tw > 0) return MakeLogic4VecVal(arena, 32, tw);
     // §20.6.2: a queue or dynamic array is a dynamically sized bit-stream
     // expression. Its current bit-stream size is the live element count times
