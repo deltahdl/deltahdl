@@ -840,16 +840,19 @@ TEST(ProgramConstruct, AnUninstantiatedProgramIsATopLevelProgram) {
   EXPECT_TRUE(design->top_modules[0]->is_program);
 }
 
+// ElaborateSource with no top name, rather than the fixture's ElaborateSrc,
+// which names the last module as the top when none is given and so roots
+// that module alone.
 TEST(ProgramConstruct, AnUninstantiatedProgramBesideAModuleIsATopToo) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
+  ProgramElabFixture f;
+  auto* design = ElaborateSource(
       "module t;\n"
       "  int a;\n"
       "endmodule\n"
       "program p;\n"
       "  int b;\n"
       "endprogram\n",
-      f);
+      f, "");
   ASSERT_NE(design, nullptr);
   ASSERT_EQ(design->top_modules.size(), 2u);
   EXPECT_EQ(design->top_modules[0]->name, "t");

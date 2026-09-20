@@ -15,6 +15,7 @@
 #include "common/types.h"
 #include "elaborator/elaborator.h"
 #include "lexer/lexer.h"
+#include "parser/ast_design.h"
 #include "parser/parser.h"
 #include "simulator/lowerer.h"
 #include "simulator/scheduler.h"
@@ -55,13 +56,34 @@ using ClockingSimFixture = SimFixtureSeeded;
 using MtSimFixture = SimFixture;
 using SimA604Fixture = SimFixture;
 
+// The last module is the top, as it is in every case written against these
+// fixtures; a unit with no module (a program standing alone, §24.3) names no
+// top, and the elaborator roots each uninstantiated program itself.
+inline std::string_view TopNameOf(const CompilationUnit* cu) {
+  return cu->modules.empty() ? std::string_view() : cu->modules.back()->name;
+}
+
 inline RtlirDesign* ElaborateSrc(const std::string& src, SimFixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
   auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
-  auto* design = elab.Elaborate(cu->modules.back()->name);
+  auto* design = elab.Elaborate(TopNameOf(cu));
+  f.has_errors = f.diag.HasErrors();
+  return design;
+}
+
+// Elaborates `src` with no top named, the way the command line does: every
+// uninstantiated module and program is a top (§23.3.1, §24.3), for a case
+// about a parallel hierarchy that ElaborateSrc's choice of one top would
+// leave unelaborated.
+inline RtlirDesign* ElaborateSrcAllTops(const std::string& src, SimFixture& f) {
+  auto fid = f.mgr.AddFile("<test>", src);
+  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
+  Parser parser(lexer, f.arena, f.diag);
+  Elaborator elab(f.arena, f.diag, parser.Parse());
+  auto* design = elab.Elaborate("");
   f.has_errors = f.diag.HasErrors();
   return design;
 }
@@ -72,7 +94,7 @@ inline RtlirDesign* ElaborateSrc(const std::string& src, SimFixtureSeeded& f) {
   Parser parser(lexer, f.arena, f.diag);
   auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
-  return elab.Elaborate(cu->modules.back()->name);
+  return elab.Elaborate(TopNameOf(cu));
 }
 
 inline Expr* ParseExprFrom(const std::string& src, SimFixture& f) {

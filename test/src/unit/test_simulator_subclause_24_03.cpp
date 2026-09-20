@@ -135,10 +135,10 @@ TEST(ProgramConstructSim, ATopLevelProgramsInitialRunsItsTask) {
 }
 
 // The same beside a module: both tops run, the module's initial and the
-// program's.
+// program's, so the unit is elaborated with no top named.
 TEST(ProgramConstructSim, ATopLevelProgramBesideAModuleRunsWithIt) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* design = ElaborateSrcAllTops(
       "module t;\n"
       "  int a;\n"
       "  initial a = 3;\n"
