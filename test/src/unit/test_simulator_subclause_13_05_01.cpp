@@ -761,4 +761,93 @@ TEST(PassByValueSim, InlinePackedUnionFormalReadsItsSecondMember) {
   LowerRunAndCheck(f, design, {{"y", 0xCDu}});
 }
 
+// §10.9.2 (printed page 263): a structure assignment pattern may name its
+// members in any order, each member expression evaluated in the context of
+// an assignment to that member, and §13.5.1 (printed 348) makes the binding
+// of an actual such an assignment to a variable of the formal's type. An
+// actual `'{b: 2, a: 1}` to a formal declared by the structure's typedef was
+// concatenated in written order at self-determined widths, with no type to
+// place it by, so the formal held 2 where `a` lies and 1 where `b` lies and
+// the body read 21; placed by member it reads 12.
+TEST(PassByValueSim, TypedefStructFormalPlacesAKeyedPatternByMemberName) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef struct { int a, b; } pair_t;\n"
+      "  int y;\n"
+      "  function int f(pair_t s);\n"
+      "    return s.a * 10 + s.b;\n"
+      "  endfunction\n"
+      "  initial y = f('{b: 2, a: 1});\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"y", 12u}});
+}
+
+// §10.9.2 (printed page 263): by position, element i initializes member i,
+// evaluated in the context of an assignment to that member's type, so an
+// 8-bit literal is extended to the int member it initializes. Concatenated
+// at self-determined widths, `'{8'd1, 8'd2}` packed sixteen bits into the low
+// end of the formal: `a` read 0 and `b` read 258, where the placed members
+// read 1 and 2.
+TEST(PassByValueSim, TypedefStructFormalPlacesANarrowPositionalPattern) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef struct packed { int a, b; } pair_t;\n"
+      "  int y;\n"
+      "  function int f(pair_t s);\n"
+      "    return s.a * 10 + s.b;\n"
+      "  endfunction\n"
+      "  initial y = f('{8'd1, 8'd2});\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"y", 12u}});
+}
+
+// §13.3 (printed page 337) declares a formal with a structure written inline,
+// and §10.9.2 places a pattern actual by that structure's members exactly as
+// by a typedef's: the layout the formal is bound to is built from its own
+// declaration, and the keyed pattern lands `a` and `b` where the body reads
+// them, 12 rather than the 21 of a concatenation in written order.
+TEST(PassByValueSim, InlineStructFormalPlacesAKeyedPattern) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int y;\n"
+      "  function int f(struct packed { int a, b; } s);\n"
+      "    return s.a * 10 + s.b;\n"
+      "  endfunction\n"
+      "  initial y = f('{b: 2, a: 1});\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"y", 12u}});
+}
+
+// §10.9.2 (printed page 263) with §7.2.1: a member that is itself a structure
+// takes the value of the expression keyed to it as a whole, at the member's
+// own offset in the enclosing layout, and the body reads its members through
+// the nested layout. Keyed with the nested member last, `'{c: 3, p: x}`
+// concatenated in written order put x's 64 bits where `c` and the high half
+// of `p` lie; placed by member the body reads 123.
+TEST(PassByValueSim, TypedefStructFormalPlacesANestedMemberByName) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef struct packed { int a, b; } pair_t;\n"
+      "  typedef struct packed { pair_t p; int c; } trip_t;\n"
+      "  pair_t x;\n"
+      "  int y;\n"
+      "  function int f(trip_t s);\n"
+      "    return s.p.a * 100 + s.p.b * 10 + s.c;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    x = '{1, 2};\n"
+      "    y = f('{c: 3, p: x});\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"y", 123u}});
+}
+
 }  // namespace

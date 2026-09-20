@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <iosfwd>
 #include <string_view>
 #include <vector>
@@ -86,24 +87,33 @@ void BindFunctionArgs(const ModuleItem* func, const Expr* expr, SimContext& ctx,
 // eval_function_args.cpp; the copy-out on return in
 // eval_function_args_writeback.cpp asks it for the same pairing.
 int ResolveArgIndex(const ModuleItem* func, const Expr* expr, size_t param_idx);
-// §11.9: a tagged union expression as the actual of a tagged-union formal.
-// TryEvalTaggedPatternActual evaluates one whose member value is a §10.9.2
-// structure assignment pattern against the layout of the member it names
-// within the formal's union, answering false where the actual has another
-// shape, so it is evaluated as any expression; TryBindTaggedActual binds the
-// union's layout and the member's tag to the formal, answering false where the
-// actual is no tagged expression or the formal's type has no layout. §13.5.1:
+// §10.9.2 with §13.5.1: an assignment pattern as the actual of a structure
+// formal, and §11.9: a tagged union expression as the actual of a tagged-union
+// formal. TryEvalPatternActual evaluates a bare or typed pattern against the
+// formal's layout, and a tagged expression whose member value is a pattern
+// against the layout of the member it names within the formal's union,
+// answering false where the actual has another shape, so it is evaluated as
+// any expression; TryBindTaggedActual binds the union's layout and the
+// member's tag to the formal, answering false where the actual is no tagged
+// expression or the formal's type has no layout. §13.5.1:
 // TryBindInlineAggregateFormal binds the layout of a formal whose structure
 // or union is written inline in its declaration, tagged or not, whatever the
 // actual is, answering false where the formal's type writes no members; the
-// layout is built once from the declaration's type and keyed by it. All three
-// are defined in eval_function_args_tagged.cpp and asked by the by-value
+// layout is built once from the declaration's type and keyed by it.
+// TryBindNamedAggregateFormal binds the layout registered under the typedef
+// name a formal is declared by, answering false where the name has none. All
+// four are defined in eval_function_args_tagged.cpp and asked by the by-value
 // binding in eval_function_args.cpp.
-bool TryEvalTaggedPatternActual(const FunctionArg& param, const Expr* actual,
-                                SimContext& ctx, Arena& arena, Logic4Vec& out);
+bool TryEvalPatternActual(const FunctionArg& param, const Expr* actual,
+                          SimContext& ctx, Arena& arena, Logic4Vec& out);
 bool TryBindTaggedActual(const FunctionArg& param, const Expr* actual,
                          SimContext& ctx);
 bool TryBindInlineAggregateFormal(const FunctionArg& param, SimContext& ctx);
+bool TryBindNamedAggregateFormal(const FunctionArg& param, SimContext& ctx);
+// §13.3 with §10.7: the declared width of a by-value formal of type `dt`, the
+// one BindValueArg resizes the actual's value into, or zero for a type no
+// width applies to -- a class handle. Defined in eval_function_args_tagged.cpp.
+uint32_t EvalFormalArgWidth(const DataType& dt, SimContext& ctx, Arena& arena);
 
 // The actual arguments of one call, as §35.6.1 "Argument passing" and §11.12
 // "Let construct" each describe them: the call-site expression, the boundary

@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <optional>
+#include <string>
 #include <vector>
 
 #include "common/types.h"
@@ -40,10 +41,11 @@ struct ReturnedAggregate {
   bool is_4state = true;
 };
 
-// A function body's registration for the aggregate it returns: constructed by
-// ExecFunctionBody for the body's whole run, so the `return` inside it has a
-// record to fill and the completion of the body is what hands the record to
-// the evaluation of the call, whichever call path ran the body.
+// A function body's registration for the aggregate it returns and for the tag
+// of a tagged union value it returns: constructed by ExecFunctionBody for the
+// body's whole run, so the `return` inside it has a record to fill and the
+// completion of the body is what hands the record to the evaluation of the
+// call, whichever call path ran the body.
 class FunctionBodyResultScope {
  public:
   FunctionBodyResultScope();
@@ -68,6 +70,22 @@ void RecordReturnedAggregate(const Expr* returned, SimContext& ctx,
 Logic4Vec EvalWithReturnedAggregate(const Expr* expr, SimContext& ctx,
                                     Arena& arena,
                                     std::optional<ReturnedAggregate>& returned);
+
+// §7.3.2 with §13.4.1: a tagged union value carries its tag beside the member's
+// bits, and a `return tagged M v` gives the implicit variable of the call
+// that value, tag included. Records, for the innermost running body, the
+// member `returned` -- the expression of the `return` ExecFuncReturn is
+// carrying out -- names where it is a tagged union expression, and records
+// nothing for another expression, or while no evaluation below is asking.
+void RecordReturnedTag(const Expr* returned);
+
+// Evaluates `expr` and answers its value; where `expr` is a call whose body
+// returned a tagged union expression, `tag` is the member that expression
+// named, and it is empty otherwise -- for an expression that is no call, for
+// a call the simulator answers without running a body and for a body that
+// returned anything else.
+Logic4Vec EvalWithReturnedTag(const Expr* expr, SimContext& ctx, Arena& arena,
+                              std::string& tag);
 
 // The element at the declared index `idx` of `returned`, or what §7.4.5's
 // Table 7-1 gives a read of a nonexistent element -- x for a 4-state element

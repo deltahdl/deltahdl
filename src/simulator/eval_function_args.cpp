@@ -17,6 +17,7 @@
 #include "simulator/assoc_element.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_array.h"
+#include "simulator/eval_call_result.h"
 #include "simulator/eval_expr_internal.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
@@ -438,27 +439,43 @@ void WritebackAssocRefs(SimContext& ctx) {
   }
 }
 
+// §13.5.1: what the actual's evaluation hands the formal -- the value copied
+// in and, where the actual is a call whose body returned a tagged union
+// expression, the tag §7.3.2 (printed page 151) has travel beside the value's
+// bits, which no vector carries; empty for every other actual.
+struct ActualValue {
+  Logic4Vec value;
+  std::string tag;
+};
+
 // The actual is the caller's expression and is read with the callee's scope
 // set aside; §13.5.3 has a default argument evaluated in the scope of the
 // subroutine's declaration, so the default stays with the callee's scope up.
 //
-// §11.9 (printed page 304) has a tagged union expression's type known from
-// its context, here the formal, and its braces be a §10.9.2 structure
-// assignment pattern, so such an actual is placed member by member against
-// the named member's layout (TryEvalTaggedPatternActual) before the general
-// evaluation, which knows no type to place it by, is reached.
-static Logic4Vec ResolveArgValue(const FunctionArg& param, const Expr* expr,
-                                 int arg_index, SimContext& ctx, Arena& arena) {
+// §10.9.2 (printed page 263) evaluates an assignment pattern's members in the
+// context of an assignment to the members they initialize, and §11.9 (printed
+// 304) has a tagged union expression's type known from its context, here the
+// formal, so a pattern actual, bare, typed or under a tagged expression, is
+// placed member by member against the formal's layout (TryEvalPatternActual)
+// before the general evaluation, which knows no type to place it by, is
+// reached. A call's result comes with the tag its body's return gave it
+// (EvalWithReturnedTag), for the binding to copy in beside the value.
+static ActualValue ResolveArgValue(const FunctionArg& param, const Expr* expr,
+                                   int arg_index, SimContext& ctx,
+                                   Arena& arena) {
+  ActualValue resolved;
   if (arg_index >= 0 && expr->args[static_cast<size_t>(arg_index)] != nullptr) {
     CalleeScopeAside aside(ctx);
     const Expr* actual = expr->args[static_cast<size_t>(arg_index)];
-    Logic4Vec placed;
-    if (TryEvalTaggedPatternActual(param, actual, ctx, arena, placed))
-      return placed;
-    return EvalExpr(actual, ctx, arena);
+    if (TryEvalPatternActual(param, actual, ctx, arena, resolved.value))
+      return resolved;
+    resolved.value = EvalWithReturnedTag(actual, ctx, arena, resolved.tag);
+    return resolved;
   }
-  if (param.default_value) return EvalExpr(param.default_value, ctx, arena);
-  return MakeLogic4Vec(arena, 32);
+  resolved.value = param.default_value
+                       ? EvalExpr(param.default_value, ctx, arena)
+                       : MakeLogic4Vec(arena, 32);
+  return resolved;
 }
 
 // §13.5.1: "This argument passing mechanism works by copying each argument into
@@ -641,8 +658,19 @@ static bool TryBindFixedArrayElementRef(const Expr* call_arg,
   return true;
 }
 
+// §13.5: the actual argument a formal is bound from -- the call expression and
+// the position the actual occupies in its argument list (negative when the call
+// supplies none, so the formal takes its default) -- and, once the actual has
+// been evaluated, the tag its value carries where it is a call whose body
+// returned a tagged union expression (ActualValue::tag), empty otherwise.
+struct ActualArgRef {
+  const Expr* expr;
+  int index;
+  std::string_view result_tag;
+};
+
 static void RegisterValueArgStructType(const FunctionArg& param,
-                                       const Expr* expr, int arg_index,
+                                       const ActualArgRef& ref,
                                        SimContext& ctx);
 
 // Attempts the ref-binding strategies (whole aggregate, plain ref, queue
@@ -667,7 +695,7 @@ static bool TryBindRefDirectionArg(const Expr* expr, int arg_index,
     return true;
   }
   if (TryBindRefArg(expr, arg_index, param.name, ctx)) {
-    RegisterValueArgStructType(param, expr, arg_index, ctx);
+    RegisterValueArgStructType(param, {expr, arg_index, {}}, ctx);
     RegisterValueArgClassType(param, ctx);
     return true;
   }
@@ -682,95 +710,25 @@ static bool TryBindRefDirectionArg(const Expr* expr, int arg_index,
   return false;
 }
 
-// Performs the default by-value bind: resolves the argument value, widens it to
-// the formal's declared width when applicable, and creates the local variable.
-// Computes a value parameter's declared width using the live simulation scope,
-// so a width that references in-scope (class/specialization) parameters -- e.g.
-// `logic [W-1:0]` -- resolves to the bound parameter value instead of
-// collapsing to 1 bit.
-//
-// A type carrying no packed dimension of its own is sized by DeclaredTypeWidth
-// rather than the one-argument EvalTypeWidth, so that §6.18's user-defined type
-// name contributes the width of the type it stands for. EvalTypeWidth gives a
-// DataTypeKind::kNamed no width at all, and BindValueArg resizes only a
-// non-zero width, so a formal written `nib p` was never resized and held
-// whatever width the caller's expression happened to have: `8'hFF` passed to a
-// four-bit formal read 255. §10.8 makes "the passing of a value to a subroutine
-// input, output, or inout argument" an assignment-like context, so §10.7
-// truncates or extends into the formal's declared width.
-//
-// A class-typed formal is excluded, and answers no width at all rather than
-// 64. §8.3 makes a class variable a handle to an object, not an object of a
-// width, so there is nothing here for §10.7 to truncate; and the table would
-// answer for the name whether or not the width it answered meant anything.
-// §8.27's forward declaration `typedef class C;` is the case that shows why:
-// it records the name with no type behind it yet, which is DataTypeKind::
-// kImplicit, and §6.10 makes that a scalar -- so the table holds 1 for the
-// class, and resizing to it would leave one bit of a handle. Whether a class
-// name is in the table at all then turns on whether the design happens to
-// forward-declare it, which is no basis for a width. CreateFuncLocalVar asks
-// ctx.FindClassType the same question for the same reason.
-static uint32_t EvalFormalArgWidth(const DataType& dt, SimContext& ctx,
-                                   Arena& arena) {
-  if (!dt.packed_dim_left || !dt.packed_dim_right) {
-    if (!dt.type_name.empty() && ctx.FindClassType(dt.type_name)) return 0;
-    // §25.9: a virtual interface formal, declared by the type or by a typedef
-    // name standing for it, holds the handle of the instance it represents,
-    // as wide as Lowerer::LowerVar makes a variable declared so, which is
-    // what an output formal is sized to before the body assigns it.
-    if (DeclaresAVirtualInterface(dt, ctx)) return 64;
-    return DeclaredTypeWidth(dt, ctx);
-  }
-  auto span = [&](const Expr* l, const Expr* r) -> uint32_t {
-    int64_t lv = static_cast<int64_t>(EvalExpr(l, ctx, arena).ToUint64());
-    int64_t rv = static_cast<int64_t>(EvalExpr(r, ctx, arena).ToUint64());
-    return static_cast<uint32_t>((lv >= rv ? lv - rv : rv - lv) + 1);
-  };
-  uint32_t width = span(dt.packed_dim_left, dt.packed_dim_right);
-  for (const auto& [l, r] : dt.extra_packed_dims) width *= span(l, r);
-  return width;
-}
-
 // §7.3.2 (printed page 151): a tagged union stores its tag beside the member
 // value, so the tag is part of what §13.5.1 (printed 348) copies into the
 // subroutine's own variable, and §11.9 (printed 304) checks a member access
 // of the formal inside the body against it. The formal took the bits alone:
 // `a.Valid` of a formal bound from a union holding `tagged Invalid` was read
 // against no tag and raised nothing, and %p of the formal printed the
-// untagged form. The actual's tag stands under the key its storage was
-// created by (TagKeyOfName), read with the callee's scope set aside as the
-// layout is; the formal's stands under its bare name, which TagKeyOfName
-// answers for a local, and which is what the body's reads and the copy-out
-// in eval_function_args_writeback.cpp ask by. §13.3 (printed 337) copies
-// nothing into an output formal, so its tag starts undefined. The tag table
-// is no frame of the call, so the formal's entry is written on every bind,
-// empty where nothing is copied in, rather than left holding the last call's.
-static void CopyUnionTagIn(const FunctionArg& param, const Expr* actual,
-                           SimContext& ctx) {
-  std::string tag;
-  if (param.direction != Direction::kOutput) {
-    CalleeScopeAside aside(ctx);
-    tag = std::string(ctx.GetVariableTag(TagKeyOfName(actual->text, ctx)));
-  }
-  ctx.SetVariableTag(param.name, tag);
-}
-
-// §7.3.2 (printed page 151) has a union's tag travel beside its bits, and
-// §13.5.1 copies both into the formal: an identifier actual's tag is copied
-// into a formal whose union is written inline as CopyUnionTagIn copies it into
-// a typedef-named one, and an actual of any other shape -- a call's result,
-// whose storage holds no tag -- leaves the formal untagged, written so on
-// every bind rather than left holding the last call's tag, which §11.9
-// (printed 304) would check the body's member reads against. Nothing for a
-// structure formal, which has no tag.
-static void BindInlineFormalUnionTag(const FunctionArg& param,
-                                     const Expr* actual, SimContext& ctx) {
-  if (!ctx.GetVariableStructType(param.name)->is_union) return;
-  if (actual != nullptr && actual->kind == ExprKind::kIdentifier) {
-    CopyUnionTagIn(param, actual, ctx);
-    return;
-  }
-  ctx.SetVariableTag(param.name, {});
+// untagged form. An identifier actual's tag stands under the key its storage
+// was created by (TagKeyOfName), read with the callee's scope set aside as
+// the layout is; a call's is the one its body's return recorded for the
+// actual's evaluation, and `f(h())` with h returning `tagged Invalid` raised
+// nothing while a call's result reached the formal untagged. Any other actual
+// carries none. §13.3 (printed 337) copies nothing into an output formal, so
+// its tag starts undefined.
+static std::string ActualTag(const FunctionArg& param, const Expr* actual,
+                             const ActualArgRef& ref, SimContext& ctx) {
+  if (actual == nullptr || param.direction == Direction::kOutput) return {};
+  if (actual->kind != ExprKind::kIdentifier) return std::string(ref.result_tag);
+  CalleeScopeAside aside(ctx);
+  return std::string(ctx.GetVariableTag(TagKeyOfName(actual->text, ctx)));
 }
 
 // §7.2.2/§13.5.1: make member access (arg.field) work on a by-value struct
@@ -778,7 +736,7 @@ static void BindInlineFormalUnionTag(const FunctionArg& param,
 // `input s_t arg` -- cannot find its layout by the type name `s_t` (a type name
 // is never a registered struct key). Resolve the layout from the actual
 // argument's registered struct type and re-register it under the parameter
-// name. No-op when the actual argument is not a resolvable struct identifier.
+// name. False when the actual argument is not a resolvable struct identifier.
 //
 // §23.9 with §13.5: the actual is a name of the caller's, resolved within the
 // instance the call runs in, so its layout is asked for by the key that
@@ -786,54 +744,53 @@ static void BindInlineFormalUnionTag(const FunctionArg& param,
 // as every other read of an actual is made. Asked by the bare name, a struct
 // variable of an instantiated module passed as an actual bound no layout to
 // the formal, and a member read of the formal inside the body answered zero.
-//
-// §13.3 (printed page 337) with §13.5.1 (printed 348): a formal whose
-// structure or union is written inline in its declaration has a layout of its
-// own, built from that declaration, and the copy §13.5.1 makes is of that
-// type whatever the actual is, so such a formal is bound to its own layout
-// (TryBindInlineAggregateFormal) before the actual is looked at; resolved from
-// the actual alone, `f(g())` bound no layout and `s.a` in the body was read
-// through no member.
-static void RegisterValueArgStructType(const FunctionArg& param,
-                                       const Expr* expr, int arg_index,
-                                       SimContext& ctx) {
-  const Expr* actual =
-      (arg_index >= 0) ? expr->args[static_cast<size_t>(arg_index)] : nullptr;
-  if (actual && TryBindTaggedActual(param, actual, ctx)) return;
-  if (TryBindInlineAggregateFormal(param, ctx)) {
-    BindInlineFormalUnionTag(param, actual, ctx);
-    return;
+static bool TryBindIdentifierActualLayout(const FunctionArg& param,
+                                          const Expr* actual, SimContext& ctx) {
+  if (actual == nullptr || actual->kind != ExprKind::kIdentifier) return false;
+  const StructTypeInfo* sinfo = nullptr;
+  {
+    CalleeScopeAside aside(ctx);
+    sinfo = StructLayoutOfName(actual->text, ctx);
   }
-  if (actual && actual->kind == ExprKind::kIdentifier) {
-    const StructTypeInfo* sinfo = nullptr;
-    {
-      CalleeScopeAside aside(ctx);
-      sinfo = StructLayoutOfName(actual->text, ctx);
-    }
-    if (sinfo) {
-      // Copy before re-inserting: registering into struct_types_ may rehash and
-      // invalidate the reference returned for the source variable.
-      StructTypeInfo copy = *sinfo;
-      ctx.RegisterStructType(param.name, copy);
-      ctx.SetVariableStructType(param.name, param.name);
-      if (copy.is_union) CopyUnionTagIn(param, actual, ctx);
-      return;
-    }
-  }
-  // Legacy fallback for an inline struct-typed formal whose actual is not a
-  // resolvable struct identifier.
-  if (param.data_type.kind == DataTypeKind::kStruct &&
-      !param.data_type.type_name.empty())
-    ctx.SetVariableStructType(param.name, param.data_type.type_name);
+  if (sinfo == nullptr) return false;
+  // Copy before re-inserting: registering into struct_types_ may rehash and
+  // invalidate the reference returned for the source variable.
+  StructTypeInfo copy = *sinfo;
+  ctx.RegisterStructType(param.name, copy);
+  ctx.SetVariableStructType(param.name, param.name);
+  return true;
 }
 
-// §13.5: the actual argument a formal is bound from -- the call expression and
-// the position the actual occupies in its argument list (negative when the call
-// supplies none, so the formal takes its default).
-struct ActualArgRef {
-  const Expr* expr;
-  int index;
-};
+// §13.5.1 (printed page 348): the copy the binding makes is a variable of the
+// formal's type, so the formal's layout is its declaration's where that
+// writes one -- §13.3 (printed 337) takes a structure or union inline there,
+// and TryBindInlineAggregateFormal builds it before the actual is looked at;
+// resolved from the actual alone, `f(g())` bound no layout and `s.a` in the
+// body was read through no member. A typedef-named formal takes an identifier
+// actual's layout (TryBindIdentifierActualLayout) and, for any other actual,
+// the typedef's own (TryBindNamedAggregateFormal), which a pattern or a call's
+// result was bound to none of. §7.3.2 (printed 151) has a union's tag travel
+// beside its bits, so a union formal takes the actual's tag (ActualTag) with
+// its layout; the tag table is no frame of the call, so the entry is written
+// on every bind, empty where nothing is copied in, rather than left holding
+// the last call's, which §11.9 (printed 304) would check the body's member
+// reads against.
+static void RegisterValueArgStructType(const FunctionArg& param,
+                                       const ActualArgRef& ref,
+                                       SimContext& ctx) {
+  const Expr* actual = (ref.index >= 0)
+                           ? ref.expr->args[static_cast<size_t>(ref.index)]
+                           : nullptr;
+  if (actual && TryBindTaggedActual(param, actual, ctx)) return;
+  if (!TryBindInlineAggregateFormal(param, ctx) &&
+      !TryBindIdentifierActualLayout(param, actual, ctx) &&
+      !TryBindNamedAggregateFormal(param, ctx)) {
+    return;
+  }
+  const StructTypeInfo* layout = ctx.GetVariableStructType(param.name);
+  if (layout == nullptr || !layout->is_union) return;
+  ctx.SetVariableTag(param.name, ActualTag(param, actual, ref, ctx));
+}
 
 // §13.3.2: the arguments of a static task/function are static storage that
 // retains its value between invocations. On a later call the formal already
@@ -857,7 +814,7 @@ static bool TryReuseStaticFormal(const FunctionArg& param,
     // a later call converts into the same answer.
     if (!existing->is_4state) CoerceTo2State(existing->value);
   }
-  RegisterValueArgStructType(param, actual.expr, actual.index, ctx);
+  RegisterValueArgStructType(param, actual, ctx);
   RegisterValueArgClassType(param, ctx);
   return true;
 }
@@ -883,8 +840,11 @@ static void BindValueArg(const FunctionArg& param, const ActualArgRef& actual,
   // aliased case, so a copy placed within it would leave the defect. Here it
   // also covers the static formal's own store and coercion, which
   // TryReuseStaticFormal reaches before the resize's result gets that far.
-  auto val =
-      OwnRhsWords(ResolveArgValue(param, expr, arg_index, ctx, arena), arena);
+  ActualValue resolved = ResolveArgValue(param, expr, arg_index, ctx, arena);
+  auto val = OwnRhsWords(resolved.value, arena);
+  // The tag the actual's evaluation handed over rides with the actual to the
+  // struct binding, whichever of the two paths below reaches it.
+  ActualArgRef bound{expr, arg_index, resolved.tag};
   const auto& dt = param.data_type;
   if (dt.kind != DataTypeKind::kImplicit) {
     uint32_t formal_width = EvalFormalArgWidth(dt, ctx, arena);
@@ -900,7 +860,7 @@ static void BindValueArg(const FunctionArg& param, const ActualArgRef& actual,
     val = MakeLogic4VecVal(arena, val.width, 0);
 
   bool is_static_sub = func && func->is_static && !func->is_automatic;
-  if (TryReuseStaticFormal(param, actual, val, func, ctx)) return;
+  if (TryReuseStaticFormal(param, bound, val, func, ctx)) return;
 
   // §6.11.3: a formal is an object declared with a type, so `integer a` is a
   // signed object however the actual arrived. Taking the signedness from the
@@ -927,7 +887,7 @@ static void BindValueArg(const FunctionArg& param, const ActualArgRef& actual,
   // A named-type struct formal (input s_t arg) has kind kNamed, not kStruct, so
   // resolve from the actual argument unconditionally; the resolver is a no-op
   // for non-struct actuals.
-  RegisterValueArgStructType(param, expr, arg_index, ctx);
+  RegisterValueArgStructType(param, bound, ctx);
   RegisterValueArgClassType(param, ctx);
 }
 

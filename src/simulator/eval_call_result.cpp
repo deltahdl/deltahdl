@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -73,9 +74,20 @@ ModuleItem* ResolveMethodOnObject(const ClassObject* obj, std::string_view name,
 // earlier and are overwritten, and a call answered without a body -- a DPI
 // import, a built-in -- completes none, which the reset before the call
 // leaves as no record.
+//
+// §7.3.2 (printed page 151) has a tagged union value carry its tag beside
+// the member's bits, and the tag a `return tagged M v` gives the implicit
+// variable (§13.4.1, printed 342) reaches the caller by the same handover:
+// the value comes back as a vector, which holds no tag, and the callee's
+// variable, whose tag table entry would, goes with the callee's scope.
+struct ReturnedRecord {
+  std::optional<ReturnedAggregate> aggregate;
+  std::string tag;
+};
+
 struct ReturnedAggregateRegister {
-  std::vector<std::optional<ReturnedAggregate>> bodies;
-  std::optional<ReturnedAggregate> completed;
+  std::vector<ReturnedRecord> bodies;
+  ReturnedRecord completed;
   int evaluations = 0;
 };
 
@@ -180,7 +192,17 @@ void RecordReturnedAggregate(const Expr* returned, SimContext& ctx,
                              Arena& arena) {
   auto& reg = Register();
   if (reg.evaluations == 0 || reg.bodies.empty()) return;
-  reg.bodies.back() = CaptureAggregate(returned, ctx, arena);
+  reg.bodies.back().aggregate = CaptureAggregate(returned, ctx, arena);
+}
+
+void RecordReturnedTag(const Expr* returned) {
+  auto& reg = Register();
+  if (reg.evaluations == 0 || reg.bodies.empty()) return;
+  if (returned == nullptr || returned->kind != ExprKind::kTagged ||
+      returned->rhs == nullptr) {
+    return;
+  }
+  reg.bodies.back().tag = std::string(returned->rhs->text);
 }
 
 Logic4Vec EvalWithReturnedAggregate(
@@ -191,11 +213,26 @@ Logic4Vec EvalWithReturnedAggregate(
     return EvalExpr(expr, ctx, arena);
   auto& reg = Register();
   ++reg.evaluations;
-  reg.completed.reset();
+  reg.completed.aggregate.reset();
   Logic4Vec value = EvalExpr(expr, ctx, arena);
   --reg.evaluations;
-  returned = std::move(reg.completed);
-  reg.completed.reset();
+  returned = std::move(reg.completed.aggregate);
+  reg.completed.aggregate.reset();
+  return value;
+}
+
+Logic4Vec EvalWithReturnedTag(const Expr* expr, SimContext& ctx, Arena& arena,
+                              std::string& tag) {
+  tag.clear();
+  if (expr == nullptr || expr->kind != ExprKind::kCall)
+    return EvalExpr(expr, ctx, arena);
+  auto& reg = Register();
+  ++reg.evaluations;
+  reg.completed.tag.clear();
+  Logic4Vec value = EvalExpr(expr, ctx, arena);
+  --reg.evaluations;
+  tag = std::move(reg.completed.tag);
+  reg.completed.tag.clear();
   return value;
 }
 

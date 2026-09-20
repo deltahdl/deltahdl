@@ -649,6 +649,13 @@ static void ExecFuncReturn(const Stmt* stmt, const FuncExecCtx& exec) {
   // variable (eval_call_result.cpp); nothing is copied unless such a read is
   // waiting.
   RecordReturnedAggregate(stmt->expr, exec.ctx, exec.arena);
+  // §7.3.2 with §13.4.1: `return tagged M v` gives the implicit variable a
+  // tagged union value, and its tag travels beside the bits, which the vector
+  // above does not carry; the member the expression names is recorded for
+  // the caller's binding of the result to a formal (eval_call_result.cpp),
+  // where an untagged formal read `a.Valid` of a `tagged Invalid` result
+  // against no tag. Nothing is recorded unless such a read is waiting.
+  RecordReturnedTag(stmt->expr);
   if (exec.ret_width != 0) {
     val = ResizeToWidth(val, exec.ret_width, exec.arena);
     val.is_signed = exec.ret_var->is_signed;

@@ -14,6 +14,7 @@
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/statement_assign_internal.h"
+#include "simulator/virtual_interface.h"
 
 namespace delta {
 
@@ -49,16 +50,18 @@ static std::string_view InlineFormalLayoutKey(const FunctionArg& param,
   return *owned;
 }
 
-// §11.9 (printed page 304): a tagged union expression's type is known from
-// its context -- for an actual, the formal it is bound to. The key the
-// formal's union layout stands under in SimContext: the typedef's name where
-// the formal is declared by one, which RegisterDesignTypeLayouts registers;
-// the key InlineFormalLayoutKey registers the layout under where the union is
-// written inline in the formal's declaration. Without the latter `a.Valid` of
-// an inline-typed formal was read through no member and `f(tagged Invalid)`
-// raised nothing. Empty where the formal's type is neither.
-static std::string_view FormalUnionLayoutKey(const FunctionArg& param,
-                                             SimContext& ctx) {
+// §13.5.1 (printed page 348) copies the actual into a variable of the
+// formal's type, and §11.9 (printed 304) has a tagged union expression's type
+// known from its context -- for an actual, that formal. The key the formal's
+// structure or union layout stands under in SimContext: the typedef's name
+// where the formal is declared by one, which RegisterDesignTypeLayouts
+// registers; the key InlineFormalLayoutKey registers the layout under where
+// the aggregate is written inline in the formal's declaration. Without the
+// latter `a.Valid` of an inline-typed formal was read through no member and
+// `f(tagged Invalid)` raised nothing. Empty where the formal's type is
+// neither.
+static std::string_view FormalLayoutKey(const FunctionArg& param,
+                                        SimContext& ctx) {
   const DataType& dt = param.data_type;
   if (!dt.type_name.empty() && ctx.FindStructType(dt.type_name) != nullptr)
     return dt.type_name;
@@ -89,19 +92,49 @@ static const StructTypeInfo* TaggedMemberLayout(const StructTypeInfo& sinfo,
 // the right-hand side of `u = tagged Add '{...}`. False where the actual is
 // no tagged expression over a pattern, typed or bare, or the member has no
 // layout of its own, so the actual is evaluated as it was.
-bool TryEvalTaggedPatternActual(const FunctionArg& param, const Expr* actual,
-                                SimContext& ctx, Arena& arena, Logic4Vec& out) {
+static bool TryEvalTaggedPatternActual(const FunctionArg& param,
+                                       const Expr* actual, SimContext& ctx,
+                                       Arena& arena, Logic4Vec& out) {
   if (actual->kind != ExprKind::kTagged || actual->rhs == nullptr ||
       actual->lhs == nullptr)
     return false;
   const Expr* pattern = UnwrapTypedPattern(actual->lhs);
   if (pattern->kind != ExprKind::kAssignmentPattern) return false;
-  std::string_view key = FormalUnionLayoutKey(param, ctx);
+  std::string_view key = FormalLayoutKey(param, ctx);
   if (key.empty()) return false;
   const StructTypeInfo* member =
       TaggedMemberLayout(*ctx.FindStructType(key), actual->rhs->text);
   if (member == nullptr) return false;
   out = EvalStructPatternValue(pattern, member, ctx, arena);
+  return true;
+}
+
+// §10.9.2 (printed page 263): a structure assignment pattern evaluates each
+// member expression in the context of an assignment to the member it
+// initializes, by position or by name, and §13.5.1 (printed 348) makes the
+// binding of an actual an assignment to a variable of the formal's type, so
+// the structure the pattern is placed by is the formal's. An actual
+// `f('{8'd1, 8'd2})` to `function int f(pair_t s)` was evaluated as any
+// expression is, with no type to place it by, so its elements were
+// concatenated in written order at their self-determined widths: the two
+// bytes packed into the low end of the formal and `s.b` read 258, and
+// `'{b: 2, a: 1}` swapped the members. The pattern, bare or typed, is
+// evaluated against the formal's layout -- the typedef's or the inline one --
+// as EvalRhsWithStructContext evaluates `s = '{...}`; a tagged expression
+// over a pattern is placed by the member it names first. False where the
+// actual is no pattern or the formal is no structure, so the actual is
+// evaluated as it was. An element that is itself a pattern for a nested
+// structure member is still evaluated untyped by EvalStructPatternValue.
+bool TryEvalPatternActual(const FunctionArg& param, const Expr* actual,
+                          SimContext& ctx, Arena& arena, Logic4Vec& out) {
+  if (TryEvalTaggedPatternActual(param, actual, ctx, arena, out)) return true;
+  const Expr* pattern = UnwrapTypedPattern(actual);
+  if (pattern->kind != ExprKind::kAssignmentPattern) return false;
+  std::string_view key = FormalLayoutKey(param, ctx);
+  if (key.empty()) return false;
+  const StructTypeInfo* layout = ctx.FindStructType(key);
+  if (layout->is_union) return false;
+  out = EvalStructPatternValue(pattern, layout, ctx, arena);
   return true;
 }
 
@@ -114,14 +147,14 @@ bool TryEvalTaggedPatternActual(const FunctionArg& param, const Expr* actual,
 // and the tag from an identifier actual's storage, which a tagged expression
 // has none of, so `f(tagged Valid -7)` bound neither to the formal: `a.Valid`
 // inside the body was read through no member and `f(tagged Invalid)` raised
-// nothing. The layout is the one FormalUnionLayoutKey names, bound as
+// nothing. The layout is the one FormalLayoutKey names, bound as
 // BindReturnStructLayout binds a return type's; the tag is the member the
 // expression names. False where the actual is no tagged expression or the
 // formal's type has no layout.
 bool TryBindTaggedActual(const FunctionArg& param, const Expr* actual,
                          SimContext& ctx) {
   if (actual->kind != ExprKind::kTagged || actual->rhs == nullptr) return false;
-  std::string_view key = FormalUnionLayoutKey(param, ctx);
+  std::string_view key = FormalLayoutKey(param, ctx);
   if (key.empty()) return false;
   ctx.SetVariableStructType(param.name, key);
   ctx.SetVariableTag(param.name, actual->rhs->text);
@@ -146,6 +179,72 @@ bool TryBindInlineAggregateFormal(const FunctionArg& param, SimContext& ctx) {
   if (key.empty()) return false;
   ctx.SetVariableStructType(param.name, key);
   return true;
+}
+
+// §13.5.1 (printed page 348) copies the actual into a variable of the
+// formal's type, and §7.2.1 (printed 147) makes a member read of that
+// variable a window of the type's layout, whatever expression the value was
+// copied from. A formal declared by a typedef's name was bound to a layout
+// from an identifier actual's storage alone: `f('{1, 2})` and `f(g())` to
+// `function int f(pair_t s)` left the formal a plain vector, so `s.a` in the
+// body was read through no member, and `a.Valid` of a `u_t` formal given a
+// call's result the same. The layout is the one RegisterDesignTypeLayouts
+// registers under the typedef's name, bound as BindReturnStructLayout binds a
+// return type's. False where the formal's type names no registered layout,
+// which is bound as it was.
+bool TryBindNamedAggregateFormal(const FunctionArg& param, SimContext& ctx) {
+  std::string_view type_name = param.data_type.type_name;
+  if (type_name.empty() || ctx.FindStructType(type_name) == nullptr)
+    return false;
+  ctx.SetVariableStructType(param.name, type_name);
+  return true;
+}
+
+// The declared width BindValueArg, the default by-value bind, resizes the
+// actual's value to before it creates the formal's variable. Computed using
+// the live simulation scope, so a width that references in-scope
+// (class/specialization) parameters -- e.g. `logic [W-1:0]` -- resolves to
+// the bound parameter value instead of collapsing to 1 bit.
+//
+// A type carrying no packed dimension of its own is sized by DeclaredTypeWidth
+// rather than the one-argument EvalTypeWidth, so that §6.18's user-defined type
+// name contributes the width of the type it stands for. EvalTypeWidth gives a
+// DataTypeKind::kNamed no width at all, and BindValueArg resizes only a
+// non-zero width, so a formal written `nib p` was never resized and held
+// whatever width the caller's expression happened to have: `8'hFF` passed to a
+// four-bit formal read 255. §10.8 makes "the passing of a value to a subroutine
+// input, output, or inout argument" an assignment-like context, so §10.7
+// truncates or extends into the formal's declared width.
+//
+// A class-typed formal is excluded, and answers no width at all rather than
+// 64. §8.3 makes a class variable a handle to an object, not an object of a
+// width, so there is nothing here for §10.7 to truncate; and the table would
+// answer for the name whether or not the width it answered meant anything.
+// §8.27's forward declaration `typedef class C;` is the case that shows why:
+// it records the name with no type behind it yet, which is DataTypeKind::
+// kImplicit, and §6.10 makes that a scalar -- so the table holds 1 for the
+// class, and resizing to it would leave one bit of a handle. Whether a class
+// name is in the table at all then turns on whether the design happens to
+// forward-declare it, which is no basis for a width. CreateFuncLocalVar asks
+// ctx.FindClassType the same question for the same reason.
+uint32_t EvalFormalArgWidth(const DataType& dt, SimContext& ctx, Arena& arena) {
+  if (!dt.packed_dim_left || !dt.packed_dim_right) {
+    if (!dt.type_name.empty() && ctx.FindClassType(dt.type_name)) return 0;
+    // §25.9: a virtual interface formal, declared by the type or by a typedef
+    // name standing for it, holds the handle of the instance it represents,
+    // as wide as Lowerer::LowerVar makes a variable declared so, which is
+    // what an output formal is sized to before the body assigns it.
+    if (DeclaresAVirtualInterface(dt, ctx)) return 64;
+    return DeclaredTypeWidth(dt, ctx);
+  }
+  auto span = [&](const Expr* l, const Expr* r) -> uint32_t {
+    int64_t lv = static_cast<int64_t>(EvalExpr(l, ctx, arena).ToUint64());
+    int64_t rv = static_cast<int64_t>(EvalExpr(r, ctx, arena).ToUint64());
+    return static_cast<uint32_t>((lv >= rv ? lv - rv : rv - lv) + 1);
+  };
+  uint32_t width = span(dt.packed_dim_left, dt.packed_dim_right);
+  for (const auto& [l, r] : dt.extra_packed_dims) width *= span(l, r);
+  return width;
 }
 
 }  // namespace delta

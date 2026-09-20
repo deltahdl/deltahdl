@@ -784,4 +784,65 @@ TEST(TaggedUnionEval,
                              "run-time error: accessing member", 5, "11.9"));
 }
 
+// §7.3.2 (printed page 151): a tagged union value carries its tag beside the
+// member's bits, and §13.4.1 (printed 342) gives a function's implicit
+// variable the return type, so `return tagged Valid -7` hands the caller a
+// tagged value; §13.5.1 (printed 348) copies it, tag included, into the
+// formal, and §11.9 (printed 304) checks the body's member read against that
+// tag. The result reached the formal as bits alone, the tag read from an
+// identifier actual's storage and a call having none: with no layout bound
+// either, `a.Valid` read nothing at all. Bound to the typedef's layout and
+// the returned tag, it reads the member's value with no report.
+TEST(TaggedUnionEval, CallResultActualCarriesTheReturnedTag) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef union tagged { void Invalid; int Valid; } u_t;\n"
+      "  int x;\n"
+      "  function u_t g();\n"
+      "    return tagged Valid -7;\n"
+      "  endfunction\n"
+      "  function int f(u_t a);\n"
+      "    return a.Valid;\n"
+      "  endfunction\n"
+      "  initial x = f(g());\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  LowerAndRun(design, f);
+  auto* x = f.ctx.FindVariable("x");
+  ASSERT_NE(x, nullptr);
+  EXPECT_EQ(x->value.ToUint64(), 0xFFFFFFF9u);
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "run-time error: accessing member", 8, "11.9"));
+}
+
+// §11.9 (printed page 304): a member access inconsistent with the current
+// tag is a run-time error, and the tag a call's result carries is the one
+// its body's `return tagged Invalid` gave it. With the result reaching the
+// formal untagged, `a.Valid` of a formal passed `h()` raised nothing.
+TEST(TaggedUnionEval, CallResultActualOfVoidMemberIsCheckedInTheBody) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef union tagged { void Invalid; int Valid; } u_t;\n"
+      "  int y;\n"
+      "  function u_t h();\n"
+      "    return tagged Invalid;\n"
+      "  endfunction\n"
+      "  function int f(u_t a);\n"
+      "    return a.Valid;\n"
+      "  endfunction\n"
+      "  initial y = f(h());\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  LowerAndRun(design, f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "tagged union 'a' which currently has tag 'Invalid'", 8, "11.9"));
+}
+
 }  // namespace
