@@ -90,8 +90,20 @@ static Logic4Vec EvalUnaryMinus(Logic4Vec operand, Arena& arena) {
     return MakeRealVec(arena, -RealVecToDouble(operand), operand.width);
   }
   if (HasUnknownBits(operand)) return MakeAllX(arena, operand.width);
-  uint64_t val = operand.ToUint64();
-  auto r = MakeLogic4VecVal(arena, operand.width, -val);
+  // §11.4.3 defines the negation over the whole width of the operand, which
+  // §11.8.2 has already sized to the expression's, so the two's complement is
+  // taken across every word -- each inverted, one added with the carry
+  // running up, the top word cut to the width. MakeLogic4VecVal over the
+  // negated low word wrote nothing above bit 63, so `-1` extended to 128 bits
+  // read 2^64-1 rather than all ones.
+  auto r = MakeLogic4Vec(arena, operand.width);
+  uint64_t carry = 1;
+  for (uint32_t i = 0; i < r.nwords; ++i) {
+    uint64_t inverted = ~operand.words[i].aval;
+    uint64_t sum = inverted + carry;
+    carry = sum < inverted ? 1 : 0;
+    r.words[i].aval = sum & WordMaskWithinWidth(operand.width, i);
+  }
   r.is_signed = operand.is_signed;
   return r;
 }

@@ -650,4 +650,41 @@ TEST(EvalOp, WideAdditionMasksAboveADeclaredWidthInsideAWord) {
   EXPECT_EQ(r->value.words[1].aval, 0u);
 }
 
+// §11.4.3 defines the unary minus over the whole of its operand, and §11.6.1
+// sizes the operand at 128 bits here, so the two's complement of 1 is all
+// ones in both words. The negation was taken on the low word alone and left
+// the high word clear, reading 2^64-1 in 128 bits.
+TEST(EvalOp, WideUnaryMinusNegatesAcrossEveryWord) {
+  SimFixture f;
+  auto* r = RunAndFindVar(
+      "module t;\n"
+      "  logic [127:0] r;\n"
+      "  initial r = -128'd1;\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(r, nullptr);
+  ASSERT_GE(r->value.nwords, 2u);
+  EXPECT_EQ(r->value.words[0].aval, ~uint64_t{0});
+  EXPECT_EQ(r->value.words[1].aval, ~uint64_t{0});
+}
+
+// The carry of the two's complement stops at the first word that does not
+// overflow: -2^64 in 128 bits is a clear low word under a high word of all
+// ones, which discriminates a carry threaded through the words from an
+// inversion of each word on its own, which would read the high word the same
+// and the low word as all ones.
+TEST(EvalOp, WideUnaryMinusCarriesIntoTheHighWord) {
+  SimFixture f;
+  auto* r = RunAndFindVar(
+      "module t;\n"
+      "  logic [127:0] r;\n"
+      "  initial r = -128'h1_0000_0000_0000_0000;\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(r, nullptr);
+  ASSERT_GE(r->value.nwords, 2u);
+  EXPECT_EQ(r->value.words[0].aval, 0u);
+  EXPECT_EQ(r->value.words[1].aval, ~uint64_t{0});
+}
+
 }  // namespace

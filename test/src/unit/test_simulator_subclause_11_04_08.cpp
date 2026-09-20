@@ -221,12 +221,13 @@ TEST(BitwiseEval, BinaryXnorMixedSignYieldsUnsigned) {
 
 // §11.4.8: for the unary bitwise negation operator, if the operand is signed
 // the result is signed. Signedness is a property of the operand's declaration,
-// so this drives a real `logic signed` operand through the full pipeline: the
-// negation of the 4-bit value 4'b0001 is 4'b1110, whose result is signed, so
-// widening it to the 8-bit assignment target sign-extends the top bit and
-// yields 8'hFE. Were the result unsigned, the widening would zero-extend to
-// 8'h0E, so the signed result is observed from source syntax.
-TEST(OperatorSim, UnaryBitwiseNotSignedOperandResultSignExtendsFromSource) {
+// so this drives a real `logic signed` operand through the full pipeline, and
+// it is observed where §11.8.1 lets the sign of an operand decide: a
+// comparison with the signed decimal 0 is a signed comparison when the other
+// operand is signed too, so the negation of 4'b0001, whose top bit is set,
+// reads below zero and the comparison answers 1. Were the result unsigned the
+// comparison would be unsigned and answer 0.
+TEST(OperatorSim, UnaryBitwiseNotSignedOperandResultIsSignedFromSource) {
   SimFixture f;
   auto* y = RunAndFindVar(
       "module t;\n"
@@ -234,20 +235,42 @@ TEST(OperatorSim, UnaryBitwiseNotSignedOperandResultSignExtendsFromSource) {
       "  logic [7:0] y;\n"
       "  initial begin\n"
       "    a = 4'b0001;\n"
-      "    y = ~a;\n"
+      "    y = (~a) < 0;\n"
       "  end\n"
       "endmodule\n",
       f, "y");
   ASSERT_NE(y, nullptr);
-  EXPECT_EQ(y->value.ToUint64() & 0xFFu, 0xFEu);
+  EXPECT_EQ(y->value.ToUint64() & 0xFFu, 1u);
 }
 
 // §11.4.8: if the operand of the unary bitwise negation operator is unsigned,
-// the result is unsigned. Same real-source construction as the signed case but
-// with a plain (unsigned) `logic` operand: ~4'b0001 = 4'b1110, an unsigned
-// result, so widening to the 8-bit target zero-extends to 8'h0E rather than the
-// 8'hFE a signed result would sign-extend to.
-TEST(OperatorSim, UnaryBitwiseNotUnsignedOperandResultZeroExtendsFromSource) {
+// the result is unsigned. Same construction as the signed case but with a
+// plain (unsigned) `logic` operand: §11.8.1 makes the comparison unsigned
+// when either operand is, so the negation of 4'b0001 reads as the positive
+// number its bits make and is not below zero.
+TEST(OperatorSim, UnaryBitwiseNotUnsignedOperandResultIsUnsignedFromSource) {
+  SimFixture f;
+  auto* y = RunAndFindVar(
+      "module t;\n"
+      "  logic [3:0] a;\n"
+      "  logic [7:0] y;\n"
+      "  initial begin\n"
+      "    a = 4'b0001;\n"
+      "    y = (~a) < 0;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "y");
+  ASSERT_NE(y, nullptr);
+  EXPECT_EQ(y->value.ToUint64() & 0xFFu, 0u);
+}
+
+// §11.4.8 sends the negation's sizing to §11.8.2, and §11.6.1's Table 11-21
+// keeps its operand context-determined, so in `y = ~a` the 4-bit operand is
+// extended to the 8 bits of the assignment before it is inverted, by zero for
+// an unsigned operand: 8'b0000_0001 inverts to 8'hFE. An inversion at the
+// operand's own 4 bits widened afterwards would read 8'h0E, which is what
+// the test this one replaces expected.
+TEST(OperatorSim, UnaryBitwiseNotExtendsUnsignedOperandBeforeInverting) {
   SimFixture f;
   auto* y = RunAndFindVar(
       "module t;\n"
@@ -260,7 +283,7 @@ TEST(OperatorSim, UnaryBitwiseNotUnsignedOperandResultZeroExtendsFromSource) {
       "endmodule\n",
       f, "y");
   ASSERT_NE(y, nullptr);
-  EXPECT_EQ(y->value.ToUint64() & 0xFFu, 0x0Eu);
+  EXPECT_EQ(y->value.ToUint64() & 0xFFu, 0xFEu);
 }
 
 // §11.4.8: for a binary bitwise operator whose operands are of unequal bit
