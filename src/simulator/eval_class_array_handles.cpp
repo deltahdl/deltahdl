@@ -201,10 +201,9 @@ static bool SelectsAHandleElement(const Expr* sel, SimContext& ctx,
   return true;
 }
 
-bool TryEvalElementObjectMethodCall(const Expr* expr, SimContext& ctx,
-                                    Arena& arena, Logic4Vec& out) {
-  if (expr == nullptr || expr->kind != ExprKind::kCall) return false;
-  const Expr* sel = SelectOfMemberAccess(expr->lhs);
+bool ResolveElementObjectMethod(const Expr* access, SimContext& ctx,
+                                Arena& arena, InstanceMethodInfo& info) {
+  const Expr* sel = SelectOfMemberAccess(access);
   std::string_view declared;
   if (sel == nullptr || !SelectsAHandleElement(sel, ctx, arena, declared))
     return false;
@@ -212,11 +211,15 @@ bool TryEvalElementObjectMethodCall(const Expr* expr, SimContext& ctx,
   // addressing no element answering the null handle, which resolves no
   // method.
   ClassObject* obj = ctx.GetClassObject(EvalExpr(sel, ctx, arena).ToUint64());
+  return ResolveMethodByDeclaredClass(obj, declared, access->rhs->text, ctx,
+                                      info);
+}
+
+bool TryEvalElementObjectMethodCall(const Expr* expr, SimContext& ctx,
+                                    Arena& arena, Logic4Vec& out) {
+  if (expr == nullptr || expr->kind != ExprKind::kCall) return false;
   InstanceMethodInfo info;
-  if (!ResolveMethodByDeclaredClass(obj, declared, expr->lhs->rhs->text, ctx,
-                                    info)) {
-    return false;
-  }
+  if (!ResolveElementObjectMethod(expr->lhs, ctx, arena, info)) return false;
   out = RunInstanceMethod(info, expr, ctx, arena);
   return true;
 }

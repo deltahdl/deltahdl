@@ -130,24 +130,27 @@ bool TryEvalAssocElementMember(const Expr* expr, SimContext& ctx, Arena& arena,
   return true;
 }
 
-bool TryEvalAssocElementMethodCall(const Expr* expr, SimContext& ctx,
-                                   Arena& arena, Logic4Vec& out) {
+bool ResolveAssocElementMethod(const Expr* access, SimContext& ctx,
+                               Arena& arena, InstanceMethodInfo& info) {
   const Expr* sel = nullptr;
   std::string_view class_type;
-  if (expr == nullptr || expr->kind != ExprKind::kCall ||
-      !SplitMemberOfSelect(expr->lhs, sel)) {
+  if (!SplitMemberOfSelect(access, sel) ||
+      HandleArrayOfSelect(sel, ctx, arena, class_type) == nullptr) {
     return false;
   }
+  return ResolveMethodByDeclaredClass(ElementObject(sel, ctx, arena),
+                                      class_type, access->rhs->text, ctx, info);
+}
+
+bool TryEvalAssocElementMethodCall(const Expr* expr, SimContext& ctx,
+                                   Arena& arena, Logic4Vec& out) {
+  if (expr == nullptr || expr->kind != ExprKind::kCall) return false;
+  InstanceMethodInfo info;
   // §8.6 (printed page 183): an element of a declared array or of a queue is
   // as much a handle to call through as an associative array's, and had no
   // dispatch of its own.
-  if (HandleArrayOfSelect(sel, ctx, arena, class_type) == nullptr)
+  if (!ResolveAssocElementMethod(expr->lhs, ctx, arena, info))
     return TryEvalElementObjectMethodCall(expr, ctx, arena, out);
-  InstanceMethodInfo info;
-  if (!ResolveMethodByDeclaredClass(ElementObject(sel, ctx, arena), class_type,
-                                    expr->lhs->rhs->text, ctx, info)) {
-    return false;
-  }
   out = RunInstanceMethod(info, expr, ctx, arena);
   return true;
 }

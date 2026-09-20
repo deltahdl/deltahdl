@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <string>
+#include <string_view>
+
 #include "helpers_scheduler.h"
 
 using namespace delta;
@@ -170,6 +173,65 @@ TEST(TaskSim, GenerateBlockFunctionBelowANestedBlockReadsItsOwnTypedef) {
                       "endmodule\n",
                       "y"),
             12123u);
+}
+
+// §13.3 (printed pages 336-337): a task enable returns to the enabling
+// process only when the task's statements have run, its delays included,
+// and §8.6 (printed 183) enables an object's task through any handle to the
+// object; §7.4.2, §7.10 and §7.8 make each element of an array, a queue or
+// an associative array declared with the class's name such a handle. The
+// three tests below declare the receiver `decl` names, fill its element by
+// the statement `setup`, enable run() through the element `elem` in one
+// fork branch and read v through it at 5 and 15 in the other, and read
+// `at5 * 10000 + at15 * 100 + done_at`: 10510 is v's initial 1 still
+// standing at 5, the 5 written after the task's #10, and the enable
+// returning at 10. Enabled through an element, the task ran on the
+// synchronous function interpreter, whose default arm steps over a delay
+// (ExecFuncStmt in eval_function_body.cpp), so v was 5 at time 0 and the
+// enable returned at 0: 50500.
+static std::string ElementTaskDesign(std::string_view decl,
+                                     std::string_view setup,
+                                     std::string_view elem) {
+  std::string e(elem);
+  return "class C;\n"
+         "  int v = 1;\n"
+         "  task run(); #10; v = 5; endtask\n"
+         "  function int get(); return v; endfunction\n"
+         "endclass\n"
+         "module t;\n"
+         "  int at5, at15, done_at, y;\n" +
+         std::string(decl) + "  initial begin\n" + std::string(setup) +
+         "    fork\n"
+         "      begin " +
+         e + ".run(); done_at = $time; end\n" + "      begin #5 at5 = " + e +
+         ".get(); #10 at15 = " + e +
+         ".get(); end\n"
+         "    join\n"
+         "    y = at5 * 10000 + at15 * 100 + done_at;\n"
+         "  end\n"
+         "endmodule\n";
+}
+
+TEST(TaskSim, ClassTaskEnabledThroughAnArrayElementConsumesItsDelay) {
+  EXPECT_EQ(RunAndGet(ElementTaskDesign("  C arr[2];\n", "    arr[0] = new;\n",
+                                        "arr[0]"),
+                      "y"),
+            10510u);
+}
+
+TEST(TaskSim, ClassTaskEnabledThroughAQueueElementConsumesItsDelay) {
+  EXPECT_EQ(RunAndGet(ElementTaskDesign("  C q[$];\n"
+                                        "  C c = new;\n",
+                                        "    q.push_back(c);\n", "q[0]"),
+                      "y"),
+            10510u);
+}
+
+TEST(TaskSim, ClassTaskEnabledThroughAnAssocElementConsumesItsDelay) {
+  EXPECT_EQ(RunAndGet(ElementTaskDesign("  C aa[string];\n",
+                                        "    aa[\"k\"] = new;\n", "aa[\"k\"]"),
+                      "y"),
+            10510u);
 }
 
 }  // namespace

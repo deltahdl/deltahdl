@@ -16,6 +16,8 @@
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "simulator/class_object.h"
+#include "simulator/eval_assoc_class_handles.h"
+#include "simulator/eval_class_array_handles.h"
 #include "simulator/eval_class_scope_types.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
@@ -148,13 +150,17 @@ static bool ResolveMethodByParts(const MethodCallParts& parts, SimContext& ctx,
 // inherits from (§8.13), the override the object's class holds taken first
 // (§8.20). False for any other expression, for a member that is a property
 // and for a name that is a variable. Taken as two identifiers alone, the
-// scoped form read m as a property and discarded the value.
+// scoped form read m as a property and discarded the value. An element of a
+// container of handles is a handle here as in the parenthesised call
+// (§8.6), so `arr[0].run;` is `arr[0].run();`.
 static bool ResolveMethodNamedBare(const Expr* expr, SimContext& ctx,
                                    Arena& arena, InstanceMethodInfo& call) {
   MethodCallParts parts;
   if (expr->kind == ExprKind::kMemberAccess && !expr->is_scope_resolution) {
-    return ExtractHandleAccessParts(expr, arena, parts) &&
-           ResolveMethodByParts(parts, ctx, call);
+    if (ExtractHandleAccessParts(expr, arena, parts))
+      return ResolveMethodByParts(parts, ctx, call);
+    return ResolveElementObjectMethod(expr, ctx, arena, call) ||
+           ResolveAssocElementMethod(expr, ctx, arena, call);
   }
   if (expr->kind != ExprKind::kIdentifier) return false;
   return ResolveMethodOnRunningObject(expr->text, ctx, call);
@@ -171,6 +177,16 @@ static bool ResolveMethodNamedBare(const Expr* expr, SimContext& ctx,
 // the enable from the initial returned at time 0.
 // §26.3 admits a package-qualified handle as the receiver, `p1::h.t(...)`,
 // resolved by the key ExtractHandleMethodCallParts answers.
+// §8.6 (printed page 183) with §7.4.2, §7.10 and §7.8: an element of a
+// declared array, a queue or an associative array of handles is a handle to
+// enable through as any other, `arr[0].t(...)`, `q[0].t(...)`,
+// `aa["k"].t(...)`, resolved by the element's object
+// (ResolveElementObjectMethod, ResolveAssocElementMethod). Admitted as an
+// identifier or `p1::h` alone, the enable through an element fell to the
+// expression evaluator, which ran the task on the synchronous function
+// interpreter: its `#10` was stepped over, the write after it landed at time 0,
+// and the enable returned at 0 where §13.3 (printed 336-337) returns it once
+// the body has run.
 static bool ResolveMethodOfStatement(const Expr* expr, SimContext& ctx,
                                      Arena& arena, InstanceMethodInfo& call) {
   if (expr->kind != ExprKind::kCall) {
@@ -181,8 +197,10 @@ static bool ResolveMethodOfStatement(const Expr* expr, SimContext& ctx,
     return ResolveMethodOnRunningObject(expr->callee, ctx, call);
   }
   MethodCallParts parts;
-  return ExtractHandleMethodCallParts(expr, arena, parts) &&
-         ResolveMethodByParts(parts, ctx, call);
+  if (ExtractHandleMethodCallParts(expr, arena, parts))
+    return ResolveMethodByParts(parts, ctx, call);
+  return ResolveElementObjectMethod(expr->lhs, ctx, arena, call) ||
+         ResolveAssocElementMethod(expr->lhs, ctx, arena, call);
 }
 
 bool SetupInstanceTaskCall(const Expr* expr, SimContext& ctx, Arena& arena,

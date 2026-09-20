@@ -1,6 +1,7 @@
 #pragma once
 
 #include "common/types.h"
+#include "simulator/eval_function_internal.h"
 
 namespace delta {
 
@@ -36,16 +37,26 @@ bool TryAssocElementNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena);
 bool TryEvalAssocElementMember(const Expr* expr, SimContext& ctx, Arena& arena,
                                Logic4Vec& out);
 
-// §8.4/§7.8: `expr` as `m[k].f(...)`, the method `f` run on the object the
-// element `m[k]` of a declared associative array of class handles refers to,
-// dispatched by the array's declared element class as a call through a
-// variable of that class is (§8.20). A call on an element of any other
-// container of handles -- a declared fixed-size or dynamic array, a queue --
-// is handed to TryEvalElementObjectMethodCall (eval_class_array_handles.h),
-// so the one site the method-call evaluator asks (TryDispatchMethodOrLet in
-// eval_function.cpp) serves every element. False for a call of any other
-// shape, one on a container whose elements are no handles, an element that
-// refers to no object, or a method the object's class does not have.
+// §8.4/§7.8: the method `f` the member access `m[k].f` names on the object
+// the element `m[k]` of an associative array of class handles refers to,
+// declared or a property, resolved by the array's element class as a call
+// through a variable of that class is (§8.20) into `info` as
+// ResolveInstanceMethod fills it. False for an access of any other shape,
+// one on an array whose elements are no handles, an element that refers to
+// no object, or a method the object's class does not have. Shared by the
+// call below and by the task enable (SetupInstanceTaskCall in
+// eval_instance_task.cpp), which runs the task as a coroutine so §13.3's
+// delays are consumed; resolved by the evaluator alone, `aa["k"].run();` ran
+// on the synchronous interpreter and dropped its `#10`.
+bool ResolveAssocElementMethod(const Expr* access, SimContext& ctx,
+                               Arena& arena, InstanceMethodInfo& info);
+
+// `expr` as `m[k].f(...)`, the method ResolveAssocElementMethod names run
+// with the call's actuals. A call on an element of any other container of
+// handles -- a declared fixed-size or dynamic array, a queue -- is handed to
+// TryEvalElementObjectMethodCall (eval_class_array_handles.h), so the one
+// site the method-call evaluator asks (TryDispatchMethodOrLet in
+// eval_function.cpp) serves every element.
 bool TryEvalAssocElementMethodCall(const Expr* expr, SimContext& ctx,
                                    Arena& arena, Logic4Vec& out);
 

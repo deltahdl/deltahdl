@@ -3,6 +3,7 @@
 #include <string_view>
 
 #include "common/types.h"
+#include "simulator/eval_function_internal.h"
 
 namespace delta {
 
@@ -51,19 +52,27 @@ Logic4Vec ConstructElementObject(const Expr* rhs, std::string_view class_type,
 bool TryEvalElementObjectMember(const Expr* expr, SimContext& ctx, Arena& arena,
                                 Logic4Vec& out);
 
-// §8.6 (printed page 183): `expr` as `a[i].f(...)`, the method `f` run on the
-// object the element `a[i]` refers to, where `a` is a declared fixed-size or
-// dynamic array of handles or a queue of them, declared or a property, and
-// §7.4.2 (printed 153-154) and §7.10 (printed 169) make the element a handle
-// like any other. Dispatched by the element's declared class where the
+// §8.6 (printed page 183): the method `f` the member access `a[i].f` names on
+// the object the element `a[i]` refers to, where `a` is a declared fixed-size
+// or dynamic array of handles or a queue of them, declared or a property,
+// §7.4.2 (printed 153-154) and §7.10 (printed 169) making the element a
+// handle like any other. Resolved by the element's declared class where the
 // array's declaration recorded one, as a call through a variable of that
-// class is (§8.20), and by the object's own class for a queue property. The
-// associative array's element is served by TryEvalAssocElementMethodCall
-// (eval_assoc_class_handles.h), which asks this for every other container.
-// False for a call of any other shape, one on a container whose elements are
-// no handles, an element that refers to no object, or a method the object's
-// class does not have. Before this the call had no dispatch: `arr[0].get()`
-// read 0 and the task enable `arr[0].run();` ran nothing.
+// class is (§8.20), and by the object's own class for a queue property, into
+// `info` as ResolveInstanceMethod fills it. False for an access of any other
+// shape, one on a container whose elements are no handles, an element that
+// refers to no object, or a method the object's class does not have. Shared
+// by the call below and by the task enable (SetupInstanceTaskCall in
+// eval_instance_task.cpp), which runs the task as a coroutine so §13.3's
+// delays are consumed; resolved by the evaluator alone, `arr[0].run();` ran
+// on the synchronous interpreter and dropped its `#10`.
+bool ResolveElementObjectMethod(const Expr* access, SimContext& ctx,
+                                Arena& arena, InstanceMethodInfo& info);
+
+// `expr` as `a[i].f(...)`, the method ResolveElementObjectMethod names run
+// with the call's actuals. The associative array's element is served by
+// TryEvalAssocElementMethodCall (eval_assoc_class_handles.h) beside this.
+// Before this the call had no dispatch: `arr[0].get()` read 0.
 bool TryEvalElementObjectMethodCall(const Expr* expr, SimContext& ctx,
                                     Arena& arena, Logic4Vec& out);
 
