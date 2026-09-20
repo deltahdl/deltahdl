@@ -19,6 +19,7 @@
 #include "simulator/class_object.h"
 #include "simulator/dpi_arg_value.h"
 #include "simulator/dpi_runtime.h"
+#include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
 #include "simulator/net.h"
@@ -28,6 +29,7 @@
 #include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
 #include "simulator/stmt_exec.h"
+#include "simulator/variable.h"
 
 namespace delta {
 
@@ -193,6 +195,43 @@ void RegisterPackageScopedSubroutines(const RtlirDesign* design,
       auto* key = arena.Create<std::string>(std::string(pkg->name) +
                                             "::" + std::string(item->name));
       ctx.RegisterFunction(*key, item);
+    }
+  }
+}
+
+// The default a package variable with no initializer holds: §6.8's Table 6-7
+// gives a 4-state integral variable x, which CreateVariable filled, and a
+// 2-state one 0. A string and a real are registered as such, since a read of
+// either goes through the kind rather than through the bits.
+static void ShapePackageVariable(const ModuleItem* item, Variable* var,
+                                 std::string_view qname, SimContext& ctx,
+                                 Arena& arena) {
+  const DataType& type = item->data_type;
+  var->is_4state = DeclaredTypeIs4State(type);
+  var->is_signed = DeclaredTypeIsSigned(type, ctx);
+  var->value.is_signed = var->is_signed;
+  if (!var->is_4state)
+    var->value = MakeLogic4VecVal(arena, var->value.width, 0);
+  if (DeclaredTypeIsString(type, ctx)) ctx.RegisterStringVariable(qname);
+  bool is_real = type.kind == DataTypeKind::kReal ||
+                 type.kind == DataTypeKind::kShortreal ||
+                 type.kind == DataTypeKind::kRealtime;
+  if (is_real) ctx.RegisterRealVariable(qname);
+}
+
+void InitPackageDataVariables(const RtlirDesign* design, SimContext& ctx,
+                              Arena& arena) {
+  for (auto* pkg : design->packages) {
+    for (auto* item : pkg->items) {
+      bool is_param = item->kind == ModuleItemKind::kParamDecl;
+      bool is_var = item->kind == ModuleItemKind::kVarDecl;
+      if (!(is_var || (is_param && item->init_expr))) continue;
+      auto* qname = arena.Create<std::string>(std::string(pkg->name) + "." +
+                                              std::string(item->name));
+      uint32_t width = is_var ? DeclaredTypeWidth(item->data_type, ctx) : 0;
+      auto* var = ctx.CreateVariable(*qname, width == 0 ? 32 : width);
+      if (is_var) ShapePackageVariable(item, var, *qname, ctx, arena);
+      if (item->init_expr) var->value = EvalExpr(item->init_expr, ctx, arena);
     }
   }
 }

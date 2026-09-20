@@ -84,6 +84,15 @@ void RegisterPackageScopedSubroutines(const RtlirDesign* design,
 // §6.19 with §26.3: each package's enumeration constants under their
 // "pk.name" keys, the keys a read through the package scope resolution
 // operator resolves by, each at the value its declaration folds to.
+// §26.2 with §6.8: every package parameter with an initializer and every
+// package variable, with or without one, is given storage under its
+// "pk.name" key -- the variable at its declared type's width, state and
+// signedness, a string or real registered as such, an integral variable
+// without an initializer at §6.8's default -- so a write through the scope
+// or an import lands and a read through either sees it.
+void InitPackageDataVariables(const RtlirDesign* design, SimContext& ctx,
+                              Arena& arena);
+
 void RegisterPackageEnumConstants(const RtlirDesign* design, SimContext& ctx,
                                   Arena& arena);
 // §6.18 with §8.25.1: each typedef name whose chain ends in a class, bound

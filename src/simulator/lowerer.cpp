@@ -672,21 +672,6 @@ static void RegisterDesignTypeWidths(const RtlirDesign* design,
   }
 }
 
-static void InitPackageDataVariables(const RtlirDesign* design, SimContext& ctx,
-                                     Arena& arena) {
-  for (auto* pkg : design->packages) {
-    for (auto* item : pkg->items) {
-      bool is_param = item->kind == ModuleItemKind::kParamDecl;
-      bool is_var = item->kind == ModuleItemKind::kVarDecl;
-      if (!(is_param || is_var) || !item->init_expr) continue;
-      auto* qname = arena.Create<std::string>(std::string(pkg->name) + "." +
-                                              std::string(item->name));
-      auto* var = ctx.CreateVariable(*qname, 32);
-      var->value = EvalExpr(item->init_expr, ctx, arena);
-    }
-  }
-}
-
 // §20.4.1: publish each design element's resolved timescale under its module
 // name and instance name so a $timeunit/$timeprecision argument that names the
 // element (e.g. $timeunit(dut)) reports that element's value. Annex D.10 adds

@@ -723,4 +723,48 @@ TEST(PackageScopeReferenceSim,
             250u * 1000u + 251u);
 }
 
+// §6.8 gives a variable declared with no initializer its type's default and
+// makes it an assignment target, and §26.3 names a package's variable through
+// the package scope resolution operator and through an import. A package
+// variable declared without an initializer, `int pn;`, was given no storage
+// at all, so `P::pn = 17` landed nowhere and pn read 0 by both names; with
+// storage the write is read through both, 17 * 100 + 17, and the bare write
+// `pn = 23` is read back through the scope, + 23.
+TEST(PackageScopeReferenceSim, PackageVariableWithoutInitializerIsWritable) {
+  EXPECT_EQ(RunAndGet("package P;\n"
+                      "  int pn;\n"
+                      "endpackage\n"
+                      "module t;\n"
+                      "  import P::*;\n"
+                      "  int out;\n"
+                      "  initial begin\n"
+                      "    P::pn = 17;\n"
+                      "    out = P::pn * 100 + pn;\n"
+                      "    pn = 23;\n"
+                      "    out = out * 100 + P::pn;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "out"),
+            (17u * 100u + 17u) * 100u + 23u);
+}
+
+// The declared type goes with the storage: a package `string ps` holds the
+// whole text written to it, len() 5, and a `logic pl` starts unknown while
+// an `int` starts 0 (§6.8 Table 6-7) -- 5 * 100 + 1 * 10 + 0.
+TEST(PackageScopeReferenceSim, PackageVariableWithoutInitializerKeepsItsType) {
+  EXPECT_EQ(RunAndGet("package P;\n"
+                      "  logic pl; int pn; string ps;\n"
+                      "endpackage\n"
+                      "module t;\n"
+                      "  int out;\n"
+                      "  initial begin\n"
+                      "    P::ps = \"name2\";\n"
+                      "    out = P::ps.len() * 100 + $isunknown(P::pl) * 10 +\n"
+                      "          (P::pn == 0 ? 0 : 1);\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "out"),
+            510u);
+}
+
 }  // namespace

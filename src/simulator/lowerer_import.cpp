@@ -216,9 +216,11 @@ void Lowerer::LowerAllImported(
 
 void Lowerer::AliasPackageDataItem(const PackageDecl* pkg,
                                    const ModuleItem* item) {
+  // §6.8: a variable is declared with or without an initializer, and
+  // InitPackageDataVariables gives both storage; a parameter has one.
   bool is_param = item->kind == ModuleItemKind::kParamDecl;
   bool is_var = item->kind == ModuleItemKind::kVarDecl;
-  if (!(is_param || is_var) || !item->init_expr) return;
+  if (!(is_var || (is_param && item->init_expr))) return;
   // §26.3 makes the imported name visible "within the current scope", and the
   // current scope is the one that wrote the import. Key the binding by the
   // instance being lowered so two instances importing a like-named item from
