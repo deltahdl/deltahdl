@@ -11,6 +11,7 @@
 #include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
 #include "simulator/class_object.h"
+#include "simulator/declared_class_key.h"
 #include "simulator/eval_array.h"
 #include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_array_class_queue.h"
@@ -402,7 +403,13 @@ static Variable* CreateFuncLocalVar(std::string_view name, const DataType& type,
   // holds a 64-bit handle and must record its class type so later method calls
   // such as `p.suspend()` dispatch -- module-scope decls do this via
   // TryExecClassVarDecl, but function-body locals take this path instead.
-  bool is_class = !type.type_name.empty() && ctx.FindClassType(type.type_name);
+  // §8.23 (printed pages 200-201): the class is the one the run holds under
+  // the declaration's spelling, `Outer::Inner` for a nested class named from
+  // outside its container (DeclaredClassKey), where a lookup by the bare
+  // `Inner` found none, so `Outer::Inner i = new; i.bump();` in a function,
+  // a task or a class method declared a plain variable and ran no method.
+  std::string_view class_key = DeclaredClassKey(type, ctx, arena);
+  bool is_class = !class_key.empty();
   // §25.9: a virtual interface declared in a function body, by the type or
   // by a typedef name standing for it, holds the handle of the instance it
   // represents, as wide as Lowerer::LowerVar makes a variable declared so and
@@ -440,7 +447,7 @@ static Variable* CreateFuncLocalVar(std::string_view name, const DataType& type,
   v->is_4state = DeclaredTypeIs4State(type);
   v->is_virtual_interface = is_virtual_interface;
   if (is_string) v->is_string = true;
-  if (is_class) ctx.SetVariableClassType(name, type.type_name);
+  if (is_class) ctx.SetVariableClassType(name, class_key);
   RecordVariableEnumType(name, type, ctx);
   // §11.5.1: the declared range an index of the local resolves against, the
   // dimension written here or the one its typedef name stands for (§6.18),
@@ -460,8 +467,7 @@ static Variable* CreateFuncLocalVar(std::string_view name, const DataType& type,
   // null. A class-typed local with a `new` initializer is therefore constructed
   // here, as the declaration path for a variable outside a subroutine does.
   if (is_class && init->kind == ExprKind::kCall && init->text == "new") {
-    v->value =
-        EvalClassNew(type.type_name, init, ctx, arena, init->range.start);
+    v->value = EvalClassNew(class_key, init, ctx, arena, init->range.start);
     ApplyClassParamOverrides(name, v->value.ToUint64(), ctx, arena);
     return v;
   }

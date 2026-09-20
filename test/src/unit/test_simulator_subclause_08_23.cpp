@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <string>
+#include <string_view>
+
 #include "common/types.h"
 #include "fixture_simulator.h"
 #include "helpers_class_object.h"
@@ -399,6 +402,72 @@ TEST(ClassScopeResolutionSim, StringListNodeExampleLinksNestedObjects) {
   LowerRunAndCheck(
       f, design,
       {{"head_depth", 2u}, {"link_depth", 1u}, {"head_is_alpha", 1u}});
+}
+
+// §8.23 (printed pages 200-201 of the LRM): from outside the containing
+// class the nested class is named `Outer::Inner`, and a nested class's
+// method has unqualified access to the containing class's static
+// properties. The three tests below declare such an object as a subroutine
+// body's local -- a module function's, a task's and a class method's --
+// which CreateFuncLocalVar (eval_function_body.cpp) creates, where a
+// procedural block's declaration goes through TryExecClassVarDecl. Looked
+// up by the bare `Inner`, the local was a plain variable, `i.bump()` ran
+// nothing and `Outer::n` stayed 0; through the `Outer::Inner` key
+// LowerNestedClass registers, bump() adds 5. The shared Outer/Inner
+// prelude is one string so the three do not repeat it.
+static std::string OuterInnerBumpDesign(std::string_view rest) {
+  return "class Outer;\n"
+         "  static int n = 0;\n"
+         "  class Inner;\n"
+         "    function void bump(); n = n + 5; endfunction\n"
+         "  endclass\n"
+         "endclass\n" +
+         std::string(rest);
+}
+
+TEST(ClassScopeResolutionSim, ModuleFunctionLocalOfANestedClassIsConstructed) {
+  EXPECT_EQ(RunAndGet(OuterInnerBumpDesign("module t;\n"
+                                           "  function int f();\n"
+                                           "    Outer::Inner i = new;\n"
+                                           "    i.bump();\n"
+                                           "    return Outer::n;\n"
+                                           "  endfunction\n"
+                                           "  int r;\n"
+                                           "  initial r = f();\n"
+                                           "endmodule\n"),
+                      "r"),
+            5u);
+}
+
+TEST(ClassScopeResolutionSim, TaskLocalOfANestedClassIsConstructed) {
+  EXPECT_EQ(RunAndGet(OuterInnerBumpDesign("module t;\n"
+                                           "  int r;\n"
+                                           "  task bump_once();\n"
+                                           "    Outer::Inner i = new;\n"
+                                           "    i.bump();\n"
+                                           "    r = Outer::n;\n"
+                                           "  endtask\n"
+                                           "  initial bump_once();\n"
+                                           "endmodule\n"),
+                      "r"),
+            5u);
+}
+
+TEST(ClassScopeResolutionSim, ClassMethodLocalOfANestedClassIsConstructed) {
+  EXPECT_EQ(RunAndGet(OuterInnerBumpDesign("class Driver;\n"
+                                           "  function int go();\n"
+                                           "    Outer::Inner i = new;\n"
+                                           "    i.bump();\n"
+                                           "    return Outer::n;\n"
+                                           "  endfunction\n"
+                                           "endclass\n"
+                                           "module t;\n"
+                                           "  Driver d = new;\n"
+                                           "  int r;\n"
+                                           "  initial r = d.go();\n"
+                                           "endmodule\n"),
+                      "r"),
+            5u);
 }
 
 }  // namespace

@@ -436,6 +436,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/coverage_cross.cpp
     simulator/coverage_db.cpp
     simulator/coverage_options.cpp
+    simulator/declared_class_key.cpp
     simulator/dpi_runtime_assertion.cpp
     simulator/dpi_runtime_global_names.cpp
     simulator/dpi_runtime_export_call.cpp
