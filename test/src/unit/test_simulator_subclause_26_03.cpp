@@ -846,4 +846,77 @@ TEST(PackageImportSim, ExplicitImportOfAnEnumLiteralShadowsAWildcardsLiteral) {
             431u);
 }
 
+// §26.3: `p::BLUE` names p's enumeration literal from any scope, with the
+// literal's type, so §6.19.3 asks no cast of `c = p::BLUE` for a variable of
+// that type, and the literal is its value wherever an integral is read. The
+// elaborator took the scoped name for an integer and rejected c2's assignment,
+// which RunAndGet reports; each scoped read also carries its own value, BLUE 2
+// and GREEN 1, so a read that finds no storage answers 0 in its digit --
+// 2 * 1000 + 2 * 100 + 1 * 10 + 2.
+TEST(PackageScopeReferenceSim, ScopedEnumLiteralAssignedToAVariableOfItsType) {
+  EXPECT_EQ(RunAndGet("package p;\n"
+                      "  typedef enum { RED, GREEN, BLUE } color_t;\n"
+                      "endpackage\n"
+                      "module t;\n"
+                      "  import p::*;\n"
+                      "  color_t c1, c2;\n"
+                      "  int i, j, out;\n"
+                      "  initial begin\n"
+                      "    c1 = BLUE;\n"
+                      "    c2 = p::BLUE;\n"
+                      "    i = p::GREEN;\n"
+                      "    j = int'(p::BLUE);\n"
+                      "    out = c1 * 1000 + c2 * 100 + i * 10 + j;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "out"),
+            2212u);
+}
+
+// The same literal through the scope alone, no import in force, into a
+// variable whose type is named through the scope as well: `c = p::BLUE` left c
+// 0. 2 is BLUE's value and neither RED's nor an unbound name's.
+TEST(PackageScopeReferenceSim, ScopedEnumLiteralAssignedWithoutAnImport) {
+  EXPECT_EQ(RunAndGet("package p;\n"
+                      "  typedef enum { RED, GREEN, BLUE } color_t;\n"
+                      "endpackage\n"
+                      "module t;\n"
+                      "  p::color_t c;\n"
+                      "  int out;\n"
+                      "  initial begin\n"
+                      "    c = p::BLUE;\n"
+                      "    out = c;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "out"),
+            2u);
+}
+
+// §12.5 compares the case expression with each case item's value, and §26.3
+// makes `p::TWO` that value where a bare TWO is; the scoped item never matched
+// and the default was taken. The default writes 7 and the item 2, so a case
+// that matches nothing and one that matches the wrong item are each told from
+// the match.
+TEST(PackageScopeReferenceSim, ScopedEnumLiteralMatchesAsACaseItem) {
+  EXPECT_EQ(RunAndGet("package p;\n"
+                      "  typedef enum { ONE = 1, TWO, THREE } num_t;\n"
+                      "endpackage\n"
+                      "module t;\n"
+                      "  import p::*;\n"
+                      "  num_t n;\n"
+                      "  int out;\n"
+                      "  initial begin\n"
+                      "    n = TWO;\n"
+                      "    case (n)\n"
+                      "      ONE: out = 1;\n"
+                      "      p::TWO: out = 2;\n"
+                      "      THREE: out = 3;\n"
+                      "      default: out = 7;\n"
+                      "    endcase\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "out"),
+            2u);
+}
+
 }  // namespace

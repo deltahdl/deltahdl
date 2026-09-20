@@ -677,4 +677,50 @@ TEST(Elaboration, EnumDeclaredInAForHeaderWithACastIsAccepted) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// §26.3 has `p::BLUE` name the enumeration literal p declares, of the
+// enumeration's type, so §6.19.3 asks no cast of it where a bare BLUE needs
+// none. The scoped name was taken for an integer and each of the three sites
+// reported it, so the module declaration's initializer, the procedural
+// declaration's and the assignment each write one.
+TEST(Elaboration, ScopedPackageEnumLiteralAssignedToItsTypeIsAccepted) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "package p;\n"
+      "  typedef enum { RED, GREEN, BLUE } color_t;\n"
+      "endpackage\n"
+      "module top();\n"
+      "  import p::*;\n"
+      "  color_t c = p::GREEN;\n"
+      "  initial begin\n"
+      "    color_t d = p::RED;\n"
+      "    c = p::BLUE;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// The scope resolution operator is not what exempts the value: a package
+// parameter named through it is an integer to §6.19.3 as a module's parameter
+// is, so the same package declaring the enumeration and the parameter has the
+// literal accepted above and the parameter reported here.
+TEST(Elaboration, ScopedPackageParameterAssignedToEnumIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package p;\n"
+      "  typedef enum { RED, GREEN, BLUE } color_t;\n"
+      "  parameter int K = 2;\n"
+      "endpackage\n"
+      "module top();\n"
+      "  import p::*;\n"
+      "  color_t c;\n"
+      "  initial c = p::K;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "integer assigned to enum variable without cast", 8,
+                            "6.19.3"));
+}
+
 }  // namespace

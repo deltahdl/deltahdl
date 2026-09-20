@@ -16,6 +16,7 @@
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/type_eval.h"
 #include "lexer/token.h"
+#include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
@@ -411,17 +412,53 @@ static bool IsEnumTypedMethodResult(const Expr* e) {
   return m == "first" || m == "last" || m == "next" || m == "prev";
 }
 
+// §6.19: whether the enumeration `item` declares, through a typedef or as the
+// type of a data declaration (Syntax 6-5), has a member named `name`.
+static bool ItemDeclaresEnumMember(const ModuleItem& item,
+                                   std::string_view name) {
+  const DataType& type = item.kind == ModuleItemKind::kTypedef
+                             ? item.typedef_type
+                             : item.data_type;
+  if (type.kind != DataTypeKind::kEnum) return false;
+  return std::any_of(type.enum_members.begin(), type.enum_members.end(),
+                     [name](const EnumMember& m) { return m.name == name; });
+}
+
+// §26.3: `pkg::name` written with the package scope resolution operator names
+// package pkg's declaration of name from any scope, imported or not, and §6.19
+// makes an enumeration's members constants of the package that writes the
+// enumeration; so where pkg declares an enumeration with a member of that name
+// the reference is the literal itself, of the enumeration's type, exactly as
+// the bare name of a literal is. A package parameter named the same way is not
+// a literal and stays an integer to §6.19.3. True for the literal alone.
+static bool IsPackageEnumMemberRef(const Expr* e, const CompilationUnit* unit) {
+  if (unit == nullptr || e->kind != ExprKind::kMemberAccess ||
+      !e->is_scope_resolution || e->lhs == nullptr || e->rhs == nullptr ||
+      e->lhs->kind != ExprKind::kIdentifier ||
+      e->rhs->kind != ExprKind::kIdentifier) {
+    return false;
+  }
+  for (const auto* pkg : unit->packages) {
+    if (pkg->name != e->lhs->text) continue;
+    for (const auto* item : pkg->items) {
+      if (ItemDeclaresEnumMember(*item, e->rhs->text)) return true;
+    }
+  }
+  return false;
+}
+
 // True when `e` may initialize or be assigned to an enum variable without a
-// cast: an identifier (another value of the type), an explicit cast, or a call
-// of an enumeration method whose declared result is the enumeration type
-// (§6.19.5). §6.19.3 requires the cast for an expression of a different type,
-// which none of these is. Every place that screens a value bound for an enum
-// variable -- an assignment, a module-item declaration's initializer, a
-// procedural declaration's initializer -- asks this one question, so that the
-// three cannot answer it differently.
-static bool IsBareEnumAssignable(const Expr* e) {
+// cast: an identifier (another value of the type), a package's enumeration
+// literal named through its scope (§26.3), an explicit cast, or a call of an
+// enumeration method whose declared result is the enumeration type (§6.19.5).
+// §6.19.3 requires the cast for an expression of a different type, which none
+// of these is. Every place that screens a value bound for an enum variable --
+// an assignment, a module-item declaration's initializer, a procedural
+// declaration's initializer -- asks this one question, so that the three
+// cannot answer it differently.
+static bool IsBareEnumAssignable(const Expr* e, const CompilationUnit* unit) {
   return e && (e->kind == ExprKind::kIdentifier || e->kind == ExprKind::kCast ||
-               IsEnumTypedMethodResult(e));
+               IsPackageEnumMemberRef(e, unit) || IsEnumTypedMethodResult(e));
 }
 
 void Elaborator::CheckEnumAssignStmt(const Stmt* s) {
@@ -436,7 +473,7 @@ void Elaborator::CheckEnumAssignStmt(const Stmt* s) {
     return;
   }
   if (!s->rhs) return;
-  if (IsBareEnumAssignable(s->rhs)) return;
+  if (IsBareEnumAssignable(s->rhs, unit_)) return;
   diag_.Error(s->range.start, "integer assigned to enum variable without cast",
               Subclause("6.19.3"));
 }
@@ -581,7 +618,7 @@ void Elaborator::WalkStmtsForEnumAssign(const Stmt* s) {
   WalkExprForEnumCalls(s->condition);
   if (StmtDeclaresEnumVar(s, typedefs_)) {
     enum_var_names_.insert(s->var_name);
-    if (s->var_init && !IsBareEnumAssignable(s->var_init)) {
+    if (s->var_init && !IsBareEnumAssignable(s->var_init, unit_)) {
       diag_.Error(s->range.start,
                   "integer assigned to enum variable without cast",
                   Subclause("6.19.3"));
@@ -614,7 +651,7 @@ void Elaborator::ValidateEnumAssignments(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kVarDecl &&
         enum_var_names_.count(item->name) != 0 && item->init_expr &&
-        !IsBareEnumAssignable(item->init_expr)) {
+        !IsBareEnumAssignable(item->init_expr, unit_)) {
       diag_.Error(item->loc, "integer assigned to enum variable without cast",
                   Subclause("6.19.3"));
     }
