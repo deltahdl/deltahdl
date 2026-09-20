@@ -1,12 +1,14 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
 #include "common/arena.h"
 #include "common/types.h"
 #include "elaborator/const_eval.h"
+#include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "lexer/token.h"
 #include "parser/ast_class.h"
@@ -161,6 +163,17 @@ static void AttachScopeMethodBodies(
   }
 }
 
+// The two things a class declaration reads from the scope declaring it: the
+// out-of-block method bodies of §8.24, which a compilation unit, package or
+// module carries in its items and a class carries none of, and the constants
+// of the compilation unit (RtlirDesign::unit_constants), which §3.12.1 has a
+// name search reach once the class body itself holds no declaration of the
+// name, for any class wherever it is declared.
+struct ClassDeclScope {
+  const std::vector<ModuleItem*>& items;
+  const ScopeMap& constants;
+};
+
 // §8.25: the value parameters a property's packed dimension may name, `bit
 // [size-1:0] a` in the subclause's `vector #(int size = 1)`, each at the
 // default the class declares for it -- the header parameters in order, a
@@ -169,8 +182,18 @@ static void AttachScopeMethodBodies(
 // type parameter stands for no value and is left out, as is a default that
 // does not fold to a constant. The widths this sizes are those of the default
 // specialization (§8.25.1).
-static ScopeMap ClassParamScope(const ClassDecl* cls) {
-  ScopeMap scope;
+//
+// The class's own parameters are laid over `constants`, the compilation
+// unit's: §6.20.4 lets a localparam be declared at compilation-unit scope and
+// §26.3 names a package's parameter through `pkg::`, and §7.4.1 has a packed
+// dimension's bounds be constant expressions, so `logic [W-1:0] v` under
+// `localparam int W = 10;` outside the class and `logic [p::W-1:0] v` are
+// ten bits, as the same dimension on a module's variable already was. Folded
+// against the class's parameters alone, neither bound folded, and the
+// property fell to the one bit of its base type.
+static ScopeMap ClassParamScope(const ClassDecl* cls,
+                                const ScopeMap& constants) {
+  ScopeMap scope = constants;
   for (const auto& [pname, pexpr] : cls->params) {
     if (pexpr == nullptr || cls->type_param_names.count(pname) != 0) continue;
     if (auto v = ConstEvalInt(pexpr, scope)) scope[pname] = *v;
@@ -186,8 +209,9 @@ static ScopeMap ClassParamScope(const ClassDecl* cls) {
   return scope;
 }
 
-static void CollectClassMembers(ClassTypeInfo* info, const ClassDecl* cls) {
-  ScopeMap params = ClassParamScope(cls);
+static void CollectClassMembers(ClassTypeInfo* info, const ClassDecl* cls,
+                                const ScopeMap& constants) {
+  ScopeMap params = ClassParamScope(cls, constants);
   for (auto* member : cls->members) {
     if (member->kind == ClassMemberKind::kProperty) {
       uint32_t w = EvalTypeWidth(member->data_type, {}, params);
@@ -342,14 +366,14 @@ static ClassTypeInfo* BaseClassOf(const ClassDecl* cls, SimContext& ctx) {
 
 // The base, the interfaces, the members, the vtable and the static storage of
 // the class `cls` declares, filled into `info` whichever scope declares the
-// class: a compilation unit, package or module, whose `scope_items` carry the
+// class: a compilation unit, package or module, whose `scope.items` carry the
 // out-of-block method bodies of §8.24, or another class (§8.23), which carries
 // none. Before the two shared this, a nested class was given its properties
 // and methods alone -- no declared type name on a property, so `link = new`
 // on a `Node link` constructed nothing, and no vtable.
 static void PopulateClassType(ClassTypeInfo* info, const ClassDecl* cls,
-                              const std::vector<ModuleItem*>& scope_items,
-                              SimContext& ctx, Arena& arena) {
+                              const ClassDeclScope& scope, SimContext& ctx,
+                              Arena& arena) {
   if (!cls->base_class.empty()) info->parent = BaseClassOf(cls, ctx);
   for (const auto& ref : cls->extends_interfaces) {
     auto* iface = ctx.FindClassType(ref.name);
@@ -359,8 +383,8 @@ static void PopulateClassType(ClassTypeInfo* info, const ClassDecl* cls,
     auto* iface = ctx.FindClassType(ref.name);
     if (iface) info->extended_interfaces.push_back(iface);
   }
-  CollectClassMembers(info, cls);
-  AttachScopeMethodBodies(info, cls, scope_items);
+  CollectClassMembers(info, cls, scope.constants);
+  AttachScopeMethodBodies(info, cls, scope.items);
   RecordArrayProperties(info, cls, ctx, arena);
   BuildVTable(info, cls);
   InitStaticProperties(info, ctx, arena);
@@ -370,15 +394,18 @@ static void PopulateClassType(ClassTypeInfo* info, const ClassDecl* cls,
 }
 
 static void LowerNestedClasses(ClassTypeInfo* outer, const ClassDecl* cls,
-                               SimContext& ctx, Arena& arena);
+                               const ScopeMap& constants, SimContext& ctx,
+                               Arena& arena);
 
 // §8.23: a class declared inside `outer` is a type of its own, reached from
 // outside as `Outer::Inner`, which is the key it is registered under; a
 // method of the containing class names it bare, which SimContext::FindClassType
 // resolves through `enclosing`. A nested class of the nested class is lowered
-// under it in turn.
+// under it in turn. The enclosing class carries no out-of-block bodies; the
+// unit's constants reach the nested class as they reach the outer one.
 static void LowerNestedClass(ClassTypeInfo* outer, const ClassDecl* nested,
-                             SimContext& ctx, Arena& arena) {
+                             const ScopeMap& constants, SimContext& ctx,
+                             Arena& arena) {
   auto qualified = std::string(outer->name) + "::" + std::string(nested->name);
   auto* info = arena.Create<ClassTypeInfo>();
   info->name = *arena.Create<std::string>(std::move(qualified));
@@ -386,16 +413,18 @@ static void LowerNestedClass(ClassTypeInfo* outer, const ClassDecl* nested,
   info->is_abstract = nested->is_virtual;
   info->is_interface = nested->is_interface;
   info->enclosing = outer;
-  PopulateClassType(info, nested, {}, ctx, arena);
+  const std::vector<ModuleItem*> kNoItems;
+  PopulateClassType(info, nested, {kNoItems, constants}, ctx, arena);
   ctx.RegisterClassType(info->name, info);
-  LowerNestedClasses(info, nested, ctx, arena);
+  LowerNestedClasses(info, nested, constants, ctx, arena);
 }
 
 static void LowerNestedClasses(ClassTypeInfo* outer, const ClassDecl* cls,
-                               SimContext& ctx, Arena& arena) {
+                               const ScopeMap& constants, SimContext& ctx,
+                               Arena& arena) {
   for (const auto* member : cls->members) {
     if (member->kind == ClassMemberKind::kClassDecl && member->nested_class)
-      LowerNestedClass(outer, member->nested_class, ctx, arena);
+      LowerNestedClass(outer, member->nested_class, constants, ctx, arena);
   }
 }
 
@@ -406,9 +435,14 @@ void Lowerer::LowerClassDecl(const ClassDecl* cls,
   info->decl = cls;
   info->is_abstract = cls->is_virtual;
   info->is_interface = cls->is_interface;
-  PopulateClassType(info, cls, scope_items, ctx_, arena_);
+  // A class lowered with no design behind it -- a test that builds the
+  // ClassDecl by hand -- reads an empty unit scope.
+  static const ScopeMap kNoConstants;
+  const ScopeMap& constants =
+      design_ != nullptr ? design_->unit_constants : kNoConstants;
+  PopulateClassType(info, cls, {scope_items, constants}, ctx_, arena_);
   ctx_.RegisterClassType(cls->name, info);
-  LowerNestedClasses(info, cls, ctx_, arena_);
+  LowerNestedClasses(info, cls, constants, ctx_, arena_);
 }
 
 }  // namespace delta

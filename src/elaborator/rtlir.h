@@ -775,6 +775,18 @@ struct RtlirDesign {
   // that knows a class by its declared name alone has this to find the class
   // a typedef name denotes, for `T::p` and `T obj`.
   std::unordered_map<std::string_view, std::string_view> type_targets;
+  // §3.12.1 with §6.20.4 and §26.3: the value of every constant a declaration
+  // outside any module may name in a constant expression -- a localparam of
+  // the compilation-unit scope under its bare name, a package's parameter
+  // under its "package.name" key, which is the spelling a `pkg::name`
+  // reference folds through, and a name an import of the unit made locally
+  // visible under the bare name it was imported as. A class body written at
+  // compilation-unit scope, or in a module, sizes a property's packed
+  // dimension by such a constant, `logic [p::W-1:0] v`, and the simulator
+  // folds that dimension from the class declaration with no scope of its own
+  // to read the value from; this is that scope. The keys are the parser's or
+  // the elaborator's arena-owned strings, so they outlive the elaborator.
+  std::unordered_map<std::string_view, int64_t> unit_constants;
 
   // §32.4.4: the parsed compilation unit and the top module declarations this
   // design was elaborated from. An interconnect delay is annotated between

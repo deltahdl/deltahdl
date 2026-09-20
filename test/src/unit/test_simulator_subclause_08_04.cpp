@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
+#include <utility>
 
 #include "common/types.h"
 #include "fixture_simulator.h"
@@ -448,6 +450,139 @@ TEST(ClassSim, StaticMethodCalledThroughANullHandleRuns) {
   LowerAndRun(design, f);
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_EQ(f.ctx.FindVariable("r")->value.ToUint64(), 7u);
+}
+
+// Elaborates, lowers and runs `src` clean, then reads the value the run left
+// in `r` and the width `$bits` reported into `w`. A property that folded to
+// its base type's one bit truncates the value written through it and reports
+// that one bit, so both are what the sizing of the property decides.
+static std::pair<uint64_t, uint64_t> RunAndReadValueAndBits(
+    const std::string& src) {
+  SimFixture f;
+  auto* design = ElaborateSrc(src, f);
+  EXPECT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors) << "source reported an elaboration error";
+  if (design == nullptr) return {0, 0};
+  LowerAndRun(design, f);
+  auto* r = f.ctx.FindVariable("r");
+  auto* w = f.ctx.FindVariable("w");
+  EXPECT_NE(r, nullptr);
+  EXPECT_NE(w, nullptr);
+  if (r == nullptr || w == nullptr) return {0, 0};
+  return {r->value.ToUint64(), w->value.ToUint64()};
+}
+
+// §6.20.4 (printed page 129 of ~/LRM.pdf) lets a local parameter be declared
+// at compilation-unit scope, §3.12.1 (printed 56) has a name the class body
+// does not declare searched in the compilation-unit scope written before it,
+// and §7.4.1 (printed 153) has a packed dimension's bounds be constant
+// expressions. The property is therefore ten bits: 10'h3FF written through it
+// reads back 1023 and $bits answers 10. Folded against the class's own
+// parameters alone, the range did not fold, the property was the one bit of
+// its `logic` base type, and both read 1.
+TEST(ClassSim, CompilationUnitLocalparamSizesClassPropertyRange) {
+  auto [r, w] = RunAndReadValueAndBits(
+      "localparam int W = 10;\n"
+      "class C;\n"
+      "  logic [W-1:0] v;\n"
+      "endclass\n"
+      "module t;\n"
+      "  int r, w;\n"
+      "  initial begin\n"
+      "    C c = new;\n"
+      "    c.v = 10'h3FF;\n"
+      "    r = c.v;\n"
+      "    w = $bits(c.v);\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_EQ(r, 1023u);
+  EXPECT_EQ(w, 10u);
+}
+
+// §26.3 (printed page 808 of ~/LRM.pdf): a package's parameter is named from
+// any scope through the package scope resolution operator, and §7.4.1 admits
+// any constant expression as a bound, so `[p::W*2-1:0]` is twenty bits where
+// `[p::W-1:0]` is ten. 20'hFFFFF reads back 1048575 from the doubled range,
+// which a ten-bit property would have cut to 1023 and a one-bit one to 1.
+TEST(ClassSim, PackageParameterSizesClassPropertyRange) {
+  auto [r, w] = RunAndReadValueAndBits(
+      "package p;\n"
+      "  parameter int W = 10;\n"
+      "endpackage\n"
+      "class C;\n"
+      "  logic [p::W-1:0] v;\n"
+      "  logic [p::W*2-1:0] u;\n"
+      "endclass\n"
+      "module t;\n"
+      "  int r, w;\n"
+      "  initial begin\n"
+      "    C c = new;\n"
+      "    c.v = 10'h3FF;\n"
+      "    c.u = 20'hFFFFF;\n"
+      "    r = c.u;\n"
+      "    w = $bits(c.v);\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_EQ(r, 1048575u);
+  EXPECT_EQ(w, 10u);
+}
+
+// §3.12.1 (printed page 56 of ~/LRM.pdf) includes among the compilation-unit
+// scope's names the ones a package import made available there, so a wildcard
+// import written outside every module lets the class body name the package's
+// parameter bare. The bare and the qualified spellings size alike: 10'h3FF
+// through the bare-named range reads 1023 and $bits of the qualified one is
+// 10.
+TEST(ClassSim, ImportedPackageParameterSizesClassPropertyRange) {
+  auto [r, w] = RunAndReadValueAndBits(
+      "package p;\n"
+      "  parameter int W = 10;\n"
+      "endpackage\n"
+      "import p::*;\n"
+      "class C;\n"
+      "  logic [W-1:0] v;\n"
+      "  logic [p::W-1:0] u;\n"
+      "endclass\n"
+      "module t;\n"
+      "  int r, w;\n"
+      "  initial begin\n"
+      "    C c = new;\n"
+      "    c.v = 10'h3FF;\n"
+      "    r = c.v;\n"
+      "    w = $bits(c.u);\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_EQ(r, 1023u);
+  EXPECT_EQ(w, 10u);
+}
+
+// §8.26 lets a class declaration stand within a module, and §3.12.1's search
+// reaches the compilation-unit scope from there as from a class declared in
+// it, so a module's class sizes its properties by the unit's localparam and
+// by a package's parameter as a compilation-unit class does: 10'h3FF through
+// the package-sized property reads 1023 and the localparam-sized one is ten
+// bits wide.
+TEST(ClassSim, ClassDeclaredInModuleSizesPropertyByUnitConstants) {
+  auto [r, w] = RunAndReadValueAndBits(
+      "package p;\n"
+      "  parameter int W = 10;\n"
+      "endpackage\n"
+      "localparam int K = 10;\n"
+      "module t;\n"
+      "  class C;\n"
+      "    logic [p::W-1:0] v;\n"
+      "    logic [K-1:0] u;\n"
+      "  endclass\n"
+      "  int r, w;\n"
+      "  initial begin\n"
+      "    C c = new;\n"
+      "    c.v = 10'h3FF;\n"
+      "    r = c.v;\n"
+      "    w = $bits(c.u);\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_EQ(r, 1023u);
+  EXPECT_EQ(w, 10u);
 }
 
 }  // namespace

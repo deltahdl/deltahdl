@@ -737,6 +737,13 @@ RtlirDesign* Elaborator::ElaborateTops(
     ValidateLetDecl(item);
   }
 
+  // §3.12.1: the constants a class declared outside every module may name in
+  // a property's packed dimension (see RtlirDesign::unit_constants). Read here
+  // rather than while the modules were elaborated, because ElaborateTopModules
+  // has put the union of what every module's imports made visible back into
+  // cu_param_scope_ by now, and a compilation-unit class is lowered ahead of
+  // the modules, with the design as its only scope.
+  design->unit_constants = cu_param_scope_;
   FinalizeDesignTail(
       design, unit_,
       TypeNameSources{typedefs_, aggregate_typedef_names_, arena_},
