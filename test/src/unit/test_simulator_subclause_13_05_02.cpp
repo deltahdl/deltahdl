@@ -888,4 +888,52 @@ TEST(PassByRef, ConstRefFormalOfAFixedArrayReadsTheCallersElements) {
   EXPECT_EQ(val, 2060u);
 }
 
+// §13.5.2 (printed page 349) lists an element of an unpacked array among what
+// may be passed by reference, beside a variable. The task adds through the
+// formal; the plain variable reads 12 and the element 45, packed as 1245.
+// 1240 is what stood when the element actual fell to the by-value bind, the
+// plain variable written in place and the element's copy thrown away.
+TEST(PassByRef, RefFormalBoundToAFixedArrayElementWritesTheElement) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  int x = 7;\n"
+      "  int arr[3];\n"
+      "  int res;\n"
+      "  task automatic add(ref int r, input int n); r = r + n; endtask\n"
+      "  initial begin\n"
+      "    add(x, 5);\n"
+      "    arr[2] = 40; add(arr[2], 5);\n"
+      "    res = x * 100 + arr[2];\n"
+      "  end\n"
+      "endmodule\n",
+      "res");
+  EXPECT_EQ(val, 1245u);
+}
+
+// §13.5.2 (printed page 349) lists a class property and a member of an
+// unpacked structure as well. Neither is a variable of its own, so the write
+// through the formal reaches the caller as the copy-out a queue element's
+// takes: the member reads 25 and the property 65 after the calls, with the
+// untouched member beside them at 1, packed as 12565. 10560 is the
+// by-value bind's answer, the member at 5 and the property at 60.
+TEST(PassByRef, RefFormalBoundToAStructMemberOrAClassPropertyWritesIt) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  typedef struct { int a; int b; } st_t;\n"
+      "  class C; int v = 60; endclass\n"
+      "  st_t s;\n"
+      "  C h = new;\n"
+      "  int res;\n"
+      "  task automatic add(ref int r, input int n); r = r + n; endtask\n"
+      "  initial begin\n"
+      "    s.a = 1; s.b = 5;\n"
+      "    add(s.b, 20);\n"
+      "    add(h.v, 5);\n"
+      "    res = s.a * 10000 + s.b * 100 + h.v;\n"
+      "  end\n"
+      "endmodule\n",
+      "res");
+  EXPECT_EQ(val, 12565u);
+}
+
 }  // namespace

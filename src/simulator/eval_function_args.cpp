@@ -504,15 +504,45 @@ static bool TryBindArrayArg(const Expr* call_arg, const FunctionArg& formal,
   return true;
 }
 
+// §13.5.2 (printed page 349) lists an element of an unpacked array among what
+// may be passed by reference. A fixed-size array's element is a variable of
+// its own, `arr[idx]` (CreateArrayElements in lowerer_var.cpp), so the formal
+// is aliased to it as TryBindRefArg aliases a whole variable; the index is the
+// caller's expression and is read with the callee's scope set aside, as the
+// actuals are. Before this the shape reached neither the queue nor the
+// associative-array element bind and fell to the by-value copy, so
+// `add(arr[2], 5)` left the element at 40. An element of a multidimensional
+// array, `arr[1][2]`, has a select for its base and is not aliased here.
+static bool TryBindFixedArrayElementRef(const Expr* call_arg,
+                                        std::string_view param_name,
+                                        SimContext& ctx, Arena& arena) {
+  if (!call_arg || call_arg->kind != ExprKind::kSelect) return false;
+  if (!call_arg->base || call_arg->base->kind != ExprKind::kIdentifier)
+    return false;
+  if (!call_arg->index || call_arg->index_end) return false;
+  Variable* elem = nullptr;
+  {
+    CalleeScopeAside aside(ctx);
+    if (!ctx.FindArrayInfo(call_arg->base->text)) return false;
+    auto idx = EvalExpr(call_arg->index, ctx, arena).ToUint64();
+    elem = ctx.FindVariable(std::string(call_arg->base->text) + "[" +
+                            std::to_string(idx) + "]");
+  }
+  if (!elem) return false;
+  ctx.AliasLocalVariable(param_name, elem);
+  return true;
+}
+
 static void RegisterValueArgStructType(const FunctionArg& param,
                                        const Expr* expr, int arg_index,
                                        SimContext& ctx);
 
 // Attempts the ref-binding strategies (whole aggregate, plain ref, queue
-// element, assoc element) for a ref-direction formal. Returns true when one of
-// them bound the argument. The aggregate bind stands first because a declared
-// aggregate's name also finds the whole variable the lowerer declares under
-// it, which the plain bind would take for the actual.
+// element, assoc element, fixed-size array element) for a ref-direction
+// formal. Returns true when one of them bound the argument. The aggregate bind
+// stands first because a declared aggregate's name also finds the whole
+// variable the lowerer declares under it, which the plain bind would take for
+// the actual.
 //
 // A structure variable is one variable, so the plain bind aliases it whole;
 // what the formal still lacks is the layout, which SimContext keys by the
@@ -535,6 +565,12 @@ static bool TryBindRefDirectionArg(const Expr* expr, int arg_index,
   }
   if (TryBindQueueElementRef(expr, arg_index, param, ctx, arena)) return true;
   if (TryBindAssocElementRef(expr, arg_index, param, ctx, arena)) return true;
+  if (arg_index >= 0 &&
+      TryBindFixedArrayElementRef(expr->args[static_cast<size_t>(arg_index)],
+                                  param.name, ctx, arena)) {
+    RegisterValueArgClassType(param, ctx);
+    return true;
+  }
   return false;
 }
 
@@ -736,8 +772,42 @@ void BindFunctionArgs(const ModuleItem* func, const Expr* expr, SimContext& ctx,
   }
 }
 
+// The root an actual is written on: the base of a select chain, else the
+// actual itself.
+static const Expr* SelectRoot(const Expr* actual) {
+  while (actual && actual->kind == ExprKind::kSelect) actual = actual->base;
+  return actual;
+}
+
+// Whether the formal's value is carried back into the actual when the
+// subroutine returns. §13.5.2 (printed page 349) has an output or inout formal
+// copied to its actual then, and lists a class property and a member of an
+// unpacked structure among what may be passed by reference. Neither of those
+// is a variable of its own -- a property is a field of its object and a
+// member a window of the structure's variable -- so there is nothing for the
+// ref binds to alias and the formal took BindValueArg's copy: `add(s.b, 20)`
+// and `add(h.v, 5)` left 5 and 60 standing. The copy is carried back into the
+// member or property here, through the assignment the actual takes as a
+// target, exactly as a queue or associative-array element's is by
+// WritebackQueueRefs and WritebackAssocRefs. A ref actual rooted anywhere
+// else is either aliased, and needs no copy-out, or is no target at all; a
+// const ref formal (printed page 350) is read only.
+static bool CopiesOutOnReturn(const FunctionArg& formal, const Expr* actual) {
+  if (formal.direction == Direction::kOutput ||
+      formal.direction == Direction::kInout) {
+    return true;
+  }
+  if (formal.direction != Direction::kRef || formal.is_const) return false;
+  // A formal declared with unpacked dimensions is an aggregate, which the
+  // copy BindValueArg makes of a member or property does not stand for.
+  if (!formal.unpacked_dims.empty()) return false;
+  const Expr* root = SelectRoot(actual);
+  return root != nullptr && root->kind == ExprKind::kMemberAccess;
+}
+
 // §13.5.2: an output or inout formal is copied to its actual when the
-// subroutine returns. The actual is an expression of the caller's, so it is
+// subroutine returns, and so is a ref formal bound to a member or property
+// (CopiesOutOnReturn). The actual is an expression of the caller's, so it is
 // assigned with the callee's scope, the top of the stack at this point,
 // taken off the stack and put back after: an actual spelled like the formal
 // would otherwise resolve to the formal and the caller's variable never
@@ -746,14 +816,14 @@ void WritebackOutputArgs(const ModuleItem* func, const Expr* expr,
                          SimContext& ctx, Arena& arena) {
   std::vector<std::pair<const Expr*, Logic4Vec>> writes;
   for (size_t i = 0; i < func->func_args.size(); ++i) {
-    auto dir = func->func_args[i].direction;
-    if (dir != Direction::kOutput && dir != Direction::kInout) continue;
-    auto* local = ctx.FindLocalVariable(func->func_args[i].name);
-    if (!local) continue;
+    const FunctionArg& formal = func->func_args[i];
     int ai = ResolveArgIndex(func, expr, i);
-    const Expr* wb_target = nullptr;
-    if (ai >= 0) wb_target = expr->args[static_cast<size_t>(ai)];
-    if (!wb_target) wb_target = func->func_args[i].default_value;
+    const Expr* actual =
+        ai >= 0 ? expr->args[static_cast<size_t>(ai)] : nullptr;
+    if (!CopiesOutOnReturn(formal, actual)) continue;
+    auto* local = ctx.FindLocalVariable(formal.name);
+    if (!local) continue;
+    const Expr* wb_target = actual ? actual : formal.default_value;
     if (!wb_target) continue;
     writes.emplace_back(wb_target, local->value);
   }
