@@ -22,6 +22,7 @@
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
+#include "parser/ast_type.h"
 
 namespace delta {
 
@@ -216,6 +217,52 @@ void Elaborator::ElaborateGenerateBlockItem(ModuleItem* item,
                         gen_prefix_scopes_);
 }
 
+// §27.5 (printed page 824) makes a generate block a scope of its own, §23.9
+// (printed 761) has a name the block declares locally stand over the
+// enclosing scope's, and §6.18 (printed 118) introduces a forward typedef's
+// name in the scope it stands in, with the definition to follow in that same
+// scope. The block's items are walked with the enclosing scope's table, so a
+// name the block declares as a typedef met the enclosing scope's entry there:
+// the block's `typedef struct pair_t;` kept a module pair_t already in the
+// table, HandleForwardTypedef in src/elaborator/elaborator_typedef.cpp
+// admitting a forward typedef repeated after its own definition, and a
+// function of the block between that forward typedef and the definition was
+// resolved at its item to the module's one-member pair_t and kept, `g.f(tagged
+// A '{3, 4})` reading 30 for §7.2.1's 34; and a nested block's definition
+// stayed in the table after the nested block's items, so a function of g
+// written below h resolved pair_t to h's three-member one -- both
+// ccc8d1f7f's remainders, found by a2d48456a's agent. The enclosing entry of
+// every name a typedef item of the block declares, above or below any
+// subroutine, is taken out ahead of the walk and handed back for
+// RestoreEnclosingTypedefs to put in place once the block's items are done,
+// so the forward typedef installs its placeholder over nothing, the
+// definition writes over that, and the enclosing scope sees its own entry
+// again below the block. A name the enclosing scope has no entry for stays as
+// the block leaves it, since Elaborator::ProcessPendingGenerate folds the
+// block's typedefs into the design-wide table for §20.6.2's $bits and would
+// find nothing otherwise. A block declaring no typedef costs nothing here.
+using EnclosingTypedefs = std::vector<std::pair<std::string_view, DataType>>;
+
+static EnclosingTypedefs TakeEnclosingTypedefs(
+    const std::vector<ModuleItem*>& items, TypedefMap& typedefs) {
+  EnclosingTypedefs taken;
+  for (const auto* item : items) {
+    if (item->kind != ModuleItemKind::kTypedef) continue;
+    auto it = typedefs.find(item->name);
+    if (it == typedefs.end()) continue;
+    taken.emplace_back(it->first, it->second);
+    typedefs.erase(it);
+  }
+  return taken;
+}
+
+static void RestoreEnclosingTypedefs(const EnclosingTypedefs& taken,
+                                     TypedefMap& typedefs) {
+  for (const auto& [name, dtype] : taken) {
+    typedefs.insert_or_assign(name, dtype);
+  }
+}
+
 void Elaborator::ElaborateGenerateItems(const std::vector<ModuleItem*>& items,
                                         RtlirModule* mod,
                                         const ScopeMap& scope) {
@@ -238,6 +285,11 @@ void Elaborator::ElaborateGenerateItems(const std::vector<ModuleItem*>& items,
   // step to gen_prefix_scopes_ as the walk reaches it. The steps are the
   // block's and end with its items, so the list is put back as it was found.
   GenBlockPrefixes entry_prefix_scopes = gen_prefix_scopes_;
+  // §27.5 with §23.9 and §6.18: the enclosing scope's entries for the names
+  // these items declare as typedefs, out for the walk and back after it; see
+  // TakeEnclosingTypedefs.
+  EnclosingTypedefs enclosing_typedefs =
+      TakeEnclosingTypedefs(items, typedefs_);
   // §27.2 rules that "all other module items, including other generate
   // constructs, are allowed in a generate block" once port declarations,
   // specify blocks and specparam declarations are excluded, so a function may
@@ -337,6 +389,7 @@ void Elaborator::ElaborateGenerateItems(const std::vector<ModuleItem*>& items,
   // the enclosing scope (§27.3), and a member resolved already resolves to
   // the same type again.
   ResolveModuleSubroutineFormalTypes(items, typedefs_, arena_);
+  RestoreEnclosingTypedefs(enclosing_typedefs, typedefs_);
   gen_prefix_scopes_ = std::move(entry_prefix_scopes);
   mod->default_disable_iff = enclosing_default_disable_iff;
   gen_const_scope_ = saved_gen_const_scope;
@@ -370,153 +423,6 @@ void Elaborator::ElaborateGenerateBlockImport(ModuleItem* item,
   auto step = gen_prefix_scopes_.empty() ? gen_prefix_scopes_.end()
                                          : gen_prefix_scopes_.end() - 1;
   gen_prefix_scopes_.insert(step, interned);
-}
-
-// §27.5: "a conditional generate construct" is the if generate construct and
-// the case generate construct, and the clause rules on page 825 that direct
-// nesting "applies only to conditional generate constructs nested in
-// conditional generate constructs. It does not apply in any way to loop
-// generate constructs."
-bool IsConditionalGenerateConstruct(ModuleItemKind k) {
-  return k == ModuleItemKind::kGenerateIf || k == ModuleItemKind::kGenerateCase;
-}
-
-// §27.5: "If a generate block in a conditional generate construct consists of
-// only one item that is itself a conditional generate construct and if that
-// item is not surrounded by begin-end keywords, then this generate block is not
-// treated as a separate scope. The generate construct within this block is said
-// to be directly nested. The generate blocks of the directly nested construct
-// are treated as if they belong to the outer construct."
-bool IsDirectlyNestedBlock(const std::vector<ModuleItem*>& body,
-                           bool has_begin_end) {
-  return !has_begin_end && body.size() == 1 &&
-         IsConditionalGenerateConstruct(body[0]->kind);
-}
-
-// §27.5: elaborate the generate block a conditional generate construct
-// selected. A directly nested block "is not treated as a separate scope", so
-// its items are elaborated under the prefix already in force and no scope is
-// opened for it. Otherwise the block creates a scope, named or not -- "If the
-// generate block selected for instantiation is named, then this name declares a
-// generate block instance and is the name for the scope it creates. If the
-// generate block selected for instantiation is not named, it still creates a
-// scope", and AssignGenerateBlockNames has already given the unnamed one the
-// name §27.6 assigns it. The block's own name is the whole of the scope name:
-// §27.4 gives an index only to a loop generate block, whose name "is a
-// declaration of an array of generate block instances", so a conditional
-// generate block contributes its name alone.
-void Elaborator::ElaborateConditionalGenerateBlock(
-    const ConditionalGenerateBlock& block, RtlirModule* mod,
-    const ScopeMap& scope) {
-  if (IsDirectlyNestedBlock(block.body, block.has_begin_end)) {
-    ElaborateGenerateItems(block.body, mod, scope);
-    return;
-  }
-  std::string saved_prefix = gen_prefix_;
-  gen_prefix_ = std::format("{}{}_", saved_prefix, block.name);
-  gen_prefix_scopes_.push_back(InternedGenPrefix());
-  gen_block_path_.push_back(
-      {block.name_is_generated ? std::string_view{} : block.name, false, 0});
-  ElaborateGenerateItems(block.body, mod, scope);
-  gen_block_path_.pop_back();
-  gen_prefix_scopes_.pop_back();
-  gen_prefix_ = saved_prefix;
-}
-
-void Elaborator::ElaborateGenerateIf(ModuleItem* item, RtlirModule* mod,
-                                     const ScopeMap& scope) {
-  // §6.23: a comparison of two type references is a constant expression, so it
-  // may gate a generate-if. Fold it here (via §6.22.1 type matching) before the
-  // ordinary integer const-eval, which does not understand type-reference
-  // operands.
-  auto cond = EvalConstTypeRefCompare(item->gen_cond);
-  if (!cond) cond = ConstEvalInt(item->gen_cond, scope);
-  if (!cond) {
-    diag_.Warning(item->loc, "generate-if condition is not constant",
-                  Subclause("27.5"));
-    return;
-  }
-  if (*cond) {
-    ElaborateConditionalGenerateBlock(
-        {item->name, item->name_is_generated, item->gen_body,
-         item->gen_body_has_begin_end},
-        mod, scope);
-    return;
-  }
-  if (item->gen_else == nullptr) return;
-
-  // §27.5: a conditional generate construct selects "at most one generate
-  // block from a set of alternative generate blocks based on constant
-  // expressions evaluated during elaboration", and an `else if` puts one of
-  // those expressions on the else branch. Annex A.4.2 gives
-  // if_generate_construct ::= if ( constant_expression ) generate_block
-  // [ else generate_block ], so an `else if` is the else branch taking the
-  // bare generate_item alternative of generate_block, and what stands there is
-  // a nested if_generate_construct selecting among the alternatives that
-  // remain. Elaborate it as one, so that its condition is read.
-  //
-  // Parser::ParseGenerateIf tells the two forms apart already:
-  // src/parser/parser_generate.cpp:181-182 makes gen_else the nested
-  // kGenerateIf itself, carrying its own gen_cond, while :184-190 makes a
-  // plain else a synthesized kGenerateIf whose gen_cond is null and whose
-  // gen_body holds that block's items. Reaching into gen_body for both
-  // instantiated the nested then-branch without ever evaluating its
-  // condition, so every selector past the first alternative built the wrong
-  // block and the final else was unreachable.
-  //
-  // Recursing opens no scope for the else branch itself, which is what §27.5
-  // requires of it: the branch holds one item that is itself a conditional
-  // generate construct and no begin-end keywords surround it, so it is directly
-  // nested, and "the generate blocks of the directly nested construct are
-  // treated as if they belong to the outer construct".
-  if (item->gen_else->gen_cond != nullptr) {
-    ElaborateGenerateIf(item->gen_else, mod, scope);
-    return;
-  }
-  ElaborateConditionalGenerateBlock(
-      {item->gen_else->name, item->gen_else->name_is_generated,
-       item->gen_else->gen_body, item->gen_else->gen_body_has_begin_end},
-      mod, scope);
-}
-
-static bool MatchesCasePattern(const std::vector<Expr*>& patterns,
-                               int64_t selector, const ScopeMap& scope) {
-  for (const auto* pat : patterns) {
-    auto val = ConstEvalInt(pat, scope);
-    if (val && *val == selector) return true;
-  }
-  return false;
-}
-
-void Elaborator::ElaborateGenerateCase(ModuleItem* item, RtlirModule* mod,
-                                       const ScopeMap& scope) {
-  auto selector = ConstEvalInt(item->gen_cond, scope);
-  if (!selector) {
-    diag_.Warning(item->loc, "generate-case selector is not constant",
-                  Subclause("27.5"));
-    return;
-  }
-  // Hold the default alternative itself rather than its body, because the scope
-  // it opens is named by its own label and shaped by its own begin-end
-  // keywords, and neither is reachable from the body alone.
-  const GenerateCaseItem* default_item = nullptr;
-  for (const auto& ci : item->gen_case_items) {
-    if (ci.is_default) {
-      default_item = &ci;
-      continue;
-    }
-    if (MatchesCasePattern(ci.patterns, *selector, scope)) {
-      ElaborateConditionalGenerateBlock(
-          {ci.label, ci.name_is_generated, ci.body, ci.has_begin_end}, mod,
-          scope);
-      return;
-    }
-  }
-  if (default_item == nullptr) return;
-  ElaborateConditionalGenerateBlock(
-      {default_item->label, default_item->name_is_generated, default_item->body,
-       default_item->has_begin_end},
-      mod, scope);
 }
 
 static bool ExprReferencesName(const Expr* e, std::string_view name) {

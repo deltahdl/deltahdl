@@ -52,6 +52,19 @@ std::string_view TypedefKindName(DataTypeKind k) {
 // recorded definition conforms to the forward kind, records the forward kind,
 // and reserves the name. Returns true if the item was a forward declaration
 // (in which case the caller must stop processing).
+//
+// The name is reserved with try_emplace because §6.18 (printed page 118)
+// admits a forward typedef before or after the final definition in the same
+// scope, and a forward written after the definition must not put the
+// placeholder over it. That keeps an entry of the same scope alone: a generate
+// block's items are walked with the enclosing scope's table, and §27.5
+// (printed 824) makes the block a scope of its own whose forward typedef
+// stands over the enclosing scope's typedef of the name, so
+// TakeEnclosingTypedefs in src/elaborator/elaborator_generate.cpp has taken
+// the enclosing entry out before the walk reaches here. Until it did, a
+// block's `typedef struct pair_t;` kept a module pair_t and the block's
+// subroutine between the forward typedef and the definition resolved to it
+// (found by a2d48456a's agent).
 bool HandleForwardTypedef(
     ModuleItem* item, TypedefMap& typedefs,
     std::unordered_map<std::string_view, DataTypeKind>& forward_typedef_kinds,
