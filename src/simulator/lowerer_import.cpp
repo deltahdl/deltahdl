@@ -46,6 +46,7 @@ void Lowerer::LowerPackageClass(const PackageDecl* pkg, const ClassDecl* cls) {
   if (ctx_.FindClassType(key)) return;
   LowerClassDecl(cls, pkg->items);
   ctx_.RegisterClassType(key, ctx_.FindClassType(cls->name));
+  AliasExportedClassKeys(pkg, cls);
 }
 
 void Lowerer::LowerPackageItem(const PackageDecl* pkg, ModuleItem* item) {
@@ -593,9 +594,11 @@ void ExportedNameWalk::CollectNamed(const PackageDecl* src,
 // and a variable, parameter or enumeration literal under "pkg.name", the key
 // EvalMemberAccess reads and ResolveLhsVariable writes a scoped name by. The
 // subroutine keeps the declaring package as the scope its body runs in
-// (RegisterSubroutinePackage). A typedef or a class has a registration of
-// neither kind and is left; so is a key the package's own declaration holds,
-// §26.3 having a declaration of the scope take the name over an import.
+// (RegisterSubroutinePackage). A class is not yet lowered when this runs and
+// is bound under the exporter's "pkg::C" as it is lowered
+// (Lowerer::AliasExportedClassKeys); a typedef has a registration of no kind
+// and is left, as is a key the package's own declaration holds, §26.3 having
+// a declaration of the scope take the name over an import.
 void AliasExportedName(const PackageDecl* pkg, const ExportedName& e,
                        SimContext& ctx, Arena& arena) {
   if (e.origin == pkg || e.name.empty()) return;
@@ -630,6 +633,45 @@ void AliasPackageExports(const RtlirDesign* design, SimContext& ctx,
   }
 }
 }  // namespace
+
+// Whether the exports of `exporter` hand on the declaration `name` of `pkg`.
+static bool ExportsHandOnName(ExportedNameWalk& walk,
+                              const PackageDecl* exporter,
+                              const PackageDecl* pkg, std::string_view name) {
+  std::vector<ExportedName> names;
+  walk.CollectExported(exporter, {}, names);
+  for (const ExportedName& e : names) {
+    if (e.origin == pkg && e.name == name) return true;
+  }
+  return false;
+}
+
+// §26.6 (printed pages 815-816) with §26.3: a class an export hands on is
+// reached through the exporting package's qualifier as through the declaring
+// one's -- `p2::C::get()` and `p2::C h` after `import p1::C; export p1::C;`
+// name p1's C -- and ResolveClassScope (eval_function.cpp),
+// PackageQualifiedClassOf (eval_static_method.cpp) and PackageClassKey
+// (lowerer_package_class_vars.cpp) each ask for the class under "pkg::C", the
+// key LowerPackageClass binds the declaring package's class by. No class is
+// lowered when AliasPackageExports runs, so the exporters' keys are bound here
+// as the class is lowered, each to the one ClassTypeInfo the declaring
+// package's key holds: the original keeps its declaring package, and a key an
+// exporter's own class holds is left, §26.3 having a declaration of the scope
+// take the name.
+void Lowerer::AliasExportedClassKeys(const PackageDecl* pkg,
+                                     const ClassDecl* cls) {
+  if (design_ == nullptr) return;
+  ClassTypeInfo* info = ctx_.FindClassType(QualifiedClassKey(pkg, cls, arena_));
+  if (info == nullptr) return;
+  ExportedNameWalk walk(design_);
+  for (const PackageDecl* exporter : design_->packages) {
+    bool own =
+        exporter == pkg || FindNamedPackageItem(exporter, cls->name) != nullptr;
+    if (own || !ExportsHandOnName(walk, exporter, pkg, cls->name)) continue;
+    std::string_view key = QualifiedClassKey(exporter, cls, arena_);
+    if (ctx_.FindClassType(key) == nullptr) ctx_.RegisterClassType(key, info);
+  }
+}
 
 void Lowerer::LowerCompilationUnitImports() {
   if (!design_) return;

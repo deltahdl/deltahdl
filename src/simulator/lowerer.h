@@ -148,6 +148,11 @@ class Lowerer {
   // so that the static properties of §8.9 have one copy however the class is
   // named. Defined in lowerer_import.cpp.
   void LowerPackageClass(const PackageDecl* pkg, const ClassDecl* cls);
+  // §26.6: binds the class `cls` of package `pkg`, once lowered, under the
+  // qualified key of every package whose exports hand it on, to the one
+  // ClassTypeInfo the declaring package's key holds. Defined in
+  // lowerer_import.cpp.
+  void AliasExportedClassKeys(const PackageDecl* pkg, const ClassDecl* cls);
   void LowerPackageItem(const PackageDecl* pkg, ModuleItem* item);
   // §26.3: applies one import declaration, wildcard or explicit, to the scope
   // inst_prefix_ names; LowerImports and LowerCompilationUnitImports both go

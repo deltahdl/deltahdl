@@ -605,4 +605,88 @@ TEST(PackageImportSim,
             63u);
 }
 
+// §26.6 (printed pages 815-816) with §26.3: a class an export hands on is
+// reached through the exporting package's qualifier as through the declaring
+// one's, an import of it being an import of the original, so `p2::C::get()`
+// and a handle declared `p2::C h` after `import p1::C; export p1::C;` name
+// p1's C: 7 * 100 + 3 from the static method and the default of v. No class
+// stood under "p2::C" before, the call answering 0 and the whole reading 3
+// at most.
+TEST(PackageImportSim, ReExportedClassThroughTheExportingPackageQualifier) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  class C;\n"
+                      "    static function int get(); return 7; endfunction\n"
+                      "    int v = 3;\n"
+                      "  endclass\n"
+                      "endpackage\n"
+                      "package p2;\n"
+                      "  import p1::C;\n"
+                      "  export p1::C;\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  int y;\n"
+                      "  initial begin\n"
+                      "    p2::C h = new;\n"
+                      "    y = p2::C::get() * 100 + h.v;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            703u);
+}
+
+// §26.6 (printed 815): `export p1::*` hands on the class the package
+// wildcard-imported, and an export of a re-exported class reaches the
+// original along the chain -- p3 exports the C it imports from p2 -- so
+// `p2::C::get()` and `p3::C::get()` are both p1's 7: 7 * 10 + 7. Neither key
+// held a class before and each call answered 0.
+TEST(PackageImportSim, ReExportedClassAlongAWildcardExportChain) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  class C;\n"
+                      "    static function int get(); return 7; endfunction\n"
+                      "  endclass\n"
+                      "endpackage\n"
+                      "package p2;\n"
+                      "  import p1::*;\n"
+                      "  export p1::*;\n"
+                      "endpackage\n"
+                      "package p3;\n"
+                      "  import p2::C;\n"
+                      "  export p2::C;\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  int y;\n"
+                      "  initial y = p2::C::get() * 10 + p3::C::get();\n"
+                      "endmodule\n",
+                      "y"),
+            77u);
+}
+
+// §26.6 with §26.3: a module's `import p2::*` brings in the class p2 hands
+// on from p1 under its bare name, the import path lowering p1's C as it
+// follows the export (LowerAllImported in lowerer_import.cpp), so `C h =
+// new` and `C::get()` are p1's: 3 * 100 + 7. Pinned beside the qualified
+// forms, which the same lowering now binds under p2's key.
+TEST(PackageImportSim, ReExportedClassReachedBareThroughAWildcardImport) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  class C;\n"
+                      "    static function int get(); return 7; endfunction\n"
+                      "    int v = 3;\n"
+                      "  endclass\n"
+                      "endpackage\n"
+                      "package p2;\n"
+                      "  import p1::*;\n"
+                      "  export p1::*;\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  import p2::*;\n"
+                      "  int y;\n"
+                      "  initial begin\n"
+                      "    C h = new;\n"
+                      "    y = h.v * 100 + C::get();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            307u);
+}
+
 }  // namespace
