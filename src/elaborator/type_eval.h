@@ -23,6 +23,18 @@ using TypedefMap = std::unordered_map<std::string_view, DataType>;
 void ResolveNestedAggregateTypes(DataType& dt, const TypedefMap& typedefs,
                                  Arena& arena);
 
+// §7.2.1 with §6.18: the packed structure or union a declared type stands for,
+// laid out for a member select -- an arena copy of the type itself when the
+// declaration wrote one, or of the one a typedef name resolves to through the
+// typedef table, followed through a name standing for another name, with its
+// nested member types resolved as ResolveNestedAggregateTypes leaves them. Null
+// for a type of any other kind, for a name the table does not hold and for an
+// aggregate with no members. A variable, a port and a net of an aggregate type
+// each carry the same layout, so all three resolve it here. Defined in
+// src/elaborator/type_eval_aggregate.cpp.
+const DataType* ResolvedAggregateType(const DataType& dtype,
+                                      const TypedefMap& typedefs, Arena& arena);
+
 // §7.4.4: the element count of the packed dimensions a declaration writes --
 // the leading range times each further one -- which is what a use-site
 // dimension multiplies the width of the type it is written on by. Zero where

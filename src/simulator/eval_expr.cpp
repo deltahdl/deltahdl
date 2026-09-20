@@ -509,7 +509,9 @@ static Logic4Vec ResolveMemberByType(std::string_view base_name,
   if (TryThisSuperMember(base_name, field_name, ctx, arena, out)) return out;
 
   auto* base_var = ctx.FindVariable(base_name);
-  auto* sinfo = ctx.GetVariableStructType(base_name);
+  // §23.9: the base resolves within the running instance, so its layout is
+  // asked for by the key that instance's storage was created under.
+  const StructTypeInfo* sinfo = StructLayoutOfName(base_name, ctx);
 
   MemberAccess ma{base_name, field_name, base_var, ctx, arena, loc};
 

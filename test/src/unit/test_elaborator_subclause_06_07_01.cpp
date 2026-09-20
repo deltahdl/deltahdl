@@ -381,4 +381,91 @@ TEST(InterconnectNet, MultipleDelayValuesRejected) {
       "interconnect net shall specify at most one delay value", 1, "6.7.1"));
 }
 
+// §6.7.1 (printed page 103 of ~/LRM.pdf) admits a packed structure as a net's
+// data type, and §7.2.1 (printed 147) lays its members out as windows of the
+// vector, which the simulator needs the members' order and widths for. The net
+// record carries the resolved aggregate for a typedef name standing for a
+// structure: the two members in declaration order beside the 32-bit width. A
+// net record carrying the width alone leaves every member select of the net
+// unresolvable.
+TEST(NetDataType, TypedefStructNetCarriesItsAggregate) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  typedef struct packed { logic [7:0] opcode; logic [23:0] imm; } "
+      "instruction_t;\n"
+      "  wire instruction_t w;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* net = FindNet(design, "w");
+  ASSERT_NE(net, nullptr);
+  EXPECT_EQ(net->width, 32u);
+  ASSERT_NE(net->dtype, nullptr);
+  ASSERT_EQ(net->dtype->struct_members.size(), 2u);
+  EXPECT_EQ(net->dtype->struct_members[0].name, "opcode");
+  EXPECT_EQ(net->dtype->struct_members[1].name, "imm");
+}
+
+// The typedef reached through an explicit import (§26.3), which enters the
+// package's typedef under its bare name, and through the anonymous form of
+// §6.7.1's own example, which writes the structure in the declaration: both
+// carry the aggregate. A resolution that took the declaration's own kind alone
+// would carry the anonymous structure and miss the imported name.
+TEST(NetDataType, ImportedAndAnonymousStructNetsCarryTheirAggregates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "package A;\n"
+      "  typedef struct packed { logic [7:0] opcode; logic [23:0] imm; } "
+      "instruction_t;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  import A::instruction_t;\n"
+      "  wire instruction_t w;\n"
+      "  wire struct packed { logic ecc; logic [7:0] data; } memsig;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* w = FindNet(design, "w");
+  ASSERT_NE(w, nullptr);
+  ASSERT_NE(w->dtype, nullptr);
+  EXPECT_EQ(w->dtype->struct_members.size(), 2u);
+  auto* memsig = FindNet(design, "memsig");
+  ASSERT_NE(memsig, nullptr);
+  EXPECT_EQ(memsig->width, 9u);
+  ASSERT_NE(memsig->dtype, nullptr);
+  ASSERT_EQ(memsig->dtype->struct_members.size(), 2u);
+  EXPECT_EQ(memsig->dtype->struct_members[0].name, "ecc");
+}
+
+// A net that is an array of the structure rather than one of it keeps the
+// width alone, as a port of the same shape does: an unpacked dimension makes
+// the net an array of elements (§7.4.2), and a use-site packed dimension
+// stacks on the type (§7.4.4), so the record carries the declaration's own
+// type for its range and no member layout. Carrying the aggregate for either
+// would lay one element's members over the whole array.
+TEST(NetDataType, StructNetWithADimensionCarriesNoAggregate) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  typedef struct packed { logic [7:0] opcode; logic [23:0] imm; } "
+      "instruction_t;\n"
+      "  wire instruction_t u [2];\n"
+      "  wire instruction_t [1:0] v;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* u = FindNet(design, "u");
+  ASSERT_NE(u, nullptr);
+  EXPECT_EQ(u->dtype, nullptr);
+  auto* v = FindNet(design, "v");
+  ASSERT_NE(v, nullptr);
+  ASSERT_NE(v->dtype, nullptr);
+  EXPECT_NE(v->dtype->packed_dim_left, nullptr);
+  EXPECT_TRUE(v->dtype->struct_members.empty());
+}
+
 }  // namespace

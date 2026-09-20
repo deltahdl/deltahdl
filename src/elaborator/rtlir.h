@@ -89,8 +89,11 @@ struct RtlirPort {
   // declaration", and `width` above says how many bits the port has rather
   // than which bit an index names -- `[15:0]` and `[2:17]` are both sixteen
   // bits wide, and index 2 reaches a different bit of each. Set when the port
-  // declares a packed dimension; null otherwise, which leaves the port
-  // addressed as [0:0].
+  // declares a packed dimension. Also set, to the resolved aggregate, for a
+  // port §23.2.2.3 makes a net whose data type is a packed structure or union
+  // (§6.7.1), which declares no variable to carry a layout of its own; the
+  // simulator lays the net's members out from it (§7.2.1). Null otherwise,
+  // which leaves the port addressed as [0:0].
   const DataType* dtype = nullptr;
 
   bool is_var = false;
@@ -142,7 +145,10 @@ struct RtlirNet {
   // index names, because `[15:0]` and `[2:17]` are both sixteen bits wide and
   // the same index addresses a different bit of each. Set when the declaration
   // carries a packed dimension, so a select on this net can be resolved against
-  // the range as written; null for a scalar, which is addressed as [0:0].
+  // the range as written. Also set, to the resolved aggregate, for a net of a
+  // packed structure or union with no dimension of its own (§6.7.1), so a
+  // member select of the net names the run of bits §7.2.1 lays the member out
+  // at. Null for a scalar, which is addressed as [0:0].
   const DataType* dtype = nullptr;
 
   bool is_signed = false;

@@ -729,6 +729,29 @@ void Elaborator::RecordNetArrayShape(ModuleItem* item, const RtlirNet& net,
   TrackVarArrayInfo(item, dims, BuildParamScope(mod), net_array_info_);
 }
 
+// The type a net record carries beyond its width. §11.5.1: the width says how
+// many bits the net has, not which bit an index names, so the declared type
+// travels wherever it holds a packed dimension and the simulator addresses the
+// net over the range as written -- the same information SetVariableTypeInfo
+// carries for a variable declared beside it. §6.7.1 admits a packed structure
+// as a net's data type, its own example `wire struct packed {...} memsig`, and
+// §7.2.1 makes a member of one a window of the vector; a net of such a type,
+// or of a typedef name standing for one, carries the resolved aggregate so the
+// simulator lays its members out as it does a variable's. Without it
+// `w.opcode` on `wire instruction_t w` selected nothing of the net's bits. A
+// net with a use-site packed dimension or an unpacked one is an array of the
+// aggregate rather than one and keeps the width alone, as a port does.
+static const DataType* NetDeclaredType(const ModuleItem* item,
+                                       const TypedefMap& typedefs,
+                                       Arena& arena) {
+  if (item->data_type.packed_dim_left != nullptr ||
+      !item->data_type.extra_packed_dims.empty()) {
+    return &item->data_type;
+  }
+  if (!item->unpacked_dims.empty()) return nullptr;
+  return ResolvedAggregateType(item->data_type, typedefs, arena);
+}
+
 void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
   // §6.23: a net declared with a type_reference data type (e.g. `wire type(x)
   // y`) resolves the referenced object's width/signedness before the net is
@@ -780,14 +803,7 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
   // naming one does not fold and the net falls back to a single bit. This is
   // the same scope the variable declaration beside it folds against.
   net.width = EvalTypeWidth(item->data_type, typedefs_, BuildParamScope(mod));
-  // §11.5.1: the width above says how many bits the net has, not which bit an
-  // index names. Carry the declared type wherever it holds a packed dimension,
-  // so the simulator can address the net over the range as written -- the same
-  // information SetVariableTypeInfo carries for a variable declared beside it.
-  if (item->data_type.packed_dim_left != nullptr ||
-      !item->data_type.extra_packed_dims.empty()) {
-    net.dtype = &item->data_type;
-  }
+  net.dtype = NetDeclaredType(item, typedefs_, arena_);
   net.is_signed = IsSignedType(item->data_type, typedefs_);
   if (non_ansi_partial_ports_.count(item->name)) {
     net.is_signed =
@@ -866,30 +882,16 @@ static void SetEnumTypeInfo(const ModuleItem* item, RtlirVariable& var,
   }
 }
 
+// §26.3 with §7.2.1: a package-scoped name, `pk::rec_t`, denotes the
+// package's typedef, held under its "pk::rec_t" key, which
+// ResolvedAggregateType looks the name up by; looked up by the bare name it
+// denoted nothing, so the variable was sized but its members were never laid
+// out and every member write was dropped.
 static void SetStructTypeInfo(const ModuleItem* item, RtlirVariable& var,
                               const TypedefMap& typedefs, Arena& arena) {
-  if (item->data_type.kind == DataTypeKind::kStruct ||
-      item->data_type.kind == DataTypeKind::kUnion) {
-    auto* copy = arena.Create<DataType>(item->data_type);
-    ResolveNestedAggregateTypes(*copy, typedefs, arena);
-    var.dtype = copy;
-    return;
-  }
-  if (item->data_type.kind != DataTypeKind::kNamed) return;
-  // §26.3 with §7.2.1: a package-scoped name, `pk::rec_t`, denotes the
-  // package's typedef, held under its "pk::rec_t" key; looked up by the bare
-  // name it denoted nothing, so the variable was sized but its members were
-  // never laid out and every member write was dropped.
-  const DataType* bound = FindNamedType(item->data_type, typedefs);
-  if (bound == nullptr) return;
-  if (bound->kind != DataTypeKind::kStruct &&
-      bound->kind != DataTypeKind::kUnion) {
-    return;
-  }
-
-  auto* copy = arena.Create<DataType>(*bound);
-  ResolveNestedAggregateTypes(*copy, typedefs, arena);
-  var.dtype = copy;
+  const DataType* aggregate =
+      ResolvedAggregateType(item->data_type, typedefs, arena);
+  if (aggregate != nullptr) var.dtype = aggregate;
 }
 
 // Records the declared-type information a variable carries beyond its raw

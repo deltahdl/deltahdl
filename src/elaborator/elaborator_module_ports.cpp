@@ -272,27 +272,10 @@ struct PortElabContext {
   RtlirModule* mod;
 };
 
-// The structure or union a port's data type stands for: the type itself when
-// the header wrote one, or the one a typedef name resolves to through the
-// typedef table, followed through a name that stands for another name. Null
-// for a port of any other type, and for a name the table does not hold.
-static const DataType* PortAggregateType(const DataType& dtype,
-                                         const TypedefMap& typedefs) {
-  const DataType* d = &dtype;
-  for (int hops = 0; d->kind == DataTypeKind::kNamed && hops < 16; ++hops) {
-    d = FindNamedType(*d, typedefs);
-    if (d == nullptr) return nullptr;
-  }
-  if (d->kind != DataTypeKind::kStruct && d->kind != DataTypeKind::kUnion) {
-    return nullptr;
-  }
-  return d->struct_members.empty() ? nullptr : d;
-}
-
-// The resolved aggregate a structure or union port carries for its layout: a
-// copy of the type PortAggregateType finds, its nested member types resolved,
-// in the arena. §26.4 applies a header import before the port list, so a
-// package's structure resolves here as the module's own does. Null for a port
+// The resolved aggregate a structure or union port carries for its layout,
+// the one ResolvedAggregateType lays out for a body declaration of the same
+// type. §26.4 applies a header import before the port list, so a package's
+// structure resolves here as the module's own does. Null for a port
 // of any other type, and for the ports the layout is not for: a port with an
 // unpacked or a use-site packed dimension is an array of the aggregate rather
 // than one and keeps the width alone; a checker's formal is §17.2's, an
@@ -310,11 +293,7 @@ static const DataType* ResolvedPortAggregate(const ModuleDecl* decl,
       !port.data_type.extra_packed_dims.empty()) {
     return nullptr;
   }
-  const DataType* aggregate = PortAggregateType(port.data_type, ctx.typedefs);
-  if (aggregate == nullptr) return nullptr;
-  auto* copy = ctx.arena.Create<DataType>(*aggregate);
-  ResolveNestedAggregateTypes(*copy, ctx.typedefs, ctx.arena);
-  return copy;
+  return ResolvedAggregateType(port.data_type, ctx.typedefs, ctx.arena);
 }
 
 // §7.2.1 with §23.2.2.2: a variable port whose data type is a structure or a

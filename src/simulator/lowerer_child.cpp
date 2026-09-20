@@ -92,6 +92,10 @@ static void CreateChildModuleNets(const std::string& inst_prefix,
         NetSpec{net.charge_strength, net.decay_ticks, net.decays,
                 net.is_user_nettype, net.resolve_func, net.is_signed});
     RecordPackedRange(net.dtype, created->resolved, ctx, arena);
+    // §6.7.1 with §7.2.1: the instance's net of a packed structure is laid
+    // out under its prefixed name, the key a member select of it is resolved
+    // by, as RegisterModuleNets lays the top's out.
+    RegisterAggregateLayout(*name, net.dtype, net.width, ctx, arena);
   }
 }
 

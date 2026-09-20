@@ -28,4 +28,16 @@ size_t MemberPathSplit(const std::string& path, SimContext& ctx) {
   return first;
 }
 
+const StructTypeInfo* StructLayoutOfName(std::string_view name,
+                                         SimContext& ctx) {
+  if (ctx.FindLocalVariable(name) != nullptr) {
+    return ctx.GetVariableStructType(name);
+  }
+  std::string prefixed = ctx.ActiveInstancePrefix() + std::string(name);
+  if (const StructTypeInfo* info = ctx.GetVariableStructType(prefixed)) {
+    return info;
+  }
+  return ctx.GetVariableStructType(name);
+}
+
 }  // namespace delta
