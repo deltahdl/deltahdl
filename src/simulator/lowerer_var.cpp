@@ -746,14 +746,26 @@ void Lowerer::LowerVar(std::string_view name, const RtlirVariable& var) {
 // declared handle type supplies it. §8.25: the object is then bound to the
 // specialization the declaration wrote, `G #(5) b = new`, as the procedural
 // declaration path binds its own (TryExecClassVarDecl); built without it, a
-// method of `b` read every parameter as the class's default. Returns true
-// when it handled a class-new initializer.
+// method of `b` read every parameter as the class's default. §8.30.1
+// (printed page 217 of ~/LRM.pdf) with §6.21 (printed 132-133): the built-in
+// weak_reference class, of which the run holds no record, has its own
+// `new(obj)`, taken through EvalWeakReferenceNew as the procedural `w =
+// new(h)` (TryClassNewAssign) and a package's or the unit's declaration
+// (ConstructClassNewInit, lowerer_package_data.cpp) take it, so a module's
+// `weak_reference #(C) w = new(h);` refers to the object its earlier `C h =
+// new;` constructed; handed to EvalClassNew, which found no class, it
+// constructed nothing and `w.get()` answered null. Returns true when it
+// handled a class-new initializer.
 static bool TryLowerClassNewVarInit(std::string_view name,
                                     const RtlirVariable& var, Variable* v,
                                     SimContext& ctx, Arena& arena) {
   if (var.class_type_name.empty() || var.init_expr->kind != ExprKind::kCall ||
       var.init_expr->text != "new")
     return false;
+  if (var.class_type_name == "weak_reference") {
+    v->value = EvalWeakReferenceNew(var.init_expr, ctx, arena);
+    return true;
+  }
   v->value = EvalClassNew(var.class_type_name, var.init_expr, ctx, arena,
                           var.init_expr->range.start);
   ApplyClassParamOverrides(name, v->value.ToUint64(), ctx, arena);

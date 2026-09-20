@@ -216,4 +216,50 @@ TEST(ClassSim, UnitWeakReferenceDeclarationInitializerRefersToTheObject) {
             3u);
 }
 
+// §8.30.1 (printed page 217 of ~/LRM.pdf) with §6.21 (printed 132-133): a
+// module's `weak_reference #(C) w = new(h);` is a declaration assignment
+// made at the declaration, ahead of the module's procedures, creating the
+// weak reference to the object the module's earlier `C h = new;`
+// constructed, so `w.get()` answers that object and its v reads 3. The
+// module's class-typed initializer (TryLowerClassNewVarInit in
+// lowerer_var.cpp) constructed by EvalClassNew alone, which holds no record
+// of the built-in weak_reference class and made nothing, so get() answered
+// null; the package's and the unit's declaration form had been given the
+// weak reference's own new(obj) (EvalWeakReferenceNew) while the module's
+// had not.
+TEST(ClassSim, ModuleWeakReferenceDeclarationInitializerRefersToTheObject) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  int v = 3;\n"
+                      "endclass\n"
+                      "module top;\n"
+                      "  C h = new;\n"
+                      "  weak_reference #(C) w = new(h);\n"
+                      "  C c;\n"
+                      "  int y;\n"
+                      "  initial begin\n"
+                      "    c = w.get();\n"
+                      "    y = c.v;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            3u);
+}
+
+// The referent is the module's own handle: `w.get() == h` reads 1 beside
+// `h != null`, 1, so y is 11. A weak reference to nothing answers null,
+// unequal to the constructed h: 10.
+TEST(ClassSim, ModuleWeakReferenceGetAnswersTheModulesOwnHandle) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  int v = 3;\n"
+                      "endclass\n"
+                      "module top;\n"
+                      "  C h = new;\n"
+                      "  weak_reference #(C) w = new(h);\n"
+                      "  int y;\n"
+                      "  initial y = (h != null) * 10 + (w.get() == h);\n"
+                      "endmodule\n",
+                      "y"),
+            11u);
+}
+
 }  // namespace
