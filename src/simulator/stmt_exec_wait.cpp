@@ -6,6 +6,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "common/arena.h"
@@ -16,6 +17,7 @@
 #include "simulator/awaiters.h"
 #include "simulator/awaiters_event_control.h"
 #include "simulator/class_object.h"
+#include "simulator/eval_semaphore.h"
 #include "simulator/evaluation.h"
 #include "simulator/exec_task.h"
 #include "simulator/expr_walk.h"
@@ -77,6 +79,31 @@ void CollectStaticPropertyReads(const Expr* cond, SimContext& ctx,
   });
 }
 
+// §15.5.3 (printed page 378) with §26.3 (printed 808): the wait condition
+// names a hierarchical_event_identifier's triggered state, and a package's
+// event is named through the package scope resolution operator,
+// `wait (p1::e.triggered)`, whose storage stands under the "p1.e" key
+// CreatePackageDataVariables (lowerer_package_data.cpp) creates it under.
+// CollectExprReads descends the scope resolution into `p1` and `e`, neither
+// of which names that storage, so nothing was armed on the event and the
+// process waited for ever; each scoped name whose key holds a variable is
+// added to `reads` under that key, which AnyChangeAwaiter arms on and the
+// trigger's `-> p1::e` wakes (ExecEventTriggerImpl in stmt_exec.cpp). A
+// scoped name of any other package item, a variable or a parameter, is
+// added the same way, its key holding its storage too.
+void CollectPackageScopedReads(const Expr* cond, SimContext& ctx,
+                               std::unordered_set<std::string>& reads) {
+  ForEachSubExpr(cond, [&](const Expr* e) {
+    if (e->kind != ExprKind::kMemberAccess || !e->is_scope_resolution ||
+        e->lhs == nullptr || e->lhs->kind != ExprKind::kIdentifier ||
+        e->rhs == nullptr || e->rhs->kind != ExprKind::kIdentifier)
+      return;
+    std::string key =
+        std::string(e->lhs->text) + "." + std::string(e->rhs->text);
+    if (ctx.FindVariable(key) != nullptr) reads.insert(std::move(key));
+  });
+}
+
 struct WaitOrderStepAwaiter {
   SimContext& ctx;
   const std::vector<std::string_view>& event_names;
@@ -123,6 +150,7 @@ ExecTask ExecWait(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   std::unordered_set<std::string> reads;
   CollectExprReads(stmt->condition, reads);
   CollectStaticPropertyReads(stmt->condition, ctx, reads);
+  CollectPackageScopedReads(stmt->condition, ctx, reads);
 
   SubstituteSequenceEndpoints(reads, ctx);
   std::vector<std::string_view> read_vars(reads.begin(), reads.end());
@@ -260,17 +288,28 @@ ExecTask ExecDelay(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   co_return StmtResult::kDone;
 }
 
-static bool IsNamedEvent(const Stmt* stmt, SimContext& ctx) {
-  if (stmt->events.size() != 1) return false;
+// §15.5.2 (printed page 378): the key of the named event an event control's
+// one operand names, empty where the control names anything else. §26.3
+// (printed 808): the operand is a hierarchical_event_identifier, which a
+// package's event is written as through the package scope resolution
+// operator, `@(p1::e)`, so the operand is read as ScopedOrBareTargetKey
+// (eval_semaphore.cpp) reads a semaphore's `p1::s = new` target -- an
+// identifier's own text, or the "p1.e" key a scoped name's storage stands
+// under -- and the awaiter arms on that key. Read as an identifier alone,
+// the scoped operand fell to EventAwaiter, which resolved no variable for it
+// and never resumed the process.
+static std::string_view NamedEventKey(const Stmt* stmt, SimContext& ctx) {
+  if (stmt->events.size() != 1) return {};
   const auto& ev = stmt->events[0];
-  if (ev.edge != Edge::kNone) return false;
+  if (ev.edge != Edge::kNone) return {};
   // §9.4.2.3: a guarded operand goes to EventAwaiter, which evaluates the
   // condition before resuming. NamedEventAwaiter resumes on the trigger alone,
   // so sending `@(e iff en)` there would fire the process however `en` read.
-  if (ev.iff_condition) return false;
-  if (!ev.signal || ev.signal->kind != ExprKind::kIdentifier) return false;
-  auto* var = ctx.FindVariable(ev.signal->text);
-  return var && var->is_event;
+  if (ev.iff_condition) return {};
+  std::string_view key = ScopedOrBareTargetKey(ev.signal, ctx.GetArena());
+  if (key.empty()) return {};
+  auto* var = ctx.FindVariable(key);
+  return var && var->is_event ? key : std::string_view{};
 }
 
 static bool HasSequenceEvent(const Stmt* stmt) {
@@ -282,10 +321,11 @@ static bool HasSequenceEvent(const Stmt* stmt) {
 
 ExecTask ExecEventControl(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (!stmt->events.empty()) {
+    std::string_view named_event = NamedEventKey(stmt, ctx);
     if (HasSequenceEvent(stmt)) {
       co_await SequenceEventAwaiter{ctx, stmt->events};
-    } else if (IsNamedEvent(stmt, ctx)) {
-      co_await NamedEventAwaiter{ctx, stmt->events[0].signal->text};
+    } else if (!named_event.empty()) {
+      co_await NamedEventAwaiter{ctx, named_event};
     } else {
       co_await EventAwaiter{ctx, stmt->events, arena};
     }

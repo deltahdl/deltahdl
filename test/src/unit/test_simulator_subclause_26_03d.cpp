@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 
+#include "fixture_simulator.h"
 #include "helpers_scheduler.h"
+#include "simulator/variable.h"
 
 using namespace delta;
 
@@ -482,6 +484,232 @@ TEST(PackageImportSim, PackageQueueOfAClassTypeHoldsHandles) {
                       "endmodule\n",
                       "y"),
             43u);
+}
+
+// §7.4.2 (printed page 154) with §26.6 (printed 815-816) and §26.2 (printed
+// 808): the subclause's own p3 imports what p2 exports of p1 and reads it in
+// a declaration assignment, here the items of a fixed-size array's pattern,
+// `int a[2] = '{VAL2, x}`, so a[0] is p1's VAL2, 2, and a[1] p1's x, 7,
+// read by p3's own function: 2 * 10 + 7. The pattern was distributed over
+// the elements when the array was created, ahead of the export binding
+// (CreatePackageArray in lowerer_package_data.cpp), so neither item found
+// "p2.VAL2" or "p2.x" and both elements read 0; the scalar `int q = x` was
+// already read after the exports (InitPackageDataVariables).
+TEST(PackageImportSim, PackageFixedSizeArrayInitializerReadingReExportedNames) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  typedef enum {VAL[3]} t;\n"
+                      "  int x = 7;\n"
+                      "endpackage\n"
+                      "package p2;\n"
+                      "  import p1::*;\n"
+                      "  export p1::*;\n"
+                      "endpackage\n"
+                      "package p3;\n"
+                      "  import p2::*;\n"
+                      "  int a[2] = '{VAL2, x};\n"
+                      "  function int sum();\n"
+                      "    return a[0] * 10 + a[1];\n"
+                      "  endfunction\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  int y;\n"
+                      "  initial y = p3::sum();\n"
+                      "endmodule\n",
+                      "y"),
+            27u);
+}
+
+// §15.5.2 (printed page 378) with §26.3 (printed 808): the event control's
+// operand is a hierarchical_event_identifier, and a package's event is named
+// through the package scope resolution operator, so `@(p1::e)` blocks the
+// process until `-> p1::e` at time 3 triggers it: y reads 3. The control
+// took an identifier alone for a named event (NamedEventKey in
+// stmt_exec_wait.cpp), so the scoped operand went to the value-change
+// awaiter, which resolved no variable for it and never resumed the process,
+// and y stayed 0. The event's storage is marked as one by
+// ShapePackageVariable (lowerer_package_data.cpp); left unmarked, the same
+// trigger woke nothing either.
+TEST(PackageImportSim, PackageEventAwaitedThroughTheQualifier) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  event e;\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  int y = 0;\n"
+                      "  initial #3 -> p1::e;\n"
+                      "  initial begin\n"
+                      "    @(p1::e);\n"
+                      "    y = $time;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            3u);
+}
+
+// §15.5.3 (printed page 378) with §26.3 (printed 808): the wait construct
+// reads the triggered state of a hierarchical_event_identifier, a package's
+// through its qualifier, so `wait (p1::e.triggered)` unblocks when `-> p1::e`
+// fires at time 3: z reads 3. The wait armed on the names `p1` and `e` the
+// read collection took the scoped operand apart into, neither the event's
+// storage (CollectPackageScopedReads in stmt_exec_wait.cpp), so the process
+// waited for ever and z stayed 0.
+TEST(PackageImportSim, PackageEventTriggeredStateWaitedOnThroughTheQualifier) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  event e;\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  int z = 0;\n"
+                      "  initial #3 -> p1::e;\n"
+                      "  initial begin\n"
+                      "    wait (p1::e.triggered);\n"
+                      "    z = $time;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "z"),
+            3u);
+}
+
+// §15.5.3 (printed page 378) with §26.3 (printed 808): the triggered state
+// persists through the time step, read as the bare member and as the
+// method call alike, so both read 1 after `-> p1::e` in the same step:
+// 1 * 10 + 1. With Variable::is_event clear on the package's storage
+// (ShapePackageVariable in lowerer_package_data.cpp), the member read fell
+// to a structure-member lookup and the call to the user-method lookup, and
+// both answered 0.
+TEST(PackageImportSim, PackageEventTriggeredStateReadThroughTheQualifier) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  event e;\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  int y;\n"
+                      "  initial begin\n"
+                      "    -> p1::e;\n"
+                      "    y = p1::e.triggered * 10 + p1::e.triggered();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            11u);
+}
+
+// §8.3 (printed page 180) with §26.2 (printed 808): a package variable of a
+// class type holds a handle, which LowerVar (lowerer_var.cpp) gives a
+// module's at 64 bits whatever the declaration's own width, so the storage
+// CreatePackageDataVariables makes under "p1.h" is 64 bits wide too
+// (PackageDataWidth in lowerer_package_data.cpp). A class type is one no
+// width table sizes, and such a type fell to the 32-bit carrier every
+// unsized package item gets, so the handle's storage was half a handle.
+TEST(PackageImportSim, PackageClassHandleCarrierIsSixtyFourBitsWide) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "package p1;\n"
+      "  class C;\n"
+      "    int v;\n"
+      "  endclass\n"
+      "  C h;\n"
+      "endpackage\n"
+      "module top;\n"
+      "  import p1::*;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  LowerAndRun(design, f);
+  auto* h = f.ctx.FindVariable("p1.h");
+  ASSERT_NE(h, nullptr);
+  EXPECT_EQ(h->value.width, 64u);
+}
+
+// §8.3 (printed page 180) with §26.3 (printed 808): `p1::h = new` constructs
+// an object of p1's C into the package's handle, which then compares unequal
+// to null: 1. Read together with the width above so that a handle held in a
+// 64-bit carrier still constructs and compares as it did in the narrower
+// one.
+TEST(PackageImportSim, PackageClassHandleConstructedThroughTheQualifier) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  class C;\n"
+                      "    int v;\n"
+                      "  endclass\n"
+                      "  C h;\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  int y;\n"
+                      "  initial begin\n"
+                      "    p1::h = new;\n"
+                      "    y = (p1::h != null);\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            1u);
+}
+
+// §15.5.2 (printed page 378) with §26.3 (printed 808): the event control's
+// operand is a hierarchical_event_identifier, and a package's event is named
+// through the package scope resolution operator, so `@(p1::e)` blocks the
+// process until `-> p1::e` at time 3 triggers it: y reads 3. The control
+// took an identifier alone for a named event (NamedEventKey in
+// stmt_exec_wait.cpp), so the scoped operand went to the value-change
+// awaiter, which resolved no variable for it and never resumed the process,
+// and y stayed 0. The event's storage is marked as one by
+// ShapePackageVariable (lowerer_package_data.cpp); left unmarked, the same
+// trigger woke nothing either.
+TEST(PackageImportSim, PackageEventAwaitedThroughTheQualifier) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  event e;\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  int y = 0;\n"
+                      "  initial #3 -> p1::e;\n"
+                      "  initial begin\n"
+                      "    @(p1::e);\n"
+                      "    y = $time;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            3u);
+}
+
+// §15.5.3 (printed page 378) with §26.3 (printed 808): the wait construct
+// reads the triggered state of a hierarchical_event_identifier, a package's
+// through its qualifier, so `wait (p1::e.triggered)` unblocks when `-> p1::e`
+// fires at time 3: z reads 3. The wait armed on the names `p1` and `e` the
+// read collection took the scoped operand apart into, neither the event's
+// storage (CollectPackageScopedReads in stmt_exec_wait.cpp), so the process
+// waited for ever and z stayed 0.
+TEST(PackageImportSim, PackageEventTriggeredStateWaitedOnThroughTheQualifier) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  event e;\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  int z = 0;\n"
+                      "  initial #3 -> p1::e;\n"
+                      "  initial begin\n"
+                      "    wait (p1::e.triggered);\n"
+                      "    z = $time;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "z"),
+            3u);
+}
+
+// §15.5.3 (printed page 378) with §26.3 (printed 808): the triggered state
+// persists through the time step, read as the bare member and as the
+// method call alike, so both read 1 after `-> p1::e` in the same step:
+// 1 * 10 + 1. With Variable::is_event clear on the package's storage
+// (ShapePackageVariable in lowerer_package_data.cpp), the member read fell
+// to a structure-member lookup and the call to the user-method lookup, and
+// both answered 0.
+TEST(PackageImportSim, PackageEventTriggeredStateReadThroughTheQualifier) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  event e;\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  int y;\n"
+                      "  initial begin\n"
+                      "    -> p1::e;\n"
+                      "    y = p1::e.triggered * 10 + p1::e.triggered();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            11u);
 }
 
 }  // namespace

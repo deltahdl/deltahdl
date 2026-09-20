@@ -35,7 +35,12 @@ namespace delta {
 // The default a package variable with no initializer holds: §6.8's Table 6-7
 // gives a 4-state integral variable x, which CreateVariable filled, and a
 // 2-state one 0. A string and a real are registered as such, since a read of
-// either goes through the kind rather than through the bits.
+// either goes through the kind rather than through the bits. §15.5 (printed
+// page 378): a variable declared `event` is a named event, which `-> e`
+// triggers, `@e` waits on and `e.triggered` reads, each through
+// Variable::is_event as a module's is marked by LowerVar (lowerer_var.cpp);
+// left clear, a package's `event e` was a one-bit value `-> p1::e` marked
+// but nothing waited on or read as an event.
 static void ShapePackageVariable(const ModuleItem* item, Variable* var,
                                  std::string_view qname, SimContext& ctx,
                                  Arena& arena) {
@@ -45,6 +50,7 @@ static void ShapePackageVariable(const ModuleItem* item, Variable* var,
   var->value.is_signed = var->is_signed;
   if (!var->is_4state)
     var->value = MakeLogic4VecVal(arena, var->value.width, 0);
+  var->is_event = type.kind == DataTypeKind::kEvent;
   if (DeclaredTypeIsString(type, ctx)) ctx.RegisterStringVariable(qname);
   bool is_real = type.kind == DataTypeKind::kReal ||
                  type.kind == DataTypeKind::kShortreal ||
