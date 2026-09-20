@@ -752,6 +752,11 @@ class Parser {
   // other. There is no form that omits it.
   Token Expect(TokenKind kind, Subclause subclause);
   Token ExpectIdentifier(Subclause subclause);
+  // Where ExpectIdentifier finds no identifier: takes a system identifier, or
+  // a decimal literal with an identifier directly against it, as the simple
+  // identifier whose first character §5.6 forbids, reporting it under §5.6
+  // and answering whether it did.
+  bool TryTakeIllFormedSimpleIdentifier(Token* out);
   void MatchEndLabel(std::string_view name);
   bool CheckIdentifier();
   bool Match(TokenKind kind);

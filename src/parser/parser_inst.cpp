@@ -1,6 +1,9 @@
+#include <algorithm>
+#include <cctype>
 #include <cstddef>
 #include <cstdint>
 #include <format>
+#include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -453,9 +456,59 @@ ModuleItem* Parser::ParseFinalBlock() {
   return item;
 }
 
+// §5.6 has the first character of a simple identifier be a letter or an
+// underscore, not a digit or a `$`. The lexer reads a name that begins with a
+// `$` as a system identifier and one that begins with a digit as an integer
+// literal with the rest of the name as a separate identifier against it, each
+// the only thing the grammar makes of those characters; where a name is
+// expected, either is the misspelt identifier §5.6 speaks of, reported as
+// such and taken as the name so that what follows is parsed in step. The
+// adjacency test is what tells `0number` from the `0 number` that white space
+// writes, which is the two tokens it looks like.
+bool Parser::TryTakeIllFormedSimpleIdentifier(Token* out) {
+  auto tok = CurrentToken();
+  if (tok.Is(TokenKind::kSystemIdentifier)) {
+    diag_.Error(
+        tok.loc,
+        "identifier '" + std::string(tok.text) + "' shall not begin with '$'",
+        Subclause("5.6"));
+    *out = Consume();
+    out->kind = TokenKind::kIdentifier;
+    return true;
+  }
+  if (!tok.Is(TokenKind::kIntLiteral) ||
+      !std::ranges::all_of(tok.text, [](char c) {
+        return std::isdigit(static_cast<unsigned char>(c)) != 0 || c == '_';
+      })) {
+    return false;
+  }
+  auto saved = lexer_.SavePos();
+  Consume();
+  auto next = CurrentToken();
+  if (!next.Is(TokenKind::kIdentifier) ||
+      next.text.data() != tok.text.data() + tok.text.size()) {
+    lexer_.RestorePos(saved);
+    return false;
+  }
+  Consume();
+  *out = tok;
+  out->kind = TokenKind::kIdentifier;
+  out->text =
+      std::string_view(tok.text.data(), tok.text.size() + next.text.size());
+  diag_.Error(tok.loc,
+              "identifier '" + std::string(out->text) +
+                  "' shall not begin with a digit",
+              Subclause("5.6"));
+  return true;
+}
+
 Token Parser::ExpectIdentifier(Subclause subclause) {
   if (CheckIdentifier()) {
     return Consume();
+  }
+  Token ill_formed;
+  if (TryTakeIllFormedSimpleIdentifier(&ill_formed)) {
+    return ill_formed;
   }
   auto tok = CurrentToken();
   diag_.Error(
