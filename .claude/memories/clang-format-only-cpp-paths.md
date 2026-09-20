@@ -1,12 +1,11 @@
 ---
 name: clang-format-only-cpp-paths
 description: Never feed every path from git status to clang-format; a CMakeLists.txt or other non-C++ file in the list is rewritten as C++ and stops parsing.
-metadata: 
-  node_type: memory
+metadata:
   type: feedback
-  originSessionId: 3f978183-d158-48d4-ba7f-a20646910f29
-  modified: 2026-09-20T17:28:36.333Z
 ---
+
+# clang-format on C++ paths only
 
 Run `clang-format -i --style=google` on the `.cpp` and `.h` files touched, named explicitly or filtered by extension, never on `$(git status --porcelain | awk '{print $2}')` as a whole.
 
