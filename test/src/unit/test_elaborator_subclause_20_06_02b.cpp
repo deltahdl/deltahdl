@@ -593,4 +593,53 @@ TEST(DeclaredWidth, RangeBoundWrittenAsAParameterReachesTheWordsAboveBit63) {
   EXPECT_EQ(ParamValue(design, "BP"), 96);
 }
 
+// §11.4.3's Table 11-4 (printed page 276): a zero base raised to a negative
+// power is x, which no parameter value folds to, so `localparam int Z = 0 **
+// -1` is left unresolved as a division by zero is, among a module's items
+// and in a parameter port list alike. §6.20.2 (printed 127) applies the
+// real-to-integer conversion to a parameter whose value is real, and both
+// fold sites refolded an integral expression the integer fold had declined
+// as a real instead, through std::pow(0, -1), inf, and std::llround of it,
+// which is undefined, so Z read as resolved to whatever that made. A real
+// zero base to a negative power, unspecified by §11.4.3, is left unresolved
+// as well.
+TEST(RealFold, ZeroToANegativePowerStaysUnresolved) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m #(parameter int ZP = 0 ** -1);\n"
+      "  localparam int Z = 0 ** -1;\n"
+      "  localparam int ZR = 0.0 ** -1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(ParamUnresolved(design, "ZP"));
+  EXPECT_TRUE(ParamUnresolved(design, "Z"));
+  EXPECT_TRUE(ParamUnresolved(design, "ZR"));
+}
+
+// §6.20.2 (printed page 127) with §6.12.1: a value with a real operand still
+// takes the real path, so `localparam real R = 2.0 ** -1` is 0.5, `localparam
+// int I = 2.0 ** 2` rounds to 4 among the items and `IP = 2.5 * 2` to 5 in
+// the port list, and `localparam int T = 3000ps`, a time literal §5.8 makes a
+// real in the ns unit, is 3.
+TEST(RealFold, RealOperandStillRoundsToTheNearestInteger) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m #(parameter int IP = 2.5 * 2);\n"
+      "  localparam real R = 2.0 ** -1;\n"
+      "  localparam int I = 2.0 ** 2;\n"
+      "  localparam int T = 3000ps;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(ParamValue(design, "IP"), 5);
+  EXPECT_EQ(ParamValue(design, "I"), 4);
+  EXPECT_EQ(ParamValue(design, "T"), 3);
+  const auto* r = FindParam(design, "m", "R");
+  ASSERT_NE(r, nullptr);
+  EXPECT_TRUE(r->is_real_value);
+  EXPECT_DOUBLE_EQ(r->resolved_real, 0.5);
+}
+
 }  // namespace

@@ -2,6 +2,8 @@
 // (§6.20.2, §6.20.3), moved out of src/elaborator/elaborator_items.cpp, which
 // holds the item walk, at its size limit.
 
+#include "elaborator/elaborator_items_params.h"
+
 #include <cmath>
 #include <cstdint>
 #include <format>
@@ -13,7 +15,6 @@
 #include "common/diagnostic.h"
 #include "common/types.h"
 #include "elaborator/const_eval.h"
-#include "elaborator/const_eval_internal.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/rtlir.h"
@@ -24,6 +25,49 @@
 #include "parser/ast_module.h"
 
 namespace delta {
+
+// §6.20.2 (printed page 127) applies §6.12.1's real-to-integer conversion to
+// a parameter whose value is real, so the value expression of an integer
+// parameter is folded as a real only where it has a real operand: a real
+// literal, a time literal, which §5.8 makes a real scaled to the time unit,
+// or a call of one of §20.5's real-returning conversions, anywhere in it. An
+// integral expression the integer fold answered x for -- `0 ** -1`, x by
+// §11.4.3's Table 11-4 (printed 276) -- was refolded as a real before,
+// std::pow(0, -1) being inf and std::llround(inf) undefined, so `localparam
+// int Z = 0 ** -1` read as resolved to whatever that made.
+static bool IsRealOperand(const Expr* e) {
+  if (e->kind == ExprKind::kRealLiteral || e->kind == ExprKind::kTimeLiteral)
+    return true;
+  if (e->kind != ExprKind::kSystemCall && e->kind != ExprKind::kCall)
+    return false;
+  return e->callee == "$itor" || e->callee == "$bitstoreal" ||
+         e->callee == "$bitstoshortreal";
+}
+
+static bool HasRealOperand(const Expr* e) {
+  if (e == nullptr) return false;
+  if (IsRealOperand(e)) return true;
+  const Expr* const kChildren[] = {e->lhs, e->rhs, e->condition, e->true_expr,
+                                   e->false_expr};
+  for (const Expr* c : kChildren) {
+    if (HasRealOperand(c)) return true;
+  }
+  for (const Expr* a : e->args) {
+    if (HasRealOperand(a)) return true;
+  }
+  return false;
+}
+
+std::optional<int64_t> FoldRealValueAsInteger(const Expr* expr,
+                                              const ScopeMap& scope) {
+  if (!HasRealOperand(expr)) return std::nullopt;
+  auto rval = ConstEvalReal(expr, scope);
+  // §11.4.3 (printed page 276) leaves a real power with a zero base and a
+  // negative exponent unspecified, which std::pow answers with inf, and
+  // §6.12.1 rounds a number, so a value that is none folds to nothing.
+  if (!rval || !std::isfinite(*rval)) return std::nullopt;
+  return std::llround(*rval);
+}
 
 namespace {
 
@@ -233,8 +277,11 @@ void ResolveParamConstValue(RtlirParamDecl& pd, const ModuleItem* item,
     pd.resolved_value = *val;
     pd.is_resolved = true;
   } else if (!is_type && ParamExpectsIntegerValue(pd, item->data_type)) {
-    if (auto rval = ConstEvalReal(item->init_expr, scope)) {
-      pd.resolved_value = std::llround(*rval);
+    // §6.20.2 (printed page 127) with §6.12.1: an integer parameter set from
+    // a real constant rounds to the nearest integer, and an integral
+    // expression the integer fold declined stays unresolved.
+    if (auto rval = FoldRealValueAsInteger(item->init_expr, scope)) {
+      pd.resolved_value = *rval;
       pd.is_resolved = true;
     }
   }

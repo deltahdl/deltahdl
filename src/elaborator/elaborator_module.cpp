@@ -1,4 +1,3 @@
-#include <cmath>
 #include <cstdint>
 #include <cstdlib>
 #include <format>
@@ -16,6 +15,7 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_items_internal.h"
+#include "elaborator/elaborator_items_params.h"
 #include "elaborator/global_clock_assertion_event.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
@@ -316,11 +316,14 @@ static void FoldParamConstantValue(RtlirParamDecl& pd, const Expr* pval,
     pd.is_resolved = true;
   } else if (!pd.is_type_param && has_param_type &&
              ParamExpectsIntegerValue(pd, *param_type)) {
-    // §6.20.2: an integer-typed parameter set from a real constant is
-    // converted to an integer per §6.12.1 (round to nearest, ties away
-    // from zero).
-    if (auto rval = ConstEvalReal(pval, scope)) {
-      pd.resolved_value = std::llround(*rval);
+    // §6.20.2 (printed page 127): an integer-typed parameter set from a real
+    // constant is converted to an integer per §6.12.1 (round to nearest,
+    // ties away from zero). An integral expression the integer fold declined
+    // -- `0 ** -1`, x under §11.4.3's Table 11-4 (printed 276) -- was
+    // refolded as a real here, through std::pow(0, -1) and std::llround of
+    // the inf it makes, and stays unresolved now.
+    if (auto rval = FoldRealValueAsInteger(pval, scope)) {
+      pd.resolved_value = *rval;
       pd.is_resolved = true;
     }
   }
