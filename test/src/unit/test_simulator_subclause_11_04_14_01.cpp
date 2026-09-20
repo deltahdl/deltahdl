@@ -427,4 +427,83 @@ TEST(StreamExpressionConcat, ChildInstanceUnionStreamsFirstMemberOnly) {
   EXPECT_EQ(var->value.ToUint64(), 0xAB00u);
 }
 
+// §11.4.14.1: a struct streams member by member in declaration order, and
+// §11.4.14 packs 4-state data bit for bit, so a 96-bit member contributes all
+// 96 of its bits. big sits at bits [103:8] of the packed struct and small at
+// [7:0]; streamed big then small, the 104-bit stream is big:small and fills the
+// 104-bit target exactly: word 0 holds 0xABCDEF0F1E2D3CA5 and word 1 the top
+// 40 bits, 0x0123456789. Taken through a 64-bit integer the member came from
+// the struct's first word alone, so word 1 read 0 while word 0 was unchanged;
+// it is word 1 that separates the two.
+TEST(StreamExpressionConcat, WideStructMemberStreamsEveryWord) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  struct packed { logic [95:0] big; logic [7:0] small; } s;\n"
+      "  logic [103:0] dst;\n"
+      "  initial begin\n"
+      "    s.big = 96'h0123_4567_89AB_CDEF_0F1E_2D3C;\n"
+      "    s.small = 8'hA5;\n"
+      "    dst = {>> {s}};\n"
+      "  end\n"
+      "endmodule\n",
+      f, "dst");
+  ASSERT_NE(var, nullptr);
+  ASSERT_EQ(var->value.width, 104u);
+  ASSERT_EQ(var->value.nwords, 2u);
+  EXPECT_TRUE(var->value.IsKnown());
+  EXPECT_EQ(var->value.words[0].aval, 0xABCDEF0F1E2D3CA5u);
+  EXPECT_EQ(var->value.words[1].aval, 0x0123456789u);
+}
+
+// §11.4.14.1: an untagged union streams its first-declared member, and that
+// member is taken whole when it is wider than 64 bits. w is 96 bits at offset
+// 0 of the union's storage; the stream is w alone, filling the 96-bit target
+// with word 0 = 0x765432100F0FA5A5 and word 1 = 0xFEDCBA98. Taken through a
+// 64-bit integer, word 1 read 0.
+TEST(StreamExpressionConcat, WideUnionFirstMemberStreamsEveryWord) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  union packed { logic [95:0] w; logic [95:0] v; } u;\n"
+      "  logic [95:0] dst;\n"
+      "  initial begin\n"
+      "    u.w = 96'hFEDC_BA98_7654_3210_0F0F_A5A5;\n"
+      "    dst = {>> {u}};\n"
+      "  end\n"
+      "endmodule\n",
+      f, "dst");
+  ASSERT_NE(var, nullptr);
+  ASSERT_EQ(var->value.width, 96u);
+  ASSERT_EQ(var->value.nwords, 2u);
+  EXPECT_TRUE(var->value.IsKnown());
+  EXPECT_EQ(var->value.words[0].aval, 0x765432100F0FA5A5u);
+  EXPECT_EQ(var->value.words[1].aval, 0xFEDCBA98u);
+}
+
+// §11.4.14: packing 4-state data yields a 4-state stream, so a struct member's
+// x bits stream as x. hi is 1010_xxxx and lo 0x5A; streamed hi then lo, the
+// 16-bit target carries x in bits [11:8] (bval 0x0F00) with the known nibble
+// 0xA above them and 0x5A below. Taken through a 64-bit integer the member's
+// x bits were flattened to a known 0, the target reading a fully known 0xA05A.
+TEST(StreamExpressionConcat, StructMemberXBitsStreamAsX) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  struct packed { logic [7:0] hi; logic [7:0] lo; } s;\n"
+      "  logic [15:0] dst;\n"
+      "  initial begin\n"
+      "    s.hi = 8'b1010_xxxx;\n"
+      "    s.lo = 8'h5A;\n"
+      "    dst = {>> {s}};\n"
+      "  end\n"
+      "endmodule\n",
+      f, "dst");
+  ASSERT_NE(var, nullptr);
+  EXPECT_FALSE(var->value.IsKnown());
+  EXPECT_EQ(var->value.words[0].bval & 0xFFFFu, 0x0F00u);
+  EXPECT_EQ((var->value.words[0].aval >> 12) & 0xFu, 0xAu);
+  EXPECT_EQ(var->value.words[0].aval & 0xFFu, 0x5Au);
+}
+
 }  // namespace

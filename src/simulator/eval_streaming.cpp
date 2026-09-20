@@ -233,26 +233,31 @@ static void ExpandAssocArrayElements(AssocArrayObject* aa,
   }
 }
 
+// §11.4.14.1: a struct is streamed by applying the procedure to each member in
+// declaration order, and §11.4.14 packs 4-state data into a 4-state stream, so
+// a member is taken as the window of the struct's storage at its own offset
+// and width -- both the value and the unknown plane, however many words it
+// spans. Read through ToUint64 the member came from the storage's first word
+// alone with x and z flattened to 0, so a member wider than 64 bits, or one
+// above bit 63, streamed truncated and an x bit streamed as a known 0.
 static void ExpandStructFields(Variable* var, const StructTypeInfo* sinfo,
                                std::vector<Logic4Vec>& parts,
                                uint32_t& total_width, Arena& arena) {
   for (const auto& f : sinfo->fields) {
-    uint64_t val = var->value.ToUint64() >> f.bit_offset;
-    uint64_t mask =
-        (f.width >= 64) ? ~uint64_t{0} : (uint64_t{1} << f.width) - 1;
-    parts.push_back(MakeLogic4VecVal(arena, f.width, val & mask));
+    parts.push_back(ExtractBitField(arena, var->value, f.bit_offset, f.width));
     total_width += f.width;
   }
 }
 
+// §11.4.14.1: an untagged union is streamed by applying the procedure to its
+// first-declared member alone, taken as a window of the union's storage the
+// same way as a struct member.
 static void ExpandUnionFirstMember(Variable* var, const StructTypeInfo* sinfo,
                                    std::vector<Logic4Vec>& parts,
                                    uint32_t& total_width, Arena& arena) {
   if (sinfo->fields.empty()) return;
   const auto& f = sinfo->fields[0];
-  uint64_t val = var->value.ToUint64() >> f.bit_offset;
-  uint64_t mask = (f.width >= 64) ? ~uint64_t{0} : (uint64_t{1} << f.width) - 1;
-  parts.push_back(MakeLogic4VecVal(arena, f.width, val & mask));
+  parts.push_back(ExtractBitField(arena, var->value, f.bit_offset, f.width));
   total_width += f.width;
 }
 
