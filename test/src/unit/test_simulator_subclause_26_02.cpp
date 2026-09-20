@@ -290,25 +290,31 @@ TEST(PackageDeclarationSim,
 // assignments complete before any initial procedure starts, and a mailbox's
 // or a semaphore's is the new() that returns the handle its variable holds,
 // so `p::built` and `p::s` refer to the queue and the bucket when the
-// module reads them while `p::bare`, declared with no initializer, is null.
-// `p::built != null` adds 1, `p::bare == null` 10 and `p::s != null` 100:
-// 111. The package's new() sized the queue and filled the bucket and left
-// the variable's value at the 0 its storage was created with, so both read
-// as null, 10.
+// module reads them while `p::bare` and `p::h`, declared with no
+// initializer, hold the null handle §8.4's Table 8-1 gives a handle by
+// default. `p::built != null` adds 1, `p::bare == null` 10, `p::s != null`
+// 100 and `p::h == null` 1000: 1111. The package's new() sized the queue
+// and filled the bucket and left the variable's value at the 0 its storage
+// was created with, so built and s read as null; and a package's handle
+// with no initializer was shaped as a 4-state named type and filled with
+// x, so `p::bare == null` and `p::h == null` read x, the sum x and y 0.
 TEST(PackageDeclarationSim, PackageSyncVariableBuiltByItsDeclarationIsNotNull) {
   EXPECT_EQ(
       RunAndGet("package p;\n"
+                "  class C;\n"
+                "  endclass\n"
                 "  mailbox built = new;\n"
                 "  mailbox bare;\n"
                 "  semaphore s = new(1);\n"
+                "  C h;\n"
                 "endpackage\n"
                 "module top;\n"
                 "  int y;\n"
                 "  initial y = (p::built != null) + 10 * (p::bare == null) +\n"
-                "              100 * (p::s != null);\n"
+                "              100 * (p::s != null) + 1000 * (p::h == null);\n"
                 "endmodule\n",
                 "y"),
-      111u);
+      1111u);
 }
 
 }  // namespace
