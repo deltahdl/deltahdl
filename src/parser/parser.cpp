@@ -662,8 +662,23 @@ static bool IsCuScopeDataTypeKeyword(TokenKind tk) {
   }
 }
 
+// §3.12.1 (printed page 56) gives the compilation-unit scope every item a
+// package may hold, and A.1.2's package_item reaches data_declaration, whose
+// data_type A.2.2.1 lets be a type_identifier: the `C` of `class C; ...
+// endclass  C h;` outside every module, which §8.3 (printed 180) makes a type
+// at its declaration, or a package's class the unit's `import p::*;` made
+// visible under §26.3 (printed 810). Both stand in known_types_ by the time
+// the declaration is read -- ParseClassDecl registers the class's name ahead
+// of its scope guard and ApplyImportedTypeNames adopts the package's -- and
+// ParseTypedItemOrInst reads such a name as a named type, as it does in a
+// module body; the keyword gate alone refused the identifier and reported
+// "expected top-level declaration".
 bool Parser::TryParseCuScopeDataDecl(CompilationUnit* unit) {
-  if (!IsCuScopeDataTypeKeyword(CurrentToken().kind)) return false;
+  bool known_type_name = Check(TokenKind::kIdentifier) &&
+                         known_types_.count(CurrentToken().text) != 0;
+  if (!known_type_name && !IsCuScopeDataTypeKeyword(CurrentToken().kind)) {
+    return false;
+  }
   std::vector<ModuleItem*> items;
   ParseDataDeclItem(items, 0, {});
   for (auto* item : items) unit->cu_items.push_back(item);

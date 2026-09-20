@@ -5,6 +5,7 @@
 #include "helpers_reported_error.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
+#include "parser/ast_type.h"
 
 using namespace delta;
 
@@ -571,6 +572,67 @@ TEST(ModuleItem, ConstructNotAllowedAtTheTopLevelNames3_12_1) {
   auto r = Parse("always @(*) x = 1;\n");
   EXPECT_TRUE(
       ReportedError(r.diags, "expected top-level declaration", 1, "3.12.1"));
+}
+
+// Checks that `item` is the variable declaration `C <name>` -- a kVarDecl of
+// the named type C -- which is the shape §3.12.1 admits at compilation-unit
+// scope through A.1.2's package_item and its data_declaration. Before the
+// unit-scope dispatch took a class's name as opening a data declaration the
+// item was reported "expected top-level declaration" and never recorded, so
+// the item's presence and its type are what tell the repaired parse apart.
+static void ExpectUnitClassVarDecl(const ModuleItem* item, const char* name) {
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
+  EXPECT_EQ(item->name, name);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kNamed);
+  EXPECT_EQ(item->data_type.type_name, "C");
+}
+
+TEST(CompilationUnitParsing, CuScopeUnitClassVariable) {
+  // §8.3 (printed page 180) makes a class a type at its declaration, and
+  // §3.12.1 (printed 56) lets the compilation-unit scope hold any item a
+  // package may, a data declaration of that type among them.
+  auto r = Parse(
+      "class C; int v = 3; endclass\n"
+      "C h;\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  ASSERT_EQ(r.cu->cu_items.size(), 1u);
+  ExpectUnitClassVarDecl(r.cu->cu_items[0], "h");
+  EXPECT_EQ(r.cu->cu_items[0]->init_expr, nullptr);
+}
+
+TEST(CompilationUnitParsing, CuScopeWildcardImportedClassVariable) {
+  // §26.3 (printed page 810) has a wildcard import make every declaration of
+  // the package visible in the importing scope, the compilation unit here, so
+  // p's class C is a type name for the unit's `C h3 = new;` and its
+  // initializer is kept.
+  auto r = Parse(
+      "package p; class C; int v = 4; endclass endpackage\n"
+      "import p::*;\n"
+      "C h3 = new;\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->cu_items.size(), 2u);
+  EXPECT_EQ(r.cu->cu_items[0]->kind, ModuleItemKind::kImportDecl);
+  ExpectUnitClassVarDecl(r.cu->cu_items[1], "h3");
+  ASSERT_NE(r.cu->cu_items[1]->init_expr, nullptr);
+  EXPECT_EQ(r.cu->cu_items[1]->init_expr->kind, ExprKind::kCall);
+  EXPECT_EQ(r.cu->cu_items[1]->init_expr->text, "new");
+}
+
+TEST(CompilationUnitParsing, CuScopeExplicitlyImportedClassVariable) {
+  // §26.3's explicit import makes the one named declaration visible, so
+  // `import p::C;` at unit scope is enough for `C h2;` after it.
+  auto r = Parse(
+      "package p; class C; int v = 5; endclass endpackage\n"
+      "import p::C;\n"
+      "C h2;\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->cu_items.size(), 2u);
+  ExpectUnitClassVarDecl(r.cu->cu_items[1], "h2");
 }
 
 }  // namespace
