@@ -18,6 +18,7 @@
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
+#include "simulator/statement_assign_internal.h"
 #include "simulator/sva_engine_sampling.h"
 
 namespace delta {
@@ -344,6 +345,16 @@ Logic4Vec EvalCast(const Expr* expr, SimContext& ctx, Arena& arena) {
 
   if (inner.is_real != IsRealCastTarget(type_name)) {
     return CastRealConversion(inner, type_name, target_width, arena);
+  }
+  // §5.7.2 (printed page 80) has a cast convert a real literal to shortreal,
+  // and §6.24.1 (printed 139) has the cast return what a variable of the
+  // casting type holds after the expression is assigned to it, so
+  // `shortreal'(0.5)` is the single-precision 0.5 and `real'(s)` the double
+  // of a shortreal's value. The mask below is for an integral
+  // value; it cut the double's pattern to 32 bits and dropped is_real, which
+  // left `shortreal'(0.5) == 0.5` false and `s + 2.5` an integer's sum.
+  if (inner.is_real) {
+    return ConvertRealForKnownLhs(inner, true, target_width, arena);
   }
   uint64_t val = inner.ToUint64();
   if (target_width < 64) val &= (uint64_t{1} << target_width) - 1;

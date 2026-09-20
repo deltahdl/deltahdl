@@ -121,3 +121,60 @@ TEST(RealLiteralConstantSim, IEEE754NegativeBitExact) {
   uint64_t expected = 0xBFF0000000000000ULL;
   EXPECT_EQ(bits, expected);
 }
+
+// §5.7.2 (printed page 80): a cast converts a real literal to shortreal, so
+// `shortreal'(0.5)` is the single-precision 0.5, which equals the real 0.5.
+// The cast masked the double's bit pattern to 32 bits, an integer of no
+// relation to the value, and the comparison was false.
+TEST(RealLiteralConstantSim, ShortrealCastOfHalfEqualsTheRealHalf) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  logic a;\n"
+      "  initial a = (shortreal'(0.5) == 0.5);\n"
+      "endmodule\n",
+      "a");
+  EXPECT_EQ(v, 1u);
+}
+
+// A shortreal initialized from the cast holds the single-precision value, so
+// `h + 2.0` is 2.5; it held 0.
+TEST(RealLiteralConstantSim, ShortrealFromCastAddsAsItsValue) {
+  auto v = RunAndGetReal(
+      "module t;\n"
+      "  shortreal h = shortreal'(0.5);\n"
+      "  real c;\n"
+      "  initial c = h + 2.0;\n"
+      "endmodule\n",
+      "c");
+  EXPECT_DOUBLE_EQ(v, 2.5);
+}
+
+// 1.2 is not exact in single precision, so the sum is 3.7 to the precision a
+// float carries and not to a double's; the pattern read as an integer gave
+// 858993474.5.
+TEST(RealLiteralConstantSim,
+     ShortrealFromCastOfInexactValueAddsToSinglePrecision) {
+  auto v = RunAndGetReal(
+      "module t;\n"
+      "  shortreal s = shortreal'(1.2);\n"
+      "  real sum;\n"
+      "  initial sum = s + 2.5;\n"
+      "endmodule\n",
+      "sum");
+  EXPECT_NEAR(v, 3.7, 1e-6);
+  EXPECT_NE(v, 3.7);
+}
+
+// §6.12 makes shortreal a C float, so the cast narrows: the single-precision
+// 0.1 widened back into a real is not the double 0.1, which discriminates a
+// cast that kept the double.
+TEST(RealLiteralConstantSim, ShortrealCastNarrowsToSinglePrecision) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  real r = shortreal'(0.1);\n"
+      "  logic e;\n"
+      "  initial e = (r == 0.1);\n"
+      "endmodule\n",
+      "e");
+  EXPECT_EQ(v, 0u);
+}
