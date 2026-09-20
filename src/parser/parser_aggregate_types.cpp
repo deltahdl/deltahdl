@@ -6,6 +6,7 @@
 // assert-no-oversized-source-files enforces; the forward typedefs that name
 // these kinds stay with the typedef in that file.
 
+#include <format>
 #include <vector>
 
 #include "common/diagnostic.h"
@@ -184,6 +185,17 @@ DataType Parser::ParseStructOrUnionBody(TokenKind kw) {
 // `q::pair_t Add` (§26.3, §8.23), which ParseDeclaredDataType reads past
 // known_types_, where a package name never stands; ParseDataType left `q` to
 // be read as the member's name and the `::` after it as a missing semicolon.
+//
+// §6.18 (printed page 118) has a user-defined type's declaration precede any
+// reference to its type_identifier, so a member type spelled as a name this
+// parse holds no declaration for -- `nosuch_t m;`, or `pair_t m;` above the
+// typedef with no forward typedef -- breaches it whether the declaration
+// stands below or nowhere, the two Elaborator::ReportUndeclaredTypeName
+// draws no line between for a module-level declaration. Inside a member list
+// the shape is a declaration and nothing else, since A.2.2.1 admits no
+// instantiation there, so it is reported here in that path's words and read
+// as the named type it spells, packed dimensions included, where a name
+// followed by `;` or `=` is still the member's own.
 DataType Parser::ParseStructMemberType() {
   DataType member_type;
   if (IsStructOrUnionKw(CurrentToken().kind)) {
@@ -197,6 +209,23 @@ DataType Parser::ParseStructMemberType() {
     return member_type;
   }
   member_type = ParseDeclaredDataType();
+  if (member_type.kind != DataTypeKind::kImplicit || !CheckIdentifier()) {
+    return member_type;
+  }
+  auto saved = lexer_.SavePos();
+  Token name_tok = Consume();
+  if (!CheckIdentifier() && !Check(TokenKind::kLBracket)) {
+    lexer_.RestorePos(saved);
+    return member_type;
+  }
+  diag_.Error(name_tok.loc,
+              std::format("declaration of type '{}' does not precede this "
+                          "reference to it",
+                          name_tok.text),
+              Subclause("6.18"));
+  member_type.kind = DataTypeKind::kNamed;
+  member_type.type_name = name_tok.text;
+  ParsePackedDims(member_type);
   return member_type;
 }
 

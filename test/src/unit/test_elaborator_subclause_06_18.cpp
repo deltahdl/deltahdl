@@ -611,4 +611,96 @@ TEST(UserDefinedTypeElaboration, ImportedAggregateTypedefHasNoWidth) {
   EXPECT_EQ(design->type_widths["p_arr_t"], 0u);
 }
 
+// §6.18 (printed page 118) has a user-defined type's declaration precede any
+// reference to its type_identifier, a forward typedef standing for a
+// definition the scope gives before or after the reference. A class method's
+// formal naming `pair_t` above the typedef, with no forward typedef, breaches
+// it, and the elaborator's second resolution of the module's classes, run for
+// the forward-typedef shape, resolved this one the same way with no report;
+// the parser had in fact read `pair_t` as a member named pair_t and reported
+// a missing semicolon at `A`. The reference is reported where it stands, in
+// the words the module-level declaration `my_type x;` earns above.
+TEST(UserDefinedTypeElaboration,
+     ClassMethodFormalMemberNamingATypedefDefinedBelowIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  class C;\n"
+      "    function int f(union tagged { void N; pair_t A; } a);\n"
+      "      return a.A.a;\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "  typedef struct { int a, b; } pair_t;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "declaration of type 'pair_t' does not precede "
+                            "this reference to it",
+                            3, "6.18"));
+}
+
+// The same class with `typedef struct pair_t;` above it: §6.18's forward
+// typedef lets the name be referenced before its definition, which may stand
+// below the class in the same scope, so nothing is reported.
+TEST(UserDefinedTypeElaboration,
+     ClassMethodFormalMemberNamingAForwardDeclaredTypedefIsClean) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  typedef struct pair_t;\n"
+      "  class C;\n"
+      "    function int f(union tagged { void N; pair_t A; } a);\n"
+      "      return a.A.a;\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "  typedef struct { int a, b; } pair_t;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// A member naming a type declared nowhere. §6.18 draws no line between a
+// declaration below the reference and none at all, so a formal's inline
+// structure with `nosuch_t m` is reported once at the member, as the
+// module-level `nosuch x;` is above; it was sized as a scalar with no report
+// of its own, behind the parser's missing-semicolon report at `m`.
+TEST(UserDefinedTypeElaboration,
+     FormalStructMemberNamingAnUndeclaredTypeIsReportedOnce) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  function int f(struct { nosuch_t m; int c; } a);\n"
+      "    return a.c;\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "declaration of type 'nosuch_t' does not precede "
+                            "this reference to it",
+                            2, "6.18"));
+  int reports = 0;
+  for (const auto& d : f.diag.Diagnostics()) {
+    if (d.message.find("does not precede") != std::string::npos) ++reports;
+  }
+  EXPECT_EQ(reports, 1);
+}
+
+// The member's type declared above the formal resolves, and nothing is
+// reported.
+TEST(UserDefinedTypeElaboration,
+     FormalStructMemberNamingADeclaredTypedefIsClean) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  typedef struct { int a, b; } pair_t;\n"
+      "  function int f(struct { pair_t m; int c; } a);\n"
+      "    return a.m.a + a.c;\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace
