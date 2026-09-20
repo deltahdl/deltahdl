@@ -166,4 +166,76 @@ TEST(TaggedUnionEval, ReturnedVariableTagIsCheckedAgainstAnotherMember) {
                             12, "11.9"));
 }
 
+// §10.4.2 (printed page 253): a nonblocking assignment evaluates its
+// right-hand side when the statement executes and lands the value in the NBA
+// region, and §7.3.2 (printed 151) makes a tagged union's value its tag beside
+// the member's bits, so `u <= tagged Valid 5` lands Valid with the 5; §11.9
+// (printed 304) then checks `u.Valid` clean and reports `u.Other`. The update
+// carried the bits alone, so u kept the Other it held: `u.Valid` was reported
+// and `u.Other` raised nothing.
+TEST(TaggedUnionEval, NonblockingTaggedAssignmentLandsTheTag) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef union tagged { void Invalid; int Valid; int Other; } u_t;\n"
+      "  u_t u;\n"
+      "  int y, z;\n"
+      "  initial begin\n"
+      "    u = tagged Other 1;\n"
+      "    u <= tagged Valid 5;\n"
+      "    #1 y = u.Valid;\n"
+      "    z = u.Other;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  LowerAndRun(design, f);
+  auto* y = f.ctx.FindVariable("y");
+  ASSERT_NE(y, nullptr);
+  EXPECT_EQ(y->value.ToUint64(), 5u);
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "run-time error: accessing member", 8, "11.9"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "tagged union 'u' which currently has tag 'Valid'",
+                            9, "11.9"));
+}
+
+// §10.4.2 (printed page 253) with §13.4.1 (printed 342): `u <= g()` evaluates
+// the call when the statement executes, and the implicit variable of the
+// call holds the tagged union value g returned, tag included (§7.3.2, printed
+// 151), which the update lands in u. The tag a call's body returned reached a
+// blocking assignment's target and never a nonblocking one's, so `u.Valid`
+// was reported against the Other u held and `u.Other` raised nothing.
+TEST(TaggedUnionEval, NonblockingCallResultLandsTheReturnedTag) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef union tagged { void Invalid; int Valid; int Other; } u_t;\n"
+      "  u_t u;\n"
+      "  int y, z;\n"
+      "  function u_t g();\n"
+      "    return tagged Valid 5;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    u = tagged Other 1;\n"
+      "    u <= g();\n"
+      "    #1 y = u.Valid;\n"
+      "    z = u.Other;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  LowerAndRun(design, f);
+  auto* y = f.ctx.FindVariable("y");
+  ASSERT_NE(y, nullptr);
+  EXPECT_EQ(y->value.ToUint64(), 5u);
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "run-time error: accessing member", 11, "11.9"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "tagged union 'u' which currently has tag 'Valid'",
+                            12, "11.9"));
+}
+
 }  // namespace
