@@ -7,6 +7,7 @@
 #include "simulator/eval_expr_internal.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
+#include "simulator/variable.h"
 
 namespace delta {
 
