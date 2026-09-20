@@ -30,7 +30,7 @@ TEST(ClassScopeResolutionSim, ScopeResolutionMethodLookup) {
   auto* method = f.arena.Create<ModuleItem>();
   method->kind = ModuleItemKind::kFunctionDecl;
   method->name = "compute";
-  method->is_static = true;
+  method->is_static_method = true;
   type->methods["compute"] = method;
 
   auto* found = f.ctx.FindClassType("Utils");

@@ -165,7 +165,7 @@ TEST(ClassSim, ParameterizedClassStaticMethod) {
   auto* method = f.arena.Create<ModuleItem>();
   method->kind = ModuleItemKind::kFunctionDecl;
   method->name = "encode";
-  method->is_static = true;
+  method->is_static_method = true;
   type->methods["encode"] = method;
 
   f.ctx.RegisterClassType("Codec", type);
@@ -174,7 +174,7 @@ TEST(ClassSim, ParameterizedClassStaticMethod) {
   ASSERT_NE(found, nullptr);
   auto it = found->methods.find("encode");
   ASSERT_NE(it, found->methods.end());
-  EXPECT_TRUE(it->second->is_static);
+  EXPECT_TRUE(it->second->is_static_method);
 }
 
 TEST(ClassSim, SpecializationsHaveIndependentStaticMembers) {

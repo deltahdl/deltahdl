@@ -70,7 +70,8 @@ static bool IsThisOrSuper(const Expr* receiver) {
 
 static bool CalleeOwnsThis(const ModuleItem* func, const Expr* expr,
                            SimContext& ctx) {
-  if (func == nullptr || func->is_static || expr == nullptr) return false;
+  if (func == nullptr || func->is_static_method || expr == nullptr)
+    return false;
   const Expr* access = expr->lhs;
   if (access == nullptr || access->kind != ExprKind::kMemberAccess ||
       access->is_scope_resolution || IsThisOrSuper(access->lhs)) {

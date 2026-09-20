@@ -531,10 +531,10 @@ static void RecordPackageFuncNames(
 // static). An out-of-block method body (§8.24), the item whose `method_class`
 // names its class, is left alone: §8.6 makes every method of a class automatic
 // and forbids a class method a static lifetime, so the scope's default is not
-// its to inherit. The simulator also reads ModuleItem::is_static on a method
-// as §8.10's static qualifier, so marking a body here made an instance method
-// of a package class run in class scope without `this`, its properties
-// unreachable.
+// its to inherit. The simulator reads ModuleItem::is_static_method for §8.10's
+// qualifier; before the two flags were split, marking a body here made an
+// instance method of a package class run in class scope without `this`, its
+// properties unreachable.
 void DefaultSubroutineLifetimes(const std::vector<ModuleItem*>& items,
                                 bool scope_is_automatic) {
   for (auto* item : items) {

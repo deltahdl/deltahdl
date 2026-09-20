@@ -424,8 +424,22 @@ struct ModuleItem {
 
   bool from_anonymous_program = false;
 
+  // §13.3.1 (printed page 339) and §13.4.2: the lifetime keyword written after
+  // `function` or `task`, `function static f()`, which makes every variable
+  // of the subroutine one cell shared by all its activations; is_automatic is
+  // the `automatic` keyword in the same position. Both false where the
+  // declaration writes neither and the scope's default decides.
   bool is_automatic = false;
   bool is_static = false;
+  // §8.10 (printed pages 186 and 187): the `static` method qualifier written
+  // before `function` or `task` in a class, `static function f()`, which makes
+  // the method callable with no object and gives it no `this`. §8.10 sets it
+  // apart from the lifetime above: a static method's variables are automatic,
+  // as every class method's are (§13.3.1, printed page 339), and a class
+  // method carrying the static lifetime is illegal. The parser once folded
+  // the qualifier into is_static, so §13.5.2's ban on a ref formal in a
+  // static-lifetime subroutine refused a class static method's ref formal.
+  bool is_static_method = false;
 
   bool is_extern = false;
   bool is_forkjoin = false;

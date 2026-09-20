@@ -314,7 +314,7 @@ bool SetupInstanceTaskCall(const Expr* expr, SimContext& ctx, Arena& arena,
   // handed to the synchronous evaluator, its delay was skipped and its fork
   // never joined. `this` is pushed for an instance task alone, and
   // TeardownInstanceTaskCall pops it for that one alone.
-  if (call.method->is_static) {
+  if (call.method->is_static_method) {
     call.obj = nullptr;
   } else if (call.obj == nullptr) {
     return false;

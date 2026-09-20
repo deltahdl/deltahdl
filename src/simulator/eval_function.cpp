@@ -113,7 +113,7 @@ static bool ResolveThroughNullHandle(const MethodCallParts& parts,
   for (const auto* t = cls; t != nullptr; t = t->parent) {
     auto it = t->methods.find(std::string(parts.method_name));
     if (it == t->methods.end()) continue;
-    if (!it->second->is_static) break;
+    if (!it->second->is_static_method) break;
     info.method = it->second;
     info.owner = t;
     return true;
@@ -361,7 +361,7 @@ Logic4Vec RunInstanceMethod(const InstanceMethodInfo& info, const Expr* expr,
   Logic4Vec out;
   // §8.10/§8.9: a static method invoked through an instance handle shares the
   // class's single static storage; dispatch it in class scope (no `this`).
-  if (info.method->is_static) {
+  if (info.method->is_static_method) {
     const ClassTypeInfo* scope =
         info.obj != nullptr ? info.obj->type : info.owner;
     RunStaticMethodInClassScope({info.method, scope}, expr, ctx, arena, out);
@@ -530,11 +530,11 @@ static bool TryEvalClassScopeCall(const Expr* expr, SimContext& ctx,
   // §8.10: a static method can directly call static methods and access static
   // properties of the same class, so the class scope must be in effect while
   // the method body executes for unqualified same-class references to resolve.
-  if (info.method->is_static) {
+  if (info.method->is_static_method) {
     ctx.PushMethodClass(info.cls);
   }
   ExecClassMethod({info.method}, expr, ctx, arena, out);
-  if (info.method->is_static) {
+  if (info.method->is_static_method) {
     ctx.PopMethodClass();
   }
   // §13.5.2: output and inout arguments are copied back to the caller on

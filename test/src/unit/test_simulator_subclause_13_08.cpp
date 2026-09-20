@@ -74,7 +74,7 @@ TEST(ParameterizedSubroutineSim, StaticMethodRegistered) {
   ASSERT_NE(info, nullptr);
   auto it = info->methods.find("get_w");
   ASSERT_NE(it, info->methods.end());
-  EXPECT_TRUE(it->second->is_static);
+  EXPECT_TRUE(it->second->is_static_method);
 }
 
 TEST(ParameterizedSubroutineSim, NonVirtualParameterizedClass) {

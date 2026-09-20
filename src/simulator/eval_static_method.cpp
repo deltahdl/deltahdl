@@ -33,7 +33,7 @@ bool TryEvalEnclosingStaticCall(const Expr* expr, SimContext& ctx, Arena& arena,
   const ClassTypeInfo* cls = ctx.CurrentMethodClass();
   if (!cls) return false;
   auto it = cls->methods.find(std::string(expr->callee));
-  if (it == cls->methods.end() || !it->second->is_static) return false;
+  if (it == cls->methods.end() || !it->second->is_static_method) return false;
   RunStaticMethodInClassScope({it->second, cls}, expr, ctx, arena, out);
   return true;
 }
@@ -68,7 +68,7 @@ bool TryEvalEnclosingInstanceCall(const Expr* expr, SimContext& ctx,
     method = self->ResolveMethodForType(expr->callee, enclosing, &defining);
   if (!method) return false;
 
-  if (method->is_static) {
+  if (method->is_static_method) {
     RunStaticMethodInClassScope({method, defining}, expr, ctx, arena, out);
     return true;
   }

@@ -439,7 +439,11 @@ void Parser::ValidateClassMethod(ClassMember* member) {
                 "static method shall not be declared virtual",
                 Subclause("8.10"));
   }
-  if (member->is_static) member->method->is_static = true;
+  // §8.10 (printed page 187): the qualifier is the method's static-ness, not
+  // its lifetime, which the check above has already refused; it is recorded on
+  // its own flag so that a lifetime reader, §13.5.2's ref-formal rule among
+  // them, does not take a static method for a static-lifetime subroutine.
+  if (member->is_static) member->method->is_static_method = true;
 }
 
 void Parser::ValidateConstructorQualifiers(ClassMember* member) {

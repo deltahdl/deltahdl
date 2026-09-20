@@ -85,18 +85,40 @@ TEST(StaticMethodParsing, StaticVirtualTaskError) {
       r.diags, "static method shall not be declared virtual", 2, "8.10"));
 }
 
+// §8.10 (printed page 187): the qualifier before `function` makes the method
+// static and leaves its variables automatic, so it lands on the method item's
+// is_static_method and not on is_static, the lifetime keyword's flag. Folded
+// into is_static, the qualifier made §13.5.2's lifetime rule refuse the
+// method's ref formal.
 TEST(StaticMethodParsing, StaticFlagPropagatedToMethod) {
   auto r = Parse(
       "class C;\n"
-      "  static function void work();\n"
+      "  static function void work(ref int r);\n"
       "  endfunction\n"
       "endclass\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto* m = r.cu->classes[0]->members[0];
   EXPECT_TRUE(m->is_static);
-  EXPECT_TRUE(m->method->is_static);
+  EXPECT_TRUE(m->method->is_static_method);
+  EXPECT_FALSE(m->method->is_static);
   EXPECT_FALSE(m->is_virtual);
+}
+
+// The lifetime keyword after `task` is the other flag: is_static is set and
+// is_static_method is not, so the §8.6 report above stands on the lifetime
+// alone and the member is no static method.
+TEST(StaticMethodParsing, StaticLifetimeSetsTheLifetimeFlagAlone) {
+  auto r = Parse(
+      "class TwoTasks;\n"
+      "  task static t2();\n"
+      "  endtask\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* m = r.cu->classes[0]->members[0];
+  EXPECT_FALSE(m->is_static);
+  EXPECT_TRUE(m->method->is_static);
+  EXPECT_FALSE(m->method->is_static_method);
 }
 
 // §8.10 distinguishes 'static' used as a method qualifier (before the method
