@@ -22,6 +22,7 @@
 #include "simulator/eval_class_array_handles.h"
 #include "simulator/eval_class_sync.h"
 #include "simulator/eval_expr_internal.h"
+#include "simulator/eval_function_args_scoped.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/eval_mailbox.h"
 #include "simulator/eval_member_path.h"
@@ -37,9 +38,12 @@
 
 namespace delta {
 
-static std::string_view LhsIdentName(const Expr* lhs) {
+// The key the kinds of the variable `lhs` names or selects into stand under
+// (DeclaredKindsKey): "$unit.s" for §3.12.1's `$unit::s` (printed page 56),
+// which asked by the text alone read a module's own `int s` for the string.
+static std::string LhsIdentName(const Expr* lhs) {
   while (lhs && lhs->kind == ExprKind::kSelect) lhs = lhs->base;
-  if (lhs && lhs->kind == ExprKind::kIdentifier) return lhs->text;
+  if (lhs && lhs->kind == ExprKind::kIdentifier) return DeclaredKindsKey(lhs);
   return {};
 }
 

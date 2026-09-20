@@ -15,4 +15,9 @@ std::string IdentifierLookupKey(const Expr* expr) {
   return key;
 }
 
+std::string DeclaredKindsKey(const Expr* expr) {
+  if (expr->scope_prefix == "$unit") return IdentifierLookupKey(expr);
+  return std::string(expr->text);
+}
+
 }  // namespace delta

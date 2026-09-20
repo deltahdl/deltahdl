@@ -162,12 +162,11 @@ static Logic4Vec EvalIdentifier(const Expr* expr, SimContext& ctx,
   // expression reading one signal reach one variable, and the argument
   // binds of eval_function_args.cpp bind a ref formal by the same key
   // (IdentifierLookupKey, eval_function_args_scoped.cpp). The unit's kinds
-  // stand under its key as its storage does; a `$root` name's under the
-  // text, as before.
+  // stand under its key as its storage does, a `$root` name's under the
+  // text, as before (DeclaredKindsKey, which the store side asks by too).
   std::string scoped_name = IdentifierLookupKey(expr);
   std::string_view lookup_name = scoped_name;
-  std::string_view kinds_name = expr->text;
-  if (expr->scope_prefix == "$unit") kinds_name = lookup_name;
+  std::string kinds_name = DeclaredKindsKey(expr);
   // §23.9 with §8.6: the class scope is searched before the scope enclosing
   // the class, so a property named bare in a method is read as the property
   // even where the instantiating module declares a variable of that name; a

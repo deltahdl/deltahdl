@@ -563,4 +563,34 @@ TEST(CompilationUnitSim, CuScopeVariableBoundByReferenceThroughUnitPrefix) {
             73u);
 }
 
+// §3.12.1 (printed page 56) with §6.16 (printed 112): `$unit::s = "abcde"`
+// writes the unit's `string s`, whose whole value a string assignment takes,
+// so a unit class method's `s.len()` reads 5 and the top's own `int s = 7`
+// stays 7: 57. The store asked the kind of the target by its text
+// (IsStringTarget in statement_assign_core.cpp), found the top's int, and
+// cut the value to the string's width: "e", 1, and 17. The length is read
+// through the class because `$unit::s.len()` is not parsed
+// (Parser::ParseSystemCall) and a unit function's frame carries no scope of
+// the unit's, so its bare s is the calling module's.
+TEST(CompilationUnitSim, CuScopeStringWrittenThroughUnitPrefixPastTheTopsInt) {
+  EXPECT_EQ(RunAndGet("string s = \"x\";\n"
+                      "class C;\n"
+                      "  function int len();\n"
+                      "    return s.len();\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module top;\n"
+                      "  int s = 7;\n"
+                      "  int y;\n"
+                      "  C c;\n"
+                      "  initial begin\n"
+                      "    c = new;\n"
+                      "    $unit::s = \"abcde\";\n"
+                      "    y = c.len() * 10 + s;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            57u);
+}
+
 }  // namespace
