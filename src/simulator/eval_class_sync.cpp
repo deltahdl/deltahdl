@@ -24,12 +24,35 @@
 
 namespace delta {
 
+// §26.2 (printed page 808 of ~/LRM.pdf): a package's declarations are
+// visible by their bare names throughout the package, its classes included,
+// and the run keys a package's typedef "pkg::name" (RegisterTypeDeclarations
+// in lowerer_register.cpp), the bare key standing only where a module's
+// import added it. So a name written bare in a class the package `package`
+// declares -- the property's own type, or a step of its chain, which the
+// targets record bare -- is looked up under the package's key first and
+// then under its own; a name written with a scope, `q::t`, under that
+// alone. Empty where nothing records the name. Looked up bare alone, the
+// `mb_t mb = new` of p's own class found nothing while no module imported p
+// and the property was no mailbox.
+static std::string_view TypeTargetFor(std::string_view name,
+                                      std::string_view package,
+                                      const SimContext& ctx) {
+  if (!package.empty() && name.find("::") == std::string_view::npos) {
+    std::string_view target =
+        ctx.FindTypeTarget(std::string(package) + "::" + std::string(name));
+    if (!target.empty()) return target;
+  }
+  return ctx.FindTypeTarget(name);
+}
+
 // §6.18 (printed page 118 of ~/LRM.pdf): a typedef name stands for the type
 // it was declared with, which may be another typedef name, and §26.3 reaches
 // a package's under `p::name`, the key the run records it by. The written
 // name is followed through the chain to the name at its end, at most as many
 // steps as the table has entries, so a chain that returns to itself ends.
-SyncKind SyncKindOfType(const DataType& type, const SimContext& ctx) {
+SyncKind SyncKindOfType(const DataType& type, std::string_view package,
+                        const SimContext& ctx) {
   if (type.kind != DataTypeKind::kNamed) return SyncKind::kNone;
   std::string name =
       type.scope_name.empty()
@@ -38,11 +61,15 @@ SyncKind SyncKindOfType(const DataType& type, const SimContext& ctx) {
   for (size_t steps = 0; steps <= ctx.TypeTargetCount(); ++steps) {
     if (name == "semaphore") return SyncKind::kSemaphore;
     if (name == "mailbox") return SyncKind::kMailbox;
-    std::string_view target = ctx.FindTypeTarget(name);
+    std::string_view target = TypeTargetFor(name, package, ctx);
     if (target.empty()) return SyncKind::kNone;
     name = std::string(target);
   }
   return SyncKind::kNone;
+}
+
+SyncKind SyncKindOfType(const DataType& type, const SimContext& ctx) {
+  return SyncKindOfType(type, {}, ctx);
 }
 
 // A property's declaration and the class that declares it, whose maps hold
@@ -68,10 +95,16 @@ static SyncMember NearestPropertyDecl(const ClassTypeInfo* from,
   return {};
 }
 
+// The kind of the property `m` declares, its type read in the package the
+// declaring class stands in (ClassTypeInfo::package, §26.2).
+static SyncKind SyncKindOfMember(const SyncMember& m, const SimContext& ctx) {
+  return SyncKindOfType(m.member->data_type, m.declaring->package, ctx);
+}
+
 static bool IsSyncMember(const SyncMember& m, const SimContext& ctx) {
   return m.member != nullptr && !m.member->is_param &&
          m.member->unpacked_dims.empty() &&
-         SyncKindOfType(m.member->data_type, ctx) != SyncKind::kNone;
+         SyncKindOfMember(m, ctx) != SyncKind::kNone;
 }
 
 // The nearest declaration of `name` on the base chain of `from`, where it
@@ -112,7 +145,7 @@ static SyncMember EnclosingStaticSyncMember(const ClassTypeInfo* from,
 static SyncProperty MakeSyncProperty(const SyncMember& m, ClassObject* obj,
                                      std::string spelling,
                                      const SimContext& ctx) {
-  return {SyncKindOfType(m.member->data_type, ctx), obj, m.member, m.declaring,
+  return {SyncKindOfMember(m, ctx), obj, m.member, m.declaring,
           std::move(spelling)};
 }
 

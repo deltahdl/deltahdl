@@ -264,6 +264,62 @@ TEST(MailboxSim, ParameterizedMailboxPropertyRejectsAPutOfAnotherType) {
       4);
 }
 
+// The source of the package class cases: the package `p` declares the
+// typedef items `typedefs`, then a class C whose mailbox property `mb` is
+// declared `new` through the type `type` names and whose go() puts 1 into
+// it; a module that imports nothing constructs a `p::C`, calls go() and
+// counts the queue into y.
+std::string PackageClassMailboxSrc(const std::string& typedefs,
+                                   const std::string& type) {
+  return "package p;\n" + typedefs +
+         "  class C;\n"
+         "    " +
+         type +
+         " mb = new;\n"
+         "    function void go();\n"
+         "      mb.put(1);\n"
+         "    endfunction\n"
+         "  endclass\n"
+         "endpackage\n"
+         "module top;\n"
+         "  int y;\n"
+         "  initial begin\n"
+         "    p::C c = new;\n"
+         "    c.go();\n"
+         "    y = c.mb.num();\n"
+         "  end\n"
+         "endmodule\n";
+}
+
+// §26.2 (printed page 808) makes a package's declarations visible by their
+// bare names throughout the package, its classes included, and §6.18
+// (printed 118) makes the typedef name stand for the type it renames, so
+// `mb_t mb = new` inside p's own class, with no module importing p, builds
+// the mailbox `mailbox mb = new` builds: go()'s put(1) is counted by
+// c.mb.num() as 1. The run keys the package's typedef "p::mb_t" and a
+// module's `import p::*` is what adds the bare key, so with no import the
+// bare name the class wrote found nothing, the property was a plain 32-bit
+// value, the put() reached no queue and y read 0.
+TEST(MailboxSim, PackageClassMailboxPropertyThroughThePackageOwnTypedef) {
+  EXPECT_EQ(
+      RunAndGet(PackageClassMailboxSrc("  typedef mailbox mb_t;\n", "mb_t"),
+                "y"),
+      1u);
+}
+
+// §6.18 (printed page 118) with §26.2 (printed 808): a package's typedef
+// may stand for another of the package's typedefs, each written bare, so
+// `typedef mb_t mb2_t` reaches the mailbox in two steps inside the package
+// and the property reads 1 as above. Qualified at the first step alone, the
+// chain's second name, the bare `mb_t` the target records, found nothing.
+TEST(MailboxSim, PackageClassMailboxPropertyThroughAChainOfPackageTypedefs) {
+  EXPECT_EQ(RunAndGet(PackageClassMailboxSrc("  typedef mailbox mb_t;\n"
+                                             "  typedef mb_t mb2_t;\n",
+                                             "mb2_t"),
+                      "y"),
+            1u);
+}
+
 // §15.3.1 (printed page 373) with §6.18: a semaphore declared through a
 // typedef, `typedef semaphore sem_t; sem_t s = new(2);`, is created with the
 // two keys its new() names. get(1) takes one, try_get(2) then finds one key

@@ -42,8 +42,15 @@ class SimContext;
 // or a typedef name standing for one -- §15.4.9's `typedef mailbox #(string)
 // s_mbox`, a package's `p::mb_t` (§26.3) and a typedef of a typedef (§6.18)
 // -- followed through the chain the run records (SimContext::FindTypeTarget),
-// bounded by the table's size. kNone for any other type.
+// bounded by the table's size. kNone for any other type. `package` is the
+// package the declaration stands in, empty for a module's or none: §26.2
+// (printed page 808) has the package's typedefs visible bare throughout it,
+// so a bare name of the chain is looked up under "package::name" before its
+// own, the key the run records a package's typedef by; a formal's type,
+// declared in no package the run names, is followed with none.
 enum class SyncKind : uint8_t { kNone, kSemaphore, kMailbox };
+SyncKind SyncKindOfType(const DataType& type, std::string_view package,
+                        const SimContext& ctx);
 SyncKind SyncKindOfType(const DataType& type, const SimContext& ctx);
 
 // The property a receiver names, where it names a semaphore or mailbox
