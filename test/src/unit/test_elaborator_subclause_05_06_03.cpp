@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 namespace {
 
@@ -65,6 +66,22 @@ TEST(SystemNameElaboration, SystemTaskInAlwaysBlockElaborates) {
              "  logic clk;\n"
              "  always @(posedge clk) $display(\"tick\");\n"
              "endmodule\n"));
+}
+
+// Syntax 5-1's footnote 55 has that a system_tf_identifier is not escaped, and
+// §5.6.1 makes an escaped name user-defined, so `\$display` is neither the
+// system task nor anything declared; the design is rejected at the escape
+// rather than the statement accepted as a call of nothing. The report is the
+// lexer's, so the source counts as not parsed.
+TEST(SystemNameElaboration, EscapedSystemTaskNameIsRejected) {
+  ElabFixture f;
+  ElaborateSrcAllowingParseErrors(
+      "module t;\n"
+      "  initial \\$display (\"x\");\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'$display' shall not be escaped", 2, "5.6.3"));
 }
 
 }  // namespace

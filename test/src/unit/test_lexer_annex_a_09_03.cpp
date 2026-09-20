@@ -130,6 +130,9 @@ TEST(IdentifierLexing, EscapedIdentifierTerminatedByNewline) {
   EXPECT_EQ(tokens[0].text, "foo");
 }
 
+// Footnote 55 of Syntax 5-1 forbids escaping a system_tf_identifier, and the
+// lexer reports the escape under §5.6.3; the token it goes on to produce is the
+// escaped identifier the backslash asks for, never a system identifier.
 TEST(IdentifierLexing, EscapedSystemTfIdentifierIsEscapedNotSystemIdent) {
   auto tokens = Lex("\\$display ");
   ASSERT_GE(tokens.size(), 2u);

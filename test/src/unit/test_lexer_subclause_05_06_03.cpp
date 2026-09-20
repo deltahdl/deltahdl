@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_lexer.h"
+#include "helpers_reported_error.h"
 #include "lexer/token.h"
 
 using namespace delta;
@@ -82,14 +83,46 @@ TEST(SystemNameLexing, DollarFollowedByWhitespaceIsNotSystemIdentifier) {
   EXPECT_EQ(tokens[1].text, "display");
 }
 
-// §5.6.3 footnote 55 (rule 2): a system_tf_identifier shall not be escaped.
-// A name introduced with the §5.6.1 escape backslash is an ordinary
-// (user-defined) escaped identifier even when its spelling begins with `$`;
-// it is not recognized as a system task/function name.
+// Syntax 5-1's footnote 55 has that a system_tf_identifier is not escaped, and
+// §5.6.1 makes what the escape backslash introduces a user-defined name. The
+// token is still the escaped identifier the backslash asks for, so that what
+// follows it is lexed in step, but it is never a system identifier, and the
+// report below is what the standard has for it.
 TEST(SystemNameLexing, EscapedNameIsNotSystemIdentifier) {
   auto r = LexOne("\\$display ");
   EXPECT_EQ(r.token.kind, TokenKind::kEscapedIdentifier);
   EXPECT_NE(r.token.kind, TokenKind::kSystemIdentifier);
+}
+
+// The spelling after the backslash is a system_tf_identifier of A.9.3, `$` and
+// then letters, digits, underscores and dollar signs only, and footnote 55
+// forbids escaping one: the escape is reported under §5.6.3 where it is lexed.
+TEST(SystemNameLexing, EscapedSystemTfIdentifierIsRejected) {
+  auto diags = LexDiagnostics("\\$display ");
+  EXPECT_TRUE(
+      ReportedError(diags, "'$display' shall not be escaped", 1, "5.6.3"));
+}
+
+// The issue's shape: the report is on the line of the escaped name, so that
+// the design is rejected rather than the statement accepted and dropped as a
+// call of an undeclared user name.
+TEST(SystemNameLexing, EscapedSystemTaskEnableIsRejectedOnItsLine) {
+  auto diags = LexDiagnostics(
+      "module t;\n"
+      "  initial \\$display (\"x\");\n"
+      "endmodule\n");
+  EXPECT_TRUE(
+      ReportedError(diags, "'$display' shall not be escaped", 2, "5.6.3"));
+}
+
+// A name with a character outside A.9.3's set after the `$` is not a
+// system_tf_identifier, so escaping it is the ordinary §5.6.1 way of writing
+// a user-defined name that begins with a dollar sign; an escaped plain name
+// and an unescaped system name are the two legal spellings beside it.
+TEST(SystemNameLexing, EscapedNameThatIsNoSystemTfIdentifierReportsNothing) {
+  EXPECT_TRUE(LexDiagnostics("\\$display-x ").empty());
+  EXPECT_TRUE(LexDiagnostics("\\display ").empty());
+  EXPECT_TRUE(LexDiagnostics("$display ").empty());
 }
 
 // §5.6.3: "Additional user-defined system tasks and system functions can be

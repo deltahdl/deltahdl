@@ -27,6 +27,20 @@ std::string IdentifierTooLongMessage() {
                      kMaxIdentifierLength);
 }
 
+// Whether `name`, the text of an escaped identifier after its backslash, is
+// spelled as A.9.3's system_tf_identifier: a `$` and then letters, digits,
+// underscores and dollar signs only. Syntax 5-1's footnote 55 has that such a
+// name is not escaped, so the escape is what LexEscapedIdentifier reports.
+bool IsSystemTfSpelling(std::string_view name) {
+  if (name.empty() || name.front() != '$') return false;
+  for (char ch : name.substr(1)) {
+    bool is_word =
+        std::isalnum(static_cast<unsigned char>(ch)) || ch == '_' || ch == '$';
+    if (!is_word) return false;
+  }
+  return true;
+}
+
 // Split a pragma comment body into whitespace-delimited words.
 std::vector<std::string_view> SplitPragmaWords(std::string_view body) {
   std::vector<std::string_view> words;
@@ -772,6 +786,16 @@ Token Lexer::LexEscapedIdentifier() {
   tok.text = source_.substr(start, pos_ - start);
   if (tok.text.size() > kMaxIdentifierLength) {
     diag_.Error(loc, IdentifierTooLongMessage(), Subclause("5.6"));
+  }
+  // Syntax 5-1's footnote 55 (§5.6.3): a system_tf_identifier is not escaped.
+  // §5.6.1 makes the escaped spelling a user-defined name, so `\$display` is
+  // neither the system task nor anything a design declares.
+  if (IsSystemTfSpelling(tok.text)) {
+    diag_.Error(loc,
+                std::format("system task or function name '{}' shall not be "
+                            "escaped",
+                            tok.text),
+                Subclause("5.6.3"));
   }
   return tok;
 }
