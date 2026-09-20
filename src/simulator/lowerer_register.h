@@ -131,13 +131,14 @@ void RegisterDesignTypeLayouts(const RtlirDesign* design, SimContext& ctx,
 void RegisterPackageClassVariables(const RtlirDesign* design, SimContext& ctx,
                                    Arena& arena);
 // §3.12.1 with §8.3: each compilation-unit variable declared with a
-// class's name, recorded under its bare name -- the key CreateUnitDataVariables
-// gives its storage -- as a handle of that class: the unit's own class, one
-// an import of the unit brings in, the one a `p::C` wrote, or the built-in
-// process or weak_reference class, with the specialization the declaration
-// wrote (§8.25). Ahead of the unit's storage, which is sized by the record,
-// and after the packages', whose classes an import may name. Defined in
-// src/simulator/lowerer_register.cpp.
+// class's name, recorded under its bare name -- the name a module's `h =
+// new` asks the class of, and the record CreateUnitDataVariables carries to
+// the "$unit.name" key it gives the storage -- as a handle of that class:
+// the unit's own class, one an import of the unit brings in, the one a
+// `p::C` wrote, or the built-in process or weak_reference class, with the
+// specialization the declaration wrote (§8.25). Ahead of the unit's
+// storage, which is sized by the record, and after the packages', whose
+// classes an import may name. Defined in src/simulator/lowerer_register.cpp.
 void RegisterUnitClassVariables(const RtlirDesign* design, SimContext& ctx,
                                 Arena& arena);
 
@@ -209,13 +210,34 @@ void RegisterPackageScopedSubroutines(const RtlirDesign* design,
 void CreatePackageDataVariables(const RtlirDesign* design, SimContext& ctx,
                                 Arena& arena);
 // §3.12.1 with §6.21: the same for every data item the compilation-unit
-// scope declares, under its bare name, the key a module's bare reference to
-// a name its own scope does not declare resolves to, registered as a name
-// bound outside every module so an instance's reference crosses §23.9's
-// boundary to it. After the packages', which §26.2 keeps from naming the
-// unit's.
+// scope declares, under its "$unit.name" key, which no module's own
+// declaration is keyed by. After the packages', which §26.2 keeps from
+// naming the unit's.
 void CreateUnitDataVariables(const RtlirDesign* design, SimContext& ctx,
                              Arena& arena);
+// §3.12.1 with §23.9: the unit's data items the module `mod` does not
+// declare, each bound under `inst_prefix` to its "$unit.name" storage with
+// the kinds the storage carries, the key a bare reference of the module's
+// processes resolves to when the module's own scope and its imports hold
+// no such name; a key either holds is left. Called by Lowerer::LowerImports
+// for the top and for each instance, after the module's imports and before
+// its declarations. Defined in src/simulator/lowerer_package_data.cpp.
+void AliasUnitDataItems(const RtlirDesign* design, const RtlirModule* mod,
+                        std::string_view inst_prefix, SimContext& ctx,
+                        Arena& arena);
+// §26.3 with §26.6: the per-name records and objects the storage under
+// `qname` carries -- its class record, real registration, queue,
+// associative array, fixed-size or dynamic array with its elements,
+// semaphore and mailbox -- given to the alias `key`, so that a method call,
+// an element select or a `new` through the alias reaches the one object.
+// Defined in src/simulator/lowerer_import.cpp, where the import's and the
+// export's aliases take it.
+void AliasVariableKinds(std::string_view key, std::string_view qname,
+                        SimContext& ctx, Arena& arena);
+// Whether the module declares `name` itself, as a variable, a port or a
+// net, the declarations LowerModule and LowerChildModules give storage
+// under the instance prefix. Defined in src/simulator/lowerer_import.cpp.
+bool ModuleDeclaresName(const RtlirModule* mod, std::string_view name);
 // §26.2: each package's declaration assignments, evaluated in the package's
 // scope into the storage CreatePackageDataVariables gave them, once every
 // package's storage exists and its exports are bound (AliasPackageExports),

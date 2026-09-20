@@ -4,9 +4,11 @@
 // module, and their declaration assignments evaluated before any procedure
 // starts, as the two subclauses require. A package's item stands under its
 // "pk.name" key, the key a `pk::name` reference and an import's alias resolve
-// by, and the compilation unit's under its bare name, the key a module's bare
-// reference reaches. Moved out of lowerer_register.cpp, which registers a
-// module's own declarations, once the two scopes' data outgrew it.
+// by, and the compilation unit's under its "$unit.name" key, which each
+// module's bare reference is bound to under the module's own prefix
+// (AliasUnitDataItems) unless the module declares the name. Moved out of
+// lowerer_register.cpp, which registers a module's own declarations, once
+// the two scopes' data outgrew it.
 
 #include <cstdint>
 #include <optional>
@@ -71,15 +73,23 @@ static bool DeclaresPackageData(const ModuleItem* item) {
   return is_var || (is_param && item->init_expr);
 }
 
+// §3.12.1 (printed page 56): the name the compilation-unit scope's items
+// are keyed and their frames named by, in the place of a package's name --
+// one no package can be declared with, `$` starting no identifier, as
+// SubroutineImportScopeKey (lowerer_import.cpp) spells a module
+// subroutine's own imports.
+constexpr std::string_view kUnitScope = "$unit";
+
 // The key a data item's storage stands under: "pk.name" for a package's,
-// the one EvalMemberAccess reads a `pk::name` by, and the bare name for the
-// compilation unit's (§3.12.1), for which `pkg` is empty -- the key
-// SimContext::FindVariable reaches from a top-level module's process, and
-// from an instance's once the name is registered as one bound outside every
-// module (CreateUnitDataVariables).
+// the one EvalMemberAccess reads a `pk::name` by, and "$unit.name" for the
+// compilation unit's (§3.12.1), for which `pkg` is kUnitScope -- a key no
+// module's declaration is keyed by, so a top-level module's own `int g`,
+// stored under the bare name, leaves the unit's g standing; stored under
+// the bare name itself, the unit's was replaced by the top's LowerVar and
+// taken for the top's port by CreatePortVariable (lowerer_register.cpp),
+// which creates a port's storage only where nothing answers the name.
 static std::string PackageDataKey(const ModuleItem* item,
                                   std::string_view pkg) {
-  if (pkg.empty()) return std::string(item->name);
   return std::string(pkg) + "." + std::string(item->name);
 }
 
@@ -366,6 +376,22 @@ static bool InitPackageSyncObject(const ModuleItem* item, std::string_view key,
   return true;
 }
 
+// §8.3 (printed page 180) with §8.25 (printed 203): the class a unit
+// variable is declared with and the specialization it wrote, which
+// RegisterUnitClassVariables (lowerer_register.cpp) recorded under the
+// item's bare name, the name a module's `h = new` asks the class of
+// (TryClassNewAssign), carried to the "$unit.name" key its storage stands
+// under, which PackageDataWidth sizes the storage by and
+// ConstructClassNewInit constructs and binds by. Nothing for an item of no
+// class type.
+static void CarryUnitClassRecord(const ModuleItem* item, std::string_view qname,
+                                 SimContext& ctx) {
+  std::string_view cls = ctx.GetVariableClassType(item->name);
+  if (cls.empty()) return;
+  ctx.SetVariableClassType(qname, cls);
+  RecordClassParamActuals(qname, item->data_type.type_params, ctx);
+}
+
 // One data item's storage under its key: every variable declaration at its
 // declared type's shape, with the semaphore, the mailbox, the queue or the
 // array its type or dimension declares, and a parameter with an initializer
@@ -377,6 +403,7 @@ static std::string_view CreatePackageDataItem(const ModuleItem* item,
                                               SimContext& ctx, Arena& arena) {
   if (!DeclaresPackageData(item)) return {};
   auto* qname = arena.Create<std::string>(PackageDataKey(item, pkg));
+  if (pkg == kUnitScope) CarryUnitClassRecord(item, *qname, ctx);
   auto* var = ctx.CreateVariable(*qname, PackageDataWidth(item, *qname, ctx));
   if (item->kind != ModuleItemKind::kVarDecl) return *qname;
   ShapePackageVariable(item, var, *qname, ctx, arena);
@@ -402,29 +429,58 @@ void CreatePackageDataVariables(const RtlirDesign* design, SimContext& ctx,
 // in a module that the module's own scope does not declare is searched for in
 // the compilation-unit scope next, so `int g;` written outside every module
 // is one variable every module of the unit reads and writes. Its storage
-// stands under the bare name, the key a top-level module's process resolves
-// a bare reference to and a `$unit::g` is read by (EvalIdentifier reads the
-// identifier's text, the prefix aside); an instance's process stops a bare
-// name at §23.9's module boundary unless the name is one bound outside every
-// module, which SimContext::RegisterImportedName records for an import's
-// alias and records here for the unit's item. No path created the storage
-// before, so a module's write to `g` landed nowhere and a read answered
-// nothing. §26.2 keeps a package from naming the unit's items, so the
-// packages' storage above is created first and the unit's after. A module
-// declaring the same name creates its own storage under the instance's key
-// afterward, which the nearer scope's lookup finds first (§3.12.1). §8.3
-// (printed 180): a unit variable of a class type, `C h;` after a unit
-// `class C`, holds a handle, which PackageDataWidth sizes at a handle's 64
-// bits by the class record RegisterUnitClassVariables (lowerer_register.cpp)
-// entered under the bare name ahead of this, the record TryClassNewAssign
-// constructs `h = new` by; with no record, the packages' alone being
-// entered, the storage was 32 bits and the `new` constructed nothing.
+// stands under "$unit.g" (PackageDataKey), the key the unit's own frame
+// resolves a bare name to (InitScopeDataItems) and each module's bare
+// reference is bound to under the module's prefix (AliasUnitDataItems), the
+// bare key for a top-level module and "u.g" for an instance. No path
+// created the storage before, so a module's write to `g` landed nowhere and
+// a read answered nothing. §26.2 keeps a package from naming the unit's
+// items, so the packages' storage above is created first and the unit's
+// after. §8.3 (printed 180): a unit variable of a class type, `C h;` after
+// a unit `class C`, holds a handle, which PackageDataWidth sizes at a
+// handle's 64 bits by the class record RegisterUnitClassVariables
+// (lowerer_register.cpp) entered under the bare name ahead of this and
+// CarryUnitClassRecord carries to the storage's key; with no record, the
+// packages' alone being entered, the storage was 32 bits and `h = new`
+// constructed nothing.
 void CreateUnitDataVariables(const RtlirDesign* design, SimContext& ctx,
                              Arena& arena) {
   if (design->compilation_unit == nullptr) return;
-  for (auto* item : design->compilation_unit->cu_items) {
-    std::string_view key = CreatePackageDataItem(item, {}, ctx, arena);
-    if (!key.empty()) ctx.RegisterImportedName(key);
+  for (auto* item : design->compilation_unit->cu_items)
+    CreatePackageDataItem(item, kUnitScope, ctx, arena);
+}
+
+// §3.12.1 (printed page 56) with §23.9 (printed 761) and §6.21 (printed
+// 132-133): a reference the module's own scope does not declare is resolved
+// in the compilation-unit scope next, so each of the unit's data items the
+// module `mod` does not declare -- as a variable, a port or a net
+// (ModuleDeclaresName) -- is bound under the module's `inst_prefix` to the
+// unit's storage, "g" for a top and "u.g" for an instance, with the queue,
+// the array, the class record and the other kinds the storage carries
+// (AliasVariableKinds), as an import's name is bound
+// (Lowerer::AliasImportedPackageName), and registered as a name bound
+// outside every module so that SimContext::FindVariable crosses §23.9's
+// boundary to the top's bare key from a generate block's process. A key the
+// module's imports or its parameters already hold is left to them (§26.5,
+// the import being the nearer scope's), and a name the module declares to
+// the declaration, which the nearer scope's lookup finds first. With the
+// unit's storage under the bare name alone, the top's `int g = 7` replaced
+// it and every instance's bare `g`, answered from that key, read the top's 7
+// for the unit's 5, and the top's `input int g` was the unit's variable.
+void AliasUnitDataItems(const RtlirDesign* design, const RtlirModule* mod,
+                        std::string_view inst_prefix, SimContext& ctx,
+                        Arena& arena) {
+  if (design->compilation_unit == nullptr) return;
+  for (const auto* item : design->compilation_unit->cu_items) {
+    if (!DeclaresPackageData(item) || ModuleDeclaresName(mod, item->name))
+      continue;
+    std::string key = std::string(inst_prefix) + std::string(item->name);
+    if (ctx.GetVariables().count(key) != 0) continue;
+    std::string_view stored = *arena.Create<std::string>(key);
+    std::string qname = PackageDataKey(item, kUnitScope);
+    ctx.AliasVariable(stored, qname);
+    AliasVariableKinds(stored, qname, ctx, arena);
+    ctx.RegisterImportedName(stored);
   }
 }
 
@@ -525,8 +581,10 @@ static void InitPackageDataItem(const ModuleItem* item, std::string_view pkg,
 // in, which resolves the package's earlier variables, its subroutines and
 // those an import brings in by their bare names
 // (SimContext::FindInPackageScope and FindFunctionInPackageScope); for the
-// compilation unit, whose `pkg` is empty, a frame of no package, through
-// which a bare name reaches the unit's own storage under its bare key.
+// compilation unit, a frame named kUnitScope, through which a bare name
+// reaches the unit's own storage under its "$unit.name" key ahead of any
+// module's, and a name the unit's imports bound under the bare key
+// (Lowerer::LowerCompilationUnitImports) as a frame of no package would.
 static void InitScopeDataItems(const std::vector<ModuleItem*>& items,
                                std::string_view pkg, SimContext& ctx,
                                Arena& arena) {
@@ -557,7 +615,8 @@ void InitUnitDataVariables(const RtlirDesign* design, SimContext& ctx,
   // (lowerer_data_init.cpp) binds just ahead of this; bound after this, the
   // imports left `import p::*; int g = K;` reading no K, and g 0.
   if (design->compilation_unit == nullptr) return;
-  InitScopeDataItems(design->compilation_unit->cu_items, {}, ctx, arena);
+  InitScopeDataItems(design->compilation_unit->cu_items, kUnitScope, ctx,
+                     arena);
 }
 
 // §8.7 (printed page 184) with §6.8 and §26.2 (printed 808): `C h = new;`
@@ -628,7 +687,8 @@ void ConstructDataClassInitializers(const RtlirDesign* design, SimContext& ctx,
   for (auto* pkg : design->packages)
     ConstructScopeClassInits(pkg->items, pkg->name, ctx, arena);
   if (design->compilation_unit == nullptr) return;
-  ConstructScopeClassInits(design->compilation_unit->cu_items, {}, ctx, arena);
+  ConstructScopeClassInits(design->compilation_unit->cu_items, kUnitScope, ctx,
+                           arena);
 }
 
 }  // namespace delta

@@ -265,7 +265,7 @@ bool Lowerer::AliasPackageEnumMember(const PackageDecl* pkg,
 // prefix. The wildcard-imported enumeration literals the elaborator emits as
 // module variables (RegisterImportedEnumLiterals in
 // src/elaborator/elaborator_typedef.cpp) are among the variables.
-static bool ModuleDeclaresName(const RtlirModule* mod, std::string_view name) {
+bool ModuleDeclaresName(const RtlirModule* mod, std::string_view name) {
   if (mod == nullptr) return false;
   for (const auto& var : mod->variables) {
     if (var.name == name) return true;
@@ -349,9 +349,10 @@ static void AliasArray(std::string_view key, std::string_view qname,
 // `import p1::q` and `p2::q.size()` through an exporter reached no object;
 // and the fixed-size or dynamic array's shape and elements (AliasArray). A
 // string's kind is a flag of the Variable itself, which the alias already
-// shares.
-static void AliasVariableKinds(std::string_view key, std::string_view qname,
-                               SimContext& ctx, Arena& arena) {
+// shares. Shared with AliasUnitDataItems (lowerer_package_data.cpp), which
+// binds the unit's items into a module the same way.
+void AliasVariableKinds(std::string_view key, std::string_view qname,
+                        SimContext& ctx, Arena& arena) {
   std::string_view cls = ctx.GetVariableClassType(qname);
   if (!cls.empty()) ctx.SetVariableClassType(key, cls);
   if (ctx.IsRealVariable(qname)) ctx.RegisterRealVariable(key);
@@ -527,6 +528,10 @@ void Lowerer::LowerImports(const RtlirModule* mod) {
   for (const auto& imp : mod->imports)
     if (imp.is_wildcard) apply_import(imp);
   importing_module_ = nullptr;
+  // §3.12.1: the compilation unit's items the module does not declare, the
+  // scope searched after the module's own and its imports', bound under the
+  // instance's prefix last so that an import of the name keeps it (§26.5).
+  AliasUnitDataItems(design_, mod, inst_prefix_, ctx_, arena_);
 }
 
 // §26.6 (printed pages 815-816): an export makes a declaration the package

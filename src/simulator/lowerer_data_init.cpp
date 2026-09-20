@@ -71,12 +71,16 @@ void Lowerer::LowerDesignData() {
 // §26.3 (printed page 810) with §3.12.1 (printed 56): an import written in
 // the compilation-unit scope makes the package's names visible in the unit's
 // scope, where the unit's own declaration assignments read them, so the
-// unit's imports are bound -- each name aliased to the package's storage,
-// which holds its value once LowerDesignData has run the package's
-// initializers -- before the unit's initializers are evaluated, and
-// `import p::*; int g = K;` outside every module reads p's K. Bound after
-// them, as LowerCompilationUnitClasses bound them, the initializer found no
-// K and g read 0.
+// unit's imports are bound -- each name aliased under its bare key to the
+// package's storage, which holds its value once LowerDesignData has run the
+// package's initializers -- before the unit's initializers are evaluated,
+// and `import p::*; int g = K;` outside every module reads p's K. Bound
+// after them, as LowerCompilationUnitClasses bound them, the initializer
+// found no K and g read 0. The unit's own items stand under "$unit.name"
+// and are reached from the unit's frame (InitScopeDataItems in
+// lowerer_package_data.cpp); each module is bound to them as it is lowered
+// (AliasUnitDataItems), so a module's own declaration of the name keeps its
+// key while the unit's storage survives it (§23.9).
 void Lowerer::InitCompilationUnitData() {
   LowerCompilationUnitImports();
   InitUnitDataVariables(design_, ctx_, arena_);

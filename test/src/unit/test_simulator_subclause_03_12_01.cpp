@@ -280,4 +280,105 @@ TEST(CompilationUnitSim, CuScopeInitializerCallsAPackageFunction) {
   EXPECT_EQ(UnitInitializerRead("int g = p::f();\n"), 8u);
 }
 
+// A design whose compilation-unit scope declares `int g = 5;` ahead of the
+// modules `modules`, the last of which is the top; answers the variable
+// `var_name` once the run has ended, a hierarchical name for an instance's.
+static uint64_t UnitGRead(const std::string& modules, const char* var_name) {
+  return RunAndGet("int g = 5;\n" + modules, var_name);
+}
+
+// §3.12.1 (printed page 56) with §23.9 (printed 761): a reference is
+// resolved in the nearer scope first, the module's own declaration ahead of
+// the compilation unit's, so top's `int g = 7;` is the g its process reads:
+// 7. A resolution that reached the unit's storage under the shared name
+// read 5.
+TEST(CompilationUnitSim, CuScopeVariableShadowedByTheModulesOwnDeclaration) {
+  EXPECT_EQ(UnitGRead("module top;\n"
+                      "  int g = 7;\n"
+                      "  int y;\n"
+                      "  initial y = g;\n"
+                      "endmodule\n",
+                      "y"),
+            7u);
+}
+
+// §3.12.1 (printed page 56) with §6.21 (printed 132-133): the unit's `int g
+// = 5;` outlives an instance's like-named declaration, a's `int g = 7;`
+// stored under the instance's own key, so top, which declares no g, reads
+// the unit's 5. An instance's declaration displacing the unit's storage
+// read 7.
+TEST(CompilationUnitSim, CuScopeVariableKeptByAnInstanceDeclaringTheName) {
+  EXPECT_EQ(UnitGRead("module a;\n"
+                      "  int g = 7;\n"
+                      "endmodule\n"
+                      "module top;\n"
+                      "  a u();\n"
+                      "  int y;\n"
+                      "  initial y = g;\n"
+                      "endmodule\n",
+                      "y"),
+            5u);
+}
+
+// §3.12.1 (printed page 56) with §23.9 (printed 761): the top's `int g =
+// 7;` is the top's own, and an instance whose module declares no g reads
+// the unit's g, the enclosing scope's, so u.y is 5. The unit's storage
+// stood under the bare name the top's declaration is keyed by, so the top's
+// LowerVar (lowerer_var.cpp) replaced it, and the instance's bare reference,
+// which SimContext::FindVariable answers from the bare key, read the top's
+// 7. The unit's storage now stands under "$unit.g" and each instance is
+// bound to it under its own prefix (AliasUnitDataItems in
+// lowerer_package_data.cpp), the top's own declaration left to the top.
+TEST(CompilationUnitSim, CuScopeVariableReadByAnInstanceWhileTheTopDeclaresIt) {
+  EXPECT_EQ(UnitGRead("module a;\n"
+                      "  int y;\n"
+                      "  initial y = g;\n"
+                      "endmodule\n"
+                      "module top;\n"
+                      "  int g = 7;\n"
+                      "  a u();\n"
+                      "endmodule\n",
+                      "u.y"),
+            5u);
+}
+
+// §3.12.1 (printed page 56) with §23.9 (printed 761) and §23.3.3.2: a port
+// of the top named as the unit's variable is the top's own g, an
+// unconnected `input var int` reading its type's default 0 (Table 6-7), and
+// the instance below reads the unit's 5, so `g * 10 + u.y` at time 1 is 5.
+// The port's storage is created only where nothing answers the name
+// (CreatePortVariable in lowerer_register.cpp), and the unit's storage
+// under the bare name answered it, so the port was the unit's variable and
+// both read 5: 55.
+TEST(CompilationUnitSim, CuScopeVariableNamedAsAPortOfTheTopIsNotThePort) {
+  EXPECT_EQ(UnitGRead("module a;\n"
+                      "  int y;\n"
+                      "  initial y = g;\n"
+                      "endmodule\n"
+                      "module top(input var int g);\n"
+                      "  a u();\n"
+                      "  int y;\n"
+                      "  initial #1 y = g * 10 + u.y;\n"
+                      "endmodule\n",
+                      "y"),
+            5u);
+}
+
+// §3.12.1 (printed page 56) with §26.2 (printed 808): the unit's own
+// declaration assignment `int h = g + 1;` reads the unit's g whatever a
+// module declares, so top's `y = h` reads 6 beside the top's own g. The
+// unit's initializers are evaluated in a frame of the unit's own scope,
+// which resolves the bare name to "$unit.g"; a frame resolving it by the
+// bare key alone finds no g once the key is left to the top's declaration.
+TEST(CompilationUnitSim, CuScopeInitializerReadsTheUnitsOwnShadowedVariable) {
+  EXPECT_EQ(UnitGRead("int h = g + 1;\n"
+                      "module top;\n"
+                      "  int g = 7;\n"
+                      "  int y;\n"
+                      "  initial y = h;\n"
+                      "endmodule\n",
+                      "y"),
+            6u);
+}
+
 }  // namespace
