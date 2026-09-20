@@ -2,11 +2,13 @@
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_data.h"
 #include "elaborator/elaborator_validate_classes.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_module.h"
@@ -49,6 +51,30 @@ bool Elaborator::IsNameInModuleScope(std::string_view name) const {
 // module's own declarations having already been searched and found wanting.
 bool Elaborator::IsNameInEnclosingScope(std::string_view name) const {
   return NameInEnclosingScope(enclosing_scope_names_, name);
+}
+
+// §23.4 makes the enclosing module's names visible inside a module declared
+// and instantiated in it, and §6.10 makes an identifier on the left of a
+// continuous assignment an implicit net of the assignment's own scope unless
+// it was declared previously in that scope or in one the scope can directly
+// reference. The reference stands in the nested declaration's text, so the
+// names that count are those the enclosing module declared above that text:
+// `module M; assign w = 1'b1; endmodule wire w; M m();` gives M an implicit w
+// of its own and leaves the outer w undriven, exactly as `assign w = 1'b1;
+// wire w;` in one scope makes the second a redeclaration. The snapshot
+// ElaborateItems recorded when its loop reached the declaration is therefore
+// the one handed on, whether the instance is written below the declaration or
+// implied at the end of the items by InstantiateImplicitNestedModules. An
+// instance written above its declaration is reached before any snapshot is
+// taken, and the names declared so far stand in for it.
+void ElaboratorData::BeginNestedDeclScope(
+    const ModuleDecl* nested,
+    std::unordered_set<std::string_view> at_instance) {
+  auto at_decl = nested_decl_scope_names_.find(nested);
+  pending_enclosing_scope_ = at_decl != nested_decl_scope_names_.end()
+                                 ? at_decl->second
+                                 : std::move(at_instance);
+  has_pending_enclosing_scope_ = true;
 }
 
 std::unordered_set<std::string_view> Elaborator::CaptureCurrentScopeNames()

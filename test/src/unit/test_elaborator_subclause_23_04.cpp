@@ -432,4 +432,112 @@ TEST(NestedModuleElaboration, ImplicitNetForAnOuterNameRefersOutward) {
   EXPECT_TRUE(w->refers_outward);
 }
 
+// §6.10 with §23.4: the outer name space being visible does not make a name
+// declared below the nested module's text one the nested module's assignment
+// was preceded by, and §6.10 assumes an implicit net of the assignment's own
+// scope for a name "not declared previously" there or in a scope it can
+// directly reference. An outer w declared between M's endmodule and its
+// instance is declared after the assignment, so M's net w refers to nothing
+// outward. The names visible to M were taken where the instance stood, so w
+// was among them and the net was marked outward.
+TEST(NestedModuleElaboration,
+     ImplicitNetForAnOuterNameDeclaredBelowTheNestedDeclarationIsItsOwn) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module top;\n"
+      "  module M;\n"
+      "    assign w = 1'b1;\n"
+      "  endmodule\n"
+      "  wire w;\n"
+      "  M m();\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* w = NestedModuleNet(design, "w");
+  ASSERT_NE(w, nullptr);
+  EXPECT_FALSE(w->refers_outward);
+}
+
+// The same rule for an instance §23.4 implies at the end of the module: the
+// names visible to M were taken there, after every item, so an outer w
+// declared anywhere below M counted as declared previously and the net was
+// marked outward. It is M's own.
+TEST(NestedModuleElaboration,
+     ImplicitlyInstantiatedNestedModuleOwnsANetDeclaredBelowIt) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module top;\n"
+      "  module M;\n"
+      "    assign w = 1'b1;\n"
+      "  endmodule\n"
+      "  wire w;\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* w = NestedModuleNet(design, "w");
+  ASSERT_NE(w, nullptr);
+  EXPECT_FALSE(w->refers_outward);
+}
+
+// The net named `name` among the nets of the nested module two levels down:
+// the first child of the top module's first child, or null.
+const RtlirNet* DoublyNestedModuleNet(const RtlirDesign* design,
+                                      std::string_view name) {
+  const auto& children = design->top_modules[0]->children;
+  if (children.empty() || children[0].resolved == nullptr) return nullptr;
+  const auto& inner = children[0].resolved->children;
+  if (inner.empty() || inner[0].resolved == nullptr) return nullptr;
+  for (const auto& net : inner[0].resolved->nets) {
+    if (net.name == name) return &net;
+  }
+  return nullptr;
+}
+
+// §23.4 through two levels: B is declared and instantiated in A, itself
+// declared and instantiated in top, so top's names are visible in B by way of
+// A's chain of enclosing scopes, and a v declared above A is what B's
+// assignment writes -- its net refers outward. Declared below A, v is not
+// declared previously at either level, and B's net is its own.
+TEST(NestedModuleElaboration, DoublyNestedImplicitNetRefersOutwardByOrder) {
+  ElabFixture above;
+  auto* design_above = Elaborate(
+      "module top;\n"
+      "  wire v;\n"
+      "  module A;\n"
+      "    module B;\n"
+      "      assign v = 1'b1;\n"
+      "    endmodule\n"
+      "    B b();\n"
+      "  endmodule\n"
+      "  A a();\n"
+      "endmodule\n",
+      above, "top");
+  ASSERT_NE(design_above, nullptr);
+  EXPECT_FALSE(above.has_errors);
+  const auto* v_above = DoublyNestedModuleNet(design_above, "v");
+  ASSERT_NE(v_above, nullptr);
+  EXPECT_TRUE(v_above->refers_outward);
+
+  ElabFixture below;
+  auto* design_below = Elaborate(
+      "module top;\n"
+      "  module A;\n"
+      "    module B;\n"
+      "      assign v = 1'b1;\n"
+      "    endmodule\n"
+      "    B b();\n"
+      "  endmodule\n"
+      "  A a();\n"
+      "  wire v;\n"
+      "endmodule\n",
+      below, "top");
+  ASSERT_NE(design_below, nullptr);
+  EXPECT_FALSE(below.has_errors);
+  const auto* v_below = DoublyNestedModuleNet(design_below, "v");
+  ASSERT_NE(v_below, nullptr);
+  EXPECT_FALSE(v_below->refers_outward);
+}
+
 }  // namespace

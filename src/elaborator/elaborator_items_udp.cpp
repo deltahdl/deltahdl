@@ -749,9 +749,11 @@ void Elaborator::InstantiateImplicitNestedModules(
     if (!current_inst_path_.empty()) current_inst_path_.push_back('.');
     current_inst_path_.append(name.data(), name.size());
     // §23.9/§24.3: a nested module/program/interface resolves names declared in
-    // this enclosing scope, so hand its visible names to ElaborateModule.
-    pending_enclosing_scope_ = CaptureCurrentScopeNames();
-    has_pending_enclosing_scope_ = true;
+    // this enclosing scope, so hand its visible names to ElaborateModule. The
+    // instance is implied at the end of the items, but §6.10 counts a name as
+    // declared previously by the text above the nested declaration, so the
+    // snapshot ElaborateItems took there is what BeginNestedDeclScope prefers.
+    BeginNestedDeclScope(nested_decl, CaptureCurrentScopeNames());
     nested_default_disable_iff_ = mod->default_disable_iff;
     inst.resolved = ElaborateModule(nested_decl, empty_params);
     current_inst_path_ = std::move(saved_inst_path);
@@ -830,6 +832,16 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   RegisteredGenScopeGuard gen_scope_guard(gen_prefix_scopes_);
 
   for (auto* item : decl->items) {
+    // §6.10 with §23.4: a reference inside a nested declaration sees an outer
+    // name only if it was declared previously, above the declaration's text,
+    // so this scope's names are recorded as they stand when the loop reaches
+    // the declaration, for BeginNestedDeclScope to hand on when the instance
+    // is elaborated -- written any distance below, or implied after the loop.
+    if (item->kind == ModuleItemKind::kNestedModuleDecl &&
+        item->nested_module_decl != nullptr) {
+      nested_decl_scope_names_[item->nested_module_decl] =
+          CaptureCurrentScopeNames();
+    }
     ElaborateItem(item, mod);
   }
 

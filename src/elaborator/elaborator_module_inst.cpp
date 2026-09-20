@@ -863,13 +863,15 @@ void Elaborator::ElaborateChildInstance(RtlirModuleInst& inst,
   // into an instance of a module declared elsewhere. §23.4 makes this scope's
   // names visible inside such a declaration as well, whether the instance is
   // written out here or implied by InstantiateImplicitNestedModules, so the
-  // names declared so far are handed to ElaborateModule the same way: without
-  // them every implicit net the nested module makes for an outer name counted
-  // as its own, and an instance materialized a net shadowing the outer one.
+  // same names are handed to ElaborateModule either way: without them every
+  // implicit net the nested module makes for an outer name counted as its own,
+  // and an instance materialized a net shadowing the outer one. Which names
+  // §6.10 settles by the declaration's place in the text rather than the
+  // instance's, so BeginNestedDeclScope prefers the snapshot ElaborateItems
+  // took there over the names declared so far.
   if (inst.is_nested_decl) {
     nested_default_disable_iff_ = mod->default_disable_iff;
-    pending_enclosing_scope_ = CaptureCurrentScopeNames();
-    has_pending_enclosing_scope_ = true;
+    BeginNestedDeclScope(child_decl, CaptureCurrentScopeNames());
   }
   inst.resolved = ElaborateModule(child_decl, child_params);
   RestoreChildTypeParams(typedefs_, saved_type_params);

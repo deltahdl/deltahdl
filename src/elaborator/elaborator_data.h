@@ -121,6 +121,24 @@ class ElaboratorData {
   std::vector<std::unordered_set<std::string_view>> enclosing_scope_names_;
   std::unordered_set<std::string_view> pending_enclosing_scope_;
   bool has_pending_enclosing_scope_ = false;
+  // §6.10 with §23.4: the enclosing scope's names as they stood when its item
+  // loop reached each nested declaration, keyed by that declaration. §6.10
+  // gives an implicit net to a name on the left of a continuous assignment
+  // that was not declared previously in the assignment's scope or in one it
+  // can directly reference, and a reference inside a nested module stands in
+  // the nested declaration's text, so what counts is what the enclosing module
+  // had declared above that text -- not above the instance, which may be
+  // written or implied any distance below it. Elaborator::ElaborateItems
+  // records the snapshot, and BeginNestedDeclScope hands it to ElaborateModule.
+  std::unordered_map<const ModuleDecl*, std::unordered_set<std::string_view>>
+      nested_decl_scope_names_;
+  // Hands ElaborateModule, through pending_enclosing_scope_, the enclosing
+  // scope's names a nested declaration `nested` may treat as declared: the
+  // snapshot recorded at its declaration, or `at_instance`, the names declared
+  // so far, when the instance is written above the declaration and no snapshot
+  // has been taken yet.
+  void BeginNestedDeclScope(const ModuleDecl* nested,
+                            std::unordered_set<std::string_view> at_instance);
   // §16.15: the default disable iff of the scope a nested declaration is
   // elaborated in, which extends to the declaration unless it has one of its
   // own; set by the two sites instantiating a nested declaration, taken by

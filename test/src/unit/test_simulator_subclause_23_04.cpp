@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include "common/types.h"
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -249,6 +250,137 @@ TEST(NestedModuleSimulation, NestedDeclarationDrivesAnOuterNetInPlace) {
   ASSERT_NE(r, nullptr);
   EXPECT_EQ(r->value.ToUint64(), 1u);
   EXPECT_EQ(f.ctx.FindVariable("m.w"), nullptr);
+}
+
+// §23.4 with §6.10: the outer name space is visible to the nested module, but
+// §6.10 gives an identifier on the left of a continuous assignment an implicit
+// net of the assignment's own scope unless it was declared previously in that
+// scope or in one it can directly reference, and "previously" is the text
+// above the assignment. An outer w declared below M's text -- here below the
+// instance as well -- is not that, so M drives an implicit w of its own under
+// the instance and the outer w has no driver: "m.w" holds 1 and r reads z.
+// With the outer declaration taken for M's regardless of order, r read 1 and
+// "m.w" was absent, which is the answer only when `wire w` stands above M.
+TEST(NestedModuleSimulation,
+     NestedDeclarationOwnsANetTheOuterModuleDeclaresBelowIt) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  module M;\n"
+      "    assign w = 1'b1;\n"
+      "  endmodule\n"
+      "  M m();\n"
+      "  wire w;\n"
+      "  logic r;\n"
+      "  initial #1 r = w;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+
+  auto* m_w = f.ctx.FindVariable("m.w");
+  ASSERT_NE(m_w, nullptr);
+  EXPECT_EQ(m_w->value.ToUint64(), 1u);
+
+  auto* r = f.ctx.FindVariable("r");
+  ASSERT_NE(r, nullptr);
+  EXPECT_EQ(r->value.words[0].aval & 1u, 0u);
+  EXPECT_EQ(r->value.words[0].bval & 1u, 1u);
+}
+
+// §6.10 measures "previously" from the assignment's text, which stands inside
+// M's declaration, not from the instance below it. An outer w declared between
+// M's endmodule and `M m()` is therefore still declared after the assignment,
+// and the answer is the one above: "m.w" holds 1 and r reads z. The names
+// visible to M were taken where the instance stood, so w was among them, r
+// read 1 and "m.w" was absent.
+TEST(NestedModuleSimulation,
+     OuterNetDeclaredBetweenNestedDeclarationAndInstanceIsNotTheNestedOnes) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  module M;\n"
+      "    assign w = 1'b1;\n"
+      "  endmodule\n"
+      "  wire w;\n"
+      "  M m();\n"
+      "  logic r;\n"
+      "  initial #1 r = w;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+
+  auto* m_w = f.ctx.FindVariable("m.w");
+  ASSERT_NE(m_w, nullptr);
+  EXPECT_EQ(m_w->value.ToUint64(), 1u);
+
+  auto* r = f.ctx.FindVariable("r");
+  ASSERT_NE(r, nullptr);
+  EXPECT_EQ(r->value.words[0].aval & 1u, 0u);
+  EXPECT_EQ(r->value.words[0].bval & 1u, 1u);
+}
+
+// §23.4 applied twice: B is declared and instantiated in A, which is declared
+// and instantiated in top, so top's name space is visible in B through A's,
+// and a v top declares above A is driven in place by B's assignment. r reads
+// 1 and no net is made under a.b.
+TEST(NestedModuleSimulation,
+     DoublyNestedDeclarationDrivesTheOutermostNetInPlace) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  wire v;\n"
+      "  logic r;\n"
+      "  module A;\n"
+      "    module B;\n"
+      "      assign v = 1'b1;\n"
+      "    endmodule\n"
+      "    B b();\n"
+      "  endmodule\n"
+      "  A a();\n"
+      "  initial #1 r = v;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+
+  auto* r = f.ctx.FindVariable("r");
+  ASSERT_NE(r, nullptr);
+  EXPECT_EQ(r->value.ToUint64(), 1u);
+  EXPECT_EQ(f.ctx.FindVariable("a.b.v"), nullptr);
+}
+
+// The same two levels with top's v declared below A: §6.10's "previously"
+// fails at both levels, so B owns an implicit v under a.b holding 1 and top's
+// v is undriven, r reading z.
+TEST(NestedModuleSimulation, DoublyNestedDeclarationOwnsANetDeclaredBelowIt) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  module A;\n"
+      "    module B;\n"
+      "      assign v = 1'b1;\n"
+      "    endmodule\n"
+      "    B b();\n"
+      "  endmodule\n"
+      "  A a();\n"
+      "  wire v;\n"
+      "  logic r;\n"
+      "  initial #1 r = v;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+
+  auto* ab_v = f.ctx.FindVariable("a.b.v");
+  ASSERT_NE(ab_v, nullptr);
+  EXPECT_EQ(ab_v->value.ToUint64(), 1u);
+
+  auto* r = f.ctx.FindVariable("r");
+  ASSERT_NE(r, nullptr);
+  EXPECT_EQ(r->value.words[0].aval & 1u, 0u);
+  EXPECT_EQ(r->value.words[0].bval & 1u, 1u);
 }
 
 }  // namespace
