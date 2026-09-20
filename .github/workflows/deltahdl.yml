@@ -2666,13 +2666,19 @@ jobs:
     # 5.3 to 10.6 for level 6. Ten is therefore the level that buys the room: it
     # costs what the levels below it cost, and the level above it costs twenty
     # times as much for room nothing needs.
+    #
+    # The shards start once every clang-tidy-test shard has finished, whatever
+    # it concluded: clang-tidy-test is in `needs` for the ordering alone, and
+    # the condition tests only build-coverage-lib, whose artifact the shard
+    # unpacks, so a red or skipped clang-tidy shard holds nothing back.
     env:
       CCACHE_COMPRESSLEVEL: '10'
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       CCACHE_MAXSIZE: '0'
       LLVM_PROFILE_FILE: ${{ github.workspace }}/profraw/%p.profraw
+    if: ${{ !cancelled() && needs.build-coverage-lib.result == 'success' }}
     name: unit-test-coverage-shard-${{ matrix.shard }}
-    needs: [build-coverage-lib]
+    needs: [build-coverage-lib, clang-tidy-test]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
