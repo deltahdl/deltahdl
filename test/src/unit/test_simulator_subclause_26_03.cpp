@@ -585,4 +585,71 @@ TEST(PackageImportSim, CuScopeWildcardImportedClassAsBaseHandleType) {
   EXPECT_EQ(val, 23u);
 }
 
+// §26.3 has a package's declarations visible throughout the package, and §13.4
+// a function read the variables of the scope it is declared in, so a package
+// function reads the package's own variable by its bare name: `pk::get()`
+// answers `base`, 30, and a write in `pk::set` lands on the same variable, so
+// the second read is 31. The variable is held under "pk.base" and the body
+// asked for "base", which no scope answered, so both reads were 0.
+TEST(PackageScopeReferenceSim,
+     PackageFunctionReadsAndWritesItsPackageVariable) {
+  EXPECT_EQ(RunAndGet("package pk;\n"
+                      "  int base = 30;\n"
+                      "  function automatic int get(); return base;\n"
+                      "  endfunction\n"
+                      "  function automatic void set(int v); base = v;\n"
+                      "  endfunction\n"
+                      "endpackage\n"
+                      "module t;\n"
+                      "  int out;\n"
+                      "  initial begin\n"
+                      "    out = pk::get() * 100;\n"
+                      "    pk::set(31);\n"
+                      "    out = out + pk::get();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "out"),
+            30u * 100u + 31u);
+}
+
+// §26.3: a wildcard import written in a package makes another package's
+// variable visible to the importing package's functions by its bare name --
+// `pq::get()` reads pk's `base` through pq's `import pk::*`.
+TEST(PackageScopeReferenceSim, PackageFunctionReadsAVariableItsPackageImports) {
+  EXPECT_EQ(RunAndGet("package pk;\n"
+                      "  int base = 30;\n"
+                      "endpackage\n"
+                      "package pq;\n"
+                      "  import pk::*;\n"
+                      "  function automatic int get(); return base;\n"
+                      "  endfunction\n"
+                      "endpackage\n"
+                      "module t;\n"
+                      "  int out;\n"
+                      "  initial out = pq::get();\n"
+                      "endmodule\n",
+                      "out"),
+            30u);
+}
+
+// §13.5.3 evaluates a default actual in the scope of the subroutine's
+// declaration, so `int v = base` of a package function reads the package's
+// base, 30, and not the caller's module variable of the same name, 1; an
+// actual the caller writes, `pk::get(base)`, is the caller's expression and
+// reads the module's 1 (§13.5) -- 30 * 10 + 1.
+TEST(PackageScopeReferenceSim, PackageFunctionDefaultReadsThePackageScope) {
+  EXPECT_EQ(RunAndGet("package pk;\n"
+                      "  int base = 30;\n"
+                      "  function automatic int get(int v = base); return v;\n"
+                      "  endfunction\n"
+                      "endpackage\n"
+                      "module t;\n"
+                      "  int base = 1;\n"
+                      "  int out;\n"
+                      "  initial out = pk::get() * 10 + pk::get(base);\n"
+                      "endmodule\n",
+                      "out"),
+            30u * 10u + 1u);
+}
+
 }  // namespace

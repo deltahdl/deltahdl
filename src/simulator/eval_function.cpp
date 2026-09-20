@@ -670,10 +670,15 @@ Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   bool is_static = func->is_static && !func->is_automatic;
   bool is_void = (func->return_type.kind == DataTypeKind::kVoid);
 
+  // §26.3 with §13.4: a package function's frame carries its package, so its
+  // body and its default actuals read the package's variables by their bare
+  // names; the caller's actuals are read with the frame set aside
+  // (ResolveArgValue) and see the caller's scope.
+  std::string_view package = ctx.SubroutinePackage(func);
   if (is_static) {
-    ctx.PushStaticScope(func->name);
+    ctx.PushStaticScope(func->name, package);
   } else {
-    ctx.PushScope();
+    ctx.PushScope(package);
   }
 
   ctx.PushQueueRefFrame();

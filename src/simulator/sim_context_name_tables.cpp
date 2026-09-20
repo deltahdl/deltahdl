@@ -103,6 +103,36 @@ void DeclaredNameTables::RegisterImportedName(std::string_view name) {
   imported_names_.insert(name);
 }
 
+void DeclaredNameTables::RegisterSubroutinePackage(const ModuleItem* subroutine,
+                                                   std::string_view pkg) {
+  subroutine_packages_[subroutine] = pkg;
+}
+
+std::string_view DeclaredNameTables::SubroutinePackage(
+    const ModuleItem* subroutine) const {
+  auto it = subroutine_packages_.find(subroutine);
+  return it != subroutine_packages_.end() ? it->second : std::string_view{};
+}
+
+void DeclaredNameTables::RegisterPackageImport(std::string_view pkg,
+                                               std::string_view imported,
+                                               std::string_view item) {
+  package_imports_[pkg].push_back({imported, item});
+}
+
+std::vector<std::string> DeclaredNameTables::PackageScopedKeys(
+    std::string_view pkg, std::string_view name) const {
+  std::vector<std::string> keys;
+  keys.push_back(std::string(pkg) + "." + std::string(name));
+  auto it = package_imports_.find(pkg);
+  if (it == package_imports_.end()) return keys;
+  for (const PackageImport& imp : it->second) {
+    if (imp.item != "*" && imp.item != name) continue;
+    keys.push_back(std::string(imp.imported) + "." + std::string(name));
+  }
+  return keys;
+}
+
 void DeclaredNameTables::RegisterNestedDeclScope(std::string_view prefix) {
   nested_decl_scopes_.insert(std::string(prefix));
 }

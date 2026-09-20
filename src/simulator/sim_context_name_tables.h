@@ -72,6 +72,21 @@ class DeclaredNameTables {
   // enclosing module's variable. `name` must outlive the context.
   void RegisterImportedName(std::string_view name);
 
+  // §26.3 with §13.4: the package a subroutine was declared in, whose
+  // variables its body reads by their bare names, and the package's own
+  // imports, through which it reads another package's. `pkg` and the import's
+  // names must outlive the context; `item` is "*" for a wildcard import.
+  void RegisterSubroutinePackage(const ModuleItem* subroutine,
+                                 std::string_view pkg);
+  std::string_view SubroutinePackage(const ModuleItem* subroutine) const;
+  void RegisterPackageImport(std::string_view pkg, std::string_view imported,
+                             std::string_view item);
+  // The keys a bare `name` read in package `pkg` may stand under, in the
+  // order §26.3 resolves them: the package's own declaration, then each
+  // package an import of `pkg` brings the name in from.
+  std::vector<std::string> PackageScopedKeys(std::string_view pkg,
+                                             std::string_view name) const;
+
   // §23.4: records that the instance at `prefix` was declared inside the
   // module holding it, whose outer name space is visible to it.
   void RegisterNestedDeclScope(std::string_view prefix);
@@ -166,6 +181,14 @@ class DeclaredNameTables {
 
   // §26.3: see RegisterImportedName.
   std::unordered_set<std::string_view> imported_names_;
+  // §26.3 with §13.4: see RegisterSubroutinePackage.
+  std::unordered_map<const ModuleItem*, std::string_view> subroutine_packages_;
+  struct PackageImport {
+    std::string_view imported;
+    std::string_view item;
+  };
+  std::unordered_map<std::string_view, std::vector<PackageImport>>
+      package_imports_;
   // §23.4: see RegisterNestedDeclScope.
   std::unordered_set<std::string> nested_decl_scopes_;
 

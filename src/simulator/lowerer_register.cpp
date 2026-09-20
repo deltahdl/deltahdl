@@ -173,9 +173,20 @@ void RegisterPackageScopedSubroutines(const RtlirDesign* design,
                                       SimContext& ctx, Arena& arena) {
   for (auto* pkg : design->packages) {
     for (auto* item : pkg->items) {
+      // §26.3 with §13.4: the package's subroutines read its variables, and
+      // through its imports another package's, by their bare names, so each
+      // subroutine is recorded as the package's and each import as one of
+      // the package's; SimContext::FindInPackageScope reads both back.
+      if (item->kind == ModuleItemKind::kImportDecl) {
+        const ImportItem& imp = item->import_item;
+        ctx.RegisterPackageImport(pkg->name, imp.package_name,
+                                  imp.is_wildcard ? "*" : imp.item_name);
+        continue;
+      }
       bool is_subroutine = item->kind == ModuleItemKind::kFunctionDecl ||
                            item->kind == ModuleItemKind::kTaskDecl;
       if (!is_subroutine || !item->method_class.empty()) continue;
+      ctx.RegisterSubroutinePackage(item, pkg->name);
       auto* key = arena.Create<std::string>(std::string(pkg->name) +
                                             "::" + std::string(item->name));
       ctx.RegisterFunction(*key, item);

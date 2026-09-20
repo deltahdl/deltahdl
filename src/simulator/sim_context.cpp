@@ -246,6 +246,24 @@ std::string SimContext::ActiveInstancePrefix() const {
                           : lowering_inst_prefix_;
 }
 
+// §26.3 with §13.4: a bare name read inside a package subroutine's body -- the
+// innermost scope on the stack that names a package is that subroutine's
+// frame -- is the package's own variable or one an import of the package
+// brings in, held under the "package.name" keys PackageScopedKeys lists;
+// null outside any package subroutine or where no key holds the name.
+Variable* SimContext::FindInPackageScope(std::string_view name) {
+  if (name.find('.') != std::string_view::npos) return nullptr;
+  for (auto it = scope_stack_.rbegin(); it != scope_stack_.rend(); ++it) {
+    if (it->package.empty()) continue;
+    for (const std::string& key : PackageScopedKeys(it->package, name)) {
+      auto found = variables_.find(key);
+      if (found != variables_.end()) return found->second;
+    }
+    return nullptr;
+  }
+  return nullptr;
+}
+
 Variable* SimContext::FindVariable(std::string_view name) {
   // §23.6: "The instance name $root refers to the top of the instantiated
   // design and is used to unambiguously gain access to the top of the design."
@@ -265,6 +283,7 @@ Variable* SimContext::FindVariable(std::string_view name) {
 
   auto* local = FindLocalVariable(name);
   if (local) return local;
+  if (auto* in_package = FindInPackageScope(name)) return in_package;
   std::string prefix = ActiveInstancePrefix();
 
   // §27.4: a generate block is a separate scope, and its declarations are
@@ -489,7 +508,9 @@ void SimContext::SetDpiRuntime(DpiRuntime* dpi) {
   DpiSetForeignRuntime(dpi);
 }
 
-void SimContext::PushScope() { scope_stack_.emplace_back(); }
+void SimContext::PushScope(std::string_view package) {
+  scope_stack_.push_back(Scope{{}, {}, {}, {}, package});
+}
 
 void SimContext::BindLocalVariable(std::string_view name, Variable* var) {
   if (!scope_stack_.empty()) scope_stack_.back().vars[name] = var;
@@ -512,12 +533,13 @@ std::string_view SimContext::StaticFrameKey(std::string_view name) {
   return *key;
 }
 
-void SimContext::PushStaticScope(std::string_view func_name) {
+void SimContext::PushStaticScope(std::string_view func_name,
+                                 std::string_view package) {
   // §13.4.2's static frame carries the variables the function declared static;
   // the three maps beside them start empty, a queue or associative array of the
   // call being the call's own and a shape with it.
   scope_stack_.push_back(
-      Scope{static_frames_[StaticFrameKey(func_name)], {}, {}, {}});
+      Scope{static_frames_[StaticFrameKey(func_name)], {}, {}, {}, package});
 }
 
 void SimContext::PopStaticScope(std::string_view func_name) {

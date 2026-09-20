@@ -38,11 +38,18 @@ struct Variable;
 // formal named after a queue of the enclosing module answered to the module's
 // until the name could be looked up here first. §23.9 gives the same answer for
 // a declaration inside a begin-end block, which is local to that block.
+//
+// §26.3 and §13.4 are why a frame names a package: a subroutine declared in a
+// package reads the package's variables, and those the package imports, by
+// their bare names, so the frame a package subroutine's call opens carries the
+// package's name and SimContext::FindVariable reads the package's keys through
+// it; every other frame carries none.
 struct Scope {
   std::unordered_map<std::string_view, Variable*> vars;
   std::unordered_map<std::string_view, ArrayInfo*> arrays;
   std::unordered_map<std::string_view, QueueObject*> queues;
   std::unordered_map<std::string_view, AssocArrayObject*> assoc_arrays;
+  std::string_view package;
 };
 
 }  // namespace delta

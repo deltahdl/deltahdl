@@ -230,33 +230,36 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   void RegisterFinalProcess(Process* proc);
   void RunFinalBlocks();
 
-  void PushScope();
+  // `package` is Scope::package, the package a subroutine the scope belongs
+  // to was declared in, empty for every other scope.
+  void PushScope(std::string_view package = {});
   void PopScope();
 
   // §18.17.7: while a randsequence production with a non-void return type is
   // being generated, the engine points the return slot at the production's
-  // return-value storage. A 'return <expr>' executed anywhere in that
-  // production's code blocks evaluates its expression into this slot. The slot
-  // is null outside randsequence value generation, so an ordinary procedural
-  // return is unaffected. The setter returns the previous slot so nested
-  // production generation can save and restore it.
+  // return-value storage, and a 'return <expr>' anywhere in the production's
+  // code blocks evaluates into it. The slot is null outside randsequence value
+  // generation. The setter returns the previous slot so nested production
+  // generation can save and restore it.
   Logic4Vec* SetRsReturnSlot(Logic4Vec* slot);
   Logic4Vec* RsReturnSlot() const { return rs_return_slot_; }
 
   std::vector<Scope> SwapScopeStack(std::vector<Scope> new_stack);
-  void PushStaticScope(std::string_view func_name);
+  void PushStaticScope(std::string_view func_name,
+                       std::string_view package = {});
   void PopStaticScope(std::string_view func_name);
   bool HasLocalScope() const { return !scope_stack_.empty(); }
   Variable* FindLocalVariable(std::string_view name);
+  // §26.3 with §13.4: see the definition in sim_context.cpp.
+  Variable* FindInPackageScope(std::string_view name);
   // Creates a scope-local variable of `width` bits, signed when `is_signed`
   // says the declaration it stands for was. §6.11.3: `byte`, `shortint`,
   // `int`, `integer` and `longint` default to signed, and a `signed`/`unsigned`
   // qualifier settles the rest, so a caller that knows the declared type passes
   // IsSignedType of it here. The parameter is defaulted because every caller
-  // that has no declared type to consult -- a foreach iterator, a `$` bound, a
-  // per-element array copy -- wants the unsigned default, and because a caller
-  // that does have one reached the wrong answer by calling a function that
-  // accepted a width alone; a new site would reach it the same way.
+  // with no declared type to consult -- a foreach iterator, a `$` bound, a
+  // per-element array copy -- wants the unsigned default, and a caller with
+  // one reached the wrong answer through a function taking a width alone.
   Variable* CreateLocalVariable(std::string_view name, uint32_t width,
                                 bool is_signed = false);
   // Makes `var`, a variable created earlier, the variable `name` names in
@@ -307,13 +310,12 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   // §21.7.1: open the dump file named by GetDumpFileName, write everything
   // that precedes the value changes and install the per-timestep recording;
   // the context owns the writer from then on. `top_scope` is the module whose
-  // $scope encloses the object definitions, and `wait_for_dumpvars` holds the
-  // recording back until a $dumpvars starts it (§21.7.1.3). `type` picks which
-  // of the two file types §21.7 defines is written, which has to be settled
-  // here because it decides the form of the object definitions. Returns the
-  // writer to dump through, or null when the file could not be opened; a
-  // writer already installed through SetVcdWriter wins and comes back
-  // unchanged, keeping the type it was given.
+  // $scope encloses the object definitions, `wait_for_dumpvars` holds the
+  // recording back until a $dumpvars starts it (§21.7.1.3), and `type` picks
+  // which of §21.7's two file types is written, settled here because it
+  // decides the form of the object definitions. Returns the writer to dump
+  // through, or null when the file could not be opened; a writer already
+  // installed through SetVcdWriter wins and comes back unchanged.
   VcdWriter* OpenVcdDump(std::string_view top_scope, bool wait_for_dumpvars,
                          VcdFileType type);
   // §21.7.1: the dump the source creates for itself, opened by the first
@@ -489,10 +491,9 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   // again, and a lookup of the name reads whatever the enclosing scopes or
   // RegisterArray registered for it once the scope is gone. §18.17 needs this
   // for the array §18.17.7 implicitly declares within a randsequence rule,
-  // that statement creating "an automatic scope". The caller must have pushed a
-  // scope: in stmt_exec_randsequence.cpp, ExecRandsequence pushes one for the
-  // statement and ExecRsProduction another for the production, both before a
-  // rule is selected. `name` must outlive the context, as for RegisterArray.
+  // that statement creating "an automatic scope". The caller must have pushed
+  // a scope, as ExecRandsequence and ExecRsProduction in
+  // stmt_exec_randsequence.cpp do. `name` must outlive the context.
   void RegisterLocalArray(std::string_view name, const ArrayInfo& info);
 
   // The shape of an array, given the lifetime the scope it was declared in
@@ -697,9 +698,8 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   // FailOn/FailOff toggle its default fail action ($error, §16.3). Each stores
   // the assertion_type (Table 20-6) and directive_type (Table 20-7) masks the
   // controlling task carried, so an assertion is affected only when its own
-  // type and directive bits are both set in the stored masks. The masks are
-  // expressed as plain integers here to keep this header free of the SVA
-  // engine's enum definitions.
+  // type and directive bits are both set in the stored masks, as plain
+  // integers to keep this header free of the SVA engine's enums.
   void SetGlobalAssertCheckingOff(uint32_t assertion_type,
                                   uint32_t directive_type);
   void SetGlobalAssertCheckingOn() { assert_checking_off_ = false; }
