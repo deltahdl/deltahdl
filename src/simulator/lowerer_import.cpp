@@ -271,6 +271,23 @@ static bool ModuleDeclaresName(const RtlirModule* mod, std::string_view name) {
   return false;
 }
 
+// The per-name records a package variable is entered in beside its storage,
+// keyed "pkg.name" as the storage is, given to the alias `key` from the
+// declaring package's `qname`: the class the variable is declared with
+// (RegisterPackageClassVariables in lowerer_package_class_vars.cpp), which
+// TryClassNewAssign (statement_assign_object.cpp) asks for under the target's
+// own key before it constructs, so that `p2::h = new` through the exporter
+// and `h = new` after a module's `import p1::h` each found no class, built
+// nothing and left the handle null; and the real registration
+// ShapePackageVariable (lowerer_register.cpp) makes. A string's kind is a
+// flag of the Variable itself, which the alias already shares.
+static void AliasVariableKinds(std::string_view key, std::string_view qname,
+                               SimContext& ctx) {
+  std::string_view cls = ctx.GetVariableClassType(qname);
+  if (!cls.empty()) ctx.SetVariableClassType(key, cls);
+  if (ctx.IsRealVariable(qname)) ctx.RegisterRealVariable(key);
+}
+
 // §26.3 makes the imported name visible under its unqualified spelling in the
 // scope that wrote the import, which is the instance being lowered; `qname` is
 // the "pkg.name" key the package's own storage holds. The binding is keyed by
@@ -310,6 +327,11 @@ void Lowerer::AliasImportedPackageName(std::string_view name,
   if (ctx_.GetVariables().count(key) != 0) return;
   auto* stored = arena_.Create<std::string>(key);
   ctx_.AliasVariable(*stored, qname);
+  // §26.3 with §8.7 (printed page 184): `h = new` after `import p1::h`
+  // constructs an object of the class p1's h is declared with, which
+  // TryClassNewAssign asks for under this key, so the class record rides the
+  // alias as it rides an export's (AliasExportedName).
+  AliasVariableKinds(*stored, qname, ctx_);
   // §26.3: the import makes this name visible under its unqualified spelling,
   // and that binding belongs to no module. SimContext::FindVariable is told so
   // because it otherwise stops a bare name at the module boundary §23.9 draws,
@@ -586,22 +608,6 @@ void ExportedNameWalk::CollectNamed(const PackageDecl* src,
   for (const ExportedName& e : handed_on) {
     if (e.name == name) out.push_back(e);
   }
-}
-
-// The per-name records a package variable is entered in beside its storage,
-// keyed "pkg.name" as the storage is, given to the alias `key` from the
-// declaring package's `qname`: the class the variable is declared with
-// (RegisterPackageClassVariables in lowerer_package_class_vars.cpp), which
-// TryClassNewAssign (statement_assign_object.cpp) asks for under the target's
-// own key before it constructs, so that `p2::h = new` through the exporter
-// found no class, built nothing and left the handle null; and the real
-// registration ShapePackageVariable (lowerer_register.cpp) makes. A string's
-// kind is a flag of the Variable itself, which the alias already shares.
-void AliasVariableKinds(std::string_view key, std::string_view qname,
-                        SimContext& ctx) {
-  std::string_view cls = ctx.GetVariableClassType(qname);
-  if (!cls.empty()) ctx.SetVariableClassType(key, cls);
-  if (ctx.IsRealVariable(qname)) ctx.RegisterRealVariable(key);
 }
 
 // Binds one name `pkg` exports under the exporting package's key to the
