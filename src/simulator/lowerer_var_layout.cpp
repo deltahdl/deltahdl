@@ -95,5 +95,6 @@ void RegisterAggregateLayout(std::string_view name, const DataType* dtype,
   auto* info = BuildStructTypeInfo(dtype, width, name, arena);
   ctx.RegisterStructType(name, *info);
   ctx.SetVariableStructType(name, name);
+}
 
 }  // namespace delta

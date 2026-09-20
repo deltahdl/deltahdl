@@ -481,6 +481,14 @@ void RecordWildcardSourcedExport(
   }
 }
 
+// Whether the package item `pi` declares `name`: an item by its own name, or
+// a class declaration by the class's.
+bool PackageItemDeclaresName(const ModuleItem* pi, std::string_view name) {
+  if (pi->name == name) return true;
+  return pi->kind == ModuleItemKind::kClassDecl && pi->class_decl &&
+         pi->class_decl->name == name;
+}
+
 // A declaration that follows such an export and supplies one of the claimed
 // names is the conflict §26.6 forbids.
 void ReportDeclarationAfterWildcardExport(

@@ -29,8 +29,8 @@ namespace {
 // its helpers.
 uint64_t LiteralDigitValue(char c) {
   if (c >= '0' && c <= '9') return static_cast<uint64_t>(c - '0');
-  if (c >= 'a' && c <= 'f') return static_cast<uint64_t>(c - 'a' + 10);
-  if (c >= 'A' && c <= 'F') return static_cast<uint64_t>(c - 'A' + 10);
+  if (c >= 'a' && c <= 'f') return static_cast<uint64_t>(c - 'a') + 10;
+  if (c >= 'A' && c <= 'F') return static_cast<uint64_t>(c - 'A') + 10;
   return 99;
 }
 

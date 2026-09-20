@@ -7,6 +7,7 @@
 
 #include "fixture_simulator.h"
 #include "helpers_reported_error.h"
+#include "simulator/variable.h"
 
 using namespace delta;
 
