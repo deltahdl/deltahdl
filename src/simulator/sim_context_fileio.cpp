@@ -367,7 +367,7 @@ SemaphoreObject* SimContext::CreateSemaphore(std::string_view name,
 
 // §23.9: a semaphore declared inside a module instance is stored under that
 // instance's prefix (CreateChildModuleVariables in lowerer_child.cpp reaching
-// CreateSemaphoreForVar in lowerer_var.cpp), so the prefixed name is what a
+// CreateSyncObjectForVar in sync_variable.cpp), so the prefixed name is what a
 // bare reference from within the instance denotes and is tried ahead of the
 // bare key, a package frame's own keys ahead of both (ScopedObjectKeys
 // above), as in FindQueue; a semaphore has no scope frame to search ahead of
@@ -392,7 +392,7 @@ MailboxObject* SimContext::CreateMailbox(std::string_view name, int32_t bound) {
 
 // §23.9: a mailbox declared inside a module instance is stored under that
 // instance's prefix (CreateChildModuleVariables in lowerer_child.cpp reaching
-// CreateMailboxForVar in lowerer_var.cpp), so the keys are walked in the
+// CreateSyncObjectForVar in sync_variable.cpp), so the keys are walked in the
 // order FindSemaphore above walks them (ScopedObjectKeys). The bare key
 // stays the answer for a mailbox of the enclosing scope.
 MailboxObject* SimContext::FindMailbox(std::string_view name) {

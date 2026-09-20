@@ -37,8 +37,8 @@ class SimContext;
 // and through any handle.
 
 // Which of the two classes a declaration's type names: a named type spelled
-// `semaphore` or `mailbox` (the spelling CreateSemaphoreForVar and
-// CreateMailboxForVar in lowerer_var.cpp recognize a module's variable by),
+// `semaphore` or `mailbox` (the spelling CreateSyncObjectForVar in
+// sync_variable.cpp recognizes a module's variable by),
 // or a typedef name standing for one -- §15.4.9's `typedef mailbox #(string)
 // s_mbox`, a package's `p::mb_t` (§26.3) and a typedef of a typedef (§6.18)
 // -- followed through the chain the run records (SimContext::FindTypeTarget),

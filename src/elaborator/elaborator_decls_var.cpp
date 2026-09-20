@@ -145,8 +145,8 @@ static void ValidateWeakReferenceTypeParam(
 // two under "p::s_mbox" and "p::sem_t", the keys FindNamedType builds from
 // the qualifier, and the lookup by dtype.type_name alone missed them, so the
 // declaration kept an empty class_type_name and the lowerer's
-// CreateMailboxForVar and CreateSemaphoreForVar made no object: put() and
-// get() ran on nothing. §6.18 (printed 118) lets one typedef name stand for
+// CreateSyncObjectForVar (sync_variable.cpp) made no object: put() and get()
+// ran on nothing. §6.18 (printed 118) lets one typedef name stand for
 // another, `typedef p::s_mbox my_mbox`, so the chain is followed until it
 // reaches a class name or a type that is not a name; a chain that comes back
 // to itself is left where it stands.

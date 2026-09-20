@@ -97,8 +97,8 @@ static std::string PackageDataKey(const ModuleItem* item,
 // §15.3 (printed page 372) and §15.4 (printed 374): the built-in
 // synchronization class the package variable `item` is declared with,
 // `semaphore` or `mailbox`, which the parser leaves as a named type of that
-// spelling, the spelling CreateSemaphoreForVar and CreateMailboxForVar
-// (sync_variable.cpp) recognize a module's by. Empty for an item of any other
+// spelling, the spelling CreateSyncObjectForVar (sync_variable.cpp)
+// recognizes a module's by. Empty for an item of any other
 // type.
 static std::string_view PackageSyncObjectType(const ModuleItem* item) {
   if (item->kind != ModuleItemKind::kVarDecl ||
@@ -333,8 +333,8 @@ static void CreatePackageAggregate(const ModuleItem* item, std::string_view pkg,
 // 808): a package's `semaphore s` is the bucket of keys its get(), put() and
 // try_get() operate on, and its `mailbox mb` the queue its put(), get(),
 // peek(), num() and try_ methods pass messages through, each made under the
-// "pk.name" key its carrier variable stands under, as CreateSemaphoreForVar
-// and CreateMailboxForVar (lowerer_var.cpp) make a module's, so that
+// "pk.name" key its carrier variable stands under, as CreateSyncObjectForVar
+// (sync_variable.cpp) makes a module's, so that
 // SemaphoreCallTarget (eval_semaphore.cpp) and MailboxCallTarget
 // (eval_mailbox.cpp) find it by the key a `p1::s` receiver resolves to, the
 // key the package's own task or function reaches a bare `s` by through

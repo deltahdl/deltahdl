@@ -295,11 +295,11 @@ TEST(PackageImportSim, PackageSemaphoreInitializedByNewThroughTheQualifier) {
 
 // §15.3.1 (printed page 373) and §15.3.2 (printed 373) with §26.2 (printed
 // 808): a package's `semaphore t` with no initializer is an empty bucket, as
-// a module's is (CreateSemaphoreForVar in lowerer_var.cpp), so `p1::t.put(3)`
-// leaves three keys in it, `p1::t.get(1)` procures one, and three try_get(1)
-// calls procure the two left and then none: 1 * 100 + 1 * 10 + 0. Under the
-// same defect no bucket stood under "p1.t", the put() and the get() reached
-// nothing and every try_get() answered 0.
+// a module's is (CreateSyncObjectForVar in sync_variable.cpp), so
+// `p1::t.put(3)` leaves three keys in it, `p1::t.get(1)` procures one, and
+// three try_get(1) calls procure the two left and then none: 1 * 100 + 1 * 10 +
+// 0. Under the same defect no bucket stood under "p1.t", the put() and the
+// get() reached nothing and every try_get() answered 0.
 TEST(PackageImportSim,
      PackageSemaphoreDeclaredWithoutInitializerThroughTheQualifier) {
   EXPECT_EQ(

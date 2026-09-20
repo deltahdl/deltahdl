@@ -91,7 +91,7 @@ TEST(PackageImportSim, PackageSubroutinesReachTheirOwnMailboxBare) {
 
 // §15.4.1 (printed page 374) with §26.2 (printed 808): a package's `mailbox
 // mb` with no initializer is an unbounded queue, as a module's is
-// (CreateMailboxForVar in lowerer_var.cpp), and a procedural `p1::mb =
+// (CreateSyncObjectForVar in sync_variable.cpp), and a procedural `p1::mb =
 // new(1)` then builds it with a bound of one (TryMailboxNewAssign), so the
 // first try_put() places its message and the second finds the queue full:
 // 1 * 10 + 0. Under the same defect no queue stood under "p1.mb", so the
