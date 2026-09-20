@@ -126,7 +126,11 @@ static void ResolveDeclaredTypeName(
 void Elaborator::ValidateVarDeclTypes(ModuleItem* item, const ScopeMap& scope) {
   if (item->data_type.kind == DataTypeKind::kNamed &&
       class_names_.count(item->data_type.type_name)) {
-    class_var_names_.insert(item->name);
+    // §7.4 and §7.8: a declaration with an unpacked dimension, `C m[string]`
+    // or `C a[3]`, is an array whose elements are handles, and a select of
+    // it is an element (§7.4.6), not §8.4's bit-select of a handle; the
+    // checks that take a class variable for one handle leave it alone.
+    if (item->unpacked_dims.empty()) class_var_names_.insert(item->name);
     class_var_types_[item->name] = item->data_type.type_name;
     ValidateParameterizedClassDefaults(item, unit_, diag_);
     ValidateSpecializationArgsConstant(item, scope, diag_);

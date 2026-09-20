@@ -635,4 +635,26 @@ TEST(ClassObjectElaboration,
                             7, "8.4"));
 }
 
+// §7.8 and §7.4.6: `C m[string]` declares an associative array whose elements
+// are handles, and `m["a"]` selects an element, so the member `m["a"].v` is
+// no §8.4 bit-select of a handle. ValidateVarDeclTypes took every variable of
+// a class type for one handle, and the element select was reported.
+TEST(ClassObjectElaboration, ElementSelectOfAnArrayOfHandlesIsNoBitSelect) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class C; int v; endclass\n"
+      "module m;\n"
+      "  C h[string];\n"
+      "  C a[2];\n"
+      "  int r;\n"
+      "  initial begin\n"
+      "    r = h[\"a\"].v + a[1].v;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "bit-select on class object handle is illegal", 7,
+                             "8.4"));
+}
+
 }  // namespace
