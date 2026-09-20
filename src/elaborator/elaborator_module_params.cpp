@@ -10,10 +10,12 @@
 #include <optional>
 #include <string_view>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
+#include "common/source_loc.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/const_eval_internal.h"
 #include "elaborator/elaborator.h"
@@ -491,6 +493,58 @@ std::vector<std::string_view> OverridableParamNames(const ModuleDecl* decl) {
     names.push_back(item->name);
   }
   return names;
+}
+
+// The parameter declaration among `decl`'s items named `pname`, or null: a
+// `parameter` or `localparam`, value or type, written at the module's own
+// level. A generate block's, a task's or a function's is not among the items
+// and is none of these (§23.10.2, printed page 766).
+static const ModuleItem* BodyParamDecl(const ModuleDecl* decl,
+                                       std::string_view pname) {
+  for (const ModuleItem* item : decl->items) {
+    if (item->kind == ModuleItemKind::kParamDecl && item->name == pname)
+      return item;
+  }
+  return nullptr;
+}
+
+// Whether `pname` names a local parameter of `decl`, which §6.20.4 (printed
+// page 128) puts beyond a defparam and any instance parameter value
+// assignment: a localparam of the parameter port list, a `localparam` among
+// the items, or a `parameter` among the items of a module with a parameter
+// port list, even an empty one, which §6.20.1 (printed 125-126) makes a
+// synonym for `localparam`. False for a name no parameter of `decl` bears.
+static bool IsLocalParamOf(const ModuleDecl* decl, std::string_view pname) {
+  if (decl->localparam_port_names.count(pname) > 0) return true;
+  const ModuleItem* item = BodyParamDecl(decl, pname);
+  return item != nullptr && (item->is_localparam || decl->has_param_port_list);
+}
+
+// The report is worded as DefparamOverrideAllowed (elaborator_defparam.cpp)
+// words a defparam's on a local parameter. Such an assignment was applied
+// and ignored in silence before: `instance top.u use #(.P(5))` on `module c
+// #(parameter W = 1); parameter P = 2;` left P at 2 and said nothing,
+// ApplyBodyParamAssignment (elaborator_items_params.cpp) passing over a local
+// parameter as §6.20.4 has it, and ElaborateParamPortList applying one to a
+// localparam port outright.
+std::vector<std::pair<std::string_view, Expr*>> AssignableConfigParams(
+    const ModuleDecl* child_decl,
+    const std::vector<std::pair<std::string_view, Expr*>>& override_params,
+    SourceLoc loc, DiagEngine& diag) {
+  std::vector<std::pair<std::string_view, Expr*>> assignable;
+  assignable.reserve(override_params.size());
+  for (const auto& entry : override_params) {
+    if (!IsLocalParamOf(child_decl, entry.first)) {
+      assignable.push_back(entry);
+      continue;
+    }
+    diag.Error(loc,
+               std::format("configuration cannot override a local parameter: "
+                           "'{}' of module '{}'",
+                           entry.first, child_decl->name),
+               Subclause("6.20.4"));
+  }
+  return assignable;
 }
 
 }  // namespace delta

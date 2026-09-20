@@ -3,9 +3,12 @@
 #include <cstdint>
 #include <optional>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "common/arena.h"
+#include "common/diagnostic.h"
+#include "common/source_loc.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
@@ -92,5 +95,18 @@ const InstanceParamAssignments* BodyParamAssignments();
 // (§23.10.2). Defined in elaborator_module_params.cpp for the instantiation
 // site's ResolveInstParams to read the override surface from.
 std::vector<std::string_view> OverridableParamNames(const ModuleDecl* decl);
+
+// The parameter value assignments of one configuration use clause, written
+// at `loc`, that may reach a parameter of `child_decl`: `override_params`
+// less each one naming a local parameter of the module, which is reported
+// against `diag`. §33.4.3 (printed page 940) has the use clause's `#(.P(5))`
+// assign a value to a parameter of the instance, and §6.20.4 (printed 128)
+// puts a local parameter beyond every instance parameter value assignment.
+// Defined in elaborator_module_params.cpp for
+// Elaborator::ApplyConfigParamOverrides.
+std::vector<std::pair<std::string_view, Expr*>> AssignableConfigParams(
+    const ModuleDecl* child_decl,
+    const std::vector<std::pair<std::string_view, Expr*>>& override_params,
+    SourceLoc loc, DiagEngine& diag);
 
 }  // namespace delta

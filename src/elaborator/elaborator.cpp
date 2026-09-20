@@ -836,6 +836,7 @@ void Elaborator::CollectConfigInstanceParamOverrides(const ConfigDecl* cfg) {
     ConfigParamOverride ov;
     ov.inst_path.assign(rule->inst_path.data(), rule->inst_path.size());
     ov.reset_all = rule->use_param_reset_all;
+    ov.loc = rule->loc;
     ov.params = rule->use_params;
     instance_param_overrides_.push_back(std::move(ov));
   }

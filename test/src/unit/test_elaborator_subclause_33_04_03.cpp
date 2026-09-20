@@ -443,4 +443,47 @@ TEST(ConfigParamApply, OverrideTakesPrecedenceOverDefparam) {
   EXPECT_EQ(ResolvedParam(a1, "W"), 32);
 }
 
+// §33.4.3 (printed page 940) has a use clause's `#(.P(5))` assign a value to
+// a parameter of the configured instance, and §6.20.4 (printed 128) puts a
+// local parameter beyond every instance parameter value assignment. §6.20.1
+// (printed 125-126) makes a `parameter` among the items of a module with a
+// parameter port list, even an empty one, a synonym for `localparam`, so P
+// here is one. The clause was applied and ignored in silence, P staying 2
+// with nothing reported; the report stands on line 4, the clause's own line,
+// and P keeps the value of its declaration. The wording is the one a defparam
+// on a local parameter draws (§23.10.1's report), with the configuration as
+// the actor.
+TEST(ConfigParamApply, UseClauseNamingABodyParameterUnderAPortListIsRejected) {
+  ElabFixture f;
+  auto* u = ConfigElabFirstChild(
+      f,
+      "module c #(parameter W = 1); parameter P = 2; endmodule\n"
+      "module top; c u(); endmodule\n"
+      "config cfg; design top;\n"
+      "  instance top.u use #(.P(5));\n"
+      "endconfig\n");
+  ASSERT_NE(u, nullptr);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "configuration cannot override a local parameter: "
+                            "'P' of module 'c'",
+                            4, "6.20.4"));
+  EXPECT_EQ(ResolvedParam(u, "P"), 2);
+}
+
+// The same clause on a module declared with no parameter port list names a
+// value parameter (§6.20.1), which §33.4.3's own examples override this way
+// (printed pages 940-943), so it is applied and nothing is reported: P reads
+// 5.
+TEST(ConfigParamApply, UseClauseOnABodyParameterOfAModuleWithoutAPortList) {
+  ElabFixture f;
+  auto* u = ConfigElabFirstChild(
+      f,
+      "module c; parameter P = 2; endmodule\n"
+      "module top; c u(); endmodule\n"
+      "config cfg; design top; instance top.u use #(.P(5)); endconfig\n");
+  ASSERT_NE(u, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(ResolvedParam(u, "P"), 5);
+}
+
 }  // namespace

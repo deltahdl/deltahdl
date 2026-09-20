@@ -547,6 +547,10 @@ class ElaboratorData {
     std::string inst_path;
     bool reset_all = false;
     std::vector<std::pair<std::string_view, Expr*>> params;
+    // The instance clause's own position -- its `instance` keyword, as
+    // Parser::ParseConfigRule records it -- where a report about one of the
+    // clause's assignments stands.
+    SourceLoc loc;
   };
   std::vector<ConfigParamOverride> instance_param_overrides_;
 

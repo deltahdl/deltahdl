@@ -757,7 +757,9 @@ void Elaborator::ApplyConfigParamOverrides(
     if (ov.reset_all) {
       ResetAllConfigParams(child_decl, child_params, locked);
     }
-    ApplyConfigOverrideParams(ov.params, child_params, scope, locked);
+    ApplyConfigOverrideParams(
+        AssignableConfigParams(child_decl, ov.params, ov.loc, diag_),
+        child_params, scope, locked);
   }
 }
 
