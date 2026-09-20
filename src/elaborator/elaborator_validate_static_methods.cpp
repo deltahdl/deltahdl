@@ -385,18 +385,17 @@ void ElaboratorClassRules::ValidateStaticMethodsAmong(
 //
 // §24.3 (printed 775) admits a class declaration among a program's items
 // through module_or_generate_item_declaration, and §25.3 (printed 781) among
-// an interface's through interface_or_generate_item; §17.2 (printed 503-504)
-// names no class declaration among a checker's items, but Parser::
-// ParseCheckerDecl reads one as it reads a module's and no rule reports it, so
-// the checker's class is a class of the design as any other. Each of the three
-// is elaborated -- and so handed here as `decl` -- only when something
+// an interface's through interface_or_generate_item. Each of the two is
+// elaborated -- and so handed here as `decl` -- only when something
 // instantiates it or, for a program, when it is a top, so `program p; class C;
 // int k; static function int f(); return k; endfunction endclass endprogram`
-// beside a module named as the top, and the same class in an interface or a
-// checker nothing instantiates, was in no walk at all. The unit's programs,
-// interfaces and checkers are walked as its packages are, and the set in
-// ValidateOneClassStaticMethods keeps an instantiated one from a second
-// report.
+// beside a module named as the top, and the same class in an interface nothing
+// instantiates, was in no walk at all. The unit's programs and interfaces are
+// walked as its packages are, and the set in ValidateOneClassStaticMethods
+// keeps an instantiated one from a second report. A checker is not walked:
+// §17.2 (printed 503-504) names no class declaration among a checker's items,
+// and the parser reports one under A.1.8 (RejectInCheckerBody in
+// parser_items.cpp), so no checker reaches elaboration holding a class.
 void ElaboratorClassRules::ValidateStaticMethodBodies(const ModuleDecl* decl) {
   for (const auto* cls : unit_->classes) {
     ValidateOneClassStaticMethods(cls);
@@ -410,9 +409,6 @@ void ElaboratorClassRules::ValidateStaticMethodBodies(const ModuleDecl* decl) {
   }
   for (const auto* iface : unit_->interfaces) {
     ValidateStaticMethodsAmong(iface->items);
-  }
-  for (const auto* chk : unit_->checkers) {
-    ValidateStaticMethodsAmong(chk->items);
   }
 }
 

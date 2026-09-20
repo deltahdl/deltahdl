@@ -183,40 +183,4 @@ TEST(CheckerDeclaration, CheckerInstantiatedInsideCheckerIsLegal) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §17.2 (printed page 503 of ~/LRM.pdf): checker_or_generate_item_declaration
-// admits a data, function, checker, assertion-item, covergroup, genvar or
-// clocking declaration and the two defaults, and no class_declaration, so a
-// class written among a checker's items is reported at the class's line; the
-// parser read a checker's items as a module's and no rule named the class.
-TEST(CheckerDeclaration, ClassDeclaredInsideCheckerIsIllegal) {
-  ElabFixture f;
-  ElaborateSrc(
-      "checker chk;\n"
-      "  class C;\n"
-      "    int k;\n"
-      "  endclass\n"
-      "endchecker\n",
-      f, "chk");
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "a class cannot be declared inside checker 'chk'",
-                            2, "17.2"));
-}
-
-// The same class under a generate construct of the checker is read by the
-// same rule (A.10 item 6, printed 1216).
-TEST(CheckerDeclaration, ClassDeclaredInsideCheckerGenerateIsIllegal) {
-  ElabFixture f;
-  ElaborateSrc(
-      "checker chk;\n"
-      "  if (1) begin : g\n"
-      "    class C;\n"
-      "    endclass\n"
-      "  end\n"
-      "endchecker\n",
-      f, "chk");
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "a class cannot be declared inside checker 'chk'",
-                            3, "17.2"));
-}
-
 }  // namespace

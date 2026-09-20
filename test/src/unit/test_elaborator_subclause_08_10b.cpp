@@ -648,8 +648,8 @@ TEST(StaticMethodHandleBases, PropertyThroughABareNonStaticHandleIsReported) {
 //
 // `k` is the non-static property the bare access names and `m_inst` the static
 // handle the accepted form reads it through, as in StaticMethodHandleSrc. The
-// class is written once here and stands in a package below and in a program,
-// an interface and a checker in DesignElementStaticMethodSrc.
+// class is written once here and stands in a package below and in a program
+// and an interface in DesignElementStaticMethodSrc.
 std::string ClassCWithStaticF(const std::string& stmt) {
   return "  class C;\n"
          "    int k = 9;\n"
@@ -757,17 +757,17 @@ TEST(StaticMethodInNestedClass, PropertyThroughAStaticPropertyIsAccepted) {
   EXPECT_TRUE(ElabOk(NestedPackageClassSrc("return m_inst.k;")));
 }
 
-// The cases below hold the class in a program, an interface or a checker that
-// nothing instantiates. §24.3 (printed page 775 of ~/LRM.pdf) admits a class
+// The cases below hold the class in a program or an interface that nothing
+// instantiates. §24.3 (printed page 775 of ~/LRM.pdf) admits a class
 // declaration among a program's items and §25.3 (printed 781) among an
-// interface's; §17.2 (printed 503-504) names none among a checker's, but
-// Parser::ParseCheckerDecl reads one as it reads a module's and no rule
-// reports it. §8.10 (printed 186) states its rule of the class wherever it is
-// declared. Elaborator::ValidateStaticMethodBodies in
+// interface's; §17.2 (printed 503-504) names none among a checker's, and the
+// parser reports one there under A.1.8 (test_parser_annex_a_01_08.cpp), so no
+// checker case stands here. §8.10 (printed 186) states its rule of the class
+// wherever it is declared. Elaborator::ValidateStaticMethodBodies in
 // src/elaborator/elaborator_validate_static_methods.cpp read the items of the
-// module it was run for, and it is run for a program, an interface or a
-// checker only when that one is elaborated -- instantiated, or a program
-// rooted as a top -- so the class of one that was neither was never walked.
+// module it was run for, and it is run for a program or an interface only when
+// that one is elaborated -- instantiated, or a program rooted as a top -- so
+// the class of one that was neither was never walked.
 //
 // `module m` stands after the element and is the top the fixture names, so
 // the element is elaborated by no run; a program alone in the file would be
@@ -790,11 +790,6 @@ TEST(StaticMethodInDesignElement, BarePropertyIsReportedInAProgram) {
 TEST(StaticMethodInDesignElement, BarePropertyIsReportedInAnInterface) {
   ExpectStaticFunctionFReported(
       DesignElementStaticMethodSrc("interface", "return k;"));
-}
-
-TEST(StaticMethodInDesignElement, BarePropertyIsReportedInAChecker) {
-  ExpectStaticFunctionFReported(
-      DesignElementStaticMethodSrc("checker", "return k;"));
 }
 
 // The exemption StaticMethodHandleBases states, kept for a class an
