@@ -453,7 +453,16 @@ static uint64_t EvalWildcardEq(Logic4Vec lhs, Logic4Vec rhs) {
   if (unknown) return kResultX;
   return equal ? 1 : 0;
 }
-return true;
+// §11.4.5: == and != compare their operands bit for bit, the narrower extended
+// to the wider's width before EvalEqualityOp is reached, so every word of the
+// two is read rather than the first alone, which had two 96-bit operands
+// differing at bit 80 equal. Both operands are known when this is asked.
+static bool ValuesEqual(const Logic4Vec& lhs, const Logic4Vec& rhs) {
+  uint32_t nwords = std::min(lhs.nwords, rhs.nwords);
+  for (uint32_t i = 0; i < nwords; ++i) {
+    if (lhs.words[i].aval != rhs.words[i].aval) return false;
+  }
+  return true;
 }
 static uint64_t EvalEqualityOp(TokenKind op, Logic4Vec lhs, Logic4Vec rhs) {
   switch (op) {
@@ -461,8 +470,7 @@ static uint64_t EvalEqualityOp(TokenKind op, Logic4Vec lhs, Logic4Vec rhs) {
     case TokenKind::kBangEq:
 
       if (HasUnknownBits(lhs) || HasUnknownBits(rhs)) return kResultX;
-      return (op == TokenKind::kEqEq) == (lhs.ToUint64() == rhs.ToUint64()) ? 1
-                                                                            : 0;
+      return (op == TokenKind::kEqEq) == ValuesEqual(lhs, rhs) ? 1 : 0;
     case TokenKind::kEqEqEq:
       return EvalCaseEquality(lhs, rhs) ? 1 : 0;
     case TokenKind::kBangEqEq:

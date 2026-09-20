@@ -575,4 +575,31 @@ TEST(OperatorSim, WildcardNeqWiderThanOneWordComparesEveryWord) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §11.4.5 (printed page 279), the operators §11.4.6 defers to for every bit
+// the right operand does not wildcard: == and != compare the operands bit for
+// bit, so a 96-bit pair equal in every word answers 1 to == and a pair that
+// differs at bit 80 alone answers 0 to == and 1 to !=. Read together as
+// eq_same * 100 + eq_diff * 10 + ne_diff.
+TEST(OperatorSim, LogicalEqWiderThanOneWordComparesEveryWord) {
+  SimFixture f;
+  auto* r = RunAndFindVar(
+      "module t;\n"
+      "  logic [95:0] a, b;\n"
+      "  int eq_same, eq_diff, ne_diff, r;\n"
+      "  initial begin\n"
+      "    a = 96'h0123_4567_89AB_CDEF_0011_2233;\n"
+      "    b = 96'h0123_4567_89AB_CDEF_0011_2233;\n"
+      "    eq_same = (a == b);\n"
+      "    a = 96'h0122_4567_89AB_CDEF_0011_2233;\n"
+      "    eq_diff = (a == b);\n"
+      "    ne_diff = (a != b);\n"
+      "    r = eq_same * 100 + eq_diff * 10 + ne_diff;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(r, nullptr);
+  EXPECT_EQ(r->value.ToUint64(), 101u);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace
