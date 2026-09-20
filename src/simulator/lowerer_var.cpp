@@ -822,17 +822,25 @@ static bool TryLowerEventVarInit(std::string_view name,
 // crosses the real/integer boundary undergoes the same implicit conversion as a
 // procedural assign (round-to-nearest ties-away one way; x/z->0 numeric
 // conversion the other), never a raw bit reinterpretation of the operand.
+// §5.7.1 final paragraph: a sized signed literal is sign-extended when
+// assigned to a wider logic object whether or not the object is signed, and
+// §11.6.1 with §11.8.2 extends any signed operand the same way into an int or
+// integer. The initializer is sized by ResizeToWidth, which sign-extends on
+// the value's is_signed exactly as WriteVar does for the procedural assignment
+// the initializer stands for (§6.8); widening through the value's unsigned
+// integer read `int c = 4'shf` as 15 and `int f = -8'sd6` as 250 where the
+// `initial c = 4'shf` beside it read -1 and -6.
 // §6.11.2: assigning a 4-state initializer to a 2-state variable is likewise an
-// automatic conversion, so unknown/high-impedance bits become zero -- the
-// width-mismatch projection already drops them, and this covers the
-// matching-width case too.
+// automatic conversion, so unknown/high-impedance bits become zero; the resize
+// keeps them, as a 4-state object of another width holds the x or z the
+// literal wrote, and the coercion below clears them for a 2-state one.
 Logic4Vec Lowerer::CoerceVarInitValue(const RtlirVariable& var, Logic4Vec val,
                                       uint32_t width) {
   if (val.is_real != var.is_real && !var.is_string && !val.is_string &&
       !var.is_event && !var.is_chandle)
     val = ConvertRealForKnownLhs(val, var.is_real, width, arena_);
   if (val.width != width && !var.is_real && !var.is_string)
-    val = MakeLogic4VecVal(arena_, width, val.ToUint64());
+    val = ResizeToWidth(val, width, arena_);
   if (var.is_string) val = StripStringZeros(val, arena_);
   if (!var.is_4state && !var.is_string && !var.is_real && !var.is_event &&
       !var.is_chandle)

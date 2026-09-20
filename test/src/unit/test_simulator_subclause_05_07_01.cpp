@@ -935,4 +935,80 @@ TEST(IntegerLiteralSim, UnsizedHexLiteralIsAsWideAsItsDigitsNeed) {
   EXPECT_EQ(result, 0x0000004400000023u);
 }
 
+// §5.7.1 final paragraph, met at the declaration initializer rather than at a
+// procedural assignment: `int c = 4'shf` is the assignment `c = 4'shf` made
+// before any procedure runs (§6.8), and the sized signed literal is
+// sign-extended into the 32-bit int, so c is -1. The initializer lowering
+// widened the 4-bit value through its unsigned integer and read 15, where the
+// procedural `initial c = 4'shf` beside it read -1.
+TEST(IntegerLiteralSim, SignedLiteralInitializerSignExtendsIntoInt) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  int c = 4'shf;\n"
+      "endmodule\n",
+      "c");
+  EXPECT_EQ(result & 0xFFFFFFFFu, 0xFFFFFFFFu);
+}
+
+// §5.7.1 final paragraph with §6.11.1: integer is a 32-bit signed 4-state
+// object, and the initializer's sized signed literal is sign-extended into it
+// as into an int.
+TEST(IntegerLiteralSim, SignedLiteralInitializerSignExtendsIntoInteger) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  integer g = 4'shf;\n"
+      "endmodule\n",
+      "g");
+  EXPECT_EQ(result & 0xFFFFFFFFu, 0xFFFFFFFFu);
+}
+
+// §5.7.1 final paragraph: the object is an unsigned logic vector, and the
+// literal is still sign-extended, the clause saying the object's own
+// signedness does not decide. 4'shf into 16 bits is ffff, not 000f.
+TEST(IntegerLiteralSim, SignedLiteralInitializerSignExtendsIntoWiderLogic) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [15:0] b = 4'shf;\n"
+      "endmodule\n",
+      "b");
+  EXPECT_EQ(result & 0xFFFFu, 0xFFFFu);
+}
+
+// §5.7.1 final paragraph: an 8-bit signed literal whose high bit is set,
+// 8'sh85, is -123 and fills the 16-bit object as ff85. The low byte
+// discriminates a sign fill from a value the widening misread.
+TEST(IntegerLiteralSim, SignedHexLiteralInitializerSignExtendsHighByte) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [15:0] d = 8'sh85;\n"
+      "endmodule\n",
+      "d");
+  EXPECT_EQ(result & 0xFFFFu, 0xFF85u);
+}
+
+// §5.7.1 final paragraph: a sized negative signed literal, -8'sd6, is the
+// 8-bit signed value fa and is sign-extended into the int, reading -6 rather
+// than 250.
+TEST(IntegerLiteralSim, NegativeSignedLiteralInitializerSignExtendsIntoInt) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  int f = -8'sd6;\n"
+      "endmodule\n",
+      "f");
+  EXPECT_EQ(result & 0xFFFFFFFFu, 0xFFFFFFFAu);
+}
+
+// Discriminates the four above: the same 8'h85 without the s designator is an
+// unsigned literal, so the initializer zero-extends it to 0085. Only the
+// literal's signedness decides the fill, in an initializer as in a procedural
+// assignment.
+TEST(IntegerLiteralSim, UnsignedLiteralInitializerZeroExtendsIntoWiderLogic) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [15:0] e = 8'h85;\n"
+      "endmodule\n",
+      "e");
+  EXPECT_EQ(result & 0xFFFFu, 0x0085u);
+}
+
 }  // namespace
