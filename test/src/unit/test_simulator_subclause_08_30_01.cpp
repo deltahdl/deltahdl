@@ -142,4 +142,78 @@ TEST(ClassSim, WeakRefE2eStdScopedBlockDeclarationIsTheBuiltinClass) {
             91u);
 }
 
+// §8.30.1 (printed page 217 of ~/LRM.pdf) with §26.2 (printed 808): a
+// package's `weak_reference #(C) w = new(h);` is the declaration assignment
+// that creates the weak reference to the object the package's earlier `C h
+// = new;` constructed, made before any procedure starts, so a module's
+// `p::w.get()` (§8.30.3) answers that object and its v reads 3. The
+// package's constructions skipped a class the run holds no record of, the
+// built-in weak_reference among them, whose new(obj) the procedural
+// assignment alone took (AssignWeakReferenceNew in
+// statement_assign_object.cpp), so nothing was created, get() answered null
+// and y stayed 0.
+TEST(ClassSim, PackageWeakReferenceDeclarationInitializerRefersToTheObject) {
+  EXPECT_EQ(RunAndGet("package p;\n"
+                      "  class C;\n"
+                      "    int v = 3;\n"
+                      "  endclass\n"
+                      "  C h = new;\n"
+                      "  weak_reference #(C) w = new(h);\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  import p::*;\n"
+                      "  C c;\n"
+                      "  int y;\n"
+                      "  initial begin\n"
+                      "    c = p::w.get();\n"
+                      "    y = c.v;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            3u);
+}
+
+// The referent is the package's own handle: `p::w.get() == p::h` reads 1,
+// and `p::h != null` 1 beside it, so y is 11. A weak reference to nothing
+// answers null, unequal to the constructed h: 10; h constructed by nothing
+// and w by nothing would compare two nulls equal: 1.
+TEST(ClassSim, PackageWeakReferenceGetAnswersThePackagesOwnHandle) {
+  EXPECT_EQ(
+      RunAndGet("package p;\n"
+                "  class C;\n"
+                "    int v = 3;\n"
+                "  endclass\n"
+                "  C h = new;\n"
+                "  weak_reference #(C) w = new(h);\n"
+                "endpackage\n"
+                "module top;\n"
+                "  int y;\n"
+                "  initial y = (p::h != null) * 10 + (p::w.get() == p::h);\n"
+                "endmodule\n",
+                "y"),
+      11u);
+}
+
+// §3.12.1 (printed page 56) with §8.30.1: the same two declarations outside
+// every module are the compilation unit's, constructed by the one path the
+// package's are (ConstructDataClassInitializers), so a module's `w.get()`
+// answers the unit's object and y reads 3.
+TEST(ClassSim, UnitWeakReferenceDeclarationInitializerRefersToTheObject) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  int v = 3;\n"
+                      "endclass\n"
+                      "C h = new;\n"
+                      "weak_reference #(C) w = new(h);\n"
+                      "module top;\n"
+                      "  C c;\n"
+                      "  int y;\n"
+                      "  initial begin\n"
+                      "    c = w.get();\n"
+                      "    y = c.v;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            3u);
+}
+
 }  // namespace

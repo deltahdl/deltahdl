@@ -567,9 +567,15 @@ void InitUnitDataVariables(const RtlirDesign* design, SimContext& ctx,
 // bound nothing, and `p1::b.get_n()` ran on no object, reading N's default
 // 1 where the specialization gives 5. The construction is made in the
 // scope's frame, as InitScopeDataItems evaluates the other initializers, so
-// a constructor argument reads the scope's own names. Nothing is made for
-// a class the run holds no record of under the class type's key -- the
-// built-in weak_reference, whose `new` the procedural path alone takes --
+// a constructor argument reads the scope's own names. §8.30.1 (printed
+// 217): the built-in weak_reference class, which the run holds no record of
+// under the class type's key, has its own `new(obj)`, taken through
+// EvalWeakReferenceNew (statement_assign_object.cpp), the one mechanism the
+// procedural `w = new(h)` takes, so `weak_reference #(C) w = new(h);` among
+// a package's or the unit's items refers to the object the scope's earlier
+// `C h = new;` constructed; skipped as a class with no record, the
+// declaration form was constructed by nothing and `p::w.get()` answered
+// null. Nothing is made for any other class the run holds no record of,
 // and §8.12's `= new src` copy is not taken, as the module path takes none.
 static void ConstructClassNewInit(const ModuleItem* item, std::string_view pkg,
                                   SimContext& ctx, Arena& arena) {
@@ -577,11 +583,15 @@ static void ConstructClassNewInit(const ModuleItem* item, std::string_view pkg,
   std::string key = PackageDataKey(item, pkg);
   if (!IsClassNewInit(item, key, ctx)) return;
   std::string_view cls = ctx.GetVariableClassType(key);
-  if (ctx.FindClassType(cls) == nullptr) return;
   const auto& variables = ctx.GetVariables();
   auto found = variables.find(key);
   if (found == variables.end()) return;
   const Expr* init = item->init_expr;
+  if (cls == "weak_reference") {
+    found->second->value = EvalWeakReferenceNew(init, ctx, arena);
+    return;
+  }
+  if (ctx.FindClassType(cls) == nullptr) return;
   found->second->value = EvalClassNew(cls, init, ctx, arena, init->range.start);
   ApplyClassParamOverrides(key, found->second->value.ToUint64(), ctx, arena);
 }

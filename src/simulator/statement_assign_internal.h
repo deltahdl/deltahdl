@@ -72,6 +72,13 @@ void ApplyCompoundAssignOp(const Stmt* stmt, SimContext& ctx, Arena& arena);
 void AssignToScalarLhs(const Stmt* stmt, Logic4Vec rhs_val, SimContext& ctx,
                        Arena& arena);
 
+// Defined in statement_assign_object.cpp; also used by the package and
+// compilation-unit declaration initializers in lowerer_package_data.cpp.
+// §8.30.1: the weak reference `call`, a weak_reference's `new(referent)`,
+// allocates, to the object its one argument evaluates to, or a null one with
+// no argument, answered as the 64-bit handle value the target holds.
+Logic4Vec EvalWeakReferenceNew(const Expr* call, SimContext& ctx, Arena& arena);
+
 // Defined in statement_assign_core.cpp: the store §11.4.1's compound operators
 // make into a variable, sized to it, 2-state coerced (§6.11.2), declined while
 // the variable is forced (§10.6.2), its watchers told. Shared with

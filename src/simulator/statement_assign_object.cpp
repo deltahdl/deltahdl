@@ -129,19 +129,33 @@ static bool TryClassCopyNewAssign(const Stmt* stmt, std::string_view target,
   return true;
 }
 
+// §8.30.1 (printed page 217 of ~/LRM.pdf): the `new(referent)` of the
+// built-in weak_reference class, which names no class the run holds a record
+// of, allocates the weak reference to the object the one argument refers to
+// -- a null reference with no argument -- and answers its handle as the
+// 64-bit value the variable of the weak_reference type holds. One mechanism
+// for the procedural `w = new(h)` below and for a package's or the unit's
+// `weak_reference #(C) w = new(h);` declaration assignment
+// (ConstructClassNewInit in lowerer_package_data.cpp); with the allocation
+// static here, the declaration form was constructed by nothing and
+// `p::w.get()` answered null.
+Logic4Vec EvalWeakReferenceNew(const Expr* call, SimContext& ctx,
+                               Arena& arena) {
+  uint64_t referent = kNullClassHandle;
+  if (!call->args.empty())
+    referent = EvalExpr(call->args[0], ctx, arena).ToUint64();
+  return MakeLogic4VecVal(arena, 64,
+                          ctx.AllocateWeakReference(referent, arena));
+}
+
 // `new (referent)` for a weak_reference-typed target: allocate the weak
 // reference wrapper and write its handle to the target.
 static void AssignWeakReferenceNew(const Stmt* stmt, std::string_view target,
                                    SimContext& ctx, Arena& arena) {
-  uint64_t referent = kNullClassHandle;
-  if (!stmt->rhs->args.empty()) {
-    auto val = EvalExpr(stmt->rhs->args[0], ctx, arena);
-    referent = val.ToUint64();
-  }
-  auto wr_handle = ctx.AllocateWeakReference(referent, arena);
+  Logic4Vec wr_handle = EvalWeakReferenceNew(stmt->rhs, ctx, arena);
   auto* var = ctx.FindVariable(target);
   if (var) {
-    var->value = MakeLogic4VecVal(arena, 64, wr_handle);
+    var->value = wr_handle;
     var->NotifyWatchers();
   }
 }
