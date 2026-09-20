@@ -824,14 +824,19 @@ void Lowerer::LowerCompilationUnitClasses() {
   }
 }
 
-// The design's type names and the packages' own declarations, registered
-// ahead of every module: RegisterDesignTypeWidths for the names, and §7.2.1's
-// layouts for the member selects that reach a value no variable holds. §26.2:
-// a package variable's declaration assignment may call a function of the
-// package or of one it imports and name an enumeration constant, and §26.6
-// (printed pages 815-816) lets it read a name another package's export hands
-// on, so the subroutines, the constants and the exports are bound before the
-// variables are initialized; bound after them, such a read answered 0.
+// The design's type names and the packages' and the compilation unit's own
+// declarations, registered ahead of every module: RegisterDesignTypeWidths
+// for the names, and §7.2.1's layouts for the member selects that reach a
+// value no variable holds. §26.2: a package variable's declaration
+// assignment may call a function of the package or of one it imports and
+// name an enumeration constant, and §26.6 (printed pages 815-816) lets it
+// read a name another package's export hands on, so the subroutines, the
+// constants and the exports are bound before the variables are initialized;
+// bound after them, such a read answered 0. §3.12.1 (printed 56) with §26.2
+// (printed 808): the compilation unit's data items are initialized before
+// any procedure starts as a package's are, and a package names none of the
+// unit's while the unit may name a package's, so the unit's storage and
+// initializers follow the packages'.
 static void RegisterDesignTypesAndPackages(const RtlirDesign* design,
                                            SimContext& ctx, Arena& arena) {
   RegisterDesignTypeWidths(design, ctx);
@@ -839,8 +844,10 @@ static void RegisterDesignTypesAndPackages(const RtlirDesign* design,
   RegisterPackageScopedSubroutines(design, ctx, arena);
   RegisterPackageEnumConstants(design, ctx, arena);
   CreatePackageDataVariables(design, ctx, arena);
+  CreateUnitDataVariables(design, ctx, arena);
   AliasPackageExports(design, ctx, arena);
   InitPackageDataVariables(design, ctx, arena);
+  InitUnitDataVariables(design, ctx, arena);
 }
 
 void Lowerer::Lower(const RtlirDesign* design) {

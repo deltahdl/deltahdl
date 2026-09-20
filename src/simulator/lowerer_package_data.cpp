@@ -1,15 +1,18 @@
-// §26.2 (printed page 808 of ~/LRM.pdf): the data items a package declares
-// -- its variables and its parameters with initializers -- given storage
-// ahead of every module under their "pk.name" keys, the key a `pk::name`
-// reference and an import's alias resolve by, and their declaration
-// assignments evaluated before any procedure starts, as the subclause
-// requires. Moved out of lowerer_register.cpp, which registers a module's own
-// declarations, once the package data outgrew it.
+// §26.2 (printed page 808 of ~/LRM.pdf) with §3.12.1 (printed 56): the data
+// items a package and the compilation-unit scope declare -- their variables
+// and their parameters with initializers -- given storage ahead of every
+// module, and their declaration assignments evaluated before any procedure
+// starts, as the two subclauses require. A package's item stands under its
+// "pk.name" key, the key a `pk::name` reference and an import's alias resolve
+// by, and the compilation unit's under its bare name, the key a module's bare
+// reference reaches. Moved out of lowerer_register.cpp, which registers a
+// module's own declarations, once the two scopes' data outgrew it.
 
 #include <cstdint>
 #include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "common/arena.h"
 #include "common/types.h"
@@ -48,9 +51,9 @@ static void ShapePackageVariable(const ModuleItem* item, Variable* var,
   var->is_4state = DeclaredTypeIs4State(type);
   var->is_signed = DeclaredTypeIsSigned(type, ctx);
   var->value.is_signed = var->is_signed;
+  var->is_event = type.kind == DataTypeKind::kEvent;
   if (!var->is_4state)
     var->value = MakeLogic4VecVal(arena, var->value.width, 0);
-  var->is_event = type.kind == DataTypeKind::kEvent;
   if (DeclaredTypeIsString(type, ctx)) ctx.RegisterStringVariable(qname);
   bool is_real = type.kind == DataTypeKind::kReal ||
                  type.kind == DataTypeKind::kShortreal ||
@@ -67,10 +70,15 @@ static bool DeclaresPackageData(const ModuleItem* item) {
   return is_var || (is_param && item->init_expr);
 }
 
-// The "pk.name" key a package item's storage stands under, the one
-// EvalMemberAccess reads a `pk::name` by.
+// The key a data item's storage stands under: "pk.name" for a package's,
+// the one EvalMemberAccess reads a `pk::name` by, and the bare name for the
+// compilation unit's (§3.12.1), for which `pkg` is empty -- the key
+// SimContext::FindVariable reaches from a top-level module's process, and
+// from an instance's once the name is registered as one bound outside every
+// module (CreateUnitDataVariables).
 static std::string PackageDataKey(const ModuleItem* item,
                                   std::string_view pkg) {
+  if (pkg.empty()) return std::string(item->name);
   return std::string(pkg) + "." + std::string(item->name);
 }
 
@@ -316,24 +324,26 @@ static void CreatePackageSemaphore(const ModuleItem* item, std::string_view pkg,
   ctx.PopScope();
 }
 
-// One package item's storage under its "pk.name" key: every variable
-// declaration at its declared type's shape, with the semaphore, the queue or
-// the associative array its type or dimension declares, and a parameter with
-// an initializer as a 32-bit constant. The initializer is evaluated by
-// InitPackageDataItem once every package's storage exists, except a
-// semaphore's, which its bucket has already taken.
-static void CreatePackageDataItem(const ModuleItem* item, std::string_view pkg,
-                                  SimContext& ctx, Arena& arena) {
-  if (!DeclaresPackageData(item)) return;
+// One data item's storage under its key: every variable declaration at its
+// declared type's shape, with the semaphore, the queue or the array its type
+// or dimension declares, and a parameter with an initializer as a 32-bit
+// constant. The initializer is evaluated by InitPackageDataItem once every
+// scope's storage exists, except a semaphore's, which its bucket has already
+// taken. Answers the interned key, empty for an item declaring no data.
+static std::string_view CreatePackageDataItem(const ModuleItem* item,
+                                              std::string_view pkg,
+                                              SimContext& ctx, Arena& arena) {
+  if (!DeclaresPackageData(item)) return {};
   auto* qname = arena.Create<std::string>(PackageDataKey(item, pkg));
   auto* var = ctx.CreateVariable(*qname, PackageDataWidth(item, *qname, ctx));
-  if (item->kind != ModuleItemKind::kVarDecl) return;
+  if (item->kind != ModuleItemKind::kVarDecl) return *qname;
   ShapePackageVariable(item, var, *qname, ctx, arena);
   if (IsPackageSemaphoreDecl(item)) {
     CreatePackageSemaphore(item, pkg, *qname, ctx, arena);
-    return;
+    return *qname;
   }
   CreatePackageAggregate(item, pkg, *qname, ctx, arena);
+  return *qname;
 }
 
 void CreatePackageDataVariables(const RtlirDesign* design, SimContext& ctx,
@@ -341,6 +351,31 @@ void CreatePackageDataVariables(const RtlirDesign* design, SimContext& ctx,
   for (auto* pkg : design->packages) {
     for (auto* item : pkg->items)
       CreatePackageDataItem(item, pkg->name, ctx, arena);
+  }
+}
+
+// §3.12.1 (printed page 56) with §6.21 (printed 132-133): the compilation-unit
+// scope holds the declarations outside any other scope, and a name referenced
+// in a module that the module's own scope does not declare is searched for in
+// the compilation-unit scope next, so `int g;` written outside every module
+// is one variable every module of the unit reads and writes. Its storage
+// stands under the bare name, the key a top-level module's process resolves
+// a bare reference to and a `$unit::g` is read by (EvalIdentifier reads the
+// identifier's text, the prefix aside); an instance's process stops a bare
+// name at §23.9's module boundary unless the name is one bound outside every
+// module, which SimContext::RegisterImportedName records for an import's
+// alias and records here for the unit's item. No path created the storage
+// before, so a module's write to `g` landed nowhere and a read answered
+// nothing. §26.2 keeps a package from naming the unit's items, so the
+// packages' storage above is created first and the unit's after. A module
+// declaring the same name creates its own storage under the instance's key
+// afterward, which the nearer scope's lookup finds first (§3.12.1).
+void CreateUnitDataVariables(const RtlirDesign* design, SimContext& ctx,
+                             Arena& arena) {
+  if (design->compilation_unit == nullptr) return;
+  for (auto* item : design->compilation_unit->cu_items) {
+    std::string_view key = CreatePackageDataItem(item, {}, ctx, arena);
+    if (!key.empty()) ctx.RegisterImportedName(key);
   }
 }
 
@@ -414,25 +449,41 @@ static void InitPackageDataItem(const ModuleItem* item, std::string_view pkg,
   found->second->value = EvalExpr(item->init_expr, ctx, arena);
 }
 
+// §26.2 with §26.3: the initializers of one scope's items, evaluated in the
+// scope's frame: for a package, the frame a package subroutine's body runs
+// in, which resolves the package's earlier variables, its subroutines and
+// those an import brings in by their bare names
+// (SimContext::FindInPackageScope and FindFunctionInPackageScope); for the
+// compilation unit, whose `pkg` is empty, a frame of no package, through
+// which a bare name reaches the unit's own storage under its bare key.
+static void InitScopeDataItems(const std::vector<ModuleItem*>& items,
+                               std::string_view pkg, SimContext& ctx,
+                               Arena& arena) {
+  ctx.PushScope(pkg);
+  for (auto* item : items) InitPackageDataItem(item, pkg, ctx, arena);
+  ctx.PopScope();
+}
+
 void InitPackageDataVariables(const RtlirDesign* design, SimContext& ctx,
                               Arena& arena) {
-  for (auto* pkg : design->packages) {
-    // §26.2 with §26.3: the initializer is an expression of the package's
-    // scope, reading the package's earlier variables, its subroutines and
-    // those an import brings in by their bare names, which the frame a
-    // package subroutine's body runs in resolves
-    // (SimContext::FindInPackageScope and FindFunctionInPackageScope); the same
-    // frame serves here. §26.6 (printed pages 815-816): a name an import
-    // brings in through another package's export is the original
-    // declaration, bound under the exporter's key by AliasPackageExports
-    // (lowerer_import.cpp), which runs between CreatePackageDataVariables and
-    // this so that p3's `int q = x` after `import p2::*` reads p1's x through
-    // p2's `export p1::*`; evaluated ahead of the exports, it read 0.
-    ctx.PushScope(pkg->name);
-    for (auto* item : pkg->items)
-      InitPackageDataItem(item, pkg->name, ctx, arena);
-    ctx.PopScope();
-  }
+  // §26.6 (printed pages 815-816): a name an import brings in through
+  // another package's export is the original declaration, bound under the
+  // exporter's key by AliasPackageExports (lowerer_import.cpp), which runs
+  // between CreatePackageDataVariables and this so that p3's `int q = x`
+  // after `import p2::*` reads p1's x through p2's `export p1::*`; evaluated
+  // ahead of the exports, it read 0.
+  for (auto* pkg : design->packages)
+    InitScopeDataItems(pkg->items, pkg->name, ctx, arena);
+}
+
+void InitUnitDataVariables(const RtlirDesign* design, SimContext& ctx,
+                           Arena& arena) {
+  // §3.12.1 with §26.2 (printed page 808): a unit item's declaration
+  // assignment is made before any initial or always procedure starts, as a
+  // package's is, and it may read the packages' items an import of the unit
+  // makes visible, so it follows the packages' initializers.
+  if (design->compilation_unit == nullptr) return;
+  InitScopeDataItems(design->compilation_unit->cu_items, {}, ctx, arena);
 }
 
 }  // namespace delta

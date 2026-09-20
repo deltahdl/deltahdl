@@ -176,22 +176,37 @@ void RegisterPackageScopedSubroutines(const RtlirDesign* design,
 // package variable, with or without one, is given storage under its
 // "pk.name" key -- the variable at its declared type's width, state and
 // signedness, a class handle (§8.3) at a handle's 64 bits, a string or real
-// registered as such, an integral variable without an initializer at §6.8's
-// default, a queue or an associative array (§7.10, §7.8) with the object its
-// methods and element selects operate on, a fixed-size array (§7.4.2) with
-// its elements at their defaults, a semaphore (§15.3) with the bucket its
-// methods operate on, holding the keys its declaration's new() names -- so a
-// write through the scope or an import lands and a read through either sees
-// it. The other initializers are left for InitPackageDataVariables. Defined
-// in src/simulator/lowerer_package_data.cpp, as is InitPackageDataVariables.
+// registered as such, a named event (§15.5) marked as one, an integral
+// variable without an initializer at §6.8's default, a queue or an
+// associative array (§7.10, §7.8) with the object its methods and element
+// selects operate on, a fixed-size array (§7.4.2) with its elements at their
+// defaults, a semaphore (§15.3) with the bucket its methods operate on,
+// holding the keys its declaration's new() names -- so a write through the
+// scope or an import lands and a read through either sees it. The other
+// initializers are left for InitPackageDataVariables. Defined in
+// src/simulator/lowerer_package_data.cpp, as are CreateUnitDataVariables,
+// InitPackageDataVariables and InitUnitDataVariables.
 void CreatePackageDataVariables(const RtlirDesign* design, SimContext& ctx,
                                 Arena& arena);
+// §3.12.1 with §6.21: the same for every data item the compilation-unit
+// scope declares, under its bare name, the key a module's bare reference to
+// a name its own scope does not declare resolves to, registered as a name
+// bound outside every module so an instance's reference crosses §23.9's
+// boundary to it. After the packages', which §26.2 keeps from naming the
+// unit's.
+void CreateUnitDataVariables(const RtlirDesign* design, SimContext& ctx,
+                             Arena& arena);
 // §26.2: each package's declaration assignments, evaluated in the package's
 // scope into the storage CreatePackageDataVariables gave them, once every
 // package's storage exists and its exports are bound (AliasPackageExports),
 // a fixed-size array's distributed over its elements then (§7.4.2).
 void InitPackageDataVariables(const RtlirDesign* design, SimContext& ctx,
                               Arena& arena);
+// §3.12.1 with §26.2: the compilation unit's declaration assignments, into
+// the storage CreateUnitDataVariables gave them, after the packages' and
+// before any procedure starts.
+void InitUnitDataVariables(const RtlirDesign* design, SimContext& ctx,
+                           Arena& arena);
 // §26.6: every name a package exports, bound under the exporting package's
 // key to the declaring package's registration -- a subroutine's "pk::name",
 // a variable's, parameter's or enumeration constant's "pk.name" -- once
