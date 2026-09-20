@@ -217,6 +217,7 @@ struct TypeNameFacts {
   std::unordered_map<std::string_view, DataTypeKind>& kinds;
   std::unordered_map<std::string_view, bool>& is_signed;
   std::unordered_map<std::string_view, const DataType*>& layouts;
+  std::unordered_map<std::string_view, std::string_view>& targets;
 };
 
 // What the typedef table has to say about the names in it: the table itself,
@@ -233,16 +234,21 @@ struct TypeNameSources {
 // at its end. The walk is bounded by the table's own size so a table that names
 // itself -- which the elaborator reports elsewhere rather than resolving --
 // cannot spin here.
-static DataTypeKind ResolvedTypeKind(const DataType& dtype,
-                                     const TypedefMap& typedefs) {
+static const DataType& ResolvedType(const DataType& dtype,
+                                    const TypedefMap& typedefs) {
   const DataType* cur = &dtype;
   for (size_t steps = 0; steps <= typedefs.size(); ++steps) {
-    if (cur->kind != DataTypeKind::kNamed) return cur->kind;
+    if (cur->kind != DataTypeKind::kNamed) return *cur;
     auto it = typedefs.find(cur->type_name);
-    if (it == typedefs.end()) return DataTypeKind::kNamed;
+    if (it == typedefs.end()) return *cur;
     cur = &it->second;
   }
-  return DataTypeKind::kNamed;
+  return *cur;
+}
+
+static DataTypeKind ResolvedTypeKind(const DataType& dtype,
+                                     const TypedefMap& typedefs) {
+  return ResolvedType(dtype, typedefs).kind;
 }
 
 // The width the table records for one name. §8.27's forward class declaration
@@ -283,6 +289,12 @@ void PopulateTypeWidths(const TypeNameSources& src, TypeNameFacts& out) {
         TypeNameWidth(dtype, src.typedefs, src.aggregates.count(name) > 0);
     out.kinds[name] = ResolvedTypeKind(dtype, src.typedefs);
     out.is_signed[name] = IsSignedType(dtype, src.typedefs);
+    // §8.3: a chain ending in a name the table does not resolve names a
+    // class, which the simulator finds through this name.
+    const DataType& end = ResolvedType(dtype, src.typedefs);
+    if (end.kind == DataTypeKind::kNamed && end.type_name != name) {
+      out.targets[name] = end.type_name;
+    }
     if (dtype.kind != DataTypeKind::kStruct &&
         dtype.kind != DataTypeKind::kUnion) {
       continue;
@@ -430,7 +442,8 @@ void FinalizeDesignTail(RtlirDesign* design, const CompilationUnit* unit,
                         const TypeNameSources& src,
                         const DesignMetadata& meta) {
   TypeNameFacts facts{design->type_widths, design->type_kinds,
-                      design->type_signed, design->type_layouts};
+                      design->type_signed, design->type_layouts,
+                      design->type_targets};
   PopulateTypeWidths(src, facts);
   CopyDesignMetadata(design, unit, meta);
 }

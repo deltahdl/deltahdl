@@ -81,6 +81,9 @@ void RegisterDesignScopeDpiImports(const RtlirDesign* design, SimContext& ctx);
 // call through the package scope resolution operator resolves by.
 void RegisterPackageScopedSubroutines(const RtlirDesign* design,
                                       SimContext& ctx, Arena& arena);
+// §6.18 with §8.25.1: each typedef name whose chain ends in a class, bound
+// to that class after every class of the design is lowered.
+void RegisterClassTypeAliases(const RtlirDesign* design, SimContext& ctx);
 // §16.8 and §16.12: the module's named sequence and property declarations,
 // which an instance of one is expanded from at the run.
 void RegisterModuleSequenceDecls(const RtlirModule* mod, SimContext& ctx);

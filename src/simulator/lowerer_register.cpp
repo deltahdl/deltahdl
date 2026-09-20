@@ -255,6 +255,18 @@ void RegisterModuleDpiImports(const RtlirModule* mod, SimContext& ctx) {
   RegisterDpiImportDecls(mod->dpi_import_decls, ctx);
 }
 
+// §6.18 with §8.25.1: a typedef name whose chain ends in a class names that
+// class -- `typedef C T;` makes `T::p` the default specialization's `C#()::p`
+// -- so each such name is bound to the class it denotes, once every class of
+// the design is lowered, unless the design declares a class of that name.
+void RegisterClassTypeAliases(const RtlirDesign* design, SimContext& ctx) {
+  for (const auto& [alias, target] : design->type_targets) {
+    if (ctx.FindClassType(alias) != nullptr) continue;
+    ClassTypeInfo* cls = ctx.FindClassType(target);
+    if (cls != nullptr) ctx.RegisterClassType(alias, cls);
+  }
+}
+
 void RegisterDesignScopeDpiImports(const RtlirDesign* design, SimContext& ctx) {
   for (const auto* pkg : design->packages) {
     RegisterDpiImportDecls(pkg->items, ctx);

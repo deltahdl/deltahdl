@@ -238,4 +238,41 @@ TEST(ParameterizedScopeResolutionSim,
             1u);
 }
 
+// §8.25.1 (printed pages 205-206 of ~/LRM.pdf): the unadorned name of a
+// parameterized class denotes its default specialization other than as the
+// prefix of the class scope resolution operator, so `typedef C T;` makes T
+// that specialization and `T::p` is `C#()::p`. The simulator knew a class by
+// its declared name alone, so the typedef name resolved to no class and the
+// read answered 0 while `C#()::p` beside it read 1. A class-body parameter is
+// reached the same way.
+TEST(ParameterizedScopeResolutionSim,
+     ScopeResolutionThroughATypedefOfTheDefaultSpecialization) {
+  EXPECT_EQ(RunAndGet("class C #(int p = 1);\n"
+                      "  parameter int q = 5;\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  typedef C T;\n"
+                      "  int result;\n"
+                      "  initial result = T::p * 100 + T::q * 10 + C#()::p;\n"
+                      "endmodule\n",
+                      "result"),
+            151u);
+}
+
+// §6.18 with §8.9: a typedef of a class with no parameters names the class as
+// well, so a static property is reached through it.
+TEST(ParameterizedScopeResolutionSim,
+     StaticPropertyThroughATypedefOfAPlainClass) {
+  EXPECT_EQ(RunAndGet("class K;\n"
+                      "  static int n = 6;\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  typedef K KT;\n"
+                      "  int result;\n"
+                      "  initial result = KT::n + 30;\n"
+                      "endmodule\n",
+                      "result"),
+            36u);
+}
+
 }  // namespace

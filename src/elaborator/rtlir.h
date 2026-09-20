@@ -733,6 +733,13 @@ struct RtlirDesign {
   // Each entry is an arena-owned copy with its nested aggregate members
   // resolved, so it outlives the elaborator that built it.
   std::unordered_map<std::string_view, const DataType*> type_layouts;
+  // §6.18 with §8.3: the name at the end of the chain of typedefs a name
+  // stands for, recorded for the names whose chain ends in a name the typedef
+  // table does not resolve -- a class. `typedef C T;` makes T the class C
+  // (§8.25.1's default specialization for a parameterized C), and a simulator
+  // that knows a class by its declared name alone has this to find the class
+  // a typedef name denotes, for `T::p` and `T obj`.
+  std::unordered_map<std::string_view, std::string_view> type_targets;
 
   // §32.4.4: the parsed compilation unit and the top module declarations this
   // design was elaborated from. An interconnect delay is annotated between
