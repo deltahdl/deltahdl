@@ -320,8 +320,21 @@ std::unordered_set<std::string_view> CollectMethodLocalNames(
 // holds is in view from each of them. Without the set, a design of two modules
 // reported the compilation unit's one offending method twice, and a package's
 // would have been reported once per module.
+//
+// §8.23 (printed 200-201) lets a class declare a class inside itself, named
+// from outside as `Outer::Inner`, and §8.10 holds over the nested class's
+// static methods as over any class's. The walk read the direct class items of
+// the unit, a module and a package, so `class Outer; class Inner; int k;
+// static function int f(); return k; endfunction endclass endclass` was never
+// reported in any of the three scopes; the nested classes are read here, as
+// ApplyAutoToClassMethods reads them, and the set guards each once.
 void ElaboratorClassRules::ValidateOneClassStaticMethods(const ClassDecl* cls) {
   if (!static_method_bodies_checked_.insert(cls).second) return;
+  for (const auto* m : cls->members) {
+    if (m->kind == ClassMemberKind::kClassDecl && m->nested_class) {
+      ValidateOneClassStaticMethods(m->nested_class);
+    }
+  }
   CheckStaticMethodsForThisSuper(cls, diag_);
 
   std::unordered_set<std::string_view> non_static =

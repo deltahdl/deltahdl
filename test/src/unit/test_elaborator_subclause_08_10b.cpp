@@ -686,4 +686,70 @@ TEST(StaticMethodInPackage, PropertyThroughAStaticPropertyIsAccepted) {
   EXPECT_TRUE(ElabOk(PackageStaticMethodSrc("return m_inst.k;", true)));
 }
 
+// The cases below hold the class inside another class. §8.23 (printed pages
+// 200-201 of ~/LRM.pdf) lets a class declare a class inside itself, named from
+// outside as `Outer::Inner`, and §8.10 (printed 186) states its rule of a
+// class's static method wherever the class is declared.
+// Elaborator::ValidateStaticMethodsAmong in
+// src/elaborator/elaborator_validate_static_methods.cpp read the direct class
+// items of the compilation unit, the module and each package, so a class
+// nested in any of the three was never walked and its static method reading a
+// bare non-static property was never reported.
+//
+// `k` is the non-static property the bare access names and `m_inst` the static
+// handle the accepted form reads it through, as in StaticMethodHandleSrc;
+// `Inner` is the one class holding a method, so `f` is the line the report
+// names.
+std::string NestedClassSrc(const std::string& stmt) {
+  return "class Outer;\n"
+         "  class Inner;\n"
+         "    int k = 9;\n"
+         "    static Inner m_inst;\n"
+         "    static function int f();\n"
+         "      " +
+         stmt +
+         "\n"
+         "    endfunction\n"
+         "  endclass\n"
+         "endclass\n";
+}
+
+// The outer class at the top of the file, inside the module, or inside a
+// package, which are the three item lists the walk reads.
+std::string NestedUnitClassSrc(const std::string& stmt) {
+  return NestedClassSrc(stmt) + "module m;\nendmodule\n";
+}
+
+std::string NestedModuleClassSrc(const std::string& stmt) {
+  return "module m;\n" + NestedClassSrc(stmt) + "endmodule\n";
+}
+
+std::string NestedPackageClassSrc(const std::string& stmt) {
+  return "package p;\n" + NestedClassSrc(stmt) +
+         "endpackage\n"
+         "module m;\n"
+         "  import p::*;\n"
+         "endmodule\n";
+}
+
+TEST(StaticMethodInNestedClass, BarePropertyIsReportedInAUnitClass) {
+  ExpectStaticFunctionFReported(NestedUnitClassSrc("return k;"));
+}
+
+TEST(StaticMethodInNestedClass, BarePropertyIsReportedInAModuleClass) {
+  ExpectStaticFunctionFReported(NestedModuleClassSrc("return k;"));
+}
+
+TEST(StaticMethodInNestedClass, BarePropertyIsReportedInAPackageClass) {
+  ExpectStaticFunctionFReported(NestedPackageClassSrc("return k;"));
+}
+
+// The exemption StaticMethodHandleBases states, kept for a nested class: the
+// property behind the static handle is read through that handle, so a walk
+// that reported every nested static method is told from one reading the body.
+TEST(StaticMethodInNestedClass, PropertyThroughAStaticPropertyIsAccepted) {
+  EXPECT_TRUE(ElabOk(NestedUnitClassSrc("return m_inst.k;")));
+  EXPECT_TRUE(ElabOk(NestedPackageClassSrc("return m_inst.k;")));
+}
+
 }  // namespace
