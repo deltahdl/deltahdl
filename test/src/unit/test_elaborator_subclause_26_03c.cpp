@@ -126,4 +126,46 @@ TEST(PackageImport, GeneratedEnumConstantsOfTwoImportsAreAmbiguous) {
 // 1, the second member of a zero-based enumeration (printed 120). Before,
 // EmitEnumLiteralsOfItems in src/elaborator/elaborator_typedef.cpp walked a
 // package's typedefs alone, so Y had no backing variable in the module and
+// the local parameter did not fold.
+TEST(PackageImport, BareEnumDataDeclarationLiteralsComeThroughAWildcardImport) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "package p;\n"
+      "  enum {X, Y} v;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  import p::*;\n"
+      "  int a = Y;\n"
+      "  localparam int L = Y;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_NE(FindVar(design, "m", "Y"), nullptr);
+  const auto* l = FindParam(design, "m", "L");
+  ASSERT_NE(l, nullptr);
+  EXPECT_TRUE(l->is_resolved);
+  EXPECT_EQ(l->resolved_value, 1);
+}
+
+// A.2.1.3 gives one data declaration several declarators, and §6.19's own
+// `enum {red, yellow, green} light1, light2;` declares its three constants
+// once for the declaration rather than once per name, so the import brings Y
+// in once: the module holds one backing variable for it.
+TEST(PackageImport, ASharedEnumDeclarationImportsItsLiteralsOnce) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "package p;\n"
+      "  enum {X, Y} v, w;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  import p::*;\n"
+      "  int a = Y;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(CountVarsEndingIn(design, "m", "Y"), 1u);
+}
+
 }  // namespace

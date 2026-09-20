@@ -130,4 +130,24 @@ TEST(EnumerationSimulation, StructMemberEnumLiteralOfAModuleReadsAtRuntime) {
             10u);
 }
 
+// §6.19 (printed page 119) has an enumerated type declare its literals as
+// named constants of the scope holding it, and Syntax 6-5 makes the enum form
+// a data_type, so p's `enum {X, Y} v;` declares X and Y in p with no typedef,
+// and §26.3 (printed 810) makes each a candidate the wildcard import brings
+// in: Y * 10 + X is 1 * 10 + 0 = 10. Before, the import's backing variables
+// were emitted for a typedef's enumeration alone, so Y had no storage in the
+// module and read nothing.
+TEST(EnumerationSimulation, PackageBareEnumLiteralReadsThroughAWildcardImport) {
+  EXPECT_EQ(RunAndGet("package p;\n"
+                      "  enum {X, Y} v;\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  import p::*;\n"
+                      "  int observed;\n"
+                      "  initial observed = Y * 10 + X;\n"
+                      "endmodule\n",
+                      "observed"),
+            10u);
+}
+
 }  // namespace

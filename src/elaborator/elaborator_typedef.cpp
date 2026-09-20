@@ -714,10 +714,18 @@ const PackageDecl* FindUnitPackage(const CompilationUnit* unit,
   return nullptr;
 }
 
-// Emits enum-literal backing variables for every enumeration a typedef among
+// Emits enum-literal backing variables for every enumeration an item among
 // `items`, a package's or the compilation unit's, writes and the module does
 // not already define, leaving out the members `explicitly_imported` names
-// (§26.5).
+// (§26.5). §6.19 (printed page 119) has an enumerated type declare its
+// literals as constants of the scope holding it, and Syntax 6-5 makes the enum
+// form a data_type, so a package's `enum {X, Y} v;` declares X and Y in the
+// package as its `typedef enum {X, Y} t;` does, and §26.3 (printed 810) makes
+// each a candidate the wildcard import brings in; ForEachEnumTypeOfItem reaches
+// the type a typedef names and the type of a data declaration alike, and only
+// the typedef's was walked before, so Y read through the import had no backing
+// variable. A.2.1.3 gives one declaration several declarators, each its own
+// item carrying the members again, and the first alone declares them.
 void EmitEnumLiteralsOfItems(
     const std::vector<ModuleItem*>& items, RtlirModule* mod,
     const ImportedEnumCtx& ctx,
@@ -727,21 +735,20 @@ void EmitEnumLiteralsOfItems(
   // already resolved.
   ScopeMap no_scope;
   for (auto* pi : items) {
-    if (pi->kind != ModuleItemKind::kTypedef) continue;
+    if (!pi->first_in_decl_list) continue;
     // §6.19 with §7.2 and §23.9: an enumeration written as the type of a
-    // member of a structure or union the typedef names declares its literals
-    // in the package as one written at the top does, and the wildcard import
-    // brings each in; ForEachEnumTypeIn reaches both.
-    ForEachEnumTypeIn(
-        pi->typedef_type, [&](std::string_view path, const DataType& type) {
-          std::string_view key = EnumTypeKey(pi->name, path, ctx.arena);
-          if (mod->enum_types.count(key) != 0) return;
-          uint32_t width = EvalTypeWidth(type, ctx.typedefs);
-          mod->enum_types[key] =
-              BuildEnumMembers(type.enum_members, width,
-                               {no_scope, ctx.arena, mod, ctx.enum_member_names,
-                                &explicitly_imported});
-        });
+    // member of a structure or union the item's type holds declares its
+    // literals in the package as one written at the top does, and the
+    // wildcard import brings each in; ForEachEnumTypeOfItem reaches both.
+    ForEachEnumTypeOfItem(pi, [&](std::string_view path, const DataType& type) {
+      std::string_view key = EnumTypeKey(pi->name, path, ctx.arena);
+      if (mod->enum_types.count(key) != 0) return;
+      uint32_t width = EvalTypeWidth(type, ctx.typedefs);
+      mod->enum_types[key] =
+          BuildEnumMembers(type.enum_members, width,
+                           {no_scope, ctx.arena, mod, ctx.enum_member_names,
+                            &explicitly_imported});
+    });
   }
 }
 
