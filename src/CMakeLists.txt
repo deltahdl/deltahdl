@@ -1,390 +1,540 @@
-#A static deltahdl_lib is copied whole into everything that links it, and
-#under coverage that is 2, 700 - odd unit - test executables carrying an
-#instrumented copy each : 16 MB apiece, 2.2 GB of build tree per shard, and a
-#link time that dominated what those shards actually spent compiling.A shared
-#library is referenced rather than embedded, so it is linked once and measured
-#once.Coverage is the only configuration that asks for it : the released
-#binary has to stand on its own with nothing beside it, so every other
-#configuration keeps the static form.
-if (DELTAHDL_COVERAGE)
-set(DELTAHDL_LIB_LINKAGE SHARED) else() set(DELTAHDL_LIB_LINKAGE STATIC) endif()
+# A static deltahdl_lib is copied whole into everything that links it, and
+# under coverage that is 2,700-odd unit-test executables carrying an
+# instrumented copy each: 16 MB apiece, 2.2 GB of build tree per shard, and a
+# link time that dominated what those shards actually spent compiling. A shared
+# library is referenced rather than embedded, so it is linked once and measured
+# once. Coverage is the only configuration that asks for it: the released
+# binary has to stand on its own with nothing beside it, so every other
+# configuration keeps the static form.
+if(DELTAHDL_COVERAGE)
+    set(DELTAHDL_LIB_LINKAGE SHARED)
+else()
+    set(DELTAHDL_LIB_LINKAGE STATIC)
+endif()
 
-    add_library(
-        deltahdl_lib ${DELTAHDL_LIB_LINKAGE} common / types.cpp driver /
-        cli_options.cpp common / diagnostic.cpp common /
-        source_mgr.cpp preprocessor / macro_table.cpp preprocessor /
-        preprocessor_join.cpp preprocessor / protect_des.cpp preprocessor /
-        protect_digest.cpp preprocessor /
-        protect_digest_algorithms.cpp preprocessor /
-        protect_digest_block.cpp preprocessor /
-        protect_digest_key.cpp preprocessor /
-        protect_encoding.cpp preprocessor /
-        protect_encoding_codecs.cpp preprocessor /
-        protect_envelope.cpp preprocessor / standard_pragmas.cpp preprocessor /
-        protect_envelope_output.cpp preprocessor /
-        protect_flow.cpp preprocessor / protect_input_line.cpp preprocessor /
-        protect_key_block.cpp preprocessor /
-        protect_key_method.cpp preprocessor /
-        protect_keywords.cpp preprocessor / protect_license.cpp preprocessor /
-        protect_pragma_line.cpp preprocessor / protect_cli.cpp preprocessor /
-        protect_processing.cpp preprocessor /
-        protect_processing_cipher.cpp preprocessor /
-        protect_region_lines.cpp preprocessor /
-        protect_viewport.cpp preprocessor / preprocessor.cpp preprocessor /
-        preprocessor_lines.cpp preprocessor /
-        preprocessor_inline.cpp preprocessor /
-        preprocessor_inline_cond.cpp preprocessor /
-        preprocessor_directives.cpp preprocessor /
-        preprocessor_macros.cpp preprocessor /
-        preprocessor_protect_in_effect.cpp preprocessor /
-        preprocessor_protect_keynames.cpp preprocessor /
-        preprocessor_protect_keys.cpp preprocessor /
-        preprocessor_protect_license.cpp preprocessor /
-        preprocessor_protect_values.cpp preprocessor /
-        preprocessor_protect_viewport.cpp lexer / keywords.cpp lexer /
-        lexer.cpp lexer / string_escape.cpp parser / parser.cpp parser /
-        parser_bind.cpp parser / parser_block_item_decl.cpp parser /
-        parser_timeunit.cpp parser / parser_port.cpp parser /
-        parser_dpi.cpp parser / parser_dpi_validate.cpp parser /
-        parser_aggregate_types.cpp parser / parser_declaration.cpp parser /
-        parser_types.cpp parser / parser_generate.cpp parser /
-        parser_class.cpp parser / parser_class_constraints.cpp parser /
-        parser_class_override.cpp parser / parser_toplevel.cpp parser /
-        expr_parser.cpp parser / expr_substitute.cpp parser /
-        parser_property_spec.cpp parser / expr_parser_aux.cpp parser /
-        expr_parser_patterns.cpp parser / parser_stmt.cpp parser /
-        parser_stmt_block.cpp parser / parser_stmt_loop.cpp parser /
-        parser_assert.cpp parser / parser_sequence_property_decl.cpp parser /
-        parser_sequence_local_var.cpp parser /
-        parser_sequence_linear.cpp parser /
-        sequence_operator_precedence.cpp parser / parser_clocking.cpp parser /
-        parser_verify.cpp parser / parser_randsequence.cpp parser /
-        parser_specify.cpp parser / parser_config.cpp parser /
-        parser_inst.cpp parser / parser_items.cpp parser /
-        parser_modport.cpp parser / parser_items_placement.cpp parser /
-        time_resolve.cpp parser / library_map.cpp parser /
-        precompiled_library.cpp parser / single_pass_compile.cpp parser /
-        assertion_control_task.cpp elaborator / elaborator.cpp elaborator /
-        elaborator_items.cpp elaborator /
-        elaborator_items_checker_rules.cpp elaborator /
-        elaborator_items_udp.cpp elaborator /
-        elaborator_items_scope.cpp elaborator /
-        elaborator_items_assertions.cpp elaborator /
-        elaborator_items_formals.cpp elaborator /
-        elaborator_items_params.cpp elaborator /
-        property_instance.cpp elaborator /
-        semantic_leading_clocks.cpp elaborator /
-        procedural_concurrent_assertion.cpp elaborator /
-        interface_syntax.cpp elaborator / property_rewrite.cpp elaborator /
-        rewrite_algorithm.cpp elaborator / checker_rewrite.cpp elaborator /
-        checker_rewrite_algorithm.cpp elaborator /
-        checker_instantiation.cpp elaborator /
-        checker_context_inference.cpp elaborator /
-        covergroup_in_checker.cpp elaborator /
-        covergroup_inheritance.cpp elaborator /
-        cross_bin_with_covergroup.cpp elaborator /
-        cross_automatic_types.cpp elaborator /
-        cross_set_expression.cpp elaborator /
-        coverpoint_bin_set_expression.cpp elaborator /
-        concurrent_assertion_expr.cpp elaborator /
-        function_in_checker.cpp elaborator / checker_procedures.cpp elaborator /
-        checker_variable_assignment.cpp elaborator /
-        property_instantiation.cpp elaborator / nexttime_index.cpp elaborator /
-        always_range.cpp elaborator / eventually_range.cpp elaborator /
-        clock_flow.cpp elaborator / clock_resolution.cpp elaborator /
-        multiclock_property.cpp elaborator /
-        multiclock_sequence.cpp elaborator / sequence_method.cpp elaborator /
-        multiclock_endpoint.cpp elaborator /
-        sequence_composition.cpp elaborator /
-        semantic_leading_clock.cpp elaborator /
-        sequence_admits_empty.cpp elaborator /
-        sequence_degeneracy.cpp elaborator /
-        sequence_match_class.cpp elaborator /
-        multiclock_sequence_rules.cpp elaborator /
-        disable_iff_resolution.cpp elaborator /
-        inferred_clock_disable.cpp elaborator /
-        sequence_match_attach.cpp elaborator /
-        sequence_repetition.cpp elaborator / sampled_value.cpp elaborator /
-        separate_compilation_bind.cpp elaborator /
-        command_line_bind.cpp elaborator /
-        overridden_sample_method.cpp elaborator /
-        global_clocking_sampled_value.cpp elaborator /
-        global_clock_assertion_event.cpp elaborator /
-        concurrent_assert_action.cpp elaborator /
-        abort_property.cpp elaborator / typed_sequence_formal.cpp elaborator /
-        typed_property_formal.cpp elaborator / let_construct.cpp elaborator /
-        rewrite_item.cpp elaborator / annex_f_notation.cpp elaborator /
-        annex_f_grammar.cpp elaborator /
-        annex_f_sequence_rewrite.cpp elaborator /
-        annex_f_property_rewrite.cpp elaborator /
-        annex_f_tight_satisfaction.cpp elaborator /
-        annex_f_local_variable_flow.cpp elaborator /
-        annex_f_tight_satisfaction_local_variables.cpp elaborator /
-        annex_f_neutral_satisfaction.cpp elaborator /
-        annex_f_neutral_satisfaction_local_variables.cpp elaborator /
-        annex_f_neutral_satisfaction_local_variables_clocked.cpp elaborator /
-        annex_f_finite_word_satisfaction.cpp elaborator /
-        annex_f_finite_word_satisfaction_local_variables.cpp elaborator /
-        annex_f_vacuity.cpp elaborator /
-        annex_f_vacuity_local_variables.cpp elaborator /
-        annex_f_satisfaction_with_local_variables.cpp elaborator /
-        annex_f_satisfaction_without_local_variables.cpp elaborator /
-        annex_f_extended_expressions.cpp elaborator /
-        annex_f_extended_booleans.cpp elaborator / annex_f_past.cpp elaborator /
-        annex_f_future.cpp elaborator / annex_f_derived_forms.cpp elaborator /
-        elaborator_defparam.cpp elaborator / elaborator_gates.cpp elaborator /
-        elaborator_validate_delays.cpp elaborator /
-        elaborator_net_delay.cpp elaborator /
-        elaborator_validate.cpp elaborator /
-        elaborator_validate_classes.cpp elaborator /
-        elaborator_validate_operations.cpp elaborator /
-        elaborator_validate_cast_ops.cpp elaborator /
-        elaborator_validate_const_assign.cpp elaborator /
-        elaborator_validate_timescale.cpp elaborator /
-        elaborator_validate_timescale.cpp elaborator /
-        elaborator_validate_types.cpp elaborator /
-        elaborator_validate_struct_types.cpp elaborator /
-        type_eval.cpp elaborator / type_eval_named.cpp elaborator /
-        type_eval_aggregate.cpp elaborator / const_eval.cpp elaborator /
-        const_eval_bits.cpp elaborator / const_eval_func.cpp elaborator /
-        const_eval_is_constant.cpp elaborator /
-        const_eval_builtin_method.cpp elaborator /
-        const_eval_context.cpp elaborator / const_eval_wide.cpp elaborator /
-        const_eval_wide_arith.cpp elaborator / sensitivity.cpp elaborator /
-        design_scopes.cpp simulator / driver_update.cpp simulator /
-        net.cpp simulator / net_strength.cpp simulator /
-        switch_network.cpp simulator / scheduler.cpp simulator /
-        process.cpp simulator / variable.cpp simulator /
-        virtual_interface.cpp simulator / eval_semaphore.cpp simulator /
-        eval_class_sync.cpp simulator / eval_mailbox.cpp simulator /
-        queue_bound.cpp simulator / sim_context.cpp simulator /
-        cover_results.cpp simulator / scope_hier_name.cpp simulator /
-        sim_context_binding.cpp simulator / sim_context_fileio.cpp simulator /
-        output_log.cpp simulator / sim_context_vcd.cpp simulator /
-        vcd_dump_state.cpp simulator / class_object.cpp simulator /
-        evaluation.cpp simulator / evaluation_literal.cpp simulator /
-        eval_ternary.cpp simulator / eval_class_new.cpp simulator /
-        eval_class_params.cpp simulator / eval_function.cpp simulator /
-        eval_function_hier.cpp simulator / eval_call_result.cpp simulator /
-        eval_class_scope_types.cpp simulator /
-        eval_process_methods.cpp simulator / eval_randomize.cpp simulator /
-        eval_randomize_blocks.cpp simulator /
-        eval_randomize_custom.cpp simulator /
-        eval_randomize_dist.cpp simulator /
-        eval_randomize_dynamic.cpp simulator /
-        eval_randomize_guard.cpp simulator /
-        eval_randomize_inline.cpp simulator /
-        eval_randomize_iterative.cpp simulator /
-        eval_randomize_joint.cpp simulator /
-        eval_randomize_membership.cpp simulator /
-        eval_randomize_mode.cpp simulator / eval_instance_task.cpp simulator /
-        eval_static_method.cpp simulator / sequence_flatten.cpp simulator /
-        sequence_monitor.cpp simulator / eval_systask.cpp simulator /
-        eval_expr.cpp simulator / eval_expr_assign_ops.cpp simulator /
-        eval_expr_cast.cpp simulator / eval_member_path.cpp simulator /
-        eval_enum.cpp simulator / eval_array.cpp simulator /
-        eval_class_array.cpp simulator /
-        eval_class_array_handles.cpp simulator /
-        eval_assoc_class_handles.cpp simulator / assoc_element.cpp simulator /
-        eval_array_assoc.cpp simulator / eval_array_class_assoc.cpp simulator /
-        eval_array_class_queue.cpp simulator / eval_string.cpp simulator /
-        eval_struct_property.cpp simulator / eval_math.cpp simulator /
-        probabilistic_distribution.cpp simulator / eval_fileio.cpp simulator /
-        eval_format.cpp simulator / stmt_exec.cpp simulator /
-        stmt_exec_deferred.cpp simulator / systf_call_statement.cpp simulator /
-        statement_assign.cpp simulator /
-        statement_assign_compound.cpp simulator /
-        statement_assign_core.cpp simulator /
-        statement_assign_object.cpp simulator /
-        statement_assign_pattern.cpp simulator /
-        statement_assign_nonblocking.cpp simulator /
-        assertion_read_names.cpp simulator / lowerer.cpp simulator /
-        lowerer_child.cpp simulator / lowerer_clocking.cpp simulator /
-        lowerer_contassign.cpp simulator / lowerer_udp.cpp simulator /
-        lowerer_register.cpp simulator / lowerer_package_data.cpp simulator /
-        lowerer_sequence_monitors.cpp simulator /
-        expect_statement.cpp simulator / procedural_assertion.cpp simulator /
-        property_attempts.cpp simulator /
-        property_instance_lookup.cpp simulator /
-        property_vacuity.cpp simulator / property_clocks.cpp simulator /
-        property_finish.cpp simulator / lowerer_process.cpp simulator /
-        lowerer_inst.cpp simulator / lowerer_import.cpp simulator /
-        lowerer_alias_kinds.cpp simulator /
-        lowerer_package_class_vars.cpp simulator / vcd_writer.cpp simulator /
-        vcd_writer_port.cpp simulator / adv_sim.cpp simulator /
-        vpi.cpp simulator / clocking.cpp simulator /
-        checker_instance_scheduling.cpp simulator /
-        checker_scheduling_semantics.cpp simulator /
-        checker_variable_randomization.cpp simulator / assertion.cpp simulator /
-        sva_engine.cpp simulator / coverage.cpp simulator /
-        dpi_c_type.cpp simulator / dpi_context.cpp simulator /
-        dpi_include_file.cpp simulator / foreign_code.cpp simulator /
-        dpi_side.cpp simulator / dpi_time.cpp simulator /
-        dpi_runtime.cpp simulator / compiled_sim.cpp simulator /
-        mt_sim.cpp simulator / constraint_solver.cpp simulator /
-        module_path_delay.cpp simulator / module_path_drive.cpp simulator /
-        specify.cpp simulator / specify_condition_text.cpp simulator /
-        specify_pulse.cpp simulator / specify_register.cpp simulator /
-        specify_timing_check.cpp simulator /
-        specify_interconnect.cpp simulator /
-        specify_timing_violation.cpp simulator / udp_eval.cpp simulator /
-        sdf_parser.cpp simulator / svdpi.cpp simulator /
-        svdpi_sv31a.cpp simulator / sv_vpi_user.cpp synthesizer /
-        aig.cpp synthesizer / synth_lower.cpp synthesizer /
-        synth_lower_check.cpp synthesizer /
-        synth_lower_compare.cpp synthesizer /
-        synth_lower_concat.cpp synthesizer /
-        synth_lower_dotted_name.cpp synthesizer /
-        synth_lower_select.cpp synthesizer / synth_lower_shift.cpp synthesizer /
-        synth_lower_unary.cpp synthesizer / synth_pattern.cpp synthesizer /
-        aig_opt.cpp synthesizer / lut_map.cpp synthesizer /
-        liberty.cpp synthesizer / cell_map.cpp synthesizer /
-        netlist_writer.cpp synthesizer / adv_synth.cpp synthesizer /
-        mem_infer.cpp elaborator / elaborator_bind.cpp elaborator /
-        elaborator_cont_assign.cpp elaborator /
-        elaborator_decls.cpp elaborator / elaborator_decls_var.cpp elaborator /
-        elaborator_dpi.cpp elaborator / elaborator_dpi_formals.cpp elaborator /
-        elaborator_dpi_names.cpp elaborator /
-        elaborator_dpi_signature.cpp elaborator /
-        elaborator_generate.cpp elaborator /
-        elaborator_generate_naming.cpp elaborator /
-        elaborator_generate_scope.cpp elaborator /
-        elaborator_import.cpp elaborator /
-        elaborator_module_inst.cpp elaborator /
-        elaborator_module.cpp elaborator /
-        elaborator_module_params.cpp elaborator /
-        elaborator_module_ports.cpp elaborator /
-        elaborator_port_binding.cpp elaborator /
-        elaborator_port_binding_nets.cpp elaborator /
-        elaborator_port_binding_checks.cpp elaborator /
-        elaborator_process.cpp elaborator /
-        elaborator_process_validate.cpp elaborator /
-        elaborator_resolve.cpp elaborator / std_package.cpp elaborator /
-        elaborator_scope_rules.cpp elaborator /
-        elaborator_scope_rules_enclosing.cpp elaborator /
-        elaborator_scope_rules_hier.cpp elaborator /
-        elaborator_scope_rules_imports.cpp elaborator /
-        elaborator_scope_rules_names.cpp elaborator /
-        elaborator_enum_constants.cpp elaborator /
-        elaborator_typedef.cpp elaborator /
-        elaborator_validate_class_array_assign.cpp elaborator /
-        elaborator_validate_class_array_index.cpp elaborator /
-        elaborator_validate_class_constraints.cpp elaborator /
-        elaborator_validate_class_constraint_methods.cpp elaborator /
-        elaborator_validate_class_handles.cpp elaborator /
-        elaborator_validate_class_inheritance.cpp elaborator /
-        elaborator_validate_class_overrides.cpp elaborator /
-        elaborator_validate_class_members.cpp elaborator /
-        elaborator_validate_class_nesting.cpp elaborator /
-        elaborator_validate_class_outofblock.cpp elaborator /
-        elaborator_validate_clocking.cpp elaborator /
-        elaborator_validate_global_clocking.cpp elaborator /
-        elaborator_validate_assertion_actions.cpp elaborator /
-        elaborator_validate_checker_refs.cpp elaborator /
-        elaborator_validate_config.cpp elaborator /
-        elaborator_validate_config_rules.cpp elaborator /
-        elaborator_validate_datatype_ops.cpp elaborator /
-        elaborator_validate_getpattern.cpp elaborator /
-        elaborator_validate_funcbody.cpp elaborator /
-        elaborator_validate_funcchecks.cpp elaborator /
-        elaborator_validate_hier_refs.cpp elaborator /
-        elaborator_validate_interface.cpp elaborator /
-        elaborator_validate_jump_statements.cpp elaborator /
-        elaborator_validate_matches.cpp elaborator /
-        elaborator_validate_operations_arrays.cpp elaborator /
-        elaborator_validate_operations_streaming.cpp elaborator /
-        elaborator_validate_queries.cpp elaborator /
-        elaborator_validate_queries_dims.cpp elaborator /
-        elaborator_validate_randsequence.cpp elaborator /
-        elaborator_validate_specify.cpp elaborator /
-        elaborator_validate_specify_limits.cpp elaborator /
-        elaborator_validate_static_methods.cpp elaborator /
-        elaborator_validate_subroutine.cpp elaborator /
-        elaborator_validate_scope_randomize.cpp elaborator /
-        elaborator_validate_subroutine_args.cpp elaborator /
-        elaborator_validate_std_prototypes.cpp elaborator /
-        queue_dim.cpp lexer / lexer_numbers.cpp lexer /
-        lexer_operators.cpp parser / expr_parser_calls.cpp parser /
-        expr_parser_literals.cpp parser /
-        parser_package_import_export.cpp parser / parser_udp.cpp simulator /
-        constraint_solver_dist.cpp simulator /
-        constraint_solver_eval.cpp simulator /
-        constraint_solver_propagate.cpp simulator /
-        constraint_solver_randc.cpp simulator /
-        constraint_solver_repair.cpp simulator /
-        constraint_solver_sizes.cpp simulator /
-        constraint_solver_soft.cpp simulator /
-        constraint_solver_solve.cpp simulator / coverage_bins.cpp simulator /
-        coverage_cross.cpp simulator / coverage_db.cpp simulator /
-        coverage_options.cpp simulator / declared_class_key.cpp simulator /
-        dpi_runtime_assertion.cpp simulator /
-        dpi_runtime_global_names.cpp simulator /
-        dpi_runtime_export_call.cpp simulator /
-        dpi_runtime_open_array.cpp simulator / dpi_runtime_scope.cpp simulator /
-        eval_array_locator.cpp simulator / eval_array_queue.cpp simulator /
-        eval_function_args.cpp simulator /
-        eval_function_args_scoped.cpp simulator /
-        eval_function_args_sync.cpp simulator /
-        eval_function_args_tagged.cpp simulator /
-        eval_function_args_writeback.cpp simulator /
-        eval_function_body.cpp simulator /
-        eval_function_body_assign.cpp simulator /
-        eval_function_dpi.cpp simulator / eval_let.cpp simulator /
-        eval_select.cpp simulator / eval_streaming.cpp simulator /
-        eval_systask_io.cpp simulator / eval_systask_scanf.cpp simulator /
-        eval_systask_pla.cpp simulator / eval_systask_query.cpp simulator /
-        eval_systask_readmem.cpp simulator /
-        eval_systask_readmem_scan.cpp simulator /
-        eval_systask_writemem.cpp simulator / eval_systask_verif.cpp simulator /
-        eval_system_func.cpp simulator / eval_systask_time.cpp simulator /
-        eval_system_task.cpp simulator / eval_system_task_dump.cpp simulator /
-        evaluation_ops.cpp simulator / wide_arith.cpp simulator /
-        lowerer_class.cpp simulator / lowerer_data_init.cpp simulator /
-        lowerer_var.cpp simulator / lowerer_var_layout.cpp simulator /
-        sync_variable.cpp simulator / sdf_annotate.cpp simulator /
-        sdf_annotate_entry.cpp simulator / sdf_annotate_task.cpp simulator /
-        sim_context_classgc.cpp simulator /
-        sim_context_name_tables.cpp simulator /
-        sim_context_random_stability.cpp simulator /
-        sim_context_systask_state.cpp simulator /
-        statement_assign_decl.cpp simulator /
-        statement_assign_force.cpp simulator /
-        statement_assign_select.cpp simulator /
-        statement_assign_stream.cpp simulator /
-        stmt_exec_control.cpp simulator / timing_check_driver.cpp simulator /
-        timing_check_pulse.cpp simulator / timing_check_skew.cpp simulator /
-        timing_check_stability.cpp simulator /
-        stmt_exec_randsequence.cpp simulator /
-        stmt_exec_randsequence_values.cpp simulator /
-        stmt_exec_class_task.cpp simulator / stmt_exec_wait.cpp simulator /
-        sva_engine_properties.cpp simulator /
-        sva_engine_sampling.cpp simulator / sva_engine_sequences.cpp simulator /
-        vlog_startup_routines.cpp simulator / vpi_assertion_cb.cpp simulator /
-        vpi_assertion_control.cpp simulator / vpi_callbacks.cpp simulator /
-        vpi_compatibility.cpp simulator / vpi_control.cpp simulator /
-        vpi_design_attach.cpp simulator / vpi_handle.cpp simulator /
-        vpi_handle_statements.cpp simulator /
-        vpi_helpers_assertions.cpp simulator /
-        vpi_helpers_instance.cpp simulator / vpi_helpers_loops.cpp simulator /
-        vpi_helpers_nets.cpp simulator / vpi_helpers_statements.cpp simulator /
-        vpi_helpers_timing_controls.cpp simulator /
-        vpi_helpers_variables.cpp simulator / vpi_include_file.cpp simulator /
-        vpi_iterate.cpp simulator / vpi_query.cpp simulator /
-        vpi_query_str.cpp simulator / vpi_systf.cpp simulator /
-        vpi_systf_build.cpp simulator / vpi_value_array.cpp simulator /
-        vpi_value.cpp)
+add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
+    common/types.cpp
+    driver/cli_options.cpp
+    common/diagnostic.cpp
+    common/source_mgr.cpp
+    preprocessor/macro_table.cpp
+    preprocessor/preprocessor_join.cpp
+    preprocessor/protect_des.cpp
+    preprocessor/protect_digest.cpp
+    preprocessor/protect_digest_algorithms.cpp
+    preprocessor/protect_digest_block.cpp
+    preprocessor/protect_digest_key.cpp
+    preprocessor/protect_encoding.cpp
+    preprocessor/protect_encoding_codecs.cpp
+    preprocessor/protect_envelope.cpp
+    preprocessor/standard_pragmas.cpp
+    preprocessor/protect_envelope_output.cpp
+    preprocessor/protect_flow.cpp
+    preprocessor/protect_input_line.cpp
+    preprocessor/protect_key_block.cpp
+    preprocessor/protect_key_method.cpp
+    preprocessor/protect_keywords.cpp
+    preprocessor/protect_license.cpp
+    preprocessor/protect_pragma_line.cpp
+    preprocessor/protect_cli.cpp
+    preprocessor/protect_processing.cpp
+    preprocessor/protect_processing_cipher.cpp
+    preprocessor/protect_region_lines.cpp
+    preprocessor/protect_viewport.cpp
+    preprocessor/preprocessor.cpp
+    preprocessor/preprocessor_lines.cpp
+    preprocessor/preprocessor_inline.cpp
+    preprocessor/preprocessor_inline_cond.cpp
+    preprocessor/preprocessor_directives.cpp
+    preprocessor/preprocessor_macros.cpp
+    preprocessor/preprocessor_protect_in_effect.cpp
+    preprocessor/preprocessor_protect_keynames.cpp
+    preprocessor/preprocessor_protect_keys.cpp
+    preprocessor/preprocessor_protect_license.cpp
+    preprocessor/preprocessor_protect_values.cpp
+    preprocessor/preprocessor_protect_viewport.cpp
+    lexer/keywords.cpp
+    lexer/lexer.cpp
+    lexer/string_escape.cpp
+    parser/parser.cpp
+    parser/parser_bind.cpp
+    parser/parser_block_item_decl.cpp
+    parser/parser_timeunit.cpp
+    parser/parser_port.cpp
+    parser/parser_dpi.cpp
+    parser/parser_dpi_validate.cpp
+    parser/parser_aggregate_types.cpp
+    parser/parser_declaration.cpp
+    parser/parser_types.cpp
+    parser/parser_generate.cpp
+    parser/parser_class.cpp
+    parser/parser_class_constraints.cpp
+    parser/parser_class_override.cpp
+    parser/parser_toplevel.cpp
+    parser/expr_parser.cpp
+    parser/expr_substitute.cpp
+    parser/parser_property_spec.cpp
+    parser/expr_parser_aux.cpp
+    parser/expr_parser_patterns.cpp
+    parser/parser_stmt.cpp
+    parser/parser_stmt_block.cpp
+    parser/parser_stmt_loop.cpp
+    parser/parser_assert.cpp
+    parser/parser_sequence_property_decl.cpp
+    parser/parser_sequence_local_var.cpp
+    parser/parser_sequence_linear.cpp
+    parser/sequence_operator_precedence.cpp
+    parser/parser_clocking.cpp
+    parser/parser_verify.cpp
+    parser/parser_randsequence.cpp
+    parser/parser_specify.cpp
+    parser/parser_config.cpp
+    parser/parser_inst.cpp
+    parser/parser_items.cpp
+    parser/parser_modport.cpp
+    parser/parser_items_placement.cpp
+    parser/time_resolve.cpp
+    parser/library_map.cpp
+    parser/precompiled_library.cpp
+    parser/single_pass_compile.cpp
+    parser/assertion_control_task.cpp
+    elaborator/elaborator.cpp
+    elaborator/elaborator_items.cpp
+    elaborator/elaborator_items_checker_rules.cpp
+    elaborator/elaborator_items_udp.cpp
+    elaborator/elaborator_items_scope.cpp
+    elaborator/elaborator_items_assertions.cpp
+    elaborator/elaborator_items_formals.cpp
+    elaborator/elaborator_items_params.cpp
+    elaborator/property_instance.cpp
+    elaborator/semantic_leading_clocks.cpp
+    elaborator/procedural_concurrent_assertion.cpp
+    elaborator/interface_syntax.cpp
+    elaborator/property_rewrite.cpp
+    elaborator/rewrite_algorithm.cpp
+    elaborator/checker_rewrite.cpp
+    elaborator/checker_rewrite_algorithm.cpp
+    elaborator/checker_instantiation.cpp
+    elaborator/checker_context_inference.cpp
+    elaborator/covergroup_in_checker.cpp
+    elaborator/covergroup_inheritance.cpp
+    elaborator/cross_bin_with_covergroup.cpp
+    elaborator/cross_automatic_types.cpp
+    elaborator/cross_set_expression.cpp
+    elaborator/coverpoint_bin_set_expression.cpp
+    elaborator/concurrent_assertion_expr.cpp
+    elaborator/function_in_checker.cpp
+    elaborator/checker_procedures.cpp
+    elaborator/checker_variable_assignment.cpp
+    elaborator/property_instantiation.cpp
+    elaborator/nexttime_index.cpp
+    elaborator/always_range.cpp
+    elaborator/eventually_range.cpp
+    elaborator/clock_flow.cpp
+    elaborator/clock_resolution.cpp
+    elaborator/multiclock_property.cpp
+    elaborator/multiclock_sequence.cpp
+    elaborator/sequence_method.cpp
+    elaborator/multiclock_endpoint.cpp
+    elaborator/sequence_composition.cpp
+    elaborator/semantic_leading_clock.cpp
+    elaborator/sequence_admits_empty.cpp
+    elaborator/sequence_degeneracy.cpp
+    elaborator/sequence_match_class.cpp
+    elaborator/multiclock_sequence_rules.cpp
+    elaborator/disable_iff_resolution.cpp
+    elaborator/inferred_clock_disable.cpp
+    elaborator/sequence_match_attach.cpp
+    elaborator/sequence_repetition.cpp
+    elaborator/sampled_value.cpp
+    elaborator/separate_compilation_bind.cpp
+    elaborator/command_line_bind.cpp
+    elaborator/overridden_sample_method.cpp
+    elaborator/global_clocking_sampled_value.cpp
+    elaborator/global_clock_assertion_event.cpp
+    elaborator/concurrent_assert_action.cpp
+    elaborator/abort_property.cpp
+    elaborator/typed_sequence_formal.cpp
+    elaborator/typed_property_formal.cpp
+    elaborator/let_construct.cpp
+    elaborator/rewrite_item.cpp
+    elaborator/annex_f_notation.cpp
+    elaborator/annex_f_grammar.cpp
+    elaborator/annex_f_sequence_rewrite.cpp
+    elaborator/annex_f_property_rewrite.cpp
+    elaborator/annex_f_tight_satisfaction.cpp
+    elaborator/annex_f_local_variable_flow.cpp
+    elaborator/annex_f_tight_satisfaction_local_variables.cpp
+    elaborator/annex_f_neutral_satisfaction.cpp
+    elaborator/annex_f_neutral_satisfaction_local_variables.cpp
+    elaborator/annex_f_neutral_satisfaction_local_variables_clocked.cpp
+    elaborator/annex_f_finite_word_satisfaction.cpp
+    elaborator/annex_f_finite_word_satisfaction_local_variables.cpp
+    elaborator/annex_f_vacuity.cpp
+    elaborator/annex_f_vacuity_local_variables.cpp
+    elaborator/annex_f_satisfaction_with_local_variables.cpp
+    elaborator/annex_f_satisfaction_without_local_variables.cpp
+    elaborator/annex_f_extended_expressions.cpp
+    elaborator/annex_f_extended_booleans.cpp
+    elaborator/annex_f_past.cpp
+    elaborator/annex_f_future.cpp
+    elaborator/annex_f_derived_forms.cpp
+    elaborator/elaborator_defparam.cpp
+    elaborator/elaborator_gates.cpp
+    elaborator/elaborator_validate_delays.cpp
+    elaborator/elaborator_net_delay.cpp
+    elaborator/elaborator_validate.cpp
+    elaborator/elaborator_validate_classes.cpp
+    elaborator/elaborator_validate_operations.cpp
+    elaborator/elaborator_validate_cast_ops.cpp
+    elaborator/elaborator_validate_const_assign.cpp
+    elaborator/elaborator_validate_timescale.cpp
+    elaborator/elaborator_validate_timescale.cpp
+    elaborator/elaborator_validate_types.cpp
+    elaborator/elaborator_validate_struct_types.cpp
+    elaborator/type_eval.cpp
+    elaborator/type_eval_named.cpp
+    elaborator/type_eval_aggregate.cpp
+    elaborator/const_eval.cpp
+    elaborator/const_eval_bits.cpp
+    elaborator/const_eval_func.cpp
+    elaborator/const_eval_is_constant.cpp
+    elaborator/const_eval_builtin_method.cpp
+    elaborator/const_eval_context.cpp
+    elaborator/const_eval_wide.cpp
+    elaborator/const_eval_wide_arith.cpp
+    elaborator/sensitivity.cpp
+    elaborator/design_scopes.cpp
+    simulator/driver_update.cpp
+    simulator/net.cpp
+    simulator/net_strength.cpp
+    simulator/switch_network.cpp
+    simulator/scheduler.cpp
+    simulator/process.cpp
+    simulator/variable.cpp
+    simulator/virtual_interface.cpp
+    simulator/eval_semaphore.cpp
+    simulator/eval_class_sync.cpp
+    simulator/eval_mailbox.cpp
+    simulator/queue_bound.cpp
+    simulator/sim_context.cpp
+    simulator/cover_results.cpp
+    simulator/scope_hier_name.cpp
+    simulator/sim_context_binding.cpp
+    simulator/sim_context_fileio.cpp
+    simulator/output_log.cpp
+    simulator/sim_context_vcd.cpp
+    simulator/vcd_dump_state.cpp
+    simulator/class_object.cpp
+    simulator/evaluation.cpp
+    simulator/evaluation_literal.cpp
+    simulator/eval_ternary.cpp
+    simulator/eval_class_new.cpp
+    simulator/eval_class_params.cpp
+    simulator/eval_function.cpp
+    simulator/eval_function_hier.cpp
+    simulator/eval_call_result.cpp
+    simulator/eval_class_scope_types.cpp
+    simulator/eval_process_methods.cpp
+    simulator/eval_randomize.cpp
+    simulator/eval_randomize_blocks.cpp
+    simulator/eval_randomize_custom.cpp
+    simulator/eval_randomize_dist.cpp
+    simulator/eval_randomize_dynamic.cpp
+    simulator/eval_randomize_guard.cpp
+    simulator/eval_randomize_inline.cpp
+    simulator/eval_randomize_iterative.cpp
+    simulator/eval_randomize_joint.cpp
+    simulator/eval_randomize_membership.cpp
+    simulator/eval_randomize_mode.cpp
+    simulator/eval_instance_task.cpp
+    simulator/eval_static_method.cpp
+    simulator/sequence_flatten.cpp
+    simulator/sequence_monitor.cpp
+    simulator/eval_systask.cpp
+    simulator/eval_expr.cpp
+    simulator/eval_expr_assign_ops.cpp
+    simulator/eval_expr_cast.cpp
+    simulator/eval_member_path.cpp
+    simulator/eval_enum.cpp
+    simulator/eval_array.cpp
+    simulator/eval_class_array.cpp
+    simulator/eval_class_array_handles.cpp
+    simulator/eval_assoc_class_handles.cpp
+    simulator/assoc_element.cpp
+    simulator/eval_array_assoc.cpp
+    simulator/eval_array_class_assoc.cpp
+    simulator/eval_array_class_queue.cpp
+    simulator/eval_string.cpp
+    simulator/eval_struct_property.cpp
+    simulator/eval_math.cpp
+    simulator/probabilistic_distribution.cpp
+    simulator/eval_fileio.cpp
+    simulator/eval_format.cpp
+    simulator/stmt_exec.cpp
+    simulator/stmt_exec_deferred.cpp
+    simulator/systf_call_statement.cpp
+    simulator/statement_assign.cpp
+    simulator/statement_assign_compound.cpp
+    simulator/statement_assign_core.cpp
+    simulator/statement_assign_object.cpp
+    simulator/statement_assign_pattern.cpp
+    simulator/statement_assign_nonblocking.cpp
+    simulator/assertion_read_names.cpp
+    simulator/lowerer.cpp
+    simulator/lowerer_child.cpp
+    simulator/lowerer_clocking.cpp
+    simulator/lowerer_contassign.cpp
+    simulator/lowerer_udp.cpp
+    simulator/lowerer_register.cpp
+    simulator/lowerer_package_data.cpp
+    simulator/lowerer_sequence_monitors.cpp
+    simulator/expect_statement.cpp
+    simulator/procedural_assertion.cpp
+    simulator/property_attempts.cpp
+    simulator/property_instance_lookup.cpp
+    simulator/property_vacuity.cpp
+    simulator/property_clocks.cpp
+    simulator/property_finish.cpp
+    simulator/lowerer_process.cpp
+    simulator/lowerer_inst.cpp
+    simulator/lowerer_import.cpp
+    simulator/lowerer_alias_kinds.cpp
+    simulator/lowerer_package_class_vars.cpp
+    simulator/vcd_writer.cpp
+    simulator/vcd_writer_port.cpp
+    simulator/adv_sim.cpp
+    simulator/vpi.cpp
+    simulator/clocking.cpp
+    simulator/checker_instance_scheduling.cpp
+    simulator/checker_scheduling_semantics.cpp
+    simulator/checker_variable_randomization.cpp
+    simulator/assertion.cpp
+    simulator/sva_engine.cpp
+    simulator/coverage.cpp
+    simulator/dpi_c_type.cpp
+    simulator/dpi_context.cpp
+    simulator/dpi_include_file.cpp
+    simulator/foreign_code.cpp
+    simulator/dpi_side.cpp
+    simulator/dpi_time.cpp
+    simulator/dpi_runtime.cpp
+    simulator/compiled_sim.cpp
+    simulator/mt_sim.cpp
+    simulator/constraint_solver.cpp
+    simulator/module_path_delay.cpp
+    simulator/module_path_drive.cpp
+    simulator/specify.cpp
+    simulator/specify_condition_text.cpp
+    simulator/specify_pulse.cpp
+    simulator/specify_register.cpp
+    simulator/specify_timing_check.cpp
+    simulator/specify_interconnect.cpp
+    simulator/specify_timing_violation.cpp
+    simulator/udp_eval.cpp
+    simulator/sdf_parser.cpp
+    simulator/svdpi.cpp
+    simulator/svdpi_sv31a.cpp
+    simulator/sv_vpi_user.cpp
+    synthesizer/aig.cpp
+    synthesizer/synth_lower.cpp
+    synthesizer/synth_lower_check.cpp
+    synthesizer/synth_lower_compare.cpp
+    synthesizer/synth_lower_concat.cpp
+    synthesizer/synth_lower_dotted_name.cpp
+    synthesizer/synth_lower_select.cpp
+    synthesizer/synth_lower_shift.cpp
+    synthesizer/synth_lower_unary.cpp
+    synthesizer/synth_pattern.cpp
+    synthesizer/aig_opt.cpp
+    synthesizer/lut_map.cpp
+    synthesizer/liberty.cpp
+    synthesizer/cell_map.cpp
+    synthesizer/netlist_writer.cpp
+    synthesizer/adv_synth.cpp
+    synthesizer/mem_infer.cpp
+    elaborator/elaborator_bind.cpp
+    elaborator/elaborator_cont_assign.cpp
+    elaborator/elaborator_decls.cpp
+    elaborator/elaborator_decls_var.cpp
+    elaborator/elaborator_dpi.cpp
+    elaborator/elaborator_dpi_formals.cpp
+    elaborator/elaborator_dpi_names.cpp
+    elaborator/elaborator_dpi_signature.cpp
+    elaborator/elaborator_generate.cpp
+    elaborator/elaborator_generate_naming.cpp
+    elaborator/elaborator_generate_scope.cpp
+    elaborator/elaborator_import.cpp
+    elaborator/elaborator_module_inst.cpp
+    elaborator/elaborator_module.cpp
+    elaborator/elaborator_module_params.cpp
+    elaborator/elaborator_module_ports.cpp
+    elaborator/elaborator_port_binding.cpp
+    elaborator/elaborator_port_binding_nets.cpp
+    elaborator/elaborator_port_binding_checks.cpp
+    elaborator/elaborator_process.cpp
+    elaborator/elaborator_process_validate.cpp
+    elaborator/elaborator_resolve.cpp
+    elaborator/std_package.cpp
+    elaborator/elaborator_scope_rules.cpp
+    elaborator/elaborator_scope_rules_enclosing.cpp
+    elaborator/elaborator_scope_rules_hier.cpp
+    elaborator/elaborator_scope_rules_imports.cpp
+    elaborator/elaborator_scope_rules_names.cpp
+    elaborator/elaborator_enum_constants.cpp
+    elaborator/elaborator_typedef.cpp
+    elaborator/elaborator_validate_class_array_assign.cpp
+    elaborator/elaborator_validate_class_array_index.cpp
+    elaborator/elaborator_validate_class_constraints.cpp
+    elaborator/elaborator_validate_class_constraint_methods.cpp
+    elaborator/elaborator_validate_class_handles.cpp
+    elaborator/elaborator_validate_class_inheritance.cpp
+    elaborator/elaborator_validate_class_overrides.cpp
+    elaborator/elaborator_validate_class_members.cpp
+    elaborator/elaborator_validate_class_nesting.cpp
+    elaborator/elaborator_validate_class_outofblock.cpp
+    elaborator/elaborator_validate_clocking.cpp
+    elaborator/elaborator_validate_global_clocking.cpp
+    elaborator/elaborator_validate_assertion_actions.cpp
+    elaborator/elaborator_validate_checker_refs.cpp
+    elaborator/elaborator_validate_config.cpp
+    elaborator/elaborator_validate_config_rules.cpp
+    elaborator/elaborator_validate_datatype_ops.cpp
+    elaborator/elaborator_validate_getpattern.cpp
+    elaborator/elaborator_validate_funcbody.cpp
+    elaborator/elaborator_validate_funcchecks.cpp
+    elaborator/elaborator_validate_hier_refs.cpp
+    elaborator/elaborator_validate_interface.cpp
+    elaborator/elaborator_validate_jump_statements.cpp
+    elaborator/elaborator_validate_matches.cpp
+    elaborator/elaborator_validate_operations_arrays.cpp
+    elaborator/elaborator_validate_operations_streaming.cpp
+    elaborator/elaborator_validate_queries.cpp
+    elaborator/elaborator_validate_queries_dims.cpp
+    elaborator/elaborator_validate_randsequence.cpp
+    elaborator/elaborator_validate_specify.cpp
+    elaborator/elaborator_validate_specify_limits.cpp
+    elaborator/elaborator_validate_static_methods.cpp
+    elaborator/elaborator_validate_subroutine.cpp
+    elaborator/elaborator_validate_scope_randomize.cpp
+    elaborator/elaborator_validate_subroutine_args.cpp
+    elaborator/elaborator_validate_std_prototypes.cpp
+    elaborator/queue_dim.cpp
+    lexer/lexer_numbers.cpp
+    lexer/lexer_operators.cpp
+    parser/expr_parser_calls.cpp
+    parser/expr_parser_literals.cpp
+    parser/parser_package_import_export.cpp
+    parser/parser_udp.cpp
+    simulator/constraint_solver_dist.cpp
+    simulator/constraint_solver_eval.cpp
+    simulator/constraint_solver_propagate.cpp
+    simulator/constraint_solver_randc.cpp
+    simulator/constraint_solver_repair.cpp
+    simulator/constraint_solver_sizes.cpp
+    simulator/constraint_solver_soft.cpp
+    simulator/constraint_solver_solve.cpp
+    simulator/coverage_bins.cpp
+    simulator/coverage_cross.cpp
+    simulator/coverage_db.cpp
+    simulator/coverage_options.cpp
+    simulator/declared_class_key.cpp
+    simulator/dpi_runtime_assertion.cpp
+    simulator/dpi_runtime_global_names.cpp
+    simulator/dpi_runtime_export_call.cpp
+    simulator/dpi_runtime_open_array.cpp
+    simulator/dpi_runtime_scope.cpp
+    simulator/eval_array_locator.cpp
+    simulator/eval_array_queue.cpp
+    simulator/eval_function_args.cpp
+    simulator/eval_function_args_scoped.cpp
+    simulator/eval_function_args_sync.cpp
+    simulator/eval_function_args_tagged.cpp
+    simulator/eval_function_args_writeback.cpp
+    simulator/eval_function_body.cpp
+    simulator/eval_function_body_assign.cpp
+    simulator/eval_function_dpi.cpp
+    simulator/eval_let.cpp
+    simulator/eval_select.cpp
+    simulator/eval_streaming.cpp
+    simulator/eval_systask_io.cpp
+    simulator/eval_systask_scanf.cpp
+    simulator/eval_systask_pla.cpp
+    simulator/eval_systask_query.cpp
+    simulator/eval_systask_readmem.cpp
+    simulator/eval_systask_readmem_scan.cpp
+    simulator/eval_systask_writemem.cpp
+    simulator/eval_systask_verif.cpp
+    simulator/eval_system_func.cpp
+    simulator/eval_systask_time.cpp
+    simulator/eval_system_task.cpp
+    simulator/eval_system_task_dump.cpp
+    simulator/evaluation_ops.cpp
+    simulator/wide_arith.cpp
+    simulator/lowerer_class.cpp
+    simulator/lowerer_data_init.cpp
+    simulator/lowerer_var.cpp
+    simulator/lowerer_var_layout.cpp
+    simulator/sync_variable.cpp
+    simulator/sdf_annotate.cpp
+    simulator/sdf_annotate_entry.cpp
+    simulator/sdf_annotate_task.cpp
+    simulator/sim_context_classgc.cpp
+    simulator/sim_context_name_tables.cpp
+    simulator/sim_context_random_stability.cpp
+    simulator/sim_context_systask_state.cpp
+    simulator/statement_assign_decl.cpp
+    simulator/statement_assign_force.cpp
+    simulator/statement_assign_select.cpp
+    simulator/statement_assign_stream.cpp
+    simulator/stmt_exec_control.cpp
+    simulator/timing_check_driver.cpp
+    simulator/timing_check_pulse.cpp
+    simulator/timing_check_skew.cpp
+    simulator/timing_check_stability.cpp
+    simulator/stmt_exec_randsequence.cpp
+    simulator/stmt_exec_randsequence_values.cpp
+    simulator/stmt_exec_class_task.cpp
+    simulator/stmt_exec_wait.cpp
+    simulator/sva_engine_properties.cpp
+    simulator/sva_engine_sampling.cpp
+    simulator/sva_engine_sequences.cpp
+    simulator/vlog_startup_routines.cpp
+    simulator/vpi_assertion_cb.cpp
+    simulator/vpi_assertion_control.cpp
+    simulator/vpi_callbacks.cpp
+    simulator/vpi_compatibility.cpp
+    simulator/vpi_control.cpp
+    simulator/vpi_design_attach.cpp
+    simulator/vpi_handle.cpp
+    simulator/vpi_handle_statements.cpp
+    simulator/vpi_helpers_assertions.cpp
+    simulator/vpi_helpers_instance.cpp
+    simulator/vpi_helpers_loops.cpp
+    simulator/vpi_helpers_nets.cpp
+    simulator/vpi_helpers_statements.cpp
+    simulator/vpi_helpers_timing_controls.cpp
+    simulator/vpi_helpers_variables.cpp
+    simulator/vpi_include_file.cpp
+    simulator/vpi_iterate.cpp
+    simulator/vpi_query.cpp
+    simulator/vpi_query_str.cpp
+    simulator/vpi_systf.cpp
+    simulator/vpi_systf_build.cpp
+    simulator/vpi_value_array.cpp
+    simulator/vpi_value.cpp
+)
 
-        target_include_directories(deltahdl_lib PUBLIC ${
-            CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(deltahdl_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
-            add_executable(deltahdl main.cpp)
-                target_link_libraries(deltahdl PRIVATE deltahdl_lib)
+add_executable(deltahdl main.cpp)
+target_link_libraries(deltahdl PRIVATE deltahdl_lib)
 
-#A shared deltahdl_lib has to be found at run time, and the executable is
-#published on its own and unpacked wherever its consumer put it.$ORIGIN
-#resolves against the executable's own directory, which is the directory the
-#library sits in, so it travels with the pair rather than with the absolute
-#path this tree happened to be built at.
-                    if (DELTAHDL_COVERAGE)
-                        set_target_properties(deltahdl PROPERTIES BUILD_RPATH
-                                              "$ORIGIN") endif()
+# A shared deltahdl_lib has to be found at run time, and the executable is
+# published on its own and unpacked wherever its consumer put it. $ORIGIN
+# resolves against the executable's own directory, which is the directory the
+# library sits in, so it travels with the pair rather than with the absolute
+# path this tree happened to be built at.
+if(DELTAHDL_COVERAGE)
+    set_target_properties(deltahdl PROPERTIES BUILD_RPATH "$ORIGIN")
+endif()
