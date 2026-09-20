@@ -192,6 +192,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/elaborator_validate_types.cpp
     elaborator/elaborator_validate_struct_types.cpp
     elaborator/type_eval.cpp
+    elaborator/type_eval_named.cpp
     elaborator/type_eval_aggregate.cpp
     elaborator/const_eval.cpp
     elaborator/const_eval_func.cpp

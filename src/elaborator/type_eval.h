@@ -78,6 +78,14 @@ uint32_t TaggedUnionTagBitOffset(const DataType& dtype);
 const DataType* FindNamedType(const DataType& dtype,
                               const TypedefMap& typedefs);
 
+// The same for a structure or union member's named type (§7.2.1): a member
+// written behind a qualifier, `q::pair_t Add`, was looked up by `pair_t`
+// alone, resolving to whatever a wildcard import made the bare name stand
+// for, or to nothing. Defined with FindNamedType in
+// src/elaborator/type_eval_named.cpp.
+const DataType* MemberNamedType(const StructMember& m,
+                                const TypedefMap& typedefs);
+
 uint32_t EvalTypeWidth(const DataType& dtype, const TypedefMap& typedefs);
 
 uint32_t EvalTypeWidth(const DataType& dtype, const TypedefMap& typedefs,
