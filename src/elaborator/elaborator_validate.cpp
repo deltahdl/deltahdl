@@ -19,6 +19,7 @@
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
+#include "parser/ast_type.h"
 
 namespace delta {
 
@@ -131,6 +132,51 @@ static void CheckArrayPatternCoverage(const ModuleItem* item, SourceLoc loc,
   }
 }
 
+// §5.10 (printed page 84): whether a declaration's type is an unpacked
+// structure, written inline or through a typedef. A packed structure is left
+// out on purpose: §7.2.1 has one take an integral value as a whole, so a
+// literal per element of an array of packed structures is a value per element
+// and not the flat form the clause does not allow.
+static bool IsUnpackedStructType(const DataType& dt,
+                                 const TypedefMap& typedefs) {
+  const DataType* t = &dt;
+  if (t->kind == DataTypeKind::kNamed) {
+    auto td = typedefs.find(t->type_name);
+    if (td == typedefs.end()) return false;
+    t = &td->second;
+  }
+  return t->kind == DataTypeKind::kStruct && !t->is_packed;
+}
+
+// §5.10: whether an element of a pattern initializing an array of structures
+// is a value that can be no structure, which is what makes the pattern the
+// C-like flat form the clause names as not allowed. A literal is one; so is a
+// name declared with a built-in integral, real or string type. A nested
+// pattern, a name of a structure or of a type this table does not record, a
+// call, a select or a member access is not decided against: the flat form is
+// told from the legal `'{s1, s2}` of two structure variables only by the type
+// of each element, and the declared kinds of names are all this pass carries.
+static bool IsElementThatIsNoStruct(
+    const Expr* e,
+    const std::unordered_map<std::string_view, DataTypeKind>& var_types) {
+  switch (e->kind) {
+    case ExprKind::kIntegerLiteral:
+    case ExprKind::kRealLiteral:
+    case ExprKind::kStringLiteral:
+    case ExprKind::kUnbasedUnsizedLiteral:
+      return true;
+    case ExprKind::kIdentifier: {
+      auto it = var_types.find(e->text);
+      if (it == var_types.end()) return false;
+      DataTypeKind kind = it->second;
+      return (IsIntegralType(kind) && kind != DataTypeKind::kImplicit) ||
+             IsRealType(kind) || kind == DataTypeKind::kString;
+    }
+    default:
+      return false;
+  }
+}
+
 void Elaborator::ValidateArrayInitPattern(const ModuleItem* item) {
   if (!item->init_expr || item->unpacked_dims.empty()) return;
   if (item->init_expr->kind != ExprKind::kAssignmentPattern) return;
@@ -138,6 +184,23 @@ void Elaborator::ValidateArrayInitPattern(const ModuleItem* item) {
     CheckArrayPatternDuplicateIndices(item->init_expr, item->loc, diag_);
     CheckArrayPatternCoverage(item, item->loc, diag_);
     return;
+  }
+
+  // §5.10: an initialized array of structures nests a pattern per structure
+  // inside the array's braces. A top-level element that can be no structure
+  // makes the pattern the flat form, and that is the rule the spelling breaks
+  // rather than the element count below, which the flat form fails only when
+  // the counts happen to disagree.
+  if (IsUnpackedStructType(item->data_type, typedefs_)) {
+    for (const auto* e : item->init_expr->elements) {
+      if (IsElementThatIsNoStruct(e, var_types_)) {
+        diag_.Error(item->loc,
+                    "assignment pattern for an array of structures shall nest "
+                    "a pattern per structure",
+                    Subclause("5.10"));
+        return;
+      }
+    }
   }
 
   const auto* dim = item->unpacked_dims[0];
@@ -210,6 +273,12 @@ static void CheckPatternKeys(const ModuleItem* item,
 void Elaborator::ValidateStructInitPattern(const ModuleItem* item) {
   if (!item->init_expr) return;
   if (item->init_expr->kind != ExprKind::kAssignmentPattern) return;
+  // §10.9.1 with §5.10: a declaration with unpacked dimensions is initialized
+  // by an array pattern whose elements are the structures, so the structure's
+  // member count says nothing about how many elements that pattern lists;
+  // reading it as a structure pattern rejected `'{'{0, 1}, '{2, 3}, '{4, 5}}`
+  // for a three-element array of a two-member structure.
+  if (!item->unpacked_dims.empty()) return;
 
   const std::vector<StructMember>* members = nullptr;
   if (!item->data_type.struct_members.empty()) {

@@ -98,14 +98,13 @@ TEST(StructLiteralElaboration, NestedBracesArrayOfStructs) {
              "endmodule\n"));
 }
 
-// §5.10: "Nested braces shall reflect the structure", and of this very example
-// the standard says "The C-like alternative '{1, 1.0, 2, 2.0} for the preceding
-// example is not allowed." What rejects it here is the §10.9.1 element count,
-// since flattening two two-member structures offers four elements to a
-// two-element array. §5.10 also forbids the flat form when the counts happen to
-// agree, and that narrower rule has no report: deciding it needs the type of
-// each element expression, which this pass does not carry, and a check written
-// without it would reject the legal '{s1, s2} of two struct variables.
+// §5.10 (printed page 84) has the nested braces of a structure literal reflect
+// the structure, names the C-like flat alternative of its own two-element
+// example as not allowed, and has the braces of an initialized array of
+// structures reflect the array and the structure. The flat form is what the
+// spelling breaks, so the report is §5.10's, not the §10.9.1 element count
+// that flattening two two-member structures into a two-element array also
+// fails.
 TEST(StructLiteralElaboration, CLikeFlatLiteralForArrayOfStructsRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -114,10 +113,89 @@ TEST(StructLiteralElaboration, CLikeFlatLiteralForArrayOfStructsRejected) {
       "  ab abarr[1:0] = '{1, 1.0, 2, 2.0};\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "assignment pattern has 4 elements, but array dimension requires 2", 3,
-      "10.9.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment pattern for an array of structures "
+                            "shall nest a pattern per structure",
+                            3, "5.10"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "assignment pattern has 4 elements", 3, "10.9.1"));
+}
+
+// The module of 5.10-structure-arrays-illegal.sv, whose rejection is scored
+// against §5.10: the same flat form, and no §10.9.2 report for it, since the
+// pattern initializes an array, not a structure.
+TEST(StructLiteralElaboration, FlatLiteralForStructArrayIsReportedUnder510) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top();\n"
+      "  typedef struct {\n"
+      "    int a;\n"
+      "    int b;\n"
+      "  } ms_t;\n"
+      "\n"
+      "  /* C-like assignment is illegal */\n"
+      "  ms_t ms[1:0] = '{0, 0, 1, 1};\n"
+      "\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment pattern for an array of structures "
+                            "shall nest a pattern per structure",
+                            8, "5.10"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "positional struct pattern has 4 elements", 8,
+                             "10.9.2"));
+}
+
+// The flat form whose count happens to agree with the array's: two literals
+// for two structures is still no nesting, and only the type of each element
+// tells it from the nested form.
+TEST(StructLiteralElaboration, CountAgreeingFlatLiteralForStructArrayRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  typedef struct { int a; int b; } ab;\n"
+      "  ab abarr[1:0] = '{0, 0};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment pattern for an array of structures "
+                            "shall nest a pattern per structure",
+                            3, "5.10"));
+}
+
+// A structure variable per element is the nesting the clause asks for,
+// written through names rather than braces.
+TEST(StructLiteralElaboration, StructVariablesPerElementOfStructArrayAccepted) {
+  EXPECT_TRUE(
+      ElabOk("module t;\n"
+             "  typedef struct { int a; int b; } ab;\n"
+             "  ab s1 = '{1, 2};\n"
+             "  ab s2 = '{3, 4};\n"
+             "  ab abarr[1:0] = '{s1, s2};\n"
+             "endmodule\n"));
+}
+
+// §7.2.1 has a packed structure take an integral value as a whole, so a
+// literal per element of an array of packed structures is no flat form.
+TEST(StructLiteralElaboration, LiteralPerElementOfPackedStructArrayAccepted) {
+  EXPECT_TRUE(
+      ElabOk("module t;\n"
+             "  typedef struct packed { logic [7:0] a; logic [7:0] b; } ab;\n"
+             "  ab abarr[1:0] = '{16'h0102, 16'h0304};\n"
+             "endmodule\n"));
+}
+
+// The nested form at a declaration, with an array extent that differs from
+// the member count: the pattern is an array pattern, so the structure's
+// member count has nothing to say about how many elements it lists.
+TEST(StructLiteralElaboration,
+     NestedPatternsForThreeElementStructArrayAccepted) {
+  EXPECT_TRUE(
+      ElabOk("module t;\n"
+             "  typedef struct { int a; int b; } ab;\n"
+             "  ab abarr[2:0] = '{'{0, 1}, '{2, 3}, '{4, 5}};\n"
+             "endmodule\n"));
 }
 
 TEST(StructLiteralElaboration, ReplicationStructLiteral) {
