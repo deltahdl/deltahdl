@@ -650,18 +650,21 @@ TEST(ScopedStaticHandleHiding, ProtectedMemberBehindTheStaticHandleIsReported) {
       "cannot access protected member from outside its class hierarchy");
 }
 
+// `class_src` held in a package, and a module reaching into it with `stmt`.
+std::string PackageStaticHandleSrc(const std::string& class_src,
+                                   const std::string& stmt) {
+  return "package p;\n" + class_src +
+         "endpackage\nmodule m;\n  int x;\n  initial " + stmt + "\nendmodule\n";
+}
+
 // The package form: §26.3 (printed 808) resolves `p::C` to the package's
 // class, and the handle's class is read through the same static property.
 TEST(ScopedStaticHandleHiding,
      LocalMemberBehindThePackageClassStaticHandleIsReported) {
   ExpectScopedAccessReported(
-      "package p;\n" +
-          StaticHandleClassSrc("local int k = 9;", "static C m_inst;") +
-          "endpackage\n"
-          "module m;\n"
-          "  int x;\n"
-          "  initial x = p::C::m_inst.k;\n"
-          "endmodule\n",
+      PackageStaticHandleSrc(
+          StaticHandleClassSrc("local int k = 9;", "static C m_inst;"),
+          "x = p::C::m_inst.k;"),
       "cannot access local member from outside its class");
 }
 
@@ -679,6 +682,63 @@ TEST(ScopedStaticHandleHiding, LocalStaticHandleNamedByTheClassIsReported) {
 TEST(ScopedStaticHandleHiding, PublicMemberBehindThePublicStaticHandleIsOk) {
   EXPECT_TRUE(ElabOk(StaticHandleClassSrc("int k = 9;", "static C m_inst;") +
                      StaticHandleModuleSrc("x = C::m_inst.k;")));
+}
+
+// The cases below hold the class inside another class. §8.23 (printed pages
+// 200-201) lets a class declare a class inside itself, named from outside as
+// `Outer::Inner` and `p::Outer::Inner` through a package, and §8.18 confines
+// the nested class's local members as it confines any class's.
+// ClassOfScopePrefix in src/elaborator/elaborator_validate_classes.cpp
+// resolved a prefix of one identifier or a package's and a class's and nothing
+// longer, so `Outer::Inner::m_inst.k` on a local `k`, `Outer::Inner::m_inst`
+// on a `static local` handle and the `p::Outer::Inner` forms were each
+// accepted where `C::m_inst.k` was reported.
+//
+// `k_decl` and `handle_decl` are the nested class's two members, as in
+// StaticHandleClassSrc; the handle's type is written by its bare name, which
+// §8.23 (printed 201) scopes inside the class that declares it.
+std::string NestedStaticHandleClassSrc(const std::string& k_decl,
+                                       const std::string& handle_decl) {
+  return "class Outer;\n  class Inner;\n    " + k_decl + "\n    " +
+         handle_decl + "\n  endclass\nendclass\n";
+}
+
+std::string NestedStaticHandleModuleSrc(const std::string& stmt) {
+  return "module m;\n  int x;\n  Outer::Inner c;\n  initial " + stmt +
+         "\nendmodule\n";
+}
+
+TEST(NestedStaticHandleHiding, LocalMemberBehindTheStaticHandleIsReported) {
+  ExpectScopedAccessReported(
+      NestedStaticHandleClassSrc("local int k = 9;", "static Inner m_inst;") +
+          NestedStaticHandleModuleSrc("x = Outer::Inner::m_inst.k;"),
+      "cannot access local member from outside its class");
+}
+
+TEST(NestedStaticHandleHiding, LocalStaticHandleNamedByTheClassIsReported) {
+  ExpectScopedAccessReported(
+      NestedStaticHandleClassSrc("int k = 9;", "static local Inner m_inst;") +
+          NestedStaticHandleModuleSrc("c = Outer::Inner::m_inst;"),
+      "cannot access local member from outside its class");
+}
+
+// The package form: §26.3 (printed 808) resolves `p::Outer` to the package's
+// class, and `Inner` is read as a class nested in it from there.
+TEST(NestedStaticHandleHiding,
+     LocalMemberBehindThePackageClassStaticHandleIsReported) {
+  ExpectScopedAccessReported(
+      PackageStaticHandleSrc(NestedStaticHandleClassSrc("local int k = 9;",
+                                                        "static Inner m_inst;"),
+                             "x = p::Outer::Inner::m_inst.k;"),
+      "cannot access local member from outside its class");
+}
+
+// The pair's accepting half: a public nested handle's public member, which a
+// walk that reported every resolved nested access would report too.
+TEST(NestedStaticHandleHiding, PublicMemberBehindThePublicStaticHandleIsOk) {
+  EXPECT_TRUE(
+      ElabOk(NestedStaticHandleClassSrc("int k = 9;", "static Inner m_inst;") +
+             NestedStaticHandleModuleSrc("x = Outer::Inner::m_inst.k;")));
 }
 
 }  // namespace

@@ -1,5 +1,6 @@
 #include "elaborator/elaborator_validate_classes.h"
 
+#include <cstddef>
 #include <format>
 #include <string_view>
 #include <unordered_map>
@@ -70,21 +71,62 @@ static const ClassDecl* FindClassInPackage(std::string_view pkg_name,
   return nullptr;
 }
 
-// The class the left operand of a `::` names: `C` by its bare name, or `p::C`
-// through the package §26.3 (printed 808) resolves the prefix to. Any other
-// prefix -- a package's own item, a typedef, a nested class two scopes deep --
-// answers null and leaves the access as silent as it was.
-static const ClassDecl* ClassOfScopePrefix(const Expr* prefix,
-                                           const CompilationUnit* unit) {
-  if (prefix->kind == ExprKind::kIdentifier) {
-    return FindClassDecl(prefix->text, unit);
-  }
-  if (prefix->kind == ExprKind::kMemberAccess && prefix->is_scope_resolution &&
-      prefix->lhs && prefix->lhs->kind == ExprKind::kIdentifier &&
-      prefix->rhs && prefix->rhs->kind == ExprKind::kIdentifier) {
-    return FindClassInPackage(prefix->lhs->text, prefix->rhs->text, unit);
+// The class named `name` among the classes declared directly inside `cls`,
+// which §8.23 (printed 200-201) names from outside as `cls::name`.
+static const ClassDecl* FindNestedClass(const ClassDecl* cls,
+                                        std::string_view name) {
+  for (const auto* m : cls->members) {
+    if (m->kind == ClassMemberKind::kClassDecl && m->nested_class &&
+        m->nested_class->name == name) {
+      return m->nested_class;
+    }
   }
   return nullptr;
+}
+
+// The identifiers of a `::` chain, left to right: `Outer::Inner` gives
+// {Outer, Inner} and `C` gives {C}. Empty where an operand is anything but an
+// identifier, a select or a parameterized class among them.
+static std::vector<std::string_view> ScopeChainNames(const Expr* prefix) {
+  std::vector<std::string_view> names;
+  const Expr* e = prefix;
+  while (e && e->kind == ExprKind::kMemberAccess && e->is_scope_resolution) {
+    if (!e->rhs || e->rhs->kind != ExprKind::kIdentifier) return {};
+    names.push_back(e->rhs->text);
+    e = e->lhs;
+  }
+  if (!e || e->kind != ExprKind::kIdentifier) return {};
+  names.push_back(e->text);
+  return {names.rbegin(), names.rend()};
+}
+
+// The class the left operand of a `::` names, read along the chain §8.23
+// (printed 200) gives it: the leftmost identifier is a package §26.3 (printed
+// 808) resolves the next one through, or a class by its bare name, and each
+// identifier after that is a class nested in the class so far. `C`, `p::C`,
+// `Outer::Inner` and `p::Outer::Inner` each resolve; a typedef or a
+// parameterized class in the chain answers null and leaves the access as
+// silent as it was.
+//
+// This read one identifier, or a package's and a class's, and nothing longer,
+// so `Outer::Inner::m_inst.k` on a local `k` and `Outer::Inner::m_inst` on a
+// `static local` handle were accepted from a module where `C::m_inst.k` was
+// reported.
+static const ClassDecl* ClassOfScopePrefix(const Expr* prefix,
+                                           const CompilationUnit* unit) {
+  const std::vector<std::string_view> kNames = ScopeChainNames(prefix);
+  if (kNames.empty()) return nullptr;
+  size_t next = 1;
+  const ClassDecl* cls = nullptr;
+  if (kNames.size() > 1) {
+    cls = FindClassInPackage(kNames[0], kNames[1], unit);
+    if (cls) next = 2;
+  }
+  if (!cls) cls = FindClassDecl(kNames[0], unit);
+  for (; cls && next < kNames.size(); ++next) {
+    cls = FindNestedClass(cls, kNames[next]);
+  }
+  return cls;
 }
 
 // The member a `::` access names: `m_inst` of `C::m_inst` or of
@@ -96,13 +138,30 @@ static const ClassMember* ScopedClassMember(const Expr* e,
   return cls ? FindMemberInClass(cls, e->rhs->text, unit) : nullptr;
 }
 
-// The class a property declared with `dt` holds a handle to: `C m_inst;` by
-// the bare name, `p::C m_inst;` through the package.
+// The class a property of `owner` declared with `dt` holds a handle to: `C
+// m_inst;` by the bare name, `p::C m_inst;` through the package, `Outer::Inner
+// m_inst;` through the enclosing class. §8.23 (printed 201) scopes a nested
+// class's name inside the class that declares it, so a bare name is first the
+// owner itself -- `static Inner m_inst;` written inside Inner -- or a class
+// nested in it, and only then a class of the unit; FindClassDecl reads the
+// unit's classes alone and answered null for `Inner` there.
 static const ClassDecl* ClassOfDeclaredType(const DataType& dt,
+                                            const ClassDecl* owner,
                                             const CompilationUnit* unit) {
   if (dt.kind != DataTypeKind::kNamed) return nullptr;
-  if (dt.scope_name.empty()) return FindClassDecl(dt.type_name, unit);
-  return FindClassInPackage(dt.scope_name, dt.type_name, unit);
+  if (dt.scope_name.empty()) {
+    if (owner->name == dt.type_name) return owner;
+    if (const ClassDecl* nested = FindNestedClass(owner, dt.type_name)) {
+      return nested;
+    }
+    return FindClassDecl(dt.type_name, unit);
+  }
+  if (const ClassDecl* in_pkg =
+          FindClassInPackage(dt.scope_name, dt.type_name, unit)) {
+    return in_pkg;
+  }
+  const ClassDecl* outer = FindClassDecl(dt.scope_name, unit);
+  return outer ? FindNestedClass(outer, dt.type_name) : nullptr;
 }
 
 // The class the left side of a `.` access holds a handle to. A variable's is
@@ -126,9 +185,11 @@ static const ClassDecl* HandleClassOfBase(
       !base->lhs || !base->rhs) {
     return nullptr;
   }
-  const ClassMember* m = ScopedClassMember(base, unit);
+  const ClassDecl* owner = ClassOfScopePrefix(base->lhs, unit);
+  if (!owner || base->rhs->kind != ExprKind::kIdentifier) return nullptr;
+  const ClassMember* m = FindMemberInClass(owner, base->rhs->text, unit);
   if (!m || m->kind != ClassMemberKind::kProperty) return nullptr;
-  return ClassOfDeclaredType(m->data_type, unit);
+  return ClassOfDeclaredType(m->data_type, owner, unit);
 }
 
 static void CheckMemberAccessVisibility(
