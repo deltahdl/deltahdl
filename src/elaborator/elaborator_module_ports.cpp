@@ -289,34 +289,48 @@ static const DataType* PortAggregateType(const DataType& dtype,
   return d->struct_members.empty() ? nullptr : d;
 }
 
-// §7.2.1 with §23.2.2.2: a port whose data type is a structure or a union is
-// a variable of that aggregate, and a member select of it, `a.opcode`, names
-// the run of the variable's bits the type lays the member out at. The port
-// record carries the port's width and no layout, and an ANSI port has no body
-// declaration to carry one either, so the simulator created the port's storage
-// with no members to select: `a.opcode` read nothing of the connected value.
-// The port therefore declares the variable a body declaration of the same name
-// declares for a non-ANSI port (§23.2.2.1), carrying the resolved aggregate for
-// its layout; the simulator finds the storage already created under the port's
-// name and keeps it as the port. §26.4 applies a header import before the port
-// list, so a package's structure resolves here as the module's own does. A
-// port with an unpacked or a use-site packed dimension is an array of the
-// aggregate rather than one, and is left with the width alone as before. A
-// checker's formal is §17.2's, an expression substituted at the instance rather
-// than a variable of the checker, so a checker declares none.
-static void DeclareAggregatePortVariable(const ModuleDecl* decl,
-                                         const PortDecl& port,
-                                         const RtlirPort& rp,
-                                         const PortElabContext& ctx) {
+// The resolved aggregate a structure or union port carries for its layout: a
+// copy of the type PortAggregateType finds, its nested member types resolved,
+// in the arena. §26.4 applies a header import before the port list, so a
+// package's structure resolves here as the module's own does. Null for a port
+// of any other type, and for the ports the layout is not for: a port with an
+// unpacked or a use-site packed dimension is an array of the aggregate rather
+// than one and keeps the width alone; a checker's formal is §17.2's, an
+// expression substituted at the instance rather than an object of the checker;
+// an explicitly named port is the expression it names; a non-ANSI port's body
+// declaration carries its own layout (§23.2.2.1).
+static const DataType* ResolvedPortAggregate(const ModuleDecl* decl,
+                                             const PortDecl& port,
+                                             const RtlirPort& rp,
+                                             const PortElabContext& ctx) {
   if (decl->is_non_ansi_ports || decl->decl_kind == ModuleDeclKind::kChecker ||
-      !rp.is_var || rp.is_interface_port || port.name.empty() ||
-      port.port_expr != nullptr || !port.unpacked_dims.empty() ||
+      rp.is_interface_port || port.name.empty() || port.port_expr != nullptr ||
+      !port.unpacked_dims.empty() ||
       port.data_type.packed_dim_left != nullptr ||
       !port.data_type.extra_packed_dims.empty()) {
-    return;
+    return nullptr;
   }
   const DataType* aggregate = PortAggregateType(port.data_type, ctx.typedefs);
-  if (aggregate == nullptr) return;
+  if (aggregate == nullptr) return nullptr;
+  auto* copy = ctx.arena.Create<DataType>(*aggregate);
+  ResolveNestedAggregateTypes(*copy, ctx.typedefs, ctx.arena);
+  return copy;
+}
+
+// §7.2.1 with §23.2.2.2: a variable port whose data type is a structure or a
+// union is a variable of that aggregate, and a member select of it,
+// `r.opcode`, names the run of the variable's bits the type lays the member
+// out at. The port record carries the port's width, and an ANSI port has no
+// body declaration to carry a layout either, so the simulator created the
+// port's storage with no members to select. The port therefore declares the
+// variable a body declaration of the same name declares for a non-ANSI port
+// (§23.2.2.1), carrying the resolved aggregate for its layout; the simulator
+// finds the storage already created under the port's name and keeps it as the
+// port.
+static void DeclareAggregatePortVariable(const PortDecl& port,
+                                         const RtlirPort& rp,
+                                         const DataType* aggregate,
+                                         const PortElabContext& ctx) {
   RtlirVariable var;
   var.name = port.name;
   // §37.3.3: the variable stands where the port declaration does.
@@ -329,10 +343,30 @@ static void DeclareAggregatePortVariable(const ModuleDecl* decl,
   var.init_expr = rp.init_value;
   var.elem_type_kind = port.data_type.kind;
   var.decl_kind = port.data_type.kind;
-  auto* copy = ctx.arena.Create<DataType>(*aggregate);
-  ResolveNestedAggregateTypes(*copy, ctx.typedefs, ctx.arena);
-  var.dtype = copy;
+  var.dtype = aggregate;
   ctx.mod->variables.push_back(var);
+}
+
+// Gives a structure or union port the layout a member select of it resolves
+// against. §23.2.2.3 makes an input or inout port with no port kind a net of
+// the default net type, `input instruction_t a` among them, and §6.7.1 admits
+// a packed structure as a net's data type, its own example declaring `wire
+// struct packed {...} memsig`. Such a port is a net -- its drivers resolve
+// against each other and it carries a strength (§28.12) -- so it declares no
+// variable; the resolved aggregate travels on the port record instead, which
+// is the type the header declared, and the simulator lays the net's storage
+// out from it when it creates the port. A variable port declares the variable
+// above. Declaring a variable for the net port too would have made the port
+// the variable the simulator finds first, and a net no longer.
+static void LayOutAggregatePort(const ModuleDecl* decl, const PortDecl& port,
+                                RtlirPort& rp, const PortElabContext& ctx) {
+  const DataType* aggregate = ResolvedPortAggregate(decl, port, rp, ctx);
+  if (aggregate == nullptr) return;
+  if (rp.is_var) {
+    DeclareAggregatePortVariable(port, rp, aggregate, ctx);
+    return;
+  }
+  rp.dtype = aggregate;
 }
 
 // §23.2.2.3: a port whose port kind was omitted is "a net of default net type"
@@ -553,7 +587,7 @@ void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
       }
     }
 
-    DeclareAggregatePortVariable(decl, port, rp, ctx);
+    LayOutAggregatePort(decl, port, rp, ctx);
     mod->ports.push_back(rp);
   }
 }

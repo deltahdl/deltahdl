@@ -1,6 +1,7 @@
 #ifndef DELTA_SIMULATOR_LOWERER_REGISTER_H_
 #define DELTA_SIMULATOR_LOWERER_REGISTER_H_
 
+#include <cstdint>
 #include <string>
 #include <string_view>
 
@@ -47,6 +48,17 @@ bool PortDefaultsToZero(const RtlirPort& port);
 // address the same bit by the same index.
 void RecordPackedRange(const DataType* dt, Variable* v, SimContext& ctx,
                        Arena& arena);
+
+// §7.2.1: record the layout of the packed structure or union `dtype` for the
+// storage held under `name`, `width` bits wide, so a member select of that
+// name resolves to the run of bits the type lays the member out at. Nothing is
+// recorded for a null type or one with no members. Shared for the same reason
+// RecordPackedRange is: the layout is a property of the declared type and not
+// of what is declared, so a net port of a packed structure (§23.2.2.3 with
+// §6.7.1) lays its members out as a variable of the same type does. Defined in
+// src/simulator/lowerer_var.cpp beside the variable declaration's use of it.
+void RegisterAggregateLayout(std::string_view name, const DataType* dtype,
+                             uint32_t width, SimContext& ctx, Arena& arena);
 
 // Create the storage one port is read and written through, under the name it
 // is keyed by. Every property a port's storage carries is set here, so a

@@ -89,12 +89,17 @@ void RegisterDesignTypeLayouts(const RtlirDesign* design, SimContext& ctx,
   RegisterPackageClassVariables(design, ctx, arena);
 }
 
-static void RegisterStructInfo(std::string_view name, const RtlirVariable& var,
-                               SimContext& ctx, Arena& arena) {
-  if (!var.dtype || var.dtype->struct_members.empty()) return;
-  auto* info = BuildStructTypeInfo(var.dtype, var.width, name, arena);
+void RegisterAggregateLayout(std::string_view name, const DataType* dtype,
+                             uint32_t width, SimContext& ctx, Arena& arena) {
+  if (!dtype || dtype->struct_members.empty()) return;
+  auto* info = BuildStructTypeInfo(dtype, width, name, arena);
   ctx.RegisterStructType(name, *info);
   ctx.SetVariableStructType(name, name);
+}
+
+static void RegisterStructInfo(std::string_view name, const RtlirVariable& var,
+                               SimContext& ctx, Arena& arena) {
+  RegisterAggregateLayout(name, var.dtype, var.width, ctx, arena);
 }
 
 static uint8_t StringLiteralByteAt(const Logic4Vec& packed, uint32_t i) {

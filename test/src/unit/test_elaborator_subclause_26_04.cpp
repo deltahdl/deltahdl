@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include "common/types.h"
+#include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 #include "helpers_rtlir_lookup.h"
 
@@ -181,14 +183,15 @@ TEST(PackageImportInHeader, WildcardProgramHeaderImportVisibleInPort) {
 // §26.4 (printed page 812 of ~/LRM.pdf) types a port through a header import,
 // its own example writing `input instruction_t a` after `import
 // A::instruction_t`, and §7.2.1 makes a member of a packed structure a window
-// of the variable's bits. The port record carries a width alone, so a port so
-// typed had no layout for `a.opcode` to select from; the module now declares
-// the port's variable with the structure resolved, as a non-ANSI body
-// declaration would. The width is 8 + 24, which is not RtlirVariable's default
-// of 1 and not the 8 of the first member alone, and the layout carries both
-// members. The instantiated module is the one that was probed, so the child is
-// elaborated through the top.
-TEST(PackageImportInHeader, WildcardImportedStructPortDeclaresItsVariable) {
+// of the port's bits. §23.2.2.3 (printed 735) makes an input port with no port
+// kind a net of the default net type, and §6.7.1 (printed 103) admits a packed
+// structure as a net's data type, so the port is a net and the module declares
+// no variable for it; the port record carried a width alone, so a port so
+// typed had no layout for `a.opcode` to select from. The port now carries the
+// resolved structure, both members laid out, for the simulator to lay the net
+// out from. The instantiated module is the one that was probed, so the child
+// is elaborated through the top.
+TEST(PackageImportInHeader, WildcardImportedStructNetPortCarriesItsLayout) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "package A;\n"
@@ -204,14 +207,19 @@ TEST(PackageImportInHeader, WildcardImportedStructPortDeclaresItsVariable) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
-  const auto* a = FindVar(design, "M", "a");
-  ASSERT_NE(a, nullptr);
-  EXPECT_EQ(a->width, 32u);
-  EXPECT_TRUE(a->is_4state);
-  ASSERT_NE(a->dtype, nullptr);
-  ASSERT_EQ(a->dtype->struct_members.size(), 2u);
-  EXPECT_EQ(a->dtype->struct_members[0].name, "opcode");
-  EXPECT_EQ(a->dtype->struct_members[1].name, "imm");
+  EXPECT_EQ(FindVar(design, "M", "a"), nullptr);
+  const auto* m = FindModule(design, "M");
+  ASSERT_NE(m, nullptr);
+  ASSERT_EQ(m->ports.size(), 1u);
+  const RtlirPort& a = m->ports[0];
+  EXPECT_EQ(a.name, "a");
+  EXPECT_FALSE(a.is_var);
+  EXPECT_EQ(a.net_type, NetType::kWire);
+  EXPECT_EQ(a.width, 32u);
+  ASSERT_NE(a.dtype, nullptr);
+  ASSERT_EQ(a.dtype->struct_members.size(), 2u);
+  EXPECT_EQ(a.dtype->struct_members[0].name, "opcode");
+  EXPECT_EQ(a.dtype->struct_members[1].name, "imm");
 }
 
 // The same declaration through the explicit form of §26.4's example, `import

@@ -139,6 +139,13 @@ void CreatePortVariable(std::string_view name, const RtlirPort& port,
   // has rather than which bit an index names, because `[8:1]` and `[1:8]` are
   // both eight bits wide and index 3 reaches a different bit of each.
   RecordPackedRange(port.dtype, v, ctx, arena);
+  // §7.2.1 with §23.2.2.3: a port the clause makes a net may be a net of a
+  // packed structure (§6.7.1), and a member select of it names a run of the
+  // net's bits. The elaborator hands such a port its resolved aggregate on the
+  // same record field, since it declares no variable for a net; a variable
+  // port of a structure never reaches here, its declaration having created
+  // and laid out the storage above.
+  RegisterAggregateLayout(name, port.dtype, port.width, ctx, arena);
   // §21.7.5 (Table 21-11): a port declared with a SystemVerilog data type is
   // dumped under that type's 1364-2005 masquerade, just as a module-body
   // declaration of the same type is. A port reaching here has no body
