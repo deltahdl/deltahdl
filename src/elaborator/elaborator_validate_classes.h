@@ -3,6 +3,7 @@
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
 #include "common/source_loc.h"
 #include "elaborator/const_eval.h"
@@ -129,7 +130,7 @@ class ElaboratorClassRules : public ElaboratorOperationRules {
 
   void ValidateForwardClassTypedefs();
 
-  void ValidateForwardTypedefsInScope(const ModuleDecl* decl);
+  void ValidateForwardTypedefsInScope(const std::vector<ModuleItem*>& items);
 
   void ValidateForwardTypedefScopePrefix(const ModuleDecl* decl);
   void ValidateInterfaceClassMembers(const ClassDecl* cls);

@@ -346,6 +346,76 @@ TEST(UserDefinedTypeElaboration, UnresolvedBareForwardTypedefInModule_Error) {
                             2, "6.18"));
 }
 
+// §6.18 (printed page 118) has a forward typedef's definition resolved within
+// the same local scope or generate block, and §27.5 (printed 824) makes a
+// generate block a scope of its own, so a block's `typedef struct pair_t;`
+// is resolved by a definition of the block alone. The check walked the
+// module's items only, so the block's forward typedef was never reported,
+// with or without a module definition of the name.
+TEST(UserDefinedTypeElaboration,
+     GenerateBlockForwardTypedefWithNoDefinitionInTheBlockIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  typedef struct { int a; } pair_t;\n"
+      "  if (1) begin : g\n"
+      "    typedef struct pair_t;\n"
+      "    pair_t p;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "forward typedef 'pair_t' is never resolved by a "
+                            "definition in the same scope",
+                            4, "6.18"));
+}
+
+TEST(UserDefinedTypeElaboration,
+     GenerateBlockForwardTypedefDefinedInTheBlockIsNotReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  if (1) begin : g\n"
+      "    typedef union pair_t;\n"
+      "    pair_t p;\n"
+      "    typedef union { int a; int b; } pair_t;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "forward typedef 'pair_t' is never resolved by a "
+                             "definition in the same scope",
+                             3, "6.18"));
+}
+
+// The nested block h is a scope of its own too, so g's definition does not
+// resolve h's forward typedef, and the else branch of an if generate is
+// walked as the block it is.
+TEST(UserDefinedTypeElaboration,
+     NestedAndElseGenerateBlockForwardTypedefsAreJudgedInTheirOwnBlock) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  if (1) begin : g\n"
+      "    typedef enum { A, B } col_t;\n"
+      "    if (1) begin : h\n"
+      "      typedef enum col_t;\n"
+      "    end\n"
+      "  end else begin : e\n"
+      "    typedef struct row_t;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "forward typedef 'col_t' is never resolved by a "
+                            "definition in the same scope",
+                            5, "6.18"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "forward typedef 'row_t' is never resolved by a "
+                            "definition in the same scope",
+                            8, "6.18"));
+}
+
 TEST(UserDefinedTypeElaboration, ForwardTypedefScopePrefixNotClass_Error) {
   ElabFixture f;
   ElaborateSrc(

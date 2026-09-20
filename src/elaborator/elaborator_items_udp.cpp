@@ -713,7 +713,7 @@ void Elaborator::RunPostItemValidations(const ModuleDecl* decl,
   ValidateHierRefToImportedName(decl, mod);
   ValidateUnresolvedReferences(decl, mod);
   ValidateHierRefInstanceArray(decl, mod);
-  ValidateForwardTypedefsInScope(decl);
+  ValidateForwardTypedefsInScope(decl->items);
   ValidateForwardTypedefScopePrefix(decl);
 }
 

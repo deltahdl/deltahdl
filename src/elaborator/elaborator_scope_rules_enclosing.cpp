@@ -192,9 +192,9 @@ std::unordered_set<std::string_view> Elaborator::CaptureCurrentScopeNames()
 
 namespace {
 
-bool ForwardTypedefHasDefinition(const ModuleDecl* decl,
+bool ForwardTypedefHasDefinition(const std::vector<ModuleItem*>& items,
                                  const ModuleItem* item) {
-  for (const auto* other : decl->items) {
+  for (const auto* other : items) {
     if (other == item) continue;
     if (other->kind == ModuleItemKind::kTypedef && other->name == item->name &&
         other->typedef_type.kind != DataTypeKind::kImplicit) {
@@ -254,12 +254,26 @@ ScopePrefixedType ScopePrefixedTypeOfItem(const ModuleItem* item) {
 
 }  // namespace
 
+// §6.18 (printed page 118) has a forward typedef's definition resolved within
+// the same local scope or generate block, and §27.5 (printed 824) makes each
+// generate block a scope of its own, so every block's items are walked as
+// their own list: a forward typedef in a block is resolved by a definition of
+// that block alone, and one in the module by the module's items alone. The
+// module's items were the only list walked, so a block's `typedef struct
+// pair_t;` with no definition in the block was never reported.
 void ElaboratorClassRules::ValidateForwardTypedefsInScope(
-    const ModuleDecl* decl) {
-  for (const auto* item : decl->items) {
+    const std::vector<ModuleItem*>& items) {
+  for (const auto* item : items) {
+    ValidateForwardTypedefsInScope(item->gen_body);
+    if (item->gen_else != nullptr) {
+      ValidateForwardTypedefsInScope({item->gen_else});
+    }
+    for (const auto& arm : item->gen_case_items) {
+      ValidateForwardTypedefsInScope(arm.body);
+    }
     if (item->kind != ModuleItemKind::kTypedef) continue;
     if (item->typedef_type.kind != DataTypeKind::kImplicit) continue;
-    bool resolved = ForwardTypedefHasDefinition(decl, item);
+    bool resolved = ForwardTypedefHasDefinition(items, item);
     if (!resolved && class_names_.count(item->name) > 0) {
       resolved = true;
     }
