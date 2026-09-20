@@ -150,6 +150,13 @@ static bool IsTwoStateScalarKind(DataTypeKind kind) {
   }
 }
 
+// §6.12: a real, shortreal or realtime member holds a real, so the bits read
+// from it are that real and not an integer of the same pattern.
+static bool IsRealKind(DataTypeKind kind) {
+  return kind == DataTypeKind::kReal || kind == DataTypeKind::kShortreal ||
+         kind == DataTypeKind::kRealtime;
+}
+
 static Logic4Vec ExtractStructField(Variable* base_var,
                                     const StructTypeInfo* info,
                                     std::string_view field, Arena& arena) {
@@ -165,6 +172,7 @@ static Logic4Vec ExtractStructField(Variable* base_var,
         slice.words[i].bval = 0;
       }
     }
+    slice.is_real = IsRealKind(kind);
     return slice;
   }
   return MakeLogic4Vec(arena, 1);

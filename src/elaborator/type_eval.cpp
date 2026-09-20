@@ -87,10 +87,12 @@ uint32_t EvalStructMemberWidth(const StructMember& m) {
 
   // Table 6-8 fixes a width for each integer data type that has one, and
   // §6.11.1 calls those "simple bit vector types with predefined widths". The
-  // cases below are that table. Only bit, logic and reg are left out of it,
-  // because Table 6-8 gives them a user-defined vector size instead -- a member
-  // declared with no packed dimension is the one-bit vector, which is what the
-  // default answers.
+  // cases below are that table, and after it §6.12's real types: a real is a
+  // C double, a shortreal a C float, and realtime is real (printed page 110),
+  // so a member of one of those holds 64 or 32 bits. Only bit, logic and reg
+  // are left out, because Table 6-8 gives them a user-defined vector size
+  // instead -- a member declared with no packed dimension is the one-bit
+  // vector, which is what the default answers.
   switch (m.type_kind) {
     case DataTypeKind::kByte:
       return 8;
@@ -98,9 +100,12 @@ uint32_t EvalStructMemberWidth(const StructMember& m) {
       return 16;
     case DataTypeKind::kInt:
     case DataTypeKind::kInteger:
+    case DataTypeKind::kShortreal:
       return 32;
     case DataTypeKind::kLongint:
     case DataTypeKind::kTime:
+    case DataTypeKind::kReal:
+    case DataTypeKind::kRealtime:
       return 64;
     case DataTypeKind::kVoid:
       return 0;

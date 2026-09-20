@@ -2,6 +2,7 @@
 
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
+#include "helpers_rtlir_lookup.h"
 
 using namespace delta;
 
@@ -228,6 +229,40 @@ TEST(StructDeclarationValidation, VoidMemberInPlainUnionRejected) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "void member is only allowed in tagged unions", 2,
                             "7.2"));
+}
+
+// §7.2 with §6.12 (printed page 110): a real member is a C double and a
+// shortreal a C float, and realtime is real, so an unpacked structure holding
+// them is as wide as those members together: 32 + 64 for `int a; real b;`,
+// and 32 + 64 for `shortreal s; realtime t;`. A real member was laid out one
+// bit wide, as a `bit` with no dimension is.
+TEST(StructDeclarationValidation, RealMemberIsSixtyFourBitsWide) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef struct { int a; real b; } ab;\n"
+      "  ab s;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  const auto* s = FindVar(design, "t", "s");
+  ASSERT_NE(s, nullptr);
+  EXPECT_EQ(s->width, 96u);
+}
+
+TEST(StructDeclarationValidation,
+     ShortrealAndRealtimeMembersAreFloatAndDouble) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef struct { shortreal s; realtime t; } st;\n"
+      "  st v;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  const auto* v = FindVar(design, "t", "v");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->width, 96u);
 }
 
 }  // namespace

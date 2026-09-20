@@ -208,4 +208,68 @@ TEST(StructLiteralSim, TypedByFunctionReturnContext) {
   EXPECT_EQ(v, 0xDEADu);
 }
 
+// §5.10 (printed page 83) with §10.9.2 (printed 263): a positional structure
+// literal assigns each member in declaration order, each expression evaluated
+// as an assignment to that member's type, and §6.12 (printed 110) makes a
+// real member a C double, so `'{8'hA5, 2.5}` into `struct { int a; real b; }`
+// gives a 165 and b 2.5. The real member was laid out one bit wide, so its
+// value was cut to one bit and read back as 0.
+TEST(StructLiteralSim, PositionalLiteralFillsARealMember) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  typedef struct { int a; real b; } ab;\n"
+      "  ab s = '{8'hA5, 2.5};\n"
+      "  initial $display(\"s.a=%0d s.b=%g\", s.a, s.b);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "s.a=165 s.b=2.5\n");
+}
+
+// The member-name form of the same clauses places the real by its name.
+TEST(StructLiteralSim, NamedLiteralFillsARealMember) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  typedef struct { int a; real b; } ab;\n"
+      "  ab s = '{b: 1.25, a: 7};\n"
+      "  initial $display(\"s.a=%0d s.b=%g\", s.a, s.b);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "s.a=7 s.b=1.25\n");
+}
+
+// With the real member declared first, the members after it sit below its 64
+// bits; a one-bit real would have put a at the wrong offset as well.
+TEST(StructLiteralSim, PositionalLiteralPlacesAMemberAfterAReal) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  typedef struct { real b; int a; } ba;\n"
+      "  ba s = '{2.5, 165};\n"
+      "  initial $display(\"s.a=%0d s.b=%g\", s.a, s.b);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "s.a=165 s.b=2.5\n");
+}
+
+// A real member read into a real variable is the real it holds (§6.12), so
+// arithmetic on the copy is real arithmetic: 2.5 + 1.0 is 3.5, not the
+// integer reading of the double's bit pattern plus one.
+TEST(StructLiteralSim, RealMemberReadsAsAReal) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  typedef struct { int a; real b; } ab;\n"
+      "  ab s = '{1, 2.5};\n"
+      "  real r;\n"
+      "  initial begin\n"
+      "    r = s.b;\n"
+      "    $display(\"%g\", r + 1.0);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "3.5\n");
+}
+
 }  // namespace
