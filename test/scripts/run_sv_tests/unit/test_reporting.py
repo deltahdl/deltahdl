@@ -29,8 +29,21 @@ def test_print_chapter_breakdown_has_box_drawing_table(
     assert all(
         s in captured
         for s in ("┌", "┐", "├", "┤", "└", "┘", "│",
-                   "Clause", "# of tests", "Failed", "Percentage")
+                   "Clause", "# of tests", "Failed")
     )
+
+
+def test_print_chapter_breakdown_has_no_percentage_column(
+    rst: ModuleType, capsys: pytest.CaptureFixture[str],
+) -> None:
+    results = [
+        {"chapter": "chapter-5", "status": "pass"},
+        {"chapter": "chapter-5", "status": "fail"},
+    ]
+    rst.print_chapter_breakdown(results)
+    captured = capsys.readouterr().out
+    assert "Percentage" not in captured
+    assert "%" not in captured
 
 
 def test_print_chapter_breakdown_shows_correct_values(
@@ -47,9 +60,7 @@ def test_print_chapter_breakdown_shows_correct_values(
     row6 = next(ln for ln in captured.splitlines() if ln.startswith("│ 6"))
     cells5 = [c.strip() for c in row5.strip("│").split("│")]
     cells6 = [c.strip() for c in row6.strip("│").split("│")]
-    assert [cells5, cells6] == [
-        ["5", "2", "1", "50.0%"], ["6", "1", "0", "100.0%"],
-    ]
+    assert [cells5, cells6] == [["5", "2", "1"], ["6", "1", "0"]]
 
 
 def test_print_chapter_breakdown_uses_natural_order(
