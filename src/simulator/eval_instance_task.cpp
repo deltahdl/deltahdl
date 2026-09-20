@@ -141,6 +141,39 @@ static bool ResolveMethodByParts(const MethodCallParts& parts, SimContext& ctx,
   return ResolveInstanceMethod(parts, ctx, call);
 }
 
+// §8.6 (printed page 183): an object's task is enabled through any handle to
+// it, and a handle is what any expression of a class type yields -- a
+// method's result, `c.self().t(...)`, a property of an element's object,
+// `arr[0].kid.t(...)`, a static property named through the class scope. The
+// method `access` names on the object the access's base evaluates to,
+// resolved by the object's own class (ResolveMethodByDeclaredClass with no
+// declared class: a virtual method by the object, §8.20, and a non-virtual
+// one as the object's class holds it). Asked after the shaped resolvers --
+// a named handle (ResolveMethodByParts), an element of a container
+// (ResolveElementObjectMethod, ResolveAssocElementMethod) -- and not before
+// them, because those know the receiver's declared class, which decides
+// §8.20's non-virtual dispatch through a base-class handle and §8.15's
+// `super`, and the value alone cannot recover it; a base they decline is
+// then evaluated exactly once here. A bare name is left to them outright: a
+// name that holds no object is theirs to report (ResolveThroughNullHandle).
+// False for an access of any other shape or a base yielding no live object.
+// Admitted by shape alone, the enable through such a receiver fell to the
+// expression evaluator and ran on the synchronous function interpreter,
+// which stepped over the task's `#10` and returned at time 0.
+static bool ResolveMethodOnEvaluatedBase(const Expr* access, SimContext& ctx,
+                                         Arena& arena,
+                                         InstanceMethodInfo& call) {
+  if (access == nullptr || access->kind != ExprKind::kMemberAccess ||
+      access->is_scope_resolution || access->lhs == nullptr ||
+      access->rhs == nullptr || access->rhs->kind != ExprKind::kIdentifier ||
+      access->lhs->kind == ExprKind::kIdentifier) {
+    return false;
+  }
+  ClassObject* obj =
+      ctx.GetClassObject(EvalExpr(access->lhs, ctx, arena).ToUint64());
+  return ResolveMethodByDeclaredClass(obj, {}, access->rhs->text, ctx, call);
+}
+
 // §13.5.5: the method a statement names without the parentheses. `h.m` is a
 // member access of a handle and a member, resolved on the handle's object as
 // the call `h.m(...)` is, the handle an identifier or, §26.3, a package's
@@ -160,7 +193,8 @@ static bool ResolveMethodNamedBare(const Expr* expr, SimContext& ctx,
     if (ExtractHandleAccessParts(expr, arena, parts))
       return ResolveMethodByParts(parts, ctx, call);
     return ResolveElementObjectMethod(expr, ctx, arena, call) ||
-           ResolveAssocElementMethod(expr, ctx, arena, call);
+           ResolveAssocElementMethod(expr, ctx, arena, call) ||
+           ResolveMethodOnEvaluatedBase(expr, ctx, arena, call);
   }
   if (expr->kind != ExprKind::kIdentifier) return false;
   return ResolveMethodOnRunningObject(expr->text, ctx, call);
@@ -186,7 +220,9 @@ static bool ResolveMethodNamedBare(const Expr* expr, SimContext& ctx,
 // expression evaluator, which ran the task on the synchronous function
 // interpreter: its `#10` was stepped over, the write after it landed at time 0,
 // and the enable returned at 0 where §13.3 (printed 336-337) returns it once
-// the body has run.
+// the body has run. Any other base yielding a handle -- a call's result, a
+// property of an element's object -- is resolved by the object it evaluates
+// to (ResolveMethodOnEvaluatedBase), last.
 static bool ResolveMethodOfStatement(const Expr* expr, SimContext& ctx,
                                      Arena& arena, InstanceMethodInfo& call) {
   if (expr->kind != ExprKind::kCall) {
@@ -200,7 +236,8 @@ static bool ResolveMethodOfStatement(const Expr* expr, SimContext& ctx,
   if (ExtractHandleMethodCallParts(expr, arena, parts))
     return ResolveMethodByParts(parts, ctx, call);
   return ResolveElementObjectMethod(expr->lhs, ctx, arena, call) ||
-         ResolveAssocElementMethod(expr->lhs, ctx, arena, call);
+         ResolveAssocElementMethod(expr->lhs, ctx, arena, call) ||
+         ResolveMethodOnEvaluatedBase(expr->lhs, ctx, arena, call);
 }
 
 bool SetupInstanceTaskCall(const Expr* expr, SimContext& ctx, Arena& arena,

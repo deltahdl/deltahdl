@@ -179,32 +179,42 @@ TEST(TaskSim, GenerateBlockFunctionBelowANestedBlockReadsItsOwnTypedef) {
 // process only when the task's statements have run, its delays included,
 // and §8.6 (printed 183) enables an object's task through any handle to the
 // object; §7.4.2, §7.10 and §7.8 make each element of an array, a queue or
-// an associative array declared with the class's name such a handle. The
-// three tests below declare the receiver `decl` names, fill its element by
-// the statement `setup`, enable run() through the element `elem` in one
-// fork branch and read v through it at 5 and 15 in the other, and read
-// `at5 * 10000 + at15 * 100 + done_at`: 10510 is v's initial 1 still
-// standing at 5, the 5 written after the task's #10, and the enable
-// returning at 10. Enabled through an element, the task ran on the
+// an associative array declared with the class's name such a handle, and a
+// method's result or a property reached through an element is one as well.
+// The tests below add `members` to the class C that holds run() and get(),
+// declare the receiver `decl` names, fill it by the statement `setup`,
+// enable run() through the expression `elem` in one fork branch and read v
+// through `reader`, a handle to the same object, at 5 and 15 in the other,
+// and read `at5 * 10000 + at15 * 100 + done_at`: 10510 is v's initial 1
+// still standing at 5, the 5 written after the task's #10, and the enable
+// returning at 10. Enabled through such a receiver, the task ran on the
 // synchronous function interpreter, whose default arm steps over a delay
 // (ExecFuncStmt in eval_function_body.cpp), so v was 5 at time 0 and the
 // enable returned at 0: 50500.
-static std::string ElementTaskDesign(std::string_view decl,
-                                     std::string_view setup,
-                                     std::string_view elem) {
-  std::string e(elem);
+struct ElementTaskShape {
+  std::string_view members;
+  std::string_view decl;
+  std::string_view setup;
+  std::string_view elem;
+  std::string_view reader;
+};
+
+static std::string ElementTaskDesign(const ElementTaskShape& shape) {
+  std::string r(shape.reader);
   return "class C;\n"
          "  int v = 1;\n"
          "  task run(); #10; v = 5; endtask\n"
-         "  function int get(); return v; endfunction\n"
+         "  function int get(); return v; endfunction\n" +
+         std::string(shape.members) +
          "endclass\n"
          "module t;\n"
          "  int at5, at15, done_at, y;\n" +
-         std::string(decl) + "  initial begin\n" + std::string(setup) +
+         std::string(shape.decl) + "  initial begin\n" +
+         std::string(shape.setup) +
          "    fork\n"
          "      begin " +
-         e + ".run(); done_at = $time; end\n" + "      begin #5 at5 = " + e +
-         ".get(); #10 at15 = " + e +
+         std::string(shape.elem) + ".run(); done_at = $time; end\n" +
+         "      begin #5 at5 = " + r + ".get(); #10 at15 = " + r +
          ".get(); end\n"
          "    join\n"
          "    y = at5 * 10000 + at15 * 100 + done_at;\n"
@@ -213,23 +223,70 @@ static std::string ElementTaskDesign(std::string_view decl,
 }
 
 TEST(TaskSim, ClassTaskEnabledThroughAnArrayElementConsumesItsDelay) {
-  EXPECT_EQ(RunAndGet(ElementTaskDesign("  C arr[2];\n", "    arr[0] = new;\n",
-                                        "arr[0]"),
-                      "y"),
-            10510u);
+  EXPECT_EQ(
+      RunAndGet(ElementTaskDesign({"", "  C arr[2];\n", "    arr[0] = new;\n",
+                                   "arr[0]", "arr[0]"}),
+                "y"),
+      10510u);
 }
 
 TEST(TaskSim, ClassTaskEnabledThroughAQueueElementConsumesItsDelay) {
-  EXPECT_EQ(RunAndGet(ElementTaskDesign("  C q[$];\n"
-                                        "  C c = new;\n",
-                                        "    q.push_back(c);\n", "q[0]"),
+  EXPECT_EQ(
+      RunAndGet(ElementTaskDesign({"",
+                                   "  C q[$];\n"
+                                   "  C c = new;\n",
+                                   "    q.push_back(c);\n", "q[0]", "q[0]"}),
+                "y"),
+      10510u);
+}
+
+TEST(TaskSim, ClassTaskEnabledThroughAnAssocElementConsumesItsDelay) {
+  EXPECT_EQ(RunAndGet(ElementTaskDesign({"", "  C aa[string];\n",
+                                         "    aa[\"k\"] = new;\n", "aa[\"k\"]",
+                                         "aa[\"k\"]"}),
                       "y"),
             10510u);
 }
 
-TEST(TaskSim, ClassTaskEnabledThroughAnAssocElementConsumesItsDelay) {
-  EXPECT_EQ(RunAndGet(ElementTaskDesign("  C aa[string];\n",
-                                        "    aa[\"k\"] = new;\n", "aa[\"k\"]"),
+// §8.6: a method's result is a handle, so `c.self().run();` enables the
+// task on the object self() returns -- c itself, which the reads take by
+// name. The statement's receiver was admitted as a name, a scoped name or an
+// element alone (ExtractHandleAccessParts and the element resolvers in
+// eval_instance_task.cpp), so a call result fell to the synchronous path.
+TEST(TaskSim, ClassTaskEnabledThroughACallResultConsumesItsDelay) {
+  EXPECT_EQ(RunAndGet(ElementTaskDesign(
+                          {"  function C self(); return this; endfunction\n",
+                           "  C c = new;\n", "", "c.self()", "c"}),
+                      "y"),
+            10510u);
+}
+
+// A property of an element's object, `arr[0].kid`, where H's `kid` is a C
+// built with H; the reads go through k, a copy of the same handle.
+TEST(TaskSim, ClassTaskEnabledThroughAnElementsPropertyConsumesItsDelay) {
+  EXPECT_EQ(RunAndGet(ElementTaskDesign({"",
+                                         "  class H; C kid = new; endclass\n"
+                                         "  H arr[2];\n"
+                                         "  C k;\n",
+                                         "    arr[0] = new;\n"
+                                         "    k = arr[0].kid;\n",
+                                         "arr[0].kid", "k"}),
+                      "y"),
+            10510u);
+}
+
+// A function returning another object's handle as the receiver,
+// `c.get_kid().run();`: the task runs on the kid, which the reads take
+// through k, a copy of the same handle.
+TEST(TaskSim, ClassTaskEnabledThroughAFunctionResultRunsOnItsObject) {
+  EXPECT_EQ(RunAndGet(ElementTaskDesign(
+                          {"  C kid;\n"
+                           "  function C get_kid(); return kid; endfunction\n",
+                           "  C c = new;\n"
+                           "  C k;\n",
+                           "    c.kid = new;\n"
+                           "    k = c.kid;\n",
+                           "c.get_kid()", "k"}),
                       "y"),
             10510u);
 }
