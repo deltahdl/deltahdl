@@ -553,29 +553,56 @@ static bool IsLocalParamOf(const ModuleDecl* decl, std::string_view pname) {
   return item != nullptr && (item->is_localparam || decl->has_param_port_list);
 }
 
-// The report is worded as DefparamOverrideAllowed (elaborator_defparam.cpp)
-// words a defparam's on a local parameter. Such an assignment was applied
-// and ignored in silence before: `instance top.u use #(.P(5))` on `module c
-// #(parameter W = 1); parameter P = 2;` left P at 2 and said nothing,
-// ApplyBodyParamAssignment (elaborator_items_params.cpp) passing over a local
-// parameter as §6.20.4 has it, and ElaborateParamPortList applying one to a
-// localparam port outright.
+// Reports the use clause's assignment to `pname`, written at `loc`, where
+// no parameter of `child_decl` may take it, and says whether it did. A local
+// parameter's report is worded as DefparamOverrideAllowed
+// (elaborator_defparam.cpp) words a defparam's; such an assignment was
+// applied and ignored in silence before: `instance top.u use #(.P(5))` on
+// `module c #(parameter W = 1); parameter P = 2;` left P at 2 and said
+// nothing, ApplyBodyParamAssignment (elaborator_items_params.cpp) passing
+// over a local parameter as §6.20.4 has it, and ElaborateParamPortList
+// applying one to a localparam port outright. A name no parameter of the
+// module bears is reported as ResolveNamedInstParams
+// (elaborator_module_inst.cpp) reports `c #(.X(5)) u()`: §33.4.3 (printed
+// page 940) has the clause assign by name alone, and §23.10.2.2 (printed
+// 767) makes the name one the instantiated module specifies. Such a name
+// passed as none of the module's local parameters and was applied to
+// nothing in silence, `use #(.X(5))` on `module c; parameter P = 2;`
+// reporting nothing.
+static bool ConfigParamRefused(
+    const ModuleDecl* child_decl,
+    const std::unordered_set<std::string_view>& overridable,
+    std::string_view pname, SourceLoc loc, DiagEngine& diag) {
+  if (IsLocalParamOf(child_decl, pname)) {
+    diag.Error(loc,
+               std::format("configuration cannot override a local parameter: "
+                           "'{}' of module '{}'",
+                           pname, child_decl->name),
+               Subclause("6.20.4"));
+    return true;
+  }
+  if (overridable.count(pname) > 0) return false;
+  diag.Error(
+      loc,
+      std::format("module '{}' has no parameter '{}'", child_decl->name, pname),
+      Subclause("23.10.2.2"));
+  return true;
+}
+
 std::vector<std::pair<std::string_view, Expr*>> AssignableConfigParams(
     const ModuleDecl* child_decl,
     const std::vector<std::pair<std::string_view, Expr*>>& override_params,
     SourceLoc loc, DiagEngine& diag) {
+  const std::vector<std::string_view> kNames =
+      OverridableParamNames(child_decl);
+  const std::unordered_set<std::string_view> kOverridable(kNames.begin(),
+                                                          kNames.end());
   std::vector<std::pair<std::string_view, Expr*>> assignable;
   assignable.reserve(override_params.size());
   for (const auto& entry : override_params) {
-    if (!IsLocalParamOf(child_decl, entry.first)) {
-      assignable.push_back(entry);
+    if (ConfigParamRefused(child_decl, kOverridable, entry.first, loc, diag))
       continue;
-    }
-    diag.Error(loc,
-               std::format("configuration cannot override a local parameter: "
-                           "'{}' of module '{}'",
-                           entry.first, child_decl->name),
-               Subclause("6.20.4"));
+    assignable.push_back(entry);
   }
   return assignable;
 }

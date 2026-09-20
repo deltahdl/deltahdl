@@ -536,4 +536,43 @@ TEST(ConfigParamApply, UseClauseLeavesAnUnnamedBodyParameterToADefparam) {
   EXPECT_EQ(ResolvedParam(u, "Q"), 9);
 }
 
+// §33.4.3 (printed page 940) has the use clause's parameter value assignment
+// name a parameter of the configured instance, by name alone, positional
+// notation being refused; §23.10.2.2 (printed 767) is the rule for the name,
+// which is the one the instantiated module specifies. A name no parameter of
+// c bears passed AssignableConfigParams as none of its local parameters and
+// was applied to nothing in silence, so `use #(.X(5), .P(7))` reported
+// nothing. The report is the one `c #(.X(5)) u()` draws, on line 4, the
+// clause's own line, and the clause's P still reads 7 beside it.
+TEST(ConfigParamApply, UseClauseNamingNoParameterOfTheModuleIsRejected) {
+  ElabFixture f;
+  auto* u = ConfigElabFirstChild(f,
+                                 "module c; parameter P = 2; endmodule\n"
+                                 "module top; c u(); endmodule\n"
+                                 "config cfg; design top;\n"
+                                 "  instance top.u use #(.X(5), .P(7));\n"
+                                 "endconfig\n");
+  ASSERT_NE(u, nullptr);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "module 'c' has no parameter 'X'", 4, "23.10.2.2"));
+  EXPECT_EQ(ResolvedParam(u, "P"), 7);
+}
+
+// The same on a module with a parameter port list, whose parameters are the
+// port list's alone (§6.20.1, printed pages 125-126): X is no parameter of
+// c and is reported as above, W keeping its default. The known port-list
+// parameter passes as OverrideSetsInstanceParameter above reads it.
+TEST(ConfigParamApply, UseClauseNamingNoParameterOfAPortListIsRejected) {
+  ElabFixture f;
+  auto* u = ConfigElabFirstChild(
+      f,
+      "module c #(parameter W = 1); endmodule\n"
+      "module top; c u(); endmodule\n"
+      "config cfg; design top; instance top.u use #(.X(5)); endconfig\n");
+  ASSERT_NE(u, nullptr);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "module 'c' has no parameter 'X'", 3, "23.10.2.2"));
+  EXPECT_EQ(ResolvedParam(u, "W"), 1);
+}
+
 }  // namespace
