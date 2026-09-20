@@ -760,6 +760,28 @@ void ClearSelectIndices(const Expr* lhs, SimContext& ctx) {
   if (lhs->index_end != nullptr) ctx.ClearDeferredArgSnapshot(lhs->index_end);
 }
 
+// §26.3 with §11.4.1: `p::shared += n` names the package's whole variable
+// through the scope resolution operator, held under "p.shared", which the
+// plain assignment resolves ahead of a structure member (ResolveLhsVariable
+// before WriteStructField in ExecBlockingAssign) and the expression form in
+// eval_expr_assign_ops.cpp does the same; WriteStructField alone took `p` for
+// a variable, found none, and wrote nothing. A member of a structure variable
+// resolves to no whole variable and takes the field write as before.
+static void CompoundAssignToMember(const Stmt* stmt, TokenKind base_op,
+                                   const Logic4Vec& actual_rhs, SimContext& ctx,
+                                   Arena& arena) {
+  if (auto* whole = ResolveLhsVariable(stmt->lhs, ctx)) {
+    auto result = EvalBinaryOp(base_op, whole->value, actual_rhs, arena);
+    result =
+        ConvertRealOnAssign(result, stmt->lhs, whole->value.width, ctx, arena);
+    WriteVar(whole, result, arena);
+    return;
+  }
+  auto lhs_val = EvalExpr(stmt->lhs, ctx, arena);
+  auto result = EvalBinaryOp(base_op, lhs_val, actual_rhs, arena);
+  WriteStructField(stmt->lhs, result, ctx);
+}
+
 void ApplyCompoundAssignOp(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   auto base_op = CompoundAssignBaseOp(stmt->rhs->op);
   auto actual_rhs = EvalExpr(stmt->rhs->rhs, ctx, arena);
@@ -790,9 +812,7 @@ void ApplyCompoundAssignOp(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     }
     ClearSelectIndices(stmt->lhs, ctx);
   } else if (stmt->lhs->kind == ExprKind::kMemberAccess) {
-    auto lhs_val = EvalExpr(stmt->lhs, ctx, arena);
-    auto result = EvalBinaryOp(base_op, lhs_val, actual_rhs, arena);
-    WriteStructField(stmt->lhs, result, ctx);
+    CompoundAssignToMember(stmt, base_op, actual_rhs, ctx, arena);
   } else {
     auto result = EvalExpr(stmt->rhs, ctx, arena);
     AssignToScalarLhs(stmt, result, ctx, arena);

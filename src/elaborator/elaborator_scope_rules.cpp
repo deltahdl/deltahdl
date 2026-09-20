@@ -523,6 +523,29 @@ void Elaborator::ValidatePackageImportRules(const ModuleDecl* decl) {
   for (const auto* item : decl->items) HandleImportRuleItem(ctx, item);
 }
 
+// §26.3 with §23.9: a package variable an import of `items` makes visible --
+// an explicit import naming it, or a wildcard import of a package declaring
+// it -- is a target of a procedural assignment as the module's own
+// declaration is, so a write to it names nothing undeclared. The names come
+// from the import items themselves, since this check runs without the
+// RtlirModule the read-side check takes its imports from.
+static bool ImportsProvideName(
+    const CompilationUnit* unit,
+    std::unordered_map<std::string_view, std::unordered_set<std::string_view>>&
+        provided_cache,
+    const std::vector<ModuleItem*>& items, std::string_view name) {
+  for (const auto* item : items) {
+    if (item->kind != ModuleItemKind::kImportDecl) continue;
+    const ImportItem& imp = item->import_item;
+    bool provided =
+        imp.is_wildcard
+            ? PackageProvidesName(unit, provided_cache, imp.package_name, name)
+            : imp.item_name == name;
+    if (provided) return true;
+  }
+  return false;
+}
+
 void Elaborator::ValidateScopeRules(const ModuleDecl* decl) {
   ScopeWalk walk;
   for (const auto* item : decl->items) {
@@ -541,6 +564,12 @@ void Elaborator::ValidateScopeRules(const ModuleDecl* decl) {
   for (const auto& [name, loc] : walk.proc_lhs) {
     if (walk.local_names.count(name)) continue;
     if (IsNameInModuleScope(name)) continue;
+    // §3.12.1 has an import written at compilation-unit scope stand for the
+    // module too, as the read-side check honours it.
+    if (ImportsProvideName(unit_, pkg_provided_names_, decl->items, name) ||
+        ImportsProvideName(unit_, pkg_provided_names_, unit_->cu_items, name)) {
+      continue;
+    }
     diag_.Error(loc, std::format("undeclared identifier '{}'", name),
                 Subclause("23.9"));
   }

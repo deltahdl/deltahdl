@@ -13,6 +13,7 @@
 #include "common/arena.h"
 #include "common/string_methods.h"
 #include "common/types.h"
+#include "parser/ast_expr.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/variable.h"
@@ -380,10 +381,40 @@ static bool DispatchMutatingMethod(std::string_view method,
   return false;
 }
 
+// §26.3: a package's string variable named through the package scope
+// resolution operator, `P::ps.len()`, is a method call whose receiver is the
+// scoped name rather than an identifier, which ExtractMethodCallParts reads
+// alone; the variable is held under the "P.ps" key the lowerer creates it
+// with (InitPackageDataVariables), so the receiver is that key. Answers the
+// key and the method for that shape, and false for any other.
+static bool ExtractScopedStringMethodParts(const Expr* expr, std::string& key,
+                                           std::string_view& method) {
+  const Expr* access = expr->lhs;
+  if (access == nullptr || access->kind != ExprKind::kMemberAccess ||
+      access->rhs == nullptr || access->rhs->kind != ExprKind::kIdentifier) {
+    return false;
+  }
+  const Expr* scoped = access->lhs;
+  if (scoped == nullptr || scoped->kind != ExprKind::kMemberAccess ||
+      !scoped->is_scope_resolution || scoped->lhs == nullptr ||
+      scoped->rhs == nullptr || scoped->lhs->kind != ExprKind::kIdentifier ||
+      scoped->rhs->kind != ExprKind::kIdentifier) {
+    return false;
+  }
+  key = std::string(scoped->lhs->text) + "." + std::string(scoped->rhs->text);
+  method = access->rhs->text;
+  return true;
+}
+
 bool TryEvalStringMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
                              Logic4Vec& out) {
   MethodCallParts parts;
-  if (!ExtractMethodCallParts(expr, parts)) return false;
+  std::string scoped_key;
+  if (ExtractScopedStringMethodParts(expr, scoped_key, parts.method_name)) {
+    parts.var_name = scoped_key;
+  } else if (!ExtractMethodCallParts(expr, parts)) {
+    return false;
+  }
 
   if (!ctx.IsStringVariable(parts.var_name)) return false;
 
