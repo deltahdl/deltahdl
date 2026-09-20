@@ -361,8 +361,17 @@ void Lowerer::LowerModule(const RtlirModule* mod) {
   // §8.7/§6.8: class types must be registered before module variables so a
   // class-handle declaration with a `new` static initializer (e.g.
   // `C h = new(42);`) can construct its object during static initialization.
+  // §8.9 (printed page 186) with §6.21 (printed 132-133): a static
+  // property's one copy takes its initializer at the static initialization,
+  // reading the declarations in scope, the module's variables among them,
+  // so the initializers wait for those variables below
+  // (InitClassStaticProperties); run here, with the classes' registration,
+  // `module top; int K = 3; class C; static int s = K; static mailbox mb =
+  // new(K); endclass` read K before LowerVar had given it 3: s was 0 and the
+  // mailbox unbounded. A package's K was already right, ConstructDesignData
+  // running ahead of every module.
   for (auto* cls : mod->class_decls) {
-    LowerClassDecl(cls, mod->function_decls);
+    RegisterClassDecl(cls, mod->function_decls);
   }
   // §6.8 sets a static variable's initial value as part of its declaration,
   // a reference the declaring scope makes, and §26.3 makes an import's names
@@ -375,6 +384,7 @@ void Lowerer::LowerModule(const RtlirModule* mod) {
   for (const auto& var : mod->variables) LowerVar(var.name, var);
   RegisterModulePorts(mod, ctx_, arena_);
   RegisterModuleSubroutines(mod, ctx_);
+  for (auto* cls : mod->class_decls) InitClassStaticProperties(cls);
   // §23.6 with §13.3: a top-level module's subroutine enabled from a parallel
   // hierarchy is named through the top's name, `m.t1()` in the other top n,
   // so it is registered under that key as an instance's is under its prefix;

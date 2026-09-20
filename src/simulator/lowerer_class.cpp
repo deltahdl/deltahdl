@@ -93,29 +93,58 @@ static void BuildVTable(ClassTypeInfo* info, const ClassDecl* cls) {
   }
 }
 
-// §8.9 (printed page 186 of ~/LRM.pdf) with §6.21 (printed 132-133): each
-// static property's one copy takes its initializer once, here, in the frame
-// LowerClassDecl pushes for the class's scope. §15.3.1 (printed 373) and
-// §15.4.1 (printed 374): a `static semaphore s = new(K)` or `static mailbox
-// mb = new(K)` builds the class's bucket or queue into its static map
-// (TryInitStaticSyncProperty), which stores the handle's carrier under the
-// name, nonzero for a copy that holds an object (§8.4, printed 181-182);
-// evaluated as a value, the `new` built nothing and the copy was built on
-// the first reference, reading K as it then stood.
+// §8.9 (printed page 186 of ~/LRM.pdf): each static property's one copy is
+// created as the class is built, at its zero default, so that an object
+// constructed by a declaration of the same scope before the initializers run
+// (Lowerer::LowerModule lowers a module's variables between
+// RegisterClassDecl and InitClassStaticProperties) reads and writes the
+// class's copy rather than finding none; ClassObject::SetProperty writes the
+// object's own slot for a static its type holds no entry for.
+static void CreateStaticProperties(ClassTypeInfo* info, Arena& arena) {
+  for (const auto& p : info->properties) {
+    if (!p.is_static) continue;
+    info->static_properties[std::string(p.name)] =
+        MakeLogic4VecVal(arena, p.width, 0);
+  }
+}
+
+// §8.9 (printed page 186) with §6.21 (printed 132-133): each static
+// property's one copy takes its initializer once, here, in the frame
+// Lowerer::InitClassStaticProperties pushes for the class's scope, after the
+// scope's own variables exist; a property with no initializer keeps the
+// default CreateStaticProperties gave it, or what a constructor run before
+// this wrote. §15.3.1 (printed 373) and §15.4.1 (printed 374): a `static
+// semaphore s = new(K)` or `static mailbox mb = new(K)` builds the class's
+// bucket or queue into its static map (TryInitStaticSyncProperty), which
+// stores the handle's carrier under the name, nonzero for a copy that holds
+// an object (§8.4, printed 181-182); evaluated as a value, the `new` built
+// nothing and the copy was built on the first reference, reading K as it
+// then stood. Evaluated as the class was built, `module top; int K = 3;
+// class C; static int s = K;` read K before LowerVar had given it 3.
 static void InitStaticProperty(ClassTypeInfo* info,
                                const ClassTypeInfo::PropertyInfo& p,
                                SimContext& ctx, Arena& arena) {
   if (TryInitStaticSyncProperty(info, p.name, p.init_expr, ctx)) return;
-  Logic4Vec value = p.init_expr != nullptr
-                        ? EvalExpr(p.init_expr, ctx, arena)
-                        : MakeLogic4VecVal(arena, p.width, 0);
-  info->static_properties[std::string(p.name)] = value;
+  if (p.init_expr == nullptr) return;
+  info->static_properties[std::string(p.name)] =
+      EvalExpr(p.init_expr, ctx, arena);
 }
 
+// The static initializers of `info` and, §8.23, of every class nested in it,
+// which LowerNestedClass registered under "Outer::Inner"; run in the frame
+// the caller pushed, where a nested class's were run in none before.
 static void InitStaticProperties(ClassTypeInfo* info, SimContext& ctx,
                                  Arena& arena) {
   for (const auto& p : info->properties) {
     if (p.is_static) InitStaticProperty(info, p, ctx, arena);
+  }
+  for (const auto* member : info->decl->members) {
+    if (member->kind != ClassMemberKind::kClassDecl || !member->nested_class)
+      continue;
+    std::string key = std::string(info->name) +
+                      "::" + std::string(member->nested_class->name);
+    if (ClassTypeInfo* nested = ctx.FindClassType(key))
+      InitStaticProperties(nested, ctx, arena);
   }
 }
 
@@ -399,7 +428,7 @@ static void PopulateClassType(ClassTypeInfo* info, const ClassDecl* cls,
   AttachScopeMethodBodies(info, cls, scope.items);
   RecordArrayProperties(info, cls, ctx, arena);
   BuildVTable(info, cls);
-  InitStaticProperties(info, ctx, arena);
+  CreateStaticProperties(info, arena);
   InitClassParams(info, cls, ctx, arena);
   CollectClassEnumMembers(info, cls);
   if (cls->is_interface) InheritInterfaceMembers(info);
@@ -498,8 +527,8 @@ static std::string_view UnitScopeOf(const RtlirDesign* design,
   return {};
 }
 
-void Lowerer::LowerClassDecl(const ClassDecl* cls,
-                             const std::vector<ModuleItem*>& scope_items) {
+void Lowerer::RegisterClassDecl(const ClassDecl* cls,
+                                const std::vector<ModuleItem*>& scope_items) {
   auto* info = arena_.Create<ClassTypeInfo>();
   info->name = cls->name;
   info->decl = cls;
@@ -514,7 +543,9 @@ void Lowerer::LowerClassDecl(const ClassDecl* cls,
   // 808): a static property's initializer is evaluated once, as an
   // expression of the class declaration's scope, so the class is populated
   // in a frame of the package or the compilation unit declaring it
-  // (InitStaticProperties), through which SimContext::FindInPackageScope
+  // (InitClassParams, and the static initializers InitClassStaticProperties
+  // evaluates in the same frame later), through which
+  // SimContext::FindInPackageScope
   // resolves a bare name to the scope's "pkg.name" or "$unit.name" storage.
   // Populated in no frame, a unit class's `static int s = g;` resolved g by
   // its bare key, which holds nothing once the unit's storage stands under
@@ -529,6 +560,26 @@ void Lowerer::LowerClassDecl(const ClassDecl* cls,
   RecordClassPackage(info, scope, ctx_);
   ctx_.RegisterClassType(cls->name, info);
   LowerNestedClasses(info, cls, constants, ctx_, arena_);
+}
+
+// §8.9 (printed page 186) with §23.9 (printed 761) and §26.2 (printed 808):
+// the static initializers of `cls`, registered by RegisterClassDecl, run
+// once in a frame of the scope declaring the class -- its package, the
+// compilation unit's "$unit", or none for a module's -- the scope
+// RecordClassPackage recorded on the class. A same-named class of another
+// scope bound under the bare name since is not `cls` and is left alone.
+void Lowerer::InitClassStaticProperties(const ClassDecl* cls) {
+  ClassTypeInfo* info = ctx_.FindClassType(cls->name);
+  if (info == nullptr || info->decl != cls) return;
+  if (!info->package.empty()) ctx_.PushScope(info->package);
+  InitStaticProperties(info, ctx_, arena_);
+  if (!info->package.empty()) ctx_.PopScope();
+}
+
+void Lowerer::LowerClassDecl(const ClassDecl* cls,
+                             const std::vector<ModuleItem*>& scope_items) {
+  RegisterClassDecl(cls, scope_items);
+  InitClassStaticProperties(cls);
 }
 
 }  // namespace delta

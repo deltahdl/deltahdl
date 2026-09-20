@@ -324,4 +324,46 @@ TEST(StaticClassPropertySim, StaticPropertyThroughAPackageQualifiedScopeAlone) {
             43u);
 }
 
+// §8.9 (printed page 186) with §6.21 (printed 132-133): a static property's
+// one copy takes its initializer at the static initialization, an
+// expression of the class's declaring scope in which the module's own `int
+// K = 3` is a declaration in scope, so `C::s` of the module's `class C;
+// static int s = K;` is 3. Lowerer::LowerModule (lowerer.cpp) evaluated the
+// module's classes' static initializers as it registered the classes, ahead
+// of the module's variables, so K was read before LowerVar had given it 3:
+// 0. A unit's or a package's K was already right, the design data being
+// constructed ahead of every module.
+TEST(StaticClassPropertySim, ModuleStaticInitializerReadsTheModulesVariable) {
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  int K = 3;\n"
+                      "  class C;\n"
+                      "    static int s = K;\n"
+                      "  endclass\n"
+                      "  int result;\n"
+                      "  initial result = C::s;\n"
+                      "endmodule\n",
+                      "result"),
+            3u);
+}
+
+// §8.9 with §15.4.1 (printed 374) and §15.4.4 (printed 375): the module's
+// `static mailbox mb = new(K)` is built once at the static initialization
+// with the bound the module's `int K = 1` gives, so the first try_put()
+// places its message, 1, and the second finds the queue full, 0: 10. Built
+// as the class was registered, the mailbox read K as 0, unbounded, and both
+// placed: 11.
+TEST(StaticClassPropertySim, ModuleStaticMailboxBoundByTheModulesVariable) {
+  EXPECT_EQ(
+      RunAndGet("module t;\n"
+                "  int K = 1;\n"
+                "  class C;\n"
+                "    static mailbox mb = new(K);\n"
+                "  endclass\n"
+                "  int result;\n"
+                "  initial result = C::mb.try_put(1) * 10 + C::mb.try_put(2);\n"
+                "endmodule\n",
+                "result"),
+      10u);
+}
+
 }  // namespace

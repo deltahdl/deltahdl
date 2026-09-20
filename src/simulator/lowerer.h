@@ -126,6 +126,19 @@ class Lowerer {
   // the body. Defined in src/simulator/lowerer_class.cpp.
   void LowerClassDecl(const ClassDecl* cls,
                       const std::vector<ModuleItem*>& scope_items);
+  // The two halves of LowerClassDecl, for a scope whose variables the
+  // class's static initializers may name: RegisterClassDecl builds and binds
+  // the class as LowerClassDecl does, each static property at its zero
+  // default, and InitClassStaticProperties then evaluates the static
+  // initializers of `cls` and of the classes nested in it (§8.23) once, in a
+  // frame of the scope declaring the class (§8.9, §6.21). LowerModule
+  // registers a module's classes ahead of its variables, which a `C h =
+  // new;` needs, and initializes their statics after them, which a `static
+  // int s = K;` on the module's K needs. Defined in
+  // src/simulator/lowerer_class.cpp.
+  void RegisterClassDecl(const ClassDecl* cls,
+                         const std::vector<ModuleItem*>& scope_items);
+  void InitClassStaticProperties(const ClassDecl* cls);
   // §26.2: the package declaring `cls`, or empty for a class of a module or
   // the compilation unit. Defined in src/simulator/lowerer_class.cpp.
   std::string_view DeclaringPackage(const ClassDecl* cls) const;
