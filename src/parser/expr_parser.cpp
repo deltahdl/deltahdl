@@ -1,4 +1,3 @@
-#include <charconv>
 #include <cstdint>
 #include <cstdlib>
 #include <string>
@@ -39,6 +38,44 @@ static bool IsCastTypeToken(TokenKind kind) {
   }
 }
 
+// The value of one digit character of an integer literal, or -1 for a
+// character that is no digit at all: an x, z or ? digit, which §5.7.1 sets to
+// the unknown or high-impedance value rather than to a number.
+static int LiteralDigitValue(char c) {
+  if (c >= '0' && c <= '9') return c - '0';
+  if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+  if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+  return -1;
+}
+
+// Folds `digits` in `base` into 64 bits, wrapping modulo 2^64, so a literal
+// wider than 64 bits yields its low 64 bits: the residue of each partial value
+// is what the next digit multiplies, and unsigned overflow discards nothing
+// below bit 64. The fold ends at the first character that is not a digit of
+// the base -- an x, z or ? digit, or a digit above the base -- leaving what the
+// digits before it made.
+static uint64_t FoldDigitsModulo64(std::string_view digits, uint64_t base) {
+  uint64_t val = 0;
+  for (char c : digits) {
+    int d = LiteralDigitValue(c);
+    if (d < 0 || static_cast<uint64_t>(d) >= base) break;
+    val = val * base + static_cast<uint64_t>(d);
+  }
+  return val;
+}
+
+// §5.7.1: a based literal's digits give its value in the base its base format
+// names, and a simple decimal number gives its value in base 10; the size
+// constant states the literal's exact width, so the digits can reach beyond
+// the 64 bits Expr::int_val holds. int_val then holds the low 64 bits of the
+// value, `96'h0123_4567_89AB_CDEF_0011_2233` giving 0x89ABCDEF00112233, which
+// is what the elaborator's ConstEvalLiteral folds and what any 64-bit
+// arithmetic on the value sees. The whole value is produced from the digits
+// again where every bit is needed: EvalIntLiteral and SetDigitBits in
+// src/simulator/evaluation_literal.cpp build the run-time vector, and
+// SynthLower::LowerLiteralBit reads the digits for a bit at or above 64. An x,
+// z or ? digit ends the fold, the digits before it standing; the same run-time
+// reparse sets the bits such a digit covers.
 uint64_t ParseIntText(std::string_view text) {
   std::string buf;
   buf.reserve(text.size());
@@ -47,15 +84,11 @@ uint64_t ParseIntText(std::string_view text) {
   }
 
   auto tick = buf.find('\'');
-  if (tick == std::string::npos) {
-    uint64_t val = 0;
-    std::from_chars(buf.data(), buf.data() + buf.size(), val, 10);
-    return val;
-  }
+  if (tick == std::string::npos) return FoldDigitsModulo64(buf, 10);
 
   size_t i = tick + 1;
   if (i < buf.size() && (buf[i] == 's' || buf[i] == 'S')) ++i;
-  int base = 10;
+  uint64_t base = 10;
   if (i < buf.size()) {
     switch (buf[i]) {
       case 'h':
@@ -75,9 +108,7 @@ uint64_t ParseIntText(std::string_view text) {
     }
     ++i;
   }
-  uint64_t val = 0;
-  std::from_chars(buf.data() + i, buf.data() + buf.size(), val, base);
-  return val;
+  return FoldDigitsModulo64(std::string_view(buf).substr(i), base);
 }
 
 static std::pair<int, int> InfixBp(TokenKind kind) {

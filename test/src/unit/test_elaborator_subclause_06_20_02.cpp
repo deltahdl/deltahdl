@@ -3,6 +3,7 @@
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
+#include "helpers_rtlir_lookup.h"
 #include "parser/ast_expr.h"
 
 using namespace delta;
@@ -884,6 +885,35 @@ TEST(ValueParameters, InstanceOverrideRecordsItsExpressionAndADefaultDoesNot) {
   EXPECT_EQ(u->params[1].name, "N");
   EXPECT_FALSE(u->params[1].from_override);
   EXPECT_EQ(u->params[1].override_expr, nullptr);
+}
+
+// §6.20.2 has a localparam take a constant expression, and §5.7.1 (printed
+// page 77) sizes a based literal by its size constant, so a 96-bit literal is
+// a constant whose value reaches past the 64 bits resolved_value holds. The
+// fold keeps the value's low 64 bits, so a constant computed from those bits
+// at elaboration -- the low byte of P -- is the byte the digits wrote, 0x33,
+// where a fold that lost the whole value to its width read 0. The literal's
+// width is read from its size constant apart from its digits, so $bits of the
+// same literal is 96 either way.
+TEST(ValueParameters, WideLiteralLocalparamFoldsItsLowSixtyFourBits) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  localparam logic [95:0] P = 96'h0123_4567_89AB_CDEF_0011_2233;\n"
+      "  localparam int L = P[7:0];\n"
+      "  localparam int W = $bits(96'h0123_4567_89AB_CDEF_0011_2233);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* l = FindParam(design, "m", "L");
+  ASSERT_NE(l, nullptr);
+  EXPECT_TRUE(l->is_resolved);
+  EXPECT_EQ(l->resolved_value, 0x33);
+  const auto* w = FindParam(design, "m", "W");
+  ASSERT_NE(w, nullptr);
+  EXPECT_TRUE(w->is_resolved);
+  EXPECT_EQ(w->resolved_value, 96);
 }
 
 }  // namespace

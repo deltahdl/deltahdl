@@ -421,4 +421,56 @@ TEST(IntegerLiteralParsing, UnaryPlusOnBasedLiteral) {
   EXPECT_EQ(rhs->lhs->int_val, 6u);
 }
 
+// §5.7.1 sizes a based literal by its size constant, so the digits of a 96-bit
+// hexadecimal literal reach beyond the 64 bits Expr::int_val holds; int_val
+// holds the low 64 bits, which the elaborator folds. Each digit position
+// differs from the one 64 places above it, so a fold keeping the high bits or
+// leaving zero reads a different number.
+TEST(IntegerLiteralParsing, WideHexLiteralFoldsItsLowSixtyFourBits) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic [95:0] x;\n"
+      "  initial x = 96'h0123_4567_89AB_CDEF_0011_2233;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
+  EXPECT_EQ(rhs->int_val, 0x89ABCDEF00112233u);
+}
+
+// A decimal literal's digits are folded in base 10 with the same wrap: 2^80 + 1
+// written out is 1208925819614629174706177, whose residue modulo 2^64 is 1. A
+// fold that gave up on overflow read 0, and one that stopped before the digit
+// taking the value past 64 bits would read the prefix 12089258196146291747.
+TEST(IntegerLiteralParsing, WideDecimalLiteralFoldsModuloTwoToTheSixtyFour) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic [79:0] x;\n"
+      "  initial x = 80'd1208925819614629174706177;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
+  EXPECT_EQ(rhs->int_val, 1u);
+}
+
+// A 70-bit binary literal whose six digits above bit 63 are all ones and whose
+// low 64 bits set bit 63 and bit 0 alone: int_val is those low 64 bits, so the
+// six high digits fall away and bit 63 stays.
+TEST(IntegerLiteralParsing, WideBinaryLiteralFoldsItsLowSixtyFourBits) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic [69:0] x;\n"
+      "  initial x = 70'b111111_1000_0000_0000_0000_0000_0000_0000_0000"
+      "_0000_0000_0000_0000_0000_0000_0000_0001;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
+  EXPECT_EQ(rhs->int_val, 0x8000000000000001u);
+}
+
 }  // namespace
