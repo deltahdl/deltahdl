@@ -95,27 +95,34 @@ void ApplyClassParamOverrides(std::string_view var_name, uint64_t handle,
 // eval_function_internal.h (so eval_static_method.cpp can run a method body
 // without a `this`); the definition is below.
 
-// §8.4: accessing a non-static member or a virtual method through a null
-// object handle is illegal, the result indeterminate, and an implementation
-// may issue an error -- this one does, at the call, so that the 0 the call
-// then yields is not read as a valid value. §8.10 lets a static method be
-// called through a handle referring to no object, so one is not reported.
-static void ReportNullHandleMethodCall(const MethodCallParts& parts,
-                                       std::string_view class_type,
-                                       SimContext& ctx) {
+// §8.10 lets a static method be called through a handle referring to no
+// object: the method is the declared class's, found up its base chain, and it
+// runs in that class's scope with no object. §8.4 makes a non-static member
+// or a virtual method accessed through a null handle illegal, the result
+// indeterminate, and lets an implementation issue an error -- this one does,
+// at the call, so that the 0 the call then yields is not read as a valid
+// value. True where the static method was found and `info` names it.
+static bool ResolveThroughNullHandle(const MethodCallParts& parts,
+                                     std::string_view class_type,
+                                     SimContext& ctx,
+                                     InstanceMethodInfo& info) {
   const ClassTypeInfo* cls = ctx.FindClassType(class_type);
-  if (cls == nullptr || !parts.loc.IsValid()) return;
-  const ModuleItem* method = nullptr;
-  for (const auto* t = cls; t != nullptr && method == nullptr; t = t->parent) {
+  if (cls == nullptr) return false;
+  for (const auto* t = cls; t != nullptr; t = t->parent) {
     auto it = t->methods.find(std::string(parts.method_name));
-    if (it != t->methods.end()) method = it->second;
+    if (it == t->methods.end()) continue;
+    if (!it->second->is_static) break;
+    info.method = it->second;
+    info.owner = t;
+    return true;
   }
-  if (method == nullptr || method->is_static) return;
+  if (!parts.loc.IsValid()) return false;
   ctx.GetDiag().Error(parts.loc,
                       "method '" + std::string(parts.method_name) +
                           "' called through the null handle '" +
                           std::string(parts.var_name) + "'",
                       Subclause("8.4"));
+  return false;
 }
 
 // Whether the class `defining` declares `name` with the virtual qualifier, as
@@ -165,8 +172,7 @@ bool ResolveInstanceMethod(const MethodCallParts& parts, SimContext& ctx,
   if (!var) return false;
   auto handle = var->value.ToUint64();
   if (handle == kNullClassHandle) {
-    ReportNullHandleMethodCall(parts, class_type, ctx);
-    return false;
+    return ResolveThroughNullHandle(parts, class_type, ctx, info);
   }
   info.obj = ctx.GetClassObject(handle);
   if (!info.obj) return false;
@@ -254,8 +260,9 @@ Logic4Vec RunInstanceMethod(const InstanceMethodInfo& info, const Expr* expr,
   // §8.10/§8.9: a static method invoked through an instance handle shares the
   // class's single static storage; dispatch it in class scope (no `this`).
   if (info.method->is_static) {
-    RunStaticMethodInClassScope({info.method, info.obj->type}, expr, ctx, arena,
-                                out);
+    const ClassTypeInfo* scope =
+        info.obj != nullptr ? info.obj->type : info.owner;
+    RunStaticMethodInClassScope({info.method, scope}, expr, ctx, arena, out);
     return out;
   }
   // Run the body with its defining class as the enclosing scope so an
