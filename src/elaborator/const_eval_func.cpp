@@ -601,8 +601,13 @@ static std::optional<ConstVal> ConstEvalIdentifierFull(const Expr* expr,
     return std::nullopt;
   }
   auto it = scope.find(expr->text);
-  if (it != scope.end()) return ConstVal{it->second, 32, true};
-  return std::nullopt;
+  if (it == scope.end()) return std::nullopt;
+  // §6.20.2: a name standing for a parameter of the registered module has the
+  // parameter's declared width and signedness; any other name -- a constant
+  // function's local, a package or class constant under its qualified key --
+  // is read as the 32-bit signed integer it always was.
+  if (auto param = RegisteredParamValue(expr->text, it->second)) return param;
+  return ConstVal{it->second, 32, true};
 }
 
 // §6.24.1: what a cast expression is worth. Each form decides the width and the

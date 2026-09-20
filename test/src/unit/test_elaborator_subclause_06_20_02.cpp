@@ -916,4 +916,33 @@ TEST(ValueParameters, WideLiteralLocalparamFoldsItsLowSixtyFourBits) {
   EXPECT_EQ(w->resolved_value, 96);
 }
 
+// §6.20.2 (printed page 126) gives P the 96 bits of its declared range, and
+// §11.5.1 (printed 296) lets a select address any of them, so a select at or
+// above bit 64 reads the digits there and a shift by 64 brings them down: a
+// fold that held the low 64 bits alone read 0 through H, M and QL.
+TEST(ValueParameters, SelectAtOrAboveBitSixtyFourReadsTheWideValue) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  localparam logic [95:0] P = 96'h0123_4567_89AB_CDEF_0011_2233;\n"
+      "  localparam int H = P[95:64];\n"
+      "  localparam int M = P[71:64];\n"
+      "  localparam int L8 = P[7:0];\n"
+      "  localparam logic [95:0] Q = P >> 64;\n"
+      "  localparam int QL = Q[31:0];\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto value = [&](const char* name) {
+    const auto* p = FindParam(design, "m", name);
+    return p != nullptr && p->is_resolved ? p->resolved_value : -1;
+  };
+  EXPECT_EQ(value("H"), 0x01234567);
+  EXPECT_EQ(value("M"), 0x67);
+  EXPECT_EQ(value("L8"), 0x33);
+  EXPECT_EQ(value("Q"), 0x01234567);
+  EXPECT_EQ(value("QL"), 0x01234567);
+}
+
 }  // namespace

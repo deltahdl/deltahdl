@@ -6,6 +6,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "common/packed_range.h"
 #include "elaborator/const_eval_internal.h"
@@ -345,10 +346,17 @@ ConstVal NormalizeConstVal(int64_t value, uint32_t width, bool is_signed) {
   return ConstVal{v, width, is_signed};
 }
 
+// §5.7.1 (printed page 77): the size constant states the literal's exact
+// width, and the digits can reach past the 64 bits Expr::int_val holds -- the
+// low 64 bits, since ed521261c. The bits above them are read from the digits
+// again here (LiteralHighWords), so a select, a shift or a bitwise operator
+// on a 96-bit literal sees the whole of it.
 std::optional<ConstVal> ConstEvalLiteral(const Expr* expr) {
-  return NormalizeConstVal(static_cast<int64_t>(expr->int_val),
-                           ConstLiteralWidth(expr),
-                           IsSignedLiteral(expr->text));
+  uint32_t width = ConstLiteralWidth(expr);
+  ConstVal v = NormalizeConstVal(static_cast<int64_t>(expr->int_val), width,
+                                 IsSignedLiteral(expr->text));
+  v.high_words = LiteralHighWords(expr->text, width);
+  return v;
 }
 
 static int ConstHexDigitVal(char c) {
@@ -610,6 +618,14 @@ std::optional<ConstVal> ConstEvalBinaryFull(const Expr* expr,
   auto rhs = ConstEvalFull(expr->rhs, scope);
   if (!lhs || !rhs) return std::nullopt;
   uint32_t w = std::max(lhs->width, rhs->width);
+  // §11.6.1's Table 11-21 (printed page 299) sizes a shift by its left operand
+  // and a bitwise operator by the wider of its two, so a result wider than 64
+  // bits has words the int64 fold cannot hold; EvalWideBinary works those
+  // operators across every word and declines the rest, which fold below on
+  // the low word as before.
+  if (w > 64) {
+    if (auto wide = EvalWideBinary(expr->op, *lhs, *rhs, w)) return wide;
+  }
   bool s = lhs->is_signed && rhs->is_signed;
   int64_t lv = 0, rv = 0;
   NormalizeBinaryOperands(*lhs, *rhs, s, lv, rv);
@@ -653,10 +669,11 @@ static int64_t SelectOffset(const std::optional<PackedRange>& range,
 // §11.5.1: "If the bit-select address is invalid (it is out of bounds or has
 // one or more x or z bits), then the value returned by the reference shall be x
 // for 4-state and 0 for 2-state values." A folded constant carries no x, so a
-// bit outside the value reads as 0 whichever it is.
-static ConstVal SelectOneBit(int64_t value, int64_t offset) {
-  if (offset < 0 || offset >= 64) return ConstVal{0, 1, false};
-  return ConstVal{(value >> offset) & 1, 1, false};
+// bit outside the value reads as 0 whichever it is. A bit at or above 64 is
+// read through ConstVal::high_words, so `P[95]` of a 96-bit parameter is the
+// bit its digits wrote and not a bit the int64 never held.
+static ConstVal SelectOneBit(const ConstVal& value, int64_t offset) {
+  return ConstVal{ConstValBit(value, offset) ? 1 : 0, 1, false};
 }
 
 // §11.5.1: "A part-select that addresses a range of bits that are completely
@@ -665,27 +682,22 @@ static ConstVal SelectOneBit(int64_t value, int64_t offset) {
 // for the bits that are out of range." Those bits read as 0 here for the reason
 // a single out-of-bounds bit does, and the bits that are in range keep the
 // places they occupy in the selected field.
-static std::optional<ConstVal> SelectBitRange(int64_t value, int64_t off_a,
-                                              int64_t off_b) {
+// The field is read as the 64-bit window of the value that starts at its low
+// end, ConstValWindow, which reaches the words above bit 63 for a range at or
+// above 64 (`P[95:64]`) and shifts the value up for one running off the
+// bottom, where the bits below it are out of range and left at zero; the
+// mask then cuts the window to the field's own width.
+static std::optional<ConstVal> SelectBitRange(const ConstVal& value,
+                                              int64_t off_a, int64_t off_b) {
   int64_t hi = std::max(off_a, off_b);
   int64_t lo = std::min(off_a, off_b);
   int64_t width = hi - lo + 1;
   if (width <= 0 || width > 63) return std::nullopt;
   auto w = static_cast<uint32_t>(width);
-  if (hi < 0 || lo >= 64) return ConstVal{0, w, false};
+  if (hi < 0) return ConstVal{0, w, false};
   uint64_t field_mask = ~uint64_t{0} >> (64 - width);
-  // A range running off the bottom of the value keeps the bits that are in it
-  // at the places they occupy in the selected field, so the shift goes the
-  // other way and the out-of-range bits below them are left at zero.
-  if (lo < 0) {
-    uint64_t in_range =
-        static_cast<uint64_t>(value) & (~uint64_t{0} >> (63 - hi));
-    return ConstVal{static_cast<int64_t>((in_range << -lo) & field_mask), w,
-                    false};
-  }
-  return ConstVal{
-      static_cast<int64_t>(static_cast<uint64_t>(value >> lo) & field_mask), w,
-      false};
+  return ConstVal{static_cast<int64_t>(ConstValWindow(value, lo) & field_mask),
+                  w, false};
 }
 
 std::optional<ConstVal> ConstEvalSelectFull(const Expr* expr,
@@ -698,10 +710,10 @@ std::optional<ConstVal> ConstEvalSelectFull(const Expr* expr,
   if (expr->index_end) {
     auto end = ConstEvalFull(expr->index_end, scope);
     if (!end) return std::nullopt;
-    return SelectBitRange(base_val->value, SelectOffset(range, idx->value),
+    return SelectBitRange(*base_val, SelectOffset(range, idx->value),
                           SelectOffset(range, end->value));
   }
-  return SelectOneBit(base_val->value, SelectOffset(range, idx->value));
+  return SelectOneBit(*base_val, SelectOffset(range, idx->value));
 }
 
 }  // namespace delta

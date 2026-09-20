@@ -1,19 +1,24 @@
 // What a declaration says about the size of a name. §20.6.2 (printed page
 // 629 of ~/LRM.pdf) has $bits answer the number of bits an argument holds,
 // which for a literal, a type keyword with or without a packed range, a
-// parameter, a variable or a net of the registered module is fixed at
-// elaboration;
-// EvalConstSysCall in const_eval.cpp is what asks. Moved out of const_eval.cpp
-// for room.
+// parameter, a variable or a net of the registered module, and an operator
+// expression over those (§11.6.1's Table 11-21, printed 299-300) is fixed at
+// elaboration; EvalConstSysCall in const_eval.cpp is what asks. §6.20.2
+// (printed 126-127) gives a parameter named in an expression the width and
+// signedness of its declaration, which ConstEvalIdentifierFull in
+// const_eval_func.cpp asks of RegisteredParamValue.
 
+#include <algorithm>
 #include <cstdint>
 #include <optional>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
 #include "elaborator/const_eval.h"
 #include "elaborator/const_eval_internal.h"
 #include "elaborator/rtlir.h"
+#include "lexer/token.h"
 #include "parser/ast_expr.h"
 
 namespace delta {
@@ -35,11 +40,12 @@ static std::optional<int64_t> IntegralKeywordWidth(std::string_view kw) {
 // An integer literal contributes its declared width. A built-in data type --
 // a bare keyword (int, logic, ...) or a ranged vector (logic [7:0]) -- has a
 // width knowable from the argument syntax alone, so it folds here as well; the
-// ranged form multiplies the atom width by the packed range. A parameter or a
-// variable of the module a ParamRangeRegistryGuard installed is sized by its
-// declaration, IdentifierBits below. User-defined type names and other typed
-// expressions need type/instance resolution unavailable at this layer and are
-// left to be sized at run time.
+// ranged form multiplies the atom width by the packed range. A parameter, a
+// variable or a net of the module a ParamRangeRegistryGuard installed is
+// sized by its declaration, IdentifierBits below, and an operator expression
+// by §11.6.1's Table 11-21 over its operands, SelfDeterminedBits. User-defined
+// type names and other typed expressions need type resolution unavailable at
+// this layer and are left to be sized at run time.
 // The ranged form of a built-in data type -- a bare keyword under a packed
 // range, `logic [7:0]`. Its width is the atom width times the range span.
 static std::optional<int64_t> RangedKeywordBits(const Expr* a,
@@ -57,6 +63,26 @@ static std::optional<int64_t> RangedKeywordBits(const Expr* a,
   return *atom * span;
 }
 
+// §6.20.2 (printed pages 126-127): whether the declaration fixes the
+// parameter's width -- a range gives it the range's, and a type with no range
+// the type's -- as against a parameter declared with neither, or with a bare
+// `signed`, which takes an implied range from the size of its final value.
+static bool HasDeclaredWidth(const RtlirParamDecl& pd) {
+  return pd.has_decl_range || (pd.has_decl_type && !pd.decl_type_implicit);
+}
+
+// §23.10.2: the expression an instance override gave the parameter where it
+// is a literal, which names nothing and so reads the same in every scope.
+// Null for an override written as anything else, which stands in the
+// instantiating module and means nothing here, and for a parameter no
+// instance overrode.
+static const Expr* LiteralOverrideExpr(const RtlirParamDecl& pd) {
+  if (pd.override_expr == nullptr ||
+      pd.override_expr->kind != ExprKind::kIntegerLiteral)
+    return nullptr;
+  return pd.override_expr;
+}
+
 // §6.20.2 (printed pages 126-127): the number of bits a value parameter holds.
 // A parameter declared with a range has the range of its declaration, and one
 // declared with a type and no range is of that type, so both answer from
@@ -72,15 +98,14 @@ static std::optional<int64_t> RangedKeywordBits(const Expr* a,
 static std::optional<int64_t> ParamDeclBits(const RtlirParamDecl& pd) {
   if (pd.is_type_param || pd.is_real_value || pd.is_string_value)
     return std::nullopt;
-  if (pd.has_decl_range || (pd.has_decl_type && !pd.decl_type_implicit)) {
+  if (HasDeclaredWidth(pd)) {
     if (pd.decl_width == 0) return std::nullopt;
     return static_cast<int64_t>(pd.decl_width);
   }
   if (pd.from_override) {
-    if (pd.override_expr == nullptr ||
-        pd.override_expr->kind != ExprKind::kIntegerLiteral)
-      return std::nullopt;
-    return static_cast<int64_t>(ConstLiteralWidth(pd.override_expr));
+    const Expr* lit = LiteralOverrideExpr(pd);
+    if (lit == nullptr) return std::nullopt;
+    return static_cast<int64_t>(ConstLiteralWidth(lit));
   }
   auto value = ConstEvalFull(pd.default_value, RegisteredModuleScope());
   if (!value) return std::nullopt;
@@ -152,14 +177,183 @@ static std::optional<int64_t> IdentifierBits(const Expr* a) {
   return RegisteredNetBits(a->text);
 }
 
+static std::optional<int64_t> SelfDeterminedBits(const Expr* a,
+                                                 const ScopeMap& scope);
+
+// §11.6.1's Table 11-21 (printed pages 299-300): how an operator sizes its
+// expression. `+ - * / % & | ^ ^~ ~^` take the larger of their operands'
+// lengths; a shift and `**` take the left operand's, the right being
+// self-determined, as do unary `+ - ~`; a comparison, an equality, a logical
+// operator, an implication, a reduction and `!` are one bit.
+enum class BitLengthRule : std::uint8_t {
+  kMaxOfOperands,
+  kLeftOperand,
+  kOneBit
+};
+
+// The rule Table 11-21 gives the operator of `a`, a unary or binary
+// expression, or empty for an operator outside the table -- the sequence
+// implication, which makes no expression, and a prefix increment.
+static std::optional<BitLengthRule> BitLengthRuleOf(const Expr* a) {
+  static const std::unordered_map<TokenKind, BitLengthRule> kBinary{
+      {TokenKind::kPlus, BitLengthRule::kMaxOfOperands},
+      {TokenKind::kMinus, BitLengthRule::kMaxOfOperands},
+      {TokenKind::kStar, BitLengthRule::kMaxOfOperands},
+      {TokenKind::kSlash, BitLengthRule::kMaxOfOperands},
+      {TokenKind::kPercent, BitLengthRule::kMaxOfOperands},
+      {TokenKind::kAmp, BitLengthRule::kMaxOfOperands},
+      {TokenKind::kPipe, BitLengthRule::kMaxOfOperands},
+      {TokenKind::kCaret, BitLengthRule::kMaxOfOperands},
+      {TokenKind::kTildeCaret, BitLengthRule::kMaxOfOperands},
+      {TokenKind::kCaretTilde, BitLengthRule::kMaxOfOperands},
+      {TokenKind::kLtLt, BitLengthRule::kLeftOperand},
+      {TokenKind::kLtLtLt, BitLengthRule::kLeftOperand},
+      {TokenKind::kGtGt, BitLengthRule::kLeftOperand},
+      {TokenKind::kGtGtGt, BitLengthRule::kLeftOperand},
+      {TokenKind::kPower, BitLengthRule::kLeftOperand},
+      {TokenKind::kLt, BitLengthRule::kOneBit},
+      {TokenKind::kGt, BitLengthRule::kOneBit},
+      {TokenKind::kLtEq, BitLengthRule::kOneBit},
+      {TokenKind::kGtEq, BitLengthRule::kOneBit},
+      {TokenKind::kEqEq, BitLengthRule::kOneBit},
+      {TokenKind::kBangEq, BitLengthRule::kOneBit},
+      {TokenKind::kEqEqEq, BitLengthRule::kOneBit},
+      {TokenKind::kBangEqEq, BitLengthRule::kOneBit},
+      {TokenKind::kEqEqQuestion, BitLengthRule::kOneBit},
+      {TokenKind::kBangEqQuestion, BitLengthRule::kOneBit},
+      {TokenKind::kAmpAmp, BitLengthRule::kOneBit},
+      {TokenKind::kPipePipe, BitLengthRule::kOneBit},
+      {TokenKind::kArrow, BitLengthRule::kOneBit},
+      {TokenKind::kLtDashGt, BitLengthRule::kOneBit},
+  };
+  static const std::unordered_map<TokenKind, BitLengthRule> kUnary{
+      {TokenKind::kPlus, BitLengthRule::kLeftOperand},
+      {TokenKind::kMinus, BitLengthRule::kLeftOperand},
+      {TokenKind::kTilde, BitLengthRule::kLeftOperand},
+      {TokenKind::kAmp, BitLengthRule::kOneBit},
+      {TokenKind::kTildeAmp, BitLengthRule::kOneBit},
+      {TokenKind::kPipe, BitLengthRule::kOneBit},
+      {TokenKind::kTildePipe, BitLengthRule::kOneBit},
+      {TokenKind::kCaret, BitLengthRule::kOneBit},
+      {TokenKind::kTildeCaret, BitLengthRule::kOneBit},
+      {TokenKind::kCaretTilde, BitLengthRule::kOneBit},
+      {TokenKind::kBang, BitLengthRule::kOneBit},
+  };
+  const auto& rules = a->kind == ExprKind::kUnary ? kUnary : kBinary;
+  auto it = rules.find(a->op);
+  if (it == rules.end()) return std::nullopt;
+  return it->second;
+}
+
+// §11.6.1's Table 11-21: the bit length of a unary or binary expression by
+// its operator's rule, the operand of a unary expression being its lhs.
+static std::optional<int64_t> OperatorBits(const Expr* a,
+                                           const ScopeMap& scope) {
+  auto rule = BitLengthRuleOf(a);
+  if (!rule) return std::nullopt;
+  if (*rule == BitLengthRule::kOneBit) return 1;
+  auto l = SelfDeterminedBits(a->lhs, scope);
+  if (*rule == BitLengthRule::kLeftOperand) return l;
+  auto r = SelfDeterminedBits(a->rhs, scope);
+  if (!l || !r) return std::nullopt;
+  return std::max(*l, *r);
+}
+
+// §11.6.1's Table 11-21: a conditional expression is as long as the longer of
+// its two arms, the condition being self-determined.
+static std::optional<int64_t> TernaryBits(const Expr* a,
+                                          const ScopeMap& scope) {
+  auto t = SelfDeterminedBits(a->true_expr, scope);
+  auto f = SelfDeterminedBits(a->false_expr, scope);
+  if (!t || !f) return std::nullopt;
+  return std::max(*t, *f);
+}
+
+// §20.6.2 with §11.6.1: the number of bits the self-determined expression `a`
+// holds, which is what $bits answers and what its result is valid at
+// elaboration for. An integer literal is as wide as its size constant
+// (§5.7.1), an identifier as its declaration, and an operator expression as
+// Table 11-21 sizes it from its operands. A concatenation, a replication, a
+// select, a call and a cast are not sized here.
+static std::optional<int64_t> SelfDeterminedBits(const Expr* a,
+                                                 const ScopeMap& scope) {
+  switch (a->kind) {
+    case ExprKind::kIntegerLiteral:
+      return static_cast<int64_t>(ConstLiteralWidth(a));
+    case ExprKind::kIdentifier:
+      return IdentifierBits(a);
+    case ExprKind::kBinary:
+    case ExprKind::kUnary:
+      return OperatorBits(a, scope);
+    case ExprKind::kTernary:
+      return TernaryBits(a, scope);
+    default:
+      return RangedKeywordBits(a, scope);
+  }
+}
+
 std::optional<int64_t> EvalConstBits(const Expr* expr, const ScopeMap& scope) {
   if (expr->args.empty()) return std::nullopt;
-  auto* a = expr->args[0];
-  if (a->kind == ExprKind::kIntegerLiteral)
-    return static_cast<int64_t>(ConstLiteralWidth(a));
+  return SelfDeterminedBits(expr->args[0], scope);
+}
 
-  if (a->kind == ExprKind::kIdentifier) return IdentifierBits(a);
-  return RangedKeywordBits(a, scope);
+// Folding a parameter's value expression to size a name that reads it folds
+// the names that expression reads in turn. A value expression naming its own
+// parameter -- which §23.9 makes a self-reference where the name is also an
+// outer scope's, and §6.20.1 does not admit -- would do so without end, so
+// the depth is capped as a constant function's recursion is.
+static int g_param_refold_depth = 0;
+static constexpr int kMaxParamRefoldDepth = 32;
+
+// The fold of the parameter's own value expression -- the declaration's
+// default, or a literal an instance override gave it -- from which a width
+// the declaration leaves to the value (§6.20.2's implied range) and the words
+// above bit 63 of a value declared wider than 64 bits are read. Empty where
+// there is no such expression, where it does not fold against the registered
+// module's parameters, or where the refold is too deep.
+static std::optional<ConstVal> RefoldParamValue(const RtlirParamDecl& pd) {
+  const Expr* value_expr =
+      pd.from_override ? LiteralOverrideExpr(pd) : pd.default_value;
+  if (value_expr == nullptr || g_param_refold_depth >= kMaxParamRefoldDepth)
+    return std::nullopt;
+  ++g_param_refold_depth;
+  struct DepthGuard {
+    ~DepthGuard() { --g_param_refold_depth; }
+  } depth_guard;
+  return ConstEvalFull(value_expr, RegisteredModuleScope());
+}
+
+// §6.20.2 (printed pages 126-127): what a name standing for a value parameter
+// of the registered module is worth. A parameter declared with a range or a
+// type has that width and that signedness whatever value it took, so the
+// value is read at them: `localparam byte B = 300` is the eight bits 300
+// leaves, and `localparam bit [3:0] Y = -1` is 15. One declared with neither
+// takes the size and signedness of its final value, which is what the fold of
+// the value expression carries, and 32 bits signed where that expression does
+// not fold here. Either way a parameter wider than 64 bits has its words
+// above bit 63 read from that fold, the ScopeMap holding the low 64 alone.
+// `value` is what the ScopeMap holds for the name, and is kept as the low
+// word rather than the refold's, since a ScopeMap built for a generate block
+// or a defparam may hold a value the refold does not see.
+//
+// The declaration is consulted only where it agrees with the ScopeMap on the
+// value, because a constant function's locals (§13.4.3) sit in the same map
+// under bare names, and a formal called as a parameter is would otherwise be
+// cut to that parameter's width.
+std::optional<ConstVal> RegisteredParamValue(std::string_view name,
+                                             int64_t value) {
+  const RtlirParamDecl* pd = RegisteredParamNamed(name);
+  if (pd == nullptr || pd->resolved_value != value) return std::nullopt;
+  bool declared = HasDeclaredWidth(*pd);
+  std::optional<ConstVal> refold;
+  if (!declared || pd->decl_width > 64) refold = RefoldParamValue(*pd);
+  uint32_t width = declared ? pd->decl_width : refold ? refold->width : 32;
+  bool is_signed = declared ? pd->decl_is_signed
+                   : refold ? refold->is_signed
+                            : true;
+  ConstVal v = NormalizeConstVal(value, width, is_signed);
+  if (refold && width > 64) v.high_words = refold->high_words;
+  return v;
 }
 
 }  // namespace delta

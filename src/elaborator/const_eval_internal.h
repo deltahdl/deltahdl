@@ -7,6 +7,7 @@
 
 #include "common/packed_range.h"
 #include "elaborator/const_eval.h"
+#include "lexer/token.h"
 
 namespace delta {
 
@@ -16,6 +17,17 @@ struct ConstVal {
   int64_t value;
   uint32_t width;
   bool is_signed;
+  // §5.7.1 (printed page 77) sizes a based literal by its size constant, and
+  // §6.20.2 (printed 126) gives a parameter its declared range, so a constant
+  // can hold more bits than `value` does. Word i here holds bits 64*(i+2)-1
+  // down to 64*(i+1); `value` holds bits 63 down to 0 as before. Empty for a
+  // value with no set bit at or above 64, whatever its width, so every reader
+  // that consults `value` alone reads what it always read. Filled by
+  // ConstEvalLiteral for a literal past 64 bits and by ConstEvalIdentifierFull
+  // for a parameter declared past them, and read by a select, a shift and a
+  // bitwise operator through const_eval_wide.cpp; the arithmetic operators,
+  // a cast, a concatenation and a unary operator still see `value` alone.
+  std::vector<uint64_t> high_words = {};
 };
 
 // The value `width` and `is_signed` make of `value`: the bits above the width
@@ -40,6 +52,30 @@ std::optional<int64_t> EvalReplicate(const Expr* expr, const ScopeMap& scope);
 std::optional<ConstVal> ConstEvalSelectFull(const Expr* expr,
                                             const ScopeMap& scope);
 
+// §5.7.1: the bits from 64 up of an integer literal's digits, as
+// ConstVal::high_words lays them out, cut to `width`. Empty for a literal no
+// wider than 64 bits, for one whose digits set no bit at or above 64, and
+// from the first x, z or ? digit on, where the fold ends as ParseIntText's
+// does. Defined in const_eval_wide.cpp.
+std::vector<uint64_t> LiteralHighWords(std::string_view text, uint32_t width);
+
+// The bit `offset` above the least significant end of `v`, read through
+// ConstVal::high_words past bit 63, and 0 for an offset outside the value.
+// Defined in const_eval_wide.cpp.
+bool ConstValBit(const ConstVal& v, int64_t offset);
+
+// The 64 bits of `v` from bit `lo` upward: bit `lo` of the value lands at bit
+// 0 of the answer. A bit below 0 or above the value's top reads 0, so a
+// negative `lo` shifts the value up by -lo. Defined in const_eval_wide.cpp.
+uint64_t ConstValWindow(const ConstVal& v, int64_t lo);
+
+// §11.4.10 with §11.4.8: a shift or a bitwise operator applied across every
+// word of `lhs` and `rhs`, at width `width`, for an operand that carries bits
+// past 63. Empty for any other operator, which the 64-bit fold answers.
+// Defined in const_eval_wide.cpp.
+std::optional<ConstVal> EvalWideBinary(TokenKind op, const ConstVal& lhs,
+                                       const ConstVal& rhs, uint32_t width);
+
 // The parameter of the registered module that `name` names where the
 // expression being folded stands, or null when no module is registered, when
 // it declares no such parameter, or when the one it declares belongs to a
@@ -58,6 +94,16 @@ uint32_t ConstLiteralWidth(const Expr* expr);
 // §20.6.2: the value of a `$bits(...)` call whose argument is sized at
 // elaboration, or empty. Defined in const_eval_bits.cpp.
 std::optional<int64_t> EvalConstBits(const Expr* expr, const ScopeMap& scope);
+
+// §6.20.2: what the name of a value parameter of the registered module is
+// worth when the ScopeMap holds `value` for it -- the value read at the
+// parameter's declared width and signedness, with the words above bit 63 of
+// one declared wider than 64 bits. Empty when the registered module declares
+// no such parameter where the expression stands, when it is a type, real or
+// string parameter, or when `value` is not the value it resolved to. Defined
+// in const_eval_bits.cpp.
+std::optional<ConstVal> RegisteredParamValue(std::string_view name,
+                                             int64_t value);
 
 // §11.5.1: the packed range the parameter `name` was declared with, taken from
 // the module a live ParamRangeRegistryGuard installed. Empty when no guard is
