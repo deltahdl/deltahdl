@@ -443,4 +443,112 @@ TEST(PackedStructSimulation, ChildInstanceKeyedPatternPlacesEachMember) {
   EXPECT_EQ(op->value.ToUint64(), 0x5Au);
 }
 
+// §7.2.1 makes a member a window on the structure's bits, and §10.7 has an
+// assignment write the whole right-hand value into the target, so a 96-bit
+// member takes all 96 bits of its value. `big` sits at bits [103:8] of `s` and
+// `low8` at [7:0]: word 0 of `s` is big's low 56 bits over 0xA5, and word 1 the
+// 40 bits above, 0x0123456789; read back as a member, `w` holds the literal
+// whole. A write that carried one word of the value would leave word 1 of `s`
+// at 0x89 and `w`'s high word at 0. These pins were written when the stream of
+// `s` read that word as 0x89 (test_simulator_subclause_11_04_14_01.cpp) and
+// the write was suspected; it was the stream's 64-bit carrier, and the deposit
+// this pins was whole all along.
+TEST(PackedStructSimulation, WideMemberWriteLandsEveryWordOfItsValue) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  struct packed { logic [95:0] big; logic [7:0] low8; } s;\n"
+      "  logic [95:0] w;\n"
+      "  initial begin\n"
+      "    s.big = 96'h0123_4567_89AB_CDEF_0F1E_2D3C;\n"
+      "    s.low8 = 8'hA5;\n"
+      "    w = s.big;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "s");
+  ASSERT_NE(var, nullptr);
+  ASSERT_EQ(var->value.nwords, 2u);
+  EXPECT_TRUE(var->value.IsKnown());
+  EXPECT_EQ(var->value.words[0].aval, 0xABCDEF0F1E2D3CA5u);
+  EXPECT_EQ(var->value.words[1].aval, 0x0123456789u);
+  auto* w = f.ctx.FindVariable("w");
+  ASSERT_NE(w, nullptr);
+  ASSERT_EQ(w->value.nwords, 2u);
+  EXPECT_EQ(w->value.words[0].aval, 0x89ABCDEF0F1E2D3Cu);
+  EXPECT_EQ(w->value.words[1].aval, 0x01234567u);
+}
+
+// §7.3.1: the members of a packed union share the union's storage, each a
+// window on all of it, so 96 bits written through `w` are the 96 bits read
+// through `v`, high word included: 0xFEDCBA98 above 0x765432100F0FA5A5. A write
+// that carried one word would leave the high word x, the union's initial value.
+TEST(PackedStructSimulation, WideUnionMemberWriteReadsBackThroughTheOther) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  union packed { logic [95:0] w; logic [95:0] v; } u;\n"
+      "  logic [95:0] rv;\n"
+      "  initial begin\n"
+      "    u.w = 96'hFEDC_BA98_7654_3210_0F0F_A5A5;\n"
+      "    rv = u.v;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "rv");
+  ASSERT_NE(var, nullptr);
+  ASSERT_EQ(var->value.nwords, 2u);
+  EXPECT_TRUE(var->value.IsKnown());
+  EXPECT_EQ(var->value.words[0].aval, 0x765432100F0FA5A5u);
+  EXPECT_EQ(var->value.words[1].aval, 0xFEDCBA98u);
+}
+
+// §7.2.1 has a structure with a 4-state member be a 4-state vector, and §6.3.1
+// lets any bit of a logic member be x, so x digits above bit 64 of the value
+// land as x above bit 72 of `s` (big's offset is 8): word 1 of `s` carries
+// aval and bval 1 in bits [39:8] and the known 0x89 in [7:0]. A deposit that
+// moved the aval plane alone would read those bits as a known 1.
+TEST(PackedStructSimulation, WideMemberWriteKeepsXAboveTheFirstWord) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  struct packed { logic [95:0] big; logic [7:0] low8; } s;\n"
+      "  initial begin\n"
+      "    s.big = 96'hxxxx_xxxx_89AB_CDEF_0F1E_2D3C;\n"
+      "    s.low8 = 8'hA5;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "s");
+  ASSERT_NE(var, nullptr);
+  ASSERT_EQ(var->value.nwords, 2u);
+  EXPECT_EQ(var->value.words[0].aval, 0xABCDEF0F1E2D3CA5u);
+  EXPECT_EQ(var->value.words[0].bval, 0u);
+  EXPECT_EQ(var->value.words[1].aval, 0xFFFFFFFF89u);
+  EXPECT_EQ(var->value.words[1].bval, 0xFFFFFFFF00u);
+}
+
+// §10.4.2: a nonblocking assignment to the member lands the same 96 bits in the
+// update region, so after #1 `s` holds the words the blocking form leaves.
+TEST(PackedStructSimulation, WideMemberNonblockingWriteLandsEveryWord) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  struct packed { logic [95:0] big; logic [7:0] low8; } s;\n"
+      "  logic [95:0] w;\n"
+      "  initial begin\n"
+      "    s.big <= 96'h0123_4567_89AB_CDEF_0F1E_2D3C;\n"
+      "    s.low8 <= 8'hA5;\n"
+      "    #1 w = s.big;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "s");
+  ASSERT_NE(var, nullptr);
+  ASSERT_EQ(var->value.nwords, 2u);
+  EXPECT_TRUE(var->value.IsKnown());
+  EXPECT_EQ(var->value.words[0].aval, 0xABCDEF0F1E2D3CA5u);
+  EXPECT_EQ(var->value.words[1].aval, 0x0123456789u);
+  auto* w = f.ctx.FindVariable("w");
+  ASSERT_NE(w, nullptr);
+  ASSERT_EQ(w->value.nwords, 2u);
+  EXPECT_EQ(w->value.words[1].aval, 0x01234567u);
+}
+
 }  // namespace
