@@ -20,6 +20,7 @@
 #include "elaborator/procedural_concurrent_assertion.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
+#include "parser/ast_class.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 
@@ -686,6 +687,19 @@ void Elaborator::ElaborateModuleClassDecl(ModuleItem* item, RtlirModule* mod) {
   if (item->class_decl == nullptr) return;
   RegisterModuleClassParams(item->class_decl, BuildParamScope(mod),
                             cu_param_scope_, arena_, diag_);
+  // §8.23: the class's typedefs are reached through its name from outside
+  // the class, `Node::value_t v;` in the module's own procedure, and the
+  // "Class::name" key is what the type tables answer such a name by;
+  // RegisterClassTypedefs in elaborator_resolve.cpp keys the compilation
+  // unit's classes so, and a class of a module had no key at all, so a local
+  // declared with the name was sized as a name nothing could resolve.
+  for (const auto* m : item->class_decl->members) {
+    if (m->kind != ClassMemberKind::kTypedef || m->typedef_item == nullptr)
+      continue;
+    auto* key = arena_.Create<std::string>(std::string(item->class_decl->name) +
+                                           "::" + std::string(m->name));
+    typedefs_[*key] = m->typedef_item->typedef_type;
+  }
 }
 
 // Declarations, types, instances, and structural items (§6, §23, §25, §28).
