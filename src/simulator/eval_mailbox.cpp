@@ -8,6 +8,7 @@
 #include "parser/ast_stmt.h"
 #include "simulator/awaiters.h"
 #include "simulator/eval_function_internal.h"
+#include "simulator/eval_semaphore.h"
 #include "simulator/evaluation.h"
 #include "simulator/exec_task.h"
 #include "simulator/sim_context.h"
@@ -92,12 +93,17 @@ bool TryEvalMailboxMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
   return false;
 }
 
+// §26.3: the target may be a package's mailbox named through the package
+// scope resolution operator, `p::mbx = new(2)`, held under the "p.mbx" key
+// ScopedOrBareTargetKey answers; a package's mailbox is not created today,
+// so the scoped form finds none until it is.
 bool TryMailboxNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
-  if (!stmt->lhs || stmt->lhs->kind != ExprKind::kIdentifier) return false;
   if (!stmt->rhs || stmt->rhs->kind != ExprKind::kCall ||
       stmt->rhs->text != "new")
     return false;
-  auto* mbx = ctx.FindMailbox(stmt->lhs->text);
+  std::string_view key = ScopedOrBareTargetKey(stmt->lhs, arena);
+  if (key.empty()) return false;
+  auto* mbx = ctx.FindMailbox(key);
   if (!mbx) return false;
   mbx->Build(MailboxBoundArg(stmt->rhs, ctx, arena));
   return true;

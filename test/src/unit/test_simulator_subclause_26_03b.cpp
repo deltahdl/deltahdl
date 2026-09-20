@@ -862,4 +862,53 @@ TEST(PackageImportSim, ExplicitlyImportedEnumLiteralInitializesADeclaration) {
             41u);
 }
 
+// §15.3.1 (printed page 373 of ~/LRM.pdf) with §26.3 (printed 808): a
+// package's `semaphore t`, declared with no initializer, is created by the
+// procedural `p1::t = new(1)` as a bucket of one key, so the first try_get(1)
+// procures it and the second finds the bucket empty: 1 * 10 + 0. The
+// statement's target, the package scope resolution `p1::t`, was taken as an
+// identifier alone by TrySemaphoreNewAssign, no class record stands under
+// "p1.t" for TryClassNewAssign, and the statement fell to the generic store,
+// leaving the bucket at its declared zero and both try_get() calls answering
+// 0. The blocking get() is kept out so an unfilled bucket reads 0 rather
+// than suspending the test.
+TEST(PackageScopeReferenceSim, PackageSemaphoreConstructedByScopedNew) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  semaphore t;\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  int a, b, y;\n"
+                      "  initial begin\n"
+                      "    p1::t = new(1);\n"
+                      "    a = p1::t.try_get(1);\n"
+                      "    b = p1::t.try_get(1);\n"
+                      "    y = a * 10 + b;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            10u);
+}
+
+// §15.3.1 (printed page 373) with §15.3.4 (printed 374) and §26.3 (printed
+// 808): the key count `p1::t = new(3)` names is the whole bucket, so three
+// try_get(1) calls procure a key each and a fourth procures none:
+// 1 * 1000 + 1 * 100 + 1 * 10 + 0. A bucket of one would read 1000, and the
+// unfilled bucket of the defect 0.
+TEST(PackageScopeReferenceSim, ScopedNewKeyCountFillsThePackageSemaphore) {
+  EXPECT_EQ(
+      RunAndGet("package p1;\n"
+                "  semaphore t;\n"
+                "endpackage\n"
+                "module top;\n"
+                "  int y;\n"
+                "  initial begin\n"
+                "    p1::t = new(3);\n"
+                "    y = p1::t.try_get(1) * 1000 + p1::t.try_get(1) * 100 +\n"
+                "        p1::t.try_get(1) * 10 + p1::t.try_get(1);\n"
+                "  end\n"
+                "endmodule\n",
+                "y"),
+      1110u);
+}
+
 }  // namespace

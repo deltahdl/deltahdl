@@ -33,6 +33,15 @@ int32_t SemaphoreKeyArg(const Expr* expr, SimContext& ctx, Arena& arena,
 bool TryEvalSemaphoreMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
                                 Logic4Vec& out);
 
+// §15.3.1 and §15.4.1 with §26.3: the key the target of `target = new(...)`
+// is held under -- an identifier's own text, or the "p.name" a package's
+// variable named through the package scope resolution operator, `p::name`,
+// is created under (CreatePackageDataVariables in lowerer_register.cpp),
+// given the arena's lifetime. Empty for any other target shape. Shared with
+// TryMailboxNewAssign, so a semaphore and a mailbox resolve a scoped target
+// alike.
+std::string_view ScopedOrBareTargetKey(const Expr* lhs, Arena& arena);
+
 // §15.3.1: `sem = new(keyCount)` fills the bucket with the keys it names.
 // Returns true when the assignment was a semaphore construction.
 bool TrySemaphoreNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena);
