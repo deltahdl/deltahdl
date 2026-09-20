@@ -21,6 +21,7 @@
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
 #include "simulator/sim_context.h"
+#include "simulator/statement_assign.h"
 
 namespace delta {
 
@@ -121,14 +122,18 @@ static void CreateStaticProperties(ClassTypeInfo* info, Arena& arena) {
 // an object (§8.4, printed 181-182); evaluated as a value, the `new` built
 // nothing and the copy was built on the first reference, reading K as it
 // then stood. Evaluated as the class was built, `module top; int K = 3;
-// class C; static int s = K;` read K before LowerVar had given it 3.
+// class C; static int s = K;` read K before LowerVar had given it 3. The
+// value is stored as an assignment to the property stores it
+// (CoerceToPropertyType): §6.12.1 rounds a real into an integral property, so
+// `static int t = 3.6` holds 4 as the instance property `int p = 3.6` does;
+// stored as evaluated, the static held the real's pattern and read 3.
 static void InitStaticProperty(ClassTypeInfo* info,
                                const ClassTypeInfo::PropertyInfo& p,
                                SimContext& ctx, Arena& arena) {
   if (TryInitStaticSyncProperty(info, p.name, p.init_expr, ctx)) return;
   if (p.init_expr == nullptr) return;
-  info->static_properties[std::string(p.name)] =
-      EvalExpr(p.init_expr, ctx, arena);
+  info->static_properties[std::string(p.name)] = CoerceToPropertyType(
+      info, p.name, EvalExpr(p.init_expr, ctx, arena), arena);
 }
 
 // The static initializers of `info` and, §8.23, of every class nested in it,

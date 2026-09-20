@@ -428,4 +428,41 @@ TEST(RealConversion, RealActualRoundsIntoAClassMethodIntFormal) {
   EXPECT_EQ(var->value.ToUint64(), 13u);
 }
 
+// §8.9 gives a static property one copy that takes its initializer as the
+// class is built, and §6.12.1 rounds a real initializer into an int, so
+// `static int t = 3.6` reads 4 through `C::t`; the instance property `int p =
+// 3.5` beside it already read 4 while the static was stored as the real's
+// pattern and read back truncated to 3.
+TEST(RealConversion, StaticPropertyRealInitializerRoundsIntoAnInt) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  class C;\n"
+      "    static int t = 3.6;\n"
+      "  endclass\n"
+      "  int a;\n"
+      "  initial a = C::t;\n"
+      "endmodule\n",
+      f, "a");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 4u);
+}
+
+// §6.12.1 rounds a half away from zero, so `static int u = -2.5` is -3, where
+// a truncation would read -2.
+TEST(RealConversion, StaticPropertyNegativeRealInitializerRoundsAway) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  class C;\n"
+      "    static int u = -2.5;\n"
+      "  endclass\n"
+      "  int a;\n"
+      "  initial a = C::u;\n"
+      "endmodule\n",
+      f, "a");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), static_cast<uint32_t>(-3));
+}
+
 }  // namespace
