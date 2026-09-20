@@ -9,6 +9,7 @@
 #include "simulator/class_object.h"
 #include "simulator/eval_array.h"
 #include "simulator/eval_array_class_assoc.h"
+#include "simulator/eval_class_array_handles.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
