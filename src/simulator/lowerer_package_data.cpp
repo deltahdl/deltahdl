@@ -455,16 +455,21 @@ static bool InitPackageAggregate(const Expr* init, std::string_view key,
 // §7.4.2 (printed page 154) with §10.9.1 and §26.2 (printed 808): a package
 // fixed-size array's declaration assignment, `int a[2] = '{VAL2, x}`, gives
 // each element the pattern item that reaches it, distributed by
-// CreateArrayElements (lowerer_var.cpp) as a module's is, one item per
-// element, keyed, replicated or positional, in the package's frame the
-// caller has pushed. The elements CreatePackageArray made at their defaults
-// are remade under the same keys holding the items' values: nothing has
-// bound or watched an element yet, the exports binding the carrier alone
-// (AliasExportedName, lowerer_import.cpp), and the carrier itself stays.
-// True where `key` holds a fixed-size array, whose carrier the initializer
-// must not reach. §26.6 (printed pages 815-816): made here rather than at
-// creation, an item naming what another package's export hands on reads the
-// exported declaration; at creation it read 0.
+// InitArrayElements (lowerer_var.cpp) as CreateArrayElements distributes a
+// module's, one item per element, keyed, replicated or positional, in the
+// package's frame the caller has pushed, and written into the element
+// variables CreatePackageArray made at their defaults. §26.6 (printed pages
+// 815-816): an export binds the exporting package's keys to those very
+// element variables (AliasArray in lowerer_import.cpp) between their
+// creation and this, so the items land where `q::a[1]` through the
+// exporter reads and `q::a[0] = 9` writes; remade under the same keys
+// holding the items' values, as they were, the elements the export had
+// bound went stale, `q::a[1]` after p's `int a[2] = '{1, 2}` read 0 and a
+// write through the exporter never reached p's own element. True where
+// `key` holds a fixed-size array, whose carrier the initializer must not
+// reach. Made here rather than at creation, an item naming what another
+// package's export hands on reads the exported declaration; at creation it
+// read 0.
 static bool InitPackageArray(const ModuleItem* item, std::string_view pkg,
                              std::string_view key, SimContext& ctx,
                              Arena& arena) {
@@ -472,7 +477,7 @@ static bool InitPackageArray(const ModuleItem* item, std::string_view pkg,
     return false;
   std::optional<RtlirVariable> var =
       PackageArrayShape(item, pkg, item->init_expr, ctx, arena);
-  if (var) CreateArrayElements(key, *var, ctx, arena);
+  if (var) InitArrayElements(key, *var, ctx, arena);
   return true;
 }
 

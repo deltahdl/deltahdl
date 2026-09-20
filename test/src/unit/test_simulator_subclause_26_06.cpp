@@ -1,6 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <string>
+
 #include "fixture_simulator.h"
+#include "helpers_scheduler.h"
 
 using namespace delta;
 
@@ -293,6 +297,56 @@ TEST(PackageExportSim, MultipleExportedPathsToSameDeclarationDoNotConflict) {
   ASSERT_NE(design, nullptr);
   LowerAndRun(design, f);
   EXPECT_EQ(f.ctx.FindVariable("r")->value.ToUint64(), 88u);
+}
+
+// A design whose package p declares `int a[2] = '{1, 2};` and a function f
+// reading a[0], and whose package q imports p and exports p's names, ahead
+// of the module `top`, whose process reads into y; answers y.
+static uint64_t ExportedArrayRead(const std::string& top) {
+  return RunAndGet(
+      "package p;\n"
+      "  int a[2] = '{1, 2};\n"
+      "  function int f();\n"
+      "    return a[0];\n"
+      "  endfunction\n"
+      "endpackage\n"
+      "package q;\n"
+      "  import p::*;\n"
+      "  export p::*;\n"
+      "endpackage\n" +
+          top,
+      "y");
+}
+
+// §26.6 (printed pages 815-816) with §7.4.2 (printed 154) and §26.2
+// (printed 808): q's `export p::*` hands p's array on, so `q::a[1]` and
+// `q::a[0]` through the exporter's qualifier are the elements p's
+// declaration assignment `'{1, 2}` gave their values: 2 * 10 + 1. The
+// export bound the elements as they stood at creation, at their defaults,
+// and p's initializer then remade the elements under p's keys
+// (InitPackageArray in lowerer_package_data.cpp), so the exporter's keys
+// held the stale elements and both read 0. The initializer is now written
+// into the elements the export bound (InitArrayElements, lowerer_var.cpp).
+TEST(PackageExportSim, ExportedInitializedFixedSizeArrayReadThroughExporter) {
+  EXPECT_EQ(ExportedArrayRead("module top;\n"
+                              "  int y;\n"
+                              "  initial y = q::a[1] * 10 + q::a[0];\n"
+                              "endmodule\n"),
+            21u);
+}
+
+// §26.6: p's a and q's a are one declaration, so `q::a[0] = 9` through the
+// exporter is the element p's own f() reads: 9. A write landing on a stale
+// element the export bound left p's element at its initializer's 1.
+TEST(PackageExportSim, WriteThroughExporterReachesTheDeclaringPackagesElement) {
+  EXPECT_EQ(ExportedArrayRead("module top;\n"
+                              "  int y;\n"
+                              "  initial begin\n"
+                              "    q::a[0] = 9;\n"
+                              "    y = p::f();\n"
+                              "  end\n"
+                              "endmodule\n"),
+            9u);
 }
 
 }  // namespace

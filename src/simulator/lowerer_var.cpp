@@ -3,7 +3,6 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
-#include <utility>
 #include <vector>
 
 #include "common/arena.h"
@@ -191,11 +190,14 @@ static void InitArrayFromNamed(const RtlirVariable& var, uint32_t idx,
 
 namespace {
 // §7.4.2: bundle for materializing the leaves of a fixed multidimensional
-// unpacked array, keeping the recursive walk within the parameter-count limit.
+// unpacked array, keeping the recursive walk within the parameter-count limit;
+// `in_place` writes each leaf already standing under its key rather than
+// creating one (InitArrayElements).
 struct MultiDimArray {
   const RtlirVariable& var;
   SimContext& ctx;
   Arena& arena;
+  bool in_place = false;
 };
 }  // namespace
 
@@ -248,15 +250,37 @@ static const Expr* SelectDimItem(const Expr* pat, uint32_t idx, uint32_t pos,
   return pos < pat->elements.size() ? pat->elements[pos] : nullptr;
 }
 
-// Materializes one leaf variable of the array and gives it the value of the
-// pattern item that reached it, or §6.8 Table 6-7's default when none did.
-static void CreateMultiDimLeaf(const MultiDimArray& m, const std::string& name,
-                               const Expr* item) {
+// Materializes one leaf variable of the array under `name`, a variable of
+// the array's element type: its state-ness and signedness are the
+// declaration's (§6.11.2, §6.11.3), and its index resolves as the
+// declaration's packed dimension says (§11.5.1).
+static Variable* NewMultiDimLeaf(const MultiDimArray& m,
+                                 const std::string& name) {
   auto* stored = m.arena.Create<std::string>(name);
   auto* elem = m.ctx.CreateVariable(*stored, m.var.width);
   RecordPackedRange(m.var.dtype, elem, m.ctx, m.arena);
   elem->is_4state = m.var.is_4state;
   elem->is_signed = m.var.is_signed;
+  return elem;
+}
+
+// The element variable standing under `key`, for a fill in place; null where
+// none does. Read straight from the table: the fill runs in a package's frame,
+// which SimContext::FindVariable would resolve the complete key against.
+static Variable* ExistingElement(SimContext& ctx, const std::string& key) {
+  const auto& variables = ctx.GetVariables();
+  auto found = variables.find(key);
+  return found == variables.end() ? nullptr : found->second;
+}
+
+// Gives one leaf variable of the array the value of the pattern item that
+// reached it, or §6.8 Table 6-7's default when none did -- the leaf made
+// here, or the one already standing under its key for a walk in place.
+static void CreateMultiDimLeaf(const MultiDimArray& m, const std::string& name,
+                               const Expr* item) {
+  Variable* elem =
+      m.in_place ? ExistingElement(m.ctx, name) : NewMultiDimLeaf(m, name);
+  if (elem == nullptr) return;
   if (!item) {
     // §6.8, Table 6-7: nothing covered this leaf, so it keeps the default
     // initial value of its type -- the 'x CreateVariable seeded for a 4-state
@@ -322,6 +346,12 @@ static void CreateMultiDimLeaves(const MultiDimArray& m,
   }
 }
 
+// §7.4.4: two dimensions or more, the bounds of every one folded.
+static bool IsMultiDimArray(const RtlirVariable& var) {
+  return var.unpacked_dim_sizes.size() >= 2 &&
+         var.unpacked_dims.size() == var.unpacked_dim_sizes.size();
+}
+
 // §7.4.2: register a fixed multidimensional unpacked array and create its
 // leaves. The single-dimension lo/size keep describing the outermost dimension
 // (so existing whole-array and outer-index paths still work), while dim_los /
@@ -329,8 +359,7 @@ static void CreateMultiDimLeaves(const MultiDimArray& m,
 static bool TryCreateMultiDimArray(std::string_view name,
                                    const RtlirVariable& var, SimContext& ctx,
                                    Arena& arena) {
-  if (var.unpacked_dim_sizes.size() < 2) return false;
-  if (var.unpacked_dims.size() != var.unpacked_dim_sizes.size()) return false;
+  if (!IsMultiDimArray(var)) return false;
   ArrayInfo info;
   info.lo = static_cast<uint32_t>(var.unpacked_lo);
   info.size = var.unpacked_size;
@@ -356,6 +385,34 @@ static bool TryCreateMultiDimArray(std::string_view name,
   return true;
 }
 
+// §7.4.2: "name[idx]", the address of position `i` counted from the low bound.
+static std::string ArrayElementKey(std::string_view name,
+                                   const RtlirVariable& var, uint32_t i) {
+  uint32_t idx = static_cast<uint32_t>(var.unpacked_lo) + i;
+  return std::string(name) + "[" + std::to_string(idx) + "]";
+}
+
+// §10.9.1: the value the declaration's initializer gives the element at
+// position `i` of a one-dimensional array, by the item form the pattern
+// wrote -- keyed, replicated or positional -- or §6.8 Table 6-7's default
+// where it names none; a keyed item is found by the element's address and a
+// positional one counted from the declaration's left bound (§11.5.2).
+static void FillArrayElement(const RtlirVariable& var, uint32_t i,
+                             Variable* elem, SimContext& ctx, Arena& arena) {
+  bool named = var.init_expr && !var.init_expr->pattern_keys.empty();
+  bool replicate = var.init_expr && var.init_expr->elements.size() == 1 &&
+                   var.init_expr->elements[0]->kind == ExprKind::kReplicate;
+  uint32_t idx = static_cast<uint32_t>(var.unpacked_lo) + i;
+  uint32_t pat_idx = var.is_descending ? (var.unpacked_size - 1 - i) : i;
+  if (named) {
+    InitArrayFromNamed(var, idx, elem, ctx, arena);
+  } else if (replicate) {
+    InitArrayFromReplicate(var, pat_idx, elem, ctx, arena);
+  } else {
+    InitArrayElement(var, pat_idx, elem, ctx, arena);
+  }
+}
+
 void CreateArrayElements(std::string_view name, const RtlirVariable& var,
                          SimContext& ctx, Arena& arena) {
   if (var.unpacked_size == 0) return;
@@ -369,13 +426,8 @@ void CreateArrayElements(std::string_view name, const RtlirVariable& var,
   info.elem_type_kind = var.elem_type_kind;
   ctx.RegisterArray(name, info);
 
-  bool named = var.init_expr && !var.init_expr->pattern_keys.empty();
-  bool replicate = var.init_expr && var.init_expr->elements.size() == 1 &&
-                   var.init_expr->elements[0]->kind == ExprKind::kReplicate;
   for (uint32_t i = 0; i < var.unpacked_size; ++i) {
-    uint32_t idx = static_cast<uint32_t>(var.unpacked_lo) + i;
-    auto elem_name = std::string(name) + "[" + std::to_string(idx) + "]";
-    auto* stored = arena.Create<std::string>(std::move(elem_name));
+    auto* stored = arena.Create<std::string>(ArrayElementKey(name, var, i));
     auto* elem = ctx.CreateVariable(*stored, var.width);
     RecordPackedRange(var.dtype, elem, ctx, arena);
     // §6.11.2: in a 2-state type "any unknown or high-impedance bits shall be
@@ -392,14 +444,21 @@ void CreateArrayElements(std::string_view name, const RtlirVariable& var,
     // rather than by whatever value flowed in.
     elem->is_4state = var.is_4state;
     elem->is_signed = var.is_signed;
-    uint32_t pat_idx = var.is_descending ? (var.unpacked_size - 1 - i) : i;
-    if (named) {
-      InitArrayFromNamed(var, idx, elem, ctx, arena);
-    } else if (replicate) {
-      InitArrayFromReplicate(var, pat_idx, elem, ctx, arena);
-    } else {
-      InitArrayElement(var, pat_idx, elem, ctx, arena);
-    }
+    FillArrayElement(var, i, elem, ctx, arena);
+  }
+}
+
+void InitArrayElements(std::string_view name, const RtlirVariable& var,
+                       SimContext& ctx, Arena& arena) {
+  if (var.unpacked_size == 0) return;
+  if (IsMultiDimArray(var)) {
+    CreateMultiDimLeaves(MultiDimArray{var, ctx, arena, /*in_place=*/true},
+                         std::string(name), 0, ArrayInitPattern(var.init_expr));
+    return;
+  }
+  for (uint32_t i = 0; i < var.unpacked_size; ++i) {
+    Variable* elem = ExistingElement(ctx, ArrayElementKey(name, var, i));
+    if (elem != nullptr) FillArrayElement(var, i, elem, ctx, arena);
   }
 }
 

@@ -76,6 +76,16 @@ void RegisterAggregateLayout(std::string_view name, const DataType* dtype,
 // makes a module's arrays through it.
 void CreateArrayElements(std::string_view name, const RtlirVariable& var,
                          SimContext& ctx, Arena& arena);
+// §7.4.2 with §10.9.1: the declaration's initializer distributed over the
+// element variables already standing under `name`, made at their defaults
+// by CreateArrayElements, each written in place -- the one Variable object
+// every alias of the element shares (§26.6's export, AliasArray in
+// lowerer_import.cpp). An element no item of the pattern reaches keeps what
+// it holds. Defined in src/simulator/lowerer_var.cpp beside
+// CreateArrayElements; InitPackageArray (lowerer_package_data.cpp) fills a
+// package's or the unit's array through it once every export is bound.
+void InitArrayElements(std::string_view name, const RtlirVariable& var,
+                       SimContext& ctx, Arena& arena);
 // §7.10 with §7.5.1: fills the queue or dynamic array `q` from a
 // declaration's initializer `init`: a new[] constructor sizes it and copies
 // the optional source, an assignment pattern or an unpacked array
