@@ -569,4 +569,117 @@ TEST(PackageScopeReferenceSim, PackageQualifiedHandleMethodCallChained) {
             21u);
 }
 
+// §26.3 (printed page 808) with §13.5.5 (printed 351): the parentheses after
+// a void function or a task that takes no arguments are optional, so
+// `p1::h.m;` and `p1::h.t;` through a package-qualified handle run C's m and
+// t on p1's object: v = 8, then v = 8 + 30 = 38. The parenthesis-free
+// statement's receiver was taken as an identifier alone, so the statement
+// read m and t as properties and discarded the values, and y stayed 0.
+TEST(PackageScopeReferenceSim,
+     PackageQualifiedHandleParenthesisFreeMethodStatement) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  class C;\n"
+                      "    int v;\n"
+                      "    function void m();\n"
+                      "      v = 8;\n"
+                      "    endfunction\n"
+                      "    task t;\n"
+                      "      v = v + 30;\n"
+                      "    endtask\n"
+                      "  endclass\n"
+                      "  C h;\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  int y;\n"
+                      "  initial begin\n"
+                      "    p1::h = new;\n"
+                      "    p1::h.m;\n"
+                      "    p1::h.t;\n"
+                      "    y = p1::h.v;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            38u);
+}
+
+// §26.3 (printed page 808) with §18.7: randomize() called through a
+// package-qualified handle, `p1::h.randomize()`, solves p1's object's
+// constraints, so `r == 9` leaves r at 9 and the call answers 1: y = 19. The
+// randomize receiver was taken as an identifier alone, so the scoped call
+// resolved no object, drew nothing, and y stayed 0.
+TEST(PackageScopeReferenceSim, PackageQualifiedHandleRandomize) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  class C;\n"
+                      "    rand bit [3:0] r;\n"
+                      "    constraint c { r == 9; }\n"
+                      "  endclass\n"
+                      "  C h;\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  int y;\n"
+                      "  initial begin\n"
+                      "    p1::h = new;\n"
+                      "    y = p1::h.randomize() * 10 + p1::h.r;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            19u);
+}
+
+// §26.3 (printed page 808) with §18.8 and §18.9: rand_mode() and
+// constraint_mode() through a package-qualified handle, in the named form
+// `p1::h.c.constraint_mode(...)` and the no-name form `p1::h.rand_mode(0)`,
+// read and set p1's object's modes: both read 1 at first, 11, and 0 each
+// once turned off, so y = 11 * 100 + 0 = 1100. The receivers were taken as
+// an identifier alone -- the no-name scoped form read as an object p1's
+// member h -- so nothing was resolved and y stayed 0.
+TEST(PackageScopeReferenceSim,
+     PackageQualifiedHandleRandModeAndConstraintMode) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  class C;\n"
+                      "    rand bit [3:0] r;\n"
+                      "    constraint c { r == 9; }\n"
+                      "  endclass\n"
+                      "  C h;\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  int y;\n"
+                      "  initial begin\n"
+                      "    p1::h = new;\n"
+                      "    y = p1::h.c.constraint_mode() * 10 + "
+                      "p1::h.r.rand_mode();\n"
+                      "    p1::h.c.constraint_mode(0);\n"
+                      "    p1::h.rand_mode(0);\n"
+                      "    y = y * 100 + p1::h.c.constraint_mode() * 10 + "
+                      "p1::h.r.rand_mode();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            1100u);
+}
+
+// §26.3 (printed page 808) with §7.10.2: a queue's methods called through
+// the package-qualified name of a package's queue, `p1::q.push_back(4)`,
+// `p1::q.push_back(6)` and `p1::q.size()`, act on p1's queue, so
+// `p1::q[1] * 10 + p1::q.size()` reads 62. The queue call's scoped receiver
+// was resolved as a class's static property alone, so nothing was pushed
+// and y stayed 0. This also depends on the package queue's storage being
+// created under the "p1.q" key (#313); until it is, the receiver names no
+// queue.
+TEST(PackageScopeReferenceSim, PackageQualifiedQueuePushBackAndSize) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  int q[$];\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  int y;\n"
+                      "  initial begin\n"
+                      "    p1::q.push_back(4);\n"
+                      "    p1::q.push_back(6);\n"
+                      "    y = p1::q[1] * 10 + p1::q.size();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            62u);
+}
+
 }  // namespace

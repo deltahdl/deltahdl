@@ -85,7 +85,6 @@ void BindFunctionArgs(const ModuleItem* func, const Expr* expr, SimContext& ctx,
 // eval_function_args.cpp; the copy-out on return in
 // eval_function_args_writeback.cpp asks it for the same pairing.
 int ResolveArgIndex(const ModuleItem* func, const Expr* expr, size_t param_idx);
-
 // The actual arguments of one call, as §35.6.1 "Argument passing" and §11.12
 // "Let construct" each describe them: the call-site expression, the boundary
 // between the positional actuals and the named ones, and the environment the
@@ -173,9 +172,19 @@ std::string_view ScopedClassKey(const Expr* scope, Arena& arena);
 // ExtractMethodCallParts answers for an identifier receiver, that key for a
 // scoped one, and false for any other shape. Defined in
 // eval_instance_task.cpp; shared with eval_function.cpp, which dispatches the
-// call expression, where the statement form is resolved beside it.
+// call expression, where the statement form is resolved beside it, and with
+// every built-in method's receiver -- the process, semaphore, array, queue
+// and randomize paths -- which took an identifier alone.
 bool ExtractHandleMethodCallParts(const Expr* expr, Arena& arena,
                                   MethodCallParts& out);
+
+// The same for the member access `access` itself, `h.m` or `p1::h.m`, the
+// receiver of a call and the parenthesis-free statement §13.5.5 allows, a
+// reduction or locator written without its parentheses (§7.12), and the
+// `h.x` a named rand_mode() or constraint_mode() call is made on (§18.8,
+// §18.9). `var_name` is the handle's key and `method_name` the member.
+bool ExtractHandleAccessParts(const Expr* access, Arena& arena,
+                              MethodCallParts& out);
 
 // §8.7/§8.15: whether `call`, a `super.new(...)` call, is one the construction
 // of the object has already made -- the first statement of the constructor of

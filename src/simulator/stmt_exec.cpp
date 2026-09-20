@@ -426,13 +426,14 @@ static ExecTask ExecWaitFork(SimContext& ctx) {
   co_return StmtResult::kDone;
 }
 
-// Resolves the process targeted by a `<handle>.await()` call and validates it,
-// emitting the relevant diagnostic and returning nullptr when the call does not
-// resolve to a process that may legally be awaited. A non-null result is a
-// process the caller should suspend on.
-static Process* ResolveProcessAwaitTarget(const Expr* expr, SimContext& ctx) {
+// The process a `<handle>.await()` call targets, validated: null, with the
+// diagnostic, where the call names none a process may legally await. §26.3
+// admits a package-qualified handle, `p::proc.await()`, by the key
+// ExtractHandleMethodCallParts answers.
+static Process* ResolveProcessAwaitTarget(const Expr* expr, SimContext& ctx,
+                                          Arena& arena) {
   MethodCallParts parts;
-  if (!ExtractMethodCallParts(expr, parts) ||
+  if (!ExtractHandleMethodCallParts(expr, arena, parts) ||
       ctx.GetVariableClassType(parts.var_name) != "process" ||
       parts.method_name != "await") {
     return nullptr;
@@ -462,18 +463,16 @@ static Process* ResolveProcessAwaitTarget(const Expr* expr, SimContext& ctx) {
 
 static ExecTask ExecProcessAwait(const Expr* expr, SimContext& ctx,
                                  Arena& arena) {
-  (void)arena;
-  auto* proc = ResolveProcessAwaitTarget(expr, ctx);
-  if (proc) {
-    co_await ProcessAwaitAwaiter{proc};
-  }
+  auto* proc = ResolveProcessAwaitTarget(expr, ctx, arena);
+  if (proc) co_await ProcessAwaitAwaiter{proc};
   co_return StmtResult::kDone;
 }
 
 // Reports whether the expression is a `<process handle>.await()` method call.
-static bool IsProcessAwaitCall(const Expr* expr, SimContext& ctx) {
+static bool IsProcessAwaitCall(const Expr* expr, SimContext& ctx,
+                               Arena& arena) {
   MethodCallParts parts;
-  return ExtractMethodCallParts(expr, parts) &&
+  return ExtractHandleMethodCallParts(expr, arena, parts) &&
          ctx.GetVariableClassType(parts.var_name) == "process" &&
          parts.method_name == "await";
 }
@@ -515,7 +514,7 @@ static ExecTask ExecInlineTaskCall(const Stmt* stmt, SimContext& ctx,
     co_return StmtResult::kDone;
   }
 
-  if (IsProcessAwaitCall(expr, ctx)) {
+  if (IsProcessAwaitCall(expr, ctx, arena)) {
     co_return co_await ExecProcessAwait(expr, ctx, arena);
   }
 

@@ -44,9 +44,10 @@ bool ExtractConstraintModeParts(const Expr* expr, std::string_view& obj_name,
     constraint_name = {};
     return true;
   }
-  // Named form: the receiver is object.constraint_id.
-  if (recv->kind == ExprKind::kMemberAccess && recv->lhs &&
-      recv->lhs->kind == ExprKind::kIdentifier && recv->rhs &&
+  // Named form: the receiver is object.constraint_id. A scope resolution,
+  // `p::h`, is no object's member; ExtractScopedModeParts takes it.
+  if (recv->kind == ExprKind::kMemberAccess && !recv->is_scope_resolution &&
+      recv->lhs && recv->lhs->kind == ExprKind::kIdentifier && recv->rhs &&
       recv->rhs->kind == ExprKind::kIdentifier) {
     obj_name = recv->lhs->text;
     constraint_name = recv->rhs->text;
@@ -89,15 +90,53 @@ bool ExtractRandModeParts(const Expr* expr, std::string_view& obj_name,
     var_name = {};
     return true;
   }
-  // Named form: the receiver is object.random_variable.
-  if (recv->kind == ExprKind::kMemberAccess && recv->lhs &&
-      recv->lhs->kind == ExprKind::kIdentifier && recv->rhs &&
+  // Named form: the receiver is object.random_variable. A scope resolution,
+  // `p::h`, is no object's member; ExtractScopedModeParts takes it.
+  if (recv->kind == ExprKind::kMemberAccess && !recv->is_scope_resolution &&
+      recv->lhs && recv->lhs->kind == ExprKind::kIdentifier && recv->rhs &&
       recv->rhs->kind == ExprKind::kIdentifier) {
     obj_name = recv->lhs->text;
     var_name = recv->rhs->text;
     return true;
   }
   return false;
+}
+
+// §26.3 with §18.8 and §18.9: rand_mode() and constraint_mode() through a
+// package-qualified handle -- the no-name form `p::h.rand_mode(...)`, whose
+// receiver is the scoped handle, and the named form `p::h.x.rand_mode(...)`,
+// whose receiver is a member access on it -- with the handle's "p.h" key in
+// `obj_name` and the member, or nothing, in `name`. The two extractors above
+// take an identifier handle alone, and read the no-name scoped form as an
+// object p's member h, which nothing answered. False for any other call; the
+// element form, `p::h.arr[i].rand_mode(...)`, is not taken.
+static bool ExtractScopedModeParts(const Expr* expr, std::string_view method,
+                                   Arena& arena, std::string_view& obj_name,
+                                   std::string_view& name) {
+  if (!expr || expr->kind != ExprKind::kCall) return false;
+  const Expr* callee = expr->lhs;
+  if (!callee || callee->kind != ExprKind::kMemberAccess || !callee->rhs ||
+      callee->rhs->kind != ExprKind::kIdentifier ||
+      callee->rhs->text != method || !callee->lhs) {
+    return false;
+  }
+  const Expr* recv = callee->lhs;
+  MethodCallParts parts;
+  if (recv->kind == ExprKind::kMemberAccess && recv->is_scope_resolution) {
+    if (!ExtractHandleMethodCallParts(expr, arena, parts)) return false;
+    obj_name = parts.var_name;
+    name = {};
+    return true;
+  }
+  if (recv->kind != ExprKind::kMemberAccess || !recv->lhs ||
+      recv->lhs->kind != ExprKind::kMemberAccess ||
+      !recv->lhs->is_scope_resolution ||
+      !ExtractHandleAccessParts(recv, arena, parts)) {
+    return false;
+  }
+  obj_name = parts.var_name;
+  name = parts.method_name;
+  return true;
 }
 
 // 18.8: report whether a random variable is active on this object. Every
@@ -240,10 +279,14 @@ bool BareRandomizeInMethod(const Expr* expr, SimContext& ctx,
 
 }  // namespace
 
+// §26.3 admits a package-qualified handle as the receiver of randomize(),
+// srandom(), get_randstate() and set_randstate(), `p::h.randomize()`,
+// resolved by the key ExtractHandleMethodCallParts answers; taken as an
+// identifier alone, the scoped call resolved no object and drew nothing.
 bool TryEvalRandomizeMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
                                 Logic4Vec& out) {
   MethodCallParts parts;
-  if (!ExtractMethodCallParts(expr, parts) &&
+  if (!ExtractHandleMethodCallParts(expr, arena, parts) &&
       !BareRandomizeInMethod(expr, ctx, parts))
     return false;
   if (parts.method_name != "randomize") return false;
@@ -445,7 +488,7 @@ bool TryEvalScopeRandomizeCall(const Expr* expr, SimContext& ctx, Arena& arena,
 bool TryEvalObjectSrandom(const Expr* expr, SimContext& ctx, Arena& arena,
                           Logic4Vec& out) {
   MethodCallParts parts;
-  if (!ExtractMethodCallParts(expr, parts)) return false;
+  if (!ExtractHandleMethodCallParts(expr, arena, parts)) return false;
   if (parts.method_name != "srandom") return false;
   ClassObject* obj = ResolveRandomizeTarget(ctx, parts);
   if (!obj) return false;
@@ -467,7 +510,7 @@ bool TryEvalObjectSrandom(const Expr* expr, SimContext& ctx, Arena& arena,
 bool TryEvalObjectGetRandState(const Expr* expr, SimContext& ctx, Arena& arena,
                                Logic4Vec& out) {
   MethodCallParts parts;
-  if (!ExtractMethodCallParts(expr, parts)) return false;
+  if (!ExtractHandleMethodCallParts(expr, arena, parts)) return false;
   if (parts.method_name != "get_randstate") return false;
   ClassObject* obj = ResolveRandomizeTarget(ctx, parts);
   if (!obj) return false;
@@ -483,7 +526,7 @@ bool TryEvalObjectGetRandState(const Expr* expr, SimContext& ctx, Arena& arena,
 bool TryEvalObjectSetRandState(const Expr* expr, SimContext& ctx, Arena& arena,
                                Logic4Vec& out) {
   MethodCallParts parts;
-  if (!ExtractMethodCallParts(expr, parts)) return false;
+  if (!ExtractHandleMethodCallParts(expr, arena, parts)) return false;
   if (parts.method_name != "set_randstate") return false;
   ClassObject* obj = ResolveRandomizeTarget(ctx, parts);
   if (!obj) return false;
@@ -529,8 +572,11 @@ bool TryEvalObjectConstraintMode(const Expr* expr, SimContext& ctx,
                                  Arena& arena, Logic4Vec& out) {
   std::string_view obj_name;
   std::string_view constraint_name;
-  if (!ExtractConstraintModeParts(expr, obj_name, constraint_name))
+  if (!ExtractConstraintModeParts(expr, obj_name, constraint_name) &&
+      !ExtractScopedModeParts(expr, "constraint_mode", arena, obj_name,
+                              constraint_name)) {
     return false;
+  }
   MethodCallParts parts;
   parts.var_name = obj_name;
   ClassObject* obj = ResolveRandomizeTarget(ctx, parts);
@@ -564,7 +610,10 @@ bool TryEvalObjectRandMode(const Expr* expr, SimContext& ctx, Arena& arena,
   std::string_view obj_name;
   std::string_view var_name;
   const Expr* element = nullptr;
-  if (!ExtractRandModeParts(expr, obj_name, var_name, element)) return false;
+  if (!ExtractRandModeParts(expr, obj_name, var_name, element) &&
+      !ExtractScopedModeParts(expr, "rand_mode", arena, obj_name, var_name)) {
+    return false;
+  }
   MethodCallParts parts;
   parts.var_name = obj_name;
   ClassObject* obj = ResolveRandomizeTarget(ctx, parts);

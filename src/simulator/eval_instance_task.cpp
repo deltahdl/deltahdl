@@ -48,32 +48,48 @@ static bool ResolveStaticTaskByScope(const Expr* expr, SimContext& ctx,
   return true;
 }
 
-// §26.3 with §8.6: the receiver a package-qualified handle names, by the key
-// its storage and its class record are held under; see the declaration in
-// eval_function_internal.h. Taken as an identifier alone, `p1::h.m()` and
-// `p1::h.t(5);` resolved no object, so the call ran on none and answered 0.
-bool ExtractHandleMethodCallParts(const Expr* expr, Arena& arena,
-                                  MethodCallParts& out) {
-  if (ExtractMethodCallParts(expr, out)) return true;
-  const Expr* access = expr->lhs;
+// §26.3: whether `expr` is a package-qualified name, `p1::h`, the scope
+// resolution of two identifiers the parser leaves it as.
+static bool IsPackageQualifiedName(const Expr* expr) {
+  return expr->kind == ExprKind::kMemberAccess && expr->is_scope_resolution &&
+         expr->lhs != nullptr && expr->rhs != nullptr &&
+         expr->lhs->kind == ExprKind::kIdentifier &&
+         expr->rhs->kind == ExprKind::kIdentifier;
+}
+
+// §26.3 with §8.6: the handle and the member of the member access `access`,
+// the handle by the key its storage and its class record are held under;
+// see the declaration in eval_function_internal.h. The identifier handle is
+// taken as ExtractMethodCallParts takes it, `C::m` with it, and the scoped
+// handle only under a member access that is no scope resolution, so that
+// `p::C::m` stays a static-scope call. Taken as an identifier alone,
+// `p1::h.m()` and `p1::h.t(5);` resolved no object, so the call ran on none
+// and answered 0.
+bool ExtractHandleAccessParts(const Expr* access, Arena& arena,
+                              MethodCallParts& out) {
   if (access == nullptr || access->kind != ExprKind::kMemberAccess ||
-      access->is_scope_resolution || access->rhs == nullptr ||
+      access->lhs == nullptr || access->rhs == nullptr ||
       access->rhs->kind != ExprKind::kIdentifier) {
     return false;
   }
-  const Expr* scoped = access->lhs;
-  if (scoped == nullptr || scoped->kind != ExprKind::kMemberAccess ||
-      !scoped->is_scope_resolution || scoped->lhs == nullptr ||
-      scoped->rhs == nullptr || scoped->lhs->kind != ExprKind::kIdentifier ||
-      scoped->rhs->kind != ExprKind::kIdentifier) {
+  const Expr* handle = access->lhs;
+  if (handle->kind == ExprKind::kIdentifier) {
+    out.var_name = handle->text;
+  } else if (!access->is_scope_resolution && IsPackageQualifiedName(handle)) {
+    auto* key = arena.Create<std::string>(std::string(handle->lhs->text) + "." +
+                                          std::string(handle->rhs->text));
+    out.var_name = *key;
+  } else {
     return false;
   }
-  auto* key = arena.Create<std::string>(std::string(scoped->lhs->text) + "." +
-                                        std::string(scoped->rhs->text));
-  out.var_name = *key;
   out.method_name = access->rhs->text;
   out.loc = access->rhs->range.start;
   return true;
+}
+
+bool ExtractHandleMethodCallParts(const Expr* expr, Arena& arena,
+                                  MethodCallParts& out) {
+  return expr != nullptr && ExtractHandleAccessParts(expr->lhs, arena, out);
 }
 
 // §8.13 with §8.20: the method `name` names on the running object, written
@@ -124,18 +140,21 @@ static bool ResolveMethodByParts(const MethodCallParts& parts, SimContext& ctx,
 }
 
 // §13.5.5: the method a statement names without the parentheses. `h.m` is a
-// member access of two identifiers, resolved on the handle's object as the
-// call `h.m(...)` is; a bare `m` inside an instance method is a method of the
-// running object's class or of one it inherits from (§8.13), the override the
-// object's class holds taken first (§8.20). False for any other expression,
-// for a member that is a property and for a name that is a variable.
+// member access of a handle and a member, resolved on the handle's object as
+// the call `h.m(...)` is, the handle an identifier or, §26.3, a package's
+// variable named through the package scope resolution operator, `p1::h.m;`,
+// which ExtractHandleAccessParts takes by its "p1.h" key; a bare `m` inside
+// an instance method is a method of the running object's class or of one it
+// inherits from (§8.13), the override the object's class holds taken first
+// (§8.20). False for any other expression, for a member that is a property
+// and for a name that is a variable. Taken as two identifiers alone, the
+// scoped form read m as a property and discarded the value.
 static bool ResolveMethodNamedBare(const Expr* expr, SimContext& ctx,
-                                   InstanceMethodInfo& call) {
-  if (expr->kind == ExprKind::kMemberAccess && !expr->is_scope_resolution &&
-      expr->lhs != nullptr && expr->lhs->kind == ExprKind::kIdentifier &&
-      expr->rhs != nullptr && expr->rhs->kind == ExprKind::kIdentifier) {
-    MethodCallParts parts{expr->lhs->text, expr->rhs->text};
-    return ResolveMethodByParts(parts, ctx, call);
+                                   Arena& arena, InstanceMethodInfo& call) {
+  MethodCallParts parts;
+  if (expr->kind == ExprKind::kMemberAccess && !expr->is_scope_resolution) {
+    return ExtractHandleAccessParts(expr, arena, parts) &&
+           ResolveMethodByParts(parts, ctx, call);
   }
   if (expr->kind != ExprKind::kIdentifier) return false;
   return ResolveMethodOnRunningObject(expr->text, ctx, call);
@@ -155,7 +174,7 @@ static bool ResolveMethodNamedBare(const Expr* expr, SimContext& ctx,
 static bool ResolveMethodOfStatement(const Expr* expr, SimContext& ctx,
                                      Arena& arena, InstanceMethodInfo& call) {
   if (expr->kind != ExprKind::kCall) {
-    return ResolveMethodNamedBare(expr, ctx, call);
+    return ResolveMethodNamedBare(expr, ctx, arena, call);
   }
   if (expr->lhs != nullptr && expr->lhs->kind == ExprKind::kIdentifier &&
       !expr->callee.empty()) {
@@ -235,7 +254,7 @@ void TeardownInstanceTaskCall(const InstanceMethodInfo& call, const Expr* expr,
 void ExecCallStmtExpr(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr == nullptr) return;
   InstanceMethodInfo call;
-  if (ResolveMethodNamedBare(expr, ctx, call)) {
+  if (ResolveMethodNamedBare(expr, ctx, arena, call)) {
     RunInstanceMethod(call, expr, ctx, arena);
     return;
   }

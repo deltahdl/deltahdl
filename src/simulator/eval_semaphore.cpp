@@ -5,23 +5,28 @@
 
 #include "common/types.h"
 #include "parser/ast_expr.h"
+#include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/sync_objects.h"
 
 namespace delta {
 
+// §26.3 admits a package-qualified semaphore as the receiver, `p::sem.get()`,
+// found under the "p.sem" key ExtractHandleMethodCallParts answers, given the
+// context's arena as the key's lifetime since the signature carries none.
+// This is asked of every call statement, so the method's name is matched
+// before the key is made.
 SemaphoreObject* SemaphoreCallTarget(const Expr* expr, SimContext& ctx,
                                      std::string_view method) {
   if (!expr || expr->kind != ExprKind::kCall) return nullptr;
   const auto* access = expr->lhs;
   if (!access || access->kind != ExprKind::kMemberAccess) return nullptr;
-  if (!access->lhs || access->lhs->kind != ExprKind::kIdentifier)
+  if (!access->rhs || access->rhs->text != method) return nullptr;
+  MethodCallParts parts;
+  if (!ExtractHandleMethodCallParts(expr, ctx.GetArena(), parts))
     return nullptr;
-  if (!access->rhs || access->rhs->kind != ExprKind::kIdentifier)
-    return nullptr;
-  if (access->rhs->text != method) return nullptr;
-  return ctx.FindSemaphore(access->lhs->text);
+  return ctx.FindSemaphore(parts.var_name);
 }
 
 int32_t SemaphoreKeyArg(const Expr* expr, SimContext& ctx, Arena& arena,

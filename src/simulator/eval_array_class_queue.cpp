@@ -145,10 +145,27 @@ QueueObject* ResolveOn(ClassObject* obj, const ClassTypeInfo* from,
   return slot;
 }
 
-// §8.23: `C::name` names the static property `name` of class C.
+// §26.3: the "p.q" key the queue `p::q` names is held under, the key a
+// scoped read resolves by (BuildMemberName in eval_expr.cpp) and a package's
+// queue is created under; empty for a base of another shape.
+std::string PackageQueueKey(const Expr* base) {
+  if (base == nullptr || base->kind != ExprKind::kMemberAccess ||
+      !base->is_scope_resolution || base->lhs == nullptr ||
+      base->rhs == nullptr || base->lhs->kind != ExprKind::kIdentifier ||
+      base->rhs->kind != ExprKind::kIdentifier) {
+    return {};
+  }
+  return std::string(base->lhs->text) + "." + std::string(base->rhs->text);
+}
+
+// §8.23: `C::name` names the static property `name` of class C; §26.3:
+// `p::q` names the queue package p declares, under its "p.q" key. Resolved
+// as a static property alone, `p1::q.push_back(4)` found no class p1 and
+// pushed nothing.
 QueueObject* ScopeResolvedQueueProperty(const Expr* base, SimContext& ctx) {
   if (base->lhs == nullptr || base->lhs->kind != ExprKind::kIdentifier)
     return nullptr;
+  if (auto* q = ctx.FindQueue(PackageQueueKey(base))) return q;
   const ClassTypeInfo* cls = ctx.FindClassType(base->lhs->text);
   if (cls == nullptr) return nullptr;
   return ResolveOn(nullptr, cls, base->rhs->text, ctx, nullptr);
@@ -225,6 +242,8 @@ void AnnounceQueueChange(const Expr* base, ClassObject* owner,
     ctx.NotifyClassHandleWatchers(owner->handle);
   } else if (base != nullptr && base->kind == ExprKind::kIdentifier) {
     NotifyOwningVar(ctx, base->text);
+  } else if (std::string key = PackageQueueKey(base); !key.empty()) {
+    NotifyOwningVar(ctx, key);
   }
 }
 

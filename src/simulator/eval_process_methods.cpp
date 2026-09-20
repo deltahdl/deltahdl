@@ -216,10 +216,12 @@ static void EvalProcessSetRandState(Process* proc, const Expr* expr,
   out = MakeLogic4VecVal(arena, 1, 0);
 }
 
+// §26.3 admits a package-qualified handle as the receiver, `p::proc.kill()`,
+// resolved by the key ExtractHandleMethodCallParts answers.
 bool TryEvalProcessMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
                               Logic4Vec& out) {
   MethodCallParts parts;
-  if (!ExtractMethodCallParts(expr, parts)) return false;
+  if (!ExtractHandleMethodCallParts(expr, arena, parts)) return false;
   if (ctx.GetVariableClassType(parts.var_name) != "process") return false;
   auto* var = ctx.FindVariable(parts.var_name);
   if (!var) return false;

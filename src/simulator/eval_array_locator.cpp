@@ -12,6 +12,7 @@
 #include "simulator/eval_array.h"
 #include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_array_internal.h"
+#include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/variable.h"
@@ -233,16 +234,15 @@ static void LocatorUniqueIndexWith(const LocatorCtx& lc,
   DedupeLocatorResults(lc, /*use_index=*/true, out);
 }
 
-static bool ExtractLocatorParts(const Expr* expr, MethodCallParts& out) {
-  if (expr->kind == ExprKind::kMemberAccess) {
-    if (!expr->lhs || expr->lhs->kind != ExprKind::kIdentifier) return false;
-    if (!expr->rhs || expr->rhs->kind != ExprKind::kIdentifier) return false;
-    out.var_name = expr->lhs->text;
-    out.method_name = expr->rhs->text;
-    return true;
-  }
-
-  return ExtractMethodCallParts(expr, out);
+// The receiver's name and the method of the locator `expr`, the call
+// `recv.method(...)` or the bare member access `recv.method with (...)`.
+// §26.3 admits a package-qualified array as the receiver, `p::a.find(...)`,
+// by the "p.a" key ExtractHandleAccessParts answers.
+static bool ExtractLocatorParts(const Expr* expr, Arena& arena,
+                                MethodCallParts& out) {
+  if (expr->kind == ExprKind::kMemberAccess)
+    return ExtractHandleAccessParts(expr, arena, out);
+  return ExtractHandleMethodCallParts(expr, arena, out);
 }
 
 // The receiver of the locator call `expr`, in either of its spellings -- the
@@ -636,7 +636,7 @@ bool TryCollectLocatorResult(const Expr* expr, SimContext& ctx, Arena& arena,
   // A property reached through a handle has no bare name to extract, so the
   // associative receiver is asked for first, by expression.
   AssocArrayObject* aa = LocatorAssocReceiver(expr, parts, ctx, arena);
-  if (aa == nullptr && !ExtractLocatorParts(expr, parts)) return false;
+  if (aa == nullptr && !ExtractLocatorParts(expr, arena, parts)) return false;
   if (!IsLocatorMethod(parts.method_name)) return false;
 
   if (!expr->args.empty() && !expr->with_expr) {

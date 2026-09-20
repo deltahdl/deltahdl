@@ -14,6 +14,7 @@
 #include "common/types.h"
 #include "parser/ast_expr.h"
 #include "simulator/eval_array_internal.h"
+#include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/variable.h"
@@ -445,10 +446,12 @@ static bool DispatchQuery(std::string_view method, const ArrayCtx& ac,
   return false;
 }
 
+// §26.3 admits a package-qualified array as the receiver, `p::a.sum()`,
+// resolved by the key ExtractHandleMethodCallParts answers.
 bool TryEvalArrayMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
                             Logic4Vec& out) {
   MethodCallParts parts;
-  if (!ExtractMethodCallParts(expr, parts)) return false;
+  if (!ExtractHandleMethodCallParts(expr, arena, parts)) return false;
   ArrayInfo scratch;
   const auto* info =
       ArrayInfoForReduction(parts.var_name, parts.method_name, ctx, scratch);
@@ -734,9 +737,11 @@ static void ExecOrderingMethod(const MethodCallParts& parts,
   ArrayShuffle(parts.var_name, info, ctx, arena);
 }
 
+// §26.3 admits a package-qualified array as the receiver, `p::a.sort()`,
+// resolved by the key ExtractHandleMethodCallParts answers.
 bool TryExecArrayMethodStmt(const Expr* expr, SimContext& ctx, Arena& arena) {
   MethodCallParts parts;
-  if (!ExtractMethodCallParts(expr, parts)) return false;
+  if (!ExtractHandleMethodCallParts(expr, arena, parts)) return false;
   auto* info = ctx.FindArrayInfo(parts.var_name);
   if (!info) return false;
   if (!IsOrderingMethod(parts.method_name)) return false;
