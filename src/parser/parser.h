@@ -68,9 +68,8 @@ class Parser {
   // and class entries are what §26.3's import declaration and §8.13's extends
   // clause put back, and they are kept past their scope's closing keyword for
   // exactly that reason, so they are carried whole. known_udps_ is the whole
-  // compilation-unit scope already, because TypeNameScope below saves and
-  // restores known_types_ and known_nettypes_ alone and nothing else narrows
-  // it.
+  // compilation-unit scope already: TypeNameScope below saves and restores
+  // known_types_ and known_nettypes_ alone, and nothing else narrows it.
   void AdoptCompilationUnitScope(const CompilationUnitScopeNames& names) {
     AdoptTypeNames(names.own);
     package_types_.insert(names.packages.begin(), names.packages.end());
@@ -762,10 +761,9 @@ class Parser {
   bool AtEnd();
   SourceLoc CurrentLoc();
   void Synchronize();
-  // Synchronize() that guarantees forward progress: a body parse loop that only
-  // terminates on its own end keyword would otherwise spin forever when
-  // Synchronize() halts on a foreign block-closing keyword without consuming
-  // it.
+  // Synchronize() that guarantees forward progress: a body parse loop ending
+  // on its own end keyword alone would spin forever when Synchronize() halts
+  // on a foreign block-closing keyword without consuming it.
   void SynchronizeWithProgress();
 
   // Makes every name of `names` a type name where the parser now stands.

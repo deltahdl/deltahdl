@@ -97,21 +97,26 @@ void VisitEnumTypes(const DataType& type, const std::string& path,
 // holds what the package bound before `until`. Before, the written name was
 // held instead, and a package declaring `VAL[2]` ahead of a wildcard import
 // of a package declaring the same had its own VAL1 replaced by the import's.
+// The constants one enumeration `type` declares, each under the names
+// EnumMemberDeclaredNames answers, added to `names`.
+void AddEnumConstantNames(const DataType& type, const ScopeMap& scope,
+                          std::unordered_set<std::string>& names) {
+  for (const auto& m : type.enum_members) {
+    for (std::string& name : EnumMemberDeclaredNames(m, scope)) {
+      names.insert(std::move(name));
+    }
+  }
+}
+
 std::unordered_set<std::string> NamesDeclaredBefore(const PackageDecl* pkg,
                                                     const ModuleItem* until,
                                                     const ScopeMap& scope) {
   std::unordered_set<std::string> names;
   for (const auto* item : pkg->items) {
     if (item == until) break;
-    if (item->kind == ModuleItemKind::kParamDecl) {
-      names.emplace(item->name);
-    }
+    if (item->kind == ModuleItemKind::kParamDecl) names.emplace(item->name);
     ForEachEnumTypeOfItem(item, [&](std::string_view, const DataType& type) {
-      for (const auto& m : type.enum_members) {
-        for (std::string& name : EnumMemberDeclaredNames(m, scope)) {
-          names.insert(std::move(name));
-        }
-      }
+      AddEnumConstantNames(type, scope, names);
     });
   }
   return names;

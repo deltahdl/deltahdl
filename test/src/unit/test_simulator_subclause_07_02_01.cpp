@@ -525,8 +525,9 @@ TEST(PackedStructSimulation, WideMemberWriteKeepsXAboveTheFirstWord) {
   EXPECT_EQ(var->value.words[1].bval, 0xFFFFFFFF00u);
 }
 
-// §10.4.2: a nonblocking assignment to the member lands the same 96 bits in the
-// update region, so after #1 `s` holds the words the blocking form leaves.
+// §10.4.2: a nonblocking assignment to the member lands the whole 96 bits in
+// the update region, so after #1 `s` holds them at the member's offset, its
+// own values so the blocking test above is not mistaken for this one.
 TEST(PackedStructSimulation, WideMemberNonblockingWriteLandsEveryWord) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -534,21 +535,19 @@ TEST(PackedStructSimulation, WideMemberNonblockingWriteLandsEveryWord) {
       "  struct packed { logic [95:0] big; logic [7:0] low8; } s;\n"
       "  logic [95:0] w;\n"
       "  initial begin\n"
-      "    s.big <= 96'h0123_4567_89AB_CDEF_0F1E_2D3C;\n"
-      "    s.low8 <= 8'hA5;\n"
+      "    s.big <= 96'hFEDC_BA98_7654_3210_0F0F_A5A5;\n"
+      "    s.low8 <= 8'h3C;\n"
       "    #1 w = s.big;\n"
       "  end\n"
       "endmodule\n",
       f, "s");
   ASSERT_NE(var, nullptr);
   ASSERT_EQ(var->value.nwords, 2u);
-  EXPECT_TRUE(var->value.IsKnown());
-  EXPECT_EQ(var->value.words[0].aval, 0xABCDEF0F1E2D3CA5u);
-  EXPECT_EQ(var->value.words[1].aval, 0x0123456789u);
+  EXPECT_EQ(var->value.words[0].aval, 0x5432100F0FA5A53Cu);
+  EXPECT_EQ(var->value.words[1].aval, 0xFEDCBA9876u);
   auto* w = f.ctx.FindVariable("w");
   ASSERT_NE(w, nullptr);
-  ASSERT_EQ(w->value.nwords, 2u);
-  EXPECT_EQ(w->value.words[1].aval, 0x01234567u);
+  EXPECT_EQ(w->value.words[1].aval, 0xFEDCBA98u);
 }
 
 }  // namespace

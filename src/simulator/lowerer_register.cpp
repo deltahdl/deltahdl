@@ -125,7 +125,8 @@ static bool EveryNameHasStorage(const Expr* expr, SimContext& ctx) {
 
 void WidenParamValue(const RtlirParamDecl& param, Variable* var,
                      SimContext& ctx, Arena& arena) {
-  if (var->width <= 64) return;
+  uint32_t width = var->value.width;
+  if (width <= 64) return;
   // ApplyParamOverride in src/elaborator/elaborator_module.cpp records the
   // override's expression, and Elaborator::ApplyDefparamSite a defparam's
   // literal. An override that recorded no expression -- a defparam naming
@@ -143,8 +144,8 @@ void WidenParamValue(const RtlirParamDecl& param, Variable* var,
     // §11.6.1 with §6.20.2: the value is sized to the declaration as an
     // assignment to it is. The words are copied because an expression that is
     // a bare parameter name answers that parameter's own storage.
-    Logic4Vec value = EvalExpr(expr, ctx, arena, var->width);
-    var->value = OwnRhsWords(ResizeToWidth(value, var->width, arena), arena);
+    Logic4Vec value = EvalExpr(expr, ctx, arena, width);
+    var->value = OwnRhsWords(ResizeToWidth(value, width, arena), arena);
   }
   ctx.SetLoweringInstancePrefix(own);
 }

@@ -15,6 +15,7 @@
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator_bind_scope.h"
 #include "elaborator/elaborator_helpers.h"
+#include "elaborator/elaborator_scope_rules_names.h"
 #include "elaborator/property_rewrite.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
@@ -268,9 +269,7 @@ class ElaboratorData {
 
   // The names each package makes directly visible, each with the package
   // declaring it (elaborator_scope_rules_names.h), filled on first use.
-  std::unordered_map<std::string_view,
-                     std::unordered_map<std::string_view, std::string_view>>
-      pkg_provided_names_;
+  ProvidedNameCache pkg_provided_names_;
 
   std::unordered_map<std::string_view, std::pair<std::string_view, SourceLoc>>
       explicit_imports_;

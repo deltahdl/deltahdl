@@ -73,12 +73,11 @@ bool BuildEventTargetName(const Expr* expr, std::string& out) {
   return false;
 }
 
-// Resolves the trigger target to the stable name used to look up its event
-// variable. A bare identifier is returned verbatim -- exactly the token the
-// scope-aware FindVariable already resolves -- so this preserves the original
-// resolution for every non-hierarchical case. Only a member-access path is
-// flattened (and interned in the arena so the view stays valid for the deferred
-// ->> scheduling and the triggered() map, both of which key by string_view).
+// The stable name a trigger target's event variable is looked up by: a bare
+// identifier as written, the token the scope-aware FindVariable resolves, and
+// a member-access path flattened and interned in the arena so the view holds
+// for the deferred ->> scheduling and the triggered() map, both string_view
+// keyed.
 std::string_view ResolveEventTargetName(const Expr* expr, SimContext& ctx) {
   if (!expr) return {};
   if (expr->kind == ExprKind::kIdentifier) return expr->text;
@@ -385,12 +384,11 @@ static ExecTask ExecFork(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   co_return StmtResult::kDone;
 }
 
-// §13.4.4: a function body must not block, so it may spawn background processes
-// only through fork...join_none. This performs the same child-process spawning
-// as ExecFork's join_none path, but as a plain call with no coroutine await, so
-// the synchronous function-body executor (ExecFuncStmt) can run it. A fork with
-// any other join kind inside a function is illegal (it would block) and is left
-// untouched here.
+// §13.4.4: a function body must not block, so it spawns background processes
+// through fork...join_none alone; the same spawning as ExecFork's join_none
+// path, as a plain call with no await, for the synchronous function-body
+// executor (ExecFuncStmt). Any other join kind inside a function is illegal
+// and is left untouched.
 void SpawnForkJoinNone(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (!stmt || stmt->join_kind != TokenKind::kKwJoinNone) return;
   bool labeled = !stmt->label.empty();
@@ -504,6 +502,27 @@ static InlineTaskDisable HandleInlineTaskDisable(const ModuleItem* func,
   return InlineTaskDisable::kPropagate;
 }
 
+// The statements of the task `func` enabled by `expr`, run in turn until one
+// returns, or until a disable reaches it: §9.6.2 ends the task's activation at
+// a disable of its own name, which HandleInlineTaskDisable answers kStopHere
+// for, and passes any other disable on as kDisable for the caller to unwind.
+static ExecTask ExecInlineTaskBody(const ModuleItem* func, const Expr* expr,
+                                   SimContext& ctx, Arena& arena) {
+  bool has_name = !func->name.empty();
+  for (auto* s : func->func_body_stmts) {
+    auto result = co_await ExecStmt(s, ctx, arena);
+    if (result == StmtResult::kReturn) break;
+    if (result == StmtResult::kDisable) {
+      if (HandleInlineTaskDisable(func, expr, has_name, ctx, arena) ==
+          InlineTaskDisable::kStopHere) {
+        break;
+      }
+      co_return StmtResult::kDisable;
+    }
+  }
+  co_return StmtResult::kDone;
+}
+
 static ExecTask ExecInlineTaskCall(const Stmt* stmt, SimContext& ctx,
                                    Arena& arena) {
   auto* expr = stmt->expr;
@@ -544,17 +563,8 @@ static ExecTask ExecInlineTaskCall(const Stmt* stmt, SimContext& ctx,
     ctx.RegisterNamedScope(func->name, ctx.CurrentProcess());
     ctx.PushActiveNamedScope(func->name);
   }
-  for (auto* s : func->func_body_stmts) {
-    auto result = co_await ExecStmt(s, ctx, arena);
-    if (result == StmtResult::kReturn) break;
-    if (result == StmtResult::kDisable) {
-      if (HandleInlineTaskDisable(func, expr, has_name, ctx, arena) ==
-          InlineTaskDisable::kStopHere) {
-        break;
-      }
-      co_return StmtResult::kDisable;
-    }
-  }
+  StmtResult outcome = co_await ExecInlineTaskBody(func, expr, ctx, arena);
+  if (outcome == StmtResult::kDisable) co_return StmtResult::kDisable;
   if (has_name) UnregisterTaskNamedScope(func, ctx);
   TeardownTaskCall(func, expr, ctx, arena);
   co_return StmtResult::kDone;
@@ -686,27 +696,17 @@ static SimCoroutine NbEventTriggerEventCoroutine(const Stmt* stmt,
                          trigger.reactive, ctx);
 }
 
-// §16.4.4: "When a disable is applied to the outermost scope of a procedure
-// that has an active deferred assertion queue, in addition to normal disable
-// activities (see 9.6.2), the deferred assertion report queue is flushed and
-// all pending assertion reports on the queue are cleared." The flush is stated
-// as an effect additional to the §9.6.2 activities and is conditioned on the
-// procedure having a queue, not on the block executing -- the clause's own
-// example disables b2 from `always @(clear_b2) begin : b3`, by which time b2
-// has finished the activation that queued the reports and is suspended on its
-// own event control. A search restricted to the blocks a process is currently
-// inside never reaches it, so the outermost scope is looked up separately.
-//
-// Only the queue is touched. §9.6.2 governs the control-flow half and says of a
-// block that is not currently executing that "the disable has no effect", so
-// the process is left running rather than deactivated.
-// Reports whether the target named the outermost scope of any procedure, so
-// that a name answered here is not also taken for an assertion label below.
-//
-// §16.14.6.4: the same disable flushes the procedure's procedural assertion
-// queue, every pending instance of its procedural concurrent assertions
-// cleared, the matured ones impacted by no disable; the procedure disabling
-// its own outermost scope flushes its own.
+// §16.4.4: a disable of the outermost scope of a procedure holding a deferred
+// assertion queue flushes that queue beside §9.6.2's own activities, whether
+// or not the block is executing -- the clause's own example disables b2 from
+// another always block while b2 sits on its event control -- so the outermost
+// scope is looked up on its own rather than among the blocks a process is
+// inside. The queue alone is touched: §9.6.2 leaves a block that is not
+// executing unaffected, so the process keeps running. §16.14.6.4 has the same
+// disable flush the procedure's procedural assertion queue, its matured
+// attempts untouched, the procedure disabling its own outermost scope flushing
+// its own. Answers whether the target named any procedure's outermost scope,
+// so that a name answered here is not also taken for an assertion label.
 static bool FlushDeferredQueueOfOutermostScope(std::string_view target,
                                                const Process* current,
                                                SimContext& ctx) {
