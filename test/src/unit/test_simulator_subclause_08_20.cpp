@@ -321,4 +321,133 @@ TEST(ClassSim, PackageExternVirtualBodyDispatchedThroughBaseHandle) {
             21u);
 }
 
+// §8.6 with §8.20: a method call whose return type is a class yields a handle,
+// and a property selected on the call applies to the object returned, here the
+// invoking object itself through `return this`. Read as a name, the select
+// reached no object and answered 0; the sentinel tells that from the read.
+TEST(ClassSim, PropertyReadOnMethodCallResult) {
+  EXPECT_EQ(RunAndGet("class Node;\n"
+                      "  int v;\n"
+                      "  function Node self();\n"
+                      "    return this;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int r = 99;\n"
+                      "  Node n = new;\n"
+                      "  initial begin\n"
+                      "    n.v = 30;\n"
+                      "    r = n.self().v;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "r"),
+            30u);
+}
+
+// §8.6: each call in the chain applies to the object the call before it
+// returned, so three levels deep the property read is the last object's.
+TEST(ClassSim, PropertyReadOnThreeChainedMethodCallResults) {
+  EXPECT_EQ(RunAndGet("class Node;\n"
+                      "  int v;\n"
+                      "  Node nxt;\n"
+                      "  function Node mk(int x);\n"
+                      "    Node n = new;\n"
+                      "    n.v = x;\n"
+                      "    n.nxt = this;\n"
+                      "    return n;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int r = 99;\n"
+                      "  Node n = new;\n"
+                      "  initial r = n.mk(1).mk(2).mk(3).v;\n"
+                      "endmodule\n",
+                      "r"),
+            3u);
+}
+
+// §8.6: a handle property selected on the call's result names the object it
+// refers to, and the property read after it is that object's: the node
+// `mk(6)` made links back to the node `mk(5)` made, whose v is 5.
+TEST(ClassSim, PropertyPathOnMethodCallResult) {
+  EXPECT_EQ(RunAndGet("class Node;\n"
+                      "  int v;\n"
+                      "  Node nxt;\n"
+                      "  function Node mk(int x);\n"
+                      "    Node n = new;\n"
+                      "    n.v = x;\n"
+                      "    n.nxt = this;\n"
+                      "    return n;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int r = 99;\n"
+                      "  Node n = new;\n"
+                      "  initial r = n.mk(5).mk(6).nxt.v;\n"
+                      "endmodule\n",
+                      "r"),
+            5u);
+}
+
+// §8.6: a method called on a method call's result runs on the object the
+// first call returned, the non-virtual `get` reading the v that `mk` set.
+TEST(ClassSim, MethodCalledOnMethodCallResult) {
+  EXPECT_EQ(RunAndGet("class Node;\n"
+                      "  int v;\n"
+                      "  function Node mk(int x);\n"
+                      "    Node n = new;\n"
+                      "    n.v = x;\n"
+                      "    return n;\n"
+                      "  endfunction\n"
+                      "  function int get();\n"
+                      "    return v;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int r = 99;\n"
+                      "  Node n = new;\n"
+                      "  initial r = n.mk(30).get();\n"
+                      "endmodule\n",
+                      "r"),
+            30u);
+}
+
+// §8.20: a virtual function's override may return a derived class type of the
+// base's return type, and a virtual method called on that result dispatches
+// by the returned object's type. `c` holds a D, so `some_method` is D's,
+// returning a D whose n is the argument, and `who` is D's: 7 * 10 + 2. C's
+// `who` answers 1, and a select that reaches no object answers 0.
+TEST(ClassSim, VirtualMethodCalledOnMethodCallResult) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  virtual function C some_method(int a);\n"
+                      "    C c = new;\n"
+                      "    return c;\n"
+                      "  endfunction\n"
+                      "  virtual function int who();\n"
+                      "    return 1;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "class D extends C;\n"
+                      "  int n;\n"
+                      "  virtual function D some_method(int a);\n"
+                      "    D d = new;\n"
+                      "    d.n = a;\n"
+                      "    return d;\n"
+                      "  endfunction\n"
+                      "  virtual function int who();\n"
+                      "    return n * 10 + 2;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int r = 99;\n"
+                      "  C c;\n"
+                      "  initial begin\n"
+                      "    c = D::new;\n"
+                      "    r = c.some_method(7).who();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "r"),
+            72u);
+}
+
 }  // namespace

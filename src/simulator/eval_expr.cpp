@@ -17,6 +17,7 @@
 #include "simulator/clocking.h"
 #include "simulator/eval_array.h"
 #include "simulator/eval_array_class_queue.h"
+#include "simulator/eval_call_result.h"
 #include "simulator/eval_expr_internal.h"
 #include "simulator/eval_string.h"
 #include "simulator/evaluation.h"
@@ -683,30 +684,27 @@ static bool TryInstanceTriggered(const Expr* expr, SimContext& ctx,
 }
 
 Logic4Vec EvalMemberAccess(const Expr* expr, SimContext& ctx, Arena& arena) {
-  Logic4Vec instance_out;
-  if (TryInstanceTriggered(expr, ctx, arena, instance_out)) return instance_out;
-  Logic4Vec reduce_out;
-  if (TryEvalArrayReductionWithClause(expr, ctx, arena, reduce_out))
-    return reduce_out;
+  Logic4Vec out;
+  if (TryInstanceTriggered(expr, ctx, arena, out)) return out;
+  if (TryEvalArrayReductionWithClause(expr, ctx, arena, out)) return out;
 
   // §7.12.2: a bare-member sort()/rsort() carrying a with clause (parenthesis-
   // free form, or any queue receiver) reorders in place; yield a void result.
   if (TryExecArrayOrderingWithClauseStmt(expr, ctx, arena))
     return MakeLogic4VecVal(arena, 1, 0);
 
-  Logic4Vec spec_out;
-  if (TryParameterizedScopeParam(expr, ctx, arena, spec_out)) return spec_out;
+  if (TryParameterizedScopeParam(expr, ctx, arena, out)) return out;
 
-  Logic4Vec vif_out;
-  if (TryVirtualInterfaceMember(expr, ctx, arena, vif_out)) return vif_out;
+  if (TryVirtualInterfaceMember(expr, ctx, arena, out)) return out;
 
   // §7.8.7: `b[2].x` reads a member of an associative array element, and
   // §7.10/§8.4 `q[1].v` a property of the object a queue element refers to;
   // the name built below reaches neither, the select contributing nothing.
-  Logic4Vec elem_member;
-  if (TryEvalAssocMemberField(expr, ctx, arena, elem_member) ||
-      TryEvalQueueElementMember(expr, ctx, arena, elem_member))
-    return elem_member;
+  // §8.6: nor `n.self().v`, a property of the object a method call returned.
+  if (TryEvalAssocMemberField(expr, ctx, arena, out) ||
+      TryEvalQueueElementMember(expr, ctx, arena, out) ||
+      TryEvalCallResultMember(expr, ctx, arena, out))
+    return out;
 
   std::string name;
   BuildMemberName(expr, name);

@@ -17,6 +17,7 @@
 #include "parser/ast_type.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_array.h"
+#include "simulator/eval_call_result.h"
 #include "simulator/eval_class_array.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/eval_semaphore.h"
@@ -496,6 +497,10 @@ static bool TryDispatchMethodOrLet(const Expr* expr, SimContext& ctx,
   if (TryEvalSuperMethodCall(expr, ctx, arena, out)) return true;
   if (TryDispatchRandomizeMethod(expr, ctx, arena, out)) return true;
   if (TryEvalClassMethodCall(expr, ctx, arena, out)) return true;
+  // §8.6: a method called on a method call's result, `c.some_method(7).who()`,
+  // runs on the object the first call returned; ExtractMethodCallParts above
+  // takes a variable alone for the handle side.
+  if (TryEvalCallResultMethodCall(expr, ctx, arena, out)) return true;
   if (TryEvalWeakRefStaticCall(expr, ctx, arena, out)) return true;
   if (TryEvalProcessStaticCall(expr, ctx, arena, out)) return true;
   if (TryEvalClassScopeCall(expr, ctx, arena, out)) return true;
