@@ -165,6 +165,19 @@ static bool TryCompoundDefaultElem(const Expr* expr, SimContext& ctx,
   return false;
 }
 
+// Whether a prefix of the select chain `expr`, short of the whole of it, names
+// a stored variable -- the element the remaining indices select within.
+static bool ChainStandsOnElement(const Expr* expr, SimContext& ctx,
+                                 Arena& arena) {
+  for (const Expr* p = expr->base; p != nullptr && p->kind == ExprKind::kSelect;
+       p = p->base) {
+    std::string name;
+    if (BuildCompoundName(p, ctx, arena, name) && ctx.FindVariable(name))
+      return true;
+  }
+  return false;
+}
+
 static bool TryCompoundArraySelect(const Expr* expr, SimContext& ctx,
                                    Arena& arena, Logic4Vec& out) {
   if (!expr->base || expr->base->kind != ExprKind::kSelect) return false;
@@ -180,17 +193,16 @@ static bool TryCompoundArraySelect(const Expr* expr, SimContext& ctx,
     out = elem->value;
     return true;
   }
-  // The full compound name is not a variable. If the base (all indices but the
-  // last) names a real packed element, the trailing index is a bit-select of
-  // that element per §11.5.2, not a further array dimension: return false so
-  // EvalSelect falls through to the bit-select path. Only when the addressed
-  // array element itself is absent is this a genuine out-of-bounds read that
-  // defaults to x/0.
-  std::string parent;
-  if (BuildCompoundName(expr->base, ctx, arena, parent) &&
-      ctx.FindVariable(parent)) {
-    return false;
-  }
+  // The full compound name is not a variable. If a prefix of the chain names
+  // a real packed element, the indices past it select within that element per
+  // §11.5.2 rather than further array dimensions -- §7.4.1 has the first of
+  // them select a subfield and the next a bit of it, so `y[0][3][1]` on a
+  // `logic [3:0][7:0] y[1:0]` stands on `y[0]` -- and this returns false so
+  // EvalSelect falls through to the packed select path. Only the base one
+  // index short was asked, so a chain of three answered Table 7-1's default
+  // for an element that exists. Only when the addressed array element itself
+  // is absent is this a genuine out-of-bounds read that defaults to x/0.
+  if (ChainStandsOnElement(expr, ctx, arena)) return false;
   return TryCompoundDefaultElem(expr, ctx, arena, out);
 }
 
@@ -493,6 +505,24 @@ static bool TryAssocSelect(const Expr* expr, SimContext& ctx, Arena& arena,
   return true;
 }
 
+// The declared variable the select base `base` names, or null where it names
+// none: a concatenation, a function result, a struct member, or a select
+// within a packed object, which is a window rather than a variable.
+static const Variable* SelectBaseVariable(const Expr* base, SimContext& ctx,
+                                          Arena& arena) {
+  if (base && base->kind == ExprKind::kIdentifier) {
+    return ctx.FindVariable(base->text);
+  }
+  if (base && base->kind == ExprKind::kSelect) {
+    // An element of an unpacked array is a vector in its own right, declared
+    // with the array's element type and so with that type's range.
+    std::string name;
+    if (BuildCompoundName(base, ctx, arena, name))
+      return ctx.FindVariable(name);
+  }
+  return nullptr;
+}
+
 // §11.5.1: the range a select's indices are resolved against. When the select
 // names a vector it is that vector's declared range, since "the actual bit that
 // is accessed by an address is, in part, determined by the declaration"; for
@@ -500,15 +530,7 @@ static bool TryAssocSelect(const Expr* expr, SimContext& ctx, Arena& arena,
 // value carries no declaration of its own and is addressed as [width-1:0].
 static PackedRange SelectBaseRange(const Expr* base, uint32_t width,
                                    SimContext& ctx, Arena& arena) {
-  const Variable* var = nullptr;
-  if (base && base->kind == ExprKind::kIdentifier) {
-    var = ctx.FindVariable(base->text);
-  } else if (base && base->kind == ExprKind::kSelect) {
-    // An element of an unpacked array is a vector in its own right, declared
-    // with the array's element type and so with that type's range.
-    std::string name;
-    if (BuildCompoundName(base, ctx, arena, name)) var = ctx.FindVariable(name);
-  }
+  const Variable* var = SelectBaseVariable(base, ctx, arena);
   return var ? var->BitSelectRange() : PackedRange::Implicit(width);
 }
 
@@ -635,14 +657,16 @@ static Logic4Vec EvalStringByteSelect(const Logic4Vec& base_val, uint64_t idx,
 
 // §7.4.1: a single-index select of a packed multidimensional array selects an
 // outermost element (the inner-dimension width) as an unsigned vector, not a
-// single bit. Returns the element value when `expr` names such an array.
+// single bit. Returns the element value when `expr` names such an array -- by
+// its own name, or as an element of an unpacked array declared with packed
+// dimensions (§7.4.4), `y[0][3]` on a `logic [3:0][7:0] y[1:0]` being subfield
+// 3 of the element `y[0]`. Only a bare name was asked, so that select read bit
+// 3 of the element.
 static std::optional<Logic4Vec> TryPackedElementSelect(
     const Expr* expr, int64_t idx, const Logic4Vec& base_val, SimContext& ctx,
     Arena& arena) {
-  if (expr->index_end || !expr->base ||
-      expr->base->kind != ExprKind::kIdentifier)
-    return std::nullopt;
-  auto* var = ctx.FindVariable(expr->base->text);
+  if (expr->index_end) return std::nullopt;
+  const Variable* var = SelectBaseVariable(expr->base, ctx, arena);
   if (!var || var->packed_elem_width <= 1) return std::nullopt;
   uint32_t w = var->packed_elem_width;
   auto range = var->DeclaredRange();

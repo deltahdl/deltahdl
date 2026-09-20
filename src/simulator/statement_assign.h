@@ -65,10 +65,14 @@ bool BuildCompoundLhsName(const Expr* expr, SimContext& ctx, Arena& arena,
 std::string_view CompoundRootName(const Expr* e);
 
 // The element a packed sub-select of an unpacked array element selects within
-// -- `mem[0]` for `mem[0][3]` on a `logic [7:0] mem [0:3]` -- or null where the
-// name is not of that shape. §11.5.1 makes the trailing index a bit of that
-// element, so both assignment forms resolve it here before they ask
-// TryResolveCompoundElement, which would answer for a second array dimension.
+// -- `mem[0]` for `mem[0][3]` on a `logic [7:0] mem [0:3]`, and `y[0]` for
+// `y[0][3][1]` on a `logic [3:0][7:0] y[1:0]` -- or the packed variable a chain
+// of indices stands on where it has no unpacked dimension, `x` for `x[1][3]`
+// on a `logic [1:0][7:0] x`; null where the name is of neither shape. §11.5.1
+// makes the trailing indices bits of that object, so both assignment forms
+// resolve it here before they ask TryResolveCompoundElement, which would
+// answer for a further array dimension, and SelectStorageBits then resolves
+// the window every index past the object names.
 Variable* TryResolveCompoundElementBase(const Expr* lhs, SimContext& ctx,
                                         Arena& arena);
 
@@ -207,6 +211,19 @@ bool TryWriteClassPropertyBits(const Expr* lhs, const Logic4Vec& rhs_val,
 bool WriteStructField(const Expr* lhs, const Logic4Vec& rhs_val,
                       SimContext& ctx, uint32_t* written_width = nullptr);
 
+// §7.4.1: whether `sel`'s base is itself a select within `var` rather than
+// `var`'s own name -- `y[0][3]` under `y[0][3][1]` with the element `y[0]` the
+// storage, `x[1]` under `x[1][3]` with `x` the storage -- so that `sel`'s own
+// index addresses bits of the subfield the base selects rather than an element
+// of the whole object. False where the base names `var` itself, `y[0]` under
+// `y[0][3]`, is no select at all, or stands on no name that resolves to `var`,
+// which leaves a variable built for one write, as the associative-array and
+// class-property writers build, addressed as it was. Defined in
+// statement_assign_select.cpp; SelectStorageBits resolves the chain by it, and
+// SelectExprWidth (statement_assign_core.cpp) sizes the select by it.
+bool SelectBaseIsSubSelect(const Variable& var, const Expr* sel,
+                           SimContext& ctx, Arena& arena);
+
 // §11.5.1: the storage bits of `var` that the select `sel` addresses, resolved
 // against the declaration, since "the actual bit that is accessed by an address
 // is, in part, determined by the declaration". A width of zero is the select
@@ -216,7 +233,10 @@ bool WriteStructField(const Expr* lhs, const Logic4Vec& rhs_val,
 // the same sentence covers.
 //
 // One index of a packed multidimensional array addresses an element rather than
-// a bit (§7.4.1), and the window is that element's.
+// a bit (§7.4.1), and the window is that element's; a further index or range on
+// that select addresses bits within the element, so a chain of selects is
+// resolved from the inside out and `sel` may stand on a select within `var`
+// (SelectBaseIsSubSelect) as well as on `var`'s own name.
 //
 // Three callers ask it: the concatenation lvalue walk, which needs an element's
 // own width rather than its variable's; the streaming-concatenation unpack,

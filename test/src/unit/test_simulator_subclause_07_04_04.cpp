@@ -488,4 +488,159 @@ TEST(MultidimensionalArraySimulation, AggregateTypedefLocalsInAnInitialBlock) {
   EXPECT_EQ(v, 267u);
 }
 
+// §7.4.1 (printed page 153) has an index of a packed array select a subfield
+// and §7.4.4 (printed 155) stacks the packed dimensions ahead of the unpacked
+// ones, so on a `logic [3:0][7:0] y[1:0]` the chain `y[0][3][1]` is bit 1 of
+// the eight-bit subfield 3 of the element `y[0]`: storage bit 25, which §11.5.1
+// (printed 296) addresses by the declaration's ranges. The write path resolved
+// one index past the element and made the third a fresh variable named after
+// the whole chain, so the element read 0; bit 25 set reads 32'h02000000, and
+// no other bit of the element gives that value.
+TEST(MultidimensionalArraySimulation,
+     BitOfPackedSubfieldOfUnpackedElementWrites) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  logic [3:0][7:0] y[1:0];\n"
+      "  initial begin\n"
+      "    y[0] = 0;\n"
+      "    y[0][3][1] = 1'b1;\n"
+      "  end\n"
+      "endmodule\n",
+      "y[0]");
+  EXPECT_EQ(v, 0x02000000u);
+}
+
+// The same chain on a variable with packed dimensions alone: `x[1][3]` on a
+// `logic [1:0][7:0] x` is bit 3 of subfield 1, storage bit 11 (§7.4.1). With no
+// unpacked dimension there was no element to stand on, and the chain was made
+// a variable of its own; bit 11 set reads 16'h0800.
+TEST(MultidimensionalArraySimulation,
+     BitOfPackedSubfieldOfPackedVariableWrites) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  logic [1:0][7:0] x;\n"
+      "  initial begin\n"
+      "    x = 0;\n"
+      "    x[1][3] = 1'b1;\n"
+      "  end\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(v, 0x0800u);
+}
+
+// One index past the element still writes the subfield whole (§7.4.1): 8'hAB
+// into subfield 2 of `y[1]` lands in bits 23 to 16 and leaves bit 0 standing,
+// which the resolver taking the element for the chain's base has to keep doing
+// now that it also answers a chain of three.
+TEST(MultidimensionalArraySimulation,
+     SubfieldOfUnpackedElementStillWritesWhole) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  logic [3:0][7:0] y[1:0];\n"
+      "  initial begin\n"
+      "    y[1] = 32'h00000001;\n"
+      "    y[1][2] = 8'hAB;\n"
+      "  end\n"
+      "endmodule\n",
+      "y[1]");
+  EXPECT_EQ(v, 0x00AB0001u);
+}
+
+// §11.5.1's part-select of the subfield: `y[0][3][7:4]` is the upper four bits
+// of subfield 3, storage bits 31 to 28, so 4'hC there reads 32'hC0000000. The
+// part-select form never reached the element at all -- the compound resolver
+// declines a range and the fallback wrote the array's base carrier -- so the
+// element read 0.
+TEST(MultidimensionalArraySimulation, PartSelectOfPackedSubfieldWrites) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  logic [3:0][7:0] y[1:0];\n"
+      "  initial begin\n"
+      "    y[0] = 0;\n"
+      "    y[0][3][7:4] = 4'hC;\n"
+      "  end\n"
+      "endmodule\n",
+      "y[0]");
+  EXPECT_EQ(v, 0xC0000000u);
+}
+
+// §11.5.1: a bit-select outside the address bounds has no effect on the data
+// stored when written. Bit 9 of an eight-bit subfield is outside it, and the
+// index is chosen so that a resolver adding it to the subfield's offset without
+// checking the bound would land inside the element: 16 + 9 is bit 25 of `y[0]`
+// and 0 + 8 is bit 8 of `x`, each of which would read as a set bit. Both reads
+// stay 0.
+TEST(MultidimensionalArraySimulation, OutOfRangeSubfieldIndexWritesNothing) {
+  auto src =
+      "module t;\n"
+      "  logic [3:0][7:0] y[1:0];\n"
+      "  logic [1:0][7:0] x;\n"
+      "  initial begin\n"
+      "    y[0] = 0;\n"
+      "    x = 0;\n"
+      "    y[0][2][9] = 1'b1;\n"
+      "    x[0][8] = 1'b1;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "y[0]"), 0u);
+  EXPECT_EQ(RunAndGet(src, "x"), 0u);
+}
+
+// §10.4.2 gives the nonblocking form the same target the blocking one takes,
+// and its select window is resolved through the same call, so `y[0][3][1] <=
+// 1'b1` lands on storage bit 25 of `y[0]` once the update region has run.
+TEST(MultidimensionalArraySimulation, NonblockingBitOfPackedSubfieldWrites) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  logic [3:0][7:0] y[1:0];\n"
+      "  initial begin\n"
+      "    y[0] = 0;\n"
+      "    y[0][3][1] <= 1'b1;\n"
+      "    #1;\n"
+      "  end\n"
+      "endmodule\n",
+      "y[0]");
+  EXPECT_EQ(v, 0x02000000u);
+}
+
+// The read of the same chains (§7.4.1, §11.5.1): with `y[0]` holding
+// 32'h5A000000, `y[0][3]` is the subfield 8'h5A and `y[0][3][1]` its bit 1,
+// which is set. The subfield read answered bit 3 of the element, 0, the
+// packed-element read asking only after a bare name; and the three-index read
+// answered Table 7-1's default for an element that exists, 'x, which projects
+// to 0.
+TEST(MultidimensionalArraySimulation, SubfieldAndBitOfUnpackedElementRead) {
+  auto src =
+      "module t;\n"
+      "  logic [3:0][7:0] y[1:0];\n"
+      "  logic [7:0] sub;\n"
+      "  logic b;\n"
+      "  initial begin\n"
+      "    y[0] = 32'h5A000000;\n"
+      "    sub = y[0][3];\n"
+      "    b = y[0][3][1];\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "sub"), 0x5Au);
+  EXPECT_EQ(RunAndGet(src, "b"), 1u);
+}
+
+// §11.4.12 sizes a concatenation lvalue element by its own width, and §7.4.1
+// makes `x[1][3]` one bit rather than the eight of `x[1]`. Sized at eight it
+// took the value's low byte, 8'h57, and left `x[0]` the bits above: x read
+// 16'h0801. At one bit it takes bit 0 of 9'h157 into storage bit 11 and `x[0]`
+// takes bits 8 to 1, 8'hAB, so x reads 16'h08AB.
+TEST(MultidimensionalArraySimulation, ConcatLvalueBitOfPackedSubfieldIsOneBit) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  logic [1:0][7:0] x;\n"
+      "  initial begin\n"
+      "    x = 0;\n"
+      "    {x[0], x[1][3]} = 9'h157;\n"
+      "  end\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(v, 0x08ABu);
+}
+
 }  // namespace

@@ -106,24 +106,62 @@ void WriteVar(Variable* var, const Logic4Vec& val, Arena& arena) {
   var->NotifyWatchers();
 }
 
+// The nearest prefix of the chain `lhs` that names stored storage -- the
+// element `y[0]` under `y[0][3][1]` -- or null where no prefix short of the
+// root does. §7.4.1 has an index of a packed array select a subfield and
+// further indices select within it, so once the element is found every index
+// past it addresses bits of that element, however many there are; only the
+// one index right after the element was looked for, so a third index found
+// nothing and TryResolveCompoundElement materialized a fresh variable under the
+// chain's full name, which nothing read back. A prefix whose index carries x or
+// z has no name to look up and is passed over, and the empty window
+// SelectStorageBits resolves for it then leaves the write with no effect.
+static Variable* DeepestElementPrefix(const Expr* lhs, SimContext& ctx,
+                                      Arena& arena) {
+  for (const Expr* p = lhs->base; p != nullptr && p->kind == ExprKind::kSelect;
+       p = p->base) {
+    std::string name;
+    if (!BuildCompoundLhsName(p, ctx, arena, name)) continue;
+    if (auto* var = ctx.FindVariable(name)) return var;
+  }
+  return nullptr;
+}
+
+// §7.4.4: the variable a chain of two or more indices on a packed
+// multidimensional variable stands on -- `x` for `x[1][3]` on a
+// `logic [1:0][7:0] x` -- or null where `root` is not one. A name registered
+// as a queue or an associative array holds its elements in an object of its own
+// rather than in the variable under the name (§7.10, §7.8), so an index of it
+// names a whole element and is declined here for the writers that reach those.
+static Variable* PackedRootVariable(std::string_view root, SimContext& ctx) {
+  if (ctx.FindQueue(root) != nullptr || ctx.FindAssocArray(root) != nullptr)
+    return nullptr;
+  auto* var = ctx.FindVariable(root);
+  return (var != nullptr && var->packed_elem_width > 1) ? var : nullptr;
+}
+
 // §11.5.1: the object a packed sub-select of an unpacked array element stands
 // on. `logic [7:0] mem [0:3]` stores each element under its own indexed name,
 // so `mem[0][3]` is a bit-select of the eight-bit element `mem[0]` and not a
 // second array dimension: the clause makes an index of a packed object address
 // a bit of it, and only the flat name of a genuinely multidimensional array is
-// an element in its own right. Answers the element the trailing index selects
-// within, or null where the name is not of that shape.
+// an element in its own right. Answers the element the trailing indices select
+// within -- `y[0]` for `y[0][3][1]` on a `logic [3:0][7:0] y[1:0]` as much as
+// for `y[0][3]`, §7.4.1 making the second index a subfield and the third a bit
+// of it -- or the packed variable itself where the chain stands on one with no
+// unpacked dimension, `x` for `x[1][3]`; null where the name is of neither
+// shape.
 //
 // The two are told apart by the flat name: `A[1][2]` on an `int A[2][3]` is a
 // variable, made when the array's leaves were created, and this declines it, so
 // the writers below go on treating a real element as one. Where the flat name
-// names nothing and the prefix does, the trailing index has an object to be a
-// bit of, and where neither does the index addresses nothing at all -- §7.4.5's
-// no operation, which TryResolveCompoundElement answers.
+// names nothing and a prefix does, the trailing indices have an object to be
+// bits of, and where no prefix does the index addresses nothing at all --
+// §7.4.5's no operation, which TryResolveCompoundElement answers.
 //
 // The read side already draws the line here: TryCompoundArraySelect
 // (eval_select.cpp) declines the same shape so EvalSelect reads the trailing
-// index as a bit-select of the element it evaluates.
+// indices as selects within the element it evaluates.
 Variable* TryResolveCompoundElementBase(const Expr* lhs, SimContext& ctx,
                                         Arena& arena) {
   if (lhs->kind != ExprKind::kSelect || lhs->base == nullptr) return nullptr;
@@ -133,6 +171,9 @@ Variable* TryResolveCompoundElementBase(const Expr* lhs, SimContext& ctx,
       ctx.FindVariable(compound) != nullptr) {
     return nullptr;
   }
+  std::string_view root = CompoundRootName(lhs);
+  const ArrayInfo* info = ctx.FindArrayInfo(root);
+  if (info == nullptr) return PackedRootVariable(root, ctx);
   // §7.4.4 also has dimensions "defined in stages with typedef", and only the
   // range the declaration itself wrote is recorded: `typedef bsix mem_type
   // [0:3]; mem_type ba [0:7];` leaves one dimension known, so `ba[0]` is a leaf
@@ -143,13 +184,8 @@ Variable* TryResolveCompoundElementBase(const Expr* lhs, SimContext& ctx,
   // an element type written as a name is left to the element the writer below
   // materializes, and an element type that is an integral type of its own is a
   // packed object whose bits this addresses.
-  const ArrayInfo* info = ctx.FindArrayInfo(CompoundRootName(lhs));
-  if (info == nullptr || info->elem_type_kind == DataTypeKind::kNamed) {
-    return nullptr;
-  }
-  std::string parent;
-  if (!BuildCompoundLhsName(lhs->base, ctx, arena, parent)) return nullptr;
-  return ctx.FindVariable(parent);
+  if (info->elem_type_kind == DataTypeKind::kNamed) return nullptr;
+  return DeepestElementPrefix(lhs, ctx, arena);
 }
 
 // §7.4.4: writes `rhs_val` to the element a multidimensional indexed name such
@@ -163,7 +199,9 @@ static bool TryCompoundElementWrite(const Expr* lhs, const Logic4Vec& rhs_val,
   // the element mem[0], which is a packed object of its own. Read as a second
   // array dimension it named an element that does not exist, and the fallback
   // below the caller walks such a name down to the array's base carrier, so the
-  // bit reached neither.
+  // bit reached neither. WriteBitSelect resolves every index past the element
+  // through SelectStorageBits, so `y[0][3][1]` and `y[0][3][7:4]` on a
+  // `logic [3:0][7:0] y[1:0]` land in subfield 3 of `y[0]` (§7.4.1).
   if (auto* elem = TryResolveCompoundElementBase(lhs, ctx, arena)) {
     WriteBitSelect(elem, lhs, rhs_val, ctx, arena);
     return true;
@@ -446,8 +484,16 @@ static bool TrySubarrayAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
 // streaming unpack shares it rather than restating these four shapes.
 uint32_t SelectExprWidth(const Variable& var, const Expr* sel, SimContext& ctx,
                          Arena& arena) {
-  if (sel->index_end == nullptr)
-    return var.packed_elem_width > 1 ? var.packed_elem_width : 1;
+  // §7.4.1: one index of a packed multidimensional array names an element,
+  // and an index on that select names one bit within it -- `x[1][3]` on a
+  // `logic [1:0][7:0] x` is a bit, not the eight-bit `x[1]` -- so the element
+  // width is the select's only where the select stands on the variable's own
+  // name, as SelectStorageBits draws the same line for the window.
+  if (sel->index_end == nullptr) {
+    bool names_element = var.packed_elem_width > 1 &&
+                         !SelectBaseIsSubSelect(var, sel, ctx, arena);
+    return names_element ? var.packed_elem_width : 1;
+  }
   bool is_indexed = sel->is_part_select_plus || sel->is_part_select_minus;
   auto idx_val = EvalExpr(sel->index, ctx, arena);
   auto end_val = EvalExpr(sel->index_end, ctx, arena);

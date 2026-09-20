@@ -7,6 +7,7 @@
 #include "common/diagnostic.h"
 #include "common/packed_range.h"
 #include "common/types.h"
+#include "parser/ast_expr.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"
@@ -78,8 +79,33 @@ void WritePartSelect(Variable* var, const PartSelectBits& bits,
   if (!var->is_4state) CoerceTo2State(var->value);
 }
 
-PartSelectBits SelectStorageBits(const Variable& var, const Expr* sel,
-                                 SimContext& ctx, Arena& arena) {
+// §11.5.1: the ranges a select's indices are resolved against. A variable
+// answers them from its declaration -- a bit-addressed view for a bit-select or
+// a part-select, and for one index of a packed multidimensional array the
+// element-addressed view §7.4.1 gives that index, `elem_width` bits per element
+// (Variable::packed_elem_width). A window a select already carved out of the
+// variable is a run of `width` bits with no declaration of its own: only the
+// outermost packed dimension is recorded (RecordPackedRange), so the window is
+// addressed as [width-1:0] with one bit per index, the view the read side's
+// SelectBaseRange (eval_select.cpp) gives the same window.
+struct SelectAddressing {
+  PackedRange bits;
+  PackedRange elems;
+  uint32_t elem_width;
+
+  static SelectAddressing OfVariable(const Variable& var) {
+    return {var.BitSelectRange(), var.DeclaredRange(), var.packed_elem_width};
+  }
+  static SelectAddressing OfWindow(uint32_t width) {
+    return {PackedRange::Implicit(width), PackedRange::Implicit(width), 0};
+  }
+};
+
+// The bits `sel`'s own index or range addresses of an object addressed by
+// `at`, counted from the object's least significant bit.
+static PartSelectBits ResolveSelectBits(const SelectAddressing& at,
+                                        const Expr* sel, SimContext& ctx,
+                                        Arena& arena) {
   auto idx_val = EvalExpr(sel->index, ctx, arena);
   if (HasUnknownBits(idx_val)) return {0, 0};
   auto idx = SelectBoundValue(idx_val);
@@ -87,15 +113,13 @@ PartSelectBits SelectStorageBits(const Variable& var, const Expr* sel,
     // §7.4.1: a single index on a packed multidimensional array addresses an
     // outermost element -- the inner dimensions' width -- rather than one bit,
     // and addresses it whole or not at all, so the source offset stays zero.
-    if (var.packed_elem_width > 1) {
-      PackedRange elems = var.DeclaredRange();
-      if (!elems.Contains(idx)) return {0, 0};
-      auto base = static_cast<uint32_t>(elems.OffsetOf(idx));
-      return {base * var.packed_elem_width, var.packed_elem_width};
+    if (at.elem_width > 1) {
+      if (!at.elems.Contains(idx)) return {0, 0};
+      auto base = static_cast<uint32_t>(at.elems.OffsetOf(idx));
+      return {base * at.elem_width, at.elem_width};
     }
-    PackedRange range = var.BitSelectRange();
-    if (!range.Contains(idx)) return {0, 0};
-    return {static_cast<uint32_t>(range.OffsetOf(idx)), 1};
+    if (!at.bits.Contains(idx)) return {0, 0};
+    return {static_cast<uint32_t>(at.bits.OffsetOf(idx)), 1};
   }
   auto end_val = EvalExpr(sel->index_end, ctx, arena);
   if (HasUnknownBits(end_val)) return {0, 0};
@@ -112,8 +136,62 @@ PartSelectBits SelectStorageBits(const Variable& var, const Expr* sel,
   // of this call, in ReportZeroWidthPartSelect below; every caller reads the
   // zero this returns as the absence it is.
   if (target.declared_width == 0) return {0, 0};
-  return PartSelectStorageBits(var.BitSelectRange(), target.first,
-                               target.second);
+  return PartSelectStorageBits(at.bits, target.first, target.second);
+}
+
+bool SelectBaseIsSubSelect(const Variable& var, const Expr* sel,
+                           SimContext& ctx, Arena& arena) {
+  const Expr* base = sel->base;
+  if (base == nullptr || base->kind != ExprKind::kSelect) return false;
+  // The longest prefix of the base that names a variable decides. The base
+  // itself naming `var` is `var`'s own name, `y[0]` under `y[0][3]`; a shorter
+  // prefix naming `var` leaves the indices between as selects within it, `y[0]`
+  // under `y[0][3][1]` and `x` under `x[1][3]`. A prefix naming some other
+  // variable, or no prefix naming any, is answered false and the caller's own
+  // resolution stands: TryWriteAssocElementBits (assoc_element.cpp) hands
+  // `aa[3][7:0]` to the writers on a stack Variable lending the element the
+  // array's declaration, which no name resolves to, and the range there is the
+  // element's own. Only a prefix that resolves to `var` says anything, so a
+  // variable built for the write is never mistaken for one the chain stands
+  // on. A prefix whose index carries x or z has no name and is passed over.
+  for (const Expr* p = base; p != nullptr; p = p->base) {
+    std::string name;
+    if (!BuildCompoundLhsName(p, ctx, arena, name)) {
+      if (p->kind != ExprKind::kSelect) break;
+      continue;
+    }
+    const Variable* named = ctx.FindVariable(name);
+    if (named == nullptr) continue;
+    return named == &var && p != base;
+  }
+  return false;
+}
+
+PartSelectBits SelectStorageBits(const Variable& var, const Expr* sel,
+                                 SimContext& ctx, Arena& arena) {
+  // §7.4.1 has an index of a packed array select a subfield and further indices
+  // select within that subfield, and §7.4.4 lets the packed dimensions be
+  // stacked, so a select chain is resolved from the inside out: the base's own
+  // window first, and this select's index within it. `y[0][3][1]` on a
+  // `logic [3:0][7:0] y[1:0]` is bit 1 of the eight-bit subfield 3 of the
+  // element `y[0]`, storage bit 25 of that element, and `x[1][3]` on a
+  // `logic [1:0][7:0] x` is storage bit 11 of `x`. Every writer of a select
+  // asks this function, so the chain is resolved once for all of them; each
+  // had asked it of the outermost index alone, which either addressed an
+  // element of `var` where a bit of a subfield was named or, from
+  // TryResolveCompoundElement, materialized a fresh variable under the chain's
+  // full name and lost the write. An empty inner window -- an inner index
+  // carrying x or z, or out of range -- addresses nothing, and §11.5.1 has such
+  // a write leave the data stored alone.
+  if (SelectBaseIsSubSelect(var, sel, ctx, arena)) {
+    PartSelectBits inner = SelectStorageBits(var, sel->base, ctx, arena);
+    if (inner.width == 0) return {0, 0};
+    PartSelectBits within = ResolveSelectBits(
+        SelectAddressing::OfWindow(inner.width), sel, ctx, arena);
+    if (within.width == 0) return {0, 0};
+    return {inner.lo + within.lo, within.width, within.src_lo};
+  }
+  return ResolveSelectBits(SelectAddressing::OfVariable(var), sel, ctx, arena);
 }
 
 // Whether two stored values differ, which is what the notification in
