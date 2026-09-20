@@ -353,6 +353,46 @@ static void BindLocalAggregateLayout(std::string_view name,
   }
 }
 
+// §11.9 (printed page 304) lets a tagged union variable be initialized with
+// a tagged union expression whose braces are a §10.9.2 structure assignment
+// pattern, and §10.9.2 (printed 263) evaluates each member expression in the
+// context of an assignment to the member it initializes, by position or by
+// name. A body local's `tagged Add '{3, 8'd4}` was evaluated as any
+// expression is, with no layout to place the pattern by, so its elements
+// were concatenated in written order at their self-determined widths -- the
+// byte 4 below the 3, `'{b: 4, a: 3}` swapped -- and `v.Add.a` read through
+// the member's window found the wrong bits, where the statement `v = tagged
+// Add '{...}` is placed by the member's layout (EvalRhsWithStructContext) and
+// an actual `f(tagged Add '{...})` by the formal's (TryEvalPatternActual).
+// TaggedPatternMemberLayout answers the layout of the member the expression
+// names within the local's union, the layout its typedef name registers, and
+// null where the initializer is no tagged expression over a pattern, bare or
+// typed, the local's type names no layout, or the member has none of its
+// own; EvalLocalInitializer places the pattern by that layout and evaluates
+// any other initializer as it was.
+static const StructTypeInfo* TaggedPatternMemberLayout(const DataType& type,
+                                                       const Expr* init,
+                                                       SimContext& ctx) {
+  if (init->kind != ExprKind::kTagged || init->rhs == nullptr ||
+      init->lhs == nullptr ||
+      UnwrapTypedPattern(init->lhs)->kind != ExprKind::kAssignmentPattern)
+    return nullptr;
+  const StructTypeInfo* layout = ctx.FindStructType(type.type_name);
+  if (layout == nullptr) return nullptr;
+  const StructFieldInfo* member = FindStructField(layout, init->rhs->text);
+  return member != nullptr ? member->nested : nullptr;
+}
+
+static Logic4Vec EvalLocalInitializer(const DataType& type, const Expr* init,
+                                      SimContext& ctx, Arena& arena) {
+  if (const StructTypeInfo* member =
+          TaggedPatternMemberLayout(type, init, ctx)) {
+    return EvalStructPatternValue(UnwrapTypedPattern(init->lhs), member, ctx,
+                                  arena);
+  }
+  return EvalExpr(init, ctx, arena);
+}
+
 static Variable* CreateFuncLocalVar(std::string_view name, const DataType& type,
                                     const Expr* init, SimContext& ctx,
                                     Arena& arena) {
@@ -448,8 +488,13 @@ static Variable* CreateFuncLocalVar(std::string_view name, const DataType& type,
   // ResizeToWidth returns its argument untouched when the widths already match,
   // which is precisely the aliased case; outside, it covers every path, and is
   // merely redundant on the path where the resize itself allocated.
-  v->value = OwnRhsWords(
-      ResizeToWidth(EvalExpr(init, ctx, arena), declared, arena), arena);
+  //
+  // §11.9: a `tagged M '{...}` initializer is placed by the member's layout
+  // (EvalLocalInitializer) before the resize into the union's frame.
+  v->value =
+      OwnRhsWords(ResizeToWidth(EvalLocalInitializer(type, init, ctx, arena),
+                                declared, arena),
+                  arena);
   // §6.11.2: "when a 4-state value is automatically converted to a 2-state
   // value, any unknown or high-impedance bits shall be converted to zeros", and
   // §6.8 makes a variable declaration assignment an assignment to the declared

@@ -1,8 +1,11 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "elaborator/rtlir.h"
 #include "fixture_simulator.h"
 #include "helpers_reported_error.h"
+#include "helpers_scheduler.h"
 
 using namespace delta;
 
@@ -393,6 +396,74 @@ TEST(TaggedUnionEval, LocalTaggedUnionIsReadInTheBodyAgainstItsTag) {
                             6, "11.9"));
   EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
                              "run-time error: accessing member", 7, "11.9"));
+}
+
+// A design declaring `pair_t`, a structure of two ints, and `u_t`, a tagged
+// union holding a pair_t under Add, followed by `rest` -- the subroutine
+// declaring a u_t local from a `tagged Add '{...}` initializer and the
+// initial block reading y from it -- so the three cases below read the
+// local's a * 10 + b through one pair of layouts.
+std::string PairUnionLocalSrc(const std::string& rest) {
+  return "module t;\n"
+         "  typedef struct { int a, b; } pair_t;\n"
+         "  typedef union tagged { void None; pair_t Add; int One; } u_t;\n"
+         "  int y;\n" +
+         rest + "endmodule\n";
+}
+
+// §11.9 (printed page 304) lets a tagged union variable be initialized with
+// a tagged union expression whose braces are a §10.9.2 structure assignment
+// pattern, and §10.9.2 (printed 263) evaluates each member expression in the
+// context of an assignment to the member it initializes -- for `'{3, 8'd4}`
+// against pair_t, 3 into a and 4 into b. A body local's initializer was
+// evaluated with no layout to place the pattern by, so its elements were
+// concatenated in written order at their self-determined widths: forty bits
+// holding 3 above the byte 4, which the union's frame took as a = 0 and b =
+// 0x304, reading 772 where the members hold 34.
+TEST(TaggedUnionEval, LocalTaggedPatternInitializerIsPlacedByTheMember) {
+  EXPECT_EQ(RunAndGet(PairUnionLocalSrc("  function int g();\n"
+                                        "    u_t v = tagged Add '{3, 8'd4};\n"
+                                        "    return v.Add.a * 10 + v.Add.b;\n"
+                                        "  endfunction\n"
+                                        "  initial y = g();\n"),
+                      "y"),
+            34u);
+}
+
+// §7.3.2 (printed page 151) has the local's value carry Add's tag beside the
+// member's bits, and §13.4.1 (printed 342) hands `return v` to the caller as
+// the function's value, so `u = g()` gives u the members the initializer
+// placed. The bits reaching u were the concatenation the body's local held,
+// so `u.Add.a * 10 + u.Add.b` read 772 from a = 0 and b = 0x304 where the
+// placed members read 34.
+TEST(TaggedUnionEval, LocalTaggedPatternInitializerReachesTheCallerPlaced) {
+  EXPECT_EQ(RunAndGet(PairUnionLocalSrc("  u_t u;\n"
+                                        "  function u_t g();\n"
+                                        "    u_t v = tagged Add '{3, 8'd4};\n"
+                                        "    return v;\n"
+                                        "  endfunction\n"
+                                        "  initial begin\n"
+                                        "    u = g();\n"
+                                        "    y = u.Add.a * 10 + u.Add.b;\n"
+                                        "  end\n"),
+                      "y"),
+            34u);
+}
+
+// §10.9.2 (printed page 263) also lets a structure pattern name its members,
+// in any order, so `'{b: 4, a: 3}` gives a 3 and b 4 whatever position each
+// is written at. The keyed pattern was concatenated in written order like the
+// positional one, 4 landing in a and 3 in b, so the body read 43 where the
+// named members read 34.
+TEST(TaggedUnionEval, LocalKeyedTaggedPatternInitializerIsPlacedByName) {
+  EXPECT_EQ(
+      RunAndGet(PairUnionLocalSrc("  function int g();\n"
+                                  "    u_t v = tagged Add '{b: 4, a: 3};\n"
+                                  "    return v.Add.a * 10 + v.Add.b;\n"
+                                  "  endfunction\n"
+                                  "  initial y = g();\n"),
+                "y"),
+      34u);
 }
 
 }  // namespace
