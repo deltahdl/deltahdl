@@ -14,6 +14,7 @@
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
+#include "parser/ast_type.h"
 
 namespace delta {
 
@@ -433,17 +434,24 @@ static bool ContainsRealType(const DataType& dtype, const TypedefMap& tds,
 
 // Whether one struct/union member is, or holds, a real type. A member written
 // through a typedef only reveals a real after the alias is resolved, so a named
-// member type is followed into the typedef table; an inline nested
-// struct/union member carries its full type in nested_type instead, and a real
-// buried in that inline aggregate counts the same.
+// member type is followed into the typedef table -- under its "q::name" key
+// where the member was written as `q::real_holder_t r`, since §26.3 (printed
+// page 808) reaches q's declaration through the qualifier and a bare lookup
+// found whatever an import of another package made `real_holder_t` stand for,
+// so q's real went unseen or another package's real-free structure was
+// reported; an inline nested struct/union member carries its full type in
+// nested_type instead, and a real buried in that inline aggregate counts the
+// same.
 static bool StructMemberContainsRealType(const StructMember& m,
                                          const TypedefMap& tds, int depth) {
   if (IsRealType(m.type_kind)) return true;
-  if (m.type_kind == DataTypeKind::kNamed) {
-    auto it = tds.find(m.type_name);
-    if (it != tds.end() && ContainsRealType(it->second, tds, depth + 1))
-      return true;
-  }
+  DataType named;
+  named.kind = m.type_kind;
+  named.type_name = m.type_name;
+  named.scope_name = m.scope_name;
+  const DataType* resolved = FindNamedType(named, tds);
+  if (resolved != nullptr && ContainsRealType(*resolved, tds, depth + 1))
+    return true;
   return m.nested_type != nullptr &&
          ContainsRealType(*m.nested_type, tds, depth + 1);
 }
@@ -454,9 +462,10 @@ static bool ContainsRealType(const DataType& dtype, const TypedefMap& tds,
   // nests only a handful of levels deep.
   if (depth > 16) return false;
   if (dtype.kind == DataTypeKind::kNamed) {
-    auto it = tds.find(dtype.type_name);
-    if (it != tds.end()) return ContainsRealType(it->second, tds, depth + 1);
-    return false;
+    // A typedef of a qualified name, `typedef q::real_holder_t idx_t`, is
+    // followed under its qualifier for the same reason as a member.
+    const DataType* resolved = FindNamedType(dtype, tds);
+    return resolved != nullptr && ContainsRealType(*resolved, tds, depth + 1);
   }
   if (IsRealType(dtype.kind)) return true;
   for (const auto& m : dtype.struct_members) {

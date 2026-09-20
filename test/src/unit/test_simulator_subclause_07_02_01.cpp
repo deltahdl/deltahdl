@@ -550,4 +550,44 @@ TEST(PackedStructSimulation, WideMemberNonblockingWriteLandsEveryWord) {
   EXPECT_EQ(w->value.words[1].aval, 0xFEDCBA98u);
 }
 
+// §7.2.1 (printed page 147) lays a packed structure's members out in the order
+// written, each at its own type's width, and §26.3 (printed 808) reaches a
+// package's typedef through its qualifier: with r's 8-bit `pair_t` imported
+// and the member written `q::pair_t p`, p is q's 16-bit pair, so a is the top
+// byte of the 24-bit v and 200 written to it reads back whole, v holding
+// 24'hC80709. The nested layout the member registers is named `q::pair_t`,
+// the key q's typedef stands under, where it carried the bare `pair_t` that r's
+// import and q's typedef both answer to. Found by the session that carried
+// the qualifier to the type resolver (4af839bf7).
+TEST(PackedStructSimulation,
+     QualifiedMemberLaidOutByItsPackageOverAnImportedSameNamedTypedef) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "package q;\n"
+      "  typedef struct packed { logic [7:0] a; logic [7:0] b; } pair_t;\n"
+      "endpackage\n"
+      "package r;\n"
+      "  typedef struct packed { logic [3:0] a; logic [3:0] b; } pair_t;\n"
+      "endpackage\n"
+      "module t;\n"
+      "  import r::*;\n"
+      "  struct packed { q::pair_t p; logic [7:0] tail; } v;\n"
+      "  logic [7:0] y;\n"
+      "  initial begin\n"
+      "    v.p.a = 8'd200;\n"
+      "    v.p.b = 8'd7;\n"
+      "    v.tail = 8'd9;\n"
+      "    y = v.p.a;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "v");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.width, 24u);
+  EXPECT_EQ(var->value.words[0].aval, 0xC80709u);
+  EXPECT_EQ(var->value.words[0].bval, 0u);
+  auto* y = f.ctx.FindVariable("y");
+  ASSERT_NE(y, nullptr);
+  EXPECT_EQ(y->value.words[0].aval, 200u);
+}
+
 }  // namespace

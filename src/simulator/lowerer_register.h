@@ -59,7 +59,7 @@ void RecordPackedRange(const DataType* dt, Variable* v, SimContext& ctx,
 // RecordPackedRange is: the layout is a property of the declared type and not
 // of what is declared, so a net port of a packed structure (§23.2.2.3 with
 // §6.7.1) lays its members out as a variable of the same type does. Defined in
-// src/simulator/lowerer_var.cpp beside the variable declaration's use of it.
+// src/simulator/lowerer_var_layout.cpp with the layout builder it calls.
 void RegisterAggregateLayout(std::string_view name, const DataType* dtype,
                              uint32_t width, SimContext& ctx, Arena& arena);
 

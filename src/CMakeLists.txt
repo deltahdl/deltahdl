@@ -461,6 +461,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/wide_arith.cpp
     simulator/lowerer_class.cpp
     simulator/lowerer_var.cpp
+    simulator/lowerer_var_layout.cpp
     simulator/sdf_annotate.cpp
     simulator/sdf_annotate_entry.cpp
     simulator/sdf_annotate_task.cpp

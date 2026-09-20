@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <string>
+#include <string_view>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -171,6 +174,72 @@ TEST(UserDefinedTypeAssocArrayElaboration,
                             "real or shortreal type shall not be used as an "
                             "associative array index type",
                             3, "7.8.5"));
+}
+
+// Two packages each declare a `real_holder_t`, q's holding a real and r's
+// not; the module imports one of them and declares `idx_t`, the index type,
+// through the other's qualifier -- `typedef_line` being that declaration.
+// §26.3 (printed page 808) reaches a package's declaration through its
+// qualifier, so the qualified name is the named package's and never the
+// imported bare name's. Found by the session that carried the qualifier to
+// the type resolver (4af839bf7).
+std::string TwoPackagesRealHolderIndex(std::string_view imported,
+                                       std::string_view typedef_line) {
+  return "package q;\n"
+         "  typedef struct { real r; } real_holder_t;\n"
+         "endpackage\n"
+         "package r;\n"
+         "  typedef struct { int r; } real_holder_t;\n"
+         "endpackage\n"
+         "module top;\n"
+         "  import " +
+         std::string(imported) + "::*;\n  " + std::string(typedef_line) +
+         "\n"
+         "  int aa[idx_t];\n"
+         "endmodule\n";
+}
+
+// §7.8.5 with §26.3: the member `q::real_holder_t h` holds q's real although
+// the imported bare `real_holder_t` is r's real-free structure. Looked up by
+// the bare name, the member resolved to r's and the index type was not
+// reported.
+TEST(UserDefinedTypeAssocArrayElaboration,
+     StructMemberQualifiedByAnotherPackageHoldingRealRejected) {
+  ElabFixture f;
+  ElaborateSrc(TwoPackagesRealHolderIndex(
+                   "r", "typedef struct { q::real_holder_t h; int i; } idx_t;"),
+               f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "real or shortreal type shall not be used as an "
+                            "associative array index type",
+                            10, "7.8.5"));
+}
+
+// The mirror: `r::real_holder_t h` holds no real although q's real-holding
+// structure is what the imported bare name stands for, so the index type is
+// legal; the bare lookup reported it.
+TEST(UserDefinedTypeAssocArrayElaboration,
+     StructMemberQualifiedByRealFreePackageAllowedDespiteImportedReal) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      TwoPackagesRealHolderIndex(
+          "q", "typedef struct { r::real_holder_t h; int i; } idx_t;"),
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// §7.8.5 with §26.3 for a typedef of a qualified name rather than a member:
+// `typedef r::real_holder_t idx_t` names r's real-free structure although the
+// imported bare name is q's, so the index type is legal; ContainsRealType
+// looked the alias up by the bare name and reported it.
+TEST(UserDefinedTypeAssocArrayElaboration,
+     TypedefOfQualifiedRealFreeTypeAllowedDespiteImportedReal) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      TwoPackagesRealHolderIndex("q", "typedef r::real_holder_t idx_t;"), f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
 }
 
 }  // namespace
