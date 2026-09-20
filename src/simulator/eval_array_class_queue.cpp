@@ -13,6 +13,7 @@
 #include "parser/ast_expr.h"
 #include "parser/ast_type.h"
 #include "simulator/class_object.h"
+#include "simulator/declared_class_key.h"
 #include "simulator/eval_array.h"
 #include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_function_args_scoped.h"
@@ -71,16 +72,23 @@ std::string_view TypeNameOf(const DataType& type) {
 // is a class, so that each element is a handle: the type the declaration
 // names, or, where it names a type parameter (§8.25), the type the object's
 // specialization binds that parameter to, else the default the class
-// declares, as §8.26's `T myFifo[$:DEPTH-1]` on a `Fifo#(Item)`.
+// declares, as §8.26's `T myFifo[$:DEPTH-1]` on a `Fifo#(Item)`. §8.23
+// (printed pages 200-201): a nested class is named `Outer::Inner` from
+// outside its container, the key DeclaredClassKey resolves the written type
+// to; asked by the bare `Inner` alone, `Outer::Inner q[$]` was a queue of
+// plain values and `h.q[0].v` read 0. A type written as a bare identifier
+// expression, which carries no type_name, is still asked for by that name.
 bool ElementTypeIsClass(const ClassMember* member, const ClassDecl* decl,
                         const ClassObject* obj, SimContext& ctx) {
-  std::string_view name = TypeNameOf(member->data_type);
+  const DataType* type = &member->data_type;
+  std::string_view name = TypeNameOf(*type);
   if (name.empty()) return false;
   if (decl->type_param_names.count(name) != 0) {
-    const DataType* bound = TypeParamActual(obj, decl, name);
-    if (bound == nullptr) return false;
-    name = TypeNameOf(*bound);
+    type = TypeParamActual(obj, decl, name);
+    if (type == nullptr) return false;
+    name = TypeNameOf(*type);
   }
+  if (!DeclaredClassKey(*type, ctx, ctx.GetArena()).empty()) return true;
   return !name.empty() && ctx.FindClassType(name) != nullptr;
 }
 

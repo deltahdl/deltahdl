@@ -470,4 +470,58 @@ TEST(ClassScopeResolutionSim, ClassMethodLocalOfANestedClassIsConstructed) {
             5u);
 }
 
+// §8.23 (printed pages 200-201), §7.10 (printed 169) and §8.4 (printed 181):
+// a queue whose element type is the nested class named `Outer::Inner` holds
+// handles, so `q[0].v` reads the property of the object the element refers
+// to. The two tests share the Outer/Inner prelude and read 7, Inner's `v`
+// initializer: a queue of plain values answers 0 for `q[0].v`, and so does a
+// declaration that built no queue at all.
+static std::string OuterInnerQueueDesign(std::string_view rest) {
+  return "class Outer;\n"
+         "  class Inner;\n"
+         "    int v = 7;\n"
+         "  endclass\n"
+         "endclass\n" +
+         std::string(rest);
+}
+
+// A procedural declaration in an initial block: ExecVarDeclImpl
+// (statement_assign_decl.cpp) took `Outer::Inner q[$]` for a scalar handle
+// once DeclaredClassKey named the class, building no queue, and
+// CreateBlockQueue had flagged the queue by the bare `Inner`.
+TEST(ClassScopeResolutionSim, ProceduralQueueOfANestedClassHoldsHandles) {
+  EXPECT_EQ(RunAndGet(OuterInnerQueueDesign("module t;\n"
+                                            "  int y;\n"
+                                            "  initial begin\n"
+                                            "    Outer::Inner q[$];\n"
+                                            "    Outer::Inner i = new;\n"
+                                            "    q.push_back(i);\n"
+                                            "    y = q[0].v;\n"
+                                            "  end\n"
+                                            "endmodule\n"),
+                      "y"),
+            7u);
+}
+
+// A class property of another class: ElementTypeIsClass
+// (eval_array_class_queue.cpp) asked for the bare `Inner` where the
+// declaration wrote `Outer::Inner`, so the property's queue held plain values
+// and `h.q[0].v` read 0.
+TEST(ClassScopeResolutionSim, PropertyQueueOfANestedClassHoldsHandles) {
+  EXPECT_EQ(RunAndGet(OuterInnerQueueDesign("class Holder;\n"
+                                            "  Outer::Inner q[$];\n"
+                                            "endclass\n"
+                                            "module t;\n"
+                                            "  Holder h = new;\n"
+                                            "  int y;\n"
+                                            "  initial begin\n"
+                                            "    Outer::Inner i = new;\n"
+                                            "    h.q.push_back(i);\n"
+                                            "    y = h.q[0].v;\n"
+                                            "  end\n"
+                                            "endmodule\n"),
+                      "y"),
+            7u);
+}
+
 }  // namespace

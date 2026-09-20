@@ -236,6 +236,13 @@ static void CreateBlockArrayElements(const Stmt* stmt, uint32_t elem_width,
                          std::string(stmt->var_name));
 }
 
+// §7.10 (printed page 169): whether the declaration's first unpacked
+// dimension is a queue dimension, `[$]` or `[$:N]`.
+static bool DeclaresQueue(const Stmt* stmt) {
+  return !stmt->var_unpacked_dims.empty() &&
+         IsQueueDim(stmt->var_unpacked_dims[0]);
+}
+
 // §7.10: a declaration whose first unpacked dimension is `[$]` or `[$:N]`
 // declares a queue, wherever the declaration stands. Creates the QueueObject
 // the queue methods of §7.10.2 operate on, so that a declaration inside a
@@ -243,9 +250,8 @@ static void CreateBlockArrayElements(const Stmt* stmt, uint32_t elem_width,
 // items gets from Lowerer::LowerVarAggregate. Returns true when it made one.
 static bool CreateBlockQueue(const Stmt* stmt, uint32_t elem_width,
                              SimContext& ctx, Arena& arena) {
-  if (stmt->var_unpacked_dims.empty()) return false;
+  if (!DeclaresQueue(stmt)) return false;
   const auto* dim = stmt->var_unpacked_dims[0];
-  if (!IsQueueDim(dim)) return false;
   // §7.10.5: N in `[$:N]` bounds the queue at N + 1 elements, and `[$]` leaves
   // it unbounded, which CreateQueue spells -1. A bound the subclause rules out
   // is left unbounded here rather than reported: the elaborator's
@@ -259,11 +265,14 @@ static bool CreateBlockQueue(const Stmt* stmt, uint32_t elem_width,
   }
   auto* q = ctx.CreateQueue(stmt->var_name, elem_width, max_size,
                             Is4stateType(stmt->var_decl_type.kind));
-  // §8.4: a queue of a class type holds handles, so `q[i].v` names a property
-  // of the object an element refers to (TryEvalQueueElementMember in
-  // eval_array_class_queue.h).
+  // §8.4 (printed page 181): a queue of a class type holds handles, so
+  // `q[i].v` names a property of the object an element refers to
+  // (TryEvalQueueElementMember in eval_array_class_queue.h). §8.23 (printed
+  // 200-201): the class is looked for under the declaration's spelling,
+  // `Outer::Inner` for a nested class (DeclaredClassKey); by the bare
+  // `Inner` alone, `Outer::Inner q[$]` was a queue of plain values.
   q->holds_class_handles =
-      ctx.FindClassType(stmt->var_decl_type.type_name) != nullptr;
+      !DeclaredClassKey(stmt->var_decl_type, ctx, arena).empty();
   return true;
 }
 
@@ -365,8 +374,16 @@ static bool TryExecClassShallowCopy(std::string_view var_name, const Expr* init,
 // (declared_class_key.h) resolves to the key the run holds it under; looked up
 // by the bare `Inner` alone, the declaration found no class, became a plain
 // variable, and `i.take()` ran nothing.
+//
+// §7.10 (printed 169) with §8.4 (printed 181): `C q[$]` declares a queue
+// whose elements are handles, not a handle, so a declaration with a queue
+// dimension is left to ExecVarDeclImpl's aggregate path, which builds the
+// queue (CreateBlockQueue) and flags its elements. Taken here, it became one
+// scalar handle under the queue's name, `q.push_back(i)` found no queue and
+// `q[0].v` read 0.
 static bool TryExecClassVarDecl(const Stmt* stmt, SimContext& ctx,
                                 Arena& arena) {
+  if (DeclaresQueue(stmt)) return false;
   std::string_view class_type =
       DeclaredClassKey(stmt->var_decl_type, ctx, arena);
   if (class_type.empty()) return false;
@@ -598,10 +615,17 @@ StmtResult ExecVarDeclImpl(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   // sets, rather than the x a 4-state declaration starts at. DeclaredTypeWidth
   // answers 0 for the type, so before this such a local took the 32-bit
   // carrier and no reader took it for a virtual interface.
+  //
+  // §8.4 (printed page 181): a queue of a class type, which TryExecClassVarDecl
+  // leaves to this path, carries one handle per element, as wide as a handle
+  // variable is made (64), where DeclaredTypeWidth answers 0 for a class and
+  // the carrier below would have sized the elements at 32.
   bool is_virtual_interface =
       DeclaresAVirtualInterface(stmt->var_decl_type, ctx);
-  uint32_t width =
-      is_virtual_interface ? 64 : DeclaredTypeWidth(stmt->var_decl_type, ctx);
+  bool is_class = !DeclaredClassKey(stmt->var_decl_type, ctx, arena).empty();
+  uint32_t width = is_virtual_interface || is_class
+                       ? 64
+                       : DeclaredTypeWidth(stmt->var_decl_type, ctx);
   bool is_real = (stmt->var_decl_type.kind == DataTypeKind::kReal ||
                   stmt->var_decl_type.kind == DataTypeKind::kShortreal ||
                   stmt->var_decl_type.kind == DataTypeKind::kRealtime);
