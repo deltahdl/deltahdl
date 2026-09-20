@@ -368,4 +368,33 @@ TEST(ParameterizedScopeResolutionSim,
             16u * 100u + 32u);
 }
 
+// §8.25.1 (printed page 205) with §26.3 (printed 808): the explicit
+// specialization of a package's class reached through `p::` prefixes the
+// class scope resolution operator as the bare name does, so a static task
+// enabled as the statement `p::Box#(byte)::show(a)` runs with T bound to
+// byte, 8 through its output formal after the `#1`, `p::Box#(shortint)` 16
+// and `p::Box#()` the default's 32. The task statement bound the actuals of
+// a bare `Box#(...)` alone, so the package-qualified forms answered 32 each.
+TEST(ParameterizedScopeResolutionSim,
+     BitsOfATypeParameterInAStaticTaskOfAPackageClassSpecialization) {
+  EXPECT_EQ(RunAndGet("package p;\n"
+                      "  class Box #(type T = int);\n"
+                      "    static task show(output int o);\n"
+                      "      #1 o = $bits(T);\n"
+                      "    endtask\n"
+                      "  endclass\n"
+                      "endpackage\n"
+                      "module t;\n"
+                      "  int a, b, c, out;\n"
+                      "  initial begin\n"
+                      "    p::Box#(byte)::show(a);\n"
+                      "    p::Box#(shortint)::show(b);\n"
+                      "    p::Box#()::show(c);\n"
+                      "    out = a * 10000 + b * 100 + c;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "out"),
+            8u * 10000u + 16u * 100u + 32u);
+}
+
 }  // namespace

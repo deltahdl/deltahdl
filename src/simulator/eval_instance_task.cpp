@@ -161,9 +161,13 @@ bool SetupInstanceTaskCall(const Expr* expr, SimContext& ctx, Arena& arena,
   // as the evaluator's class-scope call binds them (BindClassParams); a type
   // actual, `C#(byte)::t(...)`, is bound as a type beside them, since a value
   // bind makes a 1-bit local of a type name (BindClassScopeTypeActuals).
+  // §8.25.1 with §26.3 admits the package-qualified class as the prefix,
+  // `p::C#(byte)::t(...)`, which Parser::ParseParameterizedScope leaves as
+  // the `p::C` scope resolution carrying the `#(...)` list, the shape
+  // ResolveStaticTaskByScope has already resolved the class from; bound for
+  // the bare name alone, that form ran with the class's defaults.
   const Expr* scope = expr->lhs != nullptr ? expr->lhs->lhs : nullptr;
-  if (call.obj == nullptr && scope != nullptr &&
-      scope->kind == ExprKind::kIdentifier && !scope->elements.empty()) {
+  if (call.obj == nullptr && scope != nullptr && !scope->elements.empty()) {
     BindClassParams(call.owner, scope, ctx, arena);
     BindClassScopeTypeActuals(call.owner->decl, scope, ctx, arena);
   }
