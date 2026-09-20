@@ -8,6 +8,7 @@
 #include <utility>
 #include <vector>
 
+#include "common/arena.h"
 #include "common/diagnostic.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
@@ -21,8 +22,35 @@
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
+#include "parser/ast_type.h"
 
 namespace delta {
+
+// §11.5.1 with §6.18: a variable declared with a typedef name is the type the
+// name stands for, packed range included, and which bit an index addresses is
+// decided in part by the declaration: a `value_t v` on `typedef bit [15:10]
+// value_t` addresses its bits as [15:10]. The declaration itself writes no
+// dimension, so the lowerer's RecordPackedRange, which reads one off `dtype`,
+// had nothing to read and left `v` addressed as [5:0], and `v[13:10]` read
+// four bits outside it (#3808). The resolved type is set as `dtype`, the way
+// SetEnumTypeInfo in elaborator_decls.cpp sets an enum's, for a name standing
+// for a vector of one packed dimension; a name written with a dimension of its
+// own stacks it on the type (§7.4.4) and keeps the declaration's own DataType,
+// and a type of more than one packed dimension addresses elements (§7.4.1) and
+// is left as it was.
+void SetPackedTypedefTypeInfo(const ModuleItem* item, RtlirVariable& var,
+                              const TypedefMap& typedefs, Arena& arena) {
+  if (var.dtype != nullptr || item->data_type.kind != DataTypeKind::kNamed ||
+      item->data_type.packed_dim_left != nullptr) {
+    return;
+  }
+  const DataType* bound = FindNamedType(item->data_type, typedefs);
+  if (bound == nullptr || bound->kind == DataTypeKind::kNamed ||
+      bound->packed_dim_left == nullptr || !bound->extra_packed_dims.empty()) {
+    return;
+  }
+  var.dtype = arena.Create<DataType>(*bound);
+}
 
 static void ValidateParameterizedClassDefaults(const ModuleItem* item,
                                                const CompilationUnit* unit,

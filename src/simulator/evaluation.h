@@ -20,6 +20,7 @@ struct StructTypeInfo;
 struct TimeFormatSpec;
 struct NetStrength;
 struct QueueObject;
+struct Variable;
 class SimContext;
 class Arena;
 
@@ -62,6 +63,20 @@ bool DeclaredTypeIsString(const DataType& type, const SimContext& ctx);
 // DeclaredTypeWidth and DeclaredTypeIsString, the other two facts a declaration
 // reads off a name.
 bool DeclaredTypeIsSigned(const DataType& type, const SimContext& ctx);
+
+// §11.5.1: records on `v` the packed range its declaration `type` addresses
+// its bits by -- the dimension the declaration writes, through
+// RecordPackedRange, or else the one the type a name stands for was declared
+// with (§6.18), through the elaborated table -- so that a select of a
+// variable declared `Node::value_t v` on a `typedef bit [15:10] value_t` reads
+// `v[13:10]` as the four bits above its least significant two rather than as
+// four bits outside a six-bit vector. Records nothing for a type of neither
+// form, and nothing where the range does not span the variable's storage.
+// Defined in evaluation_literal.cpp beside the other facts a declaration
+// reads off a name; Lowerer::LowerVar reaches the same range through the
+// resolved type the elaborator sets on a module-scope declaration.
+void RecordDeclaredRange(const DataType& type, Variable* v, SimContext& ctx,
+                         Arena& arena);
 
 bool HasUnknownBits(const Logic4Vec& v);
 

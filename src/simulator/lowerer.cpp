@@ -11,6 +11,7 @@
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
+#include "common/packed_range.h"
 #include "common/types.h"
 #include "elaborator/design_scopes.h"
 #include "elaborator/elaborator_validate_internal.h"
@@ -669,6 +670,12 @@ static void RegisterDesignTypeWidths(const RtlirDesign* design,
   // the simulator was passing it.
   for (const auto& [name, is_signed] : design->type_signed) {
     ctx.RegisterTypeSigned(name, is_signed);
+  }
+  // §11.5.1's declared range is the fourth, and the one a select of a
+  // procedure's or a subroutine body's local of the type asks for: the name is
+  // all its declaration carries, and the width addresses it as [width-1:0].
+  for (const auto& [name, range] : design->type_ranges) {
+    ctx.RegisterTypeRange(name, range);
   }
 }
 

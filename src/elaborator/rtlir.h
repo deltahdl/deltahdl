@@ -8,6 +8,7 @@
 #include <utility>
 #include <vector>
 
+#include "common/packed_range.h"
 #include "common/source_loc.h"
 #include "common/types.h"
 #include "parser/ast_class.h"
@@ -757,6 +758,16 @@ struct RtlirDesign {
   // Each entry is an arena-owned copy with its nested aggregate members
   // resolved, so it outlives the elaborator that built it.
   std::unordered_map<std::string_view, const DataType*> type_layouts;
+  // §11.5.1 with §6.18: the packed range the type a name stands for was
+  // declared with, as written, for the names standing for a vector of one
+  // packed dimension whose bounds fold. `typedef bit [15:10] value_t` is six
+  // bits wide, and the width alone addresses it as [5:0], so `v[13:10]` of a
+  // `value_t v` declared inside a procedure or a subroutine body -- where the
+  // declaration's DataType is the name and carries no dimension of its own --
+  // read four bits that are outside a six-bit vector. Recorded only where the
+  // bounds fold to constants and the type has one packed dimension; a name
+  // nothing here records is addressed as [width-1:0], as before.
+  std::unordered_map<std::string_view, PackedRange> type_ranges;
   // §6.18 with §8.3: the name at the end of the chain of typedefs a name
   // stands for, recorded for the names whose chain ends in a name the typedef
   // table does not resolve -- a class. `typedef C T;` makes T the class C

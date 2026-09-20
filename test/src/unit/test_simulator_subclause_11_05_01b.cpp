@@ -364,4 +364,88 @@ TEST(DeclaredRangeSelect, TopAndChildInstanceBodyVectorsSelectAlike) {
   EXPECT_EQ(child_r->value.words[0].bval, top_r->value.words[0].bval);
 }
 
+// The declarations a procedure and a subroutine body make are declarations
+// too, and the clause's "determined by the declaration" says nothing about
+// where one stands. Neither recorded a range: a procedure's local went through
+// ExecVarDeclImpl and a body's through CreateFuncLocalVar, both of which sized
+// the variable and stopped, so every such vector was addressed as [width-1:0]
+// whatever its declaration wrote (#3808). 6'h2D under [15:10] puts 1,0,1,1,0,1
+// at indices 15 down to 10: [13:10] is 4'b1101, 13, and [15:12] is 4'b1011,
+// 11. Addressed as [5:0] both selects lie outside the vector and read x; a
+// range recorded the wrong way round reads the other window's bits reversed.
+TEST(DeclaredRangeSelect, ProcedureLocalKeepsItsDeclaredRange) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  int r;\n"
+      "  initial begin\n"
+      "    bit [15:10] v;\n"
+      "    v = 6'h2D;\n"
+      "    r = v[13:10] * 100 + v[15:12];\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1311u);
+}
+
+TEST(DeclaredRangeSelect, SubroutineLocalKeepsItsDeclaredRange) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  int r;\n"
+      "  function int windows();\n"
+      "    bit [15:10] v;\n"
+      "    v = 6'h2D;\n"
+      "    return v[13:10] * 100 + v[15:12];\n"
+      "  endfunction\n"
+      "  initial r = windows();\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1311u);
+}
+
+// §6.18 makes a variable declared with a typedef name the type the name stands
+// for, range included, and such a declaration writes no dimension of its own:
+// the lowerer read the range off the declaration's DataType and a name has
+// none, so `value_t v` at module scope was addressed as [5:0] however the
+// typedef was written. The elaborator now sets the resolved type on the
+// module-scope declaration, and a procedure's local, whose declaration the
+// elaborator does not rewrite, reads the range the elaborated table records
+// against the name. The same 1311 as above from both.
+TEST(DeclaredRangeSelect, TypedefNameCarriesItsRangeToAModuleVariable) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  typedef bit [15:10] value_t;\n"
+      "  value_t v;\n"
+      "  int r;\n"
+      "  initial begin\n"
+      "    v = 6'h2D;\n"
+      "    r = v[13:10] * 100 + v[15:12];\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1311u);
+}
+
+TEST(DeclaredRangeSelect, TypedefNameCarriesItsRangeToAProcedureLocal) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  typedef bit [15:10] value_t;\n"
+      "  int r;\n"
+      "  initial begin\n"
+      "    value_t v;\n"
+      "    v = 6'h2D;\n"
+      "    r = v[13:10] * 100 + v[15:12];\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1311u);
+}
+
 }  // namespace

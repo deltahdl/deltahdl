@@ -604,6 +604,15 @@ StmtResult ExecVarDeclImpl(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (var) {
     var->is_virtual_interface = is_virtual_interface;
     if (is_virtual_interface) var->value = MakeLogic4VecVal(arena, width, 0);
+    // §11.5.1: which bit an index of this variable addresses is decided by
+    // its declaration, and a declaration here recorded no range at all: a
+    // `bit [15:10] v` in a procedure was addressed as [5:0], and so was a
+    // `Node::value_t v` standing for it (§6.18), whose `v[13:10]` then read
+    // four bits outside a six-bit vector -- x, and 0 once assigned to a
+    // 2-state target (#3808). Lowerer::LowerVar records a module-scope
+    // declaration's range; this is the same fact for a procedure's.
+    if (!is_virtual_interface)
+      RecordDeclaredRange(stmt->var_decl_type, var, ctx, arena);
     InitializeDeclVariable(stmt, {var, width, is_real}, func_name, ctx, arena);
   }
   return StmtResult::kDone;

@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <format>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <tuple>
@@ -13,6 +14,7 @@
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
+#include "common/packed_range.h"
 #include "common/source_loc.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator_class_constraints.h"
@@ -224,6 +226,7 @@ struct TypeNameFacts {
   std::unordered_map<std::string_view, bool>& is_signed;
   std::unordered_map<std::string_view, const DataType*>& layouts;
   std::unordered_map<std::string_view, std::string_view>& targets;
+  std::unordered_map<std::string_view, PackedRange>& ranges;
 };
 
 // What the typedef table has to say about the names in it: the table itself,
@@ -255,6 +258,31 @@ static const DataType& ResolvedType(const DataType& dtype,
 static DataTypeKind ResolvedTypeKind(const DataType& dtype,
                                      const TypedefMap& typedefs) {
   return ResolvedType(dtype, typedefs).kind;
+}
+
+// §11.5.1 has the bit an index addresses decided in part by the declaration,
+// and §6.18 makes a typedef name's declaration the type it stands for: this is
+// the packed range a name stands for, read off the type at the end of its
+// chain of names, for a type declared with one packed dimension whose bounds
+// fold. A name written with a dimension of its own, `typedef bsix [1:10]
+// v5_t`, stacks that dimension on the type it names (§7.4.4) and addresses
+// elements rather than bits, as does a type with more than one packed
+// dimension (§7.4.1); neither is a range of bits an index resolves against, so
+// neither records one and a variable of such a type keeps the [width-1:0] view
+// it had.
+static std::optional<PackedRange> TypeNameRange(const DataType& dtype,
+                                                const TypedefMap& typedefs) {
+  if (dtype.kind == DataTypeKind::kNamed && dtype.packed_dim_left != nullptr)
+    return std::nullopt;
+  const DataType& end = ResolvedType(dtype, typedefs);
+  if (end.kind == DataTypeKind::kNamed || end.packed_dim_left == nullptr ||
+      end.packed_dim_right == nullptr || !end.extra_packed_dims.empty()) {
+    return std::nullopt;
+  }
+  auto left = ConstEvalInt(end.packed_dim_left);
+  auto right = ConstEvalInt(end.packed_dim_right);
+  if (!left || !right) return std::nullopt;
+  return PackedRange{*left, *right};
 }
 
 // The width the table records for one name. §8.27's forward class declaration
@@ -300,6 +328,9 @@ void PopulateTypeWidths(const TypeNameSources& src, TypeNameFacts& out) {
     const DataType& end = ResolvedType(dtype, src.typedefs);
     if (end.kind == DataTypeKind::kNamed && end.type_name != name) {
       out.targets[name] = end.type_name;
+    }
+    if (auto range = TypeNameRange(dtype, src.typedefs)) {
+      out.ranges[name] = *range;
     }
     if (dtype.kind != DataTypeKind::kStruct &&
         dtype.kind != DataTypeKind::kUnion) {
@@ -447,9 +478,9 @@ void CopyDesignMetadata(RtlirDesign* design, const CompilationUnit* unit,
 void FinalizeDesignTail(RtlirDesign* design, const CompilationUnit* unit,
                         const TypeNameSources& src,
                         const DesignMetadata& meta) {
-  TypeNameFacts facts{design->type_widths, design->type_kinds,
-                      design->type_signed, design->type_layouts,
-                      design->type_targets};
+  TypeNameFacts facts{design->type_widths,  design->type_kinds,
+                      design->type_signed,  design->type_layouts,
+                      design->type_targets, design->type_ranges};
   PopulateTypeWidths(src, facts);
   CopyDesignMetadata(design, unit, meta);
 }

@@ -71,6 +71,13 @@ void ComputeUnpackedDims(const std::vector<Expr*>& dims, RtlirVariable& var,
 void InferDynArraySize(const std::vector<Expr*>& dims, const Expr* init,
                        RtlirVariable& var);
 
+// §11.5.1 with §6.18: sets the resolved type as `var.dtype` for a declaration
+// written with a typedef name standing for a vector of one packed dimension,
+// so that the lowerer records the range the name was declared with; see the
+// definition in elaborator_decls_var.cpp.
+void SetPackedTypedefTypeInfo(const ModuleItem* item, RtlirVariable& var,
+                              const TypedefMap& typedefs, Arena& arena);
+
 void CheckDeclRedeclaration(const ModuleItem* item,
                             const DeclTypeRef& decl_type, DeclNameTables tables,
                             std::string_view kind_word, DiagEngine& diag);

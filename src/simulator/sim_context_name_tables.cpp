@@ -17,11 +17,13 @@
 #include "simulator/sim_context_name_tables.h"
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
 
+#include "common/packed_range.h"
 #include "parser/ast_type.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/variable.h"
@@ -280,6 +282,18 @@ void DeclaredNameTables::RegisterTypeSigned(std::string_view name,
 bool DeclaredNameTables::FindTypeSigned(std::string_view name) const {
   auto it = type_signed_.find(name);
   return it != type_signed_.end() && it->second;
+}
+
+void DeclaredNameTables::RegisterTypeRange(std::string_view name,
+                                           PackedRange range) {
+  type_ranges_[name] = range;
+}
+
+std::optional<PackedRange> DeclaredNameTables::FindTypeRange(
+    std::string_view name) const {
+  auto it = type_ranges_.find(name);
+  if (it == type_ranges_.end()) return std::nullopt;
+  return it->second;
 }
 
 void DeclaredNameTables::RegisterInstanceType(std::string_view prefix,

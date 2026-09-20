@@ -19,12 +19,14 @@
 // type table outwards from the instance the running process stands in.
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
+#include "common/packed_range.h"
 #include "parser/ast_type.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/variable.h"
@@ -140,6 +142,14 @@ class DeclaredNameTables {
   void RegisterTypeSigned(std::string_view name, bool is_signed);
   bool FindTypeSigned(std::string_view name) const;
 
+  // §11.5.1: the packed range the type a name stands for was declared with,
+  // which the width cannot say -- `bit [15:10]` and `bit [5:0]` are one width
+  // and the same index addresses a different bit of each. Recorded for the
+  // names the elaborated table gives one, RtlirDesign::type_ranges, and empty
+  // for every other name, whose variables are addressed as [width-1:0].
+  void RegisterTypeRange(std::string_view name, PackedRange range);
+  std::optional<PackedRange> FindTypeRange(std::string_view name) const;
+
   void RegisterInstanceType(std::string_view prefix, std::string_view type);
   std::string_view FindInstanceType(std::string_view prefix) const;
 
@@ -227,6 +237,7 @@ class DeclaredNameTables {
   std::unordered_map<std::string_view, uint32_t> type_widths_;
   std::unordered_map<std::string_view, DataTypeKind> type_kinds_;
   std::unordered_map<std::string_view, bool> type_signed_;
+  std::unordered_map<std::string_view, PackedRange> type_ranges_;
 
   std::unordered_map<std::string, std::string> instance_types_;
   std::unordered_set<std::string> top_module_names_;

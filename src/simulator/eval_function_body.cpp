@@ -357,6 +357,13 @@ static Variable* CreateFuncLocalVar(std::string_view name, const DataType& type,
   if (is_string) v->is_string = true;
   if (is_class) ctx.SetVariableClassType(name, type.type_name);
   RecordVariableEnumType(name, type, ctx);
+  // §11.5.1: the declared range an index of the local resolves against, the
+  // dimension written here or the one its typedef name stands for (§6.18),
+  // recorded as ExecVarDeclImpl records it for a procedure's declaration; a
+  // body local had none and was addressed as [width-1:0] whatever its
+  // declaration said.
+  if (!is_class && !is_virtual_interface)
+    RecordDeclaredRange(type, v, ctx, arena);
   if (init == nullptr) return v;
   // §8.4: `P p = new;` creates an object of class P and assigns its handle to
   // p. `new` names a construction, not a value to be read, so evaluating it as

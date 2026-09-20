@@ -1,11 +1,13 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
 
 #include "common/arena.h"
+#include "common/packed_range.h"
 #include "common/types.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_class.h"
@@ -15,7 +17,9 @@
 #include "simulator/class_object.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
+#include "simulator/lowerer_register.h"
 #include "simulator/sim_context.h"
+#include "simulator/variable.h"
 
 namespace delta {
 
@@ -133,6 +137,36 @@ bool DeclaredTypeIsSigned(const DataType& type, const SimContext& ctx) {
   if (type.kind == DataTypeKind::kNamed)
     return ctx.FindTypeSigned(TypeTableKey(type));
   return IsSignedType(type, {});
+}
+
+// §11.5.1 with §6.18: the packed range the declared type was written with,
+// for a type reached through a name. The name is looked up under the same key
+// the width is, so a class-scoped `Node::value_t` (§8.23) finds the entry
+// RegisterClassTypedefs recorded for it. A name written with a packed dimension
+// of its own stacks that dimension on the type (§7.4.4) and is left to
+// RecordPackedRange, which reads the dimension off the declaration itself.
+static std::optional<PackedRange> DeclaredTypeRange(const DataType& type,
+                                                    const SimContext& ctx) {
+  if (type.kind != DataTypeKind::kNamed || type.packed_dim_left != nullptr)
+    return std::nullopt;
+  return ctx.FindTypeRange(TypeTableKey(type));
+}
+
+void RecordDeclaredRange(const DataType& type, Variable* v, SimContext& ctx,
+                         Arena& arena) {
+  RecordPackedRange(&type, v, ctx, arena);
+  if (v->has_packed_range) return;
+  auto range = DeclaredTypeRange(type, ctx);
+  if (!range) return;
+  // The range names the bits of the type it was recorded for, and the variable
+  // was sized from the same type; storage of another width -- the carrier a
+  // declaration nothing could size is created at, or a string's -- is not that
+  // vector and stays addressed as [width-1:0], as RecordPackedRange leaves a
+  // declaration whose bounds it cannot fold.
+  auto span = static_cast<uint64_t>(range->HighIndex() - range->LowIndex() + 1);
+  if (span != v->value.width) return;
+  v->packed_range = *range;
+  v->has_packed_range = true;
 }
 
 bool DeclaredTypeIsString(const DataType& type, const SimContext& ctx) {

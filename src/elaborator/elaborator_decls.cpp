@@ -920,6 +920,7 @@ void Elaborator::SetVariableTypeInfo(const ModuleItem* item,
     var.class_data_type = &item->data_type;
   }
   SetEnumTypeInfo(item, var, typedefs_, arena_);
+  SetPackedTypedefTypeInfo(item, var, typedefs_, arena_);
   if (!var.dtype && (item->data_type.packed_dim_left != nullptr ||
                      !item->data_type.extra_packed_dims.empty())) {
     var.dtype = &item->data_type;
