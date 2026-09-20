@@ -9,6 +9,7 @@
 #include "simulator/class_object.h"
 #include "simulator/net.h"
 #include "simulator/process.h"
+#include "simulator/scope.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/sync_objects.h"
@@ -48,29 +49,61 @@ QueueObject* SimContext::CreateQueue(std::string_view name, uint32_t elem_width,
   return q;
 }
 
+// §26.3 with §13.4: the keys a bare name read inside a package subroutine's
+// body may stand under, the package's own declaration first and then each
+// package an import of it brings the name in from, as PackageScopedKeys
+// orders them; none outside any package frame (PackageFrame), and none for a
+// hierarchical name, whose head is an instance rather than a declaration of
+// the package. FindInPackageScope (sim_context.cpp) reads a variable by them
+// and ScopedObjectKeys below puts them ahead of an object's other keys.
+std::vector<std::string> SimContext::PackageFrameKeys(
+    std::string_view name) const {
+  if (name.find('.') != std::string_view::npos) return {};
+  const Scope* frame = PackageFrame();
+  if (frame == nullptr) return {};
+  return PackageScopedKeys(frame->package, name);
+}
+
+// §23.9's upward search past the scope frames, for an object held in one of
+// the run-long tables rather than in a frame: the keys a bare `name` may
+// stand under, in the order the search tries them. A package subroutine's
+// body reads the package's own object or an import's first
+// (PackageFrameKeys); then, as FindVariable orders them, the object the
+// running instance declares, stored under the instance's prefix
+// (CreateChildModuleVariables in lowerer_child.cpp), and the bare key of the
+// enclosing scope, which stays the answer for a name that resolved by it
+// before. Without the package keys a bare `q.push_back(v)` or `m["k"] = v`
+// inside a package function reached no queue and no associative array: the
+// frames held none, no instance's key and no bare key matched, and "p1.q",
+// the key the package's object was created under (CreatePackageAggregate in
+// lowerer_register.cpp), was never tried, so the push ran on nothing and
+// `p1::q.size()` afterwards read 0.
+std::vector<std::string> SimContext::ScopedObjectKeys(
+    std::string_view name) const {
+  std::vector<std::string> keys = PackageFrameKeys(name);
+  std::string prefix = ActiveInstancePrefix();
+  if (!prefix.empty()) keys.push_back(prefix + std::string(name));
+  keys.emplace_back(name);
+  return keys;
+}
+
 QueueObject* SimContext::FindQueue(std::string_view name) {
   // §23.9 searches the innermost scope first, so a queue a subroutine or a
   // begin-end block declares answers its own name while it is on the stack.
-  // The instance-prefix arm below is a separate question and keeps its place
-  // under this one: it is what a module-scoped queue reached from inside an
-  // instance is found by, and a formal's copy has to be found before it.
+  // The key walk below is a separate question and keeps its place under this
+  // one: it is what a package's queue reached from inside its subroutine or a
+  // module-scoped queue reached from inside an instance is found by, and a
+  // formal's copy has to be found before it.
   for (auto frame = scope_stack_.rbegin(); frame != scope_stack_.rend();
        ++frame) {
     auto local = frame->queues.find(name);
     if (local != frame->queues.end()) return local->second;
   }
-  // §23.9: a queue declared inside a module instance is stored under that
-  // instance's prefix, so the prefixed name is what a bare reference from
-  // within the instance denotes and is tried first. The unprefixed lookup
-  // stays as the answer for a queue of the enclosing scope, so a name that
-  // resolves today resolves to the same queue.
-  std::string prefix = ActiveInstancePrefix();
-  if (!prefix.empty()) {
-    auto prefixed = queues_.find(prefix + std::string(name));
-    if (prefixed != queues_.end()) return prefixed->second;
+  for (const std::string& key : ScopedObjectKeys(name)) {
+    auto it = queues_.find(key);
+    if (it != queues_.end()) return it->second;
   }
-  auto it = queues_.find(name);
-  return (it != queues_.end()) ? it->second : nullptr;
+  return nullptr;
 }
 
 uint32_t AssocArrayObject::Size() const {
@@ -119,18 +152,18 @@ AssocArrayObject* SimContext::FindAssocArray(std::string_view name) {
   // §23.9: an associative array declared inside a module instance is stored
   // under that instance's prefix (CreateChildModuleVariables in
   // lowerer_child.cpp), so the prefixed name is what a bare reference from
-  // within the instance denotes and is tried first, as in FindQueue above.
-  // Without this arm no associative array answered the bare name inside an
-  // instance: an element write and read fell to the carrier variable the
-  // lowerer creates under the name, and num(), foreach and %p saw none. The
-  // unprefixed lookup stays as the answer for an array of the enclosing scope.
-  std::string prefix = ActiveInstancePrefix();
-  if (!prefix.empty()) {
-    auto prefixed = assoc_arrays_.find(prefix + std::string(name));
-    if (prefixed != assoc_arrays_.end()) return prefixed->second;
+  // within the instance denotes and is tried ahead of the bare key, a
+  // package frame's own keys ahead of both (ScopedObjectKeys above), as in
+  // FindQueue. Asked by the bare key alone, no associative array answered the
+  // name inside an instance: an element write and read fell to the carrier
+  // variable the lowerer creates under the name, and num(), foreach and %p
+  // saw none. The bare key stays the answer for an array of the enclosing
+  // scope.
+  for (const std::string& key : ScopedObjectKeys(name)) {
+    auto it = assoc_arrays_.find(key);
+    if (it != assoc_arrays_.end()) return it->second;
   }
-  auto it = assoc_arrays_.find(name);
-  return (it != assoc_arrays_.end()) ? it->second : nullptr;
+  return nullptr;
 }
 
 void SimContext::AliasQueue(std::string_view alias_name,
@@ -307,19 +340,20 @@ SemaphoreObject* SimContext::CreateSemaphore(std::string_view name,
 // §23.9: a semaphore declared inside a module instance is stored under that
 // instance's prefix (CreateChildModuleVariables in lowerer_child.cpp reaching
 // CreateSemaphoreForVar in lowerer_var.cpp), so the prefixed name is what a
-// bare reference from within the instance denotes and is tried first, as in
-// FindQueue above. Asked by the bare key alone, no semaphore answered the
-// name inside an instance: `s = new(2)` filled no bucket, get() and put()
-// ran on none, and try_get() was served by no semaphore. The unprefixed
-// lookup stays as the answer for a semaphore of the enclosing scope.
+// bare reference from within the instance denotes and is tried ahead of the
+// bare key, a package frame's own keys ahead of both (ScopedObjectKeys
+// above), as in FindQueue; a semaphore has no scope frame to search ahead of
+// them, a subroutine or a block declaring none. Asked by the bare key alone,
+// no semaphore answered the name inside an instance: `s = new(2)` filled no
+// bucket, get() and put() ran on none, and try_get() was served by no
+// semaphore. The bare key stays the answer for a semaphore of the enclosing
+// scope.
 SemaphoreObject* SimContext::FindSemaphore(std::string_view name) {
-  std::string prefix = ActiveInstancePrefix();
-  if (!prefix.empty()) {
-    auto prefixed = semaphores_.find(prefix + std::string(name));
-    if (prefixed != semaphores_.end()) return prefixed->second;
+  for (const std::string& key : ScopedObjectKeys(name)) {
+    auto it = semaphores_.find(key);
+    if (it != semaphores_.end()) return it->second;
   }
-  auto it = semaphores_.find(name);
-  return (it != semaphores_.end()) ? it->second : nullptr;
+  return nullptr;
 }
 
 MailboxObject* SimContext::CreateMailbox(std::string_view name, int32_t bound) {
@@ -330,18 +364,15 @@ MailboxObject* SimContext::CreateMailbox(std::string_view name, int32_t bound) {
 
 // §23.9: a mailbox declared inside a module instance is stored under that
 // instance's prefix (CreateChildModuleVariables in lowerer_child.cpp reaching
-// CreateMailboxForVar in lowerer_var.cpp), so the prefixed name is what a
-// bare reference from within the instance denotes and is tried first, as
-// FindSemaphore above tries it. The unprefixed lookup stays as the answer for
-// a mailbox of the enclosing scope.
+// CreateMailboxForVar in lowerer_var.cpp), so the keys are walked in the
+// order FindSemaphore above walks them (ScopedObjectKeys). The bare key
+// stays the answer for a mailbox of the enclosing scope.
 MailboxObject* SimContext::FindMailbox(std::string_view name) {
-  std::string prefix = ActiveInstancePrefix();
-  if (!prefix.empty()) {
-    auto prefixed = mailboxes_.find(prefix + std::string(name));
-    if (prefixed != mailboxes_.end()) return prefixed->second;
+  for (const std::string& key : ScopedObjectKeys(name)) {
+    auto it = mailboxes_.find(key);
+    if (it != mailboxes_.end()) return it->second;
   }
-  auto it = mailboxes_.find(name);
-  return (it != mailboxes_.end()) ? it->second : nullptr;
+  return nullptr;
 }
 
 void SimContext::SetEventTriggered(std::string_view name) {

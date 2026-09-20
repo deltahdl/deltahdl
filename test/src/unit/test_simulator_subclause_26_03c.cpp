@@ -747,4 +747,68 @@ TEST(PackageImportSim, ReExportedStringWrittenAndReadThroughTheExporter) {
             44u);
 }
 
+// §26.2 (printed page 808) lets a package's items reference what the package
+// itself declares, and §13.4 runs a function's body in the scope declaring
+// it, so the bare `q` and `m` inside p1::add are p1's queue and associative
+// array, the ones `p1::q` and `p1::m` reach through §26.3's scope resolution
+// operator: one push and one element write, then 1 * 10 + 5. Under the
+// defect the body's `q` and `m` found no object: FindQueue and
+// FindAssocArray searched the frames, the running instance's key and the
+// bare key and never the package frame's "p1.q" and "p1.m", so the
+// push_back ran on no queue and the element write fell to the carrier
+// variable, and the read through the qualifier afterwards saw an empty queue
+// and an element never written -- 0. A queue found and an associative array
+// missed would read 10, the other way round 5.
+TEST(PackageImportSim,
+     PackageFunctionWritesItsOwnQueueAndAssociativeArrayBare) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  int q[$];\n"
+                      "  int m[string];\n"
+                      "  function void add(int v);\n"
+                      "    q.push_back(v);\n"
+                      "    m[\"k\"] = v;\n"
+                      "  endfunction\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  int y;\n"
+                      "  initial begin\n"
+                      "    p1::add(5);\n"
+                      "    y = p1::q.size() * 10 + p1::m[\"k\"];\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            15u);
+}
+
+// §26.3 (printed page 809): a wildcard import makes another package's
+// declarations visible in the importing package without a qualifier, so the
+// bare `r` inside p1::addr is p0's queue, the object `p0::r` reaches. Two
+// calls push 3 and then 4, so the size is 2 and the element at 1 is 4:
+// 2 * 10 + 4. The same defect left the body's `r` reaching no queue, "p0.r"
+// being a key of p1's import that the lookup never tried, and the read
+// through p0's qualifier afterwards saw an empty queue -- 0. A lookup that
+// tried p1's own key alone and not its import's would read 0 as well, which
+// is what distinguishes this case from the one above.
+TEST(PackageImportSim, PackageFunctionWritesAnImportedPackagesQueueBare) {
+  EXPECT_EQ(RunAndGet("package p0;\n"
+                      "  int r[$];\n"
+                      "endpackage\n"
+                      "package p1;\n"
+                      "  import p0::*;\n"
+                      "  function void addr(int v);\n"
+                      "    r.push_back(v);\n"
+                      "  endfunction\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  int y;\n"
+                      "  initial begin\n"
+                      "    p1::addr(3);\n"
+                      "    p1::addr(4);\n"
+                      "    y = p0::r.size() * 10 + p0::r[1];\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            24u);
+}
+
 }  // namespace

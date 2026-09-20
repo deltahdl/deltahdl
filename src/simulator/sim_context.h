@@ -250,8 +250,11 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   void PopStaticScope(std::string_view func_name);
   bool HasLocalScope() const { return !scope_stack_.empty(); }
   Variable* FindLocalVariable(std::string_view name);
-  // §26.3 with §23.9 and §13.4: see the definitions in sim_context.cpp.
+  // §26.3 with §23.9 and §13.4: see the definitions in sim_context.cpp and,
+  // for the two key lists, in sim_context_fileio.cpp.
   const Scope* PackageFrame() const;
+  std::vector<std::string> PackageFrameKeys(std::string_view name) const;
+  std::vector<std::string> ScopedObjectKeys(std::string_view name) const;
   Variable* FindInPackageScope(std::string_view name);
   ModuleItem* FindFunctionInPackageScope(std::string_view name);
   // Creates a scope-local variable of `width` bits, signed when `is_signed`
@@ -505,10 +508,8 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   // local to that block, and §13.4 gives a call's formal the lifetime of the
   // call, so neither shape may answer for a like-named variable afterwards --
   // which is what a shape registered for the run does, array_infos_ being flat
-  // and cleared by nothing.
-  //
-  // A module-level declaration has no local scope to belong to and keeps the
-  // run-long registration it always had.
+  // and cleared by nothing. A module-level declaration has no local scope to
+  // belong to and keeps the run-long registration it always had.
   void RegisterArrayInScope(std::string_view name, const ArrayInfo& info);
 
   // §6.16: marks the variable `name` finds a string, and answers whether the
@@ -747,8 +748,7 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   // The run's live coverage database. §19.9's predefined coverage system
   // tasks/functions ($set_coverage_db_name, $load_coverage_db, $get_coverage)
   // operate on it. An externally injected database (SetCoverageDB) takes
-  // precedence; otherwise one is created on first use and owned by this
-  // context.
+  // precedence; otherwise one is made on first use and owned by this context.
   class CoverageDB& CoverageData();
 
   void SetDeferredArgSnapshot(const Expr* arg, const Logic4Vec& val);

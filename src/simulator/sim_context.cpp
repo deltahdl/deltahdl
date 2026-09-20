@@ -284,13 +284,11 @@ const Scope* SimContext::PackageFrame() const {
 
 // §26.3 with §13.4: a bare name read inside a package subroutine's body is
 // the package's own variable or one an import of the package brings in, held
-// under the "package.name" keys PackageScopedKeys lists; null outside any
-// package frame (PackageFrame) or where no key holds the name.
+// under the "package.name" keys PackageFrameKeys lists
+// (sim_context_fileio.cpp); null outside any package frame or where no key
+// holds the name.
 Variable* SimContext::FindInPackageScope(std::string_view name) {
-  if (name.find('.') != std::string_view::npos) return nullptr;
-  const Scope* frame = PackageFrame();
-  if (frame == nullptr) return nullptr;
-  for (const std::string& key : PackageScopedKeys(frame->package, name)) {
+  for (const std::string& key : PackageFrameKeys(name)) {
     auto found = variables_.find(key);
     if (found != variables_.end()) return found->second;
   }
@@ -920,25 +918,25 @@ ArrayInfo* SimContext::FindArrayInfo(std::string_view name) {
 // CreateChildModuleVariables (lowerer_child.cpp) records an array that module
 // declares under the instance's prefix, so the prefixed name is what a bare
 // reference from within the instance denotes and is tried ahead of the bare
-// key, as FindQueue and FindVariable do. Asked by the bare key alone, an array
-// declared in an instantiated module was no array to any reader: an element
-// select read a bit of the carrier variable the lowerer creates under the
-// name, foreach ran once per bit of that carrier, and $size, %p and an
-// aggregate copy saw no array at all. The bare key stays the answer for an
-// array of the enclosing scope, so a name that resolved before still does.
+// key, as FindQueue and FindVariable do; ScopedObjectKeys
+// (sim_context_fileio.cpp) orders the keys, a package frame's own ahead of
+// both. Asked by the bare key alone, an array declared in an instantiated
+// module was no array to any reader: an element select read a bit of the
+// carrier variable the lowerer creates under the name, foreach ran once per
+// bit of that carrier, and $size, %p and an aggregate copy saw no array at
+// all. The bare key stays the answer for an array of the enclosing scope, so
+// a name that resolved before still does.
 const ArrayInfo* SimContext::FindArrayInfo(std::string_view name) const {
   for (auto frame = scope_stack_.rbegin(); frame != scope_stack_.rend();
        ++frame) {
     auto local = frame->arrays.find(name);
     if (local != frame->arrays.end()) return local->second;
   }
-  std::string prefix = ActiveInstancePrefix();
-  if (!prefix.empty()) {
-    auto prefixed = array_infos_.find(prefix + std::string(name));
-    if (prefixed != array_infos_.end()) return &prefixed->second;
+  for (const std::string& key : ScopedObjectKeys(name)) {
+    auto it = array_infos_.find(key);
+    if (it != array_infos_.end()) return &it->second;
   }
-  auto it = array_infos_.find(name);
-  return (it != array_infos_.end()) ? &it->second : nullptr;
+  return nullptr;
 }
 
 }  // namespace delta
