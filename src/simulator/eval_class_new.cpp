@@ -4,6 +4,7 @@
 #include <string_view>
 #include <unordered_map>
 #include <utility>
+#include <vector>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
@@ -123,6 +124,21 @@ static TypeBindings OwnTypeBindings(const ClassObject* obj) {
   return bindings;
 }
 
+// §8.25: the type actuals the extends clause of `child` gives its base's type
+// parameters: the `#(...)` list written after the base's name, or, where the
+// base is named by one of the child's own type parameters -- `class D4 #(type
+// P = C#(byte)) extends P;` (printed page 205 of ~/LRM.pdf) -- the list the
+// type that parameter is bound to on this object carries, `byte` for D4's
+// default specialization and `int` under `extends D4 #(C#(int))`. Null where
+// such a parameter is bound to nothing, which leaves the base at its defaults.
+static const std::vector<DataType>* BaseTypeActuals(
+    const ClassDecl* child, const TypeBindings& child_types) {
+  if (child->type_param_names.count(child->base_class) == 0)
+    return &child->base_class_type_params;
+  auto bound = child_types.find(child->base_class);
+  return bound == child_types.end() ? nullptr : &bound->second->type_params;
+}
+
 // §8.25: the bindings of the base level `base` of a level declared by
 // `child`, whose extends clause binds the base's type parameters as a
 // specialization does -- `extends C` takes C's defaults, `extends C
@@ -136,11 +152,12 @@ static TypeBindings BaseTypeBindings(const ClassDecl* child,
   TypeBindings bindings;
   const ClassDecl* decl = base->decl;
   if (decl == nullptr || child == nullptr) return bindings;
+  const std::vector<DataType>* actuals = BaseTypeActuals(child, child_types);
   for (size_t i = 0; i < decl->params.size(); ++i) {
     std::string_view pname = decl->params[i].first;
     if (decl->type_param_names.count(pname) == 0) continue;
     const DataType* actual =
-        ActualForParam(child->base_class_type_params, i, pname);
+        actuals == nullptr ? nullptr : ActualForParam(*actuals, i, pname);
     if (actual == nullptr) {
       actual = TypeParamActual(nullptr, decl, pname);
     } else if (actual->kind == DataTypeKind::kNamed) {

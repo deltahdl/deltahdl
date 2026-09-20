@@ -13,6 +13,7 @@
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "simulator/class_object.h"
+#include "simulator/eval_array_class_assoc.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
 #include "simulator/sim_context.h"
@@ -319,6 +320,26 @@ static void InheritInterfaceMembers(ClassTypeInfo* info) {
     InheritInterfaceStaticsAndEnums(info, iface);
 }
 
+// §8.25: the class the extends clause of `cls` names as its base. The base
+// may be named by a type parameter of the derived class, `class D4 #(type P =
+// C#(byte)) extends P;`, which §8.25 has resolve to a class type after
+// elaboration (printed page 205 of ~/LRM.pdf). The one ClassTypeInfo a class
+// declaration registers serves every specialization, so the base it records
+// is the one the parameter's default names, the base of §8.25.1's default
+// specialization; which class a specialization's actual names, and the type
+// actuals the default or the actual carries for the base's own parameters,
+// are bound as each object is constructed (BaseTypeBindings in
+// eval_class_new.cpp). A parameter given no default, or a default that is no
+// named type, names no base. Looked up by the parameter's name, the base was
+// never found, and the derived class inherited nothing.
+static ClassTypeInfo* BaseClassOf(const ClassDecl* cls, SimContext& ctx) {
+  if (cls->type_param_names.count(cls->base_class) == 0)
+    return ctx.FindClassType(cls->base_class);
+  const DataType* def = TypeParamActual(nullptr, cls, cls->base_class);
+  if (def == nullptr || def->kind != DataTypeKind::kNamed) return nullptr;
+  return ctx.FindClassType(def->type_name);
+}
+
 // The base, the interfaces, the members, the vtable and the static storage of
 // the class `cls` declares, filled into `info` whichever scope declares the
 // class: a compilation unit, package or module, whose `scope_items` carry the
@@ -329,8 +350,7 @@ static void InheritInterfaceMembers(ClassTypeInfo* info) {
 static void PopulateClassType(ClassTypeInfo* info, const ClassDecl* cls,
                               const std::vector<ModuleItem*>& scope_items,
                               SimContext& ctx, Arena& arena) {
-  if (!cls->base_class.empty())
-    info->parent = ctx.FindClassType(cls->base_class);
+  if (!cls->base_class.empty()) info->parent = BaseClassOf(cls, ctx);
   for (const auto& ref : cls->extends_interfaces) {
     auto* iface = ctx.FindClassType(ref.name);
     if (iface) info->extended_interfaces.push_back(iface);
