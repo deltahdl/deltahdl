@@ -159,7 +159,10 @@ static bool ResolveMethodByParts(const MethodCallParts& parts, SimContext& ctx,
 // False for an access of any other shape or a base yielding no live object.
 // Admitted by shape alone, the enable through such a receiver fell to the
 // expression evaluator and ran on the synchronous function interpreter,
-// which stepped over the task's `#10` and returned at time 0.
+// which stepped over the task's `#10` and returned at time 0. The
+// expression evaluator's own arm, TryEvalMethodOnEvaluatedBase below,
+// resolves a call's receiver through this for the same reasons, in the same
+// place after its shaped arms.
 static bool ResolveMethodOnEvaluatedBase(const Expr* access, SimContext& ctx,
                                          Arena& arena,
                                          InstanceMethodInfo& call) {
@@ -172,6 +175,31 @@ static bool ResolveMethodOnEvaluatedBase(const Expr* access, SimContext& ctx,
   ClassObject* obj =
       ctx.GetClassObject(EvalExpr(access->lhs, ctx, arena).ToUint64());
   return ResolveMethodByDeclaredClass(obj, {}, access->rhs->text, ctx, call);
+}
+
+// Whether the receiver `base` is a member path starting at a call,
+// `c.self()` or `c.self().kid`, which TryEvalCallResultMethodCall
+// (eval_call_result.cpp) owns in the expression evaluator: it evaluates the
+// call before it resolves the method, so the evaluator's arm below must not
+// evaluate such a base again where that arm declined -- a null result, a
+// method the object lacks -- or the call's side effects would run twice.
+static bool StartsAtACall(const Expr* base) {
+  const Expr* e = base;
+  while (e != nullptr && e->kind == ExprKind::kMemberAccess) e = e->lhs;
+  return e != nullptr && e->kind == ExprKind::kCall;
+}
+
+bool TryEvalMethodOnEvaluatedBase(const Expr* expr, SimContext& ctx,
+                                  Arena& arena, Logic4Vec& out) {
+  if (expr == nullptr || expr->kind != ExprKind::kCall ||
+      expr->lhs == nullptr || expr->lhs->kind != ExprKind::kMemberAccess ||
+      StartsAtACall(expr->lhs->lhs)) {
+    return false;
+  }
+  InstanceMethodInfo info;
+  if (!ResolveMethodOnEvaluatedBase(expr->lhs, ctx, arena, info)) return false;
+  out = RunInstanceMethod(info, expr, ctx, arena);
+  return true;
 }
 
 // §13.5.5: the method a statement names without the parentheses. `h.m` is a

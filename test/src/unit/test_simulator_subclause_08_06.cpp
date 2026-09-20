@@ -508,4 +508,59 @@ TEST(ObjectMethodSim, TaskEnabledThroughAnElementOfADeclaredArrayRuns) {
             8u);
 }
 
+// §8.6 (printed page 183): a method is accessed through any handle to its
+// object, and a property of a class type is one (§8.4), so `h.kid.get()`
+// runs get() on the C that H's `kid` holds, and `arr[0].kid.get()` on the
+// one an element's object holds. The method-call evaluator's receivers were
+// a variable, `p::h`, a call's result and a container's element
+// (TryDispatchMethodOrLet in eval_function.cpp), so a chained property
+// receiver reached no arm and the call read 0.
+TEST(ObjectMethodSim, MethodCalledThroughAChainedPropertyReceiverRuns) {
+  EXPECT_EQ(RunAndGet(ElementMethodDesign("class H;\n"
+                                          "  C kid = new;\n"
+                                          "endclass\n"
+                                          "module t;\n"
+                                          "  H h = new;\n"
+                                          "  int y;\n"
+                                          "  initial y = h.kid.get();\n"
+                                          "endmodule\n"),
+                      "y"),
+            7u);
+}
+
+TEST(ObjectMethodSim, MethodCalledThroughAnElementsPropertyReceiverRuns) {
+  EXPECT_EQ(RunAndGet(ElementMethodDesign("class H;\n"
+                                          "  C kid = new;\n"
+                                          "endclass\n"
+                                          "module t;\n"
+                                          "  H arr[2];\n"
+                                          "  int y;\n"
+                                          "  initial begin\n"
+                                          "    arr[0] = new;\n"
+                                          "    y = arr[0].kid.get();\n"
+                                          "  end\n"
+                                          "endmodule\n"),
+                      "y"),
+            7u);
+}
+
+// A call's result as the receiver, `h.get_kid().get()`, which
+// TryEvalCallResultMethodCall (eval_call_result.cpp) served already; pinned
+// beside the chained property so the two receivers stay served by one arm
+// each and neither evaluates the call twice.
+TEST(ObjectMethodSim, MethodCalledThroughACallResultReceiverRuns) {
+  EXPECT_EQ(RunAndGet(ElementMethodDesign(
+                          "class H;\n"
+                          "  C kid = new;\n"
+                          "  function C get_kid(); return kid; endfunction\n"
+                          "endclass\n"
+                          "module t;\n"
+                          "  H h = new;\n"
+                          "  int y;\n"
+                          "  initial y = h.get_kid().get();\n"
+                          "endmodule\n"),
+                      "y"),
+            7u);
+}
+
 }  // namespace

@@ -208,6 +208,20 @@ std::string_view ScopedClassKey(const Expr* scope, Arena& arena);
 bool ExtractHandleMethodCallParts(const Expr* expr, Arena& arena,
                                   MethodCallParts& out);
 
+// §8.6 (printed page 183): the call `expr`, `<base>.m(...)`, run on the
+// object its base evaluates to where the base is a chained property
+// receiver -- `c.kid.m()`, `arr[0].kid.m()`, a static property named through
+// the class scope -- the method resolved by the object's own class. A base
+// that is a bare name, an element of a container, or a path starting at a
+// call is left to the arms that know its declared class or own its
+// evaluation (TryEvalClassMethodCall, the element arms,
+// TryEvalCallResultMethodCall), so this is asked after them and evaluates
+// the base once. Defined in eval_instance_task.cpp beside the statement
+// form's resolver, which it shares; before it, `y = c.kid.get()` reached no
+// arm of TryDispatchMethodOrLet and read 0.
+bool TryEvalMethodOnEvaluatedBase(const Expr* expr, SimContext& ctx,
+                                  Arena& arena, Logic4Vec& out);
+
 // The same for the member access `access` itself, `h.m` or `p1::h.m`, the
 // receiver of a call and the parenthesis-free statement §13.5.5 allows, a
 // reduction or locator written without its parentheses (§7.12), and the

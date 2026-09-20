@@ -685,6 +685,8 @@ static bool TryDispatchMethodOrLet(const Expr* expr, SimContext& ctx,
   // handles, `arr[0].f()`, `q[0].f()` or `m["a"].f()`, runs on its object.
   if (TryEvalElementObjectMethodCall(expr, ctx, arena, out)) return true;
   if (TryEvalAssocElementMethodCall(expr, ctx, arena, out)) return true;
+  // and one on a chained property receiver, `c.kid.f()`, on its object.
+  if (TryEvalMethodOnEvaluatedBase(expr, ctx, arena, out)) return true;
   if (TryEvalWeakRefStaticCall(expr, ctx, arena, out)) return true;
   if (TryEvalProcessStaticCall(expr, ctx, arena, out)) return true;
   if (TryEvalClassScopeCall(expr, ctx, arena, out)) return true;
