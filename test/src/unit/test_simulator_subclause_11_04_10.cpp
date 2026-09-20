@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <initializer_list>
+#include <string>
+
 #include "builders_ast.h"
 #include "common/types.h"
 #include "fixture_simulator.h"
@@ -337,6 +340,244 @@ TEST(BlockingAssignSim, BlockingAssignShiftOps) {
   EXPECT_EQ(shl->value.ToUint64(), 0x3Cu);
 
   EXPECT_EQ(shr->value.ToUint64(), 0x03u);
+}
+
+// §11.4.10 (printed page 284) has every shift move the whole left operand by
+// the count and fill the vacated positions with zeros, so a 96-bit operand
+// shifted right by 64 reads its top word at the bottom. The runtime moved
+// words[0] alone by the count taken on a 64-bit machine word, where a count
+// of 64 is undefined and moved nothing on x86, so P >> 64 read
+// 0x89ABCDEF00112233 with the top word cleared.
+constexpr const char* kWideShiftHeader =
+    "module t;\n"
+    "  localparam logic [95:0] P = 96'h0123_4567_89AB_CDEF_0011_2233;\n"
+    "  logic [95:0] r;\n";
+
+TEST(WideShiftSim, LogicalRightShiftByAWholeWordReadsTheTopWord) {
+  SimFixture f;
+  auto* r = RunAndFindVar(std::string(kWideShiftHeader) +
+                              "  initial r = P >> 64;\n"
+                              "endmodule\n",
+                          f, "r");
+  ASSERT_NE(r, nullptr);
+  ASSERT_EQ(r->value.nwords, 2u);
+  EXPECT_EQ(r->value.words[0].aval, 0x01234567u);
+  EXPECT_EQ(r->value.words[1].aval, 0u);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// A count of 70 is one word and six bits: 0x01234567 >> 6 is 0x48D15. The
+// defect read 0x0226AF37BC004488, words[0] moved by six alone.
+TEST(WideShiftSim, LogicalRightShiftByAWordAndBitsCrossesTheWord) {
+  SimFixture f;
+  auto* r = RunAndFindVar(std::string(kWideShiftHeader) +
+                              "  initial r = P >> 70;\n"
+                              "endmodule\n",
+                          f, "r");
+  ASSERT_NE(r, nullptr);
+  ASSERT_EQ(r->value.nwords, 2u);
+  EXPECT_EQ(r->value.words[0].aval, 0x48D15u);
+  EXPECT_EQ(r->value.words[1].aval, 0u);
+}
+
+// A count under 64 still draws the top word's bits down into the low word:
+// P >> 32 is 0x0123456789ABCDEF, where the defect read 0x89ABCDEF.
+TEST(WideShiftSim, LogicalRightShiftWithinAWordDrawsFromTheWordAbove) {
+  SimFixture f;
+  auto* r = RunAndFindVar(std::string(kWideShiftHeader) +
+                              "  initial r = P >> 32;\n"
+                              "endmodule\n",
+                          f, "r");
+  ASSERT_NE(r, nullptr);
+  ASSERT_EQ(r->value.nwords, 2u);
+  EXPECT_EQ(r->value.words[0].aval, 0x0123456789ABCDEFull);
+  EXPECT_EQ(r->value.words[1].aval, 0u);
+}
+
+// P << 64 carries the low word's low 32 bits into bits 95:64 and leaves the
+// low word clear. The defect left words[0] as P's and words[1] at 0.
+TEST(WideShiftSim, LeftShiftByAWholeWordFillsTheTopWord) {
+  SimFixture f;
+  auto* r = RunAndFindVar(std::string(kWideShiftHeader) +
+                              "  initial r = P << 64;\n"
+                              "endmodule\n",
+                          f, "r");
+  ASSERT_NE(r, nullptr);
+  ASSERT_EQ(r->value.nwords, 2u);
+  EXPECT_EQ(r->value.words[0].aval, 0u);
+  EXPECT_EQ(r->value.words[1].aval, 0x00112233u);
+}
+
+// P << 70 puts 0x00112233 << 6, 0x04488CC0, in bits 95:64; the defect read
+// 0x6AF37BC004488CC0 in words[0] and nothing above.
+TEST(WideShiftSim, LeftShiftByAWordAndBitsCrossesTheWord) {
+  SimFixture f;
+  auto* r = RunAndFindVar(std::string(kWideShiftHeader) +
+                              "  initial r = P << 70;\n"
+                              "endmodule\n",
+                          f, "r");
+  ASSERT_NE(r, nullptr);
+  ASSERT_EQ(r->value.nwords, 2u);
+  EXPECT_EQ(r->value.words[0].aval, 0u);
+  EXPECT_EQ(r->value.words[1].aval, 0x04488CC0u);
+}
+
+// P << 32 keeps the low word's carry: words[1] takes P[63:32], 0x89ABCDEF,
+// which the defect dropped while it got words[0] right.
+TEST(WideShiftSim, LeftShiftWithinAWordCarriesIntoTheWordAbove) {
+  SimFixture f;
+  auto* r = RunAndFindVar(std::string(kWideShiftHeader) +
+                              "  initial r = P << 32;\n"
+                              "endmodule\n",
+                          f, "r");
+  ASSERT_NE(r, nullptr);
+  ASSERT_EQ(r->value.nwords, 2u);
+  EXPECT_EQ(r->value.words[0].aval, 0x0011223300000000ull);
+  EXPECT_EQ(r->value.words[1].aval, 0x89ABCDEFu);
+}
+
+// §11.4.10: a count of the operand's width or more leaves no bit of it. The
+// defect took 96 as 32 and read 0x89ABCDEF, and 100 as 36.
+TEST(WideShiftSim, ShiftByTheWidthOrMoreIsAllZeros) {
+  SimFixture f;
+  auto* r = RunAndFindVar(std::string(kWideShiftHeader) +
+                              "  logic [95:0] s, u;\n"
+                              "  initial begin\n"
+                              "    r = P >> 96;\n"
+                              "    s = P >> 100;\n"
+                              "    u = P << 100;\n"
+                              "  end\n"
+                              "endmodule\n",
+                          f, "r");
+  ASSERT_NE(r, nullptr);
+  auto* s = f.ctx.FindVariable("s");
+  auto* u = f.ctx.FindVariable("u");
+  ASSERT_NE(s, nullptr);
+  ASSERT_NE(u, nullptr);
+  for (auto* v : {r, s, u}) {
+    ASSERT_EQ(v->value.nwords, 2u);
+    EXPECT_EQ(v->value.words[0].aval, 0u);
+    EXPECT_EQ(v->value.words[1].aval, 0u);
+  }
+}
+
+// A shift by zero keeps every word; the defect rebuilt the result from the
+// low word alone and so cleared words[1].
+TEST(WideShiftSim, ShiftByZeroKeepsEveryWord) {
+  SimFixture f;
+  auto* r = RunAndFindVar(std::string(kWideShiftHeader) +
+                              "  initial r = P >> 0;\n"
+                              "endmodule\n",
+                          f, "r");
+  ASSERT_NE(r, nullptr);
+  ASSERT_EQ(r->value.nwords, 2u);
+  EXPECT_EQ(r->value.words[0].aval, 0x89ABCDEF00112233ull);
+  EXPECT_EQ(r->value.words[1].aval, 0x01234567u);
+}
+
+// §11.4.10: >>> fills the vacated positions with the sign bit when the result
+// is signed. N is -2^80 as a 96-bit signed value; N >>> 70 is -2^10, ones
+// down to bit 10 in both words. The defect zero-filled a signed operand of 64
+// bits or more and read 0 in both words.
+TEST(WideShiftSim, ArithmeticRightShiftSignFillsAcrossWords) {
+  SimFixture f;
+  auto* r = RunAndFindVar(
+      "module t;\n"
+      "  localparam logic signed [95:0] N = "
+      "96'hFFFF_0000_0000_0000_0000_0000;\n"
+      "  logic signed [95:0] r;\n"
+      "  initial r = N >>> 70;\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(r, nullptr);
+  ASSERT_EQ(r->value.nwords, 2u);
+  EXPECT_EQ(r->value.words[0].aval, 0xFFFFFFFFFFFFFC00ull);
+  EXPECT_EQ(r->value.words[1].aval, 0xFFFFFFFFu);
+  EXPECT_EQ(r->value.words[0].bval, 0u);
+  EXPECT_EQ(r->value.words[1].bval, 0u);
+}
+
+// A signed operand shifted by its width or more is the sign bit everywhere,
+// inside the width and not above it.
+TEST(WideShiftSim, ArithmeticRightShiftByTheWidthOrMoreIsAllSignBits) {
+  SimFixture f;
+  auto* r = RunAndFindVar(
+      "module t;\n"
+      "  localparam logic signed [95:0] N = "
+      "96'hFFFF_0000_0000_0000_0000_0000;\n"
+      "  logic signed [95:0] r, s;\n"
+      "  initial begin\n"
+      "    r = N >>> 96;\n"
+      "    s = N >>> 200;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(r, nullptr);
+  auto* s = f.ctx.FindVariable("s");
+  ASSERT_NE(s, nullptr);
+  for (auto* v : {r, s}) {
+    ASSERT_EQ(v->value.nwords, 2u);
+    EXPECT_EQ(v->value.words[0].aval, 0xFFFFFFFFFFFFFFFFull);
+    EXPECT_EQ(v->value.words[1].aval, 0xFFFFFFFFu);
+  }
+}
+
+// The logical >> on the same bits zero-fills whatever the operand's sign:
+// N >> 70 is 0x3FFFC00.
+TEST(WideShiftSim, LogicalRightShiftOfASignedOperandZeroFills) {
+  SimFixture f;
+  auto* r = RunAndFindVar(
+      "module t;\n"
+      "  localparam logic signed [95:0] N = "
+      "96'hFFFF_0000_0000_0000_0000_0000;\n"
+      "  logic [95:0] r;\n"
+      "  initial r = N >> 70;\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(r, nullptr);
+  ASSERT_EQ(r->value.nwords, 2u);
+  EXPECT_EQ(r->value.words[0].aval, 0x3FFFC00u);
+  EXPECT_EQ(r->value.words[1].aval, 0u);
+}
+
+// An x or z bit of the operand travels with the shift on both planes: 4'bx01z
+// deposited at q[95:92] and shifted down by 92 reads x01z at r[3:0], aval
+// 0b1010 and bval 0b1001. The defect read 0 on both planes.
+TEST(WideShiftSim, LogicalRightShiftCarriesUnknownBitsDownAcrossWords) {
+  SimFixture f;
+  auto* r = RunAndFindVar(
+      "module t;\n"
+      "  logic [95:0] q, r;\n"
+      "  initial begin\n"
+      "    q = 96'h0;\n"
+      "    q[95:92] = 4'bx01z;\n"
+      "    r = q >> 92;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(r, nullptr);
+  ASSERT_EQ(r->value.nwords, 2u);
+  EXPECT_EQ(r->value.words[0].aval, 0b1010u);
+  EXPECT_EQ(r->value.words[0].bval, 0b1001u);
+  EXPECT_EQ(r->value.words[1].aval, 0u);
+  EXPECT_EQ(r->value.words[1].bval, 0u);
+}
+
+// §11.4.10 treats the count as unsigned, so a count with a bit above its low
+// 64 is beyond any width and answers zeros. Read through the count's low word
+// alone it is 0 and left P untouched.
+TEST(WideShiftSim, ACountAboveSixtyFourBitsIsBeyondTheWidth) {
+  SimFixture f;
+  auto* r = RunAndFindVar(std::string(kWideShiftHeader) +
+                              "  localparam logic [127:0] C = "
+                              "128'h0000_0000_0000_0001_0000_0000_0000_0000;\n"
+                              "  initial r = P >> C;\n"
+                              "endmodule\n",
+                          f, "r");
+  ASSERT_NE(r, nullptr);
+  ASSERT_EQ(r->value.nwords, 2u);
+  EXPECT_EQ(r->value.words[0].aval, 0u);
+  EXPECT_EQ(r->value.words[1].aval, 0u);
 }
 
 }  // namespace

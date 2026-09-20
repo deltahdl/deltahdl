@@ -394,43 +394,95 @@ bool EvalCaseEquality(Logic4Vec lhs, Logic4Vec rhs) {
   }
   return true;
 }
-static Logic4Vec MakeSignedResult(Arena& arena, uint32_t width, uint64_t val,
-                                  bool is_signed) {
-  auto result = MakeLogic4VecVal(arena, width, val);
-  result.is_signed = is_signed;
-  return result;
+
+// §11.4.10 (printed page 284): the shift operators move the whole left
+// operand by the count and fill the vacated positions with zeros -- or, for
+// >>> on a signed result, with its sign bit. The count is a number of bit
+// positions and not a machine-word shift: a count of 64 or more moves whole
+// words and the machine's shift of a 64-bit word by 64 is undefined, so the
+// operand is read a word at a time with the count split into the words it
+// spans and the bits left over.
+//
+// One plane of the left operand, aval or bval, as the shift reads it: a word
+// of the value as stored, with the bits of the last word above the width and
+// every word beyond the value holding `fill`, which is the plane's sign bit
+// repeated for a sign-filling shift and 0 otherwise. A right shift then draws
+// the fill from above the value exactly as it draws any other bit, and a word
+// below the value is 0, which is what a left shift draws from below.
+struct ShiftPlane {
+  const Logic4Vec* src = nullptr;
+  bool bval = false;
+  uint64_t fill = 0;
+};
+
+static uint64_t ShiftPlaneWord(const ShiftPlane& p, int64_t index) {
+  if (index < 0) return 0;
+  if (index >= static_cast<int64_t>(p.src->nwords)) return p.fill;
+  const Logic4Word& w = p.src->words[index];
+  uint64_t bits = p.bval ? w.bval : w.aval;
+  uint64_t mask =
+      WordMaskWithinWidth(p.src->width, static_cast<uint32_t>(index));
+  return (bits & mask) | (p.fill & ~mask);
 }
-static Logic4Vec EvalArithShiftRight(Logic4Vec lhs, uint64_t rv, Arena& arena) {
-  uint64_t lv = lhs.ToUint64();
-  uint64_t bv = lhs.nwords > 0 ? lhs.words[0].bval : 0;
-  uint32_t w = lhs.width;
-  auto shift_right = [&](uint64_t val) -> uint64_t {
-    if (lhs.is_signed && w > 0 && w < 64 && ((val >> (w - 1)) & 1)) {
-      auto sv = static_cast<int64_t>(val | (~uint64_t{0} << w));
-      auto shifted = static_cast<uint64_t>(sv >> rv);
-      return shifted & ((uint64_t{1} << w) - 1);
-    }
-    return val >> rv;
-  };
-  auto result = MakeSignedResult(arena, w, shift_right(lv), lhs.is_signed);
-  if (result.nwords > 0) result.words[0].bval = shift_right(bv);
-  return result;
+
+// Word `index` of the plane moved by `count` positions: the word `count / 64`
+// away supplies its bits shifted by `count % 64`, and the word beyond that
+// the bits shifted out of it, taken only when the bit shift is nonzero so no
+// word is ever shifted by 64.
+static uint64_t ShiftedPlaneWord(const ShiftPlane& p, uint32_t index,
+                                 uint64_t count, bool left) {
+  auto word_shift = static_cast<int64_t>(count / 64);
+  auto bit_shift = static_cast<uint32_t>(count % 64);
+  auto i = static_cast<int64_t>(index);
+  if (left) {
+    uint64_t hi = ShiftPlaneWord(p, i - word_shift) << bit_shift;
+    if (bit_shift == 0) return hi;
+    return hi | (ShiftPlaneWord(p, i - word_shift - 1) >> (64 - bit_shift));
+  }
+  uint64_t lo = ShiftPlaneWord(p, i + word_shift) >> bit_shift;
+  if (bit_shift == 0) return lo;
+  return lo | (ShiftPlaneWord(p, i + word_shift + 1) << (64 - bit_shift));
 }
-static Logic4Vec EvalShift(TokenKind op, Logic4Vec lhs, uint64_t rv,
+
+// The plane's sign bit repeated over a word, for §11.4.10's sign fill. Each
+// plane fills from its own top bit, so a sign bit of x fills with x and one
+// of z with z rather than with a known value the operand does not hold.
+static uint64_t PlaneSignFill(const Logic4Vec& v, bool bval) {
+  if (v.width == 0) return 0;
+  uint32_t top = v.width - 1;
+  const Logic4Word& w = v.words[top / 64];
+  uint64_t bits = bval ? w.bval : w.aval;
+  return ((bits >> (top % 64)) & 1) ? ~uint64_t{0} : 0;
+}
+
+static Logic4Vec EvalShift(TokenKind op, Logic4Vec lhs, uint64_t count,
                            Arena& arena) {
-  uint64_t lv = lhs.ToUint64();
-  uint64_t bv = lhs.nwords > 0 ? lhs.words[0].bval : 0;
-  if (op == TokenKind::kLtLt || op == TokenKind::kLtLtLt) {
-    auto result = MakeSignedResult(arena, lhs.width, lv << rv, lhs.is_signed);
-    if (result.nwords > 0) result.words[0].bval = bv << rv;
-    return result;
+  bool left = op == TokenKind::kLtLt || op == TokenKind::kLtLtLt;
+  bool sign_fill = op == TokenKind::kGtGtGt && lhs.is_signed;
+  // §11.4.10: a count of the width or more leaves nothing of the operand, and
+  // clamping it there keeps the word arithmetic below in range.
+  if (count > lhs.width) count = lhs.width;
+  auto result = MakeLogic4Vec(arena, lhs.width);
+  result.is_signed = lhs.is_signed;
+  ShiftPlane a{&lhs, false, sign_fill ? PlaneSignFill(lhs, false) : 0};
+  ShiftPlane b{&lhs, true, sign_fill ? PlaneSignFill(lhs, true) : 0};
+  for (uint32_t i = 0; i < result.nwords; ++i) {
+    uint64_t mask = WordMaskWithinWidth(lhs.width, i);
+    result.words[i].aval = ShiftedPlaneWord(a, i, count, left) & mask;
+    result.words[i].bval = ShiftedPlaneWord(b, i, count, left) & mask;
   }
-  if (op == TokenKind::kGtGt) {
-    auto result = MakeSignedResult(arena, lhs.width, lv >> rv, lhs.is_signed);
-    if (result.nwords > 0) result.words[0].bval = bv >> rv;
-    return result;
+  return result;
+}
+
+// §11.4.10 takes the right operand as an unsigned number of positions.
+// Logic4Vec::ToUint64 reads its first word alone, so a count with a bit set
+// above that word -- already more than any width -- is answered as the
+// largest count rather than as its low word, which may be small or 0.
+static uint64_t ShiftCount(const Logic4Vec& rhs) {
+  for (uint32_t i = 1; i < rhs.nwords; ++i) {
+    if (rhs.words[i].aval != 0) return ~uint64_t{0};
   }
-  return EvalArithShiftRight(lhs, rv, arena);
+  return rhs.ToUint64();
 }
 
 static constexpr uint64_t kResultX = 2;
@@ -670,7 +722,7 @@ static Logic4Vec EvalBinaryCompare(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
   if (op == TokenKind::kLtLt || op == TokenKind::kLtLtLt ||
       op == TokenKind::kGtGt || op == TokenKind::kGtGtGt) {
     if (HasUnknownBits(rhs)) return MakeAllX(arena, lhs.width);
-    return EvalShift(op, lhs, rhs.ToUint64(), arena);
+    return EvalShift(op, lhs, ShiftCount(rhs), arena);
   }
 
   if (lhs.is_string || rhs.is_string) {
