@@ -13,9 +13,11 @@
 #include "elaborator/type_eval.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
+#include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_array_class_queue.h"
+#include "simulator/eval_expr_internal.h"
 #include "simulator/eval_function_hier.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
@@ -233,6 +235,35 @@ Logic4Vec EvalWithReturnedTag(const Expr* expr, SimContext& ctx, Arena& arena,
   --reg.evaluations;
   tag = std::move(reg.completed.tag);
   reg.completed.tag.clear();
+  return value;
+}
+
+// §7.3.2 (printed page 151) has a tagged union value carry its tag beside
+// the member's bits, §13.4.1 (printed 342) gives the implicit variable of a
+// call the return type, tag included for `return tagged M v`, and §11.9
+// (printed 304) checks every later member read of the target against the
+// tag the assignment gave it. `u = g();` copied the bits alone: the store
+// path reads the tag off a `tagged` right-hand side and a call is none, so
+// `u.Valid` was checked against no tag and `u.Other` raised nothing. The tag
+// a call's body returned is taken by the same handover a formal's binding
+// takes it (EvalWithReturnedTag), and set where the `u = tagged M v` writer
+// sets it, for a target whose layout is a union; a structure target has no
+// tag, and a select or a member target names no union of its own.
+Logic4Vec EvalRhsCarryingReturnedTag(const Stmt* stmt, SimContext& ctx,
+                                     Arena& arena) {
+  if (stmt->rhs == nullptr || stmt->rhs->kind != ExprKind::kCall ||
+      stmt->lhs->kind != ExprKind::kIdentifier) {
+    return EvalRhsWithStructContext(stmt, ctx, arena);
+  }
+  std::string tag;
+  Logic4Vec value = EvalWithReturnedTag(stmt->rhs, ctx, arena, tag);
+  if (tag.empty()) return value;
+  const StructTypeInfo* layout = StructLayoutOfName(stmt->lhs->text, ctx);
+  if (layout == nullptr || !layout->is_union) return value;
+  // The tag table keeps the view it is given, so the key is interned in the
+  // arena rather than left in a string that ends with this statement.
+  ctx.SetVariableTag(
+      *arena.Create<std::string>(TagKeyOfName(stmt->lhs->text, ctx)), tag);
   return value;
 }
 

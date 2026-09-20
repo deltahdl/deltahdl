@@ -7,6 +7,7 @@
 #include "parser/ast_expr.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_array_class_assoc.h"
+#include "simulator/eval_call_result.h"
 #include "simulator/eval_class_array.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
@@ -339,15 +340,33 @@ static bool TryFuncClassTargetWrite(const Expr* lhs, const Logic4Vec& val,
 // to extend.
 //
 // EvalRhsWithStructContext is what asks for that width outside a subroutine,
-// and it is what asks for it here: beside the width it packs a §10.9.2
-// structure assignment pattern and a §11.9 tagged expression against the
-// target's own layout, so each field expression is coerced to its member's
-// width rather than concatenated at its self-determined one. §10.4 gives every
-// procedure one set of assignments, so a pattern packed against the union
-// member it names in an initial block is packed against it in a method too.
+// and it is what asks for it here, through EvalRhsCarryingReturnedTag as the
+// module path asks it: beside the width it packs a §10.9.2 structure
+// assignment pattern and a §11.9 tagged expression against the target's own
+// layout, so each field expression is coerced to its member's width rather
+// than concatenated at its self-determined one, and a call's result reaches a
+// tagged union target with the tag its body returned (§7.3.2). §10.4 gives
+// every procedure one set of assignments, so a pattern packed against the
+// union member it names in an initial block is packed against it in a method
+// too.
+//
+// §13.4.1 (printed page 342): a function's value is given by a `return` or by
+// assigning the variable that has the function's own name, and §7.3.2
+// (printed 151) has `k = tagged Valid 3` give that variable a tag beside the
+// bits. The store below sets the tag under the function's name, where the
+// body's own reads find it; the caller's binding of the result to a formal
+// takes the tag from the record a `return tagged M v` fills
+// (eval_call_result.cpp), which this assignment filled none of, so a formal
+// bound from `k()` read `a.Valid` against no tag. The tag is recorded as the
+// return statement records it; a later `return` overwrites it, as §13.4.1 has
+// the return override the assigned value.
 void ExecFuncBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (!stmt->lhs) return;
   if (TryFuncSpecialBlockingAssign(stmt, ctx, arena)) return;
+  if (stmt->lhs->kind == ExprKind::kIdentifier &&
+      stmt->lhs->text == ctx.CurrentFuncName()) {
+    RecordReturnedTag(stmt->rhs);
+  }
   // §10.4 names one set of left-hand sides for every procedure, "always,
   // initial, task, and function" alike, so the forms the target's own kind
   // decides are the module path's own dispatch rather than a list restated
@@ -379,7 +398,7 @@ void ExecFuncBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   // copy where the value is produced covers all of them, and no store has to
   // know.
   Logic4Vec val =
-      OwnRhsWords(EvalRhsWithStructContext(stmt, ctx, arena), arena);
+      OwnRhsWords(EvalRhsCarryingReturnedTag(stmt, ctx, arena), arena);
   if (TryFuncClassTargetWrite(stmt->lhs, val, ctx, arena)) return;
   ApplyGenericBlockingAssign(stmt, val, ctx, arena);
 }

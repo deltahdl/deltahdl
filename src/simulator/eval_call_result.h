@@ -10,6 +10,7 @@
 namespace delta {
 
 struct Expr;
+struct Stmt;
 class SimContext;
 class Arena;
 
@@ -86,6 +87,21 @@ void RecordReturnedTag(const Expr* returned);
 // returned anything else.
 Logic4Vec EvalWithReturnedTag(const Expr* expr, SimContext& ctx, Arena& arena,
                               std::string& tag);
+
+// §7.3.2 with §13.4.1 and §11.9: the right-hand side of the blocking
+// assignment `stmt`, evaluated with the target as its context as
+// EvalRhsWithStructContext evaluates it, and, where the right-hand side is a
+// call whose body returned a tagged union expression and the target is a
+// tagged union variable named by a bare identifier, the target's tag set to
+// the member that expression named, since the tag travels beside the bits
+// the call hands back and no vector carries it. The tag stands under the key
+// the target's storage was created by (TagKeyOfName), which a `u = tagged M
+// v` writes and every member read of u checks against. A call that returned
+// anything else, and every other right-hand side, leaves the target's tag as
+// it was. Shared by the procedural and the subroutine-body executors of the
+// blocking assignment, which §10.4 gives one set of assignments.
+Logic4Vec EvalRhsCarryingReturnedTag(const Stmt* stmt, SimContext& ctx,
+                                     Arena& arena);
 
 // The element at the declared index `idx` of `returned`, or what §7.4.5's
 // Table 7-1 gives a read of a nonexistent element -- x for a 4-state element

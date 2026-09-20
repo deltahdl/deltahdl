@@ -17,6 +17,7 @@
 #include "simulator/class_object.h"
 #include "simulator/eval_array.h"
 #include "simulator/eval_assoc_class_handles.h"
+#include "simulator/eval_call_result.h"
 #include "simulator/eval_class_array.h"
 #include "simulator/eval_class_array_handles.h"
 #include "simulator/eval_expr_internal.h"
@@ -890,7 +891,9 @@ StmtResult ExecBlockingAssignImpl(const Stmt* stmt, SimContext& ctx,
   if (!stmt->lhs) return StmtResult::kDone;
   if (TryDispatchSpecialBlockingAssign(stmt, ctx, arena))
     return StmtResult::kDone;
-  auto rhs_val = EvalRhsWithStructContext(stmt, ctx, arena);
+  // §7.3.2 with §11.9: a call's result reaches a tagged union target with the
+  // tag its body returned, which the store below reads off no call.
+  auto rhs_val = EvalRhsCarryingReturnedTag(stmt, ctx, arena);
   // Every generic blocking store -- the scalar write, the select writers,
   // WriteStructField and the class property behind it -- takes the value from
   // here, so one copy at the point it is produced covers all of them.
