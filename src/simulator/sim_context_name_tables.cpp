@@ -315,6 +315,21 @@ std::optional<PackedRange> DeclaredNameTables::FindTypeRange(
   return it->second;
 }
 
+void DeclaredNameTables::RegisterTypeTarget(std::string_view name,
+                                            std::string_view target) {
+  type_targets_[name] = target;
+}
+
+std::string_view DeclaredNameTables::FindTypeTarget(
+    std::string_view name) const {
+  auto it = type_targets_.find(name);
+  return (it != type_targets_.end()) ? it->second : std::string_view{};
+}
+
+size_t DeclaredNameTables::TypeTargetCount() const {
+  return type_targets_.size();
+}
+
 void DeclaredNameTables::RegisterInstanceType(std::string_view prefix,
                                               std::string_view type) {
   instance_types_[std::string(prefix)] = std::string(type);

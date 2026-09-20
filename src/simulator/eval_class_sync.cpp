@@ -1,5 +1,6 @@
 #include "simulator/eval_class_sync.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -20,10 +21,24 @@
 
 namespace delta {
 
-SyncKind SyncKindOfType(const DataType& type) {
+// §6.18 (printed page 118 of ~/LRM.pdf): a typedef name stands for the type
+// it was declared with, which may be another typedef name, and §26.3 reaches
+// a package's under `p::name`, the key the run records it by. The written
+// name is followed through the chain to the name at its end, at most as many
+// steps as the table has entries, so a chain that returns to itself ends.
+SyncKind SyncKindOfType(const DataType& type, const SimContext& ctx) {
   if (type.kind != DataTypeKind::kNamed) return SyncKind::kNone;
-  if (type.type_name == "semaphore") return SyncKind::kSemaphore;
-  if (type.type_name == "mailbox") return SyncKind::kMailbox;
+  std::string name =
+      type.scope_name.empty()
+          ? std::string(type.type_name)
+          : std::string(type.scope_name) + "::" + std::string(type.type_name);
+  for (size_t steps = 0; steps <= ctx.TypeTargetCount(); ++steps) {
+    if (name == "semaphore") return SyncKind::kSemaphore;
+    if (name == "mailbox") return SyncKind::kMailbox;
+    std::string_view target = ctx.FindTypeTarget(name);
+    if (target.empty()) return SyncKind::kNone;
+    name = std::string(target);
+  }
   return SyncKind::kNone;
 }
 
@@ -34,14 +49,15 @@ SyncKind SyncKindOfType(const DataType& type) {
 // else or none declares the name. A static one (§8.9) is the class's rather
 // than an object's and is left to the run's tables, which hold none today.
 static const ClassMember* SyncPropertyMember(const ClassTypeInfo* from,
-                                             std::string_view name) {
+                                             std::string_view name,
+                                             const SimContext& ctx) {
   for (const ClassTypeInfo* t = from; t != nullptr; t = t->parent) {
     if (t->decl == nullptr) continue;
     for (const ClassMember* m : t->decl->members) {
       if (m->kind != ClassMemberKind::kProperty || m->name != name) continue;
-      bool held_per_object = !m->is_static && !m->is_param &&
-                             m->unpacked_dims.empty() &&
-                             SyncKindOfType(m->data_type) != SyncKind::kNone;
+      bool held_per_object =
+          !m->is_static && !m->is_param && m->unpacked_dims.empty() &&
+          SyncKindOfType(m->data_type, ctx) != SyncKind::kNone;
       return held_per_object ? m : nullptr;
     }
   }
@@ -65,9 +81,10 @@ static SyncProperty ResolveBareSyncProperty(std::string_view name,
   const ClassTypeInfo* from = ctx.CurrentMethodClass();
   if (from == nullptr && self != nullptr) from = self->type;
   if (from == nullptr || ctx.FindLocalVariable(name) != nullptr) return {};
-  const ClassMember* member = SyncPropertyMember(from, name);
+  const ClassMember* member = SyncPropertyMember(from, name, ctx);
   if (member == nullptr) return {};
-  return {SyncKindOfType(member->data_type), self, member, std::string(name)};
+  return {SyncKindOfType(member->data_type, ctx), self, member,
+          std::string(name)};
 }
 
 // §8.4: the class the handle side `side` of a member access is declared of,
@@ -97,16 +114,16 @@ static SyncProperty ResolveSyncPropertyThroughHandle(const Expr* recv,
                                                      Arena& arena) {
   std::string_view name = recv->rhs->text;
   if (ClassObject* obj = HandleSideObject(recv->lhs, ctx, arena)) {
-    const ClassMember* member = SyncPropertyMember(obj->type, name);
+    const ClassMember* member = SyncPropertyMember(obj->type, name, ctx);
     if (member == nullptr) return {};
-    return {SyncKindOfType(member->data_type), obj, member,
+    return {SyncKindOfType(member->data_type, ctx), obj, member,
             SpellHandlePath(recv)};
   }
   const ClassTypeInfo* cls = DeclaredClassOfHandleSide(recv->lhs, ctx);
   const ClassMember* member =
-      cls != nullptr ? SyncPropertyMember(cls, name) : nullptr;
+      cls != nullptr ? SyncPropertyMember(cls, name, ctx) : nullptr;
   if (member == nullptr) return {};
-  return {SyncKindOfType(member->data_type), nullptr, member,
+  return {SyncKindOfType(member->data_type, ctx), nullptr, member,
           SpellHandlePath(recv->lhs)};
 }
 
@@ -200,11 +217,11 @@ void BuildSyncProperty(const SyncProperty& prop, const Expr* new_expr,
 bool TryInitClassSyncProperty(ClassObject* obj, const ClassTypeInfo* info,
                               std::string_view name, const Expr* init,
                               SimContext& ctx) {
-  const ClassMember* member = SyncPropertyMember(info, name);
+  const ClassMember* member = SyncPropertyMember(info, name, ctx);
   if (member == nullptr) return false;
   if (init == nullptr || init->kind != ExprKind::kCall || init->text != "new")
     return true;
-  SyncProperty prop{SyncKindOfType(member->data_type), obj, member,
+  SyncProperty prop{SyncKindOfType(member->data_type, ctx), obj, member,
                     std::string(name)};
   BuildSyncProperty(prop, init, ctx, ctx.GetArena());
   return true;

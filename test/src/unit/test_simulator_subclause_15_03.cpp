@@ -3,6 +3,7 @@
 #include <string_view>
 
 #include "fixture_simulator.h"
+#include "helpers_scheduler.h"
 #include "simulator/stmt_exec.h"
 #include "simulator/sync_objects.h"
 
@@ -333,6 +334,34 @@ TEST(SemaphoreSim, ChildInstanceBucketAnswersItsBareName) {
   auto* r = f.ctx.FindVariable("m.r");
   ASSERT_NE(r, nullptr);
   EXPECT_EQ(r->value.ToUint64(), 110u);
+}
+
+// §15.3.1 (printed page 373) with §6.18 (printed 118) and §8.7 (printed
+// 184): a class property declared through `typedef semaphore sem_t` is a
+// semaphore as one declared `semaphore s` is, built per object with the one
+// key its `new(1)` names, so the object's first try_get(1) procures it and
+// the second finds none: 1 and 0 read as 10. The run held no table of what
+// a typedef stands for, so the property was of no type it knew: its `new`
+// filled no bucket and try_get() was called through a null handle.
+TEST(SemaphoreSim, TypedefdSemaphorePropertyHoldsItsKeys) {
+  EXPECT_EQ(RunAndGet("typedef semaphore sem_t;\n"
+                      "class C;\n"
+                      "  sem_t s = new(1);\n"
+                      "  function int take();\n"
+                      "    return s.try_get(1);\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module top;\n"
+                      "  int a, b, y;\n"
+                      "  initial begin\n"
+                      "    C c = new;\n"
+                      "    a = c.take();\n"
+                      "    b = c.take();\n"
+                      "    y = a * 10 + b;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            10u);
 }
 
 }  // namespace

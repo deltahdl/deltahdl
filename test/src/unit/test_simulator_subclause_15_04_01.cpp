@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 #include <string_view>
 
 #include "common/types.h"
@@ -399,6 +400,79 @@ TEST(MailboxSim, PutThroughANullPropertyMailboxIsReported) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "method 'put' called through the null handle 'mb'",
                             4, "8.4"));
+}
+
+// The source of the typedef cases: `head` declares the typedef, and the
+// class declares its mailbox property through the type `type` names, is
+// given 4 and 5, counts 2 and takes the 4 back, 42.
+std::string TypedefdMailboxPropertySrc(const std::string& head,
+                                       const std::string& type) {
+  return head + "class C;\n  " + type +
+         " mb = new;\n"
+         "  function void give(int v);\n"
+         "    mb.put(v);\n"
+         "  endfunction\n"
+         "  function int take();\n"
+         "    int v;\n"
+         "    mb.get(v);\n"
+         "    return v;\n"
+         "  endfunction\n"
+         "endclass\n"
+         "module top;\n"
+         "  int y, v, n;\n"
+         "  C c;\n"
+         "  initial begin\n"
+         "    c = new;\n"
+         "    c.give(4);\n"
+         "    c.give(5);\n"
+         "    n = c.mb.num();\n"
+         "    v = c.take();\n"
+         "    y = v * 10 + n;\n"
+         "  end\n"
+         "endmodule\n";
+}
+
+// §15.4.9 (printed page 377) with §6.18 (printed 118) and §8.7 (printed
+// 184): a class property declared through a typedef of `mailbox #(int)`,
+// `mb_t mb = new`, is a mailbox as one declared `mailbox mb` is, built per
+// object when the object is constructed, so give(4) and give(5) place two
+// messages, num() counts 2 and take() retrieves the 4: 42. The run held no
+// table of what a typedef stands for, so the property was of no type it
+// knew: its `new` built no mailbox and its every method was called through
+// a null handle.
+TEST(MailboxSim, TypedefdMailboxPropertyIsBuiltPerObject) {
+  EXPECT_EQ(RunAndGet(TypedefdMailboxPropertySrc(
+                          "typedef mailbox #(int) mb_t;\n", "mb_t"),
+                      "y"),
+            42u);
+}
+
+// §15.4.9 (printed page 377) with §26.3 (printed 808): the typedef may be a
+// package's, reached through the package scope resolution operator, so a
+// property declared `p::mb_t mb = new` is the same mailbox, read as 42
+// above. The name is recorded under "p::mb_t", which the bare name does not
+// find.
+TEST(MailboxSim, PackageTypedefdMailboxPropertyIsBuiltPerObject) {
+  EXPECT_EQ(
+      RunAndGet(TypedefdMailboxPropertySrc("package p;\n"
+                                           "  typedef mailbox #(int) mb_t;\n"
+                                           "endpackage\n",
+                                           "p::mb_t"),
+                "y"),
+      42u);
+}
+
+// §6.18 (printed page 118) lets a typedef name stand for another typedef
+// name, so a property declared through `typedef mb_t mb2_t` reaches the
+// mailbox in two steps and reads 42 as above; a lookup that stopped at the
+// first name found no mailbox.
+TEST(MailboxSim, TypedefOfATypedefdMailboxPropertyIsBuiltPerObject) {
+  EXPECT_EQ(
+      RunAndGet(TypedefdMailboxPropertySrc("typedef mailbox #(int) mb_t;\n"
+                                           "typedef mb_t mb2_t;\n",
+                                           "mb2_t"),
+                "y"),
+      42u);
 }
 
 }  // namespace

@@ -495,8 +495,16 @@ void RegisterModuleDpiImports(const RtlirModule* mod, SimContext& ctx) {
 // class -- `typedef C T;` makes `T::p` the default specialization's `C#()::p`
 // -- so each such name is bound to the class it denotes, once every class of
 // the design is lowered, unless the design declares a class of that name.
+// The name at the end of the chain is recorded for the run first, class or
+// not (SimContext::RegisterTypeTarget): §15.4.9 (printed page 377 of
+// ~/LRM.pdf) declares a mailbox through `typedef mailbox #(string) s_mbox`
+// and §15.3.1 (printed 373) a semaphore alike, neither built-in class has a
+// record to bind the name to, and a class property declared through the
+// typedef is told to be one by SyncKindOfType (eval_class_sync.cpp) following
+// the chain in this table; with no table, `mb_t mb = new` built no mailbox.
 void RegisterClassTypeAliases(const RtlirDesign* design, SimContext& ctx) {
   for (const auto& [alias, target] : design->type_targets) {
+    ctx.RegisterTypeTarget(alias, target);
     if (ctx.FindClassType(alias) != nullptr) continue;
     ClassTypeInfo* cls = ctx.FindClassType(target);
     if (cls != nullptr) ctx.RegisterClassType(alias, cls);

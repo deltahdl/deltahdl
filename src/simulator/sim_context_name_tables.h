@@ -18,6 +18,7 @@
 // instance prefixes, and SimContext::ResolveInstanceScope walks the instance
 // type table outwards from the instance the running process stands in.
 
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -155,6 +156,21 @@ class DeclaredNameTables {
   void RegisterTypeRange(std::string_view name, PackedRange range);
   std::optional<PackedRange> FindTypeRange(std::string_view name) const;
 
+  // §6.18: the name at the end of the chain of typedefs `name` stands for,
+  // as the elaborated table records it (RtlirDesign::type_targets) for every
+  // name whose chain ends in a name the typedef table does not resolve -- a
+  // class, the built-in semaphore and mailbox among them -- under the
+  // "pkg::name" key of a package's typedef (§26.3) and the bare key of a
+  // module's, the unit's or an import's. Empty for a name nothing records.
+  // TypeTargetCount bounds a walk of the chain, so a name recorded as
+  // standing for itself cannot spin it. Filled by RegisterClassTypeAliases in
+  // lowerer_register.cpp; before it the run held no table of what a typedef
+  // stands for, so a property declared `mb_t mb` through `typedef mailbox
+  // #(int) mb_t` was of no type the run knew.
+  void RegisterTypeTarget(std::string_view name, std::string_view target);
+  std::string_view FindTypeTarget(std::string_view name) const;
+  size_t TypeTargetCount() const;
+
   void RegisterInstanceType(std::string_view prefix, std::string_view type);
   std::string_view FindInstanceType(std::string_view prefix) const;
 
@@ -244,6 +260,8 @@ class DeclaredNameTables {
   std::unordered_map<std::string_view, bool> type_signed_;
   std::unordered_map<std::string_view, PackedRange> type_ranges_;
 
+  // §6.18: see RegisterTypeTarget.
+  std::unordered_map<std::string_view, std::string_view> type_targets_;
   std::unordered_map<std::string, std::string> instance_types_;
   std::unordered_set<std::string> top_module_names_;
   std::unordered_map<std::string_view, const std::vector<DataType>*>

@@ -30,15 +30,15 @@ class SimContext;
 // SimContext::FindSemaphore and FindMailbox answer by name, hold a module's,
 // a package's and an instance's and never an object's.
 
-// Which of the two classes a declaration's type names, as the parser leaves
-// it: a named type spelled `semaphore` or `mailbox` (the spelling
-// CreateSemaphoreForVar and CreateMailboxForVar in lowerer_var.cpp recognize
-// a module's variable by). kNone for any other type, a typedef standing for
-// one included: the run holds no table of what a typedef's name stands for,
-// only the class records RegisterClassTypeAliases binds, and neither class
-// has a record.
+// Which of the two classes a declaration's type names: a named type spelled
+// `semaphore` or `mailbox` (the spelling CreateSemaphoreForVar and
+// CreateMailboxForVar in lowerer_var.cpp recognize a module's variable by),
+// or a typedef name standing for one -- §15.4.9's `typedef mailbox #(string)
+// s_mbox`, a package's `p::mb_t` (§26.3) and a typedef of a typedef (§6.18)
+// -- followed through the chain the run records (SimContext::FindTypeTarget),
+// bounded by the table's size. kNone for any other type.
 enum class SyncKind : uint8_t { kNone, kSemaphore, kMailbox };
-SyncKind SyncKindOfType(const DataType& type);
+SyncKind SyncKindOfType(const DataType& type, const SimContext& ctx);
 
 // The property a receiver names, where it names a semaphore or mailbox
 // property: `kind` says which, kNone where the receiver names no such
