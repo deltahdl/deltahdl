@@ -118,6 +118,45 @@ static void ReportNullHandleMethodCall(const MethodCallParts& parts,
                       Subclause("8.4"));
 }
 
+// Whether the class `defining` declares `name` with the virtual qualifier, as
+// a pure virtual method or as an `:extends` override, read off the
+// declaration for a class whose vtable was never built, a nested one.
+static bool DeclarationIsVirtual(const ClassTypeInfo* defining,
+                                 std::string_view name) {
+  if (defining == nullptr || defining->decl == nullptr) return false;
+  for (const auto* m : defining->decl->members) {
+    if (m->kind != ClassMemberKind::kMethod || m->method == nullptr ||
+        m->method->name != name) {
+      continue;
+    }
+    return m->is_virtual || m->is_pure_virtual || m->method->is_method_extends;
+  }
+  return false;
+}
+
+// §8.20: a method is virtual from the class that first declares it so
+// downward -- a virtual method overrides in every base class, a non-virtual
+// one in its own class and its descendants alone. A handle's declared class
+// therefore sees `name` as virtual only where that class or a base of it has
+// put the name in its vtable, or declares it virtual itself; where none has,
+// the call is the declared class's own method, whatever a class below it
+// later redeclares virtual and so put in the object's vtable. An
+// interface-class handle has no such declaration and resolves by the object
+// (§8.26.9).
+static ModuleItem* ResolveNonVirtualFromDeclared(const MethodCallParts& parts,
+                                                 const ClassTypeInfo* declared,
+                                                 InstanceMethodInfo& info) {
+  if (declared == nullptr || declared->is_interface) return nullptr;
+  if (declared->FindVTableIndex(parts.method_name) >= 0) return nullptr;
+  const ClassTypeInfo* defining = nullptr;
+  ModuleItem* method =
+      info.obj->ResolveMethodForType(parts.method_name, declared, &defining);
+  if (method == nullptr || DeclarationIsVirtual(defining, parts.method_name))
+    return nullptr;
+  info.owner = defining;
+  return method;
+}
+
 bool ResolveInstanceMethod(const MethodCallParts& parts, SimContext& ctx,
                            InstanceMethodInfo& info) {
   auto class_type = ctx.GetVariableClassType(parts.var_name);
@@ -131,9 +170,12 @@ bool ResolveInstanceMethod(const MethodCallParts& parts, SimContext& ctx,
   }
   info.obj = ctx.GetClassObject(handle);
   if (!info.obj) return false;
-  info.method = info.obj->ResolveVirtualMethod(parts.method_name, &info.owner);
+  auto* declared_type = ctx.FindClassType(class_type);
+  info.method = ResolveNonVirtualFromDeclared(parts, declared_type, info);
+  if (!info.method)
+    info.method =
+        info.obj->ResolveVirtualMethod(parts.method_name, &info.owner);
   if (!info.method) {
-    auto* declared_type = ctx.FindClassType(class_type);
     // §8.26.9: a non-interface declared type resolves against that type; an
     // interface-class declared type (or no declared type at all) resolves via
     // the object's dynamic type (the implementing class).

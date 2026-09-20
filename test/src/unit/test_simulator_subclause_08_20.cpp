@@ -450,4 +450,140 @@ TEST(ClassSim, VirtualMethodCalledOnMethodCallResult) {
             72u);
 }
 
+// §8.20: a virtual method overrides in all of its base classes, a non-virtual
+// one only in its own class and its descendants, so a method becomes virtual
+// from the class that first declares it so downward. `f1` is non-virtual in
+// `base`, and a call through a `base` handle to a `B` object is `base`'s own
+// `f1` even though `A` below it declares the name virtual and `B` overrides
+// that: 1 * 10 + the 3 the same object gives through its own handle.
+TEST(ClassSim, NonVirtualBaseMethodThroughBaseHandleIgnoresGrandchildVirtual) {
+  EXPECT_EQ(RunAndGet("class base;\n"
+                      "  function int f1();\n"
+                      "    return 1;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "class A extends base;\n"
+                      "  virtual function int f1();\n"
+                      "    return 2;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "class B extends A;\n"
+                      "  function int f1();\n"
+                      "    return 3;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int r = 99;\n"
+                      "  base h;\n"
+                      "  B b = new;\n"
+                      "  initial begin\n"
+                      "    h = b;\n"
+                      "    r = h.f1() * 10 + b.f1();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "r"),
+            13u);
+}
+
+// §8.20: from the class that declares `f1` virtual downward the call
+// dispatches by the object's type, so through an `A` handle the `B` object's
+// override answers 3, not `A`'s own 2.
+TEST(ClassSim, MethodVirtualFromMidClassDispatchesThroughMidHandle) {
+  EXPECT_EQ(RunAndGet("class base;\n"
+                      "  function int f1();\n"
+                      "    return 1;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "class A extends base;\n"
+                      "  virtual function int f1();\n"
+                      "    return 2;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "class B extends A;\n"
+                      "  function int f1();\n"
+                      "    return 3;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int r = 99;\n"
+                      "  A h;\n"
+                      "  B b = new;\n"
+                      "  initial begin\n"
+                      "    h = b;\n"
+                      "    r = h.f1();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "r"),
+            3u);
+}
+
+// §8.20, Example 1: through a base handle to a derived object the virtual
+// method is the derived class's and the non-virtual one is the base's own:
+// 1 * 10 + 4, where a static resolution of both would give 12 and a virtual
+// one of both 34.
+TEST(ClassSim, VirtualMethodThroughBaseHandleStillDispatchesToDerived) {
+  EXPECT_EQ(RunAndGet("class P;\n"
+                      "  function int a();\n"
+                      "    return 1;\n"
+                      "  endfunction\n"
+                      "  virtual function int b();\n"
+                      "    return 2;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "class Q extends P;\n"
+                      "  function int a();\n"
+                      "    return 3;\n"
+                      "  endfunction\n"
+                      "  virtual function int b();\n"
+                      "    return 4;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int r = 99;\n"
+                      "  P h;\n"
+                      "  Q q = new;\n"
+                      "  initial begin\n"
+                      "    h = q;\n"
+                      "    r = h.a() * 10 + h.b();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "r"),
+            14u);
+}
+
+// §8.20 with §8.14's `:initial`, the issue's own shape: `f1` is non-virtual in
+// `base` and `A` declares it `:initial`, so only `B`'s `virtual function
+// :initial` makes the name virtual, from `B` downward; through the `base`
+// handle the call is `base`'s 1, and through `A`'s it is `A`'s 2.
+TEST(ClassSim, GrandchildVirtualInitialMethodThroughBaseAndMidHandles) {
+  EXPECT_EQ(RunAndGet("class base;\n"
+                      "  function int f1();\n"
+                      "    return 1;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "class A extends base;\n"
+                      "  function :initial int f1();\n"
+                      "    return 2;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "class B extends A;\n"
+                      "  virtual function :initial int f1();\n"
+                      "    return 3;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int r = 99;\n"
+                      "  base h;\n"
+                      "  A a;\n"
+                      "  B b = new;\n"
+                      "  initial begin\n"
+                      "    h = b;\n"
+                      "    a = b;\n"
+                      "    r = h.f1() * 100 + a.f1() * 10 + b.f1();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "r"),
+            123u);
+}
+
 }  // namespace
