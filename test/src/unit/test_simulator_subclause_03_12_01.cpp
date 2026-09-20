@@ -512,4 +512,55 @@ TEST(CompilationUnitSim, CuScopeClassMethodReadsTheUnitsVariable) {
             57u);
 }
 
+// §3.12.1 (printed page 56) with §13.5.2 (printed 349): a ref formal is the
+// actual variable itself, and `$unit::q` names the unit's queue past the
+// top's own `int q[$]`, so `push($unit::q)` appends to the unit's queue and
+// the by-value `qsize($unit::q)` copies that queue: 1 * 10 + the top's own
+// empty q, 10. Both binds resolved the actual by its text
+// (TryBindRefAggregateArg and TryBindArrayArg in eval_function_args.cpp),
+// so the push landed in the top's queue and both counted it: 11. The size
+// is read through a formal because `$unit::q.size()` is not parsed
+// (Parser::ParseSystemCall returns the prefixed identifier with no postfix
+// chain).
+TEST(CompilationUnitSim, CuScopeQueueBoundByReferenceThroughUnitPrefix) {
+  EXPECT_EQ(RunAndGet("int q[$];\n"
+                      "module top;\n"
+                      "  int q[$];\n"
+                      "  int y;\n"
+                      "  function void push(ref int a[$]);\n"
+                      "    a.push_back(1);\n"
+                      "  endfunction\n"
+                      "  function int qsize(int a[$]);\n"
+                      "    return a.size();\n"
+                      "  endfunction\n"
+                      "  initial begin\n"
+                      "    push($unit::q);\n"
+                      "    y = qsize($unit::q) * 10 + q.size();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            10u);
+}
+
+// §3.12.1 (printed page 56) with §13.5.2 (printed 349): `set3($unit::g)`
+// binds the `ref int r` formal to the unit's g, so the write through the
+// formal leaves the top's own `int g = 7` alone: `g * 10 + $unit::g` is 73.
+// TryBindRefArg (eval_function_args.cpp) resolved the actual by its text,
+// which bound the top's g: 35.
+TEST(CompilationUnitSim, CuScopeVariableBoundByReferenceThroughUnitPrefix) {
+  EXPECT_EQ(UnitGRead("module top;\n"
+                      "  int g = 7;\n"
+                      "  int y;\n"
+                      "  function void set3(ref int r);\n"
+                      "    r = 3;\n"
+                      "  endfunction\n"
+                      "  initial begin\n"
+                      "    set3($unit::g);\n"
+                      "    y = g * 10 + $unit::g;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            73u);
+}
+
 }  // namespace

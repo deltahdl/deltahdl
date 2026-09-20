@@ -14,6 +14,7 @@
 #include "parser/ast_class.h"
 #include "parser/ast_expr.h"
 #include "simulator/class_object.h"
+#include "simulator/eval_function_args_scoped.h"
 #include "simulator/evaluation_internal.h"
 #include "simulator/instance_bindings.h"
 #include "simulator/sim_context.h"
@@ -119,24 +120,6 @@ static const Logic4Vec* BoundInstanceValue(const Expr* expr, SimContext& ctx) {
   return bindings == nullptr ? nullptr : bindings->Find(expr);
 }
 
-// §23.6 with §3.12.1 (printed page 56): the key an identifier the parser
-// gave a `$root` or `$unit` scope prefix (Parser::MakeSysScopePrefix in
-// src/parser/expr_parser_calls.cpp) is looked up by -- "$root.x", which
-// SimContext::FindVariable reads straight out of the variable table, and
-// "$unit.g", the key the compilation unit's own storage stands under
-// (CreateUnitDataVariables in lowerer_package_data.cpp), which no module's
-// declaration is keyed by, so `$unit::g` names the unit's g past a module's
-// own `int g` as §3.12.1 has the prefix do. Read by its text alone, the
-// `$unit::g` of a module declaring g answered the module's; a `p::x` reads
-// "p.x" the same way (BuildMemberName in eval_expr.cpp), the parser making
-// a package's prefix a member access rather than a prefix.
-static std::string ScopedIdentifierKey(const Expr* expr) {
-  std::string key(expr->scope_prefix);
-  key += '.';
-  key += expr->text;
-  return key;
-}
-
 // The real and string kinds the declaration registered under `name`, given
 // to the value read from it: a package's or the unit's item under its
 // qualified key (ShapePackageVariable in lowerer_package_data.cpp), a
@@ -176,16 +159,14 @@ static Logic4Vec EvalIdentifier(const Expr* expr, SimContext& ctx,
   // instance is running, so `$unit::g` in a module declaring its own g
   // read the module's. ResolveSignalToVariable in src/simulator/awaiters.h
   // spells the `$root` name the same way, so an event control and an
-  // expression reading one signal reach one variable. The unit's kinds
+  // expression reading one signal reach one variable, and the argument
+  // binds of eval_function_args.cpp bind a ref formal by the same key
+  // (IdentifierLookupKey, eval_function_args_scoped.cpp). The unit's kinds
   // stand under its key as its storage does; a `$root` name's under the
   // text, as before.
-  std::string scoped_name;
-  std::string_view lookup_name = expr->text;
+  std::string scoped_name = IdentifierLookupKey(expr);
+  std::string_view lookup_name = scoped_name;
   std::string_view kinds_name = expr->text;
-  if (expr->scope_prefix == "$root" || expr->scope_prefix == "$unit") {
-    scoped_name = ScopedIdentifierKey(expr);
-    lookup_name = scoped_name;
-  }
   if (expr->scope_prefix == "$unit") kinds_name = lookup_name;
   // §23.9 with §8.6: the class scope is searched before the scope enclosing
   // the class, so a property named bare in a method is read as the property

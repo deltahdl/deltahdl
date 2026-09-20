@@ -20,6 +20,7 @@
 #include "simulator/eval_call_result.h"
 #include "simulator/eval_class_sync.h"
 #include "simulator/eval_expr_internal.h"
+#include "simulator/eval_function_args_scoped.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer_register.h"
@@ -188,6 +189,8 @@ static void RegisterValueArgClassType(const FunctionArg& param,
     ctx.SetVariableClassType(param.name, dt.type_name);
 }
 
+// §13.5.2 (printed page 349) with §3.12.1 (printed 56): the actual is the
+// variable its key names (IdentifierLookupKey), `$unit::g` the unit's own.
 static bool TryBindRefArg(const Expr* expr, int arg_index,
                           std::string_view param_name, SimContext& ctx) {
   if (arg_index < 0) return false;
@@ -197,7 +200,7 @@ static bool TryBindRefArg(const Expr* expr, int arg_index,
   Variable* target = nullptr;
   {
     CalleeScopeAside aside(ctx);
-    target = ctx.FindVariable(call_arg->text);
+    target = ctx.FindVariable(IdentifierLookupKey(call_arg));
   }
   if (!target) return false;
   ctx.AliasLocalVariable(param_name, target);
@@ -295,21 +298,22 @@ static void AliasAggregateObjects(const AggregateStorage& storage,
 //
 // A multidimensional fixed-size array holds its leaves under `arr[i][j]`
 // names this does not alias, so it is left to the bind that follows, as it
-// was.
+// was. §3.12.1 (printed page 56): `push($unit::q)` binds the unit's queue
+// by its key (IdentifierLookupKey), as TryBindArrayArg copies it; by the
+// text alone a module's own q was bound.
 static bool TryBindRefAggregateArg(const Expr* call_arg,
                                    const FunctionArg& param, SimContext& ctx,
                                    Arena& arena) {
   if (!call_arg || call_arg->kind != ExprKind::kIdentifier) return false;
-  AggregateStorage storage = FindAggregateStorage(call_arg->text, ctx);
+  std::string actual = IdentifierLookupKey(call_arg);
+  AggregateStorage storage = FindAggregateStorage(actual, ctx);
   if (!storage.queue && !storage.assoc && !storage.info) return false;
   if (storage.info && !storage.info->dim_sizes.empty()) return false;
   AliasAggregateObjects(storage, param.name, ctx);
   if (storage.info) {
     ctx.RegisterArrayInScope(param.name, *storage.info);
-    if (!storage.queue) {
-      AliasFixedArrayElements(call_arg->text, param.name, *storage.info, ctx,
-                              arena);
-    }
+    if (!storage.queue)
+      AliasFixedArrayElements(actual, param.name, *storage.info, ctx, arena);
   }
   return true;
 }
@@ -491,7 +495,7 @@ static ActualValue ResolveArgValue(const FunctionArg& param, const Expr* expr,
 static bool TryBindAssocArg(const Expr* call_arg, std::string_view param_name,
                             SimContext& ctx, Arena& arena) {
   if (!call_arg || call_arg->kind != ExprKind::kIdentifier) return false;
-  auto* src = ctx.FindAssocArray(call_arg->text);
+  auto* src = ctx.FindAssocArray(IdentifierLookupKey(call_arg));
   if (!src) return false;
   auto* dst =
       ctx.CreateAssocArray(param_name, src->elem_width, src->is_string_key);
@@ -597,7 +601,7 @@ static void BindFixedArrayArg(const Expr* call_arg, const FunctionArg& formal,
   ctx.RegisterArrayInScope(formal.name, info);
   for (uint32_t j = 0; j < info.size; ++j) {
     uint32_t idx = info.lo + j;
-    auto src = std::string(call_arg->text) + "[" + std::to_string(idx) + "]";
+    auto src = IdentifierLookupKey(call_arg) + "[" + std::to_string(idx) + "]";
     auto dst = std::string(formal.name) + "[" + std::to_string(idx) + "]";
     auto* src_var = ctx.FindVariable(src);
     auto val =
@@ -619,11 +623,10 @@ static bool TryBindArrayArg(const Expr* call_arg, const FunctionArg& formal,
   if (!call_arg || call_arg->kind != ExprKind::kIdentifier) return false;
   if (TryBindAssocArg(call_arg, formal.name, ctx, arena)) return true;
 
-  if (auto* src_q = ctx.FindQueue(call_arg->text)) {
+  if (auto* src_q = ctx.FindQueue(IdentifierLookupKey(call_arg)))
     return TryBindQueueArg(src_q, formal, ctx, arena, call_arg->range.start);
-  }
 
-  auto* info = ctx.FindArrayInfo(call_arg->text);
+  auto* info = ctx.FindArrayInfo(IdentifierLookupKey(call_arg));
   if (!info) return false;
 
   BindFixedArrayArg(call_arg, formal, *info, ctx, arena);
