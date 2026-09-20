@@ -642,4 +642,88 @@ TEST(RealFold, RealOperandStillRoundsToTheNearestInteger) {
   EXPECT_DOUBLE_EQ(r->resolved_real, 0.5);
 }
 
+// §6.20.2 (printed pages 126-127): a parameter declared with neither type nor
+// range takes the type and range of the final value assigned to it, after
+// the overrides, a logic vector as wide as that value, so `parameter P = 1`
+// overridden with the parent's 96-bit PP (§23.10.2, printed 766) is 96 bits
+// in c: `$bits(P)` reads 96 and `P[95:64]` PP's word above 64. 082e4d682
+// recorded the words above bit 63 for a declaration that fixes a width
+// alone, and sized an override only where it was a literal, so P read at 32
+// bits, H as 0 and $bits(P) as nothing.
+TEST(ParamOverride, UntypedParameterTakesTheWidthOfAParameterOverride) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module c #(parameter P = 1);\n"
+      "  localparam int B = $bits(P);\n"
+      "  localparam int H = P[95:64];\n"
+      "  localparam int L = P[31:0];\n"
+      "endmodule\n"
+      "module t;\n"
+      "  localparam logic [95:0] PP = 96'h0123_4567_89AB_CDEF_0011_2233;\n"
+      "  c #(.P(PP)) u();\n"
+      "endmodule\n",
+      f, "t");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(ParamValueIn(design, "c", "B"), 96);
+  EXPECT_EQ(ParamValueIn(design, "c", "L"), 0x00112233);
+  EXPECT_EQ(ParamValueIn(design, "c", "H"), 0x01234567);
+}
+
+// The same parameter under a literal override of 96 bits, and one of 8: each
+// gives P the literal's own width, 96 with the word above 64 read through
+// `P[95:64]`, and 8 through `$bits(P)`; the default `parameter P = 1` with
+// no override keeps the 32 bits of its unsized value.
+TEST(ParamOverride, UntypedParameterTakesTheWidthOfALiteralOverride) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module c #(parameter P = 1);\n"
+      "  localparam int H = P[95:64];\n"
+      "  localparam int B = $bits(P);\n"
+      "endmodule\n"
+      "module d #(parameter P = 1);\n"
+      "  localparam int B = $bits(P);\n"
+      "  localparam int V = P;\n"
+      "endmodule\n"
+      "module e #(parameter P = 1);\n"
+      "  localparam int B = $bits(P);\n"
+      "endmodule\n"
+      "module t;\n"
+      "  c #(.P(96'h0000_0002_FFFF_FFFF_0000_0001)) u();\n"
+      "  d #(.P(8'd5)) v();\n"
+      "  e w();\n"
+      "endmodule\n",
+      f, "t");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(ParamValueIn(design, "c", "H"), 2);
+  EXPECT_EQ(ParamValueIn(design, "c", "B"), 96);
+  EXPECT_EQ(ParamValueIn(design, "d", "B"), 8);
+  EXPECT_EQ(ParamValueIn(design, "d", "V"), 5);
+  EXPECT_EQ(ParamValueIn(design, "e", "B"), 32);
+}
+
+// §23.10.1 (printed page 765): a defparam's value, written in the module
+// holding the statement, is the final value of an untyped parameter too, so
+// `defparam u.P = PP` under the parent's 96-bit PP makes c's P 96 bits, and
+// H, made over after the defparam, reads PP's word above 64.
+TEST(ParamOverride, UntypedParameterTakesTheWidthOfADefparamValue) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module c #(parameter P = 1);\n"
+      "  localparam int H = P[95:64];\n"
+      "  localparam int B = $bits(P);\n"
+      "endmodule\n"
+      "module t;\n"
+      "  localparam logic [95:0] PP = 96'h0123_4567_89AB_CDEF_0011_2233;\n"
+      "  c u();\n"
+      "  defparam u.P = PP;\n"
+      "endmodule\n",
+      f, "t");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(ParamValueIn(design, "c", "H"), 0x01234567);
+  EXPECT_EQ(ParamValueIn(design, "c", "B"), 96);
+}
+
 }  // namespace

@@ -118,14 +118,16 @@ static const Expr* LiteralOverrideExpr(const RtlirParamDecl& pd) {
 // 8ecbbc294 read the span of the recorded bounds over it, decl_width having
 // been folded without them, which sized `logic [HI:1][3:0]` to the first
 // dimension's 8. A parameter declared with neither, or with a bare `signed`,
-// takes an implied range from the size of the final value
-// assigned to it, at least 32 bits when that value is unsized, which is the
-// width the fold of the value carries -- 8 for `localparam Q = 8'hFF` and 32
-// for `localparam R = 100`, matching the clause's own `newconst` examples.
-// The value an instance overrode is an expression written in the
-// instantiating module, whose names mean nothing here, so of those only a
-// literal is sized. Empty for a type, real or string parameter, whose value
-// is not a bit vector this layer sizes.
+// takes an implied range from the size of the final value assigned to it, at
+// least 32 bits when that value is unsized, which is the width the fold of
+// the value carries -- 8 for `localparam Q = 8'hFF` and 32 for `localparam R
+// = 100`, matching the clause's own `newconst` examples -- and which the
+// elaborator recorded as RtlirParamDecl::value_width where the value came
+// from an instance override or a defparam, whose expression stands in another
+// module and means nothing here. 082e4d682 sized such an override only where
+// it was a literal, so `parameter P = 1` overridden with a 96-bit parameter
+// of the parent answered nothing. Empty for a type, real or string parameter,
+// whose value is not a bit vector this layer sizes.
 static std::optional<int64_t> ParamDeclBits(const RtlirParamDecl& pd) {
   if (pd.is_type_param || pd.is_real_value || pd.is_string_value)
     return std::nullopt;
@@ -133,6 +135,7 @@ static std::optional<int64_t> ParamDeclBits(const RtlirParamDecl& pd) {
     if (pd.decl_width == 0) return std::nullopt;
     return static_cast<int64_t>(pd.decl_width);
   }
+  if (pd.value_width != 0) return static_cast<int64_t>(pd.value_width);
   if (pd.from_override) {
     const Expr* lit = LiteralOverrideExpr(pd);
     if (lit == nullptr) return std::nullopt;
@@ -389,6 +392,23 @@ static std::vector<uint64_t> HighWordsOfParam(
   return {};
 }
 
+// §6.20.2 (printed pages 126-127): the width and signedness a value parameter
+// is read at. The declaration's where it fixes them; else the final value's
+// as the elaborator recorded them (RtlirParamDecl::value_width); else the
+// refold's; else 32 bits signed, the implied range of an unsized value.
+struct ParamReadWidth {
+  uint32_t width;
+  bool is_signed;
+};
+
+static ParamReadWidth ReadWidthOf(const RtlirParamDecl& pd,
+                                  const std::optional<ConstVal>& refold) {
+  if (HasDeclaredWidth(pd)) return {pd.decl_width, pd.decl_is_signed};
+  if (pd.value_width != 0) return {pd.value_width, pd.value_is_signed};
+  if (refold) return {refold->width, refold->is_signed};
+  return {32, true};
+}
+
 // §6.20.2 (printed pages 126-127): what a name standing for a value parameter
 // of the registered module is worth. A parameter declared with a range or a
 // type has that width and that signedness whatever value it took, so the
@@ -406,7 +426,11 @@ static std::vector<uint64_t> HighWordsOfParam(
 // above 64 as 0 in c. `value` is what the ScopeMap holds for the name, and
 // is kept as the low word rather than the refold's, since a ScopeMap built
 // for a generate block or a defparam may hold a value the refold does not
-// see.
+// see. A parameter declared with neither range nor type is as wide as its
+// final value, which the same record keeps where that value came from an
+// override (RtlirParamDecl::value_width); 082e4d682 refolded such a
+// parameter's default or literal override alone, so one overridden with the
+// parent's 96-bit parameter read at 32 bits.
 //
 // The declaration is consulted only where it agrees with the ScopeMap on the
 // value, because a constant function's locals (§13.4.3) sit in the same map
@@ -417,41 +441,50 @@ std::optional<ConstVal> RegisteredParamValue(std::string_view name,
   const RtlirParamDecl* pd = RegisteredParamNamed(name);
   if (pd == nullptr || pd->resolved_value != value) return std::nullopt;
   bool declared = HasDeclaredWidth(*pd);
-  uint32_t decl_width = pd->decl_width;
-  bool recorded = !pd->resolved_high_words.empty();
+  bool recorded_width = declared || pd->value_width != 0;
+  bool recorded_words = !pd->resolved_high_words.empty();
   std::optional<ConstVal> refold;
-  if (!declared || (decl_width > 64 && !recorded))
+  if (!recorded_width || (pd->decl_width > 64 && !recorded_words))
     refold = RefoldParamValue(*pd);
-  uint32_t width = declared ? decl_width : refold ? refold->width : 32;
-  bool is_signed = declared ? pd->decl_is_signed
-                   : refold ? refold->is_signed
-                            : true;
-  ConstVal v = NormalizeConstVal(value, width, is_signed);
-  if (width > 64) v.high_words = HighWordsOfParam(*pd, refold);
+  ParamReadWidth rw = ReadWidthOf(*pd, refold);
+  ConstVal v = NormalizeConstVal(value, rw.width, rw.is_signed);
+  if (rw.width > 64) v.high_words = HighWordsOfParam(*pd, refold);
   return v;
 }
 
-// §6.20.2 (printed page 126) with §23.10.2 (printed 766) and §23.10.1
+// §6.20.2 (printed pages 126-127) with §23.10.2 (printed 766) and §23.10.1
 // (printed 764-765): an override value is converted to the type and range of
 // a parameter declared with either, which CastConstVal does to the fold at
 // the declared width -- the words above it cut away, a narrower signed value
 // padded from its sign -- and a parameter declared with neither takes the
-// range of the value itself, whose width the declaration does not carry, so
-// no words are recorded for it and it reads as before. The fold is trusted
-// only where its low word is the value the elaborator resolved, since the
-// scope handed in may hold less than the one that value was folded in.
+// type and range of the value itself, a logic vector as wide as the value's
+// self-determined width, which the fold carries and the declaration does
+// not, so that width and signedness are recorded with the words. 082e4d682
+// recorded nothing for such a parameter, which then read at the width of
+// its default or of a literal override, 32 bits under `.P(PP)` for a 96-bit
+// PP. The fold is trusted only where its low word is the value the
+// elaborator resolved, since the scope handed in may hold less than the one
+// that value was folded in.
 void RecordResolvedHighWords(RtlirParamDecl& pd, const Expr* expr,
                              const ScopeMap& scope) {
   pd.resolved_high_words.clear();
+  pd.value_width = 0;
+  pd.value_is_signed = false;
   if (expr == nullptr || pd.is_type_param || pd.is_real_value ||
-      pd.is_string_value || !HasDeclaredWidth(pd))
+      pd.is_string_value)
     return;
-  uint32_t width = pd.decl_width;
-  if (width <= 64) return;
+  bool declared = HasDeclaredWidth(pd);
+  if (declared && pd.decl_width <= 64) return;
   auto folded = ConstEvalFull(expr, scope);
   if (!folded) return;
-  ConstVal v = CastConstVal(*folded, width, pd.decl_is_signed);
+  uint32_t width = declared ? pd.decl_width : folded->width;
+  bool is_signed = declared ? pd.decl_is_signed : folded->is_signed;
+  ConstVal v = CastConstVal(*folded, width, is_signed);
   if (v.value != pd.resolved_value) return;
+  if (!declared) {
+    pd.value_width = width;
+    pd.value_is_signed = is_signed;
+  }
   pd.resolved_high_words = std::move(v.high_words);
 }
 

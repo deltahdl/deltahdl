@@ -15,6 +15,7 @@
 #include "common/diagnostic.h"
 #include "common/types.h"
 #include "elaborator/const_eval.h"
+#include "elaborator/const_eval_internal.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/rtlir.h"
@@ -276,6 +277,11 @@ void ResolveParamConstValue(RtlirParamDecl& pd, const ModuleItem* item,
   if (val) {
     pd.resolved_value = *val;
     pd.is_resolved = true;
+    // §6.20.2 (printed page 126): the words above bit 63 of a value declared
+    // wider than 64 bits, and the width of one declared with neither type nor
+    // range, are recorded as the value is, for a read of the name where this
+    // scope is not the one in force.
+    RecordResolvedHighWords(pd, item->init_expr, scope);
   } else if (!is_type && ParamExpectsIntegerValue(pd, item->data_type)) {
     // §6.20.2 (printed page 127) with §6.12.1: an integer parameter set from
     // a real constant rounds to the nearest integer, and an integral

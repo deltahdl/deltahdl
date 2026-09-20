@@ -580,6 +580,20 @@ struct RtlirParamDecl {
   // src/elaborator/const_eval_bits.cpp refolds. RecordResolvedHighWords there
   // fills it.
   std::vector<uint64_t> resolved_high_words;
+  // §6.20.2 (printed pages 126-127): a parameter declared with neither a type
+  // nor a range, or with a bare `signed`, takes the type and range of the
+  // final value assigned to it, after every override -- a logic vector as
+  // wide as that value. These are that value's self-determined width and
+  // signedness where the value came from an expression the fold cannot reach
+  // again where the name is read: an instance override written in the
+  // instantiating module (§23.10.2), a defparam's right-hand side (§23.10.1),
+  // and a parameter a defparam made over. A width of 0 says none was
+  // recorded, and RegisteredParamValue in src/elaborator/const_eval_bits.cpp
+  // then refolds the declaration's default or a literal override for it.
+  // RecordResolvedHighWords there fills both as it fills
+  // resolved_high_words.
+  uint32_t value_width = 0;
+  bool value_is_signed = false;
   // §6.20.2: a parameter declared with a real type takes a real value, which
   // resolved_value cannot hold. When is_real_value is set, resolved_real is the
   // parameter's value and resolved_value is not meaningful.
