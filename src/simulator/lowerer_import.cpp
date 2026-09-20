@@ -11,6 +11,7 @@
 #include "parser/ast_design.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
+#include "parser/ast_type.h"
 #include "simulator/class_object.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
@@ -83,7 +84,7 @@ static bool IsImportOrExportDecl(const ModuleItem* item) {
          item->kind == ModuleItemKind::kExportDecl;
 }
 
-static ModuleItem* FindNamedPackageItem(PackageDecl* pkg,
+static ModuleItem* FindNamedPackageItem(const PackageDecl* pkg,
                                         std::string_view name) {
   for (auto* item : pkg->items) {
     if (IsImportOrExportDecl(item)) continue;
@@ -427,8 +428,213 @@ void Lowerer::LowerImports(const RtlirModule* mod) {
   importing_module_ = nullptr;
 }
 
+// §26.6 (printed pages 815-816): an export makes a declaration the package
+// imported available through the package, an import of it being an import of
+// the original -- `package p2; import p1::x; export p1::x; endpackage` makes
+// p1::x and p2::x one declaration, so a reference through the exporting
+// package's qualifier, `p2::x`, is p1's x. The storage and the registration
+// stand under the declaring package's key alone: "p1.x" from
+// InitPackageDataVariables or RegisterPackageEnumConstants and "p1::f" from
+// RegisterPackageScopedSubroutines (lowerer_register.cpp), which a `p2::x` or
+// `p2::f()` never reached, the read answering 0 and the write landing nowhere.
+// Each name a package exports is therefore bound under the exporter's key to
+// the original. One such name: the package declaring it and its item, null
+// for an enumeration literal, which §6.19 makes a constant of the declaring
+// package rather than an item of it.
+namespace {
+struct ExportedName {
+  std::string_view name;
+  const PackageDecl* origin = nullptr;
+  ModuleItem* item = nullptr;
+};
+
+using PackageSet = std::unordered_set<const PackageDecl*>;
+
+// Calls `fn` with the name of each enumeration member `pkg` declares, on a
+// typedef or on a data declaration's own type (Syntax 6-5); a `name[N]` form
+// of §6.19.2 is given unexpanded, as the elaborator's provided-name walk
+// gives it.
+template <typename Fn>
+void ForEachEnumMemberName(const PackageDecl* pkg, Fn fn) {
+  for (const ModuleItem* item : pkg->items) {
+    for (const EnumMember& m : item->typedef_type.enum_members) fn(m.name);
+    for (const EnumMember& m : item->data_type.enum_members) fn(m.name);
+  }
+}
+
+bool PackageDeclaresEnumMember(const PackageDecl* pkg, std::string_view name) {
+  bool found = false;
+  ForEachEnumMemberName(pkg, [&](std::string_view member) {
+    if (member == name) found = true;
+  });
+  return found;
+}
+
+// Lists the declarations a package's export declarations hand on, each with
+// the package declaring it, a chain of exports followed to the original
+// declaration: `export src::name` hands on the one name, `export src::*`
+// every name the package imports from src, and `export *::*` every name the
+// package imports. A wildcard import contributes every name its source
+// provides, the over-approximation the elaborator's walk makes too
+// (AddImportedNamesFrom in elaborator_scope_rules_names.cpp), §26.6 handing
+// on only what the package's references actually imported. A package already
+// on the chain being walked contributes nothing more, which ends a cycle of
+// exports.
+class ExportedNameWalk {
+ public:
+  explicit ExportedNameWalk(const RtlirDesign* design) : design_(design) {}
+
+  void CollectExported(const PackageDecl* pkg, PackageSet visited,
+                       std::vector<ExportedName>& out);
+
+ private:
+  const PackageDecl* Find(std::string_view name) const;
+  void CollectProvided(const PackageDecl* pkg, PackageSet visited,
+                       std::vector<ExportedName>& out);
+  void CollectFromExports(const PackageDecl* pkg, const PackageSet& visited,
+                          std::vector<ExportedName>& out);
+  void CollectImportsFrom(const PackageDecl* pkg, std::string_view src_name,
+                          const PackageSet& visited,
+                          std::vector<ExportedName>& out);
+  void CollectNamed(const PackageDecl* src, std::string_view name,
+                    const PackageSet& visited, std::vector<ExportedName>& out);
+
+  const RtlirDesign* design_;
+};
+
+const PackageDecl* ExportedNameWalk::Find(std::string_view name) const {
+  for (const PackageDecl* pkg : design_->packages) {
+    if (pkg->name == name) return pkg;
+  }
+  return nullptr;
+}
+
+// The names `pkg`'s exports hand on.
+void ExportedNameWalk::CollectExported(const PackageDecl* pkg,
+                                       PackageSet visited,
+                                       std::vector<ExportedName>& out) {
+  if (!visited.insert(pkg).second) return;
+  CollectFromExports(pkg, visited, out);
+}
+
+// Every name `pkg` makes visible to a wildcard import of it: its own items,
+// its enumeration literals and what its exports hand on.
+void ExportedNameWalk::CollectProvided(const PackageDecl* pkg,
+                                       PackageSet visited,
+                                       std::vector<ExportedName>& out) {
+  if (!visited.insert(pkg).second) return;
+  for (ModuleItem* item : pkg->items) {
+    if (IsImportOrExportDecl(item) || item->name.empty()) continue;
+    out.push_back({item->name, pkg, item});
+  }
+  ForEachEnumMemberName(
+      pkg, [&](std::string_view m) { out.push_back({m, pkg, nullptr}); });
+  CollectFromExports(pkg, visited, out);
+}
+
+void ExportedNameWalk::CollectFromExports(const PackageDecl* pkg,
+                                          const PackageSet& visited,
+                                          std::vector<ExportedName>& out) {
+  for (const ModuleItem* item : pkg->items) {
+    if (item->kind != ModuleItemKind::kExportDecl) continue;
+    const ImportItem& ex = item->import_item;
+    if (ex.package_name == "*" || ex.is_wildcard) {
+      CollectImportsFrom(pkg, ex.package_name, visited, out);
+    } else if (const PackageDecl* src = Find(ex.package_name)) {
+      CollectNamed(src, ex.item_name, visited, out);
+    }
+  }
+}
+
+// What the imports `pkg` writes from the package `src_name` bring in, or
+// every import's for the "*" of `export *::*`.
+void ExportedNameWalk::CollectImportsFrom(const PackageDecl* pkg,
+                                          std::string_view src_name,
+                                          const PackageSet& visited,
+                                          std::vector<ExportedName>& out) {
+  for (const ModuleItem* item : pkg->items) {
+    if (item->kind != ModuleItemKind::kImportDecl) continue;
+    const ImportItem& imp = item->import_item;
+    if (src_name != "*" && imp.package_name != src_name) continue;
+    const PackageDecl* src = Find(imp.package_name);
+    if (src == nullptr) continue;
+    if (imp.is_wildcard) {
+      CollectProvided(src, visited, out);
+    } else {
+      CollectNamed(src, imp.item_name, visited, out);
+    }
+  }
+}
+
+// The declaration `src::name` reaches: src's own item or enumeration literal
+// of that name, or else the one src's exports hand on under it.
+void ExportedNameWalk::CollectNamed(const PackageDecl* src,
+                                    std::string_view name,
+                                    const PackageSet& visited,
+                                    std::vector<ExportedName>& out) {
+  if (ModuleItem* item = FindNamedPackageItem(src, name)) {
+    out.push_back({name, src, item});
+    return;
+  }
+  if (PackageDeclaresEnumMember(src, name)) {
+    out.push_back({name, src, nullptr});
+    return;
+  }
+  std::vector<ExportedName> handed_on;
+  CollectExported(src, visited, handed_on);
+  for (const ExportedName& e : handed_on) {
+    if (e.name == name) out.push_back(e);
+  }
+}
+
+// Binds one name `pkg` exports under the exporting package's key to the
+// declaring package's registration: a subroutine under "pkg::name", the key
+// a scoped call resolves by (FindSubroutineTarget in eval_function_hier.cpp),
+// and a variable, parameter or enumeration literal under "pkg.name", the key
+// EvalMemberAccess reads and ResolveLhsVariable writes a scoped name by. The
+// subroutine keeps the declaring package as the scope its body runs in
+// (RegisterSubroutinePackage). A typedef or a class has a registration of
+// neither kind and is left; so is a key the package's own declaration holds,
+// §26.3 having a declaration of the scope take the name over an import.
+void AliasExportedName(const PackageDecl* pkg, const ExportedName& e,
+                       SimContext& ctx, Arena& arena) {
+  if (e.origin == pkg || e.name.empty()) return;
+  bool subroutine =
+      e.item != nullptr && (e.item->kind == ModuleItemKind::kFunctionDecl ||
+                            e.item->kind == ModuleItemKind::kTaskDecl);
+  if (subroutine) {
+    if (!e.item->method_class.empty()) return;
+    std::string key = std::string(pkg->name) + "::" + std::string(e.name);
+    if (ctx.FindFunction(key) != nullptr) return;
+    ctx.RegisterFunction(*arena.Create<std::string>(key), e.item);
+    return;
+  }
+  std::string qname = PackageQualifiedName(e.origin, e.name);
+  if (ctx.GetVariables().count(qname) == 0) return;
+  std::string key = PackageQualifiedName(pkg, e.name);
+  if (ctx.GetVariables().count(key) != 0) return;
+  ctx.AliasVariable(*arena.Create<std::string>(key), qname);
+}
+
+// Every package's exports, bound once the packages' own storage and
+// subroutines are registered and ahead of the unit's and the modules'
+// imports, so that a package importing a re-exported name, `import p2::x` in
+// p3, finds "p2.x" where SimContext::FindInPackageScope searches p3's imports.
+void AliasPackageExports(const RtlirDesign* design, SimContext& ctx,
+                         Arena& arena) {
+  ExportedNameWalk walk(design);
+  for (const PackageDecl* pkg : design->packages) {
+    std::vector<ExportedName> names;
+    walk.CollectExported(pkg, {}, names);
+    for (const ExportedName& e : names) AliasExportedName(pkg, e, ctx, arena);
+  }
+}
+}  // namespace
+
 void Lowerer::LowerCompilationUnitImports() {
-  if (!design_ || !design_->compilation_unit) return;
+  if (!design_) return;
+  AliasPackageExports(design_, ctx_, arena_);
+  if (!design_->compilation_unit) return;
   const auto& items = design_->compilation_unit->cu_items;
   // §26.5's precedence of an explicit import over a wildcard one holds in the
   // compilation-unit scope as in a module, so the explicit imports bind first.

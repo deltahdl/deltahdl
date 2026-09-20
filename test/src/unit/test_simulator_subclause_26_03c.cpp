@@ -499,4 +499,110 @@ TEST(PackageImportSim, TwoExplicitImportsThroughTwoExportsBindOneVariable) {
             3737u);
 }
 
+// §26.6 (printed pages 815-816): an export makes the declaration the package
+// imported available through the package, an import of it being an import
+// of the original, so `p2::x` after `import p1::x; export p1::x;` is p1's x
+// -- the clause's own comment has p1::x and p2::x as one declaration. The
+// write of 37 through p2's qualifier is read back through p1's own, through
+// p4's, which re-exports p1 by wildcard, and through the bare name `import
+// p2::*` binds: 37 * 10000 + 37 * 100 + 37. The write resolved to a "p2.x"
+// key no package storage stood under and landed nowhere, every read then
+// answering p1's untouched 0.
+TEST(PackageImportSim, ReExportedNameThroughTheExportingPackageQualifier) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  int x;\n"
+                      "endpackage\n"
+                      "package p2;\n"
+                      "  import p1::x;\n"
+                      "  export p1::x;\n"
+                      "endpackage\n"
+                      "package p4;\n"
+                      "  import p1::*;\n"
+                      "  export p1::*;\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  import p2::*;\n"
+                      "  int y;\n"
+                      "  initial p2::x = 37;\n"
+                      "  initial #1 y = p1::x * 10000 + p4::x * 100 + x;\n"
+                      "endmodule\n",
+                      "y"),
+            373737u);
+}
+
+// §26.6 with §26.3: a subroutine an export hands on is called through the
+// exporting package's qualifier as through the declaring one's, and §13.4
+// runs its body in the scope of its declaration, so `p2::f()` is p1's f
+// reading p1's k: 4 * 10 + 1. No subroutine stood under "p2::f" before, the
+// call answering 0; a registration that lost p1's scope would read no k and
+// answer 1.
+TEST(PackageImportSim, ReExportedFunctionCalledThroughTheExportingPackage) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  int k = 4;\n"
+                      "  function automatic int f();\n"
+                      "    return k * 10 + 1;\n"
+                      "  endfunction\n"
+                      "endpackage\n"
+                      "package p2;\n"
+                      "  import p1::f;\n"
+                      "  export p1::f;\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  int y;\n"
+                      "  initial y = p2::f();\n"
+                      "endmodule\n",
+                      "y"),
+            41u);
+}
+
+// §26.6 (printed 815): `export *::*` hands on every declaration the package
+// imported, and an export of a re-exported name reaches the original along
+// the chain -- p3 exports what it imports from p2, which exports p1's x by
+// wildcard -- so the write of 5 through `p3::x` is read through `p2::x` and
+// `p1::x`: 5 * 10 + 5. A chain followed one link only would leave "p3.x"
+// unbound and both reads at 0.
+TEST(PackageImportSim, ReExportChainWrittenThroughTheLastPackage) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  int x;\n"
+                      "endpackage\n"
+                      "package p2;\n"
+                      "  import p1::*;\n"
+                      "  export p1::*;\n"
+                      "endpackage\n"
+                      "package p3;\n"
+                      "  import p2::x;\n"
+                      "  export *::*;\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  int y;\n"
+                      "  initial p3::x = 5;\n"
+                      "  initial #1 y = p2::x * 10 + p1::x;\n"
+                      "endmodule\n",
+                      "y"),
+            55u);
+}
+
+// §26.6 with §6.19 and §6.20.1: a wildcard export hands on the package's
+// parameters and the members of its enumerations, which are constants of the
+// declaring package, so `p2::MID` and `p2::K` after `import p1::*; export
+// p1::*;` are p1's 6 and 3: 6 * 10 + 3. Neither had storage under p2's key
+// and each read 0.
+TEST(PackageImportSim,
+     WildcardReExportedLiteralAndParameterThroughTheExporter) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  typedef enum {LOW, MID = 6, HIGH} level_t;\n"
+                      "  parameter int K = 3;\n"
+                      "endpackage\n"
+                      "package p2;\n"
+                      "  import p1::*;\n"
+                      "  export p1::*;\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  int y;\n"
+                      "  initial y = p2::MID * 10 + p2::K;\n"
+                      "endmodule\n",
+                      "y"),
+            63u);
+}
+
 }  // namespace
