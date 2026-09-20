@@ -53,16 +53,20 @@ struct ImportedEnumCtx {
 // literals visible by their unqualified names. Emit a backing variable per such
 // literal into `mod` (the same representation used for a locally declared enum)
 // so a bare reference like `COLOR_GREEN` resolves to its value. Covers both
-// header and body wildcard imports. Defined in elaborator_typedef.cpp.
+// header and body wildcard imports. A literal an explicit import of `decl`
+// names, `import q::FALSE`, is left to that import, which §26.5 gives
+// precedence over the wildcard's. Defined in elaborator_typedef.cpp.
 void RegisterImportedEnumLiterals(const ModuleDecl* decl, RtlirModule* mod,
                                   const ImportedEnumCtx& ctx);
 
 // §3.12.1 and §6.19: an enumeration declared by a typedef at compilation-unit
 // scope declares its literals for every module of the unit, so each is
 // emitted into `mod` as an imported package's are, a module's own typedef of
-// the same name taking its place when it is elaborated. Defined in
+// the same name taking its place when it is elaborated and an explicit import
+// of `decl` shadowing a literal it names (§23.9). Defined in
 // elaborator_typedef.cpp.
-void RegisterCuEnumLiterals(RtlirModule* mod, const ImportedEnumCtx& ctx);
+void RegisterCuEnumLiterals(const ModuleDecl* decl, RtlirModule* mod,
+                            const ImportedEnumCtx& ctx);
 
 // Maps a net data-type kind to its RTLIR net type, defaulting to kWire for any
 // kind that is not a net type. Defined once in elaborator_decls.cpp and shared

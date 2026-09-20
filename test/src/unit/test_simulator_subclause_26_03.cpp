@@ -794,4 +794,56 @@ TEST(PackageScopeReferenceSim,
             64u * 10000u + 64u * 100u + 65u);
 }
 
+// §26.3's own `import q::teeth_t, q::ORIGINAL, q::FALSE;` (printed page 809):
+// an explicit import names an enumeration literal, which §6.19 makes a
+// constant of the package and not an item of it, so LowerImportedName in
+// src/simulator/lowerer_import.cpp found nothing to bind and the bare FALSE
+// read 0. The second literal is the one read, 1 telling the binding from
+// nothing bound and from ORIGINAL -- 1 * 10 + 1.
+TEST(PackageImportSim, ExplicitImportOfAnEnumLiteralReadsItsValue) {
+  EXPECT_EQ(RunAndGet("package q;\n"
+                      "  typedef enum { ORIGINAL, FALSE } teeth_t;\n"
+                      "endpackage\n"
+                      "module t;\n"
+                      "  import q::teeth_t, q::FALSE;\n"
+                      "  teeth_t a;\n"
+                      "  int out;\n"
+                      "  initial begin\n"
+                      "    a = FALSE;\n"
+                      "    out = a * 10 + FALSE;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "out"),
+            11u);
+}
+
+// §26.3 searches a scope's locally visible identifiers, an explicit import's
+// among them, before the candidates a wildcard import supplies (printed page
+// 810), the clause's top2 module reading q's FALSE over p's. The wildcard's
+// literal was emitted as a module variable ahead of the import lowering and
+// held the name, so FALSE read p's 0; ORIGINAL is given 3 so that q's FALSE, 4,
+// and ORIGINAL itself are each told from an unbound name, and TRUE says the
+// wildcard still supplies the literal no explicit import names --
+// 4 * 100 + 3 * 10 + 1.
+TEST(PackageImportSim, ExplicitImportOfAnEnumLiteralShadowsAWildcardsLiteral) {
+  EXPECT_EQ(RunAndGet("package p;\n"
+                      "  typedef enum { FALSE, TRUE } bool_t;\n"
+                      "endpackage\n"
+                      "package q;\n"
+                      "  typedef enum { ORIGINAL = 3, FALSE } teeth_t;\n"
+                      "endpackage\n"
+                      "module t;\n"
+                      "  import p::*;\n"
+                      "  import q::teeth_t, q::ORIGINAL, q::FALSE;\n"
+                      "  teeth_t myteeth;\n"
+                      "  int out;\n"
+                      "  initial begin\n"
+                      "    myteeth = FALSE;\n"
+                      "    out = myteeth * 100 + ORIGINAL * 10 + TRUE;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "out"),
+            431u);
+}
+
 }  // namespace

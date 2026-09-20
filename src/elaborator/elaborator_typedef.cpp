@@ -155,6 +155,13 @@ struct EnumMemberDeclCtx {
   Arena& arena;
   RtlirModule* mod;
   std::unordered_set<std::string_view>& enum_member_names;
+  // §26.5: the names an explicit import of the scope has made locally visible,
+  // which take precedence over the candidate a wildcard import supplies under
+  // the same name (§26.3, printed page 810). A member so named keeps its place
+  // in the type but declares no constant in this scope, so the bare name
+  // reaches the explicitly imported literal. Null for the scope's own
+  // enumeration, whose members are declared whatever the imports name.
+  const std::unordered_set<std::string_view>* explicitly_imported = nullptr;
 };
 
 // Declares an enumeration's named constants in a module: reserves each member
@@ -171,6 +178,9 @@ std::vector<RtlirEnumMember> BuildEnumMembers(
     const EnumMemberDeclCtx& ctx) {
   auto members = FoldEnumMembers(decl_members, ctx.scope, ctx.arena);
   for (const auto& member : members) {
+    if (ctx.explicitly_imported != nullptr &&
+        ctx.explicitly_imported->count(member.name) != 0)
+      continue;
     ctx.enum_member_names.insert(member.name);
     RtlirVariable var;
     var.name = member.name;
@@ -661,9 +671,11 @@ const PackageDecl* FindUnitPackage(const CompilationUnit* unit,
 
 // Emits enum-literal backing variables for every enum typedef among `items`,
 // a package's or the compilation unit's, that the module does not already
-// define.
-void EmitEnumLiteralsOfItems(const std::vector<ModuleItem*>& items,
-                             RtlirModule* mod, const ImportedEnumCtx& ctx) {
+// define, leaving out the members `explicitly_imported` names (§26.5).
+void EmitEnumLiteralsOfItems(
+    const std::vector<ModuleItem*>& items, RtlirModule* mod,
+    const ImportedEnumCtx& ctx,
+    const std::unordered_set<std::string_view>& explicitly_imported) {
   // A package's enum members fold against the package's own constants, which
   // this path does not carry; an empty scope keeps it to the literal values it
   // already resolved.
@@ -675,36 +687,67 @@ void EmitEnumLiteralsOfItems(const std::vector<ModuleItem*>& items,
     uint32_t width = EvalTypeWidth(pi->typedef_type, ctx.typedefs);
     mod->enum_types[pi->name] =
         BuildEnumMembers(pi->typedef_type.enum_members, width,
-                         {no_scope, ctx.arena, mod, ctx.enum_member_names});
+                         {no_scope, ctx.arena, mod, ctx.enum_member_names,
+                          &explicitly_imported});
   }
+}
+
+// §26.3: the names the explicit imports among `items` make locally visible in
+// the scope that wrote them, `import q::FALSE` naming FALSE.
+std::unordered_set<std::string_view> ExplicitImportNames(
+    const std::vector<ModuleItem*>& items) {
+  std::unordered_set<std::string_view> names;
+  for (const auto* item : items) {
+    if (item->kind != ModuleItemKind::kImportDecl) continue;
+    if (!item->import_item.is_wildcard)
+      names.insert(item->import_item.item_name);
+  }
+  return names;
 }
 
 }  // namespace
 
-// The enumeration literals every wildcard import among `items` brings in.
+// The enumeration literals every wildcard import among `items` brings in, but
+// for those `explicitly_imported` names.
 static void EmitWildcardImportEnumLiterals(
     const std::vector<ModuleItem*>& items, RtlirModule* mod,
-    const ImportedEnumCtx& ctx) {
+    const ImportedEnumCtx& ctx,
+    const std::unordered_set<std::string_view>& explicitly_imported) {
   for (const auto* item : items) {
     if (item->kind != ModuleItemKind::kImportDecl) continue;
     if (!item->import_item.is_wildcard) continue;
     const PackageDecl* pkg =
         FindUnitPackage(ctx.unit, item->import_item.package_name);
-    if (pkg) EmitEnumLiteralsOfItems(pkg->items, mod, ctx);
+    if (pkg) EmitEnumLiteralsOfItems(pkg->items, mod, ctx, explicitly_imported);
   }
 }
 
 // §26.3: a wildcard import brings a package's enumeration literals with it,
 // whether the import stands in the module or, per §3.12.1, in the
 // compilation-unit scope above it (Elaborator::ApplyCompilationUnitImports).
+// §26.3 searches a scope's locally visible identifiers, an explicit import's
+// among them, before the candidates its wildcard imports supply, and only then
+// the outer scope (printed page 810), so an explicit import of the module
+// shadows a wildcard's literal in the module and in the unit, and an explicit
+// import of the unit shadows a wildcard's literal in the unit alone: the
+// module's own wildcard candidate is found before the unit is searched.
 void RegisterImportedEnumLiterals(const ModuleDecl* decl, RtlirModule* mod,
                                   const ImportedEnumCtx& ctx) {
-  EmitWildcardImportEnumLiterals(ctx.unit->cu_items, mod, ctx);
-  EmitWildcardImportEnumLiterals(decl->items, mod, ctx);
+  auto module_explicit = ExplicitImportNames(decl->items);
+  auto unit_explicit = ExplicitImportNames(ctx.unit->cu_items);
+  unit_explicit.insert(module_explicit.begin(), module_explicit.end());
+  EmitWildcardImportEnumLiterals(ctx.unit->cu_items, mod, ctx, unit_explicit);
+  EmitWildcardImportEnumLiterals(decl->items, mod, ctx, module_explicit);
 }
 
-void RegisterCuEnumLiterals(RtlirModule* mod, const ImportedEnumCtx& ctx) {
-  EmitEnumLiteralsOfItems(ctx.unit->cu_items, mod, ctx);
+// §23.9 finds a module's locally visible identifiers, an explicit import's
+// among them, before the compilation-unit scope's declarations, so a literal
+// of a unit-scope enumeration that the module's explicit import names is not
+// declared in the module.
+void RegisterCuEnumLiterals(const ModuleDecl* decl, RtlirModule* mod,
+                            const ImportedEnumCtx& ctx) {
+  EmitEnumLiteralsOfItems(ctx.unit->cu_items, mod, ctx,
+                          ExplicitImportNames(decl->items));
 }
 
 }  // namespace delta

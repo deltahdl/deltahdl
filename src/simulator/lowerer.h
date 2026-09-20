@@ -164,6 +164,15 @@ class Lowerer {
   void AliasAllPackageDataItems(const PackageDecl* pkg);
   void AliasNamedPackageDataItem(const PackageDecl* pkg,
                                  std::string_view item_name);
+  // §26.3: binds an explicitly imported enumeration literal of `pkg`, which
+  // is a constant of the package and not an item of it, under its unqualified
+  // spelling in the same scope; answers false where `pkg` declares no
+  // enumeration member of that name. Defined in lowerer_import.cpp.
+  bool AliasPackageEnumMember(const PackageDecl* pkg, std::string_view name);
+  // The binding the three above make: `name` in the scope inst_prefix_ names,
+  // aliased to the package's own storage under `qname`, unless the scope has
+  // already bound the name (§26.5). Defined in lowerer_import.cpp.
+  void AliasImportedPackageName(std::string_view name, std::string_view qname);
   void LowerDynArrayInit(QueueObject* q, const RtlirVariable& var);
   void InitAssocDefault(const Expr* init, AssocArrayObject* aa);
   void RegisterEnumForCast(std::string_view name, const RtlirVariable& var);

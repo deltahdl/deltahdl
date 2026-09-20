@@ -459,4 +459,39 @@ TEST(PackageImport, AClassTheImportDoesNotNameIsNoClassType) {
       "cannot assign class object handle to a non-class variable", 9, "8.4"));
 }
 
+// §26.3 searches a scope's locally visible identifiers, an explicit import's
+// among them, before the candidates a wildcard import supplies (printed page
+// 810), so in the clause's top2 module FALSE is q's.
+// RegisterImportedEnumLiterals in src/elaborator/elaborator_typedef.cpp emitted
+// every literal of p as a module variable, FALSE included, and that variable
+// held the name against the import lowering. The literal the explicit import
+// names is left to it; TRUE, which no explicit import names, is still emitted,
+// and bool_t keeps both members, so a fix that dropped the member from the type
+// or the whole type from the module would fail here.
+TEST(PackageImport, WildcardLiteralAnExplicitImportNamesIsNotEmitted) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "package p;\n"
+      "  typedef enum { FALSE, TRUE } bool_t;\n"
+      "endpackage\n"
+      "package q;\n"
+      "  typedef enum { ORIGINAL, FALSE } teeth_t;\n"
+      "endpackage\n"
+      "module top2;\n"
+      "  import p::*;\n"
+      "  import q::teeth_t, q::ORIGINAL, q::FALSE;\n"
+      "  teeth_t myteeth;\n"
+      "  initial myteeth = FALSE;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(FindVar(design, "top2", "FALSE"), nullptr);
+  EXPECT_NE(FindVar(design, "top2", "TRUE"), nullptr);
+  auto* mod = design->top_modules[0];
+  auto it = mod->enum_types.find("bool_t");
+  ASSERT_NE(it, mod->enum_types.end());
+  EXPECT_EQ(it->second.size(), 2u);
+}
+
 }  // namespace

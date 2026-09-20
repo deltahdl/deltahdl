@@ -119,6 +119,7 @@ void Lowerer::LowerImportedName(
     AliasPackageDataItem(pkg, found);
     return;
   }
+  if (AliasPackageEnumMember(pkg, name)) return;
 
   auto recurse = [&](std::string_view pkg_name) {
     auto* src = FindPackage(pkg_name);
@@ -214,6 +215,14 @@ void Lowerer::LowerAllImported(
   }
 }
 
+// The key the package's own storage for `name` is held under: "pkg.name", the
+// one InitPackageDataVariables and RegisterPackageEnumConstants create and
+// EvalMemberAccess reads a `pkg::name` by.
+static std::string PackageQualifiedName(const PackageDecl* pkg,
+                                        std::string_view name) {
+  return std::string(pkg->name) + "." + std::string(name);
+}
+
 void Lowerer::AliasPackageDataItem(const PackageDecl* pkg,
                                    const ModuleItem* item) {
   // §6.8: a variable is declared with or without an initializer, and
@@ -221,21 +230,43 @@ void Lowerer::AliasPackageDataItem(const PackageDecl* pkg,
   bool is_param = item->kind == ModuleItemKind::kParamDecl;
   bool is_var = item->kind == ModuleItemKind::kVarDecl;
   if (!(is_var || (is_param && item->init_expr))) return;
-  // §26.3 makes the imported name visible "within the current scope", and the
-  // current scope is the one that wrote the import. Key the binding by the
-  // instance being lowered so two instances importing a like-named item from
-  // two different packages each read their own, which §26.3 permits: the only
-  // conflict it rules illegal is between wildcard imports "within the same
-  // scope". The prefix is empty for a top module, where the key is the bare
-  // name and SimContext::FindVariable's ordinary lookup answers it.
-  std::string key = inst_prefix_ + std::string(item->name);
-  // §26.5: a declaration of the importing scope shadows the import, and the
-  // first import of a name wins over a later one. Both are already bound under
+  AliasImportedPackageName(item->name, PackageQualifiedName(pkg, item->name));
+}
+
+// §26.3's own example imports an enumeration literal by name, `import
+// q::FALSE`, and §6.19 makes the literal a constant of the package rather than
+// an item of it, so FindNamedPackageItem answers nothing for it. The constant
+// has storage under "pkg.MEMBER" (RegisterPackageEnumConstants in
+// lowerer_register.cpp, every member of every enumeration the package
+// declares, the `name[N]` forms of §6.19.2 expanded); a name no item of the
+// package carries that has that key is one of those constants, and the bare
+// name is bound to it as a parameter's is. Answers whether `name` was one.
+bool Lowerer::AliasPackageEnumMember(const PackageDecl* pkg,
+                                     std::string_view name) {
+  std::string qname = PackageQualifiedName(pkg, name);
+  if (ctx_.GetVariables().count(qname) == 0) return false;
+  AliasImportedPackageName(name, qname);
+  return true;
+}
+
+// §26.3 makes the imported name visible under its unqualified spelling in the
+// scope that wrote the import, which is the instance being lowered; `qname` is
+// the "pkg.name" key the package's own storage holds. The binding is keyed by
+// the instance so two instances importing a like-named item from two packages
+// each read their own, which §26.3 permits: the only conflict it rules illegal
+// is between wildcard imports within one scope. The prefix is empty for a top
+// module, where the key is the bare name and SimContext::FindVariable's
+// ordinary lookup answers it.
+void Lowerer::AliasImportedPackageName(std::string_view name,
+                                       std::string_view qname) {
+  std::string key = inst_prefix_ + std::string(name);
+  // §26.5: a declaration of the importing scope shadows the import, and an
+  // explicit import of a name wins over a wildcard one, which LowerImports
+  // orders by applying the explicit imports first. Both are already bound under
   // this key, so an occupied key is left alone. The map is read directly rather
   // than through SimContext::FindVariable, which would also answer from an
   // enclosing scope's binding and let one module's import silence another's.
   if (ctx_.GetVariables().count(key) != 0) return;
-  std::string qname = std::string(pkg->name) + "." + std::string(item->name);
   auto* stored = arena_.Create<std::string>(key);
   ctx_.AliasVariable(*stored, qname);
   // §26.3: the import makes this name visible under its unqualified spelling,
