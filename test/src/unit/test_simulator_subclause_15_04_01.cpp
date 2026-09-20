@@ -194,11 +194,14 @@ TEST(MailboxSim, ChildInstanceQueueAnswersItsBareName) {
 // §15.4.1 (printed page 374) with §8.7 (printed 184): a mailbox declared as
 // a class property with `= new` is built when the object is constructed, so
 // the object's methods pass messages through the object's own queue and
-// `c.mb.num()` from the module counts what is left in it: give(4) places 4,
-// take() retrieves it and num() reads 0, so y reads 41. The property's `new`
-// was evaluated as a value and built no mailbox, and a bare `mb` in a method
-// was resolved through the run's tables, which hold no object's, so put()
-// placed nothing, get() stored nothing and y read x.
+// `c.mb.num()` from the module counts what is in it: give(4) places 4,
+// num() counts the one message, then take() retrieves it, so v and n read
+// as 41. Each reading is a statement of its own because §11.4 fixes no
+// order for the operands of `+`, and a take() evaluated ahead of the num()
+// in one expression would count 0. The property's `new` was evaluated as a
+// value and built no mailbox, and a bare `mb` in a method was resolved
+// through the run's tables, which hold no object's, so put() placed
+// nothing, get() stored nothing and y read x.
 TEST(MailboxSim, ClassPropertyMailboxIsBuiltPerObject) {
   EXPECT_EQ(RunAndGet("class C;\n"
                       "  mailbox mb = new;\n"
@@ -213,11 +216,13 @@ TEST(MailboxSim, ClassPropertyMailboxIsBuiltPerObject) {
                       "  endfunction\n"
                       "endclass\n"
                       "module top;\n"
-                      "  int y;\n"
+                      "  int n, v, y;\n"
                       "  initial begin\n"
                       "    C c = new;\n"
                       "    c.give(4);\n"
-                      "    y = c.take() * 10 + c.mb.num();\n"
+                      "    n = c.mb.num();\n"
+                      "    v = c.take();\n"
+                      "    y = v * 10 + n;\n"
                       "  end\n"
                       "endmodule\n",
                       "y"),
