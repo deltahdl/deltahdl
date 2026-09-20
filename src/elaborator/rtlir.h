@@ -603,6 +603,20 @@ struct RtlirImport {
   std::string_view package_name;
   std::string_view item_name;
   bool is_wildcard = false;
+  // §26.3: an import makes the package's names candidates within the scope
+  // that writes it and for references after it in that scope, and §27.5 makes
+  // a generate block a scope of its own. An import a module writes directly
+  // carries an empty prefix and binds its names under the instance alone. One
+  // written inside a generate block carries a prefix of its own, which
+  // Elaborator::ElaborateGenerateBlockImport also puts into the
+  // GenBlockPrefixes of every process, continuous assignment and primitive
+  // instance the block elaborates after the import, one step outside the
+  // block's own prefix: SimContext::FindInGenerateBlock then answers a bare
+  // name from the block's declarations first, then from this import, and only
+  // then from the enclosing scope, while a process the block elaborated before
+  // the import never carries it. The prefix is the block's prefix followed by
+  // `:importN:`, which no declaration's key can spell.
+  std::string_view scope_prefix;
 };
 
 struct RtlirEnumMember {

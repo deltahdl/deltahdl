@@ -670,4 +670,117 @@ TEST(PackageImport, ExportedAndOwnDeclarationsOfOneNameStayAmbiguous) {
                             14, "26.3"));
 }
 
+// §26.3 Example 2 (printed page 811): the block's `x = 1` stands before the
+// block's own `import p2::*`, so b supplies no candidate and the reference is
+// searched outward into top, whose import of p does; p::x is imported into
+// top, and the module's read of x after the block is p::x alone. The block's
+// import is b's and never a second module-level candidate, so nothing is
+// ambiguous and the source elaborates clean. A check that counted the block's
+// import among the module's would report x ambiguous between p and p2.
+TEST(PackageImport, BlockImportAfterTheReferenceRaisesNoAmbiguity) {
+  ElabFixture f;
+  EXPECT_TRUE(
+      ElabOk("package p;\n"
+             "  int x;\n"
+             "endpackage\n"
+             "package p2;\n"
+             "  int x;\n"
+             "endpackage\n"
+             "module top;\n"
+             "  import p::*;\n"
+             "  int y;\n"
+             "  if (1) begin : b\n"
+             "    initial x = 1;\n"
+             "    import p2::*;\n"
+             "  end\n"
+             "  initial #1 y = p::x + x;\n"
+             "endmodule\n",
+             f));
+}
+
+// §26.3 (printed page 810): a reference after the block's import is searched
+// in the block first, where p2's x is the one candidate, so the module's
+// import of p is never reached and the two never conflict. The module's own
+// read of x after the block still resolves through p alone.
+TEST(PackageImport, BlockImportBeforeTheReferenceHidesTheModulesCandidate) {
+  ElabFixture f;
+  EXPECT_TRUE(
+      ElabOk("package p;\n"
+             "  int x;\n"
+             "endpackage\n"
+             "package p2;\n"
+             "  int x;\n"
+             "endpackage\n"
+             "module top;\n"
+             "  import p::*;\n"
+             "  int y, z;\n"
+             "  if (1) begin : b\n"
+             "    import p2::*;\n"
+             "    initial z = x;\n"
+             "  end\n"
+             "  initial #1 y = x;\n"
+             "endmodule\n",
+             f));
+}
+
+// §26.3's conflict (printed page 810) is between wildcard imports of one
+// scope: a reference in the block that the block does not resolve reaches
+// top, where both p and p2 supply x, and is reported at the reference on
+// line 11. A check that never searched a generate block's references let it
+// pass.
+TEST(PackageImport, TwoModuleImportsReachedFromABlockAreAmbiguous) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("package p;\n"
+             "  int x;\n"
+             "endpackage\n"
+             "package p2;\n"
+             "  int x;\n"
+             "endpackage\n"
+             "module top;\n"
+             "  import p::*;\n"
+             "  import p2::*;\n"
+             "  if (1) begin : b\n"
+             "    initial x = 1;\n"
+             "  end\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "reference to 'x' is ambiguous between wildcard "
+                            "imports of packages 'p' and 'p2'",
+                            11, "26.3"));
+}
+
+// §26.3 Example 1 (printed page 811): line 2's reference imports p::x into
+// top, line 3's `int x` is top.b.x and legal, being a declaration of b rather
+// than of top, line 4 writes top.b.x, and line 5's `int x` is illegal, a
+// declaration in top of a name a wildcard import already made locally
+// visible there -- reported at line 12 and nowhere else.
+TEST(PackageImport, ModuleDeclarationAfterABlocksClaimIsIllegal) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("package p;\n"
+             "  int x;\n"
+             "endpackage\n"
+             "module top;\n"
+             "  import p::*;\n"
+             "  if (1) begin : b\n"
+             "    initial x = 1;\n"
+             "    int x;\n"
+             "    initial x = 1;\n"
+             "  end\n"
+             "  int y;\n"
+             "  int x;\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "declaration of 'x' follows a reference resolved "
+                            "through a wildcard package import",
+                            12, "26.3"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "declaration of 'x' follows a reference resolved "
+                             "through a wildcard package import",
+                             8, "26.3"));
+}
+
 }  // namespace

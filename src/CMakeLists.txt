@@ -364,6 +364,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/elaborator_scope_rules.cpp
     elaborator/elaborator_scope_rules_enclosing.cpp
     elaborator/elaborator_scope_rules_hier.cpp
+    elaborator/elaborator_scope_rules_imports.cpp
     elaborator/elaborator_scope_rules_names.cpp
     elaborator/elaborator_enum_constants.cpp
     elaborator/elaborator_typedef.cpp

@@ -229,6 +229,10 @@ class Lowerer {
   // declaration (§26.5); null outside LowerImports, where the compilation
   // unit's imports bind every name.
   const RtlirModule* importing_module_ = nullptr;
+  // The prefix of the generate block whose import LowerImports is lowering
+  // (RtlirImport::scope_prefix), between the instance prefix and the name in
+  // the key AliasImportedPackageName binds; empty for a module's own import.
+  std::string_view import_scope_prefix_;
   std::vector<SpecifyScope> specify_scopes_;
   std::vector<AssertionSampleScope> assertion_sample_scopes_;
 };

@@ -129,8 +129,8 @@ void Elaborator::ApplyCompilationUnitImports(RtlirModule* mod) {
     ApplyImport(imp, unit_,
                 {typedefs_, aggregate_typedef_names_, cu_param_scope_,
                  class_names_, parameterized_class_names_, func_decls_});
-    mod->imports.push_back(
-        RtlirImport{imp.package_name, imp.item_name, imp.is_wildcard});
+    mod->imports.push_back(RtlirImport{imp.package_name, imp.item_name,
+                                       imp.is_wildcard, std::string_view()});
   }
 }
 

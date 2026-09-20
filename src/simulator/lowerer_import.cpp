@@ -279,6 +279,16 @@ static bool ModuleDeclaresName(const RtlirModule* mod, std::string_view name) {
 // ordinary lookup answers it.
 void Lowerer::AliasImportedPackageName(std::string_view name,
                                        std::string_view qname) {
+  // §26.3 with §27.5: an import written inside a generate block is the
+  // block's own, and its names are bound under the prefix the elaborator gave
+  // it (RtlirImport::scope_prefix), which SimContext::FindInGenerateBlock
+  // searches for a process the block elaborated after the import, after the
+  // block's own declarations and before the module's. A declaration of the
+  // module does not shadow such an import, the block's candidate standing
+  // nearer the reference than the enclosing scope's declaration, and its key
+  // is never a module declaration's, so the check below is the module-level
+  // import's alone.
+  bool block_import = !import_scope_prefix_.empty();
   // §26.5: a declaration of the importing scope shadows the import. The
   // module's imports are lowered before its variables, ports and nets exist,
   // so that a declaration initializer can read an imported name (§6.8), and a
@@ -286,8 +296,9 @@ void Lowerer::AliasImportedPackageName(std::string_view name,
   // occupied: the declaration binds it, and the name is never recorded as an
   // imported one, which would let an instance below the module read the
   // module's declaration across §23.9's boundary.
-  if (ModuleDeclaresName(importing_module_, name)) return;
-  std::string key = inst_prefix_ + std::string(name);
+  if (!block_import && ModuleDeclaresName(importing_module_, name)) return;
+  std::string key =
+      inst_prefix_ + std::string(import_scope_prefix_) + std::string(name);
   // §26.5: a parameter of the importing scope shadows the import too, and an
   // explicit import of a name wins over a wildcard one, which LowerImports
   // orders by applying the explicit imports first. Both are already bound under
@@ -300,8 +311,10 @@ void Lowerer::AliasImportedPackageName(std::string_view name,
   // §26.3: the import makes this name visible under its unqualified spelling,
   // and that binding belongs to no module. SimContext::FindVariable is told so
   // because it otherwise stops a bare name at the module boundary §23.9 draws,
-  // which would hide an imported item from inside every instance.
-  ctx_.RegisterImportedName(*stored);
+  // which would hide an imported item from inside every instance. A block
+  // import's key is reached through the process's generate prefixes instead
+  // and crosses no boundary.
+  if (!block_import) ctx_.RegisterImportedName(*stored);
 }
 
 void Lowerer::AliasAllPackageDataItems(const PackageDecl* pkg) {
@@ -392,7 +405,11 @@ void Lowerer::LowerImports(const RtlirModule* mod) {
     item.package_name = imp.package_name;
     item.item_name = imp.item_name;
     item.is_wildcard = imp.is_wildcard;
+    // §26.3 with §27.5: an import a generate block wrote binds under the
+    // block's own prefix, a module's directly under the instance.
+    import_scope_prefix_ = imp.scope_prefix;
     LowerOneImport(item);
+    import_scope_prefix_ = {};
   };
 
   // §26.5: an explicit import of a name takes precedence over a wildcard import

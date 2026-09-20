@@ -57,6 +57,27 @@ void PopulatePackageProvidedNames(const CompilationUnit* unit,
                                   std::string_view pkg_name,
                                   ProvidedNames& names);
 
+// The names each package makes directly visible, each with the package that
+// declares it, filled on first use by ProvidedNameOrigin;
+// Elaborator::pkg_provided_names_ is one.
+using ProvidedNameCache = std::unordered_map<std::string_view, ProvidedNames>;
+
+// Whether the unit declares the package `pkg_name`; §26.7's built-in package
+// std is always declared.
+bool PackageDeclared(const CompilationUnit* unit, std::string_view pkg_name);
+
+// The package declaring `name` as the wildcard-imported package `pkg_name`
+// provides it, or empty where `pkg_name` does not provide the name.
+std::string_view ProvidedNameOrigin(const CompilationUnit* unit,
+                                    ProvidedNameCache& provided_cache,
+                                    std::string_view pkg_name,
+                                    std::string_view name);
+
+// Whether the wildcard-imported package `pkg_name` provides `name`.
+bool PackageProvidesName(const CompilationUnit* unit,
+                         ProvidedNameCache& provided_cache,
+                         std::string_view pkg_name, std::string_view name);
+
 // The packages a module imports by wildcard, whose declarations §26.3 makes
 // directly visible to a bare read.
 std::vector<std::string_view> WildcardImportedPackages(const RtlirModule* mod);

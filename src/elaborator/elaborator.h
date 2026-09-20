@@ -443,6 +443,10 @@ class Elaborator : public ElaboratorClassRules {
 
   void ElaborateGenerateBlockItem(ModuleItem* item, RtlirModule* mod);
 
+  // §26.3: records an import written among a generate block's items as the
+  // block's own, a candidate for the items after it alone.
+  void ElaborateGenerateBlockImport(ModuleItem* item, RtlirModule* mod);
+
   void ElaborateGenerateItems(const std::vector<ModuleItem*>& items,
                               RtlirModule* mod, const ScopeMap& scope);
 
