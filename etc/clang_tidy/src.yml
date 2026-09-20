@@ -125,6 +125,10 @@ CheckOptions:
   readability-identifier-naming.StructIgnoredRegexp: '(promise_type|t_vpi_time|t_vpi_delay|t_vpi_vecval|t_vpi_strengthval|t_vpi_value|t_vpi_arrayvalue|t_vpi_systf_data|t_vpi_vlog_info|t_vpi_error_info|t_cb_data|t_vpi_assertion_step_info|t_vpi_attempt_info)'
   readability-identifier-naming.TemplateParameterCase: CamelCase
   readability-identifier-naming.TypeAliasCase: CamelCase
+  # The names the standard library looks for on a type: is_transparent marks a
+  # hash or comparator that takes a key of another type (a std::string_view
+  # against a std::string key), and the library spells it in lower case.
+  readability-identifier-naming.TypeAliasIgnoredRegexp: 'is_transparent'
   readability-identifier-naming.TypedefCase: CamelCase
   # IEEE 1800-2023: every typedef name the C API's include files print, each
   # in the order printed. Annex K.2's vpi_user.h: the six sized types of the

@@ -227,19 +227,19 @@ TEST(Elaboration, EnumRangeNMZeroBoundsAllowed) {
   EXPECT_EQ(it->second[2].value, 2);
 }
 
+// A negative second bound of name[N:M]: Syntax 6-5 (printed page 119) takes
+// an integral_number there, so `-1`, a unary expression, is the parser's to
+// report, as the negative first bound above is.
 TEST(Elaboration, EnumRangeNMNegativeEndIsError) {
-  // A negative upper bound violates the non-negative requirement on the second
-  // bound of name[N:M].
   ElabFixture f;
-  ElaborateSrc(
+  ElaborateSrcAllowingParseErrors(
       "module top;\n"
       "  typedef enum {sub[2:-1]} E1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "enum range bounds of 'sub' shall be non-negative "
-                            "integral numbers",
-                            2, "6.19.2"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "enumeration range bound must be an integral number", 2, "6.19.2"));
 }
 
 TEST(Elaboration, EnumRangeSecondLrmExample) {

@@ -47,7 +47,7 @@ void CollectBareIdents(const Expr* e, std::vector<const Expr*>& out);
 // carries without a std::string being built for each lookup.
 struct ProvidedNameHash {
   // The name the standard library looks for on a transparent hash.
-  using is_transparent = void;  // NOLINT(readability-identifier-naming)
+  using is_transparent = void;
   size_t operator()(std::string_view name) const noexcept {
     return std::hash<std::string_view>{}(name);
   }
