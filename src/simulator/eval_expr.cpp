@@ -340,11 +340,8 @@ static bool TryStaticMemberAccess(std::string_view base_name,
   for (const auto* t = cls_type; t != nullptr; t = t->parent) {
     if (TryLocalStaticMember(t, field_name, arena, out)) return true;
   }
-  if (cls_type->is_interface &&
-      TryInterfaceStaticMember(cls_type, field_name, arena, out)) {
-    return true;
-  }
-  return false;
+  return cls_type->is_interface &&
+         TryInterfaceStaticMember(cls_type, field_name, arena, out);
 }
 
 // Resolves member access on the implicit `this`/`super` object. `is_super`

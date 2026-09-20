@@ -170,8 +170,8 @@ static bool IsAccessThroughAHandle(const Expr* e) {
     return false;
   }
   const Expr* base = e->lhs;
-  return !(base && base->kind == ExprKind::kIdentifier &&
-           (base->text == "this" || base->text == "super"));
+  return base == nullptr || base->kind != ExprKind::kIdentifier ||
+         (base->text != "this" && base->text != "super");
 }
 
 static bool ExprRefsNonStaticMember(
@@ -328,13 +328,18 @@ std::unordered_set<std::string_view> CollectMethodLocalNames(
 // static function int f(); return k; endfunction endclass endclass` was never
 // reported in any of the three scopes; the nested classes are read here, as
 // ApplyAutoToClassMethods reads them, and the set guards each once.
-void ElaboratorClassRules::ValidateOneClassStaticMethods(const ClassDecl* cls) {
-  if (!static_method_bodies_checked_.insert(cls).second) return;
+void ElaboratorClassRules::ValidateNestedClassStaticMethods(
+    const ClassDecl* cls) {
   for (const auto* m : cls->members) {
     if (m->kind == ClassMemberKind::kClassDecl && m->nested_class) {
       ValidateOneClassStaticMethods(m->nested_class);
     }
   }
+}
+
+void ElaboratorClassRules::ValidateOneClassStaticMethods(const ClassDecl* cls) {
+  if (!static_method_bodies_checked_.insert(cls).second) return;
+  ValidateNestedClassStaticMethods(cls);
   CheckStaticMethodsForThisSuper(cls, diag_);
 
   std::unordered_set<std::string_view> non_static =

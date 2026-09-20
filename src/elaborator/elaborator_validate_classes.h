@@ -73,6 +73,7 @@ class ElaboratorClassRules : public ElaboratorOperationRules {
   void ValidateStaticMethodBodies(const ModuleDecl* decl);
   void ValidateStaticMethodsAmong(const std::vector<ModuleItem*>& items);
   void ValidateOneClassStaticMethods(const ClassDecl* cls);
+  void ValidateNestedClassStaticMethods(const ClassDecl* cls);
 
   void ValidateThisUsage(const ModuleDecl* decl);
   void ValidateThisInItem(const ModuleItem* item);

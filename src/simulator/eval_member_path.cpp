@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <string>
 #include <string_view>
+#include <utility>
 
 #include "common/arena.h"
 #include "common/types.h"
@@ -152,7 +153,11 @@ bool ResolveStaticHandlePath(const Expr* access, SimContext& ctx, Arena& arena,
          !base->is_scope_resolution && base->rhs != nullptr &&
          base->rhs->kind == ExprKind::kIdentifier) {
     std::string member(base->rhs->text);
-    path = path.empty() ? member : member + "." + path;
+    if (!path.empty()) {
+      member += '.';
+      member += path;
+    }
+    path = std::move(member);
     base = base->lhs;
   }
   return base != access && ResolveStaticPropertyBase(base, ctx, arena, ref);
