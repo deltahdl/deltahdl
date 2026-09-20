@@ -98,14 +98,15 @@ static void BuildVTable(ClassTypeInfo* info, const ClassDecl* cls) {
 // LowerClassDecl pushes for the class's scope. §15.3.1 (printed 373) and
 // §15.4.1 (printed 374): a `static semaphore s = new(K)` or `static mailbox
 // mb = new(K)` builds the class's bucket or queue into its static map
-// (TryInitStaticSyncProperty), the value under the name staying the
-// handle's carrier; evaluated as a value, the `new` built nothing and the
-// copy was built on the first reference, reading K as it then stood.
+// (TryInitStaticSyncProperty), which stores the handle's carrier under the
+// name, nonzero for a copy that holds an object (§8.4, printed 181-182);
+// evaluated as a value, the `new` built nothing and the copy was built on
+// the first reference, reading K as it then stood.
 static void InitStaticProperty(ClassTypeInfo* info,
                                const ClassTypeInfo::PropertyInfo& p,
                                SimContext& ctx, Arena& arena) {
-  bool is_sync = TryInitStaticSyncProperty(info, p.name, p.init_expr, ctx);
-  Logic4Vec value = !is_sync && p.init_expr != nullptr
+  if (TryInitStaticSyncProperty(info, p.name, p.init_expr, ctx)) return;
+  Logic4Vec value = p.init_expr != nullptr
                         ? EvalExpr(p.init_expr, ctx, arena)
                         : MakeLogic4VecVal(arena, p.width, 0);
   info->static_properties[std::string(p.name)] = value;

@@ -648,6 +648,49 @@ TEST(MailboxSim, PutThroughAMailboxFormalReachesTheActual) {
             91u);
 }
 
+// §15.4 (printed page 374) with §8.4 (printed pages 181-182): a mailbox
+// variable is a handle to the mailbox, an uninitialized handle is null and
+// a handle is compared with null by whether it refers to an object, so a
+// property built by its `= new` compares unequal to null and one declared
+// with no initializer equal to it, inside a method and through a handle
+// alike, and `if (built)` takes its true arm once the handle refers to one,
+// the condition reading the value the handle holds. probe() adds 1 for
+// `built == null`, 10 for `bare == null`, 100 for `built != null` and 1000
+// for `if (built)`, the module 10000 for `c.built != null` and 100000 for
+// `c.bare == null`, and after drop() sets built to null 1000000 for
+// `c.built == null`: 1111110. The value under the property's name stayed 0
+// whatever the map held, so every reading saw built null, 1100011.
+TEST(MailboxSim, PropertyMailboxComparesWithNullByTheObjectItHolds) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  mailbox built = new;\n"
+                      "  mailbox bare;\n"
+                      "  function int probe();\n"
+                      "    int r = 0;\n"
+                      "    if (built == null) r = r + 1;\n"
+                      "    if (bare == null) r = r + 10;\n"
+                      "    if (built != null) r = r + 100;\n"
+                      "    if (built) r = r + 1000;\n"
+                      "    return r;\n"
+                      "  endfunction\n"
+                      "  function void drop();\n"
+                      "    built = null;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module top;\n"
+                      "  int y;\n"
+                      "  initial begin\n"
+                      "    C c = new;\n"
+                      "    y = c.probe();\n"
+                      "    if (c.built != null) y = y + 10000;\n"
+                      "    if (c.bare == null) y = y + 100000;\n"
+                      "    c.drop();\n"
+                      "    if (c.built == null) y = y + 1000000;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            1111110u);
+}
+
 // §8.23 (printed pages 200-201) with §8.9 (printed 186): a nested class's
 // method reaches the containing class's static properties by their bare
 // names, so Inner's give(4) places into Outer's one static mailbox, which

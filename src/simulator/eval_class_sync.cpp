@@ -10,6 +10,7 @@
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
+#include "common/types.h"
 #include "parser/ast_class.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
@@ -223,6 +224,34 @@ static void ReportNullSyncProperty(const SyncProperty& prop,
                       Subclause("8.4"));
 }
 
+// §8.4 (printed pages 181-182 of ~/LRM.pdf): a handle is compared with null
+// by whether it refers to an object, an uninitialized one holding null, and
+// §15.3 (printed 372) and §15.4 (printed 374) make a semaphore or mailbox
+// variable a handle to the bucket or the queue. The value under the
+// property's name is what `mb == null`, `if (mb)` and `c.mb != null` read
+// through the generic paths, so it is kept beside the map as the handle's
+// carrier: nonzero while the map holds an object, 0 while it holds none, as
+// a class handle's is kNullClassHandle for null. An instance property's is
+// written under the declaring class's scoped key and, where no class
+// between the object's own and the declaring one shadows the name (§8.15),
+// the bare one, the pair ClassObject::SetPropertyForType writes; a static
+// property's into the class's own storage (§8.9). Left at the 0 the
+// construction stored, a property holding a mailbox compared equal to null.
+static void MirrorSyncCarrier(const SyncProperty& prop, bool holds,
+                              SimContext& ctx) {
+  std::string name(prop.member->name);
+  Logic4Vec carrier = MakeLogic4VecVal(ctx.GetArena(), 64, holds ? 1u : 0u);
+  if (prop.member->is_static) {
+    prop.declaring->static_properties[name] = carrier;
+    return;
+  }
+  if (prop.obj == nullptr) return;
+  std::string scoped = std::string(prop.declaring->name) + "::" + name;
+  prop.obj->properties[scoped] = carrier;
+  if (prop.obj->BareNameIsDeclaredBy(name, prop.declaring))
+    prop.obj->properties[name] = carrier;
+}
+
 // §8.9 with §8.4: the map the property's object stands in -- the declaring
 // class's for a static property, the object's otherwise -- or null for an
 // instance property with no object, whose access is illegal.
@@ -298,15 +327,16 @@ void BuildSyncProperty(const SyncProperty& prop, const Expr* new_expr,
     } else {
       slot->key_count = keys;
     }
-    return;
-  }
-  int32_t bound = MailboxBoundArg(new_expr, ctx, arena);
-  MailboxObject*& slot = (*MailboxMapOf(prop))[name];
-  if (slot == nullptr) {
-    slot = ctx.GetArena().Create<MailboxObject>(bound);
   } else {
-    slot->Build(bound);
+    int32_t bound = MailboxBoundArg(new_expr, ctx, arena);
+    MailboxObject*& slot = (*MailboxMapOf(prop))[name];
+    if (slot == nullptr) {
+      slot = ctx.GetArena().Create<MailboxObject>(bound);
+    } else {
+      slot->Build(bound);
+    }
   }
+  MirrorSyncCarrier(prop, true, ctx);
 }
 
 static SyncHandle HandleOfProperty(const SyncProperty& prop) {
@@ -346,29 +376,37 @@ static SyncHandle ResolveSyncHandle(const Expr* expr, SimContext& ctx,
 }
 
 // §8.12: the property `target` made a handle to the object `source` names,
-// the same object under two names.
+// the same object under two names, or the null handle where `source` holds
+// none, its carrier following (MirrorSyncCarrier).
 static void StoreSyncHandle(const SyncProperty& target,
-                            const SyncHandle& source) {
+                            const SyncHandle& source, SimContext& ctx) {
   std::string name(target.member->name);
   if (target.kind == SyncKind::kSemaphore) {
     (*SemaphoreMapOf(target))[name] = source.sem;
   } else {
     (*MailboxMapOf(target))[name] = source.mbx;
   }
+  MirrorSyncCarrier(target, source.sem != nullptr || source.mbx != nullptr,
+                    ctx);
 }
 
 // §8.7 and §8.9: the property's initializer `init` -- a `new(...)`, which
 // builds the object in the property's map, or any other expression, which
 // makes the property a handle to the semaphore or mailbox it names (§8.12)
-// or leaves it null where it names none.
+// or leaves it null where it names none; no initializer leaves it the null
+// handle §8.4 (printed page 182) gives an uninitialized one, its carrier 0.
 static void InitSyncProperty(const SyncProperty& prop, const Expr* init,
                              SimContext& ctx) {
+  if (init == nullptr) {
+    MirrorSyncCarrier(prop, false, ctx);
+    return;
+  }
   if (IsNewCall(init)) {
     BuildSyncProperty(prop, init, ctx, ctx.GetArena());
     return;
   }
   SyncHandle source = ResolveSyncHandle(init, ctx, ctx.GetArena());
-  StoreSyncHandle(prop, source.kind == prop.kind ? source : SyncHandle{});
+  StoreSyncHandle(prop, source.kind == prop.kind ? source : SyncHandle{}, ctx);
 }
 
 bool TryInitClassSyncProperty(ClassObject* obj, const ClassTypeInfo* info,
@@ -376,7 +414,6 @@ bool TryInitClassSyncProperty(ClassObject* obj, const ClassTypeInfo* info,
                               SimContext& ctx) {
   SyncMember member = SyncPropertyMember(info, name, ctx);
   if (member.member == nullptr || member.member->is_static) return false;
-  if (init == nullptr) return true;
   InitSyncProperty(MakeSyncProperty(member, obj, std::string(name), ctx), init,
                    ctx);
   return true;
@@ -389,7 +426,6 @@ bool TryInitStaticSyncProperty(const ClassTypeInfo* info, std::string_view name,
       member.declaring != info) {
     return false;
   }
-  if (init == nullptr) return true;
   InitSyncProperty(MakeSyncProperty(member, nullptr, std::string(name), ctx),
                    init, ctx);
   return true;
@@ -404,7 +440,7 @@ bool TrySyncHandleAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   SyncHandle source =
       is_null ? SyncHandle{} : ResolveSyncHandle(stmt->rhs, ctx, arena);
   if (!is_null && source.kind != target.kind) return false;
-  StoreSyncHandle(target, source);
+  StoreSyncHandle(target, source, ctx);
   return true;
 }
 

@@ -429,6 +429,46 @@ TEST(SemaphoreSim, ConstructorTakesTheModulesSemaphoreAsAHandle) {
             101u);
 }
 
+// §15.3 (printed page 372) with §8.4 (printed pages 181-182) and §8.12
+// (printed 188): a semaphore variable is a handle to the bucket, and a
+// property made a handle to the module's semaphore by the constructor's
+// `held = sem` refers to an object, so it compares unequal to null and is
+// true in a condition, while `spare`, declared with no initializer, is null
+// until `c.spare = new(2)` builds its bucket. probe() adds 1 for `held !=
+// null`, 10 for `spare == null` and 100 for `if (held)`, the module 1000 for
+// `c.held != null` and 10000 for `c.spare != null` after the new: 11111.
+// The value under the property's name stayed 0 whatever the map held, so
+// only `spare == null` read true, 10.
+TEST(SemaphoreSim, PropertySemaphoreComparesWithNullByTheObjectItHolds) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  semaphore held;\n"
+                      "  semaphore spare;\n"
+                      "  function new(semaphore sem);\n"
+                      "    held = sem;\n"
+                      "  endfunction\n"
+                      "  function int probe();\n"
+                      "    int r = 0;\n"
+                      "    if (held != null) r = r + 1;\n"
+                      "    if (spare == null) r = r + 10;\n"
+                      "    if (held) r = r + 100;\n"
+                      "    return r;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module top;\n"
+                      "  semaphore shared = new(1);\n"
+                      "  int y;\n"
+                      "  initial begin\n"
+                      "    C c = new(shared);\n"
+                      "    y = c.probe();\n"
+                      "    if (c.held != null) y = y + 1000;\n"
+                      "    c.spare = new(2);\n"
+                      "    if (c.spare != null) y = y + 10000;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            11111u);
+}
+
 // §8.23 (printed pages 200-201) with §8.9 (printed 186): a nested class's
 // method reaches the containing class's static semaphore by its bare name,
 // so Inner's try_get(1) procures Outer's one key and the module's

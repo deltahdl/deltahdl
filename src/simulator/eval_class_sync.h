@@ -109,6 +109,9 @@ void BuildSyncProperty(const SyncProperty& prop, const Expr* new_expr,
 // shared;` -- makes the property a handle to that object (§8.12, one object
 // under two names); an initializer naming none, or no initializer, leaves
 // the property the null handle a class-typed property without a `new` is.
+// The value under the name is stored too, the handle's carrier §8.4
+// (printed pages 181-182) compares with null -- nonzero for a property that
+// holds an object, 0 for one that holds none -- so the caller stores none.
 // False, building nothing, for a property of any other type, which the
 // caller then initializes as a value.
 bool TryInitClassSyncProperty(ClassObject* obj, const ClassTypeInfo* info,
@@ -122,11 +125,12 @@ bool TryInitClassSyncProperty(ClassObject* obj, const ClassTypeInfo* info,
 // built by its `new(...)` into the class's static map at lowering
 // (InitStaticProperties in lowerer_class.cpp), in the frame of the class's
 // scope, the argument read as it stands then; any other initializer makes
-// the property a handle to the object it names (§8.12), or null. False,
-// building nothing, for a property of any other type, an instance property,
-// or a static one a base class declares, whose copy is the base's own. Built
-// on the first reference instead, `new(K)` read K as a later assignment had
-// left it.
+// the property a handle to the object it names (§8.12), or null. The
+// class's storage under the name takes the handle's carrier, as
+// TryInitClassSyncProperty stores an object's. False, building nothing, for
+// a property of any other type, an instance property, or a static one a base
+// class declares, whose copy is the base's own. Built on the first reference
+// instead, `new(K)` read K as a later assignment had left it.
 bool TryInitStaticSyncProperty(const ClassTypeInfo* info, std::string_view name,
                                const Expr* init, SimContext& ctx);
 

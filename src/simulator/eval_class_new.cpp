@@ -210,14 +210,12 @@ static void InitClassPropertyDefault(const ClassTypeInfo* info,
   // §15.3.1 (printed page 373 of ~/LRM.pdf) and §15.4.1 (printed 374) with
   // §8.7: a semaphore or mailbox property's `new` builds the object's own
   // bucket or queue (ClassObject::semaphore_properties and
-  // mailbox_properties), the property's value staying the handle's carrier;
-  // evaluated as a value, the `new` built nothing and the property was a
-  // handle to no mailbox.
-  if (TryInitClassSyncProperty(obj, info, prop.name, prop.init_expr, ctx)) {
-    StoreClassPropertyDefault(
-        info, prop, MakeLogic4VecVal(arena, prop.width, 0), obj, arena);
+  // mailbox_properties) and stores the handle's carrier under the name,
+  // nonzero for a property holding an object, which §8.4 (printed 181-182)
+  // compares with null; evaluated as a value, the `new` built nothing, and a
+  // 0 stored here after the build read a property holding a mailbox as null.
+  if (TryInitClassSyncProperty(obj, info, prop.name, prop.init_expr, ctx))
     return;
-  }
   Logic4Vec val;
   if (prop.init_expr && TryInitClassPropertyNew(info, prop, ctx, arena, val)) {
     StoreClassPropertyDefault(info, prop, val, obj, arena);
