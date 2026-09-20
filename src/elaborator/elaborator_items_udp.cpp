@@ -850,10 +850,12 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
     ElaborateItem(item, mod);
   }
 
-  // §6.18: a class method's formal may name a typedef the module forward-
-  // declares above the class and defines below it, so every class is resolved
-  // again against the complete table (elaborator_items_formals.cpp).
+  // §6.18: a class method's or a module subroutine's formal may name a
+  // typedef the module forward-declares above it and defines below it, so
+  // every class and every function and task of the module is resolved again
+  // against the complete table (elaborator_items_formals.cpp).
   ResolveModuleClassFormalTypes(mod->class_decls, typedefs_, arena_);
+  ResolveModuleSubroutineFormalTypes(decl->items, typedefs_, arena_);
 
   InstantiateImplicitNestedModules(local_nested_modules, mod);
 

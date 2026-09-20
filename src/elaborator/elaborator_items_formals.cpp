@@ -33,6 +33,35 @@ void ResolveFormalAggregateTypes(ModuleItem* item, const TypedefMap& typedefs,
   }
 }
 
+// §6.18 (printed page 118) lets a forward typedef, `typedef struct pair_t;`,
+// stand for a definition the same scope gives before or after the reference,
+// and §23.9 (printed 761) resolves a function's or a task's names outward to
+// the module's, so a module subroutine written between the forward typedef
+// and the definition names pair_t lawfully in a formal. The subroutine was
+// resolved once, by Elaborator::ElaborateBehavioralItem against the table as
+// it stood at the item, where the forward name holds a placeholder with no
+// members, so `pair_t A` of `function int f(union tagged { void N; pair_t A;
+// } a)` was left unresolved, the formal sized as a scalar, and `f(tagged A
+// '{3, 4})` read 0 for §7.2.1's 34; a task's output formal of the same shape
+// wrote 0 the same way, while a class's method between the two was resolved
+// again by ResolveModuleClassFormalTypes. Every function and task among
+// `items`, the module's own, is resolved again against `typedefs`, the
+// module's table once the item walk has reached every definition; a member
+// resolved at the item resolves to the same type again. Elaborator::
+// ElaborateItems calls it after the item loop, beside the class pass, and
+// ResolveScopeSubroutineFormalTypes takes a package's and the unit's
+// subroutines through it.
+void ResolveModuleSubroutineFormalTypes(const std::vector<ModuleItem*>& items,
+                                        const TypedefMap& typedefs,
+                                        Arena& arena) {
+  for (auto* item : items) {
+    if (item->kind == ModuleItemKind::kFunctionDecl ||
+        item->kind == ModuleItemKind::kTaskDecl) {
+      ResolveFormalAggregateTypes(item, typedefs, arena);
+    }
+  }
+}
+
 namespace {
 
 // §8.23 (printed page 200): a class is a scope that nests in the one it is
@@ -54,16 +83,15 @@ TypedefMap ClassScopeTypedefs(const ClassDecl* cls, const TypedefMap& outer) {
 // items and the compilation unit's take this walk; a module's and an
 // interface's own items are walked by Elaborator::ElaborateBehavioralItem and
 // Elaborator::ElaborateModuleClassDecl, which resolve each subroutine and
-// each class as it is reached.
+// each class as it is reached, and again by ResolveModuleSubroutineFormalTypes
+// and ResolveModuleClassFormalTypes once the walk is done.
 void ResolveScopeSubroutineFormalTypes(const std::vector<ModuleItem*>& items,
                                        const TypedefMap& typedefs,
                                        Arena& arena) {
+  ResolveModuleSubroutineFormalTypes(items, typedefs, arena);
   for (auto* item : items) {
-    if (item->kind == ModuleItemKind::kFunctionDecl ||
-        item->kind == ModuleItemKind::kTaskDecl) {
-      ResolveFormalAggregateTypes(item, typedefs, arena);
-    } else if (item->kind == ModuleItemKind::kClassDecl &&
-               item->class_decl != nullptr) {
+    if (item->kind == ModuleItemKind::kClassDecl &&
+        item->class_decl != nullptr) {
       ResolveClassMethodFormalTypes(item->class_decl, typedefs, arena);
     }
   }

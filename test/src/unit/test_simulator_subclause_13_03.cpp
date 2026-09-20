@@ -690,4 +690,55 @@ TEST(TaskSim, OutputArrayFormalElementTakesABitSelectWriteInTheBody) {
   EXPECT_EQ(RunAndGet(src, "z[1]"), 0x5Au);
 }
 
+// §6.18 (printed page 118) has a user-defined type's declaration precede
+// every reference to its name, and lets a forward typedef stand for a
+// definition the same scope gives before or after the reference, so a
+// function written between `typedef struct pair_t;` and the structure's
+// definition names pair_t lawfully in its formal (§13.3, printed 337), which
+// §23.9 (printed 761) resolves outward from the function to the module's
+// typedef. The module's subroutines were resolved once, at the item, against
+// the typedefs as they stood there, where the forward name held a placeholder
+// with no members, so f was sized as if A were a scalar and `f(tagged A '{3,
+// 4})` read 0 where §7.2.1 places 3 into a and 4 into b, 34; a class's method
+// between the two was already resolved again once the definition was reached.
+TEST(TaskSim, ModuleFunctionFormalReadsATypedefDefinedBelowTheFunction) {
+  EXPECT_EQ(RunAndGet("module top;\n"
+                      "  typedef struct pair_t;\n"
+                      "  function int f(union tagged { void N; pair_t A; }"
+                      " a);\n"
+                      "    return a.A.a * 10 + a.A.b;\n"
+                      "  endfunction\n"
+                      "  typedef struct { int a, b; } pair_t;\n"
+                      "  int y;\n"
+                      "  initial y = f(tagged A '{3, 4});\n"
+                      "endmodule\n",
+                      "y"),
+            34u);
+}
+
+// The same for a task (§13.3, printed page 337): an output formal of the
+// inline union shape written between the forward typedef and the definition
+// is laid out by §7.2.1 with A's a and b once the definition is in the
+// table, so the body's `'{3, 4}` reaches the caller's p through `p.A.a * 10 +
+// p.A.b` as 34; the placeholder sized the formal as a scalar and the copy-out
+// carried 0.
+TEST(TaskSim, ModuleTaskOutputFormalReadsATypedefDefinedBelowTheTask) {
+  EXPECT_EQ(RunAndGet("module top;\n"
+                      "  typedef struct pair_t;\n"
+                      "  task tk(output union tagged { void N; pair_t A; }"
+                      " o);\n"
+                      "    o = tagged A '{3, 4};\n"
+                      "  endtask\n"
+                      "  typedef struct { int a, b; } pair_t;\n"
+                      "  union tagged { void N; pair_t A; } p;\n"
+                      "  int y;\n"
+                      "  initial begin\n"
+                      "    tk(p);\n"
+                      "    y = p.A.a * 10 + p.A.b;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            34u);
+}
+
 }  // namespace
