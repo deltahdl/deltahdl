@@ -118,6 +118,18 @@ Logic4Vec EvalWithReturnedTag(const Expr* expr, SimContext& ctx, Arena& arena,
 Logic4Vec EvalRhsCarryingReturnedTag(const Stmt* stmt, SimContext& ctx,
                                      Arena& arena);
 
+// Whether the member access `lhs`, `s.u` or `s.p.u`, names a tagged union
+// member of a variable, and in `key` what that member's tag stands under: the
+// key the variable's storage was created by (TagKeyOfName) followed by the
+// member path, "s.u" for a top-level s and "m.s.u" for one inside instance m.
+// False, with `key` unspecified, for a path a scope resolution starts, a
+// member of a class object, a member no layout answers, and a member below a
+// tagged union whose current tag is another member, whose write §11.9
+// (printed page 304) has the store report. Shared by the blocking store
+// above and the nonblocking one (statement_assign_nonblocking.cpp), which
+// sets the same key when its update lands.
+bool TaggedUnionMemberKey(const Expr* lhs, SimContext& ctx, std::string& key);
+
 // The element at the declared index `idx` of `returned`, or what §7.4.5's
 // Table 7-1 gives a read of a nonexistent element -- x for a 4-state element
 // type, 0 for a 2-state one -- where the aggregate has none there.

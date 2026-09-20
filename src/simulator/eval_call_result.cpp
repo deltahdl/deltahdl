@@ -282,8 +282,7 @@ static const StructTypeInfo* DescendToMember(const StructTypeInfo& layout,
 // m, the same shape the layout table gives a nested member's window by. A
 // path a scope resolution starts, a member of a class object and a member no
 // layout answers name no key.
-static bool TaggedUnionMemberKey(const Expr* lhs, SimContext& ctx,
-                                 std::string& key) {
+bool TaggedUnionMemberKey(const Expr* lhs, SimContext& ctx, std::string& key) {
   if (lhs->kind != ExprKind::kMemberAccess || lhs->is_scope_resolution)
     return false;
   std::string name;

@@ -247,101 +247,97 @@ static bool TryArrayConcatNba(const Stmt* stmt, SimContext& ctx, Arena& arena) {
 }
 
 // §7.3.2 (printed page 151): a tagged union's value is its tag beside the
-// member's bits, and §11.9 (printed 304) checks every member read of a
-// variable against the tag its last assignment gave it. Whether `lhs` is the
-// bare name of a tagged union variable, whose nonblocking update carries a
-// tag beside the bits; a select or a member names no union of its own here,
-// and a structure has no tag.
-static bool NamesTaggedUnion(const Expr* lhs, SimContext& ctx) {
-  if (lhs == nullptr || lhs->kind != ExprKind::kIdentifier) return false;
+// member's bits, and §11.9 (printed 304) checks every member access of a
+// union against the tag its last assignment gave it. Whether `lhs` names a
+// tagged union whose nonblocking update carries a tag beside the bits, and
+// in `key` what that tag stands under: the key the storage was created by
+// (TagKeyOfName) for the bare name of a tagged union variable, that key
+// followed by the member path for a tagged union member of a variable, "s.u"
+// (TaggedUnionMemberKey, the blocking store's). A select names no union of
+// its own here, and a structure has no tag. The member form landed the bits
+// alone: `s.u <= tagged Valid 5` left s.u's earlier tag standing, so
+// `s.u.Other = 3` after the update was not reported and overwrote the 5.
+static bool TaggedUnionTargetKey(const Expr* lhs, SimContext& ctx,
+                                 std::string& key) {
+  if (lhs == nullptr) return false;
+  if (lhs->kind == ExprKind::kMemberAccess)
+    return TaggedUnionMemberKey(lhs, ctx, key);
+  if (lhs->kind != ExprKind::kIdentifier) return false;
   const StructTypeInfo* layout = StructLayoutOfName(lhs->text, ctx);
-  return layout != nullptr && layout->is_union;
+  if (layout == nullptr || !layout->is_union) return false;
+  key = TagKeyOfName(lhs->text, ctx);
+  return true;
 }
 
 // §10.4.2 (printed page 253): the right-hand side of a nonblocking assignment
 // is evaluated when the statement executes and its value scheduled for the
 // NBA region, so the tag that value carries is taken here, beside the bits:
 // the member a `tagged M v` names, or the member a call's body returned
-// (EvalWithReturnedTag), which the vector never holds. `tag` is empty for
-// every other right-hand side, and for a target that is no tagged union,
-// whose value is evaluated as it was. The blocking form takes the tag off the
-// same two right-hand sides (AssignToScalarLhs, EvalRhsCarryingReturnedTag);
-// the nonblocking one scheduled the bits alone, so `u <= tagged Valid 5` left
-// u's earlier tag standing and `u.Other` raised nothing once the update landed.
+// (EvalWithReturnedTag), which the vector never holds. `update` carries no
+// tag for every other right-hand side, and for a target that is no tagged
+// union, whose value is evaluated as it was. The blocking form takes the tag
+// off the same two right-hand sides (AssignToScalarLhs,
+// EvalRhsCarryingReturnedTag); the nonblocking one scheduled the bits alone,
+// so `u <= tagged Valid 5` left u's earlier tag standing and `u.Other` raised
+// nothing once the update landed.
 static Logic4Vec EvalNbaRhs(const Stmt* stmt, SimContext& ctx, Arena& arena,
-                            std::string& tag) {
-  tag.clear();
-  if (stmt->rhs == nullptr || !NamesTaggedUnion(stmt->lhs, ctx))
+                            NbaUpdateTag& update) {
+  update = NbaUpdateTag{};
+  std::string key;
+  if (stmt->rhs == nullptr || !TaggedUnionTargetKey(stmt->lhs, ctx, key))
     return EvalRhsWithStructContext(stmt, ctx, arena);
-  if (stmt->rhs->kind == ExprKind::kCall)
-    return EvalWithReturnedTag(stmt->rhs, ctx, arena, tag);
+  std::string tag;
+  Logic4Vec value = stmt->rhs->kind == ExprKind::kCall
+                        ? EvalWithReturnedTag(stmt->rhs, ctx, arena, tag)
+                        : EvalRhsWithStructContext(stmt, ctx, arena);
   if (stmt->rhs->kind == ExprKind::kTagged && stmt->rhs->rhs != nullptr)
     tag = std::string(stmt->rhs->rhs->text);
-  return EvalRhsWithStructContext(stmt, ctx, arena);
+  if (tag.empty()) return value;
+  update = NbaUpdateTag{*arena.Create<std::string>(key),
+                        *arena.Create<std::string>(tag)};
+  return value;
 }
 
-// The tag a scheduled nonblocking update of a tagged union variable sets when
-// it lands, and the key it sets it under: the key the target's storage was
-// created by (TagKeyOfName), resolved where the statement executed as
-// §10.4.2 resolves the target itself, since the update runs with no scope of
-// the statement's. Both are interned in the arena: the tag table keeps the
-// views it is given, and the update outlives the statement.
-struct NbaUpdateTag {
-  std::string_view key;
-  std::string_view tag;
-};
+NbaSample SampleNonblockingRhs(const Stmt* stmt, SimContext& ctx,
+                               Arena& arena) {
+  NbaSample sample;
+  sample.value = EvalNbaRhs(stmt, ctx, arena, sample.tag);
+  sample.value =
+      ApplyStreamPackToTargetWidening(stmt, sample.value, ctx, arena);
+  // Every capture reached through ScheduleNonblockingAssign flows from here, so
+  // one copy at the point of sampling covers all of them.
+  sample.value = SampleNbaRhs(sample.value, arena);
+  return sample;
+}
 
-// Schedules the update of a whole tagged union variable that carries a tag:
-// the deposit SetupWholeVarNbaCallback installs, of the value sized to the
-// variable as ScheduleNonblockingAssign sizes it, followed in the same event
-// by the tag, which lands beside the bits and, like them, not while the
-// variable is forced. False where the update carries no tag or the name
-// resolves to no variable of its own, which ScheduleNonblockingAssign takes as
-// it did.
-static bool TryScheduleTaggedUnionNba(const Stmt* stmt,
-                                      const Logic4Vec& rhs_val,
-                                      std::string_view tag,
-                                      const NbaScheduleSlot& slot) {
-  if (tag.empty()) return false;
-  Variable* var = ResolveLhsVariable(stmt->lhs, slot.ctx);
-  if (var == nullptr) return false;
-  NbaUpdateTag update{
-      *slot.arena.Create<std::string>(TagKeyOfName(stmt->lhs->text, slot.ctx)),
-      *slot.arena.Create<std::string>(tag)};
-  auto* event = slot.ctx.GetScheduler().GetEventPool().Acquire();
-  SetupWholeVarNbaCallback(
-      event, var,
-      ConvertRealOnAssign(rhs_val, stmt->lhs, var->value.width, slot.ctx,
-                          slot.arena));
+// Wraps the deposit installed on `event` so the one callback then sets the
+// tag `update` carries, which lands beside the bits in the same update; the
+// deposit stands alone where the sample carries none. The tag is declined
+// while `forced_var` is forced, as SetupWholeVarNbaCallback declines the
+// deposit; null where the deposit asks no such question (WriteResolvedField).
+// The tag is set in the update and not where the statement executed: an
+// intra-assignment event control (§9.4.5) holds the update until the event,
+// and a member read between the statement and the event checks against the
+// tag the union still holds.
+static void AttachUpdateTag(Event* event, const Variable* forced_var,
+                            const NbaUpdateTag& update, SimContext& ctx) {
+  if (!update.Carries()) return;
   std::function<void()> deposit = std::move(event->callback);
-  SimContext& ctx = slot.ctx;
-  event->callback = [deposit, var, update, &ctx]() {
+  event->callback = [deposit, forced_var, update, &ctx]() {
     deposit();
-    if (!var->is_forced) ctx.SetVariableTag(update.key, update.tag);
+    if (forced_var == nullptr || !forced_var->is_forced)
+      ctx.SetVariableTag(update.key, update.tag);
   };
-  slot.ctx.GetScheduler().ScheduleEvent(slot.time, slot.region, event);
-  return true;
 }
 
 StmtResult ExecNonblockingAssignImpl(const Stmt* stmt, SimContext& ctx,
                                      Arena& arena) {
   if (TryArrayConcatNba(stmt, ctx, arena)) return StmtResult::kDone;
 
-  std::string tag;
-  auto rhs_val = EvalNbaRhs(stmt, ctx, arena, tag);
-  rhs_val = ApplyStreamPackToTargetWidening(stmt, rhs_val, ctx, arena);
-  // Every capture reached through ScheduleNonblockingAssign flows from here, so
-  // one copy at the point of sampling covers all of them.
-  rhs_val = SampleNbaRhs(rhs_val, arena);
-
+  NbaSample sample = SampleNonblockingRhs(stmt, ctx, arena);
   uint64_t delay = 0;
   if (stmt->delay) delay = EvalExpr(stmt->delay, ctx, arena).ToUint64();
-  auto nba_region = ctx.IsReactiveContext() ? Region::kReNBA : Region::kNBA;
-  NbaScheduleSlot slot{ctx.CurrentTime() + SimTime{delay}, nba_region, ctx,
-                       arena};
-  if (TryScheduleTaggedUnionNba(stmt, rhs_val, tag, slot))
-    return StmtResult::kDone;
-  ScheduleNonblockingAssign(stmt, rhs_val, delay, ctx, arena);
+  ScheduleNonblockingAssign(stmt, sample, delay, ctx, arena);
   return StmtResult::kDone;
 }
 
@@ -728,11 +724,11 @@ static bool TryScheduleClockvarDrive(const Expr* lhs, const Logic4Vec& rhs_val,
 }
 
 static void ScheduleResolvedFieldNba(const FieldTarget& target,
-                                     const Logic4Vec& rhs_val,
+                                     const NbaSample& sample,
                                      uint64_t delay_ticks, SimContext& ctx,
                                      Arena& arena);
 
-static void ScheduleFieldNba(const Expr* lhs, const Logic4Vec& rhs_val,
+static void ScheduleFieldNba(const Expr* lhs, const NbaSample& sample,
                              uint64_t delay_ticks, SimContext& ctx,
                              Arena& arena) {
   // A member access is the production this answers for, and it is the one the
@@ -744,7 +740,7 @@ static void ScheduleFieldNba(const Expr* lhs, const Logic4Vec& rhs_val,
   // class declaring x; ResolveBarePropertyTarget answers it, on the object
   // resolved here as §10.4.2 asks, else nothing.
   if (lhs->kind == ExprKind::kIdentifier) {
-    ScheduleResolvedFieldNba(ResolveBarePropertyTarget(lhs->text, ctx), rhs_val,
+    ScheduleResolvedFieldNba(ResolveBarePropertyTarget(lhs->text, ctx), sample,
                              delay_ticks, ctx, arena);
     return;
   }
@@ -754,31 +750,34 @@ static void ScheduleFieldNba(const Expr* lhs, const Logic4Vec& rhs_val,
   // a variable, finds none, and drops the statement. Both arrive here for the
   // same reason -- a dotted left-hand side that is no key in the variable table
   // -- so this is where the two are told apart.
-  if (TryScheduleClockvarDrive(lhs, rhs_val, ctx)) return;
-  ScheduleResolvedFieldNba(ResolveFieldTarget(lhs, ctx), rhs_val, delay_ticks,
+  if (TryScheduleClockvarDrive(lhs, sample.value, ctx)) return;
+  ScheduleResolvedFieldNba(ResolveFieldTarget(lhs, ctx), sample, delay_ticks,
                            ctx, arena);
 }
 
 // Defers the deposit into a target resolved where the statement executed to
-// the NBA region; a target that names no storage costs no event.
+// the NBA region, the tag the sample carries for a tagged union member
+// landing in the same update; a target that names no storage costs no event.
 static void ScheduleResolvedFieldNba(const FieldTarget& target,
-                                     const Logic4Vec& rhs_val,
+                                     const NbaSample& sample,
                                      uint64_t delay_ticks, SimContext& ctx,
                                      Arena& arena) {
   if (!target.HasDeposit()) return;
   auto* event = ctx.GetScheduler().GetEventPool().Acquire();
   event->kind = EventKind::kUpdate;
-  event->callback = [target, rhs_val, &ctx, &arena]() {
-    WriteResolvedField(target, rhs_val, ctx, arena);
+  event->callback = [target, value = sample.value, &ctx, &arena]() {
+    WriteResolvedField(target, value, ctx, arena);
   };
+  AttachUpdateTag(event, nullptr, sample.tag, ctx);
   ScheduleNbaEvent(event, delay_ticks, ctx);
 }
 
-void ScheduleNonblockingAssign(const Stmt* stmt, const Logic4Vec& rhs_val,
+void ScheduleNonblockingAssign(const Stmt* stmt, const NbaSample& sample,
                                uint64_t delay_ticks, SimContext& ctx,
                                Arena& arena) {
   if (!stmt->lhs) return;
 
+  const Logic4Vec& rhs_val = sample.value;
   if (stmt->lhs->kind == ExprKind::kStreamingConcat) {
     ScheduleStreamingConcatNba(stmt, rhs_val, delay_ticks, ctx, arena);
     return;
@@ -808,7 +807,7 @@ void ScheduleNonblockingAssign(const Stmt* stmt, const Logic4Vec& rhs_val,
               : sub_elem != nullptr ? sub_elem
                                     : ResolveLhsVariable(stmt->lhs, ctx);
   if (!var) {
-    ScheduleFieldNba(stmt->lhs, rhs_val, delay_ticks, ctx, arena);
+    ScheduleFieldNba(stmt->lhs, sample, delay_ticks, ctx, arena);
     return;
   }
 
@@ -839,6 +838,9 @@ void ScheduleNonblockingAssign(const Stmt* stmt, const Logic4Vec& rhs_val,
     auto converted =
         ConvertRealOnAssign(rhs_val, stmt->lhs, var->value.width, ctx, arena);
     SetupWholeVarNbaCallback(event, var, converted);
+    // §7.3.2: the whole of a tagged union variable, whose update carries the
+    // tag the right-hand side gave it, set once the bits have landed.
+    AttachUpdateTag(event, var, sample.tag, ctx);
   }
   ScheduleNbaEvent(event, delay_ticks, ctx);
 }

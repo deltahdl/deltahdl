@@ -621,13 +621,13 @@ static ExecTask ExecBlockingAssignRepeatEvent(const Stmt* stmt, SimContext& ctx,
   co_return StmtResult::kDone;
 }
 
-static SimCoroutine NbaEventCoroutine(const Stmt* stmt, Logic4Vec rhs_val,
+static SimCoroutine NbaEventCoroutine(const Stmt* stmt, NbaSample rhs_val,
                                       SimContext& ctx, Arena& arena) {
   co_await EventAwaiter{ctx, stmt->events, arena};
   ScheduleNonblockingAssign(stmt, rhs_val, 0, ctx, arena);
 }
 
-static SimCoroutine NbaRepeatEventCoroutine(const Stmt* stmt, Logic4Vec rhs_val,
+static SimCoroutine NbaRepeatEventCoroutine(const Stmt* stmt, NbaSample rhs_val,
                                             uint64_t count, SimContext& ctx,
                                             Arena& arena) {
   co_await RepeatEventAwaiter{ctx, stmt->events, arena, count};
@@ -654,16 +654,15 @@ static void SpawnNbaEventProcess(SimCoroutine coro, SimContext& ctx,
 
 static StmtResult ExecNbaWithEvent(const Stmt* stmt, SimContext& ctx,
                                    Arena& arena) {
-  // §4.9.4: this value is held across an event control, the widest gap between
-  // sampling and update in the simulator, so it is copied into the arena rather
-  // than left aliasing the variable EvalExpr read it from. See SampleNbaRhs
-  // (statement_assign_nonblocking.cpp) for why, and for why the three flags
-  // ExtractBitField does not carry are restored.
-  auto sampled = EvalExpr(stmt->rhs, ctx, arena);
-  auto rhs_val = ExtractBitField(arena, sampled, 0, sampled.width);
-  rhs_val.is_real = sampled.is_real;
-  rhs_val.is_signed = sampled.is_signed;
-  rhs_val.is_string = sampled.is_string;
+  // §10.4.2 (printed page 253): the right-hand side is evaluated when the
+  // statement executes, and the event control only defers the update, so the
+  // sample is the one the undeferred statement takes -- copied into the arena
+  // (§4.9.4, SampleNbaRhs) as it is held across the widest gap between
+  // sampling and update in the simulator, and carrying the tag a tagged union
+  // target's update sets (§7.3.2, printed 151), which the vector never holds:
+  // `u <= @(e) tagged Valid 5` landed the bits alone, so `u.Other` raised
+  // nothing after the event.
+  NbaSample rhs_val = SampleNonblockingRhs(stmt, ctx, arena);
   if (stmt->repeat_event_count) {
     uint64_t count = EvalRepeatCount(stmt->repeat_event_count, ctx, arena);
     if (count == 0) {

@@ -53,11 +53,50 @@ StmtResult ExecReleaseOrDeassignImpl(const Stmt* stmt, SimContext& ctx,
 void PerformBlockingAssign(const Expr* lhs, const Logic4Vec& rhs_val,
                            SimContext& ctx, Arena& arena);
 
-void ScheduleNonblockingAssign(const Stmt* stmt, const Logic4Vec& rhs_val,
+// §7.3.2 (printed page 151): a tagged union's value is its tag beside the
+// member's bits, so a nonblocking update of a tagged union target carries the
+// tag the right-hand side gave it and sets it when the bits land. `key` is
+// what the target's tag stands under -- the key its storage was created by
+// (TagKeyOfName) for a variable, that key followed by the member path for a
+// member of one (TaggedUnionMemberKey) -- and `tag` the member the update
+// sets it to; `tag` is empty where the update carries none. Both are resolved
+// where the statement executed, as §10.4.2 (printed 253) resolves the target
+// itself, and interned in the arena, since the update outlives the statement
+// and the tag table keeps the views it is given.
+struct NbaUpdateTag {
+  std::string_view key;
+  std::string_view tag;
+  bool Carries() const { return !tag.empty(); }
+};
+
+// §10.4.2 (printed page 253): the right-hand side of a nonblocking assignment,
+// evaluated when the statement executes and held until the update lands --
+// the value, owning its words, and the tag it carries for a tagged union
+// target.
+struct NbaSample {
+  Logic4Vec value;
+  NbaUpdateTag tag;
+};
+
+// Evaluates the right-hand side of the nonblocking assignment `stmt` where the
+// statement executes -- with the target as its context, a streaming source
+// left-aligned in a wider target (§11.4.14), and copied into the arena so no
+// later write reaches it through an alias -- and takes the tag a tagged union
+// target's update carries: the member a `tagged M v` names, or the one a
+// call's body returned. Shared by the statement executed at once and by the
+// one an intra-assignment event control defers (§9.4.5), which sample the same
+// statement at the same moment and differ only in when the update is placed.
+NbaSample SampleNonblockingRhs(const Stmt* stmt, SimContext& ctx, Arena& arena);
+
+// Places the update of `stmt` with the sampled right-hand side `sample` in
+// the NBA region `delay_ticks` from now; a tag the sample carries lands in
+// the same update as the bits.
+void ScheduleNonblockingAssign(const Stmt* stmt, const NbaSample& sample,
                                uint64_t delay_ticks, SimContext& ctx,
                                Arena& arena);
 
 void BuildLhsName(const Expr* expr, std::string& out);
+
 Variable* TryResolveArrayElement(const Expr* lhs, SimContext& ctx);
 bool BuildCompoundLhsName(const Expr* expr, SimContext& ctx, Arena& arena,
                           std::string& name);
