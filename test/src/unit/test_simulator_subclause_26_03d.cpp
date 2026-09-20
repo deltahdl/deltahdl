@@ -422,4 +422,41 @@ TEST(PackageImportSim, PackageDynamicArraySizedByNewThroughTheQualifier) {
 // before any procedure starts, so size() reads 2 and q[1] reads 2:
 // 2 * 10 + 2. The pattern was evaluated into the carrier variable rather
 // than the QueueObject (InitPackageAggregate in lowerer_register.cpp), so
+// the queue was empty and both reads answered 0.
+TEST(PackageImportSim, PackageQueueInitializedByAnAssignmentPattern) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  int q[$] = '{1, 2};\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  int y;\n"
+                      "  initial y = p1::q.size() * 10 + p1::q[1];\n"
+                      "endmodule\n",
+                      "y"),
+            22u);
+}
+
+// §7.9.11 (printed page 169) with §7.8 (printed 163) and §26.2 (printed
+// 808): a package associative array's literal gives it a default, so a read
+// of an entry nothing wrote, `p1::m["x"]`, answers the default 7 rather
+// than Table 7-1's 0. The literal was evaluated into the carrier variable
+// rather than the AssocArrayObject, which then had no default, so the read
+// answered 0.
+TEST(PackageImportSim, PackageAssociativeArrayInitializedWithADefault) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  int m[string] = '{default: 7};\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  int y;\n"
+                      "  initial y = p1::m[\"x\"];\n"
+                      "endmodule\n",
+                      "y"),
+            7u);
+}
+
+// §8.2 (printed page 179) with §7.10 (printed 169) and §26.2 (printed 808):
+// a package queue of a class type holds handles, so `p1::q[1].v` names the
+// property of the second object pushed and `p1::q[0].v` the first's:
+// 4 * 10 + 3. The queue was created before the package's classes were
+// lowered and left marked as holding plain values (holds_class_handles in
+// CreatePackageAggregate, lowerer_register.cpp), so the element select
 }  // namespace

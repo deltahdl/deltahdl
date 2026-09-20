@@ -649,14 +649,39 @@ void CreatePackageDataVariables(const RtlirDesign* design, SimContext& ctx,
   }
 }
 
+// §7.10 (printed page 169), §7.5.1 (printed 158) and §7.9.11 (printed 169)
+// with §26.2 (printed 808): a package queue's or dynamic array's declaration
+// assignment supplies its elements, `int q[$] = '{1, 2}` or `int d[] =
+// new[3]`, and an associative array's its default and keyed entries, `int
+// m[string] = '{default: 7}`, each landing in the object CreatePackageAggregate
+// made under `key` through the helper a module's declaration goes through
+// (InitQueueFromDeclInit and InitAssocFromDeclInit, lowerer_var.cpp). True
+// where the key holds such an object, whose carrier variable the initializer
+// must not reach: evaluated into the carrier, the pattern left the queue
+// empty, so `p1::q.size()` read 0, and the array with no default, so
+// `p1::m["x"]` read 0.
+static bool InitPackageAggregate(const Expr* init, std::string_view key,
+                                 SimContext& ctx, Arena& arena) {
+  if (QueueObject* q = ctx.FindQueue(key)) {
+    InitQueueFromDeclInit(q, init, ctx, arena);
+    return true;
+  }
+  if (AssocArrayObject* aa = ctx.FindAssocArray(key)) {
+    InitAssocFromDeclInit(init, aa, ctx, arena);
+    return true;
+  }
+  return false;
+}
+
 // One package item's initializer, evaluated into the storage
 // CreatePackageDataItem gave it; an item declaring no data, or none, has
 // nothing to evaluate. §15.3.1: a semaphore's initializer is the new() that
 // CreatePackageSemaphore has already read the bucket's key count from, and
 // it names no value the carrier variable holds, so it is left alone, as is a
 // fixed-size array's, which CreatePackageArray has already distributed over
-// the elements (§7.4.2); every other initializer is the carrier variable's
-// value.
+// the elements (§7.4.2). A queue's, a dynamic array's or an associative
+// array's fills the object (InitPackageAggregate); every other initializer
+// is the carrier variable's value.
 static void InitPackageDataItem(const ModuleItem* item, std::string_view pkg,
                                 SimContext& ctx, Arena& arena) {
   if (!DeclaresPackageData(item) || item->init_expr == nullptr) return;
@@ -664,6 +689,7 @@ static void InitPackageDataItem(const ModuleItem* item, std::string_view pkg,
   std::string key = PackageDataKey(item, pkg);
   if (ctx.FindArrayInfo(key) != nullptr && ctx.FindQueue(key) == nullptr)
     return;
+  if (InitPackageAggregate(item->init_expr, key, ctx, arena)) return;
   const auto& variables = ctx.GetVariables();
   auto found = variables.find(key);
   if (found == variables.end()) return;
