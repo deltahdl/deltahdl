@@ -14,6 +14,7 @@
 #include "elaborator/elaborator_scope_rules_names.h"
 #include "elaborator/elaborator_validate_classes_internal.h"
 #include "elaborator/elaborator_validate_internal.h"
+#include "elaborator/std_package.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
@@ -104,6 +105,18 @@ void CheckPackageRefIdentifier(const PackageRefContext& ctx, const Expr* e) {
   }
 }
 
+// §26.7 (printed pages 816-817): the built-in package std is declared in
+// every compilation unit and its declarations -- Annex G's semaphore,
+// mailbox, randomize, process and weak_reference (printed 1257-1258) -- are
+// visible in every scope as a wildcard import makes them, and may be named
+// behind the `std::` qualifier too; so `process::self()` and
+// `std::process::self()` in a package function reference an imported
+// package. Held to the packages the unit declares, uvm_globals.svh's
+// `process::self()` was reported.
+bool IsStdPackageOrMember(std::string_view name) {
+  return name == "std" || StdPackageMemberNamed(name).has_value();
+}
+
 // §26.2 (printed page 808): a package item may reference a package's name
 // through the scope resolution operator, the package's own declarations and
 // what its imports make visible, an explicit import's one name or a wildcard
@@ -114,7 +127,8 @@ void CheckPackageRefIdentifier(const PackageRefContext& ctx, const Expr* e) {
 void CheckPackageRefMemberRoot(const PackageRefContext& ctx, const Expr* e) {
   if (e->lhs && e->lhs->kind == ExprKind::kIdentifier && e->rhs) {
     auto root = e->lhs->text;
-    bool is_pkg = ctx.known_package_names->count(root) > 0;
+    bool is_pkg =
+        ctx.known_package_names->count(root) > 0 || IsStdPackageOrMember(root);
     bool is_self = ctx.pkg_names.count(root) > 0;
     if (!is_pkg && !is_self && !IsImportedName(ctx, root)) {
       ctx.diag->Error(

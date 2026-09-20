@@ -470,4 +470,59 @@ TEST(PackageDeclarationElaboration,
                             5, "6.20.4"));
 }
 
+// §26.7 (printed pages 816-817 of ~/LRM.pdf) gives every compilation unit
+// the built-in package std, whose declarations -- Annex G's semaphore,
+// mailbox, randomize, process and weak_reference (printed 1257-1258) -- are
+// visible everywhere as a wildcard import makes them, and names them behind
+// the `std::` qualifier as well. A package function's `process::self()`,
+// `std::process::self()` and a `semaphore` local's `s.put(1)` are therefore
+// references to an imported package, not §26.2's forbidden hierarchical
+// reference; the shape is uvm_globals.svh's, every uvm-tagged file of
+// sv-tests standing on it.
+TEST(PackageDeclarationElaboration,
+     StdPackageMemberAsAScopeRootInsideAPackageFunctionAccepted) {
+  ElabFixture f;
+  EXPECT_TRUE(
+      ElabOk("package p;\n"
+             "  function void f();\n"
+             "    process h;\n"
+             "    semaphore s = new(1);\n"
+             "    h = process::self();\n"
+             "    h = std::process::self();\n"
+             "    s.put(1);\n"
+             "  endfunction\n"
+             "endpackage\n"
+             "module top;\n"
+             "  initial p::f();\n"
+             "endmodule\n",
+             f));
+  EXPECT_FALSE(f.has_errors);
+}
+
+// A root that is neither std nor one of its members is still the
+// hierarchical reference §26.2 forbids, beside the accepted `process::`.
+TEST(PackageDeclarationElaboration,
+     UnknownScopeRootBesideAStdPackageMemberStillRejected) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("package p;\n"
+             "  function int f();\n"
+             "    process h;\n"
+             "    h = process::self();\n"
+             "    return top.x;\n"
+             "  endfunction\n"
+             "endpackage\n"
+             "module top;\n"
+             "  int x = 4;\n"
+             "  int y;\n"
+             "  initial y = p::f();\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "package item contains a hierarchical reference "
+                            "'top' that does not target the package itself "
+                            "or an imported package",
+                            5, "26.2"));
+}
+
 }  // namespace
