@@ -2,7 +2,6 @@
 #include <cstdint>
 #include <optional>
 #include <set>
-#include <string>
 #include <string_view>
 #include <tuple>
 #include <unordered_set>
@@ -13,8 +12,8 @@
 #include "elaborator/const_eval.h"
 #include "elaborator/const_eval_internal.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_data.h"
 #include "elaborator/elaborator_helpers.h"
-#include "elaborator/elaborator_items_internal.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_expr.h"
@@ -238,139 +237,52 @@ static TypedefMap ModuleTypedefTable(const TypedefMap& all,
   return typedefs;
 }
 
-// One generate block a construct may instantiate: the then-block of a
-// generate-if, each alternative of its else chain, each item of a
-// generate-case, and the body of a generate-for, whose instances §27.4
-// (printed page 820) indexes by the genvar's value.
-struct GenBlockDecl {
-  std::string_view name;
-  const std::vector<ModuleItem*>& body;
-  bool has_begin_end;
-  bool is_loop;
-};
-
 // What a parameter of a module is sized and folded against where a defparam
 // makes the module's parameters over: the typedefs in force for it, and the
 // prefixes of the generate blocks it stands in, outermost first, as
-// ElaboratorData::gen_prefix_scopes_ held them where it was declared. The
-// strings are owned here, since the prefixes are spelled again from the
-// declaration rather than found interned; a GenBlockPrefixes built over them
-// lives no longer than the context.
+// ElaboratorData::gen_prefix_scopes_ held them where it was declared.
 struct ParamFoldContext {
   TypedefMap typedefs;
-  std::vector<std::string> block_prefixes;
+  GenBlockPrefixes block_prefixes;
 };
 
-// The prefix the declarations of block `block` under `enclosing` are keyed
-// with, where `prefix` -- the RtlirParamDecl::gen_block_prefix of a
-// parameter -- stands in or under that block, and empty where it does not.
-// Elaborator::ElaborateConditionalGenerateBlock spells a conditional block's
-// prefix as the enclosing one, the name and `_`, and
-// Elaborator::ElaborateGenerateFor a loop block instance's with the genvar's
-// value and another `_` after that, which is read off `prefix` here since
-// the body is shared by every instance.
-static std::optional<std::string> BlockPrefixWithin(
-    std::string_view prefix, const std::string& enclosing,
-    const GenBlockDecl& block) {
-  std::string own = enclosing;
-  own += block.name;
-  own += '_';
-  if (!prefix.starts_with(own)) return std::nullopt;
-  if (!block.is_loop) return own;
-  size_t index_end = prefix.find('_', own.size());
-  if (index_end == std::string_view::npos) return std::nullopt;
-  own.append(prefix, own.size(), index_end + 1 - own.size());
-  return own;
-}
-
-static void LayBlocksOver(const std::vector<ModuleItem*>& items,
-                          std::string_view prefix, const std::string& enclosing,
-                          ParamFoldContext& ctx);
-
-// Lays `block`, where `prefix` stands in or under it, over `ctx`: its
-// prefix after its enclosing blocks', its typedefs over theirs, and the
-// blocks nested in it after that. §27.5 makes a block holding one
-// conditional construct and no begin-end no scope of its own, so such a
-// block's items stand under `enclosing` as they were elaborated.
-static void LayOneBlockOver(const GenBlockDecl& block, std::string_view prefix,
-                            const std::string& enclosing,
-                            ParamFoldContext& ctx) {
-  if (IsDirectlyNestedBlock(block.body, block.has_begin_end)) {
-    LayBlocksOver(block.body, prefix, enclosing, ctx);
-    return;
-  }
-  auto own = BlockPrefixWithin(prefix, enclosing, block);
-  if (!own) return;
-  ctx.block_prefixes.push_back(*own);
-  LayTypedefItemsOver(block.body, ctx.typedefs);
-  LayBlocksOver(block.body, prefix, *own, ctx);
-}
-
-// The blocks of a generate-if and of the else chain behind it, each the
-// then-block of a kGenerateIf item -- a plain else is one with no condition
-// whose body is the else block (Parser::ParseGenerateIf).
-static void LayIfChainOver(const ModuleItem* item, std::string_view prefix,
-                           const std::string& enclosing,
-                           ParamFoldContext& ctx) {
-  for (; item != nullptr; item = item->gen_else) {
-    LayOneBlockOver(
-        {item->name, item->gen_body, item->gen_body_has_begin_end, false},
-        prefix, enclosing, ctx);
-  }
-}
-
-// §23.9 (printed page 761) with §6.18 (printed 118): the typedefs in force
-// for a parameter declared in a generate block are the block's own laid over
-// its enclosing blocks' and the module's, and the names it may read are
-// those blocks' as well as the module's, so this walks the generate
-// constructs among `items`, keyed under `enclosing`, into every block the
-// parameter's `prefix` stands in or under, outermost first so that the
-// innermost declaration of a name lays last. A block's name alone says
-// which block the prefix names, so an alternative a conditional construct
-// left out of the model that shares its name with the one selected has its
-// typedefs laid too, the later alternative's over the earlier's.
-static void LayBlocksOver(const std::vector<ModuleItem*>& items,
-                          std::string_view prefix, const std::string& enclosing,
-                          ParamFoldContext& ctx) {
-  for (const auto* item : items) {
-    switch (item->kind) {
-      case ModuleItemKind::kGenerateIf:
-        LayIfChainOver(item, prefix, enclosing, ctx);
-        break;
-      case ModuleItemKind::kGenerateCase:
-        for (const auto& ci : item->gen_case_items) {
-          LayOneBlockOver({ci.label, ci.body, ci.has_begin_end, false}, prefix,
-                          enclosing, ctx);
-        }
-        break;
-      case ModuleItemKind::kGenerateFor:
-        LayOneBlockOver(
-            {item->name, item->gen_body, item->gen_body_has_begin_end, true},
-            prefix, enclosing, ctx);
-        break;
-      default:
-        break;
+// The context parameter `p` is sized and folded in: `module_typedefs`,
+// ModuleTypedefTable's, with the typedefs and the prefixes of the generate
+// block instances `p` stands in laid over it where it stands in one, read
+// from `blocks`, the module's GenBlockTypedefs. §27.4 (printed page 820) has
+// a block's declarations in scope for its items and §23.10.1 (printed
+// 764-765) lets a defparam change the parameter a block's `typedef logic
+// [TOP:0] vec_t` names, so a block's `parameter vec_t P` is sized again by
+// the block's typedef and the block's `localparam int B = $bits(P)` reads
+// it; sized against the module's table alone, P followed a module-level
+// typedef of the same name, or none, and B read 4 or 16 under `defparam
+// u.TOP = 7`, P being out of B's sight without the block registered. The
+// chain is the record's for `p`'s own prefix, and every record under each
+// prefix of the chain is laid in turn, outermost first, so that the
+// innermost declaration of a name lays last; a §27.5 (printed 824) directly
+// nested block's record stands under its enclosing instance's prefix among
+// them. Matching the blocks by name in the module's declaration instead laid
+// the typedefs of an alternative §27.5 left out of the model over the
+// selected one's where the two shared a name, as the clause allows: `if (1)
+// begin : g typedef logic [TOP:0] vec_t; ... end else begin : g typedef
+// logic [3:0] vec_t; end` read 4 from g's $bits(P).
+static ParamFoldContext ParamContextOf(
+    const RtlirParamDecl& p, const TypedefMap& module_typedefs,
+    const std::vector<GenBlockTypedefs>& blocks) {
+  ParamFoldContext ctx{module_typedefs, {}};
+  if (p.gen_block_prefix.empty()) return ctx;
+  for (const auto& block : blocks) {
+    if (block.prefix == p.gen_block_prefix) {
+      ctx.block_prefixes = block.scopes;
+      break;
     }
   }
-}
-
-// The context parameter `p` of the module `decl` declares is sized and
-// folded in: `module_typedefs`, ModuleTypedefTable's, with the typedefs and
-// the prefixes of the generate blocks `p` stands in laid over it where it
-// stands in one. §27.4 (printed page 820) has a block's declarations in
-// scope for its items and §23.10.1 (printed 764-765) lets a defparam change
-// the parameter a block's `typedef logic [TOP:0] vec_t` names, so a block's
-// `parameter vec_t P` is sized again by the block's typedef and the block's
-// `localparam int B = $bits(P)` reads it; sized against the module's table
-// alone, P followed a module-level typedef of the same name, or none, and B
-// read 4 or 16 under `defparam u.TOP = 7`, P being out of B's sight without
-// the block registered.
-static ParamFoldContext ParamContextOf(const RtlirParamDecl& p,
-                                       const TypedefMap& module_typedefs,
-                                       const ModuleDecl* decl) {
-  ParamFoldContext ctx{module_typedefs, {}};
-  if (!p.gen_block_prefix.empty() && decl != nullptr) {
-    LayBlocksOver(decl->items, p.gen_block_prefix, "", ctx);
+  for (std::string_view prefix : ctx.block_prefixes) {
+    for (const auto& block : blocks) {
+      if (block.prefix != prefix) continue;
+      for (const auto& [name, dtype] : block.typedefs)
+        ctx.typedefs.insert_or_assign(name, dtype);
+    }
   }
   return ctx;
 }
@@ -497,16 +409,18 @@ static void ResizeParamToRecomputedRange(RtlirParamDecl& p,
 void Elaborator::RecomputeDependentParams(RtlirModule* mod) {
   if (!mod) return;
   ParamRangeRegistryGuard param_range_guard(mod);
-  const ModuleDecl* decl = FindModule(mod->name);
-  const TypedefMap kTypedefs = ModuleTypedefTable(typedefs_, decl);
+  const TypedefMap kTypedefs =
+      ModuleTypedefTable(typedefs_, FindModule(mod->name));
+  static const std::vector<GenBlockTypedefs> kNoBlocks;
+  auto blocks_it = generate_typedefs_.find(mod);
+  const std::vector<GenBlockTypedefs>& blocks =
+      blocks_it == generate_typedefs_.end() ? kNoBlocks : blocks_it->second;
   for (auto& p : mod->params) {
     if (p.is_type_param) continue;
     if (p.is_unbounded) continue;
-    const ParamFoldContext kCtx = ParamContextOf(p, kTypedefs, decl);
-    const GenBlockPrefixes kPrefixes(kCtx.block_prefixes.begin(),
-                                     kCtx.block_prefixes.end());
-    RegisteredGenScopeGuard gen_scope_guard(kPrefixes);
-    auto scope = BuildParamScope(mod, kPrefixes);
+    const ParamFoldContext kCtx = ParamContextOf(p, kTypedefs, blocks);
+    RegisteredGenScopeGuard gen_scope_guard(kCtx.block_prefixes);
+    auto scope = BuildParamScope(mod, kCtx.block_prefixes);
     ResizeParamToRecomputedRange(p, kCtx.typedefs, scope);
     if (p.from_override) continue;
     if (!p.default_value) continue;

@@ -94,6 +94,72 @@ TEST(DefparamElaboration, ResizesAGenerateBlocksParameterByTheBlocksTypedef) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §27.5 (printed page 824) instantiates at most one alternative of a
+// conditional generate construct into the model and lets the alternatives
+// share a name, so the g elaborated is the one declaring `typedef logic
+// [TOP:0] vec_t`, and its P is 8 bits under `defparam u.TOP = 7`. The
+// alternatives' typedefs were laid by block name, the else's `logic [3:0]`
+// over the selected one's, so B read 4.
+TEST(DefparamElaboration, SizesByTheSelectedAlternativesTypedefAlone) {
+  ElabFixture f;
+  EXPECT_EQ(ParamOfModule("module m;\n"
+                          "  parameter int TOP = 15;\n"
+                          "  if (1) begin : g\n"
+                          "    typedef logic [TOP:0] vec_t;\n"
+                          "    parameter vec_t P = 0;\n"
+                          "    localparam int B = $bits(P);\n"
+                          "  end else begin : g\n"
+                          "    typedef logic [3:0] vec_t;\n"
+                          "  end\n"
+                          "endmodule\n"
+                          "module top;\n"
+                          "  m u();\n"
+                          "  defparam u.TOP = 7;\n"
+                          "endmodule\n",
+                          "m", "B", f),
+            8);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// Parameter `name` of module m declared in the generate block instance
+// `prefix` names, as RtlirParamDecl::gen_block_prefix spells it, or -1.
+int64_t BlockParamOfM(RtlirDesign* design, std::string_view prefix,
+                      std::string_view name) {
+  const auto* m = FindModule(design, "m");
+  if (m == nullptr) return -1;
+  for (const auto& p : m->params) {
+    if (p.name == name && p.gen_block_prefix == prefix) return p.resolved_value;
+  }
+  return -1;
+}
+
+// §27.4 (printed page 820) indexes a loop generate block's instances by the
+// genvar's value, each a scope of its own with the typedef its body declares,
+// so the second instance's P is sized by its own vec_t under `defparam
+// u.TOP = 7` as the first's is: g[1]'s B reads 8, where a record keyed
+// without the index would leave it 16.
+TEST(DefparamElaboration, SizesEachLoopInstancesParameterByItsOwnTypedef) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  parameter int TOP = 15;\n"
+      "  for (genvar i = 0; i < 2; i++) begin : g\n"
+      "    typedef logic [TOP:0] vec_t;\n"
+      "    parameter vec_t P = 0;\n"
+      "    localparam int B = $bits(P);\n"
+      "  end\n"
+      "endmodule\n"
+      "module top;\n"
+      "  m u();\n"
+      "  defparam u.TOP = 7;\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_EQ(BlockParamOfM(design, "g_1_", "B"), 8);
+  EXPECT_EQ(BlockParamOfM(design, "g_0_", "B"), 8);
+  EXPECT_FALSE(f.has_errors);
+}
+
 // A module c whose `logic [W-1:0] P` follows `parameter int W = 32`, with H
 // reading P's word above bit 64 and M its bits 47 down to 32.
 constexpr std::string_view kWideningC =

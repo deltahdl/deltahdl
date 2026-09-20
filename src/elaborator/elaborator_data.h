@@ -63,6 +63,27 @@ struct RtlirParamDecl;
 // --max-generate-iterations, which is what makes this a budget and not a limit.
 inline constexpr int64_t kDefaultMaxGenerateIterations = 262144;
 
+// The typedefs one walk of a generate block instance's items declared, with
+// where the walk stood: `prefix` as RtlirParamDecl::gen_block_prefix spells
+// the instance for the parameters declared beside them, and `scopes` the
+// prefixes of the blocks the instance stands in, outermost first with
+// `prefix` itself last, as ElaboratorData::gen_prefix_scopes_ held them.
+// §27.5 (printed page 824) instantiates at most one alternative of a
+// conditional generate construct and lets the alternatives share a name, and
+// §27.4 (printed 820) indexes a loop generate block's instances by the
+// genvar's value, so a typedef declared in a block belongs to the instance
+// that was elaborated and to no alternative left out of the model, which is
+// what keying on the instance's prefix says and a walk of the declaration
+// by block name could not. A §27.5 directly nested block opens no scope, so
+// its walk records under the enclosing instance's prefix. At namespace scope
+// because elaborator_defparam.cpp reads the record from a function outside
+// the class.
+struct GenBlockTypedefs {
+  std::string_view prefix;
+  GenBlockPrefixes scopes;
+  TypedefMap typedefs;
+};
+
 // The elaborator's state, held apart from the methods that act on it so that
 // neither half outgrows the file line cap on its own. Elaborator derives from
 // this, so every member is reached unqualified exactly as before and no
@@ -426,6 +447,15 @@ class ElaboratorData {
   // instantiated.
   std::unordered_map<RtlirModule*, std::vector<DefparamSite>>
       generate_defparams_;
+
+  // The typedefs the generate block instances of each module declared, one
+  // GenBlockTypedefs per walk of a block instance's items, recorded by
+  // Elaborator::ElaborateGenerateItems as generate_defparams_ is and for the
+  // same reason: what is here is what was instantiated. Read by
+  // Elaborator::RecomputeDependentParams to size a block's parameter by the
+  // block's own typedefs once a defparam makes the module's parameters over.
+  std::unordered_map<RtlirModule*, std::vector<GenBlockTypedefs>>
+      generate_typedefs_;
 
   // Keyed by the block instance's prefix as well as the statement, because the
   // one body AST is shared by every iteration of a loop generate block: without

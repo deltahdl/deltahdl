@@ -14,6 +14,7 @@
 #include "elaborator/const_eval.h"
 #include "elaborator/disable_iff_resolution.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_data.h"
 #include "elaborator/elaborator_items_internal.h"
 #include "elaborator/property_rewrite.h"
 #include "elaborator/rtlir.h"
@@ -348,6 +349,23 @@ static bool CollectGenerateBlockFunctions(
   return true;
 }
 
+// The GenBlockTypedefs of one walk of `items` under `prefix` and the chain
+// `scopes`: the typedefs `items` declares, a forward typedef, kImplicit,
+// declaring nothing. Made even where `items` declares none, so that the
+// chain of every instance is on record for a parameter it declares.
+static GenBlockTypedefs GenBlockTypedefsOf(
+    const std::vector<ModuleItem*>& items, std::string_view prefix,
+    const GenBlockPrefixes& scopes) {
+  GenBlockTypedefs record{prefix, scopes, {}};
+  for (const auto* item : items) {
+    if (item->kind != ModuleItemKind::kTypedef ||
+        item->typedef_type.kind == DataTypeKind::kImplicit)
+      continue;
+    record.typedefs.insert_or_assign(item->name, item->typedef_type);
+  }
+  return record;
+}
+
 void Elaborator::ElaborateGenerateItems(const std::vector<ModuleItem*>& items,
                                         RtlirModule* mod,
                                         const ScopeMap& scope) {
@@ -376,6 +394,16 @@ void Elaborator::ElaborateGenerateItems(const std::vector<ModuleItem*>& items,
   // TakeEnclosingTypedefs.
   EnclosingTypedefs enclosing_typedefs =
       TakeEnclosingTypedefs(items, typedefs_, forward_typedef_kinds_);
+  // §6.18 with §27.5 (printed page 824): the typedefs these items declare
+  // belong to this block instance, and RestoreEnclosingTypedefs takes them
+  // back out of typedefs_ once the walk is done, so they are recorded here
+  // for Elaborator::RecomputeDependentParams, which sizes a parameter of
+  // this instance again once a defparam changes what its typedef names and
+  // runs after every block has returned. Recorded as the defparam sites
+  // below are and for the same reason: an alternative §27.5 left out of the
+  // model is walked by nothing and so records nothing.
+  generate_typedefs_[mod].push_back(
+      GenBlockTypedefsOf(items, InternedGenPrefix(), gen_prefix_scopes_));
   // §27.2 with §13.4.3 and §23.9: the constant-function table for these
   // items, installed only when they declare a function; see
   // CollectGenerateBlockFunctions.
