@@ -60,6 +60,7 @@ namespace delta {
 
 class DiagEngine;
 class SpecifyManager;
+struct DataType;
 struct ModuleItem;
 struct Process;
 
@@ -269,6 +270,11 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   // relation it evaluates (18.5). The caller must have pushed a scope, and
   // `name` must outlive it.
   void BindLocalVariable(std::string_view name, Variable* var);
+  // §8.25.1: binds, in the innermost scope, the type the specialization a
+  // class-scope call names gives the type parameter `name`; the second reads
+  // it back from the innermost scope binding the name, null where none does.
+  void BindScopeTypeActual(std::string_view name, const DataType* actual);
+  const DataType* FindScopeTypeActual(std::string_view name) const;
 
   Variable* FindStaticFuncVar(std::string_view func_name,
                               std::string_view var_name);
@@ -889,20 +895,14 @@ class SimContext : public DeclaredNameTables, public RandomStability {
 
   std::unordered_map<uint64_t, ClassObject*> class_objects_;
   uint64_t next_handle_id_ = 1;
-
   std::unordered_set<WeakReference*> weak_references_;
-
   std::unordered_map<uint64_t, WeakReference*> weak_ref_by_handle_;
-
   std::unordered_map<uint64_t, Process*> process_handles_;
   uint64_t next_process_handle_id_ = 1;
-
   int function_depth_ = 0;
-
   std::vector<ClassObject*> this_stack_;
   ClassObject* constraint_caller_this_ = nullptr;
   std::vector<const ClassTypeInfo*> method_class_stack_;
-
   std::vector<std::vector<QueueRefBinding>> queue_ref_stack_;
   std::vector<std::vector<AssocRefBinding>> assoc_ref_stack_;
 
@@ -913,7 +913,6 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   std::optional<std::string> deferred_binding_scope_;
 
   int assertion_fail_count_ = 0;
-
   ImmediateCoverResults immediate_covers_;
   ConcurrentCoverResults concurrent_covers_;
 
@@ -933,16 +932,12 @@ class SimContext : public DeclaredNameTables, public RandomStability {
 
   class ClockingManager* clocking_mgr_ = nullptr;
   std::unique_ptr<ClockingManager> owned_clocking_manager_;
-
   class CoverageDB* coverage_db_ = nullptr;
   std::unique_ptr<class CoverageDB> owned_coverage_db_;
-
   std::string_view disable_target_;
-
   std::unordered_map<std::string, std::vector<Process*>> named_scope_map_;
   std::unordered_map<std::string, std::vector<Process*>> outermost_scope_map_;
   static const std::vector<Process*> kEmptyNamedScopeList;
-
   std::vector<std::string_view> active_scope_stack_;
 };
 

@@ -16,6 +16,7 @@
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "simulator/class_object.h"
+#include "simulator/eval_class_scope_types.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
@@ -157,11 +158,14 @@ bool SetupInstanceTaskCall(const Expr* expr, SimContext& ctx, Arena& arena,
   ctx.PushScope();
   // §8.25: a static task named through a specialization, `C#(42)::t(...)`,
   // runs with the class's parameters bound to the specialization's actuals,
-  // as the evaluator's class-scope call binds them (BindClassParams).
+  // as the evaluator's class-scope call binds them (BindClassParams); a type
+  // actual, `C#(byte)::t(...)`, is bound as a type beside them, since a value
+  // bind makes a 1-bit local of a type name (BindClassScopeTypeActuals).
   const Expr* scope = expr->lhs != nullptr ? expr->lhs->lhs : nullptr;
   if (call.obj == nullptr && scope != nullptr &&
       scope->kind == ExprKind::kIdentifier && !scope->elements.empty()) {
     BindClassParams(call.owner, scope, ctx, arena);
+    BindClassScopeTypeActuals(call.owner->decl, scope, ctx, arena);
   }
   if (call.obj != nullptr) ctx.PushThis(call.obj);
   ctx.PushQueueRefFrame();
@@ -170,6 +174,9 @@ bool SetupInstanceTaskCall(const Expr* expr, SimContext& ctx, Arena& arena,
   // module task enabled by name is through PushTaskCallScope.
   ctx.PushFuncName(call.method->name);
   BindFunctionArgs(call.method, expr, ctx, arena);
+  // §26.2: a task of a class a package declares reads the package's names
+  // bare, as ExecClassMethod gives a function of the class its package.
+  ctx.SetScopePackage(ctx.SubroutinePackage(call.method));
   return true;
 }
 

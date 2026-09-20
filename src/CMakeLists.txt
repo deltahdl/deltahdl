@@ -223,6 +223,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/eval_function.cpp
     simulator/eval_function_hier.cpp
     simulator/eval_call_result.cpp
+    simulator/eval_class_scope_types.cpp
     simulator/eval_process_methods.cpp
     simulator/eval_randomize.cpp
     simulator/eval_randomize_blocks.cpp

@@ -21,6 +21,7 @@
 #include "simulator/eval_assoc_class_handles.h"
 #include "simulator/eval_call_result.h"
 #include "simulator/eval_class_array.h"
+#include "simulator/eval_class_scope_types.h"
 #include "simulator/eval_function_hier.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/eval_semaphore.h"
@@ -525,6 +526,9 @@ static bool TryEvalParameterizedScopeCall(const Expr* expr, SimContext& ctx,
   if (info.access->lhs->elements.empty()) return false;
   ctx.PushScope();
   BindClassParams(info.cls, info.access->lhs, ctx, arena);
+  // §8.25.1: the type actuals of the specialization the call names, bound
+  // in the same frame for $bits(T) and the like inside the static body.
+  BindClassScopeTypeActuals(info.cls->decl, info.access->lhs, ctx, arena);
 
   if (info.access->rhs->text == "new") {
     out = EvalClassNew(info.class_name, expr, ctx, arena, expr->range.start);

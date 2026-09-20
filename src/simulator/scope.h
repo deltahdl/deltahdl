@@ -7,6 +7,7 @@ namespace delta {
 
 struct ArrayInfo;
 struct AssocArrayObject;
+struct DataType;
 struct QueueObject;
 struct Variable;
 
@@ -44,12 +45,22 @@ struct Variable;
 // their bare names, so the frame a package subroutine's call opens carries the
 // package's name and SimContext::FindVariable reads the package's keys through
 // it; every other frame carries none.
+//
+// §8.25.1 is why a frame binds a type to a type parameter's name: a static
+// method called through an explicit specialization, `Box#(byte)::bits()`,
+// runs on no object, and the type the specialization gives the class's type
+// parameter -- which §8.25 binds throughout the class body -- is held by the
+// frame the call pushed, for exactly as long as the call runs, as the value
+// parameters it binds are (BindClassParams in src/simulator/eval_function.cpp).
+// An object's specialization binds its own on the object instead
+// (ClassObject::type_param_actuals).
 struct Scope {
   std::unordered_map<std::string_view, Variable*> vars;
   std::unordered_map<std::string_view, ArrayInfo*> arrays;
   std::unordered_map<std::string_view, QueueObject*> queues;
   std::unordered_map<std::string_view, AssocArrayObject*> assoc_arrays;
   std::string_view package;
+  std::unordered_map<std::string_view, const DataType*> type_actuals;
 };
 
 }  // namespace delta

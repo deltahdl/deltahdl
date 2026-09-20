@@ -552,6 +552,19 @@ void SimContext::BindLocalVariable(std::string_view name, Variable* var) {
   if (!scope_stack_.empty()) scope_stack_.back().vars[name] = var;
 }
 
+void SimContext::BindScopeTypeActual(std::string_view name,
+                                     const DataType* actual) {
+  if (!scope_stack_.empty()) scope_stack_.back().type_actuals[name] = actual;
+}
+
+const DataType* SimContext::FindScopeTypeActual(std::string_view name) const {
+  for (auto it = scope_stack_.rbegin(); it != scope_stack_.rend(); ++it) {
+    auto found = it->type_actuals.find(name);
+    if (found != it->type_actuals.end()) return found->second;
+  }
+  return nullptr;
+}
+
 void SimContext::PopScope() {
   if (!scope_stack_.empty()) scope_stack_.pop_back();
 }

@@ -275,4 +275,97 @@ TEST(ParameterizedScopeResolutionSim,
             36u);
 }
 
+// §8.25 binds a class's type parameter throughout the class body per
+// specialization (printed page 204 of ~/LRM.pdf), and §8.25.1 has the
+// explicit specialization form as the prefix of the class scope resolution
+// operator outside the class (printed 205), so §20.6.2's `$bits(T)` (printed
+// 629) in a static method called as `Box#(byte)::bits()` is 8 whether the
+// package class is reached through an import or through `p::`, and 16 for
+// `p::Box#(shortint)::bits()`. No object runs a static method, so the actual
+// was read off none: the value-parameter bind made a 1-bit local of the type
+// name and every specialization answered 1.
+TEST(ParameterizedScopeResolutionSim,
+     BitsOfATypeParameterInAStaticMethodOfASpecialization) {
+  EXPECT_EQ(RunAndGet("package p;\n"
+                      "  class Box #(type T = int);\n"
+                      "    static function int bits(); return $bits(T);\n"
+                      "    endfunction\n"
+                      "  endclass\n"
+                      "endpackage\n"
+                      "module t;\n"
+                      "  import p::*;\n"
+                      "  int out;\n"
+                      "  initial out = Box#(byte)::bits() * 10000 +\n"
+                      "                p::Box#(byte)::bits() * 100 +\n"
+                      "                p::Box#(shortint)::bits();\n"
+                      "endmodule\n",
+                      "out"),
+            8u * 10000u + 8u * 100u + 16u);
+}
+
+// §8.25.1: `Box#()` is the default specialization, whose type parameter is
+// the default the class declares -- byte here rather than int, so that the
+// 8 the default gives is told from the 32 a class parameter's slot answered
+// for the name -- and `Box#(shortint)` beside it reads its own 16.
+TEST(ParameterizedScopeResolutionSim,
+     BitsOfATypeParameterInAStaticMethodOfTheDefaultSpecialization) {
+  EXPECT_EQ(RunAndGet("class Box #(type T = byte);\n"
+                      "  static function int bits(); return $bits(T);\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int out;\n"
+                      "  initial out = Box#()::bits() * 100 +\n"
+                      "                Box#(shortint)::bits();\n"
+                      "endmodule\n",
+                      "out"),
+            8u * 100u + 16u);
+}
+
+// §8.25 lets any type be the actual, so `Box#(logic [11:0])` -- a keyword
+// type under a packed dimension, which the parse spells as a select on the
+// name -- binds T to a 12-bit type, `Box#(int unsigned)` -- a type the parse
+// reads as a type, since an expression cannot spell the signing -- to a
+// 32-bit one, and `Box#(.T(word_t))` to the 20-bit typedef it names.
+TEST(ParameterizedScopeResolutionSim,
+     BitsOfARangedTypedefOrNamedTypeActualInAStaticMethod) {
+  EXPECT_EQ(RunAndGet("class Box #(type T = int);\n"
+                      "  static function int bits(); return $bits(T);\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  typedef bit [19:0] word_t;\n"
+                      "  int out;\n"
+                      "  initial out = Box#(logic [11:0])::bits() * 10000 +\n"
+                      "                Box#(int unsigned)::bits() * 100 +\n"
+                      "                Box#(.T(word_t))::bits();\n"
+                      "endmodule\n",
+                      "out"),
+            12u * 10000u + 32u * 100u + 20u);
+}
+
+// §8.25 with §13.3: a static task named through a specialization runs as a
+// coroutine, so its `#1` suspends the process, and the type the call bound
+// is still in force when the body resumes: `Box#(shortint)::show(out)` writes
+// 16 through its output formal where the default's `Box#()::show(out)`
+// writes 32, and the sum tells the two calls apart from a 1 or a 32 twice.
+TEST(ParameterizedScopeResolutionSim,
+     BitsOfATypeParameterInAStaticTaskOfASpecialization) {
+  EXPECT_EQ(RunAndGet("class Box #(type T = int);\n"
+                      "  static task show(output int o);\n"
+                      "    #1 o = $bits(T);\n"
+                      "  endtask\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int a, b, out;\n"
+                      "  initial begin\n"
+                      "    Box#(shortint)::show(a);\n"
+                      "    Box#()::show(b);\n"
+                      "    out = a * 100 + b;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "out"),
+            16u * 100u + 32u);
+}
+
 }  // namespace

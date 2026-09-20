@@ -16,6 +16,7 @@
 #include "parser/ast_type.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_array_class_assoc.h"
+#include "simulator/eval_class_scope_types.h"
 #include "simulator/eval_systask_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
@@ -51,11 +52,16 @@ static Logic4Vec EvalClog2(const Expr* expr, SimContext& ctx, Arena& arena) {
 // the default the class declares (§8.25.1) -- and 0 for a name that is no
 // type parameter of that class, for a call outside a method, or for a type
 // nothing sizes. The type table holds the class's default under the name, so
-// the object is asked before it.
+// the object is asked before it. A static method runs on no object: called
+// through an explicit specialization, `Box#(byte)::bits()`, it reads the
+// type the call's scope bound (§8.25.1, eval_class_scope_types.h), and
+// through the default specialization the class's default; left to the
+// expression, the name read the class's 32-bit parameter slot or the 1-bit
+// local the value-parameter bind made of the type, whatever the type was.
 static uint32_t BoundTypeParamWidth(std::string_view name, SimContext& ctx) {
   const ClassObject* self = ctx.CurrentThis();
-  if (self == nullptr || self->type == nullptr || self->type->decl == nullptr)
-    return 0;
+  if (self == nullptr) return ScopedTypeParamWidth(name, ctx);
+  if (self->type == nullptr || self->type->decl == nullptr) return 0;
   const ClassDecl* decl = self->type->decl;
   if (decl->type_param_names.count(name) == 0) return 0;
   const DataType* actual = TypeParamActual(self, decl, name);

@@ -1,0 +1,37 @@
+#pragma once
+
+#include <cstdint>
+#include <string_view>
+
+namespace delta {
+
+class Arena;
+struct ClassDecl;
+struct Expr;
+class SimContext;
+
+// §8.25.1: a static method called through an explicit specialization,
+// `Box#(byte)::bits()` or `p::Box#(shortint)::bits()`, runs on no object, so
+// the type the specialization gives each type parameter of the class -- which
+// §8.25 binds throughout the class body -- has to reach the running body some
+// other way than ClassObject::type_param_actuals. Binds it in the innermost
+// scope, the one the call pushed, under the parameter's name, beside the
+// value parameters BindClassParams in src/simulator/eval_function.cpp binds
+// there. `base` is the class name the call wrote, whose `elements` and
+// `arg_names` hold the `#(...)` list as Parser::ParseParamValueAssignment left
+// it: a keyword type or a typedef name as an identifier, a packed dimension as
+// a select on it, and a type an expression could not spell as a kTypeRef. An
+// element that spells no type, and a parameter the list leaves at its
+// default, bind nothing, so a reader falls to the class's defaults for them.
+void BindClassScopeTypeActuals(const ClassDecl* decl, const Expr* base,
+                               SimContext& ctx, Arena& arena);
+
+// §8.25 with §20.6.2: the number of bits of the type the type parameter `name`
+// of the running class stands for, where no object is running -- the type
+// the innermost scope binds it to (BindClassScopeTypeActuals), else the
+// default the class of the running method declares for it (§8.25.1). 0 for a
+// name bound in no scope that is no type parameter of that class, for a call
+// outside a method, or for a type nothing sizes.
+uint32_t ScopedTypeParamWidth(std::string_view name, SimContext& ctx);
+
+}  // namespace delta
