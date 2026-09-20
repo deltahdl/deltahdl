@@ -1,5 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <string>
+#include <string_view>
+
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
@@ -200,6 +204,63 @@ TEST(ModuleInstanceParameterAssignment,
       f, "top");
   EXPECT_TRUE(
       ReportedError(f.diag.Diagnostics(), "has no parameter", 4, "23.10.2.2"));
+}
+
+// The resolved value of parameter `name` of top's one child instance, or -1
+// where the design holds no such instance or parameter or the fold left it
+// unresolved.
+int64_t ChildParamValue(RtlirDesign* design, std::string_view name) {
+  if (design->top_modules.empty() || design->top_modules[0]->children.empty())
+    return -1;
+  const auto* child = design->top_modules[0]->children[0].resolved;
+  if (child == nullptr) return -1;
+  for (const auto& p : child->params) {
+    if (p.name == name) return p.is_resolved ? p.resolved_value : -1;
+  }
+  return -1;
+}
+
+// Q of c, whose `logic [TOP:0] P` follows its `parameter int TOP = 15` in the
+// parameter port list and whose Q is set from P, instantiated once in top
+// with `assignment` as the instance's parameter value assignment.
+int64_t ChildQUnder(std::string_view assignment, ElabFixture& f) {
+  std::string src =
+      "module c #(parameter int TOP = 15, parameter logic [TOP:0] P = 0);\n"
+      "  localparam int Q = P;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  c #(";
+  src += assignment;
+  src += ") u();\nendmodule\n";
+  auto* design = ElaborateSrc(src, f, "top");
+  if (design == nullptr) return -1;
+  return ChildParamValue(design, "Q");
+}
+
+// §23.10.2 (printed page 766) with §6.20.2 (printed 126): a named parameter
+// value assignment gives the parameter the value of an expression written in
+// the instantiating module, converted to the range of its declaration, and
+// that range may be written in terms of an earlier parameter of the same
+// list: `logic [TOP:0] P` under `parameter int TOP = 15` is 16 bits, so
+// `.P(16'hABCD)` gives P every bit of the literal and Q, set from P in the
+// child, reads 0xABCD. The range is sized with TOP in scope, as the port
+// list folds each parameter after the ones before it; cut to a width folded
+// without TOP, the vector atom's one bit, P would be 1.
+TEST(ModuleInstanceParameterAssignment,
+     NamedOverrideIsConvertedToARangeWrittenAsAnEarlierParameter) {
+  ElabFixture f;
+  EXPECT_EQ(ChildQUnder(".P(16'hABCD)", f), 0xABCD);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// The same list with TOP overridden in the same assignment: §23.10.2 has the
+// later parameter's range follow the earlier one's new value, so `.TOP(7)`
+// makes P eight bits and `.P(16'hABCD)` is cut to 0xCD, which Q reads.
+TEST(ModuleInstanceParameterAssignment,
+     NamedOverrideIsConvertedToARangeTheSameAssignmentOverrides) {
+  ElabFixture f;
+  EXPECT_EQ(ChildQUnder(".TOP(7), .P(16'hABCD)", f), 0xCD);
+  EXPECT_FALSE(f.has_errors);
 }
 
 }  // namespace
