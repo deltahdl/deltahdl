@@ -19,6 +19,7 @@
 #include "simulator/eval_array.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
+#include "simulator/lowerer_register.h"
 #include "simulator/scope.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
@@ -144,8 +145,8 @@ class CalleeOwnsThisScope {
   bool previous_;
 };
 
-static int ResolveArgIndex(const ModuleItem* func, const Expr* expr,
-                           size_t param_idx) {
+int ResolveArgIndex(const ModuleItem* func, const Expr* expr,
+                    size_t param_idx) {
   if (expr->arg_names.empty()) {
     return (param_idx < expr->args.size()) ? static_cast<int>(param_idx) : -1;
   }
@@ -546,6 +547,20 @@ static bool TryBindQueueArg(QueueObject* src_q, const FunctionArg& formal,
 
 // Binds a fixed-size unpacked-array actual by copying each element variable
 // into a fresh per-element formal variable.
+//
+// §13.3 (printed page 337) has an output formal copy its value out at the end
+// and nothing in at the beginning, so an output formal's element starts at
+// the default a scalar output formal starts at in BindValueArg rather than at
+// the caller's element; an input or inout element is the caller's copied in.
+//
+// §7.4 (printed page 153) puts the packed dimensions before the name and the
+// unpacked ones after it, so mytask4's `output [3:0][7:0] y[1:0]` (§13.3,
+// printed 337) is two elements of a packed two-dimensional type, and §7.4.1
+// makes one index of such an element select a subfield of it, `y[1][3]` the
+// eight bits of element 3. The element's variable is created here with no
+// record of that layout, so the body's `y[1][3] = 8'hAB` wrote bit 3 of it.
+// The formal's declared packed dimensions are recorded as a declaration's are
+// (RecordPackedRange), which is what SelectStorageBits reads the index by.
 static void BindFixedArrayArg(const Expr* call_arg, const FunctionArg& formal,
                               const ArrayInfo& info, SimContext& ctx,
                               Arena& arena) {
@@ -558,12 +573,15 @@ static void BindFixedArrayArg(const Expr* call_arg, const FunctionArg& formal,
     auto* src_var = ctx.FindVariable(src);
     auto val =
         src_var ? src_var->value : MakeLogic4VecVal(arena, info.elem_width, 0);
+    if (formal.direction == Direction::kOutput)
+      val = MakeLogic4VecVal(arena, val.width, 0);
     auto* dst_var = ctx.CreateLocalVariable(
         *arena.Create<std::string>(std::move(dst)), val.width);
     // §13.5.1 again: `val` is the caller's element variable's own Logic4Vec
     // where the element exists, so the store takes the words rather than the
     // pointer to them.
     dst_var->value = OwnRhsWords(val, arena);
+    RecordPackedRange(&formal.data_type, dst_var, ctx, arena);
   }
 }
 
@@ -852,71 +870,4 @@ void BindFunctionArgs(const ModuleItem* func, const Expr* expr, SimContext& ctx,
   }
 }
 
-// The root an actual is written on: the base of a select chain, else the
-// actual itself.
-static const Expr* SelectRoot(const Expr* actual) {
-  while (actual && actual->kind == ExprKind::kSelect) actual = actual->base;
-  return actual;
-}
-
-// Whether the formal's value is carried back into the actual when the
-// subroutine returns. §13.5.2 (printed page 349) has an output or inout formal
-// copied to its actual then, and lists a class property and a member of an
-// unpacked structure among what may be passed by reference. Neither of those
-// is a variable of its own -- a property is a field of its object and a
-// member a window of the structure's variable -- so there is nothing for the
-// ref binds to alias and the formal took BindValueArg's copy: `add(s.b, 20)`
-// and `add(h.v, 5)` left 5 and 60 standing. The copy is carried back into the
-// member or property here, through the assignment the actual takes as a
-// target, exactly as a queue or associative-array element's is by
-// WritebackQueueRefs and WritebackAssocRefs. A ref actual rooted anywhere
-// else is either aliased, and needs no copy-out, or is no target at all; a
-// const ref formal (printed page 350) is read only.
-static bool CopiesOutOnReturn(const FunctionArg& formal, const Expr* actual) {
-  if (formal.direction == Direction::kOutput ||
-      formal.direction == Direction::kInout) {
-    return true;
-  }
-  if (formal.direction != Direction::kRef || formal.is_const) return false;
-  // A formal declared with unpacked dimensions is an aggregate, which the
-  // copy BindValueArg makes of a member or property does not stand for.
-  if (!formal.unpacked_dims.empty()) return false;
-  const Expr* root = SelectRoot(actual);
-  return root != nullptr && root->kind == ExprKind::kMemberAccess;
-}
-
-// §13.5.2: an output or inout formal is copied to its actual when the
-// subroutine returns, and so is a ref formal bound to a member or property
-// (CopiesOutOnReturn). The actual is an expression of the caller's, so it is
-// assigned with the callee's scope, the top of the stack at this point,
-// taken off the stack and put back after: an actual spelled like the formal
-// would otherwise resolve to the formal and the caller's variable never
-// change.
-void WritebackOutputArgs(const ModuleItem* func, const Expr* expr,
-                         SimContext& ctx, Arena& arena) {
-  std::vector<std::pair<const Expr*, Logic4Vec>> writes;
-  for (size_t i = 0; i < func->func_args.size(); ++i) {
-    const FunctionArg& formal = func->func_args[i];
-    int ai = ResolveArgIndex(func, expr, i);
-    const Expr* actual =
-        ai >= 0 ? expr->args[static_cast<size_t>(ai)] : nullptr;
-    if (!CopiesOutOnReturn(formal, actual)) continue;
-    auto* local = ctx.FindLocalVariable(formal.name);
-    if (!local) continue;
-    const Expr* wb_target = actual ? actual : formal.default_value;
-    if (!wb_target) continue;
-    writes.emplace_back(wb_target, local->value);
-  }
-  if (writes.empty()) return;
-  std::vector<Scope> stack = ctx.SwapScopeStack({});
-  Scope callee = std::move(stack.back());
-  stack.pop_back();
-  ctx.SwapScopeStack(std::move(stack));
-  for (const auto& [target, value] : writes) {
-    PerformBlockingAssign(target, value, ctx, arena);
-  }
-  stack = ctx.SwapScopeStack({});
-  stack.push_back(std::move(callee));
-  ctx.SwapScopeStack(std::move(stack));
-}
 }  // namespace delta

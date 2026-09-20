@@ -587,4 +587,107 @@ TEST(TaskSim, FormalWithNeitherTypeNorDimensionIsAScalarLogic) {
   EXPECT_EQ(val, 6553521u);
 }
 
+// §13.3 (printed page 337): mytask4's `output [3:0][7:0] y[1:0]` is a formal
+// with an unpacked dimension on the identifier and a packed two-dimensional
+// element type, and the direction copies the value out at the end; §13.5
+// (printed 348) has the return pass the output formals' values to the
+// variables of the call. Each element of the caller's `y` takes the element
+// the body wrote: 32'h01020304 into y[0] and a + b[2], 513 + 7, into y[1].
+// The formal was bound as the per-element variables yo[0] and yo[1] and the
+// copy-out looked for a variable named yo alone, so both elements of y kept
+// their x and read 0; an element copied under the other's index would read
+// the other's value.
+TEST(TaskSim, OutputFormalWithAnUnpackedDimensionCopiesEachElementOut) {
+  const char* src =
+      "module t;\n"
+      "  logic [3:0][7:0] y[1:0];\n"
+      "  task mytask4(input [3:0][7:0] a, b[3:0], output [3:0][7:0] yo[1:0]);\n"
+      "    yo[0] = 32'h01020304; yo[1] = a + b[2];\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    logic [3:0][7:0] bb[3:0];\n"
+      "    bb[2] = 7;\n"
+      "    mytask4(513, bb, y);\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "y[0]"), 0x01020304u);
+  EXPECT_EQ(RunAndGet(src, "y[1]"), 520u);
+}
+
+// §7.4.1 (printed page 153): a packed array subdivides a vector into subfields
+// addressed as elements, so `yo[1][3]` on the `[3:0][7:0]` element is the
+// eight bits of subfield 3, bits 31 to 24, and writing 8'hAB there after
+// `yo[1] = 1` leaves 32'hAB000001 for the copy-out. The formal's element
+// variable carried no record of its packed dimensions, so the index addressed
+// bit 3 of the element and the copy would have carried 32'h00000009.
+TEST(TaskSim, OutputArrayFormalElementTakesAPackedSubfieldWriteInTheBody) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  logic [3:0][7:0] y[1:0];\n"
+      "  task tk(output [3:0][7:0] yo[1:0]);\n"
+      "    yo[0] = 258; yo[1] = 1; yo[1][3] = 8'hAB;\n"
+      "  endtask\n"
+      "  initial tk(y);\n"
+      "endmodule\n",
+      "y[1]");
+  EXPECT_EQ(val, 0xAB000001u);
+}
+
+// §13.3 (printed page 337): an output formal copies its value out at the end
+// and nothing in at the beginning, so an element the body leaves alone carries
+// back what the formal held from the start -- the 0 BindValueArg starts every
+// output formal at -- and not the 32'hFFFFFFFF the caller's element held
+// before the call, which a copy-in would have carried through the body.
+TEST(TaskSim, OutputArrayFormalElementLeftUnwrittenCopiesItsDefaultOut) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  logic [3:0][7:0] y[1:0];\n"
+      "  task tk(output [3:0][7:0] yo[1:0]); yo[0] = 258; endtask\n"
+      "  initial begin\n"
+      "    y[1] = 32'hFFFFFFFF;\n"
+      "    tk(y);\n"
+      "  end\n"
+      "endmodule\n",
+      "y[1]");
+  EXPECT_EQ(val, 0u);
+}
+
+// §13.3 (printed page 337): an inout formal copies in at the beginning and out
+// at the end, so each element of `io` starts at the caller's element and the
+// caller's element ends at what the body left: y[0] from 16 to 17 and y[1]
+// from 5 to 5 + 2 with subfield 3 set to 8'hC0, 32'hC0000007. A lost copy-in
+// reads 1 and 32'hC0000002; a lost copy-out reads 16 and 5.
+TEST(TaskSim, InoutArrayFormalCopiesEachElementInAndOut) {
+  const char* src =
+      "module t;\n"
+      "  logic [3:0][7:0] y[1:0];\n"
+      "  task bump(inout [3:0][7:0] io[1:0]);\n"
+      "    io[0] = io[0] + 1; io[1] = io[1] + 2; io[1][3] = 8'hC0;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    y[0] = 16; y[1] = 5;\n"
+      "    bump(y);\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "y[0]"), 17u);
+  EXPECT_EQ(RunAndGet(src, "y[1]"), 0xC0000007u);
+}
+
+// §11.5.1 with §13.3: `zo[0][3]` on an `output [7:0] zo[1:0]` formal, one
+// packed dimension, is bit 3 of element 0, so the bit set in the body reaches
+// the caller's z[0] as 8 beside the 8'h5A copied into z[1]. A lost copy-out
+// reads 0 for both; the bit landing on the wrong element reads 0x5A | 8.
+TEST(TaskSim, OutputArrayFormalElementTakesABitSelectWriteInTheBody) {
+  const char* src =
+      "module t;\n"
+      "  logic [7:0] z[1:0];\n"
+      "  task tk(output [7:0] zo[1:0]);\n"
+      "    zo[0] = 8'h00; zo[1] = 8'h5A; zo[0][3] = 1'b1;\n"
+      "  endtask\n"
+      "  initial tk(z);\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "z[0]"), 8u);
+  EXPECT_EQ(RunAndGet(src, "z[1]"), 0x5Au);
+}
+
 }  // namespace

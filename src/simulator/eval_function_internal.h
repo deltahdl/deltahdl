@@ -78,6 +78,13 @@ struct Variable;
 struct ClassObject;
 void BindFunctionArgs(const ModuleItem* func, const Expr* expr, SimContext& ctx,
                       Arena& arena);
+// §13.5.4: the position in the call's argument list of the actual bound to the
+// formal at `param_idx` -- its own position while the actuals are positional,
+// the position of the one named after it once they are named -- or -1 where
+// the call supplies none, so the formal takes its default. Defined in
+// eval_function_args.cpp; the copy-out on return in
+// eval_function_args_writeback.cpp asks it for the same pairing.
+int ResolveArgIndex(const ModuleItem* func, const Expr* expr, size_t param_idx);
 
 // The actual arguments of one call, as §35.6.1 "Argument passing" and §11.12
 // "Let construct" each describe them: the call-site expression, the boundary
