@@ -436,6 +436,39 @@ bool Parser::AtDataTypeOrVoid() {
   return TokenToTypeKind(tk).has_value();
 }
 
+// The data_type a declaration puts before its declarator. A.2.2.1 lets one be
+// a type_identifier behind a package_scope or a class_scope, and ParseDataType
+// reads an identifier as a named type only where known_types_ holds it, which
+// a package name never is: §8.5 puts no restriction on a class property's
+// data type and §26.3 names a package's declaration through the package scope
+// resolution operator, so `pk::sev_t s = pk::MED;` in a class body,
+// `pk::sev_t` as a method's return type and the same in a block item are one
+// data_type read one way. An unknown leading name followed by `::` and an
+// identifier is read through ParseNamedType, whose `::` walk and `#(...)`
+// parameters are what a known type name reaches through ParseDataType, unless
+// a `(` follows the scoped name: that is the `C::f(` of an out-of-block method
+// declaration (§8.24) whose class this parse does not know, not a type, and
+// it is left to ParseDataType and the name walk in ParseFuncName as is
+// everything else.
+DataType Parser::ParseDeclaredDataType() {
+  bool scoped = false;
+  if (Check(TokenKind::kIdentifier) &&
+      known_types_.count(CurrentToken().text) == 0) {
+    auto saved = lexer_.SavePos();
+    Consume();
+    scoped = Match(TokenKind::kColonColon) && CheckIdentifier();
+    if (scoped) {
+      Consume();
+      scoped = !Check(TokenKind::kLParen);
+    }
+    lexer_.RestorePos(saved);
+  }
+  if (!scoped) return ParseDataType();
+  DataType dtype = ParseNamedType();
+  ParsePackedDims(dtype);
+  return dtype;
+}
+
 DataType Parser::ParseDataType() {
   DataType dtype;
 

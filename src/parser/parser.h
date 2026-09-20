@@ -720,6 +720,7 @@ class Parser {
                           const std::vector<Attribute>& attrs);
 
   DataType ParseDataType();
+  DataType ParseDeclaredDataType();
   // True when the token the parse stands on opens a `data_type_or_void`
   // (A.2.2.1), for a caller whose production makes that type optional and so
   // has to decide whether one is written before it parses it. It answers for

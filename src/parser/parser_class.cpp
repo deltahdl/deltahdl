@@ -662,8 +662,10 @@ void Parser::ParseClassMembers(std::vector<ClassMember*>& members) {
                                  kQualRand | kQualRandc | kQualStatic |
                                      kQualProtected | kQualLocal | kQualConst,
                                  "class property");
+  // §8.5 puts no restriction on the property's data type, so the
+  // package-scoped `pk::t` of §26.3 is read as a declaration's type is.
   DataType dtype;
-  if (!TryParseInlineAggregateType(dtype)) dtype = ParseDataType();
+  if (!TryParseInlineAggregateType(dtype)) dtype = ParseDeclaredDataType();
   member->kind = ClassMemberKind::kProperty;
   member->data_type = dtype;
   member->name = Expect(TokenKind::kIdentifier, Subclause("8.5")).text;

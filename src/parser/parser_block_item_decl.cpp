@@ -172,19 +172,10 @@ void Parser::ParseBlockDataDecl(std::vector<Stmt*>& stmts,
     is_automatic = Match(TokenKind::kKwAutomatic);
     is_static = !is_automatic && Match(TokenKind::kKwStatic);
   }
-  // ParseDataType reads an identifier as a named type only when known_types_
-  // holds it, which a package name never is; the scoped form
-  // IsBlockVarDeclStartCore admitted is read here by ParseNamedType, whose
-  // `::` walk and `#(...)` parameters are what the leading known-type case
-  // reaches through ParseDataType.
-  DataType dtype;
-  if (Check(TokenKind::kIdentifier) &&
-      known_types_.count(CurrentToken().text) == 0 && AtScopedTypeName()) {
-    dtype = ParseNamedType();
-    ParsePackedDims(dtype);
-  } else {
-    dtype = ParseDataType();
-  }
+  // The scoped form IsBlockVarDeclStartCore admitted is what
+  // ParseDeclaredDataType reads past known_types_, which never holds a
+  // package name.
+  DataType dtype = ParseDeclaredDataType();
   if (saw_var && dtype.kind == DataTypeKind::kImplicit &&
       Check(TokenKind::kLBracket)) {
     ParsePackedDims(dtype);

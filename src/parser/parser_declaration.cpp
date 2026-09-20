@@ -474,7 +474,12 @@ DataType Parser::ParseFunctionReturnType() {
     Expect(TokenKind::kRParen, Subclause("6.23"));
     return dt;
   }
-  return ParseDataType();
+  // A.2.7's function_data_type_or_implicit takes a data_type, which A.2.2.1
+  // lets stand behind a package_scope, so `function pk::t f();` reads the
+  // scoped type; `function C::f();` of an out-of-block declaration, whose
+  // class this parse may not know, is left to ParseDataType and the name walk
+  // in ParseFuncName.
+  return ParseDeclaredDataType();
 }
 
 bool Parser::TryParseInlineAggregateType(DataType& dt) {
