@@ -60,11 +60,12 @@ struct ClassTypeInfo {
   // unqualified; both walk this chain (SimContext::FindClassType,
   // StaticPropertyOwner).
   const ClassTypeInfo* enclosing = nullptr;
-  // §26.2: the package the class is declared in, empty for a class of a
-  // module or of the compilation unit. The package's declarations are visible
-  // by their bare names throughout the package, the class's method bodies and
-  // property initializers included, so a frame running one carries this name
-  // as Scope::package and SimContext::FindInPackageScope answers them.
+  // §26.2: the package the class is declared in, "$unit" for a class the
+  // compilation unit declares (§3.12.1, the unit's data keyed "$unit.name")
+  // and empty for a module's. The scope's declarations are visible by their
+  // bare names throughout it, the class's method bodies and property
+  // initializers included, so a frame running one carries this name as
+  // Scope::package and SimContext::FindInPackageScope answers them.
   std::string_view package;
 
   struct PropertyInfo {
