@@ -172,42 +172,101 @@ void ProcessImportRuleRef(ImportRuleCtx& ctx, const Expr* e) {
   }
 }
 
+// The declaration an explicit import of `pkg_name::name` imports, named by
+// the package declaring it: §26.6 makes an import of a declaration reached
+// through an export an import of the original declaration (printed page 815),
+// so the origin is the source's own declaration or the one an export of the
+// source hands on. The source itself stands in where it provides no such
+// name, the import of a name its package lacks being the import's own report.
+std::string_view ExplicitImportOrigin(ImportRuleCtx& ctx,
+                                      std::string_view pkg_name,
+                                      std::string_view name) {
+  std::string_view origin =
+      ProvidedNameOrigin(ctx.unit, ctx.pkg_provided_names, pkg_name, name);
+  return origin.empty() ? pkg_name : origin;
+}
+
+// The package declaring the identifier a reference bound through the scope's
+// wildcard imports. ClaimWildcardCandidate claims a name only where one
+// declaration supplies it, so the first supplier's origin is the claim's.
+std::string_view WildcardClaimOrigin(ImportRuleCtx& ctx,
+                                     std::string_view name) {
+  for (auto pkg : ctx.wildcard_packages) {
+    std::string_view origin =
+        ProvidedNameOrigin(ctx.unit, ctx.pkg_provided_names, pkg, name);
+    if (!origin.empty()) return origin;
+  }
+  return {};
+}
+
+// §26.3 makes an explicit import illegal where the identifier is explicitly
+// imported from another package, an import of the same identifier from the
+// same package allowed (printed page 810), and §26.6 makes importing one
+// declaration by several exported paths no conflict (printed 815-816): the
+// clause's p2 and p4 both hand on p1's x, so `import p2::x; import p4::x;`
+// imports one declaration twice. The two imports are therefore compared by
+// the declaration each reaches rather than by the package each names.
+// Answers whether an earlier explicit import settled this one.
+bool CheckAgainstEarlierExplicitImport(ImportRuleCtx& ctx,
+                                       const ModuleItem* item,
+                                       std::string_view pkg_name) {
+  auto name = item->import_item.item_name;
+  auto eit = ctx.explicit_imports.find(name);
+  if (eit == ctx.explicit_imports.end()) return false;
+  std::string_view earlier = eit->second.first;
+  if (ExplicitImportOrigin(ctx, earlier, name) ==
+      ExplicitImportOrigin(ctx, pkg_name, name)) {
+    return true;
+  }
+  ctx.diag.Error(item->loc,
+                 std::format("explicit import of '{}::{}' conflicts with "
+                             "earlier explicit import from '{}'",
+                             pkg_name, name, earlier),
+                 Subclause("26.3"));
+  return true;
+}
+
+// Table 26-1 of §26.5, row `import p::c;`, column for a scope holding a
+// wildcard import of c (printed page 814): the explicit import makes every
+// earlier reference to c illegal. §26.3 states the other three import-legality
+// rules this file enforces but not this one, and the worked example closing
+// §26.5 (`import q::*; wire a = c; import p::c;`) is this rule alone. The
+// reference bound the wildcard-imported declaration, and the explicit import
+// would bind the name to another; where it names that same declaration,
+// reached through an export, §26.6 has the two imports agree (printed 816)
+// and nothing is rebound. Answers whether the explicit import was reported.
+bool ReportExplicitImportAfterWildcardClaim(ImportRuleCtx& ctx,
+                                            const ModuleItem* item,
+                                            std::string_view pkg_name) {
+  auto name = item->import_item.item_name;
+  if (WildcardClaimOrigin(ctx, name) ==
+      ExplicitImportOrigin(ctx, pkg_name, name)) {
+    return false;
+  }
+  ctx.diag.Error(item->loc,
+                 std::format("explicit import of '{}::{}' is illegal because "
+                             "'{}' was already referenced through a wildcard "
+                             "package import",
+                             pkg_name, name, name),
+                 Subclause("26.5"));
+  return true;
+}
+
 void HandleExplicitImport(ImportRuleCtx& ctx, const ModuleItem* item,
                           std::string_view pkg_name) {
   auto name = item->import_item.item_name;
-  auto eit = ctx.explicit_imports.find(name);
-  if (eit != ctx.explicit_imports.end()) {
-    if (eit->second.first == pkg_name) return;
-    ctx.diag.Error(
-        item->loc,
-        std::format("explicit import of '{}::{}' conflicts with earlier "
-                    "explicit import from '{}'",
-                    pkg_name, name, eit->second.first),
-        Subclause("26.3"));
-    return;
-  }
+  if (CheckAgainstEarlierExplicitImport(ctx, item, pkg_name)) return;
   if (ctx.seen_decls.count(name)) {
     if (ctx.wildcard_claimed.find(name) != ctx.wildcard_claimed.end()) {
-      // Table 26-1 of §26.5, row `import p::c;`, column "In a scope containing
-      // a wildcard import of c": "The import of p::c makes any prior reference
-      // to c illegal." §26.3 states the other three import-legality rules this
-      // function enforces but not this one, and the worked example closing
-      // §26.5 (`import q::*; wire a = c; import p::c;`) is this rule alone.
-      ctx.diag.Error(
-          item->loc,
-          std::format("explicit import of '{}::{}' is illegal because "
-                      "'{}' was already referenced through a wildcard "
-                      "package import",
-                      pkg_name, name, name),
-          Subclause("26.5"));
+      if (ReportExplicitImportAfterWildcardClaim(ctx, item, pkg_name)) return;
     } else {
       ctx.diag.Error(item->loc,
                      std::format("explicit import of '{}::{}' collides with "
                                  "existing declaration of '{}'",
                                  pkg_name, name, name),
                      Subclause("26.3"));
+      return;
     }
-    return;
   }
   ctx.explicit_imports[name] = {pkg_name, item->loc};
   ctx.seen_decls.insert(name);

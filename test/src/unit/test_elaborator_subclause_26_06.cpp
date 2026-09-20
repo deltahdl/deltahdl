@@ -408,4 +408,124 @@ TEST(PackageExport, StarStarExportMakesTheImportedVariableVisible) {
              f));
 }
 
+// §26.6: an import of a declaration made visible through an export is an
+// import of the original declaration, so importing one declaration by
+// several exported paths causes no conflict (printed pages 815-816), and
+// §26.3 makes an explicit import illegal only where the identifier is
+// declared in the scope or explicitly imported from another declaration
+// (printed 810). p2 exports p1's x by name and p4 by wildcard, so `import
+// p2::x` and `import p4::x` both import p1::x; a third, straight from p1,
+// is the same declaration once more. HandleExplicitImport in
+// src/elaborator/elaborator_scope_rules_imports.cpp compared the package
+// names, p2 against p4, and reported the second import as conflicting.
+TEST(PackageExport, ExplicitImportsOfOneDeclarationThroughTwoExportsAgree) {
+  ElabFixture f;
+  EXPECT_TRUE(
+      ElabOk("package p1;\n"
+             "  int x = 6;\n"
+             "endpackage\n"
+             "package p2;\n"
+             "  import p1::x;\n"
+             "  export p1::x;\n"
+             "endpackage\n"
+             "package p4;\n"
+             "  import p1::*;\n"
+             "  export p1::*;\n"
+             "endpackage\n"
+             "module top;\n"
+             "  import p2::x;\n"
+             "  import p4::x;\n"
+             "  import p1::x;\n"
+             "  int r;\n"
+             "  initial r = x;\n"
+             "  initial $display(\"%0d\", x);\n"
+             "endmodule\n",
+             f));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "reference to unresolved identifier 'x'", 17,
+                             "23.9"));
+}
+
+// The conflict §26.3 does state: p3 declares an x of its own, so `import
+// p3::x` after `import p2::x`, which reaches p1's, imports the same
+// identifier from another declaration and is reported at its own line. A
+// comparison that took every exported name as its source's own would let
+// this pair through as p2 against p3 let the pair above through.
+TEST(PackageExport, ExplicitImportsOfTwoDistinctDeclarationsStillConflict) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("package p1;\n"
+             "  int x = 6;\n"
+             "endpackage\n"
+             "package p2;\n"
+             "  import p1::x;\n"
+             "  export p1::x;\n"
+             "endpackage\n"
+             "package p3;\n"
+             "  int x = 9;\n"
+             "endpackage\n"
+             "module top;\n"
+             "  import p2::x;\n"
+             "  import p3::x;\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "explicit import of 'p3::x' conflicts with earlier "
+                            "explicit import from 'p2'",
+                            13, "26.3"));
+}
+
+// §26.5's Table 26-1 has an explicit import of c after a reference bound
+// through a wildcard import of c make that reference illegal (printed page
+// 814), the reference having imported one declaration and the explicit
+// import naming another; §26.6 makes a direct or wildcard import of one
+// declaration by way of several exported paths no conflict (printed 816).
+// The read of x binds p1's x through p4's wildcard export, and `import
+// p2::x` names that same declaration, so nothing is rebound and nothing is
+// reported; with p3's own x in p2's place the report stands.
+TEST(PackageExport, ExplicitImportOfTheDeclarationAWildcardReferenceBound) {
+  EXPECT_TRUE(
+      ElabOk("package p1;\n"
+             "  int x = 6;\n"
+             "endpackage\n"
+             "package p2;\n"
+             "  import p1::x;\n"
+             "  export p1::x;\n"
+             "endpackage\n"
+             "package p4;\n"
+             "  import p1::*;\n"
+             "  export p1::*;\n"
+             "endpackage\n"
+             "module top;\n"
+             "  import p4::*;\n"
+             "  int r;\n"
+             "  initial r = x;\n"
+             "  import p2::x;\n"
+             "endmodule\n"));
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("package p1;\n"
+             "  int x = 6;\n"
+             "endpackage\n"
+             "package p3;\n"
+             "  int x = 9;\n"
+             "endpackage\n"
+             "package p4;\n"
+             "  import p1::*;\n"
+             "  export p1::*;\n"
+             "endpackage\n"
+             "module top;\n"
+             "  import p4::*;\n"
+             "  int r;\n"
+             "  initial r = x;\n"
+             "  import p3::x;\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "explicit import of 'p3::x' is illegal because 'x' "
+                            "was already referenced through a wildcard "
+                            "package import",
+                            15, "26.5"));
+}
+
 }  // namespace

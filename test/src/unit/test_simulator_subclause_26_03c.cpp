@@ -467,4 +467,36 @@ TEST(PackageImportSim, LoopBlockInstanceImportBindsAfterItsPoint) {
             22u);
 }
 
+// §26.6 (printed pages 815-816): an import of a declaration reached through
+// an export is an import of the original, so `import p2::x` and `import
+// p4::x`, p2 exporting p1's x by name and p4 by wildcard, both bind the
+// module's bare x to p1's one variable and conflict with nothing under
+// §26.3 (printed 810). The write of 37 through the bare name lands in p1's x
+// and the bare read and the qualified p1::x read it back: 37 * 100 + 37.
+// The elaborator reported the second import as conflicting with the first,
+// which the fixture refuses; a bare x bound to anything but p1's would read
+// 0 beside p1::x's 37, 3700 or 37.
+TEST(PackageImportSim, TwoExplicitImportsThroughTwoExportsBindOneVariable) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  int x;\n"
+                      "endpackage\n"
+                      "package p2;\n"
+                      "  import p1::x;\n"
+                      "  export p1::x;\n"
+                      "endpackage\n"
+                      "package p4;\n"
+                      "  import p1::*;\n"
+                      "  export p1::*;\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  import p2::x;\n"
+                      "  import p4::x;\n"
+                      "  int y;\n"
+                      "  initial x = 37;\n"
+                      "  initial #1 y = x * 100 + p1::x;\n"
+                      "endmodule\n",
+                      "y"),
+            3737u);
+}
+
 }  // namespace
