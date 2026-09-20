@@ -16,6 +16,7 @@
 #include "elaborator/queue_dim.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
+#include "lexer/token.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -433,31 +434,156 @@ static int32_t PackageQueueMaxSize(const Expr* dim, std::string_view pkg,
   return size ? *size : -1;
 }
 
+// §7.4.2 (printed page 154): the bounds one unpacked dimension of a package
+// array is declared with, `[l:r]` as written, either bound the greater, and
+// `[size]` as [0:size-1]. Each bound is a constant expression, which §11.2.1
+// lets name a parameter, for a package's array one of the package's own, so
+// the caller has the package's frame pushed as PackageQueueMaxSize pushes it
+// for a queue's bound. None for a dimension of neither form or a size that is
+// not positive, which the elaborator has reported.
+static std::optional<RtlirUnpackedDim> PackageArrayDim(const Expr* dim,
+                                                       SimContext& ctx,
+                                                       Arena& arena) {
+  auto eval = [&](const Expr* e) {
+    return static_cast<int64_t>(EvalExpr(e, ctx, arena).ToUint64());
+  };
+  if (dim->kind == ExprKind::kBinary && dim->op == TokenKind::kColon)
+    return RtlirUnpackedDim{eval(dim->lhs), eval(dim->rhs)};
+  int64_t size = eval(dim);
+  if (size <= 0) return std::nullopt;
+  return RtlirUnpackedDim{0, size - 1};
+}
+
+// §7.4.2 with §7.4.4 (printed page 154): the unpacked extents of a package's
+// fixed-size array, folded into `var` as the elaborator folds a module's
+// (ComputeUnpackedDims and CollectUnpackedDimSizes in
+// src/elaborator/elaborator_decls.cpp): every dimension's bounds in
+// declaration order, the outermost summarized as the address the array
+// counts from, its element count and its direction, and the per-dimension
+// sizes CreateMultiDimLeaves reads for two dimensions or more. A package's
+// items are not elaborated into RtlirVariables, so the fold is made here,
+// in the package's frame. False where a dimension does not fold, which
+// declares no array this can build.
+static bool FoldPackageArrayDims(const ModuleItem* item, std::string_view pkg,
+                                 RtlirVariable& var, SimContext& ctx,
+                                 Arena& arena) {
+  ctx.PushScope(pkg);
+  bool folded = true;
+  for (const Expr* dim : item->unpacked_dims) {
+    std::optional<RtlirUnpackedDim> bounds =
+        dim == nullptr ? std::nullopt : PackageArrayDim(dim, ctx, arena);
+    if (!bounds) {
+      folded = false;
+      break;
+    }
+    var.unpacked_dims.push_back(*bounds);
+    var.unpacked_dim_sizes.push_back(bounds->Size());
+  }
+  ctx.PopScope();
+  if (!folded) return false;
+  const RtlirUnpackedDim& outer = var.unpacked_dims.front();
+  var.unpacked_lo = outer.Low();
+  var.unpacked_size = outer.Size();
+  var.is_descending = outer.left > outer.right;
+  var.num_unpacked_dims = static_cast<uint32_t>(item->unpacked_dims.size());
+  return true;
+}
+
+// §7.4.2 (printed page 154) with §26.2 (printed 808): a package variable
+// declared with a fixed-size unpacked dimension is an array of elements, each
+// storage of its own that an element select reads and writes and that
+// foreach and $size count, so it is given the element variables and the
+// ArrayInfo CreateArrayElements (lowerer_var.cpp) gives a module's, under the
+// "pk.name" key its carrier variable stands under: "p1.a[1]" for the element
+// and "p1.a" for the shape, the keys a bare `a[i]` inside the package's own
+// subroutine resolves to (SimContext::FindInPackageScope and FindArrayInfo
+// through ScopedObjectKeys). The carrier alone stood there, so `a[1] = 7` in
+// a package function wrote bit 1 of a 32-bit carrier, `a[1]` read it back
+// as one bit, and foreach ran once per bit of the carrier. CreateArrayElements
+// reads the declaration as a RtlirVariable, so the item's type is shaped into
+// one as ShapePackageVariable shapes the carrier, and its initializer
+// (§7.4.2's assignment pattern, distributed by CreateArrayElements one item
+// per element) is evaluated in the package's frame here rather than by
+// InitPackageDataItem, which leaves the item alone.
+static void CreatePackageArray(const ModuleItem* item, std::string_view pkg,
+                               std::string_view qname, SimContext& ctx,
+                               Arena& arena) {
+  const DataType& type = item->data_type;
+  RtlirVariable var;
+  var.name = item->name;
+  var.width = PackageDataWidth(item, ctx);
+  var.is_4state = DeclaredTypeIs4State(type);
+  var.is_signed = DeclaredTypeIsSigned(type, ctx);
+  var.is_string = DeclaredTypeIsString(type, ctx);
+  var.is_real = type.kind == DataTypeKind::kReal ||
+                type.kind == DataTypeKind::kShortreal ||
+                type.kind == DataTypeKind::kRealtime;
+  var.init_expr = item->init_expr;
+  var.dtype = &type;
+  var.elem_type_kind = type.kind;
+  if (!FoldPackageArrayDims(item, pkg, var, ctx, arena)) return;
+  ctx.PushScope(pkg);
+  CreateArrayElements(qname, var, ctx, arena);
+  ctx.PopScope();
+}
+
+// §7.5 (printed page 157) with §26.2 (printed 808): a package variable whose
+// first unpacked dimension is `[]` is a dynamic array, sized by new[] or an
+// array assignment and read by size(), which Lowerer::LowerVarAggregate
+// (lowerer_var.cpp) backs for a module's with a QueueObject of no bound and
+// an ArrayInfo marked dynamic; a package's is given both under its "pk.name"
+// key. The carrier alone stood there, so `p1::d = new[3]` sized nothing,
+// `p1::d[2] = 9` wrote nothing and `p1::d.size()` read 0.
+static void CreatePackageDynArray(std::string_view qname, uint32_t width,
+                                  bool is_4state, SimContext& ctx) {
+  ctx.CreateQueue(qname, width, /*max_size=*/-1, is_4state);
+  ArrayInfo info;
+  info.is_dynamic = true;
+  info.elem_width = width;
+  info.is_4state = is_4state;
+  ctx.RegisterArray(qname, info);
+}
+
 // §7.10 (printed page 169) and §7.8 (printed 163) with §26.2 (printed 808):
 // a package variable declared with a queue dimension or an associative
 // dimension is the queue or the associative array the methods and the
 // element selects operate on, so it is given the QueueObject or the
 // AssocArrayObject under the "pk.name" key its carrier variable stands
 // under, as Lowerer::LowerVarAggregate (lowerer_var.cpp) gives a module's
-// and CreateDeclAggregate (statement_assign_decl.cpp) a block's. The carrier
-// alone stood there, so `p1::q.push_back(4)` and `p1::m["k"] = 5` found no
-// object and did nothing, and a read of either element answered 0. The
-// object is created outside every frame: SimContext::CreateQueue and
-// CreateAssocArray keep one made inside a frame for that frame's life alone.
+// and CreateDeclAggregate (statement_assign_decl.cpp) a block's; a dynamic
+// dimension (§7.5) and a fixed-size one (§7.4.2) are given their stores by
+// the two functions above. The carrier alone stood there, so
+// `p1::q.push_back(4)` and `p1::m["k"] = 5` found no object and did nothing,
+// and a read of either element answered 0. The object is created outside
+// every frame: SimContext::CreateQueue and CreateAssocArray keep one made
+// inside a frame for that frame's life alone.
+//
+// §8.2 (printed page 179) with §7.10: a queue whose element type is a class
+// holds handles, so `q[i].v` names a property of the object an element
+// refers to (TryEvalQueueElementMember in eval_array_class_queue.cpp), which
+// the queue is told by the flag LowerVarAggregate sets from the elaborated
+// class name. The package's classes are lowered after its variables, so the
+// class cannot be found by name here; the class record
+// RegisterPackageClassVariables (lowerer_package_class_vars.cpp) entered
+// under the item's own key ahead of this says the same. Left clear, the
+// element `p1::q[0]` of a `C q[$]` was read as a value with no property.
 static void CreatePackageAggregate(const ModuleItem* item, std::string_view pkg,
                                    std::string_view qname, SimContext& ctx,
                                    Arena& arena) {
   if (item->unpacked_dims.empty()) return;
   const Expr* dim = item->unpacked_dims.front();
-  if (dim == nullptr) return;
   uint32_t width = PackageDataWidth(item, ctx);
   bool is_4state = DeclaredTypeIs4State(item->data_type);
-  if (IsQueueDim(dim)) {
+  if (dim == nullptr) {
+    CreatePackageDynArray(qname, width, is_4state, ctx);
+  } else if (IsQueueDim(dim)) {
     ctx.CreateQueue(qname, width, PackageQueueMaxSize(dim, pkg, ctx, arena),
                     is_4state);
   } else if (item->unpacked_dims.size() == 1 && IsAssocIndexDim(dim, ctx)) {
     ctx.CreateAssocArray(qname, width, dim->text == "string",
                          AssocIndexSpec(dim, is_4state, ctx));
+  } else {
+    CreatePackageArray(item, pkg, qname, ctx, arena);
   }
 }
 
@@ -527,13 +653,19 @@ void CreatePackageDataVariables(const RtlirDesign* design, SimContext& ctx,
 // CreatePackageDataItem gave it; an item declaring no data, or none, has
 // nothing to evaluate. §15.3.1: a semaphore's initializer is the new() that
 // CreatePackageSemaphore has already read the bucket's key count from, and
-// it names no value the carrier variable holds, so it is left alone.
+// it names no value the carrier variable holds, so it is left alone, as is a
+// fixed-size array's, which CreatePackageArray has already distributed over
+// the elements (§7.4.2); every other initializer is the carrier variable's
+// value.
 static void InitPackageDataItem(const ModuleItem* item, std::string_view pkg,
                                 SimContext& ctx, Arena& arena) {
   if (!DeclaresPackageData(item) || item->init_expr == nullptr) return;
   if (IsPackageSemaphoreDecl(item)) return;
+  std::string key = PackageDataKey(item, pkg);
+  if (ctx.FindArrayInfo(key) != nullptr && ctx.FindQueue(key) == nullptr)
+    return;
   const auto& variables = ctx.GetVariables();
-  auto found = variables.find(PackageDataKey(item, pkg));
+  auto found = variables.find(key);
   if (found == variables.end()) return;
   found->second->value = EvalExpr(item->init_expr, ctx, arena);
 }

@@ -10,7 +10,10 @@
 namespace delta {
 
 class Arena;
+struct AssocArrayObject;
 struct DataType;
+struct Expr;
+struct QueueObject;
 struct RtlirDesign;
 struct RtlirModule;
 struct RtlirPort;
@@ -59,6 +62,37 @@ void RecordPackedRange(const DataType* dt, Variable* v, SimContext& ctx,
 // src/simulator/lowerer_var.cpp beside the variable declaration's use of it.
 void RegisterAggregateLayout(std::string_view name, const DataType* dtype,
                              uint32_t width, SimContext& ctx, Arena& arena);
+
+// §7.4.2 with §7.4.4: the elements of the fixed-size unpacked array `var`
+// declares, each a variable of its own under `name` with its index in
+// brackets, `name[i]` or `name[i][j]`, with the ArrayInfo under `name` that
+// $size, foreach and every element select read the shape from, and each
+// element at the value the declaration's initializer or §6.8's Table 6-7
+// gives it. Nothing is made for a declaration with no unpacked extent. The
+// unpacked bounds are read from `var` as the elaborator folded them, so a
+// declaration outside any module -- a package's (CreatePackageDataVariables)
+// -- folds them into a RtlirVariable of its own first. Defined in
+// src/simulator/lowerer_var.cpp beside Lowerer::LowerVarAggregate, which
+// makes a module's arrays through it.
+void CreateArrayElements(std::string_view name, const RtlirVariable& var,
+                         SimContext& ctx, Arena& arena);
+// §7.10 with §7.5.1: fills the queue or dynamic array `q` from a
+// declaration's initializer `init`: a new[] constructor sizes it and copies
+// the optional source, an assignment pattern or an unpacked array
+// concatenation supplies its elements in order; a null initializer, or one of
+// another shape, leaves it empty. Evaluated in the scope in force, which is
+// the declaring scope's frame for a package's. Defined in
+// src/simulator/lowerer_var.cpp, where Lowerer::LowerDynArrayInit fills a
+// module's through it.
+void InitQueueFromDeclInit(QueueObject* q, const Expr* init, SimContext& ctx,
+                           Arena& arena);
+// §7.9.11: gives the associative array `aa` the default and the keyed
+// entries the assignment pattern `init` writes, `'{default: 7}` or
+// `'{"k": 1, 2: 5}`; a null initializer, or one that is not a pattern,
+// writes nothing. Defined in src/simulator/lowerer_var.cpp, where
+// Lowerer::InitAssocDefault fills a module's through it.
+void InitAssocFromDeclInit(const Expr* init, AssocArrayObject* aa,
+                           SimContext& ctx, Arena& arena);
 
 // Create the storage one port is read and written through, under the name it
 // is keyed by. Every property a port's storage carries is set here, so a

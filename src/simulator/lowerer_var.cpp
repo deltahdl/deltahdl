@@ -426,8 +426,8 @@ static bool TryCreateMultiDimArray(std::string_view name,
   return true;
 }
 
-static void CreateArrayElements(std::string_view name, const RtlirVariable& var,
-                                SimContext& ctx, Arena& arena) {
+void CreateArrayElements(std::string_view name, const RtlirVariable& var,
+                         SimContext& ctx, Arena& arena) {
   if (var.unpacked_size == 0) return;
   if (TryCreateMultiDimArray(name, var, ctx, arena)) return;
   ArrayInfo info;
@@ -538,19 +538,17 @@ static bool LowerDynArrayNewInit(const Expr* init_expr, QueueObject* q,
 // and SimContext::FindQueue resolves a name within the instance being built,
 // so a second lookup would search for the qualified name inside the instance
 // that qualified it.
-void Lowerer::LowerDynArrayInit(QueueObject* q, const RtlirVariable& var) {
-  if (!q || !var.init_expr) return;
-
-  if (LowerDynArrayNewInit(var.init_expr, q, ctx_, arena_)) return;
-
-  if (var.init_expr->kind != ExprKind::kAssignmentPattern &&
-      var.init_expr->kind != ExprKind::kConcatenation)
+void InitQueueFromDeclInit(QueueObject* q, const Expr* init, SimContext& ctx,
+                           Arena& arena) {
+  if (!q || !init) return;
+  if (LowerDynArrayNewInit(init, q, ctx, arena)) return;
+  if (init->kind != ExprKind::kAssignmentPattern &&
+      init->kind != ExprKind::kConcatenation)
     return;
-  for (auto* elem : var.init_expr->elements) {
-    q->elements.push_back(EvalExpr(elem, ctx_, arena_));
+  for (auto* elem : init->elements) {
+    q->elements.push_back(EvalExpr(elem, ctx, arena));
   }
-  EnforceQueueBound(q, "declaration initializer", var.init_expr->range.start,
-                    ctx_);
+  EnforceQueueBound(q, "declaration initializer", init->range.start, ctx);
   // Every element carries an id, and the two lists are indexed together, so
   // they have to be the same length however the elements arrived. Leaving the
   // ids empty here made an initialized queue's first insert at a nonzero index
@@ -558,7 +556,12 @@ void Lowerer::LowerDynArrayInit(QueueObject* q, const RtlirVariable& var) {
   q->AssignFreshIds();
 }
 
-void Lowerer::InitAssocDefault(const Expr* init, AssocArrayObject* aa) {
+void Lowerer::LowerDynArrayInit(QueueObject* q, const RtlirVariable& var) {
+  InitQueueFromDeclInit(q, var.init_expr, ctx_, arena_);
+}
+
+void InitAssocFromDeclInit(const Expr* init, AssocArrayObject* aa,
+                           SimContext& ctx, Arena& arena) {
   if (!init || init->kind != ExprKind::kAssignmentPattern) return;
   for (size_t i = 0; i < init->pattern_keys.size(); ++i) {
     if (i >= init->elements.size()) break;
@@ -570,7 +573,7 @@ void Lowerer::InitAssocDefault(const Expr* init, AssocArrayObject* aa) {
     // leave the array's default sharing seed's words: a later in-place deposit
     // into seed -- a bit-select write, say -- would rewrite the default, and
     // through it every entry allocated from the default.
-    auto val = OwnRhsWords(EvalExpr(init->elements[i], ctx_, arena_), arena_);
+    auto val = OwnRhsWords(EvalExpr(init->elements[i], ctx, arena), arena);
     if (key->text == "default") {
       aa->has_default = true;
       aa->default_value = val;
@@ -582,11 +585,15 @@ void Lowerer::InitAssocDefault(const Expr* init, AssocArrayObject* aa) {
       // an index of this array's declared index type, the same way a key
       // written on the left of an assignment to one element is, so that a key
       // and an index that name one entry land on one entry.
-      auto key_val = EvalExpr(key, ctx_, arena_);
+      auto key_val = EvalExpr(key, ctx, arena);
       aa->int_data[AssocIntKey(key_val, aa->is_wildcard, aa->index_width,
                                aa->is_index_signed)] = val;
     }
   }
+}
+
+void Lowerer::InitAssocDefault(const Expr* init, AssocArrayObject* aa) {
+  InitAssocFromDeclInit(init, aa, ctx_, arena_);
 }
 
 static void ApplyStructMemberDefaults(std::string_view name,

@@ -317,4 +317,109 @@ TEST(PackageImportSim,
       110u);
 }
 
+// §7.4.2 (printed page 154) with §26.2 (printed 808) and §13.4: a package's
+// `int a[4]` is an array of four elements, and the package's own functions
+// read and write them by the bare name, so set(1, 7) and set(3, 2) land in
+// two elements and get(1) and get(3) read them back: 7 * 10 + 2. The
+// package's storage was the carrier variable alone, with no element
+// variables and no ArrayInfo under "p1.a" (CreatePackageArray in
+// lowerer_register.cpp), so each write went to one bit of the 32-bit carrier
+// and each read answered that bit: 1 * 10 + 0.
+TEST(PackageImportSim, PackageFixedSizeArrayReadAndWrittenInItsOwnFunctions) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  int a[4];\n"
+                      "  function void set(int i, int v);\n"
+                      "    a[i] = v;\n"
+                      "  endfunction\n"
+                      "  function int get(int i);\n"
+                      "    return a[i];\n"
+                      "  endfunction\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  int y;\n"
+                      "  initial begin\n"
+                      "    p1::set(1, 7);\n"
+                      "    p1::set(3, 2);\n"
+                      "    y = p1::get(1) * 10 + p1::get(3);\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            72u);
+}
+
+// §12.7.3 with §7.4.2 (printed page 154) and §26.2 (printed 808): foreach
+// over the package's own array inside its function runs once per element,
+// and the elements hold what set() wrote, 7 and 2, the other two §6.8's 0
+// for a 2-state int: 9. With no ArrayInfo under "p1.a" the loop ran once per
+// bit of the carrier and each `a[i]` read one bit of it, the two writes
+// having left the low bit of 7 at bit 1 and the low bit of 2 at bit 3: 1.
+TEST(PackageImportSim, PackageFixedSizeArrayIteratedByForeachInItsOwnFunction) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  int a[4];\n"
+                      "  function void set(int i, int v);\n"
+                      "    a[i] = v;\n"
+                      "  endfunction\n"
+                      "  function int sum();\n"
+                      "    int s = 0;\n"
+                      "    foreach (a[i]) s += a[i];\n"
+                      "    return s;\n"
+                      "  endfunction\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  int y;\n"
+                      "  initial begin\n"
+                      "    p1::set(1, 7);\n"
+                      "    p1::set(3, 2);\n"
+                      "    y = p1::sum();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            9u);
+}
+
+// §12.7.3 with §7.4.2 (printed page 154) and §26.3 (printed 808): foreach
+// names the package's array through the package scope resolution operator,
+// `p1::a`, which the loop reads the shape of under the "p1.a" key, so it
+// runs four times. Under the same defect the name found no shape and the
+// loop ran once per bit of the 32-bit carrier: 32.
+TEST(PackageImportSim, PackageFixedSizeArrayCountedByForeachThroughQualifier) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  int a[4];\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  int y = 0;\n"
+                      "  initial foreach (p1::a[i]) y++;\n"
+                      "endmodule\n",
+                      "y"),
+            4u);
+}
+
+// §7.5 and §7.5.1 (printed pages 157-158) with §26.3 (printed 808): a
+// package's `int d[]` is a dynamic array, `p1::d = new[3]` sizes it to three
+// elements, `p1::d[2] = 9` writes the last, and size() reads the three:
+// 3 * 10 + 9. The package's storage was the carrier variable alone, with no
+// QueueObject and no dynamic ArrayInfo under "p1.d" (CreatePackageDynArray
+// in lowerer_register.cpp), so the new[] sized nothing, the write landed
+// nowhere and both reads answered 0.
+TEST(PackageImportSim, PackageDynamicArraySizedByNewThroughTheQualifier) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  int d[];\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  int y;\n"
+                      "  initial begin\n"
+                      "    p1::d = new[3];\n"
+                      "    p1::d[2] = 9;\n"
+                      "    y = p1::d.size() * 10 + p1::d[2];\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            39u);
+}
+
+// §7.10 (printed page 169) with §26.2 (printed 808): a package queue's
+// declaration assignment, `int q[$] = '{1, 2}`, supplies its two elements
+// before any procedure starts, so size() reads 2 and q[1] reads 2:
+// 2 * 10 + 2. The pattern was evaluated into the carrier variable rather
+// than the QueueObject (InitPackageAggregate in lowerer_register.cpp), so
 }  // namespace
