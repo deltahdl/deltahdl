@@ -8,6 +8,7 @@
 #include <string>
 #include <utility>
 
+#include "common/diagnostic.h"
 #include "fixture_simulator.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
@@ -32,12 +33,15 @@ using namespace delta;
 // leaving the variable holding whatever the statements before it produced, so
 // a caller that read the value alone would take a "0" the report explains for
 // a value the simulator computed and could not tell the two apart. Every
-// diagnostic the run raises is listed in the failure, since a caller whose
-// subject is such a report reads it through SimFixture and FindDiagFrom, not
-// through this.
-inline void ExpectRunReportedNothing(const SimFixture& f, size_t before) {
+// error the run raises is listed in the failure, since a caller whose subject
+// is such a report reads it through SimFixture and FindDiagFrom, not through
+// this. A warning is not a failure: §7.8.6's read of a nonexistent
+// associative-array entry, for one, answers the default value and may warn,
+// and the value is then the one the standard gives.
+inline void ExpectRunReportedNoError(const SimFixture& f, size_t before) {
   const auto& diags = f.diag.Diagnostics();
   for (size_t i = before; i < diags.size(); ++i) {
+    if (diags[i].severity != DiagSeverity::kError) continue;
     ADD_FAILURE() << "the run reported: " << diags[i].message;
   }
 }
@@ -53,7 +57,7 @@ inline uint64_t RunAndGet(const std::string& src, const char* var_name) {
   lowerer.Lower(design);
   f.scheduler.Run();
   f.ctx.RunFinalBlocks();
-  ExpectRunReportedNothing(f, before);
+  ExpectRunReportedNoError(f, before);
   auto* var = f.ctx.FindVariable(var_name);
   EXPECT_NE(var, nullptr);
   if (!var) return 0;

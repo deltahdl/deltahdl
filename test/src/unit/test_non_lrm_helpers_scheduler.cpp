@@ -29,6 +29,19 @@ TEST(RunAndGetHelper, FailsOnADiagnosticTheRunRaises) {
       "union 'u' which currently has tag 'V'");
 }
 
+// A warning the run raises is no failure: §7.8.6 has a read of a nonexistent
+// associative-array entry answer the default value and lets the simulator
+// warn, so the value read is the standard's and the case answers it.
+TEST(RunAndGetHelper, PassesOverAWarningTheRunRaises) {
+  EXPECT_EQ(RunAndGet("module top;\n"
+                      "  int aa[int];\n"
+                      "  int y;\n"
+                      "  initial y = aa[7] + 3;\n"
+                      "endmodule\n",
+                      "y"),
+            3u);
+}
+
 // A clean run fails nothing and answers the value, so the check above does not
 // turn every case red.
 TEST(RunAndGetHelper, AnswersTheValueOfACleanRun) {
