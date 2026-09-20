@@ -1,12 +1,11 @@
 ---
 name: no-empty-test-files
 description: "A test file with no TEST(...) block fails the assert-no-empty-test-files job, so a new lettered file is created only together with its first test"
-metadata: 
-  node_type: memory
+metadata:
   type: feedback
-  originSessionId: 7829aa59-f8bc-4f09-b395-224467199b68
-  modified: 2026-09-20T07:46:49.440Z
 ---
+
+# No empty test files
 
 A test file under `test/src` holding no `TEST(...)` block fails the
 `assert-no-empty-test-files` job (and an empty namespace fails
