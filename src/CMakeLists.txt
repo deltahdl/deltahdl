@@ -371,6 +371,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/elaborator_validate_class_inheritance.cpp
     elaborator/elaborator_validate_class_overrides.cpp
     elaborator/elaborator_validate_class_members.cpp
+    elaborator/elaborator_validate_class_nesting.cpp
     elaborator/elaborator_validate_class_outofblock.cpp
     elaborator/elaborator_validate_clocking.cpp
     elaborator/elaborator_validate_global_clocking.cpp

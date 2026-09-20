@@ -790,4 +790,135 @@ TEST(ClassScopeResolutionElaboration, ScopedTypedefNamingNoSuchTypeIsError) {
                             "8.23"));
 }
 
+// §8.23 gives a nested class no implicit handle to an object of the class it
+// is declared in: it reaches the enclosing class's static properties and
+// methods, parameters and local parameters by their bare names, and a
+// non-static property only through a handle of the enclosing class. The
+// subclause writes this very shape, `outerProp = 0;` in a method of `Inner`
+// nested in `Outer`, as its illegal line, and deltahdl said nothing about it
+// and ran the module (#3781). The report stands at the write's line.
+TEST(ClassScopeResolutionElaboration,
+     NestedClassUnqualifiedWriteToOuterNonStaticPropertyIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class Outer;\n"
+      "  int outerProp;\n"
+      "  class Inner;\n"
+      "    function void f();\n"
+      "      outerProp = 0;\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "endclass\n"
+      "module t;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "non-static property 'outerProp' of the enclosing "
+                            "class 'Outer'",
+                            5, "8.23"));
+}
+
+// §8.23 bars the access, not the write alone: a read of the property from
+// the nested class's method has no object to read it from either. The read
+// stands on the right of a return, a position a walk over assignment targets
+// alone never reaches.
+TEST(ClassScopeResolutionElaboration,
+     NestedClassUnqualifiedReadOfOuterNonStaticPropertyIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class Outer;\n"
+      "  int outerProp;\n"
+      "  class Inner;\n"
+      "    function int f();\n"
+      "      return outerProp + 1;\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "endclass\n"
+      "module t;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "non-static property 'outerProp' of the enclosing "
+                            "class 'Outer'",
+                            5, "8.23"));
+}
+
+// §8.23 gives the nested class lexically scoped, unqualified access to the
+// static properties of the enclosing class, the `outerStaticProp = 0;` its
+// example marks legal, so a check that took every enclosing property for an
+// object's would report what the subclause permits.
+TEST(ClassScopeResolutionElaboration,
+     NestedClassReadsOuterStaticPropertyUnqualified) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class Outer;\n"
+      "  static int outerStaticProp;\n"
+      "  class Inner;\n"
+      "    function int f();\n"
+      "      outerStaticProp = 0;\n"
+      "      return outerStaticProp;\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "endclass\n"
+      "module t;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(FindDiag(f, "outerStaticProp"), nullptr);
+}
+
+// A property the nested class declares itself under the enclosing class's
+// name is the one a bare name in its methods resolves to (§8.11 resolves an
+// unqualified name in a method against the object's own class first), so the
+// write is to the nested class's own object and §8.23 has nothing to report.
+TEST(ClassScopeResolutionElaboration,
+     NestedClassOwnPropertyShadowsOuterNonStaticProperty) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class Outer;\n"
+      "  int outerProp;\n"
+      "  class Inner;\n"
+      "    int outerProp;\n"
+      "    function void f();\n"
+      "      outerProp = 0;\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "endclass\n"
+      "module t;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(FindDiag(f, "outerProp"), nullptr);
+}
+
+// A formal of the method and a variable declared in its body each spell the
+// enclosing class's property name without naming it: §13.3 and §13.4 make a
+// formal a local of the subroutine, and §6.21 makes a block's declaration
+// visible to that block and the ones below it, so neither reference is the
+// property and neither is reported.
+TEST(ClassScopeResolutionElaboration,
+     NestedClassFormalAndLocalShadowOuterNonStaticProperty) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class Outer;\n"
+      "  int outerProp;\n"
+      "  int other;\n"
+      "  class Inner;\n"
+      "    function int f(int outerProp);\n"
+      "      outerProp = 0;\n"
+      "      begin\n"
+      "        int other;\n"
+      "        other = outerProp;\n"
+      "        return other;\n"
+      "      end\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "endclass\n"
+      "module t;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(FindDiag(f, "enclosing class"), nullptr);
+}
+
 }  // namespace

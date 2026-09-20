@@ -8,12 +8,14 @@
 
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
+#include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
 
 namespace delta {
@@ -45,5 +47,15 @@ bool IsClassDerivedFrom(std::string_view a, std::string_view b,
 // Defined in elaborator_validate_class_array_assign.cpp.
 bool IsSliceSelect(const Expr* e);
 bool IsNonintegralIndex(const Expr* idx, const TypeMap& var_types);
+
+// Defined in elaborator_validate_static_methods.cpp: the names a statement
+// brings into scope for its own expressions and its child statements (§6.21),
+// and the names in scope over the whole of a method body -- its formals, its
+// result name where it is a function, and the declarations at the body's top
+// level. A rule that asks whether a bare name in a method is a class member
+// subtracts both, §8.10 for a static method and §8.23 for a nested class.
+std::unordered_set<std::string_view> NamesDeclaredUnder(const Stmt* s);
+std::unordered_set<std::string_view> CollectMethodLocalNames(
+    const ModuleItem* method);
 
 }  // namespace delta

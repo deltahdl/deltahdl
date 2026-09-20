@@ -101,6 +101,12 @@ class ElaboratorClassRules : public ElaboratorOperationRules {
 
   void ValidateOutOfBlockDeclarations();
 
+  // §8.23: a nested class has no implicit handle to an object of the class it
+  // is declared in, so its methods reach the enclosing class's non-static
+  // properties through a handle alone and its static members by a bare name.
+  // Defined in elaborator_validate_class_nesting.cpp.
+  void ValidateNestedClassEnclosingAccess();
+
   void ValidateParameterizedScopeResolution(const ModuleDecl* decl);
 
   // §8.23: an incomplete forward type, a type defined by an interface-based

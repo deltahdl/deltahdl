@@ -15,6 +15,7 @@
 #include "common/diagnostic.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_validate_classes.h"
+#include "elaborator/elaborator_validate_classes_internal.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "parser/ast_class.h"
 #include "parser/ast_expr.h"
@@ -115,7 +116,12 @@ static void CollectForHeaderNames(const Stmt* s,
 //
 // The result is empty for almost every statement, which is what lets the
 // caller copy the enclosing set only where a scope is really opened.
-static std::unordered_set<std::string_view> NamesDeclaredUnder(const Stmt* s) {
+//
+// Declared in elaborator_validate_classes_internal.h: the §8.23 walk over a
+// nested class's methods in elaborator_validate_class_nesting.cpp subtracts the
+// same names for the same reason, and one list of what a statement declares is
+// what keeps the two rules from disagreeing about a scope.
+std::unordered_set<std::string_view> NamesDeclaredUnder(const Stmt* s) {
   std::unordered_set<std::string_view> declared;
   CollectForHeaderNames(s, declared);
   for (auto v : s->foreach_vars) {
@@ -256,7 +262,11 @@ static std::unordered_set<std::string_view> CollectNonStaticMemberNames(
 // A declaration deeper in the body is not here. §6.21 makes it visible to its
 // own block and the blocks below it and to nothing else, and
 // StmtRefsNonStaticMember adds it to the set as it descends into that block.
-static std::unordered_set<std::string_view> CollectStaticMethodLocalNames(
+//
+// Declared in elaborator_validate_classes_internal.h, since the same names
+// shadow the enclosing class's properties in a nested class's method under
+// §8.23, which elaborator_validate_class_nesting.cpp checks.
+std::unordered_set<std::string_view> CollectMethodLocalNames(
     const ModuleItem* method) {
   std::unordered_set<std::string_view> locals;
   for (const auto& arg : method->func_args) {
@@ -285,7 +295,7 @@ void ElaboratorClassRules::ValidateOneClassStaticMethods(const ClassDecl* cls) {
     if (!m->method) continue;
 
     std::unordered_set<std::string_view> locals =
-        CollectStaticMethodLocalNames(m->method);
+        CollectMethodLocalNames(m->method);
 
     for (const auto* s : m->method->func_body_stmts) {
       if (StmtRefsNonStaticMember(s, non_static, locals)) {

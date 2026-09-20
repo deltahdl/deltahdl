@@ -552,6 +552,8 @@ void ElaboratorClassRules::RunPreElaborationClassValidations() {
 
   ValidateOutOfBlockDeclarations();
 
+  ValidateNestedClassEnclosingAccess();
+
   ValidateInterfaceClassRules();
 
   // Clause 18: the class constraint rules are checked as one unit, against the
