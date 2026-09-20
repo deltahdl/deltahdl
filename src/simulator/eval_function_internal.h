@@ -336,6 +336,14 @@ void ExecFunctionBody(const ModuleItem* func, Variable* ret_var,
 // eval_function_body_assign.cpp; ExecFunctionBody asks it as the body starts.
 void ShapeStringReturnVariable(const ModuleItem* func, Variable* ret_var,
                                SimContext& ctx, Arena& arena);
+// §13.4.1 with §8.7: records a class-returning function's implicit variable
+// as a handle of its return type, so that `f = new` and `return new` construct
+// it. Both defined in eval_function_body_assign.cpp; ExecFunctionBody asks
+// the first as the body starts, ExecFuncReturn the second for a `new`.
+void ShapeClassReturnVariable(const ModuleItem* func, Variable* ret_var,
+                              SimContext& ctx, Arena& arena);
+bool TryFuncReturnClassNew(Expr* returned, std::string_view func_name,
+                           SimContext& ctx, Arena& arena);
 void WritebackQueueRefs(SimContext& ctx);
 void WritebackAssocRefs(SimContext& ctx);
 

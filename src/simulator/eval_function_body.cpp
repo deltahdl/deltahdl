@@ -730,6 +730,11 @@ static FuncFlow ExecFuncForeach(const Stmt* stmt, const FuncExecCtx& exec) {
 // the caller a `logic [7:0]` function's result 32 bits wide, and let a 1-bit
 // comparison's signedness stand in for an `int`'s.
 static void ExecFuncReturn(const Stmt* stmt, const FuncExecCtx& exec) {
+  // §13.4.1 with §8.7: `return new` constructs an object of the return type
+  // into the implicit variable, as `f = new` does; read as a value, the `new`
+  // stored null.
+  if (TryFuncReturnClassNew(stmt->expr, exec.func_name, exec.ctx, exec.arena))
+    return;
   // §6.8, printed page 105: a variable "shall store a value from one assignment
   // to the next", so the implicit return variable and the returned one are two
   // storage elements and neither may hold the other's words. EvalExpr answers a
@@ -920,6 +925,9 @@ void ExecFunctionBody(const ModuleItem* func, Variable* ret_var,
   // §13.4.1 with §6.16: a string return type gives the implicit variable no
   // width, shaped as a body local's (eval_function_body_assign.cpp).
   ShapeStringReturnVariable(func, ret_var, ctx, arena);
+  // §13.4.1 with §8.7: a class return type gives it the class a `new` in the
+  // body constructs, recorded as a body local's is.
+  ShapeClassReturnVariable(func, ret_var, ctx, arena);
   FuncExecCtx exec{ret_var, func->name, ctx, arena, ret_width};
   BindReturnStructLayout(func, ctx);
   // §12.8 allows a break or a continue only inside a loop, so one that reaches

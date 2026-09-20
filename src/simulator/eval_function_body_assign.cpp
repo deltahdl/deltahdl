@@ -6,7 +6,10 @@
 #include "elaborator/type_eval.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
+#include "parser/ast_stmt.h"
+#include "parser/ast_type.h"
 #include "simulator/class_object.h"
+#include "simulator/declared_class_key.h"
 #include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_call_result.h"
 #include "simulator/eval_class_array.h"
@@ -422,6 +425,49 @@ void ShapeStringReturnVariable(const ModuleItem* func, Variable* ret_var,
     return;
   ret_var->is_string = true;
   ret_var->value = MakeLogic4VecVal(arena, 0, 0);
+}
+
+// §13.4.1 (printed page 342) with §8.7 (printed 184): the implicit variable
+// has the function's return type, and the left-hand side of an assignment of
+// `new` is what decides the class constructed, so `function M mk(); mk = new;
+// endfunction` constructs an M. The variable was created with no class
+// recorded under its name, so TryClassNewAssign declined it and the `new` was
+// evaluated as a value, which is the null handle: `m = mk(); m == null` read
+// 1, while `M m = new; mk = m;` handed the object out. Recorded here as
+// CreateFuncLocalVar records a body's `M m;`, under the key §8.23 gives a
+// nested class named from the declaring class, and held in the 64 bits a
+// handle takes rather than the 32-bit carrier.
+void ShapeClassReturnVariable(const ModuleItem* func, Variable* ret_var,
+                              SimContext& ctx, Arena& arena) {
+  if (func->return_type.kind != DataTypeKind::kNamed) return;
+  std::string_view class_key = DeclaredClassKeyInScope(
+      func->return_type, ctx.CurrentMethodClass(), ctx, arena);
+  if (class_key.empty()) return;
+  ctx.SetVariableClassType(func->name, class_key);
+  if (ret_var->value.width != 64)
+    ret_var->value = MakeLogic4VecVal(arena, 64, 0);
+}
+
+// §13.4.1: a `return` writes the implicit variable an assignment to the
+// function's name writes, so `return new;` and `return new(args);` construct
+// what `f = new;` constructs -- an object of the return type, through the
+// `new` forms TryClassNewAssign answers for that target. ExecFuncReturn
+// evaluated the `new` as a value and stored the null handle it yields. False
+// where the returned expression is no `new`, or the function returns no
+// class, leaving the return to the ordinary path.
+bool TryFuncReturnClassNew(Expr* returned, std::string_view func_name,
+                           SimContext& ctx, Arena& arena) {
+  if (returned->kind != ExprKind::kCall || returned->text != "new")
+    return false;
+  auto* assign = arena.Create<Stmt>();
+  assign->kind = StmtKind::kBlockingAssign;
+  assign->range = returned->range;
+  assign->lhs = arena.Create<Expr>();
+  assign->lhs->kind = ExprKind::kIdentifier;
+  assign->lhs->range = returned->range;
+  assign->lhs->text = func_name;
+  assign->rhs = returned;
+  return TryClassNewAssign(assign, ctx, arena);
 }
 
 }  // namespace delta

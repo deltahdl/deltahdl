@@ -192,4 +192,67 @@ TEST(FunctionReturnSim, StringReturnVariableTakesAStreamOfStrings) {
   EXPECT_EQ(out, "<abcdef> <abcdef>\n");
 }
 
+// §13.4.1 (printed page 342) with §8.7 (printed 184): the implicit variable
+// has the function's return type, and the left-hand side of an assignment of
+// `new` decides the class constructed, so `mk = new` in a function returning M
+// constructs an M and the call hands its handle out -- from a module function,
+// a static method and an instance method alike, with and without constructor
+// arguments. Each handle is non-null and the object's `v` reads through it:
+// 4 from the default, 9 from the argument. The variable had no class recorded
+// under its name, so the `new` was evaluated as a value and the call returned
+// null.
+TEST(FunctionReturnSim, ClassReturnVariableAssignedNewConstructsTheObject) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  class M;\n"
+      "    int v = 4;\n"
+      "    function new(int a = 4); v = a; endfunction\n"
+      "    static function M by_name(); by_name = new; endfunction\n"
+      "    function M inst_by_name(); inst_by_name = new(9); endfunction\n"
+      "  endclass\n"
+      "  function M mk(); mk = new; endfunction\n"
+      "  M m, x, s, i;\n"
+      "  initial begin\n"
+      "    x = new;\n"
+      "    m = mk(); s = M::by_name(); i = x.inst_by_name();\n"
+      "    $display(\"%0d %0d %0d\", m == null, s == null, i == null);\n"
+      "    $display(\"%0d %0d %0d\", m.v, s.v, i.v);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(out, "0 0 0\n4 4 9\n");
+}
+
+// §13.4.1: a `return` writes the same implicit variable an assignment to the
+// function's name does, so `return new` and `return new(7)` in a function
+// returning M construct an M as `mk = new` does, from a module function and
+// from a static method of a package's class alike. The handles are non-null
+// and `v` reads 4 and 7 through them; evaluated as a value, the `new`
+// returned null.
+TEST(FunctionReturnSim, ReturnNewConstructsAnObjectOfTheReturnType) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "package p;\n"
+      "  class M;\n"
+      "    int v = 4;\n"
+      "    function new(int a = 4); v = a; endfunction\n"
+      "    static function M by_return(); return new(7); endfunction\n"
+      "  endclass\n"
+      "endpackage\n"
+      "module t;\n"
+      "  import p::*;\n"
+      "  function M mk_return(); return new; endfunction\n"
+      "  M m, s;\n"
+      "  initial begin\n"
+      "    m = mk_return(); s = M::by_return();\n"
+      "    $display(\"%0d %0d %0d %0d\", m == null, s == null, m.v, s.v);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(out, "0 0 4 7\n");
+}
+
 }  // namespace
