@@ -71,6 +71,7 @@ class ElaboratorClassRules : public ElaboratorOperationRules {
   void ValidateClassHandleContAssign(const ModuleItem* item);
 
   void ValidateStaticMethodBodies(const ModuleDecl* decl);
+  void ValidateStaticMethodsAmong(const std::vector<ModuleItem*>& items);
   void ValidateOneClassStaticMethods(const ClassDecl* cls);
 
   void ValidateThisUsage(const ModuleDecl* decl);
@@ -153,6 +154,13 @@ class ElaboratorClassRules : public ElaboratorOperationRules {
       const std::unordered_map<std::string_view, std::string_view>&
           owning_iface,
       const std::unordered_set<std::string_view>& visible);
+
+ private:
+  // §8.10: the classes ValidateOneClassStaticMethods has read. The check runs
+  // once per module the elaborator elaborates, and a class the compilation unit
+  // or a package holds is in view from every one of them, so this is what
+  // reports such a class once rather than once per module.
+  std::unordered_set<const ClassDecl*> static_method_bodies_checked_;
 };
 
 }  // namespace delta

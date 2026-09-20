@@ -11,6 +11,7 @@
 #include <cstddef>
 #include <string_view>
 #include <unordered_set>
+#include <vector>
 
 #include "common/diagnostic.h"
 #include "elaborator/elaborator.h"
@@ -312,7 +313,15 @@ std::unordered_set<std::string_view> CollectMethodLocalNames(
   return locals;
 }
 
+// §8.10 states a rule about a class declaration, and the declaration is one
+// wherever the module being validated stands, so a class is read once per
+// design: Elaborator::ValidateModuleConstraints runs ValidateStaticMethodBodies
+// for every module it elaborates, and a class the compilation unit or a package
+// holds is in view from each of them. Without the set, a design of two modules
+// reported the compilation unit's one offending method twice, and a package's
+// would have been reported once per module.
 void ElaboratorClassRules::ValidateOneClassStaticMethods(const ClassDecl* cls) {
+  if (!static_method_bodies_checked_.insert(cls).second) return;
   CheckStaticMethodsForThisSuper(cls, diag_);
 
   std::unordered_set<std::string_view> non_static =
@@ -337,14 +346,31 @@ void ElaboratorClassRules::ValidateOneClassStaticMethods(const ClassDecl* cls) {
   }
 }
 
+// The classes `items` declares directly, as a module's or a package's item
+// list holds them.
+void ElaboratorClassRules::ValidateStaticMethodsAmong(
+    const std::vector<ModuleItem*>& items) {
+  for (const auto* item : items) {
+    if (item->kind == ModuleItemKind::kClassDecl && item->class_decl) {
+      ValidateOneClassStaticMethods(item->class_decl);
+    }
+  }
+}
+
+// §26.2 (printed page 808 of ~/LRM.pdf) makes a class declaration written in a
+// package an item of that package, and §8.10 (printed 186) holds over it as it
+// holds over a class at the top of a file or inside a module. This walked the
+// compilation unit's classes and the module's own, so `package p; class C; int
+// k; static function int f(); return k; endfunction endclass endpackage` was
+// never reported while the same class at compilation-unit scope was, whether
+// or not a module imported the package.
 void ElaboratorClassRules::ValidateStaticMethodBodies(const ModuleDecl* decl) {
   for (const auto* cls : unit_->classes) {
     ValidateOneClassStaticMethods(cls);
   }
-  for (const auto* item : decl->items) {
-    if (item->kind == ModuleItemKind::kClassDecl && item->class_decl) {
-      ValidateOneClassStaticMethods(item->class_decl);
-    }
+  ValidateStaticMethodsAmong(decl->items);
+  for (const auto* pkg : unit_->packages) {
+    ValidateStaticMethodsAmong(pkg->items);
   }
 }
 

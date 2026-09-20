@@ -542,15 +542,19 @@ void ExpectHandleAccessAccepted(const std::string& stmt) {
 // The report stands at the static function's own declaration rather than at
 // the statement holding the access, because §8.10's rule is about the method:
 // Elaborator::ValidateOneClassStaticMethods scans a static method body and
-// reports the method once. `make` is a static function of the same class and
-// is clean, so the line names `f` and not the class's first method.
-void ExpectBareAccessReported(const std::string& stmt) {
+// reports the method once. `src` declares that function as `f`; `make` in
+// StaticMethodHandleSrc is a static function of the same class and is clean,
+// so the line names `f` and not the class's first method.
+void ExpectStaticFunctionFReported(const std::string& src) {
   ElabFixture f;
-  std::string src = StaticMethodHandleSrc(stmt);
   ElabOk(src, f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "static method shall not access non-static members",
                             LineHolding(src, "static function int f"), "8.10"));
+}
+
+void ExpectBareAccessReported(const std::string& stmt) {
+  ExpectStaticFunctionFReported(StaticMethodHandleSrc(stmt));
 }
 
 // The shape found first: §8.9 (printed page 186) holds a static property in
@@ -630,6 +634,56 @@ TEST(StaticMethodHandleBases, PropertyBehindThisIsReported) {
 
 TEST(StaticMethodHandleBases, PropertyThroughABareNonStaticHandleIsReported) {
   ExpectBareAccessReported("return kid.k;");
+}
+
+// The cases below hold the same class in a package. §26.2 (printed page 808 of
+// ~/LRM.pdf) makes a class declaration written in a package an item of that
+// package, and §8.10 (printed 186) states its rule of the class and not of
+// where the class is declared. Elaborator::ValidateStaticMethodBodies in
+// src/elaborator/elaborator_validate_static_methods.cpp walked the compilation
+// unit's classes and the module's own, so a package class's static method
+// reading a bare non-static property was never reported, whether or not a
+// module imported the package, while the same class at the top of the file
+// was.
+//
+// `k` is the non-static property the bare access names and `m_inst` the static
+// handle the accepted form reads it through, as in StaticMethodHandleSrc.
+std::string PackageStaticMethodSrc(const std::string& stmt, bool imports) {
+  return "package p;\n"
+         "  class C;\n"
+         "    int k = 9;\n"
+         "    static C m_inst;\n"
+         "    static function int f();\n"
+         "      " +
+         stmt +
+         "\n"
+         "    endfunction\n"
+         "  endclass\n"
+         "endpackage\n"
+         "module m;\n" +
+         std::string(imports ? "  import p::*;\n  C c;\n" : "") + "endmodule\n";
+}
+
+// The report stands at the static function's own declaration, as
+// ExpectBareAccessReported reads it, and `f` is the class's one method.
+void ExpectPackageBareAccessReported(bool imports) {
+  ExpectStaticFunctionFReported(PackageStaticMethodSrc("return k;", imports));
+}
+
+TEST(StaticMethodInPackage, BarePropertyIsReportedWhereAModuleImportsIt) {
+  ExpectPackageBareAccessReported(true);
+}
+
+// No module imports the package, so the class is in no module's scope at all;
+// §26.2 makes it the package's item either way.
+TEST(StaticMethodInPackage, BarePropertyIsReportedWhereNoModuleImportsIt) {
+  ExpectPackageBareAccessReported(false);
+}
+
+// The exemption StaticMethodHandleBases states, kept for a package class: the
+// property behind the static handle is read through that handle.
+TEST(StaticMethodInPackage, PropertyThroughAStaticPropertyIsAccepted) {
+  EXPECT_TRUE(ElabOk(PackageStaticMethodSrc("return m_inst.k;", true)));
 }
 
 }  // namespace
