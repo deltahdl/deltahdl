@@ -300,7 +300,13 @@ void SimContext::RegisterClassType(std::string_view name, ClassTypeInfo* info) {
 // containing that one, innermost first, so `Inner i = new` in a method of
 // Outer, `Node link` in a method of StringList::Node and `mine = new` on a
 // property Outer declares `Inner mine` all construct the nested class.
+// §26.7 with Syntax 26-5: `std::` before a built-in class's name reaches the
+// same declaration the bare name does, and §26.7 lets no user package be
+// called std, so a `std::` head is dropped before the table is asked.
 ClassTypeInfo* SimContext::FindClassType(std::string_view name) {
+  constexpr std::string_view kStdScope = "std::";
+  if (name.substr(0, kStdScope.size()) == kStdScope)
+    name = name.substr(kStdScope.size());
   auto it = class_types_.find(name);
   if (it != class_types_.end()) return it->second;
   for (const ClassTypeInfo* scope = CurrentMethodClass(); scope != nullptr;

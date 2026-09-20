@@ -100,13 +100,20 @@ const ClassTypeInfo* PackageQualifiedClassOf(const Expr* expr, SimContext& ctx,
 }
 
 bool TryPackageClassStaticMember(const Expr* expr, SimContext& ctx,
-                                 Logic4Vec& out) {
+                                 Arena& arena, Logic4Vec& out) {
   std::string_view member;
   const ClassTypeInfo* cls = PackageQualifiedClassOf(expr, ctx, member);
   if (cls == nullptr) return false;
   auto it = cls->static_properties.find(std::string(member));
-  if (it == cls->static_properties.end()) return false;
-  out = it->second;
+  if (it != cls->static_properties.end()) {
+    out = it->second;
+    return true;
+  }
+  // §8.26 with §26.7: an enum literal the class declares is reached the same
+  // way, `std::process::RUNNING` naming the state §9.7 lists.
+  auto eit = cls->enum_members.find(std::string(member));
+  if (eit == cls->enum_members.end()) return false;
+  out = MakeLogic4VecVal(arena, 32, eit->second);
   return true;
 }
 

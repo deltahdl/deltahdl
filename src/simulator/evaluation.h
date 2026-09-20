@@ -359,9 +359,10 @@ const ClassTypeInfo* PackageQualifiedClassOf(const Expr* expr, SimContext& ctx,
                                              std::string_view& member);
 
 // §8.9: the static property `pk::Cfg::x` reads, where PackageQualifiedClassOf
-// answers the class and the class declares the name static; false otherwise.
+// answers the class and the class declares the name static, or §8.26's enum
+// literal the class declares (`std::process::RUNNING`); false otherwise.
 bool TryPackageClassStaticMember(const Expr* expr, SimContext& ctx,
-                                 Logic4Vec& out);
+                                 Arena& arena, Logic4Vec& out);
 
 void ApplyClassParamOverrides(std::string_view var_name, uint64_t handle,
                               SimContext& ctx, Arena& arena);

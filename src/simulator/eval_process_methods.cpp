@@ -14,12 +14,25 @@
 
 namespace delta {
 
+// §26.7 with Syntax 26-5: a built-in class may be named bare, `process`, or
+// explicitly through the built-in package, `std::process`, the second parsing
+// as a scope resolution of the two identifiers; both name the one class of
+// §9.7.
+static bool NamesProcessClass(const Expr* scope) {
+  if (!scope) return false;
+  if (scope->kind == ExprKind::kIdentifier) return scope->text == "process";
+  return scope->kind == ExprKind::kMemberAccess && scope->is_scope_resolution &&
+         scope->lhs && scope->lhs->kind == ExprKind::kIdentifier &&
+         scope->lhs->text == "std" && scope->rhs &&
+         scope->rhs->kind == ExprKind::kIdentifier &&
+         scope->rhs->text == "process";
+}
+
 bool TryEvalProcessStaticCall(const Expr* expr, SimContext& ctx, Arena& arena,
                               Logic4Vec& out) {
   if (!expr->lhs || expr->lhs->kind != ExprKind::kMemberAccess) return false;
   auto* access = expr->lhs;
-  if (!access->lhs || access->lhs->kind != ExprKind::kIdentifier) return false;
-  if (access->lhs->text != "process") return false;
+  if (!NamesProcessClass(access->lhs)) return false;
   if (!access->rhs || access->rhs->kind != ExprKind::kIdentifier) return false;
   if (access->rhs->text != "self") return false;
   auto* proc = ctx.CurrentProcess();
