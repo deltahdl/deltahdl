@@ -169,11 +169,6 @@ struct EnumMemberDeclCtx {
   Arena& arena;
   RtlirModule* mod;
   std::unordered_set<std::string_view>& enum_member_names;
-  // §6.19: the members are values of the enumeration's base type, `int` when
-  // none is named, so each backing variable is signed when that type is
-  // (IsSignedType of the enumeration); a read of a member under `%d` then
-  // prints a negative value as such rather than as its bit pattern.
-  bool is_signed = false;
   // §26.5: the names an explicit import of the scope has made locally visible,
   // which take precedence over the candidate a wildcard import supplies under
   // the same name (§26.3, printed page 810). A member so named keeps its place
@@ -181,6 +176,11 @@ struct EnumMemberDeclCtx {
   // reaches the explicitly imported literal. Null for the scope's own
   // enumeration, whose members are declared whatever the imports name.
   const std::unordered_set<std::string_view>* explicitly_imported = nullptr;
+  // §6.19: the members are values of the enumeration's base type, `int` when
+  // none is named, so each backing variable is signed when that type is
+  // (IsSignedType of the enumeration); a read of a member under `%d` then
+  // prints a negative value as such rather than as its bit pattern.
+  bool is_signed = false;
 };
 
 // Declares an enumeration's named constants in a module: reserves each member
