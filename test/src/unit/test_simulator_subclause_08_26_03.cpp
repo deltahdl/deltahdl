@@ -302,4 +302,67 @@ TEST(InterfaceClassTypeAccess, InterfaceParamViaLocalparamConstantExpression) {
             255u);
 }
 
+// §8.26.3's own IntfA/IntfB example: `typedef T1[1:0] T2` declared in the
+// parameterized interface class `IntfA #(type T1 = logic)` is inherited by
+// `IntfB #(type T = bit) extends IntfA #(T)`, and a class implementing
+// `IntfB#(bit[1:0])` names it through the specialization as its method's
+// return type, `IntfA#(bit[1:0])::T2`. §8.25 binds T1 to `bit [1:0]` there,
+// so the call's result is 2 * 2 = 4 bits: `$bits(im.funcB())` reads 4. A
+// return type sized from the elaborated table alone, where T1 is unbound,
+// fell to the 32-bit carrier and read 32; sized from the default `logic`, 2.
+TEST(InterfaceClassTypeAccess, SpecializedTypedefReturnTypeWidthEndToEnd) {
+  EXPECT_EQ(
+      RunAndGet("interface class IntfA #(type T1 = logic);\n"
+                "  typedef T1[1:0] T2;\n"
+                "  pure virtual function T2 funcA();\n"
+                "endclass\n"
+                "interface class IntfB #(type T = bit) extends IntfA #(T);\n"
+                "  pure virtual function T2 funcB();\n"
+                "endclass\n"
+                "class Impl implements IntfB#(bit[1:0]);\n"
+                "  virtual function IntfA#(bit[1:0])::T2 funcA();\n"
+                "    return 3;\n"
+                "  endfunction\n"
+                "  virtual function IntfA#(bit[1:0])::T2 funcB();\n"
+                "    return 2;\n"
+                "  endfunction\n"
+                "endclass\n"
+                "module t;\n"
+                "  Impl im = new;\n"
+                "  int result;\n"
+                "  initial result = $bits(im.funcB());\n"
+                "endmodule\n",
+                "result"),
+      4u);
+}
+
+// §8.25: the width follows the actual the specialization names, not a fixed
+// count. `IntfA#(bit[3:0])::T2` binds T1 to four bits, so `T1[1:0]` is 8
+// bits; a second method of the same class specialized on `bit[1:0]` stays at
+// 4, and the two are read through one expression, 8 * 100 + 4 = 804. A width
+// fixed at the first case's 4 would read 404; the 32-bit carrier 3232.
+TEST(InterfaceClassTypeAccess, SpecializedTypedefReturnTypeFollowsActual) {
+  EXPECT_EQ(
+      RunAndGet("interface class IntfA #(type T1 = logic);\n"
+                "  typedef T1[1:0] T2;\n"
+                "  pure virtual function T2 funcA();\n"
+                "endclass\n"
+                "class Impl implements IntfA#(bit[3:0]);\n"
+                "  virtual function IntfA#(bit[3:0])::T2 funcA();\n"
+                "    return 5;\n"
+                "  endfunction\n"
+                "  function IntfA#(bit[1:0])::T2 narrow();\n"
+                "    return 1;\n"
+                "  endfunction\n"
+                "endclass\n"
+                "module t;\n"
+                "  Impl im = new;\n"
+                "  int result;\n"
+                "  initial\n"
+                "    result = $bits(im.funcA()) * 100 + $bits(im.narrow());\n"
+                "endmodule\n",
+                "result"),
+      804u);
+}
+
 }  // namespace
