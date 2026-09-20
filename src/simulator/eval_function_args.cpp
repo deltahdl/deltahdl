@@ -83,6 +83,28 @@ static int ResolveArgIndex(const ModuleItem* func, const Expr* expr,
   return -1;
 }
 
+// §8.14: a class-typed formal holds a handle whose DECLARED type governs
+// non-virtual member and property resolution. Record it just as a local class
+// variable does (see CreateFuncLocalVar in eval_function_body.cpp); otherwise
+// a base-typed formal bound
+// to a derived actual would have no declared type on file and member lookup
+// would fall back to the runtime object's type, wrongly reaching the derived
+// override instead of the hidden base member.
+//
+// A ref formal is recorded the same way. §8.2 lets an object be declared as a
+// ref argument, the handle being what is passed, and §13.5.2 makes the formal
+// a reference to the caller's variable; TryClassNewAssign constructs for
+// `r = new` only when the target's name has a declared class type on file, so
+// a `ref C r` bound with no record fell to the generic evaluation, which reads
+// a bare `new` as a null handle -- the caller's variable stayed null after
+// `remake(b, 62)` while `ref int cnt` beside it counted.
+static void RegisterValueArgClassType(const FunctionArg& param,
+                                      SimContext& ctx) {
+  const auto& dt = param.data_type;
+  if (!dt.type_name.empty() && ctx.FindClassType(dt.type_name))
+    ctx.SetVariableClassType(param.name, dt.type_name);
+}
+
 static bool TryBindRefArg(const Expr* expr, int arg_index,
                           std::string_view param_name, SimContext& ctx) {
   if (arg_index < 0) return false;
@@ -377,7 +399,10 @@ static bool TryBindArrayArg(const Expr* call_arg, const FunctionArg& formal,
 static bool TryBindRefDirectionArg(const Expr* expr, int arg_index,
                                    const FunctionArg& param, SimContext& ctx,
                                    Arena& arena) {
-  if (TryBindRefArg(expr, arg_index, param.name, ctx)) return true;
+  if (TryBindRefArg(expr, arg_index, param.name, ctx)) {
+    RegisterValueArgClassType(param, ctx);
+    return true;
+  }
   if (TryBindQueueElementRef(expr, arg_index, param, ctx, arena)) return true;
   if (TryBindAssocElementRef(expr, arg_index, param, ctx, arena)) return true;
   return false;
@@ -458,20 +483,6 @@ static void RegisterValueArgStructType(const FunctionArg& param,
   if (param.data_type.kind == DataTypeKind::kStruct &&
       !param.data_type.type_name.empty())
     ctx.SetVariableStructType(param.name, param.data_type.type_name);
-}
-
-// §8.14: a class-typed formal holds a handle whose DECLARED type governs
-// non-virtual member and property resolution. Record it just as a local class
-// variable does (see CreateFuncLocalVar in eval_function_body.cpp); otherwise
-// a base-typed formal bound
-// to a derived actual would have no declared type on file and member lookup
-// would fall back to the runtime object's type, wrongly reaching the derived
-// override instead of the hidden base member.
-static void RegisterValueArgClassType(const FunctionArg& param,
-                                      SimContext& ctx) {
-  const auto& dt = param.data_type;
-  if (!dt.type_name.empty() && ctx.FindClassType(dt.type_name))
-    ctx.SetVariableClassType(param.name, dt.type_name);
 }
 
 // §13.5: the actual argument a formal is bound from -- the call expression and

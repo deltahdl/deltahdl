@@ -693,4 +693,84 @@ TEST(ArgumentPassingSim, OutputActualSpelledLikeTheFormalIsWritten) {
   EXPECT_EQ(val, 310u);
 }
 
+// §13.5.2 has a ref formal refer to the caller's own variable rather than a
+// copy, and §8.2 lets an object be declared as a ref argument, the handle being
+// what is passed. So `r = new` through `ref C r` of a class method replaces
+// the object the caller's handle names, and `r.v = x` writes that object: the
+// caller reads 62 from its own handle, which held null before the call.
+TEST(PassByRef, ClassTypedRefFormalOfAMethodReplacesTheCallersObject) {
+  auto val = RunAndGet(
+      "class C; int v; endclass\n"
+      "class Maker;\n"
+      "  function void remake(ref C r, input int x);\n"
+      "    r = new; r.v = x;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  Maker m = new;\n"
+      "  C b;\n"
+      "  int res;\n"
+      "  initial begin\n"
+      "    m.remake(b, 62);\n"
+      "    res = (b == null) ? 1 : b.v;\n"
+      "  end\n"
+      "endmodule\n",
+      "res");
+  EXPECT_EQ(val, 62u);
+}
+
+// §13.5.2: two ref formals side by side, one a class handle and one an int,
+// each alias the caller's variable. The handle is null on entry, so the
+// method constructs into the caller's variable, calls a method on the object
+// through the formal and counts in the int; the caller reads 40 from its own
+// handle and 3 from its counter, packed as 4003.
+TEST(PassByRef, ClassTypedRefFormalBesideAnIntRefFormalBothAliasTheCaller) {
+  auto val = RunAndGet(
+      "class C; int v;\n"
+      "  function void set(int x); v = x; endfunction\n"
+      "endclass\n"
+      "class U;\n"
+      "  function void touch(ref C h, ref int cnt);\n"
+      "    if (h == null) h = new;\n"
+      "    h.set(40); cnt++;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  U u = new; C c; int n = 2;\n"
+      "  int res;\n"
+      "  initial begin\n"
+      "    u.touch(c, n);\n"
+      "    res = ((c == null) ? 1 : c.v) * 100 + n;\n"
+      "  end\n"
+      "endmodule\n",
+      "res");
+  EXPECT_EQ(val, 4003u);
+}
+
+// §13.5.2 outside a class: an automatic module-level task (the clause bars
+// ref on a static-lifetime subroutine) with a class-typed ref formal
+// aliases the caller's handle the same way. The task first points the formal
+// at another object the caller holds, writes through it, then constructs a
+// fresh one; the caller's variable ends on the fresh object (v 7) and the
+// other object carries the write made while the formal named it (v 5).
+TEST(PassByRef, ClassTypedRefFormalOfAModuleTaskRebindsTheCallersHandle) {
+  auto val = RunAndGet(
+      "class C; int v; endclass\n"
+      "module t;\n"
+      "  C a, b;\n"
+      "  int res;\n"
+      "  task automatic rebind(ref C h, input C other);\n"
+      "    h = other; h.v = 5;\n"
+      "    h = new; h.v = 7;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    a = new; a.v = 1;\n"
+      "    rebind(b, a);\n"
+      "    res = ((b == null) ? 1 : b.v) * 10 + a.v;\n"
+      "  end\n"
+      "endmodule\n",
+      "res");
+  EXPECT_EQ(val, 75u);
+}
+
 }  // namespace
