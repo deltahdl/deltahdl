@@ -57,10 +57,52 @@ struct IncDecResult {
 // blocking assignments, so the target forms are the ones a blocking assignment
 // admits and the writers are the ones it uses. new_val is taken by reference
 // because §6.11.2's coercion is applied to it here and the operator yields it.
+// Stores an operator's result in the whole variable it named. §6.11.2 gives a
+// 2-state type no x and no z, so an unknown result is coerced before it is
+// stored, as WriteVar and EvalCompoundAssign coerce theirs. §10.6.2: a force
+// "shall override a procedural assignment ... until a release procedural
+// statement is executed on the variable". Only the write is overridden: the
+// operator still yields the value it computed, which is what the enclosing
+// expression reads.
+//
+// §9.4.2: "A non-edge implicit event shall be detected on any change in the
+// value of the expression", and a value "referenced by a method or function"
+// that changes "shall cause the event expression to be reevaluated". The
+// clause exempts no writer, so an increment is a change exactly as an `=` is.
+// This stored and said nothing, and NotifyWatchers is the only route by which
+// a parked process is resumed, so the wake-up ended rather than waiting. It
+// sits inside the gate, where WriteVar and ExecFuncIdentifierAssign put
+// theirs, because a write that did not land is no change to detect. It is
+// otherwise unconditional: whether a change counts is the awaiter's own test,
+// which ChangeGatePasses and CheckEdge already make.
+static void StoreOperatorResult(Variable* var, Logic4Vec& result) {
+  if (!var->is_4state) CoerceTo2State(result);
+  if (!var->is_forced) {
+    var->value = result;
+    var->NotifyWatchers();
+  }
+}
+
+// §26.3 with §11.4.1: a package variable named through the package scope
+// resolution operator, `p::shared`, is a member access the statement form
+// resolves to the whole variable held under "p.shared" before it takes the
+// access for a structure member (ResolveLhsVariable ahead of WriteStructField
+// in statement_assign_core.cpp); the operator forms went to WriteStructField
+// alone, whose resolution takes `p` for a variable and finds none, so
+// `p::shared += n` and `p::shared++` wrote nothing. The same order here.
+static Variable* WholeVariableOfMember(const Expr* lhs, SimContext& ctx) {
+  if (lhs->kind != ExprKind::kMemberAccess) return nullptr;
+  return ResolveLhsVariable(lhs, ctx);
+}
+
 static void WriteIncDecTarget(const Expr* lhs, Logic4Vec& new_val,
                               SimContext& ctx, Arena& arena) {
   if (lhs->kind == ExprKind::kSelect) {
     TrySelectBlockingAssign(lhs, new_val, ctx, arena);
+    return;
+  }
+  if (auto* whole = WholeVariableOfMember(lhs, ctx)) {
+    StoreOperatorResult(whole, new_val);
     return;
   }
   if (lhs->kind == ExprKind::kMemberAccess) {
@@ -77,29 +119,7 @@ static void WriteIncDecTarget(const Expr* lhs, Logic4Vec& new_val,
     TryFuncClassPropertyWrite(lhs, new_val, ctx, arena);
     return;
   }
-  // §6.11.2 gives a 2-state type no x and no z, so an unknown result is coerced
-  // before it is stored, as WriteVar and EvalCompoundAssign coerce theirs.
-  // Nothing had to do this while the arithmetic could only produce known bits.
-  if (!var->is_4state) CoerceTo2State(new_val);
-  // §10.6.2: a force "shall override a procedural assignment ... until a
-  // release procedural statement is executed on the variable". Only the write
-  // is overridden: the operator still yields the value it computed, which is
-  // what the enclosing expression reads.
-  //
-  // §9.4.2: "A non-edge implicit event shall be detected on any change in the
-  // value of the expression", and a value "referenced by a method or function"
-  // that changes "shall cause the event expression to be reevaluated". The
-  // clause exempts no writer, so an increment is a change exactly as an `=` is.
-  // This stored and said nothing, and NotifyWatchers is the only route by which
-  // a parked process is resumed, so the wake-up ended rather than waiting. It
-  // sits inside the gate, where WriteVar and ExecFuncIdentifierAssign put
-  // theirs, because a write that did not land is no change to detect. It is
-  // otherwise unconditional: whether a change counts is the awaiter's own test,
-  // which ChangeGatePasses and CheckEdge already make.
-  if (!var->is_forced) {
-    var->value = new_val;
-    var->NotifyWatchers();
-  }
+  StoreOperatorResult(var, new_val);
 }
 
 static IncDecResult EvalIncDec(const Expr* expr, SimContext& ctx,
@@ -229,23 +249,25 @@ Logic4Vec EvalCompoundAssign(const Expr* expr, SimContext& ctx, Arena& arena) {
   auto rhs_val = EvalExpr(expr->rhs, ctx, arena);
   auto base_op = CompoundAssignBaseOp(expr->op);
   auto result = EvalBinaryOp(base_op, lhs_val, rhs_val, arena, target_width);
-  if (expr->lhs->kind == ExprKind::kIdentifier) {
+  if (auto* whole = WholeVariableOfMember(expr->lhs, ctx)) {
+    // §10.7 sizes the value to the variable, which LhsContextWidth did not
+    // read for a member access, so the resize the identifier arm gets from
+    // the operation's width is made here; the yield keeps the same width.
+    result =
+        ConvertRealOnAssign(result, expr->lhs, whole->value.width, ctx, arena);
+    result = ResizeToWidth(result, whole->value.width, arena);
+    yield_width = whole->value.width;
+    StoreOperatorResult(whole, result);
+  } else if (expr->lhs->kind == ExprKind::kIdentifier) {
     auto* var = ctx.FindVariable(expr->lhs->text);
     if (var) {
       result =
           ConvertRealOnAssign(result, expr->lhs, var->value.width, ctx, arena);
-      if (!var->is_4state) CoerceTo2State(result);
-      // §10.6.2, as in EvalIncDec above. §11.3.6 has the expression "stack" the
-      // value and return it whether or not the update lands, so the return
-      // below is the value computed rather than what the target still holds.
-      //
-      // §9.4.2 again, as in WriteIncDecTarget: the update is a change in the
-      // variable's value and its watchers are told so, inside the same gate,
-      // because the write that does not land is not a change.
-      if (!var->is_forced) {
-        var->value = result;
-        var->NotifyWatchers();
-      }
+      // §10.6.2 and §9.4.2, as StoreOperatorResult states them; §11.3.6 has
+      // the expression "stack" the value and return it whether or not the
+      // update lands, so the return below is the value computed rather than
+      // what the target still holds.
+      StoreOperatorResult(var, result);
     } else {
       // §8.11, as in WriteIncDecTarget: a bare name no local answers inside
       // a method is a property of the class.

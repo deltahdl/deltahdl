@@ -675,4 +675,52 @@ TEST(PackageScopeReferenceSim, PackageEnumConstantReadThroughItsScope) {
             307u);
 }
 
+// §26.3 names a package variable through the package scope resolution
+// operator as an lvalue, and §11.4.1 and §11.4.2 have an assignment operator
+// and an increment be blocking assignments to it, so `p::shared += 150` and
+// `p::shared++` update the package's variable: 100 + 150 + 1 = 251. The plain
+// `p::shared = v` landed and the operator forms wrote nothing, so the read
+// through the scope stayed 100.
+TEST(PackageScopeReferenceSim, CompoundAssignmentToAScopedPackageVariable) {
+  EXPECT_EQ(RunAndGet("package p;\n"
+                      "  int shared = 100;\n"
+                      "endpackage\n"
+                      "module t;\n"
+                      "  int out;\n"
+                      "  initial begin\n"
+                      "    p::shared += 150;\n"
+                      "    p::shared++;\n"
+                      "    out = p::shared;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "out"),
+            251u);
+}
+
+// The same operators written inside a class method (the issue's probe 88):
+// bump adds 150, inc adds 1 -- read after each, 250 * 1000 + 251.
+TEST(PackageScopeReferenceSim,
+     CompoundAssignmentToAScopedPackageVariableInAMethod) {
+  EXPECT_EQ(RunAndGet("package p;\n"
+                      "  int shared = 100;\n"
+                      "endpackage\n"
+                      "class Writer;\n"
+                      "  function void bump(int n); p::shared += n;\n"
+                      "  endfunction\n"
+                      "  function void inc(); p::shared++; endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int out;\n"
+                      "  initial begin\n"
+                      "    Writer w = new;\n"
+                      "    w.bump(150);\n"
+                      "    out = p::shared * 1000;\n"
+                      "    w.inc();\n"
+                      "    out = out + p::shared;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "out"),
+            250u * 1000u + 251u);
+}
+
 }  // namespace
