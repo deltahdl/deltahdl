@@ -80,6 +80,57 @@ TEST(Matches, ConstantParameterPatternNoMatchRuntime) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §12.6 (printed page 325): a constant expression pattern succeeds when the
+// value equals the constant's value; §12.6.2 (printed 328) matches `e matches
+// p` the same way. A 96-bit value equal to a 96-bit constant in every word
+// matches, and one that differs from it only at bit 80 -- in the second 64-bit
+// word -- does not. The two results are read together as eq * 10 + ne.
+TEST(Matches, ConstantPatternWiderThanOneWordComparesEveryWord) {
+  SimFixture f;
+  uint64_t r = RunModule(
+      f,
+      "module t;\n"
+      "  localparam logic [95:0] P = 96'h0123_4567_89AB_CDEF_0011_2233;\n"
+      "  logic [95:0] x;\n"
+      "  int eq, ne, r;\n"
+      "  initial begin\n"
+      "    x = 96'h0123_4567_89AB_CDEF_0011_2233;\n"
+      "    eq = x matches P;\n"
+      "    x = 96'h0122_4567_89AB_CDEF_0011_2233;\n"
+      "    ne = x matches P;\n"
+      "    r = eq * 10 + ne;\n"
+      "  end\n"
+      "endmodule\n",
+      "r");
+  EXPECT_EQ(r, 10u);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §12.6 (printed page 325): the same rule with a 32-bit constant against a
+// 96-bit value, the constant extended to the value's width. The value whose
+// low word alone holds the constant and whose bit 64 is set differs from it;
+// the value holding the constant with clear upper words equals it. The two
+// results are read together as high_set * 10 + high_clear.
+TEST(Matches, ConstantPatternNarrowerThanTheValueExtendsToItsWidth) {
+  SimFixture f;
+  uint64_t r = RunModule(f,
+                         "module t;\n"
+                         "  localparam logic [31:0] P = 32'h0011_2233;\n"
+                         "  logic [95:0] x;\n"
+                         "  int high_set, high_clear, r;\n"
+                         "  initial begin\n"
+                         "    x = 96'h1_0000_0000_0011_2233;\n"
+                         "    high_set = x matches P;\n"
+                         "    x = 96'h0011_2233;\n"
+                         "    high_clear = x matches P;\n"
+                         "    r = high_set * 10 + high_clear;\n"
+                         "  end\n"
+                         "endmodule\n",
+                         "r");
+  EXPECT_EQ(r, 1u);
+  EXPECT_FALSE(f.has_errors);
+}
+
 TEST(Matches, WildcardXInPattern) {
   SimFixture f;
   auto* var = f.ctx.CreateVariable("wv", 4);
