@@ -168,30 +168,6 @@ static int64_t Clog2(int64_t val) {
   return result;
 }
 
-std::optional<int64_t> EvalConcat(const Expr* expr, const ScopeMap& scope) {
-  int64_t result = 0;
-  for (auto* elem : expr->elements) {
-    auto val = ConstEvalInt(elem, scope);
-    if (!val) return std::nullopt;
-    uint32_t w = ConstLiteralWidth(elem);
-    result = (result << w) | (*val & ((int64_t{1} << w) - 1));
-  }
-  return result;
-}
-
-std::optional<int64_t> EvalReplicate(const Expr* expr, const ScopeMap& scope) {
-  auto count = ConstEvalInt(expr->repeat_count, scope);
-  if (!count || expr->elements.empty()) return std::nullopt;
-  auto val = ConstEvalInt(expr->elements[0], scope);
-  if (!val) return std::nullopt;
-  uint32_t w = ConstLiteralWidth(expr->elements[0]);
-  int64_t result = 0;
-  for (int64_t i = 0; i < *count; ++i) {
-    result = (result << w) | (*val & ((int64_t{1} << w) - 1));
-  }
-  return result;
-}
-
 static int64_t Countones(int64_t val) {
   auto u = static_cast<uint64_t>(val);
   int64_t count = 0;
@@ -564,6 +540,13 @@ std::optional<ConstVal> ConstEvalUnaryFull(const Expr* expr,
                                            const ScopeMap& scope) {
   auto operand = ConstEvalFull(expr->lhs, scope);
   if (!operand) return std::nullopt;
+  // §11.6.1's Table 11-21 (printed page 299) sizes unary `+ - ~` by their
+  // operand, so a result wider than 64 bits has words the int64 fold cannot
+  // hold, and `!` reads every bit of its operand; EvalWideUnary works those
+  // across every word and declines the rest, which fold below as before.
+  if (operand->width > 64) {
+    if (auto wide = EvalWideUnary(expr->op, *operand)) return wide;
+  }
   if (expr->op == TokenKind::kMinus) {
     return NormalizeConstVal(-operand->value, operand->width,
                              operand->is_signed);
@@ -619,10 +602,12 @@ std::optional<ConstVal> ConstEvalBinaryFull(const Expr* expr,
   if (!lhs || !rhs) return std::nullopt;
   uint32_t w = std::max(lhs->width, rhs->width);
   // §11.6.1's Table 11-21 (printed page 299) sizes a shift by its left operand
-  // and a bitwise operator by the wider of its two, so a result wider than 64
-  // bits has words the int64 fold cannot hold; EvalWideBinary works those
-  // operators across every word and declines the rest, which fold below on
-  // the low word as before.
+  // and a bitwise or an arithmetic operator by the wider of its two, so a
+  // result wider than 64 bits has words the int64 fold cannot hold, and a
+  // comparison or a logical operator reads every bit of operands that wide;
+  // EvalWideBinary works those across every word and declines a product, a
+  // quotient, a remainder and a power, which fold below on the low word as
+  // before.
   if (w > 64) {
     if (auto wide = EvalWideBinary(expr->op, *lhs, *rhs, w)) return wide;
   }

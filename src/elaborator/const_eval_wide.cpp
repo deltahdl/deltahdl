@@ -2,9 +2,12 @@
 // (printed page 77 of ~/LRM.pdf) sizes a based literal by its size constant
 // and §6.20.2 (printed 126) gives a parameter its declared range, so a
 // constant expression can be wider than the int64 the fold carries; §11.5.1
-// (printed 296) then lets a select name any bit of it, and §11.4.10 with
-// §11.4.8 shift it or combine it bit by bit. This file is where those bits
-// are produced from a literal's digits and where they are read.
+// (printed 296) then lets a select name any bit of it, §11.4.10 with §11.4.8
+// shift it or combine it bit by bit, §11.4.3 (printed 275-277) add to it,
+// §11.4.4 and §11.4.5 (printed 278-279) compare it, §11.4.7 (printed 280)
+// test it, §11.4.12 (printed 286-288) join it and §6.24.1 (printed 139) cast
+// it. This file is where those bits are produced from a literal's digits and
+// where they are read.
 
 #include <algorithm>
 #include <cstddef>
@@ -15,8 +18,10 @@
 #include <utility>
 #include <vector>
 
+#include "elaborator/const_eval.h"
 #include "elaborator/const_eval_internal.h"
 #include "lexer/token.h"
+#include "parser/ast_expr.h"
 
 namespace delta {
 namespace {
@@ -95,6 +100,21 @@ std::vector<uint64_t> WordsOfHalves(const std::vector<uint32_t>& halves) {
   return words;
 }
 
+// The bits of `words` at or above `width` cleared, so that a value read at a
+// width contributes nothing above it: a signed value under 64 bits holds its
+// sign fill in `value` (NormalizeConstVal), which is what an operand read as
+// unsigned or joined into a concatenation must not carry.
+void ClearBitsFrom(std::vector<uint64_t>& words, uint32_t width) {
+  for (size_t i = 0; i < words.size(); ++i) {
+    uint64_t base = 64 * i;
+    if (base >= width) {
+      words[i] = 0;
+    } else if (width - base < 64) {
+      words[i] &= ~uint64_t{0} >> (64 - (width - base));
+    }
+  }
+}
+
 // The words above the first of `words`, cut to `width` -- §5.7.1 truncates a
 // value wider than its size from the left -- and with the empty top words
 // dropped, which is ConstVal::high_words' layout. `width` is above 64, so
@@ -123,12 +143,16 @@ std::vector<uint64_t> WordsOf(const ConstVal& v, uint32_t width) {
   return words;
 }
 
-// The ConstVal `words` make at `width`: the first word is `value`, and the
-// rest are cut to the width and trimmed as HighWordsAt cuts and trims them.
+// The ConstVal `words` make at `width`: the first word is `value`, read at
+// the width and signedness as NormalizeConstVal reads a value of 64 bits or
+// less, and the rest are cut to the width and trimmed as HighWordsAt cuts and
+// trims them, there being none to keep at 64 bits or less.
 ConstVal ConstValOfWords(const std::vector<uint64_t>& words, uint32_t width,
                          bool is_signed) {
-  return ConstVal{static_cast<int64_t>(words[0]), width, is_signed,
-                  HighWordsAt(words, width)};
+  ConstVal v =
+      NormalizeConstVal(static_cast<int64_t>(words[0]), width, is_signed);
+  if (width > 64) v.high_words = HighWordsAt(words, width);
+  return v;
 }
 
 // §11.4.10: the words of `words` shifted left by `n` bits, the vacated low
@@ -203,14 +227,34 @@ std::optional<std::vector<uint64_t>> WideShift(TokenKind op,
   }
 }
 
+// The words of `v` at `width` as an operand of a binary operator or a cast
+// reads them: cut to v's own width, and the bits from there up to `width`
+// filled from v's sign bit where `sign_extend` asks. §11.4.3.1 (printed
+// 277), §11.4.4, §11.4.5 and §11.4.8 each sign-extend the narrower of two
+// signed operands to the wider's size and zero-extend it otherwise, and
+// §6.24.1 pads a value cast to a larger size. The words below 64 of a signed
+// value under 64 bits already hold its sign fill (NormalizeConstVal), which
+// ClearBitsFrom removes and the fill puts back only where it belongs.
+std::vector<uint64_t> ExtendedWords(const ConstVal& v, uint32_t width,
+                                    bool sign_extend) {
+  std::vector<uint64_t> words = WordsOf(v, width);
+  ClearBitsFrom(words, v.width);
+  if (sign_extend && v.width < width && ConstValBit(v, v.width - 1))
+    FillTopBits(words, width, width - v.width);
+  return words;
+}
+
 // §11.4.8: the words of `lhs` and `rhs` combined bit by bit; empty for an
-// operator that is not one of the four bitwise ones.
+// operator that is not one of the four bitwise ones. A narrower operand is
+// extended to the width by its sign where both are signed, which
+// 64b2dfbe0's WordsOf, filling with zeros whatever the signedness, did not.
 std::optional<std::vector<uint64_t>> WideBitwise(TokenKind op,
                                                  const ConstVal& lhs,
                                                  const ConstVal& rhs,
                                                  uint32_t width) {
-  std::vector<uint64_t> l = WordsOf(lhs, width);
-  std::vector<uint64_t> r = WordsOf(rhs, width);
+  bool is_signed = lhs.is_signed && rhs.is_signed;
+  std::vector<uint64_t> l = ExtendedWords(lhs, width, is_signed);
+  std::vector<uint64_t> r = ExtendedWords(rhs, width, is_signed);
   for (size_t i = 0; i < l.size(); ++i) {
     switch (op) {
       case TokenKind::kAmp:
@@ -232,6 +276,164 @@ std::optional<std::vector<uint64_t>> WideBitwise(TokenKind op,
   }
   return l;
 }
+
+// `addend` added into `acc` word by word, each word's carry going into the
+// next and the carry out of the top word dropped, which is the truncation
+// §11.6.1 gives a sum evaluated at the width of its operands.
+void AddWords(std::vector<uint64_t>& acc, const std::vector<uint64_t>& addend) {
+  uint64_t carry = 0;
+  for (size_t i = 0; i < acc.size(); ++i) {
+    uint64_t sum = acc[i] + addend[i];
+    uint64_t carry_out = sum < acc[i] ? 1 : 0;
+    uint64_t total = sum + carry;
+    carry_out += total < sum ? 1 : 0;
+    acc[i] = total;
+    carry = carry_out;
+  }
+}
+
+// §11.4.3 (printed 277): the two's complement of `words`, which is what unary
+// minus makes of its operand and what a subtraction adds in place of its
+// second operand.
+void NegateWords(std::vector<uint64_t>& words) {
+  for (uint64_t& w : words) w = ~w;
+  std::vector<uint64_t> one(words.size(), 0);
+  if (!one.empty()) one[0] = 1;
+  AddWords(words, one);
+}
+
+// §11.4.3 (printed 275): the words of `lhs` plus or minus those of `rhs`,
+// carried and borrowed across every word. Empty for any other arithmetic
+// operator: a product, a quotient, a remainder and a power stay on the low
+// word, which is what the int64 fold answers, and a case in
+// test_elaborator_subclause_20_06_02b.cpp pins that limit.
+std::optional<std::vector<uint64_t>> WideAddSub(TokenKind op,
+                                                const ConstVal& lhs,
+                                                const ConstVal& rhs,
+                                                uint32_t width) {
+  if (op != TokenKind::kPlus && op != TokenKind::kMinus) return std::nullopt;
+  bool is_signed = lhs.is_signed && rhs.is_signed;
+  std::vector<uint64_t> l = ExtendedWords(lhs, width, is_signed);
+  std::vector<uint64_t> r = ExtendedWords(rhs, width, is_signed);
+  if (op == TokenKind::kMinus) NegateWords(r);
+  AddWords(l, r);
+  return l;
+}
+
+// How two values stand to each other: whether the first is below the second,
+// and whether the two are equal, which between them answer every relational
+// and equality operator.
+struct WideOrder {
+  bool less;
+  bool equal;
+};
+
+// §11.4.4 (printed 278) and §11.4.5 (printed 279): `l` against `r`, both of
+// `width` bits, as signed values where `is_signed` -- the sign being the top
+// bit at the width, so two values of one sign order as their bit patterns do
+// -- and as unsigned values otherwise, word by word from the top.
+WideOrder CompareWords(const std::vector<uint64_t>& l,
+                       const std::vector<uint64_t>& r, uint32_t width,
+                       bool is_signed) {
+  uint64_t top = width - 1;
+  bool l_neg = is_signed && ((l[top / 64] >> (top % 64)) & 1) != 0;
+  bool r_neg = is_signed && ((r[top / 64] >> (top % 64)) & 1) != 0;
+  if (l_neg != r_neg) return {l_neg, false};
+  for (size_t i = l.size(); i-- > 0;) {
+    if (l[i] != r[i]) return {l[i] < r[i], false};
+  }
+  return {false, true};
+}
+
+// What a relational or equality operator answers from `order`; empty for an
+// operator that is neither. The case equality and wildcard operators are left
+// out as the 64-bit fold leaves them out.
+std::optional<bool> OrderAnswers(TokenKind op, WideOrder order) {
+  switch (op) {
+    case TokenKind::kLt:
+      return order.less;
+    case TokenKind::kGt:
+      return !order.less && !order.equal;
+    case TokenKind::kLtEq:
+      return order.less || order.equal;
+    case TokenKind::kGtEq:
+      return !order.less;
+    case TokenKind::kEqEq:
+      return order.equal;
+    case TokenKind::kBangEq:
+      return !order.equal;
+    default:
+      return std::nullopt;
+  }
+}
+
+// §11.4.4 and §11.4.5: the one bit a relational or equality operator answers
+// over every word of its operands, the narrower one extended as
+// ExtendedWords extends it. Empty for any other operator.
+std::optional<ConstVal> WideCompare(TokenKind op, const ConstVal& lhs,
+                                    const ConstVal& rhs, uint32_t width) {
+  bool is_signed = lhs.is_signed && rhs.is_signed;
+  auto answer = OrderAnswers(
+      op, CompareWords(ExtendedWords(lhs, width, is_signed),
+                       ExtendedWords(rhs, width, is_signed), width, is_signed));
+  if (!answer) return std::nullopt;
+  return ConstVal{*answer ? 1 : 0, 1, false};
+}
+
+// §11.4.7 (printed 280): the one bit a logical operator answers from whether
+// each operand is nonzero, read across every word of it. Empty for any other
+// operator.
+std::optional<ConstVal> WideLogical(TokenKind op, const ConstVal& lhs,
+                                    const ConstVal& rhs) {
+  bool l = ConstValIsNonZero(lhs);
+  bool r = ConstValIsNonZero(rhs);
+  std::optional<bool> answer;
+  switch (op) {
+    case TokenKind::kAmpAmp:
+      answer = l && r;
+      break;
+    case TokenKind::kPipePipe:
+      answer = l || r;
+      break;
+    case TokenKind::kArrow:
+      answer = !l || r;
+      break;
+    case TokenKind::kLtDashGt:
+      answer = l == r;
+      break;
+    default:
+      return std::nullopt;
+  }
+  return ConstVal{*answer ? 1 : 0, 1, false};
+}
+
+// §11.4.12 (printed 286-287): the words of `parts` joined at `width`, the
+// sum of their widths, the first part the most significant. Each part
+// contributes its own width of bits and nothing above them, so a signed
+// part's sign fill is cut away by ExtendedWords.
+std::vector<uint64_t> JoinedWords(const std::vector<ConstVal>& parts,
+                                  uint32_t width) {
+  std::vector<uint64_t> words((width + 63) / 64, 0);
+  for (const ConstVal& part : parts) {
+    words = ShiftWordsLeft(words, part.width);
+    std::vector<uint64_t> own = ExtendedWords(part, width, false);
+    for (size_t i = 0; i < words.size(); ++i) words[i] |= own[i];
+  }
+  return words;
+}
+
+// The unsigned value of `width` bits `parts` join to, and a value of no bits
+// for no parts or parts of no width, which a replication with a multiplier of
+// zero is (§11.4.12.1, printed 288).
+ConstVal JoinedConstVal(const std::vector<ConstVal>& parts, uint32_t width) {
+  if (width == 0) return ConstVal{0, 0, false};
+  return ConstValOfWords(JoinedWords(parts, width), width, false);
+}
+
+// The most bits a replication is let grow to at elaboration; a multiplier
+// taking the value past it leaves the fold unanswered rather than allocating
+// without bound.
+constexpr uint64_t kMaxReplicationBits = uint64_t{1} << 20;
 
 }  // namespace
 
@@ -265,6 +467,14 @@ uint64_t ConstValWindow(const ConstVal& v, int64_t lo) {
   return low | (WordAt(v, start / 64 + 1) << (64 - shift));
 }
 
+bool ConstValIsNonZero(const ConstVal& v) {
+  if (v.value != 0) return true;
+  for (uint64_t w : v.high_words) {
+    if (w != 0) return true;
+  }
+  return false;
+}
+
 std::optional<ConstVal> EvalWideBinary(TokenKind op, const ConstVal& lhs,
                                        const ConstVal& rhs, uint32_t width) {
   bool is_signed = lhs.is_signed && rhs.is_signed;
@@ -272,7 +482,60 @@ std::optional<ConstVal> EvalWideBinary(TokenKind op, const ConstVal& lhs,
     return ConstValOfWords(*shifted, width, is_signed);
   if (auto combined = WideBitwise(op, lhs, rhs, width))
     return ConstValOfWords(*combined, width, is_signed);
-  return std::nullopt;
+  if (auto summed = WideAddSub(op, lhs, rhs, width))
+    return ConstValOfWords(*summed, width, is_signed);
+  if (auto compared = WideCompare(op, lhs, rhs, width)) return compared;
+  return WideLogical(op, lhs, rhs);
+}
+
+std::optional<ConstVal> EvalWideUnary(TokenKind op, const ConstVal& operand) {
+  std::vector<uint64_t> words = WordsOf(operand, operand.width);
+  switch (op) {
+    case TokenKind::kPlus:
+      return operand;
+    case TokenKind::kMinus:
+      NegateWords(words);
+      return ConstValOfWords(words, operand.width, operand.is_signed);
+    case TokenKind::kTilde:
+      for (uint64_t& w : words) w = ~w;
+      return ConstValOfWords(words, operand.width, operand.is_signed);
+    case TokenKind::kBang:
+      return ConstVal{ConstValIsNonZero(operand) ? 0 : 1, 1, false};
+    default:
+      return std::nullopt;
+  }
+}
+
+ConstVal CastConstVal(const ConstVal& v, uint32_t width, bool is_signed) {
+  if (width <= 64) return NormalizeConstVal(v.value, width, is_signed);
+  return ConstValOfWords(ExtendedWords(v, width, v.is_signed), width,
+                         is_signed);
+}
+
+std::optional<ConstVal> ConstEvalConcatFull(const Expr* expr,
+                                            const ScopeMap& scope) {
+  std::vector<ConstVal> parts;
+  uint32_t width = 0;
+  for (const Expr* elem : expr->elements) {
+    auto part = ConstEvalFull(elem, scope);
+    if (!part) return std::nullopt;
+    width += part->width;
+    parts.push_back(*part);
+  }
+  return JoinedConstVal(parts, width);
+}
+
+std::optional<ConstVal> ConstEvalReplicateFull(const Expr* expr,
+                                               const ScopeMap& scope) {
+  auto count = ConstEvalInt(expr->repeat_count, scope);
+  if (!count || *count < 0) return std::nullopt;
+  auto inner = ConstEvalConcatFull(expr, scope);
+  if (!inner) return std::nullopt;
+  auto n = static_cast<uint64_t>(*count);
+  if (n > kMaxReplicationBits || n * inner->width > kMaxReplicationBits)
+    return std::nullopt;
+  std::vector<ConstVal> copies(static_cast<size_t>(n), *inner);
+  return JoinedConstVal(copies, static_cast<uint32_t>(n * inner->width));
 }
 
 }  // namespace delta

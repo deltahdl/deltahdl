@@ -36,7 +36,7 @@ static std::optional<ConstVal> ConstEvalSysCallFull(const Expr* expr,
     if (expr->args.empty()) return std::nullopt;
     auto arg = ConstEvalFull(expr->args[0], scope);
     if (!arg) return std::nullopt;
-    return NormalizeConstVal(arg->value, arg->width, expr->callee == "$signed");
+    return CastConstVal(*arg, arg->width, expr->callee == "$signed");
   }
   auto val = EvalConstSysCall(expr, scope);
   if (!val) return std::nullopt;
@@ -611,13 +611,15 @@ static std::optional<ConstVal> ConstEvalIdentifierFull(const Expr* expr,
 }
 
 // §6.24.1: what a cast expression is worth. Each form decides the width and the
-// signedness the operand's bits are read by, which is what NormalizeConstVal
-// applies: a signing cast keeps "the number of bits in the expression to be
-// cast" and sets "the signedness specified by the cast type"; a size cast takes
-// "the cast size" and leaves "the self-determined signedness of the expression
-// inside the cast" alone; a const cast lets "the type of the expression to be
-// cast pass through unchanged"; a cast to a predefined type takes both from
-// that type; and a void cast has no value to return.
+// signedness the operand's bits are read by, which is what CastConstVal
+// applies, keeping the words above bit 63 of an operand or a size past 64
+// bits, which the NormalizeConstVal of 64b2dfbe0 dropped: a signing cast keeps
+// "the number of bits in the expression to be cast" and sets "the signedness
+// specified by the cast type"; a size cast takes "the cast size" and leaves
+// "the self-determined signedness of the expression inside the cast" alone; a
+// const cast lets "the type of the expression to be cast pass through
+// unchanged"; a cast to a predefined type takes both from that type; and a
+// void cast has no value to return.
 static std::optional<ConstVal> ConstEvalCastFull(const Expr* expr,
                                                  const ScopeMap& scope) {
   if (expr->text == "void") return std::nullopt;
@@ -625,8 +627,7 @@ static std::optional<ConstVal> ConstEvalCastFull(const Expr* expr,
   if (!operand) return std::nullopt;
   if (expr->text == "const") return operand;
   if (expr->text == "signed" || expr->text == "unsigned")
-    return NormalizeConstVal(operand->value, operand->width,
-                             expr->text == "signed");
+    return CastConstVal(*operand, operand->width, expr->text == "signed");
   // §6.24.1: "If the casting type is a constant expression with a positive
   // integral value, the expression in parentheses shall be padded or truncated
   // to the size specified." The parser gives such a cast its size as an
@@ -636,8 +637,8 @@ static std::optional<ConstVal> ConstEvalCastFull(const Expr* expr,
   if (expr->rhs) {
     auto size = ConstEvalFull(expr->rhs, scope);
     if (!size || size->value <= 0) return std::nullopt;
-    return NormalizeConstVal(operand->value, static_cast<uint32_t>(size->value),
-                             operand->is_signed);
+    return CastConstVal(*operand, static_cast<uint32_t>(size->value),
+                        operand->is_signed);
   }
   uint32_t width = CastTargetWidth(expr->text);
   // A cast to a user-defined type takes its width from the typedef map, which
@@ -647,9 +648,9 @@ static std::optional<ConstVal> ConstEvalCastFull(const Expr* expr,
   // reason. CastTargetWidth answers 0 for a user-defined name and for `string`.
   if (width == 0) return operand;
   if (expr->text[0] >= '0' && expr->text[0] <= '9')
-    return NormalizeConstVal(operand->value, width, operand->is_signed);
-  return NormalizeConstVal(operand->value, width,
-                           TypeNameToDataType(expr->text).is_signed);
+    return CastConstVal(*operand, width, operand->is_signed);
+  return CastConstVal(*operand, width,
+                      TypeNameToDataType(expr->text).is_signed);
 }
 
 // §11.11 orders the three values "minimum, typical, and maximum", which
@@ -688,16 +689,10 @@ std::optional<ConstVal> ConstEvalFull(const Expr* expr, const ScopeMap& scope) {
       return ConstEvalFull(cond->value ? expr->true_expr : expr->false_expr,
                            scope);
     }
-    case ExprKind::kConcatenation: {
-      auto val = EvalConcat(expr, scope);
-      if (!val) return std::nullopt;
-      return ConstVal{*val, 32, false};
-    }
-    case ExprKind::kReplicate: {
-      auto val = EvalReplicate(expr, scope);
-      if (!val) return std::nullopt;
-      return ConstVal{*val, 32, false};
-    }
+    case ExprKind::kConcatenation:
+      return ConstEvalConcatFull(expr, scope);
+    case ExprKind::kReplicate:
+      return ConstEvalReplicateFull(expr, scope);
     case ExprKind::kSelect:
       return ConstEvalSelectFull(expr, scope);
     case ExprKind::kSystemCall:

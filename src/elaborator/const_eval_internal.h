@@ -24,9 +24,10 @@ struct ConstVal {
   // value with no set bit at or above 64, whatever its width, so every reader
   // that consults `value` alone reads what it always read. Filled by
   // ConstEvalLiteral for a literal past 64 bits and by ConstEvalIdentifierFull
-  // for a parameter declared past them, and read by a select, a shift and a
-  // bitwise operator through const_eval_wide.cpp; the arithmetic operators,
-  // a cast, a concatenation and a unary operator still see `value` alone.
+  // for a parameter declared past them, and read through const_eval_wide.cpp
+  // by a select, a shift, a bitwise, an additive, a comparison, a logical and
+  // a unary operator, a cast, a concatenation and a replication; a product,
+  // a quotient, a remainder and a power still see `value` alone.
   std::vector<uint64_t> high_words = {};
 };
 
@@ -44,10 +45,20 @@ std::optional<ConstVal> ConstEvalLiteral(const Expr* expr);
 std::optional<ConstVal> ConstEvalStringLiteral(const Expr* expr);
 std::optional<ConstVal> ConstEvalUnaryFull(const Expr* expr,
                                            const ScopeMap& scope);
-std::optional<int64_t> EvalConcat(const Expr* expr, const ScopeMap& scope);
 std::optional<int64_t> EvalConstSysCall(const Expr* expr,
                                         const ScopeMap& scope);
-std::optional<int64_t> EvalReplicate(const Expr* expr, const ScopeMap& scope);
+
+// §11.4.12: the value of a concatenation, each element's own width of bits
+// joined with the first element the most significant, and of a replication,
+// the concatenation of its elements repeated the multiplier's number of times
+// (§11.4.12.1), each as wide as the sum of its parts and carrying every word
+// of them. Empty where an element or the multiplier does not fold, where the
+// multiplier is negative, and where the whole would be wider than a fold is
+// let grow. Defined in const_eval_wide.cpp.
+std::optional<ConstVal> ConstEvalConcatFull(const Expr* expr,
+                                            const ScopeMap& scope);
+std::optional<ConstVal> ConstEvalReplicateFull(const Expr* expr,
+                                               const ScopeMap& scope);
 
 std::optional<ConstVal> ConstEvalSelectFull(const Expr* expr,
                                             const ScopeMap& scope);
@@ -69,12 +80,32 @@ bool ConstValBit(const ConstVal& v, int64_t offset);
 // negative `lo` shifts the value up by -lo. Defined in const_eval_wide.cpp.
 uint64_t ConstValWindow(const ConstVal& v, int64_t lo);
 
-// §11.4.10 with §11.4.8: a shift or a bitwise operator applied across every
-// word of `lhs` and `rhs`, at width `width`, for an operand that carries bits
-// past 63. Empty for any other operator, which the 64-bit fold answers.
-// Defined in const_eval_wide.cpp.
+// §11.4.10 with §11.4.8, §11.4.3, §11.4.4, §11.4.5 and §11.4.7: a shift, a
+// bitwise operator, an addition, a subtraction, a relational, an equality or
+// a logical operator applied across every word of `lhs` and `rhs`, at width
+// `width`, for an operand that carries bits past 63; a comparison and a
+// logical operator answer one bit. Empty for any other operator -- a product,
+// a quotient, a remainder and a power -- which the 64-bit fold answers on the
+// low word. Defined in const_eval_wide.cpp.
 std::optional<ConstVal> EvalWideBinary(TokenKind op, const ConstVal& lhs,
                                        const ConstVal& rhs, uint32_t width);
+
+// §11.4.3 with §11.4.8 and §11.4.7: unary plus, minus, bitwise negation and
+// logical negation applied across every word of `operand`, whose width is
+// past 64. Empty for any other operator. Defined in const_eval_wide.cpp.
+std::optional<ConstVal> EvalWideUnary(TokenKind op, const ConstVal& operand);
+
+// §11.4.7: whether any bit of `v` is set, read across every word of it, which
+// is what a logical operator asks of an operand. Defined in
+// const_eval_wide.cpp.
+bool ConstValIsNonZero(const ConstVal& v);
+
+// §6.24.1 with §11.7: `v` read at `width` bits and the signedness `is_signed`,
+// the words above the width cut away and a wider width padded from v's own
+// sign where v is signed and with zeros otherwise. NormalizeConstVal's answer
+// for a width of 64 or less, and one carrying the words above bit 63 for a
+// wider one. Defined in const_eval_wide.cpp.
+ConstVal CastConstVal(const ConstVal& v, uint32_t width, bool is_signed);
 
 // The parameter of the registered module that `name` names where the
 // expression being folded stands, or null when no module is registered, when
