@@ -483,6 +483,11 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
   // transparent to its caller. (nested_module_decls_ already had a narrower
   // per-call save at the instance site; this generalizes it to the full set.)
   ItemElaborationStateSaver saved_item_state(*this);
+  // §23.9 (printed page 761) with §27.4 (printed 820): this module's
+  // declarations stand in its own scope, so the generate block prefixes,
+  // path and loop bindings of the scope instantiating it are taken out for
+  // its items and put back after; see ElaboratorData::GenerateScopeSaver.
+  GenerateScopeSaver saved_generate_scope(*this);
 
   std::vector<std::unordered_set<std::string_view>> saved_enclosing =
       EnterEnclosingScopeChain(enclosing_scope_names_, pending_enclosing_scope_,

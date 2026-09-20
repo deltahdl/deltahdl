@@ -63,27 +63,6 @@ struct RtlirParamDecl;
 // --max-generate-iterations, which is what makes this a budget and not a limit.
 inline constexpr int64_t kDefaultMaxGenerateIterations = 262144;
 
-// The typedefs one walk of a generate block instance's items declared, with
-// where the walk stood: `prefix` as RtlirParamDecl::gen_block_prefix spells
-// the instance for the parameters declared beside them, and `scopes` the
-// prefixes of the blocks the instance stands in, outermost first with
-// `prefix` itself last, as ElaboratorData::gen_prefix_scopes_ held them.
-// §27.5 (printed page 824) instantiates at most one alternative of a
-// conditional generate construct and lets the alternatives share a name, and
-// §27.4 (printed 820) indexes a loop generate block's instances by the
-// genvar's value, so a typedef declared in a block belongs to the instance
-// that was elaborated and to no alternative left out of the model, which is
-// what keying on the instance's prefix says and a walk of the declaration
-// by block name could not. A §27.5 directly nested block opens no scope, so
-// its walk records under the enclosing instance's prefix. At namespace scope
-// because elaborator_defparam.cpp reads the record from a function outside
-// the class.
-struct GenBlockTypedefs {
-  std::string_view prefix;
-  GenBlockPrefixes scopes;
-  TypedefMap typedefs;
-};
-
 // The elaborator's state, held apart from the methods that act on it so that
 // neither half outgrows the file line cap on its own. Elaborator derives from
 // this, so every member is reached unqualified exactly as before and no
@@ -129,6 +108,55 @@ class ElaboratorData {
     // the declaration and cannot be indexed by dimension.
     std::vector<DeclaredDim> declared_dims;
     bool is_queue = false;
+  };
+
+  // §23.9 (printed page 761) with §27.4 (printed 820): a module's
+  // declarations stand in the module's own scope, and a generate block
+  // instance is a scope of the module that holds the block, not of a module
+  // instantiated inside it. Elaborator::ElaborateModule holds one of these
+  // while it elaborates a module, taking the generate block prefixes, path
+  // and loop bindings of the instantiating scope out for the module's items
+  // and putting them back after, so that a child instantiated inside a block
+  // is elaborated as its own declaration reads and not as an item of the
+  // block. Left in force, the block's prefix reached the child's declarations
+  // -- a body parameter's RtlirParamDecl::gen_block_prefix, a variable's
+  // scoped name, an instance's gen_block_path -- so that Elaborator::
+  // RecomputeDependentParams, folding the child's parameters outside any
+  // block, saw none of them, and an instance's parameter value assignment
+  // reached no body parameter (ApplyBodyParamAssignment refuses a block's).
+  // Nested rather than a friend because the members it moves are protected
+  // and the only other route is a friend declaration in elaborator.h.
+  struct GenerateScopeSaver {
+    explicit GenerateScopeSaver(ElaboratorData& e)
+        : e_(e),
+          prefix_(std::move(e.gen_prefix_)),
+          scopes_(std::move(e.gen_prefix_scopes_)),
+          path_(std::move(e.gen_block_path_)),
+          consts_(std::move(e.gen_loop_consts_)),
+          const_scope_(std::move(e.gen_const_scope_)) {
+      e.gen_prefix_.clear();
+      e.gen_prefix_scopes_.clear();
+      e.gen_block_path_.clear();
+      e.gen_loop_consts_.clear();
+      e.gen_const_scope_.clear();
+    }
+    ~GenerateScopeSaver() {
+      e_.gen_prefix_ = std::move(prefix_);
+      e_.gen_prefix_scopes_ = std::move(scopes_);
+      e_.gen_block_path_ = std::move(path_);
+      e_.gen_loop_consts_ = std::move(consts_);
+      e_.gen_const_scope_ = std::move(const_scope_);
+    }
+    GenerateScopeSaver(const GenerateScopeSaver&) = delete;
+    GenerateScopeSaver& operator=(const GenerateScopeSaver&) = delete;
+
+   private:
+    ElaboratorData& e_;
+    std::string prefix_;
+    GenBlockPrefixes scopes_;
+    HierPath path_;
+    GenBlockConsts consts_;
+    ScopeMap const_scope_;
   };
 
  protected:
@@ -448,15 +476,6 @@ class ElaboratorData {
   std::unordered_map<RtlirModule*, std::vector<DefparamSite>>
       generate_defparams_;
 
-  // The typedefs the generate block instances of each module declared, one
-  // GenBlockTypedefs per walk of a block instance's items, recorded by
-  // Elaborator::ElaborateGenerateItems as generate_defparams_ is and for the
-  // same reason: what is here is what was instantiated. Read by
-  // Elaborator::RecomputeDependentParams to size a block's parameter by the
-  // block's own typedefs once a defparam makes the module's parameters over.
-  std::unordered_map<RtlirModule*, std::vector<GenBlockTypedefs>>
-      generate_typedefs_;
-
   // Keyed by the block instance's prefix as well as the statement, because the
   // one body AST is shared by every iteration of a loop generate block: without
   // the prefix, applying the statement for the first iteration would mark it
@@ -465,18 +484,6 @@ class ElaboratorData {
       std::tuple<RtlirModule*, const ModuleItem*, size_t, std::string_view>>
       applied_defparams_;
 
-  struct EarlyDefparamResolution {
-    RtlirModule* root;
-    // The path as it was read the first time, steps and folded instance
-    // selects alike, so that Elaborator::VerifyEarlyResolvedDefparams resolves
-    // it again from the same answer rather than re-folding a select whose
-    // genvar binding is no longer in scope.
-    HierPath path;
-    HierPath writer_path;
-    RtlirParamDecl* resolved;
-    SourceLoc loc;
-  };
-  std::vector<EarlyDefparamResolution> early_defparam_resolutions_;
   // §23.8: the top-level modules of the design being elaborated, which are
   // the roots a defparam's hierarchical name is read from once its leading
   // step names no scope of the writing module. Filled once the tops exist and

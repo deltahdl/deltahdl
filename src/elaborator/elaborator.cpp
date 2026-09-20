@@ -675,7 +675,6 @@ void Elaborator::ResolveDefparamsAndGenerates(RtlirDesign* design) {
       ProcessPendingGenerate(pg);
     }
   }
-  VerifyEarlyResolvedDefparams();
 }
 
 RtlirDesign* Elaborator::ElaborateTops(
@@ -689,8 +688,6 @@ RtlirDesign* Elaborator::ElaborateTops(
   pending_generates_.clear();
   applied_defparams_.clear();
   generate_defparams_.clear();
-  generate_typedefs_.clear();
-  early_defparam_resolutions_.clear();
   defparam_top_roots_.clear();
 
   if (!ElaborateTopModules(top_decls, design)) return nullptr;

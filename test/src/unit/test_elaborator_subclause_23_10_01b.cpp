@@ -71,9 +71,13 @@ TEST(DefparamElaboration, SizesEachModulesTypedefParameterByItsOwnTypedef) {
 // its items and §6.18 (printed 118) makes a typedef name stand for that
 // declaration, so g's `parameter vec_t P` under g's own `typedef logic
 // [TOP:0] vec_t` follows the module's TOP, which §23.10.1 (printed 764-765)
-// lets `defparam u.TOP = 7` change: $bits(P) is 8. Sized again against the
-// module's table alone, P followed the module-level `typedef logic [3:0]
-// vec_t` and B read 4, or kept its 16 where the module declared none.
+// lets `defparam u.TOP = 7` change: $bits(P) is 8, the module-level `typedef
+// logic [3:0] vec_t` notwithstanding. The elaborator applies the defparam
+// before it elaborates g (Elaborator::ResolveDefparamsAndGenerates), so g is
+// sized with TOP at 7 and nothing is sized over again; this pins that order.
+// The defparam's early resolution was verified again after the block's
+// declarations had grown m's parameter vector, by the address the target
+// had before, and reported §23.10.4.2 on a name that resolved the same.
 TEST(DefparamElaboration, ResizesAGenerateBlocksParameterByTheBlocksTypedef) {
   ElabFixture f;
   EXPECT_EQ(ParamOfModule("module m;\n"
@@ -97,9 +101,8 @@ TEST(DefparamElaboration, ResizesAGenerateBlocksParameterByTheBlocksTypedef) {
 // §27.5 (printed page 824) instantiates at most one alternative of a
 // conditional generate construct into the model and lets the alternatives
 // share a name, so the g elaborated is the one declaring `typedef logic
-// [TOP:0] vec_t`, and its P is 8 bits under `defparam u.TOP = 7`. The
-// alternatives' typedefs were laid by block name, the else's `logic [3:0]`
-// over the selected one's, so B read 4.
+// [TOP:0] vec_t`, and its P is 8 bits under `defparam u.TOP = 7`, the else's
+// `logic [3:0] vec_t` reaching nothing.
 TEST(DefparamElaboration, SizesByTheSelectedAlternativesTypedefAlone) {
   ElabFixture f;
   EXPECT_EQ(ParamOfModule("module m;\n"
@@ -136,8 +139,8 @@ int64_t BlockParamOfM(RtlirDesign* design, std::string_view prefix,
 // §27.4 (printed page 820) indexes a loop generate block's instances by the
 // genvar's value, each a scope of its own with the typedef its body declares,
 // so the second instance's P is sized by its own vec_t under `defparam
-// u.TOP = 7` as the first's is: g[1]'s B reads 8, where a record keyed
-// without the index would leave it 16.
+// u.TOP = 7` as the first's is: g[1]'s B reads 8, read by the `g_1_` prefix
+// its declaration is keyed under.
 TEST(DefparamElaboration, SizesEachLoopInstancesParameterByItsOwnTypedef) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -196,7 +199,10 @@ void ExpectEveryWordOfP(std::string_view top_items) {
 // u.W = 96` after it, converting P's value over again to the 96 bits it now
 // has (§6.20.2, printed 126), reads every word of V: H is 1 and M is 3. The
 // refold registered the module holding the statement and no block, under
-// which V's declaration was out of sight and its word above bit 64 read 0.
+// which V's declaration was out of sight and its word above bit 64 read 0;
+// and c, elaborated inside g, had W, P, H and M keyed under g's prefix, so
+// that the fold making them over after `defparam u.W = 96`, standing in no
+// block, saw none of them and left H and M at 0.
 TEST(DefparamElaboration, RefoldsAGenerateBlocksDefparamValueWithItsNames) {
   constexpr std::string_view kTop =
       "  if (1) begin : g\n"

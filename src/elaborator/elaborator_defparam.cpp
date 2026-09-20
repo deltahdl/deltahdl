@@ -12,7 +12,6 @@
 #include "elaborator/const_eval.h"
 #include "elaborator/const_eval_internal.h"
 #include "elaborator/elaborator.h"
-#include "elaborator/elaborator_data.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
@@ -210,18 +209,6 @@ RtlirParamDecl* Elaborator::ResolveDefparamFromTop(const HierPath& path,
   return nullptr;
 }
 
-// Lays the typedefs `items` declares over `typedefs`, a later declaration of
-// a name over an earlier one. A forward typedef, kImplicit, defines nothing.
-static void LayTypedefItemsOver(const std::vector<ModuleItem*>& items,
-                                TypedefMap& typedefs) {
-  for (const auto* item : items) {
-    if (item->kind != ModuleItemKind::kTypedef ||
-        item->typedef_type.kind == DataTypeKind::kImplicit)
-      continue;
-    typedefs.insert_or_assign(item->name, item->typedef_type);
-  }
-}
-
 // §6.18 (printed page 118): a typedef name stands for the type its
 // declaration gave it, in the scope of that declaration. Once every module is
 // elaborated, typedefs_ holds the union of what the modules registered
@@ -229,62 +216,24 @@ static void LayTypedefItemsOver(const std::vector<ModuleItem*>& items,
 // typedefs of one name leave the last one elaborated, so the table a
 // parameter of `decl` is sized against here lays the module's own typedef
 // items over that union, as the module's own were in force where the
-// declaration was sized.
+// declaration was sized. A forward typedef, kImplicit, defines nothing. A
+// typedef a generate block declares is not among the items and is not
+// needed: Elaborator::ResolveDefparamsAndGenerates applies every defparam a
+// module's blocks could read before it elaborates the blocks, and a block's
+// declaration is sized at its elaboration with the block's own typedefs in
+// force, so no parameter a block declares is on RtlirModule::params when
+// RecomputeDependentParams runs for a defparam into the module.
 static TypedefMap ModuleTypedefTable(const TypedefMap& all,
                                      const ModuleDecl* decl) {
   TypedefMap typedefs = all;
-  if (decl != nullptr) LayTypedefItemsOver(decl->items, typedefs);
+  if (decl == nullptr) return typedefs;
+  for (const auto* item : decl->items) {
+    if (item->kind != ModuleItemKind::kTypedef ||
+        item->typedef_type.kind == DataTypeKind::kImplicit)
+      continue;
+    typedefs.insert_or_assign(item->name, item->typedef_type);
+  }
   return typedefs;
-}
-
-// What a parameter of a module is sized and folded against where a defparam
-// makes the module's parameters over: the typedefs in force for it, and the
-// prefixes of the generate blocks it stands in, outermost first, as
-// ElaboratorData::gen_prefix_scopes_ held them where it was declared.
-struct ParamFoldContext {
-  TypedefMap typedefs;
-  GenBlockPrefixes block_prefixes;
-};
-
-// The context parameter `p` is sized and folded in: `module_typedefs`,
-// ModuleTypedefTable's, with the typedefs and the prefixes of the generate
-// block instances `p` stands in laid over it where it stands in one, read
-// from `blocks`, the module's GenBlockTypedefs. §27.4 (printed page 820) has
-// a block's declarations in scope for its items and §23.10.1 (printed
-// 764-765) lets a defparam change the parameter a block's `typedef logic
-// [TOP:0] vec_t` names, so a block's `parameter vec_t P` is sized again by
-// the block's typedef and the block's `localparam int B = $bits(P)` reads
-// it; sized against the module's table alone, P followed a module-level
-// typedef of the same name, or none, and B read 4 or 16 under `defparam
-// u.TOP = 7`, P being out of B's sight without the block registered. The
-// chain is the record's for `p`'s own prefix, and every record under each
-// prefix of the chain is laid in turn, outermost first, so that the
-// innermost declaration of a name lays last; a §27.5 (printed 824) directly
-// nested block's record stands under its enclosing instance's prefix among
-// them. Matching the blocks by name in the module's declaration instead laid
-// the typedefs of an alternative §27.5 left out of the model over the
-// selected one's where the two shared a name, as the clause allows: `if (1)
-// begin : g typedef logic [TOP:0] vec_t; ... end else begin : g typedef
-// logic [3:0] vec_t; end` read 4 from g's $bits(P).
-static ParamFoldContext ParamContextOf(
-    const RtlirParamDecl& p, const TypedefMap& module_typedefs,
-    const std::vector<GenBlockTypedefs>& blocks) {
-  ParamFoldContext ctx{module_typedefs, {}};
-  if (p.gen_block_prefix.empty()) return ctx;
-  for (const auto& block : blocks) {
-    if (block.prefix == p.gen_block_prefix) {
-      ctx.block_prefixes = block.scopes;
-      break;
-    }
-  }
-  for (std::string_view prefix : ctx.block_prefixes) {
-    for (const auto& block : blocks) {
-      if (block.prefix != prefix) continue;
-      for (const auto& [name, dtype] : block.typedefs)
-        ctx.typedefs.insert_or_assign(name, dtype);
-    }
-  }
-  return ctx;
 }
 
 // Whether `p`'s declared type carries a range the parameters in scope can
@@ -400,28 +349,23 @@ static void ResizeParamToRecomputedRange(RtlirParamDecl& p,
 // just given its words above 64. Those words are recorded on each parameter
 // made over as the value is, for a later read of it. A parameter whose range
 // depends on the redefined one is sized again first, against the typedefs of
-// `mod` and of the generate blocks it stands in where its type is a typedef
-// name, its own value included where an override gave it, so that the
-// parameters after it read it at the range it now has. A parameter a block
-// declares is sized and folded with the block's prefixes registered and in
-// its scope (ParamContextOf), as it was declared: under the module's alone,
-// the block's `localparam int B = $bits(P)` could not see the block's P.
+// `mod` where its type is a typedef name, its own value included where an
+// override gave it, so that the parameters after it read it at the range it
+// now has. The module's own parameters are what is here (ModuleTypedefTable
+// says why no block's is), so the scope is the module's with no block
+// registered; a child instantiated inside a generate block of its parent had
+// its parameters keyed under that block's prefix until
+// ElaboratorData::GenerateScopeSaver, and stood out of this scope's sight.
 void Elaborator::RecomputeDependentParams(RtlirModule* mod) {
   if (!mod) return;
   ParamRangeRegistryGuard param_range_guard(mod);
   const TypedefMap kTypedefs =
       ModuleTypedefTable(typedefs_, FindModule(mod->name));
-  static const std::vector<GenBlockTypedefs> kNoBlocks;
-  auto blocks_it = generate_typedefs_.find(mod);
-  const std::vector<GenBlockTypedefs>& blocks =
-      blocks_it == generate_typedefs_.end() ? kNoBlocks : blocks_it->second;
   for (auto& p : mod->params) {
     if (p.is_type_param) continue;
     if (p.is_unbounded) continue;
-    const ParamFoldContext kCtx = ParamContextOf(p, kTypedefs, blocks);
-    RegisteredGenScopeGuard gen_scope_guard(kCtx.block_prefixes);
-    auto scope = BuildParamScope(mod, kCtx.block_prefixes);
-    ResizeParamToRecomputedRange(p, kCtx.typedefs, scope);
+    auto scope = BuildParamScope(mod, {});
+    ResizeParamToRecomputedRange(p, kTypedefs, scope);
     if (p.from_override) continue;
     if (!p.default_value) continue;
     auto val = FoldParamValue(p, p.default_value, scope);
@@ -610,9 +554,6 @@ void Elaborator::ApplyDefparamSite(RtlirModule* mod, const DefparamSite& site,
     ReplaceStringParamValue(*param, val_expr, arena_);
     RecomputeDependentParams(target_mod);
     applied_defparams_.insert(key);
-    early_defparam_resolutions_.push_back(
-        {rooted.root, rooted.steps, rooted.root == mod ? site.path : HierPath{},
-         param, site.item->loc});
   }
 }
 
@@ -639,18 +580,6 @@ void Elaborator::ApplyDefparams(RtlirModule* mod, const ModuleDecl* decl) {
     // are laid over that rather than kept in place of it.
     for (const auto& [name, value] : site.consts) scope[name] = value;
     ApplyDefparamSite(mod, site, scope);
-  }
-}
-
-void Elaborator::VerifyEarlyResolvedDefparams() {
-  for (const auto& rec : early_defparam_resolutions_) {
-    auto* now = ResolveDefparamSteps(rec.root, rec.path, rec.writer_path);
-    if (now != nullptr && now != rec.resolved) {
-      diag_.Error(rec.loc,
-                  "defparam hierarchical name resolves differently after "
-                  "full elaboration than during early resolution",
-                  Subclause("23.10.4.2"));
-    }
   }
 }
 
