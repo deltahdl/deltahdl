@@ -282,6 +282,14 @@ std::string_view DeclaredNameTables::FindInstanceType(
                                        : std::string_view{};
 }
 
+void DeclaredNameTables::RegisterTopModule(std::string_view name) {
+  top_module_names_.insert(std::string(name));
+}
+
+bool DeclaredNameTables::IsTopModule(std::string_view name) const {
+  return top_module_names_.count(std::string(name)) != 0;
+}
+
 uint64_t DeclaredNameTables::VirtualInterfaceHandle(std::string_view scope) {
   auto it = vi_instance_handles_.find(std::string(scope));
   if (it != vi_instance_handles_.end()) return it->second;

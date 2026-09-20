@@ -132,6 +132,14 @@ class DeclaredNameTables {
   void RegisterInstanceType(std::string_view prefix, std::string_view type);
   std::string_view FindInstanceType(std::string_view prefix) const;
 
+  // §23.6: each top-level module is the root of a name hierarchy, and the
+  // complete path to any object starts at one of them, usable from a parallel
+  // hierarchy -- `m.a` written in the other top-level module n. A top's own
+  // declarations are keyed under no instance prefix, so a lookup that meets
+  // one of these names at the head of a path drops it and reads the rest.
+  void RegisterTopModule(std::string_view name);
+  bool IsTopModule(std::string_view name) const;
+
   // §8.25: the parameter actuals the declaration of the class variable `var`
   // wrote in its `#(...)`, as the parser recorded them, one DataType per
   // actual in the order written (or with param_arg_name set for the named
@@ -207,6 +215,7 @@ class DeclaredNameTables {
   std::unordered_map<std::string_view, bool> type_signed_;
 
   std::unordered_map<std::string, std::string> instance_types_;
+  std::unordered_set<std::string> top_module_names_;
   std::unordered_map<std::string_view, const std::vector<DataType>*>
       var_class_type_params_;
 

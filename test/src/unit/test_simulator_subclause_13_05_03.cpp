@@ -227,4 +227,54 @@ TEST(DefaultArgumentSim, EmptyPlaceholderUsesDefault) {
   EXPECT_EQ(EvalExpr(call, f.ctx, f.arena).ToUint64(), 6u);
 }
 
+// §13.5.3's own example, in its two-top shape: n enables m's tasks by
+// hierarchical name and reads m's variables the same way (§23.6 lets the
+// complete path start at a top-level module from a parallel hierarchy), and
+// each default actual binds in m, the scope of the declaration. The reads
+// before the enables give m's initial 1 and 2, and after them the 6 the
+// output default wrote into m's `a` and the 12 the inout default left in
+// `w`; a reference into m that reaches nothing reads 0 for all four and
+// leaves `a` and `w` at 1 and 2.
+TEST(DefaultArgumentSim, DefaultBoundInDeclaringTopFromParallelTop) {
+  SimFixture f;
+  auto* design = ElaborateSrcAllTops(
+      "module m;\n"
+      "  int a = 1, w = 2;\n"
+      "  task t1(output int o = a); o = 6; endtask\n"
+      "  task t3(inout int io = w); io = io * 6; endtask\n"
+      "endmodule\n"
+      "module n;\n"
+      "  int r1, r2, r3, r4;\n"
+      "  initial begin\n"
+      "    r1 = m.a;\n"
+      "    r2 = m.w;\n"
+      "    m.t1();\n"
+      "    m.t3();\n"
+      "    r3 = m.a;\n"
+      "    r4 = m.w;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(
+      f, design,
+      {{"r1", 1u}, {"r2", 2u}, {"r3", 6u}, {"r4", 12u}, {"a", 6u}, {"w", 12u}});
+}
+
+// §23.6: a write through the same path lands in m: n's `m.a = 7` is what m's
+// own process reads a time step later, 107 rather than the 101 its initial
+// value gives when the write reaches nothing.
+TEST(DefaultArgumentSim, WriteIntoParallelTopByHierarchicalName) {
+  SimFixture f;
+  auto* design = ElaborateSrcAllTops(
+      "module m;\n"
+      "  int a = 1, b;\n"
+      "  initial #1 b = a + 100;\n"
+      "endmodule\n"
+      "module n;\n"
+      "  initial m.a = 7;\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"a", 7u}, {"b", 107u}});
+}
+
 }  // namespace

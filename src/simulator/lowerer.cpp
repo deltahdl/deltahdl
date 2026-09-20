@@ -398,6 +398,13 @@ void Lowerer::LowerModule(const RtlirModule* mod) {
   for (const auto& var : mod->variables) LowerVar(var.name, var);
   RegisterModulePorts(mod, ctx_, arena_);
   RegisterModuleSubroutines(mod, ctx_);
+  // §23.6 with §13.3: a top-level module's subroutine enabled from a parallel
+  // hierarchy is named through the top's name, `m.t1()` in the other top n,
+  // so it is registered under that key as an instance's is under its prefix;
+  // every top's bare names share one registry, so the key is what keeps m's
+  // t1 apart from n's. FindSubroutineTarget in eval_function_hier.cpp runs
+  // the body in the top's own instance, the one with no prefix.
+  RegisterInstanceSubroutines(mod, std::string(mod->name) + ".", ctx_, arena_);
   RecordSubroutineAssertionSampleScopes(mod);
   // §35.5.4: an imported subroutine is declared where the source writes it and
   // called like a native one, so the declarations of the module being lowered
@@ -877,6 +884,11 @@ void Lowerer::Lower(const RtlirDesign* design) {
   LowerCompilationUnitClasses();
   RegisterFreeCuFunctions(design, ctx_);
   RegisterDesignScopeDpiImports(design, ctx_);
+  // §23.6: each top-level module roots a name hierarchy, and a path from a
+  // parallel hierarchy starts at its name; every top's name is recorded
+  // ahead of any lowering so a top's declaration initializer can already
+  // name another top.
+  for (auto* top : design->top_modules) ctx_.RegisterTopModule(top->name);
   for (auto* mod : design->top_modules) {
     LowerModule(mod);
   }

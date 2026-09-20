@@ -33,7 +33,9 @@ struct SubroutineTarget {
 // a call whose callee is a dotted path of identifiers, `u1.tk` or `x.u1.tk`,
 // resolved relative to the calling instance ahead of the top of the design
 // (§23.6 lets the first node be the top of the hierarchy the path is used
-// from). `func` is null where no registered declaration answers.
+// from), or headed by a top-level module's name, `m.t1` from the parallel
+// top n (§23.6's complete path). `func` is null where no registered
+// declaration answers.
 SubroutineTarget FindSubroutineTarget(const Expr* call, SimContext& ctx,
                                       Arena& arena);
 

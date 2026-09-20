@@ -57,6 +57,25 @@ bool IsPackageScopedCall(const Expr* call) {
   return scoped->lhs != nullptr && scoped->lhs->elements.empty();
 }
 
+// §23.6: the complete path name to any object starts at a top-level module
+// and may be used from any level of the hierarchy or from a parallel one, so
+// "m.t1" written in the other top-level module n is m's t1, and "m.u1.tk" the
+// tk of m's child u1. A top's declarations are keyed under no prefix, as
+// Process::inst_prefix is empty there, so the instance the body runs in is
+// the path after the top's name: none for "m.t1", "u1." for "m.u1.tk". The
+// top's own subroutines are registered under its name too (LowerModule), so
+// "m.t1" as written answers m's t1 ahead of the bare "t1" of whichever top
+// registered last; a subroutine of an instance below the top is keyed with
+// the top's name left off. Leaves `target` alone when the head names no top.
+void ResolveTopHeadedPath(const std::string& path, SimContext& ctx,
+                          SubroutineTarget& target) {
+  std::string_view head = std::string_view(path).substr(0, path.find('.'));
+  if (!ctx.IsTopModule(head)) return;
+  std::string rest = path.substr(head.size() + 1);
+  if (target.func == nullptr) target.func = ctx.FindFunction(rest);
+  target.inst_prefix = InstanceOfKey(rest);
+}
+
 // The path `call` names, "tk" for a bare enable or `tk;`, "u1.tk" for a
 // hierarchical one; empty where the call names no path a module subroutine
 // is registered under.
@@ -88,9 +107,12 @@ SubroutineTarget FindSubroutineTarget(const Expr* call, SimContext& ctx,
   // and the lowerer registers each instance's subroutines under that
   // prefixed key (RegisterInstanceSubroutines). The same lookup makes a bare
   // name the calling instance's own declaration ahead of another module's
-  // registered under the same bare name.
+  // registered under the same bare name. With no prefix in force the
+  // relative key is the path itself, answered below with a top's name at its
+  // head read as §23.6's root rather than as an instance.
   std::string relative = active + path;
-  if (ModuleItem* func = ctx.FindFunction(relative)) {
+  if (ModuleItem* func =
+          active.empty() ? nullptr : ctx.FindFunction(relative)) {
     target.func = func;
     target.inst_prefix = InstanceOfKey(relative);
     return target;
@@ -107,6 +129,9 @@ SubroutineTarget FindSubroutineTarget(const Expr* call, SimContext& ctx,
   if (target.func == nullptr && !is_hierarchical)
     target.func = ctx.FindFunctionInPackageScope(path);
   target.inst_prefix = is_hierarchical ? InstanceOfKey(path) : active;
+  // §23.6: a path headed by a top-level module's name, from a parallel
+  // hierarchy or from anywhere in the design.
+  if (is_hierarchical) ResolveTopHeadedPath(path, ctx, target);
   return target;
 }
 

@@ -8,6 +8,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -89,11 +90,13 @@ DpiRuntime& SimContext::AcquireDpiRuntime() {
 
 namespace {
 
-// The two symbol tables consulted during a hierarchical name lookup: the map
-// from instance path to its module type, and the flat variable table.
+// The symbol tables consulted during a hierarchical name lookup: the map from
+// instance path to its module type, the flat variable table, and the names of
+// the design's top-level modules (§23.6).
 struct SymbolTables {
   const std::unordered_map<std::string, std::string>& instance_types;
   const std::unordered_map<std::string_view, Variable*>& variables;
+  const std::unordered_set<std::string>& top_modules;
 };
 
 // A hierarchical name being resolved: the full dotted `name`, plus its split
@@ -155,7 +158,22 @@ Variable* FindVariableByPrefixWalk(const NameLookup& lookup,
   // empty prefix. The walk above skips that iteration when it starts from an
   // empty prefix (a top-level process or a test-time lookup), so try it
   // explicitly.
-  return LookupRestUnderMatchingInstance("", lookup.head, lookup.rest, tables);
+  if (Variable* under_top = LookupRestUnderMatchingInstance(
+          "", lookup.head, lookup.rest, tables)) {
+    return under_top;
+  }
+  // §23.6: the complete path to any object starts at a top-level module and
+  // may be used from a parallel hierarchy, so "m.a" written in the other
+  // top-level module n names m's `a`. Every top's declarations are keyed under
+  // the empty prefix, while the instance type under it records one top alone,
+  // so the others are answered by their names: the head names a top, and the
+  // rest is the key. §23.6 also lets the first node be the top of the
+  // hierarchy the path is used from, and an instance of the current scope
+  // called `m` is answered by the walk above or by the plain lookup ahead of
+  // it, so that instance stands ahead of a top of the same name.
+  if (tables.top_modules.count(std::string(lookup.head)) == 0) return nullptr;
+  auto top_it = tables.variables.find(lookup.rest);
+  return (top_it != tables.variables.end()) ? top_it->second : nullptr;
 }
 
 }  // namespace
@@ -344,7 +362,7 @@ Variable* SimContext::FindVariable(std::string_view name) {
   std::string_view head = name.substr(0, dot);
   std::string_view rest = name.substr(dot + 1);
   NameLookup lookup{name, head, rest, prefix};
-  SymbolTables tables{instance_types_, variables_};
+  SymbolTables tables{instance_types_, variables_, top_module_names_};
   return FindVariableByPrefixWalk(lookup, tables);
 }
 
