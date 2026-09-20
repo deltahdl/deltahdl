@@ -157,7 +157,10 @@ Variable* ResolveLhsVariable(const Expr* lhs, SimContext& ctx) {
 static bool TaggedUnionTagMismatch(std::string_view base_name,
                                    std::string_view field_name, SimContext& ctx,
                                    SourceLoc loc) {
-  auto tag = ctx.GetVariableTag(base_name);
+  // §23.9: the tag is asked for by the key the union's storage was created
+  // under, as its layout is; by the bare name, a union initialized in its
+  // declaration inside a child instance was checked against no tag.
+  auto tag = ctx.GetVariableTag(TagKeyOfName(base_name, ctx));
   if (tag.empty()) return false;
   auto top = field_name;
   auto subdot = top.find('.');

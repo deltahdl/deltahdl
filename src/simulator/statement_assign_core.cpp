@@ -776,8 +776,12 @@ void AssignToScalarLhs(const Stmt* stmt, Logic4Vec rhs_val, SimContext& ctx,
     if (!var->is_4state) CoerceTo2State(var->value);
     var->NotifyWatchers();
 
+    // §11.9 with §23.9: the tag is recorded under the key the target's
+    // storage was created by (TagKeyOfName), the one a declaration
+    // initializer's tag already stands under, so both forms name one tag.
     if (stmt->rhs && stmt->rhs->kind == ExprKind::kTagged && stmt->rhs->rhs)
-      ctx.SetVariableTag(stmt->lhs->text, stmt->rhs->rhs->text);
+      ctx.SetVariableTag(TagKeyOfName(stmt->lhs->text, ctx),
+                         stmt->rhs->rhs->text);
   } else if (stmt->lhs->kind == ExprKind::kMemberAccess) {
     WriteStructField(stmt->lhs, rhs_val, ctx);
   }

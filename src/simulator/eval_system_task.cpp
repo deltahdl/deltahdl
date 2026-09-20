@@ -202,7 +202,7 @@ static std::optional<std::string> BuildFormatPTaggedUnion(std::string_view name,
                                                           const Logic4Vec& val,
                                                           SimContext& ctx,
                                                           Arena& arena) {
-  auto tag = ctx.GetVariableTag(name);
+  auto tag = ctx.GetVariableTag(TagKeyOfName(name, ctx));
   if (tag.empty()) return std::nullopt;
   DataTypeKind kind = DataTypeKind::kImplicit;
   uint32_t width = val.width;

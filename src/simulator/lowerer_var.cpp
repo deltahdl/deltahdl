@@ -894,7 +894,9 @@ void Lowerer::LowerVarInit(std::string_view name, const RtlirVariable& var,
   // establishes the variable's active tag, exactly as the procedural
   // `u = tagged Member value` assignment does. Without this the tag would stay
   // undefined and a later member access would not be checked against the tag
-  // set by the initializer.
+  // set by the initializer. `name` is the key the storage was created under,
+  // instance-prefixed inside a child (§23.9), which is the key every writer
+  // and reader of the tag resolves a bare name to (TagKeyOfName).
   if (var.init_expr->kind == ExprKind::kTagged && var.init_expr->rhs)
     ctx_.SetVariableTag(name, var.init_expr->rhs->text);
 }

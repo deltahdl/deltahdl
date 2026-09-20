@@ -363,4 +363,94 @@ TEST(TaggedUnionEval, MismatchedWriteNames11_9) {
                             "run-time error: assigning member", 0, "11.9"));
 }
 
+// §11.9 with §23.9: a tagged-union variable declared with an initializer
+// inside an instantiated module resolves within that instance, so the tag
+// its initializer sets governs every later member access of it there. The
+// declaration form recorded the tag under the instance-prefixed key while
+// the reads asked by the bare name, so a child's initialized union carried
+// no tag: the valid member still read -7 (a missing tag skips the check), but
+// the read of `w.Valid` against tag Invalid raised nothing.
+TEST(TaggedUnionEval, ChildInstanceDeclarationInitializerTagChecksMemberRead) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module M;\n"
+      "  typedef union tagged { void Invalid; int Valid; } u_t;\n"
+      "  u_t u = tagged Valid -7;\n"
+      "  u_t w = tagged Invalid;\n"
+      "  int x;\n"
+      "  int y;\n"
+      "  initial begin\n"
+      "    x = u.Valid;\n"
+      "    y = w.Valid;\n"
+      "  end\n"
+      "endmodule\n"
+      "module top;\n"
+      "  M m();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  LowerAndRun(design, f);
+  auto* x = f.ctx.FindVariable("m.x");
+  ASSERT_NE(x, nullptr);
+  EXPECT_EQ(x->value.ToUint64(), 0xFFFFFFF9u);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "run-time error: accessing member", 9, "11.9"));
+}
+
+// §11.9 with §23.9: the procedural `u = tagged B 9` inside the child replaces
+// the tag the declaration initializer set on the same variable, so the read
+// of `u.B` is consistent and `u.A` is the mismatch. Both forms write one
+// union, so a fix keying one of them differently from the other leaves the
+// declaration's tag A standing: `u.B` would then be reported and `u.A` not.
+TEST(TaggedUnionEval, ChildInstanceProceduralTagReplacesDeclarationTag) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module M;\n"
+      "  typedef union tagged { int A; int B; } U;\n"
+      "  U u = tagged A 5;\n"
+      "  int x;\n"
+      "  int y;\n"
+      "  initial begin\n"
+      "    u = tagged B 9;\n"
+      "    x = u.B;\n"
+      "    y = u.A;\n"
+      "  end\n"
+      "endmodule\n"
+      "module top;\n"
+      "  M m();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  LowerAndRun(design, f);
+  auto* x = f.ctx.FindVariable("m.x");
+  ASSERT_NE(x, nullptr);
+  EXPECT_EQ(x->value.ToUint64(), 9u);
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "run-time error: accessing member", 8, "11.9"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "run-time error: accessing member", 9, "11.9"));
+}
+
+// §21.2.1.6 with §11.9 and §23.9: %p prints a tagged union as its valid
+// member, "tag:value", the tag being the one the child's declaration
+// initializer set. Read by the bare name, the tag was missing and the union
+// fell to the untagged form, which prints the first declared member.
+TEST(TaggedUnionEval, ChildInstanceDeclarationInitializerPrintsTagAndValue) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module M;\n"
+      "  typedef union tagged { void Invalid; int Valid; } u_t;\n"
+      "  u_t u = tagged Valid -7;\n"
+      "  initial $display(\"%p\", u);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  M m();\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(out, "'{Valid:-7}\n");
+}
+
 }  // namespace

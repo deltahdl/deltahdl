@@ -53,6 +53,18 @@ size_t MemberPathSplit(const std::string& path, SimContext& ctx);
 const StructTypeInfo* StructLayoutOfName(std::string_view name,
                                          SimContext& ctx);
 
+// §11.9 with §23.9: the key a tagged union's current tag is recorded under
+// for the variable a bare name denotes -- the key that variable's storage was
+// created by, which is what a declaration initializer's tag is already set
+// under. Resolved as StructLayoutOfName resolves the layout: a local's bare
+// name, else the running instance's prefixed key where a layout stands under
+// it (a tagged union always registers one), else the bare name, which a
+// top-level object is keyed by. Both the procedural `u = tagged M v` writer
+// and the readers of the tag ask by this key, so a union initialized in its
+// declaration inside an instance keeps its tag through every later access.
+// Defined in eval_member_path.cpp.
+std::string TagKeyOfName(std::string_view name, SimContext& ctx);
+
 // Strips a leading "$root.<top>." prefix from a hierarchical name, returning
 // the remainder; names without the prefix are returned unchanged. Defined in
 // eval_expr.cpp; also used by statement_assign.cpp.

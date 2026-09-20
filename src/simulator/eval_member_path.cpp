@@ -40,4 +40,11 @@ const StructTypeInfo* StructLayoutOfName(std::string_view name,
   return ctx.GetVariableStructType(name);
 }
 
+std::string TagKeyOfName(std::string_view name, SimContext& ctx) {
+  if (ctx.FindLocalVariable(name) != nullptr) return std::string(name);
+  std::string prefixed = ctx.ActiveInstancePrefix() + std::string(name);
+  if (ctx.GetVariableStructType(prefixed) != nullptr) return prefixed;
+  return std::string(name);
+}
+
 }  // namespace delta

@@ -375,7 +375,10 @@ static bool TryThisSuperMember(std::string_view base_name,
 static bool TryUnionTagMismatch(const MemberAccess& ma,
                                 const StructTypeInfo* sinfo, Logic4Vec& out) {
   if (!sinfo->is_union) return false;
-  auto tag = ma.ctx.GetVariableTag(ma.base_name);
+  // §23.9: the tag is asked for by the key the union's storage was created
+  // under, as its layout is; by the bare name, a union initialized in its
+  // declaration inside a child instance was read against no tag.
+  auto tag = ma.ctx.GetVariableTag(TagKeyOfName(ma.base_name, ma.ctx));
   if (tag.empty()) return false;
   auto top = ma.field_name;
   auto subdot = top.find('.');
