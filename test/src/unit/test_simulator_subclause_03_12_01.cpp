@@ -819,12 +819,16 @@ static std::string TopWithItsOwnUnion(const std::string& stmt) {
 // line, while the top's own u holds `tagged Other 3`, against which the
 // read would pass. The unit's initializer recorded no tag under "$unit.u"
 // (InitUnitDataVariables in lowerer_package_data.cpp), so the formal was
-// bound to an empty tag, the read went unchecked and y took the 9.
+// bound to an empty tag, the read went unchecked and y took the 9. The
+// subclause says the access is an error and not what it yields; deltahdl
+// yields the union's width of x (TryUnionTagMismatch in eval_expr.cpp), which
+// §6.11.2 converts to 0 on the way into f's 2-state int result and into y,
+// so y reads 0 where the unchecked read gave 9.
 TEST(CompilationUnitSim, CuScopeTaggedUnionActualCarriesTheUnitsTag) {
   SimFixture f;
   Variable* y = RunUnitTaggedUnion(TopWithItsOwnUnion("y = f($unit::u);"), f);
   ASSERT_NE(y, nullptr);
-  EXPECT_FALSE(y->value.IsKnown());
+  EXPECT_EQ(y->value.ToUint64(), 0u);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "run-time error: accessing member 'Other' of "
                             "tagged union 'a' which currently has tag 'Valid'",
@@ -834,8 +838,9 @@ TEST(CompilationUnitSim, CuScopeTaggedUnionActualCarriesTheUnitsTag) {
 // The same tag read directly through the prefix (§3.12.1, printed page 56):
 // `$unit::u.Other` names the unit's u past the top's own, and §11.9
 // (printed 304) checks the read against the unit's Valid, reporting it at
-// the statement's line under the key the unit's storage stands by. With no
-// layout and no tag registered under "$unit.u", the read resolved through
+// the statement's line under the key the unit's storage stands by, and y
+// takes the 0 the refused read's x becomes in a 2-state int (§6.11.2). With
+// no layout and no tag registered under "$unit.u", the read resolved through
 // no member and answered 0 with nothing reported.
 TEST(CompilationUnitSim,
      CuScopeTaggedUnionMemberReadThroughUnitPrefixIsChecked) {
@@ -843,7 +848,7 @@ TEST(CompilationUnitSim,
   Variable* y =
       RunUnitTaggedUnion(TopWithItsOwnUnion("y = $unit::u.Other;"), f);
   ASSERT_NE(y, nullptr);
-  EXPECT_FALSE(y->value.IsKnown());
+  EXPECT_EQ(y->value.ToUint64(), 0u);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "run-time error: accessing member 'Other' of tagged union '$unit.u' "
@@ -876,7 +881,8 @@ TEST(CompilationUnitSim, CuScopeStructVariableMemberReadByItsBareName) {
 // the prefixed spelling the read used. The retag was recorded under the
 // module's bare name (TagKeyOfName in eval_member_path.cpp) while the read
 // asked under "$unit.u" and found the initializer's Valid there, so the 3
-// was read as Valid unreported.
+// was read as Valid unreported; the refused read's x becomes 0 in the
+// 2-state y (§6.11.2), which reads apart from that 3.
 TEST(CompilationUnitSim, CuScopeTaggedUnionRetaggedByItsBareNameIsOneTag) {
   SimFixture f;
   Variable* y = RunUnitTaggedUnion(
@@ -887,7 +893,7 @@ TEST(CompilationUnitSim, CuScopeTaggedUnionRetaggedByItsBareNameIsOneTag) {
       "  end\n",
       f);
   ASSERT_NE(y, nullptr);
-  EXPECT_FALSE(y->value.IsKnown());
+  EXPECT_EQ(y->value.ToUint64(), 0u);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "run-time error: accessing member 'Valid' of tagged union '$unit.u' "

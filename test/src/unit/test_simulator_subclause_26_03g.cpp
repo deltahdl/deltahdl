@@ -281,7 +281,8 @@ TEST(PackageImportSim, ImportedPackageStructVariableMemberReadByItsBareName) {
 // the read used. The retag was recorded under the module's bare name
 // (TagKeyOfName in eval_member_path.cpp) while the read asked under "p6.u"
 // and found the initializer's Valid there, so the 3 was read as Valid
-// unreported.
+// unreported; the refused read's x becomes 0 in the 2-state y (§6.11.2),
+// which reads apart from that 3.
 TEST(PackageImportSim,
      ImportedPackageTaggedUnionRetaggedByItsBareNameIsOneTag) {
   SimFixture f;
@@ -304,7 +305,7 @@ TEST(PackageImportSim,
   LowerAndRun(design, f);
   Variable* y = f.ctx.FindVariable("y");
   ASSERT_NE(y, nullptr);
-  EXPECT_FALSE(y->value.IsKnown());
+  EXPECT_EQ(y->value.ToUint64(), 0u);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "run-time error: accessing member 'Valid' of tagged union 'p6.u' "
