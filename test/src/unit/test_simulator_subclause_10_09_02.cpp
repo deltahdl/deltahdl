@@ -349,4 +349,56 @@ TEST(StructPatternSimulation, ReplicationInStructContext) {
   EXPECT_EQ(var->value.ToUint64(), 0xABABu);
 }
 
+// §10.9.2 (printed page 263): each member expression is evaluated in the
+// context of an assignment to the type of the corresponding member, so the
+// pattern initializing `p`, itself a structure, is placed by pair_t's own
+// members, keyed or not. The inner pattern was evaluated with no type to
+// place it by, its elements concatenated in written order: `'{b: 2, a: 1}`
+// put 2 where a lies and 1 where b lies, and the 96-bit outer took the same
+// concatenation, so the read gave 213 rather than 123.
+TEST(StructPatternSimulation,
+     NestedPositionalPatternIsPlacedByTheMembersLayout) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  typedef struct packed { int a; int b; } pair_t;\n"
+      "  typedef struct packed { pair_t p; int c; } outer_t;\n"
+      "  outer_t s;\n"
+      "  int y;\n"
+      "  initial begin\n"
+      "    s = '{'{b: 2, a: 1}, 3};\n"
+      "    y = s.p.a * 100 + s.p.b * 10 + s.c;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "y");
+  ASSERT_NE(var, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(var->value.ToUint64(), 123u);
+}
+
+// §10.9.2 (printed page 263): a member:value gives the named member its
+// value in the context of an assignment to that member's type, so the
+// pattern keyed to `p` is placed by pair_t's members, each byte widened to
+// the int it initializes. Evaluated untyped, the two bytes were concatenated
+// to sixteen bits and deposited at the low end of p: b read 258 and a
+// nothing, 2583 rather than 123.
+TEST(StructPatternSimulation, NestedKeyedPatternIsPlacedByTheMembersLayout) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  typedef struct packed { int a; int b; } pair_t;\n"
+      "  typedef struct packed { pair_t p; int c; } outer_t;\n"
+      "  outer_t s;\n"
+      "  int y;\n"
+      "  initial begin\n"
+      "    s = '{p: '{8'd1, 8'd2}, c: 3};\n"
+      "    y = s.p.a * 100 + s.p.b * 10 + s.c;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "y");
+  ASSERT_NE(var, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(var->value.ToUint64(), 123u);
+}
+
 }  // namespace

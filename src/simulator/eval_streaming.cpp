@@ -556,15 +556,35 @@ struct PatternState {
   Arena& arena;
 };
 
+// §10.9.2 (printed page 263): each member expression is evaluated in the
+// context of an assignment to the type of the member it initializes, by
+// position or by name, and §7.2.1 gives a member that is itself a structure a
+// layout of its own (StructFieldInfo::nested). An element that is a pattern,
+// bare or typed, for such a member was evaluated as any expression is, with
+// no type to place it by, so its elements were concatenated in written order
+// at their self-determined widths: `s = '{'{b: 2, a: 1}, 3}` swapped the
+// nested members, and `'{p: '{8'd1, 8'd2}, c: 3}` packed two bytes into the
+// low end of p. The value of the member's expression: a pattern for a nested
+// structure placed by that structure's layout, as the enclosing pattern is by
+// `info`'s, and any other expression evaluated as it was.
+static Logic4Vec EvalMemberExpr(const Expr* elem, const StructFieldInfo& field,
+                                SimContext& ctx, Arena& arena) {
+  const Expr* pattern = UnwrapTypedPattern(elem);
+  if (field.nested != nullptr && pattern->kind == ExprKind::kAssignmentPattern)
+    return EvalStructPatternValue(pattern, field.nested, ctx, arena);
+  return EvalExpr(elem, ctx, arena);
+}
+
 static void ApplyMemberKeys(const Expr* expr, const StructTypeInfo* info,
                             PatternState& s) {
   for (size_t i = 0; i < expr->pattern_keys.size(); ++i) {
     if (i >= expr->elements.size()) break;
     auto key = expr->pattern_keys[i]->text;
     if (!IsMemberNameKey(key, info)) continue;
-    auto val = EvalExpr(expr->elements[i], s.ctx, s.arena);
     for (size_t fi = 0; fi < info->fields.size(); ++fi) {
       if (info->fields[fi].name != key) continue;
+      auto val =
+          EvalMemberExpr(expr->elements[i], info->fields[fi], s.ctx, s.arena);
       PlaceFieldValue(s.result, info->fields[fi], val, s.arena);
       s.assigned[fi] = true;
       break;
@@ -627,17 +647,21 @@ Logic4Vec EvalStructPatternValue(const Expr* expr, const StructTypeInfo* info,
   // order, each evaluated in the context of an assignment to that member's
   // type. Coercing each element to its member's width (rather than
   // concatenating at its self-determined width) is what keeps an over-wide
-  // element from spilling into the following members. The replication form and
-  // any struct too wide for a single word fall back to the width-summing
-  // concatenation path.
+  // element from spilling into the following members, and a nested pattern
+  // is placed by its member's own layout (EvalMemberExpr). The replication
+  // form and a pattern with other than one element per member fall back to
+  // the width-summing concatenation path. A structure wider than a word took
+  // that path too, from before PlaceFieldValue deposited a member above the
+  // first word; the placement now reaches any width, and the fallback left
+  // `'{'{1, 2}, 3}` for a 96-bit structure concatenated, its nested pattern
+  // never reaching the member's layout.
   bool is_replication =
       expr->repeat_count || (expr->elements.size() == 1 &&
                              expr->elements[0]->kind == ExprKind::kReplicate);
-  if (!is_replication && info->total_width <= 64 &&
-      expr->elements.size() == info->fields.size()) {
+  if (!is_replication && expr->elements.size() == info->fields.size()) {
     auto result = MakeLogic4Vec(arena, info->total_width);
     for (size_t i = 0; i < info->fields.size(); ++i) {
-      auto val = EvalExpr(expr->elements[i], ctx, arena);
+      auto val = EvalMemberExpr(expr->elements[i], info->fields[i], ctx, arena);
       PlaceFieldValue(result, info->fields[i], val, arena);
     }
     return result;
