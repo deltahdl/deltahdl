@@ -98,4 +98,84 @@ TEST(IpcSync, MailboxNewBoundedPutBlocksWhenFull) {
   EXPECT_EQ(mb.Num(), 2);
 }
 
+// The tests above drive MailboxObject from C++. The ones below state the
+// rules as SystemVerilog, where §15.4 makes its claim; no language-level
+// mailbox was lowered at all, so `mailbox mb = new;` created no queue and
+// every method on mb reached nothing.
+
+// §15.4.1 (printed page 374): new() with no bound builds an unbounded mailbox
+// and a put() on it never blocks, so two messages go in, get() takes the
+// first in the order they were placed (§15.4.3) and num() counts the one
+// left (§15.4.2): 7 and 1 read as 71. Left unlowered, the get() stored
+// nothing and r read x.
+TEST(MailboxSim, NewUnboundedTakesMessagesWithoutLimit) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  mailbox mb = new;\n"
+      "  int a, r;\n"
+      "  initial begin\n"
+      "    mb.put(7);\n"
+      "    mb.put(9);\n"
+      "    mb.get(a);\n"
+      "    r = a * 10 + mb.num();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 71u);
+}
+
+// §15.4.1 (printed page 374): a nonzero bound is the size of the queue, and
+// the mailbox may be built by an assignment rather than a declaration
+// initializer. Built with new(1) procedurally, the first try_put() places
+// its message and the second finds the queue full (§15.4.4): 1 and 0 read as
+// 10. A bound that did not reach the queue would have read 11.
+TEST(MailboxSim, NewAssignmentBoundsTheQueue) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  mailbox mb;\n"
+      "  int first, second, r;\n"
+      "  initial begin\n"
+      "    mb = new(1);\n"
+      "    first = mb.try_put(3);\n"
+      "    second = mb.try_put(4);\n"
+      "    r = first * 10 + second;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 10u);
+}
+
+// §15.4.1 (printed page 374) with §23.9: a mailbox declared inside a module
+// instance is the instance's own, created under the instance's key, and a
+// bare `mb` inside M names it. Asked by the bare key alone, no mailbox
+// answered the name inside the instance, so put() and get() ran on none and
+// r read x; here get() retrieves the 6 put() placed and num() counts none
+// left: 60.
+TEST(MailboxSim, ChildInstanceQueueAnswersItsBareName) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module M;\n"
+      "  mailbox mb = new;\n"
+      "  int a, r;\n"
+      "  initial begin\n"
+      "    mb.put(6);\n"
+      "    mb.get(a);\n"
+      "    r = a * 10 + mb.num();\n"
+      "  end\n"
+      "endmodule\n"
+      "module top;\n"
+      "  M m();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* r = f.ctx.FindVariable("m.r");
+  ASSERT_NE(r, nullptr);
+  EXPECT_EQ(r->value.ToUint64(), 60u);
+}
+
 }  // namespace

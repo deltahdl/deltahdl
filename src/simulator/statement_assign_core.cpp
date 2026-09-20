@@ -21,6 +21,7 @@
 #include "simulator/eval_class_array_handles.h"
 #include "simulator/eval_expr_internal.h"
 #include "simulator/eval_function_internal.h"
+#include "simulator/eval_mailbox.h"
 #include "simulator/eval_semaphore.h"
 #include "simulator/eval_string.h"
 #include "simulator/evaluation.h"
@@ -837,6 +838,7 @@ static bool TryArrayObjectAssign(const Stmt* stmt, SimContext& ctx,
 bool TryDispatchSpecialBlockingAssign(const Stmt* stmt, SimContext& ctx,
                                       Arena& arena) {
   if (TrySemaphoreNewAssign(stmt, ctx, arena)) return true;
+  if (TryMailboxNewAssign(stmt, ctx, arena)) return true;
   if (TryClassNewAssign(stmt, ctx, arena)) return true;
   if (TryTypedClassNewAssign(stmt, ctx, arena)) return true;
   if (TryMemberClassNewAssign(stmt, ctx, arena)) return true;

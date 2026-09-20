@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <vector>
 
+#include "fixture_simulator.h"
 #include "simulator/sync_objects.h"
 
 using namespace delta;
@@ -199,6 +200,28 @@ TEST(IpcSync, MailboxGetTypeMismatchGeneratesError) {
   // The errored get() does not consume the message and does not clobber msg.
   EXPECT_EQ(msg, 0u);
   EXPECT_EQ(mb.Num(), 1);
+}
+
+// §15.4.5 (printed pages 375-376): get() on an empty mailbox blocks the
+// process until a message is placed in the mailbox, and then removes that
+// message. The put() at time 3 is what ends the wait, so the value 8 reaches
+// v at time 3: 8 and the time test read as 81. A get() that did not wait
+// would have stored nothing and read the time as 0.
+TEST(MailboxSim, GetWaitsUntilAMessageIsPlaced) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  mailbox mb = new;\n"
+      "  int v, r;\n"
+      "  initial begin\n"
+      "    mb.get(v);\n"
+      "    r = v * 10 + ($time == 3);\n"
+      "  end\n"
+      "  initial #3 mb.put(8);\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 81u);
 }
 
 }  // namespace

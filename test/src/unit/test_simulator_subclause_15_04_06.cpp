@@ -2,6 +2,7 @@
 
 #include <cstdint>
 
+#include "fixture_simulator.h"
 #include "simulator/sync_objects.h"
 
 using namespace delta;
@@ -73,6 +74,46 @@ TEST(IpcSync, MailboxTryGetEmptyDistinctFromTypeMismatch) {
   MailboxObject mb;
   uint64_t msg = 0;
   EXPECT_EQ(mb.TryGet(msg, kTypeString), 0);
+}
+
+// §15.4.6 (printed page 376): try_get() on an empty mailbox returns 0 without
+// waiting, and retrieves nothing, so the variable it names keeps the 5 it
+// held; a try_get() that finds a message retrieves it and returns a positive
+// integer. 0 and 5 read as 105, then 1 and 9 as 119. Left unlowered, the
+// calls evaluated to nothing and r read x.
+TEST(MailboxSim, TryGetOnEmptyLeavesTheVariableAndAnswersZero) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  mailbox mb = new;\n"
+      "  int x, status, r;\n"
+      "  initial begin\n"
+      "    x = 5;\n"
+      "    status = mb.try_get(x);\n"
+      "    r = 100 + status * 10 + x;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 105u);
+}
+
+TEST(MailboxSim, TryGetRetrievesAnAvailableMessage) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  mailbox mb = new;\n"
+      "  int x, status, r;\n"
+      "  initial begin\n"
+      "    x = 5;\n"
+      "    mb.put(9);\n"
+      "    status = mb.try_get(x);\n"
+      "    r = 100 + status * 10 + x;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 119u);
 }
 
 }  // namespace

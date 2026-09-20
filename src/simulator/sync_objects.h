@@ -99,6 +99,18 @@ struct MailboxObject {
 
   explicit MailboxObject(int32_t b = 0) : bound(b < 0 ? 0 : b) {}
 
+  // §15.4.1: new() builds the mailbox with the bound it names, 0 leaving it
+  // unbounded and a negative bound, which the subclause calls illegal, taken
+  // as 0 as the constructor takes it. A variable given a later `mbx = new(N)`
+  // names a fresh mailbox, so the messages of the one it named are gone; the
+  // processes waiting on it keep their place, as an object no handle names
+  // still resumes them.
+  void Build(int32_t b) {
+    bound = b < 0 ? 0 : b;
+    messages.clear();
+    message_types.clear();
+  }
+
   // Two message types match when they share an id. kAnyType acts as a wildcard:
   // a dynamic transfer (untracked on either side) never reports a mismatch.
   // This single predicate is shared by the run-time checks of get() (§15.4.5),

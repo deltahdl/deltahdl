@@ -2,6 +2,7 @@
 
 #include <cstdint>
 
+#include "fixture_simulator.h"
 #include "simulator/sync_objects.h"
 
 using namespace delta;
@@ -72,6 +73,45 @@ TEST(IpcSync, MailboxTryPeekEmptyDistinctFromTypeMismatch) {
   MailboxObject mb;
   uint64_t msg = 0;
   EXPECT_EQ(mb.TryPeek(msg, kTypeString), 0);
+}
+
+// §15.4.8 (printed pages 376-377): try_peek() copies the front message
+// without removing it and returns a positive integer, so the status 1, the
+// copied 4 and a num() still of 1 read as 141; on an empty mailbox it
+// returns 0 and copies nothing, leaving x at 5: 50. Left unlowered, the calls
+// evaluated to nothing and both read x.
+TEST(MailboxSim, TryPeekCopiesWithoutRemoving) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  mailbox mb = new;\n"
+      "  int x, status, r;\n"
+      "  initial begin\n"
+      "    mb.put(4);\n"
+      "    status = mb.try_peek(x);\n"
+      "    r = status * 100 + x * 10 + mb.num();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 141u);
+}
+
+TEST(MailboxSim, TryPeekOnEmptyLeavesTheVariableAndAnswersZero) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  mailbox mb = new;\n"
+      "  int x, status, r;\n"
+      "  initial begin\n"
+      "    x = 5;\n"
+      "    status = mb.try_peek(x);\n"
+      "    r = x * 10 + status;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 50u);
 }
 
 }  // namespace

@@ -2,6 +2,7 @@
 
 #include <cstdint>
 
+#include "fixture_simulator.h"
 #include "simulator/sync_objects.h"
 
 using namespace delta;
@@ -62,6 +63,29 @@ TEST(IpcSync, MailboxTryPutSucceedsAfterGetFreesSpace) {
   mb.TryGet(msg);
   EXPECT_EQ(mb.TryPut(30), 1);
   EXPECT_EQ(mb.Num(), 1);
+}
+
+// §15.4.4 (printed page 375): try_put() places its message and returns a
+// positive integer when the mailbox is not full, and returns 0 without
+// placing it when the mailbox is full. On a queue of one the first call
+// answers 1 and the second 0, and num() confirms only one message was
+// placed: 1, 0 and 1 read as 101. Left unlowered, the calls evaluated to
+// nothing and r read x.
+TEST(MailboxSim, TryPutAnswersZeroOnAFullQueue) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  mailbox mb = new(1);\n"
+      "  int first, second, r;\n"
+      "  initial begin\n"
+      "    first = mb.try_put(5);\n"
+      "    second = mb.try_put(6);\n"
+      "    r = first * 100 + second * 10 + mb.num();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 101u);
 }
 
 }  // namespace

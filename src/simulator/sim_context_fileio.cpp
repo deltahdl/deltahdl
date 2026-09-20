@@ -316,7 +316,18 @@ MailboxObject* SimContext::CreateMailbox(std::string_view name, int32_t bound) {
   return mb;
 }
 
+// §23.9: a mailbox declared inside a module instance is stored under that
+// instance's prefix (CreateChildModuleVariables in lowerer_child.cpp reaching
+// CreateMailboxForVar in lowerer_var.cpp), so the prefixed name is what a
+// bare reference from within the instance denotes and is tried first, as
+// FindSemaphore above tries it. The unprefixed lookup stays as the answer for
+// a mailbox of the enclosing scope.
 MailboxObject* SimContext::FindMailbox(std::string_view name) {
+  std::string prefix = ActiveInstancePrefix();
+  if (!prefix.empty()) {
+    auto prefixed = mailboxes_.find(prefix + std::string(name));
+    if (prefixed != mailboxes_.end()) return prefixed->second;
+  }
   auto it = mailboxes_.find(name);
   return (it != mailboxes_.end()) ? it->second : nullptr;
 }

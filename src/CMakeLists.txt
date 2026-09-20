@@ -207,6 +207,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/variable.cpp
     simulator/virtual_interface.cpp
     simulator/eval_semaphore.cpp
+    simulator/eval_mailbox.cpp
     simulator/queue_bound.cpp
     simulator/sim_context.cpp
     simulator/cover_results.cpp

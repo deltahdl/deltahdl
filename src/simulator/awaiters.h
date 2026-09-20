@@ -7,7 +7,8 @@
 // §28 inertial delay a change can cancel, ForkJoinAwaiter and WaitForkAwaiter
 // for §9.3.2 fork-join completion, CycleDelayAwaiter for a §14.11 cycle delay,
 // ProcessAwaitAwaiter for another process finishing, SemaphoreGetAwaiter for a
-// §15.3 semaphore and MailboxPutAwaiter for a §15.4 mailbox.
+// §15.3 semaphore and MailboxPutAwaiter, MailboxGetAwaiter and
+// MailboxPeekAwaiter for a §15.4 mailbox.
 //
 // The awaiters for a §9.4.2 event control and its §9.4.5 intra-assignment
 // repeat form live in src/simulator/awaiters_event_control.h, which this
@@ -750,6 +751,58 @@ struct MailboxPutAwaiter {
   // the put had blocked and the runtime has since freed room.
   void await_resume() {
     if (!placed) mbx.Put(msg);
+  }
+};
+
+// §15.4.5: a process that retrieves a message from an empty mailbox blocks
+// until a message is placed in it. When a message is there it is removed at
+// once and the process continues without suspending; otherwise the handle is
+// parked on the get-waiter queue, which §15.4.5 keeps in arrival order, and
+// the put that places a message resumes it through WakeGetWaiters(), at which
+// point the awaiter removes the message it waited for. The message is the
+// awaiter's result, for the caller to store into the variable get() names.
+struct MailboxGetAwaiter {
+  MailboxObject& mbx;
+  uint64_t msg = 0;
+  bool retrieved = false;
+
+  bool await_ready() {
+    retrieved = mbx.Get(msg) == MbxGetStatus::kRetrieved;
+    return retrieved;
+  }
+
+  void await_suspend(std::coroutine_handle<> h) {
+    mbx.get_waiters.push_back(h);
+  }
+
+  uint64_t await_resume() {
+    if (!retrieved) mbx.Get(msg);
+    return msg;
+  }
+};
+
+// §15.4.7: a process that peeks an empty mailbox blocks until a message is
+// placed in it, as get() does, and copies the message without removing it,
+// which is why one placed message can unblock every peeking process and not
+// just one: WakeGetWaiters() resumes all of the peek-waiter queue before the
+// head of the get-waiter queue. The copy is the awaiter's result.
+struct MailboxPeekAwaiter {
+  MailboxObject& mbx;
+  uint64_t msg = 0;
+  bool copied = false;
+
+  bool await_ready() {
+    copied = mbx.Peek(msg) == MbxPeekStatus::kCopied;
+    return copied;
+  }
+
+  void await_suspend(std::coroutine_handle<> h) {
+    mbx.peek_waiters.push_back(h);
+  }
+
+  uint64_t await_resume() {
+    if (!copied) mbx.Peek(msg);
+    return msg;
   }
 };
 

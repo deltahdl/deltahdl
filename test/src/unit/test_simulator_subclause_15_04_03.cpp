@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <vector>
 
+#include "fixture_simulator.h"
 #include "simulator/awaiters.h"
 #include "simulator/sync_objects.h"
 
@@ -120,6 +121,35 @@ TEST(IpcSync, MailboxPutSuspendsWhenFullThenResumesWhenRoomFrees) {
   EXPECT_EQ(tail, 20u);  // the message that had to wait is now in the queue
 
   putter.h.destroy();
+}
+
+// §15.4.3 (printed page 375): put() on a mailbox created with a bounded queue
+// suspends the process until there is enough room in the queue. The queue of
+// one holds the first message, so the forked put(2) waits, and the get() at
+// time 5 in the other branch is what makes room: it retrieves the 1 that was
+// placed first and the waiting put() completes at time 5, so 1 and 5 read as
+// 15. A put() that did not wait would have recorded time 0.
+TEST(MailboxSim, PutWaitsForRoomInABoundedQueue) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  mailbox mb = new(1);\n"
+      "  int got, at, r;\n"
+      "  initial begin\n"
+      "    mb.put(1);\n"
+      "    fork\n"
+      "      begin\n"
+      "        mb.put(2);\n"
+      "        at = $time;\n"
+      "      end\n"
+      "      #5 mb.get(got);\n"
+      "    join\n"
+      "    r = got * 10 + at;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 15u);
 }
 
 }  // namespace

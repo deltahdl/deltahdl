@@ -19,6 +19,7 @@
 #include "simulator/awaiters_event_control.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/eval_instance_task.h"
+#include "simulator/eval_mailbox.h"
 #include "simulator/eval_semaphore.h"
 #include "simulator/evaluation.h"
 #include "simulator/exec_task.h"
@@ -169,10 +170,9 @@ static StmtResult ExecNbEventTriggerImpl(const Stmt* stmt, SimContext& ctx,
 
   bool reactive = ctx.IsReactiveContext();
 
-  // Event-control form: ->> @(...) ev  or  ->> repeat(n) @(...) ev. The update
-  // event is created when the event control occurs (after n occurrences for the
-  // repeat form), not immediately. ->> never blocks the issuing process, so the
-  // wait happens in a spawned process.
+  // Event-control form, ->> @(...) ev or ->> repeat(n) @(...) ev: the update
+  // event is created when the control occurs (after n occurrences for repeat),
+  // and ->> never blocks the issuer, so the wait happens in a spawned process.
   if (!stmt->events.empty()) {
     uint64_t count = 1;
     if (stmt->repeat_event_count) {
@@ -190,8 +190,7 @@ static StmtResult ExecNbEventTriggerImpl(const Stmt* stmt, SimContext& ctx,
     return StmtResult::kDone;
   }
 
-  // Delay form (or no timing control): the update event is created when the
-  // optional delay expires.
+  // Delay form, or none: the update event is created when the delay expires.
   uint64_t delay = 0;
   if (stmt->delay) delay = EvalExpr(stmt->delay, ctx, arena).ToUint64();
   auto time = ctx.CurrentTime();
@@ -367,12 +366,11 @@ static ExecTask ExecFork(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   state->parent_proc = spawning_proc;
 
   // §9.6.1: wait fork blocks until every immediate child subprocess of the
-  // current process has terminated, irrespective of how the child was
-  // spawned. Register each child against the spawning process's wait-fork
-  // tally for all join kinds, not just join_none: after join_any the
-  // unblocked siblings keep running and a later wait fork must still wait on
-  // them. (For plain join the count is already drained by the join site, so
-  // the extra bookkeeping is inert.)
+  // current process has terminated, however the child was spawned. Each child
+  // is registered against the spawning process's wait-fork tally for every
+  // join kind, not join_none alone: after join_any the unblocked siblings keep
+  // running and a later wait fork must still wait on them, and for plain join
+  // the count is drained by the join site, so the bookkeeping is inert.
   Process* parent_proc = spawning_proc;
   WaitForkState* parent_wfs =
       parent_proc ? &parent_proc->wait_fork_state : nullptr;
@@ -526,6 +524,10 @@ static ExecTask ExecInlineTaskCall(const Stmt* stmt, SimContext& ctx,
     co_await SemaphoreGetAwaiter{*sem, SemaphoreKeyArg(expr, ctx, arena, 1)};
     co_return StmtResult::kDone;
   }
+  // §15.4.3, §15.4.5 and §15.4.7: put(), get() and peek() wait on the mailbox.
+  if (IsMailboxBlockingCall(expr, ctx, arena)) {
+    co_return co_await ExecMailboxCall(expr, ctx, arena);
+  }
   // §13.3 with §8.6: a task enabled through an object handle runs as a
   // coroutine too, so its timing controls suspend this process.
   InstanceMethodInfo instance_call;
@@ -562,10 +564,9 @@ static ExecTask ExecBlockingAssignTimed(const Stmt* stmt, SimContext& ctx,
                                         Arena& arena) {
   auto rhs_val = EvalExpr(stmt->rhs, ctx, arena);
   auto delay_val = EvalExpr(stmt->delay, ctx, arena);
-  // §10.4.1 intra-assignment delay is a §9.4.1 delay control: normalize the
-  // delay value with the shared rules (unknown/high-Z -> zero, negative ->
-  // time-variable-width unsigned) and apply §3.14.1 precision rounding rather
-  // than taking the raw bits.
+  // §10.4.1's intra-assignment delay is a §9.4.1 delay control: the value is
+  // normalized by the shared rules (unknown or high-Z to zero, negative to the
+  // time variable's unsigned width) and rounded to §3.14.1's precision.
   co_await DelayAwaiter{ctx, DelayValueToTicks(delay_val, ctx)};
   PerformBlockingAssign(stmt->lhs, rhs_val, ctx, arena);
   co_return StmtResult::kDone;

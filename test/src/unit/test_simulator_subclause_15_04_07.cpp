@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <vector>
 
+#include "fixture_simulator.h"
 #include "simulator/sync_objects.h"
 
 using namespace delta;
@@ -196,6 +197,48 @@ TEST(IpcSync, MailboxOneMessageUnblocksMultiplePeekersAndGetter) {
   peeker1.h.destroy();
   peeker2.h.destroy();
   getter.h.destroy();
+}
+
+// §15.4.7 (printed page 376): peek() copies one message from the mailbox
+// without removing it, so the copy reads 4 and num() still counts the one
+// message: 41. A peek() that removed the message would have read 40.
+TEST(MailboxSim, PeekCopiesWithoutRemoving) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  mailbox mb = new;\n"
+      "  int x, r;\n"
+      "  initial begin\n"
+      "    mb.put(4);\n"
+      "    mb.peek(x);\n"
+      "    r = x * 10 + mb.num();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 41u);
+}
+
+// §15.4.7 (printed page 376): peek() on an empty mailbox blocks the process
+// until a message is placed, and the message stays in the queue for the
+// get() that follows, so the peeked 6 at time 2 and a num() of 1 read as
+// 621. A peek() that did not wait would have stored nothing and read the
+// time as 0.
+TEST(MailboxSim, PeekWaitsUntilAMessageIsPlaced) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  mailbox mb = new;\n"
+      "  int x, r;\n"
+      "  initial begin\n"
+      "    mb.peek(x);\n"
+      "    r = x * 100 + $time * 10 + mb.num();\n"
+      "  end\n"
+      "  initial #2 mb.put(6);\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 621u);
 }
 
 }  // namespace
