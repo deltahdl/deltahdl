@@ -639,4 +639,157 @@ TEST(LevelSensitiveEventSimulation,
   EXPECT_EQ(val, 530u);
 }
 
+// §9.4.3 (printed page 236) with §8.13 (printed 189-190) and §8.9 (printed
+// 186): the static property is C's, and D extends C, so `D::n` and `C::n`
+// name one storage. The condition reads it as `D::n` and the release writes
+// it as `D::n` from another process; the wait has to arm on C, the declaring
+// class, which the write notifies. D's own static_properties hold D's
+// declarations alone, so asked of them the wait armed nothing and stayed
+// parked for ever: `result` read 0. Armed on the declaring class, the write
+// at time 10 releases it and the read through `C::n` gives 2 * 100 + 10; the
+// write of 1 at 5 shows the value, not the first write, releases it.
+TEST(LevelSensitiveEventSimulation,
+     WaitOnAnInheritedStaticPropertyThroughTheDerivedClassIsReleased) {
+  auto val = RunAndGet(
+      "class C;\n"
+      "  static int n;\n"
+      "endclass\n"
+      "class D extends C;\n"
+      "endclass\n"
+      "module t;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    wait (D::n == 2);\n"
+      "    result = C::n * 100 + $time;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    #5 D::n = 1;\n"
+      "    #5 D::n = 2;\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(val, 210u);
+}
+
+// §9.4.2 (printed page 232) with §8.13: an event control on `D::n` inside a
+// module wakes on a write through `C::n`, the same storage. The operand
+// resolved against D's own static_properties named no property, so the
+// event control was skipped and the process waited for ever: `woke` read 0.
+// Armed on C, the write of 5 at time 7 wakes it and the read gives 7 * 10 +
+// 5.
+TEST(LevelSensitiveEventSimulation,
+     EventControlOnAnInheritedStaticPropertyWakesOnTheBaseClassWrite) {
+  auto val = RunAndGet(
+      "class C;\n"
+      "  static int n;\n"
+      "endclass\n"
+      "class D extends C;\n"
+      "endclass\n"
+      "module t;\n"
+      "  int woke;\n"
+      "  initial @(D::n) woke = $time * 10 + C::n;\n"
+      "  initial #7 C::n = 5;\n"
+      "endmodule\n",
+      "woke");
+  EXPECT_EQ(val, 75u);
+}
+
+// §9.4.3 with §8.13 and §8.9: the static queue is C's and is named `D::all`
+// on both sides. The push resolves the queue through the extends chain to
+// C's storage and announces it to C's watchers, where the wait, asked of D's
+// own static_properties, had armed nothing and stayed parked for ever with
+// `result` at 0. Armed on the declaring class, the push at time 10 releases
+// it and the pop reads 7 * 100 + 10.
+TEST(LevelSensitiveEventSimulation,
+     WaitOnAnInheritedStaticQueueSizeCallIsReleasedByAPushThroughTheDerived) {
+  auto val = RunAndGet(
+      "class C;\n"
+      "  static int all[$];\n"
+      "endclass\n"
+      "class D extends C;\n"
+      "endclass\n"
+      "module t;\n"
+      "  int v, result;\n"
+      "  initial begin\n"
+      "    wait (D::all.size() != 0);\n"
+      "    v = D::all.pop_front();\n"
+      "    result = v * 100 + $time;\n"
+      "  end\n"
+      "  initial #10 D::all.push_back(7);\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(val, 710u);
+}
+
+// §9.4.3 with §8.13 and §8.10: inside a static task of D the condition names
+// the inherited static queue bare, `all.size()`, and a static function of C
+// pushes to it bare. The bare name resolves through the running method's
+// class, D, whose own static_properties hold no `all`, so the wait armed
+// nothing and the task stayed parked with `result` at 0. Resolved to the
+// declaring class C on both sides, the push at time 25 releases it and the
+// pop reads 6 * 100 + 25.
+TEST(LevelSensitiveEventSimulation,
+     WaitOnABareInheritedStaticQueueInADerivedStaticTaskIsReleased) {
+  auto val = RunAndGet(
+      "class C;\n"
+      "  static int all[$];\n"
+      "  static function void put(int x);\n"
+      "    all.push_back(x);\n"
+      "  endfunction\n"
+      "endclass\n"
+      "class D extends C;\n"
+      "  static int result;\n"
+      "  static task get();\n"
+      "    int v;\n"
+      "    wait (all.size() != 0);\n"
+      "    v = all.pop_front();\n"
+      "    result = v * 100 + $time;\n"
+      "  endtask\n"
+      "endclass\n"
+      "module t;\n"
+      "  int result;\n"
+      "  initial D::get();\n"
+      "  initial #25 C::put(6);\n"
+      "  initial #40 result = D::result;\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(val, 625u);
+}
+
+// §9.4.3 with §8.13 and §8.10: inside a static task of D the condition names
+// the inherited static value property bare, `n == 3`, and a static function
+// of D writes it bare. Both resolve through D to C's one storage, and the
+// write notifies C, where the wait is armed; asked of D's own
+// static_properties, the wait armed nothing and stayed parked with `result`
+// at 0. Released by the write at time 30, the read gives 3 * 100 + 30; the
+// write of 1 at 15 shows the value releases it.
+TEST(LevelSensitiveEventSimulation,
+     WaitOnABareInheritedStaticPropertyInADerivedStaticTaskIsReleased) {
+  auto val = RunAndGet(
+      "class C;\n"
+      "  static int n;\n"
+      "endclass\n"
+      "class D extends C;\n"
+      "  static int result;\n"
+      "  static task get();\n"
+      "    wait (n == 3);\n"
+      "    result = n * 100 + $time;\n"
+      "  endtask\n"
+      "  static function void set(int x);\n"
+      "    n = x;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  int result;\n"
+      "  initial D::get();\n"
+      "  initial begin\n"
+      "    #15 D::set(1);\n"
+      "    #15 D::set(3);\n"
+      "  end\n"
+      "  initial #40 result = D::result;\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(val, 330u);
+}
+
 }  // namespace

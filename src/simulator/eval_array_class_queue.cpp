@@ -222,9 +222,12 @@ bool LocalShadowsProperty(std::string_view name, SimContext& ctx) {
 // property `base` names -- `C::all` or `p::C::all` through the scope operator,
 // or the bare `all` a method of C names (§8.10), where no declared queue or
 // local of the name shadows it, resolved as FindQueueOfName resolves the
-// name -- else null. What names a static property is the class, not an
-// object, so this is what AnnounceQueueChange tells §9.4.2's watchers
-// through where FindQueueOfBase gave it no owner.
+// name -- else null. §8.13 (printed 189-190): that is the declaring class,
+// C for `D::all` and for the bare `all` of D's own method where D extends C,
+// which FindQueuePropertyDecl walks the extends chain to, and which the
+// watchers of `wait (D::all.size() != 0)` are armed on. What names a static
+// property is the class, not an object, so this is what AnnounceQueueChange
+// tells §9.4.2's watchers through where FindQueueOfBase gave it no owner.
 const ClassTypeInfo* StaticQueuePropertyClass(const Expr* base,
                                               SimContext& ctx) {
   const ClassTypeInfo* from = nullptr;

@@ -473,7 +473,13 @@ struct AnyChangeAwaiter {
   // neither a variable nor a property of any object in hand, armed nothing
   // and waited for ever. §26.3: a package's class is bound under `p::C`, and
   // `p::C::all` is split at its last scope operator into that key and the
-  // member; split at the first, the class was looked for as `p`.
+  // member; split at the first, the class was looked for as `p`. §8.13
+  // (printed pages 189-190): the class armed on is the one declaring the
+  // property, C for `D::n` and `D::all` where D extends C and for the bare
+  // `n` of D's own static method (StaticPropertyDeclarer,
+  // awaiters_event_control.h), which is the class every write to that one
+  // storage notifies; asked of D's own static_properties, which hold D's
+  // declarations alone, each armed nothing and waited for ever.
   bool AttachStaticPropertyWatcher(std::string_view name,
                                    std::coroutine_handle<> h, Process* proc,
                                    const std::shared_ptr<bool>& fin,
@@ -485,9 +491,9 @@ struct AnyChangeAwaiter {
       cls = ctx.FindClassType(name.substr(0, scope));
       member = name.substr(scope + 2);
     }
-    if (cls == nullptr || cls->static_properties.find(std::string(member)) ==
-                              cls->static_properties.end())
-      return false;
+    if (cls == nullptr) return false;
+    cls = StaticPropertyDeclarer(cls, member);
+    if (cls == nullptr) return false;
     cls->AddStaticWatcher(WakeOnceWatcher(h, proc, fin, consumed));
     return true;
   }

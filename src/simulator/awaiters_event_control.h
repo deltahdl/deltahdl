@@ -262,14 +262,31 @@ inline uint64_t ResolveMemberObjectHandle(const Expr* signal, SimContext& ctx,
   return obj->handle;
 }
 
-// §9.4.2 with §8.9 and §8.10: the class whose static property the operand
-// names, and the property, when the operand is one -- `C::n` through the
-// class scope operator, or the bare `n` inside a method of C, which §8.10
-// lets a method name unqualified -- else null. A static property is the
-// class's own storage, one for every object and for no object at all, so what
-// a process waiting on it has to arm on is the class, not an object: a write
-// through `C::n` reaches no object's watchers, and a static method has no
-// `this` to arm on in the first place.
+// §8.13 (printed pages 189-190) with §8.9 (printed 186): the class on the
+// extends chain from `cls` whose own storage holds the static property
+// `member` -- the one declaring it, C for `D::n` where D extends C, the one
+// storage both names reach -- or null. A derived class's static_properties
+// holds its own declarations alone, so asked of D's, `wait (D::n == 2)` and
+// `@(D::n)` found no property, armed nothing and waited for ever.
+inline const ClassTypeInfo* StaticPropertyDeclarer(const ClassTypeInfo* cls,
+                                                   std::string_view member) {
+  std::string key(member);
+  for (const auto* t = cls; t != nullptr; t = t->parent) {
+    if (t->static_properties.find(key) != t->static_properties.end()) return t;
+  }
+  return nullptr;
+}
+
+// §9.4.2 with §8.9 and §8.10: the class whose own storage holds the static
+// property the operand names, and the property, when the operand is one --
+// `C::n` through the class scope operator, `p::C::n` for a package's class
+// (§26.3), or the bare `n` inside a method of C, which §8.10 lets a method
+// name unqualified -- else null. A static property is the class's own
+// storage, one for every object and for no object at all, so what a process
+// waiting on it has to arm on is the class, not an object: a write through
+// `C::n` reaches no object's watchers, and a static method has no `this` to
+// arm on in the first place. §8.13: the class is the property's declarer, C
+// for `D::n` and for the bare `n` of D's method (StaticPropertyDeclarer).
 inline const ClassTypeInfo* ResolveStaticPropertyClass(
     const Expr* signal, SimContext& ctx, std::string_view& member) {
   const ClassTypeInfo* cls = nullptr;
@@ -277,15 +294,15 @@ inline const ClassTypeInfo* ResolveStaticPropertyClass(
     member = signal->text;
     cls = ctx.CurrentMethodClass();
   } else if (signal->kind == ExprKind::kMemberAccess &&
-             signal->is_scope_resolution && signal->lhs != nullptr &&
-             signal->lhs->kind == ExprKind::kIdentifier) {
-    member = MemberAccessField(signal);
-    cls = ctx.FindClassType(signal->lhs->text);
+             signal->is_scope_resolution && signal->lhs != nullptr) {
+    if (signal->lhs->kind == ExprKind::kIdentifier) {
+      member = MemberAccessField(signal);
+      cls = ctx.FindClassType(signal->lhs->text);
+    } else {
+      cls = PackageQualifiedClassOf(signal, ctx, member);
+    }
   }
-  if (cls == nullptr || cls->static_properties.find(std::string(member)) ==
-                            cls->static_properties.end())
-    return nullptr;
-  return cls;
+  return cls == nullptr ? nullptr : StaticPropertyDeclarer(cls, member);
 }
 
 struct EventAwaiter {
