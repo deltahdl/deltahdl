@@ -648,6 +648,14 @@ static bool IsCuScopeDataTypeKeyword(TokenKind tk) {
     case TokenKind::kKwTri:
     case TokenKind::kKwEvent:
     case TokenKind::kKwChandle:
+    // §3.12.1 gives the compilation-unit scope every item a package may hold,
+    // a data declaration of an enumeration, structure or union written in the
+    // declaration among them (§6.19's `enum {X, Y} v;`), which
+    // ParseTypedItemOrInst already reads; the gate alone refused the head and
+    // reported "expected top-level declaration".
+    case TokenKind::kKwEnum:
+    case TokenKind::kKwStruct:
+    case TokenKind::kKwUnion:
       return true;
     default:
       return false;

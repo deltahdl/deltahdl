@@ -150,4 +150,43 @@ TEST(EnumerationSimulation, PackageBareEnumLiteralReadsThroughAWildcardImport) {
             10u);
 }
 
+// §3.12.1 (printed page 56) has the compilation-unit scope hold any item a
+// package holds, a data declaration among them, visible to the modules of
+// the unit written after it; §6.19 (printed 119) has an enumerated type
+// declare its literals as constants of the scope holding it, Syntax 6-5
+// making the enum form a data_type, so a unit-scope `enum {X, Y} v;`
+// declares X and Y with no typedef, and the module reads Y * 10 + X as
+// 1 * 10 + 0 = 10 at run time through the backing variables
+// RegisterCuEnumLiterals gives it. Before, the parser admitted no enum head
+// to a unit-scope data declaration (IsCuScopeDataTypeKeyword), reporting
+// "expected top-level declaration", and RegisterCuEnumLiterals gave the
+// module the backing variables of a typedef's enumeration alone.
+TEST(EnumerationSimulation, UnitScopeBareEnumLiteralReadsAtRuntime) {
+  EXPECT_EQ(RunAndGet("enum {X, Y} v;\n"
+                      "module top;\n"
+                      "  int observed;\n"
+                      "  initial observed = Y * 10 + X;\n"
+                      "endmodule\n",
+                      "observed"),
+            10u);
+}
+
+// The same clauses for a unit-scope typedef standing beside the bare
+// declaration: the typedef's P and Q are declared as before, each enumeration
+// numbering its literals from 0 on its own (printed 120), so Q * 10 + P is
+// 1 * 10 + 0 = 10 with the bare declaration's X and Y in the same scope. The
+// typedef path is the one RegisterCuEnumLiterals walked before f98562dad, and
+// this pins it beside the data declaration the walk now reaches too.
+TEST(EnumerationSimulation,
+     UnitScopeTypedefEnumLiteralReadsBesideABareDeclaration) {
+  EXPECT_EQ(RunAndGet("typedef enum {P, Q} t;\n"
+                      "enum {X, Y} v;\n"
+                      "module top;\n"
+                      "  int observed;\n"
+                      "  initial observed = Q * 10 + P;\n"
+                      "endmodule\n",
+                      "observed"),
+            10u);
+}
+
 }  // namespace

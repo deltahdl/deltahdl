@@ -1,6 +1,5 @@
 #include <gtest/gtest.h>
 
-
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 #include "helpers_rtlir_lookup.h"
@@ -397,6 +396,33 @@ TEST(EnumerationElaboration, UnionMemberEnumLiteralFoldsIntoALocalparam) {
   ASSERT_NE(param, nullptr);
   EXPECT_TRUE(param->is_resolved);
   EXPECT_EQ(param->resolved_value, 54);
+}
+
+// §3.12.1 (printed page 56) has the compilation-unit scope hold any item a
+// package holds, a data declaration among them, and searches the portion of
+// it written before a reference once the module's own scope is exhausted;
+// §6.19 (printed 119) has an enumerated type declare its literals as
+// constants of the scope holding it, Syntax 6-5 making the enum form a
+// data_type, so a unit-scope `enum {X, Y} v;` declares X and Y for the
+// modules of the unit with no typedef, and L folds to 1 * 10 + 0 = 10.
+// Before, the parser admitted no enum head to a unit-scope data declaration
+// (IsCuScopeDataTypeKeyword), reporting "expected top-level declaration",
+// and RegisterCuEnumLiterals gave the module the backing variables of a
+// typedef's enumeration alone.
+TEST(EnumerationElaboration, UnitScopeBareEnumLiteralFoldsIntoALocalparam) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "enum {X, Y} v;\n"
+      "module m;\n"
+      "  localparam int L = Y * 10 + X;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* param = FindParam(design, "m", "L");
+  ASSERT_NE(param, nullptr);
+  EXPECT_TRUE(param->is_resolved);
+  EXPECT_EQ(param->resolved_value, 10);
 }
 
 }  // namespace

@@ -64,6 +64,26 @@ TEST(CompilationUnitParsing, TopLevelFunction) {
   ASSERT_NE(r.cu, nullptr);
 }
 
+// §3.12.1 (printed page 56) gives the compilation-unit scope every item a
+// package may hold, and §6.19 (printed 119) declares an enumeration's literals
+// where the enumeration is written, `enum {X, Y} v;` outside any module
+// declaring X, Y and v in the unit; a structure written in the declaration is
+// the same shape. The head keyword was refused as a top-level declaration, so
+// each was reported "expected top-level declaration" at line 1.
+TEST(CompilationUnitParsing, CuScopeBareEnumAndStructDataDeclarations) {
+  auto r = ParseEmptyCompilationUnit(
+      "enum {X, Y} v;\n"
+      "struct packed { logic [3:0] a; logic [3:0] b; } s;\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->cu_items.size(), 2u);
+  EXPECT_EQ(r.cu->cu_items[0]->kind, ModuleItemKind::kVarDecl);
+  EXPECT_EQ(r.cu->cu_items[0]->name, "v");
+  EXPECT_EQ(r.cu->cu_items[0]->data_type.enum_members.size(), 2u);
+  EXPECT_EQ(r.cu->cu_items[1]->kind, ModuleItemKind::kVarDecl);
+  EXPECT_EQ(r.cu->cu_items[1]->name, "s");
+  EXPECT_EQ(r.cu->cu_items[1]->data_type.struct_members.size(), 2u);
+}
+
 TEST(CompilationUnitParsing, CuScopeTypedef) {
   auto r = Parse(
       "typedef int myint;\n"
