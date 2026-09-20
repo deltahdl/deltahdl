@@ -28,10 +28,6 @@
 
 namespace delta {
 
-static DataType TypeParamOverrideToDataType(const Expr* expr,
-                                            const CompilationUnit* unit,
-                                            DiagEngine& diag, SourceLoc loc);
-
 // The specialization arguments written on a parameterized class name, in the
 // form DataType::type_params holds them in.
 //
@@ -228,10 +224,13 @@ static DataType OverrideHeadToDataType(const Expr* head,
 // of the child's parameters are type parameters, so the type has to be read
 // back off the expression node the parse left. A returned DataType still at
 // DataTypeKind::kImplicit means the value names no type, which is what lets the
-// caller tell an assignment it cannot use from an absent one.
-static DataType TypeParamOverrideToDataType(const Expr* expr,
-                                            const CompilationUnit* unit,
-                                            DiagEngine& diag, SourceLoc loc) {
+// caller tell an assignment it cannot use from an absent one. Declared in
+// elaborator_items_params.h, since Elaborator::ElaborateParamDecl reads the
+// type an assignment names for a type parameter declared among a module's
+// items through it as well.
+DataType TypeParamOverrideToDataType(const Expr* expr,
+                                     const CompilationUnit* unit,
+                                     DiagEngine& diag, SourceLoc loc) {
   std::vector<const Expr*> sels;
   const Expr* head = PeelPackedDimSelects(expr, sels);
   DataType dt = OverrideHeadToDataType(head, unit, diag, loc);
@@ -450,8 +449,8 @@ void ResolvePositionalInstParams(const ModuleItem* item,
   for (size_t i = 0; i < n; ++i) {
     auto* pexpr = item->inst_params[i].second;
     if (!pexpr) continue;
-    auto val = ConstEvalInt(pexpr, parent_scope);
-    if (val) child_params.push_back({kTargets[i], *val, pexpr});
+    PushInstParamAssignment(child_decl, kTargets[i], pexpr, parent_scope,
+                            child_params);
   }
 }
 
@@ -479,8 +478,8 @@ void ResolveNamedInstParams(const ModuleItem* item,
       continue;
     }
     if (!pexpr) continue;
-    auto val = ConstEvalInt(pexpr, parent_scope);
-    if (val) child_params.push_back({pname, *val, pexpr});
+    PushInstParamAssignment(child_decl, pname, pexpr, parent_scope,
+                            child_params);
   }
 }
 

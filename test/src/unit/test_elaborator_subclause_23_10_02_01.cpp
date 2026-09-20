@@ -9,6 +9,7 @@
 #include "fixture_elaborator.h"
 #include "helpers_param_value.h"
 #include "helpers_reported_error.h"
+#include "helpers_rtlir_lookup.h"
 #include "lexer/lexer.h"
 #include "parser/ast_design.h"
 #include "parser/parser.h"
@@ -240,15 +241,24 @@ TEST(OrderedListParameterAssignment,
 // A module m declared with no parameter port list, its parameters written
 // among its items as §23.10.2's own vdff is (printed page 766), with `items`
 // as those items, instantiated once in top with `assignment` as the
-// instance's parameter value assignment; answers m's parameter `name`.
-int64_t BodyParamUnder(std::string_view items, std::string_view assignment,
-                       std::string_view name, ElabFixture& f) {
+// instance's parameter value assignment, elaborated from top. The
+// instantiation stands on the line after the items' last, `endmodule` and
+// `module top;` between them.
+RtlirDesign* ElaborateBodyParamInstance(std::string_view items,
+                                        std::string_view assignment,
+                                        ElabFixture& f) {
   std::string src = "module m;\n";
   src += items;
   src += "endmodule\nmodule top;\n  m #(";
   src += assignment;
   src += ") u();\nendmodule\n";
-  auto* design = ElaborateSrc(src, f, "top");
+  return ElaborateSrc(src, f, "top");
+}
+
+// m's parameter `name` under `assignment`, or -1.
+int64_t BodyParamUnder(std::string_view items, std::string_view assignment,
+                       std::string_view name, ElabFixture& f) {
+  auto* design = ElaborateBodyParamInstance(items, assignment, f);
   return design == nullptr ? -1 : ParamValue(design, name);
 }
 
@@ -351,6 +361,91 @@ TEST(BodyParameterAssignment,
       f, "top");
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "module 'm' has no parameter 'P'", 5, "23.10.2.2"));
+}
+
+// The width of m's variable `x` under `assignment`, `items` declaring x with
+// a `parameter type` among them; 0 where the source did not elaborate to an
+// x.
+uint32_t BodyTypeParamVarWidth(std::string_view items,
+                               std::string_view assignment, ElabFixture& f) {
+  auto* design = ElaborateBodyParamInstance(items, assignment, f);
+  const RtlirVariable* x =
+      design == nullptr ? nullptr : FindVar(design, "m", "x");
+  return x == nullptr ? 0 : x->width;
+}
+
+// §23.10.2 (printed page 766) supplies values for any parameter specified in
+// the module's definition, §6.20.1 (printed 125) makes a `parameter type`
+// among the items of a module with no parameter port list one of them, and
+// §6.20.3 (printed 127-128) has a type parameter's override be a data type.
+// The assignment's type reached a parameter port alone, so `.T(logic [7:0])`
+// over `parameter type T = int; T x;` left T int and x 32 bits wide; x is 8
+// now, by name and, T being the first parameter declared, by position
+// (§23.10.2.1).
+TEST(BodyParameterAssignment, NamedAssignmentSetsABodyTypeParameter) {
+  ElabFixture f;
+  EXPECT_EQ(BodyTypeParamVarWidth("  parameter type T = int;\n  T x;\n",
+                                  ".T(logic [7:0])", f),
+            8u);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(BodyParameterAssignment, OrderedAssignmentSetsABodyTypeParameter) {
+  ElabFixture f;
+  EXPECT_EQ(BodyTypeParamVarWidth("  parameter type T = int;\n  T x;\n",
+                                  "logic [7:0]", f),
+            8u);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// A body type parameter left unnamed keeps its default beside the value
+// parameter the assignment does name: x stays 32 bits under `.P(5)`.
+TEST(BodyParameterAssignment, UnnamedBodyTypeParameterKeepsItsDefault) {
+  ElabFixture f;
+  EXPECT_EQ(BodyTypeParamVarWidth(
+                "  parameter P = 1;\n  parameter type T = int;\n  T x;\n",
+                ".P(5)", f),
+            32u);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §6.20.3 (printed page 128): a type parameter can only be set to a data
+// type, so an assignment whose value names none is reported, as it is for a
+// parameter port, and T is left unset rather than at a type the
+// instantiation did not write. The report stands at the value, on line 6,
+// the instantiation's line.
+TEST(BodyParameterAssignment, BodyTypeParameterAssignedAValueIsRejected) {
+  ElabFixture f;
+  BodyTypeParamVarWidth("  parameter type T = int;\n  T x;\n", ".T(3 + 4)", f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "parameter value assignment for type parameter "
+                            "'T' of 'm' does not name a type",
+                            6, "23.10.2"));
+}
+
+// §6.20.1 (printed pages 125-126): under a parameter port list, even an
+// empty one, a `parameter type` among the items is a localparam, which
+// §6.20.4 (printed 128) puts beyond the assignment, so `.T(logic [7:0])` is
+// refused as naming no parameter of m (§23.10.2.2), the report the value
+// form draws, and x keeps the 32 bits of the default.
+TEST(BodyParameterAssignment,
+     BodyTypeParameterUnderAParameterPortListIsNotAssignable) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m #();\n"
+      "  parameter type T = int;\n"
+      "  T x;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  m #(.T(logic [7:0])) u();\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "module 'm' has no parameter 'T'", 6, "23.10.2.2"));
+  ASSERT_NE(design, nullptr);
+  const RtlirVariable* x = FindVar(design, "m", "x");
+  ASSERT_NE(x, nullptr);
+  EXPECT_EQ(x->width, 32u);
 }
 
 // §33.4.3: a configuration's `instance <path> use #(.W(48))` overrides the

@@ -13,6 +13,7 @@
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
+#include "common/source_loc.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/const_eval_internal.h"
 #include "elaborator/elaborator.h"
@@ -205,11 +206,14 @@ void CheckTypeParamIsAggregateKind(const ModuleItem* item, DataTypeKind fwd,
              Subclause("6.20.3"));
 }
 
-void CheckTypeParamConformsToForwardKind(const ModuleItem* item, bool is_type,
+// `assigned` is the type the parameter takes: the declaration's default, or
+// the type an instance's parameter value assignment names for it, which the
+// restriction judges as it judges the default.
+void CheckTypeParamConformsToForwardKind(const ModuleItem* item,
+                                         const DataType& assigned,
                                          const TypedefMap& typedefs,
                                          const ClassTypeLookup& lookup,
                                          DiagEngine& diag) {
-  if (!is_type) return;
   DataTypeKind fwd = item->forward_type_kind;
   bool aggregate_restriction = fwd == DataTypeKind::kEnum ||
                                fwd == DataTypeKind::kStruct ||
@@ -218,8 +222,7 @@ void CheckTypeParamConformsToForwardKind(const ModuleItem* item, bool is_type,
       fwd == DataTypeKind::kNamed || fwd == DataTypeKind::kVoid;
   if (!aggregate_restriction && !class_restriction) return;
 
-  const DataType* resolved =
-      ResolveNamedTypeChain(&item->typedef_type, typedefs);
+  const DataType* resolved = ResolveNamedTypeChain(&assigned, typedefs);
   if (class_restriction) {
     CheckTypeParamIsClass(item, fwd, *resolved, lookup, diag);
     return;
@@ -331,6 +334,48 @@ bool ResolveTypeOperatorDefault(ModuleItem* item, const CompilationUnit* unit) {
   return item->typedef_type.kind != DataTypeKind::kImplicit;
 }
 
+// §23.10.2 (printed page 766) with §6.20.1 (printed 125) and §6.20.3
+// (printed 127-128): the type the type parameter `item` takes for the
+// instantiation being elaborated -- the type the instance's parameter value
+// assignment names for it, where the module declares it among its items
+// with no parameter port list and an assignment is installed naming it, and
+// the declaration's own default otherwise. A localparam, which §6.20.4
+// (printed 128) puts beyond any assignment and which a body `parameter` is
+// under a parameter port list, and a generate block's parameter keep their
+// default. Nothing, having reported, for an assignment that names no type,
+// as ResolveChildTypeParam (elaborator_module_inst.cpp) answers for a
+// parameter port: the default would elaborate the module against a type the
+// instantiation did not write. The default was published whatever the
+// assignment named, so `c #(.T(logic [7:0])) u()` over `module c; parameter
+// type T = int; T x;` left x 32 bits wide; ApplyChildTypeParams reads the
+// parameter port list alone.
+std::optional<DataType> AssignedTypeParamType(const ModuleItem* item,
+                                              RtlirParamDecl& pd,
+                                              const RtlirModule* mod,
+                                              const CompilationUnit* unit,
+                                              DiagEngine& diag) {
+  const InstanceParamAssignments* assigns =
+      pd.is_localparam || !pd.gen_block_prefix.empty() ? nullptr
+                                                       : BodyParamAssignments();
+  const Elaborator::ParamOverride* ovr =
+      assigns == nullptr ? nullptr
+                         : FindParamOverride(assigns->params, item->name);
+  if (ovr == nullptr || ovr->value_expr == nullptr) return item->typedef_type;
+  const SourceLoc kLoc = ovr->value_expr->range.start;
+  DataType resolved =
+      TypeParamOverrideToDataType(ovr->value_expr, unit, diag, kLoc);
+  if (resolved.kind == DataTypeKind::kImplicit) {
+    diag.Error(kLoc,
+               std::format("parameter value assignment for type parameter '{}' "
+                           "of '{}' does not name a type",
+                           item->name, mod->name),
+               Subclause("23.10.2"));
+    return std::nullopt;
+  }
+  pd.from_override = true;
+  return resolved;
+}
+
 // §23.10 (printed page 763) with §6.20.1 (printed 125): a module declared
 // with no parameter port list declares its value parameters among its items,
 // and an instance's parameter value assignment (§23.10.2, printed 766) or a
@@ -360,12 +405,7 @@ void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
   if (!is_type) is_type = ResolveTypeOperatorDefault(item, unit_);
 
   CheckTypeParamNotSetToValue(item, diag_);
-  CheckTypeParamConformsToForwardKind(
-      item, is_type, typedefs_, ClassTypeLookup{unit_, &class_names_}, diag_);
 
-  if (is_type) {
-    typedefs_[item->name] = item->typedef_type;
-  }
   RtlirParamDecl pd;
   pd.name = item->name;
   // §27.4: a generate block "comprises a separate scope and a new level of
@@ -376,6 +416,16 @@ void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
 
   pd.is_localparam = item->is_localparam || mod->has_param_port_list;
   pd.default_value = item->init_expr;
+  if (is_type) {
+    // The type the instantiation gives the parameter, or the default, is
+    // what the declaration's restriction judges and what the declarations
+    // written in terms of the parameter elaborate against.
+    if (auto type = AssignedTypeParamType(item, pd, mod, unit_, diag_)) {
+      CheckTypeParamConformsToForwardKind(
+          item, *type, typedefs_, ClassTypeLookup{unit_, &class_names_}, diag_);
+      typedefs_[item->name] = *type;
+    }
+  }
   // The parameters already elaborated, which a range bound, a type and the
   // value written in terms of one are each folded against.
   const ScopeMap kScope = BuildParamScope(mod);

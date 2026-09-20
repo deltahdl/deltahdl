@@ -12,6 +12,7 @@
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
+#include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
@@ -41,6 +42,26 @@ struct InstanceParamAssignments {
   const Elaborator::ParamList& params;
   ScopeMap scope;
 };
+
+// The assignment in `params` naming `name`, or null. Defined in
+// elaborator_module_params.cpp.
+const Elaborator::ParamOverride* FindParamOverride(
+    const Elaborator::ParamList& params, std::string_view name);
+
+// §6.20.3 (printed page 128) with §23.10.2 (printed 766): the data type the
+// value of an instance's parameter value assignment names for a type
+// parameter. The value is parsed as an expression, the parse not knowing
+// which of the module's parameters are types, so the type is read back off
+// the expression: a keyword type or a typedef or class name, with the packed
+// dimensions written after it, a class scope resolution, or a specialized
+// class. Answers a DataType at kImplicit for a value naming no type, which
+// tells such an assignment from an absent one. Defined in
+// elaborator_module_inst.cpp; ApplyChildTypeParams there reads a parameter
+// port's type through it and Elaborator::ElaborateParamDecl the type of a
+// type parameter declared among a module's items.
+DataType TypeParamOverrideToDataType(const Expr* expr,
+                                     const CompilationUnit* unit,
+                                     DiagEngine& diag, SourceLoc loc);
 
 // Gives `pd`, the parameter named `pname` declared with the type `dtype` (null
 // for one declared without), the value the assignment in `assigns` names for
@@ -95,6 +116,19 @@ const InstanceParamAssignments* BodyParamAssignments();
 // (§23.10.2). Defined in elaborator_module_params.cpp for the instantiation
 // site's ResolveInstParams to read the override surface from.
 std::vector<std::string_view> OverridableParamNames(const ModuleDecl* decl);
+
+// Appends to `child_params` the value the instance's parameter value
+// assignment `pexpr` gives the parameter `pname` of `child_decl`: folded
+// against `parent_scope`, the scope it is written in, for a value parameter,
+// and the expression alone, unfolded, for a type parameter declared among
+// the items of a module without a parameter port list, which §6.20.3
+// (printed page 128) sets to a data type and Elaborator::ElaborateParamDecl
+// reads the type off (§23.10.2, printed 766). Defined in
+// elaborator_module_params.cpp for the instantiation site's ResolveInstParams.
+void PushInstParamAssignment(const ModuleDecl* child_decl,
+                             std::string_view pname, const Expr* pexpr,
+                             const ScopeMap& parent_scope,
+                             Elaborator::ParamList& child_params);
 
 // The parameter value assignments of one configuration use clause, written
 // at `loc`, that may reach a parameter of `child_decl`: `override_params`

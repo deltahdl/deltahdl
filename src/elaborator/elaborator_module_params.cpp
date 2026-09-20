@@ -29,7 +29,7 @@
 
 namespace delta {
 
-static const Elaborator::ParamOverride* FindParamOverride(
+const Elaborator::ParamOverride* FindParamOverride(
     const Elaborator::ParamList& params, std::string_view name) {
   for (const auto& ovr : params) {
     if (ovr.name == name) {
@@ -506,6 +506,36 @@ static const ModuleItem* BodyParamDecl(const ModuleDecl* decl,
       return item;
   }
   return nullptr;
+}
+
+// Whether `pname` is a type parameter `decl` declares among its items and an
+// instance's parameter value assignment may name: one OverridableParamNames
+// lists, so of a module declared with no parameter port list (§6.20.1,
+// printed pages 125-126), declared `parameter type` (§6.20.3, printed
+// 127-128). Parser::ParseTypeParamDecl (src/parser/parser_types.cpp) marks
+// such a declaration with a void data type, its default carried beside it.
+static bool IsBodyTypeParam(const ModuleDecl* decl, std::string_view pname) {
+  if (decl->has_param_port_list) return false;
+  const ModuleItem* item = BodyParamDecl(decl, pname);
+  return item != nullptr && !item->is_localparam &&
+         item->data_type.kind == DataTypeKind::kVoid;
+}
+
+// The value of an assignment to a body type parameter is a type, which no
+// fold answers, so it was dropped with the assignment, and `c #(.T(logic
+// [7:0])) u()` over `module c; parameter type T = int; T x;` left x 32 bits
+// wide. A parameter port list's type parameter takes its type from
+// ApplyChildTypeParams (elaborator_module_inst.cpp) instead.
+void PushInstParamAssignment(const ModuleDecl* child_decl,
+                             std::string_view pname, const Expr* pexpr,
+                             const ScopeMap& parent_scope,
+                             Elaborator::ParamList& child_params) {
+  if (IsBodyTypeParam(child_decl, pname)) {
+    child_params.push_back({pname, 0, pexpr});
+    return;
+  }
+  auto val = ConstEvalInt(pexpr, parent_scope);
+  if (val) child_params.push_back({pname, *val, pexpr});
 }
 
 // Whether `pname` names a local parameter of `decl`, which §6.20.4 (printed
