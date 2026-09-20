@@ -905,7 +905,7 @@ void BindFunctionArgs(const ModuleItem* func, const Expr* expr, SimContext& ctx,
                                    ctx, arena)) {
       continue;
     }
-    BindValueArg(param, {expr, ai}, func, ctx, arena);
+    BindValueArg(param, {expr, ai, {}}, func, ctx, arena);
   }
 }
 

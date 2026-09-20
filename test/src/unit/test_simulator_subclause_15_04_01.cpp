@@ -77,9 +77,9 @@ TEST(IpcSync, MailboxNewContextBounded) {
   ASSERT_NE(mb, nullptr);
   EXPECT_EQ(mb->bound, 2);
   EXPECT_FALSE(mb->IsFull());
-  EXPECT_EQ(mb->TryPut(7), 1);
+  EXPECT_EQ(mb->TryPut(Msg(7).Get()), 1);
   EXPECT_FALSE(mb->IsFull());
-  EXPECT_EQ(mb->TryPut(8), 1);
+  EXPECT_EQ(mb->TryPut(Msg(8).Get()), 1);
   EXPECT_TRUE(mb->IsFull());
 }
 
