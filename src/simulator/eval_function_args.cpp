@@ -17,6 +17,7 @@
 #include "simulator/assoc_element.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_array.h"
+#include "simulator/eval_expr_internal.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer_register.h"
@@ -726,13 +727,25 @@ static uint32_t EvalFormalArgWidth(const DataType& dt, SimContext& ctx,
 // is never a registered struct key). Resolve the layout from the actual
 // argument's registered struct type and re-register it under the parameter
 // name. No-op when the actual argument is not a resolvable struct identifier.
+//
+// §23.9 with §13.5: the actual is a name of the caller's, resolved within the
+// instance the call runs in, so its layout is asked for by the key that
+// instance's storage was created under, and with the callee's scope set aside
+// as every other read of an actual is made. Asked by the bare name, a struct
+// variable of an instantiated module passed as an actual bound no layout to
+// the formal, and a member read of the formal inside the body answered zero.
 static void RegisterValueArgStructType(const FunctionArg& param,
                                        const Expr* expr, int arg_index,
                                        SimContext& ctx) {
   const Expr* actual =
       (arg_index >= 0) ? expr->args[static_cast<size_t>(arg_index)] : nullptr;
   if (actual && actual->kind == ExprKind::kIdentifier) {
-    if (const auto* sinfo = ctx.GetVariableStructType(actual->text)) {
+    const StructTypeInfo* sinfo = nullptr;
+    {
+      CalleeScopeAside aside(ctx);
+      sinfo = StructLayoutOfName(actual->text, ctx);
+    }
+    if (sinfo) {
       // Copy before re-inserting: registering into struct_types_ may rehash and
       // invalidate the reference returned for the source variable.
       StructTypeInfo copy = *sinfo;

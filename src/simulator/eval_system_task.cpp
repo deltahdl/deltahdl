@@ -15,6 +15,7 @@
 #include "common/types.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
+#include "simulator/eval_expr_internal.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/net.h"
@@ -205,7 +206,7 @@ static std::optional<std::string> BuildFormatPTaggedUnion(std::string_view name,
   if (tag.empty()) return std::nullopt;
   DataTypeKind kind = DataTypeKind::kImplicit;
   uint32_t width = val.width;
-  if (auto* st = ctx.GetVariableStructType(name)) {
+  if (const StructTypeInfo* st = StructLayoutOfName(name, ctx)) {
     for (const auto& f : st->fields) {
       if (f.name == tag) {
         kind = f.type_kind;
@@ -225,7 +226,7 @@ static std::optional<std::string> BuildFormatPStruct(std::string_view name,
                                                      const Logic4Vec& val,
                                                      SimContext& ctx,
                                                      Arena& arena) {
-  auto* st = ctx.GetVariableStructType(name);
+  const StructTypeInfo* st = StructLayoutOfName(name, ctx);
   if (st == nullptr) return std::nullopt;
   return FormatStructValueForP(*st, val, arena);
 }
@@ -240,7 +241,7 @@ static std::optional<std::string> BuildFormatPArray(std::string_view name,
                                                     Arena& arena) {
   auto* ai = ctx.FindArrayInfo(name);
   if (ai == nullptr || ai->size == 0) return std::nullopt;
-  const StructTypeInfo* st = ctx.GetVariableStructType(name);
+  const StructTypeInfo* st = StructLayoutOfName(name, ctx);
   const EnumTypeInfo* et = ctx.GetVariableEnumType(name);
   std::string out = "'{";
   for (uint32_t i = 0; i < ai->size; ++i) {
@@ -265,7 +266,7 @@ static std::optional<std::string> BuildFormatPQueue(std::string_view name,
                                                     Arena& arena) {
   QueueObject* q = ctx.FindQueue(name);
   if (q == nullptr) return std::nullopt;
-  const StructTypeInfo* st = ctx.GetVariableStructType(name);
+  const StructTypeInfo* st = StructLayoutOfName(name, ctx);
   const EnumTypeInfo* et = ctx.GetVariableEnumType(name);
   std::string out = "'{";
   for (size_t i = 0; i < q->elements.size(); ++i) {
@@ -286,7 +287,7 @@ static std::optional<std::string> BuildFormatPAssoc(std::string_view name,
                                                     Arena& arena) {
   AssocArrayObject* aa = ctx.FindAssocArray(name);
   if (aa == nullptr) return std::nullopt;
-  const StructTypeInfo* st = ctx.GetVariableStructType(name);
+  const StructTypeInfo* st = StructLayoutOfName(name, ctx);
   const EnumTypeInfo* et = ctx.GetVariableEnumType(name);
   std::string out = "'{";
   bool first = true;
@@ -360,6 +361,13 @@ static std::optional<std::string> BuildFormatPEnum(std::string_view name,
 // associative array, then a fixed-size unpacked array. An array whose element
 // type is a struct or enum also carries that type's info under the same name,
 // so the array checks come before the struct/enum ones.
+//
+// §23.9: the argument is a name resolved within the running instance, so each
+// form above asks for its struct or union layout by the key that instance's
+// storage was created under (StructLayoutOfName). Asked by the bare name, a
+// struct of an instantiated module printed as one number, a tagged union's
+// valid member printed at the union's width and as unsigned, and a queue of
+// structs printed each element as a number.
 static std::optional<std::string> BuildFormatPNamed(std::string_view name,
                                                     const Logic4Vec& val,
                                                     SimContext& ctx,

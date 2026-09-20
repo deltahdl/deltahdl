@@ -654,4 +654,36 @@ TEST(PassByValueSim, FixedUnpackedArrayTypedefFormalIsNotSizedToOneElement) {
   LowerRunAndCheck(f, design, {{"y", 32u}});
 }
 
+// §13.5.1 copies an input actual into the subroutine's own copy, and §7.2.1
+// makes a member of that copy a window of it, so `a.opcode` inside get_op
+// reads the opcode of the struct the caller passed. The caller is module M
+// instantiated as `m`, whose `s` is laid out under "m.s" (§23.9). The formal's
+// layout was bound by asking the layout table for bare `s`, which found
+// nothing, so the formal carried no layout and `a.opcode` answered 0; the
+// test reads 0xA5 through the formal, and imm is 0x123456 so a read of the
+// whole copy, 0xA5123456, cannot pass for the member either.
+TEST(PassByValueSim, ChildInstanceStructActualBindsTheFormalsLayout) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module M;\n"
+      "  typedef struct packed { logic [7:0] opcode; logic [23:0] imm; } "
+      "instruction_t;\n"
+      "  instruction_t s;\n"
+      "  int r;\n"
+      "  function automatic int get_op(input instruction_t a);\n"
+      "    return a.opcode;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    s.opcode = 8'hA5;\n"
+      "    s.imm = 24'h123456;\n"
+      "    r = get_op(s);\n"
+      "  end\n"
+      "endmodule\n"
+      "module top;\n"
+      "  M m();\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"m.r", 0xA5u}});
+}
+
 }  // namespace

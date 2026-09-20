@@ -9,6 +9,7 @@
 #include "common/arena.h"
 #include "common/types.h"
 #include "parser/ast_expr.h"
+#include "simulator/eval_expr_internal.h"
 #include "simulator/eval_string.h"
 #include "simulator/eval_systask_internal.h"
 #include "simulator/evaluation.h"
@@ -565,11 +566,15 @@ static Logic4Vec FreadMemoryArray(const Expr* expr, const ArrayInfo* ai,
 // §21.3.4.4: the non-array destination forms. A non-packed struct/union reads
 // member by member; anything else (including a packed aggregate, which is not
 // handled by the struct form) loads the whole value at once via the
-// integral-variable form.
+// integral-variable form. §23.9: the destination resolves within the running
+// instance, so its layout is asked for by the key that instance's storage was
+// created under; asked by the bare name, an unpacked union of an instantiated
+// module found no layout and was loaded whole, two bytes into a union whose
+// first member takes one.
 static Logic4Vec FreadNonArray(const Expr* dst, FILE* fp, SimContext& ctx,
                                Arena& arena) {
   const StructTypeInfo* sinfo = (dst->kind == ExprKind::kIdentifier)
-                                    ? ctx.GetVariableStructType(dst->text)
+                                    ? StructLayoutOfName(dst->text, ctx)
                                     : nullptr;
   if (sinfo && !sinfo->is_packed && !sinfo->fields.empty()) {
     Variable* var = ctx.FindVariable(dst->text);

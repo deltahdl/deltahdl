@@ -527,4 +527,70 @@ TEST(AssignmentPatternFormat, ShortFormOnSingularPrintsElementForm) {
   EXPECT_EQ(out, "7 \"hi\"\n");
 }
 
+// §21.2.1.6 (C1/C2) in an instantiated module: the struct is declared in M,
+// which top instantiates as `m`, so its layout stands under "m.s" (§23.9) and
+// the operand's bare name is resolved through the instance. Looked up bare,
+// no layout was found and the operand fell to the singular form, printing
+// the whole 16-bit value as 258; the named pattern prints each member.
+TEST(AssignmentPatternFormat, ChildInstanceStructPrintsNamedMembers) {
+  auto out = RunSim(
+      "module M;\n"
+      "  typedef struct packed { byte a; byte b; } pair_t;\n"
+      "  pair_t s;\n"
+      "  initial begin\n"
+      "    s.a = 8'd1;\n"
+      "    s.b = 8'd2;\n"
+      "    $display(\"%p\", s);\n"
+      "  end\n"
+      "endmodule\n"
+      "module top;\n"
+      "  M m();\n"
+      "endmodule\n");
+  EXPECT_EQ(out, "'{a:1, b:2}\n");
+}
+
+// §21.2.1.6 (C4) in an instantiated module: the valid member of a tagged
+// union prints as its own type, an int here, so -7 keeps its sign. With the
+// layout looked up by the bare name inside instance `m`, the member's type
+// and width were not found and the value was sliced at the union's width as
+// an unsigned quantity, printing '{Valid:4294967289}.
+TEST(AssignmentPatternFormat,
+     ChildInstanceTaggedUnionPrintsValidMemberAsItsType) {
+  auto out = RunSim(
+      "module M;\n"
+      "  typedef union tagged { void Invalid; int Valid; } VInt;\n"
+      "  VInt u;\n"
+      "  initial begin\n"
+      "    u = tagged Valid (-7);\n"
+      "    $display(\"%p\", u);\n"
+      "  end\n"
+      "endmodule\n"
+      "module top;\n"
+      "  M m();\n"
+      "endmodule\n");
+  EXPECT_EQ(out, "'{Valid:-7}\n");
+}
+
+// §21.2.1.6 (C5 x C7a) in an instantiated module: a queue of structs is
+// traversed to its singular members, so each element prints as a nested
+// named pattern. The queue is found through the instance, but its element
+// layout was looked up by the bare name and missed, so each element printed
+// as a number: '{258, 772}.
+TEST(AssignmentPatternFormat, ChildInstanceQueueOfStructsPrintsNestedPatterns) {
+  auto out = RunSim(
+      "module M;\n"
+      "  typedef struct packed { byte x; byte y; } p_t;\n"
+      "  p_t q [$];\n"
+      "  initial begin\n"
+      "    q.push_back(16'h0102);\n"
+      "    q.push_back(16'h0304);\n"
+      "    $display(\"%p\", q);\n"
+      "  end\n"
+      "endmodule\n"
+      "module top;\n"
+      "  M m();\n"
+      "endmodule\n");
+  EXPECT_EQ(out, "'{'{x:1, y:2}, '{x:3, y:4}}\n");
+}
+
 }  // namespace

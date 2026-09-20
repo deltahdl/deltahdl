@@ -385,7 +385,11 @@ static bool TryExpandAggregateElement(const Expr* elem, SimContext& ctx,
     return true;
   }
 
-  if (auto* sinfo = ctx.GetVariableStructType(elem->text)) {
+  // §23.9: the operand resolves within the running instance, so its layout is
+  // asked for by the key that instance's storage was created under; asked by
+  // the bare name, a union of an instantiated module found no layout and was
+  // streamed whole rather than as its first-declared member.
+  if (const StructTypeInfo* sinfo = StructLayoutOfName(elem->text, ctx)) {
     if (TryExpandStructAggregate(elem, sinfo, sink)) {
       return true;
     }

@@ -9,6 +9,7 @@
 #include "simulator/class_object.h"
 #include "simulator/eval_array.h"
 #include "simulator/eval_array_class_assoc.h"
+#include "simulator/eval_expr_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
@@ -130,7 +131,9 @@ static bool ResolveAssocMember(const Expr* expr, SimContext& ctx,
   auto* sel = expr->lhs;
   if (!AssocOfSelect(sel, ctx, ctx.GetArena())) return false;
   if (sel->base->kind != ExprKind::kIdentifier) return false;
-  const auto* info = ctx.GetVariableStructType(sel->base->text);
+  // §23.9: the array resolves within the running instance, so its element
+  // layout is asked for by the key that instance's storage was created under.
+  const StructTypeInfo* info = StructLayoutOfName(sel->base->text, ctx);
   if (!info) return false;
   std::string path;
   BuildFieldPath(expr->rhs, path);

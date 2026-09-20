@@ -690,4 +690,36 @@ TEST(FreadBinary, ReturnValueUsableAsExpressionOperand) {
   std::remove(tmp.c_str());
 }
 
+// C10 in an instantiated module: the unpacked union is declared in M, which
+// top instantiates as `m`, so its layout stands under "m.u" (§23.9) and the
+// destination's bare name is resolved through the instance. Looked up bare,
+// no layout was found and the union took the integral-variable form: both
+// seeded bytes were loaded, code read 2 and `a` read the low byte 5e. The
+// first-member form reads one byte, so code is 1 and `a` is dd.
+TEST(FreadBinary, ChildInstanceUnpackedUnionReadsFirstMemberOnly) {
+  SysTaskFixture f;
+  std::string tmp = "/tmp/deltahdl_213404_child_union.bin";
+  SeedBytes(tmp, {0xDD, 0x5E});
+  std::string out = RunCapture(
+      "module M;\n"
+      "  typedef union { bit [7:0] a; bit [15:0] b; } un_t;\n"
+      "  integer fd, code;\n"
+      "  un_t u;\n"
+      "  initial begin\n"
+      "    fd = $fopen(\"" +
+          tmp +
+          "\", \"rb\");\n"
+          "    code = $fread(u, fd);\n"
+          "    $display(\"child code=%0d a=%h\", code, u.a);\n"
+          "    $fclose(fd);\n"
+          "  end\n"
+          "endmodule\n"
+          "module top;\n"
+          "  M m();\n"
+          "endmodule\n",
+      f);
+  EXPECT_NE(out.find("child code=1 a=dd"), std::string::npos) << out;
+  std::remove(tmp.c_str());
+}
+
 }  // namespace

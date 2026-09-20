@@ -402,4 +402,29 @@ TEST(StreamExpressionConcat, NonNullClassHandleStreamsBaseFirstInDeclOrder) {
   EXPECT_EQ(var->value.ToUint64(), 0x112233u);
 }
 
+// §11.4.14.1: an untagged union streams its first-declared member alone, and
+// that holds for a union declared in an instantiated module, whose layout
+// stands under "m.u" (§23.9). The first member is 8 bits and the union's
+// storage 16, so the 8-bit stream lands left-aligned in the 16-bit target as
+// 0xAB00. Looked up by the bare name, no layout was found and the whole
+// storage streamed instead: 16 bits, filling the target as 0x00AB.
+TEST(StreamExpressionConcat, ChildInstanceUnionStreamsFirstMemberOnly) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module M;\n"
+      "  union { bit [7:0] a; bit [15:0] b; } u;\n"
+      "  logic [15:0] dst;\n"
+      "  initial begin\n"
+      "    u.a = 8'hAB;\n"
+      "    dst = {>> {u}};\n"
+      "  end\n"
+      "endmodule\n"
+      "module top;\n"
+      "  M m();\n"
+      "endmodule\n",
+      f, "m.dst");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0xAB00u);
+}
+
 }  // namespace
