@@ -234,9 +234,10 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   // `package` is Scope::package, the package a subroutine the scope belongs
   // to was declared in, empty for every other scope.
   void PushScope(std::string_view package = {});
-  // §26.2: gives the innermost frame the package its bare names are read
-  // from; nothing for an empty name. See the definition in sim_context.cpp.
-  void SetScopePackage(std::string_view package);
+  // §23.9 with §26.2: marks the innermost frame a subroutine body's and gives
+  // it the package its bare names are read from, none for an empty name. See
+  // the definition in sim_context.cpp.
+  void EnterSubroutineScope(std::string_view package);
   // §26.3 with §13.3: the same for `func`'s package, answering `func` back.
   const ModuleItem* EnterSubroutinePackage(const ModuleItem* func);
   void PopScope();
@@ -251,12 +252,12 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   Logic4Vec* RsReturnSlot() const { return rs_return_slot_; }
 
   std::vector<Scope> SwapScopeStack(std::vector<Scope> new_stack);
-  void PushStaticScope(std::string_view func_name,
-                       std::string_view package = {});
+  void PushStaticScope(std::string_view func_name);
   void PopStaticScope(std::string_view func_name);
   bool HasLocalScope() const { return !scope_stack_.empty(); }
   Variable* FindLocalVariable(std::string_view name);
-  // §26.3 with §13.4: see the definitions in sim_context.cpp.
+  // §26.3 with §23.9 and §13.4: see the definitions in sim_context.cpp.
+  const Scope* PackageFrame() const;
   Variable* FindInPackageScope(std::string_view name);
   ModuleItem* FindFunctionInPackageScope(std::string_view name);
   // Creates a scope-local variable of `width` bits, signed when `is_signed`

@@ -46,6 +46,13 @@ struct Variable;
 // package's name and SimContext::FindVariable reads the package's keys through
 // it; every other frame carries none.
 //
+// §23.9 with §26.3 is why a frame records that it is a subroutine's: a task,
+// function or method body is a scope nested in the module, package or class
+// that declares it, never in the body that calls it, so the outward search
+// for the package a bare name is read through ends at the innermost
+// subroutine frame (SimContext::PackageFrame). A begin-end, fork or loop
+// frame inside the body is not one, and still sees the body's package.
+//
 // §8.25.1 is why a frame binds a type to a type parameter's name: a static
 // method called through an explicit specialization, `Box#(byte)::bits()`,
 // runs on no object, and the type the specialization gives the class's type
@@ -61,6 +68,7 @@ struct Scope {
   std::unordered_map<std::string_view, AssocArrayObject*> assoc_arrays;
   std::string_view package;
   std::unordered_map<std::string_view, const DataType*> type_actuals;
+  bool is_subroutine = false;
 };
 
 }  // namespace delta

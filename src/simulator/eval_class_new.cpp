@@ -496,7 +496,7 @@ static void ConstructLevel(const ClassTypeInfo* info,
     // method does (ExecClassMethod); the frame is the one BindLevelFormals
     // pushed, given the package once the base, whose own frames stood above
     // it meanwhile, is constructed.
-    c.ctx.SetScopePackage(info->package);
+    c.ctx.EnterSubroutineScope(info->package);
     Variable dummy;
     ExecFunctionBody(ctor, &dummy, c.ctx, c.arena);
     WritebackLevelFormals(ctor, actuals, c.ctx, c.arena);

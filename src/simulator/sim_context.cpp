@@ -264,20 +264,35 @@ std::string SimContext::ActiveInstancePrefix() const {
                           : lowering_inst_prefix_;
 }
 
-// §26.3 with §13.4: a bare name read inside a package subroutine's body -- the
-// innermost scope on the stack that names a package is that subroutine's
-// frame -- is the package's own variable or one an import of the package
-// brings in, held under the "package.name" keys PackageScopedKeys lists;
-// null outside any package subroutine or where no key holds the name.
+// §26.3 with §23.9: the frame whose package a bare name is read through is
+// the innermost one naming a package -- a package subroutine's own, or the
+// key a module subroutine's body imports are recorded under
+// (LowerSubroutineBodyImports in lowerer_import.cpp) -- and the search ends
+// at the innermost subroutine frame, since a subroutine's body is a scope
+// nested in the module or package declaring it and not in its caller's body.
+// A block, fork or loop frame inside the body is walked past to the body's
+// own frame; a callee whose frame names no package sees none of its
+// caller's, where walking on had it read the caller's import. Null where no
+// frame supplies a package, a module process's block frames included.
+const Scope* SimContext::PackageFrame() const {
+  for (auto it = scope_stack_.rbegin(); it != scope_stack_.rend(); ++it) {
+    if (!it->package.empty()) return &*it;
+    if (it->is_subroutine) return nullptr;
+  }
+  return nullptr;
+}
+
+// §26.3 with §13.4: a bare name read inside a package subroutine's body is
+// the package's own variable or one an import of the package brings in, held
+// under the "package.name" keys PackageScopedKeys lists; null outside any
+// package frame (PackageFrame) or where no key holds the name.
 Variable* SimContext::FindInPackageScope(std::string_view name) {
   if (name.find('.') != std::string_view::npos) return nullptr;
-  for (auto it = scope_stack_.rbegin(); it != scope_stack_.rend(); ++it) {
-    if (it->package.empty()) continue;
-    for (const std::string& key : PackageScopedKeys(it->package, name)) {
-      auto found = variables_.find(key);
-      if (found != variables_.end()) return found->second;
-    }
-    return nullptr;
+  const Scope* frame = PackageFrame();
+  if (frame == nullptr) return nullptr;
+  for (const std::string& key : PackageScopedKeys(frame->package, name)) {
+    auto found = variables_.find(key);
+    if (found != variables_.end()) return found->second;
   }
   return nullptr;
 }
@@ -288,14 +303,12 @@ Variable* SimContext::FindInPackageScope(std::string_view name) {
 // import of the package brings in; null outside any package frame or where
 // no package holds the name.
 ModuleItem* SimContext::FindFunctionInPackageScope(std::string_view name) {
-  for (auto it = scope_stack_.rbegin(); it != scope_stack_.rend(); ++it) {
-    if (it->package.empty()) continue;
-    for (const std::string& key : PackageScopedKeys(it->package, name)) {
-      std::string scoped = key;
-      scoped.replace(scoped.find('.'), 1, "::");
-      if (ModuleItem* func = FindFunction(scoped)) return func;
-    }
-    return nullptr;
+  const Scope* frame = PackageFrame();
+  if (frame == nullptr) return nullptr;
+  for (const std::string& key : PackageScopedKeys(frame->package, name)) {
+    std::string scoped = key;
+    scoped.replace(scoped.find('.'), 1, "::");
+    if (ModuleItem* func = FindFunction(scoped)) return func;
   }
   return nullptr;
 }
@@ -548,13 +561,16 @@ void SimContext::PushScope(std::string_view package) {
   scope_stack_.push_back(Scope{{}, {}, {}, {}, package, {}});
 }
 
-// §26.2: a frame pushed without a package -- a class method's, pushed by the
-// caller before the actuals are bound -- is given the one whose names the
-// body reads by their bare names once the actuals are in place, so that a
-// caller's actual spelt like a package variable still reads the caller's.
-void SimContext::SetScopePackage(std::string_view package) {
-  if (package.empty() || scope_stack_.empty()) return;
-  scope_stack_.back().package = package;
+// §23.9 with §26.2: the innermost frame -- a subroutine's, pushed by the
+// caller before the actuals are bound -- becomes the frame PackageFrame
+// stops at, and is given the package whose names the body reads by their
+// bare names, none for an empty name. Both are set once the actuals are in
+// place, so that a caller's actual spelt like a package variable still reads
+// the caller's, its own import included.
+void SimContext::EnterSubroutineScope(std::string_view package) {
+  if (scope_stack_.empty()) return;
+  scope_stack_.back().is_subroutine = true;
+  if (!package.empty()) scope_stack_.back().package = package;
 }
 
 // §26.3 with §13.3: a task's frame is pushed by PushTaskCallScope
@@ -563,9 +579,10 @@ void SimContext::SetScopePackage(std::string_view package) {
 // task's own, or the key its body imports are recorded under
 // (LowerSubroutineBodyImports in lowerer_import.cpp) -- is set once
 // SetupTaskCall has bound them, which is why ExecInlineTaskCall
-// (stmt_exec.cpp) passes its result through here.
+// (stmt_exec.cpp) passes its result through here; a function's frame is
+// given it by EvalFunctionCall before its default actuals are read.
 const ModuleItem* SimContext::EnterSubroutinePackage(const ModuleItem* func) {
-  if (func != nullptr) SetScopePackage(SubroutinePackage(func));
+  if (func != nullptr) EnterSubroutineScope(SubroutinePackage(func));
   return func;
 }
 
@@ -603,13 +620,12 @@ std::string_view SimContext::StaticFrameKey(std::string_view name) {
   return *key;
 }
 
-void SimContext::PushStaticScope(std::string_view func_name,
-                                 std::string_view package) {
+void SimContext::PushStaticScope(std::string_view func_name) {
   // §13.4.2's static frame carries the variables the function declared static;
   // the three maps beside them start empty, a queue or associative array of the
   // call being the call's own and a shape with it.
-  scope_stack_.push_back(Scope{
-      static_frames_[StaticFrameKey(func_name)], {}, {}, {}, package, {}});
+  scope_stack_.push_back(
+      Scope{static_frames_[StaticFrameKey(func_name)], {}, {}, {}, {}, {}});
 }
 
 void SimContext::PopStaticScope(std::string_view func_name) {

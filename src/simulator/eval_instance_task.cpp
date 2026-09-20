@@ -180,7 +180,7 @@ bool SetupInstanceTaskCall(const Expr* expr, SimContext& ctx, Arena& arena,
   BindFunctionArgs(call.method, expr, ctx, arena);
   // §26.2: a task of a class a package declares reads the package's names
   // bare, as ExecClassMethod gives a function of the class its package.
-  ctx.SetScopePackage(ctx.SubroutinePackage(call.method));
+  ctx.EnterSubroutineScope(ctx.SubroutinePackage(call.method));
   return true;
 }
 

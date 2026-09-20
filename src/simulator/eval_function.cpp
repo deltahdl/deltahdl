@@ -475,7 +475,9 @@ void ExecClassMethod(ClassMethodTarget target, const Expr* expr,
   // pushed for the call -- carries the package RecordClassPackage
   // (lowerer_class.cpp) recorded, given once the actuals are bound so that
   // a caller's actual of a package variable's name still reads the caller's.
-  ctx.SetScopePackage(ctx.SubroutinePackage(method));
+  // §23.9: the frame is the method body's own scope from here, so a body
+  // with no package of its own reads none of its caller's.
+  ctx.EnterSubroutineScope(ctx.SubroutinePackage(method));
   Variable dummy_ret;
   Variable* ret_var = &dummy_ret;
   if (!is_void) {
@@ -691,16 +693,18 @@ Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   // §13.3.2 with §23.6: the frame is pushed with the process standing in
   // the callee's instance, so a static function's frame is that instance's.
   EnterCalleeInstance(ctx, target);
+  if (is_static) {
+    ctx.PushStaticScope(func->name);
+  } else {
+    ctx.PushScope();
+  }
   // §26.3 with §13.4: a package function's frame carries its package, so its
   // body and its default actuals read the package's variables by their bare
   // names; the caller's actuals are read with the frame set aside
-  // (ResolveArgValue) and see the caller's scope.
-  std::string_view package = ctx.SubroutinePackage(func);
-  if (is_static) {
-    ctx.PushStaticScope(func->name, package);
-  } else {
-    ctx.PushScope(package);
-  }
+  // (ResolveArgValue) and see the caller's scope. §23.9: the frame is the
+  // body's own scope, so a function with no package reads none of its
+  // caller's body import.
+  ctx.EnterSubroutinePackage(func);
   // §27.4: a generate block instance's function reads its loop index.
   BindGenBlockConsts(target, ctx, arena);
 
