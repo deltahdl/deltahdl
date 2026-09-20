@@ -555,4 +555,124 @@ TEST(InterconnectParsing, StrengthSpecIsError) {
       ReportedError(charge.diags, "expected identifier, got '('", 1, "6.7"));
 }
 
+// A.2.1.3 places a data_type_or_implicit between the net type and the
+// declared names, and A.2.2.1 lets a data_type be a type_identifier followed
+// by packed dimensions, so the `[1:0]` after `instruction_t` stacks on the
+// type (§7.4.4) rather than opening the declarator. §6.7.1 admits a packed
+// array of a packed structure as a net's data type.
+TEST(DataTypeParsing, WireNamedTypeWithPackedDim) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef struct packed { logic [7:0] opcode; logic [23:0] imm; }"
+      " instruction_t;\n"
+      "  wire instruction_t [1:0] v;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& items = r.cu->modules[0]->items;
+  ASSERT_GE(items.size(), 2u);
+  auto* item = items[1];
+  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
+  EXPECT_TRUE(item->data_type.is_net);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kNamed);
+  EXPECT_EQ(item->data_type.type_name, "instruction_t");
+  ASSERT_NE(item->data_type.packed_dim_left, nullptr);
+  ASSERT_NE(item->data_type.packed_dim_right, nullptr);
+  EXPECT_EQ(item->data_type.packed_dim_left->int_val, 1u);
+  EXPECT_EQ(item->data_type.packed_dim_right->int_val, 0u);
+  EXPECT_TRUE(item->data_type.extra_packed_dims.empty());
+  EXPECT_EQ(item->name, "v");
+  EXPECT_TRUE(item->unpacked_dims.empty());
+}
+
+// A.2.2.1 repeats the packed_dimension after a type_identifier, so a second
+// range stacks on the first as it does after an integer vector type.
+TEST(DataTypeParsing, WireNamedTypeWithTwoPackedDims) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef logic [3:0] nib_t;\n"
+      "  wire nib_t [1:0] [2:0] v;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& items = r.cu->modules[0]->items;
+  ASSERT_GE(items.size(), 2u);
+  auto* item = items[1];
+  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kNamed);
+  ASSERT_NE(item->data_type.packed_dim_left, nullptr);
+  EXPECT_EQ(item->data_type.packed_dim_left->int_val, 1u);
+  ASSERT_EQ(item->data_type.extra_packed_dims.size(), 1u);
+  EXPECT_EQ(item->data_type.extra_packed_dims[0].first->int_val, 2u);
+  EXPECT_EQ(item->data_type.extra_packed_dims[0].second->int_val, 0u);
+  EXPECT_EQ(item->name, "v");
+  EXPECT_TRUE(item->unpacked_dims.empty());
+}
+
+// A.2.1.3 writes the unpacked dimensions after the net identifier, so a
+// bracket following the name belongs to the declarator and the named type
+// carries no packed dimension of its own.
+TEST(DataTypeParsing, WireNamedTypeWithUnpackedDim) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef struct packed { logic [7:0] opcode; logic [23:0] imm; }"
+      " instruction_t;\n"
+      "  wire instruction_t u [2];\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& items = r.cu->modules[0]->items;
+  ASSERT_GE(items.size(), 2u);
+  auto* item = items[1];
+  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kNamed);
+  EXPECT_EQ(item->data_type.type_name, "instruction_t");
+  EXPECT_EQ(item->data_type.packed_dim_left, nullptr);
+  EXPECT_TRUE(item->data_type.extra_packed_dims.empty());
+  EXPECT_EQ(item->name, "u");
+  ASSERT_EQ(item->unpacked_dims.size(), 1u);
+  EXPECT_EQ(item->unpacked_dims[0]->int_val, 2u);
+}
+
+// §6.7.1: a net declared with no data type is implicitly `logic`, and an
+// identifier the parser knows no type by is the net's name, so the bracket
+// after it is the unpacked dimension of the declarator.
+TEST(DataTypeParsing, WireImplicitTypeNameWithUnpackedDim) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire w [2];\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
+  EXPECT_TRUE(item->data_type.is_net);
+  EXPECT_NE(item->data_type.kind, DataTypeKind::kNamed);
+  EXPECT_EQ(item->data_type.packed_dim_left, nullptr);
+  EXPECT_EQ(item->name, "w");
+  ASSERT_EQ(item->unpacked_dims.size(), 1u);
+  EXPECT_EQ(item->unpacked_dims[0]->int_val, 2u);
+}
+
+// A.2.2.1: an integer vector type takes any number of packed dimensions, and
+// the net path reads them all before the declarator.
+TEST(DataTypeParsing, WireLogicTwoPackedDims) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire logic [3:0] [1:0] y;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
+  ASSERT_NE(item->data_type.packed_dim_left, nullptr);
+  EXPECT_EQ(item->data_type.packed_dim_left->int_val, 3u);
+  ASSERT_EQ(item->data_type.extra_packed_dims.size(), 1u);
+  EXPECT_EQ(item->data_type.extra_packed_dims[0].first->int_val, 1u);
+  EXPECT_EQ(item->name, "y");
+  EXPECT_TRUE(item->unpacked_dims.empty());
+}
+
 }  // namespace

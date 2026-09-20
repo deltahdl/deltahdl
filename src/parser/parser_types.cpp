@@ -366,6 +366,12 @@ bool Parser::TryParseNetDataType(DataType& dtype, bool has_intervening) {
   if (Check(TokenKind::kIdentifier) &&
       known_types_.count(CurrentToken().text) != 0) {
     auto inner = ParseNamedType();
+    // A.2.2.1 lets a type_identifier carry packed dimensions, and A.2.1.3
+    // places the whole data_type before the net's name, so `wire t [1:0] v;`
+    // is a net of the packed array of t (§7.4.4) that the variable path in
+    // ParseDataType reads the same way. The name of a net cannot follow its
+    // own unpacked dimension, so a bracket here is never the declarator's.
+    ParsePackedDims(inner);
     ApplyNetInfo(inner, dtype);
     dtype = inner;
     return true;
