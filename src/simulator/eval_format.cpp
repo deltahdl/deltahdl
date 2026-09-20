@@ -576,6 +576,54 @@ static int FormatHexDigitVal(char c) {
   return -1;
 }
 
+// The character a named escape of Table 5-1 produces, or 0 for a character
+// the table does not name.
+static char FormatNamedEscape(char c) {
+  switch (c) {
+    case 'n':
+      return '\n';
+    case 't':
+      return '\t';
+    case '\\':
+      return '\\';
+    case '"':
+      return '"';
+    case 'v':
+      return '\v';
+    case 'f':
+      return '\f';
+    case 'a':
+      return '\a';
+    default:
+      return 0;
+  }
+}
+
+// Appends the byte an octal `\ddd` or hex `\xhh` escape names, `c` being the
+// character after the backslash and `i` left on the escape's last digit;
+// answers whether `c` opened one.
+static bool TryAppendNumericEscape(const std::string& fmt, size_t& i, char c,
+                                   std::string& out) {
+  if (c == 'x') {
+    int val = 0;
+    for (int j = 0;
+         j < 2 && i + 1 < fmt.size() && FormatHexDigitVal(fmt[i + 1]) >= 0; ++j)
+      val = val * 16 + FormatHexDigitVal(fmt[++i]);
+    out += static_cast<char>(val);
+    return true;
+  }
+  if (c >= '0' && c <= '7') {
+    int val = c - '0';
+    for (int j = 0;
+         j < 2 && i + 1 < fmt.size() && fmt[i + 1] >= '0' && fmt[i + 1] <= '7';
+         ++j)
+      val = val * 8 + (fmt[++i] - '0');
+    out += static_cast<char>(val);
+    return true;
+  }
+  return false;
+}
+
 // §21.2.1: inside a $display/$write string-literal argument the special
 // character '\' introduces an escape whose meaning is that of Table 5-1 in
 // 5.9.1. Decode a single such sequence in place -- named escapes, octal '\ddd'
@@ -599,48 +647,11 @@ static void AppendLiteralChar(const std::string& fmt, size_t& i,
     if (i + 1 < fmt.size() && fmt[i + 1] == '\n') ++i;
     return;
   }
-  switch (c) {
-    case 'n':
-      out += '\n';
-      return;
-    case 't':
-      out += '\t';
-      return;
-    case '\\':
-      out += '\\';
-      return;
-    case '"':
-      out += '"';
-      return;
-    case 'v':
-      out += '\v';
-      return;
-    case 'f':
-      out += '\f';
-      return;
-    case 'a':
-      out += '\a';
-      return;
-    default:
-      break;
-  }
-  if (c == 'x') {
-    int val = 0;
-    for (int j = 0;
-         j < 2 && i + 1 < fmt.size() && FormatHexDigitVal(fmt[i + 1]) >= 0; ++j)
-      val = val * 16 + FormatHexDigitVal(fmt[++i]);
-    out += static_cast<char>(val);
+  if (char named = FormatNamedEscape(c); named != 0) {
+    out += named;
     return;
   }
-  if (c >= '0' && c <= '7') {
-    int val = c - '0';
-    for (int j = 0;
-         j < 2 && i + 1 < fmt.size() && fmt[i + 1] >= '0' && fmt[i + 1] <= '7';
-         ++j)
-      val = val * 8 + (fmt[++i] - '0');
-    out += static_cast<char>(val);
-    return;
-  }
+  if (TryAppendNumericEscape(fmt, i, c, out)) return;
   out += c;
 }
 
