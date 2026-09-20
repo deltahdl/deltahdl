@@ -63,14 +63,14 @@ TEST(MailboxSim, NumCountsTheMessagesInTheQueue) {
   auto* var = RunAndFindVar(
       "module t;\n"
       "  mailbox mb = new;\n"
-      "  int a, before, after, r;\n"
+      "  int a, held, left, r;\n"
       "  initial begin\n"
       "    mb.put(1);\n"
       "    mb.put(2);\n"
-      "    before = mb.num();\n"
+      "    held = mb.num();\n"
       "    mb.get(a);\n"
-      "    after = mb.num();\n"
-      "    r = before * 10 + after;\n"
+      "    left = mb.num();\n"
+      "    r = held * 10 + left;\n"
       "  end\n"
       "endmodule\n",
       f, "r");

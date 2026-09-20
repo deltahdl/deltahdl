@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 
+#include "fixture_simulator.h"
 #include "helpers_scheduler.h"
+#include "simulator/variable.h"
 
 using namespace delta;
 
@@ -58,9 +60,12 @@ TEST(TaggedUnionSimulation, VoidMemberTaggedAssignment) {
 // `tagged` assignment (not a hand-set tag), then a read through the sibling
 // member that does not match the tag is not type-consistent and yields unknown
 // bits. This observes the read-consistency rule rather than the synthetic
-// hand-built-type path above.
+// hand-built-type path above. §11.9 (printed page 304) makes the read a
+// run-time error as well, so the fixture is read directly: RunAndGet fails a
+// case on any error the run raises.
 TEST(TaggedUnionSimulation, MismatchedMemberReadIsUnknownFromRealSource) {
-  auto unknown = RunAndGet(
+  SimFixture f;
+  auto* result = RunAndFindVar(
       "module t;\n"
       "  typedef union tagged { int A; int B; } U;\n"
       "  U u;\n"
@@ -70,8 +75,10 @@ TEST(TaggedUnionSimulation, MismatchedMemberReadIsUnknownFromRealSource) {
       "    result = $isunknown(u.B);\n"
       "  end\n"
       "endmodule\n",
-      "result");
-  EXPECT_EQ(unknown, 1u);
+      f, "result");
+  ASSERT_NE(result, nullptr);
+  EXPECT_EQ(result->value.ToUint64(), 1u);
+  EXPECT_NE(FindDiag(f, "accessing member 'B' of tagged union 'u'"), nullptr);
 }
 
 // The contrast to the mismatch case: reading through the member that does match
