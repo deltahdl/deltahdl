@@ -102,17 +102,28 @@ bool ExtractRandModeParts(const Expr* expr, std::string_view& obj_name,
   return false;
 }
 
+// §26.3 with §18.8 and §18.9: what a rand_mode() or constraint_mode() call
+// through a package-qualified handle names -- the handle's "p.h" key, the
+// member named on it or nothing, and for §18.8's element form the select
+// whose index the caller evaluates.
+struct ScopedModeParts {
+  std::string_view obj_name;
+  std::string_view name;
+  const Expr* element = nullptr;
+};
+
 // §26.3 with §18.8 and §18.9: rand_mode() and constraint_mode() through a
 // package-qualified handle -- the no-name form `p::h.rand_mode(...)`, whose
-// receiver is the scoped handle, and the named form `p::h.x.rand_mode(...)`,
-// whose receiver is a member access on it -- with the handle's "p.h" key in
-// `obj_name` and the member, or nothing, in `name`. The two extractors above
-// take an identifier handle alone, and read the no-name scoped form as an
-// object p's member h, which nothing answered. False for any other call; the
-// element form, `p::h.arr[i].rand_mode(...)`, is not taken.
+// receiver is the scoped handle, the named form `p::h.x.rand_mode(...)`,
+// whose receiver is a member access on it, and, for rand_mode alone as
+// §18.9 gives constraint_mode no element form, the element form
+// `p::h.arr[i].rand_mode(...)`, whose receiver is a single-index select on
+// that member access. The two extractors above take an identifier handle
+// alone, and read the no-name scoped form as an object p's member h, which
+// nothing answered; the element form was refused by every extractor, so the
+// call set and read nothing. False for any other call.
 static bool ExtractScopedModeParts(const Expr* expr, std::string_view method,
-                                   Arena& arena, std::string_view& obj_name,
-                                   std::string_view& name) {
+                                   Arena& arena, ScopedModeParts& out) {
   if (!expr || expr->kind != ExprKind::kCall) return false;
   const Expr* callee = expr->lhs;
   if (!callee || callee->kind != ExprKind::kMemberAccess || !callee->rhs ||
@@ -121,12 +132,19 @@ static bool ExtractScopedModeParts(const Expr* expr, std::string_view method,
     return false;
   }
   const Expr* recv = callee->lhs;
+  out.element = nullptr;
   MethodCallParts parts;
   if (recv->kind == ExprKind::kMemberAccess && recv->is_scope_resolution) {
     if (!ExtractHandleMethodCallParts(expr, arena, parts)) return false;
-    obj_name = parts.var_name;
-    name = {};
+    out.obj_name = parts.var_name;
+    out.name = {};
     return true;
+  }
+  if (method == "rand_mode" && recv->kind == ExprKind::kSelect &&
+      recv->index != nullptr && recv->index_end == nullptr &&
+      recv->base != nullptr) {
+    out.element = recv;
+    recv = recv->base;
   }
   if (recv->kind != ExprKind::kMemberAccess || !recv->lhs ||
       recv->lhs->kind != ExprKind::kMemberAccess ||
@@ -134,8 +152,8 @@ static bool ExtractScopedModeParts(const Expr* expr, std::string_view method,
       !ExtractHandleAccessParts(recv, arena, parts)) {
     return false;
   }
-  obj_name = parts.var_name;
-  name = parts.method_name;
+  out.obj_name = parts.var_name;
+  out.name = parts.method_name;
   return true;
 }
 
@@ -572,10 +590,13 @@ bool TryEvalObjectConstraintMode(const Expr* expr, SimContext& ctx,
                                  Arena& arena, Logic4Vec& out) {
   std::string_view obj_name;
   std::string_view constraint_name;
-  if (!ExtractConstraintModeParts(expr, obj_name, constraint_name) &&
-      !ExtractScopedModeParts(expr, "constraint_mode", arena, obj_name,
-                              constraint_name)) {
-    return false;
+  ScopedModeParts scoped;
+  if (!ExtractConstraintModeParts(expr, obj_name, constraint_name)) {
+    if (!ExtractScopedModeParts(expr, "constraint_mode", arena, scoped)) {
+      return false;
+    }
+    obj_name = scoped.obj_name;
+    constraint_name = scoped.name;
   }
   MethodCallParts parts;
   parts.var_name = obj_name;
@@ -610,9 +631,14 @@ bool TryEvalObjectRandMode(const Expr* expr, SimContext& ctx, Arena& arena,
   std::string_view obj_name;
   std::string_view var_name;
   const Expr* element = nullptr;
-  if (!ExtractRandModeParts(expr, obj_name, var_name, element) &&
-      !ExtractScopedModeParts(expr, "rand_mode", arena, obj_name, var_name)) {
-    return false;
+  ScopedModeParts scoped;
+  if (!ExtractRandModeParts(expr, obj_name, var_name, element)) {
+    if (!ExtractScopedModeParts(expr, "rand_mode", arena, scoped)) {
+      return false;
+    }
+    obj_name = scoped.obj_name;
+    var_name = scoped.name;
+    element = scoped.element;
   }
   MethodCallParts parts;
   parts.var_name = obj_name;

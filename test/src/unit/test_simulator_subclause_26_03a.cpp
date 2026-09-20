@@ -658,6 +658,44 @@ TEST(PackageScopeReferenceSim,
             1100u);
 }
 
+// §26.3 (printed page 808) with §18.8 (printed 554-555): rand_mode() through
+// a package-qualified handle in the element form, `p1::h.arr[1].rand_mode(0)`,
+// names one element of p1's object's unpacked array member by its index, so
+// arr[1], held at 9 and turned off, is a state variable that eight randomize
+// calls leave at 9 while arr[0] is drawn under its constraint to 3, and the
+// nonvoid form reads 0 for arr[1] and 1 for arr[0]: y = 8 * 1000 + 3 * 100 +
+// 0 * 10 + 1 = 8301. An active arr[1] is drawn from sixteen values on each
+// call, so it stays at 9 through all eight with a chance of one in 16^8. The
+// element receiver was refused by every extractor, the scoped one taking
+// the handle alone or a member access on it, so the call set nothing, the
+// element was drawn with the rest and the queries answered nothing.
+TEST(PackageScopeReferenceSim, PackageQualifiedHandleArrayElementRandMode) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  class C;\n"
+                      "    rand bit [3:0] arr[2];\n"
+                      "    constraint c { arr[0] == 3; }\n"
+                      "  endclass\n"
+                      "  C h;\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  int y, held = 0;\n"
+                      "  initial begin\n"
+                      "    p1::h = new;\n"
+                      "    p1::h.arr[1] = 9;\n"
+                      "    p1::h.arr[1].rand_mode(0);\n"
+                      "    repeat (8) begin\n"
+                      "      void'(p1::h.randomize());\n"
+                      "      if (p1::h.arr[1] == 9) held++;\n"
+                      "    end\n"
+                      "    y = held * 1000 + p1::h.arr[0] * 100 + "
+                      "p1::h.arr[1].rand_mode() * 10 + "
+                      "p1::h.arr[0].rand_mode();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            8301u);
+}
+
 // §26.3 (printed page 808) with §7.10.2: a queue's methods called through
 // the package-qualified name of a package's queue, `p1::q.push_back(4)`,
 // `p1::q.push_back(6)` and `p1::q.size()`, act on p1's queue, so
