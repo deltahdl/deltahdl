@@ -771,4 +771,64 @@ TEST(MailboxSim, StaticTypedefdMailboxPropertyIsBuiltAtStaticInitialization) {
       10u);
 }
 
+// §8.4 (printed pages 181-182) with §15.4 (printed 374) and §15.4.1
+// (printed 374): a module's mailbox variable is a handle to the queue new()
+// returns, so one declared `mailbox bare;` with no initializer holds null,
+// which comparing with null detects and a condition reads as false, one
+// declared `mailbox built = new;` refers to the queue, and `bare = new(2)`
+// in the initial block makes bare refer to one; `other = built` copies the
+// handle and `built = null` drops it. The reads add 1 for `bare == null`,
+// 10 for `if (bare)`, 100 for `built != null`, 1000 for `if (built)`,
+// 10000 for `bare != null` after the new, 100000 for `bare == null` then,
+// 1000000 for `other != null` after the copy and 10000000 for `built ==
+// null` after the null: 11011101. The variable's value stayed the 0 the
+// declaration stored whether or not a new() had built the queue, so built
+// compared equal to null and bare stayed null after its new: 100001.
+TEST(MailboxSim, ModuleMailboxVariableIsNullUntilNew) {
+  EXPECT_EQ(RunAndGet("module top;\n"
+                      "  mailbox bare;\n"
+                      "  mailbox built = new;\n"
+                      "  mailbox other;\n"
+                      "  int y;\n"
+                      "  initial begin\n"
+                      "    y = 0;\n"
+                      "    if (bare == null) y = y + 1;\n"
+                      "    if (bare) y = y + 10;\n"
+                      "    if (built != null) y = y + 100;\n"
+                      "    if (built) y = y + 1000;\n"
+                      "    bare = new(2);\n"
+                      "    if (bare != null) y = y + 10000;\n"
+                      "    if (bare == null) y = y + 100000;\n"
+                      "    other = built;\n"
+                      "    if (other != null) y = y + 1000000;\n"
+                      "    built = null;\n"
+                      "    if (built == null) y = y + 10000000;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            11011101u);
+}
+
+// §15.4.1 (printed page 374) with §8.4 (printed 182): the `bare = new(2)`
+// that makes the handle refer to a queue is the one that bounds it, so the
+// queue takes two messages and refuses the third: try_put() reads 1, 1 and
+// 0, and `bare != null` after the two adds 1000: 1110. The bound and the
+// handle are read together, so a new() that bounded the queue and left the
+// handle null reads 110, and one that marked the handle held and bounded
+// nothing 1111.
+TEST(MailboxSim, ModuleMailboxNewInProcessBoundsTheQueueItMakesHeld) {
+  EXPECT_EQ(RunAndGet("module top;\n"
+                      "  mailbox bare;\n"
+                      "  int y;\n"
+                      "  initial begin\n"
+                      "    bare = new(2);\n"
+                      "    y = bare.try_put(1) * 100 + bare.try_put(2) * 10 +\n"
+                      "        bare.try_put(3);\n"
+                      "    if (bare != null) y = y + 1000;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            1110u);
+}
+
 }  // namespace

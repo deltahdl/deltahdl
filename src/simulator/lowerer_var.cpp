@@ -12,8 +12,6 @@
 #include "elaborator/type_eval.h"
 #include "parser/ast_expr.h"
 #include "simulator/class_object.h"
-#include "simulator/eval_mailbox.h"
-#include "simulator/eval_semaphore.h"
 #include "simulator/eval_string.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
@@ -23,7 +21,7 @@
 #include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
-#include "simulator/sync_objects.h"
+#include "simulator/sync_variable.h"
 
 namespace delta {
 
@@ -688,36 +686,6 @@ static DataTypeKind VcdEffectiveDeclKind(const RtlirVariable& var) {
   return kind;
 }
 
-// §15.3: a semaphore is a bucket of keys, and the declaration is what brings
-// the bucket into being. §15.3.1's new() sets how many keys are in it and
-// defaults that to none, so a bucket no new() has reached yet is empty and
-// every get() on it waits. Does nothing for a variable of any other type.
-static void CreateSemaphoreForVar(std::string_view name,
-                                  const RtlirVariable& var, SimContext& ctx,
-                                  Arena& arena) {
-  if (var.class_type_name != "semaphore") return;
-  auto* sem = ctx.CreateSemaphore(name, 0);
-  if (var.init_expr && var.init_expr->kind == ExprKind::kCall &&
-      var.init_expr->text == "new") {
-    sem->key_count = SemaphoreKeyArg(var.init_expr, ctx, arena, 0);
-  }
-}
-
-// §15.4: a mailbox is a queue messages pass through between processes, and
-// the declaration is what brings the queue into being. §15.4.1's new() sets
-// its bound, 0 leaving it unbounded, so a queue no new() has reached yet
-// takes messages without limit and every get() on it waits until one is
-// placed. Does nothing for a variable of any other type.
-static void CreateMailboxForVar(std::string_view name, const RtlirVariable& var,
-                                SimContext& ctx, Arena& arena) {
-  if (var.class_type_name != "mailbox") return;
-  auto* mbx = ctx.CreateMailbox(name, 0);
-  if (var.init_expr && var.init_expr->kind == ExprKind::kCall &&
-      var.init_expr->text == "new") {
-    mbx->Build(MailboxBoundArg(var.init_expr, ctx, arena));
-  }
-}
-
 // §25.9: whether the declaration wrote a virtual interface type, whose
 // variable holds the handle of the interface instance it represents.
 static bool IsVirtualInterfaceDecl(const RtlirVariable& var) {
@@ -789,8 +757,7 @@ void Lowerer::LowerVar(std::string_view name, const RtlirVariable& var) {
   if (!var.init_expr) ApplyStructMemberDefaults(name, var, v, ctx_, arena_);
   if (!var.class_type_name.empty())
     ctx_.SetVariableClassType(name, var.class_type_name);
-  CreateSemaphoreForVar(name, var, ctx_, arena_);
-  CreateMailboxForVar(name, var, ctx_, arena_);
+  CreateSyncObjectForVar(name, var, v, ctx_, arena_);
 
   if (!var.enum_type_name.empty() && var.dtype) {
     RegisterEnumForCast(name, var);

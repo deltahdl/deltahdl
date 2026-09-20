@@ -29,6 +29,7 @@
 #include "simulator/statement_assign_internal.h"
 #include "simulator/stmt_result.h"
 #include "simulator/sync_objects.h"
+#include "simulator/sync_variable.h"
 #include "simulator/variable.h"
 
 namespace delta {
@@ -555,7 +556,12 @@ bool TryEvalMailboxMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
 // lowerer_package_data.cpp creates it). §8.7 with §15.4.1: it may be a class
 // property, `mb = new(1)` in a method or `c.mb = new(1)` through a handle,
 // built on the object alone (BuildSyncProperty); a semaphore property is
-// TrySemaphoreNewAssign's, asked first, so it is not reached here.
+// TrySemaphoreNewAssign's, asked first, so it is not reached here. §15.4.1
+// (printed page 374 of ~/LRM.pdf) has new() return the mailbox handle, so
+// the variable the statement assigns refers to the queue from here on and
+// §8.4 (printed 182) compares it unequal to null (HoldSyncVariable); the
+// queue alone was built, and a `mailbox mb;` read as null after its `mb =
+// new(2)`.
 bool TryMailboxNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (!stmt->rhs || stmt->rhs->kind != ExprKind::kCall ||
       stmt->rhs->text != "new")
@@ -570,6 +576,7 @@ bool TryMailboxNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   auto* mbx = ctx.FindMailbox(key);
   if (!mbx) return false;
   mbx->Build(MailboxBoundArg(stmt->rhs, ctx, arena));
+  HoldSyncVariable(key, ctx);
   return true;
 }
 

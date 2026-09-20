@@ -547,4 +547,64 @@ TEST(SemaphoreSim,
             10u);
 }
 
+// §8.4 (printed pages 181-182) with §15.3 (printed 372) and §15.3.1
+// (printed 373): a module's semaphore variable is a handle to the bucket
+// new() returns, so one declared `semaphore unset;` with no initializer
+// holds null, which comparing with null detects and a condition reads as
+// false, one declared `semaphore filled = new(1);` refers to the bucket, and
+// `unset = new(2)` in the initial block makes unset refer to one; `copy =
+// filled` copies the handle and `filled = null` drops it. The reads add 1 for
+// `unset == null`, 10 for `if (unset)`, 100 for `filled != null`, 1000 for `if
+// (filled)`, 10000 for `unset != null` after the new, 100000 for `unset ==
+// null` then, 1000000 for `copy != null` after the copy and 10000000 for
+// `filled == null` after the null: 11011101. The variable's value stayed the
+// 0 the declaration stored whether or not a new() had filled the bucket, so
+// filled compared equal to null and unset stayed null after its new: 100001.
+TEST(SemaphoreSim, ModuleSemaphoreVariableIsNullUntilNew) {
+  EXPECT_EQ(RunAndGet("module top;\n"
+                      "  semaphore unset;\n"
+                      "  semaphore filled = new(1);\n"
+                      "  semaphore copy;\n"
+                      "  int r;\n"
+                      "  initial begin\n"
+                      "    r = 0;\n"
+                      "    if (unset == null) r = r + 1;\n"
+                      "    if (unset) r = r + 10;\n"
+                      "    if (filled != null) r = r + 100;\n"
+                      "    if (filled) r = r + 1000;\n"
+                      "    unset = new(2);\n"
+                      "    if (unset != null) r = r + 10000;\n"
+                      "    if (unset == null) r = r + 100000;\n"
+                      "    copy = filled;\n"
+                      "    if (copy != null) r = r + 1000000;\n"
+                      "    filled = null;\n"
+                      "    if (filled == null) r = r + 10000000;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "r"),
+            11011101u);
+}
+
+// §15.3.1 (printed page 373) with §8.4 (printed 182): the `bare = new(2)`
+// that makes the handle refer to a bucket is the one that fills it, so the
+// bucket gives two keys and refuses the third: try_get(1) reads 1, 1 and 0,
+// and `bare != null` after the three adds 1000: 1110. The keys and the
+// handle are read together, so a new() that filled the bucket and left the
+// handle null reads 110, and one that marked the handle held and filled
+// nothing 1000.
+TEST(SemaphoreSim, ModuleSemaphoreNewInProcessFillsTheBucketItMakesHeld) {
+  EXPECT_EQ(RunAndGet("module top;\n"
+                      "  semaphore bare;\n"
+                      "  int y;\n"
+                      "  initial begin\n"
+                      "    bare = new(2);\n"
+                      "    y = bare.try_get(1) * 100 + bare.try_get(1) * 10 +\n"
+                      "        bare.try_get(1);\n"
+                      "    if (bare != null) y = y + 1000;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            1110u);
+}
+
 }  // namespace

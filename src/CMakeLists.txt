@@ -472,6 +472,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/lowerer_data_init.cpp
     simulator/lowerer_var.cpp
     simulator/lowerer_var_layout.cpp
+    simulator/sync_variable.cpp
     simulator/sdf_annotate.cpp
     simulator/sdf_annotate_entry.cpp
     simulator/sdf_annotate_task.cpp

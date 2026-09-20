@@ -15,6 +15,7 @@
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/sync_objects.h"
+#include "simulator/sync_variable.h"
 
 namespace delta {
 
@@ -127,7 +128,11 @@ std::string_view ScopedOrBareTargetKey(const Expr* lhs, Arena& arena) {
 
 // §8.7 with §15.3.1: the target may be a class property, `s = new(2)` in a
 // method or `c.s = new(2)` through a handle, whose bucket is the object's
-// alone (BuildSyncProperty).
+// alone (BuildSyncProperty). §15.3.1 (printed page 373 of ~/LRM.pdf) has
+// new() return the semaphore handle, so the variable the statement assigns
+// refers to the bucket from here on and §8.4 (printed 182) compares it
+// unequal to null (HoldSyncVariable); the bucket alone was filled, and a
+// `semaphore s;` read as null after its `s = new(2)`.
 bool TrySemaphoreNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (!stmt->rhs || stmt->rhs->kind != ExprKind::kCall ||
       stmt->rhs->text != "new")
@@ -144,6 +149,7 @@ bool TrySemaphoreNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   // §15.3.1: new() takes the key count as its one argument and defaults it to
   // zero, so a bucket built without one starts empty.
   sem->key_count = SemaphoreKeyArg(stmt->rhs, ctx, arena, 0);
+  HoldSyncVariable(key, ctx);
   return true;
 }
 
