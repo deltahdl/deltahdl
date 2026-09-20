@@ -91,14 +91,21 @@ static std::string PackageDataKey(const ModuleItem* item,
 // of this -- the package's own class, an imported one, or the built-in
 // process or weak_reference class -- so its carrier is sized the same. Sized
 // at 32, a handle written through `p1::h = new` was held in half its bits.
-// An array of handles keeps its element width as before.
+// §7.10 (printed 169), §7.5 and §7.4.2 (printed 154): a queue, a dynamic
+// array or a fixed-size array declared with the class's name, `C q[$]`,
+// `C d[]` or `C arr[2]`, is an array whose every element is such a handle,
+// and the width answered here is the element's -- the queue's elem_width,
+// the dynamic array's ArrayInfo and each element variable of the fixed-size
+// array -- so it is a handle's 64 bits too. The class record is entered for
+// the declaration whatever its dimensions, and a scalar alone was sized by
+// it, so an element of any of the three held an object id in 32 bits and an
+// id above 2^32 was truncated.
 static uint32_t PackageDataWidth(const ModuleItem* item, std::string_view qname,
                                  SimContext& ctx) {
   bool is_var = item->kind == ModuleItemKind::kVarDecl;
   uint32_t width = is_var ? DeclaredTypeWidth(item->data_type, ctx) : 0;
   if (width != 0) return width;
-  bool is_handle = is_var && item->unpacked_dims.empty() &&
-                   !ctx.GetVariableClassType(qname).empty();
+  bool is_handle = is_var && !ctx.GetVariableClassType(qname).empty();
   return is_handle ? 64 : 32;
 }
 
