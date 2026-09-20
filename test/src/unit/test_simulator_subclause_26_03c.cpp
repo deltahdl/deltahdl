@@ -811,4 +811,104 @@ TEST(PackageImportSim, PackageFunctionWritesAnImportedPackagesQueueBare) {
             24u);
 }
 
+// §7.4.6 (printed page 156) with §26.3 (printed 808): an indexed name
+// selects one element of an unpacked array, and the package scope resolution
+// operator names the package's array, so `p1::a[1] = 7` writes the element
+// "p1.a[1]" and `p1::a[1]` reads it back: 7. TryResolveArrayElement
+// (statement_assign.cpp) and TryArrayElementSelect (eval_select.cpp) took an
+// identifier base alone, so the scoped select fell to a bit-select of the
+// "p1.a" carrier on both sides: the write set its bit 1 to the low bit of
+// 7, and the read gave that one bit -- 1.
+TEST(PackageImportSim,
+     PackageFixedSizeArrayElementWrittenAndReadThroughTheQualifier) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  int a[2];\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  int y;\n"
+                      "  initial begin\n"
+                      "    p1::a[1] = 7;\n"
+                      "    y = p1::a[1];\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            7u);
+}
+
+// §7.5 (printed page 158) with §26.3 (printed 808): a package's dynamic
+// array sized by `p1::d = new[3]` holds the 5 written to `p1::d[2]`, which
+// reads back as 5. The dynamic array stands under the "p1.d" key as a
+// QueueObject and as an ArrayInfo marked dynamic (CreatePackageDynArray in
+// lowerer_package_data.cpp), and the element resolution now admitting a
+// scoped base finds that ArrayInfo too; the queue arms answer first for a
+// read and no "p1.d[2]" element variable exists for a write, so the element
+// stays the queue's. A resolution that took the ArrayInfo ahead of the
+// queue would answer the array's default element, 0.
+TEST(PackageImportSim,
+     PackageDynamicArrayElementWrittenAndReadThroughTheQualifier) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  int d[];\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  int y;\n"
+                      "  initial begin\n"
+                      "    p1::d = new[3];\n"
+                      "    p1::d[2] = 5;\n"
+                      "    y = p1::d[2];\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            5u);
+}
+
+// §11.4.1 with §7.4.6 (printed page 156) and §26.3 (printed 808): a
+// compound assignment to the scoped element reads it and writes it in one
+// statement, so `p1::a[1] += 2` on the 7 written before leaves 9.
+// ApplyCompoundAssignOp (statement_assign_compound.cpp) resolves the
+// element through TryResolveArrayElement, which declined the scoped base,
+// so the statement read one bit of the "p1.a" carrier, added 2 and wrote the
+// low bit of the sum back to that bit -- the read afterwards gave 1.
+TEST(PackageImportSim,
+     PackageFixedSizeArrayElementCompoundAssignedThroughTheQualifier) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  int a[2];\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  int y;\n"
+                      "  initial begin\n"
+                      "    p1::a[1] = 7;\n"
+                      "    p1::a[1] += 2;\n"
+                      "    y = p1::a[1];\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            9u);
+}
+
+// §7.10 (printed page 169) with §26.3 (printed 808): a package queue's
+// element named through the qualifier, `p1::q[0]`, is still the queue's
+// once the array element resolution admits a scoped base: the queue holds
+// 4, pushed by the module, and the fixed-size array beside it holds the 3
+// written to its element 1, so the reads give 4 * 10 + 3. A queue whose
+// element select the array resolution intercepted -- the "p1.q" key naming
+// no ArrayInfo, but a key of the same shape -- would read 0 for the queue's
+// element: 3.
+TEST(PackageImportSim,
+     PackageQueueElementReadThroughTheQualifierBesideAnArray) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  int q[$];\n"
+                      "  int a[2];\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  int y;\n"
+                      "  initial begin\n"
+                      "    p1::q.push_back(4);\n"
+                      "    p1::a[1] = 3;\n"
+                      "    y = p1::q[0] * 10 + p1::a[1];\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            43u);
+}
+
 }  // namespace

@@ -16,6 +16,7 @@
 #include "simulator/class_object.h"
 #include "simulator/eval_array.h"
 #include "simulator/eval_expr_internal.h"
+#include "simulator/eval_semaphore.h"
 #include "simulator/eval_string.h"
 #include "simulator/evaluation.h"
 #include "simulator/scheduler.h"
@@ -43,18 +44,26 @@ void BuildLhsName(const Expr* expr, std::string& out) {
   }
 }
 
+// §7.4.6 (printed page 156) with §26.3 (printed 808): the array an indexed
+// name writes an element of is a bare name's or, through the package scope
+// resolution operator, a package's, `p1::a[1] = 7` targeting the element
+// "p1.a[1]" CreatePackageArray (lowerer_register.cpp) created under the
+// "p1.a" key ScopedOrBareTargetKey builds. An identifier base alone was
+// taken before, so the scoped write fell through to a bit-select of the
+// "p1.a" carrier and set its bit 1.
 Variable* TryResolveArrayElement(const Expr* lhs, SimContext& ctx) {
   if (lhs->kind != ExprKind::kSelect || !lhs->base || !lhs->index)
     return nullptr;
-  if (lhs->base->kind != ExprKind::kIdentifier) return nullptr;
   if (lhs->index_end) return nullptr;
+  std::string_view key = ScopedOrBareTargetKey(lhs->base, ctx.GetArena());
+  if (key.empty()) return nullptr;
   auto idx = EvalExpr(lhs->index, ctx, ctx.GetArena());
   // An x or z bit anywhere in the index makes it invalid; an invalid-index
   // write is a no-op, so fail to resolve the element just as an out-of-range
   // index does.
   if (HasUnknownBits(idx)) return nullptr;
   auto elem_name =
-      std::string(lhs->base->text) + "[" + std::to_string(idx.ToUint64()) + "]";
+      std::string(key) + "[" + std::to_string(idx.ToUint64()) + "]";
   return ctx.FindVariable(elem_name);
 }
 

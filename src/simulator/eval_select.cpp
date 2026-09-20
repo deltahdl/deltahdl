@@ -18,6 +18,7 @@
 #include "simulator/eval_array_class_queue.h"
 #include "simulator/eval_call_result.h"
 #include "simulator/eval_class_array.h"
+#include "simulator/eval_semaphore.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign_internal.h"
@@ -84,35 +85,45 @@ static bool TryQueueSelect(const Expr* expr, SimContext& ctx, Arena& arena,
   return true;
 }
 
-static const ArrayInfo* FindRootArrayInfo(const Expr* expr, SimContext& ctx) {
+// §7.4.6 (printed page 156) with §26.3 (printed 808): the key the array an
+// indexed name stands on is held under -- a bare name's own text, or the
+// "p.a" a package's array named through the package scope resolution
+// operator, `p::a`, is created under (CreatePackageArray in
+// lowerer_register.cpp), which ScopedOrBareTargetKey builds for both shapes.
+// Empty for a root of another shape. Only an identifier root was taken
+// before, so `p1::a[1]` found no ArrayInfo and fell to a bit-select of the
+// "p1.a" carrier, reading bit 1 of it.
+static std::string_view SelectRootKey(const Expr* expr, SimContext& ctx) {
   const Expr* root = expr->base;
   while (root && root->kind == ExprKind::kSelect) root = root->base;
-  return (root && root->kind == ExprKind::kIdentifier)
-             ? ctx.FindArrayInfo(root->text)
-             : nullptr;
+  return ScopedOrBareTargetKey(root, ctx.GetArena());
+}
+
+static const ArrayInfo* FindRootArrayInfo(const Expr* expr, SimContext& ctx) {
+  std::string_view key = SelectRootKey(expr, ctx);
+  return key.empty() ? nullptr : ctx.FindArrayInfo(key);
 }
 
 // Reports whether the object a select reads from is four-state. An invalid
 // bit-select address yields x on a four-state object but 0 on a two-state one,
 // so the read result for an out-of-bounds or unknown index depends on this.
 static bool SelectBaseIs4State(const Expr* expr, SimContext& ctx) {
-  const Expr* root = expr->base;
-  while (root && root->kind == ExprKind::kSelect) root = root->base;
-  if (!root || root->kind != ExprKind::kIdentifier) return true;
-  if (auto* info = ctx.FindArrayInfo(root->text)) return info->is_4state;
-  if (auto* var = ctx.FindVariable(root->text)) return var->is_4state;
+  std::string_view key = SelectRootKey(expr, ctx);
+  if (key.empty()) return true;
+  if (auto* info = ctx.FindArrayInfo(key)) return info->is_4state;
+  if (auto* var = ctx.FindVariable(key)) return var->is_4state;
   return true;
 }
 
 static bool TryArrayElementSelect(const Expr* expr, uint64_t idx,
                                   SimContext& ctx, Arena& arena,
                                   Logic4Vec& out) {
-  if (!expr->base || expr->base->kind != ExprKind::kIdentifier) return false;
-  if (expr->index_end) return false;
-  auto* info = ctx.FindArrayInfo(expr->base->text);
+  if (!expr->base || expr->index_end) return false;
+  std::string_view key = ScopedOrBareTargetKey(expr->base, arena);
+  if (key.empty()) return false;
+  auto* info = ctx.FindArrayInfo(key);
   if (!info) return false;
-  auto elem_name =
-      std::string(expr->base->text) + "[" + std::to_string(idx) + "]";
+  auto elem_name = std::string(key) + "[" + std::to_string(idx) + "]";
   auto* elem = ctx.FindVariable(elem_name);
   // §6.16: an element of an array of strings is a string, and a string has no
   // declared width to fill with x or zero; one that was never written is "",
