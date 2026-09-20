@@ -647,10 +647,11 @@ TEST(StaticMethodHandleBases, PropertyThroughABareNonStaticHandleIsReported) {
 // was.
 //
 // `k` is the non-static property the bare access names and `m_inst` the static
-// handle the accepted form reads it through, as in StaticMethodHandleSrc.
-std::string PackageStaticMethodSrc(const std::string& stmt, bool imports) {
-  return "package p;\n"
-         "  class C;\n"
+// handle the accepted form reads it through, as in StaticMethodHandleSrc. The
+// class is written once here and stands in a package below and in a program,
+// an interface and a checker in DesignElementStaticMethodSrc.
+std::string ClassCWithStaticF(const std::string& stmt) {
+  return "  class C;\n"
          "    int k = 9;\n"
          "    static C m_inst;\n"
          "    static function int f();\n"
@@ -658,7 +659,11 @@ std::string PackageStaticMethodSrc(const std::string& stmt, bool imports) {
          stmt +
          "\n"
          "    endfunction\n"
-         "  endclass\n"
+         "  endclass\n";
+}
+
+std::string PackageStaticMethodSrc(const std::string& stmt, bool imports) {
+  return "package p;\n" + ClassCWithStaticF(stmt) +
          "endpackage\n"
          "module m;\n" +
          std::string(imports ? "  import p::*;\n  C c;\n" : "") + "endmodule\n";
@@ -750,6 +755,55 @@ TEST(StaticMethodInNestedClass, BarePropertyIsReportedInAPackageClass) {
 TEST(StaticMethodInNestedClass, PropertyThroughAStaticPropertyIsAccepted) {
   EXPECT_TRUE(ElabOk(NestedUnitClassSrc("return m_inst.k;")));
   EXPECT_TRUE(ElabOk(NestedPackageClassSrc("return m_inst.k;")));
+}
+
+// The cases below hold the class in a program, an interface or a checker that
+// nothing instantiates. §24.3 (printed page 775 of ~/LRM.pdf) admits a class
+// declaration among a program's items and §25.3 (printed 781) among an
+// interface's; §17.2 (printed 503-504) names none among a checker's, but
+// Parser::ParseCheckerDecl reads one as it reads a module's and no rule
+// reports it. §8.10 (printed 186) states its rule of the class wherever it is
+// declared. Elaborator::ValidateStaticMethodBodies in
+// src/elaborator/elaborator_validate_static_methods.cpp read the items of the
+// module it was run for, and it is run for a program, an interface or a
+// checker only when that one is elaborated -- instantiated, or a program
+// rooted as a top -- so the class of one that was neither was never walked.
+//
+// `module m` stands after the element and is the top the fixture names, so
+// the element is elaborated by no run; a program alone in the file would be
+// rooted as a top per §24.3 and reach the module walk, and the case would
+// pass on the walk that was already there. `element` is the keyword that
+// opens the declaration, and `end` + `element` closes it.
+std::string DesignElementStaticMethodSrc(const std::string& element,
+                                         const std::string& stmt) {
+  return element + " e;\n" + ClassCWithStaticF(stmt) + "end" + element +
+         "\n"
+         "module m;\n"
+         "endmodule\n";
+}
+
+TEST(StaticMethodInDesignElement, BarePropertyIsReportedInAProgram) {
+  ExpectStaticFunctionFReported(
+      DesignElementStaticMethodSrc("program", "return k;"));
+}
+
+TEST(StaticMethodInDesignElement, BarePropertyIsReportedInAnInterface) {
+  ExpectStaticFunctionFReported(
+      DesignElementStaticMethodSrc("interface", "return k;"));
+}
+
+TEST(StaticMethodInDesignElement, BarePropertyIsReportedInAChecker) {
+  ExpectStaticFunctionFReported(
+      DesignElementStaticMethodSrc("checker", "return k;"));
+}
+
+// The exemption StaticMethodHandleBases states, kept for a class an
+// uninstantiated element holds: the property behind the static handle is read
+// through that handle, so a walk that reported every such static method is
+// told from one reading the body.
+TEST(StaticMethodInDesignElement, PropertyThroughAStaticPropertyIsAccepted) {
+  EXPECT_TRUE(
+      ElabOk(DesignElementStaticMethodSrc("interface", "return m_inst.k;")));
 }
 
 }  // namespace

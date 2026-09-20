@@ -377,6 +377,21 @@ void ElaboratorClassRules::ValidateStaticMethodsAmong(
 // k; static function int f(); return k; endfunction endclass endpackage` was
 // never reported while the same class at compilation-unit scope was, whether
 // or not a module imported the package.
+//
+// §24.3 (printed 775) admits a class declaration among a program's items
+// through module_or_generate_item_declaration, and §25.3 (printed 781) among
+// an interface's through interface_or_generate_item; §17.2 (printed 503-504)
+// names no class declaration among a checker's items, but Parser::
+// ParseCheckerDecl reads one as it reads a module's and no rule reports it, so
+// the checker's class is a class of the design as any other. Each of the three
+// is elaborated -- and so handed here as `decl` -- only when something
+// instantiates it or, for a program, when it is a top, so `program p; class C;
+// int k; static function int f(); return k; endfunction endclass endprogram`
+// beside a module named as the top, and the same class in an interface or a
+// checker nothing instantiates, was in no walk at all. The unit's programs,
+// interfaces and checkers are walked as its packages are, and the set in
+// ValidateOneClassStaticMethods keeps an instantiated one from a second
+// report.
 void ElaboratorClassRules::ValidateStaticMethodBodies(const ModuleDecl* decl) {
   for (const auto* cls : unit_->classes) {
     ValidateOneClassStaticMethods(cls);
@@ -384,6 +399,15 @@ void ElaboratorClassRules::ValidateStaticMethodBodies(const ModuleDecl* decl) {
   ValidateStaticMethodsAmong(decl->items);
   for (const auto* pkg : unit_->packages) {
     ValidateStaticMethodsAmong(pkg->items);
+  }
+  for (const auto* prog : unit_->programs) {
+    ValidateStaticMethodsAmong(prog->items);
+  }
+  for (const auto* iface : unit_->interfaces) {
+    ValidateStaticMethodsAmong(iface->items);
+  }
+  for (const auto* chk : unit_->checkers) {
+    ValidateStaticMethodsAmong(chk->items);
   }
 }
 
