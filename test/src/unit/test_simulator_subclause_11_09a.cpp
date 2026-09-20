@@ -845,10 +845,4 @@ TEST(TaggedUnionEval, CallResultActualOfVoidMemberIsCheckedInTheBody) {
       "tagged union 'a' which currently has tag 'Invalid'", 8, "11.9"));
 }
 
-// §7.3.2 (printed page 151): a tagged union value carries its tag beside the
-// member's bits, and §13.4.1 (printed 342) gives the implicit variable of a
-// call the return type, so `u = g()` with g returning `tagged Valid -7`
-// assigns u a value tagged Valid, which §11.9 (printed 304) has `u.Valid`
-// read consistently with. The store copied the bits alone, reading a tag off
-// a `tagged` right-hand side and a call being none, so u was read against no
 }  // namespace
