@@ -581,7 +581,11 @@ static int FormatHexDigitVal(char c) {
 // 5.9.1. Decode a single such sequence in place -- named escapes, octal '\ddd'
 // and hex '\xhh' -- and emit the resulting byte as a literal. Decoding here,
 // one character at a time, keeps an escaped byte (e.g. octal '\045') out of the
-// '%' format-specifier machinery even when it decodes to a '%'. Any other
+// '%' format-specifier machinery even when it decodes to a '%'. §5.9 (printed
+// page 80) has a backslash immediately before a newline ignored together with
+// the newline, so a format string continued across a line prints as one line,
+// and §5.9.1 (printed 83) makes `\\` before the newline the one-backslash
+// escape with the newline kept, which this decoder's ordering gives. Any other
 // escaped character stands for itself, matching the string-literal decoder.
 static void AppendLiteralChar(const std::string& fmt, size_t& i,
                               std::string& out) {
@@ -590,6 +594,11 @@ static void AppendLiteralChar(const std::string& fmt, size_t& i,
     return;
   }
   char c = fmt[++i];
+  if (c == '\n') return;
+  if (c == '\r') {
+    if (i + 1 < fmt.size() && fmt[i + 1] == '\n') ++i;
+    return;
+  }
   switch (c) {
     case 'n':
       out += '\n';

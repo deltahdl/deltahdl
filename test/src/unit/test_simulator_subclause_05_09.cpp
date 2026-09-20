@@ -172,4 +172,45 @@ TEST(LexicalConventionSim, CastStringLiteralToPackedArrayZeroFillsLeft) {
   EXPECT_EQ(v, 0x004142u);
 }
 
+// §5.9 (printed page 80): a backslash immediately before a newline inside a
+// quoted string is ignored with the newline, so a `$display` format string
+// continued across a line prints as one line. The string variable initializer
+// already dropped both; the format string's own escape decoder dropped the
+// backslash and kept the newline, printing `[a` and `b]` on two lines.
+TEST(LexicalConventionSim, DisplayFormatLineContinuationJoinsTheLines) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  initial $display(\"[a\\\nb]\");\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "[ab]\n");
+}
+
+// §5.9.1 (printed page 83): a double backslash before the newline is the
+// escape for one backslash and no continuation, so the third backslash is what
+// continues the line and the output carries the one backslash.
+TEST(LexicalConventionSim, DisplayFormatTripleBackslashKeepsOneBackslash) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  initial $display(\"[a\\\\\\\nb]\");\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "[a\\b]\n");
+}
+
+// §5.9's Example 2: an escaped `\n` before the continuation is the one newline
+// the output carries; the continuation's own newline is dropped, so no empty
+// line stands between the two.
+TEST(LexicalConventionSim, DisplayFormatEscapedNewlineThenContinuation) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  initial $display(\"[x\\n\\\ny]\");\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "[x\ny]\n");
+}
+
 }  // namespace
