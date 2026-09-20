@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <string>
+#include <string_view>
+
 #include "builders_ast.h"
 #include "builders_systask.h"
 #include "common/types.h"
@@ -442,6 +445,67 @@ TEST(ObjectMethodSim,
                       "endmodule\n",
                       "y"),
             34u);
+}
+
+// §8.6 (printed page 183 of the LRM): an object's methods are accessed by
+// qualifying the method name with a handle to the object, and §7.4.2
+// (printed 153-154) and §7.10 (printed 169) make each element of an array or
+// a queue declared with a class's name such a handle. The three tests below
+// share the class and read its get() -- 7, the property's initializer -- or
+// the property run() wrote; a call that reached no method ran nothing and
+// read 0. Before this only an associative array's element had a dispatch
+// (TryEvalAssocElementMethodCall in eval_assoc_class_handles.cpp).
+static std::string ElementMethodDesign(std::string_view rest) {
+  return "class C;\n"
+         "  int v = 7;\n"
+         "  function int get(); return v; endfunction\n"
+         "  task run(); v = v + 1; endtask\n"
+         "endclass\n" +
+         std::string(rest);
+}
+
+TEST(ObjectMethodSim, MethodCalledThroughAnElementOfADeclaredArrayRuns) {
+  EXPECT_EQ(RunAndGet(ElementMethodDesign("module t;\n"
+                                          "  C arr[2];\n"
+                                          "  int y;\n"
+                                          "  initial begin\n"
+                                          "    arr[0] = new;\n"
+                                          "    y = arr[0].get();\n"
+                                          "  end\n"
+                                          "endmodule\n"),
+                      "y"),
+            7u);
+}
+
+// A queue's element, pushed as a handle and called through `q[0]`.
+TEST(ObjectMethodSim, MethodCalledThroughAQueueElementRuns) {
+  EXPECT_EQ(RunAndGet(ElementMethodDesign("module t;\n"
+                                          "  C q[$];\n"
+                                          "  int y;\n"
+                                          "  initial begin\n"
+                                          "    C c = new;\n"
+                                          "    q.push_back(c);\n"
+                                          "    y = q[0].get();\n"
+                                          "  end\n"
+                                          "endmodule\n"),
+                      "y"),
+            7u);
+}
+
+// A task enabled through the element as a statement: run() adds one to the
+// object's v, which get() then reads as 8.
+TEST(ObjectMethodSim, TaskEnabledThroughAnElementOfADeclaredArrayRuns) {
+  EXPECT_EQ(RunAndGet(ElementMethodDesign("module t;\n"
+                                          "  C arr[2];\n"
+                                          "  int y;\n"
+                                          "  initial begin\n"
+                                          "    arr[1] = new;\n"
+                                          "    arr[1].run();\n"
+                                          "    y = arr[1].get();\n"
+                                          "  end\n"
+                                          "endmodule\n"),
+                      "y"),
+            8u);
 }
 
 }  // namespace

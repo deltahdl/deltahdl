@@ -51,4 +51,20 @@ Logic4Vec ConstructElementObject(const Expr* rhs, std::string_view class_type,
 bool TryEvalElementObjectMember(const Expr* expr, SimContext& ctx, Arena& arena,
                                 Logic4Vec& out);
 
+// §8.6 (printed page 183): `expr` as `a[i].f(...)`, the method `f` run on the
+// object the element `a[i]` refers to, where `a` is a declared fixed-size or
+// dynamic array of handles or a queue of them, declared or a property, and
+// §7.4.2 (printed 153-154) and §7.10 (printed 169) make the element a handle
+// like any other. Dispatched by the element's declared class where the
+// array's declaration recorded one, as a call through a variable of that
+// class is (§8.20), and by the object's own class for a queue property. The
+// associative array's element is served by TryEvalAssocElementMethodCall
+// (eval_assoc_class_handles.h), which asks this for every other container.
+// False for a call of any other shape, one on a container whose elements are
+// no handles, an element that refers to no object, or a method the object's
+// class does not have. Before this the call had no dispatch: `arr[0].get()`
+// read 0 and the task enable `arr[0].run();` ran nothing.
+bool TryEvalElementObjectMethodCall(const Expr* expr, SimContext& ctx,
+                                    Arena& arena, Logic4Vec& out);
+
 }  // namespace delta

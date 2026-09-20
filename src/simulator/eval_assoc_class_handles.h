@@ -39,9 +39,13 @@ bool TryEvalAssocElementMember(const Expr* expr, SimContext& ctx, Arena& arena,
 // §8.4/§7.8: `expr` as `m[k].f(...)`, the method `f` run on the object the
 // element `m[k]` of a declared associative array of class handles refers to,
 // dispatched by the array's declared element class as a call through a
-// variable of that class is (§8.20). False for a call of any other shape, one
-// on an array whose elements are no handles, an element that refers to no
-// object, or a method the object's class does not have.
+// variable of that class is (§8.20). A call on an element of any other
+// container of handles -- a declared fixed-size or dynamic array, a queue --
+// is handed to TryEvalElementObjectMethodCall (eval_class_array_handles.h),
+// so the one site the method-call evaluator asks (TryDispatchMethodOrLet in
+// eval_function.cpp) serves every element. False for a call of any other
+// shape, one on a container whose elements are no handles, an element that
+// refers to no object, or a method the object's class does not have.
 bool TryEvalAssocElementMethodCall(const Expr* expr, SimContext& ctx,
                                    Arena& arena, Logic4Vec& out);
 

@@ -116,10 +116,14 @@ bool TryEvalAssocElementMethodCall(const Expr* expr, SimContext& ctx,
   const Expr* sel = nullptr;
   std::string_view class_type;
   if (expr == nullptr || expr->kind != ExprKind::kCall ||
-      !SplitMemberOfSelect(expr->lhs, sel) ||
-      HandleArrayOfSelect(sel, ctx, class_type) == nullptr) {
+      !SplitMemberOfSelect(expr->lhs, sel)) {
     return false;
   }
+  // §8.6 (printed page 183): an element of a declared array or of a queue is
+  // as much a handle to call through as an associative array's, and had no
+  // dispatch of its own.
+  if (HandleArrayOfSelect(sel, ctx, class_type) == nullptr)
+    return TryEvalElementObjectMethodCall(expr, ctx, arena, out);
   InstanceMethodInfo info;
   if (!ResolveMethodByDeclaredClass(ElementObject(sel, ctx, arena), class_type,
                                     expr->lhs->rhs->text, ctx, info)) {

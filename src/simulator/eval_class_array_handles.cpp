@@ -12,8 +12,10 @@
 #include "simulator/eval_array_class_queue.h"
 #include "simulator/eval_assoc_class_handles.h"
 #include "simulator/eval_class_array.h"
+#include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_types.h"
 #include "simulator/statement_assign_internal.h"
 
 namespace delta {
@@ -180,6 +182,43 @@ bool TryEvalElementObjectMember(const Expr* expr, SimContext& ctx, Arena& arena,
          TryEvalDeclaredArrayElementMember(expr, ctx, arena, out) ||
          TryEvalClassArrayElementMember(expr, ctx, arena, out) ||
          TryEvalAssocElementMember(expr, ctx, arena, out);
+}
+
+// Whether the element `sel` selects is a handle: of a declared fixed-size or
+// dynamic array (DeclaredArrayElementClass), or of a queue flagged as holding
+// handles, declared or a property (FindQueueOfBase). `declared` receives the
+// class the element is declared of -- the array's, or the one a declared
+// queue's declaration recorded under its name -- and stays empty for a queue
+// property, whose element is then dispatched by its object's own class.
+static bool SelectsAHandleElement(const Expr* sel, SimContext& ctx,
+                                  Arena& arena, std::string_view& declared) {
+  declared = DeclaredArrayElementClass(sel->base, ctx);
+  if (!declared.empty()) return true;
+  const QueueObject* q = FindQueueOfBase(sel->base, ctx, arena);
+  if (q == nullptr || !q->holds_class_handles) return false;
+  if (sel->base->kind == ExprKind::kIdentifier)
+    declared = ctx.GetVariableClassType(sel->base->text);
+  return true;
+}
+
+bool TryEvalElementObjectMethodCall(const Expr* expr, SimContext& ctx,
+                                    Arena& arena, Logic4Vec& out) {
+  if (expr == nullptr || expr->kind != ExprKind::kCall) return false;
+  const Expr* sel = SelectOfMemberAccess(expr->lhs);
+  std::string_view declared;
+  if (sel == nullptr || !SelectsAHandleElement(sel, ctx, arena, declared))
+    return false;
+  // The element is read as any select of its container is, an index
+  // addressing no element answering the null handle, which resolves no
+  // method.
+  ClassObject* obj = ctx.GetClassObject(EvalExpr(sel, ctx, arena).ToUint64());
+  InstanceMethodInfo info;
+  if (!ResolveMethodByDeclaredClass(obj, declared, expr->lhs->rhs->text, ctx,
+                                    info)) {
+    return false;
+  }
+  out = RunInstanceMethod(info, expr, ctx, arena);
+  return true;
 }
 
 }  // namespace delta
