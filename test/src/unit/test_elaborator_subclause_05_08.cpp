@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 namespace {
 
@@ -84,6 +85,47 @@ TEST(TimeLiteralElaboration, TimeLiteralConstFoldScalesToCurrentUnit) {
   EXPECT_EQ(p.name, "P");
   EXPECT_TRUE(p.is_resolved);
   EXPECT_EQ(p.resolved_value, 3000);
+}
+
+// §5.8 (printed page 80) has a time literal be its number followed without a
+// space by its unit, and Syntax 5-2's footnote 49 (printed 76) forbids white
+// space between the two, so `2.1 ns` is the real 2.1 and then the identifier
+// ns: `#2.1 ns;` is a delay of 2.1 whose statement is the call `ns;`, and
+// with no task ns declared the statement is an error. The delay ran and the
+// statement did nothing.
+TEST(TimeLiteralElaboration, UnitSeparatedFromItsNumberBySpaceIsRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  timeunit 1ns;\n"
+      "  initial begin\n"
+      "    #2.1 ns;\n"
+      "    $display(\"%0t\", $time);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'ns' after the delay 2.1 is a separate token", 4,
+                            "5.8"));
+}
+
+// The literal written as the clause has it reports nothing, and so does a
+// delay followed by a call to a task that happens to be named like a unit,
+// which is what `#2 fs;` is when a task fs is declared.
+TEST(TimeLiteralElaboration, UnitJoinedToItsNumberReportsNothing) {
+  EXPECT_TRUE(
+      ElabOk("module t;\n"
+             "  timeunit 1ns;\n"
+             "  initial #2.1ns;\n"
+             "endmodule\n"));
+}
+
+TEST(TimeLiteralElaboration, DelayThenCallOfATaskNamedLikeAUnitIsACall) {
+  EXPECT_TRUE(
+      ElabOk("module t;\n"
+             "  task fs; endtask\n"
+             "  initial #2 fs;\n"
+             "endmodule\n"));
 }
 
 }  // namespace

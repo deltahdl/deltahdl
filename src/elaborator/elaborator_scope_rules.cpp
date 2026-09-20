@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <format>
+#include <functional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -26,10 +27,28 @@ namespace delta {
 
 namespace {
 
+// A.6.9 makes a bare identifier standing as a statement a
+// subroutine_call_statement, the enabling of a task of that name (§13.3), so
+// the name is a reference §23.9 resolves like any other. `delay_number` is
+// the text of the number a delay control written immediately before it takes
+// as its delay, `2.1` for `#2.1 ns;`, and empty for every other position:
+// §5.8 (printed page 80) has a time literal be its number followed without a
+// space by its unit, so a unit name standing there as a call is the one
+// mistake the report can name.
+struct BareCall {
+  std::string_view name;
+  SourceLoc loc;
+  std::string_view delay_number;
+};
+
 struct ScopeWalk {
   std::vector<std::pair<std::string_view, SourceLoc>> block_labels;
   std::unordered_set<std::string_view> local_names;
   std::vector<std::pair<std::string_view, SourceLoc>> proc_lhs;
+  std::vector<BareCall> bare_calls;
+  // The statement each numeric delay control holds, keyed to the number's
+  // text, for CollectBareCall to read when the walk reaches the statement.
+  std::unordered_map<const Stmt*, std::string_view> delayed_bodies;
   // §12.7.1: control variables declared in a for-loop header are local to the
   // loop's implicit block. This stack holds the names currently in scope while
   // walking a loop's sub-statements, so assignments to them are not mistaken
@@ -56,6 +75,33 @@ size_t PushTypedForInitVars(const Stmt* s, ScopeWalk& out) {
   return pushed;
 }
 
+// The bare identifier `s` is when it is a statement of that shape, or null.
+const Expr* BareCallOf(const Stmt* s) {
+  if (s == nullptr || s->kind != StmtKind::kExprStmt || s->expr == nullptr ||
+      s->expr->kind != ExprKind::kIdentifier)
+    return nullptr;
+  return s->expr;
+}
+
+// Records the bare call `s` is, with the number of the delay control whose
+// statement it is when there is one. A delay control is walked before its
+// statement, so the statement a numeric delay holds is noted here and found
+// when the walk reaches it.
+void CollectBareCall(const Stmt* s, ScopeWalk& out) {
+  if (s->kind == StmtKind::kDelay && s->delay != nullptr &&
+      (s->delay->kind == ExprKind::kIntegerLiteral ||
+       s->delay->kind == ExprKind::kRealLiteral) &&
+      BareCallOf(s->body) != nullptr) {
+    out.delayed_bodies[s->body] = s->delay->text;
+  }
+  const Expr* call = BareCallOf(s);
+  if (call == nullptr) return;
+  auto it = out.delayed_bodies.find(s);
+  std::string_view delay_number =
+      it == out.delayed_bodies.end() ? std::string_view{} : it->second;
+  out.bare_calls.push_back({call->text, call->range.start, delay_number});
+}
+
 void CollectScopeWalk(const Stmt* s, ScopeWalk& out) {
   if (!s) return;
   if (s->kind == StmtKind::kBlock && !s->label.empty()) {
@@ -71,6 +117,7 @@ void CollectScopeWalk(const Stmt* s, ScopeWalk& out) {
                 s->lhs->text) == out.active_loop_vars.end()) {
     out.proc_lhs.emplace_back(s->lhs->text, s->range.start);
   }
+  CollectBareCall(s, out);
   // §23.9 makes a block label, a local declaration and an assignment target
   // part of the scope they are written in wherever the statement holding them
   // stands, so every position a statement holds a statement in is one this
@@ -217,6 +264,51 @@ static bool ImportsProvideName(const CompilationUnit* unit,
   return false;
 }
 
+// §3.12.1 with §13.3: a task or function declared at compilation-unit scope
+// is what a bare call in a module of the unit reaches when the module declares
+// none of the name, as a unit's data declaration is for an assignment target.
+static bool UnitDeclaresSubroutine(const CompilationUnit* unit,
+                                   std::string_view name) {
+  for (const auto* item : unit->cu_items) {
+    if ((item->kind == ModuleItemKind::kTaskDecl ||
+         item->kind == ModuleItemKind::kFunctionDecl ||
+         item->kind == ModuleItemKind::kDpiImport) &&
+        item->name == name) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Syntax 5-2: the six time_unit spellings.
+static bool IsTimeUnitName(std::string_view name) {
+  return name == "s" || name == "ms" || name == "us" || name == "ns" ||
+         name == "ps" || name == "fs";
+}
+
+// Reports each bare call that `visible` answers false for: a unit name that
+// stands as the statement of a numeric delay under §5.8, since `#2.1 ns;` is
+// the time literal `2.1ns` written with a space and nothing else the
+// standard admits, and any other name as §23.9's unresolved reference.
+static void ReportBareCallsNamingNothing(
+    const ScopeWalk& walk, const std::function<bool(std::string_view)>& visible,
+    DiagEngine& diag) {
+  for (const auto& call : walk.bare_calls) {
+    if (visible(call.name)) continue;
+    if (!call.delay_number.empty() && IsTimeUnitName(call.name)) {
+      diag.Error(call.loc,
+                 std::format("'{}' after the delay {} is a separate token "
+                             "that names no task; a time literal's unit "
+                             "follows its number without white space",
+                             call.name, call.delay_number),
+                 Subclause("5.8"));
+      continue;
+    }
+    diag.Error(call.loc, std::format("undeclared identifier '{}'", call.name),
+               Subclause("23.9"));
+  }
+}
+
 void Elaborator::ValidateScopeRules(const ModuleDecl* decl) {
   ScopeWalk walk;
   for (const auto* item : decl->items) {
@@ -232,24 +324,33 @@ void Elaborator::ValidateScopeRules(const ModuleDecl* decl) {
                   Subclause("23.9"));
     }
   }
+  // §3.12.1 (printed page 56) has an import written at compilation-unit
+  // scope stand for the module too, as the read-side check honours it, and
+  // the unit's own variable and net declarations likewise, which §6.21
+  // (printed 132) gives a static lifetime: `int g;` outside every module
+  // with `initial g = 5;` in a module was reported as undeclared, while a
+  // unit function's or class's name still is (UnitDeclaresData in
+  // elaborator_items.cpp asks the unit's items for a data declaration).
+  auto target_visible = [&](std::string_view name) {
+    return walk.local_names.count(name) != 0 || IsNameInModuleScope(name) ||
+           ImportsProvideName(unit_, pkg_provided_names_, decl->items, name) ||
+           ImportsProvideName(unit_, pkg_provided_names_, unit_->cu_items,
+                              name) ||
+           UnitDeclaresData(unit_, name);
+  };
   for (const auto& [name, loc] : walk.proc_lhs) {
-    if (walk.local_names.count(name)) continue;
-    if (IsNameInModuleScope(name)) continue;
-    // §3.12.1 (printed page 56) has an import written at compilation-unit
-    // scope stand for the module too, as the read-side check honours it, and
-    // the unit's own variable and net declarations likewise, which §6.21
-    // (printed 132) gives a static lifetime: `int g;` outside every module
-    // with `initial g = 5;` in a module was reported as undeclared, while a
-    // unit function's or class's name still is (UnitDeclaresData in
-    // elaborator_items.cpp asks the unit's items for a data declaration).
-    if (ImportsProvideName(unit_, pkg_provided_names_, decl->items, name) ||
-        ImportsProvideName(unit_, pkg_provided_names_, unit_->cu_items, name) ||
-        UnitDeclaresData(unit_, name)) {
-      continue;
-    }
+    if (target_visible(name)) continue;
     diag_.Error(loc, std::format("undeclared identifier '{}'", name),
                 Subclause("23.9"));
   }
+  // A bare call reaches every name an assignment target does, and the unit's
+  // tasks and functions besides, which no assignment target may name.
+  ReportBareCallsNamingNothing(
+      walk,
+      [&](std::string_view name) {
+        return target_visible(name) || UnitDeclaresSubroutine(unit_, name);
+      },
+      diag_);
 }
 
 namespace {

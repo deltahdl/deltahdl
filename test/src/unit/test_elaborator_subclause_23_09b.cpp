@@ -19,6 +19,7 @@
 
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -265,6 +266,54 @@ TEST(GenerateBlockScope,
   ASSERT_NE(n, nullptr);
   EXPECT_NE(n->resolved_value, 4)
       << "block 'a' localparam P should not be measured by len() in block 'b'";
+}
+
+// §23.9: a name referenced directly is declared locally or in a module,
+// interface, program, checker, task, function, named block or generate block
+// higher in the same branch, and A.6.9's subroutine_call_statement makes a
+// bare `foo;` the call of a task named foo (§13.3). A bare name that no scope
+// declares is an unresolved reference; it was accepted and ran as nothing.
+TEST(ScopeRulesElaboration, BareCallOfAnUndeclaredTaskIsRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  initial begin\n"
+      "    foo;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "undeclared identifier 'foo'",
+                            3, "23.9"));
+}
+
+// The task declared in the module, at compilation-unit scope (§3.12.1) or in
+// a package the module imports (§26.3) is what the bare name reaches, so each
+// reports nothing.
+TEST(ScopeRulesElaboration, BareCallOfAModuleTaskReportsNothing) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  task foo; endtask\n"
+             "  initial foo;\n"
+             "endmodule\n"));
+}
+
+TEST(ScopeRulesElaboration, BareCallOfAUnitScopeTaskReportsNothing) {
+  EXPECT_TRUE(
+      ElabOk("task foo; endtask\n"
+             "module m;\n"
+             "  initial foo;\n"
+             "endmodule\n"));
+}
+
+TEST(ScopeRulesElaboration, BareCallOfAnImportedPackageTaskReportsNothing) {
+  EXPECT_TRUE(
+      ElabOk("package p;\n"
+             "  task foo; endtask\n"
+             "endpackage\n"
+             "module m;\n"
+             "  import p::*;\n"
+             "  initial foo;\n"
+             "endmodule\n"));
 }
 
 }  // namespace
