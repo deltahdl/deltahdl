@@ -528,4 +528,48 @@ TEST(PackageExport, ExplicitImportOfTheDeclarationAWildcardReferenceBound) {
                             15, "26.5"));
 }
 
+// §26.3 (printed page 808) references a declaration made in a package through
+// the package scope resolution operator, and §26.6 (printed 815) makes a
+// declaration the package imported reachable through the package only where
+// an export hands it on, p1::x and p2::x being one declaration after `import
+// p1::x; export p1::x;`. `p2::x` and `p4::x`, p4 exporting p1 by wildcard,
+// therefore elaborate clean, while `p5::x`, p5 importing x and exporting
+// nothing, names nothing p5 declares or exports and is reported at the
+// reference's line. Nothing was reported for either shape before.
+TEST(PackageExport, ScopedReferenceThroughTheExportingPackage) {
+  EXPECT_TRUE(
+      ElabOk("package p1;\n"
+             "  int x = 6;\n"
+             "endpackage\n"
+             "package p2;\n"
+             "  import p1::x;\n"
+             "  export p1::x;\n"
+             "endpackage\n"
+             "package p4;\n"
+             "  import p1::*;\n"
+             "  export p1::*;\n"
+             "endpackage\n"
+             "module top;\n"
+             "  int r;\n"
+             "  initial r = p2::x + p4::x;\n"
+             "endmodule\n"));
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("package p1;\n"
+             "  int x = 6;\n"
+             "endpackage\n"
+             "package p5;\n"
+             "  import p1::x;\n"
+             "endpackage\n"
+             "module top;\n"
+             "  int r;\n"
+             "  initial r = p5::x;\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "reference to 'p5::x', which package 'p5' neither "
+                            "declares nor exports",
+                            9, "26.3"));
+}
+
 }  // namespace

@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <format>
+#include <string>
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
@@ -411,18 +412,17 @@ void ReportSubroutineUnresolved(const ModuleDecl* decl, Pred declared,
   }
 }
 
-// Collects the base identifier of every scope-resolution member access
-// (`base::member`, marked is_scope_resolution by the parser) whose base is a
-// plain identifier, recursing through the whole expression tree so nested forms
-// (`a::b::c`, scope refs inside calls/concats) are reached. System scopes
-// (`$unit::`, `$root.`) carry their prefix in scope_prefix and are skipped
-// here.
+// Collects every scope-resolution member access (`base::member`, marked
+// is_scope_resolution by the parser) whose base is a plain identifier,
+// recursing through the whole expression tree so nested forms (`a::b::c`,
+// scope refs inside calls/concats) are reached. System scopes (`$unit::`,
+// `$root.`) carry their prefix in scope_prefix and are skipped here.
 void CollectScopeBases(const Expr* e, std::vector<const Expr*>& out) {
   if (!e) return;
   if (e->kind == ExprKind::kMemberAccess && e->is_scope_resolution && e->lhs &&
       e->lhs->kind == ExprKind::kIdentifier && e->lhs->scope_prefix.empty() &&
       !e->lhs->text.starts_with("$")) {
-    out.push_back(e->lhs);
+    out.push_back(e);
   }
   CollectScopeBases(e->lhs, out);
   CollectScopeBases(e->rhs, out);
@@ -455,23 +455,51 @@ void CollectProcScopeBases(const Stmt* s, std::vector<const Expr*>& out) {
                    [&](Stmt* const& sub) { CollectProcScopeBases(sub, out); });
 }
 
+// §26.3 (printed page 808) references a declaration made in a package through
+// the package scope resolution operator, and §26.6 (printed 815) has a
+// declaration the package imported reachable through the package only where
+// an export hands it on, `import p1::x; export p1::x;` making p1::x and p2::x
+// one declaration. `provided` answers whether the base package makes the
+// member available so, by its own declaration or by an exported one; a scoped
+// reference to a name the package imports without exporting, or never sees,
+// is reported.
+template <typename Provided>
+void ReportUnprovidedPackageMember(const Expr* ref, Provided provided,
+                                   DiagEngine& diag) {
+  const Expr* member = ref->rhs;
+  if (member == nullptr || member->kind != ExprKind::kIdentifier) return;
+  if (provided(ref->lhs->text, member->text)) return;
+  diag.Error(ref->lhs->range.start,
+             std::format("reference to '{}::{}', which package '{}' neither "
+                         "declares nor exports",
+                         ref->lhs->text, member->text, ref->lhs->text),
+             Subclause("26.3"));
+}
+
 // §26.3: a scope-resolution prefix `base::` shall name a package (or a class /
 // type, for static-member and type-scope access). `known` accepts those base
 // names; "std" is the always-available built-in package. Any other base is an
-// unresolved package or scope.
-template <typename Pred>
+// unresolved package or scope. A base that is known is then asked for the
+// member, which `provided` answers for a package of the unit and accepts for
+// every other base.
+template <typename Pred, typename Provided>
 void ReportUnknownScopeBases(const ModuleDecl* decl, Pred known,
-                             DiagEngine& diag) {
-  std::vector<const Expr*> bases;
+                             Provided provided, DiagEngine& diag) {
+  std::vector<const Expr*> refs;
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kContAssign) {
-      CollectScopeBases(item->assign_rhs, bases);
+      CollectScopeBases(item->assign_rhs, refs);
     } else if (IsProceduralItemKind(item->kind)) {
-      CollectProcScopeBases(item->body, bases);
+      CollectProcScopeBases(item->body, refs);
     }
   }
-  for (const auto* b : bases) {
-    if (b->text == "std" || b->text == "local" || known(b->text)) continue;
+  for (const auto* ref : refs) {
+    const Expr* b = ref->lhs;
+    if (b->text == "std" || b->text == "local") continue;
+    if (known(b->text)) {
+      ReportUnprovidedPackageMember(ref, provided, diag);
+      continue;
+    }
     diag.Error(
         b->range.start,
         std::format("reference to unresolved package or scope '{}'", b->text),
@@ -595,6 +623,26 @@ void Elaborator::ValidateUnresolvedReferences(const ModuleDecl* decl,
   // bare name where an import, wildcard or explicit, has brought it in, so it
   // stands as a base too -- `c = pk_t::get();` after `import p::*` was reported
   // while `p::pk_t::get()` was not.
+  //
+  // §26.6: the member of a `pkg::x` written on a package the unit declares is
+  // one the package declares or exports; a class or typedef of the module
+  // standing under a package's name is the base §8.23 takes first, and a base
+  // that is no package of the unit -- a class, an interface, an imported class
+  // -- has its members checked elsewhere. A `name[N]` enumeration member of
+  // §6.19.2 stands in the provided names under the unexpanded name alone, and
+  // the constants it expands to are read under their "pkg.name" keys
+  // (RegisterPackageParams in elaborator_resolve.cpp).
+  auto provided = [this](std::string_view base, std::string_view member) {
+    bool unit_package = base != "std" && PackageDeclared(unit_, base) &&
+                        class_names_.count(base) == 0 &&
+                        typedefs_.count(base) == 0;
+    if (!unit_package) return true;
+    if (PackageProvidesName(unit_, pkg_provided_names_, base, member)) {
+      return true;
+    }
+    std::string key = std::string(base) + "." + std::string(member);
+    return cu_param_scope_.count(key) != 0;
+  };
   ReportUnknownScopeBases(
       decl,
       [this, &explicit_imported, &wildcard_packages](std::string_view n) {
@@ -604,7 +652,7 @@ void Elaborator::ValidateUnresolvedReferences(const ModuleDecl* decl,
                AnyPackageProvidesName(unit_, pkg_provided_names_,
                                       wildcard_packages, n);
       },
-      diag_);
+      provided, diag_);
 }
 
 }  // namespace delta
