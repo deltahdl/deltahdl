@@ -729,6 +729,20 @@ void Elaborator::RecordNetArrayShape(ModuleItem* item, const RtlirNet& net,
   TrackVarArrayInfo(item, dims, BuildParamScope(mod), net_array_info_);
 }
 
+// §20.6.2: $bits of a net array is width bits per element over every
+// dimension, so the dimensions RecordNetArrayShape folded into `infos` are
+// carried on the net itself, as a variable carries its own. A net declared
+// without an unpacked dimension has no entry there and keeps the zero count.
+static void CarryNetArrayDims(
+    std::string_view name,
+    const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>& infos,
+    RtlirNet& net) {
+  auto it = infos.find(name);
+  if (it == infos.end()) return;
+  net.num_unpacked_dims = it->second.num_unpacked_dims;
+  net.unpacked_dim_sizes = it->second.dim_sizes;
+}
+
 // The type a net record carries beyond its width. §11.5.1: the width says how
 // many bits the net has, not which bit an index names, so the declared type
 // travels wherever it holds a packed dimension and the simulator addresses the
@@ -857,6 +871,7 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
   RecordNetDeclDelay(item, net);
 
   RecordNetArrayShape(item, net, mod);
+  CarryNetArrayDims(item->name, net_array_info_, net);
 
   net.attrs = ResolveAttributes(item->attrs, diag_);
   mod->nets.push_back(net);

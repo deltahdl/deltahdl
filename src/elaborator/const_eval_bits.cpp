@@ -1,13 +1,15 @@
 // What a declaration says about the size of a name. §20.6.2 (printed page
 // 629 of ~/LRM.pdf) has $bits answer the number of bits an argument holds,
 // which for a literal, a type keyword with or without a packed range, a
-// parameter or a variable of the registered module is fixed at elaboration;
+// parameter, a variable or a net of the registered module is fixed at
+// elaboration;
 // EvalConstSysCall in const_eval.cpp is what asks. Moved out of const_eval.cpp
 // for room.
 
 #include <cstdint>
 #include <optional>
 #include <string_view>
+#include <vector>
 
 #include "elaborator/const_eval.h"
 #include "elaborator/const_eval_internal.h"
@@ -85,37 +87,69 @@ static std::optional<int64_t> ParamDeclBits(const RtlirParamDecl& pd) {
   return static_cast<int64_t>(value->width);
 }
 
+// §20.6.2 (printed page 629) with §6.24.3: the bits an array of `elem_bits`
+// bit elements holds as a bit stream, its element count being the product of
+// its unpacked dimensions. Empty when a dimension did not fold, which
+// `sizes` then has fewer entries than `num_dims` to say, and for a queue, a
+// dynamic or an associative array, whose extent the declaration does not
+// fix.
+static std::optional<int64_t> ArrayBits(uint32_t elem_bits, uint32_t num_dims,
+                                        const std::vector<uint32_t>& sizes) {
+  if (sizes.size() != num_dims) return std::nullopt;
+  int64_t bits = elem_bits;
+  for (uint32_t size : sizes) bits *= size;
+  return bits;
+}
+
 // §20.6.2 (printed page 629) opens with `logic [31:0] v` and has $bits(v)
 // answer 32, the number of bits the declaration gives the variable.
 // RtlirVariable::width carries that for a variable the registered module has
 // already elaborated, so a variable of the module answers from there. A
-// variable with an unpacked dimension holds width bits per element rather
-// than in all, and a real, string, event, chandle or class variable holds no
-// bit vector this layer sizes, so those are left to the run. A net is left
-// to the run as well: RtlirNet carries its width and nothing about an
-// unpacked dimension, so a net array cannot be told from a vector here.
+// variable with unpacked dimensions holds width bits per element, so it
+// answers width times every dimension's size where all of them folded. A
+// real, string, event, chandle or class variable holds no bit vector this
+// layer sizes, so those are left to the run.
 static std::optional<int64_t> RegisteredVariableBits(std::string_view name) {
   const RtlirModule* mod = RegisteredModule();
   if (mod == nullptr) return std::nullopt;
   for (const auto& var : mod->variables) {
     if (var.name != name) continue;
-    if (var.num_unpacked_dims != 0 || var.is_real || var.is_string ||
-        var.is_event || var.is_chandle || !var.class_type_name.empty())
+    if (var.is_real || var.is_string || var.is_event || var.is_chandle ||
+        !var.class_type_name.empty())
       return std::nullopt;
-    return static_cast<int64_t>(var.width);
+    return ArrayBits(var.width, var.num_unpacked_dims, var.unpacked_dim_sizes);
+  }
+  return std::nullopt;
+}
+
+// §20.6.2 lets $bits size a net as it sizes a variable, `wire [3:0] v` being
+// four bits and `wire [7:0] w[3]` twenty-four. RtlirNet::width is the bits of
+// one element and RtlirNet::unpacked_dim_sizes the dimensions the
+// declaration wrote, so a net of the registered module answers as a variable
+// does.
+static std::optional<int64_t> RegisteredNetBits(std::string_view name) {
+  const RtlirModule* mod = RegisteredModule();
+  if (mod == nullptr) return std::nullopt;
+  for (const auto& net : mod->nets) {
+    if (net.name != name) continue;
+    return ArrayBits(net.width, net.num_unpacked_dims, net.unpacked_dim_sizes);
   }
   return std::nullopt;
 }
 
 // §20.6.2: the bits an identifier argument of $bits holds. A type keyword is
-// sized by IntegralKeywordWidth, and no parameter or variable can be named by
-// one, so it is asked first; then a parameter of the registered module by
-// its declaration (§6.20.2), then a variable of it by its declared width.
+// sized by IntegralKeywordWidth, and no parameter, variable or net can be
+// named by one, so it is asked first; then a parameter of the registered
+// module by its declaration (§6.20.2), then a variable of it by its declared
+// width, then a net. A typedef name is not sized here: the fold has the
+// registered module and its parameters, variables and nets, and no typedef
+// table to resolve the name through.
 static std::optional<int64_t> IdentifierBits(const Expr* a) {
   if (auto w = IntegralKeywordWidth(a->text)) return w;
   if (const RtlirParamDecl* pd = RegisteredParamNamed(a->text))
     return ParamDeclBits(*pd);
-  return RegisteredVariableBits(a->text);
+  if (auto w = RegisteredVariableBits(a->text)) return w;
+  return RegisteredNetBits(a->text);
 }
 
 std::optional<int64_t> EvalConstBits(const Expr* expr, const ScopeMap& scope) {

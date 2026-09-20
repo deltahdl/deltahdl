@@ -151,6 +151,17 @@ struct RtlirNet {
   // at. Null for a scalar, which is addressed as [0:0].
   const DataType* dtype = nullptr;
 
+  // §7.4.2 with §20.6.2: the unpacked dimensions the declaration wrote after
+  // the name, `wire [7:0] w[3]` having one of size 3. `width` is the bits of
+  // one element, so the bits the net holds in all -- what $bits(w) answers,
+  // 24 -- are width times every size here, and a net with none of them is a
+  // vector of width bits. num_unpacked_dims counts every dimension written;
+  // unpacked_dim_sizes holds the size of each dimension whose bounds folded,
+  // in declaration order, so a vector shorter than num_unpacked_dims does not
+  // line up with the declaration and sizes nothing.
+  uint32_t num_unpacked_dims = 0;
+  std::vector<uint32_t> unpacked_dim_sizes;
+
   bool is_signed = false;
   std::vector<uint32_t> driver_indices;
 

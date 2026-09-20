@@ -1,6 +1,14 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
+#include <cstdint>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
+
 #include "elaborator/const_eval.h"
+#include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 #include "fixture_evaluator.h"
 #include "helpers_reported_error.h"
@@ -9,6 +17,20 @@
 using namespace delta;
 
 namespace {
+
+// The resolved value of parameter `name` of module m, or -1 where the module
+// declares none or the fold left it unresolved: no test below expects -1 of a
+// parameter it reads, so the two failures read as one wrong number.
+int64_t ParamValue(RtlirDesign* design, std::string_view name) {
+  const auto* p = FindParam(design, "m", name);
+  return p != nullptr && p->is_resolved ? p->resolved_value : -1;
+}
+
+// Whether the fold left parameter `name` of module m without a value.
+bool ParamUnresolved(RtlirDesign* design, std::string_view name) {
+  const auto* p = FindParam(design, "m", name);
+  return p == nullptr || !p->is_resolved;
+}
 
 TEST(ConstEval, BitsExpr) {
   EvalFixture f;
@@ -391,6 +413,388 @@ TEST(BitsOfDeclaration, VariableAnswersItsDeclaredWidth) {
   ASSERT_NE(bx, nullptr);
   EXPECT_TRUE(bx->is_resolved);
   EXPECT_EQ(bx->resolved_value, 16);
+}
+
+// §6.20.2 (printed page 126): a parameter declared with neither type nor range
+// takes the size of its final value, and a name standing for a 96-bit
+// parameter is 96 bits wide, so `localparam S = P` holds 96 bits and $bits(S)
+// answers 96 -- not the 32 of a fold that read every name as an int.
+TEST(BitsOfDeclaration, ImplicitParameterSetFromAWideParameterIsAsWide) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  localparam logic [95:0] P = 96'h0123_4567_89AB_CDEF_0011_2233;\n"
+      "  localparam S = P;\n"
+      "  localparam int BS = $bits(S);\n"
+      "  localparam int SH = S[95:64];\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(ParamValue(design, "BS"), 96);
+  EXPECT_EQ(ParamValue(design, "SH"), 0x01234567);
+}
+
+// §11.6.1's Table 11-21 (printed pages 299-300) sizes a self-determined
+// expression by its operator: the arithmetic and bitwise operators take the
+// wider operand, a shift and a power the left operand, a comparison, an
+// equality, a logical operator, an implication, a reduction and `!` one bit,
+// unary `+ - ~` their operand, a conditional the wider arm. B is 8 bits and
+// an unsized literal at least 32, so `B + B` is 8 bits and `B + 1` is 32.
+TEST(BitsOfDeclaration, OperatorExpressionIsSizedByTable11_21) {
+  const std::vector<std::pair<std::string, int64_t>> kCases{
+      {"B + B", 8},   {"B - B", 8},   {"B * B", 8},
+      {"B / B", 8},   {"B % B", 8},   {"B & B", 8},
+      {"B | B", 8},   {"B ^ B", 8},   {"B ^~ B", 8},
+      {"B ~^ B", 8},  {"B + 1", 32},  {"B << 4", 8},
+      {"B <<< 4", 8}, {"B >> 4", 8},  {"B >>> 4", 8},
+      {"B ** 2", 8},  {"B < B", 1},   {"B > B", 1},
+      {"B <= B", 1},  {"B >= B", 1},  {"B == B", 1},
+      {"B != B", 1},  {"B === B", 1}, {"B !== B", 1},
+      {"B ==? B", 1}, {"B !=? B", 1}, {"B && B", 1},
+      {"B || B", 1},  {"B -> B", 1},  {"B <-> B", 1},
+      {"+B", 8},      {"-B", 8},      {"~B", 8},
+      {"&B", 1},      {"~&B", 1},     {"|B", 1},
+      {"~|B", 1},     {"^B", 1},      {"~^B", 1},
+      {"^~B", 1},     {"!B", 1},      {"B ? B : 16'h1", 16}};
+  std::string src =
+      "module m;\n"
+      "  localparam logic [7:0] B = 8'hFF;\n";
+  for (size_t i = 0; i < kCases.size(); ++i) {
+    src += "  localparam int W" + std::to_string(i) + " = $bits(" +
+           kCases[i].first + ");\n";
+  }
+  src += "endmodule\n";
+  ElabFixture f;
+  auto* design = ElaborateSrc(src, f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  for (size_t i = 0; i < kCases.size(); ++i) {
+    EXPECT_EQ(ParamValue(design, "W" + std::to_string(i)), kCases[i].second)
+        << kCases[i].first;
+  }
+}
+
+// A binary operator Table 11-21 does not size -- the sequence implication,
+// which makes no expression at all -- leaves $bits unfolded rather than sized
+// as something it is not.
+TEST(BitsOfDeclaration, OperatorOutsideTable11_21IsLeftUnsized) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  localparam logic [7:0] B = 8'hFF;\n"
+      "  localparam int W = $bits(B |-> B);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(design == nullptr || ParamUnresolved(design, "W"));
+}
+
+// §6.20.2 (printed page 127): a parameter declared with a type keeps the
+// width and signedness of that type whatever value it was set to, so a byte
+// set to 300 is read as the 44 the low eight bits hold and a 4-bit unsigned
+// vector set to -1 as 15. One with a bare `signed` and no range takes the
+// range of its value, so SG is the 32-bit -3 it was set to.
+TEST(BitsOfDeclaration, ParameterNameReadsAtItsDeclaredWidthAndSign) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  localparam byte B = 300;\n"
+      "  localparam bit [3:0] Y = -1;\n"
+      "  parameter signed SG = -3;\n"
+      "  localparam int RB = B;\n"
+      "  localparam int RY = Y;\n"
+      "  localparam int RS = SG;\n"
+      "  localparam int BSG = $bits(SG);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(ParamValue(design, "RB"), 44);
+  EXPECT_EQ(ParamValue(design, "RY"), 15);
+  EXPECT_EQ(ParamValue(design, "RS"), -3);
+  EXPECT_EQ(ParamValue(design, "BSG"), 32);
+}
+
+// §13.4.3 folds a constant function's body against its locals, which sit in
+// the same scope map as the module's parameters under bare names. A formal
+// named as a byte parameter is holds the 300 the call passed, not the 44 the
+// parameter's width would leave, so the declaration is applied only to a name
+// whose value is the parameter's.
+TEST(BitsOfDeclaration, FormalNamedAsAParameterIsNotCutToItsWidth) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  localparam byte K = 3;\n"
+      "  function automatic int f(input int K);\n"
+      "    return K;\n"
+      "  endfunction\n"
+      "  localparam int R = f(300);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(ParamValue(design, "R"), 300);
+}
+
+// §6.20.2: a parameter with neither type nor range whose value is an
+// enumeration constant (§6.19) takes the value's size, and the constant is not
+// among the module's parameters the fold sizes it against, so the name reads
+// as a 32-bit signed integer, as every name did before.
+TEST(BitsOfDeclaration, ImplicitParameterSetFromAnEnumConstantReadsAsInt) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  typedef enum {A0, A1} e_t;\n"
+      "  localparam E = A1;\n"
+      "  localparam int X = E + A1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(ParamValue(design, "X"), 2);
+}
+
+// §23.9 has a module's own P hide the compilation unit's inside the module,
+// so a value written as `P + 1` names the parameter it initializes, which
+// §6.20.1 does not admit; the elaborator folded it against the unit's P
+// before this and still does. Sizing a later read of P folds `P + 1` again,
+// which names P again, and the fold is capped rather than run without end:
+// elaboration terminates and H reads the low word alone.
+TEST(BitsOfDeclaration, SelfReferentialWideParameterTerminates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "localparam logic [95:0] P = 96'h1;\n"
+      "module m;\n"
+      "  localparam logic [95:0] P = P + 1;\n"
+      "  localparam int H = P[95:64];\n"
+      "  localparam int L = P[31:0];\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_EQ(ParamValue(design, "H"), 0);
+  EXPECT_EQ(ParamValue(design, "L"), 2);
+}
+
+// §5.7.1 (printed page 77): a based literal's digits give its value in the
+// base its base format character names, in either case, with x ending the
+// digits the fold reads, and the size constant states the width the value is
+// cut to from the left. Each form's bits above 64 are read back through a
+// select at or above bit 64.
+TEST(BitsOfDeclaration, WideLiteralOfEachBaseCarriesItsHighBits) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  localparam logic [95:0] PL = 96'h0123_4567_89ab_cdef_0011_2233;\n"
+      "  localparam int PLH = PL[95:64];\n"
+      "  localparam logic [79:0] PB = 80'b"
+      "1000000000000000000000000000000000000000"
+      "0000000000000000000000000000000000000001;\n"
+      "  localparam int PBH = PB[79:64];\n"
+      "  localparam logic [71:0] PO = 72'O400000000000000000000001;\n"
+      "  localparam int POH = PO[71:64];\n"
+      "  localparam logic [79:0] PD = 80'd604462909807314587353089;\n"
+      "  localparam int PDH = PD[79:64];\n"
+      "  localparam logic [95:0] PX = 96'h0123_4567_89AB_CDEF_0011_22x3;\n"
+      "  localparam int PXH = PX[95:64];\n"
+      "  localparam logic [127:0] PW ="
+      " 128'hFEDC_BA98_7654_3210_0123_4567_89AB_CDEF;\n"
+      "  localparam int PWH = PW[127:96];\n"
+      "  localparam int PWM = PW[95:64];\n"
+      "  localparam logic [95:0] PZ = 96'h1;\n"
+      "  localparam int PZH = PZ[95:64];\n"
+      "  localparam int PZL = PZ[7:0];\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(ParamValue(design, "PLH"), 0x01234567);
+  EXPECT_EQ(ParamValue(design, "PBH"), 0x8000);
+  EXPECT_EQ(ParamValue(design, "POH"), 0x80);
+  EXPECT_EQ(ParamValue(design, "PDH"), 0x8000);
+  EXPECT_EQ(ParamValue(design, "PXH"), 0x00012345);
+  EXPECT_EQ(ParamValue(design, "PWH"), 0xFEDCBA98);
+  EXPECT_EQ(ParamValue(design, "PWM"), 0x76543210);
+  EXPECT_EQ(ParamValue(design, "PZH"), 0);
+  EXPECT_EQ(ParamValue(design, "PZL"), 1);
+}
+
+// §11.5.1 (printed page 296): a bit-select at or above bit 64 reads the bit
+// the digits wrote there, a part-select running off the bottom of the value
+// keeps its in-range bits at their places in the field with the bits below
+// read as 0, and a bit-select below the range reads 0.
+TEST(BitsOfDeclaration, BitSelectAboveSixtyFourAndBelowZero) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  localparam logic [95:0] P = 96'h0123_4567_89AB_CDEF_0011_2233;\n"
+      "  localparam int B64 = P[64];\n"
+      "  localparam int B67 = P[67];\n"
+      "  localparam int B95 = P[95];\n"
+      "  localparam int LOW = P[3:-4];\n"
+      "  localparam int NEG = P[-1];\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_EQ(ParamValue(design, "B64"), 1);
+  EXPECT_EQ(ParamValue(design, "B67"), 0);
+  EXPECT_EQ(ParamValue(design, "B95"), 0);
+  EXPECT_EQ(ParamValue(design, "LOW"), 0x30);
+  EXPECT_EQ(ParamValue(design, "NEG"), 0);
+}
+
+// §11.4.8 combines two 96-bit operands bit by bit across all 96, and §11.4.10
+// shifts across them, the arithmetic right shift of a signed operand filling
+// from its sign bit (PS, bit 95 set) and of one whose sign bit is clear (PP)
+// or that is unsigned (P) with zeros. `P + 1` is arithmetic, which the fold
+// still does on the low word, so its result is the low word plus one.
+TEST(BitsOfDeclaration, ShiftAndBitwiseOperatorsWorkAcrossTheWideValue) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  localparam logic [95:0] P = 96'h0123_4567_89AB_CDEF_0011_2233;\n"
+      "  localparam logic [95:0] M = 96'hF0F0_F0F0_F0F0_F0F0_F0F0_F0F0;\n"
+      "  localparam logic signed [95:0] PS = "
+      "96'sh8000_0000_0000_0000_0000_0001;\n"
+      "  localparam logic signed [95:0] PP = "
+      "96'sh0123_4567_89AB_CDEF_0011_2233;\n"
+      "  localparam logic [95:0] A = P & M;\n"
+      "  localparam int AH = A[95:64];\n"
+      "  localparam int AL = A[31:0];\n"
+      "  localparam logic [95:0] O = P | M;\n"
+      "  localparam int OH = O[95:64];\n"
+      "  localparam logic [95:0] X = P ^ M;\n"
+      "  localparam int XH = X[95:64];\n"
+      "  localparam logic [95:0] N1 = P ~^ M;\n"
+      "  localparam int N1H = N1[95:64];\n"
+      "  localparam logic [95:0] N2 = P ^~ M;\n"
+      "  localparam int N2H = N2[95:64];\n"
+      "  localparam logic [95:0] SL = P << 4;\n"
+      "  localparam int SLH = SL[95:64];\n"
+      "  localparam int SLL = SL[31:0];\n"
+      "  localparam logic [95:0] SW = P <<< 64;\n"
+      "  localparam int SWH = SW[95:64];\n"
+      "  localparam int SWL = SW[31:0];\n"
+      "  localparam logic [95:0] SR = P >> 4;\n"
+      "  localparam int SRH = SR[95:64];\n"
+      "  localparam int SRL = SR[31:0];\n"
+      "  localparam logic [95:0] SA = P >>> 4;\n"
+      "  localparam int SAH = SA[95:64];\n"
+      "  localparam logic signed [95:0] SS = PS >>> 4;\n"
+      "  localparam int SSH = SS[95:64];\n"
+      "  localparam logic signed [95:0] SQ = PP >>> 4;\n"
+      "  localparam int SQH = SQ[95:64];\n"
+      "  localparam logic signed [95:0] SM = PS & M;\n"
+      "  localparam int SMH = SM[95:64];\n"
+      "  localparam logic [95:0] I = P + 1;\n"
+      "  localparam int IL = I[31:0];\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(ParamValue(design, "AH"), 0x00204060);
+  EXPECT_EQ(ParamValue(design, "AL"), 0x00102030);
+  EXPECT_EQ(ParamValue(design, "OH"), 0xF1F3F5F7);
+  EXPECT_EQ(ParamValue(design, "XH"), 0xF1D3B597);
+  EXPECT_EQ(ParamValue(design, "N1H"), 0x0E2C4A68);
+  EXPECT_EQ(ParamValue(design, "N2H"), 0x0E2C4A68);
+  EXPECT_EQ(ParamValue(design, "SLH"), 0x12345678);
+  EXPECT_EQ(ParamValue(design, "SLL"), 0x01122330);
+  EXPECT_EQ(ParamValue(design, "SWH"), 0x00112233);
+  EXPECT_EQ(ParamValue(design, "SWL"), 0);
+  EXPECT_EQ(ParamValue(design, "SRH"), 0x00123456);
+  EXPECT_EQ(ParamValue(design, "SRL"), 0xF0011223);
+  EXPECT_EQ(ParamValue(design, "SAH"), 0x00123456);
+  EXPECT_EQ(ParamValue(design, "SSH"), 0xF8000000);
+  EXPECT_EQ(ParamValue(design, "SQH"), 0x00123456);
+  EXPECT_EQ(ParamValue(design, "SMH"), 0x80000000);
+  EXPECT_EQ(ParamValue(design, "IL"), 0x00112234);
+}
+
+// §23.10.2 with §6.20.2: an instance's parameter value assignment written as
+// a literal names nothing and reads the same in every scope, so the bits
+// above 64 of a 96-bit override are read where the instantiated module
+// selects them; one written as the parent's parameter stands in the parent,
+// whose names mean nothing in the child, so the child reads the low word the
+// fold carried over and 0 above it.
+TEST(BitsOfDeclaration, LiteralOverrideReadsAboveBitSixtyFour) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module c #(parameter logic [95:0] P = 96'h0);\n"
+      "  localparam int H = P[95:64];\n"
+      "  localparam int L = P[31:0];\n"
+      "endmodule\n"
+      "module t;\n"
+      "  localparam logic [95:0] PP = 96'h0123_4567_89AB_CDEF_0011_2233;\n"
+      "  c #(.P(96'h0123_4567_89AB_CDEF_0011_2233)) u1();\n"
+      "  c #(.P(PP)) u2();\n"
+      "endmodule\n",
+      f, "t");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto& children = design->top_modules[0]->children;
+  ASSERT_EQ(children.size(), 2u);
+  auto value = [](const RtlirModule* c, std::string_view name) {
+    for (const auto& p : c->params)
+      if (p.name == name) return p.resolved_value;
+    return int64_t{-1};
+  };
+  EXPECT_EQ(value(children[0].resolved, "H"), 0x01234567);
+  EXPECT_EQ(value(children[0].resolved, "L"), 0x00112233);
+  EXPECT_EQ(value(children[1].resolved, "H"), 0);
+  EXPECT_EQ(value(children[1].resolved, "L"), 0x00112233);
+}
+
+// §20.6.2 (printed page 629) with §6.24.3: an unpacked array holds its
+// element's bits per element, so `logic [7:0] arr[4]` is 32 bits, and a net
+// is sized as a variable is -- `wire [3:0] v` four bits and `wire [7:0] w[3]`
+// twenty-four. An array whose extent the declaration does not fix, a dynamic
+// array, is left to the run.
+TEST(BitsOfDeclaration, NetAndUnpackedArrayAnswerTheirBits) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] arr[4];\n"
+      "  logic [7:0] grid[2][3];\n"
+      "  wire [7:0] w[3];\n"
+      "  wire [3:0] v;\n"
+      "  logic [7:0] dyn[];\n"
+      "  localparam int BA = $bits(arr);\n"
+      "  localparam int BG = $bits(grid);\n"
+      "  localparam int BW = $bits(w);\n"
+      "  localparam int BV = $bits(v);\n"
+      "  localparam int BD = $bits(dyn);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_EQ(ParamValue(design, "BA"), 32);
+  EXPECT_EQ(ParamValue(design, "BG"), 48);
+  EXPECT_EQ(ParamValue(design, "BW"), 24);
+  EXPECT_EQ(ParamValue(design, "BV"), 4);
+  EXPECT_TRUE(ParamUnresolved(design, "BD"));
+  const auto* w = FindNet(design, "m", "w");
+  ASSERT_NE(w, nullptr);
+  EXPECT_EQ(w->num_unpacked_dims, 1u);
+  EXPECT_EQ(w->unpacked_dim_sizes, std::vector<uint32_t>{3});
+  const auto* v = FindNet(design, "m", "v");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->num_unpacked_dims, 0u);
+}
+
+// §20.6.2 sizes a typedef name by the type it stands for, `typedef logic
+// [11:0] my_t` being 12 bits. The fold has the registered module's
+// parameters, variables and nets and no typedef table, so the name is left
+// to the run rather than sized: the parameter stays unresolved, and is not
+// given a width the name does not have.
+TEST(BitsOfDeclaration, TypedefNameIsLeftToTheRun) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  typedef logic [11:0] my_t;\n"
+      "  localparam int BT = $bits(my_t);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(ParamUnresolved(design, "BT"));
 }
 
 }  // namespace
