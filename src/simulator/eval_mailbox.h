@@ -41,6 +41,20 @@ bool TryMailboxNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena);
 // peek() on a mailbox, the three methods that can suspend the process.
 bool IsMailboxBlockingCall(const Expr* expr, SimContext& ctx, Arena& arena);
 
+// §13.4 forbids a function to suspend the process that enables it, and
+// §15.4.3, §15.4.5 and §15.4.7 have put(), get() and peek() suspend it only
+// while a bounded mailbox is full or while the mailbox is empty. So a call
+// of one of the three reached in a function body is served where it would
+// not wait -- a put() on a mailbox with room places its message, a get() or
+// peek() on one holding a message retrieves or copies it, through the same
+// operations ExecMailboxCall's awaiters take -- and one that would wait is
+// reported as an error under §13.4 at the call, with the mailbox and the
+// variable as they were. Returns whether the call was one of the three.
+// Reached through the expression evaluator, which answers num() and the
+// try_* forms alone, a function's `mb.put(1)` placed nothing.
+bool TryExecMailboxCallInFunction(const Expr* expr, SimContext& ctx,
+                                  Arena& arena);
+
 // §15.4.3, §15.4.5 and §15.4.7: runs a call IsMailboxBlockingCall answered
 // true for, suspending the process while a bounded mailbox is full or while
 // the mailbox is empty, and storing the message get() or peek() retrieved

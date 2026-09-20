@@ -492,6 +492,63 @@ static void FinishMailboxRetrieval(const Expr* expr, const Logic4Vec& msg,
       method == "get" ? Subclause("15.4.5") : Subclause("15.4.7"));
 }
 
+// §13.4: the report for a put(), get() or peek() a function body reached
+// while the mailbox, spelled as the receiver was written, is in the `state`
+// -- full or empty -- that would make the call wait.
+static void ReportMailboxWouldBlock(const Expr* expr, std::string_view state,
+                                    SimContext& ctx, Arena& arena) {
+  std::string_view method = expr->lhs->rhs->text;
+  ctx.GetDiag().Error(expr->range.start,
+                      "mailbox " + std::string(method) + "(): '" +
+                          TargetSpelling(expr->lhs->lhs, ctx, arena) + "' is " +
+                          std::string(state) +
+                          ", so the call would block inside a function",
+                      Subclause("13.4"));
+}
+
+// §15.4.5 and §15.4.7 inside a function body: get() removes and peek()
+// copies the front message where the mailbox holds one, which then reaches
+// the named variable or is §15.4.5's and §15.4.7's type error as it is once
+// ExecMailboxCall's wait ends; an empty mailbox, on which either would wait,
+// is §13.4's report with the variable as it was.
+static void ExecMailboxRetrievalInFunction(MailboxObject& mbx, bool remove,
+                                           const Expr* expr, SimContext& ctx,
+                                           Arena& arena) {
+  if (mbx.Num() == 0) {
+    ReportMailboxWouldBlock(expr, "empty", ctx, arena);
+    return;
+  }
+  MailboxMessageType want = RetrievalTargetType(expr, ctx, arena);
+  Logic4Snapshot msg;
+  bool type_error = remove ? mbx.Get(msg, want) == MbxGetStatus::kTypeError
+                           : mbx.Peek(msg, want) == MbxPeekStatus::kTypeError;
+  FinishMailboxRetrieval(expr, msg.Get(), type_error, ctx, arena);
+}
+
+// §15.4.3 inside a function body: put() places its message where the
+// mailbox has room, as ExecMailboxCall's awaiter does before it would wait,
+// and a full bounded mailbox, on which it would wait, is §13.4's report with
+// the message not placed.
+bool TryExecMailboxCallInFunction(const Expr* expr, SimContext& ctx,
+                                  Arena& arena) {
+  if (auto* mbx = MailboxCallTarget(expr, ctx, arena, "put")) {
+    MailboxMessage msg = MailboxMessageArg(expr, ctx, arena);
+    if (mbx->Put(msg.value.Get(), msg.type) == MbxPutStatus::kBlock) {
+      ReportMailboxWouldBlock(expr, "full", ctx, arena);
+    }
+    return true;
+  }
+  if (auto* mbx = MailboxCallTarget(expr, ctx, arena, "get")) {
+    ExecMailboxRetrievalInFunction(*mbx, true, expr, ctx, arena);
+    return true;
+  }
+  if (auto* mbx = MailboxCallTarget(expr, ctx, arena, "peek")) {
+    ExecMailboxRetrievalInFunction(*mbx, false, expr, ctx, arena);
+    return true;
+  }
+  return false;
+}
+
 // §15.4.3: the message is evaluated before the process may suspend, so a
 // put() that waits for room stores the value its argument had when the call
 // was reached. §15.4.5 and §15.4.7: the message get() or peek() waited for

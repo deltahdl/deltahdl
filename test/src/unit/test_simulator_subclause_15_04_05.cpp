@@ -599,4 +599,60 @@ TEST(MailboxSim, GetIntoASignedLogicMemberRefusesAnUnsignedMessage) {
   ExpectWord(f, "n", 51u);
 }
 
+// §15.4.3 (printed page 375) has put() suspend the process only while a
+// bounded mailbox is full, and §13.4 (printed 340) forbids a function to
+// suspend the process enabling it, so a put() a void function reaches on an
+// unbounded mailbox places its message where it stands: the module's get()
+// then reads the 8 and num() 0, 80. Served by the expression evaluator, which
+// answers num() and the try_* forms alone, the function's put() placed
+// nothing, the get() waited on the empty mailbox and r stayed 0.
+TEST(MailboxSim, PutInsideAFunctionPlacesTheMessage) {
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  mailbox mb = new;\n"
+                      "  int x, r;\n"
+                      "  function void f();\n"
+                      "    mb.put(8);\n"
+                      "  endfunction\n"
+                      "  initial begin\n"
+                      "    f();\n"
+                      "    mb.get(x);\n"
+                      "    r = x * 10 + mb.num();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "r"),
+            80u);
+}
+
+// §13.4 (printed page 340) with §15.4.3 (printed 375): a put() on a mailbox
+// bounded at one message that already holds one would suspend the process,
+// which a function may not do, so the function's second put() is the error,
+// reported at the call under §13.4 with the message not placed: the get()
+// reads the first message, 8, and num() 0, 80. A put() that placed the 9
+// over the bound would have read 81.
+TEST(MailboxSim, PutInsideAFunctionOnAFullMailboxIsAnError) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  mailbox mb = new(1);\n"
+      "  int x, n;\n"
+      "  function void f();\n"
+      "    mb.put(8);\n"
+      "    mb.put(9);\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    f();\n"
+      "    mb.get(x);\n"
+      "    n = x * 10 + mb.num();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "mailbox put(): 'mb' is full, so the call would "
+                            "block inside a function",
+                            6, "13.4"));
+  ExpectWord(f, "n", 80u);
+}
+
 }  // namespace

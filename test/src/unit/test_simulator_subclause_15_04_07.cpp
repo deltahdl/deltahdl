@@ -7,6 +7,7 @@
 #include "common/types.h"
 #include "fixture_simulator.h"
 #include "helpers_reported_error.h"
+#include "helpers_scheduler.h"
 #include "simulator/sync_objects.h"
 
 using namespace delta;
@@ -282,6 +283,85 @@ TEST(MailboxSim, PeekIntoAVariableOfAnotherTypeIsAnError) {
   auto* x = f.ctx.FindVariable("x");
   ASSERT_NE(x, nullptr);
   EXPECT_EQ(x->value.ToUint64(), 9u);
+}
+
+// §15.4.5 (printed page 376) has get() suspend the process only while the
+// mailbox is empty, and §13.4 (printed 340) forbids a function to suspend
+// the process enabling it, so a get() a void function reaches on a mailbox
+// holding a message removes it where it stands: 4 and a num() of 0 read as
+// 40. Served by the expression evaluator, which answers num() and the try_*
+// forms alone, the function's get() retrieved nothing and read 1.
+TEST(MailboxSim, GetInsideAFunctionRetrievesAHeldMessage) {
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  mailbox mb = new;\n"
+                      "  int x, r;\n"
+                      "  function void g();\n"
+                      "    mb.get(x);\n"
+                      "  endfunction\n"
+                      "  initial begin\n"
+                      "    mb.put(4);\n"
+                      "    g();\n"
+                      "    r = x * 10 + mb.num();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "r"),
+            40u);
+}
+
+// §15.4.7 (printed page 376) has peek() copy the front message and leave it
+// in the queue, suspending the process only while the mailbox is empty, so a
+// peek() a void function reaches on a mailbox holding a message copies it
+// where it stands (§13.4, printed 340): 4 and a num() of 1 read as 41. The
+// function's peek() copied nothing and read 1.
+TEST(MailboxSim, PeekInsideAFunctionCopiesAHeldMessage) {
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  mailbox mb = new;\n"
+                      "  int y, r;\n"
+                      "  function void pk();\n"
+                      "    mb.peek(y);\n"
+                      "  endfunction\n"
+                      "  initial begin\n"
+                      "    mb.put(4);\n"
+                      "    pk();\n"
+                      "    r = y * 10 + mb.num();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "r"),
+            41u);
+}
+
+// §13.4 (printed page 340) with §15.4.5 (printed 376): a get() on an empty
+// mailbox would suspend the process, which a function may not do, so the
+// function's get() is the error, reported at the call under §13.4 with the
+// variable as it was, 9, and the process going on to read num() 0 plus 1.
+// The function's get() of an empty mailbox raised nothing.
+TEST(MailboxSim, GetInsideAFunctionOfAnEmptyMailboxIsAnError) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  mailbox mb = new;\n"
+      "  int x = 9, n;\n"
+      "  function void g();\n"
+      "    mb.get(x);\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    g();\n"
+      "    n = mb.num() + 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "mailbox get(): 'mb' is empty, so the call would "
+                            "block inside a function",
+                            5, "13.4"));
+  auto* x = f.ctx.FindVariable("x");
+  ASSERT_NE(x, nullptr);
+  EXPECT_EQ(x->value.ToUint64(), 9u);
+  auto* n = f.ctx.FindVariable("n");
+  ASSERT_NE(n, nullptr);
+  EXPECT_EQ(n->value.ToUint64(), 1u);
 }
 
 }  // namespace
