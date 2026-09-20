@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
+#include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
+#include "parser/ast_expr.h"
 
 using namespace delta;
 
@@ -853,6 +855,35 @@ TEST(ValueParameters, ModuleScopedClassParamDefaultFoldsAgainstAModuleParam) {
       "endmodule\n",
       f);
   EXPECT_FALSE(f.has_errors);
+}
+
+// §23.10.2 with §6.20.2 (printed page 126): the folded resolved_value holds 64
+// bits and the declared range survives an override, so an instance's parameter
+// value assignment leaves the expression it was folded from on the parameter,
+// for the simulator to read whole, while a parameter holding its declaration's
+// own value records none -- default_value already names that expression.
+TEST(ValueParameters, InstanceOverrideRecordsItsExpressionAndADefaultDoesNot) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module c #(parameter logic [95:0] P = 96'h0, parameter int N = 1);\n"
+      "endmodule\n"
+      "module t;\n"
+      "  c #(.P(96'h0123_4567_89AB_CDEF_0011_2233)) u();\n"
+      "endmodule\n",
+      f, "t");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* u = design->top_modules[0]->children[0].resolved;
+  ASSERT_NE(u, nullptr);
+  ASSERT_EQ(u->params.size(), 2u);
+  EXPECT_EQ(u->params[0].name, "P");
+  EXPECT_TRUE(u->params[0].from_override);
+  ASSERT_NE(u->params[0].override_expr, nullptr);
+  EXPECT_EQ(u->params[0].override_expr->kind, ExprKind::kIntegerLiteral);
+  EXPECT_NE(u->params[0].override_expr, u->params[0].default_value);
+  EXPECT_EQ(u->params[1].name, "N");
+  EXPECT_FALSE(u->params[1].from_override);
+  EXPECT_EQ(u->params[1].override_expr, nullptr);
 }
 
 }  // namespace

@@ -87,6 +87,20 @@ void RegisterDesignTypeLayouts(const RtlirDesign* design, SimContext& ctx,
 void RegisterPackageClassVariables(const RtlirDesign* design, SimContext& ctx,
                                    Arena& arena);
 
+// §6.20.2: a parameter declared with a range or a type has the range of its
+// declaration, unchanged by any override, and RtlirParamDecl::resolved_value
+// holds its value in 64 bits. `var` is the storage Lowerer::LowerParams gave
+// `param` at the declared width, filled from that value; where the width is
+// more than 64 bits this evaluates the value's own expression again at that
+// width and stores the whole of it. The expression is the declaration's
+// initializer, read in the instance being built, or the instance override's
+// (§23.10.2), read in the instantiating instance. One naming what has no
+// storage at this point -- a subroutine, an enumeration constant, an imported
+// name, a genvar -- leaves the storage as it was, the folded value being exact
+// for every value that fits 64 bits.
+void WidenParamValue(const RtlirParamDecl& param, Variable* var,
+                     SimContext& ctx, Arena& arena);
+
 void RegisterModuleNets(const RtlirModule* mod, SimContext& ctx, Arena& arena);
 void RegisterModulePorts(const RtlirModule* mod, SimContext& ctx, Arena& arena);
 void RegisterModuleSubroutines(const RtlirModule* mod, SimContext& ctx);

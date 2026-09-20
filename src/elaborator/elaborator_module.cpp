@@ -393,6 +393,13 @@ static bool ApplyParamOverride(RtlirParamDecl& pd,
   pd.resolved_value = ConvertOverrideValue(ovr->value, pd);
   pd.is_resolved = true;
   pd.from_override = true;
+  // §6.20.2 has the declared range survive the override, and the folded int64
+  // holds 64 bits of it, so the expression is kept for the simulator to
+  // evaluate at the declared width. ResetAllConfigParams (§33.4.3's `#()`)
+  // hands the declaration's own initializer back as the override, and that
+  // expression is written in the declaring module, not the instantiating one,
+  // which is what default_value already says of it.
+  if (ovr->value_expr != pd.default_value) pd.override_expr = ovr->value_expr;
   RecordStringParamValue(pd, ovr->value_expr, dtype, arena);
   return true;
 }

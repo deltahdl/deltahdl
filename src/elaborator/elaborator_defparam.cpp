@@ -373,6 +373,15 @@ void Elaborator::ApplyDefparamSite(RtlirModule* mod, const DefparamSite& site,
     param->resolved_value = *value;
     param->is_resolved = true;
     param->from_override = true;
+    // §23.10.1: the right-hand side is written in the scope of the defparam
+    // statement, which the simulator stands in nowhere when it gives the
+    // parameter storage, so an expression naming anything is left to the
+    // folded value; a literal names nothing and reads the same in every scope,
+    // and a parameter declared wider than 64 bits (§6.20.2) is widened from
+    // it. An instance override's expression recorded earlier is dropped
+    // either way, the defparam having replaced its value.
+    param->override_expr =
+        val_expr->kind == ExprKind::kIntegerLiteral ? val_expr : nullptr;
     ReplaceStringParamValue(*param, val_expr, arena_);
     RecomputeDependentParams(target_mod);
     applied_defparams_.insert(key);

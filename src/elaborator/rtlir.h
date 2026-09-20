@@ -530,6 +530,18 @@ struct RtlirParamDecl {
   // name would answer none of them.
   std::string_view gen_block_prefix;
   Expr* default_value = nullptr;
+  // §23.10.2 with §6.20.2: the expression an instance's parameter value
+  // assignment, or a configuration's (§33.4.3), gave this parameter, written
+  // in the instantiating module, and null while the value is the declaration's
+  // own or a defparam's (§23.10.1) that is not a literal. resolved_value is
+  // 64 bits, and a parameter declared wider keeps its declared range through
+  // every override, so the simulator evaluates the expression again at that
+  // width (WidenParamValue in src/simulator/lowerer_register.cpp): this one in
+  // the instantiating instance, default_value in the declaring one. A
+  // defparam's right-hand side stands in the scope of the defparam statement,
+  // which the simulator cannot stand in, so of those only a literal, which
+  // names nothing, is carried.
+  const Expr* override_expr = nullptr;
   int64_t resolved_value = 0;
   // §6.20.2: a parameter declared with a real type takes a real value, which
   // resolved_value cannot hold. When is_real_value is set, resolved_real is the

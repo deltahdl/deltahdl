@@ -1,5 +1,6 @@
 #include "simulator/lowerer_register.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -25,6 +26,7 @@
 #include "simulator/eval_function_internal.h"
 #include "simulator/eval_semaphore.h"
 #include "simulator/evaluation.h"
+#include "simulator/expr_walk.h"
 #include "simulator/lowerer.h"
 #include "simulator/net.h"
 #include "simulator/sequence_monitor.h"
@@ -69,6 +71,82 @@ void RecordPackedRange(const DataType* dt, Variable* v, SimContext& ctx,
   if (span(range.left, range.right) * stride != v->value.width) return;
   v->packed_range = range;
   v->has_packed_range = true;
+}
+
+// §23.9 with §23.10.2: the instance an override of `prefix`'s parameters was
+// written in is the instance holding `prefix`. Its prefix is found by dropping
+// one dotted component at a time until what is left names an instance
+// RegisterInstanceKeyBinding (src/simulator/lowerer.cpp) recorded -- the top
+// under the empty key -- because a generate block's instance,
+// "u1.g[0].u2.", is keyed through the block and the block itself is no
+// instance.
+static std::string InstantiatingPrefix(std::string_view prefix,
+                                       SimContext& ctx) {
+  std::string parent(prefix);
+  while (!parent.empty()) {
+    parent.pop_back();
+    auto dot = parent.rfind('.');
+    parent =
+        dot == std::string::npos ? std::string() : parent.substr(0, dot + 1);
+    std::string key = parent;
+    if (!key.empty()) key.pop_back();
+    if (!ctx.FindInstanceType(key).empty()) break;
+  }
+  return parent;
+}
+
+// §6.20.2 lets a value parameter's expression name literals, parameters,
+// genvars, enumeration names, constant functions and package references, and
+// this is which of those have storage the instance can read now, its own
+// parameters lowered ahead of it. A subroutine is registered after the
+// parameters, an enumeration constant and an imported name are bound after
+// them, and a genvar or a configuration's localparam has no storage at all, so
+// a name FindVariable does not answer and any subroutine call say no. The
+// two sides of a package scope resolution, `pk::X`, are a package's key and
+// its member rather than names of this scope, and the package's storage was
+// created ahead of every module, so those are passed over.
+static bool EveryNameHasStorage(const Expr* expr, SimContext& ctx) {
+  std::vector<const Expr*> scoped;
+  ForEachSubExpr(expr, [&](const Expr* e) {
+    if (e->kind == ExprKind::kMemberAccess && e->is_scope_resolution) {
+      scoped.push_back(e->lhs);
+      scoped.push_back(e->rhs);
+    }
+  });
+  bool all = true;
+  ForEachSubExpr(expr, [&](const Expr* e) {
+    if (e->kind == ExprKind::kCall) all = false;
+    if (e->kind != ExprKind::kIdentifier) return;
+    if (std::find(scoped.begin(), scoped.end(), e) != scoped.end()) return;
+    if (ctx.FindVariable(e->text) == nullptr) all = false;
+  });
+  return all;
+}
+
+void WidenParamValue(const RtlirParamDecl& param, Variable* var,
+                     SimContext& ctx, Arena& arena) {
+  if (var->width <= 64) return;
+  // ApplyParamOverride in src/elaborator/elaborator_module.cpp records the
+  // override's expression, and Elaborator::ApplyDefparamSite a defparam's
+  // literal. An override that recorded no expression -- a defparam naming
+  // something, or §33.4.3's `#()` handing the declaration's own initializer
+  // back -- replaced the declaration's value with one no expression here
+  // spells, so that value stays as folded.
+  if (param.from_override && param.override_expr == nullptr) return;
+  const Expr* expr = param.override_expr != nullptr ? param.override_expr
+                                                    : param.default_value;
+  if (expr == nullptr) return;
+  std::string own = ctx.ActiveInstancePrefix();
+  if (param.override_expr != nullptr)
+    ctx.SetLoweringInstancePrefix(InstantiatingPrefix(own, ctx));
+  if (EveryNameHasStorage(expr, ctx)) {
+    // §11.6.1 with §6.20.2: the value is sized to the declaration as an
+    // assignment to it is. The words are copied because an expression that is
+    // a bare parameter name answers that parameter's own storage.
+    Logic4Vec value = EvalExpr(expr, ctx, arena, var->width);
+    var->value = OwnRhsWords(ResizeToWidth(value, var->width, arena), arena);
+  }
+  ctx.SetLoweringInstancePrefix(own);
 }
 
 void RegisterModuleNets(const RtlirModule* mod, SimContext& ctx, Arena& arena) {
