@@ -81,6 +81,10 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 - [Research lives in issues](research-lives-in-issues.md) — a plan that outlives the session, and each finding it yields, is filed as it arises; the task list and scratchpad are not durable.
 - [Issues have no fixed form](issues-have-no-fixed-form.md) — no house style; write each so a fresh session can act on it alone.
 
+## Tasks
+
+- [One action per task](one-action-per-task.md) — a subject naming several actions is divisible by construction; split by action and re-read the subjects when the reminder fires.
+
 ## The notes themselves
 
 - [Where the notes live](note-directories.md) — `.claude/memories/`, one flat directory since 2026-09-07.
