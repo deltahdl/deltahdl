@@ -364,6 +364,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/elaborator_import.cpp
     elaborator/elaborator_module_inst.cpp
     elaborator/elaborator_module.cpp
+    elaborator/elaborator_module_params.cpp
     elaborator/elaborator_module_ports.cpp
     elaborator/elaborator_port_binding.cpp
     elaborator/elaborator_port_binding_nets.cpp

@@ -17,6 +17,7 @@
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
+#include "elaborator/elaborator_items_params.h"
 #include "elaborator/elaborator_module_inst_internal.h"
 #include "elaborator/elaborator_port_binding_internal.h"
 #include "elaborator/rtlir.h"
@@ -411,47 +412,53 @@ void ResetAllConfigParams(const ModuleDecl* child_decl,
 
 // Resolves positional parameter overrides (#(v0, v1, ...)) against the child
 // module's overridable parameters, appending evaluated values to child_params.
+// §23.10 (printed page 763) with §6.20.1 (printed 125): those are the
+// parameter port list's, or, for a module declared with no parameter port
+// list, the `parameter` declarations among its items in declaration order,
+// which OverridableParamNames answers; read from the port list alone, `vdff
+// #(10,15)` over §23.10.2's own vdff (printed 766) was one value too many for
+// a list of none.
 void ResolvePositionalInstParams(const ModuleItem* item,
                                  const ModuleDecl* child_decl,
                                  const ScopeMap& parent_scope,
                                  Elaborator::ParamList& child_params,
                                  DiagEngine& diag) {
-  std::vector<std::string_view> targets;
-  for (const auto& [dname, dexpr] : child_decl->params) {
-    if (child_decl->localparam_port_names.count(dname) > 0) continue;
-    targets.push_back(dname);
-  }
-  if (item->inst_params.size() > targets.size()) {
+  const std::vector<std::string_view> kTargets =
+      OverridableParamNames(child_decl);
+  if (item->inst_params.size() > kTargets.size()) {
     diag.Error(item->loc,
                std::format("too many positional parameter overrides for module "
                            "'{}': {} provided, {} allowed",
                            item->inst_module, item->inst_params.size(),
-                           targets.size()),
+                           kTargets.size()),
                Subclause("23.10.2.1"));
   }
-  size_t n = std::min(item->inst_params.size(), targets.size());
+  size_t n = std::min(item->inst_params.size(), kTargets.size());
   for (size_t i = 0; i < n; ++i) {
     auto* pexpr = item->inst_params[i].second;
     if (!pexpr) continue;
     auto val = ConstEvalInt(pexpr, parent_scope);
-    if (val) child_params.push_back({targets[i], *val, pexpr});
+    if (val) child_params.push_back({kTargets[i], *val, pexpr});
   }
 }
 
 // Resolves named parameter overrides (#(.p(v), ...)) against the child module's
-// overridable parameters, appending evaluated values to child_params.
+// overridable parameters, appending evaluated values to child_params. The
+// parameters are the ones ResolvePositionalInstParams above binds by position,
+// a module without a parameter port list having them among its items; read
+// from the port list alone, `c #(.P(5))` over `module c; parameter P = 1;`
+// was refused as naming no parameter of c.
 void ResolveNamedInstParams(const ModuleItem* item,
                             const ModuleDecl* child_decl,
                             const ScopeMap& parent_scope,
                             Elaborator::ParamList& child_params,
                             DiagEngine& diag) {
-  std::unordered_set<std::string_view> overridable;
-  for (const auto& [dname, dexpr] : child_decl->params) {
-    if (child_decl->localparam_port_names.count(dname) > 0) continue;
-    overridable.insert(dname);
-  }
+  const std::vector<std::string_view> kNames =
+      OverridableParamNames(child_decl);
+  const std::unordered_set<std::string_view> kOverridable(kNames.begin(),
+                                                          kNames.end());
   for (const auto& [pname, pexpr] : item->inst_params) {
-    if (overridable.count(pname) == 0) {
+    if (kOverridable.count(pname) == 0) {
       diag.Error(item->loc,
                  std::format("module '{}' has no parameter '{}'",
                              item->inst_module, pname),

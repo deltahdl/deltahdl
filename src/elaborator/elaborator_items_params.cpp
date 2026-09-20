@@ -295,34 +295,60 @@ void ResolveParamConstValue(RtlirParamDecl& pd, const ModuleItem* item,
     RecordStringParamValue(pd, item->init_expr, &item->data_type, arena);
 }
 
+// §6.23/§6.20.3: a type-parameter default written with the type operator,
+// e.g. `localparam type T = type(int)`, arrives as a kTypeRef init expression
+// (its text is the inner type name) rather than a typedef_type. Resolves it to
+// a concrete type so dependent declarations elaborate against the chosen
+// type, carrying the built-in's implicit signedness (so `T x` is signed for
+// int). §8.23 also permits a class scope resolution to prefix that type name,
+// as in `type(Frame::payload_t)`, which the kTypeRef expression carries in
+// scope_prefix. That form is resolved through the class instead, and
+// typedef_type left unchanged when the class or its typedef is not visible.
+// Answers whether the item is a type parameter after that, false for one
+// written any other way.
+bool ResolveTypeOperatorDefault(ModuleItem* item, const CompilationUnit* unit) {
+  if (item->data_type.kind != DataTypeKind::kVoid ||
+      item->typedef_type.kind != DataTypeKind::kImplicit ||
+      item->init_expr == nullptr ||
+      item->init_expr->kind != ExprKind::kTypeRef ||
+      item->init_expr->text.empty())
+    return false;
+  if (item->init_expr->scope_prefix.empty()) {
+    item->typedef_type = TypeNameToDataType(item->init_expr->text);
+  } else if (const DataType* scoped = FindClassScopedTypedefType(
+                 item->init_expr->scope_prefix, item->init_expr->text, unit)) {
+    item->typedef_type = *scoped;
+  }
+  return item->typedef_type.kind != DataTypeKind::kImplicit;
+}
+
+// §23.10 (printed page 763) with §6.20.1 (printed 125): a module declared
+// with no parameter port list declares its value parameters among its items,
+// and an instance's parameter value assignment (§23.10.2, printed 766) or a
+// configuration's (§33.4.3) overrides such a parameter as it does a parameter
+// port -- by name, or in declaration order (§23.10.2.1). A localparam, which
+// §6.20.4 (printed 128) puts beyond any assignment and which a body
+// `parameter` is under a parameter port list, and a parameter a generate
+// block declares (§6.20.1) are left to their own value, as is every
+// parameter while no instantiation's assignments are installed. The
+// assignments reached the parameter port list alone before, so `c #(.P(5))
+// u()` and `c #(5) u()` over `module c; parameter P = 1; localparam int Q =
+// P;` kept P at 1 and Q with it, and a config's `use #(.W(48))` on a body
+// `parameter W = 32` printed 32.
+void ApplyBodyParamAssignment(RtlirParamDecl& pd, const ModuleItem* item,
+                              Arena& arena) {
+  if (pd.is_localparam || !pd.gen_block_prefix.empty()) return;
+  const InstanceParamAssignments* assigns = BodyParamAssignments();
+  if (assigns == nullptr) return;
+  ApplyParamOverride(pd, *assigns, item->name, &item->data_type, arena);
+}
+
 }  // namespace
 
 void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
   bool is_type = item->data_type.kind == DataTypeKind::kVoid &&
                  item->typedef_type.kind != DataTypeKind::kImplicit;
-
-  // §6.23/§6.20.3: a type-parameter default written with the type operator,
-  // e.g. `localparam type T = type(int)`, arrives as a kTypeRef init expression
-  // (its text is the inner type name) rather than a typedef_type. Resolve it to
-  // a concrete type so dependent declarations elaborate against the chosen
-  // type, carrying the built-in's implicit signedness (so `T x` is signed for
-  // int). §8.23 also permits a class scope resolution to prefix that type name,
-  // as in `type(Frame::payload_t)`, which the kTypeRef expression carries in
-  // scope_prefix. Resolve that form through the class instead, and leave
-  // typedef_type unchanged when the class or its typedef is not visible.
-  if (!is_type && item->data_type.kind == DataTypeKind::kVoid &&
-      item->typedef_type.kind == DataTypeKind::kImplicit && item->init_expr &&
-      item->init_expr->kind == ExprKind::kTypeRef &&
-      !item->init_expr->text.empty()) {
-    if (item->init_expr->scope_prefix.empty()) {
-      item->typedef_type = TypeNameToDataType(item->init_expr->text);
-    } else if (const DataType* scoped =
-                   FindClassScopedTypedefType(item->init_expr->scope_prefix,
-                                              item->init_expr->text, unit_)) {
-      item->typedef_type = *scoped;
-    }
-    is_type = item->typedef_type.kind != DataTypeKind::kImplicit;
-  }
+  if (!is_type) is_type = ResolveTypeOperatorDefault(item, unit_);
 
   CheckTypeParamNotSetToValue(item, diag_);
   CheckTypeParamConformsToForwardKind(
@@ -351,16 +377,23 @@ void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
     // against the parameters already elaborated, which is what a bound written
     // in terms of an earlier parameter needs.
     RecordParamDeclRange(pd, item->data_type, kScope);
+    // After the sizing, so that the value is converted to a range written in
+    // terms of an earlier parameter, itself overridden or not (§6.20.2).
+    ApplyBodyParamAssignment(pd, item, arena_);
   }
 
+  // §23.10.2: an assignment replaced the declaration's own value, which
+  // ApplyParamOverride recorded, so the initializer is left unfolded as
+  // ElaborateParamPortList leaves an overridden parameter port's.
+  const bool kFoldsDefault = item->init_expr != nullptr && !pd.from_override;
   // §6.20.7: a parameter is unbounded if it is assigned a literal '$', or if it
   // is assigned another (unbounded) parameter; the assigned-to parameter is
   // itself unbounded in that case.
-  if (item->init_expr && item->init_expr->kind == ExprKind::kIdentifier &&
+  if (kFoldsDefault && item->init_expr->kind == ExprKind::kIdentifier &&
       (item->init_expr->text == "$" ||
        RefersToUnboundedParam(mod, item->init_expr->text))) {
     pd.is_unbounded = true;
-  } else if (item->init_expr) {
+  } else if (kFoldsDefault) {
     if (ContainsDollarSubexpr(item->init_expr)) {
       // §6.20.7: $ must be the entire, self-contained parameter value; it may
       // not be combined with operators or selects in this context.
