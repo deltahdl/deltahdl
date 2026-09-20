@@ -741,4 +741,65 @@ TEST(NestedStaticHandleHiding, PublicMemberBehindThePublicStaticHandleIsOk) {
              NestedStaticHandleModuleSrc("x = Outer::Inner::m_inst.k;")));
 }
 
+// The cases below hold the handle in one nested class and its type in a
+// sibling: `class Outer; class A; local int k; endclass class B; static A a;
+// endclass endclass`. §8.23 (printed 201) resolves a name written inside a
+// nested class first in that class, then in each enclosing class outward, then
+// the enclosing scope, so `A` inside B is Outer's nested A, and §8.18 confines
+// its local `k` as any class's. ClassOfDeclaredType in
+// src/elaborator/elaborator_validate_classes.cpp read a bare type name as the
+// owner, a class nested in the owner or a class of the unit, and a scoped one
+// as a package's class or one nested in a class of the unit, so `A` and
+// `Outer::A` written inside B resolved to no class and `Outer::B::a.k` was
+// accepted from a module where `Outer::Inner::m_inst.k` was reported.
+//
+// `k_decl` is A's one member and `handle_decl` B's; `mid_open` and `mid_close`
+// wrap B in a further class for the deeper chain.
+std::string SiblingStaticHandleClassSrc(const std::string& k_decl,
+                                        const std::string& handle_decl,
+                                        const std::string& mid_open = "",
+                                        const std::string& mid_close = "") {
+  return "class Outer;\n  class A;\n    " + k_decl + "\n  endclass\n" +
+         mid_open + "  class B;\n    " + handle_decl + "\n  endclass\n" +
+         mid_close + "endclass\n";
+}
+
+std::string SiblingStaticHandleModuleSrc(const std::string& stmt) {
+  return "module m;\n  int x;\n  initial " + stmt + "\nendmodule\n";
+}
+
+TEST(SiblingStaticHandleHiding, LocalMemberBehindTheStaticHandleIsReported) {
+  ExpectScopedAccessReported(
+      SiblingStaticHandleClassSrc("local int k = 9;", "static A a;") +
+          SiblingStaticHandleModuleSrc("x = Outer::B::a.k;"),
+      "cannot access local member from outside its class");
+}
+
+// The type written through the enclosing class: `Outer::A` inside B names the
+// chain element Outer and the A nested in it.
+TEST(SiblingStaticHandleHiding,
+     LocalMemberBehindTheScopedTypeHandleIsReported) {
+  ExpectScopedAccessReported(
+      SiblingStaticHandleClassSrc("local int k = 9;", "static Outer::A a;") +
+          SiblingStaticHandleModuleSrc("x = Outer::B::a.k;"),
+      "cannot access local member from outside its class");
+}
+
+// B two classes deep, A still nested in Outer: the walk passes Mid, which
+// holds no A, and reaches Outer's.
+TEST(SiblingStaticHandleHiding,
+     LocalMemberBehindTheDeeperChainHandleIsReported) {
+  ExpectScopedAccessReported(
+      SiblingStaticHandleClassSrc("local int k = 9;", "static A a;",
+                                  "  class Mid;\n", "  endclass\n") +
+          SiblingStaticHandleModuleSrc("x = Outer::Mid::B::a.k;"),
+      "cannot access local member from outside its class");
+}
+
+// The pair's accepting half: a public sibling's public member.
+TEST(SiblingStaticHandleHiding, PublicMemberBehindThePublicStaticHandleIsOk) {
+  EXPECT_TRUE(ElabOk(SiblingStaticHandleClassSrc("int k = 9;", "static A a;") +
+                     SiblingStaticHandleModuleSrc("x = Outer::B::a.k;")));
+}
+
 }  // namespace
