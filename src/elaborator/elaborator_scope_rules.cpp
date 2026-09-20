@@ -22,6 +22,11 @@
 
 namespace delta {
 
+// The names each package makes directly visible, filled on first use by
+// PackageProvidesName; Elaborator::pkg_provided_names_ is one.
+using ProvidedNameCache =
+    std::unordered_map<std::string_view, std::unordered_set<std::string_view>>;
+
 namespace {
 
 struct ScopeWalk {
@@ -275,11 +280,9 @@ void PopulatePackageProvidedNames(const CompilationUnit* unit,
   }
 }
 
-bool PackageProvidesName(
-    const CompilationUnit* unit,
-    std::unordered_map<std::string_view, std::unordered_set<std::string_view>>&
-        provided_cache,
-    std::string_view pkg_name, std::string_view name) {
+bool PackageProvidesName(const CompilationUnit* unit,
+                         ProvidedNameCache& provided_cache,
+                         std::string_view pkg_name, std::string_view name) {
   auto it = provided_cache.find(pkg_name);
   if (it == provided_cache.end()) {
     PopulatePackageProvidedNames(unit, pkg_name, provided_cache[pkg_name]);
@@ -294,8 +297,7 @@ bool PackageProvidesName(
 struct ImportRuleCtx {
   DiagEngine& diag;
   const CompilationUnit* unit;
-  std::unordered_map<std::string_view, std::unordered_set<std::string_view>>&
-      pkg_provided_names;
+  ProvidedNameCache& pkg_provided_names;
   std::unordered_map<std::string_view, std::pair<std::string_view, SourceLoc>>&
       explicit_imports;
   std::vector<std::string_view>& wildcard_packages;
@@ -529,11 +531,10 @@ void Elaborator::ValidatePackageImportRules(const ModuleDecl* decl) {
 // declaration is, so a write to it names nothing undeclared. The names come
 // from the import items themselves, since this check runs without the
 // RtlirModule the read-side check takes its imports from.
-static bool ImportsProvideName(
-    const CompilationUnit* unit,
-    std::unordered_map<std::string_view, std::unordered_set<std::string_view>>&
-        provided_cache,
-    const std::vector<ModuleItem*>& items, std::string_view name) {
+static bool ImportsProvideName(const CompilationUnit* unit,
+                               ProvidedNameCache& provided_cache,
+                               const std::vector<ModuleItem*>& items,
+                               std::string_view name) {
   for (const auto* item : items) {
     if (item->kind != ModuleItemKind::kImportDecl) continue;
     const ImportItem& imp = item->import_item;
@@ -684,6 +685,23 @@ void ReportDeclInitUnresolved(const ModuleDecl* decl, Pred declared,
   ReportUnresolvedRefs(refs, declared, diag);
 }
 
+// The package import declarations a subroutine body opens with. A.2.8 admits
+// package_import_declaration as a block_item_declaration, which A.2.7's
+// tf_item_declaration takes, and the parser keeps each as a kBlockItemDecl
+// statement holding the import item (Parser::ParseBlockVarDecls).
+std::vector<ModuleItem*> SubroutineBodyImports(const ModuleItem* item) {
+  std::vector<ModuleItem*> imports;
+  for (const auto* stmt : item->func_body_stmts) {
+    if (stmt == nullptr || stmt->kind != StmtKind::kBlockItemDecl) continue;
+    if (stmt->decl_item == nullptr ||
+        stmt->decl_item->kind != ModuleItemKind::kImportDecl) {
+      continue;
+    }
+    imports.push_back(stmt->decl_item);
+  }
+  return imports;
+}
+
 // §23.9: rejects an unresolved bare identifier read in a task or function body.
 // §23.9 lists a task and a function among the scopes an identifier is searched
 // upward from, and rules that the search "shall stop at a module boundary" when
@@ -693,8 +711,16 @@ void ReportDeclInitUnresolved(const ModuleDecl* decl, Pred declared,
 // §8.24 has the body read every declaration of its class, the properties it
 // inherits under §8.13 included, none of which the module declares, so it is
 // left to the class rules as a body of the compilation unit's class is.
+//
+// §26.3 makes an import declaration provide its names "within the current
+// scope", and the body is a scope of its own, so an import the body opens
+// with (SubroutineBodyImports) is honoured for the body's reads alone: `K` in
+// `function int calc(); import p::*; return K * five(); endfunction` is p's
+// parameter, which the module the function stands in never imported.
 template <typename Pred>
 void ReportSubroutineUnresolved(const ModuleDecl* decl, Pred declared,
+                                const CompilationUnit* unit,
+                                ProvidedNameCache& provided_cache,
                                 DiagEngine& diag) {
   for (const auto* item : decl->items) {
     if (item->kind != ModuleItemKind::kTaskDecl &&
@@ -708,7 +734,12 @@ void ReportSubroutineUnresolved(const ModuleDecl* decl, Pred declared,
     for (const auto* stmt : item->func_body_stmts) {
       CollectProcRhsIdents(stmt, locals, refs);
     }
-    ReportUnresolvedRefs(refs, declared, diag);
+    std::vector<ModuleItem*> body_imports = SubroutineBodyImports(item);
+    auto declared_in_body = [&](std::string_view n) {
+      return declared(n) ||
+             ImportsProvideName(unit, provided_cache, body_imports, n);
+    };
+    ReportUnresolvedRefs(refs, declared_in_body, diag);
   }
 }
 
@@ -828,11 +859,10 @@ static std::unordered_set<std::string_view> ExplicitlyImportedNames(
 // True where any of `pkgs` declares `name`. §26.3 makes every name a
 // wildcard-imported package declares directly visible, so a bare read of one
 // resolves without the package qualifier.
-static bool AnyPackageProvidesName(
-    const CompilationUnit* unit,
-    std::unordered_map<std::string_view, std::unordered_set<std::string_view>>&
-        provided_cache,
-    const std::vector<std::string_view>& pkgs, std::string_view name) {
+static bool AnyPackageProvidesName(const CompilationUnit* unit,
+                                   ProvidedNameCache& provided_cache,
+                                   const std::vector<std::string_view>& pkgs,
+                                   std::string_view name) {
   for (auto pkg : pkgs) {
     if (PackageProvidesName(unit, provided_cache, pkg, name)) return true;
   }
@@ -888,7 +918,7 @@ void Elaborator::ValidateUnresolvedReferences(const ModuleDecl* decl,
   ReportContAssignUnresolved(decl, declared, diag_);
   ReportProcUnresolved(decl, declared, diag_);
   ReportDeclInitUnresolved(decl, declared, diag_);
-  ReportSubroutineUnresolved(decl, declared, diag_);
+  ReportSubroutineUnresolved(decl, declared, unit_, pkg_provided_names_, diag_);
 
   // §26.3: a `pkg::x` scope prefix must name a known package (or a class/type
   // for static-member / type-scope access). cu_scope_names_ holds packages,

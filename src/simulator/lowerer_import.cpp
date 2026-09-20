@@ -10,6 +10,7 @@
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
 #include "parser/ast_module.h"
+#include "parser/ast_stmt.h"
 #include "simulator/class_object.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
@@ -300,7 +301,56 @@ void Lowerer::LowerOneImport(const ImportItem& imp) {
   }
 }
 
+// The key a module subroutine's own imports are recorded under, in the place
+// of the package a package subroutine is declared in: no package can be named
+// so, `$` starting no identifier, and PackageScopedKeys puts the key's own
+// "key.name" first, which no storage answers, before the imported packages'.
+static std::string_view SubroutineImportScopeKey(const RtlirModule* mod,
+                                                 const ModuleItem* func,
+                                                 Arena& arena) {
+  auto* key = arena.Create<std::string>("$import:" + std::string(mod->name) +
+                                        "::" + std::string(func->name));
+  return *key;
+}
+
+// §26.3 with A.2.8: a package import declaration is a block item declaration,
+// so a subroutine body may open with one, and the import makes the package's
+// names visible in the body's own scope alone -- `function int calc(); import
+// p::*; return K * five(); endfunction` reads p's parameter and calls p's
+// function though the module never imported p. The body runs in the frame
+// EvalFunctionCall (eval_function.cpp) and ExecInlineTaskCall (stmt_exec.cpp)
+// push for the call, which carries Scope::package, the package whose
+// declarations and imports SimContext::FindInPackageScope and
+// FindFunctionInPackageScope answer a bare name from ahead of the instance's
+// own. A module subroutine has no package, so its body imports are recorded
+// as the imports of a key of its own (SubroutineImportScopeKey) and the key
+// is made the subroutine's package: the two lookups then find "p.K" and
+// "p::five" through it and nothing under the key itself. The subroutine is
+// one declaration however many instances lower it, so a second instance
+// finds it recorded and leaves it.
+static void LowerSubroutineBodyImports(const RtlirModule* mod, SimContext& ctx,
+                                       Arena& arena) {
+  for (const ModuleItem* func : mod->function_decls) {
+    if (!func->method_class.empty()) continue;
+    if (!ctx.SubroutinePackage(func).empty()) continue;
+    std::string_view key;
+    for (const Stmt* stmt : func->func_body_stmts) {
+      if (stmt == nullptr || stmt->kind != StmtKind::kBlockItemDecl) continue;
+      const ModuleItem* decl = stmt->decl_item;
+      if (decl == nullptr || decl->kind != ModuleItemKind::kImportDecl) {
+        continue;
+      }
+      if (key.empty()) key = SubroutineImportScopeKey(mod, func, arena);
+      const ImportItem& imp = decl->import_item;
+      ctx.RegisterPackageImport(key, imp.package_name,
+                                imp.is_wildcard ? "*" : imp.item_name);
+    }
+    if (!key.empty()) ctx.RegisterSubroutinePackage(func, key);
+  }
+}
+
 void Lowerer::LowerImports(const RtlirModule* mod) {
+  LowerSubroutineBodyImports(mod, ctx_, arena_);
   auto apply_import = [&](const RtlirImport& imp) {
     ImportItem item;
     item.package_name = imp.package_name;

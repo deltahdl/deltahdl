@@ -510,4 +510,83 @@ TEST(PackageScopeReferenceSim, ScopedPackageClassVariableConstructedWithNew) {
             351u * 100u + 27u);
 }
 
+// §26.3 with A.2.8: a package import declaration is a block item declaration,
+// so a function body may open with one, and the import makes the package's
+// declarations visible in that body without a package name qualifier (printed
+// page 809). A wildcard import written as the body's first item binds both the
+// package's parameter and its function: `K * five()` is 8 * 5. Before the fix
+// neither name resolved and the function returned 0, so 40 is read only when
+// both bind; 0 or 8 would say one of them still fails.
+TEST(PackageImportSim, WildcardImportInAFunctionBodyBindsItsNames) {
+  EXPECT_EQ(RunAndGet("package p;\n"
+                      "  parameter int K = 8;\n"
+                      "  function int five(); return 5; endfunction\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  function int calc();\n"
+                      "    import p::*;\n"
+                      "    return K * five();\n"
+                      "  endfunction\n"
+                      "  int out;\n"
+                      "  initial out = calc();\n"
+                      "endmodule\n",
+                      "out"),
+            40u);
+}
+
+// §26.3: an explicit import makes exactly the symbol it names visible, and the
+// body's own scope is searched before the module's (printed page 810), so `K`
+// read in k() is p's 8 through `import p::K` although the module declares a
+// `K` of 2, and f(), automatic rather than static, reaches p's five() through
+// its own wildcard import. calc() combines the two. 8 * 1000 + 5 * 100 + 40 is
+// 8540; a body whose import did not shadow the module's K would read 2540.
+TEST(PackageImportSim, ExplicitAndWildcardImportsInSeparateFunctionBodies) {
+  EXPECT_EQ(RunAndGet("package p;\n"
+                      "  parameter int K = 8;\n"
+                      "  function int five(); return 5; endfunction\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  int K = 2;\n"
+                      "  function int k(); import p::K; return K; endfunction\n"
+                      "  function automatic int f();\n"
+                      "    import p::*;\n"
+                      "    return five();\n"
+                      "  endfunction\n"
+                      "  function int calc();\n"
+                      "    import p::*;\n"
+                      "    return K * five();\n"
+                      "  endfunction\n"
+                      "  int out;\n"
+                      "  initial out = k() * 1000 + f() * 100 + calc();\n"
+                      "endmodule\n",
+                      "out"),
+            8540u);
+}
+
+// §26.3 with §13.3: the import stands in an automatic task body that suspends
+// on a delay before it reads the imported names, so the binding must survive
+// the suspension: `#3 r = trip(K)` is 10 * 3 at time 3, and the caller reads
+// r * 10 + $time as 303. A task whose body import were lost at the delay
+// would answer 3, and one that never bound the names 0 * 10 + 3.
+TEST(PackageImportSim, WildcardImportInATaskBodyOutlivesItsDelay) {
+  EXPECT_EQ(RunAndGet("package p;\n"
+                      "  parameter int K = 10;\n"
+                      "  function int trip(int a); return a * 3; endfunction\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  task automatic t(output int r);\n"
+                      "    import p::*;\n"
+                      "    #3 r = trip(K);\n"
+                      "  endtask\n"
+                      "  int r;\n"
+                      "  int out;\n"
+                      "  initial begin\n"
+                      "    t(r);\n"
+                      "    out = r * 10 + $time;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "out"),
+            303u);
+}
+
 }  // namespace

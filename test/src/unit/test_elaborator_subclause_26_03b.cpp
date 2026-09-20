@@ -494,4 +494,85 @@ TEST(PackageImport, WildcardLiteralAnExplicitImportNamesIsNotEmitted) {
   EXPECT_EQ(it->second.size(), 2u);
 }
 
+// §26.3 with A.2.8: a package import declaration is a block item declaration,
+// which a function body may open with, and the import makes the package's
+// names visible in that body (printed page 809). The module never imports p,
+// so `r = K * five()` reads a name only the body's own wildcard import brings
+// in; ReportSubroutineUnresolved in src/elaborator/elaborator_scope_rules.cpp
+// held the body to the module's imports alone and reported K under §23.9.
+TEST(PackageImport, WildcardImportInAFunctionBodyResolvesItsReads) {
+  ElabFixture f;
+  EXPECT_TRUE(
+      ElabOk("package p;\n"
+             "  parameter int K = 3;\n"
+             "  function int five(); return 5; endfunction\n"
+             "endpackage\n"
+             "module top;\n"
+             "  function int calc();\n"
+             "    import p::*;\n"
+             "    int r;\n"
+             "    r = K * five();\n"
+             "    return r;\n"
+             "  endfunction\n"
+             "  int out;\n"
+             "  initial out = calc();\n"
+             "endmodule\n",
+             f));
+}
+
+// The same import as the first item of an automatic task body whose read
+// stands after a delay control, the shape the Clause 26 discovery's probe 77
+// reported "reference to unresolved identifier 'K'" on; an explicit import
+// of the parameter alone is enough for it, the callee being searched beyond
+// the module under §23.9 whatever the body imports.
+TEST(PackageImport, ExplicitImportInATaskBodyResolvesItsRead) {
+  ElabFixture f;
+  EXPECT_TRUE(
+      ElabOk("package p;\n"
+             "  parameter int K = 10;\n"
+             "  function int trip(int a); return a * 3; endfunction\n"
+             "endpackage\n"
+             "module top;\n"
+             "  task automatic t(output int r);\n"
+             "    import p::K;\n"
+             "    #3 r = trip(K);\n"
+             "  endtask\n"
+             "  int r;\n"
+             "  initial t(r);\n"
+             "endmodule\n",
+             f));
+}
+
+// §26.3 makes the import's names visible "within the current scope", the body
+// that holds it, so a second function of the module without an import of its
+// own still reads nothing of p: its K is reported under §23.9, on its own
+// line, while the importing body before it passes.
+TEST(PackageImport, AnImportInOneFunctionBodyReachesNoOtherBody) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("package p;\n"
+             "  parameter int K = 3;\n"
+             "endpackage\n"
+             "module top;\n"
+             "  function int a();\n"
+             "    import p::*;\n"
+             "    int r;\n"
+             "    r = K;\n"
+             "    return r;\n"
+             "  endfunction\n"
+             "  function int b();\n"
+             "    int r;\n"
+             "    r = K;\n"
+             "    return r;\n"
+             "  endfunction\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "reference to unresolved identifier 'K'", 13,
+                            "23.9"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "reference to unresolved identifier 'K'", 8,
+                             "23.9"));
+}
+
 }  // namespace

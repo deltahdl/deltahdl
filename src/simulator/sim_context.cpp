@@ -557,6 +557,18 @@ void SimContext::SetScopePackage(std::string_view package) {
   scope_stack_.back().package = package;
 }
 
+// §26.3 with §13.3: a task's frame is pushed by PushTaskCallScope
+// (eval_function.cpp) with no package and the actuals are bound into it in
+// the caller's scope, so the package whose names the body reads bare -- the
+// task's own, or the key its body imports are recorded under
+// (LowerSubroutineBodyImports in lowerer_import.cpp) -- is set once
+// SetupTaskCall has bound them, which is why ExecInlineTaskCall
+// (stmt_exec.cpp) passes its result through here.
+const ModuleItem* SimContext::EnterSubroutinePackage(const ModuleItem* func) {
+  if (func != nullptr) SetScopePackage(SubroutinePackage(func));
+  return func;
+}
+
 void SimContext::BindLocalVariable(std::string_view name, Variable* var) {
   if (!scope_stack_.empty()) scope_stack_.back().vars[name] = var;
 }

@@ -533,7 +533,7 @@ static ExecTask ExecInlineTaskCall(const Stmt* stmt, SimContext& ctx,
   if (SetupInstanceTaskCall(expr, ctx, arena, instance_call)) {
     co_return co_await ExecInstanceTaskCall(instance_call, expr, ctx, arena);
   }
-  auto* func = SetupTaskCall(expr, ctx, arena);
+  auto* func = ctx.EnterSubroutinePackage(SetupTaskCall(expr, ctx, arena));
   if (!func) {
     ExecCallStmtExpr(expr, ctx, arena);
     co_return StmtResult::kDone;

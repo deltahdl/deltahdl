@@ -237,6 +237,8 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   // §26.2: gives the innermost frame the package its bare names are read
   // from; nothing for an empty name. See the definition in sim_context.cpp.
   void SetScopePackage(std::string_view package);
+  // §26.3 with §13.3: the same for `func`'s package, answering `func` back.
+  const ModuleItem* EnterSubroutinePackage(const ModuleItem* func);
   void PopScope();
 
   // §18.17.7: while a randsequence production with a non-void return type is
