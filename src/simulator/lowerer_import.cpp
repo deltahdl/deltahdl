@@ -1,11 +1,14 @@
 #include <functional>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <unordered_set>
 #include <utility>
 #include <vector>
 
 #include "common/arena.h"
+#include "elaborator/const_eval.h"
+#include "elaborator/elaborator_enum_constants.h"
 #include "elaborator/rtlir.h"
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
@@ -473,24 +476,46 @@ struct ExportedName {
 
 using PackageSet = std::unordered_set<const PackageDecl*>;
 
-// Calls `fn` with the name of each enumeration member `pkg` declares, on a
-// typedef or on a data declaration's own type (Syntax 6-5); a `name[N]` form
-// of §6.19.2 is given unexpanded, as the elaborator's provided-name walk
-// gives it.
-template <typename Fn>
-void ForEachEnumMemberName(const PackageDecl* pkg, Fn fn) {
-  for (const ModuleItem* item : pkg->items) {
-    for (const EnumMember& m : item->typedef_type.enum_members) fn(m.name);
-    for (const EnumMember& m : item->data_type.enum_members) fn(m.name);
+// §6.19.2 (printed page 121, Table 6-10): a `name[N]` member generates the
+// constants name0 through nameN-1 and `name[N:M]` nameN through nameM, the
+// written name itself naming none, and RegisterPackageEnumConstants
+// (lowerer_register.cpp) creates the storage under the generated names,
+// "p1.VAL0" through "p1.VAL2" for `VAL[3]`. The walk held such a member under
+// its written name, which no storage answers, so `p2::VAL2` after `import
+// p1::*; export p1::*;` was bound to nothing and read 0. Appends to `names`
+// the constants the enumeration `type` writes declares, folded as the
+// registration folds them (FoldEnumMembers against `values`, the package's
+// parameters and the constants before it, which a bound may name), each
+// bound in `values` for the members after it.
+void CollectEnumConstantNames(const DataType& type, ScopeMap& values,
+                              Arena& arena,
+                              std::vector<std::string_view>& names) {
+  for (const RtlirEnumMember& m :
+       FoldEnumMembers(type.enum_members, values, arena)) {
+    values[m.name] = m.value;
+    names.push_back(m.name);
   }
 }
 
-bool PackageDeclaresEnumMember(const PackageDecl* pkg, std::string_view name) {
-  bool found = false;
-  ForEachEnumMemberName(pkg, [&](std::string_view member) {
-    if (member == name) found = true;
-  });
-  return found;
+// The names of the enumeration constants `pkg` declares, on a typedef or on a
+// data declaration's own type (Syntax 6-5), each under the name its storage
+// is keyed by. The package's parameters are folded into the scope ahead of
+// the enumerations after them, as RegisterPackageItemEnumConstants folds
+// them, so a bound naming one expands to the same constants.
+std::vector<std::string_view> PackageEnumConstantNames(const PackageDecl* pkg,
+                                                       Arena& arena) {
+  std::vector<std::string_view> names;
+  ScopeMap values;
+  for (const ModuleItem* item : pkg->items) {
+    if (item->kind == ModuleItemKind::kParamDecl && item->init_expr) {
+      if (auto v = ConstEvalInt(item->init_expr, values))
+        values[item->name] = *v;
+      continue;
+    }
+    CollectEnumConstantNames(item->typedef_type, values, arena, names);
+    CollectEnumConstantNames(item->data_type, values, arena, names);
+  }
+  return names;
 }
 
 // Lists the declarations a package's export declarations hand on, each with
@@ -505,13 +530,17 @@ bool PackageDeclaresEnumMember(const PackageDecl* pkg, std::string_view name) {
 // exports.
 class ExportedNameWalk {
  public:
-  explicit ExportedNameWalk(const RtlirDesign* design) : design_(design) {}
+  ExportedNameWalk(const RtlirDesign* design, Arena& arena)
+      : design_(design), arena_(arena) {}
 
   void CollectExported(const PackageDecl* pkg, PackageSet visited,
                        std::vector<ExportedName>& out);
 
  private:
   const PackageDecl* Find(std::string_view name) const;
+  const std::vector<std::string_view>& EnumConstantNames(
+      const PackageDecl* pkg);
+  bool DeclaresEnumConstant(const PackageDecl* pkg, std::string_view name);
   void CollectProvided(const PackageDecl* pkg, PackageSet visited,
                        std::vector<ExportedName>& out);
   void CollectFromExports(const PackageDecl* pkg, const PackageSet& visited,
@@ -523,6 +552,11 @@ class ExportedNameWalk {
                     const PackageSet& visited, std::vector<ExportedName>& out);
 
   const RtlirDesign* design_;
+  Arena& arena_;
+  // Each package's enumeration constants, expanded once: a package is asked
+  // for them by every wildcard import of it the walk follows.
+  std::unordered_map<const PackageDecl*, std::vector<std::string_view>>
+      enum_names_;
 };
 
 const PackageDecl* ExportedNameWalk::Find(std::string_view name) const {
@@ -530,6 +564,23 @@ const PackageDecl* ExportedNameWalk::Find(std::string_view name) const {
     if (pkg->name == name) return pkg;
   }
   return nullptr;
+}
+
+const std::vector<std::string_view>& ExportedNameWalk::EnumConstantNames(
+    const PackageDecl* pkg) {
+  auto it = enum_names_.find(pkg);
+  if (it == enum_names_.end()) {
+    it = enum_names_.emplace(pkg, PackageEnumConstantNames(pkg, arena_)).first;
+  }
+  return it->second;
+}
+
+bool ExportedNameWalk::DeclaresEnumConstant(const PackageDecl* pkg,
+                                            std::string_view name) {
+  for (std::string_view m : EnumConstantNames(pkg)) {
+    if (m == name) return true;
+  }
+  return false;
 }
 
 // The names `pkg`'s exports hand on.
@@ -550,8 +601,9 @@ void ExportedNameWalk::CollectProvided(const PackageDecl* pkg,
     if (IsImportOrExportDecl(item) || item->name.empty()) continue;
     out.push_back({item->name, pkg, item});
   }
-  ForEachEnumMemberName(
-      pkg, [&](std::string_view m) { out.push_back({m, pkg, nullptr}); });
+  for (std::string_view m : EnumConstantNames(pkg)) {
+    out.push_back({m, pkg, nullptr});
+  }
   CollectFromExports(pkg, visited, out);
 }
 
@@ -599,7 +651,7 @@ void ExportedNameWalk::CollectNamed(const PackageDecl* src,
     out.push_back({name, src, item});
     return;
   }
-  if (PackageDeclaresEnumMember(src, name)) {
+  if (DeclaresEnumConstant(src, name)) {
     out.push_back({name, src, nullptr});
     return;
   }
@@ -649,7 +701,7 @@ void AliasExportedName(const PackageDecl* pkg, const ExportedName& e,
 // p3, finds "p2.x" where SimContext::FindInPackageScope searches p3's imports.
 void AliasPackageExports(const RtlirDesign* design, SimContext& ctx,
                          Arena& arena) {
-  ExportedNameWalk walk(design);
+  ExportedNameWalk walk(design, arena);
   for (const PackageDecl* pkg : design->packages) {
     std::vector<ExportedName> names;
     walk.CollectExported(pkg, {}, names);
@@ -687,7 +739,7 @@ void Lowerer::AliasExportedClassKeys(const PackageDecl* pkg,
   if (design_ == nullptr) return;
   ClassTypeInfo* info = ctx_.FindClassType(QualifiedClassKey(pkg, cls, arena_));
   if (info == nullptr) return;
-  ExportedNameWalk walk(design_);
+  ExportedNameWalk walk(design_, arena_);
   for (const PackageDecl* exporter : design_->packages) {
     bool own =
         exporter == pkg || FindNamedPackageItem(exporter, cls->name) != nullptr;
