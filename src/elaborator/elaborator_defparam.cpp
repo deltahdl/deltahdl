@@ -14,6 +14,7 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/type_eval.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
@@ -208,6 +209,41 @@ RtlirParamDecl* Elaborator::ResolveDefparamFromTop(const HierPath& path,
   return nullptr;
 }
 
+// §6.18 (printed page 118): a typedef name stands for the type its
+// declaration gave it, in the scope of that declaration. Once every module is
+// elaborated, typedefs_ holds the union of what the modules registered
+// (Elaborator::ElaborateTopModules), one flat map in which two modules'
+// typedefs of one name leave the last one elaborated, so the table a
+// parameter of `decl` is sized against here lays the module's own typedef
+// items over that union, as the module's own were in force where the
+// declaration was sized. A forward typedef, kImplicit, defines nothing.
+static TypedefMap ModuleTypedefTable(const TypedefMap& all,
+                                     const ModuleDecl* decl) {
+  TypedefMap typedefs = all;
+  if (decl == nullptr) return typedefs;
+  for (const auto* item : decl->items) {
+    if (item->kind != ModuleItemKind::kTypedef ||
+        item->typedef_type.kind == DataTypeKind::kImplicit)
+      continue;
+    typedefs.insert_or_assign(item->name, item->typedef_type);
+  }
+  return typedefs;
+}
+
+// Whether `p`'s declared type carries a range the parameters in scope can
+// change: a packed range written on it, or a typedef name `typedefs` holds,
+// whose own range §6.18 (printed page 118) makes the parameter's. A name the
+// table does not hold, a type parameter's among them, sizes as the declaration
+// sized it.
+static bool DeclTypeRangeFollowsScope(const RtlirParamDecl& p,
+                                      const TypedefMap& typedefs) {
+  const DataType* dtype = p.decl_type;
+  if (dtype == nullptr) return false;
+  if (dtype->packed_dim_left != nullptr) return true;
+  return dtype->kind == DataTypeKind::kNamed &&
+         FindNamedType(*dtype, typedefs) != nullptr;
+}
+
 // §6.20.2 (printed page 126): a parameter with a range specification has the
 // range of its declaration, and that range is folded with the parameters in
 // scope, so one written as `logic [TOP:0]` follows TOP's final value, which
@@ -215,20 +251,21 @@ RtlirParamDecl* Elaborator::ResolveDefparamFromTop(const HierPath& path,
 // refolded the values alone, so `defparam u.TOP = 7` over `parameter logic
 // [TOP:0] P` left P sixteen bits wide and `$bits(P)` reading 16, and
 // `defparam u.P = 16'hABCD` after it gave P 0xABCD where the eight-bit range
-// holds 0xCD. Sizes `p` again against `scope` where its declared type carries
-// a packed range, as PopulateValueParamInfo and BuildParamDeclShell sized it
-// at the declaration, and converts a value an override gave it to the range
-// it now has (§23.10, printed 763-764). A type written as a typedef name is
-// left as the declaration sized it: the declaring module's typedef table is
-// not in force here, and the typedef itself is not made over.
+// holds 0xCD. Sizes `p` again against `scope` and `typedefs` where its
+// declared type carries a packed range, as PopulateValueParamInfo and
+// BuildParamDeclShell sized it at the declaration, and converts a value an
+// override gave it to the range it now has (§23.10, printed 763-764). A type
+// written as a typedef name, `typedef logic [TOP:0] vec_t; parameter vec_t
+// P`, is sized through the typedef's own range folded in the same scope
+// (§6.18, printed 118); it was left as first sized, with $bits(P) at 16 under
+// `defparam u.TOP = 7`, while the typedef table was not in force here.
 static void ResizeParamToRecomputedRange(RtlirParamDecl& p,
+                                         const TypedefMap& typedefs,
                                          const ScopeMap& scope) {
-  const DataType* dtype = p.decl_type;
-  if (dtype == nullptr || dtype->packed_dim_left == nullptr ||
-      dtype->kind == DataTypeKind::kNamed)
-    return;
-  PopulateParamTypeInfo(p, *dtype, {}, scope);
-  RecordParamDeclRange(p, *dtype, scope);
+  if (!DeclTypeRangeFollowsScope(p, typedefs)) return;
+  const DataType& dtype = *p.decl_type;
+  PopulateParamTypeInfo(p, dtype, typedefs, scope);
+  RecordParamDeclRange(p, dtype, scope);
   if (p.from_override)
     p.resolved_value = ConvertOverrideValue(p.resolved_value, p);
 }
@@ -242,17 +279,20 @@ static void ResizeParamToRecomputedRange(RtlirParamDecl& p,
 // `localparam int H = P[95:64]` folding to 0 over a 96-bit P a defparam had
 // just given its words above 64. Those words are recorded on each parameter
 // made over as the value is, for a later read of it. A parameter whose range
-// depends on the redefined one is sized again first, its own value included
-// where an override gave it, so that the parameters after it read it at the
-// range it now has.
+// depends on the redefined one is sized again first, against the typedefs of
+// `mod` where its type is a typedef name, its own value included where an
+// override gave it, so that the parameters after it read it at the range it
+// now has.
 void Elaborator::RecomputeDependentParams(RtlirModule* mod) {
   if (!mod) return;
   ParamRangeRegistryGuard param_range_guard(mod);
+  const TypedefMap kTypedefs =
+      ModuleTypedefTable(typedefs_, FindModule(mod->name));
   for (auto& p : mod->params) {
     if (p.is_type_param) continue;
     if (p.is_unbounded) continue;
     auto scope = BuildParamScope(mod);
-    ResizeParamToRecomputedRange(p, scope);
+    ResizeParamToRecomputedRange(p, kTypedefs, scope);
     if (p.from_override) continue;
     if (!p.default_value) continue;
     auto val = ConstEvalInt(p.default_value, scope);

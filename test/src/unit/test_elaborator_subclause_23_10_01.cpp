@@ -608,17 +608,13 @@ TEST(DefparamElaboration, GeneratedNameOfAnUnnamedGenerateBlockIsNotAPathStep) {
                               10, "23.10.1"));
 }
 
-// m's parameter `name`, m declaring `parameter logic [TOP:0] P` after
-// `parameter int TOP = 15` among its items, Q set from P and B from $bits(P),
-// instantiated once in top as u with `defparams` as top's defparam statements.
-int64_t RangeDependentParamUnder(std::string_view defparams,
-                                 std::string_view name, ElabFixture& f) {
-  std::string src =
-      "module m;\n"
-      "  parameter int TOP = 15;\n"
-      "  parameter logic [TOP:0] P = 0;\n"
-      "  localparam int Q = P;\n"
-      "  localparam int B = $bits(P);\n"
+// m's parameter `name`, m declaring `items` among its own, instantiated once
+// in top as u with `defparams` as top's defparam statements.
+int64_t ParamOfMUnder(std::string_view items, std::string_view defparams,
+                      std::string_view name, ElabFixture& f) {
+  std::string src = "module m;\n";
+  src += items;
+  src +=
       "endmodule\n"
       "module top;\n"
       "  m u();\n";
@@ -626,6 +622,18 @@ int64_t RangeDependentParamUnder(std::string_view defparams,
   src += "endmodule\n";
   auto* design = ElaborateSrc(src, f, "top");
   return design == nullptr ? -1 : ParamValue(design, name);
+}
+
+// The same for an m declaring `parameter logic [TOP:0] P` after `parameter
+// int TOP = 15`, Q set from P and B from $bits(P).
+int64_t RangeDependentParamUnder(std::string_view defparams,
+                                 std::string_view name, ElabFixture& f) {
+  return ParamOfMUnder(
+      "  parameter int TOP = 15;\n"
+      "  parameter logic [TOP:0] P = 0;\n"
+      "  localparam int Q = P;\n"
+      "  localparam int B = $bits(P);\n",
+      defparams, name, f);
 }
 
 // §6.20.2 (printed page 126): a parameter with a range specification has the
@@ -668,6 +676,37 @@ TEST(DefparamElaboration, ConvertsAnEarlierValueToTheRangeALaterDefparamSets) {
                 "  defparam u.P = 16'hABCD;\n  defparam u.TOP = 7;\n", "Q", f),
             0xCD);
   EXPECT_FALSE(f.has_errors);
+}
+
+// The same with P declared through a typedef, `typedef logic [TOP:0] vec_t;
+// parameter vec_t P = 0`.
+int64_t TypedefRangedParamUnder(std::string_view defparams,
+                                std::string_view name, ElabFixture& f) {
+  return ParamOfMUnder(
+      "  parameter int TOP = 15;\n"
+      "  typedef logic [TOP:0] vec_t;\n"
+      "  parameter vec_t P = 0;\n"
+      "  localparam int Q = P;\n"
+      "  localparam int B = $bits(P);\n",
+      defparams, name, f);
+}
+
+// §6.18 (printed page 118) makes a typedef name stand for the type it was
+// declared with, so `parameter vec_t P` under `typedef logic [TOP:0] vec_t`
+// has the range §6.20.2 (printed 126) gives `logic [TOP:0]`, folded with
+// TOP's final value: eight bits under `defparam u.TOP = 7`, so $bits(P) is 8
+// and `defparam u.P = 16'hABCD` gives P 0xCD. A parameter declared through a
+// typedef name was left as first sized, the typedef table not being in force
+// where the defparam was applied, so B read 16 and Q 0xABCD.
+TEST(DefparamElaboration, ResizesAParameterDeclaredThroughATypedef) {
+  ElabFixture fb;
+  EXPECT_EQ(TypedefRangedParamUnder("  defparam u.TOP = 7;\n", "B", fb), 8);
+  EXPECT_FALSE(fb.has_errors);
+  ElabFixture fq;
+  EXPECT_EQ(TypedefRangedParamUnder(
+                "  defparam u.TOP = 7;\n  defparam u.P = 16'hABCD;\n", "Q", fq),
+            0xCD);
+  EXPECT_FALSE(fq.has_errors);
 }
 
 }  // namespace
