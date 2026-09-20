@@ -584,8 +584,10 @@ void RegisterUnitClassVariables(const RtlirDesign* design, SimContext& ctx,
     std::string key = UnitClassKey(design, item->data_type);
     if (key.empty()) continue;
     // SimContext keys the record by string_view, and the item's name is the
-    // storage's own key (CreateUnitDataVariables), so the class key alone is
-    // given the design's lifetime.
+    // bare key a module's `h = new` asks the class of, the storage itself
+    // standing under "$unit.name" (CreateUnitDataVariables), to which
+    // CarryUnitClassRecord in lowerer_package_data.cpp carries the record,
+    // so the class key alone is given the design's lifetime.
     ctx.SetVariableClassType(item->name, *arena.Create<std::string>(key));
     // §8.25 (printed page 203): the specialization the declaration wrote,
     // `G #(5) b`, bound on the object its `new` constructs; nothing for a
