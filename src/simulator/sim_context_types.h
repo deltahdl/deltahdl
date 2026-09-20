@@ -6,6 +6,7 @@
 #include <map>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "common/types.h"
@@ -23,6 +24,24 @@ struct Process;
 struct EnumMemberInfo {
   std::string_view name;
   uint64_t value = 0;
+};
+
+// §27.4 with §13.4 and §23.6: the scope a subroutine declared in a generate
+// block instance runs in when it is called by its hierarchical name from
+// outside the block, `blk[1].triple(10)`. A generate block "comprises a
+// separate scope and a new level of hierarchy", so the body reads the
+// block's own declarations and the implicit localparam of each loop generate
+// block around it by their simple names, which a process of the block
+// resolves through Process::gen_prefixes and the constants
+// Lowerer::InstallGenBlockConsts gives it, and which the calling process, if
+// it stands outside the block, has none of. `inst_prefix` is the module
+// instance the block is in, as Process::inst_prefix spells it; `gen_prefixes`
+// is the block instance's name prefixes as Process::gen_prefixes holds them;
+// and `consts` is each loop's localparam, name and value.
+struct GenBlockSubroutineScope {
+  std::string inst_prefix;
+  std::vector<std::string> gen_prefixes;
+  std::vector<std::pair<std::string_view, int64_t>> consts;
 };
 
 struct EnumTypeInfo {

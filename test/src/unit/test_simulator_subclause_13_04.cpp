@@ -315,4 +315,182 @@ TEST(FunctionSim, CaseStatementInFunctionAndMethodBodies) {
   EXPECT_EQ(val, 921u);
 }
 
+// §13.4 with §27.4 and §23.6: a function declared in a loop generate block
+// is a member of the block instance's scope, and §23.6 names that instance
+// through the block with an instance select, `blk[1].triple`, from outside
+// the block; from inside the block its bare name reaches it. The block's own
+// initial packs its 30 in the units and the module's initial, a time step
+// later, the hierarchical call's 30 in the hundreds, 3030; a hierarchical
+// call that reaches no function answers 0 and leaves 30.
+TEST(FunctionSim, GenerateBlockFunctionCalledByHierarchicalName) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  int r;\n"
+      "  genvar g;\n"
+      "  generate\n"
+      "    for (g = 0; g < 2; g++) begin : blk\n"
+      "      function int triple(int x); return x * 3; endfunction\n"
+      "      initial if (g == 1) r = triple(10);\n"
+      "    end\n"
+      "  endgenerate\n"
+      "  initial #1 r = r + 100 * blk[1].triple(10);\n"
+      "endmodule\n",
+      "r");
+  EXPECT_EQ(val, 3030u);
+}
+
+// §27.4: each instance of the block is a separate scope with its own implicit
+// localparam, so the function of instance 0 and the function of instance 1
+// are two functions reading two values of `g`, and the instance select
+// picks which. `scaled` answers x * (g + 2): 20 from blk[0] and 30 from
+// blk[1], packed as 3020; a call that ran every instance's function as one
+// reads the same for both, and one that lost the localparam reads 20 or 0
+// for both.
+TEST(FunctionSim, GenerateBlockFunctionReadsItsOwnInstanceLoopIndex) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  int r;\n"
+      "  genvar g;\n"
+      "  generate\n"
+      "    for (g = 0; g < 2; g++) begin : blk\n"
+      "      function int scaled(int x); return x * (g + 2); endfunction\n"
+      "    end\n"
+      "  endgenerate\n"
+      "  initial r = blk[0].scaled(10) + 100 * blk[1].scaled(10);\n"
+      "endmodule\n",
+      "r");
+  EXPECT_EQ(val, 3020u);
+}
+
+// §27.4 with §23.9: the function's body reads the block instance's own
+// declaration by its simple name, the block being the scope the function was
+// declared in, whichever process calls it. Each instance's initial sets its
+// `base` to 100 * g at time zero, and the module's initial reads
+// blk[1].addbase(5) a step later: 105, where a body resolving `base` in the
+// caller's scope finds no such variable and answers 5, and one resolving it
+// in instance 0 answers 5 as well.
+TEST(FunctionSim, GenerateBlockFunctionReadsTheBlockInstancesOwnVariable) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  int r;\n"
+      "  genvar g;\n"
+      "  generate\n"
+      "    for (g = 0; g < 2; g++) begin : blk\n"
+      "      int base;\n"
+      "      initial base = 100 * g;\n"
+      "      function int addbase(int x); return x + base; endfunction\n"
+      "    end\n"
+      "  endgenerate\n"
+      "  initial #1 r = blk[1].addbase(5);\n"
+      "endmodule\n",
+      "r");
+  EXPECT_EQ(val, 105u);
+}
+
+// §13.5 with §27.4: the actuals are the caller's expressions, so an actual
+// written in one block instance and passed to another instance's function
+// reads the caller's own `base`, while the body reads the callee's. Instance
+// 0 calls blk[1].addbase(base) at #1 with its own base of 7 and the callee
+// adds its 100: 107; an actual read in the callee's scope passes 100 and
+// answers 200.
+TEST(FunctionSim, GenerateBlockFunctionActualReadsTheCallersBlock) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  int r;\n"
+      "  genvar g;\n"
+      "  generate\n"
+      "    for (g = 0; g < 2; g++) begin : blk\n"
+      "      int base;\n"
+      "      initial base = g == 0 ? 7 : 100;\n"
+      "      function int addbase(int x); return x + base; endfunction\n"
+      "      initial if (g == 0) #1 r = blk[1].addbase(base);\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      "r");
+  EXPECT_EQ(val, 107u);
+}
+
+// §27.5 with §23.6: a conditional generate block's instance is named by the
+// block's name alone, `g1.quad`, there being no index to select by, and a
+// function it declares is reached so: 40.
+TEST(FunctionSim, ConditionalGenerateBlockFunctionCalledByHierarchicalName) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  int r;\n"
+      "  generate\n"
+      "    if (1) begin : g1\n"
+      "      function int quad(int x); return x * 4; endfunction\n"
+      "    end\n"
+      "  endgenerate\n"
+      "  initial r = g1.quad(10);\n"
+      "endmodule\n",
+      "r");
+  EXPECT_EQ(val, 40u);
+}
+
+// §13.3 with §27.4: a task declared in the block is enabled the same way,
+// `blk[1].tk(2)`, and may suspend there; it adds its instance's `g` and 10
+// to the module's `r` after the delay: 11, where the task of instance 0 or
+// one with no `g` adds 10.
+TEST(FunctionSim, GenerateBlockTaskEnabledByHierarchicalName) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  int r;\n"
+      "  genvar g;\n"
+      "  generate\n"
+      "    for (g = 0; g < 2; g++) begin : blk\n"
+      "      task tk(int d); #d r = r + g + 10; endtask\n"
+      "    end\n"
+      "  endgenerate\n"
+      "  initial blk[1].tk(2);\n"
+      "endmodule\n",
+      "r");
+  EXPECT_EQ(val, 11u);
+}
+
+// §23.6: the path may go on through a module instance, `u1.blk[1].scaled`,
+// the block being the instance's; the body reads the loop index of the
+// instance's block: 30.
+TEST(FunctionSim, GenerateBlockFunctionOfAChildInstance) {
+  auto val = RunAndGet(
+      "module sub;\n"
+      "  genvar g;\n"
+      "  generate\n"
+      "    for (g = 0; g < 2; g++) begin : blk\n"
+      "      function int scaled(int x); return x * (g + 2); endfunction\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n"
+      "module t;\n"
+      "  int r;\n"
+      "  sub u1();\n"
+      "  initial r = u1.blk[1].scaled(10);\n"
+      "endmodule\n",
+      "r");
+  EXPECT_EQ(val, 30u);
+}
+
+// §23.6: the complete path starts at a top-level module and may be used from
+// a parallel hierarchy, so n's `m.blk[1].scaled(10)` is m's block's
+// function: 30.
+TEST(FunctionSim, GenerateBlockFunctionOfAParallelTop) {
+  SimFixture f;
+  auto* design = ElaborateSrcAllTops(
+      "module m;\n"
+      "  genvar g;\n"
+      "  generate\n"
+      "    for (g = 0; g < 2; g++) begin : blk\n"
+      "      function int scaled(int x); return x * (g + 2); endfunction\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n"
+      "module n;\n"
+      "  int r;\n"
+      "  initial r = m.blk[1].scaled(10);\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"r", 30u}});
+}
+
 }  // namespace

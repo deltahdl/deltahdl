@@ -189,6 +189,19 @@ void Elaborator::ElaborateGenerateBlockItem(ModuleItem* item,
   size_t first_assign = mod->assigns.size();
   size_t first_udp = mod->udp_insts.size();
   ElaborateItem(item, mod);
+  // §27.4 with §13.4 and §23.6: a subroutine the block declares is a member
+  // of this instance's scope, reached from outside by the instance's
+  // hierarchical name, and ElaborateItem has just put the one shared
+  // declaration in RtlirModule::function_decls under its bare name alone; the
+  // record made here is what keeps the instance. §8.24's out-of-block method
+  // body is a class's, as RegisterModuleSubroutines in
+  // src/simulator/lowerer_register.cpp treats it, and gets no record.
+  bool is_subroutine = item->kind == ModuleItemKind::kFunctionDecl ||
+                       item->kind == ModuleItemKind::kTaskDecl;
+  if (is_subroutine && item->method_class.empty()) {
+    mod->gen_block_subroutines.push_back(
+        {item, gen_block_path_, gen_loop_consts_, gen_prefix_scopes_});
+  }
   StampGenBlockInstance(mod->processes, first_proc, gen_loop_consts_,
                         gen_prefix_scopes_);
   // §21.2.1.5: the block instances are levels of the name a process

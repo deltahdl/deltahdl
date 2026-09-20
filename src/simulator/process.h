@@ -265,6 +265,13 @@ struct Process {
   // entry per enable still running, to be put back when the task returns
   // (EnterCalleeInstance and LeaveCalleeInstance in eval_function_hier.h).
   std::vector<std::string> caller_inst_prefixes;
+  // §27.4 with §13.3: and the generate block prefixes the process ran with
+  // before each enable, one entry per enable still running as above, put back
+  // when the subroutine returns; the enable of a generate block instance's
+  // subroutine by its hierarchical name, `blk[1].tk(3)`, replaces them with
+  // the block's for as long as the enable lasts, and any other enable leaves
+  // them as they were.
+  std::vector<std::vector<std::string>> caller_gen_prefixes;
 
   ~Process() {
     if (coro) coro.destroy();

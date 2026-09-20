@@ -679,7 +679,7 @@ Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx, Arena& arena) {
 
   // §13.3.2 with §23.6: the frame is pushed with the process standing in
   // the callee's instance, so a static function's frame is that instance's.
-  EnterCalleeInstance(ctx, target.inst_prefix);
+  EnterCalleeInstance(ctx, target);
   // §26.3 with §13.4: a package function's frame carries its package, so its
   // body and its default actuals read the package's variables by their bare
   // names; the caller's actuals are read with the frame set aside
@@ -690,6 +690,8 @@ Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   } else {
     ctx.PushScope(package);
   }
+  // §27.4: a generate block instance's function reads its loop index.
+  BindGenBlockConsts(target, ctx, arena);
 
   ctx.PushQueueRefFrame();
   ctx.PushAssocRefFrame();
@@ -747,15 +749,18 @@ Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx, Arena& arena) {
 // is the instance's variable; the actuals are read in the enabling instance
 // (BindActualsInCaller). A bare enable stands where it was, its target the
 // enabling instance's.
-static void PushTaskCallScope(const SubroutineTarget& target, SimContext& ctx) {
+static void PushTaskCallScope(const SubroutineTarget& target, SimContext& ctx,
+                              Arena& arena) {
   const ModuleItem* func = target.func;
-  EnterCalleeInstance(ctx, target.inst_prefix);
+  EnterCalleeInstance(ctx, target);
   bool is_static = func->is_static && !func->is_automatic;
   if (is_static) {
     ctx.PushStaticScope(func->name);
   } else {
     ctx.PushScope();
   }
+  // §27.4: a generate block instance's task reads its loop index.
+  BindGenBlockConsts(target, ctx, arena);
   ctx.PushQueueRefFrame();
   ctx.PushAssocRefFrame();
   ctx.PushFuncName(func->name);
@@ -772,7 +777,7 @@ static const ModuleItem* SetupTaskCallFromIdentifier(const Expr* expr,
                       func->return_type.kind == DataTypeKind::kVoid;
   if (!is_task && !is_void_func) return nullptr;
 
-  PushTaskCallScope(target, ctx);
+  PushTaskCallScope(target, ctx, arena);
   if (is_void_func) ctx.EnterFunction();
   if (!func->func_args.empty()) BindActualsInCaller(func, expr, ctx, arena);
   return func;
@@ -790,7 +795,7 @@ const ModuleItem* SetupTaskCall(const Expr* expr, SimContext& ctx,
   const ModuleItem* func = target.func;
   if (!func || func->kind != ModuleItemKind::kTaskDecl) return nullptr;
 
-  PushTaskCallScope(target, ctx);
+  PushTaskCallScope(target, ctx, arena);
   BindActualsInCaller(func, expr, ctx, arena);
   return func;
 }

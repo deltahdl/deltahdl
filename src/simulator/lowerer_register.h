@@ -4,6 +4,8 @@
 #include <string>
 #include <string_view>
 
+#include "elaborator/rtlir.h"
+
 namespace delta {
 
 class Arena;
@@ -63,6 +65,15 @@ void CreatePortVariable(std::string_view name, const RtlirPort& port,
 // has this to ask instead.
 void RegisterDesignTypeLayouts(const RtlirDesign* design, SimContext& ctx,
                                Arena& arena);
+// §26.3 with §8.4: each package variable declared with a class's name,
+// recorded under its "pk.name" key as a handle of that class -- the package's
+// own class, one an import of the package brings in, or the one a `q::C`
+// wrote -- so that a `new` written to it through the package scope resolution
+// operator constructs the class. Reached through RegisterDesignTypeLayouts,
+// which registers the design's other declared-type facts ahead of every
+// module. Defined in src/simulator/lowerer_package_class_vars.cpp.
+void RegisterPackageClassVariables(const RtlirDesign* design, SimContext& ctx,
+                                   Arena& arena);
 
 void RegisterModuleNets(const RtlirModule* mod, SimContext& ctx, Arena& arena);
 void RegisterModulePorts(const RtlirModule* mod, SimContext& ctx, Arena& arena);
@@ -72,6 +83,20 @@ void RegisterModuleSubroutines(const RtlirModule* mod, SimContext& ctx);
 void RegisterInstanceSubroutines(const RtlirModule* mod,
                                  const std::string& inst_prefix,
                                  SimContext& ctx, Arena& arena);
+// §27.4 with §13.4 and §23.6: the subroutines the module's named generate
+// block instances declare, under `key_prefix` and the instance's path,
+// "blk[1].triple" for the top and "u1.blk[1].triple" under the instance
+// prefix "u1.", which a call by hierarchical name resolves by, with the
+// scope each body runs in -- the module instance `inst_prefix` and the
+// block's own -- recorded under the same key.
+void RegisterGenBlockSubroutines(const RtlirModule* mod,
+                                 const std::string& key_prefix,
+                                 const std::string& inst_prefix,
+                                 SimContext& ctx, Arena& arena);
+// §21.2.1.5 and §27.3: `path` as the levels of a hierarchical name, a loop
+// generate block's instance with its index in brackets, `g[0].h`; empty for
+// an empty path.
+std::string GenBlockName(const HierPath& path);
 
 // §35.5.4: put this module's imported subroutine declarations in the run's DPI
 // registry, which is what a call to one reaches its declaration through. The

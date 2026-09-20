@@ -36,6 +36,17 @@ class DeclaredNameTables {
   void RegisterFunction(std::string_view name, ModuleItem* item);
   ModuleItem* FindFunction(std::string_view name);
 
+  // §27.4 with §13.4 and §23.6: the scope the subroutine registered under
+  // `key` runs in, recorded for a subroutine a generate block instance
+  // declares, under the instance-qualified key a hierarchical call resolves
+  // by, "blk[1].triple"; FindGenBlockSubroutineScope answers null for a key
+  // no generate block's subroutine is registered under. `key` must outlive
+  // the context.
+  void RegisterGenBlockSubroutineScope(std::string_view key,
+                                       GenBlockSubroutineScope scope);
+  const GenBlockSubroutineScope* FindGenBlockSubroutineScope(
+      std::string_view key) const;
+
   void RegisterLetDecl(std::string_view name, ModuleItem* item);
   ModuleItem* FindLetDecl(std::string_view name);
 
@@ -178,6 +189,9 @@ class DeclaredNameTables {
 
  protected:
   std::unordered_map<std::string_view, ModuleItem*> functions_;
+  // §27.4 with §13.4: see RegisterGenBlockSubroutineScope.
+  std::unordered_map<std::string_view, GenBlockSubroutineScope>
+      gen_block_subroutine_scopes_;
   std::unordered_map<std::string_view, ModuleItem*> let_decls_;
   std::unordered_map<std::string_view, ModuleItem*> sequence_decls_;
   std::unordered_map<std::string_view, ModuleItem*> property_decls_;

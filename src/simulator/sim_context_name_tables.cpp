@@ -19,6 +19,7 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "parser/ast_type.h"
@@ -35,6 +36,17 @@ void DeclaredNameTables::RegisterFunction(std::string_view name,
 ModuleItem* DeclaredNameTables::FindFunction(std::string_view name) {
   auto it = functions_.find(name);
   return (it != functions_.end()) ? it->second : nullptr;
+}
+
+void DeclaredNameTables::RegisterGenBlockSubroutineScope(
+    std::string_view key, GenBlockSubroutineScope scope) {
+  gen_block_subroutine_scopes_[key] = std::move(scope);
+}
+
+const GenBlockSubroutineScope* DeclaredNameTables::FindGenBlockSubroutineScope(
+    std::string_view key) const {
+  auto it = gen_block_subroutine_scopes_.find(key);
+  return (it != gen_block_subroutine_scopes_.end()) ? &it->second : nullptr;
 }
 
 void DeclaredNameTables::RegisterLetDecl(std::string_view name,

@@ -189,6 +189,54 @@ void RegisterInstanceSubroutines(const RtlirModule* mod,
   }
 }
 
+// §21.2.1.5 and §27.3: the generate block instances of a path spelled as
+// the levels of a hierarchical name, a loop block's instance with its index
+// in brackets, `g[0].h`; empty for an empty path.
+std::string GenBlockName(const HierPath& path) {
+  std::string name;
+  for (const HierStep& step : path) {
+    if (!name.empty()) name += '.';
+    name += std::string(step.name);
+    if (step.has_index) name += "[" + std::to_string(step.index) + "]";
+  }
+  return name;
+}
+
+// §27.4 with §13.4 and §23.6: a subroutine a named generate block instance
+// declares is called from outside the block by the instance's hierarchical
+// name, `blk[1].triple(10)` or `u1.blk[1].triple(10)`, so it is registered
+// under that key, `key_prefix` and then the block path as §23.6 spells it,
+// and the scope its body runs in is recorded under the same key for
+// FindSubroutineTarget in eval_function_hier.cpp: the module instance
+// `inst_prefix`, the block's name prefixes and its loop localparams, as the
+// block's own processes carry them. The two prefixes part for a top-level
+// module alone, whose instance is the empty prefix while §23.6 names it
+// from a parallel hierarchy through the top's name, "m.blk[1].triple"
+// (LowerModule in lowerer.cpp). §23.6 has a declaration of an unnamed block
+// reachable by hierarchical name from within the block alone, and such a
+// block's step has no name to spell, so it is registered under no key.
+void RegisterGenBlockSubroutines(const RtlirModule* mod,
+                                 const std::string& key_prefix,
+                                 const std::string& inst_prefix,
+                                 SimContext& ctx, Arena& arena) {
+  for (const RtlirGenBlockSubroutine& sub : mod->gen_block_subroutines) {
+    bool unnamed = false;
+    for (const HierStep& step : sub.gen_block_path)
+      unnamed |= step.name.empty();
+    if (unnamed) continue;
+    auto* key = arena.Create<std::string>(key_prefix +
+                                          GenBlockName(sub.gen_block_path) +
+                                          "." + std::string(sub.decl->name));
+    ctx.RegisterFunction(*key, sub.decl);
+    GenBlockSubroutineScope scope;
+    scope.inst_prefix = inst_prefix;
+    scope.gen_prefixes.assign(sub.gen_block_prefixes.begin(),
+                              sub.gen_block_prefixes.end());
+    scope.consts = sub.gen_block_consts;
+    ctx.RegisterGenBlockSubroutineScope(*key, std::move(scope));
+  }
+}
+
 // §26.3: a package's subroutine is referenced through the package scope
 // resolution operator, `pk::f(x)`, from any scope, imported or not, so each
 // one is registered under its "pk::f" key, the key a scoped call resolves by

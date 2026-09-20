@@ -130,6 +130,10 @@ void Lowerer::LowerChildModules(const RtlirModule* mod) {
     // §13.3 with §23.6: and under the instance's own prefixed key, which an
     // enable by hierarchical name from another instance resolves by.
     RegisterInstanceSubroutines(child.resolved, inst_prefix_, ctx_, arena_);
+    // §27.4 with §13.4: and those of the instance's generate blocks under
+    // the instance's key too, "u1.blk[1].triple".
+    RegisterGenBlockSubroutines(child.resolved, inst_prefix_, inst_prefix_,
+                                ctx_, arena_);
     // §35.5.4: an import declaration defines the subroutine in the scope
     // that writes it, an instantiated module, interface or program as much as
     // the top; the top's are registered by LowerModule.

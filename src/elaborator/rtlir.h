@@ -484,6 +484,26 @@ struct RtlirProcess {
   HierPath gen_block_path;
 };
 
+// §27.4 with §13.4 and §23.6: one subroutine declared in a generate block
+// instance. The block "comprises a separate scope and a new level of
+// hierarchy", so the subroutine is a member of the block instance's scope,
+// which §23.6 names through the block, `blk[1].triple` for the instance of
+// loop generate block blk at index 1, and its body reads the block's own
+// declarations and the implicit localparam of each loop it is inside by their
+// simple names. Every iteration of a loop generate block elaborates the one
+// declaration, so RtlirModule::function_decls holds it once per instance and
+// says nothing about which; this entry is what does. `gen_block_path` is the
+// path §23.6 names the instance by, and the other two members are what an
+// RtlirProcess of the same block carries, for the same reason: the body the
+// instances share names the block's declarations plainly, and the process
+// that calls the subroutine from outside the block stands in no such scope.
+struct RtlirGenBlockSubroutine {
+  ModuleItem* decl = nullptr;
+  HierPath gen_block_path;
+  GenBlockConsts gen_block_consts;
+  GenBlockPrefixes gen_block_prefixes;
+};
+
 struct RtlirParamDecl {
   std::string_view name;
   // §23.9: the generate block prefix in force where this parameter was
@@ -636,6 +656,10 @@ struct RtlirModule {
   // where the module declares none.
   Expr* default_disable_iff = nullptr;
   std::vector<ModuleItem*> function_decls;
+  // §27.4 with §13.4: the subroutines declared in the module's named generate
+  // block instances, each with the instance it belongs to, which
+  // function_decls does not record; see RtlirGenBlockSubroutine.
+  std::vector<RtlirGenBlockSubroutine> gen_block_subroutines;
   std::vector<ModuleItem*> let_decls;
   // §35.5.4's imported subroutines, declared in this module. They are held
   // apart from let_decls because §11.12's let is a substitution of the

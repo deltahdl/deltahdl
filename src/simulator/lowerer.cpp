@@ -82,19 +82,6 @@ static SimCoroutine MakeAlwaysCoroutine(const Stmt* body, SimContext& ctx,
 // evaluated as the procedure resumes so that its sample for the tick is
 // recorded; the evaluation where the statement is reached records the same
 // value over it. $sampled looks back through nothing and is left out.
-// §21.2.1.5 and §27.3: the generate block instances of a path spelled as
-// the levels of a hierarchical name, a loop block's instance with its index
-// in brackets, `g[0].h`; empty for an empty path.
-static std::string GenBlockName(const HierPath& path) {
-  std::string name;
-  for (const HierStep& step : path) {
-    if (!name.empty()) name += '.';
-    name += std::string(step.name);
-    if (step.has_index) name += "[" + std::to_string(step.index) + "]";
-  }
-  return name;
-}
-
 static bool IsPastDirectedFunction(std::string_view name) {
   return name == "$past" || name == "$rose" || name == "$fell" ||
          name == "$stable" || name == "$changed";
@@ -405,6 +392,12 @@ void Lowerer::LowerModule(const RtlirModule* mod) {
   // t1 apart from n's. FindSubroutineTarget in eval_function_hier.cpp runs
   // the body in the top's own instance, the one with no prefix.
   RegisterInstanceSubroutines(mod, std::string(mod->name) + ".", ctx_, arena_);
+  // §27.4 with §13.4: a subroutine of one of the top's generate block
+  // instances, `blk[1].triple()` from the top's own processes and
+  // `m.blk[1].triple()` from a parallel top.
+  RegisterGenBlockSubroutines(mod, inst_prefix_, inst_prefix_, ctx_, arena_);
+  RegisterGenBlockSubroutines(mod, std::string(mod->name) + ".", inst_prefix_,
+                              ctx_, arena_);
   RecordSubroutineAssertionSampleScopes(mod);
   // §35.5.4: an imported subroutine is declared where the source writes it and
   // called like a native one, so the declarations of the module being lowered

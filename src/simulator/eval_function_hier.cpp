@@ -1,37 +1,88 @@
 #include "simulator/eval_function_hier.h"
 
+#include <cstdint>
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
+#include "common/arena.h"
+#include "common/types.h"
 #include "parser/ast_expr.h"
 #include "simulator/eval_function_internal.h"
+#include "simulator/evaluation.h"
 #include "simulator/instance_prefix_override.h"
 #include "simulator/process.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_types.h"
+#include "simulator/variable.h"
 
 namespace delta {
 
 namespace {
 
+bool AppendHierarchicalPath(const Expr* e, std::string& path, SimContext& ctx,
+                            Arena& arena);
+
+// §23.6: a name in a path that refers to a loop generate block or to an
+// instance array is followed by an instance select, a constant expression in
+// brackets that selects one instance, `blk[1]` or `u[2]`; written inside a
+// generate block it may be the block's own loop index, `blk[g]`, which §27.4
+// makes an implicit localparam of the instance and which the running process
+// reads as one. The select is rendered as the lowerer keys the instance,
+// `blk[1]`, with a negative index spelled as GenBlockName spells it.
+// Answers false for a part select and for an index holding an x or z bit,
+// which selects no instance.
+bool AppendInstanceSelect(const Expr* e, std::string& path, SimContext& ctx,
+                          Arena& arena) {
+  if (e->base == nullptr || e->index == nullptr || e->index_end != nullptr ||
+      e->is_part_select_plus || e->is_part_select_minus) {
+    return false;
+  }
+  if (!AppendHierarchicalPath(e->base, path, ctx, arena)) return false;
+  Logic4Vec index = EvalExpr(e->index, ctx, arena);
+  if (!index.IsKnown()) return false;
+  path += "[" + std::to_string(SelectBoundValue(index)) + "]";
+  return true;
+}
+
 // Appends the dotted path a chain of member accesses of identifiers writes,
-// "u1.tk" for `u1.tk` and "x.u1.tk" for `x.u1.tk`, answering false for any
-// other shape: a select in the chain (an instance array element, §23.6's
-// instance select, is not resolved here), a scope resolution, a
-// parameterized identifier.
-bool AppendHierarchicalPath(const Expr* e, std::string& path) {
+// "u1.tk" for `u1.tk` and "x.u1.tk" for `x.u1.tk`, a name followed by an
+// instance select rendered by AppendInstanceSelect, "blk[1].triple" for
+// `blk[1].triple`; answering false for any other shape: a scope resolution,
+// a parameterized identifier.
+bool AppendHierarchicalPath(const Expr* e, std::string& path, SimContext& ctx,
+                            Arena& arena) {
   if (e == nullptr) return false;
   if (e->kind == ExprKind::kIdentifier) {
     if (!e->elements.empty()) return false;
     path += e->text;
     return true;
   }
+  if (e->kind == ExprKind::kSelect) {
+    return AppendInstanceSelect(e, path, ctx, arena);
+  }
   if (e->kind != ExprKind::kMemberAccess || e->is_scope_resolution) {
     return false;
   }
-  if (!AppendHierarchicalPath(e->lhs, path)) return false;
+  if (!AppendHierarchicalPath(e->lhs, path, ctx, arena)) return false;
   path += '.';
-  return AppendHierarchicalPath(e->rhs, path);
+  return AppendHierarchicalPath(e->rhs, path, ctx, arena);
+}
+
+// §27.4 with §13.4: where `key` is one a generate block instance's subroutine
+// was registered under, the body runs in that block's scope
+// (RegisterGenBlockSubroutines in lowerer_register.cpp): the module instance
+// the block is in, which the key alone cannot say -- InstanceOfKey reads
+// "blk[1]." out of "blk[1].triple", and no instance is keyed so -- and the
+// block's own prefixes and loop localparams. Leaves `target` alone for every
+// other key.
+void ApplyGenBlockScope(std::string_view key, SimContext& ctx,
+                        SubroutineTarget& target) {
+  const GenBlockSubroutineScope* scope = ctx.FindGenBlockSubroutineScope(key);
+  if (scope == nullptr) return;
+  target.gen_block = scope;
+  target.inst_prefix = scope->inst_prefix;
 }
 
 // The instance a registered key names: the key up to and including its last
@@ -73,19 +124,56 @@ void ResolveTopHeadedPath(const std::string& path, SimContext& ctx,
   if (!ctx.IsTopModule(head)) return;
   std::string rest = path.substr(head.size() + 1);
   if (target.func == nullptr) target.func = ctx.FindFunction(rest);
+  // §27.4: a generate block's subroutine found under the path as written,
+  // "m.blk[1].triple" under the top's own name, already stands in its
+  // instance; one below the top, "m.u1.blk[1].triple", is registered as
+  // "u1.blk[1].triple" and is looked up so.
+  if (target.gen_block != nullptr) return;
   target.inst_prefix = InstanceOfKey(rest);
+  ApplyGenBlockScope(rest, ctx, target);
 }
 
 // The path `call` names, "tk" for a bare enable or `tk;`, "u1.tk" for a
-// hierarchical one; empty where the call names no path a module subroutine
-// is registered under.
-std::string CalleePath(const Expr* call) {
+// hierarchical one, "blk[1].triple" for one into a generate block instance;
+// empty where the call names no path a module subroutine is registered
+// under.
+std::string CalleePath(const Expr* call, SimContext& ctx, Arena& arena) {
   if (call->kind == ExprKind::kIdentifier) return std::string(call->text);
   if (!call->callee.empty()) return std::string(call->callee);
   std::string path;
-  if (!AppendHierarchicalPath(call->lhs, path)) return std::string();
+  if (!AppendHierarchicalPath(call->lhs, path, ctx, arena)) {
+    return std::string();
+  }
   return path;
 }
+
+// §27.4: puts the caller's generate block prefixes back in the running
+// process for as long as it lives, with the callee's restored after, so an
+// expression of the caller read while the process stands in the callee's
+// block -- an actual, an output argument's variable -- resolves a bare name
+// against the caller's own block rather than the callee's. Does nothing
+// while no process runs or no call is in progress, as CallerInstancePrefix
+// answers the active instance there.
+class CallerGenBlockScope {
+ public:
+  explicit CallerGenBlockScope(SimContext& ctx) : proc_(ctx.CurrentProcess()) {
+    if (proc_ == nullptr || proc_->caller_gen_prefixes.empty()) {
+      proc_ = nullptr;
+      return;
+    }
+    callee_prefixes_ = std::move(proc_->gen_prefixes);
+    proc_->gen_prefixes = proc_->caller_gen_prefixes.back();
+  }
+  ~CallerGenBlockScope() {
+    if (proc_ != nullptr) proc_->gen_prefixes = std::move(callee_prefixes_);
+  }
+  CallerGenBlockScope(const CallerGenBlockScope&) = delete;
+  CallerGenBlockScope& operator=(const CallerGenBlockScope&) = delete;
+
+ private:
+  Process* proc_;
+  std::vector<std::string> callee_prefixes_;
+};
 
 }  // namespace
 
@@ -100,7 +188,7 @@ SubroutineTarget FindSubroutineTarget(const Expr* call, SimContext& ctx,
     target.inst_prefix = std::move(active);
     return target;
   }
-  std::string path = CalleePath(call);
+  std::string path = CalleePath(call, ctx, arena);
   if (path.empty()) return target;
   // §23.6: the first node of a path may be the top of the hierarchy the path
   // is used from, so "u1.tk" written in instance "x." is "x.u1.tk" first,
@@ -115,6 +203,7 @@ SubroutineTarget FindSubroutineTarget(const Expr* call, SimContext& ctx,
           active.empty() ? nullptr : ctx.FindFunction(relative)) {
     target.func = func;
     target.inst_prefix = InstanceOfKey(relative);
+    ApplyGenBlockScope(relative, ctx, target);
     return target;
   }
   // A path from the top of the design, "u1.tk" as written; a bare name found
@@ -129,17 +218,27 @@ SubroutineTarget FindSubroutineTarget(const Expr* call, SimContext& ctx,
   if (target.func == nullptr && !is_hierarchical)
     target.func = ctx.FindFunctionInPackageScope(path);
   target.inst_prefix = is_hierarchical ? InstanceOfKey(path) : active;
+  // §27.4 with §23.6: a path into a generate block instance, "blk[1].triple"
+  // from the top's own processes.
+  if (is_hierarchical) ApplyGenBlockScope(path, ctx, target);
   // §23.6: a path headed by a top-level module's name, from a parallel
   // hierarchy or from anywhere in the design.
   if (is_hierarchical) ResolveTopHeadedPath(path, ctx, target);
   return target;
 }
 
-void EnterCalleeInstance(SimContext& ctx, std::string_view inst_prefix) {
+void EnterCalleeInstance(SimContext& ctx, const SubroutineTarget& target) {
   Process* proc = ctx.CurrentProcess();
   if (proc == nullptr) return;
   proc->caller_inst_prefixes.push_back(std::move(proc->inst_prefix));
-  proc->inst_prefix = std::string(inst_prefix);
+  proc->inst_prefix = target.inst_prefix;
+  // §27.4: the block's prefixes go in beside the instance, and the caller's
+  // own wait with its instance; a target of no generate block keeps the
+  // caller's, as a bare call from inside a block has always run with them.
+  proc->caller_gen_prefixes.push_back(proc->gen_prefixes);
+  if (target.gen_block != nullptr) {
+    proc->gen_prefixes = target.gen_block->gen_prefixes;
+  }
 }
 
 void LeaveCalleeInstance(SimContext& ctx) {
@@ -147,6 +246,9 @@ void LeaveCalleeInstance(SimContext& ctx) {
   if (proc == nullptr || proc->caller_inst_prefixes.empty()) return;
   proc->inst_prefix = std::move(proc->caller_inst_prefixes.back());
   proc->caller_inst_prefixes.pop_back();
+  if (proc->caller_gen_prefixes.empty()) return;
+  proc->gen_prefixes = std::move(proc->caller_gen_prefixes.back());
+  proc->caller_gen_prefixes.pop_back();
 }
 
 std::string CallerInstancePrefix(SimContext& ctx) {
@@ -155,6 +257,18 @@ std::string CallerInstancePrefix(SimContext& ctx) {
     return ctx.ActiveInstancePrefix();
   }
   return proc->caller_inst_prefixes.back();
+}
+
+void BindGenBlockConsts(const SubroutineTarget& target, SimContext& ctx,
+                        Arena& arena) {
+  if (target.gen_block == nullptr) return;
+  for (const auto& [name, value] : target.gen_block->consts) {
+    // §27.4: the loop index is an integer, so the localparam is 32-bit
+    // signed, as Lowerer::InstallGenBlockConsts makes the block's own copy.
+    Variable* var = ctx.CreateLocalVariable(name, 32, true);
+    var->value = MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(value));
+    var->value.is_signed = true;
+  }
 }
 
 // §13.5: the actuals are expressions of the caller, so they are read in the
@@ -166,6 +280,7 @@ void BindActualsInCaller(const ModuleItem* func, const Expr* expr,
                          SimContext& ctx, Arena& arena) {
   InstancePrefixOverride in_caller(ctx.InstancePrefixOverride(),
                                    CallerInstancePrefix(ctx));
+  CallerGenBlockScope in_caller_block(ctx);
   BindFunctionArgs(func, expr, ctx, arena);
 }
 
@@ -175,6 +290,7 @@ void WritebackInCaller(const ModuleItem* func, const Expr* expr,
                        SimContext& ctx, Arena& arena) {
   InstancePrefixOverride in_caller(ctx.InstancePrefixOverride(),
                                    CallerInstancePrefix(ctx));
+  CallerGenBlockScope in_caller_block(ctx);
   WritebackOutputArgs(func, expr, ctx, arena);
   WritebackQueueRefs(ctx);
   WritebackAssocRefs(ctx);
