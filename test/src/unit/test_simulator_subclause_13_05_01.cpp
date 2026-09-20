@@ -686,4 +686,79 @@ TEST(PassByValueSim, ChildInstanceStructActualBindsTheFormalsLayout) {
   LowerRunAndCheck(f, design, {{"m.r", 0xA5u}});
 }
 
+// §13.3 (printed page 337) declares a formal with any data_type, a structure
+// written inline among them, and §13.5.1 (printed 348) copies the actual
+// into the subroutine's own variable of that type, whose members §7.2.1
+// (printed 147) makes windows of it. The formal's layout was resolved from
+// the actual's storage where the actual is an identifier; the formal's own
+// type is what lays it out, and a member read answers the same 12 either
+// way -- the case that says binding the formal's own layout first loses the
+// identifier actual nothing.
+TEST(PassByValueSim, InlineStructFormalBoundFromAStructVariable) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef struct packed { int a, b; } pair_t;\n"
+      "  pair_t x;\n"
+      "  int y;\n"
+      "  function int f(struct packed { int a, b; } s);\n"
+      "    return s.a * 10 + s.b;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    x = '{1, 2};\n"
+      "    y = f(x);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"y", 12u}});
+}
+
+// §13.5.1 (printed page 348) copies the actual's value whatever expression
+// produced it, and the copy is of the formal's type. A call's result has no
+// storage of its own to resolve a layout from, and an inline type has no
+// name the fallback could bind, so `f(g())` left the formal a plain vector:
+// `s.a` in the body was read through no member, and the body answered 0
+// where the members g placed, 3 and 4, read 34.
+TEST(PassByValueSim, InlineStructFormalBoundFromACallResult) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef struct packed { int a, b; } pair_t;\n"
+      "  int y;\n"
+      "  function pair_t g();\n"
+      "    return '{3, 4};\n"
+      "  endfunction\n"
+      "  function int f(struct packed { int a, b; } s);\n"
+      "    return s.a * 10 + s.b;\n"
+      "  endfunction\n"
+      "  initial y = f(g());\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"y", 34u}});
+}
+
+// §7.3.1 (printed page 150) lays every member of a packed union over the
+// same bits, and §13.5.1 copies a plain vector actual into a formal whose
+// packed union is written inline; the body reads the copy through the
+// union's second member, a structure whose low byte is the low byte of the
+// vector, 8'hCD of 16'hABCD. The actual is a vector variable with no layout
+// of its own, so the formal's layout can come from nowhere but its
+// declaration: read through no member the body reached nothing, and read as
+// the whole vector it would answer 16'hABCD.
+TEST(PassByValueSim, InlinePackedUnionFormalReadsItsSecondMember) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [15:0] w = 16'hABCD;\n"
+      "  int y;\n"
+      "  function int f(union packed { logic [15:0] whole;"
+      " struct packed { logic [7:0] hi, lo; } h; } u);\n"
+      "    return u.h.lo;\n"
+      "  endfunction\n"
+      "  initial y = f(w);\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"y", 0xCDu}});
+}
+
 }  // namespace

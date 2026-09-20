@@ -755,6 +755,24 @@ static void CopyUnionTagIn(const FunctionArg& param, const Expr* actual,
   ctx.SetVariableTag(param.name, tag);
 }
 
+// §7.3.2 (printed page 151) has a union's tag travel beside its bits, and
+// §13.5.1 copies both into the formal: an identifier actual's tag is copied
+// into a formal whose union is written inline as CopyUnionTagIn copies it into
+// a typedef-named one, and an actual of any other shape -- a call's result,
+// whose storage holds no tag -- leaves the formal untagged, written so on
+// every bind rather than left holding the last call's tag, which §11.9
+// (printed 304) would check the body's member reads against. Nothing for a
+// structure formal, which has no tag.
+static void BindInlineFormalUnionTag(const FunctionArg& param,
+                                     const Expr* actual, SimContext& ctx) {
+  if (!ctx.GetVariableStructType(param.name)->is_union) return;
+  if (actual != nullptr && actual->kind == ExprKind::kIdentifier) {
+    CopyUnionTagIn(param, actual, ctx);
+    return;
+  }
+  ctx.SetVariableTag(param.name, {});
+}
+
 // §7.2.2/§13.5.1: make member access (arg.field) work on a by-value struct
 // copy. struct_types_ is keyed by variable name, so a named-type formal -- e.g.
 // `input s_t arg` -- cannot find its layout by the type name `s_t` (a type name
@@ -768,12 +786,24 @@ static void CopyUnionTagIn(const FunctionArg& param, const Expr* actual,
 // as every other read of an actual is made. Asked by the bare name, a struct
 // variable of an instantiated module passed as an actual bound no layout to
 // the formal, and a member read of the formal inside the body answered zero.
+//
+// §13.3 (printed page 337) with §13.5.1 (printed 348): a formal whose
+// structure or union is written inline in its declaration has a layout of its
+// own, built from that declaration, and the copy §13.5.1 makes is of that
+// type whatever the actual is, so such a formal is bound to its own layout
+// (TryBindInlineAggregateFormal) before the actual is looked at; resolved from
+// the actual alone, `f(g())` bound no layout and `s.a` in the body was read
+// through no member.
 static void RegisterValueArgStructType(const FunctionArg& param,
                                        const Expr* expr, int arg_index,
                                        SimContext& ctx) {
   const Expr* actual =
       (arg_index >= 0) ? expr->args[static_cast<size_t>(arg_index)] : nullptr;
   if (actual && TryBindTaggedActual(param, actual, ctx)) return;
+  if (TryBindInlineAggregateFormal(param, ctx)) {
+    BindInlineFormalUnionTag(param, actual, ctx);
+    return;
+  }
   if (actual && actual->kind == ExprKind::kIdentifier) {
     const StructTypeInfo* sinfo = nullptr;
     {

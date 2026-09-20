@@ -1,4 +1,8 @@
+#include <cstdint>
+#include <format>
+#include <string>
 #include <string_view>
+#include <utility>
 
 #include "common/arena.h"
 #include "common/types.h"
@@ -13,29 +17,52 @@
 
 namespace delta {
 
+// §13.3 (printed page 337) declares a formal with any data_type, a structure
+// or union written inline in the declaration among them. Such a type names
+// no registered layout: RegisterDesignTypeLayouts registers a typedef's under
+// the typedef's name and the lowerer a declaration's under the variable's, so
+// the formal's is built from its DataType as RegisterAggregateLayout builds a
+// declaration's, as wide as §7.2.1 (printed 147) makes the type, with a
+// member naming a typedef of an aggregate of its own laid out through the
+// nested type the elaborator resolved onto the declaration
+// (ResolveFormalAggregateTypes in elaborator_items.cpp). The layout is built
+// once and found again on every later call by its key, which names the
+// declaration rather than the formal: the formal of another subroutine may
+// share the name with a type of its own, and the layout table keys a module's
+// variables by name as well, so the name alone would hand one subroutine's
+// formal another's layout. The declaration's DataType stands at one address
+// for the run, so the key is the formal's name with that address, and the
+// registered layout's type_name is that key, owned by the arena. Empty where
+// the formal's type writes no members.
+static std::string_view InlineFormalLayoutKey(const FunctionArg& param,
+                                              SimContext& ctx) {
+  const DataType& dt = param.data_type;
+  if (dt.struct_members.empty()) return {};
+  std::string key =
+      std::format("{}@{:x}", param.name, reinterpret_cast<uintptr_t>(&dt));
+  if (const StructTypeInfo* info = ctx.FindStructType(key)) {
+    return info->type_name;
+  }
+  Arena& arena = ctx.GetArena();
+  auto* owned = arena.Create<std::string>(std::move(key));
+  RegisterAggregateLayout(*owned, &dt, DeclaredTypeWidth(dt, ctx), ctx, arena);
+  return *owned;
+}
+
 // §11.9 (printed page 304): a tagged union expression's type is known from
 // its context -- for an actual, the formal it is bound to. The key the
 // formal's union layout stands under in SimContext: the typedef's name where
 // the formal is declared by one, which RegisterDesignTypeLayouts registers;
-// the formal's own name where the union is written inline in the formal's
-// declaration (§13.3, printed 337, takes any data_type there), which names no
-// registered layout, so the layout is built from the formal's DataType as
-// RegisterAggregateLayout builds a declaration's, as wide as §7.2.1 makes the
-// type, and registered under the formal's name, the key the body's reads of
-// the formal ask by. Without it `a.Valid` of an inline-typed formal was read
-// through no member and `f(tagged Invalid)` raised nothing. Empty where the
-// formal's type is neither. A member of the inline type that names a typedef
-// of its own carries no nested layout here, the elaborator resolving those
-// for the typedef table alone.
+// the key InlineFormalLayoutKey registers the layout under where the union is
+// written inline in the formal's declaration. Without the latter `a.Valid` of
+// an inline-typed formal was read through no member and `f(tagged Invalid)`
+// raised nothing. Empty where the formal's type is neither.
 static std::string_view FormalUnionLayoutKey(const FunctionArg& param,
                                              SimContext& ctx) {
   const DataType& dt = param.data_type;
   if (!dt.type_name.empty() && ctx.FindStructType(dt.type_name) != nullptr)
     return dt.type_name;
-  if (dt.struct_members.empty()) return {};
-  RegisterAggregateLayout(param.name, &dt, DeclaredTypeWidth(dt, ctx), ctx,
-                          ctx.GetArena());
-  return param.name;
+  return InlineFormalLayoutKey(param, ctx);
 }
 
 // §11.9: the struct layout of the union member a tagged expression names, or
@@ -98,6 +125,26 @@ bool TryBindTaggedActual(const FunctionArg& param, const Expr* actual,
   if (key.empty()) return false;
   ctx.SetVariableStructType(param.name, key);
   ctx.SetVariableTag(param.name, actual->rhs->text);
+  return true;
+}
+
+// §13.5.1 (printed page 348) copies the actual into the subroutine's own
+// variable, whose type is the formal's, and §7.2.1 (printed 147) makes a
+// member read of that variable a window of the type's layout, whatever
+// expression the value was copied from. RegisterValueArgStructType bound a
+// formal's layout from an identifier actual's storage alone, and its fallback
+// from a type name, which a structure or union written inline in the formal's
+// declaration has none of: `f(g())` to `function int f(struct packed { int
+// a, b; } s)` left the formal a plain vector and `s.a` in the body was read
+// through no member. The formal's own type is laid out (InlineFormalLayoutKey)
+// and bound under the formal's name, the key the body's reads ask by, before
+// the actual is looked at, so an identifier's value and a computed one land
+// in a laid-out formal alike. False for a formal whose type writes no
+// members, which is bound as it was.
+bool TryBindInlineAggregateFormal(const FunctionArg& param, SimContext& ctx) {
+  std::string_view key = InlineFormalLayoutKey(param, ctx);
+  if (key.empty()) return false;
+  ctx.SetVariableStructType(param.name, key);
   return true;
 }
 

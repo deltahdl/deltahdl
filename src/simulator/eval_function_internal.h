@@ -92,14 +92,18 @@ int ResolveArgIndex(const ModuleItem* func, const Expr* expr, size_t param_idx);
 // within the formal's union, answering false where the actual has another
 // shape, so it is evaluated as any expression; TryBindTaggedActual binds the
 // union's layout and the member's tag to the formal, answering false where the
-// actual is no tagged expression or the formal's type has no layout. A formal
-// whose union is written inline has its layout built and registered under its
-// own name. Both are defined in eval_function_args_tagged.cpp and asked by the
-// by-value binding in eval_function_args.cpp.
+// actual is no tagged expression or the formal's type has no layout. §13.5.1:
+// TryBindInlineAggregateFormal binds the layout of a formal whose structure
+// or union is written inline in its declaration, tagged or not, whatever the
+// actual is, answering false where the formal's type writes no members; the
+// layout is built once from the declaration's type and keyed by it. All three
+// are defined in eval_function_args_tagged.cpp and asked by the by-value
+// binding in eval_function_args.cpp.
 bool TryEvalTaggedPatternActual(const FunctionArg& param, const Expr* actual,
                                 SimContext& ctx, Arena& arena, Logic4Vec& out);
 bool TryBindTaggedActual(const FunctionArg& param, const Expr* actual,
                          SimContext& ctx);
+bool TryBindInlineAggregateFormal(const FunctionArg& param, SimContext& ctx);
 
 // The actual arguments of one call, as §35.6.1 "Argument passing" and §11.12
 // "Let construct" each describe them: the call-site expression, the boundary
