@@ -633,4 +633,231 @@ TEST(PackageImportSim, StarStarExportedVariableReadThroughAWildcardImport) {
             67u);
 }
 
+// §26.3 (printed page 810): a function call is resolved against the locally
+// visible identifiers of the current scope first and then the potentially
+// locally visible ones a wildcard import of that scope supplies, the outer
+// scope searched only after both; a body's `import p::*` makes p's five
+// potentially locally visible in the body, so `five()` written there is p's,
+// 5, ahead of the module's own five of 50 in the enclosing scope. A lookup
+// that asked the module's registrations before the body's imports answered
+// 50.
+TEST(PackageImportSim, BodyImportedFunctionShadowsTheModulesOfTheSameName) {
+  EXPECT_EQ(RunAndGet("package p;\n"
+                      "  function int five(); return 5; endfunction\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  function int five(); return 50; endfunction\n"
+                      "  function int calc();\n"
+                      "    import p::*;\n"
+                      "    return five();\n"
+                      "  endfunction\n"
+                      "  int out;\n"
+                      "  initial out = calc();\n"
+                      "endmodule\n",
+                      "out"),
+            5u);
+}
+
+// §26.3 with §23.6: the same body in an instance below the top, whose own
+// five is registered under the instance's prefix ahead of the bare name; the
+// body's import still stands ahead of the instance's declaration, so the
+// read is 5 and not the instance's 50.
+TEST(PackageImportSim, BodyImportedFunctionShadowsTheInstancesOfTheSameName) {
+  EXPECT_EQ(RunAndGet("package p;\n"
+                      "  function int five(); return 5; endfunction\n"
+                      "endpackage\n"
+                      "module child(output int o);\n"
+                      "  function int five(); return 50; endfunction\n"
+                      "  function int calc();\n"
+                      "    import p::*;\n"
+                      "    return five();\n"
+                      "  endfunction\n"
+                      "  initial o = calc();\n"
+                      "endmodule\n"
+                      "module top;\n"
+                      "  int out;\n"
+                      "  child u1(.o(out));\n"
+                      "endmodule\n",
+                      "out"),
+            5u);
+}
+
+// §26.3: the import's visibility is the importing body's alone, so a second
+// body of the same module with no import of its own finds no five nearer
+// than the module's and reads 50. A lookup that let one body's import leak
+// into every body of the module would answer 5.
+TEST(PackageImportSim, BodyWithoutImportCallsTheModulesFunctionOfTheSameName) {
+  EXPECT_EQ(RunAndGet("package p;\n"
+                      "  function int five(); return 5; endfunction\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  function int five(); return 50; endfunction\n"
+                      "  function int calc();\n"
+                      "    import p::*;\n"
+                      "    return five();\n"
+                      "  endfunction\n"
+                      "  function int plain(); return five(); endfunction\n"
+                      "  int out;\n"
+                      "  initial out = calc() * 100 + plain();\n"
+                      "endmodule\n",
+                      "out"),
+            550u);
+}
+
+// §26.3 with §23.8.1: a package function's body is searched through its own
+// package's scope first, and where the package neither declares nor imports
+// the name the search goes on outward and upward, so `base()` written in
+// p's twice reaches the module's base of 21 that the package never names:
+// 42. A package-scope lookup that answered "not found" instead of handing
+// on to the module's registrations would call nothing and read 0.
+TEST(PackageScopeReferenceSim,
+     PackageFunctionCallsAModuleFunctionItsPackageNeverNames) {
+  EXPECT_EQ(RunAndGet("package p;\n"
+                      "  function int twice(); return base() * 2; endfunction\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  function int base(); return 21; endfunction\n"
+                      "  int out;\n"
+                      "  initial out = p::twice();\n"
+                      "endmodule\n",
+                      "out"),
+            42u);
+}
+
+// §26.3 makes a wildcard import's names visible throughout the importing scope
+// (printed page 810), and §6.21 evaluates a declaration assignment in the
+// scope of the declaration, so `int z = x;` beside `import p1::*` reads p1's
+// x as `int y = p1::x;` does -- the Clause 26 discovery's probe 129. The
+// imports were bound after the module's variables had been lowered, so z read
+// 0 while y read 6: z * 10 + y is 66 against the 6 of an unbound z.
+TEST(PackageImportSim, WildcardImportedVariableReadByADeclarationInitializer) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  int x = 6;\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  import p1::*;\n"
+                      "  int z = x;\n"
+                      "  int y = p1::x;\n"
+                      "  int out;\n"
+                      "  initial out = z * 10 + y;\n"
+                      "endmodule\n",
+                      "out"),
+            66u);
+}
+
+// The explicit form of the same read, `import p1::x; int z = x + 1;`, which
+// read 1 for the same reason: 7 tells the bound x from an unbound one.
+TEST(PackageImportSim, ExplicitlyImportedVariableReadByADeclarationInitializer) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  int x = 6;\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  import p1::x;\n"
+                      "  int z = x + 1;\n"
+                      "endmodule\n",
+                      "z"),
+            7u);
+}
+
+// §26.6's own packages and module (printed pages 815-816): p2 exports p1's x
+// under `import p1::x; export p1::*;`, p4 under `import p1::*; export p1::*;`
+// beside its own `int y = x;`, and top imports both by wildcard and declares
+// `int z = x;`. §26.6 makes an import of a declaration reached through an
+// export an import of the original declaration, so x reached by two exported
+// paths is one candidate and no §26.3 conflict -- the discovery's probes 45
+// and 130, which read 0 or were reported. z * 10 + y is 66; RunAndGet also
+// holds the elaboration clean, so an ambiguity report fails it.
+TEST(PackageImportSim, VariableReachedByTwoExportPathsReadByAnInitializer) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  int x = 6;\n"
+                      "endpackage\n"
+                      "package p2;\n"
+                      "  import p1::x;\n"
+                      "  export p1::*;\n"
+                      "endpackage\n"
+                      "package p4;\n"
+                      "  import p1::*;\n"
+                      "  export p1::*;\n"
+                      "  int y = x;\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  import p2::*;\n"
+                      "  import p4::*;\n"
+                      "  int z = x;\n"
+                      "  int out;\n"
+                      "  initial out = z * 10 + y;\n"
+                      "endmodule\n",
+                      "out"),
+            66u);
+}
+
+// §26.5's Table 26-1: a declaration of the importing scope takes the name
+// over a wildcard import of it, and the imports now bind before the module's
+// variables exist, so the module's own x must still win: x * 100 + p1::x is
+// 306, where an import left in place of the declaration would read 606.
+TEST(PackageImportSim, AModulesOwnDeclarationShadowsAnImportInAnInitializer) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  int x = 6;\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  import p1::*;\n"
+                      "  int x = 3;\n"
+                      "  int z = x * 100 + p1::x;\n"
+                      "endmodule\n",
+                      "z"),
+            306u);
+}
+
+// An instance writes its own imports (§26.3), and its declaration
+// initializers are evaluated under its prefix, so the binding is made before
+// the instance's variables as it is for the top: u.z reads p1's 6 through the
+// child's wildcard import, and v.z reads the child's own x of 3 over the
+// import it also writes (§26.5) -- 6 * 10 + 3.
+TEST(PackageImportSim, ChildInstanceInitializerReadsItsOwnImport) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  int x = 6;\n"
+                      "endpackage\n"
+                      "module reader;\n"
+                      "  import p1::*;\n"
+                      "  int z = x;\n"
+                      "endmodule\n"
+                      "module owner;\n"
+                      "  import p1::*;\n"
+                      "  int x = 3;\n"
+                      "  int z = x;\n"
+                      "endmodule\n"
+                      "module top;\n"
+                      "  reader u();\n"
+                      "  owner v();\n"
+                      "  int out;\n"
+                      "  initial out = u.z * 10 + v.z;\n"
+                      "endmodule\n",
+                      "out"),
+            63u);
+}
+
+// §26.3's top2 (printed page 809) imports q's FALSE explicitly beside p's
+// wildcard, and its `teeth_t myteeth` is here given the literal as its
+// declaration initializer: `teeth_t a = FALSE;` reads q's FALSE, 4 with
+// ORIGINAL at 3, where p's FALSE and an unbound name both read 0; b's TRUE
+// says the wildcard's literal still initializes a declaration -- 4 * 10 + 1.
+TEST(PackageImportSim, ExplicitlyImportedEnumLiteralInitializesADeclaration) {
+  EXPECT_EQ(RunAndGet("package p;\n"
+                      "  typedef enum { FALSE, TRUE } bool_t;\n"
+                      "endpackage\n"
+                      "package q;\n"
+                      "  typedef enum { ORIGINAL = 3, FALSE } teeth_t;\n"
+                      "endpackage\n"
+                      "module top2;\n"
+                      "  import p::*;\n"
+                      "  import q::teeth_t, q::ORIGINAL, q::FALSE;\n"
+                      "  teeth_t a = FALSE;\n"
+                      "  bool_t b = TRUE;\n"
+                      "  int out;\n"
+                      "  initial out = a * 10 + b;\n"
+                      "endmodule\n",
+                      "out"),
+            41u);
+}
+
 }  // namespace

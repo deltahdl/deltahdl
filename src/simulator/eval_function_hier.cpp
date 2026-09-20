@@ -190,6 +190,23 @@ SubroutineTarget FindSubroutineTarget(const Expr* call, SimContext& ctx,
   }
   std::string path = CalleePath(call, ctx, arena);
   if (path.empty()) return target;
+  bool is_hierarchical = path.find('.') != std::string::npos;
+  // §26.3 with §26.2: a bare callee written where the innermost frame names
+  // a package -- a package subroutine's body or a package variable's
+  // initializer, or a module subroutine's body whose own import is recorded
+  // under a key of its own (LowerSubroutineBodyImports in lowerer_import.cpp)
+  // -- is looked up in that scope first, the package's own "pkg::name" and
+  // then what its imports bring in, as §26.3 searches the current scope's
+  // locally and potentially locally visible identifiers before the outer
+  // scopes: `function int calc(); import p::*; return five(); endfunction`
+  // calls p's five ahead of the module's own. Null outside any package frame
+  // or where the package provides no such name, and the module's and the
+  // top's registrations are searched then.
+  if (!is_hierarchical) target.func = ctx.FindFunctionInPackageScope(path);
+  if (target.func != nullptr) {
+    target.inst_prefix = std::move(active);
+    return target;
+  }
   // §23.6: the first node of a path may be the top of the hierarchy the path
   // is used from, so "u1.tk" written in instance "x." is "x.u1.tk" first,
   // and the lowerer registers each instance's subroutines under that
@@ -210,13 +227,6 @@ SubroutineTarget FindSubroutineTarget(const Expr* call, SimContext& ctx,
   // here is the top's, a package's or the compilation unit's and runs where
   // the caller stands, as it did before instances were registered by prefix.
   target.func = ctx.FindFunction(path);
-  bool is_hierarchical = path.find('.') != std::string::npos;
-  // §26.2: a bare callee inside a package's frame -- a package variable's
-  // initializer or a package subroutine's body calling another of the
-  // package's, or one its import brings in -- is registered under the
-  // package's "pkg::name" key and under no bare one unless imported.
-  if (target.func == nullptr && !is_hierarchical)
-    target.func = ctx.FindFunctionInPackageScope(path);
   target.inst_prefix = is_hierarchical ? InstanceOfKey(path) : active;
   // §27.4 with §23.6: a path into a generate block instance, "blk[1].triple"
   // from the top's own processes.
