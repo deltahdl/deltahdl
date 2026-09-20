@@ -91,4 +91,15 @@ inline bool IsCompoundAssignOp(TokenKind kind) {
   }
 }
 
+// Whether `next` was written directly against `first`, with no white space,
+// comment or anything else between them. A token's text is a view into the
+// lexer's source, so the test is whether `next` begins where `first` ends.
+// This is how a digit run and the letters after it, which the lexer hands on
+// as a literal and an identifier, are told from the same two tokens written
+// apart: §5.6 forbids the run as an identifier and §5.7.1 as a literal, and
+// with white space between them each token is what it looks like.
+inline bool TokenFollowsDirectly(const Token& first, const Token& next) {
+  return next.text.data() == first.text.data() + first.text.size();
+}
+
 }  // namespace delta

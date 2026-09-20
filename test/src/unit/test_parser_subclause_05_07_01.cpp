@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -511,6 +513,64 @@ TEST(IntegerLiteralParsing, LineCommentBetweenSizeAndBaseJoinsOneLiteral) {
   EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
   EXPECT_EQ(rhs->text, "4 'sd3");
   EXPECT_EQ(rhs->int_val, 3u);
+}
+
+// §5.7.1's Example 1 lists `4af` as illegal: a simple decimal number is a
+// sequence of the digits 0 through 9, and hexadecimal digits go behind a base
+// such as 'h. The lexer reads `4` as a decimal literal and `af` as the
+// identifier against it, the only thing the grammar makes of those characters,
+// so where an expression is expected the run is reported as the literal it was
+// written to be, under the subclause whose rule it breaks.
+TEST(IntegerLiteralParsing, DigitsAgainstLettersAreReportedUnderClause571) {
+  auto r = Parse(
+      "module top();\n"
+      "  logic [31:0] a;\n"
+      "  initial begin\n"
+      "    a = 4af;\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "integer literal '4af' shall be decimal digits alone or carry a base", 4,
+      "5.7.1"));
+}
+
+// The letters are taken with the digits, so the statement is parsed in step:
+// no report of a token left over after the literal, which is what §12.3 had
+// said of the `af` it was handed.
+TEST(IntegerLiteralParsing, DigitsAgainstLettersLeaveNoLeftoverTokenReport) {
+  auto r = Parse(
+      "module top();\n"
+      "  logic [31:0] a;\n"
+      "  initial a = 4af;\n"
+      "endmodule\n");
+  for (const auto& d : r.diags) {
+    EXPECT_EQ(d.message.find("expected ';'"), std::string::npos) << d.message;
+  }
+}
+
+// With white space between them, `4` and `af` are the two tokens they look
+// like and no malformed literal was written: the statement is still wrong,
+// but as a token left over, not under §5.7.1.
+TEST(IntegerLiteralParsing, DigitsThenSpaceThenLettersIsNotAClause571Report) {
+  auto r = Parse(
+      "module top();\n"
+      "  logic [31:0] a;\n"
+      "  initial a = 4 af;\n"
+      "endmodule\n");
+  EXPECT_FALSE(
+      ReportedError(r.diags, "shall be decimal digits alone", 3, "5.7.1"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ';', got identifier", 3, "12.3"));
+}
+
+// The based forms the example points to, unsized and sized, are the legal
+// spellings of the same digits and draw nothing.
+TEST(IntegerLiteralParsing, HexDigitsBehindABaseAreNotAClause571Report) {
+  EXPECT_TRUE(
+      ParseOk("module top(); logic [31:0] a; initial a = 'haf; endmodule\n"));
+  EXPECT_TRUE(
+      ParseOk("module top(); logic [31:0] a; initial a = 4'haf; endmodule\n"));
 }
 
 }  // namespace

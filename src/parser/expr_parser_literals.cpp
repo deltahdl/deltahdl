@@ -28,6 +28,7 @@
 #include "parser/ast_expr.h"
 #include "parser/expr_parser_internal.h"
 #include "parser/parser.h"
+#include "parser/parser_token_skips.h"
 
 namespace delta {
 
@@ -148,8 +149,30 @@ static bool IsSimpleDecimalText(std::string_view text) {
 // joined text is owned by the arena, as the source holds it nowhere. No other
 // production puts two integer literals side by side, so the pair is never
 // anything else.
+//
+// §5.7.1's Example 1 lists `4af` as illegal, a simple decimal number being a
+// sequence of the digits 0 through 9 and hexadecimal digits going behind a
+// base such as 'h. The lexer hands `4af` on as the literal 4 with the
+// identifier af against it, the only thing the grammar makes of those
+// characters, so a simple decimal literal whose next token is an identifier
+// starting where the literal's text ends is the malformed literal it was
+// written to be: it is reported under §5.7.1 and the identifier is taken with
+// it, so that nothing is left over for the statement to report. Where a name
+// is expected instead, the same pair is Parser::ExpectIdentifier's §5.6 report.
 Expr* Parser::ParseIntLiteralPrimary(const Token& tok) {
   auto* lit = MakeLiteral(ExprKind::kIntegerLiteral, tok);
+  if (IsSimpleDecimalText(tok.text) && Check(TokenKind::kIdentifier) &&
+      TokenFollowsDirectly(tok, CurrentToken())) {
+    Token letters = Consume();
+    std::string_view whole(tok.text.data(),
+                           tok.text.size() + letters.text.size());
+    diag_.Error(tok.loc,
+                "integer literal '" + std::string(whole) +
+                    "' shall be decimal digits alone or carry a base such "
+                    "as 'h",
+                Subclause("5.7.1"));
+    return lit;
+  }
   if (IsSimpleDecimalText(tok.text) && Check(TokenKind::kIntLiteral) &&
       !CurrentToken().text.empty() && CurrentToken().text.front() == '\'') {
     Token based = Consume();

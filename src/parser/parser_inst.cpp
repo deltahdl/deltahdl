@@ -15,6 +15,7 @@
 #include "parser/ast_module.h"
 #include "parser/parser.h"
 #include "parser/parser_property_spec_internal.h"
+#include "parser/parser_token_skips.h"
 
 namespace delta {
 
@@ -485,8 +486,7 @@ bool Parser::TryTakeIllFormedSimpleIdentifier(Token* out) {
   auto saved = lexer_.SavePos();
   Consume();
   auto next = CurrentToken();
-  if (!next.Is(TokenKind::kIdentifier) ||
-      next.text.data() != tok.text.data() + tok.text.size()) {
+  if (!next.Is(TokenKind::kIdentifier) || !TokenFollowsDirectly(tok, next)) {
     lexer_.RestorePos(saved);
     return false;
   }
