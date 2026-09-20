@@ -198,4 +198,85 @@ TEST(PackageDeclarationElaboration, TimeunitsRepeatMatchAccepted) {
              "endmodule\n"));
 }
 
+// §26.2 (printed page 808 of ~/LRM.pdf): a package shall not refer to an
+// item declared in the compilation-unit scope, and a package item shall hold
+// no hierarchical reference to an identifier outside the package. The
+// checks read a package variable's initializer alone, so a package
+// function's body reading `cu_var` or `top.v` elaborated clean.
+TEST(PackageDeclarationElaboration,
+     CompilationUnitScopeReferenceInPackageFunctionBodyRejected) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("int cu_var = 3;\n"
+             "package p;\n"
+             "  function int f(); return cu_var; endfunction\n"
+             "endpackage\n"
+             "module top;\n"
+             "  int r;\n"
+             "  initial r = p::f();\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "package item references 'cu_var' from the "
+                            "compilation-unit scope",
+                            3, "26.2"));
+}
+
+TEST(PackageDeclarationElaboration,
+     HierarchicalReferenceInPackageFunctionBodyRejected) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("package p;\n"
+             "  function int f(); return top.v; endfunction\n"
+             "endpackage\n"
+             "module top;\n"
+             "  int v = 4;\n"
+             "  int r;\n"
+             "  initial r = p::f();\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "package item contains a hierarchical reference "
+                            "'top'",
+                            2, "26.2"));
+}
+
+// The names a package subroutine declares itself -- a formal, a local of the
+// body or of a block in it, the function's result -- and those the package
+// declares or imports are the package's, whatever a compilation-unit item
+// spells the same; a member access through such a name is no hierarchical
+// reference.
+TEST(PackageDeclarationElaboration,
+     PackageFunctionBodyNamingItsOwnLocalsAndPackageItemsAccepted) {
+  ElabFixture f;
+  EXPECT_TRUE(
+      ElabOk("int x = 1;\n"
+             "int y = 2;\n"
+             "int z = 3;\n"
+             "int h = 4;\n"
+             "package q;\n"
+             "  int w = 5;\n"
+             "endpackage\n"
+             "package p;\n"
+             "  import q::*;\n"
+             "  typedef struct { int a; } pair_t;\n"
+             "  int k = 6;\n"
+             "  function int g(int x);\n"
+             "    return x;\n"
+             "  endfunction\n"
+             "  function automatic int f(pair_t h);\n"
+             "    int y;\n"
+             "    y = h.a + k + w + g(2);\n"
+             "    begin\n"
+             "      int z;\n"
+             "      z = y;\n"
+             "      f = z;\n"
+             "    end\n"
+             "  endfunction\n"
+             "endpackage\n"
+             "module top;\n"
+             "endmodule\n",
+             f));
+}
+
 }  // namespace

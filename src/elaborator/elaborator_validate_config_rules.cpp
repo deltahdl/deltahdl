@@ -3,15 +3,19 @@
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_validate_classes_internal.h"
+#include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
+#include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
 
 namespace delta {
@@ -145,6 +149,38 @@ void WalkPackageRefExpr(const PackageRefContext& ctx, const Expr* e) {
   for (const auto* el : e->elements) WalkPackageRefExpr(ctx, el);
 }
 
+// §26.2 holds for a subroutine's body as for a variable's initializer, and
+// the body's own names are the subroutine's -- §6.21 makes its formals, its
+// result and the declarations of the body and of each block in it visible
+// there -- so a name declared under `s` joins the package's names for the
+// subtree it is visible in and comes out again after it; an expression of the
+// statement is then judged as an initializer is.
+void WalkPackageRefStmt(PackageRefContext& ctx, const Stmt* s) {
+  if (s == nullptr) return;
+  std::vector<std::string_view> added;
+  for (auto name : NamesDeclaredUnder(s)) {
+    if (ctx.pkg_names.insert(name).second) added.push_back(name);
+  }
+  ForEachChildExpr(s, [&](const Expr* e) { WalkPackageRefExpr(ctx, e); });
+  ForEachChildStmt(s, [&](const Stmt* sub) { WalkPackageRefStmt(ctx, sub); });
+  for (auto name : added) ctx.pkg_names.erase(name);
+}
+
+// A subroutine of the package, an out-of-block class method among the items
+// left to its class (§8.24): its body is walked with the names the whole
+// body sees added for the walk.
+void WalkPackageSubroutine(PackageRefContext& ctx, const ModuleItem* item) {
+  bool is_subroutine = item->kind == ModuleItemKind::kFunctionDecl ||
+                       item->kind == ModuleItemKind::kTaskDecl;
+  if (!is_subroutine || !item->method_class.empty()) return;
+  std::vector<std::string_view> added;
+  for (auto name : CollectMethodLocalNames(item)) {
+    if (ctx.pkg_names.insert(name).second) added.push_back(name);
+  }
+  for (const auto* s : item->func_body_stmts) WalkPackageRefStmt(ctx, s);
+  for (auto name : added) ctx.pkg_names.erase(name);
+}
+
 }  // namespace
 
 void Elaborator::ValidatePackageReferences() {
@@ -163,6 +199,7 @@ void Elaborator::ValidatePackageReferences() {
 
     for (const auto* item : pkg->items) {
       if (item->init_expr) WalkPackageRefExpr(ctx, item->init_expr);
+      WalkPackageSubroutine(ctx, item);
     }
   }
 }
