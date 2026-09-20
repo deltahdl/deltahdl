@@ -629,6 +629,18 @@ bool ForeignLibrariesArePresent(const std::vector<std::string>& bootstrap,
   return ok;
 }
 
+// Annex J.4: both facts about the object code the command line specifies --
+// each bootstrap file well formed, each library present -- settled before the
+// run, in the order the annex processes them.
+bool ForeignCodeIsWellFormed(const delta::CliOptions& opts,
+                             delta::SourceManager& src_mgr,
+                             delta::DiagEngine& diag) {
+  std::vector<std::string> bootstrap_libraries;
+  return BootstrapFilesAreWellFormed(opts, src_mgr, diag,
+                                     bootstrap_libraries) &&
+         ForeignLibrariesArePresent(bootstrap_libraries, opts.sv_libs, diag);
+}
+
 int main(int argc, char* argv[]) {
   RecordInvocationCommandLine(argc, argv);
 
@@ -660,11 +672,7 @@ int main(int argc, char* argv[]) {
     diag.SetWarningsAsErrors(true);
   }
 
-  std::vector<std::string> bootstrap_libraries;
-  if (!BootstrapFilesAreWellFormed(opts, src_mgr, diag, bootstrap_libraries) ||
-      !ForeignLibrariesArePresent(bootstrap_libraries, opts.sv_libs, diag)) {
-    return 1;
-  }
+  if (!ForeignCodeIsWellFormed(opts, src_mgr, diag)) return 1;
 
   int mode_status = 0;
   if (RanStandaloneMode(opts, src_mgr, diag, mode_status)) return mode_status;
