@@ -712,4 +712,55 @@ TEST(PackageImportSim, PackageEventTriggeredStateReadThroughTheQualifier) {
             11u);
 }
 
+// §8.3 (printed page 180) with §26.2 (printed 808): a package variable of a
+// class type holds a handle, which LowerVar (lowerer_var.cpp) gives a
+// module's at 64 bits whatever the declaration's own width, so the storage
+// CreatePackageDataVariables makes under "p1.h" is 64 bits wide too
+// (PackageDataWidth in lowerer_package_data.cpp). A class type is one no
+// width table sizes, and such a type fell to the 32-bit carrier every
+// unsized package item gets, so the handle's storage was half a handle.
+TEST(PackageImportSim, PackageClassHandleCarrierIsSixtyFourBitsWide) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "package p1;\n"
+      "  class C;\n"
+      "    int v;\n"
+      "  endclass\n"
+      "  C h;\n"
+      "endpackage\n"
+      "module top;\n"
+      "  import p1::*;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  LowerAndRun(design, f);
+  auto* h = f.ctx.FindVariable("p1.h");
+  ASSERT_NE(h, nullptr);
+  EXPECT_EQ(h->value.width, 64u);
+}
+
+// §8.3 (printed page 180) with §26.3 (printed 808): `p1::h = new` constructs
+// an object of p1's C into the package's handle, which then compares unequal
+// to null: 1. Read together with the width above so that a handle held in a
+// 64-bit carrier still constructs and compares as it did in the narrower
+// one.
+TEST(PackageImportSim, PackageClassHandleConstructedThroughTheQualifier) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  class C;\n"
+                      "    int v;\n"
+                      "  endclass\n"
+                      "  C h;\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  int y;\n"
+                      "  initial begin\n"
+                      "    p1::h = new;\n"
+                      "    y = (p1::h != null);\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            1u);
+}
+
 }  // namespace

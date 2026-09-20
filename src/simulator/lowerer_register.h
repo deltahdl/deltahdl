@@ -175,7 +175,8 @@ void RegisterPackageScopedSubroutines(const RtlirDesign* design,
 // §26.2 with §6.8: every package parameter with an initializer and every
 // package variable, with or without one, is given storage under its
 // "pk.name" key -- the variable at its declared type's width, state and
-// signedness, a string or real registered as such, an integral variable
+// signedness, a class handle (§8.3) at a handle's 64 bits, a string or real
+// registered as such, an integral variable
 // without an initializer at §6.8's default, a queue or an associative array
 // (§7.10, §7.8) with the object its methods and element selects operate on,
 // a semaphore (§15.3) with the bucket its methods operate on, holding the

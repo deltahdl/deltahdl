@@ -74,12 +74,24 @@ static std::string PackageDataKey(const ModuleItem* item,
   return std::string(pkg) + "." + std::string(item->name);
 }
 
-// The width of a package item's storage: a variable's declared type's, and a
-// parameter's, or a type no table sizes, 32 bits.
-static uint32_t PackageDataWidth(const ModuleItem* item, SimContext& ctx) {
+// The width of a data item's storage: a variable's declared type's, and a
+// parameter's, or a type no table sizes, 32 bits. §8.3 (printed page 180)
+// with §8.4: a variable of a class type holds a handle to an object, which
+// Lowerer::LowerVar sizes at 64 bits whatever the declaration's own width
+// says (StorageWidth in lowerer_var.cpp); a package's is known to be one by
+// the class record RegisterPackageClassVariables entered under `qname` ahead
+// of this -- the package's own class, an imported one, or the built-in
+// process or weak_reference class -- so its carrier is sized the same. Sized
+// at 32, a handle written through `p1::h = new` was held in half its bits.
+// An array of handles keeps its element width as before.
+static uint32_t PackageDataWidth(const ModuleItem* item, std::string_view qname,
+                                 SimContext& ctx) {
   bool is_var = item->kind == ModuleItemKind::kVarDecl;
   uint32_t width = is_var ? DeclaredTypeWidth(item->data_type, ctx) : 0;
-  return width == 0 ? 32 : width;
+  if (width != 0) return width;
+  bool is_handle = is_var && item->unpacked_dims.empty() &&
+                   !ctx.GetVariableClassType(qname).empty();
+  return is_handle ? 64 : 32;
 }
 
 // §7.10 (printed page 169): N in `[$:N]` is a constant expression bounding
@@ -175,7 +187,7 @@ static void CreatePackageArray(const ModuleItem* item, std::string_view pkg,
   const DataType& type = item->data_type;
   RtlirVariable var;
   var.name = item->name;
-  var.width = PackageDataWidth(item, ctx);
+  var.width = PackageDataWidth(item, qname, ctx);
   var.is_4state = DeclaredTypeIs4State(type);
   var.is_signed = DeclaredTypeIsSigned(type, ctx);
   var.is_string = DeclaredTypeIsString(type, ctx);
@@ -236,7 +248,7 @@ static void CreatePackageAggregate(const ModuleItem* item, std::string_view pkg,
                                    Arena& arena) {
   if (item->unpacked_dims.empty()) return;
   const Expr* dim = item->unpacked_dims.front();
-  uint32_t width = PackageDataWidth(item, ctx);
+  uint32_t width = PackageDataWidth(item, qname, ctx);
   bool is_4state = DeclaredTypeIs4State(item->data_type);
   if (dim == nullptr) {
     CreatePackageDynArray(qname, width, is_4state, ctx);
@@ -296,7 +308,7 @@ static void CreatePackageDataItem(const ModuleItem* item, std::string_view pkg,
                                   SimContext& ctx, Arena& arena) {
   if (!DeclaresPackageData(item)) return;
   auto* qname = arena.Create<std::string>(PackageDataKey(item, pkg));
-  auto* var = ctx.CreateVariable(*qname, PackageDataWidth(item, ctx));
+  auto* var = ctx.CreateVariable(*qname, PackageDataWidth(item, *qname, ctx));
   if (item->kind != ModuleItemKind::kVarDecl) return;
   ShapePackageVariable(item, var, *qname, ctx, arena);
   if (IsPackageSemaphoreDecl(item)) {
