@@ -689,4 +689,62 @@ TEST(PackageImportSim, ReExportedClassReachedBareThroughAWildcardImport) {
             307u);
 }
 
+// §26.6 (printed pages 815-816) with §8.7: a package's class-handle variable
+// an export hands on is constructed through the exporting package's
+// qualifier as through the declaring one's, `p2::h = new` after `import
+// p1::h; export p1::h;` building an object of p1's C into p1's h, so the
+// property written through p2 reads back through p1 and p2 alike: 5 * 10 +
+// 5. The exporter's key was bound to the storage alone, with no class
+// recorded under it, so the `new` had no class to construct, the handle
+// stayed null and both reads answered 0.
+TEST(PackageImportSim, ReExportedClassHandleConstructedThroughTheExporter) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  class C;\n"
+                      "    int v;\n"
+                      "  endclass\n"
+                      "  C h;\n"
+                      "endpackage\n"
+                      "package p2;\n"
+                      "  import p1::h;\n"
+                      "  export p1::h;\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  int y;\n"
+                      "  initial begin\n"
+                      "    p2::h = new;\n"
+                      "    p2::h.v = 5;\n"
+                      "    y = p1::h.v * 10 + p2::h.v;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            55u);
+}
+
+// §26.6 (printed 815) with §6.16: a package's string variable an export hands
+// on takes a whole string through the exporting package's qualifier and
+// answers its methods there, `p2::s = "abcd"` and `p2::s.len()` after
+// `import p1::s; export p1::s;` being p1's s: 4 * 10 + 4 read through p2 and
+// p1. Pinned: the string kind travels on the Variable the exporter's key is
+// bound to (ShapePackageVariable in lowerer_register.cpp), so a write sized
+// to the variable, which would keep four characters of a longer string, and a
+// method call answering nothing are both ruled out by the read.
+TEST(PackageImportSim, ReExportedStringWrittenAndReadThroughTheExporter) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  string s;\n"
+                      "endpackage\n"
+                      "package p2;\n"
+                      "  import p1::s;\n"
+                      "  export p1::s;\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  int y;\n"
+                      "  initial begin\n"
+                      "    p2::s = \"abcd\";\n"
+                      "    y = p2::s.len() * 10 + p1::s.len();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            44u);
+}
+
 }  // namespace

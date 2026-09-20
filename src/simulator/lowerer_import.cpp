@@ -588,6 +588,22 @@ void ExportedNameWalk::CollectNamed(const PackageDecl* src,
   }
 }
 
+// The per-name records a package variable is entered in beside its storage,
+// keyed "pkg.name" as the storage is, given to the alias `key` from the
+// declaring package's `qname`: the class the variable is declared with
+// (RegisterPackageClassVariables in lowerer_package_class_vars.cpp), which
+// TryClassNewAssign (statement_assign_object.cpp) asks for under the target's
+// own key before it constructs, so that `p2::h = new` through the exporter
+// found no class, built nothing and left the handle null; and the real
+// registration ShapePackageVariable (lowerer_register.cpp) makes. A string's
+// kind is a flag of the Variable itself, which the alias already shares.
+void AliasVariableKinds(std::string_view key, std::string_view qname,
+                        SimContext& ctx) {
+  std::string_view cls = ctx.GetVariableClassType(qname);
+  if (!cls.empty()) ctx.SetVariableClassType(key, cls);
+  if (ctx.IsRealVariable(qname)) ctx.RegisterRealVariable(key);
+}
+
 // Binds one name `pkg` exports under the exporting package's key to the
 // declaring package's registration: a subroutine under "pkg::name", the key
 // a scoped call resolves by (FindSubroutineTarget in eval_function_hier.cpp),
@@ -616,7 +632,9 @@ void AliasExportedName(const PackageDecl* pkg, const ExportedName& e,
   if (ctx.GetVariables().count(qname) == 0) return;
   std::string key = PackageQualifiedName(pkg, e.name);
   if (ctx.GetVariables().count(key) != 0) return;
-  ctx.AliasVariable(*arena.Create<std::string>(key), qname);
+  std::string_view stored = *arena.Create<std::string>(key);
+  ctx.AliasVariable(stored, qname);
+  AliasVariableKinds(stored, qname, ctx);
 }
 
 // Every package's exports, bound once the packages' own storage and
