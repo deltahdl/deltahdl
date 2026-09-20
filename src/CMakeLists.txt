@@ -195,6 +195,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/type_eval_named.cpp
     elaborator/type_eval_aggregate.cpp
     elaborator/const_eval.cpp
+    elaborator/const_eval_bits.cpp
     elaborator/const_eval_func.cpp
     elaborator/const_eval_is_constant.cpp
     elaborator/const_eval_builtin_method.cpp

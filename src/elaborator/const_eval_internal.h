@@ -10,6 +10,8 @@
 
 namespace delta {
 
+struct RtlirParamDecl;
+
 struct ConstVal {
   int64_t value;
   uint32_t width;
@@ -37,6 +39,25 @@ std::optional<int64_t> EvalReplicate(const Expr* expr, const ScopeMap& scope);
 
 std::optional<ConstVal> ConstEvalSelectFull(const Expr* expr,
                                             const ScopeMap& scope);
+
+// The parameter of the registered module that `name` names where the
+// expression being folded stands, or null when no module is registered, when
+// it declares no such parameter, or when the one it declares belongs to a
+// generate block the expression does not stand in (§23.9). Defined in
+// const_eval.cpp.
+const RtlirParamDecl* RegisteredParamNamed(std::string_view name);
+
+// The parameters of the registered module as a scope, for a fold of one of
+// their own expressions. Defined in const_eval.cpp.
+ScopeMap RegisteredModuleScope();
+
+// §5.7.1: the width an integer literal's size constant states, and 32 for an
+// unsized one. Defined in const_eval.cpp.
+uint32_t ConstLiteralWidth(const Expr* expr);
+
+// §20.6.2: the value of a `$bits(...)` call whose argument is sized at
+// elaboration, or empty. Defined in const_eval_bits.cpp.
+std::optional<int64_t> EvalConstBits(const Expr* expr, const ScopeMap& scope);
 
 // §11.5.1: the packed range the parameter `name` was declared with, taken from
 // the module a live ParamRangeRegistryGuard installed. Empty when no guard is
