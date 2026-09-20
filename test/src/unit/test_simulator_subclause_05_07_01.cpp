@@ -777,19 +777,19 @@ TEST(IntegerLiteralSim, LiteralOccupiesLogicVectorMsbFirst) {
 }
 
 // §5.7.1: the digits of a decimal literal form its value at the width its size
-// constant states, so `80'd1208925819614629174706177` (2^80 + 1) sets bit 80
+// constant states, so `81'd1208925819614629174706177` (2^80 + 1) sets bit 80
 // as well as bit 0. Expr::int_val carries the value's low 64 bits alone, and a
-// run-time value built from it read the high sixteen bits as 0.
+// run-time value built from it read the high seventeen bits as 0.
 TEST(IntegerLiteralSim, WideDecimalLiteralSetsBitEighty) {
   SimFixture f;
   ASSERT_TRUE(RunSim(f,
                      "module t;\n"
-                     "  logic [79:0] x;\n"
-                     "  logic [15:0] hi;\n"
+                     "  logic [80:0] x;\n"
+                     "  logic [16:0] hi;\n"
                      "  logic [63:0] lo;\n"
                      "  initial begin\n"
-                     "    x = 80'd1208925819614629174706177;\n"
-                     "    hi = x[79:64];\n"
+                     "    x = 81'd1208925819614629174706177;\n"
+                     "    hi = x[80:64];\n"
                      "    lo = x[63:0];\n"
                      "  end\n"
                      "endmodule\n"));
@@ -797,7 +797,7 @@ TEST(IntegerLiteralSim, WideDecimalLiteralSetsBitEighty) {
   auto* lo = f.ctx.FindVariable("lo");
   ASSERT_NE(hi, nullptr);
   ASSERT_NE(lo, nullptr);
-  EXPECT_EQ(hi->value.ToUint64(), 1u);
+  EXPECT_EQ(hi->value.ToUint64(), 0x10000u);
   EXPECT_EQ(lo->value.ToUint64(), 1u);
 }
 
@@ -883,6 +883,56 @@ TEST(IntegerLiteralSim, WideDecimalLiteralTruncatesFromTheLeft) {
   ASSERT_NE(lo, nullptr);
   EXPECT_EQ(hi->value.ToUint64(), 0u);
   EXPECT_EQ(lo->value.ToUint64(), 1u);
+}
+
+// §5.7.1: an unsized based number has at least the width its value needs, so
+// the 17-digit `'hF_FFFF_FFFF_FFFF_FFFF` is 68 bits, `'b1` over 70 zeros 71
+// and the 24-digit octal all-sevens 72, each carrying its top digit into a
+// 96-bit target. Sized from Expr::int_val, whose 64 bits are the value's low
+// word, each was 64 bits and read 0 above bit 63.
+TEST(IntegerLiteralSim, UnsizedBasedLiteralPastSixtyFourBitsKeepsItsDigits) {
+  SimFixture f;
+  ASSERT_TRUE(RunSim(f,
+                     "module t;\n"
+                     "  logic [95:0] y, b, o;\n"
+                     "  logic [31:0] yhi, bhi, ohi;\n"
+                     "  logic [63:0] olo;\n"
+                     "  initial begin\n"
+                     "    y = 'hF_FFFF_FFFF_FFFF_FFFF;\n"
+                     "    b = 'b1000000000000000000000000000000000000"
+                     "0000000000000000000000000000000000;\n"
+                     "    o = 'o7777_7777_7777_7777_7777_7777;\n"
+                     "    yhi = y[95:64];\n"
+                     "    bhi = b[95:64];\n"
+                     "    ohi = o[95:64];\n"
+                     "    olo = o[63:0];\n"
+                     "  end\n"
+                     "endmodule\n"));
+  auto* yhi = f.ctx.FindVariable("yhi");
+  auto* bhi = f.ctx.FindVariable("bhi");
+  auto* ohi = f.ctx.FindVariable("ohi");
+  auto* olo = f.ctx.FindVariable("olo");
+  ASSERT_NE(yhi, nullptr);
+  ASSERT_NE(bhi, nullptr);
+  ASSERT_NE(ohi, nullptr);
+  ASSERT_NE(olo, nullptr);
+  EXPECT_EQ(yhi->value.ToUint64(), 0xFu);
+  EXPECT_EQ(bhi->value.ToUint64(), 0x40u);
+  EXPECT_EQ(ohi->value.ToUint64(), 0xFFu);
+  EXPECT_EQ(olo->value.ToUint64(), ~uint64_t{0});
+}
+
+// §5.7.1's own example: the unsized `'h7_0000_0000` is at least 35 bits, the
+// three the leading 7 needs over eight zero digits; the 17-digit all-ones hex
+// literal above is 68. A based value past 32 bits was sized 64 outright.
+TEST(IntegerLiteralSim, UnsizedHexLiteralIsAsWideAsItsDigitsNeed) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [63:0] n;\n"
+      "  initial n = {$bits('hF_FFFF_FFFF_FFFF_FFFF), $bits('h7_0000_0000)};\n"
+      "endmodule\n",
+      "n");
+  EXPECT_EQ(result, 0x0000004400000023u);
 }
 
 }  // namespace

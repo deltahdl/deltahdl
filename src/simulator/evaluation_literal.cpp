@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <bit>
 #include <cstddef>
 #include <cstdint>
@@ -192,6 +193,13 @@ static int BitsPerDigit(char base_letter) {
   }
 }
 
+static int DigitValue(char c) {
+  if (c >= '0' && c <= '9') return c - '0';
+  if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+  if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+  return -1;
+}
+
 static size_t ParseLiteralBase(std::string_view text, std::string& buf,
                                int& bpd) {
   buf.clear();
@@ -264,6 +272,37 @@ static uint32_t WideDecimalLiteralWidth(std::string_view text) {
   return IsSignedLiteral(text) ? len + 1 : len;
 }
 
+// §5.7.1: the bits the one hex, octal or binary digit `c` needs at the top of
+// a number: those of its value, so a leading 7 needs 3 and a leading 0 none,
+// or the base's full `bpd` for an x, z or ? digit, which sets all of them.
+static uint32_t TopDigitBits(char c, int bpd) {
+  int dval = DigitValue(c);
+  if (dval < 0) return static_cast<uint32_t>(bpd);
+  return static_cast<uint32_t>(std::bit_width(static_cast<unsigned>(dval)));
+}
+
+// §5.7.1: the width of an unsized hex, octal or binary literal -- the bits
+// its digits need once the leading zeros are dropped, an x, z or ? digit
+// counted at its base's full width, plus the sign bit a signed number keeps
+// -- at least 32, so `'h7_0000_0000` is 35 bits, `'sh8000_0000` 33 and
+// `'hF_FFFF_FFFF_FFFF_FFFF` 68. Returns 0 for a sized or a decimal literal.
+// Expr::int_val holds the value's low 64 bits alone, so the digits are what
+// say how wide the value is.
+static uint32_t UnsizedBasedLiteralWidth(std::string_view text) {
+  if (text.size() < 2 || text.front() != '\'') return 0;
+  size_t i = 1;
+  if (text[i] == 's' || text[i] == 'S') ++i;
+  int bpd = (i < text.size()) ? BitsPerDigit(text[i]) : 0;
+  if (bpd == 0) return 0;
+  uint32_t len = 0;
+  for (char c : text.substr(i + 1)) {
+    if (c == '_' || c == ' ' || c == '\t') continue;
+    len = (len == 0) ? TopDigitBits(c, bpd) : len + static_cast<uint32_t>(bpd);
+  }
+  if (IsSignedLiteral(text)) ++len;
+  return std::max(len, uint32_t{32});
+}
+
 uint32_t LiteralWidth(std::string_view text, uint64_t val) {
   auto tick = text.find('\'');
   if (tick != std::string_view::npos && tick > 0) {
@@ -277,8 +316,9 @@ uint32_t LiteralWidth(std::string_view text, uint64_t val) {
   // holds its value. §5.7.1 additionally requires a signed unsized number to
   // keep a sign bit, so a value whose most significant magnitude bit would
   // land on the sign position needs one extra bit to stay non-negative. A
-  // decimal value past 64 bits is sized from its digits, `val` being the
-  // value's low 64 bits alone.
+  // based number is sized from its digits, and a decimal value past 64 bits
+  // likewise, `val` being the value's low 64 bits alone.
+  if (uint32_t based = UnsizedBasedLiteralWidth(text); based > 0) return based;
   if (uint32_t wide = WideDecimalLiteralWidth(text); wide > 0) return wide;
   if (val > UINT32_MAX) return 64;
   if (IsSignedLiteral(text) && val > uint64_t{0x7FFFFFFF}) return 33;
@@ -303,13 +343,6 @@ static bool TextHasXZ(std::string_view text) {
   for (size_t i = tick + 1; i < text.size(); ++i)
     if (IsXChar(text[i]) || IsZChar(text[i])) return true;
   return false;
-}
-
-static int DigitValue(char c) {
-  if (c >= '0' && c <= '9') return c - '0';
-  if (c >= 'a' && c <= 'f') return c - 'a' + 10;
-  if (c >= 'A' && c <= 'F') return c - 'A' + 10;
-  return -1;
 }
 
 static void SetDigitBits(Logic4Vec& vec, uint32_t& bit_pos, int bit_count,
