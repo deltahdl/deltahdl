@@ -9,6 +9,20 @@ using namespace delta;
 
 namespace {
 
+// The reading §6.10 gives a nested module's own implicit net: `nested_net`
+// holds the 1 the nested assignment drove, and the outer net it never reached
+// leaves r at z.
+void ExpectNestedOwnsNetAndOuterReadsZ(SimFixture& f, const char* nested_net) {
+  auto* owned = f.ctx.FindVariable(nested_net);
+  ASSERT_NE(owned, nullptr);
+  EXPECT_EQ(owned->value.ToUint64(), 1u);
+
+  auto* r = f.ctx.FindVariable("r");
+  ASSERT_NE(r, nullptr);
+  EXPECT_EQ(r->value.words[0].aval & 1u, 0u);
+  EXPECT_EQ(r->value.words[0].bval & 1u, 1u);
+}
+
 TEST(NestedModuleSimulation, OuterScopeVariableAccessibleFromNestedModule) {
   SimFixture f;
   auto* v = RunAndFindVar(
@@ -278,14 +292,7 @@ TEST(NestedModuleSimulation,
   ASSERT_NE(design, nullptr);
   LowerAndRun(design, f);
 
-  auto* m_w = f.ctx.FindVariable("m.w");
-  ASSERT_NE(m_w, nullptr);
-  EXPECT_EQ(m_w->value.ToUint64(), 1u);
-
-  auto* r = f.ctx.FindVariable("r");
-  ASSERT_NE(r, nullptr);
-  EXPECT_EQ(r->value.words[0].aval & 1u, 0u);
-  EXPECT_EQ(r->value.words[0].bval & 1u, 1u);
+  ExpectNestedOwnsNetAndOuterReadsZ(f, "m.w");
 }
 
 // §6.10 measures "previously" from the assignment's text, which stands inside
@@ -311,14 +318,7 @@ TEST(NestedModuleSimulation,
   ASSERT_NE(design, nullptr);
   LowerAndRun(design, f);
 
-  auto* m_w = f.ctx.FindVariable("m.w");
-  ASSERT_NE(m_w, nullptr);
-  EXPECT_EQ(m_w->value.ToUint64(), 1u);
-
-  auto* r = f.ctx.FindVariable("r");
-  ASSERT_NE(r, nullptr);
-  EXPECT_EQ(r->value.words[0].aval & 1u, 0u);
-  EXPECT_EQ(r->value.words[0].bval & 1u, 1u);
+  ExpectNestedOwnsNetAndOuterReadsZ(f, "m.w");
 }
 
 // §6.10 measures "previously" from the assignment's text, which stands in M's
@@ -402,14 +402,7 @@ TEST(NestedModuleSimulation, DoublyNestedDeclarationOwnsANetDeclaredBelowIt) {
   ASSERT_NE(design, nullptr);
   LowerAndRun(design, f);
 
-  auto* ab_v = f.ctx.FindVariable("a.b.v");
-  ASSERT_NE(ab_v, nullptr);
-  EXPECT_EQ(ab_v->value.ToUint64(), 1u);
-
-  auto* r = f.ctx.FindVariable("r");
-  ASSERT_NE(r, nullptr);
-  EXPECT_EQ(r->value.words[0].aval & 1u, 0u);
-  EXPECT_EQ(r->value.words[0].bval & 1u, 1u);
+  ExpectNestedOwnsNetAndOuterReadsZ(f, "a.b.v");
 }
 
 }  // namespace

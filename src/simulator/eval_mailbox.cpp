@@ -277,14 +277,14 @@ ExecTask ExecMailboxCall(const Expr* expr, SimContext& ctx, Arena& arena) {
     co_return StmtResult::kDone;
   }
   if (auto* mbx = MailboxCallTarget(expr, ctx, arena, "get")) {
-    MailboxGetAwaiter get{*mbx, RetrievalTargetType(expr, ctx, arena)};
+    MailboxGetAwaiter get{*mbx, RetrievalTargetType(expr, ctx, arena), {}};
     MbxGetStatus status = co_await get;
     FinishMailboxRetrieval(expr, get.msg.Get(),
                            status == MbxGetStatus::kTypeError, ctx, arena);
     co_return StmtResult::kDone;
   }
   if (auto* mbx = MailboxCallTarget(expr, ctx, arena, "peek")) {
-    MailboxPeekAwaiter peek{*mbx, RetrievalTargetType(expr, ctx, arena)};
+    MailboxPeekAwaiter peek{*mbx, RetrievalTargetType(expr, ctx, arena), {}};
     MbxPeekStatus status = co_await peek;
     FinishMailboxRetrieval(expr, peek.msg.Get(),
                            status == MbxPeekStatus::kTypeError, ctx, arena);
