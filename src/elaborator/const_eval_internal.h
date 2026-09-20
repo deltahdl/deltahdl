@@ -208,8 +208,10 @@ std::optional<ConstVal> RegisteredParamValue(std::string_view name,
 // RtlirParamDecl::resolved_high_words for RegisteredParamValue to read where
 // the parameter is declared wider than 64 bits -- read at the declared width
 // and signedness, as an override value is converted to the parameter's range
-// -- and cleared where the fold carries none, does not agree with
-// pd.resolved_value on the low word, or the declaration fixes no width. The
+// -- and, for a parameter declared with neither type nor range, the value's
+// own self-determined width and signedness as RtlirParamDecl::value_width
+// and value_is_signed, §6.20.2's implied range; all cleared where the fold
+// carries none or does not agree with pd.resolved_value on the low word. The
 // elaborator calls this wherever it records a resolved value the fold of an
 // expression gave: an instance override's, folded in the instantiating
 // module, and a defparam's and the parameters it makes over, whose own
