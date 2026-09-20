@@ -2,13 +2,17 @@
 // written once here and read by every scope that declares constants -- a
 // module's enumerations in elaborator_typedef.cpp, which also emits the backing
 // variables, and the package and compilation-unit scopes, which hold constants
-// in a ScopeMap and nothing else.
+// in a ScopeMap and nothing else. The constants a package's import brings in
+// (§26.3) are bound into such a map here as well, for the two walks over a
+// package's declarations that fold and check its parameters.
 
 #include "elaborator/elaborator_enum_constants.h"
 
 #include <cstdint>
 #include <format>
+#include <string>
 #include <string_view>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -80,6 +84,23 @@ const std::vector<EnumMember>* EnumMembersDeclaredBy(const ModuleItem* item) {
   return nullptr;
 }
 
+// The names `pkg` declares ahead of `until`: its parameters and the members
+// of its enumerations, as written. A `name[N]` member of §6.19.2 is held
+// under the name it is written with, not under the indexed names it expands
+// to.
+std::unordered_set<std::string_view> NamesDeclaredBefore(
+    const PackageDecl* pkg, const ModuleItem* until) {
+  std::unordered_set<std::string_view> names;
+  for (const auto* item : pkg->items) {
+    if (item == until) break;
+    if (item->kind == ModuleItemKind::kParamDecl) names.insert(item->name);
+    const auto* members = EnumMembersDeclaredBy(item);
+    if (members == nullptr) continue;
+    for (const auto& m : *members) names.insert(m.name);
+  }
+  return names;
+}
+
 }  // namespace
 
 std::vector<RtlirEnumMember> FoldEnumMembers(
@@ -104,6 +125,29 @@ std::vector<RtlirEnumMember> BindEnumConstantsOfItem(const ModuleItem* item,
   auto folded = FoldEnumMembers(*members, scope, arena);
   for (const auto& m : folded) scope[m.name] = m.value;
   return folded;
+}
+
+void BindPackageImportConstants(const PackageDecl* pkg, const ModuleItem* imp,
+                                const ScopeMap& cu_param_scope,
+                                ScopeMap& scope) {
+  if (imp->kind != ModuleItemKind::kImportDecl) return;
+  const ImportItem& item = imp->import_item;
+  std::string prefix = std::string(item.package_name) + ".";
+  if (!item.is_wildcard) {
+    auto it = cu_param_scope.find(prefix + std::string(item.item_name));
+    if (it != cu_param_scope.end()) scope[item.item_name] = it->second;
+    return;
+  }
+  // The bare name is the tail of the recorded key, whose characters outlive
+  // every scope map (RecordPackageConstant allocates the key in the arena).
+  std::unordered_set<std::string_view> own = NamesDeclaredBefore(pkg, imp);
+  for (const auto& [key, value] : cu_param_scope) {
+    if (key.substr(0, prefix.size()) != prefix) continue;
+    std::string_view name = key.substr(prefix.size());
+    if (name.find('.') != std::string_view::npos || own.count(name) != 0)
+      continue;
+    scope[name] = value;
+  }
 }
 
 }  // namespace delta

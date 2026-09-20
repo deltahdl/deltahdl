@@ -206,4 +206,49 @@ TEST(PackageImportSim, PackageConstAndLocalparamOfPackageEnumTypeHoldLiteral) {
                     {"id", 1u}});
 }
 
+// §26.2 with §26.3: a package parameter initialized from a parameter another
+// package's import brings in -- `import base::K; parameter int KK = K;`, the
+// wildcard form with a function of the package standing between, and the
+// `base::K` form -- holds base's 21 when read through each package's scope;
+// the two bare forms were rejected as no constant expression before. §26.5
+// has d4's own K, 4, win over the wildcard's candidate.
+TEST(PackageImportSim, PackageParameterFromImportedPackageParameterReads) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "package base;\n"
+      "  parameter int K = 21;\n"
+      "  function int dbl(int a); return a * 2; endfunction\n"
+      "endpackage\n"
+      "package d1;\n"
+      "  parameter int KK = base::K;\n"
+      "endpackage\n"
+      "package d2;\n"
+      "  import base::K;\n"
+      "  parameter int KK = K;\n"
+      "endpackage\n"
+      "package d3;\n"
+      "  import base::*;\n"
+      "  function int twice_k(); return dbl(K); endfunction\n"
+      "  localparam int KK = K;\n"
+      "endpackage\n"
+      "package d4;\n"
+      "  parameter int K = 4;\n"
+      "  import base::*;\n"
+      "  parameter int KK = K;\n"
+      "endpackage\n"
+      "module top;\n"
+      "  int a, b, c, d;\n"
+      "  initial begin\n"
+      "    a = d1::KK;\n"
+      "    b = d2::KK;\n"
+      "    c = d3::KK;\n"
+      "    d = d4::KK;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  ASSERT_FALSE(f.has_errors);
+  LowerRunAndCheck(f, design, {{"a", 21u}, {"b", 21u}, {"c", 21u}, {"d", 4u}});
+}
+
 }  // namespace

@@ -787,9 +787,13 @@ void Elaborator::ValidatePackageValueParams() {
     // §6.19 declares an enumeration's members as constants of the package as
     // well, so `parameter R = (DEEP | SHALLOW);` over members of an
     // enumeration the package declared is a constant expression, and they are
-    // bound where the enumeration stands.
+    // bound where the enumeration stands. §26.3 lets the package import
+    // another, whose constants an import makes visible by bare name from
+    // where it is written, so `import base::K; parameter int KK = K;` and
+    // the wildcard form read a constant too.
     ScopeMap scope = cu_param_scope_;
     for (const auto* item : pkg->items) {
+      BindPackageImportConstants(pkg, item, cu_param_scope_, scope);
       BindEnumConstantsOfItem(item, scope, arena_);
       if (item->kind != ModuleItemKind::kParamDecl) continue;
       ValidateOneValueParam(item, scope, unit_, diag_, true);

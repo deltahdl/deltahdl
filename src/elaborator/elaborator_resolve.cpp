@@ -217,12 +217,17 @@ void RegisterOnePackageParam(ModuleItem* item, PackageRegistration& reg) {
 
 // Records each package's value parameters and enumeration constants in the
 // compilation-unit parameter scope under their fully qualified "package.name"
-// key (§26.3), each folded against what the package declared before it.
+// key (§26.3), each folded against what the package declared before it and,
+// §26.3 letting a package import another, against what an earlier import of
+// the package brings in by bare name: `import base::K; parameter int KK = K;`
+// folds KK to base's K, which the packages' order in the unit has already
+// recorded, since §26.3 compiles a package ahead of the scopes importing it.
 void RegisterPackageParams(CompilationUnit* unit, ScopeMap& cu_param_scope,
                            Arena& arena) {
   for (auto* pkg : unit->packages) {
     PackageRegistration reg{pkg->name, cu_param_scope, cu_param_scope, arena};
     for (auto* item : pkg->items) {
+      BindPackageImportConstants(pkg, item, cu_param_scope, reg.values);
       for (const auto& m : BindEnumConstantsOfItem(item, reg.values, arena))
         RecordPackageConstant(pkg->name, m.name, m.value, cu_param_scope,
                               arena);

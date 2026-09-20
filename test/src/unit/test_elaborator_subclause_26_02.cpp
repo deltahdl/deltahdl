@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 #include "helpers_rtlir_lookup.h"
@@ -313,6 +315,80 @@ TEST(PackageDeclarationElaboration,
   expect_34("SCOPED");
   expect_34("IMPORTED");
   expect_34("VIAPKG");
+}
+
+// §26.2 lets a package's items name what an import of another package makes
+// visible, and §26.3 makes an explicit or a wildcard import do so from where
+// it is written; §6.20.1 has a parameter's value a constant expression. A
+// package parameter initialized from base's K reached by explicit import, by
+// wildcard import and through `base::K` therefore folds to 21 and is no
+// breach of §6.20.4, which the two bare forms were reported as. §26.5's
+// Table 26-1 has a declaration of the importing scope win over a wildcard's
+// candidate, so d4's own K, 4, is what its KK reads.
+TEST(PackageDeclarationElaboration,
+     PackageParameterFromImportedPackageParameterIsConstant) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "package base;\n"
+      "  parameter int K = 21;\n"
+      "endpackage\n"
+      "package d1;\n"
+      "  parameter int KK = base::K;\n"
+      "endpackage\n"
+      "package d2;\n"
+      "  import base::K;\n"
+      "  parameter int KK = K;\n"
+      "endpackage\n"
+      "package d3;\n"
+      "  import base::*;\n"
+      "  localparam int KK = K;\n"
+      "endpackage\n"
+      "package d4;\n"
+      "  parameter int K = 4;\n"
+      "  import base::*;\n"
+      "  parameter int KK = K;\n"
+      "endpackage\n"
+      "module top;\n"
+      "  localparam int A = d1::KK;\n"
+      "  localparam int B = d2::KK;\n"
+      "  localparam int C = d3::KK;\n"
+      "  localparam int D = d4::KK;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto expect_value = [design](const char* name, int64_t value) {
+    const auto* param = FindParam(design, "top", name);
+    ASSERT_NE(param, nullptr) << name;
+    EXPECT_TRUE(param->is_resolved) << name;
+    EXPECT_EQ(param->resolved_value, value) << name;
+  };
+  expect_value("A", 21);
+  expect_value("B", 21);
+  expect_value("C", 21);
+  expect_value("D", 4);
+}
+
+// The binding reaches no further than the import: a package that imports
+// nothing and names base's K bare still reads a name no constant of its scope
+// holds, which §6.20.4 rejects as it did before.
+TEST(PackageDeclarationElaboration,
+     PackageParameterNamingUnimportedPackageParameterRejected) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("package base;\n"
+             "  parameter int K = 21;\n"
+             "endpackage\n"
+             "package d5;\n"
+             "  parameter int KK = K;\n"
+             "endpackage\n"
+             "module top;\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "localparam 'KK' initializer is not a constant "
+                            "expression",
+                            5, "6.20.4"));
 }
 
 }  // namespace
