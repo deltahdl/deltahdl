@@ -192,4 +192,45 @@ TEST(IntegerLiteralSynthesis,
   EXPECT_EQ(aig->outputs[64], AigGraph::kConstFalse);
 }
 
+// §5.7.1: the digits of a decimal literal form its value at the width its size
+// constant states, so `81'd1208925819614629174706177` (2^80 + 1) writes bit 80
+// as well as bit 0 and nothing between. Expr::int_val holds the value's low 64
+// bits alone, and `SynthLower::LowerLiteralBit` read a decimal literal from
+// it, answering `AigGraph::kConstFalse` at bit 80. The case names the outputs
+// rather than driving the netlist with `EvalAigOutputs`, which packs outputs
+// into a `uint64_t` and cannot describe 81 output bits.
+TEST(IntegerLiteralSynthesis, WideDecimalLiteralWritesBitEighty) {
+  SynthFixture f;
+  auto* mod = ElaborateSrc(f,
+                           "module m(output logic [80:0] y);\n"
+                           "  assign y = 81'd1208925819614629174706177;\n"
+                           "endmodule\n");
+  ASSERT_NE(mod, nullptr);
+  SynthLower synth(f.arena, f.diag);
+  auto* aig = synth.Lower(mod);
+  ASSERT_NE(aig, nullptr);
+  ASSERT_EQ(aig->outputs.size(), 81u);
+  EXPECT_EQ(aig->outputs[80], AigGraph::kConstTrue);
+  EXPECT_EQ(aig->outputs[40], AigGraph::kConstFalse);
+  EXPECT_EQ(aig->outputs[0], AigGraph::kConstTrue);
+}
+
+// §5.7.1's first form, a simple decimal number, is folded from its digits the
+// same way: the unsized 1180591620717411303424 (2^70) writes bit 70 alone.
+TEST(IntegerLiteralSynthesis, UnsizedWideDecimalLiteralWritesBitSeventy) {
+  SynthFixture f;
+  auto* mod = ElaborateSrc(f,
+                           "module m(output logic [71:0] y);\n"
+                           "  assign y = 1180591620717411303424;\n"
+                           "endmodule\n");
+  ASSERT_NE(mod, nullptr);
+  SynthLower synth(f.arena, f.diag);
+  auto* aig = synth.Lower(mod);
+  ASSERT_NE(aig, nullptr);
+  ASSERT_EQ(aig->outputs.size(), 72u);
+  EXPECT_EQ(aig->outputs[70], AigGraph::kConstTrue);
+  EXPECT_EQ(aig->outputs[69], AigGraph::kConstFalse);
+  EXPECT_EQ(aig->outputs[0], AigGraph::kConstFalse);
+}
+
 }  // namespace

@@ -23,10 +23,11 @@ struct PatternBits {
   std::vector<bool> aval;
   std::vector<bool> dc_mask;
 
-  // True where the literal was written with a base that gives each digit its
-  // own bits, which is what makes `aval` the value. A decimal literal writes
-  // no per-digit bits, so its value is the one the parser folded into
-  // Expr::int_val rather than anything here.
+  // True where `aval` is the value the literal's digits form: a hex, octal or
+  // binary literal gives each digit its own bits, and a decimal one without a
+  // don't-care digit is folded from its digits by multiply-and-add, so a
+  // decimal value past the 64 bits Expr::int_val holds keeps its high bits.
+  // False for a decimal carrying a don't-care digit, which writes no value.
   bool has_digits = false;
 
   // A decimal literal carrying a don't-care digit is don't-care throughout,

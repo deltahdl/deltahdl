@@ -58,6 +58,43 @@ static bool ScanDecimalForDontCare(const std::string& buf, size_t start,
   return false;
 }
 
+// §5.7.1: multiplies the magnitude `words` holds, least significant word
+// first, by 10 and adds `digit`, growing by a word when the product carries
+// out of the top one. Each word is multiplied in 32-bit halves so the carry
+// between them needs no integer wider than 64 bits.
+static void MulTenAdd(std::vector<uint64_t>& words, uint64_t digit) {
+  uint64_t carry = digit;
+  for (uint64_t& w : words) {
+    uint64_t lo = (w & 0xFFFFFFFFu) * 10 + carry;
+    uint64_t hi = (w >> 32) * 10 + (lo >> 32);
+    w = (hi << 32) | (lo & 0xFFFFFFFFu);
+    carry = hi >> 32;
+  }
+  if (carry != 0) words.push_back(carry);
+}
+
+// §5.7.1: the bits the decimal digits of `buf` from `start` form, however many
+// the value needs: `80'd1208925819614629174706177` (2^80 + 1) writes bits 80
+// and 0. Expr::int_val holds the value's low 64 bits alone, so the digits are
+// read again here. The fold ends at the first character that is no decimal
+// digit, which is where an x, z or ? digit stands.
+static void DecodeDecimalDigits(const std::string& buf, size_t start,
+                                PatternBits& result) {
+  std::vector<uint64_t> words{0};
+  for (size_t j = start; j < buf.size(); ++j) {
+    char c = buf[j];
+    if (c < '0' || c > '9') break;
+    MulTenAdd(words, static_cast<uint64_t>(c - '0'));
+  }
+  for (size_t w = 0; w < words.size(); ++w) {
+    for (uint32_t b = 0; b < 64; ++b) {
+      if ((words[w] >> b) & 1u)
+        SetPatternBit(result.aval, static_cast<uint32_t>(w * 64) + b);
+    }
+  }
+  result.has_digits = true;
+}
+
 // True if char c marks a don't-care digit under the given case kind. Under
 // casez only z/?/Z is don't-care; otherwise x/X is don't-care too.
 static bool IsDontCareDigit(char c, TokenKind case_kind) {
@@ -109,7 +146,11 @@ PatternBits ParsePatternLiteral(std::string_view text, TokenKind case_kind) {
   PatternBits result{};
   std::string buf = StripPatternSeparators(text);
   auto tick = buf.find('\'');
-  if (tick == std::string::npos) return result;
+  // §5.7.1's first form, a simple decimal number: every character is a digit.
+  if (tick == std::string::npos) {
+    DecodeDecimalDigits(buf, 0, result);
+    return result;
+  }
 
   size_t i = tick + 1;
   if (i < buf.size() && (buf[i] == 's' || buf[i] == 'S')) ++i;
@@ -131,7 +172,10 @@ PatternBits ParsePatternLiteral(std::string_view text, TokenKind case_kind) {
       break;
     case 'd':
     case 'D':
-      ScanDecimalForDontCare(buf, i + 1, case_kind, result);
+      // A don't-care decimal is don't-care throughout; any other is folded
+      // from its digits, so a value past 64 bits keeps its high bits.
+      if (!ScanDecimalForDontCare(buf, i + 1, case_kind, result))
+        DecodeDecimalDigits(buf, i + 1, result);
       return result;
     default:
       return result;

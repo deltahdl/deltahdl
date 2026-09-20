@@ -384,10 +384,12 @@ const PatternBits& SynthLower::LiteralBits(const Expr* expr) {
 uint32_t SynthLower::LowerLiteralBit(const Expr* expr, uint32_t bit) {
   // §5.7.1 sizes an integer literal by its size constant, "in terms of its
   // exact number of bits", which admits a literal wider than the 64 bits
-  // Expr::int_val holds: `128'h1_0000_0000_0000_0000` writes bit 64, and
+  // Expr::int_val holds: `128'h1_0000_0000_0000_0000` writes bit 64 and
+  // `80'd1208925819614629174706177` (2^80 + 1) bit 80, and
   // Parser::ParseIntText folds the digits modulo 2^64, so int_val holds the
   // value's low 64 bits and nothing of bit 64 or above. The digits are
-  // therefore what answers a literal written with a base.
+  // therefore what answers a literal, a based one digit by digit and a decimal
+  // one by ParsePatternLiteral's multiply-and-add fold.
   const PatternBits& bits = LiteralBits(expr);
   if (bits.has_digits) {
     // §5.7.1 pads the number "to the left with zeros" above the positions its
@@ -395,9 +397,9 @@ uint32_t SynthLower::LowerLiteralBit(const Expr* expr, uint32_t bit) {
     return PatternBitValue(bits, bit) ? AigGraph::kConstTrue
                                       : AigGraph::kConstFalse;
   }
-  // A decimal literal writes no per-digit bits, so its value is the one
-  // Parser::ParseIntText folded into Expr::int_val, and the positions above
-  // what that holds are the zeros §5.7.1 pads with.
+  // A decimal literal carrying a don't-care digit writes no value, so what
+  // Parser::ParseIntText folded into Expr::int_val stands, and the positions
+  // above what that holds are the zeros §5.7.1 pads with.
   if (bit >= 64) return AigGraph::kConstFalse;
   return ((expr->int_val >> bit) & 1u) != 0 ? AigGraph::kConstTrue
                                             : AigGraph::kConstFalse;
