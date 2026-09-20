@@ -11,7 +11,6 @@
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
-#include "common/packed_range.h"
 #include "common/types.h"
 #include "elaborator/design_scopes.h"
 #include "elaborator/elaborator_validate_internal.h"
@@ -643,31 +642,6 @@ void Lowerer::LowerProcess(const RtlirProcess& proc, bool from_program,
   ScheduleProcess(p, ctx_);
 }
 
-static void RegisterDesignTypeWidths(const RtlirDesign* design,
-                                     SimContext& ctx) {
-  for (const auto& [name, width] : design->type_widths) {
-    ctx.RegisterTypeWidth(name, width);
-  }
-  // §6.18: the width says how big the type a name stands for is and the kind
-  // says what it is, and only the second tells `typedef string s_t` from a name
-  // nothing could size.
-  for (const auto& [name, kind] : design->type_kinds) {
-    ctx.RegisterTypeKind(name, kind);
-  }
-  // §6.11.1's default signedness and the `signed` keyword are the third fact a
-  // name carries, and the one IsSignedType could not recover with the empty map
-  // the simulator was passing it.
-  for (const auto& [name, is_signed] : design->type_signed) {
-    ctx.RegisterTypeSigned(name, is_signed);
-  }
-  // §11.5.1's declared range is the fourth, and the one a select of a
-  // procedure's or a subroutine body's local of the type asks for: the name is
-  // all its declaration carries, and the width addresses it as [width-1:0].
-  for (const auto& [name, range] : design->type_ranges) {
-    ctx.RegisterTypeRange(name, range);
-  }
-}
-
 // §20.4.1: publish each design element's resolved timescale under its module
 // name and instance name so a $timeunit/$timeprecision argument that names the
 // element (e.g. $timeunit(dut)) reports that element's value. Annex D.10 adds
@@ -813,42 +787,15 @@ static void RegisterInteractiveScopes(const RtlirDesign* design,
 
 // §3.12.1: the unit's imports are visible to its own class declarations and
 // to every module, and §26.5 has a declaration of the scope take the name
-// over an import, so the imports bind first and a unit class rebinds its
-// name over them; the first of two unit classes of one name keeps it.
+// over an import, so the imports bind first (InitCompilationUnitData, which
+// Lower runs ahead of this) and a unit class rebinds its name over them; the
+// first of two unit classes of one name keeps it.
 void Lowerer::LowerCompilationUnitClasses() {
-  LowerCompilationUnitImports();
   std::unordered_set<std::string_view> unit_class_names;
   for (auto* cls : design_->cu_class_decls) {
     if (unit_class_names.insert(cls->name).second)
       LowerClassDecl(cls, design_->cu_function_decls);
   }
-}
-
-// The design's type names and the packages' and the compilation unit's own
-// declarations, registered ahead of every module: RegisterDesignTypeWidths
-// for the names, and §7.2.1's layouts for the member selects that reach a
-// value no variable holds. §26.2: a package variable's declaration
-// assignment may call a function of the package or of one it imports and
-// name an enumeration constant, and §26.6 (printed pages 815-816) lets it
-// read a name another package's export hands on, so the subroutines, the
-// constants and the exports are bound before the variables are initialized;
-// bound after them, such a read answered 0. §3.12.1 (printed 56) with §26.2
-// (printed 808): the compilation unit's data items are initialized before
-// any procedure starts as a package's are, and a package names none of the
-// unit's while the unit may name a package's, so the unit's storage and
-// initializers follow the packages'.
-static void RegisterDesignTypesAndPackages(const RtlirDesign* design,
-                                           SimContext& ctx, Arena& arena) {
-  RegisterDesignTypeWidths(design, ctx);
-  RegisterDesignTypeLayouts(design, ctx, arena);
-  RegisterUnitClassVariables(design, ctx, arena);
-  RegisterPackageScopedSubroutines(design, ctx, arena);
-  RegisterPackageEnumConstants(design, ctx, arena);
-  CreatePackageDataVariables(design, ctx, arena);
-  CreateUnitDataVariables(design, ctx, arena);
-  AliasPackageExports(design, ctx, arena);
-  InitPackageDataVariables(design, ctx, arena);
-  InitUnitDataVariables(design, ctx, arena);
 }
 
 void Lowerer::Lower(const RtlirDesign* design) {
@@ -873,7 +820,7 @@ void Lowerer::Lower(const RtlirDesign* design) {
   for (auto* top : design->top_modules) {
     RegisterScopeTimescales(top, ctx_, std::string(top->name), "");
   }
-  RegisterDesignTypesAndPackages(design, ctx_, arena_);
+  LowerDesignData();
 
   // §16.5.1 reads a concurrent assertion's variables as of the Preponed region
   // of the time slot the clock tick falls in. No event reaches a Preponed
@@ -887,6 +834,7 @@ void Lowerer::Lower(const RtlirDesign* design) {
   ctx_.GetScheduler().AddPostTimestepCallback(
       [ctx = &ctx_]() { ctx->AssertionSamples().Refill(ctx->GetArena()); });
 
+  InitCompilationUnitData();
   LowerCompilationUnitClasses();
   RegisterFreeCuFunctions(design, ctx_);
   RegisterDesignScopeDpiImports(design, ctx_);

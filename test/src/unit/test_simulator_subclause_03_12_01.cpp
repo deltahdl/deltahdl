@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <string>
+
 #include "helpers_scheduler.h"
 
 using namespace delta;
@@ -224,6 +227,57 @@ TEST(CompilationUnitSim, CuScopeHandleOfAWildcardImportedPackageClass) {
       "endmodule\n",
       "y");
   EXPECT_EQ(val, 4u);
+}
+
+// A design whose package p declares `int K = 4` and a function f reading it,
+// followed by the unit-scope declarations `unit_decls` outside every module,
+// the last of which declares g, and a module top whose process reads g into
+// y at time 0; answers y.
+static uint64_t UnitInitializerRead(const std::string& unit_decls) {
+  return RunAndGet(
+      "package p;\n"
+      "  int K = 4;\n"
+      "  function int f();\n"
+      "    return K * 2;\n"
+      "  endfunction\n"
+      "endpackage\n" +
+          unit_decls +
+          "module top;\n"
+          "  int y;\n"
+          "  initial y = g;\n"
+          "endmodule\n",
+      "y");
+}
+
+// §3.12.1 (printed page 56) with §26.3 (printed 810) and §26.2 (printed
+// 808): a wildcard import written at compilation-unit scope makes p's K
+// visible in the unit's scope, whose declaration assignment `int g = K;` is
+// made before any procedure starts, after p's own `int K = 4;`, so a module
+// reads 4 through g at time 0. The unit's imports were bound after the
+// unit's initializers had run (LowerCompilationUnitImports after
+// InitUnitDataVariables), so the initializer found no K and g read 0.
+TEST(CompilationUnitSim, CuScopeInitializerReadsAWildcardImportedVariable) {
+  EXPECT_EQ(UnitInitializerRead("import p::*;\n"
+                                "int g = K;\n"),
+            4u);
+}
+
+// The same through an explicit `import p::K;`, which §26.3 binds ahead of a
+// wildcard one (§26.5): `int g = K * 10 + 1;` reads 41; an unbound K read 0
+// and g 1.
+TEST(CompilationUnitSim, CuScopeInitializerReadsAnExplicitlyImportedVariable) {
+  EXPECT_EQ(UnitInitializerRead("import p::K;\n"
+                                "int g = K * 10 + 1;\n"),
+            41u);
+}
+
+// §3.12.1 with §26.2 (printed page 808): the unit's `int g = p::f();` calls
+// the package's function through the scope resolution operator (§26.3),
+// which reads the package's own K, initialized before the unit's items are,
+// so g holds 8 and a module reads 8. A K read before its initializer would
+// give 0, and a call resolved to nothing 0.
+TEST(CompilationUnitSim, CuScopeInitializerCallsAPackageFunction) {
+  EXPECT_EQ(UnitInitializerRead("int g = p::f();\n"), 8u);
 }
 
 }  // namespace

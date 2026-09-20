@@ -132,14 +132,21 @@ class Lowerer {
   // package's names visible to every module of the unit, which reaches them
   // after searching its own scope. Applied once, ahead of the modules, from
   // the unit's own import declarations; §26.6's exports are already bound
-  // (AliasPackageExports, run by RegisterDesignTypesAndPackages in lowerer.cpp
+  // (AliasPackageExports, run by LowerDesignData in lowerer_data_init.cpp
   // before the package initializers), each name a package exports keyed under
   // the exporting package to the declaring package's storage or subroutine.
   // Defined in lowerer_import.cpp.
   void LowerCompilationUnitImports();
-  // The unit's imports, then its own class declarations, in that order for
-  // the reason given at the definition. Defined in lowerer.cpp.
+  // The unit's own class declarations, after its imports
+  // (InitCompilationUnitData) for the reason given at the definition. Defined
+  // in lowerer.cpp.
   void LowerCompilationUnitClasses();
+  // The two steps of the design's data, each defined in
+  // src/simulator/lowerer_data_init.cpp with the order it keeps: the type
+  // names and the packages' and the unit's storage, the packages'
+  // initializers with them; then the unit's imports and its initializers.
+  void LowerDesignData();
+  void InitCompilationUnitData();
   // §26.3: `p::C` reaches a package's class whether or not the package was
   // imported, so every package class no import has lowered is lowered here and
   // bound under its qualified key, after the modules so that no unqualified

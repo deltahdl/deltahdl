@@ -547,7 +547,10 @@ void InitUnitDataVariables(const RtlirDesign* design, SimContext& ctx,
   // §3.12.1 with §26.2 (printed page 808): a unit item's declaration
   // assignment is made before any initial or always procedure starts, as a
   // package's is, and it may read the packages' items an import of the unit
-  // makes visible, so it follows the packages' initializers.
+  // makes visible (§26.3, printed 810), so it follows the packages'
+  // initializers and the unit's imports, which Lowerer::InitCompilationUnitData
+  // (lowerer_data_init.cpp) binds just ahead of this; bound after this, the
+  // imports left `import p::*; int g = K;` reading no K, and g 0.
   if (design->compilation_unit == nullptr) return;
   InitScopeDataItems(design->compilation_unit->cu_items, {}, ctx, arena);
 }
