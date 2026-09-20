@@ -647,15 +647,18 @@ struct RtlirParamDecl {
   const DataType* decl_type = nullptr;
   // §23.10.1 (printed pages 764-765) with §6.20.2 (printed 126): the
   // right-hand side of the defparam that gave this parameter its value, the
-  // values in scope where that statement stands and the module holding it,
-  // kept so that Elaborator::RecomputeDependentParams, sizing the parameter
-  // again once a later defparam changes its declared range, can fold the
-  // expression over again and convert it to the new range, its words above
-  // bit 63 recorded as Elaborator::ApplyDefparamSite records them; the value
-  // converted to the earlier range had lost every bit outside it. Null and
-  // empty while no defparam has set the value.
+  // values in scope where that statement stands, the generate blocks it
+  // stands in (§23.9, printed 761, outermost first) and the module holding
+  // it, kept so that Elaborator::RecomputeDependentParams, sizing the
+  // parameter again once a later defparam changes its declared range, can
+  // fold the expression over again and convert it to the new range, its
+  // words above bit 63 recorded as Elaborator::ApplyDefparamSite records
+  // them; the value converted to the earlier range had lost every bit
+  // outside it, and a refold outside the blocks read a block's parameter as
+  // its low 64 bits. Null and empty while no defparam has set the value.
   const Expr* defparam_value_expr = nullptr;
   std::unordered_map<std::string_view, int64_t> defparam_value_scope;
+  GenBlockPrefixes defparam_value_scopes;
   const struct RtlirModule* defparam_module = nullptr;
 };
 

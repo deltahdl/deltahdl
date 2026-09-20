@@ -248,19 +248,26 @@ static bool DeclTypeRangeFollowsScope(const RtlirParamDecl& p,
 // defparam gave `p` is the right-hand side converted to the range `p` now
 // has, so the right-hand side is folded again in the scope of the statement
 // as Elaborator::ApplyDefparamSite folded it, with the module holding the
-// statement registered, and the words above bit 63 of one wider than 64 bits
-// recorded from it. Converting the value already cut to the earlier range
-// kept that range's bits alone: `defparam u.P = 96'h1_0000_0003_0000_0005`
-// applied while `logic [W-1:0] P` was 32 bits wide, and `defparam u.W = 96`
-// after it, left P[95:64] reading 0 and P[47:32] 0. A value an instance's
-// assignment gave is converted as it stands: its expression is written in the
-// instantiating module, which is not carried here.
+// statement and the generate blocks the statement stands in registered, and
+// the words above bit 63 of one wider than 64 bits recorded from it.
+// Converting the value already cut to the earlier range kept that range's
+// bits alone: `defparam u.P = 96'h1_0000_0003_0000_0005` applied while
+// `logic [W-1:0] P` was 32 bits wide, and `defparam u.W = 96` after it, left
+// P[95:64] reading 0 and P[47:32] 0. The blocks are registered because a
+// name on the right-hand side written in a block may be the block's own
+// parameter (§23.9, printed 761; §27.4, printed 820), which the module's
+// registration alone keeps out of sight: `defparam u.P = V` in a block
+// declaring `localparam logic [95:0] V` read V's low 64 bits alone when a
+// later defparam widened P. A value an instance's assignment gave is
+// converted as it stands: its expression is written in the instantiating
+// module, which is not carried here.
 static void ReconvertOverrideValue(RtlirParamDecl& p) {
   if (p.defparam_value_expr == nullptr) {
     p.resolved_value = ConvertOverrideValue(p.resolved_value, p);
     return;
   }
   ParamRangeRegistryGuard defparam_module_guard(p.defparam_module);
+  RegisteredGenScopeGuard gen_scope_guard(p.defparam_value_scopes);
   auto val = FoldParamValue(p, p.defparam_value_expr, p.defparam_value_scope);
   p.resolved_value = ConvertOverrideValue(val.value_or(p.resolved_value), p);
   RecordResolvedHighWords(p, p.defparam_value_expr, p.defparam_value_scope);
@@ -497,6 +504,7 @@ void Elaborator::ApplyDefparamSite(RtlirModule* mod, const DefparamSite& site,
     RecordResolvedHighWords(*param, val_expr, scope);
     param->defparam_value_expr = val_expr;
     param->defparam_value_scope = scope;
+    param->defparam_value_scopes = site.scopes;
     param->defparam_module = mod;
     ReplaceStringParamValue(*param, val_expr, arena_);
     RecomputeDependentParams(target_mod);

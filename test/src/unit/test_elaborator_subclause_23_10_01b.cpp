@@ -67,4 +67,52 @@ TEST(DefparamElaboration, SizesEachModulesTypedefParameterByItsOwnTypedef) {
   EXPECT_EQ(ParamOfModule(kSrc, "b", "B", fb), 16);
 }
 
+// A module c whose `logic [W-1:0] P` follows `parameter int W = 32`, with H
+// reading P's word above bit 64 and M its bits 47 down to 32.
+constexpr std::string_view kWideningC =
+    "module c;\n"
+    "  parameter int W = 32;\n"
+    "  parameter logic [W-1:0] P = 0;\n"
+    "  localparam int H = P[95:64], M = P[47:32];\n"
+    "endmodule\n";
+
+// c's parameter `name` under a top holding `top_items`.
+int64_t WideParamOfC(std::string_view top_items, std::string_view name,
+                     ElabFixture& f) {
+  std::string src(kWideningC);
+  src += "module top;\n";
+  src += top_items;
+  src += "endmodule\n";
+  return ParamOfModule(src, "c", name, f);
+}
+
+// Under `top_items`, c's P holds 96'h1_0000_0003_0000_0005 in full: H reads
+// 1 and M 3, with nothing reported.
+void ExpectEveryWordOfP(std::string_view top_items) {
+  ElabFixture fh;
+  EXPECT_EQ(WideParamOfC(top_items, "H", fh), 1);
+  EXPECT_FALSE(fh.has_errors);
+  ElabFixture fm;
+  EXPECT_EQ(WideParamOfC(top_items, "M", fm), 3);
+}
+
+// §27.4 (printed page 820) and §23.9 (printed 761) have a generate block's
+// declarations in scope for the items written in it, and §23.10.1 (printed
+// 764-765) folds a defparam's right-hand side where the statement stands, so
+// `defparam u.P = V` in block g reads g's 96-bit localparam V, and `defparam
+// u.W = 96` after it, converting P's value over again to the 96 bits it now
+// has (§6.20.2, printed 126), reads every word of V: H is 1 and M is 3. The
+// refold registered the module holding the statement and no block, under
+// which V's declaration was out of sight and its word above bit 64 read 0.
+TEST(DefparamElaboration, RefoldsAGenerateBlocksDefparamValueWithItsNames) {
+  constexpr std::string_view kTop =
+      "  if (1) begin : g\n"
+      "    localparam logic [95:0] V = 96'h1_0000_0003_0000_0005;\n"
+      "    c u();\n"
+      "    defparam u.P = V;\n"
+      "    defparam u.W = 96;\n"
+      "  end\n";
+  ExpectEveryWordOfP(kTop);
+}
+
 }  // namespace
