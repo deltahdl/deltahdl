@@ -705,4 +705,53 @@ TEST(CompilationUnitSim, CuScopeFunctionWritesTheUnitsVariable) {
             1201u);
 }
 
+// §3.12.1 (printed page 56) with §13.5.1 (printed 348) and §7.2.1 (printed
+// 147): `f($unit::u)` copies the unit's `st u = '{8'h12, 8'h34}` into the
+// formal `st x`, whose members are st's two 8-bit fields, so `x.b` is
+// 8'h34 beside a top declaring its own u of another packed structure, mt,
+// with a 4-bit a and a 12-bit b. The formal's layout was taken from the
+// actual's storage by its text (TryBindIdentifierActualLayout in
+// eval_function_args.cpp), the top's mt, so x.b was the low 12 bits of the
+// unit's value, 12'h234.
+TEST(CompilationUnitSim, CuScopeStructActualThroughUnitPrefix) {
+  EXPECT_EQ(
+      RunAndGet("typedef struct packed { logic [7:0] a, b; } st;\n"
+                "st u = '{8'h12, 8'h34};\n"
+                "module top;\n"
+                "  typedef struct packed { logic [3:0] a; logic [11:0] b; }"
+                " mt;\n"
+                "  mt u = '{4'hA, 12'hBCD};\n"
+                "  int y;\n"
+                "  function int f(st x);\n"
+                "    return x.b;\n"
+                "  endfunction\n"
+                "  initial y = f($unit::u);\n"
+                "endmodule\n",
+                "y"),
+      0x34u);
+}
+
+// §3.12.1 (printed page 56) with §7.3.2 (printed 151) and §11.9 (printed
+// 304): the tag a by-value formal takes from `f($unit::u)` is the unit's
+// u's, whose `tagged Valid 9` initializer leaves no tag recorded, so
+// `a.Valid` in the body reads the 9 copied in and raises nothing, while the
+// top's own u holds `tagged Invalid`. The tag was read from the actual's
+// storage by its text (ActualTag in eval_function_args.cpp), the top's
+// Invalid, and the read of a.Valid was reported inconsistent with it at
+// the body's line, which RunAndGet refuses.
+TEST(CompilationUnitSim, CuScopeTaggedUnionActualThroughUnitPrefix) {
+  EXPECT_EQ(RunAndGet("typedef union tagged { void Invalid; int Valid; } u_t;\n"
+                      "u_t u = tagged Valid 9;\n"
+                      "module top;\n"
+                      "  u_t u = tagged Invalid;\n"
+                      "  int y;\n"
+                      "  function int f(u_t a);\n"
+                      "    return a.Valid;\n"
+                      "  endfunction\n"
+                      "  initial y = f($unit::u);\n"
+                      "endmodule\n",
+                      "y"),
+            9u);
+}
+
 }  // namespace

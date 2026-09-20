@@ -27,13 +27,17 @@ std::string IdentifierLookupKey(const Expr* expr);
 // The key an identifier's declared kinds stand under -- real
 // (SimContext::IsRealVariable) and string (IsStringVariable), which decide
 // how a value read from or stored into it is treated (§6.12.1, §6.16 printed
-// page 112): "$unit.s" for a `$unit` prefix, the key the unit's storage and
-// its registrations share (ShapePackageVariable in lowerer_package_data.cpp),
-// and the text for any other, a `$root` name's kinds standing under the text
-// as before. Asked by the text, `$unit::s = "abcde"` over a unit `string s`
-// beside a module's `int s` was stored as the module's int, sized to the
-// variable's width (IsStringTarget in statement_assign_core.cpp), while the
-// read side asked under the key (MarkDeclaredKinds in evaluation.cpp).
+// page 112), and a structure's layout (GetVariableStructType) with a tagged
+// union's tag (GetVariableTag), which a by-value formal takes from an
+// identifier actual (§13.5.1 printed 348, §7.3.2 printed 151; ActualTag and
+// TryBindIdentifierActualLayout in eval_function_args.cpp): "$unit.s" for a
+// `$unit` prefix, the key the unit's storage and its registrations share
+// (ShapePackageVariable in lowerer_package_data.cpp), and the text for any
+// other, a `$root` name's kinds standing under the text as before. Asked by the
+// text, `$unit::s = "abcde"` over a unit `string s` beside a module's `int s`
+// was stored as the module's int, sized to the variable's width (IsStringTarget
+// in statement_assign_core.cpp), while the read side asked under the key
+// (MarkDeclaredKinds in evaluation.cpp).
 std::string DeclaredKindsKey(const Expr* expr);
 
 }  // namespace delta

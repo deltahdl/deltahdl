@@ -721,18 +721,20 @@ static bool TryBindRefDirectionArg(const Expr* expr, int arg_index,
 // `a.Valid` of a formal bound from a union holding `tagged Invalid` was read
 // against no tag and raised nothing, and %p of the formal printed the
 // untagged form. An identifier actual's tag stands under the key its storage
-// was created by (TagKeyOfName), read with the callee's scope set aside as
-// the layout is; a call's is the one its body's return recorded for the
-// actual's evaluation, and `f(h())` with h returning `tagged Invalid` raised
-// nothing while a call's result reached the formal untagged. Any other actual
-// carries none. §13.3 (printed 337) copies nothing into an output formal, so
-// its tag starts undefined.
+// was created by (TagKeyOfName of DeclaredKindsKey, "$unit.u" for `$unit::u`,
+// §3.12.1 printed 56), read with the callee's scope set aside as the layout
+// is; a call's is the one its body's return recorded for the actual's
+// evaluation, and `f(h())` with h returning `tagged Invalid` raised nothing
+// while a call's result reached the formal untagged. Any other actual carries
+// none. §13.3 (printed 337) copies nothing into an output formal, so its tag
+// starts undefined.
 static std::string ActualTag(const FunctionArg& param, const Expr* actual,
                              const ActualArgRef& ref, SimContext& ctx) {
   if (actual == nullptr || param.direction == Direction::kOutput) return {};
   if (actual->kind != ExprKind::kIdentifier) return std::string(ref.result_tag);
   CalleeScopeAside aside(ctx);
-  return std::string(ctx.GetVariableTag(TagKeyOfName(actual->text, ctx)));
+  std::string key = TagKeyOfName(DeclaredKindsKey(actual), ctx);
+  return std::string(ctx.GetVariableTag(key));
 }
 
 // §7.2.2/§13.5.1: make member access (arg.field) work on a by-value struct
@@ -744,17 +746,17 @@ static std::string ActualTag(const FunctionArg& param, const Expr* actual,
 //
 // §23.9 with §13.5: the actual is a name of the caller's, resolved within the
 // instance the call runs in, so its layout is asked for by the key that
-// instance's storage was created under, and with the callee's scope set aside
-// as every other read of an actual is made. Asked by the bare name, a struct
-// variable of an instantiated module passed as an actual bound no layout to
-// the formal, and a member read of the formal inside the body answered zero.
+// instance's storage was created under (DeclaredKindsKey: "$unit.u" for
+// `$unit::u`, §3.12.1 printed 56), with the callee's scope set aside as every
+// other read of an actual is made. Asked by the bare name, an instance's
+// struct bound no layout and a module's own u bound its layout for the unit's.
 static bool TryBindIdentifierActualLayout(const FunctionArg& param,
                                           const Expr* actual, SimContext& ctx) {
   if (actual == nullptr || actual->kind != ExprKind::kIdentifier) return false;
   const StructTypeInfo* sinfo = nullptr;
   {
     CalleeScopeAside aside(ctx);
-    sinfo = StructLayoutOfName(actual->text, ctx);
+    sinfo = StructLayoutOfName(DeclaredKindsKey(actual), ctx);
   }
   if (sinfo == nullptr) return false;
   // Copy before re-inserting: registering into struct_types_ may rehash and
