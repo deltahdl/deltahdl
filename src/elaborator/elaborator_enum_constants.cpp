@@ -90,18 +90,28 @@ void VisitEnumTypes(const DataType& type, const std::string& path,
   }
 }
 
-// The names `pkg` declares ahead of `until`: its parameters and the members
-// of its enumerations, as written. A `name[N]` member of §6.19.2 is held
-// under the name it is written with, not under the indexed names it expands
-// to.
-std::unordered_set<std::string_view> NamesDeclaredBefore(
-    const PackageDecl* pkg, const ModuleItem* until) {
-  std::unordered_set<std::string_view> names;
+// The names `pkg` declares ahead of `until`: its parameters and the constants
+// of its enumerations. A `name[N]` member of §6.19.2 declares the constants
+// it generates, name0 through nameN-1, and not the name it is written with
+// (Table 6-10), so those are held; the bounds fold against `scope`, which
+// holds what the package bound before `until`. Before, the written name was
+// held instead, and a package declaring `VAL[2]` ahead of a wildcard import
+// of a package declaring the same had its own VAL1 replaced by the import's.
+std::unordered_set<std::string> NamesDeclaredBefore(const PackageDecl* pkg,
+                                                    const ModuleItem* until,
+                                                    const ScopeMap& scope) {
+  std::unordered_set<std::string> names;
   for (const auto* item : pkg->items) {
     if (item == until) break;
-    if (item->kind == ModuleItemKind::kParamDecl) names.insert(item->name);
+    if (item->kind == ModuleItemKind::kParamDecl) {
+      names.emplace(item->name);
+    }
     ForEachEnumTypeOfItem(item, [&](std::string_view, const DataType& type) {
-      for (const auto& m : type.enum_members) names.insert(m.name);
+      for (const auto& m : type.enum_members) {
+        for (std::string& name : EnumMemberDeclaredNames(m, scope)) {
+          names.insert(std::move(name));
+        }
+      }
     });
   }
   return names;
@@ -177,11 +187,12 @@ void BindPackageImportConstants(const PackageDecl* pkg, const ModuleItem* imp,
   }
   // The bare name is the tail of the recorded key, whose characters outlive
   // every scope map (RecordPackageConstant allocates the key in the arena).
-  std::unordered_set<std::string_view> own = NamesDeclaredBefore(pkg, imp);
+  std::unordered_set<std::string> own = NamesDeclaredBefore(pkg, imp, scope);
   for (const auto& [key, value] : cu_param_scope) {
     if (key.substr(0, prefix.size()) != prefix) continue;
     std::string_view name = key.substr(prefix.size());
-    if (name.find('.') != std::string_view::npos || own.count(name) != 0)
+    if (name.find('.') != std::string_view::npos ||
+        own.count(std::string(name)) != 0)
       continue;
     scope[name] = value;
   }

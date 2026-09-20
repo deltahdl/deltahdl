@@ -629,9 +629,12 @@ void Elaborator::ValidateUnresolvedReferences(const ModuleDecl* decl,
   // standing under a package's name is the base §8.23 takes first, and a base
   // that is no package of the unit -- a class, an interface, an imported class
   // -- has its members checked elsewhere. A `name[N]` enumeration member of
-  // §6.19.2 stands in the provided names under the unexpanded name alone, and
-  // the constants it expands to are read under their "pkg.name" keys
-  // (RegisterPackageParams in elaborator_resolve.cpp).
+  // §6.19.2 stands in the provided names under the constants it generates,
+  // name0 through nameN-1, and not under the written name (Table 6-10,
+  // printed page 121), so `pkg::name` is reported while `pkg::name1` is
+  // provided; the constants are also read under their "pkg.name1" keys
+  // (RegisterPackageParams in elaborator_resolve.cpp), which is what answers
+  // for a member whose bound the provided-name walk could not fold.
   auto provided = [this](std::string_view base, std::string_view member) {
     bool unit_package = base != "std" && PackageDeclared(unit_, base) &&
                         class_names_.count(base) == 0 &&

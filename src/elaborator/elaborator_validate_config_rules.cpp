@@ -268,8 +268,9 @@ bool RangedMemberGenerates(const EnumMember& em, std::string_view name) {
 // the type itself (Syntax 6-5) or as the type of a member of a structure or
 // union of it (§7.2), is a declaration of the scope as the type's own name is.
 // A ranged member of §6.19.2 declares the constants it generates and not the
-// name it is written with, which the provided-name walk of
-// elaborator_scope_rules_names.cpp still holds it under.
+// name it is written with, as the provided-name walk of
+// elaborator_scope_rules_names.cpp holds it too; this check folds each bound
+// on the spot, where that walk asks EnumMemberDeclaredNames.
 bool TypeDeclaresEnumLiteral(const DataType& type, std::string_view name) {
   for (const auto& em : type.enum_members) {
     if (em.range_start == nullptr ? em.name == name
