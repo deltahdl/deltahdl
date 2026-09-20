@@ -376,7 +376,13 @@ void CreatePackageDataVariables(const RtlirDesign* design, SimContext& ctx,
 // nothing. §26.2 keeps a package from naming the unit's items, so the
 // packages' storage above is created first and the unit's after. A module
 // declaring the same name creates its own storage under the instance's key
-// afterward, which the nearer scope's lookup finds first (§3.12.1).
+// afterward, which the nearer scope's lookup finds first (§3.12.1). §8.3
+// (printed 180): a unit variable of a class type, `C h;` after a unit
+// `class C`, holds a handle, which PackageDataWidth sizes at a handle's 64
+// bits by the class record RegisterUnitClassVariables (lowerer_register.cpp)
+// entered under the bare name ahead of this, the record TryClassNewAssign
+// constructs `h = new` by; with no record, the packages' alone being
+// entered, the storage was 32 bits and the `new` constructed nothing.
 void CreateUnitDataVariables(const RtlirDesign* design, SimContext& ctx,
                              Arena& arena) {
   if (design->compilation_unit == nullptr) return;

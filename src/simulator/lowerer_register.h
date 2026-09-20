@@ -120,6 +120,16 @@ void RegisterDesignTypeLayouts(const RtlirDesign* design, SimContext& ctx,
 // module. Defined in src/simulator/lowerer_package_class_vars.cpp.
 void RegisterPackageClassVariables(const RtlirDesign* design, SimContext& ctx,
                                    Arena& arena);
+// §3.12.1 with §8.3: each compilation-unit variable declared with a
+// class's name, recorded under its bare name -- the key CreateUnitDataVariables
+// gives its storage -- as a handle of that class: the unit's own class, one
+// an import of the unit brings in, the one a `p::C` wrote, or the built-in
+// process or weak_reference class, with the specialization the declaration
+// wrote (§8.25). Ahead of the unit's storage, which is sized by the record,
+// and after the packages', whose classes an import may name. Defined in
+// src/simulator/lowerer_register.cpp.
+void RegisterUnitClassVariables(const RtlirDesign* design, SimContext& ctx,
+                                Arena& arena);
 
 // §6.20.2: a parameter declared with a range or a type has the range of its
 // declaration, unchanged by any override, and RtlirParamDecl::resolved_value

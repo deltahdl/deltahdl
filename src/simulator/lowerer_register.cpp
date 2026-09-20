@@ -14,6 +14,7 @@
 #include "elaborator/elaborator_enum_constants.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
+#include "parser/ast_class.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -499,6 +500,89 @@ void RegisterClassTypeAliases(const RtlirDesign* design, SimContext& ctx) {
     if (ctx.FindClassType(alias) != nullptr) continue;
     ClassTypeInfo* cls = ctx.FindClassType(target);
     if (cls != nullptr) ctx.RegisterClassType(alias, cls);
+  }
+}
+
+// §9.7 (printed page 245) and §8.30.1 (printed 217): the built-in class
+// the declared type names, `process` or `weak_reference`, bare or through
+// the std package (§26.7), by the bare name the run keys the class under.
+// Empty for any other type.
+static std::string UnitBuiltinClassKey(const DataType& type) {
+  bool std_or_bare = type.scope_name.empty() || type.scope_name == "std";
+  bool builtin =
+      type.type_name == "process" || type.type_name == "weak_reference";
+  if (type.kind != DataTypeKind::kNamed || !std_or_bare || !builtin) return {};
+  return std::string(type.type_name);
+}
+
+// "pkg::name", the key LowerPackageClass (lowerer_import.cpp) binds a
+// package's class under, where the design's package `pkg` declares a class
+// so named; empty otherwise.
+static std::string PackageClassKeyIn(const RtlirDesign* design,
+                                     std::string_view pkg,
+                                     std::string_view name) {
+  for (const auto* p : design->packages) {
+    if (p->name != pkg) continue;
+    for (const auto* item : p->items) {
+      if (item->kind == ModuleItemKind::kClassDecl && item->class_decl &&
+          item->class_decl->name == name)
+        return std::string(pkg) + "::" + std::string(name);
+    }
+  }
+  return {};
+}
+
+// §3.12.1 (printed page 56) with §26.3 (printed 810): the key the run holds
+// the class under that a bare type name written in the compilation-unit
+// scope denotes -- the unit's own class by its bare name, the name
+// LowerCompilationUnitClasses binds it under and a unit declaration takes
+// over an import (§26.5), else the class the first import of the unit that
+// provides the name brings in, a wildcard import or an explicit import of
+// that very name. Empty where neither declares a class of the name: a
+// typedef, an enumeration or a type nothing declares.
+static std::string UnitScopeClassKey(const RtlirDesign* design,
+                                     std::string_view name) {
+  for (const auto* cls : design->cu_class_decls) {
+    if (cls->name == name) return std::string(name);
+  }
+  for (const auto* item : design->compilation_unit->cu_items) {
+    if (item->kind != ModuleItemKind::kImportDecl) continue;
+    const ImportItem& imp = item->import_item;
+    if (!imp.is_wildcard && imp.item_name != name) continue;
+    std::string key = PackageClassKeyIn(design, imp.package_name, name);
+    if (!key.empty()) return key;
+  }
+  return {};
+}
+
+// The key the run holds the class under that `type`, the declared type of a
+// compilation-unit variable, names: the built-in class, the package class a
+// `p::C` wrote, or the class a bare name denotes in the unit's scope. Empty
+// where the type names no class.
+static std::string UnitClassKey(const RtlirDesign* design,
+                                const DataType& type) {
+  std::string key = UnitBuiltinClassKey(type);
+  if (!key.empty() || type.kind != DataTypeKind::kNamed) return key;
+  if (!type.scope_name.empty())
+    return PackageClassKeyIn(design, type.scope_name, type.type_name);
+  return UnitScopeClassKey(design, type.type_name);
+}
+
+void RegisterUnitClassVariables(const RtlirDesign* design, SimContext& ctx,
+                                Arena& arena) {
+  if (design->compilation_unit == nullptr) return;
+  for (const auto* item : design->compilation_unit->cu_items) {
+    if (item->kind != ModuleItemKind::kVarDecl) continue;
+    std::string key = UnitClassKey(design, item->data_type);
+    if (key.empty()) continue;
+    // SimContext keys the record by string_view, and the item's name is the
+    // storage's own key (CreateUnitDataVariables), so the class key alone is
+    // given the design's lifetime.
+    ctx.SetVariableClassType(item->name, *arena.Create<std::string>(key));
+    // §8.25 (printed page 203): the specialization the declaration wrote,
+    // `G #(5) b`, bound on the object its `new` constructs; nothing for a
+    // bare `G b`.
+    RecordClassParamActuals(item->name, item->data_type.type_params, ctx);
   }
 }
 

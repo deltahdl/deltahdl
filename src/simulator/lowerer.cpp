@@ -841,6 +841,7 @@ static void RegisterDesignTypesAndPackages(const RtlirDesign* design,
                                            SimContext& ctx, Arena& arena) {
   RegisterDesignTypeWidths(design, ctx);
   RegisterDesignTypeLayouts(design, ctx, arena);
+  RegisterUnitClassVariables(design, ctx, arena);
   RegisterPackageScopedSubroutines(design, ctx, arena);
   RegisterPackageEnumConstants(design, ctx, arena);
   CreatePackageDataVariables(design, ctx, arena);

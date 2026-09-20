@@ -100,4 +100,80 @@ TEST(CompilationUnitSim, CuScopeVariableInitializedBeforeAnyProcess) {
   EXPECT_EQ(val, 44u);
 }
 
+// §3.12.1 (printed page 56) with §8.3 (printed 180): `C h;` outside every
+// module, after a unit-scope `class C`, is one handle variable of C the
+// unit's modules share, so `h = new` through a unit function constructs an
+// object of C into it and a module's `h.v` reads the property's initializer
+// 3. The unit's storage was sized 32 bits, half a handle, with no class
+// recorded under `h` (RegisterUnitClassVariables in lowerer_register.cpp
+// records the packages' alone before), so the `new` found no class to
+// construct and `h.v` read no object. The write goes through a unit
+// function for the reason CuScopeVariableSharedByTwoModules gives.
+TEST(CompilationUnitSim, CuScopeClassHandleConstructedThroughUnitFunction) {
+  auto val = RunAndGet(
+      "class C;\n"
+      "  int v = 3;\n"
+      "endclass\n"
+      "C h;\n"
+      "function void mk();\n"
+      "  h = new;\n"
+      "endfunction\n"
+      "module top;\n"
+      "  int y;\n"
+      "  initial begin\n"
+      "    mk();\n"
+      "    y = h.v;\n"
+      "  end\n"
+      "endmodule\n",
+      "y");
+  EXPECT_EQ(val, 3u);
+}
+
+// §3.12.1 (printed page 56) with §8.7 (printed 184) and §26.2 (printed
+// 808): the unit's declaration assignment `C h2 = new;` constructs the
+// object before any procedure starts, as a package's would, so a module
+// reads 3 through `h2.v` at time 0 with no write of its own. The
+// initializer was evaluated as an ordinary expression, which a bare `new`
+// is not, so nothing was constructed (ConstructDataClassInitializers in
+// lowerer_package_data.cpp makes the construction once the unit's classes
+// are lowered).
+TEST(CompilationUnitSim, CuScopeClassHandleConstructedByItsInitializer) {
+  auto val = RunAndGet(
+      "class C;\n"
+      "  int v = 3;\n"
+      "endclass\n"
+      "C h2 = new;\n"
+      "module top;\n"
+      "  int y;\n"
+      "  initial y = h2.v;\n"
+      "endmodule\n",
+      "y");
+  EXPECT_EQ(val, 3u);
+}
+
+// §3.12.1 (printed page 56) with §26.3 (printed 810): a wildcard import
+// written at compilation-unit scope makes a package's class visible to the
+// unit's own declarations, so `C h3 = new;` after `import p::*` is a handle
+// of p's C, constructed before any procedure starts, and a module reads 4
+// through it. The record of the class a unit variable holds is found
+// through the unit's imports when the unit declares no class of the name
+// (UnitScopeClassKey in lowerer_register.cpp); with none, the storage was
+// 32 bits and nothing was constructed.
+TEST(CompilationUnitSim, CuScopeHandleOfAWildcardImportedPackageClass) {
+  auto val = RunAndGet(
+      "package p;\n"
+      "  class C;\n"
+      "    int v = 4;\n"
+      "  endclass\n"
+      "endpackage\n"
+      "import p::*;\n"
+      "C h3 = new;\n"
+      "module top;\n"
+      "  int y;\n"
+      "  initial y = h3.v;\n"
+      "endmodule\n",
+      "y");
+  EXPECT_EQ(val, 4u);
+}
+
 }  // namespace
