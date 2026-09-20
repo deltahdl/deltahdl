@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+
 #include "common/types.h"
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
@@ -21,6 +23,23 @@ void ExpectNestedOwnsNetAndOuterReadsZ(SimFixture& f, const char* nested_net) {
   ASSERT_NE(r, nullptr);
   EXPECT_EQ(r->value.words[0].aval & 1u, 0u);
   EXPECT_EQ(r->value.words[0].bval & 1u, 1u);
+}
+
+// The reading §23.4 with §6.10 gives a nested declaration whose instance is
+// written above it: the outer name declared between the instance and the
+// declaration stands above the declaration's text, so the nested module's
+// reference resolves to it. `src` must elaborate with no report, and the
+// outer r, which reads the object the nested module drove, holds `expected`.
+void ExpectOuterReadsThroughNestedAssign(SimFixture& f, const char* src,
+                                         uint64_t expected) {
+  auto* design = ElaborateSrc(src, f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  LowerAndRun(design, f);
+
+  auto* r = f.ctx.FindVariable("r");
+  ASSERT_NE(r, nullptr);
+  EXPECT_EQ(r->value.ToUint64(), expected);
 }
 
 TEST(NestedModuleSimulation, OuterScopeVariableAccessibleFromNestedModule) {
@@ -348,6 +367,76 @@ TEST(NestedModuleSimulation,
   auto* r = f.ctx.FindVariable("r");
   ASSERT_NE(r, nullptr);
   EXPECT_EQ(r->value.ToUint64(), 1u);
+}
+
+// §6.19 declares an enumeration's literals as named constants of the scope
+// holding the enumeration, so top's `enum {A = 5, B} e` declares B in top,
+// and §6.10's "previously" is measured from M's text, below the enumeration
+// wherever `M m()` stands. M's assignment reads top's B, 6, into the outer v,
+// and r reads 6. The names counted above the declaration were the items'
+// own names alone, so B was not among them, and M's read of B was reported
+// an undeclared identifier under §23.9.
+TEST(NestedModuleSimulation,
+     InstanceAboveTheNestedDeclarationReadsAnEnumConstantDeclaredBetweenThem) {
+  SimFixture f;
+  ExpectOuterReadsThroughNestedAssign(f,
+                                      "module top;\n"
+                                      "  M m();\n"
+                                      "  enum {A = 5, B} e;\n"
+                                      "  wire [7:0] v;\n"
+                                      "  logic [7:0] r;\n"
+                                      "  initial #1 r = v;\n"
+                                      "  module M;\n"
+                                      "    assign v = B;\n"
+                                      "  endmodule\n"
+                                      "endmodule\n",
+                                      6u);
+}
+
+// §6.19 with §7.2 and §23.9: an enumeration written as the type of a
+// structure member declares its literals where the structure is written, a
+// structure being no scope of its own, so top's typedef declares Q in top as
+// the bare enumeration above declares B, and M reads Q, 4, the same way.
+TEST(NestedModuleSimulation,
+     InstanceAboveTheNestedDeclarationReadsAStructMemberEnumConstant) {
+  SimFixture f;
+  ExpectOuterReadsThroughNestedAssign(
+      f,
+      "module top;\n"
+      "  M m();\n"
+      "  typedef struct { enum {P = 3, Q} k; int n; } t;\n"
+      "  wire [7:0] v;\n"
+      "  logic [7:0] r;\n"
+      "  initial #1 r = v;\n"
+      "  module M;\n"
+      "    assign v = Q;\n"
+      "  endmodule\n"
+      "endmodule\n",
+      4u);
+}
+
+// §6.10 gives an undeclared identifier on the left of a continuous assignment
+// an implicit net of the scope the assignment appears in, so top's `assign q
+// = 1'bz` declares q in top, above M's text. M's `assign q = 1'b1` drives that
+// outer q rather than an implicit q of its own: no net is made under m, and
+// r reads 1, the z driver deferring to the driven value (§6.6.1). The names
+// counted above the declaration were the items' own names alone, so q was
+// not among them, "m.q" held 1 and r read z.
+TEST(NestedModuleSimulation,
+     InstanceAboveTheNestedDeclarationDrivesAnOuterImplicitNetDeclaredBetween) {
+  SimFixture f;
+  ExpectOuterReadsThroughNestedAssign(f,
+                                      "module top;\n"
+                                      "  M m();\n"
+                                      "  assign q = 1'bz;\n"
+                                      "  logic r;\n"
+                                      "  initial #1 r = q;\n"
+                                      "  module M;\n"
+                                      "    assign q = 1'b1;\n"
+                                      "  endmodule\n"
+                                      "endmodule\n",
+                                      1u);
+  EXPECT_EQ(f.ctx.FindVariable("m.q"), nullptr);
 }
 
 // §23.4 applied twice: B is declared and instantiated in A, which is declared

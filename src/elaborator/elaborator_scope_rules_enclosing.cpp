@@ -9,9 +9,12 @@
 #include "common/source_loc.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_data.h"
+#include "elaborator/elaborator_enum_constants.h"
 #include "elaborator/elaborator_validate_classes.h"
 #include "elaborator/type_eval.h"
+#include "parser/ast_expr.h"
 #include "parser/ast_module.h"
+#include "parser/ast_type.h"
 
 namespace delta {
 
@@ -88,16 +91,44 @@ void ElaboratorData::BeginNestedDeclScope(
   has_pending_enclosing_scope_ = true;
 }
 
+// §6.19 declares an enumeration's literals as named constants of the scope
+// holding the enumeration, and §7.2 with §23.9 has one written as the type of
+// a structure or union member declare them in the same scope, the structure
+// being no scope of its own. The names one such member declares as the text
+// shows them: its written name, or nothing for a `name[N]` member of §6.19.2,
+// whose constants are generated rather than written and are owned by no text
+// a std::string_view could point into (EnumMemberDeclaredNames builds them).
+static void AddEnumMemberName(const EnumMember& member,
+                              std::unordered_set<std::string_view>& names) {
+  if (member.range_start == nullptr) names.insert(member.name);
+}
+
 // The names `item` declares as the text alone shows them: the declared name
 // of a net, variable, parameter, typedef, class, subroutine, let, property,
 // sequence, covergroup, clocking block or nettype, the label of a generate
-// block or an assertion, an instance's name and a gate instance's name. An
-// enumeration's named constants declared inline are not read here.
+// block or an assertion, an instance's name and a gate instance's name; the
+// constants of each enumeration the item writes inline, which A.2.1.3 has
+// the first declarator of a declaration list introduce once; and the
+// identifier on the left of a continuous assignment, which §6.10 declares as
+// an implicit net of the scope where it was not declared before and which is
+// already among the names where it was.
 static void AddItemDeclaredNames(const ModuleItem* item,
                                  std::unordered_set<std::string_view>& names) {
   if (!item->name.empty()) names.insert(item->name);
   if (!item->inst_name.empty()) names.insert(item->inst_name);
   if (!item->gate_inst_name.empty()) names.insert(item->gate_inst_name);
+  if (item->first_in_decl_list) {
+    ForEachEnumTypeOfItem(item, [&](std::string_view, const DataType& type) {
+      for (const auto& member : type.enum_members) {
+        AddEnumMemberName(member, names);
+      }
+    });
+  }
+  if (item->kind == ModuleItemKind::kContAssign &&
+      item->assign_lhs != nullptr &&
+      item->assign_lhs->kind == ExprKind::kIdentifier) {
+    names.insert(item->assign_lhs->text);
+  }
 }
 
 // §6.10 counts a name as declared previously by the text above the nested

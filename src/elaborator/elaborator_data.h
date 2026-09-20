@@ -144,7 +144,9 @@ class ElaboratorData {
       nested_decl_names_above_;
   // Records, for each kNestedModuleDecl among `items`, the names the items
   // above it declare as the text shows them: each item's declared name, its
-  // instance name and its gate instance name.
+  // instance name and its gate instance name, the written constants of each
+  // enumeration it writes inline (§6.19) and the identifier a continuous
+  // assignment's left side names (§6.10's implicit net).
   void RecordNestedDeclNamesAbove(const std::vector<ModuleItem*>& items);
   // Hands ElaborateModule, through pending_enclosing_scope_, the enclosing
   // scope's names a nested declaration `nested` may treat as declared: the
