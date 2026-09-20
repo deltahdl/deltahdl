@@ -2,6 +2,7 @@
 
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
+#include "helpers_rtlir_lookup.h"
 
 namespace {
 
@@ -509,6 +510,36 @@ TEST(PackageImport, ExplicitImportMakesEnumMemberVisible) {
              "  int y;\n"
              "  initial y = TRUE;\n"
              "endmodule\n"));
+}
+
+// §26.5's package p of Table 26-1 with a localparam of its enumeration type
+// initialized to a literal of the type: §26.2 with §6.19 makes the literal a
+// constant of the package visible by its bare name, so the localparam folds
+// to TRUE, 1, and a module reads it through `p::` and through the wildcard
+// import. A fold that lost the literal left both unresolved.
+TEST(PackageImport, PackageLocalparamOfPackageEnumTypeFoldsToLiteral) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "package p;\n"
+      "  typedef enum { FALSE, TRUE } BOOL;\n"
+      "  localparam BOOL d = TRUE;\n"
+      "endpackage\n"
+      "module top;\n"
+      "  import p::*;\n"
+      "  localparam int SCOPED = p::d;\n"
+      "  localparam int IMPORTED = d;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* scoped = FindParam(design, "top", "SCOPED");
+  ASSERT_NE(scoped, nullptr);
+  EXPECT_TRUE(scoped->is_resolved);
+  EXPECT_EQ(scoped->resolved_value, 1);
+  const auto* imported = FindParam(design, "top", "IMPORTED");
+  ASSERT_NE(imported, nullptr);
+  EXPECT_TRUE(imported->is_resolved);
+  EXPECT_EQ(imported->resolved_value, 1);
 }
 
 }  // namespace

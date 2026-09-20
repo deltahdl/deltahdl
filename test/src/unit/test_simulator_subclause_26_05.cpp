@@ -165,4 +165,45 @@ TEST(PackageImportSim, DerivedPackageLocalparamReadsThroughScopeAndImport) {
                    {{"scoped", 34u}, {"imported", 34u}, {"viapkg", 34u}});
 }
 
+// §26.5's package p of Table 26-1, a `const` of the package's enumeration
+// type initialized to one of its literals, beside a localparam of the type:
+// §26.2 makes the literal visible by its bare name in the package, so each
+// holds TRUE, 1, through `p::` and through the wildcard import; `sum` reads
+// the literal in an expression, 3. Each read 0 while the initializers were
+// evaluated before the package's literals had storage; `e`, a literal
+// initializer, was 1 already.
+TEST(PackageImportSim, PackageConstAndLocalparamOfPackageEnumTypeHoldLiteral) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "package p;\n"
+      "  typedef enum { FALSE, TRUE } BOOL;\n"
+      "  const BOOL c = TRUE;\n"
+      "  localparam BOOL d = TRUE;\n"
+      "  localparam int e = 1;\n"
+      "  const int sum = TRUE + 2;\n"
+      "endpackage\n"
+      "module top;\n"
+      "  import p::*;\n"
+      "  int sc, sd, se, ssum, ic, id;\n"
+      "  initial begin\n"
+      "    sc = p::c;\n"
+      "    sd = p::d;\n"
+      "    se = p::e;\n"
+      "    ssum = p::sum;\n"
+      "    ic = c;\n"
+      "    id = d;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  ASSERT_FALSE(f.has_errors);
+  LowerRunAndCheck(f, design,
+                   {{"sc", 1u},
+                    {"sd", 1u},
+                    {"se", 1u},
+                    {"ssum", 3u},
+                    {"ic", 1u},
+                    {"id", 1u}});
+}
+
 }  // namespace
