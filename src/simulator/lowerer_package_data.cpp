@@ -165,6 +165,34 @@ static bool FoldPackageArrayDims(const ModuleItem* item, std::string_view pkg,
   return true;
 }
 
+// §7.4.2 (printed page 154): the package array `item` declares, shaped as
+// the RtlirVariable CreateArrayElements (lowerer_var.cpp) reads a module's
+// from -- its element type as ShapePackageVariable shapes the carrier, its
+// unpacked extents folded in the package's frame -- with the declaration's
+// initializer `init`, which CreateArrayElements distributes one item per
+// element (§10.9.1), or none. None where a dimension does not fold.
+static std::optional<RtlirVariable> PackageArrayShape(const ModuleItem* item,
+                                                      std::string_view pkg,
+                                                      const Expr* init,
+                                                      SimContext& ctx,
+                                                      Arena& arena) {
+  const DataType& type = item->data_type;
+  RtlirVariable var;
+  var.name = item->name;
+  var.width = PackageDataWidth(item, PackageDataKey(item, pkg), ctx);
+  var.is_4state = DeclaredTypeIs4State(type);
+  var.is_signed = DeclaredTypeIsSigned(type, ctx);
+  var.is_string = DeclaredTypeIsString(type, ctx);
+  var.is_real = type.kind == DataTypeKind::kReal ||
+                type.kind == DataTypeKind::kShortreal ||
+                type.kind == DataTypeKind::kRealtime;
+  var.init_expr = init;
+  var.dtype = &type;
+  var.elem_type_kind = type.kind;
+  if (!FoldPackageArrayDims(item, pkg, var, ctx, arena)) return std::nullopt;
+  return var;
+}
+
 // §7.4.2 (printed page 154) with §26.2 (printed 808): a package variable
 // declared with a fixed-size unpacked dimension is an array of elements, each
 // storage of its own that an element select reads and writes and that
@@ -175,31 +203,21 @@ static bool FoldPackageArrayDims(const ModuleItem* item, std::string_view pkg,
 // subroutine resolves to (SimContext::FindInPackageScope and FindArrayInfo
 // through ScopedObjectKeys). The carrier alone stood there, so `a[1] = 7` in
 // a package function wrote bit 1 of a 32-bit carrier, `a[1]` read it back
-// as one bit, and foreach ran once per bit of the carrier. CreateArrayElements
-// reads the declaration as a RtlirVariable, so the item's type is shaped into
-// one as ShapePackageVariable shapes the carrier, and its initializer
-// (§7.4.2's assignment pattern, distributed by CreateArrayElements one item
-// per element) is evaluated in the package's frame here rather than by
-// InitPackageDataItem, which leaves the item alone.
+// as one bit, and foreach ran once per bit of the carrier. The elements are
+// made at §6.8's Table 6-7 defaults here, the declaration's initializer left
+// for InitPackageArray: §26.6 (printed pages 815-816) lets an item of the
+// pattern name what another package's export hands on, `'{VAL2, x}` after
+// `import p2::*`, which is bound between this and InitPackageDataVariables
+// (AliasPackageExports, lowerer_import.cpp); distributed here, such an item
+// found no "p2.VAL2" and read 0.
 static void CreatePackageArray(const ModuleItem* item, std::string_view pkg,
                                std::string_view qname, SimContext& ctx,
                                Arena& arena) {
-  const DataType& type = item->data_type;
-  RtlirVariable var;
-  var.name = item->name;
-  var.width = PackageDataWidth(item, qname, ctx);
-  var.is_4state = DeclaredTypeIs4State(type);
-  var.is_signed = DeclaredTypeIsSigned(type, ctx);
-  var.is_string = DeclaredTypeIsString(type, ctx);
-  var.is_real = type.kind == DataTypeKind::kReal ||
-                type.kind == DataTypeKind::kShortreal ||
-                type.kind == DataTypeKind::kRealtime;
-  var.init_expr = item->init_expr;
-  var.dtype = &type;
-  var.elem_type_kind = type.kind;
-  if (!FoldPackageArrayDims(item, pkg, var, ctx, arena)) return;
+  std::optional<RtlirVariable> var =
+      PackageArrayShape(item, pkg, nullptr, ctx, arena);
+  if (!var) return;
   ctx.PushScope(pkg);
-  CreateArrayElements(qname, var, ctx, arena);
+  CreateArrayElements(qname, *var, ctx, arena);
   ctx.PopScope();
 }
 
@@ -350,22 +368,45 @@ static bool InitPackageAggregate(const Expr* init, std::string_view key,
   return false;
 }
 
-// One package item's initializer, evaluated into the storage
+// §7.4.2 (printed page 154) with §10.9.1 and §26.2 (printed 808): a package
+// fixed-size array's declaration assignment, `int a[2] = '{VAL2, x}`, gives
+// each element the pattern item that reaches it, distributed by
+// CreateArrayElements (lowerer_var.cpp) as a module's is, one item per
+// element, keyed, replicated or positional, in the package's frame the
+// caller has pushed. The elements CreatePackageArray made at their defaults
+// are remade under the same keys holding the items' values: nothing has
+// bound or watched an element yet, the exports binding the carrier alone
+// (AliasExportedName, lowerer_import.cpp), and the carrier itself stays.
+// True where `key` holds a fixed-size array, whose carrier the initializer
+// must not reach. §26.6 (printed pages 815-816): made here rather than at
+// creation, an item naming what another package's export hands on reads the
+// exported declaration; at creation it read 0.
+static bool InitPackageArray(const ModuleItem* item, std::string_view pkg,
+                             std::string_view key, SimContext& ctx,
+                             Arena& arena) {
+  if (ctx.FindArrayInfo(key) == nullptr || ctx.FindQueue(key) != nullptr)
+    return false;
+  std::optional<RtlirVariable> var =
+      PackageArrayShape(item, pkg, item->init_expr, ctx, arena);
+  if (var) CreateArrayElements(key, *var, ctx, arena);
+  return true;
+}
+
+// One data item's initializer, evaluated into the storage
 // CreatePackageDataItem gave it; an item declaring no data, or none, has
 // nothing to evaluate. §15.3.1: a semaphore's initializer is the new() that
 // CreatePackageSemaphore has already read the bucket's key count from, and
-// it names no value the carrier variable holds, so it is left alone, as is a
-// fixed-size array's, which CreatePackageArray has already distributed over
-// the elements (§7.4.2). A queue's, a dynamic array's or an associative
-// array's fills the object (InitPackageAggregate); every other initializer
-// is the carrier variable's value.
+// it names no value the carrier variable holds, so it is left alone. A
+// fixed-size array's is distributed over the elements (InitPackageArray,
+// §7.4.2), and a queue's, a dynamic array's or an associative array's fills
+// the object (InitPackageAggregate); every other initializer is the carrier
+// variable's value.
 static void InitPackageDataItem(const ModuleItem* item, std::string_view pkg,
                                 SimContext& ctx, Arena& arena) {
   if (!DeclaresPackageData(item) || item->init_expr == nullptr) return;
   if (IsPackageSemaphoreDecl(item)) return;
   std::string key = PackageDataKey(item, pkg);
-  if (ctx.FindArrayInfo(key) != nullptr && ctx.FindQueue(key) == nullptr)
-    return;
+  if (InitPackageArray(item, pkg, key, ctx, arena)) return;
   if (InitPackageAggregate(item->init_expr, key, ctx, arena)) return;
   const auto& variables = ctx.GetVariables();
   auto found = variables.find(key);

@@ -763,4 +763,37 @@ TEST(PackageImportSim, PackageClassHandleConstructedThroughTheQualifier) {
             1u);
 }
 
+// §7.4.2 (printed page 154) with §26.6 (printed 815-816) and §26.2 (printed
+// 808): the subclause's own p3 imports what p2 exports of p1 and reads it in
+// a declaration assignment, here the items of a fixed-size array's pattern,
+// `int a[2] = '{VAL2, x}`, so a[0] is p1's VAL2, 2, and a[1] p1's x, 7,
+// read by p3's own function: 2 * 10 + 7. The pattern was distributed over
+// the elements when the array was created, ahead of the export binding
+// (CreatePackageArray in lowerer_package_data.cpp), so neither item found
+// "p2.VAL2" or "p2.x" and both elements read 0; the scalar `int q = x` was
+// already read after the exports (InitPackageDataVariables).
+TEST(PackageImportSim, PackageFixedSizeArrayInitializerReadingReExportedNames) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  typedef enum {VAL[3]} t;\n"
+                      "  int x = 7;\n"
+                      "endpackage\n"
+                      "package p2;\n"
+                      "  import p1::*;\n"
+                      "  export p1::*;\n"
+                      "endpackage\n"
+                      "package p3;\n"
+                      "  import p2::*;\n"
+                      "  int a[2] = '{VAL2, x};\n"
+                      "  function int sum();\n"
+                      "    return a[0] * 10 + a[1];\n"
+                      "  endfunction\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  int y;\n"
+                      "  initial y = p3::sum();\n"
+                      "endmodule\n",
+                      "y"),
+            27u);
+}
+
 }  // namespace
