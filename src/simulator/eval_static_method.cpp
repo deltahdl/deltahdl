@@ -1,7 +1,9 @@
 #include <string>
+#include <string_view>
 
 #include "common/arena.h"
 #include "common/types.h"
+#include "parser/ast_expr.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
@@ -73,6 +75,38 @@ bool TryEvalEnclosingInstanceCall(const Expr* expr, SimContext& ctx,
   ctx.PushMethodClass(defining);
   out = ExecInstanceMethodCall(method, self, expr, ctx, arena);
   ctx.PopMethodClass();
+  return true;
+}
+
+const ClassTypeInfo* PackageQualifiedClassOf(const Expr* expr, SimContext& ctx,
+                                             std::string_view& member) {
+  if (expr == nullptr || expr->kind != ExprKind::kMemberAccess ||
+      !expr->is_scope_resolution || expr->rhs == nullptr ||
+      expr->rhs->kind != ExprKind::kIdentifier) {
+    return nullptr;
+  }
+  const Expr* scope = expr->lhs;
+  if (scope == nullptr || scope->kind != ExprKind::kMemberAccess ||
+      !scope->is_scope_resolution || scope->lhs == nullptr ||
+      scope->rhs == nullptr || scope->lhs->kind != ExprKind::kIdentifier ||
+      scope->rhs->kind != ExprKind::kIdentifier) {
+    return nullptr;
+  }
+  std::string key =
+      std::string(scope->lhs->text) + "::" + std::string(scope->rhs->text);
+  const ClassTypeInfo* cls = ctx.FindClassType(key);
+  if (cls != nullptr) member = expr->rhs->text;
+  return cls;
+}
+
+bool TryPackageClassStaticMember(const Expr* expr, SimContext& ctx,
+                                 Logic4Vec& out) {
+  std::string_view member;
+  const ClassTypeInfo* cls = PackageQualifiedClassOf(expr, ctx, member);
+  if (cls == nullptr) return false;
+  auto it = cls->static_properties.find(std::string(member));
+  if (it == cls->static_properties.end()) return false;
+  out = it->second;
   return true;
 }
 

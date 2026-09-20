@@ -280,4 +280,48 @@ TEST(StaticClassPropertySim, StaticQueuePropertyPushedFromConstructors) {
             25u);
 }
 
+// §8.9 (printed page 186 of ~/LRM.pdf) reaches a static property through the
+// class scope resolution operator, and §26.3 (printed 808) reaches a package's
+// class through the package scope resolution operator, so `pk::Cfg::depth` is
+// the static property of the package's class -- the same storage `Cfg::depth`
+// reads after `import pk::Cfg`. The doubly-qualified name was joined into
+// "pk.Cfg.depth" and "pk" looked up as a class, which it is not, so the read
+// answered 0 while the imported form, `pk::Cfg::two()` and `pk::Cfg::A` were
+// right. The result packs the scoped read with the imported one, and a write
+// through the scoped form is read back through the imported one.
+TEST(StaticClassPropertySim, StaticPropertyThroughAPackageQualifiedClassScope) {
+  EXPECT_EQ(RunAndGet("package pk;\n"
+                      "  class Cfg;\n"
+                      "    static int depth = 3;\n"
+                      "  endclass\n"
+                      "endpackage\n"
+                      "module t;\n"
+                      "  import pk::Cfg;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    result = pk::Cfg::depth * 10 + Cfg::depth;\n"
+                      "    pk::Cfg::depth = 7;\n"
+                      "    result = result * 100 + Cfg::depth;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            3307u);
+}
+
+// §8.9 with §26.3: the same read with no import written, the package's class
+// named through its scope alone.
+TEST(StaticClassPropertySim, StaticPropertyThroughAPackageQualifiedScopeAlone) {
+  EXPECT_EQ(RunAndGet("package pk;\n"
+                      "  class Cfg;\n"
+                      "    static int depth = 3;\n"
+                      "  endclass\n"
+                      "endpackage\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial result = pk::Cfg::depth + 40;\n"
+                      "endmodule\n",
+                      "result"),
+            43u);
+}
+
 }  // namespace

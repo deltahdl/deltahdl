@@ -331,6 +331,19 @@ bool TryClassScopeEnumLiteral(std::string_view name, const ClassTypeInfo* cls,
 void BindClassParams(const ClassTypeInfo* cls, const Expr* base_id,
                      SimContext& ctx, Arena& arena);
 
+// §8.9 with §26.3: the class a doubly-qualified scoped name, `pk::Cfg::x`,
+// names -- `pk::Cfg` being the key the lowerer binds a package's class under
+// whether or not the package was imported -- and, in `member`, the name `x`
+// after it. Null for an expression of any other shape or a pair of names that
+// is no package's class. Defined in eval_static_method.cpp.
+const ClassTypeInfo* PackageQualifiedClassOf(const Expr* expr, SimContext& ctx,
+                                             std::string_view& member);
+
+// §8.9: the static property `pk::Cfg::x` reads, where PackageQualifiedClassOf
+// answers the class and the class declares the name static; false otherwise.
+bool TryPackageClassStaticMember(const Expr* expr, SimContext& ctx,
+                                 Logic4Vec& out);
+
 void ApplyClassParamOverrides(std::string_view var_name, uint64_t handle,
                               SimContext& ctx, Arena& arena);
 

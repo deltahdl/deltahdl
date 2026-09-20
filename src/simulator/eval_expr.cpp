@@ -703,7 +703,8 @@ Logic4Vec EvalMemberAccess(const Expr* expr, SimContext& ctx, Arena& arena) {
   // §8.6: nor `n.self().v`, a property of the object a method call returned.
   if (TryEvalAssocMemberField(expr, ctx, arena, out) ||
       TryEvalElementObjectMember(expr, ctx, arena, out) ||
-      TryEvalCallResultMember(expr, ctx, arena, out))
+      TryEvalCallResultMember(expr, ctx, arena, out) ||
+      TryPackageClassStaticMember(expr, ctx, out))
     return out;
 
   std::string name;

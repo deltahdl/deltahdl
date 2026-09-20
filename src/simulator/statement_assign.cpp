@@ -422,6 +422,28 @@ static FieldTarget ResolveStaticClassField(std::string_view base_name,
   return target;
 }
 
+// §8.9 with §26.3: the static property `pk::Cfg::x` names of the package's
+// class. The flattened name below would take `pk` for the class, which it is
+// not, so the expression is asked before it is flattened. *handled is set
+// true when the expression names a package's class.
+static FieldTarget ResolvePackageClassStaticField(const Expr* lhs,
+                                                  SimContext& ctx,
+                                                  bool* handled) {
+  *handled = false;
+  std::string_view member;
+  const ClassTypeInfo* cls = PackageQualifiedClassOf(lhs, ctx, member);
+  if (cls == nullptr) return {};
+  *handled = true;
+  auto sit = cls->static_properties.find(std::string(member));
+  if (sit == cls->static_properties.end()) return {};
+  FieldTarget target;
+  target.kind = FieldTarget::Kind::kStatic;
+  target.type = cls;
+  target.slot = &sit->second;
+  target.field = std::string(member);
+  return target;
+}
+
 // The component the member access `lhs` names of the interface instance its
 // base is bound to. §25.9 has every component of the instance a virtual
 // interface represents reachable through it by the dot notation once it is
@@ -514,6 +536,8 @@ FieldTarget ResolveFieldTarget(const Expr* lhs, SimContext& ctx) {
   // so those bases still reach their own resolvers below.
   bool handled = false;
   FieldTarget target = ResolveVirtualInterfaceField(lhs, ctx, &handled);
+  if (handled) return target;
+  target = ResolvePackageClassStaticField(lhs, ctx, &handled);
   if (handled) return target;
 
   std::string name;
