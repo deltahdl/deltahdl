@@ -109,6 +109,29 @@ TEST(CompilationUnitSim, CuScopeVariableWrittenDirectlyByAModuleProcess) {
   EXPECT_EQ(val, 5u);
 }
 
+// §3.12.1 (printed page 56) with §6.10 (printed 108) and §10.3.2 (printed
+// 249): a module's continuous assignment drives the unit's variable, `assign
+// g = 5;` in a with no declaration of g in the module, and top reads 5
+// through it at time 1. The elaborator assumed an implicit net `g` of the
+// module for the target (MaybeCreateImplicitNet in elaborator_items.cpp knew
+// the module's own names alone), so the assignment drove that net and the
+// unit's variable, keyed under its bare name and registered as an imported
+// name, stayed 0 -- which a run whose driver lands elsewhere still reads.
+TEST(CompilationUnitSim, CuScopeVariableDrivenByAModuleContinuousAssignment) {
+  auto val = RunAndGet(
+      "int g;\n"
+      "module a;\n"
+      "  assign g = 5;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  a u();\n"
+      "  int y;\n"
+      "  initial #1 y = g;\n"
+      "endmodule\n",
+      "y");
+  EXPECT_EQ(val, 5u);
+}
+
 // §3.12.1 (printed page 56) with §26.2 (printed 808): a declaration
 // assignment of the compilation-unit scope is made before any initial or
 // always procedure starts, as a package's is, so `int g = 4;` outside every

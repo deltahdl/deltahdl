@@ -79,4 +79,44 @@ TEST(CompilationUnitScopeWrites, ModuleVariableShadowingTheUnitsIsTheModules) {
   EXPECT_NE(FindVar(design, "m", "g"), nullptr);
 }
 
+// §3.12.1 (printed page 56) with §6.10 (printed 108) and §10.3.2 (printed
+// 249): an implicit net is assumed for a continuous assignment's target only
+// where no scope the assignment can directly reference declares the name, and
+// the compilation-unit scope is searched for a name the module's own scope
+// does not declare, so `assign g = 1;` in a module drives the unit's `int g`,
+// a variable §10.3.2 lets one continuous assignment drive.
+// MaybeCreateImplicitNet (elaborator_items.cpp) asked the module's variables,
+// nets, ports and parameters alone, so the module gained an implicit net `g`
+// shadowing the unit's variable, and the assignment drove that net.
+TEST(CompilationUnitScopeWrites, UnitVariableDrivenByAContinuousAssignment) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "int g;\n"
+      "module m;\n"
+      "  assign g = 1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(FindNet(design, "m", "g"), nullptr);
+}
+
+// §6.10 (printed page 108): a continuous assignment's target declared in no
+// scope the module can reach is still an implicit scalar net of the module,
+// so with the unit declaring `g` and nothing declaring `h`, `assign h = 1;`
+// gets the net as before. A check that admitted every target once the unit
+// declared anything would make no net here.
+TEST(CompilationUnitScopeWrites, NameDeclaredNowhereStillGetsAnImplicitNet) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "int g;\n"
+      "module m;\n"
+      "  assign h = 1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_NE(FindNet(design, "m", "h"), nullptr);
+}
+
 }  // namespace

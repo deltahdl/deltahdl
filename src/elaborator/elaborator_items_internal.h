@@ -130,6 +130,15 @@ void ResolveUnitScopeFormalTypes(CompilationUnit* unit,
 // by the module-instantiation/port-binding and generate translation units.
 bool IsNameDeclared(std::string_view name, const RtlirModule* mod);
 
+// §3.12.1 with §6.21: whether the compilation-unit scope declares `name` as a
+// variable or a net, one of the items written outside every design element.
+// The unit's items are asked for a data declaration rather than every named
+// item, so a unit function's or class's name is not one. Defined in
+// elaborator_items.cpp for MaybeCreateImplicitNet; ValidateScopeRules in
+// elaborator_scope_rules.cpp keeps a file-local twin, which is to fold into
+// this one.
+bool UnitDeclaresData(const CompilationUnit* unit, std::string_view name);
+
 // §27.5: "a conditional generate construct" is the if generate construct and
 // the case generate construct. Defined in elaborator_generate.cpp and shared
 // with the generate-block naming translation unit, so that the one sentence

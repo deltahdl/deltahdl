@@ -21,6 +21,7 @@
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_class.h"
+#include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 
@@ -75,6 +76,17 @@ bool IsNameDeclared(std::string_view name, const RtlirModule* mod) {
   }
   for (const auto& p : mod->ports) {
     if (p.name == name) return true;
+  }
+  return false;
+}
+
+bool UnitDeclaresData(const CompilationUnit* unit, std::string_view name) {
+  for (const auto* item : unit->cu_items) {
+    if ((item->kind == ModuleItemKind::kVarDecl ||
+         item->kind == ModuleItemKind::kNetDecl) &&
+        item->name == name) {
+      return true;
+    }
   }
   return false;
 }
@@ -143,6 +155,12 @@ bool Elaborator::MaybeCreateImplicitNet(std::string_view name, SourceLoc loc,
   // it. Creating a scalar net of the same name here would instead shadow the
   // parameter with an undriven wire and deliver zero to the port.
   if (IsParamDeclared(name, mod, gen_prefix_scopes_)) return true;
+  // §3.12.1 (printed page 56) searches the compilation-unit scope for a name
+  // the module does not declare, so its declarations are among those §6.10
+  // (printed 108) lets the reference reach, and §10.3.2 (printed 249) lets a
+  // continuous assignment drive a variable. `int g;` outside every module with
+  // `assign g = 1;` in a module got an implicit net `g` shadowing the unit's.
+  if (UnitDeclaresData(unit_, name)) return true;
   if (unit_->default_nettype == NetType::kNone) {
     diag_.Error(loc,
                 std::format("implicit net '{}' forbidden by "
