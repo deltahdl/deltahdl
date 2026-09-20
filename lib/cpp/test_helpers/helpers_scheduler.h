@@ -2,6 +2,7 @@
 
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <cstdint>
 #include <initializer_list>
 #include <string>
@@ -24,16 +25,35 @@ using namespace delta;
 // elaborator accepted from source it rejected -- it would be asserting on
 // whatever the evaluator made of a program that will not elaborate. The fixture
 // already records the verdict; this reads it.
+//
+// The run is required to be clean as well. An evaluator that meets an error
+// while running -- a member read against another tag, a mailbox message of the
+// wrong type, an out-of-range select it refuses -- reports it and carries on,
+// leaving the variable holding whatever the statements before it produced, so
+// a caller that read the value alone would take a "0" the report explains for
+// a value the simulator computed and could not tell the two apart. Every
+// diagnostic the run raises is listed in the failure, since a caller whose
+// subject is such a report reads it through SimFixture and FindDiagFrom, not
+// through this.
+inline void ExpectRunReportedNothing(const SimFixture& f, size_t before) {
+  const auto& diags = f.diag.Diagnostics();
+  for (size_t i = before; i < diags.size(); ++i) {
+    ADD_FAILURE() << "the run reported: " << diags[i].message;
+  }
+}
+
 inline uint64_t RunAndGet(const std::string& src, const char* var_name) {
   SimFixture f;
   auto* design = ElaborateSrc(src, f);
   EXPECT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors) << "source reported an elaboration error";
   if (!design) return 0;
+  size_t before = f.diag.Diagnostics().size();
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
   f.ctx.RunFinalBlocks();
+  ExpectRunReportedNothing(f, before);
   auto* var = f.ctx.FindVariable(var_name);
   EXPECT_NE(var, nullptr);
   if (!var) return 0;
