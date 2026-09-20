@@ -226,8 +226,21 @@ static void InitClassPropertyDefault(const ClassTypeInfo* info,
     // declared object, so it is coerced into the property exactly as a later
     // write to it is. The two arms below already size from prop.width, which
     // is what made this one's silence visible.
-    val = CoerceToPropertyType(info, prop.name,
-                               EvalExpr(prop.init_expr, ctx, arena), arena);
+    //
+    // §11.6.1 with §11.8.2: the initializer is the right-hand side of that
+    // assignment, so the property's declared width sizes its
+    // context-determined operands before the operators are applied, as
+    // Lowerer::LowerVarInit sizes a module variable's. Evaluated
+    // self-determined and widened after, `logic [15:0] v = -8'd6` negated at
+    // 8 bits and read 00fa where the clause gives fffa. A property whose
+    // width the declaration did not settle, or a real one, is evaluated
+    // self-determined and converted by CoerceToPropertyType as before.
+    uint32_t context_width = prop.width_is_declared && !prop.is_real
+                                 ? BoundPropertyWidth(prop, c)
+                                 : 0;
+    val = CoerceToPropertyType(
+        info, prop.name, EvalExpr(prop.init_expr, ctx, arena, context_width),
+        arena);
   } else if (prop.is_4state) {
     val = MakeAllX(arena, BoundPropertyWidth(prop, c));
   } else {

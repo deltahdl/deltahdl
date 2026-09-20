@@ -355,4 +355,84 @@ TEST(IntegerLiteralSim, UnsignedLiteralInitializerZeroExtendsIntoWiderLogic) {
       "e");
   EXPECT_EQ(result & 0xFFFFu, 0x0085u);
 }
+
+// §5.7.1's final paragraph with §11.6.1 and §11.8.2: the operand of a unary
+// minus is context-determined (Table 11-21 keeps only `!` and the reductions
+// self-determined), so in `logic [15:0] a = -8'd6` the 8-bit literal is
+// extended to the 16 bits of the assignment before it is negated, and the
+// object holds the 16-bit two's complement fffa. The negation was done at the
+// literal's 8 bits and the 8-bit fa then zero-extended to 00fa.
+TEST(IntegerLiteralSim,
+     NegativeUnsignedLiteralInitializerNegatesAtTargetWidth) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [15:0] a = -8'd6;\n"
+      "endmodule\n",
+      "a");
+  EXPECT_EQ(result & 0xFFFFu, 0xFFFAu);
+}
+
+// §11.6.1 with §6.20.2: a parameter's value expression is the right-hand side
+// of an assignment to the parameter, so its declared 16 bits size the operand
+// of the negation as a variable's do.
+TEST(IntegerLiteralSim,
+     NegativeUnsignedLiteralParameterNegatesAtDeclaredWidth) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  parameter logic [15:0] V = -8'd6;\n"
+      "  logic [15:0] a = V;\n"
+      "endmodule\n",
+      "a");
+  EXPECT_EQ(result & 0xFFFFu, 0xFFFAu);
+}
+
+// §8.7 with §6.8: a class property's initializer is an assignment to the
+// property, so the 16 bits the property declares size the negation's operand
+// as a module variable's do; the property's initializer was evaluated
+// self-determined and its 8-bit fa widened afterwards, reading 00fa.
+TEST(IntegerLiteralSim, NegativeUnsignedLiteralClassPropertyNegatesAtWidth) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  class C;\n"
+      "    logic [15:0] v = -8'd6;\n"
+      "  endclass\n"
+      "  logic [15:0] a;\n"
+      "  initial begin\n"
+      "    C c;\n"
+      "    c = new;\n"
+      "    a = c.v;\n"
+      "  end\n"
+      "endmodule\n",
+      "a");
+  EXPECT_EQ(result & 0xFFFFu, 0xFFFAu);
+}
+
+// Discriminates the three above from a sign extension of the literal: `8'd6`
+// is unsigned, so extending it first gives 16'd6 and the negation fffa, while
+// a negation at 8 bits followed by a sign extension of the unsigned fa would
+// also give fffa. `-8'd130` tells them apart: extended first it is
+// -130 = ff7e; negated at 8 bits it is 7e, whose high bit is clear, and no
+// extension of that reads ff7e.
+TEST(IntegerLiteralSim, NegativeUnsignedLiteralAboveHalfRangeNegatesAtWidth) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [15:0] a = -8'd130;\n"
+      "endmodule\n",
+      "a");
+  EXPECT_EQ(result & 0xFFFFu, 0xFF7Eu);
+}
+
+// §11.6.1 Table 11-21 gives `~` the same L(i) row as unary minus, so its
+// operand is extended to the context before the inversion: `~8'hFF` into 16
+// bits inverts sixteen bits of 00ff to ff00, not eight bits to 00 and then
+// widens.
+TEST(IntegerLiteralSim, BitwiseNotOfSizedLiteralInvertsAtTargetWidth) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [15:0] a = ~8'hFF;\n"
+      "endmodule\n",
+      "a");
+  EXPECT_EQ(result & 0xFFFFu, 0xFF00u);
+}
+
 }  // namespace

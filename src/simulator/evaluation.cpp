@@ -747,12 +747,29 @@ static Logic4Vec EvalRealOrTimeLiteral(const Expr* expr, Arena& arena) {
   return rv;
 }
 
-static Logic4Vec EvalUnaryExpr(const Expr* expr, SimContext& ctx,
-                               Arena& arena) {
+// §11.6.1: Table 11-21 sizes unary `+ - ~` by their operand and keeps only
+// `!` and the reductions self-determined, so the operand of the three is
+// context-determined and §11.8.2 propagates the expression's size down to it
+// before the operator is applied, extending it by its sign where it is signed
+// and by zero otherwise (§11.8.1). `logic [15:0] a = -8'd6` therefore negates
+// the 16-bit 6 and reads fffa, as §5.7.1's final paragraph has a sized
+// negative literal sign-extended into a wider logic object; negated at the
+// literal's 8 bits and widened afterwards, it read 00fa. A real operand is
+// not extended, and a context of 0 is a self-determined one.
+static Logic4Vec EvalUnaryExpr(const Expr* expr, SimContext& ctx, Arena& arena,
+                               uint32_t context_width) {
   if (expr->op == TokenKind::kPlusPlus || expr->op == TokenKind::kMinusMinus) {
     return EvalPrefixUnary(expr, ctx, arena);
   }
-  return EvalUnaryOp(expr->op, EvalExpr(expr->lhs, ctx, arena), arena);
+  if (expr->op == TokenKind::kBang || IsUnaryReductionOp(expr->op) ||
+      context_width == 0) {
+    return EvalUnaryOp(expr->op, EvalExpr(expr->lhs, ctx, arena), arena);
+  }
+  uint32_t width = std::max(context_width, SimSelfWidth(expr->lhs, ctx));
+  Logic4Vec operand = EvalExpr(expr->lhs, ctx, arena, width);
+  if (!operand.is_real && operand.width < width)
+    operand = ExtendVec(operand, width, operand.is_signed, arena);
+  return EvalUnaryOp(expr->op, operand, arena);
 }
 
 static Logic4Vec EvalBinaryDispatch(const Expr* expr, SimContext& ctx,
@@ -830,7 +847,7 @@ Logic4Vec EvalExpr(const Expr* expr, SimContext& ctx, Arena& arena,
       if (const Logic4Vec* bound = BoundInstanceValue(expr, ctx)) return *bound;
       return EvalIdentifier(expr, ctx, arena);
     case ExprKind::kUnary:
-      return EvalUnaryExpr(expr, ctx, arena);
+      return EvalUnaryExpr(expr, ctx, arena, context_width);
     case ExprKind::kBinary:
       return EvalBinaryDispatch(expr, ctx, arena, context_width);
     case ExprKind::kTernary:
