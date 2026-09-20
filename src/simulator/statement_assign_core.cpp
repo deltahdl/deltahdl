@@ -1,7 +1,9 @@
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -27,6 +29,7 @@
 #include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
 #include "simulator/stmt_result.h"
+#include "simulator/variable.h"
 
 namespace delta {
 
@@ -485,14 +488,15 @@ static bool TrySubarrayAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
 uint32_t SelectExprWidth(const Variable& var, const Expr* sel, SimContext& ctx,
                          Arena& arena) {
   // §7.4.1: one index of a packed multidimensional array names an element,
-  // and an index on that select names one bit within it -- `x[1][3]` on a
-  // `logic [1:0][7:0] x` is a bit, not the eight-bit `x[1]` -- so the element
-  // width is the select's only where the select stands on the variable's own
-  // name, as SelectStorageBits draws the same line for the window.
+  // and an index on that select names an element of the next packed dimension
+  // (§7.4.4), one bit at the innermost -- `x[1][3]` on a `logic [1:0][7:0] x`
+  // is a bit, not the eight-bit `x[1]`, and `z[1][0]` on a
+  // `logic [1:0][1:0][7:0] z` eight bits of the sixteen-bit `z[1]` -- so the
+  // width is that of the dimension the select's depth within the variable
+  // reaches, as SelectStorageBits resolves the window by the same depth.
   if (sel->index_end == nullptr) {
-    bool names_element = var.packed_elem_width > 1 &&
-                         !SelectBaseIsSubSelect(var, sel, ctx, arena);
-    return names_element ? var.packed_elem_width : 1;
+    auto level = var.PackedLevelAt(SelectDepthWithin(var, sel, ctx, arena));
+    return level ? level->elem_width : 1;
   }
   bool is_indexed = sel->is_part_select_plus || sel->is_part_select_minus;
   auto idx_val = EvalExpr(sel->index, ctx, arena);

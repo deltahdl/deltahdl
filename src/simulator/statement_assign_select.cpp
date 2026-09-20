@@ -1,5 +1,7 @@
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -84,10 +86,16 @@ void WritePartSelect(Variable* var, const PartSelectBits& bits,
 // a part-select, and for one index of a packed multidimensional array the
 // element-addressed view §7.4.1 gives that index, `elem_width` bits per element
 // (Variable::packed_elem_width). A window a select already carved out of the
-// variable is a run of `width` bits with no declaration of its own: only the
-// outermost packed dimension is recorded (RecordPackedRange), so the window is
-// addressed as [width-1:0] with one bit per index, the view the read side's
-// SelectBaseRange (eval_select.cpp) gives the same window.
+// variable, `depth` indices deep, is addressed by the packed dimension those
+// indices reach (§7.4.4, Variable::PackedLevelWithin), the same views one
+// dimension in: elements of that dimension's own element width, or bits of its
+// declared range at the innermost. Only the outermost dimension was recorded,
+// so every window was a run of `width` bits addressed as [width-1:0] with one
+// bit per index, and `z[1][0]` on a `logic [1:0][1:0][7:0] z` was bit 16 of
+// `z` rather than the eight-bit subfield at bits 23 to 16. A window past the
+// dimensions, or one the dimension does not account for, keeps that flat view,
+// which the read side's SelectBaseRange (eval_select.cpp) gives the same
+// window.
 struct SelectAddressing {
   PackedRange bits;
   PackedRange elems;
@@ -96,8 +104,13 @@ struct SelectAddressing {
   static SelectAddressing OfVariable(const Variable& var) {
     return {var.BitSelectRange(), var.DeclaredRange(), var.packed_elem_width};
   }
-  static SelectAddressing OfWindow(uint32_t width) {
-    return {PackedRange::Implicit(width), PackedRange::Implicit(width), 0};
+  static SelectAddressing OfWindow(const Variable& var, size_t depth,
+                                   uint32_t width) {
+    PackedRange flat = PackedRange::Implicit(width);
+    auto level = var.PackedLevelWithin(depth, width);
+    if (!level) return {flat, flat, 0};
+    return {level->elem_width > 1 ? flat : level->range, level->range,
+            level->elem_width};
   }
 };
 
@@ -139,22 +152,24 @@ static PartSelectBits ResolveSelectBits(const SelectAddressing& at,
   return PartSelectStorageBits(at.bits, target.first, target.second);
 }
 
-bool SelectBaseIsSubSelect(const Variable& var, const Expr* sel,
-                           SimContext& ctx, Arena& arena) {
+size_t SelectDepthWithin(const Variable& var, const Expr* sel, SimContext& ctx,
+                         Arena& arena) {
   const Expr* base = sel->base;
-  if (base == nullptr || base->kind != ExprKind::kSelect) return false;
+  if (base == nullptr || base->kind != ExprKind::kSelect) return 0;
   // The longest prefix of the base that names a variable decides. The base
   // itself naming `var` is `var`'s own name, `y[0]` under `y[0][3]`; a shorter
-  // prefix naming `var` leaves the indices between as selects within it, `y[0]`
-  // under `y[0][3][1]` and `x` under `x[1][3]`. A prefix naming some other
-  // variable, or no prefix naming any, is answered false and the caller's own
-  // resolution stands: TryWriteAssocElementBits (assoc_element.cpp) hands
-  // `aa[3][7:0]` to the writers on a stack Variable lending the element the
-  // array's declaration, which no name resolves to, and the range there is the
+  // prefix naming `var` leaves the indices between as selects within it, one
+  // dimension each: `y[0]` under `y[0][3][1]` and `x` under `x[1][3]` at one,
+  // `z` under `z[1][0][3]` at two. A prefix naming some other variable, or no
+  // prefix naming any, is answered zero and the caller's own resolution
+  // stands: TryWriteAssocElementBits (assoc_element.cpp) hands `aa[3][7:0]` to
+  // the writers on a stack Variable lending the element the array's
+  // declaration, which no name resolves to, and the range there is the
   // element's own. Only a prefix that resolves to `var` says anything, so a
   // variable built for the write is never mistaken for one the chain stands
   // on. A prefix whose index carries x or z has no name and is passed over.
-  for (const Expr* p = base; p != nullptr; p = p->base) {
+  size_t depth = 0;
+  for (const Expr* p = base; p != nullptr; p = p->base, ++depth) {
     std::string name;
     if (!BuildCompoundLhsName(p, ctx, arena, name)) {
       if (p->kind != ExprKind::kSelect) break;
@@ -162,9 +177,9 @@ bool SelectBaseIsSubSelect(const Variable& var, const Expr* sel,
     }
     const Variable* named = ctx.FindVariable(name);
     if (named == nullptr) continue;
-    return named == &var && p != base;
+    return named == &var ? depth : 0;
   }
-  return false;
+  return 0;
 }
 
 PartSelectBits SelectStorageBits(const Variable& var, const Expr* sel,
@@ -180,18 +195,23 @@ PartSelectBits SelectStorageBits(const Variable& var, const Expr* sel,
   // had asked it of the outermost index alone, which either addressed an
   // element of `var` where a bit of a subfield was named or, from
   // TryResolveCompoundElement, materialized a fresh variable under the chain's
-  // full name and lost the write. An empty inner window -- an inner index
-  // carrying x or z, or out of range -- addresses nothing, and §11.5.1 has such
-  // a write leave the data stored alone.
-  if (SelectBaseIsSubSelect(var, sel, ctx, arena)) {
-    PartSelectBits inner = SelectStorageBits(var, sel->base, ctx, arena);
-    if (inner.width == 0) return {0, 0};
-    PartSelectBits within = ResolveSelectBits(
-        SelectAddressing::OfWindow(inner.width), sel, ctx, arena);
-    if (within.width == 0) return {0, 0};
-    return {inner.lo + within.lo, within.width, within.src_lo};
+  // full name and lost the write. Each index steps one packed dimension in
+  // (§7.4.4): `z[1][0][3]` on a `logic [1:0][1:0][7:0] z` is bit 3 of the
+  // eight-bit `z[1][0]`, itself subfield 0 of the sixteen-bit `z[1]`, storage
+  // bit 19. An empty inner window -- an inner index carrying x or z, or out of
+  // range -- addresses nothing, and §11.5.1 has such a write leave the data
+  // stored alone.
+  size_t depth = SelectDepthWithin(var, sel, ctx, arena);
+  if (depth == 0) {
+    return ResolveSelectBits(SelectAddressing::OfVariable(var), sel, ctx,
+                             arena);
   }
-  return ResolveSelectBits(SelectAddressing::OfVariable(var), sel, ctx, arena);
+  PartSelectBits inner = SelectStorageBits(var, sel->base, ctx, arena);
+  if (inner.width == 0) return {0, 0};
+  PartSelectBits within = ResolveSelectBits(
+      SelectAddressing::OfWindow(var, depth, inner.width), sel, ctx, arena);
+  if (within.width == 0) return {0, 0};
+  return {inner.lo + within.lo, within.width, within.src_lo};
 }
 
 // Whether two stored values differ, which is what the notification in

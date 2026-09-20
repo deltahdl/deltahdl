@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -505,33 +506,68 @@ static bool TryAssocSelect(const Expr* expr, SimContext& ctx, Arena& arena,
   return true;
 }
 
-// The declared variable the select base `base` names, or null where it names
-// none: a concatenation, a function result, a struct member, or a select
-// within a packed object, which is a window rather than a variable.
-static const Variable* SelectBaseVariable(const Expr* base, SimContext& ctx,
-                                          Arena& arena) {
-  if (base && base->kind == ExprKind::kIdentifier) {
-    return ctx.FindVariable(base->text);
-  }
-  if (base && base->kind == ExprKind::kSelect) {
-    // An element of an unpacked array is a vector in its own right, declared
-    // with the array's element type and so with that type's range.
+// The declared variable a select base stands on, and how many selects within
+// it the base is deep -- 0 where the base is the variable's own name.
+struct SelectBaseObject {
+  const Variable* var = nullptr;
+  size_t depth = 0;
+};
+
+// The declared variable the select base `base` stands on, or null where it
+// stands on none: a concatenation, a function result, a struct member. An
+// element of an unpacked array is a vector in its own right, declared with
+// the array's element type and so with that type's range, and is the object
+// at depth 0. A select within a packed object is a window of it, and the
+// object is found under the chain: `z[1]` stands on `z` at depth 1 and
+// `y[0][3]` on the element `y[0]` at depth 1. Only the base itself was asked
+// after, so the window was a vector with no declaration. An index of a queue
+// or of an associative array names a whole element rather than a window of
+// the variable under the name (§7.10, §7.8), so a chain on one of those stands
+// on nothing here, as the writers' PackedRootVariable declines them.
+static SelectBaseObject FindSelectBaseObject(const Expr* base, SimContext& ctx,
+                                             Arena& arena) {
+  size_t depth = 0;
+  for (const Expr* p = base; p != nullptr; p = p->base, ++depth) {
+    if (p->kind == ExprKind::kIdentifier) {
+      bool holds_elements =
+          depth > 0 && (ctx.FindQueue(p->text) != nullptr ||
+                        ctx.FindAssocArray(p->text) != nullptr);
+      return {holds_elements ? nullptr : ctx.FindVariable(p->text), depth};
+    }
+    if (p->kind != ExprKind::kSelect) break;
     std::string name;
-    if (BuildCompoundName(base, ctx, arena, name))
-      return ctx.FindVariable(name);
+    if (!BuildCompoundName(p, ctx, arena, name)) continue;
+    if (const Variable* var = ctx.FindVariable(name)) return {var, depth};
   }
-  return nullptr;
+  return {};
+}
+
+// §7.4.4: the packed dimension the select base `base`, a window of `width`
+// bits, is indexed by, or none where the base stands on no declaration or
+// its selects have gone past the dimensions.
+static std::optional<PackedLevel> SelectBaseLevel(const Expr* base,
+                                                  uint32_t width,
+                                                  SimContext& ctx,
+                                                  Arena& arena) {
+  SelectBaseObject obj = FindSelectBaseObject(base, ctx, arena);
+  if (obj.var == nullptr) return std::nullopt;
+  return obj.var->PackedLevelWithin(obj.depth, width);
 }
 
 // §11.5.1: the range a select's indices are resolved against. When the select
 // names a vector it is that vector's declared range, since "the actual bit that
-// is accessed by an address is, in part, determined by the declaration"; for
-// anything else -- a concatenation, a function result, a struct member -- the
-// value carries no declaration of its own and is addressed as [width-1:0].
+// is accessed by an address is, in part, determined by the declaration", and
+// when it names a subfield of a packed multidimensional array the range of
+// the dimension that subfield is indexed by (§7.4.4); for anything else -- a
+// concatenation, a function result, a struct member -- the value carries no
+// declaration of its own and is addressed as [width-1:0]. A dimension whose
+// index selects elements rather than bits keeps the flat view too, as
+// Variable::BitSelectRange does for the outermost.
 static PackedRange SelectBaseRange(const Expr* base, uint32_t width,
                                    SimContext& ctx, Arena& arena) {
-  const Variable* var = SelectBaseVariable(base, ctx, arena);
-  return var ? var->BitSelectRange() : PackedRange::Implicit(width);
+  auto level = SelectBaseLevel(base, width, ctx, arena);
+  if (!level || level->elem_width > 1) return PackedRange::Implicit(width);
+  return level->range;
 }
 
 // §11.5.1: how wide a non-indexed part-select is when one of its two bounds is
@@ -660,16 +696,19 @@ static Logic4Vec EvalStringByteSelect(const Logic4Vec& base_val, uint64_t idx,
 // single bit. Returns the element value when `expr` names such an array -- by
 // its own name, or as an element of an unpacked array declared with packed
 // dimensions (§7.4.4), `y[0][3]` on a `logic [3:0][7:0] y[1:0]` being subfield
-// 3 of the element `y[0]`. Only a bare name was asked, so that select read bit
-// 3 of the element.
+// 3 of the element `y[0]` -- or a subfield of one with a dimension still
+// inside it, `z[1][0]` on a `logic [1:0][1:0][7:0] z` being the eight-bit
+// subfield 0 of the sixteen-bit `z[1]`. Only a bare name was asked at first,
+// so `y[0][3]` read bit 3 of the element, and then only the outermost
+// dimension was known, so `z[1][0]` read bit 0 of `z[1]`.
 static std::optional<Logic4Vec> TryPackedElementSelect(
     const Expr* expr, int64_t idx, const Logic4Vec& base_val, SimContext& ctx,
     Arena& arena) {
   if (expr->index_end) return std::nullopt;
-  const Variable* var = SelectBaseVariable(expr->base, ctx, arena);
-  if (!var || var->packed_elem_width <= 1) return std::nullopt;
-  uint32_t w = var->packed_elem_width;
-  auto range = var->DeclaredRange();
+  auto level = SelectBaseLevel(expr->base, base_val.width, ctx, arena);
+  if (!level || level->elem_width <= 1) return std::nullopt;
+  uint32_t w = level->elem_width;
+  auto range = level->range;
   uint64_t off = range.Contains(idx)
                      ? static_cast<uint64_t>(range.OffsetOf(idx)) * w
                      : base_val.width;

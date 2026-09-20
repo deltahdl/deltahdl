@@ -643,4 +643,89 @@ TEST(MultidimensionalArraySimulation, ConcatLvalueBitOfPackedSubfieldIsOneBit) {
   EXPECT_EQ(v, 0x08ABu);
 }
 
+// §7.4.4 reads the packed dimensions left to right, each index selecting one
+// element of the next, and §7.4.1 nests them: on the 32-bit
+// `logic [1:0][1:0][7:0] z`, `z[1]` is bits 31 to 16, `z[1][0]` the lower
+// eight of those, bits 23 to 16, and `z[1][0][3]` their bit 3, storage bit 19,
+// so the write reads 32'h00080000; `z[0][1]` is bits 15 to 8 of `z[0]`, whose
+// bit 7 is storage bit 15, and `z[1][1]` is bits 31 to 24, so the three
+// together read 32'h5A088000. With only the outermost dimension recorded,
+// `z[1][0]` was bit 0 of the sixteen-bit `z[1]`, storage bit 16, and `z[1][1]`
+// its bit 1, so the whole-subfield write put the value's bit 0, which is
+// clear, at storage bit 17, and the bit writes, with nothing left to index in
+// a one-bit window, wrote nothing: z read 0.
+TEST(MultidimensionalArraySimulation, ThirdPackedDimensionBitWrites) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  logic [1:0][1:0][7:0] z;\n"
+      "  initial begin\n"
+      "    z = 0;\n"
+      "    z[1][0][3] = 1'b1;\n"
+      "    z[0][1][7] = 1'b1;\n"
+      "    z[1][1] = 8'h5A;\n"
+      "  end\n"
+      "endmodule\n",
+      "z");
+  EXPECT_EQ(v, 0x5A088000u);
+}
+
+// The reads of the same chains: with z holding 32'h89ABCDEF, `z[1]` is
+// 16'h89AB and `z[1][0]` its low byte 8'hAB; `z[0]` is 16'hCDEF, `z[0][1]` is
+// 8'hCD, and bit 6 of that is set. Read as bits of the sixteen-bit windows,
+// `z[1][0]` was bit 0 of 16'h89AB, 1, and `z[0][1]` bit 1 of 16'hCDEF, whose
+// bit 6 is out of range and read x, 0.
+TEST(MultidimensionalArraySimulation, ThirdPackedDimensionSubfieldAndBitRead) {
+  auto src =
+      "module t;\n"
+      "  logic [1:0][1:0][7:0] z;\n"
+      "  logic [7:0] sub;\n"
+      "  logic b;\n"
+      "  initial begin\n"
+      "    z = 32'h89ABCDEF;\n"
+      "    sub = z[1][0];\n"
+      "    b = z[0][1][6];\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "sub"), 0xABu);
+  EXPECT_EQ(RunAndGet(src, "b"), 1u);
+}
+
+// §11.5.1's part-select of the innermost subfield: `z[0][1][7:4]` is the upper
+// four bits of storage bits 15 to 8, so 4'hC there reads 32'h0000C000. The
+// one-bit window `z[0][1]` was resolved to had no bits 7 to 4, so nothing was
+// written and z read 0.
+TEST(MultidimensionalArraySimulation, ThirdPackedDimensionPartSelectWrites) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  logic [1:0][1:0][7:0] z;\n"
+      "  initial begin\n"
+      "    z = 0;\n"
+      "    z[0][1][7:4] = 4'hC;\n"
+      "  end\n"
+      "endmodule\n",
+      "z");
+  EXPECT_EQ(v, 0x0000C000u);
+}
+
+// §11.5.1 has the bit an index reaches decided by the declaration, and the
+// inner dimension is declared too: on `logic [1:0][0:7] w`, index 0 of the
+// subfield `w[1]` is its most significant bit, storage bit 15, so the write
+// reads 16'h8000 and the read of `w[1][0]` on 16'h8000 is 1. Addressed as a
+// flat [7:0] window, `w[1][0]` was storage bit 8, reading 16'h0100 and 0.
+TEST(MultidimensionalArraySimulation, InnerPackedDimensionRangeAsDeclared) {
+  auto src =
+      "module t;\n"
+      "  logic [1:0][0:7] w;\n"
+      "  logic b;\n"
+      "  initial begin\n"
+      "    w = 16'h8000;\n"
+      "    b = w[1][0];\n"
+      "    w = 0;\n"
+      "    w[1][0] = 1'b1;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "b"), 1u);
+  EXPECT_EQ(RunAndGet(src, "w"), 0x8000u);
+}
+
 }  // namespace

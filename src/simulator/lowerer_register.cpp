@@ -42,10 +42,20 @@ void RecordPackedRange(const DataType* dt, Variable* v, SimContext& ctx,
   auto span = [](int64_t l, int64_t r) {
     return static_cast<uint64_t>((l >= r ? l - r : r - l) + 1);
   };
+  // §7.4.4: every dimension inside the outermost is kept as declared, so a
+  // select chain steps through them one index at a time (Variable::
+  // PackedLevelWithin); their product alone left `z[1][0]` on a
+  // `logic [1:0][1:0][7:0]` a bit of the sixteen-bit `z[1]`.
   uint64_t stride = 1;
-  for (const auto& [l, r] : dt->extra_packed_dims)
-    stride *= span(eval(l), eval(r));
-  if (stride > 1) v->packed_elem_width = static_cast<uint32_t>(stride);
+  std::vector<PackedRange> inner;
+  for (const auto& [l, r] : dt->extra_packed_dims) {
+    inner.push_back({eval(l), eval(r)});
+    stride *= span(inner.back().left, inner.back().right);
+  }
+  if (stride > 1) {
+    v->packed_elem_width = static_cast<uint32_t>(stride);
+    v->inner_packed_dims = std::move(inner);
+  }
   PackedRange range{eval(dt->packed_dim_left), eval(dt->packed_dim_right)};
   // The elaborator sized this storage from the same dimensions. Bounds that do
   // not account for its width came from an expression this scope cannot fold,

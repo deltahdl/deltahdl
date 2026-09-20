@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -211,18 +212,19 @@ bool TryWriteClassPropertyBits(const Expr* lhs, const Logic4Vec& rhs_val,
 bool WriteStructField(const Expr* lhs, const Logic4Vec& rhs_val,
                       SimContext& ctx, uint32_t* written_width = nullptr);
 
-// §7.4.1: whether `sel`'s base is itself a select within `var` rather than
-// `var`'s own name -- `y[0][3]` under `y[0][3][1]` with the element `y[0]` the
-// storage, `x[1]` under `x[1][3]` with `x` the storage -- so that `sel`'s own
-// index addresses bits of the subfield the base selects rather than an element
-// of the whole object. False where the base names `var` itself, `y[0]` under
+// §7.4.1: how many selects within `var` stand between `sel` and `var`'s own
+// name -- one for `y[0][3]` under `y[0][3][1]` with the element `y[0]` the
+// storage and for `x[1]` under `x[1][3]` with `x` the storage, two for
+// `z[1][0]` under `z[1][0][3]` -- which is the packed dimension `sel`'s own
+// index addresses (§7.4.4, Variable::PackedLevelWithin) rather than an element
+// of the whole object. Zero where the base names `var` itself, `y[0]` under
 // `y[0][3]`, is no select at all, or stands on no name that resolves to `var`,
 // which leaves a variable built for one write, as the associative-array and
 // class-property writers build, addressed as it was. Defined in
 // statement_assign_select.cpp; SelectStorageBits resolves the chain by it, and
 // SelectExprWidth (statement_assign_core.cpp) sizes the select by it.
-bool SelectBaseIsSubSelect(const Variable& var, const Expr* sel,
-                           SimContext& ctx, Arena& arena);
+size_t SelectDepthWithin(const Variable& var, const Expr* sel, SimContext& ctx,
+                         Arena& arena);
 
 // §11.5.1: the storage bits of `var` that the select `sel` addresses, resolved
 // against the declaration, since "the actual bit that is accessed by an address
@@ -236,7 +238,8 @@ bool SelectBaseIsSubSelect(const Variable& var, const Expr* sel,
 // a bit (§7.4.1), and the window is that element's; a further index or range on
 // that select addresses bits within the element, so a chain of selects is
 // resolved from the inside out and `sel` may stand on a select within `var`
-// (SelectBaseIsSubSelect) as well as on `var`'s own name.
+// (SelectDepthWithin) as well as on `var`'s own name, each index one packed
+// dimension further in (§7.4.4).
 //
 // Three callers ask it: the concatenation lvalue walk, which needs an element's
 // own width rather than its variable's; the streaming-concatenation unpack,

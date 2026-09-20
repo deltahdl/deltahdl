@@ -1,7 +1,10 @@
 #pragma once
 
+#include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <optional>
 #include <utility>
 #include <vector>
 
@@ -28,6 +31,21 @@ struct ProcContAssignWindow {
   uint32_t src_width = 0;
   uint32_t dst_lo = 0;
   uint32_t dst_width = 0;
+};
+
+// §7.4.4: one packed dimension of a declaration as an index on it is resolved
+// -- the range the index is checked against and the width of the element one
+// value of it selects, which is the product of the dimensions inside it and 1
+// at the innermost, where an index selects a bit.
+struct PackedLevel {
+  PackedRange range;
+  uint32_t elem_width = 1;
+
+  // The width of the object the dimension is a dimension of.
+  uint64_t Width() const {
+    return static_cast<uint64_t>(range.HighIndex() - range.LowIndex() + 1) *
+           elem_width;
+  }
 };
 
 struct Variable {
@@ -122,9 +140,51 @@ struct Variable {
   bool has_packed_range = false;
   PackedRange packed_range{};
 
+  // §7.4.4: the packed dimensions inside the outermost one, outermost first
+  // and exactly as declared -- [1:0] then [7:0] for a `logic [1:0][1:0][7:0]`
+  // -- whose spans multiply to packed_elem_width. RecordPackedRange records
+  // them with it, so that a chain of selects steps one dimension per index
+  // (§7.4.1) instead of reading every index past the first as a bit of the
+  // subfield the first selected: with only the outermost dimension known,
+  // `z[1][0]` on that declaration was bit 16 of `z`, bit 0 of the sixteen-bit
+  // `z[1]`, with nothing left for a third index to address, where §7.4.4 has
+  // it the eight bits 23 to 16 and `z[1][0][3]` their bit 3, storage bit 19.
+  std::vector<PackedRange> inner_packed_dims;
+
   // The range an index in a select of this variable is resolved against.
   PackedRange DeclaredRange() const {
     return has_packed_range ? packed_range : PackedRange::Implicit(value.width);
+  }
+
+  // §7.4.4: the dimension an index reaches `depth` single-index selects inside
+  // this variable: 0 is the declaration's own outermost dimension, 1 the first
+  // inner one. None where the depth has exhausted the dimensions, the window
+  // there a run of bits with no declaration of its own.
+  std::optional<PackedLevel> PackedLevelAt(size_t depth) const {
+    if (depth == 0) {
+      return PackedLevel{DeclaredRange(),
+                         std::max<uint32_t>(packed_elem_width, 1)};
+    }
+    if (depth > inner_packed_dims.size()) return std::nullopt;
+    PackedLevel level{inner_packed_dims[depth - 1], 1};
+    for (size_t i = depth; i < inner_packed_dims.size(); ++i) {
+      level.elem_width *=
+          static_cast<uint32_t>(inner_packed_dims[i].HighIndex() -
+                                inner_packed_dims[i].LowIndex() + 1);
+    }
+    return level;
+  }
+
+  // PackedLevelAt for a window of `width` bits, and none where the dimension
+  // does not account for that width: a window an index of a queue or of an
+  // associative array carved out is a whole element, and the variable under
+  // the array's name models one element rather than the array, so a further
+  // index of it is not a dimension of this variable's declaration.
+  std::optional<PackedLevel> PackedLevelWithin(size_t depth,
+                                               uint32_t width) const {
+    auto level = PackedLevelAt(depth);
+    if (level && depth > 0 && level->Width() != width) return std::nullopt;
+    return level;
   }
 
   // The range a select addressed by bit resolves against. A packed
