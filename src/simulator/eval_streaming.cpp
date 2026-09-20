@@ -48,54 +48,19 @@ static uint32_t StreamSliceSize(const Expr* size_expr, SimContext& ctx,
   return static_cast<uint32_t>(val);
 }
 
-// §11.4.14: a stream carries 4-state values, so a slice must move both the
-// value (aval) and the unknown (bval) plane; carrying aval alone silently
-// flattens x/z to a known 0 through the pack.
-struct SliceBits {
-  uint64_t aval = 0;
-  uint64_t bval = 0;
-};
-
-static SliceBits ExtractSlice(const Logic4Vec& src, uint32_t start_bit,
-                              uint32_t slice_size) {
-  SliceBits result;
-  uint32_t bits_left = slice_size;
-  uint32_t dst_bit = 0;
-  while (bits_left > 0 && start_bit < src.width) {
-    uint32_t word = start_bit / 64;
-    uint32_t bit = start_bit % 64;
-    uint32_t avail = 64 - bit;
-    uint32_t take = (bits_left < avail) ? bits_left : avail;
-    if (word < src.nwords) {
-      uint64_t mask = (take >= 64) ? ~uint64_t{0} : (uint64_t{1} << take) - 1;
-      result.aval |= ((src.words[word].aval >> bit) & mask) << dst_bit;
-      result.bval |= ((src.words[word].bval >> bit) & mask) << dst_bit;
-    }
-    dst_bit += take;
-    start_bit += take;
-    bits_left -= take;
-  }
-  return result;
-}
-
-static void PlaceSlice(Logic4Vec& dst, uint32_t start_bit, SliceBits val,
-                       uint32_t slice_size) {
-  uint32_t bits_left = slice_size;
-  uint32_t src_bit = 0;
-  while (bits_left > 0 && start_bit < dst.width) {
-    uint32_t word = start_bit / 64;
-    uint32_t bit = start_bit % 64;
-    uint32_t avail = 64 - bit;
-    uint32_t put = (bits_left < avail) ? bits_left : avail;
-    if (word < dst.nwords) {
-      uint64_t mask = (put >= 64) ? ~uint64_t{0} : (uint64_t{1} << put) - 1;
-      dst.words[word].aval |= ((val.aval >> src_bit) & mask) << bit;
-      dst.words[word].bval |= ((val.bval >> src_bit) & mask) << bit;
-    }
-    src_bit += put;
-    start_bit += put;
-    bits_left -= put;
-  }
+// §11.4.14.1 appends each stream_expression to the right-hand end of the
+// generic stream, and §11.4.14 has a stream of 4-state data carry every x and
+// z. The parts are placed from the last written upward, so `bit_pos` is the
+// bit the next part's low end lands on and the placed part is `bit_pos` wider.
+// DepositBitField moves both planes and every word: a part wider than 64 bits
+// -- a 96-bit structure member, a 128-bit literal -- was once moved through a
+// 64-bit carrier in two 64-bit takes, the second shifted by 64, which the
+// hardware wraps to a shift by 0, so the part's second word landed OR'd over
+// its first and the destination's second word read the low bits of that.
+static void AppendStreamPart(Logic4Vec& stream, uint32_t& bit_pos,
+                             const Logic4Vec& part) {
+  DepositBitField(stream, bit_pos, part, part.width);
+  bit_pos += part.width;
 }
 
 // §11.4.14.1: the stream being assembled from an unpacked array's elements --
@@ -411,8 +376,14 @@ static bool TryExpandAggregateElement(const Expr* elem, SimContext& ctx,
   return false;
 }
 
-// Reverses the concatenation in slice_size-wide chunks (the `<<` streaming
-// reorder), mapping each source slice to its mirrored destination position.
+// §11.4.14.2: the `<<` reorder slices the stream into blocks of slice_size
+// bits from the right-most bit, reverses the order of the blocks and keeps the
+// order of the bits within each; the last (left-most) block holds whatever bits
+// remain and is neither padded nor truncated, so it is as wide as those bits
+// and lands at bit 0 with nothing above it. Each block is moved whole through
+// ExtractBitField and DepositBitField: a block of more than 64 bits -- a
+// `{<< 96 {...}}`, or a slice_size naming a wide type -- went through the same
+// 64-bit carrier AppendStreamPart describes and came out mangled the same way.
 static Logic4Vec StreamReorderSlices(const Logic4Vec& concat,
                                      uint32_t total_width, uint32_t slice_size,
                                      Arena& arena) {
@@ -423,8 +394,10 @@ static Logic4Vec StreamReorderSlices(const Logic4Vec& concat,
     uint32_t dst_start = total_width > (i + 1) * slice_size
                              ? total_width - (i + 1) * slice_size
                              : 0;
-    SliceBits slice = ExtractSlice(concat, src_start, slice_size);
-    PlaceSlice(result, dst_start, slice, slice_size);
+    uint32_t block_width = std::min(slice_size, total_width - src_start);
+    DepositBitField(result, dst_start,
+                    ExtractBitField(arena, concat, src_start, block_width),
+                    block_width);
   }
   return result;
 }
@@ -445,8 +418,7 @@ Logic4Vec EvalStreamingConcat(const Expr* expr, SimContext& ctx, Arena& arena) {
   auto concat = MakeLogic4Vec(arena, total_width);
   uint32_t bit_pos = 0;
   for (auto it = parts.rbegin(); it != parts.rend(); ++it) {
-    PlaceSlice(concat, bit_pos, ExtractSlice(*it, 0, it->width), it->width);
-    bit_pos += it->width;
+    AppendStreamPart(concat, bit_pos, *it);
   }
 
   if (expr->op != TokenKind::kLtLt) return concat;
@@ -463,8 +435,7 @@ static Logic4Vec AssembleBitStreamParts(const std::vector<Logic4Vec>& parts,
   auto packed = MakeLogic4Vec(arena, total_width);
   uint32_t bit_pos = 0;
   for (auto it = parts.rbegin(); it != parts.rend(); ++it) {
-    PlaceSlice(packed, bit_pos, ExtractSlice(*it, 0, it->width), it->width);
-    bit_pos += it->width;
+    AppendStreamPart(packed, bit_pos, *it);
   }
   return packed;
 }

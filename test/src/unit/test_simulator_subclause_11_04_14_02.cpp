@@ -188,4 +188,52 @@ TEST(StreamReordering, UnpackZeroSliceSizeNames11_4_14_2) {
                             "11.4.14.2"));
 }
 
+// §11.4.14.2: `<<` reverses the order of the blocks and keeps the order of the
+// bits within each, so two 96-bit blocks swap whole. The source is A:B with A
+// 0x0123456789ABCDEF0F1E2D3C and B 0xFEDCBA98765432100F0FA5A5, and the stream
+// is B:A: word 0 the low 64 bits of A, word 1 B's low 32 bits over A's high 32,
+// word 2 B's high 64. Moved through a 64-bit carrier in two takes, the second
+// shifted by 64 -- which the hardware wraps to 0 -- each block's high 32 bits
+// landed over its low 32 (word 0 reading 0x89ABCDEF0F3F6D7F) and reappeared in
+// the block's high word; every word tells the two apart.
+TEST(StreamReordering, LeftShiftWideBlocksSwapWhole) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [191:0] result;\n"
+      "  initial result = {<< 96 {192'h0123_4567_89AB_CDEF_0F1E_2D3C_"
+      "FEDC_BA98_7654_3210_0F0F_A5A5}};\n"
+      "endmodule\n",
+      f, "result");
+  ASSERT_NE(var, nullptr);
+  ASSERT_EQ(var->value.nwords, 3u);
+  EXPECT_TRUE(var->value.IsKnown());
+  EXPECT_EQ(var->value.words[0].aval, 0x89ABCDEF0F1E2D3Cu);
+  EXPECT_EQ(var->value.words[1].aval, 0x0F0FA5A501234567u);
+  EXPECT_EQ(var->value.words[2].aval, 0xFEDCBA9876543210u);
+}
+
+// §11.4.14.2: the last (left-most) block has the size of the remaining bits,
+// neither padded nor truncated. 160 bits sliced by 96 leave a 64-bit block H
+// (0xABCDEF0123456789) above the 96-bit block L (0xFEDCBA98765432100F0FA5A5);
+// the stream is L:H, H filling word 0 exactly and L words 1 and 2. A block
+// deposited at its full slice_size would carry 32 zero bits over the bottom of
+// L; a block moved through the 64-bit carrier would mangle L as above.
+TEST(StreamReordering, LeftShiftWideShortLastBlockKeepsItsSize) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [159:0] result;\n"
+      "  initial result = {<< 96 {160'hABCD_EF01_2345_6789_"
+      "FEDC_BA98_7654_3210_0F0F_A5A5}};\n"
+      "endmodule\n",
+      f, "result");
+  ASSERT_NE(var, nullptr);
+  ASSERT_EQ(var->value.nwords, 3u);
+  EXPECT_TRUE(var->value.IsKnown());
+  EXPECT_EQ(var->value.words[0].aval, 0xABCDEF0123456789u);
+  EXPECT_EQ(var->value.words[1].aval, 0x765432100F0FA5A5u);
+  EXPECT_EQ(var->value.words[2].aval, 0xFEDCBA98u);
+}
+
 }  // namespace
