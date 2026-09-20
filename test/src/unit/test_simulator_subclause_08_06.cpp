@@ -242,4 +242,89 @@ TEST(ObjectMethodSim,
             74u);
 }
 
+// §8.4 and §8.6 with §24.3: a program is a scope that admits a data
+// declaration, so `Cnt c = new(20)` as a program item holds an ordinary
+// object and `c.inc()` in the program's initial runs on it. The object is
+// created under the instance's name, `pr.c`, while the initial names it `c`;
+// the declared class was on file under the instance's name alone, so the
+// call found no class for `c`, ran nothing and answered 0 -- the result read
+// 20 (the constructor's value, which the bare property read reached) rather
+// than 2121, the 21 the call returns beside the 21 it left in the property.
+TEST(ObjectMethodSim, MethodCalledOnAClassVariableAProgramDeclares) {
+  EXPECT_EQ(RunAndGet("class Cnt;\n"
+                      "  int v;\n"
+                      "  function new(int s); v = s; endfunction\n"
+                      "  function int inc(); v = v + 1; return v; endfunction\n"
+                      "endclass\n"
+                      "program p;\n"
+                      "  Cnt c = new(20);\n"
+                      "  int r;\n"
+                      "  initial r = c.inc() * 100 + c.v;\n"
+                      "endprogram\n"
+                      "module t;\n"
+                      "  p pr();\n"
+                      "endmodule\n",
+                      "pr.r"),
+            2121u);
+}
+
+// §8.4 and §8.6 with §27.4: each instance of a loop generate block declares
+// its own `Cnt c = new(5)`, created under the block's name, `blk[0].c` and
+// `blk[1].c`, and the initial of each block names its own as `c`. Block 1
+// increments its object before both blocks read theirs at #1, so the result
+// packs 5 from block 0 and 6 from block 1 as 605: the call ran on no object
+// and answered 0 for both, and one object shared by the two blocks would
+// read 606.
+TEST(ObjectMethodSim, MethodCalledOnAClassVariableAGenerateBlockDeclares) {
+  EXPECT_EQ(RunAndGet("class Cnt;\n"
+                      "  int v;\n"
+                      "  function new(int s); v = s; endfunction\n"
+                      "  function int inc(); v = v + 1; return v; endfunction\n"
+                      "  function int get(); return v; endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int r;\n"
+                      "  genvar g;\n"
+                      "  generate for (g = 0; g < 2; g++) begin : blk\n"
+                      "    Cnt c = new(5);\n"
+                      "    initial begin\n"
+                      "      if (g == 1) void'(c.inc());\n"
+                      "      #1;\n"
+                      "      if (g == 0) r = r + c.get();\n"
+                      "      else r = r + 100 * c.get();\n"
+                      "    end\n"
+                      "  end endgenerate\n"
+                      "endmodule\n",
+                      "r"),
+            605u);
+}
+
+// §8.4 and §8.6 with §25.3: an interface item may be a class variable, and
+// §8.5 reaches its property through the instance path, `i.c.v` from the
+// module. The interface's own initial calls `c.inc()` on the object created
+// as `i.c` and keeps the 13 it returns in `i.r`; the module then reads `i.r`
+// and `i.c.v` at #1, 1313. The call answered 0 as the program's did, and the
+// property read split `i.c.v` at its first dot, `i` -- an instance, not a
+// variable -- against `c.v`, and read 0 where the split at `i.c` reads 13.
+TEST(ObjectMethodSim,
+     MethodCalledOnAClassVariableAnInterfaceDeclaresAndItsPropertyRead) {
+  EXPECT_EQ(RunAndGet("class Cnt;\n"
+                      "  int v;\n"
+                      "  function new(int s); v = s; endfunction\n"
+                      "  function int inc(); v = v + 1; return v; endfunction\n"
+                      "endclass\n"
+                      "interface ifc;\n"
+                      "  Cnt c = new(12);\n"
+                      "  int r;\n"
+                      "  initial r = c.inc();\n"
+                      "endinterface\n"
+                      "module t;\n"
+                      "  ifc i();\n"
+                      "  int res;\n"
+                      "  initial #1 res = i.r * 100 + i.c.v;\n"
+                      "endmodule\n",
+                      "res"),
+            1313u);
+}
+
 }  // namespace

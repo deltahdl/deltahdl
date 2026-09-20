@@ -8,6 +8,7 @@
 #include "parser/ast_expr.h"
 #include "simulator/class_object.h"
 #include "simulator/net.h"
+#include "simulator/process.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/sync_objects.h"
@@ -301,9 +302,30 @@ void SimContext::SetVariableClassType(std::string_view var,
   var_class_types_[var] = type;
 }
 
+// §23.9 and §27.4: a class variable a program, an interface or a generate
+// block declares is recorded under the name its declaration was lowered as,
+// the instance prefix and the generate block prefixes ahead of the declared
+// name -- `pr.c` for a program's `c`, `blk[0].c` for a generate block's --
+// while a process of that scope names it bare, which FindVariable resolves by
+// the process's instance and generate blocks. The record is looked up the
+// same way: the name as written, then under each enclosing generate block
+// innermost first, then under the instance the name resolves within. Keyed by
+// the written name alone, `c.inc()` in the program found no class for `c`
+// and ran on no object.
 std::string_view SimContext::GetVariableClassType(std::string_view var) const {
   auto it = var_class_types_.find(var);
-  return (it != var_class_types_.end()) ? it->second : std::string_view{};
+  if (it != var_class_types_.end()) return it->second;
+  std::string prefix = ActiveInstancePrefix();
+  if (current_process_ != nullptr) {
+    const std::vector<std::string>& blocks = current_process_->gen_prefixes;
+    for (auto block = blocks.rbegin(); block != blocks.rend(); ++block) {
+      auto found = var_class_types_.find(prefix + *block + std::string(var));
+      if (found != var_class_types_.end()) return found->second;
+    }
+  }
+  if (prefix.empty()) return {};
+  auto found = var_class_types_.find(prefix + std::string(var));
+  return (found != var_class_types_.end()) ? found->second : std::string_view{};
 }
 
 void SimContext::SetVariableClassParamExprs(std::string_view var,

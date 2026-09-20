@@ -721,7 +721,7 @@ Logic4Vec EvalMemberAccess(const Expr* expr, SimContext& ctx, Arena& arena) {
     return sampled != nullptr ? *sampled : var->value;
   }
 
-  auto dot = resolved.find('.');
+  auto dot = MemberPathSplit(resolved, ctx);
   if (dot == std::string::npos) return MakeLogic4Vec(arena, 1);
   auto base_name = std::string_view(resolved).substr(0, dot);
   auto field_name = std::string_view(resolved).substr(dot + 1);
