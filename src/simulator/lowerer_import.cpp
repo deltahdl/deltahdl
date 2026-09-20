@@ -297,6 +297,10 @@ static void AliasVariableKinds(std::string_view key, std::string_view qname,
   if (ctx.IsRealVariable(qname)) ctx.RegisterRealVariable(key);
   ctx.AliasQueue(key, qname);
   ctx.AliasAssocArray(key, qname);
+  // §15.3 and §15.4: a package's semaphore or mailbox the same way, so `s.get`
+  // after `import p1::s` and `p2::s` through an export reach the one bucket.
+  ctx.AliasSemaphore(key, qname);
+  ctx.AliasMailbox(key, qname);
 }
 
 // §26.3 makes the imported name visible under its unqualified spelling in the

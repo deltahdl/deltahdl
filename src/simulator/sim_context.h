@@ -80,8 +80,7 @@ class SimContext : public DeclaredNameTables, public RandomStability {
 
   Variable* FindVariable(std::string_view name);
   // Resolves a name against the generate block instance the running process
-  // belongs to (§27.4), or nullptr when it belongs to none or the block
-  // declares no such name.
+  // belongs to (§27.4); null when it belongs to none or the block lacks it.
   Variable* FindInGenerateBlock(const std::string& inst_prefix,
                                 std::string_view name);
 
@@ -337,10 +336,9 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   // dumps its source opened still open, either or both. WriteVcdClose writes
   // nothing on a 4-state dump, which §21.7.3.6 gives no such keyword command.
   void CloseVcdDump();
-  // §21.7.3.6.1: close the extended dump alone, which is what $vcdclose
-  // terminates. §21.7.3.6 adds the keyword to the extended format alone, so a
-  // 4-state dump open beside it is neither stamped nor closed and goes on
-  // recording.
+  // §21.7.3.6.1: closes the extended dump alone, which is what $vcdclose
+  // terminates; §21.7.3.6 adds the keyword to that format alone, so a 4-state
+  // dump open beside it is neither stamped nor closed and goes on recording.
   void CloseDumpportsDump();
 
   // §32.9: the timing data a $sdf_annotate call reads out of an SDF file lands
@@ -350,9 +348,8 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   void SetSpecifyManager(SpecifyManager* mgr) { specify_manager_ = mgr; }
   SpecifyManager* GetSpecifyManager() { return specify_manager_; }
   // §30.3's specify data for the design, created on the first call and
-  // installed as the manager GetSpecifyManager answers with. The context owns
-  // it because it outlives the Lowerer that fills it: a $sdf_annotate call
-  // reads it during the run.
+  // installed as the manager GetSpecifyManager answers with; owned here since
+  // it outlives the Lowerer that fills it, $sdf_annotate reading it in the run.
   SpecifyManager& AcquireSpecifyManager();
 
   // §21.7.2.1: register the model's dumpable objects with a VCD writer, in
@@ -457,9 +454,8 @@ class SimContext : public DeclaredNameTables, public RandomStability {
 
   // §36.10: the run's nets, keyed the way GetVariables keys its variables --
   // one flat string per object, the instance prefix folded into it. VpiContext
-  // ::Attach reads both, because "VPI routines provide access to objects in an
-  // instantiated SystemVerilog design" and the clause's own example of such an
-  // object is a wire.
+  // ::Attach reads both: the clause gives VPI routines access to the objects
+  // of the instantiated design, its own example of one being a wire.
   const std::unordered_map<std::string_view, Net*>& GetNets() const {
     return nets_;
   }
@@ -614,9 +610,13 @@ class SimContext : public DeclaredNameTables, public RandomStability {
 
   SemaphoreObject* CreateSemaphore(std::string_view name, int32_t keys);
   SemaphoreObject* FindSemaphore(std::string_view name);
+  // The same as AliasQueue, for a semaphore and a mailbox a package declares.
+  void AliasSemaphore(std::string_view alias_name,
+                      std::string_view target_name);
 
   MailboxObject* CreateMailbox(std::string_view name, int32_t bound);
   MailboxObject* FindMailbox(std::string_view name);
+  void AliasMailbox(std::string_view alias_name, std::string_view target_name);
 
   void SetEventTriggered(std::string_view name);
   bool IsEventTriggered(std::string_view name) const;

@@ -720,4 +720,33 @@ TEST(PackageScopeReferenceSim, PackageQualifiedQueuePushBackAndSize) {
             62u);
 }
 
+// §26.3 (printed page 810) makes an imported declaration visible under its
+// unqualified name and §26.6 (printed 815) an export hand it on under the
+// exporter's, and §15.3 (printed 372) gives a semaphore its bucket: the bare
+// `s` after `import p1::s` and `p2::s` through p2's export are p1's one
+// bucket of two keys, so a get through each leaves try_get through the
+// qualifier nothing: 10. The import and the export aliased the Variable and
+// the queue alone, so neither name found a bucket and both gets ran on none,
+// leaving the two keys and reading 11.
+TEST(PackageScopeReferenceSim, ImportedAndReExportedSemaphoreShareOneBucket) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  semaphore s = new(2);\n"
+                      "endpackage\n"
+                      "package p2;\n"
+                      "  import p1::s;\n"
+                      "  export p1::s;\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  import p1::s;\n"
+                      "  int y;\n"
+                      "  initial begin\n"
+                      "    s.get(1);\n"
+                      "    p2::s.get(1);\n"
+                      "    y = 10 + p1::s.try_get(1);\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            10u);
+}
+
 }  // namespace
