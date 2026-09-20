@@ -235,11 +235,19 @@ AssocArrayObject* ResolveOn(ClassObject* obj, const ClassTypeInfo* from,
   return slot;
 }
 
-// §8.23: `C::name` names the static property `name` of class C.
+// §8.23: `C::name` names the static property `name` of class C; §26.3
+// (printed page 808): `p::m` names the associative array package p declares
+// under its "p.m" key (CreatePackageAggregate in lowerer_package_data.cpp),
+// as ScopeResolvedQueueProperty (eval_array_class_queue.cpp) reads `p::q`.
+// Resolved as a static property alone, `p1::m["k"]` found no class p1 and
+// fell to a bit-select of the "p1.m" carrier, which answered x.
 AssocArrayObject* ScopeResolvedAssocProperty(const Expr* base,
                                              SimContext& ctx) {
   if (base->lhs == nullptr || base->lhs->kind != ExprKind::kIdentifier)
     return nullptr;
+  std::string key =
+      std::string(base->lhs->text) + "." + std::string(base->rhs->text);
+  if (auto* aa = ctx.FindAssocArray(key)) return aa;
   const ClassTypeInfo* cls = ctx.FindClassType(base->lhs->text);
   if (cls == nullptr) return nullptr;
   return ResolveOn(nullptr, cls, base->rhs->text, ctx, nullptr);

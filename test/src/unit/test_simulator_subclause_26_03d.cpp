@@ -440,9 +440,12 @@ TEST(PackageImportSim, PackageQueueInitializedByAnAssignmentPattern) {
 // §7.9.11 (printed page 169) with §7.8 (printed 163) and §26.2 (printed
 // 808): a package associative array's literal gives it a default, so a read
 // of an entry nothing wrote, `p1::m["x"]`, answers the default 7 rather
-// than Table 7-1's 0. The literal was evaluated into the carrier variable
-// rather than the AssocArrayObject, which then had no default, so the read
-// answered 0.
+// than Table 7-1's 0. The literal lands in the AssocArrayObject under "p1.m"
+// (InitPackageAggregate in lowerer_package_data.cpp), but the read through
+// the qualifier resolved no array: ScopeResolvedAssocProperty
+// (eval_array_class_assoc.cpp) took `p1::m` for a static property of a
+// class p1 alone and never tried the "p1.m" key, so the select fell to a
+// bit-select of the carrier and answered 0.
 TEST(PackageImportSim, PackageAssociativeArrayInitializedWithADefault) {
   EXPECT_EQ(RunAndGet("package p1;\n"
                       "  int m[string] = '{default: 7};\n"

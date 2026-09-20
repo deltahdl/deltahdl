@@ -106,4 +106,143 @@ TEST(PackageScopeReferenceSim,
             57u);
 }
 
+// §13.4 (printed page 340) with §26.3 (printed 808): a package void function
+// named through the qualifier as a statement, `p1::set(5);`, runs as the
+// call `p1::set(5)` in an expression does, and the value a nonvoid one
+// discards under a void cast, `void'(p1::bump(1))`, is computed all the
+// same, so the package's x reads 5 after the first and 6 after the second:
+// 5 * 10 + 6. A statement that never ran its body would read 0 after the
+// first, 50 or 0 in all, and a cast that skipped the call 55. Split off
+// PackageFunctionWritesItsOwnQueueAndAssociativeArrayBare (26_03c) to pin
+// the statement form apart from the objects that function writes.
+TEST(PackageImportSim, PackageVoidFunctionCalledAsAStatementWritesItsPackage) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  int x;\n"
+                      "  function void set(int v);\n"
+                      "    x = v;\n"
+                      "  endfunction\n"
+                      "  function int bump(int v);\n"
+                      "    x = x + v;\n"
+                      "    return x;\n"
+                      "  endfunction\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  int a, y;\n"
+                      "  initial begin\n"
+                      "    p1::set(5);\n"
+                      "    a = p1::x;\n"
+                      "    void'(p1::bump(1));\n"
+                      "    y = a * 10 + p1::x;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            56u);
+}
+
+// §7.10 (printed page 169) with §26.2 (printed 808): the package's own
+// queue, pushed by its own function's bare `q.push_back(v)` through the
+// "p1.q" key ScopedObjectKeys puts first, holds the two values the two
+// calls pushed, so size() reads 2 and q[1] the second: 2 * 10 + 6. The queue
+// half of the 26_03c case alone, which reads 0 there because the
+// associative-array half beside it answers x and the sum with it is x.
+TEST(PackageImportSim, PackageFunctionWritesItsOwnQueueBare) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  int q[$];\n"
+                      "  function void add(int v);\n"
+                      "    q.push_back(v);\n"
+                      "  endfunction\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  int y;\n"
+                      "  initial begin\n"
+                      "    p1::add(5);\n"
+                      "    p1::add(6);\n"
+                      "    y = p1::q.size() * 10 + p1::q[1];\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            26u);
+}
+
+// §7.8 (printed page 163) with §26.2 (printed 808): the package's own
+// associative array, written by its function's bare `m["k"] = v` and read
+// by another's bare `m["k"]`, both through the "p1.m" key, holds the 5 the
+// first wrote: 5. The write side of the 26_03c case alone, read without the
+// qualifier so that the entry's presence is pinned apart from the read
+// through `p1::m[...]` below.
+TEST(PackageImportSim, PackageFunctionWritesItsOwnAssociativeArrayReadBare) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  int m[string];\n"
+                      "  function void put(int v);\n"
+                      "    m[\"k\"] = v;\n"
+                      "  endfunction\n"
+                      "  function int get();\n"
+                      "    return m[\"k\"];\n"
+                      "  endfunction\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  int y;\n"
+                      "  initial begin\n"
+                      "    p1::put(5);\n"
+                      "    y = p1::get();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            5u);
+}
+
+// §7.8 (printed page 163) with §26.3 (printed 808): the entry the package's
+// function wrote is read through the package scope resolution operator,
+// `p1::m["k"]`, which names the same array under its "p1.m" key: 5. The
+// select resolved no array -- ScopeResolvedAssocProperty
+// (eval_array_class_assoc.cpp) took `p1::m` for a static property of a class
+// named p1, unlike ScopeResolvedQueueProperty's `p1::q` -- so it fell to a
+// bit-select of the 32-bit carrier at the string's value, out of range, and
+// answered x, which the 2-state y stored as 0 with no diagnostic. An empty
+// array with the entry missed would answer 0 as well, which the bare read
+// above tells apart.
+TEST(PackageImportSim,
+     PackageFunctionWritesItsOwnAssociativeArrayReadThroughTheQualifier) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  int m[string];\n"
+                      "  function void put(int v);\n"
+                      "    m[\"k\"] = v;\n"
+                      "  endfunction\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  int y;\n"
+                      "  initial begin\n"
+                      "    p1::put(5);\n"
+                      "    y = p1::m[\"k\"];\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            5u);
+}
+
+// §7.8 (printed page 163) with §26.3 (printed 808): the mirror, an entry
+// written through the qualifier, `p1::m["k"] = 7`, and read by the package's
+// own function: 7. The write goes through the same resolver as the read
+// above (TryAssocIndexedWrite through FindAssocArrayOfBase), so with `p1::m`
+// resolving no array it landed on the carrier and the function read the
+// missing entry's 0.
+TEST(PackageImportSim,
+     PackageAssociativeArrayWrittenThroughTheQualifierReadBare) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  int m[string];\n"
+                      "  function int get();\n"
+                      "    return m[\"k\"];\n"
+                      "  endfunction\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  int y;\n"
+                      "  initial begin\n"
+                      "    p1::m[\"k\"] = 7;\n"
+                      "    y = p1::get();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            7u);
+}
+
 }  // namespace
