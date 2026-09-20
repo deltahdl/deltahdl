@@ -542,10 +542,28 @@ static bool RunConstFuncBody(const ModuleItem* func, ScopeMap& locals) {
   return true;
 }
 
+// §26.3: the key a call is registered under -- the bare callee, or for a
+// call written through the package scope resolution operator, `pk::f(...)`,
+// which the parser keeps as a call with no callee text and the scoped name as
+// its base, the "pk::f" the package's functions are registered under.
+static std::string ConstCallKey(const Expr* expr) {
+  if (!expr->callee.empty()) return std::string(expr->callee);
+  const Expr* scoped = expr->lhs;
+  if (scoped == nullptr || scoped->kind != ExprKind::kMemberAccess ||
+      !scoped->is_scope_resolution || scoped->lhs == nullptr ||
+      scoped->lhs->kind != ExprKind::kIdentifier || scoped->rhs == nullptr ||
+      scoped->rhs->kind != ExprKind::kIdentifier) {
+    return {};
+  }
+  return std::string(scoped->lhs->text) + "::" + std::string(scoped->rhs->text);
+}
+
 static std::optional<ConstVal> ConstEvalUserCall(const Expr* expr,
                                                  const ScopeMap& scope) {
-  if (!g_const_func_registry || expr->callee.empty()) return std::nullopt;
-  auto it = g_const_func_registry->find(expr->callee);
+  if (!g_const_func_registry) return std::nullopt;
+  std::string key = ConstCallKey(expr);
+  if (key.empty()) return std::nullopt;
+  auto it = g_const_func_registry->find(key);
   if (it == g_const_func_registry->end() || it->second == nullptr)
     return std::nullopt;
   const ModuleItem* func = it->second;

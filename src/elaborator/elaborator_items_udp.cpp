@@ -503,6 +503,29 @@ void RecordTaskFuncNames(
   }
 }
 
+// §13.4.3 with §26.3: a constant function declared in a package is called
+// through the package scope resolution operator, `pk::twice(6)`, so every
+// package's functions are registered under that key in the table the folder
+// reads; an out-of-block class method (§8.24) is the class's and is left out.
+// The key is arena-owned, as the table holds views. An import registers the
+// bare name (RegisterImportItem in elaborator_import.cpp).
+static void RecordPackageFuncNames(
+    const CompilationUnit* unit,
+    std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
+    Arena& arena) {
+  for (const auto* pkg : unit->packages) {
+    for (const auto* item : pkg->items) {
+      if (item->kind != ModuleItemKind::kFunctionDecl ||
+          !item->method_class.empty()) {
+        continue;
+      }
+      auto* key = arena.Create<std::string>(std::string(pkg->name) +
+                                            "::" + std::string(item->name));
+      func_decls[*key] = item;
+    }
+  }
+}
+
 // §6.21/§13.3.1: a task/function with no explicit lifetime inherits the
 // enclosing scope's lifetime (automatic if the scope is automatic, otherwise
 // static). An out-of-block method body (§8.24), the item whose `method_class`
@@ -765,6 +788,7 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   }
 
   ClassifyTaskFuncDecls(decl, task_names_, func_decls_, auto_task_func_names_);
+  RecordPackageFuncNames(unit_, func_decls_, arena_);
 
   std::vector<std::pair<std::string_view, ModuleDecl*>> local_nested_modules(
       nested_module_decls_.begin(), nested_module_decls_.end());

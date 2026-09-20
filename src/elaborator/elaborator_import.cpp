@@ -1,6 +1,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <unordered_set>
 
 #include "elaborator/const_eval.h"
@@ -27,6 +28,9 @@ struct ImportScope {
   ScopeMap& cu_param_scope;
   std::unordered_set<std::string_view>& class_names;
   std::unordered_set<std::string_view>& parameterized_classes;
+  // §13.4.3: the functions the constant-expression folder may call, which an
+  // imported package function joins under its bare name.
+  std::unordered_map<std::string_view, const ModuleItem*>& func_decls;
 };
 
 // Register a single imported package item into a module's elaboration scopes:
@@ -41,6 +45,9 @@ void RegisterImportItem(const ModuleItem* pi, std::string_view pkg_name,
     if (!pi->class_decl->params.empty()) {
       scope.parameterized_classes.insert(name);
     }
+  } else if (pi->kind == ModuleItemKind::kFunctionDecl &&
+             pi->method_class.empty()) {
+    scope.func_decls[name] = pi;
   } else if (pi->kind == ModuleItemKind::kTypedef) {
     scope.typedefs[name] = pi->typedef_type;
     // §6.18: an import is what gives a package's typedef its bare name in this
@@ -121,7 +128,7 @@ void Elaborator::ApplyCompilationUnitImports(RtlirModule* mod) {
     const ImportItem& imp = item->import_item;
     ApplyImport(imp, unit_,
                 {typedefs_, aggregate_typedef_names_, cu_param_scope_,
-                 class_names_, parameterized_class_names_});
+                 class_names_, parameterized_class_names_, func_decls_});
     mod->imports.push_back(
         RtlirImport{imp.package_name, imp.item_name, imp.is_wildcard});
   }
@@ -137,7 +144,7 @@ void Elaborator::ApplyHeaderImports(const ModuleDecl* decl) {
     if (!item->import_item.is_header) continue;
     ApplyImport(item->import_item, unit_,
                 {typedefs_, aggregate_typedef_names_, cu_param_scope_,
-                 class_names_, parameterized_class_names_});
+                 class_names_, parameterized_class_names_, func_decls_});
   }
 }
 
@@ -156,7 +163,7 @@ void Elaborator::ApplyBodyImport(const ImportItem& import_item) {
   if (import_item.is_header) return;
   ApplyImport(import_item, unit_,
               {typedefs_, aggregate_typedef_names_, cu_param_scope_,
-               class_names_, parameterized_class_names_});
+               class_names_, parameterized_class_names_, func_decls_});
 }
 
 }  // namespace delta
