@@ -215,6 +215,89 @@ TEST(PackageImportSim, ClassMethodWithoutImportKeepsTheModulesFunction) {
             550u);
 }
 
+// §8.7 (printed page 184) with §26.3 (printed 810) and §23.9 (printed 761):
+// a property's default is set at construction, and it is an expression of
+// the class declaration's scope, nested in the module, so `five()` in C's
+// `int x = five()` is the module's 50 whichever body constructs the object:
+// calc(), whose body imports p, reads p's 5 for its own call and C's 50
+// through the object, 5 * 100 + 50. Defaults evaluated in the constructing
+// body's frames read p's five through calc's import for 505.
+TEST(PackageImportSim, PropertyDefaultKeepsTheModulesFunctionOverConstructors) {
+  EXPECT_EQ(RunAndGet("package p;\n"
+                      "  function int five(); return 5; endfunction\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  function int five(); return 50; endfunction\n"
+                      "  class C;\n"
+                      "    int x = five();\n"
+                      "  endclass\n"
+                      "  function int calc();\n"
+                      "    import p::*;\n"
+                      "    C c = new;\n"
+                      "    return five() * 100 + c.x;\n"
+                      "  endfunction\n"
+                      "  int out;\n"
+                      "  initial out = calc();\n"
+                      "endmodule\n",
+                      "out"),
+            550u);
+}
+
+// §26.2 with §8.7: a class p declares reads p's names bare in its property
+// defaults, so `int x = five()` in p::C is p's 5 when a module body with no
+// import of p, and a five() of its own, constructs the object: the body's
+// own call is the module's 50, 50 * 100 + 5. A default read in the
+// constructing body's scope took the module's five, 50 * 100 + 50 = 5050.
+TEST(PackageImportSim,
+     PackageClassPropertyDefaultReadsItsPackageFromAModuleBody) {
+  EXPECT_EQ(RunAndGet("package p;\n"
+                      "  function int five(); return 5; endfunction\n"
+                      "  class C;\n"
+                      "    int x = five();\n"
+                      "  endclass\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  function int five(); return 50; endfunction\n"
+                      "  function int calc();\n"
+                      "    p::C c = new;\n"
+                      "    return five() * 100 + c.x;\n"
+                      "  endfunction\n"
+                      "  int out;\n"
+                      "  initial out = calc();\n"
+                      "endmodule\n",
+                      "out"),
+            5005u);
+}
+
+// §8.25 with §8.7: the value parameter of the specialization `C#(7)::new`
+// is bound for the construction (BindClassParams in eval_function.cpp), so
+// `int x = W` reads 7 in a body that imports p, whose own W of 3 never
+// stands ahead of the class's parameter: 7 * 100 + 5 from calc's imported
+// five(). A defaults frame that hid the binding beneath it read p's 3 for
+// 305, or nothing of the 7 at all.
+TEST(PackageImportSim,
+     SpecializedClassPropertyDefaultReadsItsParameterInAnImportingBody) {
+  EXPECT_EQ(RunAndGet("package p;\n"
+                      "  int W = 3;\n"
+                      "  function int five(); return 5; endfunction\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  class C #(int W = 1);\n"
+                      "    int x = W;\n"
+                      "  endclass\n"
+                      "  function int calc();\n"
+                      "    import p::*;\n"
+                      "    C c;\n"
+                      "    c = C#(7)::new;\n"
+                      "    return c.x * 100 + five();\n"
+                      "  endfunction\n"
+                      "  int out;\n"
+                      "  initial out = calc();\n"
+                      "endmodule\n",
+                      "out"),
+            705u);
+}
+
 // §26.3 with §23.9: a named begin-end block and a foreach loop inside calc's
 // body are scopes nested in the body, not subroutines of their own, so the
 // `five()` written in each still reaches the body's import of p: 5 in the

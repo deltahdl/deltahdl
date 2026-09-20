@@ -462,15 +462,23 @@ static void ConstructBaseThenDefaults(const ClassTypeInfo* info,
                    BaseConstructorActuals(info, ctor, c.new_expr, c.arena), c);
     c.types = std::move(own);
   }
-  // §26.2 with §8.7: a property initializer of a class a package declares
-  // names the package's enum literals, parameters and variables bare, so the
-  // defaults are read in a frame of their own carrying the package -- pushed
+  // §8.7 with §23.9 and §26.3: a property initializer is an expression of
+  // the class declaration's scope, nested in the package, module or unit
+  // declaring the class and never in the body constructing the object, so
+  // the defaults are read in a frame of their own marked a subroutine's, at
+  // which the package search ends (SimContext::PackageFrame): a package
+  // class's frame carries the package, whose enum literals, parameters and
+  // variables the initializer names bare (§26.2), and a module or unit
+  // class's carries none, so `int x = five()` is the module's five and not
+  // the one a constructing body's own import supplies. The frame is pushed
   // after the base is constructed, so a base of another scope reads its own.
-  // A class of a module or the compilation unit reads them as before.
-  const bool kInPackage = !info->package.empty();
-  if (kInPackage) c.ctx.PushScope(info->package);
+  // A specialization's value parameters, bound as locals of the frame the
+  // `C#(7)::new` call pushed (BindClassParams), are still read through it:
+  // the mark ends the package search alone, never the search for a local.
+  c.ctx.PushScope();
+  c.ctx.EnterSubroutineScope(info->package);
   InitClassPropertyDefaults(info, c);
-  if (kInPackage) c.ctx.PopScope();
+  c.ctx.PopScope();
 }
 
 // Constructs the `info` level of the object in the order §8.7 gives: the
