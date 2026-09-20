@@ -732,4 +732,54 @@ TEST(SysTask, IntegerSpecifierOnUnpackedArrayNames21_2_1_1) {
                             "21.2.1.1"));
 }
 
+// §21.2.1.1 (printed page 656): an expression argument with no corresponding
+// format specification prints in the task's default decimal format, sized
+// automatically. A template with no conversion took every expression after it
+// as its own, so `$display("x", a)` printed `x` and dropped `a`.
+TEST(SysTask, ExpressionAfterATemplateWithoutConversionsPrintsInDecimal) {
+  SimFixture f;
+  std::string out = CaptureDisplayOutput(
+      "module t;\n"
+      "  logic [7:0] a;\n"
+      "  initial begin\n"
+      "    a = 42;\n"
+      "    $display(\"x\", a);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "x 42\n");
+}
+
+// §21.2.1.1 with §21.2.1: a template's conversions take the arguments that
+// follow, as many as there are conversions; a string literal reached with none
+// pending is output literally as a template of its own, and the conversion of
+// that template takes the argument after it.
+TEST(SysTask, TemplateTakesAsManyArgumentsAsItHasConversions) {
+  SimFixture f;
+  std::string out = CaptureDisplayOutput(
+      "module t;\n"
+      "  int a = 5;\n"
+      "  initial $display(\"%0d\", a, \"y%0d\", \"B\");\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "5y66\n");
+}
+
+// §21.2.1.1 with §21.2.1.5: `%m` and `%%` take no argument, so a template
+// holding only those hands the expression after it to the default decimal
+// rendering rather than consuming it.
+TEST(SysTask, ScopeAndPercentSpecsTakeNoArgument) {
+  SimFixture f;
+  std::string out = CaptureDisplayOutput(
+      "module t;\n"
+      "  logic [7:0] a;\n"
+      "  initial begin\n"
+      "    a = 7;\n"
+      "    $display(\"%m%%\", a);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "t%  7\n");
+}
+
 }  // namespace

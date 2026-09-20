@@ -921,8 +921,4 @@ std::string FormatDisplay(const std::string& fmt,
   return out;
 }
 
-std::string ExtractFormatString(const Expr* first_arg) {
-  return std::string(StringLiteralBody(first_arg->text));
-}
-
 }  // namespace delta

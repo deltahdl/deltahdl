@@ -40,8 +40,12 @@ static std::string BuildStringTaskOutput(const std::vector<Expr*>& args,
     if (a->kind == ExprKind::kStringLiteral) {
       std::string fmt = ExtractFormatString(a);
       std::vector<Logic4Vec> vals;
+      // §21.2.1.1: the template's conversions take as many of the arguments
+      // after it as there are conversions, a string literal among them being
+      // the §5.9 integer its characters make.
+      const size_t kTaken = CountFormatConversions(fmt);
       while (i + 1 < args.size() && args[i + 1] != nullptr &&
-             args[i + 1]->kind != ExprKind::kStringLiteral) {
+             vals.size() < kTaken) {
         vals.push_back(EvalExpr(args[++i], ctx, arena));
       }
       out += FormatDisplay(fmt, vals, {.ctx = &ctx, .loc = a->range.start});

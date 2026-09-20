@@ -271,6 +271,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/probabilistic_distribution.cpp
     simulator/eval_fileio.cpp
     simulator/eval_format.cpp
+    simulator/eval_format_template.cpp
     simulator/stmt_exec.cpp
     simulator/stmt_exec_deferred.cpp
     simulator/systf_call_statement.cpp

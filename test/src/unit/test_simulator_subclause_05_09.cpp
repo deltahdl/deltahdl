@@ -319,4 +319,63 @@ TEST(LexicalConventionSim, TripleQuotedMacroArgumentPrintsItsText) {
   EXPECT_EQ(out, "arg \"x\" here\n");
 }
 
+// §5.9 (printed page 81, last paragraph) with §21.2.1.1 (printed 656): a
+// string literal used as an operand is the unsigned integer its 8-bit ASCII
+// codes make, an escape sequence one code, and each conversion of a format
+// takes the expression argument that follows it, a string literal being one.
+// The display path took every string literal argument as a template of its
+// own, so the five printed as their characters in place of `10 9 65 16706 65`.
+TEST(LexicalConventionSim, StringLiteralUnderDecimalConversionIsItsInteger) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  initial $display(\"%0d %0d %0d %0d %0d\", \"\\n\", \"\\t\", \"A\", "
+      "\"AB\", \"A\" + 0);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "10 9 65 16706 65\n");
+}
+
+// §5.9.1 Table 5-1 (printed page 83) with §5.9: an escape sequence in a string
+// literal operand is one 8-bit value, so `\\`, `\"` and `\a` are 92, 34 and 7
+// under a decimal conversion where the path printed the characters.
+TEST(LexicalConventionSim, EscapedStringLiteralUnderDecimalConversion) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  initial $display(\"%0d %0d %0d\", \"\\\\\", \"\\\"\", \"\\a\");\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "92 34 7\n");
+}
+
+// §21.2.1.1: a string literal under a `%s` conversion prints its characters,
+// which is what the template-of-its-own reading also printed; the conversion
+// is what takes it now, so it is pinned beside the decimal cases.
+TEST(LexicalConventionSim, StringLiteralUnderStringConversionPrintsItsText) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  initial $display(\"[%s]\", \"abc\");\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "[abc]\n");
+}
+
+// §21.3.3 with §21.2.1.1: `$swrite` takes its arguments as `$write` does, so a
+// string literal following a decimal conversion is that conversion's integer.
+TEST(LexicalConventionSim, StringLiteralUnderSwriteDecimalConversion) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  string s;\n"
+      "  initial begin\n"
+      "    $swrite(s, \"%0d\", \"A\");\n"
+      "    $display(\"%s\", s);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "65\n");
+}
+
 }  // namespace

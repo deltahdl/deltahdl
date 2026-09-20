@@ -672,15 +672,20 @@ struct DisplayArgRenderings {
   std::vector<std::string> byte_strings;
 };
 
-// Evaluate the expression arguments that follow a format template, stopping at
-// the next string literal (which starts a template of its own) and advancing
-// `i` past those consumed.
+// Evaluate the arguments a format template's conversions take: §21.2.1.1 has
+// each conversion take the expression argument that follows the template, so
+// as many arguments as `fmt` has conversions are taken, a string literal among
+// them being the §5.9 integer its characters make. The argument after the
+// last one taken, whether a string literal starting a template of its own or an
+// expression printed under the default radix, is left to the caller; `i` is
+// advanced past those taken.
 static DisplayArgRenderings CollectDisplayArgs(const Expr* expr, size_t& i,
+                                               const std::string& fmt,
                                                SimContext& ctx, Arena& arena) {
   DisplayArgRenderings r;
   const size_t kN = expr->args.size();
-  while (i + 1 < kN && expr->args[i + 1] != nullptr &&
-         expr->args[i + 1]->kind != ExprKind::kStringLiteral) {
+  const size_t kTaken = CountFormatConversions(fmt);
+  while (i + 1 < kN && expr->args[i + 1] != nullptr && r.vals.size() < kTaken) {
     const Expr* val_arg = expr->args[++i];
     auto v = EvalExpr(val_arg, ctx, arena);
     r.vals.push_back(v);
@@ -737,7 +742,7 @@ static void AppendDisplayArg(const Expr* expr, size_t& i, SimContext& ctx,
   }
   if (arg->kind == ExprKind::kStringLiteral) {
     std::string fmt = ExtractFormatString(arg);
-    DisplayArgRenderings r = CollectDisplayArgs(expr, i, ctx, arena);
+    DisplayArgRenderings r = CollectDisplayArgs(expr, i, fmt, ctx, arena);
     output += FormatDisplay(fmt, r.vals,
                             {.p_fmts = &r.p_fmts,
                              .v_fmts = &r.v_fmts,

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <iosfwd>
 #include <string>
@@ -452,7 +453,14 @@ std::string FormatStrength(const NetStrength& ns);
 std::string FormatTimeUnderTimeformat(const Logic4Vec& val,
                                       const TimeFormatSpec& spec);
 std::string FormatValueAsString(const Logic4Vec& val);
+// The format template a string literal argument of a display task supplies:
+// the literal's text between its delimiters, escapes undecoded. Defined in
+// eval_format_template.cpp.
 std::string ExtractFormatString(const Expr* first_arg);
+// How many expression arguments the conversions of the template `fmt` take,
+// §21.2.1.1's count of `%` other than `%%`, `%m` and `%l`. Defined in
+// eval_format_template.cpp.
+size_t CountFormatConversions(std::string_view fmt);
 
 Logic4Vec EvalUnbasedUnsized(const Expr* expr, Arena& arena);
 
