@@ -244,6 +244,85 @@ TEST(PackageDeclarationElaboration,
                             2, "26.2"));
 }
 
+// §26.2 (printed page 808): a package item may reference what the package
+// declares and what an import makes visible in it, and §26.3 (printed 810)
+// has a wildcard import make every declaration of the imported package
+// visible, so `r.push_back(v)` in p1's function names p0's queue r through
+// p1's `import p0::*`; the head of that member access is no hierarchical
+// reference. Held to p1's own names and the packages' names alone, the check
+// reported r at line 7.
+TEST(PackageDeclarationElaboration,
+     WildcardImportedQueueNamedBareInPackageFunctionAccepted) {
+  ElabFixture f;
+  EXPECT_TRUE(
+      ElabOk("package p0;\n"
+             "  int r[$];\n"
+             "endpackage\n"
+             "package p1;\n"
+             "  import p0::*;\n"
+             "  function void addr(int v);\n"
+             "    r.push_back(v);\n"
+             "  endfunction\n"
+             "endpackage\n"
+             "module top;\n"
+             "  initial p1::addr(3);\n"
+             "endmodule\n",
+             f));
+}
+
+// §26.3 (printed page 810): an explicit import makes its one name visible,
+// so `import p0::r` admits `r.push_back(v)` as the wildcard form does.
+TEST(PackageDeclarationElaboration,
+     ExplicitlyImportedQueueNamedBareInPackageFunctionAccepted) {
+  ElabFixture f;
+  EXPECT_TRUE(
+      ElabOk("package p0;\n"
+             "  int r[$];\n"
+             "endpackage\n"
+             "package p1;\n"
+             "  import p0::r;\n"
+             "  function void addr(int v);\n"
+             "    r.push_back(v);\n"
+             "  endfunction\n"
+             "endpackage\n"
+             "module top;\n"
+             "  initial p1::addr(3);\n"
+             "endmodule\n",
+             f));
+}
+
+// The import admits the names the imported package provides and nothing
+// else: `top.x` inside the same function is a hierarchical reference to a
+// module, which §26.2 forbids a package item, and it is reported at its own
+// line, the wildcard import beside it notwithstanding. A check that took an
+// importing package's every member access for an imported name would let it
+// through.
+TEST(PackageDeclarationElaboration,
+     HierarchicalReferenceBesideAWildcardImportRejected) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("package p0;\n"
+             "  int r[$];\n"
+             "endpackage\n"
+             "package p1;\n"
+             "  import p0::*;\n"
+             "  function void addr(int v);\n"
+             "    r.push_back(v);\n"
+             "    r.push_back(top.x);\n"
+             "  endfunction\n"
+             "endpackage\n"
+             "module top;\n"
+             "  int x = 4;\n"
+             "  initial p1::addr(3);\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "package item contains a hierarchical reference "
+                            "'top' that does not target the package itself "
+                            "or an imported package",
+                            8, "26.2"));
+}
+
 // The names a package subroutine declares itself -- a formal, a local of the
 // body or of a block in it, the function's result -- and those the package
 // declares or imports are the package's, whatever a compilation-unit item

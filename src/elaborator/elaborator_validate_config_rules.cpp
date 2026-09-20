@@ -11,6 +11,7 @@
 #include "common/source_loc.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_scope_rules_names.h"
 #include "elaborator/elaborator_validate_classes_internal.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/type_eval.h"
@@ -31,6 +32,7 @@ struct PackageRefContext {
   std::unordered_set<std::string_view> pkg_names;
   std::unordered_set<std::string_view> imported_names;
   std::unordered_set<std::string_view> wildcard_pkgs;
+  ProvidedNameCache* provided_names;
   DiagEngine* diag;
 };
 
@@ -63,27 +65,23 @@ void CollectPackageLocalNames(const PackageDecl* pkg, PackageRefContext& ctx) {
   }
 }
 
-bool PackageItemDeclaresName(const ModuleItem* pi, std::string_view name) {
-  if (pi->name == name) return true;
-  return pi->kind == ModuleItemKind::kClassDecl && pi->class_decl &&
-         pi->class_decl->name == name;
-}
-
-bool NamedPackageDeclaresName(const PackageDecl* p, std::string_view name) {
-  for (const auto* pi : p->items) {
-    if (PackageItemDeclaresName(pi, name)) return true;
-  }
-  return false;
-}
-
+// §26.3 (printed page 810) with §26.6 (printed 815-816): whether a wildcard
+// import the package wrote makes `name` visible in it -- a declaration of
+// the imported package, a constant of an enumeration it declares, or a name
+// its exports hand on -- as PackageProvidesName answers the same question of
+// a module's wildcard import.
 bool IsProvidedByWildcard(const PackageRefContext& ctx, std::string_view name) {
   for (auto pname : ctx.wildcard_pkgs) {
-    for (const auto* p : ctx.unit->packages) {
-      if (p->name != pname) continue;
-      if (NamedPackageDeclaresName(p, name)) return true;
-    }
+    if (PackageProvidesName(ctx.unit, *ctx.provided_names, pname, name))
+      return true;
   }
   return false;
+}
+
+// §26.2 (printed page 808): the names an import makes visible in the package,
+// the one an explicit import names and every one a wildcard import provides.
+bool IsImportedName(const PackageRefContext& ctx, std::string_view name) {
+  return ctx.imported_names.count(name) != 0 || IsProvidedByWildcard(ctx, name);
 }
 
 void CheckPackageRefIdentifier(const PackageRefContext& ctx, const Expr* e) {
@@ -95,9 +93,7 @@ void CheckPackageRefIdentifier(const PackageRefContext& ctx, const Expr* e) {
                     e->scope_prefix),
         Subclause("26.2"));
   } else if (ctx.cu_top_names->count(e->text) &&
-             !ctx.pkg_names.count(e->text) &&
-             !ctx.imported_names.count(e->text) &&
-             !IsProvidedByWildcard(ctx, e->text)) {
+             !ctx.pkg_names.count(e->text) && !IsImportedName(ctx, e->text)) {
     ctx.diag->Error(
         e->range.start,
         std::format("package item references '{}' from the "
@@ -108,12 +104,19 @@ void CheckPackageRefIdentifier(const PackageRefContext& ctx, const Expr* e) {
   }
 }
 
+// §26.2 (printed page 808): a package item may reference a package's name
+// through the scope resolution operator, the package's own declarations and
+// what its imports make visible, an explicit import's one name or a wildcard
+// import's every provided name (§26.3, printed 810); the head of any other
+// member access is a hierarchical reference the subclause forbids. Held to
+// the package's own names, `r.push_back(v)` in a function of a package with
+// `import p0::*` was reported for p0's queue r.
 void CheckPackageRefMemberRoot(const PackageRefContext& ctx, const Expr* e) {
   if (e->lhs && e->lhs->kind == ExprKind::kIdentifier && e->rhs) {
     auto root = e->lhs->text;
     bool is_pkg = ctx.known_package_names->count(root) > 0;
     bool is_self = ctx.pkg_names.count(root) > 0;
-    if (!is_pkg && !is_self) {
+    if (!is_pkg && !is_self && !IsImportedName(ctx, root)) {
       ctx.diag->Error(
           e->range.start,
           std::format("package item contains a hierarchical reference "
@@ -196,6 +199,7 @@ void Elaborator::ValidatePackageReferences() {
     ctx.unit = unit_;
     ctx.known_package_names = &known_package_names;
     ctx.cu_top_names = &cu_top_names;
+    ctx.provided_names = &pkg_provided_names_;
     ctx.diag = &diag_;
     CollectPackageLocalNames(pkg, ctx);
 
