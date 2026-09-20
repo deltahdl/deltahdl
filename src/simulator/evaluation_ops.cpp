@@ -434,12 +434,26 @@ static Logic4Vec EvalShift(TokenKind op, Logic4Vec lhs, uint64_t rv,
 }
 
 static constexpr uint64_t kResultX = 2;
+// §11.4.6: an x or z bit of the right operand is a wildcard at its own bit
+// position, matching whatever the left operand holds there; every other
+// position is compared as == compares it, and a left x or z at one of them
+// makes the relation unknown. EvalEqualityCompare hands the operands here
+// extended to one width as §11.4.6 extends them, and every word of that width
+// takes part: reading the first word alone had two 96-bit operands differing
+// at bit 80 equal, and a wildcard at bit 80 no wildcard at all.
 static uint64_t EvalWildcardEq(Logic4Vec lhs, Logic4Vec rhs) {
-  uint64_t rhs_dc = rhs.nwords > 0 ? rhs.words[0].bval : 0;
-  uint64_t lhs_x = lhs.nwords > 0 ? lhs.words[0].bval : 0;
-
-  if (lhs_x & ~rhs_dc) return kResultX;
-  return (((lhs.ToUint64() ^ rhs.ToUint64()) & ~rhs_dc) == 0) ? 1 : 0;
+  uint32_t nwords = std::min(lhs.nwords, rhs.nwords);
+  bool unknown = false;
+  bool equal = true;
+  for (uint32_t i = 0; i < nwords; ++i) {
+    uint64_t mask = ~rhs.words[i].bval;
+    unknown = unknown || (lhs.words[i].bval & mask) != 0;
+    equal = equal && ((lhs.words[i].aval ^ rhs.words[i].aval) & mask) == 0;
+  }
+  if (unknown) return kResultX;
+  return equal ? 1 : 0;
+}
+return true;
 }
 static uint64_t EvalEqualityOp(TokenKind op, Logic4Vec lhs, Logic4Vec rhs) {
   switch (op) {

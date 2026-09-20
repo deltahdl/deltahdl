@@ -472,4 +472,107 @@ TEST(OperatorSim, WildcardEqInterfaceClassHandleEquivalenceAtRuntime) {
   EXPECT_EQ(r->value.ToUint64(), 1u);
 }
 
+// §11.4.6 (printed page 280): the operands are compared bit for bit, and one
+// of unequal length is extended as for logical equality, so every bit of a
+// 96-bit operand takes part. Two equal 96-bit values answer 1, and a pair that
+// differs at bit 80 alone -- in the second 64-bit word -- answers 0. The two
+// results are read together as eq * 10 + ne.
+TEST(OperatorSim, WildcardEqWiderThanOneWordComparesEveryWord) {
+  SimFixture f;
+  auto* r = RunAndFindVar(
+      "module t;\n"
+      "  logic [95:0] a, b;\n"
+      "  int eq, ne, r;\n"
+      "  initial begin\n"
+      "    a = 96'h0123_4567_89AB_CDEF_0011_2233;\n"
+      "    b = 96'h0123_4567_89AB_CDEF_0011_2233;\n"
+      "    eq = (a ==? b);\n"
+      "    a = 96'h0122_4567_89AB_CDEF_0011_2233;\n"
+      "    ne = (a ==? b);\n"
+      "    r = eq * 10 + ne;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(r, nullptr);
+  EXPECT_EQ(r->value.ToUint64(), 10u);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §11.4.6 (printed page 280): an x in the right operand is a wildcard at its
+// own bit position and nowhere else, above bit 63 as below it. With the right
+// operand x across bits 80 to 83, a left operand differing from it inside
+// those bits alone matches, and one differing at bit 90 -- outside the
+// wildcard, in the same word -- does not. Read as under * 10 + outside.
+TEST(OperatorSim, WildcardEqRhsWildcardAboveBit63MasksItsOwnBitAlone) {
+  SimFixture f;
+  auto* r = RunAndFindVar(
+      "module t;\n"
+      "  logic [95:0] a, b;\n"
+      "  int under, outside, r;\n"
+      "  initial begin\n"
+      "    b = 96'h012x_4567_89AB_CDEF_0011_2233;\n"
+      "    a = 96'h0129_4567_89AB_CDEF_0011_2233;\n"
+      "    under = (a ==? b);\n"
+      "    a = 96'h0523_4567_89AB_CDEF_0011_2233;\n"
+      "    outside = (a ==? b);\n"
+      "    r = under * 10 + outside;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(r, nullptr);
+  EXPECT_EQ(r->value.ToUint64(), 10u);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §11.4.6 (printed page 280): an x in the left operand is no wildcard, and a
+// left x at a position the right operand does not wildcard makes the relation
+// unknown, so ==? answers 1'bx. The x sits at bits 80 to 83, in the second
+// word, against a known right operand; the result's low bval bit is set.
+TEST(OperatorSim, WildcardEqLhsXAboveBit63NotUnderWildcardYieldsX) {
+  SimFixture f;
+  auto* r = RunAndFindVar(
+      "module t;\n"
+      "  logic [95:0] a, b;\n"
+      "  logic r;\n"
+      "  initial begin\n"
+      "    a = 96'h012x_4567_89AB_CDEF_0011_2233;\n"
+      "    b = 96'h0123_4567_89AB_CDEF_0011_2233;\n"
+      "    r = (a ==? b);\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(r, nullptr);
+  EXPECT_EQ(r->value.width, 1u);
+  EXPECT_NE(r->value.words[0].bval & 1u, 0u);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §11.4.6 (printed page 280): !=? is the negation of ==? over the same bit
+// positions, so on 96-bit operands it answers 1 for a pair differing at bit 80
+// alone, 0 for an equal pair, and 0 when the right operand wildcards bits 80
+// to 83 and the left differs there alone. Read as ne * 100 + eq * 10 + wild.
+TEST(OperatorSim, WildcardNeqWiderThanOneWordComparesEveryWord) {
+  SimFixture f;
+  auto* r = RunAndFindVar(
+      "module t;\n"
+      "  logic [95:0] a, b;\n"
+      "  int ne, eq, wild, r;\n"
+      "  initial begin\n"
+      "    b = 96'h0123_4567_89AB_CDEF_0011_2233;\n"
+      "    a = 96'h0122_4567_89AB_CDEF_0011_2233;\n"
+      "    ne = (a !=? b);\n"
+      "    a = 96'h0123_4567_89AB_CDEF_0011_2233;\n"
+      "    eq = (a !=? b);\n"
+      "    b = 96'h012x_4567_89AB_CDEF_0011_2233;\n"
+      "    a = 96'h0129_4567_89AB_CDEF_0011_2233;\n"
+      "    wild = (a !=? b);\n"
+      "    r = ne * 100 + eq * 10 + wild;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(r, nullptr);
+  EXPECT_EQ(r->value.ToUint64(), 100u);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace
