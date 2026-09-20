@@ -335,6 +335,14 @@ void ReportUnresolvedClassScopedType(const DataType& dtype, SourceLoc loc,
                                      const CompilationUnit* unit,
                                      DiagEngine& diag);
 
+// §8.23: the key the simulator holds a nested class under, `Outer::Inner`,
+// when `dtype` is written `Outer::Inner` and the class `Outer` reaches
+// declares a class named `Inner`; empty for any other type. The declared
+// variable is then a class handle of that key rather than a value of a type
+// nothing resolved. Defined in elaborator_validate_struct_types.cpp.
+std::string_view NestedClassKey(const DataType& dtype,
+                                const CompilationUnit* unit, Arena& arena);
+
 // §8.25: rewrites `dtype` in place when it names a member of a specialization
 // of a parameterized class, substituting the arguments DataType::type_params
 // carries for the class's own parameters. Returns false, leaving `dtype`

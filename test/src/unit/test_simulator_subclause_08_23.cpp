@@ -252,4 +252,153 @@ TEST(ClassScopeResolutionSim, EnumNamedConstantViaScope) {
             3u);
 }
 
+// §8.23 (printed page 200-201 of the LRM): a class declared inside another
+// is a type of its own, named `Outer::Inner` from outside, whose objects have
+// their own properties and methods. `int v = 5` reading 0 and `twice()` 0 is
+// the object built with no class behind it, so the product cannot be 510 by
+// accident.
+TEST(ClassScopeResolutionSim, ModuleScopeNestedObjectPropertyAndMethod) {
+  EXPECT_EQ(RunAndGet("class Outer;\n"
+                      "  class Inner;\n"
+                      "    int v = 5;\n"
+                      "    function int twice(); return v * 2; endfunction\n"
+                      "  endclass\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  Outer::Inner in = new;\n"
+                      "  int r;\n"
+                      "  initial r = in.v * 100 + in.twice();\n"
+                      "endmodule\n",
+                      "r"),
+            510u);
+}
+
+// §8.23: inside the containing class the nested class is named bare, both by
+// a method's local `Inner i = new` and by a property `Inner mine` the
+// constructor builds with `mine = new`. 8 is `i.v = 4` doubled and 5 the
+// property's initializer read through `mine`; a local or a property with no
+// class behind it answers 0 for either.
+TEST(ClassScopeResolutionSim, NestedObjectBuiltInsideAnOuterMethod) {
+  EXPECT_EQ(RunAndGet("class Outer;\n"
+                      "  class Inner;\n"
+                      "    int v = 5;\n"
+                      "    function int twice(); return v * 2; endfunction\n"
+                      "  endclass\n"
+                      "  Inner mine;\n"
+                      "  function new(); mine = new; endfunction\n"
+                      "  function int useInner();\n"
+                      "    Inner i = new;\n"
+                      "    i.v = 4;\n"
+                      "    return i.twice();\n"
+                      "  endfunction\n"
+                      "  function int mineV(); return mine.v; endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  Outer o = new;\n"
+                      "  int r;\n"
+                      "  initial r = o.useInner() * 10 + o.mineV();\n"
+                      "endmodule\n",
+                      "r"),
+            85u);
+}
+
+// §8.23's Outer/Inner example: a nested class's method has lexically scoped,
+// unqualified access to the containing class's static properties, the local
+// one included, and reaches a non-static one only through a handle. 7, 4 and
+// 9 are the three initializers; each digit that reads 0 is a lookup that did
+// not reach the containing class.
+TEST(ClassScopeResolutionSim, NestedMethodReadsTheContainingClassStatics) {
+  EXPECT_EQ(RunAndGet("class Outer;\n"
+                      "  int outerProp = 9;\n"
+                      "  static int outerStaticProp = 7;\n"
+                      "  static local int outerLocalStaticProp = 4;\n"
+                      "  class Inner;\n"
+                      "    function int readStatic();\n"
+                      "      return outerStaticProp;\n"
+                      "    endfunction\n"
+                      "    function int readOuter(Outer h);\n"
+                      "      return h.outerProp;\n"
+                      "    endfunction\n"
+                      "    function int readLocal();\n"
+                      "      return outerLocalStaticProp;\n"
+                      "    endfunction\n"
+                      "  endclass\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  Outer::Inner in = new;\n"
+                      "  Outer o = new;\n"
+                      "  int r;\n"
+                      "  initial r = in.readStatic() * 100 +\n"
+                      "              in.readLocal() * 10 + in.readOuter(o);\n"
+                      "endmodule\n",
+                      "r"),
+            749u);
+}
+
+// §8.23's `outerStaticProp = 0` in innerMethod: the unqualified name written
+// from the nested class's method is the containing class's own storage, which
+// `Outer::outerStaticProp` then reads. 31 is neither the initializer nor a
+// write that landed on the nested object.
+TEST(ClassScopeResolutionSim, NestedMethodWritesTheContainingClassStatic) {
+  EXPECT_EQ(RunAndGet("class Outer;\n"
+                      "  static int outerStaticProp = 7;\n"
+                      "  class Inner;\n"
+                      "    function void innerMethod();\n"
+                      "      outerStaticProp = 31;\n"
+                      "    endfunction\n"
+                      "  endclass\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  Outer::Inner in = new;\n"
+                      "  int r;\n"
+                      "  initial begin\n"
+                      "    in.innerMethod();\n"
+                      "    r = Outer::outerStaticProp;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "r"),
+            31u);
+}
+
+// §8.23's StringList/Node example, with a depth and a push that links each
+// new node ahead of the head: after pushing "beta" then "alpha" the head is
+// the "alpha" node at depth 2, linked to the "beta" node at depth 1. A Node
+// built with no class behind it holds neither name nor depth, reading "" and
+// 0 for every line.
+TEST(ClassScopeResolutionSim, StringListNodeExampleLinksNestedObjects) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class StringList;\n"
+      "  class Node;\n"
+      "    string name;\n"
+      "    Node link;\n"
+      "    int depth;\n"
+      "  endclass\n"
+      "  Node head;\n"
+      "  function void push(string s);\n"
+      "    Node n = new;\n"
+      "    n.name = s;\n"
+      "    n.link = head;\n"
+      "    n.depth = head == null ? 1 : head.depth + 1;\n"
+      "    head = n;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  StringList l = new;\n"
+      "  int head_depth, link_depth;\n"
+      "  bit head_is_alpha;\n"
+      "  initial begin\n"
+      "    l.push(\"beta\");\n"
+      "    l.push(\"alpha\");\n"
+      "    head_depth = l.head.depth;\n"
+      "    link_depth = l.head.link.depth;\n"
+      "    head_is_alpha = l.head.name == \"alpha\";\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(
+      f, design,
+      {{"head_depth", 2u}, {"link_depth", 1u}, {"head_is_alpha", 1u}});
+}
+
 }  // namespace

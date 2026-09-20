@@ -292,9 +292,24 @@ void SimContext::RegisterClassType(std::string_view name, ClassTypeInfo* info) {
   class_types_[name] = info;
 }
 
+// §8.23: a class nested in another is held under `Outer::Inner`, the name
+// that reaches it from outside the containing class, while a method of the
+// containing class names it `Inner` alone, classes being scopes that nest as
+// modules do. A name the table does not hold as written is therefore tried
+// under the running method's class and then under each class lexically
+// containing that one, innermost first, so `Inner i = new` in a method of
+// Outer, `Node link` in a method of StringList::Node and `mine = new` on a
+// property Outer declares `Inner mine` all construct the nested class.
 ClassTypeInfo* SimContext::FindClassType(std::string_view name) {
   auto it = class_types_.find(name);
-  return (it != class_types_.end()) ? it->second : nullptr;
+  if (it != class_types_.end()) return it->second;
+  for (const ClassTypeInfo* scope = CurrentMethodClass(); scope != nullptr;
+       scope = scope->enclosing) {
+    auto nested =
+        class_types_.find(std::string(scope->name) + "::" + std::string(name));
+    if (nested != class_types_.end()) return nested->second;
+  }
+  return nullptr;
 }
 
 void SimContext::SetVariableClassType(std::string_view var,

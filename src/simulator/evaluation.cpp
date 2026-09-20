@@ -53,10 +53,12 @@ static Logic4Vec EvalIdentifierClassScope(const Expr* expr, SimContext& ctx,
     auto it = self->properties.find(std::string(expr->text));
     if (it != self->properties.end()) return it->second;
   }
-  if (method_cls) {
-    auto it = method_cls->static_properties.find(std::string(expr->text));
-    if (it != method_cls->static_properties.end()) return it->second;
-  }
+  // §8.23: the class's own static property, or one of a class lexically
+  // containing it, which a nested class's method names unqualified.
+  const ClassTypeInfo* owner =
+      method_cls ? method_cls->StaticPropertyOwner(expr->text) : nullptr;
+  if (owner)
+    return owner->static_properties.find(std::string(expr->text))->second;
   // §6.19: a literal of an enumeration the class declares, tried before the
   // property read, which answers a value for an unknown name all the same.
   const ClassTypeInfo* scope = method_cls ? method_cls
@@ -78,10 +80,8 @@ static Logic4Vec EvalIdentifierClassScope(const Expr* expr, SimContext& ctx,
 // never the instance of the same name in the enclosing module.
 static bool ClassScopeDeclares(std::string_view name, SimContext& ctx) {
   const ClassTypeInfo* method_cls = ctx.CurrentMethodClass();
-  if (method_cls != nullptr &&
-      method_cls->static_properties.count(std::string(name)) != 0) {
+  if (method_cls != nullptr && method_cls->StaticPropertyOwner(name) != nullptr)
     return true;
-  }
   const ClassObject* self = ctx.CurrentThis();
   const ClassTypeInfo* scope = method_cls != nullptr ? method_cls
                                : self != nullptr     ? self->type

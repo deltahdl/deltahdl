@@ -319,37 +319,64 @@ static void InheritInterfaceMembers(ClassTypeInfo* info) {
     InheritInterfaceStaticsAndEnums(info, iface);
 }
 
-static void CollectNestedClassMembers(ClassTypeInfo* nested_info,
-                                      const ClassDecl* nested_class) {
-  for (auto* m : nested_class->members) {
-    if (m->kind == ClassMemberKind::kProperty) {
-      uint32_t w = EvalTypeWidth(m->data_type, {});
-      bool sized = w != 0;
-      if (w == 0) w = 32;
-      nested_info->properties.push_back(
-          {m->name, w, m->is_static, m->is_local, m->is_protected, m->is_const,
-           m->init_expr, Is4stateType(m->data_type, {}), sized,
-           IsRealKind(m->data_type.kind), IsSignedType(m->data_type, {})});
-    } else if (m->kind == ClassMemberKind::kMethod && m->method) {
-      nested_info->methods[std::string(m->method->name)] = m->method;
-    }
+// The base, the interfaces, the members, the vtable and the static storage of
+// the class `cls` declares, filled into `info` whichever scope declares the
+// class: a compilation unit, package or module, whose `scope_items` carry the
+// out-of-block method bodies of §8.24, or another class (§8.23), which carries
+// none. Before the two shared this, a nested class was given its properties
+// and methods alone -- no declared type name on a property, so `link = new`
+// on a `Node link` constructed nothing, and no vtable.
+static void PopulateClassType(ClassTypeInfo* info, const ClassDecl* cls,
+                              const std::vector<ModuleItem*>& scope_items,
+                              SimContext& ctx, Arena& arena) {
+  if (!cls->base_class.empty())
+    info->parent = ctx.FindClassType(cls->base_class);
+  for (const auto& ref : cls->extends_interfaces) {
+    auto* iface = ctx.FindClassType(ref.name);
+    if (iface) info->extended_interfaces.push_back(iface);
   }
+  for (const auto& ref : cls->implements_types) {
+    auto* iface = ctx.FindClassType(ref.name);
+    if (iface) info->extended_interfaces.push_back(iface);
+  }
+  CollectClassMembers(info, cls);
+  AttachScopeMethodBodies(info, cls, scope_items);
+  RecordArrayProperties(info, cls, ctx, arena);
+  BuildVTable(info, cls);
+  InitStaticProperties(info, ctx, arena);
+  InitClassParams(info, cls, ctx, arena);
+  CollectClassEnumMembers(info, cls);
+  if (cls->is_interface) InheritInterfaceMembers(info);
 }
 
-static void LowerNestedClass(const ClassDecl* outer, const ClassMember* member,
+static void LowerNestedClasses(ClassTypeInfo* outer, const ClassDecl* cls,
+                               SimContext& ctx, Arena& arena);
+
+// §8.23: a class declared inside `outer` is a type of its own, reached from
+// outside as `Outer::Inner`, which is the key it is registered under; a
+// method of the containing class names it bare, which SimContext::FindClassType
+// resolves through `enclosing`. A nested class of the nested class is lowered
+// under it in turn.
+static void LowerNestedClass(ClassTypeInfo* outer, const ClassDecl* nested,
                              SimContext& ctx, Arena& arena) {
-  auto qualified =
-      std::string(outer->name) + "::" + std::string(member->nested_class->name);
-  auto* nested_info = arena.Create<ClassTypeInfo>();
-  nested_info->name = *arena.Create<std::string>(std::move(qualified));
-  nested_info->decl = member->nested_class;
-  nested_info->is_abstract = member->nested_class->is_virtual;
-  nested_info->is_interface = member->nested_class->is_interface;
-  if (!member->nested_class->base_class.empty())
-    nested_info->parent = ctx.FindClassType(member->nested_class->base_class);
-  CollectNestedClassMembers(nested_info, member->nested_class);
-  InitStaticProperties(nested_info, ctx, arena);
-  ctx.RegisterClassType(nested_info->name, nested_info);
+  auto qualified = std::string(outer->name) + "::" + std::string(nested->name);
+  auto* info = arena.Create<ClassTypeInfo>();
+  info->name = *arena.Create<std::string>(std::move(qualified));
+  info->decl = nested;
+  info->is_abstract = nested->is_virtual;
+  info->is_interface = nested->is_interface;
+  info->enclosing = outer;
+  PopulateClassType(info, nested, {}, ctx, arena);
+  ctx.RegisterClassType(info->name, info);
+  LowerNestedClasses(info, nested, ctx, arena);
+}
+
+static void LowerNestedClasses(ClassTypeInfo* outer, const ClassDecl* cls,
+                               SimContext& ctx, Arena& arena) {
+  for (const auto* member : cls->members) {
+    if (member->kind == ClassMemberKind::kClassDecl && member->nested_class)
+      LowerNestedClass(outer, member->nested_class, ctx, arena);
+  }
 }
 
 void Lowerer::LowerClassDecl(const ClassDecl* cls,
@@ -359,32 +386,9 @@ void Lowerer::LowerClassDecl(const ClassDecl* cls,
   info->decl = cls;
   info->is_abstract = cls->is_virtual;
   info->is_interface = cls->is_interface;
-
-  if (!cls->base_class.empty())
-    info->parent = ctx_.FindClassType(cls->base_class);
-  for (const auto& ref : cls->extends_interfaces) {
-    auto* iface = ctx_.FindClassType(ref.name);
-    if (iface) info->extended_interfaces.push_back(iface);
-  }
-  for (const auto& ref : cls->implements_types) {
-    auto* iface = ctx_.FindClassType(ref.name);
-    if (iface) info->extended_interfaces.push_back(iface);
-  }
-  CollectClassMembers(info, cls);
-  AttachScopeMethodBodies(info, cls, scope_items);
-  RecordArrayProperties(info, cls, ctx_, arena_);
-  BuildVTable(info, cls);
-  InitStaticProperties(info, ctx_, arena_);
-  InitClassParams(info, cls, ctx_, arena_);
-  CollectClassEnumMembers(info, cls);
-
-  if (cls->is_interface) InheritInterfaceMembers(info);
+  PopulateClassType(info, cls, scope_items, ctx_, arena_);
   ctx_.RegisterClassType(cls->name, info);
-
-  for (const auto* member : cls->members) {
-    if (member->kind == ClassMemberKind::kClassDecl && member->nested_class)
-      LowerNestedClass(cls, member, ctx_, arena_);
-  }
+  LowerNestedClasses(info, cls, ctx_, arena_);
 }
 
 }  // namespace delta

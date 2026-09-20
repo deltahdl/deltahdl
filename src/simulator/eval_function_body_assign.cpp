@@ -90,16 +90,18 @@ static void WriteSelfProperty(ClassObject* self, std::string_view name,
 bool TryFuncClassPropertyWrite(const Expr* lhs, const Logic4Vec& val,
                                SimContext& ctx, Arena& arena) {
   const ClassTypeInfo* method_cls = ctx.CurrentMethodClass();
-  if (method_cls != nullptr) {
-    auto it = method_cls->static_properties.find(std::string(lhs->text));
-    if (it != method_cls->static_properties.end()) {
-      it->second = val;
-      // §9.4.2 with §8.9: the write lands in the class's own storage, so the
-      // processes watching the class are the ones told (`@(C::n)` from a
-      // module, the bare `@(n)` from a method of C).
-      method_cls->NotifyStaticWatchers();
-      return true;
-    }
+  // §8.23: the static property may be the containing class's, which a nested
+  // class's method writes unqualified as the subclause's `outerStaticProp = 0`.
+  const ClassTypeInfo* owner = method_cls != nullptr
+                                   ? method_cls->StaticPropertyOwner(lhs->text)
+                                   : nullptr;
+  if (owner != nullptr) {
+    owner->static_properties[std::string(lhs->text)] = val;
+    // §9.4.2 with §8.9: the write lands in the class's own storage, so the
+    // processes watching the class are the ones told (`@(C::n)` from a
+    // module, the bare `@(n)` from a method of C).
+    owner->NotifyStaticWatchers();
+    return true;
   }
   auto* self = ctx.CurrentThis();
   if (self == nullptr) return false;

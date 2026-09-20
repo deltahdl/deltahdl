@@ -44,6 +44,15 @@ const ClassTypeInfo::PropertyInfo* ClassTypeInfo::FindProperty(
   return nullptr;
 }
 
+const ClassTypeInfo* ClassTypeInfo::StaticPropertyOwner(
+    std::string_view name) const {
+  std::string key(name);
+  for (const auto* t = this; t != nullptr; t = t->enclosing) {
+    if (t->static_properties.find(key) != t->static_properties.end()) return t;
+  }
+  return nullptr;
+}
+
 Logic4Vec ClassObject::GetProperty(std::string_view name, Arena& arena) const {
   std::string key(name);
   auto it = properties.find(key);

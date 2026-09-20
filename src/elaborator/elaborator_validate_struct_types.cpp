@@ -222,6 +222,20 @@ const ClassDecl* FindClassDecl(std::string_view name,
   return ambiguous ? nullptr : only;
 }
 
+std::string_view NestedClassKey(const DataType& dtype,
+                                const CompilationUnit* unit, Arena& arena) {
+  if (dtype.kind != DataTypeKind::kNamed || dtype.scope_name.empty()) return {};
+  const ClassDecl* outer = FindClassDecl(dtype.scope_name, unit);
+  if (outer == nullptr) return {};
+  for (const auto* m : outer->members) {
+    if (m->kind != ClassMemberKind::kClassDecl || m->name != dtype.type_name)
+      continue;
+    return *arena.Create<std::string>(std::string(dtype.scope_name) +
+                                      "::" + std::string(dtype.type_name));
+  }
+  return {};
+}
+
 static const ModuleItem* FindClassTypedef(const ClassDecl* cls,
                                           std::string_view member_name) {
   for (const auto* m : cls->members) {

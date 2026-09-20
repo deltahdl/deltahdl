@@ -50,6 +50,14 @@ struct ClassTypeInfo {
   // relation reports NULL.
   bool is_builtin = false;
   std::vector<const ClassTypeInfo*> extended_interfaces;
+  // §8.23: the class this one is declared inside, or nullptr for a class
+  // declared at the scope of a compilation unit, package or module. A nested
+  // class is registered under `Outer::Inner`, the name that reaches it from
+  // outside, while a method of the containing class names it `Inner` and a
+  // method of the nested class names the containing class's static properties
+  // unqualified; both walk this chain (SimContext::FindClassType,
+  // StaticPropertyOwner).
+  const ClassTypeInfo* enclosing = nullptr;
 
   struct PropertyInfo {
     std::string_view name;
@@ -228,6 +236,13 @@ struct ClassTypeInfo {
   // §8.13: the property `name` declares in this class or in one it inherits
   // from, the nearest declaration first, or nullptr where none declares it.
   const PropertyInfo* FindProperty(std::string_view name) const;
+
+  // §8.10 and §8.23: the class whose own storage holds the static property a
+  // method of this class names bare -- this class, or else the nearest class
+  // lexically containing it, a nested class having unqualified access to the
+  // containing class's static properties, local ones included. Nullptr where
+  // none of them declares `name`.
+  const ClassTypeInfo* StaticPropertyOwner(std::string_view name) const;
 };
 
 inline constexpr uint64_t kNullClassHandle = 0;
