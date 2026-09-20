@@ -355,15 +355,15 @@ Variable* SimContext::FindVariable(std::string_view name) {
   // the ordinary lookup rather than an upward step; a dotted name is the §23.8
   // climb, which names the module it reaches; and a name a package import
   // brought into scope is bound flat under its unqualified spelling rather
-  // than declared in an enclosing module at all. §23.4 adds a fourth: a module
+  // than declared in an enclosing module at all, as is each element of an
+  // imported array (IsImportedName). §23.4 adds a fourth: a module
   // declared inside the one instantiating it, of which that subclause says
   // "The outer name space is visible to the inner module so that any name
   // declared there can be used", so the boundary §23.9 draws is not there.
   // §23.6's `$root` is a fifth, answered above rather than here: it names the
   // top of the design outright rather than climbing to it, so no boundary
   // stands between the reference and what it reaches.
-  if (prefix.empty() || dot != std::string_view::npos ||
-      imported_names_.count(name) != 0 ||
+  if (prefix.empty() || dot != std::string_view::npos || IsImportedName(name) ||
       nested_decl_scopes_.count(std::string(prefix)) != 0) {
     auto it = variables_.find(name);
     if (it != variables_.end()) return it->second;

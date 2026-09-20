@@ -16,6 +16,7 @@
 
 #include "simulator/sim_context_name_tables.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -115,6 +116,13 @@ bool DeclaredNameTables::IsRealVariable(std::string_view name) const {
 
 void DeclaredNameTables::RegisterImportedName(std::string_view name) {
   imported_names_.insert(name);
+}
+
+bool DeclaredNameTables::IsImportedName(std::string_view name) const {
+  if (imported_names_.count(name) != 0) return true;
+  size_t bracket = name.find('[');
+  return bracket != std::string_view::npos &&
+         imported_names_.count(name.substr(0, bracket)) != 0;
 }
 
 void DeclaredNameTables::RegisterSubroutinePackage(const ModuleItem* subroutine,

@@ -1,3 +1,5 @@
+#include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <string>
 #include <string_view>
@@ -21,6 +23,7 @@
 #include "simulator/lowerer_register.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
 #include "simulator/stmt_exec.h"
 
@@ -275,6 +278,61 @@ static bool ModuleDeclaresName(const RtlirModule* mod, std::string_view name) {
   return false;
 }
 
+// §7.4.2 with §7.4.4 (printed page 154): the index suffixes of the elements
+// of the fixed-size array `info` describes, "[1]" for a one-dimensional
+// array's second element and "[1][0]" for a two-dimensional array's, each
+// dimension's addresses counted from its low bound in declaration order, the
+// spelling CreateArrayElements and CreateMultiDimLeaves (lowerer_var.cpp) key
+// the element variables by. A one-dimensional array's extent is the lo and
+// size pair, a multidimensional array's the per-dimension vectors.
+static void CollectElementSuffixes(const ArrayInfo& info, size_t dim,
+                                   const std::string& prefix,
+                                   std::vector<std::string>& out) {
+  bool multi = !info.dim_sizes.empty();
+  size_t dims = multi ? info.dim_sizes.size() : 1;
+  if (dim == dims) {
+    out.push_back(prefix);
+    return;
+  }
+  uint32_t lo = multi ? info.dim_los[dim] : info.lo;
+  uint32_t size = multi ? info.dim_sizes[dim] : info.size;
+  for (uint32_t i = 0; i < size; ++i) {
+    CollectElementSuffixes(info, dim + 1,
+                           prefix + "[" + std::to_string(lo + i) + "]", out);
+  }
+}
+
+// §26.3 (printed page 810) with §7.4.2 (printed 154) and §7.5 (printed
+// 157-158): the fixed-size or dynamic array a package `int a[2]` or `int d[]`
+// declares, given to the alias `key`: the ArrayInfo CreatePackageArray or
+// CreatePackageDynArray (lowerer_package_data.cpp) registered under `qname`,
+// which foreach, $size and every element select read the shape from, copied
+// under the alias as the queue and the associative array are, and each
+// element variable of a fixed-size array, "p1.a[1]", aliased under the
+// alias's own spelling of it, "a[1]" under the instance prefix, the key
+// FindVariable answers a module's element by. A dynamic array's elements are
+// the QueueObject's, which AliasQueue already shares. The alias carried the
+// carrier variable alone, so `a[1] = 7` after `import p1::*` wrote bit 1 of
+// the 32-bit carrier and `a[1]` read it back as one bit, `foreach (a[i])` ran
+// once per bit, `$size(a)` answered the carrier's width, and `d.size()` and
+// `d[2]` after the package's own `p1::d = new[3]` answered 0. The shape is
+// copied before the alias is registered: the registration inserts into the
+// table the found shape lives in.
+static void AliasArray(std::string_view key, std::string_view qname,
+                       SimContext& ctx, Arena& arena) {
+  const ArrayInfo* found = ctx.FindArrayInfo(qname);
+  if (found == nullptr) return;
+  ArrayInfo info = *found;
+  ctx.RegisterArray(key, info);
+  if (info.is_dynamic) return;
+  std::vector<std::string> suffixes;
+  CollectElementSuffixes(info, 0, "", suffixes);
+  for (const std::string& suffix : suffixes) {
+    auto* elem_key = arena.Create<std::string>(std::string(key) + suffix);
+    ctx.AliasVariable(*elem_key, std::string(qname) + suffix);
+  }
+}
+
 // The per-name records a package variable is entered in beside its storage,
 // keyed "pkg.name" as the storage is, given to the alias `key` from the
 // declaring package's `qname`: the class the variable is declared with
@@ -285,18 +343,20 @@ static bool ModuleDeclaresName(const RtlirModule* mod, std::string_view name) {
 // nothing and left the handle null; and the real registration
 // ShapePackageVariable (lowerer_register.cpp) makes; and the queue or the
 // associative array a package `int q[$]` or `int m[string]` declares
-// (CreatePackageAggregate in lowerer_register.cpp), which FindQueue and
+// (CreatePackageAggregate in lowerer_package_data.cpp), which FindQueue and
 // FindAssocArray answer by their own keys, so that `q.push_back(4)` after
-// `import p1::q` and `p2::q.size()` through an exporter reached no object. A
+// `import p1::q` and `p2::q.size()` through an exporter reached no object;
+// and the fixed-size or dynamic array's shape and elements (AliasArray). A
 // string's kind is a flag of the Variable itself, which the alias already
 // shares.
 static void AliasVariableKinds(std::string_view key, std::string_view qname,
-                               SimContext& ctx) {
+                               SimContext& ctx, Arena& arena) {
   std::string_view cls = ctx.GetVariableClassType(qname);
   if (!cls.empty()) ctx.SetVariableClassType(key, cls);
   if (ctx.IsRealVariable(qname)) ctx.RegisterRealVariable(key);
   ctx.AliasQueue(key, qname);
   ctx.AliasAssocArray(key, qname);
+  AliasArray(key, qname, ctx, arena);
   // §15.3 and §15.4: a package's semaphore or mailbox the same way, so `s.get`
   // after `import p1::s` and `p2::s` through an export reach the one bucket.
   ctx.AliasSemaphore(key, qname);
@@ -346,7 +406,7 @@ void Lowerer::AliasImportedPackageName(std::string_view name,
   // constructs an object of the class p1's h is declared with, which
   // TryClassNewAssign asks for under this key, so the class record rides the
   // alias as it rides an export's (AliasExportedName).
-  AliasVariableKinds(*stored, qname, ctx_);
+  AliasVariableKinds(*stored, qname, ctx_, arena_);
   // §26.3: the import makes this name visible under its unqualified spelling,
   // and that binding belongs to no module. SimContext::FindVariable is told so
   // because it otherwise stops a bare name at the module boundary §23.9 draws,
@@ -716,7 +776,7 @@ void AliasExportedName(const PackageDecl* pkg, const ExportedName& e,
   if (ctx.GetVariables().count(key) != 0) return;
   std::string_view stored = *arena.Create<std::string>(key);
   ctx.AliasVariable(stored, qname);
-  AliasVariableKinds(stored, qname, ctx);
+  AliasVariableKinds(stored, qname, ctx, arena);
 }
 
 }  // namespace

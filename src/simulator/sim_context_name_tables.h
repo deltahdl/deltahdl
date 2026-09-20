@@ -84,6 +84,11 @@ class DeclaredNameTables {
   // FindVariable answers it from inside an instance where §23.9 stops an
   // enclosing module's variable. `name` must outlive the context.
   void RegisterImportedName(std::string_view name);
+  // Whether `name` is one so registered, or an element of one: §7.4.2 makes
+  // the elements of an imported array, keyed `a[1]` under the import's key
+  // (AliasArray in lowerer_import.cpp), the imported declaration's own, so
+  // the key up to its first bracket is the one asked for.
+  bool IsImportedName(std::string_view name) const;
 
   // §26.3 with §13.4: the package a subroutine was declared in, whose
   // variables its body reads by their bare names, and the package's own
