@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include "common/types.h"
@@ -583,6 +584,72 @@ TEST(ClassSim, ClassDeclaredInModuleSizesPropertyByUnitConstants) {
       "endmodule\n");
   EXPECT_EQ(r, 1023u);
   EXPECT_EQ(w, 10u);
+}
+
+// §8.4 (printed page 181 of the LRM): a variable of a class type holds an
+// object handle, and §7.4.2 (printed 153-154) and §7.5 (printed 157) make
+// each element of an unpacked array a variable of the element type, so
+// `C arr[2]` is two handles, each constructed by `new` into its element and
+// read through it. The three tests below share the class and read 7, its
+// property's initializer; a `new` that constructed nothing and a read that
+// reached no object answer 0.
+static std::string HandleArrayDesign(std::string_view rest) {
+  return "class C;\n"
+         "  int v = 7;\n"
+         "endclass\n" +
+         std::string(rest);
+}
+
+// The module-scope fixed-size array: `arr[0] = new` had no path (the `new`
+// target key named no select, and the element constructors served array
+// properties alone) and `arr[0].v` none either, the member name built from
+// the select being no variable's.
+TEST(ClassSim, NewIntoAnElementOfADeclaredFixedArrayIsReadThroughIt) {
+  EXPECT_EQ(RunAndGet(HandleArrayDesign("module t;\n"
+                                        "  C arr[2];\n"
+                                        "  int y;\n"
+                                        "  initial begin\n"
+                                        "    arr[0] = new;\n"
+                                        "    y = arr[0].v;\n"
+                                        "  end\n"
+                                        "endmodule\n"),
+                      "y"),
+            7u);
+}
+
+// The module-scope dynamic array, sized by new[] (§7.5.1) and then given an
+// object in its second element.
+TEST(ClassSim, NewIntoAnElementOfADeclaredDynamicArrayIsReadThroughIt) {
+  EXPECT_EQ(RunAndGet(HandleArrayDesign("module t;\n"
+                                        "  C d[];\n"
+                                        "  int y;\n"
+                                        "  initial begin\n"
+                                        "    d = new[2];\n"
+                                        "    d[1] = new;\n"
+                                        "    y = d[1].v;\n"
+                                        "  end\n"
+                                        "endmodule\n"),
+                      "y"),
+            7u);
+}
+
+// Both arrays declared in the initial block itself, whose elements are the
+// block's own (§7.4.2 in a begin-end block): 77 is the fixed array's second
+// element then the dynamic array's first.
+TEST(ClassSim, NewIntoElementsOfBlockDeclaredArraysIsReadThroughThem) {
+  EXPECT_EQ(RunAndGet(HandleArrayDesign("module t;\n"
+                                        "  int y;\n"
+                                        "  initial begin\n"
+                                        "    C arr[2];\n"
+                                        "    C d[];\n"
+                                        "    arr[1] = new;\n"
+                                        "    d = new[2];\n"
+                                        "    d[0] = new;\n"
+                                        "    y = arr[1].v * 10 + d[0].v;\n"
+                                        "  end\n"
+                                        "endmodule\n"),
+                      "y"),
+            77u);
 }
 
 }  // namespace

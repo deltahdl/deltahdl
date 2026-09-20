@@ -178,6 +178,18 @@ static std::string_view ClassNewTargetKey(const Expr* lhs, Arena& arena) {
                                     std::string(lhs->rhs->text));
 }
 
+// §7.5.1 (printed page 158) with §8.4 (printed 181): the class a declaration
+// records under an array's name (SetVariableClassType by Lowerer::LowerVar,
+// ExecVarDeclImpl and CreateFuncLocalVar) is its elements', and `d = new[2]`
+// on a dynamic array of handles sizes the array (TryQueueBlockingAssign)
+// rather than constructing an object, so a target that holds an array's shape
+// is no handle to construct into. Whether `name` holds one: a fixed-size or
+// dynamic array's, a queue's or an associative array's.
+static bool NameHoldsAnArray(std::string_view name, SimContext& ctx) {
+  return ctx.FindArrayInfo(name) != nullptr || ctx.FindQueue(name) != nullptr ||
+         ctx.FindAssocArray(name) != nullptr;
+}
+
 bool TryClassNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (!stmt->rhs || stmt->rhs->kind != ExprKind::kCall) return false;
   if (stmt->rhs->text != "new") return false;
@@ -186,6 +198,11 @@ bool TryClassNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (target.empty()) return false;
   auto type_name = ctx.GetVariableClassType(target);
   if (type_name.empty()) return false;
+  // Asked ahead of the array paths (TryDispatchSpecialBlockingAssign in
+  // statement_assign_core.cpp), this took a module's `C d[]; d = new[2];`
+  // for a construction: a C was built by the size, its handle written into
+  // the array's carrier, and the array never sized.
+  if (NameHoldsAnArray(target, ctx)) return false;
 
   if (TryClassCopyNewAssign(stmt, target, ctx, arena)) return true;
 
