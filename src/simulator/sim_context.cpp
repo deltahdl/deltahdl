@@ -430,11 +430,6 @@ void SimContext::NullifyEventVariable(std::string_view name) {
   var->is_null_event = true;
 }
 
-Net* SimContext::FindNet(std::string_view name) {
-  auto it = nets_.find(name);
-  return (it != nets_.end()) ? it->second : nullptr;
-}
-
 namespace {
 
 // §6.7.1: install a net's default value before it is driven. A user-defined

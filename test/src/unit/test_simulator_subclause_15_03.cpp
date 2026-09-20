@@ -299,4 +299,40 @@ TEST(SemaphoreSim, OneKeyAdmitsOneProcessAtATime) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
+// §15.3 in an instantiated module: `semaphore s` declared in M, which top
+// instantiates as `m`, is created under "m.s", and §23.9 resolves the bare
+// name `s` inside M through the instance. The lookup
+// (SimContext::FindSemaphore) asked for the bare key alone, so `s = new(0)`
+// filled no bucket, put() and get() ran on no semaphore, and try_get() was
+// served by none. The bucket starts empty, put() returns two keys, get()
+// procures one without waiting so the count after it is 1, the first try_get()
+// procures the last key and the second finds none: 1, 1, 0 read as 110.
+TEST(SemaphoreSim, ChildInstanceBucketAnswersItsBareName) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module M;\n"
+      "  semaphore s;\n"
+      "  int gets, first, second, r;\n"
+      "  initial begin\n"
+      "    gets = 0;\n"
+      "    s = new(0);\n"
+      "    s.put(2);\n"
+      "    s.get(1);\n"
+      "    gets = gets + 1;\n"
+      "    first = s.try_get(1);\n"
+      "    second = s.try_get(1);\n"
+      "    r = gets * 100 + first * 10 + second;\n"
+      "  end\n"
+      "endmodule\n"
+      "module top;\n"
+      "  M m();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* r = f.ctx.FindVariable("m.r");
+  ASSERT_NE(r, nullptr);
+  EXPECT_EQ(r->value.ToUint64(), 110u);
+}
+
 }  // namespace

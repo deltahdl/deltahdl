@@ -52,4 +52,38 @@ TEST(ForceReleaseSim, ForceOfAVectorVariableTruncatesToItsWidth) {
   EXPECT_EQ(q->value.ToUint64(), 0x5u);
 }
 
+// §10.6.2 in an instantiated module: `wire w` declared in M, which top
+// instantiates as `m`, is created under "m.w", and §23.9 resolves the bare
+// name `w` inside M through the instance. The net lookup (SimContext::FindNet)
+// asked for the bare key alone, so the instance's `assign w = 0` wrote the
+// variable directly instead of driving the net, and `release w` found no net
+// to re-resolve from its drivers: the forced 1 stood after the release. The
+// force overrides the driver, so w reads 1 while forced, and the release
+// hands w back to the driver, so it reads 0 after: 10.
+TEST(ForceReleaseSim, ChildInstanceReleaseReresolvesFromTheInstancesDriver) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module M;\n"
+      "  wire w;\n"
+      "  int r, forced, released;\n"
+      "  assign w = 1'b0;\n"
+      "  initial begin\n"
+      "    force w = 1'b1;\n"
+      "    #1 forced = w;\n"
+      "    release w;\n"
+      "    #1 released = w;\n"
+      "    r = forced * 10 + released;\n"
+      "  end\n"
+      "endmodule\n"
+      "module top;\n"
+      "  M m();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* r = f.ctx.FindVariable("m.r");
+  ASSERT_NE(r, nullptr);
+  EXPECT_EQ(r->value.ToUint64(), 10u);
+}
+
 }  // namespace

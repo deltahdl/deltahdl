@@ -133,6 +133,29 @@ AssocArrayObject* SimContext::FindAssocArray(std::string_view name) {
   return (it != assoc_arrays_.end()) ? it->second : nullptr;
 }
 
+// §23.9: a net declared inside a module instance is stored under that
+// instance's prefix (CreateChildModuleNets in lowerer_child.cpp), so the
+// prefixed name is what a bare reference from within the instance denotes and
+// is tried first, as in FindQueue above; a net has no scope frame to search
+// ahead of it, a subroutine or a block declaring none. Asked by the bare key
+// alone, a net declared in an instantiated module was no net to any writer
+// naming it from within: a continuous assignment wrote the variable directly
+// instead of joining the net's drivers, so a second driver of the same net
+// overwrote the first rather than resolving with it, a release re-resolved
+// nothing and left the forced value standing (§10.6.2), and %v, $countdrivers
+// and a primitive's output found no net -- while a top-level net of the same
+// name took every one of them. The unprefixed lookup stays as the answer for a
+// net of the enclosing scope.
+Net* SimContext::FindNet(std::string_view name) {
+  std::string prefix = ActiveInstancePrefix();
+  if (!prefix.empty()) {
+    auto prefixed = nets_.find(prefix + std::string(name));
+    if (prefixed != nets_.end()) return prefixed->second;
+  }
+  auto it = nets_.find(name);
+  return (it != nets_.end()) ? it->second : nullptr;
+}
+
 void SimContext::SetVariableTag(std::string_view var_name,
                                 std::string_view tag) {
   var_tags_[var_name] = std::string(tag);
@@ -269,7 +292,20 @@ SemaphoreObject* SimContext::CreateSemaphore(std::string_view name,
   return sem;
 }
 
+// §23.9: a semaphore declared inside a module instance is stored under that
+// instance's prefix (CreateChildModuleVariables in lowerer_child.cpp reaching
+// CreateSemaphoreForVar in lowerer_var.cpp), so the prefixed name is what a
+// bare reference from within the instance denotes and is tried first, as in
+// FindQueue above. Asked by the bare key alone, no semaphore answered the
+// name inside an instance: `s = new(2)` filled no bucket, get() and put()
+// ran on none, and try_get() was served by no semaphore. The unprefixed
+// lookup stays as the answer for a semaphore of the enclosing scope.
 SemaphoreObject* SimContext::FindSemaphore(std::string_view name) {
+  std::string prefix = ActiveInstancePrefix();
+  if (!prefix.empty()) {
+    auto prefixed = semaphores_.find(prefix + std::string(name));
+    if (prefixed != semaphores_.end()) return prefixed->second;
+  }
   auto it = semaphores_.find(name);
   return (it != semaphores_.end()) ? it->second : nullptr;
 }
