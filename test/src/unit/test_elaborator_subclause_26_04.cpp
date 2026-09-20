@@ -178,4 +178,75 @@ TEST(PackageImportInHeader, WildcardProgramHeaderImportVisibleInPort) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §26.4 (printed page 812 of ~/LRM.pdf) types a port through a header import,
+// its own example writing `input instruction_t a` after `import
+// A::instruction_t`, and §7.2.1 makes a member of a packed structure a window
+// of the variable's bits. The port record carries a width alone, so a port so
+// typed had no layout for `a.opcode` to select from; the module now declares
+// the port's variable with the structure resolved, as a non-ANSI body
+// declaration would. The width is 8 + 24, which is not RtlirVariable's default
+// of 1 and not the 8 of the first member alone, and the layout carries both
+// members. The instantiated module is the one that was probed, so the child is
+// elaborated through the top.
+TEST(PackageImportInHeader, WildcardImportedStructPortDeclaresItsVariable) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "package A;\n"
+      "  typedef struct packed { logic [7:0] opcode; logic [23:0] imm; } "
+      "instruction_t;\n"
+      "endpackage\n"
+      "module M import A::*; (input instruction_t a);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  A::instruction_t instr;\n"
+      "  M m(.a(instr));\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* a = FindVar(design, "M", "a");
+  ASSERT_NE(a, nullptr);
+  EXPECT_EQ(a->width, 32u);
+  EXPECT_TRUE(a->is_4state);
+  ASSERT_NE(a->dtype, nullptr);
+  ASSERT_EQ(a->dtype->struct_members.size(), 2u);
+  EXPECT_EQ(a->dtype->struct_members[0].name, "opcode");
+  EXPECT_EQ(a->dtype->struct_members[1].name, "imm");
+}
+
+// The same declaration through the explicit form of §26.4's example, `import
+// A::instruction_t, B::*;` ahead of a parameter port list, on the top itself:
+// the module's own port list, not an instance's, is what declares the variable.
+// The `bit` members make the variable 2-state, which is read back as well since
+// a layout copied from the wrong type would as easily carry the wrong state.
+TEST(PackageImportInHeader,
+     NamedImportedStructPortOfTheTopDeclaresItsVariable) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "package A;\n"
+      "  typedef struct packed { bit [7:0] opcode; bit [23:0] addr; } "
+      "instruction_t;\n"
+      "endpackage\n"
+      "package B;\n"
+      "  typedef enum bit { FALSE, TRUE } boolean_t;\n"
+      "endpackage\n"
+      "module M import A::instruction_t, B::*;\n"
+      "  #(WIDTH = 32)\n"
+      "  (input [WIDTH-1:0] data, output instruction_t a, output boolean_t OK);"
+      "\n"
+      "  assign OK = TRUE;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* a = FindVar(design, "M", "a");
+  ASSERT_NE(a, nullptr);
+  EXPECT_EQ(a->width, 32u);
+  EXPECT_FALSE(a->is_4state);
+  ASSERT_NE(a->dtype, nullptr);
+  EXPECT_EQ(a->dtype->struct_members.size(), 2u);
+  EXPECT_EQ(FindVar(design, "M", "data"), nullptr);
+  EXPECT_EQ(FindVar(design, "M", "OK"), nullptr);
+}
+
 }  // namespace

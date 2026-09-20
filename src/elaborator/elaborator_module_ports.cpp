@@ -266,7 +266,74 @@ struct PortElabContext {
   std::unordered_map<std::string_view, uint32_t>& partial_ports;
   std::unordered_set<std::string_view>& signed_ports;
   DiagEngine& diag;
+  // The arena the resolved aggregate type of a structure port is copied into,
+  // and the module the port's variable is declared on.
+  Arena& arena;
+  RtlirModule* mod;
 };
+
+// The structure or union a port's data type stands for: the type itself when
+// the header wrote one, or the one a typedef name resolves to through the
+// typedef table, followed through a name that stands for another name. Null
+// for a port of any other type, and for a name the table does not hold.
+static const DataType* PortAggregateType(const DataType& dtype,
+                                         const TypedefMap& typedefs) {
+  const DataType* d = &dtype;
+  for (int hops = 0; d->kind == DataTypeKind::kNamed && hops < 16; ++hops) {
+    d = FindNamedType(*d, typedefs);
+    if (d == nullptr) return nullptr;
+  }
+  if (d->kind != DataTypeKind::kStruct && d->kind != DataTypeKind::kUnion) {
+    return nullptr;
+  }
+  return d->struct_members.empty() ? nullptr : d;
+}
+
+// §7.2.1 with §23.2.2.2: a port whose data type is a structure or a union is
+// a variable of that aggregate, and a member select of it, `a.opcode`, names
+// the run of the variable's bits the type lays the member out at. The port
+// record carries the port's width and no layout, and an ANSI port has no body
+// declaration to carry one either, so the simulator created the port's storage
+// with no members to select: `a.opcode` read nothing of the connected value.
+// The port therefore declares the variable a body declaration of the same name
+// declares for a non-ANSI port (§23.2.2.1), carrying the resolved aggregate for
+// its layout; the simulator finds the storage already created under the port's
+// name and keeps it as the port. §26.4 applies a header import before the port
+// list, so a package's structure resolves here as the module's own does. A
+// port with an unpacked or a use-site packed dimension is an array of the
+// aggregate rather than one, and is left with the width alone as before. A
+// checker's formal is §17.2's, an expression substituted at the instance rather
+// than a variable of the checker, so a checker declares none.
+static void DeclareAggregatePortVariable(const ModuleDecl* decl,
+                                         const PortDecl& port,
+                                         const RtlirPort& rp,
+                                         const PortElabContext& ctx) {
+  if (decl->is_non_ansi_ports || decl->decl_kind == ModuleDeclKind::kChecker ||
+      !rp.is_var || rp.is_interface_port || port.name.empty() ||
+      port.port_expr != nullptr || !port.unpacked_dims.empty() ||
+      port.data_type.packed_dim_left != nullptr ||
+      !port.data_type.extra_packed_dims.empty()) {
+    return;
+  }
+  const DataType* aggregate = PortAggregateType(port.data_type, ctx.typedefs);
+  if (aggregate == nullptr) return;
+  RtlirVariable var;
+  var.name = port.name;
+  // §37.3.3: the variable stands where the port declaration does.
+  var.loc = port.loc;
+  var.width = rp.width;
+  var.is_4state = Is4stateType(port.data_type, ctx.typedefs);
+  var.is_signed = IsSignedType(port.data_type, ctx.typedefs);
+  // §23.2.2.2, footnote 2: a variable output port's initializer is the value
+  // the variable holds before any procedure runs, as a declaration's is.
+  var.init_expr = rp.init_value;
+  var.elem_type_kind = port.data_type.kind;
+  var.decl_kind = port.data_type.kind;
+  auto* copy = ctx.arena.Create<DataType>(*aggregate);
+  ResolveNestedAggregateTypes(*copy, ctx.typedefs, ctx.arena);
+  var.dtype = copy;
+  ctx.mod->variables.push_back(var);
+}
 
 // §23.2.2.3: a port whose port kind was omitted is "a net of default net type"
 // for input and inout, and for output when the data type was omitted or
@@ -447,7 +514,9 @@ void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
                       non_ansi_complete_ports_,
                       non_ansi_partial_ports_,
                       non_ansi_signed_ports_,
-                      diag_};
+                      diag_,
+                      arena_,
+                      mod};
 
   for (const auto& port : decl->ports) {
     if (RejectIllegalPortType(port, diag_)) continue;
@@ -484,6 +553,7 @@ void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
       }
     }
 
+    DeclareAggregatePortVariable(decl, port, rp, ctx);
     mod->ports.push_back(rp);
   }
 }
