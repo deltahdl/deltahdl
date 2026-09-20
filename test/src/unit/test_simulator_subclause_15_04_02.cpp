@@ -2,6 +2,7 @@
 
 #include <cstdint>
 
+#include "common/types.h"
 #include "fixture_simulator.h"
 #include "simulator/sync_objects.h"
 
@@ -9,14 +10,26 @@ using namespace delta;
 
 namespace {
 
+// A 64-bit two-state message holding `v`, as the C++ cases below place one,
+// and the low word of a message read back out of the queue.
+Logic4Snapshot Msg(uint64_t v) {
+  Logic4Word word{v, 0};
+  Logic4Vec vec{64, 1, &word};
+  Logic4Snapshot snap;
+  snap.Capture(vec);
+  return snap;
+}
+
+uint64_t Word(const Logic4Snapshot& msg) { return msg.Get().ToUint64(); }
+
 TEST(IpcSync, MailboxNumReflectsState) {
   delta::MailboxObject mb;
   EXPECT_EQ(mb.Num(), 0);
-  mb.TryPut(1);
+  mb.TryPut(Msg(1).Get());
   EXPECT_EQ(mb.Num(), 1);
-  mb.TryPut(2);
+  mb.TryPut(Msg(2).Get());
   EXPECT_EQ(mb.Num(), 2);
-  uint64_t msg = 0;
+  Logic4Snapshot msg;
   mb.TryGet(msg);
   EXPECT_EQ(mb.Num(), 1);
   mb.TryGet(msg);
@@ -25,11 +38,11 @@ TEST(IpcSync, MailboxNumReflectsState) {
 
 TEST(IpcSync, MailboxNumAtBound) {
   delta::MailboxObject mb(3);
-  mb.TryPut(1);
-  mb.TryPut(2);
-  mb.TryPut(3);
+  mb.TryPut(Msg(1).Get());
+  mb.TryPut(Msg(2).Get());
+  mb.TryPut(Msg(3).Get());
   EXPECT_EQ(mb.Num(), 3);
-  EXPECT_EQ(mb.TryPut(4), 0);
+  EXPECT_EQ(mb.TryPut(Msg(4).Get()), 0);
   EXPECT_EQ(mb.Num(), 3);
 }
 
@@ -39,7 +52,7 @@ TEST(IpcSync, MailboxNumAtBound) {
 TEST(IpcSync, MailboxNumUnchangedByFailedGet) {
   delta::MailboxObject mb;
   EXPECT_EQ(mb.Num(), 0);
-  uint64_t msg = 0;
+  Logic4Snapshot msg;
   mb.TryGet(msg);
   EXPECT_EQ(mb.Num(), 0);
 }

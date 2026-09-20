@@ -2,6 +2,7 @@
 
 #include <cstdint>
 
+#include "common/types.h"
 #include "fixture_simulator.h"
 #include "simulator/sync_objects.h"
 
@@ -9,10 +10,22 @@ using namespace delta;
 
 namespace {
 
+// A 64-bit two-state message holding `v`, as the C++ cases below place one,
+// and the low word of a message read back out of the queue.
+Logic4Snapshot Msg(uint64_t v) {
+  Logic4Word word{v, 0};
+  Logic4Vec vec{64, 1, &word};
+  Logic4Snapshot snap;
+  snap.Capture(vec);
+  return snap;
+}
+
+uint64_t Word(const Logic4Snapshot& msg) { return msg.Get().ToUint64(); }
+
 TEST(IpcSync, MailboxTryPutBoundedWithRoom) {
   MailboxObject mb(2);
-  EXPECT_EQ(mb.TryPut(10), 1);
-  EXPECT_EQ(mb.TryPut(20), 1);
+  EXPECT_EQ(mb.TryPut(Msg(10).Get()), 1);
+  EXPECT_EQ(mb.TryPut(Msg(20).Get()), 1);
   EXPECT_EQ(mb.Num(), 2);
 }
 
@@ -22,46 +35,46 @@ TEST(IpcSync, MailboxTryPutBoundedWithRoom) {
 // rejected message leaves the queue (and its FIFO contents) undisturbed.
 TEST(IpcSync, MailboxTryPutRejectsAtBoundGreaterThanOne) {
   MailboxObject mb(2);
-  EXPECT_EQ(mb.TryPut(10), 1);
-  EXPECT_EQ(mb.TryPut(20), 1);
-  EXPECT_EQ(mb.TryPut(30), 0);
+  EXPECT_EQ(mb.TryPut(Msg(10).Get()), 1);
+  EXPECT_EQ(mb.TryPut(Msg(20).Get()), 1);
+  EXPECT_EQ(mb.TryPut(Msg(30).Get()), 0);
   EXPECT_EQ(mb.Num(), 2);
-  uint64_t msg = 0;
+  Logic4Snapshot msg;
   mb.TryGet(msg);
-  EXPECT_EQ(msg, 10u);
+  EXPECT_EQ(Word(msg), 10u);
   mb.TryGet(msg);
-  EXPECT_EQ(msg, 20u);
+  EXPECT_EQ(Word(msg), 20u);
 }
 
 TEST(IpcSync, MailboxTryPutFifoOrder) {
   MailboxObject mb;
-  mb.TryPut(100);
-  mb.TryPut(200);
-  mb.TryPut(300);
-  uint64_t msg = 0;
+  mb.TryPut(Msg(100).Get());
+  mb.TryPut(Msg(200).Get());
+  mb.TryPut(Msg(300).Get());
+  Logic4Snapshot msg;
   mb.TryGet(msg);
-  EXPECT_EQ(msg, 100u);
+  EXPECT_EQ(Word(msg), 100u);
   mb.TryGet(msg);
-  EXPECT_EQ(msg, 200u);
+  EXPECT_EQ(Word(msg), 200u);
   mb.TryGet(msg);
-  EXPECT_EQ(msg, 300u);
+  EXPECT_EQ(Word(msg), 300u);
 }
 
 TEST(IpcSync, MailboxTryPutUnboundedNeverFull) {
   MailboxObject mb;
   for (int i = 0; i < 100; ++i) {
-    EXPECT_EQ(mb.TryPut(static_cast<uint64_t>(i)), 1);
+    EXPECT_EQ(mb.TryPut(Msg(static_cast<uint64_t>(i)).Get()), 1);
   }
   EXPECT_EQ(mb.Num(), 100);
 }
 
 TEST(IpcSync, MailboxTryPutSucceedsAfterGetFreesSpace) {
   MailboxObject mb(1);
-  EXPECT_EQ(mb.TryPut(10), 1);
-  EXPECT_EQ(mb.TryPut(20), 0);
-  uint64_t msg = 0;
+  EXPECT_EQ(mb.TryPut(Msg(10).Get()), 1);
+  EXPECT_EQ(mb.TryPut(Msg(20).Get()), 0);
+  Logic4Snapshot msg;
   mb.TryGet(msg);
-  EXPECT_EQ(mb.TryPut(30), 1);
+  EXPECT_EQ(mb.TryPut(Msg(30).Get()), 1);
   EXPECT_EQ(mb.Num(), 1);
 }
 

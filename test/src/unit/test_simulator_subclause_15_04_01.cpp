@@ -3,11 +3,24 @@
 #include <cstdint>
 #include <string_view>
 
+#include "common/types.h"
 #include "fixture_simulator.h"
 #include "simulator/stmt_exec.h"
 #include "simulator/sync_objects.h"
 
 namespace {
+
+// A 64-bit two-state message holding `v`, as the C++ cases below place one,
+// and the low word of a message read back out of the queue.
+Logic4Snapshot Msg(uint64_t v) {
+  Logic4Word word{v, 0};
+  Logic4Vec vec{64, 1, &word};
+  Logic4Snapshot snap;
+  snap.Capture(vec);
+  return snap;
+}
+
+uint64_t Word(const Logic4Snapshot& msg) { return msg.Get().ToUint64(); }
 
 TEST(IpcSync, MailboxNewUnbounded) {
   MailboxObject mb;
@@ -24,9 +37,9 @@ TEST(IpcSync, MailboxNewNegativeBoundClampsToZero) {
 TEST(IpcSync, MailboxNewBoundOne) {
   MailboxObject mb(1);
   EXPECT_EQ(mb.bound, 1);
-  EXPECT_EQ(mb.TryPut(42), 1);
+  EXPECT_EQ(mb.TryPut(Msg(42).Get()), 1);
   EXPECT_TRUE(mb.IsFull());
-  EXPECT_EQ(mb.TryPut(99), 0);
+  EXPECT_EQ(mb.TryPut(Msg(99).Get()), 0);
 }
 
 // §15.4.1: a nonzero bound is the size of the mailbox queue. Confirm that a
@@ -36,14 +49,14 @@ TEST(IpcSync, MailboxNewBoundOne) {
 TEST(IpcSync, MailboxNewBoundedFillsAtBoundValue) {
   MailboxObject mb(3);
   EXPECT_EQ(mb.bound, 3);
-  EXPECT_EQ(mb.TryPut(10), 1);
+  EXPECT_EQ(mb.TryPut(Msg(10).Get()), 1);
   EXPECT_FALSE(mb.IsFull());
-  EXPECT_EQ(mb.TryPut(20), 1);
+  EXPECT_EQ(mb.TryPut(Msg(20).Get()), 1);
   EXPECT_FALSE(mb.IsFull());
-  EXPECT_EQ(mb.TryPut(30), 1);
+  EXPECT_EQ(mb.TryPut(Msg(30).Get()), 1);
   EXPECT_TRUE(mb.IsFull());
   EXPECT_EQ(mb.Num(), 3);
-  EXPECT_EQ(mb.TryPut(40), 0);
+  EXPECT_EQ(mb.TryPut(Msg(40).Get()), 0);
 }
 
 TEST(IpcSync, MailboxNewContextUnbounded) {
@@ -76,7 +89,8 @@ TEST(IpcSync, MailboxNewContextBounded) {
 TEST(IpcSync, MailboxNewUnboundedPutNeverBlocks) {
   MailboxObject mb;  // default bound 0 -> unbounded
   for (int i = 0; i < 1000; ++i) {
-    EXPECT_EQ(mb.Put(static_cast<uint64_t>(i)), MbxPutStatus::kPlaced);
+    EXPECT_EQ(mb.Put(Msg(static_cast<uint64_t>(i)).Get()),
+              MbxPutStatus::kPlaced);
     EXPECT_FALSE(mb.IsFull());
   }
   EXPECT_EQ(mb.Num(), 1000);
@@ -91,10 +105,10 @@ TEST(IpcSync, MailboxNewUnboundedPutNeverBlocks) {
 // block.
 TEST(IpcSync, MailboxNewBoundedPutBlocksWhenFull) {
   MailboxObject mb(2);  // nonzero bound -> queue size is 2
-  EXPECT_EQ(mb.Put(11), MbxPutStatus::kPlaced);
-  EXPECT_EQ(mb.Put(22), MbxPutStatus::kPlaced);
+  EXPECT_EQ(mb.Put(Msg(11).Get()), MbxPutStatus::kPlaced);
+  EXPECT_EQ(mb.Put(Msg(22).Get()), MbxPutStatus::kPlaced);
   EXPECT_TRUE(mb.IsFull());
-  EXPECT_EQ(mb.Put(33), MbxPutStatus::kBlock);
+  EXPECT_EQ(mb.Put(Msg(33).Get()), MbxPutStatus::kBlock);
   EXPECT_EQ(mb.Num(), 2);
 }
 

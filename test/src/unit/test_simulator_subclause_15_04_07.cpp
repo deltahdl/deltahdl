@@ -4,16 +4,31 @@
 #include <cstdint>
 #include <vector>
 
+#include "common/types.h"
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "simulator/sync_objects.h"
 
 using namespace delta;
 
 namespace {
 
-// Arbitrary, distinct type ids standing in for two non-equivalent data types.
-constexpr uint32_t kTypeInt = 1;
-constexpr uint32_t kTypeString = 2;
+// A 64-bit two-state message holding `v`, as the C++ cases below place one,
+// and the low word of a message read back out of the queue.
+Logic4Snapshot Msg(uint64_t v) {
+  Logic4Word word{v, 0};
+  Logic4Vec vec{64, 1, &word};
+  Logic4Snapshot snap;
+  snap.Capture(vec);
+  return snap;
+}
+
+uint64_t Word(const Logic4Snapshot& msg) { return msg.Get().ToUint64(); }
+
+// Two non-equivalent message types, §6.22.2 c)'s int and §6.22.1 a)'s string.
+constexpr MailboxMessageType kTypeInt =
+    MailboxMessageType::Integral(32, true, MailboxMessageType::States::kTwo);
+constexpr MailboxMessageType kTypeString = MailboxMessageType::String();
 
 // Minimal coroutine helpers used to observe the suspend/resume side of peek()
 // and get(). Each starts suspended; the first resume runs it to the co_await,
@@ -54,14 +69,14 @@ struct BlockingTask {
   std::coroutine_handle<promise_type> h;
 };
 
-inline BlockingTask SpawnPeeker(MailboxObject& mbx, uint64_t& out,
+inline BlockingTask SpawnPeeker(MailboxObject& mbx, Logic4Snapshot& out,
                                 std::vector<int>& ran, int id) {
   co_await PeekWaiter{mbx};
   mbx.Peek(out);
   ran.push_back(id);
 }
 
-inline BlockingTask SpawnGetter(MailboxObject& mbx, uint64_t& out,
+inline BlockingTask SpawnGetter(MailboxObject& mbx, Logic4Snapshot& out,
                                 std::vector<int>& ran, int id) {
   co_await GetWaiter{mbx};
   mbx.Get(out);
@@ -70,50 +85,50 @@ inline BlockingTask SpawnGetter(MailboxObject& mbx, uint64_t& out,
 
 TEST(IpcSync, MailboxPeekCopiesWithoutRemoving) {
   MailboxObject mb;
-  mb.TryPut(42);
-  uint64_t msg = 0;
+  mb.TryPut(Msg(42).Get());
+  Logic4Snapshot msg;
   EXPECT_EQ(mb.Peek(msg), MbxPeekStatus::kCopied);
-  EXPECT_EQ(msg, 42u);
+  EXPECT_EQ(Word(msg), 42u);
   EXPECT_EQ(mb.Num(), 1);
 }
 
 TEST(IpcSync, MailboxPeekEmptyReturnsBlock) {
   MailboxObject mb;
-  uint64_t msg = 0;
+  Logic4Snapshot msg;
   EXPECT_EQ(mb.Peek(msg), MbxPeekStatus::kBlock);
 }
 
 TEST(IpcSync, MailboxPeekRepeatedReturnsSameMessage) {
   MailboxObject mb;
-  mb.TryPut(100);
-  mb.TryPut(200);
-  uint64_t msg = 0;
+  mb.TryPut(Msg(100).Get());
+  mb.TryPut(Msg(200).Get());
+  Logic4Snapshot msg;
   EXPECT_EQ(mb.Peek(msg), MbxPeekStatus::kCopied);
-  EXPECT_EQ(msg, 100u);
+  EXPECT_EQ(Word(msg), 100u);
   EXPECT_EQ(mb.Peek(msg), MbxPeekStatus::kCopied);
-  EXPECT_EQ(msg, 100u);
+  EXPECT_EQ(Word(msg), 100u);
   EXPECT_EQ(mb.Num(), 2);
 }
 
 TEST(IpcSync, MailboxPeekThenGetReturnsSameMessage) {
   MailboxObject mb;
-  mb.TryPut(55);
-  uint64_t peek_msg = 0;
-  uint64_t get_msg = 0;
+  mb.TryPut(Msg(55).Get());
+  Logic4Snapshot peek_msg;
+  Logic4Snapshot get_msg;
   EXPECT_EQ(mb.Peek(peek_msg), MbxPeekStatus::kCopied);
   EXPECT_EQ(mb.Get(get_msg), MbxGetStatus::kRetrieved);
-  EXPECT_EQ(peek_msg, get_msg);
+  EXPECT_EQ(Word(peek_msg), Word(get_msg));
   EXPECT_EQ(mb.Num(), 0);
 }
 
 TEST(IpcSync, MailboxPeekAfterGetReturnsNext) {
   MailboxObject mb;
-  mb.TryPut(10);
-  mb.TryPut(20);
-  uint64_t msg = 0;
+  mb.TryPut(Msg(10).Get());
+  mb.TryPut(Msg(20).Get());
+  Logic4Snapshot msg;
   mb.Get(msg);
   EXPECT_EQ(mb.Peek(msg), MbxPeekStatus::kCopied);
-  EXPECT_EQ(msg, 20u);
+  EXPECT_EQ(Word(msg), 20u);
   EXPECT_EQ(mb.Num(), 1);
 }
 
@@ -123,10 +138,10 @@ TEST(IpcSync, MailboxPeekAfterGetReturnsNext) {
 // clobbered.
 TEST(IpcSync, MailboxPeekTypeMismatchGeneratesError) {
   MailboxObject mb;
-  mb.TryPut(0xAB, kTypeInt);
-  uint64_t msg = 0;
+  mb.TryPut(Msg(0xAB).Get(), kTypeInt);
+  Logic4Snapshot msg = Msg(0xEE);
   EXPECT_EQ(mb.Peek(msg, kTypeString), MbxPeekStatus::kTypeError);
-  EXPECT_EQ(msg, 0u);
+  EXPECT_EQ(Word(msg), 0xEEu);
   EXPECT_EQ(mb.Num(), 1);
 }
 
@@ -134,11 +149,11 @@ TEST(IpcSync, MailboxPeekTypeMismatchGeneratesError) {
 // later peek() with the matching type still copies it.
 TEST(IpcSync, MailboxPeekTypeErrorLeavesMessageForMatchingPeek) {
   MailboxObject mb;
-  mb.TryPut(0xAB, kTypeInt);
-  uint64_t msg = 0;
+  mb.TryPut(Msg(0xAB).Get(), kTypeInt);
+  Logic4Snapshot msg;
   EXPECT_EQ(mb.Peek(msg, kTypeString), MbxPeekStatus::kTypeError);
   EXPECT_EQ(mb.Peek(msg, kTypeInt), MbxPeekStatus::kCopied);
-  EXPECT_EQ(msg, 0xABu);
+  EXPECT_EQ(Word(msg), 0xABu);
   EXPECT_EQ(mb.Num(), 1);
 }
 
@@ -149,19 +164,19 @@ TEST(IpcSync, MailboxPeekTypeErrorLeavesMessageForMatchingPeek) {
 TEST(IpcSync, MailboxPeekBlocksUntilMessagePlaced) {
   MailboxObject mb;  // empty
   std::vector<int> ran;
-  uint64_t got = 0;
+  Logic4Snapshot got;
   auto peeker = SpawnPeeker(mb, got, ran, 7);
   peeker.h.resume();  // runs to the co_await; empty -> parks on peek_waiters
   ASSERT_EQ(mb.peek_waiters.size(), 1u);
   EXPECT_TRUE(ran.empty());
 
-  EXPECT_EQ(mb.TryPut(0x55),
-            1);  // wakes the parked peeker via WakeGetWaiters()
+  // Wakes the parked peeker via WakeGetWaiters().
+  EXPECT_EQ(mb.TryPut(Msg(0x55).Get()), 1);
   ASSERT_EQ(ran.size(), 1u);
   EXPECT_EQ(ran[0], 7);
   EXPECT_TRUE(mb.peek_waiters.empty());
-  EXPECT_EQ(got, 0x55u);   // the resumed peeker copied the placed message
-  EXPECT_EQ(mb.Num(), 1);  // and left it in the queue
+  EXPECT_EQ(Word(got), 0x55u);  // the resumed peeker copied the placed message
+  EXPECT_EQ(mb.Num(), 1);       // and left it in the queue
 
   peeker.h.destroy();
 }
@@ -173,7 +188,7 @@ TEST(IpcSync, MailboxPeekBlocksUntilMessagePlaced) {
 TEST(IpcSync, MailboxOneMessageUnblocksMultiplePeekersAndGetter) {
   MailboxObject mb;  // empty
   std::vector<int> ran;
-  uint64_t p1 = 0, p2 = 0, g = 0;
+  Logic4Snapshot p1, p2, g;
   auto peeker1 = SpawnPeeker(mb, p1, ran, 1);
   auto peeker2 = SpawnPeeker(mb, p2, ran, 2);
   auto getter = SpawnGetter(mb, g, ran, 3);
@@ -185,14 +200,14 @@ TEST(IpcSync, MailboxOneMessageUnblocksMultiplePeekersAndGetter) {
   EXPECT_TRUE(ran.empty());
 
   // One message wakes both blocked peekers and the blocked getter.
-  EXPECT_EQ(mb.TryPut(0x77), 1);
+  EXPECT_EQ(mb.TryPut(Msg(0x77).Get()), 1);
   EXPECT_EQ(ran.size(), 3u);
   EXPECT_TRUE(mb.peek_waiters.empty());
   EXPECT_TRUE(mb.get_waiters.empty());
-  EXPECT_EQ(p1, 0x77u);  // both peekers copied the same message...
-  EXPECT_EQ(p2, 0x77u);
-  EXPECT_EQ(g, 0x77u);     // ...and the getter retrieved it
-  EXPECT_EQ(mb.Num(), 0);  // only the getter removed it from the queue
+  EXPECT_EQ(Word(p1), 0x77u);  // both peekers copied the same message...
+  EXPECT_EQ(Word(p2), 0x77u);
+  EXPECT_EQ(Word(g), 0x77u);  // ...and the getter retrieved it
+  EXPECT_EQ(mb.Num(), 0);     // only the getter removed it from the queue
 
   peeker1.h.destroy();
   peeker2.h.destroy();
@@ -239,6 +254,34 @@ TEST(MailboxSim, PeekWaitsUntilAMessageIsPlaced) {
       f, "r");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 621u);
+}
+
+// §15.4.7 (printed page 376): when the type of the message variable is not
+// equivalent to the type of the message in the mailbox, peek() generates a
+// run-time error. The typeless mailbox holds the real 2.5, and peek() into
+// an int is reported at the variable and leaves the int as it was: 9. An
+// untyped copy stored the low word of the real's bit pattern over the 9.
+TEST(MailboxSim, PeekIntoAVariableOfAnotherTypeIsAnError) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  mailbox mb = new;\n"
+      "  int x = 9;\n"
+      "  initial begin\n"
+      "    mb.put(2.5);\n"
+      "    mb.peek(x);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "mailbox peek(): the message's type is not equivalent to the type of 'x'",
+      6, "15.4.7"));
+  auto* x = f.ctx.FindVariable("x");
+  ASSERT_NE(x, nullptr);
+  EXPECT_EQ(x->value.ToUint64(), 9u);
 }
 
 }  // namespace

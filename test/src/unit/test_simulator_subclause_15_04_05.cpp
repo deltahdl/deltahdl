@@ -4,12 +4,27 @@
 #include <cstdint>
 #include <vector>
 
+#include "common/types.h"
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
+#include "helpers_string_var.h"
 #include "simulator/sync_objects.h"
 
 using namespace delta;
 
 namespace {
+
+// A 64-bit two-state message holding `v`, as the C++ cases below place one,
+// and the low word of a message read back out of the queue.
+Logic4Snapshot Msg(uint64_t v) {
+  Logic4Word word{v, 0};
+  Logic4Vec vec{64, 1, &word};
+  Logic4Snapshot snap;
+  snap.Capture(vec);
+  return snap;
+}
+
+uint64_t Word(const Logic4Snapshot& msg) { return msg.Get().ToUint64(); }
 
 // Minimal getter coroutine used to observe the get-side wakeup. It starts
 // suspended; the first resume runs it to the co_await, where — while the
@@ -41,7 +56,7 @@ struct BlockingGetter {
   std::coroutine_handle<promise_type> h;
 };
 
-inline BlockingGetter SpawnGetter(MailboxObject& mbx, uint64_t& out,
+inline BlockingGetter SpawnGetter(MailboxObject& mbx, Logic4Snapshot& out,
                                   std::vector<int>& ran, int id) {
   co_await GetWaiter{mbx};
   mbx.Get(out);
@@ -50,17 +65,17 @@ inline BlockingGetter SpawnGetter(MailboxObject& mbx, uint64_t& out,
 
 TEST(IpcSync, MailboxGetRetrievesFrontMessage) {
   MailboxObject mb;
-  mb.TryPut(10);
-  mb.TryPut(20);
-  uint64_t msg = 0;
+  mb.TryPut(Msg(10).Get());
+  mb.TryPut(Msg(20).Get());
+  Logic4Snapshot msg;
   EXPECT_EQ(mb.Get(msg), MbxGetStatus::kRetrieved);
-  EXPECT_EQ(msg, 10u);
+  EXPECT_EQ(Word(msg), 10u);
   EXPECT_EQ(mb.Num(), 1);
 }
 
 TEST(IpcSync, MailboxGetEmptyReturnsBlock) {
   MailboxObject mb;
-  uint64_t msg = 0;
+  Logic4Snapshot msg;
   EXPECT_EQ(mb.Get(msg), MbxGetStatus::kBlock);
   EXPECT_EQ(mb.Num(), 0);
 }
@@ -72,19 +87,20 @@ TEST(IpcSync, MailboxGetEmptyReturnsBlock) {
 TEST(IpcSync, MailboxGetBlocksUntilMessagePlaced) {
   MailboxObject mb;  // empty
   std::vector<int> ran;
-  uint64_t got = 0;
+  Logic4Snapshot got;
   auto getter = SpawnGetter(mb, got, ran, 9);
   getter.h.resume();  // runs to the co_await; empty -> parks on get_waiters
   ASSERT_EQ(mb.get_waiters.size(), 1u);
   EXPECT_TRUE(ran.empty());
 
   // Placing a message wakes the parked getter via WakeGetWaiters().
-  EXPECT_EQ(mb.TryPut(0x55), 1);
+  EXPECT_EQ(mb.TryPut(Msg(0x55).Get()), 1);
   ASSERT_EQ(ran.size(), 1u);
   EXPECT_EQ(ran[0], 9);
   EXPECT_TRUE(mb.get_waiters.empty());
-  EXPECT_EQ(got, 0x55u);   // the resumed getter retrieved the placed message
-  EXPECT_EQ(mb.Num(), 0);  // and consumed it from the queue
+  // The resumed getter retrieved the placed message and consumed it.
+  EXPECT_EQ(Word(got), 0x55u);
+  EXPECT_EQ(mb.Num(), 0);
 
   getter.h.destroy();
 }
@@ -98,8 +114,8 @@ TEST(IpcSync, MailboxGetBlocksUntilMessagePlaced) {
 TEST(IpcSync, MailboxWaitingQueuePreservesArrivalOrder) {
   MailboxObject mb;  // empty
   std::vector<int> ran;
-  uint64_t got_first = 0;
-  uint64_t got_second = 0;
+  Logic4Snapshot got_first;
+  Logic4Snapshot got_second;
   auto first = SpawnGetter(mb, got_first, ran, 1);
   auto second = SpawnGetter(mb, got_second, ran, 2);
   first.h.resume();   // parks first on get_waiters
@@ -108,15 +124,15 @@ TEST(IpcSync, MailboxWaitingQueuePreservesArrivalOrder) {
   EXPECT_TRUE(ran.empty());
 
   // Each placed message wakes exactly the head of the waiting queue.
-  EXPECT_EQ(mb.TryPut(0xAA), 1);
+  EXPECT_EQ(mb.TryPut(Msg(0xAA).Get()), 1);
   ASSERT_EQ(ran.size(), 1u);
   EXPECT_EQ(ran[0], 1);  // the earliest arrival ran first
-  EXPECT_EQ(got_first, 0xAAu);
+  EXPECT_EQ(Word(got_first), 0xAAu);
 
-  EXPECT_EQ(mb.TryPut(0xBB), 1);
+  EXPECT_EQ(mb.TryPut(Msg(0xBB).Get()), 1);
   ASSERT_EQ(ran.size(), 2u);
   EXPECT_EQ(ran[1], 2);  // the later arrival ran second
-  EXPECT_EQ(got_second, 0xBBu);
+  EXPECT_EQ(Word(got_second), 0xBBu);
   EXPECT_TRUE(mb.get_waiters.empty());
 
   first.h.destroy();
@@ -125,42 +141,43 @@ TEST(IpcSync, MailboxWaitingQueuePreservesArrivalOrder) {
 
 TEST(IpcSync, MailboxGetFifoOrder) {
   MailboxObject mb;
-  mb.TryPut(100);
-  mb.TryPut(200);
-  mb.TryPut(300);
-  uint64_t msg = 0;
+  mb.TryPut(Msg(100).Get());
+  mb.TryPut(Msg(200).Get());
+  mb.TryPut(Msg(300).Get());
+  Logic4Snapshot msg;
   EXPECT_EQ(mb.Get(msg), MbxGetStatus::kRetrieved);
-  EXPECT_EQ(msg, 100u);
+  EXPECT_EQ(Word(msg), 100u);
   EXPECT_EQ(mb.Get(msg), MbxGetStatus::kRetrieved);
-  EXPECT_EQ(msg, 200u);
+  EXPECT_EQ(Word(msg), 200u);
   EXPECT_EQ(mb.Get(msg), MbxGetStatus::kRetrieved);
-  EXPECT_EQ(msg, 300u);
+  EXPECT_EQ(Word(msg), 300u);
   EXPECT_EQ(mb.Get(msg), MbxGetStatus::kBlock);
 }
 
 TEST(IpcSync, MailboxGetFreesSpaceForPut) {
   MailboxObject mb(1);
-  EXPECT_EQ(mb.TryPut(10), 1);
-  EXPECT_EQ(mb.TryPut(20), 0);
-  uint64_t msg = 0;
+  EXPECT_EQ(mb.TryPut(Msg(10).Get()), 1);
+  EXPECT_EQ(mb.TryPut(Msg(20).Get()), 0);
+  Logic4Snapshot msg;
   EXPECT_EQ(mb.Get(msg), MbxGetStatus::kRetrieved);
-  EXPECT_EQ(msg, 10u);
-  EXPECT_EQ(mb.TryPut(30), 1);
+  EXPECT_EQ(Word(msg), 10u);
+  EXPECT_EQ(mb.TryPut(Msg(30).Get()), 1);
   EXPECT_EQ(mb.Num(), 1);
 }
 
-// Arbitrary, distinct type ids standing in for two non-equivalent data types.
-constexpr uint32_t kTypeInt = 1;
-constexpr uint32_t kTypeString = 2;
+// Two non-equivalent message types, §6.22.2 c)'s int and §6.22.1 a)'s string.
+constexpr MailboxMessageType kTypeInt =
+    MailboxMessageType::Integral(32, true, MailboxMessageType::States::kTwo);
+constexpr MailboxMessageType kTypeString = MailboxMessageType::String();
 
 // §15.4.5: the mailbox maintains the data type placed by put(), so a get()
 // whose variable type matches that stored type retrieves the value.
 TEST(IpcSync, MailboxGetMaintainsTypePlacedByPut) {
   MailboxObject mb;
-  mb.TryPut(0xAB, kTypeInt);
-  uint64_t msg = 0;
+  mb.TryPut(Msg(0xAB).Get(), kTypeInt);
+  Logic4Snapshot msg;
   EXPECT_EQ(mb.Get(msg, kTypeInt), MbxGetStatus::kRetrieved);
-  EXPECT_EQ(msg, 0xABu);
+  EXPECT_EQ(Word(msg), 0xABu);
   EXPECT_EQ(mb.Num(), 0);
 }
 
@@ -173,9 +190,9 @@ TEST(IpcSync, MailboxGetMaintainsTypePlacedByPut) {
 // type.
 TEST(IpcSync, MailboxGetRetrievesEachMessageWithItsOwnStoredType) {
   MailboxObject mb;
-  mb.TryPut(0xAB, kTypeInt);     // first placed, first out
-  mb.TryPut(0xCD, kTypeString);  // second placed, second out
-  uint64_t msg = 0;
+  mb.TryPut(Msg(0xAB).Get(), kTypeInt);     // first placed, first out
+  mb.TryPut(Msg(0xCD).Get(), kTypeString);  // second placed, second out
+  Logic4Snapshot msg;
 
   // The front message was placed as kTypeInt: a kTypeString get() sees the
   // front's maintained type, not the later kTypeString message, and errors.
@@ -184,9 +201,9 @@ TEST(IpcSync, MailboxGetRetrievesEachMessageWithItsOwnStoredType) {
 
   // Retrieved by its own stored type; the queue then advances to the second.
   EXPECT_EQ(mb.Get(msg, kTypeInt), MbxGetStatus::kRetrieved);
-  EXPECT_EQ(msg, 0xABu);
+  EXPECT_EQ(Word(msg), 0xABu);
   EXPECT_EQ(mb.Get(msg, kTypeString), MbxGetStatus::kRetrieved);
-  EXPECT_EQ(msg, 0xCDu);
+  EXPECT_EQ(Word(msg), 0xCDu);
   EXPECT_EQ(mb.Num(), 0);
 }
 
@@ -194,11 +211,11 @@ TEST(IpcSync, MailboxGetRetrievesEachMessageWithItsOwnStoredType) {
 // a run-time type error is generated instead of a retrieval.
 TEST(IpcSync, MailboxGetTypeMismatchGeneratesError) {
   MailboxObject mb;
-  mb.TryPut(0xAB, kTypeInt);
-  uint64_t msg = 0;
+  mb.TryPut(Msg(0xAB).Get(), kTypeInt);
+  Logic4Snapshot msg = Msg(0xEE);
   EXPECT_EQ(mb.Get(msg, kTypeString), MbxGetStatus::kTypeError);
   // The errored get() does not consume the message and does not clobber msg.
-  EXPECT_EQ(msg, 0u);
+  EXPECT_EQ(Word(msg), 0xEEu);
   EXPECT_EQ(mb.Num(), 1);
 }
 
@@ -222,6 +239,114 @@ TEST(MailboxSim, GetWaitsUntilAMessageIsPlaced) {
       f, "r");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 81u);
+}
+
+// §15.4 (printed page 374) with §15.4.3 (printed 375): a message is any
+// singular expression, so a 96-bit vector travels through the mailbox whole
+// and get() hands all of it back: the two words of v read the three 32-bit
+// pieces the literal was written from. Held as one 64-bit word, the message
+// lost 32'h01234567, the upper piece, and v's second word read 0.
+TEST(MailboxSim, GetHandsBackAWideMessageWhole) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  mailbox mb = new;\n"
+      "  logic [95:0] w = 96'h01234567_89ABCDEF_00112233;\n"
+      "  logic [95:0] v;\n"
+      "  initial begin\n"
+      "    mb.put(w);\n"
+      "    mb.get(v);\n"
+      "  end\n"
+      "endmodule\n",
+      f, "v");
+  ASSERT_NE(var, nullptr);
+  ASSERT_EQ(var->value.width, 96u);
+  ASSERT_EQ(var->value.nwords, 2u);
+  EXPECT_EQ(var->value.words[0].aval, 0x89ABCDEF00112233u);
+  EXPECT_EQ(var->value.words[1].aval, 0x01234567u);
+  EXPECT_EQ(var->value.words[0].bval, 0u);
+  EXPECT_EQ(var->value.words[1].bval, 0u);
+}
+
+// §15.4 (printed page 374): a 4-state message keeps its x and z bits through
+// the mailbox, so the variable get() fills reads case-equal to the value
+// put() placed: 1 and a num() of 0 read as 10. Held as a 64-bit word, the
+// unknown bits were dropped and the case equality read 0.
+TEST(MailboxSim, GetHandsBackAFourStateMessageWhole) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  mailbox mb = new;\n"
+      "  logic [7:0] a = 8'b1x0z_0101;\n"
+      "  logic [7:0] b;\n"
+      "  int r;\n"
+      "  initial begin\n"
+      "    mb.put(a);\n"
+      "    mb.get(b);\n"
+      "    r = (b === 8'b1x0z_0101) * 10 + mb.num();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 10u);
+  auto* b = f.ctx.FindVariable("b");
+  ASSERT_NE(b, nullptr);
+  EXPECT_EQ(b->value.words[0].aval & 0xFFu, 0xC5u);
+  EXPECT_EQ(b->value.words[0].bval & 0xFFu, 0x50u);
+}
+
+// §15.4.9 (printed page 377) with §15.4.5: the subclause's own example puts
+// "hello" into a `mailbox #(string)` and get() leaves the string variable
+// holding "hello". Held as a 64-bit word, the message carried the characters
+// but the store sized them to the variable and a string read back cut.
+TEST(MailboxSim, GetHandsBackAStringMessageWhole) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  mailbox #(string) sm = new;\n"
+      "  string s;\n"
+      "  initial begin\n"
+      "    sm.put(\"hello\");\n"
+      "    sm.get(s);\n"
+      "  end\n"
+      "endmodule\n",
+      f, "s");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(VecToStr(var->value), "hello");
+}
+
+// §15.4.5 (printed page 376): when the type of the message variable is not
+// equivalent to the type of the message in the mailbox, a run-time error is
+// generated. The typeless mailbox holds the int 7, and get() into a string
+// is reported at the variable, leaves the message in the queue and the
+// string as it was: "keep" and a num() of 1. An untyped retrieval stored
+// the 7 over the string and answered 0 for num().
+TEST(MailboxSim, GetIntoAVariableOfAnotherTypeIsAnError) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  mailbox mb = new;\n"
+      "  string s = \"keep\";\n"
+      "  int n;\n"
+      "  initial begin\n"
+      "    mb.put(7);\n"
+      "    mb.get(s);\n"
+      "    n = mb.num();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "mailbox get(): the message's type is not equivalent to the type of 's'",
+      7, "15.4.5"));
+  auto* s = f.ctx.FindVariable("s");
+  ASSERT_NE(s, nullptr);
+  EXPECT_EQ(VecToStr(s->value), "keep");
+  auto* n = f.ctx.FindVariable("n");
+  ASSERT_NE(n, nullptr);
+  EXPECT_EQ(n->value.ToUint64(), 1u);
 }
 
 }  // namespace

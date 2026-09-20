@@ -3,8 +3,11 @@
 #include <coroutine>
 #include <cstdint>
 #include <deque>
+#include <string_view>
 #include <utility>
 #include <vector>
+
+#include "common/types.h"
 
 namespace delta {
 
@@ -78,21 +81,84 @@ enum class MbxGetStatus : uint8_t { kRetrieved, kBlock, kTypeError };
 // rather than a copy, so kTypeError joins the copied/blocked outcomes.
 enum class MbxPeekStatus : uint8_t { kCopied, kBlock, kTypeError };
 
+// §15.4.5: the data type a message was placed with, which a typeless mailbox
+// keeps beside the message so that get(), try_get(), peek() and try_peek()
+// can compare it against the type of the variable they are handed. The kinds
+// are the ones §6.22.2 tells apart for a singular value: an integral type by
+// its total bits, signedness and number of states (§6.22.2 c), a real by its
+// own width, a string, and a class by its name (§6.22.1 a and d). kAny is the
+// wildcard of a side whose type nobody recorded -- a computed actual, a
+// selected target, or any message of a parameterized mailbox, whose types
+// §15.4.9 has the compiler verify -- and it matches every type.
+struct MailboxMessageType {
+  enum class Kind : uint8_t { kAny, kIntegral, kReal, kString, kClass };
+  // §6.22.2 c) separates a 2-state type from a 4-state one. A literal states
+  // neither, so kUnknown stands where the count is not recorded and the
+  // comparison passes over it.
+  enum class States : uint8_t { kUnknown, kTwo, kFour };
+
+  Kind kind = Kind::kAny;
+  uint32_t width = 0;
+  bool is_signed = false;
+  States states = States::kUnknown;
+  std::string_view class_name;
+
+  static constexpr MailboxMessageType Integral(uint32_t width, bool is_signed,
+                                               States states) {
+    return {Kind::kIntegral, width, is_signed, states, {}};
+  }
+  static constexpr MailboxMessageType Real(uint32_t width) {
+    return {Kind::kReal, width, false, States::kUnknown, {}};
+  }
+  static constexpr MailboxMessageType String() {
+    return {Kind::kString, 0, false, States::kUnknown, {}};
+  }
+  static constexpr MailboxMessageType Class(std::string_view name) {
+    return {Kind::kClass, 0, false, States::kUnknown, name};
+  }
+
+  // §6.22.2: whether two message types are equivalent. kAny on either side
+  // never reports a mismatch. This single predicate is shared by the run-time
+  // checks of get() (§15.4.5), try_get() (§15.4.6), peek() (§15.4.7) and
+  // try_peek() (§15.4.8), and by the parameterized mailbox's element-type
+  // contract (§15.4.9).
+  bool EquivalentTo(const MailboxMessageType& other) const {
+    if (kind == Kind::kAny || other.kind == Kind::kAny) return true;
+    if (kind != other.kind) return false;
+    switch (kind) {
+      case Kind::kIntegral:
+        return width == other.width && is_signed == other.is_signed &&
+               (states == States::kUnknown ||
+                other.states == States::kUnknown || states == other.states);
+      case Kind::kReal:
+        return width == other.width;
+      case Kind::kClass:
+        return class_name == other.class_name;
+      default:
+        return true;
+    }
+  }
+};
+
 struct MailboxObject {
   // §15.4.5: a nonparameterized (typeless) mailbox may carry messages of
   // differing types, so the implementation maintains the data type placed by
   // put() alongside each value to enable the run-time type check performed by
-  // get()/try_get()/try_peek(). kAnyType is the wildcard used by callers that
-  // do not track a concrete type — a fully dynamic transfer that suppresses the
-  // mismatch report on whichever side carries it.
-  static constexpr uint32_t kAnyType = 0;
-
+  // get()/try_get()/try_peek(). A default MailboxMessageType is the wildcard
+  // used by callers that do not track a concrete type -- a fully dynamic
+  // transfer that suppresses the mismatch report on whichever side carries it.
+  //
+  // §15.4.3: a message is any singular expression, so it is held whole as the
+  // words of its value with the 4-state plane and the width, signedness, real
+  // and string marks the evaluator gave it, in storage of the queue's own:
+  // the value put() was handed may be a view of a variable's words, which
+  // the variable's next assignment would rewrite under the queue.
   int32_t bound = 0;
   // §15.4.9: a parameterized mailbox fixes its element type up front; the
-  // generic (dynamic) mailbox leaves this as kAnyType and is typeless.
-  uint32_t param_type = kAnyType;
-  std::deque<uint64_t> messages;
-  std::deque<uint32_t> message_types;
+  // generic (dynamic) mailbox leaves this as the wildcard and is typeless.
+  MailboxMessageType param_type;
+  std::deque<Logic4Snapshot> messages;
+  std::deque<MailboxMessageType> message_types;
   std::vector<std::coroutine_handle<>> get_waiters;
   std::vector<std::coroutine_handle<>> peek_waiters;
   std::vector<std::coroutine_handle<>> put_waiters;
@@ -111,38 +177,25 @@ struct MailboxObject {
     message_types.clear();
   }
 
-  // Two message types match when they share an id. kAnyType acts as a wildcard:
-  // a dynamic transfer (untracked on either side) never reports a mismatch.
-  // This single predicate is shared by the run-time checks of get() (§15.4.5),
-  // try_get() (§15.4.6) and try_peek() (§15.4.8), and by the parameterized
-  // mailbox's element-type contract (§15.4.9).
-  static bool TypesEquivalent(uint32_t a, uint32_t b) {
-    return a == kAnyType || b == kAnyType || a == b;
-  }
-
   // §15.4.9: the only difference between a generic mailbox and a parameterized
   // one is that the parameterized mailbox verifies argument types up front;
   // this predicate is the decision a parameterized mailbox applies to a value's
   // type.
-  bool AcceptsType(uint32_t type) const {
-    return TypesEquivalent(param_type, type);
+  bool AcceptsType(const MailboxMessageType& type) const {
+    return param_type.EquivalentTo(type);
   }
 
   int32_t Num() const { return static_cast<int32_t>(messages.size()); }
 
-  MbxPutStatus Put(uint64_t msg, uint32_t type = kAnyType) {
+  MbxPutStatus Put(const Logic4Vec& msg, const MailboxMessageType& type = {}) {
     if (IsFull()) return MbxPutStatus::kBlock;
-    messages.push_back(msg);
-    message_types.push_back(type);
-    WakeGetWaiters();
+    Append(msg, type);
     return MbxPutStatus::kPlaced;
   }
 
-  int32_t TryPut(uint64_t msg, uint32_t type = kAnyType) {
+  int32_t TryPut(const Logic4Vec& msg, const MailboxMessageType& type = {}) {
     if (IsFull()) return 0;
-    messages.push_back(msg);
-    message_types.push_back(type);
-    WakeGetWaiters();
+    Append(msg, type);
     return 1;
   }
 
@@ -150,25 +203,22 @@ struct MailboxObject {
   // caller blocks; if the front message's type is not equivalent to the
   // retrieving variable's type a run-time type error is reported and the queue
   // is left untouched.
-  MbxGetStatus Get(uint64_t& msg, uint32_t expected_type = kAnyType) {
+  MbxGetStatus Get(Logic4Snapshot& msg,
+                   const MailboxMessageType& expected_type = {}) {
     if (messages.empty()) return MbxGetStatus::kBlock;
-    if (!TypesEquivalent(message_types.front(), expected_type))
-      return MbxGetStatus::kTypeError;
-    msg = messages.front();
-    PopFront();
-    WakePutWaiters();
+    if (!FrontMatches(expected_type)) return MbxGetStatus::kTypeError;
+    Remove(msg);
     return MbxGetStatus::kRetrieved;
   }
 
   // §15.4.6: empty mailbox yields 0; a type that is not equivalent to the front
   // message yields a negative integer (the message is left in place); otherwise
   // the message is removed and a positive integer is returned.
-  int32_t TryGet(uint64_t& msg, uint32_t expected_type = kAnyType) {
+  int32_t TryGet(Logic4Snapshot& msg,
+                 const MailboxMessageType& expected_type = {}) {
     if (messages.empty()) return 0;
-    if (!TypesEquivalent(message_types.front(), expected_type)) return -1;
-    msg = messages.front();
-    PopFront();
-    WakePutWaiters();
+    if (!FrontMatches(expected_type)) return -1;
+    Remove(msg);
     return 1;
   }
 
@@ -177,10 +227,10 @@ struct MailboxObject {
   // get(), a stored message whose type is not equivalent to the receiving
   // variable's type generates a run-time type error and the message is left
   // untouched rather than copied out.
-  MbxPeekStatus Peek(uint64_t& msg, uint32_t expected_type = kAnyType) {
+  MbxPeekStatus Peek(Logic4Snapshot& msg,
+                     const MailboxMessageType& expected_type = {}) {
     if (messages.empty()) return MbxPeekStatus::kBlock;
-    if (!TypesEquivalent(message_types.front(), expected_type))
-      return MbxPeekStatus::kTypeError;
+    if (!FrontMatches(expected_type)) return MbxPeekStatus::kTypeError;
     msg = messages.front();
     return MbxPeekStatus::kCopied;
   }
@@ -188,14 +238,36 @@ struct MailboxObject {
   // §15.4.8: like try_get() but the message is never removed; empty yields 0, a
   // non-equivalent type yields a negative integer, a match yields a positive
   // integer with the message copied out.
-  int32_t TryPeek(uint64_t& msg, uint32_t expected_type = kAnyType) {
+  int32_t TryPeek(Logic4Snapshot& msg,
+                  const MailboxMessageType& expected_type = {}) {
     if (messages.empty()) return 0;
-    if (!TypesEquivalent(message_types.front(), expected_type)) return -1;
+    if (!FrontMatches(expected_type)) return -1;
     msg = messages.front();
     return 1;
   }
 
   bool IsFull() const { return bound > 0 && Num() >= bound; }
+
+  bool FrontMatches(const MailboxMessageType& expected_type) const {
+    return message_types.front().EquivalentTo(expected_type);
+  }
+
+  // §15.4.3 and §15.4.4: the message joins the tail of the queue, in strict
+  // FIFO order, copied into the queue's own words, and a process waiting for
+  // one is woken.
+  void Append(const Logic4Vec& msg, const MailboxMessageType& type) {
+    messages.emplace_back().Capture(msg);
+    message_types.push_back(type);
+    WakeGetWaiters();
+  }
+
+  // §15.4.5 and §15.4.6: the front message leaves the queue into `msg`, and a
+  // process waiting for room is woken.
+  void Remove(Logic4Snapshot& msg) {
+    msg = std::move(messages.front());
+    PopFront();
+    WakePutWaiters();
+  }
 
   void PopFront() {
     messages.pop_front();

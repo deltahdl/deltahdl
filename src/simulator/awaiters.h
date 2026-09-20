@@ -732,13 +732,18 @@ struct SemaphoreGetAwaiter {
 // sender). When the mailbox is full the handle is parked on the put-waiter
 // queue; the runtime resumes it from WakePutWaiters() once a get/try_get
 // frees a slot, at which point the awaiter stores the deferred message.
+// §15.4.3: the message is the value the actual had when the call was
+// reached, so the awaiter owns a copy of its words rather than a view of the
+// variable's, which the process that frees the room may have rewritten by
+// then; the type it was placed with rides beside it for §15.4.5's check.
 struct MailboxPutAwaiter {
   MailboxObject& mbx;
-  uint64_t msg;
+  Logic4Snapshot msg;
+  MailboxMessageType type;
   bool placed = false;
 
   bool await_ready() {
-    placed = mbx.Put(msg) == MbxPutStatus::kPlaced;
+    placed = mbx.Put(msg.Get(), type) == MbxPutStatus::kPlaced;
     return placed;
   }
 
@@ -750,7 +755,7 @@ struct MailboxPutAwaiter {
   // already stored when it was placed in await_ready; store it now only when
   // the put had blocked and the runtime has since freed room.
   void await_resume() {
-    if (!placed) mbx.Put(msg);
+    if (!placed) mbx.Put(msg.Get(), type);
   }
 };
 
@@ -759,25 +764,29 @@ struct MailboxPutAwaiter {
 // once and the process continues without suspending; otherwise the handle is
 // parked on the get-waiter queue, which §15.4.5 keeps in arrival order, and
 // the put that places a message resumes it through WakeGetWaiters(), at which
-// point the awaiter removes the message it waited for. The message is the
-// awaiter's result, for the caller to store into the variable get() names.
+// point the awaiter removes the message it waited for. The message is left in
+// `msg` for the caller to store into the variable get() names, and `status`
+// says whether it was retrieved: a message whose type is not equivalent to
+// `expected` is not removed and the process does not wait for another, since
+// §15.4.5 has that generate a run-time error, which the caller reports.
 struct MailboxGetAwaiter {
   MailboxObject& mbx;
-  uint64_t msg = 0;
-  bool retrieved = false;
+  MailboxMessageType expected;
+  Logic4Snapshot msg;
+  MbxGetStatus status = MbxGetStatus::kBlock;
 
   bool await_ready() {
-    retrieved = mbx.Get(msg) == MbxGetStatus::kRetrieved;
-    return retrieved;
+    status = mbx.Get(msg, expected);
+    return status != MbxGetStatus::kBlock;
   }
 
   void await_suspend(std::coroutine_handle<> h) {
     mbx.get_waiters.push_back(h);
   }
 
-  uint64_t await_resume() {
-    if (!retrieved) mbx.Get(msg);
-    return msg;
+  MbxGetStatus await_resume() {
+    if (status == MbxGetStatus::kBlock) status = mbx.Get(msg, expected);
+    return status;
   }
 };
 
@@ -785,24 +794,27 @@ struct MailboxGetAwaiter {
 // placed in it, as get() does, and copies the message without removing it,
 // which is why one placed message can unblock every peeking process and not
 // just one: WakeGetWaiters() resumes all of the peek-waiter queue before the
-// head of the get-waiter queue. The copy is the awaiter's result.
+// head of the get-waiter queue. The copy is left in `msg` and `status` says
+// whether it was made, a message of a type not equivalent to `expected`
+// being §15.4.7's run-time error rather than a copy.
 struct MailboxPeekAwaiter {
   MailboxObject& mbx;
-  uint64_t msg = 0;
-  bool copied = false;
+  MailboxMessageType expected;
+  Logic4Snapshot msg;
+  MbxPeekStatus status = MbxPeekStatus::kBlock;
 
   bool await_ready() {
-    copied = mbx.Peek(msg) == MbxPeekStatus::kCopied;
-    return copied;
+    status = mbx.Peek(msg, expected);
+    return status != MbxPeekStatus::kBlock;
   }
 
   void await_suspend(std::coroutine_handle<> h) {
     mbx.peek_waiters.push_back(h);
   }
 
-  uint64_t await_resume() {
-    if (!copied) mbx.Peek(msg);
-    return msg;
+  MbxPeekStatus await_resume() {
+    if (status == MbxPeekStatus::kBlock) status = mbx.Peek(msg, expected);
+    return status;
   }
 };
 

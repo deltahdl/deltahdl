@@ -2,6 +2,7 @@
 
 #include <cstdint>
 
+#include "common/types.h"
 #include "fixture_simulator.h"
 #include "simulator/sync_objects.h"
 
@@ -9,23 +10,35 @@ using namespace delta;
 
 namespace {
 
+// A 64-bit two-state message holding `v`, as the C++ cases below place one,
+// and the low word of a message read back out of the queue.
+Logic4Snapshot Msg(uint64_t v) {
+  Logic4Word word{v, 0};
+  Logic4Vec vec{64, 1, &word};
+  Logic4Snapshot snap;
+  snap.Capture(vec);
+  return snap;
+}
+
+uint64_t Word(const Logic4Snapshot& msg) { return msg.Get().ToUint64(); }
+
 TEST(IpcSync, MailboxParameterizedSameMethodsAsDynamic) {
   MailboxObject mb;
 
   EXPECT_EQ(mb.Num(), 0);
-  EXPECT_EQ(mb.Put(42), MbxPutStatus::kPlaced);
-  EXPECT_EQ(mb.TryPut(43), 1);
+  EXPECT_EQ(mb.Put(Msg(42).Get()), MbxPutStatus::kPlaced);
+  EXPECT_EQ(mb.TryPut(Msg(43).Get()), 1);
   EXPECT_EQ(mb.Num(), 2);
 
-  uint64_t msg = 0;
+  Logic4Snapshot msg;
   EXPECT_EQ(mb.Peek(msg), MbxPeekStatus::kCopied);
-  EXPECT_EQ(msg, 42u);
+  EXPECT_EQ(Word(msg), 42u);
   EXPECT_EQ(mb.TryPeek(msg), 1);
-  EXPECT_EQ(msg, 42u);
+  EXPECT_EQ(Word(msg), 42u);
   EXPECT_EQ(mb.Get(msg), MbxGetStatus::kRetrieved);
-  EXPECT_EQ(msg, 42u);
+  EXPECT_EQ(Word(msg), 42u);
   EXPECT_EQ(mb.TryGet(msg), 1);
-  EXPECT_EQ(msg, 43u);
+  EXPECT_EQ(Word(msg), 43u);
   EXPECT_EQ(mb.Num(), 0);
 }
 
@@ -33,14 +46,14 @@ TEST(IpcSync, MailboxParameterizedSameRuntimeAsTypeless) {
   MailboxObject typed_mb(5);
   MailboxObject untyped_mb(5);
 
-  typed_mb.TryPut(100);
-  untyped_mb.TryPut(100);
+  typed_mb.TryPut(Msg(100).Get());
+  untyped_mb.TryPut(Msg(100).Get());
 
-  uint64_t t_msg = 0;
-  uint64_t u_msg = 0;
+  Logic4Snapshot t_msg;
+  Logic4Snapshot u_msg;
   typed_mb.TryGet(t_msg);
   untyped_mb.TryGet(u_msg);
-  EXPECT_EQ(t_msg, u_msg);
+  EXPECT_EQ(Word(t_msg), Word(u_msg));
 }
 
 // §15.4.9 (printed page 377): a parameterized mailbox provides the same

@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <vector>
 
+#include "common/types.h"
 #include "fixture_simulator.h"
 #include "simulator/awaiters.h"
 #include "simulator/sync_objects.h"
@@ -11,6 +12,18 @@
 using namespace delta;
 
 namespace {
+
+// A 64-bit two-state message holding `v`, as the C++ cases below place one,
+// and the low word of a message read back out of the queue.
+Logic4Snapshot Msg(uint64_t v) {
+  Logic4Word word{v, 0};
+  Logic4Vec vec{64, 1, &word};
+  Logic4Snapshot snap;
+  snap.Capture(vec);
+  return snap;
+}
+
+uint64_t Word(const Logic4Snapshot& msg) { return msg.Get().ToUint64(); }
 
 // Minimal coroutine modelling a process that blocks in mailbox put(). It starts
 // suspended; the first resume() runs it up to the co_await on the production
@@ -36,30 +49,30 @@ struct BlockingPutter {
 
 inline BlockingPutter SpawnPutter(MailboxObject& mbx, uint64_t msg,
                                   std::vector<int>& ran, int id) {
-  co_await MailboxPutAwaiter{mbx, msg};
+  co_await MailboxPutAwaiter{mbx, Msg(msg)};
   ran.push_back(id);
 }
 
 TEST(IpcSync, MailboxPutUnboundedAlwaysPlaced) {
   MailboxObject mb;
-  EXPECT_EQ(mb.Put(10), MbxPutStatus::kPlaced);
-  EXPECT_EQ(mb.Put(20), MbxPutStatus::kPlaced);
-  EXPECT_EQ(mb.Put(30), MbxPutStatus::kPlaced);
+  EXPECT_EQ(mb.Put(Msg(10).Get()), MbxPutStatus::kPlaced);
+  EXPECT_EQ(mb.Put(Msg(20).Get()), MbxPutStatus::kPlaced);
+  EXPECT_EQ(mb.Put(Msg(30).Get()), MbxPutStatus::kPlaced);
   EXPECT_EQ(mb.Num(), 3);
 }
 
 TEST(IpcSync, MailboxPutFifoOrder) {
   MailboxObject mb;
-  mb.Put(100);
-  mb.Put(200);
-  mb.Put(300);
-  uint64_t msg = 0;
+  mb.Put(Msg(100).Get());
+  mb.Put(Msg(200).Get());
+  mb.Put(Msg(300).Get());
+  Logic4Snapshot msg;
   mb.TryGet(msg);
-  EXPECT_EQ(msg, 100u);
+  EXPECT_EQ(Word(msg), 100u);
   mb.TryGet(msg);
-  EXPECT_EQ(msg, 200u);
+  EXPECT_EQ(Word(msg), 200u);
   mb.TryGet(msg);
-  EXPECT_EQ(msg, 300u);
+  EXPECT_EQ(Word(msg), 300u);
 }
 
 // §15.4.3: a put() blocked on a full bounded mailbox stores nothing while it
@@ -69,21 +82,22 @@ TEST(IpcSync, MailboxPutFifoOrder) {
 // message first and the once-blocked message last.
 TEST(IpcSync, MailboxPutAfterBlockAppendsAtTail) {
   MailboxObject mb(2);
-  EXPECT_EQ(mb.Put(10), MbxPutStatus::kPlaced);
-  EXPECT_EQ(mb.Put(20), MbxPutStatus::kPlaced);
-  EXPECT_EQ(mb.Put(30), MbxPutStatus::kBlock);  // full: not stored
+  EXPECT_EQ(mb.Put(Msg(10).Get()), MbxPutStatus::kPlaced);
+  EXPECT_EQ(mb.Put(Msg(20).Get()), MbxPutStatus::kPlaced);
+  EXPECT_EQ(mb.Put(Msg(30).Get()), MbxPutStatus::kBlock);  // full: not stored
   EXPECT_EQ(mb.Num(), 2);
 
-  uint64_t msg = 0;
+  Logic4Snapshot msg;
   mb.TryGet(msg);  // frees a slot, removes 10
-  EXPECT_EQ(msg, 10u);
-  EXPECT_EQ(mb.Put(30), MbxPutStatus::kPlaced);  // now stored, at the tail
+  EXPECT_EQ(Word(msg), 10u);
+  // Now stored, at the tail.
+  EXPECT_EQ(mb.Put(Msg(30).Get()), MbxPutStatus::kPlaced);
   EXPECT_EQ(mb.Num(), 2);
 
   mb.TryGet(msg);
-  EXPECT_EQ(msg, 20u);  // the message queued ahead exits first
+  EXPECT_EQ(Word(msg), 20u);  // the message queued ahead exits first
   mb.TryGet(msg);
-  EXPECT_EQ(msg, 30u);  // the once-blocked message exits last
+  EXPECT_EQ(Word(msg), 30u);  // the once-blocked message exits last
 }
 
 // §15.4.3: when the mailbox was created with a bounded queue and is full, a
@@ -95,7 +109,8 @@ TEST(IpcSync, MailboxPutAfterBlockAppendsAtTail) {
 // the sender continues.
 TEST(IpcSync, MailboxPutSuspendsWhenFullThenResumesWhenRoomFrees) {
   MailboxObject mb(1);
-  EXPECT_EQ(mb.Put(10), MbxPutStatus::kPlaced);  // fills the single slot
+  // Fills the single slot.
+  EXPECT_EQ(mb.Put(Msg(10).Get()), MbxPutStatus::kPlaced);
   EXPECT_TRUE(mb.IsFull());
 
   std::vector<int> ran;
@@ -107,18 +122,19 @@ TEST(IpcSync, MailboxPutSuspendsWhenFullThenResumesWhenRoomFrees) {
 
   // A get() removes a message and frees a slot, resuming the parked sender via
   // WakePutWaiters().
-  uint64_t got = 0;
+  Logic4Snapshot got;
   EXPECT_EQ(mb.Get(got), MbxGetStatus::kRetrieved);
-  EXPECT_EQ(got, 10u);
+  EXPECT_EQ(Word(got), 10u);
 
   // The resumed awaiter stored the once-blocked message and the sender ran.
   ASSERT_EQ(ran.size(), 1u);
   EXPECT_EQ(ran[0], 7);
   EXPECT_TRUE(mb.put_waiters.empty());
   EXPECT_EQ(mb.Num(), 1);
-  uint64_t tail = 0;
+  Logic4Snapshot tail;
   EXPECT_EQ(mb.Get(tail), MbxGetStatus::kRetrieved);
-  EXPECT_EQ(tail, 20u);  // the message that had to wait is now in the queue
+  // The message that had to wait is now in the queue.
+  EXPECT_EQ(Word(tail), 20u);
 
   putter.h.destroy();
 }
