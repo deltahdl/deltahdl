@@ -285,4 +285,30 @@ TEST(PackageDeclarationSim,
   EXPECT_EQ(PackageClassReadBesideTheTopsG("    int v = g;\n", "c.v"), 57u);
 }
 
+// §26.2 (printed page 808) with §8.4 (printed pages 181-182), §15.4.1
+// (printed 374) and §15.3.1 (printed 373): a package's variable declaration
+// assignments complete before any initial procedure starts, and a mailbox's
+// or a semaphore's is the new() that returns the handle its variable holds,
+// so `p::built` and `p::s` refer to the queue and the bucket when the
+// module reads them while `p::bare`, declared with no initializer, is null.
+// `p::built != null` adds 1, `p::bare == null` 10 and `p::s != null` 100:
+// 111. The package's new() sized the queue and filled the bucket and left
+// the variable's value at the 0 its storage was created with, so both read
+// as null, 10.
+TEST(PackageDeclarationSim, PackageSyncVariableBuiltByItsDeclarationIsNotNull) {
+  EXPECT_EQ(
+      RunAndGet("package p;\n"
+                "  mailbox built = new;\n"
+                "  mailbox bare;\n"
+                "  semaphore s = new(1);\n"
+                "endpackage\n"
+                "module top;\n"
+                "  int y;\n"
+                "  initial y = (p::built != null) + 10 * (p::bare == null) +\n"
+                "              100 * (p::s != null);\n"
+                "endmodule\n",
+                "y"),
+      111u);
+}
+
 }  // namespace

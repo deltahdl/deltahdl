@@ -34,6 +34,7 @@
 #include "simulator/sim_context_types.h"
 #include "simulator/statement_assign_internal.h"
 #include "simulator/sync_objects.h"
+#include "simulator/sync_variable.h"
 #include "simulator/variable.h"
 
 namespace delta {
@@ -369,10 +370,10 @@ static bool InitPackageSyncObject(const ModuleItem* item, std::string_view key,
   if (type == "semaphore") {
     if (SemaphoreObject* sem = ctx.FindSemaphore(key))
       sem->key_count = SemaphoreKeyArg(init, ctx, arena, 0);
-    return true;
-  }
-  if (MailboxObject* mbx = ctx.FindMailbox(key))
+  } else if (MailboxObject* mbx = ctx.FindMailbox(key)) {
     mbx->Build(MailboxBoundArg(init, ctx, arena));
+  }
+  HoldSyncVariable(key, ctx);
   return true;
 }
 
