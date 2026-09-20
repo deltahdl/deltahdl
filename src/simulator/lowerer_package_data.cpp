@@ -392,6 +392,43 @@ static void CarryUnitClassRecord(const ModuleItem* item, std::string_view qname,
   RecordClassParamActuals(qname, item->data_type.type_params, ctx);
 }
 
+// §7.2.1 (printed page 147) with §3.12.1 (printed 56) and §26.2 (printed
+// 808): a package's or the unit's variable of a packed structure or union
+// type is laid out as its type lays its members out, so a member read or
+// write of it, `$unit::u.b` or `p::u.b`, is the window of bits the layout
+// gives the member (ResolveMemberByType in eval_expr.cpp, through
+// StructLayoutOfName), a by-value formal bound from `f($unit::u)` takes the
+// variable's layout (TryBindIdentifierActualLayout in
+// eval_function_args.cpp) and a tagged union's tag stands under the key the
+// layout answers for (TagKeyOfName). The layout is registered under the
+// storage's "pk.name" or "$unit.name" key as Lowerer::LowerVar registers a
+// module's under the variable's name: built from the declaration for a
+// structure written inline, and for a typedef name bound to the typedef's
+// own layout, which RegisterDesignTypeLayouts (lowerer_var_layout.cpp)
+// registers under the name the design's typedef table keys it by -- the
+// bare name for the unit's typedef, "pk::name" for the package's own, and
+// "scope::name" for one written with a scope. No layout stood under the
+// key, so `$unit::u.b` read through no member and answered 0, and a formal
+// bound from `f($unit::u)` fell back to its typedef's layout.
+static void RegisterPackageDataLayout(const ModuleItem* item,
+                                      std::string_view pkg,
+                                      std::string_view qname, SimContext& ctx,
+                                      Arena& arena) {
+  const DataType& type = item->data_type;
+  if (!type.struct_members.empty()) {
+    RegisterAggregateLayout(qname, &type, PackageDataWidth(item, qname, ctx),
+                            ctx, arena);
+    return;
+  }
+  if (type.kind != DataTypeKind::kNamed) return;
+  std::string scoped =
+      std::string(type.scope_name.empty() ? pkg : type.scope_name) +
+      "::" + std::string(type.type_name);
+  const StructTypeInfo* info = ctx.FindStructType(scoped);
+  if (info == nullptr) info = ctx.FindStructType(type.type_name);
+  if (info != nullptr) ctx.SetVariableStructType(qname, info->type_name);
+}
+
 // One data item's storage under its key: every variable declaration at its
 // declared type's shape, with the semaphore, the mailbox, the queue or the
 // array its type or dimension declares, and a parameter with an initializer
@@ -407,6 +444,7 @@ static std::string_view CreatePackageDataItem(const ModuleItem* item,
   auto* var = ctx.CreateVariable(*qname, PackageDataWidth(item, *qname, ctx));
   if (item->kind != ModuleItemKind::kVarDecl) return *qname;
   ShapePackageVariable(item, var, *qname, ctx, arena);
+  RegisterPackageDataLayout(item, pkg, *qname, ctx, arena);
   std::string_view sync_type = PackageSyncObjectType(item);
   if (!sync_type.empty()) {
     CreatePackageSyncObject(sync_type, *qname, ctx);
@@ -551,6 +589,36 @@ static bool IsClassNewInit(const ModuleItem* item, std::string_view key,
   return !ctx.GetVariableClassType(key).empty();
 }
 
+// §10.9.2 (printed page 263) with §7.2.1 (printed 147): a structure
+// variable's assignment-pattern initializer, keyed or positional, is
+// evaluated against the layout RegisterPackageDataLayout registered under
+// `key`, each member expression coerced to its member, as
+// Lowerer::LowerVarInit (lowerer_var.cpp) evaluates a module's; with no
+// layout the pattern is concatenated at its items' self-determined widths,
+// so `'{b: 12'hBCD, a: 4'hA}` placed b's item where a's bits are. §11.9
+// (printed 304) with §7.3.2 (printed 151): a tagged union variable's
+// `tagged Valid 9` initializer sets the variable's tag beside its bits,
+// recorded under the storage's key, the one every reader of the tag
+// resolves the name to (TagKeyOfName), interned as 9183540f7 interns a
+// procedural assignment's since SimContext::var_tags_ keeps the view it is
+// given. No tag was recorded, so `$unit::u.Other` and `a.Other` through a
+// formal bound from `f($unit::u)` were checked against nothing and read
+// the 9 unreported. Every other initializer is the carrier's value as it
+// was.
+static void InitPackageCarrier(const Expr* init, std::string_view key,
+                               Variable* var, SimContext& ctx, Arena& arena) {
+  const StructTypeInfo* sinfo = ctx.GetVariableStructType(key);
+  const Expr* pattern = UnwrapTypedPattern(init);
+  if (sinfo != nullptr && pattern->kind == ExprKind::kAssignmentPattern) {
+    var->value = EvalStructPatternValue(pattern, sinfo, ctx, arena);
+    return;
+  }
+  var->value = EvalExpr(init, ctx, arena);
+  if (init->kind != ExprKind::kTagged || init->rhs == nullptr) return;
+  ctx.SetVariableTag(*arena.Create<std::string>(std::string(key)),
+                     init->rhs->text);
+}
+
 // One data item's initializer, evaluated into the storage
 // CreatePackageDataItem gave it; an item declaring no data, or none, has
 // nothing to evaluate. §15.3.1 and §15.4.1: a semaphore's or a mailbox's
@@ -561,7 +629,8 @@ static bool IsClassNewInit(const ModuleItem* item, std::string_view key,
 // fixed-size array's is distributed over the elements (InitPackageArray,
 // §7.4.2), and a queue's, a dynamic array's or an associative array's fills
 // the object (InitPackageAggregate); every other initializer is the carrier
-// variable's value.
+// variable's value, a structure's placed by its layout and a tagged union's
+// recording its tag (InitPackageCarrier).
 static void InitPackageDataItem(const ModuleItem* item, std::string_view pkg,
                                 SimContext& ctx, Arena& arena) {
   if (!DeclaresPackageData(item) || item->init_expr == nullptr) return;
@@ -573,7 +642,7 @@ static void InitPackageDataItem(const ModuleItem* item, std::string_view pkg,
   const auto& variables = ctx.GetVariables();
   auto found = variables.find(key);
   if (found == variables.end()) return;
-  found->second->value = EvalExpr(item->init_expr, ctx, arena);
+  InitPackageCarrier(item->init_expr, key, found->second, ctx, arena);
 }
 
 // §26.2 with §26.3: the initializers of one scope's items, evaluated in the

@@ -3,7 +3,10 @@
 #include <cstdint>
 #include <string>
 
+#include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "helpers_scheduler.h"
+#include "simulator/variable.h"
 
 using namespace delta;
 
@@ -733,12 +736,12 @@ TEST(CompilationUnitSim, CuScopeStructActualThroughUnitPrefix) {
 
 // §3.12.1 (printed page 56) with §7.3.2 (printed 151) and §11.9 (printed
 // 304): the tag a by-value formal takes from `f($unit::u)` is the unit's
-// u's, whose `tagged Valid 9` initializer leaves no tag recorded, so
-// `a.Valid` in the body reads the 9 copied in and raises nothing, while the
-// top's own u holds `tagged Invalid`. The tag was read from the actual's
-// storage by its text (ActualTag in eval_function_args.cpp), the top's
-// Invalid, and the read of a.Valid was reported inconsistent with it at
-// the body's line, which RunAndGet refuses.
+// u's, Valid from its `tagged Valid 9` initializer, so `a.Valid` in the
+// body is consistent with it, reads the 9 copied in and raises nothing,
+// while the top's own u holds `tagged Invalid`. The tag was read from the
+// actual's storage by its text (ActualTag in eval_function_args.cpp), the
+// top's Invalid, and the read of a.Valid was reported inconsistent with it
+// at the body's line, which RunAndGet refuses.
 TEST(CompilationUnitSim, CuScopeTaggedUnionActualThroughUnitPrefix) {
   EXPECT_EQ(RunAndGet("typedef union tagged { void Invalid; int Valid; } u_t;\n"
                       "u_t u = tagged Valid 9;\n"
@@ -752,6 +755,93 @@ TEST(CompilationUnitSim, CuScopeTaggedUnionActualThroughUnitPrefix) {
                       "endmodule\n",
                       "y"),
             9u);
+}
+
+// §3.12.1 (printed page 56) with §7.2.1 (printed 147): `$unit::u.b` reads
+// the member b of the unit's own `st2 u`, laid out as st2 lays it, a 4-bit
+// a above a 12-bit b, so the keyed pattern `'{b: 12'hBCD, a: 4'hA}` places
+// 12'hBCD in b beside a top declaring its own u of another packed
+// structure. The unit's storage was created under "$unit.u" with no layout
+// registered for it (CreateUnitDataVariables in lowerer_package_data.cpp),
+// so the member read resolved through no layout and answered 0, and the
+// pattern was concatenated in written order rather than placed by member.
+TEST(CompilationUnitSim, CuScopeStructVariableMemberReadThroughUnitPrefix) {
+  EXPECT_EQ(RunAndGet("typedef struct packed { logic [3:0] a; logic [11:0] b; }"
+                      " st2;\n"
+                      "st2 u = '{b: 12'hBCD, a: 4'hA};\n"
+                      "module top;\n"
+                      "  typedef struct packed { logic [7:0] a, b; } mt;\n"
+                      "  mt u = '{8'h12, 8'h34};\n"
+                      "  int y;\n"
+                      "  initial y = $unit::u.b;\n"
+                      "endmodule\n",
+                      "y"),
+            0xBCDu);
+}
+
+// A design whose unit declares a three-member tagged union type u_t and
+// `u_t u = tagged Valid 9;`, and a module top declaring its own
+// `u_t u = tagged Other 3;` with `int y` and the function f of one by-value
+// u_t formal a returning a.Other, whose one initial statement is `stmt`;
+// runs it in `f` and answers the top's y, null where the design did not
+// elaborate. The two u's hold different tags so that a tag read from the
+// wrong storage reads apart.
+static Variable* RunUnitTaggedUnion(const std::string& stmt, SimFixture& f) {
+  auto* design = ElaborateSrc(
+      "typedef union tagged { void Invalid; int Valid; int Other; } u_t;\n"
+      "u_t u = tagged Valid 9;\n"
+      "module top;\n"
+      "  u_t u = tagged Other 3;\n"
+      "  int y;\n"
+      "  function int f(u_t a);\n"
+      "    return a.Other;\n"
+      "  endfunction\n"
+      "  initial " +
+          stmt + "\n" + "endmodule\n",
+      f);
+  EXPECT_NE(design, nullptr);
+  if (design == nullptr) return nullptr;
+  EXPECT_FALSE(f.has_errors);
+  LowerAndRun(design, f);
+  return f.ctx.FindVariable("y");
+}
+
+// §3.12.1 (printed page 56) with §7.3.2 (printed 151), §13.5.1 (printed
+// 348) and §11.9 (printed 304): `f($unit::u)` copies the unit's u, tag
+// included, into the formal a, so `a.Other` in the body is inconsistent
+// with the Valid the unit's initializer set and is reported at the body's
+// line, while the top's own u holds `tagged Other 3`, against which the
+// read would pass. The unit's initializer recorded no tag under "$unit.u"
+// (InitUnitDataVariables in lowerer_package_data.cpp), so the formal was
+// bound to an empty tag, the read went unchecked and y took the 9.
+TEST(CompilationUnitSim, CuScopeTaggedUnionActualCarriesTheUnitsTag) {
+  SimFixture f;
+  Variable* y = RunUnitTaggedUnion("y = f($unit::u);", f);
+  ASSERT_NE(y, nullptr);
+  EXPECT_FALSE(y->value.IsKnown());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "run-time error: accessing member 'Other' of "
+                            "tagged union 'a' which currently has tag 'Valid'",
+                            7, "11.9"));
+}
+
+// The same tag read directly through the prefix (§3.12.1, printed page 56):
+// `$unit::u.Other` names the unit's u past the top's own, and §11.9
+// (printed 304) checks the read against the unit's Valid, reporting it at
+// the statement's line under the key the unit's storage stands by. With no
+// layout and no tag registered under "$unit.u", the read resolved through
+// no member and answered 0 with nothing reported.
+TEST(CompilationUnitSim,
+     CuScopeTaggedUnionMemberReadThroughUnitPrefixIsChecked) {
+  SimFixture f;
+  Variable* y = RunUnitTaggedUnion("y = $unit::u.Other;", f);
+  ASSERT_NE(y, nullptr);
+  EXPECT_FALSE(y->value.IsKnown());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "run-time error: accessing member 'Other' of tagged union '$unit.u' "
+      "which currently has tag 'Valid'",
+      9, "11.9"));
 }
 
 }  // namespace
