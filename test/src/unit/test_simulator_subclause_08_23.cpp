@@ -524,4 +524,51 @@ TEST(ClassScopeResolutionSim, PropertyQueueOfANestedClassHoldsHandles) {
             7u);
 }
 
+// §7.8 (printed page 163) declares an associative array by its index type
+// whatever the element type, and §8.4 (printed 181) makes each element of
+// one declared with a class's name a handle, constructed by `new` into the
+// entry (§7.8.1). Declared in an initial block with the nested class's
+// scoped name, TryExecClassVarDecl (statement_assign_decl.cpp) took
+// `Outer::Inner aa[string]` for one scalar handle and built no array, so
+// `aa["k"] = new` constructed nothing and `aa["k"].v` read 0.
+TEST(ClassScopeResolutionSim, ProceduralAssocArrayOfANestedClassHoldsHandles) {
+  EXPECT_EQ(RunAndGet(OuterInnerQueueDesign("module t;\n"
+                                            "  int y;\n"
+                                            "  initial begin\n"
+                                            "    Outer::Inner aa[string];\n"
+                                            "    aa[\"k\"] = new;\n"
+                                            "    y = aa[\"k\"].v;\n"
+                                            "  end\n"
+                                            "endmodule\n"),
+                      "y"),
+            7u);
+}
+
+// §7.4.2 (printed pages 153-154) declares a fixed-size array by its range
+// whatever the element type, so `Outer::Inner arr[2]` in an initial block is
+// two elements each holding a handle (§8.4, printed 181). Taken for one
+// scalar handle, `arr[0] = b` set one bit of it, and what the queue then
+// received from `arr[0]` was that bit, no handle: 97 is b's 9 then a's 7
+// read back through the queue, where the scalar's bits gave a null handle
+// and at most a's 7.
+TEST(ClassScopeResolutionSim, ProceduralFixedArrayOfANestedClassHoldsHandles) {
+  EXPECT_EQ(RunAndGet(OuterInnerQueueDesign("module t;\n"
+                                            "  int y;\n"
+                                            "  initial begin\n"
+                                            "    Outer::Inner arr[2];\n"
+                                            "    Outer::Inner q[$];\n"
+                                            "    Outer::Inner a = new;\n"
+                                            "    Outer::Inner b = new;\n"
+                                            "    b.v = 9;\n"
+                                            "    arr[0] = b;\n"
+                                            "    arr[1] = a;\n"
+                                            "    q.push_back(arr[0]);\n"
+                                            "    q.push_back(arr[1]);\n"
+                                            "    y = q[0].v * 10 + q[1].v;\n"
+                                            "  end\n"
+                                            "endmodule\n"),
+                      "y"),
+            97u);
+}
+
 }  // namespace

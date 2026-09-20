@@ -375,15 +375,18 @@ static bool TryExecClassShallowCopy(std::string_view var_name, const Expr* init,
 // by the bare `Inner` alone, the declaration found no class, became a plain
 // variable, and `i.take()` ran nothing.
 //
-// §7.10 (printed 169) with §8.4 (printed 181): `C q[$]` declares a queue
-// whose elements are handles, not a handle, so a declaration with a queue
-// dimension is left to ExecVarDeclImpl's aggregate path, which builds the
-// queue (CreateBlockQueue) and flags its elements. Taken here, it became one
-// scalar handle under the queue's name, `q.push_back(i)` found no queue and
-// `q[0].v` read 0.
+// §7.10 (printed 169), §7.4.2 (printed 153-154), §7.5 (printed 157) and §7.8
+// (printed 163) with §8.4 (printed 181): `C q[$]`, `C arr[2]`, `C d[]` and
+// `C aa[string]` declare a queue or an array whose elements are handles, not
+// a handle, so a declaration with an unpacked dimension is left to
+// ExecVarDeclImpl's aggregate path, which builds the queue or the array
+// (CreateDeclAggregate) as Lowerer::LowerVar builds a module's. Taken here,
+// each became one scalar handle under the array's name: `q.push_back(i)`
+// found no queue, `aa["k"] = new` no array, and `arr[0] = b` set a bit of
+// the handle.
 static bool TryExecClassVarDecl(const Stmt* stmt, SimContext& ctx,
                                 Arena& arena) {
-  if (DeclaresQueue(stmt)) return false;
+  if (!stmt->var_unpacked_dims.empty()) return false;
   std::string_view class_type =
       DeclaredClassKey(stmt->var_decl_type, ctx, arena);
   if (class_type.empty()) return false;
@@ -616,13 +619,20 @@ StmtResult ExecVarDeclImpl(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   // answers 0 for the type, so before this such a local took the 32-bit
   // carrier and no reader took it for a virtual interface.
   //
-  // §8.4 (printed page 181): a queue of a class type, which TryExecClassVarDecl
-  // leaves to this path, carries one handle per element, as wide as a handle
-  // variable is made (64), where DeclaredTypeWidth answers 0 for a class and
-  // the carrier below would have sized the elements at 32.
+  // §8.4 (printed page 181): a queue or an array of a class type, which
+  // TryExecClassVarDecl leaves to this path, carries one handle per element,
+  // as wide as a handle variable is made (64), where DeclaredTypeWidth
+  // answers 0 for a class and the carrier below would have sized the elements
+  // at 32; and the class is recorded under the array's name as
+  // Lowerer::LowerVar records a module's (SetVariableClassType), which is
+  // what tells an associative array of handles from one of values when
+  // `aa["k"] = new` constructs into an entry and `aa["k"].v` reads through
+  // one (HandleArrayOfSelect in eval_assoc_class_handles.cpp).
   bool is_virtual_interface =
       DeclaresAVirtualInterface(stmt->var_decl_type, ctx);
-  bool is_class = !DeclaredClassKey(stmt->var_decl_type, ctx, arena).empty();
+  std::string_view class_key =
+      DeclaredClassKey(stmt->var_decl_type, ctx, arena);
+  bool is_class = !class_key.empty();
   uint32_t width = is_virtual_interface || is_class
                        ? 64
                        : DeclaredTypeWidth(stmt->var_decl_type, ctx);
@@ -631,6 +641,7 @@ StmtResult ExecVarDeclImpl(const Stmt* stmt, SimContext& ctx, Arena& arena) {
                   stmt->var_decl_type.kind == DataTypeKind::kRealtime);
   CreateDeclVariable(stmt, width, is_real, ctx, arena);
   RecordVariableEnumType(stmt->var_name, stmt->var_decl_type, ctx);
+  if (is_class) ctx.SetVariableClassType(stmt->var_name, class_key);
   auto* var = ctx.FindVariable(stmt->var_name);
   if (var) {
     var->is_virtual_interface = is_virtual_interface;
