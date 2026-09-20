@@ -2,6 +2,7 @@
 
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
+#include "helpers_rtlir_lookup.h"
 
 namespace {
 
@@ -277,6 +278,41 @@ TEST(PackageDeclarationElaboration,
              "module top;\n"
              "endmodule\n",
              f));
+}
+
+// §26.2 with §6.20.1: a package localparam initialized from an earlier
+// parameter of the package by its bare name folds to the computed value, and
+// a module reads that value through the package scope resolution operator, a
+// wildcard import and a parameter the package derived through `p::K`. Each
+// is 34; a fold that lost K left the localparam unrecorded and the module's
+// reads unresolved.
+TEST(PackageDeclarationElaboration,
+     LocalparamDerivedFromPackageParameterByBareNameFolds) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "package p;\n"
+      "  parameter int K = 17;\n"
+      "  localparam int L = K * 2;\n"
+      "  parameter int M = p::K * 2;\n"
+      "endpackage\n"
+      "module top;\n"
+      "  import p::*;\n"
+      "  localparam int SCOPED = p::L;\n"
+      "  localparam int IMPORTED = L;\n"
+      "  localparam int VIAPKG = M;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto expect_34 = [design](const char* name) {
+    const auto* param = FindParam(design, "top", name);
+    ASSERT_NE(param, nullptr) << name;
+    EXPECT_TRUE(param->is_resolved) << name;
+    EXPECT_EQ(param->resolved_value, 34) << name;
+  };
+  expect_34("SCOPED");
+  expect_34("IMPORTED");
+  expect_34("VIAPKG");
 }
 
 }  // namespace
