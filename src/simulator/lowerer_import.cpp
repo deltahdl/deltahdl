@@ -512,7 +512,8 @@ std::vector<std::string_view> PackageEnumConstantNames(const PackageDecl* pkg,
   ScopeMap values;
   for (const ModuleItem* item : pkg->items) {
     if (item->kind == ModuleItemKind::kParamDecl && item->init_expr) {
-      if (auto v = ConstEvalInt(item->init_expr, values))
+      if (auto v =
+              FoldDeclaredParamValue(item->init_expr, item->data_type, values))
         values[item->name] = *v;
       continue;
     }

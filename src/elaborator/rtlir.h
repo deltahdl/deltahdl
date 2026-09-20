@@ -561,8 +561,8 @@ struct RtlirParamDecl {
   // own or a defparam's (§23.10.1) that is not a literal. resolved_value is
   // 64 bits, and a parameter declared wider keeps its declared range through
   // every override, so the simulator evaluates the expression again at that
-  // width (WidenParamValue in src/simulator/lowerer_register.cpp): this one in
-  // the instantiating instance, default_value in the declaring one. A
+  // width (ReevaluateParamValue in src/simulator/lowerer_register.cpp): this
+  // one in the instantiating instance, default_value in the declaring one. A
   // defparam's right-hand side stands in the scope of the defparam statement,
   // which the simulator cannot stand in, so of those only a literal, which
   // names nothing, is carried.

@@ -72,6 +72,11 @@ std::optional<ConstVal> ConstEvalUnaryFull(const Expr* expr,
                                            FoldContext ctx);
 std::optional<ConstVal> ConstEvalFull(const Expr* expr, const ScopeMap& scope);
 std::optional<ConstVal> ConstEvalLiteral(const Expr* expr);
+// §5.7.1 (printed page 78): `'0`, `'1`, `'x` or `'z` at ctx.width bits, or
+// at one bit where no context propagates a width; x and z fold to 0, ConstVal
+// holding no unknown bit. Defined in const_eval.cpp.
+std::optional<ConstVal> ConstEvalUnbasedUnsized(const Expr* expr,
+                                                FoldContext ctx);
 std::optional<ConstVal> ConstEvalStringLiteral(const Expr* expr);
 
 // §11.6.1's Table 11-21 (printed page 300): the value of the conditional

@@ -354,6 +354,23 @@ std::optional<ConstVal> ConstEvalLiteral(const Expr* expr) {
   return v;
 }
 
+// §5.7.1 (printed page 78): an unbased unsized literal sets every bit of the
+// value it stands for, so it is as wide as the context §11.8.2 propagates to
+// it -- the parameter or the operand it is assigned to -- and one bit where
+// it is self-determined, as an item of a concatenation is. ConstVal spells a
+// value with no x or z, so 'x and 'z fold to a 0 of that width, as a based
+// literal's x and z digits do in ConstEvalLiteral; the lowerer evaluates the
+// expression again to put the unknown bits in the parameter's storage
+// (ReevaluateParamValue in src/simulator/lowerer_register.cpp).
+std::optional<ConstVal> ConstEvalUnbasedUnsized(const Expr* expr,
+                                                FoldContext ctx) {
+  uint32_t width = ctx.width > 0 ? ctx.width : 1;
+  bool ones = expr->text.size() >= 2 && expr->text[1] == '1';
+  std::vector<uint64_t> words((width + 63) / 64, ones ? ~uint64_t{0} : 0);
+  ClearBitsFrom(words, width);
+  return ConstValOfWords(words, width, false);
+}
+
 static int ConstHexDigitVal(char c) {
   if (c >= '0' && c <= '9') return c - '0';
   if (c >= 'a' && c <= 'f') return c - 'a' + 10;

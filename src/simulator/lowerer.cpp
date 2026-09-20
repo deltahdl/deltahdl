@@ -306,8 +306,9 @@ void Lowerer::LowerParams(const RtlirModule* mod) {
     var->value = MakeLogic4VecVal(arena_, width,
                                   static_cast<uint64_t>(p.resolved_value));
     // §6.20.2: a value wider than 64 bits is re-evaluated whole from its own
-    // expression, the folded value holding the low word alone.
-    WidenParamValue(p, var, ctx_, arena_);
+    // expression, the folded value holding the low word alone, as is one
+    // whose expression holds an x or a z (§5.7.1), which the fold holds as 0.
+    ReevaluateParamValue(p, var, ctx_, arena_);
     // §11.8.2: an operand is sign-extended to the propagated width only when it
     // is signed, so a parameter declared signed has to reach evaluation
     // carrying that. Without it `parameter signed [3:0] P = -4'sd1` reads back

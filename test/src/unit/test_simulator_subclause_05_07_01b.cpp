@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 
 #include "helpers_scheduler.h"
 
@@ -433,6 +434,131 @@ TEST(IntegerLiteralSim, BitwiseNotOfSizedLiteralInvertsAtTargetWidth) {
       "endmodule\n",
       "a");
   EXPECT_EQ(result & 0xFFFFu, 0xFF00u);
+}
+
+// §5.7.1 (printed page 78): an unbased unsized literal sets every bit of the
+// value it stands for, and §6.20.2 gives a parameter declared with a range
+// that range, so `'1` as the default of an 8-bit parameter is 255. The
+// elaborator's fold had no case for the literal, the parameter stayed
+// unresolved, and every read of it gave 0.
+TEST(IntegerLiteralSim, UnbasedUnsizedOneFillsARangedParameter) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  parameter logic [7:0] Q = '1;\n"
+      "  logic [15:0] a = Q;\n"
+      "endmodule\n",
+      "a");
+  EXPECT_EQ(result & 0xFFFFu, 0xFFu);
+}
+
+// The same literal into a 4-bit parameter is 15, which tells the fill at the
+// declared width from a fill at some fixed width: 255 masked to 16 bits would
+// read 255 for both.
+TEST(IntegerLiteralSim, UnbasedUnsizedOneFillsAFourBitParameter) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  parameter logic [3:0] U = '1;\n"
+      "  logic [15:0] a = U;\n"
+      "endmodule\n",
+      "a");
+  EXPECT_EQ(result & 0xFFFFu, 0xFu);
+}
+
+// §5.7.1: in a self-determined context the literal is one bit wide, and
+// §6.20.2 gives a parameter declared with neither type nor range the range of
+// its value, so `parameter R = '1` is a 1-bit 1 and not the 64 bits of ones
+// the literal's carrier holds.
+TEST(IntegerLiteralSim, UnbasedUnsizedOneIsOneBitInAnUntypedParameter) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  parameter R = '1;\n"
+      "  logic [63:0] a = R;\n"
+      "endmodule\n",
+      "a");
+  EXPECT_EQ(result, 1u);
+}
+
+// A localparam takes its default the same way (§6.20.4).
+TEST(IntegerLiteralSim, UnbasedUnsizedOneFillsALocalparam) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  localparam logic [7:0] P = '1;\n"
+      "  logic [15:0] a = P;\n"
+      "endmodule\n",
+      "a");
+  EXPECT_EQ(result & 0xFFFFu, 0xFFu);
+}
+
+// §5.7.1's `'x` fills a 32-bit integer parameter with x, which case equality
+// against 32 bits of x observes and a 0 fails: the fold carries no unknown
+// bit, so the lowerer evaluates the parameter's own expression to restore it.
+TEST(IntegerLiteralSim, UnbasedUnsizedXFillsAnIntegerParameterWithX) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  parameter integer S = 'x;\n"
+      "  logic a;\n"
+      "  initial a = (S === 32'bx);\n"
+      "endmodule\n",
+      "a");
+  EXPECT_EQ(result, 1u);
+}
+
+// A sized literal's x digits reach the parameter's storage the same way:
+// `8'hx` is eight bits of x (§5.7.1's Example 2), which the folded 0 was not.
+TEST(IntegerLiteralSim, SizedXLiteralFillsAParameterWithX) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  parameter logic [7:0] S = 8'hx;\n"
+      "  logic a;\n"
+      "  initial a = (S === 8'bx);\n"
+      "endmodule\n",
+      "a");
+  EXPECT_EQ(result, 1u);
+}
+
+// §23.2.3 with §6.20.2: a parameter port's default is folded as a body
+// parameter's is, so `'1` fills the 8 bits the port declares.
+TEST(IntegerLiteralSim, UnbasedUnsizedOneFillsAParameterPortDefault) {
+  auto result = RunAndGet(
+      "module m #(parameter logic [7:0] A = '1);\n"
+      "  logic [15:0] a = A;\n"
+      "endmodule\n"
+      "module t;\n"
+      "  m u ();\n"
+      "endmodule\n",
+      "u.a");
+  EXPECT_EQ(result & 0xFFFFu, 0xFFu);
+}
+
+// §26.3 with §6.20.2: a package's parameter has its declared range too, so
+// `parameter logic [11:0] W = '1` read through `p::W` is 4095. The package's
+// storage was sized at 32 bits whatever the declaration said and the
+// initializer evaluated self-determined, which put the literal's 64-bit
+// carrier there and read 18446744073709551615.
+TEST(IntegerLiteralSim, UnbasedUnsizedOneFillsAPackageParameter) {
+  auto result = RunAndGet(
+      "package p;\n"
+      "  parameter logic [11:0] W = '1;\n"
+      "endpackage\n"
+      "module t;\n"
+      "  logic [63:0] a = p::W;\n"
+      "endmodule\n",
+      "a");
+  EXPECT_EQ(result, 0xFFFu);
+}
+
+// §6.20.2 with §5.7.1: a parameter declared past 64 bits is filled to its
+// whole range, the words above bit 63 included, so `logic [95:0] G = '1`
+// reads ones in its top 32 bits as in its low 64.
+TEST(IntegerLiteralSim, UnbasedUnsizedOneFillsAParameterPastSixtyFourBits) {
+  const std::string kSrc =
+      "module t;\n"
+      "  parameter logic [95:0] G = '1;\n"
+      "  logic [31:0] hi = G[95:64];\n"
+      "  logic [63:0] lo = G[63:0];\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(kSrc, "hi"), 0xFFFFFFFFu);
+  EXPECT_EQ(RunAndGet(kSrc, "lo"), ~uint64_t{0});
 }
 
 }  // namespace

@@ -26,6 +26,7 @@
 #include "elaborator/type_eval.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_type.h"
 
 namespace delta {
 
@@ -463,19 +464,45 @@ FoldContext DeclaredFoldContext(const RtlirParamDecl& pd) {
   return {pd.decl_width, false};
 }
 
-// The cut keeps the expression's own signedness, as a ConstVal of the width
+// The value of `expr` folded as the right-hand side of an assignment to a
+// parameter read in `ctx`, cut to the context's width where it has one. The
+// cut keeps the expression's own signedness, as a ConstVal of the width
 // reads its bits, rather than the declaration's: what stands in
 // RtlirParamDecl::resolved_value is read again at the declared width and
 // signedness wherever the name is (RegisteredParamValue, the lowerer), and
 // `localparam int H = P[95:64]` over a select of all ones has always held
 // the 0xFFFFFFFF the unsigned select folds to.
+static std::optional<int64_t> FoldValueInContext(const Expr* expr,
+                                                 const ScopeMap& scope,
+                                                 FoldContext ctx) {
+  auto value = ConstEvalFull(expr, scope, ctx);
+  if (!value) return std::nullopt;
+  if (ctx.width == 0) return value->value;
+  return CastConstVal(*value, ctx.width, value->is_signed).value;
+}
+
 std::optional<int64_t> FoldParamValue(const RtlirParamDecl& pd,
                                       const Expr* expr, const ScopeMap& scope) {
-  const FoldContext kCtx = DeclaredFoldContext(pd);
-  auto value = ConstEvalFull(expr, scope, kCtx);
-  if (!value) return std::nullopt;
-  if (kCtx.width == 0) return value->value;
-  return CastConstVal(*value, kCtx.width, value->is_signed).value;
+  return FoldValueInContext(expr, scope, DeclaredFoldContext(pd));
+}
+
+// The width a parameter declared with `type` is read at, as
+// PopulateParamTypeInfo (elaborator_module_params.cpp) and HasDeclaredWidth
+// read it off an RtlirParamDecl: the type's where the declaration writes a
+// range or a type other than the implicit one, and 0 where it writes neither,
+// the value then sizing the parameter (§6.20.2); a typedef name, which
+// EvalTypeWidth has no map to resolve, answers 0 too.
+static uint32_t DeclaredTypeParamWidth(const DataType& type) {
+  if (type.packed_dim_left == nullptr && type.kind == DataTypeKind::kImplicit)
+    return 0;
+  return EvalTypeWidth(type);
+}
+
+std::optional<int64_t> FoldDeclaredParamValue(const Expr* expr,
+                                              const DataType& type,
+                                              const ScopeMap& scope) {
+  return FoldValueInContext(expr, scope,
+                            FoldContext{DeclaredTypeParamWidth(type), false});
 }
 
 // §6.20.2 (printed pages 126-127) with §23.10.2 (printed 766) and §23.10.1

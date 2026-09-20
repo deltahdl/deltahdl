@@ -119,10 +119,27 @@ static bool EveryNameHasStorage(const Expr* expr, SimContext& ctx) {
   return all;
 }
 
-void WidenParamValue(const RtlirParamDecl& param, Variable* var,
-                     SimContext& ctx, Arena& arena) {
+// §5.7.1 (printed page 78): whether `expr` holds a literal with an x or a z
+// in it -- `'x`, `'z`, or a based literal with an x, z or ? digit after its
+// base -- which the elaborator's fold, holding no unknown bit, folded as 0.
+static bool HoldsXZLiteral(const Expr* expr) {
+  bool found = false;
+  ForEachSubExpr(expr, [&](const Expr* e) {
+    if (e->kind != ExprKind::kUnbasedUnsizedLiteral &&
+        e->kind != ExprKind::kIntegerLiteral)
+      return;
+    std::string_view text = e->text;
+    auto tick = text.find('\'');
+    if (tick == std::string_view::npos) return;
+    if (text.find_first_of("xXzZ?", tick + 1) != std::string_view::npos)
+      found = true;
+  });
+  return found;
+}
+
+void ReevaluateParamValue(const RtlirParamDecl& param, Variable* var,
+                          SimContext& ctx, Arena& arena) {
   uint32_t width = var->value.width;
-  if (width <= 64) return;
   // ApplyParamOverride in src/elaborator/elaborator_module.cpp records the
   // override's expression, and Elaborator::ApplyDefparamSite a defparam's
   // literal. An override that recorded no expression -- a defparam naming
@@ -133,6 +150,7 @@ void WidenParamValue(const RtlirParamDecl& param, Variable* var,
   const Expr* expr = param.override_expr != nullptr ? param.override_expr
                                                     : param.default_value;
   if (expr == nullptr) return;
+  if (width <= 64 && !HoldsXZLiteral(expr)) return;
   std::string own = ctx.ActiveInstancePrefix();
   if (param.override_expr != nullptr)
     ctx.SetLoweringInstancePrefix(InstantiatingPrefix(own, ctx));
@@ -388,7 +406,9 @@ static void RegisterPackageItemEnumConstants(const ModuleItem* item,
                                              ScopeMap& values, SimContext& ctx,
                                              Arena& arena) {
   if (item->kind == ModuleItemKind::kParamDecl && item->init_expr) {
-    if (auto v = ConstEvalInt(item->init_expr, values)) values[item->name] = *v;
+    if (auto v =
+            FoldDeclaredParamValue(item->init_expr, item->data_type, values))
+      values[item->name] = *v;
     return;
   }
   // Syntax 6-5 lets the enumeration stand as the type a typedef names or as

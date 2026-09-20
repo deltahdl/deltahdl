@@ -206,10 +206,14 @@ struct PackageRegistration {
 // constants of the scope the enumeration stands in and §6.20.1 lets a
 // parameter read an earlier one: `parameter R = (DEEP | SHALLOW);` names two
 // members of an enumeration the package declared, and folding it against the
-// compilation-unit scope alone left R unrecorded and `pkg::R` unresolved.
+// compilation-unit scope alone left R unrecorded and `pkg::R` unresolved. It
+// is folded at the width the declaration fixes (FoldDeclaredParamValue), as
+// a module's parameter is, so `parameter logic [11:0] W = '1` records 4095
+// and not the 1 the literal is self-determined (§5.7.1, §6.20.2).
 void RegisterOnePackageParam(ModuleItem* item, PackageRegistration& reg) {
   if (item->kind != ModuleItemKind::kParamDecl || !item->init_expr) return;
-  auto val = ConstEvalInt(item->init_expr, reg.values);
+  auto val =
+      FoldDeclaredParamValue(item->init_expr, item->data_type, reg.values);
   if (!val) return;
   RecordPackageConstant(reg.pkg_name, item->name, *val, reg.cu_param_scope,
                         reg.arena);
@@ -424,10 +428,11 @@ void ClassifyCuScopeItem(ModuleItem* item, CuScope& scope) {
     // and the report those produce stands at a different declaration and names
     // a different parameter.
     //
-    // The report asks IsConstantExpr while the scope keeps the ConstEvalInt
-    // fold, because the two answer different questions: an initializer this
-    // elaborator cannot fold to an integer is not thereby a non-constant
-    // expression, and a real-valued one folds to neither.
+    // The report asks IsConstantExpr while the scope keeps the fold, because
+    // the two answer different questions: an initializer this elaborator
+    // cannot fold to an integer is not thereby a non-constant expression, and
+    // a real-valued one folds to neither. The fold is at the width the
+    // declaration fixes (FoldDeclaredParamValue), as a package's is.
     if (!IsConstantExpr(item->init_expr, scope.param_scope)) {
       scope.diag.Error(item->loc,
                        std::format("localparam '{}' initializer is not a "
@@ -435,7 +440,8 @@ void ClassifyCuScopeItem(ModuleItem* item, CuScope& scope) {
                                    item->name),
                        Subclause("6.20.4"));
     }
-    auto val = ConstEvalInt(item->init_expr, scope.param_scope);
+    auto val = FoldDeclaredParamValue(item->init_expr, item->data_type,
+                                      scope.param_scope);
     if (val) {
       scope.param_scope[item->name] = *val;
     }

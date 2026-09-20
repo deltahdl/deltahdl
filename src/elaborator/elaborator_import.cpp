@@ -67,7 +67,8 @@ void RegisterImportItem(const ModuleItem* pi, std::string_view pkg_name,
       scope.cu_param_scope[name] = it->second;
       return;
     }
-    auto val = ConstEvalInt(pi->init_expr, scope.cu_param_scope);
+    auto val = FoldDeclaredParamValue(pi->init_expr, pi->data_type,
+                                      scope.cu_param_scope);
     if (val) scope.cu_param_scope[name] = *val;
   }
 }

@@ -627,14 +627,17 @@ const Expr* SelectMinTypMaxMember(const Expr* expr) {
 
 // The value of `expr` itself, before ReadInContext converts it to `ctx`. The
 // operator expressions and the conditional hand the context down to their
-// context-determined operands; every other form is self-determined in
-// itself, and its parts are.
+// context-determined operands, and an unbased unsized literal is as wide as
+// the context (§5.7.1); every other form is self-determined in itself, and
+// its parts are.
 static std::optional<ConstVal> ConstEvalNode(const Expr* expr,
                                              const ScopeMap& scope,
                                              FoldContext ctx) {
   switch (expr->kind) {
     case ExprKind::kIntegerLiteral:
       return ConstEvalLiteral(expr);
+    case ExprKind::kUnbasedUnsizedLiteral:
+      return ConstEvalUnbasedUnsized(expr, ctx);
     case ExprKind::kStringLiteral:
       return ConstEvalStringLiteral(expr);
     case ExprKind::kIdentifier:

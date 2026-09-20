@@ -182,6 +182,19 @@ std::optional<int64_t> ConstEvalInt(const Expr* expr);
 
 std::optional<int64_t> ConstEvalInt(const Expr* expr, const ScopeMap& scope);
 
+// §6.20.2 (printed pages 126-127) with §11.6.1 (printed 299): the value of a
+// parameter declared with `type` and the initializer `expr`, folded against
+// `scope` as the right-hand side of an assignment to the parameter -- its
+// context-determined operands sized by the declared width and the value cut
+// to it where the declaration writes a range or a type, and self-determined
+// where it writes neither and the value sizes the parameter. For a package's
+// or the compilation unit's parameter, whose declaration stands on its
+// ModuleItem alone; a module's has its RtlirParamDecl folded by FoldParamValue
+// (const_eval_internal.h). Defined in const_eval_bits.cpp.
+std::optional<int64_t> FoldDeclaredParamValue(const Expr* expr,
+                                              const DataType& type,
+                                              const ScopeMap& scope);
+
 std::optional<double> ConstEvalReal(const Expr* expr);
 std::optional<double> ConstEvalReal(const Expr* expr, const ScopeMap& scope);
 
