@@ -5,6 +5,7 @@
 #include <string_view>
 
 #include "common/arena.h"
+#include "common/source_loc.h"
 #include "elaborator/rtlir.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
@@ -50,42 +51,58 @@ static bool NetNamesAPortOf(const RtlirModule* mod, std::string_view name) {
   return false;
 }
 
+// Whether the nested declaration `child` owns `net`, or reaches an enclosing
+// scope's object through it. §23.4 has the outer name space visible to a
+// module declared and instantiated in the same scope, so a name a continuous
+// assignment or port connection inside it writes may be one declared around
+// it; Elaborator::MaybeCreateImplicitNet (src/elaborator/elaborator_items.cpp)
+// asks the nested module's own declarations alone, and so pushes an implicit
+// net of that name onto the module's list, which stands for the outer object
+// and must not be materialized under the instance or the assignment would
+// drive the new net rather than the outer one. §37.3.3 is what tells the two
+// apart: RtlirNet::loc is where the declaration that made the net stands, and
+// is invalid for a net no declaration produced. A net the nested module
+// declares for itself is its own -- §23.4's ff2 encapsulates its `wire q2` --
+// and §23.4 hides an outer name behind such a local one.
+static bool NestedDeclOwnsNet(const RtlirNet& net) { return net.loc.IsValid(); }
+
+// Whether `child` owns `net` and so materializes it under its instance prefix.
+//
+// An interface keeps every one of its nets, ports included, because §25.3.2
+// has its members shared through the port by reference rather than driven
+// across it. A regular module's port is the parent's net, reached through the
+// binding CreateChildModulePorts makes, so a same-named net materialized here
+// would shadow that outer net and the assign would never reach it. §23.9's
+// module boundary makes every other net of an instantiated module its own,
+// and a nested declaration's is its own when its declaration produced it
+// (NestedDeclOwnsNet).
+static bool ChildOwnsNet(const RtlirModuleInst& child, const RtlirNet& net) {
+  const RtlirModule* resolved = child.resolved;
+  if (resolved->is_interface) return true;
+  if (NetNamesAPortOf(resolved, net.name)) return false;
+  return !child.is_nested_decl || NestedDeclOwnsNet(net);
+}
+
 // 25.3.2: a child instance's nets - e.g. an interface `wire` member accessed
 // through a port by reference - must be materialized under the child's instance
 // prefix, just like its variables. LowerModule does this for the top via
 // RegisterModuleNets; child instances need the prefixed form so a continuous
 // assign driven through the port resolves onto the shared net.
 //
-// §36.10 is why a regular module's nets are materialized too: "if a module m
-// contains wire w and is instantiated twice as m1 and m2, then m1.w and m2.w
-// are two distinct objects". A net a module declares for itself has one object
+// §36.10 is why a regular module's nets are materialized too: a module m
+// holding a wire w and instantiated twice as m1 and m2 has m1.w and m2.w as
+// two distinct objects. A net a module declares for itself has one object
 // per instance, and with none created there was nothing under either name --
-// the design held the declaration and no storage for it.
-//
-// Two shapes reach an enclosing scope's net rather than owning one, and both
-// are left alone. A port is one: a regular module drives a net declared outside
-// it through its port, so a same-named net materialized here would shadow that
-// outer net and the assign would never reach it. A nested declaration is the
-// other: §23.4 has "the outer name space is visible to the inner module", so a
-// name a continuous assign inside it writes may be one declared around it, and
-// the net the elaborator made for that reference stands for the outer object.
-// §23.9's module boundary is what leaves an ordinary instance out of this --
-// a module instantiated rather than declared here sees none of those names, so
-// every net it declares is its own.
-//
-// An interface keeps every one of its nets, ports included, because §25.3.2 has
-// its members shared through the port by reference rather than driven across
-// it.
+// the design held the declaration and no storage for it. §23.4 makes a nested
+// declaration's instances such instances too: `and2 u1(...), u2(...), u3(...)`
+// of a module declared beside them are three, each with the nets it declares.
+// ChildOwnsNet says which nets are the child's own to materialize.
 static void CreateChildModuleNets(const std::string& inst_prefix,
                                   const RtlirModuleInst& child, SimContext& ctx,
                                   Arena& arena) {
   const RtlirModule* resolved = child.resolved;
-  bool owns_its_nets = resolved->is_interface || !child.is_nested_decl;
-  if (!owns_its_nets) return;
   for (const auto& net : resolved->nets) {
-    if (!resolved->is_interface && NetNamesAPortOf(resolved, net.name)) {
-      continue;
-    }
+    if (!ChildOwnsNet(child, net)) continue;
     auto* name = arena.Create<std::string>(inst_prefix + std::string(net.name));
     auto* created = ctx.CreateNet(
         *name, net.net_type, net.width,

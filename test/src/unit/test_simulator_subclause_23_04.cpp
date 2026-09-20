@@ -135,4 +135,51 @@ TEST(NestedModuleSimulation, OuterNameIsVisibleToANestedDeclarationOnly) {
   EXPECT_NE(seen->value.ToUint64(), 42u);
 }
 
+// §23.4 with §23.3: a nested declaration is a module, and each instantiation
+// of it is a separate instance whose own declarations -- the `wire q2` of
+// the clause's ff2, encapsulated in it -- belong to that instance alone, as
+// §36.10 spells out for m1.w and m2.w of any module instantiated twice. The
+// outer name space being visible does not make a net the nested module
+// declares for itself the enclosing module's. Two instances of a nested M
+// each drive their own w from their own input; the top reads x*10 + y = 10,
+// and m1.w holds 1 beside m2.w holding 0. With no net created under either
+// instance, neither assignment found a target, both m1.w and m2.w were
+// absent, and x and y were never driven.
+TEST(NestedModuleSimulation, EachInstanceOfANestedDeclarationOwnsItsNets) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  logic a, b;\n"
+      "  logic [7:0] r;\n"
+      "  wire x, y;\n"
+      "  module M(input logic i, output wire o);\n"
+      "    wire w;\n"
+      "    assign w = i;\n"
+      "    assign o = w;\n"
+      "  endmodule\n"
+      "  M m1(.i(a), .o(x));\n"
+      "  M m2(.i(b), .o(y));\n"
+      "  initial begin\n"
+      "    a = 1;\n"
+      "    b = 0;\n"
+      "    #1 r = x * 10 + y;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+
+  auto* r = f.ctx.FindVariable("r");
+  ASSERT_NE(r, nullptr);
+  EXPECT_EQ(r->value.ToUint64(), 10u);
+
+  auto* m1_w = f.ctx.FindVariable("m1.w");
+  ASSERT_NE(m1_w, nullptr);
+  EXPECT_EQ(m1_w->value.ToUint64(), 1u);
+
+  auto* m2_w = f.ctx.FindVariable("m2.w");
+  ASSERT_NE(m2_w, nullptr);
+  EXPECT_EQ(m2_w->value.ToUint64(), 0u);
+}
+
 }  // namespace
