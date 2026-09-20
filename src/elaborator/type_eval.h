@@ -41,6 +41,10 @@ const DataType* ResolvedAggregateType(const DataType& dtype,
 // the declaration carries no packed dimension or a bound does not fold.
 uint32_t PackedDimProduct(const DataType& dtype);
 
+// The same product with each bound folded against `scope`, so a bound naming
+// a parameter resolves; zero where a bound does not fold.
+uint32_t PackedDimProduct(const DataType& dtype, const ScopeMap& scope);
+
 uint32_t EvalTypeWidth(const DataType& dtype);
 
 // §10.9.1's `type:value` key. IsTypeKeyword answers whether a key names a type

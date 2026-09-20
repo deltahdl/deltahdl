@@ -149,7 +149,7 @@ struct MethodCallParts;
 // the i-th of the class's: by name where an actual was written `.name(type)`
 // (§23.10.2.2), else by position, and null where the list gives it none, which
 // leaves the parameter at the default the class declares. Defined in
-// eval_function.cpp; shared with the construction of a base level in
+// eval_class_params.cpp; shared with the construction of a base level in
 // eval_class_new.cpp, whose extends clause is such a list.
 const DataType* ActualForParam(const std::vector<DataType>& actuals, size_t i,
                                std::string_view pname);

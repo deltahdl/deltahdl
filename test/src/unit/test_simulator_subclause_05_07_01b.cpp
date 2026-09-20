@@ -728,4 +728,102 @@ TEST(IntegerLiteralSim, UnbasedUnsizedOneFillsAPropertyAssignedThroughAHandle) {
   EXPECT_EQ(result & 0xFFu, 0xFFu);
 }
 
+// §8.25 (printed page 203) with §6.20.2 and §5.7.1: `'1` is a constant
+// expression and a legal default for a class value parameter, filling the
+// parameter's declared `logic [7:0]`, so a property initialized from it
+// reads 255. The elaborator rejected the default as not constant, and the
+// simulator evaluated a class parameter's default self-determined, at the
+// literal's one bit, whatever the declared type.
+TEST(IntegerLiteralSim, UnbasedUnsizedOneFillsAClassParameterDefault) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  class C #(parameter logic [7:0] INIT = '1);\n"
+      "    logic [7:0] v = INIT;\n"
+      "  endclass\n"
+      "  logic [15:0] a;\n"
+      "  initial begin\n"
+      "    C c;\n"
+      "    c = new;\n"
+      "    a = c.v;\n"
+      "  end\n"
+      "endmodule\n",
+      "a");
+  EXPECT_EQ(result & 0xFFFFu, 0xFFu);
+}
+
+// §8.25.1 lets a later parameter's declaration name an earlier one, so
+// `logic [W-1:0] INIT = '1` under `int W = 8` is eight bits of ones in the
+// default specialization; the width is folded against the earlier
+// parameters' values.
+TEST(IntegerLiteralSim, UnbasedUnsizedOneFillsAClassParameterSizedByAnother) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  class C #(parameter int W = 8, parameter logic [W-1:0] INIT = '1);\n"
+      "    logic [15:0] v = INIT;\n"
+      "  endclass\n"
+      "  logic [15:0] a;\n"
+      "  initial begin\n"
+      "    C c;\n"
+      "    c = new;\n"
+      "    a = c.v;\n"
+      "  end\n"
+      "endmodule\n",
+      "a");
+  EXPECT_EQ(result & 0xFFFFu, 0xFFu);
+}
+
+// The class's own copy of the default, read through the class scope
+// resolution operator (§8.23), is the same eight bits of ones.
+TEST(IntegerLiteralSim, UnbasedUnsizedOneFillsAClassParameterReadByScope) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  class C #(parameter int W = 8, parameter logic [W-1:0] INIT = '1);\n"
+      "  endclass\n"
+      "  logic [15:0] a;\n"
+      "  initial a = C::INIT;\n"
+      "endmodule\n",
+      "a");
+  EXPECT_EQ(result & 0xFFFFu, 0xFFu);
+}
+
+// §8.25 with §6.20.2: a specialization's value actual is converted to the
+// parameter's declared type as an override of a module's parameter is
+// (§23.10.2), so `C #(12, 'h0f)` gives INIT the 12-bit 00f, and `C #(12,
+// 'hfff0)` the 12-bit ff0 -- the actual cut to the width W the same
+// specialization set, which discriminates the declared width from the
+// actual's own 32 bits.
+TEST(IntegerLiteralSim, ClassParameterOverrideIsCutToTheDeclaredWidth) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  class C #(parameter int W = 8, parameter logic [W-1:0] INIT = '1);\n"
+      "    function logic [31:0] get(); return INIT; endfunction\n"
+      "  endclass\n"
+      "  logic [31:0] a;\n"
+      "  initial begin\n"
+      "    C #(12, 'hfff0) c;\n"
+      "    c = new;\n"
+      "    a = c.get();\n"
+      "  end\n"
+      "endmodule\n",
+      "a");
+  EXPECT_EQ(result & 0xFFFFFFFFu, 0xFF0u);
+}
+
+// §26.3 with §6.20.1 and §6.20.2: a package parameter's range may name an
+// earlier package parameter, so `logic [N-1:0] M = '1` under `int N = 12` is
+// twelve bits of ones. The range was folded with no parameter in scope,
+// which left the type its base's one bit and M a single 1.
+TEST(IntegerLiteralSim, UnbasedUnsizedOneFillsAPackageParameterSizedByAnother) {
+  auto result = RunAndGet(
+      "package p;\n"
+      "  parameter int N = 12;\n"
+      "  parameter logic [N-1:0] M = '1;\n"
+      "endpackage\n"
+      "module t;\n"
+      "  logic [15:0] a = p::M;\n"
+      "endmodule\n",
+      "a");
+  EXPECT_EQ(result & 0xFFFFu, 0xFFFu);
+}
+
 }  // namespace

@@ -279,10 +279,18 @@ struct ClassParamRegistration {
   DiagEngine& diag;
 };
 
+// §8.25 with §6.20.2 (printed pages 126-127) and §11.6.1: the value is folded
+// as the right-hand side of an assignment to a parameter of the declared
+// `type`, its range folded against the parameters recorded before it
+// (FoldDeclaredParamValue), so `logic [W-1:0] INIT = '1` after `int W = 8`
+// records 255 and not the 1 the literal is on its own (§5.7.1). Null for a
+// declaration recording no type.
 static void RecordClassParam(std::string_view pname, const Expr* pexpr,
+                             const DataType* type,
                              ClassParamRegistration& reg) {
   if (!pexpr) return;
-  auto val = ConstEvalInt(pexpr, reg.values);
+  auto val = type != nullptr ? FoldDeclaredParamValue(pexpr, *type, reg.values)
+                             : ConstEvalInt(pexpr, reg.values);
   if (!val) {
     if (!ExprMentionsAny(pexpr, reg.formals)) {
       reg.diag.Error(pexpr->range.start,
@@ -305,13 +313,16 @@ static void RecordClassParam(std::string_view pname, const Expr* pexpr,
 // Body parameter and localparam declarations are class members flagged is_param
 // (parser_class.cpp records them as kProperty members).
 static void RegisterOneClassParams(ClassParamRegistration& reg) {
-  for (const auto& [pname, pexpr] : reg.cls->params) {
+  const auto& params = reg.cls->params;
+  const auto& types = reg.cls->param_types;
+  for (size_t i = 0; i < params.size(); ++i) {
+    const auto& [pname, pexpr] = params[i];
     if (reg.cls->type_param_names.count(pname)) continue;
-    RecordClassParam(pname, pexpr, reg);
+    RecordClassParam(pname, pexpr, i < types.size() ? &types[i] : nullptr, reg);
   }
   for (const auto* m : reg.cls->members) {
     if (m->kind == ClassMemberKind::kProperty && m->is_param)
-      RecordClassParam(m->name, m->init_expr, reg);
+      RecordClassParam(m->name, m->init_expr, &m->data_type, reg);
   }
 }
 

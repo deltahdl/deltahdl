@@ -220,8 +220,9 @@ class DeclaredNameTables {
   // SimContext::GetVariableClassParamExprs to carry -- `string` is a type, not
   // a value -- so this is what binds a type parameter to the object a `new` on
   // the variable constructs (ApplyClassParamOverrides in
-  // src/simulator/eval_function.cpp). The list lives in the declaration's AST,
-  // which outlives the run. Null for a variable declared with no `#(...)`.
+  // src/simulator/eval_class_params.cpp). The list lives in the declaration's
+  // AST, which outlives the run. Null for a variable declared with no
+  // `#(...)`.
   void RegisterVariableClassTypeParams(std::string_view var,
                                        const std::vector<DataType>* params);
   const std::vector<DataType>* FindVariableClassTypeParams(

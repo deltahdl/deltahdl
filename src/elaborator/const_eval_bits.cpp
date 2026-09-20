@@ -489,23 +489,17 @@ std::optional<int64_t> FoldParamValue(const RtlirParamDecl& pd,
   return FoldValueInContext(expr, scope, DeclaredFoldContext(pd));
 }
 
-// The width a parameter declared with `type` is read at, as
-// PopulateParamTypeInfo (elaborator_module_params.cpp) and HasDeclaredWidth
-// read it off an RtlirParamDecl: the type's where the declaration writes a
-// range or a type other than the implicit one, and 0 where it writes neither,
-// the value then sizing the parameter (§6.20.2); a typedef name, which
-// EvalTypeWidth has no map to resolve, answers 0 too.
-static uint32_t DeclaredTypeParamWidth(const DataType& type) {
-  if (type.packed_dim_left == nullptr && type.kind == DataTypeKind::kImplicit)
-    return 0;
+uint32_t DeclaredParamTypeWidth(const DataType& type, const ScopeMap& scope) {
+  if (type.packed_dim_left != nullptr) return PackedDimProduct(type, scope);
+  if (type.kind == DataTypeKind::kImplicit) return 0;
   return EvalTypeWidth(type);
 }
 
 std::optional<int64_t> FoldDeclaredParamValue(const Expr* expr,
                                               const DataType& type,
                                               const ScopeMap& scope) {
-  return FoldValueInContext(expr, scope,
-                            FoldContext{DeclaredTypeParamWidth(type), false});
+  return FoldValueInContext(
+      expr, scope, FoldContext{DeclaredParamTypeWidth(type, scope), false});
 }
 
 // §6.20.2 (printed pages 126-127) with §23.10.2 (printed 766) and §23.10.1

@@ -16,6 +16,7 @@
 #include "parser/ast_module.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_array_class_assoc.h"
+#include "simulator/eval_class_params.h"
 #include "simulator/eval_class_sync.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
@@ -328,14 +329,19 @@ static void StoreClassParam(ClassTypeInfo* info, std::string_view pname,
   info->static_properties[std::string(pname)] = value;
 }
 
+// §8.25 with §6.20.2: each default is sized by the parameter's declared type
+// (ClassParamSizer), so `logic [W-1:0] INIT = '1` after `int W = 8` holds
+// eight bits of ones and not the literal's one bit.
 static void InitClassParams(ClassTypeInfo* info, const ClassDecl* cls,
                             SimContext& ctx, Arena& arena) {
+  ClassParamSizer sizer(cls);
   // §6.20: parameters supplied through the class's parameter port list.
-  for (const auto& [pname, pexpr] : cls->params) {
+  for (size_t i = 0; i < cls->params.size(); ++i) {
+    const auto& [pname, pexpr] = cls->params[i];
     info->properties.push_back({pname, 32, false});
-    StoreClassParam(
-        info, pname,
-        pexpr ? EvalExpr(pexpr, ctx, arena) : MakeLogic4VecVal(arena, 32, 0));
+    StoreClassParam(info, pname,
+                    pexpr ? sizer.Value(i, pexpr, ctx, arena)
+                          : MakeLogic4VecVal(arena, 32, 0));
   }
   // §8.25/§8.26.3: parameters declared in the class body (carried as kProperty
   // members with is_param) become static compile-time constants of the class,
@@ -346,8 +352,10 @@ static void InitClassParams(ClassTypeInfo* info, const ClassDecl* cls,
     uint32_t w = EvalTypeWidth(member->data_type, {});
     if (w == 0) w = 32;
     StoreClassParam(info, member->name,
-                    member->init_expr ? EvalExpr(member->init_expr, ctx, arena)
-                                      : MakeLogic4VecVal(arena, w, 0));
+                    member->init_expr
+                        ? sizer.Value(member->name, &member->data_type,
+                                      member->init_expr, ctx, arena)
+                        : MakeLogic4VecVal(arena, w, 0));
   }
 }
 

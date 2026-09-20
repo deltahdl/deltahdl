@@ -364,6 +364,10 @@ const ClassTypeInfo* PackageQualifiedClassOf(const Expr* expr, SimContext& ctx,
 bool TryPackageClassStaticMember(const Expr* expr, SimContext& ctx,
                                  Arena& arena, Logic4Vec& out);
 
+// §8.25: binds the actuals the declaration of `var_name` wrote in its
+// `#(...)` list on the object `handle` -- each type parameter to its type and
+// each value parameter to its actual's value, sized by the parameter's
+// declared type. Defined in eval_class_params.cpp.
 void ApplyClassParamOverrides(std::string_view var_name, uint64_t handle,
                               SimContext& ctx, Arena& arena);
 

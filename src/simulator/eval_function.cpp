@@ -3,7 +3,6 @@
 #include <string>
 #include <string_view>
 #include <unordered_set>
-#include <vector>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
@@ -22,6 +21,7 @@
 #include "simulator/eval_call_result.h"
 #include "simulator/eval_class_array.h"
 #include "simulator/eval_class_array_handles.h"
+#include "simulator/eval_class_params.h"
 #include "simulator/eval_class_scope_types.h"
 #include "simulator/eval_function_hier.h"
 #include "simulator/eval_function_internal.h"
@@ -29,69 +29,8 @@
 #include "simulator/eval_semaphore.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
-#include "simulator/statement_assign_internal.h"
 
 namespace delta {
-
-const DataType* ActualForParam(const std::vector<DataType>& actuals, size_t i,
-                               std::string_view pname) {
-  for (const auto& actual : actuals) {
-    if (actual.param_arg_name == pname) return &actual;
-  }
-  if (i < actuals.size() && actuals[i].param_arg_name.empty())
-    return &actuals[i];
-  return nullptr;
-}
-
-// §8.25: binds each type parameter of the object's class to the type the
-// variable's declaration wrote for it, so that a property declared with the
-// parameter as its type or as its associative index -- uvm_pool's `T
-// pool[KEY]` -- is read with the bound type rather than with the name. A type
-// actual is no expression, so the value loop below cannot carry it. Nothing
-// is bound for a variable declared with no `#(...)`, which is the default
-// specialization (§8.25.1) and reads the defaults.
-static void BindTypeParamActuals(ClassObject* obj,
-                                 const std::vector<DataType>* actuals) {
-  if (actuals == nullptr) return;
-  const ClassDecl& decl = *obj->type->decl;
-  for (size_t i = 0; i < decl.params.size(); ++i) {
-    std::string_view pname = decl.params[i].first;
-    if (decl.type_param_names.count(pname) == 0) continue;
-    if (const DataType* actual = ActualForParam(*actuals, i, pname))
-      obj->type_param_actuals[std::string(pname)] = actual;
-  }
-}
-
-void ApplyClassParamOverrides(std::string_view var_name, uint64_t handle,
-                              SimContext& ctx, Arena& arena) {
-  auto* obj = ctx.GetClassObject(handle);
-  if (!obj || !obj->type || !obj->type->decl) return;
-  const std::vector<DataType>* actuals =
-      ctx.FindVariableClassTypeParams(var_name);
-  BindTypeParamActuals(obj, actuals);
-  if (actuals == nullptr) return;
-  const auto& params = obj->type->decl->params;
-  for (size_t i = 0; i < params.size(); ++i) {
-    // §23.10.2.2 through §8.25: a value actual is matched to its parameter
-    // as a type actual is, by the name it was written with or else by its
-    // position; a type actual carries no expression and is left to
-    // BindTypeParamActuals above.
-    const DataType* actual = ActualForParam(*actuals, i, params[i].first);
-    if (actual == nullptr || actual->type_ref_expr == nullptr) continue;
-    // §6.8, as in the default arm of InitClassPropertyDefaults in
-    // eval_class_new.cpp: the object's stored parameter and whatever the
-    // override expression read are two data storage elements, and a
-    // Logic4Vec copy carries the words pointer rather than the words, so
-    // `C #(.W(n)) c;` stored as it arrived left the object and the variable
-    // n as one buffer. One copy serves both keys, which are two names for
-    // the one parameter.
-    auto val = OwnRhsWords(EvalExpr(actual->type_ref_expr, ctx, arena), arena);
-    obj->properties[std::string(params[i].first)] = val;
-    std::string scoped =
-        std::string(obj->type->name) + "::" + std::string(params[i].first);
-    obj->properties[scoped] = val;
-  }
-}
 
 // ClassMethodTarget and the ExecClassMethod prototype live in
 // eval_function_internal.h (so eval_static_method.cpp can run a method body
@@ -395,12 +334,15 @@ void BindClassParams(const ClassTypeInfo* cls, const Expr* base_id,
   if (!cls->decl) return;
   const auto& params = cls->decl->params;
   const auto& values = base_id->elements;
+  // §8.25 with §6.20.2: the actual or the default is sized by the
+  // parameter's declared type (ClassParamSizer).
+  ClassParamSizer sizer(cls->decl);
   for (size_t i = 0; i < params.size(); ++i) {
     Logic4Vec val;
     if (i < values.size()) {
-      val = EvalExpr(values[i], ctx, arena);
+      val = sizer.Value(i, values[i], ctx, arena);
     } else if (params[i].second) {
-      val = EvalExpr(params[i].second, ctx, arena);
+      val = sizer.Value(i, params[i].second, ctx, arena);
     } else {
       val = MakeLogic4VecVal(arena, 32, 0);
     }

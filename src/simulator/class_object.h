@@ -327,8 +327,8 @@ struct ClassObject {
   // specialization this object was constructed as, keyed by the parameter's
   // name -- `KEY` to `string` for a `uvm_pool #(string, int)` -- as the
   // declaration of the variable the `new` was on wrote the actual
-  // (ApplyClassParamOverrides in src/simulator/eval_function.cpp binds it). A
-  // parameter absent here takes the default the class declares
+  // (ApplyClassParamOverrides in src/simulator/eval_class_params.cpp binds
+  // it). A parameter absent here takes the default the class declares
   // (ClassDecl::param_types), which is §8.25.1's default specialization. The
   // pointed-to types live in the AST, which outlives the run.
   std::unordered_map<std::string, const DataType*> type_param_actuals;

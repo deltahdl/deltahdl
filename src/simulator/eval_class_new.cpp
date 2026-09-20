@@ -19,6 +19,7 @@
 #include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_array_class_queue.h"
 #include "simulator/eval_class_array.h"
+#include "simulator/eval_class_params.h"
 #include "simulator/eval_class_sync.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
@@ -265,7 +266,13 @@ static void InitClassPropertyDefaults(const ClassTypeInfo* info,
   }
 
   if (info->decl) {
-    for (const auto& [pname, pexpr] : info->decl->params) {
+    // §8.25 with §6.20.2: each default is sized by the parameter's declared
+    // type (ClassParamSizer), as the class's own copy is (InitClassParams in
+    // lowerer_class.cpp).
+    ClassParamSizer sizer(info->decl);
+    const auto& params = info->decl->params;
+    for (size_t i = 0; i < params.size(); ++i) {
+      const auto& [pname, pexpr] = params[i];
       if (pexpr) {
         // §6.8 makes the object's stored parameter and whatever the default
         // expression read two data storage elements, each storing "a value
@@ -277,7 +284,7 @@ static void InitClassPropertyDefaults(const ClassTypeInfo* info,
         // CoerceToPropertyType; this arm coerces nothing, so it takes it here.
         // The bare and the scoped key are two names for the one parameter and
         // every writer sets both, so they share the one copy as they do above.
-        auto val = OwnRhsWords(EvalExpr(pexpr, ctx, arena), arena);
+        auto val = OwnRhsWords(sizer.Value(i, pexpr, ctx, arena), arena);
         obj->properties[std::string(pname)] = val;
         std::string scoped =
             std::string(info->name) + "::" + std::string(pname);

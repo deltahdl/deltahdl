@@ -195,6 +195,16 @@ std::optional<int64_t> FoldDeclaredParamValue(const Expr* expr,
                                               const DataType& type,
                                               const ScopeMap& scope);
 
+// The width a parameter declared with `type` is read at, as
+// PopulateParamTypeInfo (elaborator_module_params.cpp) and HasDeclaredWidth
+// (const_eval_bits.cpp) read it off an RtlirParamDecl: a range's, its bounds
+// folded against `scope`, where the declaration writes one -- §6.20.1 and
+// §8.25.1 let the bounds name an earlier parameter -- else the type's, and 0
+// where the declaration writes neither, the value then sizing the parameter
+// (§6.20.2), where a bound does not fold, and for a typedef name, which
+// EvalTypeWidth has no map to resolve. Defined in const_eval_bits.cpp.
+uint32_t DeclaredParamTypeWidth(const DataType& type, const ScopeMap& scope);
+
 std::optional<double> ConstEvalReal(const Expr* expr);
 std::optional<double> ConstEvalReal(const Expr* expr, const ScopeMap& scope);
 

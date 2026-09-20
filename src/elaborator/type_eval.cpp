@@ -333,9 +333,7 @@ uint32_t PackedDimProduct(const DataType& dtype) {
   return w;
 }
 
-// The same product with the range bounds folded against a parameter scope, so
-// a parameter-valued bound resolves.
-static uint32_t PackedDimProduct(const DataType& dtype, const ScopeMap& scope) {
+uint32_t PackedDimProduct(const DataType& dtype, const ScopeMap& scope) {
   if (!dtype.packed_dim_left || !dtype.packed_dim_right) return 0;
   uint32_t w =
       EvalRangeWidth(dtype.packed_dim_left, dtype.packed_dim_right, scope);
