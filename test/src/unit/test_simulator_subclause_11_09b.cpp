@@ -323,4 +323,79 @@ TEST(TaggedUnionEval, CallResultAssignedToAMemberSetsTheMembersTag) {
       12, "11.9"));
 }
 
+// §11.9 (printed page 304) lets a tagged union variable be initialized with
+// a tagged union expression, and §7.3.2 (printed 151) has its value carry the
+// tag beside the member's bits wherever the variable stands -- a function
+// body's own local (§13.3, printed 337) included -- so `u_t v = tagged Valid
+// -7; return v;` hands the caller a value tagged Valid, which `u = g()`
+// copies into u over the Other it held. The local was created with no layout
+// and no tag, so the return recorded none: u kept its Other, `u.Valid` was
+// reported against it and `u.Other` raised nothing. The -7 read through
+// `u.Valid` says the bits travel beside the tag.
+TEST(TaggedUnionEval, LocalDeclarationInitializerTagIsReturnedWithTheLocal) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef union tagged { void Invalid; int Valid; int Other; } u_t;\n"
+      "  u_t u;\n"
+      "  int y, z;\n"
+      "  function u_t g();\n"
+      "    u_t v = tagged Valid -7;\n"
+      "    return v;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    u = tagged Other 1;\n"
+      "    u = g();\n"
+      "    y = u.Valid;\n"
+      "    z = u.Other;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  LowerAndRun(design, f);
+  auto* y = f.ctx.FindVariable("y");
+  ASSERT_NE(y, nullptr);
+  EXPECT_EQ(y->value.ToUint64(), 0xFFFFFFF9u);
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "run-time error: accessing member", 12, "11.9"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "tagged union 'u' which currently has tag 'Valid'",
+                            13, "11.9"));
+}
+
+// §7.2.1 with §6.18: a local declared by the typedef's name has the members
+// the union declares, so `v.Valid` inside the body is the window of the
+// member, and §11.9 (printed 304) checks each such read against the tag the
+// local's `tagged` initializer gave it. The local had no layout bound to its
+// name, so `v.Valid` was read through no member at all, and no tag, so
+// `v.Other` raised nothing; -7 through `v.Valid` says the member is reached
+// and the report at the body's line says the tag is the initializer's.
+TEST(TaggedUnionEval, LocalTaggedUnionIsReadInTheBodyAgainstItsTag) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef union tagged { void Invalid; int Valid; int Other; } u_t;\n"
+      "  int y, z;\n"
+      "  function int g();\n"
+      "    u_t v = tagged Valid -7;\n"
+      "    z = v.Other;\n"
+      "    return v.Valid;\n"
+      "  endfunction\n"
+      "  initial y = g();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  LowerAndRun(design, f);
+  auto* y = f.ctx.FindVariable("y");
+  ASSERT_NE(y, nullptr);
+  EXPECT_EQ(y->value.ToUint64(), 0xFFFFFFF9u);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "tagged union 'v' which currently has tag 'Valid'",
+                            6, "11.9"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "run-time error: accessing member", 7, "11.9"));
+}
+
 }  // namespace

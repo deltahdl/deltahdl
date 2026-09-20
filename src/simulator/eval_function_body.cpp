@@ -310,6 +310,49 @@ bool DeclaredTypeIs4State(const DataType& type) {
   return Is4stateType(type.kind);
 }
 
+// §6.18 with §7.2.1: a variable declared by a typedef name is an object of
+// the type the name stands for, and a member read or write of it is a window
+// of that type's layout, which SimContext resolves through the layout bound
+// to the variable's name (ResolveMemberByType, ResolveFieldTarget). The
+// layout a typedef name stands for is registered under that name by
+// RegisterDesignTypeLayouts, so the variable's name is bound to it, as a
+// declared variable's is by Lowerer::LowerVar. Answers whether the name
+// stands for a layout at all; a type that is no structure or union -- or one
+// written inline, which has no name the table could hold -- binds nothing.
+// The subroutine's implicit variable (BindReturnStructLayout) and a body
+// local (BindLocalAggregateLayout) are bound through here alike.
+static bool BindNamedLayout(std::string_view var_name, const DataType& type,
+                            SimContext& ctx) {
+  std::string_view type_name = type.type_name;
+  if (type_name.empty() || ctx.FindStructType(type_name) == nullptr)
+    return false;
+  ctx.SetVariableStructType(var_name, type_name);
+  return true;
+}
+
+// §13.3 (printed page 337) runs a subroutine body's statements as a
+// begin-end group's, declarations included, and §11.9 (printed 304) lets a
+// tagged union variable be initialized with a tagged union expression, whose
+// value §7.3.2 (printed 151) has carry the member's tag beside its bits. A
+// body local declared by a typedef name was bound to no layout and, with a
+// `tagged` initializer, to no tag: `u_t v = tagged Valid -7;` inside a
+// function left `v.Valid` read through no member, and `return v;` handed
+// the caller the bits with no tag, RecordReturnedVariableTag gating on the
+// local's layout being a union. The layout is bound as the return type's is,
+// and the tag set as Lowerer::LowerVar sets a module-scope declaration's and
+// AssignToScalarLhs a `v = tagged M x` statement's -- under the local's own
+// name, which is the key TagKeyOfName resolves a local to, so the body's
+// reads, the return and a later assignment all find one tag.
+static void BindLocalAggregateLayout(std::string_view name,
+                                     const DataType& type, const Expr* init,
+                                     SimContext& ctx) {
+  if (!BindNamedLayout(name, type, ctx)) return;
+  if (init != nullptr && init->kind == ExprKind::kTagged &&
+      init->rhs != nullptr) {
+    ctx.SetVariableTag(name, init->rhs->text);
+  }
+}
+
 static Variable* CreateFuncLocalVar(std::string_view name, const DataType& type,
                                     const Expr* init, SimContext& ctx,
                                     Arena& arena) {
@@ -362,8 +405,12 @@ static Variable* CreateFuncLocalVar(std::string_view name, const DataType& type,
   // recorded as ExecVarDeclImpl records it for a procedure's declaration; a
   // body local had none and was addressed as [width-1:0] whatever its
   // declaration said.
-  if (!is_class && !is_virtual_interface)
+  if (!is_class && !is_virtual_interface) {
     RecordDeclaredRange(type, v, ctx, arena);
+    // §6.18 with §7.3.2: the members the local's typedef name declares, and
+    // the tag a `tagged` initializer gives a tagged union local.
+    BindLocalAggregateLayout(name, type, init, ctx);
+  }
   if (init == nullptr) return v;
   // §8.4: `P p = new;` creates an object of class P and assigns its handle to
   // p. `new` names a construction, not a value to be read, so evaluating it as
@@ -790,9 +837,7 @@ static FuncFlow ExecFuncStmt(const Stmt* stmt, const FuncExecCtx& exec) {
 // A return type that is no structure -- or one written inline, which has no
 // name the table could hold -- records nothing, and the body runs as before.
 static void BindReturnStructLayout(const ModuleItem* func, SimContext& ctx) {
-  std::string_view type_name = func->return_type.type_name;
-  if (type_name.empty() || ctx.FindStructType(type_name) == nullptr) return;
-  ctx.SetVariableStructType(func->name, type_name);
+  BindNamedLayout(func->name, func->return_type, ctx);
 }
 
 void ExecFunctionBody(const ModuleItem* func, Variable* ret_var,
