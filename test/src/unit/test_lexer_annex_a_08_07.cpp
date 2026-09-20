@@ -434,28 +434,47 @@ TEST(NumberTokenLexing, BinaryValueWithQuestion) {
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
 }
 
-TEST(NumberTokenLexing, RealLeadingDotNotRealLiteral) {
+// A.8.7 derives a fixed_point_number as an unsigned_number, a point and an
+// unsigned_number, so a point with a digit on one side only, the four invalid
+// forms §5.7.2 lists, is derived by no production. The lexer reads each as the
+// one real literal it was written to be and reports it under §5.7.2, rather
+// than handing the parser a point or an integer that the grammar would then
+// reject for a reason of its own.
+TEST(NumberTokenLexing, RealLeadingDotIsOneReportedRealToken) {
   auto tokens = Lex(".12 ");
-  ASSERT_GE(tokens.size(), 3u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kDot);
-  EXPECT_EQ(tokens[1].kind, TokenKind::kIntLiteral);
+  ASSERT_GE(tokens.size(), 1u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kRealLiteral);
+  EXPECT_EQ(tokens[0].text, ".12");
+  EXPECT_TRUE(ReportedError(LexDiagnostics(".12 "), "'.12' has no digit before",
+                            1, "5.7.2"));
 }
 
-TEST(NumberTokenLexing, RealTrailingDotNotRealLiteral) {
+TEST(NumberTokenLexing, RealTrailingDotIsOneReportedRealToken) {
   auto tokens = Lex("9.; ");
-  EXPECT_EQ(tokens[0].kind, TokenKind::kIntLiteral);
-  EXPECT_EQ(tokens[0].text, "9");
+  ASSERT_GE(tokens.size(), 2u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kRealLiteral);
+  EXPECT_EQ(tokens[0].text, "9.");
+  EXPECT_EQ(tokens[1].kind, TokenKind::kSemicolon);
+  EXPECT_TRUE(ReportedError(LexDiagnostics("9.; "), "'9.' has no digit after",
+                            1, "5.7.2"));
 }
 
-TEST(NumberTokenLexing, RealDotBeforeExponentNotRealLiteral) {
+TEST(NumberTokenLexing, RealDotBeforeExponentIsOneReportedRealToken) {
   auto tokens = Lex("4.E3 ");
-  EXPECT_EQ(tokens[0].kind, TokenKind::kIntLiteral);
-  EXPECT_EQ(tokens[0].text, "4");
+  ASSERT_GE(tokens.size(), 1u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kRealLiteral);
+  EXPECT_EQ(tokens[0].text, "4.E3");
+  EXPECT_TRUE(ReportedError(LexDiagnostics("4.E3 "),
+                            "'4.E3' has no digit after", 1, "5.7.2"));
 }
 
-TEST(NumberTokenLexing, RealLeadingDotWithExponentNotRealLiteral) {
+TEST(NumberTokenLexing, RealLeadingDotWithExponentIsOneReportedRealToken) {
   auto tokens = Lex(".2e-7 ");
-  EXPECT_EQ(tokens[0].kind, TokenKind::kDot);
+  ASSERT_GE(tokens.size(), 1u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kRealLiteral);
+  EXPECT_EQ(tokens[0].text, ".2e-7");
+  EXPECT_TRUE(ReportedError(LexDiagnostics(".2e-7 "),
+                            "'.2e-7' has no digit before", 1, "5.7.2"));
 }
 
 TEST(NumberTokenLexing, RealTrailingUnderscoreBeforeExponent) {

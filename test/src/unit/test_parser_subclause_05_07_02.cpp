@@ -4,6 +4,7 @@
 #include "fixture_evaluator.h"
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
 
@@ -125,6 +126,49 @@ TEST(RealLiteralParsing, RealLiteralAddition) {
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kPlus);
   EXPECT_EQ(rhs->lhs->kind, ExprKind::kRealLiteral);
+}
+
+// §5.7.2 lists `.12`, `9.`, `4.E3` and `.2e-7` as invalid real numbers for
+// lacking a digit on one side of the decimal point. The lexer reads each as the
+// real literal it was written to be and reports it there, so each assignment of
+// the sv-tests module is reported under the subclause whose rule it breaks, on
+// its own line.
+TEST(RealLiteralParsing, PointWithoutADigitOnEachSideIsReportedUnderClause572) {
+  auto r = Parse(
+      "module top();\n"
+      "  logic [31:0] a;\n"
+      "  initial begin\n"
+      "    a = .12;\n"
+      "    a = 9.;\n"
+      "    a = 4.E3;\n"
+      "    a = .2e-7;\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, "'.12' has no digit before", 4, "5.7.2"));
+  EXPECT_TRUE(ReportedError(r.diags, "'9.' has no digit after", 5, "5.7.2"));
+  EXPECT_TRUE(ReportedError(r.diags, "'4.E3' has no digit after", 6, "5.7.2"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "'.2e-7' has no digit before", 7, "5.7.2"));
+}
+
+// The whole spelling is one token, so the statements are parsed in step: no
+// report of a member name expected after the point, which is what §23.3.2.3 had
+// said of the `.` handed to it, and none of a token left over after the
+// literal, which is what §12.3 had said of the digits.
+TEST(RealLiteralParsing, PointWithoutADigitLeavesNoLeftoverTokenReport) {
+  auto r = Parse(
+      "module top();\n"
+      "  logic [31:0] a;\n"
+      "  initial begin\n"
+      "    a = .12;\n"
+      "    a = 9.;\n"
+      "    a = 4.E3;\n"
+      "    a = .2e-7;\n"
+      "  end\n"
+      "endmodule\n");
+  for (const auto& d : r.diags) {
+    EXPECT_EQ(d.subclause, "5.7.2") << d.message;
+  }
 }
 
 }  // namespace

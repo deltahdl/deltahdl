@@ -255,6 +255,13 @@ Token Lexer::LexOpHash(SourceLoc loc, uint32_t start) {
 }
 
 Token Lexer::LexOpDot(SourceLoc loc, uint32_t start) {
+  // A point against a digit, as in `.12` and `.2e-7`, is the decimal point of
+  // a real literal missing the digit §5.7.2 wants before it: no legal token
+  // starts that way, since the member or port name a point introduces is an
+  // identifier, which never begins with a digit.
+  if (!AtEnd() && std::isdigit(static_cast<unsigned char>(Current()))) {
+    return LexRealMissingDigit(loc, start, "before");
+  }
   if (!AtEnd() && Current() == '*') {
     Advance();
     return MakeOp(TokenKind::kDotStar, loc, start);

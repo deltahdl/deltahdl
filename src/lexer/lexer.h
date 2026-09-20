@@ -148,6 +148,7 @@ class Lexer {
                           uint32_t digit_start);
   void LexFractionalPart();
   void LexExponentPart();
+  Token LexRealMissingDigit(SourceLoc loc, uint32_t start, const char* side);
   bool IsWordBoundary(uint32_t p) const;
   bool TryLexTimeSuffix();
 

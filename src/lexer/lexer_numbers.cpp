@@ -1,14 +1,15 @@
 // The number-lexing members of Lexer. §5.7 and §5.8 give the literals read
 // here: based and unbased-unsized integers, real numbers with a fractional or
 // exponent part, and the time literals of §5.8. Lexer::Next dispatches into
-// Lexer::LexNumber, and Lexer::LexApostrophe in src/lexer/lexer_operators.cpp
-// calls Lexer::ApostropheStartsBaseSpecifier; every other call among these
-// members comes from one of the others. The declarations are in
-// src/lexer/lexer.h, so a caller needs no include beyond the ones it already
-// has.
+// Lexer::LexNumber, and in src/lexer/lexer_operators.cpp Lexer::LexApostrophe
+// calls Lexer::ApostropheStartsBaseSpecifier and Lexer::LexOpDot calls
+// Lexer::LexRealMissingDigit; every other call among these members comes from
+// one of the others. The declarations are in src/lexer/lexer.h, so a caller
+// needs no include beyond the ones it already has.
 
 #include <cctype>
 #include <cstdint>
+#include <string>
 
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
@@ -226,6 +227,36 @@ void Lexer::LexExponentPart() {
   }
 }
 
+// Read the rest of a real literal written with a decimal point that has no
+// digit on one side of it, and report it. §5.7.2 has a real number expressed
+// with a decimal point carry at least one digit on each side of the point, and
+// lists `.12`, `9.`, `4.E3` and `.2e-7` as invalid for lacking one. Nothing
+// legal starts with a point against a digit, or with a digit run against a
+// point that no digit follows, so the spelling can only be the real literal it
+// was written to be: it is read whole, digits, underscores and exponent, and
+// returned as one token so that the statement holding it is parsed in step and
+// nothing cascades from the point or the digits taken separately. `start` is
+// where the literal begins in the source and `loc` its location; the caller has
+// read past the point, and `side` says which side of it, "before" or "after",
+// has no digit.
+Token Lexer::LexRealMissingDigit(SourceLoc loc, uint32_t start,
+                                 const char* side) {
+  while (!AtEnd() && (std::isdigit(static_cast<unsigned char>(Current())) ||
+                      Current() == '_')) {
+    Advance();
+  }
+  LexExponentPart();
+  Token tok;
+  tok.kind = TokenKind::kRealLiteral;
+  tok.loc = loc;
+  tok.text = source_.substr(start, pos_ - start);
+  diag_.Error(loc,
+              "real literal '" + std::string(tok.text) + "' has no digit " +
+                  side + " its decimal point",
+              Subclause("5.7.2"));
+  return tok;
+}
+
 bool Lexer::IsWordBoundary(uint32_t p) const {
   return p >= source_.size() ||
          (!std::isalnum(source_[p]) && source_[p] != '_');
@@ -285,6 +316,16 @@ Token Lexer::LexNumber() {
   }
   pos_ = before_ws;
   column_ = column_before_ws;
+
+  // A point that no digit follows, as in `9.` and `4.E3`, is the decimal point
+  // of a real literal missing the digit §5.7.2 wants after it: no legal token
+  // puts a point against a digit run, since a member access or a hierarchical
+  // name is written against an identifier and never against a number.
+  if (!AtEnd() && Current() == '.' &&
+      !std::isdigit(static_cast<unsigned char>(PeekChar()))) {
+    Advance();
+    return LexRealMissingDigit(loc, start, "after");
+  }
 
   uint32_t before_real = pos_;
   LexFractionalPart();
