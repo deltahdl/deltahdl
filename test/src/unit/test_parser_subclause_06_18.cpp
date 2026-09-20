@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_parser.h"
 #include "helpers_reported_error.h"
 #include "parser/ast_module.h"
@@ -418,6 +420,65 @@ TEST(ParserUndeclaredTypeDecl,
   EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
   EXPECT_EQ(item->inst_name, "u");
   EXPECT_NE(item->inst_range_left, nullptr);
+}
+
+// Parses a module whose one item is `typedef <qualified> alias_t;` and checks
+// that it parsed without a report into one typedef of a kNamed type held in
+// scope `scope` under `type_name`. The typedef's type is A.2.2.1's
+// `[ class_scope | package_scope ] type_identifier`, which the parser once
+// read as a bare name -- `r` taken for the typedef's own name and the `::`
+// after it reported as a missing semicolon -- so a qualified name is what
+// tells the repaired parse from the old one.
+static void ExpectQualifiedTypedef(const char* qualified, const char* scope,
+                                   const char* type_name) {
+  std::string src = std::string("module m;\n  typedef ") + qualified +
+                    " alias_t;\nendmodule\n";
+  auto r = Parse(src);
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules[0]->items.size(), 1u);
+  const auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kTypedef);
+  EXPECT_EQ(item->name, "alias_t");
+  EXPECT_EQ(item->typedef_type.kind, DataTypeKind::kNamed);
+  EXPECT_EQ(item->typedef_type.scope_name, scope);
+  EXPECT_EQ(item->typedef_type.type_name, type_name);
+  EXPECT_EQ(item->forward_type_kind, DataTypeKind::kImplicit);
+}
+
+TEST(TypeDeclParsing, PackageQualifiedTypedefType) {
+  // §26.3 (printed page 808) reaches a package's typedef through the package
+  // scope resolution operator, and A.2.1.3's type_declaration takes any
+  // data_type, so `typedef r::real_holder_t idx_t;` is one typedef of a named
+  // type held in scope r, not a forward typedef of `r`.
+  ExpectQualifiedTypedef("r::real_holder_t", "r", "real_holder_t");
+}
+
+TEST(TypeDeclParsing, ClassQualifiedTypedefType) {
+  // A.2.2.1 admits a class_scope before the type_identifier as it does a
+  // package_scope, so `typedef C::T alias_t;` reads the same way with the
+  // class held as the scope.
+  ExpectQualifiedTypedef("C::T", "C", "T");
+}
+
+TEST(TypeDeclParsing, ForwardStructTypedefStaysForward) {
+  // §6.18 (printed page 118) lists `typedef struct type_identifier;` among the
+  // forward typedef forms. Reading the typedef's type through the declared-
+  // data-type path must leave this form to the forward probe that precedes
+  // it: the item carries the forward kind and no type of its own.
+  auto r = Parse(
+      "module m;\n"
+      "  typedef struct pair_t;\n"
+      "  typedef struct { int a; int b; } pair_t;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules[0]->items.size(), 2u);
+  const auto* fwd = r.cu->modules[0]->items[0];
+  EXPECT_EQ(fwd->kind, ModuleItemKind::kTypedef);
+  EXPECT_EQ(fwd->name, "pair_t");
+  EXPECT_EQ(fwd->forward_type_kind, DataTypeKind::kStruct);
+  EXPECT_EQ(fwd->typedef_type.kind, DataTypeKind::kImplicit);
 }
 
 }  // namespace

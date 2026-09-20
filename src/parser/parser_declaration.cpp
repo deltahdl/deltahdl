@@ -244,12 +244,21 @@ ModuleItem* Parser::ParseTypedef() {
   if (TryForwardBareTypedef(item)) return item;
   if (TryInterfacePortTypedef(item)) return item;
 
+  // A.2.1.3's type_declaration takes a data_type, and A.2.2.1 admits a
+  // type_identifier behind a package_scope or a class_scope, the `r::` of
+  // `typedef r::real_holder_t idx_t;` reaching the package's typedef by §26.3
+  // (printed page 808). ParseDeclaredDataType reads such a name past
+  // known_types_, where a package name never stands; ParseDataType left `r`
+  // to be read as the typedef's own name, the `::` after it reported as a
+  // missing semicolon under §6.18, and `r` then recorded as a forward typedef
+  // no definition resolves. The forward forms above are already settled by
+  // the time this is reached, so `typedef T;` stays a forward typedef.
   if (Check(TokenKind::kKwEnum)) {
     item->typedef_type = ParseEnumType();
   } else if (Check(TokenKind::kKwStruct) || Check(TokenKind::kKwUnion)) {
     item->typedef_type = ParseStructOrUnionType();
   } else {
-    item->typedef_type = ParseDataType();
+    item->typedef_type = ParseDeclaredDataType();
   }
 
   item->name = Expect(TokenKind::kIdentifier, Subclause("6.18")).text;
