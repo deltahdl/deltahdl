@@ -207,6 +207,19 @@ void RecordReturnedTag(const Expr* returned) {
   reg.bodies.back().tag = std::string(returned->rhs->text);
 }
 
+void RecordReturnedVariableTag(const Expr* returned, SimContext& ctx) {
+  auto& reg = Register();
+  if (reg.evaluations == 0 || reg.bodies.empty()) return;
+  if (returned == nullptr || returned->kind != ExprKind::kIdentifier) return;
+  // The layout gate keeps a tag left in the table under a bare name -- a
+  // local of an earlier call, a top-level object of the same name -- from
+  // being read as the tag of a variable that has none.
+  const StructTypeInfo* layout = StructLayoutOfName(returned->text, ctx);
+  if (layout == nullptr || !layout->is_union) return;
+  std::string_view tag = ctx.GetVariableTag(TagKeyOfName(returned->text, ctx));
+  if (!tag.empty()) reg.bodies.back().tag = std::string(tag);
+}
+
 Logic4Vec EvalWithReturnedAggregate(
     const Expr* expr, SimContext& ctx, Arena& arena,
     std::optional<ReturnedAggregate>& returned) {

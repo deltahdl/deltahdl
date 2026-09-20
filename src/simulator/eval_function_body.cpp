@@ -656,6 +656,15 @@ static void ExecFuncReturn(const Stmt* stmt, const FuncExecCtx& exec) {
   // where an untagged formal read `a.Valid` of a `tagged Invalid` result
   // against no tag. Nothing is recorded unless such a read is waiting.
   RecordReturnedTag(stmt->expr);
+  // §7.3.2 (printed page 151): a tagged union variable's value is its tag
+  // beside the member's bits, so `return v` hands out v's tag as much as
+  // `return tagged M x` hands out M's -- and §11.9 (printed 304) checks the
+  // caller's member reads of what it assigned the call to against it. The
+  // tag stands in the table by v's storage key rather than in the vector the
+  // return evaluated to, so it is read from there; recorded from a `tagged`
+  // expression alone, `u = g()` for a g returning a variable left u's
+  // previous tag standing and `u.Other` raised nothing after `tagged Valid`.
+  RecordReturnedVariableTag(stmt->expr, exec.ctx);
   if (exec.ret_width != 0) {
     val = ResizeToWidth(val, exec.ret_width, exec.arena);
     val.is_signed = exec.ret_var->is_signed;

@@ -102,4 +102,68 @@ TEST(TaggedUnionEval, TaggedAssignmentToTheFunctionNameReachesTheFormal) {
       "tagged union 'a' which currently has tag 'Invalid'", 11, "11.9"));
 }
 
+// §7.3.2 (printed page 151): a tagged union variable's value is its tag
+// beside the member's bits, so `return v` hands out the tag v holds, and
+// §13.4.1 (printed 342) gives the implicit variable of `g()` that value,
+// which `u = g()` copies into u. The return recorded a tag from a `tagged`
+// expression alone, so u kept the Other it held and `u.Valid` was reported
+// against it; the -7 read through u says the bits travel beside the tag.
+TEST(TaggedUnionEval, ReturnedVariableCarriesItsTag) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef union tagged { void Invalid; int Valid; int Other; } u_t;\n"
+      "  u_t u, v;\n"
+      "  int y;\n"
+      "  function u_t g();\n"
+      "    v = tagged Valid -7;\n"
+      "    return v;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    u = tagged Other 1;\n"
+      "    u = g();\n"
+      "    y = u.Valid;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  LowerAndRun(design, f);
+  auto* y = f.ctx.FindVariable("y");
+  ASSERT_NE(y, nullptr);
+  EXPECT_EQ(y->value.ToUint64(), 0xFFFFFFF9u);
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "run-time error: accessing member", 12, "11.9"));
+}
+
+// §11.9 (printed page 304): reading a member inconsistent with the current
+// tag is a run-time error, and the tag `u = g()` gives u is the Valid the
+// returned variable held. With u's earlier Other left standing, `u.Other`
+// raised nothing.
+TEST(TaggedUnionEval, ReturnedVariableTagIsCheckedAgainstAnotherMember) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef union tagged { void Invalid; int Valid; int Other; } u_t;\n"
+      "  u_t u, v;\n"
+      "  int y;\n"
+      "  function u_t g();\n"
+      "    v = tagged Valid -7;\n"
+      "    return v;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    u = tagged Other 1;\n"
+      "    u = g();\n"
+      "    y = u.Other;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  LowerAndRun(design, f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "tagged union 'u' which currently has tag 'Valid'",
+                            12, "11.9"));
+}
+
 }  // namespace

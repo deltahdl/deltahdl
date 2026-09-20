@@ -80,6 +80,17 @@ Logic4Vec EvalWithReturnedAggregate(const Expr* expr, SimContext& ctx,
 // nothing for another expression, or while no evaluation below is asking.
 void RecordReturnedTag(const Expr* returned);
 
+// §7.3.2 with §13.4.1: `return v` for a tagged union variable v gives the
+// implicit variable of the call v's value, and that value is v's tag beside
+// the member's bits -- the tag standing in the table under the key v's
+// storage was created by (TagKeyOfName), never in the vector the return
+// evaluates to. Records, for the innermost running body, that tag where
+// `returned` -- the expression of the `return` ExecFuncReturn is carrying out
+// -- is a bare identifier whose layout is a union and which holds a tag, and
+// records nothing for another expression, for a union holding no tag, or
+// while no evaluation below is asking.
+void RecordReturnedVariableTag(const Expr* returned, SimContext& ctx);
+
 // Evaluates `expr` and answers its value; where `expr` is a call whose body
 // returned a tagged union expression, `tag` is the member that expression
 // named, and it is empty otherwise -- for an expression that is no call, for
