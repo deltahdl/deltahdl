@@ -216,6 +216,32 @@ static bool ImportsProvideName(const CompilationUnit* unit,
   return false;
 }
 
+// §3.12.1 (printed page 56) with §6.21 (printed 132): a variable or a net
+// declared outside every module is a declaration of the compilation-unit
+// scope, which is searched for a name the module's own scope does not declare
+// once that scope and its imports have been, and §6.21 gives such a variable a
+// static lifetime, so a module's procedural assignment to it names nothing
+// undeclared. `int g;` outside every module with `initial g = 5;` in a module
+// was reported as undeclared, because the check below knew the module's own
+// names and its imports' alone while the read side (IsDeclaredNameForRhs)
+// admits the unit's; a unit-scope function body escaped it, which is how the
+// unit's variables were written until now. The items are asked for a data
+// declaration rather than cu_scope_names_ for every named item, so a write to
+// a unit function's or class's name is still reported. The order §3.12.1 gives
+// -- the part of the unit written before the reference -- is not applied
+// here, as the read side does not apply it either.
+static bool UnitDeclaresData(const CompilationUnit* unit,
+                             std::string_view name) {
+  for (const auto* item : unit->cu_items) {
+    if ((item->kind == ModuleItemKind::kVarDecl ||
+         item->kind == ModuleItemKind::kNetDecl) &&
+        item->name == name) {
+      return true;
+    }
+  }
+  return false;
+}
+
 void Elaborator::ValidateScopeRules(const ModuleDecl* decl) {
   ScopeWalk walk;
   for (const auto* item : decl->items) {
@@ -235,9 +261,11 @@ void Elaborator::ValidateScopeRules(const ModuleDecl* decl) {
     if (walk.local_names.count(name)) continue;
     if (IsNameInModuleScope(name)) continue;
     // §3.12.1 has an import written at compilation-unit scope stand for the
-    // module too, as the read-side check honours it.
+    // module too, as the read-side check honours it, and the unit's own data
+    // declarations likewise (UnitDeclaresData above).
     if (ImportsProvideName(unit_, pkg_provided_names_, decl->items, name) ||
-        ImportsProvideName(unit_, pkg_provided_names_, unit_->cu_items, name)) {
+        ImportsProvideName(unit_, pkg_provided_names_, unit_->cu_items, name) ||
+        UnitDeclaresData(unit_, name)) {
       continue;
     }
     diag_.Error(loc, std::format("undeclared identifier '{}'", name),

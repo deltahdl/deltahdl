@@ -59,12 +59,14 @@ TEST(CompilationUnitSim, CuScopeEnumLiteralsResolveInModulesAndClasses) {
 // function and top's reads it at time 1: 5. No lowerer path created the
 // unit's storage (CreateUnitDataVariables in lowerer_package_data.cpp), so
 // the write landed nowhere and the read answered nothing. The write goes
-// through a function of the unit because the elaborator's §23.9 check of a
-// procedural assignment's target (ValidateScopeRules in
-// elaborator_scope_rules.cpp) knows the module's own names and its imports'
-// and not the unit's, so `initial g = 5` in a module is reported as
-// undeclared, which a subroutine body escapes; the read side admits the
-// unit's names.
+// through a function of the unit because, when this case was written, the
+// elaborator's §23.9 check of a procedural assignment's target
+// (ValidateScopeRules in elaborator_scope_rules.cpp) knew the module's own
+// names and its imports' and not the unit's, so `initial g = 5` in a module
+// was reported as undeclared, which a subroutine body escapes; the case is
+// kept beside CuScopeVariableWrittenDirectlyByAModuleProcess below, which
+// writes without the function, so the unit function's write to the unit's
+// variable stays covered.
 TEST(CompilationUnitSim, CuScopeVariableSharedByTwoModules) {
   auto val = RunAndGet(
       "int g;\n"
@@ -73,6 +75,30 @@ TEST(CompilationUnitSim, CuScopeVariableSharedByTwoModules) {
       "endfunction\n"
       "module a;\n"
       "  initial set_g(5);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  a u();\n"
+      "  int y;\n"
+      "  initial #1 y = g;\n"
+      "endmodule\n",
+      "y");
+  EXPECT_EQ(val, 5u);
+}
+
+// §3.12.1 (printed page 56) with §6.21 (printed 132-133): a module's own
+// procedural assignment writes the unit's variable, `initial g = 5;` in a
+// with no function between, and top reads 5 through it at time 1. The
+// elaborator reported the write as "undeclared identifier 'g'"
+// (ValidateScopeRules in elaborator_scope_rules.cpp admitted the module's
+// names and its imports' alone), so no such design reached the simulator;
+// the case above wrote through a unit function to get past it. The value
+// read is the write's and not the declaration's, which has none, so a run
+// whose write landed elsewhere reads 0.
+TEST(CompilationUnitSim, CuScopeVariableWrittenDirectlyByAModuleProcess) {
+  auto val = RunAndGet(
+      "int g;\n"
+      "module a;\n"
+      "  initial g = 5;\n"
       "endmodule\n"
       "module top;\n"
       "  a u();\n"
@@ -108,7 +134,8 @@ TEST(CompilationUnitSim, CuScopeVariableInitializedBeforeAnyProcess) {
 // recorded under `h` (RegisterUnitClassVariables in lowerer_register.cpp
 // records the packages' alone before), so the `new` found no class to
 // construct and `h.v` read no object. The write goes through a unit
-// function for the reason CuScopeVariableSharedByTwoModules gives.
+// function for the reason CuScopeVariableSharedByTwoModules gives, and is
+// kept so a unit function's `new` into the unit's handle stays covered.
 TEST(CompilationUnitSim, CuScopeClassHandleConstructedThroughUnitFunction) {
   auto val = RunAndGet(
       "class C;\n"
