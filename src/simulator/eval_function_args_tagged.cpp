@@ -6,6 +6,7 @@
 #include "parser/ast_type.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
+#include "simulator/lowerer_register.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/statement_assign_internal.h"
@@ -14,16 +15,27 @@ namespace delta {
 
 // §11.9 (printed page 304): a tagged union expression's type is known from
 // its context -- for an actual, the formal it is bound to. The key the
-// formal's union layout stands under in SimContext: the typedef's name the
-// formal is declared by, which RegisterDesignTypeLayouts registers. Empty
-// where the formal's type names no registered layout, a union written inline
-// in the formal's declaration among them.
+// formal's union layout stands under in SimContext: the typedef's name where
+// the formal is declared by one, which RegisterDesignTypeLayouts registers;
+// the formal's own name where the union is written inline in the formal's
+// declaration (§13.3, printed 337, takes any data_type there), which names no
+// registered layout, so the layout is built from the formal's DataType as
+// RegisterAggregateLayout builds a declaration's, as wide as §7.2.1 makes the
+// type, and registered under the formal's name, the key the body's reads of
+// the formal ask by. Without it `a.Valid` of an inline-typed formal was read
+// through no member and `f(tagged Invalid)` raised nothing. Empty where the
+// formal's type is neither. A member of the inline type that names a typedef
+// of its own carries no nested layout here, the elaborator resolving those
+// for the typedef table alone.
 static std::string_view FormalUnionLayoutKey(const FunctionArg& param,
                                              SimContext& ctx) {
   const DataType& dt = param.data_type;
   if (!dt.type_name.empty() && ctx.FindStructType(dt.type_name) != nullptr)
     return dt.type_name;
-  return {};
+  if (dt.struct_members.empty()) return {};
+  RegisterAggregateLayout(param.name, &dt, DeclaredTypeWidth(dt, ctx), ctx,
+                          ctx.GetArena());
+  return param.name;
 }
 
 // §11.9: the struct layout of the union member a tagged expression names, or

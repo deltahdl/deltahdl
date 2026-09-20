@@ -707,4 +707,50 @@ TEST(TaggedUnionEval, TaggedPatternActualIsPlacedByMemberName) {
 // expression's type known from the formal. An inline type names no
 // registered layout, so the formal was bound as a plain vector: `a.Valid`
 // was read through no member and answered 1 bit, not 5. The layout is built
+// from the formal's own type and registered under the formal's name.
+TEST(TaggedUnionEval, TaggedExprActualBindsAnInlineUnionFormalsLayout) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int x;\n"
+      "  function int f(union tagged { void Invalid; int Valid; } a);\n"
+      "    return a.Valid;\n"
+      "  endfunction\n"
+      "  initial x = f(tagged Valid 5);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  LowerAndRun(design, f);
+  auto* x = f.ctx.FindVariable("x");
+  ASSERT_NE(x, nullptr);
+  EXPECT_EQ(x->value.ToUint64(), 5u);
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "run-time error: accessing member", 4, "11.9"));
+}
+
+// §11.9 (printed page 304): a member access inconsistent with the current
+// tag is a run-time error, and the formal's tag is the member the actual
+// names, whether the formal's union is named by a typedef or written inline.
+// With no layout bound, `a.Valid` of an inline-typed formal passed `tagged
+// Invalid` raised nothing.
+TEST(TaggedUnionEval, TaggedExprActualOfInlineUnionFormalIsCheckedInTheBody) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int y;\n"
+      "  function int f(union tagged { void Invalid; int Valid; } a);\n"
+      "    return a.Valid;\n"
+      "  endfunction\n"
+      "  initial y = f(tagged Invalid);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  LowerAndRun(design, f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "tagged union 'a' which currently has tag 'Invalid'", 4, "11.9"));
+}
+
 }  // namespace
