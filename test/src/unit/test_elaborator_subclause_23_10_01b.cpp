@@ -67,6 +67,33 @@ TEST(DefparamElaboration, SizesEachModulesTypedefParameterByItsOwnTypedef) {
   EXPECT_EQ(ParamOfModule(kSrc, "b", "B", fb), 16);
 }
 
+// §27.4 (printed page 820) has a generate block's declarations in scope for
+// its items and §6.18 (printed 118) makes a typedef name stand for that
+// declaration, so g's `parameter vec_t P` under g's own `typedef logic
+// [TOP:0] vec_t` follows the module's TOP, which §23.10.1 (printed 764-765)
+// lets `defparam u.TOP = 7` change: $bits(P) is 8. Sized again against the
+// module's table alone, P followed the module-level `typedef logic [3:0]
+// vec_t` and B read 4, or kept its 16 where the module declared none.
+TEST(DefparamElaboration, ResizesAGenerateBlocksParameterByTheBlocksTypedef) {
+  ElabFixture f;
+  EXPECT_EQ(ParamOfModule("module m;\n"
+                          "  parameter int TOP = 15;\n"
+                          "  typedef logic [3:0] vec_t;\n"
+                          "  if (1) begin : g\n"
+                          "    typedef logic [TOP:0] vec_t;\n"
+                          "    parameter vec_t P = 0;\n"
+                          "    localparam int B = $bits(P);\n"
+                          "  end\n"
+                          "endmodule\n"
+                          "module top;\n"
+                          "  m u();\n"
+                          "  defparam u.TOP = 7;\n"
+                          "endmodule\n",
+                          "m", "B", f),
+            8);
+  EXPECT_FALSE(f.has_errors);
+}
+
 // A module c whose `logic [W-1:0] P` follows `parameter int W = 32`, with H
 // reading P's word above bit 64 and M its bits 47 down to 32.
 constexpr std::string_view kWideningC =
