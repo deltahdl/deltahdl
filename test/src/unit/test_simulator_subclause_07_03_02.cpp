@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "helpers_scheduler.h"
 #include "simulator/variable.h"
 
@@ -78,7 +79,10 @@ TEST(TaggedUnionSimulation, MismatchedMemberReadIsUnknownFromRealSource) {
       f, "result");
   ASSERT_NE(result, nullptr);
   EXPECT_EQ(result->value.ToUint64(), 1u);
-  EXPECT_NE(FindDiag(f, "accessing member 'B' of tagged union 'u'"), nullptr);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "run-time error: accessing member 'B' of tagged "
+                            "union 'u' which currently has tag 'A'",
+                            7, "11.9"));
 }
 
 // The contrast to the mismatch case: reading through the member that does match
