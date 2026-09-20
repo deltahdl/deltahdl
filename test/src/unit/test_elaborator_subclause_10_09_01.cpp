@@ -43,6 +43,11 @@ TEST(ArrayLiteralElaboration, SizeMismatchError) {
                             2, "10.9.1"));
 }
 
+// The flat pattern for an array of structures breaks §5.10, which has the
+// braces of a structure literal nest to reflect the structure, and the §10.9.1
+// element count is only a consequence of the flat form, one that would not
+// arise for `'{0, 0}`; so the pattern is reported under §5.10 and the count
+// says nothing.
 TEST(ArrayLiteralElaboration, FlatInitIllegal) {
   ElabFixture f;
   ElaborateSrc(
@@ -52,9 +57,13 @@ TEST(ArrayLiteralElaboration, FlatInitIllegal) {
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "assignment pattern has 4 elements, but array "
-                            "dimension requires 2",
-                            3, "10.9.1"));
+                            "assignment pattern for an array of structures "
+                            "shall nest a pattern per structure",
+                            3, "5.10"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "assignment pattern has 4 elements, but array "
+                             "dimension requires 2",
+                             3, "10.9.1"));
 }
 
 TEST(ArrayLiteralElaboration, DuplicateIndexError) {

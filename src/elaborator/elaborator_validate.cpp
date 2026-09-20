@@ -270,6 +270,19 @@ static void CheckPatternKeys(const ModuleItem* item,
   }
 }
 
+// The members of the structure a declaration's type names, written inline or
+// through a typedef, or null when the type is no structure.
+static const std::vector<StructMember>* DeclaredStructMembers(
+    const ModuleItem* item, const TypedefMap& typedefs) {
+  if (!item->data_type.struct_members.empty()) {
+    return &item->data_type.struct_members;
+  }
+  if (item->data_type.kind != DataTypeKind::kNamed) return nullptr;
+  auto td = typedefs.find(item->data_type.type_name);
+  if (td == typedefs.end() || td->second.struct_members.empty()) return nullptr;
+  return &td->second.struct_members;
+}
+
 void Elaborator::ValidateStructInitPattern(const ModuleItem* item) {
   if (!item->init_expr) return;
   if (item->init_expr->kind != ExprKind::kAssignmentPattern) return;
@@ -280,14 +293,8 @@ void Elaborator::ValidateStructInitPattern(const ModuleItem* item) {
   // for a three-element array of a two-member structure.
   if (!item->unpacked_dims.empty()) return;
 
-  const std::vector<StructMember>* members = nullptr;
-  if (!item->data_type.struct_members.empty()) {
-    members = &item->data_type.struct_members;
-  } else if (item->data_type.kind == DataTypeKind::kNamed) {
-    auto td = typedefs_.find(item->data_type.type_name);
-    if (td != typedefs_.end() && !td->second.struct_members.empty())
-      members = &td->second.struct_members;
-  }
+  const std::vector<StructMember>* members =
+      DeclaredStructMembers(item, typedefs_);
   if (!members) return;
 
   if (item->init_expr->pattern_keys.empty()) {
