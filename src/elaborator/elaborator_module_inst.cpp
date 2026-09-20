@@ -860,9 +860,16 @@ void Elaborator::ElaborateChildInstance(RtlirModuleInst& inst,
   auto saved_type_params =
       ApplyChildTypeParams(item, child_decl, typedefs_, unit_, diag_);
   // §16.15: the default disable iff extends to a nested declaration and not
-  // into an instance of a module declared elsewhere.
+  // into an instance of a module declared elsewhere. §23.4 makes this scope's
+  // names visible inside such a declaration as well, whether the instance is
+  // written out here or implied by InstantiateImplicitNestedModules, so the
+  // names declared so far are handed to ElaborateModule the same way: without
+  // them every implicit net the nested module makes for an outer name counted
+  // as its own, and an instance materialized a net shadowing the outer one.
   if (inst.is_nested_decl) {
     nested_default_disable_iff_ = mod->default_disable_iff;
+    pending_enclosing_scope_ = CaptureCurrentScopeNames();
+    has_pending_enclosing_scope_ = true;
   }
   inst.resolved = ElaborateModule(child_decl, child_params);
   RestoreChildTypeParams(typedefs_, saved_type_params);

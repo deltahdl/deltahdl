@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <string_view>
+
+#include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 
 namespace {
@@ -369,6 +372,64 @@ TEST(NestedModuleElaboration, ImplicitInstanceElaboratesNestedBody) {
     if (net.name == "inner_net") has_inner_net = true;
   }
   EXPECT_TRUE(has_inner_net);
+}
+
+// The net named `name` among the nested module's, which is the first child of
+// the design's top module, or null when it holds none of the name.
+const RtlirNet* NestedModuleNet(const RtlirDesign* design,
+                                std::string_view name) {
+  const auto& children = design->top_modules[0]->children;
+  if (children.empty() || children[0].resolved == nullptr) return nullptr;
+  for (const auto& net : children[0].resolved->nets) {
+    if (net.name == name) return &net;
+  }
+  return nullptr;
+}
+
+// §6.10 with §23.4: a name a continuous assignment inside a nested module
+// writes that no module declares, the enclosing ones included, is an implicit
+// net of the nested module's own scope, so the net the elaborator makes for
+// it refers to nothing outward. The lowerer reads RtlirNet::refers_outward to
+// materialize such a net under each instance.
+TEST(NestedModuleElaboration, UndeclaredImplicitNetOfNestedModuleIsItsOwn) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module top;\n"
+      "  wire x;\n"
+      "  module M(output o);\n"
+      "    assign q = 1'b1;\n"
+      "    assign o = q;\n"
+      "  endmodule\n"
+      "  M m1(.o(x));\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* q = NestedModuleNet(design, "q");
+  ASSERT_NE(q, nullptr);
+  EXPECT_FALSE(q->refers_outward);
+}
+
+// §23.4: a continuous assignment inside a nested module to a name the
+// enclosing module declares reaches that outer net, and the net the elaborator
+// pushes onto the nested module's list for the reference stands for it, so it
+// is marked as referring outward and no instance materializes it.
+TEST(NestedModuleElaboration, ImplicitNetForAnOuterNameRefersOutward) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module top;\n"
+      "  wire w;\n"
+      "  module M;\n"
+      "    assign w = 1'b1;\n"
+      "  endmodule\n"
+      "  M m();\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* w = NestedModuleNet(design, "w");
+  ASSERT_NE(w, nullptr);
+  EXPECT_TRUE(w->refers_outward);
 }
 
 }  // namespace

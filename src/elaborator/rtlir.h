@@ -215,6 +215,20 @@ struct RtlirNet {
   // not recorded here answers neither. Invalid for a net no declaration
   // produced, an implicitly declared one among them.
   SourceLoc loc;
+
+  // §23.4: whether this net stands for an object of a lexically enclosing
+  // module rather than one of this module's own. The outer name space is
+  // visible to a module declared and instantiated inside another, so a name a
+  // continuous assignment or port connection in the nested module writes may
+  // be one an enclosing module declares; the elaborator still pushes a net of
+  // that name onto the nested module's list, for its assignment to be lowered
+  // against, and marks it here so that no instance materializes it -- a net of
+  // the name under the instance would shadow the outer object and take the
+  // assignment with it. False for a net the module declares, which §23.4 has
+  // hide an outer name, and for an implicit net of a name declared nowhere,
+  // which §6.10 gives to the scope the reference appears in, so each instance
+  // of the nested module has its own.
+  bool refers_outward = false;
 };
 
 struct RtlirVariable {

@@ -5,7 +5,6 @@
 #include <string_view>
 
 #include "common/arena.h"
-#include "common/source_loc.h"
 #include "elaborator/rtlir.h"
 #include "parser/ast_expr.h"
 #include "simulator/evaluation.h"
@@ -52,21 +51,6 @@ static bool NetNamesAPortOf(const RtlirModule* mod, std::string_view name) {
   return false;
 }
 
-// Whether the nested declaration `child` owns `net`, or reaches an enclosing
-// scope's object through it. §23.4 has the outer name space visible to a
-// module declared and instantiated in the same scope, so a name a continuous
-// assignment or port connection inside it writes may be one declared around
-// it; Elaborator::MaybeCreateImplicitNet (src/elaborator/elaborator_items.cpp)
-// asks the nested module's own declarations alone, and so pushes an implicit
-// net of that name onto the module's list, which stands for the outer object
-// and must not be materialized under the instance or the assignment would
-// drive the new net rather than the outer one. §37.3.3 is what tells the two
-// apart: RtlirNet::loc is where the declaration that made the net stands, and
-// is invalid for a net no declaration produced. A net the nested module
-// declares for itself is its own -- §23.4's ff2 encapsulates its `wire q2` --
-// and §23.4 hides an outer name behind such a local one.
-static bool NestedDeclOwnsNet(const RtlirNet& net) { return net.loc.IsValid(); }
-
 // Whether `child` owns `net` and so materializes it under its instance prefix.
 //
 // An interface keeps every one of its nets, ports included, because §25.3.2
@@ -75,13 +59,25 @@ static bool NestedDeclOwnsNet(const RtlirNet& net) { return net.loc.IsValid(); }
 // binding CreateChildModulePorts makes, so a same-named net materialized here
 // would shadow that outer net and the assign would never reach it. §23.9's
 // module boundary makes every other net of an instantiated module its own,
-// and a nested declaration's is its own when its declaration produced it
-// (NestedDeclOwnsNet).
+// with one exception a nested declaration brings: §23.4 has the outer name
+// space visible to a module declared and instantiated in the same scope, so a
+// name a continuous assignment or port connection inside it writes may be one
+// declared around it, and the net Elaborator::MaybeCreateImplicitNet
+// (src/elaborator/elaborator_items.cpp) pushed for that reference stands for
+// the outer object -- materialized under the instance it would shadow that
+// object and take the assignment with it. The elaborator, which sees the
+// enclosing declarations, marks such a net with RtlirNet::refers_outward, and
+// that mark alone is what leaves a net to the outer scope: a net the nested
+// module declares for itself is its own, §23.4's ff2 encapsulating its `wire
+// q2`, and so is an implicit net of a name no enclosing module declares,
+// which §6.10 gives to the scope the reference appears in -- one per instance,
+// as §36.10 has for m1.w and m2.w. RtlirNet::loc told the declared nets from
+// the implicit ones before, and put that last kind with the outer scope.
 static bool ChildOwnsNet(const RtlirModuleInst& child, const RtlirNet& net) {
   const RtlirModule* resolved = child.resolved;
   if (resolved->is_interface) return true;
   if (NetNamesAPortOf(resolved, net.name)) return false;
-  return !child.is_nested_decl || NestedDeclOwnsNet(net);
+  return !net.refers_outward;
 }
 
 // 25.3.2: a child instance's nets - e.g. an interface `wire` member accessed

@@ -889,8 +889,9 @@ class Elaborator : public ElaboratorClassRules {
   void ValidateUnresolvedReferences(const ModuleDecl* decl,
                                     const RtlirModule* mod);
   bool IsDeclaredNameForRhs(std::string_view name) const;
-  // True when `name` resolves against any module-level name set (see .cpp).
+  // Whether `name` is in a module-level name set, or in an enclosing scope's.
   bool IsNameInModuleScope(std::string_view name) const;
+  bool IsNameInEnclosingScope(std::string_view name) const;
 
   // §23.9/§24.3: snapshot of the names declared in the scope currently being
   // elaborated, captured when descending into a lexically-nested declaration so

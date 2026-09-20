@@ -177,6 +177,12 @@ bool Elaborator::MaybeCreateImplicitNet(std::string_view name, SourceLoc loc,
   RtlirNet net =
       MakeImplicitPortNet(scoped, /*port_width=*/1, /*port_is_signed=*/false,
                           unit_->default_nettype);
+  // §23.4: a nested module sees the enclosing modules' names, so the reference
+  // may name an outer object rather than declare a net of its own; the net is
+  // pushed either way, for the assignment to lower against, and
+  // RtlirNet::refers_outward tells Lowerer which. §6.10 gives a name declared
+  // nowhere to the scope of the reference, so it is the nested module's own.
+  net.refers_outward = IsNameInEnclosingScope(name);
   mod->nets.push_back(net);
   declared_names_.insert(scoped);
   net_names_.insert(name);

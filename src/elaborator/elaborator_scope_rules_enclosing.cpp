@@ -44,6 +44,13 @@ bool Elaborator::IsNameInModuleScope(std::string_view name) const {
   return false;
 }
 
+// §23.4: the enclosing chain alone, which is what an implicit net of a nested
+// module asks -- whether the name it stands for is an outer module's, the
+// module's own declarations having already been searched and found wanting.
+bool Elaborator::IsNameInEnclosingScope(std::string_view name) const {
+  return NameInEnclosingScope(enclosing_scope_names_, name);
+}
+
 std::unordered_set<std::string_view> Elaborator::CaptureCurrentScopeNames()
     const {
   std::unordered_set<std::string_view> scope;

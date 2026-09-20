@@ -182,4 +182,73 @@ TEST(NestedModuleSimulation, EachInstanceOfANestedDeclarationOwnsItsNets) {
   EXPECT_EQ(m2_w->value.ToUint64(), 0u);
 }
 
+// §23.4 with §6.10: an implicit net belongs to the scope the reference that
+// declares it appears in, and a nested module is such a scope, so a name a
+// continuous assignment inside it writes that no enclosing module declares is
+// the nested module's own implicit net -- one per instance, as §36.10 has for
+// any net of a module instantiated twice -- and not an outer name §23.4 makes
+// visible. Two instances of M each drive their own q and hand it out through
+// o; the top reads x*10 + y = 11 and finds m1.q and m2.q each holding 1. With
+// every implicit net of a nested declaration left to the outer scope, neither
+// m1.q nor m2.q was made, and o was driven from nothing.
+TEST(NestedModuleSimulation, NestedDeclarationOwnsAnUndeclaredImplicitNet) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  logic [7:0] r;\n"
+      "  wire x, y;\n"
+      "  module M(output o);\n"
+      "    assign q = 1'b1;\n"
+      "    assign o = q;\n"
+      "  endmodule\n"
+      "  M m1(.o(x));\n"
+      "  M m2(.o(y));\n"
+      "  initial #1 r = x * 10 + y;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+
+  auto* r = f.ctx.FindVariable("r");
+  ASSERT_NE(r, nullptr);
+  EXPECT_EQ(r->value.ToUint64(), 11u);
+
+  auto* m1_q = f.ctx.FindVariable("m1.q");
+  ASSERT_NE(m1_q, nullptr);
+  EXPECT_EQ(m1_q->value.ToUint64(), 1u);
+
+  auto* m2_q = f.ctx.FindVariable("m2.q");
+  ASSERT_NE(m2_q, nullptr);
+  EXPECT_EQ(m2_q->value.ToUint64(), 1u);
+}
+
+// §23.4: the outer name space is visible to the nested module, so a
+// continuous assignment inside it to a name the enclosing module declares
+// drives that outer net, and no net of the name is made under the instance,
+// which would shadow the outer one and take the assignment with it. The top's
+// w reads 1 through the nested assignment, and "m.w" is absent. This holds the
+// case apart from the one above: there the name is declared nowhere and is
+// the instance's own.
+TEST(NestedModuleSimulation, NestedDeclarationDrivesAnOuterNetInPlace) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  wire w;\n"
+      "  logic r;\n"
+      "  module M;\n"
+      "    assign w = 1'b1;\n"
+      "  endmodule\n"
+      "  M m();\n"
+      "  initial #1 r = w;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+
+  auto* r = f.ctx.FindVariable("r");
+  ASSERT_NE(r, nullptr);
+  EXPECT_EQ(r->value.ToUint64(), 1u);
+  EXPECT_EQ(f.ctx.FindVariable("m.w"), nullptr);
+}
+
 }  // namespace
