@@ -899,6 +899,7 @@ void Lowerer::Lower(const RtlirDesign* design) {
   }
   LowerUnimportedPackageClasses();
   RegisterClassTypeAliases(design, ctx_);
+  ConstructDataClassInitializers(design, ctx_, arena_);
 
   AttachDesignClocking();
 

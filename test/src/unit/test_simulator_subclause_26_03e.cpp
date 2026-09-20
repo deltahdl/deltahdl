@@ -75,4 +75,35 @@ TEST(PackageImportSim, PackageQueueOfHandlesReadThroughElementProperties) {
             806u);
 }
 
+// §8.25 (printed pages 203 and 204) with §8.7 (printed 184) and §26.2
+// (printed 808): a package variable declared with a specialization and
+// constructed by its own declaration assignment, `G #(5) b = new;`, holds an
+// object of that specialization, whose N a method reads as 5, and a second
+// variable `G #(7) c = new;` beside it an object of another specialization
+// reading 7: 5 * 10 + 7. The initializer was evaluated as an ordinary
+// expression, which constructs nothing, so `p1::b.get_n()` ran on no object
+// and read the default 1 for both, 11; the object is now constructed once
+// the package's classes are lowered (ConstructDataClassInitializers in
+// lowerer_package_data.cpp) and bound to the declaration's actuals through
+// the same ApplyClassParamOverrides a module's `G #(5) b = new` goes
+// through, so 15 or 51 would say one specialization was bound to both.
+TEST(PackageScopeReferenceSim,
+     PackageClassVariableInitializerConstructsItsSpecialization) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  class G #(int N = 1);\n"
+                      "    function int get_n();\n"
+                      "      return N;\n"
+                      "    endfunction\n"
+                      "  endclass\n"
+                      "  G #(5) b = new;\n"
+                      "  G #(7) c = new;\n"
+                      "endpackage\n"
+                      "module t;\n"
+                      "  int y;\n"
+                      "  initial y = p1::b.get_n() * 10 + p1::c.get_n();\n"
+                      "endmodule\n",
+                      "y"),
+            57u);
+}
+
 }  // namespace

@@ -434,11 +434,27 @@ static bool InitPackageArray(const ModuleItem* item, std::string_view pkg,
   return true;
 }
 
+// §8.7 (printed page 184) with §8.3 (printed 180): whether the data item
+// `key` is a variable of a class type -- one the class record entered under
+// its key ahead of the storage names (RegisterPackageClassVariables) --
+// whose declaration assignment is a `new` call, `C h = new;` or `G #(5) b =
+// new(3);`, which constructs an object of the class rather than naming a
+// value the carrier could hold.
+static bool IsClassNewInit(const ModuleItem* item, std::string_view key,
+                           SimContext& ctx) {
+  const Expr* init = item->init_expr;
+  if (init == nullptr || init->kind != ExprKind::kCall || init->text != "new")
+    return false;
+  return !ctx.GetVariableClassType(key).empty();
+}
+
 // One data item's initializer, evaluated into the storage
 // CreatePackageDataItem gave it; an item declaring no data, or none, has
 // nothing to evaluate. §15.3.1: a semaphore's initializer is the new() that
 // CreatePackageSemaphore has already read the bucket's key count from, and
-// it names no value the carrier variable holds, so it is left alone. A
+// it names no value the carrier variable holds, so it is left alone, as is
+// a class variable's `new` (IsClassNewInit), which names a construction
+// ConstructDataClassInitializers makes once the class exists. A
 // fixed-size array's is distributed over the elements (InitPackageArray,
 // §7.4.2), and a queue's, a dynamic array's or an associative array's fills
 // the object (InitPackageAggregate); every other initializer is the carrier
@@ -448,6 +464,7 @@ static void InitPackageDataItem(const ModuleItem* item, std::string_view pkg,
   if (!DeclaresPackageData(item) || item->init_expr == nullptr) return;
   if (IsPackageSemaphoreDecl(item)) return;
   std::string key = PackageDataKey(item, pkg);
+  if (IsClassNewInit(item, key, ctx)) return;
   if (InitPackageArray(item, pkg, key, ctx, arena)) return;
   if (InitPackageAggregate(item->init_expr, key, ctx, arena)) return;
   const auto& variables = ctx.GetVariables();
@@ -491,6 +508,61 @@ void InitUnitDataVariables(const RtlirDesign* design, SimContext& ctx,
   // makes visible, so it follows the packages' initializers.
   if (design->compilation_unit == nullptr) return;
   InitScopeDataItems(design->compilation_unit->cu_items, {}, ctx, arena);
+}
+
+// §8.7 (printed page 184) with §6.8 and §26.2 (printed 808): `C h = new;`
+// among a package's items constructs an object of C as the package's
+// declaration assignment, as TryLowerClassNewVarInit (lowerer_var.cpp)
+// constructs a module's, and §8.25 (printed 203) has the object be of the
+// specialization the declaration wrote, `G #(5) b = new`, whose actuals
+// RegisterPackageClassVariables recorded under the item's key for
+// ApplyClassParamOverrides to bind on the object, as the module path binds
+// them. A bare `new` names no class of its own, so InitPackageDataItem,
+// which evaluated it as an ordinary expression, constructed nothing and
+// bound nothing, and `p1::b.get_n()` ran on no object, reading N's default
+// 1 where the specialization gives 5. The construction is made in the
+// scope's frame, as InitScopeDataItems evaluates the other initializers, so
+// a constructor argument reads the scope's own names. Nothing is made for
+// a class the run holds no record of under the class type's key -- the
+// built-in weak_reference, whose `new` the procedural path alone takes --
+// and §8.12's `= new src` copy is not taken, as the module path takes none.
+static void ConstructClassNewInit(const ModuleItem* item, std::string_view pkg,
+                                  SimContext& ctx, Arena& arena) {
+  if (item->kind != ModuleItemKind::kVarDecl) return;
+  std::string key = PackageDataKey(item, pkg);
+  if (!IsClassNewInit(item, key, ctx)) return;
+  std::string_view cls = ctx.GetVariableClassType(key);
+  if (ctx.FindClassType(cls) == nullptr) return;
+  const auto& variables = ctx.GetVariables();
+  auto found = variables.find(key);
+  if (found == variables.end()) return;
+  const Expr* init = item->init_expr;
+  found->second->value = EvalClassNew(cls, init, ctx, arena, init->range.start);
+  ApplyClassParamOverrides(key, found->second->value.ToUint64(), ctx, arena);
+}
+
+// The constructions of one scope's items, in the scope's frame.
+static void ConstructScopeClassInits(const std::vector<ModuleItem*>& items,
+                                     std::string_view pkg, SimContext& ctx,
+                                     Arena& arena) {
+  ctx.PushScope(pkg);
+  for (auto* item : items) ConstructClassNewInit(item, pkg, ctx, arena);
+  ctx.PopScope();
+}
+
+void ConstructDataClassInitializers(const RtlirDesign* design, SimContext& ctx,
+                                    Arena& arena) {
+  // §26.2 with §3.12.1: a package's classes are lowered after every module
+  // (Lowerer::LowerUnimportedPackageClasses, the imports having lowered
+  // some earlier) and the unit's before them (LowerCompilationUnitClasses),
+  // so the constructions wait for both rather than running with the other
+  // initializers, ahead of which no class of either scope was lowered and
+  // EvalClassNew found none; the packages' first, the unit's after, in the
+  // order the initializers were made.
+  for (auto* pkg : design->packages)
+    ConstructScopeClassInits(pkg->items, pkg->name, ctx, arena);
+  if (design->compilation_unit == nullptr) return;
+  ConstructScopeClassInits(design->compilation_unit->cu_items, {}, ctx, arena);
 }
 
 }  // namespace delta
