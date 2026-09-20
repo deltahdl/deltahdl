@@ -1,6 +1,6 @@
 ---
 name: autopilot
-description: Start or stop the standing reminders that keep an autonomous issue-solving session on the rails. Use when the user says "start autopilot", "go autonomous on the subclauses", "go autonomous on issues above N", "go autonomous on the §5 issues", "stop autopilot", or asks to clear the reminders. Takes "start bysubclause", "start byissuefloor <issue-number>", "start bylabel <label>" or "stop".
+description: Start or stop the standing reminders that keep an autonomous issue-solving session on the rails. Use when the user says "start autopilot", "go autonomous on the subclauses", "go autonomous on issues above N", "go autonomous on the §5 issues", "stop autopilot", or asks to clear the reminders. Takes "start bysubclause", "start byissuefloor <issue-number>", "start bylabel <label>" or "stop"; every "start" form also takes `--skip-label <label>`, repeatable, naming a label whose issues the loop leaves alone.
 ---
 
 # Autopilot
@@ -17,7 +17,9 @@ The form names the set of issues to work, and only the `:01` reminder differs be
 
 `start` alone is `bysubclause`, `start <issue-number>` is `byissuefloor`, and `start §5` is `bylabel`. `start byissuefloor` with no number and `start bylabel` with no label are missing their argument: ask for it before creating anything.
 
-Create ten jobs with `CronCreate`, `recurring: true`. Take `:01` from the form asked for, substituting the number for `{X}` or the label for `{L}` wherever it appears, and the other nine verbatim.
+Any form may be followed by `--skip-label <label>`, once per label, naming a label whose issues the loop must not take — `start bylabel §5 --skip-label "needs decision"` leaves every §5 issue that also carries `needs decision` to a person. A label with a space in it is quoted. `gh issue list` has no flag that excludes a label; the exclusion is a `--search` query, so with `--skip-label` the `:01` command gains, right after `--state open`, one `--search` flag holding one `-label:"<label>"` term per label, such as `--search '-label:"needs decision"'` or `--search '-label:"needs decision" -label:"blocked"'`, and the reminder ends with one extra sentence after a space: `An issue labelled '<label>' is left to a person, whatever else it carries.` — one such sentence per label. A `--skip-label` with no label is missing its argument: ask for it before creating anything.
+
+Create ten jobs with `CronCreate`, `recurring: true`. Take `:01` from the form asked for, substituting the number for `{X}` or the label for `{L}` wherever it appears and adding the `--skip-label` search and sentences when they were asked for, and the other nine verbatim.
 
 ### The `:01` reminder, on `1,11,21,31,41,51 * * * *`
 
@@ -55,7 +57,7 @@ REMINDER: Run gh issue list --state open --label '{L}' --limit 1000 --json numbe
 
 ### Report and begin
 
-Run the form's `gh issue list` command once. Name what it printed: the subclause and issue for `bysubclause`; the floor or label, how many open issues it selects, and which one the first iteration takes for the other two. If it names nothing, say so and create no jobs.
+Run the form's `gh issue list` command once, with its `--search` exclusion when `--skip-label` was given. Name what it printed: the subclause and issue for `bysubclause`; the floor or label, how many open issues it selects, and which one the first iteration takes for the other two; and, when labels are skipped, which they are. If it names nothing, say so and create no jobs.
 
 Otherwise say that ten reminders are running, that they live in this session only, and that recurring jobs expire after seven days. Then start the first iteration in the same turn: take the issue the command named and begin solving it under the ten prompts above.
 
