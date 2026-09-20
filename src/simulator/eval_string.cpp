@@ -14,6 +14,7 @@
 #include "common/string_methods.h"
 #include "common/types.h"
 #include "parser/ast_expr.h"
+#include "simulator/eval_function_args_scoped.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/variable.h"
@@ -385,8 +386,12 @@ static bool DispatchMutatingMethod(std::string_view method,
 // resolution operator, `P::ps.len()`, is a method call whose receiver is the
 // scoped name rather than an identifier, which ExtractMethodCallParts reads
 // alone; the variable is held under the "P.ps" key the lowerer creates it
-// with (InitPackageDataVariables), so the receiver is that key. Answers the
-// key and the method for that shape, and false for any other.
+// with (InitPackageDataVariables), so the receiver is that key. §3.12.1
+// (printed page 56): `$unit::s.len()` is likewise the unit's string under
+// "$unit.s" past a module's own s, the identifier carrying the prefix the
+// parser keeps (DeclaredKindsKey); read as a bare identifier by
+// ExtractMethodCallParts, the module's s answered. Answers the key and the
+// method for those shapes, and false for any other.
 static bool ExtractScopedStringMethodParts(const Expr* expr, std::string& key,
                                            std::string_view& method) {
   const Expr* access = expr->lhs;
@@ -395,6 +400,12 @@ static bool ExtractScopedStringMethodParts(const Expr* expr, std::string& key,
     return false;
   }
   const Expr* scoped = access->lhs;
+  if (scoped != nullptr && scoped->kind == ExprKind::kIdentifier &&
+      scoped->scope_prefix == "$unit") {
+    key = DeclaredKindsKey(scoped);
+    method = access->rhs->text;
+    return true;
+  }
   if (scoped == nullptr || scoped->kind != ExprKind::kMemberAccess ||
       !scoped->is_scope_resolution || scoped->lhs == nullptr ||
       scoped->rhs == nullptr || scoped->lhs->kind != ExprKind::kIdentifier ||

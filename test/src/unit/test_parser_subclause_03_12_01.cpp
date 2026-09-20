@@ -173,6 +173,92 @@ TEST(CompilationUnitParsing, DollarUnitScopeResolutionExpr) {
   EXPECT_EQ(assign_stmt->rhs->scope_prefix, "$unit");
 }
 
+// The right-hand side of the one initial procedure's assignment in the
+// module `src` parses -- `y = <expr>;` -- with the compilation unit accepted
+// whole, or null where the source is refused, so that a case reads the
+// expression's shape rather than a placeholder the recovery left.
+static const Expr* ParsedInitialRhs(const char* src) {
+  auto r = Parse(src);
+  EXPECT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  if (r.cu == nullptr || r.has_errors || r.cu->modules.size() != 1u)
+    return nullptr;
+  const auto* initial = r.cu->modules[0]->items.back();
+  if (initial->body == nullptr) return nullptr;
+  return initial->body->rhs;
+}
+
+// Checks that `id` is the `$unit::name` identifier: the prefix in
+// Expr::scope_prefix, as Parser::MakeSysScopePrefix leaves it, and the name
+// in the text.
+static void ExpectUnitPrefixedIdentifier(const Expr* id, const char* name) {
+  ASSERT_NE(id, nullptr);
+  EXPECT_EQ(id->kind, ExprKind::kIdentifier);
+  EXPECT_EQ(id->text, name);
+  EXPECT_EQ(id->scope_prefix, "$unit");
+}
+
+// Checks that `call` is the method call `$unit::<var>.<method>()`: a call
+// whose callee is the member access of `method` on the `$unit`-prefixed
+// identifier `var`.
+static void ExpectUnitPrefixedMethodCall(const Expr* call, const char* var,
+                                         const char* method) {
+  ASSERT_NE(call, nullptr);
+  EXPECT_EQ(call->kind, ExprKind::kCall);
+  ASSERT_NE(call->lhs, nullptr);
+  EXPECT_EQ(call->lhs->kind, ExprKind::kMemberAccess);
+  EXPECT_FALSE(call->lhs->is_scope_resolution);
+  ASSERT_NE(call->lhs->rhs, nullptr);
+  EXPECT_EQ(call->lhs->rhs->text, method);
+  ExpectUnitPrefixedIdentifier(call->lhs->lhs, var);
+}
+
+// §3.12.1 (printed page 56) makes `$unit::q` the explicit reference to the
+// unit scope's q, and A.8.4's primary (printed 1211) lets that identifier
+// carry the method call any name carries, so `$unit::q.size()` is a call of
+// size whose base is the prefixed identifier. Parser::ParseSystemCall
+// returned the identifier with no postfix chain, so the statement was
+// reported "expected ';'" at the `.`.
+TEST(CompilationUnitParsing, DollarUnitIdentifierTakesAMethodCall) {
+  const Expr* rhs = ParsedInitialRhs(
+      "int q[$];\n"
+      "module m;\n"
+      "  int y;\n"
+      "  initial y = $unit::q.size();\n"
+      "endmodule\n");
+  ExpectUnitPrefixedMethodCall(rhs, "q", "size");
+}
+
+// The same chain on a string: `$unit::s.len()` is a call of len on the
+// prefixed identifier s, which §6.16's method takes with no argument.
+TEST(CompilationUnitParsing, DollarUnitIdentifierTakesAStringMethodCall) {
+  const Expr* rhs = ParsedInitialRhs(
+      "string s;\n"
+      "module m;\n"
+      "  int y;\n"
+      "  initial y = $unit::s.len();\n"
+      "endmodule\n");
+  ExpectUnitPrefixedMethodCall(rhs, "s", "len");
+}
+
+// A.8.4's select on the prefixed identifier: `$unit::arr[0]` is a select
+// whose base is the `$unit`-prefixed arr and whose index is the literal,
+// with no part-select end. Reported "expected ';'" at the `[` before.
+TEST(CompilationUnitParsing, DollarUnitIdentifierTakesAnIndexSelect) {
+  const Expr* rhs = ParsedInitialRhs(
+      "int arr[4];\n"
+      "module m;\n"
+      "  int y;\n"
+      "  initial y = $unit::arr[0];\n"
+      "endmodule\n");
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kSelect);
+  ExpectUnitPrefixedIdentifier(rhs->base, "arr");
+  ASSERT_NE(rhs->index, nullptr);
+  EXPECT_EQ(rhs->index->kind, ExprKind::kIntegerLiteral);
+  EXPECT_EQ(rhs->index_end, nullptr);
+}
+
 TEST(CompilationUnitParsing, DollarUnitScopeInAssignment) {
   EXPECT_TRUE(
       ParseOk("task t;\n"

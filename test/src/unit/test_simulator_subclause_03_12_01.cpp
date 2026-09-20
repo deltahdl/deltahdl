@@ -593,4 +593,57 @@ TEST(CompilationUnitSim, CuScopeStringWrittenThroughUnitPrefixPastTheTopsInt) {
             57u);
 }
 
+// §3.12.1 (printed page 56) with A.8.4 (printed 1211): `$unit::q.size()`
+// is the size method on the unit's queue, named explicitly past the top's
+// own `int q[$]`, so with the unit's q holding two elements and the top's
+// one, `$unit::q.size() * 10 + q.size()` is 21. Parser::ParseSystemCall
+// (expr_parser_calls.cpp) returned the prefixed identifier with no postfix
+// chain, so the statement was reported "expected ';'" at the `.`, and the
+// queue's receiver was read by its text (FindQueueOfBase in
+// eval_array_class_queue.cpp), which would have counted the top's: 11. The
+// earlier CuScopeQueueBoundByReferenceThroughUnitPrefix reads the size
+// through a by-value formal for that reason and is kept.
+TEST(CompilationUnitSim, CuScopeQueueSizeThroughUnitPrefix) {
+  EXPECT_EQ(RunAndGet("int q[$] = '{1, 2};\n"
+                      "module top;\n"
+                      "  int q[$] = '{5};\n"
+                      "  int y;\n"
+                      "  initial y = $unit::q.size() * 10 + q.size();\n"
+                      "endmodule\n",
+                      "y"),
+            21u);
+}
+
+// The same chain on a string (§6.16, printed 112): `$unit::s.len()` is the
+// length of the unit's "abcde", 5, beside the top's own "xy", 2: 52. Read
+// by the receiver's text (ExtractMethodCallParts in eval_expr.cpp, which
+// TryEvalStringMethodCall in eval_string.cpp fell to for a receiver that is
+// no package-scoped name), the top's answered both: 22.
+TEST(CompilationUnitSim, CuScopeStringLengthThroughUnitPrefix) {
+  EXPECT_EQ(RunAndGet("string s = \"abcde\";\n"
+                      "module top;\n"
+                      "  string s = \"xy\";\n"
+                      "  int y;\n"
+                      "  initial y = $unit::s.len() * 10 + s.len();\n"
+                      "endmodule\n",
+                      "y"),
+            52u);
+}
+
+// A.8.4's select on the prefixed identifier (§7.4.2, printed 154):
+// `$unit::arr[0]` is the first element of the unit's array, 7, beside the
+// top's own arr[0], 1: 71. Reported "expected ';'" at the `[` before, and
+// keyed by the text (ScopedOrBareTargetKey in eval_semaphore.cpp) the top's
+// element would have answered: 11.
+TEST(CompilationUnitSim, CuScopeArrayElementThroughUnitPrefix) {
+  EXPECT_EQ(RunAndGet("int arr[2] = '{7, 8};\n"
+                      "module top;\n"
+                      "  int arr[2] = '{1, 2};\n"
+                      "  int y;\n"
+                      "  initial y = $unit::arr[0] * 10 + arr[0];\n"
+                      "endmodule\n",
+                      "y"),
+            71u);
+}
+
 }  // namespace

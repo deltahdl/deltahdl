@@ -78,9 +78,21 @@ Expr* Parser::ParseSystemCall() {
                 Subclause("31.2"));
   }
 
+  // §3.12.1 (printed page 56) makes `$unit::` the explicit reference to an
+  // identifier of the compilation-unit scope, and A.8.4's primary (printed
+  // 1211) gives that identifier the select and method-call chain any
+  // hierarchical identifier takes, so `$unit::q.size()`, `$unit::s.len()`
+  // and `$unit::arr[0]` read through the same tail a `$root.` name reads
+  // and the same postfix loop a bare name takes (ParseIdentifierPostfixChain,
+  // expr_parser.cpp). Returned as the prefixed identifier alone, each was
+  // reported as a statement missing its ';' at the `.` or `[`. The head
+  // identifier keeps the prefix in Expr::scope_prefix, which the simulator
+  // resolves the unit's storage by (IdentifierLookupKey in
+  // src/simulator/eval_function_args_scoped.cpp).
   if (tok.text == "$unit" && Check(TokenKind::kColonColon)) {
     Consume();
-    return MakeSysScopePrefix(tok);
+    return ParseIdentifierPostfixChain(
+        ParseSysRootTail(MakeSysScopePrefix(tok)));
   }
   if (tok.text == "$root" && Check(TokenKind::kDot)) {
     Consume();

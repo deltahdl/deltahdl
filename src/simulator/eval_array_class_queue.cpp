@@ -15,6 +15,7 @@
 #include "simulator/class_object.h"
 #include "simulator/eval_array.h"
 #include "simulator/eval_array_class_assoc.h"
+#include "simulator/eval_function_args_scoped.h"
 #include "simulator/evaluation.h"
 #include "simulator/queue_bound.h"
 #include "simulator/sim_context.h"
@@ -224,8 +225,12 @@ QueueObject* FindQueueOfBase(const Expr* base, SimContext& ctx, Arena& arena,
                              ClassObject** owner) {
   if (owner != nullptr) *owner = nullptr;
   if (base == nullptr) return nullptr;
+  // §3.12.1 (printed page 56): `$unit::q.size()` names the unit's queue
+  // under "$unit.q" past a module's own q, the key the prefix the parser
+  // keeps on the identifier resolves to (DeclaredKindsKey); by the text
+  // alone the module's queue answered.
   if (base->kind == ExprKind::kIdentifier)
-    return FindQueueOfName(base->text, ctx, owner);
+    return FindQueueOfName(DeclaredKindsKey(base), ctx, owner);
   if (base->kind != ExprKind::kMemberAccess || base->lhs == nullptr ||
       base->rhs == nullptr || base->rhs->kind != ExprKind::kIdentifier) {
     return nullptr;
@@ -241,7 +246,7 @@ void AnnounceQueueChange(const Expr* base, ClassObject* owner,
   if (owner != nullptr) {
     ctx.NotifyClassHandleWatchers(owner->handle);
   } else if (base != nullptr && base->kind == ExprKind::kIdentifier) {
-    NotifyOwningVar(ctx, base->text);
+    NotifyOwningVar(ctx, DeclaredKindsKey(base));
   } else if (std::string key = PackageQueueKey(base); !key.empty()) {
     NotifyOwningVar(ctx, key);
   }

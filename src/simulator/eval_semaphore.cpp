@@ -10,6 +10,7 @@
 #include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
 #include "simulator/eval_class_sync.h"
+#include "simulator/eval_function_args_scoped.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
@@ -106,7 +107,15 @@ bool TryExecSemaphoreCallInFunction(const Expr* expr, SimContext& ctx,
 // the statement fell to the generic store and the bucket stayed empty.
 std::string_view ScopedOrBareTargetKey(const Expr* lhs, Arena& arena) {
   if (lhs == nullptr) return {};
-  if (lhs->kind == ExprKind::kIdentifier) return lhs->text;
+  // §3.12.1 (printed page 56): a `$unit::arr` identifier is the unit's
+  // object under "$unit.arr" (DeclaredKindsKey), so `$unit::arr[0]`
+  // (TryArrayElementSelect in eval_select.cpp) reads the unit's element past
+  // a module's own arr, which the text alone named; any other identifier is
+  // its text, as before.
+  if (lhs->kind == ExprKind::kIdentifier) {
+    if (lhs->scope_prefix != "$unit") return lhs->text;
+    return *arena.Create<std::string>(DeclaredKindsKey(lhs));
+  }
   if (lhs->kind != ExprKind::kMemberAccess || !lhs->is_scope_resolution ||
       lhs->lhs == nullptr || lhs->lhs->kind != ExprKind::kIdentifier ||
       lhs->rhs == nullptr || lhs->rhs->kind != ExprKind::kIdentifier) {
