@@ -258,6 +258,13 @@ struct Process {
   // are, and another process running meanwhile sees neither.
   std::vector<ClassObject*> saved_this_stack;
   std::vector<const ClassTypeInfo*> saved_method_class_stack;
+  // §13.3 with §23.6: a task enabled by hierarchical name, `u1.tk(3)`, runs
+  // in the instance that declares it and may suspend there on a timing
+  // control, so inst_prefix names the callee's instance for as long as the
+  // enable lasts, and the instance the enable was written in waits here, one
+  // entry per enable still running, to be put back when the task returns
+  // (EnterCalleeInstance and LeaveCalleeInstance in eval_function_hier.h).
+  std::vector<std::string> caller_inst_prefixes;
 
   ~Process() {
     if (coro) coro.destroy();

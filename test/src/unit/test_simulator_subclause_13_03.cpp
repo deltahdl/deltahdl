@@ -315,4 +315,79 @@ TEST(TaskSim, PackageTaskEnabledThroughItsScopedNameConsumesItsDelay) {
   EXPECT_EQ(val, 15u);
 }
 
+// §13.3 (printed page 335) enables a task from a statement, and §23.6
+// (printed page 753) names an item of another module instance by its
+// hierarchical path, so `u1.tk(4)` enables sub's task in the instance u1 and
+// its body writes that instance's `got`. The enable was dropped whole, the
+// registry holding the task under its bare name alone, so `u1.got` stayed 0.
+TEST(TaskSim, TaskEnabledByHierarchicalNameRunsInTheChildInstance) {
+  auto val = RunAndGet(
+      "module sub;\n"
+      "  int got;\n"
+      "  task tk(int d);\n"
+      "    got = d;\n"
+      "  endtask\n"
+      "endmodule\n"
+      "module t;\n"
+      "  sub u1();\n"
+      "  initial u1.tk(4);\n"
+      "endmodule\n",
+      "u1.got");
+  EXPECT_EQ(val, 4u);
+}
+
+// §13.3.2 (printed page 339): a static task in each instance of a module has
+// storage of its own, and §13.3 has the enable consume the body's delay before
+// control returns. Enabled by hierarchical name from the top, the task's
+// static `n` counts 1 at time 3 in u1, 1 at 8 in u2 and 2 at 10 in u1 again;
+// one storage for both would read 2 at 8 and 3 at 10, and a body run without
+// its delay would read every time as 0.
+TEST(TaskSim, StaticLocalOfTaskEnabledByHierarchicalNameIsPerInstance) {
+  auto val = RunAndGet(
+      "module sub;\n"
+      "  task tk(int d, output int r);\n"
+      "    int n;\n"
+      "    #d;\n"
+      "    n++;\n"
+      "    r = n * 100 + $time;\n"
+      "  endtask\n"
+      "endmodule\n"
+      "module t;\n"
+      "  int a, b, c;\n"
+      "  logic [31:0] x;\n"
+      "  sub u1();\n"
+      "  sub u2();\n"
+      "  initial begin\n"
+      "    u1.tk(3, a);\n"
+      "    u2.tk(5, b);\n"
+      "    u1.tk(2, c);\n"
+      "    x = a * 1000000 + b * 1000 + c;\n"
+      "  end\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(val, 103108210u);
+}
+
+// §13.4 with §23.6: a function called by hierarchical name, `u1.twice(21)`,
+// is the instance's, and its body reads the instance's own `k` -- 21, for
+// 42 -- rather than the caller's `k` of 5, which would give 26; a call that
+// found no function read 0.
+TEST(TaskSim, FunctionCalledByHierarchicalNameReadsTheChildInstance) {
+  auto val = RunAndGet(
+      "module sub;\n"
+      "  int k = 21;\n"
+      "  function int twice(int v);\n"
+      "    return v + k;\n"
+      "  endfunction\n"
+      "endmodule\n"
+      "module t;\n"
+      "  int k = 5;\n"
+      "  logic [31:0] x;\n"
+      "  sub u1();\n"
+      "  initial x = u1.twice(21);\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(val, 42u);
+}
+
 }  // namespace

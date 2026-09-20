@@ -1,6 +1,7 @@
 #ifndef DELTA_SIMULATOR_LOWERER_REGISTER_H_
 #define DELTA_SIMULATOR_LOWERER_REGISTER_H_
 
+#include <string>
 #include <string_view>
 
 namespace delta {
@@ -66,6 +67,11 @@ void RegisterDesignTypeLayouts(const RtlirDesign* design, SimContext& ctx,
 void RegisterModuleNets(const RtlirModule* mod, SimContext& ctx, Arena& arena);
 void RegisterModulePorts(const RtlirModule* mod, SimContext& ctx, Arena& arena);
 void RegisterModuleSubroutines(const RtlirModule* mod, SimContext& ctx);
+// §13.3 with §23.6: the same subroutines under the instance's prefixed key,
+// "u1.tk", which a hierarchical enable from another instance resolves by.
+void RegisterInstanceSubroutines(const RtlirModule* mod,
+                                 const std::string& inst_prefix,
+                                 SimContext& ctx, Arena& arena);
 
 // §35.5.4: put this module's imported subroutine declarations in the run's DPI
 // registry, which is what a call to one reaches its declaration through. The

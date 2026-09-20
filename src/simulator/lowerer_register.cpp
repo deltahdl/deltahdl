@@ -168,12 +168,33 @@ void RegisterModuleSubroutines(const RtlirModule* mod, SimContext& ctx) {
   }
 }
 
+// §13.3 with §23.6: a task or function of a module instance is enabled by
+// its hierarchical name from another instance, `u1.tk(3)`, and §13.3.2 gives
+// a static task in each instance its own storage, so every instance's
+// subroutines are registered under the instance's prefixed key as well as
+// the bare name RegisterModuleSubroutines records, "u1.tk" for the instance
+// "u1." and "u1.u2.tk" for one nested in it, the key FindSubroutineTarget in
+// eval_function_hier.cpp resolves a dotted callee by. The key is interned in
+// the arena because the registry holds it rather than a copy. §8.24 keeps an
+// out-of-block method body out of the instance's subroutines, as the bare
+// registration does.
+void RegisterInstanceSubroutines(const RtlirModule* mod,
+                                 const std::string& inst_prefix,
+                                 SimContext& ctx, Arena& arena) {
+  for (auto* func : mod->function_decls) {
+    if (!func->method_class.empty()) continue;
+    auto* key =
+        arena.Create<std::string>(inst_prefix + std::string(func->name));
+    ctx.RegisterFunction(*key, func);
+  }
+}
+
 // §26.3: a package's subroutine is referenced through the package scope
 // resolution operator, `pk::f(x)`, from any scope, imported or not, so each
 // one is registered under its "pk::f" key, the key a scoped call resolves by
-// (SubroutineKey in eval_function.cpp). An import binds the bare name as
-// well, in LowerPackageItem. §8.24 keeps an out-of-block method body out of
-// the package's own subroutines.
+// (FindSubroutineTarget in eval_function_hier.cpp). An import binds the bare
+// name as well, in LowerPackageItem. §8.24 keeps an out-of-block method body
+// out of the package's own subroutines.
 void RegisterPackageScopedSubroutines(const RtlirDesign* design,
                                       SimContext& ctx, Arena& arena) {
   for (auto* pkg : design->packages) {

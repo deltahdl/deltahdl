@@ -21,6 +21,7 @@
 #include "simulator/eval_assoc_class_handles.h"
 #include "simulator/eval_call_result.h"
 #include "simulator/eval_class_array.h"
+#include "simulator/eval_function_hier.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/eval_semaphore.h"
 #include "simulator/evaluation.h"
@@ -421,22 +422,6 @@ std::string_view ScopedClassKey(const Expr* scope, Arena& arena) {
   return *key;
 }
 
-// §26.3: a subroutine called through the package scope resolution operator,
-// `pk::f(x)`, parses as a call with no callee text and the scoped name as its
-// base; the lowerer registers every package subroutine under that "pk::f"
-// key (RegisterPackageScopedSubroutines), so the lookup goes by it. A class
-// scope never reaches this key: TryEvalClassScopeCall and the instance-task
-// path take those calls before the registry is asked.
-static std::string_view SubroutineKey(const Expr* call, Arena& arena) {
-  if (!call->callee.empty()) return call->callee;
-  const Expr* scoped = call->lhs;
-  if (!scoped || scoped->kind != ExprKind::kMemberAccess ||
-      !scoped->is_scope_resolution)
-    return {};
-  if (!scoped->lhs || !scoped->lhs->elements.empty()) return {};
-  return ScopedClassKey(scoped, arena);
-}
-
 static bool ResolveClassScope(const Expr* expr, SimContext& ctx, Arena& arena,
                               ClassScopeInfo& info) {
   if (!expr->lhs || expr->lhs->kind != ExprKind::kMemberAccess) return false;
@@ -683,12 +668,18 @@ Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   Logic4Vec result;
   if (TryDispatchMethodOrLet(expr, ctx, arena, result)) return result;
 
-  auto* func = ctx.FindFunction(SubroutineKey(expr, arena));
+  // §13.3 with §23.6: a function called by hierarchical name, `u1.f(2)`,
+  // is the instance's, and its body runs there (eval_function_hier.h).
+  SubroutineTarget target = FindSubroutineTarget(expr, ctx, arena);
+  const ModuleItem* func = target.func;
   if (!func) return EvalDpiCall(expr, ctx, arena);
 
   bool is_static = func->is_static && !func->is_automatic;
   bool is_void = (func->return_type.kind == DataTypeKind::kVoid);
 
+  // §13.3.2 with §23.6: the frame is pushed with the process standing in
+  // the callee's instance, so a static function's frame is that instance's.
+  EnterCalleeInstance(ctx, target.inst_prefix);
   // §26.3 with §13.4: a package function's frame carries its package, so its
   // body and its default actuals read the package's variables by their bare
   // names; the caller's actuals are read with the frame set aside
@@ -702,7 +693,7 @@ Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx, Arena& arena) {
 
   ctx.PushQueueRefFrame();
   ctx.PushAssocRefFrame();
-  BindFunctionArgs(func, expr, ctx, arena);
+  BindActualsInCaller(func, expr, ctx, arena);
 
   Variable dummy_ret;
   Variable* ret_var = &dummy_ret;
@@ -734,13 +725,11 @@ Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   // ExecInlineTaskCall.
   ctx.PushActiveNamedScope(func->name);
   ctx.EnterFunction();
-  ExecFunctionBody(func, ret_var, ctx, arena);
+  ExecFunctionBodyInCallee(func, target.inst_prefix, ret_var, ctx, arena);
   ctx.ExitFunction();
   ctx.PopActiveNamedScope();
   ctx.PopFuncName();
-  WritebackOutputArgs(func, expr, ctx, arena);
-  WritebackQueueRefs(ctx);
-  WritebackAssocRefs(ctx);
+  WritebackInCaller(func, expr, ctx, arena);
   result = is_void ? MakeLogic4VecVal(arena, 1, 0) : ret_var->value;
 
   if (is_static) {
@@ -748,10 +737,19 @@ Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   } else {
     ctx.PopScope();
   }
+  LeaveCalleeInstance(ctx);
   return result;
 }
 
-static void PushTaskCallScope(const ModuleItem* func, SimContext& ctx) {
+// §13.3 with §23.6: the process stands in the callee's instance from here
+// until TeardownTaskCall, across every timing control of the body, so the
+// static frame is the instance's own (§13.3.2) and a bare name the body reads
+// is the instance's variable; the actuals are read in the enabling instance
+// (BindActualsInCaller). A bare enable stands where it was, its target the
+// enabling instance's.
+static void PushTaskCallScope(const SubroutineTarget& target, SimContext& ctx) {
+  const ModuleItem* func = target.func;
+  EnterCalleeInstance(ctx, target.inst_prefix);
   bool is_static = func->is_static && !func->is_automatic;
   if (is_static) {
     ctx.PushStaticScope(func->name);
@@ -766,16 +764,17 @@ static void PushTaskCallScope(const ModuleItem* func, SimContext& ctx) {
 static const ModuleItem* SetupTaskCallFromIdentifier(const Expr* expr,
                                                      SimContext& ctx,
                                                      Arena& arena) {
-  auto* func = ctx.FindFunction(expr->text);
+  SubroutineTarget target = FindSubroutineTarget(expr, ctx, arena);
+  const ModuleItem* func = target.func;
   if (!func) return nullptr;
   bool is_task = func->kind == ModuleItemKind::kTaskDecl;
   bool is_void_func = func->kind == ModuleItemKind::kFunctionDecl &&
                       func->return_type.kind == DataTypeKind::kVoid;
   if (!is_task && !is_void_func) return nullptr;
 
-  PushTaskCallScope(func, ctx);
+  PushTaskCallScope(target, ctx);
   if (is_void_func) ctx.EnterFunction();
-  if (!func->func_args.empty()) BindFunctionArgs(func, expr, ctx, arena);
+  if (!func->func_args.empty()) BindActualsInCaller(func, expr, ctx, arena);
   return func;
 }
 
@@ -787,19 +786,18 @@ const ModuleItem* SetupTaskCall(const Expr* expr, SimContext& ctx,
     return SetupTaskCallFromIdentifier(expr, ctx, arena);
   }
   if (expr->kind != ExprKind::kCall) return nullptr;
-  auto* func = ctx.FindFunction(SubroutineKey(expr, arena));
+  SubroutineTarget target = FindSubroutineTarget(expr, ctx, arena);
+  const ModuleItem* func = target.func;
   if (!func || func->kind != ModuleItemKind::kTaskDecl) return nullptr;
 
-  PushTaskCallScope(func, ctx);
-  BindFunctionArgs(func, expr, ctx, arena);
+  PushTaskCallScope(target, ctx);
+  BindActualsInCaller(func, expr, ctx, arena);
   return func;
 }
 
 void TeardownTaskCall(const ModuleItem* func, const Expr* expr, SimContext& ctx,
                       Arena& arena) {
-  WritebackOutputArgs(func, expr, ctx, arena);
-  WritebackQueueRefs(ctx);
-  WritebackAssocRefs(ctx);
+  WritebackInCaller(func, expr, ctx, arena);
   bool is_void_func = func->kind == ModuleItemKind::kFunctionDecl &&
                       func->return_type.kind == DataTypeKind::kVoid;
   if (is_void_func) ctx.ExitFunction();
@@ -810,6 +808,9 @@ void TeardownTaskCall(const ModuleItem* func, const Expr* expr, SimContext& ctx,
   } else {
     ctx.PopScope();
   }
+  // §13.3 with §23.6: the enable is over, and the process is back in the
+  // instance that wrote it (PushTaskCallScope).
+  LeaveCalleeInstance(ctx);
 }
 
 void ValidateRefLifetime(const ModuleItem* func, DiagEngine& diag) {

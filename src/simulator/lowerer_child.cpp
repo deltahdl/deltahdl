@@ -127,6 +127,9 @@ void Lowerer::LowerChildModules(const RtlirModule* mod) {
     // its own body resolves (and %m composes the instance + subroutine path);
     // LowerModule registers these for the top only.
     RegisterModuleSubroutines(child.resolved, ctx_);
+    // §13.3 with §23.6: and under the instance's own prefixed key, which an
+    // enable by hierarchical name from another instance resolves by.
+    RegisterInstanceSubroutines(child.resolved, inst_prefix_, ctx_, arena_);
     // §35.5.4: an import declaration defines the subroutine in the scope
     // that writes it, an instantiated module, interface or program as much as
     // the top; the top's are registered by LowerModule.
