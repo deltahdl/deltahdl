@@ -655,4 +655,76 @@ TEST(PackageExport, ExplicitExportOfAStructMemberAndAVariableEnumLiteral) {
              "endmodule\n"));
 }
 
+// §6.19.2 (printed page 121, Table 6-10): a `sub[5]` member generates the
+// named constants sub0 through sub4 and a `v[2:4]` member v2 through v4, so
+// sub3 and v4 are declarations of p1 as its typedef's name is, and §26.6
+// (printed 815) makes `export p1::sub3` legal where p2 imports it, p2::sub3
+// being p1's sub3. Both exports were reported "'sub3' is not a candidate for
+// import from package 'p1'" and "'v4' ..." before, the candidate check
+// holding a ranged member under the name it is written with alone. The
+// reads through p2's qualifier and through an explicit import of p2's name
+// stand as they stand for an unranged literal.
+TEST(PackageExport, ExplicitExportOfARangedEnumerationLiteral) {
+  EXPECT_TRUE(
+      ElabOk("package p1;\n"
+             "  typedef enum {add = 10, sub[5]} e1_t;\n"
+             "  enum {v[2:4] = 7} vr;\n"
+             "endpackage\n"
+             "package p2;\n"
+             "  import p1::*;\n"
+             "  export p1::sub3;\n"
+             "  export p1::v4;\n"
+             "endpackage\n"
+             "module top;\n"
+             "  int r, s;\n"
+             "  initial begin\n"
+             "    r = p2::sub3;\n"
+             "    s = p2::v4;\n"
+             "  end\n"
+             "endmodule\n"
+             "module m;\n"
+             "  import p2::sub3;\n"
+             "  int r;\n"
+             "  initial r = sub3;\n"
+             "endmodule\n"));
+}
+
+// §6.19.2 (printed page 121, Table 6-10): `sub[5]` generates sub0 through
+// sub4 and no other constant -- neither a sub5 past the range nor a constant
+// named `sub` itself -- so each is a name p1 never declares and §26.6
+// (printed 815) makes its export the error the clause names, reported at the
+// export's line with the message the unranged case carries. `export p1::sub`
+// elaborated clean before, the written name of a ranged member matched as a
+// literal; `export p1::sub5` was reported as now. A decrementing `w[3:1]`
+// generates w3, w2 and w1, so w0 is reported and w1 is not.
+TEST(PackageExport, ExportOfANameARangedLiteralNeverGeneratesIsReported) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("package p1;\n"
+             "  typedef enum {sub[5], w[3:1]} e1_t;\n"
+             "endpackage\n"
+             "package p2;\n"
+             "  import p1::*;\n"
+             "  export p1::sub5;\n"
+             "  export p1::sub;\n"
+             "  export p1::w0;\n"
+             "  export p1::w1;\n"
+             "endpackage\n"
+             "module top;\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "'sub5' is not a candidate for import from package 'p1'", 6, "26.6"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "'sub' is not a candidate for import from package 'p1'", 7, "26.6"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "'w0' is not a candidate for import from package 'p1'", 8, "26.6"));
+  EXPECT_FALSE(ReportedError(
+      f.diag.Diagnostics(),
+      "'w1' is not a candidate for import from package 'p1'", 9, "26.6"));
+}
+
 }  // namespace

@@ -1,4 +1,6 @@
+#include <cstdint>
 #include <format>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -218,16 +220,62 @@ struct PackageImportSet {
   std::unordered_set<std::string_view> wildcard_sources;
 };
 
+// §6.19.2 (Table 6-10): the constants a ranged member generates are its
+// written name followed by an index written as a decimal number, sub0 through
+// sub4 for `sub[5]`, so `name` is one of them only when what follows the
+// written name is such a number: digits alone, and no leading zero but for the
+// index 0 itself, which is how FoldEnumMembers in elaborator_enum_constants.cpp
+// writes them. The index is answered, or nothing when `name` has no such
+// suffix; more than eighteen digits is past every range and past int64_t.
+std::optional<int64_t> GeneratedIndexOf(std::string_view written,
+                                        std::string_view name) {
+  if (name.size() <= written.size() || !name.starts_with(written)) {
+    return std::nullopt;
+  }
+  std::string_view digits = name.substr(written.size());
+  if (digits.size() > 18 || (digits.size() > 1 && digits[0] == '0')) {
+    return std::nullopt;
+  }
+  int64_t index = 0;
+  for (char c : digits) {
+    if (c < '0' || c > '9') return std::nullopt;
+    index = (index * 10) + (c - '0');
+  }
+  return index;
+}
+
+// §6.19.2 (Table 6-10): `name[N]` generates name0 through nameN-1, and
+// `name[N:M]` nameN through nameM, incrementing or decrementing from N to M;
+// the written name itself names no constant. The bounds are folded without a
+// scope, as ComputeEnumRangeCount in elaborator_validate_types.cpp folds them,
+// this validation running before the package's parameters are registered; a
+// bound that does not fold admits every index, on the permissive side a
+// wildcard import is taken on.
+bool RangedMemberGenerates(const EnumMember& em, std::string_view name) {
+  auto index = GeneratedIndexOf(em.name, name);
+  if (!index) return false;
+  auto n = ConstEvalInt(em.range_start);
+  if (!n) return true;
+  if (em.range_end == nullptr) return *index < *n;
+  auto m = ConstEvalInt(em.range_end);
+  if (!m) return true;
+  return *n <= *m ? *index >= *n && *index <= *m : *index >= *m && *index <= *n;
+}
+
 // §6.19: an enumerated type declares its literals as named constants of the
 // scope holding the enum -- two enumerations naming one literal cannot stand
 // in the same scope -- so a literal of an enumeration written in `type`, as
 // the type itself (Syntax 6-5) or as the type of a member of a structure or
 // union of it (§7.2), is a declaration of the scope as the type's own name is.
-// A `name[N]` literal of §6.19.2 is held under the name it is written with,
-// as the provided-name walk of elaborator_scope_rules_names.cpp holds it.
+// A ranged member of §6.19.2 declares the constants it generates and not the
+// name it is written with, which the provided-name walk of
+// elaborator_scope_rules_names.cpp still holds it under.
 bool TypeDeclaresEnumLiteral(const DataType& type, std::string_view name) {
   for (const auto& em : type.enum_members) {
-    if (em.name == name) return true;
+    if (em.range_start == nullptr ? em.name == name
+                                  : RangedMemberGenerates(em, name)) {
+      return true;
+    }
   }
   for (const auto& sm : type.struct_members) {
     if (sm.nested_type != nullptr &&
