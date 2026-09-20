@@ -593,4 +593,27 @@ TEST(AssignmentPatternFormat, ChildInstanceQueueOfStructsPrintsNestedPatterns) {
   EXPECT_EQ(out, "'{'{x:1, y:2}, '{x:3, y:4}}\n");
 }
 
+// §21.2.1.6 (C5 x C7a) in an instantiated module: a fixed-size unpacked
+// array of structs prints each element as a nested named pattern. The array
+// is declared in M and stored under "m.a" (§23.9), and the formatter asked
+// for its shape by the bare name and found none, so the operand fell to the
+// struct form and printed the never-written carrier as one pattern,
+// '{x:0, y:0}; the two elements print in index order.
+TEST(AssignmentPatternFormat, ChildInstanceArrayOfStructsPrintsNestedPatterns) {
+  auto out = RunSim(
+      "module M;\n"
+      "  typedef struct packed { byte x; byte y; } p_t;\n"
+      "  p_t a [2];\n"
+      "  initial begin\n"
+      "    a[0] = 16'h0102;\n"
+      "    a[1] = 16'h0304;\n"
+      "    $display(\"%p\", a);\n"
+      "  end\n"
+      "endmodule\n"
+      "module top;\n"
+      "  M m();\n"
+      "endmodule\n");
+  EXPECT_EQ(out, "'{'{x:1, y:2}, '{x:3, y:4}}\n");
+}
+
 }  // namespace

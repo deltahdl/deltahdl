@@ -920,11 +920,27 @@ ArrayInfo* SimContext::FindArrayInfo(std::string_view name) {
 // what its name reads while that scope is on the stack, and a like-named array
 // RegisterArray recorded for the whole run is what the name reads again once
 // the scope is gone.
+//
+// The upward search from inside an instance reaches its own module first, and
+// CreateChildModuleVariables (lowerer_child.cpp) records an array that module
+// declares under the instance's prefix, so the prefixed name is what a bare
+// reference from within the instance denotes and is tried ahead of the bare
+// key, as FindQueue and FindVariable do. Asked by the bare key alone, an array
+// declared in an instantiated module was no array to any reader: an element
+// select read a bit of the carrier variable the lowerer creates under the
+// name, foreach ran once per bit of that carrier, and $size, %p and an
+// aggregate copy saw no array at all. The bare key stays the answer for an
+// array of the enclosing scope, so a name that resolved before still does.
 const ArrayInfo* SimContext::FindArrayInfo(std::string_view name) const {
   for (auto frame = scope_stack_.rbegin(); frame != scope_stack_.rend();
        ++frame) {
     auto local = frame->arrays.find(name);
     if (local != frame->arrays.end()) return local->second;
+  }
+  std::string prefix = ActiveInstancePrefix();
+  if (!prefix.empty()) {
+    auto prefixed = array_infos_.find(prefix + std::string(name));
+    if (prefixed != array_infos_.end()) return &prefixed->second;
   }
   auto it = array_infos_.find(name);
   return (it != array_infos_.end()) ? &it->second : nullptr;

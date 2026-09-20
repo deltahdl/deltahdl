@@ -116,6 +116,19 @@ AssocArrayObject* SimContext::FindAssocArray(std::string_view name) {
     auto local = frame->assoc_arrays.find(name);
     if (local != frame->assoc_arrays.end()) return local->second;
   }
+  // §23.9: an associative array declared inside a module instance is stored
+  // under that instance's prefix (CreateChildModuleVariables in
+  // lowerer_child.cpp), so the prefixed name is what a bare reference from
+  // within the instance denotes and is tried first, as in FindQueue above.
+  // Without this arm no associative array answered the bare name inside an
+  // instance: an element write and read fell to the carrier variable the
+  // lowerer creates under the name, and num(), foreach and %p saw none. The
+  // unprefixed lookup stays as the answer for an array of the enclosing scope.
+  std::string prefix = ActiveInstancePrefix();
+  if (!prefix.empty()) {
+    auto prefixed = assoc_arrays_.find(prefix + std::string(name));
+    if (prefixed != assoc_arrays_.end()) return prefixed->second;
+  }
   auto it = assoc_arrays_.find(name);
   return (it != assoc_arrays_.end()) ? it->second : nullptr;
 }

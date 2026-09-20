@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 
 using namespace delta;
@@ -335,6 +336,67 @@ TEST(AssocArraySimulation,
       "endmodule\n",
       "result");
   EXPECT_EQ(v, 80u);
+}
+
+// §7.8 in an instantiated module: `int aa[int]` declared in M, which top
+// instantiates as `m`, is stored under "m.aa", and §23.9 resolves the bare
+// name `aa` inside M through the instance. SimContext::FindAssocArray asked
+// for the bare key alone, so no associative array answered inside the
+// instance: the element write and read fell to the carrier variable the
+// lowerer creates under the name, and num() was asked of no array. Two
+// entries allocated by assignment (§7.8) read back 17 under 9 and a count of
+// 2.
+TEST(AssocArraySimulation, ChildInstanceIntKeyedArrayHoldsItsElements) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module M;\n"
+      "  int aa[int];\n"
+      "  int r;\n"
+      "  initial begin\n"
+      "    aa[5] = 42;\n"
+      "    aa[9] = 17;\n"
+      "    r = aa[9] * 100 + aa.num();\n"
+      "  end\n"
+      "endmodule\n"
+      "module top;\n"
+      "  M m();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* r = f.ctx.FindVariable("m.r");
+  ASSERT_NE(r, nullptr);
+  EXPECT_EQ(r->value.ToUint64(), 1702u);
+}
+
+// A string index keys the same lookup (§7.8), and foreach walks the entries
+// the array holds (§12.7.3): three written in the instance sum to 3 + 4 + 5,
+// with size() answering 3. With no array found by the bare name, the loop
+// ran over the carrier variable instead and the sum stayed at 0.
+TEST(AssocArraySimulation, ChildInstanceStringKeyedArrayHoldsItsElements) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module M;\n"
+      "  int sa[string];\n"
+      "  int r, s;\n"
+      "  initial begin\n"
+      "    s = 0;\n"
+      "    sa[\"k\"] = 3;\n"
+      "    sa[\"j\"] = 4;\n"
+      "    sa[\"l\"] = 5;\n"
+      "    foreach (sa[key]) s = s + sa[key];\n"
+      "    r = sa.size() * 100 + s;\n"
+      "  end\n"
+      "endmodule\n"
+      "module top;\n"
+      "  M m();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* r = f.ctx.FindVariable("m.r");
+  ASSERT_NE(r, nullptr);
+  EXPECT_EQ(r->value.ToUint64(), 312u);
 }
 
 }  // namespace

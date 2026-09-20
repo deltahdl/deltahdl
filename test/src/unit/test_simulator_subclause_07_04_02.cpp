@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 
 using namespace delta;
@@ -139,6 +140,69 @@ TEST(UnpackedArraySimulation, QueueDimensionInAProceduralBlockIsNotASize) {
       "endmodule\n",
       "result");
   EXPECT_EQ(v, 7u);
+}
+
+// §7.4.2 in an instantiated module: `int a[4]` declared in M, which top
+// instantiates as `m`, is stored under "m.a" and its elements under "m.a[i]",
+// and §23.9 resolves the bare name `a` inside M through the instance. The
+// lookup for the array's shape (SimContext::FindArrayInfo) asked for the bare
+// key alone, so an element read `a[1]` found no array and fell to a bit-select
+// of the carrier variable the lowerer creates under the name -- a carrier the
+// element writes never touch -- reading 0 for both terms; the elements read
+// back 22 and 44.
+TEST(UnpackedArraySimulation, ChildInstanceElementsReadBackByBareName) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module M;\n"
+      "  int a[4];\n"
+      "  int r;\n"
+      "  initial begin\n"
+      "    a[0] = 11;\n"
+      "    a[1] = 22;\n"
+      "    a[2] = 33;\n"
+      "    a[3] = 44;\n"
+      "    r = a[1] * 100 + a[3];\n"
+      "  end\n"
+      "endmodule\n"
+      "module top;\n"
+      "  M m();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* r = f.ctx.FindVariable("m.r");
+  ASSERT_NE(r, nullptr);
+  EXPECT_EQ(r->value.ToUint64(), 2244u);
+}
+
+// §12.7.3 and §20.7 on the same array: foreach steps through the four
+// elements and $size answers the declared dimension, both asking the array's
+// shape by its bare name inside the instance (§23.9). With no shape found,
+// foreach ran once per bit of the 32-bit carrier and $size measured that
+// carrier, answering 32; the loop fills 10, 20, 30, 40 and the sum is 100
+// under a size of 4.
+TEST(UnpackedArraySimulation, ChildInstanceForeachAndSizeSeeTheArray) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module M;\n"
+      "  int a[4];\n"
+      "  int r, s;\n"
+      "  initial begin\n"
+      "    s = 0;\n"
+      "    foreach (a[i]) a[i] = (i + 1) * 10;\n"
+      "    foreach (a[i]) s = s + a[i];\n"
+      "    r = $size(a) * 1000 + s;\n"
+      "  end\n"
+      "endmodule\n"
+      "module top;\n"
+      "  M m();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* r = f.ctx.FindVariable("m.r");
+  ASSERT_NE(r, nullptr);
+  EXPECT_EQ(r->value.ToUint64(), 4100u);
 }
 
 }  // namespace
