@@ -234,6 +234,9 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   // `package` is Scope::package, the package a subroutine the scope belongs
   // to was declared in, empty for every other scope.
   void PushScope(std::string_view package = {});
+  // §26.2: gives the innermost frame the package its bare names are read
+  // from; nothing for an empty name. See the definition in sim_context.cpp.
+  void SetScopePackage(std::string_view package);
   void PopScope();
 
   // §18.17.7: while a randsequence production with a non-void return type is

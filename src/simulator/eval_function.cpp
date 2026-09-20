@@ -469,6 +469,13 @@ void ExecClassMethod(ClassMethodTarget target, const Expr* expr,
   ModuleItem* method = target.method;
   bool is_void = (method->return_type.kind == DataTypeKind::kVoid);
   BindFunctionArgs(method, expr, ctx, arena);
+  // §26.2 with §8.24: a method of a class a package declares, in-class or
+  // out-of-block, reads the package's parameters, enum literals, variables
+  // and functions by their bare names, so its frame -- the one the caller
+  // pushed for the call -- carries the package RecordClassPackage
+  // (lowerer_class.cpp) recorded, given once the actuals are bound so that
+  // a caller's actual of a package variable's name still reads the caller's.
+  ctx.SetScopePackage(ctx.SubroutinePackage(method));
   Variable dummy_ret;
   Variable* ret_var = &dummy_ret;
   if (!is_void) {

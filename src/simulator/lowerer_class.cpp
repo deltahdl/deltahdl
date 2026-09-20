@@ -397,6 +397,23 @@ static void LowerNestedClasses(ClassTypeInfo* outer, const ClassDecl* cls,
                                const ScopeMap& constants, SimContext& ctx,
                                Arena& arena);
 
+// §26.2: records `package` as the one `info` is declared in, and each of the
+// class's methods -- the in-class bodies and the §8.24 out-of-block ones
+// AttachScopeMethodBodies put in their place -- as a subroutine of that
+// package, so ExecClassMethod gives a method's frame the package as
+// EvalFunctionCall gives a package function's, and the package's parameters,
+// enum literals, variables and functions answer to their bare names inside
+// the body. Nothing is recorded for a class of a module or the compilation
+// unit.
+static void RecordClassPackage(ClassTypeInfo* info, std::string_view package,
+                               SimContext& ctx) {
+  if (package.empty()) return;
+  info->package = package;
+  for (const auto& entry : info->methods) {
+    ctx.RegisterSubroutinePackage(entry.second, package);
+  }
+}
+
 // §8.23: a class declared inside `outer` is a type of its own, reached from
 // outside as `Outer::Inner`, which is the key it is registered under; a
 // method of the containing class names it bare, which SimContext::FindClassType
@@ -415,6 +432,7 @@ static void LowerNestedClass(ClassTypeInfo* outer, const ClassDecl* nested,
   info->enclosing = outer;
   const std::vector<ModuleItem*> kNoItems;
   PopulateClassType(info, nested, {kNoItems, constants}, ctx, arena);
+  RecordClassPackage(info, outer->package, ctx);
   ctx.RegisterClassType(info->name, info);
   LowerNestedClasses(info, nested, constants, ctx, arena);
 }
@@ -426,6 +444,21 @@ static void LowerNestedClasses(ClassTypeInfo* outer, const ClassDecl* cls,
     if (member->kind == ClassMemberKind::kClassDecl && member->nested_class)
       LowerNestedClass(outer, member->nested_class, constants, ctx, arena);
   }
+}
+
+// §26.2: the name of the package whose items declare `cls`, or an empty view
+// for a class a module or the compilation unit declares. LowerPackageClass in
+// lowerer_import.cpp hands LowerClassDecl the package's items alone, so the
+// package is found from the declaration itself.
+std::string_view Lowerer::DeclaringPackage(const ClassDecl* cls) const {
+  if (design_ == nullptr) return {};
+  for (const auto* pkg : design_->packages) {
+    for (const auto* item : pkg->items) {
+      if (item->kind == ModuleItemKind::kClassDecl && item->class_decl == cls)
+        return pkg->name;
+    }
+  }
+  return {};
 }
 
 void Lowerer::LowerClassDecl(const ClassDecl* cls,
@@ -441,6 +474,7 @@ void Lowerer::LowerClassDecl(const ClassDecl* cls,
   const ScopeMap& constants =
       design_ != nullptr ? design_->unit_constants : kNoConstants;
   PopulateClassType(info, cls, {scope_items, constants}, ctx_, arena_);
+  RecordClassPackage(info, DeclaringPackage(cls), ctx_);
   ctx_.RegisterClassType(cls->name, info);
   LowerNestedClasses(info, cls, constants, ctx_, arena_);
 }

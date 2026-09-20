@@ -548,6 +548,15 @@ void SimContext::PushScope(std::string_view package) {
   scope_stack_.push_back(Scope{{}, {}, {}, {}, package});
 }
 
+// §26.2: a frame pushed without a package -- a class method's, pushed by the
+// caller before the actuals are bound -- is given the one whose names the
+// body reads by their bare names once the actuals are in place, so that a
+// caller's actual spelt like a package variable still reads the caller's.
+void SimContext::SetScopePackage(std::string_view package) {
+  if (package.empty() || scope_stack_.empty()) return;
+  scope_stack_.back().package = package;
+}
+
 void SimContext::BindLocalVariable(std::string_view name, Variable* var) {
   if (!scope_stack_.empty()) scope_stack_.back().vars[name] = var;
 }

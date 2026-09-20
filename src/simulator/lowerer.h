@@ -121,6 +121,9 @@ class Lowerer {
   // the body. Defined in src/simulator/lowerer_class.cpp.
   void LowerClassDecl(const ClassDecl* cls,
                       const std::vector<ModuleItem*>& scope_items);
+  // §26.2: the package declaring `cls`, or empty for a class of a module or
+  // the compilation unit. Defined in src/simulator/lowerer_class.cpp.
+  std::string_view DeclaringPackage(const ClassDecl* cls) const;
   void LowerImports(const RtlirModule* mod);
   // §3.12.1: an import written in the compilation-unit scope makes the
   // package's names visible to every module of the unit, which reaches them

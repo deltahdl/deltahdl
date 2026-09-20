@@ -462,7 +462,15 @@ static void ConstructBaseThenDefaults(const ClassTypeInfo* info,
                    BaseConstructorActuals(info, ctor, c.new_expr, c.arena), c);
     c.types = std::move(own);
   }
+  // §26.2 with §8.7: a property initializer of a class a package declares
+  // names the package's enum literals, parameters and variables bare, so the
+  // defaults are read in a frame of their own carrying the package -- pushed
+  // after the base is constructed, so a base of another scope reads its own.
+  // A class of a module or the compilation unit reads them as before.
+  const bool kInPackage = !info->package.empty();
+  if (kInPackage) c.ctx.PushScope(info->package);
   InitClassPropertyDefaults(info, c);
+  if (kInPackage) c.ctx.PopScope();
 }
 
 // Constructs the `info` level of the object in the order §8.7 gives: the
@@ -484,6 +492,11 @@ static void ConstructLevel(const ClassTypeInfo* info,
   c.ctx.PushMethodClass(info);
   ConstructBaseThenDefaults(info, ctor, c);
   if (ctor) {
+    // §26.2: the constructor body reads the package's names bare as any
+    // method does (ExecClassMethod); the frame is the one BindLevelFormals
+    // pushed, given the package once the base, whose own frames stood above
+    // it meanwhile, is constructed.
+    c.ctx.SetScopePackage(info->package);
     Variable dummy;
     ExecFunctionBody(ctor, &dummy, c.ctx, c.arena);
     WritebackLevelFormals(ctor, actuals, c.ctx, c.arena);
