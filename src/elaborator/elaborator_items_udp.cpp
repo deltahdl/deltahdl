@@ -826,6 +826,13 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   // each fold rather than copied, so a parameter declared earlier in this item
   // list is visible to a select written later in it.
   ParamRangeRegistryGuard param_range_guard(mod);
+  // §20.6.2 with §6.18: expose this scope's typedefs so `$bits(my_t)` written
+  // in a parameter's value is sized by the type the name stands for, and the
+  // names among them that stand for an unpacked aggregate, which have no
+  // single width and are left to the run. The table is consulted at each fold
+  // as the module is, so a typedef declared earlier in this item list is
+  // visible to a call written later in it.
+  TypedefRegistryGuard typedef_guard(&typedefs_, &aggregate_typedef_names_);
   // §23.9: this runs while the module is being elaborated, so a UDP instance
   // written in a generate block reads that block's parameters as well as the
   // module's, and gen_prefix_scopes_ is already where the instance stands.

@@ -1,6 +1,7 @@
 // What a declaration says about the size of a name. §20.6.2 (printed page
 // 629 of ~/LRM.pdf) has $bits answer the number of bits an argument holds,
 // which for a literal, a type keyword with or without a packed range, a
+// typedef name of the scope being elaborated (§6.18, printed 118), a
 // parameter, a variable or a net of the registered module, and an operator
 // expression over those (§11.6.1's Table 11-21, printed 299-300) is fixed at
 // elaboration; EvalConstSysCall in const_eval.cpp is what asks. §6.20.2
@@ -13,15 +14,38 @@
 #include <optional>
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "elaborator/const_eval.h"
 #include "elaborator/const_eval_internal.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/type_eval.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_type.h"
 
 namespace delta {
+
+// §6.18: the typedef table of the scope being elaborated and the names in it
+// that stand for an unpacked aggregate, installed by the elaborator via
+// TypedefRegistryGuard. Null unless a guard is live.
+static const TypedefMap* g_typedefs = nullptr;
+static const std::unordered_set<std::string_view>* g_aggregate_typedef_names =
+    nullptr;
+
+TypedefRegistryGuard::TypedefRegistryGuard(
+    const TypedefMap* typedefs,
+    const std::unordered_set<std::string_view>* aggregate_names)
+    : prev_(g_typedefs), prev_aggregate_names_(g_aggregate_typedef_names) {
+  g_typedefs = typedefs;
+  g_aggregate_typedef_names = aggregate_names;
+}
+
+TypedefRegistryGuard::~TypedefRegistryGuard() {
+  g_typedefs = prev_;
+  g_aggregate_typedef_names = prev_aggregate_names_;
+}
 
 // §20.6.2: the packed bit width of a built-in integral type keyword. The
 // vector atoms (bit/logic/reg) are 1 bit; the integer-atom keywords carry
@@ -162,15 +186,41 @@ static std::optional<int64_t> RegisteredNetBits(std::string_view name) {
   return std::nullopt;
 }
 
+// §20.6.2 (printed page 629) with §6.18 (printed 118): the bits a typedef
+// name holds -- the clause's own `$bits(MyType)` of a structure typedef is 9
+// -- as EvalTypeWidth sizes the type the name stands for through the table a
+// live TypedefRegistryGuard installed, following a name standing for another
+// name, with a packed range folded against `scope`. Empty when no guard is
+// live, when the table holds no such name, when the name stands for an
+// unpacked aggregate -- a queue, a dynamic, an associative or a fixed-size
+// unpacked array, whose dimensions the table does not carry, so the entry
+// would size one element -- and when the type has no width the fold can
+// state: a string, an event, a class, a forward declaration. d6a7eab50 left
+// every typedef name to the run, the fold having reached no table.
+static std::optional<int64_t> RegisteredTypedefBits(std::string_view name,
+                                                    const ScopeMap& scope) {
+  if (g_typedefs == nullptr) return std::nullopt;
+  auto it = g_typedefs->find(name);
+  if (it == g_typedefs->end()) return std::nullopt;
+  if (g_aggregate_typedef_names != nullptr &&
+      g_aggregate_typedef_names->count(name) != 0)
+    return std::nullopt;
+  uint32_t width = EvalTypeWidth(it->second, *g_typedefs, scope);
+  if (width == 0) return std::nullopt;
+  return static_cast<int64_t>(width);
+}
+
 // §20.6.2: the bits an identifier argument of $bits holds. A type keyword is
-// sized by IntegralKeywordWidth, and no parameter, variable or net can be
-// named by one, so it is asked first; then a parameter of the registered
-// module by its declaration (§6.20.2), then a variable of it by its declared
-// width, then a net. A typedef name is not sized here: the fold has the
-// registered module and its parameters, variables and nets, and no typedef
-// table to resolve the name through.
-static std::optional<int64_t> IdentifierBits(const Expr* a) {
+// sized by IntegralKeywordWidth, and no typedef, parameter, variable or net
+// can be named by one, so it is asked first; then a typedef of the scope by
+// the type it stands for (§6.18), which no parameter of the same scope can
+// share a name with; then a parameter of the registered module by its
+// declaration (§6.20.2), then a variable of it by its declared width, then a
+// net.
+static std::optional<int64_t> IdentifierBits(const Expr* a,
+                                             const ScopeMap& scope) {
   if (auto w = IntegralKeywordWidth(a->text)) return w;
+  if (auto w = RegisteredTypedefBits(a->text, scope)) return w;
   if (const RtlirParamDecl* pd = RegisteredParamNamed(a->text))
     return ParamDeclBits(*pd);
   if (auto w = RegisteredVariableBits(a->text)) return w;
@@ -281,7 +331,7 @@ static std::optional<int64_t> SelfDeterminedBits(const Expr* a,
     case ExprKind::kIntegerLiteral:
       return static_cast<int64_t>(ConstLiteralWidth(a));
     case ExprKind::kIdentifier:
-      return IdentifierBits(a);
+      return IdentifierBits(a, scope);
     case ExprKind::kBinary:
     case ExprKind::kUnary:
       return OperatorBits(a, scope);

@@ -11,26 +11,13 @@
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 #include "fixture_evaluator.h"
+#include "helpers_param_value.h"
 #include "helpers_reported_error.h"
 #include "helpers_rtlir_lookup.h"
 
 using namespace delta;
 
 namespace {
-
-// The resolved value of parameter `name` of module m, or -1 where the module
-// declares none or the fold left it unresolved: no test below expects -1 of a
-// parameter it reads, so the two failures read as one wrong number.
-int64_t ParamValue(RtlirDesign* design, std::string_view name) {
-  const auto* p = FindParam(design, "m", name);
-  return p != nullptr && p->is_resolved ? p->resolved_value : -1;
-}
-
-// Whether the fold left parameter `name` of module m without a value.
-bool ParamUnresolved(RtlirDesign* design, std::string_view name) {
-  const auto* p = FindParam(design, "m", name);
-  return p == nullptr || !p->is_resolved;
-}
 
 TEST(ConstEval, BitsExpr) {
   EvalFixture f;
@@ -780,21 +767,33 @@ TEST(BitsOfDeclaration, NetAndUnpackedArrayAnswerTheirBits) {
   EXPECT_EQ(v->num_unpacked_dims, 0u);
 }
 
-// §20.6.2 sizes a typedef name by the type it stands for, `typedef logic
-// [11:0] my_t` being 12 bits. The fold has the registered module's
-// parameters, variables and nets and no typedef table, so the name is left
-// to the run rather than sized: the parameter stays unresolved, and is not
-// given a width the name does not have.
-TEST(BitsOfDeclaration, TypedefNameIsLeftToTheRun) {
+// §20.6.2 (printed page 629) with §6.18 (printed 118): a typedef name is
+// sized by the type it stands for -- the clause's own `$bits(MyType)` of a
+// structure typedef is 9 -- through the table a TypedefRegistryGuard installs
+// over the scope being elaborated, so `localparam int BT = $bits(my_t)`
+// reads 12 for `typedef logic [11:0] my_t`, the packed structure of a 4-bit
+// and an 8-bit member reads 12, and a name standing for another name reads
+// what that name does. d6a7eab50 left every typedef name to the run, the
+// fold having reached no table, and pinned it here as
+// TypedefNameIsLeftToTheRun; the queue typedef that stays refused is in
+// test_elaborator_subclause_20_06_02b.cpp.
+TEST(BitsOfDeclaration, TypedefNameAnswersItsTypeWidth) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
       "  typedef logic [11:0] my_t;\n"
       "  localparam int BT = $bits(my_t);\n"
+      "  typedef struct packed { logic [3:0] a; logic [7:0] b; } s_t;\n"
+      "  localparam int BS = $bits(s_t);\n"
+      "  typedef s_t alias_t;\n"
+      "  localparam int BA = $bits(alias_t);\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(ParamUnresolved(design, "BT"));
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(ParamValue(design, "BT"), 12);
+  EXPECT_EQ(ParamValue(design, "BS"), 12);
+  EXPECT_EQ(ParamValue(design, "BA"), 12);
 }
 
 }  // namespace

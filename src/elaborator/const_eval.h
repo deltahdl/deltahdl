@@ -5,6 +5,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "common/types.h"
@@ -15,6 +16,7 @@ struct Expr;
 struct ModuleItem;
 struct ClassDecl;
 struct RtlirModule;
+struct DataType;
 
 using ScopeMap = std::unordered_map<std::string_view, int64_t>;
 
@@ -88,6 +90,33 @@ class ParamRangeRegistryGuard {
  private:
   const RtlirModule* prev_;
   std::vector<std::string_view> prev_scopes_;
+};
+
+// §20.6.2 has $bits answer the number of bits a data type holds, its own
+// example sizing a structure typedef, and §6.18 lets a typedef name stand for
+// any data type under the scoping rules of a data identifier. A folded
+// constant sees a ScopeMap and the registered module, neither of which holds
+// a typedef, and RtlirDesign::type_widths is filled only once the last module
+// is elaborated, so `localparam int BT = $bits(my_t)` could not be sized
+// while the module's items were. The elaborator installs the typedef table of
+// the scope being elaborated for the duration of a guard, with the names in
+// it that stand for an unpacked aggregate -- a queue, a dynamic, an
+// associative or a fixed-size unpacked array, whose dimensions the table does
+// not carry -- so that such a name is left to the run rather than sized as
+// one element. Both pointers are borrowed; the guard restores the previously
+// active pair on destruction.
+class TypedefRegistryGuard {
+ public:
+  TypedefRegistryGuard(
+      const std::unordered_map<std::string_view, DataType>* typedefs,
+      const std::unordered_set<std::string_view>* aggregate_names);
+  ~TypedefRegistryGuard();
+  TypedefRegistryGuard(const TypedefRegistryGuard&) = delete;
+  TypedefRegistryGuard& operator=(const TypedefRegistryGuard&) = delete;
+
+ private:
+  const std::unordered_map<std::string_view, DataType>* prev_;
+  const std::unordered_set<std::string_view>* prev_aggregate_names_;
 };
 
 // §23.9 lists "Generate blocks" among the elements that "define a new scope",
