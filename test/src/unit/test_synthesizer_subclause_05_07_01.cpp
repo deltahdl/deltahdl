@@ -311,4 +311,94 @@ TEST(IntegerLiteralSynthesis, CasezPatternDigitAboveItsSizeIsTruncated) {
       32, [](uint64_t sel) { return sel == 0 ? uint64_t{1} : uint64_t{0}; });
 }
 
+// A module driving `y` high where `item` matches the `width`-bit input `sel`
+// under the case statement `kind`. The cases below read the padding §5.7.1
+// gives the item's literal through the values the match admits.
+static std::string CaseItemSrc(const char* kind, int width, const char* item) {
+  return std::string("module m(input [") + std::to_string(width - 1) +
+         ":0] sel, output logic y);\n"
+         "  always_comb begin\n"
+         "    " +
+         kind + " (sel)\n      " + item +
+         ": y = 1'b1;\n"
+         "      default: y = 1'b0;\n"
+         "    endcase\n"
+         "  end\n"
+         "endmodule\n";
+}
+
+// §5.7.1 pads a number narrower than its size constant to the left with its
+// leftmost digit when that digit is x or z, `?` standing for z in a casez
+// item, so `8'b?` is don't-care at every one of its eight bits and matches
+// every value of `sel`. `DecodePatternDigits` in
+// src/synthesizer/synth_pattern.cpp marked the one digit's own position alone,
+// so the item was don't-care at bit 0 and compared bits 1 to 7 against zero,
+// matching `sel == 0` and `sel == 1` alone.
+TEST(IntegerLiteralSynthesis, CasezDontCareDigitPadsTheWholeSizedPattern) {
+  ExpectInputSweep(CaseItemSrc("casez", 8, "8'b?"), 256,
+                   [](uint64_t) { return uint64_t{1}; });
+}
+
+// §5.7.1's padding sits above the digits' own positions: `8'b?1` keeps bit 0
+// at 1 and is don't-care at bits 1 to 7, so it matches every odd value. A
+// pattern padded with zeros instead matches 1 and 3 alone.
+TEST(IntegerLiteralSynthesis, CasezLeftmostDontCareDigitPadsAboveTheDigits) {
+  ExpectInputSweep(CaseItemSrc("casez", 8, "8'b?1"), 256,
+                   [](uint64_t sel) { return sel & 1u; });
+}
+
+// §12.5.1 makes x don't-care under casex, so the leftmost x of `8'bx1` pads
+// bits 1 to 7 with x and the item matches every odd value, where a zero
+// padding matches 1 and 3 alone.
+TEST(IntegerLiteralSynthesis, CasexLeftmostXDigitPadsAboveTheDigits) {
+  ExpectInputSweep(CaseItemSrc("casex", 8, "8'bx1"), 256,
+                   [](uint64_t sel) { return sel & 1u; });
+}
+
+// §5.7.1 has a z octal digit set 3 bits, so `8'o?1` is don't-care at bits 3
+// to 5 from the digit itself and at bits 6 and 7 from the padding, matching
+// every value whose low three bits are 001. A pattern marking the digit's own
+// bits alone compares bits 6 and 7 against zero and matches 1, 9, 17 and 25
+// alone.
+TEST(IntegerLiteralSynthesis, CasezLeftmostOctalDontCareDigitPadsAboveItself) {
+  ExpectInputSweep(CaseItemSrc("casez", 8, "8'o?1"), 256, [](uint64_t sel) {
+    return (sel & 7u) == 1 ? uint64_t{1} : uint64_t{0};
+  });
+}
+
+// §5.7.1 has an x hex digit set 4 bits, so the leftmost x of `12'hx1` is
+// don't-care at bits 4 to 7 from the digit and at bits 8 to 11 from the
+// padding, and under casex the item matches every value whose low nibble is
+// 1. A pattern marking the digit's own four bits alone compares bits 8 to 11
+// against zero and matches 0x001, 0x011, ..., 0x0F1 alone.
+TEST(IntegerLiteralSynthesis, CasexLeftmostHexXDigitPadsAboveItsFourBits) {
+  ExpectInputSweep(CaseItemSrc("casex", 12, "12'hx1"), 4096, [](uint64_t sel) {
+    return (sel & 15u) == 1 ? uint64_t{1} : uint64_t{0};
+  });
+}
+
+// §5.7.1 extends an unsized literal whose high-order digit is x or z to the
+// size of the expression holding it, so `'b?1` against a 40-bit `sel` is
+// don't-care at every bit above bit 0, bit 36 included, and matches every odd
+// value: the simulator's `ParseBasedXZLiteral` in
+// src/simulator/evaluation_literal.cpp pads `'bz` to its 32-bit width and
+// `EvalIntLiteral` extends it into the wider context. A pattern padded to 32
+// bits alone compares bit 36 against zero and matches 1 but not 2^36 + 1, and
+// one marking the digit's own position alone matches 1 and 3 alone. The case
+// drives chosen values rather than sweeping, since a sweep reaching bit 36
+// would take 2^36 evaluations.
+TEST(IntegerLiteralSynthesis,
+     CasezUnsizedDontCarePatternIsExtendedToTheSelectorWidth) {
+  SynthFixture f;
+  const auto* aig = LowerSrc(f, CaseItemSrc("casez", 40, "'b?1"));
+  ASSERT_NE(aig, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  const uint64_t kBitThirtySix = uint64_t{1} << 36;
+  EXPECT_EQ(EvalAigOutputs(*aig, 1), 1u);
+  EXPECT_EQ(EvalAigOutputs(*aig, 5), 1u);
+  EXPECT_EQ(EvalAigOutputs(*aig, kBitThirtySix | 1u), 1u);
+  EXPECT_EQ(EvalAigOutputs(*aig, 2), 0u);
+  EXPECT_EQ(EvalAigOutputs(*aig, kBitThirtySix), 0u);
+}
+
 }  // namespace

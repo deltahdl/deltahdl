@@ -29,7 +29,8 @@ bool PatternBitValue(const PatternBits& bits, uint32_t b) {
 // comparison.
 static bool PatternBitIsDontCare(const PatternBits& bits, uint32_t b) {
   if (bits.all_dont_care) return true;
-  return b < bits.dc_mask.size() && bits.dc_mask[b];
+  if (b < bits.dc_mask.size()) return bits.dc_mask[b];
+  return bits.dont_care_above;
 }
 
 static std::string StripPatternSeparators(std::string_view text) {
@@ -127,9 +128,12 @@ static void SetDigitValueBits(uint64_t dv, uint32_t bit_pos, int bits_per_digit,
   }
 }
 
-static void DecodePatternDigits(const std::string& buf, size_t i,
-                                int bits_per_digit, TokenKind case_kind,
-                                PatternBits& result) {
+// The bits the digits of `buf` from `i` write, each at its own positions, and
+// the number of positions they reached, which is where the padding above them
+// starts.
+static uint32_t DecodePatternDigits(const std::string& buf, size_t i,
+                                    int bits_per_digit, TokenKind case_kind,
+                                    PatternBits& result) {
   uint32_t bit_pos = 0;
   for (size_t j = buf.size(); j > i; --j) {
     char c = buf[j - 1];
@@ -140,6 +144,31 @@ static void DecodePatternDigits(const std::string& buf, size_t i,
     }
     bit_pos += bits_per_digit;
   }
+  return bit_pos;
+}
+
+// §5.7.1: a number narrower than its size constant is padded to the left with
+// its leftmost digit where that digit is an x or a z, and with zeros
+// otherwise (printed page 77). A leftmost don't-care digit therefore makes
+// every position from `top`, the first above the digits, up to `size`
+// don't-care too: `8'b?` at every bit, `8'bz1` at bits 1 to 7, and `12'hx1`
+// at bits 4 to 11, the x digit's own four and then the rest. A leftmost 0 or 1
+// pads with the zeros the vectors hold no position for, and so does an x under
+// casez, which is no don't-care there and which DigitCharValue reads as 0 in
+// its own position already. Size 0 is an unsized literal, which the clause
+// extends to the size of the expression holding it when its high-order digit
+// is x or z, so `'b?1` is don't-care at every position above bit 0 however
+// wide the selector; the simulator's ParseBasedXZLiteral pads `'bz` to its
+// 32-bit width and EvalIntLiteral extends it into the wider context the same
+// way. DecodePatternDigits marked the digits' own positions alone, so `8'b?`
+// was don't-care at bit 0 alone and matched `sel == 0` rather than every
+// value, and `8'bz1` matched 1 alone rather than every odd value.
+static void PadWithDontCare(uint32_t top, uint32_t size, PatternBits& result) {
+  if (size == 0) {
+    result.dont_care_above = true;
+    return;
+  }
+  if (top < size) MarkDontCareBits(top, static_cast<int>(size - top), result);
 }
 
 // §5.7.1: the size constant written before the apostrophe at `tick`, the
@@ -158,8 +187,9 @@ static uint32_t PatternSizeConstant(const std::string& buf, size_t tick) {
 // 8'hFF, and `80'd1208925819614629174706177` (2^80 + 1) keeps bit 0 alone. A
 // don't-care digit is cut the same way, `4'b?0000` being 4'b0000. Size 0 is
 // an unsized literal, which is padded to the left rather than truncated, and
-// a number narrower than its size is already padded by the entries the
-// vectors hold no position for.
+// a number narrower than its size is already padded, with zeros by the
+// entries the vectors hold no position for or with its leftmost don't-care
+// digit by PadWithDontCare.
 static void TruncateToSize(PatternBits& result, uint32_t size) {
   if (size == 0) return;
   if (result.aval.size() > size) result.aval.resize(size);
@@ -167,9 +197,11 @@ static void TruncateToSize(PatternBits& result, uint32_t size) {
 }
 
 // §5.7.1's second form, a based literal: the base letter after the apostrophe
-// at `tick`, an optional s before it, and the digits after it.
+// at `tick`, an optional s before it, and the digits after it, padded up to
+// `size` with the leftmost digit where it is don't-care.
 static void DecodeBasedLiteral(const std::string& buf, size_t tick,
-                               TokenKind case_kind, PatternBits& result) {
+                               uint32_t size, TokenKind case_kind,
+                               PatternBits& result) {
   size_t i = tick + 1;
   if (i < buf.size() && (buf[i] == 's' || buf[i] == 'S')) ++i;
   if (i >= buf.size()) return;
@@ -201,7 +233,9 @@ static void DecodeBasedLiteral(const std::string& buf, size_t tick,
   ++i;
 
   result.has_digits = true;
-  DecodePatternDigits(buf, i, bits_per_digit, case_kind, result);
+  uint32_t top = DecodePatternDigits(buf, i, bits_per_digit, case_kind, result);
+  if (i < buf.size() && IsDontCareDigit(buf[i], case_kind))
+    PadWithDontCare(top, size, result);
 }
 
 PatternBits ParsePatternLiteral(std::string_view text, TokenKind case_kind) {
@@ -214,8 +248,9 @@ PatternBits ParsePatternLiteral(std::string_view text, TokenKind case_kind) {
     DecodeDecimalDigits(buf, 0, result);
     return result;
   }
-  DecodeBasedLiteral(buf, tick, case_kind, result);
-  TruncateToSize(result, PatternSizeConstant(buf, tick));
+  uint32_t size = PatternSizeConstant(buf, tick);
+  DecodeBasedLiteral(buf, tick, size, case_kind, result);
+  TruncateToSize(result, size);
   return result;
 }
 

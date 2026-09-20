@@ -16,12 +16,20 @@ class SynthLower;
 // `aval`, and the positions the literal wrote a don't-care digit at in
 // `dc_mask`. Both are indexed by bit position and hold no entry above the
 // highest position the digits reached, which §5.7.1 pads to the left with
-// zeros. A position is addressed rather than a 64-bit word shifted, because
-// §5.7.1 sizes a literal by its size constant and admits one wider than any
-// integer C++ has: `128'h1_0000_0000_0000_0000` writes bit 64.
+// zeros, or with the leftmost digit up to the size constant where that digit
+// is x or z, `dc_mask` then holding the padded positions too. A position is
+// addressed rather than a 64-bit word shifted, because §5.7.1 sizes a literal
+// by its size constant and admits one wider than any integer C++ has:
+// `128'h1_0000_0000_0000_0000` writes bit 64.
 struct PatternBits {
   std::vector<bool> aval;
   std::vector<bool> dc_mask;
+
+  // True where every position above the highest `dc_mask` holds is don't-care
+  // as well: §5.7.1 extends an unsized literal whose high-order digit is x or
+  // z to the size of the expression holding it, so `'b?1` under casez is
+  // don't-care at every bit of the selector above bit 0, however wide it is.
+  bool dont_care_above = false;
 
   // True where `aval` is the value the literal's digits form: a hex, octal or
   // binary literal gives each digit its own bits, and a decimal one without a
