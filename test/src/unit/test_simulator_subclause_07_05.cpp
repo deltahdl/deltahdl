@@ -53,4 +53,42 @@ TEST(DynamicArraySimulation, PackedVectorElementHoldsValue) {
   EXPECT_EQ(v, 0xC3u);
 }
 
+// §7.5 (printed pages 157-158 of the LRM): a declaration whose first unpacked
+// dimension is `[]` declares a dynamic array wherever it stands, sized by the
+// new[] constructor (§7.5.1) and read by size() (§7.5.2). Declared in an
+// initial block, `int d[]` built no storage -- CreateBlockArrayElements in
+// statement_assign_decl.cpp read no bounds off the dimension -- so `d =
+// new[3]` sized nothing, `d[1] = 5` wrote nothing and `d[1] + d.size()`
+// read 0 where the module-scope declaration reads 8.
+TEST(DynamicArraySimulation, BlockDeclaredDynamicArraySizedByNewHoldsElements) {
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  int y;\n"
+                      "  initial begin\n"
+                      "    int d[];\n"
+                      "    d = new[3];\n"
+                      "    d[1] = 5;\n"
+                      "    y = d[1] + d.size();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            8u);
+}
+
+// The same declaration as a function body's local, which CreateFuncLocalVar
+// (eval_function_body.cpp) creates and the same aggregate builder backs.
+TEST(DynamicArraySimulation, FunctionBodyDynamicArraySizedByNewHoldsElements) {
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  function int f();\n"
+                      "    int d[];\n"
+                      "    d = new[3];\n"
+                      "    d[1] = 5;\n"
+                      "    return d[1] + d.size();\n"
+                      "  endfunction\n"
+                      "  int y;\n"
+                      "  initial y = f();\n"
+                      "endmodule\n",
+                      "y"),
+            8u);
+}
+
 }  // namespace

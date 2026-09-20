@@ -295,6 +295,32 @@ static bool CreateBlockAssocArray(const Stmt* stmt, uint32_t elem_width,
   return true;
 }
 
+// §7.5 (printed pages 157-158): a declaration whose first unpacked dimension
+// is `[]`, which the parser records as a null dimension, declares a dynamic
+// array, empty until new[] sizes it (§7.5.1), wherever the declaration
+// stands. It is given what Lowerer::LowerVarAggregate (lowerer_var.cpp) gives
+// a module's and CreatePackageDynArray (lowerer_package_data.cpp) a
+// package's: the unbounded QueueObject `d = new[3]`, `d[1] = 5` and
+// `d.size()` operate on, and the ArrayInfo marked dynamic that the
+// whole-array reads and writes consult, the latter registered for the
+// block's life as a fixed-size array's shape is. Before this the null
+// dimension reached CreateBlockArrayElements, which reads no bounds off it
+// and built nothing, so a block's or a subroutine body's `int d[]` had no
+// store: new[] sized nothing and the element read 0.
+static bool CreateBlockDynArray(const Stmt* stmt, uint32_t elem_width,
+                                SimContext& ctx) {
+  if (stmt->var_unpacked_dims.empty() || stmt->var_unpacked_dims[0] != nullptr)
+    return false;
+  bool is_4state = DeclaredTypeIs4State(stmt->var_decl_type);
+  ctx.CreateQueue(stmt->var_name, elem_width, /*max_size=*/-1, is_4state);
+  ArrayInfo info;
+  info.is_dynamic = true;
+  info.elem_width = elem_width;
+  info.is_4state = is_4state;
+  ctx.RegisterArrayInScope(stmt->var_name, info);
+  return true;
+}
+
 // §7.10 and §7.4.2: the storage a declaration's unpacked dimensions ask for
 // beside the variable that carries one element's width. A queue dimension is
 // not the range dimension of a fixed-size unpacked array, so a declaration is
@@ -308,6 +334,7 @@ static bool CreateBlockAssocArray(const Stmt* stmt, uint32_t elem_width,
 void CreateDeclAggregate(const Stmt* stmt, uint32_t elem_width, SimContext& ctx,
                          Arena& arena) {
   if (CreateBlockAssocArray(stmt, elem_width, ctx)) return;
+  if (CreateBlockDynArray(stmt, elem_width, ctx)) return;
   if (!CreateBlockQueue(stmt, elem_width, ctx, arena)) {
     CreateBlockArrayElements(stmt, elem_width, ctx, arena);
   }
