@@ -213,4 +213,58 @@ TEST(PackageImportSim, ExplicitlyImportedPackageQueueAndAssociativeArray) {
             625u);
 }
 
+// §26.6 (printed pages 815-816) with §26.2 (printed 808): p3's `import p2::*`
+// brings in the names p2 hands on through `export p1::*`, VAL2 and x among
+// them, each the original declaration of p1, and a package's declaration
+// assignment reads them as its subroutines would: 2 * 10 + 7. The
+// initializers were evaluated before the exports were bound, so p3's search
+// through p2 found no "p2.VAL2" and no "p2.x" and q was 0; the exports are
+// now bound between the packages' storage and their initializers
+// (RegisterDesignTypesAndPackages in lowerer.cpp).
+TEST(PackageImportSim, PackageInitializerReadingWildcardReExportedNames) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  typedef enum {VAL[3]} t;\n"
+                      "  int x = 7;\n"
+                      "endpackage\n"
+                      "package p2;\n"
+                      "  import p1::*;\n"
+                      "  export p1::*;\n"
+                      "endpackage\n"
+                      "package p3;\n"
+                      "  import p2::*;\n"
+                      "  int q = VAL2 * 10 + x;\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  int y;\n"
+                      "  initial y = p3::q;\n"
+                      "endmodule\n",
+                      "y"),
+            27u);
+}
+
+// §26.6 (printed pages 815-816): the subclause's own p3 imports a name p2
+// exports and reads it in a declaration assignment, `int q = x`, and an
+// explicit `import p2::x` names p1's x through the export as the wildcard
+// form does: 7. The explicit import's search reached the same unbound
+// "p2.x" as the wildcard one's, so q read 0.
+TEST(PackageImportSim, PackageInitializerReadingAnExplicitlyImportedReExport) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  int x = 7;\n"
+                      "endpackage\n"
+                      "package p2;\n"
+                      "  import p1::*;\n"
+                      "  export p1::*;\n"
+                      "endpackage\n"
+                      "package p3;\n"
+                      "  import p2::x;\n"
+                      "  int q = x;\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  int y;\n"
+                      "  initial y = p3::q;\n"
+                      "endmodule\n",
+                      "y"),
+            7u);
+}
+
 }  // namespace

@@ -128,9 +128,11 @@ class Lowerer {
   // §3.12.1: an import written in the compilation-unit scope makes the
   // package's names visible to every module of the unit, which reaches them
   // after searching its own scope. Applied once, ahead of the modules, from
-  // the unit's own import declarations; §26.6's exports are bound first, each
-  // name a package exports keyed under the exporting package to the
-  // declaring package's storage or subroutine. Defined in lowerer_import.cpp.
+  // the unit's own import declarations; §26.6's exports are already bound
+  // (AliasPackageExports, run by RegisterDesignTypesAndPackages in lowerer.cpp
+  // before the package initializers), each name a package exports keyed under
+  // the exporting package to the declaring package's storage or subroutine.
+  // Defined in lowerer_import.cpp.
   void LowerCompilationUnitImports();
   // The unit's imports, then its own class declarations, in that order for
   // the reason given at the definition. Defined in lowerer.cpp.

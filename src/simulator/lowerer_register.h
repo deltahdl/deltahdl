@@ -139,6 +139,13 @@ void CreatePackageDataVariables(const RtlirDesign* design, SimContext& ctx,
 // package's storage exists and its exports are bound (AliasPackageExports).
 void InitPackageDataVariables(const RtlirDesign* design, SimContext& ctx,
                               Arena& arena);
+// §26.6: every name a package exports, bound under the exporting package's
+// key to the declaring package's registration -- a subroutine's "pk::name",
+// a variable's, parameter's or enumeration constant's "pk.name" -- once
+// those registrations exist and ahead of every import that reads one. The
+// definition stands in lowerer_import.cpp beside the export walk.
+void AliasPackageExports(const RtlirDesign* design, SimContext& ctx,
+                         Arena& arena);
 // §6.19 with §26.3: each package's enumeration constants under their
 // "pk.name" keys, the keys a read through the package scope resolution
 // operator resolves by, each at the value its declaration folds to.

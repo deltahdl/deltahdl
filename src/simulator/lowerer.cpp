@@ -846,9 +846,10 @@ void Lowerer::LowerCompilationUnitClasses() {
 // ahead of every module: RegisterDesignTypeWidths for the names, and §7.2.1's
 // layouts for the member selects that reach a value no variable holds. §26.2:
 // a package variable's declaration assignment may call a function of the
-// package or of one it imports and name an enumeration constant, so the
-// subroutines and the constants are registered before the variables are
-// initialized.
+// package or of one it imports and name an enumeration constant, and §26.6
+// (printed pages 815-816) lets it read a name another package's export hands
+// on, so the subroutines, the constants and the exports are bound before the
+// variables are initialized; bound after them, such a read answered 0.
 static void RegisterDesignTypesAndPackages(const RtlirDesign* design,
                                            SimContext& ctx, Arena& arena) {
   RegisterDesignTypeWidths(design, ctx);
@@ -856,6 +857,7 @@ static void RegisterDesignTypesAndPackages(const RtlirDesign* design,
   RegisterPackageScopedSubroutines(design, ctx, arena);
   RegisterPackageEnumConstants(design, ctx, arena);
   CreatePackageDataVariables(design, ctx, arena);
+  AliasPackageExports(design, ctx, arena);
   InitPackageDataVariables(design, ctx, arena);
 }
 

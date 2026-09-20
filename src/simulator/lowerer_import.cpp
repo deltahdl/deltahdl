@@ -18,6 +18,7 @@
 #include "simulator/class_object.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
+#include "simulator/lowerer_register.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"
@@ -707,10 +708,14 @@ void AliasExportedName(const PackageDecl* pkg, const ExportedName& e,
   AliasVariableKinds(stored, qname, ctx);
 }
 
-// Every package's exports, bound once the packages' own storage and
-// subroutines are registered and ahead of the unit's and the modules'
-// imports, so that a package importing a re-exported name, `import p2::x` in
-// p3, finds "p2.x" where SimContext::FindInPackageScope searches p3's imports.
+}  // namespace
+
+// Every package's exports, bound once the packages' own storage, constants
+// and subroutines are registered and ahead of the package initializers and
+// of the unit's and the modules' imports (RegisterDesignTypesAndPackages in
+// lowerer.cpp), so that a package importing a re-exported name, `import
+// p2::x` in p3, finds "p2.x" where SimContext::FindInPackageScope searches
+// p3's imports, in a declaration initializer of p3 as in a subroutine body.
 void AliasPackageExports(const RtlirDesign* design, SimContext& ctx,
                          Arena& arena) {
   ExportedNameWalk walk(design, arena);
@@ -720,7 +725,6 @@ void AliasPackageExports(const RtlirDesign* design, SimContext& ctx,
     for (const ExportedName& e : names) AliasExportedName(pkg, e, ctx, arena);
   }
 }
-}  // namespace
 
 // Whether the exports of `exporter` hand on the declaration `name` of `pkg`.
 static bool ExportsHandOnName(ExportedNameWalk& walk,
@@ -762,9 +766,7 @@ void Lowerer::AliasExportedClassKeys(const PackageDecl* pkg,
 }
 
 void Lowerer::LowerCompilationUnitImports() {
-  if (!design_) return;
-  AliasPackageExports(design_, ctx_, arena_);
-  if (!design_->compilation_unit) return;
+  if (!design_ || !design_->compilation_unit) return;
   const auto& items = design_->compilation_unit->cu_items;
   // §26.5's precedence of an explicit import over a wildcard one holds in the
   // compilation-unit scope as in a module, so the explicit imports bind first.
