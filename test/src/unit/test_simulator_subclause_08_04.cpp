@@ -652,4 +652,43 @@ TEST(ClassSim, NewIntoElementsOfBlockDeclaredArraysIsReadThroughThem) {
             77u);
 }
 
+// §13.4 (printed page 340): a function body's declarations are the body's
+// own, and §7.4.2 (printed 153-154) with §8.4 (printed 181) make each element
+// of the body's `C arr[2]` a handle. The body's assignment reaches the
+// element constructor through the module path's dispatch
+// (TryDispatchSpecialBlockingAssign, which ExecFuncBlockingAssign in
+// eval_function_body_assign.cpp asks after its own four forms), so `arr[0] =
+// new` constructs into the local's element and `arr[0].v` reads its 7. Pinned
+// here for the subroutine-body shape, beside the block's.
+TEST(ClassSim, NewIntoAnElementOfAFunctionBodyArrayIsReadThroughIt) {
+  EXPECT_EQ(RunAndGet(HandleArrayDesign("module t;\n"
+                                        "  function int f();\n"
+                                        "    C arr[2];\n"
+                                        "    arr[0] = new;\n"
+                                        "    return arr[0].v;\n"
+                                        "  endfunction\n"
+                                        "  int y;\n"
+                                        "  initial y = f();\n"
+                                        "endmodule\n"),
+                      "y"),
+            7u);
+}
+
+// The same statement in a task body, whose dynamic local is sized by new[]
+// first (§7.5.1, printed 158) and written to the module's y.
+TEST(ClassSim, NewIntoAnElementOfATaskBodyDynamicArrayIsReadThroughIt) {
+  EXPECT_EQ(RunAndGet(HandleArrayDesign("module t;\n"
+                                        "  int y;\n"
+                                        "  task build();\n"
+                                        "    C d[];\n"
+                                        "    d = new[2];\n"
+                                        "    d[1] = new;\n"
+                                        "    y = d[1].v;\n"
+                                        "  endtask\n"
+                                        "  initial build();\n"
+                                        "endmodule\n"),
+                      "y"),
+            7u);
+}
+
 }  // namespace
