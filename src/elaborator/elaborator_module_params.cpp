@@ -350,6 +350,8 @@ bool ApplyParamOverride(RtlirParamDecl& pd,
   if (pd.override_expr != nullptr) {
     if (auto in_context = ContextOverrideValue(pd, *ovr, assigns.scope))
       pd.resolved_value = ConvertOverrideValue(*in_context, pd);
+    pd.override_scope = assigns.scope;
+    pd.override_module = assigns.module;
     RecordResolvedHighWords(pd, pd.override_expr, assigns.scope);
   }
   RecordStringParamValue(pd, ovr->value_expr, dtype, arena);
@@ -407,7 +409,8 @@ void Elaborator::ElaborateParamPortList(const ModuleDecl* decl,
   // The instantiating module is the one registered here, from the item loop
   // this instantiation is an item of, and its parameters are what the
   // assignments' expressions name.
-  const InstanceParamAssignments kAssigns{params, RegisteredModuleScope()};
+  const InstanceParamAssignments kAssigns{params, RegisteredModuleScope(),
+                                          RegisteredModule()};
   for (size_t i = 0; i < decl->params.size(); ++i) {
     const auto& [pname, pval] = decl->params[i];
     auto scope = BuildParamScope(mod);

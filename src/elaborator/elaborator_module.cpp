@@ -518,8 +518,8 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
   // parameters as localparams, which no assignment reaches, so none are
   // installed for it. ElaborateParamPortList alone read the assignments
   // before, so `c #(.P(5)) u()` over `module c; parameter P = 1;` kept 1.
-  const InstanceParamAssignments kBodyAssignments{params,
-                                                  RegisteredModuleScope()};
+  const InstanceParamAssignments kBodyAssignments{
+      params, RegisteredModuleScope(), RegisteredModule()};
   BodyParamAssignmentsGuard body_assignments_guard(
       decl->has_param_port_list ? nullptr : &kBodyAssignments);
 

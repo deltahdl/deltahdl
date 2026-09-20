@@ -244,6 +244,34 @@ static bool DeclTypeRangeFollowsScope(const RtlirParamDecl& p,
          FindNamedType(*dtype, typedefs) != nullptr;
 }
 
+// Gives `p` the value `expr`, folded against `scope` under the registration
+// the caller installed, converted to the range `p` now has, with the words
+// above bit 63 of one wider than 64 bits recorded from it. A fold that fails
+// leaves the value `p` held to the conversion.
+static void RefoldOverride(RtlirParamDecl& p, const Expr* expr,
+                           const ScopeMap& scope) {
+  auto val = FoldParamValue(p, expr, scope);
+  p.resolved_value = ConvertOverrideValue(val.value_or(p.resolved_value), p);
+  RecordResolvedHighWords(p, expr, scope);
+}
+
+// §23.10.2 (printed page 766) with §6.20.2 (printed 126): whether the
+// expression an instance's assignment gave `p`, folded where the
+// instantiation was written as Elaborator::ApplyParamOverride recorded it,
+// reproduces the value `p` holds at the range it has now, so that a refold
+// of it at another range can be trusted. False for a value no instance
+// assigned, for one whose scope was not recorded, and where the fold gives
+// another value: the recorded scope holds the instantiating module's own
+// parameters, and a name the site read otherwise -- a generate block's
+// parameter of the same name -- would fold to something the source did not
+// write.
+static bool OverrideExprReproducesValue(const RtlirParamDecl& p) {
+  if (p.override_expr == nullptr || p.override_module == nullptr) return false;
+  ParamRangeRegistryGuard instantiating_module_guard(p.override_module);
+  auto val = FoldParamValue(p, p.override_expr, p.override_scope);
+  return val && ConvertOverrideValue(*val, p) == p.resolved_value;
+}
+
 // §23.10.1 (printed pages 764-765) with §6.20.2 (printed 126): the value a
 // defparam gave `p` is the right-hand side converted to the range `p` now
 // has, so the right-hand side is folded again in the scope of the statement
@@ -258,19 +286,24 @@ static bool DeclTypeRangeFollowsScope(const RtlirParamDecl& p,
 // parameter (§23.9, printed 761; §27.4, printed 820), which the module's
 // registration alone keeps out of sight: `defparam u.P = V` in a block
 // declaring `localparam logic [95:0] V` read V's low 64 bits alone when a
-// later defparam widened P. A value an instance's assignment gave is
-// converted as it stands: its expression is written in the instantiating
-// module, which is not carried here.
-static void ReconvertOverrideValue(RtlirParamDecl& p) {
-  if (p.defparam_value_expr == nullptr) {
-    p.resolved_value = ConvertOverrideValue(p.resolved_value, p);
+// later defparam widened P. A value an instance's assignment gave (§23.10.2,
+// printed 766) is folded again the same way where `refold_override` says the
+// expression and scope recorded for it reproduce it, and otherwise converted
+// as it stands, which kept the 5 the 32-bit range had left of
+// `c #(.P(96'h1_0000_0003_0000_0005)) u()` under `defparam u.W = 96`.
+static void ReconvertOverrideValue(RtlirParamDecl& p, bool refold_override) {
+  if (p.defparam_value_expr != nullptr) {
+    ParamRangeRegistryGuard defparam_module_guard(p.defparam_module);
+    RegisteredGenScopeGuard gen_scope_guard(p.defparam_value_scopes);
+    RefoldOverride(p, p.defparam_value_expr, p.defparam_value_scope);
     return;
   }
-  ParamRangeRegistryGuard defparam_module_guard(p.defparam_module);
-  RegisteredGenScopeGuard gen_scope_guard(p.defparam_value_scopes);
-  auto val = FoldParamValue(p, p.defparam_value_expr, p.defparam_value_scope);
-  p.resolved_value = ConvertOverrideValue(val.value_or(p.resolved_value), p);
-  RecordResolvedHighWords(p, p.defparam_value_expr, p.defparam_value_scope);
+  if (refold_override) {
+    ParamRangeRegistryGuard instantiating_module_guard(p.override_module);
+    RefoldOverride(p, p.override_expr, p.override_scope);
+    return;
+  }
+  p.resolved_value = ConvertOverrideValue(p.resolved_value, p);
 }
 
 // §6.20.2 (printed page 126): a parameter with a range specification has the
@@ -292,10 +325,12 @@ static void ResizeParamToRecomputedRange(RtlirParamDecl& p,
                                          const TypedefMap& typedefs,
                                          const ScopeMap& scope) {
   if (!DeclTypeRangeFollowsScope(p, typedefs)) return;
+  // Judged at the range `p` still has, which the recorded value was cut to.
+  const bool kRefoldOverride = OverrideExprReproducesValue(p);
   const DataType& dtype = *p.decl_type;
   PopulateParamTypeInfo(p, dtype, typedefs, scope);
   RecordParamDeclRange(p, dtype, scope);
-  if (p.from_override) ReconvertOverrideValue(p);
+  if (p.from_override) ReconvertOverrideValue(p, kRefoldOverride);
 }
 
 // §23.10.2 (printed page 766): a parameter whose value depends on the one a

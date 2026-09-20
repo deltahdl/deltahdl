@@ -41,6 +41,10 @@ std::optional<int64_t> FoldRealValueAsInteger(const Expr* expr,
 struct InstanceParamAssignments {
   const Elaborator::ParamList& params;
   ScopeMap scope;
+  // The instantiating module, registered where `scope` was taken, kept on
+  // RtlirParamDecl::override_module for a refold of an assignment's
+  // expression once a defparam widens the parameter (§23.10.2, printed 766).
+  const RtlirModule* module;
 };
 
 // The assignment in `params` naming `name`, or null. Defined in

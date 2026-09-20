@@ -660,6 +660,12 @@ struct RtlirParamDecl {
   std::unordered_map<std::string_view, int64_t> defparam_value_scope;
   GenBlockPrefixes defparam_value_scopes;
   const struct RtlirModule* defparam_module = nullptr;
+  // §23.10.2 (printed page 766): the same for override_expr -- the values in
+  // scope where the instantiation stands and the instantiating module, as
+  // InstanceParamAssignments took them -- for a refold at a range a defparam
+  // later gives the parameter. Null while no instance assigned the value.
+  std::unordered_map<std::string_view, int64_t> override_scope;
+  const struct RtlirModule* override_module = nullptr;
 };
 
 struct RtlirPortBinding {

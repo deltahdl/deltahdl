@@ -115,4 +115,38 @@ TEST(DefparamElaboration, RefoldsAGenerateBlocksDefparamValueWithItsNames) {
   ExpectEveryWordOfP(kTop);
 }
 
+// §23.10.2 (printed page 766) assigns an instance's parameter value to the
+// parameter and §6.20.2 (printed 126) converts it to the range the
+// declaration finally has, so `c #(.P(96'h1_0000_0003_0000_0005)) u()` with
+// `defparam u.W = 96` after it gives P every digit of the literal: M reads
+// the 3 at bits 47 down to 32 and H the 1 above bit 64. The value was
+// converted from the 5 the 32-bit range had kept of it, so M read 0.
+TEST(DefparamElaboration, RefoldsAnInstanceOverrideALaterDefparamWidens) {
+  constexpr std::string_view kTop =
+      "  c #(.P(96'h1_0000_0003_0000_0005)) u();\n"
+      "  defparam u.W = 96;\n";
+  ExpectEveryWordOfP(kTop);
+}
+
+// The same with the override written as the instantiating module's own
+// 96-bit localparam, `.P(PP)`, whose words above bit 64 are read under top's
+// registration alone: the refold stands in the scope the instantiation was
+// written in, so H reads 1 and M 3 as for the literal.
+TEST(DefparamElaboration, RefoldsAnInstanceOverrideNamingTheParentsParameter) {
+  constexpr std::string_view kTop =
+      "  localparam logic [95:0] PP = 96'h1_0000_0003_0000_0005;\n"
+      "  c #(.P(PP)) u();\n"
+      "  defparam u.W = 96;\n";
+  ExpectEveryWordOfP(kTop);
+}
+
+// Both values given in the instantiation, `c #(.W(96), .P(...))`: W is 96
+// before P is sized, so P is converted once, to 96 bits, and reads the same
+// H and M with no defparam involved.
+TEST(DefparamElaboration, WidensAnInstanceOverrideGivenInThePortList) {
+  constexpr std::string_view kTop =
+      "  c #(.W(96), .P(96'h1_0000_0003_0000_0005)) u();\n";
+  ExpectEveryWordOfP(kTop);
+}
+
 }  // namespace
