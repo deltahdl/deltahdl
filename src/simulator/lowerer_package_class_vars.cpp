@@ -10,7 +10,12 @@
 // (InitPackageDataVariables in lowerer_register.cpp) with no class recorded
 // under that key, so the handle stayed null. Each package variable whose type
 // names a class is recorded here under the same key, for the whole design,
-// ahead of every module.
+// ahead of every module. §9.7 (printed page 245 of ~/LRM.pdf) and §8.30.1
+// (printed 217) let a variable be declared of the built-in process and
+// weak_reference classes, and the elaborator names each by its bare name, the
+// name LowerVar records a module's under and every method path asks for; a
+// package's `process proc` and `weak_reference #(C) w` were recorded under
+// nothing, so `p1::proc.kill()` and `p1::w.get()` resolved no receiver.
 
 #include <string>
 #include <string_view>
@@ -85,12 +90,32 @@ static std::string PackageClassKey(const RtlirDesign* design,
   return std::string(owner->name) + "::" + std::string(type.type_name);
 }
 
+// §9.7 (printed page 245) and §8.30.1 (printed 217) with §26.7: the built-in
+// class the declared type `type` names, `process` or `weak_reference`,
+// written bare or through the std package's scope, by the bare name the
+// elaborator gives a module's variable of it (SetVariableTypeInfo in
+// elaborator_decls.cpp), which LowerVar records and TryEvalProcessMethodCall,
+// IsProcessAwaitCall and TryEvalWeakRefMethodCall compare a variable's class
+// record to. Empty for any other type. The semaphore and the mailbox are the
+// built-in classes whose object a package declaration creates rather than
+// records (CreatePackageSemaphore in lowerer_register.cpp), and a `new` on
+// either is taken by the object's own path ahead of the class record, so
+// neither is named here.
+static std::string BuiltinClassKey(const DataType& type) {
+  if (type.kind != DataTypeKind::kNamed) return {};
+  if (!type.scope_name.empty() && type.scope_name != "std") return {};
+  if (type.type_name != "process" && type.type_name != "weak_reference")
+    return {};
+  return std::string(type.type_name);
+}
+
 void RegisterPackageClassVariables(const RtlirDesign* design, SimContext& ctx,
                                    Arena& arena) {
   for (const auto* pkg : design->packages) {
     for (const auto* item : pkg->items) {
       if (item->kind != ModuleItemKind::kVarDecl) continue;
-      std::string key = PackageClassKey(design, pkg, item->data_type);
+      std::string key = BuiltinClassKey(item->data_type);
+      if (key.empty()) key = PackageClassKey(design, pkg, item->data_type);
       if (key.empty()) continue;
       // SimContext keys the record by string_view, so both names are given
       // the design's lifetime.

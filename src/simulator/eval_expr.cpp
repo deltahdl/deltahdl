@@ -19,6 +19,7 @@
 #include "simulator/eval_call_result.h"
 #include "simulator/eval_class_array_handles.h"
 #include "simulator/eval_expr_internal.h"
+#include "simulator/eval_function_internal.h"
 #include "simulator/eval_string.h"
 #include "simulator/eval_struct_property.h"
 #include "simulator/evaluation.h"
@@ -466,11 +467,14 @@ static bool TryEventSequenceMethod(const MemberAccess& ma, Logic4Vec& out) {
 // TryEventSequenceMethod during member-access evaluation; this routine covers
 // the call form, which arrives as a kCall whose receiver is the named event.
 // It yields the same single-bit result: the event's triggered state for the
-// current time step, or 1'b0 when the named event is null.
+// current time step, or 1'b0 when the named event is null. §26.3 admits a
+// package's event as the receiver, `p::e.triggered()`, by the "p.e" key
+// ExtractHandleMethodCallParts answers; taken as an identifier alone, the
+// scoped call fell to the user-method lookup, which found no method.
 bool TryEvalEventTriggeredCall(const Expr* expr, SimContext& ctx, Arena& arena,
                                Logic4Vec& out) {
   MethodCallParts parts;
-  if (!ExtractMethodCallParts(expr, parts)) return false;
+  if (!ExtractHandleMethodCallParts(expr, arena, parts)) return false;
   if (parts.method_name != "triggered") return false;
   auto* var = ctx.FindVariable(parts.var_name);
   if (!var || !var->is_event) return false;

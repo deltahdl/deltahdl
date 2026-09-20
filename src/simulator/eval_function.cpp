@@ -577,10 +577,14 @@ bool TryEvalTypedConstructorNew(const Expr* expr, SimContext& ctx, Arena& arena,
   return true;
 }
 
+// §8.30.3 and §8.30.4: get() and clear() on a weak_reference variable. §26.3
+// admits a package's variable as the receiver, `p::w.get()`, by the "p.w" key
+// ExtractHandleMethodCallParts answers; taken as an identifier alone, the
+// scoped call resolved no reference and answered nothing.
 static bool TryEvalWeakRefMethodCall(const Expr* expr, SimContext& ctx,
                                      Arena& arena, Logic4Vec& out) {
   MethodCallParts parts;
-  if (!ExtractMethodCallParts(expr, parts)) return false;
+  if (!ExtractHandleMethodCallParts(expr, arena, parts)) return false;
   if (ctx.GetVariableClassType(parts.var_name) != "weak_reference")
     return false;
   auto* var = ctx.FindVariable(parts.var_name);

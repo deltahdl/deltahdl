@@ -749,4 +749,65 @@ TEST(PackageScopeReferenceSim, ImportedAndReExportedSemaphoreShareOneBucket) {
             10u);
 }
 
+// §9.7 (printed page 245 of ~/LRM.pdf) lets a variable be declared of the
+// built-in process class and has kill() forcibly terminate the process a
+// handle names, whose status() then reads KILLED; §26.3 (printed 808) names
+// a package's variable through the package scope resolution operator. The
+// child assigns itself to p1's handle and would write 99 to x at #10, the
+// kill at #1 stops it, and at #21 the status is KILLED and x still 0:
+// 1 * 10 + 1. No class was recorded under "p1.proc", so the kill resolved no
+// receiver, the child wrote 99 and finished, and status() answered no call:
+// 0. A kill that landed with a status() that did not would read 1.
+TEST(PackageScopeReferenceSim, PackageProcessHandleIsKilledAndReadsKilled) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  process proc;\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  int x = 0, y;\n"
+                      "  initial begin\n"
+                      "    fork\n"
+                      "      begin\n"
+                      "        p1::proc = process::self();\n"
+                      "        #10 x = 99;\n"
+                      "      end\n"
+                      "    join_none\n"
+                      "    #1;\n"
+                      "    p1::proc.kill();\n"
+                      "    #20;\n"
+                      "    y = (p1::proc.status() == process::KILLED) * 10;\n"
+                      "    y = y + (x == 0);\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            11u);
+}
+
+// §9.7 (printed page 245): await() suspends the caller until the process the
+// handle names terminates; §26.3 (printed 808) names a package's handle
+// through the package scope resolution operator. The child sets a at #5, the
+// parent awaits it from #1 and then copies a: 1. With no class recorded under
+// "p1.proc" the await resolved no process, so the parent went on at #1 and
+// copied the 0 a still held.
+TEST(PackageScopeReferenceSim, PackageProcessHandleAwaitsTermination) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  process proc;\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  int a = 0, y;\n"
+                      "  initial begin\n"
+                      "    fork\n"
+                      "      begin\n"
+                      "        p1::proc = process::self();\n"
+                      "        #5 a = 1;\n"
+                      "      end\n"
+                      "    join_none\n"
+                      "    #1;\n"
+                      "    p1::proc.await();\n"
+                      "    y = a;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            1u);
+}
+
 }  // namespace
