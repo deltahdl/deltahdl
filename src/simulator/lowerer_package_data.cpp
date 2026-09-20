@@ -24,6 +24,7 @@
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
 #include "simulator/eval_function_internal.h"
+#include "simulator/eval_mailbox.h"
 #include "simulator/eval_semaphore.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer_register.h"
@@ -297,46 +298,80 @@ static void CreatePackageAggregate(const ModuleItem* item, std::string_view pkg,
   }
 }
 
-// §15.3 (printed page 372): whether the package variable `item` is declared
-// with the built-in semaphore class, which the parser leaves as a named type
-// spelled `semaphore`, the spelling CreateSemaphoreForVar (lowerer_var.cpp)
-// recognizes a module's by.
-static bool IsPackageSemaphoreDecl(const ModuleItem* item) {
-  return item->kind == ModuleItemKind::kVarDecl &&
-         item->data_type.kind == DataTypeKind::kNamed &&
-         item->data_type.type_name == "semaphore";
+// §15.3 (printed page 372) and §15.4 (printed 374): the built-in
+// synchronization class the package variable `item` is declared with,
+// `semaphore` or `mailbox`, which the parser leaves as a named type of that
+// spelling, the spelling CreateSemaphoreForVar and CreateMailboxForVar
+// (lowerer_var.cpp) recognize a module's by. Empty for an item of any other
+// type.
+static std::string_view PackageSyncObjectType(const ModuleItem* item) {
+  if (item->kind != ModuleItemKind::kVarDecl ||
+      item->data_type.kind != DataTypeKind::kNamed)
+    return {};
+  std::string_view name = item->data_type.type_name;
+  if (name == "semaphore" || name == "mailbox") return name;
+  return {};
 }
 
-// §15.3 (printed page 372) with §26.2 (printed 808): a package's `semaphore
-// s` is the bucket of keys its get(), put() and try_get() operate on, made
-// under the "pk.name" key its carrier variable stands under, as
-// CreateSemaphoreForVar (lowerer_var.cpp) makes a module's, so that
-// SemaphoreCallTarget (eval_semaphore.cpp) finds it by the key a `p1::s`
-// receiver resolves to. §15.3.1 (printed 373): the declaration assignment is
-// a new() whose one argument is the number of keys the bucket starts with,
-// none when it is absent, and the argument is an expression of the package's
-// scope, evaluated in the package's frame as PackageQueueMaxSize evaluates a
-// queue's bound. A declaration with no initializer starts the bucket empty,
-// as a module's does. The carrier alone stood there, the new() evaluated
-// into it, so `p1::s.get()` and `p1::s.try_get()` ran on no semaphore.
-static void CreatePackageSemaphore(const ModuleItem* item, std::string_view pkg,
-                                   std::string_view qname, SimContext& ctx,
-                                   Arena& arena) {
-  SemaphoreObject* sem = ctx.CreateSemaphore(qname, 0);
+// §15.3 (printed page 372) and §15.4 (printed 374) with §26.2 (printed
+// 808): a package's `semaphore s` is the bucket of keys its get(), put() and
+// try_get() operate on, and its `mailbox mb` the queue its put(), get(),
+// peek(), num() and try_ methods pass messages through, each made under the
+// "pk.name" key its carrier variable stands under, as CreateSemaphoreForVar
+// and CreateMailboxForVar (lowerer_var.cpp) make a module's, so that
+// SemaphoreCallTarget (eval_semaphore.cpp) and MailboxCallTarget
+// (eval_mailbox.cpp) find it by the key a `p1::s` receiver resolves to, the
+// key the package's own task or function reaches a bare `s` by through
+// ScopedObjectKeys, and the key an import aliases (AliasSemaphore in
+// lowerer_import.cpp). The bucket starts empty and the queue unbounded, as a
+// module's do with no initializer; a declaration assignment sizes either in
+// InitPackageSyncObject once the package's earlier items hold their values.
+// The carrier alone stood there for a mailbox, the new() evaluated into it
+// and no MailboxObject made under "p1.mb", so `p1::mb.put(7)` placed
+// nothing, `p1::mb.get(a)` retrieved nothing and left a unwritten, and num()
+// and try_put() were served by no mailbox -- 61223c5d5's remainder, which
+// created a module's alone.
+static void CreatePackageSyncObject(std::string_view type,
+                                    std::string_view qname, SimContext& ctx) {
+  if (type == "semaphore") ctx.CreateSemaphore(qname, 0);
+  if (type == "mailbox") ctx.CreateMailbox(qname, 0);
+}
+
+// §15.3.1 (printed page 373) and §15.4.1 (printed 374) with §26.2 (printed
+// 808): a semaphore's declaration assignment is a new() whose one argument
+// is the number of keys the bucket starts with, none when it is absent, and
+// a mailbox's a new() whose one argument is the bound, 0 and unbounded when
+// it is absent; the argument is an expression of the package's scope, read
+// in the package's frame as InitScopeDataItems reads every other
+// initializer, after the package's parameters and earlier variables hold
+// their values, so `new(D)` reads the package's own D (§11.2.1). Read when
+// the object was created, ahead of the parameters' own initializers, D was
+// the 0 its storage was created with, and the bucket started empty and the
+// queue unbounded whatever the declaration wrote. The new() names no value
+// the carrier variable holds, so the caller leaves the carrier alone. True
+// for a semaphore's or a mailbox's item whatever its initializer.
+static bool InitPackageSyncObject(const ModuleItem* item, std::string_view key,
+                                  SimContext& ctx, Arena& arena) {
+  std::string_view type = PackageSyncObjectType(item);
+  if (type.empty()) return false;
   const Expr* init = item->init_expr;
-  if (init == nullptr || init->kind != ExprKind::kCall || init->text != "new")
-    return;
-  ctx.PushScope(pkg);
-  sem->key_count = SemaphoreKeyArg(init, ctx, arena, 0);
-  ctx.PopScope();
+  if (init->kind != ExprKind::kCall || init->text != "new") return true;
+  if (type == "semaphore") {
+    if (SemaphoreObject* sem = ctx.FindSemaphore(key))
+      sem->key_count = SemaphoreKeyArg(init, ctx, arena, 0);
+    return true;
+  }
+  if (MailboxObject* mbx = ctx.FindMailbox(key))
+    mbx->Build(MailboxBoundArg(init, ctx, arena));
+  return true;
 }
 
 // One data item's storage under its key: every variable declaration at its
-// declared type's shape, with the semaphore, the queue or the array its type
-// or dimension declares, and a parameter with an initializer as a 32-bit
-// constant. The initializer is evaluated by InitPackageDataItem once every
-// scope's storage exists, except a semaphore's, which its bucket has already
-// taken. Answers the interned key, empty for an item declaring no data.
+// declared type's shape, with the semaphore, the mailbox, the queue or the
+// array its type or dimension declares, and a parameter with an initializer
+// as a 32-bit constant. The initializer is evaluated by InitPackageDataItem
+// once every scope's storage exists. Answers the interned key, empty for an
+// item declaring no data.
 static std::string_view CreatePackageDataItem(const ModuleItem* item,
                                               std::string_view pkg,
                                               SimContext& ctx, Arena& arena) {
@@ -345,8 +380,9 @@ static std::string_view CreatePackageDataItem(const ModuleItem* item,
   auto* var = ctx.CreateVariable(*qname, PackageDataWidth(item, *qname, ctx));
   if (item->kind != ModuleItemKind::kVarDecl) return *qname;
   ShapePackageVariable(item, var, *qname, ctx, arena);
-  if (IsPackageSemaphoreDecl(item)) {
-    CreatePackageSemaphore(item, pkg, *qname, ctx, arena);
+  std::string_view sync_type = PackageSyncObjectType(item);
+  if (!sync_type.empty()) {
+    CreatePackageSyncObject(sync_type, *qname, ctx);
     return *qname;
   }
   CreatePackageAggregate(item, pkg, *qname, ctx, arena);
@@ -456,11 +492,11 @@ static bool IsClassNewInit(const ModuleItem* item, std::string_view key,
 
 // One data item's initializer, evaluated into the storage
 // CreatePackageDataItem gave it; an item declaring no data, or none, has
-// nothing to evaluate. §15.3.1: a semaphore's initializer is the new() that
-// CreatePackageSemaphore has already read the bucket's key count from, and
-// it names no value the carrier variable holds, so it is left alone, as is
-// a class variable's `new` (IsClassNewInit), which names a construction
-// ConstructDataClassInitializers makes once the class exists. A
+// nothing to evaluate. §15.3.1 and §15.4.1: a semaphore's or a mailbox's
+// initializer is the new() that sizes the object (InitPackageSyncObject) and
+// names no value the carrier variable holds, so the carrier is left alone, as
+// it is for a class variable's `new` (IsClassNewInit), which names a
+// construction ConstructDataClassInitializers makes once the class exists. A
 // fixed-size array's is distributed over the elements (InitPackageArray,
 // §7.4.2), and a queue's, a dynamic array's or an associative array's fills
 // the object (InitPackageAggregate); every other initializer is the carrier
@@ -468,8 +504,8 @@ static bool IsClassNewInit(const ModuleItem* item, std::string_view key,
 static void InitPackageDataItem(const ModuleItem* item, std::string_view pkg,
                                 SimContext& ctx, Arena& arena) {
   if (!DeclaresPackageData(item) || item->init_expr == nullptr) return;
-  if (IsPackageSemaphoreDecl(item)) return;
   std::string key = PackageDataKey(item, pkg);
+  if (InitPackageSyncObject(item, key, ctx, arena)) return;
   if (IsClassNewInit(item, key, ctx)) return;
   if (InitPackageArray(item, pkg, key, ctx, arena)) return;
   if (InitPackageAggregate(item->init_expr, key, ctx, arena)) return;
