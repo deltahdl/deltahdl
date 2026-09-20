@@ -533,24 +533,35 @@ static void RegisterTypeDeclarations(const RtlirDesign* design,
   RegisterScopeTypedefs(unit->programs, ctx);
 }
 
+// §6.18 (printed page 118 of ~/LRM.pdf): the name at the end of each
+// typedef name's chain, recorded for the run, class or not
+// (SimContext::RegisterTypeTarget), with the typedef items' own types beside
+// it (RegisterTypeDeclarations) for the parameter list a typedef of a
+// parameterized mailbox carries. §15.4.9 (printed 377) declares a mailbox
+// through `typedef mailbox #(string) s_mbox` and §15.3.1 (printed 373) a
+// semaphore alike, neither built-in class has a record to bind the name to,
+// and a class property declared through the typedef is told to be one by
+// SyncKindOfType (eval_class_sync.cpp) following the chain in this table;
+// with no table, `mb_t mb = new` built no mailbox. Recorded ahead of every
+// class (Lowerer::LowerDesignData), since §8.9 (printed 186) with §6.21
+// (printed 132-133) creates a static property's one copy at the class's
+// static initialization, which lowering the class runs
+// (InitStaticProperties in lowerer_class.cpp): recorded with the class
+// aliases, after the packages' and the unit's classes were lowered, a
+// package class's `static mb_t mb = new(K)` was known for no mailbox then
+// and was built on the first reference, reading K as the module had left it.
+void RegisterTypeTargets(const RtlirDesign* design, SimContext& ctx) {
+  RegisterTypeDeclarations(design, ctx);
+  for (const auto& [alias, target] : design->type_targets)
+    ctx.RegisterTypeTarget(alias, target);
+}
+
 // §6.18 with §8.25.1: a typedef name whose chain ends in a class names that
 // class -- `typedef C T;` makes `T::p` the default specialization's `C#()::p`
 // -- so each such name is bound to the class it denotes, once every class of
 // the design is lowered, unless the design declares a class of that name.
-// The name at the end of the chain is recorded for the run first, class or
-// not (SimContext::RegisterTypeTarget): §15.4.9 (printed page 377 of
-// ~/LRM.pdf) declares a mailbox through `typedef mailbox #(string) s_mbox`
-// and §15.3.1 (printed 373) a semaphore alike, neither built-in class has a
-// record to bind the name to, and a class property declared through the
-// typedef is told to be one by SyncKindOfType (eval_class_sync.cpp) following
-// the chain in this table; with no table, `mb_t mb = new` built no mailbox.
-// The typedef items' own types are recorded beside them
-// (RegisterTypeDeclarations) for the parameter list a typedef of a
-// parameterized mailbox carries.
 void RegisterClassTypeAliases(const RtlirDesign* design, SimContext& ctx) {
-  RegisterTypeDeclarations(design, ctx);
   for (const auto& [alias, target] : design->type_targets) {
-    ctx.RegisterTypeTarget(alias, target);
     if (ctx.FindClassType(alias) != nullptr) continue;
     ClassTypeInfo* cls = ctx.FindClassType(target);
     if (cls != nullptr) ctx.RegisterClassType(alias, cls);

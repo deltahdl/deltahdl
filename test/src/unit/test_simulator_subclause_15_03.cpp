@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <string>
 #include <string_view>
 
 #include "fixture_simulator.h"
@@ -456,6 +457,27 @@ TEST(SemaphoreSim, NestedClassMethodTakesTheEnclosingClassStaticSemaphore) {
             10u);
 }
 
+// The source of the static-initialization cases: the compilation unit
+// declares `int keys = 1`, the typedef `head` and a class whose static
+// semaphore property, declared through the type `type` names, is built by
+// `new(keys)`; the module writes keys to 3 and then tries to procure one
+// key twice, reading the two try_get() results as a two-digit number.
+std::string StaticSemaphoreKeyedByUnitSrc(const std::string& head,
+                                          const std::string& type) {
+  return "int keys = 1;\n" + head + "class C;\n  static " + type +
+         " s = new(keys);\n"
+         "endclass\n"
+         "module top;\n"
+         "  int first, second, r;\n"
+         "  initial begin\n"
+         "    keys = 3;\n"
+         "    first = C::s.try_get(1);\n"
+         "    second = C::s.try_get(1);\n"
+         "    r = first * 10 + second;\n"
+         "  end\n"
+         "endmodule\n";
+}
+
 // §8.9 (printed page 186) with §6.21 (printed 132-133), §3.12.1 (printed
 // 56) and §15.3.1 (printed 373): a static semaphore property's one bucket
 // is created at the class's static initialization with the keys its
@@ -465,19 +487,22 @@ TEST(SemaphoreSim, NestedClassMethodTakesTheEnclosingClassStaticSemaphore) {
 // 10. Built on the first reference instead, the `new` read the 3 and both
 // reads were 1, 11.
 TEST(SemaphoreSim, StaticSemaphorePropertyIsBuiltAtStaticInitialization) {
-  EXPECT_EQ(RunAndGet("int keys = 1;\n"
-                      "class C;\n"
-                      "  static semaphore s = new(keys);\n"
-                      "endclass\n"
-                      "module top;\n"
-                      "  int first, second, r;\n"
-                      "  initial begin\n"
-                      "    keys = 3;\n"
-                      "    first = C::s.try_get(1);\n"
-                      "    second = C::s.try_get(1);\n"
-                      "    r = first * 10 + second;\n"
-                      "  end\n"
-                      "endmodule\n",
+  EXPECT_EQ(RunAndGet(StaticSemaphoreKeyedByUnitSrc("", "semaphore"), "r"),
+            10u);
+}
+
+// §6.18 (printed page 118) with §8.9 (printed 186) and §6.21 (printed
+// 132-133): a typedef name stands for its type, so a static property
+// declared `static sem_t s = new(keys)` through the unit's `typedef
+// semaphore sem_t` is the semaphore above, built at the class's static
+// initialization with the one key keys then holds: 10 as above. The run's
+// table of what a typedef stands for was filled after the unit's class was
+// lowered, so the static initialization knew the property for no semaphore
+// and the first `C::s.try_get(1)` built it, reading the 3, 11.
+TEST(SemaphoreSim,
+     StaticTypedefdSemaphorePropertyIsBuiltAtStaticInitialization) {
+  EXPECT_EQ(RunAndGet(StaticSemaphoreKeyedByUnitSrc(
+                          "typedef semaphore sem_t;\n", "sem_t"),
                       "r"),
             10u);
 }

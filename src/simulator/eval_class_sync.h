@@ -76,15 +76,16 @@ SyncProperty ResolveSyncProperty(const Expr* recv, SimContext& ctx,
                                  Arena& arena);
 
 // The semaphore or the mailbox the property `prop` holds, for a call of
-// `method` at `loc`, or null where `prop` is of the other kind. A static
-// property the class's static initialization (TryInitStaticSyncProperty)
-// did not build -- declared through a typedef the run's table did not yet
-// hold -- is built here from its declaration's `new` (§8.9 creates the one
-// copy once), on the first reference. A property that holds
-// none -- declared with no initializer and never assigned, or an instance
-// property reached through a null handle or from a static method -- is
-// §8.4's illegal access, reported as ResolveThroughNullHandle in
-// eval_function.cpp reports a method called through a null handle.
+// `method` at `loc`, or null where `prop` is of the other kind. A property
+// that holds none -- declared with no initializer and never assigned, or an
+// instance property reached through a null handle or from a static method
+// -- is §8.4's illegal access, reported as ResolveThroughNullHandle in
+// eval_function.cpp reports a method called through a null handle. A static
+// property declared through a typedef was built here on the first
+// reference, the run's typedef table being filled after the packages' and
+// the unit's classes were lowered; filled ahead of every class
+// (RegisterTypeTargets in lowerer_register.cpp), the class's static
+// initialization builds it (TryInitStaticSyncProperty).
 SemaphoreObject* SemaphoreOfProperty(const SyncProperty& prop,
                                      std::string_view method, SourceLoc loc,
                                      SimContext& ctx);

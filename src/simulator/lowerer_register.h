@@ -271,6 +271,13 @@ void AliasPackageExports(const RtlirDesign* design, SimContext& ctx,
 // operator resolves by, each at the value its declaration folds to.
 void RegisterPackageEnumConstants(const RtlirDesign* design, SimContext& ctx,
                                   Arena& arena);
+// §6.18 with §15.4.9 and §15.3.1: the name at the end of each typedef name's
+// chain and each typedef item's own type, recorded for the run ahead of
+// every class (Lowerer::LowerDesignData), so a class's static
+// initialization knows a property declared through a typedef of `mailbox`
+// or `semaphore` for one.
+void RegisterTypeTargets(const RtlirDesign* design, SimContext& ctx);
+
 // §6.18 with §8.25.1: each typedef name whose chain ends in a class, bound
 // to that class after every class of the design is lowered.
 void RegisterClassTypeAliases(const RtlirDesign* design, SimContext& ctx);

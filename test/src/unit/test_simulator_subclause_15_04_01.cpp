@@ -678,6 +678,30 @@ TEST(MailboxSim, NestedClassMethodPutsIntoTheEnclosingClassStaticMailbox) {
             14u);
 }
 
+// The source of the static-initialization cases: the package p declares
+// `int K = 1`, the typedef `head` and a class whose static mailbox property,
+// declared through the type `type` names, is built by `new(K)`; the module
+// writes K to 3 and then tries to place two messages, reading the two
+// try_put() results as a two-digit number.
+std::string StaticMailboxBoundedByKSrc(const std::string& head,
+                                       const std::string& type) {
+  return "package p;\n  int K = 1;\n" + head + "  class C;\n    static " +
+         type +
+         " mb = new(K);\n"
+         "  endclass\n"
+         "endpackage\n"
+         "module top;\n"
+         "  import p::*;\n"
+         "  int a, b, y;\n"
+         "  initial begin\n"
+         "    K = 3;\n"
+         "    a = C::mb.try_put(1);\n"
+         "    b = C::mb.try_put(2);\n"
+         "    y = a * 10 + b;\n"
+         "  end\n"
+         "endmodule\n";
+}
+
 // §8.9 (printed page 186) with §6.21 (printed 132-133) and §15.4.1 (printed
 // 374): a static property's one copy is created at the class's static
 // initialization, its `new(K)` reading K as it stands then, so the package
@@ -686,24 +710,22 @@ TEST(MailboxSim, NestedClassMethodPutsIntoTheEnclosingClassStaticMailbox) {
 // reads 1 and the second, on the full mailbox, 0, 10. Built on the first
 // reference instead, the `new` read the 3 and both reads were 1, 11.
 TEST(MailboxSim, StaticMailboxPropertyIsBuiltAtStaticInitialization) {
-  EXPECT_EQ(RunAndGet("package p;\n"
-                      "  int K = 1;\n"
-                      "  class C;\n"
-                      "    static mailbox mb = new(K);\n"
-                      "  endclass\n"
-                      "endpackage\n"
-                      "module top;\n"
-                      "  import p::*;\n"
-                      "  int a, b, y;\n"
-                      "  initial begin\n"
-                      "    K = 3;\n"
-                      "    a = C::mb.try_put(1);\n"
-                      "    b = C::mb.try_put(2);\n"
-                      "    y = a * 10 + b;\n"
-                      "  end\n"
-                      "endmodule\n",
-                      "y"),
-            10u);
+  EXPECT_EQ(RunAndGet(StaticMailboxBoundedByKSrc("", "mailbox"), "y"), 10u);
+}
+
+// §6.18 (printed page 118) with §8.9 (printed 186) and §6.21 (printed
+// 132-133): a typedef name stands for its type, so a static property
+// declared `static mb_t mb = new(K)` through the package's `typedef mailbox
+// mb_t` is the mailbox above, built at the class's static initialization
+// with the bound K then holds, 1: the reads are 10 as above. The run's
+// table of what a typedef stands for was filled after the package's class
+// was lowered, so the static initialization knew the property for no
+// mailbox and the first `C::mb.try_put(1)` built it, reading the 3, 11.
+TEST(MailboxSim, StaticTypedefdMailboxPropertyIsBuiltAtStaticInitialization) {
+  EXPECT_EQ(
+      RunAndGet(StaticMailboxBoundedByKSrc("  typedef mailbox mb_t;\n", "mb_t"),
+                "y"),
+      10u);
 }
 
 }  // namespace

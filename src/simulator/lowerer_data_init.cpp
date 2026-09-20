@@ -44,8 +44,12 @@ static void RegisterDesignTypeWidths(const RtlirDesign* design,
 
 // The design's type names and the packages' and the compilation unit's own
 // declarations, registered ahead of every module: RegisterDesignTypeWidths
-// for the names, and §7.2.1's layouts for the member selects that reach a
-// value no variable holds. §26.2: a package variable's declaration
+// for the names, §6.18's typedef chains (RegisterTypeTargets) ahead of every
+// class, whose static initialization (§8.9, printed page 186) asks them
+// whether a `static mb_t mb = new(K)` is a mailbox -- asked once the
+// packages' and the unit's classes were lowered, the copy was built on the
+// first reference instead -- and §7.2.1's layouts for the member selects
+// that reach a value no variable holds. §26.2: a package variable's declaration
 // assignment may call a function of the package or of one it imports and
 // name an enumeration constant, and §26.6 (printed pages 815-816) lets it
 // read a name another package's export hands on, so the subroutines, the
@@ -58,6 +62,7 @@ static void RegisterDesignTypeWidths(const RtlirDesign* design,
 // packages' initializers.
 void Lowerer::LowerDesignData() {
   RegisterDesignTypeWidths(design_, ctx_);
+  RegisterTypeTargets(design_, ctx_);
   RegisterDesignTypeLayouts(design_, ctx_, arena_);
   RegisterUnitClassVariables(design_, ctx_, arena_);
   RegisterPackageScopedSubroutines(design_, ctx_, arena_);
@@ -93,7 +98,7 @@ void Lowerer::InitCompilationUnitData() {
 // packages' classes are lowered for it here (LowerUnimportedPackageClasses,
 // lowerer_import.cpp), the unit's having been lowered by
 // LowerCompilationUnitClasses, and the typedef names that denote a class
-// (§6.18) are bound so a variable declared by one constructs; the names a
+// (§6.18) are bound to it so a variable declared by one constructs; the names a
 // package class leaves unbound until the modules are lowered are bound
 // again by RebindStrayPackageClassNames. Constructed after the modules, as
 // they were, the package's object was made after the module's initializer

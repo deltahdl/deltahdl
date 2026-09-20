@@ -248,36 +248,28 @@ static bool IsNewCall(const Expr* expr) {
          expr->text == "new";
 }
 
-// The semaphore or mailbox the property holds, or null where it holds none.
-// §8.9: a static property is created once, at the class's static
-// initialization (TryInitStaticSyncProperty), which leaves the map an entry
-// for it -- an entry, null included, is what that or an assignment left.
-// A static property whose map has no entry is one the pass did not know
-// for a semaphore or mailbox, and its one copy is built here on the first
-// reference from the declaration's `new`: PopulateClassType
-// (lowerer_class.cpp) runs the pass for every class, top-level and nested,
-// but a unit's or a package's class is lowered before RegisterClassTypeAliases
-// fills the typedef table, so a static property declared through a typedef
-// (§15.4.9's `s_mbox`) is built here, reading its argument at that first
-// reference.
+// The semaphore or mailbox the property holds, or null where it holds none:
+// the entry the construction (TryInitClassSyncProperty), the class's static
+// initialization (§8.9, TryInitStaticSyncProperty) or an assignment left,
+// null included, or no entry for an instance property with no object. A
+// static property declared through a typedef was built here on the first
+// reference, the typedef table being filled after the packages' and the
+// unit's classes were lowered (RegisterClassTypeAliases); the table is
+// filled ahead of every class now (RegisterTypeTargets in
+// lowerer_register.cpp), so every static one is built at lowering.
 template <typename T>
 static T* HeldSyncObject(std::unordered_map<std::string, T*>* held,
-                         const SyncProperty& prop, SimContext& ctx) {
+                         const SyncProperty& prop) {
   if (held == nullptr) return nullptr;
-  std::string name(prop.member->name);
-  auto it = held->find(name);
-  if (it != held->end()) return it->second;
-  if (!prop.member->is_static || !IsNewCall(prop.member->init_expr))
-    return nullptr;
-  BuildSyncProperty(prop, prop.member->init_expr, ctx, ctx.GetArena());
-  return (*held)[name];
+  auto it = held->find(std::string(prop.member->name));
+  return it != held->end() ? it->second : nullptr;
 }
 
 SemaphoreObject* SemaphoreOfProperty(const SyncProperty& prop,
                                      std::string_view method, SourceLoc loc,
                                      SimContext& ctx) {
   if (prop.kind != SyncKind::kSemaphore) return nullptr;
-  SemaphoreObject* sem = HeldSyncObject(SemaphoreMapOf(prop), prop, ctx);
+  SemaphoreObject* sem = HeldSyncObject(SemaphoreMapOf(prop), prop);
   if (sem == nullptr) ReportNullSyncProperty(prop, method, loc, ctx);
   return sem;
 }
@@ -286,7 +278,7 @@ MailboxObject* MailboxOfProperty(const SyncProperty& prop,
                                  std::string_view method, SourceLoc loc,
                                  SimContext& ctx) {
   if (prop.kind != SyncKind::kMailbox) return nullptr;
-  MailboxObject* mbx = HeldSyncObject(MailboxMapOf(prop), prop, ctx);
+  MailboxObject* mbx = HeldSyncObject(MailboxMapOf(prop), prop);
   if (mbx == nullptr) ReportNullSyncProperty(prop, method, loc, ctx);
   return mbx;
 }
@@ -317,12 +309,11 @@ void BuildSyncProperty(const SyncProperty& prop, const Expr* new_expr,
   }
 }
 
-static SyncHandle HandleOfProperty(const SyncProperty& prop, SimContext& ctx) {
+static SyncHandle HandleOfProperty(const SyncProperty& prop) {
   if (prop.kind == SyncKind::kSemaphore) {
-    return {prop.kind, HeldSyncObject(SemaphoreMapOf(prop), prop, ctx),
-            nullptr};
+    return {prop.kind, HeldSyncObject(SemaphoreMapOf(prop), prop), nullptr};
   }
-  return {prop.kind, nullptr, HeldSyncObject(MailboxMapOf(prop), prop, ctx)};
+  return {prop.kind, nullptr, HeldSyncObject(MailboxMapOf(prop), prop)};
 }
 
 static SyncHandle HandleOfVariable(const Variable* var, const SimContext& ctx) {
@@ -340,7 +331,7 @@ static SyncHandle HandleOfVariable(const Variable* var, const SimContext& ctx) {
 static SyncHandle ResolveSyncHandle(const Expr* expr, SimContext& ctx,
                                     Arena& arena) {
   SyncProperty prop = ResolveSyncProperty(expr, ctx, arena);
-  if (prop.kind != SyncKind::kNone) return HandleOfProperty(prop, ctx);
+  if (prop.kind != SyncKind::kNone) return HandleOfProperty(prop);
   if (expr->kind == ExprKind::kIdentifier) {
     if (const Variable* local = ctx.FindLocalVariable(expr->text))
       return HandleOfVariable(local, ctx);
