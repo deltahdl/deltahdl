@@ -1,12 +1,19 @@
+#include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "common/arena.h"
 #include "common/types.h"
 #include "elaborator/type_eval.h"
+#include "parser/ast_class.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_module.h"
+#include "parser/ast_type.h"
+#include "simulator/class_object.h"
+#include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 
@@ -33,12 +40,70 @@ static std::string TypeTableKey(const DataType& type) {
   return std::string(type.scope_name) + "::" + std::string(type.type_name);
 }
 
+// §8.23: the type a typedef member `name` of the class `decl` declares, or
+// null where the class declares no typedef of that name.
+static const DataType* ClassTypedefType(const ClassDecl& decl,
+                                        std::string_view name) {
+  for (const ClassMember* m : decl.members) {
+    if (m->kind != ClassMemberKind::kTypedef || m->name != name) continue;
+    return m->typedef_item ? &m->typedef_item->typedef_type : nullptr;
+  }
+  return nullptr;
+}
+
+// §8.25: the type the specialization `actuals` binds the type parameter
+// `pname` of `decl` to: the actual its `#(...)` list gives, else the default
+// the class declares (§8.25.1), else null for a parameter given no default.
+static const DataType* SpecializationActual(
+    const ClassDecl& decl, const std::vector<DataType>& actuals,
+    std::string_view pname) {
+  for (size_t i = 0; i < decl.params.size(); ++i) {
+    if (decl.params[i].first != pname) continue;
+    if (const DataType* actual = ActualForParam(actuals, i, pname))
+      return actual;
+    return i < decl.param_types.size() ? &decl.param_types[i] : nullptr;
+  }
+  return nullptr;
+}
+
+// §8.26.3 has a typedef of a parameterized interface class, `typedef T1[1:0]
+// T2` in `IntfA #(type T1 = logic)`, named through a specialization as a
+// method's return type, `IntfA#(bit[1:0])::T2`; §8.25 binds T1 to the
+// specialization's actual throughout the class, so the type is four bits.
+// The elaborated table holds `IntfA::T2` sized with T1 unbound, which is no
+// width at all. Where the name carries a scope and type actuals and the
+// typedef's type names a type parameter of the class, the width is the
+// actual's -- by ActualForParam, the one the `#(...)` list gives, else the
+// default the class declares (§8.25.1) -- times the typedef's own packed
+// dimensions and the use-site ones (§7.4.4). 0 for every other type. Answered
+// here, under DeclaredTypeWidth, rather than at the one site that sizes a
+// method's result: ExecFunctionBody asks this same question to decide whether
+// a `return` is resized to the result variable at all, and with the answer
+// given at the sizing site alone the variable was four bits and `return 2;`
+// still handed the caller the expression's own 32.
+static uint32_t SpecializedTypedefWidth(const DataType& type, SimContext& ctx) {
+  if (type.scope_name.empty() || type.type_params.empty()) return 0;
+  const ClassTypeInfo* cls = ctx.FindClassType(type.scope_name);
+  if (cls == nullptr || cls->decl == nullptr) return 0;
+  const ClassDecl& decl = *cls->decl;
+  const DataType* alias = ClassTypedefType(decl, type.type_name);
+  if (alias == nullptr || alias->kind != DataTypeKind::kNamed) return 0;
+  if (decl.type_param_names.count(alias->type_name) == 0) return 0;
+  const DataType* actual =
+      SpecializationActual(decl, type.type_params, alias->type_name);
+  if (actual == nullptr) return 0;
+  uint32_t width = DeclaredTypeWidth(*actual, ctx);
+  if (uint32_t inner = PackedDimProduct(*alias); inner > 0) width *= inner;
+  if (uint32_t outer = PackedDimProduct(type); outer > 0) width *= outer;
+  return width;
+}
+
 uint32_t DeclaredTypeWidth(const DataType& type, SimContext& ctx) {
   uint32_t width = EvalTypeWidth(type);
   if (width != 0) return width;
   if (type.kind != DataTypeKind::kNamed) return 0;
   uint32_t base = ctx.FindTypeWidth(TypeTableKey(type));
-  if (base == 0) return 0;
+  if (base == 0) return SpecializedTypedefWidth(type, ctx);
   // §7.4.4: "Multiple packed dimensions can also be defined in stages with
   // typedef", and a dimension written where the name is used stacks on the ones
   // the typedef itself carries -- `bsix [1:10] v5` on a `typedef bit [1:5]

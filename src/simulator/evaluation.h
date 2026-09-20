@@ -37,9 +37,13 @@ uint32_t LiteralWidth(std::string_view text, uint64_t val);
 // EvalTypeWidth gives DataTypeKind::kNamed no width at all. The elaborated
 // width of every named type reaches the simulator as the type_widths table
 // RegisterDesignTypeWidths fills, so this asks that table rather than carrying
-// a second copy of the typedefs down here. Returns 0 for a type nothing here
-// can size -- void, a string, a class handle, a name the design never declared
-// -- which leaves each caller's own fallback in charge of the answer.
+// a second copy of the typedefs down here. A class typedef named through a
+// specialization, §8.26.3's `IntfA#(bit[1:0])::T2`, is in that table with its
+// type parameter unbound and so at no width; its width is read off the class
+// declaration with the actual the name carries (§8.25). Returns 0 for a type
+// nothing here can size -- void, a string, a class handle, a name the design
+// never declared -- which leaves each caller's own fallback in charge of the
+// answer.
 //
 // A packed dimension written where the name is used is not stacked onto the
 // width the name carries, though §7.4.4 says it should be; EvalTypeWidth

@@ -404,69 +404,11 @@ static bool ResolveClassScope(const Expr* expr, SimContext& ctx, Arena& arena,
   return true;
 }
 
-// §8.23: the type a typedef member `name` of the class `decl` declares, or
-// null where the class declares no typedef of that name.
-static const DataType* ClassTypedefType(const ClassDecl& decl,
-                                        std::string_view name) {
-  for (const ClassMember* m : decl.members) {
-    if (m->kind != ClassMemberKind::kTypedef || m->name != name) continue;
-    return m->typedef_item ? &m->typedef_item->typedef_type : nullptr;
-  }
-  return nullptr;
-}
-
-// §8.25: the type the specialization `actuals` binds the type parameter
-// `pname` of `decl` to: the actual its `#(...)` list gives, else the default
-// the class declares (§8.25.1), else null for a parameter given no default.
-static const DataType* SpecializationActual(
-    const ClassDecl& decl, const std::vector<DataType>& actuals,
-    std::string_view pname) {
-  for (size_t i = 0; i < decl.params.size(); ++i) {
-    if (decl.params[i].first != pname) continue;
-    if (const DataType* actual = ActualForParam(actuals, i, pname))
-      return actual;
-    return i < decl.param_types.size() ? &decl.param_types[i] : nullptr;
-  }
-  return nullptr;
-}
-
-// §8.26.3 has a typedef of a parameterized interface class, `typedef T1[1:0]
-// T2` in `IntfA #(type T1 = logic)`, named through a specialization as a
-// method's return type, `IntfA#(bit[1:0])::T2`; §8.25 binds T1 to the
-// specialization's actual throughout the class, so the type is four bits.
-// The elaborated table holds `IntfA::T2` sized with T1 unbound, which is no
-// width at all, and the carrier 32 the fallback substitutes is what
-// `$bits(im.funcB())` read. Where the return type is such a name and the
-// typedef's type names a type parameter of the class, the width is the
-// actual's -- by ActualForParam, the one the `#(...)` list gives, else the
-// default the class declares (§8.25.1) -- times the typedef's own packed
-// dimensions and the use-site ones (§7.4.4). 0 for every other return type.
-static uint32_t SpecializedTypedefWidth(const DataType& ret, SimContext& ctx) {
-  if (ret.kind != DataTypeKind::kNamed || ret.scope_name.empty() ||
-      ret.type_params.empty())
-    return 0;
-  const ClassTypeInfo* cls = ctx.FindClassType(ret.scope_name);
-  if (cls == nullptr || cls->decl == nullptr) return 0;
-  const ClassDecl& decl = *cls->decl;
-  const DataType* alias = ClassTypedefType(decl, ret.type_name);
-  if (alias == nullptr || alias->kind != DataTypeKind::kNamed) return 0;
-  if (decl.type_param_names.count(alias->type_name) == 0) return 0;
-  const DataType* actual =
-      SpecializationActual(decl, ret.type_params, alias->type_name);
-  if (actual == nullptr) return 0;
-  uint32_t width = DeclaredTypeWidth(*actual, ctx);
-  if (uint32_t inner = PackedDimProduct(*alias); inner > 0) width *= inner;
-  if (uint32_t outer = PackedDimProduct(ret); outer > 0) width *= outer;
-  return width;
-}
-
 // Computes the width of a class method's return variable, evaluating the
 // declared return type with the parameterized class's bound parameters in scope
 // when available. Falls back to 32 bits when the width is indeterminate.
 static uint32_t ComputeMethodReturnWidth(ModuleItem* method, SimContext& ctx,
                                          const ClassTypeInfo* param_cls) {
-  if (uint32_t w = SpecializedTypedefWidth(method->return_type, ctx); w > 0)
-    return w;
   if (param_cls && param_cls->decl) {
     ScopeMap scope;
     for (const auto& [pname, pexpr] : param_cls->decl->params) {
@@ -480,7 +422,7 @@ static uint32_t ComputeMethodReturnWidth(ModuleItem* method, SimContext& ctx,
     // same table DeclaredTypeWidth uses, but only once the scope-aware overload
     // has had its say.
     if (width == 0) width = ctx.FindTypeWidth(method->return_type.type_name);
-    return width == 0 ? 32 : width;
+    if (width != 0) return width;
   }
   uint32_t width = DeclaredTypeWidth(method->return_type, ctx);
   return width == 0 ? 32 : width;
