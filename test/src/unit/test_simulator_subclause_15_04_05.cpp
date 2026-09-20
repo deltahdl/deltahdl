@@ -2,6 +2,8 @@
 
 #include <coroutine>
 #include <cstdint>
+#include <string>
+#include <string_view>
 #include <vector>
 
 #include "common/types.h"
@@ -315,6 +317,30 @@ TEST(MailboxSim, GetHandsBackAStringMessageWhole) {
   EXPECT_EQ(VecToStr(var->value), "hello");
 }
 
+// §15.4.5's run-time error, reported at the variable get() named, spelled
+// as `target`, on line `line`; and the value a variable was left holding.
+void ExpectGetTypeError(const SimFixture& f, const std::string& target,
+                        uint32_t line) {
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "mailbox get(): the message's type is not "
+                            "equivalent to the type of '" +
+                                target + "'",
+                            line, "15.4.5"));
+}
+
+void ExpectWord(SimFixture& f, std::string_view name, uint64_t expected) {
+  auto* var = f.ctx.FindVariable(name);
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), expected);
+}
+
+void ExpectString(SimFixture& f, std::string_view name,
+                  const std::string& expected) {
+  auto* var = f.ctx.FindVariable(name);
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(VecToStr(var->value), expected);
+}
+
 // §15.4.5 (printed page 376): when the type of the message variable is not
 // equivalent to the type of the message in the mailbox, a run-time error is
 // generated. The typeless mailbox holds the int 7, and get() into a string
@@ -337,16 +363,100 @@ TEST(MailboxSim, GetIntoAVariableOfAnotherTypeIsAnError) {
       f);
   ASSERT_NE(design, nullptr);
   LowerAndRun(design, f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "mailbox get(): the message's type is not equivalent to the type of 's'",
-      7, "15.4.5"));
-  auto* s = f.ctx.FindVariable("s");
-  ASSERT_NE(s, nullptr);
-  EXPECT_EQ(VecToStr(s->value), "keep");
-  auto* n = f.ctx.FindVariable("n");
-  ASSERT_NE(n, nullptr);
-  EXPECT_EQ(n->value.ToUint64(), 1u);
+  ExpectGetTypeError(f, "s", 7);
+  ExpectString(f, "s", "keep");
+  ExpectWord(f, "n", 1u);
+}
+
+// §15.4.3 (printed page 375) has put() place any singular expression, and
+// §15.4.5 (printed 376) has the mailbox maintain the data type it was placed
+// with: `a + 1` over the int a is, by §11.6.1 and §11.8.1, a 32-bit signed
+// integral, so get() into a string is the run-time error, reported at the
+// string with the message left in the queue and the string as it was, and
+// get() into an int then reads the sum: 5 and a num() of 0 read as 50. A
+// computed actual placed with no type stored the 5 over the string and
+// raised nothing, the int get() then waiting on an empty mailbox.
+TEST(MailboxSim, PutOfAComputedActualCarriesTheSumsType) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  mailbox mb = new;\n"
+      "  int a = 4, b, n;\n"
+      "  string s = \"keep\";\n"
+      "  initial begin\n"
+      "    mb.put(a + 1);\n"
+      "    mb.get(s);\n"
+      "    mb.get(b);\n"
+      "    n = b * 10 + mb.num();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  ExpectGetTypeError(f, "s", 7);
+  ExpectString(f, "s", "keep");
+  ExpectWord(f, "n", 50u);
+}
+
+// §15.4.5 (printed page 376) with §7.2.1: the message variable may be any
+// valid left-hand expression, and a member of a structure is of the type its
+// declaration gives it. The int 7 is not equivalent to the 8-bit byte member
+// (§6.22.2 c) asks for one total width), so `mb.get(s.b)` is the run-time
+// error, reported at the member with 9 left in it, and `mb.get(s.i)` into the
+// int member reads the 7: 9, 7 and a num() of 0 read as 970. A member with
+// no type read stored the 7 in the byte, and the int member's get() then
+// waited on an empty mailbox, leaving n at 0.
+TEST(MailboxSim, GetIntoAMemberOfAnotherTypeIsAnError) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  mailbox mb = new;\n"
+      "  typedef struct packed { byte b; int i; } s_t;\n"
+      "  s_t s;\n"
+      "  int n;\n"
+      "  initial begin\n"
+      "    s.b = 9;\n"
+      "    mb.put(7);\n"
+      "    mb.get(s.b);\n"
+      "    mb.get(s.i);\n"
+      "    n = s.b * 100 + s.i * 10 + mb.num();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  ExpectGetTypeError(f, "s.b", 9);
+  ExpectWord(f, "n", 970u);
+}
+
+// §15.4.5 (printed page 376) with §7.4.2: an element of an unpacked array is
+// of the array's element type, the signed 8-bit byte. The int 6 is not
+// equivalent to it, so `mb.get(arr[i])` is the run-time error and the int w
+// takes the 6; the literal 8'sd3 is 8 bits and signed, so the element then
+// reads it, where the unsigned 8'd3 would not have (§6.22.2 c) asks for one
+// signedness): 6, 3 and a num() of 0 read as 630. An element with no type
+// read stored the 6, and the int's get() then waited on an empty mailbox.
+TEST(MailboxSim, GetIntoAnElementOfAnotherTypeIsAnError) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  mailbox mb = new;\n"
+      "  byte arr[2];\n"
+      "  int i = 1, w, n;\n"
+      "  initial begin\n"
+      "    mb.put(6);\n"
+      "    mb.get(arr[i]);\n"
+      "    mb.get(w);\n"
+      "    mb.put(8'sd3);\n"
+      "    mb.get(arr[i]);\n"
+      "    n = w * 100 + arr[1] * 10 + mb.num();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  ExpectGetTypeError(f, "arr[i]", 7);
+  ExpectWord(f, "n", 630u);
 }
 
 }  // namespace

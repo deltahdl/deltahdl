@@ -155,4 +155,60 @@ TEST(MailboxSim, TryPeekIntoAVariableOfAnotherTypeAnswersNegative) {
   EXPECT_EQ(x->value.ToUint64(), 5u);
 }
 
+// §15.4.8 (printed page 377) with §15.4.3 (printed 375): the message put()
+// places is any singular expression, held with its type, and `a + 2` over
+// the 16-bit unsigned a is, by §11.6.1 and §11.8.1, 32 bits wide and
+// unsigned: try_peek() into the signed int x answers a negative integer and
+// copies nothing, try_peek() into the unsigned 32-bit u a positive one with
+// the 42: a status of -1, a status of 1 and 42 read as 1142. A computed
+// message held with no type answered 1 to both, 142; one held at a's own 16
+// bits refused u as well, 900; and one held signed copied into x and
+// refused u, -100.
+TEST(MailboxSim, TryPeekOfAComputedMessageChecksItsWidthAndSign) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  mailbox mb = new;\n"
+      "  bit [15:0] a = 16'd40;\n"
+      "  bit [31:0] u;\n"
+      "  int x, sx, su, r;\n"
+      "  initial begin\n"
+      "    mb.put(a + 2);\n"
+      "    sx = mb.try_peek(x);\n"
+      "    su = mb.try_peek(u);\n"
+      "    r = (sx == -1) * 1000 + su * 100 + u;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1142u);
+}
+
+// §15.4.8 (printed page 377) with §7.4.2: the message variable may be any
+// valid left-hand expression, and an element of an unpacked array is of the
+// array's element type. The mailbox holds a 16-bit vector, and try_peek()
+// into an element of an int array -- 32 bits, not equivalent under
+// §6.22.2 c) -- answers a negative integer and copies nothing, leaving the
+// element at 5 and the message in the queue: -1, 5 and a num() of 1 read as
+// 151. An element read with no type answered 1 and took the vector's value.
+TEST(MailboxSim, TryPeekIntoAnElementOfAnotherTypeAnswersNegative) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  mailbox mb = new;\n"
+      "  bit [15:0] h = 16'h1234;\n"
+      "  int arr[2];\n"
+      "  int i = 1, status, r;\n"
+      "  initial begin\n"
+      "    arr[1] = 5;\n"
+      "    mb.put(h);\n"
+      "    status = mb.try_peek(arr[i]);\n"
+      "    r = (status == -1) * 100 + arr[1] * 10 + mb.num();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 151u);
+}
+
 }  // namespace

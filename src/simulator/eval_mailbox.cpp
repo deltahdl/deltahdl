@@ -8,17 +8,21 @@
 
 #include "common/diagnostic.h"
 #include "common/types.h"
+#include "elaborator/type_eval.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
 #include "simulator/awaiters.h"
+#include "simulator/eval_expr_internal.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/eval_semaphore.h"
 #include "simulator/eval_string.h"
 #include "simulator/evaluation.h"
 #include "simulator/exec_task.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
+#include "simulator/statement_assign_internal.h"
 #include "simulator/stmt_result.h"
 #include "simulator/sync_objects.h"
 #include "simulator/variable.h"
@@ -93,21 +97,167 @@ static MailboxMessageType VariableMessageType(std::string_view name,
                                           : MailboxMessageType::States::kTwo);
 }
 
-// §15.4.5: the type a message is placed with, as the evaluator knows the
-// actual: a variable is of its declared kind, a string or real literal of
-// that type, and an integer literal an integral of its width and signedness
-// whose number of states no literal spells out, so §6.22.2 c)'s state count
-// is left unknown and a 2-state or a 4-state variable of the width alike
-// retrieves it. A computed expression records no type, as the elaborator's
-// compile-time check leaves one unchecked, and nor does any message of a
-// parameterized mailbox.
-static MailboxMessageType ActualMessageType(const Expr* arg,
-                                            const Logic4Vec& val, bool typed,
-                                            SimContext& ctx) {
-  if (typed) return {};
+// §6.22.2 c) with §6.11.2: the number of states a declared kind's values
+// have -- four for logic, reg, integer and time, two for the rest -- and
+// unknown for a type name, whose definition the kind records do not follow.
+static MailboxMessageType::States StatesOfKind(DataTypeKind kind) {
+  if (kind == DataTypeKind::kNamed) return MailboxMessageType::States::kUnknown;
+  return Is4stateType(kind) ? MailboxMessageType::States::kFour
+                            : MailboxMessageType::States::kTwo;
+}
+
+// §6.22.2: the type a declaration of kind `kind` and `width` bits gives a
+// structure member or an array element: a string or a real is of its own
+// built-in type, a real told from a shortreal by its width as
+// VariableMessageType tells them, and anything else is integral.
+static MailboxMessageType DeclaredKindType(DataTypeKind kind, uint32_t width,
+                                           bool is_signed) {
+  if (kind == DataTypeKind::kString) return MailboxMessageType::String();
+  if (kind == DataTypeKind::kReal) return MailboxMessageType::Real(64);
+  if (kind == DataTypeKind::kShortreal) return MailboxMessageType::Real(32);
+  return MailboxMessageType::Integral(width, is_signed, StatesOfKind(kind));
+}
+
+// §7.2.1: the dotted member path of the access `s.f` or `s.p.f`, appended to
+// `path`, and the variable at its root; nullptr where the root is not a
+// bare name.
+static const Expr* MemberPathRoot(const Expr* access, std::string& path) {
+  if (access->kind == ExprKind::kIdentifier) return access;
+  if (access->kind != ExprKind::kMemberAccess || access->lhs == nullptr ||
+      access->rhs == nullptr)
+    return nullptr;
+  const Expr* root = MemberPathRoot(access->lhs, path);
+  if (!path.empty()) path += '.';
+  path += access->rhs->text;
+  return root;
+}
+
+// §7.2.1 with §6.22.2: the type of the member `s.f` of a structure or union
+// whose layout was registered, that of the member's declaration -- its kind
+// and its width. The layout records no signing modifier, so a member is
+// signed when its kind is (§6.11.1's byte, shortint, int, integer and
+// longint) and unsigned otherwise. A member of an object no layout was
+// registered for -- a class property, a handle's member -- is of any type.
+static MailboxMessageType MemberTargetType(const Expr* arg, SimContext& ctx) {
+  std::string path;
+  const Expr* root = MemberPathRoot(arg, path);
+  if (root == nullptr) return {};
+  const StructTypeInfo* info = StructLayoutOfName(root->text, ctx);
+  if (info == nullptr) return {};
+  uint32_t offset = 0;
+  uint32_t width = 0;
+  DataTypeKind kind = DataTypeKind::kLogic;
+  if (!ResolveStructFieldPath(info, path, &offset, &width, &kind)) return {};
+  return DeclaredKindType(kind, width, IsImplicitlySigned(kind));
+}
+
+// §7.4.2 with §6.22.2: the type of the element `a[i]` of the unpacked array
+// `name`, that of the array's element type: the element's own variable says
+// whether it is signed where the array's leaves were created, and the shape
+// record answers the width, the kind and the number of states. A shape
+// registered with no element kind -- a dynamic array's -- leaves the
+// element of any type.
+static MailboxMessageType ArrayElementType(const ArrayInfo& info,
+                                           std::string_view name,
+                                           const Expr* index, SimContext& ctx,
+                                           Arena& arena) {
+  if (info.elem_type_kind == DataTypeKind::kImplicit) return {};
+  uint64_t idx = EvalExpr(index, ctx, arena).ToUint64();
+  std::string elem = std::string(name) + "[" + std::to_string(idx) + "]";
+  const Variable* var = ctx.FindVariable(elem);
+  bool is_signed =
+      var != nullptr ? var->is_signed : IsImplicitlySigned(info.elem_type_kind);
+  return DeclaredKindType(info.elem_type_kind, info.elem_width, is_signed);
+}
+
+// §11.5 with §6.22.2: the type of the select `a[i]`: an element of an array
+// of class handles is of the class recorded under the array's name; an
+// element of any other unpacked array is of its element type; and a
+// bit-select or part-select of a packed object is an unsigned integral of
+// the bits it names (§11.8.1 has a select unsigned regardless of its
+// operand) with the object's number of states. A slice of an unpacked
+// array, a select of a string and a select whose base is not a bare name
+// are of any type.
+static MailboxMessageType ElementTargetType(const Expr* arg, SimContext& ctx,
+                                            Arena& arena) {
+  const Expr* base = arg->base;
+  if (base == nullptr || base->kind != ExprKind::kIdentifier) return {};
+  std::string_view class_name = ctx.GetVariableClassType(base->text);
+  if (!class_name.empty()) return MailboxMessageType::Class(class_name);
+  if (const ArrayInfo* info = ctx.FindArrayInfo(base->text)) {
+    if (arg->index_end != nullptr) return {};
+    return ArrayElementType(*info, base->text, arg->index, ctx, arena);
+  }
+  const Variable* var = ctx.FindVariable(base->text);
+  if (var == nullptr || var->is_string) return {};
+  return MailboxMessageType::Integral(
+      SelectExprWidth(*var, arg, ctx, arena), false,
+      var->is_4state ? MailboxMessageType::States::kFour
+                     : MailboxMessageType::States::kTwo);
+}
+
+// §15.4.5 through §15.4.8: the type of the left-hand expression a retrieval
+// or a copy names, or of the same shape placed by put(): a variable is of
+// its declared kind, a member of the member's declared type and a select of
+// the element's. Any other shape is of any type.
+static MailboxMessageType TargetType(const Expr* arg, SimContext& ctx,
+                                     Arena& arena) {
   switch (arg->kind) {
     case ExprKind::kIdentifier:
       return VariableMessageType(arg->text, ctx);
+    case ExprKind::kMemberAccess:
+      return MemberTargetType(arg, ctx);
+    case ExprKind::kSelect:
+      return ElementTargetType(arg, ctx, arena);
+    default:
+      return {};
+  }
+}
+
+// §11.6.1 and §11.8.1 with §6.22.2: the type of an operator expression, as
+// its self-determined value carries it -- a string or a real of the value's
+// width, else an integral of the computed width and signedness, whose
+// number of states no operator records, so §6.22.2 c)'s state count is left
+// unknown as it is for a literal.
+static MailboxMessageType ComputedMessageType(const Logic4Vec& val) {
+  if (val.is_string) return MailboxMessageType::String();
+  if (val.is_real) return MailboxMessageType::Real(val.width);
+  return MailboxMessageType::Integral(val.width, val.is_signed,
+                                      MailboxMessageType::States::kUnknown);
+}
+
+// §11.4.11 with §8.4: whether a conditional operator chooses between class
+// handles, whose value is a handle and not the integral its words are: an
+// arm names a class variable, or is itself such a conditional.
+static bool ArmIsAHandle(const Expr* arm, SimContext& ctx);
+
+static bool TernaryChoosesAHandle(const Expr* arg, SimContext& ctx) {
+  return ArmIsAHandle(arg->true_expr, ctx) ||
+         ArmIsAHandle(arg->false_expr, ctx);
+}
+
+static bool ArmIsAHandle(const Expr* arm, SimContext& ctx) {
+  if (arm == nullptr) return false;
+  if (arm->kind == ExprKind::kTernary) return TernaryChoosesAHandle(arm, ctx);
+  return arm->kind == ExprKind::kIdentifier &&
+         !ctx.GetVariableClassType(arm->text).empty();
+}
+
+// §15.4.5: the type a message is placed with, as the evaluator knows the
+// actual: a variable is of its declared kind, a member or an element of its
+// declared type, a string or real literal of that type, and an integer
+// literal an integral of its width and signedness whose number of states no
+// literal spells out, so §6.22.2 c)'s state count is left unknown and a
+// 2-state or a 4-state variable of the width alike retrieves it. An
+// operator expression is of its self-determined type, a conditional over
+// class handles excepted, which is of any type as a call is; and so is
+// every message of a parameterized mailbox, whose actuals the elaborator
+// verified.
+static MailboxMessageType ActualMessageType(const Expr* arg,
+                                            const Logic4Vec& val, bool typed,
+                                            SimContext& ctx, Arena& arena) {
+  if (typed) return {};
+  switch (arg->kind) {
     case ExprKind::kStringLiteral:
       return MailboxMessageType::String();
     case ExprKind::kRealLiteral:
@@ -116,8 +266,16 @@ static MailboxMessageType ActualMessageType(const Expr* arg,
     case ExprKind::kIntegerLiteral:
       return MailboxMessageType::Integral(val.width, val.is_signed,
                                           MailboxMessageType::States::kUnknown);
+    case ExprKind::kTernary:
+      return TernaryChoosesAHandle(arg, ctx) ? MailboxMessageType{}
+                                             : ComputedMessageType(val);
+    case ExprKind::kUnary:
+    case ExprKind::kBinary:
+    case ExprKind::kConcatenation:
+    case ExprKind::kReplicate:
+      return ComputedMessageType(val);
     default:
-      return {};
+      return TargetType(arg, ctx, arena);
   }
 }
 
@@ -128,16 +286,15 @@ static const Expr* MailboxArg(const Expr* expr) {
 }
 
 // §15.4.5 through §15.4.8: the type the message must be equivalent to, that
-// of the variable the call names. A parameterized mailbox's messages were
-// verified by the compiler (§15.4.9), and a target that is not a bare name
-// -- a select or a member -- has no kind record to read, so both expect any
-// type.
+// of the left-hand expression the call names. A parameterized mailbox's
+// messages were verified by the compiler (§15.4.9), so its target expects
+// any type.
 static MailboxMessageType RetrievalTargetType(const Expr* expr, SimContext& ctx,
                                               Arena& arena) {
   const Expr* arg = MailboxArg(expr);
-  if (arg == nullptr || arg->kind != ExprKind::kIdentifier) return {};
+  if (arg == nullptr) return {};
   if (IsParameterizedMailbox(expr, ctx, arena)) return {};
-  return VariableMessageType(arg->text, ctx);
+  return TargetType(arg, ctx, arena);
 }
 
 // §15.4.3 and §15.4.4: the message put() or try_put() places, any singular
@@ -155,8 +312,8 @@ static MailboxMessage MailboxMessageArg(const Expr* expr, SimContext& ctx,
   if (arg == nullptr) return msg;
   Logic4Vec val = EvalExpr(arg, ctx, arena);
   msg.value.Capture(val);
-  msg.type = ActualMessageType(arg, val,
-                               IsParameterizedMailbox(expr, ctx, arena), ctx);
+  msg.type = ActualMessageType(
+      arg, val, IsParameterizedMailbox(expr, ctx, arena), ctx, arena);
   return msg;
 }
 
@@ -241,6 +398,43 @@ bool IsMailboxBlockingCall(const Expr* expr, SimContext& ctx, Arena& arena) {
          MailboxCallTarget(expr, ctx, arena, "peek") != nullptr;
 }
 
+// §11.5.1: the separator a part-select was written with.
+static std::string_view PartSelectSeparator(const Expr* sel) {
+  if (sel->is_part_select_plus) return "+:";
+  if (sel->is_part_select_minus) return "-:";
+  return ":";
+}
+
+// The spelling of a select's index for a report: as written where it is a
+// name or a literal, else the value it evaluated to.
+static std::string IndexSpelling(const Expr* index, SimContext& ctx,
+                                 Arena& arena) {
+  if (!index->text.empty()) return std::string(index->text);
+  return std::to_string(EvalExpr(index, ctx, arena).ToUint64());
+}
+
+// §15.4.5 through §15.4.8: the left-hand expression a retrieval names, as a
+// report spells it -- a bare name, a member access `s.f` and a select
+// `a[i]` or `v[7:0]` as written.
+static std::string TargetSpelling(const Expr* arg, SimContext& ctx,
+                                  Arena& arena) {
+  switch (arg->kind) {
+    case ExprKind::kMemberAccess:
+      return TargetSpelling(arg->lhs, ctx, arena) + "." +
+             std::string(arg->rhs->text);
+    case ExprKind::kSelect: {
+      std::string index = IndexSpelling(arg->index, ctx, arena);
+      if (arg->index_end != nullptr) {
+        index += PartSelectSeparator(arg);
+        index += IndexSpelling(arg->index_end, ctx, arena);
+      }
+      return TargetSpelling(arg->base, ctx, arena) + "[" + index + "]";
+    }
+    default:
+      return std::string(arg->text);
+  }
+}
+
 // §15.4.5 and §15.4.7: what get() and peek() do once the wait ends. The
 // message goes to the variable the call names; a message whose type is not
 // equivalent to the variable's is the run-time error both subclauses
@@ -260,7 +454,7 @@ static void FinishMailboxRetrieval(const Expr* expr, const Logic4Vec& msg,
       arg->range.start,
       "mailbox " + std::string(method) +
           "(): the message's type is not equivalent to the type of '" +
-          std::string(arg->text) + "'",
+          TargetSpelling(arg, ctx, arena) + "'",
       method == "get" ? Subclause("15.4.5") : Subclause("15.4.7"));
 }
 
