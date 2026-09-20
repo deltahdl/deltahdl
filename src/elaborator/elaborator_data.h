@@ -132,11 +132,26 @@ class ElaboratorData {
   // records the snapshot, and BeginNestedDeclScope hands it to ElaborateModule.
   std::unordered_map<const ModuleDecl*, std::unordered_set<std::string_view>>
       nested_decl_scope_names_;
+  // The names the enclosing scope's items above each nested declaration
+  // declare, read from the text before any item is elaborated, keyed by that
+  // declaration. An instance written above its declaration is elaborated
+  // before the item loop reaches the declaration and takes its snapshot, and
+  // the names declared between the instance and the declaration -- previous
+  // to the declaration's text by §6.10 -- are then known from the text alone.
+  // Elaborator::ElaborateItems records these through
+  // RecordNestedDeclNamesAbove before its item loop.
+  std::unordered_map<const ModuleDecl*, std::unordered_set<std::string_view>>
+      nested_decl_names_above_;
+  // Records, for each kNestedModuleDecl among `items`, the names the items
+  // above it declare as the text shows them: each item's declared name, its
+  // instance name and its gate instance name.
+  void RecordNestedDeclNamesAbove(const std::vector<ModuleItem*>& items);
   // Hands ElaborateModule, through pending_enclosing_scope_, the enclosing
   // scope's names a nested declaration `nested` may treat as declared: the
-  // snapshot recorded at its declaration, or `at_instance`, the names declared
-  // so far, when the instance is written above the declaration and no snapshot
-  // has been taken yet.
+  // snapshot recorded at its declaration; or, when the instance is written
+  // above the declaration and no snapshot has been taken yet, `at_instance`,
+  // the names declared so far, joined with the names the text declares above
+  // the declaration.
   void BeginNestedDeclScope(const ModuleDecl* nested,
                             std::unordered_set<std::string_view> at_instance);
   // §16.15: the default disable iff of the scope a nested declaration is

@@ -831,12 +831,17 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   // module's, and gen_prefix_scopes_ is already where the instance stands.
   RegisteredGenScopeGuard gen_scope_guard(gen_prefix_scopes_);
 
+  // §6.10 with §23.4: a reference inside a nested declaration sees an outer
+  // name only if it was declared previously, above the declaration's text. An
+  // instance written above its declaration is elaborated before the loop
+  // below reaches the declaration, so the names the text declares above each
+  // nested declaration are read first, for BeginNestedDeclScope to join with
+  // the names declared so far at such an instance.
+  RecordNestedDeclNamesAbove(decl->items);
   for (auto* item : decl->items) {
-    // §6.10 with §23.4: a reference inside a nested declaration sees an outer
-    // name only if it was declared previously, above the declaration's text,
-    // so this scope's names are recorded as they stand when the loop reaches
-    // the declaration, for BeginNestedDeclScope to hand on when the instance
-    // is elaborated -- written any distance below, or implied after the loop.
+    // The same rule for an instance written or implied below: this scope's
+    // names are recorded as they stand when the loop reaches the declaration,
+    // for BeginNestedDeclScope to hand on when the instance is elaborated.
     if (item->kind == ModuleItemKind::kNestedModuleDecl &&
         item->nested_module_decl != nullptr) {
       nested_decl_scope_names_[item->nested_module_decl] =

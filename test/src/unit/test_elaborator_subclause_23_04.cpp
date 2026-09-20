@@ -481,6 +481,53 @@ TEST(NestedModuleElaboration,
   EXPECT_FALSE(w->refers_outward);
 }
 
+// §6.10 measures "previously" from the assignment's text, which stands in M's
+// declaration, wherever M's instance is written. With the instance above the
+// declaration and the outer w between the two, w is declared above M's text,
+// so M's assignment writes the outer net and M's net for it refers outward.
+// The names visible to M were taken where the instance stood, above w, so w
+// was not among them and M took the net as its own.
+TEST(NestedModuleElaboration,
+     OuterNetDeclaredBetweenAnInstanceAboveAndTheNestedDeclarationIsOuter) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module top;\n"
+      "  M m();\n"
+      "  wire w;\n"
+      "  module M;\n"
+      "    assign w = 1'b1;\n"
+      "  endmodule\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* w = NestedModuleNet(design, "w");
+  ASSERT_NE(w, nullptr);
+  EXPECT_TRUE(w->refers_outward);
+}
+
+// The same instance above its declaration with the outer w declared below
+// the declaration: w is declared after M's assignment at every point, so M's
+// net is its own, as it is when the instance is written below.
+TEST(NestedModuleElaboration,
+     InstanceAboveTheNestedDeclarationOwnsANetDeclaredBelowTheDeclaration) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module top;\n"
+      "  M m();\n"
+      "  module M;\n"
+      "    assign w = 1'b1;\n"
+      "  endmodule\n"
+      "  wire w;\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* w = NestedModuleNet(design, "w");
+  ASSERT_NE(w, nullptr);
+  EXPECT_FALSE(w->refers_outward);
+}
+
 // The net named `name` among the nets of the nested module two levels down:
 // the first child of the top module's first child, or null.
 const RtlirNet* DoublyNestedModuleNet(const RtlirDesign* design,

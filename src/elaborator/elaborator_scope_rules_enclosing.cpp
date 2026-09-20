@@ -66,15 +66,55 @@ bool Elaborator::IsNameInEnclosingScope(std::string_view name) const {
 // the one handed on, whether the instance is written below the declaration or
 // implied at the end of the items by InstantiateImplicitNestedModules. An
 // instance written above its declaration is reached before any snapshot is
-// taken, and the names declared so far stand in for it.
+// taken; the names declared so far stand in for it, joined with the names the
+// text declares above the declaration, which RecordNestedDeclNamesAbove read
+// before any item was elaborated: `M m(); wire w; module M; assign w = 1'b1;
+// endmodule` has w declared previously to M's assignment, though not to the
+// instance, so M's assignment drives the outer w.
 void ElaboratorData::BeginNestedDeclScope(
     const ModuleDecl* nested,
     std::unordered_set<std::string_view> at_instance) {
   auto at_decl = nested_decl_scope_names_.find(nested);
-  pending_enclosing_scope_ = at_decl != nested_decl_scope_names_.end()
-                                 ? at_decl->second
-                                 : std::move(at_instance);
+  if (at_decl != nested_decl_scope_names_.end()) {
+    pending_enclosing_scope_ = at_decl->second;
+    has_pending_enclosing_scope_ = true;
+    return;
+  }
+  auto above = nested_decl_names_above_.find(nested);
+  if (above != nested_decl_names_above_.end()) {
+    at_instance.insert(above->second.begin(), above->second.end());
+  }
+  pending_enclosing_scope_ = std::move(at_instance);
   has_pending_enclosing_scope_ = true;
+}
+
+// The names `item` declares as the text alone shows them: the declared name
+// of a net, variable, parameter, typedef, class, subroutine, let, property,
+// sequence, covergroup, clocking block or nettype, the label of a generate
+// block or an assertion, an instance's name and a gate instance's name. An
+// enumeration's named constants declared inline are not read here.
+static void AddItemDeclaredNames(const ModuleItem* item,
+                                 std::unordered_set<std::string_view>& names) {
+  if (!item->name.empty()) names.insert(item->name);
+  if (!item->inst_name.empty()) names.insert(item->inst_name);
+  if (!item->gate_inst_name.empty()) names.insert(item->gate_inst_name);
+}
+
+// §6.10 counts a name as declared previously by the text above the nested
+// declaration, and an instance written above that declaration is elaborated
+// before the item loop reaches it, so the names the items above each nested
+// declaration declare are read from the text first, for BeginNestedDeclScope
+// to join with the names declared so far at such an instance.
+void ElaboratorData::RecordNestedDeclNamesAbove(
+    const std::vector<ModuleItem*>& items) {
+  std::unordered_set<std::string_view> above;
+  for (const auto* item : items) {
+    if (item->kind == ModuleItemKind::kNestedModuleDecl &&
+        item->nested_module_decl != nullptr) {
+      nested_decl_names_above_[item->nested_module_decl] = above;
+    }
+    AddItemDeclaredNames(item, above);
+  }
 }
 
 std::unordered_set<std::string_view> Elaborator::CaptureCurrentScopeNames()

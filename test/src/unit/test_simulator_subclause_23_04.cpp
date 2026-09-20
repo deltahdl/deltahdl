@@ -321,6 +321,35 @@ TEST(NestedModuleSimulation,
   EXPECT_EQ(r->value.words[0].bval & 1u, 1u);
 }
 
+// §6.10 measures "previously" from the assignment's text, which stands in M's
+// declaration, wherever M's instance is written. With `M m()` above the
+// declaration and the outer w between the two, w is declared above M's text,
+// so M's assignment drives the outer w in place: r reads 1 and no net is made
+// under m. The names visible to M were taken where the instance stood, above
+// w, so M drove an implicit w of its own, "m.w" held 1 and r read z.
+TEST(NestedModuleSimulation,
+     InstanceAboveTheNestedDeclarationDrivesAnOuterNetDeclaredBetweenThem) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  M m();\n"
+      "  wire w;\n"
+      "  logic r;\n"
+      "  initial #1 r = w;\n"
+      "  module M;\n"
+      "    assign w = 1'b1;\n"
+      "  endmodule\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+
+  EXPECT_EQ(f.ctx.FindVariable("m.w"), nullptr);
+  auto* r = f.ctx.FindVariable("r");
+  ASSERT_NE(r, nullptr);
+  EXPECT_EQ(r->value.ToUint64(), 1u);
+}
+
 // §23.4 applied twice: B is declared and instantiated in A, which is declared
 // and instantiated in top, so top's name space is visible in B through A's,
 // and a v top declares above A is driven in place by B's assignment. r reads
