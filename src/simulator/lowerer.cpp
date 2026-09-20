@@ -870,6 +870,7 @@ void Lowerer::Lower(const RtlirDesign* design) {
   // reach a value no variable holds.
   RegisterDesignTypeLayouts(design, ctx_, arena_);
   InitPackageDataVariables(design, ctx_, arena_);
+  RegisterPackageEnumConstants(design, ctx_, arena_);
 
   // §16.5.1 reads a concurrent assertion's variables as of the Preponed region
   // of the time slot the clock tick falls in. No event reaches a Preponed

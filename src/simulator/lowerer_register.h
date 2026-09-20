@@ -81,6 +81,11 @@ void RegisterDesignScopeDpiImports(const RtlirDesign* design, SimContext& ctx);
 // call through the package scope resolution operator resolves by.
 void RegisterPackageScopedSubroutines(const RtlirDesign* design,
                                       SimContext& ctx, Arena& arena);
+// §6.19 with §26.3: each package's enumeration constants under their
+// "pk.name" keys, the keys a read through the package scope resolution
+// operator resolves by, each at the value its declaration folds to.
+void RegisterPackageEnumConstants(const RtlirDesign* design, SimContext& ctx,
+                                  Arena& arena);
 // §6.18 with §8.25.1: each typedef name whose chain ends in a class, bound
 // to that class after every class of the design is lowered.
 void RegisterClassTypeAliases(const RtlirDesign* design, SimContext& ctx);

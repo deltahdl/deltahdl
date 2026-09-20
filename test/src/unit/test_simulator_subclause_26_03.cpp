@@ -652,4 +652,27 @@ TEST(PackageScopeReferenceSim, PackageFunctionDefaultReadsThePackageScope) {
             30u * 10u + 1u);
 }
 
+// §6.19 makes an enumeration's members constants of the scope the enumeration
+// is written in and §26.3 references a package's declaration through the
+// package scope resolution operator (printed pages 119 and 808 of ~/LRM.pdf),
+// so `pk::HIGH` is the package's constant from a module that imports nothing,
+// as `pk::P` is its parameter. A package's parameters had storage under their
+// scoped key and its enumeration constants none, so the read answered 0. HIGH
+// is 3 and B follows A, which §6.20.1 lets name the package's parameter, at
+// BASE + 2: 3 * 100 + 7. A constant folded without the package's parameters
+// would read 301, and one with no storage 0.
+TEST(PackageScopeReferenceSim, PackageEnumConstantReadThroughItsScope) {
+  EXPECT_EQ(RunAndGet("package pk;\n"
+                      "  parameter int BASE = 5;\n"
+                      "  typedef enum {LOW, MED = 2, HIGH} sev_t;\n"
+                      "  typedef enum {A = BASE + 1, B} step_t;\n"
+                      "endpackage\n"
+                      "module t;\n"
+                      "  int out;\n"
+                      "  initial out = pk::HIGH * 100 + pk::B;\n"
+                      "endmodule\n",
+                      "out"),
+            307u);
+}
+
 }  // namespace
