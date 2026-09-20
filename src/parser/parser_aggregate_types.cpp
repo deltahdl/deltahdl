@@ -19,7 +19,11 @@ namespace delta {
 namespace {
 
 // §7.2.1: a struct/union member declarator inherits the shared member type's
-// kind, sign, packed dimensions, and type name. Pure field copy.
+// kind, sign, packed dimensions, type name and, for a name written behind a
+// package or class qualifier (§26.3, §8.23), the qualifier, `q` of `q::pair_t
+// Add`; dropping the qualifier left the member to be looked up by the bare
+// name, which a wildcard import might make stand for another declaration.
+// Pure field copy.
 void ApplyMemberType(StructMember& member, const DataType& member_type) {
   member.type_kind = member_type.kind;
   member.is_signed = member_type.is_signed;
@@ -27,6 +31,7 @@ void ApplyMemberType(StructMember& member, const DataType& member_type) {
   member.packed_dim_right = member_type.packed_dim_right;
   member.extra_packed_dims = member_type.extra_packed_dims;
   member.type_name = member_type.type_name;
+  member.scope_name = member_type.scope_name;
 }
 
 // §7.2: a struct or union keyword introduces an aggregate member type.
@@ -174,18 +179,24 @@ DataType Parser::ParseStructOrUnionBody(TokenKind kw) {
 }
 
 // Parse the data_type that prefixes a struct/union member declaration,
-// including any nested struct/union/enum with its packed dimensions.
+// including any nested struct/union/enum with its packed dimensions. A.2.2.1
+// lets the type be a type_identifier behind a package_scope or a class_scope,
+// `q::pair_t Add` (§26.3, §8.23), which ParseDeclaredDataType reads past
+// known_types_, where a package name never stands; ParseDataType left `q` to
+// be read as the member's name and the `::` after it as a missing semicolon.
 DataType Parser::ParseStructMemberType() {
   DataType member_type;
   if (IsStructOrUnionKw(CurrentToken().kind)) {
     member_type = ParseStructOrUnionType();
     ParsePackedDims(member_type);
-  } else if (Check(TokenKind::kKwEnum)) {
+    return member_type;
+  }
+  if (Check(TokenKind::kKwEnum)) {
     member_type = ParseEnumType();
     ParsePackedDims(member_type);
-  } else {
-    member_type = ParseDataType();
+    return member_type;
   }
+  member_type = ParseDeclaredDataType();
   return member_type;
 }
 

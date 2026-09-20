@@ -836,4 +836,53 @@ TEST(PackageScopeReferenceSim,
             34u);
 }
 
+// §26.3 (printed page 808) names a package's declaration through the package
+// scope resolution operator, and §26.2 (printed 808) has p's items see what p
+// declares or imports and nothing of the compilation unit's, so with no import
+// in p the member `q::pair_t Add` of f's formal resolves through q's qualifier
+// alone. The parser read `q` as a member name and stopped at the `::`, and
+// had it got further the member kept `pair_t` alone, a name p's table never
+// held, so Add was sized as a scalar and `p::f(tagged Add '{3, 4})` had no
+// members to place 3 and 4 in for `a.Add.a * 10 + a.Add.b`, 34.
+TEST(PackageScopeReferenceSim,
+     PackageFunctionInlineUnionFormalResolvesAnotherPackagesQualifiedMember) {
+  EXPECT_EQ(RunAndGet("package q;\n"
+                      "  typedef struct { int a, b; } pair_t;\n"
+                      "endpackage\n"
+                      "package p;\n"
+                      "  function int f(union tagged { void None; q::pair_t "
+                      "Add; } a);\n"
+                      "    return a.Add.a * 10 + a.Add.b;\n"
+                      "  endfunction\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  int y;\n"
+                      "  initial y = p::f(tagged Add '{3, 4});\n"
+                      "endmodule\n",
+                      "y"),
+            34u);
+}
+
+// The same qualified member on a module variable's inline union: §26.3's
+// `q::pair_t` names q's structure from a module that imports nothing, and
+// §7.2.1 (printed 147) lays the union's Add member out by that structure, so
+// a tagged assignment of `'{3, 4}` places 3 in a and 4 in b for `v.Add.a *
+// 10 + v.Add.b` to read 34.
+TEST(PackageScopeReferenceSim,
+     ModuleVariableInlineUnionResolvesAPackageQualifiedMember) {
+  EXPECT_EQ(RunAndGet("package q;\n"
+                      "  typedef struct { int a, b; } pair_t;\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  union tagged { void None; q::pair_t Add; } v;\n"
+                      "  int y;\n"
+                      "  initial begin\n"
+                      "    v = tagged Add '{3, 4};\n"
+                      "    y = v.Add.a * 10 + v.Add.b;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            34u);
+}
+
 }  // namespace

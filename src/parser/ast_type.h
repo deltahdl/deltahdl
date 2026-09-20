@@ -73,6 +73,10 @@ struct StructMember {
   std::vector<std::pair<Expr*, Expr*>> extra_packed_dims;
   std::string_view name;
   std::string_view type_name;
+  // §26.3 / §8.23: the package or class a named member type was written
+  // behind, `q` of `q::pair_t Add`, so the type is looked up in that scope's
+  // declarations and never by its bare name. Empty for an unqualified name.
+  std::string_view scope_name;
   Expr* init_expr = nullptr;
   std::vector<Expr*> unpacked_dims;
   std::vector<Attribute> attrs;

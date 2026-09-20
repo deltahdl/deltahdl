@@ -1,3 +1,4 @@
+#include <string_view>
 #include <vector>
 
 #include "common/arena.h"
@@ -68,6 +69,29 @@ void ResolveScopeSubroutineFormalTypes(const std::vector<ModuleItem*>& items,
   }
 }
 
+// §26.3 (printed page 808) lets a package's items name another package's
+// declaration through its qualifier, `q::pair_t Add` in p's function, while
+// §26.2 (printed 808) keeps the compilation-unit scope's own declarations out
+// of a package's reach. The unit's table holds a package typedef under the
+// "q::pair_t" key RegisterPackageTypedefs records and the unit's own under
+// bare names, so the table a package resolves by starts from the keys whose
+// prefix names a package of `unit` and nothing else; a package's table began
+// from nothing and left `q::pair_t` a name it could not answer.
+TypedefMap PackageQualifiedTypedefs(const CompilationUnit* unit,
+                                    const TypedefMap& typedefs) {
+  TypedefMap qualified;
+  for (const auto& [key, type] : typedefs) {
+    auto sep = key.find("::");
+    if (sep == std::string_view::npos) continue;
+    for (const auto* pkg : unit->packages) {
+      if (pkg->name != key.substr(0, sep)) continue;
+      qualified.emplace(key, type);
+      break;
+    }
+  }
+  return qualified;
+}
+
 }  // namespace
 
 // §8.6 (printed page 183) has an object's method called as its properties are
@@ -118,7 +142,8 @@ void ResolveModuleClassFormalTypes(const std::vector<ClassDecl*>& classes,
 // against the package's own typedefs and its imports' alone; §3.12.1 gives a
 // compilation-unit subroutine or class the unit's typedefs and imports, and
 // `typedefs` is the unit's table as Elaborator::RegisterCuScopeItems has
-// filled it, the packages' and the classes' qualified names included.
+// filled it, the packages' and the classes' qualified names included, of
+// which a package sees the packages' (§26.3, PackageQualifiedTypedefs).
 // DpiScopeTypedefs adds a scope's own typedefs and its imports' to a table
 // for §35.5.6's check, which is the table a formal of the scope resolves by
 // too. A package function's `pair_t Add` in `function int f(union tagged {
@@ -130,10 +155,10 @@ void ResolveModuleClassFormalTypes(const std::vector<ClassDecl*>& classes,
 // unit->classes, apart from cu_items (§3.12.1), so both lists are walked.
 void ResolveUnitScopeFormalTypes(CompilationUnit* unit,
                                  const TypedefMap& typedefs, Arena& arena) {
-  const TypedefMap kNone;
+  const TypedefMap kQualified = PackageQualifiedTypedefs(unit, typedefs);
   for (auto* pkg : unit->packages) {
     ResolveScopeSubroutineFormalTypes(
-        pkg->items, DpiScopeTypedefs(pkg->items, unit, kNone), arena);
+        pkg->items, DpiScopeTypedefs(pkg->items, unit, kQualified), arena);
   }
   TypedefMap unit_typedefs = DpiScopeTypedefs(unit->cu_items, unit, typedefs);
   ResolveScopeSubroutineFormalTypes(unit->cu_items, unit_typedefs, arena);

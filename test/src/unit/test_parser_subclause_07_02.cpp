@@ -275,4 +275,27 @@ TEST(StructDeclarationParsing, UnionSoftAloneOk) {
   EXPECT_FALSE(item->data_type.is_tagged);
 }
 
+// §26.3 (printed page 808) references a package's declaration through the
+// package scope resolution operator, and A.2.2.1 lets a member's data_type be
+// a type_identifier behind a package_scope. A package name is never one the
+// parser knows as a type, so `q::pair_t p` was read as a member named `q`
+// with `::` where its semicolon should stand; read as a data_type, the
+// member keeps the qualifier beside the name so the elaborator can look the
+// type up in q and not by the bare name.
+TEST(StructDeclarationParsing, MemberTypeBehindAPackageQualifierKeepsIt) {
+  auto r = Parse(
+      "module m;\n"
+      "  struct { q::pair_t p; int c; } s;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& members = r.cu->modules[0]->items[0]->data_type.struct_members;
+  ASSERT_EQ(members.size(), 2u);
+  EXPECT_EQ(members[0].type_kind, DataTypeKind::kNamed);
+  EXPECT_EQ(members[0].scope_name, "q");
+  EXPECT_EQ(members[0].type_name, "pair_t");
+  EXPECT_EQ(members[0].name, "p");
+  EXPECT_TRUE(members[1].scope_name.empty());
+}
+
 }  // namespace
