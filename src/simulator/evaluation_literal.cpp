@@ -324,18 +324,27 @@ uint32_t LiteralWidth(std::string_view text, uint64_t val) {
   if (IsSignedLiteral(text) && val > uint64_t{0x7FFFFFFF}) return 33;
   return 32;
 }
+
+// §5.7.1 (printed page 78): an unbased unsized literal is one bit wide where
+// it is self-determined -- `$bits('1)` is 1, `'1` prints 1 and `'1 == 1'b1`
+// holds -- and sets every bit of the context it stands in: EvalExpr fills it
+// to the width a context hands down, and Logic4Vec::fills_width has a later
+// resize replicate the bit where the width is settled only by the
+// assignment, the formal or the operand the value reaches. Carried at 64
+// bits, the literal answered 64 to $bits and 18446744073709551615 to %0d.
 Logic4Vec EvalUnbasedUnsized(const Expr* expr, Arena& arena) {
   auto text = expr->text;
+  auto vec = MakeLogic4Vec(arena, 1);
+  vec.fills_width = true;
   if (text.size() >= 2 && text[0] == '\'') {
     char c = text[1];
-    if (c == '1') return MakeLogic4VecVal(arena, 64, ~uint64_t{0});
-    if (c == '0') return MakeLogic4VecVal(arena, 64, 0);
-    auto vec = MakeLogic4Vec(arena, 64);
-    if (c == 'x' || c == 'X') vec.words[0] = {~uint64_t{0}, ~uint64_t{0}};
-    if (c == 'z' || c == 'Z' || c == '?') vec.words[0] = {0, ~uint64_t{0}};
+    if (c == '1') vec.words[0] = {1, 0};
+    if (c == 'x' || c == 'X') vec.words[0] = {1, 1};
+    if (c == 'z' || c == 'Z' || c == '?') vec.words[0] = {0, 1};
     return vec;
   }
-  return MakeLogic4VecVal(arena, 64, expr->int_val);
+  vec.words[0] = {expr->int_val & 1, 0};
+  return vec;
 }
 static bool TextHasXZ(std::string_view text) {
   auto tick = text.find('\'');

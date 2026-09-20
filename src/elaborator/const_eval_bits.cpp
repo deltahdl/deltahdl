@@ -333,14 +333,17 @@ static std::optional<int64_t> TernaryBits(const Expr* a,
 // §20.6.2 with §11.6.1: the number of bits the self-determined expression `a`
 // holds, which is what $bits answers and what its result is valid at
 // elaboration for. An integer literal is as wide as its size constant
-// (§5.7.1), an identifier as its declaration, and an operator expression as
-// Table 11-21 sizes it from its operands. A concatenation, a replication, a
-// select, a call and a cast are not sized here.
+// (§5.7.1), an unbased unsized literal one bit (§5.7.1, printed page 78), an
+// identifier as its declaration, and an operator expression as Table 11-21
+// sizes it from its operands. A concatenation, a replication, a select, a
+// call and a cast are not sized here.
 static std::optional<int64_t> SelfDeterminedBits(const Expr* a,
                                                  const ScopeMap& scope) {
   switch (a->kind) {
     case ExprKind::kIntegerLiteral:
       return static_cast<int64_t>(ConstLiteralWidth(a));
+    case ExprKind::kUnbasedUnsizedLiteral:
+      return 1;
     case ExprKind::kIdentifier:
       return IdentifierBits(a, scope);
     case ExprKind::kBinary:

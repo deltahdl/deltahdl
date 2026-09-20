@@ -210,6 +210,10 @@ static Logic4Vec EvalIdentifier(const Expr* expr, SimContext& ctx,
   // module port). Derive the read value's signedness from the declaration
   // so a signed value stored into an unsigned object reads back unsigned.
   val.is_signed = var->is_signed;
+  // §5.7.1: what is read is the variable's value and no literal, so a 1-bit
+  // variable set from `'1` reads as a 1-bit 1 that zero-extends, whatever
+  // the value it was set from would have filled.
+  val.fills_width = false;
   return val;
 }
 bool HasUnknownBits(const Logic4Vec& v) {
@@ -281,30 +285,14 @@ Logic4Vec AssembleConcatParts(const std::vector<Logic4Vec>& parts,
   return result;
 }
 
-static Logic4Vec SelfDeterminedOperand(const Expr* elem, Logic4Vec vec,
-                                       Arena& arena) {
-  // Concatenation operands are self-determined; an unbased unsized
-  // literal contributes one bit (per §5.7.1) rather than its default
-  // wide carrier.
-  if (elem && elem->kind == ExprKind::kUnbasedUnsizedLiteral && vec.width > 1) {
-    auto bit = MakeLogic4Vec(arena, 1);
-    if (vec.nwords > 0) {
-      bit.words[0].aval = vec.words[0].aval & 1;
-      bit.words[0].bval = vec.words[0].bval & 1;
-    }
-    return bit;
-  }
-  return vec;
-}
-
 static Logic4Vec EvalConcat(const Expr* expr, SimContext& ctx, Arena& arena) {
   uint32_t total_width = 0;
   bool any_string = false;
   std::vector<Logic4Vec> parts;
+  // §11.4.12: every operand of a concatenation is self-determined, an
+  // unbased unsized literal among them one bit wide (§5.7.1).
   for (auto* elem : expr->elements) {
-    auto vec = EvalExpr(elem, ctx, arena);
-    vec = SelfDeterminedOperand(elem, vec, arena);
-    parts.push_back(vec);
+    parts.push_back(EvalExpr(elem, ctx, arena));
     if (parts.back().is_string) any_string = true;
     total_width += parts.back().width;
   }
@@ -586,6 +574,8 @@ static uint32_t SimSelfWidth(const Expr* expr, SimContext& ctx) {
   switch (expr->kind) {
     case ExprKind::kIntegerLiteral:
       return LiteralWidth(expr->text, expr->int_val);
+    case ExprKind::kUnbasedUnsizedLiteral:
+      return 1;  // §5.7.1: one bit where self-determined
     case ExprKind::kIdentifier: {
       auto* var = ctx.FindVariable(expr->text);
       return var ? var->value.width : 0;
@@ -800,10 +790,7 @@ static Logic4Vec EvalMinTypMax(const Expr* expr, SimContext& ctx, Arena& arena,
   return result;
 }
 
-// §5.7.1: widen an unbased unsized literal to `width`, replicating its single
-// bit (0/1/x/z) across every bit of the context-sized result.
-static Logic4Vec FillUnbasedUnsized(const Logic4Vec& v, uint32_t width,
-                                    Arena& arena) {
+Logic4Vec FillUnbasedUnsized(const Logic4Vec& v, uint32_t width, Arena& arena) {
   uint64_t af = (v.nwords > 0 && (v.words[0].aval & 1)) ? ~uint64_t{0} : 0;
   uint64_t bf = (v.nwords > 0 && (v.words[0].bval & 1)) ? ~uint64_t{0} : 0;
   auto out = MakeLogic4Vec(arena, width);
@@ -833,8 +820,9 @@ Logic4Vec EvalExpr(const Expr* expr, SimContext& ctx, Arena& arena,
     case ExprKind::kUnbasedUnsizedLiteral: {
       auto v = EvalUnbasedUnsized(expr, arena);
       // §5.7.1: an unbased unsized literal takes the size of the context it
-      // appears in, filling every bit with its single-bit value. Context-free
-      // calls (context_width == 0) keep the self-determined carrier.
+      // appears in, filling every bit with its single-bit value. Where no
+      // context reaches it (context_width == 0) it is the 1-bit value that
+      // fills whatever width it is later resized to.
       if (context_width == 0 || context_width == v.width) return v;
       return FillUnbasedUnsized(v, context_width, arena);
     }

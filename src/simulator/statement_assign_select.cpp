@@ -401,6 +401,13 @@ static void MaskHighBits(uint32_t target_width, Logic4Vec& result) {
 }
 
 Logic4Vec ResizeToWidth(Logic4Vec val, uint32_t target_width, Arena& arena) {
+  // §5.7.1: an unbased unsized literal sets every bit of the width it is
+  // resized to, and the value resized to it stands for the literal no more
+  // -- a 1-bit variable set from `'1` holds a 1-bit 1 -- so the flag stops
+  // here whether or not the width changes.
+  if (val.fills_width && target_width > val.width)
+    return FillUnbasedUnsized(val, target_width, arena);
+  val.fills_width = false;
   if (val.width == target_width || target_width == 0) return val;
 
   bool has_xz = false;

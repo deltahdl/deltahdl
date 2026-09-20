@@ -451,6 +451,12 @@ std::string FormatValueAsString(const Logic4Vec& val);
 std::string ExtractFormatString(const Expr* first_arg);
 
 Logic4Vec EvalUnbasedUnsized(const Expr* expr, Arena& arena);
+
+// §5.7.1: the unbased unsized literal's value `v` at `width` bits, its one
+// bit (0, 1, x or z) replicated across every bit, as the literal fills the
+// context it stands in. The result stands for no literal any more: its
+// fills_width is clear. Defined in evaluation.cpp.
+Logic4Vec FillUnbasedUnsized(const Logic4Vec& v, uint32_t width, Arena& arena);
 Logic4Vec EvalIntLiteral(const Expr* expr, Arena& arena);
 Logic4Vec EvalStringLiteral(const Expr* expr, Arena& arena);
 

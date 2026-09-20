@@ -47,6 +47,16 @@ TEST(ConstEval, BitsLiteralIsResolvedWithoutEvaluatingValue) {
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("$bits(12'bxxxxxxxxxxxx)", f)), 12);
 }
 
+// §5.7.1 (printed page 78) with §20.6.2: an unbased unsized literal is one
+// bit wide in a self-determined context, and $bits's argument is one, so
+// `$bits('1)` and `$bits('x)` fold to 1. The fold had no width for the
+// literal and declined.
+TEST(ConstEval, BitsOfUnbasedUnsizedLiteralIsOne) {
+  EvalFixture f;
+  EXPECT_EQ(ConstEvalInt(ParseExprFrom("$bits('1)", f)), 1);
+  EXPECT_EQ(ConstEvalInt(ParseExprFrom("$bits('x)", f)), 1);
+}
+
 // §20.6.2: applying $bits directly to a dynamically sized type identifier
 // (queue typedef here) has no defined extent and shall be an error.
 TEST(BitsCallRestrictions, BitsOnQueueTypedefIsError) {

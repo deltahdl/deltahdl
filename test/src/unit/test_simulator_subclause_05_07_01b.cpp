@@ -561,4 +561,171 @@ TEST(IntegerLiteralSim, UnbasedUnsizedOneFillsAParameterPastSixtyFourBits) {
   EXPECT_EQ(RunAndGet(kSrc, "lo"), ~uint64_t{0});
 }
 
+// §5.7.1 (printed page 78): in a self-determined context an unbased unsized
+// literal has a width of 1 bit, and §20.6.2 has $bits answer the width of its
+// expression, so $bits('1) is 1. The literal was carried as a 64-bit value
+// wherever nothing supplied a width, and $bits read the carrier's 64.
+TEST(IntegerLiteralSim, UnbasedUnsizedOneIsOneBitUnderBits) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  int b;\n"
+      "  initial b = $bits('1);\n"
+      "endmodule\n",
+      "b");
+  EXPECT_EQ(result, 1u);
+}
+
+// The same for 'x, whose carrier was 64 bits of x.
+TEST(IntegerLiteralSim, UnbasedUnsizedXIsOneBitUnderBits) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  int b;\n"
+      "  initial b = $bits('x);\n"
+      "endmodule\n",
+      "b");
+  EXPECT_EQ(result, 1u);
+}
+
+// §11.4.5 with §11.6.1: the operands of == are sized to the wider of the two,
+// so `'1 == 1'b1` compares a 1-bit 1 with a 1-bit 1 and is true. The 64-bit
+// carrier against the zero-extended 1'b1 was false.
+TEST(IntegerLiteralSim, UnbasedUnsizedOneEqualsAOneBitOne) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic c;\n"
+      "  initial c = ('1 == 1'b1);\n"
+      "endmodule\n",
+      "c");
+  EXPECT_EQ(result, 1u);
+}
+
+// §21.2.1.2 formats the argument's value at its own width, so `%0d` of the
+// 1-bit literal prints 1; the carrier printed 18446744073709551615.
+TEST(IntegerLiteralSim, UnbasedUnsizedOneFormatsAsOne) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic c;\n"
+      "  initial c = ($sformatf(\"%0d\", '1) == \"1\");\n"
+      "endmodule\n",
+      "c");
+  EXPECT_EQ(result, 1u);
+}
+
+// §5.7.1 with §11.6.1: sized to the 8-bit operand beside it, the literal sets
+// all eight bits, so `x == '1` over ff is true. The 64-bit carrier against x
+// zero-extended to 64 was false, as a 1-bit literal zero-extended to 8 would
+// be: the extension has to replicate the literal's bit.
+TEST(IntegerLiteralSim, UnbasedUnsizedOneFillsTheOperandItIsComparedWith) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] x = 8'hff;\n"
+      "  logic c;\n"
+      "  initial c = (x == '1);\n"
+      "endmodule\n",
+      "c");
+  EXPECT_EQ(result, 1u);
+}
+
+// §12.5: a case item is sized to the longest of the case expression and the
+// items, so `'1` matches an 8-bit selector of ff.
+TEST(IntegerLiteralSim, UnbasedUnsizedOneCaseItemFillsTheSelectorWidth) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] x = 8'hff;\n"
+      "  logic [7:0] y;\n"
+      "  initial case (x)\n"
+      "    '1: y = 8'd1;\n"
+      "    default: y = 8'd0;\n"
+      "  endcase\n"
+      "endmodule\n",
+      "y");
+  EXPECT_EQ(result & 0xFFu, 1u);
+}
+
+// §13.5.1 with §6.20.2: a by-value actual is assigned to the formal, so `'1`
+// handed to an 8-bit formal fills it and the function returns ff.
+TEST(IntegerLiteralSim, UnbasedUnsizedOneFillsAFormalArgument) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  function logic [7:0] f(input logic [7:0] a);\n"
+      "    return a;\n"
+      "  endfunction\n"
+      "  logic [7:0] y;\n"
+      "  initial y = f('1);\n"
+      "endmodule\n",
+      "y");
+  EXPECT_EQ(result & 0xFFu, 0xFFu);
+}
+
+// §10.4.2: a nonblocking assignment's right-hand side is sized by the
+// variable it updates, so `w <= '1` on a 128-bit variable sets the top word
+// as well as the low one.
+TEST(IntegerLiteralSim, UnbasedUnsizedOneNonblockingFillsPastSixtyFourBits) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [127:0] w;\n"
+      "  logic [63:0] hi;\n"
+      "  initial begin\n"
+      "    w <= '1;\n"
+      "    #1 hi = w[127:64];\n"
+      "  end\n"
+      "endmodule\n",
+      "hi");
+  EXPECT_EQ(result, ~uint64_t{0});
+}
+
+// A 1-bit variable initialized from `'1` holds a 1-bit 1 and nothing more:
+// read into an 8-bit variable it zero-extends to 01 (§11.8.2, unsigned), the
+// fill being the literal's and not the stored value's.
+TEST(IntegerLiteralSim, OneBitVariableSetFromUnbasedUnsizedOneReadsAsOne) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic a = '1;\n"
+      "  logic [7:0] b;\n"
+      "  initial b = a;\n"
+      "endmodule\n",
+      "b");
+  EXPECT_EQ(result & 0xFFu, 1u);
+}
+
+// The same through a class property assigned `'1` after construction and
+// read back: the property is 1 bit, so the read is 01.
+TEST(IntegerLiteralSim, OneBitPropertySetFromUnbasedUnsizedOneReadsAsOne) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  class C;\n"
+      "    logic en;\n"
+      "  endclass\n"
+      "  logic [7:0] b;\n"
+      "  initial begin\n"
+      "    C c;\n"
+      "    c = new;\n"
+      "    c.en = '1;\n"
+      "    b = c.en;\n"
+      "  end\n"
+      "endmodule\n",
+      "b");
+  EXPECT_EQ(result & 0xFFu, 1u);
+}
+
+// An 8-bit property assigned `'1` after construction takes all eight bits
+// (§8.7 with §6.20.2's assignment context).
+TEST(IntegerLiteralSim, UnbasedUnsizedOneFillsAPropertyAssignedThroughAHandle) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  class C;\n"
+      "    logic [7:0] v;\n"
+      "  endclass\n"
+      "  logic [7:0] b;\n"
+      "  initial begin\n"
+      "    C c;\n"
+      "    c = new;\n"
+      "    c.v = '1;\n"
+      "    b = c.v;\n"
+      "  end\n"
+      "endmodule\n",
+      "b");
+  EXPECT_EQ(result & 0xFFu, 0xFFu);
+}
+
 }  // namespace

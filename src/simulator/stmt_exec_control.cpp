@@ -303,17 +303,30 @@ static bool CaseMatchesMatch(const Logic4Vec& sel, const Logic4Vec& pat,
   return CaseInsideValueMatch(sel, pat);
 }
 
+// §12.5 (printed page 321): the case expression and every case item are
+// sized to the longest of them, so an item that is an unbased unsized literal
+// (§5.7.1) sets every bit of the selector's width -- `'1` against an 8-bit
+// selector is ff -- where the bitwise extension below would zero-fill its one
+// bit. The item's own width stands where it is not the literal's.
+static Logic4Vec CaseItemValue(const Expr* pat, const Logic4Vec& sel,
+                               SimContext& ctx, Arena& arena) {
+  Logic4Vec pv = EvalExpr(pat, ctx, arena);
+  if (pv.fills_width && pv.width < sel.width)
+    return FillUnbasedUnsized(pv, sel.width, arena);
+  return pv;
+}
+
 static bool CaseMatchesPatternMatch(const Logic4Vec& sel, const Expr* pat_expr,
                                     SimContext& ctx, Arena& arena,
                                     TokenKind case_kind) {
   if (pat_expr->kind == ExprKind::kBinary &&
       pat_expr->op == TokenKind::kAmpAmpAmp) {
-    auto pat_val = EvalExpr(pat_expr->lhs, ctx, arena);
+    auto pat_val = CaseItemValue(pat_expr->lhs, sel, ctx, arena);
     if (!CaseMatchesMatch(sel, pat_val, case_kind)) return false;
     auto guard = EvalExpr(pat_expr->rhs, ctx, arena);
     return guard.IsTruthy();
   }
-  auto pv = EvalExpr(pat_expr, ctx, arena);
+  auto pv = CaseItemValue(pat_expr, sel, ctx, arena);
   return CaseMatchesMatch(sel, pv, case_kind);
 }
 
@@ -329,7 +342,8 @@ static bool CasePatternMatch(const Logic4Vec& sel, const Expr* pat,
   if (stmt->case_inside) return CaseInsidePatternMatch(sel, pat, ctx, arena);
   if (stmt->case_matches)
     return CaseMatchesPatternMatch(sel, pat, ctx, arena, stmt->case_kind);
-  return CaseItemMatches(sel, EvalExpr(pat, ctx, arena), stmt->case_kind);
+  return CaseItemMatches(sel, CaseItemValue(pat, sel, ctx, arena),
+                         stmt->case_kind);
 }
 
 static bool CaseItemHasMatch(const Logic4Vec& sel, const CaseItem& item,

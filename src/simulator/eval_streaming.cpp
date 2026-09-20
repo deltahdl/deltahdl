@@ -502,9 +502,20 @@ Logic4Vec EvalAssignmentPattern(const Expr* expr, SimContext& ctx,
 // across placements: §10.9.2's "Every member shall be covered by one of these
 // rules" is exactly what PatternState::assigned enforces, so no two of the
 // three rules write one member's bits.
+// §10.9.2 (printed page 263) with §5.7.1 (printed 78): a member's value is
+// the expression assigned to the member, so an unbased unsized literal,
+// `'{default: '1}` or a positional `'1`, sets every bit of the member; any
+// other value is the member's width of its low bits, as before.
+static Logic4Vec MemberBits(const Logic4Vec& val, uint32_t width,
+                            Arena& arena) {
+  if (val.fills_width && width > val.width)
+    return FillUnbasedUnsized(val, width, arena);
+  return ExtractBitField(arena, val, 0, width);
+}
+
 static void PlaceFieldValue(Logic4Vec& result, const StructFieldInfo& f,
                             const Logic4Vec& val, Arena& arena) {
-  DepositBitField(result, f.bit_offset, ExtractBitField(arena, val, 0, f.width),
+  DepositBitField(result, f.bit_offset, MemberBits(val, f.width, arena),
                   f.width);
 }
 
@@ -521,8 +532,8 @@ static void PlaceDefaultValue(Logic4Vec& result, const StructFieldInfo& f,
       PlaceDefaultValue(result, sub, base + f.bit_offset, val, arena);
     return;
   }
-  DepositBitField(result, base + f.bit_offset,
-                  ExtractBitField(arena, val, 0, f.width), f.width);
+  DepositBitField(result, base + f.bit_offset, MemberBits(val, f.width, arena),
+                  f.width);
 }
 
 static DataTypeKind TypeKeyToKind(std::string_view key) {

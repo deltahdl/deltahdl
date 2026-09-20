@@ -386,6 +386,10 @@ static void ApplySignFill(Logic4Vec& result, const Logic4Vec& v,
 
 Logic4Vec ExtendVec(const Logic4Vec& v, uint32_t target_width, bool sign_ext,
                     Arena& arena) {
+  // §5.7.1: an unbased unsized literal sized to an operand beside it, `x ==
+  // '1`, sets every bit of that width, signed or not.
+  if (v.fills_width && target_width > v.width)
+    return FillUnbasedUnsized(v, target_width, arena);
   auto result = MakeLogic4Vec(arena, target_width);
   for (uint32_t i = 0; i < v.nwords; ++i) {
     result.words[i] = v.words[i];
