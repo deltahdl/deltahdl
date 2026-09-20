@@ -7,7 +7,9 @@
 // elaboration; EvalConstSysCall in const_eval.cpp is what asks. §6.20.2
 // (printed 126-127) gives a parameter named in an expression the width and
 // signedness of its declaration, which ConstEvalIdentifierFull in
-// const_eval_func.cpp asks of RegisteredParamValue.
+// const_eval_func.cpp asks of RegisteredParamValue, and the words above bit
+// 63 of one declared past 64 bits, which RecordResolvedHighWords keeps for a
+// value the fold cannot reach again from where the name is read.
 
 #include <algorithm>
 #include <cstdint>
@@ -15,6 +17,7 @@
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "elaborator/const_eval.h"
@@ -392,6 +395,15 @@ static std::optional<ConstVal> RefoldParamValue(const RtlirParamDecl& pd) {
   return ConstEvalFull(value_expr, RegisteredModuleScope());
 }
 
+// The words above bit 63 a parameter wider than 64 bits reads: the ones the
+// elaborator recorded when it resolved the value, or the refold's, or none.
+static std::vector<uint64_t> HighWordsOfParam(
+    const RtlirParamDecl& pd, const std::optional<ConstVal>& refold) {
+  if (!pd.resolved_high_words.empty()) return pd.resolved_high_words;
+  if (refold) return refold->high_words;
+  return {};
+}
+
 // §6.20.2 (printed pages 126-127): what a name standing for a value parameter
 // of the registered module is worth. A parameter declared with a range or a
 // type has that width and that signedness whatever value it took, so the
@@ -400,10 +412,16 @@ static std::optional<ConstVal> RefoldParamValue(const RtlirParamDecl& pd) {
 // takes the size and signedness of its final value, which is what the fold of
 // the value expression carries, and 32 bits signed where that expression does
 // not fold here. Either way a parameter wider than 64 bits has its words
-// above bit 63 read from that fold, the ScopeMap holding the low 64 alone.
-// `value` is what the ScopeMap holds for the name, and is kept as the low
-// word rather than the refold's, since a ScopeMap built for a generate block
-// or a defparam may hold a value the refold does not see.
+// above bit 63 read from the words the elaborator recorded when it resolved
+// the value (RecordResolvedHighWords) and, where it recorded none, from that
+// fold, the ScopeMap holding the low 64 alone. 64b2dfbe0 read the fold alone,
+// which reaches the declaration's default and a literal override and not an
+// override written as the instantiating module's parameter (§23.10.2) or a
+// value a defparam gave (§23.10.1), so `c #(.P(PP)) u()` read P's words
+// above 64 as 0 in c. `value` is what the ScopeMap holds for the name, and
+// is kept as the low word rather than the refold's, since a ScopeMap built
+// for a generate block or a defparam may hold a value the refold does not
+// see.
 //
 // The declaration is consulted only where it agrees with the ScopeMap on the
 // value, because a constant function's locals (§13.4.3) sit in the same map
@@ -415,15 +433,41 @@ std::optional<ConstVal> RegisteredParamValue(std::string_view name,
   if (pd == nullptr || pd->resolved_value != value) return std::nullopt;
   bool declared = HasDeclaredWidth(*pd);
   uint32_t decl_width = DeclaredParamWidth(*pd);
+  bool recorded = !pd->resolved_high_words.empty();
   std::optional<ConstVal> refold;
-  if (!declared || decl_width > 64) refold = RefoldParamValue(*pd);
+  if (!declared || (decl_width > 64 && !recorded))
+    refold = RefoldParamValue(*pd);
   uint32_t width = declared ? decl_width : refold ? refold->width : 32;
   bool is_signed = declared ? pd->decl_is_signed
                    : refold ? refold->is_signed
                             : true;
   ConstVal v = NormalizeConstVal(value, width, is_signed);
-  if (refold && width > 64) v.high_words = refold->high_words;
+  if (width > 64) v.high_words = HighWordsOfParam(*pd, refold);
   return v;
+}
+
+// §6.20.2 (printed page 126) with §23.10.2 (printed 766) and §23.10.1
+// (printed 764-765): an override value is converted to the type and range of
+// a parameter declared with either, which CastConstVal does to the fold at
+// the declared width -- the words above it cut away, a narrower signed value
+// padded from its sign -- and a parameter declared with neither takes the
+// range of the value itself, whose width the declaration does not carry, so
+// no words are recorded for it and it reads as before. The fold is trusted
+// only where its low word is the value the elaborator resolved, since the
+// scope handed in may hold less than the one that value was folded in.
+void RecordResolvedHighWords(RtlirParamDecl& pd, const Expr* expr,
+                             const ScopeMap& scope) {
+  pd.resolved_high_words.clear();
+  if (expr == nullptr || pd.is_type_param || pd.is_real_value ||
+      pd.is_string_value || !HasDeclaredWidth(pd))
+    return;
+  uint32_t width = DeclaredParamWidth(pd);
+  if (width <= 64) return;
+  auto folded = ConstEvalFull(expr, scope);
+  if (!folded) return;
+  ConstVal v = CastConstVal(*folded, width, pd.decl_is_signed);
+  if (v.value != pd.resolved_value) return;
+  pd.resolved_high_words = std::move(v.high_words);
 }
 
 }  // namespace delta

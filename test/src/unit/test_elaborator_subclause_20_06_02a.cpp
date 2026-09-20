@@ -632,8 +632,9 @@ TEST(BitsOfDeclaration, BitSelectAboveSixtyFourAndBelowZero) {
 // §11.4.8 combines two 96-bit operands bit by bit across all 96, and §11.4.10
 // shifts across them, the arithmetic right shift of a signed operand filling
 // from its sign bit (PS, bit 95 set) and of one whose sign bit is clear (PP)
-// or that is unsigned (P) with zeros. `P + 1` is arithmetic, which the fold
-// still does on the low word, so its result is the low word plus one.
+// or that is unsigned (P) with zeros. `P + 1` is arithmetic, which 994404a79
+// carried across the words too; its low word here is the low word plus one,
+// and test_elaborator_subclause_20_06_02b.cpp reads the carry above it.
 TEST(BitsOfDeclaration, ShiftAndBitwiseOperatorsWorkAcrossTheWideValue) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -701,8 +702,11 @@ TEST(BitsOfDeclaration, ShiftAndBitwiseOperatorsWorkAcrossTheWideValue) {
 // a literal names nothing and reads the same in every scope, so the bits
 // above 64 of a 96-bit override are read where the instantiated module
 // selects them; one written as the parent's parameter stands in the parent,
-// whose names mean nothing in the child, so the child reads the low word the
-// fold carried over and 0 above it.
+// whose names mean nothing in the child, so its words above bit 63 are
+// recorded on the child's parameter as the value is resolved, against the
+// parent's registration, and the child reads the same 0x01234567 through
+// it. 64b2dfbe0 refolded a literal override alone and read 0 above bit 64
+// through the second instance.
 TEST(BitsOfDeclaration, LiteralOverrideReadsAboveBitSixtyFour) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -727,7 +731,7 @@ TEST(BitsOfDeclaration, LiteralOverrideReadsAboveBitSixtyFour) {
   };
   EXPECT_EQ(value(children[0].resolved, "H"), 0x01234567);
   EXPECT_EQ(value(children[0].resolved, "L"), 0x00112233);
-  EXPECT_EQ(value(children[1].resolved, "H"), 0);
+  EXPECT_EQ(value(children[1].resolved, "H"), 0x01234567);
   EXPECT_EQ(value(children[1].resolved, "L"), 0x00112233);
 }
 

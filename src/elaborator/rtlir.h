@@ -568,6 +568,18 @@ struct RtlirParamDecl {
   // names nothing, is carried.
   const Expr* override_expr = nullptr;
   int64_t resolved_value = 0;
+  // §6.20.2 with §23.10.1 and §23.10.2: the bits from 64 up of the value, as
+  // ConstVal::high_words lays them out -- word i holding bits 64*(i+2)-1 down
+  // to 64*(i+1) -- for a parameter declared wider than 64 bits whose value
+  // was folded from an expression the fold cannot reach again where the name
+  // is read: an instance override written in the instantiating module, a
+  // defparam's right-hand side written in the module holding the statement,
+  // and a parameter a defparam made over. Empty where no bit from 64 up is
+  // set and where the value came from the declaration's own default or a
+  // literal override, which RegisteredParamValue in
+  // src/elaborator/const_eval_bits.cpp refolds. RecordResolvedHighWords there
+  // fills it.
+  std::vector<uint64_t> resolved_high_words;
   // §6.20.2: a parameter declared with a real type takes a real value, which
   // resolved_value cannot hold. When is_real_value is set, resolved_real is the
   // parameter's value and resolved_value is not meaningful.

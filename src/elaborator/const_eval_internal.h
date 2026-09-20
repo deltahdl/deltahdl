@@ -186,6 +186,21 @@ std::optional<int64_t> EvalConstBits(const Expr* expr, const ScopeMap& scope);
 std::optional<ConstVal> RegisteredParamValue(std::string_view name,
                                              int64_t value);
 
+// §6.20.2 with §23.10.1 and §23.10.2: the words above bit 63 of the value
+// `expr` folds to against `scope`, recorded on `pd` as
+// RtlirParamDecl::resolved_high_words for RegisteredParamValue to read where
+// the parameter is declared wider than 64 bits -- read at the declared width
+// and signedness, as an override value is converted to the parameter's range
+// -- and cleared where the fold carries none, does not agree with
+// pd.resolved_value on the low word, or the declaration fixes no width. The
+// elaborator calls this wherever it records a resolved value the fold of an
+// expression gave: an instance override's, folded in the instantiating
+// module, and a defparam's and the parameters it makes over, whose own
+// expressions RegisteredParamValue could not refold there. Defined in
+// const_eval_bits.cpp.
+void RecordResolvedHighWords(RtlirParamDecl& pd, const Expr* expr,
+                             const ScopeMap& scope);
+
 // §11.5.1: the packed range the parameter `name` was declared with, taken from
 // the module a live ParamRangeRegistryGuard installed. Empty when no guard is
 // live, when the module declares no such parameter, or when that parameter's

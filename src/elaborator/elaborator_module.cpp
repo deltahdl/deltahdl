@@ -12,6 +12,7 @@
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "elaborator/const_eval.h"
+#include "elaborator/const_eval_internal.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_items_internal.h"
@@ -400,6 +401,18 @@ static bool ApplyParamOverride(RtlirParamDecl& pd,
   // expression is written in the declaring module, not the instantiating one,
   // which is what default_value already says of it.
   if (ovr->value_expr != pd.default_value) pd.override_expr = ovr->value_expr;
+  // §23.10.2 (printed page 766): the override's expression is written in the
+  // instantiating module, and its fold at elaboration reads the parameter's
+  // words above bit 63 nowhere else -- the instantiating module's
+  // registration, live from the item loop this instantiation is an item of,
+  // is the one the expression's names mean something in, and the child's own
+  // registration, under which the name is later read, cannot refold it. So
+  // the words are recorded now, against that registration's parameters. An
+  // expression that is the declaration's own initializer, handed back by
+  // ResetAllConfigParams, stands in the declaring module and is left to the
+  // refold there.
+  if (pd.override_expr != nullptr)
+    RecordResolvedHighWords(pd, pd.override_expr, RegisteredModuleScope());
   RecordStringParamValue(pd, ovr->value_expr, dtype, arena);
   return true;
 }

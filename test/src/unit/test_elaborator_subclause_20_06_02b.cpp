@@ -1,7 +1,12 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <string_view>
+
+#include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 #include "helpers_param_value.h"
+#include "helpers_rtlir_lookup.h"
 
 using namespace delta;
 
@@ -437,6 +442,155 @@ TEST(WideOperators, DivisionByZeroFoldsToNothing) {
   ASSERT_NE(design, nullptr);
   EXPECT_TRUE(ParamUnresolved(design, "DZ"));
   EXPECT_TRUE(ParamUnresolved(design, "RZ"));
+}
+
+// The resolved value of parameter `name` of module `mod`, or -1 where the
+// design holds no such module or parameter or the fold left it unresolved,
+// for a reading of a parameter of an instantiated module.
+int64_t ParamValueIn(RtlirDesign* design, std::string_view mod,
+                     std::string_view name) {
+  const auto* p = FindParam(design, mod, name);
+  return p != nullptr && p->is_resolved ? p->resolved_value : -1;
+}
+
+// §23.10.2 (printed page 766) with §6.20.2 (printed 126): an instance's
+// parameter value assignment by name gives the parameter the value of an
+// expression written in the instantiating module, and the parameter keeps
+// its declared range, so `c #(.P(PP)) u()` under a 96-bit PP gives c's P
+// every bit of PP and `P[95:64]` in c reads PP's word above 64. 64b2dfbe0
+// refolded a literal override alone for the words above bit 63, so an
+// override written as the parent's parameter read 0 there.
+TEST(ParamOverride, NamedOverrideWrittenAsAParameterReadsAboveBitSixtyFour) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module c #(parameter logic [95:0] P = 96'h1);\n"
+      "  localparam int H = P[95:64];\n"
+      "  localparam int L = P[31:0];\n"
+      "endmodule\n"
+      "module t;\n"
+      "  localparam logic [95:0] PP = 96'h0123_4567_89AB_CDEF_0011_2233;\n"
+      "  c #(.P(PP)) u();\n"
+      "endmodule\n",
+      f, "t");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(ParamValueIn(design, "c", "H"), 0x01234567);
+  EXPECT_EQ(ParamValueIn(design, "c", "L"), 0x00112233);
+}
+
+// §23.10.2.1 (printed page 766): an assignment by ordered list gives the
+// parameters their values in the order of their declaration, so `c #(PP)
+// u()` is the same override as `.P(PP)` and reads the same word above 64,
+// and an expression over the parent's parameter, `PP + 1`, is folded there
+// and carried across every word.
+TEST(ParamOverride, OrderedOverrideWrittenAsAParameterReadsAboveBitSixtyFour) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module c #(parameter logic [95:0] P = 96'h1, parameter logic [95:0] "
+      "Q = 96'h1);\n"
+      "  localparam int H = P[95:64];\n"
+      "  localparam int QH = Q[95:64];\n"
+      "  localparam int QL = Q[31:0];\n"
+      "endmodule\n"
+      "module t;\n"
+      "  localparam logic [95:0] PP = 96'h0123_4567_89AB_CDEF_0011_2233;\n"
+      "  localparam logic [95:0] PF = 96'h0000_0001_FFFF_FFFF_FFFF_FFFF;\n"
+      "  c #(PP, PF + 1) u();\n"
+      "endmodule\n",
+      f, "t");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(ParamValueIn(design, "c", "H"), 0x01234567);
+  EXPECT_EQ(ParamValueIn(design, "c", "QH"), 2);
+  EXPECT_EQ(ParamValueIn(design, "c", "QL"), 0);
+}
+
+// §23.10.1 (printed pages 764-765): a defparam gives the parameter it names
+// the value of an expression written in the module holding the statement,
+// and a parameter whose value depends on it takes its new value too
+// (§23.10.2, printed 766). Over a 96-bit P of c, `defparam u.P = PP` under
+// the parent's 96-bit PP and `defparam v.P = 96'h...` a literal each give P
+// their words above 64, and `P[95:64]` in c, made over after the defparam,
+// reads them. 64b2dfbe0 refolded the literal alone, and made c's dependent
+// parameters over with the parent registered, under which c's P was read at
+// 32 bits, so H read 0 through both.
+TEST(ParamOverride, DefparamValueReadsAboveBitSixtyFour) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module c #(parameter logic [95:0] P = 96'h1);\n"
+      "  localparam int H = P[95:64];\n"
+      "  localparam int L = P[31:0];\n"
+      "endmodule\n"
+      "module d #(parameter logic [95:0] P = 96'h1);\n"
+      "  localparam int H = P[95:64];\n"
+      "endmodule\n"
+      "module t;\n"
+      "  localparam logic [95:0] PP = 96'h0123_4567_89AB_CDEF_0011_2233;\n"
+      "  c u();\n"
+      "  d v();\n"
+      "  defparam u.P = PP;\n"
+      "  defparam v.P = 96'h0000_0002_FFFF_FFFF_FFFF_FFFF;\n"
+      "endmodule\n",
+      f, "t");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(ParamValueIn(design, "c", "H"), 0x01234567);
+  EXPECT_EQ(ParamValueIn(design, "c", "L"), 0x00112233);
+  EXPECT_EQ(ParamValueIn(design, "d", "H"), 2);
+}
+
+// §6.20.2 (printed page 126): a parameter with a range specification has the
+// range of its declaration, whichever way the bounds are written, so `logic
+// [HI:1] V` under `localparam int HI = 8` is eight bits and `V[HI]` its top
+// one (§11.5.1, printed 296). RtlirParamDecl::decl_width is folded without
+// the earlier parameters in scope and is left at the vector's one bit where a
+// bound names one, and 64b2dfbe0's RegisteredParamValue read that width, so
+// V was cut to its low bit and `V[HI]` folded to 0; $bits(V) answered 1 from
+// the same field. The bounds themselves fold against the parameters already
+// elaborated, and the width is read from them now: 1 from `V[HI]`, 0 from
+// `V[HI-1]` and 8 from $bits(V).
+TEST(DeclaredWidth, RangeBoundWrittenAsAParameterSizesTheValue) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  localparam int HI = 8;\n"
+      "  localparam logic [HI:1] V = 8'b1010_0101;\n"
+      "  localparam W = V[HI];\n"
+      "  localparam W6 = V[HI-1];\n"
+      "  localparam int BV = $bits(V);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(ParamValue(design, "W"), 1);
+  EXPECT_EQ(ParamValue(design, "W6"), 0);
+  EXPECT_EQ(ParamValue(design, "BV"), 8);
+}
+
+// The same declaration past 64 bits: `logic [TOP:0] P` under `localparam int
+// TOP = 95` is 96 bits, and its words above bit 63 are read from the refold
+// of its value only where the declared width is known to reach them. With
+// the width read as one bit no refold was made, so `P[64]`, `P[TOP:64]` and
+// $bits(P) folded to 0, 0 and 1 where 1, 1 and 96 are right; `P[65]` is 0
+// either way and pins that the bit above the set one stays clear.
+TEST(DeclaredWidth, RangeBoundWrittenAsAParameterReachesTheWordsAboveBit63) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  localparam int TOP = 95;\n"
+      "  localparam logic [TOP:0] P = 96'h0000_0001_FFFF_FFFF_FFFF_FFFF;\n"
+      "  localparam B64 = P[64];\n"
+      "  localparam B65 = P[65];\n"
+      "  localparam int PH = P[TOP:64];\n"
+      "  localparam int BP = $bits(P);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(ParamValue(design, "B64"), 1);
+  EXPECT_EQ(ParamValue(design, "B65"), 0);
+  EXPECT_EQ(ParamValue(design, "PH"), 1);
+  EXPECT_EQ(ParamValue(design, "BP"), 96);
 }
 
 }  // namespace

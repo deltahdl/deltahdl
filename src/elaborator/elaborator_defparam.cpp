@@ -10,6 +10,7 @@
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "elaborator/const_eval.h"
+#include "elaborator/const_eval_internal.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/rtlir.h"
@@ -206,8 +207,18 @@ RtlirParamDecl* Elaborator::ResolveDefparamFromTop(const HierPath& path,
   return nullptr;
 }
 
+// §23.10.2 (printed page 766): a parameter whose value depends on the one a
+// defparam redefined takes its new value too. Each such value expression is
+// written in `mod`, so `mod` is registered while it folds: the module
+// holding the defparam, which ApplyDefparams registers, is where the
+// right-hand side's names mean something and not where these do, and under
+// it a select on the redefined parameter read that parameter at 32 bits,
+// `localparam int H = P[95:64]` folding to 0 over a 96-bit P a defparam had
+// just given its words above 64. Those words are recorded on each parameter
+// made over as the value is, for a later read of it.
 void Elaborator::RecomputeDependentParams(RtlirModule* mod) {
   if (!mod) return;
+  ParamRangeRegistryGuard param_range_guard(mod);
   for (auto& p : mod->params) {
     if (p.from_override) continue;
     if (p.is_type_param) continue;
@@ -218,6 +229,7 @@ void Elaborator::RecomputeDependentParams(RtlirModule* mod) {
     if (val) {
       p.resolved_value = *val;
       p.is_resolved = true;
+      RecordResolvedHighWords(p, p.default_value, scope);
     }
   }
 }
@@ -385,6 +397,11 @@ void Elaborator::ApplyDefparamSite(RtlirModule* mod, const DefparamSite& site,
     param->is_resolved = true;
     param->from_override = true;
     param->override_expr = DefparamOverrideExpr(val_expr);
+    // §23.10.1 (printed pages 764-765): the right-hand side stands in the
+    // scope of the defparam statement, which is registered here and not
+    // where the parameter is later read, so its words above bit 63 are
+    // recorded now as the value is.
+    RecordResolvedHighWords(*param, val_expr, scope);
     ReplaceStringParamValue(*param, val_expr, arena_);
     RecomputeDependentParams(target_mod);
     applied_defparams_.insert(key);
