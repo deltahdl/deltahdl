@@ -480,4 +480,118 @@ TEST(BodyParameterAssignment, ConfigurationUseClauseReachesABodyParameter) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// A module c declaring `parameter P = 1` among its items with no parameter
+// port list, a module d declaring `parameter W = 1` in its port list, and a
+// top holding `top_items`, elaborated from top.
+RtlirDesign* ElaborateChildrenUnderTop(std::string_view top_items,
+                                       ElabFixture& f) {
+  std::string src =
+      "module c;\n"
+      "  parameter P = 1;\n"
+      "endmodule\n"
+      "module d #(parameter W = 1);\n"
+      "endmodule\n"
+      "module top;\n";
+  src += top_items;
+  src += "endmodule\n";
+  return ElaborateSrc(src, f, "top");
+}
+
+// Parameter `name` of the module instantiated as `inst_name` directly under
+// the top of `design`, or -1 where top instantiates nothing by that name or
+// the fold left the parameter unresolved. The elaborator flattens the
+// generate block instances between top and the instance into the name
+// (RtlirModuleInst::inst_name), so `u` in `begin : g` is instantiated as
+// `g_u` and, at genvar value 1, as `g_1_u`.
+int64_t ChildParamUnderTop(RtlirDesign* design, std::string_view inst_name,
+                           std::string_view name) {
+  if (design == nullptr) return -1;
+  for (const auto& child : design->top_modules[0]->children) {
+    if (child.inst_name != inst_name || child.resolved == nullptr) continue;
+    for (const auto& p : child.resolved->params) {
+      if (p.name == name) return p.is_resolved ? p.resolved_value : -1;
+    }
+  }
+  return -1;
+}
+
+// c's P, c instantiated by `inst` inside `if (1) begin : g ... end` of top.
+int64_t ConditionalBlockChildP(std::string_view inst, ElabFixture& f) {
+  std::string items = "  if (1) begin : g\n    ";
+  items += inst;
+  items += "\n  end\n";
+  return ChildParamUnderTop(ElaborateChildrenUnderTop(items, f), "g_u", "P");
+}
+
+// §23.10.2 (printed page 766) has an instance's parameter value assignment
+// supply the value of any parameter the instantiated module's definition
+// specifies, §23.9 (printed 761) makes a module a scope of its own and
+// §27.4 (printed 821) makes a generate block a separate scope of the module
+// holding it, so c, instantiated inside top's block g, elaborates its items
+// in its own scope and `c #(.P(5)) u()` sets P as it does at module level.
+// The elaboration of c left g's prefix in force for c's items, so P was
+// keyed under g as a parameter g declares (§6.20.1), which the assignment
+// passes over, and P stayed at 1 with nothing reported; f3a9ea3d8's
+// ElaboratorData::GenerateScopeSaver takes the instantiating scope's block
+// out for the module's items.
+TEST(BodyParameterAssignment,
+     NamedAssignmentReachesABodyParameterUnderAConditionalGenerateBlock) {
+  ElabFixture f;
+  EXPECT_EQ(ConditionalBlockChildP("c #(.P(5)) u();", f), 5);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §23.10.2.1 (printed page 766): the ordered form binds the one value to
+// the one parameter c declares, under the block as at module level. P read
+// 1 for the same reason as the named form's.
+TEST(BodyParameterAssignment,
+     OrderedAssignmentReachesABodyParameterUnderAConditionalGenerateBlock) {
+  ElabFixture f;
+  EXPECT_EQ(ConditionalBlockChildP("c #(5) u();", f), 5);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §27.4 (printed page 821) declares a named loop generate block as an array
+// of block instances indexed by the genvar's values, each a scope of its own
+// with the c it instantiates elaborated once for it, so c's P under `inst`
+// written in `for (genvar i = 0; i < 2; i++) begin : g ... end` reads
+// `value` in the instance at genvar 0, `g_0_u`, and at genvar 1, `g_1_u`,
+// with nothing reported.
+void ExpectEachLoopInstancesP(std::string_view inst, int64_t value) {
+  std::string items = "  for (genvar i = 0; i < 2; i++) begin : g\n    ";
+  items += inst;
+  items += "\n  end\n";
+  ElabFixture f;
+  RtlirDesign* design = ElaborateChildrenUnderTop(items, f);
+  EXPECT_EQ(ChildParamUnderTop(design, "g_0_u", "P"), value);
+  EXPECT_EQ(ChildParamUnderTop(design, "g_1_u", "P"), value);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// Both instances of c under the loop take the named assignment: P reads 5
+// in each, where each read 1 under the loop instance's prefix.
+TEST(BodyParameterAssignment,
+     NamedAssignmentReachesABodyParameterInEachLoopGenerateInstance) {
+  ExpectEachLoopInstancesP("c #(.P(5)) u();", 5);
+}
+
+// The ordered form, under the loop: 5 in each instance, where each read 1.
+TEST(BodyParameterAssignment,
+     OrderedAssignmentReachesABodyParameterInEachLoopGenerateInstance) {
+  ExpectEachLoopInstancesP("c #(5) u();", 5);
+}
+
+// A parameter port takes the instance's assignment under a block as it did
+// before f3a9ea3d8: the port list is elaborated apart from the module's
+// items and carried no block prefix, so `d #(.W(8)) v()` in g read 8
+// throughout and stays a pin beside the body parameter's reading.
+TEST(BodyParameterAssignment,
+     PortListParameterUnderAConditionalGenerateBlockTakesTheAssignment) {
+  ElabFixture f;
+  RtlirDesign* design = ElaborateChildrenUnderTop(
+      "  if (1) begin : g\n    d #(.W(8)) v();\n  end\n", f);
+  EXPECT_EQ(ChildParamUnderTop(design, "g_v", "W"), 8);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace
