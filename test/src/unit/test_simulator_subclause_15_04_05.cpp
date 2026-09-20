@@ -9,6 +9,7 @@
 #include "common/types.h"
 #include "fixture_simulator.h"
 #include "helpers_reported_error.h"
+#include "helpers_scheduler.h"
 #include "helpers_string_var.h"
 #include "simulator/sync_objects.h"
 
@@ -457,6 +458,97 @@ TEST(MailboxSim, GetIntoAnElementOfAnotherTypeIsAnError) {
   LowerAndRun(design, f);
   ExpectGetTypeError(f, "arr[i]", 7);
   ExpectWord(f, "n", 630u);
+}
+
+// §6.22.1 b) and d) (printed page 135) with §6.22.2 a) (printed 136): a
+// typedef that renames a class matches the class, so a handle declared
+// through it is of a type equivalent to one declared by the class name, and
+// §15.4.5 (printed 376) hands the message to get(). The block-local `c_t h`
+// holding v = 5 is put and the `C g` get() takes it: 5 and a num() of 0 read
+// as 50. Typed by the typedef's name, the get() was reported not equivalent
+// and g stayed null.
+TEST(MailboxSim, GetIntoAHandleOfTheClassTakesATypedefdHandlesMessage) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  int v;\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  typedef C c_t;\n"
+                      "  mailbox mb = new;\n"
+                      "  C g;\n"
+                      "  int r;\n"
+                      "  initial begin\n"
+                      "    c_t h = new;\n"
+                      "    h.v = 5;\n"
+                      "    mb.put(h);\n"
+                      "    mb.get(g);\n"
+                      "    r = g.v * 10 + mb.num();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "r"),
+            50u);
+}
+
+// §6.22.1 d) (printed page 135): a typedef for a class matches the class it
+// renames and no other, so a `d_t k` declared through a typedef of D is not
+// equivalent to the C handle in the queue, and §15.4.5 (printed 376) makes
+// its get() the run-time error, reported at k with the message left in the
+// queue: a num() of 1. A typedef resolved to any class at all would have
+// stored the C handle in k and answered 0.
+TEST(MailboxSim, GetIntoAHandleOfAnotherTypedefdClassIsAnError) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class C;\n"
+      "  int v;\n"
+      "endclass\n"
+      "class D;\n"
+      "  int w;\n"
+      "endclass\n"
+      "module t;\n"
+      "  typedef C c_t;\n"
+      "  typedef D d_t;\n"
+      "  mailbox mb = new;\n"
+      "  int n;\n"
+      "  initial begin\n"
+      "    c_t h = new;\n"
+      "    d_t k;\n"
+      "    mb.put(h);\n"
+      "    mb.get(k);\n"
+      "    n = mb.num();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  ExpectGetTypeError(f, "k", 16);
+  ExpectWord(f, "n", 1u);
+}
+
+// §15.4.3 (printed page 375) has put() place an object handle, and §15.3
+// makes a semaphore a built-in class of which the run keeps no class record,
+// so its handle is a message of the class named by the declaration and not
+// of any type: §15.4.5 (printed 376) makes get() into an int the run-time
+// error, reported at n with n as it was and the message left in the queue:
+// 4 and a num() of 1. A handle of an unrecorded class typed as any would
+// have stored the handle over the 4 and answered 0.
+TEST(MailboxSim, GetOfABuiltInClassHandleIntoAnIntIsAnError) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  mailbox mb = new;\n"
+      "  semaphore s = new(1);\n"
+      "  int n = 4, k;\n"
+      "  initial begin\n"
+      "    mb.put(s);\n"
+      "    mb.get(n);\n"
+      "    k = mb.num();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  ExpectGetTypeError(f, "n", 7);
+  ExpectWord(f, "n", 4u);
+  ExpectWord(f, "k", 1u);
 }
 
 }  // namespace

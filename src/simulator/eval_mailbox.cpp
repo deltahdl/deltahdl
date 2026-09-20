@@ -13,6 +13,7 @@
 #include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
 #include "simulator/awaiters.h"
+#include "simulator/class_object.h"
 #include "simulator/eval_expr_internal.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/eval_semaphore.h"
@@ -73,6 +74,23 @@ static bool IsParameterizedMailbox(const Expr* expr, SimContext& ctx,
   return false;
 }
 
+// §6.22.1 b) and d) with §6.22.2 a): a typedef that renames a class is a
+// matching type of the class, so a handle declared through it is of the
+// class's own type and equivalent to one declared by the class name. A
+// handle a procedural block declares through the typedef is recorded under
+// the typedef's name (TryExecClassVarDecl in statement_assign_decl.cpp),
+// which the run knows the class by through the alias RegisterClassTypeAliases
+// binds, so the message is typed by the class's own name; recorded as the
+// typedef's name, `c_t h` put and `C g` got were reported not equivalent. A
+// name no class record answers -- the built-in semaphore's or mailbox's --
+// is kept as recorded.
+static MailboxMessageType ClassMessageType(std::string_view name,
+                                           SimContext& ctx) {
+  const ClassTypeInfo* cls = ctx.FindClassType(name);
+  if (cls != nullptr) name = cls->name;
+  return MailboxMessageType::Class(name);
+}
+
 // §15.4.5 with §6.22.2: the type of the variable `name`, as the kind records
 // the lowerer left describe it. A class handle is of its declared class,
 // which §6.22.1 d) matches with itself alone; a string and a real are of
@@ -84,7 +102,7 @@ static bool IsParameterizedMailbox(const Expr* expr, SimContext& ctx,
 static MailboxMessageType VariableMessageType(std::string_view name,
                                               SimContext& ctx) {
   std::string_view class_name = ctx.GetVariableClassType(name);
-  if (!class_name.empty()) return MailboxMessageType::Class(class_name);
+  if (!class_name.empty()) return ClassMessageType(class_name, ctx);
   const Variable* var = ctx.FindVariable(name);
   if (var == nullptr) return {};
   if (var->is_string) return MailboxMessageType::String();
@@ -183,7 +201,7 @@ static MailboxMessageType ElementTargetType(const Expr* arg, SimContext& ctx,
   const Expr* base = arg->base;
   if (base == nullptr || base->kind != ExprKind::kIdentifier) return {};
   std::string_view class_name = ctx.GetVariableClassType(base->text);
-  if (!class_name.empty()) return MailboxMessageType::Class(class_name);
+  if (!class_name.empty()) return ClassMessageType(class_name, ctx);
   if (const ArrayInfo* info = ctx.FindArrayInfo(base->text)) {
     if (arg->index_end != nullptr) return {};
     return ArrayElementType(*info, base->text, arg->index, ctx, arena);
