@@ -821,4 +821,55 @@ TEST(ProgramConstruct, ModuleDeclaredAfterProgramInstantiatingItIsError) {
                             2, "17.2"));
 }
 
+// §24.3 has a top-level program that is not explicitly instantiated
+// implicitly instantiated once, under its declaration name (printed page 776
+// of ~/LRM.pdf), as §23.3.1 has an uninstantiated module. CollectAutoTopModules
+// in src/elaborator/elaborator.cpp rooted the modules alone, so a program
+// standing alone in the source, or beside a module, was elaborated by no run.
+TEST(ProgramConstruct, AnUninstantiatedProgramIsATopLevelProgram) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "program p;\n"
+      "  int b;\n"
+      "  initial b = 2;\n"
+      "endprogram\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  ASSERT_EQ(design->top_modules.size(), 1u);
+  EXPECT_EQ(design->top_modules[0]->name, "p");
+  EXPECT_TRUE(design->top_modules[0]->is_program);
+}
+
+TEST(ProgramConstruct, AnUninstantiatedProgramBesideAModuleIsATopToo) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int a;\n"
+      "endmodule\n"
+      "program p;\n"
+      "  int b;\n"
+      "endprogram\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  ASSERT_EQ(design->top_modules.size(), 2u);
+  EXPECT_EQ(design->top_modules[0]->name, "t");
+  EXPECT_EQ(design->top_modules[1]->name, "p");
+}
+
+// A program a module instantiates is that module's instance and no top.
+TEST(ProgramConstruct, AnInstantiatedProgramIsNoTopLevelProgram) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "program p;\n"
+      "  int b;\n"
+      "endprogram\n"
+      "module t;\n"
+      "  p u();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  ASSERT_EQ(design->top_modules.size(), 1u);
+  EXPECT_EQ(design->top_modules[0]->name, "t");
+}
+
 }  // namespace

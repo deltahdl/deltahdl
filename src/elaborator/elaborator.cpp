@@ -70,13 +70,15 @@ void CollectItemInstantiations(const ModuleItem* item,
 }
 
 // §23.3.1: the top-level modules of a compilation unit are the modules present
-// in the source but not instantiated by any other module. Returns them in
-// source order; used when no explicit top module is named.
+// in the source but not instantiated by any other module, and §24.3 has a
+// top-level program that is not explicitly instantiated implicitly
+// instantiated once, under its declaration name. Returns the modules in source
+// order and the programs after them; used when no explicit top module is
+// named.
 //
-// Only unit->modules is read, and that is why an interface, program or checker
-// nothing instantiates is elaborated by no run and so validated by none.
-// §23.3.1 makes a top-level module implicitly instantiated, and it says that of
-// modules alone; an interface reaches Elaborator::ElaborateModule only through
+// An interface or checker nothing instantiates is elaborated by no run and so
+// validated by none: §23.3.1 and §24.3 say that of modules and programs alone,
+// and an interface reaches Elaborator::ElaborateModule only through
 // Elaborator::FindModule, whose CollectModuleCandidates appends
 // unit->interfaces, unit->programs and unit->checkers. A design element that is
 // never instantiated contributes nothing to the elaborated design, so the
@@ -85,10 +87,14 @@ std::vector<ModuleDecl*> CollectAutoTopModules(const CompilationUnit* unit) {
   std::unordered_set<std::string_view> instantiated;
   for (const auto* mod : unit->modules)
     CollectInstantiatedNames(mod->items, instantiated);
+  for (const auto* prog : unit->programs)
+    CollectInstantiatedNames(prog->items, instantiated);
 
   std::vector<ModuleDecl*> tops;
   for (auto* mod : unit->modules)
     if (!instantiated.contains(mod->name)) tops.push_back(mod);
+  for (auto* prog : unit->programs)
+    if (!instantiated.contains(prog->name)) tops.push_back(prog);
   return tops;
 }
 
@@ -711,13 +717,15 @@ RtlirDesign* Elaborator::ElaborateTops(
 
 RtlirDesign* Elaborator::Elaborate(std::string_view top_module_name) {
   // No explicit top module: root every uninstantiated module as a top per
-  // §23.3.1. A package-only or class-only compilation unit has nothing to
-  // instantiate but its package/class items still need validation, so it
-  // proceeds with an empty top set. A genuinely empty unit (e.g. empty or
-  // comment-only source) yields no design.
+  // §23.3.1, and every uninstantiated program per §24.3. A package-only or
+  // class-only compilation unit has nothing to instantiate but its
+  // package/class items still need validation, so it proceeds with an empty
+  // top set. A genuinely empty unit (e.g. empty or comment-only source) yields
+  // no design.
   if (top_module_name.empty()) {
-    if (unit_->modules.empty() && unit_->packages.empty() &&
-        unit_->cu_items.empty() && unit_->classes.empty())
+    if (unit_->modules.empty() && unit_->programs.empty() &&
+        unit_->packages.empty() && unit_->cu_items.empty() &&
+        unit_->classes.empty())
       return nullptr;
     RunPreElaborationValidations();
     auto tops = CollectAutoTopModules(unit_);

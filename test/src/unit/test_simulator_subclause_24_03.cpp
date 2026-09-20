@@ -113,4 +113,49 @@ TEST(ProgramConstructSim, ProgramInitialTerminatesDescendantThreads) {
   EXPECT_EQ(v->value.ToUint64(), 7u);
 }
 
+// §24.3: a top-level program not explicitly instantiated is implicitly
+// instantiated once (printed page 776 of ~/LRM.pdf), so its initial runs and
+// a task it declares, enabled from that initial, consumes its delay (§13.3):
+// the write lands at time 5. The program was rooted by no run before, so
+// nothing ran and `at` kept its reset value.
+TEST(ProgramConstructSim, ATopLevelProgramsInitialRunsItsTask) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "program p;\n"
+      "  int at;\n"
+      "  task pw(int d); #d; at = d * 100 + $time; endtask\n"
+      "  initial pw(5);\n"
+      "endprogram\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* at = f.ctx.FindVariable("at");
+  ASSERT_NE(at, nullptr);
+  EXPECT_EQ(at->value.ToUint64(), 505u);
+}
+
+// The same beside a module: both tops run, the module's initial and the
+// program's.
+TEST(ProgramConstructSim, ATopLevelProgramBesideAModuleRunsWithIt) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int a;\n"
+      "  initial a = 3;\n"
+      "endmodule\n"
+      "program p;\n"
+      "  int b;\n"
+      "  initial b = 7;\n"
+      "endprogram\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* a = f.ctx.FindVariable("a");
+  auto* b = f.ctx.FindVariable("b");
+  ASSERT_NE(a, nullptr);
+  ASSERT_NE(b, nullptr);
+  EXPECT_EQ(a->value.ToUint64(), 3u);
+  EXPECT_EQ(b->value.ToUint64(), 7u);
+}
+
 }  // namespace
