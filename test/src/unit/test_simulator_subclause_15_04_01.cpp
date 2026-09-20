@@ -831,4 +831,40 @@ TEST(MailboxSim, ModuleMailboxNewInProcessBoundsTheQueueItMakesHeld) {
             1110u);
 }
 
+// §8.4 (printed page 182) with §15.4 (printed 374): equality and
+// inequality compare two handles by the object each refers to, and each
+// mailbox variable or property built by its own new() is a handle to its
+// own queue, so `a == b` on two module mailboxes each built by `new` is
+// false, `c = a` makes c refer to a's queue so `c == a` is true and `c !=
+// b` true, `o.x == o.y` on two properties each built by its own `new` is
+// false, and after `o.y = o.x` the two refer to one queue and compare
+// equal. The reads add 1, 10, 100, 1000 and 10000 in that order: 10110.
+// Every held handle carried the same 1, so a and b compared equal, o.x and
+// o.y too, and c was told from b by nothing: 11011.
+TEST(MailboxSim, MailboxHandlesCompareByTheQueueEachRefersTo) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  mailbox x = new;\n"
+                      "  mailbox y = new;\n"
+                      "endclass\n"
+                      "module top;\n"
+                      "  mailbox a = new;\n"
+                      "  mailbox b = new;\n"
+                      "  mailbox c;\n"
+                      "  int r;\n"
+                      "  initial begin\n"
+                      "    C o = new;\n"
+                      "    r = 0;\n"
+                      "    if (a == b) r = r + 1;\n"
+                      "    c = a;\n"
+                      "    if (c == a) r = r + 10;\n"
+                      "    if (c != b) r = r + 100;\n"
+                      "    if (o.x == o.y) r = r + 1000;\n"
+                      "    o.y = o.x;\n"
+                      "    if (o.x == o.y) r = r + 10000;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "r"),
+            10110u);
+}
+
 }  // namespace

@@ -94,6 +94,21 @@ static std::string PackageDataKey(const ModuleItem* item,
   return std::string(pkg) + "." + std::string(item->name);
 }
 
+// §15.3 (printed page 372) and §15.4 (printed 374): the built-in
+// synchronization class the package variable `item` is declared with,
+// `semaphore` or `mailbox`, which the parser leaves as a named type of that
+// spelling, the spelling CreateSemaphoreForVar and CreateMailboxForVar
+// (sync_variable.cpp) recognize a module's by. Empty for an item of any other
+// type.
+static std::string_view PackageSyncObjectType(const ModuleItem* item) {
+  if (item->kind != ModuleItemKind::kVarDecl ||
+      item->data_type.kind != DataTypeKind::kNamed)
+    return {};
+  std::string_view name = item->data_type.type_name;
+  if (name == "semaphore" || name == "mailbox") return name;
+  return {};
+}
+
 // The width of a data item's storage: a variable's declared type's, and a
 // parameter's, or a type no table sizes, 32 bits. §8.3 (printed page 180)
 // with §8.4: a variable of a class type holds a handle to an object, which
@@ -111,13 +126,18 @@ static std::string PackageDataKey(const ModuleItem* item,
 // array -- so it is a handle's 64 bits too. The class record is entered for
 // the declaration whatever its dimensions, and a scalar alone was sized by
 // it, so an element of any of the three held an object id in 32 bits and an
-// id above 2^32 was truncated.
+// id above 2^32 was truncated. §15.3 (printed 372) and §15.4 (printed 374):
+// a package's `semaphore s` or `mailbox mb` is a handle too, of no class
+// record, so it is sized by its type's spelling (PackageSyncObjectType);
+// sized at 32, the object's identity (SyncObjectIdentity) was held in half
+// its bits.
 static uint32_t PackageDataWidth(const ModuleItem* item, std::string_view qname,
                                  SimContext& ctx) {
   bool is_var = item->kind == ModuleItemKind::kVarDecl;
   uint32_t width = is_var ? DeclaredTypeWidth(item->data_type, ctx) : 0;
   if (width != 0) return width;
-  bool is_handle = is_var && !ctx.GetVariableClassType(qname).empty();
+  bool is_handle = is_var && (!ctx.GetVariableClassType(qname).empty() ||
+                              !PackageSyncObjectType(item).empty());
   return is_handle ? 64 : 32;
 }
 
@@ -309,21 +329,6 @@ static void CreatePackageAggregate(const ModuleItem* item, std::string_view pkg,
   }
 }
 
-// §15.3 (printed page 372) and §15.4 (printed 374): the built-in
-// synchronization class the package variable `item` is declared with,
-// `semaphore` or `mailbox`, which the parser leaves as a named type of that
-// spelling, the spelling CreateSemaphoreForVar and CreateMailboxForVar
-// (lowerer_var.cpp) recognize a module's by. Empty for an item of any other
-// type.
-static std::string_view PackageSyncObjectType(const ModuleItem* item) {
-  if (item->kind != ModuleItemKind::kVarDecl ||
-      item->data_type.kind != DataTypeKind::kNamed)
-    return {};
-  std::string_view name = item->data_type.type_name;
-  if (name == "semaphore" || name == "mailbox") return name;
-  return {};
-}
-
 // §15.3 (printed page 372) and §15.4 (printed 374) with §26.2 (printed
 // 808): a package's `semaphore s` is the bucket of keys its get(), put() and
 // try_get() operate on, and its `mailbox mb` the queue its put(), get(),
@@ -358,9 +363,12 @@ static void CreatePackageSyncObject(std::string_view type,
 // their values, so `new(D)` reads the package's own D (§11.2.1). Read when
 // the object was created, ahead of the parameters' own initializers, D was
 // the 0 its storage was created with, and the bucket started empty and the
-// queue unbounded whatever the declaration wrote. The new() names no value
-// the carrier variable holds, so the caller leaves the carrier alone. True
-// for a semaphore's or a mailbox's item whatever its initializer.
+// queue unbounded whatever the declaration wrote. The new() returns the
+// handle the variable holds, so the variable under the key is marked held
+// (HoldSyncVariable in sync_variable.cpp), as a module's declaration
+// marks its own; left at the 0 its storage was created with, §8.4 (printed
+// 181-182) compared `p::mb` equal to null after its `= new`. True for a
+// semaphore's or a mailbox's item whatever its initializer.
 static bool InitPackageSyncObject(const ModuleItem* item, std::string_view key,
                                   SimContext& ctx, Arena& arena) {
   std::string_view type = PackageSyncObjectType(item);

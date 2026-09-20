@@ -607,4 +607,41 @@ TEST(SemaphoreSim, ModuleSemaphoreNewInProcessFillsTheBucketItMakesHeld) {
             1110u);
 }
 
+// §8.4 (printed page 182) with §15.3 (printed 372): equality and
+// inequality compare two handles by the object each refers to, and each
+// semaphore variable or property built by its own new() is a handle to its
+// own bucket, so `first != second` on two module semaphores each built by
+// `new(1)` is true, `third = first` makes third refer to first's bucket so
+// `third == first` is true and `third == second` false, `o.p != o.q` on two
+// properties each built by its own `new(1)` is true, and after `o.q = o.p`
+// the two refer to one bucket so `o.p != o.q` is false. The reads add 1,
+// 10, 100, 1000 and 10000 in that order: 1011. Every held handle carried
+// the same 1, so first and second compared equal, o.p and o.q too, and
+// third was told from second by nothing: 10110.
+TEST(SemaphoreSim, SemaphoreHandlesCompareByTheBucketEachRefersTo) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  semaphore p = new(1);\n"
+                      "  semaphore q = new(1);\n"
+                      "endclass\n"
+                      "module top;\n"
+                      "  semaphore first = new(1);\n"
+                      "  semaphore second = new(1);\n"
+                      "  semaphore third;\n"
+                      "  int y;\n"
+                      "  initial begin\n"
+                      "    C o = new;\n"
+                      "    y = 0;\n"
+                      "    if (first != second) y = y + 1;\n"
+                      "    third = first;\n"
+                      "    if (third == first) y = y + 10;\n"
+                      "    if (third == second) y = y + 100;\n"
+                      "    if (o.p != o.q) y = y + 1000;\n"
+                      "    o.q = o.p;\n"
+                      "    if (o.p != o.q) y = y + 10000;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            1011u);
+}
+
 }  // namespace

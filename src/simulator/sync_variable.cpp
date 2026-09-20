@@ -15,11 +15,13 @@
 namespace delta {
 
 // §8.4 (printed page 182 of ~/LRM.pdf): the value the variable holds while
-// its handle refers to an object, nonzero as a class handle's is and as
-// MirrorSyncCarrier (eval_class_sync.cpp) stores a property's, at the
-// variable's own width; the null handle is the 0 the declaration stored.
-static void MarkSyncVariableHeld(Variable* v, Arena& arena) {
-  v->value = MakeLogic4VecVal(arena, v->value.width, 1);
+// its handle refers to an object is the object's identity
+// (SyncObjectIdentity), as MirrorSyncCarrier (eval_class_sync.cpp) stores a
+// property's, at the variable's own width; the null handle is the 0 the
+// declaration stored. Stored as a 1 for every object, two variables each
+// built by its own `new` compared equal.
+static void MarkSyncVariableHeld(Variable* v, const void* obj, Arena& arena) {
+  v->value = MakeLogic4VecVal(arena, v->value.width, SyncObjectIdentity(obj));
 }
 
 // §15.3.1 and §15.4.1: whether the declaration's initializer is the
@@ -39,7 +41,7 @@ static void CreateSemaphoreForVar(std::string_view name,
   auto* sem = ctx.CreateSemaphore(name, 0);
   if (!InitIsNew(var)) return;
   sem->key_count = SemaphoreKeyArg(var.init_expr, ctx, arena, 0);
-  MarkSyncVariableHeld(v, arena);
+  MarkSyncVariableHeld(v, sem, arena);
 }
 
 // §15.4: a mailbox is a queue messages pass through between processes, made
@@ -51,7 +53,7 @@ static void CreateMailboxForVar(std::string_view name, const RtlirVariable& var,
   auto* mbx = ctx.CreateMailbox(name, 0);
   if (!InitIsNew(var)) return;
   mbx->Build(MailboxBoundArg(var.init_expr, ctx, arena));
-  MarkSyncVariableHeld(v, arena);
+  MarkSyncVariableHeld(v, mbx, arena);
 }
 
 // The variable's value was left at the 0 the declaration stored whether or
@@ -69,7 +71,10 @@ void CreateSyncObjectForVar(std::string_view name, const RtlirVariable& var,
 
 void HoldSyncVariable(std::string_view key, SimContext& ctx) {
   Variable* v = ctx.FindVariable(key);
-  if (v != nullptr) MarkSyncVariableHeld(v, ctx.GetArena());
+  if (v == nullptr) return;
+  const void* obj = ctx.FindSemaphore(key);
+  if (obj == nullptr) obj = ctx.FindMailbox(key);
+  MarkSyncVariableHeld(v, obj, ctx.GetArena());
 }
 
 }  // namespace delta

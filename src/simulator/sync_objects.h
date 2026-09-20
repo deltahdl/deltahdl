@@ -11,6 +11,22 @@
 
 namespace delta {
 
+// §8.4 (printed page 182 of ~/LRM.pdf) compares two handles by the object
+// each refers to, and §15.3 (printed 372) and §15.4 (printed 374) make a
+// semaphore or mailbox variable a handle to its bucket or its queue, so the
+// value the handle carries -- what `a == b`, `a != null` and `if (a)` read
+// through the generic paths -- is the object's identity: its address folded
+// to 64 bits. Every SemaphoreObject and MailboxObject of a run is
+// arena-owned and neither freed nor moved, so the address is unique among
+// them and stable, and it needs no counter that one of the construction
+// sites -- a module's or a package's declaration, a class property's `new`,
+// a test's own MailboxObject -- could miss; no object stands at 0, which
+// stays the null handle. Null for no object. Every held object carried 1,
+// so two mailboxes each built by its own `new` compared equal.
+inline uint64_t SyncObjectIdentity(const void* obj) {
+  return static_cast<uint64_t>(reinterpret_cast<uintptr_t>(obj));
+}
+
 enum class SemGetStatus : uint8_t { kAcquired, kBlock, kError };
 
 struct SemaphoreObject {

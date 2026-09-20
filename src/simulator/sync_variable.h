@@ -17,10 +17,12 @@ struct Variable;
 // uninitialized one being detected by comparing it with null. The run keeps
 // the object under the variable's name (SimContext::CreateSemaphore and
 // CreateMailbox, found by FindSemaphore and FindMailbox), and the variable's
-// own value is the handle's carrier, the value `mb == null`, `mb != null`
-// and `if (mb)` read through the generic paths, as a class property's is
-// (MirrorSyncCarrier in eval_class_sync.cpp): 0 while the handle is null
-// and nonzero while it refers to an object.
+// own value is the handle's carrier, the value `mb == null`, `mb != null`,
+// `a == b` and `if (mb)` read through the generic paths, as a class
+// property's is (MirrorSyncCarrier in eval_class_sync.cpp): 0 while the
+// handle is null and the object's identity (SyncObjectIdentity in
+// sync_objects.h) while it refers to one, so that two handles compare equal
+// exactly where they refer to one object (§8.4).
 
 // Creates the bucket or the queue the variable `var`, created under `name`
 // as `v`, is a handle to, and marks the handle held where the declaration's
@@ -33,10 +35,11 @@ void CreateSyncObjectForVar(std::string_view name, const RtlirVariable& var,
                             Variable* v, SimContext& ctx, Arena& arena);
 
 // Marks the semaphore or mailbox variable under `key` -- a bare name, an
-// instance's prefixed one or a package's "p.name" -- as holding an object,
-// after a procedural `key = new(...)` has built or rebuilt it; nothing where
-// no variable stands under the key. Left at the 0 its declaration stored,
-// the variable compared equal to null after the new.
+// instance's prefixed one or a package's "p.name" -- as holding the object
+// the run keeps under that key, after a procedural or a package
+// declaration's `new(...)` has built or rebuilt it; nothing where no
+// variable stands under the key. Left at the 0 its declaration stored, the
+// variable compared equal to null after the new.
 void HoldSyncVariable(std::string_view key, SimContext& ctx);
 
 }  // namespace delta
