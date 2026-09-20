@@ -83,6 +83,10 @@ void RegisterDesignTypeLayouts(const RtlirDesign* design, SimContext& ctx,
         BuildStructTypeInfo(dtype, AggregateTypeWidth(dtype), name, arena);
     ctx.RegisterStructType(name, *info);
   }
+  // §26.3 with §8.4: the class a package variable is declared with is the
+  // other declared-type fact no module's lowering records, so it is recorded
+  // beside the layouts.
+  RegisterPackageClassVariables(design, ctx, arena);
 }
 
 static void RegisterStructInfo(std::string_view name, const RtlirVariable& var,

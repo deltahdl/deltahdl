@@ -112,8 +112,8 @@ bool TryAssocLiteralAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
 
 // `new src_obj` shallow-copy form: returns true (and writes the copy handle to
 // the target) when the rhs argument resolves to an existing class object.
-static bool TryClassCopyNewAssign(const Stmt* stmt, SimContext& ctx,
-                                  Arena& arena) {
+static bool TryClassCopyNewAssign(const Stmt* stmt, std::string_view target,
+                                  SimContext& ctx, Arena& arena) {
   if (!stmt->rhs->lhs || stmt->rhs->lhs->kind != ExprKind::kIdentifier)
     return false;
   auto src_val = EvalExpr(stmt->rhs->lhs, ctx, arena);
@@ -121,7 +121,7 @@ static bool TryClassCopyNewAssign(const Stmt* stmt, SimContext& ctx,
   if (!src_obj) return false;
   auto* copy = src_obj->ShallowCopy(arena);
   auto copy_handle = ctx.AllocateClassObject(copy);
-  auto* var = ctx.FindVariable(stmt->lhs->text);
+  auto* var = ctx.FindVariable(target);
   if (var) {
     var->value = MakeLogic4VecVal(arena, 64, copy_handle);
     var->NotifyWatchers();
@@ -131,43 +131,63 @@ static bool TryClassCopyNewAssign(const Stmt* stmt, SimContext& ctx,
 
 // `new (referent)` for a weak_reference-typed target: allocate the weak
 // reference wrapper and write its handle to the target.
-static void AssignWeakReferenceNew(const Stmt* stmt, SimContext& ctx,
-                                   Arena& arena) {
+static void AssignWeakReferenceNew(const Stmt* stmt, std::string_view target,
+                                   SimContext& ctx, Arena& arena) {
   uint64_t referent = kNullClassHandle;
   if (!stmt->rhs->args.empty()) {
     auto val = EvalExpr(stmt->rhs->args[0], ctx, arena);
     referent = val.ToUint64();
   }
   auto wr_handle = ctx.AllocateWeakReference(referent, arena);
-  auto* var = ctx.FindVariable(stmt->lhs->text);
+  auto* var = ctx.FindVariable(target);
   if (var) {
     var->value = MakeLogic4VecVal(arena, 64, wr_handle);
     var->NotifyWatchers();
   }
 }
 
+// The key the storage of a `new`'s target is held under, and its class
+// recorded under: a variable's own name, and for a package variable named
+// through the package scope resolution operator (§26.3), `p::h = new`, the
+// "p.h" InitPackageDataVariables creates the storage under and
+// RegisterPackageClassVariables records the class under. `C::x = new` on a
+// class's static property has the same shape and is answered by no class
+// record under "C.x", which leaves it to TryMemberClassNewAssign. Empty for
+// any other target.
+static std::string_view ClassNewTargetKey(const Expr* lhs, Arena& arena) {
+  if (lhs->kind == ExprKind::kIdentifier) return lhs->text;
+  if (lhs->kind != ExprKind::kMemberAccess || !lhs->is_scope_resolution ||
+      !lhs->lhs || lhs->lhs->kind != ExprKind::kIdentifier || !lhs->rhs ||
+      lhs->rhs->kind != ExprKind::kIdentifier)
+    return {};
+  return *arena.Create<std::string>(std::string(lhs->lhs->text) + "." +
+                                    std::string(lhs->rhs->text));
+}
+
 bool TryClassNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (!stmt->rhs || stmt->rhs->kind != ExprKind::kCall) return false;
   if (stmt->rhs->text != "new") return false;
-  if (!stmt->lhs || stmt->lhs->kind != ExprKind::kIdentifier) return false;
-  auto type_name = ctx.GetVariableClassType(stmt->lhs->text);
+  if (!stmt->lhs) return false;
+  std::string_view target = ClassNewTargetKey(stmt->lhs, arena);
+  if (target.empty()) return false;
+  auto type_name = ctx.GetVariableClassType(target);
   if (type_name.empty()) return false;
 
-  if (TryClassCopyNewAssign(stmt, ctx, arena)) return true;
+  if (TryClassCopyNewAssign(stmt, target, ctx, arena)) return true;
 
   if (type_name == "weak_reference") {
-    AssignWeakReferenceNew(stmt, ctx, arena);
+    AssignWeakReferenceNew(stmt, target, ctx, arena);
     return true;
   }
 
   auto handle =
       EvalClassNew(type_name, stmt->rhs, ctx, arena, stmt->rhs->range.start);
-  auto* var = ctx.FindVariable(stmt->lhs->text);
+  auto* var = ctx.FindVariable(target);
   if (var) {
     var->value = handle;
     var->NotifyWatchers();
   }
-  ApplyClassParamOverrides(stmt->lhs->text, handle.ToUint64(), ctx, arena);
+  ApplyClassParamOverrides(target, handle.ToUint64(), ctx, arena);
   return true;
 }
 

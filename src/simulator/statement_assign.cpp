@@ -1,5 +1,6 @@
 #include "simulator/statement_assign.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -555,6 +556,27 @@ static FieldTarget ResolveVariableField(std::string_view base_name,
   return ResolveClassObjectField(base_var, base_name, field_name, ctx);
 }
 
+// §26.3 with §8.4: `p::h.v` writes a property of the object the package
+// variable `p::h` holds. The flattened name "p.h.v" parts at its first dot,
+// which takes the package for the variable; a member path rooted in a package
+// scope resolution -- `p::h` at the left end of the chain, however many
+// members follow it -- parts after the "p.h" the package's storage is keyed
+// by instead. Answers the first dot for every other target.
+static size_t FieldTargetSplit(const Expr* lhs, const std::string& name) {
+  const Expr* root = lhs;
+  while (root->kind == ExprKind::kMemberAccess && !root->is_scope_resolution &&
+         root->lhs != nullptr) {
+    root = root->lhs;
+  }
+  bool scoped_root = root != lhs && root->kind == ExprKind::kMemberAccess &&
+                     root->is_scope_resolution && root->lhs != nullptr &&
+                     root->lhs->kind == ExprKind::kIdentifier &&
+                     root->rhs != nullptr &&
+                     root->rhs->kind == ExprKind::kIdentifier;
+  if (scoped_root) return root->lhs->text.size() + 1 + root->rhs->text.size();
+  return name.find('.');
+}
+
 FieldTarget ResolveFieldTarget(const Expr* lhs, SimContext& ctx) {
   // A virtual interface base is asked first, on the expression rather than
   // the flattened name: `this.vif.a` splits to `this` and `vif.a`, which
@@ -571,7 +593,7 @@ FieldTarget ResolveFieldTarget(const Expr* lhs, SimContext& ctx) {
 
   std::string name;
   BuildLhsName(lhs, name);
-  auto dot = name.find('.');
+  auto dot = FieldTargetSplit(lhs, name);
   if (dot == std::string::npos) return {};
   auto base_name = std::string_view(name).substr(0, dot);
   auto field_name = std::string_view(name).substr(dot + 1);

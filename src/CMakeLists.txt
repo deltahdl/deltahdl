@@ -286,6 +286,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/lowerer_process.cpp
     simulator/lowerer_inst.cpp
     simulator/lowerer_import.cpp
+    simulator/lowerer_package_class_vars.cpp
     simulator/vcd_writer.cpp
     simulator/vcd_writer_port.cpp
     simulator/adv_sim.cpp
