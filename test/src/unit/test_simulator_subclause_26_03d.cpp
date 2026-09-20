@@ -459,4 +459,29 @@ TEST(PackageImportSim, PackageAssociativeArrayInitializedWithADefault) {
 // 4 * 10 + 3. The queue was created before the package's classes were
 // lowered and left marked as holding plain values (holds_class_handles in
 // CreatePackageAggregate, lowerer_register.cpp), so the element select
+// followed by `.v` read no object's property and answered 0.
+TEST(PackageImportSim, PackageQueueOfAClassTypeHoldsHandles) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  class C;\n"
+                      "    int v;\n"
+                      "  endclass\n"
+                      "  C q[$];\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  import p1::*;\n"
+                      "  int y;\n"
+                      "  initial begin\n"
+                      "    C c1 = new;\n"
+                      "    C c2 = new;\n"
+                      "    c1.v = 3;\n"
+                      "    p1::q.push_back(c1);\n"
+                      "    c2.v = 4;\n"
+                      "    p1::q.push_back(c2);\n"
+                      "    y = p1::q[1].v * 10 + p1::q[0].v;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            43u);
+}
+
 }  // namespace

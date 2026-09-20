@@ -577,8 +577,9 @@ static void CreatePackageAggregate(const ModuleItem* item, std::string_view pkg,
   if (dim == nullptr) {
     CreatePackageDynArray(qname, width, is_4state, ctx);
   } else if (IsQueueDim(dim)) {
-    ctx.CreateQueue(qname, width, PackageQueueMaxSize(dim, pkg, ctx, arena),
-                    is_4state);
+    QueueObject* q = ctx.CreateQueue(
+        qname, width, PackageQueueMaxSize(dim, pkg, ctx, arena), is_4state);
+    q->holds_class_handles = !ctx.GetVariableClassType(qname).empty();
   } else if (item->unpacked_dims.size() == 1 && IsAssocIndexDim(dim, ctx)) {
     ctx.CreateAssocArray(qname, width, dim->text == "string",
                          AssocIndexSpec(dim, is_4state, ctx));
