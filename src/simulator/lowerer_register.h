@@ -220,9 +220,11 @@ void InitUnitDataVariables(const RtlirDesign* design, SimContext& ctx,
 // §8.7 with §8.25 and §26.2: the object each package variable's or unit
 // variable's `new` declaration assignment constructs, `C h = new;` or `G
 // #(5) b = new;`, of the specialization the declaration wrote, once every
-// class of the design is lowered -- a package's after the modules
-// (Lowerer::LowerUnimportedPackageClasses) -- since the other initializers
-// run ahead of every class. Defined in src/simulator/lowerer_package_data.cpp.
+// class of the design is lowered and ahead of every module
+// (Lowerer::ConstructDesignData in lowerer_data_init.cpp), since the other
+// initializers run ahead of every class and §6.21 has a module's variable
+// initialized at its declaration. Defined in
+// src/simulator/lowerer_package_data.cpp.
 void ConstructDataClassInitializers(const RtlirDesign* design, SimContext& ctx,
                                     Arena& arena);
 // §26.6: every name a package exports, bound under the exporting package's
