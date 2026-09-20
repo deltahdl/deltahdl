@@ -465,6 +465,7 @@ class Parser {
   ModuleItem* ParseNettypeDecl();
   DataType ParseEnumType();
   DataType ParseEnumBody(const DataType& base);
+  Expr* ParseEnumRangeBound();
   DataType ParseStructOrUnionType();
   void ParseUnionQualifiers(DataType& dtype);
   void ParseStructPackedSigning(DataType& dtype);

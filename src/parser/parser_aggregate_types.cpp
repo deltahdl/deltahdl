@@ -67,9 +67,9 @@ DataType Parser::ParseEnumBody(const DataType& base) {
     member.name = Expect(TokenKind::kIdentifier, Subclause("6.19")).text;
 
     if (Match(TokenKind::kLBracket)) {
-      member.range_start = ParseExpr();
+      member.range_start = ParseEnumRangeBound();
       if (Match(TokenKind::kColon)) {
-        member.range_end = ParseExpr();
+        member.range_end = ParseEnumRangeBound();
       }
       Expect(TokenKind::kRBracket, Subclause("6.19.2"));
     }
@@ -80,6 +80,26 @@ DataType Parser::ParseEnumBody(const DataType& base) {
   } while (Match(TokenKind::kComma));
   Expect(TokenKind::kRBrace, Subclause("6.19"));
   return dtype;
+}
+
+// §6.19.2 (Syntax 6-5, A.2.2.1): an enum_name_declaration writes its range
+// as `[ integral_number [ : integral_number ] ]`, and Table 6-10 has each
+// bound be a positive or non-negative integral number, so a bound is a number
+// as A.8.7 spells one -- `3`, `'d3`, `4'h3` -- and never a constant
+// expression: `VAL[N]` over a parameter N names no constant, however N folds,
+// and `VAL[(3)]` is no integral_number either. The bound is read as an
+// expression, for the recovery that gives, and one that is not a number token
+// alone is reported where it starts; the member keeps it, so a walk over the
+// declaration sees the range it was written with.
+Expr* Parser::ParseEnumRangeBound() {
+  Expr* bound = ParseExpr();
+  if (bound != nullptr &&
+      (bound->kind != ExprKind::kIntegerLiteral || bound->is_parenthesized)) {
+    diag_.Error(bound->range.start,
+                "enumeration range bound must be an integral number",
+                Subclause("6.19.2"));
+  }
+  return bound;
 }
 
 // §7.3.2: a union may carry at most one of the 'soft'/'tagged' qualifiers; a

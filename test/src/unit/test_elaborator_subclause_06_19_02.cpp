@@ -168,17 +168,20 @@ TEST(Elaboration, EnumRangeNZeroIsError) {
                             2, "6.19.2"));
 }
 
+// Syntax 6-5 (printed page 119) takes an integral_number for each bound, so
+// `-1`, a unary expression, is the parser's to report; the elaborator's
+// non-negative rule is what a bound that parsed would meet, and no integral
+// number is negative.
 TEST(Elaboration, EnumRangeNMNegativeIsError) {
   ElabFixture f;
-  ElaborateSrc(
+  ElaborateSrcAllowingParseErrors(
       "module top;\n"
       "  typedef enum {sub[-1:2]} E1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "enum range bounds of 'sub' shall be non-negative "
-                            "integral numbers",
-                            2, "6.19.2"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "enumeration range bound must be an integral number", 2, "6.19.2"));
 }
 
 TEST(Elaboration, EnumRangeNOneProducesSingle) {
