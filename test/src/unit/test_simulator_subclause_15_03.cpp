@@ -428,4 +428,32 @@ TEST(SemaphoreSim, ConstructorTakesTheModulesSemaphoreAsAHandle) {
             101u);
 }
 
+// §8.23 (printed pages 200-201) with §8.9 (printed 186): a nested class's
+// method reaches the containing class's static semaphore by its bare name,
+// so Inner's try_get(1) procures Outer's one key and the module's
+// `Outer::s.try_get(1)` then finds none: 1 and 0 read as 10. Looked for
+// along Inner's base chain alone, the bare name reached no bucket, so the
+// nested take() procured nothing and the module's read 1: 01.
+TEST(SemaphoreSim, NestedClassMethodTakesTheEnclosingClassStaticSemaphore) {
+  EXPECT_EQ(RunAndGet("class Outer;\n"
+                      "  static semaphore s = new(1);\n"
+                      "  class Inner;\n"
+                      "    function int take();\n"
+                      "      return s.try_get(1);\n"
+                      "    endfunction\n"
+                      "  endclass\n"
+                      "endclass\n"
+                      "module top;\n"
+                      "  int a, b, y;\n"
+                      "  initial begin\n"
+                      "    Outer::Inner i = new;\n"
+                      "    a = i.take();\n"
+                      "    b = Outer::s.try_get(1);\n"
+                      "    y = a * 10 + b;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            10u);
+}
+
 }  // namespace

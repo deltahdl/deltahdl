@@ -52,21 +52,58 @@ struct SyncMember {
 };
 
 // §8.13: the declaration of the property `name` nearest to `from` on its
-// base chain, the one a bare name in a method of `from` denotes, where that
-// declaration is a property of a semaphore or mailbox type with no unpacked
-// dimension, static (§8.9) or not; none where the nearest declaration is
-// anything else or none declares the name.
-static SyncMember SyncPropertyMember(const ClassTypeInfo* from,
-                                     std::string_view name,
-                                     const SimContext& ctx) {
+// base chain, the one a bare name in a method of `from` denotes, of
+// whatever type, with the class declaring it; none where no class of the
+// chain declares the name.
+static SyncMember NearestPropertyDecl(const ClassTypeInfo* from,
+                                      std::string_view name) {
   for (const ClassTypeInfo* t = from; t != nullptr; t = t->parent) {
     if (t->decl == nullptr) continue;
     for (const ClassMember* m : t->decl->members) {
-      if (m->kind != ClassMemberKind::kProperty || m->name != name) continue;
-      bool is_sync = !m->is_param && m->unpacked_dims.empty() &&
-                     SyncKindOfType(m->data_type, ctx) != SyncKind::kNone;
-      return is_sync ? SyncMember{m, t} : SyncMember{};
+      if (m->kind == ClassMemberKind::kProperty && m->name == name)
+        return {m, t};
     }
+  }
+  return {};
+}
+
+static bool IsSyncMember(const SyncMember& m, const SimContext& ctx) {
+  return m.member != nullptr && !m.member->is_param &&
+         m.member->unpacked_dims.empty() &&
+         SyncKindOfType(m.member->data_type, ctx) != SyncKind::kNone;
+}
+
+// The nearest declaration of `name` on the base chain of `from`, where it
+// is a property of a semaphore or mailbox type with no unpacked dimension,
+// static (§8.9) or not; none where the nearest declaration is anything else
+// or none declares the name.
+static SyncMember SyncPropertyMember(const ClassTypeInfo* from,
+                                     std::string_view name,
+                                     const SimContext& ctx) {
+  SyncMember nearest = NearestPropertyDecl(from, name);
+  return IsSyncMember(nearest, ctx) ? nearest : SyncMember{};
+}
+
+// §8.23 (printed pages 200-201): a nested class's method reaches the static
+// properties of the classes enclosing it, innermost first, by their bare
+// names, and a non-static one only through a handle. The nearest
+// declaration of `name` on the base chain of the class nearest to `from`
+// that declares one, where it is a static semaphore or mailbox property;
+// none where that declaration is anything else, or no enclosing class
+// declares the name. Asked of a bare name only once the base chain of
+// `from` itself declares nothing of the name (§8.13), as StaticPropertyOwner
+// walks the chain for a static value property. Walked along the base chain
+// alone, `mb.put(v)` in the nested class reached nothing.
+static SyncMember EnclosingStaticSyncMember(const ClassTypeInfo* from,
+                                            std::string_view name,
+                                            const SimContext& ctx) {
+  for (const ClassTypeInfo* t = from->enclosing; t != nullptr;
+       t = t->enclosing) {
+    SyncMember nearest = NearestPropertyDecl(t, name);
+    if (nearest.member == nullptr) continue;
+    bool is_static_sync =
+        nearest.member->is_static && IsSyncMember(nearest, ctx);
+    return is_static_sync ? nearest : SyncMember{};
   }
   return {};
 }
@@ -97,7 +134,9 @@ static SyncProperty ResolveBareSyncProperty(std::string_view name,
   const ClassTypeInfo* from = ctx.CurrentMethodClass();
   if (from == nullptr && self != nullptr) from = self->type;
   if (from == nullptr || ctx.FindLocalVariable(name) != nullptr) return {};
-  SyncMember member = SyncPropertyMember(from, name, ctx);
+  SyncMember member = NearestPropertyDecl(from, name).member == nullptr
+                          ? EnclosingStaticSyncMember(from, name, ctx)
+                          : SyncPropertyMember(from, name, ctx);
   if (member.member == nullptr) return {};
   return MakeSyncProperty(member, self, std::string(name), ctx);
 }

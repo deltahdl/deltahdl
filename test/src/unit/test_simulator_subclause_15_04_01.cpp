@@ -648,4 +648,34 @@ TEST(MailboxSim, PutThroughAMailboxFormalReachesTheActual) {
             91u);
 }
 
+// §8.23 (printed pages 200-201) with §8.9 (printed 186): a nested class's
+// method reaches the containing class's static properties by their bare
+// names, so Inner's give(4) places into Outer's one static mailbox, which
+// the module's `Outer::mb.num()` counts as 1 and `Outer::mb.get(v)`
+// retrieves the 4 from: 14. The bare name was looked for along Inner's base
+// chain alone, which declares no mb, so the put() reached nothing and the
+// count read 0.
+TEST(MailboxSim, NestedClassMethodPutsIntoTheEnclosingClassStaticMailbox) {
+  EXPECT_EQ(RunAndGet("class Outer;\n"
+                      "  static mailbox mb = new;\n"
+                      "  class Inner;\n"
+                      "    function void give(int v);\n"
+                      "      mb.put(v);\n"
+                      "    endfunction\n"
+                      "  endclass\n"
+                      "endclass\n"
+                      "module top;\n"
+                      "  int v, y;\n"
+                      "  initial begin\n"
+                      "    Outer::Inner i = new;\n"
+                      "    i.give(4);\n"
+                      "    y = Outer::mb.num() * 10;\n"
+                      "    Outer::mb.get(v);\n"
+                      "    y = y + v;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            14u);
+}
+
 }  // namespace

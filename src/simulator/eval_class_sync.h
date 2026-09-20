@@ -67,17 +67,20 @@ struct SyncProperty {
 };
 
 // The semaphore or mailbox property `recv` names: a bare name inside a method
-// of the declaring class or of one derived from it, no local of the name
-// shadowing it, `this.name` or `h.name` through a handle path (§8.4), and
-// `C::name` for a static property of the class C (§8.9); a package's
-// `p::name` and every other shape name none.
+// of the declaring class or of one derived from it, or, for a static
+// property, of a class nested in it (§8.23), no local of the name shadowing
+// it, `this.name` or `h.name` through a handle path (§8.4), and `C::name`
+// for a static property of the class C (§8.9); a package's `p::name` and
+// every other shape name none.
 SyncProperty ResolveSyncProperty(const Expr* recv, SimContext& ctx,
                                  Arena& arena);
 
 // The semaphore or the mailbox the property `prop` holds, for a call of
 // `method` at `loc`, or null where `prop` is of the other kind. A static
-// property not yet built is built here from its declaration's `new` (§8.9
-// creates the one copy once), on the first reference. A property that holds
+// property the class's static initialization (TryInitStaticSyncProperty)
+// did not build -- declared through a typedef the run's table did not yet
+// hold -- is built here from its declaration's `new` (§8.9 creates the one
+// copy once), on the first reference. A property that holds
 // none -- declared with no initializer and never assigned, or an instance
 // property reached through a null handle or from a static method -- is
 // §8.4's illegal access, reported as ResolveThroughNullHandle in
