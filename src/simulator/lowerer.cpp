@@ -315,27 +315,6 @@ void Lowerer::LowerParams(const RtlirModule* mod) {
   }
 }
 
-void Lowerer::LowerAliases(const RtlirModule* mod) {
-  for (const auto& alias : mod->aliases) {
-    if (alias.nets.size() < 2) continue;
-    std::string_view primary;
-    for (auto* net : alias.nets) {
-      if (net->kind != ExprKind::kIdentifier) continue;
-      if (primary.empty()) {
-        primary = net->text;
-      } else {
-        // §10.11: aliased nets denote the same physical net, so they share one
-        // resolved storage. Redirect both the variable map (used for reads) and
-        // the net map (used by continuous-assign driver resolution); otherwise
-        // a driver on the non-primary net writes a Variable the alias never
-        // sees.
-        ctx_.AliasVariable(net->text, primary);
-        ctx_.AliasNet(net->text, primary);
-      }
-    }
-  }
-}
-
 void RegisterInstanceKeyBinding(const std::string& inst_prefix,
                                 std::string_view library, std::string_view name,
                                 SimContext& ctx) {

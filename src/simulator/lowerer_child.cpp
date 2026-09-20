@@ -7,6 +7,7 @@
 #include "common/arena.h"
 #include "common/source_loc.h"
 #include "elaborator/rtlir.h"
+#include "parser/ast_expr.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
 #include "simulator/lowerer_register.h"
@@ -116,6 +117,39 @@ static void CreateChildModuleNets(const std::string& inst_prefix,
   }
 }
 
+// §10.11: an alias statement makes the nets it lists one physical net, each a
+// driver and a receiver of the others, and §23.9 resolves the bare names it
+// writes in the module that declares them, so the alias of a module
+// instantiated twice joins each instance's own nets. The nets of an instance
+// are created under the instance's prefix by CreateChildModuleNets and the
+// top's under their bare names by RegisterModuleNets, so each name the alias
+// writes is keyed the same way: inst_prefix_ is empty for the top. Registered
+// under the bare name alone, an instance's alias found the top's like-named
+// net or none, and an instance's nets stayed apart. The prefixed name is
+// interned in the arena because the variable and net maps hold the key rather
+// than a copy of it.
+void Lowerer::LowerAliases(const RtlirModule* mod) {
+  for (const auto& alias : mod->aliases) {
+    if (alias.nets.size() < 2) continue;
+    std::string_view primary;
+    for (auto* net : alias.nets) {
+      if (net->kind != ExprKind::kIdentifier) continue;
+      const std::string& name =
+          *arena_.Create<std::string>(inst_prefix_ + std::string(net->text));
+      if (primary.empty()) {
+        primary = name;
+        continue;
+      }
+      // The aliased nets share one resolved storage. Both the variable map,
+      // which reads go through, and the net map, which continuous-assign
+      // driver resolution goes through, are redirected; otherwise a driver on
+      // the non-primary net writes a Variable the alias never sees.
+      ctx_.AliasVariable(name, primary);
+      ctx_.AliasNet(name, primary);
+    }
+  }
+}
+
 void Lowerer::LowerChildModules(const RtlirModule* mod) {
   for (const auto& child : mod->children) {
     if (!child.resolved) continue;
@@ -182,6 +216,10 @@ void Lowerer::LowerChildModules(const RtlirModule* mod) {
     inst_prefix_ = child_prefix;
     ctx_.SetLoweringInstancePrefix(inst_prefix_);
 
+    // §10.11: the instance's alias statements join the nets created above,
+    // ahead of the processes and continuous assignments that drive and read
+    // them, as LowerModule orders the top's.
+    LowerAliases(child.resolved);
     uint32_t child_block_id =
         child.resolved->is_program ? next_program_block_id_++ : 0;
     LowerProcesses(child.resolved->processes, child.resolved->is_program,

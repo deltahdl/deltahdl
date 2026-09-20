@@ -78,6 +78,9 @@ class Lowerer {
  private:
   void LowerModule(const RtlirModule* mod);
   void LowerParams(const RtlirModule* mod);
+  // §10.11: joins the nets each alias statement of `mod` lists, under the
+  // names the instance inst_prefix_ names creates them by. Defined in
+  // src/simulator/lowerer_child.cpp beside the child lowering that shares it.
   void LowerAliases(const RtlirModule* mod);
   // Creates the storage a variable declaration states, keyed under `name`.
   // `name` is the name the storage is reachable by, which is the declared name
