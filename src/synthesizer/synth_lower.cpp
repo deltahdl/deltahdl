@@ -385,8 +385,9 @@ uint32_t SynthLower::LowerLiteralBit(const Expr* expr, uint32_t bit) {
   // §5.7.1 sizes an integer literal by its size constant, "in terms of its
   // exact number of bits", which admits a literal wider than the 64 bits
   // Expr::int_val holds: `128'h1_0000_0000_0000_0000` writes bit 64, and
-  // Parser::ParseIntText leaves int_val at zero for a value that overflows it.
-  // The digits are therefore what answers a literal written with a base.
+  // Parser::ParseIntText folds the digits modulo 2^64, so int_val holds the
+  // value's low 64 bits and nothing of bit 64 or above. The digits are
+  // therefore what answers a literal written with a base.
   const PatternBits& bits = LiteralBits(expr);
   if (bits.has_digits) {
     // §5.7.1 pads the number "to the left with zeros" above the positions its
