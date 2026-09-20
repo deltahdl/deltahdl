@@ -1,6 +1,12 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <string>
+
+#include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "helpers_scheduler.h"
+#include "simulator/variable.h"
 
 using namespace delta;
 
@@ -226,6 +232,84 @@ TEST(PackageImportSim, GenerateBlockImportedArrayElementReadInTheBlock) {
                       "endmodule\n",
                       "y2"),
             73u);
+}
+
+// A design whose package p5 declares the packed structure st2, a 4-bit a
+// above a 12-bit b, and `st2 u = '{b: 12'hBCD, a: 4'hA};`, and a module top
+// whose items are `top_items`; answers the top's y.
+static uint64_t PackageStructRead(const std::string& top_items) {
+  return RunAndGet(
+      "package p5;\n"
+      "  typedef struct packed { logic [3:0] a; logic [11:0] b; } st2;\n"
+      "  st2 u = '{b: 12'hBCD, a: 4'hA};\n"
+      "endpackage\n"
+      "module top;\n" +
+          top_items + "endmodule\n",
+      "y");
+}
+
+// §26.3 (printed page 810) with §7.2.1 (printed 147) and §10.9.2 (printed
+// 263): `p5::u.b` names the member b of the package's own `st2 u`, laid out
+// as st2 lays it, so the keyed pattern's 12'hBCD is read back from b. The
+// package's storage stood under "p5.u" with no layout registered for it
+// (CreatePackageDataVariables in lowerer_package_data.cpp), so the read
+// resolved through no member and answered 0, and the pattern was
+// concatenated in written order rather than placed by member.
+TEST(PackageImportSim, PackageStructVariableMemberReadThroughItsScopedName) {
+  EXPECT_EQ(PackageStructRead("  int y;\n"
+                              "  initial y = p5::u.b;\n"),
+            0xBCDu);
+}
+
+// §26.3 (printed page 810) with §7.2.1 (printed 147): a wildcard import
+// makes the package's u visible under its bare name, the one variable the
+// package declares, so `u.b` reads the same 12'hBCD `p5::u.b` does. The
+// import bound the carrier variable alone, with none of its layout
+// (AliasVariableKinds), so the read resolved through no member and answered
+// 0.
+TEST(PackageImportSim, ImportedPackageStructVariableMemberReadByItsBareName) {
+  EXPECT_EQ(PackageStructRead("  import p5::*;\n"
+                              "  int y;\n"
+                              "  initial y = u.b;\n"),
+            0xBCDu);
+}
+
+// §26.3 (printed page 810) with §11.9 (printed 304): the imported bare u
+// and `p6::u` name the one package variable, which has one tag, so after the
+// module's `u = tagged Other 3;` the read `p6::u.Valid` is inconsistent with
+// Other and is reported at its line, naming the union by the scoped spelling
+// the read used. The retag was recorded under the module's bare name
+// (TagKeyOfName in eval_member_path.cpp) while the read asked under "p6.u"
+// and found the initializer's Valid there, so the 3 was read as Valid
+// unreported.
+TEST(PackageImportSim,
+     ImportedPackageTaggedUnionRetaggedByItsBareNameIsOneTag) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "package p6;\n"
+      "  typedef union tagged { void Invalid; int Valid; int Other; } u_t;\n"
+      "  u_t u = tagged Valid 9;\n"
+      "endpackage\n"
+      "module top;\n"
+      "  import p6::*;\n"
+      "  int y;\n"
+      "  initial begin\n"
+      "    u = tagged Other 3;\n"
+      "    y = p6::u.Valid;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  LowerAndRun(design, f);
+  Variable* y = f.ctx.FindVariable("y");
+  ASSERT_NE(y, nullptr);
+  EXPECT_FALSE(y->value.IsKnown());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "run-time error: accessing member 'Valid' of tagged union 'p6.u' "
+      "which currently has tag 'Other'",
+      10, "11.9"));
 }
 
 }  // namespace

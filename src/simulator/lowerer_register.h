@@ -228,10 +228,11 @@ void AliasUnitDataItems(const RtlirDesign* design, const RtlirModule* mod,
 // §26.3 with §26.6: the per-name records and objects the storage under
 // `qname` carries -- its class record, real registration, queue,
 // associative array, fixed-size or dynamic array with its elements,
-// semaphore and mailbox -- given to the alias `key`, so that a method call,
-// an element select or a `new` through the alias reaches the one object.
-// Defined in src/simulator/lowerer_import.cpp, where the import's and the
-// export's aliases take it.
+// semaphore, mailbox and structure or union layout -- given to the alias
+// `key`, so that a method call, an element select, a member select or a
+// `new` through the alias reaches the one object. Defined in
+// src/simulator/lowerer_alias_kinds.cpp; the import's, the export's and the
+// unit's aliases take it.
 void AliasVariableKinds(std::string_view key, std::string_view qname,
                         SimContext& ctx, Arena& arena);
 // Whether the module declares `name` itself, as a variable, a port or a

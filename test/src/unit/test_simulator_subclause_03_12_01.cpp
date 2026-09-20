@@ -780,30 +780,36 @@ TEST(CompilationUnitSim, CuScopeStructVariableMemberReadThroughUnitPrefix) {
 }
 
 // A design whose unit declares a three-member tagged union type u_t and
-// `u_t u = tagged Valid 9;`, and a module top declaring its own
-// `u_t u = tagged Other 3;` with `int y` and the function f of one by-value
-// u_t formal a returning a.Other, whose one initial statement is `stmt`;
-// runs it in `f` and answers the top's y, null where the design did not
-// elaborate. The two u's hold different tags so that a tag read from the
-// wrong storage reads apart.
-static Variable* RunUnitTaggedUnion(const std::string& stmt, SimFixture& f) {
+// `u_t u = tagged Valid 9;` on its first two lines, and a module top whose
+// items are `top_items`, from line 4 on; runs it in `f` and answers the
+// top's y, null where the design did not elaborate.
+static Variable* RunUnitTaggedUnion(const std::string& top_items,
+                                    SimFixture& f) {
   auto* design = ElaborateSrc(
       "typedef union tagged { void Invalid; int Valid; int Other; } u_t;\n"
       "u_t u = tagged Valid 9;\n"
-      "module top;\n"
-      "  u_t u = tagged Other 3;\n"
-      "  int y;\n"
-      "  function int f(u_t a);\n"
-      "    return a.Other;\n"
-      "  endfunction\n"
-      "  initial " +
-          stmt + "\n" + "endmodule\n",
+      "module top;\n" +
+          top_items + "endmodule\n",
       f);
   EXPECT_NE(design, nullptr);
   if (design == nullptr) return nullptr;
   EXPECT_FALSE(f.has_errors);
   LowerAndRun(design, f);
   return f.ctx.FindVariable("y");
+}
+
+// The top of the two tests below: its own `u_t u = tagged Other 3;`, so
+// that a tag read from the wrong storage reads apart, `int y`, and the
+// function f of one by-value u_t formal a returning a.Other on line 7,
+// followed by the initial statement `stmt` on line 9.
+static std::string TopWithItsOwnUnion(const std::string& stmt) {
+  return "  u_t u = tagged Other 3;\n"
+         "  int y;\n"
+         "  function int f(u_t a);\n"
+         "    return a.Other;\n"
+         "  endfunction\n"
+         "  initial " +
+         stmt + "\n";
 }
 
 // §3.12.1 (printed page 56) with §7.3.2 (printed 151), §13.5.1 (printed
@@ -816,7 +822,7 @@ static Variable* RunUnitTaggedUnion(const std::string& stmt, SimFixture& f) {
 // bound to an empty tag, the read went unchecked and y took the 9.
 TEST(CompilationUnitSim, CuScopeTaggedUnionActualCarriesTheUnitsTag) {
   SimFixture f;
-  Variable* y = RunUnitTaggedUnion("y = f($unit::u);", f);
+  Variable* y = RunUnitTaggedUnion(TopWithItsOwnUnion("y = f($unit::u);"), f);
   ASSERT_NE(y, nullptr);
   EXPECT_FALSE(y->value.IsKnown());
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
@@ -834,7 +840,8 @@ TEST(CompilationUnitSim, CuScopeTaggedUnionActualCarriesTheUnitsTag) {
 TEST(CompilationUnitSim,
      CuScopeTaggedUnionMemberReadThroughUnitPrefixIsChecked) {
   SimFixture f;
-  Variable* y = RunUnitTaggedUnion("y = $unit::u.Other;", f);
+  Variable* y =
+      RunUnitTaggedUnion(TopWithItsOwnUnion("y = $unit::u.Other;"), f);
   ASSERT_NE(y, nullptr);
   EXPECT_FALSE(y->value.IsKnown());
   EXPECT_TRUE(ReportedError(
@@ -842,6 +849,50 @@ TEST(CompilationUnitSim,
       "run-time error: accessing member 'Other' of tagged union '$unit.u' "
       "which currently has tag 'Valid'",
       9, "11.9"));
+}
+
+// §3.12.1 (printed page 56) with §7.2.1 (printed 147): a module declaring
+// no u reaches the unit's `st2 u` by its bare name, the one variable the
+// unit declares, so `u.b` reads the 12'hBCD its layout places in b, as
+// `$unit::u.b` does. The module's bare u was bound to the unit's storage
+// with none of its layout (AliasVariableKinds, then in lowerer_import.cpp),
+// so the read resolved through no member and answered 0.
+TEST(CompilationUnitSim, CuScopeStructVariableMemberReadByItsBareName) {
+  EXPECT_EQ(RunAndGet("typedef struct packed { logic [3:0] a; logic [11:0] b; }"
+                      " st2;\n"
+                      "st2 u = '{b: 12'hBCD, a: 4'hA};\n"
+                      "module top;\n"
+                      "  int y;\n"
+                      "  initial y = u.b;\n"
+                      "endmodule\n",
+                      "y"),
+            0xBCDu);
+}
+
+// §3.12.1 (printed page 56) with §11.9 (printed 304): the module's bare u
+// and `$unit::u` name the one unit variable, which has one tag, so after
+// the module's `u = tagged Other 3;` the read `$unit::u.Valid` is
+// inconsistent with Other and is reported at its line, naming the union by
+// the prefixed spelling the read used. The retag was recorded under the
+// module's bare name (TagKeyOfName in eval_member_path.cpp) while the read
+// asked under "$unit.u" and found the initializer's Valid there, so the 3
+// was read as Valid unreported.
+TEST(CompilationUnitSim, CuScopeTaggedUnionRetaggedByItsBareNameIsOneTag) {
+  SimFixture f;
+  Variable* y = RunUnitTaggedUnion(
+      "  int y;\n"
+      "  initial begin\n"
+      "    u = tagged Other 3;\n"
+      "    y = $unit::u.Valid;\n"
+      "  end\n",
+      f);
+  ASSERT_NE(y, nullptr);
+  EXPECT_FALSE(y->value.IsKnown());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "run-time error: accessing member 'Valid' of tagged union '$unit.u' "
+      "which currently has tag 'Other'",
+      7, "11.9"));
 }
 
 }  // namespace

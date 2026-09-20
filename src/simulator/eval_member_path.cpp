@@ -43,10 +43,35 @@ const StructTypeInfo* StructLayoutOfName(std::string_view name,
   return ctx.GetVariableStructType(name);
 }
 
+// §11.9 (printed page 304) with §3.12.1 (printed 56) and §26.3 (printed
+// 810): a tagged union variable has one tag, whichever name it is written or
+// read by, and the tag table (SimContext::var_tags_) keys it by name with no
+// alias of its own, so an alias of a variable -- a module's bare `u` bound to
+// the unit's "$unit.u" by AliasUnitDataItems, or an import's name bound to
+// "pk.u" -- resolves to the key its storage stands under: the key its layout
+// is registered by (StructTypeInfo::type_name, which the builder spells as
+// the registration's key), where that key names the same variable as `key`
+// does. A module's own declaration registers its layout under its storage
+// key (RegisterAggregateLayout), so its key answers itself, and a package's
+// or the unit's variable is given a registration under its own key when it
+// is first aliased (AliasLayout in lowerer_alias_kinds.cpp); a name bound to
+// a typedef's registration, which names no variable, keeps its key. Under
+// the alias's own key, `u = tagged Other 3;` in a module declaring no u
+// recorded Other under "u" while `$unit::u.Valid` read the initializer's
+// Valid under "$unit.u" and passed a read the subclause reports.
+static std::string StorageKeyOfLayout(const std::string& key, SimContext& ctx) {
+  const StructTypeInfo* info = ctx.GetVariableStructType(key);
+  if (info == nullptr || info->type_name == key) return key;
+  Variable* own = ctx.FindVariable(key);
+  if (own == nullptr || ctx.FindVariable(info->type_name) != own) return key;
+  return std::string(info->type_name);
+}
+
 std::string TagKeyOfName(std::string_view name, SimContext& ctx) {
   if (ctx.FindLocalVariable(name) != nullptr) return std::string(name);
   std::string prefixed = ctx.ActiveInstancePrefix() + std::string(name);
-  if (ctx.GetVariableStructType(prefixed) != nullptr) return prefixed;
+  if (ctx.GetVariableStructType(prefixed) != nullptr)
+    return StorageKeyOfLayout(prefixed, ctx);
   return std::string(name);
 }
 

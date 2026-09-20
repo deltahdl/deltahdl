@@ -59,7 +59,11 @@ const StructTypeInfo* StructLayoutOfName(std::string_view name,
 // under. Resolved as StructLayoutOfName resolves the layout: a local's bare
 // name, else the running instance's prefixed key where a layout stands under
 // it (a tagged union always registers one), else the bare name, which a
-// top-level object is keyed by. Both the procedural `u = tagged M v` writer
+// top-level object is keyed by; a name bound as an alias of a package's or
+// the unit's storage (AliasLayout in lowerer_alias_kinds.cpp) resolves on to
+// the key that storage stands under, "$unit.u" or "pk.u", so the alias and
+// the scoped spelling record and read one tag (§3.12.1, §26.3). Both the
+// procedural `u = tagged M v` writer
 // and the readers of the tag ask by this key, so a union initialized in its
 // declaration inside an instance keeps its tag through every later access.
 // Defined in eval_member_path.cpp.
