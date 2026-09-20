@@ -835,6 +835,22 @@ void Lowerer::LowerCompilationUnitClasses() {
   }
 }
 
+// The design's type names and the packages' own declarations, registered
+// ahead of every module: RegisterDesignTypeWidths for the names, and §7.2.1's
+// layouts for the member selects that reach a value no variable holds. §26.2:
+// a package variable's declaration assignment may call a function of the
+// package or of one it imports and name an enumeration constant, so the
+// subroutines and the constants are registered before the variables are
+// initialized.
+static void RegisterDesignTypesAndPackages(const RtlirDesign* design,
+                                           SimContext& ctx, Arena& arena) {
+  RegisterDesignTypeWidths(design, ctx);
+  RegisterDesignTypeLayouts(design, ctx, arena);
+  RegisterPackageScopedSubroutines(design, ctx, arena);
+  RegisterPackageEnumConstants(design, ctx, arena);
+  InitPackageDataVariables(design, ctx, arena);
+}
+
 void Lowerer::Lower(const RtlirDesign* design) {
   if (!design) return;
   // §20.10.1: a $fatal or $error elaboration severity task that survived
@@ -857,17 +873,7 @@ void Lowerer::Lower(const RtlirDesign* design) {
   for (auto* top : design->top_modules) {
     RegisterScopeTimescales(top, ctx_, std::string(top->name), "");
   }
-  RegisterDesignTypeWidths(design, ctx_);
-  // §7.2.1: what is inside each of those names, for the member selects that
-  // reach a value no variable holds.
-  RegisterDesignTypeLayouts(design, ctx_, arena_);
-  // §26.2: a package variable's declaration assignment may call a function
-  // of the package or of one it imports and name an enumeration constant, so
-  // the subroutines and the constants are registered before the variables are
-  // initialized.
-  RegisterPackageScopedSubroutines(design, ctx_, arena_);
-  RegisterPackageEnumConstants(design, ctx_, arena_);
-  InitPackageDataVariables(design, ctx_, arena_);
+  RegisterDesignTypesAndPackages(design, ctx_, arena_);
 
   // §16.5.1 reads a concurrent assertion's variables as of the Preponed region
   // of the time slot the clock tick falls in. No event reaches a Preponed

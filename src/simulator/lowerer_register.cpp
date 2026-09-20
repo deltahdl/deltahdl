@@ -240,6 +240,22 @@ static void ShapePackageVariable(const ModuleItem* item, Variable* var,
   if (is_real) ctx.RegisterRealVariable(qname);
 }
 
+// One package item's storage under its "pk.name" key: every variable
+// declaration at its declared type's shape, and a parameter with an
+// initializer as a 32-bit constant; any other item declares no data.
+static void InitPackageDataItem(const ModuleItem* item, std::string_view pkg,
+                                SimContext& ctx, Arena& arena) {
+  bool is_param = item->kind == ModuleItemKind::kParamDecl;
+  bool is_var = item->kind == ModuleItemKind::kVarDecl;
+  if (!(is_var || (is_param && item->init_expr))) return;
+  auto* qname = arena.Create<std::string>(std::string(pkg) + "." +
+                                          std::string(item->name));
+  uint32_t width = is_var ? DeclaredTypeWidth(item->data_type, ctx) : 0;
+  auto* var = ctx.CreateVariable(*qname, width == 0 ? 32 : width);
+  if (is_var) ShapePackageVariable(item, var, *qname, ctx, arena);
+  if (item->init_expr) var->value = EvalExpr(item->init_expr, ctx, arena);
+}
+
 void InitPackageDataVariables(const RtlirDesign* design, SimContext& ctx,
                               Arena& arena) {
   for (auto* pkg : design->packages) {
@@ -250,17 +266,8 @@ void InitPackageDataVariables(const RtlirDesign* design, SimContext& ctx,
     // (SimContext::FindInPackageScope and FindFunctionInPackageScope); the same
     // frame serves here.
     ctx.PushScope(pkg->name);
-    for (auto* item : pkg->items) {
-      bool is_param = item->kind == ModuleItemKind::kParamDecl;
-      bool is_var = item->kind == ModuleItemKind::kVarDecl;
-      if (!(is_var || (is_param && item->init_expr))) continue;
-      auto* qname = arena.Create<std::string>(std::string(pkg->name) + "." +
-                                              std::string(item->name));
-      uint32_t width = is_var ? DeclaredTypeWidth(item->data_type, ctx) : 0;
-      auto* var = ctx.CreateVariable(*qname, width == 0 ? 32 : width);
-      if (is_var) ShapePackageVariable(item, var, *qname, ctx, arena);
-      if (item->init_expr) var->value = EvalExpr(item->init_expr, ctx, arena);
-    }
+    for (auto* item : pkg->items)
+      InitPackageDataItem(item, pkg->name, ctx, arena);
     ctx.PopScope();
   }
 }
