@@ -20,6 +20,7 @@
 #include "simulator/eval_call_result.h"
 #include "simulator/eval_class_sync.h"
 #include "simulator/eval_expr_internal.h"
+#include "simulator/eval_function_args_internal.h"
 #include "simulator/eval_function_args_scoped.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
@@ -34,69 +35,14 @@
 
 namespace delta {
 
-// §13.5: an actual argument is an expression of the caller, read before the
-// subroutine's formals exist. BindFunctionArgs runs after the callee's scope
-// is pushed, and for a static subroutine §13.3.2 has that scope carry the
-// formals of the last call, so an actual named after a formal read the formal:
-// error_type(opcode) with `input int opcode` refreshed the formal from itself
-// and never saw the caller's opcode change, and an actual named after a formal
-// bound just before it read that formal instead of the caller's variable.
-// While one of these lives the callee's scope is set aside and the caller's
-// stands on top; it is put back when the object goes, so the binding that
-// follows the read still lands in the callee's scope.
-//
-// The callee's object is set aside with its scope. §8.11 (printed page 187)
-// makes a property named inside a method, bare or through `this`, the
-// property of the object the method was invoked on, and the actual is
-// written inside the caller's method: `b.add8(v)` in a method of A names
-// A's `v`. ExecInstanceMethodCall and SetupInstanceTaskCall push the
-// callee's object, and the class defining the method with it, before the
-// actuals are bound, so `v` was looked up on B's object, which has none, and
-// add8 was passed 0. Which binding this holds for is what BindFunctionArgs
-// decides (CalleeOwnsThis) and records for the reads of the actuals.
-static bool& CalleeOwnsThisFlag() {
+// The flag CalleeScopeAside reads (eval_function_args_internal.h): whether
+// the object on top of the `this` stack is the callee's own, which
+// BindFunctionArgs decides (CalleeOwnsThis) for one binding at a time
+// (CalleeOwnsThisScope).
+bool& CalleeOwnsThisFlag() {
   static thread_local bool flag = false;
   return flag;
 }
-
-class CalleeScopeAside {
- public:
-  explicit CalleeScopeAside(SimContext& ctx) : ctx_(ctx) {
-    std::vector<Scope> stack = ctx_.SwapScopeStack({});
-    if (!stack.empty()) {
-      callee_ = std::move(stack.back());
-      stack.pop_back();
-      set_aside_ = true;
-    }
-    ctx_.SwapScopeStack(std::move(stack));
-    if (!CalleeOwnsThisFlag()) return;
-    self_ = ctx_.CurrentThis();
-    method_class_ = ctx_.CurrentMethodClass();
-    ctx_.PopThis();
-    ctx_.PopMethodClass();
-    this_set_aside_ = true;
-  }
-  ~CalleeScopeAside() {
-    if (this_set_aside_) {
-      ctx_.PushMethodClass(method_class_);
-      ctx_.PushThis(self_);
-    }
-    if (!set_aside_) return;
-    std::vector<Scope> stack = ctx_.SwapScopeStack({});
-    stack.push_back(std::move(callee_));
-    ctx_.SwapScopeStack(std::move(stack));
-  }
-  CalleeScopeAside(const CalleeScopeAside&) = delete;
-  CalleeScopeAside& operator=(const CalleeScopeAside&) = delete;
-
- private:
-  SimContext& ctx_;
-  Scope callee_;
-  bool set_aside_ = false;
-  ClassObject* self_ = nullptr;
-  const ClassTypeInfo* method_class_ = nullptr;
-  bool this_set_aside_ = false;
-};
 
 // Whether the object on top of the `this` stack is the callee's own, pushed
 // for the call being bound rather than the caller's: the call is written on a
@@ -832,25 +778,6 @@ static bool TryReuseStaticFormal(const FunctionArg& param,
   return true;
 }
 
-// §13.5.1 (printed page 348) with §8.2 (printed 180): an object passed by
-// value is passed as its handle, so the actual of a `mailbox m` or
-// `semaphore s` formal is read for the object it is a handle to
-// (ResolveSyncActual), in the caller's scope as ResolveArgValue reads its
-// value -- an actual named after a formal bound just before it would read
-// that formal. Of kind kNone, binding nothing, for a formal of any other
-// type; the value copied in is the carrier alone, which names no object, so
-// the body's `m.put(v)` and a constructor's `mb = m` reached no mailbox.
-static SyncHandle SyncActualOf(const FunctionArg& param,
-                               const ActualArgRef& ref, SimContext& ctx,
-                               Arena& arena) {
-  SyncHandle handle;
-  handle.kind = SyncKindOfType(param.data_type, ctx);
-  const Expr* actual = ActualExprOf(ref);
-  if (handle.kind == SyncKind::kNone || actual == nullptr) return handle;
-  CalleeScopeAside aside(ctx);
-  return ResolveSyncActual(handle.kind, actual, ctx, arena);
-}
-
 static void BindValueArg(const FunctionArg& param, const ActualArgRef& actual,
                          const ModuleItem* func, SimContext& ctx,
                          Arena& arena) {
@@ -892,7 +819,7 @@ static void BindValueArg(const FunctionArg& param, const ActualArgRef& actual,
     val = MakeLogic4VecVal(arena, val.width, 0);
 
   bool is_static_sub = func && func->is_static && !func->is_automatic;
-  SyncHandle sync = SyncActualOf(param, bound, ctx, arena);
+  SyncHandle sync = SyncActualOf(param, ActualExprOf(bound), func, ctx, arena);
   if (TryReuseStaticFormal(param, bound, val, func, ctx)) {
     BindSyncFormal(sync, ctx.FindLocalVariable(param.name), ctx);
     return;
