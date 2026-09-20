@@ -1,9 +1,16 @@
 #include <gtest/gtest.h>
 
+#include <iostream>
+#include <sstream>
+#include <streambuf>
 #include <string>
 
+#include "elaborator/elaborator.h"
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
+#include "lexer/lexer.h"
+#include "parser/parser.h"
+#include "preprocessor/preprocessor.h"
 #include "simulator/lowerer.h"
 
 using namespace delta;
@@ -15,6 +22,27 @@ static std::string ElemChar(SimFixture& f, const std::string& name) {
   if (!v) return "";
   auto val = static_cast<char>(v->value.ToUint64() & 0xFF);
   return std::string(1, val);
+}
+
+// The run's output for `src` taken through the preprocessor first, for a case
+// whose literal reaches the simulator through a macro body or argument.
+static std::string PreprocessAndCapture(const std::string& src) {
+  SimFixture f;
+  auto fid = f.mgr.AddFile("<test>", src);
+  Preprocessor pp(f.mgr, f.diag, {});
+  auto preprocessed = pp.Preprocess(fid);
+  auto fid2 = f.mgr.AddFile("<preprocessed>", preprocessed);
+  Lexer lexer(f.mgr.FileContent(fid2), fid2, f.diag,
+              TextOrigin::kPreprocessorOutput);
+  Parser parser(lexer, f.arena, f.diag);
+  auto* cu = parser.Parse();
+  Elaborator elab(f.arena, f.diag, cu);
+  auto* design = elab.Elaborate(TopNameOf(cu));
+  std::ostringstream captured;
+  std::streambuf* old_buf = std::cout.rdbuf(captured.rdbuf());
+  if (design != nullptr) LowerAndRun(design, f);
+  std::cout.rdbuf(old_buf);
+  return captured.str();
 }
 
 TEST(LexicalConventionSim, SingleCharValue) {
@@ -211,6 +239,84 @@ TEST(LexicalConventionSim, DisplayFormatEscapedNewlineThenContinuation) {
       "endmodule\n",
       f);
   EXPECT_EQ(out, "[x\ny]\n");
+}
+
+// §5.9 (printed page 81): a triple-quoted string literal is the text between
+// its triple quotes and in every other way the same literal as a quoted one,
+// so as a `$display` format it prints that text. The format string's own
+// decoder stripped one quote at each end and printed `""plain""`; the string
+// variable initializer beside it was already right.
+TEST(LexicalConventionSim, TripleQuotedDisplayFormatPrintsItsText) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  initial $display(\"\"\"plain\"\"\");\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "plain\n");
+}
+
+// §5.9 (printed page 81): a `"` stands directly inside a triple-quoted string,
+// so the format prints it as a character of the text.
+TEST(LexicalConventionSim, TripleQuotedDisplayFormatKeepsAnInnerQuote) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  initial $display(\"\"\"[a \"b\"]\"\"\");\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "[a \"b\"]\n");
+}
+
+// §5.9's Example 3 (printed page 81): a newline stands directly inside a
+// triple-quoted string, so the format prints its two lines as they are
+// written, the inner quotes with them.
+TEST(LexicalConventionSim, TripleQuotedDisplayFormatWithADirectNewline) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  initial $display(\"\"\"sat on a \"wall\".\n"
+      "had a great fall. \"\"\");\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "sat on a \"wall\".\nhad a great fall. \n");
+}
+
+// §21.2.1 (printed page 655): every string literal argument of `$write` is
+// output literally, so a triple-quoted literal after another literal prints
+// its text after the first's. The literal was split at its first inner `"`
+// and printed `""a "b"""`. The `\"` is the escape a quoted string needs too,
+// since a bare `"` before the closing `"""` would close the literal early.
+TEST(LexicalConventionSim, TripleQuotedLiteralAfterAnotherPrintsItsText) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  initial $write(\"x\", \"\"\"a \"b\\\"\"\"\");\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "xa \"b\"");
+}
+
+// §22.5.1 with §5.9: a triple-quoted literal as a macro's whole body reaches
+// `$display` as the same literal and prints its text.
+TEST(LexicalConventionSim, TripleQuotedMacroBodyPrintsItsText) {
+  auto out = PreprocessAndCapture(
+      "`define MSG \"\"\"say \"hi\" now\"\"\"\n"
+      "module t;\n"
+      "  initial $display(`MSG);\n"
+      "endmodule\n");
+  EXPECT_EQ(out, "say \"hi\" now\n");
+}
+
+// §22.5.1 with §5.9: a triple-quoted literal as a macro's actual argument is
+// substituted whole, its inner `"` included, and prints its text.
+TEST(LexicalConventionSim, TripleQuotedMacroArgumentPrintsItsText) {
+  auto out = PreprocessAndCapture(
+      "`define SHOW(s) $display(s)\n"
+      "module t;\n"
+      "  initial `SHOW(\"\"\"arg \"x\" here\"\"\");\n"
+      "endmodule\n");
+  EXPECT_EQ(out, "arg \"x\" here\n");
 }
 
 }  // namespace

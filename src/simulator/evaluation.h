@@ -462,6 +462,10 @@ Logic4Vec EvalUnbasedUnsized(const Expr* expr, Arena& arena);
 // fills_width is clear. Defined in evaluation.cpp.
 Logic4Vec FillUnbasedUnsized(const Logic4Vec& v, uint32_t width, Arena& arena);
 Logic4Vec EvalIntLiteral(const Expr* expr, Arena& arena);
+// The text between a string literal token's delimiters, `"""` or `"`, with
+// its escape sequences still undecoded; text with neither is returned as it
+// is. Defined in evaluation_literal.cpp.
+std::string_view StringLiteralBody(std::string_view text);
 Logic4Vec EvalStringLiteral(const Expr* expr, Arena& arena);
 
 }  // namespace delta

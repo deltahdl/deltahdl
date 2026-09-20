@@ -562,13 +562,19 @@ static std::vector<uint8_t> DecodeStringBody(std::string_view text) {
   }
   return bytes;
 }
-Logic4Vec EvalStringLiteral(const Expr* expr, Arena& arena) {
-  auto text = expr->text;
+std::string_view StringLiteralBody(std::string_view text) {
+  // §5.9 (printed page 81): a triple-quoted string literal is the text between
+  // its `"""` delimiters, and in every other way the same literal as a quoted
+  // one; a lone `"` inside it is one of its items.
   if (text.size() >= 6 && text.substr(0, 3) == "\"\"\"")
-    text = text.substr(3, text.size() - 6);
-  else if (text.size() >= 2 && text.front() == '"')
-    text = text.substr(1, text.size() - 2);
-  auto bytes = DecodeStringBody(text);
+    return text.substr(3, text.size() - 6);
+  if (text.size() >= 2 && text.front() == '"')
+    return text.substr(1, text.size() - 2);
+  return text;
+}
+
+Logic4Vec EvalStringLiteral(const Expr* expr, Arena& arena) {
+  auto bytes = DecodeStringBody(StringLiteralBody(expr->text));
   uint32_t width = static_cast<uint32_t>(bytes.size()) * 8;
   if (width == 0) width = 8;
   auto vec = MakeLogic4Vec(arena, width);

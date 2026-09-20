@@ -922,11 +922,7 @@ std::string FormatDisplay(const std::string& fmt,
 }
 
 std::string ExtractFormatString(const Expr* first_arg) {
-  auto text = first_arg->text;
-  if (text.size() >= 2 && text.front() == '"') {
-    return std::string(text.substr(1, text.size() - 2));
-  }
-  return std::string(text);
+  return std::string(StringLiteralBody(first_arg->text));
 }
 
 }  // namespace delta
