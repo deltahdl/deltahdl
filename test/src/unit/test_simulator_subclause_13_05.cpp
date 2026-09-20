@@ -550,4 +550,80 @@ TEST(SubroutineCallSim, TaskActualNamingAPropertyOfTheCallingObject) {
   EXPECT_EQ(var->value.ToUint64(), 48u);
 }
 
+// §13.5 (printed page 348) copies an output or inout formal to its actual
+// when the task returns, and the actual is written in the enabling method,
+// so by §8.11 (printed 187) a property it names is the enabling object's:
+// `b.addt(v, w)` and `b.dbl(z)` in a task of A leave 48 in A's `w` and 14 in
+// A's `z`, and B's `w` and `z` -- the same names, so a copy-out on the wrong
+// object shows as their change -- keep 3 and 5. With B's object still in
+// force for the copy-out, A's kept 1 and 7 while B's took 48 and 14.
+TEST(SubroutineCallSim, TaskOutputActualNamingAPropertyOfTheCallingObject) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int aw, az, bw, bz;\n"
+      "  class B;\n"
+      "    int w = 3;\n"
+      "    int z = 5;\n"
+      "    task addt(input int a, output int o); o = a + 8; endtask\n"
+      "    task dbl(inout int io); io = io * 2; endtask\n"
+      "  endclass\n"
+      "  class A;\n"
+      "    int v = 40;\n"
+      "    int w = 1;\n"
+      "    int z = 7;\n"
+      "    task via();\n"
+      "      B b = new;\n"
+      "      b.addt(v, w);\n"
+      "      b.dbl(z);\n"
+      "      aw = w; az = z; bw = b.w; bz = b.z;\n"
+      "    endtask\n"
+      "  endclass\n"
+      "  initial begin\n"
+      "    A a = new;\n"
+      "    a.via();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design,
+                   {{"aw", 48u}, {"az", 14u}, {"bw", 3u}, {"bz", 5u}});
+}
+
+// The same rule one enable deeper: B's task `outer`, enabled from A's,
+// enables C's `addt` with B's own `w` as the output actual, so the copy-out
+// lands on B's object (48), `outer` answers 49 into A's `w`, and C's `w`
+// keeps 2. With the enabled task's object still in force for each copy-out,
+// C's `w` took 48, B's took 4 and A's kept 1.
+TEST(SubroutineCallSim, TaskOutputActualOfANestedTaskNamingTheEnablingObject) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int aw, bw, cw;\n"
+      "  class C;\n"
+      "    int w = 2;\n"
+      "    task addt(input int a, output int o); o = a + 8; endtask\n"
+      "  endclass\n"
+      "  class B;\n"
+      "    int w = 3;\n"
+      "    task outer(input int a, output int o);\n"
+      "      C c = new;\n"
+      "      c.addt(a, w);\n"
+      "      o = w + 1;\n"
+      "      bw = w; cw = c.w;\n"
+      "    endtask\n"
+      "  endclass\n"
+      "  class A;\n"
+      "    int v = 40;\n"
+      "    int w = 1;\n"
+      "    task via(); B b = new; b.outer(v, w); aw = w; endtask\n"
+      "  endclass\n"
+      "  initial begin\n"
+      "    A a = new;\n"
+      "    a.via();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"aw", 49u}, {"bw", 48u}, {"cw", 2u}});
+}
+
 }  // namespace

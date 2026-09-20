@@ -182,15 +182,20 @@ bool SetupInstanceTaskCall(const Expr* expr, SimContext& ctx, Arena& arena,
 
 void TeardownInstanceTaskCall(const InstanceMethodInfo& call, const Expr* expr,
                               SimContext& ctx, Arena& arena) {
-  // §13.5.2: output and inout arguments are copied back to the caller on
-  // return, as the instance-method path does.
+  // §13.5: output and inout arguments are copied back to the caller on
+  // return, as the instance-method path does. The actual is an expression of
+  // the enabling method's, so §8.11 makes a property it names the enabling
+  // object's: `b.addt(v, w)` in a task of A names A's `w`. The copy-out is
+  // therefore made once the task's `this` and its class are popped, as
+  // ExecInstanceMethodCall pops them before its writeback; with B's object
+  // still in force the value landed on B's `w` and A's never changed.
+  if (call.obj != nullptr) ctx.PopThis();
+  ctx.PopMethodClass();
   WritebackOutputArgs(call.method, expr, ctx, arena);
   WritebackQueueRefs(ctx);
   WritebackAssocRefs(ctx);
   ctx.PopFuncName();
-  if (call.obj != nullptr) ctx.PopThis();
   ctx.PopScope();
-  ctx.PopMethodClass();
 }
 
 void ExecCallStmtExpr(const Expr* expr, SimContext& ctx, Arena& arena) {
