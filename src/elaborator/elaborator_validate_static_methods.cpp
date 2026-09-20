@@ -147,10 +147,39 @@ std::unordered_set<std::string_view> NamesDeclaredUnder(const Stmt* s) {
 // Expr::pattern_keys. AnyExprChild answers a question about a subtree and stops
 // at the first child that answers it, which is what this search wants, so it is
 // used here rather than ForEachExprChild beside it.
+//
+// §8.10 (printed page 186 of ~/LRM.pdf) denies a static method the non-static
+// members of an object it holds no handle to, and §8.4 (printed 181-182) reads
+// a member through any handle a variable holds -- `p.fileID` in §8.9's example
+// on the same page as §8.10 -- which a static method may hold as any subroutine
+// may: in a static property, a local, a formal, a call's result or an element
+// of an array of handles. A `.` access is therefore qualified by whatever its
+// left side names, and only that side is searched, as FirstEnclosingPropRef in
+// elaborator_validate_class_nesting.cpp searches it under §8.23. The one base
+// that is no such handle is `this` (and `super`, §8.15), the object the static
+// method does not have, so a member behind either is the bare access still. A
+// `::` access names a member through the class scope rather than through an
+// object and is left to the search of both sides.
+//
+// This searched the member name of every `.` access as if it stood bare, so
+// `return m_inst.k;` through a static property of the class and `return c.k;`
+// through a local handle were each reported as the access §8.10 bars.
+static bool IsAccessThroughAHandle(const Expr* e) {
+  if (e->kind != ExprKind::kMemberAccess || e->is_scope_resolution) {
+    return false;
+  }
+  const Expr* base = e->lhs;
+  return !(base && base->kind == ExprKind::kIdentifier &&
+           (base->text == "this" || base->text == "super"));
+}
+
 static bool ExprRefsNonStaticMember(
     const Expr* e, const std::unordered_set<std::string_view>& non_static,
     const std::unordered_set<std::string_view>& locals) {
   if (!e) return false;
+  if (IsAccessThroughAHandle(e)) {
+    return ExprRefsNonStaticMember(e->lhs, non_static, locals);
+  }
   if (e->kind == ExprKind::kIdentifier && non_static.count(e->text) &&
       !locals.count(e->text))
     return true;

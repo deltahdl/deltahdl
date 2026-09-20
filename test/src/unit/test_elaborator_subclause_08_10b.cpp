@@ -24,6 +24,11 @@
 // #3319. The cases at the end of this file are one per link that walk did not
 // read, and they stand here rather than in test_elaborator_subclause_08_10a.cpp
 // because that file is already the larger half of the split.
+//
+// The cases at the very end are the accesses §8.10 does not bar: a member read
+// or a method called through a handle the static method holds, which
+// ExprRefsNonStaticMember reported as the bare access until the left side of a
+// `.` access became the only side it searches.
 
 #include <gtest/gtest.h>
 
@@ -486,6 +491,145 @@ TEST(StaticMethodThisPositions, SuperInAForkArmIsReported) {
       ReportedError(f.diag.Diagnostics(),
                     "'this' and 'super' shall not be used in a static method",
                     LineHolding(src, "static task"), "8.10"));
+}
+
+// The cases below are the member accesses §8.10 does not bar: a member read
+// through a handle. §8.10 (printed page 186 of ~/LRM.pdf) denies a static
+// method the non-static members of an object it holds no handle to, and §8.4
+// (printed 181-182) reads a member through any handle a variable holds --
+// `p.fileID` in §8.9's example on the same page as §8.10 -- which a static
+// method may hold as any subroutine may. ExprRefsNonStaticMember in
+// src/elaborator/elaborator_validate_static_methods.cpp searched the member
+// name of every `.` access as if it stood bare, so `return m_inst.k;` through a
+// static property of the class and `return c.k;` through a local handle were
+// each reported as the access §8.10 bars, and so was every method called
+// through a handle.
+//
+// The class gives the static function every kind of handle the access may be
+// written through: the static property `m_inst`, the local `c`, the formal
+// `formal`, the static function `make` for a call's result and the local array
+// `arr` for an element. `k` and `get` are the non-static members the bare
+// access names, and `kid` is a non-static handle so a case can show the base
+// of an access is still searched when it is the bare member.
+std::string StaticMethodHandleSrc(const std::string& stmt) {
+  return "class C;\n"
+         "  int k = 9;\n"
+         "  C kid;\n"
+         "  static C m_inst;\n"
+         "  function int get(); return k; endfunction\n"
+         "  static function C make();\n"
+         "    C h;\n"
+         "    h = new;\n"
+         "    return h;\n"
+         "  endfunction\n"
+         "  static function int f(C formal);\n"
+         "    C c;\n"
+         "    C arr[2];\n"
+         "    " +
+         stmt +
+         "\n"
+         "  endfunction\n"
+         "endclass\n"
+         "module m;\n"
+         "  C c;\n"
+         "endmodule\n";
+}
+
+void ExpectHandleAccessAccepted(const std::string& stmt) {
+  EXPECT_TRUE(ElabOk(StaticMethodHandleSrc(stmt)));
+}
+
+// The report stands at the static function's own declaration rather than at
+// the statement holding the access, because §8.10's rule is about the method:
+// Elaborator::ValidateOneClassStaticMethods scans a static method body and
+// reports the method once. `make` is a static function of the same class and
+// is clean, so the line names `f` and not the class's first method.
+void ExpectBareAccessReported(const std::string& stmt) {
+  ElabFixture f;
+  std::string src = StaticMethodHandleSrc(stmt);
+  ElabOk(src, f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "static method shall not access non-static members",
+                            LineHolding(src, "static function int f"), "8.10"));
+}
+
+// The shape found first: §8.9 (printed page 186) holds a static property in
+// one copy shared by every object, and a handle held there is read through as
+// any handle is.
+TEST(StaticMethodHandleBases, PropertyThroughAStaticPropertyIsAccepted) {
+  ExpectHandleAccessAccepted("return m_inst.k;");
+}
+
+TEST(StaticMethodHandleBases, PropertyThroughALocalHandleIsAccepted) {
+  ExpectHandleAccessAccepted("return c.k;");
+}
+
+TEST(StaticMethodHandleBases, PropertyThroughAFormalIsAccepted) {
+  ExpectHandleAccessAccepted("return formal.k;");
+}
+
+TEST(StaticMethodHandleBases, PropertyThroughACallResultIsAccepted) {
+  ExpectHandleAccessAccepted("return make().k;");
+}
+
+TEST(StaticMethodHandleBases, PropertyThroughAnArrayElementIsAccepted) {
+  ExpectHandleAccessAccepted("return arr[0].k;");
+}
+
+// A chain: `kid` is a non-static member, but written behind `m_inst.` it is
+// read through the static property's handle and not through the object the
+// static method does not have.
+TEST(StaticMethodHandleBases, PropertyThroughAChainedHandleIsAccepted) {
+  ExpectHandleAccessAccepted("return m_inst.kid.k;");
+}
+
+// The access as an assignment target: Stmt::lhs holds the member access, and
+// the search reads its left side there as it does on the right.
+TEST(StaticMethodHandleBases, PropertyAssignedThroughALocalHandleIsAccepted) {
+  ExpectHandleAccessAccepted("c.k = 1; return 0;");
+}
+
+// §8.6 (printed page 183) calls a method through a handle as §8.4 reads a
+// property through one; the parser keeps the call's member access in
+// Expr::lhs, and a call written that way carries no bare callee.
+TEST(StaticMethodHandleBases, MethodThroughAStaticPropertyIsAccepted) {
+  ExpectHandleAccessAccepted("return m_inst.get();");
+}
+
+TEST(StaticMethodHandleBases, MethodThroughALocalHandleIsAccepted) {
+  ExpectHandleAccessAccepted("return c.get();");
+}
+
+TEST(StaticMethodHandleBases, MethodThroughACallResultIsAccepted) {
+  ExpectHandleAccessAccepted("return make().get();");
+}
+
+TEST(StaticMethodHandleBases, MethodThroughAnArrayElementIsAccepted) {
+  ExpectHandleAccessAccepted("return arr[1].get();");
+}
+
+// The four cases below are the accesses §8.10 does bar, written into the same
+// class so the pair with the cases above is what tells the searched side apart:
+// the bare property, the bare method call, the member behind `this`, and a
+// member whose base is itself a bare non-static property, which is the access
+// the search of the left side still finds.
+TEST(StaticMethodHandleBases, BarePropertyBesideTheHandlesIsReported) {
+  ExpectBareAccessReported("return k;");
+}
+
+TEST(StaticMethodHandleBases, BareMethodCallBesideTheHandlesIsReported) {
+  ExpectBareAccessReported("return get();");
+}
+
+// `this` is the one base that is no handle a static method holds, so the member
+// behind it is the bare access still; CheckStaticMethodsForThisSuper reports
+// the handle itself beside this report.
+TEST(StaticMethodHandleBases, PropertyBehindThisIsReported) {
+  ExpectBareAccessReported("return this.k;");
+}
+
+TEST(StaticMethodHandleBases, PropertyThroughABareNonStaticHandleIsReported) {
+  ExpectBareAccessReported("return kid.k;");
 }
 
 }  // namespace
