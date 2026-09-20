@@ -73,20 +73,24 @@ static ClassObject* ShallowCopyOfNewSource(const Expr* init, SimContext& ctx,
 // in lowerer_var.cpp and TryExecClassVarDecl in statement_assign_decl.cpp do
 // for a variable. The actuals are bound with the enclosing object as `this`
 // (BindCallerConstructorArgs), so `= new(i)` reads the enclosing object's `i`.
-// False for any other initializer, or for a property of no class type.
-static bool TryInitClassPropertyNew(const ClassTypeInfo::PropertyInfo& prop,
+// §8.25: the declared class may be named by a type parameter of the level
+// `info`, `T obj = new`, which PropertyClassName reads through the object
+// under construction's specialization. False for any other initializer, or
+// for a property of no class type.
+static bool TryInitClassPropertyNew(const ClassTypeInfo* info,
+                                    const ClassTypeInfo::PropertyInfo& prop,
                                     SimContext& ctx, Arena& arena,
                                     Logic4Vec& out) {
   const Expr* init = prop.init_expr;
   if (init->kind != ExprKind::kCall || init->text != "new") return false;
-  if (prop.type_name.empty() || !ctx.FindClassType(prop.type_name)) {
-    return false;
-  }
+  std::string_view class_name =
+      PropertyClassName(ctx.CurrentThis(), info, prop.name, ctx);
+  if (class_name.empty()) return false;
   if (ClassObject* copy = ShallowCopyOfNewSource(init, ctx, arena)) {
     out = MakeLogic4VecVal(arena, 64, ctx.AllocateClassObject(copy));
     return true;
   }
-  out = EvalClassNew(prop.type_name, init, ctx, arena, init->range.start);
+  out = EvalClassNew(class_name, init, ctx, arena, init->range.start);
   return true;
 }
 
@@ -203,7 +207,7 @@ static void InitClassPropertyDefault(const ClassTypeInfo* info,
     return;
   }
   Logic4Vec val;
-  if (prop.init_expr && TryInitClassPropertyNew(prop, ctx, arena, val)) {
+  if (prop.init_expr && TryInitClassPropertyNew(info, prop, ctx, arena, val)) {
     StoreClassPropertyDefault(info, prop, val, obj, arena);
     return;
   }

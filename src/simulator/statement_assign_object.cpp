@@ -28,10 +28,12 @@
 #include "parser/ast_expr.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_array.h"
+#include "simulator/eval_array_class_assoc.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
+#include "simulator/variable.h"
 
 namespace delta {
 
@@ -199,22 +201,33 @@ bool TryTypedClassNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   return true;
 }
 
-// The class whose property `field = new` names: the declared class of the
-// variable `base` when it is a class handle, and otherwise, when `base` is
+// The class whose property `field = new` names, and the object holding the
+// property: the declared class of the variable `base` when it is a class
+// handle, with the object the handle refers to, and otherwise, when `base` is
 // itself a class name and the class has a static property of that name, the
-// class -- §8.9's `C::x` form, which §8.7 gives the same right to a bare `new`
-// as any other target. Null when the base is neither.
-static const ClassTypeInfo* MemberNewBaseClass(std::string_view base,
-                                               std::string_view field,
-                                               SimContext& ctx) {
+// class alone -- §8.9's `C::x` form, which §8.7 gives the same right to a bare
+// `new` as any other target. A null class when the base is neither.
+struct MemberNewBase {
+  const ClassTypeInfo* cls = nullptr;
+  const ClassObject* obj = nullptr;
+};
+
+static MemberNewBase MemberNewBaseClass(std::string_view base,
+                                        std::string_view field,
+                                        SimContext& ctx) {
   auto base_type = ctx.GetVariableClassType(base);
-  if (!base_type.empty()) return ctx.FindClassType(base_type);
+  if (!base_type.empty()) {
+    const Variable* var = ctx.FindVariable(base);
+    const ClassObject* obj =
+        var != nullptr ? ctx.GetClassObject(var->value.ToUint64()) : nullptr;
+    return {ctx.FindClassType(base_type), obj};
+  }
   const auto* cls = ctx.FindClassType(base);
-  if (cls == nullptr) return nullptr;
+  if (cls == nullptr) return {};
   if (cls->static_properties.find(std::string(field)) ==
       cls->static_properties.end())
-    return nullptr;
-  return cls;
+    return {};
+  return {cls, nullptr};
 }
 
 // §8.4 / §8.12: `obj.field = new` where field is a class handle, and §8.9's
@@ -232,12 +245,14 @@ bool TryMemberClassNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     return false;
   if (!stmt->lhs->rhs || stmt->lhs->rhs->kind != ExprKind::kIdentifier)
     return false;
-  const auto* cls =
+  MemberNewBase base =
       MemberNewBaseClass(stmt->lhs->lhs->text, stmt->lhs->rhs->text, ctx);
-  if (cls == nullptr) return false;
-  auto field_type = MemberClassTypeName(cls, stmt->lhs->rhs->text);
-  if (field_type.empty() || ctx.FindClassType(field_type) == nullptr)
-    return false;
+  if (base.cls == nullptr) return false;
+  // §8.25: a property declared with a type parameter of the class, `T obj`,
+  // is a handle of the class the object's specialization binds T to.
+  auto field_type =
+      PropertyClassName(base.obj, base.cls, stmt->lhs->rhs->text, ctx);
+  if (field_type.empty()) return false;
   auto handle =
       EvalClassNew(field_type, stmt->rhs, ctx, arena, stmt->rhs->range.start);
   WriteStructField(stmt->lhs, handle, ctx);

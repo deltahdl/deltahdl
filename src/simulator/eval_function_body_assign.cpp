@@ -6,6 +6,7 @@
 #include "elaborator/type_eval.h"
 #include "parser/ast_expr.h"
 #include "simulator/class_object.h"
+#include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_class_array.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
@@ -167,9 +168,10 @@ static bool TrySelfClassNewAssign(const Stmt* stmt, std::string_view field_name,
   if (self == nullptr) return false;
   const ClassTypeInfo* enclosing = ctx.CurrentMethodClass();
   if (enclosing == nullptr) enclosing = self->type;
-  auto field_type = MemberClassTypeName(enclosing, field_name);
-  if (field_type.empty() || ctx.FindClassType(field_type) == nullptr)
-    return false;
+  // §8.25: the declared type may be a type parameter of the class, `T obj`,
+  // which names the class the object's specialization binds it to.
+  auto field_type = PropertyClassName(self, enclosing, field_name, ctx);
+  if (field_type.empty()) return false;
   WriteSelfProperty(
       self, field_name,
       EvalClassNew(field_type, stmt->rhs, ctx, arena, stmt->rhs->range.start),

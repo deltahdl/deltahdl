@@ -17,6 +17,7 @@
 #include "parser/ast_type.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_array.h"
+#include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_assoc_class_handles.h"
 #include "simulator/eval_call_result.h"
 #include "simulator/eval_class_array.h"
@@ -209,12 +210,61 @@ static bool ResolveMethodOnThis(std::string_view method_name, SimContext& ctx,
   return info.method != nullptr;
 }
 
+// The handle the property `name` holds on `self`, read as GetPropertyForType
+// reads it -- the slot of the class `enclosing` or of a base of it first
+// (§8.15), the bare slot or a static one after -- but without the value a
+// property never written is made up as, which is no handle.
+static uint64_t HeldPropertyHandle(const ClassObject* self,
+                                   const ClassTypeInfo* enclosing,
+                                   std::string_view name) {
+  for (const auto* t = enclosing; t != nullptr; t = t->parent) {
+    auto it =
+        self->properties.find(std::string(t->name) + "::" + std::string(name));
+    if (it != self->properties.end()) return it->second.ToUint64();
+  }
+  auto it = self->properties.find(std::string(name));
+  if (it != self->properties.end()) return it->second.ToUint64();
+  if (self->type == nullptr) return kNullClassHandle;
+  auto sit = self->type->static_properties.find(std::string(name));
+  return sit != self->type->static_properties.end() ? sit->second.ToUint64()
+                                                    : kNullClassHandle;
+}
+
+// §8.11 with §8.6: a call through a property of the running method's object,
+// `obj.get()` with `obj` a class-typed property named without `this.`, runs
+// the method on the object the property refers to, resolved by the property's
+// declared class as a call through a variable is by the variable's; and
+// §8.25 lets that class be named by a type parameter of the enclosing class,
+// `T obj`, which PropertyClassName reads through the object's specialization.
+// A local of the name shadows the property and takes the variable path. The
+// variable path alone answered a call, so one through a property fell to the
+// module's functions and read 0 whatever the object held.
+static bool ResolveMethodOnPropertyHandle(const MethodCallParts& parts,
+                                          SimContext& ctx,
+                                          InstanceMethodInfo& info) {
+  ClassObject* self = ctx.CurrentThis();
+  if (self == nullptr || NameDenotesVariable(parts.var_name, ctx)) return false;
+  const ClassTypeInfo* enclosing = ctx.CurrentMethodClass();
+  if (enclosing == nullptr) enclosing = self->type;
+  std::string_view declared =
+      PropertyClassName(self, enclosing, parts.var_name, ctx);
+  if (declared.empty()) return false;
+  uint64_t handle = HeldPropertyHandle(self, enclosing, parts.var_name);
+  if (handle == kNullClassHandle) {
+    return ResolveThroughNullHandle(parts, declared, ctx, info);
+  }
+  return ResolveMethodByDeclaredClass(ctx.GetClassObject(handle), declared,
+                                      parts.method_name, ctx, info);
+}
+
 bool ResolveInstanceMethod(const MethodCallParts& parts, SimContext& ctx,
                            InstanceMethodInfo& info) {
   if (parts.var_name == "this")
     return ResolveMethodOnThis(parts.method_name, ctx, info);
   auto class_type = ctx.GetVariableClassType(parts.var_name);
-  if (class_type.empty()) return false;
+  if (class_type.empty()) {
+    return ResolveMethodOnPropertyHandle(parts, ctx, info);
+  }
   auto* var = ctx.FindVariable(parts.var_name);
   if (!var) return false;
   auto handle = var->value.ToUint64();

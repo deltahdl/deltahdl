@@ -771,4 +771,141 @@ TEST(ClassSim, BaseNamedByATypeParameterBoundThroughAnExtendsLevel) {
             16u * 100000u + 65535u);
 }
 
+// §8.25 (printed page 204 of ~/LRM.pdf): a type parameter may be bound to a
+// class type, so a property declared with the parameter as its type, `T obj`
+// in `class Holder #(type T = Item)`, is a handle of the bound class -- of
+// Item in the default specialization (§8.25.1) -- and `obj = new` in the
+// constructor builds an Item whose `get()` answers its `v`, 12. The `new`
+// was resolved against a class named T, which there is none of, so nothing
+// was built and `obj.get()` through the null handle read 0.
+TEST(ClassSim, TypeParameterClassPropertyBuiltInTheConstructor) {
+  EXPECT_EQ(RunAndGet("class Item;\n"
+                      "  int v = 12;\n"
+                      "  function int get(); return v; endfunction\n"
+                      "endclass\n"
+                      "class Holder #(type T = Item);\n"
+                      "  T obj;\n"
+                      "  function new(); obj = new; endfunction\n"
+                      "  function int read(); return obj.get(); endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  Holder h = new;\n"
+                      "  int r;\n"
+                      "  initial r = h.read();\n"
+                      "endmodule\n",
+                      "r"),
+            12u);
+}
+
+// The same property on a `Holder #(Item2)` object is a handle of Item2, whose
+// `get()` overrides Item's to answer 99: the class built is the one the
+// specialization binds T to, where one fixed to the default would build an
+// Item and read 12. The object is built by a method run after the
+// declaration has bound the actual to the object; #4344 covers binding it
+// before the constructor runs.
+TEST(ClassSim, TypeParameterClassPropertyBuiltAsTheBoundClass) {
+  EXPECT_EQ(RunAndGet("class Item;\n"
+                      "  int v = 12;\n"
+                      "  function int get(); return v; endfunction\n"
+                      "endclass\n"
+                      "class Item2 extends Item;\n"
+                      "  function int get(); return 99; endfunction\n"
+                      "endclass\n"
+                      "class Holder #(type T = Item);\n"
+                      "  T obj;\n"
+                      "  function void build(); obj = new; endfunction\n"
+                      "  function int read(); return obj.get(); endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  Holder #(Item2) h2 = new;\n"
+                      "  int r2;\n"
+                      "  initial begin\n"
+                      "    h2.build();\n"
+                      "    r2 = h2.read();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "r2"),
+            99u);
+}
+
+// A property of the bound class is read through the handle directly, `obj.v`,
+// beside the method: Item2's constructor sets v to 34, so the bound Item2
+// reads 34 * 100 + 99 where an Item would read 12 * 100 + 12 and a null
+// handle 0.
+TEST(ClassSim, TypeParameterClassPropertyReadThroughItsHandle) {
+  EXPECT_EQ(RunAndGet("class Item;\n"
+                      "  int v = 12;\n"
+                      "  function int get(); return v; endfunction\n"
+                      "endclass\n"
+                      "class Item2 extends Item;\n"
+                      "  function new(); v = 34; endfunction\n"
+                      "  function int get(); return 99; endfunction\n"
+                      "endclass\n"
+                      "class Holder #(type T = Item);\n"
+                      "  T obj;\n"
+                      "  function void build(); obj = new; endfunction\n"
+                      "  function int read();\n"
+                      "    return obj.v * 100 + obj.get();\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  Holder #(Item2) h2 = new;\n"
+                      "  int r;\n"
+                      "  initial begin\n"
+                      "    h2.build();\n"
+                      "    r = h2.read();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "r"),
+            34u * 100u + 99u);
+}
+
+// §8.7 with §8.25: the `new` may stand as the property's initializer, `T obj
+// = new;`, which InitClassPropertyDefault resolves through the same class:
+// the default specialization builds an Item and reads 12.
+TEST(ClassSim, TypeParameterClassPropertyNewInitializer) {
+  EXPECT_EQ(RunAndGet("class Item;\n"
+                      "  int v = 12;\n"
+                      "  function int get(); return v; endfunction\n"
+                      "endclass\n"
+                      "class Holder #(type T = Item);\n"
+                      "  T obj = new;\n"
+                      "  function int read(); return obj.get(); endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  Holder h = new;\n"
+                      "  int r;\n"
+                      "  initial r = h.read();\n"
+                      "endmodule\n",
+                      "r"),
+            12u);
+}
+
+// And through a handle from outside the class, `h2.obj = new`, where the
+// class is read off the object the handle refers to: bound to Item2, the
+// object built answers 99.
+TEST(ClassSim, TypeParameterClassPropertyBuiltThroughAHandle) {
+  EXPECT_EQ(RunAndGet("class Item;\n"
+                      "  int v = 12;\n"
+                      "  function int get(); return v; endfunction\n"
+                      "endclass\n"
+                      "class Item2 extends Item;\n"
+                      "  function int get(); return 99; endfunction\n"
+                      "endclass\n"
+                      "class Holder #(type T = Item);\n"
+                      "  T obj;\n"
+                      "  function int read(); return obj.get(); endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  Holder #(Item2) h2 = new;\n"
+                      "  int r2;\n"
+                      "  initial begin\n"
+                      "    h2.obj = new;\n"
+                      "    r2 = h2.read();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "r2"),
+            99u);
+}
+
 }  // namespace

@@ -36,6 +36,52 @@ const DataType* TypeParamActual(const ClassObject* obj, const ClassDecl* decl,
   return nullptr;
 }
 
+namespace {
+
+// The member declaring the property `field` on the chain from `from`, with
+// the class declaring it, which is what its type parameters are read from.
+struct PropertyDeclaration {
+  const ClassMember* member = nullptr;
+  const ClassDecl* declaring = nullptr;
+};
+
+PropertyDeclaration FindPropertyDeclaration(const ClassTypeInfo* from,
+                                            std::string_view field) {
+  for (const auto* t = from; t != nullptr; t = t->parent) {
+    if (t->decl == nullptr) continue;
+    for (const auto* m : t->decl->members) {
+      if (m->kind == ClassMemberKind::kProperty && m->name == field)
+        return {m, t->decl};
+    }
+  }
+  return {};
+}
+
+}  // namespace
+
+// §8.25 with §8.7: the class the property `field` is a handle of on `obj`:
+// the declared type's name where it names a class, else the class the type
+// parameter the name stands for is bound to on `obj`. A declaration of the
+// form `T obj` names no class of its own, so a `new` assigned to it was
+// resolved against a class named T, which there is none of, and the property
+// was no handle in any specialization.
+std::string_view PropertyClassName(const ClassObject* obj,
+                                   const ClassTypeInfo* from,
+                                   std::string_view field, SimContext& ctx) {
+  PropertyDeclaration decl = FindPropertyDeclaration(from, field);
+  if (decl.member == nullptr) return {};
+  std::string_view name = decl.member->data_type.type_name;
+  if (name.empty()) return {};
+  if (ctx.FindClassType(name) != nullptr) return name;
+  if (decl.declaring->type_param_names.count(name) == 0) return {};
+  const DataType* bound = TypeParamActual(obj, decl.declaring, name);
+  if (bound == nullptr || bound->kind != DataTypeKind::kNamed ||
+      ctx.FindClassType(bound->type_name) == nullptr) {
+    return {};
+  }
+  return bound->type_name;
+}
+
 // Whether `expr` is a path of names to an object -- an identifier, `this`
 // among them, or a member access down such a path -- which is evaluated to a
 // handle without running anything. A call or a select on the way is not, and

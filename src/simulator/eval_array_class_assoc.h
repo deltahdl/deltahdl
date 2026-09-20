@@ -61,6 +61,18 @@ AssocArrayObject* FindAssocArrayOfBase(const Expr* base, SimContext& ctx,
 const DataType* TypeParamActual(const ClassObject* obj, const ClassDecl* decl,
                                 std::string_view pname);
 
+// §8.25 with §8.7: the class the property `field` is a handle of on `obj`,
+// the property's declaration looked for from the class `from` up its base
+// chain as MemberClassTypeName of src/simulator/class_object.h looks: the
+// declared type's name where it names a class, else -- `T obj` with T a type
+// parameter of the declaring class -- the class the parameter stands for on
+// `obj` (TypeParamActual), which a specialization may bind to any class type.
+// Empty where the property is of no class type, or names a type parameter
+// bound to no class. `obj` may be null, which reads the class's defaults.
+std::string_view PropertyClassName(const ClassObject* obj,
+                                   const ClassTypeInfo* from,
+                                   std::string_view field, SimContext& ctx);
+
 // Whether `expr` is a path of names to an object -- an identifier, `this`
 // among them, or a member access down such a path -- which is evaluated to a
 // handle without running anything. A call or a select on the way is not, and
