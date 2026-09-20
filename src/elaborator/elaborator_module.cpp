@@ -21,6 +21,7 @@
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
+#include "parser/ast_type.h"
 
 namespace delta {
 
@@ -425,6 +426,46 @@ struct ItemElaborationStateSaver {
   }
 };
 
+// §23.9/§24.3: the enclosing-scope chain follows lexical nesting, not the
+// instance tree. A lexically nested declaration (set up by the nested-decl
+// elaboration site, which records the enclosing scope in `pending`) extends
+// the caller's chain by one entry; any other call (a separately-instantiated
+// child, a bind, or the top cell) starts from an empty chain so the prior
+// caller's scope does not leak in. Answers the caller's chain, put back once
+// the cell is done. Moved out of ElaborateModule, which c70321083's guard took
+// past readability-function-size's statement threshold.
+static std::vector<std::unordered_set<std::string_view>>
+EnterEnclosingScopeChain(
+    std::vector<std::unordered_set<std::string_view>>& chain,
+    std::unordered_set<std::string_view>& pending, bool& has_pending) {
+  std::vector<std::unordered_set<std::string_view>> saved = std::move(chain);
+  chain.clear();
+  if (has_pending) {
+    chain = saved;
+    chain.push_back(std::move(pending));
+    pending.clear();
+    has_pending = false;
+  }
+  return saved;
+}
+
+// §14.14: this cell's own global clocking declaration `own_gclk` joins the
+// chain of its ancestors' rather than replacing it, so back() is the
+// declaration closest to the point of reference -- rule a) before rule b) --
+// and the answer is the event a $global_clock reference in the cell resolves
+// to, null where the chain is empty. The caller pops its own entry once the
+// cell is done.
+template <class Scopes>
+static const std::vector<EventExpr>* EnterGlobalClockingChain(
+    Scopes& scopes, const std::vector<EventExpr>* own_gclk,
+    const std::string& inst_path, Arena& arena) {
+  if (own_gclk != nullptr) scopes.push_back({own_gclk, inst_path});
+  if (scopes.empty()) return nullptr;
+  const auto& nearest = scopes.back();
+  return EffectiveGlobalClockingEvent(nearest.events, nearest.inst_path,
+                                      inst_path, arena);
+}
+
 RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
                                          const ParamList& params) {
   auto* mod = arena_.Create<RtlirModule>();
@@ -443,21 +484,9 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
   // per-call save at the instance site; this generalizes it to the full set.)
   ItemElaborationStateSaver saved_item_state(*this);
 
-  // §23.9/§24.3: the enclosing-scope chain follows lexical nesting, not the
-  // instance tree. A lexically nested declaration (set up by the nested-decl
-  // elaboration site, which records the enclosing scope in
-  // pending_enclosing_scope_) extends the caller's chain by one entry; any
-  // other call (a separately-instantiated child, a bind, or the top cell)
-  // starts from an empty chain so the prior caller's scope does not leak in.
   std::vector<std::unordered_set<std::string_view>> saved_enclosing =
-      std::move(enclosing_scope_names_);
-  enclosing_scope_names_.clear();
-  if (has_pending_enclosing_scope_) {
-    enclosing_scope_names_ = saved_enclosing;
-    enclosing_scope_names_.push_back(std::move(pending_enclosing_scope_));
-    pending_enclosing_scope_.clear();
-    has_pending_enclosing_scope_ = false;
-  }
+      EnterEnclosingScopeChain(enclosing_scope_names_, pending_enclosing_scope_,
+                               has_pending_enclosing_scope_);
   // §16.15: the default disable iff a nested declaration inherits from the
   // scope it is declared in, taken here so that the instances this cell
   // contains, other than its own nested declarations, inherit none.
@@ -489,10 +518,10 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
   // parameters as localparams, which no assignment reaches, so none are
   // installed for it. ElaborateParamPortList alone read the assignments
   // before, so `c #(.P(5)) u()` over `module c; parameter P = 1;` kept 1.
-  const InstanceParamAssignments body_assignments{params,
+  const InstanceParamAssignments kBodyAssignments{params,
                                                   RegisteredModuleScope()};
   BodyParamAssignmentsGuard body_assignments_guard(
-      decl->has_param_port_list ? nullptr : &body_assignments);
+      decl->has_param_port_list ? nullptr : &kBodyAssignments);
 
   ReportParamsMissingValue(decl, mod, diag_);
 
@@ -511,21 +540,11 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
   global_clocking_in_scope_ =
       saved_global_clocking_in_scope || ModuleDeclaresGlobalClocking(decl);
 
-  // §14.14: this cell's own global clocking declaration joins the chain of its
-  // ancestors' rather than replacing it, so back() is "the global clocking
-  // declaration closest to the point of reference" -- rule a) before rule b).
   const std::vector<EventExpr>* own_gclk = ModuleGlobalClockingEvent(decl);
-  if (own_gclk != nullptr) {
-    global_clocking_scopes_.push_back({own_gclk, current_inst_path_});
-  }
   const std::vector<EventExpr>* saved_global_clocking_event =
       module_global_clocking_event_;
-  module_global_clocking_event_ = nullptr;
-  if (!global_clocking_scopes_.empty()) {
-    const auto& nearest = global_clocking_scopes_.back();
-    module_global_clocking_event_ = EffectiveGlobalClockingEvent(
-        nearest.events, nearest.inst_path, current_inst_path_, arena_);
-  }
+  module_global_clocking_event_ = EnterGlobalClockingChain(
+      global_clocking_scopes_, own_gclk, current_inst_path_, arena_);
 
   ElaborateItems(decl, mod);
   ResolveExplicitPortTypes(decl, mod);
