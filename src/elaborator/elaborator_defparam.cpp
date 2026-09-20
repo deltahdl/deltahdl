@@ -244,6 +244,28 @@ static bool DeclTypeRangeFollowsScope(const RtlirParamDecl& p,
          FindNamedType(*dtype, typedefs) != nullptr;
 }
 
+// §23.10.1 (printed pages 764-765) with §6.20.2 (printed 126): the value a
+// defparam gave `p` is the right-hand side converted to the range `p` now
+// has, so the right-hand side is folded again in the scope of the statement
+// as Elaborator::ApplyDefparamSite folded it, with the module holding the
+// statement registered, and the words above bit 63 of one wider than 64 bits
+// recorded from it. Converting the value already cut to the earlier range
+// kept that range's bits alone: `defparam u.P = 96'h1_0000_0003_0000_0005`
+// applied while `logic [W-1:0] P` was 32 bits wide, and `defparam u.W = 96`
+// after it, left P[95:64] reading 0 and P[47:32] 0. A value an instance's
+// assignment gave is converted as it stands: its expression is written in the
+// instantiating module, which is not carried here.
+static void ReconvertOverrideValue(RtlirParamDecl& p) {
+  if (p.defparam_value_expr == nullptr) {
+    p.resolved_value = ConvertOverrideValue(p.resolved_value, p);
+    return;
+  }
+  ParamRangeRegistryGuard defparam_module_guard(p.defparam_module);
+  auto val = ConstEvalInt(p.defparam_value_expr, p.defparam_value_scope);
+  p.resolved_value = ConvertOverrideValue(val.value_or(p.resolved_value), p);
+  RecordResolvedHighWords(p, p.defparam_value_expr, p.defparam_value_scope);
+}
+
 // §6.20.2 (printed page 126): a parameter with a range specification has the
 // range of its declaration, and that range is folded with the parameters in
 // scope, so one written as `logic [TOP:0]` follows TOP's final value, which
@@ -266,8 +288,7 @@ static void ResizeParamToRecomputedRange(RtlirParamDecl& p,
   const DataType& dtype = *p.decl_type;
   PopulateParamTypeInfo(p, dtype, typedefs, scope);
   RecordParamDeclRange(p, dtype, scope);
-  if (p.from_override)
-    p.resolved_value = ConvertOverrideValue(p.resolved_value, p);
+  if (p.from_override) ReconvertOverrideValue(p);
 }
 
 // §23.10.2 (printed page 766): a parameter whose value depends on the one a
@@ -470,8 +491,13 @@ void Elaborator::ApplyDefparamSite(RtlirModule* mod, const DefparamSite& site,
     // §23.10.1 (printed pages 764-765): the right-hand side stands in the
     // scope of the defparam statement, which is registered here and not
     // where the parameter is later read, so its words above bit 63 are
-    // recorded now as the value is.
+    // recorded now as the value is, and the expression, the scope and the
+    // module are kept for RecomputeDependentParams to record them again
+    // should a later defparam widen the parameter's range.
     RecordResolvedHighWords(*param, val_expr, scope);
+    param->defparam_value_expr = val_expr;
+    param->defparam_value_scope = scope;
+    param->defparam_module = mod;
     ReplaceStringParamValue(*param, val_expr, arena_);
     RecomputeDependentParams(target_mod);
     applied_defparams_.insert(key);

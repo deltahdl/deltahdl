@@ -709,4 +709,53 @@ TEST(DefparamElaboration, ResizesAParameterDeclaredThroughATypedef) {
   EXPECT_FALSE(fq.has_errors);
 }
 
+// m's parameter `name`, m declaring `parameter logic [W-1:0] P = 0` after
+// `parameter int W = 32`, H set from P[95:64], M from P[47:32] and B from
+// $bits(P).
+int64_t WideningParamUnder(std::string_view defparams, std::string_view name,
+                           ElabFixture& f) {
+  return ParamOfMUnder(
+      "  parameter int W = 32;\n"
+      "  parameter logic [W-1:0] P = 0;\n"
+      "  localparam int H = P[95:64];\n"
+      "  localparam int M = P[47:32];\n"
+      "  localparam int B = $bits(P);\n",
+      defparams, name, f);
+}
+
+// Top's defparams widening P before its value is set, and after it.
+constexpr std::string_view kWidenThenSet =
+    "  defparam u.W = 96;\n"
+    "  defparam u.P = 96'h1_0000_0003_0000_0005;\n";
+constexpr std::string_view kSetThenWiden =
+    "  defparam u.P = 96'h1_0000_0003_0000_0005;\n"
+    "  defparam u.W = 96;\n";
+
+// §6.20.2 (printed page 126) converts an override value to the range of the
+// parameter's declaration, and §23.10.1 (printed 764-765) has a defparam's
+// value take effect over the declaration's, so `defparam u.W = 96` gives
+// `logic [W-1:0] P` 96 bits and `defparam u.P = 96'h1_0000_0003_0000_0005`
+// every digit of that literal: H reads its word above bit 64, 1, and $bits(P)
+// 96. Sized again by W's defparam, P was converted from the value it held
+// and its words above bit 63 were not recorded again, so H read 0.
+TEST(DefparamElaboration, RecordsAWidenedDefparamValuesWordsAboveSixtyFour) {
+  ElabFixture fh;
+  EXPECT_EQ(WideningParamUnder(kWidenThenSet, "H", fh), 1);
+  EXPECT_FALSE(fh.has_errors);
+  ElabFixture fb;
+  EXPECT_EQ(WideningParamUnder(kWidenThenSet, "B", fb), 96);
+}
+
+// The defparams in the other order: P's value was converted to the 32 bits
+// it then had, and W's defparam widening it to 96 converts the right-hand
+// side over again to the new range rather than the 5 the first conversion
+// left, so M reads the 3 at bits 47 down to 32 and H the 1 above bit 64.
+TEST(DefparamElaboration, RefoldsADefparamValueALaterDefparamWidens) {
+  ElabFixture fh;
+  EXPECT_EQ(WideningParamUnder(kSetThenWiden, "H", fh), 1);
+  EXPECT_FALSE(fh.has_errors);
+  ElabFixture fm;
+  EXPECT_EQ(WideningParamUnder(kSetThenWiden, "M", fm), 3);
+}
+
 }  // namespace
