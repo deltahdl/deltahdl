@@ -104,14 +104,11 @@ static void BuildVTable(ClassTypeInfo* info, const ClassDecl* cls) {
 static void InitStaticProperty(ClassTypeInfo* info,
                                const ClassTypeInfo::PropertyInfo& p,
                                SimContext& ctx, Arena& arena) {
-  Logic4Vec& slot = info->static_properties[std::string(p.name)];
-  if (TryInitStaticSyncProperty(info, p.name, p.init_expr, ctx)) {
-    slot = MakeLogic4VecVal(arena, p.width, 0);
-  } else if (p.init_expr) {
-    slot = EvalExpr(p.init_expr, ctx, arena);
-  } else {
-    slot = MakeLogic4VecVal(arena, p.width, 0);
-  }
+  bool is_sync = TryInitStaticSyncProperty(info, p.name, p.init_expr, ctx);
+  Logic4Vec value = !is_sync && p.init_expr != nullptr
+                        ? EvalExpr(p.init_expr, ctx, arena)
+                        : MakeLogic4VecVal(arena, p.width, 0);
+  info->static_properties[std::string(p.name)] = value;
 }
 
 static void InitStaticProperties(ClassTypeInfo* info, SimContext& ctx,

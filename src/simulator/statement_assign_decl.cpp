@@ -359,10 +359,32 @@ static bool TryExecClassShallowCopy(std::string_view var_name, const Expr* init,
   return true;
 }
 
+// §8.23 (printed pages 200-201 of ~/LRM.pdf): a class nested in another is
+// named `Outer::Inner` from outside the containing class, the key
+// LowerNestedClass (lowerer_class.cpp) registers it under, and §26.3 names a
+// package's class `p::C`, which the run binds under its bare name as well.
+// The key the run holds the declared class under: the scoped spelling where
+// the declaration wrote a scope the run holds it by, else the bare name;
+// empty where neither names a class. Looked up by the bare name alone, a
+// procedural `Outer::Inner i = new;` found no class, became a plain
+// variable, and `i.take()` ran nothing.
+static std::string_view DeclaredLocalClassKey(const Stmt* stmt, SimContext& ctx,
+                                              Arena& arena) {
+  std::string_view scope = stmt->var_decl_type.scope_name;
+  std::string_view name = stmt->var_decl_type.type_name;
+  if (name.empty()) return {};
+  if (!scope.empty()) {
+    auto* scoped = arena.Create<std::string>(std::string(scope) +
+                                             "::" + std::string(name));
+    if (ctx.FindClassType(*scoped) != nullptr) return *scoped;
+  }
+  return ctx.FindClassType(name) != nullptr ? name : std::string_view{};
+}
+
 static bool TryExecClassVarDecl(const Stmt* stmt, SimContext& ctx,
                                 Arena& arena) {
-  auto class_type = stmt->var_decl_type.type_name;
-  if (class_type.empty() || !ctx.FindClassType(class_type)) return false;
+  std::string_view class_type = DeclaredLocalClassKey(stmt, ctx, arena);
+  if (class_type.empty()) return false;
   ctx.CreateVariable(stmt->var_name, 64);
   ctx.SetVariableClassType(stmt->var_name, class_type);
 
