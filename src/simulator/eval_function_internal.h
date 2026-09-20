@@ -216,9 +216,12 @@ bool ExtractHandleMethodCallParts(const Expr* expr, Arena& arena,
 // call is left to the arms that know its declared class or own its
 // evaluation (TryEvalClassMethodCall, the element arms,
 // TryEvalCallResultMethodCall), so this is asked after them and evaluates
-// the base once. Defined in eval_instance_task.cpp beside the statement
-// form's resolver, which it shares; before it, `y = c.kid.get()` reached no
-// arm of TryDispatchMethodOrLet and read 0.
+// the base once -- but for a bare name that is a static property of the
+// running method's class (§8.9), which the shared resolver takes by the
+// property's declared class (ResolveMethodOnStaticHandle), no `this` being
+// in force for the arms to read it through. Defined in eval_instance_task.cpp
+// beside the statement form's resolver, which it shares; before it, `y =
+// c.kid.get()` reached no arm of TryDispatchMethodOrLet and read 0.
 bool TryEvalMethodOnEvaluatedBase(const Expr* expr, SimContext& ctx,
                                   Arena& arena, Logic4Vec& out);
 

@@ -366,4 +366,174 @@ TEST(StaticClassPropertySim, ModuleStaticMailboxBoundByTheModulesVariable) {
       10u);
 }
 
+// §8.9 (printed page 186) with §8.4 (printed 181-182): a static property is
+// one variable shared by every object and usable with no object, and a
+// property of an object is read through any handle to it -- the handle
+// `C::m_inst` holds included. The module stores its own object in the
+// static property and reads `C::m_inst.k` beside the null test, 9 for the
+// object's k. EvalMemberAccess flattened the path to "C.m_inst.k" and parted
+// it at the class, "C" and "m_inst.k", a static property nothing is named,
+// so the read was x and printed 0 while `C::m_inst == null` was right.
+TEST(StaticClassPropertySim, PropertyReadThroughTheClassScopedStaticHandle) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  int k = 9;\n"
+                      "  static C m_inst;\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    C c;\n"
+                      "    c = new;\n"
+                      "    C::m_inst = c;\n"
+                      "    result = (C::m_inst == null) * 100 + C::m_inst.k;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            9u);
+}
+
+// §8.9 with §8.4: the write side of the same access, `C::m_inst.k = 4`,
+// lands on the object the static handle refers to, read back through the
+// module's own handle to it, and a chained member `C::m_inst.kid.k` reads
+// through a second handle the object holds. The flattened "C.m_inst" named
+// no variable, so the write went nowhere and c.k stayed 9; the chained read
+// was x.
+TEST(StaticClassPropertySim, PropertyWrittenThroughTheClassScopedStaticHandle) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  int k = 9;\n"
+                      "  C kid;\n"
+                      "  static C m_inst;\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    C c;\n"
+                      "    c = new;\n"
+                      "    c.kid = new;\n"
+                      "    C::m_inst = c;\n"
+                      "    C::m_inst.k = 4;\n"
+                      "    result = c.k * 10 + C::m_inst.kid.k;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            49u);
+}
+
+// §8.10 (printed page 186): a static method accesses the static properties
+// of its class directly, by the bare name, and §8.4 reads a member of the
+// object one of them refers to through it. The static method constructs the
+// object into m_inst and reads `m_inst.k`, 9, where copying to a local first
+// already read 9. A bare base was resolved through the running object's
+// properties alone (TryImplicitThisHandleMember), and a static method runs
+// on none, so the read fell through to x and printed 0.
+TEST(StaticClassPropertySim, StaticMethodReadsAPropertyThroughItsStaticHandle) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  int k = 9;\n"
+                      "  static C m_inst;\n"
+                      "  static function int k_via_static();\n"
+                      "    if (m_inst == null) m_inst = new;\n"
+                      "    return m_inst.k;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial result = C::k_via_static();\n"
+                      "endmodule\n",
+                      "result"),
+            9u);
+}
+
+// §8.10 with §8.6 (printed page 183): a method is called through any handle
+// to the object, so the static method's `m_inst.add(7)` runs add on the
+// object m_inst holds, which adds 7 to its k, and `m_inst.k = m_inst.k + 20`
+// writes the same property through the same handle: 9 + 7 + 20. Resolved by
+// the shaped arms alone -- a variable's handle, a running object's property
+// -- the bare base with no `this` reached no object, so the call fell to the
+// module's functions and the write went nowhere; the copy to a local read 9.
+TEST(StaticClassPropertySim, StaticMethodCallsAndWritesThroughItsStaticHandle) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  int k = 9;\n"
+                      "  static C m_inst;\n"
+                      "  function void add(int v); k = k + v; endfunction\n"
+                      "  static function int go();\n"
+                      "    C c;\n"
+                      "    if (m_inst == null) m_inst = new;\n"
+                      "    m_inst.add(7);\n"
+                      "    m_inst.k = m_inst.k + 20;\n"
+                      "    c = m_inst;\n"
+                      "    return c.k;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial result = C::go();\n"
+                      "endmodule\n",
+                      "result"),
+            36u);
+}
+
+// §8.9 with §26.3 (printed page 810): the same three accesses on a class a
+// package declares -- the static method's bare `m_inst.add(7)` and
+// `m_inst.k`, and the module's `p::C::m_inst.k` through the package scope
+// after the method has built the object -- which is uvm_domain.svh:189's
+// `m_uvm_domain.add(...)` after `m_uvm_domain = new("uvm")`. Each read 0 and
+// the add wrote nothing; 16 from the method, then 16 again through the
+// package-qualified scope.
+TEST(StaticClassPropertySim, PackageClassStaticHandleReachesItsObject) {
+  EXPECT_EQ(RunAndGet("package p;\n"
+                      "  class C;\n"
+                      "    int k = 9;\n"
+                      "    static C m_inst;\n"
+                      "    function void add(int v); k = k + v; endfunction\n"
+                      "    static function int go();\n"
+                      "      if (m_inst == null) begin\n"
+                      "        m_inst = new;\n"
+                      "        m_inst.add(7);\n"
+                      "      end\n"
+                      "      return m_inst.k;\n"
+                      "    endfunction\n"
+                      "  endclass\n"
+                      "endpackage\n"
+                      "module t;\n"
+                      "  import p::*;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    result = C::go() * 100;\n"
+                      "    result = result + p::C::m_inst.k;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            1616u);
+}
+
+// §8.9 with §8.20 (printed page 196): the static handle is declared with the
+// base class, so a non-virtual method called through it is the base's own
+// even where the object is of the derived class, while a virtual one is the
+// derived class's override -- the declared class the static property's
+// declaration names decides the dispatch, as a variable's declared class
+// does. The base's who() answers 1, the derived's 2; the virtual tag()
+// answers 20 from the override: 1 * 100 + 20.
+TEST(StaticClassPropertySim, StaticHandleDispatchesByItsDeclaredClass) {
+  EXPECT_EQ(RunAndGet("class B;\n"
+                      "  static B m_inst;\n"
+                      "  function int who(); return 1; endfunction\n"
+                      "  virtual function int tag(); return 10; endfunction\n"
+                      "endclass\n"
+                      "class D extends B;\n"
+                      "  function int who(); return 2; endfunction\n"
+                      "  virtual function int tag(); return 20; endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    D d;\n"
+                      "    d = new;\n"
+                      "    B::m_inst = d;\n"
+                      "    result = B::m_inst.who() * 100 + B::m_inst.tag();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            120u);
+}
+
 }  // namespace

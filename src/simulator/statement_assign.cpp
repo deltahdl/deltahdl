@@ -17,6 +17,7 @@
 #include "simulator/eval_array.h"
 #include "simulator/eval_expr_internal.h"
 #include "simulator/eval_function_args_scoped.h"
+#include "simulator/eval_member_path.h"
 #include "simulator/eval_semaphore.h"
 #include "simulator/eval_string.h"
 #include "simulator/evaluation.h"
@@ -552,6 +553,31 @@ static FieldTarget ResolveStaticClassField(std::string_view base_name,
   return target;
 }
 
+// §8.9 (printed page 186) with §8.4 (printed 181-182): `C::m_inst.k = v`,
+// `p::C::m_inst.k = v` and the bare `m_inst.k = v` of a static method
+// (§8.10, printed 186) write the property of the object the static property
+// holds a handle to, resolved on that object as `h.k = v` is on the
+// variable's (ResolveClassFieldTarget, the declared class scoping the
+// deposit as §8.15 asks). The flattened name parted at "C.m_inst", which
+// names no variable, and the bare base met no `this`, so each write went
+// nowhere while the object's k kept its 9. *handled is set true where the
+// base names a static property holding a live object; a null one is left to
+// the resolvers below, which answer no storage for it as they do for a null
+// variable.
+static FieldTarget ResolveStaticHandleField(const Expr* lhs, SimContext& ctx,
+                                            bool* handled) {
+  *handled = false;
+  StaticPropertyRef ref;
+  std::string path;
+  if (!ResolveStaticHandlePath(lhs, ctx, ctx.GetArena(), ref, path)) return {};
+  std::string_view declared_key;
+  ClassObject* obj = StaticPropertyObject(ref, ctx, &declared_key);
+  if (obj == nullptr) return {};
+  *handled = true;
+  return ResolveClassFieldTarget(obj, ctx.FindClassType(declared_key), path,
+                                 ctx);
+}
+
 // §8.9 with §26.3: the static property `pk::Cfg::x` names of the package's
 // class. The flattened name below would take `pk` for the class, which it is
 // not, so the expression is asked before it is flattened. *handled is set
@@ -692,6 +718,8 @@ FieldTarget ResolveFieldTarget(const Expr* lhs, SimContext& ctx) {
   FieldTarget target = ResolveVirtualInterfaceField(lhs, ctx, &handled);
   if (handled) return target;
   target = ResolvePackageClassStaticField(lhs, ctx, &handled);
+  if (handled) return target;
+  target = ResolveStaticHandleField(lhs, ctx, &handled);
   if (handled) return target;
 
   std::string name;

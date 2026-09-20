@@ -20,6 +20,7 @@
 #include "simulator/eval_class_array_handles.h"
 #include "simulator/eval_class_scope_types.h"
 #include "simulator/eval_function_internal.h"
+#include "simulator/eval_member_path.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 
@@ -141,6 +142,31 @@ static bool ResolveMethodByParts(const MethodCallParts& parts, SimContext& ctx,
   return ResolveInstanceMethod(parts, ctx, call);
 }
 
+// §8.9 (printed page 186) with §8.6 (printed 183): the method `access` names
+// on the object a static property holds a handle to -- `m_inst.add(7)` in a
+// static method of the class (§8.10, printed 186), which runs on no object
+// for ResolveMethodOnPropertyHandle to read the property through, or
+// `C::m_inst.add(7)` from anywhere -- resolved by the class the property is
+// declared with, as a call through a variable is by the variable's
+// (ResolveMethodByDeclaredClass), which decides §8.20's non-virtual dispatch
+// where the object is of a class derived from it. False where the base names
+// no static property or the property holds no live object. Asked ahead of
+// the general evaluation below, which the bare form never reached: a bare
+// name is left to the shaped arms, and with no `this` running they resolved
+// nothing, so `m_inst.add(7)` fell to the module's functions and wrote no
+// property.
+static bool ResolveMethodOnStaticHandle(const Expr* access, SimContext& ctx,
+                                        Arena& arena,
+                                        InstanceMethodInfo& call) {
+  StaticPropertyRef ref;
+  if (!ResolveStaticPropertyBase(access->lhs, ctx, arena, ref)) return false;
+  std::string_view declared_key;
+  ClassObject* obj = StaticPropertyObject(ref, ctx, &declared_key);
+  if (obj == nullptr) return false;
+  return ResolveMethodByDeclaredClass(obj, declared_key, access->rhs->text, ctx,
+                                      call);
+}
+
 // §8.6 (printed page 183): an object's task is enabled through any handle to
 // it, and a handle is what any expression of a class type yields -- a
 // method's result, `c.self().t(...)`, a property of an element's object,
@@ -154,9 +180,11 @@ static bool ResolveMethodByParts(const MethodCallParts& parts, SimContext& ctx,
 // them, because those know the receiver's declared class, which decides
 // §8.20's non-virtual dispatch through a base-class handle and §8.15's
 // `super`, and the value alone cannot recover it; a base they decline is
-// then evaluated exactly once here. A bare name is left to them outright: a
-// name that holds no object is theirs to report (ResolveThroughNullHandle).
-// False for an access of any other shape or a base yielding no live object.
+// then evaluated exactly once here. A bare name is left to them outright,
+// but for a static property of the running method's class
+// (ResolveMethodOnStaticHandle above): a name that holds no object is theirs
+// to report (ResolveThroughNullHandle). False for an access of any other
+// shape or a base yielding no live object.
 // Admitted by shape alone, the enable through such a receiver fell to the
 // expression evaluator and ran on the synchronous function interpreter,
 // which stepped over the task's `#10` and returned at time 0. The
@@ -168,10 +196,11 @@ static bool ResolveMethodOnEvaluatedBase(const Expr* access, SimContext& ctx,
                                          InstanceMethodInfo& call) {
   if (access == nullptr || access->kind != ExprKind::kMemberAccess ||
       access->is_scope_resolution || access->lhs == nullptr ||
-      access->rhs == nullptr || access->rhs->kind != ExprKind::kIdentifier ||
-      access->lhs->kind == ExprKind::kIdentifier) {
+      access->rhs == nullptr || access->rhs->kind != ExprKind::kIdentifier) {
     return false;
   }
+  if (ResolveMethodOnStaticHandle(access, ctx, arena, call)) return true;
+  if (access->lhs->kind == ExprKind::kIdentifier) return false;
   ClassObject* obj =
       ctx.GetClassObject(EvalExpr(access->lhs, ctx, arena).ToUint64());
   return ResolveMethodByDeclaredClass(obj, {}, access->rhs->text, ctx, call);
@@ -218,8 +247,10 @@ static bool ResolveMethodNamedBare(const Expr* expr, SimContext& ctx,
                                    Arena& arena, InstanceMethodInfo& call) {
   MethodCallParts parts;
   if (expr->kind == ExprKind::kMemberAccess && !expr->is_scope_resolution) {
-    if (ExtractHandleAccessParts(expr, arena, parts))
-      return ResolveMethodByParts(parts, ctx, call);
+    if (ExtractHandleAccessParts(expr, arena, parts)) {
+      return ResolveMethodByParts(parts, ctx, call) ||
+             ResolveMethodOnStaticHandle(expr, ctx, arena, call);
+    }
     return ResolveElementObjectMethod(expr, ctx, arena, call) ||
            ResolveAssocElementMethod(expr, ctx, arena, call) ||
            ResolveMethodOnEvaluatedBase(expr, ctx, arena, call);
@@ -261,8 +292,10 @@ static bool ResolveMethodOfStatement(const Expr* expr, SimContext& ctx,
     return ResolveMethodOnRunningObject(expr->callee, ctx, call);
   }
   MethodCallParts parts;
-  if (ExtractHandleMethodCallParts(expr, arena, parts))
-    return ResolveMethodByParts(parts, ctx, call);
+  if (ExtractHandleMethodCallParts(expr, arena, parts)) {
+    return ResolveMethodByParts(parts, ctx, call) ||
+           ResolveMethodOnStaticHandle(expr->lhs, ctx, arena, call);
+  }
   return ResolveElementObjectMethod(expr->lhs, ctx, arena, call) ||
          ResolveAssocElementMethod(expr->lhs, ctx, arena, call) ||
          ResolveMethodOnEvaluatedBase(expr->lhs, ctx, arena, call);

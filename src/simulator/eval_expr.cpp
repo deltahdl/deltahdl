@@ -20,6 +20,7 @@
 #include "simulator/eval_class_array_handles.h"
 #include "simulator/eval_expr_internal.h"
 #include "simulator/eval_function_internal.h"
+#include "simulator/eval_member_path.h"
 #include "simulator/eval_string.h"
 #include "simulator/eval_struct_property.h"
 #include "simulator/evaluation.h"
@@ -680,10 +681,13 @@ Logic4Vec EvalMemberAccess(const Expr* expr, SimContext& ctx, Arena& arena) {
   // `q[1].v` or `a[1].v` a property of the object an element of a queue or of
   // an array property (§7.4.2) refers to; the name built below reaches none.
   // §8.6: nor `n.self().v`, a property of the object a method call returned.
+  // §8.9 with §8.4: nor `C::m_inst.k` or a static method's bare `m_inst.k`,
+  // a property of the object a static property holds a handle to.
   if (TryEvalAssocMemberField(expr, ctx, arena, out) ||
       TryEvalElementObjectMember(expr, ctx, arena, out) ||
       TryEvalCallResultMember(expr, ctx, arena, out) ||
-      TryPackageClassStaticMember(expr, ctx, arena, out))
+      TryPackageClassStaticMember(expr, ctx, arena, out) ||
+      TryStaticHandleMember(expr, ctx, arena, out))
     return out;
 
   std::string name;

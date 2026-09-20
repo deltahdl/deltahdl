@@ -4,7 +4,14 @@
 #include <string>
 #include <string_view>
 
+#include "common/arena.h"
+#include "common/types.h"
+#include "parser/ast_expr.h"
+#include "simulator/class_object.h"
+#include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_expr_internal.h"
+#include "simulator/eval_function_internal.h"
+#include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/variable.h"
@@ -82,6 +89,81 @@ const StructTypeInfo* TaggedMemberLayout(const StructTypeInfo& sinfo,
     if (field.name == member && field.nested) return field.nested;
   }
   return nullptr;
+}
+
+// The class whose static property the bare name `name` reads inside a method
+// (§8.10 for a static method, §8.23 for a nested class's), or the class the
+// scope `C::name` or `p::C::name` names; null for a name a local shadows or
+// a base of another shape.
+static const ClassTypeInfo* StaticPropertyClassOf(const Expr* base,
+                                                  SimContext& ctx, Arena& arena,
+                                                  std::string_view& name) {
+  if (base->kind == ExprKind::kIdentifier) {
+    if (NameDenotesVariable(base->text, ctx)) return nullptr;
+    name = base->text;
+    const ClassTypeInfo* method_cls = ctx.CurrentMethodClass();
+    return method_cls != nullptr ? method_cls->StaticPropertyOwner(name)
+                                 : nullptr;
+  }
+  if (base->kind != ExprKind::kMemberAccess || !base->is_scope_resolution ||
+      base->rhs == nullptr || base->rhs->kind != ExprKind::kIdentifier) {
+    return nullptr;
+  }
+  name = base->rhs->text;
+  return ctx.FindClassType(ScopedClassKey(base->lhs, arena));
+}
+
+bool ResolveStaticPropertyBase(const Expr* base, SimContext& ctx, Arena& arena,
+                               StaticPropertyRef& out) {
+  if (base == nullptr) return false;
+  std::string_view name;
+  const ClassTypeInfo* cls = StaticPropertyClassOf(base, ctx, arena, name);
+  if (cls == nullptr) return false;
+  auto it = cls->static_properties.find(std::string(name));
+  if (it == cls->static_properties.end()) return false;
+  out = {cls, &it->second, name};
+  return true;
+}
+
+ClassObject* StaticPropertyObject(const StaticPropertyRef& ref, SimContext& ctx,
+                                  std::string_view* declared_key) {
+  const ClassTypeInfo::PropertyInfo* prop = ref.owner->FindProperty(ref.name);
+  if (prop != nullptr && prop->IsArray()) return nullptr;
+  *declared_key = PropertyClassName(nullptr, ref.owner, ref.name, ctx);
+  const ClassTypeInfo* declared = ctx.FindClassType(*declared_key);
+  // §9.7 with §26.7: a built-in class's handle, `static process p`, numbers
+  // no ClassObject of the run and is the built-in method paths' to read; the
+  // built-in class is the one registered with no declaration of its own
+  // (RegisterProcessClassType in lowerer_register.cpp).
+  if (declared == nullptr || declared->decl == nullptr) return nullptr;
+  return ctx.GetClassObject(ref.slot->ToUint64());
+}
+
+bool ResolveStaticHandlePath(const Expr* access, SimContext& ctx, Arena& arena,
+                             StaticPropertyRef& ref, std::string& path) {
+  path.clear();
+  const Expr* base = access;
+  while (base != nullptr && base->kind == ExprKind::kMemberAccess &&
+         !base->is_scope_resolution && base->rhs != nullptr &&
+         base->rhs->kind == ExprKind::kIdentifier) {
+    std::string member(base->rhs->text);
+    path = path.empty() ? member : member + "." + path;
+    base = base->lhs;
+  }
+  return base != access && ResolveStaticPropertyBase(base, ctx, arena, ref);
+}
+
+bool TryStaticHandleMember(const Expr* expr, SimContext& ctx, Arena& arena,
+                           Logic4Vec& out) {
+  StaticPropertyRef ref;
+  std::string path;
+  if (!ResolveStaticHandlePath(expr, ctx, arena, ref, path)) return false;
+  std::string_view declared_key;
+  ClassObject* obj = StaticPropertyObject(ref, ctx, &declared_key);
+  if (obj == nullptr) return false;
+  out = ResolveClassFieldChain(obj, ctx.FindClassType(declared_key), path, ctx,
+                               arena);
+  return true;
 }
 
 }  // namespace delta
