@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 
@@ -146,6 +148,48 @@ TEST(ClassSim, WeakRefE2eInstancesUniqueButSameReferent) {
       "endmodule\n",
       f);
   LowerRunAndCheck(f, design, {{"distinct", 1u}, {"same_referent", 1u}});
+}
+
+// §8.30.2's example (printed page 218 of ~/LRM.pdf) read whole through the
+// production pipeline, the two references declared as one module-scope
+// declarator list with the `#` against the class name, and every method of
+// §8.30.1's list (printed 217-219) called on them in one run: the two
+// instances are distinct objects (§8.30.2) referring to one referent, get()
+// answers the referent (§8.30.3) whose property initializer is read back
+// through it, clear() sets get() to null (§8.30.4), and get_id() answers 0
+// for null, one value for one object whichever class the specialization
+// names, and a nonzero value otherwise (§8.30.5). The example's names weak1
+// and weak2 are Table B.1's reserved drive strengths (printed 1220), which
+// §5.6 (printed 74) keeps out of user-defined identifiers, so the references
+// are named wref1 and wref2 here. Every line is a distinct printed value, so
+// a reference that ran on nothing shows in the output where it stood.
+TEST(ClassSim, WeakRefE2eModuleScopeDeclaratorListRunsEveryMethod) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class obj; int v = 9; endclass\n"
+      "class ex_obj extends obj; endclass\n"
+      "module t;\n"
+      "  obj strong_obj, got;\n"
+      "  weak_reference#(obj) wref1, wref2;\n"
+      "  initial begin\n"
+      "    strong_obj = new;\n"
+      "    wref1 = new(strong_obj); wref2 = new(strong_obj);\n"
+      "    $display(\"neq %0d\", wref1 != wref2);\n"
+      "    $display(\"same %0d\", wref1.get() == wref2.get());\n"
+      "    got = wref1.get();\n"
+      "    $display(\"v %0d\", got.v);\n"
+      "    wref1.clear();\n"
+      "    $display(\"cleared %0d\", wref1.get() == null);\n"
+      "    $display(\"id0 %0d\", weak_reference#(obj)::get_id(null));\n"
+      "    $display(\"idsame %0d\", weak_reference#(obj)::get_id(strong_obj) "
+      "== weak_reference#(ex_obj)::get_id(strong_obj));\n"
+      "    $display(\"idnz %0d\", weak_reference#(obj)::get_id(strong_obj) "
+      "!= 0);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(out, "neq 1\nsame 1\nv 9\ncleared 1\nid0 0\nidsame 1\nidnz 1\n");
 }
 
 }  // namespace

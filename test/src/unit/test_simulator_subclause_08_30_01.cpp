@@ -1,8 +1,11 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "common/types.h"
 #include "fixture_simulator.h"
 #include "helpers_class_object.h"
+#include "helpers_scheduler.h"
 #include "simulator/class_object.h"
 
 using namespace delta;
@@ -83,6 +86,60 @@ TEST(ClassSim, WeakReferenceInstanceIsGcEligible) {
 
   EXPECT_EQ(f.ctx.GetClassObject(wr_handle), nullptr);
   EXPECT_NE(f.ctx.GetClassObject(handle), nullptr);
+}
+
+// §8.30.1 (printed page 218 of ~/LRM.pdf) puts the weak_reference class in
+// the built-in std package of §26.7 (printed 816), which §26.3 reaches through
+// the package scope resolution operator, so `std::weak_reference#(obj)` at
+// module scope declares the same class as the bare name: the run constructs
+// it with new(referent) (§8.30.2), reads the referent's property through get()
+// (§8.30.3) and has clear() set get() to null (§8.30.4). A declaration the
+// package scope turned into something other than the built-in class would
+// construct no weak reference, and the two printed values would not both be
+// read.
+TEST(ClassSim, WeakRefE2eStdScopedModuleScopeDeclarationIsTheBuiltinClass) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class obj; int v = 9; endclass\n"
+      "module t;\n"
+      "  obj strong_obj, got;\n"
+      "  std::weak_reference#(obj) wref1;\n"
+      "  initial begin\n"
+      "    strong_obj = new;\n"
+      "    wref1 = new(strong_obj);\n"
+      "    got = wref1.get();\n"
+      "    $display(\"v %0d\", got.v);\n"
+      "    wref1.clear();\n"
+      "    $display(\"cleared %0d\", wref1.get() == null);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(out, "v 9\ncleared 1\n");
+}
+
+// The same package-scoped declaration as a block item of the initial
+// procedure (A.2.8), where the procedural declaration path rather than the
+// lowerer creates the variable: get() answers the referent, so the property
+// read through it is 9, and after clear() the reference answers null, so the
+// packed result is 9 * 10 + 1.
+TEST(ClassSim, WeakRefE2eStdScopedBlockDeclarationIsTheBuiltinClass) {
+  EXPECT_EQ(RunAndGet("class obj; int v = 9; endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    obj strong_obj = new;\n"
+                      "    obj got;\n"
+                      "    std::weak_reference#(obj) wref1;\n"
+                      "    wref1 = new(strong_obj);\n"
+                      "    got = wref1.get();\n"
+                      "    result = got.v * 10;\n"
+                      "    wref1.clear();\n"
+                      "    result = result + (wref1.get() == null);\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            91u);
 }
 
 }  // namespace

@@ -264,4 +264,33 @@ TEST(ClassConstraintElaboration,
       "    end");
 }
 
+// §8.30.1 (printed page 218 of ~/LRM.pdf) puts weak_reference in the built-in
+// std package of §26.7 (printed 816), so the class named through the package
+// scope, at module scope and as a block item, is the built-in class: the
+// declaration elaborates, and the class-type restriction on its parameter
+// holds for the scoped spelling exactly as for the bare one. A spelling the
+// elaborator took for some other type would raise no §8.30.1 report at all.
+TEST(ClassConstraintElaboration, WeakReferenceStdScopedIsTheBuiltinClass) {
+  EXPECT_TRUE(
+      ElabOk("class my_obj;\n"
+             "  int x;\n"
+             "endclass\n"
+             "module m;\n"
+             "  std::weak_reference#(my_obj) wref1;\n"
+             "  initial begin\n"
+             "    std::weak_reference#(my_obj) wref2;\n"
+             "  end\n"
+             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "module m;\n"
+      "  std::weak_reference#(int) wref1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "weak_reference type parameter shall be a class "
+                            "type",
+                            2, "8.30.1"));
+}
+
 }  // namespace
