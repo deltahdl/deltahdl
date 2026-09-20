@@ -599,4 +599,73 @@ TEST(ClassScopeResolutionSim,
             7u);
 }
 
+// §8.23 (printed pages 200-201) with §8.4 (printed 181): a property of
+// another class declared with the nested class's scoped name is a handle of
+// Outer::Inner, so `x.h = new` constructs one and `x.h.v` reads its 7.
+// PropertyClassName (eval_array_class_assoc.cpp) resolved the property's
+// class by the bare `Inner`, which names no class outside Outer, so
+// TryMemberClassNewAssign declined, the generic assignment stored no object,
+// and the read answered 0.
+TEST(ClassScopeResolutionSim, HandlePropertyOfANestedClassIsConstructed) {
+  EXPECT_EQ(RunAndGet(OuterInnerQueueDesign("class H;\n"
+                                            "  Outer::Inner h;\n"
+                                            "endclass\n"
+                                            "module t;\n"
+                                            "  H x = new;\n"
+                                            "  int y;\n"
+                                            "  initial begin\n"
+                                            "    x.h = new;\n"
+                                            "    y = x.h.v;\n"
+                                            "  end\n"
+                                            "endmodule\n"),
+                      "y"),
+            7u);
+}
+
+// §7.4.2 (printed pages 153-154): the array property `Outer::Inner kids[2]`
+// holds two handles, each constructed by `new` into its element and read
+// through it. ElementsAreHandles (eval_class_array_handles.cpp) asked for the
+// bare `Inner`, so the elements were plain values: nothing was constructed
+// and `x.kids[1].v` read 0.
+TEST(ClassScopeResolutionSim, ArrayPropertyOfANestedClassHoldsHandles) {
+  EXPECT_EQ(RunAndGet(OuterInnerQueueDesign("class H;\n"
+                                            "  Outer::Inner kids[2];\n"
+                                            "endclass\n"
+                                            "module t;\n"
+                                            "  H x = new;\n"
+                                            "  int y;\n"
+                                            "  initial begin\n"
+                                            "    x.kids[1] = new;\n"
+                                            "    y = x.kids[1].v;\n"
+                                            "  end\n"
+                                            "endmodule\n"),
+                      "y"),
+            7u);
+}
+
+// §8.23: inside Outer the nested class is named bare, so Outer's property
+// `Inner h` is a handle of Outer::Inner, constructed from a module by `o.h =
+// new` where no method of Outer runs. The bare name was resolved through the
+// running method's class alone, so the property named no class from the
+// module and `o.h.v` read 0.
+TEST(ClassScopeResolutionSim,
+     BareNestedNameHandlePropertyConstructedFromAModule) {
+  EXPECT_EQ(RunAndGet("class Outer;\n"
+                      "  class Inner;\n"
+                      "    int v = 7;\n"
+                      "  endclass\n"
+                      "  Inner h;\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  Outer o = new;\n"
+                      "  int y;\n"
+                      "  initial begin\n"
+                      "    o.h = new;\n"
+                      "    y = o.h.v;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            7u);
+}
+
 }  // namespace

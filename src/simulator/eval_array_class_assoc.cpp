@@ -12,6 +12,7 @@
 #include "parser/ast_expr.h"
 #include "parser/ast_type.h"
 #include "simulator/class_object.h"
+#include "simulator/declared_class_key.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
@@ -39,10 +40,11 @@ const DataType* TypeParamActual(const ClassObject* obj, const ClassDecl* decl,
 namespace {
 
 // The member declaring the property `field` on the chain from `from`, with
-// the class declaring it, which is what its type parameters are read from.
+// the class declaring it, which is what its type parameters are read from
+// and the scope its declared type is written in (§8.23).
 struct PropertyDeclaration {
   const ClassMember* member = nullptr;
-  const ClassDecl* declaring = nullptr;
+  const ClassTypeInfo* declaring = nullptr;
 };
 
 PropertyDeclaration FindPropertyDeclaration(const ClassTypeInfo* from,
@@ -51,7 +53,7 @@ PropertyDeclaration FindPropertyDeclaration(const ClassTypeInfo* from,
     if (t->decl == nullptr) continue;
     for (const auto* m : t->decl->members) {
       if (m->kind == ClassMemberKind::kProperty && m->name == field)
-        return {m, t->decl};
+        return {m, t};
     }
   }
   return {};
@@ -60,26 +62,30 @@ PropertyDeclaration FindPropertyDeclaration(const ClassTypeInfo* from,
 }  // namespace
 
 // §8.25 with §8.7: the class the property `field` is a handle of on `obj`:
-// the declared type's name where it names a class, else the class the type
-// parameter the name stands for is bound to on `obj`. A declaration of the
-// form `T obj` names no class of its own, so a `new` assigned to it was
-// resolved against a class named T, which there is none of, and the property
-// was no handle in any specialization.
+// the class the declared type names as written in the declaring class, else
+// the class the type parameter the name stands for is bound to on `obj`. A
+// declaration of the form `T obj` names no class of its own, so a `new`
+// assigned to it was resolved against a class named T, which there is none
+// of, and the property was no handle in any specialization. §8.23 (printed
+// pages 200-201): the declared type is resolved as written in the declaring
+// class (DeclaredClassKeyInScope), where the bare type name alone named no
+// class for `Outer::Inner h` outside Outer, nor for `Inner h` inside it once
+// asked from a module, so `x.h = new` and `o.h = new` constructed nothing.
 std::string_view PropertyClassName(const ClassObject* obj,
                                    const ClassTypeInfo* from,
                                    std::string_view field, SimContext& ctx) {
   PropertyDeclaration decl = FindPropertyDeclaration(from, field);
   if (decl.member == nullptr) return {};
+  Arena& arena = ctx.GetArena();
+  std::string_view key = DeclaredClassKeyInScope(decl.member->data_type,
+                                                 decl.declaring, ctx, arena);
+  if (!key.empty()) return key;
   std::string_view name = decl.member->data_type.type_name;
-  if (name.empty()) return {};
-  if (ctx.FindClassType(name) != nullptr) return name;
-  if (decl.declaring->type_param_names.count(name) == 0) return {};
-  const DataType* bound = TypeParamActual(obj, decl.declaring, name);
-  if (bound == nullptr || bound->kind != DataTypeKind::kNamed ||
-      ctx.FindClassType(bound->type_name) == nullptr) {
-    return {};
-  }
-  return bound->type_name;
+  const ClassDecl* cls = decl.declaring->decl;
+  if (name.empty() || cls->type_param_names.count(name) == 0) return {};
+  const DataType* bound = TypeParamActual(obj, cls, name);
+  if (bound == nullptr || bound->kind != DataTypeKind::kNamed) return {};
+  return DeclaredClassKeyInScope(*bound, decl.declaring, ctx, arena);
 }
 
 // Whether `expr` is a path of names to an object -- an identifier, `this`

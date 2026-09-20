@@ -61,14 +61,20 @@ AssocArrayObject* FindAssocArrayOfBase(const Expr* base, SimContext& ctx,
 const DataType* TypeParamActual(const ClassObject* obj, const ClassDecl* decl,
                                 std::string_view pname);
 
-// §8.25 with §8.7: the class the property `field` is a handle of on `obj`,
-// the property's declaration looked for from the class `from` up its base
-// chain as MemberClassTypeName of src/simulator/class_object.h looks: the
-// declared type's name where it names a class, else -- `T obj` with T a type
-// parameter of the declaring class -- the class the parameter stands for on
-// `obj` (TypeParamActual), which a specialization may bind to any class type.
-// Empty where the property is of no class type, or names a type parameter
-// bound to no class. `obj` may be null, which reads the class's defaults.
+// §8.25 with §8.7: the key the run holds the class the property `field` is a
+// handle of on `obj` under, the property's declaration looked for from the
+// class `from` up its base chain as MemberClassTypeName of
+// src/simulator/class_object.h looks: the class the declared type names as
+// written in the declaring class (DeclaredClassKeyInScope of
+// declared_class_key.h, so §8.23's `Outer::Inner h` in another class and
+// `Inner h` in Outer both answer `Outer::Inner`), else -- `T obj` with T a
+// type parameter of the declaring class -- the class the parameter stands for
+// on `obj` (TypeParamActual), which a specialization may bind to any class
+// type. Empty where the property is of no class type, or names a type
+// parameter bound to no class. `obj` may be null, which reads the class's
+// defaults. Resolved by the bare type name alone, `x.h = new` on
+// `Outer::Inner h` constructed nothing and an array property `Outer::Inner
+// kids[2]` held plain values.
 std::string_view PropertyClassName(const ClassObject* obj,
                                    const ClassTypeInfo* from,
                                    std::string_view field, SimContext& ctx);

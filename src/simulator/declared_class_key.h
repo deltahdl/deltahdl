@@ -19,6 +19,7 @@ namespace delta {
 
 class Arena;
 class SimContext;
+struct ClassTypeInfo;
 struct DataType;
 
 // The key the run holds the declared class under: the scoped spelling where
@@ -28,5 +29,22 @@ struct DataType;
 // constructor both read it later.
 std::string_view DeclaredClassKey(const DataType& type, SimContext& ctx,
                                   Arena& arena);
+
+// §8.23 (printed pages 200-201): a nested class's bare name is visible
+// throughout the containing class, so a declaration written in class
+// `declaring` -- a property of Outer, or of a class nested in Outer, declared
+// `Inner h` or `Inner q[$]` -- names the class the run holds under
+// `Outer::Inner`. The key for `type` as written in `declaring`: the scoped
+// spelling where the declaration wrote one the run holds a class by, else the
+// class of `type`'s bare name nested in `declaring` or in a class enclosing
+// it, innermost first, else the bare name; empty where none names a class.
+// The nested probe goes ahead of the bare one so that the key answered is
+// the one the class is registered under whichever scope later reads it:
+// SimContext::FindClassType resolves a bare nested name through the running
+// method's class alone, so a property first referenced from a module's
+// initial block, where no method runs, named no class by its bare name.
+std::string_view DeclaredClassKeyInScope(const DataType& type,
+                                         const ClassTypeInfo* declaring,
+                                         SimContext& ctx, Arena& arena);
 
 }  // namespace delta

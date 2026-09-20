@@ -5,6 +5,7 @@
 
 #include "common/arena.h"
 #include "parser/ast_type.h"
+#include "simulator/class_object.h"
 #include "simulator/sim_context.h"
 
 namespace delta {
@@ -31,6 +32,30 @@ std::string_view DeclaredClassKey(const DataType& type, SimContext& ctx,
     if (ctx.FindClassType(*scoped) != nullptr) return *scoped;
   }
   return ctx.FindClassType(name) != nullptr ? name : std::string_view{};
+}
+
+// The `<scope>::<name>` key of the class `name` nested in `scope` or in a
+// class enclosing it, innermost first, built in the arena; empty where none
+// of them holds one.
+static std::string_view NestedClassKeyInScope(std::string_view name,
+                                              const ClassTypeInfo* scope,
+                                              SimContext& ctx, Arena& arena) {
+  for (const ClassTypeInfo* t = scope; t != nullptr; t = t->enclosing) {
+    auto* key = arena.Create<std::string>(std::string(t->name) +
+                                          "::" + std::string(name));
+    if (ctx.FindClassType(*key) != nullptr) return *key;
+  }
+  return {};
+}
+
+std::string_view DeclaredClassKeyInScope(const DataType& type,
+                                         const ClassTypeInfo* declaring,
+                                         SimContext& ctx, Arena& arena) {
+  std::string_view name = type.type_name;
+  if (name.empty()) return {};
+  if (!type.scope_name.empty()) return DeclaredClassKey(type, ctx, arena);
+  std::string_view nested = NestedClassKeyInScope(name, declaring, ctx, arena);
+  return !nested.empty() ? nested : DeclaredClassKey(type, ctx, arena);
 }
 
 }  // namespace delta

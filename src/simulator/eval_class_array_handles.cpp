@@ -8,6 +8,7 @@
 #include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
 #include "simulator/class_object.h"
+#include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_array_class_queue.h"
 #include "simulator/eval_assoc_class_handles.h"
 #include "simulator/eval_class_array.h"
@@ -18,14 +19,17 @@ namespace delta {
 
 namespace {
 
-// Whether the elements of the array property `ref` are class handles: the
-// property's declared type names a class the simulation knows. A property of
-// a class type has width_is_declared false and a 32-bit carrier for its
-// width, so the type name is the one fact that tells a handle element from a
-// value one.
-bool ElementsAreHandles(const ClassArrayRef& ref, SimContext& ctx) {
-  return !ref.prop->type_name.empty() &&
-         ctx.FindClassType(ref.prop->type_name) != nullptr;
+// The key of the class the elements of the array property `ref` are handles
+// of, empty where they are values: the class the property's declared type
+// names as written in its declaring class (PropertyClassName), so that
+// §8.23's `Outer::Inner kids[2]` in another class and `Inner kids[2]` in
+// Outer both answer `Outer::Inner`. A property of a class type has
+// width_is_declared false and a 32-bit carrier for its width, so the type is
+// the one fact that tells a handle element from a value one. Asked by the
+// property record's bare type name, `Outer::Inner kids[2]` held plain
+// values: `x.kids[1] = new` constructed nothing and `x.kids[1].v` read 0.
+std::string_view ElementClassKey(const ClassArrayRef& ref, SimContext& ctx) {
+  return PropertyClassName(ref.obj, ref.obj->type, ref.prop->name, ctx);
 }
 
 // `expr` as a single-index select, or null for an expression of any other
@@ -62,10 +66,9 @@ bool TryClassArrayElementNewAssign(const Stmt* stmt, SimContext& ctx,
     return false;
   }
   ClassArrayRef ref;
-  if (!ResolveClassArray(lhs->base, ctx, arena, ref) ||
-      !ElementsAreHandles(ref, ctx)) {
-    return false;
-  }
+  if (!ResolveClassArray(lhs->base, ctx, arena, ref)) return false;
+  std::string_view class_key = ElementClassKey(ref, ctx);
+  if (class_key.empty()) return false;
   // §11.4.1: the index is evaluated once, before the constructor runs, which
   // may write the array itself.
   Logic4Vec idx_val = EvalExpr(lhs->index, ctx, arena);
@@ -73,8 +76,7 @@ bool TryClassArrayElementNewAssign(const Stmt* stmt, SimContext& ctx,
   int64_t index = SelectBoundValue(idx_val);
   if (index < ref.lo || index >= ref.lo + static_cast<int64_t>(ref.size))
     return true;
-  Logic4Vec handle =
-      ConstructElementObject(rhs, ref.prop->type_name, ctx, arena);
+  Logic4Vec handle = ConstructElementObject(rhs, class_key, ctx, arena);
   ref.obj->SetProperty(ClassArrayElementKey(ref.prop->name, index), handle);
   // §9.4.2: a change to an object's data member wakes a process waiting on
   // the object, as every other write to an element of the property tells it.
@@ -93,7 +95,7 @@ bool TryEvalClassArrayElementMember(const Expr* expr, SimContext& ctx,
   if (sel == nullptr) return false;
   ClassArrayRef ref;
   if (!ResolveClassArray(sel->base, ctx, arena, ref) ||
-      !ElementsAreHandles(ref, ctx)) {
+      ElementClassKey(ref, ctx).empty()) {
     return false;
   }
   // The element is read as any select of the property is (EvalSelect through
