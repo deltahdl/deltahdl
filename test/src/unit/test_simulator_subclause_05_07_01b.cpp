@@ -772,15 +772,18 @@ TEST(IntegerLiteralSim, UnbasedUnsizedOneFillsAClassParameterSizedByAnother) {
   EXPECT_EQ(result & 0xFFFFu, 0xFFu);
 }
 
-// The class's own copy of the default, read through the class scope
-// resolution operator (§8.23), is the same eight bits of ones.
+// The default specialization `C#()` (§8.25.1), reached through the class
+// scope resolution operator (§8.23) with no object, binds the same eight bits
+// of ones for a static method to read; a parameterized class's bare name is
+// no specialization, so the read goes through `C#()::`.
 TEST(IntegerLiteralSim, UnbasedUnsizedOneFillsAClassParameterReadByScope) {
   auto result = RunAndGet(
       "module t;\n"
       "  class C #(parameter int W = 8, parameter logic [W-1:0] INIT = '1);\n"
+      "    static function logic [15:0] get(); return INIT; endfunction\n"
       "  endclass\n"
       "  logic [15:0] a;\n"
-      "  initial a = C::INIT;\n"
+      "  initial a = C#()::get();\n"
       "endmodule\n",
       "a");
   EXPECT_EQ(result & 0xFFFFu, 0xFFu);
