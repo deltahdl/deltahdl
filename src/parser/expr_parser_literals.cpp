@@ -14,6 +14,7 @@
 // Parser::ParseIntLiteralPrimary are still called from there, being members
 // src/parser/parser.h declares.
 
+#include <cctype>
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
@@ -122,11 +123,45 @@ void Parser::WarnSizedOverflow(const Token& tok) {
   }
 }
 
+// Whether `text` is a simple decimal number, the digits and underscores §5.7.1
+// composes it of and nothing else -- so no apostrophe, and none of the '.', 'e'
+// and unit letters that make a real or a time literal.
+static bool IsSimpleDecimalText(std::string_view text) {
+  if (text.empty()) return false;
+  for (char c : text) {
+    if (!std::isdigit(static_cast<unsigned char>(c)) && c != '_') return false;
+  }
+  return true;
+}
+
 // casting_type allows constant_primary; an integer literal followed by '(expr)
 // is a width-cast (the literal is the target width). Otherwise it is just the
 // integer literal.
+//
+// §5.7.1 (printed page 77): a based literal is up to three tokens, its size,
+// its base and its digits, and §5.4 makes a comment a separator between tokens
+// as §5.3's white space is, so `8 /* c */ 'h11` is the one literal 8'h11.
+// Lexer::LexNumber reads the size and the based number after it as one token
+// across spaces and tabs alone; across a comment or a newline the size arrives
+// as a simple decimal token and the rest as an unsized based one, which is the
+// pair joined here into the token the lexer would have made of `8 'h11`. The
+// joined text is owned by the arena, as the source holds it nowhere. No other
+// production puts two integer literals side by side, so the pair is never
+// anything else.
 Expr* Parser::ParseIntLiteralPrimary(const Token& tok) {
   auto* lit = MakeLiteral(ExprKind::kIntegerLiteral, tok);
+  if (IsSimpleDecimalText(tok.text) && Check(TokenKind::kIntLiteral) &&
+      !CurrentToken().text.empty() && CurrentToken().text.front() == '\'') {
+    Token based = Consume();
+    auto* joined = arena_.Create<std::string>(std::string(tok.text) + " " +
+                                              std::string(based.text));
+    Token whole = tok;
+    whole.text = *joined;
+    lit->text = whole.text;
+    lit->int_val = ParseIntText(whole.text);
+    WarnSizedOverflow(whole);
+    return lit;
+  }
   if (!Check(TokenKind::kApostrophe)) return lit;
   auto saved = lexer_.SavePos();
   Consume();

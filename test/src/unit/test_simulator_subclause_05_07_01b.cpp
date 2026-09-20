@@ -899,4 +899,44 @@ TEST(IntegerLiteralSim, UnsizedHexZExtendsASixtyFourBitInitializer) {
   EXPECT_EQ(result, 1u);
 }
 
+// §5.7.1 (printed page 77): a based literal is up to three tokens, its size,
+// its base and its digits, and §5.4 makes a comment a token separator as
+// §5.3's white space is, so `8 /* c */ 'h11` is the sized 8'h11 and reads 17.
+// The size and the base were two literals, and the second a stray token.
+TEST(IntegerLiteralSim, BlockCommentBetweenSizeAndBaseReadsTheSizedValue) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial x = 8 /* c */ 'h11;\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(result, 17u);
+}
+
+// §5.7.1 with §11.6.1: the size the comment separates is the literal's own, so
+// `4 /* c */ 'shf` is the 4-bit signed -1 and sign-extends to ffff in a 16-bit
+// object; read as the unsized `'shf` beside a stray 4 it would be 000f.
+TEST(IntegerLiteralSim, BlockCommentBetweenSizeAndBaseKeepsTheSizeSigned) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [15:0] x;\n"
+      "  initial x = 4 /* c */ 'shf;\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(result, 0xFFFFu);
+}
+
+// §5.3 counts a newline as white space, so the base may open the next line,
+// here after a one-line comment closes the size's.
+TEST(IntegerLiteralSim, LineCommentBetweenSizeAndBaseReadsTheSizedValue) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial x = 8 // c\n"
+      "    'h11;\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(result, 17u);
+}
+
 }  // namespace

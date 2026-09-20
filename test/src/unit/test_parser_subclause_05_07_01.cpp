@@ -473,4 +473,44 @@ TEST(IntegerLiteralParsing, WideBinaryLiteralFoldsItsLowSixtyFourBits) {
   EXPECT_EQ(rhs->int_val, 0x8000000000000001u);
 }
 
+// §5.7.1 (printed page 77) composes a based literal of up to three tokens, its
+// size, its base and its digits, and §5.4 makes a comment a token separator as
+// §5.3's white space is, so `8 /* c */ 'h11` is the one sized literal 8'h11.
+// The lexer reads the size and the base as one token across spaces and tabs
+// alone; across the comment the size was a decimal literal of its own and
+// `'h11` a second literal, which the parser reported as a stray token. The
+// digit in the comment discriminates a join that read the source between the
+// two tokens as part of the size.
+TEST(IntegerLiteralParsing, BlockCommentBetweenSizeAndBaseJoinsOneLiteral) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial x = 8 /* 2 */ 'h11;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
+  EXPECT_EQ(rhs->text, "8 'h11");
+  EXPECT_EQ(rhs->int_val, 0x11u);
+}
+
+// §5.3 counts a newline as white space, so a size on one line and its base on
+// the next are the same three-token literal, here with a one-line comment
+// ending the first line.
+TEST(IntegerLiteralParsing, LineCommentBetweenSizeAndBaseJoinsOneLiteral) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial x = 4 // c\n"
+      "    'sd3;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
+  EXPECT_EQ(rhs->text, "4 'sd3");
+  EXPECT_EQ(rhs->int_val, 3u);
+}
+
 }  // namespace
