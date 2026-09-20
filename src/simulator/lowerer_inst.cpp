@@ -145,16 +145,28 @@ void Lowerer::LowerPortBindings(const RtlirModuleInst& inst,
     auto* local_id =
         MakeLocalPortId(inst_seg + std::string(binding.port_name), arena_);
 
-    // §23.3.3 ref ports and §23.3.3.4 inout ports both share storage with the
-    // connected parent signal, so alias the child port onto it rather than
-    // lowering a one-way continuous assignment.
+    // §23.3.3.2 ref ports and §23.3.3.3 inout ports both share storage with
+    // the connected parent signal, so alias the child port onto it rather than
+    // lowering a one-way continuous assignment. An inout port is a net
+    // (§23.3.3.3 connects it to a net and never to a variable), and §23.3.3.7
+    // merges the port's net and the connected net into one simulated net, so
+    // the net map is redirected beside the variable map, as LowerAliases and
+    // TryAliasInterfacePort do: a continuous assignment inside the child
+    // resolves its driver through SimContext::FindNet under the child's
+    // prefix, where CreatePortVariable (lowerer_register.cpp) registered the
+    // port's own net, and with the variable alone aliased that net took the
+    // driver and the parent's net never saw it. A ref port's connection is a
+    // variable, which FindNet does not answer, so its net alias is a no-op.
+    // The key is interned in the arena because the net map holds it rather
+    // than a copy, and a variable-kind port has no entry there yet.
     if (binding.direction == Direction::kInout ||
         binding.direction == Direction::kRef) {
       if (binding.connection->kind != ExprKind::kIdentifier) continue;
-      std::string local_qualified =
-          inst_prefix_ + inst_seg + std::string(binding.port_name);
+      const std::string& local_qualified = *arena_.Create<std::string>(
+          inst_prefix_ + inst_seg + std::string(binding.port_name));
       std::string target = inst_prefix_ + std::string(binding.connection->text);
       ctx_.AliasVariable(local_qualified, target);
+      ctx_.AliasNet(local_qualified, target);
       continue;
     }
 

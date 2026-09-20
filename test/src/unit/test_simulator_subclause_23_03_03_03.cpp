@@ -148,4 +148,30 @@ TEST(PortConnectionRulesForNetsSimulation,
   EXPECT_EQ(var->value.ToUint64(), 0xCDu);
 }
 
+// §23.3.3.3 connects an inout net port to a net, and §23.3.3.7 merges the
+// port's net and the connected net into one simulated net, so a continuous
+// assignment inside the child is one driver of the parent's net beside the
+// parent's own, and §6.6.1's wire resolution combines the two: the parent
+// drives the low nibble and leaves the high one at z, the child the reverse.
+// Written directly into the shared variable rather than joining the drivers,
+// the child's value would stand alone as 8'hFz or be overwritten by the
+// parent's 8'hz0; only the resolved 8'hF0 says both drivers reached the net.
+TEST(PortConnectionRulesForNetsSimulation,
+     InoutNetPortDriverResolvesWithParentDriver) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module child(inout wire [7:0] data);\n"
+      "  assign data = 8'b1111_zzzz;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  wire [7:0] bus;\n"
+      "  assign bus = 8'bzzzz_0000;\n"
+      "  child u(.data(bus));\n"
+      "endmodule\n",
+      f, "bus");
+  ASSERT_NE(var, nullptr);
+  EXPECT_TRUE(var->value.IsKnown());
+  EXPECT_EQ(var->value.ToUint64(), 0xF0u);
+}
+
 }  // namespace
