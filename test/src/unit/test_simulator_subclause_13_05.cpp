@@ -456,4 +456,98 @@ TEST(SubroutineCallArgWriteback,
   EXPECT_EQ(var->value.ToUint64(), 909u);
 }
 
+// §13.5 (printed page 348) has the call pass an input formal the value of
+// the expression written in the call, and §8.11 (printed page 187) makes a
+// property named inside a method, bare or as `this.v`, the property of the
+// object the method was invoked on. `b.add8(v)` inside a method of A, with
+// A's `v` at 40, therefore passes 40 and reads 48; the actual read with B's
+// object already in force found no `v` on it and passed 0, so the method
+// answered 8. Bare, `this.`-qualified and the expression `v + 1` are read
+// into one number: 48 * 10000 + 48 * 100 + 49 = 484849 against 80809.
+TEST(SubroutineCallSim, ActualNamingAPropertyOfTheCallingObject) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  class B;\n"
+      "    function int add8(int a); return a + 8; endfunction\n"
+      "  endclass\n"
+      "  class A;\n"
+      "    int v = 40;\n"
+      "    function int bare(); B b = new; return b.add8(v); endfunction\n"
+      "    function int qual(); B b = new; return b.add8(this.v);\n"
+      "    endfunction\n"
+      "    function int expr(); B b = new; return b.add8(v + 1);\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "  int r;\n"
+      "  initial begin\n"
+      "    A a = new;\n"
+      "    r = a.bare() * 10000 + a.qual() * 100 + a.expr();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 484849u);
+}
+
+// The same rule one call deeper: in `b.add8(c.add8(v))` the inner call is an
+// actual of the outer one and `v` an actual of the inner one, both written
+// in A's method, so both are read on A's object: 40 + 8 + 8 = 56. A read on
+// the wrong object gave 16. The inner call's own object is pushed while its
+// actual is read, so a bind that set only the outermost callee aside would
+// still fail here.
+TEST(SubroutineCallSim, ActualNamingAPropertyOfTheCallingObjectInANestedCall) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  class B;\n"
+      "    function int add8(int a); return a + 8; endfunction\n"
+      "  endclass\n"
+      "  class A;\n"
+      "    int v = 40;\n"
+      "    function int nested();\n"
+      "      B b = new; B c = new;\n"
+      "      return b.add8(c.add8(v));\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "  int r;\n"
+      "  initial begin\n"
+      "    A a = new;\n"
+      "    r = a.nested();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 56u);
+}
+
+// A class task enabled on another object takes the same rule: §13.5 reads
+// the actual in the enabling task, so `b.addt(v, t)` inside a task of A
+// passes A's 40 and B's task answers 48 through the output formal, which the
+// enabling task keeps in A's `w`; with B's object in force for the actual it
+// answered 8.
+TEST(SubroutineCallSim, TaskActualNamingAPropertyOfTheCallingObject) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  class B;\n"
+      "    task addt(input int a, output int o); o = a + 8; endtask\n"
+      "  endclass\n"
+      "  class A;\n"
+      "    int v = 40;\n"
+      "    int w;\n"
+      "    task via(); B b = new; int t; b.addt(v, t); w = t; endtask\n"
+      "  endclass\n"
+      "  int r;\n"
+      "  initial begin\n"
+      "    A a = new;\n"
+      "    a.via();\n"
+      "    r = a.w;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 48u);
+}
+
 }  // namespace

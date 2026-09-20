@@ -39,6 +39,21 @@ namespace delta {
 // While one of these lives the callee's scope is set aside and the caller's
 // stands on top; it is put back when the object goes, so the binding that
 // follows the read still lands in the callee's scope.
+//
+// The callee's object is set aside with its scope. §8.11 (printed page 187)
+// makes a property named inside a method, bare or through `this`, the
+// property of the object the method was invoked on, and the actual is
+// written inside the caller's method: `b.add8(v)` in a method of A names
+// A's `v`. ExecInstanceMethodCall and SetupInstanceTaskCall push the
+// callee's object, and the class defining the method with it, before the
+// actuals are bound, so `v` was looked up on B's object, which has none, and
+// add8 was passed 0. Which binding this holds for is what BindFunctionArgs
+// decides (CalleeOwnsThis) and records for the reads of the actuals.
+static bool& CalleeOwnsThisFlag() {
+  static thread_local bool flag = false;
+  return flag;
+}
+
 class CalleeScopeAside {
  public:
   explicit CalleeScopeAside(SimContext& ctx) : ctx_(ctx) {
@@ -49,8 +64,18 @@ class CalleeScopeAside {
       set_aside_ = true;
     }
     ctx_.SwapScopeStack(std::move(stack));
+    if (!CalleeOwnsThisFlag()) return;
+    self_ = ctx_.CurrentThis();
+    method_class_ = ctx_.CurrentMethodClass();
+    ctx_.PopThis();
+    ctx_.PopMethodClass();
+    this_set_aside_ = true;
   }
   ~CalleeScopeAside() {
+    if (this_set_aside_) {
+      ctx_.PushMethodClass(method_class_);
+      ctx_.PushThis(self_);
+    }
     if (!set_aside_) return;
     std::vector<Scope> stack = ctx_.SwapScopeStack({});
     stack.push_back(std::move(callee_));
@@ -63,6 +88,60 @@ class CalleeScopeAside {
   SimContext& ctx_;
   Scope callee_;
   bool set_aside_ = false;
+  ClassObject* self_ = nullptr;
+  const ClassTypeInfo* method_class_ = nullptr;
+  bool this_set_aside_ = false;
+};
+
+// Whether the object on top of the `this` stack is the callee's own, pushed
+// for the call being bound rather than the caller's: the call is written on a
+// receiver, `h.m(...)`, and `func` is a non-static method of that object's
+// class or of one it inherits from. A call through `this` or `super` runs on
+// the caller's own object, and a static method (§8.10) is run with no object
+// pushed, so neither has anything to set aside; a hierarchical call written
+// `inst.f(...)` has a receiver but names no method of the object, so the
+// object on top is the caller's and stays. A constructor's actuals are bound
+// by EvalClassNew with the object under construction already popped, and
+// its `super.new(...)` and extends-specifier actuals carry no receiver.
+static bool IsMethodOfObject(const ModuleItem* func, const ClassObject* self) {
+  if (self == nullptr) return false;
+  for (const ClassTypeInfo* t = self->type; t != nullptr; t = t->parent) {
+    auto it = t->methods.find(std::string(func->name));
+    if (it != t->methods.end() && it->second == func) return true;
+  }
+  return false;
+}
+
+static bool IsThisOrSuper(const Expr* receiver) {
+  return receiver != nullptr && receiver->kind == ExprKind::kIdentifier &&
+         (receiver->text == "this" || receiver->text == "super");
+}
+
+static bool CalleeOwnsThis(const ModuleItem* func, const Expr* expr,
+                           SimContext& ctx) {
+  if (func == nullptr || func->is_static || expr == nullptr) return false;
+  const Expr* access = expr->lhs;
+  if (access == nullptr || access->kind != ExprKind::kMemberAccess ||
+      access->is_scope_resolution || IsThisOrSuper(access->lhs)) {
+    return false;
+  }
+  return IsMethodOfObject(func, ctx.CurrentThis());
+}
+
+// Holds CalleeOwnsThisFlag at the answer for one binding and restores the
+// enclosing binding's on the way out: an actual that is itself a method call
+// binds that call's actuals with the caller's object already set aside.
+class CalleeOwnsThisScope {
+ public:
+  explicit CalleeOwnsThisScope(bool owns) : previous_(CalleeOwnsThisFlag()) {
+    CalleeOwnsThisFlag() = owns;
+  }
+  ~CalleeOwnsThisScope() { CalleeOwnsThisFlag() = previous_; }
+  CalleeOwnsThisScope(const CalleeOwnsThisScope&) = delete;
+  CalleeOwnsThisScope& operator=(const CalleeOwnsThisScope&) = delete;
+
+ private:
+  bool previous_;
 };
 
 static int ResolveArgIndex(const ModuleItem* func, const Expr* expr,
@@ -757,6 +836,7 @@ static void BindValueArg(const FunctionArg& param, const ActualArgRef& actual,
 
 void BindFunctionArgs(const ModuleItem* func, const Expr* expr, SimContext& ctx,
                       Arena& arena) {
+  CalleeOwnsThisScope owns_this(CalleeOwnsThis(func, expr, ctx));
   for (size_t i = 0; i < func->func_args.size(); ++i) {
     int ai = ResolveArgIndex(func, expr, i);
     const auto& param = func->func_args[i];
