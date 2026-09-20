@@ -349,4 +349,111 @@ TEST(SubroutineCallSim,
   EXPECT_EQ(static_cast<int32_t>(var->value.ToUint64()), -6);
 }
 
+// §13.5 (printed page 348) has the return from a subroutine pass the value of
+// an output formal to the variable the call named as the actual, and §8.11
+// (printed 187) makes `this.w` inside a method the property `w` of the object
+// the method was invoked on -- the same target the bare `w` names, spelled
+// with its handle. The copy-out resolves that actual with the caller's `this`
+// and the caller's class in force, so it lands where a read through the handle
+// looks: `h.w` reads the property under the key the object's construction
+// wrote for the declaring class, and a deposit under the bare key alone
+// answered the stale 0 beside it. w takes 9 through `setw(this.w)` and z 9
+// through `setw(z)` less one, so the read is 98; the copy-out dropped for the
+// `this.`-spelled actual alone gave 8.
+TEST(SubroutineCallArgWriteback,
+     OutputActualThisPropertyInsideAMethodIsWrittenAtReturn) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  class C;\n"
+      "    int w, z;\n"
+      "    function void fill();\n"
+      "      setw(this.w);\n"
+      "      setw(z);\n"
+      "      z = z - 1;\n"
+      "    endfunction\n"
+      "    function void setw(output int o);\n"
+      "      o = 9;\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "  int r;\n"
+      "  initial begin\n"
+      "    C h = new;\n"
+      "    h.fill();\n"
+      "    r = h.w * 10 + h.z;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 98u);
+}
+
+// The inout form of the same actual: §13.5 passes the actual's value in at the
+// call and the formal's value out at the return, so `bump(this.w)` with w at 3
+// reads 3 into the formal, adds 4, and writes 7 back to the property. A
+// copy-out that missed the `this.`-spelled actual left 3; a copy-in that read
+// the property as 0 left 4.
+TEST(SubroutineCallArgWriteback,
+     InoutActualThisPropertyInsideAMethodIsReadAndWrittenBack) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  class C;\n"
+      "    int w;\n"
+      "    function void fill();\n"
+      "      this.w = 3;\n"
+      "      bump(this.w);\n"
+      "    endfunction\n"
+      "    function void bump(inout int o);\n"
+      "      o = o + 4;\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "  int r;\n"
+      "  initial begin\n"
+      "    C h = new;\n"
+      "    h.fill();\n"
+      "    r = h.w;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 7u);
+}
+
+// §8.15 has a method of the base class name the base's declaration of `w`
+// through `this.w` whatever the object's own class, so a `fill` declared in B
+// and invoked on a D object writes the `w` B declares, and a read through the
+// D-typed handle and through a B-typed one both see it: 9 * 100 + 9 = 909. The
+// copy-out dropped on the derived object gave 0.
+TEST(SubroutineCallArgWriteback,
+     OutputActualThisPropertyFromABaseMethodOnADerivedObject) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  class B;\n"
+      "    int w;\n"
+      "    function void fill();\n"
+      "      setw(this.w);\n"
+      "    endfunction\n"
+      "    function void setw(output int o);\n"
+      "      o = 9;\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "  class D extends B;\n"
+      "    int extra;\n"
+      "  endclass\n"
+      "  int r;\n"
+      "  initial begin\n"
+      "    D d = new;\n"
+      "    B b;\n"
+      "    b = d;\n"
+      "    d.fill();\n"
+      "    r = d.w * 100 + b.w;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 909u);
+}
+
 }  // namespace
