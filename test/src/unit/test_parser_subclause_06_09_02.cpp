@@ -2,8 +2,12 @@
 
 #include <gtest/gtest.h>
 
+#include <string>
+
+#include "common/diagnostic.h"
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 #include "model_net_declaration.h"
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
@@ -147,6 +151,60 @@ TEST(VectorNetAccessibility, PlainWireNeitherFlag) {
   ASSERT_NE(item, nullptr);
   EXPECT_FALSE(item->data_type.is_vectored);
   EXPECT_FALSE(item->data_type.is_scalared);
+}
+
+// §6.9.2 gives vectored and scalared to vector net declarations, and the
+// variable declaration grammar of §6.8 admits neither, so the keyword after a
+// variable's type is reported under §6.9.2 rather than as the identifier the
+// declarator list did not find. sv-tests' 6.9.2--vector_vectored_inv.sv writes
+// `logic vectored` for a vectored net, and a report under §6.8 scored it FAIL.
+TEST(VectorNetAccessibility, VectoredAfterVariableTypeIsAClause692Report) {
+  auto r = Parse(
+      "module top();\n"
+      "  logic vectored [15:0] a = 0;\n"
+      "  assign a[1] = 1;\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "'vectored' shall be used in a vector net declaration and 'logic' "
+      "declares no net",
+      2, "6.9.2"));
+  for (const auto& d : r.diags) {
+    EXPECT_EQ(d.subclause, "6.9.2") << d.message;
+  }
+}
+
+TEST(VectorNetAccessibility, ScalaredAfterVariableTypeIsAClause692Report) {
+  auto r = Parse(
+      "module top();\n"
+      "  bit scalared [7:0] b;\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "'scalared' shall be used in a vector net declaration and 'bit' "
+      "declares no net",
+      2, "6.9.2"));
+  for (const auto& d : r.diags) {
+    EXPECT_EQ(d.subclause, "6.9.2") << d.message;
+  }
+}
+
+// The keyword is taken with the type, so the declarators after it are parsed
+// in step: the declaration still lands as a variable named as written.
+TEST(VectorNetAccessibility, VectoredAfterVariableTypeLeavesTheDeclarator) {
+  auto r = Parse(
+      "module top();\n"
+      "  logic vectored [15:0] a = 0;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
+  EXPECT_FALSE(item->data_type.is_net);
+  EXPECT_FALSE(item->data_type.is_vectored);
+  EXPECT_EQ(item->name, "a");
+  ASSERT_NE(item->data_type.packed_dim_left, nullptr);
+  EXPECT_EQ(item->data_type.packed_dim_left->int_val, 15u);
 }
 
 }  // namespace

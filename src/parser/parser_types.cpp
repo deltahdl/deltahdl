@@ -475,6 +475,30 @@ DataType Parser::ParseDeclaredDataType() {
   return dtype;
 }
 
+// §6.9.2 has vectored and scalared be advisory keywords of vector net
+// declarations, and Syntax 10-1 places them in net_declaration alone: the
+// variable declaration grammar of §6.8 admits neither. On a net the keyword is
+// recorded. After a variable's type it is reported under §6.9.2, the rule the
+// spelling breaks, and taken with the type so that the declarators after it
+// are parsed in step and the report is not the identifier the list did not
+// find: sv-tests' 6.9.2--vector_vectored_inv.sv writes `logic vectored` for a
+// vectored net, and the §6.8 report scored a correct rejection FAIL.
+void Parser::ParseVectoredScalared(DataType& dtype) {
+  if (dtype.is_net) {
+    dtype.is_vectored = Match(TokenKind::kKwVectored);
+    if (!dtype.is_vectored) dtype.is_scalared = Match(TokenKind::kKwScalared);
+    return;
+  }
+  if (!Check(TokenKind::kKwVectored) && !Check(TokenKind::kKwScalared)) return;
+  Token tok = CurrentToken();
+  diag_.Error(tok.loc,
+              std::format("'{}' shall be used in a vector net declaration and "
+                          "'{}' declares no net",
+                          tok.text, dtype.type_name),
+              Subclause("6.9.2"));
+  Consume();
+}
+
 DataType Parser::ParseDataType() {
   DataType dtype;
 
@@ -513,11 +537,7 @@ DataType Parser::ParseDataType() {
   Consume();
 
   ParseNetStrength(dtype);
-
-  dtype.is_vectored = dtype.is_net && Match(TokenKind::kKwVectored);
-  if (dtype.is_net && !dtype.is_vectored) {
-    dtype.is_scalared = Match(TokenKind::kKwScalared);
-  }
+  ParseVectoredScalared(dtype);
 
   bool has_intervening = dtype.drive_strength0 != 0 ||
                          dtype.charge_strength != 0 || dtype.is_vectored ||

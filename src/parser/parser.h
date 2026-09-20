@@ -509,6 +509,7 @@ class Parser {
   void ParseDriveStrength(uint8_t& s0, uint8_t& s1);
   void ReportDriveStrengthAfterDelay(const Expr* delay);
   void ParseNetStrength(DataType& dtype);
+  void ParseVectoredScalared(DataType& dtype);
   void ParseVarDeclList(std::vector<ModuleItem*>& items, const DataType& dtype);
   void ParseContinuousAssign(std::vector<ModuleItem*>& items);
   ModuleItem* ParseAlias();
