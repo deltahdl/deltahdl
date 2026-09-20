@@ -673,8 +673,10 @@ void Lexer::CheckEscapeDigits() {
     ++taken;
   }
   if (taken == kMax || p >= source_.size()) return;
-  const char c = source_[p];
-  if (c != 'x' && c != 'X' && c != 'z' && c != 'Z' && c != '?') return;
+  const char kNext = source_[p];
+  if (kNext != 'x' && kNext != 'X' && kNext != 'z' && kNext != 'Z' &&
+      kNext != '?')
+    return;
   diag_.Error(MakeLoc(),
               kHex ? "x or z digit in a hex escape of a string literal"
                    : "x or z digit in an octal escape of a string literal",
