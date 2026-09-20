@@ -486,4 +486,54 @@ TEST(ConfigParamApply, UseClauseOnABodyParameterOfAModuleWithoutAPortList) {
   EXPECT_EQ(ResolvedParam(u, "P"), 5);
 }
 
+// §33.4.3 (printed page 940): a parameter override from a configuration
+// takes precedence over a defparam on the same parameter, and `use #()`
+// returns every parameter of the instance to its module default (printed
+// 941). P is declared among the items of a module with no parameter port
+// list (§6.20.1, printed 125-126), so the instance's `.P(7)` is discarded and
+// the defparam's 9 is refused: P reads 2. The `#()` locked the parameter port
+// list's parameters alone, so the defparam made P 9.
+TEST(ConfigParamApply, EmptyListLocksABodyParameterAgainstADefparam) {
+  ElabFixture f;
+  auto* u = ConfigElabFirstChild(
+      f,
+      "module c; parameter P = 2; endmodule\n"
+      "module top; c #(.P(7)) u(); defparam u.P = 9; endmodule\n"
+      "config cfg; design top; instance top.u use #(); endconfig\n");
+  ASSERT_NE(u, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(ResolvedParam(u, "P"), 2);
+}
+
+// The precedence is the named assignment's as well: `use #(.P(5))` on the
+// same body parameter holds 5 against `defparam u.P = 9`.
+TEST(ConfigParamApply, NamedUseClauseLocksABodyParameterAgainstADefparam) {
+  ElabFixture f;
+  auto* u = ConfigElabFirstChild(
+      f,
+      "module c; parameter P = 2; endmodule\n"
+      "module top; c u(); defparam u.P = 9; endmodule\n"
+      "config cfg; design top; instance top.u use #(.P(5)); endconfig\n");
+  ASSERT_NE(u, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(ResolvedParam(u, "P"), 5);
+}
+
+// §33.4.3 (printed page 940) gives the configuration precedence where both
+// reference the same parameter, and in every other condition the defparam
+// works as §23.10.1 defines it: a body parameter the use clause does not
+// name is still the defparam's, so Q reads 9 beside the clause's P.
+TEST(ConfigParamApply, UseClauseLeavesAnUnnamedBodyParameterToADefparam) {
+  ElabFixture f;
+  auto* u = ConfigElabFirstChild(
+      f,
+      "module c; parameter P = 2; parameter Q = 3; endmodule\n"
+      "module top; c u(); defparam u.Q = 9; endmodule\n"
+      "config cfg; design top; instance top.u use #(.P(5)); endconfig\n");
+  ASSERT_NE(u, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(ResolvedParam(u, "P"), 5);
+  EXPECT_EQ(ResolvedParam(u, "Q"), 9);
+}
+
 }  // namespace

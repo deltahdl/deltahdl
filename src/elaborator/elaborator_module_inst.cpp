@@ -394,6 +394,17 @@ void DropParamOverride(Elaborator::ParamList& child_params,
 
 // "#()" returns every parameter to its module default: discard the
 // instantiation's overrides and let the configuration own each one (§33.4.3).
+//
+// §33.4.3 (printed page 940) has the configuration's parameter override take
+// precedence over a defparam on the same parameter, and the parameters the
+// use clause returns to their defaults are every one the instance's
+// assignment could name (OverridableParamNames) -- a `parameter` among the
+// items of a module declared with no parameter port list among them
+// (§6.20.1, printed 125-126), which the cleared assignment list leaves to
+// its own value. The parameter port list's alone were locked before, so
+// `defparam top.u.P = 9` in top after `instance top.u use #()` on `module c;
+// parameter P = 2;` made P 9. A defparam on a type parameter is refused
+// before the lock is read (§6.20.3), so locking one changes nothing.
 void ResetAllConfigParams(const ModuleDecl* child_decl,
                           Elaborator::ParamList& child_params,
                           std::vector<std::string_view>& locked) {
@@ -401,13 +412,15 @@ void ResetAllConfigParams(const ModuleDecl* child_decl,
   for (const auto& [dname, dexpr] : child_decl->params) {
     if (child_decl->localparam_port_names.count(dname) > 0) continue;
     if (child_decl->type_param_names.count(dname) > 0) continue;
-    locked.push_back(dname);
     if (dexpr) {
       if (auto val = ConstEvalInt(dexpr)) {
         child_params.push_back({dname, *val, dexpr});
       }
     }
   }
+  const std::vector<std::string_view> kOwned =
+      OverridableParamNames(child_decl);
+  locked.insert(locked.end(), kOwned.begin(), kOwned.end());
 }
 
 // Resolves positional parameter overrides (#(v0, v1, ...)) against the child
