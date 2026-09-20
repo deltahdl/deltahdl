@@ -84,24 +84,50 @@ static bool ElementTypeIsFixed(const std::vector<DataType>& params) {
   return elem.kind != DataTypeKind::kNamed || elem.type_name != "dynamic_type";
 }
 
+// §26.2 (printed page 808 of ~/LRM.pdf): a package's declarations are
+// visible by their bare names throughout the package, its classes included,
+// and the run keys a package's typedef "pkg::name" (RegisterTypeDeclarations
+// in lowerer_register.cpp), the bare key standing only where a module's
+// import added it. So the typedef a bare name written in a class the
+// package `package` declares stands for is looked up under the package's key
+// first and then under the bare one, as SyncKindOfType (eval_class_sync.cpp)
+// follows the targets; a name written with a scope, `q::t`, under that
+// alone. Null where nothing records the name. Looked up bare alone, the
+// `mb_t mb = new` of p's own class through `typedef mailbox #(int) mb_t`
+// carried no list while no module imported p and its put() of a string
+// went unchecked.
+static const DataType* TypeDeclarationFor(const DataType& named,
+                                          std::string_view package,
+                                          const SimContext& ctx) {
+  if (!named.scope_name.empty()) {
+    return ctx.FindTypeDeclaration(std::string(named.scope_name) +
+                                   "::" + std::string(named.type_name));
+  }
+  if (!package.empty()) {
+    const DataType* scoped = ctx.FindTypeDeclaration(
+        std::string(package) + "::" + std::string(named.type_name));
+    if (scoped != nullptr) return scoped;
+  }
+  return ctx.FindTypeDeclaration(named.type_name);
+}
+
 // §6.18 with §26.3: the `#(...)` list of the `mailbox` the declared type
 // `type` stands for, followed through the typedef chain the run records
-// (SimContext::FindTypeDeclaration), a package's under "p::name", bounded by
-// the table's size; null where the chain ends in anything else. Read off
-// the property's own declaration alone, a `mb_t mb` carried no list and its
-// put() of a string, which the elaborator never sees, went unchecked.
+// (SimContext::FindTypeDeclaration), a package's under "p::name" and a bare
+// step of the chain under the declaring class's package `package` first
+// (TypeDeclarationFor), bounded by the table's size; null where the chain
+// ends in anything else. Read off the property's own declaration alone, a
+// `mb_t mb` carried no list and its put() of a string, which the elaborator
+// never sees, went unchecked.
 static const std::vector<DataType>* MailboxTypeParams(const DataType& type,
+                                                      std::string_view package,
                                                       const SimContext& ctx) {
   const DataType* cur = &type;
   for (size_t steps = 0; steps <= ctx.TypeDeclarationCount(); ++steps) {
     if (cur->kind != DataTypeKind::kNamed) return nullptr;
     if (cur->scope_name.empty() && cur->type_name == "mailbox")
       return &cur->type_params;
-    std::string key =
-        cur->scope_name.empty()
-            ? std::string(cur->type_name)
-            : std::string(cur->scope_name) + "::" + std::string(cur->type_name);
-    cur = ctx.FindTypeDeclaration(key);
+    cur = TypeDeclarationFor(*cur, package, ctx);
     if (cur == nullptr) return nullptr;
   }
   return nullptr;
@@ -112,7 +138,7 @@ static bool IsParameterizedMailbox(const Expr* expr, SimContext& ctx,
   SyncProperty prop = ResolveSyncProperty(expr->lhs->lhs, ctx, arena);
   if (prop.kind == SyncKind::kMailbox) {
     const std::vector<DataType>* params =
-        MailboxTypeParams(prop.member->data_type, ctx);
+        MailboxTypeParams(prop.member->data_type, prop.declaring->package, ctx);
     return params != nullptr && ElementTypeIsFixed(*params);
   }
   MethodCallParts parts;
@@ -396,7 +422,7 @@ static MailboxMessageType PropertyElementType(const Expr* expr, SimContext& ctx,
   SyncProperty prop = ResolveSyncProperty(expr->lhs->lhs, ctx, arena);
   if (prop.kind != SyncKind::kMailbox) return {};
   const std::vector<DataType>* params =
-      MailboxTypeParams(prop.member->data_type, ctx);
+      MailboxTypeParams(prop.member->data_type, prop.declaring->package, ctx);
   if (params == nullptr || !ElementTypeIsFixed(*params)) return {};
   return ElementMessageType(params->front(), ctx);
 }

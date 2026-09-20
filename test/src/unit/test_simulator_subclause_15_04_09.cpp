@@ -266,18 +266,21 @@ TEST(MailboxSim, ParameterizedMailboxPropertyRejectsAPutOfAnotherType) {
 
 // The source of the package class cases: the package `p` declares the
 // typedef items `typedefs`, then a class C whose mailbox property `mb` is
-// declared `new` through the type `type` names and whose go() puts 1 into
-// it; a module that imports nothing constructs a `p::C`, calls go() and
-// counts the queue into y.
+// declared `new` through the type `type` names and whose go() puts the
+// message `msg` into it; a module that imports nothing constructs a `p::C`,
+// calls go() and counts the queue into y.
 std::string PackageClassMailboxSrc(const std::string& typedefs,
-                                   const std::string& type) {
+                                   const std::string& type,
+                                   const std::string& msg = "1") {
   return "package p;\n" + typedefs +
          "  class C;\n"
          "    " +
          type +
          " mb = new;\n"
          "    function void go();\n"
-         "      mb.put(1);\n"
+         "      mb.put(" +
+         msg +
+         ");\n"
          "    endfunction\n"
          "  endclass\n"
          "endpackage\n"
@@ -318,6 +321,50 @@ TEST(MailboxSim, PackageClassMailboxPropertyThroughAChainOfPackageTypedefs) {
                                              "mb2_t"),
                       "y"),
             1u);
+}
+
+// Runs the package class source whose go() puts the string "s" into the
+// property declared through `type` from the package's `typedefs`, expects
+// the §15.4.9 report for the put at the line `line`, and reads 0 from y,
+// the rejected message placed on no queue.
+void ExpectPackagePropertyPutOfStringReported(const std::string& typedefs,
+                                              const std::string& type,
+                                              int line) {
+  SimFixture f;
+  auto* var =
+      RunAndFindVar(PackageClassMailboxSrc(typedefs, type, "\"s\""), f, "y");
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "argument to mailbox method 'put' is not type-equivalent",
+                    line, "15.4.9"));
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0u);
+}
+
+const char* const kPackageIntMailboxTypedef =
+    "  typedef mailbox #(int) mb_t;\n";
+
+// §15.4.9 (printed page 377) with §26.2 (printed 808): the property of p's
+// own class declared `mb_t mb = new` through the package's `typedef mailbox
+// #(int) mb_t`, with no module importing p, is the parameterized mailbox of
+// int, whose put() of a string is reported at the call, line 6, the message
+// placed on no queue and y counting 0. The parameter list was read through
+// the typedef chain by the bare name, which the run keys "p::mb_t", so the
+// property was taken for a typeless mailbox and the put() went unreported.
+TEST(MailboxSim, PackageClassMailboxPropertyThroughOwnTypedefRejectsAPut) {
+  ExpectPackagePropertyPutOfStringReported(kPackageIntMailboxTypedef, "mb_t",
+                                           6);
+}
+
+// §6.18 (printed page 118) with §26.2 (printed 808): the package's `typedef
+// mb_t mb2_t` stands for its `mailbox #(int)` in two bare steps, so the
+// property declared `mb2_t` earns the same report at the put, line 7 after
+// the second typedef. Qualified at the first step alone, the chain's bare
+// `mb_t` found no declaration and the put() went unreported.
+TEST(MailboxSim, PackageClassMailboxPropertyThroughTypedefChainRejectsAPut) {
+  ExpectPackagePropertyPutOfStringReported(
+      std::string(kPackageIntMailboxTypedef) + "  typedef mb_t mb2_t;\n",
+      "mb2_t", 7);
 }
 
 // §15.3.1 (printed page 373) with §6.18: a semaphore declared through a
