@@ -170,4 +170,76 @@ TEST(FunctionLifetimeSim, DefaultFunctionInAutomaticPackageIsAutomatic) {
   EXPECT_EQ(val, 3u);
 }
 
+// §13.4.2 with §8.11: a class method is automatic and may call itself, and
+// `this.fib(...)` inside it names the same method on the object the call is
+// running on, exactly as the bare `fib(...)` does. Both spellings recurse
+// here, so h.fib(10) is 55; with every `this.`-qualified call answering 0 the
+// bare chain alone survives and the sum collapses to 1.
+TEST(FunctionLifetimeSim, ClassMethodRecursesThroughThisAndBareName) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  class C;\n"
+      "    function int fib(int n);\n"
+      "      return n < 2 ? n : fib(n - 1) + this.fib(n - 2);\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "  logic [31:0] result;\n"
+      "  initial begin\n"
+      "    C h = new;\n"
+      "    result = h.fib(10);\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(val, 55u);
+}
+
+// §13.4.2 with §8.11: the recursion written through `this` alone. Each frame
+// multiplies its own n by the inner call's result, so fact(5) is 120; a
+// `this.` call that reached no method would answer 0 and so would the product.
+TEST(FunctionLifetimeSim, ClassMethodRecursesThroughThisAlone) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  class C;\n"
+      "    function int fact(int n);\n"
+      "      if (n <= 1) return 1;\n"
+      "      return this.fact(n - 1) * n;\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "  logic [31:0] result;\n"
+      "  initial begin\n"
+      "    C h = new;\n"
+      "    result = h.fact(5);\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(val, 120u);
+}
+
+// §8.11: a `this.`-qualified call as a statement runs the method on the same
+// object, so two `this.bump();` inside twice() leave count at 2. A call that
+// resolved to nothing would leave it at 0.
+TEST(FunctionLifetimeSim, ThisQualifiedCallStatementWritesOwnProperty) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  class C;\n"
+      "    int count;\n"
+      "    function void bump();\n"
+      "      count = count + 1;\n"
+      "    endfunction\n"
+      "    function void twice();\n"
+      "      this.bump();\n"
+      "      this.bump();\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "  logic [31:0] result;\n"
+      "  initial begin\n"
+      "    C h = new;\n"
+      "    h.twice();\n"
+      "    result = h.count;\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(val, 2u);
+}
+
 }  // namespace

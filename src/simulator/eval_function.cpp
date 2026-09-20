@@ -184,8 +184,35 @@ bool ResolveMethodByDeclaredClass(ClassObject* obj,
   return info.method != nullptr;
 }
 
+// §8.11: `this` names the object the method was invoked on, so `this.m(...)`
+// is the bare `m(...)` written with its receiver, and §13.4.2 lets the method
+// -- automatic, as every class method is -- reach itself that way. It is
+// resolved as TryEvalEnclosingInstanceCall (eval_static_method.cpp) resolves
+// the bare name: the object's dynamic type through the vtable first (§8.20),
+// then a walk from the lexically enclosing class up its base chain. `this` is
+// a keyword and names no variable, so the handle path below, which reads the
+// declared class of a variable, found no class for it and the call fell
+// through to the module's functions, answering 0 -- every `this.fib(n - 2)`
+// of `fib(n - 1) + this.fib(n - 2)` read 0 and `h.fib(10)` summed to 1.
+static bool ResolveMethodOnThis(std::string_view method_name, SimContext& ctx,
+                                InstanceMethodInfo& info) {
+  ClassObject* self = ctx.CurrentThis();
+  if (self == nullptr) return false;
+  info.obj = self;
+  info.method = self->ResolveVirtualMethod(method_name, &info.owner);
+  if (info.method == nullptr) {
+    const ClassTypeInfo* enclosing = ctx.CurrentMethodClass();
+    info.method = self->ResolveMethodForType(
+        method_name, enclosing != nullptr ? enclosing : self->type,
+        &info.owner);
+  }
+  return info.method != nullptr;
+}
+
 bool ResolveInstanceMethod(const MethodCallParts& parts, SimContext& ctx,
                            InstanceMethodInfo& info) {
+  if (parts.var_name == "this")
+    return ResolveMethodOnThis(parts.method_name, ctx, info);
   auto class_type = ctx.GetVariableClassType(parts.var_name);
   if (class_type.empty()) return false;
   auto* var = ctx.FindVariable(parts.var_name);
