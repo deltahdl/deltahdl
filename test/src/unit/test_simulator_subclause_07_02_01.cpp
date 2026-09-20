@@ -363,4 +363,84 @@ TEST(PackedStructSimulation, MemberWriteThroughAPropertyLeavesTheOtherMember) {
   LowerRunAndCheck(f, design, {{"r1", 0xAA07u}});
 }
 
+// §7.2.1 with §23.9: a member of a packed structure declared in an
+// instantiated module is a window of that instance's own vector. The child
+// writes 8'hA5 into opcode and 24'h123456 into imm, and the top reads the
+// whole of `m.s` as 32'hA5123456. Both writes went nowhere -- the target was
+// resolved by asking the layout table for bare `s`, while the instance's
+// layout is keyed "m.s" -- so the whole read 0 and both members read 0. The
+// values tell a landed write from a misplaced one: opcode's high bit is set,
+// so a write at bit 0 instead of bit 24 reads 0x000000A5 for the whole, and
+// imm differs in every byte from opcode.
+TEST(PackedStructSimulation, ChildInstanceMemberWriteLandsInItsWindow) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module M;\n"
+      "  typedef struct packed { logic [7:0] opcode; logic [23:0] imm; } "
+      "instruction_t;\n"
+      "  instruction_t s;\n"
+      "  int op, im;\n"
+      "  initial begin\n"
+      "    s.opcode = 8'hA5;\n"
+      "    s.imm = 24'h123456;\n"
+      "    op = s.opcode;\n"
+      "    im = s.imm;\n"
+      "  end\n"
+      "endmodule\n"
+      "module top;\n"
+      "  M m();\n"
+      "  int whole;\n"
+      "  initial #1 whole = m.s;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* whole = f.ctx.FindVariable("whole");
+  auto* op = f.ctx.FindVariable("m.op");
+  auto* im = f.ctx.FindVariable("m.im");
+  ASSERT_NE(whole, nullptr);
+  ASSERT_NE(op, nullptr);
+  ASSERT_NE(im, nullptr);
+  EXPECT_EQ(whole->value.ToUint64(), 0xA5123456u);
+  EXPECT_EQ(op->value.ToUint64(), 0xA5u);
+  EXPECT_EQ(im->value.ToUint64(), 0x123456u);
+}
+
+// §10.9.2: a structure assignment pattern keyed by member name places each
+// value in the member it names, whatever order the keys are written in. The
+// child assigns `'{imm: 24'h0F1E2D, opcode: 8'h5A}` and the top reads the
+// whole of `m.s` as 32'h5A0F1E2D. With the layout looked up by bare `s`
+// inside instance `m`, no layout was found and the pattern fell back to a
+// concatenation of the values in written order, 32'h0F1E2D5A, with opcode
+// reading 0x0F; the keys are written in the reverse of the declaration order
+// so that fallback and the keyed placement cannot agree.
+TEST(PackedStructSimulation, ChildInstanceKeyedPatternPlacesEachMember) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module M;\n"
+      "  typedef struct packed { logic [7:0] opcode; logic [23:0] imm; } "
+      "instruction_t;\n"
+      "  instruction_t s;\n"
+      "  int op;\n"
+      "  initial begin\n"
+      "    s = '{imm: 24'h0F1E2D, opcode: 8'h5A};\n"
+      "    op = s.opcode;\n"
+      "  end\n"
+      "endmodule\n"
+      "module top;\n"
+      "  M m();\n"
+      "  int whole;\n"
+      "  initial #1 whole = m.s;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* whole = f.ctx.FindVariable("whole");
+  auto* op = f.ctx.FindVariable("m.op");
+  ASSERT_NE(whole, nullptr);
+  ASSERT_NE(op, nullptr);
+  EXPECT_EQ(whole->value.ToUint64(), 0x5A0F1E2Du);
+  EXPECT_EQ(op->value.ToUint64(), 0x5Au);
+}
+
 }  // namespace

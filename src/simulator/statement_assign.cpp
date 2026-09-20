@@ -538,7 +538,11 @@ static FieldTarget ResolveVariableField(std::string_view base_name,
                                         SimContext& ctx, SourceLoc loc) {
   auto* base_var = ctx.FindVariable(base_name);
   if (!base_var) return {};
-  const auto* info = ctx.GetVariableStructType(base_name);
+  // §23.9: the base resolves within the running instance, so its layout is
+  // asked for by the key that instance's storage was created under; asked by
+  // the bare name, a member write inside a child instance found no layout and
+  // went nowhere.
+  const StructTypeInfo* info = StructLayoutOfName(base_name, ctx);
   if (info) {
     FieldTarget target;
     if (info->is_union &&

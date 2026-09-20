@@ -20,6 +20,7 @@
 #include "simulator/eval_assoc_class_handles.h"
 #include "simulator/eval_class_array.h"
 #include "simulator/eval_class_array_handles.h"
+#include "simulator/eval_expr_internal.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/eval_semaphore.h"
 #include "simulator/eval_string.h"
@@ -315,7 +316,7 @@ Logic4Vec EvalRhsWithStructContext(const Stmt* stmt, SimContext& ctx,
   // concatenated at its self-determined width.
   if (stmt->rhs->kind == ExprKind::kTagged && stmt->rhs->rhs &&
       stmt->rhs->lhs && stmt->rhs->lhs->kind == ExprKind::kAssignmentPattern) {
-    const auto* sinfo = ctx.GetVariableStructType(stmt->lhs->text);
+    const StructTypeInfo* sinfo = StructLayoutOfName(stmt->lhs->text, ctx);
     if (const StructTypeInfo* member =
             sinfo ? TaggedMemberLayout(*sinfo, stmt->rhs->rhs->text) : nullptr)
       return EvalStructPatternValue(stmt->rhs->lhs, member, ctx, arena);
@@ -323,10 +324,14 @@ Logic4Vec EvalRhsWithStructContext(const Stmt* stmt, SimContext& ctx,
   auto* inner = UnwrapTypedPattern(stmt->rhs);
   // §10.9.2: both keyed and positional structure patterns are evaluated against
   // the target's member layout so each member expression is coerced to its
-  // member's type; only route when the target is actually a struct.
+  // member's type; only route when the target is actually a struct. §23.9:
+  // the target resolves within the running instance, so its layout is asked
+  // for by the key that instance's storage was created under; asked by the
+  // bare name, a pattern assigned inside a child instance found no layout and
+  // was concatenated in written order instead of placed by member.
   if (inner->kind != ExprKind::kAssignmentPattern)
     return EvalExpr(stmt->rhs, ctx, arena, ctx_width);
-  auto* sinfo = ctx.GetVariableStructType(stmt->lhs->text);
+  const StructTypeInfo* sinfo = StructLayoutOfName(stmt->lhs->text, ctx);
   if (!sinfo) return EvalExpr(stmt->rhs, ctx, arena, ctx_width);
   return EvalStructPatternValue(inner, sinfo, ctx, arena);
 }
