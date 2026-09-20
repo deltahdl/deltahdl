@@ -743,6 +743,26 @@ static FuncFlow ExecFuncStmt(const Stmt* stmt, const FuncExecCtx& exec) {
   }
 }
 
+// §13.4.1: a function may return a structure or a union, and a hierarchical
+// name inside the function beginning with the function's name is a member of
+// the return value, so `mk.a = 3` in `function st_t mk()` writes the member
+// `a` of the implicit variable and `return mk`, or falling off the end, hands
+// the members out. The implicit variable is created at the return type's width
+// alone (EvalFunctionCall, ExecClassMethod), and the member window §7.2 makes
+// of `mk.a` is read off the layout SimContext holds for a variable's name
+// (ResolveFieldTarget, ResolveMemberByType), which nothing recorded for the
+// function's: the write resolved to no member and the caller read zeros
+// (#3809). The layout a typedef name stands for is registered under that name
+// by RegisterDesignTypeLayouts, for a packed and an unpacked structure alike,
+// so the implicit variable's name is bound to it as a declared variable's is.
+// A return type that is no structure -- or one written inline, which has no
+// name the table could hold -- records nothing, and the body runs as before.
+static void BindReturnStructLayout(const ModuleItem* func, SimContext& ctx) {
+  std::string_view type_name = func->return_type.type_name;
+  if (type_name.empty() || ctx.FindStructType(type_name) == nullptr) return;
+  ctx.SetVariableStructType(func->name, type_name);
+}
+
 void ExecFunctionBody(const ModuleItem* func, Variable* ret_var,
                       SimContext& ctx, Arena& arena) {
   // §37.44 detail 1: "as a thread works its way down a call chain of tasks
@@ -759,6 +779,7 @@ void ExecFunctionBody(const ModuleItem* func, Variable* ret_var,
   uint32_t ret_width =
       DeclaredTypeWidth(func->return_type, ctx) == 0 ? 0 : ret_var->value.width;
   FuncExecCtx exec{ret_var, func->name, ctx, arena, ret_width};
+  BindReturnStructLayout(func, ctx);
   // §12.8 allows a break or a continue only inside a loop, so one that reaches
   // the body's own statement list has no loop to act on it; the body ends
   // there, as it does at a return, rather than going on as if the statement

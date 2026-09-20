@@ -660,4 +660,88 @@ TEST(FunctionReturnSim, FunctionNameAssignOfAVariableCoercesOnlyTheResult) {
   EXPECT_EQ(handed_back->value.words[0].bval & 0xFFFu, 0x000u);
 }
 
+// §13.4.1 (printed page 342): a function's return may be a structure, and a
+// hierarchical name inside the function that begins with the function's name
+// is a member of the return value; §7.2 makes `s.a` that member of the
+// structure variable. The implicit variable was created with the return
+// type's width alone and no layout was recorded for its name, so `mk.a = 3`
+// resolved to no member window and the body handed back the zeros the
+// variable was created with (#3809). 3 and 4 combine to 34; the defect reads
+// 0, and a member written at the wrong offset reads 30, 4 or 40.
+TEST(FunctionReturnSim,
+     MemberWritesThroughTheFunctionNameFillAnUnpackedStruct) {
+  SimFixture f;
+  auto* got = RunAndFindVar(
+      "module t;\n"
+      "  typedef struct { int a; int b; } st_t;\n"
+      "  function st_t mk();\n"
+      "    mk.a = 3;\n"
+      "    mk.b = 4;\n"
+      "  endfunction\n"
+      "  st_t r;\n"
+      "  int got;\n"
+      "  initial begin\n"
+      "    r = mk();\n"
+      "    got = r.a * 10 + r.b;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "got");
+  ASSERT_NE(got, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(got->value.ToUint64(), 34u);
+}
+
+// The same rule over a packed structure (§7.2.1): the implicit variable is one
+// vector the members are windows of, and a write through the function's name
+// lands in the member's window. 34 as above; 0 on the defect.
+TEST(FunctionReturnSim, MemberWritesThroughTheFunctionNameFillAPackedStruct) {
+  SimFixture f;
+  auto* got = RunAndFindVar(
+      "module t;\n"
+      "  typedef struct packed { int a; int b; } st_t;\n"
+      "  function st_t mk();\n"
+      "    mk.a = 3;\n"
+      "    mk.b = 4;\n"
+      "  endfunction\n"
+      "  st_t r;\n"
+      "  int got;\n"
+      "  initial begin\n"
+      "    r = mk();\n"
+      "    got = r.a * 10 + r.b;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "got");
+  ASSERT_NE(got, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(got->value.ToUint64(), 34u);
+}
+
+// §13.4.1 (printed page 342) has the two forms meet: a member written through
+// the function's name is read back through it, and an explicit `return mk`
+// then hands the whole implicit variable out. 5 and 5 + 2 combine to 57; the
+// defect returns a `mk` whose members are zeros, reading 0, and a `mk.a` read
+// that finds no member gives `mk.b` 2 and the sum 2 or 52.
+TEST(FunctionReturnSim, ReturnOfTheFunctionNameCarriesItsWrittenMembers) {
+  SimFixture f;
+  auto* got = RunAndFindVar(
+      "module t;\n"
+      "  typedef struct { int a; int b; } st_t;\n"
+      "  function st_t mk();\n"
+      "    mk.a = 5;\n"
+      "    mk.b = mk.a + 2;\n"
+      "    return mk;\n"
+      "  endfunction\n"
+      "  st_t r;\n"
+      "  int got;\n"
+      "  initial begin\n"
+      "    r = mk();\n"
+      "    got = r.a * 10 + r.b;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "got");
+  ASSERT_NE(got, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(got->value.ToUint64(), 57u);
+}
+
 }  // namespace
