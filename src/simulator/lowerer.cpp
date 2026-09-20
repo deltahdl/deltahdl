@@ -855,6 +855,7 @@ static void RegisterDesignTypesAndPackages(const RtlirDesign* design,
   RegisterDesignTypeLayouts(design, ctx, arena);
   RegisterPackageScopedSubroutines(design, ctx, arena);
   RegisterPackageEnumConstants(design, ctx, arena);
+  CreatePackageDataVariables(design, ctx, arena);
   InitPackageDataVariables(design, ctx, arena);
 }
 

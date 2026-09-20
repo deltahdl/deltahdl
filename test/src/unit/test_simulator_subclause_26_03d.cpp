@@ -155,4 +155,62 @@ TEST(PackageImportSim,
             55u);
 }
 
+// §7.10 (printed page 169) and §7.8 (printed 163) with §26.3 (printed 808):
+// a package's `int q[$]` is a queue and its `int m[string]` an associative
+// array, and a wildcard import makes each visible under its bare name, so
+// two push_backs leave q[1] at 6 with a size of 2 and the write to m["k"]
+// reads back 5: 6 * 100 + 2 * 10 + 5. The package's storage was the carrier
+// variable alone, with no QueueObject or AssocArrayObject under "p1.q" or
+// "p1.m", so the methods and the element selects found nothing and y was 0.
+// The value depends on two bindings: CreatePackageDataVariables
+// (lowerer_register.cpp) creating the objects under the package's keys, and
+// the import's alias reaching them under the bare names.
+TEST(PackageImportSim, WildcardImportedPackageQueueAndAssociativeArray) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  int q[$];\n"
+                      "  int m[string];\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  import p1::*;\n"
+                      "  int y;\n"
+                      "  initial begin\n"
+                      "    q.push_back(4);\n"
+                      "    q.push_back(6);\n"
+                      "    m[\"k\"] = 5;\n"
+                      "    y = q[1] * 100 + q.size() * 10 + m[\"k\"];\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            625u);
+}
+
+// §7.10 (printed page 169) and §7.8 with §26.3 (printed 808): `import p1::q`
+// and `import p1::m` name the queue and the associative array explicitly,
+// and each is p1's own object under its bare name; the queue is bounded
+// `[$:1]`, so §7.10.5 discards the third push_back's element and it holds
+// two, q[1] at 6: 6 * 100 + 2 * 10 + 5. An unbounded queue would keep the
+// third and read 635. The explicit import binds the bare name through the
+// same alias the wildcard one does, which reached the carrier variable
+// alone.
+TEST(PackageImportSim, ExplicitlyImportedPackageQueueAndAssociativeArray) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  int q[$:1];\n"
+                      "  int m[string];\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  import p1::q;\n"
+                      "  import p1::m;\n"
+                      "  int y;\n"
+                      "  initial begin\n"
+                      "    q.push_back(4);\n"
+                      "    q.push_back(6);\n"
+                      "    q.push_back(8);\n"
+                      "    m[\"k\"] = 5;\n"
+                      "    y = q[1] * 100 + q.size() * 10 + m[\"k\"];\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            625u);
+}
+
 }  // namespace

@@ -1,6 +1,7 @@
 #include "simulator/lowerer_register.h"
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -11,9 +12,11 @@
 #include "common/types.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator_enum_constants.h"
+#include "elaborator/queue_dim.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_design.h"
+#include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
 #include "simulator/class_object.h"
@@ -309,20 +312,107 @@ static void ShapePackageVariable(const ModuleItem* item, Variable* var,
   if (is_real) ctx.RegisterRealVariable(qname);
 }
 
-// One package item's storage under its "pk.name" key: every variable
-// declaration at its declared type's shape, and a parameter with an
-// initializer as a 32-bit constant; any other item declares no data.
-static void InitPackageDataItem(const ModuleItem* item, std::string_view pkg,
-                                SimContext& ctx, Arena& arena) {
+// The items of a package that declare data with storage of their own: every
+// variable declaration, and a parameter with an initializer; any other item
+// declares no data.
+static bool DeclaresPackageData(const ModuleItem* item) {
   bool is_param = item->kind == ModuleItemKind::kParamDecl;
   bool is_var = item->kind == ModuleItemKind::kVarDecl;
-  if (!(is_var || (is_param && item->init_expr))) return;
-  auto* qname = arena.Create<std::string>(std::string(pkg) + "." +
-                                          std::string(item->name));
+  return is_var || (is_param && item->init_expr);
+}
+
+// The "pk.name" key a package item's storage stands under, the one
+// EvalMemberAccess reads a `pk::name` by.
+static std::string PackageDataKey(const ModuleItem* item,
+                                  std::string_view pkg) {
+  return std::string(pkg) + "." + std::string(item->name);
+}
+
+// The width of a package item's storage: a variable's declared type's, and a
+// parameter's, or a type no table sizes, 32 bits.
+static uint32_t PackageDataWidth(const ModuleItem* item, SimContext& ctx) {
+  bool is_var = item->kind == ModuleItemKind::kVarDecl;
   uint32_t width = is_var ? DeclaredTypeWidth(item->data_type, ctx) : 0;
-  auto* var = ctx.CreateVariable(*qname, width == 0 ? 32 : width);
-  if (is_var) ShapePackageVariable(item, var, *qname, ctx, arena);
-  if (item->init_expr) var->value = EvalExpr(item->init_expr, ctx, arena);
+  return width == 0 ? 32 : width;
+}
+
+// §7.10 (printed page 169): N in `[$:N]` is a constant expression bounding
+// the queue at N + 1 elements, and §11.2.1 lets it name a parameter, which
+// for a package's queue is one of the package's own, read by its bare name
+// through the frame a package subroutine's body runs in. `[$]` is unbounded,
+// which CreateQueue spells -1, as is a bound the subclause rules out, which
+// the elaborator has already reported.
+static int32_t PackageQueueMaxSize(const Expr* dim, std::string_view pkg,
+                                   SimContext& ctx, Arena& arena) {
+  if (dim->rhs == nullptr) return -1;
+  ctx.PushScope(pkg);
+  auto bound = static_cast<int64_t>(EvalExpr(dim->rhs, ctx, arena).ToUint64());
+  ctx.PopScope();
+  std::optional<int32_t> size = QueueBoundMaxSize(bound);
+  return size ? *size : -1;
+}
+
+// §7.10 (printed page 169) and §7.8 (printed 163) with §26.2 (printed 808):
+// a package variable declared with a queue dimension or an associative
+// dimension is the queue or the associative array the methods and the
+// element selects operate on, so it is given the QueueObject or the
+// AssocArrayObject under the "pk.name" key its carrier variable stands
+// under, as Lowerer::LowerVarAggregate (lowerer_var.cpp) gives a module's
+// and CreateDeclAggregate (statement_assign_decl.cpp) a block's. The carrier
+// alone stood there, so `p1::q.push_back(4)` and `p1::m["k"] = 5` found no
+// object and did nothing, and a read of either element answered 0. The
+// object is created outside every frame: SimContext::CreateQueue and
+// CreateAssocArray keep one made inside a frame for that frame's life alone.
+static void CreatePackageAggregate(const ModuleItem* item, std::string_view pkg,
+                                   std::string_view qname, SimContext& ctx,
+                                   Arena& arena) {
+  if (item->unpacked_dims.empty()) return;
+  const Expr* dim = item->unpacked_dims.front();
+  if (dim == nullptr) return;
+  uint32_t width = PackageDataWidth(item, ctx);
+  bool is_4state = DeclaredTypeIs4State(item->data_type);
+  if (IsQueueDim(dim)) {
+    ctx.CreateQueue(qname, width, PackageQueueMaxSize(dim, pkg, ctx, arena),
+                    is_4state);
+  } else if (item->unpacked_dims.size() == 1 && IsAssocIndexDim(dim, ctx)) {
+    ctx.CreateAssocArray(qname, width, dim->text == "string",
+                         AssocIndexSpec(dim, is_4state, ctx));
+  }
+}
+
+// One package item's storage under its "pk.name" key: every variable
+// declaration at its declared type's shape, with the queue or associative
+// array its dimension declares, and a parameter with an initializer as a
+// 32-bit constant. The initializer is evaluated by InitPackageDataItem once
+// every package's storage exists.
+static void CreatePackageDataItem(const ModuleItem* item, std::string_view pkg,
+                                  SimContext& ctx, Arena& arena) {
+  if (!DeclaresPackageData(item)) return;
+  auto* qname = arena.Create<std::string>(PackageDataKey(item, pkg));
+  auto* var = ctx.CreateVariable(*qname, PackageDataWidth(item, ctx));
+  if (item->kind != ModuleItemKind::kVarDecl) return;
+  ShapePackageVariable(item, var, *qname, ctx, arena);
+  CreatePackageAggregate(item, pkg, *qname, ctx, arena);
+}
+
+void CreatePackageDataVariables(const RtlirDesign* design, SimContext& ctx,
+                                Arena& arena) {
+  for (auto* pkg : design->packages) {
+    for (auto* item : pkg->items)
+      CreatePackageDataItem(item, pkg->name, ctx, arena);
+  }
+}
+
+// One package item's initializer, evaluated into the storage
+// CreatePackageDataItem gave it; an item declaring no data, or none, has
+// nothing to evaluate.
+static void InitPackageDataItem(const ModuleItem* item, std::string_view pkg,
+                                SimContext& ctx, Arena& arena) {
+  if (!DeclaresPackageData(item) || item->init_expr == nullptr) return;
+  const auto& variables = ctx.GetVariables();
+  auto found = variables.find(PackageDataKey(item, pkg));
+  if (found == variables.end()) return;
+  found->second->value = EvalExpr(item->init_expr, ctx, arena);
 }
 
 void InitPackageDataVariables(const RtlirDesign* design, SimContext& ctx,
@@ -333,7 +423,12 @@ void InitPackageDataVariables(const RtlirDesign* design, SimContext& ctx,
     // those an import brings in by their bare names, which the frame a
     // package subroutine's body runs in resolves
     // (SimContext::FindInPackageScope and FindFunctionInPackageScope); the same
-    // frame serves here.
+    // frame serves here. §26.6 (printed pages 815-816): a name an import
+    // brings in through another package's export is the original
+    // declaration, bound under the exporter's key by AliasPackageExports
+    // (lowerer_import.cpp), which runs between CreatePackageDataVariables and
+    // this so that p3's `int q = x` after `import p2::*` reads p1's x through
+    // p2's `export p1::*`; evaluated ahead of the exports, it read 0.
     ctx.PushScope(pkg->name);
     for (auto* item : pkg->items)
       InitPackageDataItem(item, pkg->name, ctx, arena);
