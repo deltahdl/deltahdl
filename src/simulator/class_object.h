@@ -409,7 +409,7 @@ struct ClassObject {
 
   Logic4Vec GetProperty(std::string_view name, Arena& arena) const;
 
-  void SetProperty(std::string_view name, const Logic4Vec& val);
+  void SetProperty(std::string_view name, const Logic4Vec& raw);
 
   ModuleItem* ResolveVirtualMethod(
       std::string_view name, const ClassTypeInfo** owner_out = nullptr) const;
@@ -432,7 +432,7 @@ struct ClassObject {
                             const ClassTypeInfo* owner) const;
   void SetPropertyForType(std::string_view name,
                           const ClassTypeInfo* declared_type,
-                          const Logic4Vec& val);
+                          const Logic4Vec& raw);
 
   ClassObject* ShallowCopy(Arena& arena) const;
 };

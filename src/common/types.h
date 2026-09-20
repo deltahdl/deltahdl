@@ -35,9 +35,10 @@ struct Logic4Vec {
   // every bit of whatever width the context it stands in has -- so a resize
   // to a wider width replicates that bit (ResizeToWidth, ExtendVec) where it
   // would extend another value by zero or by its sign. Set by
-  // EvalUnbasedUnsized alone; a value built from it, read from storage
-  // (EvalIdentifier) or resized (ResizeToWidth) no longer stands for the
-  // literal and carries the flag no further.
+  // EvalUnbasedUnsized alone and kept by a copy of the value (OwnRhsWords);
+  // a value built from it, resized (ResizeToWidth), read from a variable
+  // (EvalIdentifier) or stored in a property (ClassObject::SetProperty) no
+  // longer stands for the literal and carries the flag no further.
   bool fills_width = false;
 
   bool IsKnown() const;

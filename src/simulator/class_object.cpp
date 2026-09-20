@@ -76,7 +76,19 @@ Logic4Vec ClassObject::GetProperty(std::string_view name, Arena& arena) const {
   return MakeLogic4VecVal(arena, 32, 0);
 }
 
-void ClassObject::SetProperty(std::string_view name, const Logic4Vec& val) {
+// §5.7.1: what a property holds is its own value and no literal, so a 1-bit
+// property set from `'1` holds a 1-bit 1 that zero-extends when read into a
+// wider object; the flag that has the literal's value fill a resize stops at
+// the store, as it does at a variable's (ResizeToWidth in
+// statement_assign_select.cpp).
+static Logic4Vec StoredPropertyValue(const Logic4Vec& val) {
+  Logic4Vec stored = val;
+  stored.fills_width = false;
+  return stored;
+}
+
+void ClassObject::SetProperty(std::string_view name, const Logic4Vec& raw) {
+  Logic4Vec val = StoredPropertyValue(raw);
   std::string key(name);
   // §8.13 with §8.9: the storage written is the declaring class's, C's for a
   // D object's `n` where D extends C, so the processes watching that class
@@ -155,7 +167,8 @@ bool ClassObject::BareNameIsDeclaredBy(std::string_view name,
 // scoped key alone, and `child.v` read the bare default of 0 afterwards.
 void ClassObject::SetPropertyForType(std::string_view name,
                                      const ClassTypeInfo* declared_type,
-                                     const Logic4Vec& val) {
+                                     const Logic4Vec& raw) {
+  Logic4Vec val = StoredPropertyValue(raw);
   for (const auto* t = declared_type; t != nullptr; t = t->parent) {
     std::string scoped = std::string(t->name) + "::" + std::string(name);
     auto it = properties.find(scoped);

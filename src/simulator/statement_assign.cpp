@@ -348,16 +348,8 @@ Logic4Vec CoerceToPropertyType(const ClassTypeInfo* type, std::string_view name,
   // it did below: a string property is one of the types that reaches the early
   // return, and ExtractBitField builds with MakeLogic4Vec, which leaves
   // is_string false.
-  //
-  // §5.7.1: a value that is an unbased unsized literal's, `c.v = '1`, fills
-  // the property's declared width, and the copy is a value of the literal's
-  // one bit that fills nothing, so the fill comes first and the copy after
-  // it; a property of no declared width takes the literal's one bit.
-  const auto* prop = FindPropertyInfo(type, name);
-  if (val.fills_width && prop != nullptr && prop->width_is_declared &&
-      !prop->is_real)
-    val = ResizeToWidth(val, prop->width, arena);
   val = OwnRhsWords(val, arena);
+  const auto* prop = FindPropertyInfo(type, name);
   if (prop == nullptr || !prop->width_is_declared) return val;
   // ConvertRealForKnownLhs rather than ResizeToWidth: §6.12.1 converts a value
   // crossing the real boundary rather than reinterpreting its bits, and it

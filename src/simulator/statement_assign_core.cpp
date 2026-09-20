@@ -94,6 +94,11 @@ Logic4Vec OwnRhsWords(const Logic4Vec& val, Arena& arena) {
   copy.is_real = val.is_real;
   copy.is_signed = val.is_signed;
   copy.is_string = val.is_string;
+  // §5.7.1: a copy of an unbased unsized literal's value is that value, and
+  // fills the width it is later resized to as the original would; the
+  // blocking assignment and the formal's bind copy the value ahead of the
+  // resize that sizes it.
+  copy.fills_width = val.fills_width;
   return copy;
 }
 
