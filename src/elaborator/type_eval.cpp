@@ -428,9 +428,25 @@ bool Is4stateType(const DataType& dtype, const TypedefMap& typedefs) {
   return false;
 }
 
+// §6.19 (printed page 119): an enumeration's values are of its base type,
+// which is `int` when the declaration names none, so the enumeration is signed
+// when that base is. A typedef base answers through the table it is declared
+// in; a keyword base carries its signing on the enumeration itself, written or
+// implied by the keyword; no base at all is the signed `int`.
+static bool IsSignedEnum(const DataType& dtype, const TypedefMap& typedefs) {
+  if (!dtype.enum_base_name.empty()) {
+    auto it = typedefs.find(dtype.enum_base_name);
+    if (it != typedefs.end()) return IsSignedType(it->second, typedefs);
+  }
+  if (dtype.enum_base_kind != DataTypeKind::kImplicit) return dtype.is_signed;
+  return true;
+}
+
 bool IsSignedType(const DataType& dtype, const TypedefMap& typedefs) {
   const auto* resolved = FindNamedType(dtype, typedefs);
-  return resolved ? IsSignedType(*resolved, typedefs) : dtype.is_signed;
+  if (resolved) return IsSignedType(*resolved, typedefs);
+  if (dtype.kind == DataTypeKind::kEnum) return IsSignedEnum(dtype, typedefs);
+  return dtype.is_signed;
 }
 
 bool IsVector(const DataType& dtype) {

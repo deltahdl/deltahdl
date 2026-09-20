@@ -425,4 +425,64 @@ TEST(EnumerationElaboration, UnitScopeBareEnumLiteralFoldsIntoALocalparam) {
   EXPECT_EQ(param->resolved_value, 10);
 }
 
+// §6.19 (printed page 119): an enumeration's named constants are of its base
+// type, `int` when the declaration names none, so the backing variable of a
+// member carries the base type's signedness: signed for `int`, written or
+// defaulted, unsigned for `logic [3:0]`, and for a typedef base whatever the
+// typedef names. The value -6 of `C = -8'sd6` is what an unsigned 32-bit
+// variable would print as 4294967290.
+TEST(EnumerationElaboration, MemberOfAnIntBaseEnumIsSigned) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef enum int {A = 'h10, B = 32'b1_1, C = -8'sd6} e_t;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  const auto* c = FindVar(design, "t", "C");
+  ASSERT_NE(c, nullptr);
+  EXPECT_TRUE(c->is_signed);
+  EXPECT_EQ(c->width, 32u);
+}
+
+TEST(EnumerationElaboration, MemberOfAnEnumWithNoBaseIsSignedAsInt) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  enum {N = -1, P} e;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  const auto* n = FindVar(design, "t", "N");
+  ASSERT_NE(n, nullptr);
+  EXPECT_TRUE(n->is_signed);
+}
+
+TEST(EnumerationElaboration, MemberOfALogicBaseEnumIsUnsigned) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef enum logic [3:0] {U = 4'hF} e_t;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  const auto* u = FindVar(design, "t", "U");
+  ASSERT_NE(u, nullptr);
+  EXPECT_FALSE(u->is_signed);
+}
+
+TEST(EnumerationElaboration, MemberOfATypedefIntBaseEnumIsSigned) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef int base_t;\n"
+      "  typedef enum base_t {M = -5} e_t;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  const auto* m = FindVar(design, "t", "M");
+  ASSERT_NE(m, nullptr);
+  EXPECT_TRUE(m->is_signed);
+}
+
 }  // namespace

@@ -189,4 +189,62 @@ TEST(EnumerationSimulation,
             10u);
 }
 
+// §6.19 (printed page 119) has an enumeration's named constants be of its
+// base type, so a member of `enum int` read in a display is a signed 32-bit
+// value, and §5.7.1 (printed 79) has the sized signed literal `-8'sd6`
+// sign-extended when it is widened: C is -6, which an unsigned reading of the
+// same 32 bits prints as 4294967290. A and B alongside are the issue's other
+// members, unchanged at 16 and 3.
+TEST(EnumerationSimulation, NegativeMemberOfAnIntBaseEnumPrintsSigned) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  typedef enum int {A = 'h10, B = 32'b1_1, C = -8'sd6} e_t;\n"
+      "  initial $display(\"A=%0d B=%0d C=%0d\", A, B, C);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "A=16 B=3 C=-6\n");
+}
+
+// The same clause makes `int` the base type of an enumeration that names
+// none, so a member of a bare `enum {...}` is signed too: -1 prints as -1
+// rather than 4294967295.
+TEST(EnumerationSimulation, NegativeMemberOfAnEnumWithNoBasePrintsSigned) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  enum {N = -1, P} e;\n"
+      "  initial $display(\"N=%0d P=%0d\", N, P);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "N=-1 P=0\n");
+}
+
+// A variable of the enumerated type holds a value of the base type as well
+// (§6.19.4), so the member read through the variable prints the same -6.
+TEST(EnumerationSimulation, VariableOfAnIntBaseEnumPrintsItsMemberSigned) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  typedef enum int {A = 'h10, C = -8'sd6} e_t;\n"
+      "  e_t v = C;\n"
+      "  initial $display(\"v=%0d\", v);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "v=-6\n");
+}
+
+// A member of an enumeration over an unsigned base keeps the unsigned
+// reading: `logic [3:0]` at 4'hF prints 15, not -1.
+TEST(EnumerationSimulation, MemberOfALogicBaseEnumPrintsUnsigned) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  typedef enum logic [3:0] {U = 4'hF} e_t;\n"
+      "  initial $display(\"U=%0d\", U);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "U=15\n");
+}
+
 }  // namespace

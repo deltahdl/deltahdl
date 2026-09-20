@@ -169,6 +169,11 @@ struct EnumMemberDeclCtx {
   Arena& arena;
   RtlirModule* mod;
   std::unordered_set<std::string_view>& enum_member_names;
+  // §6.19: the members are values of the enumeration's base type, `int` when
+  // none is named, so each backing variable is signed when that type is
+  // (IsSignedType of the enumeration); a read of a member under `%d` then
+  // prints a negative value as such rather than as its bit pattern.
+  bool is_signed = false;
   // §26.5: the names an explicit import of the scope has made locally visible,
   // which take precedence over the candidate a wildcard import supplies under
   // the same name (§26.3, printed page 810). A member so named keeps its place
@@ -200,6 +205,7 @@ std::vector<RtlirEnumMember> BuildEnumMembers(
     var.name = member.name;
     var.width = width;
     var.is_4state = false;
+    var.is_signed = ctx.is_signed;
     auto* init = ctx.arena.Create<Expr>();
     init->kind = ExprKind::kIntegerLiteral;
     init->int_val = static_cast<uint64_t>(member.value);
@@ -400,7 +406,8 @@ void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
         ValidateEnumDecl(type, item->loc, /*declares_its_constants=*/true);
         DeclareEnumType(type, EnumTypeKey(item->name, path, arena_),
                         EvalTypeWidth(type, typedefs_), scope,
-                        {scope, arena_, mod, enum_member_names_});
+                        {scope, arena_, mod, enum_member_names_, nullptr,
+                         IsSignedType(type, typedefs_)});
       });
 }
 
@@ -434,7 +441,8 @@ void Elaborator::EmitBareEnumMembers(const ModuleItem* item, RtlirModule* mod) {
           ValidateEnumDecl(type, item->loc, /*declares_its_constants=*/true);
         DeclareEnumType(type, EnumTypeKey(item->name, path, arena_),
                         EvalTypeWidth(type, typedefs_), scope,
-                        {scope, arena_, mod, enum_member_names_});
+                        {scope, arena_, mod, enum_member_names_, nullptr,
+                         IsSignedType(type, typedefs_)});
       });
 }
 
@@ -765,10 +773,10 @@ void EmitEnumLiteralsOfItems(
       std::string_view key = EnumTypeKey(pi->name, path, ctx.arena);
       if (mod->enum_types.count(key) != 0) return;
       uint32_t width = EvalTypeWidth(type, ctx.typedefs);
-      mod->enum_types[key] =
-          BuildEnumMembers(type.enum_members, width,
-                           {no_scope, ctx.arena, mod, ctx.enum_member_names,
-                            &explicitly_imported});
+      mod->enum_types[key] = BuildEnumMembers(
+          type.enum_members, width,
+          {no_scope, ctx.arena, mod, ctx.enum_member_names,
+           &explicitly_imported, IsSignedType(type, ctx.typedefs)});
     });
   }
 }
