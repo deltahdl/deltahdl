@@ -119,6 +119,34 @@ static const Logic4Vec* BoundInstanceValue(const Expr* expr, SimContext& ctx) {
   return bindings == nullptr ? nullptr : bindings->Find(expr);
 }
 
+// §23.6 with §3.12.1 (printed page 56): the key an identifier the parser
+// gave a `$root` or `$unit` scope prefix (Parser::MakeSysScopePrefix in
+// src/parser/expr_parser_calls.cpp) is looked up by -- "$root.x", which
+// SimContext::FindVariable reads straight out of the variable table, and
+// "$unit.g", the key the compilation unit's own storage stands under
+// (CreateUnitDataVariables in lowerer_package_data.cpp), which no module's
+// declaration is keyed by, so `$unit::g` names the unit's g past a module's
+// own `int g` as §3.12.1 has the prefix do. Read by its text alone, the
+// `$unit::g` of a module declaring g answered the module's; a `p::x` reads
+// "p.x" the same way (BuildMemberName in eval_expr.cpp), the parser making
+// a package's prefix a member access rather than a prefix.
+static std::string ScopedIdentifierKey(const Expr* expr) {
+  std::string key(expr->scope_prefix);
+  key += '.';
+  key += expr->text;
+  return key;
+}
+
+// The real and string kinds the declaration registered under `name`, given
+// to the value read from it: a package's or the unit's item under its
+// qualified key (ShapePackageVariable in lowerer_package_data.cpp), a
+// module's under the identifier's text.
+static void MarkDeclaredKinds(Logic4Vec& val, std::string_view name,
+                              SimContext& ctx) {
+  if (ctx.IsRealVariable(name)) val.is_real = true;
+  if (ctx.IsStringVariable(name)) val.is_string = true;
+}
+
 static Logic4Vec EvalIdentifier(const Expr* expr, SimContext& ctx,
                                 Arena& arena) {
   // §8.11: "The this keyword denotes a predefined object handle that refers to
@@ -140,21 +168,25 @@ static Logic4Vec EvalIdentifier(const Expr* expr, SimContext& ctx,
     return MakeLogic4VecVal(arena, 64, ctx.CurrentThisHandle());
   }
   // §23.6: a leading `$root` makes the name absolute from the top of the
-  // instantiated design, and the parser keeps it in Expr::scope_prefix rather
-  // than in the identifier's text (Parser::MakeSysScopePrefix in
-  // src/parser/expr_parser_calls.cpp). Reading the text alone drops it and
-  // resolves the name in whichever instance is running.
-  // ResolveSignalToVariable in src/simulator/awaiters.h spells the same name
-  // the same way, so an event control and an expression reading one signal
-  // reach one variable. Only `$root` is spelled out: Expr::scope_prefix also
-  // carries the §23.7.1 package and `$unit` prefixes, which resolve elsewhere.
-  std::string rooted_name;
+  // instantiated design, and §3.12.1 a leading `$unit::` the compilation
+  // unit's own declaration, past any module's; the parser keeps either in
+  // Expr::scope_prefix rather than in the identifier's text
+  // (Parser::MakeSysScopePrefix in src/parser/expr_parser_calls.cpp).
+  // Reading the text alone drops it and resolves the name in whichever
+  // instance is running, so `$unit::g` in a module declaring its own g
+  // read the module's. ResolveSignalToVariable in src/simulator/awaiters.h
+  // spells the `$root` name the same way, so an event control and an
+  // expression reading one signal reach one variable. The unit's kinds
+  // stand under its key as its storage does; a `$root` name's under the
+  // text, as before.
+  std::string scoped_name;
   std::string_view lookup_name = expr->text;
-  if (expr->scope_prefix == "$root") {
-    rooted_name = "$root.";
-    rooted_name += expr->text;
-    lookup_name = rooted_name;
+  std::string_view kinds_name = expr->text;
+  if (expr->scope_prefix == "$root" || expr->scope_prefix == "$unit") {
+    scoped_name = ScopedIdentifierKey(expr);
+    lookup_name = scoped_name;
   }
+  if (expr->scope_prefix == "$unit") kinds_name = lookup_name;
   // §23.9 with §8.6: the class scope is searched before the scope enclosing
   // the class, so a property named bare in a method is read as the property
   // even where the instantiating module declares a variable of that name; a
@@ -189,8 +221,7 @@ static Logic4Vec EvalIdentifier(const Expr* expr, SimContext& ctx,
   const Logic4Vec* sampled =
       ctx.AssertionSamples().ReadWithinProperty(var, ctx.CurrentTime());
   if (sampled != nullptr) val = *sampled;
-  if (ctx.IsRealVariable(expr->text)) val.is_real = true;
-  if (ctx.IsStringVariable(expr->text)) val.is_string = true;
+  MarkDeclaredKinds(val, kinds_name, ctx);
   // An object's signedness is fixed by its own declaration; it is never
   // inherited from a value that flowed in from elsewhere (e.g. across a
   // module port). Derive the read value's signedness from the declaration

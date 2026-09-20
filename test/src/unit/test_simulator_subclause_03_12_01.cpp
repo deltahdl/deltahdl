@@ -381,4 +381,62 @@ TEST(CompilationUnitSim, CuScopeInitializerReadsTheUnitsOwnShadowedVariable) {
             6u);
 }
 
+// §3.12.1 (printed page 56) with §23.9 (printed 761): `$unit::g` names the
+// compilation-unit scope's g explicitly, past the top's own `int g = 7;`,
+// which the bare g resolves to, so `g * 10 + $unit::g` is 75. The prefix
+// was dropped by EvalIdentifier (evaluation.cpp), which read the
+// identifier's text alone, so both read the top's 7: 77.
+TEST(CompilationUnitSim, CuScopeVariableNamedThroughUnitPrefixPastTheTopsOwn) {
+  EXPECT_EQ(UnitGRead("module top;\n"
+                      "  int g = 7;\n"
+                      "  int y;\n"
+                      "  initial y = g * 10 + $unit::g;\n"
+                      "endmodule\n",
+                      "y"),
+            75u);
+}
+
+// §3.12.1 (printed page 56) with §23.9 (printed 761): `$unit::g = 3` in the
+// top writes the unit's g, so the top's own g stays 7 and the instance a,
+// declaring no g, reads the unit's 3 at time 1: `g * 10 + u.y` at time 2
+// is 73. Resolved by the identifier's text (ResolveLhsVariable in
+// statement_assign.cpp), the write landed in the top's g and the instance
+// read the unit's untouched 5: 35.
+TEST(CompilationUnitSim,
+     CuScopeVariableWrittenThroughUnitPrefixPastTheTopsOwn) {
+  EXPECT_EQ(UnitGRead("module a;\n"
+                      "  int y;\n"
+                      "  initial #1 y = g;\n"
+                      "endmodule\n"
+                      "module top;\n"
+                      "  int g = 7;\n"
+                      "  a u();\n"
+                      "  int y;\n"
+                      "  initial begin\n"
+                      "    $unit::g = 3;\n"
+                      "    #2 y = g * 10 + u.y;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            73u);
+}
+
+// §3.12.1 (printed page 56) with §13.5.1: a `$unit::g` actual is the
+// unit's g passed by value, so `twice($unit::g) * 10 + twice(g)` beside the
+// top's own g is 114; the actual read by its text was the top's 7: 154.
+// `$unit::g` where the module declares no g reads as the bare g does
+// (CuScopeVariableInitializedBeforeAnyProcess above).
+TEST(CompilationUnitSim, CuScopeVariableAsAnActualThroughUnitPrefix) {
+  EXPECT_EQ(UnitGRead("function int twice(int v);\n"
+                      "  return v * 2;\n"
+                      "endfunction\n"
+                      "module top;\n"
+                      "  int g = 7;\n"
+                      "  int y;\n"
+                      "  initial y = twice($unit::g) * 10 + twice(g);\n"
+                      "endmodule\n",
+                      "y"),
+            114u);
+}
+
 }  // namespace

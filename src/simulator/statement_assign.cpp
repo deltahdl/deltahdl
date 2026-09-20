@@ -145,7 +145,16 @@ Variable* TryResolveCompoundElement(const Expr* lhs, SimContext& ctx,
 }
 
 Variable* ResolveLhsVariable(const Expr* lhs, SimContext& ctx) {
-  if (lhs->kind == ExprKind::kIdentifier) return ctx.FindVariable(lhs->text);
+  if (lhs->kind == ExprKind::kIdentifier) {
+    // §3.12.1 (printed page 56): `$unit::g = 3` writes the compilation
+    // unit's g under its "$unit.g" key (CreateUnitDataVariables in
+    // lowerer_package_data.cpp) past a module's own `int g`, as
+    // EvalIdentifier (evaluation.cpp) reads it; by the text alone the
+    // write landed in the module's.
+    if (lhs->scope_prefix == "$unit")
+      return ctx.FindVariable("$unit." + std::string(lhs->text));
+    return ctx.FindVariable(lhs->text);
+  }
   if (lhs->kind == ExprKind::kMemberAccess) {
     std::string name;
     BuildLhsName(lhs, name);
