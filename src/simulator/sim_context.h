@@ -235,8 +235,7 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   // to was declared in, empty for every other scope.
   void PushScope(std::string_view package = {});
   // §23.9 with §26.2: marks the innermost frame a subroutine body's and gives
-  // it the package its bare names are read from, none for an empty name. See
-  // the definition in sim_context.cpp.
+  // it the package its bare names are read from, none for an empty name.
   void EnterSubroutineScope(std::string_view package);
   // §26.3 with §13.3: the same for `func`'s package, answering `func` back.
   const ModuleItem* EnterSubroutinePackage(const ModuleItem* func);
