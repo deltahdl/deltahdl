@@ -91,4 +91,43 @@ TEST(DynamicArraySimulation, FunctionBodyDynamicArraySizedByNewHoldsElements) {
             8u);
 }
 
+// §7.5.1 (printed page 158 of the LRM): the new[] constructor may stand as
+// the right-hand side of a variable declaration assignment, sizing the
+// array. A block's `int d[] = new[3]` was evaluated onto the carrier variable
+// and sized nothing (InitializeDeclVariable in statement_assign_decl.cpp),
+// where the module's declaration is sized by LowerDynArrayNewInit, so
+// `d.size()` read 0 for 3.
+TEST(DynamicArraySimulation,
+     BlockDeclaredDynamicArraySizedByItsNewInitializer) {
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  int y;\n"
+                      "  initial begin\n"
+                      "    int d[] = new[3];\n"
+                      "    y = d.size();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            3u);
+}
+
+// The same initializer on a function body's local, and §7.5.1's optional
+// initialization array: `int e[] = new[4](d)` takes d's three elements and
+// a fourth at the element type's default, so e.size() * 100 + e[1] + e[3]
+// reads 405 from d's `d[1] = 5`. A local sized by nothing read 0.
+TEST(DynamicArraySimulation, FunctionBodyDynamicArraySizedByItsNewInitializer) {
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  function int f();\n"
+                      "    int d[] = new[3];\n"
+                      "    int e[];\n"
+                      "    d[1] = 5;\n"
+                      "    e = new[4](d);\n"
+                      "    return e.size() * 100 + e[1] + e[3];\n"
+                      "  endfunction\n"
+                      "  int y;\n"
+                      "  initial y = f();\n"
+                      "endmodule\n",
+                      "y"),
+            405u);
+}
+
 }  // namespace

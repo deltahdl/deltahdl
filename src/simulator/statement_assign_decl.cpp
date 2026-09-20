@@ -15,6 +15,7 @@
 #include "elaborator/type_eval.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_stmt.h"
 #include "simulator/class_object.h"
 #include "simulator/declared_class_key.h"
 #include "simulator/eval_function_internal.h"
@@ -307,8 +308,38 @@ static bool CreateBlockAssocArray(const Stmt* stmt, uint32_t elem_width,
 // dimension reached CreateBlockArrayElements, which reads no bounds off it
 // and built nothing, so a block's or a subroutine body's `int d[]` had no
 // store: new[] sized nothing and the element read 0.
+//
+// §7.5.1 (printed 158): the new[] constructor may stand as the declaration
+// assignment's right-hand side, sizing the array and copying the optional
+// initialization array, as Lowerer::LowerDynArrayNewInit does for a module's
+// `int d[] = new[3]`. A block's initializer was evaluated onto the carrier
+// variable alone -- InitializeDeclVariable below and CreateFuncLocalVar
+// (eval_function_body.cpp) treat every initializer of a declaration with
+// unpacked dimensions so -- and the array stayed empty, `d.size()` reading 0.
+// The initializer is run as the assignment `d = new[3]` it stands for
+// (§6.8), through the new[] arm of TryQueueBlockingAssign, which sizes,
+// default-initializes and copies as the executed statement does.
+static void SizeBlockDynArrayFromInit(const Stmt* stmt, Arena& arena,
+                                      SimContext& ctx) {
+  const Expr* init = stmt->var_init;
+  if (init == nullptr || init->kind != ExprKind::kCall || init->text != "new" ||
+      init->args.empty()) {
+    return;
+  }
+  auto* target = arena.Create<Expr>();
+  target->kind = ExprKind::kIdentifier;
+  target->range = stmt->range;
+  target->text = stmt->var_name;
+  auto* assign = arena.Create<Stmt>();
+  assign->kind = StmtKind::kBlockingAssign;
+  assign->range = stmt->range;
+  assign->lhs = target;
+  assign->rhs = stmt->var_init;
+  TryQueueBlockingAssign(assign, ctx, arena);
+}
+
 static bool CreateBlockDynArray(const Stmt* stmt, uint32_t elem_width,
-                                SimContext& ctx) {
+                                SimContext& ctx, Arena& arena) {
   if (stmt->var_unpacked_dims.empty() || stmt->var_unpacked_dims[0] != nullptr)
     return false;
   bool is_4state = DeclaredTypeIs4State(stmt->var_decl_type);
@@ -318,6 +349,7 @@ static bool CreateBlockDynArray(const Stmt* stmt, uint32_t elem_width,
   info.elem_width = elem_width;
   info.is_4state = is_4state;
   ctx.RegisterArrayInScope(stmt->var_name, info);
+  SizeBlockDynArrayFromInit(stmt, arena, ctx);
   return true;
 }
 
@@ -334,7 +366,7 @@ static bool CreateBlockDynArray(const Stmt* stmt, uint32_t elem_width,
 void CreateDeclAggregate(const Stmt* stmt, uint32_t elem_width, SimContext& ctx,
                          Arena& arena) {
   if (CreateBlockAssocArray(stmt, elem_width, ctx)) return;
-  if (CreateBlockDynArray(stmt, elem_width, ctx)) return;
+  if (CreateBlockDynArray(stmt, elem_width, ctx, arena)) return;
   if (!CreateBlockQueue(stmt, elem_width, ctx, arena)) {
     CreateBlockArrayElements(stmt, elem_width, ctx, arena);
   }
