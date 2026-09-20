@@ -49,6 +49,10 @@ static StructTypeInfo* BuildStructTypeInfo(const DataType* dtype,
       field_off = offset;
     }
     StructFieldInfo fi{m.name, field_off, fw, m.type_kind};
+    // §7.2.1 with §6.22.2 c): the member's signedness as the parser resolved
+    // it, the modifier where one was written and the kind's default where
+    // none was (ApplyMemberType in parser_aggregate_types.cpp).
+    fi.is_signed = m.is_signed;
     if (m.nested_type && !m.nested_type->struct_members.empty()) {
       fi.nested = BuildStructTypeInfo(m.nested_type, fw,
                                       NestedLayoutName(m, arena), arena);

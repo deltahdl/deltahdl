@@ -551,4 +551,52 @@ TEST(MailboxSim, GetOfABuiltInClassHandleIntoAnIntIsAnError) {
   ExpectWord(f, "k", 1u);
 }
 
+// §7.2.1 (printed page 147) gives each member of a packed structure its
+// declared type, and §6.22.2 c) (printed 136) has two integral types
+// equivalent at one total width, one signedness and one number of states:
+// the member `logic signed [7:0] m` is 8 bits and signed, so §15.4.5
+// (printed 376) hands it the literal 8'sd3, which is both: 3 and a num() of
+// 0 read as 30. Typed by its kind alone, the member read unsigned, the get()
+// was reported not equivalent and r stayed 0.
+TEST(MailboxSim, GetIntoASignedLogicMemberTakesASignedMessage) {
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  mailbox mb = new;\n"
+                      "  struct packed { logic signed [7:0] m; int i; } s;\n"
+                      "  int r;\n"
+                      "  initial begin\n"
+                      "    mb.put(8'sd3);\n"
+                      "    mb.get(s.m);\n"
+                      "    r = s.m * 10 + mb.num();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "r"),
+            30u);
+}
+
+// §6.22.2 c) (printed page 136): the unsigned 8'd3 is of the member's width
+// but not of its signedness, so `mb.get(s.m)` into the `logic signed [7:0]`
+// member is §15.4.5's run-time error (printed 376), reported at the member
+// with the message left in the queue and the member as it was: 5 and a
+// num() of 1 read as 51. The member typed unsigned took the 3 and read 30.
+TEST(MailboxSim, GetIntoASignedLogicMemberRefusesAnUnsignedMessage) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  mailbox mb = new;\n"
+      "  struct packed { logic signed [7:0] m; int i; } s;\n"
+      "  int n;\n"
+      "  initial begin\n"
+      "    s.m = 5;\n"
+      "    mb.put(8'd3);\n"
+      "    mb.get(s.m);\n"
+      "    n = s.m * 10 + mb.num();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  ExpectGetTypeError(f, "s.m", 8);
+  ExpectWord(f, "n", 51u);
+}
+
 }  // namespace

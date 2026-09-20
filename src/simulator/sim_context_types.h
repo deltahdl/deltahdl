@@ -56,6 +56,12 @@ struct StructFieldInfo {
   uint32_t bit_offset = 0;
   uint32_t width = 0;
   DataTypeKind type_kind = DataTypeKind::kLogic;
+  // §7.2.1 with §6.22.2 c): whether the member's declared type is signed --
+  // by its signing modifier, `logic signed [7:0]`, or by its kind where none
+  // stands (§6.11.1's byte, shortint, int, integer and longint). Unrecorded,
+  // a member's type was read as signed by its kind alone, so a signed logic
+  // member typed unsigned.
+  bool is_signed = false;
   // §7.2.1: the layout of this field's own type when it is itself a struct or
   // union, so a nested member is reachable by its dotted path. Null for
   // scalars.

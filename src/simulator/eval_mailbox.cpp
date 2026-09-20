@@ -1,5 +1,6 @@
 #include "simulator/eval_mailbox.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -150,23 +151,38 @@ static const Expr* MemberPathRoot(const Expr* access, std::string& path) {
   return root;
 }
 
-// §7.2.1 with §6.22.2: the type of the member `s.f` of a structure or union
-// whose layout was registered, that of the member's declaration -- its kind
-// and its width. The layout records no signing modifier, so a member is
-// signed when its kind is (§6.11.1's byte, shortint, int, integer and
-// longint) and unsigned otherwise. A member of an object no layout was
-// registered for -- a class property, a handle's member -- is of any type.
+// §7.2.1: the field the dotted member path `f` or `p.f` names in the layout
+// `info`, descending through the nested layouts, or nullptr where a segment
+// names no member.
+static const StructFieldInfo* StructFieldByPath(const StructTypeInfo* info,
+                                                std::string_view path) {
+  while (info != nullptr) {
+    size_t dot = path.find('.');
+    const StructFieldInfo* field = FindStructField(
+        info, dot == std::string_view::npos ? path : path.substr(0, dot));
+    if (field == nullptr || dot == std::string_view::npos) return field;
+    info = field->nested;
+    path = path.substr(dot + 1);
+  }
+  return nullptr;
+}
+
+// §7.2.1 with §6.22.2 c): the type of the member `s.f` of a structure or
+// union whose layout was registered, that of the member's declaration -- its
+// kind, its width and its signedness, the modifier the member was declared
+// with or its kind's default (StructFieldInfo::is_signed). Read as signed by
+// its kind alone, a `logic signed [7:0]` member typed unsigned, so a get()
+// into it refused the signed 8-bit message and took an unsigned one. A member
+// of an object no layout was registered for -- a class property, a handle's
+// member -- is of any type.
 static MailboxMessageType MemberTargetType(const Expr* arg, SimContext& ctx) {
   std::string path;
   const Expr* root = MemberPathRoot(arg, path);
   if (root == nullptr) return {};
-  const StructTypeInfo* info = StructLayoutOfName(root->text, ctx);
-  if (info == nullptr) return {};
-  uint32_t offset = 0;
-  uint32_t width = 0;
-  DataTypeKind kind = DataTypeKind::kLogic;
-  if (!ResolveStructFieldPath(info, path, &offset, &width, &kind)) return {};
-  return DeclaredKindType(kind, width, IsImplicitlySigned(kind));
+  const StructFieldInfo* field =
+      StructFieldByPath(StructLayoutOfName(root->text, ctx), path);
+  if (field == nullptr) return {};
+  return DeclaredKindType(field->type_kind, field->width, field->is_signed);
 }
 
 // §7.4.2 with §6.22.2: the type of the element `a[i]` of the unpacked array
