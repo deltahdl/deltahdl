@@ -11,7 +11,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <format>
-#include <functional>
 #include <string>
 #include <string_view>
 #include <unordered_set>
