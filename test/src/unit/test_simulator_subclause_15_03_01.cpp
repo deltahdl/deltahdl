@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_simulator.h"
+#include "helpers_scheduler.h"
 #include "simulator/sync_objects.h"
 
 namespace {
@@ -73,6 +74,30 @@ TEST(IpcSync, SemaphoreNewReturnsHandle) {
   auto* sem = f.ctx.CreateSemaphore("s", 4);
   ASSERT_NE(sem, nullptr);
   EXPECT_EQ(sem->key_count, 4);
+}
+
+// §15.3.1 (printed page 373) with §26.3 (printed 808): a semaphore declared
+// through a package's typedef reached by the package scope resolution
+// operator, `p::sem_t s = new(2)` on `typedef semaphore sem_t`, is created
+// with the two keys its new() names, as §6.18 has the typedef name stand for
+// the semaphore. get(1) takes one, try_get(2) then finds one key short and
+// answers 0, and try_get(1) takes the last and answers 1: r reads 1. The
+// typedef was looked up by its bare name, which the table holds only under
+// "p::sem_t", so no bucket was created: get(1) blocked and r stayed 0.
+TEST(SemaphoreSim, PackageQualifiedTypedefdSemaphoreHoldsItsKeys) {
+  EXPECT_EQ(RunAndGet("package p;\n"
+                      "  typedef semaphore sem_t;\n"
+                      "endpackage\n"
+                      "module t;\n"
+                      "  p::sem_t s = new(2);\n"
+                      "  int r;\n"
+                      "  initial begin\n"
+                      "    s.get(1);\n"
+                      "    r = s.try_get(2) * 10 + s.try_get(1);\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "r"),
+            1u);
 }
 
 }  // namespace

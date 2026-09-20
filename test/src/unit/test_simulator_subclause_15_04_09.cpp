@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 
 #include "common/types.h"
 #include "fixture_simulator.h"
@@ -80,6 +81,62 @@ TEST(MailboxSim, ParameterizedMailboxCarriesItsMessages) {
   EXPECT_EQ(var->value.ToUint64(), 30u);
 }
 
+// Runs the source `head` -- a package, where the case has one, and a module
+// `t` open with its string mailbox `sm` declared -- with a body that puts
+// "hello", counts the queue by num() into `n` and gets the message into `s`,
+// and reads "hello" from `s` and 1 from `n`. The declaration of `sm` is what
+// each case below varies.
+void ExpectMailboxCarriesHello(const std::string& head) {
+  SimFixture f;
+  auto* var = RunAndFindVar(head +
+                                "  string s;\n"
+                                "  int n;\n"
+                                "  initial begin\n"
+                                "    sm.put(\"hello\");\n"
+                                "    n = sm.num();\n"
+                                "    sm.get(s);\n"
+                                "  end\n"
+                                "endmodule\n",
+                            f, "s");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(VecToStr(var->value), "hello");
+  auto* n = f.ctx.FindVariable("n");
+  ASSERT_NE(n, nullptr);
+  EXPECT_EQ(n->value.ToUint64(), 1u);
+}
+
+// Elaborates the source `head`, shaped as above, with a body whose get()
+// reads the string mailbox `sm` into an int on the line `line`, and expects
+// the §15.4.9 report there.
+void ExpectGetOfAnotherTypeReported(const std::string& head, int line) {
+  SimFixture f;
+  ElaborateSrc(head +
+                   "  int n;\n"
+                   "  initial sm.get(n);\n"
+                   "endmodule\n",
+               f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "argument to mailbox method 'get' is not type-equivalent",
+                    line, "15.4.9"));
+}
+
+// The head of the cases whose module declares the typedef itself.
+const char* const kModuleTypedefHead =
+    "module t;\n"
+    "  typedef mailbox #(string) s_mbox;\n"
+    "  s_mbox sm = new;\n";
+
+// The head of the cases that reach the typedef through `p::`: the package
+// holding it, and a module `t` whose mailbox declaration `decl` names it.
+std::string PackageTypedefHead(const std::string& decl) {
+  return "package p;\n"
+         "  typedef mailbox #(string) s_mbox;\n"
+         "endpackage\n"
+         "module t;\n" +
+         decl;
+}
+
 // §15.4.9 (printed page 377): the subclause's own form declares the
 // parameterized mailbox through a typedef, `typedef mailbox #(string)
 // s_mbox; s_mbox sm = new;`, and §6.18 makes the typedef name stand for the
@@ -88,25 +145,30 @@ TEST(MailboxSim, ParameterizedMailboxCarriesItsMessages) {
 // leaves s holding "hello". A declaration the typedef name left uncreated
 // put on no queue, counted 0 and left s empty.
 TEST(MailboxSim, TypedefdMailboxCarriesItsMessages) {
-  SimFixture f;
-  auto* var = RunAndFindVar(
-      "module t;\n"
-      "  typedef mailbox #(string) s_mbox;\n"
-      "  s_mbox sm = new;\n"
-      "  string s;\n"
-      "  int n;\n"
-      "  initial begin\n"
-      "    sm.put(\"hello\");\n"
-      "    n = sm.num();\n"
-      "    sm.get(s);\n"
-      "  end\n"
-      "endmodule\n",
-      f, "s");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(VecToStr(var->value), "hello");
-  auto* n = f.ctx.FindVariable("n");
-  ASSERT_NE(n, nullptr);
-  EXPECT_EQ(n->value.ToUint64(), 1u);
+  ExpectMailboxCarriesHello(kModuleTypedefHead);
+}
+
+// §15.4.9 (printed page 377) with §26.3 (printed 808): the typedef of
+// `mailbox #(string)` declared in a package is reached through the package
+// scope resolution operator, so `p::s_mbox sm = new` creates the mailbox
+// the module-scope typedef above does, carrying "hello" and counting 1. The
+// typedef was looked up by its bare name, which the table holds only under
+// "p::s_mbox", so the declaration created no queue: put() and get() ran on
+// nothing, n counted 0 and s stayed empty.
+TEST(MailboxSim, PackageQualifiedTypedefdMailboxCarriesItsMessages) {
+  ExpectMailboxCarriesHello(PackageTypedefHead("  p::s_mbox sm = new;\n"));
+}
+
+// §6.18 (printed page 118) lets a typedef name stand for a type that is
+// itself a typedef name, and §26.3 lets that name be a package's, so
+// `typedef p::s_mbox my_mbox; my_mbox sm = new` reaches `mailbox #(string)`
+// in two steps, one of them across the package qualifier: "hello" and 1 as
+// above. A walk that stopped at the first name found `p::s_mbox` no class
+// and created nothing.
+TEST(MailboxSim, TypedefOfAPackageQualifiedMailboxTypedefCarriesItsMessages) {
+  ExpectMailboxCarriesHello(
+      PackageTypedefHead("  typedef p::s_mbox my_mbox;\n"
+                         "  my_mbox sm = new;\n"));
 }
 
 // §15.4.9 (printed page 377): a mailbox declared through a typedef of
@@ -114,18 +176,18 @@ TEST(MailboxSim, TypedefdMailboxCarriesItsMessages) {
 // the compiler verifies, so get() into an int is reported at the call under
 // this subclause rather than left to the run.
 TEST(MailboxSim, TypedefdMailboxRejectsAGetOfAnotherType) {
-  SimFixture f;
-  ElaborateSrc(
-      "module t;\n"
-      "  typedef mailbox #(string) s_mbox;\n"
-      "  s_mbox sm = new;\n"
-      "  int n;\n"
-      "  initial sm.get(n);\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "argument to mailbox method 'get' is not type-equivalent", 5, "15.4.9"));
+  ExpectGetOfAnotherTypeReported(kModuleTypedefHead, 5);
+}
+
+// §15.4.9 (printed page 377) with §26.3 (printed 808): the mailbox declared
+// through the package's typedef, `p::s_mbox sm = new`, is the same
+// parameterized mailbox, so its get() into an int earns the same report at
+// the call, line 7 after the package's three lines. A declaration the
+// qualified lookup missed was no mailbox to the check and its get() went
+// unreported.
+TEST(MailboxSim, PackageQualifiedTypedefdMailboxRejectsAGetOfAnotherType) {
+  ExpectGetOfAnotherTypeReported(PackageTypedefHead("  p::s_mbox sm = new;\n"),
+                                 7);
 }
 
 // §15.3.1 (printed page 373) with §6.18: a semaphore declared through a

@@ -128,12 +128,28 @@ static void ValidateWeakReferenceTypeParam(
 // entirely -- the name there is `P` and the class is `D`. Rewriting the name is
 // what puts the declaration in front of those checks, and it carries the
 // specialization arguments §8.25 makes the type depend on along with it.
-// Only the three fields that say which type it is are taken, so a qualifier or
-// a dimension written on the declaration itself survives.
+// Only the three fields that say which type it is are taken, so a dimension
+// written on the declaration itself survives.
 //
 // The declaration is passed whole rather than as its DataType because the
 // specialization earns §23.10.2.2 reports about the names its arguments carry,
 // and ModuleItem::loc is where those stand.
+//
+// The typedef is looked up by the name the declaration wrote, qualifier
+// included: §26.3 (printed page 808) reaches a package's typedef through the
+// package scope resolution operator, and §15.4.9 (printed 377) declares a
+// parameterized mailbox through a typedef of `mailbox #(string)`, so
+// `p::s_mbox sm = new` on a package's `typedef mailbox #(string) s_mbox`
+// declares a mailbox, as `p::sem_t s = new(2)` on its `typedef semaphore
+// sem_t` declares a semaphore (§15.3.1, printed 373). The table holds the
+// two under "p::s_mbox" and "p::sem_t", the keys FindNamedType builds from
+// the qualifier, and the lookup by dtype.type_name alone missed them, so the
+// declaration kept an empty class_type_name and the lowerer's
+// CreateMailboxForVar and CreateSemaphoreForVar made no object: put() and
+// get() ran on nothing. §6.18 (printed 118) lets one typedef name stand for
+// another, `typedef p::s_mbox my_mbox`, so the chain is followed until it
+// reaches a class name or a type that is not a name; a chain that comes back
+// to itself is left where it stands.
 static void ResolveDeclaredTypeName(
     ModuleItem* item, const CompilationUnit* unit, const TypedefMap& typedefs,
     const std::unordered_set<std::string_view>& class_names, DiagEngine& diag) {
@@ -141,14 +157,18 @@ static void ResolveDeclaredTypeName(
   ResolveParameterizedType(dtype, unit, diag, item->loc);
   if (dtype.kind != DataTypeKind::kNamed) return;
   if (class_names.count(dtype.type_name) > 0) return;
-  auto it = typedefs.find(dtype.type_name);
-  if (it == typedefs.end()) return;
-  const DataType& bound = it->second;
-  if (bound.kind != DataTypeKind::kNamed) return;
-  if (class_names.count(bound.type_name) == 0) return;
-  dtype.type_name = bound.type_name;
-  dtype.scope_name = bound.scope_name;
-  dtype.type_params = bound.type_params;
+  const DataType* bound = FindNamedType(dtype, typedefs);
+  for (size_t depth = 0; depth < typedefs.size() && bound != nullptr &&
+                         bound->kind == DataTypeKind::kNamed;
+       ++depth) {
+    if (class_names.count(bound->type_name) > 0) {
+      dtype.type_name = bound->type_name;
+      dtype.scope_name = bound->scope_name;
+      dtype.type_params = bound->type_params;
+      return;
+    }
+    bound = FindNamedType(*bound, typedefs);
+  }
 }
 
 void Elaborator::ValidateVarDeclTypes(ModuleItem* item, const ScopeMap& scope) {
