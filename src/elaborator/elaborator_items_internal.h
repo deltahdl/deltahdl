@@ -106,7 +106,10 @@ void ResolveModuleClassFormalTypes(const std::vector<ClassDecl*>& classes,
 // §27.5) for every one written in a generate block of the items, however
 // deeply the block nests, since the block's items reach the module's typedefs
 // directly. Elaborator::ElaborateItems calls it after the item loop beside
-// the class pass, with the module's items and its complete table.
+// the class pass, with the module's items and its complete table, and
+// Elaborator::ElaborateGenerateItems after a block's item walk, with the
+// block's items and the table holding the typedefs the block itself defines
+// below its subroutines (§6.18).
 void ResolveModuleSubroutineFormalTypes(const std::vector<ModuleItem*>& items,
                                         const TypedefMap& typedefs,
                                         Arena& arena);

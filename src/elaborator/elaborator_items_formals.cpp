@@ -64,6 +64,15 @@ void ResolveFormalAggregateTypes(ModuleItem* item, const TypedefMap& typedefs,
 // walk now descends into a conditional generate's body and each of its else
 // arms, a case generate's arms and a loop generate's body, before the pending
 // pass runs, and the pending pass then finds each member resolved.
+//
+// §6.18 also lets a generate block forward-declare a typedef of its own and
+// define it below the block's subroutine, and that definition enters the
+// table only as Elaborator::ElaborateGenerateItems reaches it, after the
+// module's pass and after the block's subroutine was resolved at its item, so
+// `g.f(tagged A '{3, 4})` still read 0 with the forward typedef and the
+// definition both written in g -- ca0c213d4's remainder. That site now calls
+// this again once the block's items are walked, with the table as the walk
+// leaves it, and the descent reaches the blocks nested in the block.
 void ResolveModuleSubroutineFormalTypes(const std::vector<ModuleItem*>& items,
                                         const TypedefMap& typedefs,
                                         Arena& arena) {

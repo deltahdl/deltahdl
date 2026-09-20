@@ -826,4 +826,90 @@ TEST(TaskSim, GenerateCaseAndElseArmFunctionFormalsReadATypedefDefinedBelow) {
             99u);
 }
 
+// §6.18 (printed page 118) resolves a forward typedef's definition within the
+// same generate block, before or after the reference, and §27.5 (printed 824)
+// makes the block a scope of its own, so a function g writes between its own
+// `typedef struct pair_t;` and the structure's definition names pair_t in its
+// formal. The definition entered the table only as the block's items were
+// walked, after the module's pass over the generate blocks had run with the
+// module's table and after the function was resolved once at its item
+// against the placeholder, so A was sized as a scalar and `g.f(tagged A '{3,
+// 4})` read 0 for §7.2.1's 34.
+TEST(TaskSim, GenerateBlockFunctionFormalReadsTheBlocksOwnTypedefDefinedBelow) {
+  EXPECT_EQ(RunAndGet("module top;\n"
+                      "  if (1) begin : g\n"
+                      "    typedef struct pair_t;\n"
+                      "    function int f(union tagged { void N; pair_t A; }"
+                      " a);\n"
+                      "      return a.A.a * 10 + a.A.b;\n"
+                      "    endfunction\n"
+                      "    typedef struct { int a, b; } pair_t;\n"
+                      "  end\n"
+                      "  int y;\n"
+                      "  initial y = g.f(tagged A '{3, 4});\n"
+                      "endmodule\n",
+                      "y"),
+            34u);
+}
+
+// The same one level down (§27.5, printed page 824): h, a block of g's,
+// forward-declares and defines pair_t around its own function, and k, a
+// sibling block of h in g, writes its function between g's `typedef struct
+// duo_t;` and g's definition of duo_t below k, which §27.3 (printed 818)
+// reaches from k through the enclosing scope; `g.h.f` reads §7.2.1's 34 from
+// `'{3, 4}` and `g.k.f`, whose body swaps the members, 65 from `'{5, 6}`, 99
+// in all, where a pass over g's items alone left h's formal a scalar and one
+// over k's alone left k's, the sum 65 or 34.
+TEST(TaskSim, NestedGenerateBlockFunctionFormalsReadTypedefsDefinedBelowThem) {
+  EXPECT_EQ(RunAndGet("module top;\n"
+                      "  if (1) begin : g\n"
+                      "    if (1) begin : h\n"
+                      "      typedef struct pair_t;\n"
+                      "      function int f(union tagged { void N; pair_t A; }"
+                      " a);\n"
+                      "        return a.A.a * 10 + a.A.b;\n"
+                      "      endfunction\n"
+                      "      typedef struct { int a, b; } pair_t;\n"
+                      "    end\n"
+                      "    typedef struct duo_t;\n"
+                      "    if (1) begin : k\n"
+                      "      function int f(union tagged { void N; duo_t D; }"
+                      " a);\n"
+                      "        return a.D.b * 10 + a.D.a;\n"
+                      "      endfunction\n"
+                      "    end\n"
+                      "    typedef struct { int a, b; } duo_t;\n"
+                      "  end\n"
+                      "  int y;\n"
+                      "  initial y = g.h.f(tagged A '{3, 4})"
+                      " + g.k.f(tagged D '{5, 6});\n"
+                      "endmodule\n",
+                      "y"),
+            99u);
+}
+
+// The same through a loop generate's block (§27.4, printed page 820), each
+// instance blk[i] holding the forward typedef, the function and the
+// definition of its own, the body reading the members swapped: blk[0].f adds
+// 0 * 100 to the 21 of `'{1, 2}` and blk[1].f adds 100 to the 43 of `'{3,
+// 4}`, 164 in all, where the unresolved formal read 0 from both bodies'
+// member reads, 100.
+TEST(TaskSim, GenerateForBlockFunctionFormalReadsTheBlocksOwnTypedefBelowIt) {
+  EXPECT_EQ(RunAndGet("module top;\n"
+                      "  for (genvar i = 0; i < 2; i++) begin : blk\n"
+                      "    typedef struct pair_t;\n"
+                      "    function int f(union tagged { void N; pair_t A; }"
+                      " a);\n"
+                      "      return i * 100 + a.A.b * 10 + a.A.a;\n"
+                      "    endfunction\n"
+                      "    typedef struct { int a, b; } pair_t;\n"
+                      "  end\n"
+                      "  int y;\n"
+                      "  initial y = blk[0].f(tagged A '{1, 2})"
+                      " + blk[1].f(tagged A '{3, 4});\n"
+                      "endmodule\n",
+                      "y"),
+            164u);
+}
+
 }  // namespace

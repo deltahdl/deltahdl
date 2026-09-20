@@ -321,6 +321,22 @@ void Elaborator::ElaborateGenerateItems(const std::vector<ModuleItem*>& items,
         break;
     }
   }
+  // §6.18 (printed page 118) resolves a forward typedef's definition within
+  // the same local scope or generate block, before or after the reference,
+  // and §27.5 (printed 824) makes the block a scope of its own, so a function
+  // the block writes between its own `typedef struct pair_t;` and the
+  // structure's definition names pair_t in a formal lawfully. The typedef
+  // enters typedefs_ only as the loop above reaches it, after the module's
+  // pass in Elaborator::ElaborateItems has run and after ElaborateItem has
+  // resolved the function once against the placeholder, so `g.f(tagged A
+  // '{3, 4})` read 0 for §7.2.1's 34 -- ca0c213d4's remainder, which reached
+  // a block's subroutine with the module's complete table and no block's. The
+  // block's subroutines are resolved again here with the table as the walk
+  // leaves it, the block's definitions in; the walk descends into a nested
+  // construct's blocks, whose subroutines name this block's typedefs through
+  // the enclosing scope (§27.3), and a member resolved already resolves to
+  // the same type again.
+  ResolveModuleSubroutineFormalTypes(items, typedefs_, arena_);
   gen_prefix_scopes_ = std::move(entry_prefix_scopes);
   mod->default_disable_iff = enclosing_default_disable_iff;
   gen_const_scope_ = saved_gen_const_scope;
