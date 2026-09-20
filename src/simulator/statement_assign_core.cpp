@@ -38,14 +38,8 @@
 namespace delta {
 
 static std::string_view LhsIdentName(const Expr* lhs) {
-  while (lhs) {
-    if (lhs->kind == ExprKind::kIdentifier) return lhs->text;
-    if (lhs->kind == ExprKind::kSelect && lhs->base) {
-      lhs = lhs->base;
-      continue;
-    }
-    break;
-  }
+  while (lhs && lhs->kind == ExprKind::kSelect) lhs = lhs->base;
+  if (lhs && lhs->kind == ExprKind::kIdentifier) return lhs->text;
   return {};
 }
 
@@ -820,6 +814,15 @@ static bool TryArrayObjectAssign(const Stmt* stmt, SimContext& ctx,
          TryQueueBlockingAssign(stmt, ctx, arena);
 }
 
+// §15.3 and §15.4: `new` into a semaphore or a mailbox, or a handle copied
+// into a class property, one arm of the dispatch below (complexity 15).
+static bool TryDispatchSyncAssign(const Stmt* stmt, SimContext& ctx,
+                                  Arena& arena) {
+  return TrySemaphoreNewAssign(stmt, ctx, arena) ||
+         TryMailboxNewAssign(stmt, ctx, arena) ||
+         TrySyncHandleAssign(stmt, ctx, arena);
+}
+
 // Run the chain of special-case blocking-assignment handlers that do not need
 // the generic rhs value (class `new`, a semaphore or mailbox handle into a
 // property, associative-array copy/literal, streaming-to-queue,
@@ -831,9 +834,7 @@ static bool TryArrayObjectAssign(const Stmt* stmt, SimContext& ctx,
 // bind it.
 bool TryDispatchSpecialBlockingAssign(const Stmt* stmt, SimContext& ctx,
                                       Arena& arena) {
-  if (TrySemaphoreNewAssign(stmt, ctx, arena)) return true;
-  if (TryMailboxNewAssign(stmt, ctx, arena)) return true;
-  if (TrySyncHandleAssign(stmt, ctx, arena)) return true;
+  if (TryDispatchSyncAssign(stmt, ctx, arena)) return true;
   if (TryClassNewAssign(stmt, ctx, arena)) return true;
   if (TryTypedClassNewAssign(stmt, ctx, arena)) return true;
   if (TryMemberClassNewAssign(stmt, ctx, arena)) return true;
