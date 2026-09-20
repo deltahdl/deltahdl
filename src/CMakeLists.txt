@@ -105,6 +105,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/elaborator_items_scope.cpp
     elaborator/elaborator_items_assertions.cpp
     elaborator/elaborator_items_formals.cpp
+    elaborator/elaborator_items_params.cpp
     elaborator/property_instance.cpp
     elaborator/semantic_leading_clocks.cpp
     elaborator/procedural_concurrent_assertion.cpp
