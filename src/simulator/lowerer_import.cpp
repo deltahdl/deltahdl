@@ -250,6 +250,25 @@ bool Lowerer::AliasPackageEnumMember(const PackageDecl* pkg,
   return true;
 }
 
+// Whether the module declares `name` itself: as a variable, a port or a net,
+// the three LowerModule and LowerChildModules give storage under the instance
+// prefix. The wildcard-imported enumeration literals the elaborator emits as
+// module variables (RegisterImportedEnumLiterals in
+// src/elaborator/elaborator_typedef.cpp) are among the variables.
+static bool ModuleDeclaresName(const RtlirModule* mod, std::string_view name) {
+  if (mod == nullptr) return false;
+  for (const auto& var : mod->variables) {
+    if (var.name == name) return true;
+  }
+  for (const auto& port : mod->ports) {
+    if (port.name == name) return true;
+  }
+  for (const auto& net : mod->nets) {
+    if (net.name == name) return true;
+  }
+  return false;
+}
+
 // §26.3 makes the imported name visible under its unqualified spelling in the
 // scope that wrote the import, which is the instance being lowered; `qname` is
 // the "pkg.name" key the package's own storage holds. The binding is keyed by
@@ -260,8 +279,16 @@ bool Lowerer::AliasPackageEnumMember(const PackageDecl* pkg,
 // ordinary lookup answers it.
 void Lowerer::AliasImportedPackageName(std::string_view name,
                                        std::string_view qname) {
+  // §26.5: a declaration of the importing scope shadows the import. The
+  // module's imports are lowered before its variables, ports and nets exist,
+  // so that a declaration initializer can read an imported name (§6.8), and a
+  // name the module declares is therefore left unbound here rather than found
+  // occupied: the declaration binds it, and the name is never recorded as an
+  // imported one, which would let an instance below the module read the
+  // module's declaration across §23.9's boundary.
+  if (ModuleDeclaresName(importing_module_, name)) return;
   std::string key = inst_prefix_ + std::string(name);
-  // §26.5: a declaration of the importing scope shadows the import, and an
+  // §26.5: a parameter of the importing scope shadows the import too, and an
   // explicit import of a name wins over a wildcard one, which LowerImports
   // orders by applying the explicit imports first. Both are already bound under
   // this key, so an occupied key is left alone. The map is read directly rather
@@ -359,6 +386,7 @@ static void LowerSubroutineBodyImports(const RtlirModule* mod, SimContext& ctx,
 
 void Lowerer::LowerImports(const RtlirModule* mod) {
   LowerSubroutineBodyImports(mod, ctx_, arena_);
+  importing_module_ = mod;
   auto apply_import = [&](const RtlirImport& imp) {
     ImportItem item;
     item.package_name = imp.package_name;
@@ -368,15 +396,18 @@ void Lowerer::LowerImports(const RtlirModule* mod) {
   };
 
   // §26.5: an explicit import of a name takes precedence over a wildcard import
-  // of the same name. Because alias_data_item lets the first binding of a name
-  // win, the explicitly imported names must be bound before any wildcard import
-  // is applied, regardless of the order the import declarations appear in the
-  // source. Module-local declarations are materialized before LowerImports
-  // runs, so they already shadow both kinds of import.
+  // of the same name. Because AliasImportedPackageName lets the first binding
+  // of a name win, the explicitly imported names must be bound before any
+  // wildcard import is applied, regardless of the order the import declarations
+  // appear in the source. A module-local declaration shadows both kinds of
+  // import, which AliasImportedPackageName honours by leaving a name the
+  // module declares unbound: the imports are lowered before the module's
+  // variables so that a declaration initializer can read an imported name.
   for (const auto& imp : mod->imports)
     if (!imp.is_wildcard) apply_import(imp);
   for (const auto& imp : mod->imports)
     if (imp.is_wildcard) apply_import(imp);
+  importing_module_ = nullptr;
 }
 
 void Lowerer::LowerCompilationUnitImports() {

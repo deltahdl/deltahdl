@@ -725,11 +725,12 @@ TEST(PackageScopeReferenceSim,
 }
 
 // §26.3 makes a wildcard import's names visible throughout the importing scope
-// (printed page 810), and §6.21 evaluates a declaration assignment in the
-// scope of the declaration, so `int z = x;` beside `import p1::*` reads p1's
-// x as `int y = p1::x;` does -- the Clause 26 discovery's probe 129. The
-// imports were bound after the module's variables had been lowered, so z read
-// 0 while y read 6: z * 10 + y is 66 against the 6 of an unbound z.
+// (printed page 810), and §6.8 sets a variable's initial value as part of its
+// declaration (printed 106), a reference that scope makes, so `int z = x;`
+// beside `import p1::*` reads p1's x as `int y = p1::x;` does -- the Clause 26
+// discovery's probe 129. The imports were bound after the module's variables
+// had been lowered, so z read 0 while y read 6: z * 10 + y is 66 against the 6
+// of an unbound z.
 TEST(PackageImportSim, WildcardImportedVariableReadByADeclarationInitializer) {
   EXPECT_EQ(RunAndGet("package p1;\n"
                       "  int x = 6;\n"
@@ -747,7 +748,8 @@ TEST(PackageImportSim, WildcardImportedVariableReadByADeclarationInitializer) {
 
 // The explicit form of the same read, `import p1::x; int z = x + 1;`, which
 // read 1 for the same reason: 7 tells the bound x from an unbound one.
-TEST(PackageImportSim, ExplicitlyImportedVariableReadByADeclarationInitializer) {
+TEST(PackageImportSim,
+     ExplicitlyImportedVariableReadByADeclarationInitializer) {
   EXPECT_EQ(RunAndGet("package p1;\n"
                       "  int x = 6;\n"
                       "endpackage\n"

@@ -266,7 +266,10 @@ class ElaboratorData {
   std::unordered_set<std::string_view> auto_task_func_names_;
   std::unordered_map<std::string_view, ModuleDecl*> nested_module_decls_;
 
-  std::unordered_map<std::string_view, std::unordered_set<std::string_view>>
+  // The names each package makes directly visible, each with the package
+  // declaring it (elaborator_scope_rules_names.h), filled on first use.
+  std::unordered_map<std::string_view,
+                     std::unordered_map<std::string_view, std::string_view>>
       pkg_provided_names_;
 
   std::unordered_map<std::string_view, std::pair<std::string_view, SourceLoc>>

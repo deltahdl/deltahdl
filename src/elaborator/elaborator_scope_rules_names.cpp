@@ -92,26 +92,29 @@ void CollectRandsequenceDeclaredNames(
 // package declaration (the FALSE/TRUE members of the clause's example package
 // p). Each member name is registered so that a name supplied by two
 // wildcard-imported packages is detected as ambiguous, not just the enum type
-// name itself.
+// name itself. `origin` is the package declaring the enumeration.
 void AddEnumMemberNames(const std::vector<EnumMember>& members,
-                        std::unordered_set<std::string_view>& names) {
+                        std::string_view origin, ProvidedNames& names) {
   for (const auto& em : members) {
-    if (!em.name.empty()) names.insert(em.name);
+    if (!em.name.empty()) names.insert({em.name, origin});
   }
 }
 
-// The names one package item makes directly visible: its own name, the name of
-// a class it declares, and any enumeration constants it brings, which may sit
-// on a typedef's type or on a bare enum data declaration.
-void AddPackageItemNames(const ModuleItem* pi,
-                         std::unordered_set<std::string_view>& names) {
-  if (!pi->name.empty()) names.insert(pi->name);
+// The names one package item of `pkg` makes directly visible: its own name,
+// the name of a class it declares, and any enumeration constants it brings,
+// which may sit on a typedef's type or on a bare enum data declaration. Each is
+// declared by `pkg`. A name already in the map keeps its first origin: the
+// package's own items are added ahead of what its exports hand on, and §26.3
+// has a declaration of the scope take the name over an import.
+void AddPackageItemNames(const PackageDecl* pkg, const ModuleItem* pi,
+                         ProvidedNames& names) {
+  if (!pi->name.empty()) names.insert({pi->name, pkg->name});
   if (pi->kind == ModuleItemKind::kClassDecl && pi->class_decl &&
       !pi->class_decl->name.empty()) {
-    names.insert(pi->class_decl->name);
+    names.insert({pi->class_decl->name, pkg->name});
   }
-  AddEnumMemberNames(pi->typedef_type.enum_members, names);
-  AddEnumMemberNames(pi->data_type.enum_members, names);
+  AddEnumMemberNames(pi->typedef_type.enum_members, pkg->name, names);
+  AddEnumMemberNames(pi->data_type.enum_members, pkg->name, names);
 }
 
 const PackageDecl* FindPackageDecl(const CompilationUnit* unit,
@@ -123,9 +126,28 @@ const PackageDecl* FindPackageDecl(const CompilationUnit* unit,
 }
 
 void AddPackageProvidedNames(const CompilationUnit* unit,
-                             const PackageDecl* pkg,
-                             std::unordered_set<std::string_view>& names,
+                             const PackageDecl* pkg, ProvidedNames& names,
                              std::unordered_set<const PackageDecl*>& visited);
+
+// The package declaring `name` as the package `src_name` provides it, which is
+// what an explicit import or export of `src_name::name` reaches (§26.6: p2's
+// `import p1::x; export p1::*;` makes p1::x and p2::x one declaration). The
+// source package's provided names are gathered afresh over a copy of
+// `visited`, so a source already on the chain, which a cycle of exports makes,
+// contributes nothing and the name is taken as the source's own; so is a name
+// the source does not provide, which the source itself is reported for.
+std::string_view DeclaringPackageOf(
+    const CompilationUnit* unit, std::string_view src_name,
+    std::string_view name,
+    const std::unordered_set<const PackageDecl*>& visited) {
+  const PackageDecl* src = FindPackageDecl(unit, src_name);
+  if (src == nullptr) return src_name;
+  ProvidedNames provided;
+  std::unordered_set<const PackageDecl*> sub = visited;
+  AddPackageProvidedNames(unit, src, provided, sub);
+  auto it = provided.find(name);
+  return it == provided.end() ? src_name : it->second;
+}
 
 // The names `pkg` imports from the package `src_name`, which an export of
 // that package hands on (§26.6): the one name of each explicit import, and
@@ -134,15 +156,15 @@ void AddPackageProvidedNames(const CompilationUnit* unit,
 // references the package makes; every candidate is taken instead, which can
 // only suppress a report, never raise one.
 void AddImportedNamesFrom(const CompilationUnit* unit, const PackageDecl* pkg,
-                          std::string_view src_name,
-                          std::unordered_set<std::string_view>& names,
+                          std::string_view src_name, ProvidedNames& names,
                           std::unordered_set<const PackageDecl*>& visited) {
   for (const auto* item : pkg->items) {
     if (item->kind != ModuleItemKind::kImportDecl) continue;
     const ImportItem& imp = item->import_item;
     if (imp.package_name != src_name) continue;
     if (!imp.is_wildcard) {
-      names.insert(imp.item_name);
+      names.insert({imp.item_name, DeclaringPackageOf(unit, src_name,
+                                                      imp.item_name, visited)});
     } else if (const PackageDecl* src = FindPackageDecl(unit, src_name)) {
       AddPackageProvidedNames(unit, src, names, visited);
     }
@@ -155,7 +177,7 @@ void AddImportedNamesFrom(const CompilationUnit* unit, const PackageDecl* pkg,
 // hands on every import of the package, `export src::*` those from one
 // package, and `export src::name` the one name.
 void AddExportedNames(const CompilationUnit* unit, const PackageDecl* pkg,
-                      std::unordered_set<std::string_view>& names,
+                      ProvidedNames& names,
                       std::unordered_set<const PackageDecl*>& visited) {
   for (const auto* item : pkg->items) {
     if (item->kind != ModuleItemKind::kExportDecl) continue;
@@ -169,7 +191,8 @@ void AddExportedNames(const CompilationUnit* unit, const PackageDecl* pkg,
     } else if (ex.is_wildcard) {
       AddImportedNamesFrom(unit, pkg, ex.package_name, names, visited);
     } else {
-      names.insert(ex.item_name);
+      names.insert({ex.item_name, DeclaringPackageOf(unit, ex.package_name,
+                                                     ex.item_name, visited)});
     }
   }
 }
@@ -179,11 +202,10 @@ void AddExportedNames(const CompilationUnit* unit, const PackageDecl* pkg,
 // imports. A package reached twice along a chain of exports adds its names
 // once, which is also what ends a cycle of exports.
 void AddPackageProvidedNames(const CompilationUnit* unit,
-                             const PackageDecl* pkg,
-                             std::unordered_set<std::string_view>& names,
+                             const PackageDecl* pkg, ProvidedNames& names,
                              std::unordered_set<const PackageDecl*>& visited) {
   if (!visited.insert(pkg).second) return;
-  for (const auto* pi : pkg->items) AddPackageItemNames(pi, names);
+  for (const auto* pi : pkg->items) AddPackageItemNames(pkg, pi, names);
   AddExportedNames(unit, pkg, names, visited);
 }
 
@@ -216,7 +238,7 @@ bool IsValueListSystemTask(const Expr* call) {
 
 void PopulatePackageProvidedNames(const CompilationUnit* unit,
                                   std::string_view pkg_name,
-                                  std::unordered_set<std::string_view>& names) {
+                                  ProvidedNames& names) {
   const PackageDecl* pkg = FindPackageDecl(unit, pkg_name);
   if (pkg == nullptr) return;
   std::unordered_set<const PackageDecl*> visited;

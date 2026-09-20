@@ -22,10 +22,10 @@
 
 namespace delta {
 
-// The names each package makes directly visible, filled on first use by
-// PackageProvidesName; Elaborator::pkg_provided_names_ is one.
-using ProvidedNameCache =
-    std::unordered_map<std::string_view, std::unordered_set<std::string_view>>;
+// The names each package makes directly visible, each with the package that
+// declares it, filled on first use by ProvidedNameOrigin;
+// Elaborator::pkg_provided_names_ is one.
+using ProvidedNameCache = std::unordered_map<std::string_view, ProvidedNames>;
 
 namespace {
 
@@ -244,15 +244,25 @@ bool PackageDeclared(const CompilationUnit* unit, std::string_view pkg_name) {
   return false;
 }
 
-bool PackageProvidesName(const CompilationUnit* unit,
-                         ProvidedNameCache& provided_cache,
-                         std::string_view pkg_name, std::string_view name) {
+// The package declaring `name` as the wildcard-imported package `pkg_name`
+// provides it, or empty where `pkg_name` does not provide the name.
+std::string_view ProvidedNameOrigin(const CompilationUnit* unit,
+                                    ProvidedNameCache& provided_cache,
+                                    std::string_view pkg_name,
+                                    std::string_view name) {
   auto it = provided_cache.find(pkg_name);
   if (it == provided_cache.end()) {
     PopulatePackageProvidedNames(unit, pkg_name, provided_cache[pkg_name]);
     it = provided_cache.find(pkg_name);
   }
-  return it->second.count(name) != 0;
+  auto found = it->second.find(name);
+  return found == it->second.end() ? std::string_view() : found->second;
+}
+
+bool PackageProvidesName(const CompilationUnit* unit,
+                         ProvidedNameCache& provided_cache,
+                         std::string_view pkg_name, std::string_view name) {
+  return !ProvidedNameOrigin(unit, provided_cache, pkg_name, name).empty();
 }
 
 // Mutable state shared across the import-rule checking helpers below. Holds
@@ -283,15 +293,26 @@ void TrackImportRuleDecl(ImportRuleCtx& ctx, std::string_view name,
   ctx.seen_decls.insert(name);
 }
 
+// §26.3 makes it illegal for the wildcard imports of more than one package to
+// define the same potentially locally visible identifier that a reference
+// matches (printed page 810), and §26.6 makes an import of a declaration
+// reached through an export an import of the original declaration, so that
+// reaching one declaration by several exported paths is no conflict (printed
+// 815): the clause's own `import p2::*; import p4::*; int y = x;` reads p1's x
+// through both. The wildcard-imported packages supplying `name` are therefore
+// counted by the package declaring it, a second supplier of the same
+// declaration adding nothing.
 void ProcessImportRuleRef(ImportRuleCtx& ctx, const Expr* e) {
   auto name = e->text;
   if (name.empty()) return;
   if (ctx.seen_decls.count(name)) return;
   std::vector<std::string_view> providers;
+  std::unordered_set<std::string_view> origins;
   for (auto pkg : ctx.wildcard_packages) {
-    if (PackageProvidesName(ctx.unit, ctx.pkg_provided_names, pkg, name)) {
-      providers.push_back(pkg);
-    }
+    std::string_view origin =
+        ProvidedNameOrigin(ctx.unit, ctx.pkg_provided_names, pkg, name);
+    if (origin.empty()) continue;
+    if (origins.insert(origin).second) providers.push_back(pkg);
   }
   if (providers.size() > 1) {
     ctx.diag.Error(

@@ -575,4 +575,99 @@ TEST(PackageImport, AnImportInOneFunctionBodyReachesNoOtherBody) {
                              "23.9"));
 }
 
+// §26.6's own packages and module (printed pages 815-816): p2 hands p1's x on
+// under `import p1::x; export p1::*;`, p4 under `import p1::*; export p1::*;`,
+// and top imports both by wildcard and declares `int z = x;`. §26.3 rules the
+// wildcard imports of two packages defining one potentially locally visible
+// identifier that a reference matches illegal (printed 810), and §26.6 makes
+// an import of a declaration reached through an export an import of the
+// original declaration, several exported paths to one declaration causing no
+// conflict (printed 815). Both packages hand on p1's one x, so neither the
+// declaration initializer nor the procedural read is ambiguous, and neither
+// is unresolved -- the Clause 26 discovery's probes 45, 109 and 130.
+TEST(PackageImport,
+     DeclarationInitializerReadsAVariableReachedByTwoExportPaths) {
+  ElabFixture f;
+  EXPECT_TRUE(
+      ElabOk("package p1;\n"
+             "  int x = 6;\n"
+             "endpackage\n"
+             "package p2;\n"
+             "  import p1::x;\n"
+             "  export p1::*;\n"
+             "endpackage\n"
+             "package p4;\n"
+             "  import p1::*;\n"
+             "  export p1::*;\n"
+             "  int y = x;\n"
+             "endpackage\n"
+             "module top;\n"
+             "  import p2::*;\n"
+             "  import p4::*;\n"
+             "  int z = x;\n"
+             "  initial $display(\"%0d %0d\", z, y);\n"
+             "endmodule\n",
+             f));
+}
+
+// The same one declaration handed on by an explicit export on one path and by
+// `export *::*` on the other, three packages deep on the second: still one
+// candidate.
+TEST(PackageImport, ExplicitAndStarExportPathsToOneDeclarationAreOneCandidate) {
+  ElabFixture f;
+  EXPECT_TRUE(
+      ElabOk("package p1;\n"
+             "  int x = 6;\n"
+             "endpackage\n"
+             "package p2;\n"
+             "  import p1::x;\n"
+             "  export p1::x;\n"
+             "endpackage\n"
+             "package p3;\n"
+             "  import p1::*;\n"
+             "  export *::*;\n"
+             "  int w = x;\n"
+             "endpackage\n"
+             "package p4;\n"
+             "  import p3::*;\n"
+             "  export *::*;\n"
+             "endpackage\n"
+             "module top;\n"
+             "  import p2::*;\n"
+             "  import p4::*;\n"
+             "  int z = x;\n"
+             "endmodule\n",
+             f));
+}
+
+// Two exported paths are one candidate only where they reach one declaration:
+// p3 hands on p1's x while p2 declares an x of its own, so the initializer's
+// x matches two distinct declarations and §26.3's conflict stands, reported
+// at the reference on line 14 under §26.3. A check that took every supplier
+// of a name for one candidate would pass this.
+TEST(PackageImport, ExportedAndOwnDeclarationsOfOneNameStayAmbiguous) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("package p1;\n"
+             "  int x = 6;\n"
+             "endpackage\n"
+             "package p2;\n"
+             "  int x = 7;\n"
+             "endpackage\n"
+             "package p3;\n"
+             "  import p1::x;\n"
+             "  export p1::*;\n"
+             "endpackage\n"
+             "module top;\n"
+             "  import p2::*;\n"
+             "  import p3::*;\n"
+             "  int z = x;\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "reference to 'x' is ambiguous between wildcard "
+                            "imports of packages 'p2' and 'p3'",
+                            14, "26.3"));
+}
+
 }  // namespace

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string_view>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -38,6 +39,15 @@ namespace delta {
 // plain reads that must resolve to a declaration.
 void CollectBareIdents(const Expr* e, std::vector<const Expr*>& out);
 
+// The names a package makes directly visible, each with the name of the
+// package that declares it: the package itself for its own declarations, and
+// the package at the end of the export chain for a name an export hands on.
+// §26.6 makes an import of a declaration reached through an export an import of
+// the original declaration, so two wildcard imports supplying one name are one
+// candidate where the declaring packages agree and §26.3's conflict where they
+// differ.
+using ProvidedNames = std::unordered_map<std::string_view, std::string_view>;
+
 // The names the package `pkg_name` makes directly visible to a scope that
 // imports it by wildcard: every declaration of its own, with the members of
 // each enumeration it declares (§26.5), and what its export declarations hand
@@ -45,7 +55,7 @@ void CollectBareIdents(const Expr* e, std::vector<const Expr*>& out);
 // among them. Nothing is added for a package the unit does not declare.
 void PopulatePackageProvidedNames(const CompilationUnit* unit,
                                   std::string_view pkg_name,
-                                  std::unordered_set<std::string_view>& names);
+                                  ProvidedNames& names);
 
 // The packages a module imports by wildcard, whose declarations §26.3 makes
 // directly visible to a bare read.

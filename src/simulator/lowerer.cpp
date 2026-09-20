@@ -383,6 +383,14 @@ void Lowerer::LowerModule(const RtlirModule* mod) {
   for (auto* cls : mod->class_decls) {
     LowerClassDecl(cls, mod->function_decls);
   }
+  // §6.8 sets a static variable's initial value as part of its declaration,
+  // a reference the declaring scope makes, and §26.3 makes an import's names
+  // visible throughout the importing scope, so the names the module's imports
+  // bring in are bound before any variable's initializer is evaluated;
+  // `import p1::*; int z = x;` read 0 while the binding came after the
+  // variables. LowerImports leaves a name the module declares to the
+  // declaration (§26.5). LowerChildModules orders an instance's the same way.
+  LowerImports(mod);
   for (const auto& var : mod->variables) LowerVar(var.name, var);
   RegisterModulePorts(mod, ctx_, arena_);
   RegisterModuleSubroutines(mod, ctx_);
@@ -407,7 +415,6 @@ void Lowerer::LowerModule(const RtlirModule* mod) {
   RegisterModuleSequenceDecls(mod, ctx_);
   LowerSequenceMonitors(mod);
 
-  LowerImports(mod);
   RegisterProcessClassType(ctx_, arena_);
   LowerAliases(mod);
   uint32_t program_block_id = mod->is_program ? next_program_block_id_++ : 0;

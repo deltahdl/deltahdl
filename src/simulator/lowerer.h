@@ -224,6 +224,11 @@ class Lowerer {
   uint32_t next_id_ = 0;
   uint32_t next_program_block_id_ = 1;
   std::string inst_prefix_;
+  // The module whose imports LowerImports is lowering, so that
+  // AliasImportedPackageName can leave a name the module declares to the
+  // declaration (§26.5); null outside LowerImports, where the compilation
+  // unit's imports bind every name.
+  const RtlirModule* importing_module_ = nullptr;
   std::vector<SpecifyScope> specify_scopes_;
   std::vector<AssertionSampleScope> assertion_sample_scopes_;
 };

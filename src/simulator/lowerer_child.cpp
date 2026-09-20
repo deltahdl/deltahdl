@@ -120,6 +120,15 @@ void Lowerer::LowerChildModules(const RtlirModule* mod) {
     // module is lowered, because a module path delay may be written as a
     // specparam and this instance's specparam variables are created below.
     RecordSpecifyScope(child.resolved);
+    // §26.3: an import makes a package's names visible "within the current
+    // scope", and the scope is the one that writes the import. A module writes
+    // its own imports whether it is the top or an instance, so the instance's
+    // are lowered here, and before its variables as LowerModule orders the
+    // top's: §6.8 sets a variable's initial value as part of its declaration,
+    // a reference the declaring scope makes with the imported names already
+    // visible. A name the instance declares itself is left to the declaration
+    // by LowerImports (§26.5).
+    LowerImports(child.resolved);
     CreateChildModuleVariables(inst_prefix_, child.resolved);
     CreateChildModulePorts(inst_prefix_, child.resolved, ctx_, arena_);
     CreateChildModuleNets(inst_prefix_, child, ctx_, arena_);
@@ -143,13 +152,6 @@ void Lowerer::LowerChildModules(const RtlirModule* mod) {
     // sequence the instance's module declares expands it at the run, so the
     // declarations are registered as the top's are.
     RegisterModuleSequenceDecls(child.resolved, ctx_);
-    // §26.3: an import makes a package's names visible "within the current
-    // scope", and the scope is the one that writes the import. A module writes
-    // its own imports whether it is the top or an instance, so the instance's
-    // are lowered here. This runs after the child's variables, ports and
-    // subroutines exist, which is where LowerModule runs it too, so a
-    // module-local declaration still shadows an import as §26.5 requires.
-    LowerImports(child.resolved);
 
     // Port connections resolve in the parent scope (see LowerPortBindings),
     // then restore the child prefix for the child's own body.
