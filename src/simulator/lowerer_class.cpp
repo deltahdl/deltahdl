@@ -403,8 +403,14 @@ static void LowerNestedClasses(ClassTypeInfo* outer, const ClassDecl* cls,
 // package, so ExecClassMethod gives a method's frame the package as
 // EvalFunctionCall gives a package function's, and the package's parameters,
 // enum literals, variables and functions answer to their bare names inside
-// the body. Nothing is recorded for a class of a module or the compilation
-// unit.
+// the body. §3.12.1 (printed page 56): the compilation unit's scope is
+// recorded the same way under kUnitScopeName for a class the unit declares,
+// so a method's frame and the property defaults' frame
+// (ConstructBaseThenDefaults in eval_class_new.cpp) resolve a bare name to
+// the unit's "$unit.name" storage ahead of the calling module's like-named
+// declaration, which the class's scope never contains (§23.9). With nothing
+// recorded, a unit class's `return g;` and `int p = g;` read the top's own
+// `int g = 7` for the unit's 5. Nothing is recorded for a module's class.
 static void RecordClassPackage(ClassTypeInfo* info, std::string_view package,
                                SimContext& ctx) {
   if (package.empty()) return;
@@ -461,6 +467,25 @@ std::string_view Lowerer::DeclaringPackage(const ClassDecl* cls) const {
   return {};
 }
 
+// §3.12.1 (printed page 56): the name the compilation-unit scope's frames
+// are pushed with and its items keyed under, "$unit.name", as
+// lowerer_package_data.cpp spells it for the unit's storage and its own
+// initializers' frames (kUnitScope there); no package can be named so, `$`
+// starting no identifier.
+constexpr std::string_view kUnitScopeName = "$unit";
+
+// §3.12.1: kUnitScopeName for a class the compilation unit itself declares
+// (RtlirDesign::cu_class_decls), and an empty view for a package's or a
+// module's class, or with no design behind the class.
+static std::string_view UnitScopeOf(const RtlirDesign* design,
+                                    const ClassDecl* cls) {
+  if (design == nullptr) return {};
+  for (const ClassDecl* unit_cls : design->cu_class_decls) {
+    if (unit_cls == cls) return kUnitScopeName;
+  }
+  return {};
+}
+
 void Lowerer::LowerClassDecl(const ClassDecl* cls,
                              const std::vector<ModuleItem*>& scope_items) {
   auto* info = arena_.Create<ClassTypeInfo>();
@@ -473,8 +498,23 @@ void Lowerer::LowerClassDecl(const ClassDecl* cls,
   static const ScopeMap kNoConstants;
   const ScopeMap& constants =
       design_ != nullptr ? design_->unit_constants : kNoConstants;
+  // §8.9 (printed page 186) with §23.9 (printed 761) and §26.2 (printed
+  // 808): a static property's initializer is evaluated once, as an
+  // expression of the class declaration's scope, so the class is populated
+  // in a frame of the package or the compilation unit declaring it
+  // (InitStaticProperties), through which SimContext::FindInPackageScope
+  // resolves a bare name to the scope's "pkg.name" or "$unit.name" storage.
+  // Populated in no frame, a unit class's `static int s = g;` resolved g by
+  // its bare key, which holds nothing once the unit's storage stands under
+  // "$unit.g" (CreateUnitDataVariables in lowerer_package_data.cpp), and
+  // `C::s` read 0; a package class's read the package's variable through
+  // no key at all. A module's class is populated in no frame, as before.
+  std::string_view scope = DeclaringPackage(cls);
+  if (scope.empty()) scope = UnitScopeOf(design_, cls);
+  if (!scope.empty()) ctx_.PushScope(scope);
   PopulateClassType(info, cls, {scope_items, constants}, ctx_, arena_);
-  RecordClassPackage(info, DeclaringPackage(cls), ctx_);
+  if (!scope.empty()) ctx_.PopScope();
+  RecordClassPackage(info, scope, ctx_);
   ctx_.RegisterClassType(cls->name, info);
   LowerNestedClasses(info, cls, constants, ctx_, arena_);
 }

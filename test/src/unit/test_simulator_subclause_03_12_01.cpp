@@ -439,4 +439,77 @@ TEST(CompilationUnitSim, CuScopeVariableAsAnActualThroughUnitPrefix) {
             114u);
 }
 
+// §3.12.1 (printed page 56) with §8.9 (printed 186): a static property of
+// the unit's own class C is initialized once, its `static int s = g * 10 +
+// 1;` an expression of the unit's scope, which declares g, so a module
+// reads 51 through `C::s`. The unit's classes are lowered before any
+// module is, and the initializer was evaluated in no frame, resolving g by
+// its bare key, which holds nothing once the unit's storage stands under
+// "$unit.g": s read 1. LowerClassDecl (lowerer_class.cpp) now evaluates the
+// initializer in a frame of the unit's scope.
+TEST(CompilationUnitSim, CuScopeClassStaticInitializerReadsTheUnitsVariable) {
+  EXPECT_EQ(UnitGRead("class C;\n"
+                      "  static int s = g * 10 + 1;\n"
+                      "endclass\n"
+                      "module top;\n"
+                      "  int y;\n"
+                      "  initial y = C::s;\n"
+                      "endmodule\n",
+                      "y"),
+            51u);
+}
+
+// A design whose compilation-unit scope declares `int g = 5;` and then the
+// class `unit_class`, and whose top declares its own `int g = 7;`,
+// constructs a C and reads `read * 10 + g` into y; answers y, in which the
+// tens digit is what the class read and the units the top's own g.
+static uint64_t UnitClassReadBesideTheTopsG(const std::string& unit_class,
+                                            const std::string& read) {
+  return UnitGRead(unit_class +
+                       "module top;\n"
+                       "  int g = 7;\n"
+                       "  int y;\n"
+                       "  C c;\n"
+                       "  initial begin\n"
+                       "    c = new;\n"
+                       "    y = " +
+                       read +
+                       " * 10 + g;\n"
+                       "  end\n"
+                       "endmodule\n",
+                   "y");
+}
+
+// §3.12.1 (printed page 56) with §8.7 (printed 184) and §23.9 (printed
+// 761): the unit class's `int p = g;` is an expression of the class
+// declaration's scope, the unit's, whose g is 5 whatever the constructing
+// module declares, so `c.p * 10 + g` in a top with its own `int g = 7;` is
+// 57. The defaults were read in a frame of no package
+// (ConstructBaseThenDefaults in eval_class_new.cpp, as b0255e0e9 left a unit
+// class), which resolved g through the top's instance prefix to the top's
+// 7: 77.
+TEST(CompilationUnitSim, CuScopeClassPropertyInitializerReadsTheUnitsVariable) {
+  EXPECT_EQ(UnitClassReadBesideTheTopsG("class C;\n"
+                                        "  int p = g;\n"
+                                        "endclass\n",
+                                        "c.p"),
+            57u);
+}
+
+// §3.12.1 (printed page 56) with §23.9 (printed 761): a method of the unit
+// class reads a bare g as the unit's 5, its body nested in the unit's scope
+// and never in the calling module's, so `c.get() * 10 + g` is 57 beside
+// the top's own g. The method's frame carried no scope (RecordClassPackage
+// in lowerer_class.cpp recorded a package alone), so the bare g resolved
+// through the calling instance's prefix to the top's 7: 77.
+TEST(CompilationUnitSim, CuScopeClassMethodReadsTheUnitsVariable) {
+  EXPECT_EQ(UnitClassReadBesideTheTopsG("class C;\n"
+                                        "  function int get();\n"
+                                        "    return g;\n"
+                                        "  endfunction\n"
+                                        "endclass\n",
+                                        "c.get()"),
+            57u);
+}
+
 }  // namespace
