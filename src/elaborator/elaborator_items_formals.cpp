@@ -33,6 +33,36 @@ void ResolveFormalAggregateTypes(ModuleItem* item, const TypedefMap& typedefs,
   }
 }
 
+namespace {
+
+// §27.5 (printed page 824) with §23.9 (printed 761): the subroutines of a
+// generate block, `items`, resolved from an enclosing scope's pass against
+// `typedefs`, that scope's table, less every name a typedef item among the
+// items declares, above or below the subroutine (§6.18, printed 118), so a
+// member naming a typedef the block itself declares is left unresolved for
+// the block's own pass, Elaborator::ElaborateGenerateItems's call of
+// ResolveModuleSubroutineFormalTypes with the block's table, rather than
+// resolved to the enclosing scope's typedef of the same name and kept. A
+// block declaring no typedef is walked by the table as it is, at no copy.
+void ResolveGenerateBlockFormalTypes(const std::vector<ModuleItem*>& items,
+                                     const TypedefMap& typedefs, Arena& arena) {
+  bool declares_typedef = false;
+  for (const auto* item : items) {
+    declares_typedef |= item->kind == ModuleItemKind::kTypedef;
+  }
+  if (!declares_typedef) {
+    ResolveModuleSubroutineFormalTypes(items, typedefs, arena);
+    return;
+  }
+  TypedefMap visible = typedefs;
+  for (const auto* item : items) {
+    if (item->kind == ModuleItemKind::kTypedef) visible.erase(item->name);
+  }
+  ResolveModuleSubroutineFormalTypes(items, visible, arena);
+}
+
+}  // namespace
+
 // §6.18 (printed page 118) lets a forward typedef, `typedef struct pair_t;`,
 // stand for a definition the same scope gives before or after the reference,
 // and §23.9 (printed 761) resolves a function's or a task's names outward to
@@ -73,6 +103,20 @@ void ResolveFormalAggregateTypes(ModuleItem* item, const TypedefMap& typedefs,
 // definition both written in g -- ca0c213d4's remainder. That site now calls
 // this again once the block's items are walked, with the table as the walk
 // leaves it, and the descent reaches the blocks nested in the block.
+//
+// §27.5 (printed page 824) makes the block a scope of its own and §23.9
+// (printed 761) has a name the block declares locally stand over the
+// enclosing scope's, so a typedef the block declares hides a module typedef
+// of the same name for the block's subroutines. The descent reached the
+// block's subroutines with the module's table, resolved `pair_t A` of g's
+// `function int f(union tagged { void N; pair_t A; } a)` to the module's
+// one-member pair_t, and the block's pass, finding the member resolved, kept
+// it, so `g.f(tagged A '{3, 4})` read 30 for §7.2.1's 34 -- ccc8d1f7f's
+// remainder, found by its agent. The descent into a block now goes through
+// ResolveGenerateBlockFormalTypes, which takes the names the block's own
+// typedef items declare out of the table, leaving such a member to the
+// block's pass; every other member of the block's subroutines still resolves
+// to the enclosing scope's typedef here.
 void ResolveModuleSubroutineFormalTypes(const std::vector<ModuleItem*>& items,
                                         const TypedefMap& typedefs,
                                         Arena& arena) {
@@ -82,12 +126,12 @@ void ResolveModuleSubroutineFormalTypes(const std::vector<ModuleItem*>& items,
       ResolveFormalAggregateTypes(item, typedefs, arena);
       continue;
     }
-    ResolveModuleSubroutineFormalTypes(item->gen_body, typedefs, arena);
+    ResolveGenerateBlockFormalTypes(item->gen_body, typedefs, arena);
     if (item->gen_else != nullptr) {
       ResolveModuleSubroutineFormalTypes({item->gen_else}, typedefs, arena);
     }
     for (const auto& arm : item->gen_case_items) {
-      ResolveModuleSubroutineFormalTypes(arm.body, typedefs, arena);
+      ResolveGenerateBlockFormalTypes(arm.body, typedefs, arena);
     }
   }
 }
