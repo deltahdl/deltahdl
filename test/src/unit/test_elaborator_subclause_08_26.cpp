@@ -48,6 +48,42 @@ TEST(InterfaceClassAllowedContent, InterfaceClassDataMemberError) {
                             "shall not contain data members", 1, "8.26"));
 }
 
+// §8.26 (printed page 206) confines an interface class to pure virtual
+// methods, type declarations and parameter declarations, and Syntax 8-3 in
+// §8.26.1 (printed 208) gives interface_class_item no class_property
+// alternative, so a data member is barred whatever its qualifier: a static
+// one is no parameter, and §8.9's one storage never spans an `implements`.
+TEST(InterfaceClassAllowedContent, InterfaceClassStaticDataMemberError) {
+  ElabFixture f;
+  ElabOk(
+      "interface class I;\n"
+      "  static int n;\n"
+      "endclass\n"
+      "class A implements I;\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "shall not contain data members", 1, "8.26"));
+}
+
+// Syntax 8-3 (printed page 208): a `const` property is a class_property
+// (§8.4 with §6.20.6) and no parameter_declaration, so it is barred too; the
+// check exempted `const` beside `parameter` and accepted `const int x = 1;`.
+TEST(InterfaceClassAllowedContent, InterfaceClassConstDataMemberError) {
+  ElabFixture f;
+  ElabOk(
+      "interface class I;\n"
+      "  const int x = 1;\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "shall not contain data members", 1, "8.26"));
+}
+
 TEST(InterfaceClassAllowedContent, InterfaceClassMultiplePureVirtualsOk) {
   EXPECT_TRUE(
       ElabOk("interface class IC;\n"

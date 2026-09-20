@@ -232,11 +232,14 @@ static void CheckInterfaceClassMemberKind(const ClassDecl* cls,
                            "pure virtual methods",
                            cls->name),
                Subclause("8.26"));
-  } else if (m->kind == ClassMemberKind::kProperty && !m->is_const &&
-             !m->is_param) {
-    // §8.26: an interface class may contain pure virtual methods, type
-    // declarations, and parameter declarations; a parameter/localparam (carried
-    // as kProperty with is_param) is not a data member.
+  } else if (m->kind == ClassMemberKind::kProperty && !m->is_param) {
+    // §8.26 (printed page 206): an interface class may contain pure virtual
+    // methods, type declarations, and parameter declarations; a
+    // parameter/localparam (carried as kProperty with is_param) is not a data
+    // member. Syntax 8-3 (printed 208) gives interface_class_item no
+    // class_property alternative, so a `const` or a `static` property is a
+    // data member like any other; exempting `const` here accepted
+    // `const int x = 1;`.
     diag.Error(cls->range.start,
                std::format("interface class '{}' shall not contain "
                            "data members",
