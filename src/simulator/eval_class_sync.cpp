@@ -249,9 +249,17 @@ static bool IsNewCall(const Expr* expr) {
 }
 
 // The semaphore or mailbox the property holds, or null where it holds none.
-// §8.9: a static property is created once, and its one copy is built here
-// on the first reference from the declaration's `new` where the map has no
-// entry for it yet -- an entry, null included, is what an assignment left.
+// §8.9: a static property is created once, at the class's static
+// initialization (TryInitStaticSyncProperty), which leaves the map an entry
+// for it -- an entry, null included, is what that or an assignment left.
+// A static property whose map has no entry is one the pass did not know
+// for a semaphore or mailbox, and its one copy is built here on the first
+// reference from the declaration's `new`: PopulateClassType
+// (lowerer_class.cpp) runs the pass for every class, top-level and nested,
+// but a unit's or a package's class is lowered before RegisterClassTypeAliases
+// fills the typedef table, so a static property declared through a typedef
+// (§15.4.9's `s_mbox`) is built here, reading its argument at that first
+// reference.
 template <typename T>
 static T* HeldSyncObject(std::unordered_map<std::string, T*>* held,
                          const SyncProperty& prop, SimContext& ctx) {
@@ -358,19 +366,41 @@ static void StoreSyncHandle(const SyncProperty& target,
   }
 }
 
+// §8.7 and §8.9: the property's initializer `init` -- a `new(...)`, which
+// builds the object in the property's map, or any other expression, which
+// makes the property a handle to the semaphore or mailbox it names (§8.12)
+// or leaves it null where it names none.
+static void InitSyncProperty(const SyncProperty& prop, const Expr* init,
+                             SimContext& ctx) {
+  if (IsNewCall(init)) {
+    BuildSyncProperty(prop, init, ctx, ctx.GetArena());
+    return;
+  }
+  SyncHandle source = ResolveSyncHandle(init, ctx, ctx.GetArena());
+  StoreSyncHandle(prop, source.kind == prop.kind ? source : SyncHandle{});
+}
+
 bool TryInitClassSyncProperty(ClassObject* obj, const ClassTypeInfo* info,
                               std::string_view name, const Expr* init,
                               SimContext& ctx) {
   SyncMember member = SyncPropertyMember(info, name, ctx);
   if (member.member == nullptr || member.member->is_static) return false;
   if (init == nullptr) return true;
-  SyncProperty prop = MakeSyncProperty(member, obj, std::string(name), ctx);
-  if (IsNewCall(init)) {
-    BuildSyncProperty(prop, init, ctx, ctx.GetArena());
-    return true;
+  InitSyncProperty(MakeSyncProperty(member, obj, std::string(name), ctx), init,
+                   ctx);
+  return true;
+}
+
+bool TryInitStaticSyncProperty(const ClassTypeInfo* info, std::string_view name,
+                               const Expr* init, SimContext& ctx) {
+  SyncMember member = SyncPropertyMember(info, name, ctx);
+  if (member.member == nullptr || !member.member->is_static ||
+      member.declaring != info) {
+    return false;
   }
-  SyncHandle source = ResolveSyncHandle(init, ctx, ctx.GetArena());
-  if (source.kind == prop.kind) StoreSyncHandle(prop, source);
+  if (init == nullptr) return true;
+  InitSyncProperty(MakeSyncProperty(member, nullptr, std::string(name), ctx),
+                   init, ctx);
   return true;
 }
 

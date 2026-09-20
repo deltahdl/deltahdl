@@ -456,4 +456,30 @@ TEST(SemaphoreSim, NestedClassMethodTakesTheEnclosingClassStaticSemaphore) {
             10u);
 }
 
+// §8.9 (printed page 186) with §6.21 (printed 132-133), §3.12.1 (printed
+// 56) and §15.3.1 (printed 373): a static semaphore property's one bucket
+// is created at the class's static initialization with the keys its
+// `new(keys)` reads then, so the compilation unit's class holds the one key
+// the unit's `int keys = 1` gives and the module's `keys = 3` before the
+// first try_get() adds none: the first try_get(1) reads 1 and the second 0,
+// 10. Built on the first reference instead, the `new` read the 3 and both
+// reads were 1, 11.
+TEST(SemaphoreSim, StaticSemaphorePropertyIsBuiltAtStaticInitialization) {
+  EXPECT_EQ(RunAndGet("int keys = 1;\n"
+                      "class C;\n"
+                      "  static semaphore s = new(keys);\n"
+                      "endclass\n"
+                      "module top;\n"
+                      "  int first, second, r;\n"
+                      "  initial begin\n"
+                      "    keys = 3;\n"
+                      "    first = C::s.try_get(1);\n"
+                      "    second = C::s.try_get(1);\n"
+                      "    r = first * 10 + second;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "r"),
+            10u);
+}
+
 }  // namespace

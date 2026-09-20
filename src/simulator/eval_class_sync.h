@@ -114,6 +114,21 @@ bool TryInitClassSyncProperty(ClassObject* obj, const ClassTypeInfo* info,
                               std::string_view name, const Expr* init,
                               SimContext& ctx);
 
+// §8.9 (printed page 186) with §6.21 (printed 132-133): a static property is
+// created once, at the class's static initialization, and a static variable
+// takes its declaration's initializer then, so the one copy of the static
+// property `name` that `info` itself declares a semaphore or a mailbox is
+// built by its `new(...)` into the class's static map at lowering
+// (InitStaticProperties in lowerer_class.cpp), in the frame of the class's
+// scope, the argument read as it stands then; any other initializer makes
+// the property a handle to the object it names (§8.12), or null. False,
+// building nothing, for a property of any other type, an instance property,
+// or a static one a base class declares, whose copy is the base's own. Built
+// on the first reference instead, `new(K)` read K as a later assignment had
+// left it.
+bool TryInitStaticSyncProperty(const ClassTypeInfo* info, std::string_view name,
+                               const Expr* init, SimContext& ctx);
+
 // §15.4 (printed page 374 of ~/LRM.pdf) makes a mailbox variable a handle to
 // the mailbox object, §15.3 a semaphore's alike, and §8.12 (printed 188) has
 // a handle assigned to another variable leave one object under two names.

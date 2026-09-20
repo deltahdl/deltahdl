@@ -16,6 +16,7 @@
 #include "parser/ast_module.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_array_class_assoc.h"
+#include "simulator/eval_class_sync.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
 #include "simulator/sim_context.h"
@@ -92,18 +93,31 @@ static void BuildVTable(ClassTypeInfo* info, const ClassDecl* cls) {
   }
 }
 
+// §8.9 (printed page 186 of ~/LRM.pdf) with §6.21 (printed 132-133): each
+// static property's one copy takes its initializer once, here, in the frame
+// LowerClassDecl pushes for the class's scope. §15.3.1 (printed 373) and
+// §15.4.1 (printed 374): a `static semaphore s = new(K)` or `static mailbox
+// mb = new(K)` builds the class's bucket or queue into its static map
+// (TryInitStaticSyncProperty), the value under the name staying the
+// handle's carrier; evaluated as a value, the `new` built nothing and the
+// copy was built on the first reference, reading K as it then stood.
+static void InitStaticProperty(ClassTypeInfo* info,
+                               const ClassTypeInfo::PropertyInfo& p,
+                               SimContext& ctx, Arena& arena) {
+  Logic4Vec& slot = info->static_properties[std::string(p.name)];
+  if (TryInitStaticSyncProperty(info, p.name, p.init_expr, ctx)) {
+    slot = MakeLogic4VecVal(arena, p.width, 0);
+  } else if (p.init_expr) {
+    slot = EvalExpr(p.init_expr, ctx, arena);
+  } else {
+    slot = MakeLogic4VecVal(arena, p.width, 0);
+  }
+}
+
 static void InitStaticProperties(ClassTypeInfo* info, SimContext& ctx,
                                  Arena& arena) {
   for (const auto& p : info->properties) {
-    if (p.is_static) {
-      if (p.init_expr) {
-        info->static_properties[std::string(p.name)] =
-            EvalExpr(p.init_expr, ctx, arena);
-      } else {
-        info->static_properties[std::string(p.name)] =
-            MakeLogic4VecVal(arena, p.width, 0);
-      }
-    }
+    if (p.is_static) InitStaticProperty(info, p, ctx, arena);
   }
 }
 

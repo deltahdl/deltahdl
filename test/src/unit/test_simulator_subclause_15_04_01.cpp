@@ -678,4 +678,32 @@ TEST(MailboxSim, NestedClassMethodPutsIntoTheEnclosingClassStaticMailbox) {
             14u);
 }
 
+// §8.9 (printed page 186) with §6.21 (printed 132-133) and §15.4.1 (printed
+// 374): a static property's one copy is created at the class's static
+// initialization, its `new(K)` reading K as it stands then, so the package
+// class's mailbox is bounded by the package's `int K = 1` and the module's
+// `K = 3` before the first put() does not widen it: the first try_put()
+// reads 1 and the second, on the full mailbox, 0, 10. Built on the first
+// reference instead, the `new` read the 3 and both reads were 1, 11.
+TEST(MailboxSim, StaticMailboxPropertyIsBuiltAtStaticInitialization) {
+  EXPECT_EQ(RunAndGet("package p;\n"
+                      "  int K = 1;\n"
+                      "  class C;\n"
+                      "    static mailbox mb = new(K);\n"
+                      "  endclass\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  import p::*;\n"
+                      "  int a, b, y;\n"
+                      "  initial begin\n"
+                      "    K = 3;\n"
+                      "    a = C::mb.try_put(1);\n"
+                      "    b = C::mb.try_put(2);\n"
+                      "    y = a * 10 + b;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            10u);
+}
+
 }  // namespace
