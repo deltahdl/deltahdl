@@ -1,4 +1,5 @@
 #include <format>
+#include <string>
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
@@ -7,6 +8,7 @@
 
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
+#include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_data.h"
 #include "elaborator/elaborator_enum_constants.h"
@@ -83,9 +85,12 @@ void ElaboratorData::BeginNestedDeclScope(
     has_pending_enclosing_scope_ = true;
     return;
   }
+  // The recorded names are owned strings (a ranged enumeration member's
+  // constants are spelled by no text); nested_decl_names_above_ keeps them for
+  // as long as the elaborator lives, so views into them are handed on.
   auto above = nested_decl_names_above_.find(nested);
   if (above != nested_decl_names_above_.end()) {
-    at_instance.insert(above->second.begin(), above->second.end());
+    for (const std::string& name : above->second) at_instance.emplace(name);
   }
   pending_enclosing_scope_ = std::move(at_instance);
   has_pending_enclosing_scope_ = true;
@@ -94,13 +99,23 @@ void ElaboratorData::BeginNestedDeclScope(
 // §6.19 declares an enumeration's literals as named constants of the scope
 // holding the enumeration, and §7.2 with §23.9 has one written as the type of
 // a structure or union member declare them in the same scope, the structure
-// being no scope of its own. The names one such member declares as the text
-// shows them: its written name, or nothing for a `name[N]` member of §6.19.2,
-// whose constants are generated rather than written and are owned by no text
-// a std::string_view could point into (EnumMemberDeclaredNames builds them).
-static void AddEnumMemberName(const EnumMember& member,
-                              std::unordered_set<std::string_view>& names) {
-  if (member.range_start == nullptr) names.insert(member.name);
+// being no scope of its own. The names one such member declares: its written
+// name, or for a `name[N]` or `name[N:M]` member the constants Table 6-10 of
+// §6.19.2 (printed page 121) generates from it, name0 through nameN-1 or
+// nameN through nameM, which EnumMemberDeclaredNames spells out; the member's
+// written name itself declares nothing then. The generated names are owned by
+// no text, so `names` owns its strings. The bounds are folded against no
+// scope, this walk running on the syntax tree before any item is elaborated;
+// a bound naming a parameter does not fold, and the written name is then kept
+// in place of the constants. Before, a ranged member was left out altogether,
+// and `M m(); enum {C[2] = 5} e; wire [7:0] v; module M; assign v = C1;`
+// reported C1 undeclared in M.
+static void AddEnumMemberNames(const EnumMember& member,
+                               std::unordered_set<std::string>& names) {
+  const ScopeMap kNoScope;
+  for (std::string& name : EnumMemberDeclaredNames(member, kNoScope)) {
+    names.insert(std::move(name));
+  }
 }
 
 // The names `item` declares as the text alone shows them: the declared name
@@ -113,21 +128,21 @@ static void AddEnumMemberName(const EnumMember& member,
 // an implicit net of the scope where it was not declared before and which is
 // already among the names where it was.
 static void AddItemDeclaredNames(const ModuleItem* item,
-                                 std::unordered_set<std::string_view>& names) {
-  if (!item->name.empty()) names.insert(item->name);
-  if (!item->inst_name.empty()) names.insert(item->inst_name);
-  if (!item->gate_inst_name.empty()) names.insert(item->gate_inst_name);
+                                 std::unordered_set<std::string>& names) {
+  if (!item->name.empty()) names.emplace(item->name);
+  if (!item->inst_name.empty()) names.emplace(item->inst_name);
+  if (!item->gate_inst_name.empty()) names.emplace(item->gate_inst_name);
   if (item->first_in_decl_list) {
     ForEachEnumTypeOfItem(item, [&](std::string_view, const DataType& type) {
       for (const auto& member : type.enum_members) {
-        AddEnumMemberName(member, names);
+        AddEnumMemberNames(member, names);
       }
     });
   }
   if (item->kind == ModuleItemKind::kContAssign &&
       item->assign_lhs != nullptr &&
       item->assign_lhs->kind == ExprKind::kIdentifier) {
-    names.insert(item->assign_lhs->text);
+    names.emplace(item->assign_lhs->text);
   }
 }
 
@@ -135,14 +150,18 @@ static void AddItemDeclaredNames(const ModuleItem* item,
 // declaration, and an instance written above that declaration is elaborated
 // before the item loop reaches it, so the names the items above each nested
 // declaration declare are read from the text first, for BeginNestedDeclScope
-// to join with the names declared so far at such an instance.
+// to join with the names declared so far at such an instance. The text is the
+// same each time the enclosing module is elaborated, so the first recording
+// for a declaration is kept: the strings it owns are what the views
+// BeginNestedDeclScope hands on point into, and a second elaboration of the
+// enclosing module must not free them.
 void ElaboratorData::RecordNestedDeclNamesAbove(
     const std::vector<ModuleItem*>& items) {
-  std::unordered_set<std::string_view> above;
+  std::unordered_set<std::string> above;
   for (const auto* item : items) {
     if (item->kind == ModuleItemKind::kNestedModuleDecl &&
         item->nested_module_decl != nullptr) {
-      nested_decl_names_above_[item->nested_module_decl] = above;
+      nested_decl_names_above_.try_emplace(item->nested_module_decl, above);
     }
     AddItemDeclaredNames(item, above);
   }

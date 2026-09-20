@@ -415,6 +415,52 @@ TEST(NestedModuleSimulation,
       4u);
 }
 
+// §6.19.2's Table 6-10 has a `name[N]` member generate name0 through nameN-1,
+// a `name[N:M]` member nameN through nameM in either direction, and a value
+// given to either go to the first generated constant, the rest counting on
+// from it: C0 is 5 and C1 6, D1 7 and D2 8, E3 9, E2 10 and E1 11. Those
+// constants, spelled by no text, are what top declares above M, so M reads
+// their sum, 25, with no report. Before, a ranged member was left out of the
+// names counted above the declaration and C1 was reported undeclared.
+TEST(NestedModuleSimulation,
+     InstanceAboveTheNestedDeclarationReadsRangedEnumConstants) {
+  SimFixture f;
+  ExpectOuterReadsThroughNestedAssign(
+      f,
+      "module top;\n"
+      "  M m();\n"
+      "  enum {C[2] = 5, D[1:2], E[3:1] = 9} e;\n"
+      "  wire [7:0] v;\n"
+      "  logic [7:0] r;\n"
+      "  initial #1 r = v;\n"
+      "  module M;\n"
+      "    assign v = C1 + D2 + E1;\n"
+      "  endmodule\n"
+      "endmodule\n",
+      25u);
+}
+
+// The same generated constants through §7.2 with §23.9: a ranged member of an
+// enumeration written as a structure member's type declares S0, 20, and S1,
+// 21, where the structure is written, so M reads S1 as it reads Q above.
+TEST(NestedModuleSimulation,
+     InstanceAboveTheNestedDeclarationReadsAStructMemberRangedEnumConstant) {
+  SimFixture f;
+  ExpectOuterReadsThroughNestedAssign(
+      f,
+      "module top;\n"
+      "  M m();\n"
+      "  typedef struct { enum {S[2] = 20} k; int n; } t;\n"
+      "  wire [7:0] v;\n"
+      "  logic [7:0] r;\n"
+      "  initial #1 r = v;\n"
+      "  module M;\n"
+      "    assign v = S1;\n"
+      "  endmodule\n"
+      "endmodule\n",
+      21u);
+}
+
 // §6.10 gives an undeclared identifier on the left of a continuous assignment
 // an implicit net of the scope the assignment appears in, so top's `assign q
 // = 1'bz` declares q in top, above M's text. M's `assign q = 1'b1` drives that

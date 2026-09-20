@@ -139,13 +139,17 @@ class ElaboratorData {
   // the names declared between the instance and the declaration -- previous
   // to the declaration's text by §6.10 -- are then known from the text alone.
   // Elaborator::ElaborateItems records these through
-  // RecordNestedDeclNamesAbove before its item loop.
-  std::unordered_map<const ModuleDecl*, std::unordered_set<std::string_view>>
+  // RecordNestedDeclNamesAbove before its item loop. The names are owned
+  // strings rather than views: the constants a `name[N]` or `name[N:M]`
+  // enumeration member generates (§6.19.2) are spelled by no text, and this
+  // class holds no arena to intern them in.
+  std::unordered_map<const ModuleDecl*, std::unordered_set<std::string>>
       nested_decl_names_above_;
   // Records, for each kNestedModuleDecl among `items`, the names the items
   // above it declare as the text shows them: each item's declared name, its
-  // instance name and its gate instance name, the written constants of each
-  // enumeration it writes inline (§6.19) and the identifier a continuous
+  // instance name and its gate instance name, the constants of each
+  // enumeration it writes inline (§6.19), a ranged member's generated
+  // constants among them (§6.19.2), and the identifier a continuous
   // assignment's left side names (§6.10's implicit net).
   void RecordNestedDeclNamesAbove(const std::vector<ModuleItem*>& items);
   // Hands ElaborateModule, through pending_enclosing_scope_, the enclosing
