@@ -48,6 +48,34 @@ static bool ResolveStaticTaskByScope(const Expr* expr, SimContext& ctx,
   return true;
 }
 
+// §26.3 with §8.6: the receiver a package-qualified handle names, by the key
+// its storage and its class record are held under; see the declaration in
+// eval_function_internal.h. Taken as an identifier alone, `p1::h.m()` and
+// `p1::h.t(5);` resolved no object, so the call ran on none and answered 0.
+bool ExtractHandleMethodCallParts(const Expr* expr, Arena& arena,
+                                  MethodCallParts& out) {
+  if (ExtractMethodCallParts(expr, out)) return true;
+  const Expr* access = expr->lhs;
+  if (access == nullptr || access->kind != ExprKind::kMemberAccess ||
+      access->is_scope_resolution || access->rhs == nullptr ||
+      access->rhs->kind != ExprKind::kIdentifier) {
+    return false;
+  }
+  const Expr* scoped = access->lhs;
+  if (scoped == nullptr || scoped->kind != ExprKind::kMemberAccess ||
+      !scoped->is_scope_resolution || scoped->lhs == nullptr ||
+      scoped->rhs == nullptr || scoped->lhs->kind != ExprKind::kIdentifier ||
+      scoped->rhs->kind != ExprKind::kIdentifier) {
+    return false;
+  }
+  auto* key = arena.Create<std::string>(std::string(scoped->lhs->text) + "." +
+                                        std::string(scoped->rhs->text));
+  out.var_name = *key;
+  out.method_name = access->rhs->text;
+  out.loc = access->rhs->range.start;
+  return true;
+}
+
 // §8.13 with §8.20: the method `name` names on the running object, written
 // bare inside a method of the object's class -- the object's own class
 // through the vtable first, then the walk from the lexically enclosing class
@@ -122,8 +150,10 @@ static bool ResolveMethodNamedBare(const Expr* expr, SimContext& ctx,
 // `go(d)` and `super.go(d)` inside a class task ran through the synchronous
 // function interpreter, which wrote the property and dropped the `#d`, and
 // the enable from the initial returned at time 0.
+// §26.3 admits a package-qualified handle as the receiver, `p1::h.t(...)`,
+// resolved by the key ExtractHandleMethodCallParts answers.
 static bool ResolveMethodOfStatement(const Expr* expr, SimContext& ctx,
-                                     InstanceMethodInfo& call) {
+                                     Arena& arena, InstanceMethodInfo& call) {
   if (expr->kind != ExprKind::kCall) {
     return ResolveMethodNamedBare(expr, ctx, call);
   }
@@ -132,14 +162,14 @@ static bool ResolveMethodOfStatement(const Expr* expr, SimContext& ctx,
     return ResolveMethodOnRunningObject(expr->callee, ctx, call);
   }
   MethodCallParts parts;
-  return ExtractMethodCallParts(expr, parts) &&
+  return ExtractHandleMethodCallParts(expr, arena, parts) &&
          ResolveMethodByParts(parts, ctx, call);
 }
 
 bool SetupInstanceTaskCall(const Expr* expr, SimContext& ctx, Arena& arena,
                            InstanceMethodInfo& call) {
   if (expr == nullptr) return false;
-  bool through_handle = ResolveMethodOfStatement(expr, ctx, call);
+  bool through_handle = ResolveMethodOfStatement(expr, ctx, arena, call);
   if (!through_handle && !ResolveStaticTaskByScope(expr, ctx, arena, call))
     return false;
   if (call.method->kind != ModuleItemKind::kTaskDecl) return false;

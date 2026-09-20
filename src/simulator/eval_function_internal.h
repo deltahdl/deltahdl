@@ -161,6 +161,22 @@ Logic4Vec RunInstanceMethod(const InstanceMethodInfo& info, const Expr* expr,
 // resolves a static task named through the class scope.
 std::string_view ScopedClassKey(const Expr* scope, Arena& arena);
 
+// §26.3 with §8.6: a method is called through a handle by the syntax a
+// property is read by, and the handle may be a package's variable named
+// through the package scope resolution operator, `p1::h.m(...)`, which the
+// parser leaves as a scope resolution of two identifiers on the handle side
+// of the member access. The variable is held under the "p1.h" key a scoped
+// read resolves by (BuildMemberName in eval_expr.cpp), and its class is
+// recorded under the same key (RegisterPackageClassVariables in
+// lowerer_package_class_vars.cpp), so the receiver is that key, given the
+// arena's lifetime as ScopedClassKey gives a class key. Answers what
+// ExtractMethodCallParts answers for an identifier receiver, that key for a
+// scoped one, and false for any other shape. Defined in
+// eval_instance_task.cpp; shared with eval_function.cpp, which dispatches the
+// call expression, where the statement form is resolved beside it.
+bool ExtractHandleMethodCallParts(const Expr* expr, Arena& arena,
+                                  MethodCallParts& out);
+
 // §8.7/§8.15: whether `call`, a `super.new(...)` call, is one the construction
 // of the object has already made -- the first statement of the constructor of
 // the class whose method is running, or §8.17's `super.new(default)`.

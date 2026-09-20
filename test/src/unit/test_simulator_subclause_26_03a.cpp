@@ -455,4 +455,118 @@ TEST(PackageScopeReferenceSim, UnitClassKeepsNameOverImportedPackageClass) {
             89u);
 }
 
+// §26.3 (printed page 808) with §8.6 (printed 183): a method is called
+// through a handle by the syntax a property is read by, and the handle may
+// be a package's variable named through the package scope resolution
+// operator, so `p1::h.m()` after `p1::h = new` runs C's m on p1's object:
+// 3 * 7 = 21. The receiver of a method call was taken as an identifier
+// alone, so the scoped receiver resolved no object and y stayed 0.
+TEST(PackageScopeReferenceSim, PackageQualifiedHandleMethodCall) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  class C;\n"
+                      "    int v = 3;\n"
+                      "    function int m();\n"
+                      "      return v * 7;\n"
+                      "    endfunction\n"
+                      "  endclass\n"
+                      "  C h;\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  int y;\n"
+                      "  initial begin\n"
+                      "    p1::h = new;\n"
+                      "    y = p1::h.m();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            21u);
+}
+
+// §26.3 (printed page 808) with §8.6 (printed 183) and §13.3: a task enabled
+// through a package-qualified handle, `p1::h.t(5);`, runs C's t on p1's
+// object, so the property it writes reads back through the same handle as 5.
+// The statement's receiver was taken as an identifier alone, so the task ran
+// on no object and the read answered 0.
+TEST(PackageScopeReferenceSim, PackageQualifiedHandleTaskEnableWritesProperty) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  class C;\n"
+                      "    int v;\n"
+                      "    task t(int a);\n"
+                      "      v = a;\n"
+                      "    endtask\n"
+                      "  endclass\n"
+                      "  C h;\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  int y;\n"
+                      "  initial begin\n"
+                      "    p1::h = new;\n"
+                      "    p1::h.t(5);\n"
+                      "    y = p1::h.v;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            5u);
+}
+
+// §26.6 (printed page 815) with §8.6: a package's class-handle variable an
+// export hands on takes a method call through the exporting package's
+// qualifier as through the declaring one's, `p2::h.m()` after `import p1::h;
+// export p1::h;` and `p2::h = new` running C's m on p1's object: 3 * 7 = 21.
+// The exporter's key is bound to p1's storage and class record, but the
+// scoped receiver was not taken, so y stayed 0.
+TEST(PackageScopeReferenceSim, ExportedHandleMethodCallThroughTheExporter) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  class C;\n"
+                      "    int v = 3;\n"
+                      "    function int m();\n"
+                      "      return v * 7;\n"
+                      "    endfunction\n"
+                      "  endclass\n"
+                      "  C h;\n"
+                      "endpackage\n"
+                      "package p2;\n"
+                      "  import p1::h;\n"
+                      "  export p1::h;\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  int y;\n"
+                      "  initial begin\n"
+                      "    p2::h = new;\n"
+                      "    y = p2::h.m();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            21u);
+}
+
+// §26.3 (printed page 808) with §8.6 (printed 183): a method called on the
+// object a method call returned, `p1::h.self().m()`, runs on that object,
+// the inner call being one through the package-qualified handle: 3 * 7 =
+// 21. The inner call resolved no object, so the outer one had none to run
+// on and y stayed 0.
+TEST(PackageScopeReferenceSim, PackageQualifiedHandleMethodCallChained) {
+  EXPECT_EQ(RunAndGet("package p1;\n"
+                      "  class C;\n"
+                      "    int v = 3;\n"
+                      "    function C self();\n"
+                      "      return this;\n"
+                      "    endfunction\n"
+                      "    function int m();\n"
+                      "      return v * 7;\n"
+                      "    endfunction\n"
+                      "  endclass\n"
+                      "  C h;\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  int y;\n"
+                      "  initial begin\n"
+                      "    p1::h = new;\n"
+                      "    y = p1::h.self().m();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            21u);
+}
+
 }  // namespace

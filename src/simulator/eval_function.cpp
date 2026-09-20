@@ -357,10 +357,12 @@ Logic4Vec RunInstanceMethod(const InstanceMethodInfo& info, const Expr* expr,
   return out;
 }
 
+// §26.3 admits a package-qualified handle as the receiver, `p1::h.m(...)`,
+// resolved by the key ExtractHandleMethodCallParts answers.
 static bool TryEvalClassMethodCall(const Expr* expr, SimContext& ctx,
                                    Arena& arena, Logic4Vec& out) {
   MethodCallParts parts;
-  if (!ExtractMethodCallParts(expr, parts)) return false;
+  if (!ExtractHandleMethodCallParts(expr, arena, parts)) return false;
   InstanceMethodInfo info;
   if (!ResolveInstanceMethod(parts, ctx, info)) return false;
   out = RunInstanceMethod(info, expr, ctx, arena);
