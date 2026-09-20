@@ -8,6 +8,7 @@
 #include "parser/ast_stmt.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_array.h"
+#include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_class_array_handles.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
@@ -18,23 +19,34 @@ namespace delta {
 
 namespace {
 
-// The declared associative array of class handles `sel` selects an element
-// of, with its declared element class in `class_type`; null where `sel` is no
-// single-index select, its base no bare name of a declared associative array,
-// or the array's element type no class the simulation knows. The lowering
-// records the element class under the array's name (SetVariableClassType in
-// Lowerer::LowerVar) as it does for a variable of a class type, so the name
-// is what tells an array of handles from one of values.
+// The associative array of class handles `sel` selects an element of, with
+// its declared element class in `class_type` and, where the array is an
+// object's property, that object in `owner`; null where `sel` is no
+// single-index select, its base names no associative array, or the array's
+// element type is no class the simulation knows. The base is a declared
+// array's bare name or, §8.5 restricting no property's type, a property of
+// an object named bare in a method (§8.11) or through a handle, which
+// FindAssocArrayOfBase resolves. A declared array's element class is
+// recorded under the array's name (SetVariableClassType in
+// Lowerer::LowerVar) as it is for a variable of a class type, and a
+// property's on the array itself (AssocArrayObject::elem_class, set by
+// MakeAssocProperty), so one or the other is what tells an array of handles
+// from one of values. Asked for a bare declared name alone, `x.m["a"] =
+// new(5)` on a property constructed nothing and `x.m["a"].v` read 0.
 AssocArrayObject* HandleArrayOfSelect(const Expr* sel, SimContext& ctx,
-                                      std::string_view& class_type) {
+                                      Arena& arena,
+                                      std::string_view& class_type,
+                                      ClassObject** owner = nullptr) {
   if (sel == nullptr || sel->kind != ExprKind::kSelect ||
       sel->base == nullptr || sel->index == nullptr ||
-      sel->index_end != nullptr || sel->base->kind != ExprKind::kIdentifier) {
+      sel->index_end != nullptr) {
     return nullptr;
   }
-  AssocArrayObject* aa = ctx.FindAssocArray(sel->base->text);
+  AssocArrayObject* aa = FindAssocArrayOfBase(sel->base, ctx, arena, owner);
   if (aa == nullptr) return nullptr;
-  class_type = ctx.GetVariableClassType(sel->base->text);
+  class_type = aa->elem_class;
+  if (class_type.empty() && sel->base->kind == ExprKind::kIdentifier)
+    class_type = ctx.GetVariableClassType(sel->base->text);
   if (class_type.empty() || ctx.FindClassType(class_type) == nullptr)
     return nullptr;
   return aa;
@@ -80,7 +92,9 @@ bool TryAssocElementNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (rhs == nullptr || rhs->kind != ExprKind::kCall || rhs->text != "new")
     return false;
   std::string_view class_type;
-  AssocArrayObject* aa = HandleArrayOfSelect(lhs, ctx, class_type);
+  ClassObject* owner = nullptr;
+  AssocArrayObject* aa =
+      HandleArrayOfSelect(lhs, ctx, arena, class_type, &owner);
   if (aa == nullptr) return false;
   // The index is evaluated once, before the constructor runs, which may write
   // the array itself.
@@ -92,8 +106,13 @@ bool TryAssocElementNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   StoreElement(aa, idx, handle);
   // §9.4.2: a change to an aggregate element wakes a process waiting on the
   // array, as every other write to an element of it tells the watchers armed
-  // on the variable under its name.
-  NotifyOwningVar(ctx, lhs->base->text);
+  // on the variable under its name, or, for a property, those on the
+  // variables designating the object whose property it is.
+  if (owner != nullptr) {
+    ctx.NotifyClassHandleWatchers(owner->handle);
+  } else {
+    NotifyOwningVar(ctx, lhs->base->text);
+  }
   return true;
 }
 
@@ -102,7 +121,7 @@ bool TryEvalAssocElementMember(const Expr* expr, SimContext& ctx, Arena& arena,
   const Expr* sel = nullptr;
   std::string_view class_type;
   if (!SplitMemberOfSelect(expr, sel) ||
-      HandleArrayOfSelect(sel, ctx, class_type) == nullptr) {
+      HandleArrayOfSelect(sel, ctx, arena, class_type) == nullptr) {
     return false;
   }
   ClassObject* obj = ElementObject(sel, ctx, arena);
@@ -122,7 +141,7 @@ bool TryEvalAssocElementMethodCall(const Expr* expr, SimContext& ctx,
   // §8.6 (printed page 183): an element of a declared array or of a queue is
   // as much a handle to call through as an associative array's, and had no
   // dispatch of its own.
-  if (HandleArrayOfSelect(sel, ctx, class_type) == nullptr)
+  if (HandleArrayOfSelect(sel, ctx, arena, class_type) == nullptr)
     return TryEvalElementObjectMethodCall(expr, ctx, arena, out);
   InstanceMethodInfo info;
   if (!ResolveMethodByDeclaredClass(ElementObject(sel, ctx, arena), class_type,

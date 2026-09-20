@@ -668,4 +668,26 @@ TEST(ClassScopeResolutionSim,
             7u);
 }
 
+// §7.8 (printed page 163) with §8.23: the associative array property
+// `Outer::Inner m[string]` of another class holds handles of the nested
+// class, constructed by `new` into an entry through the handle and read
+// through it. The property's element class was resolved by nothing -- the
+// element paths served declared arrays alone -- so `x.m["k"] = new`
+// constructed nothing and `x.m["k"].v` read 0.
+TEST(ClassScopeResolutionSim, AssocArrayPropertyOfANestedClassHoldsHandles) {
+  EXPECT_EQ(RunAndGet(OuterInnerQueueDesign("class H;\n"
+                                            "  Outer::Inner m[string];\n"
+                                            "endclass\n"
+                                            "module t;\n"
+                                            "  H x = new;\n"
+                                            "  int y;\n"
+                                            "  initial begin\n"
+                                            "    x.m[\"k\"] = new;\n"
+                                            "    y = x.m[\"k\"].v;\n"
+                                            "  end\n"
+                                            "endmodule\n"),
+                      "y"),
+            7u);
+}
+
 }  // namespace

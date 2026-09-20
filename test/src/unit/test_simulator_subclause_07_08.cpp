@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <string>
+#include <string_view>
+
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 
@@ -397,6 +400,53 @@ TEST(AssocArraySimulation, ChildInstanceStringKeyedArrayHoldsItsElements) {
   auto* r = f.ctx.FindVariable("m.r");
   ASSERT_NE(r, nullptr);
   EXPECT_EQ(r->value.ToUint64(), 312u);
+}
+
+// §7.8 (printed page 163 of the LRM) with §8.5: a class property may be an
+// associative array of any element type, and §8.4 (printed 181) makes an
+// element declared with a class's name a handle, constructed by `new` into
+// the entry and read through it as a declared array's is above. The two
+// tests below share the classes and read 5, the constructor's argument, from
+// the module through a handle and from a method by the bare name. Before
+// this only a declared array had the two paths (HandleArrayOfSelect in
+// eval_assoc_class_handles.cpp asked for a bare declared name alone), so
+// `x.m["a"] = new(5)` constructed nothing and `x.m["a"].v` read 0.
+static std::string AssocPropertyDesign(std::string_view rest) {
+  return "class C;\n"
+         "  int v;\n"
+         "  function new(int x); v = x; endfunction\n"
+         "endclass\n"
+         "class H;\n"
+         "  C m[string];\n"
+         "  function int go();\n"
+         "    m[\"b\"] = new(5);\n"
+         "    return m[\"b\"].v;\n"
+         "  endfunction\n"
+         "endclass\n" +
+         std::string(rest);
+}
+
+TEST(AssocArraySimulation, AssocPropertyOfHandlesConstructedThroughAHandle) {
+  EXPECT_EQ(RunAndGet(AssocPropertyDesign("module t;\n"
+                                          "  H x = new;\n"
+                                          "  int result;\n"
+                                          "  initial begin\n"
+                                          "    x.m[\"a\"] = new(5);\n"
+                                          "    result = x.m[\"a\"].v;\n"
+                                          "  end\n"
+                                          "endmodule\n"),
+                      "result"),
+            5u);
+}
+
+TEST(AssocArraySimulation, AssocPropertyOfHandlesConstructedInAMethod) {
+  EXPECT_EQ(RunAndGet(AssocPropertyDesign("module t;\n"
+                                          "  H x = new;\n"
+                                          "  int result;\n"
+                                          "  initial result = x.go();\n"
+                                          "endmodule\n"),
+                      "result"),
+            5u);
 }
 
 }  // namespace

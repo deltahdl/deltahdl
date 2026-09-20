@@ -234,6 +234,17 @@ struct AssocArrayObject {
   // question; it names no struct type, so a read still yields x or 0.
   bool has_elem_init = false;
   Logic4Vec elem_init;
+  // §8.4 with §7.8: the key the run holds the class under whose handles the
+  // elements are, where the array is a class property declared with a
+  // class's name (`C m[string]`, §8.23's `Outer::Inner m[string]`), set by
+  // MakeAssocProperty (eval_array_class_assoc.cpp) from the declaration as
+  // written in the declaring class; empty where the elements are values. A
+  // declared array's element class is recorded under the array's name
+  // instead (SetVariableClassType), which is where the property had none,
+  // so `x.m["k"] = new` constructed nothing and `x.m["k"].v` read 0. The key
+  // is kept rather than a flag so the `new` into an entry knows what to
+  // construct without resolving the declaration again.
+  std::string_view elem_class;
   // §10.6: what a force or an assign standing on an element drives it from,
   // keyed the way the element itself is. An associative array's keys are its
   // elements' identities, so a record outlives every insertion and deletion of
