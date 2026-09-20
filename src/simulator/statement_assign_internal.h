@@ -51,7 +51,7 @@ Logic4Vec ConvertRealOnAssign(Logic4Vec rhs_val, const Expr* lhs,
 Logic4Vec ConvertRealForKnownLhs(Logic4Vec rhs_val, bool lhs_is_real,
                                  uint32_t target_width, Arena& arena);
 
-// Defined in statement_assign_core.cpp; also used by the subroutine-body
+// Defined in statement_assign_compound.cpp; also used by the subroutine-body
 // statement executor in eval_function_body.cpp. §11.4.1 states a compound
 // assignment as one blocking assignment -- "an assignment operator is
 // semantically equivalent to a blocking assignment, with the exception that any
@@ -64,7 +64,21 @@ Logic4Vec ConvertRealForKnownLhs(Logic4Vec rhs_val, bool lhs_is_real,
 
 void ApplyCompoundAssignOp(const Stmt* stmt, SimContext& ctx, Arena& arena);
 
-// Defined in statement_assign_core.cpp; also used by EvalCompoundAssign in
+// Defined in statement_assign_core.cpp; the plain blocking assignment of a
+// scalar value to the target `stmt->lhs` names, resolved to its variable, a
+// string given its whole value, a real converted on the way (§6.12.1), a
+// structure member written through its window. ApplyCompoundAssignOp in
+// statement_assign_compound.cpp takes it for a target no other arm claims.
+void AssignToScalarLhs(const Stmt* stmt, Logic4Vec rhs_val, SimContext& ctx,
+                       Arena& arena);
+
+// Defined in statement_assign_core.cpp: the store §11.4.1's compound operators
+// make into a variable, sized to it, 2-state coerced (§6.11.2), declined while
+// the variable is forced (§10.6.2), its watchers told. Shared with
+// ApplyCompoundAssignOp in statement_assign_compound.cpp.
+void WriteVar(Variable* var, const Logic4Vec& val, Arena& arena);
+
+// Defined in statement_assign_compound.cpp; also used by EvalCompoundAssign in
 // eval_expr.cpp. §11.4.1 makes one exception to a compound assignment being an
 // ordinary blocking assignment -- "any left-hand index expression is only
 // evaluated once" -- and the helpers that resolve, read and write a select
