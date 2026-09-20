@@ -850,6 +850,11 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
     ElaborateItem(item, mod);
   }
 
+  // §6.18: a class method's formal may name a typedef the module forward-
+  // declares above the class and defines below it, so every class is resolved
+  // again against the complete table (elaborator_items_formals.cpp).
+  ResolveModuleClassFormalTypes(mod->class_decls, typedefs_, arena_);
+
   InstantiateImplicitNestedModules(local_nested_modules, mod);
 
   // §28.16: a net delay is a property of the net, so it reaches the drivers

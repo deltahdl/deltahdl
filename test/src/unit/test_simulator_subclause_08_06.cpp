@@ -412,4 +412,36 @@ TEST(ObjectMethodSim,
             78u);
 }
 
+// §6.18 (printed page 118) has a user-defined type's declaration precede
+// every reference to its name, and lets a forward typedef stand for a
+// definition the same scope gives before or after the reference, so a
+// class written between `typedef struct pair_t;` and the structure's
+// definition names pair_t lawfully in a method's formal, which §23.9
+// (printed 761) resolves outward from the class to the module's typedef.
+// The class's methods were resolved against the typedefs as they stood at
+// the class, where the forward name held a placeholder with no members, so
+// C's f was sized as if A were a scalar and `h.f(tagged A '{3, 4})` read 0
+// where §7.2.1 places 3 into a and 4 into b, 34.
+TEST(ObjectMethodSim,
+     ModuleClassMethodFormalReadsATypedefDefinedBelowTheClass) {
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  typedef struct pair_t;\n"
+                      "  class C;\n"
+                      "    function int f(union tagged { void N; pair_t A; }"
+                      " a);\n"
+                      "      return a.A.a * 10 + a.A.b;\n"
+                      "    endfunction\n"
+                      "  endclass\n"
+                      "  typedef struct { int a, b; } pair_t;\n"
+                      "  C h;\n"
+                      "  int y;\n"
+                      "  initial begin\n"
+                      "    h = new;\n"
+                      "    y = h.f(tagged A '{3, 4});\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            34u);
+}
+
 }  // namespace

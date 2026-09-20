@@ -93,6 +93,13 @@ void ResolveFormalAggregateTypes(ModuleItem* item, const TypedefMap& typedefs,
 void ResolveClassMethodFormalTypes(ClassDecl* cls, const TypedefMap& outer,
                                    Arena& arena);
 
+// §6.18: a forward typedef's definition may stand below a class whose method
+// formal names it, so the same again for every class of a module, `classes`
+// being the module's class_decls, against the module's complete table.
+// Elaborator::ElaborateItems calls it after the item loop.
+void ResolveModuleClassFormalTypes(const std::vector<ClassDecl*>& classes,
+                                   const TypedefMap& typedefs, Arena& arena);
+
 // §26.2 and §3.12.1: the same for every subroutine and every class's methods
 // of the unit's packages and of the compilation-unit scope, each against the
 // typedefs its own scope sees; `typedefs` is the unit's table.

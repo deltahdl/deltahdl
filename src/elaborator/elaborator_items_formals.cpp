@@ -92,6 +92,26 @@ void ResolveClassMethodFormalTypes(ClassDecl* cls, const TypedefMap& outer,
   }
 }
 
+// §6.18 (printed page 118) has a user-defined type's declaration precede
+// every reference to its name, and lets a forward typedef, `typedef pair_t;`,
+// stand for a definition the same scope gives before or after the reference.
+// A class declared between the two is resolved by
+// Elaborator::ElaborateModuleClassDecl against the table as it stands at the
+// class, where the forward name holds a placeholder with no members, so the
+// member `pair_t A` of a method's `union tagged { void N; pair_t A; } a` was
+// left unresolved and `h.f(tagged A '{3, 4})` read 0 for §7.2.1's 34. Every
+// class the module's walk recorded, `classes`, is resolved again once the
+// walk has given the table the definition; a member resolved at the class
+// resolves to the same type again, and the class's own typedefs stand over
+// the module's as before (§8.23). Elaborator::ElaborateItems calls it after
+// the item loop, with the module's class_decls.
+void ResolveModuleClassFormalTypes(const std::vector<ClassDecl*>& classes,
+                                   const TypedefMap& typedefs, Arena& arena) {
+  for (auto* cls : classes) {
+    if (cls != nullptr) ResolveClassMethodFormalTypes(cls, typedefs, arena);
+  }
+}
+
 // §26.2 (printed page 808) has a package's items reference what the package
 // declares or imports and nothing the compilation-unit scope declares, so a
 // package's subroutines and the methods of its classes resolve their formals

@@ -709,7 +709,10 @@ void Elaborator::ElaborateModuleClassDecl(ModuleItem* item, RtlirModule* mod) {
   // §13.3 with §7.2.1: the class's methods are reached by no item walk, so
   // their inline aggregate formals are resolved here, against the module's
   // typedefs as they stand at the declaration and the class's own (§8.23),
-  // as ElaborateBehavioralItem resolves the module's own subroutines.
+  // as ElaborateBehavioralItem resolves the module's own subroutines. A
+  // member naming a typedef the module forward-declares above the class and
+  // defines below it (§6.18) finds a placeholder here and is resolved by
+  // ResolveModuleClassFormalTypes once the walk has reached the definition.
   ResolveClassMethodFormalTypes(item->class_decl, typedefs_, arena_);
 }
 
