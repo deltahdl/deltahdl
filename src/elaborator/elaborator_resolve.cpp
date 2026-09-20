@@ -17,6 +17,7 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_enum_constants.h"
 #include "elaborator/elaborator_helpers.h"
+#include "elaborator/elaborator_items_internal.h"
 #include "elaborator/std_package.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_class.h"
@@ -572,6 +573,11 @@ void Elaborator::RegisterCuScopeItems() {
   RegisterClassParams(unit_, cu_param_scope_, arena_, diag_);
   RegisterPackageTypedefs(unit_, typedefs_, arena_);
   RegisterClassTypedefs(unit_, typedefs_, arena_);
+  // §13.3 with §7.2.1: after the two registrations above, which are what give
+  // the table the "pkg::T" and "Class::T" names a formal's member may be
+  // written with; a package's and a compilation-unit class's subroutines are
+  // reached by no module's item walk (elaborator_items_formals.cpp).
+  ResolveUnitScopeFormalTypes(unit_, typedefs_, arena_);
   // Seed the unions ItemElaborationStateSaver folds each module's entries into.
   // A compilation unit with no module to elaborate never reaches that fold, and
   // the passes reading the unions afterwards still have to see what the

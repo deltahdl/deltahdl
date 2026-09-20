@@ -810,4 +810,30 @@ TEST(PackageScopeReferenceSim, PackageProcessHandleAwaitsTermination) {
             1u);
 }
 
+// §26.2 (printed page 808) has a package's subroutines see the package's own
+// typedefs, §13.3 (printed 337) declares a formal with any data_type, and
+// §7.2.1 (printed 147) lays an inline union out member by member, `pair_t
+// Add` naming a typedef of a structure of its own. The elaborator resolved a
+// formal's typedef-named members for a module's subroutines alone, reached
+// by its item walk, and a package's by nothing, so p's f was sized as if Add
+// were a scalar: its layout gave Add no members to place `'{3, 4}` by or to
+// read `a.Add.a` through, and `p::f(tagged Add '{3, 4})` answered 0 where
+// §10.9.2 (printed 263) places 3 into a and 4 into b, 34.
+TEST(PackageScopeReferenceSim,
+     PackageFunctionInlineUnionFormalReadsANestedTypedefMember) {
+  EXPECT_EQ(RunAndGet("package p;\n"
+                      "  typedef struct { int a, b; } pair_t;\n"
+                      "  function int f(union tagged { void None; pair_t Add; }"
+                      " a);\n"
+                      "    return a.Add.a * 10 + a.Add.b;\n"
+                      "  endfunction\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  int y;\n"
+                      "  initial y = p::f(tagged Add '{3, 4});\n"
+                      "endmodule\n",
+                      "y"),
+            34u);
+}
+
 }  // namespace

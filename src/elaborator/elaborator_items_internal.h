@@ -73,6 +73,34 @@ void RegisterCuEnumLiterals(const ModuleDecl* decl, RtlirModule* mod,
 // by the translation units that lower net declarations and validate operations.
 NetType DataTypeToNetType(DataTypeKind kind);
 
+// §13.3: a formal takes any data_type, an inline structure or union among
+// them, and §7.2.1 lays one out member by member, a member naming a typedef of
+// an aggregate included. Resolves each formal's inline aggregate members of
+// `item`, a function or task declaration, in place against `typedefs`, the
+// table of the scope the declaration stands in. Defined in
+// elaborator_items_formals.cpp with the two below; elaborator_items.cpp calls
+// it for a module's or an interface's own subroutine as
+// Elaborator::ElaborateBehavioralItem reaches it.
+void ResolveFormalAggregateTypes(ModuleItem* item, const TypedefMap& typedefs,
+                                 Arena& arena);
+
+// §8.6 and §13.3: a class method's formal takes any data_type as a module
+// subroutine's does, and the typedefs a method's declaration sees are the
+// class's own (§8.23) over those of the scope the class stands in, `outer`.
+// Resolves each method's inline aggregate formals of `cls`, and of every
+// class nested in it, in place. Elaborator::ElaborateModuleClassDecl calls it
+// for a class declared in a module or an interface.
+void ResolveClassMethodFormalTypes(ClassDecl* cls, const TypedefMap& outer,
+                                   Arena& arena);
+
+// §26.2 and §3.12.1: the same for every subroutine and every class's methods
+// of the unit's packages and of the compilation-unit scope, each against the
+// typedefs its own scope sees; `typedefs` is the unit's table.
+// Elaborator::RegisterCuScopeItems calls it once the table holds the
+// packages' and the classes' qualified typedef names.
+void ResolveUnitScopeFormalTypes(CompilationUnit* unit,
+                                 const TypedefMap& typedefs, Arena& arena);
+
 // Shared file-local helper for the elaborator_items translation units: a name
 // is "declared" in a module if it matches any variable, net, or port already
 // recorded on the module. Defined once in elaborator_items.cpp; used there and

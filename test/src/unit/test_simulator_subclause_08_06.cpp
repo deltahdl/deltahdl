@@ -327,4 +327,89 @@ TEST(ObjectMethodSim,
             1313u);
 }
 
+// §8.6 (printed page 183) calls an object's method through its handle, §13.3
+// (printed 337) declares a method's formal with any data_type, and §7.2.1
+// (printed 147) lays an inline union out member by member, `pair_t Add`
+// naming a typedef of a structure the module declares. A class's methods
+// are reached by no item walk, so the elaborator resolved a formal's
+// typedef-named members for the module's own subroutines alone: C's f was
+// sized as if Add were a scalar, its layout gave Add no members to place
+// `'{3, 4}` by or to read `a.Add.a` through, and `h.f(tagged Add '{3, 4})`
+// answered 0 where §10.9.2 (printed 263) places 3 into a and 4 into b, 34.
+TEST(ObjectMethodSim,
+     ModuleClassMethodInlineUnionFormalReadsANestedTypedefMember) {
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  typedef struct { int a, b; } pair_t;\n"
+                      "  class C;\n"
+                      "    function int f(union tagged { void None; pair_t Add;"
+                      " } a);\n"
+                      "      return a.Add.a * 10 + a.Add.b;\n"
+                      "    endfunction\n"
+                      "  endclass\n"
+                      "  C h;\n"
+                      "  int y;\n"
+                      "  initial begin\n"
+                      "    h = new;\n"
+                      "    y = h.f(tagged Add '{3, 4});\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            34u);
+}
+
+// §26.2 (printed page 808) with §8.6 (printed 183): a package's class sees
+// the package's typedefs, and its method is called through a handle a
+// module's procedure declares after `import p::*;`. The package's classes
+// were reached by no item walk either, so `q.sum(tagged Pt '{5, 6})` read 0
+// from the same shape of body where §7.2.1 places 5 and 6, 56.
+TEST(ObjectMethodSim,
+     PackageClassMethodInlineUnionFormalReadsANestedTypedefMember) {
+  EXPECT_EQ(RunAndGet("package p;\n"
+                      "  typedef struct { int x, y; } xy_t;\n"
+                      "  class Geo;\n"
+                      "    function int sum(union tagged { void Nil; xy_t Pt; }"
+                      " v);\n"
+                      "      return v.Pt.x * 10 + v.Pt.y;\n"
+                      "    endfunction\n"
+                      "  endclass\n"
+                      "endpackage\n"
+                      "import p::*;\n"
+                      "module t;\n"
+                      "  int r;\n"
+                      "  initial begin\n"
+                      "    Geo q = new;\n"
+                      "    r = q.sum(tagged Pt '{5, 6});\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "r"),
+            56u);
+}
+
+// §3.12.1 with §8.23 (printed page 200): a class declared outside every
+// design element stands in the compilation-unit scope, and a typedef the
+// class's own body declares stands by its bare name inside the class, so the
+// member `duo_t Two` names the class's typedef, which the unit's table does
+// not hold: a resolution reading that table alone would find no duo_t.
+// `k.m(tagged Two '{7, 8})` reads 78 where the unresolved member read 0.
+TEST(ObjectMethodSim,
+     UnitClassMethodInlineUnionFormalReadsAClassTypedefMember) {
+  EXPECT_EQ(RunAndGet("class K;\n"
+                      "  typedef struct { int hi, lo; } duo_t;\n"
+                      "  function int m(union tagged { void One; duo_t Two; }"
+                      " d);\n"
+                      "    return d.Two.hi * 10 + d.Two.lo;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  K k;\n"
+                      "  int z;\n"
+                      "  initial begin\n"
+                      "    k = new;\n"
+                      "    z = k.m(tagged Two '{7, 8});\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "z"),
+            78u);
+}
+
 }  // namespace

@@ -650,27 +650,6 @@ bool HasInstanceArrayRange(const ModuleItem* item) {  // §28.3.6
   return item->inst_range_left != nullptr && item->inst_range_right != nullptr;
 }
 
-// §13.3 (printed page 337) declares a formal with any data_type, a structure
-// or union written inline in the declaration among them, and §7.2.1 (printed
-// 147) lays such a type out member by member, a member naming a typedef of an
-// aggregate of its own included. The simulator sizes and lays a formal out
-// from the declaration's DataType alone, with no typedef table in reach, and
-// ResolvedAggregateType resolves a variable's or a port's members for it
-// before lowering while a formal's were left as parsed: `pair_t Add` of
-// `function int f(union tagged { void None; pair_t Add; } a)` carried no
-// nested type, so the formal was sized as if the member were a scalar and
-// `a.Add.a` in the body reached no member. Each formal's inline aggregate is
-// resolved in place on the declaration, as the typedef table stands when the
-// declaration is reached; a formal of any other type has no member to
-// resolve, and one resolved by an earlier elaboration of the same
-// declaration resolves to the same types again.
-void ResolveFormalAggregateTypes(ModuleItem* item, const TypedefMap& typedefs,
-                                 Arena& arena) {
-  for (auto& arg : item->func_args) {
-    ResolveNestedAggregateTypes(arg.data_type, typedefs, arena);
-  }
-}
-
 }  // namespace
 
 // The instance range is what makes §28.3.6's widths a question at all, so an
@@ -727,6 +706,11 @@ void Elaborator::ElaborateModuleClassDecl(ModuleItem* item, RtlirModule* mod) {
                                            "::" + std::string(m->name));
     typedefs_[*key] = m->typedef_item->typedef_type;
   }
+  // §13.3 with §7.2.1: the class's methods are reached by no item walk, so
+  // their inline aggregate formals are resolved here, against the module's
+  // typedefs as they stand at the declaration and the class's own (§8.23),
+  // as ElaborateBehavioralItem resolves the module's own subroutines.
+  ResolveClassMethodFormalTypes(item->class_decl, typedefs_, arena_);
 }
 
 // Declarations, types, instances, and structural items (§6, §23, §25, §28).
