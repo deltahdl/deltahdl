@@ -303,6 +303,73 @@ TEST(ClassSim, ModuleClassOutOfBlockStaticFunctionThroughClassScope) {
             5u);
 }
 
+// §8.24: a default argument value is given in the `extern` prototype and may
+// be omitted from the out-of-block declaration; §13.5.3 has a call that omits
+// the argument take that default. The body replacing the prototype must keep
+// the prototype's default, or `c.g()` reads `a` as 0 and answers 10.
+TEST(ClassSim, OutOfBlockVirtualMethodTakesPrototypeDefault) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  int base = 10;\n"
+                      "  extern virtual function int g(int a = 1);\n"
+                      "endclass\n"
+                      "function int C::g(int a);\n"
+                      "  return base + a;\n"
+                      "endfunction\n"
+                      "module t;\n"
+                      "  int r;\n"
+                      "  initial begin\n"
+                      "    C c = new;\n"
+                      "    r = c.g();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "r"),
+            11u);
+}
+
+// §8.24 for the constructor: `new(7)` against `extern function new(int a,
+// int b = 3)` whose out-of-block body names no default leaves `w` 3, not 0.
+TEST(ClassSim, OutOfBlockConstructorTakesPrototypeDefault) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  int v, w;\n"
+                      "  extern function new(int a, int b = 3);\n"
+                      "endclass\n"
+                      "function C::new(int a, int b);\n"
+                      "  v = a * 2;\n"
+                      "  w = b;\n"
+                      "endfunction\n"
+                      "module t;\n"
+                      "  int r;\n"
+                      "  initial begin\n"
+                      "    C c = new(7);\n"
+                      "    r = c.v * 100 + c.w;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "r"),
+            1403u);
+}
+
+// §8.24 and §13.5.3: two trailing defaults in the prototype of a non-virtual
+// method, the call giving the first argument alone; each omitted argument
+// takes its own default, so the sum is 5 + 20 + 300 rather than 5.
+TEST(ClassSim, OutOfBlockMethodTakesPrototypeDefaultsAfterFirstGiven) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  extern function int sum(int a, int b = 20,\n"
+                      "                          int c = 300);\n"
+                      "endclass\n"
+                      "function int C::sum(int a, int b, int c);\n"
+                      "  return a + b + c;\n"
+                      "endfunction\n"
+                      "module t;\n"
+                      "  int r;\n"
+                      "  initial begin\n"
+                      "    C c = new;\n"
+                      "    r = c.sum(5);\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "r"),
+            325u);
+}
+
 TEST(ClassSim, UnresolvedMethodReturnsNull) {
   SimFixture f;
   auto* type = MakeClassType(f, "C", {});

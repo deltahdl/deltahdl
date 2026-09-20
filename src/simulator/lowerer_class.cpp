@@ -111,17 +111,34 @@ static bool IsRealKind(DataTypeKind kind) {
          kind == DataTypeKind::kRealtime;
 }
 
+// §8.24: a default argument value stands in the prototype and may be left out
+// of the out-of-block declaration, which otherwise matches it formal for
+// formal. The body's formals are what a call binds against once the body has
+// replaced the prototype, so each formal the body gives no default takes the
+// prototype's; a default the body repeats is the prototype's own, the
+// elaborator having required the two to be syntactically identical. §13.5.3
+// then has a call omitting the argument evaluate that default.
+static void CarryPrototypeDefaults(const ModuleItem* proto, ModuleItem* body) {
+  if (proto->func_args.size() != body->func_args.size()) return;
+  for (size_t i = 0; i < body->func_args.size(); ++i) {
+    if (body->func_args[i].default_value == nullptr)
+      body->func_args[i].default_value = proto->func_args[i].default_value;
+  }
+}
+
 // §8.24: makes `body`, an out-of-block method definition, the method of `cls`
 // its name selects, in place of the in-class prototype. The definition repeats
 // neither the lifetime nor the static qualifier of the prototype, so the body
 // item parses with is_static false; the static-ness is carried forward from
 // the prototype before the body replaces it, so that a call through the class
-// scope resolution operator of §8.23 still resolves it as static.
+// scope resolution operator of §8.23 still resolves it as static, and so are
+// the prototype's default argument values.
 static void AttachMethodBody(ClassTypeInfo* cls, ModuleItem* body) {
   std::string name(body->name);
   auto existing = cls->methods.find(name);
-  if (existing != cls->methods.end() && existing->second->is_static) {
-    body->is_static = true;
+  if (existing != cls->methods.end()) {
+    if (existing->second->is_static) body->is_static = true;
+    CarryPrototypeDefaults(existing->second, body);
   }
   cls->methods[name] = body;
 }
