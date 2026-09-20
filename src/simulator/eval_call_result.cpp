@@ -23,6 +23,7 @@
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
+#include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
 
 namespace delta {
@@ -251,6 +252,85 @@ Logic4Vec EvalWithReturnedTag(const Expr* expr, SimContext& ctx, Arena& arena,
   return value;
 }
 
+// One step of the walk from an aggregate's layout to the member `seg` names
+// in it: the member's own layout, with `key` -- the tag key of the aggregate,
+// its storage key followed by the path so far -- extended by the member's
+// name. Null where `seg` names no member or a scalar one, and null where the
+// aggregate is a tagged union whose current tag is another member than
+// `seg`, since §11.9 (printed page 304) makes the write inconsistent with the
+// tag a run-time error that the store reports and declines, and a tag set
+// for a member never written would be read against nothing.
+static const StructTypeInfo* DescendToMember(const StructTypeInfo& layout,
+                                             std::string_view seg,
+                                             std::string& key,
+                                             SimContext& ctx) {
+  if (layout.is_union) {
+    std::string_view tag = ctx.GetVariableTag(key);
+    if (!tag.empty() && tag != seg) return nullptr;
+  }
+  const StructFieldInfo* field = FindStructField(&layout, seg);
+  if (field == nullptr) return nullptr;
+  key += '.';
+  key += seg;
+  return field->nested;
+}
+
+// Whether the member access `lhs`, `s.u` or `s.p.u`, names a tagged union
+// member of a variable, and the key that member's tag stands under: the key
+// the variable's storage was created by (TagKeyOfName) followed by the
+// member path, "s.u" for a top-level s and "m.s.u" for one inside instance
+// m, the same shape the layout table gives a nested member's window by. A
+// path a scope resolution starts, a member of a class object and a member no
+// layout answers name no key.
+static bool TaggedUnionMemberKey(const Expr* lhs, SimContext& ctx,
+                                 std::string& key) {
+  if (lhs->kind != ExprKind::kMemberAccess || lhs->is_scope_resolution)
+    return false;
+  std::string name;
+  BuildLhsName(lhs, name);
+  size_t dot = MemberPathSplit(name, ctx);
+  if (dot == std::string::npos) return false;
+  std::string_view base = std::string_view(name).substr(0, dot);
+  std::string_view path = std::string_view(name).substr(dot + 1);
+  const StructTypeInfo* layout = StructLayoutOfName(base, ctx);
+  key = TagKeyOfName(base, ctx);
+  while (layout != nullptr) {
+    size_t seg_end = path.find('.');
+    layout = DescendToMember(*layout, path.substr(0, seg_end), key, ctx);
+    if (seg_end == std::string_view::npos)
+      return layout != nullptr && layout->is_union;
+    path = path.substr(seg_end + 1);
+  }
+  return false;
+}
+
+// §7.3.2 (printed page 151) has a tagged union value carry its tag beside the
+// member's bits, whether the union is a variable or the member of one:
+// `s.u = tagged Valid 9` and `s.u = g()` give s's member u the tag Valid as
+// `u = tagged Valid 9` gives u, and §11.9 (printed 304) checks a later write
+// into that member, `s.u.Other = 3`, against it. The member store takes the
+// bits alone (WriteStructField sees no right-hand expression), so the tag is
+// set here, under the member's own key (TaggedUnionMemberKey), from the
+// member a `tagged M v` names or the one a call's body returned. Every other
+// member target, and every other right-hand side, is evaluated as it was.
+static Logic4Vec EvalRhsForTaggedMember(const Stmt* stmt, SimContext& ctx,
+                                        Arena& arena) {
+  bool is_call = stmt->rhs->kind == ExprKind::kCall;
+  bool is_tagged =
+      stmt->rhs->kind == ExprKind::kTagged && stmt->rhs->rhs != nullptr;
+  std::string key;
+  if ((!is_call && !is_tagged) || !TaggedUnionMemberKey(stmt->lhs, ctx, key))
+    return EvalRhsWithStructContext(stmt, ctx, arena);
+  std::string tag;
+  Logic4Vec value = is_call ? EvalWithReturnedTag(stmt->rhs, ctx, arena, tag)
+                            : EvalRhsWithStructContext(stmt, ctx, arena);
+  if (is_tagged) tag = std::string(stmt->rhs->rhs->text);
+  // The tag table keeps the view it is given, so the key is interned in the
+  // arena rather than left in a string that ends with this statement.
+  if (!tag.empty()) ctx.SetVariableTag(*arena.Create<std::string>(key), tag);
+  return value;
+}
+
 // §7.3.2 (printed page 151) has a tagged union value carry its tag beside
 // the member's bits, §13.4.1 (printed 342) gives the implicit variable of a
 // call the return type, tag included for `return tagged M v`, and §11.9
@@ -261,10 +341,14 @@ Logic4Vec EvalWithReturnedTag(const Expr* expr, SimContext& ctx, Arena& arena,
 // a call's body returned is taken by the same handover a formal's binding
 // takes it (EvalWithReturnedTag), and set where the `u = tagged M v` writer
 // sets it, for a target whose layout is a union; a structure target has no
-// tag, and a select or a member target names no union of its own.
+// tag, a select names no union of its own, and a member target that is a
+// tagged union of a variable's is EvalRhsForTaggedMember's.
 Logic4Vec EvalRhsCarryingReturnedTag(const Stmt* stmt, SimContext& ctx,
                                      Arena& arena) {
-  if (stmt->rhs == nullptr || stmt->rhs->kind != ExprKind::kCall ||
+  if (stmt->rhs == nullptr) return EvalRhsWithStructContext(stmt, ctx, arena);
+  if (stmt->lhs->kind == ExprKind::kMemberAccess)
+    return EvalRhsForTaggedMember(stmt, ctx, arena);
+  if (stmt->rhs->kind != ExprKind::kCall ||
       stmt->lhs->kind != ExprKind::kIdentifier) {
     return EvalRhsWithStructContext(stmt, ctx, arena);
   }

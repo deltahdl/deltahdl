@@ -190,8 +190,8 @@ const EnumTypeInfo* DeclaredNameTables::GetVariableEnumType(
   return FindEnumType(it->second);
 }
 
-static const StructFieldInfo* FindStructField(const StructTypeInfo* info,
-                                              std::string_view name) {
+const StructFieldInfo* FindStructField(const StructTypeInfo* info,
+                                       std::string_view name) {
   for (const auto& f : info->fields) {
     if (f.name == name) return &f;
   }

@@ -71,6 +71,10 @@ struct StructTypeInfo {
   bool is_soft = false;
 };
 
+// §7.2.1: the member of `info` named `name`, or null where it declares none
+// so named.
+const StructFieldInfo* FindStructField(const StructTypeInfo* info,
+                                       std::string_view name);
 // §7.2.1 / §23.6: resolve a (possibly dotted) member path within `info` to the
 // absolute bit offset and width within the base variable, descending through
 // nested struct/union fields. Returns false if any path segment is not a field.

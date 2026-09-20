@@ -238,4 +238,83 @@ TEST(TaggedUnionEval, NonblockingCallResultLandsTheReturnedTag) {
                             12, "11.9"));
 }
 
+// §7.3.2 (printed page 151): a tagged union's value is its tag beside the
+// member's bits wherever the union stands, so `s.u = tagged Valid 9` gives
+// the member u of s the tag Valid with the 9, and §11.9 (printed 304) makes a
+// later write into another member of it, `s.u.Other = 3`, a run-time error
+// that changes nothing. The member store took the bits alone and no tag was
+// kept for a member, so the write into Other went through unreported and the
+// 9 was gone.
+TEST(TaggedUnionEval, TaggedAssignmentToAMemberSetsTheMembersTag) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef union tagged { void Invalid; int Valid; int Other; } u_t;\n"
+      "  typedef struct { u_t u; int c; } s_t;\n"
+      "  s_t s;\n"
+      "  int y, z;\n"
+      "  initial begin\n"
+      "    s.u = tagged Valid 9;\n"
+      "    y = s.u.Valid;\n"
+      "    s.u.Other = 3;\n"
+      "    z = s.u.Valid;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  LowerAndRun(design, f);
+  auto* y = f.ctx.FindVariable("y");
+  ASSERT_NE(y, nullptr);
+  EXPECT_EQ(y->value.ToUint64(), 9u);
+  auto* z = f.ctx.FindVariable("z");
+  ASSERT_NE(z, nullptr);
+  EXPECT_EQ(z->value.ToUint64(), 9u);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "assigning member 'Other' of tagged union 's.u' which currently has "
+      "tag 'Valid'",
+      9, "11.9"));
+}
+
+// §13.4.1 (printed page 342) gives the implicit variable of `g()` the tagged
+// union value g returned, tag included (§7.3.2, printed 151), and `s.u = g()`
+// copies it into the member u of s, tag and bits, so §11.9 (printed 304)
+// reports `s.u.Other = 3` against the Valid the call returned. The returned
+// tag reached a bare variable's target and never a member's.
+TEST(TaggedUnionEval, CallResultAssignedToAMemberSetsTheMembersTag) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef union tagged { void Invalid; int Valid; int Other; } u_t;\n"
+      "  typedef struct { u_t u; int c; } s_t;\n"
+      "  s_t s;\n"
+      "  int y, z;\n"
+      "  function u_t g();\n"
+      "    return tagged Valid 9;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    s.u = g();\n"
+      "    y = s.u.Valid;\n"
+      "    s.u.Other = 3;\n"
+      "    z = s.u.Valid;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  LowerAndRun(design, f);
+  auto* y = f.ctx.FindVariable("y");
+  ASSERT_NE(y, nullptr);
+  EXPECT_EQ(y->value.ToUint64(), 9u);
+  auto* z = f.ctx.FindVariable("z");
+  ASSERT_NE(z, nullptr);
+  EXPECT_EQ(z->value.ToUint64(), 9u);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "assigning member 'Other' of tagged union 's.u' which currently has "
+      "tag 'Valid'",
+      12, "11.9"));
+}
+
 }  // namespace

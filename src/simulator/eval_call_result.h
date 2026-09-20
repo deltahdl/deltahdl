@@ -107,10 +107,14 @@ Logic4Vec EvalWithReturnedTag(const Expr* expr, SimContext& ctx, Arena& arena,
 // the member that expression named, since the tag travels beside the bits
 // the call hands back and no vector carries it. The tag stands under the key
 // the target's storage was created by (TagKeyOfName), which a `u = tagged M
-// v` writes and every member read of u checks against. A call that returned
-// anything else, and every other right-hand side, leaves the target's tag as
-// it was. Shared by the procedural and the subroutine-body executors of the
-// blocking assignment, which §10.4 gives one set of assignments.
+// v` writes and every member read of u checks against. Where the target is
+// a member of a variable that is itself a tagged union, `s.u`, the member's
+// tag is set under the variable's key followed by the member path, "s.u",
+// from a `tagged M v` right-hand side or a call's returned tag alike, since
+// the member store sees the bits alone. A call that returned anything else,
+// and every other right-hand side, leaves the target's tag as it was. Shared
+// by the procedural and the subroutine-body executors of the blocking
+// assignment, which §10.4 gives one set of assignments.
 Logic4Vec EvalRhsCarryingReturnedTag(const Stmt* stmt, SimContext& ctx,
                                      Arena& arena);
 
