@@ -375,7 +375,7 @@ void Elaborator::ElaborateParamPortList(const ModuleDecl* decl,
   // The instantiating module is the one registered here, from the item loop
   // this instantiation is an item of, and its parameters are what the
   // assignments' expressions name.
-  const InstanceParamAssignments assigns{params, RegisteredModuleScope()};
+  const InstanceParamAssignments kAssigns{params, RegisteredModuleScope()};
   for (size_t i = 0; i < decl->params.size(); ++i) {
     const auto& [pname, pval] = decl->params[i];
     auto scope = BuildParamScope(mod);
@@ -385,7 +385,7 @@ void Elaborator::ElaborateParamPortList(const ModuleDecl* decl,
         decl, i, {typedefs_, scope, real_param_names_}, has_param_type);
     const DataType* param_type =
         has_param_type ? &decl->param_types[i] : nullptr;
-    ApplyParamOverride(pd, assigns, pname, param_type, arena_);
+    ApplyParamOverride(pd, kAssigns, pname, param_type, arena_);
     if (!pd.is_resolved && pval) {
       bool refers_to_unbounded = pval->kind == ExprKind::kIdentifier &&
                                  RefersToUnboundedParam(mod, pval->text);
