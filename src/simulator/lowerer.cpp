@@ -843,12 +843,17 @@ void Lowerer::Lower(const RtlirDesign* design) {
   // ahead of any lowering so a top's declaration initializer can already
   // name another top.
   for (auto* top : design->top_modules) ctx_.RegisterTopModule(top->name);
+  // §26.2 with §6.21: the packages' and the unit's objects exist before the
+  // first module's declaration initializer runs (lowerer_data_init.cpp).
+  ConstructDesignData();
   for (auto* mod : design->top_modules) {
     LowerModule(mod);
   }
-  LowerUnimportedPackageClasses();
+  // §26.3: the bare names of the package classes no scope had bound, held
+  // back while the modules bound their own, and the typedef names that
+  // denote one of them (§6.18), bound once the modules are lowered.
+  RebindStrayPackageClassNames();
   RegisterClassTypeAliases(design, ctx_);
-  ConstructDataClassInitializers(design, ctx_, arena_);
 
   AttachDesignClocking();
 

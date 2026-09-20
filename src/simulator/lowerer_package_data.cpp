@@ -597,13 +597,19 @@ static void ConstructScopeClassInits(const std::vector<ModuleItem*>& items,
 
 void ConstructDataClassInitializers(const RtlirDesign* design, SimContext& ctx,
                                     Arena& arena) {
-  // §26.2 with §3.12.1: a package's classes are lowered after every module
-  // (Lowerer::LowerUnimportedPackageClasses, the imports having lowered
-  // some earlier) and the unit's before them (LowerCompilationUnitClasses),
-  // so the constructions wait for both rather than running with the other
-  // initializers, ahead of which no class of either scope was lowered and
-  // EvalClassNew found none; the packages' first, the unit's after, in the
-  // order the initializers were made.
+  // §26.2 with §3.12.1: a package's classes are lowered after the packages'
+  // and the unit's other initializers (Lowerer::LowerUnimportedPackageClasses,
+  // the imports having lowered some earlier) and the unit's after the unit's
+  // initializers (LowerCompilationUnitClasses), so the constructions wait
+  // for both rather than running with the other initializers, ahead of
+  // which no class of either scope was lowered and EvalClassNew found none;
+  // the packages' first, the unit's after, in the order the initializers
+  // were made. §6.21 (printed pages 132-133): a module's variable is
+  // initialized at its declaration, ahead of the module's procedures, so the
+  // constructions run before any module is lowered
+  // (Lowerer::ConstructDesignData in lowerer_data_init.cpp); run after the
+  // modules, they came after a module's `int y = p1::b.get_n();`, which
+  // called the method on a null handle.
   for (auto* pkg : design->packages)
     ConstructScopeClassInits(pkg->items, pkg->name, ctx, arena);
   if (design->compilation_unit == nullptr) return;

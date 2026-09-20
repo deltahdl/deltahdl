@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -872,9 +873,60 @@ void Lowerer::LowerUnimportedClassesOf(const PackageDecl* pkg) {
   for (const auto& [name, held] : displaced) ctx_.RegisterClassType(name, held);
 }
 
+// The bare names of the packages' classes that no scope has bound when the
+// packages' classes are lowered: not a unit class's
+// (LowerCompilationUnitClasses binds those first) and not one a unit import
+// brought in (LowerCompilationUnitImports), each once.
+static std::vector<std::string_view> UnboundPackageClassNames(
+    const RtlirDesign* design, SimContext& ctx) {
+  std::vector<std::string_view> names;
+  for (const auto* pkg : design->packages) {
+    for (const auto* item : pkg->items) {
+      if (item->kind != ModuleItemKind::kClassDecl || !item->class_decl)
+        continue;
+      std::string_view name = item->class_decl->name;
+      bool seen = std::find(names.begin(), names.end(), name) != names.end();
+      if (!seen && ctx.FindClassType(name) == nullptr) names.push_back(name);
+    }
+  }
+  return names;
+}
+
+// §26.2 (printed page 808) with §6.21 (printed 132-133): a package's
+// declaration assignments, its `C h = new;` among them, are made before any
+// procedure starts, and a module's variable is initialized at its declaration,
+// ahead of the module's own procedures, so a module's `int y = p1::b.get_n();`
+// reads the object the package's initializer constructed; the packages'
+// classes are therefore lowered here, ahead of every module, for
+// ConstructDataClassInitializers (lowerer_package_data.cpp) to construct
+// them by. Lowered after the modules, as they were, the construction came
+// after the module's initializer, which ran on a null handle. §26.3
+// (printed 810): a package's class is visible in a module by import or
+// through `p1::C` alone, so a bare name nothing had bound before this pass
+// is given back to no class when the pass is done -- bound to the package's
+// class, it took the bare name from a module's later import of another
+// package's like-named class (LowerPackageItem keeps a bound bare name) --
+// and is bound to the class again once the modules are lowered
+// (RebindStrayPackageClassNames), the state the pass left behind when it
+// ran after them, which a module's `p1::C h; initial h = new` relies on, the
+// elaborator naming the class by its bare name (SetVariableTypeInfo in
+// src/elaborator/elaborator_decls.cpp). A name a unit class or a unit
+// import held keeps its holder, as LowerUnimportedClassesOf gives it back.
 void Lowerer::LowerUnimportedPackageClasses() {
   if (!design_) return;
+  std::vector<std::string_view> unbound =
+      UnboundPackageClassNames(design_, ctx_);
   for (const auto* pkg : design_->packages) LowerUnimportedClassesOf(pkg);
+  for (std::string_view name : unbound) {
+    stray_package_class_names_.emplace_back(name, ctx_.FindClassType(name));
+    ctx_.RegisterClassType(name, nullptr);
+  }
+}
+
+void Lowerer::RebindStrayPackageClassNames() {
+  for (const auto& [name, info] : stray_package_class_names_) {
+    if (ctx_.FindClassType(name) == nullptr) ctx_.RegisterClassType(name, info);
+  }
 }
 
 }  // namespace delta

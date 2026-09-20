@@ -4,6 +4,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "common/types.h"
@@ -27,6 +28,7 @@ struct RtlirProcess;
 struct AssocArrayObject;
 struct QueueObject;
 struct ClassDecl;
+struct ClassTypeInfo;
 struct Expr;
 struct RtlirModuleInst;
 struct RtlirPortBinding;
@@ -141,19 +143,27 @@ class Lowerer {
   // (InitCompilationUnitData) for the reason given at the definition. Defined
   // in lowerer.cpp.
   void LowerCompilationUnitClasses();
-  // The two steps of the design's data, each defined in
+  // The three steps of the design's data, each defined in
   // src/simulator/lowerer_data_init.cpp with the order it keeps: the type
   // names and the packages' and the unit's storage, the packages'
-  // initializers with them; then the unit's imports and its initializers.
+  // initializers with them; then the unit's imports and its initializers;
+  // then, once every class of the packages and the unit is lowered and ahead
+  // of every module, the objects the two scopes' declaration assignments
+  // construct.
   void LowerDesignData();
   void InitCompilationUnitData();
+  void ConstructDesignData();
   // §26.3: `p::C` reaches a package's class whether or not the package was
   // imported, so every package class no import has lowered is lowered here and
-  // bound under its qualified key, after the modules so that no unqualified
-  // binding an import or a declaration made is displaced by it. Defined in
-  // lowerer_import.cpp.
+  // bound under its qualified key, ahead of the modules (§26.2 has the
+  // package's declaration assignments, which construct objects of them, made
+  // before a module's) and displacing no unqualified binding an import or a
+  // declaration made: a bare name nothing held is left unbound until the
+  // modules are lowered and RebindStrayPackageClassNames binds it to the
+  // class. Defined in lowerer_import.cpp.
   void LowerUnimportedPackageClasses();
   void LowerUnimportedClassesOf(const PackageDecl* pkg);
+  void RebindStrayPackageClassNames();
   // Lowers the class `cls` that package `pkg` declares and binds it under
   // "pkg::name" as well as under the bare name LowerClassDecl gives it, once:
   // a second call for the same class finds the qualified key and does nothing,
@@ -254,6 +264,11 @@ class Lowerer {
   std::string_view import_scope_prefix_;
   std::vector<SpecifyScope> specify_scopes_;
   std::vector<AssertionSampleScope> assertion_sample_scopes_;
+  // The bare class names LowerUnimportedPackageClasses found no scope had
+  // bound, each with the package class the pass bound it to, which
+  // RebindStrayPackageClassNames binds again once the modules are lowered.
+  std::vector<std::pair<std::string_view, ClassTypeInfo*>>
+      stray_package_class_names_;
 };
 
 }  // namespace delta

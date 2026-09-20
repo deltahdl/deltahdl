@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <string>
+
 #include "helpers_scheduler.h"
 
 using namespace delta;
@@ -131,6 +134,67 @@ TEST(PackageImportSim, PackageSemaphoreKeyCountReadsThePackagesOwnParameter) {
                       "endmodule\n",
                       "y"),
             11u);
+}
+
+// A design whose package p1 declares the class B, with `int n = 7` and
+// get_n() reading it, and constructs `B b = new;` as its own declaration
+// assignment, followed by `module_items` as the body of a module top, the
+// last of which declares y at its declaration; answers y at time 0.
+static uint64_t ModuleInitializerRead(const std::string& module_items) {
+  return RunAndGet(
+      "package p1;\n"
+      "  class B;\n"
+      "    int n = 7;\n"
+      "    function int get_n();\n"
+      "      return n;\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "  B b = new;\n"
+      "endpackage\n"
+      "module top;\n" +
+          module_items + "endmodule\n",
+      "y");
+}
+
+// §26.2 (printed page 808) with §6.21 (printed 132-133): a package's `B b =
+// new;` is made before any procedure starts, and a module's `int y =
+// p1::b.get_n();` is initialized at its declaration, ahead of the module's
+// own procedures, so y reads 7 through the package's object. The package's
+// constructions ran after the modules were lowered
+// (ConstructDataClassInitializers after LowerModule), so the module's
+// initializer called get_n() on a null handle and y read 0.
+TEST(PackageImportSim,
+     ModuleInitializerReadsAPackageHandleThroughTheQualifier) {
+  EXPECT_EQ(ModuleInitializerRead("  int y = p1::b.get_n();\n"), 7u);
+}
+
+// The same through the module's own wildcard import (§26.3, printed page
+// 810), the property read bare: `int y = b.n;` reads 7 from the object the
+// package constructed; a null b read 0.
+TEST(PackageImportSim, ModuleInitializerReadsAnImportedPackageHandle) {
+  EXPECT_EQ(ModuleInitializerRead("  import p1::*;\n"
+                                  "  int y = b.n;\n"),
+            7u);
+}
+
+// §3.12.1 (printed page 56) with §26.2 and §6.21: the compilation unit's
+// `B ub = new;` outside every module is made before any procedure starts,
+// as a package's is, so a module's `int y = ub.get_n();` reads 7 through the
+// unit's object at its declaration. The unit's constructions ran after the
+// modules as the packages' did, so y read 0.
+TEST(PackageImportSim, ModuleInitializerReadsAUnitHandle) {
+  EXPECT_EQ(RunAndGet("class B;\n"
+                      "  int n = 7;\n"
+                      "  function int get_n();\n"
+                      "    return n;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "B ub = new;\n"
+                      "module top;\n"
+                      "  int y = ub.get_n();\n"
+                      "endmodule\n",
+                      "y"),
+            7u);
 }
 
 }  // namespace

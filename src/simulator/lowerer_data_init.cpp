@@ -4,7 +4,8 @@
 // assignments made before any initial or always procedure starts, as a
 // compilation unit's are, §3.12.1 (printed 56) has a module's reference
 // searched for in the unit's scope, the names its imports make visible
-// included. Moved out of lowerer.cpp, which stood at the size the
+// included, and §6.21 (printed 132-133) has a module's own variable initialized
+// at its declaration. Moved out of lowerer.cpp, which stood at the size the
 // assert-no-oversized-source-files job fails at, as the order grew its
 // steps.
 
@@ -79,6 +80,24 @@ void Lowerer::LowerDesignData() {
 void Lowerer::InitCompilationUnitData() {
   LowerCompilationUnitImports();
   InitUnitDataVariables(design_, ctx_, arena_);
+}
+
+// §26.2 (printed page 808) with §6.21 (printed 132-133): the objects the
+// packages' and the unit's `C h = new;` declaration assignments construct
+// exist before any module's variable is initialized at its declaration, so
+// a module's `int y = p1::b.get_n();` reads the package's object. The
+// packages' classes are lowered for it here (LowerUnimportedPackageClasses,
+// lowerer_import.cpp), the unit's having been lowered by
+// LowerCompilationUnitClasses, and the typedef names that denote a class
+// (§6.18) are bound so a variable declared by one constructs; the names a
+// package class leaves unbound until the modules are lowered are bound
+// again by RebindStrayPackageClassNames. Constructed after the modules, as
+// they were, the package's object was made after the module's initializer
+// had called a method on a null handle.
+void Lowerer::ConstructDesignData() {
+  LowerUnimportedPackageClasses();
+  RegisterClassTypeAliases(design_, ctx_);
+  ConstructDataClassInitializers(design_, ctx_, arena_);
 }
 
 }  // namespace delta
