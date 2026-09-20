@@ -390,4 +390,145 @@ TEST(TaskSim, FunctionCalledByHierarchicalNameReadsTheChildInstance) {
   EXPECT_EQ(val, 42u);
 }
 
+// §13.3 (printed page 335): a task may enable another task, which may enable
+// still others, and control does not return to the enabling process until
+// every task it enabled has completed; §8.13 (printed 190) lets a method
+// name a method of its own class bare, on the object it runs on. `go(d)`
+// enabled from inside `viabare`, itself enabled through the handle, was
+// handed to the synchronous function interpreter, which ran the property
+// write and dropped the `#d`, so the enable from the initial returned at 0
+// with v already 1: the time reads 5 and the property 1, packed as 51 where
+// the defect read 1.
+TEST(TaskSim, ClassTaskEnabledByItsBareNameFromATaskConsumesItsDelay) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  logic [31:0] x;\n"
+      "  class C;\n"
+      "    int v;\n"
+      "    task go(int d);\n"
+      "      #d;\n"
+      "      v = v + 1;\n"
+      "    endtask\n"
+      "    task viabare(int d);\n"
+      "      go(d);\n"
+      "    endtask\n"
+      "  endclass\n"
+      "  initial begin\n"
+      "    C c = new;\n"
+      "    c.viabare(5);\n"
+      "    x = $time * 10 + c.v;\n"
+      "  end\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(val, 51u);
+}
+
+// §8.11 (printed page 187) has `this` denote the object the method was
+// invoked on, so `this.go(d)` is the bare `go(d)` with its receiver written,
+// and §13.3 has the enable return after the callee's delay. A second enable
+// after the bare one reads 10 and a property of 2, packed as 102; the delay
+// dropped in either enable reads a smaller time, and a write lost through
+// the receiver reads 1.
+TEST(TaskSim, ClassTaskEnabledThroughThisFromATaskConsumesItsDelay) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  logic [31:0] x;\n"
+      "  class C;\n"
+      "    int v;\n"
+      "    task go(int d);\n"
+      "      #d;\n"
+      "      v = v + 1;\n"
+      "    endtask\n"
+      "    task viabare(int d);\n"
+      "      go(d);\n"
+      "    endtask\n"
+      "    task viathis(int d);\n"
+      "      this.go(d);\n"
+      "    endtask\n"
+      "  endclass\n"
+      "  initial begin\n"
+      "    C c = new;\n"
+      "    c.viabare(5);\n"
+      "    c.viathis(5);\n"
+      "    x = $time * 10 + c.v;\n"
+      "  end\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(val, 102u);
+}
+
+// §8.15 (printed page 191): `super.go(d)` in a derived class's task names the
+// base class's `go`, the one the derived `go` overrides, and §13.3 has the
+// derived task go on only when that enable has completed. The base body
+// waits `d` and adds 1; the override adds 10 with no wait. The direct enable
+// through the derived handle reads the override, and `viasuper` after it
+// reads the base's: time 5 and property 11, packed as 61. Dispatch through
+// the object's class would add 10 more and wait nothing, 21; the base body
+// run without its delay reads 11.
+TEST(TaskSim, BaseClassTaskEnabledThroughSuperFromATaskConsumesItsDelay) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  logic [31:0] x;\n"
+      "  class Base;\n"
+      "    int v;\n"
+      "    task go(int d);\n"
+      "      #d;\n"
+      "      v = v + 1;\n"
+      "    endtask\n"
+      "  endclass\n"
+      "  class Der extends Base;\n"
+      "    task go(int d);\n"
+      "      v = v + 10;\n"
+      "    endtask\n"
+      "    task viasuper(int d);\n"
+      "      super.go(d);\n"
+      "    endtask\n"
+      "  endclass\n"
+      "  initial begin\n"
+      "    Der d = new;\n"
+      "    d.go(5);\n"
+      "    d.viasuper(5);\n"
+      "    x = $time * 10 + d.v;\n"
+      "  end\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(val, 61u);
+}
+
+// §9.3.2 (printed page 226) with §8.15: a `fork ... join` in the base task
+// reached through `super.run()` joins before the statement after it runs, and
+// the derived task goes on only then. The branch's write at time 2 is read
+// after the join, so the base packs 3 * 10 + 2 = 32 into the property and the
+// derived task reads time 2: 2 * 100 + 32 = 232. A base body never run reads
+// 0, and a join that does not wait reads 0 * 10 + 0 with the derived at 0.
+TEST(TaskSim, BaseClassTaskWithAForkJoinEnabledThroughSuperJoinsFirst) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  logic [31:0] x;\n"
+      "  class Base;\n"
+      "    int v;\n"
+      "    task run;\n"
+      "      int r;\n"
+      "      fork\n"
+      "        #2 r = 3;\n"
+      "        #1;\n"
+      "      join\n"
+      "      v = r * 10 + $time;\n"
+      "    endtask\n"
+      "  endclass\n"
+      "  class Der extends Base;\n"
+      "    task run;\n"
+      "      super.run();\n"
+      "      x = $time * 100 + v;\n"
+      "    endtask\n"
+      "  endclass\n"
+      "  initial begin\n"
+      "    Der d = new;\n"
+      "    d.run();\n"
+      "  end\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(val, 232u);
+}
+
 }  // namespace

@@ -47,6 +47,53 @@ static bool ResolveStaticTaskByScope(const Expr* expr, SimContext& ctx,
   return true;
 }
 
+// §8.13 with §8.20: the method `name` names on the running object, written
+// bare inside a method of the object's class -- the object's own class
+// through the vtable first, then the walk from the lexically enclosing class
+// up its base chain, the two-step the receiver-qualified call takes. False
+// outside an instance method.
+static bool ResolveMethodOnRunningObject(std::string_view name, SimContext& ctx,
+                                         InstanceMethodInfo& call) {
+  ClassObject* self = ctx.CurrentThis();
+  if (self == nullptr) return false;
+  const ClassTypeInfo* enclosing = ctx.CurrentMethodClass();
+  if (enclosing == nullptr) enclosing = self->type;
+  call.obj = self;
+  call.method = self->ResolveVirtualMethod(name, &call.owner);
+  if (call.method == nullptr) {
+    call.method = self->ResolveMethodForType(name, enclosing, &call.owner);
+  }
+  return call.method != nullptr;
+}
+
+// §8.15: `super.m` names the base class's m from inside a derived class, the
+// one the derived class overrides included, so the walk starts at the parent
+// of the lexically enclosing class and takes no virtual dispatch, which would
+// land back on the override. The body runs on the same object. False outside
+// an instance method of a derived class.
+static bool ResolveMethodThroughSuper(std::string_view name, SimContext& ctx,
+                                      InstanceMethodInfo& call) {
+  ClassObject* self = ctx.CurrentThis();
+  if (self == nullptr) return false;
+  const ClassTypeInfo* enclosing = ctx.CurrentMethodClass();
+  if (enclosing == nullptr) enclosing = self->type;
+  if (enclosing == nullptr || enclosing->parent == nullptr) return false;
+  call.obj = self;
+  call.method =
+      self->ResolveMethodForType(name, enclosing->parent, &call.owner);
+  return call.method != nullptr;
+}
+
+// The method `h.m` names: the base class's through `super` (§8.15), or
+// ResolveInstanceMethod's answer for `this` and for a handle.
+static bool ResolveMethodByParts(const MethodCallParts& parts, SimContext& ctx,
+                                 InstanceMethodInfo& call) {
+  if (parts.var_name == "super") {
+    return ResolveMethodThroughSuper(parts.method_name, ctx, call);
+  }
+  return ResolveInstanceMethod(parts, ctx, call);
+}
+
 // §13.5.5: the method a statement names without the parentheses. `h.m` is a
 // member access of two identifiers, resolved on the handle's object as the
 // call `h.m(...)` is; a bare `m` inside an instance method is a method of the
@@ -59,31 +106,33 @@ static bool ResolveMethodNamedBare(const Expr* expr, SimContext& ctx,
       expr->lhs != nullptr && expr->lhs->kind == ExprKind::kIdentifier &&
       expr->rhs != nullptr && expr->rhs->kind == ExprKind::kIdentifier) {
     MethodCallParts parts{expr->lhs->text, expr->rhs->text};
-    return ResolveInstanceMethod(parts, ctx, call);
+    return ResolveMethodByParts(parts, ctx, call);
   }
   if (expr->kind != ExprKind::kIdentifier) return false;
-  ClassObject* self = ctx.CurrentThis();
-  const ClassTypeInfo* enclosing = ctx.CurrentMethodClass();
-  if (self == nullptr || enclosing == nullptr) return false;
-  call.obj = self;
-  call.method = self->ResolveVirtualMethod(expr->text, &call.owner);
-  if (call.method == nullptr) {
-    call.method =
-        self->ResolveMethodForType(expr->text, enclosing, &call.owner);
-  }
-  return call.method != nullptr;
+  return ResolveMethodOnRunningObject(expr->text, ctx, call);
 }
 
 // The method a statement's expression calls on an object: `h.m(...)` through
-// the handle, or the parenthesis-free forms above.
+// the handle, `this.m(...)` and `super.m(...)`, the parenthesis-free forms
+// above, or a bare `m(...)` inside a method of the object's class (§8.13).
+// §13.3 has a task enable other tasks and return only when they have
+// completed, so the bare and the `super` forms are resolved here for the
+// coroutine path as the handle form is; left to the expression evaluator,
+// `go(d)` and `super.go(d)` inside a class task ran through the synchronous
+// function interpreter, which wrote the property and dropped the `#d`, and
+// the enable from the initial returned at time 0.
 static bool ResolveMethodOfStatement(const Expr* expr, SimContext& ctx,
                                      InstanceMethodInfo& call) {
   if (expr->kind != ExprKind::kCall) {
     return ResolveMethodNamedBare(expr, ctx, call);
   }
+  if (expr->lhs != nullptr && expr->lhs->kind == ExprKind::kIdentifier &&
+      !expr->callee.empty()) {
+    return ResolveMethodOnRunningObject(expr->callee, ctx, call);
+  }
   MethodCallParts parts;
   return ExtractMethodCallParts(expr, parts) &&
-         ResolveInstanceMethod(parts, ctx, call);
+         ResolveMethodByParts(parts, ctx, call);
 }
 
 bool SetupInstanceTaskCall(const Expr* expr, SimContext& ctx, Arena& arena,
