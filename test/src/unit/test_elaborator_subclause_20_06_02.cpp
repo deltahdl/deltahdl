@@ -4,6 +4,7 @@
 #include "fixture_elaborator.h"
 #include "fixture_evaluator.h"
 #include "helpers_reported_error.h"
+#include "helpers_rtlir_lookup.h"
 
 using namespace delta;
 
@@ -279,6 +280,117 @@ TEST(BitsCallRestrictions, BitsOnQueueTypedefInARandsequenceCodeBlockIsError) {
       f.diag.Diagnostics(),
       "'$bits' cannot be applied directly to dynamically sized type 'qt'", 6,
       "20.6.2"));
+}
+
+// §20.6.2 (printed page 629) has $bits answer the number of bits an
+// expression holds and lets a fixed-size answer stand as an elaboration-time
+// constant, and §6.20.2 (printed page 126) gives a parameter declared with a
+// range the range of its declaration. So $bits of a parameter declared
+// `logic [95:0]` is 96, and a localparam set to it resolves at elaboration
+// with that value, where a fold that sized literals and type keywords alone
+// left the localparam with no value at all -- is_resolved false on its
+// declaration.
+TEST(BitsOfDeclaration, RangedParameterAnswersItsDeclaredWidth) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  localparam logic [95:0] P = 96'h0123_4567_89AB_CDEF_0011_2233;\n"
+      "  localparam int W = $bits(P);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* w = FindParam(design, "m", "W");
+  ASSERT_NE(w, nullptr);
+  EXPECT_TRUE(w->is_resolved);
+  EXPECT_EQ(w->resolved_value, 96);
+}
+
+// §6.20.2 (printed page 126): a parameter declared with a type and no range is
+// of that type, so `localparam int N = 5` holds int's 32 bits whatever its
+// value needs -- 5 fits in 3 bits, which is the answer a fold sizing the value
+// rather than the declaration would give.
+TEST(BitsOfDeclaration, TypedParameterAnswersItsTypeWidth) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  localparam int N = 5;\n"
+      "  localparam int BN = $bits(N);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* bn = FindParam(design, "m", "BN");
+  ASSERT_NE(bn, nullptr);
+  EXPECT_TRUE(bn->is_resolved);
+  EXPECT_EQ(bn->resolved_value, 32);
+}
+
+// §6.20.2 (printed page 127): a parameter declared with neither type nor range
+// takes an implied range from the size of the final value assigned to it, and
+// at least 32 bits when that value is unsized. The clause's own examples set
+// `newconst = 3'h4` to [2:0] and `newconst = 4` to at least [31:0], so a sized
+// literal of 8 bits gives 8 and an unsized decimal gives 32.
+TEST(BitsOfDeclaration, ImplicitParameterAnswersItsValueWidth) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  localparam Q = 8'hFF;\n"
+      "  localparam R = 100;\n"
+      "  localparam int BQ = $bits(Q);\n"
+      "  localparam int BR = $bits(R);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* bq = FindParam(design, "m", "BQ");
+  ASSERT_NE(bq, nullptr);
+  EXPECT_TRUE(bq->is_resolved);
+  EXPECT_EQ(bq->resolved_value, 8);
+  const auto* br = FindParam(design, "m", "BR");
+  ASSERT_NE(br, nullptr);
+  EXPECT_TRUE(br->is_resolved);
+  EXPECT_EQ(br->resolved_value, 32);
+}
+
+// §20.6.2 (printed page 629) lets the constant $bits folds to size the
+// declaration of another variable, its own example being a typedef of
+// `bit [$bits(MyType):1]`. A variable whose packed range is written in terms
+// of $bits of a 96-bit parameter is 96 bits wide, and not the 1 bit a range
+// with an unfolded bound falls back to.
+TEST(BitsOfDeclaration, ParameterWidthSizesAVariable) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  localparam logic [95:0] P = 96'h0123_4567_89AB_CDEF_0011_2233;\n"
+      "  logic [$bits(P)-1:0] v;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* v = FindVar(design, "m", "v");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->width, 96u);
+}
+
+// §20.6.2 (printed page 629) opens with `logic [31:0] v` and has $bits(v)
+// answer 32, the bits the declaration gives the variable. A variable the
+// module has already elaborated carries that width, so a localparam set to
+// $bits of a 16-bit variable resolves to 16 at elaboration.
+TEST(BitsOfDeclaration, VariableAnswersItsDeclaredWidth) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic [15:0] x;\n"
+      "  localparam int BX = $bits(x);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* bx = FindParam(design, "m", "BX");
+  ASSERT_NE(bx, nullptr);
+  EXPECT_TRUE(bx->is_resolved);
+  EXPECT_EQ(bx->resolved_value, 16);
 }
 
 }  // namespace
