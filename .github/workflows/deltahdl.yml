@@ -1231,14 +1231,23 @@ jobs:
     # were compiled once per shard a run and stored once per shard in the cache.
     # Compile them once here and hand the shards the object tree.
     #
-    # 284 instrumented src/ objects measure ~70 MB, a quarter of a megabyte
-    # apiece, so this asks for the same 200M the other single-build jobs use. The
-    # 400M it was first given reported "Cache size (GB): 0.1 / 0.4 (17.50%)" --
-    # five times the space it needs, held against a quota the whole repository
-    # shares.
+    # The cache is not capped while the build runs and is trimmed after it,
+    # as the coverage shards do it. Under the 200M this job carried as its
+    # CCACHE_MAXSIZE, sized when the library was 284 objects at a quarter of a
+    # megabyte apiece, run 35657769589 restored the entry saved at 561cc0211,
+    # a commit no C++ file had changed since, and still reported 161 misses
+    # of 518 with 99 cleanups and the cache at 99.76% of the cap: the
+    # instrumented library no longer fits, so every run evicted a third of it
+    # during the build and compiled that third again, 188 of the build step's
+    # 201 seconds. Level 10 is the compression the shards measured as costing
+    # nothing over ccache's own level and leaving a slice fifteen percent
+    # smaller; the 517 Debug objects of the library compress to 298 MiB at
+    # ccache's own level and 237 MiB at level 10 before instrumentation, and
+    # the trim below is what caps the cache.
     env:
+      CCACHE_COMPRESSLEVEL: '10'
       CCACHE_DIR: ${{ github.workspace }}/.ccache
-      CCACHE_MAXSIZE: 200M
+      CCACHE_MAXSIZE: '0'
     needs: [cache-googletest]
     # The major this job installed, published so unit-test-coverage installs
     # the same one. .github/actions/install-llvm floats to the newest stable
@@ -1328,22 +1337,45 @@ jobs:
       # itself costs.
       - name: Report free space after the build
         run: df -h /
-      # ccache evicts only on the path that stores a new object, so a job that
-      # got a hit for every compilation never applies CCACHE_MAXSIZE at all: it
-      # restores whatever the last run saved, adds nothing, and saves the lot
-      # back. This job is the clearest case of it, reporting 284 hits out of 284
-      # cacheable calls once warm, and a cap that binds only when something
-      # misses is not a cap. The cache quota is shared across the whole
-      # repository, so evict explicitly here and let the entry this job saves
-      # honour its configured size either way. Cleanup leaves the hit and miss
-      # counters alone, so the report below still describes this build while the
-      # size it prints is the size that actually gets saved.
+      # The size the build left, which is what the cap below has to cover: the
+      # whole library at level 10 plus the earlier versions of whatever changed
+      # since the restored entry was saved. The du after the trim reports the
+      # cap, so the difference between the two is what the trim evicted, and
+      # what it evicts is what the next run misses.
+      - name: Report the ccache size the build left
+        run: du -sk "$CCACHE_DIR"
+      # This step is the only thing that caps the cache, the build above having
+      # run under the job's CCACHE_MAXSIZE of 0, ccache's spelling of no limit.
+      # Evicting here rather than during the build spares the build the objects
+      # it would otherwise drop before compiling them. Leaving it to ccache
+      # would also cap nothing on the runs that matter most: ccache evicts only
+      # on the path that stores a new object, so a job that got a hit for every
+      # compilation never applies the cap at all and saves the lot back over
+      # it. The cache quota is shared across the whole repository, so evict
+      # explicitly here. Cleanup leaves the hit and miss counters alone, so the
+      # report below still describes this build while the size it prints is the
+      # size that gets saved.
+      #
+      # 300M is a figure to be replaced by a reading: the size the build left,
+      # reported above on a run whose tree the restored entry already held,
+      # plus the fifteen percent the shards allow, is the cap the library
+      # needs, and it is not known until that run has been read.
+      #
+      # export rather than an env: block on the step, because the job sets
+      # CCACHE_MAXSIZE and a value written into the environment by a step does
+      # not override the job's.
       - name: Trim ccache to its size limit
-        run: ccache --cleanup
+        run: |
+          export CCACHE_MAXSIZE=300M
+          ccache --cleanup
       # The hit rate decides whether the job rebuilds from scratch, so record it
-      # rather than inferring it from the build duration.
+      # rather than inferring it from the build duration. du reports the size
+      # because ccache -s rounds it to a tenth of a GiB and prints no
+      # percentage under a CCACHE_MAXSIZE of 0.
       - name: Report ccache statistics
-        run: ccache -s
+        run: |
+          ccache -s
+          du -sk "$CCACHE_DIR"
       # The tree travels as a tar because actions/upload-artifact uploads a set
       # of files and so carries no empty directory, and a configured tree is
       # full of them: one object output directory per target nobody has built
