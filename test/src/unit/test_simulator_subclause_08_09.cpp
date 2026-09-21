@@ -281,7 +281,7 @@ TEST(StaticClassPropertySim, StaticQueuePropertyPushedFromConstructors) {
             25u);
 }
 
-// §8.9 (printed page 186 of ~/IEEE 1800-2023.pdf) reaches a static property
+// §8.9 (printed page 186 of IEEE 1800-2023) reaches a static property
 // through the class scope resolution operator, and §26.3 (printed 808) reaches
 // a package's class through the package scope resolution operator, so
 // `pk::Cfg::depth` is the static property of the package's class -- the same

@@ -286,7 +286,7 @@ TEST(LoopSyntaxParsing, ForeachArrayNameStartsAtItsRoot) {
 }
 
 // A.9.3's hierarchical_identifier is `{ identifier constant_bit_select . }
-// identifier` (printed page 1214 of ~/IEEE 1800-2023.pdf), so the array a
+// identifier` (printed page 1214 of IEEE 1800-2023), so the array a
 // foreach names may select an element before each `.`:
 // `successors[s].m_predecessors` is one hierarchical_array_identifier and
 // `[pred]` alone is the loop_variables list. The parser took the first bracket

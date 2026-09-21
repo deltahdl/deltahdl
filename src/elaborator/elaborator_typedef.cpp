@@ -574,7 +574,7 @@ static std::string NettypeResolutionRuleMessage(
 // that "while a class function method may be used for a resolution function,
 // such functions shall be class static methods as the method call occurs in a
 // context where no class object is involved in the call" (printed page 98 of
-// ~/IEEE 1800-2023.pdf), so whether the function is a class method decides
+// IEEE 1800-2023), so whether the function is a class method decides
 // which requirements it is held to.
 //
 // `scope_named_nothing` separates a qualifier that reaches neither a package

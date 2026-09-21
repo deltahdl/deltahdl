@@ -201,7 +201,7 @@ TEST(PackageDeclarationElaboration, TimeunitsRepeatMatchAccepted) {
              "endmodule\n"));
 }
 
-// §26.2 (printed page 808 of ~/IEEE 1800-2023.pdf): a package shall not refer
+// §26.2 (printed page 808 of IEEE 1800-2023): a package shall not refer
 // to an item declared in the compilation-unit scope, and a package item shall
 // hold no hierarchical reference to an identifier outside the package. The
 // checks read a package variable's initializer alone, so a package
@@ -470,7 +470,7 @@ TEST(PackageDeclarationElaboration,
                             5, "6.20.4"));
 }
 
-// §26.7 (printed pages 816-817 of ~/IEEE 1800-2023.pdf) gives every compilation
+// §26.7 (printed pages 816-817 of IEEE 1800-2023) gives every compilation
 // unit the built-in package std, whose declarations -- Annex G's semaphore,
 // mailbox, randomize, process and weak_reference (printed 1257-1258) -- are
 // visible everywhere as a wildcard import makes them, and names them behind

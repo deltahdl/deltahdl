@@ -184,7 +184,7 @@ class DeclaredNameTables {
   std::string_view FindTypeTarget(std::string_view name) const;
   size_t TypeTargetCount() const;
 
-  // §6.18 with §15.4.9 (printed page 377 of ~/IEEE 1800-2023.pdf): the type the
+  // §6.18 with §15.4.9 (printed page 377 of IEEE 1800-2023): the type the
   // typedef `name` was declared with, as the parser read it -- `mailbox #(int)`
   // with its parameter list, or another typedef's name, one step of the chain
   // -- keyed as the type targets are, "pkg::name" for a package's typedef and

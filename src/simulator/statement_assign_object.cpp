@@ -129,7 +129,7 @@ static bool TryClassCopyNewAssign(const Stmt* stmt, std::string_view target,
   return true;
 }
 
-// §8.30.1 (printed page 217 of ~/IEEE 1800-2023.pdf): the `new(referent)` of
+// §8.30.1 (printed page 217 of IEEE 1800-2023): the `new(referent)` of
 // the built-in weak_reference class, which names no class the run holds a
 // record of, allocates the weak reference to the object the one argument refers
 // to

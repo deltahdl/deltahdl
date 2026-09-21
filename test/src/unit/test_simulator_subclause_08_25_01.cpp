@@ -238,7 +238,7 @@ TEST(ParameterizedScopeResolutionSim,
             1u);
 }
 
-// §8.25.1 (printed pages 205-206 of ~/IEEE 1800-2023.pdf): the unadorned name
+// §8.25.1 (printed pages 205-206 of IEEE 1800-2023): the unadorned name
 // of a parameterized class denotes its default specialization other than as the
 // prefix of the class scope resolution operator, so `typedef C T;` makes T
 // that specialization and `T::p` is `C#()::p`. The simulator knew a class by
@@ -276,7 +276,7 @@ TEST(ParameterizedScopeResolutionSim,
 }
 
 // §8.25 binds a class's type parameter throughout the class body per
-// specialization (printed page 204 of ~/IEEE 1800-2023.pdf), and §8.25.1 has
+// specialization (printed page 204 of IEEE 1800-2023), and §8.25.1 has
 // the explicit specialization form as the prefix of the class scope resolution
 // operator outside the class (printed 205), so §20.6.2's `$bits(T)` (printed
 // 629) in a static method called as `Box#(byte)::bits()` is 8 whether the

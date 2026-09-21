@@ -513,7 +513,7 @@ TEST(ClassSim, TypeParameterQueuePropertyInEachSpecialization) {
             741u);
 }
 
-// §8.25 (printed page 203 of ~/IEEE 1800-2023.pdf) instantiates an object under
+// §8.25 (printed page 203 of IEEE 1800-2023) instantiates an object under
 // the parameter override rules of §23.10, whose §23.10.2.2 binds an actual
 // written `.name(value)` to the parameter of that name whatever its
 // position. The value actuals were bound by position alone, so `#(.E(7))`
@@ -537,7 +537,7 @@ TEST(ClassSim, NamedValueActualBindsTheParameterOfItsName) {
             21u);
 }
 
-// §8.25 (printed page 203 of ~/IEEE 1800-2023.pdf): an object is instantiated
+// §8.25 (printed page 203 of IEEE 1800-2023): an object is instantiated
 // with the parameter override rules of §23.10, `vector #(10) vten;`, and inside
 // its methods a value parameter names what the specialization bound it to.
 // Declared at module scope, `G #(5) b = new;` constructed the class's default
@@ -590,7 +590,7 @@ TEST(ClassSim, ValueParameterOfAModuleScopeSpecializationConstructedLater) {
 }
 
 // §8.25's own generic class, `class vector #(int size = 1); bit [size-1:0]
-// a;` (printed page 203 of ~/IEEE 1800-2023.pdf), sizes a property by the
+// a;` (printed page 203 of IEEE 1800-2023), sizes a property by the
 // class's value parameter, which §6.20.1 declares in the class's parameter port
 // list or its body (printed 125). The lowerer sized every property with no
 // parameter in scope, so `logic [W-1:0] v` was one bit wide: `c.v = '1`
@@ -618,8 +618,8 @@ TEST(ClassSim, PropertyWidthNamesTheClassParameters) {
 }
 
 // §8.25: a specialization `stack #(bit [2:0])` binds the type parameter T to
-// `bit [2:0]` throughout the class body (printed pages 203-204 of ~/IEEE
-// 1800-2023.pdf), so §20.6.2's `$bits(T)` in an instance method is 3, and the
+// `bit [2:0]` throughout the class body (printed pages 203-204 of IEEE
+// 1800-2023), so §20.6.2's `$bits(T)` in an instance method is 3, and the
 // object of the default specialization (§8.25.1) reads the default int's 32.
 // EvalBits asked the type table alone, which holds the class's default for the
 // name, so the specialized object read 32 too. The three objects are declared
@@ -670,7 +670,7 @@ TEST(ClassSim, TypeParameterIndexedPropertyOfAModuleScopeSpecialization) {
             2u * 10000u + 31u * 100u + 42u);
 }
 
-// §8.25's own chain (printed page 204 of ~/IEEE 1800-2023.pdf): a class
+// §8.25's own chain (printed page 204 of IEEE 1800-2023): a class
 // extending a parameterized class binds the base's type parameter as its
 // extends clause says -- `extends C` takes C's default bit, `extends C
 // #(integer)` binds integer, and `extends C #(P)` binds the derived class's own
@@ -721,7 +721,7 @@ TEST(ClassSim, BaseTypeParameterBoundThroughTwoExtendsLevels) {
             16u * 100000u + 65535u);
 }
 
-// §8.25's D4 (printed page 205 of ~/IEEE 1800-2023.pdf): the base class may be
+// §8.25's D4 (printed page 205 of IEEE 1800-2023): the base class may be
 // named by a type parameter of the derived class, `class D4 #(type P =
 // C#(byte)) extends P;` extending the class the parameter's default names with
 // the default's own actuals, so the default specialization of D4 inherits C's
@@ -771,7 +771,7 @@ TEST(ClassSim, BaseNamedByATypeParameterBoundThroughAnExtendsLevel) {
             16u * 100000u + 65535u);
 }
 
-// §8.25 (printed page 204 of ~/IEEE 1800-2023.pdf): a type parameter may be
+// §8.25 (printed page 204 of IEEE 1800-2023): a type parameter may be
 // bound to a class type, so a property declared with the parameter as its type,
 // `T obj` in `class Holder #(type T = Item)`, is a handle of the bound class --
 // of Item in the default specialization (§8.25.1) -- and `obj = new` in the

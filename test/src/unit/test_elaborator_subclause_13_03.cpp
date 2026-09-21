@@ -212,7 +212,7 @@ TEST(TaskElaboration, ValueReturningProductionInATaskOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.3 (printed page 335 of ~/IEEE 1800-2023.pdf) enables a task from a
+// §13.3 (printed page 335 of IEEE 1800-2023) enables a task from a
 // statement, and §13.2 lets a nonvoid function alone stand as an operand of an
 // expression: a task returns no value, so `x = t(1);` has no value to assign.
 // No pass asked whether a call's callee is a task, so the misuse of an imported

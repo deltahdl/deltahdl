@@ -1,5 +1,5 @@
 // What a declaration says about the size of a name. §20.6.2 (printed page
-// 629 of ~/IEEE 1800-2023.pdf) has $bits answer the number of bits an argument
+// 629 of IEEE 1800-2023) has $bits answer the number of bits an argument
 // holds, which for a literal, a type keyword with or without a packed range, a
 // typedef name of the scope being elaborated (§6.18, printed 118), a
 // parameter, a variable or a net of the registered module, and an operator

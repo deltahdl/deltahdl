@@ -7,14 +7,14 @@
 # reports, which is a reading of the standard rather than a comparison of
 # strings.
 #
-# The list is committed because ~/IEEE 1800-2023.pdf is a local file no CI runner has.
-# Regenerate it from the repository root, with the standard at ~/IEEE 1800-2023.pdf, by
-# running this and putting the header back above the result:
+# The list is committed because the standard is a PDF no CI runner has.
+# Regenerate it from the repository root, with LRM set to the path of that PDF,
+# by running this and putting the header back above the result:
 #
 #     PYTHONPATH=. python3 - <<'EOF'
 #     import os
 #     from lib.python.lrm import load_toc
-#     for identifier in sorted(load_toc(os.path.expanduser("~/IEEE 1800-2023.pdf"))):
+#     for identifier in sorted(load_toc(os.environ["LRM"])):
 #         print(identifier)
 #     EOF
 #

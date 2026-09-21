@@ -72,7 +72,7 @@ TEST(DataTypeParsing, MalformedEnumRangeNames6_19_2) {
   EXPECT_TRUE(ReportedError(r.diags, "expected ']'", 2, "6.19.2"));
 }
 
-// §6.19.2's Syntax 6-5 (printed page 119 of ~/IEEE 1800-2023.pdf, A.2.2.1 at
+// §6.19.2's Syntax 6-5 (printed page 119 of IEEE 1800-2023, A.2.2.1 at
 // printed 1182) writes an enum_name_declaration's range as
 // `[ integral_number [ : integral_number ] ]`, not as a constant expression,
 // and Table 6-10 (printed 121) has N be a positive integral number: `VAL[N]`

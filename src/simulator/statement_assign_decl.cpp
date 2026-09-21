@@ -428,7 +428,7 @@ static bool TryExecClassShallowCopy(std::string_view var_name, const Expr* init,
   return true;
 }
 
-// §8.23 (printed pages 200-201 of ~/IEEE 1800-2023.pdf): a procedural
+// §8.23 (printed pages 200-201 of IEEE 1800-2023): a procedural
 // `Outer::Inner i = new;` names the nested class by its scoped spelling, which
 // DeclaredClassKey (declared_class_key.h) resolves to the key the run holds it
 // under; looked up by the bare `Inner` alone, the declaration found no class,

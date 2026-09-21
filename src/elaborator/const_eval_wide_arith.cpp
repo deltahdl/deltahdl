@@ -1,5 +1,5 @@
 // The multiplicative operators over a constant wider than 64 bits. §11.4.3
-// (printed pages 275-276 of ~/IEEE 1800-2023.pdf) defines the product, the
+// (printed pages 275-276 of IEEE 1800-2023) defines the product, the
 // quotient, the remainder and the power: the quotient truncates toward zero,
 // the remainder takes the sign of the first operand, a division by zero is x,
 // and Table 11-4 fixes the power's answer by the signs and sizes of its

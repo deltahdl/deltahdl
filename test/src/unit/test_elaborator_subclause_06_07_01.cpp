@@ -381,7 +381,7 @@ TEST(InterconnectNet, MultipleDelayValuesRejected) {
       "interconnect net shall specify at most one delay value", 1, "6.7.1"));
 }
 
-// §6.7.1 (printed page 103 of ~/IEEE 1800-2023.pdf) admits a packed structure
+// §6.7.1 (printed page 103 of IEEE 1800-2023) admits a packed structure
 // as a net's data type, and §7.2.1 (printed 147) lays its members out as
 // windows of the vector, which the simulator needs the members' order and
 // widths for. The net record carries the resolved aggregate for a typedef name

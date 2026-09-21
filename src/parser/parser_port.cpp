@@ -35,8 +35,8 @@ struct ParamPortList {
 // the element after the comma. A.2.1.1's `parameter` and `localparam` each
 // open a declaration whose list_of_param_assignments or
 // list_of_type_assignments (A.2.3) runs on past commas, and `type` opens the
-// second kind of list (printed pages 1174, 1181 and 1184 of ~/IEEE
-// 1800-2023.pdf): an element written with neither keyword nor a data type is
+// second kind of list (printed pages 1174, 1181 and 1184 of IEEE
+// 1800-2023): an element written with neither keyword nor a data type is
 // another member of the list before it, and is a type parameter when that list
 // is one of types.
 struct ParamPortGroup {

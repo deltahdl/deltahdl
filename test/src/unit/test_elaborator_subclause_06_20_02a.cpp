@@ -572,7 +572,7 @@ TEST(ValueParameters, NonConstantClassParamDefaultIsRejected) {
 
 // §6.20.1 rules that "all param_assignments appearing within a class body
 // shall become localparam declarations regardless of the presence or absence
-// of a parameter_port_list" (printed page 125 of ~/IEEE 1800-2023.pdf), so a
+// of a parameter_port_list" (printed page 125 of IEEE 1800-2023), so a
 // parameter declared in the class body is under the §6.20.2 constancy rule
 // exactly as a
 // #() parameter port is. The two reach RecordClassParam through different

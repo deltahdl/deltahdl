@@ -799,7 +799,7 @@ class Parser {
   // §23.9 lists the elements that define a new scope: "Modules, Interfaces,
   // Programs, Checkers, Packages, Classes, Tasks, Functions, begin-end blocks
   // (named or unnamed), fork-join blocks (named or unnamed), Generate blocks"
-  // (printed page 761 of ~/IEEE 1800-2023.pdf). A type name declared inside one
+  // (printed page 761 of IEEE 1800-2023). A type name declared inside one
   // is a type name there and not in the design element after it. Constructing
   // this records what known_types_ and known_nettypes_ held on the way in;
   // destroying it puts both back. §6.6.7's ParseNettypeDecl fills the two

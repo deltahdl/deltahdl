@@ -141,7 +141,7 @@ bool TryInitClassSyncProperty(ClassObject* obj, const ClassTypeInfo* info,
 bool TryInitStaticSyncProperty(const ClassTypeInfo* info, std::string_view name,
                                const Expr* init, SimContext& ctx);
 
-// §15.4 (printed page 374 of ~/IEEE 1800-2023.pdf) makes a mailbox variable a
+// §15.4 (printed page 374 of IEEE 1800-2023) makes a mailbox variable a
 // handle to the mailbox object, §15.3 a semaphore's alike, and §8.12 (printed
 // 188) has a handle assigned to another variable leave one object under two
 // names. A blocking assignment whose target ResolveSyncProperty answers takes

@@ -25,7 +25,7 @@ int64_t ResolvedParam(RtlirDesign* design, std::string_view name) {
 // §13.4.3 lets a constant function be declared in a package and called in a
 // parameter initializer, and §26.3 names a package's function through the
 // package scope resolution operator or an import (printed pages 345 and 808
-// of ~/IEEE 1800-2023.pdf). The folder registered a module's own functions
+// of IEEE 1800-2023). The folder registered a module's own functions
 // alone and declined a call with no bare callee, so `pk::twice(6)` never folded
 // and P was left unresolved.
 TEST(ConstantFunctionElaboration, PackageFunctionThroughPackageScopeFolds) {

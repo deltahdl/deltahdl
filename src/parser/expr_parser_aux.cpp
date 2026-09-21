@@ -172,7 +172,7 @@ Expr* Parser::ParseParenExpr() {
 // elements.
 //
 // A.4.1.1 makes each element a param_expression (printed page 1194 of
-// ~/IEEE 1800-2023.pdf), which A.8.3 lets be a data_type. ParseExpr spells a
+// IEEE 1800-2023), which A.8.3 lets be a data_type. ParseExpr spells a
 // keyword type as a name with its packed dimensions as selects, which the
 // elaborator's override readers take, but it cannot spell A.2.2.1's signing
 // after an integer type nor a virtual interface type (printed page 1182): `int

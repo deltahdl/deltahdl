@@ -149,7 +149,7 @@ std::unordered_set<std::string_view> NamesDeclaredUnder(const Stmt* s) {
 // at the first child that answers it, which is what this search wants, so it is
 // used here rather than ForEachExprChild beside it.
 //
-// §8.10 (printed page 186 of ~/IEEE 1800-2023.pdf) denies a static method the
+// §8.10 (printed page 186 of IEEE 1800-2023) denies a static method the
 // non-static members of an object it holds no handle to, and §8.4 (printed
 // 181-182) reads a member through any handle a variable holds -- `p.fileID` in
 // §8.9's example on the same page as §8.10 -- which a static method may hold as
@@ -376,7 +376,7 @@ void ElaboratorClassRules::ValidateStaticMethodsAmong(
   }
 }
 
-// §26.2 (printed page 808 of ~/IEEE 1800-2023.pdf) makes a class declaration
+// §26.2 (printed page 808 of IEEE 1800-2023) makes a class declaration
 // written in a package an item of that package, and §8.10 (printed 186) holds
 // over it as it holds over a class at the top of a file or inside a module.
 // This walked the compilation unit's classes and the module's own, so `package

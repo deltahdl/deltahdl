@@ -199,7 +199,7 @@ void Parser::AdoptBaseClassTypeNames(const ClassDecl* decl) {
 // §8.24 has an out-of-block method declaration access every declaration of the
 // class whose prototype it implements: its example resolves the `T` of
 // `function void C::f(T x)` to `C::T` rather than to the compilation unit's T
-// (printed page 203 of ~/IEEE 1800-2023.pdf). The class's own type names left
+// (printed page 203 of IEEE 1800-2023). The class's own type names left
 // known_types_ at its `endclass`, so the method's tf_port_list and body are
 // given them back from class_types_, inside the guard ParseFunctionDecl or
 // ParseTaskDecl opened, which takes them out again at the method's end. The

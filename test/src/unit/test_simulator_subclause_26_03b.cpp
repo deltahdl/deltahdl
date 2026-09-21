@@ -37,7 +37,7 @@ TEST(PackageScopeReferenceSim, PackageScopedStructVariableHasItsMembers) {
             0x07012c * 16u + 7u);
 }
 
-// §26.3 (printed page 808 of ~/IEEE 1800-2023.pdf): a declaration made in a
+// §26.3 (printed page 808 of IEEE 1800-2023): a declaration made in a
 // package is referenced through the package scope resolution operator, the
 // subclause's own example being a function call, `ComplexPkg::mul(a, b)`. A
 // package function called through its scoped name was looked up under the empty
@@ -205,8 +205,8 @@ TEST(PackageScopeReferenceSim, PackageFunctionDefaultReadsThePackageScope) {
 
 // §6.19 makes an enumeration's members constants of the scope the enumeration
 // is written in and §26.3 references a package's declaration through the
-// package scope resolution operator (printed pages 119 and 808 of ~/IEEE
-// 1800-2023.pdf), so `pk::HIGH` is the package's constant from a module that
+// package scope resolution operator (printed pages 119 and 808 of IEEE
+// 1800-2023), so `pk::HIGH` is the package's constant from a module that
 // imports nothing, as `pk::P` is its parameter. A package's parameters had
 // storage under their scoped key and its enumeration constants none, so the
 // read answered 0. HIGH is 3 and B follows A, which §6.20.1 lets name the
@@ -470,7 +470,7 @@ TEST(PackageScopeReferenceSim, ScopedEnumLiteralMatchesAsACaseItem) {
             2u);
 }
 
-// §26.3 (printed page 808 of ~/IEEE 1800-2023.pdf) names a package's variable
+// §26.3 (printed page 808 of IEEE 1800-2023) names a package's variable
 // through the package scope resolution operator, and §8.7 has `new` construct
 // an object of the class the target is declared with -- the issue's probes 114
 // and 69: `p::global_h = new` from a module initial and from a method of a
@@ -510,7 +510,7 @@ TEST(PackageScopeReferenceSim, ScopedPackageClassVariableConstructedWithNew) {
             351u * 100u + 27u);
 }
 
-// §8.25 (printed page 203 of ~/IEEE 1800-2023.pdf) with §26.2 (printed 808): a
+// §8.25 (printed page 203 of IEEE 1800-2023) with §26.2 (printed 808): a
 // package variable declared with a specialization, `G #(5) b;`, is a handle of
 // that specialization, and the object `p1::b = new` constructs through the
 // package scope resolution operator binds N to 5, which a method of the object
@@ -895,7 +895,7 @@ TEST(PackageImportSim, ExplicitlyImportedEnumLiteralInitializesADeclaration) {
             41u);
 }
 
-// §15.3.1 (printed page 373 of ~/IEEE 1800-2023.pdf) with §26.3 (printed 808):
+// §15.3.1 (printed page 373 of IEEE 1800-2023) with §26.3 (printed 808):
 // a package's `semaphore t`, declared with no initializer, is created by the
 // procedural `p1::t = new(1)` as a bucket of one key, so the first try_get(1)
 // procures it and the second finds the bucket empty: 1 * 10 + 0. The

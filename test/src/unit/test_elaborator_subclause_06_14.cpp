@@ -497,7 +497,7 @@ TEST(ChandleDataType, ChandleAdditionInRandsequenceCodeBlock_Error) {
                             "operator is not allowed on chandle", 6, "6.14"));
 }
 
-// §6.14 (printed page 111 of ~/IEEE 1800-2023.pdf): a chandle is assigned from
+// §6.14 (printed page 111 of IEEE 1800-2023): a chandle is assigned from
 // another chandle, and chandles are returned from functions; §35.5.5 (printed
 // 979) admits chandle as an imported function's result. The result of a call to
 // a function declared `chandle` is therefore a chandle, and `keep = give();` is

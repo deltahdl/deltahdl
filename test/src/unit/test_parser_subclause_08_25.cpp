@@ -334,7 +334,7 @@ TEST(ParameterizedClassParsing, StaticMemberInParameterizedClass) {
 }
 
 // A.1.3's parameter_port_declaration opens with `parameter`, `localparam`,
-// `type` or a data type (printed page 1174 of ~/IEEE 1800-2023.pdf), so the `T
+// `type` or a data type (printed page 1174 of IEEE 1800-2023), so the `T
 // = int` after the comma in `#(type KEY = int, T = int)` is no new declaration:
 // it is the second type_assignment of A.2.1.1's one type_parameter_declaration,
 // `type [ forward_type ] list_of_type_assignments` (printed pages 1181 and

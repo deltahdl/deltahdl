@@ -81,7 +81,7 @@ TEST(NetDefaultValue, UndrivenVectorTriregAllBitsX) {
   EXPECT_EQ(var->value.words[0].bval & 0xF, 0xFu);
 }
 
-// §6.7.1 (printed page 103 of ~/IEEE 1800-2023.pdf) admits a packed structure
+// §6.7.1 (printed page 103 of IEEE 1800-2023) admits a packed structure
 // as a net's data type, `wire addressT w1` reaching a type through a typedef
 // name in its own example, and §7.2.1 (printed 147) makes a member of a packed
 // structure a window of the vector, `w.opcode` the top eight bits of

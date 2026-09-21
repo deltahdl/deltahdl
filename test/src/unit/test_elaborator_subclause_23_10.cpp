@@ -611,7 +611,7 @@ TEST(ParameterOverride,
 }
 
 // A.4.1.1's ordered_parameter_assignment is a param_expression (printed page
-// 1194 of ~/IEEE 1800-2023.pdf), which A.8.3 lets be a data_type, and a data
+// 1194 of IEEE 1800-2023), which A.8.3 lets be a data_type, and a data
 // type an expression cannot spell -- A.2.2.1's signing after an integer type
 // (printed page 1182) -- reaches the child through the specialization the
 // override names. `int unsigned` on T2 makes elem_t unsigned where T2's

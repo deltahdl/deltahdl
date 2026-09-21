@@ -37,7 +37,7 @@ namespace delta {
 // §26.3 admits a package-qualified mailbox as the receiver, `p::mbx.get(x)`,
 // found under the "p.mbx" key ExtractHandleMethodCallParts answers. This is
 // asked of every call statement, so the method's name is matched before the
-// key is made. §8.7 with §15.4.1 (printed page 374 of ~/IEEE 1800-2023.pdf): a
+// key is made. §8.7 with §15.4.1 (printed page 374 of IEEE 1800-2023): a
 // mailbox declared as a class property is each object's own, so a bare `mb`
 // inside a method of the class, `this.mb` and a handle's `c.mb` name the
 // object's (ResolveSyncProperty) ahead of the run's tables, which hold no
@@ -84,7 +84,7 @@ static bool ElementTypeIsFixed(const std::vector<DataType>& params) {
   return elem.kind != DataTypeKind::kNamed || elem.type_name != "dynamic_type";
 }
 
-// §26.2 (printed page 808 of ~/IEEE 1800-2023.pdf): a package's declarations
+// §26.2 (printed page 808 of IEEE 1800-2023): a package's declarations
 // are visible by their bare names throughout the package, its classes included,
 // and the run keys a package's typedef "pkg::name" (RegisterTypeDeclarations
 // in lowerer_register.cpp), the bare key standing only where a module's
@@ -583,7 +583,7 @@ bool TryEvalMailboxMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
 // property, `mb = new(1)` in a method or `c.mb = new(1)` through a handle,
 // built on the object alone (BuildSyncProperty); a semaphore property is
 // TrySemaphoreNewAssign's, asked first, so it is not reached here. §15.4.1
-// (printed page 374 of ~/IEEE 1800-2023.pdf) has new() return the mailbox
+// (printed page 374 of IEEE 1800-2023) has new() return the mailbox
 // handle, so the variable the statement assigns refers to the queue from here
 // on and §8.4 (printed 182) compares it unequal to null (HoldSyncVariable); the
 // queue alone was built, and a `mailbox mb;` read as null after its `mb =

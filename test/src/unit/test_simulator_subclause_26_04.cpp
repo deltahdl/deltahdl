@@ -38,7 +38,7 @@ TEST(PackageImportInHeaderSim, WildcardConstantFromHeaderImport) {
   EXPECT_EQ(f.ctx.FindVariable("y")->value.ToUint64(), 7u);
 }
 
-// §26.4 (printed page 812 of ~/IEEE 1800-2023.pdf) has a header import make a
+// §26.4 (printed page 812 of IEEE 1800-2023) has a header import make a
 // package's names visible in the port list, its own example typing `input
 // instruction_t a` through `import A::instruction_t`, and §7.2.1 makes a member
 // of a packed structure a window of the variable's bits, `a.opcode` the top

@@ -96,7 +96,7 @@ static void BuildVTable(ClassTypeInfo* info, const ClassDecl* cls) {
   }
 }
 
-// §8.9 (printed page 186 of ~/IEEE 1800-2023.pdf): each static property's one
+// §8.9 (printed page 186 of IEEE 1800-2023): each static property's one
 // copy is created as the class is built, at its zero default, so that an object
 // constructed by a declaration of the same scope before the initializers run
 // (Lowerer::LowerModule lowers a module's variables between
@@ -425,7 +425,7 @@ static void InheritInterfaceMembers(ClassTypeInfo* info) {
 // §8.25: the class the extends clause of `cls` names as its base. The base
 // may be named by a type parameter of the derived class, `class D4 #(type P =
 // C#(byte)) extends P;`, which §8.25 has resolve to a class type after
-// elaboration (printed page 205 of ~/IEEE 1800-2023.pdf). The one ClassTypeInfo
+// elaboration (printed page 205 of IEEE 1800-2023). The one ClassTypeInfo
 // a class declaration registers serves every specialization, so the base it
 // records is the one the parameter's default names, the base of §8.25.1's
 // default specialization; which class a specialization's actual names, and the

@@ -449,7 +449,7 @@ void ElaboratorClassRules::ValidateImplementsInterfaceMethods(
     // §8.26 poses the obligation to implement a pure virtual method only for an
     // interface class: "the Fifo class is also implementing the PutImp and
     // GetImp interface classes so it shall provide implementations for the put
-    // and get methods" (printed page 209 of ~/IEEE 1800-2023.pdf). A name that
+    // and get methods" (printed page 209 of IEEE 1800-2023). A name that
     // resolves to anything else is already rejected under §8.26.2 by
     // ValidateRegularClassInheritance in
     // src/elaborator/elaborator_validate_class_overrides.cpp, so reporting it

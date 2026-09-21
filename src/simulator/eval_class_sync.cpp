@@ -24,7 +24,7 @@
 
 namespace delta {
 
-// §26.2 (printed page 808 of ~/IEEE 1800-2023.pdf): a package's declarations
+// §26.2 (printed page 808 of IEEE 1800-2023): a package's declarations
 // are visible by their bare names throughout the package, its classes included,
 // and the run keys a package's typedef "pkg::name" (RegisterTypeDeclarations
 // in lowerer_register.cpp), the bare key standing only where a module's
@@ -46,7 +46,7 @@ static std::string_view TypeTargetFor(std::string_view name,
   return ctx.FindTypeTarget(name);
 }
 
-// §6.18 (printed page 118 of ~/IEEE 1800-2023.pdf): a typedef name stands for
+// §6.18 (printed page 118 of IEEE 1800-2023): a typedef name stands for
 // the type it was declared with, which may be another typedef name, and §26.3
 // reaches a package's under `p::name`, the key the run records it by. The
 // written name is followed through the chain to the name at its end, at most as
@@ -257,7 +257,7 @@ static void ReportNullSyncProperty(const SyncProperty& prop,
                       Subclause("8.4"));
 }
 
-// §8.4 (printed pages 181-182 of ~/IEEE 1800-2023.pdf): a handle is compared
+// §8.4 (printed pages 181-182 of IEEE 1800-2023): a handle is compared
 // with null by whether it refers to an object, an uninitialized one holding
 // null, and §15.3 (printed 372) and §15.4 (printed 374) make a semaphore or
 // mailbox variable a handle to the bucket or the queue. The value under the

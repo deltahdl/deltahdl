@@ -109,7 +109,7 @@ void CheckDuplicateImportNamesInScope(const std::vector<ModuleItem*>& items,
 // allows tasks to be called from a foreign language, similar to functions. Such
 // tasks are termed exported tasks" and forwards the whole of §35.7 to them:
 // "all aspects of exported functions described above in 35.7 apply to exported
-// tasks" (printed page 983 of ~/IEEE 1800-2023.pdf). So the two checks below
+// tasks" (printed page 983 of IEEE 1800-2023). So the two checks below
 // are reached for an exported task as readily as for an exported function, and
 // a report that spells the word as a literal tells a user who wrote `task` to
 // go looking for a function they never declared.

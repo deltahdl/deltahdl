@@ -413,7 +413,7 @@ void ExecFuncBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   ApplyGenericBlockingAssign(stmt, val, ctx, arena);
 }
 
-// §13.4.1 (printed page 342 of ~/IEEE 1800-2023.pdf): the variable a function's
+// §13.4.1 (printed page 342 of IEEE 1800-2023): the variable a function's
 // own name implicitly declares has the function's return type, and §6.16
 // (printed 112) makes a string variable dynamic -- as long as the text last
 // assigned to it, with no declared width. EvalFunctionCall and ExecClassMethod

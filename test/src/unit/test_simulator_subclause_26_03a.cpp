@@ -109,8 +109,8 @@ TEST(PackageImportSim, ExplicitImportFunctionCalledUnqualified) {
 
 // §26.3: a package import makes the package's names visible unqualified in the
 // scope that writes the import, and this case holds that the scope may be a
-// module reached through an instance. §26.3 (printed page 809 of ~/IEEE
-// 1800-2023.pdf) states the visibility the read rests on: the import
+// module reached through an instance. §26.3 (printed page 809 of IEEE
+// 1800-2023) states the visibility the read rests on: the import
 // declaration "allows identifiers declared within packages to be visible within
 // the current scope without a package name qualifier".
 //
@@ -149,7 +149,7 @@ TEST(PackageImportSim, InstantiatedModuleReadsImportedParameter) {
 
 // §26.3: the import declaration "allows identifiers declared within packages to
 // be visible within the current scope without a package name qualifier"
-// (printed page 809 of ~/IEEE 1800-2023.pdf). The current scope here is
+// (printed page 809 of IEEE 1800-2023). The current scope here is
 // `child`, and `top` imports nothing, so the child's own import is the only
 // thing that can make VAL visible to `initial y = VAL;`.
 //
@@ -282,7 +282,7 @@ TEST(PackageImportSim,
   EXPECT_EQ(yb->value.ToUint64(), 22u);
 }
 
-// §26.3 (printed page 808 of ~/IEEE 1800-2023.pdf) references a package's
+// §26.3 (printed page 808 of IEEE 1800-2023) references a package's
 // declarations through the package name whether or not the package was
 // imported, and §6.18 (printed page 118) makes an object declared with a
 // typedef's name an object of the type the name stands for. A `pkg::nib_t v;`
@@ -750,7 +750,7 @@ TEST(PackageScopeReferenceSim, ImportedAndReExportedSemaphoreShareOneBucket) {
             10u);
 }
 
-// §9.7 (printed page 245 of ~/IEEE 1800-2023.pdf) lets a variable be declared
+// §9.7 (printed page 245 of IEEE 1800-2023) lets a variable be declared
 // of the built-in process class and has kill() forcibly terminate the process a
 // handle names, whose status() then reads KILLED; §26.3 (printed 808) names
 // a package's variable through the package scope resolution operator. The

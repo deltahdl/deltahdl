@@ -779,7 +779,7 @@ void Lowerer::LowerVar(std::string_view name, const RtlirVariable& var) {
 // specialization the declaration wrote, `G #(5) b = new`, as the procedural
 // declaration path binds its own (TryExecClassVarDecl); built without it, a
 // method of `b` read every parameter as the class's default. §8.30.1
-// (printed page 217 of ~/IEEE 1800-2023.pdf) with §6.21 (printed 132-133): the
+// (printed page 217 of IEEE 1800-2023) with §6.21 (printed 132-133): the
 // built-in weak_reference class, of which the run holds no record, has its own
 // `new(obj)`, taken through EvalWeakReferenceNew as the procedural `w =
 // new(h)` (TryClassNewAssign) and a package's or the unit's declaration

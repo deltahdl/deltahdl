@@ -1,5 +1,5 @@
 // The width and type an expression propagates down to its operands. §11.6.1
-// (printed pages 299-300 of ~/IEEE 1800-2023.pdf) has the size of an expression
+// (printed pages 299-300 of IEEE 1800-2023) has the size of an expression
 // determined by its operands and by the context it stands in -- in an
 // assignment, the left-hand side counts among the operands -- and Table
 // 11-21 says which operands are self-determined instead: a shift's count, a

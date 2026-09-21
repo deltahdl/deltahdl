@@ -1,5 +1,5 @@
 // The bits of a constant past the 64 that ConstVal::value holds. §5.7.1
-// (printed page 77 of ~/IEEE 1800-2023.pdf) sizes a based literal by its size
+// (printed page 77 of IEEE 1800-2023) sizes a based literal by its size
 // constant and §6.20.2 (printed 126) gives a parameter its declared range, so a
 // constant expression can be wider than the int64 the fold carries; §11.5.1
 // (printed 296) then lets a select name any bit of it, §11.4.10 with §11.4.8

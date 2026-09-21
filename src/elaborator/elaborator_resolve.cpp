@@ -252,7 +252,7 @@ void RegisterPackageParams(CompilationUnit* unit, ScopeMap& cu_param_scope,
 // out. §6.20.1's Syntax 6-6 writes a param_assignment as `parameter_identifier
 // { variable_dimension } [ = constant_param_expression ]`, and makes every
 // param_assignment in a class body a localparam declaration whether or not the
-// class has a parameter_port_list (printed page 125 of ~/IEEE 1800-2023.pdf),
+// class has a parameter_port_list (printed page 125 of IEEE 1800-2023),
 // so a class body parameter and a #() parameter port are both under that rule.
 // Leaving the parameter out instead is what let a breach elaborate in silence:
 // a name absent from the scope reads to every later consumer as a name it

@@ -823,7 +823,7 @@ TEST(ProgramConstruct, ModuleDeclaredAfterProgramInstantiatingItIsError) {
 
 // §24.3 has a top-level program that is not explicitly instantiated
 // implicitly instantiated once, under its declaration name (printed page 776
-// of ~/IEEE 1800-2023.pdf), as §23.3.1 has an uninstantiated module.
+// of IEEE 1800-2023), as §23.3.1 has an uninstantiated module.
 // CollectAutoTopModules in src/elaborator/elaborator.cpp rooted the modules
 // alone, so a program standing alone in the source, or beside a module, was
 // elaborated by no run.

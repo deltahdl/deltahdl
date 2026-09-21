@@ -57,7 +57,7 @@ Stmt* Parser::ParseRepeatStmt() {
 // `this.arr` and `C::arr` were reported as a missing identifier or '['.
 //
 // A.9.3's hierarchical_identifier is `{ identifier constant_bit_select . }
-// identifier` (printed page 1214 of ~/IEEE 1800-2023.pdf), so a segment before
+// identifier` (printed page 1214 of IEEE 1800-2023), so a segment before
 // a '.' may select an element: in `foreach
 // (successors[s].m_predecessors[pred])` the array is the member of the selected
 // element and `[pred]` alone is the loop_variables §12.7.3 puts after the array

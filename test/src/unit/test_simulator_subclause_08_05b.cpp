@@ -83,7 +83,7 @@ TEST(ObjectPropertySim,
 
 // §8.5 puts no restriction on a property's data type and §26.3 references a
 // package's declarations through the package scope resolution operator
-// (printed pages 183 and 808 of ~/IEEE 1800-2023.pdf), so `pk::sev_t s =
+// (printed pages 183 and 808 of IEEE 1800-2023), so `pk::sev_t s =
 // pk::MED;` declares a property of the package's enum type holding the
 // package's MED. The declaration was a parse error at the `::`. MED is 2 and
 // HIGH 3, so the initializer read through the handle and the value written

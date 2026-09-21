@@ -604,7 +604,7 @@ TEST(DataHidingElaboration, SiblingBlocksBindTheSameNameSeparately) {
 }
 
 // The cases below reach the member through a class-scoped static handle. §8.9
-// (printed page 186 of ~/IEEE 1800-2023.pdf) holds a static property in one
+// (printed page 186 of IEEE 1800-2023) holds a static property in one
 // copy usable with no object, reached as `C::m_inst`, and §8.4 (printed
 // 181-182) reads a member through whatever handle a variable holds; §8.18
 // (printed 194) confines a local member to the methods of its class and a

@@ -150,7 +150,7 @@ TEST(ClassSim, WeakRefE2eInstancesUniqueButSameReferent) {
   LowerRunAndCheck(f, design, {{"distinct", 1u}, {"same_referent", 1u}});
 }
 
-// §8.30.2's example (printed page 218 of ~/IEEE 1800-2023.pdf) read whole
+// §8.30.2's example (printed page 218 of IEEE 1800-2023) read whole
 // through the production pipeline, the two references declared as one
 // module-scope declarator list with the `#` against the class name, and every
 // method of §8.30.1's list (printed 217-219) called on them in one run: the two

@@ -14,7 +14,7 @@
 
 namespace delta {
 
-// §8.4 (printed page 182 of ~/IEEE 1800-2023.pdf): the value the variable holds
+// §8.4 (printed page 182 of IEEE 1800-2023): the value the variable holds
 // while its handle refers to an object is the object's identity
 // (SyncObjectIdentity), as MirrorSyncCarrier (eval_class_sync.cpp) stores a
 // property's, at the variable's own width; the null handle is the 0 the
