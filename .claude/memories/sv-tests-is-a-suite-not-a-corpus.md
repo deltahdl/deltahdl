@@ -24,9 +24,10 @@ noticing.
 **How to apply:** when touching an issue that mentions sv-tests at all —
 editing its body, commenting on it, or only labelling it — grep its title and
 body for these words first and rewrite them, even in sentences the touch does
-not otherwise change: on 2026-09-21 the user found "corpus" and "the tool" in
-#3637 after this session had labelled it twice without reading it, the body
-having been filed on the morning of 2026-09-18, before the words were banned.
+not otherwise change: on 2026-09-21 the user found "corpus" and "the tool"
+in issue #3637 after this session had labelled it twice without reading it,
+the body having been filed on the morning of 2026-09-18, before the words
+were banned.
 The 34 open sv-tests issues were rewritten that day; a quoted log line from
 a run that printed the old wording (`tool rejected the file under …, but the
 corpus tags it …`) stays as quoted. See [[single-edition-1800-2023]] and
