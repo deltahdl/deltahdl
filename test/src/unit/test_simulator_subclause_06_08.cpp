@@ -432,4 +432,41 @@ TEST(VariableDeclaration, KeyedPatternStatementUncoveredElementTakesTable67) {
   EXPECT_EQ(var->value.ToString(), "xxxxxxxx");
 }
 
+// Table 6-7 (printed page 107) with §13.3 and §13.4: a 4-state local of a
+// subroutine body takes 'x whatever the subroutine's lifetime -- in an
+// automatic function, an automatic task, a class method and a static
+// function -- while the int, string and real beside it take 0, "" and 0.0.
+// Each read 0 where a module-scope logic read x.
+TEST(VariableDeclaration, Logic4StateSubroutineLocalDefaultsToX) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(
+                "module t;\n"
+                "  function automatic void fa();\n"
+                "    logic l; logic [3:0] v; int n; string s; real r;\n"
+                "    $display(\"fa: l=%0h v=%b n=%0d s=[%s] r=%f\", l, v, n, s,"
+                " r);\n"
+                "  endfunction\n"
+                "  task automatic ta();\n"
+                "    logic l;\n"
+                "    $display(\"ta: l=%0h\", l);\n"
+                "  endtask\n"
+                "  function void fs();\n"
+                "    integer i;\n"
+                "    $display(\"fs: i=%0h\", i);\n"
+                "  endfunction\n"
+                "  class C;\n"
+                "    function void m();\n"
+                "      logic l;\n"
+                "      $display(\"m: l=%0h\", l);\n"
+                "    endfunction\n"
+                "  endclass\n"
+                "  C c;\n"
+                "  initial begin\n"
+                "    fa(); ta(); fs(); c = new; c.m();\n"
+                "  end\n"
+                "endmodule\n",
+                f),
+            "fa: l=x v=xxxx n=0 s=[] r=0.000000\nta: l=x\nfs: i=x\nm: l=x\n");
+}
+
 }  // namespace

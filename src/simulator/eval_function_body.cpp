@@ -445,6 +445,16 @@ static Variable* CreateFuncLocalVar(std::string_view name, const DataType& type,
   // `integer` local is a signed operand rather than an unsigned one.
   auto* v = ctx.CreateLocalVariable(name, w, DeclaredTypeIsSigned(type, ctx));
   v->is_4state = DeclaredTypeIs4State(type);
+  // §6.8 (Table 6-7): a 4-state local starts as 'x whatever the subroutine's
+  // lifetime (§13.3, §13.4), as Lowerer::LowerVar starts a module's; the
+  // initializer below overwrites it. Created at 0 by CreateLocalVariable, a
+  // body's `logic l;` read 0 where the module's read x. A handle, a virtual
+  // interface and a string are no 4-state values and keep their own starts.
+  if (v->is_4state && !is_class && !is_virtual_interface && !is_string &&
+      init == nullptr) {
+    v->value = MakeAllX(arena, w);
+    v->value.is_signed = v->is_signed;
+  }
   v->is_virtual_interface = is_virtual_interface;
   if (is_string) v->is_string = true;
   if (is_class) ctx.SetVariableClassType(name, class_key);
