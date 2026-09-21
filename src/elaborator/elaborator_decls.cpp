@@ -2,7 +2,6 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
-#include <format>
 #include <optional>
 #include <string>
 #include <string_view>
