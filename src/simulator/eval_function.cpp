@@ -154,12 +154,25 @@ static bool ResolveMethodOnThis(std::string_view method_name, SimContext& ctx,
 }
 
 // The handle the property `name` holds on `self`, read as GetPropertyForType
-// reads it -- the slot of the class `enclosing` or of a base of it first
-// (§8.15), the bare slot or a static one after -- but without the value a
-// property never written is made up as, which is no handle.
+// reads it -- a static of the running method's class `enclosing` or of a
+// base of it from the class's one storage (§8.9, §8.13), the slot of that
+// class or of a base of it on the object (§8.15), the bare slot after -- but
+// without the value a property never written is made up as, which is no
+// handle. The static is asked of `enclosing` ahead of the object: §8.10 has a
+// static method run with no object of its own, and the object on the stack
+// while it runs is whatever its caller ran on -- Other's for
+// `C::via()` inside Other::go() -- whose class declares no such static, so
+// the read answered null and the call through `m_t` was reported before a
+// later resolver ran it.
 static uint64_t HeldPropertyHandle(const ClassObject* self,
                                    const ClassTypeInfo* enclosing,
                                    std::string_view name) {
+  const ClassTypeInfo* scope = enclosing != nullptr ? enclosing : self->type;
+  const ClassTypeInfo* declarer =
+      scope != nullptr ? scope->StaticPropertyDeclarer(name) : nullptr;
+  if (declarer != nullptr)
+    return declarer->static_properties.find(std::string(name))
+        ->second.ToUint64();
   for (const auto* t = enclosing; t != nullptr; t = t->parent) {
     auto it =
         self->properties.find(std::string(t->name) + "::" + std::string(name));
@@ -167,12 +180,7 @@ static uint64_t HeldPropertyHandle(const ClassObject* self,
   }
   auto it = self->properties.find(std::string(name));
   if (it != self->properties.end()) return it->second.ToUint64();
-  // §8.13 (printed 189-190): a base's static handle is the derived object's
-  // too, read from the declaring class's one storage; D's own read null.
-  const ClassTypeInfo* declarer =
-      self->type ? self->type->StaticPropertyDeclarer(name) : nullptr;
-  if (declarer == nullptr) return kNullClassHandle;
-  return declarer->static_properties.find(std::string(name))->second.ToUint64();
+  return kNullClassHandle;
 }
 
 // §8.11 with §8.6: a call through a property of the running method's object,

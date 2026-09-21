@@ -624,4 +624,38 @@ TEST(StaticClassPropertySim, ValueAssignedToAStaticThroughAStaticHandle) {
             5u);
 }
 
+// §8.9 (printed page 186) with §8.10 (printed 186-187): a static method
+// names its class's static handle bare and calls through it, `m_t.k()` in
+// C::via(), whatever object the method that called it was running on --
+// here Other's go(), whose object C's static is no property of. The call
+// answers the Q's 4 and reports nothing. The handle was read off the
+// calling method's object by its class, Other, which declares no m_t, so
+// the call was reported as made through a null handle and then run.
+TEST(StaticClassPropertySim,
+     StaticMethodCallsThroughItsStaticHandleUnderAnotherClassesMethod) {
+  EXPECT_EQ(
+      RunAndGet("class Q;\n"
+                "  function int k(); return 4; endfunction\n"
+                "endclass\n"
+                "class C;\n"
+                "  static Q m_t;\n"
+                "  static function int via(); return m_t.k(); endfunction\n"
+                "endclass\n"
+                "class Other;\n"
+                "  function int go();\n"
+                "    C::m_t = new;\n"
+                "    return C::via();\n"
+                "  endfunction\n"
+                "endclass\n"
+                "module t;\n"
+                "  int result;\n"
+                "  initial begin\n"
+                "    Other o = new;\n"
+                "    result = o.go();\n"
+                "  end\n"
+                "endmodule\n",
+                "result"),
+      4u);
+}
+
 }  // namespace
