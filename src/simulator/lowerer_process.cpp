@@ -3,7 +3,6 @@
 
 #include "common/arena.h"
 #include "common/types.h"
-#include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
 #include "simulator/lowerer.h"
 #include "simulator/process.h"
