@@ -255,7 +255,8 @@ def test_a_uvm_tagged_file_is_handed_the_suite_library(tmp_path: Path) -> None:
         if line.endswith(alpha)
     ]
     assert (result.returncode, argv) == (
-        0, [["--lint-only", f"+incdir+{src}", str(uvm_pkg), alpha]],
+        0,
+        [["--lint-only", "-D", "UVM_NO_DPI", f"+incdir+{src}", str(uvm_pkg), alpha]],
     )
 
 

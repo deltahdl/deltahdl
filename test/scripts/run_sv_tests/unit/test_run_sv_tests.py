@@ -119,11 +119,22 @@ def test_defines_passed_as_dash_d_flags(rst: ModuleType, capture_run_cmd: Captur
 def test_library_incdirs_and_files_precede_the_file(
     rst: ModuleType, capture_run_cmd: CaptureRunCmd,
 ) -> None:
-    library = rst.Library(("/lib/uvm_pkg.sv",), ("/lib/src",))
+    library = rst.Library(("/lib/uvm_pkg.sv",), ("/lib/src",), ())
     cmd = capture_run_cmd(
         rst, lambda: rst.run_test("/fake/test.sv", library=library),
     )
     assert cmd[-3:] == ["+incdir+/lib/src", "/lib/uvm_pkg.sv", "/fake/test.sv"]
+
+
+def test_library_defines_precede_the_files_own(
+    rst: ModuleType, capture_run_cmd: CaptureRunCmd,
+) -> None:
+    library = rst.Library(("/lib/uvm_pkg.sv",), ("/lib/src",), ("UVM_NO_DPI",))
+    cmd = capture_run_cmd(
+        rst,
+        lambda: rst.run_test("/fake/test.sv", defines=["FOO"], library=library),
+    )
+    assert _d_flag_values(cmd) == ["UVM_NO_DPI", "FOO"]
 
 
 def test_no_library_adds_nothing_before_the_file(
@@ -255,8 +266,22 @@ def test_load_libraries_resolves_paths_against_the_suite_third_party(
     assert libraries == {
         "uvm": rst.Library(
             (str(third_party / "uvm_pkg.sv"),), (str(third_party),),
+            ("UVM_NO_DPI",),
         ),
     }
+
+
+def test_load_libraries_gives_a_library_it_knows_no_define_for_none(
+    rst: ModuleType, tmp_path: Path,
+) -> None:
+    test_dir = _write_suite_libraries(
+        tmp_path,
+        '{"other": {"files": ["tests/other/pkg.sv"], "incdirs": []}}',
+        ("tests/other/pkg.sv",),
+    )
+    with patch.object(rst, "TEST_DIR", test_dir):
+        libraries = rst.load_libraries()
+    assert libraries["other"].defines == ()
 
 
 def test_load_libraries_raises_naming_a_library_not_checked_out(
@@ -290,7 +315,7 @@ _LIBRARIES = {
 
 def _libraries(rst: ModuleType) -> dict[str, Any]:
     return {
-        tag: rst.Library((file,), (incdir,))
+        tag: rst.Library((file,), (incdir,), ("UVM_NO_DPI",))
         for tag, (file, incdir) in _LIBRARIES.items()
     }
 
@@ -299,6 +324,7 @@ def test_library_for_picks_the_library_the_tags_name(rst: ModuleType) -> None:
     library = rst.library_for({"tags": "uvm-random uvm"}, _libraries(rst))
     assert library == rst.Library(
         ("/tp/tests/uvm/src/uvm_pkg.sv",), ("/tp/tests/uvm/src",),
+        ("UVM_NO_DPI",),
     )
 
 
@@ -306,15 +332,16 @@ def test_library_for_matches_a_tag_whole(rst: ModuleType) -> None:
     library = rst.library_for({"tags": "uvm-1.2"}, _libraries(rst))
     assert library == rst.Library(
         ("/tp/tests/uvm-1.2/src/uvm_pkg.sv",), ("/tp/tests/uvm-1.2/src",),
+        ("UVM_NO_DPI",),
     )
 
 
 def test_library_for_is_empty_without_a_library_tag(rst: ModuleType) -> None:
-    assert rst.library_for({"tags": "18.5"}, _libraries(rst)) == rst.Library((), ())
+    assert rst.library_for({"tags": "18.5"}, _libraries(rst)) == rst.Library((), (), ())
 
 
 def test_library_for_is_empty_without_tags(rst: ModuleType) -> None:
-    assert rst.library_for({}, _libraries(rst)) == rst.Library((), ())
+    assert rst.library_for({}, _libraries(rst)) == rst.Library((), (), ())
 
 
 def test_extracts_all_fields(rst: ModuleType, tmp_path: Path) -> None:

@@ -25,6 +25,13 @@ TEST_DIR = REPO_ROOT / "third_party" / "sv-tests" / "tests"
 class Library(NamedTuple):
     files: tuple[str, ...]
     incdirs: tuple[str, ...]
+    defines: tuple[str, ...]
+
+
+_DEFINES_OF_LIBRARY_WITHOUT_FOREIGN_CODE: dict[str, tuple[str, ...]] = {
+    "uvm": ("UVM_NO_DPI",),
+    "uvm-1.2": ("UVM_NO_DPI",),
+}
 
 
 def load_libraries() -> dict[str, Library]:
@@ -42,7 +49,9 @@ def load_libraries() -> dict[str, Library]:
                     f"library '{tag}' names {path}, which is not checked out",
                 )
         libraries[tag] = Library(
-            tuple(str(p) for p in files), tuple(str(p) for p in incdirs),
+            tuple(str(p) for p in files),
+            tuple(str(p) for p in incdirs),
+            _DEFINES_OF_LIBRARY_WITHOUT_FOREIGN_CODE.get(tag, ()),
         )
     return libraries
 
@@ -53,11 +62,13 @@ def library_for(
     tags = metadata.get("tags", "").split()
     files: tuple[str, ...] = ()
     incdirs: tuple[str, ...] = ()
+    defines: tuple[str, ...] = ()
     for tag, entry in libraries.items():
         if tag in tags:
             files += entry.files
             incdirs += entry.incdirs
-    return Library(files, incdirs)
+            defines += entry.defines
+    return Library(files, incdirs, defines)
 
 
 def parse_args() -> argparse.Namespace:
@@ -188,11 +199,11 @@ def run_test(
     path: str,
     mode: str = "elaboration",
     defines: tuple[str, ...] | list[str] = (),
-    library: Library = Library((), ()),
+    library: Library = Library((), (), ()),
 ) -> tuple[bool, str, int]:
     option = _STAGE_OPTION_OF_MODE[mode]
     cmd = [str(BINARY)] if option is None else [str(BINARY), option]
-    for d in defines:
+    for d in (*library.defines, *defines):
         cmd.extend(["-D", d])
     for incdir in library.incdirs:
         cmd.append(f"+incdir+{incdir}")
