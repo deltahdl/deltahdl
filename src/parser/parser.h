@@ -672,6 +672,7 @@ class Parser {
   Expr* ParseIdentifierExpr();
   Expr* ParseLocalScopeExpr();
   Expr* TryParseIdentifierCast(Expr* base, bool* handled);
+  Expr* ParseCastMethodTail(Expr* cast);
   Expr* ParseIdentifierPostfixChain(Expr* result);
   Expr* ParseWithClauseTail(Expr* result);
   Expr* ParseSelectExpr(Expr* base);

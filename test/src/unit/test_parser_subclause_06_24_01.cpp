@@ -336,4 +336,53 @@ TEST(CastOperatorParsing, UnsignedCastParses) {
   EXPECT_EQ(rhs->kind, ExprKind::kCast);
 }
 
+// A.8.4 lists a cast among the primaries and A.8.6 makes a primary the root
+// of a method call, so `Cols'(2).name()` is the call of name() on the cast:
+// a call whose callee is a member select on a kCast node. Read as an
+// expression ending at the cast's ')', the '.' was reported unexpected.
+TEST(CastOperatorParsing, MethodCallOnAValueCastPrimary) {
+  auto r = Parse(
+      "module t;\n"
+      "  typedef enum {Red, Green, Blue} Cols;\n"
+      "  string s;\n"
+      "  initial s = Cols'(2).name();\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kCall);
+  ASSERT_NE(stmt->rhs->lhs, nullptr);
+  EXPECT_EQ(stmt->rhs->lhs->kind, ExprKind::kMemberAccess);
+  ASSERT_NE(stmt->rhs->lhs->lhs, nullptr);
+  EXPECT_EQ(stmt->rhs->lhs->lhs->kind, ExprKind::kCast);
+  ASSERT_NE(stmt->rhs->lhs->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->lhs->rhs->text, "name");
+}
+
+// The same tail after a cast to a keyword type, `string'(v).len()` (§6.16),
+// and a member select with no argument list after a cast, `Cols'(2).name`
+// (§6.19.5.7).
+TEST(CastOperatorParsing, MethodTailOnAKeywordCastAndWithoutArguments) {
+  auto r = Parse(
+      "module t;\n"
+      "  typedef enum {Red, Green, Blue} Cols;\n"
+      "  int n; string s;\n"
+      "  initial begin\n"
+      "    n = string'(65).len();\n"
+      "    s = Cols'(2).name;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kCall);
+  ASSERT_NE(stmt->rhs->lhs, nullptr);
+  ASSERT_NE(stmt->rhs->lhs->lhs, nullptr);
+  EXPECT_EQ(stmt->rhs->lhs->lhs->kind, ExprKind::kCast);
+}
+
 }  // namespace

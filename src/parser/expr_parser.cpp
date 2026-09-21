@@ -664,7 +664,7 @@ Expr* Parser::TryParseIdentifierCast(Expr* base, bool* handled) {
       auto* value = ParseExpr();
       auto* cast = MakeNodeCast(arena_, base, value);
       Expect(TokenKind::kRParen, Subclause("6.24.1"));
-      return cast;
+      return ParseCastMethodTail(cast);
     }
     lexer_.RestorePos(saved);
   }

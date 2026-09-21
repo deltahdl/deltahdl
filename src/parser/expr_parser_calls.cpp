@@ -167,6 +167,22 @@ Expr* Parser::ParseConcatenation() {
   return cat;
 }
 
+// A.8.4 lists a cast among the primaries and A.8.6 makes a primary the root
+// of a method call, `method_call_root . method_identifier`, so a member
+// select and a call may follow a cast: `Cols'(2).name()` is name() on the
+// value cast to Cols (§6.19.5.6), `string'(v).len()` len() on the string
+// (§6.16.1), and `Cols'(1).next` the call with no argument list (§6.19.5.7).
+// Read as ending at the cast's ')', the '.' was reported as an unexpected
+// token. A select follows no cast: A.8.4 has a bit-select or part-select
+// apply to a hierarchical identifier and not to a primary.
+Expr* Parser::ParseCastMethodTail(Expr* cast) {
+  while (Check(TokenKind::kDot)) {
+    cast = MakeMemberAccess(cast);
+    if (Check(TokenKind::kLParen)) cast = ParseCallExpr(cast);
+  }
+  return cast;
+}
+
 Expr* Parser::ParseCastExpr() {
   auto type_tok = Consume();
   // A.8.4's casting_type is `simple_type | constant_primary | signing |
@@ -189,7 +205,7 @@ Expr* Parser::ParseCastExpr() {
   cast->range.start = type_tok.loc;
   cast->lhs = ParseExpr();
   Expect(TokenKind::kRParen, Subclause("6.24.1"));
-  return cast;
+  return ParseCastMethodTail(cast);
 }
 
 // A.2.10: the `with [ ... ]` array range of a §7.12.1 array manipulation call

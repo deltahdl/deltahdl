@@ -425,6 +425,32 @@ static bool IsEnumTypedMethodCall(const Expr* e) {
          ReturnsTheEnumType(callee->rhs->text);
 }
 
+// §6.24.1 with A.8.4: a static cast is a primary of its casting type, so
+// `Cols'(2)` is an expression of the enumeration Cols and `C::e_t'(1)` of
+// the class-scoped one (§8.23). The casting type stands in the cast's rhs as
+// the parser read it, a name or a scoped name, and a cast written with a
+// keyword type (`int'(x)`, held in the node's text) names no enumeration.
+static const EnumTypeInfo* EnumTypeOfCast(const Expr* e, SimContext& ctx) {
+  const Expr* type_node = e->rhs;
+  if (type_node == nullptr) return nullptr;
+  DataType type;
+  type.kind = DataTypeKind::kNamed;
+  if (type_node->kind == ExprKind::kIdentifier) {
+    type.scope_name = type_node->scope_prefix;
+    type.type_name = type_node->text;
+  } else if (type_node->kind == ExprKind::kMemberAccess &&
+             type_node->is_scope_resolution && type_node->lhs != nullptr &&
+             type_node->rhs != nullptr &&
+             type_node->lhs->kind == ExprKind::kIdentifier &&
+             type_node->rhs->kind == ExprKind::kIdentifier) {
+    type.scope_name = type_node->lhs->text;
+    type.type_name = type_node->rhs->text;
+  } else {
+    return nullptr;
+  }
+  return EnumTypeOfDeclaredType(type, {ctx.CurrentMethodClass(), {}}, ctx);
+}
+
 // The enumeration an expression carries, by the declaration behind it, as
 // deep as a chain of calls is written (`s.first().next().name()`); described
 // in evaluation.h.
@@ -432,6 +458,7 @@ const EnumTypeInfo* EnumTypeOfExpr(const Expr* e, SimContext& ctx,
                                    Arena& arena) {
   if (e == nullptr) return nullptr;
   if (e->kind == ExprKind::kIdentifier) return EnumTypeOfName(e, ctx);
+  if (e->kind == ExprKind::kCast) return EnumTypeOfCast(e, ctx);
   if (e->kind == ExprKind::kMemberAccess)
     return EnumTypeOfMemberAccess(e, ctx, arena);
   if (e->kind != ExprKind::kCall || e->lhs == nullptr) return nullptr;

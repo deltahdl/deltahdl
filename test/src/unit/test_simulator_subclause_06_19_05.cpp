@@ -347,6 +347,26 @@ TEST(EnumMethodReceivers, PropertyAfterADelayInATask) {
             "t=0 e=green\nt=5 e=blue\nt=10 e=yellow\n");
 }
 
+// §6.24.1 with A.8.4: a static cast to the enumeration is a primary of that
+// type, so §6.19.5.6's name() is called on it: `Cols'(Su)` holds Su's 6,
+// which is no member of Cols, so name() answers the empty string (§6.19.5.6),
+// and `Cols'(2)` holds Blue; `Cols'(1).next.name` chains without parentheses
+// (§6.19.5.7).
+TEST(EnumMethodReceivers, StaticCastResult) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  typedef enum {Red, Green, Blue} Cols;\n"
+                 "  typedef enum {Mo, Tu, We, Th, Fr, Sa, Su} Week;\n"
+                 "  initial begin\n"
+                 "    $display(\"name=[%s] n2=%s nn=%s\", Cols'(Su).name(),\n"
+                 "             Cols'(2).name(), Cols'(1).next.name);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "name=[] n2=Blue nn=Blue\n");
+}
+
 // §6.19.5.7 (printed page 124) writes its own example with `c.first`,
 // `c.name`, `c.last` and `c.next` and no argument list, the form A.8.6's
 // method_call_body admits for a method taking no arguments: each of the six
