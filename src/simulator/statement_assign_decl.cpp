@@ -633,6 +633,18 @@ static void InitializeDeclVariable(const Stmt* stmt, const DeclaredObject& obj,
   Variable* var = obj.var;
   var->is_4state = Is4stateType(stmt->var_decl_type.kind);
   if (!var->is_4state) CoerceTo2State(var->value);
+  // §6.8 (Table 6-7): a 4-state local starts as 'x whatever the scope's
+  // lifetime, as a module's does (§13.3, §13.4). A local of an automatic
+  // task or block is made by SimContext::CreateLocalVariable, which fills it
+  // with 0 where CreateVariable fills a module's with x, so `logic l;` in an
+  // automatic task read 0. A virtual interface keeps the null handle set
+  // above, and a declaration with unpacked dimensions is the element-width
+  // carrier its elements are sized from rather than a value.
+  if (var->is_4state && !var->is_virtual_interface && !stmt->var_init &&
+      stmt->var_unpacked_dims.empty() && var->value.width > 0) {
+    var->value = MakeAllX(arena, var->value.width);
+    var->value.is_signed = var->is_signed;
+  }
   if (stmt->var_init) {
     Logic4Vec val = EvalExpr(stmt->var_init, ctx, arena);
     if (stmt->var_unpacked_dims.empty()) {

@@ -33,6 +33,14 @@ class Arena;
 // resolved kind this far.
 bool DeclaredTypeIs4State(const DataType& type);
 
+// §13.3 and §13.4 with §6.8: executes the variable declaration `stmt` of the
+// body of the subroutine `func_name` -- the local's storage, kinds, default
+// and initializer, kept across calls for a static one (§13.4.2) under the
+// subroutine's name. Defined in eval_function_body_decl.cpp; called by the
+// statement executor in eval_function_body.cpp.
+void ExecFuncVarDecl(const Stmt* stmt, std::string_view func_name,
+                     SimContext& ctx, Arena& arena);
+
 // §10.4's blocking assignment as a subroutine body performs it, over every
 // left-hand side that body admits: an identifier, a select, `this.f`,
 // `super.f`, an unqualified property of the enclosing object, and the member of

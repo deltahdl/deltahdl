@@ -457,6 +457,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/eval_function_args_tagged.cpp
     simulator/eval_function_args_writeback.cpp
     simulator/eval_function_body.cpp
+    simulator/eval_function_body_decl.cpp
     simulator/eval_function_body_assign.cpp
     simulator/eval_function_dpi.cpp
     simulator/eval_let.cpp

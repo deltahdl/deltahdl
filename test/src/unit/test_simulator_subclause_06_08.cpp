@@ -436,37 +436,40 @@ TEST(VariableDeclaration, KeyedPatternStatementUncoveredElementTakesTable67) {
 // subroutine body takes 'x whatever the subroutine's lifetime -- in an
 // automatic function, an automatic task, a class method and a static
 // function -- while the int, string and real beside it take 0, "" and 0.0.
-// Each read 0 where a module-scope logic read x.
+// Each read 0 where a module-scope logic read x. The static function's local
+// is a 4-bit vector printed in binary, since how %0h renders a vector of
+// unknowns is §21.2.1.2's question and not this one.
 TEST(VariableDeclaration, Logic4StateSubroutineLocalDefaultsToX) {
   SimFixture f;
-  EXPECT_EQ(RunCapture(
-                "module t;\n"
-                "  function automatic void fa();\n"
-                "    logic l; logic [3:0] v; int n; string s; real r;\n"
-                "    $display(\"fa: l=%0h v=%b n=%0d s=[%s] r=%f\", l, v, n, s,"
-                " r);\n"
-                "  endfunction\n"
-                "  task automatic ta();\n"
-                "    logic l;\n"
-                "    $display(\"ta: l=%0h\", l);\n"
-                "  endtask\n"
-                "  function void fs();\n"
-                "    integer i;\n"
-                "    $display(\"fs: i=%0h\", i);\n"
-                "  endfunction\n"
-                "  class C;\n"
-                "    function void m();\n"
-                "      logic l;\n"
-                "      $display(\"m: l=%0h\", l);\n"
-                "    endfunction\n"
-                "  endclass\n"
-                "  C c;\n"
-                "  initial begin\n"
-                "    fa(); ta(); fs(); c = new; c.m();\n"
-                "  end\n"
-                "endmodule\n",
-                f),
-            "fa: l=x v=xxxx n=0 s=[] r=0.000000\nta: l=x\nfs: i=x\nm: l=x\n");
+  EXPECT_EQ(
+      RunCapture(
+          "module t;\n"
+          "  function automatic void fa();\n"
+          "    logic l; logic [3:0] v; int n; string s; real r;\n"
+          "    $display(\"fa: l=%0h v=%b n=%0d s=[%s] r=%f\", l, v, n, s,"
+          " r);\n"
+          "  endfunction\n"
+          "  task automatic ta();\n"
+          "    logic l;\n"
+          "    $display(\"ta: l=%0h\", l);\n"
+          "  endtask\n"
+          "  function void fs();\n"
+          "    logic [3:0] i;\n"
+          "    $display(\"fs: i=%b\", i);\n"
+          "  endfunction\n"
+          "  class C;\n"
+          "    function void m();\n"
+          "      logic l;\n"
+          "      $display(\"m: l=%0h\", l);\n"
+          "    endfunction\n"
+          "  endclass\n"
+          "  C c;\n"
+          "  initial begin\n"
+          "    fa(); ta(); fs(); c = new; c.m();\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "fa: l=x v=xxxx n=0 s=[] r=0.000000\nta: l=x\nfs: i=xxxx\nm: l=x\n");
 }
 
 }  // namespace
