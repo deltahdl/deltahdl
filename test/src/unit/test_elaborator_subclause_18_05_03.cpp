@@ -95,4 +95,54 @@ TEST(RealDistRange, InheritedRealTargetChecked) {
                             5, "18.5.3"));
 }
 
+// 18.5.3: a dist operation shall not be applied to a randc variable. The
+// qualifier and the distribution are both declarations, so the class is
+// rejected as declared, before any randomize() call; the report stands at the
+// distributed variable, on line 3 with the constraint.
+TEST(DistOnRandc, RandcTargetRejected) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("class a;\n"
+             "  randc int b;\n"
+             "  constraint c { b dist {3 := 0, 10 := 5}; }\n"
+             "endclass\n"
+             "module m; endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "a dist constraint may not be applied to randc variable 'b'", 3,
+      "18.5.3"));
+}
+
+// 18.5.3: the limitation is on the randc qualifier, not on dist itself; the
+// same distribution over a rand variable elaborates.
+TEST(DistOnRandc, RandTargetAccepted) {
+  EXPECT_TRUE(
+      ElabOk("class a;\n"
+             "  rand int b;\n"
+             "  constraint c { b dist {3 := 0, 10 := 5}; }\n"
+             "endclass\n"
+             "module m; endmodule\n"));
+}
+
+// 18.5.3: the distributed variable may be an inherited randc property; the
+// target is resolved through the base-class chain, so the derived class's
+// dist over it is rejected, on line 5 where that dist stands.
+TEST(DistOnRandc, InheritedRandcTargetRejected) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("class B;\n"
+             "  randc int b;\n"
+             "endclass\n"
+             "class D extends B;\n"
+             "  constraint c { b dist {3 := 0, 10 := 5}; }\n"
+             "endclass\n"
+             "module m; endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "a dist constraint may not be applied to randc variable 'b'", 5,
+      "18.5.3"));
+}
+
 }  // namespace

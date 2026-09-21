@@ -233,8 +233,15 @@ void ClassConstraintValidator::ValidateForeachConstraintDims() {
     ValidateOneClassForeachConstraintDims(cls);
 }
 
-// 18.5.3: a range of real values in a distribution shall use the :/ operator
-// and shall specify a weight. When the distributed variable is real-typed,
+// 18.5.3 lists among its limitations that a dist operation is not applied to a
+// randc variable. Both the qualifier and the distribution are declarations, so
+// the breach is decided from the class text and reported here, at the
+// distributed variable, rather than left to the randomize() call the solver
+// refuses at run time (constraint_solver.cpp, HasDistOnRandc), which a design
+// that never randomizes the object would not reach.
+//
+// 18.5.3 also requires that a range of real values in a distribution use the :/
+// operator and specify a weight. When the distributed variable is real-typed,
 // every range item of its distribution is a real-valued range, so it may
 // neither use
 // := (which spreads the weight per element — meaningful only for an integral
@@ -243,7 +250,7 @@ void ClassConstraintValidator::ValidateForeachConstraintDims() {
 // with no weight. A real range whose per_element flag is set therefore violates
 // the rule and is rejected; a :/ range (per_element clear, weight always
 // present) is accepted. The target is resolved against the class property map
-// so an inherited real member is recognized.
+// so an inherited randc or real member is recognized.
 static void CheckOneDistConstraintRef(
     const ConstraintDistRef& ref,
     const std::unordered_map<std::string_view, const ClassMember*>& properties,
@@ -252,6 +259,13 @@ static void CheckOneDistConstraintRef(
     return;
   auto it = properties.find(ref.target->text);
   if (it == properties.end()) return;
+  if (it->second->is_randc) {
+    diag.Error(ref.target->range.start,
+               std::format("a dist constraint may not be applied to randc "
+                           "variable '{}'",
+                           ref.target->text),
+               Subclause("18.5.3"));
+  }
   if (!IsRealDataType(it->second->data_type.kind)) return;
   for (const auto& item : ref.items) {
     if (!item.is_range || !item.per_element) continue;

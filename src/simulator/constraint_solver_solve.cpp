@@ -253,7 +253,10 @@ bool ConstraintSolver::SolveWith(
 
   // 18.5.3: a dist operation shall not be applied to a randc variable, and a
   // dist expression requires at least one rand variable. A distribution that
-  // violates either limitation makes randomization fail outright.
+  // violates either limitation makes randomization fail outright. The
+  // elaborator already reports the randc form in a compilation-unit class
+  // (elaborator_validate_class_constraints.cpp); the refusal here is what a
+  // class its validation does not walk meets.
   if (HasDistOnRandc()) return false;
   if (DistLacksRandVariable()) return false;
 
