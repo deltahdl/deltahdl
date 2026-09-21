@@ -660,6 +660,34 @@ bool ForeignCodeIsWellFormed(const delta::CliOptions& opts,
          ForeignLibrariesArePresent(bootstrap_libraries, opts.sv_libs, diag);
 }
 
+// What the run does with a parsed compilation unit, chosen by the options
+// that name a stage: --dump-ast prints the tree and goes on; --parse-only,
+// "Parse only", ends the run here, after the parse's own reports have already
+// returned 1, with the status --lint-only gave before it elaborated, so a
+// source only the elaborator rejects passes, which is what a file meant to
+// test the preprocessor or the parser alone asks for; --lint-only elaborates
+// and stops; --synth synthesizes; and with none of them the design is
+// simulated.
+int RunParsedUnit(const delta::CliOptions& opts, delta::CompilationUnit* cu,
+                  delta::DiagEngine& diag) {
+  if (opts.dump_ast) {
+    DumpAst(cu);
+  }
+  if (opts.parse_only) {
+    std::cout << "parse pass: no errors\n";
+    return 0;
+  }
+
+  delta::Arena elab_arena;
+  if (opts.lint_only) {
+    return RunLint(opts, cu, diag, elab_arena);
+  }
+  if (opts.synth_mode) {
+    return RunSynthesis(opts, cu, diag, elab_arena);
+  }
+  return RunSimulationOnDeepStack(opts, cu, diag, elab_arena);
+}
+
 int main(int argc, char* argv[]) {
   RecordInvocationCommandLine(argc, argv);
 
@@ -707,25 +735,5 @@ int main(int argc, char* argv[]) {
     return 1;
   }
   ApplyPreprocMetadata(cu, pp);
-
-  if (opts.dump_ast) {
-    DumpAst(cu);
-  }
-  // --parse-only, "Parse only": the run ends here, after the parse's own
-  // reports have returned 1 above, with the status --lint-only gave before it
-  // elaborated. A source only the elaborator rejects passes, which is what a
-  // file meant to test the preprocessor or the parser alone asks for.
-  if (opts.parse_only) {
-    std::cout << "parse pass: no errors\n";
-    return 0;
-  }
-
-  delta::Arena elab_arena;
-  if (opts.lint_only) {
-    return RunLint(opts, cu, diag, elab_arena);
-  }
-  if (opts.synth_mode) {
-    return RunSynthesis(opts, cu, diag, elab_arena);
-  }
-  return RunSimulationOnDeepStack(opts, cu, diag, elab_arena);
+  return RunParsedUnit(opts, cu, diag);
 }
