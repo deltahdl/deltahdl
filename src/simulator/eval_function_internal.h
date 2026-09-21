@@ -41,6 +41,15 @@ bool DeclaredTypeIs4State(const DataType& type);
 void ExecFuncVarDecl(const Stmt* stmt, std::string_view func_name,
                      SimContext& ctx, Arena& arena);
 
+// §6.18 with §7.2.1: binds the variable `var_name` to the layout its typedef
+// name `type` stands for, where the name is a registered structure or union
+// (RegisterDesignTypeLayouts), so a member read or write of it is a window of
+// that layout. Answers whether a layout was bound. Defined in
+// eval_function_body_decl.cpp; also used for the subroutine's implicit
+// variable by BindReturnStructLayout in eval_function_body.cpp.
+bool BindNamedLayout(std::string_view var_name, const DataType& type,
+                     SimContext& ctx);
+
 // §10.4's blocking assignment as a subroutine body performs it, over every
 // left-hand side that body admits: an identifier, a select, `this.f`,
 // `super.f`, an unqualified property of the enclosing object, and the member of

@@ -44,8 +44,8 @@ bool DeclaredTypeIs4State(const DataType& type) {
 // written inline, which has no name the table could hold -- binds nothing.
 // The subroutine's implicit variable (BindReturnStructLayout) and a body
 // local (BindLocalAggregateLayout) are bound through here alike.
-static bool BindNamedLayout(std::string_view var_name, const DataType& type,
-                            SimContext& ctx) {
+bool BindNamedLayout(std::string_view var_name, const DataType& type,
+                     SimContext& ctx) {
   std::string_view type_name = type.type_name;
   if (type_name.empty() || ctx.FindStructType(type_name) == nullptr)
     return false;
@@ -120,8 +120,10 @@ static Logic4Vec EvalLocalInitializer(const DataType& type, const Expr* init,
 // at 0 by CreateLocalVariable, a body's `logic l;` read 0 where the module's
 // read x. A handle and a virtual interface are no 4-state values and keep
 // the 0 that is null, and a string, created with no width, keeps its "".
-static void FillLocalDefault(Variable* v, bool holds_a_handle, Arena& arena) {
-  if (!v->is_4state || holds_a_handle || v->is_string) return;
+static void FillLocalDefault(Variable* v, bool has_initializer,
+                             bool holds_a_handle, Arena& arena) {
+  if (has_initializer || !v->is_4state || holds_a_handle || v->is_string)
+    return;
   v->value = MakeAllX(arena, v->value.width);
   v->value.is_signed = v->is_signed;
 }
@@ -149,6 +151,7 @@ static Variable* CreateFuncLocalVar(std::string_view name, const DataType& type,
   // 32-bit vector no reader took for a virtual interface, and `v.clk` named
   // nothing.
   bool is_virtual_interface = DeclaresAVirtualInterface(type, ctx);
+  bool holds_a_handle = is_class || is_virtual_interface;
   // §6.18: a local declared with a user-defined type name is an object of the
   // type that name stands for, so `nib v` is as wide as `nib` is.
   // DeclaredTypeWidth is what reaches that width; the one-argument
@@ -157,8 +160,7 @@ static Variable* CreateFuncLocalVar(std::string_view name, const DataType& type,
   // site a subroutine body's declaration takes -- the statement executor's own
   // ExecVarDeclImpl serves a declaration outside a subroutine -- so the two
   // have to reach the typedef table separately.
-  uint32_t declared =
-      is_class || is_virtual_interface ? 64 : DeclaredTypeWidth(type, ctx);
+  uint32_t declared = holds_a_handle ? 64 : DeclaredTypeWidth(type, ctx);
   // §6.16: a string has no declared width and starts as "", so it is created
   // with none rather than at the carrier width below, and marked so that what
   // reads a string reads the flag rather than a width. A declaration outside a
@@ -177,8 +179,7 @@ static Variable* CreateFuncLocalVar(std::string_view name, const DataType& type,
   v->is_4state = DeclaredTypeIs4State(type);
   v->is_virtual_interface = is_virtual_interface;
   if (is_string) v->is_string = true;
-  if (init == nullptr)
-    FillLocalDefault(v, is_class || is_virtual_interface, arena);
+  FillLocalDefault(v, init != nullptr, holds_a_handle, arena);
   if (is_class) ctx.SetVariableClassType(name, class_key);
   RecordVariableEnumType(name, type, ctx);
   // §11.5.1: the declared range an index of the local resolves against, the
@@ -186,7 +187,7 @@ static Variable* CreateFuncLocalVar(std::string_view name, const DataType& type,
   // recorded as ExecVarDeclImpl records it for a procedure's declaration; a
   // body local had none and was addressed as [width-1:0] whatever its
   // declaration said.
-  if (!is_class && !is_virtual_interface) {
+  if (!holds_a_handle) {
     RecordDeclaredRange(type, v, ctx, arena);
     // §6.18 with §7.3.2: the members the local's typedef name declares, and
     // the tag a `tagged` initializer gives a tagged union local.
