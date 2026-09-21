@@ -469,7 +469,8 @@ static void CollectAggregateDriverTargets(
   }
 }
 
-// Multiple continuous assignments writing to overlapping element prefixes.
+// Multiple continuous assignments writing to overlapping element prefixes,
+// which §6.5's precise rule states in terms of the longest static prefix.
 // Whole-identifier vs whole-identifier pairs are already diagnosed by
 // ValidateContAssignIdentLhs, so at least one side of a reported pair must be
 // an aggregate element.
@@ -483,7 +484,7 @@ static void CheckOverlappingContTargets(const std::vector<ContTarget>& conts,
                    std::format("multiple continuous assignments drive "
                                "overlapping element '{}'",
                                conts[j].prefix),
-                   Subclause("10.3.2"));
+                   Subclause("6.5"));
       }
     }
   }

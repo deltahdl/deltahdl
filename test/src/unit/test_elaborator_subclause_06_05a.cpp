@@ -90,10 +90,11 @@ TEST(NetsAndVariables, VariableMultipleContinuousAssignmentsError) {
       "endmodule\n",
       f);
   // ValidateContAssignIdentLhs files the second whole-variable continuous
-  // driver under §10.3.2, and stands it at that second assignment.
+  // driver under §6.5, where the standard states the rule in full (§10.3.2
+  // restates it and refers back), and stands it at that second assignment.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "multiple continuous assignments to 'v'", 4,
-                            "10.3.2"));
+                            "6.5"));
 }
 
 TEST(NetsAndVariables, VariableMixedContinuousAndProceduralError) {
@@ -310,11 +311,12 @@ TEST(NetsAndVariables, SamePackedBitMultipleContinuousAssignmentsError) {
       "endmodule\n",
       f);
   // CheckOverlappingContTargets names the overlapping prefix and files it under
-  // §10.3.2, standing it at the second of the two assignments.
+  // §6.5, whose precise rule is written in terms of the longest static prefix,
+  // standing it at the second of the two assignments.
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "multiple continuous assignments drive overlapping element 'v[0]'", 4,
-      "10.3.2"));
+      "6.5"));
 }
 
 // §6.5: the same per-element rule applies to an element of an unpacked array;
@@ -331,7 +333,7 @@ TEST(NetsAndVariables, UnpackedArrayElementMultipleContinuousAssignmentsError) {
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "multiple continuous assignments drive overlapping element 'mem[0]'", 4,
-      "10.3.2"));
+      "6.5"));
 }
 
 // §6.5: distinct elements of an unpacked array have non-overlapping longest
@@ -392,7 +394,7 @@ TEST(NetsAndVariables, StructMemberMultipleContinuousAssignmentsError) {
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "multiple continuous assignments drive overlapping element 'abc.c'", 9,
-      "10.3.2"));
+      "6.5"));
 }
 
 // §6.5: identifying the driven element by its longest static prefix admits a
@@ -417,7 +419,7 @@ TEST(NetsAndVariables,
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "multiple continuous assignments drive overlapping element 'v[0]'", 5,
-      "10.3.2"));
+      "6.5"));
 }
 
 // §6.5: localparam indices (another constant form of §11.2.1) that resolve to

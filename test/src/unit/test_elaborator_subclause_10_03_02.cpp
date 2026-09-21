@@ -69,9 +69,11 @@ TEST(ContAssignStatementElaboration, VarMultipleContAssignsErrors) {
       "  assign v = 1'b1;\n"
       "endmodule\n",
       f);
+  // §10.3.2 restates the one-continuous-assignment rule and refers to §6.5,
+  // which states it in full, so the report carries §6.5.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "multiple continuous assignments to 'v'", 4,
-                            "10.3.2"));
+                            "6.5"));
 }
 
 TEST(ContAssignStatementElaboration, NettypeLhsWithSelectErrors) {

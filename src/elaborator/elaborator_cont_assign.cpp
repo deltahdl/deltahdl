@@ -22,9 +22,12 @@ void Elaborator::ValidateContAssignIdentLhs(ModuleItem* item,
   MaybeCreateImplicitNet(name, item->loc, mod);
   if (!cont_assign_targets_.emplace(name, item->loc).second) {
     if (net_names_.count(name) == 0) {
+      // §6.5 states the rule in full: multiple continuous assignments to any
+      // term in the expansion of a variable's longest static prefix are an
+      // error. §10.3.2 restates it and refers back, so the report cites §6.5.
       diag_.Error(item->loc,
                   std::format("multiple continuous assignments to '{}'", name),
-                  Subclause("10.3.2"));
+                  Subclause("6.5"));
     } else {
       auto it = var_types_.find(name);
       if (it != var_types_.end() && it->second == DataTypeKind::kUwire) {
