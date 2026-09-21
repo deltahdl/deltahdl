@@ -777,4 +777,55 @@ TEST(TwoStateAndFourState, TwoStateArrayInitLeavesItsSourceVariableAlone) {
   EXPECT_EQ(var->value.ToString(), "xxxxxxxx");
 }
 
+// §6.11.2 with §11.8.2: a declaration initializer is an assignment, so the
+// unsized `-1` is negated at the variable's 64 bits and fills a longint and
+// a time with ones, -1 and 18446744073709551615 (Table 6-8 has time 64 bits
+// and unsigned); the negation was done at the literal's 32 bits and the
+// result zero-extended, reading 4294967295 for both where the write from an
+// int variable and a 64-bit shift were sign-extended.
+TEST(TwoStateAndFourState, NegativeInitializerFillsALongintAndATime) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  longint lo = -1, lo2; time t = -1; longint neg;\n"
+                 "  int i = -5;\n"
+                 "  initial begin\n"
+                 "    lo2 = i;\n"
+                 "    neg = -(64'd1 << 32);\n"
+                 "    $display(\"lo=%0d lo2=%0d t=%0d neg=%0d\", lo, lo2, "
+                 "t, neg);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "lo=-1 lo2=-5 t=18446744073709551615 neg=-4294967296\n");
+}
+
+// §6.11.3 with §6.11.2: byte, shortint, int, integer and longint are signed
+// and read their initializers back as negatives, `byte by = 200` being -56
+// once the 32-bit 200 is cut to 8 bits; bit, logic, time and an explicit
+// `unsigned` are unsigned and read -1 as all ones at their own width; an
+// explicit `signed` on int and on a bit vector reads -1.
+TEST(TwoStateAndFourState, SignednessDefaultsDecideTheReadOfAnInitializer) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  byte by = 200; shortint sh = 16'hFFFF;\n"
+                 "  int i = 32'hFFFFFFFF; longint lo = -1; integer in = -1;\n"
+                 "  bit [7:0] b = -1; logic [7:0] l = -1;\n"
+                 "  int unsigned ui = -1; time t = -1;\n"
+                 "  int signed si = -1; bit signed [7:0] sb = 8'hFF;\n"
+                 "  logic unsigned [31:0] ul = -1;\n"
+                 "  initial begin\n"
+                 "    $display(\"by=%0d sh=%0d i=%0d lo=%0d in=%0d\", by, sh, "
+                 "i, lo, in);\n"
+                 "    $display(\"b=%0d l=%0d ui=%0d t=%0d\", b, l, ui, t);\n"
+                 "    $display(\"si=%0d sb=%0d ul=%0d\", si, sb, ul);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "by=-56 sh=-1 i=-1 lo=-1 in=-1\n"
+      "b=255 l=255 ui=4294967295 t=18446744073709551615\n"
+      "si=-1 sb=-1 ul=4294967295\n");
+}
+
 }  // namespace
