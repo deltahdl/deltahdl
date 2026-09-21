@@ -301,8 +301,14 @@ def reported_subclauses(stderr: str) -> list[str]:
 
 _CLAUSE_PREFIX_RE = re.compile(r"(\d+(?:\.\d+)*)--")
 
+_CLAUSE_OF_MISTAGGED_FILE: dict[str, str] = {
+    "13.4.4--fork-invalid.sv": "13.4",
+}
+
 
 def tagged_clause(metadata: dict[str, str], name: str) -> str:
+    if name in _CLAUSE_OF_MISTAGGED_FILE:
+        return _CLAUSE_OF_MISTAGGED_FILE[name]
     tags = metadata.get("tags", "").split()
     if tags and re.fullmatch(r"\d+(?:\.\d+)*", tags[0]):
         return tags[0]

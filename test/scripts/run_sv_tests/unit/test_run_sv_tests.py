@@ -726,6 +726,18 @@ def test_rejection_under_the_2023_number_of_a_renumbered_tag_evaluates_as_a_pass
     assert (ok, result["status"]) == (1, "pass")
 
 
+def test_rejection_under_the_rule_a_mistagged_file_tests_evaluates_as_a_pass(
+    rst: ModuleType, tmp_path: Path,
+) -> None:
+    sv = _write_expected_rejection(tmp_path, "13.4.4", "13.4.4--fork-invalid.sv")
+    result, ok = _evaluate_rejection_of_file(
+        rst, sv, 1,
+        "13.4.4--fork-invalid.sv:21:2: error: only fork/join_none is permitted"
+        " inside a function (§13.4)\n",
+    )
+    assert (ok, result["status"]) == (1, "pass")
+
+
 def test_rejection_within_the_2023_number_of_a_renumbered_tag_evaluates_as_a_pass(
     rst: ModuleType, tmp_path: Path,
 ) -> None:
