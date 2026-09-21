@@ -643,7 +643,7 @@ Expr* Parser::TryParseUserTypeCast(const Token& tok) {
   auto* value = ParseExpr();
   auto* cast = MakeTextCast(arena_, tok.text, tok.loc, value);
   Expect(TokenKind::kRParen, Subclause("6.24.1"));
-  return cast;
+  return ParseCastMethodTail(cast);
 }
 
 // An identifier or scoped name may be the casting_type of a cast: "id'{...}"

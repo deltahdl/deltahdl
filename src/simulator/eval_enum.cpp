@@ -428,14 +428,17 @@ static bool IsEnumTypedMethodCall(const Expr* e) {
 // §6.24.1 with A.8.4: a static cast is a primary of its casting type, so
 // `Cols'(2)` is an expression of the enumeration Cols and `C::e_t'(1)` of
 // the class-scoped one (§8.23). The casting type stands in the cast's rhs as
-// the parser read it, a name or a scoped name, and a cast written with a
-// keyword type (`int'(x)`, held in the node's text) names no enumeration.
+// the parser read it, a name or a scoped name, or in the node's text for a
+// name the parser knew as a type when it read it (TryParseUserTypeCast) and
+// for a keyword type, `int'(x)`, which names no enumeration.
 static const EnumTypeInfo* EnumTypeOfCast(const Expr* e, SimContext& ctx) {
   const Expr* type_node = e->rhs;
-  if (type_node == nullptr) return nullptr;
   DataType type;
   type.kind = DataTypeKind::kNamed;
-  if (type_node->kind == ExprKind::kIdentifier) {
+  if (type_node == nullptr) {
+    if (e->text.empty()) return nullptr;
+    type.type_name = e->text;
+  } else if (type_node->kind == ExprKind::kIdentifier) {
     type.scope_name = type_node->scope_prefix;
     type.type_name = type_node->text;
   } else if (type_node->kind == ExprKind::kMemberAccess &&
