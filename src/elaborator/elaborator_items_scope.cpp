@@ -100,6 +100,13 @@ bool Elaborator::ContainsDollarSubexpr(const Expr* e) const {
   return ExprContainsDollarSubexpr(e);
 }
 
+// var_types_ records every explicit net and variable declaration and
+// net_names_ the implicit nets beside the explicit ones, so the two together
+// answer for every net or variable the module has declared so far.
+bool Elaborator::DeclaresNetOrVariable(std::string_view name) const {
+  return var_types_.count(name) != 0 || net_names_.count(name) != 0;
+}
+
 std::string_view Elaborator::ScopedName(std::string_view base) {
   if (gen_prefix_.empty()) return base;
   std::string full = gen_prefix_ + std::string(base);

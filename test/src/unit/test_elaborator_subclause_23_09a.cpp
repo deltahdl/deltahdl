@@ -54,7 +54,10 @@ void ExpectLoopArrayNameConflictsWith(const std::string& module_level_decl) {
 }
 
 // §23.9: an identifier shall be used to declare only one item within a
-// scope. Two nets sharing a name in the same module scope is illegal.
+// scope. Two nets sharing a name in the same module scope is illegal. §6.5's
+// closing sentence names this case, a net or variable redeclaring a name a net
+// or variable declared, so the report cites §6.5; §23.9 is the citation when
+// the earlier declaration is of another kind, as the task case below reads.
 TEST(ScopeRulesElaboration, DuplicateIdentifierInSameScopeRejected) {
   ElabFixture f;
   ElabOk(
@@ -64,12 +67,13 @@ TEST(ScopeRulesElaboration, DuplicateIdentifierInSameScopeRejected) {
       "endmodule\n",
       f);
   EXPECT_TRUE(
-      ReportedError(f.diag.Diagnostics(), "redeclaration of 'w'", 3, "23.9"));
+      ReportedError(f.diag.Diagnostics(), "redeclaration of 'w'", 3, "6.5"));
 }
 
 // §23.9: the same rule applies to the construct the LRM names first — two
 // variable declarations sharing a name in one scope. This exercises the
-// variable declaration form rather than the net form above.
+// variable declaration form rather than the net form above, and it is §6.5's
+// case for the same reason.
 TEST(ScopeRulesElaboration, DuplicateVariableDeclarationInSameScopeRejected) {
   ElabFixture f;
   ElabOk(
@@ -79,7 +83,7 @@ TEST(ScopeRulesElaboration, DuplicateVariableDeclarationInSameScopeRejected) {
       "endmodule\n",
       f);
   EXPECT_TRUE(
-      ReportedError(f.diag.Diagnostics(), "redeclaration of 'x'", 3, "23.9"));
+      ReportedError(f.diag.Diagnostics(), "redeclaration of 'x'", 3, "6.5"));
 }
 
 // §23.9 also forbids naming a task the same as a variable in the same
@@ -220,13 +224,16 @@ TEST(ScopeRulesElaboration, DuplicateNamedBlockLabelsInSameScopeRejected) {
 
 // §23.9: the report that rejects a name declared twice in one scope names the
 // subclause stating the rule, so a caller learns which rule was enforced
-// without matching the wording of the message.
+// without matching the wording of the message. A function reusing a net's
+// name is §23.9's general rule and not the net-or-variable case §6.5 names.
 TEST(ScopeRulesElaboration, DuplicateIdentifierNames23_9) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
       "  wire w;\n"
-      "  wire w;\n"
+      "  function int w();\n"
+      "    return 1;\n"
+      "  endfunction\n"
       "endmodule\n",
       f);
   EXPECT_TRUE(

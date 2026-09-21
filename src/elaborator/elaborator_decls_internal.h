@@ -45,6 +45,10 @@ struct DeclNameTables {
   // key so distinct loop-iteration instances do not collide. Equals the bare
   // name for an unprefixed top-level declaration.
   std::string_view scoped_name;
+  // Whether the name the declaration reuses was declared by a net or a
+  // variable of this module, the case §6.5's closing sentence names; a clash
+  // with a declaration of any other kind is §23.9's general rule.
+  bool redeclares_net_or_variable;
 };
 
 // §23.2.2.1: the declared type whose vector width is reconciled against an

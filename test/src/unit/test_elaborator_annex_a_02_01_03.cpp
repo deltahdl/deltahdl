@@ -233,8 +233,10 @@ TEST(TypeDeclElaboration, ErrorRedeclarationDetected) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
+  // A variable redeclaring a variable is the case §6.5's closing sentence
+  // names, so the report carries §6.5 rather than §23.9's general rule.
   EXPECT_TRUE(
-      ReportedError(f.diag.Diagnostics(), "redeclaration of 'x'", 3, "23.9"));
+      ReportedError(f.diag.Diagnostics(), "redeclaration of 'x'", 3, "6.5"));
 }
 
 TEST(TypeDeclElaboration, ErrorVectoredOrScalaredWithoutPackedDim) {

@@ -450,8 +450,10 @@ TEST(ImplicitDeclaration, ExplicitNetAfterImplicitInOneGenerateBlockIsRedecl) {
       "  endgenerate\n"
       "endmodule\n",
       f);
+  // The implicit net is a net, so the explicit one redeclares a name a net
+  // declared: §6.5's own case, and its citation.
   EXPECT_TRUE(
-      ReportedError(f.diag.Diagnostics(), "redeclaration of 'w'", 5, "23.9"));
+      ReportedError(f.diag.Diagnostics(), "redeclaration of 'w'", 5, "6.5"));
 }
 
 // §6.10 with §27.4: each iteration of a loop generate block is its own scope,

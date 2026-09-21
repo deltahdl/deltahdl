@@ -804,7 +804,8 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   CheckDeclRedeclaration(
       item, {item->data_type, typedefs_},
       {ansi_port_names_, non_ansi_complete_ports_, non_ansi_partial_ports_,
-       declared_names_, ScopedName(item->name)},
+       declared_names_, ScopedName(item->name),
+       DeclaresNetOrVariable(item->name)},
       "variable", diag_);
 
   RegisterVarDeclNames(item,

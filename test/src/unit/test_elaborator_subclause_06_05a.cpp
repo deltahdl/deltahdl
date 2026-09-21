@@ -452,10 +452,12 @@ TEST(NetsAndVariables, RedeclareVariableAsNetError) {
       "  wire v;\n"
       "endmodule\n",
       f);
-  // CheckPartialPortOrNameRedeclaration files the clash under §23.9, the
-  // subclause that states the name space rule §6.5 refers to.
+  // CheckPartialPortOrNameRedeclaration files the clash under §6.5, whose
+  // closing sentence names a net or variable redeclaring a name a net or
+  // variable declared; §23.9 states the general one-item-per-scope rule and is
+  // the citation when the earlier declaration is of another kind.
   EXPECT_TRUE(
-      ReportedError(f.diag.Diagnostics(), "redeclaration of 'v'", 3, "23.9"));
+      ReportedError(f.diag.Diagnostics(), "redeclaration of 'v'", 3, "6.5"));
 }
 
 // §6.5: the redeclaration prohibition is symmetric in the kinds involved -- a
@@ -469,7 +471,7 @@ TEST(NetsAndVariables, RedeclareNetAsVariableError) {
       "endmodule\n",
       f);
   EXPECT_TRUE(
-      ReportedError(f.diag.Diagnostics(), "redeclaration of 'w'", 3, "23.9"));
+      ReportedError(f.diag.Diagnostics(), "redeclaration of 'w'", 3, "6.5"));
 }
 
 // §6.5: connecting a variable to an input port implies a continuous assignment

@@ -274,8 +274,15 @@ static void CheckPartialPortOrNameRedeclaration(const ModuleItem* item,
     // name is tracked under its generate-prefixed (scoped) form; an unprefixed
     // top-level declaration scopes to its bare name, leaving that case
     // unchanged. Only a true same-scope clash collides.
+    //
+    // §6.5 closes with the rule that within a name space a name a net or
+    // variable declared is not redeclared, and §23.9 states the general rule
+    // that an identifier declares one item in a scope. A net or variable
+    // reusing a net's or variable's name is the case §6.5 names and is filed
+    // there, which is where sv-tests tags 6.5--variable_redeclare.sv; a clash
+    // with a declaration of another kind keeps §23.9.
     diag.Error(item->loc, std::format("redeclaration of '{}'", item->name),
-               Subclause("23.9"));
+               Subclause(tables.redeclares_net_or_variable ? "6.5" : "23.9"));
   }
 }
 
@@ -782,7 +789,8 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
   CheckDeclRedeclaration(
       item, {item->data_type, typedefs_},
       {ansi_port_names_, non_ansi_complete_ports_, non_ansi_partial_ports_,
-       declared_names_, ScopedName(item->name)},
+       declared_names_, ScopedName(item->name),
+       DeclaresNetOrVariable(item->name)},
       "net", diag_);
   net_names_.insert(item->name);
   var_types_[item->name] = item->data_type.kind;

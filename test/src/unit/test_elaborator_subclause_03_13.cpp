@@ -367,10 +367,12 @@ TEST(NameSpaceElaboration, RedeclVarInModuleScope) {
              "  logic x;\n"
              "endmodule\n",
              f));
-  // The module name space is §23.9's, so that is the subclause the report
-  // carries; §3.13(e) is what refers the module name space here.
+  // §3.13(e) is what refers the module name space here; a variable reusing a
+  // variable's name in it is the case §6.5's closing sentence names, so that
+  // is the subclause the report carries, §23.9's general rule standing for a
+  // clash with a declaration of another kind, as the task case below reads.
   EXPECT_TRUE(
-      ReportedError(f.diag.Diagnostics(), "redeclaration of 'x'", 3, "23.9"));
+      ReportedError(f.diag.Diagnostics(), "redeclaration of 'x'", 3, "6.5"));
 }
 
 TEST(NameSpaceElaboration, RedeclarationOfVariableAsNetError) {
@@ -382,7 +384,7 @@ TEST(NameSpaceElaboration, RedeclarationOfVariableAsNetError) {
       "endmodule\n",
       f);
   EXPECT_TRUE(
-      ReportedError(f.diag.Diagnostics(), "redeclaration of 'v'", 3, "23.9"));
+      ReportedError(f.diag.Diagnostics(), "redeclaration of 'v'", 3, "6.5"));
 }
 
 TEST(NameSpaceElaboration, RedeclarationOfNetAsVariableError) {
@@ -394,7 +396,7 @@ TEST(NameSpaceElaboration, RedeclarationOfNetAsVariableError) {
       "endmodule\n",
       f);
   EXPECT_TRUE(
-      ReportedError(f.diag.Diagnostics(), "redeclaration of 'w'", 3, "23.9"));
+      ReportedError(f.diag.Diagnostics(), "redeclaration of 'w'", 3, "6.5"));
 }
 
 TEST(NameSpaceElaboration, TaskSameNameAsVariableError) {
@@ -411,7 +413,8 @@ TEST(NameSpaceElaboration, TaskSameNameAsVariableError) {
 
 TEST(NameSpaceElaboration, NamedEventSameNameAsVariableError) {
   // §3.13(e): named events are unified with variables in the module name space,
-  // so an event may not share a name with a variable in the same module.
+  // so an event may not share a name with a variable in the same module. The
+  // event is a variable of the event type, so the clash is §6.5's own case.
   ElabFixture f;
   EXPECT_FALSE(
       ElabOk("module m;\n"
@@ -420,7 +423,7 @@ TEST(NameSpaceElaboration, NamedEventSameNameAsVariableError) {
              "endmodule\n",
              f));
   EXPECT_TRUE(
-      ReportedError(f.diag.Diagnostics(), "redeclaration of 'e'", 3, "23.9"));
+      ReportedError(f.diag.Diagnostics(), "redeclaration of 'e'", 3, "6.5"));
 }
 
 TEST(NameSpaceElaboration, TaskSameNameAsVariableInInterfaceError) {
@@ -491,7 +494,7 @@ TEST(NameSpaceElaboration, BlockNameSpaceDuplicateDeclarationError) {
              "endmodule\n",
              f));
   EXPECT_TRUE(
-      ReportedError(f.diag.Diagnostics(), "redeclaration of 'x'", 4, "23.9"));
+      ReportedError(f.diag.Diagnostics(), "redeclaration of 'x'", 4, "6.5"));
 }
 
 TEST(NameSpaceElaboration, DuplicateLocalInSameProceduralBlockError) {

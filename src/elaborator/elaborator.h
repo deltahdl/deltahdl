@@ -505,6 +505,9 @@ class Elaborator : public ElaboratorClassRules {
 
   bool MaybeCreateImplicitNet(std::string_view name, SourceLoc loc,
                               RtlirModule* mod);
+  // Whether a net or variable of the module being elaborated, explicit or
+  // implicit, has declared `name`.
+  bool DeclaresNetOrVariable(std::string_view name) const;
 
   std::string_view ScopedName(std::string_view base);
   // The generate prefix currently in force, arena-persisted so it outlives the
