@@ -80,6 +80,17 @@ struct ExecTask {
     return handle_.promise().result;
   }
 
+  // Runs the task from a caller that is no coroutine and so cannot co_await
+  // it: a function body, whose statements §13.4.4 keeps free of every time
+  // control, so nothing under the task suspends and the one resumption
+  // carries it to its end. The result is the one await_resume would hand a
+  // coroutine. For a task with a frame to run, which is every task a
+  // coroutine function returns; a task Immediate() built has none.
+  StmtResult RunToCompletion() noexcept {
+    handle_.resume();
+    return handle_.promise().result;
+  }
+
  private:
   void Destroy() {
     if (handle_) {

@@ -60,7 +60,8 @@ static uint64_t DrawBelow(uint64_t total, SimContext& ctx) {
   return ((hi << 32) | lo) % total;
 }
 
-ExecTask ExecRandcase(const Stmt* stmt, SimContext& ctx, Arena& arena) {
+const Stmt* SelectRandcaseBranch(const Stmt* stmt, SimContext& ctx,
+                                 Arena& arena) {
   // §18.16: each branch's weight expression is evaluated at most once, in
   // declaration order. Cache the drawn weights so a side-effecting expression
   // runs a single time and the same value feeds both the sum and the
@@ -77,7 +78,7 @@ ExecTask ExecRandcase(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     ctx.GetDiag().Warning(stmt->range.start,
                           "randcase: all weights are zero; no branch selected",
                           Subclause("18.16"));
-    co_return StmtResult::kDone;
+    return nullptr;
   }
 
   // §18.16: one random number in [0, sum); branches are selected in
@@ -88,11 +89,15 @@ ExecTask ExecRandcase(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   uint64_t cumulative = 0;
   for (size_t i = 0; i < stmt->randcase_items.size(); ++i) {
     cumulative += weights[i];
-    if (pick < cumulative) {
-      co_return co_await ExecStmt(stmt->randcase_items[i].second, ctx, arena);
-    }
+    if (pick < cumulative) return stmt->randcase_items[i].second;
   }
-  co_return StmtResult::kDone;
+  return nullptr;
+}
+
+ExecTask ExecRandcase(const Stmt* stmt, SimContext& ctx, Arena& arena) {
+  const Stmt* branch = SelectRandcaseBranch(stmt, ctx, arena);
+  if (branch == nullptr) co_return StmtResult::kDone;
+  co_return co_await ExecStmt(branch, ctx, arena);
 }
 
 // The two types below are also defined in

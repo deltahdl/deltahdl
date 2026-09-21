@@ -177,4 +177,30 @@ TEST(RandcaseRun, ASeededThreadSelectsTheSameBranchesBesideABusyOne) {
   EXPECT_EQ(out, "1\n");
 }
 
+// 18.16 with 13.4: a randcase is a statement a function body may hold, and
+// it selects a branch there as it does in a process, weighing each item with
+// an expression evaluated in the function's own frame. The weights are the
+// function's argument y read twice, y - y and y + y, so with y = 6 the first
+// branch weighs 0 and is never taken and the second weighs 12 and always is:
+// the function returns 10, and not the 0 a body that stepped over the
+// statement returns nor the 5 a weight that could not read y would allow.
+// This is the shape of sv-tests' 18.16--random-weighted-case-randcase_2.sv.
+TEST(RandcaseRun, ARandcaseInAFunctionBodyWeighsWithTheFunctionsArguments) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "function int F(int y);\n"
+      "  int a;\n"
+      "  randcase\n"
+      "    y - y : a = 5;\n"
+      "    y + y : a = 10;\n"
+      "  endcase\n"
+      "  return a;\n"
+      "endfunction\n"
+      "module t;\n"
+      "  initial $display(\"%0d\", F(6));\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "10\n");
+}
+
 }  // namespace

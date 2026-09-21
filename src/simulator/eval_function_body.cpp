@@ -20,6 +20,7 @@
 #include "simulator/eval_mailbox.h"
 #include "simulator/eval_semaphore.h"
 #include "simulator/evaluation.h"
+#include "simulator/exec_task.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
@@ -556,6 +557,31 @@ static FuncFlow ExecFuncCase(const Stmt* stmt, const FuncExecCtx& exec) {
   return flow;
 }
 
+// §18.16 with §13.4: a randcase is a statement a function body may hold. The
+// branch is the one SelectRandcaseBranch draws, and it runs here as any
+// statement of the body does, so a return in it is the function's return and
+// a break or continue in it is the enclosing loop's. Left to the default the
+// statement did nothing, and a function selecting a branch returned what its
+// variables held before it.
+static FuncFlow ExecFuncRandcase(const Stmt* stmt, const FuncExecCtx& exec) {
+  return ExecFuncStmt(SelectRandcaseBranch(stmt, exec.ctx, exec.arena), exec);
+}
+
+// §18.17 with §13.4: a randsequence is a statement a function body may hold,
+// and ExecRandsequence in stmt_exec_randsequence.cpp, the engine that
+// generates it, is a coroutine driving each code block through the process
+// path's ExecStmt. Nothing in a function body suspends (§13.4.4), so the
+// engine is run to its end here. §18.17.6 gives a break in a code block the
+// randsequence to end and a return there its production, and the engine
+// consumes both, so the body goes on to its next statement as a process does.
+// Left to the default the statement did nothing, and a function generating a
+// sequence returned what its variables held before it.
+static FuncFlow ExecFuncRandsequence(const Stmt* stmt,
+                                     const FuncExecCtx& exec) {
+  ExecRandsequence(stmt, exec.ctx, exec.arena).RunToCompletion();
+  return FuncFlow::kNext;
+}
+
 static FuncFlow ExecFuncStmt(const Stmt* stmt, const FuncExecCtx& exec) {
   if (!stmt) return FuncFlow::kNext;
   switch (stmt->kind) {
@@ -626,6 +652,10 @@ static FuncFlow ExecFuncStmt(const Stmt* stmt, const FuncExecCtx& exec) {
     case StmtKind::kAssumeImmediate:
     case StmtKind::kCoverImmediate:
       return ExecFuncImmediateAssert(stmt, exec);
+    case StmtKind::kRandcase:
+      return ExecFuncRandcase(stmt, exec);
+    case StmtKind::kRandsequence:
+      return ExecFuncRandsequence(stmt, exec);
     default:
       return FuncFlow::kNext;
   }

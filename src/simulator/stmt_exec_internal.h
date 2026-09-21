@@ -34,6 +34,14 @@ uint64_t DelayValueToTicks(const Logic4Vec& val, const SimContext& ctx);
 // external linkage and are declared here rather than as file-local statics.
 
 // Defined in stmt_exec_randsequence.cpp.
+// §18.16: the branch one execution of a randcase takes -- its weights
+// evaluated once each, a number drawn below their sum, the item whose
+// cumulative weight the number falls under -- or null when every weight is
+// zero, which is warned of here. Shared by ExecRandcase and the function-body
+// path in eval_function_body.cpp, which runs the branch as it runs any
+// statement of the body, so that a return in the branch is the function's.
+const Stmt* SelectRandcaseBranch(const Stmt* stmt, SimContext& ctx,
+                                 Arena& arena);
 ExecTask ExecRandcase(const Stmt* stmt, SimContext& ctx, Arena& arena);
 ExecTask ExecRandsequence(const Stmt* stmt, SimContext& ctx, Arena& arena);
 

@@ -108,4 +108,59 @@ TEST(RandsequenceRun, TheNamedProductionOrElseTheFirstIsTheTopLevel) {
   EXPECT_EQ(out, "1 1\n");
 }
 
+// 18.17 with 13.4: a randsequence is a statement a function body may hold,
+// and it generates its sequence there as it does in a process. The function's
+// own variable is what the code blocks write, so the value the function
+// returns is the sum the three productions left in it -- 6 -- and not the 0 a
+// body that stepped over the statement returns. This is the shape of sv-tests'
+// 18.17--random-sequence-generation-randsequence_0.sv.
+TEST(RandsequenceRun, ARandsequenceInAFunctionBodyGeneratesItsSequence) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "function int F();\n"
+      "  int x;\n"
+      "  randsequence( main )\n"
+      "    main : first second done;\n"
+      "    first : { x = x + 1; };\n"
+      "    second : { x = x + 2; };\n"
+      "    done : { x = x + 3; };\n"
+      "  endsequence\n"
+      "  return x;\n"
+      "endfunction\n"
+      "module t;\n"
+      "  initial $display(\"%0d\", F());\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "6\n");
+}
+
+// 18.17.6: a return in a production code block ends that production and the
+// sequence goes on, whatever encloses the randsequence. In a function body the
+// return has a second candidate to end, the function itself, and it does not:
+// `second` returns before its own addition, `third` still runs, and the
+// function's own return hands out 25. A return that left the function would
+// hand out 20 -- or, read as the function's, would want a value the bare
+// return does not carry. This is the shape of sv-tests'
+// 18.17.6--aborting-productions-break-and-return_2.sv.
+TEST(RandsequenceRun, AReturnInAProductionInAFunctionEndsTheProductionOnly) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "function int F();\n"
+      "  int x;\n"
+      "  static int return_on = 1;\n"
+      "  randsequence( main )\n"
+      "    main : first second third;\n"
+      "    first : { x = x + 20; };\n"
+      "    second : { if (return_on == 1) return; x = x + 10; };\n"
+      "    third : { x = x + 5; };\n"
+      "  endsequence\n"
+      "  return x;\n"
+      "endfunction\n"
+      "module t;\n"
+      "  initial $display(\"%0d\", F());\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "25\n");
+}
+
 }  // namespace
