@@ -793,6 +793,20 @@ def test_rejection_under_the_rule_a_file_tagged_on_its_parent_test_tests_evaluat
     assert (ok, result["status"]) == (1, "pass")
 
 
+def test_rejection_under_the_name_rule_a_file_tagged_on_a_construct_tests_evaluates_as_a_pass(
+    rst: ModuleType, tmp_path: Path,
+) -> None:
+    sv = _write_expected_rejection(
+        tmp_path, "18.17.2", "18.17.2--if-else-production-statements_0_fail.sv",
+    )
+    result, ok = _evaluate_rejection_of_file(
+        rst, sv, 1,
+        "18.17.2--if-else-production-statements_0_fail.sv:23:20: error:"
+        " reference to unresolved identifier 'switch' (§23.9)\n",
+    )
+    assert (ok, result["status"]) == (1, "pass")
+
+
 def test_rejection_within_the_2023_number_of_a_renumbered_tag_evaluates_as_a_pass(
     rst: ModuleType, tmp_path: Path,
 ) -> None:

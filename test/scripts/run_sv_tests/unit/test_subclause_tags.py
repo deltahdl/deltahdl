@@ -1,5 +1,7 @@
 from types import ModuleType
 
+import pytest
+
 
 def test_lists_every_subclause_in_the_order_written(rst: ModuleType) -> None:
     stderr = (
@@ -134,3 +136,14 @@ def test_a_file_the_suite_tags_on_its_parent_test_is_judged_by_the_rule_it_tests
         {"tags": "18.17.6"},
         "18.17.6--aborting-productions-break-and-return_2_fail.sv",
     ) == "18.17"
+
+
+@pytest.mark.parametrize("name, tag", [
+    ("18.17.2--if-else-production-statements_0_fail.sv", "18.17.2"),
+    ("18.17.2--if-else-production-statements_2_fail.sv", "18.17.2"),
+    ("18.17.3--case-production-statements_0_fail.sv", "18.17.3"),
+])
+def test_a_file_tagged_on_the_construct_its_undeclared_name_stands_in_is_judged_by_the_name_rule(
+    rst: ModuleType, name: str, tag: str,
+) -> None:
+    assert rst.tagged_clause({"tags": tag}, name) == "23.9"

@@ -305,6 +305,9 @@ _CLAUSE_OF_MISTAGGED_FILE: dict[str, str] = {
     "9.3.3--fork_return.sv": "9.3.2",
     "13.4.4--fork-invalid.sv": "13.4",
     "18.9--controlling-constraints-with-constraint_mode_1.sv": "18.9",
+    "18.17.2--if-else-production-statements_0_fail.sv": "23.9",
+    "18.17.2--if-else-production-statements_2_fail.sv": "23.9",
+    "18.17.3--case-production-statements_0_fail.sv": "23.9",
     "18.17.6--aborting-productions-break-and-return_2_fail.sv": "18.17",
     "variable-slice-zero.sv": "11.5.1",
 }
