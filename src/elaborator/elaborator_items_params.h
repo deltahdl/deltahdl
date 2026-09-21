@@ -32,6 +32,14 @@ namespace delta {
 std::optional<int64_t> FoldRealValueAsInteger(const Expr* expr,
                                               const ScopeMap& scope);
 
+// §6.20.2 (printed pages 126-127): whether the value expression `expr` is
+// real -- has a real literal, a time literal, a call of one of §20.5's
+// real-returning conversions or a name standing for a real parameter of the
+// registered module as an operand -- which is what makes a parameter
+// declared with neither type nor range a real parameter. Defined in
+// elaborator_items_params.cpp.
+bool HasRealOperand(const Expr* expr);
+
 // §23.10.2 (printed page 766) and §33.4.3: the parameter value assignments of
 // the instantiation being elaborated, and the scope their expressions were
 // written in -- the instantiating module's parameters, which

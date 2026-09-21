@@ -36,16 +36,26 @@ namespace delta {
 // §11.4.3's Table 11-4 (printed 276) -- was refolded as a real before,
 // std::pow(0, -1) being inf and std::llround(inf) undefined, so `localparam
 // int Z = 0 ** -1` read as resolved to whatever that made.
+//
+// §6.20.2 (printed page 126) makes a parameter whose value is real a real
+// parameter, so a name standing for one -- declared real, or untyped with a
+// real value -- is a real operand as its value would be: `(r + f) / 2` over
+// `parameter r = 5.7` is real arithmetic. Only a parameter of the registered
+// module is known here, as ConstEvalReal reads it.
 static bool IsRealOperand(const Expr* e) {
   if (e->kind == ExprKind::kRealLiteral || e->kind == ExprKind::kTimeLiteral)
     return true;
+  if (e->kind == ExprKind::kIdentifier) {
+    const RtlirParamDecl* pd = RegisteredParamNamed(e->text);
+    return pd != nullptr && pd->is_real_value;
+  }
   if (e->kind != ExprKind::kSystemCall && e->kind != ExprKind::kCall)
     return false;
   return e->callee == "$itor" || e->callee == "$bitstoreal" ||
          e->callee == "$bitstoshortreal";
 }
 
-static bool HasRealOperand(const Expr* e) {
+bool HasRealOperand(const Expr* e) {
   if (e == nullptr) return false;
   if (IsRealOperand(e)) return true;
   const Expr* const kChildren[] = {e->lhs, e->rhs, e->condition, e->true_expr,
@@ -285,7 +295,16 @@ void ResolveParamConstValue(RtlirParamDecl& pd, const ModuleItem* item,
   if (!is_type &&
       TryFoldRealParamValue(pd, item->init_expr, item->data_type, scope))
     return;
-  auto val = FoldParamValue(pd, item->init_expr, scope);
+  // §6.20.2 (printed page 127) with §6.12.1: an integer parameter set from a
+  // real expression rounds it to the nearest integer, and the rounding comes
+  // before the integer fold because that fold answers a name standing for a
+  // real parameter with the 0 its integer slot holds, so `parameter int ri =
+  // r` over `parameter r = 5.7` read 0 for 6. An integral expression the
+  // integer fold declines stays unresolved.
+  std::optional<int64_t> val;
+  if (!is_type && ParamExpectsIntegerValue(pd, item->data_type))
+    val = FoldRealValueAsInteger(item->init_expr, scope);
+  if (!val) val = FoldParamValue(pd, item->init_expr, scope);
   if (val) {
     pd.resolved_value = *val;
     pd.is_resolved = true;
@@ -294,14 +313,6 @@ void ResolveParamConstValue(RtlirParamDecl& pd, const ModuleItem* item,
     // range, are recorded as the value is, for a read of the name where this
     // scope is not the one in force.
     RecordResolvedHighWords(pd, item->init_expr, scope);
-  } else if (!is_type && ParamExpectsIntegerValue(pd, item->data_type)) {
-    // §6.20.2 (printed page 127) with §6.12.1: an integer parameter set from
-    // a real constant rounds to the nearest integer, and an integral
-    // expression the integer fold declined stays unresolved.
-    if (auto rval = FoldRealValueAsInteger(item->init_expr, scope)) {
-      pd.resolved_value = *rval;
-      pd.is_resolved = true;
-    }
   }
   if (!is_type)
     RecordStringParamValue(pd, item->init_expr, &item->data_type, arena);
@@ -464,6 +475,12 @@ void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
     }
     ValidateTypenameAsElabConstant(item->init_expr);
     ResolveParamConstValue(pd, item, is_type, kScope, arena_);
+    // §6.20.2 (printed page 126): a parameter declared with neither type nor
+    // range whose value is real is a real parameter, so it joins the set
+    // §11.5.1's rejection of a select on one reads, as a declared real one
+    // did through PopulateValueParamInfo.
+    if (pd.is_real_value && item->unpacked_dims.empty())
+      real_param_names_.insert(item->name);
   }
   mod->params.push_back(pd);
 

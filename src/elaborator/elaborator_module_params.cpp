@@ -136,9 +136,24 @@ bool ParamExpectsIntegerValue(const RtlirParamDecl& pd, const DataType& dtype) {
   return pd.has_decl_range || (pd.has_decl_type && !IsRealType(dtype.kind));
 }
 
+// §6.20.2 (printed page 126): a parameter declared with neither type nor
+// range takes the type of its final value, and where that value is real the
+// parameter is real -- the clause's own `parameter r = 5.7`, which its
+// comment calls a real parameter. Its expression is real where it has a real
+// operand (HasRealOperand): a real literal, or a name standing for a real
+// parameter already resolved. Tried for a declared real type alone, `r` was
+// folded as an integer, which a real literal is not, and stayed unresolved,
+// reading 0.0 at the run.
+static bool TakesRealFromValue(const RtlirParamDecl& pd, const Expr* init,
+                               const DataType& dtype) {
+  return dtype.kind == DataTypeKind::kImplicit && !pd.has_decl_range &&
+         !pd.has_decl_type && HasRealOperand(init);
+}
+
 bool TryFoldRealParamValue(RtlirParamDecl& pd, const Expr* init,
                            const DataType& dtype, const ScopeMap& scope) {
-  if (!IsRealType(dtype.kind)) return false;
+  if (!IsRealType(dtype.kind) && !TakesRealFromValue(pd, init, dtype))
+    return false;
   auto rval = ConstEvalReal(init, scope);
   if (!rval) return false;
   pd.resolved_real = *rval;
@@ -235,7 +250,19 @@ static void FoldParamConstantValue(RtlirParamDecl& pd, const Expr* pval,
   if (has_param_type && param_type != nullptr &&
       TryFoldRealParamValue(pd, pval, *param_type, scope))
     return;
-  auto val = FoldParamValue(pd, pval, scope);
+  // §6.20.2 (printed page 127): an integer-typed parameter set from a real
+  // expression is converted to an integer per §6.12.1 (round to nearest,
+  // ties away from zero), ahead of the integer fold as ResolveParamConstValue
+  // (elaborator_items_params.cpp) orders the two, since that fold reads a
+  // name standing for a real parameter as 0. An integral expression the
+  // integer fold declined -- `0 ** -1`, x under §11.4.3's Table 11-4
+  // (printed 276) -- was refolded as a real here, through std::pow(0, -1)
+  // and std::llround of the inf it makes, and stays unresolved now.
+  std::optional<int64_t> val;
+  if (!pd.is_type_param && has_param_type &&
+      ParamExpectsIntegerValue(pd, *param_type))
+    val = FoldRealValueAsInteger(pval, scope);
+  if (!val) val = FoldParamValue(pd, pval, scope);
   if (val) {
     pd.resolved_value = *val;
     pd.is_resolved = true;
@@ -248,18 +275,6 @@ static void FoldParamConstantValue(RtlirParamDecl& pd, const Expr* pval,
     // src/simulator/lowerer_register.cpp); an override records its own
     // (ApplyParamOverride).
     RecordResolvedHighWords(pd, pval, scope);
-  } else if (!pd.is_type_param && has_param_type &&
-             ParamExpectsIntegerValue(pd, *param_type)) {
-    // §6.20.2 (printed page 127): an integer-typed parameter set from a real
-    // constant is converted to an integer per §6.12.1 (round to nearest,
-    // ties away from zero). An integral expression the integer fold declined
-    // -- `0 ** -1`, x under §11.4.3's Table 11-4 (printed 276) -- was
-    // refolded as a real here, through std::pow(0, -1) and std::llround of
-    // the inf it makes, and stays unresolved now.
-    if (auto rval = FoldRealValueAsInteger(pval, scope)) {
-      pd.resolved_value = *rval;
-      pd.is_resolved = true;
-    }
   }
 }
 
@@ -437,7 +452,21 @@ void Elaborator::ElaborateParamPortList(const ModuleDecl* decl,
       ParamValueExpr val{
           pval,           pname,     refers_to_unbounded, contains_dollar,
           has_param_type, param_type};
+      // §6.20.2 (printed page 126): the default is written in the declaring
+      // module, so this module is the one registered while it is folded, as
+      // it is for a parameter among the items: a real parameter port already
+      // built, `parameter real a = 1.5`, is read as the real it is by a
+      // later port's `parameter b = a * 2` from the registration alone, the
+      // scope holding one integer per name. The override above stands in
+      // the instantiating module and is folded under that one's
+      // registration, which is why the guard opens here and not around the
+      // loop.
+      ParamRangeRegistryGuard default_guard(mod);
       ResolveUnresolvedParamValue(pd, val, scope, diag_);
+      // §6.20.2 (printed page 126): an untyped port whose default is real is
+      // a real parameter, recorded for §11.5.1 as BuildParamDeclShell records
+      // a port declared real.
+      if (pd.is_real_value) real_param_names_.insert(pname);
     }
     // Only where the value came from `pval`, the declaration's own initializer.
     // An overridden parameter no longer has that value, and ApplyParamOverride

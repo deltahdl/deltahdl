@@ -776,6 +776,28 @@ static std::optional<double> ConstEvalRealSysCall(const Expr* expr,
   return std::nullopt;
 }
 
+// §6.20.2 (printed pages 126-127): a name standing for a real parameter of
+// the registered module is worth the double the elaborator resolved it to
+// (RtlirParamDecl::resolved_real), which the ScopeMap, holding one integer
+// per name, cannot carry: its slot for such a parameter holds the 0 the
+// integer fold never wrote, so `parameter average_delay = (r + f) / 2` over
+// `parameter r = 5.7` folded to 4.5 and `parameter twice = r1 * 2` over a
+// declared `real r1` to 0. The registered parameter is consulted only where
+// the scope holds its integer value or no value at all, as
+// RegisteredParamValue (const_eval_bits.cpp) consults it, because a
+// constant function's locals (§13.4.3) sit in the same map under bare names.
+// Any other name is the integer the scope holds, widened.
+static std::optional<double> ConstEvalRealIdentifier(const Expr* expr,
+                                                     const ScopeMap& scope) {
+  auto it = scope.find(expr->text);
+  const RtlirParamDecl* pd = RegisteredParamNamed(expr->text);
+  if (pd != nullptr && pd->is_real_value &&
+      (it == scope.end() || it->second == pd->resolved_value))
+    return pd->resolved_real;
+  if (it != scope.end()) return static_cast<double>(it->second);
+  return std::nullopt;
+}
+
 std::optional<double> ConstEvalReal(const Expr* expr, const ScopeMap& scope) {
   if (!expr) return std::nullopt;
 
@@ -789,11 +811,8 @@ std::optional<double> ConstEvalReal(const Expr* expr, const ScopeMap& scope) {
       return expr->real_val;
     case ExprKind::kIntegerLiteral:
       return static_cast<double>(expr->int_val);
-    case ExprKind::kIdentifier: {
-      auto it = scope.find(expr->text);
-      if (it != scope.end()) return static_cast<double>(it->second);
-      return std::nullopt;
-    }
+    case ExprKind::kIdentifier:
+      return ConstEvalRealIdentifier(expr, scope);
     case ExprKind::kUnary: {
       auto operand = ConstEvalReal(expr->lhs, scope);
       if (!operand) return std::nullopt;

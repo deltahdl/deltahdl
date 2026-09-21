@@ -265,4 +265,54 @@ TEST(ValueParameterSim, UntypedParameterPortTakesTheWidthOfItsFinalValue) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §6.20.2 (printed pages 126-127): a parameter declared with neither type nor
+// range takes the type of its final value, and a real value makes it a real
+// parameter, so `parameter r = 5.7` -- the clause's own example, which its
+// comment calls a real parameter -- reads 5.7, and `average_delay = (r + f)
+// / 2`, real arithmetic on it with the integer f of 9, is the real 7.35,
+// which $rtoi truncates to 7. Both read 0 while a real fold was tried for a
+// declared real type alone and an untyped parameter's real literal folded
+// as no integer at all, and while a fold reading a real parameter's name
+// found the 0 its integer slot holds: `twice = r1 * 2` from the declared
+// `real r1 = 3.5e17` is 7.0e17, and the conversion of §6.12.1, which the
+// clause applies to parameters, rounds `int ri = r` to 6.
+TEST(ValueParameterSim, UntypedParameterWithARealValueIsReal) {
+  SimFixture f;
+  std::string printed = RunCapture(
+      "module t;\n"
+      "  parameter r = 5.7;\n"
+      "  parameter e = 25, f = 9;\n"
+      "  parameter average_delay = (r + f) / 2;\n"
+      "  parameter real r1 = 3.5e17;\n"
+      "  parameter twice = r1 * 2;\n"
+      "  parameter int ri = r;\n"
+      "  initial $display(\"r=%f avg=%0d avgr=%f twice=%0d ri=%0d e=%0d\", r,\n"
+      "                   $rtoi(average_delay), average_delay,\n"
+      "                   twice == 7.0e17, ri, e);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(printed, "r=5.700000 avg=7 avgr=7.350000 twice=1 ri=6 e=25\n");
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §6.20.1 (printed page 125) writes the same declarations in a parameter port
+// list, so an untyped port whose default is real arithmetic on an earlier
+// real port, `parameter b = a * 2` after `parameter real a = 1.5`, is the
+// real 3.0 in the instance, and an untyped port with a real literal default,
+// `parameter c = 0.25`, reads 0.25 in an instance that keeps the default.
+TEST(ValueParameterSim, UntypedParameterPortWithARealDefaultIsReal) {
+  SimFixture f;
+  std::string printed = RunCapture(
+      "module c #(parameter real a = 1.5, parameter b = a * 2,\n"
+      "           parameter c = 0.25);\n"
+      "  initial $display(\"b=%f c=%f\", b, c);\n"
+      "endmodule\n"
+      "module t;\n"
+      "  c u();\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(printed, "b=3.000000 c=0.250000\n");
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace
