@@ -580,6 +580,21 @@ bool Preprocessor::ProcessExpandedStateDirective(std::string_view line,
                                   Subclause("22.9")))
       return true;
     unconnected_drive_ = NetType::kWire;
+    // §22.9 gives `unconnected_drive one of the arguments pull1 or pull0 and
+    // this directive none, so a strength keyword after it is an argument the
+    // directive does not take and goes with the directive rather than to the
+    // parser as a stray keyword. Anything else after it is a language element
+    // on the directive's line, which §22.2 allows.
+    auto [arg, remainder] =
+        SplitFirstToken(AfterDirective(line, "nounconnected_drive"));
+    if (arg == "pull0" || arg == "pull1") {
+      diag_.Error(loc,
+                  "`nounconnected_drive takes no argument; '" +
+                      std::string(arg) + "' was given",
+                  Subclause("22.9"));
+      OutputText(remainder, file_id, line_num, output);
+      return true;
+    }
     OutputRemainder(line, "nounconnected_drive", file_id, line_num, output);
     return true;
   }
