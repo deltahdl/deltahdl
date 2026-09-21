@@ -880,7 +880,7 @@ void Lowerer::Lower(const RtlirDesign* design) {
   // back while the modules bound their own, and the typedef names that
   // denote one of them (§6.18), bound once the modules are lowered.
   RebindStrayPackageClassNames();
-  RegisterClassTypeAliases(design, ctx_);
+  RegisterClassTypeAliases(design, ctx_, arena_);
 
   AttachDesignClocking();
 

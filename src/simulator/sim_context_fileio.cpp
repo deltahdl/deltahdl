@@ -1,5 +1,4 @@
 #include <cstdint>
-#include <cstdio>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -431,6 +430,13 @@ void SimContext::RegisterClassType(std::string_view name, ClassTypeInfo* info) {
 // containing that one, innermost first, so `Inner i = new` in a method of
 // Outer, `Node link` in a method of StringList::Node and `mine = new` on a
 // property Outer declares `Inner mine` all construct the nested class.
+// §6.18 with §8.13 (printed pages 189-190): a class's own typedef that
+// names a class is held under `Class::alias` as a nested class is
+// (RegisterClassTypeAliases in lowerer_register.cpp), and a subclass
+// inherits the base's typedefs among its members, so each scope's base
+// chain is tried under the scope itself: uvm_callbacks#(T,CB)'s `this_type`
+// and the `super_type` its base declares both name a class from its
+// methods, where the bare name named none and `m_inst = new` stored null.
 // §26.7 with Syntax 26-5: `std::` before a built-in class's name reaches the
 // same declaration the bare name does, and §26.7 lets no user package be
 // called std, so a `std::` head is dropped before the table is asked.
@@ -442,11 +448,22 @@ ClassTypeInfo* SimContext::FindClassType(std::string_view name) {
   if (it != class_types_.end()) return it->second;
   for (const ClassTypeInfo* scope = CurrentMethodClass(); scope != nullptr;
        scope = scope->enclosing) {
-    auto nested =
-        class_types_.find(std::string(scope->name) + "::" + std::string(name));
-    if (nested != class_types_.end()) return nested->second;
+    for (const ClassTypeInfo* base = scope; base != nullptr;
+         base = base->parent) {
+      auto nested =
+          class_types_.find(std::string(base->name) + "::" + std::string(name));
+      if (nested != class_types_.end()) return nested->second;
+    }
   }
   return nullptr;
+}
+
+std::vector<ClassTypeInfo*> SimContext::RegisteredClassTypes() const {
+  std::vector<ClassTypeInfo*> classes;
+  for (const auto& [key, info] : class_types_) {
+    if (key == info->name) classes.push_back(info);
+  }
+  return classes;
 }
 
 void SimContext::SetVariableClassType(std::string_view var,

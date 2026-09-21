@@ -20,6 +20,7 @@
 #include "simulator/eval_class_sync.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
+#include "simulator/lowerer_register.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
@@ -596,6 +597,9 @@ void Lowerer::RegisterClassDecl(const ClassDecl* cls,
   if (!scope.empty()) ctx_.PopScope();
   RecordClassPackage(info, scope, ctx_);
   ctx_.RegisterClassType(cls->name, info);
+  // §6.18 with §8.3: the class's typedefs naming a class, its own included,
+  // bound before InitClassStaticProperties runs its methods.
+  RegisterClassScopeTypedefAliases(info, ctx_, arena_);
   LowerNestedClasses(info, cls, constants, ctx_, arena_);
 }
 

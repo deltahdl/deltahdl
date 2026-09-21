@@ -106,7 +106,7 @@ void Lowerer::InitCompilationUnitData() {
 // had called a method on a null handle.
 void Lowerer::ConstructDesignData() {
   LowerUnimportedPackageClasses();
-  RegisterClassTypeAliases(design_, ctx_);
+  RegisterClassTypeAliases(design_, ctx_, arena_);
   ConstructDataClassInitializers(design_, ctx_, arena_);
 }
 

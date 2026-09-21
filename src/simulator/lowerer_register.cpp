@@ -601,12 +601,52 @@ void RegisterTypeTargets(const RtlirDesign* design, SimContext& ctx) {
 // class -- `typedef C T;` makes `T::p` the default specialization's `C#()::p`
 // -- so each such name is bound to the class it denotes, once every class of
 // the design is lowered, unless the design declares a class of that name.
-void RegisterClassTypeAliases(const RtlirDesign* design, SimContext& ctx) {
+
+// §6.18 with §8.3 (printed page 180): a typedef is a class item too, and a
+// class's own `typedef C#(T,CB) this_type;` names the class C throughout the
+// class body and, §8.13, its subclasses' bodies, so each such typedef is
+// bound under `Class::alias`, the key a nested class is held by and
+// SimContext::FindClassType tries under the running method's class and its
+// bases. The class the typedef names is found by its bare or scoped name as
+// the design's typedefs' targets are, the parameter list a specialization
+// carries naming the one declaration every specialization shares; a name
+// the run holds no class for yet is left for the design-wide pass below.
+// Called as the class is registered, ahead of its static initializers,
+// which run its methods (Lowerer::RegisterClassDecl): bound nowhere,
+// uvm_callbacks#(T,CB)'s `local static this_type m_inst` was a variable of
+// no class, and `m_inst = new` stored the null handle.
+void RegisterClassScopeTypedefAliases(ClassTypeInfo* info, SimContext& ctx,
+                                      Arena& arena) {
+  if (info == nullptr || info->decl == nullptr) return;
+  for (const ClassMember* member : info->decl->members) {
+    if (member->kind != ClassMemberKind::kTypedef ||
+        member->typedef_item == nullptr) {
+      continue;
+    }
+    const DataType& target = member->typedef_item->typedef_type;
+    if (target.kind != DataTypeKind::kNamed) continue;
+    auto* alias = arena.Create<std::string>(std::string(info->name) +
+                                            "::" + std::string(member->name));
+    if (ctx.FindClassType(*alias) != nullptr) continue;
+    ClassTypeInfo* cls = nullptr;
+    if (!target.scope_name.empty()) {
+      cls = ctx.FindClassType(std::string(target.scope_name) +
+                              "::" + std::string(target.type_name));
+    }
+    if (cls == nullptr) cls = ctx.FindClassType(target.type_name);
+    if (cls != nullptr) ctx.RegisterClassType(*alias, cls);
+  }
+}
+
+void RegisterClassTypeAliases(const RtlirDesign* design, SimContext& ctx,
+                              Arena& arena) {
   for (const auto& [alias, target] : design->type_targets) {
     if (ctx.FindClassType(alias) != nullptr) continue;
     ClassTypeInfo* cls = ctx.FindClassType(target);
     if (cls != nullptr) ctx.RegisterClassType(alias, cls);
   }
+  for (ClassTypeInfo* info : ctx.RegisteredClassTypes())
+    RegisterClassScopeTypedefAliases(info, ctx, arena);
 }
 
 // §9.7 (printed page 245) and §8.30.1 (printed 217): the built-in class

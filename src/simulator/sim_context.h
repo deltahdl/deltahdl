@@ -595,6 +595,10 @@ class SimContext : public DeclaredNameTables,
 
   void RegisterClassType(std::string_view name, ClassTypeInfo* info);
   ClassTypeInfo* FindClassType(std::string_view name);
+  // Every class the run holds under its own name, an alias's entry left
+  // out, in no particular order; what RegisterClassTypeAliases walks for
+  // the classes' own typedefs.
+  std::vector<ClassTypeInfo*> RegisteredClassTypes() const;
   void SetVariableClassType(std::string_view var, std::string_view type);
   std::string_view GetVariableClassType(std::string_view var) const;
   void SetVariableClassParamExprs(std::string_view var,

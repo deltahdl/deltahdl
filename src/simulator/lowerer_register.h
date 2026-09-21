@@ -12,6 +12,7 @@ namespace delta {
 
 class Arena;
 struct AssocArrayObject;
+struct ClassTypeInfo;
 struct DataType;
 struct Expr;
 struct QueueObject;
@@ -310,8 +311,16 @@ void RegisterPackageEnumConstants(const RtlirDesign* design, SimContext& ctx,
 void RegisterTypeTargets(const RtlirDesign* design, SimContext& ctx);
 
 // §6.18 with §8.25.1: each typedef name whose chain ends in a class, bound
-// to that class after every class of the design is lowered.
-void RegisterClassTypeAliases(const RtlirDesign* design, SimContext& ctx);
+// to that class after every class of the design is lowered; and, §8.3, each
+// class's own typedef naming a class, bound under `Class::alias`, the key
+// built in `arena` as a nested class's is.
+void RegisterClassTypeAliases(const RtlirDesign* design, SimContext& ctx,
+                              Arena& arena);
+// §6.18 with §8.3: the class's own typedefs naming a class the run already
+// holds, bound under `Class::alias`; the rest wait for
+// RegisterClassTypeAliases.
+void RegisterClassScopeTypedefAliases(ClassTypeInfo* info, SimContext& ctx,
+                                      Arena& arena);
 // §16.8 and §16.12: the module's named sequence and property declarations,
 // which an instance of one is expanded from at the run.
 void RegisterModuleSequenceDecls(const RtlirModule* mod, SimContext& ctx);
