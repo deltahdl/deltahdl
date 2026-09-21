@@ -644,4 +644,25 @@ TEST(PackageImportSim, PackageClassHandleConstructedThroughTheQualifier) {
             1u);
 }
 
+// §26.3 (printed page 808) with §13.4: a package function named through the
+// scope resolution operator, `mypkg::add(1, 3)`, runs the package's
+// function, and its formals `int a, b`, two names under one type, take the
+// two actuals, 4. This is the shape of the suite's 26.3--package-ref.sv,
+// which run 30725357212 reported failing (#2922) and every run since
+// 35657769589 reports passing, with no case of the family pinning it.
+TEST(PackageScopeReferenceSim,
+     PackageFunctionWithFormalsUnderOneTypeCalledQualified) {
+  EXPECT_EQ(RunAndGet("package mypkg;\n"
+                      "  function int add(int a, b);\n"
+                      "    return a + b;\n"
+                      "  endfunction\n"
+                      "endpackage : mypkg\n"
+                      "module top();\n"
+                      "  int y;\n"
+                      "  initial y = mypkg::add(1, 3);\n"
+                      "endmodule\n",
+                      "y"),
+            4u);
+}
+
 }  // namespace
