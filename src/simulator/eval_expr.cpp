@@ -663,22 +663,30 @@ static bool TryInstanceTriggered(const Expr* expr, SimContext& ctx,
   return true;
 }
 
-Logic4Vec EvalMemberAccess(const Expr* expr, SimContext& ctx, Arena& arena) {
-  Logic4Vec out;
-  if (TryInstanceTriggered(expr, ctx, arena, out)) return out;
-  if (TryEvalArrayReductionWithClause(expr, ctx, arena, out)) return out;
-
+// The member selects that are something other than a read of a member of a
+// value: a sequence's end point (§16.9.11), an array reduction or ordering
+// method with a with clause (§7.12), a parameter of a parameterized class
+// scope (§8.25.1), and an enumeration method written without an argument
+// list (§6.19.5.7), `c.name` or `c.next`, asked ahead of the member reads
+// since a receiver of an enumeration type leaves no member of the name for
+// them to read. True with `out` set when the select was one of them.
+static bool TryMemberSelectThatIsNoRead(const Expr* expr, SimContext& ctx,
+                                        Arena& arena, Logic4Vec& out) {
+  if (TryInstanceTriggered(expr, ctx, arena, out)) return true;
+  if (TryEvalArrayReductionWithClause(expr, ctx, arena, out)) return true;
   // §7.12.2: a bare-member sort()/rsort() carrying a with clause (parenthesis-
   // free form, or any queue receiver) reorders in place; yield a void result.
-  if (TryExecArrayOrderingWithClauseStmt(expr, ctx, arena))
-    return MakeLogic4VecVal(arena, 1, 0);
+  if (TryExecArrayOrderingWithClauseStmt(expr, ctx, arena)) {
+    out = MakeLogic4VecVal(arena, 1, 0);
+    return true;
+  }
+  if (TryParameterizedScopeParam(expr, ctx, arena, out)) return true;
+  return TryEvalEnumMethodWithoutArgs(expr, ctx, arena, out);
+}
 
-  if (TryParameterizedScopeParam(expr, ctx, arena, out)) return out;
-  // §6.19.5.7: `c.name` or `c.next` with no argument list is the enumeration
-  // method's call, on any receiver of an enumeration type; asked here, ahead
-  // of the member reads, since the receiver being of that type leaves no
-  // member of the name for them to read.
-  if (TryEvalEnumMethodWithoutArgs(expr, ctx, arena, out)) return out;
+Logic4Vec EvalMemberAccess(const Expr* expr, SimContext& ctx, Arena& arena) {
+  Logic4Vec out;
+  if (TryMemberSelectThatIsNoRead(expr, ctx, arena, out)) return out;
 
   if (TryVirtualInterfaceMember(expr, ctx, arena, out)) return out;
 

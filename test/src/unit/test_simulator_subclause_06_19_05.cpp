@@ -359,7 +359,7 @@ TEST(EnumMethodWithoutArgumentList, EveryMethodOnAVariable) {
                  "  Colors c;\n"
                  "  initial begin\n"
                  "    c = blue;\n"
-                 "    $display(\"name=%s next=%s prev=%s first=%s last=%s "
+                 "    $display(\"name=%s next=%0d prev=%0d first=%0d last=%0d "
                  "num=%0d val=%0d\",\n"
                  "             c.name, c.next, c.prev, c.first, c.last, c.num,"
                  " c);\n"
