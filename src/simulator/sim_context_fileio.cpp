@@ -461,8 +461,11 @@ ClassTypeInfo* SimContext::FindClassType(std::string_view name) {
 
 std::vector<ClassTypeInfo*> SimContext::RegisteredClassTypes() const {
   std::vector<ClassTypeInfo*> classes;
+  // A package class's bare name held back while the modules bind their own
+  // stands with no class behind it (Lowerer::LowerUnimportedPackageClasses)
+  // and is passed over; read through it, this dereferenced null.
   for (const auto& [key, info] : class_types_) {
-    if (key == info->name) classes.push_back(info);
+    if (info != nullptr && key == info->name) classes.push_back(info);
   }
   return classes;
 }
