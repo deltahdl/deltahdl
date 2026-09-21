@@ -10,7 +10,7 @@ metadata:
 
 # Locating a clause in the PDF
 
-`~/LRM.pdf` is IEEE 1800-2023, 1354 PDF pages. The printed page number is the physical page minus one: §10.1 General is physical page 248, printed 247.
+`~/IEEE 1800-2023.pdf` is IEEE 1800-2023, 1354 PDF pages. The printed page number is the physical page minus one: §10.1 General is physical page 248, printed 247.
 
 Locate a clause with the Read tool and nothing else, one page per call, per [reading-the-lrm-one-page-per-call](reading-the-lrm-one-page-per-call.md). Read the contents page that lists the clause, add one to the printed page it gives, and Read that physical page.
 
@@ -18,7 +18,7 @@ Locate a clause with the Read tool and nothing else, one page per call, per [rea
 
 Until 2026-09-18 this note also grew a landmark list by one entry per lookup, each entry committed to `main` on its own, and told every session to keep adding to it. The user asked whether that was useful. It was not: the contents pages already resolve any first- or second-level clause in one read, so most entries saved nothing, and the standing order produced commits whose whole content was a page number. The map below replaces it.
 
-**How to apply:** Never import `pypdf` against `~/LRM.pdf`, not even for the outline. The contents pages, by physical page, each listing clauses to two levels:
+**How to apply:** Never import `pypdf` against `~/IEEE 1800-2023.pdf`, not even for the outline. The contents pages, by physical page, each listing clauses to two levels:
 
 | Physical page | Lists |
 | --- | --- |

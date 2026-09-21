@@ -572,8 +572,9 @@ TEST(ValueParameters, NonConstantClassParamDefaultIsRejected) {
 
 // §6.20.1 rules that "all param_assignments appearing within a class body
 // shall become localparam declarations regardless of the presence or absence
-// of a parameter_port_list" (printed page 125 of ~/LRM.pdf), so a parameter
-// declared in the class body is under the §6.20.2 constancy rule exactly as a
+// of a parameter_port_list" (printed page 125 of ~/IEEE 1800-2023.pdf), so a
+// parameter declared in the class body is under the §6.20.2 constancy rule
+// exactly as a
 // #() parameter port is. The two reach RecordClassParam through different
 // loops in RegisterClassParams -- cls->params for the ports, cls->members for
 // the body declarations -- so a fix covering only the ports leaves this one

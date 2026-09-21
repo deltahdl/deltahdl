@@ -37,13 +37,13 @@ namespace delta {
 // §26.3 admits a package-qualified mailbox as the receiver, `p::mbx.get(x)`,
 // found under the "p.mbx" key ExtractHandleMethodCallParts answers. This is
 // asked of every call statement, so the method's name is matched before the
-// key is made. §8.7 with §15.4.1 (printed page 374 of ~/LRM.pdf): a mailbox
-// declared as a class property is each object's own, so a bare `mb` inside a
-// method of the class, `this.mb` and a handle's `c.mb` name the object's
-// (ResolveSyncProperty) ahead of the run's tables, which hold no object's;
-// resolved by name alone, `mb.put(v)` in a method reached no mailbox. §13.5.1
-// (printed 348) with §8.2 (printed 180): a formal declared `mailbox m` is a
-// handle to the actual's mailbox (BindSyncFormal), asked next
+// key is made. §8.7 with §15.4.1 (printed page 374 of ~/IEEE 1800-2023.pdf): a
+// mailbox declared as a class property is each object's own, so a bare `mb`
+// inside a method of the class, `this.mb` and a handle's `c.mb` name the
+// object's (ResolveSyncProperty) ahead of the run's tables, which hold no
+// object's; resolved by name alone, `mb.put(v)` in a method reached no mailbox.
+// §13.5.1 (printed 348) with §8.2 (printed 180): a formal declared `mailbox m`
+// is a handle to the actual's mailbox (BindSyncFormal), asked next
 // (MailboxOfFormal), the formal's name shadowing a module's.
 MailboxObject* MailboxCallTarget(const Expr* expr, SimContext& ctx,
                                  Arena& arena, std::string_view method) {
@@ -84,8 +84,8 @@ static bool ElementTypeIsFixed(const std::vector<DataType>& params) {
   return elem.kind != DataTypeKind::kNamed || elem.type_name != "dynamic_type";
 }
 
-// §26.2 (printed page 808 of ~/LRM.pdf): a package's declarations are
-// visible by their bare names throughout the package, its classes included,
+// §26.2 (printed page 808 of ~/IEEE 1800-2023.pdf): a package's declarations
+// are visible by their bare names throughout the package, its classes included,
 // and the run keys a package's typedef "pkg::name" (RegisterTypeDeclarations
 // in lowerer_register.cpp), the bare key standing only where a module's
 // import added it. So the typedef a bare name written in a class the
@@ -583,9 +583,9 @@ bool TryEvalMailboxMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
 // property, `mb = new(1)` in a method or `c.mb = new(1)` through a handle,
 // built on the object alone (BuildSyncProperty); a semaphore property is
 // TrySemaphoreNewAssign's, asked first, so it is not reached here. §15.4.1
-// (printed page 374 of ~/LRM.pdf) has new() return the mailbox handle, so
-// the variable the statement assigns refers to the queue from here on and
-// §8.4 (printed 182) compares it unequal to null (HoldSyncVariable); the
+// (printed page 374 of ~/IEEE 1800-2023.pdf) has new() return the mailbox
+// handle, so the variable the statement assigns refers to the queue from here
+// on and §8.4 (printed 182) compares it unequal to null (HoldSyncVariable); the
 // queue alone was built, and a `mailbox mb;` read as null after its `mb =
 // new(2)`.
 bool TryMailboxNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {

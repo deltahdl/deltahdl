@@ -513,8 +513,8 @@ TEST(ClassSim, TypeParameterQueuePropertyInEachSpecialization) {
             741u);
 }
 
-// §8.25 (printed page 203 of ~/LRM.pdf) instantiates an object under the
-// parameter override rules of §23.10, whose §23.10.2.2 binds an actual
+// §8.25 (printed page 203 of ~/IEEE 1800-2023.pdf) instantiates an object under
+// the parameter override rules of §23.10, whose §23.10.2.2 binds an actual
 // written `.name(value)` to the parameter of that name whatever its
 // position. The value actuals were bound by position alone, so `#(.E(7))`
 // on a class whose first parameter is D wrote 7 into D and left E at its
@@ -537,9 +537,9 @@ TEST(ClassSim, NamedValueActualBindsTheParameterOfItsName) {
             21u);
 }
 
-// §8.25 (printed page 203 of ~/LRM.pdf): an object is instantiated with the
-// parameter override rules of §23.10, `vector #(10) vten;`, and inside its
-// methods a value parameter names what the specialization bound it to.
+// §8.25 (printed page 203 of ~/IEEE 1800-2023.pdf): an object is instantiated
+// with the parameter override rules of §23.10, `vector #(10) vten;`, and inside
+// its methods a value parameter names what the specialization bound it to.
 // Declared at module scope, `G #(5) b = new;` constructed the class's default
 // specialization: the lowerer built the object without recording the
 // declaration's parameter value assignment, which only a declaration inside a
@@ -590,9 +590,9 @@ TEST(ClassSim, ValueParameterOfAModuleScopeSpecializationConstructedLater) {
 }
 
 // §8.25's own generic class, `class vector #(int size = 1); bit [size-1:0]
-// a;` (printed page 203 of ~/LRM.pdf), sizes a property by the class's value
-// parameter, which §6.20.1 declares in the class's parameter port list or
-// its body (printed 125). The lowerer sized every property with no
+// a;` (printed page 203 of ~/IEEE 1800-2023.pdf), sizes a property by the
+// class's value parameter, which §6.20.1 declares in the class's parameter port
+// list or its body (printed 125). The lowerer sized every property with no
 // parameter in scope, so `logic [W-1:0] v` was one bit wide: `c.v = '1`
 // stored 1 and `$bits(c.v)` answered 1. Here v is sized by the header
 // parameter and u by a body localparam derived from it, so the write of all
@@ -618,12 +618,12 @@ TEST(ClassSim, PropertyWidthNamesTheClassParameters) {
 }
 
 // §8.25: a specialization `stack #(bit [2:0])` binds the type parameter T to
-// `bit [2:0]` throughout the class body (printed pages 203-204 of ~/LRM.pdf),
-// so §20.6.2's `$bits(T)` in an instance method is 3, and the object of the
-// default specialization (§8.25.1) reads the default int's 32. EvalBits asked
-// the type table alone, which holds the class's default for the name, so the
-// specialized object read 32 too. The three objects are declared at module
-// scope, in a procedural block and with the actual bound by name.
+// `bit [2:0]` throughout the class body (printed pages 203-204 of ~/IEEE
+// 1800-2023.pdf), so §20.6.2's `$bits(T)` in an instance method is 3, and the
+// object of the default specialization (§8.25.1) reads the default int's 32.
+// EvalBits asked the type table alone, which holds the class's default for the
+// name, so the specialized object read 32 too. The three objects are declared
+// at module scope, in a procedural block and with the actual bound by name.
 TEST(ClassSim, BitsOfATypeParameterReadsTheSpecializationsActual) {
   EXPECT_EQ(RunAndGet("class stack #(type T = int);\n"
                       "  function int bits();\n"
@@ -670,14 +670,14 @@ TEST(ClassSim, TypeParameterIndexedPropertyOfAModuleScopeSpecialization) {
             2u * 10000u + 31u * 100u + 42u);
 }
 
-// §8.25's own chain (printed page 204 of ~/LRM.pdf): a class extending a
-// parameterized class binds the base's type parameter as its extends clause
-// says -- `extends C` takes C's default bit, `extends C #(integer)` binds
-// integer, and `extends C #(P)` binds the derived class's own type parameter,
-// real by default -- so the inherited `T x` is 1, 32 and 64 bits wide through
-// the base's `$bits(x)`. The base's properties were sized by the base's
-// defaults alone, 32 in every case (bit fell to the 32-bit carrier), so d1
-// read 32 and d3 32 -- 1 * 100000 + 32 * 1000 + 64.
+// §8.25's own chain (printed page 204 of ~/IEEE 1800-2023.pdf): a class
+// extending a parameterized class binds the base's type parameter as its
+// extends clause says -- `extends C` takes C's default bit, `extends C
+// #(integer)` binds integer, and `extends C #(P)` binds the derived class's own
+// type parameter, real by default -- so the inherited `T x` is 1, 32 and 64
+// bits wide through the base's `$bits(x)`. The base's properties were sized by
+// the base's defaults alone, 32 in every case (bit fell to the 32-bit carrier),
+// so d1 read 32 and d3 32 -- 1 * 100000 + 32 * 1000 + 64.
 TEST(ClassSim, BaseTypeParameterBoundThroughExtendsSizesTheProperty) {
   EXPECT_EQ(RunAndGet("class C #(type T = bit);\n"
                       "  T x;\n"
@@ -721,10 +721,10 @@ TEST(ClassSim, BaseTypeParameterBoundThroughTwoExtendsLevels) {
             16u * 100000u + 65535u);
 }
 
-// §8.25's D4 (printed page 205 of ~/LRM.pdf): the base class may be named by
-// a type parameter of the derived class, `class D4 #(type P = C#(byte))
-// extends P;` extending the class the parameter's default names with the
-// default's own actuals, so the default specialization of D4 inherits C's
+// §8.25's D4 (printed page 205 of ~/IEEE 1800-2023.pdf): the base class may be
+// named by a type parameter of the derived class, `class D4 #(type P =
+// C#(byte)) extends P;` extending the class the parameter's default names with
+// the default's own actuals, so the default specialization of D4 inherits C's
 // members with T bound to byte and the inherited `T x` is 8 bits wide
 // through the base's `$bits(x)`. The lowerer looked the base up under the
 // parameter's name, found no class, and D4 inherited nothing, so `d4.w()`
@@ -771,10 +771,10 @@ TEST(ClassSim, BaseNamedByATypeParameterBoundThroughAnExtendsLevel) {
             16u * 100000u + 65535u);
 }
 
-// §8.25 (printed page 204 of ~/LRM.pdf): a type parameter may be bound to a
-// class type, so a property declared with the parameter as its type, `T obj`
-// in `class Holder #(type T = Item)`, is a handle of the bound class -- of
-// Item in the default specialization (§8.25.1) -- and `obj = new` in the
+// §8.25 (printed page 204 of ~/IEEE 1800-2023.pdf): a type parameter may be
+// bound to a class type, so a property declared with the parameter as its type,
+// `T obj` in `class Holder #(type T = Item)`, is a handle of the bound class --
+// of Item in the default specialization (§8.25.1) -- and `obj = new` in the
 // constructor builds an Item whose `get()` answers its `v`, 12. The `new`
 // was resolved against a class named T, which there is none of, so nothing
 // was built and `obj.get()` through the null handle read 0.

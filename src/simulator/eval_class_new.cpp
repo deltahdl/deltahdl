@@ -133,10 +133,11 @@ static TypeBindings OwnTypeBindings(const ClassObject* obj) {
 // §8.25: the type actuals the extends clause of `child` gives its base's type
 // parameters: the `#(...)` list written after the base's name, or, where the
 // base is named by one of the child's own type parameters -- `class D4 #(type
-// P = C#(byte)) extends P;` (printed page 205 of ~/LRM.pdf) -- the list the
-// type that parameter is bound to on this object carries, `byte` for D4's
-// default specialization and `int` under `extends D4 #(C#(int))`. Null where
-// such a parameter is bound to nothing, which leaves the base at its defaults.
+// P = C#(byte)) extends P;` (printed page 205 of ~/IEEE 1800-2023.pdf) -- the
+// list the type that parameter is bound to on this object carries, `byte` for
+// D4's default specialization and `int` under `extends D4 #(C#(int))`. Null
+// where such a parameter is bound to nothing, which leaves the base at its
+// defaults.
 static const std::vector<DataType>* BaseTypeActuals(
     const ClassDecl* child, const TypeBindings& child_types) {
   if (child->type_param_names.count(child->base_class) == 0)
@@ -149,9 +150,9 @@ static const std::vector<DataType>* BaseTypeActuals(
 // `child`, whose extends clause binds the base's type parameters as a
 // specialization does -- `extends C` takes C's defaults, `extends C
 // #(integer)` binds integer, and `extends C #(P)` binds what the child's own
-// parameter P is bound to on this object (printed page 204 of ~/LRM.pdf), so
-// an actual naming one of the child's type parameters is read through the
-// child's bindings.
+// parameter P is bound to on this object (printed page 204 of ~/IEEE
+// 1800-2023.pdf), so an actual naming one of the child's type parameters is
+// read through the child's bindings.
 static TypeBindings BaseTypeBindings(const ClassDecl* child,
                                      const TypeBindings& child_types,
                                      const ClassTypeInfo* base) {
@@ -208,9 +209,9 @@ static void InitClassPropertyDefault(const ClassTypeInfo* info,
       InitClassQueueProperty(obj, info, prop.name, prop.init_expr, ctx)) {
     return;
   }
-  // §15.3.1 (printed page 373 of ~/LRM.pdf) and §15.4.1 (printed 374) with
-  // §8.7: a semaphore or mailbox property's `new` builds the object's own
-  // bucket or queue (ClassObject::semaphore_properties and
+  // §15.3.1 (printed page 373 of ~/IEEE 1800-2023.pdf) and §15.4.1 (printed
+  // 374) with §8.7: a semaphore or mailbox property's `new` builds the object's
+  // own bucket or queue (ClassObject::semaphore_properties and
   // mailbox_properties) and stores the handle's carrier under the name,
   // nonzero for a property holding an object, which §8.4 (printed 181-182)
   // compares with null; evaluated as a value, the `new` built nothing, and a

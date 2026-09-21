@@ -83,11 +83,11 @@ TEST(ObjectPropertySim,
 
 // §8.5 puts no restriction on a property's data type and §26.3 references a
 // package's declarations through the package scope resolution operator
-// (printed pages 183 and 808 of ~/LRM.pdf), so `pk::sev_t s = pk::MED;`
-// declares a property of the package's enum type holding the package's MED.
-// The declaration was a parse error at the `::`. MED is 2 and HIGH 3, so the
-// initializer read through the handle and the value written through it after
-// make 23; a lost initializer reads 3 and a lost write 20.
+// (printed pages 183 and 808 of ~/IEEE 1800-2023.pdf), so `pk::sev_t s =
+// pk::MED;` declares a property of the package's enum type holding the
+// package's MED. The declaration was a parse error at the `::`. MED is 2 and
+// HIGH 3, so the initializer read through the handle and the value written
+// through it after make 23; a lost initializer reads 3 and a lost write 20.
 TEST(ObjectPropertySim, PackageScopedEnumPropertyHoldsItsInitializer) {
   EXPECT_EQ(RunAndGet("package pk;\n"
                       "  typedef enum {LOW, MED = 2, HIGH} sev_t;\n"

@@ -9,7 +9,7 @@ metadata:
 
 When a formula on an LRM page is not legible in the `Read` rendering, do not
 guess from context: rasterize a crop of the physical page with
-`pdftoppm -f <page> -l <page> -r 300 -x <px> -y <px> -W <px> -H <px> -png ~/LRM.pdf <stem>`
+`pdftoppm -f <page> -l <page> -r 300 -x <px> -y <px> -W <px> -H <px> -png ~/IEEE\ 1800-2023.pdf <stem>`
 into the scratchpad and `Read` the PNG. `pdftoppm` is at
 `/opt/homebrew/bin/pdftoppm`; PyMuPDF is not installed.
 

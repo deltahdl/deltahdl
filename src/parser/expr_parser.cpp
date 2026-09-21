@@ -368,11 +368,11 @@ Expr* Parser::ParseThisOrSuperExpr() {
     }
   }
   // §8.11 makes `this` a handle to the object the method runs in (printed
-  // page 187 of ~/LRM.pdf), and a name reached through it takes the postfix
-  // chain any name takes -- A.8.4's method_call and A.8.6's select run on --
-  // so `this.m[k].kill()` is read here as `m[k].kill()` is, through the loop
-  // ParseIdentifierExpr uses. Reading one call and one select then stopping
-  // left the `.` before kill unread, and the statement was reported as
+  // page 187 of ~/IEEE 1800-2023.pdf), and a name reached through it takes the
+  // postfix chain any name takes -- A.8.4's method_call and A.8.6's select run
+  // on -- so `this.m[k].kill()` is read here as `m[k].kill()` is, through the
+  // loop ParseIdentifierExpr uses. Reading one call and one select then
+  // stopping left the `.` before kill unread, and the statement was reported as
   // missing its ';'.
   result = ParseIdentifierPostfixChain(result);
   if (Check(TokenKind::kPlusPlus) || Check(TokenKind::kMinusMinus)) {

@@ -38,9 +38,9 @@ static const ClassMember* FindMemberInClass(const ClassDecl* cls,
   return nullptr;
 }
 
-// §8.18 (printed page 194 of ~/LRM.pdf): the report for a member reached from
-// outside the class its qualifier confines it to, at `loc`, where `m` is that
-// member; nothing for a public member or for no member at all.
+// §8.18 (printed page 194 of ~/IEEE 1800-2023.pdf): the report for a member
+// reached from outside the class its qualifier confines it to, at `loc`, where
+// `m` is that member; nothing for a public member or for no member at all.
 static void ReportHiddenMember(const ClassMember* m, SourceLoc loc,
                                DiagEngine& diag) {
   if (m && m->is_local) {

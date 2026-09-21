@@ -251,10 +251,10 @@ TEST(OutOfBlockDeclParsing, RegularTaskNoMethodClass) {
 
 // §8.24 has an out-of-block method declaration access every declaration of the
 // class whose prototype it implements, its example resolving the `T` of
-// `function void C::f(T x)` to `C::T` (printed pages 202 and 203 of ~/LRM.pdf).
-// The parser decides whether an identifier opens a declaration by the type
-// names it knows where it stands, and the class's own names leave at
-// `endclass`, so the method's argument list and body have to be given them
+// `function void C::f(T x)` to `C::T` (printed pages 202 and 203 of ~/IEEE
+// 1800-2023.pdf). The parser decides whether an identifier opens a declaration
+// by the type names it knows where it stands, and the class's own names leave
+// at `endclass`, so the method's argument list and body have to be given them
 // back: before that, `pair_t p;` was read as an expression statement and
 // reported "expected ';', got identifier".
 TEST(OutOfBlockDeclParsing, BodyReadsTheClassTypedefAsAType) {

@@ -1,7 +1,7 @@
 // The multiplicative operators over a constant wider than 64 bits. §11.4.3
-// (printed pages 275-276 of ~/LRM.pdf) defines the product, the quotient,
-// the remainder and the power: the quotient truncates toward zero, the
-// remainder takes the sign of the first operand, a division by zero is x,
+// (printed pages 275-276 of ~/IEEE 1800-2023.pdf) defines the product, the
+// quotient, the remainder and the power: the quotient truncates toward zero,
+// the remainder takes the sign of the first operand, a division by zero is x,
 // and Table 11-4 fixes the power's answer by the signs and sizes of its
 // operands, the exponent self-determined. §11.4.3.1 (printed 277) has both
 // operands signed read as two's complement values and either unsigned read

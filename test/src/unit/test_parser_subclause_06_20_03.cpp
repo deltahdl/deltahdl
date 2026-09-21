@@ -131,8 +131,8 @@ TEST(TypeParameterParsing, TypeParamForwardStructBody) {
 }
 
 // A.1.3's parameter_port_declaration opens with `parameter`, `localparam`,
-// `type` or a data type (printed page 1174 of ~/LRM.pdf), so `B = logic`
-// after the comma continues A.2.1.1's `type list_of_type_assignments`
+// `type` or a data type (printed page 1174 of ~/IEEE 1800-2023.pdf), so `B =
+// logic` after the comma continues A.2.1.1's `type list_of_type_assignments`
 // (printed pages 1181 and 1184) rather than opening a value parameter: B is a
 // type parameter, and `B x;` in the body declares x. The same holds under the
 // `parameter` keyword.

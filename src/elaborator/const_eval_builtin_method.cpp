@@ -3,11 +3,11 @@
 // that evaluates it. Both answers live here because they are the same answer.
 // §11.2.1 states of such a call that "when used in constant expressions, these
 // function calls shall be evaluated at elaboration time" (printed page 270 of
-// ~/LRM.pdf), so a call this file cannot evaluate is not one a constant
-// expression may hold. Splitting the two apart is what let an expression be
-// admitted wherever a constant expression is required and then fold to no
-// value, leaving the declaration silently unresolved rather than either folded
-// or reported.
+// ~/IEEE 1800-2023.pdf), so a call this file cannot evaluate is not one a
+// constant expression may hold. Splitting the two apart is what let an
+// expression be admitted wherever a constant expression is required and then
+// fold to no value, leaving the declaration silently unresolved rather than
+// either folded or reported.
 
 #include <cstdint>
 #include <optional>

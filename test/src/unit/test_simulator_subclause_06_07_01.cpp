@@ -81,17 +81,17 @@ TEST(NetDefaultValue, UndrivenVectorTriregAllBitsX) {
   EXPECT_EQ(var->value.words[0].bval & 0xF, 0xFu);
 }
 
-// §6.7.1 (printed page 103 of ~/LRM.pdf) admits a packed structure as a net's
-// data type, `wire addressT w1` reaching a type through a typedef name in its
-// own example, and §7.2.1 (printed 147) makes a member of a packed structure a
-// window of the vector, `w.opcode` the top eight bits of thirty-two. A net
-// declared in a module body carried no layout, so the member selects read 0
-// after `assign w = instr` had driven every bit. 165 is read back through the
-// member and through the part-select of the same bits, and 0x123456 through
-// the second member: a net with no layout answers 165 to the part-select
-// alone and 0 to both members, and a net laid out over the wrong bits answers
-// something other than 165 and 0x123456 to them. $bits still reports the
-// net's whole width.
+// §6.7.1 (printed page 103 of ~/IEEE 1800-2023.pdf) admits a packed structure
+// as a net's data type, `wire addressT w1` reaching a type through a typedef
+// name in its own example, and §7.2.1 (printed 147) makes a member of a packed
+// structure a window of the vector, `w.opcode` the top eight bits of
+// thirty-two. A net declared in a module body carried no layout, so the member
+// selects read 0 after `assign w = instr` had driven every bit. 165 is read
+// back through the member and through the part-select of the same bits, and
+// 0x123456 through the second member: a net with no layout answers 165 to the
+// part-select alone and 0 to both members, and a net laid out over the wrong
+// bits answers something other than 165 and 0x123456 to them. $bits still
+// reports the net's whole width.
 TEST(StructNetLayout, TypedefStructWireReadsItsMembers) {
   SimFixture f;
   auto* design = ElaborateSrc(

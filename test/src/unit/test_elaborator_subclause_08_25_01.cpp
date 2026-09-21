@@ -352,8 +352,8 @@ TEST(ParameterizedScopeResolutionElaboration,
       "used as scope resolution prefix for parameterized class", 8, "8.25.1"));
 }
 
-// §8.25.1 (printed page 205 of ~/LRM.pdf) makes the unadorned name of a
-// parameterized class illegal as the prefix of the class scope resolution
+// §8.25.1 (printed page 205 of ~/IEEE 1800-2023.pdf) makes the unadorned name
+// of a parameterized class illegal as the prefix of the class scope resolution
 // operator outside the class and its out-of-block declarations, wherever it
 // stands: a module-level variable declaration's initializer, `int x = C::p;`,
 // is such a place, and it was passed over -- the check walked the procedural

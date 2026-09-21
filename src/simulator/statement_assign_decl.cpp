@@ -428,11 +428,11 @@ static bool TryExecClassShallowCopy(std::string_view var_name, const Expr* init,
   return true;
 }
 
-// §8.23 (printed pages 200-201 of ~/LRM.pdf): a procedural `Outer::Inner i =
-// new;` names the nested class by its scoped spelling, which DeclaredClassKey
-// (declared_class_key.h) resolves to the key the run holds it under; looked up
-// by the bare `Inner` alone, the declaration found no class, became a plain
-// variable, and `i.take()` ran nothing.
+// §8.23 (printed pages 200-201 of ~/IEEE 1800-2023.pdf): a procedural
+// `Outer::Inner i = new;` names the nested class by its scoped spelling, which
+// DeclaredClassKey (declared_class_key.h) resolves to the key the run holds it
+// under; looked up by the bare `Inner` alone, the declaration found no class,
+// became a plain variable, and `i.take()` ran nothing.
 //
 // §7.10 (printed 169), §7.4.2 (printed 153-154), §7.5 (printed 157) and §7.8
 // (printed 163) with §8.4 (printed 181): `C q[$]`, `C arr[2]`, `C d[]` and

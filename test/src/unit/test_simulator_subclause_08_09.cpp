@@ -281,15 +281,16 @@ TEST(StaticClassPropertySim, StaticQueuePropertyPushedFromConstructors) {
             25u);
 }
 
-// §8.9 (printed page 186 of ~/LRM.pdf) reaches a static property through the
-// class scope resolution operator, and §26.3 (printed 808) reaches a package's
-// class through the package scope resolution operator, so `pk::Cfg::depth` is
-// the static property of the package's class -- the same storage `Cfg::depth`
-// reads after `import pk::Cfg`. The doubly-qualified name was joined into
-// "pk.Cfg.depth" and "pk" looked up as a class, which it is not, so the read
-// answered 0 while the imported form, `pk::Cfg::two()` and `pk::Cfg::A` were
-// right. The result packs the scoped read with the imported one, and a write
-// through the scoped form is read back through the imported one.
+// §8.9 (printed page 186 of ~/IEEE 1800-2023.pdf) reaches a static property
+// through the class scope resolution operator, and §26.3 (printed 808) reaches
+// a package's class through the package scope resolution operator, so
+// `pk::Cfg::depth` is the static property of the package's class -- the same
+// storage `Cfg::depth` reads after `import pk::Cfg`. The doubly-qualified name
+// was joined into "pk.Cfg.depth" and "pk" looked up as a class, which it is
+// not, so the read answered 0 while the imported form, `pk::Cfg::two()` and
+// `pk::Cfg::A` were right. The result packs the scoped read with the imported
+// one, and a write through the scoped form is read back through the imported
+// one.
 TEST(StaticClassPropertySim, StaticPropertyThroughAPackageQualifiedClassScope) {
   EXPECT_EQ(RunAndGet("package pk;\n"
                       "  class Cfg;\n"

@@ -88,10 +88,10 @@ TEST(ClassSim, WeakReferenceInstanceIsGcEligible) {
   EXPECT_NE(f.ctx.GetClassObject(handle), nullptr);
 }
 
-// §8.30.1 (printed page 218 of ~/LRM.pdf) puts the weak_reference class in
-// the built-in std package of §26.7 (printed 816), which §26.3 reaches through
-// the package scope resolution operator, so `std::weak_reference#(obj)` at
-// module scope declares the same class as the bare name: the run constructs
+// §8.30.1 (printed page 218 of ~/IEEE 1800-2023.pdf) puts the weak_reference
+// class in the built-in std package of §26.7 (printed 816), which §26.3 reaches
+// through the package scope resolution operator, so `std::weak_reference#(obj)`
+// at module scope declares the same class as the bare name: the run constructs
 // it with new(referent) (§8.30.2), reads the referent's property through get()
 // (§8.30.3) and has clear() set get() to null (§8.30.4). A declaration the
 // package scope turned into something other than the built-in class would
@@ -142,8 +142,8 @@ TEST(ClassSim, WeakRefE2eStdScopedBlockDeclarationIsTheBuiltinClass) {
             91u);
 }
 
-// §8.30.1 (printed page 217 of ~/LRM.pdf) with §26.2 (printed 808): a
-// package's `weak_reference #(C) w = new(h);` is the declaration assignment
+// §8.30.1 (printed page 217 of ~/IEEE 1800-2023.pdf) with §26.2 (printed 808):
+// a package's `weak_reference #(C) w = new(h);` is the declaration assignment
 // that creates the weak reference to the object the package's earlier `C h
 // = new;` constructed, made before any procedure starts, so a module's
 // `p::w.get()` (§8.30.3) answers that object and its v reads 3. The
@@ -216,10 +216,10 @@ TEST(ClassSim, UnitWeakReferenceDeclarationInitializerRefersToTheObject) {
             3u);
 }
 
-// §8.30.1 (printed page 217 of ~/LRM.pdf) with §6.21 (printed 132-133): a
-// module's `weak_reference #(C) w = new(h);` is a declaration assignment
-// made at the declaration, ahead of the module's procedures, creating the
-// weak reference to the object the module's earlier `C h = new;`
+// §8.30.1 (printed page 217 of ~/IEEE 1800-2023.pdf) with §6.21 (printed
+// 132-133): a module's `weak_reference #(C) w = new(h);` is a declaration
+// assignment made at the declaration, ahead of the module's procedures,
+// creating the weak reference to the object the module's earlier `C h = new;`
 // constructed, so `w.get()` answers that object and its v reads 3. The
 // module's class-typed initializer (TryLowerClassNewVarInit in
 // lowerer_var.cpp) constructed by EvalClassNew alone, which holds no record

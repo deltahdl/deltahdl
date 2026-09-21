@@ -497,12 +497,12 @@ TEST(ChandleDataType, ChandleAdditionInRandsequenceCodeBlock_Error) {
                             "operator is not allowed on chandle", 6, "6.14"));
 }
 
-// §6.14 (printed page 111 of ~/LRM.pdf): a chandle is assigned from another
-// chandle, and chandles are returned from functions; §35.5.5 (printed 979)
-// admits chandle as an imported function's result. The result of a call to a
-// function declared `chandle` is therefore a chandle, and `keep = give();`
-// is an assignment between chandles. The check knew a chandle by a variable's
-// name alone, so the call was "not a chandle" and the assignment was refused.
+// §6.14 (printed page 111 of ~/IEEE 1800-2023.pdf): a chandle is assigned from
+// another chandle, and chandles are returned from functions; §35.5.5 (printed
+// 979) admits chandle as an imported function's result. The result of a call to
+// a function declared `chandle` is therefore a chandle, and `keep = give();` is
+// an assignment between chandles. The check knew a chandle by a variable's name
+// alone, so the call was "not a chandle" and the assignment was refused.
 TEST(ChandleDataType, ChandleAssignedFromAnImportedFunctionResult_Ok) {
   ElabFixture f;
   auto* design = ElaborateSrc(

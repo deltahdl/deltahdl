@@ -604,17 +604,17 @@ TEST(DataHidingElaboration, SiblingBlocksBindTheSameNameSeparately) {
 }
 
 // The cases below reach the member through a class-scoped static handle. §8.9
-// (printed page 186 of ~/LRM.pdf) holds a static property in one copy usable
-// with no object, reached as `C::m_inst`, and §8.4 (printed 181-182) reads a
-// member through whatever handle a variable holds; §8.18 (printed 194) confines
-// a local member to the methods of its class and a protected one to the class
-// and its subclasses, and a module's procedure is outside both.
-// CheckMemberAccessVisibility in src/elaborator/elaborator_validate_classes.cpp
-// read the handle's class from a variable's declared type alone, so
-// `C::m_inst.k` and `p::C::m_inst.k` resolved to no class and a local `k`
-// behind either was accepted where `c.k` through `C c;` was reported, and
-// `C::m_inst` itself, declared `static local`, was accepted for the same
-// reason: only a `.` access was ever read.
+// (printed page 186 of ~/IEEE 1800-2023.pdf) holds a static property in one
+// copy usable with no object, reached as `C::m_inst`, and §8.4 (printed
+// 181-182) reads a member through whatever handle a variable holds; §8.18
+// (printed 194) confines a local member to the methods of its class and a
+// protected one to the class and its subclasses, and a module's procedure is
+// outside both. CheckMemberAccessVisibility in
+// src/elaborator/elaborator_validate_classes.cpp read the handle's class from a
+// variable's declared type alone, so `C::m_inst.k` and `p::C::m_inst.k`
+// resolved to no class and a local `k` behind either was accepted where `c.k`
+// through `C c;` was reported, and `C::m_inst` itself, declared `static local`,
+// was accepted for the same reason: only a `.` access was ever read.
 //
 // `k_decl` declares the property the access reaches and `handle_decl` the
 // static handle it reaches it through, so a case can qualify either one.

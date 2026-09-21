@@ -1,8 +1,8 @@
 // The order the design's type names and the packages' and the compilation
 // unit's data are registered, initialized and constructed in, ahead of every
-// module: §26.2 (printed page 808 of ~/LRM.pdf) has a package's declaration
-// assignments made before any initial or always procedure starts, as a
-// compilation unit's are, §3.12.1 (printed 56) has a module's reference
+// module: §26.2 (printed page 808 of ~/IEEE 1800-2023.pdf) has a package's
+// declaration assignments made before any initial or always procedure starts,
+// as a compilation unit's are, §3.12.1 (printed 56) has a module's reference
 // searched for in the unit's scope, the names its imports make visible
 // included, and §6.21 (printed 132-133) has a module's own variable initialized
 // at its declaration. Moved out of lowerer.cpp, which stood at the size the

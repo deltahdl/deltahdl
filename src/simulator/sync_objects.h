@@ -11,8 +11,8 @@
 
 namespace delta {
 
-// §8.4 (printed page 182 of ~/LRM.pdf) compares two handles by the object
-// each refers to, and §15.3 (printed 372) and §15.4 (printed 374) make a
+// §8.4 (printed page 182 of ~/IEEE 1800-2023.pdf) compares two handles by the
+// object each refers to, and §15.3 (printed 372) and §15.4 (printed 374) make a
 // semaphore or mailbox variable a handle to its bucket or its queue, so the
 // value the handle carries -- what `a == b`, `a != null` and `if (a)` read
 // through the generic paths -- is the object's identity: its address folded

@@ -109,10 +109,10 @@ TEST(PackageImportSim, ExplicitImportFunctionCalledUnqualified) {
 
 // §26.3: a package import makes the package's names visible unqualified in the
 // scope that writes the import, and this case holds that the scope may be a
-// module reached through an instance. §26.3 (printed page 809 of ~/LRM.pdf)
-// states the visibility the read rests on: the import declaration "allows
-// identifiers declared within packages to be visible within the current scope
-// without a package name qualifier".
+// module reached through an instance. §26.3 (printed page 809 of ~/IEEE
+// 1800-2023.pdf) states the visibility the read rests on: the import
+// declaration "allows identifiers declared within packages to be visible within
+// the current scope without a package name qualifier".
 //
 // The case is a guard rail rather than a defect-catcher. It passes today, and
 // it must keep passing after the fix for #3054 narrows SimContext::FindVariable
@@ -149,9 +149,9 @@ TEST(PackageImportSim, InstantiatedModuleReadsImportedParameter) {
 
 // §26.3: the import declaration "allows identifiers declared within packages to
 // be visible within the current scope without a package name qualifier"
-// (printed page 809 of ~/LRM.pdf). The current scope here is `child`, and `top`
-// imports nothing, so the child's own import is the only thing that can make
-// VAL visible to `initial y = VAL;`.
+// (printed page 809 of ~/IEEE 1800-2023.pdf). The current scope here is
+// `child`, and `top` imports nothing, so the child's own import is the only
+// thing that can make VAL visible to `initial y = VAL;`.
 //
 // This catches an import written inside an instantiated module binding nothing.
 // Lowerer::LowerImports runs for the top module only until #3056 is fixed, so
@@ -282,14 +282,15 @@ TEST(PackageImportSim,
   EXPECT_EQ(yb->value.ToUint64(), 22u);
 }
 
-// §26.3 (printed page 808 of ~/LRM.pdf) references a package's declarations
-// through the package name whether or not the package was imported, and §6.18
-// (printed page 118) makes an object declared with a typedef's name an object
-// of the type the name stands for. A `pkg::nib_t v;` written as a block item
-// of a sequential block is sized at run time from the design's type_widths
-// table, which the elaborator keys by "pkg::nib_t" and which the simulator
-// looked up by "nib_t" alone, so v was created at the 32-bit carrier that
-// stands in for a type nothing could size: v = -1 read 4294967295 and $bits(v)
+// §26.3 (printed page 808 of ~/IEEE 1800-2023.pdf) references a package's
+// declarations through the package name whether or not the package was
+// imported, and §6.18 (printed page 118) makes an object declared with a
+// typedef's name an object of the type the name stands for. A `pkg::nib_t v;`
+// written as a block item of a sequential block is sized at run time from the
+// design's type_widths table, which the elaborator keys by "pkg::nib_t" and
+// which the simulator looked up by "nib_t" alone, so v was created at the
+// 32-bit carrier that stands in for a type nothing could size: v = -1 read
+// 4294967295 and $bits(v)
 // 32. The -1 is the discriminating value, since 15 and 4294967295 differ.
 TEST(PackageScopeReferenceSim, PackageScopedTypedefSizesBlockLocal) {
   SimFixture f;
@@ -749,8 +750,8 @@ TEST(PackageScopeReferenceSim, ImportedAndReExportedSemaphoreShareOneBucket) {
             10u);
 }
 
-// §9.7 (printed page 245 of ~/LRM.pdf) lets a variable be declared of the
-// built-in process class and has kill() forcibly terminate the process a
+// §9.7 (printed page 245 of ~/IEEE 1800-2023.pdf) lets a variable be declared
+// of the built-in process class and has kill() forcibly terminate the process a
 // handle names, whose status() then reads KILLED; §26.3 (printed 808) names
 // a package's variable through the package scope resolution operator. The
 // child assigns itself to p1's handle and would write 99 to x at #10, the

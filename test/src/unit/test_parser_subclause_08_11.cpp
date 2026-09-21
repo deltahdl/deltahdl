@@ -109,10 +109,10 @@ TEST(ThisParsing, ThisMultipleMemberAccesses) {
 }
 
 // §8.11 makes `this` a handle to the object the method runs in (printed page
-// 187 of ~/LRM.pdf), and a name reached through it takes the same postfix
-// chain as any other name: A.8.4's method_call and A.8.6's select run on,
-// so `this.m[k].kill()` calls a method of a selected element. The parser read
-// one call and one select after the `this.` chain and stopped, so the `.`
+// 187 of ~/IEEE 1800-2023.pdf), and a name reached through it takes the same
+// postfix chain as any other name: A.8.4's method_call and A.8.6's select run
+// on, so `this.m[k].kill()` calls a method of a selected element. The parser
+// read one call and one select after the `this.` chain and stopped, so the `.`
 // before kill was reported as a missing ';' under §12.3.
 TEST(ThisParsing, ThisSelectedElementMethodCall) {
   auto r = Parse(

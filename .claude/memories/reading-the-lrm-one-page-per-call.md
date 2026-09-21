@@ -1,6 +1,6 @@
 ---
 name: reading-the-lrm-one-page-per-call
-description: Read ~/LRM.pdf one page per Read call, waiting for each result; batching exhausts a content-filter budget for the whole turn.
+description: Read ~/IEEE 1800-2023.pdf one page per Read call, waiting for each result; batching exhausts a content-filter budget for the whole turn.
 metadata:
   type: feedback
 ---

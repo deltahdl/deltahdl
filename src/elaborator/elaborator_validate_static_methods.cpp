@@ -149,16 +149,17 @@ std::unordered_set<std::string_view> NamesDeclaredUnder(const Stmt* s) {
 // at the first child that answers it, which is what this search wants, so it is
 // used here rather than ForEachExprChild beside it.
 //
-// §8.10 (printed page 186 of ~/LRM.pdf) denies a static method the non-static
-// members of an object it holds no handle to, and §8.4 (printed 181-182) reads
-// a member through any handle a variable holds -- `p.fileID` in §8.9's example
-// on the same page as §8.10 -- which a static method may hold as any subroutine
-// may: in a static property, a local, a formal, a call's result or an element
-// of an array of handles. A `.` access is therefore qualified by whatever its
-// left side names, and only that side is searched, as FirstEnclosingPropRef in
-// elaborator_validate_class_nesting.cpp searches it under §8.23. The one base
-// that is no such handle is `this` (and `super`, §8.15), the object the static
-// method does not have, so a member behind either is the bare access still. A
+// §8.10 (printed page 186 of ~/IEEE 1800-2023.pdf) denies a static method the
+// non-static members of an object it holds no handle to, and §8.4 (printed
+// 181-182) reads a member through any handle a variable holds -- `p.fileID` in
+// §8.9's example on the same page as §8.10 -- which a static method may hold as
+// any subroutine may: in a static property, a local, a formal, a call's result
+// or an element of an array of handles. A `.` access is therefore qualified by
+// whatever its left side names, and only that side is searched, as
+// FirstEnclosingPropRef in elaborator_validate_class_nesting.cpp searches it
+// under §8.23. The one base that is no such handle is `this` (and `super`,
+// §8.15), the object the static method does not have, so a member behind either
+// is the bare access still. A
 // `::` access names a member through the class scope rather than through an
 // object and is left to the search of both sides.
 //
@@ -375,13 +376,13 @@ void ElaboratorClassRules::ValidateStaticMethodsAmong(
   }
 }
 
-// §26.2 (printed page 808 of ~/LRM.pdf) makes a class declaration written in a
-// package an item of that package, and §8.10 (printed 186) holds over it as it
-// holds over a class at the top of a file or inside a module. This walked the
-// compilation unit's classes and the module's own, so `package p; class C; int
-// k; static function int f(); return k; endfunction endclass endpackage` was
-// never reported while the same class at compilation-unit scope was, whether
-// or not a module imported the package.
+// §26.2 (printed page 808 of ~/IEEE 1800-2023.pdf) makes a class declaration
+// written in a package an item of that package, and §8.10 (printed 186) holds
+// over it as it holds over a class at the top of a file or inside a module.
+// This walked the compilation unit's classes and the module's own, so `package
+// p; class C; int k; static function int f(); return k; endfunction endclass
+// endpackage` was never reported while the same class at compilation-unit scope
+// was, whether or not a module imported the package.
 //
 // §24.3 (printed 775) admits a class declaration among a program's items
 // through module_or_generate_item_declaration, and §25.3 (printed 781) among

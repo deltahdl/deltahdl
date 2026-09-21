@@ -737,11 +737,11 @@ TEST(FunctionDeclParsing, DpiImportWithOnePropertyAccepted) {
   EXPECT_FALSE(item->dpi_is_pure);
 }
 
-// §35.5.4 (printed page 977 of ~/LRM.pdf) with A.1.9 and H.9.2: a DPI import
-// declaration is an item of a module, interface, program, package, generate
-// block or compilation unit, and a class body admits none. One written in a
-// class was reported as a package import under §26.3, naming a construct the
-// source does not contain; the string after the keyword is what tells the
+// §35.5.4 (printed page 977 of ~/IEEE 1800-2023.pdf) with A.1.9 and H.9.2: a
+// DPI import declaration is an item of a module, interface, program, package,
+// generate block or compilation unit, and a class body admits none. One written
+// in a class was reported as a package import under §26.3, naming a construct
+// the source does not contain; the string after the keyword is what tells the
 // two apart, and the report names the DPI import that was written.
 TEST(DpiParsing, DpiImportInsideClassBodyIsReportedAsADpiImport) {
   auto r = Parse(R"(

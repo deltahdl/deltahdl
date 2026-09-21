@@ -9,7 +9,7 @@ struct RtlirVariable;
 class SimContext;
 struct Variable;
 
-// §15.3 (printed page 372 of ~/LRM.pdf) and §15.4 (printed 374): a
+// §15.3 (printed page 372 of ~/IEEE 1800-2023.pdf) and §15.4 (printed 374): a
 // module's, an instance's or a package's `semaphore s` or `mailbox mb` is a
 // variable holding a handle to the bucket or the queue, which §15.3.1
 // (printed 373) and §15.4.1 (printed 374) have new() create and return, and

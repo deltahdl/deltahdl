@@ -1,7 +1,7 @@
 #pragma once
 
-// §8.23 (printed pages 200-201 of ~/LRM.pdf): a class nested in another is
-// named `Outer::Inner` from outside the containing class, the key
+// §8.23 (printed pages 200-201 of ~/IEEE 1800-2023.pdf): a class nested in
+// another is named `Outer::Inner` from outside the containing class, the key
 // LowerNestedClass (lowerer_class.cpp) registers it under, and §26.3 names a
 // package's class `p::C`, which the run binds under its bare name as well.
 // The parser keeps the two halves apart -- DataType::scope_name holds the

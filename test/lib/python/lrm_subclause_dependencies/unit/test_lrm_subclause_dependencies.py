@@ -175,58 +175,58 @@ def test_run_oracle_call_passes_clean_env() -> None:
 
 
 def test_build_dependency_prompt_mentions_subclause() -> None:
-    assert "§33.4.1.5" in build_dependency_prompt("33.4.1.5", "~/LRM.pdf")
+    assert "§33.4.1.5" in build_dependency_prompt("33.4.1.5", "~/IEEE 1800-2023.pdf")
 
 
 def test_build_dependency_prompt_mentions_read_only() -> None:
-    assert "read-only" in build_dependency_prompt("33.4.1.5", "~/LRM.pdf")
+    assert "read-only" in build_dependency_prompt("33.4.1.5", "~/IEEE 1800-2023.pdf")
 
 
 def test_build_dependency_prompt_mentions_lrm() -> None:
-    assert "~/LRM.pdf" in build_dependency_prompt("33.4.1.5", "~/LRM.pdf")
+    assert "~/IEEE 1800-2023.pdf" in build_dependency_prompt("33.4.1.5", "~/IEEE 1800-2023.pdf")
 
 
 def test_build_dependency_prompt_grounds_in_normative_rule() -> None:
-    prompt = build_dependency_prompt("33.4.1.5", "~/LRM.pdf")
+    prompt = build_dependency_prompt("33.4.1.5", "~/IEEE 1800-2023.pdf")
     assert "normative rule" in prompt
 
 
 def test_build_dependency_prompt_anchors_dep_on_machinery_prereq() -> None:
-    prompt = build_dependency_prompt("33.4.1.5", "~/LRM.pdf")
+    prompt = build_dependency_prompt("33.4.1.5", "~/IEEE 1800-2023.pdf")
     assert "machinery" in prompt
 
 
 def test_build_dependency_prompt_invites_quotable_evidence() -> None:
-    prompt = build_dependency_prompt("33.4.1.5", "~/LRM.pdf")
+    prompt = build_dependency_prompt("33.4.1.5", "~/IEEE 1800-2023.pdf")
     assert "quote" in prompt
 
 
 def test_build_dependency_prompt_drops_term_use_criterion() -> None:
-    prompt = build_dependency_prompt("33.4.1.5", "~/LRM.pdf")
+    prompt = build_dependency_prompt("33.4.1.5", "~/IEEE 1800-2023.pdf")
     assert "term, function, or syntactic construct" not in prompt
 
 
 def test_build_dependency_prompt_orders_foundations_first() -> None:
-    prompt = build_dependency_prompt("33.4.1.5", "~/LRM.pdf")
+    prompt = build_dependency_prompt("33.4.1.5", "~/IEEE 1800-2023.pdf")
     assert "foundations-first" in prompt
 
 
 def test_build_dependency_prompt_avoids_required_emphasis() -> None:
-    prompt = build_dependency_prompt("33.4.1.5", "~/LRM.pdf")
+    prompt = build_dependency_prompt("33.4.1.5", "~/IEEE 1800-2023.pdf")
     assert "REQUIRED" not in prompt
 
 
 def test_build_dependency_prompt_drops_parent_rollup_rule() -> None:
-    prompt = build_dependency_prompt("33.4", "~/LRM.pdf")
+    prompt = build_dependency_prompt("33.4", "~/IEEE 1800-2023.pdf")
     assert "rolls up" not in prompt
 
 
 def test_build_dependency_prompt_requests_json_array() -> None:
-    assert "JSON array" in build_dependency_prompt("33.4.1.5", "~/LRM.pdf")
+    assert "JSON array" in build_dependency_prompt("33.4.1.5", "~/IEEE 1800-2023.pdf")
 
 
 def test_build_dependency_prompt_says_empty_if_none() -> None:
-    assert "[]" in build_dependency_prompt("33.4.1.5", "~/LRM.pdf")
+    assert "[]" in build_dependency_prompt("33.4.1.5", "~/IEEE 1800-2023.pdf")
 
 
 _EMPTY_TOC: dict[str, tuple[int, int]] = {}
@@ -427,17 +427,17 @@ def test_compute_subclause_dependencies_loads_toc_from_lrm_path() -> None:
 
 
 def test_build_dependency_prompt_excludes_self_via_substituted_subclause() -> None:
-    prompt = build_dependency_prompt("33.4.1.5", "~/LRM.pdf")
+    prompt = build_dependency_prompt("33.4.1.5", "~/IEEE 1800-2023.pdf")
     assert "{subclause}" not in prompt
 
 
 def test_build_dependency_prompt_avoids_uppercase_do_not() -> None:
-    prompt = build_dependency_prompt("33.4.1.5", "~/LRM.pdf")
+    prompt = build_dependency_prompt("33.4.1.5", "~/IEEE 1800-2023.pdf")
     assert "Do NOT" not in prompt
 
 
 def test_build_dependency_prompt_avoids_lowercase_do_not() -> None:
-    prompt = build_dependency_prompt("33.4.1.5", "~/LRM.pdf")
+    prompt = build_dependency_prompt("33.4.1.5", "~/IEEE 1800-2023.pdf")
     assert "do not" not in prompt
 
 
@@ -451,7 +451,7 @@ def test_build_dependency_prompt_sub_level_parent_mentions_preamble() -> None:
         "lib.python.lrm_subclause_dependencies.load_toc",
         return_value=_PARENT_TOC,
     ):
-        prompt = build_dependency_prompt("33.4", "~/LRM.pdf")
+        prompt = build_dependency_prompt("33.4", "~/IEEE 1800-2023.pdf")
     assert "preamble" in prompt
 
 
@@ -460,7 +460,7 @@ def test_build_dependency_prompt_sub_level_parent_signals_subclauses_separate() 
         "lib.python.lrm_subclause_dependencies.load_toc",
         return_value=_PARENT_TOC,
     ):
-        prompt = build_dependency_prompt("33.4", "~/LRM.pdf")
+        prompt = build_dependency_prompt("33.4", "~/IEEE 1800-2023.pdf")
     assert "queried separately" in prompt
 
 
@@ -469,7 +469,7 @@ def test_build_dependency_prompt_sub_level_parent_grounds_in_normative_rule() ->
         "lib.python.lrm_subclause_dependencies.load_toc",
         return_value=_PARENT_TOC,
     ):
-        prompt = build_dependency_prompt("33.4", "~/LRM.pdf")
+        prompt = build_dependency_prompt("33.4", "~/IEEE 1800-2023.pdf")
     assert "normative rule" in prompt
 
 
@@ -478,7 +478,7 @@ def test_build_dependency_prompt_sub_level_parent_keeps_machinery_anchor() -> No
         "lib.python.lrm_subclause_dependencies.load_toc",
         return_value=_PARENT_TOC,
     ):
-        prompt = build_dependency_prompt("33.4", "~/LRM.pdf")
+        prompt = build_dependency_prompt("33.4", "~/IEEE 1800-2023.pdf")
     assert "machinery" in prompt
 
 
@@ -487,7 +487,7 @@ def test_build_dependency_prompt_sub_level_parent_keeps_json_array() -> None:
         "lib.python.lrm_subclause_dependencies.load_toc",
         return_value=_PARENT_TOC,
     ):
-        prompt = build_dependency_prompt("33.4", "~/LRM.pdf")
+        prompt = build_dependency_prompt("33.4", "~/IEEE 1800-2023.pdf")
     assert "JSON array" in prompt
 
 
@@ -496,7 +496,7 @@ def test_build_dependency_prompt_sub_level_parent_avoids_do_not() -> None:
         "lib.python.lrm_subclause_dependencies.load_toc",
         return_value=_PARENT_TOC,
     ):
-        prompt = build_dependency_prompt("33.4", "~/LRM.pdf")
+        prompt = build_dependency_prompt("33.4", "~/IEEE 1800-2023.pdf")
     assert "do not" not in prompt
 
 
@@ -504,7 +504,7 @@ def test_build_dependency_prompt_leaf_omits_preamble() -> None:
     with patch(
         "lib.python.lrm_subclause_dependencies.load_toc", return_value={},
     ):
-        prompt = build_dependency_prompt("33.4.1.5", "~/LRM.pdf")
+        prompt = build_dependency_prompt("33.4.1.5", "~/IEEE 1800-2023.pdf")
     assert "preamble" not in prompt
 
 
@@ -514,7 +514,7 @@ def test_build_dependency_prompt_top_level_singleton_omits_preamble() -> None:
         "lib.python.lrm_subclause_dependencies.load_toc",
         return_value=singleton_toc,
     ):
-        prompt = build_dependency_prompt("2", "~/LRM.pdf")
+        prompt = build_dependency_prompt("2", "~/IEEE 1800-2023.pdf")
     assert "preamble" not in prompt
 
 

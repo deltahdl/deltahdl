@@ -57,13 +57,13 @@ Stmt* Parser::ParseRepeatStmt() {
 // `this.arr` and `C::arr` were reported as a missing identifier or '['.
 //
 // A.9.3's hierarchical_identifier is `{ identifier constant_bit_select . }
-// identifier` (printed page 1214 of ~/LRM.pdf), so a segment before a '.'
-// may select an element: in `foreach (successors[s].m_predecessors[pred])`
-// the array is the member of the selected element and `[pred]` alone is the
-// loop_variables §12.7.3 puts after the array (printed page 331). A run of
-// bracket groups is a select when a '.' follows it and the loop_variables
-// when the `)` does; the parser had taken the first group for the loop
-// variables and asked for `)` at the '.'.
+// identifier` (printed page 1214 of ~/IEEE 1800-2023.pdf), so a segment before
+// a '.' may select an element: in `foreach
+// (successors[s].m_predecessors[pred])` the array is the member of the selected
+// element and `[pred]` alone is the loop_variables §12.7.3 puts after the array
+// (printed page 331). A run of bracket groups is a select when a '.' follows it
+// and the loop_variables when the `)` does; the parser had taken the first
+// group for the loop variables and asked for `)` at the '.'.
 Expr* Parser::ParseForeachArrayId() {
   Token head = Check(TokenKind::kKwThis) || Check(TokenKind::kKwSuper)
                    ? Consume()

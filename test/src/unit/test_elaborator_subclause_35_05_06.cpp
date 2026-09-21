@@ -320,8 +320,8 @@ TEST(DpiImportFormalTypedefType,
   EXPECT_FALSE(f.has_errors);
 }
 
-// §35.5.6 (printed page 979 of ~/LRM.pdf) lists the only types a formal
-// argument of an import or export subroutine may have, and among the
+// §35.5.6 (printed page 979 of ~/IEEE 1800-2023.pdf) lists the only types a
+// formal argument of an import or export subroutine may have, and among the
 // unpacked kinds it admits the unpacked array (with §35.5.6.1's open array
 // for imports); a queue (§7.10) and an associative array (§7.8) are not among
 // them and the foreign side has no representation of either. Both formals
@@ -377,10 +377,10 @@ TEST(DpiImportFormalType, ImportedFunctionWithSizedAndOpenFormalsIsOk) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §35.5.6 (printed page 979 of ~/LRM.pdf) names imports and exports together
-// when it lists the permitted formal argument types, and §35.7 (printed 982)
-// holds an exported subroutine to the same restrictions; a queue or an
-// associative array is not among them. The export path looked for the
+// §35.5.6 (printed page 979 of ~/IEEE 1800-2023.pdf) names imports and exports
+// together when it lists the permitted formal argument types, and §35.7
+// (printed 982) holds an exported subroutine to the same restrictions; a queue
+// or an associative array is not among them. The export path looked for the
 // dynamic array's absent dimension alone and let a `[$]` or `[string]`
 // dimension through, and the type check read the data type, where `int`
 // is permitted.

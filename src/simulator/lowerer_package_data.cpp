@@ -1,10 +1,10 @@
-// §26.2 (printed page 808 of ~/LRM.pdf) with §3.12.1 (printed 56): the data
-// items a package and the compilation-unit scope declare -- their variables
-// and their parameters with initializers -- given storage ahead of every
-// module, and their declaration assignments evaluated before any procedure
-// starts, as the two subclauses require. A package's item stands under its
-// "pk.name" key, the key a `pk::name` reference and an import's alias resolve
-// by, and the compilation unit's under its "$unit.name" key, which each
+// §26.2 (printed page 808 of ~/IEEE 1800-2023.pdf) with §3.12.1 (printed 56):
+// the data items a package and the compilation-unit scope declare -- their
+// variables and their parameters with initializers -- given storage ahead of
+// every module, and their declaration assignments evaluated before any
+// procedure starts, as the two subclauses require. A package's item stands
+// under its "pk.name" key, the key a `pk::name` reference and an import's alias
+// resolve by, and the compilation unit's under its "$unit.name" key, which each
 // module's bare reference is bound to under the module's own prefix
 // (AliasUnitDataItems) unless the module declares the name. Moved out of
 // lowerer_register.cpp, which registers a module's own declarations, once

@@ -45,11 +45,12 @@ TEST(ClassParsing, WeakReferenceAsFunctionArg) {
               "endmodule\n"));
 }
 
-// §8.30.1 (printed page 217 of ~/LRM.pdf) has a variable declared of type
-// weak_reference#(T), and §8.30.2's example (printed 218) declares two of them
-// at module scope with the `#` written against the class name. §6.8 continues
-// a data_declaration with a list of declarators, so the two names share one
-// declared type, each carrying the class name and its one type argument.
+// §8.30.1 (printed page 217 of ~/IEEE 1800-2023.pdf) has a variable declared of
+// type weak_reference#(T), and §8.30.2's example (printed 218) declares two of
+// them at module scope with the `#` written against the class name. §6.8
+// continues a data_declaration with a list of declarators, so the two names
+// share one declared type, each carrying the class name and its one type
+// argument.
 TEST(ClassParsing, WeakReferenceModuleScopeDeclaratorList) {
   auto r = Parse(
       "class obj;\n"

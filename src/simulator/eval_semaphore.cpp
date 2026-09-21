@@ -23,11 +23,12 @@ namespace delta {
 // found under the "p.sem" key ExtractHandleMethodCallParts answers, given the
 // context's arena as the key's lifetime since the signature carries none.
 // This is asked of every call statement, so the method's name is matched
-// before the key is made. §8.7 with §15.3.1 (printed page 373 of ~/LRM.pdf):
-// a semaphore declared as a class property is each object's own, so a bare
-// `s` inside a method of the class, `this.s` and a handle's `c.s` name the
-// object's (ResolveSyncProperty) ahead of the run's tables, which hold no
-// object's; resolved by name alone, `s.get(1)` in a method reached no bucket.
+// before the key is made. §8.7 with §15.3.1 (printed page 373 of ~/IEEE
+// 1800-2023.pdf): a semaphore declared as a class property is each object's
+// own, so a bare `s` inside a method of the class, `this.s` and a handle's
+// `c.s` name the object's (ResolveSyncProperty) ahead of the run's tables,
+// which hold no object's; resolved by name alone, `s.get(1)` in a method
+// reached no bucket.
 SemaphoreObject* SemaphoreCallTarget(const Expr* expr, SimContext& ctx,
                                      std::string_view method) {
   if (!expr || expr->kind != ExprKind::kCall) return nullptr;
@@ -78,9 +79,9 @@ static std::string ReceiverSpelling(const Expr* recv) {
          std::string(recv->rhs->text);
 }
 
-// §15.3.3 (printed page 373 of ~/LRM.pdf) inside a function body: get()
-// takes the keys where the bucket holds enough, as SemaphoreGetAwaiter does
-// before it would park the process, and a bucket with too few, on which it
+// §15.3.3 (printed page 373 of ~/IEEE 1800-2023.pdf) inside a function body:
+// get() takes the keys where the bucket holds enough, as SemaphoreGetAwaiter
+// does before it would park the process, and a bucket with too few, on which it
 // would wait, is §13.4's report (printed 340) with the bucket as it was. The
 // receiver resolves through SemaphoreCallTarget, so a method's bare `s.get(1)`
 // on a class property reaches the object's bucket as a module's reaches the
@@ -128,8 +129,8 @@ std::string_view ScopedOrBareTargetKey(const Expr* lhs, Arena& arena) {
 
 // §8.7 with §15.3.1: the target may be a class property, `s = new(2)` in a
 // method or `c.s = new(2)` through a handle, whose bucket is the object's
-// alone (BuildSyncProperty). §15.3.1 (printed page 373 of ~/LRM.pdf) has
-// new() return the semaphore handle, so the variable the statement assigns
+// alone (BuildSyncProperty). §15.3.1 (printed page 373 of ~/IEEE 1800-2023.pdf)
+// has new() return the semaphore handle, so the variable the statement assigns
 // refers to the bucket from here on and §8.4 (printed 182) compares it
 // unequal to null (HoldSyncVariable); the bucket alone was filled, and a
 // `semaphore s;` read as null after its `s = new(2)`.

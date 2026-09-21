@@ -494,9 +494,9 @@ TEST(StaticMethodThisPositions, SuperInAForkArmIsReported) {
 }
 
 // The cases below are the member accesses §8.10 does not bar: a member read
-// through a handle. §8.10 (printed page 186 of ~/LRM.pdf) denies a static
-// method the non-static members of an object it holds no handle to, and §8.4
-// (printed 181-182) reads a member through any handle a variable holds --
+// through a handle. §8.10 (printed page 186 of ~/IEEE 1800-2023.pdf) denies a
+// static method the non-static members of an object it holds no handle to, and
+// §8.4 (printed 181-182) reads a member through any handle a variable holds --
 // `p.fileID` in §8.9's example on the same page as §8.10 -- which a static
 // method may hold as any subroutine may. ExprRefsNonStaticMember in
 // src/elaborator/elaborator_validate_static_methods.cpp searched the member
@@ -637,9 +637,9 @@ TEST(StaticMethodHandleBases, PropertyThroughABareNonStaticHandleIsReported) {
 }
 
 // The cases below hold the same class in a package. §26.2 (printed page 808 of
-// ~/LRM.pdf) makes a class declaration written in a package an item of that
-// package, and §8.10 (printed 186) states its rule of the class and not of
-// where the class is declared. Elaborator::ValidateStaticMethodBodies in
+// ~/IEEE 1800-2023.pdf) makes a class declaration written in a package an item
+// of that package, and §8.10 (printed 186) states its rule of the class and not
+// of where the class is declared. Elaborator::ValidateStaticMethodBodies in
 // src/elaborator/elaborator_validate_static_methods.cpp walked the compilation
 // unit's classes and the module's own, so a package class's static method
 // reading a bare non-static property was never reported, whether or not a
@@ -692,9 +692,9 @@ TEST(StaticMethodInPackage, PropertyThroughAStaticPropertyIsAccepted) {
 }
 
 // The cases below hold the class inside another class. §8.23 (printed pages
-// 200-201 of ~/LRM.pdf) lets a class declare a class inside itself, named from
-// outside as `Outer::Inner`, and §8.10 (printed 186) states its rule of a
-// class's static method wherever the class is declared.
+// 200-201 of ~/IEEE 1800-2023.pdf) lets a class declare a class inside itself,
+// named from outside as `Outer::Inner`, and §8.10 (printed 186) states its rule
+// of a class's static method wherever the class is declared.
 // Elaborator::ValidateStaticMethodsAmong in
 // src/elaborator/elaborator_validate_static_methods.cpp read the direct class
 // items of the compilation unit, the module and each package, so a class
@@ -758,7 +758,7 @@ TEST(StaticMethodInNestedClass, PropertyThroughAStaticPropertyIsAccepted) {
 }
 
 // The cases below hold the class in a program or an interface that nothing
-// instantiates. §24.3 (printed page 775 of ~/LRM.pdf) admits a class
+// instantiates. §24.3 (printed page 775 of ~/IEEE 1800-2023.pdf) admits a class
 // declaration among a program's items and §25.3 (printed 781) among an
 // interface's; §17.2 (printed 503-504) names none among a checker's, and the
 // parser reports one there under A.1.8 (test_parser_annex_a_01_08.cpp), so no

@@ -574,7 +574,7 @@ static void RegisterTypeDeclarations(const RtlirDesign* design,
   RegisterScopeTypedefs(unit->programs, ctx);
 }
 
-// §6.18 (printed page 118 of ~/LRM.pdf): the name at the end of each
+// §6.18 (printed page 118 of ~/IEEE 1800-2023.pdf): the name at the end of each
 // typedef name's chain, recorded for the run, class or not
 // (SimContext::RegisterTypeTarget), with the typedef items' own types beside
 // it (RegisterTypeDeclarations) for the parameter list a typedef of a

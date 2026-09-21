@@ -10,8 +10,8 @@
 // (InitPackageDataVariables in lowerer_register.cpp) with no class recorded
 // under that key, so the handle stayed null. Each package variable whose type
 // names a class is recorded here under the same key, for the whole design,
-// ahead of every module. §9.7 (printed page 245 of ~/LRM.pdf) and §8.30.1
-// (printed 217) let a variable be declared of the built-in process and
+// ahead of every module. §9.7 (printed page 245 of ~/IEEE 1800-2023.pdf) and
+// §8.30.1 (printed 217) let a variable be declared of the built-in process and
 // weak_reference classes, and the elaborator names each by its bare name, the
 // name LowerVar records a module's under and every method path asks for; a
 // package's `process proc` and `weak_reference #(C) w` were recorded under

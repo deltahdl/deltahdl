@@ -253,12 +253,13 @@ void RegisterPackageParams(CompilationUnit* unit, ScopeMap& cu_param_scope,
 // { variable_dimension } [ = constant_param_expression ]`, and rules that "all
 // param_assignments appearing within a class body shall become localparam
 // declarations regardless of the presence or absence of a parameter_port_list"
-// (printed page 125 of ~/LRM.pdf), so a class body parameter and a #()
-// parameter port are both under that rule. Leaving the parameter out instead is
-// what let a breach elaborate in silence: a name absent from the scope reads to
-// every later consumer as a name it cannot see rather than as a value the
-// source got wrong, and CollectUnpackedDimSizes in elaborator_decls_var.cpp
-// drops the array dimension the parameter was sizing rather than reporting it.
+// (printed page 125 of ~/IEEE 1800-2023.pdf), so a class body parameter and a
+// #() parameter port are both under that rule. Leaving the parameter out
+// instead is what let a breach elaborate in silence: a name absent from the
+// scope reads to every later consumer as a name it cannot see rather than as a
+// value the source got wrong, and CollectUnpackedDimSizes in
+// elaborator_decls_var.cpp drops the array dimension the parameter was sizing
+// rather than reporting it.
 //
 // §6.20.1: one class's list of parameter constants, as far as registration has
 // read it. `formals` holds every parameter name the class declares, type

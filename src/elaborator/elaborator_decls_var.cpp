@@ -73,9 +73,9 @@ static void ValidateParameterizedClassDefaults(const ModuleItem* item,
 
 // §8.25: the objects of a parameterized class "can then be instantiated like
 // modules or interfaces, using the same parameter override rules (see 23.10)"
-// (printed page 203 of ~/LRM.pdf), and §23.10.2 gives a parameter override a
-// constant expression as its value. Reports a value argument of `C#(...) c;`
-// that is not one.
+// (printed page 203 of ~/IEEE 1800-2023.pdf), and §23.10.2 gives a parameter
+// override a constant expression as its value. Reports a value argument of
+// `C#(...) c;` that is not one.
 //
 // A value argument parses as an implicit-typed slot carrying the expression, so
 // `type_name` is empty and `type_ref_expr` holds it; a type argument names a

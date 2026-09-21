@@ -124,9 +124,10 @@ const DataType* ResolveNamedTypeChain(const DataType* dtype,
 
 // §6.20.3: "it shall be an error if the type parameter is assigned a type
 // definition that does not conform to the specified basic data type" (printed
-// page 128 of ~/LRM.pdf). `class` and `interface class` are two of the five
-// basic data types that clause lists, and §8.26 makes them different kinds of
-// declaration, so a type conforming to one does not conform to the other.
+// page 128 of ~/IEEE 1800-2023.pdf). `class` and `interface class` are two of
+// the five basic data types that clause lists, and §8.26 makes them different
+// kinds of declaration, so a type conforming to one does not conform to the
+// other.
 //
 // Four answers, and the declaration decides them. A class (or interface class)
 // type is always referenced by name, so a resolved concrete type -- a built-in

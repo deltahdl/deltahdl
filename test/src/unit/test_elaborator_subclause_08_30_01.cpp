@@ -264,10 +264,10 @@ TEST(ClassConstraintElaboration,
       "    end");
 }
 
-// §8.30.1 (printed page 218 of ~/LRM.pdf) puts weak_reference in the built-in
-// std package of §26.7 (printed 816), so the class named through the package
-// scope, at module scope and as a block item, is the built-in class: the
-// declaration elaborates, and the class-type restriction on its parameter
+// §8.30.1 (printed page 218 of ~/IEEE 1800-2023.pdf) puts weak_reference in the
+// built-in std package of §26.7 (printed 816), so the class named through the
+// package scope, at module scope and as a block item, is the built-in class:
+// the declaration elaborates, and the class-type restriction on its parameter
 // holds for the scoped spelling exactly as for the bare one. A spelling the
 // elaborator took for some other type would raise no §8.30.1 report at all.
 TEST(ClassConstraintElaboration, WeakReferenceStdScopedIsTheBuiltinClass) {

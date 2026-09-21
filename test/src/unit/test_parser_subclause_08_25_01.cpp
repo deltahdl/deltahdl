@@ -130,12 +130,13 @@ TEST(ParameterizedScopeResolutionParsing, EmptyParamListWithMemberAccess) {
 }
 
 // A.4.1.1's ordered_parameter_assignment is a param_expression (printed page
-// 1194 of ~/LRM.pdf), which A.8.3 lets be a data_type, and A.2.2.1 gives an
-// integer type an optional signing and a virtual interface its `virtual`
-// keyword (printed page 1182). An expression reader spells a keyword type as
-// a bare name, so `int unsigned` stopped at `unsigned` and `virtual ifc` at
-// `virtual`, each reported as a missing `)` under §23.10.2; those elements
-// are now read as the data types they are and carried on the scope's node.
+// 1194 of ~/IEEE 1800-2023.pdf), which A.8.3 lets be a data_type, and A.2.2.1
+// gives an integer type an optional signing and a virtual interface its
+// `virtual` keyword (printed page 1182). An expression reader spells a keyword
+// type as a bare name, so `int unsigned` stopped at `unsigned` and `virtual
+// ifc` at `virtual`, each reported as a missing `)` under §23.10.2; those
+// elements are now read as the data types they are and carried on the scope's
+// node.
 TEST(ParameterizedScopeResolutionParsing, SignedIntegerTypeAsParameterValue) {
   auto r = Parse(
       "class C #(type T = int);\n"

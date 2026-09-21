@@ -128,9 +128,9 @@ TEST(DpiImportLowering, ACallToAnUnresolvedImportIsReported) {
       "35.5.4"));
 }
 
-// §35.5.4 (printed page 977 of ~/LRM.pdf): an import declaration defines a
-// subroutine of that name in the scope the declaration is written in, and
-// the standard puts no scope off limits -- a package, an interface, a
+// §35.5.4 (printed page 977 of ~/IEEE 1800-2023.pdf): an import declaration
+// defines a subroutine of that name in the scope the declaration is written in,
+// and the standard puts no scope off limits -- a package, an interface, a
 // program, a module that is not the top and the compilation unit each hold
 // one. Only the top module's declarations reached the registry, so a call
 // to any other's found no import and read a silent 0. Each case below has the

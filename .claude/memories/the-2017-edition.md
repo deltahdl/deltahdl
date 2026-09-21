@@ -9,7 +9,7 @@ metadata:
 
 `~/IEEE 1800-2017.pdf` is IEEE 1800-2017. A body page's physical number is
 its printed number plus one. Read it one page per call, as
-[[reading-the-lrm-one-page-per-call]] says for `~/LRM.pdf`.
+[[reading-the-lrm-one-page-per-call]] says for `~/IEEE 1800-2023.pdf`.
 
 **Why:** sv-tests tags its tests by 1800-2017, so whether a tag is wrong in
 its own edition, rather than renumbered in 2023, is settled from the 2017

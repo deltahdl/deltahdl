@@ -302,9 +302,9 @@ TEST(ExtendsVsImplementsRestrictions, ClassImplementsVirtualClassError) {
 // subclause and nothing else, so the report above is the only one the source
 // draws. §8.26 poses the obligation to provide an implementation for a pure
 // virtual method only where an interface class is implemented (printed page 209
-// of ~/LRM.pdf), and VBase is a virtual class, so a report saying C fails to
-// implement 'foo' "from interface 'VBase'" states something false about the
-// source and names a clause the source does not break.
+// of ~/IEEE 1800-2023.pdf), and VBase is a virtual class, so a report saying C
+// fails to implement 'foo' "from interface 'VBase'" states something false
+// about the source and names a clause the source does not break.
 //
 // The assertion is about what was not reported, which ReportedError cannot say:
 // it answers whether some recorded error matches, and passes whether or not a

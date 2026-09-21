@@ -180,8 +180,8 @@ TEST(PackageImportInHeader, WildcardProgramHeaderImportVisibleInPort) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §26.4 (printed page 812 of ~/LRM.pdf) types a port through a header import,
-// its own example writing `input instruction_t a` after `import
+// §26.4 (printed page 812 of ~/IEEE 1800-2023.pdf) types a port through a
+// header import, its own example writing `input instruction_t a` after `import
 // A::instruction_t`, and §7.2.1 makes a member of a packed structure a window
 // of the port's bits. §23.2.2.3 (printed 735) makes an input port with no port
 // kind a net of the default net type, and §6.7.1 (printed 103) admits a packed

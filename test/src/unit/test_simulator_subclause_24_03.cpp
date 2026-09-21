@@ -114,10 +114,10 @@ TEST(ProgramConstructSim, ProgramInitialTerminatesDescendantThreads) {
 }
 
 // §24.3: a top-level program not explicitly instantiated is implicitly
-// instantiated once (printed page 776 of ~/LRM.pdf), so its initial runs and
-// a task it declares, enabled from that initial, consumes its delay (§13.3):
-// the write lands at time 5. The program was rooted by no run before, so
-// nothing ran and `at` kept its reset value.
+// instantiated once (printed page 776 of ~/IEEE 1800-2023.pdf), so its initial
+// runs and a task it declares, enabled from that initial, consumes its delay
+// (§13.3): the write lands at time 5. The program was rooted by no run before,
+// so nothing ran and `at` kept its reset value.
 TEST(ProgramConstructSim, ATopLevelProgramsInitialRunsItsTask) {
   SimFixture f;
   auto* design = ElaborateSrc(

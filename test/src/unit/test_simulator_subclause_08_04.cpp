@@ -403,10 +403,10 @@ TEST(ClassSim, NewConstructsHandleDeclaredInClassMethodBody) {
   EXPECT_EQ(RunAndGet(src, "rx"), 222u);
 }
 
-// §8.4 (printed page 182 of ~/LRM.pdf): accessing a non-static member or a
-// virtual method through a null object handle is illegal, the result
-// indeterminate, and an implementation may issue an error. `c.get()` on a
-// `C c;` never assigned answered 0 in silence, a value a testbench reads as
+// §8.4 (printed page 182 of ~/IEEE 1800-2023.pdf): accessing a non-static
+// member or a virtual method through a null object handle is illegal, the
+// result indeterminate, and an implementation may issue an error. `c.get()` on
+// a `C c;` never assigned answered 0 in silence, a value a testbench reads as
 // valid; it is reported at the call, and the 0 is what the call yields.
 TEST(ClassSim, MethodCalledThroughANullHandleIsReported) {
   SimFixture f;
@@ -473,10 +473,10 @@ static std::pair<uint64_t, uint64_t> RunAndReadValueAndBits(
   return {r->value.ToUint64(), w->value.ToUint64()};
 }
 
-// §6.20.4 (printed page 129 of ~/LRM.pdf) lets a local parameter be declared
-// at compilation-unit scope, §3.12.1 (printed 56) has a name the class body
-// does not declare searched in the compilation-unit scope written before it,
-// and §7.4.1 (printed 153) has a packed dimension's bounds be constant
+// §6.20.4 (printed page 129 of ~/IEEE 1800-2023.pdf) lets a local parameter be
+// declared at compilation-unit scope, §3.12.1 (printed 56) has a name the class
+// body does not declare searched in the compilation-unit scope written before
+// it, and §7.4.1 (printed 153) has a packed dimension's bounds be constant
 // expressions. The property is therefore ten bits: 10'h3FF written through it
 // reads back 1023 and $bits answers 10. Folded against the class's own
 // parameters alone, the range did not fold, the property was the one bit of
@@ -500,9 +500,10 @@ TEST(ClassSim, CompilationUnitLocalparamSizesClassPropertyRange) {
   EXPECT_EQ(w, 10u);
 }
 
-// §26.3 (printed page 808 of ~/LRM.pdf): a package's parameter is named from
-// any scope through the package scope resolution operator, and §7.4.1 admits
-// any constant expression as a bound, so `[p::W*2-1:0]` is twenty bits where
+// §26.3 (printed page 808 of ~/IEEE 1800-2023.pdf): a package's parameter is
+// named from any scope through the package scope resolution operator, and
+// §7.4.1 admits any constant expression as a bound, so `[p::W*2-1:0]` is twenty
+// bits where
 // `[p::W-1:0]` is ten. 20'hFFFFF reads back 1048575 from the doubled range,
 // which a ten-bit property would have cut to 1023 and a one-bit one to 1.
 TEST(ClassSim, PackageParameterSizesClassPropertyRange) {
@@ -528,12 +529,12 @@ TEST(ClassSim, PackageParameterSizesClassPropertyRange) {
   EXPECT_EQ(w, 10u);
 }
 
-// §3.12.1 (printed page 56 of ~/LRM.pdf) includes among the compilation-unit
-// scope's names the ones a package import made available there, so a wildcard
-// import written outside every module lets the class body name the package's
-// parameter bare. The bare and the qualified spellings size alike: 10'h3FF
-// through the bare-named range reads 1023 and $bits of the qualified one is
-// 10.
+// §3.12.1 (printed page 56 of ~/IEEE 1800-2023.pdf) includes among the
+// compilation-unit scope's names the ones a package import made available
+// there, so a wildcard import written outside every module lets the class body
+// name the package's parameter bare. The bare and the qualified spellings size
+// alike: 10'h3FF through the bare-named range reads 1023 and $bits of the
+// qualified one is 10.
 TEST(ClassSim, ImportedPackageParameterSizesClassPropertyRange) {
   auto [r, w] = RunAndReadValueAndBits(
       "package p;\n"

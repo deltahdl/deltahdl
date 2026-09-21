@@ -10,10 +10,10 @@
 
 namespace delta {
 
-// §26.7 with Syntax 26-5 (printed pages 816-817 of ~/LRM.pdf): the built-in
-// package's names are written with or without the `std::` qualifier and reach
-// one declaration, and no user package may be called std, so the run holds
-// its classes under the bare name and SimContext::FindClassType drops the
+// §26.7 with Syntax 26-5 (printed pages 816-817 of ~/IEEE 1800-2023.pdf): the
+// built-in package's names are written with or without the `std::` qualifier
+// and reach one declaration, and no user package may be called std, so the run
+// holds its classes under the bare name and SimContext::FindClassType drops the
 // qualifier before asking its table. The scoped probe below then found
 // `std::process` and answered that spelling as the key, so `std::process p =
 // std::process::self();` recorded p's class as "std::process", which the

@@ -92,11 +92,11 @@ TEST(ObjectPropertyParsing, PropertyReadAndWrite) {
 // §8.5 puts no restriction on the data type of a class property, §26.3
 // references a package's declaration through the package scope resolution
 // operator, and A.2.2.1 lets a data_type be a type_identifier behind a
-// package_scope (printed pages 183, 808 and 1182 of ~/LRM.pdf). The parser
-// reads an identifier as a named type only where it knows the name as a type,
-// and a package name never is one, so `pk::sev_t s = pk::MED;` in a class body
-// was reported at the `::` where a `;` was expected. The property keeps both
-// halves of the scoped name and its initializer.
+// package_scope (printed pages 183, 808 and 1182 of ~/IEEE 1800-2023.pdf). The
+// parser reads an identifier as a named type only where it knows the name as a
+// type, and a package name never is one, so `pk::sev_t s = pk::MED;` in a class
+// body was reported at the `::` where a `;` was expected. The property keeps
+// both halves of the scoped name and its initializer.
 TEST(ObjectPropertyParsing, PackageScopedTypeDeclaresAProperty) {
   auto r = Parse(
       "package pk;\n"

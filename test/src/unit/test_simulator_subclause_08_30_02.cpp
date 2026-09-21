@@ -150,10 +150,10 @@ TEST(ClassSim, WeakRefE2eInstancesUniqueButSameReferent) {
   LowerRunAndCheck(f, design, {{"distinct", 1u}, {"same_referent", 1u}});
 }
 
-// §8.30.2's example (printed page 218 of ~/LRM.pdf) read whole through the
-// production pipeline, the two references declared as one module-scope
-// declarator list with the `#` against the class name, and every method of
-// §8.30.1's list (printed 217-219) called on them in one run: the two
+// §8.30.2's example (printed page 218 of ~/IEEE 1800-2023.pdf) read whole
+// through the production pipeline, the two references declared as one
+// module-scope declarator list with the `#` against the class name, and every
+// method of §8.30.1's list (printed 217-219) called on them in one run: the two
 // instances are distinct objects (§8.30.2) referring to one referent, get()
 // answers the referent (§8.30.3) whose property initializer is read back
 // through it, clear() sets get() to null (§8.30.4), and get_id() answers 0

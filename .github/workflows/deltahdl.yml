@@ -924,7 +924,7 @@ jobs:
             while IFS=: read -r line _
             do
               echo "::error file=$f,line=$line::$f:$line passes" \
-                "Subclause::Unread(); read the site against ~/LRM.pdf and" \
+                "Subclause::Unread(); read the site against ~/IEEE 1800-2023.pdf and" \
                 "name the subclause it enforces, or Subclause::None() if it" \
                 "enforces no rule of the standard"
               fail=1
