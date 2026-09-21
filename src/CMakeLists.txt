@@ -223,6 +223,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/scope_hier_name.cpp
     simulator/sim_context_binding.cpp
     simulator/sim_context_fileio.cpp
+    simulator/sim_context_scope.cpp
     simulator/output_log.cpp
     simulator/sim_context_vcd.cpp
     simulator/vcd_dump_state.cpp

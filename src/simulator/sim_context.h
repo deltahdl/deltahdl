@@ -6,13 +6,14 @@
 // VCD dump, the timescales, the file descriptors, the class objects and the
 // state each system task records.
 //
-// Three groups of it stand in headers of their own, included below. Two are
+// Four groups of it stand in headers of their own, included below. Two are
 // declared as base classes, so every call through a SimContext reads as it
 // did: simulator/sim_context_name_tables.h holds the tables keyed by a
-// declared name, and simulator/sim_context_random_stability.h holds the
-// §18.13 and §18.14 operations on a generator that lives on a ClassObject or
-// a Process. simulator/instance_prefix_override.h holds the §32.4.3 override
-// and its guard, which SimContext keeps as a member.
+// declared name, simulator/sim_context_random_stability.h holds the §18.13
+// and §18.14 operations on a generator that lives on a ClassObject or a
+// Process, and simulator/sim_context_scope_stack.h holds the §23.9 scope
+// stack a subroutine call pushes. simulator/instance_prefix_override.h holds
+// the §32.4.3 override and its guard, which SimContext keeps as a member.
 
 #include <array>
 #include <cstdint>
@@ -38,9 +39,9 @@
 #include "simulator/net.h"
 #include "simulator/output_log.h"
 #include "simulator/scheduler.h"
-#include "simulator/scope.h"
 #include "simulator/sim_context_name_tables.h"
 #include "simulator/sim_context_random_stability.h"
+#include "simulator/sim_context_scope_stack.h"
 #include "simulator/sim_context_types.h"
 // ClockingManager, SpecifyManager and DpiRuntime, each held by value behind an
 // owning unique_ptr below. The constructor of this class is defined inline,
@@ -64,7 +65,9 @@ struct DataType;
 struct ModuleItem;
 struct Process;
 
-class SimContext : public DeclaredNameTables, public RandomStability {
+class SimContext : public DeclaredNameTables,
+                   public RandomStability,
+                   public ScopeStack {
  public:
   SimContext(Scheduler& sched, Arena& arena, DiagEngine& diag,
              uint32_t seed = 0)
@@ -226,15 +229,13 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   void RegisterFinalProcess(Process* proc);
   void RunFinalBlocks();
 
-  // `package` is Scope::package, the package a subroutine the scope belongs
-  // to was declared in, empty for every other scope.
-  void PushScope(std::string_view package = {});
-  // §23.9 with §26.2: marks the innermost frame a subroutine body's and gives
-  // it the package its bare names are read from, none for an empty name.
-  void EnterSubroutineScope(std::string_view package);
-  // §26.3 with §13.3: the same for `func`'s package, answering `func` back.
+  // §26.3 with §13.3: EnterSubroutineScope for `func`'s package, answering
+  // `func` back.
   const ModuleItem* EnterSubroutinePackage(const ModuleItem* func);
-  void PopScope();
+  // §13.4.2: a static function's frame is the one PopStaticScope retained
+  // under StaticFrameKey the last time the function returned.
+  void PushStaticScope(std::string_view func_name);
+  void PopStaticScope(std::string_view func_name);
 
   // §18.17.7: while a randsequence production with a non-void return type is
   // being generated, the engine points the return slot at the production's
@@ -244,21 +245,8 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   Logic4Vec* SetRsReturnSlot(Logic4Vec* slot);
   Logic4Vec* RsReturnSlot() const { return rs_return_slot_; }
 
-  std::vector<Scope> SwapScopeStack(std::vector<Scope> new_stack);
-  void PushStaticScope(std::string_view func_name);
-  void PopStaticScope(std::string_view func_name);
-  bool HasLocalScope() const { return !scope_stack_.empty(); }
-  // §23.9 (printed page 761): the end of the frames a bare name is looked up
-  // in, walking the stack inward from crbegin(): the frames down to and
-  // including the innermost subroutine frame, since a task's or function's
-  // body is a scope nested in the module, package or class declaring it and
-  // the caller's body, another branch of the name tree, is not searched.
-  // Defined in sim_context.cpp beside FindLocalVariable.
-  std::vector<Scope>::const_reverse_iterator VisibleFramesEnd() const;
-  Variable* FindLocalVariable(std::string_view name);
-  // §26.3 with §23.9 and §13.4: see the definitions in sim_context.cpp and,
-  // for the two key lists, in sim_context_fileio.cpp.
-  const Scope* PackageFrame() const;
+  // §26.3 with §23.9 and §13.4: the two key lists, in sim_context_fileio.cpp,
+  // and the lookups through them.
   std::vector<std::string> PackageFrameKeys(std::string_view name) const;
   std::vector<std::string> ScopedObjectKeys(std::string_view name) const;
   Variable* FindInPackageScope(std::string_view name);
@@ -272,35 +260,12 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   // per-element array copy -- wants the unsigned default.
   Variable* CreateLocalVariable(std::string_view name, uint32_t width,
                                 bool is_signed = false);
-  // Makes `var`, a variable created earlier, the variable `name` names in
-  // the innermost scope, as CreateLocalVariable makes the one it creates:
-  // what a constraint's trial does with the locals it binds the random
-  // variables to, which it makes once per randomize() call and binds once per
-  // relation it evaluates (18.5). The caller must have pushed a scope, and
-  // `name` must outlive it.
-  void BindLocalVariable(std::string_view name, Variable* var);
-  // §8.25.1: binds, in the innermost scope, the type the specialization a
-  // class-scope call names gives the type parameter `name`; the second reads
-  // it back from the innermost scope binding the name, null where none does.
-  void BindScopeTypeActual(std::string_view name, const DataType* actual);
-  const DataType* FindScopeTypeActual(std::string_view name) const;
 
   Variable* FindStaticFuncVar(std::string_view func_name,
                               std::string_view var_name);
 
   void SaveStaticFuncVar(std::string_view func_name, std::string_view var_name,
                          Variable* var);
-
-  void AliasLocalVariable(std::string_view name, Variable* var);
-
-  void PushFuncName(std::string_view name);
-  void PopFuncName();
-  std::string_view CurrentFuncName() const;
-  // The active subroutine call chain, outermost frame first. Used to report the
-  // call stack for $stacktrace (§20.17.2).
-  const std::vector<std::string_view>& FuncNameStack() const {
-    return func_name_stack_;
-  }
 
   void EnterFunction() { ++function_depth_; }
   void ExitFunction();
@@ -806,14 +771,8 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   uint32_t default_seed_;
   std::unordered_map<std::string_view, Variable*> variables_;
   std::unordered_map<std::string_view, Net*> nets_;
-  std::vector<Scope> scope_stack_;
   Logic4Vec* rs_return_slot_ = nullptr;
 
-  std::unordered_map<std::string_view,
-                     std::unordered_map<std::string_view, Variable*>>
-      static_frames_;
-
-  std::vector<std::string_view> func_name_stack_;
   std::vector<Process*> final_processes_;
   // §21.7.2.1: record one time unit's simulation_time command and the value
   // changes under it, which is what the end of a time slot does and what a
