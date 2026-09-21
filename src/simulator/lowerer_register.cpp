@@ -37,11 +37,16 @@
 
 namespace delta {
 
+// §6.9.1: either bound of a packed dimension may be negative, so each is read
+// as the integer it stands for (SelectBoundValue) and not as the magnitude of
+// its bits: `logic [-1:4] b` read its `-1` as 4294967295, a span that did not
+// account for the six bits, and the vector stayed addressed as [5:0], where
+// b[4] was bit 4 and b[-1] out of range.
 void RecordPackedRange(const DataType* dt, Variable* v, SimContext& ctx,
                        Arena& arena) {
   if (!dt || !dt->packed_dim_left || !dt->packed_dim_right) return;
   auto eval = [&](const Expr* e) {
-    return static_cast<int64_t>(EvalExpr(e, ctx, arena).ToUint64());
+    return SelectBoundValue(EvalExpr(e, ctx, arena));
   };
   auto span = [](int64_t l, int64_t r) {
     return static_cast<uint64_t>((l >= r ? l - r : r - l) + 1);
