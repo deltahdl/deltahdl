@@ -250,16 +250,15 @@ void RegisterPackageParams(CompilationUnit* unit, ScopeMap& cu_param_scope,
 //
 // A value that is not a constant expression is reported here rather than left
 // out. §6.20.1's Syntax 6-6 writes a param_assignment as `parameter_identifier
-// { variable_dimension } [ = constant_param_expression ]`, and rules that "all
-// param_assignments appearing within a class body shall become localparam
-// declarations regardless of the presence or absence of a parameter_port_list"
-// (printed page 125 of ~/IEEE 1800-2023.pdf), so a class body parameter and a
-// #() parameter port are both under that rule. Leaving the parameter out
-// instead is what let a breach elaborate in silence: a name absent from the
-// scope reads to every later consumer as a name it cannot see rather than as a
-// value the source got wrong, and CollectUnpackedDimSizes in
-// elaborator_decls_var.cpp drops the array dimension the parameter was sizing
-// rather than reporting it.
+// { variable_dimension } [ = constant_param_expression ]`, and makes every
+// param_assignment in a class body a localparam declaration whether or not the
+// class has a parameter_port_list (printed page 125 of ~/IEEE 1800-2023.pdf),
+// so a class body parameter and a #() parameter port are both under that rule.
+// Leaving the parameter out instead is what let a breach elaborate in silence:
+// a name absent from the scope reads to every later consumer as a name it
+// cannot see rather than as a value the source got wrong, and
+// CollectUnpackedDimSizes in elaborator_decls_var.cpp drops the array dimension
+// the parameter was sizing rather than reporting it.
 //
 // §6.20.1: one class's list of parameter constants, as far as registration has
 // read it. `formals` holds every parameter name the class declares, type
@@ -267,8 +266,8 @@ void RegisterPackageParams(CompilationUnit* unit, ScopeMap& cu_param_scope,
 // or not, because §8.25 binds those only when the class is specialized, and
 // `class C #(type T = int, int S = $bits(T));` is legal and has no value where
 // it stands. `values` is `cu_param_scope` with the values recorded so far
-// layered over it under their bare names, which is what §6.20.1's "in a list of
-// parameter constants, a parameter can depend on earlier parameters" requires.
+// layered over it under their bare names, which is what §6.20.1 requires when
+// it lets a parameter in a list of parameter constants depend on earlier ones.
 // The three fields that follow are where a recorded value goes and how a
 // breach is reported.
 struct ClassParamRegistration {
