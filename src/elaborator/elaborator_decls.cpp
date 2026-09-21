@@ -831,7 +831,17 @@ static void SetEnumTypeInfo(const ModuleItem* item, RtlirVariable& var,
   if (item->data_type.kind != DataTypeKind::kNamed) return;
   const DataType* bound = FindNamedType(item->data_type, typedefs);
   if (bound != nullptr && bound->kind == DataTypeKind::kEnum) {
-    var.enum_type_name = item->data_type.type_name;
+    // §8.23 and §26.3: a typedef named through a scope, `C::e_t en` or
+    // `P::c_t v`, is the key "C::e_t" the design's typedef table holds it
+    // under, and the key the simulator registers the enumeration by
+    // (RtlirDesign::type_enums); the bare name alone named an enumeration of
+    // the module, which such a variable's is not.
+    var.enum_type_name =
+        item->data_type.scope_name.empty()
+            ? item->data_type.type_name
+            : *arena.Create<std::string>(
+                  std::string(item->data_type.scope_name) +
+                  "::" + std::string(item->data_type.type_name));
 
     var.dtype = arena.Create<DataType>(*bound);
   }

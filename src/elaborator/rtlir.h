@@ -871,6 +871,18 @@ struct RtlirDesign {
   // Each entry is an arena-owned copy with its nested aggregate members
   // resolved, so it outlives the elaborator that built it.
   std::unordered_map<std::string_view, const DataType*> type_layouts;
+  // §6.19 with §6.18: the enumeration declaration every typedef name standing
+  // for an enumeration resolves to, under the typedef's key -- the bare name
+  // for a module's or an imported one, "P::name" for a package's (§26.3) and
+  // "C::name" for a class's (§8.23) -- as the elaborator's typedef table holds
+  // it. §6.19.5 declares its methods on the enumeration type, and the
+  // simulator, which registers a module's enumerations from RtlirModule's
+  // enum_types alone, had no members to answer with for a property declared
+  // with a class's or a package's typedef (RegisterDesignEnumTypes in
+  // src/simulator/lowerer_data_init.cpp). Each entry is an arena-owned copy,
+  // so it outlives the elaborator that built it; the member values fold in
+  // the simulator against unit_constants below.
+  std::unordered_map<std::string_view, const DataType*> type_enums;
   // §11.5.1 with §6.18: the packed range the type a name stands for was
   // declared with, as written, for the names standing for a vector of one
   // packed dimension whose bounds fold. `typedef bit [15:10] value_t` is six

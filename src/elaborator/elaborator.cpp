@@ -227,6 +227,7 @@ struct TypeNameFacts {
   std::unordered_map<std::string_view, const DataType*>& layouts;
   std::unordered_map<std::string_view, std::string_view>& targets;
   std::unordered_map<std::string_view, PackedRange>& ranges;
+  std::unordered_map<std::string_view, const DataType*>& enums;
 };
 
 // What the typedef table has to say about the names in it: the table itself,
@@ -328,6 +329,12 @@ void PopulateTypeWidths(const TypeNameSources& src, TypeNameFacts& out) {
     const DataType& end = ResolvedType(dtype, src.typedefs);
     if (end.kind == DataTypeKind::kNamed && end.type_name != name) {
       out.targets[name] = end.type_name;
+    }
+    // §6.19 with §6.18: the enumeration a name stands for, at the end of its
+    // chain of typedefs, whose members §6.19.5's methods on a value held
+    // under the name walk (RtlirDesign::type_enums).
+    if (end.kind == DataTypeKind::kEnum) {
+      out.enums[name] = src.arena.Create<DataType>(end);
     }
     if (auto range = TypeNameRange(dtype, src.typedefs)) {
       out.ranges[name] = *range;
@@ -480,7 +487,8 @@ void FinalizeDesignTail(RtlirDesign* design, const CompilationUnit* unit,
                         const DesignMetadata& meta) {
   TypeNameFacts facts{design->type_widths,  design->type_kinds,
                       design->type_signed,  design->type_layouts,
-                      design->type_targets, design->type_ranges};
+                      design->type_targets, design->type_ranges,
+                      design->type_enums};
   PopulateTypeWidths(src, facts);
   CopyDesignMetadata(design, unit, meta);
 }

@@ -126,6 +126,16 @@ class DeclaredNameTables {
   void SetVariableEnumType(std::string_view var_name,
                            std::string_view type_name);
   const EnumTypeInfo* GetVariableEnumType(std::string_view var_name) const;
+  // §6.19: a member literal is an expression of the enumeration that declares
+  // it, so the methods of §6.19.5 are called on it, `IDLE.next()` or
+  // `P::RED.name()`. The registered enumeration whose members hold `member`:
+  // one registered under `scope` ("P" for a package's, a class's name for a
+  // class's) when `scope` is given, else one of the module's own -- a bare
+  // key, where an import's is entered too -- ahead of any scoped one, since a
+  // bare literal names what is visible where it is written. Null where none
+  // declares the member.
+  const EnumTypeInfo* FindEnumTypeDeclaringMember(std::string_view member,
+                                                  std::string_view scope) const;
 
   void RegisterStructType(std::string_view name, const StructTypeInfo& info);
   const StructTypeInfo* FindStructType(std::string_view name) const;

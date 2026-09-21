@@ -64,6 +64,7 @@ void Lowerer::LowerDesignData() {
   RegisterDesignTypeWidths(design_, ctx_);
   RegisterTypeTargets(design_, ctx_);
   RegisterDesignTypeLayouts(design_, ctx_, arena_);
+  RegisterDesignEnumTypes(design_, ctx_, arena_);
   RegisterUnitClassVariables(design_, ctx_, arena_);
   RegisterPackageScopedSubroutines(design_, ctx_, arena_);
   RegisterPackageEnumConstants(design_, ctx_, arena_);

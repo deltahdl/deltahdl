@@ -508,6 +508,27 @@ static void RegisterPackageDataLayout(const ModuleItem* item,
 // fixes none. The initializer is evaluated by InitPackageDataItem
 // once every scope's storage exists. Answers the interned key, empty for an
 // item declaring no data.
+// §6.19.5 with §26.3: a package's variable or parameter declared with an
+// enumeration's typedef, `color_t pc` or `parameter color_t EC`, is an
+// expression of that type wherever it is named -- `P::pc.next()`, `EC.name()`
+// through an import -- so the enumeration is recorded under the storage's
+// key, by the typedef's "pk::name" key when the package's own typedef or a
+// scoped one is written and by the bare name otherwise. Unrecorded, the
+// methods found no enumeration under the key and answered 0 or "".
+static void RegisterPackageDataEnumType(const ModuleItem* item,
+                                        std::string_view pkg,
+                                        std::string_view qname,
+                                        SimContext& ctx) {
+  const DataType& type = item->data_type;
+  if (type.kind != DataTypeKind::kNamed) return;
+  std::string scoped =
+      std::string(type.scope_name.empty() ? pkg : type.scope_name) +
+      "::" + std::string(type.type_name);
+  const EnumTypeInfo* info = ctx.FindEnumType(scoped);
+  if (info == nullptr) info = ctx.FindEnumType(type.type_name);
+  if (info != nullptr) ctx.SetVariableEnumType(qname, info->type_name);
+}
+
 static std::string_view CreatePackageDataItem(const ModuleItem* item,
                                               std::string_view pkg,
                                               SimContext& ctx, Arena& arena) {
@@ -515,6 +536,7 @@ static std::string_view CreatePackageDataItem(const ModuleItem* item,
   auto* qname = arena.Create<std::string>(PackageDataKey(item, pkg));
   if (pkg == kUnitScope) CarryUnitClassRecord(item, *qname, ctx);
   auto* var = ctx.CreateVariable(*qname, PackageDataWidth(item, *qname, ctx));
+  RegisterPackageDataEnumType(item, pkg, *qname, ctx);
   if (item->kind != ModuleItemKind::kVarDecl) return *qname;
   ShapePackageVariable(item, var, *qname, ctx, arena);
   RegisterPackageDataLayout(item, pkg, *qname, ctx, arena);

@@ -4,6 +4,7 @@
 #include <string_view>
 
 #include "common/arena.h"
+#include "elaborator/elaborator_enum_constants.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_type.h"
@@ -91,6 +92,30 @@ void RegisterDesignTypeLayouts(const RtlirDesign* design, SimContext& ctx,
   // other declared-type fact no module's lowering records, so it is recorded
   // beside the layouts.
   RegisterPackageClassVariables(design, ctx, arena);
+}
+
+// §6.19.5 with §6.18: the enumeration behind each typedef name the design
+// records (RtlirDesign::type_enums), registered under the typedef's key, so
+// that a value declared with a class's "C::name" (§8.23) or a package's
+// "P::name" (§26.3) has members for the methods to walk. A bare name is left
+// to the module that declares or imports it: Lowerer::RegisterEnumTypes folds
+// that one against the module's own constants, which a member value may name,
+// while the design's copy folds against the compilation unit's alone.
+void RegisterDesignEnumTypes(const RtlirDesign* design, SimContext& ctx,
+                             Arena& arena) {
+  for (const auto& [name, dtype] : design->type_enums) {
+    if (dtype == nullptr || name.find("::") == std::string_view::npos ||
+        ctx.FindEnumType(name) != nullptr) {
+      continue;
+    }
+    EnumTypeInfo info;
+    info.type_name = name;
+    for (const RtlirEnumMember& m :
+         FoldEnumMembers(dtype->enum_members, design->unit_constants, arena)) {
+      info.members.push_back({m.name, static_cast<uint64_t>(m.value)});
+    }
+    ctx.RegisterEnumType(name, info);
+  }
 }
 
 void RegisterAggregateLayout(std::string_view name, const DataType* dtype,

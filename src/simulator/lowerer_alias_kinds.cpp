@@ -135,6 +135,11 @@ void AliasVariableKinds(std::string_view key, std::string_view qname,
   std::string_view cls = ctx.GetVariableClassType(qname);
   if (!cls.empty()) ctx.SetVariableClassType(key, cls);
   if (ctx.IsRealVariable(qname)) ctx.RegisterRealVariable(key);
+  // §6.19.5 with §26.3: the enumeration a package's variable or parameter is
+  // declared with (RegisterPackageDataEnumType in lowerer_package_data.cpp),
+  // so `pc.num()` and `EC.name()` after `import p1::*` walk its members.
+  if (const EnumTypeInfo* info = ctx.GetVariableEnumType(qname))
+    ctx.SetVariableEnumType(key, info->type_name);
   ctx.AliasQueue(key, qname);
   ctx.AliasAssocArray(key, qname);
   AliasArray(key, qname, ctx, arena);

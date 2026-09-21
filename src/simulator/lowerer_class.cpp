@@ -21,6 +21,7 @@
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
 
 namespace delta {
@@ -365,18 +366,33 @@ static void InitClassParams(ClassTypeInfo* info, const ClassDecl* cls,
   }
 }
 
-static void CollectClassEnumMembers(ClassTypeInfo* info, const ClassDecl* cls) {
+// §8.23 with §6.19: the literals of every enumeration a typedef of the class
+// declares, each bound in the class scope, and the enumeration itself
+// registered under "Class::name", the key a property or a variable declared
+// with the class-scoped typedef resolves its type by (EnumTypeOfDeclaredType
+// in eval_enum.cpp), so that §6.19.5's methods on such a value have members
+// to walk. A nested class's typedef is entered by no other path: the design's
+// typedef table (RtlirDesign::type_enums) holds the unit's classes alone.
+static void CollectClassEnumMembers(ClassTypeInfo* info, const ClassDecl* cls,
+                                    SimContext& ctx, Arena& arena) {
   for (const auto* member : cls->members) {
     if (member->kind != ClassMemberKind::kTypedef || !member->typedef_item)
       continue;
     const auto& enum_members = member->typedef_item->typedef_type.enum_members;
+    if (enum_members.empty()) continue;
+    EnumTypeInfo type;
+    type.type_name = *arena.Create<std::string>(
+        std::string(info->name) + "::" + std::string(member->name));
     int64_t next_val = 0;
     for (const auto& em : enum_members) {
       if (em.value) next_val = static_cast<int64_t>(em.value->int_val);
       info->enum_members[std::string(em.name)] =
           static_cast<uint64_t>(next_val);
+      type.members.push_back({em.name, static_cast<uint64_t>(next_val)});
       ++next_val;
     }
+    if (ctx.FindEnumType(type.type_name) == nullptr)
+      ctx.RegisterEnumType(type.type_name, type);
   }
 }
 
@@ -444,7 +460,7 @@ static void PopulateClassType(ClassTypeInfo* info, const ClassDecl* cls,
   BuildVTable(info, cls);
   CreateStaticProperties(info, arena);
   InitClassParams(info, cls, ctx, arena);
-  CollectClassEnumMembers(info, cls);
+  CollectClassEnumMembers(info, cls, ctx, arena);
   if (cls->is_interface) InheritInterfaceMembers(info);
 }
 

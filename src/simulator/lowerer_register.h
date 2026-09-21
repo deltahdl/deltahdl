@@ -121,6 +121,14 @@ void CreatePortVariable(std::string_view name, const RtlirPort& port,
 // has this to ask instead.
 void RegisterDesignTypeLayouts(const RtlirDesign* design, SimContext& ctx,
                                Arena& arena);
+// §6.19.5 with §6.18: the enumeration behind each scoped typedef name the
+// design records (RtlirDesign::type_enums), "C::name" or "P::name",
+// registered in the enum table under that key with its member values folded
+// against the unit's constants, so that a class property or a package
+// variable declared with the name has an enumeration for the methods of
+// §6.19.5 to walk. Defined in src/simulator/lowerer_var_layout.cpp.
+void RegisterDesignEnumTypes(const RtlirDesign* design, SimContext& ctx,
+                             Arena& arena);
 // §26.3 with §8.4: each package variable declared with a class's name,
 // recorded under its "pk.name" key as a handle of that class -- the package's
 // own class, one an import of the package brings in, or the one a `q::C`

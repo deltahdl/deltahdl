@@ -209,6 +209,30 @@ const EnumTypeInfo* DeclaredNameTables::GetVariableEnumType(
   return FindEnumType(it->second);
 }
 
+static bool DeclaresMember(const EnumTypeInfo& info, std::string_view member) {
+  for (const EnumMemberInfo& m : info.members) {
+    if (m.name == member) return true;
+  }
+  return false;
+}
+
+const EnumTypeInfo* DeclaredNameTables::FindEnumTypeDeclaringMember(
+    std::string_view member, std::string_view scope) const {
+  const EnumTypeInfo* scoped = nullptr;
+  for (const auto& [key, info] : enum_types_) {
+    if (!DeclaresMember(info, member)) continue;
+    auto sep = key.find("::");
+    if (!scope.empty()) {
+      if (sep != std::string_view::npos && key.substr(0, sep) == scope)
+        return &info;
+      continue;
+    }
+    if (sep == std::string_view::npos) return &info;
+    if (scoped == nullptr) scoped = &info;
+  }
+  return scoped;
+}
+
 const StructFieldInfo* FindStructField(const StructTypeInfo* info,
                                        std::string_view name) {
   for (const auto& f : info->fields) {

@@ -648,6 +648,11 @@ static bool TryBindRefDirectionArg(const Expr* expr, int arg_index,
   if (TryBindRefArg(expr, arg_index, param.name, ctx)) {
     RegisterValueArgStructType(param, {expr, arg_index, {}}, ctx);
     RegisterValueArgClassType(param, ctx);
+    // §6.19.5 with §13.5.2: a ref formal declared with an enumeration is an
+    // expression of that type inside the body, `c = c.next()`, whatever the
+    // actual's own name is recorded under.
+    if (param.unpacked_dims.empty())
+      RecordVariableEnumType(param.name, param.data_type, ctx);
     return true;
   }
   if (TryBindQueueElementRef(expr, arg_index, param, ctx, arena)) return true;
@@ -874,6 +879,12 @@ static void BindValueArg(const FunctionArg& param, const ActualArgRef& actual,
   // the default, `s.len()` inside the body found no string under the name and
   // answered 0, and `s.toupper()` "".
   var->is_string = DeclaredTypeIsString(dt, ctx);
+  // §6.19.5 with §13.5.1: a formal declared with an enumeration is an
+  // expression of that type inside the body, `c.next().name()` on an input
+  // and `c = c.next()` on an output, as a body local declared with one is
+  // (CreateFuncLocalVar); unrecorded, the methods found no enumeration under
+  // the formal's name and answered 0 or "".
+  if (param.unpacked_dims.empty()) RecordVariableEnumType(param.name, dt, ctx);
   // §25.9 has a virtual interface passed as an argument to a task, function or
   // method; the formal is then a virtual interface of its own, and a member
   // the body reaches through it is a component of the instance it holds.
