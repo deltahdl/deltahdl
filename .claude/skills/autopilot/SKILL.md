@@ -1,6 +1,6 @@
 ---
 name: autopilot
-description: Start or stop the standing reminders that keep a session on the rails, with or without the loop that works through open issues on its own. Use when the user says "start autopilot", "go autonomous on the subclauses", "go autonomous on issues above N", "go autonomous on the §5 issues", "reminders on", "reminders only", "stop autopilot", "reminders off", or asks to clear the reminders. Takes "start bysubclause", "start byissuefloor <issue-number>", "start bylabel <label>", "reminders-only" or "stop"; every "start" form also takes `--skip-label <label>`, repeatable, naming a label whose issues the loop leaves alone.
+description: Start or stop the standing reminders that keep a session on the rails, with or without the loop that works through open issues on its own. Use when the user says "start autopilot", "go autonomous on the subclauses", "go autonomous on issues above N", "go autonomous on the §5 issues", "reminders on", "reminders only", "stop autopilot", "reminders off", or asks to clear the reminders. Takes "start bysubclause", "start byissuefloor <issue-number>", "start bylabel <label>", "start reminders-only" or "stop"; every "start" form but "reminders-only" also takes `--skip-label <label>`, repeatable, naming a label whose issues the loop leaves alone.
 ---
 
 # Autopilot
@@ -23,7 +23,7 @@ Every form of this skill creates these, verbatim, at these offsets:
 
 ## The three loop reminders
 
-The `start` forms add these. Only the `:01` reminder differs between forms; the other two are verbatim.
+The `start` forms that name a set of issues add these. Only the `:01` reminder differs between forms; the other two are verbatim.
 
 ### The `:01` reminder, on `1,11,21,31,41,51 * * * *`
 
@@ -45,7 +45,7 @@ REMINDER: Run gh issue list --state open --limit 1000 --json number,title --jq '
 REMINDER: Run gh issue list --state open --label '{L}' --limit 1000 --json number,title for the open issues labelled '{L}'; take one, solve it, and run the same command again when it closes. The open issues without the label '{L}' are not this loop's work.
 ```
 
-### The two loop reminders every `start` form carries
+### The two loop reminders every issue-working `start` form carries
 
 | Offset | Cron | Prompt |
 | --- | --- | --- |
@@ -54,25 +54,22 @@ REMINDER: Run gh issue list --state open --label '{L}' --limit 1000 --json numbe
 
 ## Creating the jobs
 
-Call `CronList` first. Create with `CronCreate`, `recurring: true`, only a reminder whose prompt is not already scheduled, so that `reminders-only` followed by `start` adds the three loop reminders and nothing twice, and a form run again adds nothing. Report which were created and which were already running.
-
-## Reminders only
-
-`reminders-only` creates the seven standing reminders and no loop reminder: the session keeps working on what the user gives it, under the seven rules. Say that they live in this session only and that recurring jobs expire after seven days, then carry on with whatever the session was doing.
+Call `CronList` first. Create with `CronCreate`, `recurring: true`, only a reminder whose prompt is not already scheduled, so that `start reminders-only` followed by another `start` form adds the three loop reminders and nothing twice, and a form run again adds nothing. Report which were created and which were already running.
 
 ## Start
 
-The form names the set of issues to work:
+The form names the set of issues to work, or none:
 
 - `start bysubclause` — the lowest subclause with an open `Satisfy IEEE 1800-2023 §<subclause>` issue.
 - `start byissuefloor <issue-number>` — the open issues above the number.
 - `start bylabel <label>` — the open issues carrying the label, exactly as written; `gh label list` prints them, the clause labels being `§1` through `§41`, `Annex A` and `Annex B`.
+- `start reminders-only` — no issues: the seven standing reminders alone, and the session carries on with what the user gives it.
 
 `start` alone is `bysubclause`, `start <issue-number>` is `byissuefloor`, and `start §5` is `bylabel`. `start byissuefloor` with no number and `start bylabel` with no label are missing their argument: ask for it before creating anything.
 
-Any form may be followed by `--skip-label <label>`, once per label, naming a label whose issues the loop must not take — `start bylabel §5 --skip-label "needs decision"` leaves every §5 issue that also carries `needs decision` to a person. A label with a space in it is quoted. `gh issue list` has no flag that excludes a label; the exclusion is a `--search` query, so with `--skip-label` the `:01` command gains, right after `--state open`, one `--search` flag holding one `-label:"<label>"` term per label, such as `--search '-label:"needs decision"'` or `--search '-label:"needs decision" -label:"blocked"'`, and the reminder ends with one extra sentence after a space: `An issue labelled '<label>' is left to a person, whatever else it carries.` — one such sentence per label. A `--skip-label` with no label is missing its argument: ask for it before creating anything.
+Any form but `reminders-only` may be followed by `--skip-label <label>`, once per label, naming a label whose issues the loop must not take — `start bylabel §5 --skip-label "needs decision"` leaves every §5 issue that also carries `needs decision` to a person. A label with a space in it is quoted. `gh issue list` has no flag that excludes a label; the exclusion is a `--search` query, so with `--skip-label` the `:01` command gains, right after `--state open`, one `--search` flag holding one `-label:"<label>"` term per label, such as `--search '-label:"needs decision"'` or `--search '-label:"needs decision" -label:"blocked"'`, and the reminder ends with one extra sentence after a space: `An issue labelled '<label>' is left to a person, whatever else it carries.` — one such sentence per label. A `--skip-label` with no label is missing its argument: ask for it before creating anything.
 
-Create the seven standing reminders and the three loop reminders. Take `:01` from the form asked for, substituting the number for `{X}` or the label for `{L}` wherever it appears and adding the `--skip-label` search and sentences when they were asked for.
+Create the seven standing reminders. For `reminders-only`, say that they live in this session only and that recurring jobs expire after seven days, then carry on with whatever the session was doing; the rest of this section is for the other three forms. For those, create the three loop reminders as well, taking `:01` from the form asked for, substituting the number for `{X}` or the label for `{L}` wherever it appears and adding the `--skip-label` search and sentences when they were asked for.
 
 ### Report and begin
 
