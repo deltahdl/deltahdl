@@ -32,7 +32,7 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 
 - [The LRM is the source of truth](lrm-source-of-truth.md) — check every non-cosmetic change against the clause; the standard beats the linter.
 - [One edition only](single-edition-1800-2023.md) — IEEE 1800-2023 alone; another edition's numbering is translated to 2023 and never carried into deltahdl.
-- [The 2017 edition on the shared drive](the-2017-edition-on-the-shared-drive.md) — `Standards/SystemVerilog/1800-2017.pdf` on the 10U Labs shared drive, read only to judge an sv-tests tag in its own edition.
+- [The 2017 edition on the shared drive](the-2017-edition-on-the-shared-drive.md) — `~/IEEE 1800-2017.pdf`, a link to the shared drive's copy, read only to judge an sv-tests tag in its own edition.
 - [The LRM's text is copyrighted](lrm-text-is-copyrighted.md) — cite the clause number and paraphrase; never quote the standard's sentences verbatim.
 - [The standard guides structure](lrm-guides-structure.md) — mirror the entities the clause defines when grouping parameters into a struct.
 - [One LRM page per call](reading-the-lrm-one-page-per-call.md) — one `Read` page per tool call, waiting for each; batching blocks every result in the turn.
