@@ -424,4 +424,65 @@ TEST(InheritanceSimulation, InheritedStaticHandleNamedBareInDerivedMethod) {
             16u);
 }
 
+// §8.13 (printed pages 189-190) with §8.10 (printed 186-187): a subclass
+// inherits the base's methods, static ones among them, and a static method
+// runs with no `this`, so a static method of D calling C's static function
+// bare calls C's, in class scope. D::quad(5) is twice(twice(5)), 20. Looked
+// up in D's own methods alone, the call ran nothing and yielded 0.
+TEST(InheritanceSimulation, InheritedStaticFunctionCalledBareInDerivedStatic) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  static function int twice(int x);\n"
+                      "    return x + x;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "class D extends C;\n"
+                      "  static function int quad(int x);\n"
+                      "    return twice(twice(x));\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    result = D::quad(5);\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            20u);
+}
+
+// §8.13 with §8.10 and §13.5.2 (printed page 348): the inherited static
+// function may be void and take a ref formal, as uvm_typed_callbacks'
+// m_get_q does for uvm_callbacks' get_first, and the write through the ref
+// reaches the caller's local: get_first's q holds the object m_get_q
+// constructed, whose size reads 3. The call ran nothing, q stayed null, and
+// the size call through it was reported.
+TEST(InheritanceSimulation,
+     InheritedStaticVoidFunctionWritesDerivedCallersRef) {
+  EXPECT_EQ(
+      RunAndGet("class Q;\n"
+                "  int n = 3;\n"
+                "  function int size(); return n; endfunction\n"
+                "endclass\n"
+                "class C;\n"
+                "  static function void m_get_q(ref Q q, input int obj);\n"
+                "    q = new;\n"
+                "  endfunction\n"
+                "endclass\n"
+                "class D extends C;\n"
+                "  static function int get_first();\n"
+                "    Q q;\n"
+                "    m_get_q(q, 0);\n"
+                "    return q == null ? 7 : q.size();\n"
+                "  endfunction\n"
+                "endclass\n"
+                "module t;\n"
+                "  int result;\n"
+                "  initial begin\n"
+                "    result = D::get_first();\n"
+                "  end\n"
+                "endmodule\n",
+                "result"),
+      3u);
+}
+
 }  // namespace

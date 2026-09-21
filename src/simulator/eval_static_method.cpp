@@ -28,14 +28,26 @@ void RunStaticMethodInClassScope(ClassMethodTarget target, const Expr* expr,
   ctx.PopScope();
 }
 
+// §8.13 with §8.10: a subclass inherits the base's methods, static ones
+// among them, so the static method a bare call names from inside a static
+// method of D may be one C declares -- uvm_callbacks' get_first calling
+// uvm_typed_callbacks' m_get_q -- and it runs in the scope of the class
+// declaring it, the nearest one up the chain. The name may instead belong to
+// an instance method, which the instance path below runs on `this`. Searched
+// in D's own methods alone, the inherited call ran nothing and yielded 0.
 bool TryEvalEnclosingStaticCall(const Expr* expr, SimContext& ctx, Arena& arena,
                                 Logic4Vec& out) {
   const ClassTypeInfo* cls = ctx.CurrentMethodClass();
   if (!cls) return false;
-  auto it = cls->methods.find(std::string(expr->callee));
-  if (it == cls->methods.end() || !it->second->is_static_method) return false;
-  RunStaticMethodInClassScope({it->second, cls}, expr, ctx, arena, out);
-  return true;
+  const std::string name(expr->callee);
+  for (const ClassTypeInfo* t = cls; t != nullptr; t = t->parent) {
+    auto it = t->methods.find(name);
+    if (it == t->methods.end()) continue;
+    if (!it->second->is_static_method) return false;
+    RunStaticMethodInClassScope({it->second, t}, expr, ctx, arena, out);
+    return true;
+  }
+  return false;
 }
 
 // §8.13: a subclass "inherits the members of the base class", and §8.6 makes a
@@ -49,10 +61,10 @@ bool TryEvalEnclosingStaticCall(const Expr* expr, SimContext& ctx, Arena& arena,
 // a walk from the lexically enclosing class up its base chain for a method that
 // is not virtual. That is the same two-step the receiver-qualified path uses.
 //
-// The enclosing-class static call above is tried first and searches only that
-// one class, so a static method inherited from a base reaches here; it is run
-// in class scope rather than on `this`, because §8.10 gives a static method no
-// `this` however it was named.
+// The static call above is tried first and answers every bare call made
+// from a static method; a static method named from an instance method
+// reaches here, and it is run in class scope rather than on `this`, because
+// §8.10 gives a static method no `this` however it was named.
 bool TryEvalEnclosingInstanceCall(const Expr* expr, SimContext& ctx,
                                   Arena& arena, Logic4Vec& out) {
   MethodCallParts parts;
