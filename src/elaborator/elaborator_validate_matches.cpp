@@ -180,38 +180,23 @@ static bool IsNonIntegralConstantPattern(const Expr* e) {
 
 // §12.6: pattern identifiers (the `. variable_identifier` binding form) shall
 // be unique within a single pattern; the same name cannot bind in more than one
-// position. Collects every binding name reachable in the pattern tree and
-// reports the second and later use of any repeated name. Descends the nesting
-// forms of Syntax 12-4: a `&&&` filter wrapper (pattern on the left),
-// tagged-union patterns (the nested member pattern), and structure/array
-// patterns (each element pattern). Constant expression patterns and the `.*`
-// wildcard bind nothing and are ignored.
+// position. Reports the second and later use of any repeated name among the
+// bindings ForEachPatternBinding (elaborator_validate_internal.h) hands over,
+// which is the one walk of Syntax 12-4's nesting forms the §23.9 scope rule
+// reads the same names off.
 static void CollectPatternBindings(const Expr* p,
                                    std::unordered_set<std::string_view>& seen,
                                    DiagEngine& diag) {
-  if (!p) return;
-  if (p->kind == ExprKind::kBinary && p->op == TokenKind::kAmpAmpAmp) {
-    CollectPatternBindings(p->lhs, seen, diag);
-    return;
-  }
-  if (p->kind == ExprKind::kIdentifier && p->is_pattern_binding) {
-    if (!seen.insert(p->text).second) {
+  ForEachPatternBinding(p, [&](const Expr* binding) {
+    if (!seen.insert(binding->text).second) {
       diag.Error(
-          p->range.start,
+          binding->range.start,
           std::format("pattern identifier '{}' is used more than once in "
                       "a single pattern",
-                      p->text),
+                      binding->text),
           Subclause("12.6"));
     }
-    return;
-  }
-  if (p->kind == ExprKind::kTagged) {
-    CollectPatternBindings(p->lhs, seen, diag);
-    return;
-  }
-  if (p->kind == ExprKind::kAssignmentPattern) {
-    for (const auto* e : p->elements) CollectPatternBindings(e, seen, diag);
-  }
+  });
 }
 
 static void CheckMatchesPattern(const Expr* pat, DiagEngine& diag) {

@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_simulator.h"
 #include "helpers_reported_error.h"
 
@@ -377,6 +379,89 @@ TEST(PatternMatching,
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "constant expression pattern shall be of integral type", 7, "12.6"));
+}
+
+// §12.6: a pattern of the form `. variable_identifier` declares a new variable
+// whose scope is the statement the pattern guards, so a read of it there
+// resolves against the pattern and is not §23.9's unresolved reference. The
+// cases below each read a bound variable in the guarded statement and ask that
+// the source elaborate with nothing reported; the union and the reads are
+// sv-tests' 12.6.1--case_pattern.sv, 12.6.2--if_pattern.sv and
+// 12.6.3--conditional_pattern.sv, which were reported "reference to unresolved
+// identifier 'v'" (#4353) because the names a procedural block declares were
+// collected from its declarations, loops and randsequences and never from a
+// pattern.
+constexpr const char* kTaggedUnion =
+    "  typedef union tagged {\n"
+    "    struct { bit [3:0] val1, val2; } a;\n"
+    "    struct { bit [7:0] val1, val2; } b;\n"
+    "  } u;\n"
+    "  u tmp;\n";
+
+TEST(PatternVariableReads, ACaseMatchesItemReadsTheVariablesItsPatternBinds) {
+  SimFixture f;
+  ElaborateSrc(std::string("module t;\n") + kTaggedUnion +
+                   "  initial case (tmp) matches\n"
+                   "    tagged a '{.v, 0} : $display(\"a %d\", v);\n"
+                   "    tagged a '{.v1, .v2} : $display(\"a %d %d\", v1, v2);\n"
+                   "    tagged b '{0, .v} : $display(\"b %d\", v);\n"
+                   "  endcase\n"
+                   "endmodule\n",
+               f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// The same through a `&&&` filter, which §12.6.1 puts to the right of the
+// pattern: the bound variable is read by the filter as well as by the item.
+TEST(PatternVariableReads, AFilteredCaseMatchesItemReadsItsVariable) {
+  SimFixture f;
+  ElaborateSrc(std::string("module t;\n") + kTaggedUnion +
+                   "  int y;\n"
+                   "  initial case (tmp) matches\n"
+                   "    tagged a '{.v, 0} &&& v > 2 : y = v;\n"
+                   "    default : y = 0;\n"
+                   "  endcase\n"
+                   "endmodule\n",
+               f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(PatternVariableReads, AnIfMatchesBranchReadsTheVariableItsPatternBinds) {
+  SimFixture f;
+  ElaborateSrc(std::string("module t;\n") + kTaggedUnion +
+                   "  initial if (tmp matches tagged a '{4'b01zx, .v})\n"
+                   "    $display(\"a %d\", v);\n"
+                   "endmodule\n",
+               f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §12.6.3: the conditional operator's first operand may be a `matches`, and
+// the variable it binds is read by the second operand.
+TEST(PatternVariableReads,
+     AConditionalOperatorReadsTheVariableItsPatternBinds) {
+  SimFixture f;
+  ElaborateSrc(std::string("module t;\n") + kTaggedUnion +
+                   "  bit [3:0] val;\n"
+                   "  initial val = tmp matches tagged a '{.v, 0} ? v : 2;\n"
+                   "endmodule\n",
+               f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// The control: a name no pattern binds is still §23.9's unresolved reference,
+// read beside a bound one in the same item, on line 8.
+TEST(PatternVariableReads, ANameNoPatternBindsIsStillReported) {
+  SimFixture f;
+  ElaborateSrc(std::string("module t;\n") + kTaggedUnion +
+                   "  initial case (tmp) matches\n"
+                   "    tagged a '{.v, 0} : $display(\"a %d %d\", v, w);\n"
+                   "  endcase\n"
+                   "endmodule\n",
+               f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "reference to unresolved identifier 'w'", 8,
+                            "23.9"));
 }
 
 }  // namespace

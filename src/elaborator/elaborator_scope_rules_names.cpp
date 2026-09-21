@@ -9,6 +9,7 @@
 #include "elaborator/elaborator_enum_constants.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/rtlir.h"
+#include "lexer/token.h"
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
@@ -412,15 +413,50 @@ void CollectModuleGenerateNames(const std::vector<ModuleItem*>& items,
   }
 }
 
+// §12.6: a pattern of the form `. variable_identifier` declares a new
+// variable, and a pattern stands to the right of every `matches` operator in
+// an expression -- an if's condition (§12.6.2), a conditional operator's first
+// operand (§12.6.3), or a `matches` written anywhere else an expression is.
+// Collects the names the patterns under `e` bind.
+static void CollectMatchesBindings(
+    const Expr* e, std::unordered_set<std::string_view>& names) {
+  if (e == nullptr) return;
+  if (e->kind == ExprKind::kBinary && e->op == TokenKind::kKwMatches) {
+    ForEachPatternBinding(e->rhs,
+                          [&](const Expr* b) { names.insert(b->text); });
+  }
+  AnyExprChild(e, [&](const Expr* child) {
+    CollectMatchesBindings(child, names);
+    return false;
+  });
+}
+
 // Over-approximated set of names that are local to a procedural block: block
 // (begin/end) variable declarations, for-loop control variables, foreach index
-// variables, and the two kinds of name §18.17.7 gives a randsequence statement.
-// Collected flat across the whole block tree without tracking scope
-// boundaries — that can only ever SUPPRESS a diagnostic, never raise one, so a
-// missed boundary is always safe.
+// variables, the two kinds of name §18.17.7 gives a randsequence statement,
+// and the variables §12.6's patterns bind. Collected flat across the whole
+// block tree without tracking scope boundaries — that can only ever SUPPRESS a
+// diagnostic, never raise one, so a missed boundary is always safe.
 void CollectProcLocalNames(const Stmt* s,
                            std::unordered_set<std::string_view>& names) {
   if (!s) return;
+  // §12.6's patterns: those of a `case ... matches` item (§12.6.1), and those
+  // under a `matches` operator in the positions CollectProcRhsIdents below
+  // reads -- the statement's condition, an assignment's right side and a
+  // display task's arguments -- so that a variable a pattern declares is a
+  // local wherever the read of it is collected. The read of a variable a
+  // pattern binds is the whole of what sv-tests' §12.6 files do, and each was
+  // reported unresolved (#4353).
+  if (s->case_matches) {
+    for (const auto& ci : s->case_items) {
+      for (const Expr* p : ci.patterns) {
+        ForEachPatternBinding(p, [&](const Expr* b) { names.insert(b->text); });
+      }
+    }
+  }
+  CollectMatchesBindings(s->condition, names);
+  CollectMatchesBindings(s->rhs, names);
+  CollectMatchesBindings(SubroutineCallOfStmt(s), names);
   if (s->kind == StmtKind::kVarDecl && !s->var_name.empty()) {
     names.insert(s->var_name);
   }

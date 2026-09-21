@@ -20,6 +20,7 @@
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/global_clocking_sampled_value.h"
+#include "lexer/token.h"
 #include "parser/ast_class.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -332,6 +333,36 @@ void ForEachChildExpr(S* s, Visit visit) {
 // and `scope_prefix` name a subroutine and a package, `arg_names` and
 // `with_restrict_ids` are identifier lists, and `inline_constraint` is a
 // ClassMember.
+// Hands `visit` every `. variable_identifier` a pattern binds, the one form of
+// Syntax 12-4 that declares a variable (§12.6). The walk follows the forms
+// that hold a pattern: a `pattern &&& filter_expression` (§12.6.1) holds the
+// pattern on its left, the filter on its right being an ordinary expression; a
+// tagged pattern holds its member pattern in Expr::lhs; and a structure or
+// array pattern holds one pattern per element. A constant expression pattern
+// and the `.*` wildcard bind nothing. The uniqueness rule of §12.6
+// (elaborator_validate_matches.cpp) and the scope rule of §23.9
+// (elaborator_scope_rules_names.cpp) read the names off the same walk, so that
+// a form one of them reached and the other did not cannot arise.
+template <typename Visit>
+void ForEachPatternBinding(const Expr* p, Visit visit) {
+  if (p == nullptr) return;
+  if (p->kind == ExprKind::kBinary && p->op == TokenKind::kAmpAmpAmp) {
+    ForEachPatternBinding(p->lhs, visit);
+    return;
+  }
+  if (p->kind == ExprKind::kIdentifier && p->is_pattern_binding) {
+    visit(p);
+    return;
+  }
+  if (p->kind == ExprKind::kTagged) {
+    ForEachPatternBinding(p->lhs, visit);
+    return;
+  }
+  if (p->kind == ExprKind::kAssignmentPattern) {
+    for (const Expr* e : p->elements) ForEachPatternBinding(e, visit);
+  }
+}
+
 template <typename Fn>
 bool AnyExprChild(const Expr* e, Fn&& fn) {
   for (const Expr* child :
