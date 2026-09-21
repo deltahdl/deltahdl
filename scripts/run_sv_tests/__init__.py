@@ -302,6 +302,7 @@ def reported_subclauses(stderr: str) -> list[str]:
 _CLAUSE_PREFIX_RE = re.compile(r"(\d+(?:\.\d+)*)--")
 
 _CLAUSE_OF_MISTAGGED_FILE: dict[str, str] = {
+    "9.3.3--fork_return.sv": "9.3.2",
     "13.4.4--fork-invalid.sv": "13.4",
     "variable-slice-zero.sv": "11.5.1",
 }

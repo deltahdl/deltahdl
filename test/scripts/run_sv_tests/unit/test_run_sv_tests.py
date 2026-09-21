@@ -750,6 +750,18 @@ def test_rejection_under_the_rule_a_file_tagged_on_its_operation_tests_evaluates
     assert (ok, result["status"]) == (1, "pass")
 
 
+def test_rejection_under_the_rule_a_file_tagged_on_the_next_subclause_tests_evaluates_as_a_pass(
+    rst: ModuleType, tmp_path: Path,
+) -> None:
+    sv = _write_expected_rejection(tmp_path, "9.3.3", "9.3.3--fork_return.sv")
+    result, ok = _evaluate_rejection_of_file(
+        rst, sv, 1,
+        "9.3.3--fork_return.sv:22:4: error: return statement is not allowed"
+        " inside a fork-join block (§9.3.2)\n",
+    )
+    assert (ok, result["status"]) == (1, "pass")
+
+
 def test_rejection_within_the_2023_number_of_a_renumbered_tag_evaluates_as_a_pass(
     rst: ModuleType, tmp_path: Path,
 ) -> None:

@@ -111,3 +111,9 @@ def test_a_file_the_suite_tags_on_the_operation_is_judged_by_the_rule_it_tests(
     rst: ModuleType,
 ) -> None:
     assert rst.tagged_clause({"tags": "7.4.3"}, "variable-slice-zero.sv") == "11.5.1"
+
+
+def test_a_file_the_suite_tags_on_the_next_subclause_is_judged_by_the_rule_it_tests(
+    rst: ModuleType,
+) -> None:
+    assert rst.tagged_clause({"tags": "9.3.3"}, "9.3.3--fork_return.sv") == "9.3.2"
