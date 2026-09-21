@@ -80,6 +80,7 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 - [One indivisible problem per issue](one-indivisible-problem-per-issue.md) — one defect, one fix per issue; an issue found holding two is split there and then.
 - [Research lives in issues](research-lives-in-issues.md) — a plan that outlives the session, and each finding it yields, is filed as it arises; the task list and scratchpad are not durable.
 - [Issues have no fixed form](issues-have-no-fixed-form.md) — no house style; write each so a fresh session can act on it alone.
+- [Issues define their terms](issues-define-their-terms.md) — say what each file, term and cited clause is and why it is there; never a name the reader must already know.
 
 ## Tasks
 
