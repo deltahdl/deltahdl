@@ -498,11 +498,25 @@ static FieldTarget ResolveOwnPropertyMemberTarget(std::string_view base_name,
   return ResolveClassFieldTarget(self, enclosing, path, ctx);
 }
 
+static FieldTarget StaticPropertyTarget(const ClassTypeInfo* cls,
+                                        std::string_view field_name);
+
 FieldTarget ResolveBarePropertyTarget(std::string_view name, SimContext& ctx) {
   auto* self = ctx.CurrentThis();
-  if (!self || !self->type || self->type->FindProperty(name) == nullptr)
-    return {};
-  return ResolveOwnPropertyTarget(name, ctx);
+  if (self != nullptr && self->type != nullptr &&
+      self->type->FindProperty(name) != nullptr) {
+    return ResolveOwnPropertyTarget(name, ctx);
+  }
+  // §8.10 with §8.9: a static method runs on no object, and a static property
+  // it names bare is the class's one copy, the declaring class's storage as
+  // `C::name` reaches it (StaticPropertyTarget); §8.23 lets a nested class's
+  // method name a containing class's static property the same way, which is
+  // the chain StaticPropertyOwner walks. Answered on no object at all, the
+  // bare name in a static method named no storage.
+  const ClassTypeInfo* method_cls = ctx.CurrentMethodClass();
+  const ClassTypeInfo* owner =
+      method_cls != nullptr ? method_cls->StaticPropertyOwner(name) : nullptr;
+  return owner != nullptr ? StaticPropertyTarget(owner, name) : FieldTarget{};
 }
 
 // The field of the current `this` object. *handled is set true when base_name

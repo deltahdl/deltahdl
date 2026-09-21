@@ -322,4 +322,110 @@ TEST(StringMethodReceivers, PropertyThroughAChainOfHandles) {
             "len=3 up=ABC\n");
 }
 
+// §6.16.2 (putc) and the indexed character assignment of §6.16 (printed page
+// 113) on a property through a handle: each replaces one character of the
+// property's text and the property holds the result, where a dispatcher
+// finding no variable under `h.p` left the text as it was.
+TEST(StringMethodReceivers, PutcAndIndexedWriteOnAPropertyThroughAHandle) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  class C; string p = \"abz\"; endclass\n"
+                       "  C h;\n"
+                       "  initial begin\n"
+                       "    h = new; h.p[0] = \"x\"; h.p.putc(1, \"y\");\n"
+                       "    $display(\"prop=%s\", h.p);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "prop=xyz\n");
+}
+
+// §6.16.11 through §6.16.15 on a property named bare inside a method of the
+// class: each conversion stores its text in the property, so the five prints
+// are the five conversions and not the text the property last held.
+TEST(StringMethodReceivers, ConversionsIntoAPropertyInsideAMethod) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  class C;\n"
+                       "    string n;\n"
+                       "    function void conv();\n"
+                       "      n.itoa(42); $write(\"itoa=%s \", n);\n"
+                       "      n.hextoa(255); $write(\"hextoa=%s \", n);\n"
+                       "      n.octtoa(15); $write(\"octtoa=%s \", n);\n"
+                       "      n.bintoa(5); $write(\"bintoa=%s \", n);\n"
+                       "      n.realtoa(1.5); $display(\"realtoa=%s\", n);\n"
+                       "    endfunction\n"
+                       "  endclass\n"
+                       "  C h;\n"
+                       "  initial begin\n"
+                       "    h = new; h.n = \"2.5\"; h.conv();\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "itoa=42 hextoa=ff octtoa=17 bintoa=101 realtoa=1.5\n");
+}
+
+// §8.11 with §6.16.2: `this.s.putc` inside a method and a bare `s[i] = c`
+// there write the object's own property, read back through the handle.
+TEST(StringMethodReceivers, PutcThroughThisAndIndexedWriteBareInsideAMethod) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  class C;\n"
+                       "    string s = \"hello\";\n"
+                       "    function void fix(); this.s.putc(1, \"a\");\n"
+                       "      s[4] = \"!\"; endfunction\n"
+                       "  endclass\n"
+                       "  C h;\n"
+                       "  initial begin\n"
+                       "    h = new; h.fix();\n"
+                       "    $display(\"put=%s\", h.s);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "put=hall!\n");
+}
+
+// §8.9 and §8.10 with §6.16.2 and §6.16.11: a static property written by
+// putc through `C::name` and by itoa on its bare name inside a static method
+// is the class's one copy, read back through `C::name`.
+TEST(StringMethodReceivers, PutcScopedAndItoaBareOnAStaticProperty) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  class C;\n"
+                       "    static string name = \"name\";\n"
+                       "    static function void num(); name.itoa(7);\n"
+                       "    endfunction\n"
+                       "  endclass\n"
+                       "  initial begin\n"
+                       "    C::name.putc(0, \"N\");\n"
+                       "    $display(\"%s\", C::name);\n"
+                       "    C::num();\n"
+                       "    $display(\"%s\", C::name);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "Name\n7\n");
+}
+
+// §13.5.1 with §6.16.11: an output formal declared string takes itoa's text
+// and the concatenations around it, and the actual holds the result.
+TEST(StringMethodReceivers, ItoaIntoAnOutputStringFormal) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module t;\n"
+          "  function automatic void h(output string o, input int n);\n"
+          "    o = \"abc\"; o = {o, \"-\"}; o.itoa(n); o = {\"abc-\", o};\n"
+          "    $display(\"out=%s\", o);\n"
+          "  endfunction\n"
+          "  string o;\n"
+          "  initial begin\n"
+          "    h(o, 3);\n"
+          "    $display(\"o=%s\", o);\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "out=abc-3\no=abc-3\n");
+}
+
 }  // namespace

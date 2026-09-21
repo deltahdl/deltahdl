@@ -246,6 +246,11 @@ bool TrySelectBlockingAssign(const Expr* lhs, Logic4Vec& rhs_val,
   // would otherwise fabricate a plain variable named "aa[3]" and divert the
   // write into it, leaving the array untouched.
   if (TryWriteAssocElementBits(lhs, rhs_val, ctx, arena)) return true;
+  // §6.16: `h.p[0] = "x"` on a string property replaces one character of its
+  // text. TryWriteClassPropertyPart declines a property of no declared width
+  // and the writers below it name no storage of a class object, so the write
+  // was dropped with `true` returned, as a bit-select of a property once was.
+  if (TryWriteStringPropertyChar(lhs, rhs_val, ctx, arena)) return true;
   if (TryWriteClassPropertyPart(lhs, rhs_val, ctx, arena)) return true;
   if (TryCompoundElementWrite(lhs, rhs_val, ctx, arena)) return true;
   auto* var = ResolveLhsVariable(lhs, ctx);
