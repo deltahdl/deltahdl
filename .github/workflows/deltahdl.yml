@@ -1356,10 +1356,14 @@ jobs:
       # report below still describes this build while the size it prints is the
       # size that gets saved.
       #
-      # 300M is a figure to be replaced by a reading: the size the build left,
-      # reported above on a run whose tree the restored entry already held,
-      # plus the fifteen percent the shards allow, is the cap the library
-      # needs, and it is not known until that run has been read.
+      # 300M holds the library: run 35661247203, the first under no cap, left
+      # 216,044 KiB with the tree's versions of that commit alone, and run
+      # 35667385416, whose commit changed one .cpp, reported 506 hits of 519
+      # with the restored entry at 298,752 KiB. The entry carries the earlier
+      # versions of whatever changed since, up to the cap, so the size the
+      # build leaves reads as the cap from here on and the hit count above
+      # is what says whether the cap still holds the tree: a run on an
+      # unchanged tree missing more than a handful is the sign to raise it.
       #
       # export rather than an env: block on the step, because the job sets
       # CCACHE_MAXSIZE and a value written into the environment by a step does
