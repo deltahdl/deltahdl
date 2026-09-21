@@ -107,12 +107,13 @@ TEST(InterfaceClassDiamondInheritance, ThreePathDiamondMergesOneCopy) {
              "endmodule\n"));
 }
 
-// §8.26.6.3 states "There is no diamond relationship if different
-// specializations of the same parameterized interface class are inherited by
-// the same interface class ... As a result, method name conflicts as described
-// in 8.26.6.1 and parameter and type declaration name conflicts as described in
-// 8.26.6.2 may occur." §8.26.6.3 therefore names §8.26.6.2 as the rule the
-// unresolved parameter T breaks, and the report carries that number.
+// §8.26.6.3 makes each specialization of a parameterized interface class a
+// type of its own, so IntfBase#(bit) and IntfBase#(logic) are two interface
+// classes rather than one reached twice: there is no diamond, and T arrives in
+// IntfFinal from both. The report carries §8.26.6.3, the rule that decides the
+// two paths are two, rather than §8.26.6.2, which describes the conflict once
+// that is settled; §8.26.6.2 stays on a conflict between unrelated interface
+// classes, which test_elaborator_subclause_08_26_06_02.cpp holds to.
 TEST(InterfaceClassDiamond, DifferentSpecializationsNotDiamondError) {
   ElabFixture f;
   ElabOk(
@@ -133,7 +134,7 @@ TEST(InterfaceClassDiamond, DifferentSpecializationsNotDiamondError) {
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "is inherited from multiple interface classes and must be overridden", 10,
-      "8.26.6.2"));
+      "8.26.6.3"));
 }
 
 TEST(InterfaceClassDiamond, DifferentSpecializationsWithOverrideOk) {
@@ -153,6 +154,36 @@ TEST(InterfaceClassDiamond, DifferentSpecializationsWithOverrideOk) {
              "endclass\n"
              "module m;\n"
              "endmodule\n"));
+}
+
+// The method side of the same rule. ibase#(bit) and ibase#(string) are two
+// interface class types under §8.26.6.3, so fn(T) reaches ic3 twice with two
+// signatures and the conflict is that subclause's; the same two prototypes
+// from two unrelated interface classes are §8.26.6.1's, which
+// InterfaceClassMethodConflict.UnrelatedSpecializationsConflictError in
+// test_elaborator_subclause_08_26_06_01.cpp holds to. This is the shape of
+// sv-tests' 8.26.6.3--diamond_relationship_parametrized.sv; line 11 is ic3.
+TEST(InterfaceClassDiamond, DifferentSpecializationsMethodConflictError) {
+  ElabFixture f;
+  ElabOk(
+      "module class_tb;\n"
+      "  interface class ibase #(type T = logic);\n"
+      "    pure virtual function void fn(T val);\n"
+      "  endclass\n"
+      "  interface class ic1 extends ibase#(bit);\n"
+      "    pure virtual function void fn1();\n"
+      "  endclass\n"
+      "  interface class ic2 extends ibase#(string);\n"
+      "    pure virtual function void fn2();\n"
+      "  endclass\n"
+      "  interface class ic3 extends ic1, ic2;\n"
+      "    pure virtual function void fn3();\n"
+      "  endclass\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "method name conflict for 'fn' in 'ic3'", 11,
+                            "8.26.6.3"));
 }
 
 // Boundary of the specialization rule: identical parameterizations of a
@@ -203,7 +234,7 @@ TEST(InterfaceClassDiamond, DifferentValueSpecializationsNotDiamondError) {
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "is inherited from multiple interface classes and must be overridden", 10,
-      "8.26.6.2"));
+      "8.26.6.3"));
 }
 
 // Boundary of the value-specialization rule: identical value parameterizations
@@ -255,7 +286,7 @@ TEST(InterfaceClassDiamond, DifferentNamedTypeSpecializationsNotDiamondError) {
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "is inherited from multiple interface classes and must be overridden", 12,
-      "8.26.6.2"));
+      "8.26.6.3"));
 }
 
 // §8.1 lets a class be declared wherever a data declaration may appear. Two
@@ -283,7 +314,7 @@ TEST(InterfaceClassDiamond, DifferentSpecializationsInsideAModuleError) {
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "is inherited from multiple interface classes and must be overridden", 11,
-      "8.26.6.2"));
+      "8.26.6.3"));
 }
 
 TEST(InterfaceClassDiamond, SameSpecializationInsideAModuleOk) {
@@ -318,11 +349,11 @@ TEST(InterfaceClassDiamond, SameSpecializationInsideAModuleOk) {
 // does not.
 // The same source as TwoLocalparamArgumentsAreTwoSpecializations with the
 // localparams moved into the module, which is the one variable that test holds
-// fixed. §8.26.6.3 rules that "each unique parameterization of a parameterized
-// interface class is an interface class specialization" (printed page 214) and
-// makes no exception for where the argument's value is declared, so
-// IntfBase#(A) and IntfBase#(B) are two specializations here as much as at
-// compilation-unit scope and SIZE collides under §8.26.6.2.
+// fixed. §8.26.6.3 makes every distinct parameterization of a parameterized
+// interface class a specialization of its own (printed page 214) and makes no
+// exception for where the argument's value is declared, so IntfBase#(A) and
+// IntfBase#(B) are two specializations here as much as at compilation-unit
+// scope and SIZE collides under §8.26.6.3.
 //
 // Elaborator::ValidateInterfaceClassRules runs before any module is elaborated,
 // so A and B have a value only where the module's own items are folded. Without
@@ -351,7 +382,7 @@ TEST(InterfaceClassSpecialization,
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "is inherited from multiple interface classes and must be overridden", 13,
-      "8.26.6.2"));
+      "8.26.6.3"));
 }
 
 // The other direction, and the reason the fold has to compute the value rather
@@ -408,7 +439,7 @@ TEST(InterfaceClassSpecialization,
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "is inherited from multiple interface classes and must be overridden", 12,
-      "8.26.6.2"));
+      "8.26.6.3"));
 }
 
 // §8.26.6.3 rules that where inherited parameters "originate from the same

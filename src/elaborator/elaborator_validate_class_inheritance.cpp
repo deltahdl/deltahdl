@@ -249,6 +249,30 @@ static void CollectInScopeInterfaceMethods(const ClassDecl* cls,
   }
 }
 
+// The interface class a specialization key names: `IntfBase` for
+// `IntfBase#(bit)`, and the key itself when the interface class has no
+// arguments.
+static std::string_view InterfaceClassOfSpecKey(std::string_view key) {
+  return key.substr(0, key.find("#("));
+}
+
+// The subclause a conflict between the interfaces `keys` name is reported
+// under. §8.26.6.3 makes each specialization of a parameterized interface
+// class a type of its own, so that two specializations of one interface class
+// reached by two paths are not a diamond and their members collide instead of
+// merging; a conflict between such specializations is that subclause's, the
+// rule that decides the paths are two. A conflict between different interface
+// classes is `unrelated`'s: §8.26.6.1 for a method name, §8.26.6.2 for a
+// parameter or type name.
+static Subclause ConflictSubclause(const std::vector<std::string_view>& keys,
+                                   Subclause unrelated) {
+  for (auto key : keys) {
+    if (InterfaceClassOfSpecKey(key) != InterfaceClassOfSpecKey(keys.front()))
+      return unrelated;
+  }
+  return Subclause("8.26.6.3");
+}
+
 // Reports two interfaces in scope contributing the same method name with
 // incompatible signatures.
 static void DiagnoseInterfaceSignatureConflicts(
@@ -269,7 +293,8 @@ static void DiagnoseInterfaceSignatureConflicts(
                         "signatures in interface '{}' and interface '{}'",
                         method_name, cls->name, entries[0].first.key,
                         entries[i].first.key),
-            Subclause("8.26.6.1"));
+            ConflictSubclause({entries[0].first.key, entries[i].first.key},
+                              Subclause("8.26.6.1")));
         break;
       }
     }
@@ -612,7 +637,9 @@ static void ValidateParamTypeConflicts(const ClassDecl* cls,
                       "inherited from multiple interface classes and must be "
                       "overridden",
                       name, cls->name),
-          Subclause("8.26.6.2"));
+          ConflictSubclause(
+              std::vector<std::string_view>(origins.begin(), origins.end()),
+              Subclause("8.26.6.2")));
     }
   }
 }

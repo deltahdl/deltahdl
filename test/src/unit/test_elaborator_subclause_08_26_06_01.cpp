@@ -347,4 +347,30 @@ TEST(InterfaceClassMethodNameConflicts,
              "endmodule\n"));
 }
 
+// A conflict between two specializations of one parameterized interface class
+// is §8.26.6.3's, the rule that makes them two types (see
+// InterfaceClassDiamond.DifferentSpecializationsMethodConflictError in
+// test_elaborator_subclause_08_26_06_03.cpp). The interfaces below are
+// specializations too, but of two different interface classes, so no diamond
+// was ever in question and the conflict keeps §8.26.6.1: the citation turns on
+// the interface class named, not on the presence of arguments.
+TEST(InterfaceClassMethodConflict, UnrelatedSpecializationsConflictError) {
+  ElabFixture f;
+  ElabOk(
+      "interface class ia #(type T = logic);\n"
+      "  pure virtual function void fn(T val);\n"
+      "endclass\n"
+      "interface class ib #(type T = logic);\n"
+      "  pure virtual function void fn(T val);\n"
+      "endclass\n"
+      "interface class ic extends ia#(bit), ib#(string);\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "method name conflict for 'fn' in 'ic'", 7,
+                            "8.26.6.1"));
+}
+
 }  // namespace
