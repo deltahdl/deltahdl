@@ -431,6 +431,19 @@ static void CollectMatchesBindings(
   });
 }
 
+// §12.6.1: the patterns of a `case ... matches` item, each binding variables
+// the item's statement reads. A case that is not `matches` compares values
+// and binds nothing.
+static void CollectCaseMatchesBindings(
+    const Stmt* s, std::unordered_set<std::string_view>& names) {
+  if (!s->case_matches) return;
+  for (const auto& ci : s->case_items) {
+    for (const Expr* p : ci.patterns) {
+      ForEachPatternBinding(p, [&](const Expr* b) { names.insert(b->text); });
+    }
+  }
+}
+
 // Over-approximated set of names that are local to a procedural block: block
 // (begin/end) variable declarations, for-loop control variables, foreach index
 // variables, the two kinds of name §18.17.7 gives a randsequence statement,
@@ -447,13 +460,7 @@ void CollectProcLocalNames(const Stmt* s,
   // local wherever the read of it is collected. The read of a variable a
   // pattern binds is the whole of what sv-tests' §12.6 files do, and each was
   // reported unresolved (#4353).
-  if (s->case_matches) {
-    for (const auto& ci : s->case_items) {
-      for (const Expr* p : ci.patterns) {
-        ForEachPatternBinding(p, [&](const Expr* b) { names.insert(b->text); });
-      }
-    }
-  }
+  CollectCaseMatchesBindings(s, names);
   CollectMatchesBindings(s->condition, names);
   CollectMatchesBindings(s->rhs, names);
   CollectMatchesBindings(SubroutineCallOfStmt(s), names);
