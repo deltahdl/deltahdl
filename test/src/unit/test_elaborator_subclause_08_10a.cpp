@@ -708,4 +708,85 @@ TEST(StaticMethodElaboration, BlockLocalShadowsThePropertyInANestedBlock) {
              "endmodule\n"));
 }
 
+// §8.10 denies a static method the non-static members of the object it has no
+// handle to; §8.23 has the class scope resolution operator `::` name a member
+// of the class its left side stands for. The right side of a `::` is that
+// class's member and not this one's, so a static method calling another
+// class's static method through `::` is not the access §8.10 bars, whatever
+// name this class also declares. ExprRefsNonStaticMember searched the right
+// side of a `::` against this class's non-static names (#4352), so
+// `type_id::get()` in UVM's uvm_object_param_utils, where uvm_pool also has a
+// non-static `get`, was reported in every file that includes the library.
+TEST(StaticMethodClassScopeAccess,
+     AnotherClassesStaticMethodCalledThroughItsScopeIsAccepted) {
+  EXPECT_TRUE(
+      ElabOk("class Registry;\n"
+             "  static function int get();\n"
+             "    return 1;\n"
+             "  endfunction\n"
+             "endclass\n"
+             "class C;\n"
+             "  virtual function int get(int key);\n"
+             "    return key;\n"
+             "  endfunction\n"
+             "  static function int get_type();\n"
+             "    return Registry::get();\n"
+             "  endfunction\n"
+             "endclass\n"
+             "module m;\n"
+             "  C c;\n"
+             "endmodule\n"));
+}
+
+// The UVM shape: the class the `::` names is a typedef of a parameterized
+// class specialization declared in the calling class itself.
+TEST(StaticMethodClassScopeAccess,
+     AStaticMethodOfATypedefSpecializationIsAccepted) {
+  EXPECT_TRUE(
+      ElabOk("class Registry #(type T = int);\n"
+             "  static function int get();\n"
+             "    return 1;\n"
+             "  endfunction\n"
+             "endclass\n"
+             "class C #(type KEY = int);\n"
+             "  typedef Registry #(KEY) type_id;\n"
+             "  virtual function int get(KEY key);\n"
+             "    return key;\n"
+             "  endfunction\n"
+             "  static function int get_type();\n"
+             "    return type_id::get();\n"
+             "  endfunction\n"
+             "endclass\n"
+             "module m;\n"
+             "  C #(int) c;\n"
+             "endmodule\n"));
+}
+
+// The control: the same class calling its non-static `get` bare is still the
+// access §8.10 bars, reported at the static function on line 10.
+TEST(StaticMethodClassScopeAccess, TheOwnNonStaticMethodCalledBareIsReported) {
+  ElabFixture f;
+  ElabOk(
+      "class Registry;\n"
+      "  static function int get();\n"
+      "    return 1;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "class C;\n"
+      "  virtual function int get(int key);\n"
+      "    return key;\n"
+      "  endfunction\n"
+      "  static function int get_type();\n"
+      "    return get(1);\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  C c;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "static method shall not access non-static members",
+                            10, "8.10"));
+}
+
 }  // namespace

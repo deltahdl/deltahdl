@@ -159,9 +159,7 @@ std::unordered_set<std::string_view> NamesDeclaredUnder(const Stmt* s) {
 // FirstEnclosingPropRef in elaborator_validate_class_nesting.cpp searches it
 // under §8.23. The one base that is no such handle is `this` (and `super`,
 // §8.15), the object the static method does not have, so a member behind either
-// is the bare access still. A
-// `::` access names a member through the class scope rather than through an
-// object and is left to the search of both sides.
+// is the bare access still.
 //
 // This searched the member name of every `.` access as if it stood bare, so
 // `return m_inst.k;` through a static property of the class and `return c.k;`
@@ -175,11 +173,23 @@ static bool IsAccessThroughAHandle(const Expr* e) {
          (base->text != "this" && base->text != "super");
 }
 
+// §8.23 (printed page 200) has the class scope resolution operator name a
+// member of the class its left side stands for, so the right side of a `::`
+// is that class's member and not this one's, and only the left side is
+// searched, as the left side of a `.` is. Searched against this class's
+// non-static names, the right side reported every static method that reached
+// another class's member by a name this class also declares -- `type_id::get()`
+// in UVM's uvm_object_param_utils, where uvm_pool has a non-static `get` of
+// its own (#4352). Whether the left side names this class itself is not asked.
+static bool IsAccessThroughAClassScope(const Expr* e) {
+  return e->kind == ExprKind::kMemberAccess && e->is_scope_resolution;
+}
+
 static bool ExprRefsNonStaticMember(
     const Expr* e, const std::unordered_set<std::string_view>& non_static,
     const std::unordered_set<std::string_view>& locals) {
   if (!e) return false;
-  if (IsAccessThroughAHandle(e)) {
+  if (IsAccessThroughAHandle(e) || IsAccessThroughAClassScope(e)) {
     return ExprRefsNonStaticMember(e->lhs, non_static, locals);
   }
   if (e->kind == ExprKind::kIdentifier && non_static.count(e->text) &&
