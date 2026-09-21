@@ -180,7 +180,7 @@ TEST(SelectElaboration, RealVariableBitSelectError) {
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "bit-select of a real variable is illegal", 4,
-                            "11.5.1"));
+                            "6.12"));
 }
 
 TEST(SelectElaboration, RealVariablePartSelectError) {
@@ -194,7 +194,7 @@ TEST(SelectElaboration, RealVariablePartSelectError) {
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "part-select of a real variable is illegal", 4,
-                            "11.5.1"));
+                            "6.12"));
 }
 
 TEST(SelectElaboration, NonIndexedPartSelectBoundsMustBeConstant) {
@@ -359,8 +359,10 @@ TEST(SelectElaboration, IndexedPartSelectWidthLocalparamAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §11.5.1: a bit-select of a real-typed variable is illegal, and the rule
-// covers the whole real family -- shortreal is a real type just as `real` is.
+// §11.5.1 restates what §6.12 lists, that a bit-select of a real variable is
+// illegal, and the rule covers the whole real family -- shortreal is a real
+// type just as `real` is. The report cites §6.12, the clause that lists the
+// prohibition, so every case in this file reads that citation.
 TEST(SelectElaboration, ShortrealVariableBitSelectError) {
   ElabFixture f;
   ElaborateSrc(
@@ -372,10 +374,10 @@ TEST(SelectElaboration, ShortrealVariableBitSelectError) {
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "bit-select of a real variable is illegal", 4,
-                            "11.5.1"));
+                            "6.12"));
 }
 
-// §11.5.1: realtime is likewise a real type, so selecting from it is illegal.
+// realtime is likewise a real type, so selecting from it is illegal.
 TEST(SelectElaboration, RealtimeVariableBitSelectError) {
   ElabFixture f;
   ElaborateSrc(
@@ -387,7 +389,7 @@ TEST(SelectElaboration, RealtimeVariableBitSelectError) {
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "bit-select of a real variable is illegal", 4,
-                            "11.5.1"));
+                            "6.12"));
 }
 
 // §11.5.1: for an ascending [0:15] declaration the smaller index names the more
@@ -588,12 +590,13 @@ TEST(SelectElaboration,
                             "11.5.1"));
 }
 
-// §11.5.1: "A bit-select or part-select of a scalar, or of a real variable or
-// real parameter, shall be illegal." The sentence names two constructs, and
-// `a[3:0]` is the second of them, so a report naming a bit-select names the
-// construct that was not written. This fails when CheckRealSelectNode in
-// src/elaborator/elaborator_validate.cpp emits one message for every select
-// rather than choosing on the node's own `index_end`.
+// §11.5.1 restates §6.12's prohibition of a bit-select or part-select of a
+// real variable, and extends it to a scalar and to a real parameter. The
+// sentence names two constructs, and `a[3:0]` is the second of them, so a
+// report naming a bit-select names the construct that was not written. This
+// fails when CheckRealSelectNode in src/elaborator/elaborator_validate.cpp
+// emits one message for every select rather than choosing on the node's own
+// `index_end`.
 TEST(RealSelect, PartSelectOfARealNamesPartSelect) {
   ElabFixture f;
   ElaborateSrc(
@@ -605,7 +608,7 @@ TEST(RealSelect, PartSelectOfARealNamesPartSelect) {
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "part-select of a real variable is illegal", 4,
-                            "11.5.1"));
+                            "6.12"));
 }
 
 // The same alternative of §11.5.1's sentence reached through the ascending
@@ -624,7 +627,7 @@ TEST(RealSelect, IndexedPlusPartSelectOfARealNamesPartSelect) {
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "part-select of a real variable is illegal", 4,
-                            "11.5.1"));
+                            "6.12"));
 }
 
 // The descending indexed form, which sets `is_part_select_minus` instead. It is
@@ -642,7 +645,7 @@ TEST(RealSelect, IndexedMinusPartSelectOfARealNamesPartSelect) {
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "part-select of a real variable is illegal", 4,
-                            "11.5.1"));
+                            "6.12"));
 }
 
 // The other alternative, and the control on the three above. `a[2]` sets none
@@ -661,7 +664,7 @@ TEST(RealSelect, BitSelectOfARealStillNamesBitSelect) {
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "bit-select of a real variable is illegal", 4,
-                            "11.5.1"));
+                            "6.12"));
 }
 
 // §11.5.1 states one rule, so one breach of it draws one report. This fails
@@ -712,7 +715,7 @@ TEST(RealSelect, SelectOfARealInAProceduralStatementNamesTheRealRule) {
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "bit-select of a real variable is illegal", 4,
-                            "11.5.1"));
+                            "6.12"));
 }
 
 // §11.5.2 "Array and memory addressing": an address written after the name of

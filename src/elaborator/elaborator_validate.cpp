@@ -651,13 +651,17 @@ static void CheckRealSelectNode(const Expr* e, const TypeMap& types,
   const bool kIsRealParam =
       !name.empty() && operands.parameters.count(name) != 0;
   if (kIsRealVar || kIsRealParam) {
-    // §11.5.1: "A bit-select or part-select of a scalar, or of a real variable
-    // or real parameter, shall be illegal." The sentence names two constructs
-    // and two real operands, so the report names the construct that was written
-    // and the operand it was written on. A select node carries `index_end` for
-    // `[m:l]` and `is_part_select_plus` or `is_part_select_minus` for `[b +:
-    // w]` and `[b -: w]`, the same three fields CheckIndexedPartSelectWidthNode
-    // reads; a node with none of them set is a bit-select.
+    // §6.12 lists a bit-select or part-select reference of a real variable
+    // among the cases in which real variables are prohibited, and §11.5.1
+    // restates it and extends it to a scalar and to a real parameter. A real
+    // variable is reported under §6.12, the clause that lists the prohibition,
+    // and a real parameter under §11.5.1, the one clause that names it. The
+    // sentence names two constructs, so the report names the construct that
+    // was written and the operand it was written on. A select node carries
+    // `index_end` for `[m:l]` and `is_part_select_plus` or
+    // `is_part_select_minus` for `[b +: w]` and `[b -: w]`, the same three
+    // fields CheckIndexedPartSelectWidthNode reads; a node with none of them
+    // set is a bit-select.
     //
     // The two name sets are asked rather than the declared type of the operand,
     // because a real declared with an unpacked dimension is in neither set:
@@ -670,12 +674,12 @@ static void CheckRealSelectNode(const Expr* e, const TypeMap& types,
         kIsRealVar ? "real variable" : "real parameter";
     diag.Error(e->range.start,
                std::format("{} of a {} is illegal", kConstruct, kOperand),
-               Subclause("11.5.1"));
+               Subclause(kIsRealVar ? "6.12" : "11.5.1"));
     // Returning here leaves the index check below unreached for this node, so
     // `real a; real i; assign b = a[i];` draws the operand report alone. That
     // is deliberate: the operand breach already makes the whole select illegal
-    // under the sentence quoted above, and one construct drawing one report is
-    // what this check exists to do.
+    // under the sentence above, and one construct drawing one report is what
+    // this check exists to do.
     return;
   }
   if (!e->index) return;
@@ -683,8 +687,11 @@ static void CheckRealSelectNode(const Expr* e, const TypeMap& types,
   if (idx.empty()) return;
   auto it = types.find(idx);
   if (it != types.end() && IsRealType(it->second)) {
+    // §6.12 lists a real index expression of a bit-select or part-select of a
+    // vector among the prohibited cases; §11.5.1 only has the index be an
+    // integer expression, so the citation is §6.12.
     diag.Error(e->range.start, "real type used as index is illegal",
-               Subclause("11.5.1"));
+               Subclause("6.12"));
   }
 }
 
@@ -732,11 +739,15 @@ static void CheckElementSelectNode(const Expr* e, const SelectShapeMap& shapes,
   if (chain.addresses != it->second.addressable_dims + 1) return;
   const bool kIsBitSelect =
       !e->index_end && !e->is_part_select_plus && !e->is_part_select_minus;
+  // The real element is reported under §6.12, as CheckRealSelectNode reports a
+  // real declared without the dimension, since the element is a real variable
+  // and §6.12 is the clause that lists the prohibition; the scalar element is
+  // reported under §11.5.1, which alone names a scalar.
   if (it->second.element_is_real) {
     diag.Error(e->range.start,
                std::format("{} of a real variable is illegal",
                            kIsBitSelect ? "bit-select" : "part-select"),
-               Subclause("11.5.1"));
+               Subclause("6.12"));
     return;
   }
   if (it->second.element_is_scalar) {

@@ -6,12 +6,14 @@
 
 using namespace delta;
 
-// §11.5.2 sends a select of an array element to §11.5.1 for judgement: "Once
-// selected, bit-selects and part-selects shall be addressed in the same manner
-// as net and variable bit-selects and part-selects (see 11.5.1)." §11.5.1 then
-// bars this operand: "A bit-select or part-select of a scalar, or of a real
-// variable or real parameter, shall be illegal." `arr[i]` selects one real
-// element, and `[0]` selects a bit out of that real, so the source is illegal.
+// §11.5.2 sends a select of an array element to §11.5.1 for judgement, since
+// once the element is selected its bit-selects and part-selects are addressed
+// as those of a net or variable are. §11.5.1 then bars this operand, restating
+// the prohibition §6.12 lists, a bit-select or part-select of a real variable,
+// and extending it to a scalar and to a real parameter. `arr[i]` selects one
+// real element, and `[0]` selects a bit out of that real, so the source is
+// illegal, and the report cites §6.12 as for a real declared without the
+// dimension.
 //
 // This fails while CheckRealSelectNode in
 // src/elaborator/elaborator_validate.cpp opens with ExprIdent(e->base), which
@@ -30,7 +32,7 @@ TEST(RealSelect, BitSelectOfARealArrayElementIsIllegal) {
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "bit-select of a real variable is illegal", 5,
-                            "11.5.1"));
+                            "6.12"));
 }
 
 // The same operand written as a part-select. §11.5.1 names a bit-select and a
@@ -53,7 +55,7 @@ TEST(RealSelect, PartSelectOfARealArrayElementIsIllegal) {
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "part-select of a real variable is illegal", 5,
-                            "11.5.1"));
+                            "6.12"));
 }
 
 // The same §11.5.1 breach written in the statement-target position, which
@@ -74,7 +76,7 @@ TEST(RealSelect, BitSelectOfARealArrayElementAsATargetIsIllegal) {
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "bit-select of a real variable is illegal", 5,
-                            "11.5.1"));
+                            "6.12"));
 }
 
 // §11.5.1's other alternative, reached by the same §11.5.2 route: "A bit-select
@@ -244,7 +246,7 @@ TEST(RealSelect, BitSelectOfARealArrayElementInAlwaysCombIsIllegal) {
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "bit-select of a real variable is illegal", 5,
-                            "11.5.1"));
+                            "6.12"));
 }
 
 // The same select written in an always_ff procedure. §9.2.2.4 says what that
@@ -272,7 +274,7 @@ TEST(RealSelect, BitSelectOfARealArrayElementInAlwaysFfIsIllegal) {
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "bit-select of a real variable is illegal", 6,
-                            "11.5.1"));
+                            "6.12"));
 }
 
 // The same select written in an always_latch procedure. §9.2.2.3 says what
@@ -297,7 +299,7 @@ TEST(RealSelect, BitSelectOfARealArrayElementInAlwaysLatchIsIllegal) {
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "bit-select of a real variable is illegal", 5,
-                            "11.5.1"));
+                            "6.12"));
 }
 
 // The same select written in a final procedure. §9.2.3 says what that
@@ -324,7 +326,7 @@ TEST(RealSelect, BitSelectOfARealArrayElementInFinalIsIllegal) {
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "bit-select of a real variable is illegal", 5,
-                            "11.5.1"));
+                            "6.12"));
 }
 
 // A.6.12 makes a randsequence code block a list of statements, so the §11.5.1
@@ -362,7 +364,7 @@ TEST(SelectElaboration, RealSelectInAnAssertPassArmIsRejected) {
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "bit-select of a real variable is illegal", 4,
-                            "11.5.1"));
+                            "6.12"));
 }
 
 // A.6.8 makes a for-loop initialization a statement; mirrors
@@ -431,7 +433,7 @@ TEST(RealSelect, BitSelectOfARealInAConditionalConditionIsIllegal) {
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "bit-select of a real variable is illegal", 4,
-                            "11.5.1"));
+                            "6.12"));
 }
 
 // The conditional operator's second operand, reached through `true_expr`. It is
@@ -449,7 +451,7 @@ TEST(RealSelect, BitSelectOfARealInAConditionalTrueArmIsIllegal) {
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "bit-select of a real variable is illegal", 5,
-                            "11.5.1"));
+                            "6.12"));
 }
 
 // The conditional operator's third operand, reached through `false_expr`, which
@@ -466,7 +468,7 @@ TEST(RealSelect, BitSelectOfARealInAConditionalFalseArmIsIllegal) {
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "bit-select of a real variable is illegal", 5,
-                            "11.5.1"));
+                            "6.12"));
 }
 
 // A call argument, reached through `args`. §11.5 makes the call itself an
@@ -486,7 +488,7 @@ TEST(RealSelect, BitSelectOfARealInACallArgumentIsIllegal) {
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "bit-select of a real variable is illegal", 7,
-                            "11.5.1"));
+                            "6.12"));
 }
 
 // A concatenation element, reached through `elements`. §11.5 makes the
@@ -505,7 +507,7 @@ TEST(RealSelect, PartSelectOfARealInAConcatenationNamesPartSelect) {
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "part-select of a real variable is illegal", 4,
-                            "11.5.1"));
+                            "6.12"));
 }
 
 // The second bound of a non-indexed part-select, reached through `index_end`.
@@ -526,7 +528,7 @@ TEST(RealSelect, BitSelectOfARealInAPartSelectBoundIsIllegal) {
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "bit-select of a real variable is illegal", 5,
-                            "11.5.1"));
+                            "6.12"));
 }
 
 // §11.5.1 bars a bit-select of a real variable or a scalar and no other, so a

@@ -40,8 +40,9 @@ TEST(RealDataType, RealPosedgeError) {
                             "edge event on real type is illegal", 3, "6.12"));
 }
 
-// A real index is reported by the §11.5.1 select rule rather than under §6.12,
-// and the report stands at the select's base `b`.
+// §6.12 lists a real index expression of a bit-select of a vector among the
+// cases it prohibits, so the report cites §6.12 rather than §11.5.1, which only
+// has the index be an integer expression; it stands at the select's base `b`.
 TEST(RealDataType, RealIndexInBitSelectError) {
   ElabFixture f;
   ElaborateSrc(
@@ -53,7 +54,7 @@ TEST(RealDataType, RealIndexInBitSelectError) {
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "real type used as index is illegal", 5, "11.5.1"));
+                            "real type used as index is illegal", 5, "6.12"));
 }
 
 TEST(RealDataType, AllRealTypesElaborateWithIsReal) {
@@ -124,7 +125,7 @@ TEST(RealDataType, RealBitSelectError) {
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "bit-select of a real variable is illegal", 4,
-                            "11.5.1"));
+                            "6.12"));
 }
 
 TEST(RealDataType, RealPartSelectError) {
@@ -136,11 +137,11 @@ TEST(RealDataType, RealPartSelectError) {
       "  assign b = a[3:0];\n"
       "endmodule\n",
       f);
-  // a[3:0] is a part-select, which is the second of the two constructs
-  // §11.5.1's sentence names, so the report is the part-select one.
+  // a[3:0] is a part-select, the second of the two constructs §6.12's
+  // prohibition names, so the report is the part-select one.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "part-select of a real variable is illegal", 4,
-                            "11.5.1"));
+                            "6.12"));
 }
 
 TEST(RealDataType, ShortrealBitSelectError) {
@@ -154,7 +155,7 @@ TEST(RealDataType, ShortrealBitSelectError) {
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "bit-select of a real variable is illegal", 4,
-                            "11.5.1"));
+                            "6.12"));
 }
 
 // §6.12: edge event controls are prohibited on every real-variable type, not
@@ -185,7 +186,7 @@ TEST(RealDataType, RealtimeBitSelectError) {
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "bit-select of a real variable is illegal", 4,
-                            "11.5.1"));
+                            "6.12"));
 }
 
 // §6.12: a real index expression is prohibited in a part-select of a vector,
@@ -201,7 +202,7 @@ TEST(RealDataType, RealIndexInPartSelectError) {
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "real type used as index is illegal", 5, "11.5.1"));
+                            "real type used as index is illegal", 5, "6.12"));
 }
 
 TEST(RealDataType, RealAndRealtimeInterchangeable) {
