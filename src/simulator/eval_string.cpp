@@ -531,9 +531,9 @@ static bool ReadStringReceiver(const Expr* receiver, SimContext& ctx,
   return ReadHandleStringProperty(receiver, ctx, arena, str);
 }
 
-bool TryEvalStringMethodOnValue(const Logic4Vec& value, std::string_view method,
-                                const Expr* call_expr, SimContext& ctx,
-                                Arena& arena, Logic4Vec& out) {
+bool TryEvalStringMethodOnValue(const Logic4Vec& value, const Expr* call_expr,
+                                SimContext& ctx, Arena& arena, Logic4Vec& out) {
+  std::string_view method = call_expr->lhs->rhs->text;
   if (!StringMethodAnswersAValue(method)) return false;
   StringMethodArgs args{nullptr, Logic4VecToString(value), call_expr, ctx,
                         arena};

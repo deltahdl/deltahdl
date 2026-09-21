@@ -221,12 +221,12 @@ bool TryEvalStringMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
 
 // §6.16 with §13.4: a value-answering string method (StringMethodAnswersAValue
 // in src/common/string_methods.h) called on `value`, the text a call answered,
-// `h.get().len()` or `s.toupper().substr(0, 2)`; `call_expr` is the call whose
-// arguments the method reads. False for a method of any other name, the six
-// that write their object among them, since a value is no object to write.
-bool TryEvalStringMethodOnValue(const Logic4Vec& value, std::string_view method,
-                                const Expr* call_expr, SimContext& ctx,
-                                Arena& arena, Logic4Vec& out);
+// `h.get().len()` or `s.toupper().substr(0, 2)`; `call_expr` is the call, a
+// member select of the method's name on the inner call, whose arguments the
+// method reads. False for a method of any other name, the six that write
+// their object among them, since a value is no object to write.
+bool TryEvalStringMethodOnValue(const Logic4Vec& value, const Expr* call_expr,
+                                SimContext& ctx, Arena& arena, Logic4Vec& out);
 
 // §6.19.5: every enumeration method works from "the current value of the given
 // variable" and answers with a value of that variable's enumeration, so a call

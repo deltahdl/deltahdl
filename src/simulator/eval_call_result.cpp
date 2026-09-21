@@ -408,8 +408,8 @@ bool TryEvalCallResultMethodCall(const Expr* expr, SimContext& ctx,
   // the method is one of the string type's, `h.get().len()` or
   // `s.toupper().substr(0, 2)`, read off the value the call already produced.
   // Read as a handle, the text named no object and the call answered nothing.
-  if (handle.is_string && TryEvalStringMethodOnValue(handle, access->rhs->text,
-                                                     expr, ctx, arena, out)) {
+  if (handle.is_string &&
+      TryEvalStringMethodOnValue(handle, expr, ctx, arena, out)) {
     return true;
   }
   InstanceMethodInfo info;

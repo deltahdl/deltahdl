@@ -429,6 +429,20 @@ static uint32_t ComputeMethodReturnWidth(ModuleItem* method, SimContext& ctx,
   return width == 0 ? 32 : width;
 }
 
+// §13.4.1 with §6.16: the value a call answers -- a placeholder for a void
+// subroutine, else the implicit variable's, carrying the string kind
+// ShapeStringReturnVariable gave the variable of a subroutine declared to
+// return a string, so that a method called on the call, `h.get().len()`,
+// reads it as text (TryEvalCallResultMethodCall); the words alone read as a
+// packed number and no string method reached them.
+static Logic4Vec CallResult(bool is_void, const Variable* ret_var,
+                            Arena& arena) {
+  if (is_void) return MakeLogic4VecVal(arena, 1, 0);
+  Logic4Vec result = ret_var->value;
+  result.is_string = ret_var->is_string;
+  return result;
+}
+
 void ExecClassMethod(ClassMethodTarget target, const Expr* expr,
                      SimContext& ctx, Arena& arena, Logic4Vec& out) {
   ModuleItem* method = target.method;
@@ -457,13 +471,7 @@ void ExecClassMethod(ClassMethodTarget target, const Expr* expr,
     ret_var->is_4state = DeclaredTypeIs4State(method->return_type);
   }
   ExecFunctionBody(method, ret_var, ctx, arena);
-  out = is_void ? MakeLogic4VecVal(arena, 1, 0) : ret_var->value;
-  // §13.4.1 with §6.16: a method declared to return a string answers a
-  // string, and the value carries the kind (ShapeStringReturnVariable marks
-  // the implicit variable) so that a method called on the call,
-  // `h.get().len()`, reads it as text (TryEvalCallResultMethodCall); the words
-  // alone read as a packed number and no string method reached them.
-  if (!is_void) out.is_string = ret_var->is_string;
+  out = CallResult(is_void, ret_var, arena);
 }
 
 static bool TryEvalClassScopeCall(const Expr* expr, SimContext& ctx,
@@ -726,9 +734,7 @@ Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   ctx.PopActiveNamedScope();
   ctx.PopFuncName();
   WritebackInCaller(func, expr, ctx, arena);
-  result = is_void ? MakeLogic4VecVal(arena, 1, 0) : ret_var->value;
-  // §13.4.1 with §6.16: as ExecClassMethod marks a method's string result.
-  if (!is_void) result.is_string = ret_var->is_string;
+  result = CallResult(is_void, ret_var, arena);
 
   if (is_static) {
     ctx.PopStaticScope(func->name);
