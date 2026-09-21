@@ -300,9 +300,8 @@ void Lowerer::LowerParams(const RtlirModule* mod) {
       ctx_.Vcd().SetVcdVarKind(*full, DataTypeKind::kString);
       continue;
     }
-    // Use declared width if parameter has explicit type, else 32 (§10.8
-    // context)
-    uint32_t width = (p.decl_width > 0) ? p.decl_width : 32;
+    ParamStorageShape shape = ParamStorageShapeOf(p);
+    uint32_t width = shape.width;
     auto* var = ctx_.CreateVariable(*full, width);
     var->value = MakeLogic4VecVal(arena_, width,
                                   static_cast<uint64_t>(p.resolved_value));
@@ -311,11 +310,11 @@ void Lowerer::LowerParams(const RtlirModule* mod) {
     // whose expression holds an x or a z (§5.7.1), which the fold holds as 0.
     ReevaluateParamValue(p, var, ctx_, arena_);
     // §11.8.2: an operand is sign-extended to the propagated width only when it
-    // is signed, so a parameter declared signed has to reach evaluation
-    // carrying that. Without it `parameter signed [3:0] P = -4'sd1` reads back
-    // as 15.
-    var->is_signed = p.decl_is_signed;
-    var->value.is_signed = p.decl_is_signed;
+    // is signed, so a parameter declared signed, or an untyped one whose final
+    // value is (§6.20.2), has to reach evaluation carrying that. Without it
+    // `parameter signed [3:0] P = -4'sd1` reads back as 15.
+    var->is_signed = shape.is_signed;
+    var->value.is_signed = shape.is_signed;
   }
 }
 

@@ -167,6 +167,25 @@ void RegisterUnitClassVariables(const RtlirDesign* design, SimContext& ctx,
 void ReevaluateParamValue(const RtlirParamDecl& param, Variable* var,
                           SimContext& ctx, Arena& arena);
 
+// §6.20.2 (printed pages 126-127): the width and signedness a value
+// parameter's storage takes. A parameter declared with a range has the range
+// of its declaration, and one declared with a type and no range is of that
+// type, whatever value either took, so both are stored at decl_width with
+// the declaration's sign. One declared with neither, or with a bare `signed`,
+// takes the type and range of its final value -- a logic vector as wide as
+// that value's self-determined width, 13 bits for `parameter p1 = 13'h7e`,
+// 3 for `newconst3 = 3'h4` and at least 32 for the unsized `newconst4 = 4`,
+// the clause's own examples -- which the elaborator records with the value
+// as RtlirParamDecl::value_width and value_is_signed (RecordResolvedHighWords
+// in src/elaborator/const_eval_bits.cpp). Where it recorded none, the value
+// not having folded, 32 bits with the declaration's sign, the implied range
+// of an unsized value. Defined in src/simulator/lowerer_register.cpp.
+struct ParamStorageShape {
+  uint32_t width;
+  bool is_signed;
+};
+ParamStorageShape ParamStorageShapeOf(const RtlirParamDecl& param);
+
 void RegisterModuleNets(const RtlirModule* mod, SimContext& ctx, Arena& arena);
 void RegisterModulePorts(const RtlirModule* mod, SimContext& ctx, Arena& arena);
 void RegisterModuleSubroutines(const RtlirModule* mod, SimContext& ctx);

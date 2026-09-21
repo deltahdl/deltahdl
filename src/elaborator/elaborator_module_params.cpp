@@ -239,6 +239,15 @@ static void FoldParamConstantValue(RtlirParamDecl& pd, const Expr* pval,
   if (val) {
     pd.resolved_value = *val;
     pd.is_resolved = true;
+    // §6.20.2 (printed page 126): the width and signedness of the default of
+    // a parameter port declared with neither type nor range, and the words
+    // above bit 63 of one declared wider, are recorded as a parameter among
+    // the items has them recorded (ResolveParamConstValue in
+    // elaborator_items_params.cpp), for the storage the lowerer gives the
+    // instance that keeps the default (ParamStorageShapeOf in
+    // src/simulator/lowerer_register.cpp); an override records its own
+    // (ApplyParamOverride).
+    RecordResolvedHighWords(pd, pval, scope);
   } else if (!pd.is_type_param && has_param_type &&
              ParamExpectsIntegerValue(pd, *param_type)) {
     // §6.20.2 (printed page 127): an integer-typed parameter set from a real

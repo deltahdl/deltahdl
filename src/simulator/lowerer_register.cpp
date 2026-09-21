@@ -143,6 +143,21 @@ static bool HoldsXZLiteral(const Expr* expr) {
   return found;
 }
 
+// Lowerer::LowerParams (lowerer.cpp) read decl_width wherever it was not 0
+// and took 32 bits otherwise, which sized every untyped parameter to 32
+// whatever its literal said, `$bits(p1)` answering 32 for `parameter p1 =
+// 13'h7e`, and a bare `signed` to the one bit EvalTypeWidth gives the
+// implicit type.
+ParamStorageShape ParamStorageShapeOf(const RtlirParamDecl& param) {
+  bool declared = param.has_decl_range ||
+                  (param.has_decl_type && !param.decl_type_implicit);
+  if (declared && param.decl_width > 0)
+    return {param.decl_width, param.decl_is_signed};
+  if (!declared && param.value_width > 0)
+    return {param.value_width, param.value_is_signed || param.decl_is_signed};
+  return {32, param.decl_is_signed};
+}
+
 void ReevaluateParamValue(const RtlirParamDecl& param, Variable* var,
                           SimContext& ctx, Arena& arena) {
   uint32_t width = var->value.width;
