@@ -199,9 +199,8 @@ class Elaborator : public ElaboratorClassRules {
 
   // §6.20.2: resolves each parameter of `decl`'s parameter port list against
   // `params`, the overrides the instantiation supplied, and appends the result
-  // to mod->params. Each is resolved against a scope rebuilt from the
-  // parameters already appended, so one parameter port may be written in terms
-  // of an earlier one.
+  // to mod->params, each against a scope rebuilt from the parameters already
+  // appended, so one parameter port may be written in terms of an earlier one.
   void ElaborateParamPortList(const ModuleDecl* decl, const ParamList& params,
                               RtlirModule* mod);
 
@@ -505,8 +504,7 @@ class Elaborator : public ElaboratorClassRules {
 
   bool MaybeCreateImplicitNet(std::string_view name, SourceLoc loc,
                               RtlirModule* mod);
-  // Whether a net or variable of the module being elaborated, explicit or
-  // implicit, has declared `name`.
+  // Whether an explicit or implicit net or variable of the module declares it.
   bool DeclaresNetOrVariable(std::string_view name) const;
 
   std::string_view ScopedName(std::string_view base);
@@ -787,8 +785,7 @@ class Elaborator : public ElaboratorClassRules {
 
   // §G.3: a call on a handle of a std class whose prototype
   // src/elaborator/std_package.h writes down names a method the prototype
-  // declares and passes no fewer actuals than its formals without a default
-  // and no more than its formals.
+  // declares and passes at least its formals without a default, at most all.
   void ValidateStdClassMethodCalls(const ModuleDecl* decl);
 
   void ValidateArrayArgTypes(const ModuleDecl* decl);
