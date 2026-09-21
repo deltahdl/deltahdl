@@ -42,8 +42,7 @@ def test_print_chapter_breakdown_has_no_percentage_column(
     ]
     rst.print_chapter_breakdown(results)
     captured = capsys.readouterr().out
-    assert "Percentage" not in captured
-    assert "%" not in captured
+    assert not any(s in captured for s in ("Percentage", "%"))
 
 
 def test_print_chapter_breakdown_shows_correct_values(
