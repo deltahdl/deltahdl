@@ -22,20 +22,24 @@ using namespace delta;
 namespace {
 
 // §23.9 with §3.12.1: a function at compilation-unit scope reading a name
-// declared nowhere. Line 2 is the read; the module beside it declares nothing
-// of the name either, so the module is not what answers.
+// declared nowhere. Line 3 is the read; the module beside it declares nothing
+// of the name either, so the module is not what answers. The read stands on an
+// assignment's right side because that is the position the collector reads
+// (CollectProcRhsIdents); a return's expression is #4358's.
 TEST(UnitScopeSubroutineReads, UndeclaredNameInAUnitFunctionIsReported) {
   ElabFixture f;
   ElabOk(
       "function int f();\n"
-      "  return undeclared;\n"
+      "  int x;\n"
+      "  x = undeclared;\n"
+      "  return x;\n"
       "endfunction\n"
       "module m;\n"
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "reference to unresolved identifier 'undeclared'",
-                            2, "23.9"));
+                            3, "23.9"));
 }
 
 // The same read inside a randsequence production code block of the function,
@@ -62,13 +66,15 @@ TEST(UnitScopeSubroutineReads,
 }
 
 // §23.9 with Clause 26: a function declared in a package reading a name
-// declared nowhere, on line 3.
+// declared nowhere, on line 4.
 TEST(UnitScopeSubroutineReads, UndeclaredNameInAPackageFunctionIsReported) {
   ElabFixture f;
   ElabOk(
       "package p;\n"
       "  function int f();\n"
-      "    return undeclared;\n"
+      "    int x;\n"
+      "    x = undeclared;\n"
+      "    return x;\n"
       "  endfunction\n"
       "endpackage\n"
       "module m;\n"
@@ -76,7 +82,7 @@ TEST(UnitScopeSubroutineReads, UndeclaredNameInAPackageFunctionIsReported) {
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "reference to unresolved identifier 'undeclared'",
-                            3, "23.9"));
+                            4, "23.9"));
 }
 
 // The control for the compilation-unit body: each name it reads is one §23.9
@@ -84,7 +90,9 @@ TEST(UnitScopeSubroutineReads, UndeclaredNameInAPackageFunctionIsReported) {
 // member of an enumeration declared there (§6.19 makes it a constant of the
 // scope), a name a package the unit imports provides (§26.3), and a name an
 // import written in the body itself provides. The names are distinct so that
-// a predicate missing any one of them is what fails this case.
+// a predicate missing any one of them is what fails this case, and the read
+// stands on an assignment's right side, the position the collector reads, so
+// that the case is not satisfied by a read never collected.
 TEST(UnitScopeSubroutineReads, AUnitFunctionReadingReachableNamesIsClean) {
   EXPECT_TRUE(
       ElabOk("package q;\n"
@@ -99,7 +107,9 @@ TEST(UnitScopeSubroutineReads, AUnitFunctionReadingReachableNamesIsClean) {
              "typedef enum { UNIT_MEMBER = 3 } unit_e;\n"
              "function int f();\n"
              "  import r::from_r;\n"
-             "  return unit_var + unit_param + UNIT_MEMBER + from_q + from_r;\n"
+             "  int x;\n"
+             "  x = unit_var + unit_param + UNIT_MEMBER + from_q + from_r;\n"
+             "  return x;\n"
              "endfunction\n"
              "module m;\n"
              "endmodule\n"));
@@ -119,7 +129,9 @@ TEST(UnitScopeSubroutineReads, APackageFunctionReadingReachableNamesIsClean) {
              "  parameter int pkg_param = 2;\n"
              "  typedef enum { PKG_MEMBER = 3 } pkg_e;\n"
              "  function int f();\n"
-             "    return pkg_var + pkg_param + PKG_MEMBER + from_q;\n"
+             "    int x;\n"
+             "    x = pkg_var + pkg_param + PKG_MEMBER + from_q;\n"
+             "    return x;\n"
              "  endfunction\n"
              "endpackage\n"
              "module m;\n"
@@ -133,7 +145,9 @@ TEST(UnitScopeSubroutineReads, AUnitFunctionReadingItsOwnNamesIsClean) {
   EXPECT_TRUE(
       ElabOk("function int f(int formal);\n"
              "  int local_var = 1;\n"
-             "  return formal + local_var;\n"
+             "  int x;\n"
+             "  x = formal + local_var;\n"
+             "  return x;\n"
              "endfunction\n"
              "module m;\n"
              "endmodule\n"));
