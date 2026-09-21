@@ -337,4 +337,32 @@ TEST(PackageImportSim, UninitializedPackageVariablesHoldTheirTypesDefaults) {
       "pl=x pn=0 ps=[] pr=0.000000\nql=x qn=0 qs=[] qr=0.000000\n");
 }
 
+// §26.3 with §6.8: a package variable a wildcard import makes visible is an
+// assignment target by its bare name as by `P::pn`, and the write is an
+// assignment to that variable: `pn = lv` from a 4-state `4'bx1z1` converts
+// as §6.11.2 has a 2-state variable take an unknown, 0101, and `pn = 1.5`
+// rounds as §6.12.1 has a real assigned to an integral variable, 2. The
+// bare write was reported "undeclared identifier 'pn'" (§23.9) while the
+// bare read resolved.
+TEST(PackageImportSim, ImportedPackageVariableIsAnAssignmentTarget) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("package P; int pn; endpackage\n"
+                       "module t;\n"
+                       "  import P::*;\n"
+                       "  logic [3:0] lv = 4'bx1z1;\n"
+                       "  initial begin\n"
+                       "    P::pn = 17;\n"
+                       "    $display(\"a=%0d b=%0d\", pn, P::pn);\n"
+                       "    pn = 23;\n"
+                       "    $display(\"c=%0d d=%0d\", pn, P::pn);\n"
+                       "    pn = lv;\n"
+                       "    $display(\"e=%0d\", P::pn);\n"
+                       "    pn = 1.5;\n"
+                       "    $display(\"f=%0d\", P::pn);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "a=17 b=17\nc=23 d=23\ne=5\nf=2\n");
+}
+
 }  // namespace
