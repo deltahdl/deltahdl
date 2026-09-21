@@ -248,6 +248,13 @@ class SimContext : public DeclaredNameTables, public RandomStability {
   void PushStaticScope(std::string_view func_name);
   void PopStaticScope(std::string_view func_name);
   bool HasLocalScope() const { return !scope_stack_.empty(); }
+  // §23.9 (printed page 761): the end of the frames a bare name is looked up
+  // in, walking the stack inward from crbegin(): the frames down to and
+  // including the innermost subroutine frame, since a task's or function's
+  // body is a scope nested in the module, package or class declaring it and
+  // the caller's body, another branch of the name tree, is not searched.
+  // Defined in sim_context.cpp beside FindLocalVariable.
+  std::vector<Scope>::const_reverse_iterator VisibleFramesEnd() const;
   Variable* FindLocalVariable(std::string_view name);
   // §26.3 with §23.9 and §13.4: see the definitions in sim_context.cpp and,
   // for the two key lists, in sim_context_fileio.cpp.

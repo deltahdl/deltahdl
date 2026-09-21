@@ -110,7 +110,7 @@ QueueObject* SimContext::FindQueue(std::string_view name) {
   // one: it is what a package's queue reached from inside its subroutine or a
   // module-scoped queue reached from inside an instance is found by, and a
   // formal's copy has to be found before it.
-  for (auto frame = scope_stack_.rbegin(); frame != scope_stack_.rend();
+  for (auto frame = scope_stack_.crbegin(); frame != VisibleFramesEnd();
        ++frame) {
     auto local = frame->queues.find(name);
     if (local != frame->queues.end()) return local->second;
@@ -160,7 +160,7 @@ AssocArrayObject* SimContext::CreateAssocArray(std::string_view name,
 
 AssocArrayObject* SimContext::FindAssocArray(std::string_view name) {
   // §23.9's innermost-first search, as in FindQueue above.
-  for (auto frame = scope_stack_.rbegin(); frame != scope_stack_.rend();
+  for (auto frame = scope_stack_.crbegin(); frame != VisibleFramesEnd();
        ++frame) {
     auto local = frame->assoc_arrays.find(name);
     if (local != frame->assoc_arrays.end()) return local->second;

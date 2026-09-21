@@ -38,6 +38,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_simulator.h"
+#include "helpers_scheduler.h"
 #include "simulator/lowerer.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/variable.h"
@@ -373,6 +374,63 @@ TEST(InstanceScopeSimulation, ArrayFormalShapeDoesNotOutliveTheCall) {
       f, "got");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
+// §23.9 (printed page 761): a name referenced directly within a function is
+// declared in the function or in a scope higher in the same branch of the
+// name tree, so the search climbs from the body outward through the module
+// declaring it, and the body of the caller, which is another branch, is
+// never searched. read_n's bare n is the module's 7 while caller() holds a
+// local n of 3. The search walked every frame on the stack, the caller's
+// included, so read_n read the caller's 3.
+TEST(InstanceScopeSimulation, FunctionBareNameDoesNotReachItsCallersLocal) {
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  int n = 7;\n"
+                      "  int result;\n"
+                      "  function automatic int read_n();\n"
+                      "    return n;\n"
+                      "  endfunction\n"
+                      "  function automatic int caller();\n"
+                      "    int n = 3;\n"
+                      "    return read_n();\n"
+                      "  endfunction\n"
+                      "  initial result = caller();\n"
+                      "endmodule\n",
+                      "result"),
+            7u);
+}
+
+// The same rule for a static method (§8.10) naming the class's static
+// property bare, which is uvm_coreservice_t's `inst` under a caller holding
+// a local of that name: C::set(c) from first(), whose local `C inst` is not
+// in the method's scope, stores c in C's own inst, so C::get() reads c's k
+// of 4 from first() and again from second(), 44. Resolved against the
+// caller's frame, set wrote first's local and get read it there, 4, then
+// read the class's untouched null from second, 1, for 41 -- and
+// uvm_coreservice_t::get() found its inst null on every later call and
+// re-entered uvm_init without end.
+TEST(InstanceScopeSimulation, StaticMethodBareStaticIsNotItsCallersLocal) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  static C inst;\n"
+                      "  int k = 4;\n"
+                      "  static function void set(C c); inst = c; endfunction\n"
+                      "  static function C get(); return inst; endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  function automatic int first();\n"
+                      "    C inst;\n"
+                      "    C c = new;\n"
+                      "    C::set(c);\n"
+                      "    return C::get() == null ? 1 : C::get().k;\n"
+                      "  endfunction\n"
+                      "  function automatic int second();\n"
+                      "    return C::get() == null ? 1 : C::get().k;\n"
+                      "  endfunction\n"
+                      "  initial result = first() * 10 + second();\n"
+                      "endmodule\n",
+                      "result"),
+            44u);
 }
 
 }  // namespace

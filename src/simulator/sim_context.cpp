@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <iterator>
 #include <memory>
 #include <random>
 #include <string>
@@ -589,7 +590,7 @@ void SimContext::BindScopeTypeActual(std::string_view name,
 }
 
 const DataType* SimContext::FindScopeTypeActual(std::string_view name) const {
-  for (auto it = scope_stack_.rbegin(); it != scope_stack_.rend(); ++it) {
+  for (auto it = scope_stack_.crbegin(); it != VisibleFramesEnd(); ++it) {
     auto found = it->type_actuals.find(name);
     if (found != it->type_actuals.end()) return found->second;
   }
@@ -628,8 +629,26 @@ void SimContext::PopStaticScope(std::string_view func_name) {
   }
 }
 
+// §23.9 (printed page 761): a name referenced directly within a task or
+// function is declared in it or in a scope higher in the same branch of the
+// name tree, so the frames its body sees end at the body's own frame, the
+// innermost one EnterSubroutineScope marked; a begin-end, fork or loop frame
+// inside the body is walked past to it, and a module process's block frames,
+// under no subroutine, are all visible. Walked to the bottom of the stack,
+// every lookup below read the callers' locals as the callee's own:
+// uvm_coreservice_t::set(cs), its `inst = cs` run under a caller holding a
+// local named inst, stored the handle in that local, and
+// uvm_coreservice_t::get() on the next call found the class's inst null.
+std::vector<Scope>::const_reverse_iterator SimContext::VisibleFramesEnd()
+    const {
+  for (auto it = scope_stack_.crbegin(); it != scope_stack_.crend(); ++it) {
+    if (it->is_subroutine) return std::next(it);
+  }
+  return scope_stack_.crend();
+}
+
 Variable* SimContext::FindLocalVariable(std::string_view name) {
-  for (auto it = scope_stack_.rbegin(); it != scope_stack_.rend(); ++it) {
+  for (auto it = scope_stack_.crbegin(); it != VisibleFramesEnd(); ++it) {
     auto found = it->vars.find(name);
     if (found != it->vars.end()) return found->second;
   }
@@ -927,7 +946,7 @@ ArrayInfo* SimContext::FindArrayInfo(std::string_view name) {
 // all. The bare key stays the answer for an array of the enclosing scope, so
 // a name that resolved before still does.
 const ArrayInfo* SimContext::FindArrayInfo(std::string_view name) const {
-  for (auto frame = scope_stack_.rbegin(); frame != scope_stack_.rend();
+  for (auto frame = scope_stack_.crbegin(); frame != VisibleFramesEnd();
        ++frame) {
     auto local = frame->arrays.find(name);
     if (local != frame->arrays.end()) return local->second;
