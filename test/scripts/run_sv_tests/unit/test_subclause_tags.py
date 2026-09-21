@@ -109,7 +109,7 @@ def test_a_file_of_the_same_tag_outside_the_table_keeps_its_tag(
     assert rst.tagged_clause({"tags": "13.4.4"}, "13.4.4--fork-valid.sv") == "13.4.4"
 
 
-def test_a_file_the_suite_tags_on_the_operation_is_judged_by_the_rule_it_tests(
+def test_a_file_tagged_by_the_feature_it_uses_is_judged_by_the_rule_it_breaks(
     rst: ModuleType,
 ) -> None:
     assert rst.tagged_clause({"tags": "7.4.3"}, "variable-slice-zero.sv") == "11.5.1"

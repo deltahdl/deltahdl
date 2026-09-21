@@ -339,13 +339,18 @@ _CLAUSE_OF_MISTAGGED_FILE: dict[str, str] = {
     "18.17.2--if-else-production-statements_2_fail.sv": "23.9",
     "18.17.3--case-production-statements_0_fail.sv": "23.9",
     "18.17.6--aborting-productions-break-and-return_2_fail.sv": "18.17",
+}
+
+_RULE_OF_FILE_TAGGED_BY_FEATURE: dict[str, str] = {
     "variable-slice-zero.sv": "11.5.1",
 }
 
+_CLAUSE_OF_FILE = _CLAUSE_OF_MISTAGGED_FILE | _RULE_OF_FILE_TAGGED_BY_FEATURE
+
 
 def tagged_clause(metadata: dict[str, str], name: str) -> str:
-    if name in _CLAUSE_OF_MISTAGGED_FILE:
-        return _CLAUSE_OF_MISTAGGED_FILE[name]
+    if name in _CLAUSE_OF_FILE:
+        return _CLAUSE_OF_FILE[name]
     tags = metadata.get("tags", "").split()
     if tags and re.fullmatch(r"\d+(?:\.\d+)*", tags[0]):
         return tags[0]
