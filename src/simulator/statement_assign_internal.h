@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -151,15 +152,16 @@ AssocArraySpec AssocIndexSpecOfType(const DataType& index_type,
 bool TrySelectBlockingAssign(const Expr* lhs, Logic4Vec& rhs_val,
                              SimContext& ctx, Arena& arena);
 
-// Defined in statement_assign_core.cpp; also used by the nonblocking scheduler
-// in statement_assign_nonblocking.cpp, which needs the answer before it takes
-// an event from the pool rather than after. §11.4.12 gives a concatenation the
-// left-hand side of an assignment and §10.9 gives an assignment pattern, bare
-// or typed, the same use, so the three are one kind of target. Answers whether
-// the left-hand side is one of them, a typed pattern's cast looked through.
+// Defined in statement_assign_concat.cpp; also used by the nonblocking
+// scheduler in statement_assign_nonblocking.cpp, which needs the answer before
+// it takes an event from the pool rather than after. §11.4.12 gives a
+// concatenation the left-hand side of an assignment and §10.9 gives an
+// assignment pattern, bare or typed, the same use, so the three are one kind of
+// target. Answers whether the left-hand side is one of them, a typed pattern's
+// cast looked through.
 bool IsConcatLhs(const Expr* lhs);
 
-// Defined in statement_assign_core.cpp; also used by the §10.6.1 and §10.6.2
+// Defined in statement_assign_concat.cpp; also used by the §10.6.1 and §10.6.2
 // procedural continuous assignments in statement_assign_decl.cpp, whose
 // concatenation targets walk the same elements. §10.9 lets an assignment
 // pattern carry a type prefix -- `type_reference '{...}` -- and that prefix is
@@ -168,7 +170,7 @@ bool IsConcatLhs(const Expr* lhs);
 // the pattern a typed pattern wraps, and the expression itself otherwise.
 const Expr* UnwrapTypedPattern(const Expr* expr);
 
-// Defined in statement_assign_core.cpp; also used by the §11.4.14 streaming
+// Defined in statement_assign_concat.cpp; also used by the §11.4.14 streaming
 // unpack in statement_assign_stream.cpp, which sizes a target element that is a
 // select with it. §11.5.1: how wide the select `sel` on `var` is as an
 // expression -- one bit for an ordinary bit-select, the element width for the
@@ -188,7 +190,7 @@ const Expr* UnwrapTypedPattern(const Expr* expr);
 uint32_t SelectExprWidth(const Variable& var, const Expr* sel, SimContext& ctx,
                          Arena& arena);
 
-// Defined in statement_assign_core.cpp; also used by the §10.6.1 and §10.6.2
+// Defined in statement_assign_concat.cpp; also used by the §10.6.1 and §10.6.2
 // procedural continuous assignments in statement_assign_decl.cpp, which cut a
 // forced or assigned value into the same element windows a blocking assignment
 // cuts it into. §11.4.12/§11.5.1: the width of one concatenation lvalue element
@@ -205,7 +207,7 @@ uint32_t SelectExprWidth(const Variable& var, const Expr* sel, SimContext& ctx,
 // left then took its bits one element too low.
 uint32_t ConcatLhsElemWidth(const Expr* e, SimContext& ctx, Arena& arena);
 
-// Defined in statement_assign_core.cpp; also used by the §10.6.1 and §10.6.2
+// Defined in statement_assign_concat.cpp; also used by the §10.6.1 and §10.6.2
 // procedural continuous assignments in statement_assign_decl.cpp, which have
 // the same element to decline. §11.5.1: whether the concatenation lvalue
 // element `e`, having resolved to `var`, addresses any bit of it -- false for
@@ -216,9 +218,9 @@ uint32_t ConcatLhsElemWidth(const Expr* e, SimContext& ctx, Arena& arena);
 bool ConcatLhsElemHasWritableBits(const Expr* e, const Variable& var,
                                   SimContext& ctx, Arena& arena);
 
-// Defined in statement_assign.cpp, whose bit-select writer raises it before it
-// resolves a window; also used by the §11.4.12 concatenation unpack in
-// statement_assign_core.cpp and by the §10.6.1 and §10.6.2 procedural
+// Defined in statement_assign_select.cpp, whose bit-select writer raises it
+// before it resolves a window; also used by the §11.4.12 concatenation unpack
+// in statement_assign_concat.cpp and by the §10.6.1 and §10.6.2 procedural
 // continuous assignments in statement_assign_decl.cpp, each of which sizes a
 // concatenation element itself and so never reaches that writer with one this
 // concerns. §11.5.1 requires an indexed part-select's width to "be a positive
@@ -232,7 +234,7 @@ bool ConcatLhsElemHasWritableBits(const Expr* e, const Variable& var,
 // still passes the element over without advancing its offset.
 void ReportZeroWidthPartSelect(const Expr* sel, SimContext& ctx, Arena& arena);
 
-// Defined in statement_assign_core.cpp; also used by the subroutine-body
+// Defined in statement_assign_concat.cpp; also used by the subroutine-body
 // statement executor in eval_function_body.cpp. §10.4 puts procedural
 // assignments "within procedures such as always, initial, task, and function",
 // so a concatenation or assignment-pattern target is written the same way in a
@@ -241,7 +243,7 @@ void ReportZeroWidthPartSelect(const Expr* sel, SimContext& ctx, Arena& arena);
 bool TryUnpackConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,
                         SimContext& ctx, Arena& arena);
 
-// Defined in statement_assign_core.cpp; also used by the subroutine-body
+// Defined in statement_assign_concat.cpp; also used by the subroutine-body
 // statement executor in eval_function_body.cpp, the §11.4.1 compound
 // assignment in eval_expr_assign_ops.cpp and the §10.6 procedural continuous
 // assignments in statement_assign_decl.cpp. §10.7: "The size of the left-hand
@@ -255,11 +257,31 @@ bool TryUnpackConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,
 // EvalExpr reads as self-determined.
 uint32_t LhsContextWidth(const Expr* lhs, SimContext& ctx, Arena& arena);
 
-// Defined in statement_assign_core.cpp; also used by the §11.4.2 nonblocking
+// Defined in statement_assign_concat.cpp; also used by the §11.4.2 nonblocking
 // path in statement_assign_nonblocking.cpp. Evaluate the rhs with the lhs as
 // the assignment context (width and, for named patterns, struct type).
 Logic4Vec EvalRhsWithStructContext(const Stmt* stmt, SimContext& ctx,
                                    Arena& arena);
+
+// Defined in statement_assign_core.cpp; also used by the §11.4.12 element
+// widths in statement_assign_concat.cpp. The key the kinds of the variable
+// `lhs` names or selects into stand under (DeclaredKindsKey): "$unit.s" for
+// §3.12.1's `$unit::s`, which asked by the text alone read a module's own
+// `int s` for the string. Empty for a left-hand side that is no identifier
+// under its selects.
+std::string LhsIdentName(const Expr* lhs);
+
+// Defined in statement_assign_slice.cpp; the §7.4.6 assignment of an unpacked
+// array slice `a[1:2] = b[3:4]` or `a[1:2] = packed_value`, the destination
+// window's elements each written from the source's in declared order. False
+// when the left-hand side is no such slice, so the blocking dispatch in
+// statement_assign_core.cpp goes on to its other forms.
+bool TryUnpackedSliceAssign(const Stmt* stmt, SimContext& ctx, Arena& arena);
+
+// Defined in statement_assign_slice.cpp; the §7.4.6 copy of one subarray into
+// another, `a[1] = b[2]` over two-dimensional unpacked arrays, element by
+// element. False when either side is no such compound select.
+bool TrySubarrayAssign(const Stmt* stmt, SimContext& ctx, Arena& arena);
 
 // The whole-object assignment forms, defined in statement_assign_object.cpp
 // and each used by the blocking-assignment dispatch in
@@ -362,11 +384,11 @@ uint32_t PatternKeyIndex(const Expr* key, SimContext& ctx, Arena& arena);
 void CollectQueueElements(const Expr* expr, SimContext& ctx, Arena& arena,
                           std::vector<Logic4Vec>& out);
 
-// Defined in statement_assign.cpp; also used by the §11.4.2 nonblocking path in
-// statement_assign_nonblocking.cpp, whose deferred update deposits the window
-// its own left-hand side named. §11.5.1 has a part-select that is only partly
-// in range "when written, only affect the bits that are in range", and this
-// writes `rhs_val` into exactly the window `bits` names: `bits.lo` and
+// Defined in statement_assign_select.cpp; also used by the §11.4.2 nonblocking
+// path in statement_assign_nonblocking.cpp, whose deferred update deposits the
+// window its own left-hand side named. §11.5.1 has a part-select that is only
+// partly in range "when written, only affect the bits that are in range", and
+// this writes `rhs_val` into exactly the window `bits` names: `bits.lo` and
 // `bits.width` are the bits of `var` that are affected, and `bits.src_lo` is
 // where in the value the bits they receive begin. `bits` is what
 // SelectStorageBits (statement_assign.h) answers, and the two are meant to be
@@ -389,7 +411,7 @@ void CollectQueueElements(const Expr* expr, SimContext& ctx, Arena& arena,
 void WritePartSelect(Variable* var, const PartSelectBits& bits,
                      const Logic4Vec& rhs_val, Arena& arena);
 
-// Defined in statement_assign.cpp; also used by the array-copy form of a
+// Defined in statement_assign_select.cpp; also used by the array-copy form of a
 // pattern assignment in statement_assign_pattern.cpp. Copies element by
 // element over the overlap of the two arrays, leaving any excess destination
 // element untouched.
