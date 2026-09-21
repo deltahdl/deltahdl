@@ -173,6 +173,18 @@ struct CompilationUnit {
 
   TimeScale preproc_timescale;
   bool has_preproc_timescale = false;
+
+  // Whether the unit holds nothing an elaboration could take up: no module or
+  // program to root a design at, no package or class whose items want
+  // validating, and no compilation-unit item (§3.12.1). A source of compiler
+  // directives and comments alone is such a unit, and Elaborator::Elaborate
+  // answers it with no design and no report; a run that asks only whether the
+  // source is clean -- deltahdl's --lint-only -- reads this to tell that answer
+  // from a design that could not be built.
+  bool DeclaresNothing() const {
+    return modules.empty() && programs.empty() && packages.empty() &&
+           cu_items.empty() && classes.empty();
+  }
 };
 
 struct ResolvedTimescale {

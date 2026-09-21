@@ -632,10 +632,7 @@ RtlirDesign* Elaborator::Elaborate(std::string_view top_module_name) {
   // top set. A genuinely empty unit (e.g. empty or comment-only source) yields
   // no design.
   if (top_module_name.empty()) {
-    if (unit_->modules.empty() && unit_->programs.empty() &&
-        unit_->packages.empty() && unit_->cu_items.empty() &&
-        unit_->classes.empty())
-      return nullptr;
+    if (unit_->DeclaresNothing()) return nullptr;
     RunPreElaborationValidations();
     auto tops = CollectAutoTopModules(unit_);
     // §23.3.1: a design shall contain at least one top-level module. If the

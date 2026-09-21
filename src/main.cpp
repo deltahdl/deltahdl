@@ -345,6 +345,24 @@ int RunSynthesis(const delta::CliOptions& opts, delta::CompilationUnit* cu,
   return 0;
 }
 
+// --lint-only, "Parse and elaborate only": the design is elaborated as it is
+// ahead of a simulation, so every rule the elaborator enforces is applied and
+// reported, and nothing is run. The status is 1 on any report, and 1 when no
+// design came back from a source that declares something -- a library search
+// order naming no library, say, which ElaborateDesign reports on its own. A
+// source that declares nothing, which is what a file of compiler directives or
+// of comments alone is, has nothing to elaborate and nothing to report, and
+// passes. Until this the option returned 0 as soon as the source had parsed,
+// so a source only the elaborator could reject was reported clean.
+int RunLint(const delta::CliOptions& opts, delta::CompilationUnit* cu,
+            delta::DiagEngine& diag, delta::Arena& arena) {
+  const auto* design = ElaborateDesign(opts, cu, diag, arena);
+  if (diag.HasErrors()) return 1;
+  if (design == nullptr && !cu->DeclaresNothing()) return 1;
+  std::cout << "lint pass: no errors\n";
+  return 0;
+}
+
 int RunSimulation(const delta::CliOptions& opts, delta::CompilationUnit* cu,
                   delta::DiagEngine& diag, delta::Arena& arena) {
   const auto* design = ElaborateDesign(opts, cu, diag, arena);
@@ -693,12 +711,10 @@ int main(int argc, char* argv[]) {
     DumpAst(cu);
   }
 
-  if (opts.lint_only) {
-    std::cout << "lint pass: no errors\n";
-    return 0;
-  }
-
   delta::Arena elab_arena;
+  if (opts.lint_only) {
+    return RunLint(opts, cu, diag, elab_arena);
+  }
   if (opts.synth_mode) {
     return RunSynthesis(opts, cu, diag, elab_arena);
   }
