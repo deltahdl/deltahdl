@@ -194,6 +194,32 @@ def test_run_test_in_a_parsing_mode_judges_by_the_exit_status_alone(
     assert actual == (True, "", 0)
 
 
+def test_a_file_typed_preprocessing_is_run_to_the_parser_alone(
+    rst: ModuleType, tmp_path: Path, capture_run_cmd: CaptureRunCmd,
+) -> None:
+    sv = tmp_path / "chapter-22" / "expansion.sv"
+    sv.parent.mkdir(parents=True)
+    sv.write_text(
+        "/*\n:name: expansion\n:type: preprocessing\n:tags: 22.5.1\n*/\n"
+        "`define append(f) f``_master\nmodule top();\n"
+        "initial $display(`append(clock));\nendmodule\n"
+    )
+    cmd = capture_run_cmd(rst, lambda: rst.build_result(str(sv)))
+    assert cmd[-2:] == ["--parse-only", str(sv)]
+
+
+def test_a_file_whose_type_names_no_mode_evaluates_as_a_fail(
+    rst: ModuleType, tmp_path: Path,
+) -> None:
+    sv = tmp_path / "chapter-5" / "linting.sv"
+    sv.parent.mkdir(parents=True)
+    sv.write_text("/*\n:name: linting\n:type: linting\n*/\nmodule m; endmodule\n")
+    result, ok = rst.build_result(str(sv))
+    assert (ok, result["status"], result["stderr"]) == (
+        0, "fail", "ValueError: no run mode among ['linting']",
+    )
+
+
 def _write_suite_libraries(
     tmp_path: Path, libs_json: str, checked_out: tuple[str, ...] = (),
 ) -> Path:
@@ -605,33 +631,6 @@ class TestBuildResult:
     ) -> None:
         cmd = _build_result_over_a_simulation_file(rst, tmp_path)[2]
         assert "--lint-only" not in cmd
-
-    def test_a_file_typed_preprocessing_is_run_to_the_parser_alone(
-        self,
-        rst: ModuleType,
-        tmp_path: Path,
-        capture_run_cmd: CaptureRunCmd,
-    ) -> None:
-        sv = tmp_path / "chapter-22" / "expansion.sv"
-        sv.parent.mkdir(parents=True)
-        sv.write_text(
-            "/*\n:name: expansion\n:type: preprocessing\n:tags: 22.5.1\n*/\n"
-            "`define append(f) f``_master\nmodule top();\n"
-            "initial $display(`append(clock));\nendmodule\n"
-        )
-        cmd = capture_run_cmd(rst, lambda: rst.build_result(str(sv)))
-        assert cmd[-2:] == ["--parse-only", str(sv)]
-
-    def test_a_file_whose_type_names_no_mode_evaluates_as_a_fail(
-        self, rst: ModuleType, tmp_path: Path,
-    ) -> None:
-        sv = tmp_path / "chapter-5" / "linting.sv"
-        sv.parent.mkdir(parents=True)
-        sv.write_text("/*\n:name: linting\n:type: linting\n*/\nmodule m; endmodule\n")
-        result, ok = rst.build_result(str(sv))
-        assert (ok, result["status"], result["stderr"]) == (
-            0, "fail", "ValueError: no run mode among ['linting']",
-        )
 
     def test_a_simulated_file_whose_assertions_hold_evaluates_as_a_pass(
         self, rst: ModuleType, tmp_path: Path,
