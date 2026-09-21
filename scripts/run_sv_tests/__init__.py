@@ -233,26 +233,19 @@ def chapter_from_path(path: str) -> str:
 
 def _aggregate_chapters(
     results: list[dict[str, Any]],
-) -> list[tuple[str, str, str]]:
-    chapters: defaultdict[str, dict[str, int]] = defaultdict(
-        lambda: {"total": 0, "failed": 0},
-    )
+) -> list[tuple[str, str]]:
+    failed: defaultdict[str, int] = defaultdict(int)
     for r in results:
-        bucket = chapters[r["chapter"]]
-        bucket["total"] += 1
-        if r["status"] != "pass":
-            bucket["failed"] += 1
-    rows: list[tuple[str, str, str]] = []
-    for name in sorted(chapters, key=_natural_sort_key):
-        c = chapters[name]
-        display = name.removeprefix("chapter-")
-        rows.append((display, str(c["total"]), str(c["failed"])))
+        failed[r["chapter"]] += int(r["status"] != "pass")
+    rows: list[tuple[str, str]] = []
+    for name in sorted(failed, key=_natural_sort_key):
+        rows.append((name.removeprefix("chapter-"), str(failed[name])))
     return rows
 
 
 def print_chapter_breakdown(results: list[dict[str, Any]]) -> None:
     rows = _aggregate_chapters(results)
-    headers = ("Clause", "# of tests", "Failed")
+    headers = ("Clause", "Failed")
     widths = [
         max(len(h), max((len(row[i]) for row in rows), default=0))
         for i, h in enumerate(headers)
@@ -272,11 +265,11 @@ def print_chapter_breakdown(results: list[dict[str, Any]]) -> None:
 
     print("\nPer-chapter breakdown:")
     print(_border("┌", "┬", "┐"))
-    print(_row(headers, ["<"] * 3))
+    print(_row(headers, ["<"] * 2))
     print(_border("├", "┼", "┤"))
     for row in rows:
-        color = GREEN if row[2] == "0" else RED
-        print(_row(row, ["<", ">", ">"], color))
+        color = GREEN if row[1] == "0" else RED
+        print(_row(row, ["<", ">"], color))
     print(_border("└", "┴", "┘"))
 
 
