@@ -504,9 +504,13 @@ static void ConstructBaseThenDefaults(const ClassTypeInfo* info,
   // the one a constructing body's own import supplies. The frame is pushed
   // after the base is constructed, so a base of another scope reads its own.
   // A specialization's value parameters, bound as locals of the frame the
-  // `C#(7)::new` call pushed (BindClassParams), are still read through it:
-  // the mark ends the package search alone, never the search for a local.
+  // `C#(7)::new` call pushed (BindClassParams), are bound again in this
+  // frame (CollectClassParamBindings): the mark ends the search for a local
+  // at this frame too (§23.9), so `int x = W` under `C#(7)::new` reads the
+  // 7 here or nowhere.
+  auto params = CollectClassParamBindings(info, c.ctx);
   c.ctx.PushScope();
+  RebindClassParamBindings(params, c.ctx);
   c.ctx.EnterSubroutineScope(info->package);
   InitClassPropertyDefaults(info, c);
   c.ctx.PopScope();
@@ -527,7 +531,14 @@ static void ConstructBaseThenDefaults(const ClassTypeInfo* info,
 static void ConstructLevel(const ClassTypeInfo* info,
                            ConstructorActuals actuals, Construction& c) {
   const ModuleItem* ctor = ClassConstructor(info);
-  if (ctor) BindLevelFormals(ctor, actuals, c.ctx, c.arena);
+  // §8.25: the constructor body reads the specialization's parameters the
+  // `C#(7)::new` call bound as the property defaults do, so they are bound
+  // again in the frame BindLevelFormals pushes (CollectClassParamBindings).
+  auto params = CollectClassParamBindings(info, c.ctx);
+  if (ctor) {
+    BindLevelFormals(ctor, actuals, c.ctx, c.arena);
+    RebindClassParamBindings(params, c.ctx);
+  }
   c.ctx.PushMethodClass(info);
   ConstructBaseThenDefaults(info, ctor, c);
   if (ctor) {

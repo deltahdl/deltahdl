@@ -6,6 +6,7 @@
 #include <string_view>
 #include <vector>
 
+#include "common/arena.h"
 #include "common/types.h"
 #include "elaborator/const_eval.h"
 #include "parser/ast_class.h"
@@ -159,6 +160,32 @@ void ApplyClassParamOverrides(std::string_view var_name, uint64_t handle,
     std::string scoped =
         std::string(obj->type->name) + "::" + std::string(params[i].first);
     obj->properties[scoped] = val;
+  }
+}
+
+std::vector<ClassParamBinding> CollectClassParamBindings(
+    const ClassTypeInfo* cls, SimContext& ctx) {
+  std::vector<ClassParamBinding> bindings;
+  if (cls == nullptr || cls->decl == nullptr) return bindings;
+  for (const auto& [pname, pexpr] : cls->decl->params) {
+    ClassParamBinding b{pname, ctx.FindLocalVariable(pname),
+                        ctx.FindScopeTypeActual(pname)};
+    if (b.value != nullptr || b.type != nullptr) bindings.push_back(b);
+    std::string qualified =
+        std::string(cls->decl->name) + "." + std::string(pname);
+    if (Variable* qv = ctx.FindLocalVariable(qualified)) {
+      auto* key = ctx.GetArena().Create<std::string>(qualified);
+      bindings.push_back({*key, qv, nullptr});
+    }
+  }
+  return bindings;
+}
+
+void RebindClassParamBindings(const std::vector<ClassParamBinding>& bindings,
+                              SimContext& ctx) {
+  for (const ClassParamBinding& b : bindings) {
+    if (b.value != nullptr) ctx.BindLocalVariable(b.name, b.value);
+    if (b.type != nullptr) ctx.BindScopeTypeActual(b.name, b.type);
   }
 }
 

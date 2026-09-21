@@ -5,6 +5,7 @@
 #include "common/types.h"
 #include "parser/ast_expr.h"
 #include "simulator/class_object.h"
+#include "simulator/eval_class_params.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
@@ -19,7 +20,12 @@ namespace delta {
 void RunStaticMethodInClassScope(ClassMethodTarget target, const Expr* expr,
                                  SimContext& ctx, Arena& arena,
                                  Logic4Vec& out) {
+  // §8.25: the specialization's parameters the caller's frame binds go
+  // with the call (CollectClassParamBindings), `helper()` inside
+  // `C#(5)::outer()` reading the 5.
+  auto params = CollectClassParamBindings(target.param_cls, ctx);
   ctx.PushScope();
+  RebindClassParamBindings(params, ctx);
   ctx.PushMethodClass(target.param_cls);
   ExecClassMethod(target, expr, ctx, arena, out);
   // §13.5.2: copy output/inout arguments back to the caller on return.
