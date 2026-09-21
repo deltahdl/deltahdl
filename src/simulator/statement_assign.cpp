@@ -252,6 +252,9 @@ static void SetClassField(ClassObject* obj, const ClassTypeInfo* declared_type,
 // `first` is not a live handle, the whole remaining path stays with the object
 // in hand and is stored under a flattened key (the legacy nested-handle storage
 // scheme).
+static FieldTarget StaticPropertyTarget(const ClassTypeInfo* cls,
+                                        std::string_view field_name);
+
 static FieldTarget ResolveClassFieldTarget(ClassObject* obj,
                                            const ClassTypeInfo* declared_type,
                                            std::string_view field_path,
@@ -287,6 +290,14 @@ static FieldTarget ResolveClassFieldTarget(ClassObject* obj,
                                      field_path.substr(dot + 1), ctx);
     }
   }
+  // §8.9 (printed page 186): a static property named through a handle,
+  // `m_t_inst.m_tw_cb_q`, is the class's one storage, so the deposit goes
+  // where `C::m_tw_cb_q = v` goes (StaticPropertyTarget), as the read side
+  // already reads it; deposited in the object's own map, the class's copy
+  // stayed null for every read of it.
+  const ClassTypeInfo* scope = declared_type ? declared_type : obj->type;
+  if (scope != nullptr && scope->StaticPropertyDeclarer(field_path) != nullptr)
+    return StaticPropertyTarget(scope, field_path);
   FieldTarget target;
   target.kind = FieldTarget::Kind::kProperty;
   target.obj = obj;

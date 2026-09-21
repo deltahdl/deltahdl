@@ -563,4 +563,65 @@ TEST(StaticClassPropertySim, Uninitialized4StateStaticReadsX) {
       "l=x sl=x sv=xxxx sn=0 hsl=x\n");
 }
 
+// §8.9 (printed page 186) with §8.7: a static property named through a
+// handle, `m_t_inst.m_tw`, is the class's one storage, and a bare `new`
+// assigned to it constructs an object of the property's declared class into
+// that storage: `m_t_inst.m_tw = new` in init(), m_t_inst itself a static
+// handle, is what uvm_typed_callbacks#(T)::m_initialize does with
+// `m_t_inst.m_tw_cb_q = new("typewide_queue")`, and `C::m_tw.k` then reads
+// the constructed Q's 3. The base of the `new` was taken for a variable or
+// a class name alone, so the static handle named neither, the `new` was
+// read as a value, and C::m_tw stayed null, 7.
+TEST(StaticClassPropertySim, NewAssignedToAStaticThroughAStaticHandle) {
+  EXPECT_EQ(RunAndGet("class Q;\n"
+                      "  int k = 3;\n"
+                      "endclass\n"
+                      "class C;\n"
+                      "  static C m_t_inst;\n"
+                      "  static Q m_tw;\n"
+                      "  static function void init();\n"
+                      "    m_t_inst = new;\n"
+                      "    m_t_inst.m_tw = new;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    C::init();\n"
+                      "    result = C::m_tw == null ? 7 : C::m_tw.k;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            3u);
+}
+
+// §8.9 with §8.4: the same target written a handle, `m_t_inst.m_tw = q`,
+// lands in the class's storage, which `C::m_tw` reads as q's k of 5. The
+// write through the static handle landed in the object's own property map,
+// where no read of C::m_tw looked, 7.
+TEST(StaticClassPropertySim, ValueAssignedToAStaticThroughAStaticHandle) {
+  EXPECT_EQ(RunAndGet("class Q;\n"
+                      "  int k = 3;\n"
+                      "endclass\n"
+                      "class C;\n"
+                      "  static C m_t_inst;\n"
+                      "  static Q m_tw;\n"
+                      "  static function void init();\n"
+                      "    Q q = new;\n"
+                      "    q.k = 5;\n"
+                      "    m_t_inst = new;\n"
+                      "    m_t_inst.m_tw = q;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    C::init();\n"
+                      "    result = C::m_tw == null ? 7 : C::m_tw.k;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            5u);
+}
+
 }  // namespace

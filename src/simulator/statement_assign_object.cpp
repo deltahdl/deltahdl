@@ -264,9 +264,10 @@ struct MemberNewBase {
   const ClassObject* obj = nullptr;
 };
 
-static MemberNewBase MemberNewBaseClass(std::string_view base,
-                                        std::string_view field,
-                                        SimContext& ctx) {
+static MemberNewBase MemberNewBaseClass(const Expr* base_expr,
+                                        std::string_view field, SimContext& ctx,
+                                        Arena& arena) {
+  std::string_view base = base_expr->text;
   auto base_type = ctx.GetVariableClassType(base);
   if (!base_type.empty()) {
     const Variable* var = ctx.FindVariable(base);
@@ -275,7 +276,16 @@ static MemberNewBase MemberNewBaseClass(std::string_view base,
     return {ctx.FindClassType(base_type), obj};
   }
   const auto* cls = ctx.FindClassType(base);
-  if (cls == nullptr) return {};
+  if (cls == nullptr) {
+    // §8.9 with §8.4: the base may be a static property holding a handle,
+    // `m_t_inst.m_tw_cb_q = new` in a static method of its class, or any
+    // other name a handle is read from; the object it refers to gives the
+    // class. Taken for a variable or a class name alone, the static handle
+    // named neither and the `new` was read as a value.
+    const ClassObject* obj =
+        ctx.GetClassObject(EvalExpr(base_expr, ctx, arena).ToUint64());
+    return obj != nullptr ? MemberNewBase{obj->type, obj} : MemberNewBase{};
+  }
   // §8.13 (printed pages 189-190): `D::m_inst = new` names the static handle
   // a base of D declares, constructed and stored on that class's one storage
   // (ClassTypeInfo::StaticPropertyDeclarer); asked of D's own
@@ -302,7 +312,7 @@ bool TryMemberClassNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (!stmt->lhs->rhs || stmt->lhs->rhs->kind != ExprKind::kIdentifier)
     return false;
   MemberNewBase base =
-      MemberNewBaseClass(stmt->lhs->lhs->text, stmt->lhs->rhs->text, ctx);
+      MemberNewBaseClass(stmt->lhs->lhs, stmt->lhs->rhs->text, ctx, arena);
   if (base.cls == nullptr) return false;
   // §8.25: a property declared with a type parameter of the class, `T obj`,
   // is a handle of the class the object's specialization binds T to.
