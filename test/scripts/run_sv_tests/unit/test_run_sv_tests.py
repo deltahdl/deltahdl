@@ -23,7 +23,7 @@ def _simulate_over_a_failing_assertion(rst: ModuleType) -> tuple[bool, str, int]
     )
     with patch.object(rst.subprocess, "run", return_value=mock_result):
         outcome: tuple[bool, str, int] = rst.run_test(
-            "/fake/test.sv", simulate=True,
+            "/fake/test.sv", mode="simulation",
         )
     return outcome
 
@@ -88,7 +88,7 @@ def test_timeout_propagates(rst: ModuleType) -> None:
 def test_simulate_pass_with_assertions(rst: ModuleType) -> None:
     mock_result = MagicMock(returncode=0, stdout=":assert: (True)\n", stderr="")
     with patch.object(rst.subprocess, "run", return_value=mock_result):
-        actual = rst.run_test("/fake/test.sv", simulate=True)
+        actual = rst.run_test("/fake/test.sv", mode="simulation")
     assert actual == (True, "", 0)
 
 
@@ -105,7 +105,7 @@ def test_simulate_names_the_failed_assertion(rst: ModuleType) -> None:
 def test_simulate_fail_on_nonzero_exit(rst: ModuleType) -> None:
     mock_result = MagicMock(returncode=1, stdout="", stderr="error\n")
     with patch.object(rst.subprocess, "run", return_value=mock_result):
-        actual = rst.run_test("/fake/test.sv", simulate=True)
+        actual = rst.run_test("/fake/test.sv", mode="simulation")
     assert actual == (False, "error\n", 1)
 
 
@@ -131,6 +131,67 @@ def test_no_library_adds_nothing_before_the_file(
 ) -> None:
     cmd = capture_run_cmd(rst, lambda: rst.run_test("/fake/test.sv"))
     assert cmd[-2:] == ["--lint-only", "/fake/test.sv"]
+
+
+@pytest.mark.parametrize(
+    ("type_line", "mode"),
+    [
+        ("preprocessing", "preprocessing"),
+        ("preprocessing parsing", "parsing"),
+        ("parsing", "parsing"),
+        ("elaboration", "elaboration"),
+        ("parsing elaboration", "elaboration"),
+        ("simulation elaboration parsing", "simulation"),
+        ("simulation_without_run elaboration", "simulation_without_run"),
+    ],
+)
+def test_run_mode_is_the_first_of_the_suites_modes_the_type_lists(
+    rst: ModuleType, type_line: str, mode: str,
+) -> None:
+    assert rst.run_mode({"type": type_line}) == mode
+
+
+def test_run_mode_of_a_file_without_a_type_is_elaboration(rst: ModuleType) -> None:
+    assert rst.run_mode({"tags": "5.10"}) == "elaboration"
+
+
+def test_run_mode_raises_on_a_type_naming_no_mode(rst: ModuleType) -> None:
+    with pytest.raises(ValueError, match="no run mode among"):
+        rst.run_mode({"type": "linting"})
+
+
+@pytest.mark.parametrize(
+    ("mode", "option"),
+    [
+        ("parsing", "--parse-only"),
+        ("preprocessing", "--parse-only"),
+        ("elaboration", "--lint-only"),
+        ("simulation_without_run", "--lint-only"),
+    ],
+)
+def test_run_test_passes_the_option_that_stops_at_its_mode(
+    rst: ModuleType, capture_run_cmd: CaptureRunCmd, mode: str, option: str,
+) -> None:
+    cmd = capture_run_cmd(rst, lambda: rst.run_test("/fake/test.sv", mode=mode))
+    assert cmd[1:] == [option, "/fake/test.sv"]
+
+
+def test_run_test_in_simulation_mode_passes_no_stage_option(
+    rst: ModuleType, capture_run_cmd: CaptureRunCmd,
+) -> None:
+    cmd = capture_run_cmd(
+        rst, lambda: rst.run_test("/fake/test.sv", mode="simulation"),
+    )
+    assert cmd[1:] == ["/fake/test.sv"]
+
+
+def test_run_test_in_a_parsing_mode_judges_by_the_exit_status_alone(
+    rst: ModuleType,
+) -> None:
+    mock_result = MagicMock(returncode=0, stdout=":assert: (1 == 2)\n", stderr="")
+    with patch.object(rst.subprocess, "run", return_value=mock_result):
+        actual = rst.run_test("/fake/test.sv", mode="preprocessing")
+    assert actual == (True, "", 0)
 
 
 def _write_suite_libraries(
@@ -544,6 +605,33 @@ class TestBuildResult:
     ) -> None:
         cmd = _build_result_over_a_simulation_file(rst, tmp_path)[2]
         assert "--lint-only" not in cmd
+
+    def test_a_file_typed_preprocessing_is_run_to_the_parser_alone(
+        self,
+        rst: ModuleType,
+        tmp_path: Path,
+        capture_run_cmd: CaptureRunCmd,
+    ) -> None:
+        sv = tmp_path / "chapter-22" / "expansion.sv"
+        sv.parent.mkdir(parents=True)
+        sv.write_text(
+            "/*\n:name: expansion\n:type: preprocessing\n:tags: 22.5.1\n*/\n"
+            "`define append(f) f``_master\nmodule top();\n"
+            "initial $display(`append(clock));\nendmodule\n"
+        )
+        cmd = capture_run_cmd(rst, lambda: rst.build_result(str(sv)))
+        assert cmd[-2:] == ["--parse-only", str(sv)]
+
+    def test_a_file_whose_type_names_no_mode_evaluates_as_a_fail(
+        self, rst: ModuleType, tmp_path: Path,
+    ) -> None:
+        sv = tmp_path / "chapter-5" / "linting.sv"
+        sv.parent.mkdir(parents=True)
+        sv.write_text("/*\n:name: linting\n:type: linting\n*/\nmodule m; endmodule\n")
+        result, ok = rst.build_result(str(sv))
+        assert (ok, result["status"], result["stderr"]) == (
+            0, "fail", "ValueError: no run mode among ['linting']",
+        )
 
     def test_a_simulated_file_whose_assertions_hold_evaluates_as_a_pass(
         self, rst: ModuleType, tmp_path: Path,

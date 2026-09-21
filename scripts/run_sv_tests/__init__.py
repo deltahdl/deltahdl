@@ -166,13 +166,32 @@ def check_assertions(stdout: str) -> tuple[bool, str]:
     return True, ""
 
 
+_STAGE_OPTION_OF_MODE: dict[str, str | None] = {
+    "simulation": None,
+    "simulation_without_run": "--lint-only",
+    "elaboration": "--lint-only",
+    "parsing": "--parse-only",
+    "preprocessing": "--parse-only",
+}
+_DEFAULT_TYPE = "parsing elaboration"
+
+
+def run_mode(metadata: dict[str, str]) -> str:
+    features = metadata.get("type", _DEFAULT_TYPE).split()
+    for mode in _STAGE_OPTION_OF_MODE:
+        if mode in features:
+            return mode
+    raise ValueError(f"no run mode among {features}")
+
+
 def run_test(
     path: str,
-    simulate: bool = False,
+    mode: str = "elaboration",
     defines: tuple[str, ...] | list[str] = (),
     library: Library = Library((), ()),
 ) -> tuple[bool, str, int]:
-    cmd = [str(BINARY)] if simulate else [str(BINARY), "--lint-only"]
+    option = _STAGE_OPTION_OF_MODE[mode]
+    cmd = [str(BINARY)] if option is None else [str(BINARY), option]
     for d in defines:
         cmd.extend(["-D", d])
     for incdir in library.incdirs:
@@ -186,7 +205,7 @@ def run_test(
         check=False,
         text=True,
     )
-    if not simulate:
+    if mode != "simulation":
         return result.returncode == 0, result.stderr, result.returncode
     if result.returncode != 0:
         return False, result.stderr, result.returncode
@@ -371,7 +390,7 @@ def _run_and_evaluate(
 ) -> tuple[str, str, int, int]:
     ok, stderr, returncode = run_test(
         path,
-        simulate="simulation" in metadata.get("type", "").split(),
+        mode=run_mode(metadata),
         defines=metadata.get("defines", "").split(),
         library=library,
     )
