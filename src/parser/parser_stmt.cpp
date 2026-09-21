@@ -333,6 +333,7 @@ Stmt* Parser::ParseIfStmt() {
   Expect(TokenKind::kKwIf, Subclause("12.4"));
   Expect(TokenKind::kLParen, Subclause("12.4"));
   stmt->condition = ParseExpr();
+  SkipUnparenthesizedAssignInExpr();
   Expect(TokenKind::kRParen, Subclause("12.4"));
   stmt->then_branch = ParseStmt();
   if (Match(TokenKind::kKwElse)) {
@@ -597,9 +598,19 @@ Stmt* Parser::ParseVoidCastCallStmt() {
   return stmt;
 }
 
+void Parser::SkipUnparenthesizedAssignInExpr() {
+  if (!Check(TokenKind::kEq)) return;
+  diag_.Error(
+      CurrentLoc(),
+      "an assignment within an expression must be enclosed in parentheses",
+      Subclause("11.3.6"));
+  while (Match(TokenKind::kEq)) ParseExpr();
+}
+
 Stmt* Parser::ParseAssignmentOrExprStmt() {
   auto* stmt = Check(TokenKind::kKwVoid) ? ParseVoidCastCallStmt()
                                          : ParseAssignmentOrExprNoSemi();
+  SkipUnparenthesizedAssignInExpr();
   Expect(TokenKind::kSemicolon, Subclause("12.3"));
   return stmt;
 }

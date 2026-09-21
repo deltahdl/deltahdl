@@ -79,22 +79,62 @@ TEST(OperatorAndExpressionParsing, ConcatTargetAssignInExpr) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §11.3.6: a blocking assignment used within an expression shall be enclosed in
+// §11.3.6: a blocking assignment used within an expression is enclosed in
 // parentheses. The parenthesized chain `a = (b = (c = 5))` parses (see
 // ChainedAssignInExpr); the same nested assignment without the parentheses is
-// not admitted by the expression grammar, so the embedded `=` is left over and
-// the statement fails to parse. This observes the rejecting side of the
-// parenthesization rule alongside its accepting side.
+// not admitted by the expression grammar, so the second `=` stands where the
+// statement terminator belongs, and that `=` is what the parser reports under
+// §11.3.6 -- the rule broken -- rather than under §12.3 as a missing
+// terminator. This observes the rejecting side of the parenthesization rule
+// alongside its accepting side.
 TEST(OperatorAndExpressionParsing, UnparenthesizedAssignInExprIsRejected) {
   auto r = Parse(
       "module t;\n"
       "  int a, b, c;\n"
       "  initial a = b = c;\n"
       "endmodule\n");
-  // The second '=' is left standing where the statement terminator belongs, so
-  // §12.3 reports it: §11.3.6 has no report of its own for the unparenthesized
-  // form.
-  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got '='", 3, "12.3"));
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "an assignment within an expression must be enclosed in parentheses", 3,
+      "11.3.6"));
+  EXPECT_FALSE(ReportedError(r.diags, "expected ';', got '='", 3, "12.3"));
+}
+
+// The shape of sv-tests' 11.3.6--assign_in_expr_inv.sv: two assignments left
+// unparenthesized in one statement. The first stray `=` is reported once, the
+// rest of the chain is read with it, and the terminator is met where the
+// author's statement ends, so nothing after the statement is reported.
+TEST(OperatorAndExpressionParsing, ChainOfUnparenthesizedAssignsReportedOnce) {
+  auto r = Parse(
+      "module t;\n"
+      "  int a, b, c;\n"
+      "  initial begin\n"
+      "    a = b = c = 5;\n"
+      "    a = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "an assignment within an expression must be enclosed in parentheses", 4,
+      "11.3.6"));
+  EXPECT_EQ(r.diags.size(), 1u);
+}
+
+// §11.3.6 names the mistake the parentheses exist to prevent: `a = b` written
+// for `a == b` in a condition. The parenthesized `if ((a = 0))` parses (see
+// AssignInExprAsIfCondition); the bare form leaves `=` where the condition's
+// closing parenthesis belongs and is reported under §11.3.6 at the `=`.
+TEST(OperatorAndExpressionParsing, UnparenthesizedAssignAsIfConditionRejected) {
+  auto r = Parse(
+      "module t;\n"
+      "  int a, b;\n"
+      "  initial if (a = b) ;\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "an assignment within an expression must be enclosed in parentheses", 3,
+      "11.3.6"));
+  EXPECT_FALSE(ReportedError(r.diags, "expected ')', got '='", 3, "12.4"));
 }
 
 // §11.3.6: a blocking assignment within an expression is permitted only when it

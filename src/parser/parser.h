@@ -576,6 +576,12 @@ class Parser {
   Stmt* ParseVoidCastCallStmt();
   Stmt* ParseAssignmentOrExprStmt();
   Stmt* ParseAssignmentOrExprNoSemi();
+  // §11.3.6: an assignment within an expression is enclosed in parentheses.
+  // Called once an expression has been read and the construct's closing token
+  // is due: a `=` standing there is the assignment its parentheses were left
+  // off, reported at the `=` and read through with every `= expr` chained
+  // after it, so the closing token is met where the author's construct ends.
+  void SkipUnparenthesizedAssignInExpr();
   Stmt* ParseCycleDelayStmt();
   Stmt* ParseDelayStmt();
   Stmt* ParseEventControlStmt();
