@@ -528,7 +528,15 @@ static bool TryEvalParameterizedScopeCall(const Expr* expr, SimContext& ctx,
     ctx.PopScope();
     return true;
   }
+  // §8.10 with §8.25.1: the static method of a specialization runs in the
+  // class's scope as the unparameterized form above runs it, so a bare call
+  // or static property inside it resolves to the class's own, or to one a
+  // base declares (§8.13) -- the `get()` and `m_get_q(q, obj)` of
+  // uvm_callbacks#(T,CB)::get_first. Run under the caller's class, the two
+  // resolved nowhere and get_first's q stayed null.
+  if (info.method->is_static_method) ctx.PushMethodClass(info.cls);
   ExecClassMethod({info.method, info.cls}, expr, ctx, arena, out);
+  if (info.method->is_static_method) ctx.PopMethodClass();
   // §13.5.2: copy output/inout arguments back to the caller on return (the
   // parameterized class-scope path, e.g. `Cls#(N)::task(out_arg)`).
   WritebackOutputArgs(info.method, expr, ctx, arena);

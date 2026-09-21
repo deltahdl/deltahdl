@@ -39,7 +39,7 @@ bool TryEvalEnclosingStaticCall(const Expr* expr, SimContext& ctx, Arena& arena,
                                 Logic4Vec& out) {
   const ClassTypeInfo* cls = ctx.CurrentMethodClass();
   if (!cls) return false;
-  const std::string name(expr->callee);
+  std::string name(expr->callee);
   for (const ClassTypeInfo* t = cls; t != nullptr; t = t->parent) {
     auto it = t->methods.find(name);
     if (it == t->methods.end()) continue;

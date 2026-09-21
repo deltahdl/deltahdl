@@ -397,4 +397,71 @@ TEST(ParameterizedScopeResolutionSim,
             8u * 10000u + 16u * 100u + 32u);
 }
 
+// §8.25.1 with §8.10 (printed pages 186-187): a static method called
+// through a specialization's scope, `C#(5)::outer()`, runs in the class's
+// scope, so a bare `helper()` inside it is the class's own static method,
+// as it is under `C::outer()`. outer reads helper() + N, twice N plus N, 15
+// under #(5). The specialization call bound N and pushed no class, so the
+// bare call was looked up in the caller's class, ran nothing and read 0,
+// and outer answered 5.
+TEST(ParameterizedScopeResolutionSim,
+     BareStaticCallInsideAStaticMethodOfASpecialization) {
+  EXPECT_EQ(RunAndGet("class C #(int N = 1);\n"
+                      "  static function int helper();\n"
+                      "    return N * 2;\n"
+                      "  endfunction\n"
+                      "  static function int outer();\n"
+                      "    return helper() + N;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    result = C#(5)::outer();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            15u);
+}
+
+// §8.25.1 with §8.13: and the bare call may name a static method the base
+// declares, uvm_typed_callbacks#(T)'s m_get_q called from
+// uvm_callbacks#(T,CB)::get_first, which uvm_callback_iter#(T,CB)::first
+// reaches as `uvm_callbacks#(T,CB)::get_first(m_i, m_obj)`: the ref formal
+// writes get_first's q, whose size reads 3. Under the caller's class the
+// call ran nothing, q stayed null and its size call was reported.
+TEST(ParameterizedScopeResolutionSim,
+     BareInheritedStaticCallInsideAStaticMethodOfASpecialization) {
+  EXPECT_EQ(RunAndGet("class Q;\n"
+                      "  int n = 3;\n"
+                      "  function int size(); return n; endfunction\n"
+                      "endclass\n"
+                      "class C #(type T = int);\n"
+                      "  static function void m_get_q(ref Q q, input T obj);\n"
+                      "    q = new;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "class D #(type T = int) extends C#(T);\n"
+                      "  static function int get_first(input T obj);\n"
+                      "    Q q;\n"
+                      "    m_get_q(q, obj);\n"
+                      "    return q == null ? 7 : q.size();\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "class Iter #(type T = int);\n"
+                      "  function int first();\n"
+                      "    return D#(T)::get_first(0);\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    Iter#(int) it = new;\n"
+                      "    result = it.first();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            3u);
+}
+
 }  // namespace
