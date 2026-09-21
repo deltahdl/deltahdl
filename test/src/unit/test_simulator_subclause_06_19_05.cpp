@@ -347,4 +347,68 @@ TEST(EnumMethodReceivers, PropertyAfterADelayInATask) {
             "t=0 e=green\nt=5 e=blue\nt=10 e=yellow\n");
 }
 
+// §6.19.5.7 (printed page 124) writes its own example with `c.first`,
+// `c.name`, `c.last` and `c.next` and no argument list, the form A.8.6's
+// method_call_body admits for a method taking no arguments: each of the six
+// methods on a module-scope variable, spelled without parentheses.
+TEST(EnumMethodWithoutArgumentList, EveryMethodOnAVariable) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  typedef enum {red, green, blue, yellow} Colors;\n"
+                 "  Colors c;\n"
+                 "  initial begin\n"
+                 "    c = blue;\n"
+                 "    $display(\"name=%s next=%s prev=%s first=%s last=%s "
+                 "num=%0d val=%0d\",\n"
+                 "             c.name, c.next, c.prev, c.first, c.last, c.num,"
+                 " c);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "name=blue next=3 prev=1 first=0 last=3 num=4 val=2\n");
+}
+
+// §6.19.5.7's loop as the subclause writes it, over a variable initialized
+// with `c.first`, visiting every member once and stopping at `c.last`.
+TEST(EnumMethodWithoutArgumentList, TheSubclausesOwnLoop) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  typedef enum {red, green, blue, yellow} Colors;\n"
+                       "  Colors c = c.first;\n"
+                       "  initial begin\n"
+                       "    forever begin\n"
+                       "      $display(\"%s : %0d\", c.name, c);\n"
+                       "      if (c == c.last) break;\n"
+                       "      c = c.next;\n"
+                       "    end\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "red : 0\ngreen : 1\nblue : 2\nyellow : 3\n");
+}
+
+// The argument-list-free form on a property through a handle, `h.e.name`, on
+// a bare property inside a method, and chained, `c.next.name` and
+// `h.e.next.next.name`, since §6.19.5.3 gives next() the enumeration's type.
+TEST(EnumMethodWithoutArgumentList, OnAPropertyAndChained) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  typedef enum {red, green, blue, yellow} Colors;\n"
+                 "  class C;\n"
+                 "    Colors e = green;\n"
+                 "    function string nn(); return e.next.name; endfunction\n"
+                 "  endclass\n"
+                 "  C h; Colors c = yellow;\n"
+                 "  initial begin\n"
+                 "    h = new;\n"
+                 "    $display(\"p=%s pn=%s cn=%s hnn=%s\", h.e.name, h.nn(),\n"
+                 "             c.next.name, h.e.next.next.name);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "p=green pn=blue cn=red hnn=yellow\n");
+}
+
 }  // namespace

@@ -252,10 +252,17 @@ void RecordVariableEnumType(std::string_view var_name, const DataType& type,
 const EnumTypeInfo* EnumTypeOfExpr(const Expr* e, SimContext& ctx,
                                    Arena& arena);
 
+// §6.19.5: the call `expr`, `c.next(2)` or `h.e.name()`, when its receiver
+// is of an enumeration type and its method one of the six; false for any
+// other call, the receiver left unevaluated.
 bool TryEvalEnumMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
                            Logic4Vec& out);
-bool TryEvalEnumProperty(std::string_view var_name, std::string_view method,
-                         SimContext& ctx, Arena& arena, Logic4Vec& out);
+// §6.19.5.7 with A.8.6: the member select `expr`, `c.name` or `c.next`, that
+// is one of the six methods written without an argument list, as the
+// subclause's own example writes them, on a receiver of an enumeration type;
+// `c.next` takes the default step. False for any other member select.
+bool TryEvalEnumMethodWithoutArgs(const Expr* expr, SimContext& ctx,
+                                  Arena& arena, Logic4Vec& out);
 
 bool TryEvalArrayMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
                             Logic4Vec& out);

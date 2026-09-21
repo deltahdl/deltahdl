@@ -402,6 +402,12 @@ static const EnumTypeInfo* EnumTypeOfMemberAccess(const Expr* e,
     return nullptr;
   }
   if (!e->is_scope_resolution) {
+    // §6.19.5.7: `c.next` with no argument list is the call, and one of the
+    // enumeration's own type (§6.19.5.3), so `c.next.name` chains as
+    // `c.next().name()` does.
+    if (ReturnsTheEnumType(e->rhs->text)) {
+      if (const auto* info = EnumTypeOfExpr(e->lhs, ctx, arena)) return info;
+    }
     return EnumTypeOfClassMember(ClassBehindHandle(e->lhs, ctx, arena),
                                  e->rhs->text, ctx);
   }
@@ -451,56 +457,38 @@ static uint64_t CurrentValueOfBase(const Expr* base, SimContext& ctx,
 
 // The six method names of §6.19.5.1 through §6.19.5.6, asked before the
 // receiver is resolved, since resolving a receiver that is a handle path
-// reads the handle, which every other method call has no reason to do here.
+// reads the handle, which every other member select or method call has no
+// reason to do here.
 static bool IsEnumMethodName(std::string_view method) {
   return ReturnsTheEnumType(method) || method == "num" || method == "name";
 }
 
-bool TryEvalEnumMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
-                           Logic4Vec& out) {
-  if (!expr->lhs || expr->lhs->kind != ExprKind::kMemberAccess) return false;
-  const auto* access = expr->lhs;
-  if (!access->rhs || access->rhs->kind != ExprKind::kIdentifier) return false;
+// The method the member select `access` names, on the enumeration its
+// receiver carries, with the arguments of `call_expr` -- the call's, or none
+// where the select stands alone (§6.19.5.7).
+static bool TryEvalEnumMethod(const Expr* access, const Expr* call_expr,
+                              SimContext& ctx, Arena& arena, Logic4Vec& out) {
+  if (access == nullptr || access->kind != ExprKind::kMemberAccess ||
+      access->is_scope_resolution || access->lhs == nullptr ||
+      access->rhs == nullptr || access->rhs->kind != ExprKind::kIdentifier) {
+    return false;
+  }
   if (!IsEnumMethodName(access->rhs->text)) return false;
-
   const auto* info = EnumTypeOfExpr(access->lhs, ctx, arena);
   if (!info) return false;
-
   uint64_t current = CurrentValueOfBase(access->lhs, ctx, arena);
-
-  EnumMethodArgs args{*info, current, expr, ctx, arena};
+  EnumMethodArgs args{*info, current, call_expr, ctx, arena};
   return DispatchEnumMethod(access->rhs->text, args, out);
 }
 
-bool TryEvalEnumProperty(std::string_view var_name, std::string_view method,
-                         SimContext& ctx, Arena& arena, Logic4Vec& out) {
-  const auto* info = ctx.GetVariableEnumType(var_name);
-  if (!info) return false;
+bool TryEvalEnumMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
+                           Logic4Vec& out) {
+  return TryEvalEnumMethod(expr->lhs, expr, ctx, arena, out);
+}
 
-  auto* var = ctx.FindVariable(var_name);
-  uint64_t current = var ? var->value.ToUint64() : 0;
-
-  if (method == "first") {
-    out = EnumFirst(*info, arena);
-    return true;
-  }
-  if (method == "last") {
-    out = EnumLast(*info, arena);
-    return true;
-  }
-  if (method == "next") {
-    out = EnumNext(*info, current, 1, arena);
-    return true;
-  }
-  if (method == "prev") {
-    out = EnumPrev(*info, current, 1, arena);
-    return true;
-  }
-  if (method == "num") {
-    out = EnumNum(*info, arena);
-    return true;
-  }
-  return false;
+bool TryEvalEnumMethodWithoutArgs(const Expr* expr, SimContext& ctx,
+                                  Arena& arena, Logic4Vec& out) {
+  return TryEvalEnumMethod(expr, expr, ctx, arena, out);
 }
 
 }  // namespace delta

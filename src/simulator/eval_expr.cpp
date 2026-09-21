@@ -538,7 +538,6 @@ static Logic4Vec ResolveMemberByType(std::string_view base_name,
   if (TryClassEnumAccess(base_var, field_name, ctx, arena, out)) return out;
   if (TryClassPropertyAccess(ma, out)) return out;
   if (TryCollectionAccess(base_name, field_name, ctx, arena, out)) return out;
-  if (TryEvalEnumProperty(base_name, field_name, ctx, arena, out)) return out;
   if (TryStaticMemberAccess(base_name, field_name, ctx, arena, out)) return out;
   if (TryClockvarMemberAccess(base_name, field_name, ctx, arena, out))
     return out;
@@ -675,6 +674,11 @@ Logic4Vec EvalMemberAccess(const Expr* expr, SimContext& ctx, Arena& arena) {
     return MakeLogic4VecVal(arena, 1, 0);
 
   if (TryParameterizedScopeParam(expr, ctx, arena, out)) return out;
+  // §6.19.5.7: `c.name` or `c.next` with no argument list is the enumeration
+  // method's call, on any receiver of an enumeration type; asked here, ahead
+  // of the member reads, since the receiver being of that type leaves no
+  // member of the name for them to read.
+  if (TryEvalEnumMethodWithoutArgs(expr, ctx, arena, out)) return out;
 
   if (TryVirtualInterfaceMember(expr, ctx, arena, out)) return out;
 

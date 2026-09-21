@@ -751,6 +751,13 @@ void Lowerer::LowerVar(std::string_view name, const RtlirVariable& var) {
   // know which variables are chandles.
   if (var.is_chandle) ctx_.RegisterChandleVariable(name);
   RegisterStructInfo(name, var, ctx_, arena_);
+  // §6.19.5.7 with §6.21: the enumeration a variable is declared with is a
+  // fact of the declaration, and its initializer may call a method of it on
+  // the variable itself, `Colors c = c.first;` as the subclause's own example
+  // does, so the record stands before the initializer is evaluated.
+  if (!var.enum_type_name.empty() && var.dtype) {
+    RegisterEnumForCast(name, var);
+  }
   if (var.init_expr) {
     LowerVarInit(name, var, v, width);
   }
@@ -758,10 +765,6 @@ void Lowerer::LowerVar(std::string_view name, const RtlirVariable& var) {
   if (!var.class_type_name.empty())
     ctx_.SetVariableClassType(name, var.class_type_name);
   CreateSyncObjectForVar(name, var, v, ctx_, arena_);
-
-  if (!var.enum_type_name.empty() && var.dtype) {
-    RegisterEnumForCast(name, var);
-  }
   LowerVarAggregate(name, var);
 }
 
