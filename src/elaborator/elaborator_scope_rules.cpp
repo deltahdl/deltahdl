@@ -494,12 +494,16 @@ std::vector<ModuleItem*> SubroutineBodyImports(const ModuleItem* item) {
 // with (SubroutineBodyImports) is honoured for the body's reads alone: `K` in
 // `function int calc(); import p::*; return K * five(); endfunction` is p's
 // parameter, which the module the function stands in never imported.
+//
+// Written over an item list rather than over a module because a subroutine the
+// compilation unit or a package holds is in no module's list (see
+// ReportUnresolvedInUnitScopeSubroutines below); a module passes its own.
 template <typename Pred>
-void ReportSubroutineUnresolved(const ModuleDecl* decl, Pred declared,
-                                const CompilationUnit* unit,
+void ReportSubroutineUnresolved(const std::vector<ModuleItem*>& items,
+                                Pred declared, const CompilationUnit* unit,
                                 ProvidedNameCache& provided_cache,
                                 DiagEngine& diag) {
-  for (const auto* item : decl->items) {
+  for (const auto* item : items) {
     if (item->kind != ModuleItemKind::kTaskDecl &&
         item->kind != ModuleItemKind::kFunctionDecl) {
       continue;
@@ -722,7 +726,8 @@ void Elaborator::ValidateUnresolvedReferences(const ModuleDecl* decl,
   ReportContAssignUnresolved(decl, declared, diag_);
   ReportProcUnresolved(decl, declared, diag_);
   ReportDeclInitUnresolved(decl, declared, diag_);
-  ReportSubroutineUnresolved(decl, declared, unit_, pkg_provided_names_, diag_);
+  ReportSubroutineUnresolved(decl->items, declared, unit_, pkg_provided_names_,
+                             diag_);
 
   // §26.3: a `pkg::x` scope prefix must name a known package (or a class/type
   // for static-member / type-scope access). cu_scope_names_ holds packages,
@@ -764,6 +769,52 @@ void Elaborator::ValidateUnresolvedReferences(const ModuleDecl* decl,
                                       wildcard_packages, n);
       },
       provided, diag_);
+}
+
+// §23.9 over the subroutines no module holds. Every walk above runs from
+// Elaborator::ValidateUnresolvedReferences, once per elaborated module and over
+// that module's items, and §3.12.1 puts a subroutine outside every design
+// element in the compilation-unit scope while Clause 26 puts one in a package;
+// neither is in any module's list, so a read in either body was never
+// resolved, and `function int f(); return undeclared; endfunction` at the top
+// of a file elaborated clean. This is the walk over those two scopes, run
+// from Elaborator::ValidatePerDeclarationRulesInUnitScopes beside the other
+// per-declaration rules that scope keeps.
+//
+// What a compilation-unit body can reach is what RegisterCuScopeItems recorded
+// of the unit's items, held in `names`: the item names, the constants (§6.19's
+// enumeration members and §6.20.4's local parameters -- and,
+// RegisterPackageParams filling the same map, every package's constants by bare
+// name, which is an over-approximation in the safe direction, a name accepted
+// rather than a name reported), the typedefs and the classes; and the names the
+// unit's own import declarations provide (§26.3, ImportsProvideName over the
+// unit's items). A package body reaches its own items and its own imports on
+// top of those. The body's formals, locals and body-level imports are the
+// walk's own business, as they are for a module's subroutine.
+void ReportUnresolvedInUnitScopeSubroutines(const CompilationUnit* unit,
+                                            const UnitScopeNames& names,
+                                            ProvidedNameCache& provided_cache,
+                                            DiagEngine& diag) {
+  auto unit_declares = [&](std::string_view n) {
+    return names.item_names.count(n) != 0 || names.constants.count(n) != 0 ||
+           names.typedefs.count(n) != 0 || names.class_names.count(n) != 0 ||
+           ImportsProvideName(unit, provided_cache, unit->cu_items, n);
+  };
+  ReportSubroutineUnresolved(unit->cu_items, unit_declares, unit,
+                             provided_cache, diag);
+  for (const auto* pkg : unit->packages) {
+    if (pkg == nullptr) continue;
+    std::unordered_set<std::string_view> pkg_names;
+    for (const auto* item : pkg->items) {
+      if (item != nullptr && !item->name.empty()) pkg_names.insert(item->name);
+    }
+    auto pkg_declares = [&](std::string_view n) {
+      return pkg_names.count(n) != 0 || unit_declares(n) ||
+             ImportsProvideName(unit, provided_cache, pkg->items, n);
+    };
+    ReportSubroutineUnresolved(pkg->items, pkg_declares, unit, provided_cache,
+                               diag);
+  }
 }
 
 }  // namespace delta

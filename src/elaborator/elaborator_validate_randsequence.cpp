@@ -17,6 +17,7 @@
 
 #include "common/diagnostic.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_scope_rules_names.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
@@ -171,6 +172,12 @@ void Elaborator::ValidatePerDeclarationRulesInUnitScopes() {
   for (const auto* pkg : unit_->packages) {
     if (pkg != nullptr) run_over(pkg->items);
   }
+  // §23.9 for the same two scopes: their subroutines are in no module's item
+  // list, so Elaborator::ValidateUnresolvedReferences never reads them.
+  ReportUnresolvedInUnitScopeSubroutines(
+      unit_,
+      UnitScopeNames{cu_scope_names_, cu_param_scope_, typedefs_, class_names_},
+      pkg_provided_names_, diag_);
   for (const auto* cls : unit_->classes) {
     std::vector<ModuleItem*> methods;
     ForEachClassBodyItem(cls, [&](const ModuleItem* m) {

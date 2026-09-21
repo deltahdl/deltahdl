@@ -8,7 +8,10 @@
 #include <unordered_set>
 #include <vector>
 
+#include "common/diagnostic.h"
+#include "elaborator/const_eval.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/type_eval.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -121,5 +124,25 @@ void CollectProcRhsIdents(const Stmt* s,
 // formal arguments, a function's own name, and what the body declares.
 void CollectSubroutineLocalNames(const ModuleItem* item,
                                  std::unordered_set<std::string_view>& names);
+
+// The name sets of the compilation-unit scope (§3.12.1) a read resolves
+// against where no module's own names apply, as
+// Elaborator::RegisterCuScopeItems fills them: the unit's item names
+// (cu_scope_names_), its constants (cu_param_scope_), its typedefs (typedefs_)
+// and its classes (class_names_).
+struct UnitScopeNames {
+  const std::unordered_set<std::string_view>& item_names;
+  const ScopeMap& constants;
+  const TypedefMap& typedefs;
+  const std::unordered_set<std::string_view>& class_names;
+};
+
+// §23.9 over the subroutines the compilation unit and each package declare,
+// which no module's walk reaches; reports every bare read that none of `names`,
+// the scope's own declarations and imports, or the body's own names answers.
+void ReportUnresolvedInUnitScopeSubroutines(const CompilationUnit* unit,
+                                            const UnitScopeNames& names,
+                                            ProvidedNameCache& provided_cache,
+                                            DiagEngine& diag);
 
 }  // namespace delta
