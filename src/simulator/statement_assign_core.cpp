@@ -318,11 +318,12 @@ Logic4Vec ConvertRealForKnownLhs(Logic4Vec rhs_val, bool lhs_is_real,
 }
 
 Logic4Vec ConvertRealOnAssign(Logic4Vec rhs_val, const Expr* lhs,
-                              uint32_t target_width, SimContext& ctx,
+                              const Variable& var, SimContext& ctx,
                               Arena& arena) {
+  uint32_t target_width = var.value.width;
   auto name = LhsIdentName(lhs);
   if (name.empty()) return ResizeToWidth(rhs_val, target_width, arena);
-  bool lhs_is_real = ctx.IsRealVariable(name);
+  bool lhs_is_real = var.is_real || ctx.IsRealVariable(name);
   return ConvertRealForKnownLhs(rhs_val, lhs_is_real, target_width, arena);
 }
 
@@ -355,8 +356,7 @@ void AssignToScalarLhs(const Stmt* stmt, Logic4Vec rhs_val, SimContext& ctx,
       var->NotifyWatchers();
       return;
     }
-    rhs_val =
-        ConvertRealOnAssign(rhs_val, stmt->lhs, var->value.width, ctx, arena);
+    rhs_val = ConvertRealOnAssign(rhs_val, stmt->lhs, *var, ctx, arena);
     var->value = rhs_val;
     if (!var->is_4state) CoerceTo2State(var->value);
     var->NotifyWatchers();
@@ -518,8 +518,7 @@ void PerformBlockingAssign(const Expr* lhs, const Logic4Vec& rhs_val,
   auto* var = ResolveLhsVariable(lhs, ctx);
   if (var) {
     if (var->is_forced) return;
-    auto converted =
-        ConvertRealOnAssign(owned, lhs, var->value.width, ctx, arena);
+    auto converted = ConvertRealOnAssign(owned, lhs, *var, ctx, arena);
     var->value = converted;
     if (!var->is_4state) CoerceTo2State(var->value);
     var->NotifyWatchers();

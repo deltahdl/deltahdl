@@ -358,8 +358,7 @@ bool AssignmentWouldChangeActual(const Expr* lhs, const Logic4Vec& next,
                       ? ResolveLhsVariable(lhs, ctx)
                       : nullptr;
   if (var == nullptr) return true;
-  Logic4Vec stored =
-      ConvertRealOnAssign(next, lhs, var->value.width, ctx, arena);
+  Logic4Vec stored = ConvertRealOnAssign(next, lhs, *var, ctx, arena);
   if (!var->is_4state) CoerceTo2State(stored);
   return !var->value.SameValueAs(stored);
 }

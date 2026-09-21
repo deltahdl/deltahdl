@@ -84,6 +84,68 @@ TEST(RealDataType, RealKeepsDoublePrecision) {
   EXPECT_EQ(v, 0u);
 }
 
+// §6.12 (printed page 110): real is a C double, and §13.5.1 (printed 348)
+// passes an argument by copying it into the subroutine's area, §13.5.2 by a
+// reference to the original, so a `real` input formal carries the actual's
+// value inside the body and a `ref real` one is the caller's variable. The
+// actuals are the issue's: f(2.25, 3.25) through a `real l` local reads 5.5,
+// and add1 on `real rr = 5.5` leaves 6.5. Both read 0.0 while the formal and
+// the local were known to be real by the value alone and the store into `l`
+// or `x` converted the sum as into an integer, whose bits the caller then read
+// as a double. The module's `int a` shares the first formal's name: it is
+// written after the call, and reads 3 only while the formal's kind stayed on
+// the formal rather than on every variable of the name.
+TEST(RealDataType, RealFormalsOfAnAutomaticSubroutineCarryTheActual) {
+  SimFixture f;
+  std::string printed = RunCapture(
+      "module t;\n"
+      "  int a = 7;\n"
+      "  real rr = 5.5;\n"
+      "  function automatic real f(real a, real b);\n"
+      "    real l;\n"
+      "    l = a + b;\n"
+      "    return l;\n"
+      "  endfunction\n"
+      "  task automatic add1(ref real x);\n"
+      "    x = x + 1.0;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    add1(rr);\n"
+      "    $display(\"f=%f ref=%f\", f(2.25, 3.25), rr);\n"
+      "    a = 3;\n"
+      "    $display(\"a=%0d\", a);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(printed, "f=5.500000 ref=6.500000\na=3\n");
+}
+
+// §13.5.1 (printed page 348): an input formal is the subroutine's own copy,
+// so `v = v * 2.0` inside dbl leaves the caller's r at 1.25 while the call
+// returns 2.5; and §13.4.1 with §6.12.1 (printed 110): the implicit variable
+// a `real` function returns through has the function's type, so `return i`
+// of an int local converts the integer into a real -- 3.0 for the 3 that
+// `i = a` rounded 2.5 to -- rather than handing out its bits.
+TEST(RealDataType, RealFormalIsACopyAndARealReturnConvertsAnInteger) {
+  SimFixture f;
+  std::string printed = RunCapture(
+      "module t;\n"
+      "  real r = 1.25;\n"
+      "  function automatic real h(real a);\n"
+      "    int i;\n"
+      "    i = a;\n"
+      "    return i;\n"
+      "  endfunction\n"
+      "  function automatic real dbl(real v);\n"
+      "    v = v * 2.0;\n"
+      "    return v;\n"
+      "  endfunction\n"
+      "  initial $display(\"h=%f dbl=%f r=%f\", h(2.5), dbl(r), r);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(printed, "h=3.000000 dbl=2.500000 r=1.250000\n");
+}
+
 TEST(RealDataType, RealVarStorage) {
   RealFixture f;
   f.CreateRealVar("x", 1.5);

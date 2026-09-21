@@ -258,6 +258,7 @@ void Lowerer::LowerParams(const RtlirModule* mod) {
       std::memcpy(&bits, &p.resolved_real, sizeof(bits));
       rvar->value = MakeLogic4VecVal(arena_, 64, bits);
       rvar->value.is_real = true;
+      rvar->is_real = true;
       ctx_.RegisterRealVariable(*full);
       continue;
     }

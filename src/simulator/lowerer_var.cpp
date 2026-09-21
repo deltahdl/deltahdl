@@ -742,6 +742,9 @@ void Lowerer::LowerVar(std::string_view name, const RtlirVariable& var) {
   if (var.is_event) v->is_event = true;
   if (var.is_signed) v->is_signed = true;
   if (var.is_string) ctx_.RegisterStringVariable(name);
+  // §6.12: the mark the store and read paths take from the variable itself,
+  // beside the name the readers that hold no Variable ask for.
+  v->is_real = var.is_real;
   if (var.is_real) ctx_.RegisterRealVariable(name);
   // §21.7.5 (Table 21-11): remember the declared type keyword so this
   // variable's $var declaration masquerades as the matching 1364-2005 var_type

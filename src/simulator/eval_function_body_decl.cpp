@@ -128,6 +128,16 @@ static void FillLocalDefault(Variable* v, bool has_initializer,
   v->value.is_signed = v->is_signed;
 }
 
+// §10.7 sizes a declaration's initializer into the declared width; §6.12.1
+// has one assigned to a real local convert numerically instead, `real l = 2`
+// holding 2.0 and a real into a shortreal its single-precision value, where a
+// resize would have kept the integer's bits or cut the double's in half.
+static Logic4Vec SizeLocalInitializer(const Logic4Vec& val, const Variable& v,
+                                      uint32_t declared, Arena& arena) {
+  if (v.is_real) return ConvertRealForKnownLhs(val, true, declared, arena);
+  return ResizeToWidth(val, declared, arena);
+}
+
 static Variable* CreateFuncLocalVar(std::string_view name, const DataType& type,
                                     const Expr* init, SimContext& ctx,
                                     Arena& arena) {
@@ -179,6 +189,14 @@ static Variable* CreateFuncLocalVar(std::string_view name, const DataType& type,
   v->is_4state = DeclaredTypeIs4State(type);
   v->is_virtual_interface = is_virtual_interface;
   if (is_string) v->is_string = true;
+  // §6.12: a local declared real, shortreal or realtime, by the keyword or by
+  // a typedef name standing for one, is a real variable the body stores into
+  // under §6.12.1's conversion and reads as a real, as a formal declared so
+  // is (BindValueArg). A declaration outside a subroutine registers its name
+  // for the same (CreateDeclVariable); the mark on the variable is what the
+  // body's stores read, so `real l; l = a + b;` keeps the real sum rather
+  // than rounding it into an integer whose bits the caller read as 0.0.
+  v->is_real = !holds_a_handle && DeclaredTypeIsReal(type, ctx);
   FillLocalDefault(v, init != nullptr, holds_a_handle, arena);
   if (is_class) ctx.SetVariableClassType(name, class_key);
   RecordVariableEnumType(name, type, ctx);
@@ -232,10 +250,10 @@ static Variable* CreateFuncLocalVar(std::string_view name, const DataType& type,
   //
   // §11.9: a `tagged M '{...}` initializer is placed by the member's layout
   // (EvalLocalInitializer) before the resize into the union's frame.
-  v->value =
-      OwnRhsWords(ResizeToWidth(EvalLocalInitializer(type, init, ctx, arena),
-                                declared, arena),
-                  arena);
+  v->value = OwnRhsWords(
+      SizeLocalInitializer(EvalLocalInitializer(type, init, ctx, arena), *v,
+                           declared, arena),
+      arena);
   // §6.11.2: "when a 4-state value is automatically converted to a 2-state
   // value, any unknown or high-impedance bits shall be converted to zeros", and
   // §6.8 makes a variable declaration assignment an assignment to the declared

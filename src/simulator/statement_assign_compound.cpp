@@ -51,8 +51,7 @@ static void CompoundAssignToMember(const Stmt* stmt, TokenKind base_op,
                                    Arena& arena) {
   if (auto* whole = ResolveLhsVariable(stmt->lhs, ctx)) {
     auto result = EvalBinaryOp(base_op, whole->value, actual_rhs, arena);
-    result =
-        ConvertRealOnAssign(result, stmt->lhs, whole->value.width, ctx, arena);
+    result = ConvertRealOnAssign(result, stmt->lhs, *whole, ctx, arena);
     WriteVar(whole, result, arena);
     return;
   }
@@ -71,8 +70,7 @@ void ApplyCompoundAssignOp(const Stmt* stmt, SimContext& ctx, Arena& arena) {
       auto result = EvalBinaryOp(base_op, var->value, actual_rhs, arena);
       // §6.12.1's conversion, which WriteVar does not apply: `int i; i += 1.5;`
       // computes a real and stores an integer.
-      result =
-          ConvertRealOnAssign(result, stmt->lhs, var->value.width, ctx, arena);
+      result = ConvertRealOnAssign(result, stmt->lhs, *var, ctx, arena);
       WriteVar(var, result, arena);
     }
   } else if (stmt->lhs->kind == ExprKind::kSelect) {

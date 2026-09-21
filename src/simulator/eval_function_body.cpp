@@ -509,7 +509,14 @@ static void ExecFuncReturn(const Stmt* stmt, const FuncExecCtx& exec) {
   // previous tag standing and `u.Other` raised nothing after `tagged Valid`.
   RecordReturnedVariableTag(stmt->expr, exec.ctx);
   if (exec.ret_width != 0) {
-    val = ResizeToWidth(val, exec.ret_width, exec.arena);
+    // §6.12.1 with §13.4.1: the store into the implicit variable is an
+    // assignment to an object of the return type, so a real function's
+    // `return i` of an integer converts the integer into a real, 3.0 for 3,
+    // and an integral function's `return r` rounds the real, as `f = expr`
+    // does through ConvertRealOnAssign. Resized alone, the integer's bits
+    // went out as the double 0.0.
+    val = ConvertRealForKnownLhs(val, exec.ret_var->is_real, exec.ret_width,
+                                 exec.arena);
     val.is_signed = exec.ret_var->is_signed;
   }
   exec.ret_var->value = val;

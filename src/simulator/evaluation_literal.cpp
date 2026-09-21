@@ -177,6 +177,20 @@ bool DeclaredTypeIsString(const DataType& type, const SimContext& ctx) {
          ctx.FindTypeKind(TypeTableKey(type)) == DataTypeKind::kString;
 }
 
+// §6.12: the three kinds the clause declares real variables by. A typedef
+// name is asked the same way a string's is, by the kind the elaborator
+// recorded for it.
+static bool IsRealKind(DataTypeKind kind) {
+  return kind == DataTypeKind::kReal || kind == DataTypeKind::kShortreal ||
+         kind == DataTypeKind::kRealtime;
+}
+
+bool DeclaredTypeIsReal(const DataType& type, const SimContext& ctx) {
+  if (IsRealKind(type.kind)) return true;
+  return type.kind == DataTypeKind::kNamed &&
+         IsRealKind(ctx.FindTypeKind(TypeTableKey(type)));
+}
+
 static int BitsPerDigit(char base_letter) {
   switch (base_letter) {
     case 'h':

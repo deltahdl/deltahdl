@@ -98,6 +98,7 @@ static void ShapePackageVariable(const ModuleItem* item, Variable* var,
   bool is_real = type.kind == DataTypeKind::kReal ||
                  type.kind == DataTypeKind::kShortreal ||
                  type.kind == DataTypeKind::kRealtime;
+  var->is_real = is_real;
   if (is_real) ctx.RegisterRealVariable(qname);
 }
 

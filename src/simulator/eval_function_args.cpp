@@ -804,6 +804,28 @@ static bool DeclaredKindIsIntegral(DataTypeKind kind) {
   }
 }
 
+// §10.8 makes passing a value to a subroutine argument an assignment-like
+// context, so the actual converts into the formal's declared type as into a
+// variable of it. §6.12.1 converts a real assigned to an integer by rounding
+// it to the nearest integer, a half away from zero: `fi(12.5)` into `input int
+// x` reads 13 and `fb(-3.5)` into a byte -4; the real's 64-bit pattern was
+// resized to the formal's width as any vector is, and read 0. The same clause
+// converts an integer assigned to a real numerically, so `f(2)` into a `real a`
+// reads 2.0 rather than the bits of 2 read as a double, and a real into a
+// `shortreal` formal takes the single-precision value at its 32 bits. A formal
+// no width can be found for is left as the actual arrived.
+static Logic4Vec ConvertToFormalType(Logic4Vec val, const DataType& dt,
+                                     uint32_t formal_width, SimContext& ctx,
+                                     Arena& arena) {
+  if (formal_width == 0) return val;
+  if (val.is_real && DeclaredKindIsIntegral(dt.kind))
+    return ConvertRealForKnownLhs(val, false, formal_width, arena);
+  if (DeclaredTypeIsReal(dt, ctx))
+    return ConvertRealForKnownLhs(val, true, formal_width, arena);
+  if (formal_width != val.width) return ResizeToWidth(val, formal_width, arena);
+  return val;
+}
+
 static void BindValueArg(const FunctionArg& param, const ActualArgRef& actual,
                          const ModuleItem* func, SimContext& ctx,
                          Arena& arena) {
@@ -832,16 +854,8 @@ static void BindValueArg(const FunctionArg& param, const ActualArgRef& actual,
   ActualArgRef bound{expr, arg_index, resolved.tag};
   const auto& dt = param.data_type;
   if (dt.kind != DataTypeKind::kImplicit) {
-    uint32_t formal_width = EvalFormalArgWidth(dt, ctx, arena);
-    // §10.8 makes passing a value to a subroutine argument an assignment-like
-    // context, and §6.12.1 converts a real assigned to an integer by rounding
-    // it to the nearest integer, a half away from zero: `fi(12.5)` into
-    // `input int x` reads 13 and `fb(-3.5)` into a byte -4. The real's 64-bit
-    // pattern was resized to the formal's width as any vector is, and read 0.
-    if (val.is_real && DeclaredKindIsIntegral(dt.kind) && formal_width > 0)
-      val = ConvertRealForKnownLhs(val, false, formal_width, arena);
-    else if (formal_width > 0 && formal_width != val.width)
-      val = ResizeToWidth(val, formal_width, arena);
+    val = ConvertToFormalType(val, dt, EvalFormalArgWidth(dt, ctx, arena), ctx,
+                              arena);
   }
   // 13.3.2/13.5.1: an output formal is not passed a value from the caller; only
   // input and inout formals receive the actual's value. The actual is evaluated
@@ -879,6 +893,15 @@ static void BindValueArg(const FunctionArg& param, const ActualArgRef& actual,
   // the default, `s.len()` inside the body found no string under the name and
   // answered 0, and `s.toupper()` "".
   var->is_string = DeclaredTypeIsString(dt, ctx);
+  // §6.12 with §13.5.1: a formal declared real, shortreal or realtime is a
+  // real variable the body reads and writes as one -- `l = a + b` of two real
+  // formals is a real sum, and `x = x + 1.0` into a ref real one a real store.
+  // The mark is what the store path reads (ConvertRealOnAssign) and what
+  // EvalIdentifier gives the value read; a body local declared so takes it in
+  // CreateFuncLocalVar. Left at the default, a formal was real only by the
+  // value it arrived with, and a real store into a local of the body converted
+  // the sum as into an integer.
+  var->is_real = DeclaredTypeIsReal(dt, ctx);
   // §6.19.5 with §13.5.1: a formal declared with an enumeration is an
   // expression of that type inside the body, `c.next().name()` on an input
   // and `c = c.next()` on an output, as a body local declared with one is

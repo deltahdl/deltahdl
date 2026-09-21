@@ -253,16 +253,14 @@ Logic4Vec EvalCompoundAssign(const Expr* expr, SimContext& ctx, Arena& arena) {
     // §10.7 sizes the value to the variable, which LhsContextWidth did not
     // read for a member access, so the resize the identifier arm gets from
     // the operation's width is made here; the yield keeps the same width.
-    result =
-        ConvertRealOnAssign(result, expr->lhs, whole->value.width, ctx, arena);
+    result = ConvertRealOnAssign(result, expr->lhs, *whole, ctx, arena);
     result = ResizeToWidth(result, whole->value.width, arena);
     yield_width = whole->value.width;
     StoreOperatorResult(whole, result);
   } else if (expr->lhs->kind == ExprKind::kIdentifier) {
     auto* var = ctx.FindVariable(expr->lhs->text);
     if (var) {
-      result =
-          ConvertRealOnAssign(result, expr->lhs, var->value.width, ctx, arena);
+      result = ConvertRealOnAssign(result, expr->lhs, *var, ctx, arena);
       // §10.6.2 and §9.4.2, as StoreOperatorResult states them; §11.3.6 has
       // the expression "stack" the value and return it whether or not the
       // update lands, so the return below is the value computed rather than

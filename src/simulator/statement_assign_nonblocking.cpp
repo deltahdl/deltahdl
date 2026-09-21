@@ -835,8 +835,7 @@ void ScheduleNonblockingAssign(const Stmt* stmt, const NbaSample& sample,
       return;
     }
   } else {
-    auto converted =
-        ConvertRealOnAssign(rhs_val, stmt->lhs, var->value.width, ctx, arena);
+    auto converted = ConvertRealOnAssign(rhs_val, stmt->lhs, *var, ctx, arena);
     SetupWholeVarNbaCallback(event, var, converted);
     // §7.3.2: the whole of a tagged union variable, whose update carries the
     // tag the right-hand side gave it, set once the bits have landed.

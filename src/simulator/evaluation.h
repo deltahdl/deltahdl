@@ -60,6 +60,12 @@ uint32_t DeclaredTypeWidth(const DataType& type, SimContext& ctx);
 // of the same question about a name.
 bool DeclaredTypeIsString(const DataType& type, const SimContext& ctx);
 
+// §6.12: whether the declared type is real, shortreal or realtime, whether
+// written as the keyword or reached through a typedef name. Defined in
+// evaluation_literal.cpp beside DeclaredTypeIsString, which answers the same
+// question about a string.
+bool DeclaredTypeIsReal(const DataType& type, const SimContext& ctx);
+
 // §6.11.1/§6.18: whether the declared type is signed, resolving a typedef name
 // through the elaborated table. Defined in evaluation_literal.cpp beside
 // DeclaredTypeWidth and DeclaredTypeIsString, the other two facts a declaration

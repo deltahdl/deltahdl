@@ -126,10 +126,14 @@ static const Logic4Vec* BoundInstanceValue(const Expr* expr, SimContext& ctx) {
 // The real and string kinds the declaration registered under `name`, given
 // to the value read from it: a package's or the unit's item under its
 // qualified key (ShapePackageVariable in lowerer_package_data.cpp), a
-// module's under the identifier's text.
+// module's under the identifier's text. §6.12: the real kind is also read off
+// the variable itself, which is where a subroutine's `real a` formal and
+// `real l` local carry it (BindValueArg, CreateFuncLocalVar) -- no name table
+// holds them, since one keyed by the bare text would make every `a` in the
+// design a real.
 static void MarkDeclaredKinds(Logic4Vec& val, std::string_view name,
-                              SimContext& ctx) {
-  if (ctx.IsRealVariable(name)) val.is_real = true;
+                              const Variable& var, SimContext& ctx) {
+  if (var.is_real || ctx.IsRealVariable(name)) val.is_real = true;
   if (ctx.IsStringVariable(name)) val.is_string = true;
 }
 
@@ -204,7 +208,7 @@ static Logic4Vec EvalIdentifier(const Expr* expr, SimContext& ctx,
   const Logic4Vec* sampled =
       ctx.AssertionSamples().ReadWithinProperty(var, ctx.CurrentTime());
   if (sampled != nullptr) val = *sampled;
-  MarkDeclaredKinds(val, kinds_name, ctx);
+  MarkDeclaredKinds(val, kinds_name, *var, ctx);
   // An object's signedness is fixed by its own declaration; it is never
   // inherited from a value that flowed in from elsewhere (e.g. across a
   // module port). Derive the read value's signedness from the declaration

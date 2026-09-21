@@ -40,9 +40,12 @@ Logic4Vec OwnRhsWords(const Logic4Vec& val, Arena& arena);
 // path in statement_assign_nonblocking.cpp and by the subroutine-body statement
 // executor in eval_function_body.cpp, which applies §10.7 to its own writes.
 // Convert the rhs value when the lhs and rhs differ in real-ness or real width
-// before a write.
+// before a write into `var`, the variable `lhs` names, at its width. §6.12:
+// whether the target is real is read off the variable's own mark first, which
+// a subroutine's formal and local carry and no name table does, and off the
+// name the declaration registered for the readers that hold none.
 Logic4Vec ConvertRealOnAssign(Logic4Vec rhs_val, const Expr* lhs,
-                              uint32_t target_width, SimContext& ctx,
+                              const Variable& var, SimContext& ctx,
                               Arena& arena);
 
 // Defined in statement_assign_core.cpp; also used by lowerer_var.cpp for the

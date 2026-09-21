@@ -469,6 +469,11 @@ void ExecClassMethod(ClassMethodTarget target, const Expr* expr,
     // §13.4.1 gives the implicit variable the method's return type, so §6.11.2
     // decides whether it holds unknowns as it does for any other object.
     ret_var->is_4state = DeclaredTypeIs4State(method->return_type);
+    // §13.4.1 with §6.12: a method returning real holds its result in a real
+    // variable, as EvalFunctionCall's below does; a `return i` of an integer
+    // then converts under §6.12.1 (ExecFuncReturn) rather than handing out
+    // the integer's bits as a double.
+    ret_var->is_real = DeclaredTypeIsReal(method->return_type, ctx);
   }
   ExecFunctionBody(method, ret_var, ctx, arena);
   out = CallResult(is_void, ret_var, arena);
@@ -719,6 +724,13 @@ Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx, Arena& arena) {
     // function as well as on a fresh one, so the second call answers as the
     // first did.
     ret_var->is_4state = DeclaredTypeIs4State(func->return_type);
+    // §13.4.1 with §6.12: the implicit variable of a function returning real,
+    // shortreal or realtime is a real variable, so the store a `return`
+    // makes into it and the `f = expr` form alike convert under §6.12.1, and
+    // the value the caller reads is a real. Left at the default, `return i`
+    // of an int local handed the caller the integer's bits, which %f read as
+    // 0.0.
+    ret_var->is_real = DeclaredTypeIsReal(func->return_type, ctx);
   }
 
   // §20.17.2: a function body is a calling context on the $stacktrace chain,

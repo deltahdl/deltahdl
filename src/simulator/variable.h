@@ -84,6 +84,20 @@ struct Variable {
   // it by the same lookup the mark now hangs off.
   bool is_string = false;
 
+  // §6.12: whether this variable was declared real, shortreal or realtime, so
+  // that a value assigned to it converts numerically under §6.12.1 rather than
+  // being resized, and a value read from it is a real (EvalIdentifier). It
+  // lives on the variable for the reason is_string does: the set of names
+  // SimContext::RegisterRealVariable keeps is keyed by the bare text, so a
+  // subroutine's `real a` formal or `real l` local registered there would make
+  // every `a` and `l` in the design a real for the rest of the run, and left
+  // unregistered -- as they were -- the formal and the local were known to be
+  // real by their value alone, and `l = a + b` stored the sum as an integer
+  // whose bits the caller read back as a double, 0.0. A module-scope or
+  // procedural declaration is still registered under its name as well, for
+  // the readers that hold a name and no Variable.
+  bool is_real = false;
+
   // §25.9: whether this variable was declared `virtual interface`, so that its
   // value is the handle of the interface instance it represents -- the number
   // SimContext::VirtualInterfaceHandle issues for the instance's scope, 0 for
