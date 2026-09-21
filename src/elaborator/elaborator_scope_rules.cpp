@@ -12,6 +12,7 @@
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_enum_constants.h"
 #include "elaborator/elaborator_items_internal.h"
 #include "elaborator/elaborator_scope_rules_names.h"
 #include "elaborator/elaborator_validate_internal.h"
@@ -783,14 +784,15 @@ void Elaborator::ValidateUnresolvedReferences(const ModuleDecl* decl,
 //
 // What a compilation-unit body can reach is what RegisterCuScopeItems recorded
 // of the unit's items, held in `names`: the item names, the constants (§6.19's
-// enumeration members and §6.20.4's local parameters -- and,
-// RegisterPackageParams filling the same map, every package's constants by bare
-// name, which is an over-approximation in the safe direction, a name accepted
-// rather than a name reported), the typedefs and the classes; and the names the
-// unit's own import declarations provide (§26.3, ImportsProvideName over the
-// unit's items). A package body reaches its own items and its own imports on
-// top of those. The body's formals, locals and body-level imports are the
-// walk's own business, as they are for a module's subroutine.
+// enumeration members and §6.20.4's local parameters, by bare name), the
+// typedefs and the classes; and the names the unit's own import declarations
+// provide (§26.3, ImportsProvideName over the unit's items). A package body
+// reaches its own items, the members of the enumerations its items declare
+// (§6.19 -- RegisterPackageParams records those in the constants map under the
+// qualified `pkg.NAME` alone, so they are read off the items here through
+// ForEachEnumTypeOfItem) and its own imports, on top of the unit's. The body's
+// formals, locals and body-level imports are the walk's own business, as they
+// are for a module's subroutine.
 void ReportUnresolvedInUnitScopeSubroutines(const CompilationUnit* unit,
                                             const UnitScopeNames& names,
                                             ProvidedNameCache& provided_cache,
@@ -804,12 +806,20 @@ void ReportUnresolvedInUnitScopeSubroutines(const CompilationUnit* unit,
                              provided_cache, diag);
   for (const auto* pkg : unit->packages) {
     if (pkg == nullptr) continue;
-    std::unordered_set<std::string_view> pkg_names;
+    std::unordered_set<std::string> pkg_names;
     for (const auto* item : pkg->items) {
-      if (item != nullptr && !item->name.empty()) pkg_names.insert(item->name);
+      if (item == nullptr) continue;
+      if (!item->name.empty()) pkg_names.insert(std::string(item->name));
+      ForEachEnumTypeOfItem(
+          item, [&](std::string_view, const DataType& enum_type) {
+            for (const auto& member : enum_type.enum_members) {
+              for (auto& n : EnumMemberDeclaredNames(member, names.constants))
+                pkg_names.insert(std::move(n));
+            }
+          });
     }
     auto pkg_declares = [&](std::string_view n) {
-      return pkg_names.count(n) != 0 || unit_declares(n) ||
+      return pkg_names.count(std::string(n)) != 0 || unit_declares(n) ||
              ImportsProvideName(unit, provided_cache, pkg->items, n);
     };
     ReportSubroutineUnresolved(pkg->items, pkg_declares, unit, provided_cache,
