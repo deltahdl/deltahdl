@@ -329,9 +329,12 @@ void CollectBareIdents(const Expr* e, std::vector<const Expr*>& out) {
   if (e->kind == ExprKind::kIdentifier) {
     // `null` (§6.24.1) and the `$` of an open range or a queue's last index
     // (§7.10.1) parse as identifier-shaped nodes and name no declaration, so
-    // neither is a read this can find a declaration for.
+    // neither is a read this can find a declaration for. Nor is a §12.6
+    // pattern's `. variable_identifier`, which declares the variable it names
+    // (Expr::is_pattern_binding); it is reached here through a matches
+    // condition, whose pattern side is the expression's right operand.
     if (e->scope_prefix.empty() && !IsBuiltinTypeKeyword(e->text) &&
-        e->text != "null" && e->text != "$") {
+        e->text != "null" && e->text != "$" && !e->is_pattern_binding) {
       out.push_back(e);
     }
     return;
@@ -480,12 +483,32 @@ void CollectProcRhsIdents(const Stmt* s,
              call != nullptr && IsValueListSystemTask(call)) {
     read = call;
   }
-  if (read != nullptr) {
-    std::vector<const Expr*> refs;
-    CollectBareIdents(read, refs);
-    for (const auto* r : refs) {
-      if (locals.count(r->text) == 0) out.push_back(r);
+  std::vector<const Expr*> refs;
+  CollectBareIdents(read, refs);
+  // §23.9 and §6.5 say nothing about the position a read stands in, and an
+  // assignment's right side is one of several a statement evaluates: the
+  // condition of an if, a while, a repeat, a do-while or a wait and the
+  // selector of a case (Stmt::condition), a for loop's condition, a case
+  // item's pattern (a value the selector is compared with, §12.5 -- unless the
+  // case is §12.6's `matches`, whose patterns declare rather than read), and
+  // the expressions a randsequence statement holds outside its code blocks: an
+  // rs_if_else condition, an rs_case expression and its arms, a rule's weight,
+  // a rand join's expression and a production item's actual arguments
+  // (ForEachRandsequenceExpr in elaborator_validate_internal.h). Left to the
+  // right side alone, `if (undeclared) x = 1;` elaborated clean. A statement's
+  // delay, event control, disable target, initializer and assertion are not
+  // read here.
+  CollectBareIdents(s->condition, refs);
+  CollectBareIdents(s->for_cond, refs);
+  if (!s->case_matches) {
+    for (const auto& ci : s->case_items) {
+      for (const auto* p : ci.patterns) CollectBareIdents(p, refs);
     }
+  }
+  ForEachRandsequenceExpr(s,
+                          [&](Expr* const& e) { CollectBareIdents(e, refs); });
+  for (const auto* r : refs) {
+    if (locals.count(r->text) == 0) out.push_back(r);
   }
   // §6.5's declared-before-use rule is broken by the assignment wherever the
   // assignment stands, and §26.3 makes an identifier a package supplies

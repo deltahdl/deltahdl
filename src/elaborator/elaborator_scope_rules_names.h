@@ -113,9 +113,11 @@ void CollectModuleGenerateNames(const std::vector<ModuleItem*>& items,
 void CollectProcLocalNames(const Stmt* s,
                            std::unordered_set<std::string_view>& names);
 
-// Collects the bare identifier reads of every procedural assignment's right
-// side under `s`, and of every argument of a display, write, strobe, monitor
-// or severity system task statement, dropping the ones `locals` names.
+// Collects the bare identifier reads under `s`: every procedural assignment's
+// right side, every argument of a display, write, strobe, monitor or severity
+// system task statement, every statement's condition, for condition and case
+// item pattern (a `matches` case's aside), and every expression a randsequence
+// statement holds outside its code blocks, dropping the ones `locals` names.
 void CollectProcRhsIdents(const Stmt* s,
                           const std::unordered_set<std::string_view>& locals,
                           std::vector<const Expr*>& out);
