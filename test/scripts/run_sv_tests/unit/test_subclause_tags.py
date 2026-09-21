@@ -125,3 +125,12 @@ def test_a_file_the_suite_tags_one_subclause_off_is_judged_by_the_rule_it_tests(
     assert rst.tagged_clause(
         {"tags": "18.8"}, "18.9--controlling-constraints-with-constraint_mode_1.sv",
     ) == "18.9"
+
+
+def test_a_file_the_suite_tags_on_its_parent_test_is_judged_by_the_rule_it_tests(
+    rst: ModuleType,
+) -> None:
+    assert rst.tagged_clause(
+        {"tags": "18.17.6"},
+        "18.17.6--aborting-productions-break-and-return_2_fail.sv",
+    ) == "18.17"
