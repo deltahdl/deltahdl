@@ -103,11 +103,18 @@ static void BuildVTable(ClassTypeInfo* info, const ClassDecl* cls) {
 // RegisterClassDecl and InitClassStaticProperties) reads and writes the
 // class's copy rather than finding none; ClassObject::SetProperty writes the
 // object's own slot for a static its type holds no entry for.
+// §8.9 with §6.8 (Table 6-7): a static property's one copy takes its type's
+// default as an instance property does when it is constructed
+// (InitClassPropertyDefault in eval_class_new.cpp) -- 'x for a 4-state type,
+// 0 for a 2-state one -- until its initializer, if any, runs
+// (InitStaticProperty). Filled with 0 whatever the type, `static logic sl`
+// read 0 while the class's `logic l` read x.
 static void CreateStaticProperties(ClassTypeInfo* info, Arena& arena) {
   for (const auto& p : info->properties) {
     if (!p.is_static) continue;
     info->static_properties[std::string(p.name)] =
-        MakeLogic4VecVal(arena, p.width, 0);
+        p.is_4state ? MakeAllX(arena, p.width)
+                    : MakeLogic4VecVal(arena, p.width, 0);
   }
 }
 

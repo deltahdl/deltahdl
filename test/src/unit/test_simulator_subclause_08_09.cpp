@@ -536,4 +536,29 @@ TEST(StaticClassPropertySim, StaticHandleDispatchesByItsDeclaredClass) {
             120u);
 }
 
+// §8.9 with §6.8 (Table 6-7, printed page 107): a static property with no
+// initializer takes its type's default -- 'x for a 4-state logic or vector,
+// 0 for a 2-state int -- as the instance property of the same class does,
+// whether read through the class scope or through a handle. The static
+// logic read 0 while the instance logic beside it read x.
+TEST(StaticClassPropertySim, Uninitialized4StateStaticReadsX) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  class C;\n"
+                 "    logic l;\n"
+                 "    static logic sl; static logic [3:0] sv;\n"
+                 "    static int sn;\n"
+                 "  endclass\n"
+                 "  C c;\n"
+                 "  initial begin\n"
+                 "    c = new;\n"
+                 "    $display(\"l=%0h sl=%0h sv=%b sn=%0d hsl=%0h\", c.l,\n"
+                 "             C::sl, C::sv, C::sn, c.sl);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "l=x sl=x sv=xxxx sn=0 hsl=x\n");
+}
+
 }  // namespace
