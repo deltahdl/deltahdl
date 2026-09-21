@@ -218,4 +218,27 @@ TEST(ImplicitNamedPortConnectionElaboration,
   EXPECT_NE(bindings[0].connection, nullptr);
 }
 
+// 23.3.2.3: the name of an implicit .name connection shall be declared in the
+// instantiating scope, and an interface instance is one such declaration for
+// an interface port (§25.3.2). This is the control for that acceptance: with
+// no instance and no signal of the name `iface` in top -- the only `iface`
+// being the port of `sub` -- the connection is still reported, on line 7.
+TEST(ImplicitNamedPortConnectionElaboration,
+     ErrorWhenInterfaceInstanceNotDeclared) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface test_bus;\n"
+      "  logic test_pad;\n"
+      "endinterface\n"
+      "module sub(test_bus iface);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  sub sub (.iface);\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "requires signal 'iface' to be declared", 7,
+                            "23.3.2.3"));
+}
+
 }  // namespace

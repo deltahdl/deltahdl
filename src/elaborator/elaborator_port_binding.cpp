@@ -516,12 +516,19 @@ void Elaborator::CheckPortModportConsistency(const PortBindScope& scope,
   }
 }
 
+// §23.3.2.3: the implicit `.name` form is the named connection `.name(name)`
+// without an implicit net declaration, so the name shall already be declared
+// in the instantiating scope. An interface instance is such a declaration
+// (§25.3.2 connects an interface port to one by name), and it is not among the
+// module's signals IsNameDeclared answers for, so the instance table is asked
+// beside it; the explicit form asks the same table before it creates a net.
 void Elaborator::PrepareExplicitConnNet(const PortBindScope& scope,
                                         const ExplicitPortBind& bind) {
   const Expr* conn_expr = bind.conn_expr;
   if (!conn_expr || conn_expr->kind != ExprKind::kIdentifier) return;
   if (bind.is_implicit) {
-    if (!IsNameDeclared(conn_expr->text, scope.parent_mod)) {
+    if (!IsNameDeclared(conn_expr->text, scope.parent_mod) &&
+        !interface_inst_types_.count(conn_expr->text)) {
       diag_.Error(
           scope.item->loc,
           std::format("implicit named port connection '.{}' requires "

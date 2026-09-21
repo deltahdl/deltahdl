@@ -116,7 +116,10 @@ TEST(InterfaceNamedBundleSim, VariableRefAccessViaNamedConnection) {
 
 // §25.3.2 consumes §23.3.2.3 implicit named port connection (.name): with the
 // interface port and the interface instance sharing an identifier, .sb_intf
-// binds them, and ref access is observed at run time.
+// binds them, and ref access is observed at run time. The elaboration is also
+// asked to have reported nothing: the binding was made and the run passed
+// while a §23.3.2.3 error stood against the connection (#4355), which
+// LowerRunAndCheck does not read.
 TEST(InterfaceNamedBundleSim, VariableRefAccessViaImplicitConnection) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -132,6 +135,7 @@ TEST(InterfaceNamedBundleSim, VariableRefAccessViaImplicitConnection) {
       "  initial sb_intf.req = 1;\n"
       "endmodule\n",
       f);
+  EXPECT_FALSE(f.has_errors);
   LowerRunAndCheck(f, design, {{"top.sb_intf.gnt", 1u}});
 }
 
