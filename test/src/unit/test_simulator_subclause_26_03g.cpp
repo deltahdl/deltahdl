@@ -313,4 +313,28 @@ TEST(PackageImportSim,
       10, "11.9"));
 }
 
+// §26.3 with §6.8 (Table 6-7, printed page 107): a package variable with no
+// declaration assignment holds its type's default -- 'x for a logic, 0 for
+// an int, "" for a string, 0.0 for a real -- and the one storage is read
+// through the package scope, `P::pl`, and through the bare name a wildcard
+// import binds, `pl`, alike. A package's `logic pl` read 0 both ways.
+TEST(PackageImportSim, UninitializedPackageVariablesHoldTheirTypesDefaults) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "package P;\n"
+          "  logic pl; int pn; string ps; real pr;\n"
+          "endpackage\n"
+          "module t;\n"
+          "  import P::*;\n"
+          "  initial begin\n"
+          "    $display(\"pl=%0h pn=%0d ps=[%s] pr=%f\", pl, pn, ps, pr);\n"
+          "    $display(\"ql=%0h qn=%0d qs=[%s] qr=%f\", P::pl, P::pn,\n"
+          "             P::ps, P::pr);\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "pl=x pn=0 ps=[] pr=0.000000\nql=x qn=0 qs=[] qr=0.000000\n");
+}
+
 }  // namespace
