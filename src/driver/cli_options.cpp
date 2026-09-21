@@ -240,6 +240,10 @@ bool TryParseGeneralFlag(std::string_view arg, CliOptions& opts) {
     opts.lint_only = true;
     return true;
   }
+  if (arg == "--parse-only") {
+    opts.parse_only = true;
+    return true;
+  }
   if (arg == "--dump-ast") {
     opts.dump_ast = true;
     return true;

@@ -73,6 +73,9 @@ struct CliOptions {
   uint32_t lut_size = 4;
   bool synth_mode = false;
   bool lint_only = false;
+  // --parse-only stops after the parse, where --lint-only stops after the
+  // elaboration: a source only the elaborator rejects passes under it.
+  bool parse_only = false;
   bool dump_ast = false;
   bool dump_ir = false;
   bool dump_aig = false;

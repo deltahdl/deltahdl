@@ -92,6 +92,7 @@ void PrintHelp() {
             << "  --timescale <t/p>    Override default timescale\n"
             << "  -D <name>[=<value>]  Define preprocessor macro\n"
             << "  --lint-only          Parse and elaborate only\n"
+            << "  --parse-only         Parse only\n"
             << "  --dump-ast           Print AST to stdout\n"
             << "  --dump-ir            Print RTLIR to stdout\n\n"
             << "Synthesis:\n"
@@ -709,6 +710,14 @@ int main(int argc, char* argv[]) {
 
   if (opts.dump_ast) {
     DumpAst(cu);
+  }
+  // --parse-only, "Parse only": the run ends here, after the parse's own
+  // reports have returned 1 above, with the status --lint-only gave before it
+  // elaborated. A source only the elaborator rejects passes, which is what a
+  // file meant to test the preprocessor or the parser alone asks for.
+  if (opts.parse_only) {
+    std::cout << "parse pass: no errors\n";
+    return 0;
   }
 
   delta::Arena elab_arena;
