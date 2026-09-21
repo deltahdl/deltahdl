@@ -238,6 +238,19 @@ bool TryEvalStringMethodOnValue(const Logic4Vec& value, const Expr* call_expr,
 void RecordVariableEnumType(std::string_view var_name, const DataType& type,
                             SimContext& ctx);
 
+// §6.19.5 declares its methods on the enumeration type, so an expression of
+// that type is the receiver of one wherever it is declared: the enumeration
+// behind `e`, read from the declaration behind it -- a variable's record, a
+// class member's named bare inside a method, through `C::x`, a handle, a
+// chain of them, `this` or `super`, a package's variable, parameter or
+// literal, a member literal's declaring enumeration, or the declared result
+// type of the subroutine or §6.19.5 method a call names. Null for an
+// expression of no enumeration this can see. Also what §6.24.2's $cast asks
+// of its destination, which may be a property as well as a variable. Defined
+// in eval_enum.cpp.
+const EnumTypeInfo* EnumTypeOfExpr(const Expr* e, SimContext& ctx,
+                                   Arena& arena);
+
 bool TryEvalEnumMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
                            Logic4Vec& out);
 bool TryEvalEnumProperty(std::string_view var_name, std::string_view method,

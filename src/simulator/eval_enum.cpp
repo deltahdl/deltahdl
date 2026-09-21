@@ -419,16 +419,11 @@ static bool IsEnumTypedMethodCall(const Expr* e) {
          ReturnsTheEnumType(callee->rhs->text);
 }
 
-// §6.19.5 declares its methods on the enumeration type, so the receiver of
-// one is any expression of that type, and this answers the enumeration an
-// expression carries by the declaration behind it: a variable's, a class
-// member's read bare, through a scope, a handle, a chain of them, `this` or
-// `super`, a package's, a member literal's, or the result type of the
-// subroutine or the §6.19.5 method a call names, as deep as a chain of calls
-// is written (`s.first().next().name()`). Null for an expression of no
-// enumeration this can see.
-static const EnumTypeInfo* EnumTypeOfExpr(const Expr* e, SimContext& ctx,
-                                          Arena& arena) {
+// The enumeration an expression carries, by the declaration behind it, as
+// deep as a chain of calls is written (`s.first().next().name()`); described
+// in evaluation.h.
+const EnumTypeInfo* EnumTypeOfExpr(const Expr* e, SimContext& ctx,
+                                   Arena& arena) {
   if (e == nullptr) return nullptr;
   if (e->kind == ExprKind::kIdentifier) return EnumTypeOfName(e, ctx);
   if (e->kind == ExprKind::kMemberAccess)

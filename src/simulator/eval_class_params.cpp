@@ -9,11 +9,13 @@
 #include "common/types.h"
 #include "elaborator/const_eval.h"
 #include "parser/ast_class.h"
+#include "parser/ast_expr.h"
 #include "parser/ast_type.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
 
@@ -38,6 +40,38 @@ Logic4Vec ClassParamSizer::Value(size_t i, const Expr* expr, SimContext& ctx,
   return Value(name, ParamType(decl_, i), expr, ctx, arena);
 }
 
+// §6.20.2 with §6.19: a default written as an enumeration's literal,
+// `localparam Colors LC = green`, names a constant of the scope the class is
+// declared in, whose storage a module creates after its classes are lowered
+// (Lowerer::LowerModule), so that reading the name found nothing and the
+// parameter held 0. The literal is read off the enumeration declaring it
+// while no variable of the name exists yet.
+static bool TryEnumLiteralDefault(const Expr* expr, SimContext& ctx,
+                                  uint64_t& value) {
+  if (expr == nullptr || expr->kind != ExprKind::kIdentifier ||
+      !expr->scope_prefix.empty() || ctx.FindVariable(expr->text) != nullptr) {
+    return false;
+  }
+  const EnumTypeInfo* info = ctx.FindEnumTypeDeclaringMember(expr->text, {});
+  if (info == nullptr) return false;
+  for (const EnumMemberInfo& m : info->members) {
+    if (m.name != expr->text) continue;
+    value = m.value;
+    return true;
+  }
+  return false;
+}
+
+static Logic4Vec ParamDefaultValue(const Expr* expr, uint32_t width,
+                                   SimContext& ctx, Arena& arena) {
+  uint64_t literal = 0;
+  if (TryEnumLiteralDefault(expr, ctx, literal))
+    return MakeLogic4VecVal(arena, width == 0 ? 32 : width, literal);
+  return width == 0
+             ? EvalExpr(expr, ctx, arena)
+             : ResizeToWidth(EvalExpr(expr, ctx, arena, width), width, arena);
+}
+
 Logic4Vec ClassParamSizer::Value(std::string_view name, const DataType* type,
                                  const Expr* expr, SimContext& ctx,
                                  Arena& arena) {
@@ -46,9 +80,7 @@ Logic4Vec ClassParamSizer::Value(std::string_view name, const DataType* type,
       type->kind != DataTypeKind::kShortreal &&
       type->kind != DataTypeKind::kRealtime)
     width = DeclaredParamTypeWidth(*type, scope_);
-  Logic4Vec val = width == 0 ? EvalExpr(expr, ctx, arena)
-                             : ResizeToWidth(EvalExpr(expr, ctx, arena, width),
-                                             width, arena);
+  Logic4Vec val = ParamDefaultValue(expr, width, ctx, arena);
   if (!name.empty() && !val.is_real)
     scope_[name] = static_cast<int64_t>(val.ToUint64());
   return val;

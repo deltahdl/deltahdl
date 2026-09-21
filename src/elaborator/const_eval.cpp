@@ -11,6 +11,7 @@
 #include "common/packed_range.h"
 #include "elaborator/const_eval_internal.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/rtlir_scopes.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
 

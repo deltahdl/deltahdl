@@ -15,6 +15,7 @@
 #include "elaborator/elaborator_data.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/rtlir_scopes.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"

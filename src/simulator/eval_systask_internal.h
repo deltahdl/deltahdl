@@ -77,6 +77,13 @@ void WarnIfArgCountMismatch(SimContext& ctx, std::string_view task_name,
                             const std::string& fmt, size_t supplied,
                             SourceLoc loc);
 
+// §6.24.2 $cast (defined in eval_systask_cast.cpp); called by the
+// EvalUtilitySysCall dispatcher in eval_systask.cpp. The destination, the
+// call's first argument, is a variable or a class property named bare or
+// through a handle; the value is the second argument's. Answers 1 when the
+// cast took and the destination was written, 0 otherwise.
+Logic4Vec EvalCastSysFunc(const Expr* expr, SimContext& ctx, Arena& arena);
+
 // §21.3.4 formatted string read (defined in eval_systask_scanf.cpp); called
 // by the EvalIOSysCall dispatcher.
 Logic4Vec EvalSscanf(const Expr* expr, SimContext& ctx, Arena& arena);

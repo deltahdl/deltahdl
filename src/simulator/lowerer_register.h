@@ -6,6 +6,7 @@
 #include <string_view>
 
 #include "elaborator/rtlir.h"
+#include "elaborator/rtlir_scopes.h"
 
 namespace delta {
 

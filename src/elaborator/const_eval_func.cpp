@@ -13,6 +13,7 @@
 #include "elaborator/const_eval.h"
 #include "elaborator/const_eval_internal.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/rtlir_scopes.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"

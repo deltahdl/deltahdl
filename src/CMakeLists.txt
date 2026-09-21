@@ -99,6 +99,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     parser/single_pass_compile.cpp
     parser/assertion_control_task.cpp
     elaborator/elaborator.cpp
+    elaborator/elaborator_type_facts.cpp
     elaborator/elaborator_items.cpp
     elaborator/elaborator_items_checker_rules.cpp
     elaborator/elaborator_items_udp.cpp
@@ -252,6 +253,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/sequence_flatten.cpp
     simulator/sequence_monitor.cpp
     simulator/eval_systask.cpp
+    simulator/eval_systask_cast.cpp
     simulator/eval_expr.cpp
     simulator/eval_expr_assign_ops.cpp
     simulator/eval_expr_cast.cpp

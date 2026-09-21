@@ -6,6 +6,7 @@
 #include "elaborator/elaborator_decls_internal.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/rtlir_scopes.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
 

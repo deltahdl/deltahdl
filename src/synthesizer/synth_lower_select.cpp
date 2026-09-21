@@ -10,6 +10,7 @@
 #include "common/packed_range.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/rtlir_scopes.h"
 #include "parser/ast_expr.h"
 #include "synthesizer/aig.h"
 #include "synthesizer/synth_lower.h"
