@@ -615,6 +615,20 @@ void RegisterTypeTargets(const RtlirDesign* design, SimContext& ctx) {
 // which run its methods (Lowerer::RegisterClassDecl): bound nowhere,
 // uvm_callbacks#(T,CB)'s `local static this_type m_inst` was a variable of
 // no class, and `m_inst = new` stored the null handle.
+// The class a typedef's declared type names, by the scoped spelling where
+// it wrote one the run holds a class by, else by the bare name; null for a
+// type that is no class name.
+static ClassTypeInfo* ClassNamedByTypedef(const DataType& target,
+                                          SimContext& ctx) {
+  if (target.kind != DataTypeKind::kNamed) return nullptr;
+  if (!target.scope_name.empty()) {
+    ClassTypeInfo* scoped = ctx.FindClassType(
+        std::string(target.scope_name) + "::" + std::string(target.type_name));
+    if (scoped != nullptr) return scoped;
+  }
+  return ctx.FindClassType(target.type_name);
+}
+
 void RegisterClassScopeTypedefAliases(ClassTypeInfo* info, SimContext& ctx,
                                       Arena& arena) {
   if (info == nullptr || info->decl == nullptr) return;
@@ -623,17 +637,11 @@ void RegisterClassScopeTypedefAliases(ClassTypeInfo* info, SimContext& ctx,
         member->typedef_item == nullptr) {
       continue;
     }
-    const DataType& target = member->typedef_item->typedef_type;
-    if (target.kind != DataTypeKind::kNamed) continue;
     auto* alias = arena.Create<std::string>(std::string(info->name) +
                                             "::" + std::string(member->name));
     if (ctx.FindClassType(*alias) != nullptr) continue;
-    ClassTypeInfo* cls = nullptr;
-    if (!target.scope_name.empty()) {
-      cls = ctx.FindClassType(std::string(target.scope_name) +
-                              "::" + std::string(target.type_name));
-    }
-    if (cls == nullptr) cls = ctx.FindClassType(target.type_name);
+    ClassTypeInfo* cls =
+        ClassNamedByTypedef(member->typedef_item->typedef_type, ctx);
     if (cls != nullptr) ctx.RegisterClassType(*alias, cls);
   }
 }

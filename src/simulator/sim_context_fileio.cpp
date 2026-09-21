@@ -1,4 +1,5 @@
 #include <cstdint>
+#include <cstdio>
 #include <string>
 #include <string_view>
 #include <utility>
