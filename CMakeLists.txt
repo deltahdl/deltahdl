@@ -6,6 +6,14 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# With the standard at 20 or above, CMake has Ninja scan every source for C++
+# module imports and exports before compiling any of it, and no source here
+# declares or imports one. The scan is a preprocessor pass per source that
+# finds nothing, one step per object ahead of the objects -- 520 of the 1,040
+# steps of build-coverage-lib, 12 of its 201 seconds in run 35657769589 --
+# and the objects wait on the whole of it.
+set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
+
 option(DELTAHDL_COVERAGE "Enable code coverage instrumentation" OFF)
 option(DELTAHDL_SANITIZERS "Enable ASan + UBSan" OFF)
 option(DELTAHDL_TSAN "Enable ThreadSanitizer" OFF)
