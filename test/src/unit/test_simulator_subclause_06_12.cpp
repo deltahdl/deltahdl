@@ -146,6 +146,44 @@ TEST(RealDataType, RealFormalIsACopyAndARealReturnConvertsAnInteger) {
   EXPECT_EQ(printed, "h=3.000000 dbl=2.500000 r=1.250000\n");
 }
 
+// §8.5 (printed page 183): a class property has any data type, so `real r;`
+// holds a real, and §8.6 makes the object's properties available to its
+// methods, so `r * 2.0` in dbl is real arithmetic on the object's r and reads
+// 7.25 for the 3.625 written through the handle. The module declares its own
+// `real r = 2.5` beside the class, as the issue's probe does: the method read
+// 5.0, twice the module's r, while a bare name in a method was looked up
+// among the variables before the class scope (§23.9 with §8.13 puts the class
+// first). A property written inside a method, `r = r + 0.5`, reads back
+// through the handle as 4.125, the module's r still 2.5, and a real property
+// with a declaration initializer doubles to 3.0.
+TEST(RealDataType, RealPropertyReadInAMethodIsTheObjectsNotTheModules) {
+  SimFixture f;
+  std::string printed = RunCapture(
+      "module t;\n"
+      "  class C;\n"
+      "    real r;\n"
+      "    function real dbl(); return r * 2.0; endfunction\n"
+      "    function void bump(); r = r + 0.5; endfunction\n"
+      "  endclass\n"
+      "  class D;\n"
+      "    real r = 1.5;\n"
+      "    function real dbl(); return r * 2.0; endfunction\n"
+      "  endclass\n"
+      "  real r = 2.5;\n"
+      "  C h;\n"
+      "  D d;\n"
+      "  initial begin\n"
+      "    h = new; h.r = 3.625;\n"
+      "    d = new;\n"
+      "    $display(\"prop=%f init=%f\", h.dbl(), d.dbl());\n"
+      "    h.bump();\n"
+      "    $display(\"h.r=%f r=%f\", h.r, r);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(printed, "prop=7.250000 init=3.000000\nh.r=4.125000 r=2.500000\n");
+}
+
 TEST(RealDataType, RealVarStorage) {
   RealFixture f;
   f.CreateRealVar("x", 1.5);
