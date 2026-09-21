@@ -1,7 +1,6 @@
 #include <cmath>
 #include <cstdint>
 #include <cstring>
-#include <optional>
 #include <string>
 #include <string_view>
 
@@ -506,10 +505,7 @@ void PerformBlockingAssign(const Expr* lhs, const Logic4Vec& rhs_val,
   Logic4Vec owned = OwnRhsWords(rhs_val, arena);
   // §10.9: a typed assignment pattern expression on the left unpacks like the
   // bare pattern it wraps.
-  if (IsConcatLhs(lhs)) {
-    UnpackConcatLhs(UnwrapTypedPattern(lhs), owned, ctx, arena);
-    return;
-  }
+  if (TryUnpackConcatLhs(lhs, owned, ctx, arena)) return;
 
   if (lhs->kind == ExprKind::kStreamingConcat) {
     UnpackStreamingConcatLhs(lhs, owned, ctx, arena);
