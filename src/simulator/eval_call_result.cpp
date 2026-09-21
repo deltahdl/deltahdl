@@ -402,6 +402,16 @@ bool TryEvalCallResultMethodCall(const Expr* expr, SimContext& ctx,
   if (returned) {
     return TryReturnedAggregateMethod(*returned, access->rhs->text, arena, out);
   }
+  // §6.16 with §13.4: the call answered a string -- a subroutine declared to
+  // return one (ExecClassMethod, EvalFunctionCall) or a string method that
+  // answers one (StringResult in eval_string.cpp) marks its value so -- and
+  // the method is one of the string type's, `h.get().len()` or
+  // `s.toupper().substr(0, 2)`, read off the value the call already produced.
+  // Read as a handle, the text named no object and the call answered nothing.
+  if (handle.is_string && TryEvalStringMethodOnValue(handle, access->rhs->text,
+                                                     expr, ctx, arena, out)) {
+    return true;
+  }
   InstanceMethodInfo info;
   info.obj = ctx.GetClassObject(handle.ToUint64());
   if (info.obj == nullptr) return false;

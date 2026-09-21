@@ -458,6 +458,12 @@ void ExecClassMethod(ClassMethodTarget target, const Expr* expr,
   }
   ExecFunctionBody(method, ret_var, ctx, arena);
   out = is_void ? MakeLogic4VecVal(arena, 1, 0) : ret_var->value;
+  // §13.4.1 with §6.16: a method declared to return a string answers a
+  // string, and the value carries the kind (ShapeStringReturnVariable marks
+  // the implicit variable) so that a method called on the call,
+  // `h.get().len()`, reads it as text (TryEvalCallResultMethodCall); the words
+  // alone read as a packed number and no string method reached them.
+  if (!is_void) out.is_string = ret_var->is_string;
 }
 
 static bool TryEvalClassScopeCall(const Expr* expr, SimContext& ctx,
@@ -721,6 +727,8 @@ Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   ctx.PopFuncName();
   WritebackInCaller(func, expr, ctx, arena);
   result = is_void ? MakeLogic4VecVal(arena, 1, 0) : ret_var->value;
+  // §13.4.1 with §6.16: as ExecClassMethod marks a method's string result.
+  if (!is_void) result.is_string = ret_var->is_string;
 
   if (is_static) {
     ctx.PopStaticScope(func->name);

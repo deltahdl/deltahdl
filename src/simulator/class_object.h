@@ -98,6 +98,13 @@ struct ClassTypeInfo {
     // told apart by the declared type and the stored Logic4Vec does not carry
     // it.
     bool is_real = false;
+    // §6.16: whether the declaration wrote the string type, so that a string
+    // method called on the property, `h.s.len()` or `s.len()` inside a
+    // method, reads the text it holds (ReadStringReceiver in
+    // src/simulator/eval_string.cpp). The stored Logic4Vec does not carry it:
+    // a literal or a concatenation stored into the property is a packed value
+    // (§5.9), and only the declaration says the property is a string.
+    bool is_string = false;
     // §6.11.3: the signedness the declaration gives the property, which the
     // value stored in it carries. A variable keeps this on the Variable and a
     // read consults it there; a property is only its Logic4Vec, so the flag has

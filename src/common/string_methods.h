@@ -24,4 +24,20 @@ inline bool StringMethodWritesItsObject(std::string_view method) {
          method == "octtoa" || method == "bintoa" || method == "realtoa";
 }
 
+// §6.16: whether one of the string methods answers a value and leaves its
+// object alone -- the twelve of §6.16.1 (len), §6.16.3 (getc), §6.16.4
+// (toupper), §6.16.5 (tolower), §6.16.6 (compare), §6.16.7 (icompare), §6.16.8
+// (substr), §6.16.9 (atoi, atohex, atooct, atobin) and §6.16.10 (atoreal).
+// These are the methods a string that is no variable of the run's tables can
+// be the object of -- a class property, a formal, a call's result -- since
+// nothing is written back; the simulator asks before it evaluates such a
+// receiver, so that a call of a class's own method of another name never has
+// its receiver evaluated twice.
+inline bool StringMethodAnswersAValue(std::string_view method) {
+  return method == "len" || method == "getc" || method == "toupper" ||
+         method == "tolower" || method == "compare" || method == "icompare" ||
+         method == "substr" || method == "atoi" || method == "atohex" ||
+         method == "atooct" || method == "atobin" || method == "atoreal";
+}
+
 }  // namespace delta

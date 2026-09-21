@@ -867,6 +867,13 @@ static void BindValueArg(const FunctionArg& param, const ActualArgRef& actual,
   // body converts, which it could not while every formal was left at Variable's
   // 4-state default.
   var->is_4state = DeclaredTypeIs4State(param.data_type);
+  // §6.16 with §13.5.1: a formal declared string, `input string s` or
+  // `output string o`, is a string the body reads and writes as one, and the
+  // mark is what every reader of a string reads (SimContext::IsStringVariable)
+  // -- a body local declared string takes it in CreateFuncLocalVar. Left at
+  // the default, `s.len()` inside the body found no string under the name and
+  // answered 0, and `s.toupper()` "".
+  var->is_string = DeclaredTypeIsString(dt, ctx);
   // §25.9 has a virtual interface passed as an argument to a task, function or
   // method; the formal is then a virtual interface of its own, and a member
   // the body reaches through it is a component of the instance it holds.

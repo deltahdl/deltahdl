@@ -14,6 +14,7 @@
 #include "common/string_methods.h"
 #include "common/types.h"
 #include "parser/ast_expr.h"
+#include "simulator/class_object.h"
 #include "simulator/eval_function_args_scoped.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
@@ -128,16 +129,27 @@ static Logic4Vec StringGetc(const std::string& str, const Expr* call_expr,
   return MakeLogic4VecVal(arena, 8, static_cast<unsigned char>(str[idx]));
 }
 
+// §6.16.4, §6.16.5 and §6.16.8 declare toupper, tolower and substr with a
+// string result, and the value answered carries the kind so that a method
+// called on it, `s.toupper().substr(0, 2)`, reads it as text
+// (TryEvalCallResultMethodCall); StringToLogic4Vec alone leaves the words a
+// packed number.
+static Logic4Vec StringResult(std::string_view str, Arena& arena) {
+  Logic4Vec out = StringToLogic4Vec(arena, str);
+  out.is_string = true;
+  return out;
+}
+
 static Logic4Vec StringToupper(const std::string& str, Arena& arena) {
   std::string upper = str;
   for (auto& c : upper) c = static_cast<char>(std::toupper(c));
-  return StringToLogic4Vec(arena, upper);
+  return StringResult(upper, arena);
 }
 
 static Logic4Vec StringTolower(const std::string& str, Arena& arena) {
   std::string lower = str;
   for (auto& c : lower) c = static_cast<char>(std::tolower(c));
-  return StringToLogic4Vec(arena, lower);
+  return StringResult(lower, arena);
 }
 
 static std::string EvalArgAsString(const Expr* arg, SimContext& ctx,
@@ -168,13 +180,13 @@ static Logic4Vec StringIcompare(const std::string& str, const Expr* call_expr,
 
 static Logic4Vec StringSubstr(const std::string& str, const Expr* call_expr,
                               SimContext& ctx, Arena& arena) {
-  if (call_expr->args.size() < 2) return StringToLogic4Vec(arena, "");
+  if (call_expr->args.size() < 2) return StringResult("", arena);
   auto i = EvalExpr(call_expr->args[0], ctx, arena).ToUint64();
   auto j = EvalExpr(call_expr->args[1], ctx, arena).ToUint64();
   if (i >= str.size() || j >= str.size() || i > j) {
-    return StringToLogic4Vec(arena, "");
+    return StringResult("", arena);
   }
-  return StringToLogic4Vec(arena, str.substr(i, j - i + 1));
+  return StringResult(str.substr(i, j - i + 1), arena);
 }
 
 static int DigitValueForBase(char c, int base) {
@@ -417,6 +429,135 @@ static bool ExtractScopedStringMethodParts(const Expr* expr, std::string& key,
   return true;
 }
 
+// §6.16 with §8.7: whether `type`, or a class it extends, declares the
+// property `name` with the string type.
+static bool PropertyIsString(const ClassTypeInfo* type, std::string_view name) {
+  const ClassTypeInfo::PropertyInfo* prop =
+      type != nullptr ? type->FindProperty(name) : nullptr;
+  return prop != nullptr && prop->is_string;
+}
+
+// Whether `e` is a name or a chain of member selects down from one, `h` or
+// `d.c`: reading it runs no subroutine, so it can be evaluated to find the
+// object it denotes and evaluated again by whichever dispatcher takes the call
+// when it denotes no string.
+static bool IsNamePath(const Expr* e) {
+  if (e == nullptr) return false;
+  if (e->kind == ExprKind::kIdentifier) return true;
+  return e->kind == ExprKind::kMemberAccess && !e->is_scope_resolution &&
+         e->rhs != nullptr && e->rhs->kind == ExprKind::kIdentifier &&
+         IsNamePath(e->lhs);
+}
+
+// §6.16 with §8.10 and §8.11: the class scope a bare name inside a method
+// resolves against -- the class whose static property it names, the running
+// method's class, or the object's own -- as EvalIdentifierClassScope
+// (evaluation.cpp) resolves it; nullptr outside every method.
+static const ClassTypeInfo* BareNameClassScope(std::string_view name,
+                                               SimContext& ctx) {
+  const ClassTypeInfo* method_cls = ctx.CurrentMethodClass();
+  if (method_cls != nullptr) {
+    const ClassTypeInfo* owner = method_cls->StaticPropertyOwner(name);
+    return owner != nullptr ? owner : method_cls;
+  }
+  const ClassObject* self = ctx.CurrentThis();
+  return self != nullptr ? self->type : nullptr;
+}
+
+// The text of a string property named bare inside a method of its class
+// (§8.6, §8.10). A variable of the name is what the identifier denotes
+// instead (§23.9), and a string one is TryEvalStringMethodCall's own case;
+// `this` names no property.
+static bool ReadBareStringProperty(const Expr* name, SimContext& ctx,
+                                   Arena& arena, std::string& str) {
+  if (name->text == "this" || NameDenotesVariable(name->text, ctx))
+    return false;
+  if (!PropertyIsString(BareNameClassScope(name->text, ctx), name->text))
+    return false;
+  str = Logic4VecToString(EvalExpr(name, ctx, arena));
+  return true;
+}
+
+// The text of a static string property named through the class scope
+// resolution operator, `C::name` (§8.9).
+static bool ReadScopedStringProperty(const Expr* access, SimContext& ctx,
+                                     Arena& arena, std::string& str) {
+  if (access->lhs->kind != ExprKind::kIdentifier) return false;
+  if (!PropertyIsString(ctx.FindClassType(access->lhs->text),
+                        access->rhs->text)) {
+    return false;
+  }
+  str = Logic4VecToString(EvalExpr(access, ctx, arena));
+  return true;
+}
+
+// The text of a string property reached through a handle or a chain of them,
+// `h.s`, `this.s` or `d.c.s` (§8.3, §8.11); the handle side is a name path,
+// so reading it to find the object runs nothing.
+static bool ReadHandleStringProperty(const Expr* access, SimContext& ctx,
+                                     Arena& arena, std::string& str) {
+  if (!IsNamePath(access->lhs)) return false;
+  const ClassObject* obj =
+      ctx.GetClassObject(EvalExpr(access->lhs, ctx, arena).ToUint64());
+  if (obj == nullptr || !PropertyIsString(obj->type, access->rhs->text))
+    return false;
+  str = Logic4VecToString(obj->GetProperty(access->rhs->text, arena));
+  return true;
+}
+
+// §6.16 declares the string methods on the string type, so a method is called
+// on any expression of that type, and the receivers of this file's other two
+// readers -- a string variable of the run's tables, a package's under its
+// scoped key -- are two of them. The text of the others, when the declaration
+// behind the receiver wrote the string type: a class property named bare
+// inside a method of the class, a static property named bare in a static
+// method or as `C::name`, or a property reached through a handle or a chain
+// of them. The declaration is asked because the value read is not: a literal
+// stored into the property is a packed value (§5.9) that carries no kind.
+// Answers false for any other receiver, a call's result among them, which
+// TryEvalCallResultMethodCall reads by the kind the call's value carries.
+static bool ReadStringReceiver(const Expr* receiver, SimContext& ctx,
+                               Arena& arena, std::string& str) {
+  if (receiver == nullptr) return false;
+  if (receiver->kind == ExprKind::kIdentifier)
+    return ReadBareStringProperty(receiver, ctx, arena, str);
+  if (receiver->kind != ExprKind::kMemberAccess || receiver->lhs == nullptr ||
+      receiver->rhs == nullptr ||
+      receiver->rhs->kind != ExprKind::kIdentifier) {
+    return false;
+  }
+  if (receiver->is_scope_resolution)
+    return ReadScopedStringProperty(receiver, ctx, arena, str);
+  return ReadHandleStringProperty(receiver, ctx, arena, str);
+}
+
+bool TryEvalStringMethodOnValue(const Logic4Vec& value, std::string_view method,
+                                const Expr* call_expr, SimContext& ctx,
+                                Arena& arena, Logic4Vec& out) {
+  if (!StringMethodAnswersAValue(method)) return false;
+  StringMethodArgs args{nullptr, Logic4VecToString(value), call_expr, ctx,
+                        arena};
+  return DispatchReturningMethod(method, args, out);
+}
+
+// The value-answering methods on a receiver ReadStringReceiver reads. The
+// name is asked first so that a receiver is evaluated for a string method
+// alone: a call of a class's own method on a chain of handles is left to the
+// dispatcher that runs it, its receiver read once, there.
+static bool TryEvalStringMethodOnReceiver(const Expr* expr, SimContext& ctx,
+                                          Arena& arena, Logic4Vec& out) {
+  const Expr* access = expr->lhs;
+  if (access == nullptr || access->kind != ExprKind::kMemberAccess ||
+      access->rhs == nullptr || access->rhs->kind != ExprKind::kIdentifier ||
+      !StringMethodAnswersAValue(access->rhs->text)) {
+    return false;
+  }
+  std::string str;
+  if (!ReadStringReceiver(access->lhs, ctx, arena, str)) return false;
+  StringMethodArgs args{nullptr, str, expr, ctx, arena};
+  return DispatchReturningMethod(access->rhs->text, args, out);
+}
+
 bool TryEvalStringMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
                              Logic4Vec& out) {
   MethodCallParts parts;
@@ -424,10 +565,17 @@ bool TryEvalStringMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
   if (ExtractScopedStringMethodParts(expr, scoped_key, parts.method_name)) {
     parts.var_name = scoped_key;
   } else if (!ExtractMethodCallParts(expr, parts)) {
-    return false;
+    return TryEvalStringMethodOnReceiver(expr, ctx, arena, out);
   }
 
-  if (!ctx.IsStringVariable(parts.var_name)) return false;
+  // §23.9 with §8.6: a bare name inside a method that the class scope declares
+  // is the property, not a like-named string of the enclosing module, which
+  // NameDenotesVariable tells apart as EvalIdentifier does; asked of the
+  // tables alone, `s.len()` in a method read the module's s.
+  if (!ctx.IsStringVariable(parts.var_name) ||
+      !NameDenotesVariable(parts.var_name, ctx)) {
+    return TryEvalStringMethodOnReceiver(expr, ctx, arena, out);
+  }
 
   auto* var = ctx.FindVariable(parts.var_name);
   std::string str = var ? Logic4VecToString(var->value) : "";
