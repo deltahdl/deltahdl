@@ -117,3 +117,11 @@ def test_a_file_the_suite_tags_on_the_next_subclause_is_judged_by_the_rule_it_te
     rst: ModuleType,
 ) -> None:
     assert rst.tagged_clause({"tags": "9.3.3"}, "9.3.3--fork_return.sv") == "9.3.2"
+
+
+def test_a_file_the_suite_tags_one_subclause_off_is_judged_by_the_rule_it_tests(
+    rst: ModuleType,
+) -> None:
+    assert rst.tagged_clause(
+        {"tags": "18.8"}, "18.9--controlling-constraints-with-constraint_mode_1.sv",
+    ) == "18.9"
