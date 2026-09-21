@@ -410,6 +410,20 @@ void ApplyBodyParamAssignment(RtlirParamDecl& pd, const ModuleItem* item,
 
 }  // namespace
 
+// §6.20.2 (printed page 126): a parameter declared with neither type nor
+// range whose value is real is a real parameter, so it joins the set
+// §11.5.1's rejection of a select on one reads, as a declared real one does
+// through PopulateValueParamInfo and on the same terms: a parameter carrying
+// an unpacked dimension stays out, §11.5.2 making an address after its name
+// an element select. Its own function because ElaborateParamDecl is at the
+// cognitive complexity limit.
+static void RecordUntypedRealParam(
+    const RtlirParamDecl& pd, const ModuleItem* item,
+    std::unordered_set<std::string_view>& real_param_names) {
+  if (pd.is_real_value && item->unpacked_dims.empty())
+    real_param_names.insert(item->name);
+}
+
 void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
   bool is_type = item->data_type.kind == DataTypeKind::kVoid &&
                  item->typedef_type.kind != DataTypeKind::kImplicit;
@@ -475,12 +489,7 @@ void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
     }
     ValidateTypenameAsElabConstant(item->init_expr);
     ResolveParamConstValue(pd, item, is_type, kScope, arena_);
-    // §6.20.2 (printed page 126): a parameter declared with neither type nor
-    // range whose value is real is a real parameter, so it joins the set
-    // §11.5.1's rejection of a select on one reads, as a declared real one
-    // did through PopulateValueParamInfo.
-    if (pd.is_real_value && item->unpacked_dims.empty())
-      real_param_names_.insert(item->name);
+    RecordUntypedRealParam(pd, item, real_param_names_);
   }
   mod->params.push_back(pd);
 
