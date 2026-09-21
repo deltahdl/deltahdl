@@ -344,6 +344,34 @@ TEST(Preprocessor, Include_FromMacroBodyExpansion) {
   EXPECT_NE(result.find("wire via_macro;"), std::string::npos);
 }
 
+// §22.5.1 (printed page 710) has a macro's compiler directive take effect
+// when the macro is used and makes a macro recursive only where it expands
+// to text holding a usage of itself; the rest of the line a usage stands on
+// is no part of its text. Two usages of DO_INCLUDE on one line, each
+// expanding to a whole `include, are two directives, and both files'
+// contents are in the result with nothing reported. This is the suite's
+// 22.4--include_via_define.sv (#2921): the second usage was expanded while
+// the first still stood on the expansion stack and was reported as a
+// recursive expansion, and its text was then appended to the first's
+// `include line, which reported the trailing text (§22.4).
+TEST(Preprocessor, Include_TwoMacroUsagesOnOneLineAreTwoIncludes) {
+  IncludeTestDir tmp;
+  tmp.WriteFile("first.svh", "wire first_included;\n");
+  tmp.WriteFile("second.svh", "wire second_included;\n");
+
+  PreprocFixture f;
+  auto fid =
+      f.mgr.AddFile((tmp.dir / "top.sv").string(),
+                    "`define DO_INCLUDE(FN) `include FN\n"
+                    "`DO_INCLUDE(\"first.svh\") `DO_INCLUDE(\"second.svh\")\n");
+  Preprocessor pp(f.mgr, f.diag, {});
+  auto result = pp.Preprocess(fid);
+
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("wire first_included;"), std::string::npos);
+  EXPECT_NE(result.find("wire second_included;"), std::string::npos);
+}
+
 TEST(Preprocessor, Include_DoubleQuote_FallsBackToIncludeDirs) {
   IncludeTestDir tmp;
   fs::create_directories(tmp.dir / "inc");
