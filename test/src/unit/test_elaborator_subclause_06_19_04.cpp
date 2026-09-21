@@ -21,8 +21,11 @@ using namespace delta;
 
 namespace {
 
-// A compound assignment assigns an expression to the enum variable, which
-// §6.19.3 admits only through an explicit cast.
+// A compound assignment adds to the enum variable and assigns the sum back,
+// so the variable is an operand of a numerical expression: §6.19.4 auto-casts
+// it to the base type there and requires a cast to assign the result to the
+// variable, whose type the sum's is not. §6.19.3 states the cast for a value
+// outside the enumeration, so it is the §6.19.4 rule the report cites.
 TEST(EnumNumericalExpr, EnumArithNoCast_Error) {
   ElabFixture f;
   ElaborateSrc(
@@ -37,7 +40,7 @@ TEST(EnumNumericalExpr, EnumArithNoCast_Error) {
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "compound assignment to enum variable without cast",
-                            6, "6.19.3"));
+                            6, "6.19.4"));
 }
 
 TEST(EnumNumericalExpr, EnumToIntAutocast_Ok) {
@@ -81,7 +84,8 @@ TEST(EnumNumericalExpr, EnumIntComparison_Ok) {
 }
 
 // C + 1 is a numerical expression §6.19.4 permits, and assigning it back to an
-// enum variable is what §6.19.3 requires a cast for.
+// enum variable is what the same clause requires a cast for, since the sum's
+// type is the base type and not the enumeration's.
 TEST(EnumNumericalExpr, EnumExprAssignNoCast_Error) {
   ElabFixture f;
   ElaborateSrc(
@@ -91,6 +95,89 @@ TEST(EnumNumericalExpr, EnumExprAssignNoCast_Error) {
       "    Colors C;\n"
       "    C = Red;\n"
       "    C = C + 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "integer assigned to enum variable without cast", 6,
+                            "6.19.4"));
+}
+
+// The expression need not name the variable it is assigned to: a member of the
+// enumeration is an enum identifier used as part of an expression, which
+// §6.19.4 auto-casts to the base type, so `Red + 1` is that clause's case too.
+TEST(EnumNumericalExpr, EnumMemberExprAssignNoCastIsAClause6194Report) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top();\n"
+      "  typedef enum {Red, Green, Blue} Colors;\n"
+      "  initial begin\n"
+      "    Colors C;\n"
+      "    C = Red + 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "integer assigned to enum variable without cast", 5,
+                            "6.19.4"));
+}
+
+// The enumeration methods first, last, next and prev return a value of the
+// enumeration type (§6.19.5), so `C.next + 1` is arithmetic on an enum value
+// and the assignment back is §6.19.4's case. A walk that stopped at every
+// member access as it does at `c.num()` would call this §6.19.3.
+TEST(EnumNumericalExpr, EnumMethodResultExprAssignNoCastIsAClause6194Report) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top();\n"
+      "  typedef enum {Red, Green, Blue} Colors;\n"
+      "  initial begin\n"
+      "    Colors C;\n"
+      "    C = Red;\n"
+      "    C = C.next + 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "integer assigned to enum variable without cast", 6,
+                            "6.19.4"));
+}
+
+// A declaration's initializer is an assignment of the value to the variable,
+// so an initializer that is arithmetic on an enum member is §6.19.4's case
+// wherever the declaration stands: as a module item and as a procedural
+// declaration, which two different walks judge.
+TEST(EnumNumericalExpr, EnumExprInitializersAreClause6194Reports) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top();\n"
+      "  typedef enum {Red, Green, Blue} Colors;\n"
+      "  Colors M = Green + 1;\n"
+      "  initial begin\n"
+      "    Colors P = Blue * 2;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "integer assigned to enum variable without cast", 3,
+                            "6.19.4"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "integer assigned to enum variable without cast", 5,
+                            "6.19.4"));
+}
+
+// An expression with no enum operand is an arbitrary expression of another
+// type, whose cast §6.19.3 states; §6.19.4 speaks only of expressions an enum
+// takes part in. A fix that cited §6.19.4 for every non-bare value fails here.
+TEST(EnumNumericalExpr, IntegerExprAssignNoCastStaysAClause6193Report) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top();\n"
+      "  typedef enum {Red, Green, Blue} Colors;\n"
+      "  int x;\n"
+      "  initial begin\n"
+      "    Colors C;\n"
+      "    C = x + 1;\n"
       "  end\n"
       "endmodule\n",
       f);
@@ -172,8 +259,8 @@ TEST(EnumNumericalExpr, EnumExplicitBaseAutocast_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// An increment is the same assignment written a third way, and it is reported
-// under the same §6.19.3 requirement.
+// An increment is the same assignment written a third way, §11.4.2 having
+// `C++` stand for `C = C + 1`, so it is reported under the same §6.19.4 rule.
 TEST(EnumNumericalExpr, EnumIncrementNoCast_Error) {
   ElabFixture f;
   ElaborateSrc(
@@ -188,7 +275,7 @@ TEST(EnumNumericalExpr, EnumIncrementNoCast_Error) {
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "increment/decrement of enum variable without cast",
-                            6, "6.19.3"));
+                            6, "6.19.4"));
 }
 
 }  // namespace

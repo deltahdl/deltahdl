@@ -461,21 +461,68 @@ static bool IsBareEnumAssignable(const Expr* e, const CompilationUnit* unit) {
                IsPackageEnumMemberRef(e, unit) || IsEnumTypedMethodResult(e));
 }
 
+// What EnumValueSubclause reads to find an enum among a value's operands: the
+// enum variables and enumeration members in scope, and the compilation unit
+// that resolves a package-scoped member.
+struct EnumOperandNames {
+  const NameSet& enum_vars;
+  const NameSet& enum_members;
+  const CompilationUnit* unit;
+};
+
+// True when an enum variable, an enumeration member or an enumeration-typed
+// method result is an operand of `e`: §6.19.4 has an enum identifier used as
+// part of an expression auto-cast to the enumeration's base type. A member
+// access or a call other than those methods is a value of its own type, so the
+// walk stops there: the receiver of `c.num()` takes part in no arithmetic.
+static bool ExprHasEnumOperand(const Expr* e, const EnumOperandNames& names) {
+  if (!e) return false;
+  if (e->kind == ExprKind::kIdentifier) {
+    return names.enum_vars.count(e->text) != 0 ||
+           names.enum_members.count(e->text) != 0;
+  }
+  if (IsEnumTypedMethodResult(e) || IsPackageEnumMemberRef(e, names.unit)) {
+    return true;
+  }
+  if (e->kind == ExprKind::kMemberAccess || e->kind == ExprKind::kCall) {
+    return false;
+  }
+  return AnyExprChild(e, [&names](const Expr* child) {
+    return ExprHasEnumOperand(child, names);
+  });
+}
+
+// The clause the cast a value bound for an enum variable lacks is stated in.
+// Two clauses state it: §6.19.3, that an enum variable is not directly assigned
+// a value outside its enumeration, and an arbitrary expression only through a
+// cast; and §6.19.4, that an enum used as part of a numerical expression is
+// auto-cast to the base type and a cast is required to assign an expression
+// whose type is not the enumeration's back to an enum variable. A value that
+// has an enum among its operands is §6.19.4's case, and any other value is
+// §6.19.3's. The value is known not to be bare-assignable when this is asked.
+static std::string_view EnumValueSubclause(const Expr* value,
+                                           const EnumOperandNames& names) {
+  return ExprHasEnumOperand(value, names) ? "6.19.4" : "6.19.3";
+}
+
 void Elaborator::CheckEnumAssignStmt(const Stmt* s) {
   auto name = ExprIdent(s->lhs);
   if (name.empty()) return;
   if (enum_var_names_.count(name) == 0) return;
   if (s->rhs && s->rhs->kind == ExprKind::kBinary &&
       IsCompoundAssignOp(s->rhs->op)) {
+    // §11.4.2 has `val += 1` stand for `val = val + 1`, so the variable is an
+    // operand of the expression assigned to it and the case is §6.19.4's.
     diag_.Error(s->range.start,
                 "compound assignment to enum variable without cast",
-                Subclause("6.19.3"));
+                Subclause("6.19.4"));
     return;
   }
   if (!s->rhs) return;
   if (IsBareEnumAssignable(s->rhs, unit_)) return;
   diag_.Error(s->range.start, "integer assigned to enum variable without cast",
-              Subclause("6.19.3"));
+              Subclause(EnumValueSubclause(
+                  s->rhs, {enum_var_names_, enum_member_names_, unit_})));
 }
 
 static bool FormalIsEnumType(const DataType& formal,
@@ -572,7 +619,9 @@ bool StmtIsPostfixIncDec(const Stmt* s) {
 }
 
 // Reports an unguarded ++/-- on an enum variable (callers ensure the statement
-// is a postfix unary expression statement).
+// is a postfix unary expression statement). §11.4.2 has `val++` stand for
+// `val = val + 1`, the variable being an operand of the expression assigned to
+// it, so the cast it lacks is the one §6.19.4 states.
 void CheckEnumIncDecStmt(const Stmt* s,
                          const std::unordered_set<std::string_view>& enum_vars,
                          DiagEngine& diag) {
@@ -580,7 +629,7 @@ void CheckEnumIncDecStmt(const Stmt* s,
   if (!name.empty() && enum_vars.count(name) != 0) {
     diag.Error(s->range.start,
                "increment/decrement of enum variable without cast",
-               Subclause("6.19.3"));
+               Subclause("6.19.4"));
   }
 }
 
@@ -619,9 +668,10 @@ void Elaborator::WalkStmtsForEnumAssign(const Stmt* s) {
   if (StmtDeclaresEnumVar(s, typedefs_)) {
     enum_var_names_.insert(s->var_name);
     if (s->var_init && !IsBareEnumAssignable(s->var_init, unit_)) {
-      diag_.Error(s->range.start,
-                  "integer assigned to enum variable without cast",
-                  Subclause("6.19.3"));
+      diag_.Error(
+          s->range.start, "integer assigned to enum variable without cast",
+          Subclause(EnumValueSubclause(
+              s->var_init, {enum_var_names_, enum_member_names_, unit_})));
     }
   } else if (StmtIsProceduralAssign(s)) {
     CheckEnumAssignStmt(s);
@@ -652,8 +702,10 @@ void Elaborator::ValidateEnumAssignments(const ModuleDecl* decl) {
     if (item->kind == ModuleItemKind::kVarDecl &&
         enum_var_names_.count(item->name) != 0 && item->init_expr &&
         !IsBareEnumAssignable(item->init_expr, unit_)) {
-      diag_.Error(item->loc, "integer assigned to enum variable without cast",
-                  Subclause("6.19.3"));
+      diag_.Error(
+          item->loc, "integer assigned to enum variable without cast",
+          Subclause(EnumValueSubclause(
+              item->init_expr, {enum_var_names_, enum_member_names_, unit_})));
     }
     bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body) {

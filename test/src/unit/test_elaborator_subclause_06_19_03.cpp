@@ -104,9 +104,10 @@ TEST(Elaboration, EnumExprAssignNoCast_Error) {
                             "6.19.3"));
 }
 
-// §6.19.3: a compound assignment writes the arithmetic result back into the
-// enum variable, which is an arbitrary-expression assignment and therefore
-// requires an explicit cast — without one the strong-typing rule is violated.
+// A compound assignment writes the arithmetic result back into the enum
+// variable, which is an operand of that arithmetic, so the cast it lacks is the
+// one §6.19.4 states for an expression an enum takes part in; §6.19.3's own
+// case is a value outside the enumeration, and the report is a §6.19.4 one.
 TEST(Elaboration, EnumCompoundAssign_Error) {
   ElabFixture f;
   ElaborateSrc(
@@ -120,11 +121,12 @@ TEST(Elaboration, EnumCompoundAssign_Error) {
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "compound assignment to enum variable without cast",
-                            5, "6.19.3"));
+                            5, "6.19.4"));
 }
 
-// §6.19.3: an increment likewise stores an integral result into the enum
-// variable without a cast, so the strong-typing rule rejects it.
+// An increment likewise stores the result of arithmetic on the enum variable
+// back into it without a cast, and is reported under §6.19.4 as the compound
+// assignment is.
 TEST(Elaboration, EnumIncrement_Error) {
   ElabFixture f;
   ElaborateSrc(
@@ -138,7 +140,7 @@ TEST(Elaboration, EnumIncrement_Error) {
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "increment/decrement of enum variable without cast",
-                            5, "6.19.3"));
+                            5, "6.19.4"));
 }
 
 TEST(Elaboration, EnumLocalVarInitInt_Error) {
@@ -643,9 +645,9 @@ TEST(Elaboration, EnumDeclaredInAForHeaderWithAnIntegerIsReported) {
 
 // The half that compounds: because the declaration was not judged the variable
 // was not registered, so nothing assigned to it anywhere in the loop was judged
-// either. The step assigns the integer result of an addition, and the header
-// declares its variable with a cast so that the report this asserts is the
-// step's rather than the declaration's.
+// either. The step assigns the integer result of an addition on the variable,
+// which is §6.19.4's case, and the header declares its variable with a cast so
+// that the report this asserts is the step's rather than the declaration's.
 TEST(Elaboration, AssignmentToAForHeaderEnumVariableIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -658,7 +660,7 @@ TEST(Elaboration, AssignmentToAForHeaderEnumVariableIsReported) {
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "integer assigned to enum variable without cast", 4,
-                            "6.19.3"));
+                            "6.19.4"));
 }
 
 // §6.19.3 admits a cast, so a header that writes one is accepted and the loop
