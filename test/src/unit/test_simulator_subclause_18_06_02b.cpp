@@ -119,4 +119,31 @@ TEST(PrePostRandomizeRun, AnOverrideRunsTheBasesStepsThroughSuperAlone) {
   EXPECT_EQ(out, "1 1 2 0 0 4\n");
 }
 
+// 18.6.2: post_randomize() runs after the new values are assigned, and
+// nothing of randomize() runs after it, so a value it writes to a random
+// variable is the value the caller reads -- the method is a hook that can
+// change the result, not a notification of it. The constraint keeps the
+// solver's own value above 100, so a 5 read back is post_randomize()'s and
+// not a draw.
+TEST(PrePostRandomizeRun, AValuePostRandomizeAssignsIsWhatTheCallerReads) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class Fixer;\n"
+      "  rand bit [7:0] x;\n"
+      "  function void post_randomize();\n"
+      "    x = 5;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  int ok;\n"
+      "  initial begin\n"
+      "    Fixer fx = new;\n"
+      "    ok = fx.randomize() with { x > 100; };\n"
+      "    $display(\"%0d %0d\", ok, fx.x);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 5\n");
+}
+
 }  // namespace
