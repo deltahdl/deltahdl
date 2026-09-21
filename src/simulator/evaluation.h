@@ -15,6 +15,7 @@
 namespace delta {
 
 struct DataType;
+struct EnumTypeInfo;
 struct Expr;
 struct ModuleItem;
 struct StructTypeInfo;
