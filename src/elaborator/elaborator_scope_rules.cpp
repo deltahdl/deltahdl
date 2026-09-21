@@ -793,6 +793,25 @@ void Elaborator::ValidateUnresolvedReferences(const ModuleDecl* decl,
 // ForEachEnumTypeOfItem) and its own imports, on top of the unit's. The body's
 // formals, locals and body-level imports are the walk's own business, as they
 // are for a module's subroutine.
+// The names a package's own items declare: each named item, and the members
+// of every enumeration an item declares (§6.19), folded against `constants`.
+static std::unordered_set<std::string> PackageDeclaredNames(
+    const PackageDecl* pkg, const ScopeMap& constants) {
+  std::unordered_set<std::string> pkg_names;
+  for (const auto* item : pkg->items) {
+    if (item == nullptr) continue;
+    if (!item->name.empty()) pkg_names.insert(std::string(item->name));
+    ForEachEnumTypeOfItem(
+        item, [&](std::string_view, const DataType& enum_type) {
+          for (const auto& member : enum_type.enum_members) {
+            for (auto& n : EnumMemberDeclaredNames(member, constants))
+              pkg_names.insert(std::move(n));
+          }
+        });
+  }
+  return pkg_names;
+}
+
 void ReportUnresolvedInUnitScopeSubroutines(const CompilationUnit* unit,
                                             const UnitScopeNames& names,
                                             ProvidedNameCache& provided_cache,
@@ -806,18 +825,8 @@ void ReportUnresolvedInUnitScopeSubroutines(const CompilationUnit* unit,
                              provided_cache, diag);
   for (const auto* pkg : unit->packages) {
     if (pkg == nullptr) continue;
-    std::unordered_set<std::string> pkg_names;
-    for (const auto* item : pkg->items) {
-      if (item == nullptr) continue;
-      if (!item->name.empty()) pkg_names.insert(std::string(item->name));
-      ForEachEnumTypeOfItem(
-          item, [&](std::string_view, const DataType& enum_type) {
-            for (const auto& member : enum_type.enum_members) {
-              for (auto& n : EnumMemberDeclaredNames(member, names.constants))
-                pkg_names.insert(std::move(n));
-            }
-          });
-    }
+    std::unordered_set<std::string> pkg_names =
+        PackageDeclaredNames(pkg, names.constants);
     auto pkg_declares = [&](std::string_view n) {
       return pkg_names.count(std::string(n)) != 0 || unit_declares(n) ||
              ImportsProvideName(unit, provided_cache, pkg->items, n);
