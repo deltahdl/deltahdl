@@ -126,7 +126,8 @@ void ClassConstraintValidator::ValidateOneClassRandomVariables(
 }
 
 void ClassConstraintValidator::ValidateRandomVariableTypes() {
-  for (const auto* cls : unit_->classes) ValidateOneClassRandomVariables(cls);
+  for (const auto* cls : AllClassDecls(unit_))
+    ValidateOneClassRandomVariables(cls);
 }
 
 // 18.5: constraint block names shall be unique within a class.
@@ -147,7 +148,8 @@ void ClassConstraintValidator::ValidateOneClassConstraintNames(
 }
 
 void ClassConstraintValidator::ValidateConstraintBlockNames() {
-  for (const auto* cls : unit_->classes) ValidateOneClassConstraintNames(cls);
+  for (const auto* cls : AllClassDecls(unit_))
+    ValidateOneClassConstraintNames(cls);
 }
 
 // 18.5.7.1: the dimension count of a class property whose dimensions are fully
@@ -229,15 +231,14 @@ void ClassConstraintValidator::ValidateOneClassForeachConstraintDims(
 }
 
 void ClassConstraintValidator::ValidateForeachConstraintDims() {
-  for (const auto* cls : unit_->classes)
+  for (const auto* cls : AllClassDecls(unit_))
     ValidateOneClassForeachConstraintDims(cls);
 }
 
 // 18.5.3 lists among its limitations that a dist operation is not applied to a
 // randc variable. Both the qualifier and the distribution are declarations, so
 // the breach is decided from the class text and reported here, at the
-// distributed variable, rather than left to the randomize() call the solver
-// refuses at run time (constraint_solver.cpp, HasDistOnRandc), which a design
+// distributed variable, rather than left to a randomize() call, which a design
 // that never randomizes the object would not reach.
 //
 // 18.5.3 also requires that a range of real values in a distribution use the :/
@@ -290,7 +291,8 @@ void ClassConstraintValidator::ValidateOneClassDistConstraints(
 }
 
 void ClassConstraintValidator::ValidateDistConstraints() {
-  for (const auto* cls : unit_->classes) ValidateOneClassDistConstraints(cls);
+  for (const auto* cls : AllClassDecls(unit_))
+    ValidateOneClassDistConstraints(cls);
 }
 
 // 18.5.4 / footnote 13: a range_list member of a uniqueness constraint denotes
@@ -364,7 +366,8 @@ void ClassConstraintValidator::ValidateOneClassUniqueConstraints(
 }
 
 void ClassConstraintValidator::ValidateUniqueConstraints() {
-  for (const auto* cls : unit_->classes) ValidateOneClassUniqueConstraints(cls);
+  for (const auto* cls : AllClassDecls(unit_))
+    ValidateOneClassUniqueConstraints(cls);
 }
 
 // 18.5.9: a variable named in a solve...before ordering shall be of integral or
@@ -566,7 +569,7 @@ void ClassConstraintValidator::ValidateOneClassSolveBeforeConstraints(
 }
 
 void ClassConstraintValidator::ValidateSolveBeforeConstraints() {
-  for (const auto* cls : unit_->classes)
+  for (const auto* cls : AllClassDecls(unit_))
     ValidateOneClassSolveBeforeConstraints(cls);
 }
 
@@ -598,7 +601,7 @@ void ClassConstraintValidator::ValidateOneClassSoftConstraintVariables(
 }
 
 void ClassConstraintValidator::ValidateSoftConstraintVariables() {
-  for (const auto* cls : unit_->classes)
+  for (const auto* cls : AllClassDecls(unit_))
     ValidateOneClassSoftConstraintVariables(cls);
 }
 

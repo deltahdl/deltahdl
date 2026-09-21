@@ -145,4 +145,63 @@ TEST(DistOnRandc, InheritedRandcTargetRejected) {
       "18.5.3"));
 }
 
+// 18.5.3: the limitation holds wherever the class is declared. §8.1 lets a
+// class be declared inside a module, and such a class is not in the compilation
+// unit's own class list, so the report on line 4 says the check walks the
+// module's classes as well.
+TEST(DistOnRandc, ModuleScopedClassRejected) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  class a;\n"
+             "    randc int b;\n"
+             "    constraint c { b dist {3 := 0, 10 := 5}; }\n"
+             "  endclass\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "a dist constraint may not be applied to randc variable 'b'", 4,
+      "18.5.3"));
+}
+
+// 18.5.3: the same for a class declared inside a package, which the parser
+// records as a package item rather than a compilation-unit class.
+TEST(DistOnRandc, PackageScopedClassRejected) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("package p;\n"
+             "  class a;\n"
+             "    randc int b;\n"
+             "    constraint c { b dist {3 := 0, 10 := 5}; }\n"
+             "  endclass\n"
+             "endpackage\n"
+             "module m; endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "a dist constraint may not be applied to randc variable 'b'", 4,
+      "18.5.3"));
+}
+
+// 18.5.3: the same for a class nested in another class's body (§8.23), which
+// the parser keeps as a member of the outer class rather than in any scope's
+// list; the report on line 4 is the inner class's dist.
+TEST(DistOnRandc, NestedClassRejected) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("class Outer;\n"
+             "  class Inner;\n"
+             "    randc int b;\n"
+             "    constraint c { b dist {3 := 0, 10 := 5}; }\n"
+             "  endclass\n"
+             "endclass\n"
+             "module m; endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "a dist constraint may not be applied to randc variable 'b'", 4,
+      "18.5.3"));
+}
+
 }  // namespace

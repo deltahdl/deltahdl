@@ -17,7 +17,10 @@ namespace delta {
 // external-block and inheritance rules on constraint prototypes. They read the
 // compilation unit and its typedef table and report through the diagnostic
 // engine, so they form a unit of their own rather than further members of the
-// elaborator.
+// elaborator. The per-class rules walk every class the unit declares, in a
+// module, interface, program, checker or package as well as at the top of a
+// file (AllClassDecls in elaborator_helpers.h); the external-block rules read
+// the compilation unit's own classes, the scope an external block shares.
 class ClassConstraintValidator {
  public:
   ClassConstraintValidator(const CompilationUnit* unit,

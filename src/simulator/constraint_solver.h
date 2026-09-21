@@ -536,9 +536,6 @@ class ConstraintSolver {
   bool DistValueAdmissible(const std::string& name,
                            const std::vector<ConstraintExpr>& extra) const;
 
-  // 18.5.3: a dist operation shall not be applied to a randc variable. True if
-  // any enabled constraint block applies a distribution to a randc variable.
-  bool HasDistOnRandc() const;
   // 18.6.1: whether an active variable's domain holds no value.
   bool HasEmptyDomain() const;
 

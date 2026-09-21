@@ -410,29 +410,6 @@ TEST(ConstraintDist, DefaultCoversRemainderOfDomain) {
   EXPECT_GT(RunAndGet(src, "cother"), 0u);
 }
 
-// 18.5.3: a dist operation shall not be applied to a randc variable, so a
-// distribution targeting one makes randomize() fail. The class is declared
-// inside the module: the elaborator rejects the same declaration as a
-// compilation-unit class (test_elaborator_subclause_18_05_03.cpp,
-// DistOnRandc.RandcTargetRejected), and its class-constraint validation walks
-// the compilation unit's classes alone, so a module-scoped class is what
-// reaches the solver's refusal that this case observes.
-TEST(ConstraintDist, DistOnRandcVariableFails) {
-  const char* src =
-      "module t;\n"
-      "  class C;\n"
-      "    randc int x;\n"
-      "    constraint c { x dist {10 := 1, 20 := 1}; }\n"
-      "  endclass\n"
-      "  int ok;\n"
-      "  initial begin\n"
-      "    C o = new;\n"
-      "    ok = o.randomize();\n"
-      "  end\n"
-      "endmodule\n";
-  EXPECT_EQ(RunAndGet(src, "ok"), 0u);
-}
-
 // 18.5.3: a dist expression requires that the expression contain at least one
 // rand variable. A distribution applied to a non-rand member supplies no rand
 // variable, so randomize() fails even though the class has an unrelated rand

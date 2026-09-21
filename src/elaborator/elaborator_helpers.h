@@ -261,6 +261,16 @@ std::string_view ExprIdent(const Expr* e);
 const ClassDecl* FindClassDecl(std::string_view name,
                                const CompilationUnit* unit);
 
+// Every class the unit declares, wherever it is declared: the compilation
+// unit's own list, which the parser fills from the classes at the top of a
+// file alone, then the class items of each module, interface, program,
+// checker and package, in that order, each followed by the classes nested in
+// its body (§8.23). §8.1 lets a class be declared wherever a data declaration
+// may appear, so a rule that walks the unit's own list passes over a class
+// written inside a module; a rule that walks this sees every one. Defined in
+// elaborator_validate_struct_types.cpp.
+std::vector<const ClassDecl*> AllClassDecls(const CompilationUnit* unit);
+
 // Whether any identifier or callee anywhere in `e` is one of `names`. A caller
 // that has failed to fold an expression asks this to tell a value it cannot
 // compute yet from one it can never compute.

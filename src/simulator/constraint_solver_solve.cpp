@@ -251,13 +251,12 @@ bool ConstraintSolver::SolveWith(
   // of the class via a shared static block before deciding which blocks apply.
   RefreshStaticBlockState();
 
-  // 18.5.3: a dist operation shall not be applied to a randc variable, and a
-  // dist expression requires at least one rand variable. A distribution that
-  // violates either limitation makes randomization fail outright. The
-  // elaborator already reports the randc form in a compilation-unit class
-  // (elaborator_validate_class_constraints.cpp); the refusal here is what a
-  // class its validation does not walk meets.
-  if (HasDistOnRandc()) return false;
+  // 18.5.3: a dist expression requires at least one rand variable. A
+  // distribution that lacks one makes randomization fail outright. The
+  // clause's other limitation, that a dist is not applied to a randc variable,
+  // is decided from the class text and reported by the elaborator
+  // (elaborator_validate_class_constraints.cpp), so no such distribution
+  // reaches the solver.
   if (DistLacksRandVariable()) return false;
 
   // 18.5.4: a uniqueness constraint group may not contain a randc variable and

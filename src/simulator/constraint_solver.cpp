@@ -341,21 +341,6 @@ bool ConstraintSolver::HasEmptyDomain() const {
   return false;
 }
 
-bool ConstraintSolver::HasDistOnRandc() const {
-  for (const auto& block : blocks_) {
-    if (!block.enabled) continue;
-    for (const auto& c : block.constraints) {
-      if (c.kind != ConstraintKind::kDist) continue;
-      auto it = variables_.find(c.var_name);
-      if (it != variables_.end() &&
-          it->second.qualifier == RandQualifier::kRandc) {
-        return true;
-      }
-    }
-  }
-  return false;
-}
-
 // 18.5.3: a dist expression requires that it contain at least one rand
 // variable. The distribution names the single variable it constrains, so that
 // target must resolve to an active rand variable; a target the solver does not

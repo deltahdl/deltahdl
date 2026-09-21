@@ -222,6 +222,38 @@ const ClassDecl* FindClassDecl(std::string_view name,
   return ambiguous ? nullptr : only;
 }
 
+// Appends `cls` and, after it, each class nested in its body (§8.23), which
+// the parser keeps as a kClassDecl member rather than in any scope's list.
+static void AppendClassAndNested(const ClassDecl* cls,
+                                 std::vector<const ClassDecl*>& out) {
+  out.push_back(cls);
+  for (const auto* m : cls->members) {
+    if (m->kind == ClassMemberKind::kClassDecl && m->nested_class != nullptr)
+      AppendClassAndNested(m->nested_class, out);
+  }
+}
+
+static void AppendClassDecls(const std::vector<ModuleItem*>& items,
+                             std::vector<const ClassDecl*>& out) {
+  for (const auto* item : items) {
+    if (item != nullptr && item->kind == ModuleItemKind::kClassDecl &&
+        item->class_decl != nullptr) {
+      AppendClassAndNested(item->class_decl, out);
+    }
+  }
+}
+
+std::vector<const ClassDecl*> AllClassDecls(const CompilationUnit* unit) {
+  std::vector<const ClassDecl*> out;
+  for (const auto* cls : unit->classes) AppendClassAndNested(cls, out);
+  for (const auto* group :
+       {&unit->modules, &unit->interfaces, &unit->programs, &unit->checkers}) {
+    for (const auto* decl : *group) AppendClassDecls(decl->items, out);
+  }
+  for (const auto* pkg : unit->packages) AppendClassDecls(pkg->items, out);
+  return out;
+}
+
 std::string_view NestedClassKey(const DataType& dtype,
                                 const CompilationUnit* unit, Arena& arena) {
   if (dtype.kind != DataTypeKind::kNamed || dtype.scope_name.empty()) return {};

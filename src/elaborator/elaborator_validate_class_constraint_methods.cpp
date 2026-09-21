@@ -204,7 +204,7 @@ void ClassConstraintValidator::ValidateOneClassConstraintFunctionArgs(
 }
 
 void ClassConstraintValidator::ValidateConstraintFunctionArgs() {
-  for (const auto* cls : unit_->classes)
+  for (const auto* cls : AllClassDecls(unit_))
     ValidateOneClassConstraintFunctionArgs(cls);
 }
 
@@ -275,7 +275,8 @@ void ClassConstraintValidator::ValidateOneClassBuiltinMethods(
 }
 
 void ClassConstraintValidator::ValidateBuiltinRandomizationMethods() {
-  for (const auto* cls : unit_->classes) ValidateOneClassBuiltinMethods(cls);
+  for (const auto* cls : AllClassDecls(unit_))
+    ValidateOneClassBuiltinMethods(cls);
 }
 
 // True when location 'a' lies strictly before location 'b' within one file.
@@ -556,7 +557,7 @@ static void ValidatePureConstraintConflicts(const ClassDecl* cls,
 }
 
 void ClassConstraintValidator::ValidateConstraintInheritance() {
-  for (const auto* cls : unit_->classes) {
+  for (const auto* cls : AllClassDecls(unit_)) {
     for (const auto* m : cls->members) {
       if (m->kind != ClassMemberKind::kConstraint) continue;
       // 18.5.2: a pure constraint is an obligation and may only appear in an
