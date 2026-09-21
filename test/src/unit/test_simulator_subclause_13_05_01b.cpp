@@ -62,4 +62,40 @@ TEST(PassByValueSim, PackageTaskMailboxFormalThroughThePackagesOwnTypedef) {
             1u);
 }
 
+// §13.5.1 with §8.2 (printed page 180): a formal declared with a class type
+// is passed the object handle, so it is as wide as one and the body may
+// assign it an object whatever the actual was. uvm_init's `cs =
+// dcs` under `uvm_coreservice_t cs = null` is this. init(null) and init()
+// both construct a D and store it in cs, whose get() reads D's 9, packed as
+// 909. The formal took the width of the actual it arrived with, and the
+// literal null is a bit wide, so the handle was cut to its low bit: 0, the
+// null that answered 1, or 1, the handle of the C the module constructed
+// first, whose get() answered 5.
+TEST(PassByValueSim, ClassFormalBoundFromNullHoldsTheObjectTheBodyAssigns) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  int k = 5;\n"
+                      "  function int get(); return k; endfunction\n"
+                      "endclass\n"
+                      "class D extends C;\n"
+                      "  function new(); k = 9; endfunction\n"
+                      "endclass\n"
+                      "function automatic int init(C cs = null);\n"
+                      "  D d;\n"
+                      "  if (cs == null) begin\n"
+                      "    d = new;\n"
+                      "    cs = d;\n"
+                      "  end\n"
+                      "  return cs == null ? 1 : cs.get();\n"
+                      "endfunction\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    C first = new;\n"
+                      "    result = init(null) * 100 + init();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            909u);
+}
+
 }  // namespace

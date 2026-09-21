@@ -8,6 +8,7 @@
 #include "common/types.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_type.h"
+#include "simulator/declared_class_key.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/eval_member_path.h"
 #include "simulator/evaluation.h"
@@ -206,20 +207,24 @@ bool TryBindNamedAggregateFormal(const FunctionArg& param, SimContext& ctx) {
 // input, output, or inout argument" an assignment-like context, so §10.7
 // truncates or extends into the formal's declared width.
 //
-// A class-typed formal is excluded, and answers no width at all rather than
-// 64. §8.3 makes a class variable a handle to an object, not an object of a
-// width, so there is nothing here for §10.7 to truncate; and the table would
-// answer for the name whether or not the width it answered meant anything.
-// §8.27's forward declaration `typedef class C;` is the case that shows why:
-// it records the name with no type behind it yet, which is DataTypeKind::
-// kImplicit, and §6.10 makes that a scalar -- so the table holds 1 for the
-// class, and resizing to it would leave one bit of a handle. Whether a class
-// name is in the table at all then turns on whether the design happens to
-// forward-declare it, which is no basis for a width. CreateFuncLocalVar asks
-// ctx.FindClassType the same question for the same reason.
+// A class-typed formal is passed the object handle (§8.2, printed page 180),
+// so it holds a handle and is as wide as CreateFuncLocalVar makes a body
+// local declared so, 64, rather than what the type table answers for the
+// name.
+// §8.27's forward declaration `typedef class C;` is the case that shows why
+// the table is not asked: it records the name with no type behind it yet,
+// which is DataTypeKind::kImplicit, and §6.10 makes that a scalar -- so the
+// table holds 1 for the class, and resizing to it would leave one bit of a
+// handle. The class is found as CreateFuncLocalVar finds it, by the key the
+// run holds it under (DeclaredClassKey), `Outer::Inner` for a nested one.
+// Answering no width at all left the formal as wide as the actual arrived,
+// and the literal null arrives a bit wide, so `uvm_coreservice_t cs = null`
+// bound from uvm_init(null) held one bit of the object `cs = dcs` stored:
+// the null handle, and uvm_coreservice_t::get() then re-entered uvm_init
+// without end.
 uint32_t EvalFormalArgWidth(const DataType& dt, SimContext& ctx, Arena& arena) {
   if (!dt.packed_dim_left || !dt.packed_dim_right) {
-    if (!dt.type_name.empty() && ctx.FindClassType(dt.type_name)) return 0;
+    if (!DeclaredClassKey(dt, ctx, arena).empty()) return 64;
     // §25.9: a virtual interface formal, declared by the type or by a typedef
     // name standing for it, holds the handle of the instance it represents,
     // as wide as Lowerer::LowerVar makes a variable declared so, which is
