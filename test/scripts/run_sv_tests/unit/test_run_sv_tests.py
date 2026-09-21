@@ -738,6 +738,18 @@ def test_rejection_under_the_rule_a_mistagged_file_tests_evaluates_as_a_pass(
     assert (ok, result["status"]) == (1, "pass")
 
 
+def test_rejection_under_the_rule_a_file_tagged_on_its_operation_tests_evaluates_as_a_pass(
+    rst: ModuleType, tmp_path: Path,
+) -> None:
+    sv = _write_expected_rejection(tmp_path, "7.4.3", "variable-slice-zero.sv")
+    result, ok = _evaluate_rejection_of_file(
+        rst, sv, 1,
+        "variable-slice-zero.sv:37:2: error: indexed part-select width must be"
+        " a positive constant (§11.5.1)\n",
+    )
+    assert (ok, result["status"]) == (1, "pass")
+
+
 def test_rejection_within_the_2023_number_of_a_renumbered_tag_evaluates_as_a_pass(
     rst: ModuleType, tmp_path: Path,
 ) -> None:

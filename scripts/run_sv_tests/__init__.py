@@ -303,6 +303,7 @@ _CLAUSE_PREFIX_RE = re.compile(r"(\d+(?:\.\d+)*)--")
 
 _CLAUSE_OF_MISTAGGED_FILE: dict[str, str] = {
     "13.4.4--fork-invalid.sv": "13.4",
+    "variable-slice-zero.sv": "11.5.1",
 }
 
 
