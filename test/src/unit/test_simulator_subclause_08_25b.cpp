@@ -132,4 +132,40 @@ TEST(ClassSim, ClassScopeTypedefOfASpecializationNamesThatSpecialization) {
   EXPECT_EQ(out, "a 4\nb 8\n");
 }
 
+// §8.25 (printed page 204 of IEEE 1800-2023): the actuals belong to the
+// specialization, which is the type, rather than to the declaration of the
+// variable each object is constructed on. Where the name the `new` is written
+// against is a typedef of a specialization, that declaration writes no
+// `#(...)` list of its own, so the actuals have to come from the type: D's
+// extends clause passes its own P to C's T, and the P the object stands under
+// is the one its specialization binds. Two typedefs of one class discriminate:
+// falling back to the parameter's default leaves both reads at real's 64, and
+// taking each specialization's own actual leaves integer's 32 and shortint's
+// 16.
+TEST(ClassSim, ConstructedThroughATypedefTheBaseTakesTheSpecializationsActual) {
+  SimFixture f;
+  auto out = RunCapture(
+      "class C #(type T = real);\n"
+      "  T x;\n"
+      "  function int w(); return $bits(x); endfunction\n"
+      "endclass\n"
+      "class D #(type P = real) extends C #(P);\n"
+      "endclass\n"
+      "class Holder;\n"
+      "  typedef D#(integer) di;\n"
+      "  typedef D#(shortint) ds;\n"
+      "  function int a(); di u = new; return u.w(); endfunction\n"
+      "  function int b(); ds v = new; return v.w(); endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  Holder h = new;\n"
+      "  initial begin\n"
+      "    $display(\"a %0d\", h.a());\n"
+      "    $display(\"b %0d\", h.b());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "a 32\nb 16\n");
+}
+
 }  // namespace

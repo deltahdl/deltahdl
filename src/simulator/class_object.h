@@ -67,6 +67,18 @@ struct ClassTypeInfo {
   // initializers included, so a frame running one carries this name as
   // Scope::package and SimContext::FindInPackageScope answers them.
   std::string_view package;
+  // §8.25 (printed page 204 of IEEE 1800-2023): the set of actual parameter
+  // values this type is the generic class together with, as the `#(...)` list
+  // naming the specialization wrote them, held in the arena so it outlives
+  // the list it was copied from (SpecializationOf in
+  // class_specialization.cpp). Null on the type registered for a class
+  // declaration, which is §8.25.1's default specialization and takes the
+  // declaration's own defaults. A name the specialization is reached by that
+  // writes no list of its own -- a typedef of it, `typedef D#(integer) di;`
+  // -- leaves the construction of `di u = new` nothing to bind the type
+  // parameters from, and this is what it reads instead
+  // (BindTypeParamActuals in eval_class_params.cpp).
+  const std::vector<DataType>* param_actuals = nullptr;
 
   struct PropertyInfo {
     std::string_view name;

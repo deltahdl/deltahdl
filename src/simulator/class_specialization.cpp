@@ -130,10 +130,17 @@ ClassTypeInfo* SpecializationOf(ClassTypeInfo* generic,
   // The declaration's type is copied rather than built again: the interfaces,
   // the members, the vtable and the methods are facts about the declaration
   // and are shared by every specialization, and only the static storage, the
-  // parameters standing in it and a base the actuals name are the
-  // specialization's own.
+  // parameters standing in it, the actuals themselves and a base the actuals
+  // name are the specialization's own.
   auto* spec = arena.Create<ClassTypeInfo>(*generic);
   spec->name = *arena.Create<std::string>(std::move(key));
+  // §8.25: the actuals are a fact about the specialization, which is the
+  // type, rather than about the declaration each object of it is constructed
+  // on, so the list is kept here; copied into the arena because a caller may
+  // have built it for the call alone (ScopeActuals above). Construction reads
+  // it where the name the `new` was written against carries no list of its
+  // own (BindTypeParamActuals in eval_class_params.cpp).
+  spec->param_actuals = arena.Create<std::vector<DataType>>(actuals);
   BindSpecializationBase(spec, actuals, ctx);
   for (auto& [pname, value] : values)
     spec->static_properties[std::string(pname)] = value;
