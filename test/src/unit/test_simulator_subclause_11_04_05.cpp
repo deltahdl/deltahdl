@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <string>
 #include <string_view>
 
 #include "builders_ast.h"
@@ -64,6 +66,51 @@ TEST(EqualityOperatorSim, LogicalInequalityAmbiguousZOperandYieldsX) {
   ASSERT_NE(r, nullptr);
   EXPECT_EQ(r->value.width, 1u);
   EXPECT_NE(r->value.words[0].bval & 1u, 0u);
+}
+
+// Runs `op` between a and b, two 8-bit logic variables holding the literals
+// `a` and `b`, and reads r as the known bit `want`, its unknown bit clear:
+// what §11.4.5 (printed page 279) promises where the relation is not
+// ambiguous.
+void ExpectKnownEquality(std::string_view a, std::string_view b,
+                         std::string_view op, uint64_t want) {
+  SimFixture f;
+  auto* r = RunAndFindVar(std::string("module t;\n"
+                                      "  logic [7:0] a, b;\n"
+                                      "  logic r;\n"
+                                      "  initial begin\n"
+                                      "    a = ") +
+                              std::string(a) + ";\n    b = " + std::string(b) +
+                              ";\n    r = (a " + std::string(op) +
+                              " b);\n"
+                              "  end\n"
+                              "endmodule\n",
+                          f, "r");
+  ASSERT_NE(r, nullptr);
+  EXPECT_EQ(r->value.width, 1u);
+  EXPECT_EQ(r->value.words[0].bval & 1u, 0u);
+  EXPECT_EQ(r->value.ToUint64(), want);
+}
+
+// §11.4.5 (printed page 279): == is 1'bx only where the unknown bits leave
+// the relation ambiguous, and 8'b1101x001 against 8'b1101x000 differ at bit
+// 0, which both hold known, so they are unequal whatever bit 3 holds: 0.
+// This is the suite's 11.4.5--equality-op.sv (#2914); asked whether either
+// operand held an unknown bit before any bit was compared, it read x, as
+// the two ambiguous cases above rightly do.
+TEST(EqualityOperatorSim, LogicalEqualityKnownMismatchBesideAnXIsFalse) {
+  ExpectKnownEquality("8'b1101x001", "8'b1101x000", "==", 0);
+}
+
+// The same with z in place of x, the file's second pair: 0.
+TEST(EqualityOperatorSim, LogicalEqualityKnownMismatchBesideAZIsFalse) {
+  ExpectKnownEquality("8'b1101z001", "8'b1101z000", "==", 0);
+}
+
+// §11.4.5: != answers 1 for the same operands, the known mismatch deciding
+// it; a rule that read the unknown bit first answered x here too.
+TEST(EqualityOperatorSim, LogicalInequalityKnownMismatchBesideAnXIsTrue) {
+  ExpectKnownEquality("8'b1101x001", "8'b1101x000", "!=", 1);
 }
 
 // §11.4.5: for case equality (===) and case inequality (!==), the x and z bits

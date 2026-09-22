@@ -521,24 +521,33 @@ static uint64_t EvalWildcardEq(Logic4Vec lhs, Logic4Vec rhs) {
   if (unknown) return kResultX;
   return equal ? 1 : 0;
 }
-// §11.4.5: == and != compare their operands bit for bit, the narrower extended
-// to the wider's width before EvalEqualityOp is reached, so every word of the
-// two is read rather than the first alone, which had two 96-bit operands
-// differing at bit 80 equal. Both operands are known when this is asked.
-static bool ValuesEqual(const Logic4Vec& lhs, const Logic4Vec& rhs) {
+// §11.4.5 (printed page 279): == and != compare their operands bit for bit,
+// the narrower extended to the wider's width before EvalEqualityOp is
+// reached, so every word of the two is read rather than the first alone,
+// which had two 96-bit operands differing at bit 80 equal. The result is
+// 1'bx only where the unknown or high-impedance bits leave the relation
+// ambiguous: a bit position both operands hold known and differently makes
+// them unequal whatever the other positions hold, so 8'b1101x001 ==
+// 8'b1101x000 is 0, the suite's 11.4.5--equality-op.sv; asked whether either
+// operand held an unknown bit before any bit was compared, it read x.
+static uint64_t EvalLogicalEq(const Logic4Vec& lhs, const Logic4Vec& rhs) {
   uint32_t nwords = std::min(lhs.nwords, rhs.nwords);
+  bool unknown = false;
   for (uint32_t i = 0; i < nwords; ++i) {
-    if (lhs.words[i].aval != rhs.words[i].aval) return false;
+    uint64_t known = ~(lhs.words[i].bval | rhs.words[i].bval);
+    if (((lhs.words[i].aval ^ rhs.words[i].aval) & known) != 0) return 0;
+    unknown = unknown || ~known != 0;
   }
-  return true;
+  return unknown ? kResultX : 1;
 }
 static uint64_t EvalEqualityOp(TokenKind op, Logic4Vec lhs, Logic4Vec rhs) {
   switch (op) {
     case TokenKind::kEqEq:
-    case TokenKind::kBangEq:
-
-      if (HasUnknownBits(lhs) || HasUnknownBits(rhs)) return kResultX;
-      return (op == TokenKind::kEqEq) == ValuesEqual(lhs, rhs) ? 1 : 0;
+      return EvalLogicalEq(lhs, rhs);
+    case TokenKind::kBangEq: {
+      uint64_t r = EvalLogicalEq(lhs, rhs);
+      return r == kResultX ? kResultX : r ^ 1;
+    }
     case TokenKind::kEqEqEq:
       return EvalCaseEquality(lhs, rhs) ? 1 : 0;
     case TokenKind::kBangEqEq:
