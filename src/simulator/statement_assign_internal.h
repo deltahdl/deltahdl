@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "common/packed_range.h"
+#include "common/source_loc.h"
 #include "common/types.h"
 
 namespace delta {
@@ -319,11 +320,22 @@ bool TryAssocLiteralAssign(const Stmt* stmt, SimContext& ctx, Arena& arena);
 bool TryTypedClassNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena);
 bool TryMemberClassNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena);
 
-// Defined in statement_assign_stream.cpp; also used by the §11.4.2 nonblocking
-// path in statement_assign_nonblocking.cpp. §11.4.14: left-align a streaming
-// concatenation source in a wider fixed-size target.
+// Defined in statement_assign_stream_widen.cpp; also used by the §11.4.2
+// nonblocking path in statement_assign_nonblocking.cpp. §11.4.14: left-align
+// a streaming concatenation source in a wider fixed-size target.
 Logic4Vec ApplyStreamPackToTargetWidening(const Stmt* stmt, Logic4Vec rhs_val,
                                           SimContext& ctx, Arena& arena);
+// The same rule for a stream and the width of the fixed-size target it is
+// assigned to, a declaration's initializer among the callers: the stream
+// widened with zero bits on the right, or reported at `loc` where the
+// target is the narrower.
+Logic4Vec WidenStreamPackToFixedTarget(Logic4Vec stream, uint32_t target_width,
+                                       SourceLoc loc, SimContext& ctx,
+                                       Arena& arena);
+// Left-shift `stream` (stream_w bits) into a `total_w`-bit vector, padding the
+// LSB side with zero bits; the stream itself when total_w is no wider.
+Logic4Vec RightPadStreamToWidth(const Logic4Vec& stream, uint32_t stream_w,
+                                uint32_t total_w, Arena& arena);
 
 // Defined in statement_assign_stream.cpp.
 void UnpackStreamingConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,

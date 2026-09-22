@@ -650,6 +650,20 @@ static void InitializeDeclVariable(const Stmt* stmt, const DeclaredObject& obj,
   }
   if (stmt->var_init) {
     Logic4Vec val = EvalExpr(stmt->var_init, ctx, arena);
+    // §11.4.14 (printed page 291): a streaming concatenation initializing a
+    // fixed-size variable is left-aligned in it, widened with zero bits on
+    // the right, and reported where the variable is the narrower, as
+    // ApplyStreamPackToTargetWidening does for `d = {<< 32 {a, b, c}}`.
+    // Asked before §10.7's resizing below, which would extend the stream on
+    // the left to the declared width and leave nothing to widen: taken so,
+    // `bit [127:0] d = {<< 32 {a, b, c}}` held the 96-bit stream
+    // right-aligned and `int d = {<<{a, b, c}}` was accepted.
+    if (stmt->var_init->kind == ExprKind::kStreamingConcat &&
+        stmt->var_unpacked_dims.empty() && !var->is_string && !obj.is_real &&
+        obj.declared_width > 0) {
+      val = WidenStreamPackToFixedTarget(
+          val, obj.declared_width, stmt->var_init->range.start, ctx, arena);
+    }
     if (stmt->var_unpacked_dims.empty()) {
       uint32_t target = obj.is_real ? var->value.width : obj.declared_width;
       val = ConvertRealForKnownLhs(val, obj.is_real, target, arena);

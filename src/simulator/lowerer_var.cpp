@@ -891,10 +891,22 @@ void Lowerer::LowerVarInit(std::string_view name, const RtlirVariable& var,
     v->value = EvalStructPatternValue(init, sinfo, ctx_, arena_);
     return;
   }
+  // §11.4.14 (printed page 291): a streaming concatenation is evaluated at
+  // its own width and then left-aligned in the fixed-size variable it
+  // initializes, widened with zero bits on the right, or reported where the
+  // variable is the narrower -- the rule InitializeDeclVariable applies to a
+  // block-local declaration. Evaluated under the declared width, `bit
+  // [127:0] m = {<< 32 {a, b, c}}` at module scope held the 96-bit stream
+  // right-aligned.
+  bool is_stream = init->kind == ExprKind::kStreamingConcat && !var.is_string;
   bool self_determined = sinfo != nullptr || var.is_real || var.is_string ||
-                         var.is_event || var.is_chandle ||
+                         var.is_event || var.is_chandle || is_stream ||
                          init->kind == ExprKind::kAssignmentPattern;
   auto val = EvalExpr(var.init_expr, ctx_, arena_, self_determined ? 0 : width);
+  if (is_stream && width > 0) {
+    val = WidenStreamPackToFixedTarget(val, width, init->range.start, ctx_,
+                                       arena_);
+  }
   v->value = CoerceVarInitValue(var, val, width);
 
   // §11.9: initializing a tagged-union variable with a tagged expression

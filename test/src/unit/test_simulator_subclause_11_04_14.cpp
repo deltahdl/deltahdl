@@ -261,4 +261,77 @@ TEST(StreamingOperatorSim, NarrowTargetErrorNames11_4_14) {
                             "wider than the fixed-size target", 6, "11.4.14"));
 }
 
+// §11.4.14 (printed page 291): the stream initializing a block-local
+// declaration is left-aligned in it as one assigned by a statement is, the
+// 96-bit `{<< 32 {a, b, c}}` of three ints -- c, b, a from the left once the
+// 32-bit slices are reversed -- widened with 32 zero bits on the right of a
+// `bit [127:0]`: 128'h00000003_00000002_00000001_00000000, whose upper word
+// (bits 127:64) is 3 and lower word is 32'h00000001 << 32. This is the
+// suite's 11.4.14.3--unpack_stream_pad-sim.sv (#4362); the initializer was
+// taken as evaluated and the stream sat right-aligned, upper word 0 and lower
+// word 32'h00000002_00000001. The result is copied to a module variable the
+// case reads, the local being gone with its block.
+TEST(StreamingOperatorSim,
+     DeclarationInitializerStreamIsLeftAlignedInAWiderLocal) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  int a = 1, b = 2, c = 3;\n"
+      "  bit [127:0] out;\n"
+      "  initial begin\n"
+      "    bit [127:0] d = {<< 32 {a, b, c}};\n"
+      "    out = d;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "out");
+  ASSERT_NE(var, nullptr);
+  ASSERT_EQ(var->value.nwords, 2u);
+  EXPECT_EQ(var->value.words[1].aval, 3u);
+  EXPECT_EQ(var->value.words[0].aval, uint64_t{0x00000002} << 32 | 0x00000001);
+}
+
+// §11.4.14 (printed page 291) with §11.4.14.3's own example `int j = {>>{ a,
+// b, c }}`, marked an error for j's 32 bits being fewer than the stream's 96:
+// the declaration's initializer is reported as the statement form above is,
+// at the stream, under §11.4.14. This is the suite's
+// 11.4.14.3--unpack_stream_inv.sv (#4364), accepted before.
+TEST(StreamingOperatorSim,
+     DeclarationInitializerStreamWiderThanTheLocalErrors) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int a = 1, b = 2, c = 3;\n"
+      "  initial begin\n"
+      "    int d = {<<{a, b, c}};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "wider than the fixed-size target", 4, "11.4.14"));
+}
+
+// §11.4.14 (printed page 291) with §6.8: a module-scope declaration's
+// initializer is assigned as from an initial procedure, so its stream is
+// left-aligned as the block-local one above is: the same 128 bits, upper
+// word 3. Lowerer::LowerVarInit evaluated the stream under the declared
+// width, which left it right-aligned, upper word 0.
+TEST(StreamingOperatorSim,
+     ModuleScopeInitializerStreamIsLeftAlignedInAWiderVariable) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  int a = 1, b = 2, c = 3;\n"
+      "  bit [127:0] m = {<< 32 {a, b, c}};\n"
+      "endmodule\n",
+      f, "m");
+  ASSERT_NE(var, nullptr);
+  ASSERT_EQ(var->value.nwords, 2u);
+  EXPECT_EQ(var->value.words[1].aval, 3u);
+  EXPECT_EQ(var->value.words[0].aval, uint64_t{0x00000002} << 32 | 0x00000001);
+}
+
 }  // namespace
