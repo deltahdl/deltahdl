@@ -422,6 +422,10 @@ static const ModuleItem* MethodNamedAsAValue(const Expr* expr, SimContext& ctx,
   MethodCallParts parts;
   InstanceMethodInfo call;
   if (!ExtractHandleAccessParts(expr, arena, parts)) return nullptr;
+  // Only asking which member the name designates, so a null handle is not
+  // reported here (ResolveThroughNullHandle reports at a located call alone):
+  // `b.x` naming a property through a null b is the member read's to judge.
+  parts.loc = SourceLoc::None();
   if (!ResolveMethodByParts(parts, ctx, call) &&
       !ResolveMethodOnStaticHandle(expr, ctx, arena, call)) {
     return nullptr;

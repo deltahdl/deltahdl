@@ -306,4 +306,38 @@ TEST(ArgumentBindingSim, FunctionNameInsideItsBodyIsItsResultVariable) {
   EXPECT_EQ(val, 8u);
 }
 
+// §13.5.5 with §18.5.12: only a method's name stands for its call, so a
+// property named through a null handle in a constraint guard is no call of a
+// method and raises no report of one; the guard's other disjunct, a.x == 5,
+// is TRUE, which sifts the null b.x away and generates y == 10.
+TEST(ArgumentBindingSim, PropertyThroughANullHandleInAGuardIsNoMethodCall) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "class D;\n"
+      "  int x;\n"
+      "endclass\n"
+      "class C;\n"
+      "  rand int y;\n"
+      "  D a, b;\n"
+      "  constraint c1 { (a.x == 5 || b.x > 0) -> y == 10; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  C c;\n"
+      "  D d;\n"
+      "  int r = 0;\n"
+      "  initial begin\n"
+      "    c = new;\n"
+      "    d = new;\n"
+      "    d.x = 5;\n"
+      "    c.a = d;\n"
+      "    void'(c.randomize());\n"
+      "    r = c.y;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 10u);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace
