@@ -397,4 +397,30 @@ TEST(ClassSim, LocalTypedByATypeParameterIsAHandleOfItsActual) {
   EXPECT_EQ(out, "3 3\n");
 }
 
+// §8.25 with §8.20: a method of R#(A) reads A for T however the call reaches
+// it. Through a handle of R's abstract base the call carries no list of its
+// own, and the object `R #(A) r = new;` built holds the actual; read from
+// the default instead, `obj = new();` tried to construct the abstract Base.
+TEST(ClassSim, TypeParameterReadThroughAHandleOfTheBaseIsTheObjectsActual) {
+  SimFixture f;
+  auto out = RunCapture(
+      "virtual class Base; pure virtual function int ident(); endclass\n"
+      "class A extends Base; function int ident(); return 3; endfunction\n"
+      "endclass\n"
+      "virtual class W; pure virtual function Base make(); endclass\n"
+      "class R #(type T = Base) extends W;\n"
+      "  function Base make(); T obj; obj = new(); return obj; endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  initial begin\n"
+      "    R #(A) r = new;\n"
+      "    W w = r;\n"
+      "    Base b = w.make();\n"
+      "    $display(\"%0d\", b == null ? -1 : b.ident());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "3\n");
+}
+
 }  // namespace
