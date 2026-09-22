@@ -467,6 +467,11 @@ def test_a_comparison_over_nul_characters_reads_the_characters_around_them(
     rst: ModuleType,
 ) -> None:
     assert rst.check_assertions(":assert: ('ab' == 'a\0b')") == (True, "")
+
+
+def test_a_comparison_over_nul_characters_still_fails_on_the_characters_around_them(
+    rst: ModuleType,
+) -> None:
     assert rst.check_assertions(":assert: ('ac' == 'a\0b')")[0] is False
 
 
