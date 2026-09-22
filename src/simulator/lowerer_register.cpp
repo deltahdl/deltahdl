@@ -661,12 +661,40 @@ void RegisterClassScopeTypedefAliases(ClassTypeInfo* info, SimContext& ctx,
   }
 }
 
+// §8.25 (printed page 204): a typedef of the design that writes a list,
+// `typedef R#(A) ra;`, names the specialization the list spells, as a class's
+// own typedef does (ClassNamedByTypedef), rather than `target`, the class at
+// the end of the chain, which §8.25.1 makes the default specialization alone:
+// bound to that, `ra x = new;` built an R whose T read R's default. A typedef
+// naming another typedef, `typedef ra rb;`, names what that one names, so the
+// chain is followed to the first declaration writing a list; a chain writing
+// none names `target` itself.
+static ClassTypeInfo* ClassNamedByDesignTypedef(std::string_view alias,
+                                                ClassTypeInfo* target,
+                                                SimContext& ctx, Arena& arena) {
+  const DataType* declared = ctx.FindTypeDeclaration(alias);
+  for (size_t hops = 0;
+       declared != nullptr && declared->kind == DataTypeKind::kNamed &&
+       declared->type_params.empty() && hops < ctx.TypeDeclarationCount();
+       ++hops) {
+    declared = ctx.FindTypeDeclaration(declared->type_name);
+  }
+  if (declared == nullptr || declared->kind != DataTypeKind::kNamed ||
+      declared->type_params.empty()) {
+    return target;
+  }
+  return SpecializationOf(target, declared->type_params, ctx, arena);
+}
+
 void RegisterClassTypeAliases(const RtlirDesign* design, SimContext& ctx,
                               Arena& arena) {
   for (const auto& [alias, target] : design->type_targets) {
     if (ctx.FindClassType(alias) != nullptr) continue;
     ClassTypeInfo* cls = ctx.FindClassType(target);
-    if (cls != nullptr) ctx.RegisterClassType(alias, cls);
+    if (cls != nullptr) {
+      ctx.RegisterClassType(alias,
+                            ClassNamedByDesignTypedef(alias, cls, ctx, arena));
+    }
   }
   for (ClassTypeInfo* info : ctx.RegisteredClassTypes())
     RegisterClassScopeTypedefAliases(info, ctx, arena);

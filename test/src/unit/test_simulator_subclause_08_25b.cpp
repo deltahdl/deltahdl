@@ -423,4 +423,35 @@ TEST(ClassSim, TypeParameterReadThroughAHandleOfTheBaseIsTheObjectsActual) {
   EXPECT_EQ(out, "3\n");
 }
 
+// §8.25 with §6.18: a typedef written outside any class names the
+// specialization its list spells, as a class's own typedef does
+// (ConstructedThroughATypedefTheValueParameterIsTheActual), and a typedef of
+// that typedef names the same one. Bound to the generic class, each object
+// read the defaults: 1 for size and Base's 1 for T's ident().
+TEST(ClassSim, UnitTypedefNamesTheSpecializationItsListSpells) {
+  SimFixture f;
+  auto out = RunCapture(
+      "class V #(int size = 1);\n"
+      "  function int w(); return size; endfunction\n"
+      "endclass\n"
+      "class Base; virtual function int ident(); return 1; endfunction\n"
+      "endclass\n"
+      "class A extends Base; function int ident(); return 3; endfunction\n"
+      "endclass\n"
+      "class R #(type T = Base);\n"
+      "  function int make(); T obj = new(); return obj.ident(); endfunction\n"
+      "endclass\n"
+      "typedef V#(6) v6;\n"
+      "typedef v6 v6_again;\n"
+      "typedef R#(A) ra;\n"
+      "module t;\n"
+      "  initial begin\n"
+      "    v6 x = new; v6_again y = new; ra z = new;\n"
+      "    $display(\"%0d %0d %0d\", x.w(), y.w(), z.make());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "6 6 3\n");
+}
+
 }  // namespace
