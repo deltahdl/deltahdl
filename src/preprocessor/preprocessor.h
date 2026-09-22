@@ -225,6 +225,8 @@ class Preprocessor {
   bool ExpandUserDefinedMacro(std::string_view name,
                               std::string_view macro_name, std::string& output,
                               SourceLoc loc, int depth);
+  void RunDirectiveOpenedByMacro(std::string expanded, std::string_view rest,
+                                 SourceLoc loc, int depth, std::string& output);
   bool IsRecursiveExpansion(std::string_view name, SourceLoc loc) const;
   bool ExpandFunctionLikeMacro(const MacroDef& def, std::string_view macro_name,
                                SourceLoc loc, std::string& expanded,

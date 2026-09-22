@@ -150,33 +150,52 @@ bool Preprocessor::ExpandUserDefinedMacro(std::string_view name,
   auto exp_trimmed = Trim(std::string_view(expanded));
   bool starts_directive = !exp_trimmed.empty() && exp_trimmed[0] == '`' &&
                           !HasInlineConditional(exp_trimmed);
-  if (!starts_directive) {
-    expanded = ExpandSubstitutedBody(expanded, loc.file_id, loc.line);
+  if (starts_directive) {
+    RunDirectiveOpenedByMacro(std::move(expanded), rest, loc, depth, output);
+    return true;
   }
+  expanded = ExpandSubstitutedBody(expanded, loc.file_id, loc.line);
   // §22.5.1 (printed page 710): a macro is recursive where it expands to
   // text holding a usage of itself, and the rest of the line its usage
   // stands on is no part of that text, so the macro leaves the expansion
-  // stack before the rest is expanded; expanded under it, a second usage on
-  // the line, `DO_INCLUDE("a") `DO_INCLUDE("b"), was reported recursive.
+  // stack before the rest is expanded.
   expansion_stack_.pop_back();
-  // The rest of the line completes a directive the body opened, `INC "f.svh"
-  // after `define INC `include, unless it opens with a backtick of its own:
-  // a further directive or a usage expanding to one is a directive of its
-  // own and not trailing text of the first, which §22.4 lets only white
-  // space or a comment follow.
-  std::string_view rest_trimmed = Trim(rest);
-  bool rest_is_own_text = !rest_trimmed.empty() && rest_trimmed[0] == '`';
-  if (!rest.empty() && !(starts_directive && rest_is_own_text)) {
+  if (!rest.empty()) {
     expanded += ExpandInlineMacros(rest, loc.file_id, loc.line);
   }
-  if (starts_directive) {
-    ProcessDirective(expanded, loc.file_id, loc.line, depth, output);
-    if (rest_is_own_text)
-      output.append(ExpandInlineMacros(rest, loc.file_id, loc.line));
-  } else {
-    output.append(expanded);
-  }
+  output.append(expanded);
   return true;
+}
+
+// The text a macro substitutes opened a directive, `include FN after
+// `define DO_INCLUDE(FN) `include FN. The rest of the line the usage stands
+// on completes that directive, `INC "f.svh" after `define INC `include,
+// unless it opens with a backtick of its own: §22.4 lets only white space or
+// a comment follow an `include's file name, so a further directive there, or
+// a usage expanding to one, is a directive line of its own. §22.5.1 (printed
+// page 710) makes a macro recursive where it expands to text holding a usage
+// of itself, and the rest of the line is no part of that text: the macro
+// stays on the expansion stack while its own directive runs, so `define REC
+// `REC is still reported, and leaves it before the rest is read. The suite's
+// 22.4--include_via_define.sv writes `DO_INCLUDE("dummy_include.sv") twice
+// on one line: read under the first usage, the second was reported
+// recursive, and substituted inline it left its `include as text in the
+// output, since the inline expander copies a directive name through.
+void Preprocessor::RunDirectiveOpenedByMacro(std::string expanded,
+                                             std::string_view rest,
+                                             SourceLoc loc, int depth,
+                                             std::string& output) {
+  std::string_view rest_trimmed = Trim(rest);
+  bool rest_is_own_line = !rest_trimmed.empty() && rest_trimmed[0] == '`';
+  if (!rest.empty() && !rest_is_own_line) {
+    expanded += ExpandInlineMacros(rest, loc.file_id, loc.line);
+  }
+  ProcessDirective(expanded, loc.file_id, loc.line, depth, output);
+  expansion_stack_.pop_back();
+  if (rest_is_own_line &&
+      !ProcessDirective(rest_trimmed, loc.file_id, loc.line, depth, output)) {
+    output.append(ExpandInlineMacros(rest, loc.file_id, loc.line));
+  }
 }
 
 bool Preprocessor::TryExpandMacro(std::string_view trimmed, std::string& output,
