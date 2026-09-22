@@ -17,6 +17,7 @@
 #include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
 #include "simulator/class_object.h"
+#include "simulator/class_specialization.h"
 #include "simulator/declared_class_key.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
@@ -401,6 +402,7 @@ static bool TryExecWeakRefVarDecl(const Stmt* stmt, SimContext& ctx,
 }
 
 void RecordClassParamActuals(std::string_view var_name,
+                             std::string_view class_name,
                              const std::vector<DataType>& type_params,
                              SimContext& ctx) {
   if (type_params.empty()) return;
@@ -411,6 +413,15 @@ void RecordClassParamActuals(std::string_view var_name,
   }
   ctx.SetVariableClassParamExprs(var_name, std::move(exprs));
   ctx.RegisterVariableClassTypeParams(var_name, &type_params);
+  // §8.25: the declaration names a specialization, which is a type of its own
+  // holding its own static members, so the variable is recorded as being of
+  // that type rather than of the generic class the declaration's name alone
+  // would find.
+  ClassTypeInfo* generic = ctx.FindClassType(class_name);
+  if (generic == nullptr) return;
+  ClassTypeInfo* spec =
+      SpecializationOf(generic, type_params, ctx, ctx.GetArena());
+  if (spec != generic) ctx.SetVariableClassType(var_name, spec->name);
 }
 
 // Handles `T v = new src;` shallow-copy construction. Returns true if `init`
@@ -452,7 +463,8 @@ static bool TryExecClassVarDecl(const Stmt* stmt, SimContext& ctx,
   ctx.CreateVariable(stmt->var_name, 64);
   ctx.SetVariableClassType(stmt->var_name, class_type);
 
-  RecordClassParamActuals(stmt->var_name, stmt->var_decl_type.type_params, ctx);
+  RecordClassParamActuals(stmt->var_name, class_type,
+                          stmt->var_decl_type.type_params, ctx);
 
   if (!stmt->var_init) return true;
 

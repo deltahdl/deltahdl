@@ -462,7 +462,7 @@ static void CarryUnitClassRecord(const ModuleItem* item, std::string_view qname,
   std::string_view cls = ctx.GetVariableClassType(item->name);
   if (cls.empty()) return;
   ctx.SetVariableClassType(qname, cls);
-  RecordClassParamActuals(qname, item->data_type.type_params, ctx);
+  RecordClassParamActuals(qname, cls, item->data_type.type_params, ctx);
 }
 
 // §7.2.1 (printed page 147) with §3.12.1 (printed 56) and §26.2 (printed

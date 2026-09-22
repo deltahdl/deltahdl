@@ -723,7 +723,8 @@ static void RecordClassSpecialization(std::string_view name,
                                       const RtlirVariable& var,
                                       SimContext& ctx) {
   if (var.class_data_type == nullptr) return;
-  RecordClassParamActuals(name, var.class_data_type->type_params, ctx);
+  RecordClassParamActuals(name, var.class_type_name,
+                          var.class_data_type->type_params, ctx);
 }
 
 void Lowerer::LowerVar(std::string_view name, const RtlirVariable& var) {
@@ -765,7 +766,9 @@ void Lowerer::LowerVar(std::string_view name, const RtlirVariable& var) {
     LowerVarInit(name, var, v, width);
   }
   if (!var.init_expr) ApplyStructMemberDefaults(name, var, v, ctx_, arena_);
-  if (!var.class_type_name.empty())
+  // §8.25: the specialization recorded above stands; the generic class's bare
+  // name does not replace it.
+  if (!var.class_type_name.empty() && ctx_.GetVariableClassType(name).empty())
     ctx_.SetVariableClassType(name, var.class_type_name);
   CreateSyncObjectForVar(name, var, v, ctx_, arena_);
   LowerVarAggregate(name, var);
@@ -798,8 +801,13 @@ static bool TryLowerClassNewVarInit(std::string_view name,
     v->value = EvalWeakReferenceNew(var.init_expr, ctx, arena);
     return true;
   }
-  v->value = EvalClassNew(var.class_type_name, var.init_expr, ctx, arena,
-                          var.init_expr->range.start);
+  // §8.25: the specialization RecordClassSpecialization recorded is the type
+  // constructed; the bare class name is the generic class, which the clause
+  // makes no type at all (class_specialization.h).
+  std::string_view cls = ctx.GetVariableClassType(name);
+  if (cls.empty()) cls = var.class_type_name;
+  v->value =
+      EvalClassNew(cls, var.init_expr, ctx, arena, var.init_expr->range.start);
   ApplyClassParamOverrides(name, v->value.ToUint64(), ctx, arena);
   return true;
 }

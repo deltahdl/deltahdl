@@ -15,6 +15,7 @@
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "simulator/class_object.h"
+#include "simulator/class_specialization.h"
 #include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_class_params.h"
 #include "simulator/eval_class_sync.h"
@@ -161,6 +162,29 @@ static void InitStaticProperties(ClassTypeInfo* info, SimContext& ctx,
     if (ClassTypeInfo* nested = ctx.FindClassType(key))
       InitStaticProperties(nested, ctx, arena);
   }
+}
+
+// §8.25 (printed page 204) with §8.9 (printed 186): a specialization's static
+// properties take their initializers in a frame where that specialization's
+// value parameters are bound, so `static const int W = size` holds 4 under
+// `V #(4)` and 8 under `V #(8)`. The generic class's copy is evaluated with
+// nothing bound -- the class declaration names no actuals -- so the name
+// `size` read nothing and the one shared copy held 0 for every
+// specialization.
+void InitSpecializationStaticProperties(ClassTypeInfo* spec, SimContext& ctx,
+                                        Arena& arena) {
+  if (spec == nullptr || spec->decl == nullptr) return;
+  if (!spec->package.empty()) ctx.PushScope(spec->package);
+  ctx.PushScope();
+  for (const auto& [pname, pexpr] : spec->decl->params) {
+    auto entry = spec->static_properties.find(std::string(pname));
+    if (entry == spec->static_properties.end()) continue;
+    auto* v = ctx.CreateLocalVariable(pname, entry->second.width);
+    v->value = entry->second;
+  }
+  InitStaticProperties(spec, ctx, arena);
+  ctx.PopScope();
+  if (!spec->package.empty()) ctx.PopScope();
 }
 
 // §6.12: the real family, whose members §6.12.1 converts a value into rather

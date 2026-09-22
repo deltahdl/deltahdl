@@ -132,7 +132,7 @@ void RegisterPackageClassVariables(const RtlirDesign* design, SimContext& ctx,
       ctx.SetVariableClassType(*qname, *arena.Create<std::string>(key));
       // §8.25: the specialization the declaration wrote, `G #(5) b`, bound on
       // the object `p1::b = new` constructs; nothing for a bare `G b`.
-      RecordClassParamActuals(*qname, item->data_type.type_params, ctx);
+      RecordClassParamActuals(*qname, key, item->data_type.type_params, ctx);
     }
   }
 }

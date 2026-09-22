@@ -738,7 +738,7 @@ void RegisterUnitClassVariables(const RtlirDesign* design, SimContext& ctx,
     // §8.25 (printed page 203): the specialization the declaration wrote,
     // `G #(5) b`, bound on the object its `new` constructs; nothing for a
     // bare `G b`.
-    RecordClassParamActuals(item->name, item->data_type.type_params, ctx);
+    RecordClassParamActuals(item->name, key, item->data_type.type_params, ctx);
   }
 }
 

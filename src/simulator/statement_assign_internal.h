@@ -125,7 +125,15 @@ void CreateDeclAggregate(const Stmt* stmt, uint32_t elem_width, SimContext& ctx,
 // is no expression and binds a type parameter -- for ApplyClassParamOverrides
 // to bind on the object the variable's `new` constructs. Nothing is recorded
 // for a declaration that wrote no `#(...)`.
+//
+// §8.25 makes each specialization a type of its own with its own static
+// members, so the declaration is also pointed at the specialization's own
+// ClassTypeInfo (SpecializationOf in class_specialization.cpp), registered
+// under a key spelling the actuals, and the variable's recorded class type
+// becomes that key. `class_name` is the class the declaration wrote; a name
+// no class is registered under leaves the variable as it was.
 void RecordClassParamActuals(std::string_view var_name,
+                             std::string_view class_name,
                              const std::vector<DataType>& type_params,
                              SimContext& ctx);
 
