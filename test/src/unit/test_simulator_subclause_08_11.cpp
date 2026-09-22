@@ -313,4 +313,37 @@ TEST(ClassSim, PropertyWriteThroughOneHandleWakesAnAliasOfTheSameObject) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
+// §8.11 (printed page 187): an unqualified name in a method resolves in the
+// innermost scope, so a task's own `O d;` hides the property d, which `this.d`
+// alone reaches. The local, a class handle, was declared design-wide rather
+// than in the task's frame, so `d = new` and `d.n = 3` went to the property
+// while `d.get()` called through the null design-wide d.
+TEST(ClassSim, TaskLocalHandleHidesTheSameNamedProperty) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  class O;\n"
+      "    int n = 7;\n"
+      "    function int get(); return n; endfunction\n"
+      "  endclass\n"
+      "  class P;\n"
+      "    O d;\n"
+      "    task run(output int r);\n"
+      "      O d;\n"
+      "      d = new;\n"
+      "      d.n = 3;\n"
+      "      r = d.get() * 10 + (this.d == null);\n"
+      "    endtask\n"
+      "  endclass\n"
+      "  int r;\n"
+      "  initial begin\n"
+      "    P p = new;\n"
+      "    p.run(r);\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 31u);
+}
+
 }  // namespace

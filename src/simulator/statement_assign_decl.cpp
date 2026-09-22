@@ -445,6 +445,21 @@ static bool TryExecClassShallowCopy(std::string_view var_name, const Expr* init,
   return true;
 }
 
+// §6.11.3: a declaration in a procedural block or a task body carries its
+// declared signedness as a module-scope declaration does (Lowerer sets the
+// same flag there) and as a subroutine body local does (CreateFuncLocalVar),
+// so an `int` declared in a task is a signed operand, and a solver drawing
+// it (18.12) draws it over the signed range rather than the unsigned one.
+static Variable* CreateVarInScope(std::string_view name, uint32_t width,
+                                  bool is_signed, SimContext& ctx) {
+  if (ctx.HasLocalScope())
+    return ctx.CreateLocalVariable(name, width, is_signed);
+  Variable* var = ctx.CreateVariable(name, width);
+  var->is_signed = is_signed;
+  var->value.is_signed = is_signed;
+  return var;
+}
+
 // §8.23 (printed pages 200-201 of IEEE 1800-2023): a procedural
 // `Outer::Inner i = new;` names the nested class by its scoped spelling, which
 // DeclaredClassKey (declared_class_key.h) resolves to the key the run holds it
@@ -466,7 +481,10 @@ static bool TryExecClassVarDecl(const Stmt* stmt, SimContext& ctx,
   std::string_view class_type =
       DeclaredClassKey(stmt->var_decl_type, ctx, arena);
   if (class_type.empty()) return false;
-  ctx.CreateVariable(stmt->var_name, 64);
+  // §8.11 (printed page 187): in a method, the handle is the innermost
+  // scope's and hides a property of its name; made design-wide instead, a
+  // task's `O d; d = new;` wrote the property d.
+  CreateVarInScope(stmt->var_name, 64, false, ctx);
   ctx.SetVariableClassType(stmt->var_name, class_type);
 
   RecordClassParamActuals(stmt->var_name, class_type,
@@ -509,21 +527,6 @@ static bool TryExecClassVarDecl(const Stmt* stmt, SimContext& ctx,
   if (var) var->value = handle;
   ApplyClassParamOverrides(stmt->var_name, handle.ToUint64(), ctx, arena);
   return true;
-}
-
-// §6.11.3: a declaration in a procedural block or a task body carries its
-// declared signedness as a module-scope declaration does (Lowerer sets the
-// same flag there) and as a subroutine body local does (CreateFuncLocalVar),
-// so an `int` declared in a task is a signed operand, and a solver drawing
-// it (18.12) draws it over the signed range rather than the unsigned one.
-static Variable* CreateVarInScope(std::string_view name, uint32_t width,
-                                  bool is_signed, SimContext& ctx) {
-  if (ctx.HasLocalScope())
-    return ctx.CreateLocalVariable(name, width, is_signed);
-  Variable* var = ctx.CreateVariable(name, width);
-  var->is_signed = is_signed;
-  var->value.is_signed = is_signed;
-  return var;
 }
 
 static void CreateDeclVariable(const Stmt* stmt, uint32_t width, bool is_real,
