@@ -572,7 +572,7 @@ bool TryQueueIndexedWrite(const Expr* lhs, const Logic4Vec& rhs_val,
   // notifies once for the element and the size together, a watcher
   // re-evaluating its expression rather than reading a delta.
   if (idx == sz) {
-    q->elements.push_back(rhs_val);
+    q->elements.push_back(SizedForQueueElement(*q, rhs_val, arena));
     q->element_ids.push_back(q->AllocateId());
     ++q->generation;
     EnforceQueueBound(q, "indexed write", lhs->range.start, ctx);
@@ -585,7 +585,8 @@ bool TryQueueIndexedWrite(const Expr* lhs, const Logic4Vec& rhs_val,
     // variable of its own, so a write to a driven element is ignored and there
     // is nothing to announce.
     if (q->ElementIsDriven(static_cast<size_t>(idx))) return true;
-    q->elements[static_cast<size_t>(idx)] = rhs_val;
+    q->elements[static_cast<size_t>(idx)] =
+        SizedForQueueElement(*q, rhs_val, arena);
     AnnounceQueueChange(lhs->base, owner, ctx);
     return true;
   }

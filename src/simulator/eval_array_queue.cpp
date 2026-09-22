@@ -14,6 +14,7 @@
 #include "simulator/evaluation.h"
 #include "simulator/queue_bound.h"
 #include "simulator/sim_context.h"
+#include "simulator/statement_assign.h"
 #include "simulator/variable.h"
 
 namespace delta {
@@ -59,7 +60,8 @@ static bool DispatchQueueEval(std::string_view method, QueueObject* q,
 
 static void QueuePushBack(QueueObject* q, const Expr* expr, SimContext& ctx,
                           Arena& arena) {
-  auto val = EvalExpr(expr->args[0], ctx, arena);
+  auto val =
+      SizedForQueueElement(*q, EvalExpr(expr->args[0], ctx, arena), arena);
   q->elements.push_back(val);
   q->element_ids.push_back(q->AllocateId());
   ++q->generation;
@@ -68,7 +70,8 @@ static void QueuePushBack(QueueObject* q, const Expr* expr, SimContext& ctx,
 
 static void QueuePushFront(QueueObject* q, const Expr* expr, SimContext& ctx,
                            Arena& arena) {
-  auto val = EvalExpr(expr->args[0], ctx, arena);
+  auto val =
+      SizedForQueueElement(*q, EvalExpr(expr->args[0], ctx, arena), arena);
   q->elements.insert(q->elements.begin(), val);
   q->element_ids.insert(q->element_ids.begin(), q->AllocateId());
   EnforceQueueBound(q, "push_front", expr->range.start, ctx);
@@ -78,7 +81,8 @@ static void QueuePushFront(QueueObject* q, const Expr* expr, SimContext& ctx,
 static void QueueInsertAt(QueueObject* q, const Expr* expr, SimContext& ctx,
                           Arena& arena) {
   auto idx_val = EvalExpr(expr->args[0], ctx, arena);
-  auto val = EvalExpr(expr->args[1], ctx, arena);
+  auto val =
+      SizedForQueueElement(*q, EvalExpr(expr->args[1], ctx, arena), arena);
   if (!idx_val.IsKnown()) return;
   auto raw = static_cast<int64_t>(idx_val.ToUint64());
   if (idx_val.is_signed && raw < 0) return;

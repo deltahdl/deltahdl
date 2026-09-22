@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+
 #include "builders_ast.h"
 #include "common/types.h"
 #include "fixture_simulator.h"
@@ -547,6 +549,35 @@ TEST(QueueOps, QueueDeclaredInProceduralBlockIsAQueue) {
       f, "n");
   ASSERT_NE(n, nullptr);
   EXPECT_EQ(n->value.ToUint64(), 2u);
+}
+
+// §10.7 (printed page 258) with §7.10.1: the element push_back, push_front
+// and insert put into a queue takes the element's width, so on a `logic
+// signed [3:0]` queue 12, 300 and 4'sd7 are held as the 4-bit -4, -4 and 7,
+// and $bits of one reads 4. The three stored the value as it arrived, the
+// 32-bit 12 among them, the same store the indexed write made (the §7.5
+// case ElementWriteTakesTheElementWidth). n reads 4, and s the three
+// elements' sum, -1.
+TEST(QueueOps, PushedElementsTakeTheElementWidth) {
+  SimFixture f;
+  auto* n = RunAndFindVar(
+      "module t;\n"
+      "  int n, s;\n"
+      "  initial begin\n"
+      "    logic signed [3:0] q[$];\n"
+      "    q.push_back(12);\n"
+      "    q.push_front(300);\n"
+      "    q.insert(1, 4'sd7);\n"
+      "    n = $bits(q[0]);\n"
+      "    s = q[0] + q[1] + q[2];\n"
+      "  end\n"
+      "endmodule\n",
+      f, "n");
+  ASSERT_NE(n, nullptr);
+  EXPECT_EQ(n->value.ToUint64(), 4u);
+  auto* s = f.ctx.FindVariable("s");
+  ASSERT_NE(s, nullptr);
+  EXPECT_EQ(static_cast<int32_t>(s->value.ToUint64()), -1);
 }
 
 }  // namespace

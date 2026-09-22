@@ -74,6 +74,29 @@ TEST(DynamicArraySimulation, BlockDeclaredDynamicArraySizedByNewHoldsElements) {
             8u);
 }
 
+// §10.7 (printed page 258) with §7.5: an assignment to an element of a
+// dynamic array takes the element's width, so `d[0] = 1` on `byte d[]`
+// leaves an 8-bit element, `$bits(d[0])` reading 8 as it does before the
+// write, and `d[1] = 300` holds 300's low byte, 44. The element store kept
+// the right-hand value's own width, the 32-bit literal, so
+// `{<< 8 {..., d}}` streamed four bytes for the element and the suite's
+// 11.4.14.4--dynamic_array_stream-sim.sv packed 32 bytes where 17 were
+// written (#4365). y reads 8 * 1000 + 44.
+TEST(DynamicArraySimulation, ElementWriteTakesTheElementWidth) {
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  int y;\n"
+                      "  initial begin\n"
+                      "    byte d[];\n"
+                      "    d = new[2];\n"
+                      "    d[0] = 1;\n"
+                      "    d[1] = 300;\n"
+                      "    y = $bits(d[0]) * 1000 + d[1];\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "y"),
+            8044u);
+}
+
 // The same declaration as a function body's local, which CreateFuncLocalVar
 // (eval_function_body.cpp) creates and the same aggregate builder backs.
 TEST(DynamicArraySimulation, FunctionBodyDynamicArraySizedByNewHoldsElements) {

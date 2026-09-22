@@ -597,4 +597,47 @@ TEST(StreamingDynamicDataSim,
   EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 0x1Au);
 }
 
+// §11.4.14.3 with §11.4.14.1 (printed pages 291-292) and §11.4.14.4 (293):
+// the source of an unpack that names a queue is the bit-stream cast of its
+// elements, and an unbounded dynamic array at the end of the target list is
+// resized to the bytes the three ints leave. The 17-byte queue `pkt`, packed
+// from three ints and a five-byte array by `{<< 8 {...}}`, unpacks by the
+// same operator back into 12, 5 and 42, and o_data takes the five bytes 1
+// to 5: the suite's 11.4.14.4--dynamic_array_stream-sim.sv (#4365). The
+// queue name evaluated to its carrier and the unpack was reported "too few
+// bits in stream"; from a packed source the greedy sizing already worked.
+TEST(StreamingDynamicDataSim, UnpackFromAQueueSourceFillsADynamicArray) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int i_header, i_len, i_crc;\n"
+      "  byte i_data[];\n"
+      "  int o_header, o_len, o_crc;\n"
+      "  byte o_data[];\n"
+      "  int n, last;\n"
+      "  initial begin\n"
+      "    byte pkt[$];\n"
+      "    i_header = 12;\n"
+      "    i_len = 5;\n"
+      "    i_crc = 42;\n"
+      "    i_data = new[5];\n"
+      "    i_data[0] = 1; i_data[1] = 2; i_data[2] = 3;\n"
+      "    i_data[3] = 4; i_data[4] = 5;\n"
+      "    pkt = {<< 8 {i_header, i_len, i_crc, i_data}};\n"
+      "    {<< 8 {o_header, o_len, o_crc, o_data}} = pkt;\n"
+      "    n = o_data.size();\n"
+      "    last = o_data[4];\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(f.ctx.FindVariable("o_header")->value.ToUint64(), 12u);
+  EXPECT_EQ(f.ctx.FindVariable("o_len")->value.ToUint64(), 5u);
+  EXPECT_EQ(f.ctx.FindVariable("o_crc")->value.ToUint64(), 42u);
+  EXPECT_EQ(f.ctx.FindVariable("n")->value.ToUint64(), 5u);
+  EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 5u);
+}
+
 }  // namespace

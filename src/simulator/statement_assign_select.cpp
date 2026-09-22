@@ -12,6 +12,7 @@
 #include "parser/ast_expr.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
 #include "simulator/variable.h"
@@ -427,6 +428,20 @@ Logic4Vec ResizeToWidth(Logic4Vec val, uint32_t target_width, Arena& arena) {
   SignExtendWideResult(val, target_width, result);
   MaskHighBits(target_width, result);
   return result;
+}
+
+// §10.7 with §7.10.1: an element store into a queue is an assignment to a
+// variable of the element type, so the value is truncated or extended to
+// the element width as a fixed-size array's element store is (WriteVar);
+// stored as it arrived, `d[0] = 1` on `byte d[]` made a 32-bit element, and
+// `{<< 8 {..., d}}` streamed four bytes for it, the suite's
+// 11.4.14.4--dynamic_array_stream-sim.sv packing 32 bytes where 17 were
+// written. A string is dynamically sized (§6.16), a real is its own 64
+// bits, and a handle is a handle, so those keep their width.
+Logic4Vec SizedForQueueElement(const QueueObject& q, Logic4Vec val,
+                               Arena& arena) {
+  if (val.is_string || val.is_real || q.holds_class_handles) return val;
+  return ResizeToWidth(val, q.elem_width, arena);
 }
 
 void CopyArrayElements(std::string_view dst_name, const ArrayInfo& dst,

@@ -337,6 +337,12 @@ PartSelectBits SelectStorageBits(const Variable& var, const Expr* sel,
 void WriteBitSelect(Variable* var, const Expr* lhs, const Logic4Vec& rhs_val,
                     SimContext& ctx, Arena& arena);
 Logic4Vec ResizeToWidth(Logic4Vec val, uint32_t target_width, Arena& arena);
+// §10.7 with §7.10.1: a value stored as an element of a queue, or of the
+// dynamic array a queue backs, takes the element's width, `d[0] = 1` on
+// `byte d[]` holding an 8-bit 1 and not the 32-bit literal; a string, a real
+// and a class handle keep their own. Defined in statement_assign_select.cpp.
+Logic4Vec SizedForQueueElement(const QueueObject& q, Logic4Vec val,
+                               Arena& arena);
 
 // §8.5 puts no restriction on a class property's data type, so a property is an
 // object of the type its declaration gave it, and §10.4 makes every write to

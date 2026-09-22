@@ -345,6 +345,17 @@ static Logic4Vec EvalRhsForTaggedMember(const Stmt* stmt, SimContext& ctx,
 Logic4Vec EvalRhsCarryingReturnedTag(const Stmt* stmt, SimContext& ctx,
                                      Arena& arena) {
   if (stmt->rhs == nullptr) return EvalRhsWithStructContext(stmt, ctx, arena);
+  // §11.4.14.3 with §11.4.14.1 (printed pages 291-292): the source of an
+  // unpack is a bit-stream, and one that names an unpacked aggregate -- a
+  // queue, a dynamic or a fixed-size array -- is the bit-stream cast of its
+  // elements, the first in the most significant bits, which
+  // PackBitStreamOperand builds as it does for $countones. Evaluated as a
+  // name, a queue answered its carrier alone, so `{<< 8 {h, l, c, d}} = pkt`
+  // of a 17-byte queue was reported "too few bits in stream": the suite's
+  // 11.4.14.4--dynamic_array_stream-sim.sv (#4365) and the queue source of
+  // #4042.
+  if (stmt->lhs->kind == ExprKind::kStreamingConcat)
+    return PackBitStreamOperand(stmt->rhs, ctx, arena);
   if (stmt->lhs->kind == ExprKind::kMemberAccess)
     return EvalRhsForTaggedMember(stmt, ctx, arena);
   if (stmt->rhs->kind != ExprKind::kCall ||
