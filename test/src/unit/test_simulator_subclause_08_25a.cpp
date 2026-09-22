@@ -102,7 +102,7 @@ ClassObject* ConstructWithParamOverride(SimFixture& f, Expr* override_expr) {
   DataType actual;
   actual.type_ref_expr = override_expr;
   actuals->push_back(actual);
-  RecordClassParamActuals("c", *actuals, f.ctx);
+  RecordClassParamActuals("c", "P", *actuals, f.ctx);
   ApplyClassParamOverrides("c", handle, f.ctx, f.arena);
   return obj;
 }
