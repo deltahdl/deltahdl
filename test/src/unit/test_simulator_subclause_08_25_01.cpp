@@ -601,4 +601,36 @@ TEST(ParameterizedScopeResolutionSim,
   LowerRunAndCheck(f, design, {{"a", 1u}, {"b", 2u}, {"c", 1u}});
 }
 
+TEST(ParameterizedScopeResolutionSim,
+     TypeParameterOfTheRunningClassInAScopeListIsItsActual) {
+  // §8.25: a type parameter used in a type resolves to a type only after
+  // elaboration, so `Box#(T)::` written in a method of `Reg #(type T)` names
+  // Box specialized by whatever the running specialization of Reg binds T to
+  // -- UVM's `uvm_typeid#(CB)::get()` inside uvm_callbacks#(T,CB) -- and not
+  // a class named T. A static method reached through Reg#(byte):: and an
+  // instance method of a Reg #(shortint) object discriminate: keyed by the
+  // name T, the two calls reach one Box whose T is nothing, and read one width
+  // twice; resolved through the running specialization, they read byte's 8
+  // and shortint's 16.
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class Box #(type T = int);\n"
+      "  static function int w(); return $bits(T); endfunction\n"
+      "endclass\n"
+      "class Reg #(type T = int);\n"
+      "  static function int sw(); return Box#(T)::w(); endfunction\n"
+      "  function int iw(); return Box#(T)::w(); endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  Reg #(shortint) r = new;\n"
+      "  int a, b;\n"
+      "  initial begin\n"
+      "    a = Reg#(byte)::sw();\n"
+      "    b = r.iw();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"a", 8u}, {"b", 16u}});
+}
+
 }  // namespace

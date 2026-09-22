@@ -539,7 +539,7 @@ static bool TryEvalParameterizedScopeCall(const Expr* expr, SimContext& ctx,
   BindClassParams(info.cls, info.access->lhs, ctx, arena);
   // §8.25.1: the type actuals of the specialization the call names, bound
   // in the same frame for $bits(T) and the like inside the static body.
-  BindClassScopeTypeActuals(info.cls->decl, info.access->lhs, ctx, arena);
+  BindClassScopeTypeActuals(info.cls, info.access->lhs, ctx, arena);
 
   if (info.access->rhs->text == "new") {
     out = EvalClassNew(info.class_name, expr, ctx, arena, expr->range.start);

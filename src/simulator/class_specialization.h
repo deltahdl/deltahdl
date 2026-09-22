@@ -75,7 +75,11 @@ void InitSpecializationStaticProperties(ClassTypeInfo* spec, SimContext& ctx,
 // form name one specialization, and §8.25 makes that specialization a type of
 // its own carrying its own set of static member variables. Interned on the
 // call where nothing has interned it already, a scope form being able to be
-// the whole of what names a specialization.
+// the whole of what names a specialization. An actual in the list that
+// names a type parameter of the running method's class stands for the type
+// the running specialization binds it to, §8.25 resolving a type parameter
+// used in a type only after elaboration: `Box#(T)::` inside `Reg #(type T)`
+// names Box#(byte) under Reg#(byte).
 //
 // §8.25.1 also lets the prefix be the unadorned name, inside the named class
 // alone, where it refers to the members of the class in hand rather than

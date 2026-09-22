@@ -334,7 +334,7 @@ bool SetupInstanceTaskCall(const Expr* expr, SimContext& ctx, Arena& arena,
   const Expr* scope = expr->lhs != nullptr ? expr->lhs->lhs : nullptr;
   if (call.obj == nullptr && scope != nullptr && !scope->elements.empty()) {
     BindClassParams(call.owner, scope, ctx, arena);
-    BindClassScopeTypeActuals(call.owner->decl, scope, ctx, arena);
+    BindClassScopeTypeActuals(call.owner, scope, ctx, arena);
   }
   if (call.obj != nullptr) ctx.PushThis(call.obj);
   ctx.PushQueueRefFrame();

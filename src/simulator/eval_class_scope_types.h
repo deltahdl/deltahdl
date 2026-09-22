@@ -6,7 +6,7 @@
 namespace delta {
 
 class Arena;
-struct ClassDecl;
+struct ClassTypeInfo;
 struct DataType;
 struct Expr;
 class SimContext;
@@ -33,7 +33,10 @@ DataType TypeSpelledBy(const Expr* elem);
 // a select on it, and a type an expression could not spell as a kTypeRef. An
 // element that spells no type, and a parameter the list leaves at its
 // default, bind nothing, so a reader falls to the class's defaults for them.
-void BindClassScopeTypeActuals(const ClassDecl* decl, const Expr* base,
+// Where `cls` is the specialization the list names, its own actuals are bound
+// instead, resolved as the scope was read in the caller, so a list naming the
+// caller's type parameter binds the type that parameter stands for.
+void BindClassScopeTypeActuals(const ClassTypeInfo* cls, const Expr* base,
                                SimContext& ctx, Arena& arena);
 
 // §8.25 with §20.6.2: the number of bits of the type the type parameter `name`

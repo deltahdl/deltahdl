@@ -12,6 +12,7 @@
 #include "parser/ast_expr.h"
 #include "parser/ast_type.h"
 #include "simulator/class_object.h"
+#include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_class_params.h"
 #include "simulator/eval_class_scope_types.h"
 #include "simulator/eval_function_internal.h"
@@ -213,6 +214,48 @@ std::vector<DataType> SpelledActuals(const ClassDecl* decl,
   return spelled;
 }
 
+// §8.25: the type the running method's scope binds `name`, a type parameter
+// of the running method's class, to: the binding a call through a
+// specialization made in the running frame (eval_class_scope_types.h), else
+// the actual the running specialization carries, else the default the class
+// declares, which §8.25.1 makes the default specialization's. Null where no
+// method is running or `name` is no type parameter of its class.
+const DataType* RunningTypeActual(std::string_view name, SimContext& ctx) {
+  const ClassTypeInfo* running = ctx.CurrentMethodClass();
+  if (running == nullptr || running->decl == nullptr ||
+      running->decl->type_param_names.count(name) == 0) {
+    return nullptr;
+  }
+  if (const DataType* bound = ctx.FindScopeTypeActual(name)) return bound;
+  if (const DataType* actual = HolderActualFor(running, name)) return actual;
+  return TypeParamActual(nullptr, running->decl, name);
+}
+
+// §8.25 (printed page 204 of IEEE 1800-2023): a type parameter used in a type
+// resolves to a type only after elaboration, so a scope form written in a
+// method of a parameterized class whose list names that class's own type
+// parameter -- UVM's `uvm_typeid#(CB)::get()` in uvm_callbacks#(T,CB) --
+// names the specialization of `decl` the running specialization's actual
+// gives, a different one under each specialization of the running class.
+// These are the actuals `written` spells, each naming such a parameter
+// replaced by the type RunningTypeActual answers for it; spelled by the name
+// alone, every such scope keyed by the parameter's name, and one
+// specialization answered for every T.
+std::vector<DataType> ActualsUnderRunningClass(
+    const ClassDecl* decl, const std::vector<DataType>& written,
+    SimContext& ctx) {
+  std::vector<DataType> bound = SpelledActuals(decl, written);
+  for (DataType& actual : bound) {
+    if (actual.kind != DataTypeKind::kNamed) continue;
+    const DataType* a = RunningTypeActual(actual.type_name, ctx);
+    if (a == nullptr) continue;
+    std::string_view arg = actual.param_arg_name;
+    actual = *a;
+    actual.param_arg_name = arg;
+  }
+  return bound;
+}
+
 }  // namespace
 
 std::vector<DataType> ActualsUnderSpecialization(
@@ -309,8 +352,12 @@ ClassTypeInfo* ScopeNamedSpecialization(const Expr* base, SimContext& ctx,
   if (base == nullptr || base->kind != ExprKind::kIdentifier) return nullptr;
   ClassTypeInfo* generic = ctx.FindClassType(base->text);
   if (generic == nullptr || generic->decl == nullptr) return nullptr;
-  if (base->has_param_spec && !base->elements.empty())
-    return SpecializationOf(generic, ScopeActuals(*base), ctx, arena);
+  if (base->has_param_spec && !base->elements.empty()) {
+    return SpecializationOf(
+        generic,
+        ActualsUnderRunningClass(generic->decl, ScopeActuals(*base), ctx), ctx,
+        arena);
+  }
   // §8.25.1: the unadorned name is a legal scope prefix only inside the class
   // it names, and there it refers to the members of the class in hand rather
   // than denoting the default specialization, so it names whichever

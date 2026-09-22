@@ -13,6 +13,7 @@
 #include "parser/ast_type.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_array_class_assoc.h"
+#include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 
@@ -62,9 +63,33 @@ DataType TypeSpelledBy(const Expr* elem) {
   return dt;
 }
 
-void BindClassScopeTypeActuals(const ClassDecl* decl, const Expr* base,
+// §8.25.1: the binding made from the specialization `spec` itself, whose
+// actuals were resolved where the scope was read -- in the caller, ahead of
+// the callee's frame -- so a list naming the caller's own type parameter,
+// `Box#(T)::w()` inside `Reg #(type T)`, binds the callee's T to the type the
+// caller's T stands for (ScopeNamedSpecialization in class_specialization.h).
+// Read again from the list in the callee's frame, such a name bound a type
+// called T. An actual that spells no type binds nothing.
+static void BindSpecializationTypeActuals(const ClassTypeInfo* spec,
+                                          SimContext& ctx) {
+  const ClassDecl* decl = spec->decl;
+  for (size_t i = 0; i < decl->params.size(); ++i) {
+    std::string_view pname = decl->params[i].first;
+    if (decl->type_param_names.count(pname) == 0) continue;
+    const DataType* actual = ActualForParam(*spec->param_actuals, i, pname);
+    if (actual == nullptr || actual->kind == DataTypeKind::kImplicit) continue;
+    ctx.BindScopeTypeActual(pname, actual);
+  }
+}
+
+void BindClassScopeTypeActuals(const ClassTypeInfo* cls, const Expr* base,
                                SimContext& ctx, Arena& arena) {
-  if (decl == nullptr || base == nullptr) return;
+  if (cls == nullptr || cls->decl == nullptr || base == nullptr) return;
+  if (cls->param_actuals != nullptr) {
+    BindSpecializationTypeActuals(cls, ctx);
+    return;
+  }
+  const ClassDecl* decl = cls->decl;
   for (size_t i = 0; i < decl->params.size(); ++i) {
     std::string_view pname = decl->params[i].first;
     if (decl->type_param_names.count(pname) == 0) continue;
