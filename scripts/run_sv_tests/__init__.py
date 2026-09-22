@@ -344,6 +344,7 @@ _CLAUSE_PREFIX_RE = re.compile(r"(\d+(?:\.\d+)*)--")
 
 _CLAUSE_OF_MISTAGGED_FILE: dict[str, str] = {
     "9.3.3--fork_return.sv": "9.3.2",
+    "10.3--proc-assignment--bad.sv": "10.4",
     "13.4.4--fork-invalid.sv": "13.4",
     "18.9--controlling-constraints-with-constraint_mode_1.sv": "18.9",
     "18.17.2--if-else-production-statements_0_fail.sv": "23.9",

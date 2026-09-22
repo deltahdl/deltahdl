@@ -126,6 +126,14 @@ def test_a_file_the_suite_tags_on_the_next_subclause_is_judged_by_the_rule_it_te
     assert rst.tagged_clause({"tags": "9.3.3"}, "9.3.3--fork_return.sv") == "9.3.2"
 
 
+def test_a_file_the_suite_tags_on_the_clause_it_was_split_out_of_is_judged_by_the_rule_it_tests(
+    rst: ModuleType,
+) -> None:
+    assert rst.tagged_clause(
+        {"tags": "10.3"}, "10.3--proc-assignment--bad.sv",
+    ) == "10.4"
+
+
 def test_a_file_the_suite_tags_one_subclause_off_is_judged_by_the_rule_it_tests(
     rst: ModuleType,
 ) -> None:
