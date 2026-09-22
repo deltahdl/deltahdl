@@ -11,10 +11,14 @@ using namespace delta;
 
 namespace {
 
+// The three cases below write their output port from a procedure, so the port
+// is declared `output logic`: §23.2.2.3 makes `output y` with no data type a
+// net of the default net type, and §6.5 lets no procedure write a net, which
+// the elaborator reports since 40d5e271b registered such ports as nets.
 TEST(ProceduralBlockSynthesis, AlwaysCombBlockLowers) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
-                           "module m(input a, input b, output y);\n"
+                           "module m(input a, input b, output logic y);\n"
                            "  always_comb y = a & b;\n"
                            "endmodule\n");
   ASSERT_NE(mod, nullptr);
@@ -27,7 +31,7 @@ TEST(ProceduralBlockSynthesis, AlwaysCombBlockLowers) {
 TEST(ProceduralBlockSynthesis, AlwaysLatchBlockLowers) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
-                           "module m(input en, input d, output q);\n"
+                           "module m(input en, input d, output logic q);\n"
                            "  always_latch if (en) q = d;\n"
                            "endmodule\n");
   ASSERT_NE(mod, nullptr);
@@ -40,7 +44,7 @@ TEST(ProceduralBlockSynthesis, AlwaysLatchBlockLowers) {
 TEST(ProceduralBlockSynthesis, AlwaysFFBlockLowers) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
-                           "module m(input clk, input d, output q);\n"
+                           "module m(input clk, input d, output logic q);\n"
                            "  always_ff @(posedge clk) q <= d;\n"
                            "endmodule\n");
   ASSERT_NE(mod, nullptr);

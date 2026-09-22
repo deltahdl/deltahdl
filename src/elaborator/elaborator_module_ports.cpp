@@ -533,16 +533,17 @@ static void FoldBodyParamsIntoPortScope(const ModuleDecl* decl,
 // declared `wire w` was reported. A non-ANSI port registers through its body
 // net declaration in ElaborateNetDecl; a checker's formal is §17.2's and no
 // net.
-void Elaborator::RegisterPortNetNames(const ModuleDecl* decl,
-                                      const PortDecl& port,
-                                      const RtlirPort& rp) {
+static void RegisterPortNetNames(
+    const ModuleDecl* decl, const PortDecl& port, const RtlirPort& rp,
+    std::unordered_set<std::string_view>& interconnect_names,
+    std::unordered_set<std::string_view>& net_names) {
   if (port.name.empty()) return;
-  if (port.data_type.is_interconnect) interconnect_names_.insert(port.name);
+  if (port.data_type.is_interconnect) interconnect_names.insert(port.name);
   if (decl->is_non_ansi_ports || decl->decl_kind == ModuleDeclKind::kChecker ||
       rp.is_var) {
     return;
   }
-  net_names_.insert(port.name);
+  net_names.insert(port.name);
 }
 
 void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
@@ -564,7 +565,7 @@ void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
     if (RejectIllegalPortType(port, diag_)) continue;
 
     RtlirPort rp = ElaborateOnePort(decl, port, ctx);
-    RegisterPortNetNames(decl, port, rp);
+    RegisterPortNetNames(decl, port, rp, interconnect_names_, net_names_);
     // §37.3.3: where the port declaration stands, which the port object
     // reports through vpiLineNo and vpiFile.
     rp.loc = port.loc;

@@ -206,8 +206,6 @@ class Elaborator : public ElaboratorClassRules {
                               RtlirModule* mod);
 
   void ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod);
-  void RegisterPortNetNames(const ModuleDecl* decl, const PortDecl& port,
-                            const RtlirPort& rp);
 
   static bool HasParamPortWithoutDefault(const ModuleDecl* decl);
 
