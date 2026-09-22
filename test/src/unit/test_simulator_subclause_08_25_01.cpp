@@ -569,4 +569,36 @@ TEST(ParameterizedScopeResolutionSim,
   LowerRunAndCheck(f, design, {{"a", 2u}, {"b", 1u}});
 }
 
+TEST(ParameterizedScopeResolutionSim,
+     TypeActualsOfAScopeNameTheSpecializationTheirTypesGive) {
+  // §8.25.1: the explicit `#(...)` of a scope form names one specialization,
+  // and §8.25 makes two sets of parameters the same only where each type
+  // parameter's two types match, each specialization having its own set of
+  // static member variables. C#(byte):: and C#(shortint):: therefore name two
+  // specializations with an n each, and C#(byte):: names the very one a
+  // variable declared `C #(byte)` holds. Keyed without the types they spell,
+  // the two scopes share one n and read 2 twice, and the declared object's
+  // specialization, keyed by its type, reads an n no scope wrote, 0.
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class C #(type T = int);\n"
+      "  static int n;\n"
+      "  static function void set(int v); n = v; endfunction\n"
+      "  function int get(); return n; endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  C #(byte) cb = new;\n"
+      "  int a, b, c;\n"
+      "  initial begin\n"
+      "    C#(byte)::set(1);\n"
+      "    C#(shortint)::set(2);\n"
+      "    a = C#(byte)::n;\n"
+      "    b = C#(shortint)::n;\n"
+      "    c = cb.get();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"a", 1u}, {"b", 2u}, {"c", 1u}});
+}
+
 }  // namespace

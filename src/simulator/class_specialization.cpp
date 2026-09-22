@@ -13,6 +13,7 @@
 #include "parser/ast_type.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_class_params.h"
+#include "simulator/eval_class_scope_types.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer_register.h"
@@ -179,6 +180,37 @@ void BindSpecializationBase(ClassTypeInfo* spec,
     spec->parent = base;
 }
 
+// §8.25 with §23.10.2.2: a type parameter's actual matches another by
+// matching types, so each type actual is held as the type it spells. A scope
+// form's list, `C#(byte)::`, reaches here through ScopeActuals as the
+// expressions the parser left, each an implicit type carrying the element
+// that spells it, and a declaration's list leaves a name the parser did not
+// read as a type the same way (ParseOneTypeParam in parser_types.cpp).
+// Spelled by no name and an implicit kind, every such actual keyed alike, so
+// C#(byte):: and C#(shortint):: were one specialization with one set of
+// static member variables, and neither was the C#(byte) a declaration
+// writes, which the parser reads as the keyword's type. A value parameter's
+// actual is an expression and stays one.
+std::vector<DataType> SpelledActuals(const ClassDecl* decl,
+                                     const std::vector<DataType>& actuals) {
+  std::vector<DataType> spelled = actuals;
+  for (size_t j = 0; j < spelled.size(); ++j) {
+    DataType& actual = spelled[j];
+    std::string_view pname = actual.param_arg_name;
+    if (pname.empty() && j < decl->params.size()) pname = decl->params[j].first;
+    if (decl->type_param_names.count(pname) == 0) continue;
+    if (actual.kind != DataTypeKind::kImplicit ||
+        actual.type_ref_expr == nullptr) {
+      continue;
+    }
+    DataType type = TypeSpelledBy(actual.type_ref_expr);
+    if (type.kind == DataTypeKind::kImplicit) continue;
+    type.param_arg_name = actual.param_arg_name;
+    actual = type;
+  }
+  return spelled;
+}
+
 }  // namespace
 
 std::vector<DataType> ActualsUnderSpecialization(
@@ -202,6 +234,7 @@ ClassTypeInfo* SpecializationOf(ClassTypeInfo* generic,
   if (generic == nullptr || generic->decl == nullptr || actuals.empty())
     return generic;
   const ClassDecl* decl = generic->decl;
+  std::vector<DataType> spelled = SpelledActuals(decl, actuals);
   // §8.25.1 with §6.20.2: an actual, like a default, is sized by the type the
   // parameter's declaration writes, and a range may name an earlier
   // parameter, so one sizer takes the list in header order and records each
@@ -215,7 +248,7 @@ ClassTypeInfo* SpecializationOf(ClassTypeInfo* generic,
     std::string_view pname = decl->params[i].first;
     // §23.10.2.2 through §8.25: an actual is matched to its parameter by the
     // name it was written with, in the named form, and otherwise by position.
-    const DataType* actual = ActualForParam(actuals, i, pname);
+    const DataType* actual = ActualForParam(spelled, i, pname);
     if (decl->type_param_names.count(pname) != 0) {
       key += TypeActualKey(decl, i, actual, ctx);
       continue;
@@ -250,8 +283,8 @@ ClassTypeInfo* SpecializationOf(ClassTypeInfo* generic,
   // have built it for the call alone (ScopeActuals above). Construction reads
   // it where the name the `new` was written against carries no list of its
   // own (BindTypeParamActuals in eval_class_params.cpp).
-  spec->param_actuals = arena.Create<std::vector<DataType>>(actuals);
-  BindSpecializationBase(spec, actuals, ctx, arena);
+  spec->param_actuals = arena.Create<std::vector<DataType>>(spelled);
+  BindSpecializationBase(spec, spelled, ctx, arena);
   for (auto& [pname, value] : values)
     spec->static_properties[std::string(pname)] = value;
   ctx.RegisterClassType(spec->name, spec);

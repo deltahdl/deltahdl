@@ -7,8 +7,18 @@ namespace delta {
 
 class Arena;
 struct ClassDecl;
+struct DataType;
 struct Expr;
 class SimContext;
+
+// §8.25 through §23.10.2.2: the type an element of a `#(...)` list spells, at
+// kImplicit where it spells none. A keyword type or a typedef name arrives as
+// an identifier, each packed dimension hung off the node before it so the
+// last one written is the outermost node; §7.4.1 orders them leftmost first,
+// so they are put back in written order, ahead of any the named type carries.
+// `int unsigned` and the like arrive as the type the parser read into a
+// kTypeRef.
+DataType TypeSpelledBy(const Expr* elem);
 
 // §8.25.1: a static method called through an explicit specialization,
 // `Box#(byte)::bits()` or `p::Box#(shortint)::bits()`, runs on no object, so

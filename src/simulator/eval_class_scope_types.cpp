@@ -42,13 +42,7 @@ static bool IsPackedDimension(const Expr* expr) {
          !expr->is_part_select_plus && !expr->is_part_select_minus;
 }
 
-// The type the element spells, at kImplicit where it spells none. A keyword
-// type or a typedef name arrives as an identifier, each packed dimension
-// hung off the node before it so the last one written is the outermost node;
-// §7.4.1 orders them leftmost first, so they are put back in written order,
-// ahead of any the named type carries. `int unsigned` and the like arrive as
-// the type the parser read into a kTypeRef.
-static DataType TypeSpelledBy(const Expr* elem) {
+DataType TypeSpelledBy(const Expr* elem) {
   if (elem->kind == ExprKind::kTypeRef && elem->type_value != nullptr)
     return *elem->type_value;
   std::vector<std::pair<Expr*, Expr*>> dims;
