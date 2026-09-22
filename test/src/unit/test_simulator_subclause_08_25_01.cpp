@@ -539,4 +539,34 @@ TEST(ParameterizedScopeResolutionSim,
   LowerRunAndCheck(f, design, {{"a", 2u}, {"b", 1u}});
 }
 
+TEST(ParameterizedScopeResolutionSim,
+     UnadornedScopeInsideClassReadsItsSpecializationStaticProperty) {
+  // §8.25.1: inside the parameterized class, the unadorned name as a scope
+  // resolution prefix refers to the members of the class in hand rather than
+  // to the default specialization, and §8.25 gives each specialization its own
+  // set of static member variables, so `counter::count` inside get() is the
+  // count of whichever specialization the call is running under. Two
+  // `counter #(1)` objects and one `counter #(4)` object leave 2 and 1; the
+  // declaration's own map, which no constructor writes now that a variable's
+  // actuals point it at a specialization, leaves 0 for both calls.
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class counter #(int size = 1);\n"
+      "  static int count = 0;\n"
+      "  function new(); count++; endfunction\n"
+      "  static function int get(); return counter::count; endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  counter #(1) x1 = new, y1 = new;\n"
+      "  counter #(4) x4 = new;\n"
+      "  int a, b;\n"
+      "  initial begin\n"
+      "    a = counter#(1)::get();\n"
+      "    b = counter#(4)::get();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"a", 2u}, {"b", 1u}});
+}
+
 }  // namespace

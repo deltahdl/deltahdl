@@ -53,16 +53,23 @@ void InitSpecializationStaticProperties(ClassTypeInfo* spec, SimContext& ctx,
 // call where nothing has interned it already, a scope form being able to be
 // the whole of what names a specialization.
 //
-// Null where `base` is no identifier carrying a `#(...)` list or where the
-// identifier names no class declaration.
+// §8.25.1 also lets the prefix be the unadorned name, inside the named class
+// alone, where it refers to the members of the class in hand rather than
+// denoting the default specialization: such a `base` names the specialization
+// the running method belongs to, `counter::count` inside a method reached
+// through `counter#(4)::` being that specialization's count.
+//
+// Null where `base` is no identifier, where the identifier names no class
+// declaration, and where an unadorned one names a class no running method
+// belongs to a specialization of.
 ClassTypeInfo* ScopeNamedSpecialization(const Expr* base, SimContext& ctx,
                                         Arena& arena);
 
 // The static property `expr` reads through a specialization scope,
 // `vector#(1)::count`: true with `out` filled where `expr` is a member
-// select whose left side is an identifier carrying a `#(...)` list, that
-// identifier names a class declaration, and the class or one of its bases
-// declares a static property of that name. §8.25.1 has the scope form name
+// select whose left side names a specialization as ScopeNamedSpecialization
+// reads it, and that specialization or one of its bases declares a static
+// property of that name. §8.25.1 has the scope form name
 // one specialization,
 // and §8.25 gives each specialization its own set of static member variables,
 // so the read is of that specialization's copy rather than of the

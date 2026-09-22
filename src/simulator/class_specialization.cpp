@@ -106,13 +106,21 @@ ClassTypeInfo* SpecializationOf(ClassTypeInfo* generic,
 
 ClassTypeInfo* ScopeNamedSpecialization(const Expr* base, SimContext& ctx,
                                         Arena& arena) {
-  if (base == nullptr || base->kind != ExprKind::kIdentifier ||
-      !base->has_param_spec || base->elements.empty()) {
-    return nullptr;
-  }
+  if (base == nullptr || base->kind != ExprKind::kIdentifier) return nullptr;
   ClassTypeInfo* generic = ctx.FindClassType(base->text);
   if (generic == nullptr || generic->decl == nullptr) return nullptr;
-  return SpecializationOf(generic, ScopeActuals(*base), ctx, arena);
+  if (base->has_param_spec && !base->elements.empty())
+    return SpecializationOf(generic, ScopeActuals(*base), ctx, arena);
+  // §8.25.1: the unadorned name is a legal scope prefix only inside the class
+  // it names, and there it refers to the members of the class in hand rather
+  // than denoting the default specialization, so it names whichever
+  // specialization the running method belongs to. That class is told from an
+  // unrelated one of the name by sharing the declaration the bare name found,
+  // every specialization being a copy of it; it is asked for again by its own
+  // name because the stack hands it out for reading alone.
+  const ClassTypeInfo* running = ctx.CurrentMethodClass();
+  if (running == nullptr || running->decl != generic->decl) return nullptr;
+  return ctx.FindClassType(running->name);
 }
 
 bool TryScopeSpecializationStaticMember(const Expr* expr, SimContext& ctx,
