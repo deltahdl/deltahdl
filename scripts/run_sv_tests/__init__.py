@@ -163,7 +163,7 @@ def check_assertions(stdout: str) -> tuple[bool, str]:
         match = re.search(r":assert:\s*(.*)", line)
         if not match:
             continue
-        expr = match.group(1).strip()
+        expr = match.group(1).strip().replace("\0", "")
         try:
             tree = ast.parse(expr, mode="eval")
             if not eval_node(tree.body):

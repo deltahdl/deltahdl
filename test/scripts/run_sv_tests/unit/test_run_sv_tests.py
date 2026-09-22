@@ -456,6 +456,20 @@ def test_multiple_assertions_one_fails(rst: ModuleType) -> None:
     assert ok is False
 
 
+def test_a_nul_character_a_displayed_value_carries_is_no_part_of_the_expression(
+    rst: ModuleType,
+) -> None:
+    stdout = ":assert: ('TEST' in 'Test\0\0\0TEST')\n:assert: ('Test' in 'Test\0TEST')\n"
+    assert rst.check_assertions(stdout) == (True, "")
+
+
+def test_a_comparison_over_nul_characters_reads_the_characters_around_them(
+    rst: ModuleType,
+) -> None:
+    assert rst.check_assertions(":assert: ('ab' == 'a\0b')") == (True, "")
+    assert rst.check_assertions(":assert: ('ac' == 'a\0b')")[0] is False
+
+
 def test_syntax_error_fails(rst: ModuleType) -> None:
     assert rst.check_assertions(":assert: (!!!)")[0] is False
 
