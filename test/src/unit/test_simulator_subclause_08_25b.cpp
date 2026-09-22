@@ -263,4 +263,34 @@ TEST(ClassSim, ClassScopeTypedefOfTheClassesOwnParameterIsPerSpecialization) {
   EXPECT_EQ(out, "b 8\ns 16\n");
 }
 
+// §8.25 (printed page 204 of IEEE 1800-2023) with §6.22.1: two sets of
+// parameters are the same only where each type parameter's two types match,
+// and `bit [2:0]` and `bit [7:0]` do not, being packed arrays of different
+// sizes. W#(bit [2:0]) and W#(bit [7:0]) are therefore two specializations
+// with an n each. The keyword the two actuals share is the whole of the name
+// the parser records for either, so spelled by that name they are one
+// specialization, and both reads give the 8 written last; spelled by the
+// keyword and the width, they give 3 and 8.
+TEST(ClassSim, BuiltinTypeActualsOfDifferentWidthsAreTwoSpecializations) {
+  SimFixture f;
+  auto out = RunCapture(
+      "class W #(type T = int);\n"
+      "  static int n;\n"
+      "  function void set(int v); n = v; endfunction\n"
+      "  function int get(); return n; endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  W #(bit [2:0]) w3 = new;\n"
+      "  W #(bit [7:0]) w8 = new;\n"
+      "  initial begin\n"
+      "    w3.set(3);\n"
+      "    w8.set(8);\n"
+      "    $display(\"w3 %0d\", w3.get());\n"
+      "    $display(\"w8 %0d\", w8.get());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "w3 3\nw8 8\n");
+}
+
 }  // namespace

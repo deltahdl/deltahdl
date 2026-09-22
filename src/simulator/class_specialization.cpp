@@ -24,10 +24,10 @@ namespace delta {
 namespace {
 
 // §6.11 and §6.12 name the integral and real types the standard defines, each
-// of which a type actual may be written as; the keyword, for a kind the
-// parser records without one. Empty for a kind no type actual is written as
-// -- a net type, a void -- and for the named and inline aggregate kinds,
-// which TypeActualKey spells for itself.
+// of which a type actual may be written as; the keyword each such kind is
+// spelled by in a specialization's key, whatever name the type carries. Empty
+// for a kind no type actual is written as -- a net type, a void -- and for the
+// named and inline aggregate kinds, which TypeActualKey spells for itself.
 std::string_view BuiltinTypeKeyword(DataTypeKind kind) {
   switch (kind) {
     case DataTypeKind::kLogic:
@@ -69,23 +69,25 @@ std::string_view BuiltinTypeKeyword(DataTypeKind kind) {
 
 // §8.25 with §23.10.2.2: a type parameter's actual matches by matching types,
 // so the key has to tell two actuals apart exactly when their types differ. A
-// named type is told by its name. A built-in one carries none -- the parser
-// records `D#(integer)` as a DataType of kind kInteger and nothing else
-// (ParseOneTypeParam in parser_types.cpp) -- so it is spelled by its keyword
+// named type is told by its name. A built-in one is spelled by its keyword
 // together with the width its declaration gives it, which separates integer
-// from shortint by the keyword and `bit [2:0]` from `bit [7:0]` by the width.
-// Spelled by the empty name alone, every one of those keyed as `D#()`, and
-// SpecializationOf handed the second actual the specialization the first had
-// made. The declaration's own default stands where the specialization leaves
-// the parameter out, which is the type the default specialization binds.
+// from shortint by the keyword and `bit [2:0]` from `bit [7:0]` by the width,
+// whatever name it carries: ParseDataType (parser_types.cpp) records a
+// keyword's own text as the name of the type a declaration writes, which
+// leaves `bit [2:0]` and `bit [7:0]` both named bit, while the same keyword
+// read out of a scope form's list (TypeSpelledBy) carries no name at all, so
+// a name taken first keyed a declaration's `C #(byte)` as C#(byte) and the
+// scope form `C#(byte)::` as C#(byte[8]), two specializations of one type.
+// The declaration's own default stands where the specialization leaves the
+// parameter out, which is the type the default specialization binds.
 std::string TypeActualKey(const ClassDecl* decl, size_t i,
                           const DataType* actual, SimContext& ctx) {
   const DataType* type = actual;
   if (type == nullptr)
     type = i < decl->param_types.size() ? &decl->param_types[i] : nullptr;
   if (type == nullptr) return {};
-  if (!type->type_name.empty()) return std::string(type->type_name);
   std::string key(BuiltinTypeKeyword(type->kind));
+  if (key.empty()) return std::string(type->type_name);
   return key + "[" + std::to_string(DeclaredTypeWidth(*type, ctx)) + "]";
 }
 
