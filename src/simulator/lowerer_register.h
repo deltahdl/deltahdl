@@ -321,7 +321,13 @@ void RegisterClassTypeAliases(const RtlirDesign* design, SimContext& ctx,
 // RegisterClassTypeAliases. §8.25: a typedef writing a parameter list,
 // `typedef V#(4) t4;`, names the specialization that list gives rather than
 // the generic class, which is no type at all, so the alias is bound to the
-// specialization, interned here where nothing has interned it already.
+// specialization, interned here where nothing has interned it already. Where
+// the list names a type parameter of `info` -- `typedef Box#(T) box_t;` --
+// the type it stands for is the one `info` binds it to, which §8.25 settles
+// only after elaboration, so a specialization binds its own aliases under its
+// own name as it is created (SpecializationOf in class_specialization.cpp)
+// and the declaration's binding, made with the parameter standing for
+// nothing, is the default specialization's alone.
 void RegisterClassScopeTypedefAliases(ClassTypeInfo* info, SimContext& ctx,
                                       Arena& arena);
 // §16.8 and §16.12: the module's named sequence and property declarations,

@@ -24,6 +24,7 @@
 #include "simulator/class_specialization.h"
 #include "simulator/dpi_arg_value.h"
 #include "simulator/dpi_runtime.h"
+#include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/expr_walk.h"
 #include "simulator/lowerer.h"
@@ -628,7 +629,47 @@ void RegisterTypeTargets(const RtlirDesign* design, SimContext& ctx) {
 // §8.25.1 makes the default specialization alone: bound to that, `t4::W` and
 // `t8::W` both read the default's W. A typedef writing no list names that
 // default, which SpecializationOf answers for an empty list.
+// §8.25: the type the specialization `holder` binds its own type parameter
+// `pname` to, null where it binds it nothing -- the class declaration's own
+// type, which §8.25.1 makes the default specialization, binds none.
+static const DataType* HolderActualFor(const ClassTypeInfo* holder,
+                                       std::string_view pname) {
+  if (holder->param_actuals == nullptr) return nullptr;
+  const ClassDecl* decl = holder->decl;
+  for (size_t i = 0; i < decl->params.size(); ++i) {
+    if (decl->params[i].first == pname)
+      return ActualForParam(*holder->param_actuals, i, pname);
+  }
+  return nullptr;
+}
+
+// §8.25 (printed page 204 of IEEE 1800-2023): a type parameter used in a type
+// resolves to a type only after elaboration, so a class-scope typedef whose
+// actuals name a type parameter of the class holding it -- UVM's `typedef
+// uvm_object_registry#(T,Tname) this_type;` -- names a different
+// specialization in each specialization of that class. These are the actuals
+// the typedef wrote with each such name replaced by the type `holder` binds it
+// to, `Box#(T)` becoming Box#(byte) under Reg#(byte); the name a named actual
+// was written with is kept, the substitution being of the type alone. The list
+// comes back as written where the holder binds nothing, which is the class
+// declaration's own type, and for an actual naming no parameter of it.
+static std::vector<DataType> TypedefActualsUnder(
+    const ClassTypeInfo* holder, const std::vector<DataType>& written) {
+  std::vector<DataType> bound = written;
+  for (DataType& actual : bound) {
+    if (actual.kind != DataTypeKind::kNamed) continue;
+    if (holder->decl->type_param_names.count(actual.type_name) == 0) continue;
+    const DataType* a = HolderActualFor(holder, actual.type_name);
+    if (a == nullptr) continue;
+    std::string_view arg = actual.param_arg_name;
+    actual = *a;
+    actual.param_arg_name = arg;
+  }
+  return bound;
+}
+
 static ClassTypeInfo* ClassNamedByTypedef(const DataType& target,
+                                          const ClassTypeInfo* holder,
                                           SimContext& ctx, Arena& arena) {
   if (target.kind != DataTypeKind::kNamed) return nullptr;
   ClassTypeInfo* generic = nullptr;
@@ -638,7 +679,8 @@ static ClassTypeInfo* ClassNamedByTypedef(const DataType& target,
   }
   if (generic == nullptr) generic = ctx.FindClassType(target.type_name);
   if (generic == nullptr) return nullptr;
-  return SpecializationOf(generic, target.type_params, ctx, arena);
+  return SpecializationOf(
+      generic, TypedefActualsUnder(holder, target.type_params), ctx, arena);
 }
 
 void RegisterClassScopeTypedefAliases(ClassTypeInfo* info, SimContext& ctx,
@@ -652,8 +694,8 @@ void RegisterClassScopeTypedefAliases(ClassTypeInfo* info, SimContext& ctx,
     auto* alias = arena.Create<std::string>(std::string(info->name) +
                                             "::" + std::string(member->name));
     if (ctx.FindClassType(*alias) != nullptr) continue;
-    ClassTypeInfo* cls =
-        ClassNamedByTypedef(member->typedef_item->typedef_type, ctx, arena);
+    ClassTypeInfo* cls = ClassNamedByTypedef(member->typedef_item->typedef_type,
+                                             info, ctx, arena);
     if (cls != nullptr) ctx.RegisterClassType(*alias, cls);
   }
 }

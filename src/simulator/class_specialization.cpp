@@ -15,6 +15,7 @@
 #include "simulator/eval_class_params.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
+#include "simulator/lowerer_register.h"
 #include "simulator/sim_context.h"
 
 namespace delta {
@@ -200,6 +201,16 @@ ClassTypeInfo* SpecializationOf(ClassTypeInfo* generic,
   for (auto& [pname, value] : values)
     spec->static_properties[std::string(pname)] = value;
   ctx.RegisterClassType(spec->name, spec);
+  // §8.25: a class-scope typedef whose actuals name a type parameter of this
+  // class resolves to a type only once the actuals are known, so the aliases
+  // are bound again under the specialization's own name, `Reg#(byte)::box_t`
+  // standing beside the `Reg::box_t` the declaration bound with the parameter
+  // standing for nothing. SimContext::FindClassType tries the running
+  // method's class before any other, so a method of the specialization
+  // reaches its own. Registered ahead of this, so a typedef naming this very
+  // specialization -- `typedef Reg#(T) this_type;` -- finds it by its key
+  // rather than making it again without end.
+  RegisterClassScopeTypedefAliases(spec, ctx, arena);
   InitSpecializationStaticProperties(spec, ctx, arena);
   return spec;
 }

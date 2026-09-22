@@ -198,4 +198,35 @@ TEST(ClassSim, ConstructedThroughATypedefTheValueParameterIsTheActual) {
   EXPECT_EQ(out, "a 4\nb 8\n");
 }
 
+// §8.25 (printed page 204 of IEEE 1800-2023): a type parameter used in a type
+// resolves to a type only after elaboration, so a class-scope typedef whose
+// actuals name the class's own parameter -- UVM's `typedef
+// uvm_object_registry#(T,Tname) this_type;` -- names a different
+// specialization in each specialization of the class holding it, and cannot be
+// settled once for the declaration. Two specializations of the outer class
+// discriminate: binding the typedef once, with T standing for nothing, leaves
+// both reads at whatever that one inner type gives, and resolving it per
+// specialization leaves byte's 8 and shortint's 16.
+TEST(ClassSim, ClassScopeTypedefOfTheClassesOwnParameterIsPerSpecialization) {
+  SimFixture f;
+  auto out = RunCapture(
+      "class Box #(type T = int);\n"
+      "  function int w(); return $bits(T); endfunction\n"
+      "endclass\n"
+      "class Reg #(type T = int);\n"
+      "  typedef Box#(T) box_t;\n"
+      "  function int w(); box_t b = new; return b.w(); endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  Reg #(byte) rb = new;\n"
+      "  Reg #(shortint) rs = new;\n"
+      "  initial begin\n"
+      "    $display(\"b %0d\", rb.w());\n"
+      "    $display(\"s %0d\", rs.w());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "b 8\ns 16\n");
+}
+
 }  // namespace
