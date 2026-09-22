@@ -485,7 +485,10 @@ void ExecClassMethod(ClassMethodTarget target, const Expr* expr,
     // the integer's bits as a double.
     ret_var->is_real = DeclaredTypeIsReal(method->return_type, ctx);
   }
+  // §8.10: a static method has no `this`, its caller's included.
+  if (method->is_static_method) ctx.PushThis(nullptr);
   ExecFunctionBody(method, ret_var, ctx, arena);
+  if (method->is_static_method) ctx.PopThis();
   out = CallResult(is_void, ret_var, arena);
 }
 

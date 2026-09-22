@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 
+#include "fixture_simulator.h"
 #include "helpers_scheduler.h"
+#include "simulator/variable.h"
 
 using namespace delta;
 
@@ -244,6 +246,65 @@ TEST(StaticMethodSimulation, StaticTaskForksAndJoins) {
                       "endmodule\n",
                       "result"),
             6093u);
+}
+
+// §8.10 (printed pages 186-187): a static method has no `this`, even when an
+// instance method of another class calls it. The caller's object stayed in
+// force instead, and a process the static method forked inherited it, so
+// `pool.push_back(e)` on the static queue was taken as a method called
+// through a property handle of R and reported a null handle under §8.4.
+TEST(StaticMethodSimulation, ForkOfAStaticMethodCalledFromAnObjectHasNoThis) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "class E;\n"
+      "  int v;\n"
+      "endclass\n"
+      "class C;\n"
+      "  local static E pool[$];\n"
+      "  static function void later();\n"
+      "    fork\n"
+      "      begin\n"
+      "        E e = new;\n"
+      "        #1;\n"
+      "        pool.push_back(e);\n"
+      "      end\n"
+      "    join_none\n"
+      "  endfunction\n"
+      "  static task hold();\n"
+      "    fork\n"
+      "      begin\n"
+      "        E e = new;\n"
+      "        #1;\n"
+      "        pool.push_back(e);\n"
+      "      end\n"
+      "    join_none\n"
+      "  endtask\n"
+      "  static function int n();\n"
+      "    return pool.size();\n"
+      "  endfunction\n"
+      "endclass\n"
+      "class R;\n"
+      "  int x;\n"
+      "  function void start();\n"
+      "    C::later();\n"
+      "  endfunction\n"
+      "  task begin_hold();\n"
+      "    C::hold();\n"
+      "  endtask\n"
+      "endclass\n"
+      "module t;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    R r = new;\n"
+      "    r.start();\n"
+      "    r.begin_hold();\n"
+      "    #2 result = C::n();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 2u);
+  EXPECT_FALSE(f.diag.HasErrors());
 }
 
 }  // namespace

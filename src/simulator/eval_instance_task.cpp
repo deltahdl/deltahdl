@@ -314,8 +314,9 @@ bool SetupInstanceTaskCall(const Expr* expr, SimContext& ctx, Arena& arena,
   // through the class scope or through a handle, and §13.3 lets its body hold
   // timing controls as any task's may, so it is run as a coroutine here too;
   // handed to the synchronous evaluator, its delay was skipped and its fork
-  // never joined. `this` is pushed for an instance task alone, and
-  // TeardownInstanceTaskCall pops it for that one alone.
+  // never joined. A static task's `this` is pushed as null, so neither its
+  // body nor a process it forks reads the caller's object as its own, and
+  // TeardownInstanceTaskCall pops it as it pops an instance task's.
   if (call.method->is_static_method) {
     call.obj = nullptr;
   } else if (call.obj == nullptr) {
@@ -338,7 +339,7 @@ bool SetupInstanceTaskCall(const Expr* expr, SimContext& ctx, Arena& arena,
     BindClassParams(call.owner, scope, ctx, arena);
     BindClassScopeTypeActuals(call.owner, scope, ctx, arena);
   }
-  if (call.obj != nullptr) ctx.PushThis(call.obj);
+  ctx.PushThis(call.obj);
   ctx.PushQueueRefFrame();
   ctx.PushAssocRefFrame();
   // §20.17.2: the task is a calling context on the $stacktrace chain, as a
@@ -360,7 +361,7 @@ void TeardownInstanceTaskCall(const InstanceMethodInfo& call, const Expr* expr,
   // therefore made once the task's `this` and its class are popped, as
   // ExecInstanceMethodCall pops them before its writeback; with B's object
   // still in force the value landed on B's `w` and A's never changed.
-  if (call.obj != nullptr) ctx.PopThis();
+  ctx.PopThis();
   ctx.PopMethodClass();
   WritebackOutputArgs(call.method, expr, ctx, arena);
   WritebackQueueRefs(ctx);
