@@ -490,6 +490,15 @@ struct ClassTypespecParamAssign {
   bool has_explicit_arg = false;
   std::string_view explicit_rhs;
   std::string_view default_rhs;
+  // §37.32 detail 3 (printed page 1043 of IEEE 1800-2023): a typespec
+  // representing only a lexical construct answers the written expression for
+  // vpiRhs, which explicit_rhs and default_rhs carry, but one representing a
+  // class specialization may answer any object holding the value the
+  // parameter has. True with `bound_value` filled where the type the typespec
+  // was built from holds that value, which §8.25 makes a fact about the
+  // specialization (VpiClassTypespecOf below).
+  bool has_bound_value = false;
+  Logic4Vec bound_value;
 };
 
 // §37.32: a constraint visible from a class typespec. An inline constraint is
@@ -571,6 +580,23 @@ bool VpiClassTypespecParamIsLocal(const ClassTypespecParam& param);
 // §37.32: the vpiRhs of a parameter assignment -- the explicit argument when
 // one was supplied, otherwise the declared default.
 std::string_view VpiClassTypespecParamRhs(const ClassTypespecParamAssign& pa);
+
+// §37.32 detail 1 (printed page 1043 of IEEE 1800-2023): a class typespec
+// whose parameter values are all resolved represents a class specialization,
+// which the values a class type carries at the run are, so this is the
+// typespec of `type` and its kind is kSpecialization. Detail 3 then lets each
+// param assignment answer the value the parameter has rather than the
+// expression the source wrote, so each carries what
+// ClassTypeInfo::static_properties holds for it (§8.25 putting a
+// specialization's parameters there, SpecializationOf in
+// class_specialization.cpp), and a parameter the type holds no value for
+// carries none.
+//
+// `extends` is left null, a returned value owning no nested typespec: the
+// base's is had by asking this of ClassTypeInfo::parent. An empty typespec
+// for a null `type` or one with no declaration, a built-in class having none
+// and §37.32 having its class_defn report NULL.
+ClassTypespecInfo VpiClassTypespecOf(const ClassTypeInfo* type);
 
 // §37.32: a value read through a class typespec is only well defined for static
 // members; a non-static member has no value until an instance is selected, so

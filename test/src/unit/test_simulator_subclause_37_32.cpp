@@ -2,6 +2,9 @@
 
 #include <vector>
 
+#include "common/arena.h"
+#include "common/types.h"
+#include "parser/ast_class.h"
 #include "simulator/class_object.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
@@ -247,6 +250,48 @@ TEST(ClassTypespec, VirtualInterfaceArrayExpandsPerElement) {
 
   EXPECT_EQ(VpiClassTypespecVirtualInterfaceVarCount(spec), 4);
   EXPECT_EQ(VpiClassTypespecArrayVarCount(spec), 2);
+}
+
+// §37.32 details 1 and 3 (printed page 1043 of IEEE 1800-2023): a class
+// typespec whose parameter values are all resolved represents a class
+// specialization, and for such a typespec the vpiRhs of each param assignment
+// may be any object carrying the value the parameter has, where a typespec
+// representing only a lexical construct answers the explicit parameter
+// expression or, failing that, the expression the parameter was declared with.
+// The typespec built from a class type the run holds is the resolved one:
+// §8.25 makes the specialization the type and the run keeps its parameters'
+// values on it. Two parameters discriminate: the record carried the written
+// expression's text alone and no value at all, and the type's own storage
+// gives 4 and 8.
+TEST(ClassTypespec, SpecializationTypespecCarriesItsResolvedParameterValues) {
+  Arena arena;
+  ClassDecl decl;
+  decl.name = "vector";
+  decl.params = {{"size", nullptr}, {"depth", nullptr}};
+  decl.localparam_port_names.insert("depth");
+  ClassTypeInfo spec;
+  spec.name = "vector#(4,8)";
+  spec.decl = &decl;
+  spec.static_properties["size"] = MakeLogic4VecVal(arena, 32, 4);
+  spec.static_properties["depth"] = MakeLogic4VecVal(arena, 32, 8);
+
+  ClassTypespecInfo ts = VpiClassTypespecOf(&spec);
+
+  EXPECT_EQ(ts.kind, ClassTypespecKind::kSpecialization);
+  EXPECT_EQ(ts.name, "vector#(4,8)");
+  EXPECT_EQ(ts.class_defn, &spec);
+  ASSERT_EQ(ts.params.size(), 2u);
+  EXPECT_EQ(ts.params[0].name, "size");
+  EXPECT_FALSE(ts.params[0].is_local_param);
+  EXPECT_EQ(ts.params[1].name, "depth");
+  EXPECT_TRUE(ts.params[1].is_local_param);
+  ASSERT_EQ(ts.param_assigns.size(), 2u);
+  EXPECT_EQ(ts.param_assigns[0].name, "size");
+  EXPECT_TRUE(ts.param_assigns[0].has_bound_value);
+  EXPECT_EQ(ts.param_assigns[0].bound_value.ToUint64(), 4u);
+  EXPECT_EQ(ts.param_assigns[1].name, "depth");
+  EXPECT_TRUE(ts.param_assigns[1].has_bound_value);
+  EXPECT_EQ(ts.param_assigns[1].bound_value.ToUint64(), 8u);
 }
 
 }  // namespace

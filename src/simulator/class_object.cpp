@@ -341,6 +341,27 @@ std::string_view VpiClassTypespecParamRhs(const ClassTypespecParamAssign& pa) {
   return pa.has_explicit_arg ? pa.explicit_rhs : pa.default_rhs;
 }
 
+ClassTypespecInfo VpiClassTypespecOf(const ClassTypeInfo* type) {
+  ClassTypespecInfo ts;
+  if (type == nullptr || type->decl == nullptr) return ts;
+  ts.name = type->name;
+  ts.kind = ClassTypespecKind::kSpecialization;
+  ts.class_defn = type;
+  for (const auto& [pname, pexpr] : type->decl->params) {
+    ts.params.push_back(
+        {pname, type->decl->localparam_port_names.count(pname) != 0});
+    ClassTypespecParamAssign pa;
+    pa.name = pname;
+    auto held = type->static_properties.find(std::string(pname));
+    if (held != type->static_properties.end()) {
+      pa.has_bound_value = true;
+      pa.bound_value = held->second;
+    }
+    ts.param_assigns.push_back(pa);
+  }
+  return ts;
+}
+
 // §37.32: reading a value through the typespec is allowed unless the member is
 // a non-static member reached only via the typespec.
 bool VpiClassTypespecValueAccessAllowed(bool obtained_from_class_typespec,
