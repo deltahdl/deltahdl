@@ -310,7 +310,11 @@ TEST(SeveritySystemTaskSim, MessageReportsSourceLine) {
 // §20.10 (final paragraph): an assertion whose action_block has no else (fail)
 // clause takes the default fail action, which is a call to $error. A bare
 // immediate assert that fails must therefore report ERROR severity even though
-// the source names no severity task, and the run continues (unlike $fatal).
+// the source names no severity task, and the run continues (unlike $fatal);
+// and being a call to $error, it is the run-time error §20.10 has $error
+// generate, the one the run's exit status reports, as much as a $error the
+// source calls -- noted for the source's calls alone, it left
+// test/src/e2e/assert_statement.sv's failing no_else assertion with status 0.
 TEST(SeveritySystemTaskSim, AssertionDefaultFailActionIsError) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -324,6 +328,7 @@ TEST(SeveritySystemTaskSim, AssertionDefaultFailActionIsError) {
   f.scheduler.Run();
   EXPECT_EQ(f.ctx.LastSeverity(), "ERROR");
   EXPECT_FALSE(f.ctx.StopRequested());
+  EXPECT_TRUE(f.ctx.HasRuntimeErrors());
 }
 
 TEST(SeveritySystemTaskSim, InfoIncludesUserDefinedMessage) {

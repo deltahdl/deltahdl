@@ -731,41 +731,45 @@ static bool AppendUnpackedArrayArg(const Expr* arg, SimContext& ctx,
 
 // Render one argument of a display or write task, consuming any expression
 // arguments a format template takes with it.
-// `default_radix` is the specifier a bare expression argument is rendered
-// under: the task's own for the display and write families, decimal for a
-// severity task, whose name says nothing of a radix ($info ends in the
-// letter the octal family does).
+// The text a display-syntax argument list is rendered into, and the
+// specifier a bare expression argument is rendered under: the task's own for
+// the display and write families, decimal for a severity task, whose name
+// says nothing of a radix ($info ends in the letter the octal family does).
+struct DisplayText {
+  std::string& text;
+  char default_radix;
+};
+
 static void AppendDisplayArg(const Expr* expr, size_t& i, SimContext& ctx,
-                             Arena& arena, std::string& output,
-                             char default_radix) {
+                             Arena& arena, DisplayText out) {
   const Expr* arg = expr->args[i];
   // An omitted argument -- a leading, trailing, or doubled comma in the call --
   // carries no expression and is rendered as a single space.
   if (arg == nullptr) {
-    output += ' ';
+    out.text += ' ';
     return;
   }
   if (arg->kind == ExprKind::kStringLiteral) {
     std::string fmt = ExtractFormatString(arg);
     DisplayArgRenderings r = CollectDisplayArgs(expr, i, fmt, ctx, arena);
-    output += FormatDisplay(fmt, r.vals,
-                            {.p_fmts = &r.p_fmts,
-                             .v_fmts = &r.v_fmts,
-                             .arg_nonscalar_net = &r.nonscalar_nets,
-                             .ctx = &ctx,
-                             .arg_unpacked_agg = &r.agg_flags,
-                             .arg_byte_strings = &r.byte_strings,
-                             .loc = arg->range.start});
+    out.text += FormatDisplay(fmt, r.vals,
+                              {.p_fmts = &r.p_fmts,
+                               .v_fmts = &r.v_fmts,
+                               .arg_nonscalar_net = &r.nonscalar_nets,
+                               .ctx = &ctx,
+                               .arg_unpacked_agg = &r.agg_flags,
+                               .arg_byte_strings = &r.byte_strings,
+                               .loc = arg->range.start});
     return;
   }
-  if (AppendUnpackedArrayArg(arg, ctx, output)) return;
+  if (AppendUnpackedArrayArg(arg, ctx, out.text)) return;
   // A bare expression renders under the task's default radix; a value carrying
   // string-typed data is always rendered as its character sequence regardless
   // of the task name. The rendering carries the §21.2.1.2 automatic sizing, so
   // a plain $display pads its default decimal exactly as an explicit %d would.
   auto val = EvalExpr(arg, ctx, arena);
-  char spec = val.is_string ? 's' : default_radix;
-  output += FormatArgAutoSized(val, spec);
+  char spec = val.is_string ? 's' : out.default_radix;
+  out.text += FormatArgAutoSized(val, spec);
 }
 
 void ExecDisplayWrite(const Expr* expr, SimContext& ctx, Arena& arena) {
@@ -773,9 +777,9 @@ void ExecDisplayWrite(const Expr* expr, SimContext& ctx, Arena& arena) {
   // as a format template whose specifiers are filled by the expression
   // arguments that immediately follow it.
   std::string output;
-  char radix = DefaultRadixForDisplayWriteTask(expr->callee);
+  DisplayText out{output, DefaultRadixForDisplayWriteTask(expr->callee)};
   for (size_t i = 0; i < expr->args.size(); ++i)
-    AppendDisplayArg(expr, i, ctx, arena, output, radix);
+    AppendDisplayArg(expr, i, ctx, arena, out);
   ctx.Out() << output;
   // The display family ($display, $displayb, $displayo, $displayh) terminates
   // its output with a newline; the write family does not.
@@ -795,6 +799,13 @@ void EmitSeverityHeader(SimContext& ctx, std::string_view prefix,
   if (!msg.empty()) os << ": " << msg;
   os << "\n";
   ctx.SetLastSeverity(prefix, msg, ctx.CurrentTime(), scope, line);
+  // §20.10: an error or a fatal report is a run-time error of the run, the
+  // tool's own -- an assertion's default action (§16.14.1), wait_order's
+  // (§15.5.4) -- as much as a $error or $fatal the source calls, and the
+  // run's exit status reports it (RunSimulation in src/main.cpp). Noted for
+  // the two calls alone, test/src/e2e/assert_statement.sv's failing no_else
+  // assertion left the status 0.
+  if (prefix == "ERROR" || prefix == "FATAL") ctx.NoteRuntimeError();
 }
 
 void ExecSeverityTask(const Expr* expr, SimContext& ctx, Arena& arena,
@@ -814,8 +825,9 @@ void ExecSeverityTask(const Expr* expr, SimContext& ctx, Arena& arena,
   // `$error($sformatf("property check failed"))`, the action block of the
   // suite's chapter-16 -fail assertions, printed the header and no message.
   std::string msg;
+  DisplayText out{msg, 'd'};
   for (size_t i = start_idx; i < expr->args.size(); ++i) {
-    AppendDisplayArg(expr, i, ctx, arena, msg, 'd');
+    AppendDisplayArg(expr, i, ctx, arena, out);
   }
   // §20.10: report the source line of the call, matching the `__LINE__ the
   // preprocessor would produce here (§22.13).
