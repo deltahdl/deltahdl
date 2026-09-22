@@ -162,11 +162,15 @@ void BindSpecializationBase(ClassTypeInfo* spec,
   const ClassDecl* decl = spec->decl;
   if (!decl->base_class_type_params.empty() &&
       decl->type_param_names.count(decl->base_class) == 0) {
-    if (spec->parent == nullptr) return;
+    // Asked for again by its own name, the copy holding its base for reading
+    // alone.
+    ClassTypeInfo* base = spec->parent != nullptr
+                              ? ctx.FindClassType(spec->parent->name)
+                              : nullptr;
+    if (base == nullptr) return;
     spec->parent = SpecializationOf(
-        spec->parent,
-        ActualsUnderSpecialization(spec, decl->base_class_type_params), ctx,
-        arena);
+        base, ActualsUnderSpecialization(spec, decl->base_class_type_params),
+        ctx, arena);
     return;
   }
   const DataType* actual = BaseActual(decl, actuals);
