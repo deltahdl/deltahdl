@@ -196,4 +196,114 @@ TEST(ArgumentBindingSim, BareMethodNameInAClassTaskNoParensCallsIt) {
   EXPECT_EQ(val, 6u);
 }
 
+// §13.5.5 (printed page 351): the parentheses are optional after a class
+// function method with no arguments wherever it is called, so `C::k` read as
+// an operand is the call `C::k()`. The call answers 41 and the sum 42; the
+// name read as a static property of the class instead answers nothing.
+TEST(ArgumentBindingSim, ScopeNamedStaticMethodNoParensReadsItsResult) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  class C;\n"
+      "    static function int k();\n"
+      "      return 41;\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "  int x = 0;\n"
+      "  initial x = C::k + 1;\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(val, 42u);
+}
+
+// §13.5.5 with §8.6: `h.get` read as an operand is `h.get()`, run on the
+// object the handle holds, whose n is 7.
+TEST(ArgumentBindingSim, HandleNamedMethodNoParensReadsItsResult) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  class C;\n"
+      "    int n = 7;\n"
+      "    function int get();\n"
+      "      return n;\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "  C h = new;\n"
+      "  int x = 0;\n"
+      "  initial x = h.get * 2;\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(val, 14u);
+}
+
+// §13.5.5 with §8.13: inside a method of the class, the bare name of another
+// read as an operand is its call, the formal with a default included, and in
+// a static method a static method's bare name is (§8.10).
+TEST(ArgumentBindingSim, BareMethodNameReadInAClassMethodCallsIt) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  class C;\n"
+      "    int n = 9;\n"
+      "    function int val(int k = 2);\n"
+      "      return n * k;\n"
+      "    endfunction\n"
+      "    function int twice();\n"
+      "      return val + 1;\n"
+      "    endfunction\n"
+      "    static function int base();\n"
+      "      return 100;\n"
+      "    endfunction\n"
+      "    static function int more();\n"
+      "      return base + 3;\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "  C h = new;\n"
+      "  int x = 0;\n"
+      "  initial x = h.twice() + C::more();\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(val, 122u);
+}
+
+// §13.5.5 with §8.25 (printed page 204): `T::k` through a type parameter is
+// the call of k on the class the parameter's actual names.
+TEST(ArgumentBindingSim, TypeParameterScopeMethodNoParensReadsItsResult) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  class C;\n"
+      "    static function int k();\n"
+      "      return 41;\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "  class H #(type T = int);\n"
+      "    static function int read();\n"
+      "      return T::k + 2;\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "  int x = 0;\n"
+      "  initial x = H#(C)::read();\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(val, 43u);
+}
+
+// §13.5.5 with §13.4.1 (printed page 342): inside a nonvoid function its own
+// name is the variable holding its result, never a call of the function, so
+// `get` reads the 3 written to it and the function answers 3 + 5.
+TEST(ArgumentBindingSim, FunctionNameInsideItsBodyIsItsResultVariable) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  class C;\n"
+      "    int n = 5;\n"
+      "    function int get();\n"
+      "      get = 3;\n"
+      "      get = get + n;\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "  C h = new;\n"
+      "  int x = 0;\n"
+      "  initial x = h.get;\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(val, 8u);
+}
+
 }  // namespace

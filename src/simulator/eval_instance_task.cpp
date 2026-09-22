@@ -11,11 +11,13 @@
 
 #include <string>
 #include <string_view>
+#include <unordered_map>
 
 #include "common/arena.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "simulator/class_object.h"
+#include "simulator/class_specialization.h"
 #include "simulator/eval_assoc_class_handles.h"
 #include "simulator/eval_class_array_handles.h"
 #include "simulator/eval_class_scope_types.h"
@@ -365,6 +367,93 @@ void TeardownInstanceTaskCall(const InstanceMethodInfo& call, const Expr* expr,
   WritebackAssocRefs(ctx);
   ctx.PopFuncName();
   ctx.PopScope();
+}
+
+// §13.5.5 (printed page 351): whether a call of `method` may leave off its
+// parentheses in an expression -- a function whose formals, if any, all have
+// defaults. The constructor is not such a method: `C::new` is answered by
+// TryEvalTypedConstructorNew.
+static bool CallableWithoutParens(const ModuleItem* method) {
+  if (method == nullptr || method->kind != ModuleItemKind::kFunctionDecl ||
+      method->name == "new") {
+    return false;
+  }
+  for (const auto& arg : method->func_args) {
+    if (arg.default_value == nullptr) return false;
+  }
+  return true;
+}
+
+// The method `cls` declares or inherits (§8.13) under `name`, or nullptr.
+static const ModuleItem* MethodOfClassChain(const ClassTypeInfo* cls,
+                                            std::string_view name) {
+  for (; cls != nullptr; cls = cls->parent) {
+    auto it = cls->methods.find(std::string(name));
+    if (it != cls->methods.end()) return it->second;
+  }
+  return nullptr;
+}
+
+// The method a name read as a value designates: a bare `m` of the running
+// method's class (§8.13), `C::m` or `T::m` through the class scope, a type
+// parameter's standing for the class its actual names (§8.23, §8.25), or
+// `h.m` through a handle, `this` or `super`, as ResolveMethodNamedBare
+// resolves the statement form. Nullptr for a name designating no method.
+static const ModuleItem* MethodNamedAsAValue(const Expr* expr, SimContext& ctx,
+                                             Arena& arena) {
+  if (expr->kind == ExprKind::kIdentifier) {
+    const ClassTypeInfo* scope = ctx.CurrentMethodClass();
+    if (scope == nullptr && ctx.CurrentThis() != nullptr) {
+      scope = ctx.CurrentThis()->type;
+    }
+    return MethodOfClassChain(scope, expr->text);
+  }
+  if (expr->kind != ExprKind::kMemberAccess || expr->rhs == nullptr ||
+      expr->rhs->kind != ExprKind::kIdentifier) {
+    return nullptr;
+  }
+  if (expr->is_scope_resolution) {
+    std::string_view key = ScopedClassKey(expr->lhs, arena);
+    if (key.empty()) return nullptr;
+    const ClassTypeInfo* cls = ctx.FindClassType(key);
+    if (cls == nullptr) cls = ClassNamedByTypeParam(key, ctx, arena);
+    return MethodOfClassChain(cls, expr->rhs->text);
+  }
+  MethodCallParts parts;
+  InstanceMethodInfo call;
+  if (!ExtractHandleAccessParts(expr, arena, parts)) return nullptr;
+  if (!ResolveMethodByParts(parts, ctx, call) &&
+      !ResolveMethodOnStaticHandle(expr, ctx, arena, call)) {
+    return nullptr;
+  }
+  return call.method;
+}
+
+// The call `name()` that a method named without its parentheses stands for,
+// shaped as Parser::ParseCallExpr shapes the written call and built once per
+// name, so evaluating the name again in a loop allocates nothing more.
+static const Expr* ParenFreeCall(const Expr* name, SimContext& ctx) {
+  auto [it, fresh] = ctx.ParenFreeCalls().try_emplace(name, nullptr);
+  if (fresh) {
+    Arena& arena = ctx.GetArena();
+    auto* call = arena.Create<Expr>();
+    call->kind = ExprKind::kCall;
+    call->callee = name->text;
+    call->lhs = arena.Create<Expr>(*name);
+    call->range = name->range;
+    it->second = call;
+  }
+  return it->second;
+}
+
+bool TryEvalParenFreeMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
+                                Logic4Vec& out) {
+  if (expr == nullptr ||
+      !CallableWithoutParens(MethodNamedAsAValue(expr, ctx, arena))) {
+    return false;
+  }
+  out = EvalExpr(ParenFreeCall(expr, ctx), ctx, arena);
+  return true;
 }
 
 void ExecCallStmtExpr(const Expr* expr, SimContext& ctx, Arena& arena) {

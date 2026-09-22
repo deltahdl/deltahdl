@@ -15,6 +15,7 @@
 #include "parser/ast_expr.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_function_args_scoped.h"
+#include "simulator/eval_instance_task.h"
 #include "simulator/evaluation_internal.h"
 #include "simulator/instance_bindings.h"
 #include "simulator/sim_context.h"
@@ -71,6 +72,8 @@ static Logic4Vec EvalIdentifierClassScope(const Expr* expr, SimContext& ctx,
   Logic4Vec literal;
   if (TryClassScopeEnumLiteral(expr->text, scope, arena, literal))
     return literal;
+  // §13.5.5: a method of the class named bare is its call, `m` as `m()`.
+  if (TryEvalParenFreeMethodCall(expr, ctx, arena, literal)) return literal;
   if (!self) return MakeLogic4Vec(arena, 1);
   if (method_cls)
     return self->GetPropertyForType(expr->text, method_cls, arena);
@@ -135,6 +138,15 @@ static void MarkDeclaredKinds(Logic4Vec& val, std::string_view name,
                               const Variable& var, SimContext& ctx) {
   if (var.is_real || ctx.IsRealVariable(name)) val.is_real = true;
   if (ctx.IsStringVariable(name)) val.is_string = true;
+}
+
+// §13.5.5 (printed page 351): a member select naming a class method, `C::m`
+// or `h.m`, is the method's call; any other is the member's read.
+static Logic4Vec EvalMemberAccessOrCall(const Expr* expr, SimContext& ctx,
+                                        Arena& arena) {
+  Logic4Vec call;
+  if (TryEvalParenFreeMethodCall(expr, ctx, arena, call)) return call;
+  return EvalMemberAccess(expr, ctx, arena);
 }
 
 static Logic4Vec EvalIdentifier(const Expr* expr, SimContext& ctx,
@@ -857,7 +869,7 @@ Logic4Vec EvalExpr(const Expr* expr, SimContext& ctx, Arena& arena,
     case ExprKind::kPostfixUnary:
       return EvalPostfixUnary(expr, ctx, arena);
     case ExprKind::kMemberAccess:
-      return EvalMemberAccess(expr, ctx, arena);
+      return EvalMemberAccessOrCall(expr, ctx, arena);
     case ExprKind::kCast:
       if (const Logic4Vec* bound = BoundInstanceValue(expr, ctx)) return *bound;
       return EvalCast(expr, ctx, arena);

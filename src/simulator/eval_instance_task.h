@@ -1,5 +1,6 @@
 #pragma once
 
+#include "common/types.h"
 #include "simulator/eval_function_internal.h"
 
 namespace delta {
@@ -39,5 +40,14 @@ void TeardownInstanceTaskCall(const InstanceMethodInfo& call, const Expr* expr,
 // statement executor calls this for an expression statement that is no task
 // call, in place of evaluating the expression.
 void ExecCallStmtExpr(const Expr* expr, SimContext& ctx, Arena& arena);
+
+// §13.5.5 (printed page 351): a class function method whose formals, if any,
+// all have defaults is called by its name alone wherever its value is read,
+// not only as a statement -- a bare `m` inside a method of the class, `C::m`
+// or `T::m` through the class scope, `h.m` through a handle -- as the call
+// with the empty parentheses would be. True with the call's value in `out`
+// when `expr` is such a name; false, having evaluated nothing, otherwise.
+bool TryEvalParenFreeMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
+                                Logic4Vec& out);
 
 }  // namespace delta

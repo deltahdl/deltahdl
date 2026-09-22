@@ -743,6 +743,12 @@ class SimContext : public DeclaredNameTables,
   // EvalIdentifier, which holds the context and nothing else.
   AssertionSampleStore& AssertionSamples() { return assertion_samples_; }
 
+  // §13.5.5: the call each class method named without its parentheses stands
+  // for, keyed by the name (ParenFreeCall in eval_instance_task.cpp).
+  std::unordered_map<const Expr*, Expr*>& ParenFreeCalls() {
+    return paren_free_calls_;
+  }
+
   // §21.2.3 continuous monitoring. Only one $monitor display list can be
   // active at a time; recording a new one bumps the generation so that
   // watchers left behind by a superseded list deactivate themselves.
@@ -821,6 +827,7 @@ class SimContext : public DeclaredNameTables,
   std::unordered_map<const Expr*, Logic4Vec> deferred_arg_snapshots_;
 
   AssertionSampleStore assertion_samples_;
+  std::unordered_map<const Expr*, Expr*> paren_free_calls_;
 
   const Expr* active_monitor_ = nullptr;
   // §33.7: the instance the active display list was written in (see above).
