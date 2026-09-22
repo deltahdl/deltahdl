@@ -10,6 +10,7 @@
 #include "elaborator/type_eval.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
+#include "simulator/class_object.h"
 #include "simulator/eval_array.h"
 #include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_array_class_queue.h"
@@ -41,14 +42,15 @@ namespace delta {
 // write-back that surround a call.
 
 // The environment in which a subroutine body executes (§13.4): the return
-// variable that a `return` writes, the subroutine name used to key static
-// function-local variables (§13.4.2), and the simulation/evaluation context.
-// This quartet travels together through the entire recursive statement
-// executor, so it is bundled into one entity rather than passed field by
-// field.
+// variable that a `return` writes, the subroutine name that variable is
+// declared under, the key its static function-local variables are kept under
+// (§13.4.2, StaticLocalFrame), and the simulation/evaluation context. These
+// travel together through the entire recursive statement executor, so they
+// are bundled into one entity rather than passed field by field.
 struct FuncExecCtx {
   Variable* ret_var;
   std::string_view func_name;
+  std::string_view static_frame;
   SimContext& ctx;
   Arena& arena;
   // The declared width of the return value, or zero where the return type has
@@ -615,7 +617,7 @@ static FuncFlow ExecFuncStmt(const Stmt* stmt, const FuncExecCtx& exec) {
       }
       return FuncFlow::kNext;
     case StmtKind::kVarDecl:
-      ExecFuncVarDecl(stmt, exec.func_name, exec.ctx, exec.arena);
+      ExecFuncVarDecl(stmt, exec.static_frame, exec.ctx, exec.arena);
       return FuncFlow::kNext;
     case StmtKind::kIf:
       return ExecFuncIf(stmt, exec);
@@ -679,6 +681,29 @@ static void BindReturnStructLayout(const ModuleItem* func, SimContext& ctx) {
   BindNamedLayout(func->name, func->return_type, ctx);
 }
 
+// §6.21 with §13.4.2: a variable a subroutine body declares static has one
+// copy for that subroutine, kept between calls, and §8.25 (printed page 204 of
+// IEEE 1800-2023) makes each specialization of a parameterized class a type of
+// its own -- consistent, the clause says, with C++ templated classes, whose
+// function-local statics are per instantiation. A method's static locals are
+// therefore the declaring level's own: the level of the running method's
+// class, a specialization included, whose methods hold `func`. Keyed by the
+// bare name, every class's `get()` declaring `static this_type m_inst` --
+// uvm_object_registry#(T,Tname)::get and uvm_registry_common::get among them
+// -- shared one variable, and the first registry asked answered for every
+// other. A subroutine no running class declares keeps its name.
+static std::string_view StaticLocalFrame(const ModuleItem* func,
+                                         SimContext& ctx, Arena& arena) {
+  std::string name(func->name);
+  for (const ClassTypeInfo* level = ctx.CurrentMethodClass(); level != nullptr;
+       level = level->parent) {
+    auto it = level->methods.find(name);
+    if (it == level->methods.end() || it->second != func) continue;
+    return *arena.Create<std::string>(std::string(level->name) + "::" + name);
+  }
+  return func->name;
+}
+
 void ExecFunctionBody(const ModuleItem* func, Variable* ret_var,
                       SimContext& ctx, Arena& arena) {
   // §37.44 detail 1: "as a thread works its way down a call chain of tasks
@@ -703,7 +728,8 @@ void ExecFunctionBody(const ModuleItem* func, Variable* ret_var,
   // §13.4.1 with §8.7: a class return type gives it the class a `new` in the
   // body constructs, recorded as a body local's is.
   ShapeClassReturnVariable(func, ret_var, ctx, arena);
-  FuncExecCtx exec{ret_var, func->name, ctx, arena, ret_width};
+  std::string_view static_frame = StaticLocalFrame(func, ctx, arena);
+  FuncExecCtx exec{ret_var, func->name, static_frame, ctx, arena, ret_width};
   BindReturnStructLayout(func, ctx);
   // §12.8 allows a break or a continue only inside a loop, so one that reaches
   // the body's own statement list has no loop to act on it; the body ends

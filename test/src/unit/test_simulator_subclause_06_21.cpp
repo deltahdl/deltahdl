@@ -157,4 +157,34 @@ TEST(ScopeAndLifetimeSimulation, UnnamedBlockVarVisibleToNestedBlock) {
   EXPECT_EQ(val, 15u);
 }
 
+// §6.21: a variable explicitly declared static inside an automatic function
+// has a static lifetime, one copy kept between calls, and that copy is the
+// function's own -- §13.4.2 has a static subroutine's items belong to the
+// subroutine that declares them. Two classes each declaring a static method
+// bump() with a static local n are two functions and two copies. Two calls to
+// A::bump() and one to B::bump() discriminate: one copy under the name bump
+// reads 3 for B's call, and a copy each reads 1.
+TEST(ScopeAndLifetimeSimulation,
+     StaticLocalOfOneClassMethodIsNotAnotherClasss) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  class A;\n"
+      "    static function int bump(); static int n; n++; return n;\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "  class B;\n"
+      "    static function int bump(); static int n; n++; return n;\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "  logic [31:0] result;\n"
+      "  initial begin\n"
+      "    void'(A::bump());\n"
+      "    void'(A::bump());\n"
+      "    result = B::bump();\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(val, 1u);
+}
+
 }  // namespace

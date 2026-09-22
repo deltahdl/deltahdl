@@ -304,14 +304,14 @@ static void ExecFuncVarDeclStatic(const Stmt* stmt, std::string_view func_name,
   ctx.SaveStaticFuncVar(func_name, stmt->var_name, v);
 }
 
-void ExecFuncVarDecl(const Stmt* stmt, std::string_view func_name,
+void ExecFuncVarDecl(const Stmt* stmt, std::string_view static_frame,
                      SimContext& ctx, Arena& arena) {
   if (stmt->var_is_automatic) {
     ExecFuncVarDeclAutomatic(stmt, ctx, arena);
     return;
   }
   if (stmt->var_is_static) {
-    ExecFuncVarDeclStatic(stmt, func_name, ctx, arena);
+    ExecFuncVarDeclStatic(stmt, static_frame, ctx, arena);
     return;
   }
   if (ctx.FindLocalVariable(stmt->var_name)) return;

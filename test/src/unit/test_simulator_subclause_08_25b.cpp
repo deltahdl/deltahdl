@@ -293,4 +293,30 @@ TEST(ClassSim, BuiltinTypeActualsOfDifferentWidthsAreTwoSpecializations) {
   EXPECT_EQ(out, "w3 3\nw8 8\n");
 }
 
+// §8.25 (printed page 204 of IEEE 1800-2023): each specialization is a type of
+// its own, with its own set of static member variables, and the clause calls
+// this consistent with C++ templated classes, where a static variable local
+// to a member function has one copy per instantiation. With §6.21's static
+// local that is a copy per specialization: UVM's uvm_object_registry#(T)::get
+// keeps its singleton in `static this_type m_inst`. Two calls through P#(1)
+// and one through P#(2) discriminate: one copy for every specialization reads
+// 3 for P#(2), and a copy each reads 1.
+TEST(ClassSim, StaticLocalOfAMethodIsPerSpecialization) {
+  SimFixture f;
+  auto out = RunCapture(
+      "class P #(int K = 0);\n"
+      "  static function int bump(); static int n; n++; return n;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  initial begin\n"
+      "    void'(P#(1)::bump());\n"
+      "    void'(P#(1)::bump());\n"
+      "    $display(\"p2 %0d\", P#(2)::bump());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "p2 1\n");
+}
+
 }  // namespace
