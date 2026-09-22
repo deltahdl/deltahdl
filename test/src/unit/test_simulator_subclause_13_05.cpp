@@ -626,4 +626,90 @@ TEST(SubroutineCallSim, TaskOutputActualOfANestedTaskNamingTheEnablingObject) {
   LowerRunAndCheck(f, design, {{"aw", 49u}, {"bw", 48u}, {"cw", 2u}});
 }
 
+// §13.5 (printed page 348) has the call pass an input formal the value of
+// the expression written in the call, and §8.10 (printed page 186) runs a
+// static method in its class's scope, which each call pushes before binding
+// the actuals. `n` written in a static method of A is A's static n, 20, so
+// K::twice(n) answers 40, P#(3)::plus(n) 23 and k.twice(n) 40; read with
+// the callee's class in force each found the callee's own n, 5 or 7, and
+// answered 101010.
+TEST(SubroutineCallSim, ActualOfAStaticCallReadInTheCallersClass) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  class K;\n"
+      "    static int n = 5;\n"
+      "    static function int twice(int a); return a * 2; endfunction\n"
+      "  endclass\n"
+      "  class P #(int W = 1);\n"
+      "    static int n = 7;\n"
+      "    static function int plus(int a); return a + W; endfunction\n"
+      "  endclass\n"
+      "  class A;\n"
+      "    static int n = 20;\n"
+      "    static function int scope(); return K::twice(n); endfunction\n"
+      "    static function int spec(); return P#(3)::plus(n); endfunction\n"
+      "    static function int handle(); K k = new; return k.twice(n);\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "  int r;\n"
+      "  initial r = A::scope() * 10000 + A::spec() * 100 + A::handle();\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 402340u);
+}
+
+// §13.5 with §8.23 (printed page 200): the scope an actual names is looked
+// up where the call is written, so `K::chk(T::get())` in `H #(type T)`
+// passes the handle R::get() returns under H#(R), whose v K::chk reads as 7.
+// Read under K, which has no T, the actual was the null handle and chk
+// answered -1.
+TEST(SubroutineCallSim, ActualNamingATypeParameterOfTheCallersClass) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  class R;\n"
+      "    int v = 7;\n"
+      "    static function R get(); R r = new; return r; endfunction\n"
+      "  endclass\n"
+      "  class K;\n"
+      "    static function int chk(R x); return x == null ? -1 : x.v;\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "  class H #(type T = int);\n"
+      "    static function int go(); return K::chk(T::get()); endfunction\n"
+      "  endclass\n"
+      "  int r;\n"
+      "  initial r = H#(R)::go();\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 7u);
+}
+
+// §13.5 with §8.10: a static task pushes its class before binding the
+// actuals as a static function does, so `K::twice(n)` in a static task of A
+// passes A's n, 20, and stores 40; read under K it passed K's 5 and stored
+// 10.
+TEST(SubroutineCallSim, ActualOfAStaticTaskCallReadInTheCallersClass) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  int r;\n"
+      "  class K;\n"
+      "    static int n = 5;\n"
+      "    static task twice(input int a); r = a * 2; endtask\n"
+      "  endclass\n"
+      "  class A;\n"
+      "    static int n = 20;\n"
+      "    static task via(); K::twice(n); endtask\n"
+      "  endclass\n"
+      "  initial A::via();\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 40u);
+}
+
 }  // namespace

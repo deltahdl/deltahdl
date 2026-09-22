@@ -927,6 +927,7 @@ static void BindValueArg(const FunctionArg& param, const ActualArgRef& actual,
 void BindFunctionArgs(const ModuleItem* func, const Expr* expr, SimContext& ctx,
                       Arena& arena) {
   CalleeOwnsThisScope owns_this(CalleeOwnsThis(func, expr, ctx));
+  CalleeOwnsClassScope owns_class(func->is_static_method);
   for (size_t i = 0; i < func->func_args.size(); ++i) {
     int ai = ResolveArgIndex(func, expr, i);
     const auto& param = func->func_args[i];

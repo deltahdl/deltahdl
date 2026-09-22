@@ -25,6 +25,33 @@ class Arena;
 // Defined in eval_function_args.cpp.
 bool& CalleeOwnsThisFlag();
 
+// Whether the class on top of the method-class stack is the callee's own,
+// pushed for the call being bound with no object beside it: §8.10 (printed
+// page 186) runs a static method in its class's scope with no `this`, and
+// every call of one -- `C::m(...)`, `C#(P)::m(...)`, `h.m(...)`, a bare
+// call from within the class, and the static task alike -- pushes that class
+// before the actuals are bound. BindFunctionArgs holds it for the reads of
+// the actuals (CalleeOwnsClassScope).
+inline bool& CalleeOwnsClassFlag() {
+  static thread_local bool flag = false;
+  return flag;
+}
+
+// Holds CalleeOwnsClassFlag at `owns` for one binding and restores the
+// enclosing binding's on the way out, as CalleeOwnsThisScope does its flag.
+class CalleeOwnsClassScope {
+ public:
+  explicit CalleeOwnsClassScope(bool owns) : previous_(CalleeOwnsClassFlag()) {
+    CalleeOwnsClassFlag() = owns;
+  }
+  ~CalleeOwnsClassScope() { CalleeOwnsClassFlag() = previous_; }
+  CalleeOwnsClassScope(const CalleeOwnsClassScope&) = delete;
+  CalleeOwnsClassScope& operator=(const CalleeOwnsClassScope&) = delete;
+
+ private:
+  bool previous_;
+};
+
 // §13.5: an actual argument is an expression of the caller, read before the
 // subroutine's formals exist. BindFunctionArgs runs after the callee's scope
 // is pushed, and for a static subroutine §13.3.2 has that scope carry the
@@ -45,6 +72,13 @@ bool& CalleeOwnsThisFlag();
 // actuals are bound, so `v` was looked up on B's object, which has none, and
 // add8 was passed 0. Which binding this holds for is what BindFunctionArgs
 // decides (CalleeOwnsThis) and records for the reads of the actuals.
+//
+// A static method's class is set aside alone, the caller's object staying in
+// force. §8.23 (printed page 200) has the class a scope names looked up where
+// the call is written, so `C::chk(T::get())` in `H #(type T)` names H's T,
+// and `C::twice(n)` in a static method of A names A's static n: read under
+// C, the first found no T and passed the null handle, and the second read
+// C's own n.
 class CalleeScopeAside {
  public:
   explicit CalleeScopeAside(SimContext& ctx) : ctx_(ctx) {
@@ -55,6 +89,11 @@ class CalleeScopeAside {
       set_aside_ = true;
     }
     ctx_.SwapScopeStack(std::move(stack));
+    if (CalleeOwnsClassFlag()) {
+      method_class_ = ctx_.CurrentMethodClass();
+      ctx_.PopMethodClass();
+      class_set_aside_ = true;
+    }
     if (!CalleeOwnsThisFlag()) return;
     self_ = ctx_.CurrentThis();
     method_class_ = ctx_.CurrentMethodClass();
@@ -63,6 +102,7 @@ class CalleeScopeAside {
     this_set_aside_ = true;
   }
   ~CalleeScopeAside() {
+    if (class_set_aside_) ctx_.PushMethodClass(method_class_);
     if (this_set_aside_) {
       ctx_.PushMethodClass(method_class_);
       ctx_.PushThis(self_);
@@ -82,6 +122,7 @@ class CalleeScopeAside {
   ClassObject* self_ = nullptr;
   const ClassTypeInfo* method_class_ = nullptr;
   bool this_set_aside_ = false;
+  bool class_set_aside_ = false;
 };
 
 // §13.5.1 (printed page 348) with §8.2 (printed 180): an object passed by
