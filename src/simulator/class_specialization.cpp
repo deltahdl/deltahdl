@@ -48,6 +48,42 @@ std::vector<DataType> ScopeActuals(const Expr& base) {
   return actuals;
 }
 
+// §8.25 (printed page 204 of IEEE 1800-2023): the extends clause of a
+// parameterized class may name one of the class's own type parameters, `class
+// D #(type B = P) extends B;`. This is the actual `actuals` binds that
+// parameter to; null where the extends clause names no type parameter of the
+// class, and where the list leaves that parameter out, which leaves the
+// parameter's default standing.
+const DataType* BaseActual(const ClassDecl* decl,
+                           const std::vector<DataType>& actuals) {
+  if (decl->base_class.empty() ||
+      decl->type_param_names.count(decl->base_class) == 0) {
+    return nullptr;
+  }
+  for (size_t i = 0; i < decl->params.size(); ++i) {
+    if (decl->params[i].first == decl->base_class)
+      return ActualForParam(actuals, i, decl->base_class);
+  }
+  return nullptr;
+}
+
+// §8.25: the class `spec` extends, where its declaration's extends clause
+// names one of the class's own type parameters, is the one this set of actuals
+// binds that parameter to. BaseClassOf in lowerer_class.cpp binds the
+// declaration's base from the parameter's default, there being one
+// ClassTypeInfo per declaration when it runs, and that default is the base of
+// §8.25.1's default specialization alone; the copy a specialization is made of
+// carries it until this answers the actual's class instead. An actual that is
+// no named type, and one naming no class, leave the default standing.
+void BindSpecializationBase(ClassTypeInfo* spec,
+                            const std::vector<DataType>& actuals,
+                            SimContext& ctx) {
+  const DataType* actual = BaseActual(spec->decl, actuals);
+  if (actual == nullptr || actual->kind != DataTypeKind::kNamed) return;
+  if (ClassTypeInfo* base = ctx.FindClassType(actual->type_name))
+    spec->parent = base;
+}
+
 }  // namespace
 
 ClassTypeInfo* SpecializationOf(ClassTypeInfo* generic,
@@ -64,7 +100,6 @@ ClassTypeInfo* SpecializationOf(ClassTypeInfo* generic,
   std::string key(generic->name);
   key += "#(";
   std::vector<std::pair<std::string_view, Logic4Vec>> values;
-  const DataType* base_actual = nullptr;
   for (size_t i = 0; i < decl->params.size(); ++i) {
     if (i != 0) key += ",";
     std::string_view pname = decl->params[i].first;
@@ -72,7 +107,6 @@ ClassTypeInfo* SpecializationOf(ClassTypeInfo* generic,
     // name it was written with, in the named form, and otherwise by position.
     const DataType* actual = ActualForParam(actuals, i, pname);
     if (decl->type_param_names.count(pname) != 0) {
-      if (pname == decl->base_class) base_actual = actual;
       key += TypeActualName(decl, i, actual);
       continue;
     }
@@ -100,19 +134,7 @@ ClassTypeInfo* SpecializationOf(ClassTypeInfo* generic,
   // specialization's own.
   auto* spec = arena.Create<ClassTypeInfo>(*generic);
   spec->name = *arena.Create<std::string>(std::move(key));
-  // §8.25: where the extends clause names one of the class's own type
-  // parameters, `class D #(type B = P) extends B;`, the class extended is the
-  // one this set of actuals binds that parameter to. BaseClassOf in
-  // lowerer_class.cpp binds the declaration's base from the parameter's
-  // default, there being one ClassTypeInfo per declaration when it runs, and
-  // that default is the base of §8.25.1's default specialization alone; the
-  // copy carries it until this answers the actual's class instead. An actual
-  // the list leaves out, one that is no named type, and one naming no class
-  // leave the default standing.
-  if (base_actual != nullptr && base_actual->kind == DataTypeKind::kNamed) {
-    if (ClassTypeInfo* base = ctx.FindClassType(base_actual->type_name))
-      spec->parent = base;
-  }
+  BindSpecializationBase(spec, actuals, ctx);
   for (auto& [pname, value] : values)
     spec->static_properties[std::string(pname)] = value;
   ctx.RegisterClassType(spec->name, spec);
