@@ -512,4 +512,31 @@ TEST(ParameterizedScopeResolutionSim,
   LowerRunAndCheck(f, design, {{"a", 4u}, {"b", 8u}});
 }
 
+TEST(ParameterizedScopeResolutionSim,
+     StaticMethodCallRunsAgainstItsSpecialization) {
+  // §8.25.1 with §8.25: `counter#(1)::get()` names one specialization, and a
+  // static method reached through that scope reads the static member variables
+  // §8.25 gives it. Two `counter #(1)` objects and one `counter #(4)` object
+  // leave 2 and 1; the one map the class declaration holds leaves 3 for both
+  // calls.
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class counter #(int size = 1);\n"
+      "  static int count = 0;\n"
+      "  function new(); count++; endfunction\n"
+      "  static function int get(); return count; endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  counter #(1) x1 = new, y1 = new;\n"
+      "  counter #(4) x4 = new;\n"
+      "  int a, b;\n"
+      "  initial begin\n"
+      "    a = counter#(1)::get();\n"
+      "    b = counter#(4)::get();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"a", 2u}, {"b", 1u}});
+}
+
 }  // namespace

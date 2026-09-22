@@ -104,18 +104,24 @@ ClassTypeInfo* SpecializationOf(ClassTypeInfo* generic,
   return spec;
 }
 
+ClassTypeInfo* ScopeNamedSpecialization(const Expr* base, SimContext& ctx,
+                                        Arena& arena) {
+  if (base == nullptr || base->kind != ExprKind::kIdentifier ||
+      !base->has_param_spec || base->elements.empty()) {
+    return nullptr;
+  }
+  ClassTypeInfo* generic = ctx.FindClassType(base->text);
+  if (generic == nullptr || generic->decl == nullptr) return nullptr;
+  return SpecializationOf(generic, ScopeActuals(*base), ctx, arena);
+}
+
 bool TryScopeSpecializationStaticMember(const Expr* expr, SimContext& ctx,
                                         Arena& arena, Logic4Vec& out) {
-  if (expr == nullptr || expr->lhs == nullptr || expr->rhs == nullptr ||
-      expr->lhs->kind != ExprKind::kIdentifier ||
-      expr->rhs->kind != ExprKind::kIdentifier || !expr->lhs->has_param_spec ||
-      expr->lhs->elements.empty()) {
+  if (expr == nullptr || expr->rhs == nullptr ||
+      expr->rhs->kind != ExprKind::kIdentifier) {
     return false;
   }
-  ClassTypeInfo* generic = ctx.FindClassType(expr->lhs->text);
-  if (generic == nullptr || generic->decl == nullptr) return false;
-  const ClassTypeInfo* spec =
-      SpecializationOf(generic, ScopeActuals(*expr->lhs), ctx, arena);
+  const ClassTypeInfo* spec = ScopeNamedSpecialization(expr->lhs, ctx, arena);
   if (spec == nullptr) return false;
   // §8.13: the property may be one a base declares, and a base's one storage
   // is where it lives, so the walk that finds the declaring level is asked

@@ -46,6 +46,18 @@ ClassTypeInfo* SpecializationOf(ClassTypeInfo* generic,
 void InitSpecializationStaticProperties(ClassTypeInfo* spec, SimContext& ctx,
                                         Arena& arena);
 
+// The specialization the left side of a scope form names, the `vector#(4)` of
+// `vector#(4)::count` and of `vector#(4)::get()`: §8.25.1 has the explicit
+// form name one specialization, and §8.25 makes that specialization a type of
+// its own carrying its own set of static member variables. Interned on the
+// call where nothing has interned it already, a scope form being able to be
+// the whole of what names a specialization.
+//
+// Null where `base` is no identifier carrying a `#(...)` list or where the
+// identifier names no class declaration.
+ClassTypeInfo* ScopeNamedSpecialization(const Expr* base, SimContext& ctx,
+                                        Arena& arena);
+
 // The static property `expr` reads through a specialization scope,
 // `vector#(1)::count`: true with `out` filled where `expr` is a member
 // select whose left side is an identifier carrying a `#(...)` list, that

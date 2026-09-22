@@ -15,6 +15,7 @@
 #include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
 #include "simulator/class_object.h"
+#include "simulator/class_specialization.h"
 #include "simulator/eval_array.h"
 #include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_assoc_class_handles.h"
@@ -525,6 +526,15 @@ static bool TryEvalParameterizedScopeCall(const Expr* expr, SimContext& ctx,
   ClassScopeInfo info;
   if (!ResolveClassScope(expr, ctx, arena, info)) return false;
   if (info.access->lhs->elements.empty()) return false;
+  // §8.25.1 with §8.25: the scope form names one specialization, and each
+  // specialization has its own set of static member variables, so the body runs
+  // under that specialization rather than under the class declaration, whose
+  // one map every specialization shares. ResolveClassScope found the class by
+  // the bare name the scope carries, which is the declaration.
+  if (ClassTypeInfo* spec =
+          ScopeNamedSpecialization(info.access->lhs, ctx, arena)) {
+    info.cls = spec;
+  }
   ctx.PushScope();
   BindClassParams(info.cls, info.access->lhs, ctx, arena);
   // §8.25.1: the type actuals of the specialization the call names, bound
