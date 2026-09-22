@@ -367,7 +367,7 @@ struct AssocArraySpec {
   bool is_index_signed = true;
   // §7.8.3: the class an index of a class type names; empty for any other
   // index type. See AssocArrayObject::index_class.
-  std::string_view index_class;
+  std::string_view index_class = {};
 };
 
 }  // namespace delta

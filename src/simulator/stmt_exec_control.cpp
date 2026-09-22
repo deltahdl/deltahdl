@@ -797,6 +797,20 @@ static void SetForeachIterVar(Variable* iter_var, const ArrayInfo* info,
   iter_var->value = MakeLogic4VecVal(arena, 32, index);
 }
 
+// Creates the loop variable `iter_name` names in the scope ExecForeach
+// pushed, or none where the dimension is unnamed. §12.7.3: the loop variable
+// has the index type, a handle of the index class for an array keyed by one
+// (AssocArrayObject::index_class).
+static Variable* CreateForeachIterVar(std::string_view iter_name,
+                                      const ForeachSetup& setup,
+                                      SimContext& ctx) {
+  if (iter_name.empty()) return nullptr;
+  Variable* iter_var = ctx.CreateLocalVariable(iter_name, 32);
+  if (!setup.key_class.empty())
+    ctx.SetVariableClassType(iter_name, setup.key_class);
+  return iter_var;
+}
+
 // Pops the dynamic scope ExecForeach pushed for the loop body and the static
 // scope a label introduced, in the order they were pushed. Called on every
 // ExecForeach exit path that runs after the body scope is established.
@@ -899,14 +913,7 @@ ExecTask ExecForeach(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   }
 
   ctx.PushScope();
-  Variable* iter_var = nullptr;
-  if (!iter_name.empty()) {
-    iter_var = ctx.CreateLocalVariable(iter_name, 32);
-    // §12.7.3: the loop variable has the index type, a handle of the index
-    // class for an array keyed by one (AssocArrayObject::index_class).
-    if (!setup.key_class.empty())
-      ctx.SetVariableClassType(iter_name, setup.key_class);
-  }
+  Variable* iter_var = CreateForeachIterVar(iter_name, setup, ctx);
 
   for (uint32_t i = 0; i < size && !ctx.StopRequested(); ++i) {
     SetForeachIterVar(iter_var, info, setup, i, arena);
