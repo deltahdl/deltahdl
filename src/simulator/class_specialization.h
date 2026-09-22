@@ -39,10 +39,28 @@ struct Expr;
 // `class D #(type B = P) extends B;`, the specialization extends the class its
 // own actual binds that parameter to rather than the default's, §8.25 letting
 // a type parameter name the base and making each specialization a type of its
-// own.
+// own. Where it writes a `#(...)` list, `class D3 #(type P = real) extends C
+// #(P);`, the specialization extends the specialization of the base that list
+// names once the class's own parameters in it are replaced by its actuals
+// (ActualsUnderSpecialization), and so reads that specialization's static
+// member variables rather than the base declaration's.
 ClassTypeInfo* SpecializationOf(ClassTypeInfo* generic,
                                 const std::vector<DataType>& actuals,
                                 SimContext& ctx, Arena& arena);
+
+// §8.25 (printed page 204 of IEEE 1800-2023): a type parameter used in a type
+// resolves to a type only after elaboration, so a list of actuals naming a
+// type parameter of the class that writes it names a different specialization
+// in each specialization of that class: a class-scope typedef, UVM's
+// `typedef uvm_object_registry#(T,Tname) this_type;`, and an extends clause,
+// `class D3 #(type P = real) extends C #(P);`. These are the actuals `written`
+// with each such name replaced by the type `holder` binds it to, `Box#(T)`
+// becoming Box#(byte) under Reg#(byte); the name a named actual was written
+// with is kept, the substitution being of the type alone. The list comes back
+// as written where the holder binds nothing, which is the class declaration's
+// own type, and for an actual naming no parameter of it.
+std::vector<DataType> ActualsUnderSpecialization(
+    const ClassTypeInfo* holder, const std::vector<DataType>& written);
 
 // Defined in lowerer_class.cpp, beside the static initialization of a class
 // declaration, and called on each specialization as it is created. §8.9: each

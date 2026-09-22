@@ -123,6 +123,20 @@ const DataType* BaseActual(const ClassDecl* decl,
   return nullptr;
 }
 
+// §8.25: the type the specialization `holder` binds its own type parameter
+// `pname` to, null where it binds it nothing -- the class declaration's own
+// type, which §8.25.1 makes the default specialization, binds none.
+const DataType* HolderActualFor(const ClassTypeInfo* holder,
+                                std::string_view pname) {
+  if (holder->param_actuals == nullptr) return nullptr;
+  const ClassDecl* decl = holder->decl;
+  for (size_t i = 0; i < decl->params.size(); ++i) {
+    if (decl->params[i].first == pname)
+      return ActualForParam(*holder->param_actuals, i, pname);
+  }
+  return nullptr;
+}
+
 // §8.25: the class `spec` extends, where its declaration's extends clause
 // names one of the class's own type parameters, is the one this set of actuals
 // binds that parameter to. BaseClassOf in lowerer_class.cpp binds the
@@ -131,16 +145,52 @@ const DataType* BaseActual(const ClassDecl* decl,
 // §8.25.1's default specialization alone; the copy a specialization is made of
 // carries it until this answers the actual's class instead. An actual that is
 // no named type, and one naming no class, leave the default standing.
+//
+// Where the extends clause writes a `#(...)` list instead, `class D3 #(type P
+// = real) extends C #(P);` (printed page 204 of IEEE 1800-2023), what it
+// names is a specialization of the base, C#(P) binding C's T to P, and the
+// class `spec` extends is that specialization with each of the class's own
+// parameters the list names replaced by the type `spec` binds it to. The copy
+// carries the base's declaration, whose static member variables are the
+// default specialization's, so a static property the base declares -- UVM's
+// `static this_type m_t_inst` in uvm_typed_callbacks#(T), which
+// uvm_callbacks#(T,CB) extends -- was read off a copy that
+// uvm_typed_callbacks#(T)'s own static methods never wrote.
 void BindSpecializationBase(ClassTypeInfo* spec,
                             const std::vector<DataType>& actuals,
-                            SimContext& ctx) {
-  const DataType* actual = BaseActual(spec->decl, actuals);
+                            SimContext& ctx, Arena& arena) {
+  const ClassDecl* decl = spec->decl;
+  if (!decl->base_class_type_params.empty() &&
+      decl->type_param_names.count(decl->base_class) == 0) {
+    if (spec->parent == nullptr) return;
+    spec->parent = SpecializationOf(
+        spec->parent,
+        ActualsUnderSpecialization(spec, decl->base_class_type_params), ctx,
+        arena);
+    return;
+  }
+  const DataType* actual = BaseActual(decl, actuals);
   if (actual == nullptr || actual->kind != DataTypeKind::kNamed) return;
   if (ClassTypeInfo* base = ctx.FindClassType(actual->type_name))
     spec->parent = base;
 }
 
 }  // namespace
+
+std::vector<DataType> ActualsUnderSpecialization(
+    const ClassTypeInfo* holder, const std::vector<DataType>& written) {
+  std::vector<DataType> bound = written;
+  for (DataType& actual : bound) {
+    if (actual.kind != DataTypeKind::kNamed) continue;
+    if (holder->decl->type_param_names.count(actual.type_name) == 0) continue;
+    const DataType* a = HolderActualFor(holder, actual.type_name);
+    if (a == nullptr) continue;
+    std::string_view arg = actual.param_arg_name;
+    actual = *a;
+    actual.param_arg_name = arg;
+  }
+  return bound;
+}
 
 ClassTypeInfo* SpecializationOf(ClassTypeInfo* generic,
                                 const std::vector<DataType>& actuals,
@@ -197,7 +247,7 @@ ClassTypeInfo* SpecializationOf(ClassTypeInfo* generic,
   // it where the name the `new` was written against carries no list of its
   // own (BindTypeParamActuals in eval_class_params.cpp).
   spec->param_actuals = arena.Create<std::vector<DataType>>(actuals);
-  BindSpecializationBase(spec, actuals, ctx);
+  BindSpecializationBase(spec, actuals, ctx, arena);
   for (auto& [pname, value] : values)
     spec->static_properties[std::string(pname)] = value;
   ctx.RegisterClassType(spec->name, spec);

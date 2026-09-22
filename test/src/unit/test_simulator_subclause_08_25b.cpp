@@ -100,6 +100,40 @@ TEST(ClassSim, SpecializationExtendsTheBaseItsOwnActualNames) {
   EXPECT_EQ(out, "p 1\nq 2\n");
 }
 
+// §8.25 (printed page 204 of IEEE 1800-2023): a parameterized class may extend
+// a specialization of another, and `class D3 #(type P = real) extends C
+// #(P);` binds C's T to P, so D3#(byte) extends C#(byte) -- a specialization,
+// which §8.25 makes a type of its own with its own set of static member
+// variables. A static property the base declares is therefore read, through a
+// D#(byte) object, off B#(byte)'s copy, and through a D#(shortint) object off
+// B#(shortint)'s. B#(byte) writes 5 into its own copy, and the reads
+// discriminate: a specialization extending the base's declaration leaves both
+// at 0, one copy shared by every specialization leaves both at 5, and the
+// base each list names leaves 5 and 0.
+TEST(ClassSim, SpecializationExtendsTheBaseSpecializationItsListNames) {
+  SimFixture f;
+  auto out = RunCapture(
+      "class B #(type T = int);\n"
+      "  static int n;\n"
+      "  function void set(int v); n = v; endfunction\n"
+      "endclass\n"
+      "class D #(type T = int) extends B #(T);\n"
+      "  function int get(); return n; endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  B #(byte) b = new;\n"
+      "  D #(byte) db = new;\n"
+      "  D #(shortint) ds = new;\n"
+      "  initial begin\n"
+      "    b.set(5);\n"
+      "    $display(\"b %0d\", db.get());\n"
+      "    $display(\"s %0d\", ds.get());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "b 5\ns 0\n");
+}
+
 // §8.25 (printed page 204 of IEEE 1800-2023) with §6.18: a typedef names the
 // type its declaration writes, and what `typedef V#(4) t4;` writes is a
 // specialization -- a generic class together with one set of actual parameter
