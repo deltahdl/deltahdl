@@ -64,6 +64,7 @@ class SpecifyManager;
 struct DataType;
 struct ModuleItem;
 struct Process;
+struct Stmt;
 
 class SimContext : public DeclaredNameTables,
                    public RandomStability,
@@ -748,6 +749,11 @@ class SimContext : public DeclaredNameTables,
   std::unordered_map<const Expr*, Expr*>& ParenFreeCalls() {
     return paren_free_calls_;
   }
+  // §6.18 with §8.3: each method-body declaration reshaped by the class-scope
+  // typedef it names (DeclShapedByClassTypedef in eval_array_class_assoc.cpp).
+  std::unordered_map<const Stmt*, const Stmt*>& ClassTypedefShapedDecls() {
+    return class_typedef_shaped_decls_;
+  }
 
   // §21.2.3 continuous monitoring. Only one $monitor display list can be
   // active at a time; recording a new one bumps the generation so that
@@ -828,6 +834,7 @@ class SimContext : public DeclaredNameTables,
 
   AssertionSampleStore assertion_samples_;
   std::unordered_map<const Expr*, Expr*> paren_free_calls_;
+  std::unordered_map<const Stmt*, const Stmt*> class_typedef_shaped_decls_;
 
   const Expr* active_monitor_ = nullptr;
   // §33.7: the instance the active display list was written in (see above).

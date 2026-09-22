@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
 #include "common/arena.h"
@@ -12,6 +13,7 @@
 #include "parser/ast_class.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
+#include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
 #include "simulator/class_object.h"
 #include "simulator/declared_class_key.h"
@@ -112,6 +114,56 @@ ClassObject* HandleSideObject(const Expr* side, SimContext& ctx, Arena& arena) {
   return ctx.GetClassObject(EvalExpr(side, ctx, arena).ToUint64());
 }
 
+// The typedef item the class `t` itself declares under `name`; null where it
+// declares none.
+static const ModuleItem* OwnTypedefItem(const ClassTypeInfo* t,
+                                        std::string_view name) {
+  if (t->decl == nullptr) return nullptr;
+  for (const ClassMember* m : t->decl->members) {
+    if (m->kind == ClassMemberKind::kTypedef && m->name == name)
+      return m->typedef_item;
+  }
+  return nullptr;
+}
+
+const ModuleItem* ClassScopeTypedefItem(const ClassTypeInfo* from,
+                                        std::string_view name) {
+  for (const ClassTypeInfo* scope = from; scope != nullptr;
+       scope = scope->enclosing) {
+    for (const ClassTypeInfo* t = scope; t != nullptr; t = t->parent) {
+      if (const ModuleItem* item = OwnTypedefItem(t, name)) return item;
+    }
+  }
+  return nullptr;
+}
+
+const Stmt* DeclShapedByClassTypedef(const Stmt* stmt, SimContext& ctx,
+                                     Arena& arena) {
+  const DataType& type = stmt->var_decl_type;
+  if (!stmt->var_unpacked_dims.empty() || type.kind != DataTypeKind::kNamed) {
+    return stmt;
+  }
+  auto [it, fresh] = ctx.ClassTypedefShapedDecls().try_emplace(stmt, stmt);
+  if (!fresh) return it->second;
+  const ClassTypeInfo* from = nullptr;
+  if (!type.scope_name.empty()) {
+    from = ctx.FindClassType(type.scope_name);
+  } else {
+    from = ctx.CurrentMethodClass();
+    if (from == nullptr && ctx.CurrentThis() != nullptr) {
+      from = ctx.CurrentThis()->type;
+    }
+  }
+  const ModuleItem* item = ClassScopeTypedefItem(from, type.type_name);
+  if (item == nullptr || item->unpacked_dims.empty()) return stmt;
+  auto* shaped = arena.Create<Stmt>(*stmt);
+  shaped->var_decl_type = item->typedef_type;
+  shaped->var_decl_type.is_const = type.is_const;
+  shaped->var_unpacked_dims = item->unpacked_dims;
+  it->second = shaped;
+  return shaped;
+}
+
 namespace {
 
 // §8.25: whether the dimension `dim` names a type parameter of the class
@@ -122,18 +174,6 @@ namespace {
 bool DimNamesTypeParam(const Expr* dim, const ClassDecl* decl) {
   return dim != nullptr && dim->kind == ExprKind::kIdentifier &&
          decl->type_param_names.count(dim->text) != 0;
-}
-
-// The typedef item the class `t` itself declares under `name`; null where it
-// declares none.
-const ModuleItem* OwnTypedefItem(const ClassTypeInfo* t,
-                                 std::string_view name) {
-  if (t->decl == nullptr) return nullptr;
-  for (const ClassMember* m : t->decl->members) {
-    if (m->kind == ClassMemberKind::kTypedef && m->name == name)
-      return m->typedef_item;
-  }
-  return nullptr;
 }
 
 // §6.18 with §8.3 (printed page 180 of IEEE 1800-2023): a typedef is a class
@@ -153,14 +193,8 @@ const std::vector<Expr*>& PropertyUnpackedDims(const ClassMember* member,
       !type.scope_name.empty()) {
     return member->unpacked_dims;
   }
-  for (const ClassTypeInfo* scope = declaring; scope != nullptr;
-       scope = scope->enclosing) {
-    for (const ClassTypeInfo* t = scope; t != nullptr; t = t->parent) {
-      if (const ModuleItem* item = OwnTypedefItem(t, type.type_name))
-        return item->unpacked_dims;
-    }
-  }
-  return member->unpacked_dims;
+  const ModuleItem* item = ClassScopeTypedefItem(declaring, type.type_name);
+  return item != nullptr ? item->unpacked_dims : member->unpacked_dims;
 }
 
 // §8.5/§7.8: whether the property declaration `member` of `declaring` is an

@@ -19,6 +19,7 @@
 #include "simulator/class_object.h"
 #include "simulator/class_specialization.h"
 #include "simulator/declared_class_key.h"
+#include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/net.h"
@@ -696,6 +697,7 @@ static void InitializeDeclVariable(const Stmt* stmt, const DeclaredObject& obj,
 }
 
 StmtResult ExecVarDeclImpl(const Stmt* stmt, SimContext& ctx, Arena& arena) {
+  stmt = DeclShapedByClassTypedef(stmt, ctx, arena);
   if (TryExecWeakRefVarDecl(stmt, ctx, arena)) return StmtResult::kDone;
   if (TryExecClassVarDecl(stmt, ctx, arena)) return StmtResult::kDone;
 

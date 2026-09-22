@@ -113,4 +113,50 @@ TEST(ClassScopeTypedefSim, PropertyDeclaredByAnAssociativeArrayTypedef) {
             4112u);
 }
 
+// §6.18 with §7.4.4 and §8.3: a local of a method declared by a class-scope
+// typedef is an object of the type the typedef stands for, its associative
+// dimension included, whether named bare in the declaring class's function
+// or through the class scope in another class's task. N's link fills its
+// bare-typed local with two keys, 2; H's task fills a `N::edges_t` local
+// through a ref formal of the same type and sums the keys' ids, 2 + 3.
+// Declared as scalars, neither local held a key: the counts read 0 and the
+// foreach ran once with a null key.
+TEST(ClassScopeTypedefSim, MethodLocalDeclaredByAnAssociativeArrayTypedef) {
+  EXPECT_EQ(RunAndGet("class N;\n"
+                      "  int id;\n"
+                      "  typedef bit edges_t[N];\n"
+                      "  protected edges_t succ;\n"
+                      "  function new(int i); id = i; endfunction\n"
+                      "  function void add(N n); succ[n] = 1; endfunction\n"
+                      "  function void get_succ(ref edges_t out);\n"
+                      "    foreach (succ[p]) out[p] = 1;\n"
+                      "  endfunction\n"
+                      "  function int link(N a, N b);\n"
+                      "    edges_t e;\n"
+                      "    e[a] = 1; e[b] = 1;\n"
+                      "    return e.num();\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "class H;\n"
+                      "  int sum;\n"
+                      "  task sync(N n);\n"
+                      "    N::edges_t edges;\n"
+                      "    n.get_succ(edges);\n"
+                      "    foreach (edges[p]) sum += p.id;\n"
+                      "  endtask\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    N a = new(1), b = new(2), c = new(3);\n"
+                      "    H h = new;\n"
+                      "    a.add(b); a.add(c);\n"
+                      "    h.sync(a);\n"
+                      "    result = a.link(b, c) * 100 + h.sum;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            205u);
+}
+
 }  // namespace

@@ -10,8 +10,32 @@ struct ClassObject;
 struct ClassTypeInfo;
 struct DataType;
 struct Expr;
+struct ModuleItem;
+struct Stmt;
 class SimContext;
 class Arena;
+
+// §6.18 with §8.3 (printed page 180 of IEEE 1800-2023): a typedef is a class
+// item, seen from `from`, its bases (§8.13) and the classes enclosing it
+// (§8.23). The typedef item the nearest of them declares under `name`; null
+// where none does, or where `from` is null.
+const ModuleItem* ClassScopeTypedefItem(const ClassTypeInfo* from,
+                                        std::string_view name);
+
+// §6.18 with §7.4.4 and §8.3: a declaration in a method's body whose type names
+// a class-scope typedef, bare as `edges_t e;` from the declaring class's own
+// methods or through the class scope as `uvm_phase::edges_t edges;` from
+// anywhere, declares an object of the type the typedef stands for, the
+// typedef's unpacked dimensions included. The elaborator gives a module
+// procedure's declaration a typedef's dimensions (AdoptTypedefDimsInStmt) and
+// reaches neither a class's method bodies nor its typedefs, so such a local
+// was a scalar of the element type: uvm_phase_hopper::sync_phase's `edges`
+// held no predecessor and its foreach ran once with a null key. The
+// declaration `stmt` with the typedef's element type and dimensions written
+// on it, built once per declaration; `stmt` itself where it writes dimensions
+// of its own or names no such typedef.
+const Stmt* DeclShapedByClassTypedef(const Stmt* stmt, SimContext& ctx,
+                                     Arena& arena);
 
 // §7.8/§8.5: a class property declared with an associative dimension, `int
 // count[severity_t]`, is an associative array of the object: §8.5 puts no

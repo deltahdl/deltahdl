@@ -8,6 +8,7 @@
 #include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
 #include "simulator/declared_class_key.h"
+#include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/eval_member_path.h"
 #include "simulator/evaluation.h"
@@ -306,6 +307,7 @@ static void ExecFuncVarDeclStatic(const Stmt* stmt, std::string_view func_name,
 
 void ExecFuncVarDecl(const Stmt* stmt, std::string_view static_frame,
                      SimContext& ctx, Arena& arena) {
+  stmt = DeclShapedByClassTypedef(stmt, ctx, arena);
   if (stmt->var_is_automatic) {
     ExecFuncVarDeclAutomatic(stmt, ctx, arena);
     return;
