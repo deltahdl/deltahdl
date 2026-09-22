@@ -144,22 +144,24 @@ _COMPARE_OPS: dict[type[ast.cmpop], Callable[[Any, Any], bool]] = {
 }
 
 
+def _eval_compare(node: ast.Compare) -> bool:
+    left = eval_node(node.left)
+    for op, comp in zip(node.ops, node.comparators):
+        right = eval_node(comp)
+        if not _COMPARE_OPS[type(op)](left, right):
+            return False
+        left = right
+    return True
+
+
 def eval_node(node: ast.AST) -> Any:
     if isinstance(node, ast.Constant):
         return node.value
     if isinstance(node, ast.Compare):
-        left = eval_node(node.left)
-        for op, comp in zip(node.ops, node.comparators):
-            right = eval_node(comp)
-            if not _COMPARE_OPS[type(op)](left, right):
-                return False
-            left = right
-        return True
+        return _eval_compare(node)
     if isinstance(node, ast.BoolOp):
         vals = [eval_node(v) for v in node.values]
-        if isinstance(node.op, ast.And):
-            return all(vals)
-        return any(vals)
+        return all(vals) if isinstance(node.op, ast.And) else any(vals)
     if isinstance(node, ast.UnaryOp) and type(node.op) in _UNARY_OPS:
         return _UNARY_OPS[type(node.op)](eval_node(node.operand))
     if isinstance(node, ast.BinOp) and type(node.op) in _BINARY_OPS:
