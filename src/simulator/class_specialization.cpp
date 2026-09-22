@@ -64,6 +64,7 @@ ClassTypeInfo* SpecializationOf(ClassTypeInfo* generic,
   std::string key(generic->name);
   key += "#(";
   std::vector<std::pair<std::string_view, Logic4Vec>> values;
+  const DataType* base_actual = nullptr;
   for (size_t i = 0; i < decl->params.size(); ++i) {
     if (i != 0) key += ",";
     std::string_view pname = decl->params[i].first;
@@ -71,6 +72,7 @@ ClassTypeInfo* SpecializationOf(ClassTypeInfo* generic,
     // name it was written with, in the named form, and otherwise by position.
     const DataType* actual = ActualForParam(actuals, i, pname);
     if (decl->type_param_names.count(pname) != 0) {
+      if (pname == decl->base_class) base_actual = actual;
       key += TypeActualName(decl, i, actual);
       continue;
     }
@@ -91,12 +93,26 @@ ClassTypeInfo* SpecializationOf(ClassTypeInfo* generic,
   }
   key += ")";
   if (ClassTypeInfo* found = ctx.FindClassType(key)) return found;
-  // The declaration's type is copied rather than built again: the base, the
-  // interfaces, the members, the vtable and the methods are facts about the
-  // declaration and are shared by every specialization, and only the static
-  // storage and the parameters standing in it are the specialization's own.
+  // The declaration's type is copied rather than built again: the interfaces,
+  // the members, the vtable and the methods are facts about the declaration
+  // and are shared by every specialization, and only the static storage, the
+  // parameters standing in it and a base the actuals name are the
+  // specialization's own.
   auto* spec = arena.Create<ClassTypeInfo>(*generic);
   spec->name = *arena.Create<std::string>(std::move(key));
+  // §8.25: where the extends clause names one of the class's own type
+  // parameters, `class D #(type B = P) extends B;`, the class extended is the
+  // one this set of actuals binds that parameter to. BaseClassOf in
+  // lowerer_class.cpp binds the declaration's base from the parameter's
+  // default, there being one ClassTypeInfo per declaration when it runs, and
+  // that default is the base of §8.25.1's default specialization alone; the
+  // copy carries it until this answers the actual's class instead. An actual
+  // the list leaves out, one that is no named type, and one naming no class
+  // leave the default standing.
+  if (base_actual != nullptr && base_actual->kind == DataTypeKind::kNamed) {
+    if (ClassTypeInfo* base = ctx.FindClassType(base_actual->type_name))
+      spec->parent = base;
+  }
   for (auto& [pname, value] : values)
     spec->static_properties[std::string(pname)] = value;
   ctx.RegisterClassType(spec->name, spec);

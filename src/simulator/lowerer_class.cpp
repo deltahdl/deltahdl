@@ -450,15 +450,16 @@ static void InheritInterfaceMembers(ClassTypeInfo* info) {
 // §8.25: the class the extends clause of `cls` names as its base. The base
 // may be named by a type parameter of the derived class, `class D4 #(type P =
 // C#(byte)) extends P;`, which §8.25 has resolve to a class type after
-// elaboration (printed page 205 of IEEE 1800-2023). The one ClassTypeInfo
-// a class declaration registers serves every specialization, so the base it
-// records is the one the parameter's default names, the base of §8.25.1's
-// default specialization; which class a specialization's actual names, and the
-// type actuals the default or the actual carries for the base's own parameters,
-// are bound as each object is constructed (BaseTypeBindings in
-// eval_class_new.cpp). A parameter given no default, or a default that is no
-// named type, names no base. Looked up by the parameter's name, the base was
-// never found, and the derived class inherited nothing.
+// elaboration (printed page 205 of IEEE 1800-2023). What this registers is the
+// declaration's own type, which §8.25.1 makes the default specialization, so
+// the base it records is the one the parameter's default names; a
+// specialization whose actual names another class is given that class as it
+// is created (SpecializationOf in class_specialization.cpp). The type actuals
+// the default or the actual carries for the base's own parameters are bound
+// as each object is constructed (BaseTypeBindings in eval_class_new.cpp). A
+// parameter given no default, or a default that is no named type, names no
+// base. Looked up by the parameter's name, the base was never found, and the
+// derived class inherited nothing.
 static ClassTypeInfo* BaseClassOf(const ClassDecl* cls, SimContext& ctx) {
   if (cls->type_param_names.count(cls->base_class) == 0)
     return ctx.FindClassType(cls->base_class);

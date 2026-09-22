@@ -69,4 +69,35 @@ TEST(ClassSim, StaticInitializerReadsItsSpecializationParameter) {
   EXPECT_EQ(out, "w4 4\nw8 8\n");
 }
 
+// §8.25 (printed page 204 of IEEE 1800-2023) with §8.25.1 (printed 205): a
+// specialization is a distinct type, and where the extends clause names one of
+// the class's own type parameters -- `class D #(type B = P) extends B;` -- the
+// class each specialization extends is the one that specialization's actual
+// binds the parameter to, the default the declaration wrote being the base of
+// the default specialization alone. Two bases whose `who()` answer differently
+// discriminate: taking the base from the default leaves both reads at P's 1,
+// and extending the class each actual names leaves 1 and 2.
+TEST(ClassSim, SpecializationExtendsTheBaseItsOwnActualNames) {
+  SimFixture f;
+  auto out = RunCapture(
+      "class P;\n"
+      "  function int who(); return 1; endfunction\n"
+      "endclass\n"
+      "class Q;\n"
+      "  function int who(); return 2; endfunction\n"
+      "endclass\n"
+      "class D #(type B = P) extends B;\n"
+      "endclass\n"
+      "module t;\n"
+      "  D #(P) dp = new;\n"
+      "  D #(Q) dq = new;\n"
+      "  initial begin\n"
+      "    $display(\"p %0d\", dp.who());\n"
+      "    $display(\"q %0d\", dq.who());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "p 1\nq 2\n");
+}
+
 }  // namespace

@@ -34,6 +34,12 @@ struct Expr;
 // `generic` itself is answered where it names no class declaration or where
 // `actuals` is empty, the latter being §8.25.1's default specialization, whose
 // parameters the declaration's own defaults already gave it.
+//
+// Where the extends clause names one of the class's own type parameters,
+// `class D #(type B = P) extends B;`, the specialization extends the class its
+// own actual binds that parameter to rather than the default's, §8.25 letting
+// a type parameter name the base and making each specialization a type of its
+// own.
 ClassTypeInfo* SpecializationOf(ClassTypeInfo* generic,
                                 const std::vector<DataType>& actuals,
                                 SimContext& ctx, Arena& arena);
