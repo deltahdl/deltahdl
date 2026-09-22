@@ -100,4 +100,36 @@ TEST(ClassSim, SpecializationExtendsTheBaseItsOwnActualNames) {
   EXPECT_EQ(out, "p 1\nq 2\n");
 }
 
+// §8.25 (printed page 204 of IEEE 1800-2023) with §6.18: a typedef names the
+// type its declaration writes, and what `typedef V#(4) t4;` writes is a
+// specialization -- a generic class together with one set of actual parameter
+// values -- rather than the generic class, which §8.25 says is no type at all.
+// The name therefore reaches the static member variables of that one
+// specialization. Two typedefs of one class discriminate: binding the alias to
+// the declaration's own type, which §8.25.1 makes the default specialization,
+// leaves both reads at the default's 1, and binding each to the specialization
+// its own actuals name leaves 4 and 8.
+TEST(ClassSim, ClassScopeTypedefOfASpecializationNamesThatSpecialization) {
+  SimFixture f;
+  auto out = RunCapture(
+      "class V #(int size = 1);\n"
+      "  static const int W = size;\n"
+      "endclass\n"
+      "class Holder;\n"
+      "  typedef V#(4) t4;\n"
+      "  typedef V#(8) t8;\n"
+      "  function int a(); return t4::W; endfunction\n"
+      "  function int b(); return t8::W; endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  Holder h = new;\n"
+      "  initial begin\n"
+      "    $display(\"a %0d\", h.a());\n"
+      "    $display(\"b %0d\", h.b());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "a 4\nb 8\n");
+}
+
 }  // namespace

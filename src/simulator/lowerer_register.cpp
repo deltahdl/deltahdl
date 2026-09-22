@@ -21,6 +21,7 @@
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
 #include "simulator/class_object.h"
+#include "simulator/class_specialization.h"
 #include "simulator/dpi_arg_value.h"
 #include "simulator/dpi_runtime.h"
 #include "simulator/evaluation.h"
@@ -618,15 +619,26 @@ void RegisterTypeTargets(const RtlirDesign* design, SimContext& ctx) {
 // The class a typedef's declared type names, by the scoped spelling where
 // it wrote one the run holds a class by, else by the bare name; null for a
 // type that is no class name.
+// §8.25 (printed page 204 of IEEE 1800-2023): what `typedef V#(4) t4;` writes
+// is a specialization -- the generic class together with one set of actual
+// parameter values -- and §8.25 makes each specialization a type of its own
+// carrying its own set of static member variables, the generic class being no
+// type at all. The name the typedef's own `#(...)` list spells is therefore
+// what the alias is bound to, rather than the declaration's type, which
+// §8.25.1 makes the default specialization alone: bound to that, `t4::W` and
+// `t8::W` both read the default's W. A typedef writing no list names that
+// default, which SpecializationOf answers for an empty list.
 static ClassTypeInfo* ClassNamedByTypedef(const DataType& target,
-                                          SimContext& ctx) {
+                                          SimContext& ctx, Arena& arena) {
   if (target.kind != DataTypeKind::kNamed) return nullptr;
+  ClassTypeInfo* generic = nullptr;
   if (!target.scope_name.empty()) {
-    ClassTypeInfo* scoped = ctx.FindClassType(
-        std::string(target.scope_name) + "::" + std::string(target.type_name));
-    if (scoped != nullptr) return scoped;
+    generic = ctx.FindClassType(std::string(target.scope_name) +
+                                "::" + std::string(target.type_name));
   }
-  return ctx.FindClassType(target.type_name);
+  if (generic == nullptr) generic = ctx.FindClassType(target.type_name);
+  if (generic == nullptr) return nullptr;
+  return SpecializationOf(generic, target.type_params, ctx, arena);
 }
 
 void RegisterClassScopeTypedefAliases(ClassTypeInfo* info, SimContext& ctx,
@@ -641,7 +653,7 @@ void RegisterClassScopeTypedefAliases(ClassTypeInfo* info, SimContext& ctx,
                                             "::" + std::string(member->name));
     if (ctx.FindClassType(*alias) != nullptr) continue;
     ClassTypeInfo* cls =
-        ClassNamedByTypedef(member->typedef_item->typedef_type, ctx);
+        ClassNamedByTypedef(member->typedef_item->typedef_type, ctx, arena);
     if (cls != nullptr) ctx.RegisterClassType(*alias, cls);
   }
 }

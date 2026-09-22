@@ -318,7 +318,10 @@ void RegisterClassTypeAliases(const RtlirDesign* design, SimContext& ctx,
                               Arena& arena);
 // §6.18 with §8.3: the class's own typedefs naming a class the run already
 // holds, bound under `Class::alias`; the rest wait for
-// RegisterClassTypeAliases.
+// RegisterClassTypeAliases. §8.25: a typedef writing a parameter list,
+// `typedef V#(4) t4;`, names the specialization that list gives rather than
+// the generic class, which is no type at all, so the alias is bound to the
+// specialization, interned here where nothing has interned it already.
 void RegisterClassScopeTypedefAliases(ClassTypeInfo* info, SimContext& ctx,
                                       Arena& arena);
 // §16.8 and §16.12: the module's named sequence and property declarations,
