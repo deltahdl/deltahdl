@@ -1,6 +1,6 @@
 ---
 name: verifying-through-ci
-description: Never build locally and never run a local tool that CI also runs; push and read the run instead.
+description: Never run a gate CI also runs; push and read the run instead. Local builds to investigate a defect are allowed.
 metadata:
   type: feedback
 ---
@@ -18,6 +18,6 @@ Never build locally, and never run any local tool that CI also runs. The user se
 - "It reproduces the gate in 1.3 seconds" — the seconds are not the cost. The tokens spent reading its output are.
 - "Local caught a regression, so it was worth it" — CI would have surfaced the same diff for nothing.
 
-Do not build locally for a bug that only shows up while the simulator is running. An earlier version of this rule allowed exactly that, for coroutine, scheduler and event-watcher bugs, and the permission is gone: a local build always finds something, so it is easy to justify after the fact, and catching a regression is not evidence that the regression was invisible to CI. When a defect really does hide in run-time state, read the code and the clause instead of probing for it.
+Building locally to investigate is allowed. On 2026-09-22 the user wrote "Feel free to use the local laptop to figure things out", which replaces an earlier line here telling me to read the code and the clause instead of probing run-time state. A Debug build of `deltahdl` in the scratchpad, run over small repro sources or an instrumented copy of a library such as UVM, is how to find where a run-time defect lives and to check that a fix changes the repro's output. What is still not done locally is the gate list above: the unit test binaries, `clang-tidy`, the size caps, pytest and the rest are still verified by pushing and reading the run.
 
-There are exactly two exceptions, and they are exceptions for different reasons. [clang-format-style-flag](clang-format-style-flag.md) rewrites files rather than judging them, so running it is part of authoring the change. [the-sv-tests-build-exception](the-sv-tests-build-exception.md) reads something the CI log does not carry, and is bounded by one named file.
+Apart from investigation, there are two exceptions, and they are exceptions for different reasons. [clang-format-style-flag](clang-format-style-flag.md) rewrites files rather than judging them, so running it is part of authoring the change. [the-sv-tests-build-exception](the-sv-tests-build-exception.md) reads something the CI log does not carry, and is bounded by one named file.

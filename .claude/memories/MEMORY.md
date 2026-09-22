@@ -58,7 +58,7 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 
 ## Verification
 
-- [Verifying through CI](verifying-through-ci.md) — never build locally, never run a gate CI runs; push and read the run.
+- [Verifying through CI](verifying-through-ci.md) — never run a gate CI runs; push and read the run. A local build to investigate a defect is allowed.
 - [Reading a CI run](reading-a-ci-run.md) — `gh run list --limit 1` before pushing, `gh run view --log-failed` after.
 - [Watching a run in the background](watching-a-run-in-the-background.md) — a background shell or a Monitor, never a foreground `gh run watch`.
 - [Waiting while a CI run is in progress](waiting-while-a-ci-run-is-in-progress.md) — the "do nothing but wait while a workflow is running" reminder means any CI run of any workflow; no diagnosis, edits or commits until it lands.
