@@ -81,6 +81,64 @@ TEST(MailboxSim, ParameterizedMailboxCarriesItsMessages) {
   EXPECT_EQ(var->value.ToUint64(), 30u);
 }
 
+// Runs a module whose `mailbox #(string) m` is declared at module scope and
+// created by `m = new()` inside the initial, where the message "abc" is a
+// local with an initializer; `place` puts it and `take` gets it into `r`
+// after peek() has read it into `r_peek`, n counts the queue between the
+// two, and i holds what the two calls answered where they answer anything.
+// Reads "abc" from both strings, 1 from n and `want_i` from i. This is the
+// shape of the suite's 15.4--mailbox-blocking.sv and
+// 15.4--mailbox-non-blocking.sv (#2918), which differ only in the two calls.
+void ExpectStringMailboxPeekedThenTaken(const std::string& place,
+                                        const std::string& take,
+                                        uint64_t want_i) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  mailbox #(string) m;\n"
+      "  string r, r_peek;\n"
+      "  int n, i;\n"
+      "  initial begin\n"
+      "    string msg = \"abc\";\n"
+      "    m = new();\n" +
+          place +
+          "    m.peek(r_peek);\n"
+          "    n = m.num();\n" +
+          take + "  end\nendmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(VecToStr(var->value), "abc");
+  auto* peeked = f.ctx.FindVariable("r_peek");
+  ASSERT_NE(peeked, nullptr);
+  EXPECT_EQ(VecToStr(peeked->value), "abc");
+  auto* n = f.ctx.FindVariable("n");
+  ASSERT_NE(n, nullptr);
+  EXPECT_EQ(n->value.ToUint64(), 1u);
+  auto* i = f.ctx.FindVariable("i");
+  ASSERT_NE(i, nullptr);
+  EXPECT_EQ(i->value.ToUint64(), want_i);
+}
+
+// §15.4.9 (printed page 377) with §15.4.3, §15.4.7 and §15.4.5: put() on a
+// string mailbox created in the initial places "abc", peek() copies it
+// without removing it, so num() counts 1, and get() then hands the same
+// "abc" to r; neither call answers anything, so i stays 0. The suite's
+// 15.4--mailbox-blocking.sv: run 30725357212 reported it failing and no
+// case here peeked a string message.
+TEST(MailboxSim, StringMailboxPutPeekedAndGotReadsOneMessage) {
+  ExpectStringMailboxPeekedThenTaken("    m.put(msg);\n", "    m.get(r);\n", 0);
+}
+
+// §15.4.9 (printed page 377) with §15.4.4 and §15.4.6: try_put() on the
+// same mailbox places "abc" and answers 1, and after peek() has copied it
+// and num() counted 1, try_get() takes it into r and answers 1 too, i
+// holding 11 for the two. The suite's 15.4--mailbox-non-blocking.sv,
+// reported failing by the same run.
+TEST(MailboxSim, StringMailboxTryPutPeekedAndTryGotReadsOneMessage) {
+  ExpectStringMailboxPeekedThenTaken("    i = m.try_put(msg) * 10;\n",
+                                     "    i = i + m.try_get(r);\n", 11);
+}
+
 // Runs the source `head` -- a package, where the case has one, and a module
 // `t` open with its string mailbox `sm` declared -- with a body that puts
 // "hello", counts the queue by num() into `n` and gets the message into `s`,
