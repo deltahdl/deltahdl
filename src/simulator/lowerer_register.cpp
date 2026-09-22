@@ -640,9 +640,19 @@ static ClassTypeInfo* ClassNamedByTypedef(const DataType& target,
   }
   if (generic == nullptr) generic = ctx.FindClassType(target.type_name);
   if (generic == nullptr) return nullptr;
-  return SpecializationOf(
+  // §8.25 with §8.3: a value actual the list writes is an expression of the
+  // holder's scope, UVM's `Tname` in uvm_component_registry#(T,Tname)'s
+  // `typedef uvm_registry_common#(this_type, ..., T, Tname) common_type;`, so
+  // it is evaluated with the holder as the running class, whose own value
+  // parameters its static storage holds (EvalIdentifierClassScope). Evaluated
+  // under no class, the name read nothing and every specialization's
+  // common_type was one whose Tname was empty.
+  ctx.PushMethodClass(holder);
+  ClassTypeInfo* spec = SpecializationOf(
       generic, ActualsUnderSpecialization(holder, target.type_params, ctx), ctx,
       arena);
+  ctx.PopMethodClass();
+  return spec;
 }
 
 void RegisterClassScopeTypedefAliases(ClassTypeInfo* info, SimContext& ctx,

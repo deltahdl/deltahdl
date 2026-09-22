@@ -454,4 +454,29 @@ TEST(ClassSim, UnitTypedefNamesTheSpecializationItsListSpells) {
   EXPECT_EQ(out, "6 6 3\n");
 }
 
+// §8.25 with §8.3: a value actual in a class-scope typedef's list is an
+// expression of the holder's scope, so under Reg#(int, "hopper") the
+// `Tname` of `typedef Common#(T, Tname) common_type;` is "hopper", and
+// common_type's static method answers it. Evaluated under no class, the
+// name read nothing and the call answered the empty string.
+TEST(ClassSim, ClassScopeTypedefValueActualIsTheHoldersValue) {
+  SimFixture f;
+  auto out = RunCapture(
+      "class Common #(type Tr = int, string Tname = \"<unknown>\");\n"
+      "  static function string type_name(); return Tname; endfunction\n"
+      "endclass\n"
+      "class Reg #(type T = int, string Tname = \"<unknown>\");\n"
+      "  typedef Common#(T, Tname) common_type;\n"
+      "  static function string name();\n"
+      "    return common_type::type_name();\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  initial $display(\"%s %s\", Reg#(int, \"hopper\")::name(),\n"
+      "                   Reg#(byte, \"root\")::name());\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "hopper root\n");
+}
+
 }  // namespace
