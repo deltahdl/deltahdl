@@ -109,10 +109,14 @@ def test_a_file_of_the_same_tag_outside_the_table_keeps_its_tag(
     assert rst.tagged_clause({"tags": "13.4.4"}, "13.4.4--fork-valid.sv") == "13.4.4"
 
 
+@pytest.mark.parametrize("name, tag, rule", [
+    ("variable-slice-zero.sv", "7.4.3", "11.5.1"),
+    ("14.3--clocking-block-signals-error.sv", "14.3", "6.5"),
+])
 def test_a_file_tagged_by_the_feature_it_uses_is_judged_by_the_rule_it_breaks(
-    rst: ModuleType,
+    rst: ModuleType, name: str, tag: str, rule: str,
 ) -> None:
-    assert rst.tagged_clause({"tags": "7.4.3"}, "variable-slice-zero.sv") == "11.5.1"
+    assert rst.tagged_clause({"tags": tag}, name) == rule
 
 
 def test_a_file_the_suite_tags_on_the_next_subclause_is_judged_by_the_rule_it_tests(

@@ -336,6 +336,7 @@ _CLAUSE_OF_MISTAGGED_FILE: dict[str, str] = {
 
 _RULE_OF_FILE_TAGGED_BY_FEATURE: dict[str, str] = {
     "variable-slice-zero.sv": "11.5.1",
+    "14.3--clocking-block-signals-error.sv": "6.5",
 }
 
 _CLAUSE_OF_FILE = _CLAUSE_OF_MISTAGGED_FILE | _RULE_OF_FILE_TAGGED_BY_FEATURE

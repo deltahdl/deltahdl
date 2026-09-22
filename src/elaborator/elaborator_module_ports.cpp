@@ -516,6 +516,35 @@ static void FoldBodyParamsIntoPortScope(const ModuleDecl* decl,
   }
 }
 
+// §6.6.8: an interconnect port is a typeless/generic net, exactly like a
+// local interconnect declaration. Register its name so the assignment- and
+// expression-use checks -- which reject procedural/continuous/expression uses
+// of an interconnect "net or port" -- also fire for the port inside its own
+// module. A non-ANSI interconnect port already registers via its body net
+// declaration; this covers the ANSI `interconnect p` header form.
+//
+// §23.2.2.3: a port the clause makes a net of the default net type -- `output
+// b` with no port kind and no data type among them, the clause's own `mh8
+// (output x)` -- is likewise a net to every rule of its module that asks
+// whether a name is one, §6.5's rule that a net cannot be the target of a
+// procedural assignment first. Left out of net_names_, `b <= a` in an
+// always_ff on such a port was accepted, the suite's
+// 14.3--clocking-block-signals-error.sv with it, while the same write to a
+// declared `wire w` was reported. A non-ANSI port registers through its body
+// net declaration in ElaborateNetDecl; a checker's formal is §17.2's and no
+// net.
+void Elaborator::RegisterPortNetNames(const ModuleDecl* decl,
+                                      const PortDecl& port,
+                                      const RtlirPort& rp) {
+  if (port.name.empty()) return;
+  if (port.data_type.is_interconnect) interconnect_names_.insert(port.name);
+  if (decl->is_non_ansi_ports || decl->decl_kind == ModuleDeclKind::kChecker ||
+      rp.is_var) {
+    return;
+  }
+  net_names_.insert(port.name);
+}
+
 void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
   auto param_scope = BuildParamScope(mod);
   FoldBodyParamsIntoPortScope(decl, param_scope);
@@ -534,16 +563,8 @@ void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
   for (const auto& port : decl->ports) {
     if (RejectIllegalPortType(port, diag_)) continue;
 
-    // §6.6.8: an interconnect port is a typeless/generic net, exactly like a
-    // local interconnect declaration. Register its name so the assignment- and
-    // expression-use checks — which reject procedural/continuous/expression
-    // uses of an interconnect "net or port" — also fire for the port inside its
-    // own module. A non-ANSI interconnect port already registers via its body
-    // net declaration; this covers the ANSI `interconnect p` header form.
-    if (port.data_type.is_interconnect && !port.name.empty())
-      interconnect_names_.insert(port.name);
-
     RtlirPort rp = ElaborateOnePort(decl, port, ctx);
+    RegisterPortNetNames(decl, port, rp);
     // §37.3.3: where the port declaration stands, which the port object
     // reports through vpiLineNo and vpiFile.
     rp.loc = port.loc;

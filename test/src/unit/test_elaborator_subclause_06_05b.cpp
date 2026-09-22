@@ -144,4 +144,51 @@ TEST(NetsAndVariables, PackageScopedAssignmentIsNotAWriteToThePrefixName) {
              f));
 }
 
+// §6.5 with §23.2.2.3 (printed page 735): an output port declared with no
+// port kind and no data type, `output b`, is a net of the default net type,
+// the clause's own `mh8 (output x)`, so `b <= a` inside an always_ff is a
+// procedural assignment to a net and is reported as the write to a declared
+// `wire w` above is. This is the suite's 14.3--clocking-block-signals-error.sv
+// (#2917), whose clocking block declares `output b` as a clockvar and whose
+// always_ff writes the port itself; the port was known to the rule as no net
+// and the write was accepted.
+TEST(NetsAndVariables, UntypedOutputPortIsANetAProcedureCannotWrite) {
+  ElabFixture f;
+  Elaborate(
+      "module top(input clk, input a, output b, output c);\n"
+      "  clocking ck1 @(posedge clk);\n"
+      "    default input #10ns output #5ns;\n"
+      "    input a;\n"
+      "    output b;\n"
+      "    output #3ns c;\n"
+      "  endclocking\n"
+      "  always_ff @(posedge clk) begin\n"
+      "    b <= a;\n"
+      "    c <= a;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "net 'b' cannot be the target of a procedural assignment", 9, "6.5"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "net 'c' cannot be the target of a procedural assignment", 10, "6.5"));
+}
+
+// §23.2.2.3: an output port declared with an explicit data type and no port
+// kind, `output logic b`, is a variable, so the same always_ff write is the
+// ordinary procedural assignment §6.5 allows and nothing is reported. This is
+// the shape of the suite's passing 14.3--clocking-block-signals.sv, and the
+// discriminating half of the case above: a rule that took every output port
+// for a net would report it.
+TEST(NetsAndVariables, TypedOutputPortIsAVariableAProcedureMayWrite) {
+  ElabFixture f;
+  EXPECT_TRUE(
+      ElabOk("module top(input clk, input a, output logic b);\n"
+             "  always_ff @(posedge clk) b <= a;\n"
+             "endmodule\n",
+             f));
+}
+
 }  // namespace
