@@ -29,6 +29,25 @@ TEST(AbstractClassElaboration, ConcreteOverridesAllPureVirtuals) {
              "endmodule\n"));
 }
 
+// §8.20 (printed page 197): an override of a virtual method is virtual
+// without the keyword, so a plain `function int area()` in Circle implements
+// Shape's pure area() and Circle is no abstract class; counted only when
+// written `virtual`, the override left area() reported as unimplemented.
+TEST(AbstractClassElaboration, OverrideWithoutVirtualKeywordImplementsPure) {
+  EXPECT_TRUE(
+      ElabOk("virtual class Shape;\n"
+             "  pure virtual function int area();\n"
+             "  pure virtual task draw();\n"
+             "endclass\n"
+             "class Circle extends Shape;\n"
+             "  function int area(); return 3; endfunction\n"
+             "  task draw(); endtask\n"
+             "endclass\n"
+             "module m;\n"
+             "  Circle c;\n"
+             "endmodule\n"));
+}
+
 // The report stands at the offending subclass's own declaration -- the site
 // passes `cls->range.start` -- rather than at the pure virtual method it leaves
 // unimplemented.

@@ -154,6 +154,13 @@ void ElaboratorClassRules::ValidateVirtualMethodOverrides() {
   }
 }
 
+// §8.21 with §8.20 (printed page 197 of IEEE 1800-2023): a method that
+// overrides a pure virtual one is its implementation whether or not it is
+// declared `virtual`, since a method identified as virtual stays virtual in
+// every subclass that overrides it and the keyword there is optional. Only a
+// member that is not itself pure takes the name off the list; kept on it for
+// want of the keyword, `function int area(); ... endfunction` in a subclass
+// of Shape reported Shape's pure area() as unimplemented.
 static void CollectPureVirtualMethods(
     const ClassDecl* cls, const CompilationUnit* unit,
     std::vector<std::string_view>& pure_names) {
@@ -166,7 +173,7 @@ static void CollectPureVirtualMethods(
     if (m->kind != ClassMemberKind::kMethod || !m->method) continue;
     if (m->is_pure_virtual) {
       pure_names.push_back(m->method->name);
-    } else if (m->is_virtual) {
+    } else {
       std::erase(pure_names, m->method->name);
     }
   }
