@@ -13,6 +13,7 @@
 // ClassTypeInfo of its own, so that the map, and the class parameters stored
 // beside it, belong to the one set of actuals rather than to the declaration.
 
+#include <string_view>
 #include <vector>
 
 #include "common/types.h"
@@ -61,6 +62,17 @@ ClassTypeInfo* SpecializationOf(ClassTypeInfo* generic,
 // own type, and for an actual naming no parameter of it.
 std::vector<DataType> ActualsUnderSpecialization(
     const ClassTypeInfo* holder, const std::vector<DataType>& written);
+
+// §8.25 with §8.23: a type parameter stands for the type its actual gives,
+// so a scope form whose prefix is a type parameter of the running method's
+// class, UVM's `Tregistry::get()` in uvm_registry_common#(Tregistry, ...),
+// names the class that actual names -- a different one under each
+// specialization of the running class. That class, specialized by the list
+// the actual writes, or the class itself where it writes none; null where
+// `name` is no type parameter of the running class, where no method is
+// running, and where the actual names no class.
+ClassTypeInfo* ClassNamedByTypeParam(std::string_view name, SimContext& ctx,
+                                     Arena& arena);
 
 // Defined in lowerer_class.cpp, beside the static initialization of a class
 // declaration, and called on each specialization as it is created. §8.9: each

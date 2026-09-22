@@ -406,6 +406,7 @@ static bool ResolveClassScope(const Expr* expr, SimContext& ctx, Arena& arena,
   if (!info.access->rhs || info.access->rhs->kind != ExprKind::kIdentifier)
     return false;
   info.cls = ctx.FindClassType(info.class_name);
+  if (!info.cls) info.cls = ClassNamedByTypeParam(info.class_name, ctx, arena);
   if (!info.cls) return false;
   auto it = info.cls->methods.find(std::string(info.access->rhs->text));
   if (it == info.cls->methods.end()) return false;

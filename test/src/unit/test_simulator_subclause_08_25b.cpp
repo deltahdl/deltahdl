@@ -319,4 +319,25 @@ TEST(ClassSim, StaticLocalOfAMethodIsPerSpecialization) {
   EXPECT_EQ(out, "p2 1\n");
 }
 
+// §8.25 with §8.23: a type parameter stands for the type its actual gives, so
+// `T::get()` inside H #(type T) calls the static method of the class the
+// running specialization binds T to -- UVM's `Tregistry::get()` in
+// uvm_registry_common. R and S answer different values, so H#(R) and H#(S)
+// each show which class their T reached; a prefix no class is registered
+// under resolved to no call at all.
+TEST(ClassSim, ScopePrefixNamingATypeParameterNamesItsActualsClass) {
+  SimFixture f;
+  auto out = RunCapture(
+      "class R; static function int get(); return 7; endfunction endclass\n"
+      "class S; static function int get(); return 9; endfunction endclass\n"
+      "class H #(type T = int);\n"
+      "  static function int call(); return T::get(); endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  initial $display(\"%0d %0d\", H#(R)::call(), H#(S)::call());\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "7 9\n");
+}
+
 }  // namespace

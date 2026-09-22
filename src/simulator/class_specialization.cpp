@@ -273,6 +273,20 @@ std::vector<DataType> ActualsUnderSpecialization(
   return bound;
 }
 
+ClassTypeInfo* ClassNamedByTypeParam(std::string_view name, SimContext& ctx,
+                                     Arena& arena) {
+  const DataType* actual = RunningTypeActual(name, ctx);
+  if (actual == nullptr || actual->kind != DataTypeKind::kNamed) return nullptr;
+  ClassTypeInfo* generic = nullptr;
+  if (!actual->scope_name.empty()) {
+    generic = ctx.FindClassType(std::string(actual->scope_name) +
+                                "::" + std::string(actual->type_name));
+  }
+  if (generic == nullptr) generic = ctx.FindClassType(actual->type_name);
+  if (generic == nullptr) return nullptr;
+  return SpecializationOf(generic, actual->type_params, ctx, arena);
+}
+
 ClassTypeInfo* SpecializationOf(ClassTypeInfo* generic,
                                 const std::vector<DataType>& actuals,
                                 SimContext& ctx, Arena& arena) {
