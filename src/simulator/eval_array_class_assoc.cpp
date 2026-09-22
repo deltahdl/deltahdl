@@ -124,6 +124,18 @@ bool DimNamesTypeParam(const Expr* dim, const ClassDecl* decl) {
          decl->type_param_names.count(dim->text) != 0;
 }
 
+// The typedef item the class `t` itself declares under `name`; null where it
+// declares none.
+const ModuleItem* OwnTypedefItem(const ClassTypeInfo* t,
+                                 std::string_view name) {
+  if (t->decl == nullptr) return nullptr;
+  for (const ClassMember* m : t->decl->members) {
+    if (m->kind == ClassMemberKind::kTypedef && m->name == name)
+      return m->typedef_item;
+  }
+  return nullptr;
+}
+
 // §6.18 with §8.3 (printed page 180 of IEEE 1800-2023): a typedef is a class
 // item, and a property declared through one has the unpacked dimensions the
 // typedef writes -- uvm_phase's `edges_t m_successors` under `typedef bit
@@ -144,13 +156,8 @@ const std::vector<Expr*>& PropertyUnpackedDims(const ClassMember* member,
   for (const ClassTypeInfo* scope = declaring; scope != nullptr;
        scope = scope->enclosing) {
     for (const ClassTypeInfo* t = scope; t != nullptr; t = t->parent) {
-      if (t->decl == nullptr) continue;
-      for (const ClassMember* m : t->decl->members) {
-        if (m->kind == ClassMemberKind::kTypedef && m->name == type.type_name &&
-            m->typedef_item != nullptr) {
-          return m->typedef_item->unpacked_dims;
-        }
-      }
+      if (const ModuleItem* item = OwnTypedefItem(t, type.type_name))
+        return item->unpacked_dims;
     }
   }
   return member->unpacked_dims;
