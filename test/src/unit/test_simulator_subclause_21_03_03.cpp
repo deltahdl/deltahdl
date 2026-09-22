@@ -409,4 +409,20 @@ TEST(StringFormatTaskSim, SformatDestinationWakesAnEventControlOnIt) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
+// §21.3.3 (printed page 668): $sformatf returns a string, so the value it
+// answers is one to a task handed it, `$display($sformatf("e %0d", v))`
+// printing the text as `$display(s)` prints a string variable holding it.
+// Without the kind on the value the bytes were rendered as the number they
+// make, 6627381 for "e 5".
+TEST(StringFormatTaskSim, SformatfResultDisplaysAsText) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  int v = 5;\n"
+      "  initial $display($sformatf(\"e %0d\", v));\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "e 5\n");
+}
+
 }  // namespace

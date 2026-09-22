@@ -308,6 +308,7 @@ static Logic4Vec EvalSeveritySysCall(const Expr* expr, SimContext& ctx,
                                      Arena& arena, std::string_view name) {
   if (name == "$fatal") {
     ExecSeverityTask(expr, ctx, arena, "FATAL", std::cerr);
+    ctx.NoteRuntimeError();
     // §20.10: calling $fatal produces an implicit $finish. Its optional first
     // argument is a finish_number consistent with $finish's argument (§20.2),
     // which selects how much diagnostic information the tool reports before it
@@ -322,7 +323,11 @@ static Logic4Vec EvalSeveritySysCall(const Expr* expr, SimContext& ctx,
     EmitFinishDiagnostic(ctx, "$finish", level, ctx.Out());
     ctx.RequestFinish();
   } else if (name == "$error") {
+    // §20.10: a run-time error, which the run's exit status reports; the
+    // suite's three chapter-16 -fail files fail an assertion into `$error`
+    // and are counted as passing on that status alone (#2928, #2926).
     ExecSeverityTask(expr, ctx, arena, "ERROR", std::cerr);
+    ctx.NoteRuntimeError();
   } else if (name == "$warning") {
     ExecSeverityTask(expr, ctx, arena, "WARNING", ctx.Out());
   } else if (name == "$info") {

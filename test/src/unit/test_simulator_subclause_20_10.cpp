@@ -341,4 +341,80 @@ TEST(SeveritySystemTaskSim, InfoIncludesUserDefinedMessage) {
   EXPECT_EQ(f.ctx.LastSeverityMsg(), "hello world");
 }
 
+// Runs `src`, a module whose initial calls one severity task, through the
+// full pipeline and hands back the fixture for the reads below.
+void RunSeveritySource(SimFixture& f, const std::string& src) {
+  auto* design = ElaborateSrc(src, f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+}
+
+// §20.10 (printed page 635): the user-defined message uses $display's
+// syntax, and the tool's message shall include it, so a first argument that
+// is no string literal is rendered as $display renders it: the string
+// $sformatf returns (§21.3.3) as its text. This is the action block of the
+// suite's chapter-16 -fail assertions, `$error($sformatf("property check
+// failed :assert: (True)"))` (#2928, #2926); read for a format string
+// alone, the call printed the header with no message, and once the value was
+// rendered as a number it printed 55922512392437378615... for the text.
+TEST(SeveritySystemTaskSim, ErrorRendersASformatfArgumentAsItsText) {
+  SimFixture f;
+  RunSeveritySource(f,
+                    "module t;\n"
+                    "  int v = 7;\n"
+                    "  initial $error($sformatf(\"v is %0d\", v));\n"
+                    "endmodule\n");
+  EXPECT_EQ(f.ctx.LastSeverity(), "ERROR");
+  EXPECT_EQ(f.ctx.LastSeverityMsg(), "v is 7");
+}
+
+// §20.10: a bare expression after the format is rendered in decimal, as
+// $display renders it; the radix was read off the task's last letter, and
+// $info, ending in the letter $displayo does, rendered 5 in octal as
+// 00000000005.
+TEST(SeveritySystemTaskSim, InfoRendersABareArgumentInDecimal) {
+  SimFixture f;
+  RunSeveritySource(f,
+                    "module t;\n"
+                    "  int v = 5;\n"
+                    "  initial $info(\"plain\", v);\n"
+                    "endmodule\n");
+  EXPECT_EQ(f.ctx.LastSeverityMsg(), "plain          5");
+}
+
+// §20.10 (printed page 635): $error generates a run-time error and $fatal
+// terminates the simulation with an error code, so a run that called either
+// records a run-time error, which RunSimulation in src/main.cpp turns into
+// exit status 1; the suite's chapter-16 -fail files are counted as passing
+// on that status, and its 20.10--error.sv is kept a parsing test for it. A
+// $warning records none.
+TEST(SeveritySystemTaskSim, ErrorLeavesTheRunWithARuntimeError) {
+  SimFixture f;
+  RunSeveritySource(f,
+                    "module t;\n"
+                    "  initial $error(\"e\");\n"
+                    "endmodule\n");
+  EXPECT_TRUE(f.ctx.HasRuntimeErrors());
+}
+
+TEST(SeveritySystemTaskSim, FatalLeavesTheRunWithARuntimeError) {
+  SimFixture f;
+  RunSeveritySource(f,
+                    "module t;\n"
+                    "  initial $fatal(0, \"f\");\n"
+                    "endmodule\n");
+  EXPECT_TRUE(f.ctx.HasRuntimeErrors());
+}
+
+TEST(SeveritySystemTaskSim, WarningLeavesTheRunWithNoRuntimeError) {
+  SimFixture f;
+  RunSeveritySource(f,
+                    "module t;\n"
+                    "  initial $warning(\"w\");\n"
+                    "endmodule\n");
+  EXPECT_FALSE(f.ctx.HasRuntimeErrors());
+}
+
 }  // namespace

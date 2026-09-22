@@ -124,6 +124,13 @@ class SimContext : public DeclaredNameTables,
   // on StopRequested() unwind while the scheduler halts on FinishRequested().
   void RequestFinish();
   bool FinishRequested() const { return finish_requested_; }
+  // §20.10: $fatal terminates the simulation with an error code and $error
+  // generates a run-time error, so a run in which either was called ends with
+  // the status an elaboration error ends with; RunSimulation in src/main.cpp
+  // reads this beside DiagEngine::HasErrors. A run that called neither, a
+  // $warning or an $info among its calls, exits as it did.
+  void NoteRuntimeError() { ++runtime_error_count_; }
+  bool HasRuntimeErrors() const { return runtime_error_count_ > 0; }
 
   // Optional $reset family (Annex D.8). RecordReset tallies one reset of the
   // tool and remembers the reset_value argument so that the $reset_value
@@ -797,6 +804,7 @@ class SimContext : public DeclaredNameTables,
   InstancePrefixOverrideState prefix_override_;
   bool stop_requested_ = false;
   bool finish_requested_ = false;
+  uint32_t runtime_error_count_ = 0;
   uint32_t reset_count_ = 0;
   int64_t reset_value_ = 0;
   std::string interactive_scope_;

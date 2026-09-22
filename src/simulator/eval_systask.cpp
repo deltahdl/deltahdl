@@ -662,7 +662,15 @@ static Logic4Vec EvalSformatf(const Expr* expr, SimContext& ctx, Arena& arena) {
                          expr->range.start);
   std::string result =
       FormatDisplay(fmt, arg_vals, {.ctx = &ctx, .loc = expr->range.start});
-  return StringToLogic4Vec(arena, result);
+  // §21.3.3: the result is a string, and the value carries the kind so that
+  // a display or severity task handed it, `$error($sformatf(...))`, renders
+  // its text rather than the number its bytes make (AppendDisplayArg in
+  // eval_system_task.cpp reads the kind), as a string variable holding the
+  // same text is rendered; without the kind `$display($sformatf("e %0d",
+  // 5))` printed 6627381.
+  Logic4Vec out = StringToLogic4Vec(arena, result);
+  out.is_string = true;
+  return out;
 }
 
 static Logic4Vec EvalItor(const Expr* expr, SimContext& ctx, Arena& arena) {

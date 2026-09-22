@@ -395,7 +395,8 @@ int RunSimulation(const delta::CliOptions& opts, delta::CompilationUnit* cu,
   // tasks opened as well as one --vcd asked for, and does nothing when the run
   // opened none.
   sim_ctx.CloseVcdDump();
-  return diag.HasErrors() ? 1 : 0;
+  // §20.10: a $fatal or an $error the run called is an error of the run.
+  return diag.HasErrors() || sim_ctx.HasRuntimeErrors() ? 1 : 0;
 }
 
 // The arguments RunSimulation takes and the status it answers, carried across

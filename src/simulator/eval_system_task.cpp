@@ -731,8 +731,13 @@ static bool AppendUnpackedArrayArg(const Expr* arg, SimContext& ctx,
 
 // Render one argument of a display or write task, consuming any expression
 // arguments a format template takes with it.
+// `default_radix` is the specifier a bare expression argument is rendered
+// under: the task's own for the display and write families, decimal for a
+// severity task, whose name says nothing of a radix ($info ends in the
+// letter the octal family does).
 static void AppendDisplayArg(const Expr* expr, size_t& i, SimContext& ctx,
-                             Arena& arena, std::string& output) {
+                             Arena& arena, std::string& output,
+                             char default_radix) {
   const Expr* arg = expr->args[i];
   // An omitted argument -- a leading, trailing, or doubled comma in the call --
   // carries no expression and is rendered as a single space.
@@ -759,8 +764,7 @@ static void AppendDisplayArg(const Expr* expr, size_t& i, SimContext& ctx,
   // of the task name. The rendering carries the §21.2.1.2 automatic sizing, so
   // a plain $display pads its default decimal exactly as an explicit %d would.
   auto val = EvalExpr(arg, ctx, arena);
-  char spec =
-      val.is_string ? 's' : DefaultRadixForDisplayWriteTask(expr->callee);
+  char spec = val.is_string ? 's' : default_radix;
   output += FormatArgAutoSized(val, spec);
 }
 
@@ -769,8 +773,9 @@ void ExecDisplayWrite(const Expr* expr, SimContext& ctx, Arena& arena) {
   // as a format template whose specifiers are filled by the expression
   // arguments that immediately follow it.
   std::string output;
+  char radix = DefaultRadixForDisplayWriteTask(expr->callee);
   for (size_t i = 0; i < expr->args.size(); ++i)
-    AppendDisplayArg(expr, i, ctx, arena, output);
+    AppendDisplayArg(expr, i, ctx, arena, output, radix);
   ctx.Out() << output;
   // The display family ($display, $displayb, $displayo, $displayh) terminates
   // its output with a newline; the write family does not.
@@ -794,29 +799,24 @@ void EmitSeverityHeader(SimContext& ctx, std::string_view prefix,
 
 void ExecSeverityTask(const Expr* expr, SimContext& ctx, Arena& arena,
                       const char* prefix, std::ostream& os) {
-  std::string fmt;
-  std::vector<Logic4Vec> arg_vals;
   size_t start_idx = 0;
-
   if (std::string_view(prefix) == "FATAL" && !expr->args.empty()) {
     if (expr->args[0]->kind != ExprKind::kStringLiteral) {
       EvalExpr(expr->args[0], ctx, arena);
       start_idx = 1;
     }
   }
-
+  // §20.10 (printed page 635): the user-defined message uses the syntax of
+  // $display, and the tool's message shall include it, so the arguments are
+  // rendered as ExecDisplayWrite renders $display's -- a string literal a
+  // format for the arguments after it, a string-typed value its text, any
+  // other value in the default radix. Read for a format string alone,
+  // `$error($sformatf("property check failed"))`, the action block of the
+  // suite's chapter-16 -fail assertions, printed the header and no message.
+  std::string msg;
   for (size_t i = start_idx; i < expr->args.size(); ++i) {
-    auto val = EvalExpr(expr->args[i], ctx, arena);
-    if (i == start_idx && expr->args[i]->kind == ExprKind::kStringLiteral) {
-      fmt = ExtractFormatString(expr->args[i]);
-    } else {
-      arg_vals.push_back(val);
-    }
+    AppendDisplayArg(expr, i, ctx, arena, msg, 'd');
   }
-  std::string msg =
-      fmt.empty() ? ""
-                  : FormatDisplay(fmt, arg_vals,
-                                  {.ctx = &ctx, .loc = expr->range.start});
   // §20.10: report the source line of the call, matching the `__LINE__ the
   // preprocessor would produce here (§22.13).
   EmitSeverityHeader(ctx, prefix, msg, os, expr->range.start.line);
