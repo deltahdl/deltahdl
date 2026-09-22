@@ -5,9 +5,9 @@ description: Start or stop the standing reminders, with or without the loop that
 
 # Autopilot
 
-## The seven standing reminders
+## The eight standing reminders
 
-Every `start` form creates these:
+Every `start` form creates these. The minutes 0 to 9 are taken, seven by the table below and 1, 4 and 5 by the loop reminders, so the eighth stands on 11 and shares its firing minutes with the loop reminder on 1; both fire, and a form that creates no loop reminder leaves 11 to itself.
 
 | Cron | Prompt |
 | --- | --- |
@@ -18,6 +18,7 @@ Every `start` form creates these:
 | `7,17,27,37,47,57 * * * *` | `REMINDER: While any CI run for a pushed commit is in progress, only wait: no diagnosis, edits or commits.` |
 | `8,18,28,38,48,58 * * * *` | `REMINDER: Solve what you find rather than filing it and moving on. A failing integration test in deltahdl.yml is the exception: leave that one where it is.` |
 | `9,19,29,39,49,59 * * * *` | `REMINDER: Ensure every task on the list is indivisible, whether it was written with TaskCreate or rewritten with TaskUpdate: read each subject as written and count the actions it names; a subject naming more than one action is divisible, whatever single purpose those actions serve, and is split into one task per action.` |
+| `11,21,31,41,51 * * * *` | `REMINDER: The sv-tests README establishes which subclause an sv-test is tagged with: a test case covers a single feature, and where it uses several, the tag names the feature it directly tests, drawn from the list in conf/lrm.conf and deciding the tests/chapter-N directory the file sits in. Read that rule to settle what a suite file's tag should be, and resolve the tag from its 2017 number to the 2023 clause before comparing it with anything deltahdl reports.` |
 
 ## The three loop reminders
 
@@ -55,13 +56,13 @@ And these two:
 - `start bysubclause` — the lowest subclause with an open `Satisfy IEEE 1800-2023 §<subclause>` issue.
 - `start byissuefloor <issue-number>` — the open issues above the number.
 - `start bylabel <label>` — the open issues carrying the label, exactly as written; `gh label list` prints them.
-- `start reminders-only` — the seven standing reminders alone.
+- `start reminders-only` — the eight standing reminders alone.
 
 `start` alone is `bysubclause`, `start <issue-number>` is `byissuefloor`, and `start §5` is `bylabel`. A form missing its argument: ask for it before creating anything.
 
 Any form but `reminders-only` may be followed by `--skip-label <label>`, once per label, quoted when it holds a space. Each adds to the loop's `gh issue list` command, right after `--state open`, a `-label:"<label>"` term in one `--search` flag — `--search '-label:"needs decision" -label:"blocked"'` — and appends to that reminder, after a space, `An issue labelled '<label>' is left to a person, whatever else it carries.`
 
-For any form but `reminders-only`, run the loop's `gh issue list` command once and name what it printed: the subclause and issue for `bysubclause`; the floor or label, how many open issues it selects, and which one the first iteration takes for the other two; and the labels skipped. If it names nothing, say so and create the seven standing reminders only.
+For any form but `reminders-only`, run the loop's `gh issue list` command once and name what it printed: the subclause and issue for `bysubclause`; the floor or label, how many open issues it selects, and which one the first iteration takes for the other two; and the labels skipped. If it names nothing, say so and create the eight standing reminders only.
 
 Call `CronList`, then `CronCreate` with `recurring: true` for each reminder of the form whose prompt is not already scheduled, substituting the number for `{X}` or the label for `{L}`. Report which were created and which were already running, that they live in this session only, and that recurring jobs expire after seven days. Then begin solving the issue named in the same turn, or, when none was, carry on with whatever the session was doing.
 
