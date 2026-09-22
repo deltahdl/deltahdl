@@ -119,6 +119,34 @@ TEST(ObjectPropertySim, ParameterDefaultValueAccessViaInstance) {
             7u);
 }
 
+// §8.5 (printed page 179) with §8.25: a parameter is read through a handle
+// as a property is, and the handle declared at module scope with a
+// specialization, `test_cls #(34) test_obj;` on a class the module itself
+// declares, constructed later by `test_obj = new`, reads the 34 the
+// specialization gave it, while a handle declared with no `#(...)` reads
+// the default 12: 3412. This is the suite's 8.5--parameters.sv (#2916),
+// which run 30725357212 reported reading 12; e87e650bc binds the
+// specialization's actuals on the object at that later construction, and
+// the two cases above hold the handle in the initial and construct it
+// there.
+TEST(ObjectPropertySim,
+     ParameterOfAModuleScopeSpecializationConstructedLaterReadViaInstance) {
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  class test_cls #(parameter a = 12);\n"
+                      "  endclass\n"
+                      "  test_cls #(34) test_obj;\n"
+                      "  test_cls dflt;\n"
+                      "  int out;\n"
+                      "  initial begin\n"
+                      "    test_obj = new;\n"
+                      "    dflt = new;\n"
+                      "    out = test_obj.a * 100 + dflt.a;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "out"),
+            3412u);
+}
+
 TEST(ObjectPropertySim, NoRestrictionOnPropertyDataType) {
   EXPECT_EQ(RunAndGet("class C;\n"
                       "  bit [7:0] b;\n"
