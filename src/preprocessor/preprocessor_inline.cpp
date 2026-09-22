@@ -110,6 +110,22 @@ bool Preprocessor::ExpandFunctionLikeMacro(const MacroDef& def,
   return true;
 }
 
+// The text a macro substituted opens a compiler directive where the name after
+// its leading backtick is a directive keyword. A backtick equally opens a usage
+// of another text macro, and §22.5.1 (printed page 710) parts the two: usages
+// written in the macro text are substituted after the outer macro is
+// substituted, while a compiler directive written there takes effect when the
+// macro is used. Item a) of the same page is what makes the name enough to tell
+// them apart, a text macro name never spelling a directive keyword. `__FILE__
+// and `__LINE__ (22.13) stand for a value where they are written, so a text
+// opening with one is ordinary text for the inline expander to substitute into.
+static bool OpensCompilerDirective(std::string_view text) {
+  if (text.empty() || text[0] != '`') return false;
+  size_t end = 1;
+  while (end < text.size() && IsIdentChar(text[end])) ++end;
+  return IsDirectiveOtherThanValue(text.substr(1, end - 1));
+}
+
 bool Preprocessor::ExpandUserDefinedMacro(std::string_view name,
                                           std::string_view macro_name,
                                           std::string& output, SourceLoc loc,
@@ -148,8 +164,8 @@ bool Preprocessor::ExpandUserDefinedMacro(std::string_view name,
   // §22.5.1 has a directive written in a macro's text take effect when the
   // macro is used (printed page 710), so ExpandSubstitutedBody evaluates it.
   auto exp_trimmed = Trim(std::string_view(expanded));
-  bool starts_directive = !exp_trimmed.empty() && exp_trimmed[0] == '`' &&
-                          !HasInlineConditional(exp_trimmed);
+  bool starts_directive =
+      OpensCompilerDirective(exp_trimmed) && !HasInlineConditional(exp_trimmed);
   if (starts_directive) {
     RunDirectiveOpenedByMacro(std::move(expanded), rest, loc, depth, output);
     return true;

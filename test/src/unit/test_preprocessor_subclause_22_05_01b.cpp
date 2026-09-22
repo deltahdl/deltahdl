@@ -312,3 +312,28 @@ TEST(Preprocessor, FunctionLikeMacroWithoutParenthesesAfterTextIsRejected) {
                             "'FUNC'",
                             2, "22.5.1"));
 }
+
+// §22.5.1 (printed page 710) lets the macro text contain usages of other text
+// macros, substituted after the outer macro is substituted, and separately has
+// a compiler directive written in that text take effect when the macro is
+// used. A backtick opens either one, and item a) of the same page is what
+// parts them: a text macro name shall not be the same as a compiler directive
+// keyword. The shape below is uvm_tlm_imps.svh:177 of the UVM library sv-tests
+// ships, where `UVM_GET_PEEK_IMP is two usages on two lines and nothing else;
+// read as a compiler directive because of the backtick alone, neither of them
+// reached the output and the class the file declares lost its methods.
+TEST(Preprocessor, MacroTextOpeningWithAnotherUsageExpandsEveryLineOfIt) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define GET(arg) task get(output int arg); endtask\n"
+      "`define PEEK(arg) task peek(output int arg); endtask\n"
+      "`define GET_PEEK(arg) \\\n"
+      "  `GET(arg) \\\n"
+      "  `PEEK(arg)\n"
+      "`GET_PEEK(t)\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("task get(output int t); endtask"), std::string::npos);
+  EXPECT_NE(result.find("task peek(output int t); endtask"), std::string::npos);
+  EXPECT_EQ(result.find('`'), std::string::npos);
+}
