@@ -255,4 +255,37 @@ TEST(FunctionReturnSim, ReturnNewConstructsAnObjectOfTheReturnType) {
   EXPECT_EQ(out, "0 0 4 7\n");
 }
 
+// §13.4.1 (printed page 342) with §8.3: the implicit variable is the
+// function's own, of its return type, so a call of another function of the
+// same name made while the body runs -- B's make, returning a B -- leaves the
+// outer make's variable an A, and `$cast(make, a)` casts an A into it and
+// succeeds. Recorded under the bare name for the whole run, the inner call's
+// class stood for the outer's variable, the cast failed and the call
+// returned null.
+TEST(FunctionReturnSim, ReturnVariableClassOutlivesANestedSameNamedCall) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class A; int v = 1; endclass\n"
+      "class B; int v = 2; static function B make(); make = new; endfunction\n"
+      "endclass\n"
+      "class F;\n"
+      "  static int ok = 0;\n"
+      "  static function A make();\n"
+      "    A a = new;\n"
+      "    B inner = B::make();\n"
+      "    ok = $cast(make, a);\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  A r;\n"
+      "  initial begin\n"
+      "    r = F::make();\n"
+      "    $display(\"%0d %0d\", r == null, F::ok);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(out, "0 1\n");
+}
+
 }  // namespace

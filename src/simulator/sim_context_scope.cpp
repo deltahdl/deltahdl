@@ -23,7 +23,7 @@ namespace delta {
 // grown past the line cap.
 
 void ScopeStack::PushScope(std::string_view package) {
-  scope_stack_.push_back(Scope{{}, {}, {}, {}, package, {}});
+  scope_stack_.push_back(Scope{{}, {}, {}, {}, package, {}, false, {}});
 }
 
 // §23.9 with §26.2: the innermost frame -- a subroutine's, pushed by the
@@ -68,6 +68,28 @@ const DataType* ScopeStack::FindScopeTypeActual(std::string_view name) const {
   return nullptr;
 }
 
+bool ScopeStack::RecordLocalClassType(std::string_view name,
+                                      std::string_view type) {
+  for (auto it = scope_stack_.rbegin(); it != scope_stack_.rend(); ++it) {
+    if (it->vars.count(name) != 0) {
+      it->class_types[name] = type;
+      return true;
+    }
+    if (it->is_subroutine) break;
+  }
+  return false;
+}
+
+const std::string_view* ScopeStack::FindLocalClassType(
+    std::string_view name) const {
+  for (auto it = scope_stack_.crbegin(); it != VisibleFramesEnd(); ++it) {
+    if (it->vars.count(name) == 0) continue;
+    auto found = it->class_types.find(name);
+    return found != it->class_types.end() ? &found->second : nullptr;
+  }
+  return nullptr;
+}
+
 // §26.3 with §23.9: the frame whose package a bare name is read through is
 // the innermost one naming a package -- a package subroutine's own, or the
 // key a module subroutine's body imports are recorded under
@@ -107,8 +129,14 @@ void SimContext::PushStaticScope(std::string_view func_name) {
   // §13.4.2's static frame carries the variables the function declared static;
   // the three maps beside them start empty, a queue or associative array of the
   // call being the call's own and a shape with it.
-  scope_stack_.push_back(
-      Scope{static_frames_[StaticFrameKey(func_name)], {}, {}, {}, {}, {}});
+  scope_stack_.push_back(Scope{static_frames_[StaticFrameKey(func_name)],
+                               {},
+                               {},
+                               {},
+                               {},
+                               {},
+                               false,
+                               {}});
 }
 
 void SimContext::PopStaticScope(std::string_view func_name) {

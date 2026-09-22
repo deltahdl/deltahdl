@@ -61,6 +61,15 @@ struct Variable;
 // parameters it binds are (BindClassParams in src/simulator/eval_function.cpp).
 // An object's specialization binds its own on the object instead
 // (ClassObject::type_param_actuals).
+//
+// §13.4 with §8.3 is why a frame records the class of each handle it declares:
+// a function's implicit result variable, its formals and its locals are the
+// frame's own, and a call of a function of the same name made while the body
+// runs -- uvm_registry_common#(...)::create reached again for another
+// specialization while constructing the first one's object -- declares its own.
+// Recorded only under the bare name for the whole run, the inner call's class
+// replaced the outer's, and the outer's `$cast(create, obj)` was screened
+// against the inner call's class.
 struct Scope {
   std::unordered_map<std::string_view, Variable*> vars;
   std::unordered_map<std::string_view, ArrayInfo*> arrays;
@@ -69,6 +78,7 @@ struct Scope {
   std::string_view package;
   std::unordered_map<std::string_view, const DataType*> type_actuals;
   bool is_subroutine = false;
+  std::unordered_map<std::string_view, std::string_view> class_types;
 };
 
 }  // namespace delta

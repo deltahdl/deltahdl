@@ -473,6 +473,7 @@ std::vector<ClassTypeInfo*> SimContext::RegisteredClassTypes() const {
 
 void SimContext::SetVariableClassType(std::string_view var,
                                       std::string_view type) {
+  RecordLocalClassType(var, type);
   var_class_types_[var] = type;
 }
 
@@ -487,6 +488,10 @@ void SimContext::SetVariableClassType(std::string_view var,
 // the written name alone, `c.inc()` in the program found no class for `c`
 // and ran on no object.
 std::string_view SimContext::GetVariableClassType(std::string_view var) const {
+  // §13.4 with §8.3: a subroutine's own handle is answered by the frame that
+  // declares it (Scope::class_types), whatever a call made since recorded
+  // under the same bare name.
+  if (const std::string_view* local = FindLocalClassType(var)) return *local;
   auto it = var_class_types_.find(var);
   if (it != var_class_types_.end()) return it->second;
   std::string prefix = ActiveInstancePrefix();

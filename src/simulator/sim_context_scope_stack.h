@@ -53,6 +53,12 @@ class ScopeStack {
   // class-scope call names gives the type parameter `name`; the second reads
   // it back from the innermost scope binding the name, null where none does.
   void BindScopeTypeActual(std::string_view name, const DataType* actual);
+  // §13.4 with §8.3: records `type` as the class of the handle `name` in the
+  // innermost visible frame declaring it, false where none does; the second
+  // reads it back from that frame, null where the frame declaring the name
+  // recorded none or no visible frame declares it (Scope::class_types).
+  bool RecordLocalClassType(std::string_view name, std::string_view type);
+  const std::string_view* FindLocalClassType(std::string_view name) const;
   const DataType* FindScopeTypeActual(std::string_view name) const;
 
   void PushFuncName(std::string_view name);
