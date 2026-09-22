@@ -87,10 +87,11 @@ TEST(InterconnectElaboration, DeclNetTypeIsInterconnect) {
   EXPECT_EQ(mod->nets[0].net_type, NetType::kInterconnect);
 }
 
-// A blocking assignment whose target is an interconnect net is rejected by the
-// §6.5 rule against a net as a procedural-assignment target, not by a report of
-// its own: no §6.6.8 site names this shape, because the interconnect net is a
-// net and §6.5 already forbids it.
+// A blocking assignment whose target is an interconnect net is rejected by
+// §10.4's requirement that a procedural assignment's left-hand side be a
+// variable, not by a report of its own: no §6.6.8 site names this shape,
+// because the interconnect net is a net and a net is none of the four forms
+// §10.4 admits.
 TEST(InterconnectElaboration, ProceduralAssignIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -101,7 +102,7 @@ TEST(InterconnectElaboration, ProceduralAssignIsError) {
       f);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "net 'sig' cannot be the target of a procedural assignment", 3, "6.5"));
+      "net 'sig' cannot be the target of a procedural assignment", 3, "10.4"));
 }
 
 TEST(InterconnectElaboration, ForceIsError) {

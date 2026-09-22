@@ -448,9 +448,9 @@ static void CollectLhsBaseNames(
 // §6.5's rule that "it shall be an error to have multiple continuous
 // assignments or a mixture of procedural and continuous assignments writing to
 // any term in the expansion of the longest static prefix of a variable", and
-// for §6.5's other rule that a net cannot be the target of a procedural
-// assignment. Both tests read sets that are complete only after every item has
-// been walked, so this only collects; Elaborator::ValidateMixedAssignments and
+// for §10.4's rule that a procedural assignment's left-hand side be a variable.
+// Both tests read sets that are complete only after every item has been walked,
+// so this only collects; Elaborator::ValidateMixedAssignments and
 // Elaborator::ValidateProceduralNetAssign report.
 //
 // The statement position an assignment stands in decides neither rule, so this

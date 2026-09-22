@@ -164,7 +164,7 @@ TEST(NetsAndVariables, NetCannotBeProcedurallyAssigned) {
       f);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "net 'w' cannot be the target of a procedural assignment", 3, "6.5"));
+      "net 'w' cannot be the target of a procedural assignment", 3, "10.4"));
 }
 
 // §6.5: a declared variable initialization counts as a procedural assignment
@@ -570,7 +570,7 @@ TEST(NetsAndVariables, NetAssignedFromAlwaysCombError) {
   // the location CollectProcTargets recorded in proc_assign_targets_.
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "net 'w' cannot be the target of a procedural assignment", 3, "6.5"));
+      "net 'w' cannot be the target of a procedural assignment", 3, "10.4"));
 }
 
 // §9.2.3's `final` is a procedure too, and it reaches the procedural-item set
@@ -587,7 +587,7 @@ TEST(NetsAndVariables, NetAssignedFromFinalError) {
       f);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "net 'w' cannot be the target of a procedural assignment", 3, "6.5"));
+      "net 'w' cannot be the target of a procedural assignment", 3, "10.4"));
 }
 
 // §6.5's bar on mixing the two kinds of assignment holds for a procedural
@@ -732,7 +732,7 @@ TEST(NetsAndVariables, ProceduralAssignmentToANetInAForkIsRejected) {
       f);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "net 'w' cannot be the target of a procedural assignment", 4, "6.5"));
+      "net 'w' cannot be the target of a procedural assignment", 4, "10.4"));
 }
 
 // The regression against a walk that reports on every statement it newly
@@ -815,7 +815,7 @@ TEST(NetsAndVariables, ProceduralAssignmentToANetInARandsequenceIsRejected) {
       f);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "net 'w' cannot be the target of a procedural assignment", 5, "6.5"));
+      "net 'w' cannot be the target of a procedural assignment", 5, "10.4"));
 }
 
 // The regression against a walk that reports on every statement it newly

@@ -748,7 +748,7 @@ def test_rejection_under_the_rule_a_mistagged_file_tests_evaluates_as_a_pass(
         "14.3",
         "14.3--clocking-block-signals-error.sv",
         "14.3--clocking-block-signals-error.sv:28:2: error: net 'b' cannot be"
-        " the target of a procedural assignment (§6.5)\n",
+        " the target of a procedural assignment (§10.4)\n",
     ),
     (
         "11.4.14.3",

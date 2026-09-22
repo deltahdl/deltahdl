@@ -574,7 +574,7 @@ void Elaborator::ValidateProceduralNetAssign() {
                   std::format("net '{}' cannot be the target of a "
                               "procedural assignment",
                               name),
-                  Subclause("6.5"));
+                  Subclause("10.4"));
     }
   }
 }

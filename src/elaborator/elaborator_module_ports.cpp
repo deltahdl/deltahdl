@@ -526,9 +526,9 @@ static void FoldBodyParamsIntoPortScope(const ModuleDecl* decl,
 // §23.2.2.3: a port the clause makes a net of the default net type -- `output
 // b` with no port kind and no data type among them, the clause's own `mh8
 // (output x)` -- is likewise a net to every rule of its module that asks
-// whether a name is one, §6.5's rule that a net cannot be the target of a
-// procedural assignment first. Left out of net_names_, `b <= a` in an
-// always_ff on such a port was accepted, the suite's
+// whether a name is one, §10.4's rule that a procedural assignment's left-hand
+// side be a variable first. Left out of net_names_, `b <= a` in an always_ff
+// on such a port was accepted, the suite's
 // 14.3--clocking-block-signals-error.sv with it, while the same write to a
 // declared `wire w` was reported. A non-ANSI port registers through its body
 // net declaration in ElaborateNetDecl; a checker's formal is §17.2's and no

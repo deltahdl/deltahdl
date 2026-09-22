@@ -23,12 +23,14 @@ TEST(ProceduralAssignmentElaboration, VariableLhsIsAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §10.4 states "The left-hand side shall be a variable that receives the
-// assignment from the right-hand side". §6.5 states the same rule from the
-// net's side, in the words the report uses: "A net cannot be procedurally
-// assigned."
-// The check tests the target against the module's net names, so it enforces
-// §6.5 and the report names that subclause.
+// §10.4 requires that the left-hand side of a procedural assignment be a
+// variable, and admits four forms for it: a singular variable (§6.4), an
+// aggregate variable (Clause 7), a bit-select, part-select or slice of a packed
+// array, and a slice of an unpacked array. A net is none of the four, so the
+// report cites §10.4. §6.5 says that a net cannot be procedurally assigned, but
+// says it as what follows for a net from the requirement §10.4 places on the
+// assignment, so it is not the citation however the check is written -- this
+// one reads the module's net names, which is a mechanism and not the rule.
 TEST(ProceduralAssignmentElaboration, ProceduralAssignToNetIsError) {
   SimFixture f;
   ElaborateSrc(
@@ -41,7 +43,7 @@ TEST(ProceduralAssignmentElaboration, ProceduralAssignToNetIsError) {
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "cannot be the target of a procedural assignment",
-                            4, "6.5"));
+                            4, "10.4"));
 }
 
 TEST(ProceduralAssignmentElaboration, NonblockingAssignToNetIsError) {
@@ -56,7 +58,7 @@ TEST(ProceduralAssignmentElaboration, NonblockingAssignToNetIsError) {
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "cannot be the target of a procedural assignment",
-                            4, "6.5"));
+                            4, "10.4"));
 }
 
 TEST(ProceduralAssignmentElaboration, SelectOfNetBaseIsError) {
@@ -71,7 +73,7 @@ TEST(ProceduralAssignmentElaboration, SelectOfNetBaseIsError) {
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "cannot be the target of a procedural assignment",
-                            4, "6.5"));
+                            4, "10.4"));
 }
 
 TEST(ProceduralAssignmentElaboration, ConcatenationContainingNetIsError) {
@@ -87,7 +89,7 @@ TEST(ProceduralAssignmentElaboration, ConcatenationContainingNetIsError) {
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "cannot be the target of a procedural assignment",
-                            5, "6.5"));
+                            5, "10.4"));
 }
 
 }  // namespace
