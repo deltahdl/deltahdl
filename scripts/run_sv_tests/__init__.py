@@ -118,6 +118,20 @@ _UNARY_OPS: dict[type[ast.unaryop], Callable[[Any], Any]] = {
     ast.Invert: operator.invert,
 }
 
+_BINARY_OPS: dict[type[ast.operator], Callable[[Any, Any], Any]] = {
+    ast.Add: operator.add,
+    ast.Sub: operator.sub,
+    ast.Mult: operator.mul,
+    ast.FloorDiv: operator.floordiv,
+    ast.Mod: operator.mod,
+    ast.Pow: operator.pow,
+    ast.LShift: operator.lshift,
+    ast.RShift: operator.rshift,
+    ast.BitAnd: operator.and_,
+    ast.BitOr: operator.or_,
+    ast.BitXor: operator.xor,
+}
+
 _COMPARE_OPS: dict[type[ast.cmpop], Callable[[Any, Any], bool]] = {
     ast.Eq: operator.eq,
     ast.NotEq: operator.ne,
@@ -148,6 +162,8 @@ def eval_node(node: ast.AST) -> Any:
         return any(vals)
     if isinstance(node, ast.UnaryOp) and type(node.op) in _UNARY_OPS:
         return _UNARY_OPS[type(node.op)](eval_node(node.operand))
+    if isinstance(node, ast.BinOp) and type(node.op) in _BINARY_OPS:
+        return _BINARY_OPS[type(node.op)](eval_node(node.left), eval_node(node.right))
     raise ValueError(f"Unsupported node: {type(node).__name__}")
 
 

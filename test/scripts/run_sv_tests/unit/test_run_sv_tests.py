@@ -414,6 +414,30 @@ def test_unary_not(rst: ModuleType) -> None:
     assert rst.eval_node(tree.body) is True
 
 
+@pytest.mark.parametrize("expr", [
+    "((1 << 32) + 2 == 4294967298)",
+    "(7 - 2 == 5)",
+    "(6 * 7 == 42)",
+    "(7 // 2 == 3)",
+    "(7 % 2 == 1)",
+    "(2 ** 10 == 1024)",
+    "(1024 >> 3 == 128)",
+    "(6 & 3 == 2)",
+    "(6 | 3 == 7)",
+    "(6 ^ 3 == 5)",
+])
+def test_binary_operators(rst: ModuleType, expr: str) -> None:
+    tree = ast.parse(expr, mode="eval")
+    assert rst.eval_node(tree.body) is True
+
+
+def test_the_suites_stream_concat_assertion_is_read_as_the_python_it_is(
+    rst: ModuleType,
+) -> None:
+    line = ":assert: ((( 1094861636 << 32) +  1162233672) ==  4702394921427289928) \n"
+    assert rst.check_assertions(line) == (True, "")
+
+
 def test_unsupported_node_raises(rst: ModuleType) -> None:
     raised = False
     try:
