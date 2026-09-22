@@ -553,11 +553,11 @@ TEST(NetsAndVariables, ContinuousAndAlwaysCombAssignmentsToOneVariableError) {
       "variable 'y' has both continuous and procedural assignments", 4, "6.5"));
 }
 
-// §6.5 bars a net from being the target of a procedural assignment whichever
-// procedure encloses it, and §9.2.2.2 makes `always_comb` one such procedure.
-// NetCannotBeProcedurallyAssigned above writes the same statement in `initial`
-// and expects the same report, because neither subclause makes the procedure
-// keyword decide the rule.
+// §10.4 requires a procedural assignment's left-hand side to be a variable
+// whichever procedure encloses the assignment, and §9.2.2.2 makes
+// `always_comb` one such procedure. NetCannotBeProcedurallyAssigned above
+// writes the same statement in `initial` and expects the same report, because
+// neither subclause makes the procedure keyword decide the rule.
 TEST(NetsAndVariables, NetAssignedFromAlwaysCombError) {
   ElabFixture f;
   Elaborate(
@@ -575,8 +575,8 @@ TEST(NetsAndVariables, NetAssignedFromAlwaysCombError) {
 
 // §9.2.3's `final` is a procedure too, and it reaches the procedural-item set
 // by its own ModuleItemKind rather than by any of the `always` enumerators, so
-// this names the §6.5 net rule for the one kind the three `always_` cases
-// cannot speak for.
+// this names §10.4's rule on the left-hand side for the one kind the three
+// `always_` cases cannot speak for.
 TEST(NetsAndVariables, NetAssignedFromFinalError) {
   ElabFixture f;
   Elaborate(
@@ -718,8 +718,9 @@ TEST(NetsAndVariables,
       "variable 'x' has both continuous and procedural assignments", 3, "6.5"));
 }
 
-// §6.5's other rule reads the same map, so a net assigned procedurally inside a
-// fork is reported for the same reason the mixture above is.
+// §10.4's rule on the left-hand side reads the same map, so a net assigned
+// procedurally inside a fork is reported for the same reason the mixture above
+// is.
 TEST(NetsAndVariables, ProceduralAssignmentToANetInAForkIsRejected) {
   ElabFixture f;
   Elaborate(
@@ -799,8 +800,9 @@ TEST(NetsAndVariables,
       "variable 'x' has both continuous and procedural assignments", 3, "6.5"));
 }
 
-// §6.5's other rule reads the same map, so a net assigned procedurally inside a
-// randsequence code block is reported for the same reason the mixture above is.
+// §10.4's rule on the left-hand side reads the same map, so a net assigned
+// procedurally inside a randsequence code block is reported for the same reason
+// the mixture above is.
 TEST(NetsAndVariables, ProceduralAssignmentToANetInARandsequenceIsRejected) {
   ElabFixture f;
   Elaborate(

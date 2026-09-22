@@ -13,8 +13,9 @@ namespace {
 
 // The three cases below write their output port from a procedure, so the port
 // is declared `output logic`: §23.2.2.3 makes `output y` with no data type a
-// net of the default net type, and §6.5 lets no procedure write a net, which
-// the elaborator reports since 40d5e271b registered such ports as nets.
+// net of the default net type, and §10.4 requires a procedural assignment's
+// left-hand side to be a variable, which the elaborator reports since
+// 40d5e271b registered such ports as nets.
 TEST(ProceduralBlockSynthesis, AlwaysCombBlockLowers) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,

@@ -127,8 +127,9 @@ TEST(NetsAndVariables,
 // or a class rather than a data object, and the walk ends there rather than
 // returning it. A net and a package can carry one name, which is what lets this
 // case put the two together: descending through the prefix would record `p::x =
-// 1` as a procedural write to the net `p` and draw §6.5's net-as-target report
-// over a statement that writes no net at all.
+// 1` as a procedural write to the net `p` and draw §10.4's report of a net as
+// a procedural assignment's left-hand side over a statement that writes no net
+// at all.
 TEST(NetsAndVariables, PackageScopedAssignmentIsNotAWriteToThePrefixName) {
   ElabFixture f;
   EXPECT_TRUE(
@@ -144,14 +145,14 @@ TEST(NetsAndVariables, PackageScopedAssignmentIsNotAWriteToThePrefixName) {
              f));
 }
 
-// §6.5 with §23.2.2.3 (printed page 735): an output port declared with no
+// §10.4 with §23.2.2.3 (printed page 735): an output port declared with no
 // port kind and no data type, `output b`, is a net of the default net type,
 // the clause's own `mh8 (output x)`, so `b <= a` inside an always_ff is a
-// procedural assignment to a net and is reported as the write to a declared
-// `wire w` above is. This is the suite's 14.3--clocking-block-signals-error.sv
-// (#2917), whose clocking block declares `output b` as a clockvar and whose
-// always_ff writes the port itself; the port was known to the rule as no net
-// and the write was accepted.
+// procedural assignment whose left-hand side is no variable and is reported
+// as the write to a declared `wire w` above is. This is the suite's
+// 14.3--clocking-block-signals-error.sv (#2917), whose clocking block declares
+// `output b` as a clockvar and whose always_ff writes the port itself; the
+// port was known to the rule as no net and the write was accepted.
 TEST(NetsAndVariables, UntypedOutputPortIsANetAProcedureCannotWrite) {
   ElabFixture f;
   Elaborate(
@@ -170,15 +171,15 @@ TEST(NetsAndVariables, UntypedOutputPortIsANetAProcedureCannotWrite) {
       f);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "net 'b' cannot be the target of a procedural assignment", 9, "6.5"));
+      "net 'b' cannot be the target of a procedural assignment", 9, "10.4"));
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "net 'c' cannot be the target of a procedural assignment", 10, "6.5"));
+      "net 'c' cannot be the target of a procedural assignment", 10, "10.4"));
 }
 
 // §23.2.2.3: an output port declared with an explicit data type and no port
 // kind, `output logic b`, is a variable, so the same always_ff write is the
-// ordinary procedural assignment §6.5 allows and nothing is reported. This is
+// ordinary procedural assignment §10.4 allows and nothing is reported. This is
 // the shape of the suite's passing 14.3--clocking-block-signals.sv, and the
 // discriminating half of the case above: a rule that took every output port
 // for a net would report it.
