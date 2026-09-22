@@ -13,7 +13,7 @@ Every `start` form creates these. The minutes 0 to 9 are taken, seven by the tab
 | --- | --- |
 | `0,10,20,30,40,50 * * * *` | `REMINDER: Work through a set of indivisible tasks, written down with TaskCreate before the work starts and marked with TaskUpdate as each one starts and finishes.` |
 | `2,12,22,32,42,52 * * * *` | `REMINDER: ~/IEEE 1800-2023.pdf is the source of truth. sv-tests was written against ~/IEEE 1800-2017.pdf, so its tags and file names carry 2017 clause numbers: read the 2017 edition only to learn what such a number meant there, resolve it to the 2023 clause, and let no 2017 number, wording or rule reach deltahdl's code, reports or tests.` |
-| `3,13,23,33,43,53 * * * *` | `REMINDER: Solve the issue with a single commit and push.` |
+| `3,13,23,33,43,53 * * * *` | `REMINDER: Let every push carry exactly one commit: push each commit before making the next, so no push ever carries two.` |
 | `6,16,26,36,46,56 * * * *` | `REMINDER: Keep the task list itself current, not only the marks on it: a task that arises is added the moment it does, a task that turns out unneeded is removed, and a task whose shape changed is rewritten, so that the list always says what is left to do.` |
 | `7,17,27,37,47,57 * * * *` | `REMINDER: While any CI run for a pushed commit is in progress, only wait: no diagnosis, edits or commits.` |
 | `8,18,28,38,48,58 * * * *` | `REMINDER: Solve what you find rather than filing it and moving on. A failing integration test in deltahdl.yml is the exception: leave that one where it is.` |
