@@ -70,4 +70,47 @@ TEST(ClassScopeTypedefSim, LocalDeclaredByABaseClassTypedefConstructs) {
             5u);
 }
 
+// §6.18 with §8.3 (printed page 180) and §7.8: a property declared through a
+// class's typedef of an associative array is that array -- uvm_phase's
+// `protected edges_t m_successors;` under `typedef bit edges_t[uvm_phase];`
+// -- and so is one a subclass declares through the base's typedef (§8.13).
+// p links q once, D keys q and itself, and p's string-keyed count holds 4:
+// 110 + 4000 + 2. Read off the property's own declaration, which writes no
+// dimension, each was no array and every write was dropped.
+TEST(ClassScopeTypedefSim, PropertyDeclaredByAnAssociativeArrayTypedef) {
+  EXPECT_EQ(RunAndGet("class P;\n"
+                      "  typedef bit edges_t[P];\n"
+                      "  typedef int count_t[string];\n"
+                      "  protected edges_t succ;\n"
+                      "  count_t counts;\n"
+                      "  function void link(P e);\n"
+                      "    succ[e] = 1;\n"
+                      "    counts[\"a\"] = 4;\n"
+                      "  endfunction\n"
+                      "  function int n(P e);\n"
+                      "    return succ.num() * 100 + succ.exists(e) * 10;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "class D extends P;\n"
+                      "  edges_t more;\n"
+                      "  function int m(P e);\n"
+                      "    more[e] = 1;\n"
+                      "    more[this] = 1;\n"
+                      "    return more.num();\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    P p = new;\n"
+                      "    P q = new;\n"
+                      "    D d = new;\n"
+                      "    p.link(q);\n"
+                      "    result = p.n(q) + p.counts[\"a\"] * 1000 + d.m(q);\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            4112u);
+}
+
 }  // namespace
