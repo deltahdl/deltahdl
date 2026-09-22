@@ -266,11 +266,11 @@ TEST(StreamingOperatorSim, NarrowTargetErrorNames11_4_14) {
 // 96-bit `{<< 32 {a, b, c}}` of three ints -- c, b, a from the left once the
 // 32-bit slices are reversed -- widened with 32 zero bits on the right of a
 // `bit [127:0]`: 128'h00000003_00000002_00000001_00000000, whose upper word
-// (bits 127:64) is 3 and lower word is 32'h00000001 << 32. This is the
-// suite's 11.4.14.3--unpack_stream_pad-sim.sv (#4362); the initializer was
-// taken as evaluated and the stream sat right-aligned, upper word 0 and lower
-// word 32'h00000002_00000001. The result is copied to a module variable the
-// case reads, the local being gone with its block.
+// (bits 127:64) is 64'h00000003_00000002 and lower word 64'h00000001_00000000.
+// This is the suite's 11.4.14.3--unpack_stream_pad-sim.sv (#4362); the
+// initializer was taken as evaluated and the stream sat right-aligned, upper
+// word 3 and lower word 64'h00000002_00000001. The result is copied to a
+// module variable the case reads, the local being gone with its block.
 TEST(StreamingOperatorSim,
      DeclarationInitializerStreamIsLeftAlignedInAWiderLocal) {
   SimFixture f;
@@ -286,8 +286,8 @@ TEST(StreamingOperatorSim,
       f, "out");
   ASSERT_NE(var, nullptr);
   ASSERT_EQ(var->value.nwords, 2u);
-  EXPECT_EQ(var->value.words[1].aval, 3u);
-  EXPECT_EQ(var->value.words[0].aval, uint64_t{0x00000002} << 32 | 0x00000001);
+  EXPECT_EQ(var->value.words[1].aval, uint64_t{0x00000003} << 32 | 0x00000002);
+  EXPECT_EQ(var->value.words[0].aval, uint64_t{0x00000001} << 32);
 }
 
 // §11.4.14 (printed page 291) with §11.4.14.3's own example `int j = {>>{ a,
@@ -316,9 +316,9 @@ TEST(StreamingOperatorSim,
 
 // §11.4.14 (printed page 291) with §6.8: a module-scope declaration's
 // initializer is assigned as from an initial procedure, so its stream is
-// left-aligned as the block-local one above is: the same 128 bits, upper
-// word 3. Lowerer::LowerVarInit evaluated the stream under the declared
-// width, which left it right-aligned, upper word 0.
+// left-aligned as the block-local one above is: the same 128 bits.
+// Lowerer::LowerVarInit evaluated the stream under the declared width, which
+// left it right-aligned.
 TEST(StreamingOperatorSim,
      ModuleScopeInitializerStreamIsLeftAlignedInAWiderVariable) {
   SimFixture f;
@@ -330,8 +330,8 @@ TEST(StreamingOperatorSim,
       f, "m");
   ASSERT_NE(var, nullptr);
   ASSERT_EQ(var->value.nwords, 2u);
-  EXPECT_EQ(var->value.words[1].aval, 3u);
-  EXPECT_EQ(var->value.words[0].aval, uint64_t{0x00000002} << 32 | 0x00000001);
+  EXPECT_EQ(var->value.words[1].aval, uint64_t{0x00000003} << 32 | 0x00000002);
+  EXPECT_EQ(var->value.words[0].aval, uint64_t{0x00000001} << 32);
 }
 
 }  // namespace

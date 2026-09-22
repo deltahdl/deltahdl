@@ -112,6 +112,7 @@ def test_a_file_of_the_same_tag_outside_the_table_keeps_its_tag(
 @pytest.mark.parametrize("name, tag, rule", [
     ("variable-slice-zero.sv", "7.4.3", "11.5.1"),
     ("14.3--clocking-block-signals-error.sv", "14.3", "6.5"),
+    ("11.4.14.3--unpack_stream_inv.sv", "11.4.14.3", "11.4.14"),
 ])
 def test_a_file_tagged_by_the_feature_it_uses_is_judged_by_the_rule_it_breaks(
     rst: ModuleType, name: str, tag: str, rule: str,

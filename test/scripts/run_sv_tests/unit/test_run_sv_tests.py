@@ -750,6 +750,12 @@ def test_rejection_under_the_rule_a_mistagged_file_tests_evaluates_as_a_pass(
         "14.3--clocking-block-signals-error.sv:28:2: error: net 'b' cannot be"
         " the target of a procedural assignment (§6.5)\n",
     ),
+    (
+        "11.4.14.3",
+        "11.4.14.3--unpack_stream_inv.sv",
+        "11.4.14.3--unpack_stream_inv.sv:25:11: error: streaming concatenation"
+        " source is wider than the fixed-size target (§11.4.14)\n",
+    ),
 ])
 def test_rejection_under_the_rule_broken_by_a_file_tagged_by_its_feature_evaluates_as_a_pass(
     rst: ModuleType, tmp_path: Path, tag: str, name: str, stderr: str,
