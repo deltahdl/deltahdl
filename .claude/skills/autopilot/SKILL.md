@@ -7,24 +7,24 @@ description: Start or stop the standing reminders, with or without the loop that
 
 ## The eight standing reminders
 
-Every `start` form creates these. The minutes 0 to 9 are taken, seven by the table below and 1, 4 and 5 by the loop reminders, so the eighth stands on 11 and shares its firing minutes with the loop reminder on 1; both fire, and a form that creates no loop reminder leaves 11 to itself.
+Every `start` form creates these. Each reminder fires every 20 minutes, on a minute of its own from 0 to 19 and the same minute 20 and 40 later: the eight below take 0, 2, 3 and 6 to 10, and the loop reminders take 1, 4 and 5.
 
 | Cron | Prompt |
 | --- | --- |
-| `0,10,20,30,40,50 * * * *` | `REMINDER: Work through a set of indivisible tasks, written down with TaskCreate before the work starts and marked with TaskUpdate as each one starts and finishes.` |
-| `2,12,22,32,42,52 * * * *` | `REMINDER: ~/IEEE 1800-2023.pdf is the source of truth. sv-tests was written against ~/IEEE 1800-2017.pdf, so its tags and file names carry 2017 clause numbers: read the 2017 edition only to learn what such a number meant there, resolve it to the 2023 clause, and let no 2017 number, wording or rule reach deltahdl's code, reports or tests.` |
-| `3,13,23,33,43,53 * * * *` | `REMINDER: Let every push carry exactly one commit: push each commit before making the next, so no push ever carries two.` |
-| `6,16,26,36,46,56 * * * *` | `REMINDER: Keep the task list itself current, not only the marks on it: a task that arises is added the moment it does, a task that turns out unneeded is removed, and a task whose shape changed is rewritten, so that the list always says what is left to do.` |
-| `7,17,27,37,47,57 * * * *` | `REMINDER: While any CI run for a pushed commit is in progress, only wait: no diagnosis, edits or commits.` |
-| `8,18,28,38,48,58 * * * *` | `REMINDER: Solve what you find rather than filing it and moving on. A failing integration test in deltahdl.yml is the exception: leave that one where it is.` |
-| `9,19,29,39,49,59 * * * *` | `REMINDER: Ensure every task on the list is indivisible, whether it was written with TaskCreate or rewritten with TaskUpdate: read each subject as written and count the actions it names; a subject naming more than one action is divisible, whatever single purpose those actions serve, and is split into one task per action.` |
-| `11,21,31,41,51 * * * *` | `REMINDER: The sv-tests README establishes which subclause an sv-test is tagged with: a test case covers a single feature, and where it uses several, the tag names the feature it directly tests, drawn from the list in conf/lrm.conf and deciding the tests/chapter-N directory the file sits in. Read that rule to settle what a suite file's tag should be, and resolve the tag from its 2017 number to the 2023 clause before comparing it with anything deltahdl reports.` |
+| `0,20,40 * * * *` | `REMINDER: Work through a set of indivisible tasks, written down with TaskCreate before the work starts and marked with TaskUpdate as each one starts and finishes.` |
+| `2,22,42 * * * *` | `REMINDER: ~/IEEE 1800-2023.pdf is the source of truth. sv-tests was written against ~/IEEE 1800-2017.pdf, so its tags and file names carry 2017 clause numbers: read the 2017 edition only to learn what such a number meant there, resolve it to the 2023 clause, and let no 2017 number, wording or rule reach deltahdl's code, reports or tests. The UVM standard is ~/IEEE 1800.2-2020.pdf.` |
+| `3,23,43 * * * *` | `REMINDER: Let every push carry exactly one commit: push each commit before making the next, so no push ever carries two.` |
+| `6,26,46 * * * *` | `REMINDER: Keep the task list itself current, not only the marks on it: a task that arises is added the moment it does, a task that turns out unneeded is removed, and a task whose shape changed is rewritten, so that the list always says what is left to do.` |
+| `7,27,47 * * * *` | `REMINDER: While any CI run for a pushed commit is in progress, only wait: no diagnosis, edits or commits.` |
+| `8,28,48 * * * *` | `REMINDER: Solve what you find rather than filing it and moving on. A failing integration test in deltahdl.yml is the exception: leave that one where it is.` |
+| `9,29,49 * * * *` | `REMINDER: Ensure every task on the list is indivisible, whether it was written with TaskCreate or rewritten with TaskUpdate: read each subject as written and count the actions it names; a subject naming more than one action is divisible, whatever single purpose those actions serve, and is split into one task per action.` |
+| `10,30,50 * * * *` | `REMINDER: The sv-tests README establishes which subclause an sv-test is tagged with: a test case covers a single feature, and where it uses several, the tag names the feature it directly tests, drawn from the list in conf/lrm.conf and deciding the tests/chapter-N directory the file sits in. Read that rule to settle what a suite file's tag should be, and resolve the tag from its 2017 number to the 2023 clause before comparing it with anything deltahdl reports.` |
 
 ## The three loop reminders
 
 Every `start` form but `reminders-only` adds these.
 
-On `1,11,21,31,41,51 * * * *`, by form:
+On `1,21,41 * * * *`, by form:
 
 `start bysubclause`:
 
@@ -48,8 +48,8 @@ And these two:
 
 | Cron | Prompt |
 | --- | --- |
-| `4,14,24,34,44,54 * * * *` | `REMINDER: Continue autonomously, unless you need human feedback about ANYTHING — not just about what to take next. When you do, write the question as a comment on the issue, label the issue 'needs decision', and move on to the next issue.` |
-| `5,15,25,35,45,55 * * * *` | `REMINDER: After pushing, deltahdl.yml might fail at its integration tests. You can ignore that.` |
+| `4,24,44 * * * *` | `REMINDER: Continue autonomously, unless you need human feedback about ANYTHING — not just about what to take next. When you do, write the question as a comment on the issue, label the issue 'needs decision', and move on to the next issue.` |
+| `5,25,45 * * * *` | `REMINDER: After pushing, deltahdl.yml might fail at its integration tests. You can ignore that.` |
 
 ## Start
 
