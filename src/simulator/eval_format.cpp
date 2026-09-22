@@ -7,6 +7,7 @@
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "common/types.h"
+#include "simulator/eval_format_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/process.h"
 #include "simulator/scope_hier_name.h"
@@ -150,21 +151,11 @@ static std::string FormatRealAsInt(const Logic4Vec& val) {
   return buf;
 }
 
+// §21.2.1.1: the numeral of a known value of any width, every word read
+// (FormatDecimalDigits in eval_format_decimal.cpp); read through a 64-bit
+// word, a 96-bit value printed its low 64 bits.
 static std::string FormatDecimal(const Logic4Vec& val) {
-  uint64_t v = val.ToUint64();
-  char buf[64];
-  if (val.is_signed) {
-    auto sv = static_cast<int64_t>(v);
-    if (val.width < 64) {
-      uint64_t sign_bit = uint64_t{1} << (val.width - 1);
-      if (v & sign_bit)
-        sv = static_cast<int64_t>(v | (~uint64_t{0} << val.width));
-    }
-    std::snprintf(buf, sizeof(buf), "%lld", static_cast<long long>(sv));
-  } else {
-    std::snprintf(buf, sizeof(buf), "%llu", static_cast<unsigned long long>(v));
-  }
-  return buf;
+  return FormatDecimalDigits(val);
 }
 
 // §21.2.1.3: a bit-range classification used by the decimal, hexadecimal, and
@@ -258,30 +249,6 @@ static std::string FormatDecimalXZ(const Logic4Vec& val) {
   char xz = XZDigitChar(ClassifyBits(val, 0, val.width));
   if (xz != 0) return std::string(1, xz);
   return FormatDecimal(val);
-}
-
-// §21.2.1.2: the number of columns the automatically sized decimal field
-// occupies -- enough characters for the largest value the expression could
-// possibly hold. An unsigned width-w value tops out at 2^w - 1; a signed one
-// is bounded in print length by its most negative value, whose magnitude
-// 2^(w-1) is joined by a sign column. Rendering reads at most 64 bits, so a
-// wider value sizes as a 64-bit one.
-static uint32_t AutoDecimalFieldWidth(const Logic4Vec& val) {
-  uint32_t bits = val.width;
-  if (bits == 0) bits = 1;
-  if (bits > 64) bits = 64;
-  uint64_t max_mag = 0;
-  if (val.is_signed) {
-    max_mag = uint64_t{1} << (bits - 1);
-  } else {
-    max_mag = (bits == 64) ? ~uint64_t{0} : (uint64_t{1} << bits) - 1;
-  }
-  uint32_t digits = 1;
-  while (max_mag >= 10) {
-    max_mag /= 10;
-    ++digits;
-  }
-  return digits + (val.is_signed ? 1u : 0u);
 }
 
 // §21.2.1.2: the automatically sized decimal rendering. Suppressed leading

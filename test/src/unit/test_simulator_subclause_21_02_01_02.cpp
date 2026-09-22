@@ -171,6 +171,53 @@ TEST(SizeOfDisplayedData, AutoSizedSixtyFourBitDecimalField) {
   EXPECT_EQ(out, ":                  10:\n");
 }
 
+// §21.2.1.2 with §21.2.1.1: a decimal renders the whole value, and the
+// automatically sized field holds the largest value the width admits: the
+// 96-bit 96'h00000003_00000002_00000001 is 55340232229718589441, twenty
+// digits, in the 29-column field 2^96 - 1 needs. Read through a 64-bit word,
+// it printed its low 64 bits, 8589934593, in a 20-column field: the suite's
+// 11.4.14.3--unpack_stream-sim.sv (#4363). A value that fits 64 bits cannot
+// tell the two renderings apart.
+TEST(SizeOfDisplayedData, AutoSizedNinetySixBitDecimalRendersEveryWord) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  bit [95:0] d;\n"
+      "  initial begin\n"
+      "    d = 96'h00000003_00000002_00000001;\n"
+      "    $display(\":%d:\", d);\n"
+      "    $display(\":%0d:\", d);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out,
+            ":         55340232229718589441:\n"
+            ":55340232229718589441:\n");
+}
+
+// §21.2.1.2 (C1) with §21.2.1.1: a signed 96-bit value holding -1 renders as
+// -1, its magnitude the two's complement within its own width, in a
+// 30-column field: the 29 digits of 2^95 and the sign column. Sign-extended
+// from its low 64 bits alone, -1 happened to read right while a 96-bit -2^70
+// did not; the field width is what tells the widths apart here.
+TEST(SizeOfDisplayedData, AutoSizedSignedNinetySixBitDecimalField) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  bit signed [95:0] s;\n"
+      "  initial begin\n"
+      "    s = -1;\n"
+      "    $display(\":%d:\", s);\n"
+      "    s = -(96'sd1 << 70);\n"
+      "    $display(\":%0d:\", s);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out,
+            ":                            -1:\n"
+            ":-1180591620717411303424:\n");
+}
+
 // §21.2.1.2 (C1): the `int` keyword type is a signed 32-bit operand, so its
 // automatic decimal field is eleven columns (ten digits plus the sign of the
 // most negative value) -- one wider than the unsigned 32-bit field, which
