@@ -369,4 +369,32 @@ TEST(ClassSim, TypedefNamedInAnActualListIsTheHoldersTypedef) {
   EXPECT_EQ(out, "3 5\n");
 }
 
+// §8.25: a type parameter stands for the type its specialization's actual
+// gives, so a local `T obj` declared in a method of R#(A) is a handle of A,
+// and `new` on it constructs an A whichever form writes it. A reads 3, the
+// default Base 1, and a local whose class nobody resolved stays null, -1.
+TEST(ClassSim, LocalTypedByATypeParameterIsAHandleOfItsActual) {
+  SimFixture f;
+  auto out = RunCapture(
+      "class Base; virtual function int ident(); return 1; endfunction\n"
+      "endclass\n"
+      "class A extends Base; function int ident(); return 3; endfunction\n"
+      "endclass\n"
+      "class R #(type T = Base);\n"
+      "  function Base assigned(); T obj; obj = new(); return obj;\n"
+      "  endfunction\n"
+      "  function Base initialized(); T obj = new(); return obj; endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  function int id(Base b); return b == null ? -1 : b.ident();\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    R #(A) r = new;\n"
+      "    $display(\"%0d %0d\", id(r.assigned()), id(r.initialized()));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "3 3\n");
+}
+
 }  // namespace

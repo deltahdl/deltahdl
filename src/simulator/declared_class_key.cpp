@@ -6,6 +6,7 @@
 #include "common/arena.h"
 #include "parser/ast_type.h"
 #include "simulator/class_object.h"
+#include "simulator/class_specialization.h"
 #include "simulator/sim_context.h"
 
 namespace delta {
@@ -31,7 +32,17 @@ std::string_view DeclaredClassKey(const DataType& type, SimContext& ctx,
                                              "::" + std::string(name));
     if (ctx.FindClassType(*scoped) != nullptr) return *scoped;
   }
-  return ctx.FindClassType(name) != nullptr ? name : std::string_view{};
+  if (ctx.FindClassType(name) != nullptr) return name;
+  // §8.25 (printed page 204): a type parameter of the running method's class
+  // stands for the type its actual gives, so `T obj` in a method of R#(A)
+  // declares a handle of class A, and of the default's class where the
+  // specialization writes no actual (ClassNamedByTypeParam). The name is the
+  // one the class is held under, which outlives the call.
+  if (scope.empty()) {
+    if (const ClassTypeInfo* cls = ClassNamedByTypeParam(name, ctx, arena))
+      return cls->name;
+  }
+  return {};
 }
 
 // The `<scope>::<name>` key of the class `name` nested in `scope` or in a

@@ -23,8 +23,10 @@ struct ClassTypeInfo;
 struct DataType;
 
 // The key the run holds the declared class under: the scoped spelling where
-// the declaration wrote a scope the run holds it by, else the bare name;
-// empty where neither names a class. A scoped spelling is built in the arena
+// the declaration wrote a scope the run holds it by, else the bare name, else,
+// for a bare name that is a type parameter of the running method's class,
+// the key of the class its actual names (§8.25); empty where none names a
+// class. A scoped spelling is built in the arena
 // so that the key outlives the call, as the recorded class type and the
 // constructor both read it later.
 std::string_view DeclaredClassKey(const DataType& type, SimContext& ctx,
