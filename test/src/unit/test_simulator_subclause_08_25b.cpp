@@ -168,4 +168,34 @@ TEST(ClassSim, ConstructedThroughATypedefTheBaseTakesTheSpecializationsActual) {
   EXPECT_EQ(out, "a 32\nb 16\n");
 }
 
+// §8.25 (printed page 204 of IEEE 1800-2023): a specialization is the generic
+// class together with one set of actual parameter values, and the value
+// parameters belong to it as the type parameters do, so a name that reaches
+// the specialization reaches its values. `typedef V#(4) v4;` is such a name,
+// and `v4 x = new` writes no `#(...)` of its own for the construction to read.
+// Two typedefs of one class discriminate: the declaration's default leaves
+// both reads at 1, and each specialization's own actual leaves 4 and 8.
+TEST(ClassSim, ConstructedThroughATypedefTheValueParameterIsTheActual) {
+  SimFixture f;
+  auto out = RunCapture(
+      "class V #(int size = 1);\n"
+      "  function int w(); return size; endfunction\n"
+      "endclass\n"
+      "class Holder;\n"
+      "  typedef V#(4) v4;\n"
+      "  typedef V#(8) v8;\n"
+      "  function int a(); v4 x = new; return x.w(); endfunction\n"
+      "  function int b(); v8 y = new; return y.w(); endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  Holder h = new;\n"
+      "  initial begin\n"
+      "    $display(\"a %0d\", h.a());\n"
+      "    $display(\"b %0d\", h.b());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "a 4\nb 8\n");
+}
+
 }  // namespace

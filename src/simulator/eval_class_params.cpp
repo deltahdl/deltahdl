@@ -136,6 +136,13 @@ void ApplyClassParamOverrides(std::string_view var_name, uint64_t handle,
   if (!obj || !obj->type || !obj->type->decl) return;
   const std::vector<DataType>* actuals =
       ctx.FindVariableClassTypeParams(var_name);
+  // §8.25 (printed page 204 of IEEE 1800-2023): the value parameters belong
+  // to the specialization as the type parameters do, so a name reaching the
+  // specialization while writing no list of its own -- `typedef V#(4) v4;`,
+  // on which `v4 x = new` writes nothing -- is answered by the list the type
+  // carries. Without it the loop below was skipped whole and the object kept
+  // the declaration's default, `x.w()` reading V's 1 rather than 4.
+  if (actuals == nullptr) actuals = obj->type->param_actuals;
   BindTypeParamActuals(obj, actuals);
   if (actuals == nullptr) return;
   const auto& params = obj->type->decl->params;
