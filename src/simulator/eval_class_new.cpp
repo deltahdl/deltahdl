@@ -575,6 +575,13 @@ Logic4Vec EvalClassNew(std::string_view class_type, const Expr* new_expr,
   }
   auto* obj = arena.Create<ClassObject>();
   obj->type = info;
+  // §8.25: the type parameters the specialization `info` is binds are bound
+  // here, ahead of the bindings the levels are built from, because a property
+  // whose declared type names one is sized as its level is built
+  // (BoundPropertyWidth). The list the declaration of the variable wrote is
+  // bound only once this has returned (ApplyClassParamOverrides), which is
+  // late enough for a method reading `$bits(T)` and too late for a width.
+  BindSpecializationTypeParams(obj);
   auto handle = ctx.AllocateClassObject(obj);
   ctx.PushThis(obj);
   Construction construction{obj, new_expr, ctx, arena, OwnTypeBindings(obj)};

@@ -376,6 +376,7 @@ bool TryEvalTypedConstructorNew(const Expr* expr, SimContext& ctx, Arena& arena,
 // overridden values. base_id is the identifier carrying the #(...) overrides in
 // its elements.
 struct ClassTypeInfo;
+struct ClassObject;
 // §6.19/§8.4: an enumeration declared in a class names its literals within
 // the class, so a bare literal in a method or a constraint of the class or
 // of a class derived from it reads as its value, found on the class the
@@ -407,6 +408,21 @@ bool TryPackageClassStaticMember(const Expr* expr, SimContext& ctx,
 // declared type. Defined in eval_class_params.cpp.
 void ApplyClassParamOverrides(std::string_view var_name, uint64_t handle,
                               SimContext& ctx, Arena& arena);
+
+// §8.25 (printed page 204 of IEEE 1800-2023): binds each type parameter of
+// `obj`'s class to the actual the specialization that class is was made with
+// (ClassTypeInfo::param_actuals), the actuals being a fact about the type
+// rather than about the declaration each object of it is constructed on, so
+// that a name carrying no `#(...)` of its own -- a typedef of the
+// specialization, `typedef D#(integer) di;` -- still reaches them. Called as
+// the object is created and before its properties are built: a property whose
+// declared type names a parameter is sized as it is built (BoundPropertyWidth
+// in eval_class_new.cpp), which the declaration's own list, bound only once
+// construction has returned, comes too late for. Binds nothing for an object
+// of a class that is no specialization, which is §8.25.1's default
+// specialization and reads the declaration's defaults. Defined in
+// eval_class_params.cpp.
+void BindSpecializationTypeParams(ClassObject* obj);
 
 class DiagEngine;
 struct ModuleItem;

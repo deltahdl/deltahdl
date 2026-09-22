@@ -108,17 +108,12 @@ const DataType* ActualForParam(const std::vector<DataType>& actuals, size_t i,
 // pool[KEY]` -- is read with the bound type rather than with the name. A type
 // actual is no expression, so the value loop below cannot carry it.
 //
-// §8.25 (printed page 204 of IEEE 1800-2023) makes the specialization the
-// type, so where the declaration wrote no list the object's own type is asked
-// for the one it was specialized by: `typedef D#(integer) di;` names the
-// specialization D#(integer), and `di u = new` writes no `#(...)` of its own,
-// so nothing was bound and the inherited property took D's declared default
-// instead of integer. Nothing is bound for a declaration with no list of a
-// class that is no specialization, which is §8.25.1's default specialization
-// and reads the defaults.
+// Nothing is bound for a declaration that wrote no list, which is §8.25.1's
+// default specialization and reads the defaults; the specialization the
+// object's own type may be is bound ahead of this, as the object is created
+// (BindSpecializationTypeParams below).
 static void BindTypeParamActuals(ClassObject* obj,
                                  const std::vector<DataType>* actuals) {
-  if (actuals == nullptr) actuals = obj->type->param_actuals;
   if (actuals == nullptr) return;
   const ClassDecl& decl = *obj->type->decl;
   for (size_t i = 0; i < decl.params.size(); ++i) {
@@ -127,6 +122,12 @@ static void BindTypeParamActuals(ClassObject* obj,
     if (const DataType* actual = ActualForParam(*actuals, i, pname))
       obj->type_param_actuals[std::string(pname)] = actual;
   }
+}
+
+void BindSpecializationTypeParams(ClassObject* obj) {
+  if (obj == nullptr || obj->type == nullptr || obj->type->decl == nullptr)
+    return;
+  BindTypeParamActuals(obj, obj->type->param_actuals);
 }
 
 void ApplyClassParamOverrides(std::string_view var_name, uint64_t handle,

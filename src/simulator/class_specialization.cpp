@@ -21,15 +21,70 @@ namespace delta {
 
 namespace {
 
-// §8.25: a type parameter's actual matches by matching types, so the type's
-// name is what the key carries for it. The declaration's own default stands
-// where the specialization leaves the parameter out, which is the type the
-// default specialization binds.
-std::string_view TypeActualName(const ClassDecl* decl, size_t i,
-                                const DataType* actual) {
-  if (actual != nullptr && !actual->type_name.empty()) return actual->type_name;
-  if (i < decl->param_types.size()) return decl->param_types[i].type_name;
-  return {};
+// §6.11 and §6.12 name the integral and real types the standard defines, each
+// of which a type actual may be written as; the keyword, for a kind the
+// parser records without one. Empty for a kind no type actual is written as
+// -- a net type, a void -- and for the named and inline aggregate kinds,
+// which TypeActualKey spells for itself.
+std::string_view BuiltinTypeKeyword(DataTypeKind kind) {
+  switch (kind) {
+    case DataTypeKind::kLogic:
+      return "logic";
+    case DataTypeKind::kReg:
+      return "reg";
+    case DataTypeKind::kBit:
+      return "bit";
+    case DataTypeKind::kByte:
+      return "byte";
+    case DataTypeKind::kShortint:
+      return "shortint";
+    case DataTypeKind::kInt:
+      return "int";
+    case DataTypeKind::kLongint:
+      return "longint";
+    case DataTypeKind::kInteger:
+      return "integer";
+    case DataTypeKind::kReal:
+      return "real";
+    case DataTypeKind::kShortreal:
+      return "shortreal";
+    case DataTypeKind::kTime:
+      return "time";
+    case DataTypeKind::kRealtime:
+      return "realtime";
+    case DataTypeKind::kString:
+      return "string";
+    case DataTypeKind::kEvent:
+      return "event";
+    case DataTypeKind::kChandle:
+      return "chandle";
+    case DataTypeKind::kVoid:
+      return "void";
+    default:
+      return {};
+  }
+}
+
+// §8.25 with §23.10.2.2: a type parameter's actual matches by matching types,
+// so the key has to tell two actuals apart exactly when their types differ. A
+// named type is told by its name. A built-in one carries none -- the parser
+// records `D#(integer)` as a DataType of kind kInteger and nothing else
+// (ParseOneTypeParam in parser_types.cpp) -- so it is spelled by its keyword
+// together with the width its declaration gives it, which separates integer
+// from shortint by the keyword and `bit [2:0]` from `bit [7:0]` by the width.
+// Spelled by the empty name alone, every one of those keyed as `D#()`, and
+// SpecializationOf handed the second actual the specialization the first had
+// made. The declaration's own default stands where the specialization leaves
+// the parameter out, which is the type the default specialization binds.
+std::string TypeActualKey(const ClassDecl* decl, size_t i,
+                          const DataType* actual, SimContext& ctx) {
+  const DataType* type = actual;
+  if (type == nullptr)
+    type = i < decl->param_types.size() ? &decl->param_types[i] : nullptr;
+  if (type == nullptr) return {};
+  if (!type->type_name.empty()) return std::string(type->type_name);
+  std::string key(BuiltinTypeKeyword(type->kind));
+  return key + "[" + std::to_string(DeclaredTypeWidth(*type, ctx)) + "]";
 }
 
 // §23.10.2.2 with §8.25.1: the `#(...)` of a scope form is a parameter value
@@ -107,7 +162,7 @@ ClassTypeInfo* SpecializationOf(ClassTypeInfo* generic,
     // name it was written with, in the named form, and otherwise by position.
     const DataType* actual = ActualForParam(actuals, i, pname);
     if (decl->type_param_names.count(pname) != 0) {
-      key += TypeActualName(decl, i, actual);
+      key += TypeActualKey(decl, i, actual, ctx);
       continue;
     }
     const Expr* expr = actual != nullptr && actual->type_ref_expr != nullptr
