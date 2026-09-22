@@ -245,6 +245,15 @@ struct AssocArrayObject {
   // is kept rather than a flag so the `new` into an entry knows what to
   // construct without resolving the declaration again.
   std::string_view elem_class;
+  // §7.8.3 (printed page 164) with §12.7.3: the class the index type names
+  // where the array is keyed by class handles, `bit m[P]` or uvm_phase's
+  // `edges_t m_successors` under `typedef bit edges_t[uvm_phase];`; empty for
+  // any other index type. A foreach over the array gives its loop variable the
+  // index type, so the variable is a handle of this class, and
+  // `succ.m_find_successor(...)` on it runs P's method on the object the key
+  // designates. Without the class the loop variable was a plain vector and
+  // every method called through it ran nothing.
+  std::string_view index_class;
   // §10.6: what a force or an assign standing on an element drives it from,
   // keyed the way the element itself is. An associative array's keys are its
   // elements' identities, so a record outlives every insertion and deletion of
@@ -356,6 +365,9 @@ struct AssocArraySpec {
   bool is_wildcard = false;
   bool is_4state = false;
   bool is_index_signed = true;
+  // §7.8.3: the class an index of a class type names; empty for any other
+  // index type. See AssocArrayObject::index_class.
+  std::string_view index_class;
 };
 
 }  // namespace delta

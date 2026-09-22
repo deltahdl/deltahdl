@@ -656,7 +656,8 @@ void Lowerer::LowerVarAggregate(std::string_view name,
     auto* aa = ctx_.CreateAssocArray(
         name, var.width, var.is_string_index,
         AssocArraySpec{var.assoc_index_width, var.is_wildcard_index,
-                       var.is_4state, var.is_index_signed});
+                       var.is_4state, var.is_index_signed,
+                       var.assoc_index_class_name});
     InitAssocDefault(var.init_expr, aa);
     RecordAssocElemInit(name, var, aa, ctx_, arena_);
   } else {

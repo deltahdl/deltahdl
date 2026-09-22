@@ -421,7 +421,8 @@ static std::vector<Logic4Vec> ForeachIndexValues(const Stmt* stmt,
 // leaves the subroutine.
 static FuncFlow ExecFuncForeachLoop(const Stmt* stmt,
                                     const std::vector<Logic4Vec>& keys,
-                                    bool string_keys, const FuncExecCtx& exec) {
+                                    const AssocArrayObject* aa,
+                                    const FuncExecCtx& exec) {
   std::string_view iter_name;
   if (!stmt->foreach_vars.empty() && !stmt->foreach_vars[0].empty()) {
     iter_name = stmt->foreach_vars[0];
@@ -431,7 +432,11 @@ static FuncFlow ExecFuncForeachLoop(const Stmt* stmt,
   Variable* iter_var = nullptr;
   if (!iter_name.empty()) {
     iter_var = exec.ctx.CreateLocalVariable(iter_name, 32);
-    iter_var->is_string = string_keys;
+    iter_var->is_string = aa != nullptr && aa->is_string_key;
+    // §12.7.3: the loop variable has the index type, a handle of the index
+    // class for an array keyed by one (AssocArrayObject::index_class).
+    if (aa != nullptr && !aa->index_class.empty())
+      exec.ctx.SetVariableClassType(iter_name, aa->index_class);
   }
 
   FuncFlow flow = FuncFlow::kNext;
@@ -452,8 +457,7 @@ static FuncFlow ExecFuncForeach(const Stmt* stmt, const FuncExecCtx& exec) {
   std::vector<Logic4Vec> keys = ForeachIndexValues(stmt, exec);
   FuncFlow flow = FuncFlow::kNext;
   if (!keys.empty()) {
-    flow = ExecFuncForeachLoop(stmt, keys, aa != nullptr && aa->is_string_key,
-                               exec);
+    flow = ExecFuncForeachLoop(stmt, keys, aa, exec);
   }
   if (labeled) exec.ctx.PopStaticScope(stmt->label);
   return flow;

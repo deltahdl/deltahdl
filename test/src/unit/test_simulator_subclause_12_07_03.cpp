@@ -737,4 +737,66 @@ TEST(LoopStatementSim, ForeachOverAFixedSizeArrayPropertyInsideAClassTask) {
             38u);
 }
 
+// §12.7.3 with §7.8.3: the loop variable has the index type, so over an
+// array keyed by a class it is a handle of that class, and a method called
+// through it runs on the object the key designates -- uvm_phase's
+// `foreach (m_successors[succ]) succ.m_find_successor(...)`. The keys are
+// objects holding 3 and 40, summed through their get() inside a method: 43.
+// Typed as the 32-bit counter it was, the variable named no class and each
+// call answered 0.
+TEST(LoopStatementSim, ForeachKeyOfAClassKeyedPropertyIsAHandle) {
+  EXPECT_EQ(RunAndGet("class N;\n"
+                      "  int v;\n"
+                      "  function int get(); return v; endfunction\n"
+                      "endclass\n"
+                      "class G;\n"
+                      "  bit succ[N];\n"
+                      "  function int sum();\n"
+                      "    int s = 0;\n"
+                      "    foreach (succ[k]) s += k.get();\n"
+                      "    return s;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    N a = new;\n"
+                      "    N b = new;\n"
+                      "    G g = new;\n"
+                      "    a.v = 3;\n"
+                      "    b.v = 40;\n"
+                      "    g.succ[a] = 1;\n"
+                      "    g.succ[b] = 1;\n"
+                      "    result = g.sum();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            43u);
+}
+
+// §12.7.3 with §7.8.3: the same for a module's array iterated by a procedural
+// foreach, which creates its loop variable apart from a subroutine body's.
+TEST(LoopStatementSim, ForeachKeyOfAClassKeyedModuleArrayIsAHandle) {
+  EXPECT_EQ(RunAndGet("class N;\n"
+                      "  int v;\n"
+                      "  function int get(); return v; endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  bit m[N];\n"
+                      "  initial begin\n"
+                      "    N a = new;\n"
+                      "    N b = new;\n"
+                      "    a.v = 3;\n"
+                      "    b.v = 40;\n"
+                      "    m[a] = 1;\n"
+                      "    m[b] = 1;\n"
+                      "    result = 0;\n"
+                      "    foreach (m[k]) result += k.get();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            43u);
+}
+
 }  // namespace

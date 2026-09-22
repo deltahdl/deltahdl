@@ -78,6 +78,11 @@ AssocArraySpec AssocIndexSpecOfType(const DataType& index_type,
     if (uint32_t width = EvalTypeWidth(index_type); width != 0)
       spec.index_width = width;
     spec.is_index_signed = IsSignedType(index_type, {});
+  } else if (ctx.FindClassType(index_type.type_name) != nullptr) {
+    // §7.8.3: a class index keys by handle, which the run holds in 64 bits,
+    // as the elaborator sizes a declared array's class index.
+    spec.index_width = 64;
+    spec.index_class = index_type.type_name;
   } else if (uint32_t named = ctx.FindTypeWidth(index_type.type_name);
              named != 0) {
     spec.index_width = named;

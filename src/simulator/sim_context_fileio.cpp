@@ -139,6 +139,7 @@ void PopulateAssocArrayFields(AssocArrayObject* aa, uint32_t elem_width,
   aa->index_width = spec.index_width;
   aa->is_4state = spec.is_4state;
   aa->is_index_signed = spec.is_index_signed;
+  aa->index_class = spec.index_class;
 }
 
 }  // namespace
