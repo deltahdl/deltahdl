@@ -640,7 +640,7 @@ static ClassTypeInfo* ClassNamedByTypedef(const DataType& target,
   if (generic == nullptr) generic = ctx.FindClassType(target.type_name);
   if (generic == nullptr) return nullptr;
   return SpecializationOf(
-      generic, ActualsUnderSpecialization(holder, target.type_params), ctx,
+      generic, ActualsUnderSpecialization(holder, target.type_params, ctx), ctx,
       arena);
 }
 

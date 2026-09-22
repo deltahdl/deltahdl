@@ -57,11 +57,14 @@ ClassTypeInfo* SpecializationOf(ClassTypeInfo* generic,
 // `class D3 #(type P = real) extends C #(P);`. These are the actuals `written`
 // with each such name replaced by the type `holder` binds it to, `Box#(T)`
 // becoming Box#(byte) under Reg#(byte); the name a named actual was written
-// with is kept, the substitution being of the type alone. The list comes back
-// as written where the holder binds nothing, which is the class declaration's
-// own type, and for an actual naming no parameter of it.
+// with is kept, the substitution being of the type alone. An actual naming a
+// class-scope typedef of `holder` (§8.3), UVM's `this_type`, is spelled by the
+// name the run holds that typedef's class under, the name being `holder`'s
+// and not the specialized class's. A type parameter comes back as written
+// where the holder binds nothing, which is the class declaration's own type.
 std::vector<DataType> ActualsUnderSpecialization(
-    const ClassTypeInfo* holder, const std::vector<DataType>& written);
+    const ClassTypeInfo* holder, const std::vector<DataType>& written,
+    SimContext& ctx);
 
 // §8.25 with §8.23: a type parameter stands for the type its actual gives,
 // so a scope form whose prefix is a type parameter of the running method's

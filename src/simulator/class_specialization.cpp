@@ -141,6 +141,29 @@ const DataType* HolderActualFor(const ClassTypeInfo* holder,
   return nullptr;
 }
 
+// §8.3 with §8.23: a class-scope typedef is an item of the class declaring
+// it, so a name one names in an actual list the class `holder` writes -- UVM's
+// `this_type` in uvm_object_registry#(T,Tname)'s `typedef
+// uvm_registry_common#(this_type, ...) common_type;` -- denotes the class that
+// typedef names in `holder`, or in a base `holder` inherits it from (§8.13).
+// The class the run holds under `holder`'s own name for it, null where
+// `actual` writes a list of its own or names no such typedef. Kept by the bare
+// name, the actual was read again in the scope of the class it specializes,
+// where the same name is that class's own typedef: uvm_registry_common's
+// Tregistry named uvm_registry_common itself, and Tregistry::get() answered no
+// registry.
+const ClassTypeInfo* HolderScopeClass(const ClassTypeInfo* holder,
+                                      const DataType& actual, SimContext& ctx) {
+  if (!actual.type_params.empty() || !actual.scope_name.empty()) return nullptr;
+  for (const ClassTypeInfo* level = holder; level != nullptr;
+       level = level->parent) {
+    if (const ClassTypeInfo* cls = ctx.FindClassType(
+            std::string(level->name) + "::" + std::string(actual.type_name)))
+      return cls;
+  }
+  return nullptr;
+}
+
 // §8.25: the class `spec` extends, where its declaration's extends clause
 // names one of the class's own type parameters, is the one this set of actuals
 // binds that parameter to. BaseClassOf in lowerer_class.cpp binds the
@@ -173,7 +196,8 @@ void BindSpecializationBase(ClassTypeInfo* spec,
                               : nullptr;
     if (base == nullptr) return;
     spec->parent = SpecializationOf(
-        base, ActualsUnderSpecialization(spec, decl->base_class_type_params),
+        base,
+        ActualsUnderSpecialization(spec, decl->base_class_type_params, ctx),
         ctx, arena);
     return;
   }
@@ -259,11 +283,16 @@ std::vector<DataType> ActualsUnderRunningClass(
 }  // namespace
 
 std::vector<DataType> ActualsUnderSpecialization(
-    const ClassTypeInfo* holder, const std::vector<DataType>& written) {
+    const ClassTypeInfo* holder, const std::vector<DataType>& written,
+    SimContext& ctx) {
   std::vector<DataType> bound = written;
   for (DataType& actual : bound) {
     if (actual.kind != DataTypeKind::kNamed) continue;
-    if (holder->decl->type_param_names.count(actual.type_name) == 0) continue;
+    if (holder->decl->type_param_names.count(actual.type_name) == 0) {
+      if (const ClassTypeInfo* cls = HolderScopeClass(holder, actual, ctx))
+        actual.type_name = cls->name;
+      continue;
+    }
     const DataType* a = HolderActualFor(holder, actual.type_name);
     if (a == nullptr) continue;
     std::string_view arg = actual.param_arg_name;

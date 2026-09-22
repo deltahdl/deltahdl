@@ -340,4 +340,33 @@ TEST(ClassSim, ScopePrefixNamingATypeParameterNamesItsActualsClass) {
   EXPECT_EQ(out, "7 9\n");
 }
 
+// §8.25 with §8.3: a class-scope typedef is an item of the class declaring it,
+// so `this_type` in Reg's `typedef Common #(this_type) common_type;` is Reg's
+// own specialization, not the `this_type` Common declares -- UVM's
+// uvm_object_registry#(T) handing itself to uvm_registry_common as its
+// Tregistry. Common's R::id() then reaches Reg#(A) and Reg#(B), whose T::v()
+// answer 3 and 5; read in Common's scope, R named Common, which has no id().
+TEST(ClassSim, TypedefNamedInAnActualListIsTheHoldersTypedef) {
+  SimFixture f;
+  auto out = RunCapture(
+      "typedef class Common;\n"
+      "class A; static function int v(); return 3; endfunction endclass\n"
+      "class B; static function int v(); return 5; endfunction endclass\n"
+      "class Reg #(type T = int);\n"
+      "  typedef Reg #(T) this_type;\n"
+      "  typedef Common #(this_type) common_type;\n"
+      "  static function int id(); return T::v(); endfunction\n"
+      "  static function int via(); return common_type::call(); endfunction\n"
+      "endclass\n"
+      "class Common #(type R = int);\n"
+      "  typedef Common #(R) this_type;\n"
+      "  static function int call(); return R::id(); endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  initial $display(\"%0d %0d\", Reg#(A)::via(), Reg#(B)::via());\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "3 5\n");
+}
+
 }  // namespace
