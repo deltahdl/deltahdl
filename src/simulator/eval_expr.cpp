@@ -14,6 +14,7 @@
 #include "parser/ast_expr.h"
 #include "simulator/assoc_element.h"
 #include "simulator/class_object.h"
+#include "simulator/class_specialization.h"
 #include "simulator/clocking.h"
 #include "simulator/eval_array.h"
 #include "simulator/eval_call_result.h"
@@ -681,6 +682,7 @@ static bool TryMemberSelectThatIsNoRead(const Expr* expr, SimContext& ctx,
     return true;
   }
   if (TryParameterizedScopeParam(expr, ctx, arena, out)) return true;
+  if (TryScopeSpecializationStaticMember(expr, ctx, arena, out)) return true;
   return TryEvalEnumMethodWithoutArgs(expr, ctx, arena, out);
 }
 

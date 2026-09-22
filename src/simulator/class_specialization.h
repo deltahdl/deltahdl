@@ -15,12 +15,15 @@
 
 #include <vector>
 
+#include "common/types.h"
+
 namespace delta {
 
 class Arena;
 class SimContext;
 struct ClassTypeInfo;
 struct DataType;
+struct Expr;
 
 // The class type for `generic` specialized by `actuals`, registered under a
 // key that spells the actuals -- `vector#(4)` -- and created on the first
@@ -42,5 +45,23 @@ ClassTypeInfo* SpecializationOf(ClassTypeInfo* generic,
 // bound, so an initializer naming one reads the actual rather than nothing.
 void InitSpecializationStaticProperties(ClassTypeInfo* spec, SimContext& ctx,
                                         Arena& arena);
+
+// The static property `expr` reads through a specialization scope,
+// `vector#(1)::count`: true with `out` filled where `expr` is a member
+// select whose left side is an identifier carrying a `#(...)` list, that
+// identifier names a class declaration, and the class or one of its bases
+// declares a static property of that name. §8.25.1 has the scope form name
+// one specialization,
+// and §8.25 gives each specialization its own set of static member variables,
+// so the read is of that specialization's copy rather than of the
+// declaration's one map. The specialization is interned on the read where
+// nothing has interned it already, which is what `V#(4)::W` needs: a scope
+// form can be the whole of what names a specialization, no variable of it
+// ever being declared.
+//
+// False for a parameter of the class, whose value the list carries rather
+// than the specialization's storage, and which is read before this.
+bool TryScopeSpecializationStaticMember(const Expr* expr, SimContext& ctx,
+                                        Arena& arena, Logic4Vec& out);
 
 }  // namespace delta

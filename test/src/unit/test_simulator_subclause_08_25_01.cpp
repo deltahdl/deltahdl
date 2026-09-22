@@ -464,4 +464,52 @@ TEST(ParameterizedScopeResolutionSim,
             3u);
 }
 
+TEST(ParameterizedScopeResolutionSim, StaticPropertyReadsItsSpecialization) {
+  // §8.25.1 with §8.25: the explicit specialization form names one
+  // specialization, and each specialization has its own set of static member
+  // variables, so `vector#(1)::count` and `vector#(4)::count` read two
+  // counters. Two `vector #(1)` objects and one `vector #(4)` object leave 2
+  // and 1; one counter shared by the declaration leaves 3 for both.
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class vector #(int size = 1);\n"
+      "  static int count = 0;\n"
+      "  function new(); count++; endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  vector #(1) x1 = new, y1 = new;\n"
+      "  vector #(4) x4 = new;\n"
+      "  int a, b;\n"
+      "  initial begin\n"
+      "    a = vector#(1)::count;\n"
+      "    b = vector#(4)::count;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"a", 2u}, {"b", 1u}});
+}
+
+TEST(ParameterizedScopeResolutionSim,
+     StaticInitializerRunsForTheScopeNamedSpecialization) {
+  // §8.25.1 with §8.9: a specialization the source names only through the
+  // scope form, never declaring a variable of it, still has its own copy of
+  // each static property, and that copy takes its initializer with the
+  // specialization's own parameters bound. The two widths discriminate from
+  // each other and from the 0 the declaration's shared copy holds.
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class V #(int size = 1);\n"
+      "  static const int W = size;\n"
+      "endclass\n"
+      "module t;\n"
+      "  int a, b;\n"
+      "  initial begin\n"
+      "    a = V#(4)::W;\n"
+      "    b = V#(8)::W;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"a", 4u}, {"b", 8u}});
+}
+
 }  // namespace

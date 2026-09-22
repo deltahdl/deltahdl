@@ -9,6 +9,7 @@
 #include "common/arena.h"
 #include "common/types.h"
 #include "parser/ast_class.h"
+#include "parser/ast_expr.h"
 #include "parser/ast_type.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_class_params.h"
@@ -29,6 +30,22 @@ std::string_view TypeActualName(const ClassDecl* decl, size_t i,
   if (actual != nullptr && !actual->type_name.empty()) return actual->type_name;
   if (i < decl->param_types.size()) return decl->param_types[i].type_name;
   return {};
+}
+
+// §23.10.2.2 with §8.25.1: the `#(...)` of a scope form is a parameter value
+// assignment list, which the parser leaves on the identifier as expressions in
+// `elements`, each named entry carrying its parameter's name in `arg_names`.
+// SpecializationOf reads the actuals a variable's declaration gives it, where
+// the expression stands under `type_ref_expr` and the name under
+// `param_arg_name`, so the list is rewritten into that shape.
+std::vector<DataType> ScopeActuals(const Expr& base) {
+  std::vector<DataType> actuals(base.elements.size());
+  for (size_t i = 0; i < base.elements.size(); ++i) {
+    actuals[i].type_ref_expr = base.elements[i];
+    if (i < base.arg_names.size())
+      actuals[i].param_arg_name = base.arg_names[i];
+  }
+  return actuals;
 }
 
 }  // namespace
@@ -85,6 +102,28 @@ ClassTypeInfo* SpecializationOf(ClassTypeInfo* generic,
   ctx.RegisterClassType(spec->name, spec);
   InitSpecializationStaticProperties(spec, ctx, arena);
   return spec;
+}
+
+bool TryScopeSpecializationStaticMember(const Expr* expr, SimContext& ctx,
+                                        Arena& arena, Logic4Vec& out) {
+  if (expr == nullptr || expr->lhs == nullptr || expr->rhs == nullptr ||
+      expr->lhs->kind != ExprKind::kIdentifier ||
+      expr->rhs->kind != ExprKind::kIdentifier || !expr->lhs->has_param_spec ||
+      expr->lhs->elements.empty()) {
+    return false;
+  }
+  ClassTypeInfo* generic = ctx.FindClassType(expr->lhs->text);
+  if (generic == nullptr || generic->decl == nullptr) return false;
+  const ClassTypeInfo* spec =
+      SpecializationOf(generic, ScopeActuals(*expr->lhs), ctx, arena);
+  if (spec == nullptr) return false;
+  // §8.13: the property may be one a base declares, and a base's one storage
+  // is where it lives, so the walk that finds the declaring level is asked
+  // rather than the specialization's own map.
+  const ClassTypeInfo* declarer = spec->StaticPropertyDeclarer(expr->rhs->text);
+  if (declarer == nullptr) return false;
+  out = declarer->static_properties.find(std::string(expr->rhs->text))->second;
+  return true;
 }
 
 }  // namespace delta
