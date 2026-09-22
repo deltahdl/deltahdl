@@ -728,4 +728,86 @@ TEST(MultidimensionalArraySimulation, InnerPackedDimensionRangeAsDeclared) {
   EXPECT_EQ(RunAndGet(src, "w"), 0x8000u);
 }
 
+// §7.4.4 (printed page 155) lets an array's dimensions be defined in stages
+// with typedef, and §8.5 puts no restriction on a property's type, so a
+// property declared through a typedef written outside the class has the
+// typedef's dimensions. Only a class-scope typedef's reached a property: this
+// one was a single int, and the element write through the handle was lost.
+TEST(MultidimensionalArraySimulation, PropertyTakesAModuleTypedefsFixedDim) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  typedef int arr_t[3];\n"
+      "  class C; arr_t a; endclass\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    C c = new;\n"
+      "    c.a[1] = 9;\n"
+      "    c.a[2] = 4;\n"
+      "    result = c.a[1] * 10 + c.a[2];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 94u);
+}
+
+// The queue half: three pushes onto a property declared through a
+// compilation-unit queue typedef answer a size of 3.
+TEST(MultidimensionalArraySimulation, PropertyTakesAUnitTypedefsQueueDim) {
+  auto v = RunAndGet(
+      "typedef int q_t[$];\n"
+      "class C; q_t q; endclass\n"
+      "module t;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    C c = new;\n"
+      "    c.q.push_back(7);\n"
+      "    c.q.push_back(8);\n"
+      "    c.q.push_back(9);\n"
+      "    result = c.q.size() * 100 + c.q[1];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 308u);
+}
+
+// The associative half: two keys written through a property declared through
+// a compilation-unit associative typedef are two entries.
+TEST(MultidimensionalArraySimulation, PropertyTakesAUnitTypedefsAssocDim) {
+  auto v = RunAndGet(
+      "typedef int a_t[string];\n"
+      "class C; a_t m; endclass\n"
+      "module t;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    C c = new;\n"
+      "    c.m[\"x\"] = 3;\n"
+      "    c.m[\"y\"] = 4;\n"
+      "    result = c.m.num() * 10 + c.m[\"y\"];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 24u);
+}
+
+// §26.3: a class a package declares reads the package's typedef by its bare
+// name, so its property takes that typedef's dimensions too.
+TEST(MultidimensionalArraySimulation, PropertyTakesAPackageTypedefsQueueDim) {
+  auto v = RunAndGet(
+      "package p;\n"
+      "  typedef int q_t[$];\n"
+      "  class C; q_t q; endclass\n"
+      "endpackage\n"
+      "module t;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    p::C c = new;\n"
+      "    c.q.push_back(5);\n"
+      "    c.q.push_back(6);\n"
+      "    result = c.q.size() * 10 + c.q[0];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 25u);
+}
+
 }  // namespace

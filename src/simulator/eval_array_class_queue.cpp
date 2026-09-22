@@ -11,6 +11,7 @@
 #include "elaborator/queue_dim.h"
 #include "parser/ast_class.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_module.h"
 #include "parser/ast_type.h"
 #include "simulator/class_object.h"
 #include "simulator/declared_class_key.h"
@@ -27,11 +28,19 @@ namespace delta {
 
 namespace {
 
-// §8.5/§7.10: whether the property declaration `member` is a queue: one
-// unpacked dimension written `[$]` or `[$:N]` (Syntax 7-4).
-bool DeclaresQueueProperty(const ClassMember* member) {
-  return !member->is_param && member->unpacked_dims.size() == 1 &&
-         IsQueueDim(member->unpacked_dims[0]);
+// §8.5/§7.10: the one unpacked dimension of the property declaration `member`
+// of `declaring` where it is a queue dimension, written `[$]` or `[$:N]`
+// (Syntax 7-4) on the declaration or, §7.4.4 (printed page 155), on the
+// typedef its type names (PropertyTypedefItem); null where the property is no
+// queue.
+const Expr* QueuePropertyDim(const ClassMember* member,
+                             const ClassTypeInfo* declaring, SimContext& ctx) {
+  if (member->is_param) return nullptr;
+  const ModuleItem* item = PropertyTypedefItem(member, declaring, ctx);
+  const std::vector<Expr*>& dims =
+      item != nullptr ? item->unpacked_dims : member->unpacked_dims;
+  if (dims.size() != 1 || !IsQueueDim(dims[0])) return nullptr;
+  return dims[0];
 }
 
 // §8.5/§7.10: the declaration of the property `name` on the class chain from
@@ -40,14 +49,14 @@ bool DeclaresQueueProperty(const ClassMember* member) {
 // answers (§8.13): a class between that redeclares the name as something else
 // hides the queue below it, and answers null.
 const ClassMember* FindQueuePropertyDecl(const ClassTypeInfo* type,
-                                         std::string_view name,
+                                         std::string_view name, SimContext& ctx,
                                          const ClassTypeInfo*& declaring) {
   for (const auto* t = type; t != nullptr; t = t->parent) {
     if (t->decl == nullptr) continue;
     for (const auto* member : t->decl->members) {
       if (member->kind != ClassMemberKind::kProperty || member->name != name)
         continue;
-      if (!DeclaresQueueProperty(member)) return nullptr;
+      if (QueuePropertyDim(member, t, ctx) == nullptr) return nullptr;
       declaring = t;
       return member;
     }
@@ -70,20 +79,23 @@ std::string_view TypeNameOf(const DataType& type) {
 
 // §8.4: whether the element type of the property `member` of `declaring` on
 // `obj` is a class, so that each element is a handle: the type the
-// declaration names, or, where it names a type parameter (§8.25), the type
-// the object's specialization binds that parameter to, else the default the
-// class declares, as §8.26's `T myFifo[$:DEPTH-1]` on a `Fifo#(Item)`. §8.23
-// (printed pages 200-201): a nested class is named `Outer::Inner` from
-// outside its container and bare within it, the key DeclaredClassKeyInScope
-// (declared_class_key.h) resolves the written type to; asked by the bare
-// `Inner` alone, `Outer::Inner q[$]` was a queue of plain values and
-// `h.q[0].v` read 0. A type written as a bare identifier expression, which
-// carries no type_name, is still asked for by that name.
+// declaration names -- the typedef's element type where a typedef gives the
+// property its dimension (PropertyTypedefItem) -- or, where it names a type
+// parameter (§8.25), the type the object's specialization binds that parameter
+// to, else the default the class declares, as §8.26's `T myFifo[$:DEPTH-1]` on
+// a `Fifo#(Item)`. §8.23 (printed pages 200-201): a nested class is named
+// `Outer::Inner` from outside its container and bare within it, the key
+// DeclaredClassKeyInScope (declared_class_key.h) resolves the written type to;
+// asked by the bare `Inner` alone, `Outer::Inner q[$]` was a queue of plain
+// values and `h.q[0].v` read 0. A type written as a bare identifier expression,
+// which carries no type_name, is still asked for by that name.
 bool ElementTypeIsClass(const ClassMember* member,
                         const ClassTypeInfo* declaring, const ClassObject* obj,
                         SimContext& ctx) {
   const ClassDecl* decl = declaring->decl;
-  const DataType* type = &member->data_type;
+  const ModuleItem* item = PropertyTypedefItem(member, declaring, ctx);
+  const DataType* type =
+      item != nullptr ? &item->typedef_type : &member->data_type;
   std::string_view name = TypeNameOf(*type);
   if (name.empty()) return false;
   if (decl->type_param_names.count(name) != 0) {
@@ -131,7 +143,8 @@ QueueObject* MakeQueueProperty(const ClassTypeInfo* declaring,
   auto* q = ctx.GetArena().Create<QueueObject>();
   q->elem_width = prop != nullptr ? prop->width : 32;
   q->is_4state = prop != nullptr && prop->is_4state;
-  q->max_size = PropertyQueueBound(member->unpacked_dims[0], obj, ctx);
+  q->max_size =
+      PropertyQueueBound(QueuePropertyDim(member, declaring, ctx), obj, ctx);
   q->holds_class_handles = ElementTypeIsClass(member, declaring, obj, ctx);
   return q;
 }
@@ -142,7 +155,7 @@ QueueObject* ResolveOn(ClassObject* obj, const ClassTypeInfo* from,
                        std::string_view name, SimContext& ctx,
                        ClassObject** owner) {
   const ClassTypeInfo* declaring = nullptr;
-  const ClassMember* member = FindQueuePropertyDecl(from, name, declaring);
+  const ClassMember* member = FindQueuePropertyDecl(from, name, ctx, declaring);
   if (member == nullptr) return nullptr;
   if (member->is_static) {
     auto& slot = declaring->static_queue_properties[std::string(name)];
@@ -246,7 +259,7 @@ const ClassTypeInfo* StaticQueuePropertyClass(const Expr* base,
   }
   if (from == nullptr) return nullptr;
   const ClassTypeInfo* declaring = nullptr;
-  const ClassMember* member = FindQueuePropertyDecl(from, name, declaring);
+  const ClassMember* member = FindQueuePropertyDecl(from, name, ctx, declaring);
   return member != nullptr && member->is_static ? declaring : nullptr;
 }
 
@@ -261,7 +274,7 @@ bool InitClassQueueProperty(ClassObject* obj, const ClassTypeInfo* info,
                             std::string_view name, const Expr* init,
                             SimContext& ctx) {
   const ClassTypeInfo* declaring = nullptr;
-  const ClassMember* member = FindQueuePropertyDecl(info, name, declaring);
+  const ClassMember* member = FindQueuePropertyDecl(info, name, ctx, declaring);
   if (member == nullptr || declaring != info || member->is_static) return false;
   auto& slot = obj->queue_properties[std::string(name)];
   if (slot == nullptr) slot = MakeQueueProperty(info, member, obj, ctx);

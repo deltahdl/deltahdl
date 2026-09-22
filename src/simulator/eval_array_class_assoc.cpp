@@ -137,6 +137,37 @@ const ModuleItem* ClassScopeTypedefItem(const ClassTypeInfo* from,
   return nullptr;
 }
 
+const ModuleItem* TypedefItemSeenFrom(const DataType& type,
+                                      const ClassTypeInfo* from,
+                                      SimContext& ctx) {
+  if (type.kind != DataTypeKind::kNamed) return nullptr;
+  std::string_view name = type.type_name;
+  if (!type.scope_name.empty()) {
+    if (const ClassTypeInfo* cls = ctx.FindClassType(type.scope_name))
+      return ClassScopeTypedefItem(cls, name);
+    return ctx.FindTypedefItem(std::string(type.scope_name) +
+                               "::" + std::string(name));
+  }
+  if (const ModuleItem* item = ClassScopeTypedefItem(from, name)) return item;
+  if (from != nullptr && !from->package.empty()) {
+    if (const ModuleItem* item = ctx.FindTypedefItem(
+            std::string(from->package) + "::" + std::string(name))) {
+      return item;
+    }
+  }
+  return ctx.FindTypedefItem(name);
+}
+
+const ModuleItem* PropertyTypedefItem(const ClassMember* member,
+                                      const ClassTypeInfo* declaring,
+                                      SimContext& ctx) {
+  if (!member->unpacked_dims.empty()) return nullptr;
+  const ModuleItem* item =
+      TypedefItemSeenFrom(member->data_type, declaring, ctx);
+  if (item == nullptr || item->unpacked_dims.empty()) return nullptr;
+  return item;
+}
+
 const Stmt* DeclShapedByClassTypedef(const Stmt* stmt, SimContext& ctx,
                                      Arena& arena) {
   const DataType& type = stmt->var_decl_type;
@@ -179,21 +210,19 @@ bool DimNamesTypeParam(const Expr* dim, const ClassDecl* decl) {
 // §6.18 with §8.3 (printed page 180 of IEEE 1800-2023): a typedef is a class
 // item, and a property declared through one has the unpacked dimensions the
 // typedef writes -- uvm_phase's `edges_t m_successors` under `typedef bit
-// edges_t[uvm_phase];` is an associative array keyed by uvm_phase. The
-// dimensions of the property `member` of `declaring`: those written on the
-// declaration, else those of the class-scope typedef its type names in
-// `declaring`, in a base of it (§8.13) or in a class enclosing it (§8.23),
-// nearest first. Read off the declaration alone, the property was no array,
-// every `m_successors[n] = 1` was dropped, and UVM's common domain linked no
-// phase, so `find(uvm_build_phase::get())` answered null.
+// edges_t[uvm_phase];` is an associative array keyed by uvm_phase. §7.4.4
+// (printed page 155) lets the dimensions be defined in stages with typedef
+// wherever the typedef stands, so one of the compilation unit or of a
+// package gives a property its dimensions as a class's does. The dimensions
+// of the property `member` of `declaring`: those written on the declaration,
+// else those of the typedef its type names (PropertyTypedefItem). Read off
+// the declaration alone, the property was no array, every `m_successors[n] =
+// 1` was dropped, and UVM's common domain linked no phase, so
+// `find(uvm_build_phase::get())` answered null.
 const std::vector<Expr*>& PropertyUnpackedDims(const ClassMember* member,
-                                               const ClassTypeInfo* declaring) {
-  const DataType& type = member->data_type;
-  if (!member->unpacked_dims.empty() || type.kind != DataTypeKind::kNamed ||
-      !type.scope_name.empty()) {
-    return member->unpacked_dims;
-  }
-  const ModuleItem* item = ClassScopeTypedefItem(declaring, type.type_name);
+                                               const ClassTypeInfo* declaring,
+                                               SimContext& ctx) {
+  const ModuleItem* item = PropertyTypedefItem(member, declaring, ctx);
   return item != nullptr ? item->unpacked_dims : member->unpacked_dims;
 }
 
@@ -202,7 +231,7 @@ const std::vector<Expr*>& PropertyUnpackedDims(const ClassMember* member,
 // type parameter of the class (§8.25).
 bool DeclaresAssocProperty(const ClassMember* member,
                            const ClassTypeInfo* declaring, SimContext& ctx) {
-  const std::vector<Expr*>& dims = PropertyUnpackedDims(member, declaring);
+  const std::vector<Expr*>& dims = PropertyUnpackedDims(member, declaring, ctx);
   if (member->is_param || dims.size() != 1) return false;
   const Expr* dim = dims[0];
   return IsAssocIndexDim(dim, ctx) || DimNamesTypeParam(dim, declaring->decl);
@@ -248,9 +277,9 @@ DataType ResolveNamedType(const DataType& type) {
 // keyed, as an int would key it, rather than left at the width of nothing.
 DataType PropertyIndexType(const ClassMember* member,
                            const ClassTypeInfo* declaring,
-                           const ClassObject* obj) {
+                           const ClassObject* obj, SimContext& ctx) {
   const ClassDecl* decl = declaring->decl;
-  const Expr* dim = PropertyUnpackedDims(member, declaring)[0];
+  const Expr* dim = PropertyUnpackedDims(member, declaring, ctx)[0];
   if (!DimNamesTypeParam(dim, decl)) return TypeNameToDataType(dim->text);
   const DataType* bound = TypeParamActual(obj, decl, dim->text);
   DataType index_type =
@@ -268,10 +297,10 @@ AssocArraySpec PropertyIndexSpec(const ClassMember* member,
                                  const ClassTypeInfo* declaring,
                                  const ClassObject* obj, bool elem_4state,
                                  SimContext& ctx) {
-  const Expr* dim = PropertyUnpackedDims(member, declaring)[0];
+  const Expr* dim = PropertyUnpackedDims(member, declaring, ctx)[0];
   if (!DimNamesTypeParam(dim, declaring->decl))
     return AssocIndexSpec(dim, elem_4state, ctx);
-  return AssocIndexSpecOfType(PropertyIndexType(member, declaring, obj),
+  return AssocIndexSpecOfType(PropertyIndexType(member, declaring, obj, ctx),
                               elem_4state, ctx);
 }
 
@@ -290,8 +319,8 @@ AssocArrayObject* MakeAssocProperty(const ClassTypeInfo* declaring,
       PropertyIndexSpec(member, declaring, obj, elem_4state, ctx);
   auto* aa = ctx.GetArena().Create<AssocArrayObject>();
   aa->elem_width = elem_width;
-  aa->is_string_key =
-      PropertyIndexType(member, declaring, obj).kind == DataTypeKind::kString;
+  aa->is_string_key = PropertyIndexType(member, declaring, obj, ctx).kind ==
+                      DataTypeKind::kString;
   aa->is_wildcard = spec.is_wildcard;
   aa->index_width = spec.index_width;
   aa->is_4state = spec.is_4state;

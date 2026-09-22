@@ -340,19 +340,21 @@ static uint32_t FixedDimensionSize(const Expr* dim, int64_t& lo,
 // §7.4.2/§7.5/§18.5.7: mark each property declared with one fixed or
 // dynamic unpacked dimension as the array it is, so the object holds its
 // elements one by one and a constraint can iterate over them or reduce them.
+// §7.4.4 (printed page 155): the dimension may be the typedef's the property
+// is declared through (PropertyTypedefItem), `arr_t a;` under `typedef int
+// arr_t[3];`, which left read off the declaration made `a` one element wide.
 // A property with more than one unpacked dimension is left as it was.
 static void RecordArrayProperties(ClassTypeInfo* info, const ClassDecl* cls,
                                   SimContext& ctx, Arena& arena) {
   for (const auto* member : cls->members) {
-    if (member->kind != ClassMemberKind::kProperty ||
-        member->unpacked_dims.size() != 1) {
-      continue;
-    }
-    const bool kDynamic = member->unpacked_dims[0] == nullptr;
+    if (member->kind != ClassMemberKind::kProperty) continue;
+    const ModuleItem* item = PropertyTypedefItem(member, info, ctx);
+    const std::vector<Expr*>& dims =
+        item != nullptr ? item->unpacked_dims : member->unpacked_dims;
+    if (dims.size() != 1) continue;
+    const bool kDynamic = dims[0] == nullptr;
     int64_t lo = 0;
-    uint32_t size =
-        kDynamic ? 0
-                 : FixedDimensionSize(member->unpacked_dims[0], lo, ctx, arena);
+    uint32_t size = kDynamic ? 0 : FixedDimensionSize(dims[0], lo, ctx, arena);
     if (size == 0 && !kDynamic) continue;
     for (auto& prop : info->properties) {
       if (prop.name != member->name) continue;

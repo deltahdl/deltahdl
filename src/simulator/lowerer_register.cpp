@@ -549,7 +549,7 @@ static void RegisterTypedefItems(const std::vector<ModuleItem*>& items,
       key = *ctx.GetArena().Create<std::string>(std::string(prefix) +
                                                 "::" + std::string(item->name));
     }
-    ctx.RegisterTypeDeclaration(key, &item->typedef_type);
+    ctx.RegisterTypeDeclaration(key, item);
   }
 }
 

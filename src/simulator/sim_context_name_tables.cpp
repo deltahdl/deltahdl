@@ -25,6 +25,7 @@
 #include <vector>
 
 #include "common/packed_range.h"
+#include "parser/ast_module.h"
 #include "parser/ast_type.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/variable.h"
@@ -355,11 +356,17 @@ size_t DeclaredNameTables::TypeTargetCount() const {
 }
 
 void DeclaredNameTables::RegisterTypeDeclaration(std::string_view name,
-                                                 const DataType* type) {
-  type_declarations_[name] = type;
+                                                 const ModuleItem* item) {
+  type_declarations_[name] = item;
 }
 
 const DataType* DeclaredNameTables::FindTypeDeclaration(
+    std::string_view name) const {
+  const ModuleItem* item = FindTypedefItem(name);
+  return item != nullptr ? &item->typedef_type : nullptr;
+}
+
+const ModuleItem* DeclaredNameTables::FindTypedefItem(
     std::string_view name) const {
   auto it = type_declarations_.find(name);
   return (it != type_declarations_.end()) ? it->second : nullptr;

@@ -5,6 +5,7 @@
 namespace delta {
 
 struct AssocArrayObject;
+struct ClassMember;
 struct ClassDecl;
 struct ClassObject;
 struct ClassTypeInfo;
@@ -21,6 +22,23 @@ class Arena;
 // where none does, or where `from` is null.
 const ModuleItem* ClassScopeTypedefItem(const ClassTypeInfo* from,
                                         std::string_view name);
+
+// §6.18 with §26.3: the typedef item the written type `type` names, seen from
+// the class `from`: one the class scope `C::` or the package `p::` qualifying
+// it declares, else one of `from`'s class scope (ClassScopeTypedefItem), of
+// the package `from` is declared in, or of the compilation unit, nearest
+// first. Null where `type` names no typedef.
+const ModuleItem* TypedefItemSeenFrom(const DataType& type,
+                                      const ClassTypeInfo* from,
+                                      SimContext& ctx);
+
+// §7.4.4 with §8.5: the typedef that gives the property `member` of
+// `declaring` its unpacked dimensions -- the one its type names
+// (TypedefItemSeenFrom) where the declaration writes none of its own and the
+// typedef writes some; null otherwise.
+const ModuleItem* PropertyTypedefItem(const ClassMember* member,
+                                      const ClassTypeInfo* declaring,
+                                      SimContext& ctx);
 
 // §6.18 with §7.4.4 and §8.3: a declaration in a method's body whose type names
 // a class-scope typedef, bare as `edges_t e;` from the declaring class's own

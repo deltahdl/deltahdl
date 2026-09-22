@@ -35,6 +35,7 @@
 namespace delta {
 
 struct MailboxObject;
+struct ModuleItem;
 struct SemaphoreObject;
 
 class DeclaredNameTables {
@@ -194,9 +195,12 @@ class DeclaredNameTables {
   // `mb_t mb` through `typedef mailbox #(int) mb_t` was known for a mailbox
   // and not for one of int, and its put() of a string went unchecked. Null
   // for a name nothing records; TypeDeclarationCount bounds a walk of the
-  // chain.
-  void RegisterTypeDeclaration(std::string_view name, const DataType* type);
+  // chain. §7.4.4 lets a typedef define an array's dimensions in stages, so
+  // the item the typedef is, its unpacked dimensions with it, is what is
+  // recorded (FindTypedefItem), and its type is read off the item.
+  void RegisterTypeDeclaration(std::string_view name, const ModuleItem* item);
   const DataType* FindTypeDeclaration(std::string_view name) const;
+  const ModuleItem* FindTypedefItem(std::string_view name) const;
   size_t TypeDeclarationCount() const;
 
   // §15.3 and §15.4 with §13.5.1: the semaphore or the mailbox the variable
@@ -305,7 +309,7 @@ class DeclaredNameTables {
   // §6.18: see RegisterTypeTarget.
   std::unordered_map<std::string_view, std::string_view> type_targets_;
   // §6.18 with §15.4.9: see RegisterTypeDeclaration.
-  std::unordered_map<std::string_view, const DataType*> type_declarations_;
+  std::unordered_map<std::string_view, const ModuleItem*> type_declarations_;
   // §15.3 and §15.4 with §13.5.1: see BindSemaphoreHandle.
   std::unordered_map<const Variable*, SemaphoreObject*> semaphore_handles_;
   std::unordered_map<const Variable*, MailboxObject*> mailbox_handles_;
