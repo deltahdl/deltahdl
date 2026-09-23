@@ -621,38 +621,6 @@ jobs:
           --cov-branch
           --cov-report=term-missing
           --cov-fail-under=100
-  test-next-subclause:
-    needs: test-lib-github
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - name: Restore pip cache
-        uses: actions/cache@v5
-        with:
-          key: >-
-            pip-scripts-test-script-${{
-            hashFiles('.github/workflows/scripts.yml') }}
-          path: ~/.cache/pip
-          restore-keys: |
-            pip-scripts-test-script-
-      - name: Install tools
-        run: pip install pytest pytest-cov
-      - name: Run unit tests with 100% coverage gate
-        run: >-
-          PYTHONPATH=.:scripts python3 -m pytest
-          test/scripts/next_subclause/unit/ -v
-          --cov=next_subclause
-          --cov-branch
-          --cov-report=term-missing
-          --cov-fail-under=100
-      - name: Run integration tests
-        run: >-
-          PYTHONPATH=.:scripts python3 -m pytest
-          test/scripts/next_subclause/integration/ -v
-      - name: Run e2e tests
-        run: >-
-          PYTHONPATH=.:scripts python3 -m pytest
-          test/scripts/next_subclause/e2e/ -v
   test-run-integration-tests:
     needs: test-lib-run-tests-common
     runs-on: ubuntu-latest
@@ -758,7 +726,6 @@ on:
     branches: [main]
     paths:
       - .github/workflows/scripts.yml
-      - docs/dependency_graph.json
       - lib/python/**
       - scripts/**
       - test/lib/python/**

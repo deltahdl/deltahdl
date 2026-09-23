@@ -26,7 +26,7 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 - [clang-format on C++ paths only](clang-format-only-cpp-paths.md) — filter the touched paths to `.cpp`/`.h`; a CMakeLists.txt fed to it is rewritten as C++ and stops parsing.
 - [Annex files are not edited](annex-files-are-not-edited.md) — `vpi_user.h` is Annex K.2's text byte for byte; a platform shim goes in the build, never in the file.
 - [Include what you use](include-what-you-use.md) — name the header that declares each symbol used and none that is unused; no umbrella headers, `vpi_user.h` is Annex K.2's one C file, and an include finding fails the job.
-- [Markdown opens with a heading](markdown-top-level-heading.md) — MD041 runs across `**/*.md` with `--dot`, so the notes are linted too.
+- [Markdown opens with a heading](markdown-top-level-heading.md) — MD041 runs over every Markdown file in the checkout with `--dot`, so the notes are linted too.
 - [Accuracy over fitting a column](prose-length-over-column-fitting.md) — never buy a shorter line with a less accurate word; move the text instead.
 
 ## The LRM

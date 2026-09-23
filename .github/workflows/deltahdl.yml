@@ -3132,13 +3132,12 @@ jobs:
       fail-fast: false
       matrix:
         shard: [0, 1, 2, 3, 4]
-  # Nothing is held behind this job. documentation.yml puts its jsonlint and
-  # markdownlint behind its yamllint, on the argument that a linter is only as
-  # trustworthy as the file defining it, but that argument covers every
-  # scanning job in this workflow, and acting on it would let a YAML breach
-  # leave the formatting check, the length cap, the assertions and the
-  # copy-paste detectors recorded neither green nor red. A job that did not run
-  # reports nothing. Each scan stands on its own instead.
+  # Nothing is held behind this job. The argument that a linter is only as
+  # trustworthy as the file defining it would put every scanning job in this
+  # workflow behind it, and acting on it would let a YAML breach leave the
+  # formatting check, the length cap, the assertions and the copy-paste
+  # detectors recorded neither green nor red. A job that did not run reports
+  # nothing. Each scan stands on its own instead.
   #
   # Nothing stands in front of this job either. A pair of jobs deciding from
   # the changed paths whether the lint was necessary stood there, and the same

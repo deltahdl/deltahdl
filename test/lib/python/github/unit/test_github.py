@@ -12,5 +12,5 @@ def test_format_subclause_label_annex() -> None:
     assert format_subclause_label("A.1.1") == "A.1.1"
 
 
-def test_issue_title_for_is_the_title_next_subclause_matches_on() -> None:
+def test_issue_title_for_names_the_subclause_it_satisfies() -> None:
     assert issue_title_for("18.16") == "Satisfy IEEE 1800-2023 §18.16"

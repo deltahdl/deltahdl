@@ -1,21 +1,8 @@
 ---
 concurrency:
   cancel-in-progress: true
-  group: documentation-${{ github.ref }}
+  group: markdownlint-${{ github.ref }}
 jobs:
-  jsonlint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - name: Install tools
-        run: npm install -g jsonlint
-      # Reports whatever the steps ahead of it did, for the reason set out on
-      # markdownlint below.
-      - if: ${{ !cancelled() }}
-        name: Lint JSON
-        run: |
-          find docs -name '*.json' -print0 \
-            | xargs -0 -n1 jsonlint --quiet
   markdownlint:
     runs-on: ubuntu-latest
     steps:
@@ -25,7 +12,7 @@ jobs:
         with:
           key: >-
             pip-${{ github.job }}-${{
-            hashFiles('.github/workflows/documentation.yml') }}
+            hashFiles('.github/workflows/markdownlint.yml') }}
           path: ~/.cache/pip
           restore-keys: |
             pip-${{ github.job }}-
@@ -59,13 +46,14 @@ jobs:
       # MD013 is off because a table row is one line and cannot be
       # wrapped: a row carrying a link outgrows eighty columns without
       # any way to shorten it but deleting a column.
-      # --dot is what puts .claude/rules/ and .claude/skills/ in front
-      # of the linter: markdownlint-cli skips a dot-prefixed directory
-      # unless it is passed.
-      # --disable is variadic, so the glob goes before it.
+      # The checkout's root is passed as a directory, which markdownlint-cli
+      # expands to every *.md and *.markdown file beneath it; --dot is what
+      # puts dot-prefixed directories such as .claude/ in front of the linter,
+      # which it otherwise skips. --disable is variadic, so the directory goes
+      # before it.
       - if: ${{ !cancelled() }}
         name: Lint Markdown
-        run: markdownlint '**/*.md' --dot --disable MD013
+        run: markdownlint . --dot --disable MD013
   yamllint:
     runs-on: ubuntu-latest
     steps:
@@ -75,7 +63,7 @@ jobs:
         with:
           key: >-
             pip-${{ github.job }}-${{
-            hashFiles('.github/workflows/documentation.yml') }}
+            hashFiles('.github/workflows/markdownlint.yml') }}
           path: ~/.cache/pip
           restore-keys: |
             pip-${{ github.job }}-
@@ -93,7 +81,7 @@ jobs:
           assert-no-inline-directives
           --tools yamllint
           --verbose
-          .github/workflows/documentation.yml
+          .github/workflows/markdownlint.yml
       - if: ${{ !cancelled() }}
         name: Lint YAML
         run: |
@@ -106,8 +94,8 @@ jobs:
           yamllint --strict \
             --config-data \
             "{extends: default, rules: {$RULES}}" \
-            .github/workflows/documentation.yml
-name: documentation
+            .github/workflows/markdownlint.yml
+name: markdownlint
 on:
   push:
     branches: [main]
@@ -119,6 +107,5 @@ on:
       # SKILL.md started no run at all before it was added.
       - '**/*.md'
       - .claude/**/*.md
-      - docs/**/*.json
-      - .github/workflows/documentation.yml
+      - .github/workflows/markdownlint.yml
   workflow_dispatch: {}

@@ -8,7 +8,7 @@ metadata:
 
 # Waiting while a CI run is in progress
 
-While any CI run for a pushed commit is in progress -- any workflow under .github/workflows, deltahdl.yml, scripts.yml, documentation.yml or another -- do nothing but wait for it: no probing of the failing file, no edits, no local commits.
+While any CI run for a pushed commit is in progress -- any workflow under .github/workflows, deltahdl.yml, scripts.yml, markdownlint.yml or another -- do nothing but wait for it: no probing of the failing file, no edits, no local commits.
 
 **Why:** A run's findings decide the next step, and work done before they land is done on a guess about them.
 
