@@ -26,13 +26,16 @@ TEST(StructuredProcedureSimulation, AllProcedureTypesCoexist) {
   EXPECT_EQ(sum->value.ToUint64(), 30u);
 }
 
+// The $finish at 21 falls between the firings at 20 and 22: §4.7 leaves open
+// the order of two processes due at one time, and §20.2 runs nothing of that
+// step after the $finish, so it is kept off a firing's own tick.
 TEST(StructuredProcedureSimulation, AlwaysRepeatsUntilTermination) {
   auto val = RunAndGet(
       "module m;\n"
       "  logic [31:0] count;\n"
       "  initial count = 0;\n"
-      "  always #1 count = count + 1;\n"
-      "  initial #10 $finish;\n"
+      "  always #2 count = count + 1;\n"
+      "  initial #21 $finish;\n"
       "endmodule\n",
       "count");
   EXPECT_EQ(val, 10u);
@@ -60,16 +63,18 @@ TEST(StructuredProcedureSimulation, NoImpliedOrderInitialAndAlways) {
   EXPECT_EQ(vb->value.ToUint64(), 42u);
 }
 
+// Each always fires at 2, 4, 6, 8 and 10, and the $finish at 11 falls off
+// those ticks, for the reason AlwaysRepeatsUntilTermination gives.
 TEST(StructuredProcedureSimulation, NoLimitOnAlwaysCount) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
       "  logic [31:0] a, b, c;\n"
       "  initial begin a = 0; b = 0; c = 0; end\n"
-      "  always #1 a = a + 1;\n"
-      "  always #1 b = b + 2;\n"
-      "  always #1 c = c + 3;\n"
-      "  initial #5 $finish;\n"
+      "  always #2 a = a + 1;\n"
+      "  always #2 b = b + 2;\n"
+      "  always #2 c = c + 3;\n"
+      "  initial #11 $finish;\n"
       "endmodule\n",
       f);
   LowerRunAndCheck(f, design, {{"a", 5u}, {"b", 10u}, {"c", 15u}});

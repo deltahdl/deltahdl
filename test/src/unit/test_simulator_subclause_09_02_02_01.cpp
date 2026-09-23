@@ -8,6 +8,10 @@ using namespace delta;
 
 namespace {
 
+// The $finish falls between two firings, at 27: §4.7 leaves open the order
+// of two processes due at one time, and §20.2 runs nothing of that time step
+// after the $finish, so a firing on the finish's own tick would count or not
+// by that order alone.
 TEST(GeneralPurposeAlwaysSimulation, ClockOscillatorWithDelay) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -15,7 +19,7 @@ TEST(GeneralPurposeAlwaysSimulation, ClockOscillatorWithDelay) {
       "  logic [31:0] clk;\n"
       "  initial clk = 0;\n"
       "  always #5 clk = clk + 1;\n"
-      "  initial #25 $finish;\n"
+      "  initial #27 $finish;\n"
       "endmodule\n",
       f, "clk");
   ASSERT_NE(var, nullptr);
@@ -66,6 +70,8 @@ TEST(GeneralPurposeAlwaysSimulation, RepeatsUnderLocalparamDelay) {
   EXPECT_EQ(var->value.ToUint64(), 4u);
 }
 
+// The clock rises at 5, 15 and 25 and falls at 10 and 20, so at the $finish
+// at 17, off both edges, it is 1 only if the block went round a second time.
 TEST(GeneralPurposeAlwaysSimulation, TwoPhaseClockBeginEnd) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -76,11 +82,11 @@ TEST(GeneralPurposeAlwaysSimulation, TwoPhaseClockBeginEnd) {
       "    #5 clk = 1;\n"
       "    #5 clk = 0;\n"
       "  end\n"
-      "  initial #20 $finish;\n"
+      "  initial #17 $finish;\n"
       "endmodule\n",
       f, "clk");
   ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 0u);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
 TEST(GeneralPurposeAlwaysSimulation, SensitivityListTriggersOnEdge) {
