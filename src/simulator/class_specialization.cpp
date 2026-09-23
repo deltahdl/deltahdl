@@ -164,6 +164,20 @@ const ClassTypeInfo* HolderScopeClass(const ClassTypeInfo* holder,
   return nullptr;
 }
 
+// §8.3 with §6.18: an actual naming a class-scope typedef of `holder` that
+// stands for no class -- UVM's `rsrc_sv_q_t` in uvm_resource_types's `typedef
+// uvm_shared#(rsrc_sv_q_t) rsrc_shared_q_t;`, a queue of uvm_resource_base --
+// names the type that typedef declares in `holder`, so the actual is
+// qualified with `holder`'s name, where TypedefItemSeenFrom
+// (eval_array_class_assoc.h) finds it. Left bare, the name was looked up
+// from the specialized class, which declares no such typedef, and uvm_shared's
+// `T value` lost the queue dimension.
+void QualifyHolderTypedef(const ClassTypeInfo* holder, DataType& actual) {
+  if (!actual.type_params.empty() || !actual.scope_name.empty()) return;
+  if (ClassScopeTypedefItem(holder, actual.type_name) == nullptr) return;
+  actual.scope_name = holder->name;
+}
+
 // §8.25: the class `spec` extends, where its declaration's extends clause
 // names one of the class's own type parameters, is the one this set of actuals
 // binds that parameter to. BaseClassOf in lowerer_class.cpp binds the
@@ -303,6 +317,8 @@ std::vector<DataType> ActualsUnderSpecialization(
     if (holder->decl->type_param_names.count(actual.type_name) == 0) {
       if (const ClassTypeInfo* cls = HolderScopeClass(holder, actual, ctx))
         actual.type_name = cls->name;
+      else
+        QualifyHolderTypedef(holder, actual);
       continue;
     }
     const DataType* a = HolderActualFor(holder, actual.type_name);

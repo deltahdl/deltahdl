@@ -17,6 +17,7 @@
 #include "parser/ast_type.h"
 #include "simulator/class_object.h"
 #include "simulator/declared_class_key.h"
+#include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
@@ -158,12 +159,46 @@ const ModuleItem* TypedefItemSeenFrom(const DataType& type,
   return ctx.FindTypedefItem(name);
 }
 
+// §8.25: the type the type parameter `name` of `declaring` stands for in the
+// specialization `declaring` is: the actual its list gives, else the default
+// the class declares, which §8.25.1 makes the default specialization's.
+static const DataType* SpecializationTypeActual(const ClassTypeInfo* declaring,
+                                                std::string_view name) {
+  const ClassDecl* decl = declaring->decl;
+  if (declaring->param_actuals != nullptr) {
+    for (size_t i = 0; i < decl->params.size(); ++i) {
+      if (decl->params[i].first != name) continue;
+      if (const DataType* actual =
+              ActualForParam(*declaring->param_actuals, i, name)) {
+        return actual;
+      }
+    }
+  }
+  return TypeParamActual(nullptr, decl, name);
+}
+
+// §8.25 with §7.4.4: the type the property `member` of `declaring` is written
+// with, or, where that names a type parameter of the class, the type the
+// specialization binds it to, whose unpacked dimensions a typedef it names
+// may give (PropertyTypedefItem). Null for a parameter nothing binds.
+static const DataType* PropertyWrittenType(const ClassMember* member,
+                                           const ClassTypeInfo* declaring) {
+  const DataType& type = member->data_type;
+  if (declaring == nullptr || declaring->decl == nullptr ||
+      type.kind != DataTypeKind::kNamed || !type.scope_name.empty() ||
+      declaring->decl->type_param_names.count(type.type_name) == 0) {
+    return &type;
+  }
+  return SpecializationTypeActual(declaring, type.type_name);
+}
+
 const ModuleItem* PropertyTypedefItem(const ClassMember* member,
                                       const ClassTypeInfo* declaring,
                                       SimContext& ctx) {
   if (!member->unpacked_dims.empty()) return nullptr;
-  const ModuleItem* item =
-      TypedefItemSeenFrom(member->data_type, declaring, ctx);
+  const DataType* type = PropertyWrittenType(member, declaring);
+  if (type == nullptr) return nullptr;
+  const ModuleItem* item = TypedefItemSeenFrom(*type, declaring, ctx);
   if (item == nullptr || item->unpacked_dims.empty()) return nullptr;
   return item;
 }

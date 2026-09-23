@@ -479,4 +479,52 @@ TEST(ClassSim, ClassScopeTypedefValueActualIsTheHoldersValue) {
   EXPECT_EQ(out, "hopper root\n");
 }
 
+// §8.25 with §7.4.4: a type parameter stands for the type its actual names,
+// and a typedef's unpacked dimensions are part of that type, so under
+// S #(iq_t) the property `T value` is a queue of int. Two pushes answer a
+// size of 2 and 8 at index 1; typed as the element alone, the property was a
+// scalar and the pushes stored nothing, answering 0 and 0.
+TEST(ClassSim, PropertyTypedByATypeParameterTakesItsActualsQueueDim) {
+  SimFixture f;
+  auto out = RunCapture(
+      "typedef int iq_t[$];\n"
+      "class S #(type T = int); T value; endclass\n"
+      "module t;\n"
+      "  initial begin\n"
+      "    S #(iq_t) s;\n"
+      "    s = new;\n"
+      "    s.value.push_back(7);\n"
+      "    s.value.push_back(8);\n"
+      "    $display(\"%0d %0d\", s.value.size(), s.value[1]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "2 8\n");
+}
+
+// The same rule where the actual is a class-scope typedef, as UVM's
+// uvm_resource_types spells `typedef uvm_shared#(rsrc_sv_q_t)
+// rsrc_shared_q_t;`: iq_t in H's list is H's queue typedef, found in the
+// class that wrote the list rather than in S, which declares `T value`.
+TEST(ClassSim, PropertyTypedByATypeParameterTakesAHoldersQueueTypedef) {
+  SimFixture f;
+  auto out = RunCapture(
+      "class S #(type T = int); T value; endclass\n"
+      "class H;\n"
+      "  typedef int iq_t[$];\n"
+      "  typedef S #(iq_t) sq_t;\n"
+      "endclass\n"
+      "module t;\n"
+      "  initial begin\n"
+      "    H::sq_t s;\n"
+      "    s = new;\n"
+      "    s.value.push_back(7);\n"
+      "    s.value.push_back(8);\n"
+      "    $display(\"%0d %0d\", s.value.size(), s.value[1]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "2 8\n");
+}
+
 }  // namespace
