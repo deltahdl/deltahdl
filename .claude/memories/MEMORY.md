@@ -81,7 +81,7 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 
 ## Issues
 
-- [File, then solve, what the session finds](solving-what-a-session-finds.md) — one issue per indivisible new problem, then solve the ones the original issue depends on.
+- [File, then solve, what the session finds](solving-what-a-session-finds.md) — one issue per indivisible new problem not already filed, then solve the ones the original issue depends on.
 - [What does not get filed](what-does-not-get-filed.md) — nothing the commit in hand fixes, nothing an open issue already covers.
 - [One indivisible problem per issue](one-indivisible-problem-per-issue.md) — one defect, one fix per issue; an issue found holding two is split there and then.
 - [Research lives in issues](research-lives-in-issues.md) — a plan that outlives the session, and each finding it yields, is filed as it arises; the task list and scratchpad are not durable.
