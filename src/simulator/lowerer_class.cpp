@@ -337,6 +337,18 @@ static uint32_t FixedDimensionSize(const Expr* dim, int64_t& lo,
                                             : left - right + 1);
 }
 
+// Gives the property named `name` the unpacked dimension RecordArrayProperties
+// read for it.
+static void MarkArrayProperty(ClassTypeInfo* info, std::string_view name,
+                              uint32_t size, int64_t lo, bool dynamic) {
+  for (auto& prop : info->properties) {
+    if (prop.name != name) continue;
+    prop.array_size = size;
+    prop.array_lo = lo;
+    prop.is_dynamic = dynamic;
+  }
+}
+
 // §7.4.2/§7.5/§18.5.7: mark each property declared with one fixed or
 // dynamic unpacked dimension as the array it is, so the object holds its
 // elements one by one and a constraint can iterate over them or reduce them.
@@ -356,12 +368,7 @@ static void RecordArrayProperties(ClassTypeInfo* info, const ClassDecl* cls,
     int64_t lo = 0;
     uint32_t size = kDynamic ? 0 : FixedDimensionSize(dims[0], lo, ctx, arena);
     if (size == 0 && !kDynamic) continue;
-    for (auto& prop : info->properties) {
-      if (prop.name != member->name) continue;
-      prop.array_size = size;
-      prop.array_lo = lo;
-      prop.is_dynamic = kDynamic;
-    }
+    MarkArrayProperty(info, member->name, size, lo, kDynamic);
   }
 }
 
