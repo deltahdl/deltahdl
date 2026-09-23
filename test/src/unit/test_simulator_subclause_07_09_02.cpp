@@ -344,4 +344,36 @@ TEST(AssocArrayDeleteMethod, MissingStringKeyIssuesNoWarning) {
   EXPECT_EQ(with_delete, 0u);
 }
 
+// §7.9.2 with §8.5: delete on a property that is an associative array of
+// class handles, called in a task of the class, is the array's method -- as
+// UVM's uvm_objection::wait_for ends with `m_events.delete(obj)` -- so the
+// entry goes and nothing is reported. Taken for a call through a class handle
+// of the element's class, the property read as a null handle and §8.4's error
+// was raised, though the array's delete then ran as well.
+TEST(AssocArrayDeleteMethod,
+     DeleteOnAHandleArrayPropertyInATaskReportsNothing) {
+  SimFixture f;
+  auto out = RunCapture(
+      "class E; endclass\n"
+      "class K; endclass\n"
+      "class O;\n"
+      "  E m_events[K];\n"
+      "  task drop(K k);\n"
+      "    m_events[k] = new;\n"
+      "    m_events.delete(k);\n"
+      "    $display(\"num=%0d\", m_events.num());\n"
+      "  endtask\n"
+      "endclass\n"
+      "module t;\n"
+      "  initial begin\n"
+      "    O o = new;\n"
+      "    K k = new;\n"
+      "    o.drop(k);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "num=0\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
 }  // namespace

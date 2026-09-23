@@ -228,12 +228,14 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/sim_context_vcd.cpp
     simulator/vcd_dump_state.cpp
     simulator/class_object.cpp
+    simulator/class_event_property.cpp
     simulator/evaluation.cpp
     simulator/evaluation_literal.cpp
     simulator/eval_ternary.cpp
     simulator/eval_class_new.cpp
     simulator/eval_class_params.cpp
     simulator/eval_function.cpp
+    simulator/eval_function_ref_checks.cpp
     simulator/eval_function_hier.cpp
     simulator/eval_call_result.cpp
     simulator/eval_class_scope_types.cpp

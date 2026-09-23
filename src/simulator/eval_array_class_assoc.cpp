@@ -93,6 +93,14 @@ std::string_view PropertyClassName(const ClassObject* obj,
   return DeclaredClassKeyInScope(*bound, decl.declaring, ctx, arena);
 }
 
+bool PropertyIsArray(const ClassTypeInfo* from, std::string_view field,
+                     SimContext& ctx) {
+  PropertyDeclaration decl = FindPropertyDeclaration(from, field);
+  if (decl.member == nullptr) return false;
+  return !decl.member->unpacked_dims.empty() ||
+         PropertyTypedefItem(decl.member, decl.declaring, ctx) != nullptr;
+}
+
 // Whether `expr` is a path of names to an object -- an identifier, `this`
 // among them, or a member access down such a path -- which is evaluated to a
 // handle without running anything. A call or a select on the way is not, and

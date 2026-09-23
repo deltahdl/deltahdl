@@ -315,4 +315,133 @@ TEST(Simulator, EventNullifyOnAliasBreaksOnlyAssignedName) {
   EXPECT_EQ(still_equal->value.ToUint64(), 0u);
 }
 
+// §6.17 with §8.5: an event property is an event of the object, so an event
+// control on it through a handle, `@(e.ev)`, returns when a trigger through a
+// handle, `-> e.ev`, sets it (§9.4.2). With no event behind the property the
+// wait stayed parked and the fork never printed.
+TEST(Simulator, EventPropertyWaitedAndTriggeredThroughAHandle) {
+  SimFixture f;
+  auto out = RunCapture(
+      "class E; event ev; endclass\n"
+      "module t;\n"
+      "  E e = new;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      begin @(e.ev); $display(\"woke %0t\", $time); end\n"
+      "    join_none\n"
+      "    #1 -> e.ev;\n"
+      "    #1 $display(\"done %0t\", $time);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "woke 1\ndone 2\n");
+}
+
+// The same inside the class: a method waits on the object's own event by its
+// bare name and another method triggers it, as #3719's `-> ev` in a task of
+// the class does for a wait written outside it.
+TEST(Simulator, EventPropertyWaitedAndTriggeredInsideTheClass) {
+  SimFixture f;
+  auto out = RunCapture(
+      "class O;\n"
+      "  event own;\n"
+      "  task wait_own(); @(own); $display(\"woke %0t\", $time); endtask\n"
+      "  function void fire(); -> own; endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  O o = new;\n"
+      "  initial begin\n"
+      "    fork o.wait_own(); join_none\n"
+      "    #1 o.fire();\n"
+      "    #1 $display(\"done %0t\", $time);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "woke 1\ndone 2\n");
+}
+
+// UVM's uvm_objection::wait_for waits on `@(m_events[obj].all_dropped)`, an
+// event property of an object held in an associative array keyed by a
+// handle, which m_forked_drain triggers with `->m_events[obj].all_dropped`.
+TEST(Simulator, EventPropertyOfAnAssociativeElementWakesItsWaiter) {
+  SimFixture f;
+  auto out = RunCapture(
+      "class E; event all_dropped; endclass\n"
+      "class K; endclass\n"
+      "class O;\n"
+      "  E m_events[K];\n"
+      "  task wait_for(K k);\n"
+      "    if (!m_events.exists(k)) m_events[k] = new;\n"
+      "    @(m_events[k].all_dropped);\n"
+      "    $display(\"woke %0t\", $time);\n"
+      "  endtask\n"
+      "  function void fire(K k); ->m_events[k].all_dropped; endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  O o = new;\n"
+      "  K k = new;\n"
+      "  initial begin\n"
+      "    fork o.wait_for(k); join_none\n"
+      "    #1 o.fire(k);\n"
+      "    #1 $display(\"done %0t\", $time);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "woke 1\ndone 2\n");
+}
+
+// Each object's property is an event of its own: triggering a's wakes the
+// process waiting on a's and leaves the one waiting on b's parked, so b's
+// waiter wakes only at b's trigger a time unit later.
+TEST(Simulator, EventPropertiesOfTwoObjectsAreDistinctEvents) {
+  SimFixture f;
+  auto out = RunCapture(
+      "class E; event ev; endclass\n"
+      "module t;\n"
+      "  E a = new;\n"
+      "  E b = new;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      begin @(a.ev); $display(\"a %0t\", $time); end\n"
+      "      begin @(b.ev); $display(\"b %0t\", $time); end\n"
+      "    join_none\n"
+      "    #1 -> a.ev;\n"
+      "    #1 -> b.ev;\n"
+      "    #1 $display(\"done %0t\", $time);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "a 1\nb 2\ndone 3\n");
+}
+
+// §6.17 with §8.9: a static event property is one event for the class and
+// every object of it, so a wait by the scope form `@Sync::e` returns at
+// `-> Sync::e`, a static task's wait on the bare `e` returns at the same
+// trigger, and a wait through an object's handle, `@x.e`, returns at a
+// trigger through the handle -- #3924's shapes, which woke nothing.
+TEST(Simulator, StaticEventPropertyIsTheClassesOneEvent) {
+  SimFixture f;
+  auto out = RunCapture(
+      "class Sync;\n"
+      "  static event e;\n"
+      "  static task waiter(); @e; $display(\"task %0t\", $time); endtask\n"
+      "endclass\n"
+      "module t;\n"
+      "  Sync x = new;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      begin @Sync::e; $display(\"scope %0t\", $time); end\n"
+      "      Sync::waiter();\n"
+      "      #2 -> Sync::e;\n"
+      "    join\n"
+      "    fork\n"
+      "      begin @x.e; $display(\"handle %0t\", $time); end\n"
+      "      #2 -> x.e;\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "scope 2\ntask 2\nhandle 4\n");
+}
+
 }  // namespace

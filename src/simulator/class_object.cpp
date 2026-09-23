@@ -258,6 +258,9 @@ ClassObject* ClassObject::ShallowCopy(Arena& arena) const {
   // property is a handle to the built-in object (§15.3.1, §15.4.1), so the
   // copy names the same bucket or queue, as a copied class handle does.
   copy->semaphore_properties = semaphore_properties;
+  // §8.12 for an event property: the property is a handle to a
+  // synchronization object (§6.17), so the copy names the same event.
+  copy->event_properties = event_properties;
   copy->mailbox_properties = mailbox_properties;
   // §8.12 has the copy be of the same class, which for a parameterized class
   // is the same specialization (§8.25), so it is bound to the same types.

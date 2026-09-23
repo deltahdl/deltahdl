@@ -17,6 +17,7 @@
 #include "parser/ast_expr.h"
 #include "simulator/awaiters.h"
 #include "simulator/awaiters_event_control.h"
+#include "simulator/class_event_property.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/eval_instance_task.h"
 #include "simulator/eval_mailbox.h"
@@ -91,13 +92,9 @@ std::string_view ResolveEventTargetName(const Expr* expr, SimContext& ctx) {
 
 static StmtResult ExecEventTriggerImpl(const Stmt* stmt, SimContext& ctx) {
   auto event_name = ResolveEventTargetName(stmt->expr, ctx);
-  if (event_name.empty()) return StmtResult::kDone;
-  auto* var = ctx.FindVariable(event_name);
-  if (!var) return StmtResult::kDone;
-
-  if (var->is_null_event) return StmtResult::kDone;
-
-  ctx.SetEventTriggered(event_name);
+  auto* var = TriggerTargetEvent(stmt->expr, event_name, ctx);
+  if (!var || var->is_null_event) return StmtResult::kDone;
+  if (!event_name.empty()) ctx.SetEventTriggered(event_name);
 
   auto pending = std::move(var->watchers);
   var->watchers.clear();

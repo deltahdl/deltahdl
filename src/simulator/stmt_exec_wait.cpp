@@ -16,6 +16,7 @@
 #include "parser/ast_stmt.h"
 #include "simulator/awaiters.h"
 #include "simulator/awaiters_event_control.h"
+#include "simulator/class_event_property.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_semaphore.h"
 #include "simulator/evaluation.h"
@@ -378,13 +379,27 @@ static bool HasSequenceEvent(const Stmt* stmt) {
   return false;
 }
 
+// §6.17 with §9.4.2: the event a single event control with no edge and no
+// guard waits on where its operand names a class's event property, `@(h.ev)`
+// or `@(ev)` in a method (ClassEventVariable); null otherwise, and where the
+// operand is a declared event NamedEventKey finds by name.
+static Variable* ClassEventOfControl(const Stmt* stmt, SimContext& ctx,
+                                     Arena& arena) {
+  if (stmt->events.size() != 1) return nullptr;
+  const auto& ev = stmt->events[0];
+  if (ev.edge != Edge::kNone || ev.iff_condition) return nullptr;
+  return ClassEventVariable(ev.signal, ctx, arena);
+}
+
 ExecTask ExecEventControl(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (!stmt->events.empty()) {
     std::string_view named_event = NamedEventKey(stmt, ctx);
+    Variable* class_event =
+        named_event.empty() ? ClassEventOfControl(stmt, ctx, arena) : nullptr;
     if (HasSequenceEvent(stmt)) {
       co_await SequenceEventAwaiter{ctx, stmt->events};
-    } else if (!named_event.empty()) {
-      co_await NamedEventAwaiter{ctx, named_event};
+    } else if (!named_event.empty() || class_event != nullptr) {
+      co_await NamedEventAwaiter{ctx, named_event, class_event};
     } else {
       co_await EventAwaiter{ctx, stmt->events, arena};
     }

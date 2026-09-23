@@ -19,6 +19,7 @@ struct AssocArrayObject;
 struct MailboxObject;
 struct QueueObject;
 struct SemaphoreObject;
+struct Variable;
 struct ClassDecl;
 struct ClassMember;
 struct ConstraintForeachRef;
@@ -206,6 +207,10 @@ struct ClassTypeInfo {
       static_semaphore_properties;
   mutable std::unordered_map<std::string, MailboxObject*>
       static_mailbox_properties;
+  // §6.17 with §8.9: the event a property declared `static event e` holds,
+  // one for the class and every object of it, made on the first reference as
+  // ClassObject::event_properties are.
+  mutable std::unordered_map<std::string, Variable*> static_event_properties;
 
   // §18.5.10: a constraint block qualified 'static' has one active/inactive
   // state shared by every instance of the declaring class, rather than a
@@ -342,6 +347,15 @@ struct ClassObject {
   // class's mailbox passed nothing and its semaphore held no keys.
   std::unordered_map<std::string, SemaphoreObject*> semaphore_properties;
   std::unordered_map<std::string, MailboxObject*> mailbox_properties;
+  // §6.17 with §8.5: the event each property declared `event e` holds, keyed
+  // by the property's bare name. An event variable is a handle to a
+  // synchronization object, so each object's property is an event of its
+  // own, which a trigger `-> h.e` or `-> e` in a method sets and an event
+  // control `@(h.e)` or `@(e)` waits on (ClassEventVariable in
+  // src/simulator/class_event_property.h), made on the first reference.
+  // Without it neither side found an event, and a wait on the property never
+  // returned.
+  std::unordered_map<std::string, Variable*> event_properties;
   // §8.25: the type each type parameter of the class is bound to in the
   // specialization this object was constructed as, keyed by the parameter's
   // name -- `KEY` to `string` for a `uvm_pool #(string, int)` -- as the

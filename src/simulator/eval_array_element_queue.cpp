@@ -31,25 +31,31 @@ QueueObject* NewElementQueue(uint32_t width, bool is_4state, bool handles,
   return q;
 }
 
-// The queue under `key` of the associative array `aa`, whose entries are
-// `data` and whose element queues are `queues`. A key `data` lacks is
-// allocated where `allocate` says so, the queue a deleted entry left under it
-// dropped so the new element starts empty (§7.8.7); read alone, it answers a
-// fresh empty queue and allocates nothing.
+// The entries of an associative array under one kind of key, `data`, and the
+// queue each element that is a queue holds under the same key, `queues`.
 template <typename Key>
-QueueObject* AssocElementQueue(AssocArrayObject* aa,
-                               std::map<Key, Logic4Vec>& data,
-                               std::map<Key, QueueObject*>& queues,
+struct KeyedEntries {
+  std::map<Key, Logic4Vec>& data;
+  std::map<Key, QueueObject*>& queues;
+};
+
+// The queue under `key` of the associative array `aa`, whose entries under
+// that kind of key are `entries`. A key the entries lack is allocated where
+// `allocate` says so, the queue a deleted entry left under it dropped so the
+// new element starts empty (§7.8.7); read alone, it answers a fresh empty
+// queue and allocates nothing.
+template <typename Key>
+QueueObject* AssocElementQueue(AssocArrayObject* aa, KeyedEntries<Key> entries,
                                const Key& key, bool allocate, Arena& arena) {
-  if (data.count(key) == 0) {
+  if (entries.data.count(key) == 0) {
     if (!allocate) {
       return NewElementQueue(aa->elem_width, aa->is_4state,
                              aa->element_queue_handles, arena);
     }
-    data.emplace(key, AssocAllocValue(aa, arena));
-    queues.erase(key);
+    entries.data.emplace(key, AssocAllocValue(aa, arena));
+    entries.queues.erase(key);
   }
-  QueueObject*& q = queues[key];
+  QueueObject*& q = entries.queues[key];
   if (q == nullptr) {
     q = NewElementQueue(aa->elem_width, aa->is_4state,
                         aa->element_queue_handles, arena);
@@ -63,14 +69,16 @@ QueueObject* OfAssocElement(AssocArrayObject* aa, const Expr* sel,
                             SimContext& ctx, Arena& arena, bool allocate) {
   Logic4Vec idx = EvalExpr(sel->index, ctx, arena);
   if (aa->is_string_key) {
-    return AssocElementQueue(aa, aa->str_data, aa->str_element_queues,
-                             AssocStringKey(idx), allocate, arena);
+    return AssocElementQueue(
+        aa, KeyedEntries<std::string>{aa->str_data, aa->str_element_queues},
+        AssocStringKey(idx), allocate, arena);
   }
   if (HasUnknownBits(idx)) return nullptr;
   int64_t key =
       AssocIntKey(idx, aa->is_wildcard, aa->index_width, aa->is_index_signed);
-  return AssocElementQueue(aa, aa->int_data, aa->int_element_queues, key,
-                           allocate, arena);
+  return AssocElementQueue(
+      aa, KeyedEntries<int64_t>{aa->int_data, aa->int_element_queues}, key,
+      allocate, arena);
 }
 
 // §7.10.1: the element `sel` selects of the queue or dynamic array `outer`,

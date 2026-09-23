@@ -82,11 +82,15 @@ struct DelayAwaiter {
 struct NamedEventAwaiter {
   SimContext& ctx;
   std::string_view event_name;
+  // §6.17: the event itself where it is no variable of a scope but a class's
+  // event property (ClassEventVariable in class_event_property.h), which no
+  // name finds; null to find the event by `event_name`.
+  Variable* event = nullptr;
 
   bool await_ready() const noexcept { return false; }
 
   void await_suspend(std::coroutine_handle<> h) {
-    auto* var = ctx.FindVariable(event_name);
+    auto* var = event != nullptr ? event : ctx.FindVariable(event_name);
     if (!var) return;
     auto* proc = ctx.CurrentProcess();
     auto* ctx_ptr = &ctx;

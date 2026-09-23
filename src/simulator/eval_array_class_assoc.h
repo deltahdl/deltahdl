@@ -121,6 +121,14 @@ std::string_view PropertyClassName(const ClassObject* obj,
                                    const ClassTypeInfo* from,
                                    std::string_view field, SimContext& ctx);
 
+// §7.4 with §8.5: whether the property `field` on the class chain from
+// `from` is an unpacked array -- a fixed-size, dynamic, associative array or
+// queue -- by its own unpacked dimensions or those of the typedef its type
+// names (PropertyTypedefItem). Its methods are then the array's, whatever
+// class its elements are handles of.
+bool PropertyIsArray(const ClassTypeInfo* from, std::string_view field,
+                     SimContext& ctx);
+
 // Whether `expr` is a path of names to an object -- an identifier, `this`
 // among them, or a member access down such a path -- which is evaluated to a
 // handle without running anything. A call or a select on the way is not, and
