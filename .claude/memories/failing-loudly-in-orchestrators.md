@@ -7,7 +7,7 @@ metadata:
 
 # Failing loudly in the orchestrator scripts
 
-Crash the run when something goes wrong inside one of the orchestrators under `scripts/` — an oversize dependency cycle, an unexpected oracle result, a bad dependency — rather than skipping the failing item and carrying on.
+Crash the run when something goes wrong inside one of the orchestrators under `scripts/` rather than skipping the failing item and carrying on.
 
 **Why:** The user is the one running these orchestrators. Silent partial-success runs disguise failures, spend tokens on unrelated downstream work, and leave it ambiguous whether the run finished. A hard failure forces the question.
 

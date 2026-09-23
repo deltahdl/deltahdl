@@ -245,7 +245,7 @@ jobs:
           restore-keys: |
             pip-${{ github.job }}-
       - name: Install tools
-        run: pip install mypy pypdf pytest pyyaml types-PyYAML
+        run: pip install mypy pytest pyyaml types-PyYAML
       - name: Run mypy on source
         run: >-
           PYTHONPATH=.:scripts python3 -m mypy --strict
@@ -264,7 +264,7 @@ jobs:
           restore-keys: |
             pip-${{ github.job }}-
       - name: Install tools
-        run: pip install mypy pypdf pytest pyyaml types-PyYAML
+        run: pip install mypy pytest pyyaml types-PyYAML
       - name: Run mypy on tests
         run: >-
           MYPYPATH=.:scripts
@@ -284,7 +284,7 @@ jobs:
           restore-keys: |
             pip-${{ github.job }}-
       - name: Install tools
-        run: pip install pylint pypdf pytest pyyaml types-PyYAML
+        run: pip install pylint pytest pyyaml types-PyYAML
       - name: Run pylint on source
         run: >-
           PYTHONPATH=.:scripts python3 -m pylint
@@ -307,7 +307,7 @@ jobs:
           restore-keys: |
             pip-${{ github.job }}-
       - name: Install tools
-        run: pip install pylint pypdf pytest pyyaml types-PyYAML
+        run: pip install pylint pytest pyyaml types-PyYAML
       - name: Run pylint on tests
         run: >-
           PYTHONPATH=.:scripts
@@ -363,176 +363,6 @@ jobs:
           --cov-branch
           --cov-report=term-missing
           --cov-fail-under=100
-  test-generate-lrm-subclause-dependencies:
-    needs:
-      - test-lib-cli
-      - test-lib-lrm
-      - test-lib-lrm-subclause-dependencies
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - name: Restore pip cache
-        uses: actions/cache@v5
-        with:
-          key: >-
-            pip-scripts-test-script-${{
-            hashFiles('.github/workflows/scripts.yml') }}
-          path: ~/.cache/pip
-          restore-keys: |
-            pip-scripts-test-script-
-      - name: Install tools
-        run: pip install pypdf pytest pytest-cov
-      - name: Run unit tests with 100% coverage gate
-        run: >-
-          PYTHONPATH=.:scripts python3 -m pytest
-          test/scripts/generate_lrm_subclause_dependencies/unit/ -v
-          --cov=generate_lrm_subclause_dependencies
-          --cov-branch
-          --cov-report=term-missing
-          --cov-fail-under=100
-      - name: Run integration tests
-        run: >-
-          PYTHONPATH=.:scripts python3 -m pytest
-          test/scripts/generate_lrm_subclause_dependencies/integration/ -v
-      - name: Run e2e tests
-        run: >-
-          PYTHONPATH=.:scripts python3 -m pytest
-          test/scripts/generate_lrm_subclause_dependencies/e2e/ -v
-  test-lib-claude-cli-streaming:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - name: Restore pip cache
-        uses: actions/cache@v5
-        with:
-          key: >-
-            pip-scripts-test-lib-${{
-            hashFiles('.github/workflows/scripts.yml') }}
-          path: ~/.cache/pip
-          restore-keys: |
-            pip-scripts-test-lib-
-      - name: Install tools
-        run: pip install pytest pytest-cov
-      - name: Run tests with 100% coverage gate
-        run: >-
-          python3 -m pytest test/lib/python/claude_cli_streaming/unit/ -v
-          --cov=lib.python.claude_cli_streaming
-          --cov-branch
-          --cov-report=term-missing
-          --cov-fail-under=100
-  test-lib-cli:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - name: Restore pip cache
-        uses: actions/cache@v5
-        with:
-          key: >-
-            pip-scripts-test-lib-${{
-            hashFiles('.github/workflows/scripts.yml') }}
-          path: ~/.cache/pip
-          restore-keys: |
-            pip-scripts-test-lib-
-      - name: Install tools
-        run: pip install pytest pytest-cov
-      - name: Run unit tests with 100% coverage gate
-        run: >-
-          python3 -m pytest test/lib/python/cli/unit/ -v
-          --cov=lib.python.cli
-          --cov-branch
-          --cov-report=term-missing
-          --cov-fail-under=100
-  test-lib-github:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - name: Restore pip cache
-        uses: actions/cache@v5
-        with:
-          key: >-
-            pip-scripts-test-lib-${{
-            hashFiles('.github/workflows/scripts.yml') }}
-          path: ~/.cache/pip
-          restore-keys: |
-            pip-scripts-test-lib-
-      - name: Install tools
-        run: pip install pytest pytest-cov
-      - name: Run tests with 100% coverage gate
-        run: >-
-          python3 -m pytest test/lib/python/github/unit/ -v
-          --cov=lib.python.github
-          --cov-branch
-          --cov-report=term-missing
-          --cov-fail-under=100
-  test-lib-lrm:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - name: Restore pip cache
-        uses: actions/cache@v5
-        with:
-          key: >-
-            pip-scripts-test-lib-${{
-            hashFiles('.github/workflows/scripts.yml') }}
-          path: ~/.cache/pip
-          restore-keys: |
-            pip-scripts-test-lib-
-      - name: Install tools
-        run: pip install pypdf pytest pytest-cov
-      - name: Run tests with 100% coverage gate
-        run: >-
-          python3 -m pytest test/lib/python/lrm/unit/ -v
-          --cov=lib.python.lrm
-          --cov-branch
-          --cov-report=term-missing
-          --cov-fail-under=100
-  test-lib-lrm-subclause-dependencies:
-    needs:
-      - test-lib-claude-cli-streaming
-      - test-lib-lrm
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - name: Restore pip cache
-        uses: actions/cache@v5
-        with:
-          key: >-
-            pip-scripts-test-lib-${{
-            hashFiles('.github/workflows/scripts.yml') }}
-          path: ~/.cache/pip
-          restore-keys: |
-            pip-scripts-test-lib-
-      - name: Install tools
-        run: pip install pypdf pytest pytest-cov
-      - name: Run tests with 100% coverage gate
-        run: >-
-          python3 -m pytest test/lib/python/lrm_subclause_dependencies/unit/ -v
-          --cov=lib.python.lrm_subclause_dependencies
-          --cov-branch
-          --cov-report=term-missing
-          --cov-fail-under=100
-  test-lib-retry:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - name: Restore pip cache
-        uses: actions/cache@v5
-        with:
-          key: >-
-            pip-scripts-test-lib-${{
-            hashFiles('.github/workflows/scripts.yml') }}
-          path: ~/.cache/pip
-          restore-keys: |
-            pip-scripts-test-lib-
-      - name: Install tools
-        run: pip install pytest pytest-cov
-      - name: Run tests with 100% coverage gate
-        run: >-
-          python3 -m pytest test/lib/python/retry/unit/ -v
-          --cov=lib.python.retry
-          --cov-branch
-          --cov-report=term-missing
-          --cov-fail-under=100
   test-lib-run-tests-common:
     runs-on: ubuntu-latest
     steps:
@@ -552,50 +382,6 @@ jobs:
         run: >-
           python3 -m pytest test/lib/python/run_tests_common/ -v
           --cov=lib.python.run_tests_common
-          --cov-branch
-          --cov-report=term-missing
-          --cov-fail-under=100
-  test-lib-subclause:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - name: Restore pip cache
-        uses: actions/cache@v5
-        with:
-          key: >-
-            pip-scripts-test-lib-${{
-            hashFiles('.github/workflows/scripts.yml') }}
-          path: ~/.cache/pip
-          restore-keys: |
-            pip-scripts-test-lib-
-      - name: Install tools
-        run: pip install pytest pytest-cov
-      - name: Run tests with 100% coverage gate
-        run: >-
-          python3 -m pytest test/lib/python/subclause/unit/ -v
-          --cov=lib.python.subclause
-          --cov-branch
-          --cov-report=term-missing
-          --cov-fail-under=100
-  test-lib-test-fixtures:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - name: Restore pip cache
-        uses: actions/cache@v5
-        with:
-          key: >-
-            pip-scripts-test-lib-${{
-            hashFiles('.github/workflows/scripts.yml') }}
-          path: ~/.cache/pip
-          restore-keys: |
-            pip-scripts-test-lib-
-      - name: Install tools
-        run: pip install pypdf pytest pytest-cov
-      - name: Run tests with 100% coverage gate
-        run: >-
-          python3 -m pytest test/lib/python/test_fixtures/unit/ -v
-          --cov=lib.python.test_fixtures
           --cov-branch
           --cov-report=term-missing
           --cov-fail-under=100
