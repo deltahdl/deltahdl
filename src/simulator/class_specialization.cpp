@@ -344,13 +344,19 @@ ClassTypeInfo* ClassNamedByTypeParam(std::string_view name, SimContext& ctx,
   return SpecializationOf(generic, actual->type_params, ctx, arena);
 }
 
-ClassTypeInfo* SpecializationOf(ClassTypeInfo* generic,
-                                const std::vector<DataType>& actuals,
-                                SimContext& ctx, Arena& arena) {
-  if (generic == nullptr || generic->decl == nullptr || actuals.empty())
-    return generic;
+namespace {
+
+using ParamValues = std::vector<std::pair<std::string_view, Logic4Vec>>;
+
+// The key SpecializationOf registers the specialization of `generic` that
+// `spelled` names under, `vector#(4)`, with the value each value parameter
+// takes collected into `values`. An empty list spells the declaration's
+// defaults.
+std::string SpecializationKey(const ClassTypeInfo* generic,
+                              const std::vector<DataType>& spelled,
+                              SimContext& ctx, Arena& arena,
+                              ParamValues& values) {
   const ClassDecl* decl = generic->decl;
-  std::vector<DataType> spelled = SpelledActuals(decl, actuals);
   // §8.25.1 with §6.20.2: an actual, like a default, is sized by the type the
   // parameter's declaration writes, and a range may name an earlier
   // parameter, so one sizer takes the list in header order and records each
@@ -358,7 +364,6 @@ ClassTypeInfo* SpecializationOf(ClassTypeInfo* generic,
   ClassParamSizer sizer(decl);
   std::string key(generic->name);
   key += "#(";
-  std::vector<std::pair<std::string_view, Logic4Vec>> values;
   for (size_t i = 0; i < decl->params.size(); ++i) {
     if (i != 0) key += ",";
     std::string_view pname = decl->params[i].first;
@@ -385,6 +390,28 @@ ClassTypeInfo* SpecializationOf(ClassTypeInfo* generic,
     values.emplace_back(pname, value);
   }
   key += ")";
+  return key;
+}
+
+}  // namespace
+
+ClassTypeInfo* SpecializationOf(ClassTypeInfo* generic,
+                                const std::vector<DataType>& actuals,
+                                SimContext& ctx, Arena& arena) {
+  if (generic == nullptr || generic->decl == nullptr || actuals.empty())
+    return generic;
+  std::vector<DataType> spelled = SpelledActuals(generic->decl, actuals);
+  ParamValues values;
+  std::string key = SpecializationKey(generic, spelled, ctx, arena, values);
+  // §8.25 (printed pages 203-204): actuals that match the declaration's
+  // defaults parameter for parameter name the default specialization, which
+  // §8.25.1 makes the one the unadorned name and `#()` name, so `S #(int)`
+  // under `type T = int` is S itself, its static member variables included.
+  // Made as a type of its own, `S #(int)::n` read none of what `S s = new;`
+  // had counted.
+  ParamValues default_values;
+  if (key == SpecializationKey(generic, {}, ctx, arena, default_values))
+    return generic;
   if (ClassTypeInfo* found = ctx.FindClassType(key)) return found;
   // The declaration's type is copied rather than built again: the interfaces,
   // the members, the vtable and the methods are facts about the declaration

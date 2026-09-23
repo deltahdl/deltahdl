@@ -591,4 +591,25 @@ TEST(ClassSim, SpecializationMadeLateStartsWithItsOwnStatics) {
   EXPECT_EQ(out, "0\n");
 }
 
+// §8.25 (printed pages 203-204): S #(int) gives T the value the declaration
+// gives it by default, so it is the default specialization S names, one type
+// with one n; made as a specialization of its own, S #(int)::n read 0 after
+// `S s = new;` had counted into the default's.
+TEST(ClassSim, ActualsEqualToTheDefaultsNameTheDefaultSpecialization) {
+  SimFixture f;
+  auto out = RunCapture(
+      "class S #(type T = int);\n"
+      "  static int n;\n"
+      "  function new(); n++; endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  initial begin\n"
+      "    S s = new;\n"
+      "    $display(\"%0d\", S#(int)::n);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1\n");
+}
+
 }  // namespace
