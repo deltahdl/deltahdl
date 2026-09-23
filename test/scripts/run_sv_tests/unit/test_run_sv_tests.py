@@ -764,14 +764,14 @@ def test_rejection_under_the_rule_a_file_the_suite_expects_accepted_breaks_evalu
     assert (ok, result["status"]) == (1, "pass")
 
 
-def test_a_clean_run_of_a_file_the_suite_expects_accepted_against_a_rule_does_not_evaluate_as_a_pass(
+def test_a_clean_run_of_a_file_the_suite_expects_accepted_against_a_rule_evaluates_as_a_fail(
     rst: ModuleType, tmp_path: Path,
 ) -> None:
     result, ok = _evaluate_the_timeformat_file(rst, tmp_path, 0, "")
     assert (ok, result["status"]) == (0, "fail")
 
 
-def test_rejection_elsewhere_than_the_rule_a_file_the_suite_expects_accepted_breaks_does_not_evaluate_as_a_pass(
+def test_rejection_under_another_rule_of_a_file_the_suite_expects_accepted_evaluates_as_a_fail(
     rst: ModuleType, tmp_path: Path,
 ) -> None:
     result, ok = _evaluate_the_timeformat_file(
