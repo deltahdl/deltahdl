@@ -4,15 +4,16 @@ concurrency:
   group: deltahdl-${{ github.ref_name }}
 jobs:
   assert-coverage:
-    # The three tiers whose counters this job merges are named here one by one.
-    # Each of unit-test-coverage, integration-test-coverage and
-    # e2e-test-coverage descends from build-coverage-lib and from nothing the
-    # other two produce, so none of them orders another and naming one would
-    # leave this job downloading an artifact a tier still running has not
-    # uploaded.
+    # The four tiers whose counters this job merges are named here one by one.
+    # Each of unit-test-coverage, e2e-test-coverage, sv-tests-coverage and
+    # supplemental-integration-test-coverage descends from build-coverage-lib
+    # and from nothing the other three produce, so none of them orders another
+    # and naming one would leave this job downloading an artifact a tier still
+    # running has not uploaded.
     needs:
       - e2e-test-coverage
-      - integration-test-coverage
+      - supplemental-integration-test-coverage
+      - sv-tests-coverage
       - unit-test-coverage
     permissions:
       id-token: write
@@ -40,16 +41,21 @@ jobs:
         with:
           name: profraw-e2e
           path: profraw/e2e/
-      - name: Download integration profraw
+      - name: Download sv-tests profraw
         uses: actions/download-artifact@v4
         with:
-          name: profraw-integration
-          path: profraw/integration/
+          name: profraw-sv-tests
+          path: profraw/sv-tests/
+      - name: Download supplemental integration profraw
+        uses: actions/download-artifact@v4
+        with:
+          name: profraw-supplemental-integration
+          path: profraw/supplemental-integration/
       - name: Install LLVM
         uses: ./.github/actions/install-llvm
-      # The merge takes the unit tier already merged and the other two raw.
+      # The merge takes the unit tier already merged and the other three raw.
       # llvm-profdata reads a .profdata as readily as a .profraw and sums
-      # counters either way, so the shard merges and the two raw sets give the
+      # counters either way, so the shard merges and the three raw sets give the
       # same profile the raw sets of every shard used to give.
       #
       # Under coverage deltahdl_lib is a shared library, so the executable
@@ -62,7 +68,8 @@ jobs:
           llvm-profdata merge -sparse \
             profdata/unit/*.profdata \
             profraw/e2e/*.profraw \
-            profraw/integration/*.profraw \
+            profraw/sv-tests/*.profraw \
+            profraw/supplemental-integration/*.profraw \
             -o merged.profdata
           llvm-cov show build/src/deltahdl \
             -object build/src/libdeltahdl_lib.so \
@@ -2158,16 +2165,17 @@ jobs:
           --language cpp
           --dir test/src/
           --dir lib/cpp/
-  # The twelve integration and e2e jobs below each test the jobs they need
-  # rather than the health of the run. !cancelled() supplies a status function
-  # so a skipped need does not carry the skip onwards by default, and the
-  # result tests put back exactly what the default condition provided: run when
-  # what this job depends on succeeded, stay out when it did not.
+  # The e2e and integration jobs below, and supplemental-integration-test-coverage
+  # and sv-tests-coverage further on, each test the jobs they need rather than
+  # the health of the run. !cancelled() supplies a status function so a skipped
+  # need does not carry the skip onwards by default, and the result tests put
+  # back exactly what the default condition provided: run when what this job
+  # depends on succeeded, stay out when it did not.
   #
   # `!failure()` stood here before, and it is true only when nothing anywhere in
-  # the run has failed. integration-test-coverage depends on nothing the unit
-  # tier produces, and a red unit shard skipped it in every run for over a
-  # hundred pushes; when it finally ran it reported 132 failing sv-tests that no
+  # the run has failed. sv-tests-coverage depends on nothing the unit tier
+  # produces, and a red unit shard skipped it in every run for over a hundred
+  # pushes; when it finally ran it reported 132 failing sv-tests that no
   # run in that window had said anything about. A job held back by a failure it
   # has no relation to reports nothing, and a job that did not run is recorded
   # neither green nor red, so the tier's state stopped being visible at exactly
@@ -2309,43 +2317,6 @@ jobs:
         run: chmod +x build/src/deltahdl
       - name: Run sv-tests
         run: PYTHONPATH=.:scripts python3 -m run_sv_tests
-  # This job downloads the simulator build-coverage-lib uploads, and cache-sv-tests
-  # is what orders the two: it needs build-coverage-lib, so the artifact is
-  # uploaded before this job is scheduled and naming build-coverage-lib here as
-  # well would add no ordering. The condition is covered along the same path --
-  # build-coverage-lib failing skips cache-sv-tests, whose result is then
-  # 'skipped' rather than 'success', which is what this job tests.
-  integration-test-coverage:
-    env:
-      LLVM_PROFILE_FILE: ${{ github.workspace }}/profraw/%p.profraw
-    if: >-
-      !cancelled()
-      && needs.cache-sv-tests.result == 'success'
-    needs: [cache-sv-tests]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - name: Restore sv-tests cache
-        uses: actions/cache/restore@v4
-        with:
-          fail-on-cache-miss: true
-          key: sv-tests-with-libraries-${{ needs.cache-sv-tests.outputs.sv-tests-sha }}
-          path: third_party/sv-tests
-      - name: Download simulator
-        uses: actions/download-artifact@v4
-        with:
-          name: coverage-simulator
-          path: build/src/
-      - name: Fix permissions
-        run: chmod +x build/src/deltahdl
-      - name: Run sv-tests
-        run: PYTHONPATH=.:scripts python3 -m run_sv_tests
-      - name: Upload profraw
-        uses: actions/upload-artifact@v4
-        with:
-          name: profraw-integration
-          path: profraw/
-          retention-days: 1
   integration-test-macos-26-arm64-clang:
     if: >-
       !cancelled()
@@ -2603,6 +2574,70 @@ jobs:
         run: |
           git tag -f latest
           git push origin latest --force
+  # The integration tests deltahdl keeps for itself, in test/src/integration/,
+  # covering what the sv-tests suite does not. They run under the coverage build
+  # alone, and their counters join the unit, e2e and sv-tests tiers' in
+  # assert-coverage.
+  supplemental-integration-test-coverage:
+    env:
+      LLVM_PROFILE_FILE: ${{ github.workspace }}/profraw/%p.profraw
+    if: ${{ !cancelled() && needs.build-coverage-lib.result == 'success' }}
+    needs: build-coverage-lib
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Download simulator
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-simulator
+          path: build/src/
+      - name: Fix permissions
+        run: chmod +x build/src/deltahdl
+      - name: Integration tests
+        run: PYTHONPATH=.:scripts python3 -m run_integration_tests
+      - name: Upload profraw
+        uses: actions/upload-artifact@v4
+        with:
+          name: profraw-supplemental-integration
+          path: profraw/
+          retention-days: 1
+  # This job downloads the simulator build-coverage-lib uploads, and cache-sv-tests
+  # is what orders the two: it needs build-coverage-lib, so the artifact is
+  # uploaded before this job is scheduled and naming build-coverage-lib here as
+  # well would add no ordering. The condition is covered along the same path --
+  # build-coverage-lib failing skips cache-sv-tests, whose result is then
+  # 'skipped' rather than 'success', which is what this job tests.
+  sv-tests-coverage:
+    env:
+      LLVM_PROFILE_FILE: ${{ github.workspace }}/profraw/%p.profraw
+    if: >-
+      !cancelled()
+      && needs.cache-sv-tests.result == 'success'
+    needs: [cache-sv-tests]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Restore sv-tests cache
+        uses: actions/cache/restore@v4
+        with:
+          fail-on-cache-miss: true
+          key: sv-tests-with-libraries-${{ needs.cache-sv-tests.outputs.sv-tests-sha }}
+          path: third_party/sv-tests
+      - name: Download simulator
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-simulator
+          path: build/src/
+      - name: Fix permissions
+        run: chmod +x build/src/deltahdl
+      - name: Run sv-tests
+        run: PYTHONPATH=.:scripts python3 -m run_sv_tests
+      - name: Upload profraw
+        uses: actions/upload-artifact@v4
+        with:
+          name: profraw-sv-tests
+          path: profraw/
+          retention-days: 1
   unit-test-asan-ubsan:
     env:
       ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
