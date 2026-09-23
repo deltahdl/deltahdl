@@ -3158,16 +3158,17 @@ on:
       - CMakeLists.txt
       - etc/**
       - lib/cpp/**
-      # The four Python trees below hold programs this workflow's own jobs run,
+      # The five Python trees below hold programs this workflow's own jobs run,
       # and their unit tests live under test/scripts/ and test/lib/python/ and
       # run in .github/workflows/scripts.yml instead. Without these entries a
       # change to one of them is exercised by its unit tests alone and never by
       # the job that runs it: lib/python/run_tests_common/,
-      # scripts/run_sim_tests/ and scripts/run_sv_tests/ by the integration and
-      # e2e jobs, scripts/assert_subclause_citations/ by
-      # assert-subclause-citations.
+      # scripts/run_integration_tests/, scripts/run_sim_tests/ and
+      # scripts/run_sv_tests/ by the integration and e2e jobs,
+      # scripts/assert_subclause_citations/ by assert-subclause-citations.
       - lib/python/run_tests_common/**
       - scripts/assert_subclause_citations/**
+      - scripts/run_integration_tests/**
       - scripts/run_sim_tests/**
       - scripts/run_sv_tests/**
       - src/**

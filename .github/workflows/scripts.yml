@@ -653,6 +653,30 @@ jobs:
         run: >-
           PYTHONPATH=.:scripts python3 -m pytest
           test/scripts/next_subclause/e2e/ -v
+  test-run-integration-tests:
+    needs: test-lib-run-tests-common
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Restore pip cache
+        uses: actions/cache@v5
+        with:
+          key: >-
+            pip-scripts-test-script-${{
+            hashFiles('.github/workflows/scripts.yml') }}
+          path: ~/.cache/pip
+          restore-keys: |
+            pip-scripts-test-script-
+      - name: Install tools
+        run: pip install pytest pytest-cov
+      - name: Run tests with 100% coverage gate
+        run: >-
+          PYTHONPATH=.:scripts python3 -m pytest
+          test/scripts/run_integration_tests/ -v
+          --cov=run_integration_tests
+          --cov-branch
+          --cov-report=term-missing
+          --cov-fail-under=100
   test-run-sim-tests:
     needs: test-lib-run-tests-common
     runs-on: ubuntu-latest
