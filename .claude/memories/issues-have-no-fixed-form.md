@@ -11,9 +11,9 @@ There is no house style for an issue's title or body. An issue is written in
 the form that lets a session that has never seen this conversation act on it:
 the method, the clause and printed page, the reproduction inline.
 
-**Why:** the user, on 2026-09-19: "there are no conventions for issues in
-this repo despite any patterns you may see. you are free to write the issues
-as you wish."
+**Why:** the repository has no convention for issues, whatever patterns
+earlier issues show; the one test of an issue is whether a fresh session can
+act on it.
 
 **How to apply:** do not mirror an earlier issue's layout for its own sake;
 do keep the substance rules that are not about form — one indivisible problem

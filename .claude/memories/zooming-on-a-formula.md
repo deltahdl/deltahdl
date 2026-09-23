@@ -13,10 +13,9 @@ guess from context: rasterize a crop of the physical page with
 into the scratchpad and `Read` the PNG. `pdftoppm` is at
 `/opt/homebrew/bin/pdftoppm`; PyMuPDF is not installed.
 
-**Why:** the §F.5.3.3 abort shape was modelled with ⊭ on both completions
-(`x ⊥^ω ⊭ P or x T^ω ⊭ P`) because the page rendering blurred the slash;
-at 300 dpi the rule is `x ⊥^ω ⊨ P or x T^ω ⊭ P`, and the wrong reading had
-been fixed into two test files across two subclauses.
+**Why:** the page rendering can blur a single stroke: §F.5.3.3's abort rule,
+`x ⊥^ω ⊨ P or x T^ω ⊭ P` at 300 dpi, reads as ⊭ on both completions, and a
+misread glyph goes straight into the model and every test built on it.
 
 **How to apply:** whenever a modelling decision turns on one glyph, zoom
 before writing the test; a crop of a few hundred pixels is a small image.

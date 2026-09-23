@@ -16,9 +16,7 @@ with the tracker that counts them (#3640 and its like) adjusted to match.
 
 **Why:** An issue with two problems never closes cleanly: it sits open while
 half its content is done, its title says less than its body, and nothing in
-the tracker says which half is left. The user asked for this on 2026-09-19 on
-seeing #2930 describe a parser defect (sixteen `uvm`-tagged files) and an
-elaborator defect (one `randc` `dist` file) under one number.
+the tracker says which half is left.
 
 **How to apply:** Ask of each finding whether it could be fixed and closed
 alone; where it could, it is its own issue. This applies to every new problem

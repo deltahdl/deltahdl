@@ -7,7 +7,7 @@ metadata:
 
 # Describing a change in the module's own terms
 
-Describe a change to a module in that module's own terms: an error message or commit message about module M should make sense to a reader who has never heard of anything that calls M. Docstrings and comments are not among the places since 2026-09-14, when the assert-no-comments job in `.github/workflows/scripts.yml` began refusing both under lib/python, scripts, their tests and the workflow itself; see [[no-comments-or-docstrings-in-python]].
+Describe a change to a module in that module's own terms: an error message or commit message about module M should make sense to a reader who has never heard of anything that calls M. Docstrings and comments are not among the places: the assert-no-comments job in `.github/workflows/scripts.yml` refuses both under lib/python, scripts, their tests and the workflow itself; see [[no-comments-or-docstrings-in-python]].
 
 **Why:** Nothing enforces this, and naming the caller reads as helpful context at the time of writing. It stops being true as soon as a second caller exists, and it makes the module's own documentation unreadable to anyone arriving from a third direction.
 

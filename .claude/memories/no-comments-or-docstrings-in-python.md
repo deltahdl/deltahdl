@@ -7,7 +7,7 @@ metadata:
 
 # No comments or docstrings in the Python trees
 
-Write no `#` comment and no docstring under `lib/python/`, `scripts/`, `test/lib/python/`, `test/scripts/` or in `.github/workflows/scripts.yml`. The user asked for the gate on 2026-09-14.
+Write no `#` comment and no docstring under `lib/python/`, `scripts/`, `test/lib/python/`, `test/scripts/` or in `.github/workflows/scripts.yml`.
 
 **Why:** The `assert-no-comments` job in `.github/workflows/scripts.yml` (the 10U-Labs tool of that name) refuses every one of them, including a module, class or function docstring and a trailing `# pragma: no cover`. Prose beside code is checked by nothing and goes stale silently; the reasoning belongs in the commit message and the issue, which are dated and attached to a change. The pylint jobs pass `--disable=missing-*-docstring` on the command line for this reason, since inline directives and configuration files are refused by their own gates.
 

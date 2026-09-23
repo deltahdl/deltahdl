@@ -4,8 +4,6 @@ description: "Resolve an LRM clause to a page through the Read tool alone, never
 metadata: 
   node_type: memory
   type: feedback
-  originSessionId: ec269662-372b-4932-ad5a-23c29f07e1d6
-  modified: 2026-09-18T00:00:00.000Z
 ---
 
 # Locating a clause in the PDF
@@ -14,9 +12,7 @@ metadata:
 
 Locate a clause with the Read tool and nothing else, one page per call, per [reading-the-lrm-one-page-per-call](reading-the-lrm-one-page-per-call.md). Read the contents page that lists the clause, add one to the printed page it gives, and Read that physical page.
 
-**Why:** On 2026-09-14 the user saw a `pypdf` bookmark walk being used to find a page and said: "You can read PDFs directly through your Read tool. Yet you are using pypdf." An earlier version of this note recommended that walk as a metadata-only shortcut; the user does not want `pypdf` used on the LRM at all — see also [not-converting-the-lrm-to-text](not-converting-the-lrm-to-text.md).
-
-Until 2026-09-18 this note also grew a landmark list by one entry per lookup, each entry committed to `main` on its own, and told every session to keep adding to it. The user asked whether that was useful. It was not: the contents pages already resolve any first- or second-level clause in one read, so most entries saved nothing, and the standing order produced commits whose whole content was a page number. The map below replaces it.
+**Why:** The Read tool reads PDFs directly, and the user does not want `pypdf` used on the LRM at all, not even for its bookmarks — see also [not-converting-the-lrm-to-text](not-converting-the-lrm-to-text.md). The contents pages resolve any first- or second-level clause in one read, so a list of clauses they already give saves nothing.
 
 **How to apply:** Never import `pypdf` against `~/IEEE 1800-2023.pdf`, not even for the outline. The contents pages, by physical page, each listing clauses to two levels:
 

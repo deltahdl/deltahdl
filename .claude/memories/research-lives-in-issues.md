@@ -7,16 +7,15 @@ metadata:
 
 # Research lives in issues
 
-When a session plans work that spans more than the session — the whole-LRM
-reconciliation of 2026-09-19 (#3647, one issue per clause #3648–#3681), or any
-survey whose findings arrive over hours — the plan and each finding go into
+When a session plans work that spans more than the session — a
+clause-by-clause reconciliation of the LRM, or any survey whose findings arrive
+over hours — the plan and each finding go into
 GitHub issues as they arise, one indivisible problem per issue, with enough of
 the method in the body that a fresh session can run it from the issue alone.
 The session's task list and scratchpad are not durable.
 
-**Why:** the user, on 2026-09-19: "these tasks about reconciliation are
-probably best recorded in issue. one issue per indivisible problem. this
-session might be lost and we dont want to lose that research."
+**Why:** a session can be lost, and its task list and scratchpad with it;
+research recorded only there is lost too.
 
 **How to apply:** alongside [[solving-what-a-session-finds]], which files each
 new problem met while working, a plan of discovery, and each mismatch a

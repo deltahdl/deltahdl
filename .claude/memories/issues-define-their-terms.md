@@ -17,13 +17,10 @@ error on stderr"), never only as a noun the reader must already know
 same sentence (the clause deltahdl's error cites, the table the test's own
 reason cites), never listed as if the connection were obvious.
 
-**Why:** the user, on 2026-09-21, of #3637's title "10.3--proc-assignment--bad.sv
-is tagged 10.3 in the corpus, where §6.5 states that a net is not procedurally
-assigned and Table 10-1 is in §10.2, so a correct §6.5 rejection is scored
-FAIL": "this issue's title and body do not provide any context" — what is the
-file, what does tagged mean, what has §6.5 to do with it, what has Table 10-1
-to do with it, what is a rejection. The session that filed it knew all five
-from the run it had just read, and wrote as if the reader had read it too.
+**Why:** the session that files an issue knows the run it has just read and
+writes as if the reader had read it too. A reader who opens the issue from the
+list has none of that, and cannot act on a file, a term or a clause whose
+meaning and tie to the defect are left out.
 
 **How to apply:** before filing or editing an issue, read its title and body
 as someone who has opened it from the issue list with nothing else, and for

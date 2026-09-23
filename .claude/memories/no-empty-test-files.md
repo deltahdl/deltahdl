@@ -12,10 +12,8 @@ A test file under `test/src` holding no `TEST(...)` block fails the
 `clang-format` too), so a new lettered file is never committed as a
 placeholder for an agent to fill.
 
-**Why:** run 35497622647 went red on three placeholder files
-(`test_elaborator_subclause_03_12_01b.cpp`, `20_06_02b.cpp`,
-`test_simulator_subclause_26_03f.cpp`) that 36086db32 registered ahead of the
-agents writing into them.
+**Why:** a placeholder is empty when it is committed, whatever an agent will
+write into it later, so the push that carries it goes red.
 
 **How to apply:** give an agent the file's name and its `add_unit_test`
 line to write, or write the file's first test yourself, and commit the file and

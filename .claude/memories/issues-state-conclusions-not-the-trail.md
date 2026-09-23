@@ -11,11 +11,10 @@ When a later finding settles a question an issue was weighing, the body is
 rewritten to say the answer and what it rests on; the options it ruled out
 and the reasoning that ranked them are removed, not kept beside it.
 
-**Why:** the user, on 2026-09-21, of #3637 after five rounds of questions
-had each added a paragraph: "why is there so much noise in this issue if the
-sv-tests repo is strict about which tag it should be?" The suite's own rule
-fixed the tag, which made the three-way comparison of candidate tags and the
-cost of each the trail of getting there, not findings.
+**Why:** once a finding settles the question, the options it ruled out and
+the reasoning that ranked them are the trail of getting there, not findings;
+kept beside the answer, they are noise a reader has to get through to find
+it.
 
 **How to apply:** after adding a finding, re-read the whole issue and cut
 every sentence the finding makes moot. See [[issues-define-their-terms]].

@@ -63,7 +63,7 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 - [Verifying through CI](verifying-through-ci.md) — never run a gate CI runs; push and read the run. A local build to investigate a defect is allowed.
 - [Reading a CI run](reading-a-ci-run.md) — `gh run list --limit 1` before pushing, `gh run view --log-failed` after.
 - [Watching a run in the background](watching-a-run-in-the-background.md) — a background shell or a Monitor, never a foreground `gh run watch`.
-- [Waiting while a CI run is in progress](waiting-while-a-ci-run-is-in-progress.md) — the "do nothing but wait while a workflow is running" reminder means any CI run of any workflow; no diagnosis, edits or commits until it lands.
+- [Waiting while a CI run is in progress](waiting-while-a-ci-run-is-in-progress.md) — while any CI run of any workflow is in progress, only wait: no diagnosis, edits or commits until it lands.
 - [Fixing a red run](fixing-a-red-run.md) — fix it in the session that finds it, whoever caused it.
 - [Gate limits live in tracked files](gate-limits-live-in-tracked-files.md) — read the linter config or workflow threshold rather than running the gate.
 - [Read the sv-tests log first](reading-the-sv-tests-log-first.md) — deltahdl's own output is already under every FAIL line.
@@ -96,5 +96,5 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 
 ## The notes themselves
 
-- [Where the notes live](note-directories.md) — `.claude/memories/`, one flat directory since 2026-09-07.
-- [Recording what a session learns](recording-what-a-session-learns.md) — one indivisible fact per file, front matter, and a line here.
+- [Where the notes live](note-directories.md) — `.claude/memories/`, one flat directory.
+- [Recording what a session learns](recording-what-a-session-learns.md) — one indivisible fact per file, front matter, a line here, and no history: the reason, never when or after what.
