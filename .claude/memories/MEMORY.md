@@ -32,6 +32,7 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 ## The LRM
 
 - [The LRM is the source of truth](lrm-source-of-truth.md) — check every non-cosmetic change against the clause; the standard beats the linter.
+- [A shall outranks an example and a can](shall-outranks-examples-and-can.md) — §1.5 and §1.10 settle a clash inside the standard; only two equal requirements go to a person.
 - [One edition only](single-edition-1800-2023.md) — IEEE 1800-2023 alone; another edition's numbering is translated to 2023 and never carried into deltahdl.
 - [The 2017 edition](the-2017-edition.md) — `~/IEEE 1800-2017.pdf`, read only to judge an sv-tests tag in its own edition.
 - [No local paths in code or workflows](no-local-paths-in-code-or-workflows.md) — code, tests, scripts and workflows say `IEEE 1800-2023`; the path `~/IEEE 1800-2023.pdf` is written only under .claude/.
