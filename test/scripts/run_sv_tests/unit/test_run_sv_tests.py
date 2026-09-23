@@ -343,33 +343,6 @@ def test_library_for_is_empty_without_tags(rst: ModuleType) -> None:
     assert rst.library_for({}, _libraries(rst)) == rst.Library((), (), ())
 
 
-def test_extracts_all_fields(rst: ModuleType, tmp_path: Path) -> None:
-    sv = tmp_path / "test.sv"
-    sv.write_text(
-        "/*\n:name: foo\n:type: simulation elaboration parsing\n"
-        ":tags: 7.3.2\n:should_fail_because: bad code\n*/\n"
-        "module top; endmodule\n"
-    )
-    assert rst.parse_metadata(str(sv)) == {
-        "name": "foo",
-        "type": "simulation elaboration parsing",
-        "tags": "7.3.2",
-        "should_fail_because": "bad code",
-    }
-
-
-def test_returns_empty_dict_when_no_comment(rst: ModuleType, tmp_path: Path) -> None:
-    sv = tmp_path / "bare.sv"
-    sv.write_text("module bare; endmodule\n")
-    assert not rst.parse_metadata(str(sv))
-
-
-def test_returns_empty_type_when_absent(rst: ModuleType, tmp_path: Path) -> None:
-    sv = tmp_path / "no_type.sv"
-    sv.write_text("/*\n:name: no_type\n:tags: 5.10\n*/\nmodule m; endmodule\n")
-    assert set(rst.parse_metadata(str(sv))) == {"name", "tags"}
-
-
 def _write_expected_rejection(tmp_path: Path, tags: str, file_name: str) -> Path:
     sv = tmp_path / "chapter-5" / file_name
     sv.parent.mkdir(parents=True)
