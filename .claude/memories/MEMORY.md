@@ -63,7 +63,6 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 - [Verifying through CI](verifying-through-ci.md) — never run a gate CI runs; push and read the run. A local build to investigate a defect is allowed.
 - [Reading a CI run](reading-a-ci-run.md) — `gh run list --limit 1` before pushing, `gh run view --log-failed` after.
 - [Watching a run in the background](watching-a-run-in-the-background.md) — a background shell or a Monitor, never a foreground `gh run watch`.
-- [Waiting while a CI run is in progress](waiting-while-a-ci-run-is-in-progress.md) — while any CI run of any workflow is in progress, only wait: no diagnosis, edits or commits until it lands.
 - [Fixing a red run](fixing-a-red-run.md) — fix it in the session that finds it, whoever caused it.
 - [Gate limits live in tracked files](gate-limits-live-in-tracked-files.md) — read the linter config or workflow threshold rather than running the gate.
 - [Read the sv-tests log first](reading-the-sv-tests-log-first.md) — deltahdl's own output is already under every FAIL line.
