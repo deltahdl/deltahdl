@@ -1,14 +1,17 @@
 ---
 name: solving-what-a-session-finds
-description: Solve a defect the session finds rather than filing it and moving on; a failing integration test in deltahdl.yml is the one exception, left where it is.
+description: "A new problem met while working is filed as one GitHub issue per indivisible problem, then the issues the original issue depends on are solved."
 metadata:
+  node_type: memory
   type: feedback
+  originSessionId: 0eac2fc8-aa5f-4f95-9fa7-69e4f3f0a42a
+  modified: 2026-09-23T02:05:24.443Z
 ---
 
-# Solving what a session finds
+# Filing, then solving, what a session finds
 
-Solve what you find rather than filing it and moving on. A failing integration test in deltahdl.yml is the exception: leave that one where it is.
+When you come up against a new problem, file a GitHub issue per indivisible problem. Then solve whatever issue or issues need to be solved in order to solve the original issue.
 
-**Why:** This is reminder :08 of `.claude/skills/autopilot/SKILL.md`, and the notes have to say the same thing the reminder says or a session runs under two rules. The file this replaced said the reverse — file the finding, do not ask — and on 2026-09-18 a session solving #3620 followed it and filed #3621, #3622 and #3623 for three defects it had read its way to; the user said that was wrong and that the memory should match the autopilot reminder. A defect written into the tracker waits for a later session to redo the reading that found it, while the session that found it has the reading in hand. The exception is drawn where the reminder draws it: the integration failures in deltahdl.yml are the standing red that #2910 through #2939 track; the e2e tests are not exempt, since the user said on 2026-09-20 that those are to be solved, and a session sent at those spends itself on what it was not started to fix.
+**Why:** This is reminder :08 of `.claude/skills/autopilot/SKILL.md`, and the notes have to say what the reminder says or a session runs under two rules. The user set this wording on 2026-09-22, replacing the earlier rule of solving a finding without filing it.
 
-**How to apply:** Finish the work in hand first, then fix the finding in the same session — in the commit in hand where it belongs there, otherwise in a commit of its own — and let its own commit message state it. Nothing is filed for it, which is what [what-does-not-get-filed](what-does-not-get-filed.md) already says of a defect the commit in hand fixes. A finding that cannot be solved in the session is a question for the user, not an issue. Where something is filed regardless — an existing issue to cite, a finding the user asked to have tracked — split it by scope per [one-indivisible-problem-per-issue](one-indivisible-problem-per-issue.md).
+**How to apply:** File each new problem as its own issue, split per [[one-indivisible-problem-per-issue]] and skipping what [[what-does-not-get-filed]] excludes. Then solve the filed issues the original one depends on, and go back to the original.

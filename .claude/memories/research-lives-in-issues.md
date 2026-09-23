@@ -18,8 +18,8 @@ The session's task list and scratchpad are not durable.
 probably best recorded in issue. one issue per indivisible problem. this
 session might be lost and we dont want to lose that research."
 
-**How to apply:** this is the counterpart of [[solving-what-a-session-finds]]:
-a defect met while working is fixed in the session, but a plan of discovery,
-and each mismatch a discovery records, is filed at once. Include the probe
+**How to apply:** alongside [[solving-what-a-session-finds]], which files each
+new problem met while working, a plan of discovery, and each mismatch a
+discovery records, is filed at once. Include the probe
 source inline in a mismatch issue so it reproduces without the scratch
 directory. See [[one-indivisible-problem-per-issue]] for the grain.
