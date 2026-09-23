@@ -251,6 +251,39 @@ static bool DeclaresQueue(const Stmt* stmt) {
          IsQueueDim(stmt->var_unpacked_dims[0]);
 }
 
+// §7.4 with §7.10 (printed pages 153 and 169): the type the elements of the
+// array `stmt` declares have where each of them is itself a queue -- a second
+// dimension `[$]`, `int aq[string][$]`, or, the declaration writing a single
+// dimension, a type naming a typedef whose own one unpacked dimension is `[$]`,
+// UVM's `rsrc_sv_q_t all[int]` under `typedef uvm_resource_base
+// rsrc_sv_q_t[$];` (§6.18 making the typedef's dimensions part of the type).
+// Null where the elements are no queues. The typedef is looked for from the
+// running method's class, where a class-scope one is declared.
+static const DataType* ElementQueueType(const Stmt* stmt, SimContext& ctx) {
+  const std::vector<Expr*>& dims = stmt->var_unpacked_dims;
+  if (dims.size() == 2 && dims[1] != nullptr && IsQueueDim(dims[1]))
+    return &stmt->var_decl_type;
+  if (dims.size() != 1) return nullptr;
+  const ModuleItem* item =
+      TypedefItemSeenFrom(stmt->var_decl_type, ctx.CurrentMethodClass(), ctx);
+  if (item == nullptr || item->unpacked_dims.size() != 1 ||
+      !IsQueueDim(item->unpacked_dims[0])) {
+    return nullptr;
+  }
+  return &item->typedef_type;
+}
+
+// §7.10: marks the queue or dynamic array `q` that `stmt` declares as one
+// whose elements are queues, where they are (ElementQueueType), with those
+// queues' elements handles where their type is a class (§8.4).
+static void MarkElementQueues(const Stmt* stmt, QueueObject* q, SimContext& ctx,
+                              Arena& arena) {
+  const DataType* type = ElementQueueType(stmt, ctx);
+  if (type == nullptr) return;
+  q->elements_are_queues = true;
+  q->holds_class_handles = !DeclaredClassKey(*type, ctx, arena).empty();
+}
+
 // §7.10: a declaration whose first unpacked dimension is `[$]` or `[$:N]`
 // declares a queue, wherever the declaration stands. Creates the QueueObject
 // the queue methods of §7.10.2 operate on, so that a declaration inside a
@@ -281,6 +314,7 @@ static bool CreateBlockQueue(const Stmt* stmt, uint32_t elem_width,
   // `Inner` alone, `Outer::Inner q[$]` was a queue of plain values.
   q->holds_class_handles =
       !DeclaredClassKey(stmt->var_decl_type, ctx, arena).empty();
+  MarkElementQueues(stmt, q, ctx, arena);
   return true;
 }
 
@@ -292,14 +326,27 @@ static bool CreateBlockQueue(const Stmt* stmt, uint32_t elem_width,
 // so a local array existed for no name: ctx.FindAssocArray answered null, and
 // TryAssocIndexedWrite, TryAssocCopyAssign and the read beside them each
 // declined, storing nothing and reporting nothing (#3614).
+//
+// §7.8 with §7.10: the elements may themselves be queues, `int aq[string][$]`
+// or a queue typedef's `q_t all[int]` (ElementQueueType), and the array then
+// keeps a queue under each key it holds (eval_array_element_queue.h).
 static bool CreateBlockAssocArray(const Stmt* stmt, uint32_t elem_width,
-                                  SimContext& ctx) {
-  if (stmt->var_unpacked_dims.size() != 1) return false;
+                                  SimContext& ctx, Arena& arena) {
+  const DataType* queue_type = ElementQueueType(stmt, ctx);
+  if (stmt->var_unpacked_dims.size() !=
+      (queue_type == &stmt->var_decl_type ? 2u : 1u)) {
+    return false;
+  }
   const Expr* dim = stmt->var_unpacked_dims.front();
   if (!IsAssocIndexDim(dim, ctx)) return false;
-  ctx.CreateAssocArray(
+  AssocArrayObject* aa = ctx.CreateAssocArray(
       stmt->var_name, elem_width, dim->text == "string",
       AssocIndexSpec(dim, DeclaredTypeIs4State(stmt->var_decl_type), ctx));
+  if (queue_type != nullptr) {
+    aa->elements_are_queues = true;
+    aa->element_queue_handles =
+        !DeclaredClassKey(*queue_type, ctx, arena).empty();
+  }
   return true;
 }
 
@@ -350,7 +397,9 @@ static bool CreateBlockDynArray(const Stmt* stmt, uint32_t elem_width,
   if (stmt->var_unpacked_dims.empty() || stmt->var_unpacked_dims[0] != nullptr)
     return false;
   bool is_4state = DeclaredTypeIs4State(stmt->var_decl_type);
-  ctx.CreateQueue(stmt->var_name, elem_width, /*max_size=*/-1, is_4state);
+  QueueObject* q =
+      ctx.CreateQueue(stmt->var_name, elem_width, /*max_size=*/-1, is_4state);
+  MarkElementQueues(stmt, q, ctx, arena);
   ArrayInfo info;
   info.is_dynamic = true;
   info.elem_width = elem_width;
@@ -372,7 +421,7 @@ static bool CreateBlockDynArray(const Stmt* stmt, uint32_t elem_width,
 // in a task body was a plain vector and q.push_back had no store to reach.
 void CreateDeclAggregate(const Stmt* stmt, uint32_t elem_width, SimContext& ctx,
                          Arena& arena) {
-  if (CreateBlockAssocArray(stmt, elem_width, ctx)) return;
+  if (CreateBlockAssocArray(stmt, elem_width, ctx, arena)) return;
   if (CreateBlockDynArray(stmt, elem_width, ctx, arena)) return;
   if (!CreateBlockQueue(stmt, elem_width, ctx, arena)) {
     CreateBlockArrayElements(stmt, elem_width, ctx, arena);

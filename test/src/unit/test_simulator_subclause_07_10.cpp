@@ -193,4 +193,137 @@ TEST(QueueAccess, QueuePropertyAssignedThroughAHandle) {
             351u);
 }
 
+// §7.10 with §7.4: a queue's elements may themselves be queues, and a method
+// called on one, `qq[1].push_back(42)`, operates on that element. Pushed a
+// queue of two and an empty one, the outer queue holds two elements, the
+// first of size 2 and the second, after its push, of size 1 holding 42.
+// With no storage for the inner queues, every inner size read 0 and the
+// element 0.
+TEST(QueueAccess, ElementOfAQueueOfQueuesTakesAPush) {
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  int qq[$][$];\n"
+                      "  int inner[$];\n"
+                      "  int out;\n"
+                      "  initial begin\n"
+                      "    inner.push_back(1);\n"
+                      "    inner.push_back(2);\n"
+                      "    qq.push_back(inner);\n"
+                      "    qq.push_back({});\n"
+                      "    qq[1].push_back(42);\n"
+                      "    out = qq.size() * 100000 + qq[0].size() * 10000 +\n"
+                      "          qq[1].size() * 1000 + qq[1][0];\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "out"),
+            221042u);
+}
+
+// §7.10 with §7.8.7: an element of an associative array of queues is
+// allocated when a queue method first uses it, so three pushes into
+// aq["a"] and aq["b"] leave two entries of sizes 2 and 1, aq["a"] holding 3
+// then 4, and pop_front on it answers 3 and leaves one element. Treated as a
+// read of a missing entry, each push warned and stored nothing, and every
+// count read 0.
+TEST(QueueAccess, AssociativeEntryIsAllocatedByAQueueMethod) {
+  EXPECT_EQ(
+      RunAndGet("module t;\n"
+                "  int aq[string][$];\n"
+                "  int out;\n"
+                "  initial begin\n"
+                "    aq[\"a\"].push_back(3);\n"
+                "    aq[\"a\"].push_back(4);\n"
+                "    aq[\"b\"].push_back(9);\n"
+                "    out = aq.num() * 1000000 + aq[\"a\"].size() * 100000"
+                " +\n"
+                "          aq[\"b\"].size() * 10000 + aq[\"a\"][0] * 1000 "
+                "+\n"
+                "          aq[\"a\"][1] * 100;\n"
+                "    out = out + aq[\"a\"].pop_front() * 10;\n"
+                "    out = out + aq[\"a\"].size();\n"
+                "  end\n"
+                "endmodule\n",
+                "out"),
+      2213431u);
+}
+
+// The same for a fixed-size and a dynamic array whose element type is a
+// typedef'd queue: fx[1] and dy[1] each take one push and hold it.
+TEST(QueueAccess, ElementsOfFixedAndDynamicArraysOfQueuesTakePushes) {
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  typedef int q_t[$];\n"
+                      "  q_t fx[2];\n"
+                      "  q_t dy[];\n"
+                      "  int out;\n"
+                      "  initial begin\n"
+                      "    dy = new[2];\n"
+                      "    fx[1].push_back(4);\n"
+                      "    dy[1].push_back(5);\n"
+                      "    out = fx[1].size() * 1000 + dy[1].size() * 100 +\n"
+                      "          fx[1][0] * 10 + dy[1][0];\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "out"),
+            1145u);
+}
+
+// UVM's uvm_resource_pool::sort_by_precedence buckets resources by pushing
+// onto `all[prec]` of a function-local `rsrc_sv_q_t all[int]`: push_front on
+// an entry allocates it and prepends, so all[2] holds 6 then 5 and all[7]
+// holds 8, two entries in all.
+TEST(QueueAccess, PushFrontOnATypedefQueueEntryOfALocalAssociativeArray) {
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  typedef int q_t[$];\n"
+                      "  int out;\n"
+                      "  function automatic int bucket();\n"
+                      "    q_t all[int];\n"
+                      "    all[2].push_front(5);\n"
+                      "    all[2].push_front(6);\n"
+                      "    all[7].push_front(8);\n"
+                      "    return all.num() * 1000 + all[2].size() * 100 +\n"
+                      "           all[2][0] * 10 + all[7][0];\n"
+                      "  endfunction\n"
+                      "  initial out = bucket();\n"
+                      "endmodule\n",
+                      "out"),
+            2268u);
+}
+
+// §10.10 with §7.10: an element of an array of queues is an unpacked array,
+// so as an item of an unpacked array concatenation it contributes its
+// elements -- UVM's sort_by_precedence_q rebuilds its queue as `q = {q,
+// all[iter]}` over a local `rsrc_sv_q_t all[int]`, the typedef a class's
+// queue of handles. Bucketed as 7 under key 1 and 5 then 6 under key 2, the
+// rebuilt queue holds three handles whose ids read 756; taken as the entries'
+// placeholders, it held two values that were no handles.
+TEST(QueueAccess, ElementQueueOfAClassScopeTypedefIsAConcatenationItem) {
+  EXPECT_EQ(RunAndGet("class B;\n"
+                      "  int id;\n"
+                      "  function new(int i); id = i; endfunction\n"
+                      "endclass\n"
+                      "class H;\n"
+                      "  typedef B bq_t[$];\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int out;\n"
+                      "  function automatic int rebuild();\n"
+                      "    H::bq_t all[int];\n"
+                      "    B q[$];\n"
+                      "    B b;\n"
+                      "    b = new(5);\n"
+                      "    all[2].push_back(b);\n"
+                      "    b = new(6);\n"
+                      "    all[2].push_back(b);\n"
+                      "    b = new(7);\n"
+                      "    all[1].push_back(b);\n"
+                      "    foreach (all[k]) q = {q, all[k]};\n"
+                      "    return q.size() * 1000 + q[0].id * 100 + q[1].id * "
+                      "10 +\n"
+                      "           q[2].id;\n"
+                      "  endfunction\n"
+                      "  initial out = rebuild();\n"
+                      "endmodule\n",
+                      "out"),
+            3756u);
+}
+
 }  // namespace

@@ -287,6 +287,11 @@ struct RtlirVariable {
   bool is_dynamic = false;
   bool is_queue = false;
   int32_t queue_max_size = -1;
+  // §7.4 with §7.10: whether each element of the queue, dynamic array or
+  // associative array the first dimension declares is itself a queue -- a
+  // second dimension `[$]`, `int aq[string][$]`, or a type naming a queue
+  // typedef, `q_t d[]` under `typedef int q_t[$];`.
+  bool elements_are_queues = false;
   bool is_assoc = false;
   bool is_string_index = false;
   bool is_wildcard_index = false;

@@ -15,6 +15,7 @@
 #include "simulator/eval_array.h"
 #include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_array_class_queue.h"
+#include "simulator/eval_array_element_queue.h"
 #include "simulator/eval_expr_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/queue_bound.h"
@@ -702,9 +703,19 @@ static void CollectFixedArrayElements(std::string_view name,
 // The queue is a declared one by its bare name or a property of an object
 // (§8.5), bare in a method or through a handle, so `q = {q, x}` in a method
 // of the class declaring `q` appends to the property.
+//
+// §7.4 with §7.10: an element of an array whose elements are queues, UVM's
+// `all[iter]` in `q = {q, all[iter]}` over `rsrc_sv_q_t all[int]`, is such a
+// queue, and contributes its elements (ElementQueueOfSelect); read as the
+// element's placeholder, it contributed one value that was no handle.
 static void CollectQueueItem(const Expr* expr, SimContext& ctx, Arena& arena,
                              std::vector<Logic4Vec>& out) {
   if (CollectFromQueueSlice(expr, ctx, arena, out)) return;
+  if (const QueueObject* element =
+          ElementQueueOfSelect(expr, ctx, arena, /*allocate=*/false)) {
+    out.insert(out.end(), element->elements.begin(), element->elements.end());
+    return;
+  }
   if (CollectFromQueueElem(expr, ctx, arena, out)) return;
   if (expr->kind == ExprKind::kIdentifier ||
       expr->kind == ExprKind::kMemberAccess) {

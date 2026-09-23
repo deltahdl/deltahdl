@@ -11,6 +11,7 @@
 #include "simulator/class_object.h"
 #include "simulator/eval_array.h"
 #include "simulator/eval_array_class_queue.h"
+#include "simulator/eval_array_element_queue.h"
 #include "simulator/evaluation.h"
 #include "simulator/queue_bound.h"
 #include "simulator/sim_context.h"
@@ -58,22 +59,34 @@ static bool DispatchQueueEval(std::string_view method, QueueObject* q,
   return false;
 }
 
+// The value a push puts in the queue `q` for the argument `item`, the
+// element being given the identity `id`. §7.10.2 with §7.4: where each element
+// of `q` is itself a queue, the argument is a queue value, which is kept under
+// the element's identity (ElementQueueFromItem in
+// eval_array_element_queue.h), and the element holds a placeholder.
+static Logic4Vec PushedValue(QueueObject* q, const Expr* item, uint64_t id,
+                             SimContext& ctx, Arena& arena) {
+  if (!q->elements_are_queues)
+    return SizedForQueueElement(*q, EvalExpr(item, ctx, arena), arena);
+  q->element_queues[id] = ElementQueueFromItem(q, item, ctx, arena);
+  return NonexistentQueueElement(q, arena);
+}
+
 static void QueuePushBack(QueueObject* q, const Expr* expr, SimContext& ctx,
                           Arena& arena) {
-  auto val =
-      SizedForQueueElement(*q, EvalExpr(expr->args[0], ctx, arena), arena);
-  q->elements.push_back(val);
-  q->element_ids.push_back(q->AllocateId());
+  uint64_t id = q->AllocateId();
+  q->elements.push_back(PushedValue(q, expr->args[0], id, ctx, arena));
+  q->element_ids.push_back(id);
   ++q->generation;
   EnforceQueueBound(q, "push_back", expr->range.start, ctx);
 }
 
 static void QueuePushFront(QueueObject* q, const Expr* expr, SimContext& ctx,
                            Arena& arena) {
-  auto val =
-      SizedForQueueElement(*q, EvalExpr(expr->args[0], ctx, arena), arena);
-  q->elements.insert(q->elements.begin(), val);
-  q->element_ids.insert(q->element_ids.begin(), q->AllocateId());
+  uint64_t id = q->AllocateId();
+  q->elements.insert(q->elements.begin(),
+                     PushedValue(q, expr->args[0], id, ctx, arena));
+  q->element_ids.insert(q->element_ids.begin(), id);
   EnforceQueueBound(q, "push_front", expr->range.start, ctx);
   ++q->generation;
 }
@@ -192,6 +205,15 @@ static QueueCall ResolveQueueCall(const Expr* expr, SimContext& ctx,
   }
   call.receiver = access->lhs;
   call.method = access->rhs->text;
+  // §7.8.7 with §7.10: a method that changes the queue writes the element it
+  // is called on, so `aq["a"].push_back(3)` allocates aq["a"] where the array
+  // holds no such entry; a method that only reads it allocates nothing.
+  if (access->lhs->kind == ExprKind::kSelect) {
+    bool writes =
+        IsQueueMutator(call.method) || IsQueueOrderingMethod(call.method);
+    call.queue = ElementQueueOfSelect(access->lhs, ctx, arena, writes);
+    if (call.queue != nullptr) return call;
+  }
   call.queue = FindQueueOfBase(access->lhs, ctx, arena, &call.owner);
   return call;
 }

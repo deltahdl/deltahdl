@@ -178,6 +178,19 @@ struct QueueObject {
   // elements need identities of their own.
   void AllocateIdsForAppended();
 
+  // §7.4 with §7.10 (printed pages 153 and 169): whether each element of this
+  // queue or dynamic array is itself a queue, `int qq[$][$]` or `q_t d[]`
+  // under `typedef int q_t[$];`. Such an element keeps a placeholder in
+  // `elements`, so the size, the identities and the iteration of the outer
+  // array stay what they are, and its own queue in `element_queues`, under
+  // the element's identity where the queue keeps one and under its position
+  // otherwise (ElementQueueOfSelect in eval_array_element_queue.h). The inner
+  // queue's elements are as wide, as four-state and as much handles as this
+  // array's element type says: elem_width and is_4state describe the element
+  // type at the bottom of the dimensions, and holds_class_handles the same.
+  bool elements_are_queues = false;
+  std::map<uint64_t, QueueObject*> element_queues;
+
  private:
   uint64_t next_elem_id_ = 0;
 };
@@ -260,6 +273,18 @@ struct AssocArrayObject {
   // another entry and goes only when its own entry is deleted.
   std::map<int64_t, ElementDrive> int_drives;
   std::map<std::string, ElementDrive> str_drives;
+  // §7.8 with §7.10 (printed pages 163 and 169): whether each element is
+  // itself a queue, `int aq[string][$]` or UVM's `rsrc_sv_q_t all[int]` under
+  // `typedef uvm_resource_base rsrc_sv_q_t[$];`. The entry in int_data or
+  // str_data marks the key present, so num(), exists() and foreach see it,
+  // and the element's queue is kept under the same key below
+  // (ElementQueueOfSelect in eval_array_element_queue.h), its elements as
+  // wide and as four-state as this array's element type and handles where
+  // `element_queue_handles` says the type is a class.
+  bool elements_are_queues = false;
+  bool element_queue_handles = false;
+  std::map<int64_t, QueueObject*> int_element_queues;
+  std::map<std::string, QueueObject*> str_element_queues;
   uint32_t Size() const;
 };
 
@@ -291,6 +316,11 @@ struct ArrayInfo {
   // says the same of the outermost dimension alone, for the paths that read
   // the lo/size pair rather than these vectors.
   std::vector<bool> dim_descending = {};
+  // §7.4 with §7.10: whether each element of this fixed-size array is itself
+  // a queue, `q_t fx[2]` under `typedef int q_t[$];`. Each element's queue is
+  // a QueueObject created under the element's own name, `fx[1]`, where
+  // ElementQueueOfSelect (eval_array_element_queue.h) finds it.
+  bool elements_are_queues = false;
 };
 
 // §20.15.3: a queued entry as the queue manager retains it. $q_add records the

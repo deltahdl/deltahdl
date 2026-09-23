@@ -17,6 +17,7 @@
 #include "simulator/declared_class_key.h"
 #include "simulator/eval_array.h"
 #include "simulator/eval_array_class_assoc.h"
+#include "simulator/eval_array_element_queue.h"
 #include "simulator/eval_function_args_scoped.h"
 #include "simulator/evaluation.h"
 #include "simulator/queue_bound.h"
@@ -314,6 +315,11 @@ QueueObject* FindQueueOfBase(const Expr* base, SimContext& ctx, Arena& arena,
   // alone the module's queue answered.
   if (base->kind == ExprKind::kIdentifier)
     return FindQueueOfName(DeclaredKindsKey(base), ctx, owner);
+  // §7.4 with §7.10: an element of an array whose elements are queues, `qq[1]`
+  // or `aq["a"]`, is a queue itself; read here, as by `qq[1][0]` or
+  // `aq["a"].size()`, a missing entry is allocated by nothing.
+  if (base->kind == ExprKind::kSelect)
+    return ElementQueueOfSelect(base, ctx, arena, /*allocate=*/false);
   if (base->kind != ExprKind::kMemberAccess || base->lhs == nullptr ||
       base->rhs == nullptr || base->rhs->kind != ExprKind::kIdentifier) {
     return nullptr;

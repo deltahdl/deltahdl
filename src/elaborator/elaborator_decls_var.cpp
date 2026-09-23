@@ -16,6 +16,7 @@
 #include "elaborator/elaborator_decls_internal.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_items_internal.h"
+#include "elaborator/queue_dim.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "lexer/token.h"
@@ -697,6 +698,26 @@ static void RegisterVirtualInterfaceVarDecl(const ModuleItem* item,
                                  diag);
 }
 
+// §7.4 with §7.10 (printed pages 153 and 169): whether each element of the
+// array `item` declares is itself a queue -- its second of two dimensions is
+// `[$]`, `int aq[string][$]`, or its one dimension's element type names a
+// typedef whose own one unpacked dimension is `[$]`, `q_t d[]` under `typedef
+// int q_t[$];`, the typedef's dimensions being part of the type it names
+// (§6.18).
+static bool DeclaresElementQueues(
+    const ModuleItem* item,
+    const std::unordered_map<std::string_view, std::vector<Expr*>>&
+        td_array_dims) {
+  const std::vector<Expr*>& dims = item->unpacked_dims;
+  if (dims.size() == 2 && dims[1] != nullptr && IsQueueDim(dims[1]))
+    return true;
+  if (dims.size() != 1 || item->data_type.kind != DataTypeKind::kNamed)
+    return false;
+  auto it = td_array_dims.find(item->data_type.type_name);
+  return it != td_array_dims.end() && it->second.size() == 1 &&
+         it->second[0] != nullptr && IsQueueDim(it->second[0]);
+}
+
 // §6.18 / §7.4 / §10.10.1: when a variable's named type is a fixed unpacked-
 // array typedef and it declares no unpacked dimensions of its own, rewrite it
 // to the typedef's element base type (keeping its own const-ness) plus the
@@ -858,6 +879,7 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
       {{typedefs_, class_names_}, BuildParamScope(mod), diag_, item->loc});
   ValidateUnpackedDimRange(item->unpacked_dims, item->loc);
   InferDynArraySize(item->unpacked_dims, item->init_expr, var);
+  var.elements_are_queues = DeclaresElementQueues(item, td_array_dims_);
 
   TrackVarArrayInfo(item, var, BuildParamScope(mod), var_array_info_);
 
