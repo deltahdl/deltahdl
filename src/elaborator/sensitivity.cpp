@@ -64,11 +64,41 @@ static void CollectSelectReads(const Expr* expr,
   CollectExprReads(cur, out);
 }
 
+// The dotted name a member access down a path of plain names spells,
+// `dif.clk` for the member clk of the interface instance dif; false where a
+// step of the path is anything but a name.
+static bool DottedNamePath(const Expr* expr, std::string& out) {
+  if (expr->kind == ExprKind::kIdentifier) {
+    out += expr->text;
+    return true;
+  }
+  if (expr->kind != ExprKind::kMemberAccess || expr->is_scope_resolution ||
+      expr->lhs == nullptr || expr->rhs == nullptr ||
+      expr->rhs->kind != ExprKind::kIdentifier) {
+    return false;
+  }
+  if (!DottedNamePath(expr->lhs, out)) return false;
+  out += '.';
+  out += expr->rhs->text;
+  return true;
+}
+
 void CollectExprReads(const Expr* expr, std::unordered_set<std::string>& out) {
   if (!expr) return;
   if (expr->kind == ExprKind::kIdentifier) {
     out.insert(std::string(expr->text));
     return;
+  }
+  // §25.10 with §10.3.2 and §23.6: a member access down a path of names reads
+  // the variable held under the dotted name, a member of an interface
+  // instance, `assign w = dif.clk;`, or of a module instance, as well as the
+  // parts the recursion below collects (a struct member's variable is its
+  // base's). A name no variable is held under is dropped by the reader
+  // (DropUnwatchableNames). Collected as `dif` and `clk` alone, the reads
+  // named no variable, and a port connected to `dif.clk` never followed it.
+  if (expr->kind == ExprKind::kMemberAccess) {
+    std::string dotted;
+    if (DottedNamePath(expr, dotted)) out.insert(dotted);
   }
   if (expr->kind == ExprKind::kSelect) {
     CollectSelectReads(expr, out);

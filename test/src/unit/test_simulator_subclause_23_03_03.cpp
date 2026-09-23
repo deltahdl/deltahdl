@@ -162,4 +162,33 @@ TEST(PortConnectionRulesSimulation, ParameterValueSourceDrivesInputPort) {
       0x77u);
 }
 
+// §23.3.3 with §25.10: a port connected to a member of an interface instance,
+// `gen dut(.clk(dif.clk), .o(dif.o))`, follows it as a port connected to any
+// variable does: the input takes dif.clk's rise, the module's always runs on
+// it, and the output drives dif.o. The input's continuous assignment watched
+// neither `dif` nor `clk` alone, so it never ran again after the first
+// evaluation and all three read 0.
+TEST(PortConnectionRulesSimulation,
+     PortsConnectedToInterfaceMembersFollowThem) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module gen(input clk, output reg o);\n"
+      "  initial o = 0;\n"
+      "  always @(posedge clk) o <= 1;\n"
+      "endmodule\n"
+      "interface gi(output bit clk, input o);\n"
+      "endinterface\n"
+      "module t;\n"
+      "  gi dif();\n"
+      "  gen dut(.clk(dif.clk), .o(dif.o));\n"
+      "  initial begin\n"
+      "    dif.clk = 0;\n"
+      "    #10 dif.clk = 1;\n"
+      "    #10 $display(\"%b %b %b\", dut.clk, dut.o, dif.o);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 1 1\n");
+}
+
 }  // namespace
