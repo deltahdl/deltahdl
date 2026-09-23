@@ -5,7 +5,7 @@ description: Start or stop the standing reminders, with or without the loop that
 
 # Autopilot
 
-## The eight standing reminders
+## The seven standing reminders
 
 Every `start` form creates these.
 
@@ -18,7 +18,6 @@ Every `start` form creates these.
 | `7,27,47 * * * *` | `REMINDER: While any CI run for a pushed commit is in progress, only wait: no diagnosis, edits or commits.` |
 | `8,28,48 * * * *` | `REMINDER: When you come up against a new problem, file a GitHub issue per indivisible problem, unless an issue or issues are already filed. Then solve whatever issue or issues need to be solved in order to solve the original issue.` |
 | `9,29,49 * * * *` | `REMINDER: Ensure every task on the list is indivisible, whether it was written with TaskCreate or rewritten with TaskUpdate: read each subject as written and count the actions it names; a subject naming more than one action is divisible, whatever single purpose those actions serve, and is split into one task per action.` |
-| `10,30,50 * * * *` | `REMINDER: The sv-tests README establishes which subclause an sv-test is tagged with: a test case covers a single feature, and where it uses several, the tag names the feature it directly tests, drawn from the list in conf/lrm.conf and deciding the tests/chapter-N directory the file sits in. Read that rule to settle what a suite file's tag should be, and resolve the tag from its 2017 number to the 2023 clause before comparing it with anything deltahdl reports.` |
 
 ## The two loop reminders
 
@@ -56,7 +55,7 @@ And this one:
 
 Any form but `reminders-only` may be followed by `--skip-label <label>`, once per label, quoted when it holds a space. Each adds to the loop's `gh issue list` command, right after `--state open`, a `-label:"<label>"` term in one `--search` flag — `--search '-label:"needs decision" -label:"blocked"'` — and appends to that reminder, after a space, `An issue labelled '<label>' is left to a person, whatever else it carries.`
 
-For any form but `reminders-only`, run the loop's `gh issue list` command once; if it names no issue, create the eight standing reminders only.
+For any form but `reminders-only`, run the loop's `gh issue list` command once; if it names no issue, create the seven standing reminders only.
 
 Call `CronList`, then `CronCreate` with `recurring: true` for each reminder of the form whose prompt is not already scheduled, substituting the number for `{X}` or the label for `{L}`. Then begin solving the issue the command named.
 
