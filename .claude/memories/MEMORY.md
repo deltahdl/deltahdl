@@ -89,7 +89,7 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 
 ## Tasks
 
-- [One action per task](one-action-per-task.md) — a subject naming several actions is divisible by construction; split by action and re-read the subjects when the reminder fires.
+- [One action per task](one-action-per-task.md) — a subject naming several actions is divisible by construction, and so is an umbrella verb like "Solve #N"; count the steps it commits to and split by action.
 
 ## The notes themselves
 
