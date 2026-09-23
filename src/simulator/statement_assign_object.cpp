@@ -37,12 +37,20 @@
 
 namespace delta {
 
+// §7.9.9 (printed page 168): assigning one associative array to another
+// clears the target and copies each entry of the source into it. Either side
+// may be a class property (§8.5) -- by its bare name in a method, through a
+// handle, `b.m = a.m`, or `C::m` -- which FindAssocArrayOfBase resolves as a
+// declared array's name is; asked by name alone, a property on either side
+// found no array and the assignment did nothing, which lost every edge set
+// UVM's uvm_phase::add copies with `end_node.m_successors =
+// after_phase.m_successors;`.
 bool TryAssocCopyAssign(const Stmt* stmt, SimContext& ctx) {
-  if (stmt->lhs->kind != ExprKind::kIdentifier) return false;
-  if (stmt->rhs->kind != ExprKind::kIdentifier) return false;
-  auto* dst = ctx.FindAssocArray(stmt->lhs->text);
-  auto* src = ctx.FindAssocArray(stmt->rhs->text);
-  if (!dst || !src) return false;
+  Arena& arena = ctx.GetArena();
+  auto* dst = FindAssocArrayOfBase(stmt->lhs, ctx, arena);
+  if (!dst) return false;
+  auto* src = FindAssocArrayOfBase(stmt->rhs, ctx, arena);
+  if (!src) return false;
   dst->int_data = src->int_data;
   dst->str_data = src->str_data;
   return true;

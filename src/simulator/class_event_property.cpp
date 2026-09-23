@@ -75,32 +75,44 @@ Variable* OnClass(const ClassTypeInfo* cls, std::string_view name,
   return EventIn(declaring->static_event_properties[std::string(name)], arena);
 }
 
+// A bare name inside a method: the running object's event property, else the
+// running class's static one.
+Variable* OfBareName(std::string_view name, SimContext& ctx, Arena& arena) {
+  if (ClassObject* self = ctx.CurrentThis()) {
+    if (Variable* ev = OnObject(self, name, arena)) return ev;
+  }
+  const ClassTypeInfo* cls = ctx.CurrentMethodClass();
+  return cls != nullptr ? OnClass(cls, name, arena) : nullptr;
+}
+
+// The object the left side of `side.ev` designates: a handle path names its
+// object without evaluating anything (HandleSideObject), and an element of an
+// array of handles, `m_events[obj]`, is read for the handle it holds.
+ClassObject* ObjectOfSide(const Expr* side, SimContext& ctx, Arena& arena) {
+  if (ClassObject* obj = HandleSideObject(side, ctx, arena)) return obj;
+  if (side->kind != ExprKind::kSelect) return nullptr;
+  return ctx.GetClassObject(EvalExpr(side, ctx, arena).ToUint64());
+}
+
+// `C::ev`, a static event property named through its class.
+Variable* OfScopeForm(const Expr* expr, SimContext& ctx, Arena& arena) {
+  if (expr->lhs->kind != ExprKind::kIdentifier) return nullptr;
+  const ClassTypeInfo* cls = ctx.FindClassType(expr->lhs->text);
+  return cls != nullptr ? OnClass(cls, expr->rhs->text, arena) : nullptr;
+}
+
 }  // namespace
 
 Variable* ClassEventVariable(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr == nullptr) return nullptr;
-  if (expr->kind == ExprKind::kIdentifier) {
-    if (ClassObject* self = ctx.CurrentThis()) {
-      if (Variable* ev = OnObject(self, expr->text, arena)) return ev;
-    }
-    const ClassTypeInfo* cls = ctx.CurrentMethodClass();
-    return cls != nullptr ? OnClass(cls, expr->text, arena) : nullptr;
-  }
+  if (expr->kind == ExprKind::kIdentifier)
+    return OfBareName(expr->text, ctx, arena);
   if (expr->kind != ExprKind::kMemberAccess || expr->lhs == nullptr ||
       expr->rhs == nullptr || expr->rhs->kind != ExprKind::kIdentifier) {
     return nullptr;
   }
-  if (expr->is_scope_resolution) {
-    if (expr->lhs->kind != ExprKind::kIdentifier) return nullptr;
-    const ClassTypeInfo* cls = ctx.FindClassType(expr->lhs->text);
-    return cls != nullptr ? OnClass(cls, expr->rhs->text, arena) : nullptr;
-  }
-  // A handle path names its object without evaluating anything
-  // (HandleSideObject); an element of an array of handles, `m_events[obj]`,
-  // is read for the handle it holds.
-  ClassObject* obj = HandleSideObject(expr->lhs, ctx, arena);
-  if (obj == nullptr && expr->lhs->kind == ExprKind::kSelect)
-    obj = ctx.GetClassObject(EvalExpr(expr->lhs, ctx, arena).ToUint64());
+  if (expr->is_scope_resolution) return OfScopeForm(expr, ctx, arena);
+  ClassObject* obj = ObjectOfSide(expr->lhs, ctx, arena);
   return obj != nullptr ? OnObject(obj, expr->rhs->text, arena) : nullptr;
 }
 
