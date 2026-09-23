@@ -7,7 +7,7 @@ description: Start or stop the standing reminders, with or without the loop that
 
 ## The eight standing reminders
 
-Every `start` form creates these. Each reminder fires every 20 minutes, on a minute of its own from 0 to 19 and the same minute 20 and 40 later: the eight below take 0, 2, 3 and 6 to 10, and the loop reminders take 1 and 4.
+Every `start` form creates these.
 
 | Cron | Prompt |
 | --- | --- |
@@ -52,19 +52,14 @@ And this one:
 
 ## Start
 
-- `start bysubclause` — the lowest subclause with an open `Satisfy IEEE 1800-2023 §<subclause>` issue.
-- `start byissuefloor <issue-number>` — the open issues above the number.
-- `start bylabel <label>` — the open issues carrying the label, exactly as written; `gh label list` prints them.
-- `start reminders-only` — the eight standing reminders alone.
-
-`start` alone is `bysubclause`, `start <issue-number>` is `byissuefloor`, and `start §5` is `bylabel`. A form missing its argument: ask for it before creating anything.
+`start` alone is `bysubclause`, `start <issue-number>` is `byissuefloor`, and `start §5` is `bylabel`.
 
 Any form but `reminders-only` may be followed by `--skip-label <label>`, once per label, quoted when it holds a space. Each adds to the loop's `gh issue list` command, right after `--state open`, a `-label:"<label>"` term in one `--search` flag — `--search '-label:"needs decision" -label:"blocked"'` — and appends to that reminder, after a space, `An issue labelled '<label>' is left to a person, whatever else it carries.`
 
-For any form but `reminders-only`, run the loop's `gh issue list` command once and name what it printed: the subclause and issue for `bysubclause`; the floor or label, how many open issues it selects, and which one the first iteration takes for the other two; and the labels skipped. If it names nothing, say so and create the eight standing reminders only.
+For any form but `reminders-only`, run the loop's `gh issue list` command once; if it names no issue, create the eight standing reminders only.
 
-Call `CronList`, then `CronCreate` with `recurring: true` for each reminder of the form whose prompt is not already scheduled, substituting the number for `{X}` or the label for `{L}`. Report which were created and which were already running, that they live in this session only, and that recurring jobs expire after seven days. Then begin solving the issue named in the same turn, or, when none was, carry on with whatever the session was doing.
+Call `CronList`, then `CronCreate` with `recurring: true` for each reminder of the form whose prompt is not already scheduled, substituting the number for `{X}` or the label for `{L}`. Then begin solving the issue the command named.
 
 ## Stop
 
-Call `CronList`, then `CronDelete` for every job it returns. Call `CronList` again to confirm it is empty and report how many were deleted.
+Call `CronList`, then `CronDelete` for every job it returns.
