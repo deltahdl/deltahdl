@@ -612,4 +612,107 @@ TEST(ClassSim, ActualsEqualToTheDefaultsNameTheDefaultSpecialization) {
   EXPECT_EQ(out, "1\n");
 }
 
+// §8.25 (printed page 204): an assignment through a scope form writes the
+// static property of the specialization the form names, as a read through
+// it reads it; S#(byte)::n = 5 landed in the default specialization's n.
+TEST(ClassSim, ScopeFormAssignmentWritesTheSpecializationsStatic) {
+  SimFixture f;
+  auto out = RunCapture(
+      "class S #(type T = int);\n"
+      "  static int n = 0;\n"
+      "endclass\n"
+      "module t;\n"
+      "  initial begin\n"
+      "    S#(byte)::n = 5;\n"
+      "    $display(\"%0d %0d\", S#(byte)::n, S#(int)::n);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "5 0\n");
+}
+
+// The same rule for a compound assignment, which reads and writes the one
+// static through the same scope form.
+TEST(ClassSim, ScopeFormCompoundAssignmentWritesTheSpecializationsStatic) {
+  SimFixture f;
+  auto out = RunCapture(
+      "class S #(type T = int);\n"
+      "  static int n = 1;\n"
+      "endclass\n"
+      "module t;\n"
+      "  initial begin\n"
+      "    S#(shortint)::n += 3;\n"
+      "    $display(\"%0d %0d\", S#(shortint)::n, S#(int)::n);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "4 1\n");
+}
+
+// §8.25 (printed page 204) with §6.22.1 (printed page 135): a typedef name
+// matches the type it stands for, so S #(word_t) under `typedef int word_t;`
+// is S #(int), the default specialization, and shares its static n; keyed by
+// the alias's name, it was a specialization with a count of its own.
+TEST(ClassSim, TypedefActualNamesTheSpecializationOfItsType) {
+  SimFixture f;
+  auto out = RunCapture(
+      "typedef int word_t;\n"
+      "class S #(type T = int);\n"
+      "  static int n = 0;\n"
+      "  function new(); n++; endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  initial begin\n"
+      "    S #(int) a = new;\n"
+      "    S #(word_t) b = new;\n"
+      "    $display(\"%0d\", S#(int)::n);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "2\n");
+}
+
+// The same rule through a chain of typedefs, each a name for the one before
+// it: u8b_t stands for u8_t, which stands for bit [7:0].
+TEST(ClassSim, TypedefChainActualNamesTheSpecializationOfItsType) {
+  SimFixture f;
+  auto out = RunCapture(
+      "typedef bit [7:0] u8_t;\n"
+      "typedef u8_t u8b_t;\n"
+      "class S #(type T = int);\n"
+      "  static int n = 0;\n"
+      "  function new(); n++; endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  initial begin\n"
+      "    S #(bit [7:0]) a = new;\n"
+      "    S #(u8b_t) b = new;\n"
+      "    $display(\"%0d %0d\", S#(bit [7:0])::n, S#(int)::n);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "2 0\n");
+}
+
+// A typedef declaring unpacked dimensions stands for an array, not for its
+// element type: S #(iq_t) under `typedef int iq_t[$];` is no S #(int), and
+// constructing one leaves the default specialization's count alone.
+TEST(ClassSim, UnpackedTypedefActualKeepsItsOwnSpecialization) {
+  SimFixture f;
+  auto out = RunCapture(
+      "typedef int iq_t[$];\n"
+      "class S #(type T = int);\n"
+      "  static int n = 0;\n"
+      "  function new(); n++; endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  initial begin\n"
+      "    S #(iq_t) a = new;\n"
+      "    $display(\"%0d %0d\", S#(iq_t)::n, S#(int)::n);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 0\n");
+}
+
 }  // namespace

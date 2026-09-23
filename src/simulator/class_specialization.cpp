@@ -10,6 +10,7 @@
 #include "common/types.h"
 #include "parser/ast_class.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_module.h"
 #include "parser/ast_type.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_array_class_assoc.h"
@@ -68,6 +69,25 @@ std::string_view BuiltinTypeKeyword(DataTypeKind kind) {
   }
 }
 
+// §6.18 with §6.22.1: the built-in type at the end of the chain of typedefs
+// the name `type` writes, `int` for `word_t` under `typedef int word_t;`.
+// Null where `type` names no typedef, where the chain ends at no built-in
+// type -- a class, an enum, a struct -- and where a step on it writes a
+// parameter list or declares unpacked dimensions, `typedef int iq_t[$];`
+// standing for a queue of int rather than for int.
+const DataType* BuiltinTypedefTarget(const DataType& type, SimContext& ctx) {
+  const DataType* step = &type;
+  for (size_t hops = 0; hops <= ctx.TypeDeclarationCount(); ++hops) {
+    if (step->kind != DataTypeKind::kNamed)
+      return BuiltinTypeKeyword(step->kind).empty() ? nullptr : step;
+    if (!step->type_params.empty()) return nullptr;
+    const ModuleItem* item = TypedefItemSeenFrom(*step, nullptr, ctx);
+    if (item == nullptr || !item->unpacked_dims.empty()) return nullptr;
+    step = &item->typedef_type;
+  }
+  return nullptr;
+}
+
 // §8.25 with §23.10.2.2: a type parameter's actual matches by matching types,
 // so the key has to tell two actuals apart exactly when their types differ. A
 // named type is told by its name. A built-in one is spelled by its keyword
@@ -81,6 +101,12 @@ std::string_view BuiltinTypeKeyword(DataTypeKind kind) {
 // scope form `C#(byte)::` as C#(byte[8]), two specializations of one type.
 // The declaration's own default stands where the specialization leaves the
 // parameter out, which is the type the default specialization binds.
+//
+// §6.22.1 (printed page 135 of IEEE 1800-2023) makes a typedef name match the
+// type it stands for, so a name reaching a built-in type through its chain of
+// typedefs (BuiltinTypedefTarget) is spelled as that type is: keyed by the
+// alias's own name, `S #(word_t)` under `typedef int word_t;` was a
+// specialization apart from `S #(int)`, with statics of its own.
 std::string TypeActualKey(const ClassDecl* decl, size_t i,
                           const DataType* actual, SimContext& ctx) {
   const DataType* type = actual;
@@ -88,7 +114,11 @@ std::string TypeActualKey(const ClassDecl* decl, size_t i,
     type = i < decl->param_types.size() ? &decl->param_types[i] : nullptr;
   if (type == nullptr) return {};
   std::string key(BuiltinTypeKeyword(type->kind));
-  if (key.empty()) return std::string(type->type_name);
+  if (key.empty()) {
+    const DataType* target = BuiltinTypedefTarget(*type, ctx);
+    if (target == nullptr) return std::string(type->type_name);
+    key = BuiltinTypeKeyword(target->kind);
+  }
   return key + "[" + std::to_string(DeclaredTypeWidth(*type, ctx)) + "]";
 }
 

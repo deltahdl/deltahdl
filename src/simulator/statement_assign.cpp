@@ -13,6 +13,7 @@
 #include "parser/ast_expr.h"
 #include "simulator/assoc_element.h"
 #include "simulator/class_object.h"
+#include "simulator/class_specialization.h"
 #include "simulator/eval_array.h"
 #include "simulator/eval_expr_internal.h"
 #include "simulator/eval_member_path.h"
@@ -438,6 +439,28 @@ static FieldTarget StaticPropertyTarget(const ClassTypeInfo* cls,
   return target;
 }
 
+// §8.25 (printed page 204 of IEEE 1800-2023): `S#(byte)::n = 5` writes the
+// static property of the specialization the scope form names, each
+// specialization holding its own set of static member variables, as the read
+// of `S#(byte)::n` does (TryScopeSpecializationStaticMember). The flattened
+// name drops the parameter list, so ResolveStaticClassField took `S` for the
+// class and the value landed in the default specialization's n. *handled is
+// set true where the left side of the scope form names a specialization.
+static FieldTarget ResolveSpecializationStaticField(const Expr* lhs,
+                                                    SimContext& ctx,
+                                                    bool* handled) {
+  *handled = false;
+  if (lhs->kind != ExprKind::kMemberAccess || !lhs->is_scope_resolution ||
+      lhs->rhs == nullptr || lhs->rhs->kind != ExprKind::kIdentifier) {
+    return {};
+  }
+  const ClassTypeInfo* spec =
+      ScopeNamedSpecialization(lhs->lhs, ctx, ctx.GetArena());
+  if (spec == nullptr) return {};
+  *handled = true;
+  return StaticPropertyTarget(spec, lhs->rhs->text);
+}
+
 // The static property field_name of the class named base_name. *handled is set
 // true when base_name names a known class type.
 static FieldTarget ResolveStaticClassField(std::string_view base_name,
@@ -610,6 +633,8 @@ FieldTarget ResolveFieldTarget(const Expr* lhs, SimContext& ctx) {
   target = ResolvePackageClassStaticField(lhs, ctx, &handled);
   if (handled) return target;
   target = ResolveStaticHandleField(lhs, ctx, &handled);
+  if (handled) return target;
+  target = ResolveSpecializationStaticField(lhs, ctx, &handled);
   if (handled) return target;
 
   std::string name;
