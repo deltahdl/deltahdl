@@ -12,4 +12,4 @@ Wait for a CI run with `run_in_background: true` on the Bash call, or with the M
 
 **Why:** A foreground watch holds the whole session for the length of the run, and nothing else, a reminder included, can arrive while it does.
 
-**How to apply:** After the push in [reading-a-ci-run](reading-a-ci-run.md), start `gh run watch <id> --exit-status` as a background Bash command and let its completion notification bring the result, then read the run with `gh run view --log-failed` as usual.
+**How to apply:** After the push in [reading-a-ci-run](reading-a-ci-run.md), start `gh run watch <id> --exit-status` as a background Bash command and let its completion notification bring the result, then read the run with `gh run view --log-failed` as usual. Find the run's id with `gh run list --commit "$(git rev-parse HEAD)"`: `--commit` matches only a full SHA, so a short one lists nothing, and a loop waiting for it to list a run never ends.
