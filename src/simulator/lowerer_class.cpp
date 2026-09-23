@@ -171,9 +171,17 @@ static void InitStaticProperties(ClassTypeInfo* info, SimContext& ctx,
 // nothing bound -- the class declaration names no actuals -- so the name
 // `size` read nothing and the one shared copy held 0 for every
 // specialization.
+//
+// §8.25 also makes the storage the specialization's own from the start: it is
+// copied from the generic class (SpecializationOf in class_specialization.cpp)
+// with whatever that class's copy holds by then, so each static property is
+// first set back to the default CreateStaticProperties gives it. Kept as
+// copied, `S #(byte)::n` made after `S s = new;` had run read the count the
+// default specialization's constructor had made.
 void InitSpecializationStaticProperties(ClassTypeInfo* spec, SimContext& ctx,
                                         Arena& arena) {
   if (spec == nullptr || spec->decl == nullptr) return;
+  CreateStaticProperties(spec, arena);
   if (!spec->package.empty()) ctx.PushScope(spec->package);
   ctx.PushScope();
   for (const auto& [pname, pexpr] : spec->decl->params) {

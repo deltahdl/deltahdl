@@ -569,4 +569,26 @@ TEST(ClassSim, FunctionLocalInitializerNewBuildsTheSpecialization) {
   EXPECT_EQ(out, "1 0\n");
 }
 
+// §8.25 (printed pages 203-204): each specialization has its own set of
+// static member variables, so S #(byte)'s n is untouched by the default
+// specialization's constructor even where S #(byte) comes into being after
+// it has run; made then as a copy of the generic class, S #(byte) started
+// with the count the default's objects had already made.
+TEST(ClassSim, SpecializationMadeLateStartsWithItsOwnStatics) {
+  SimFixture f;
+  auto out = RunCapture(
+      "class S #(type T = int);\n"
+      "  static int n;\n"
+      "  function new(); n++; endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  initial begin\n"
+      "    S s = new;\n"
+      "    $display(\"%0d\", S#(byte)::n);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "0\n");
+}
+
 }  // namespace
