@@ -663,6 +663,13 @@ void RegisterClassScopeTypedefAliases(ClassTypeInfo* info, SimContext& ctx,
         member->typedef_item == nullptr) {
       continue;
     }
+    // §6.18: a typedef's unpacked dimensions are part of the type it
+    // declares, so UVM's `typedef uvm_resource_base rsrc_sv_q_t[$];` names a
+    // queue of handles and no class. Bound under the alias, it stood for
+    // uvm_resource_base itself, and HolderScopeClass spelled the actual of
+    // `typedef uvm_shared#(rsrc_sv_q_t) rsrc_shared_q_t;` as that class, so
+    // uvm_shared's `T value` was one handle and the resource pool kept nothing.
+    if (!member->typedef_item->unpacked_dims.empty()) continue;
     auto* alias = arena.Create<std::string>(std::string(info->name) +
                                             "::" + std::string(member->name));
     if (ctx.FindClassType(*alias) != nullptr) continue;

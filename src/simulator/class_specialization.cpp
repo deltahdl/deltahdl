@@ -352,6 +352,13 @@ std::vector<DataType> ActualsUnderSpecialization(
       continue;
     }
     const DataType* a = HolderActualFor(holder, actual.type_name);
+    // §8.25.1: the generic class stands for the default specialization, so
+    // with no actuals of its own its parameter is its default, which UVM's
+    // `typedef uvm_resource #(T) rsrc_t;` in uvm_resource_db_implementation_t
+    // #(type T = uvm_object) writes. Left as the bare name, the list spelled
+    // a specialization keyed by `T` that no other name reached.
+    if (a == nullptr && holder->param_actuals == nullptr)
+      a = TypeParamActual(nullptr, holder->decl, actual.type_name);
     if (a == nullptr) continue;
     std::string_view arg = actual.param_arg_name;
     actual = *a;
@@ -423,6 +430,28 @@ std::string SpecializationKey(const ClassTypeInfo* generic,
   return key;
 }
 
+// §8.25 with §8.20: a virtual method an object of `spec` dispatches to is a
+// method of `spec`, or of the base level of `spec` that declares it, and runs
+// as that class's, with its type parameters, its class-scope typedefs and its
+// statics. The vtable copied from the declaration names the generic class
+// and the generic bases as the owners, so each entry is moved to the level
+// of `spec`'s chain made from the same declaration. Left on the declaration,
+// uvm_resource_db_default_implementation_t #(T)'s get_by_name ran under the
+// generic class, and the `rsrc_t::get_type()` it passed was another
+// specialization's handle than the one every stored resource reported.
+void OwnVTableEntries(ClassTypeInfo* spec) {
+  for (VTableEntry& entry : spec->vtable) {
+    if (entry.owner == nullptr) continue;
+    for (const ClassTypeInfo* level = spec; level != nullptr;
+         level = level->parent) {
+      if (level->decl == entry.owner->decl) {
+        entry.owner = level;
+        break;
+      }
+    }
+  }
+}
+
 }  // namespace
 
 ClassTypeInfo* SpecializationOf(ClassTypeInfo* generic,
@@ -458,6 +487,7 @@ ClassTypeInfo* SpecializationOf(ClassTypeInfo* generic,
   // own (BindTypeParamActuals in eval_class_params.cpp).
   spec->param_actuals = arena.Create<std::vector<DataType>>(spelled);
   BindSpecializationBase(spec, spelled, ctx, arena);
+  OwnVTableEntries(spec);
   for (auto& [pname, value] : values)
     spec->static_properties[std::string(pname)] = value;
   ctx.RegisterClassType(spec->name, spec);

@@ -633,4 +633,38 @@ TEST(ParameterizedScopeResolutionSim,
   LowerRunAndCheck(f, design, {{"a", 8u}, {"b", 16u}});
 }
 
+TEST(ParameterizedScopeResolutionSim,
+     DefaultSpecializationsTypedefNamesTheSpecializationOfItsDefault) {
+  // §8.25.1: inside the default specialization, a class-scope typedef writing
+  // the class's type parameter, `typedef R #(T) rsrc_t;` in `Own #(type T =
+  // int)`, names R #(int), the default standing for T -- UVM's `typedef
+  // uvm_resource #(T) rsrc_t;` in uvm_resource_db_implementation_t, whose
+  // default T is uvm_object. `rsrc_t::id` in Own #(int) therefore reads
+  // R #(int)'s 7, as `R#(T)::id` does and as Own #(byte) reads R #(byte)'s 9.
+  // Bound when the class had no actuals, T stood for its own name and
+  // rsrc_t named an R of its own, whose id read 0.
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class R #(type T = int);\n"
+      "  static int id;\n"
+      "endclass\n"
+      "class Own #(type T = int);\n"
+      "  typedef R #(T) rsrc_t;\n"
+      "  function int td(); return rsrc_t::id; endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  Own #(int) o = new;\n"
+      "  Own #(byte) b = new;\n"
+      "  int a, c;\n"
+      "  initial begin\n"
+      "    R#(int)::id = 7;\n"
+      "    R#(byte)::id = 9;\n"
+      "    a = o.td();\n"
+      "    c = b.td();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"a", 7u}, {"c", 9u}});
+}
+
 }  // namespace

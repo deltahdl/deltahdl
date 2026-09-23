@@ -527,6 +527,101 @@ TEST(ClassSim, PropertyTypedByATypeParameterTakesAHoldersQueueTypedef) {
   EXPECT_EQ(out, "2 8\n");
 }
 
+// §6.18 with §8.25: the holder's typedef stays a queue where its elements are
+// class handles, as UVM's `typedef uvm_resource_base rsrc_sv_q_t[$];` is:
+// bq_t names a queue of B, not B, so under `S #(bq_t)` the property
+// `T value` holds both pushed handles. Taken for the class B its element
+// names, the actual made `value` one handle, the pushes stored nothing and
+// the size read 0, which emptied UVM's resource pool.
+TEST(ClassSim, PropertyTypedByATypeParameterTakesAHoldersQueueOfHandles) {
+  SimFixture f;
+  auto out = RunCapture(
+      "class B; int id; function new(int i); id = i; endfunction endclass\n"
+      "class S #(type T = int); T value; endclass\n"
+      "class H;\n"
+      "  typedef B bq_t[$];\n"
+      "  typedef S #(bq_t) sq_t;\n"
+      "endclass\n"
+      "module t;\n"
+      "  initial begin\n"
+      "    H::sq_t s;\n"
+      "    B b;\n"
+      "    s = new;\n"
+      "    b = new(4);\n"
+      "    s.value.push_back(b);\n"
+      "    b = new(5);\n"
+      "    s.value.push_back(b);\n"
+      "    $display(\"%0d\", s.value.size());\n"
+      "    if (s.value.size() == 2) $display(\"%0d\", s.value[1].id);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "2\n5\n");
+}
+
+// §8.25 with §8.20: a virtual method called on an object of Own #(byte) is
+// Own #(byte)'s method, so `rsrc_t`, Own's `typedef R #(T) rsrc_t;`, names
+// R #(byte) in it as in the non-virtual one, and both read R #(byte)'s 9. The
+// specialization's vtable, copied from the declaration, named the generic Own
+// as the virtual method's class, which the call ran under: rsrc_t resolved
+// there, to another R, and read 0 -- UVM's resource pool compared the type
+// handle `rsrc_t::get_type()` its default implementation's virtual
+// get_by_name passed against each resource's own and matched none.
+TEST(ClassSim, VirtualMethodOfASpecializationRunsUnderTheSpecialization) {
+  SimFixture f;
+  auto out = RunCapture(
+      "class R #(type T = int);\n"
+      "  static int id;\n"
+      "endclass\n"
+      "class Own #(type T = int);\n"
+      "  typedef R #(T) rsrc_t;\n"
+      "  virtual function int get_v(); return rsrc_t::id; endfunction\n"
+      "  function int get_nv(); return rsrc_t::id; endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  initial begin\n"
+      "    Own #(byte) o = new;\n"
+      "    R#(int)::id = 7;\n"
+      "    R#(byte)::id = 9;\n"
+      "    $display(\"%0d %0d\", o.get_v(), o.get_nv());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "9 9\n");
+}
+
+// The same where the virtual method overrides a base's pure virtual one and
+// the typedef is the base's, as uvm_resource_db_default_implementation_t
+// #(T) implements uvm_resource_db_implementation_t #(T)'s get_by_name with
+// the base's rsrc_t: the override runs as Imp #(byte)'s, whose base is
+// ImpBase #(byte), so the inherited rsrc_t is R #(byte) and reads 9.
+TEST(ClassSim, OverrideOfASpecializationReadsItsBasesTypedef) {
+  SimFixture f;
+  auto out = RunCapture(
+      "class R #(type T = int);\n"
+      "  static int id;\n"
+      "endclass\n"
+      "virtual class ImpBase #(type T = int);\n"
+      "  typedef R #(T) rsrc_t;\n"
+      "  pure virtual function int get();\n"
+      "endclass\n"
+      "class Imp #(type T = int) extends ImpBase #(T);\n"
+      "  virtual function int get(); return rsrc_t::id; endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  initial begin\n"
+      "    Imp #(byte) i = new;\n"
+      "    ImpBase #(byte) h;\n"
+      "    R#(int)::id = 7;\n"
+      "    R#(byte)::id = 9;\n"
+      "    h = i;\n"
+      "    $display(\"%0d %0d\", i.get(), h.get());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "9 9\n");
+}
+
 // §8.25 (printed pages 203-204): a declaration's initializer `new`
 // constructs the specialization the declared type names, so the constructor
 // that runs is S #(byte)'s and increments its static n rather than the
