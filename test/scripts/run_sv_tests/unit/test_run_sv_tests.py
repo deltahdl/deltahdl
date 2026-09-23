@@ -738,6 +738,61 @@ def test_rejection_under_the_rule_broken_by_a_file_tagged_by_its_feature_evaluat
     assert (ok, result["status"]) == (1, "pass")
 
 
+def _evaluate_the_timeformat_file(
+    rst: ModuleType, tmp_path: Path, returncode: int, stderr: str,
+) -> tuple[dict[str, Any], int]:
+    sv = tmp_path / "chapter-20" / "20.4--timeformat.sv"
+    sv.parent.mkdir(parents=True)
+    sv.write_text(
+        "/*\n:name: timeformat_task\n:tags: 20.4\n"
+        ":type: simulation elaboration parsing\n*/\nmodule top; endmodule\n"
+    )
+    mock_result = MagicMock(returncode=returncode, stdout="", stderr=stderr)
+    with patch.object(rst.subprocess, "run", return_value=mock_result):
+        evaluated: tuple[dict[str, Any], int] = rst.build_result(str(sv))
+        return evaluated
+
+
+def test_rejection_under_the_rule_a_file_the_suite_expects_accepted_breaks_evaluates_as_a_pass(
+    rst: ModuleType, tmp_path: Path,
+) -> None:
+    result, ok = _evaluate_the_timeformat_file(
+        rst, tmp_path, 1,
+        "20.4--timeformat.sv:23:18: error: $timeformat precision_number out of"
+        " range [2 .. -15] (§20.4.3)\n",
+    )
+    assert (ok, result["status"]) == (1, "pass")
+
+
+def test_a_clean_run_of_a_file_the_suite_expects_accepted_against_a_rule_does_not_evaluate_as_a_pass(
+    rst: ModuleType, tmp_path: Path,
+) -> None:
+    result, ok = _evaluate_the_timeformat_file(rst, tmp_path, 0, "")
+    assert (ok, result["status"]) == (0, "fail")
+
+
+def test_rejection_elsewhere_than_the_rule_a_file_the_suite_expects_accepted_breaks_does_not_evaluate_as_a_pass(
+    rst: ModuleType, tmp_path: Path,
+) -> None:
+    result, ok = _evaluate_the_timeformat_file(
+        rst, tmp_path, 1,
+        "20.4--timeformat.sv:23:2: error: $printtimescale argument is not a"
+        " hierarchical name (§20.4.1)\n",
+    )
+    assert (ok, result["status"]) == (0, "fail")
+
+
+def test_a_file_the_suite_expects_accepted_against_a_rule_is_reported_as_an_expected_rejection(
+    rst: ModuleType, tmp_path: Path,
+) -> None:
+    result, _ = _evaluate_the_timeformat_file(
+        rst, tmp_path, 1,
+        "20.4--timeformat.sv:23:18: error: $timeformat precision_number out of"
+        " range [2 .. -15] (§20.4.3)\n",
+    )
+    assert result["should_fail"] is True
+
+
 def test_rejection_under_the_rule_a_file_tagged_on_the_next_subclause_tests_evaluates_as_a_pass(
     rst: ModuleType, tmp_path: Path,
 ) -> None:

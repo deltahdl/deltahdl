@@ -91,6 +91,12 @@ def test_a_file_tagged_by_the_feature_it_uses_is_judged_by_the_rule_it_breaks(
     assert rst.tagged_clause({"tags": tag}, name) == rule
 
 
+def test_a_file_the_suite_expects_accepted_is_judged_by_the_rule_it_breaks(
+    rst: ModuleType,
+) -> None:
+    assert rst.tagged_clause({"tags": "20.4"}, "20.4--timeformat.sv") == "20.4.3"
+
+
 def test_a_file_the_suite_tags_on_the_next_subclause_is_judged_by_the_rule_it_tests(
     rst: ModuleType,
 ) -> None:

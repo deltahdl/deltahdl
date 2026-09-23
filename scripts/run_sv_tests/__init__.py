@@ -216,7 +216,22 @@ _RULE_OF_FILE_TAGGED_BY_FEATURE: dict[str, str] = {
     "11.4.14.3--unpack_stream_inv.sv": "11.4.14",
 }
 
-_CLAUSE_OF_FILE = _CLAUSE_OF_MISTAGGED_FILE | _RULE_OF_FILE_TAGGED_BY_FEATURE
+_RULE_BROKEN_BY_FILE_THE_SUITE_EXPECTS_ACCEPTED: dict[str, str] = {
+    "20.4--timeformat.sv": "20.4.3",
+}
+
+_CLAUSE_OF_FILE = (
+    _CLAUSE_OF_MISTAGGED_FILE
+    | _RULE_OF_FILE_TAGGED_BY_FEATURE
+    | _RULE_BROKEN_BY_FILE_THE_SUITE_EXPECTS_ACCEPTED
+)
+
+
+def expects_rejection(metadata: dict[str, str], name: str) -> bool:
+    return (
+        bool(metadata.get("should_fail_because"))
+        or name in _RULE_BROKEN_BY_FILE_THE_SUITE_EXPECTS_ACCEPTED
+    )
 
 
 def tagged_clause(metadata: dict[str, str], name: str) -> str:
@@ -276,7 +291,7 @@ def _run_and_evaluate(
         defines=metadata.get("defines", "").split(),
         library=library,
     )
-    if metadata.get("should_fail_because"):
+    if expects_rejection(metadata, Path(path).name):
         ok = (
             returncode == 1
             and bool(stderr.strip())
@@ -306,7 +321,7 @@ def build_result(
     try:
         metadata = parse_metadata(path)
         name = _tag_prefixed(name, metadata)
-        should_fail = bool(metadata.get("should_fail_because"))
+        should_fail = expects_rejection(metadata, Path(path).name)
         clause = tagged_clause(metadata, Path(path).name)
         library = library_for(metadata, libraries or {})
 
