@@ -144,6 +144,16 @@ static bool SlotHasLiveEvent(const TimeSlot& slot) {
   return false;
 }
 
+bool Scheduler::Halted() const {
+  return ctx_ != nullptr && ctx_->FinishRequested();
+}
+
+void Scheduler::ReleaseSlot(TimeSlot& slot) {
+  for (auto& queue : slot.regions) {
+    while (!queue.empty()) pool_.Release(queue.Pop());
+  }
+}
+
 void Scheduler::Run() {
   // §38.36.3: "cbStartOfSimulation -- start of simulation (beginning of time
   // zero simulation cycle)". It is one of the action reasons, which the clause
@@ -153,28 +163,27 @@ void Scheduler::Run() {
   GetGlobalVpiContext().DispatchCallbacks(kCbStartOfSimulation);
 
   // §20.2: an explicit $finish/$stop/$fatal requests a hard halt through the
-  // SimContext. Honor it between time slots so no later-time events run once
-  // the halt is pending -- a process suspended on a delay must not resume in a
-  // time step past the finish (e.g. `forever #10` with `#45 $finish` performs
-  // its t=40 iteration but not the t=50 one). This checks FinishRequested(),
-  // not the broader StopRequested(): program completion (§24) raises only the
-  // soft stop so the event calendar still drains and a program's own pending
-  // nonblocking assign in a later slot takes effect.
-  while (!event_calendar_.empty() && !stop_requested_ &&
-         (ctx_ == nullptr || !ctx_->FinishRequested())) {
+  // SimContext, and the run ends where it was called. No later time slot runs
+  // -- a process suspended on a delay must not resume in a time step past the
+  // finish (e.g. `forever #10` with `#45 $finish` performs its t=40 iteration
+  // but not the t=50 one) -- and ExecuteTimeSlot stops the slot the halt came
+  // in, whose remaining events are released here unrun. This checks
+  // Halted(), not the broader StopRequested(): program completion (§24) raises
+  // only the soft stop so the event calendar still drains and a program's own
+  // pending nonblocking assign in a later slot takes effect.
+  while (!event_calendar_.empty() && !stop_requested_ && !Halted()) {
     auto it = event_calendar_.begin();
     if (!SlotHasLiveEvent(it->second)) {
       // Every event here is a superseded inertial-delay timeout that an earlier
       // operand change cancelled (IEEE 1800 §28). They do no work, so drop them
       // without advancing simulation time past the last real activity.
-      for (auto& queue : it->second.regions) {
-        while (!queue.empty()) pool_.Release(queue.Pop());
-      }
+      ReleaseSlot(it->second);
       event_calendar_.erase(it);
       continue;
     }
     current_time_ = it->first;
     ExecuteTimeSlot(it->second);
+    ReleaseSlot(it->second);
     event_calendar_.erase(it);
   }
   // The scheduler is now idle: no process is executing. An event callback that
@@ -191,30 +200,36 @@ void Scheduler::Run() {
   GetGlobalVpiContext().DispatchCallbacks(kCbEndOfSimulation);
 }
 
+// §20.2 with §9.2.3: once a halt is requested the slot runs no further event,
+// whatever region it waits in, so a nonblocking update, a deferred assertion's
+// pending report (§16.4.1) or a $strobe (§21.2.2) queued behind the $finish in
+// its own time step is never reached. The post-timestep callbacks still run:
+// they record what the slot did before the halt, such as the value changes a
+// VCD dump writes for it, and execute no scheduled event.
 void Scheduler::ExecuteTimeSlot(TimeSlot& slot) {
   ExecuteRegion(slot, Region::kPreponed);
 
   ExecuteRegion(slot, Region::kPreActive);
 
-  while (slot.AnyIterativeNonempty()) {
+  while (!Halted() && slot.AnyIterativeNonempty()) {
     while (IterateActiveSet(slot)) {
     }
     while (IterateReactiveSet(slot)) {
     }
 
-    if (!slot.AnyNonemptyIn(Region::kActive, Region::kPostReNBA)) {
+    if (!Halted() && !slot.AnyNonemptyIn(Region::kActive, Region::kPostReNBA)) {
       ExecuteRegion(slot, Region::kPrePostponed);
     }
   }
 
-  ExecuteRegion(slot, Region::kPostponed);
+  if (!Halted()) ExecuteRegion(slot, Region::kPostponed);
 
   current_region_ = Region::kCOUNT;
   for (const auto& cb : post_timestep_cbs_) cb();
 }
 
 bool Scheduler::IterateActiveSet(TimeSlot& slot) {
-  if (!slot.AnyNonemptyIn(Region::kActive, Region::kPostObserved)) {
+  if (Halted() || !slot.AnyNonemptyIn(Region::kActive, Region::kPostObserved)) {
     return false;
   }
   // §4.5 reference algorithm: drain the active region set together with the
@@ -223,7 +238,8 @@ bool Scheduler::IterateActiveSet(TimeSlot& slot) {
   // created during the Observed region) is therefore processed before the
   // reactive set, and the Pre-Observed/Observed regions sample only once every
   // earlier active-set region — including Inactive→Active re-entries — settles.
-  while (slot.AnyNonemptyIn(Region::kActive, Region::kPostObserved)) {
+  while (!Halted() &&
+         slot.AnyNonemptyIn(Region::kActive, Region::kPostObserved)) {
     ExecuteRegion(slot,
                   slot.FirstNonemptyIn(Region::kActive, Region::kPostObserved));
   }
@@ -231,12 +247,13 @@ bool Scheduler::IterateActiveSet(TimeSlot& slot) {
 }
 
 bool Scheduler::IterateReactiveSet(TimeSlot& slot) {
-  if (!slot.AnyNonemptyIn(Region::kReactive, Region::kPostReNBA)) {
+  if (Halted() || !slot.AnyNonemptyIn(Region::kReactive, Region::kPostReNBA)) {
     return false;
   }
   // §4.5 reference algorithm: same earliest-nonempty-first drain across the
   // reactive region set (Reactive..Post-Re-NBA).
-  while (slot.AnyNonemptyIn(Region::kReactive, Region::kPostReNBA)) {
+  while (!Halted() &&
+         slot.AnyNonemptyIn(Region::kReactive, Region::kPostReNBA)) {
     ExecuteRegion(slot,
                   slot.FirstNonemptyIn(Region::kReactive, Region::kPostReNBA));
   }
@@ -249,7 +266,7 @@ void Scheduler::ExecuteRegion(TimeSlot& slot, Region region) {
 }
 
 void Scheduler::DrainQueue(EventQueue& queue) {
-  while (!queue.empty()) {
+  while (!queue.empty() && !Halted()) {
     Event* event = queue.Pop();
     if (event->callback) {
       event->callback();

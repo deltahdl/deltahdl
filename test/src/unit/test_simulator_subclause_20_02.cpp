@@ -206,4 +206,77 @@ TEST(SimControlSim, FinishInARandsequenceProductionCodeBlockEndsGeneration) {
   EXPECT_EQ(after->value.ToUint64(), 0u);
 }
 
+// §20.2 has $finish end the run where it is called, and §9.2.3 has no event
+// still scheduled then execute after the final procedures, so what the time
+// step of the $finish had queued behind it is dropped rather than drained. A
+// nonblocking assignment made in that step is one such event: its update
+// belongs to the NBA region, which comes after the Active region the $finish
+// ran in. The one made a step earlier has had its NBA region and lands.
+TEST(SimControlSim, FinishLeavesItsStepsNonblockingAssignmentUnapplied) {
+  SimFixture f;
+  auto* n = RunAndFindVar(
+      "module t;\n"
+      "  int n = 0;\n"
+      "  initial begin\n"
+      "    n <= 3;\n"
+      "    #1 n <= 5;\n"
+      "    $finish(0);\n"
+      "  end\n"
+      "endmodule\n",
+      f, "n");
+  ASSERT_NE(n, nullptr);
+  EXPECT_EQ(n->value.ToUint64(), 3u);
+}
+
+// §20.2 with §21.2.2: $strobe prints once every event of the current time has
+// occurred, just before time advances, and a run ended by $finish in that
+// step never gets there, while a $display ahead of the $finish prints where it
+// is called and a $strobe a step earlier prints at the end of its own step.
+TEST(SimControlSim, FinishLeavesItsStepsStrobeUnprinted) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  initial begin\n"
+      "    $strobe(\"early\");\n"
+      "    #1 $display(\"shown\");\n"
+      "    $strobe(\"late\");\n"
+      "    $finish(0);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "early\nshown\n");
+}
+
+// §20.2 with §16.4.1: a failing deferred assertion queues its action as a
+// pending report, which for `assert #0` matures in the Observed region and
+// for `assert final` in the Postponed region of the step. The pair failing in
+// the step of the $finish is never reached by either region, so neither
+// action runs; the pair failing a step earlier matures as usual, once each.
+TEST(SimControlSim, FinishLeavesItsStepsDeferredReportsUnmatured) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int n = 0, observed_fails = 0, final_fails = 0;\n"
+      "  function void observed_fail(); observed_fails++; endfunction\n"
+      "  function void final_fail(); final_fails++; endfunction\n"
+      "  initial begin\n"
+      "    assert #0 (n != 0) else observed_fail();\n"
+      "    assert final (n != 0) else final_fail();\n"
+      "    #1;\n"
+      "    assert #0 (n != 0) else observed_fail();\n"
+      "    assert final (n != 0) else final_fail();\n"
+      "    $finish(0);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* observed = f.ctx.FindVariable("observed_fails");
+  auto* final_fails = f.ctx.FindVariable("final_fails");
+  ASSERT_NE(observed, nullptr);
+  ASSERT_NE(final_fails, nullptr);
+  EXPECT_EQ(observed->value.ToUint64(), 1u);
+  EXPECT_EQ(final_fails->value.ToUint64(), 1u);
+}
+
 }  // namespace

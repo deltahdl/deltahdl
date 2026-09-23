@@ -204,6 +204,12 @@ class Scheduler {
   }
 
  private:
+  // §20.2: whether an explicit $finish, $stop or $fatal has ended the run,
+  // after which no scheduled event runs, in the current time slot or a later
+  // one. A scheduler with no context is never halted.
+  bool Halted() const;
+  // Returns every event still queued in `slot` to the pool without running it.
+  void ReleaseSlot(TimeSlot& slot);
   void ExecuteTimeSlot(TimeSlot& slot);
   void ExecuteRegion(TimeSlot& slot, Region region);
   void DrainQueue(EventQueue& queue);

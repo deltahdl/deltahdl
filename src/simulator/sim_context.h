@@ -116,8 +116,9 @@ class SimContext : public DeclaredNameTables,
   void RequestStop() { stop_requested_ = true; }
   bool StopRequested() const { return stop_requested_; }
 
-  // §20.2: an explicit $finish/$stop/$fatal ends the run and drops any events
-  // already scheduled in a later time slot. This is distinct from the "soft"
+  // §20.2: an explicit $finish/$stop/$fatal ends the run and drops every event
+  // still scheduled, in its own time slot as in a later one (§9.2.3 lets none
+  // run after the final procedures). This is distinct from the "soft"
   // stop that program completion (§24) raises through RequestStop(): that only
   // tells running processes to stop starting new work and lets the event
   // calendar drain naturally, so a program's own pending nonblocking assign
