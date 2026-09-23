@@ -521,8 +521,13 @@ static bool TryExecClassVarDecl(const Stmt* stmt, SimContext& ctx,
     return true;
   }
 
-  auto handle = EvalClassNew(class_type, stmt->var_init, ctx, arena,
-                             stmt->var_init->range.start);
+  // §8.25 (printed pages 203-204): the object built is of the specialization
+  // RecordClassParamActuals recorded the variable as, so `S #(byte) a = new;`
+  // runs S #(byte)'s constructor against S #(byte)'s static members, as
+  // `S #(byte) b; b = new;` does.
+  auto handle =
+      EvalClassNew(ctx.GetVariableClassType(stmt->var_name), stmt->var_init,
+                   ctx, arena, stmt->var_init->range.start);
   auto* var = ctx.FindVariable(stmt->var_name);
   if (var) var->value = handle;
   ApplyClassParamOverrides(stmt->var_name, handle.ToUint64(), ctx, arena);

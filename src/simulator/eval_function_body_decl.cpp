@@ -199,7 +199,13 @@ static Variable* CreateFuncLocalVar(std::string_view name, const DataType& type,
   // than rounding it into an integer whose bits the caller read as 0.0.
   v->is_real = !holds_a_handle && DeclaredTypeIsReal(type, ctx);
   FillLocalDefault(v, init != nullptr, holds_a_handle, arena);
-  if (is_class) ctx.SetVariableClassType(name, class_key);
+  if (is_class) {
+    ctx.SetVariableClassType(name, class_key);
+    // §8.25 (printed pages 203-204): `S #(byte) l` is of the specialization
+    // its list names, recorded as a declaration outside a subroutine records
+    // it, so its `new` and its static members are S #(byte)'s.
+    RecordClassParamActuals(name, class_key, type.type_params, ctx);
+  }
   RecordVariableEnumType(name, type, ctx);
   // §11.5.1: the declared range an index of the local resolves against, the
   // dimension written here or the one its typedef name stands for (§6.18),
@@ -219,7 +225,8 @@ static Variable* CreateFuncLocalVar(std::string_view name, const DataType& type,
   // null. A class-typed local with a `new` initializer is therefore constructed
   // here, as the declaration path for a variable outside a subroutine does.
   if (is_class && init->kind == ExprKind::kCall && init->text == "new") {
-    v->value = EvalClassNew(class_key, init, ctx, arena, init->range.start);
+    v->value = EvalClassNew(ctx.GetVariableClassType(name), init, ctx, arena,
+                            init->range.start);
     ApplyClassParamOverrides(name, v->value.ToUint64(), ctx, arena);
     return v;
   }

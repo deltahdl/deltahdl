@@ -527,4 +527,46 @@ TEST(ClassSim, PropertyTypedByATypeParameterTakesAHoldersQueueTypedef) {
   EXPECT_EQ(out, "2 8\n");
 }
 
+// §8.25 (printed pages 203-204): a declaration's initializer `new`
+// constructs the specialization the declared type names, so the constructor
+// that runs is S #(byte)'s and increments its static n rather than the
+// default specialization's; built as the generic S, the count went to
+// S #(int)::n.
+TEST(ClassSim, DeclarationInitializerNewBuildsTheSpecialization) {
+  SimFixture f;
+  auto out = RunCapture(
+      "class S #(type T = int);\n"
+      "  static int n;\n"
+      "  function new(); n++; endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  initial begin\n"
+      "    S #(byte) a = new;\n"
+      "    $display(\"%0d %0d\", S#(byte)::n, S#(int)::n);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 0\n");
+}
+
+// The same rule for a local declared in a function body, which is declared
+// by a path of its own and had recorded no specialization at all.
+TEST(ClassSim, FunctionLocalInitializerNewBuildsTheSpecialization) {
+  SimFixture f;
+  auto out = RunCapture(
+      "class S #(type T = int);\n"
+      "  static int n;\n"
+      "  function new(); n++; endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  function automatic void g(); S #(byte) l = new; endfunction\n"
+      "  initial begin\n"
+      "    g();\n"
+      "    $display(\"%0d %0d\", S#(byte)::n, S#(int)::n);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 0\n");
+}
+
 }  // namespace
