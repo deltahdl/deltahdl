@@ -87,6 +87,7 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 - [Issues have no fixed form](issues-have-no-fixed-form.md) — no house style; write each so a fresh session can act on it alone.
 - [Issues define their terms](issues-define-their-terms.md) — say what each file, term and cited clause is and why it is there; never a name the reader must already know.
 - [Issues state the conclusion](issues-state-conclusions-not-the-trail.md) — a finding that settles a question replaces the options it ruled out; never append round after round.
+- [A question the rules answer is not a decision](a-question-the-rules-answer-is-not-a-decision.md) — 'needs decision' only when the reminders, the issue, its links and the LRM leave the question open; order and priority never qualify.
 
 ## Tasks
 
