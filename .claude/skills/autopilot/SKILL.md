@@ -7,7 +7,7 @@ description: Start or stop the standing reminders, with or without the loop that
 
 ## The eight standing reminders
 
-Every `start` form creates these. Each reminder fires every 20 minutes, on a minute of its own from 0 to 19 and the same minute 20 and 40 later: the eight below take 0, 2, 3 and 6 to 10, and the loop reminders take 1, 4 and 5.
+Every `start` form creates these. Each reminder fires every 20 minutes, on a minute of its own from 0 to 19 and the same minute 20 and 40 later: the eight below take 0, 2, 3 and 6 to 10, and the loop reminders take 1 and 4.
 
 | Cron | Prompt |
 | --- | --- |
@@ -20,7 +20,7 @@ Every `start` form creates these. Each reminder fires every 20 minutes, on a min
 | `9,29,49 * * * *` | `REMINDER: Ensure every task on the list is indivisible, whether it was written with TaskCreate or rewritten with TaskUpdate: read each subject as written and count the actions it names; a subject naming more than one action is divisible, whatever single purpose those actions serve, and is split into one task per action.` |
 | `10,30,50 * * * *` | `REMINDER: The sv-tests README establishes which subclause an sv-test is tagged with: a test case covers a single feature, and where it uses several, the tag names the feature it directly tests, drawn from the list in conf/lrm.conf and deciding the tests/chapter-N directory the file sits in. Read that rule to settle what a suite file's tag should be, and resolve the tag from its 2017 number to the 2023 clause before comparing it with anything deltahdl reports.` |
 
-## The three loop reminders
+## The two loop reminders
 
 Every `start` form but `reminders-only` adds these.
 
@@ -44,12 +44,11 @@ REMINDER: Run gh issue list --state open --limit 1000 --json number,title --jq '
 REMINDER: Run gh issue list --state open --label '{L}' --limit 1000 --json number,title for the open issues labelled '{L}'; take one, solve it, and run the same command again when it closes. The open issues without the label '{L}' are not this loop's work.
 ```
 
-And these two:
+And this one:
 
 | Cron | Prompt |
 | --- | --- |
 | `4,24,44 * * * *` | `REMINDER: Continue autonomously, unless you need human feedback about ANYTHING — not just about what to take next. When you do, write the question as a comment on the issue, label the issue 'needs decision', and move on to the next issue.` |
-| `5,25,45 * * * *` | `REMINDER: After pushing, deltahdl.yml might fail at its integration tests. You can ignore that.` |
 
 ## Start
 
