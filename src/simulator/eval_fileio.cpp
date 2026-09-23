@@ -99,6 +99,16 @@ static Logic4Vec EvalFgets(const Expr* expr, SimContext& ctx, Arena& arena) {
 static Logic4Vec EvalFgetc(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.empty()) return MakeLogic4VecVal(arena, 32, 0xFFFFFFFF);
   uint32_t fd = FdFromArg(expr->args[0], ctx, arena);
+  // §21.3.4.1: the next $fgetc on a descriptor returns what $ungetc pushed
+  // onto it, a character in the descriptor's buffer rather than the file, so
+  // it is answered even where the file itself may not be read.
+  std::string& pushed = ctx.FdPushback(fd);
+  if (!pushed.empty()) {
+    auto ch = static_cast<unsigned char>(pushed.back());
+    pushed.pop_back();
+    ctx.ClearFileIoError(fd);
+    return MakeLogic4VecVal(arena, 32, ch);
+  }
   // §21.3.4: only a descriptor opened with a read or read-update type may be
   // read. Consulting the readability gate (rather than the raw handle) matters
   // when the host stream could deliver data anyway -- e.g. a "w+" or "a+" file
@@ -244,8 +254,11 @@ static Logic4Vec EvalFseek(const Expr* expr, SimContext& ctx, Arena& arena) {
   ctx.ClearFileIoError(fd);
   // §21.3.8: repositioning makes the descriptor readable again -- the host
   // fseek clears the stream's end-of-file indicator, and the simulator's own
-  // detection record is erased to match.
+  // detection record is erased to match. The push back of a descriptor not
+  // open for reading is held here rather than in the host stream, so it is
+  // cancelled here too.
   ctx.SetFdEofDetected(fd, false);
+  ctx.FdPushback(fd).clear();
   return MakeLogic4VecVal(arena, 64, 0);
 }
 
@@ -286,18 +299,46 @@ static Logic4Vec EvalRewind(const Expr* expr, SimContext& ctx, Arena& arena) {
   }
   ctx.ClearFileIoError(fd);
   // §21.3.8: as with $fseek, a successful rewind erases both the host end-of-
-  // file indicator and the simulator's own detection record.
+  // file indicator and the simulator's own detection record, and cancels the
+  // push back held for a descriptor not open for reading.
   ctx.SetFdEofDetected(fd, false);
+  ctx.FdPushback(fd).clear();
   return MakeLogic4VecVal(arena, 64, 0);
+}
+
+// §21.3.4.1: a push back onto a descriptor that is open but not for reading,
+// "w", "a" or STDOUT. It reads nothing, so §21.3.4's rule that only the r and
+// r+ types may be read does not refuse it, but the host stream of such a file
+// refuses one on some C libraries, so the character is held in the context,
+// where $fgetc finds it. Pushing EOF itself, as the host library refuses it,
+// or onto a descriptor with no open file, fails with EOF and a cause for
+// $ferror (§21.3.7).
+static Logic4Vec PushBackOntoUnreadableFd(int ch, uint32_t fd, SimContext& ctx,
+                                          Arena& arena) {
+  if (ctx.GetFileHandle(fd) == nullptr) {
+    ctx.SetFileIoError(fd, EBADF, "file descriptor is not open");
+    return MakeLogic4VecVal(arena, 32, 0xFFFFFFFF);
+  }
+  if (ch == EOF) {
+    ctx.SetFileIoError(fd, EINVAL, "character push back was refused");
+    return MakeLogic4VecVal(arena, 32, 0xFFFFFFFF);
+  }
+  ctx.FdPushback(fd).push_back(
+      static_cast<char>(static_cast<unsigned char>(ch)));
+  ctx.ClearFileIoError(fd);
+  ctx.SetFdEofDetected(fd, false);
+  return MakeLogic4VecVal(arena, 32, 0);
 }
 
 static Logic4Vec EvalUngetc(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.size() < 2) return MakeLogic4VecVal(arena, 32, 0);
   auto ch = static_cast<int>(EvalExpr(expr->args[0], ctx, arena).ToUint64());
   uint32_t fd = FdFromArg(expr->args[1], ctx, arena);
-  // §21.3.4: a push back is a read-side operation, so a descriptor that was
-  // not opened with a read or read-update type refuses it -- with the same EOF
-  // code a failed host push back reports, keeping the refusal observable.
+  if (!ctx.IsFdReadable(fd)) {
+    return PushBackOntoUnreadableFd(ch, fd, ctx, arena);
+  }
+  // A descriptor open for reading keeps the pushed character in its host
+  // stream, where $fgets, $fscanf and $fread see it as well as $fgetc.
   FILE* fp = ReadableHandle(fd, ctx);
   if (!fp) return MakeLogic4VecVal(arena, 32, 0xFFFFFFFF);
   // §21.3.4.1: the result of a push back is zero on success and EOF when the

@@ -377,6 +377,56 @@ TEST(FilePositioning, RewindCancelsUngetcPushback) {
   std::remove(tmp.c_str());
 }
 
+// §21.3.5 cancels the push back of any descriptor a $fseek repositions, one
+// opened "w" among them, where §21.3.4.1 still lets $ungetc push a character
+// for the next $fgetc: after the seek that $fgetc finds nothing pushed and a
+// file it cannot read, and answers EOF.
+TEST(FilePositioning, FseekCancelsAWriteOnlyFdsPushBack) {
+  SysTaskFixture f;
+  std::string tmp = "/tmp/deltahdl_2135_seek_ungetc_w.txt";
+  std::string out = RunCapture(
+      "module t;\n"
+      "  integer fd, u, s, c;\n"
+      "  initial begin\n"
+      "    fd = $fopen(\"" +
+          tmp +
+          "\", \"w\");\n"
+          "    u = $ungetc(\"Z\", fd);\n"
+          "    s = $fseek(fd, 0, 0);\n"
+          "    c = $fgetc(fd);\n"
+          "    $display(\"u=%0d s=%0d c=%0d\", u, s, c);\n"
+          "    $fclose(fd);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_NE(out.find("u=0 s=0 c=-1"), std::string::npos) << out;
+  std::remove(tmp.c_str());
+}
+
+// §21.3.5: $rewind repositions as $fseek(fd, 0, 0) does, so it too cancels
+// the push back of a descriptor opened "w".
+TEST(FilePositioning, RewindCancelsAWriteOnlyFdsPushBack) {
+  SysTaskFixture f;
+  std::string tmp = "/tmp/deltahdl_2135_rewind_ungetc_w.txt";
+  std::string out = RunCapture(
+      "module t;\n"
+      "  integer fd, u, s, c;\n"
+      "  initial begin\n"
+      "    fd = $fopen(\"" +
+          tmp +
+          "\", \"w\");\n"
+          "    u = $ungetc(\"Z\", fd);\n"
+          "    s = $rewind(fd);\n"
+          "    c = $fgetc(fd);\n"
+          "    $display(\"u=%0d s=%0d c=%0d\", u, s, c);\n"
+          "    $fclose(fd);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_NE(out.find("u=0 s=0 c=-1"), std::string::npos) << out;
+  std::remove(tmp.c_str());
+}
+
 // §21.3.5: the position indicator may be set beyond the end of the existing
 // data, but $fseek by itself does not extend the size of the file -- seeking
 // back to EOF afterward still finds the original six bytes.

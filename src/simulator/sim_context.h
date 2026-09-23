@@ -588,6 +588,9 @@ class SimContext : public DeclaredNameTables,
   // the file erase the record.
   void SetFdEofDetected(uint32_t fd, bool detected);
   bool FdEofDetected(uint32_t fd) const;
+  // §21.3.4.1: what $ungetc pushed onto a descriptor not open for reading, for
+  // $fgetc to return last-pushed first; a readable one's host stream holds it.
+  std::string& FdPushback(uint32_t fd) { return fd_pushback_[fd]; }
 
   SemaphoreObject* CreateSemaphore(std::string_view name, int32_t keys);
   SemaphoreObject* FindSemaphore(std::string_view name);
@@ -866,6 +869,7 @@ class SimContext : public DeclaredNameTables,
   // still queryable through $ferror with that same value.
   std::unordered_map<uint32_t, FileIoError> fileio_errors_;
   std::unordered_set<uint32_t> fd_eof_detected_;
+  std::unordered_map<uint32_t, std::string> fd_pushback_;
   // Bit i in mcd_channels_[i] tracks the file opened on channel i (1..30).
   std::array<FILE*, 31> mcd_channels_ = {};
   bool stdio_descriptors_ready_ = false;

@@ -204,25 +204,61 @@ TEST(FileReadFunctions, FgetsOnWriteOnlyFdReturnsZeroAndLeavesDest) {
   std::remove(tmp.c_str());
 }
 
-TEST(FileReadFunctions, UngetcOnWriteOnlyFdReturnsEof) {
-  // A push back is a read-side operation; on a write-only descriptor it fails
-  // with the same EOF result a failed host push back reports.
+// §21.3.4.1 has $ungetc put the character in the descriptor's buffer, leave
+// the file unchanged and the next $fgetc on the descriptor return it; §21.3.4
+// limits reading the file to the r and r+ types, which a push back does not
+// do. So on a "w" descriptor the push back answers 0 and the next $fgetc 72,
+// the one after it EOF, since the file itself still cannot be read, and the
+// file stays empty.
+TEST(FileReadFunctions, UngetcOnWriteOnlyFdIsReturnedByNextFgetc) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_2134_w_ungetc.txt";
   std::string out = RunCapture(
       "module t;\n"
-      "  integer fd, code;\n"
+      "  integer fd, code, c, next;\n"
       "  initial begin\n"
       "    fd = $fopen(\"" +
           tmp +
           "\", \"w\");\n"
           "    code = $ungetc(72, fd);\n"
-          "    $display(\"code=%0d\", code);\n"
+          "    c = $fgetc(fd);\n"
+          "    next = $fgetc(fd);\n"
+          "    $display(\"code=%0d c=%0d next=%0d\", code, c, next);\n"
           "    $fclose(fd);\n"
           "  end\n"
           "endmodule\n",
       f);
-  EXPECT_NE(out.find("code=-1"), std::string::npos) << out;
+  EXPECT_NE(out.find("code=0 c=72 next=-1"), std::string::npos) << out;
+  EXPECT_EQ(SlurpFile(tmp), "");
+  std::remove(tmp.c_str());
+}
+
+// §21.3.4.1 puts the pushed character in the buffer of the descriptor, and
+// $fclose ends that descriptor (§21.3.1), so a descriptor $fopen hands out
+// again for the same slot starts with nothing pushed back: its first $fgetc
+// on a "w" file is EOF, not the character pushed onto the closed one.
+TEST(FileReadFunctions, FcloseDropsAWriteOnlyFdsPushBack) {
+  SysTaskFixture f;
+  std::string tmp = "/tmp/deltahdl_2134_w_ungetc_close.txt";
+  std::string out = RunCapture(
+      "module t;\n"
+      "  integer fd, again, code, c;\n"
+      "  initial begin\n"
+      "    fd = $fopen(\"" +
+          tmp +
+          "\", \"w\");\n"
+          "    code = $ungetc(72, fd);\n"
+          "    $fclose(fd);\n"
+          "    again = $fopen(\"" +
+          tmp +
+          "\", \"w\");\n"
+          "    c = $fgetc(again);\n"
+          "    $display(\"code=%0d same=%0d c=%0d\", code, again == fd, c);\n"
+          "    $fclose(again);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_NE(out.find("code=0 same=1 c=-1"), std::string::npos) << out;
   std::remove(tmp.c_str());
 }
 

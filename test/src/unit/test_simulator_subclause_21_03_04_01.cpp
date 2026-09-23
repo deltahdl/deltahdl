@@ -343,4 +343,55 @@ TEST(ReadCharacterAtATime, FailedUngetcPushesNothing) {
   std::remove(tmp.c_str());
 }
 
+// §21.3.4.1: the failure rule holds for a descriptor opened "w" too, whose
+// push back deltahdl holds itself rather than in the host stream. EOF itself
+// cannot be pushed, so the call answers EOF, $ferror describes it, and the
+// next $fgetc finds nothing pushed and a file it may not read.
+TEST(ReadCharacterAtATime, UngetcOfEofOntoAWriteOnlyFdFailsAndPushesNothing) {
+  SysTaskFixture f;
+  std::string tmp = "/tmp/deltahdl_213411_w_pusheof.txt";
+  std::string out = RunCapture(
+      "module t;\n"
+      "  integer fd, code, err, c;\n"
+      "  reg [639:0] s;\n"
+      "  initial begin\n"
+      "    fd = $fopen(\"" +
+          tmp +
+          "\", \"w\");\n"
+          "    code = $ungetc(-1, fd);\n"
+          "    err = $ferror(fd, s);\n"
+          "    c = $fgetc(fd);\n"
+          "    $display(\"code=%0d errnz=%0d c=%0d\", code, err != 0, c);\n"
+          "    $fclose(fd);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_NE(out.find("code=-1 errnz=1 c=-1"), std::string::npos) << out;
+  std::remove(tmp.c_str());
+}
+
+// §21.3.4.1: a push back onto a descriptor whose file has been closed has no
+// buffer to go into, so it fails with EOF and a cause $ferror can report.
+TEST(ReadCharacterAtATime, UngetcOntoAClosedFdFails) {
+  SysTaskFixture f;
+  std::string tmp = "/tmp/deltahdl_213411_closed_push.txt";
+  std::string out = RunCapture(
+      "module t;\n"
+      "  integer fd, code, err;\n"
+      "  reg [639:0] s;\n"
+      "  initial begin\n"
+      "    fd = $fopen(\"" +
+          tmp +
+          "\", \"w\");\n"
+          "    $fclose(fd);\n"
+          "    code = $ungetc(72, fd);\n"
+          "    err = $ferror(fd, s);\n"
+          "    $display(\"code=%0d errnz=%0d\", code, err != 0);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_NE(out.find("code=-1 errnz=1"), std::string::npos) << out;
+  std::remove(tmp.c_str());
+}
+
 }  // namespace

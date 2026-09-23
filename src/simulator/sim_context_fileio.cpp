@@ -302,6 +302,7 @@ void SimContext::CloseFile(uint32_t descriptor) {
     readable_fds_.erase(descriptor);
     fileio_errors_.erase(descriptor);
     fd_eof_detected_.erase(descriptor);
+    fd_pushback_.erase(descriptor);
     return;
   }
   // Multichannel descriptor: every bit set selects a channel to close.
