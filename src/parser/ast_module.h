@@ -331,6 +331,11 @@ struct SeqMatchAssign {
   // by-value arguments as they read at the match; `lvar` and `rhs` are unset
   // where this is.
   Expr* call = nullptr;
+  // §16.10 and §16.13.7: where `lvar` names a local of a named property, the
+  // literal standing for the attempt's copy of it, which the property's other
+  // expressions read in the local's place; the item assigns the copy by
+  // rewriting the literal. Null for any other target.
+  Expr* local_copy = nullptr;
 };
 
 // §16.10: a local variable of a sequence body, one an

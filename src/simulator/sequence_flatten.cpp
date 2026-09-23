@@ -92,7 +92,9 @@ Expr* CastActual(Expr* actual, TokenKind type_kw, Arena& arena) {
 // §16.10 over the match items of one operand: the right-hand sides read the
 // actuals as the operands do, and an assigned local named after a formal --
 // a local variable formal argument, whose flattened name the actual is -- is
-// renamed with it.
+// renamed with it. A local of a named property, or a local variable formal
+// argument of one, stands as the literal of the attempt's copy of it
+// (§16.13.7, §16.12.19), which the item then assigns.
 std::vector<SeqMatchAssign> SubstituteMatchItems(
     const std::vector<SeqMatchAssign>& items, const ActualsByFormal& actuals,
     Arena& arena) {
@@ -103,6 +105,9 @@ std::vector<SeqMatchAssign> SubstituteMatchItems(
     if (it != actuals.end() && it->second != nullptr &&
         it->second->kind == ExprKind::kIdentifier) {
       copy.lvar = it->second->text;
+    } else if (it != actuals.end() && it->second != nullptr &&
+               it->second->kind == ExprKind::kIntegerLiteral) {
+      copy.local_copy = it->second;
     }
     copy.rhs = SubstituteFormals(item.rhs, actuals, arena);
     if (item.call != nullptr) {
@@ -723,6 +728,16 @@ void AppendSubstitutedOperand(SubstitutedOperand sub, SimContext& ctx,
 }
 
 }  // namespace
+
+Expr* LiteralOfValue(const Logic4Vec& value, Arena& arena) {
+  std::string text = std::to_string(value.width) + "'" +
+                     (value.is_signed ? "s" : "") + "b" + value.ToString();
+  auto* literal = arena.Create<Expr>();
+  literal->kind = ExprKind::kIntegerLiteral;
+  literal->text = {arena.AllocString(text.data(), text.size()), text.size()};
+  literal->int_val = value.ToUint64();
+  return literal;
+}
 
 LinearSequence SubstituteLinearSequence(const LinearSequence& body,
                                         const ActualsByFormal& actuals,

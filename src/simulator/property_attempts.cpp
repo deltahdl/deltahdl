@@ -311,18 +311,6 @@ bool Ticked(const StepContext& sc, int clock) {
 Tri Step(const PropertyExprNode* node, NodeState& state, StepContext& sc,
          bool begin);
 
-// A literal holding `value`, its width and sign kept, for an expression
-// that reads the value as it stood.
-Expr* LiteralOfValue(const Logic4Vec& value, Arena& arena) {
-  std::string text = std::to_string(value.width) + "'" +
-                     (value.is_signed ? "s" : "") + "b" + value.ToString();
-  auto* literal = arena.Create<Expr>();
-  literal->kind = ExprKind::kIntegerLiteral;
-  literal->text = {arena.AllocString(text.data(), text.size()), text.size()};
-  literal->int_val = value.ToUint64();
-  return literal;
-}
-
 // §16.12.19 by way of §16.8.2: a local variable formal argument of a named
 // property, whose direction is input alone, is a local variable of the
 // instance, a new copy of it initialized from the actual when the attempt

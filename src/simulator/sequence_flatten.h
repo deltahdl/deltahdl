@@ -13,6 +13,7 @@ namespace delta {
 
 class SimContext;
 class Arena;
+struct Logic4Vec;
 
 // The linear form of a named sequence after §16.8's instantiation has been
 // applied to it: the Boolean operands matched along consecutive clock ticks,
@@ -132,5 +133,10 @@ ActualsByFormal BindInstanceActuals(const ModuleItem* decl,
 LinearSequence SubstituteLinearSequence(const LinearSequence& body,
                                         const ActualsByFormal& actuals,
                                         SimContext& ctx, Arena& arena);
+
+// A literal holding `value`, its width and sign kept, for an expression
+// that reads the value as it stood; the copy of a local of a named property
+// is one, rewritten in place as the local is assigned (§16.13.7).
+Expr* LiteralOfValue(const Logic4Vec& value, Arena& arena);
 
 }  // namespace delta
