@@ -31,6 +31,43 @@ def print_result(passed: bool, name: str) -> None:
         print(f"  {RED}FAIL{RESET}: {name}", flush=True)
 
 
+def natural_sort_key(text: str) -> list[Any]:
+    return [int(tok) if tok.isdigit() else tok for tok in re.split(r"(\d+)", text)]
+
+
+def print_clause_breakdown(failed_by_clause: dict[str, int]) -> None:
+    rows = [
+        (clause, str(failed_by_clause[clause]))
+        for clause in sorted(failed_by_clause, key=natural_sort_key)
+    ]
+    headers = ("Clause", "Failed")
+    widths = [
+        max(len(h), max((len(row[i]) for row in rows), default=0))
+        for i, h in enumerate(headers)
+    ]
+
+    def _border(left: str, mid: str, right: str) -> str:
+        return left + mid.join("─" * (w + 2) for w in widths) + right
+
+    def _row(
+        vals: tuple[str, ...] | list[str],
+        aligns: list[str],
+        color: str = "",
+    ) -> str:
+        cells = [f" {v:{a}{widths[i]}} " for i, (v, a) in enumerate(zip(vals, aligns))]
+        inner = "│".join(cells)
+        return f"│{color}{inner}{RESET}│" if color else "│" + inner + "│"
+
+    print("\nPer-clause breakdown:")
+    print(_border("┌", "┬", "┐"))
+    print(_row(headers, ["<"] * 2))
+    print(_border("├", "┼", "┤"))
+    for row in rows:
+        color = GREEN if row[1] == "0" else RED
+        print(_row(row, ["<", ">"], color))
+    print(_border("└", "┴", "┘"))
+
+
 def parse_metadata(path: str) -> dict[str, str]:
     text = Path(path).read_text(encoding="utf-8")
     match = re.search(r"/\*(.*?)\*/", text, re.DOTALL)

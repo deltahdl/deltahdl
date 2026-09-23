@@ -1,5 +1,4 @@
 import io
-import re
 from collections.abc import Callable
 from pathlib import Path
 from types import ModuleType
@@ -20,72 +19,16 @@ def test_chapter_from_path_falls_back_to_parent_name(rst: ModuleType) -> None:
     assert rst.chapter_from_path("/some/other/foo.sv") == "other"
 
 
-def test_print_chapter_breakdown_has_box_drawing_table(
-    rst: ModuleType, capsys: pytest.CaptureFixture[str],
-) -> None:
-    results = [{"chapter": "chapter-5", "status": "pass"}]
-    rst.print_chapter_breakdown(results)
-    captured = capsys.readouterr().out
-    assert all(
-        s in captured
-        for s in ("┌", "┐", "├", "┤", "└", "┘", "│",
-                   "Clause", "Failed")
-    )
-
-
-def test_print_chapter_breakdown_has_no_test_count_column(
-    rst: ModuleType, capsys: pytest.CaptureFixture[str],
-) -> None:
-    results = [
-        {"chapter": "chapter-5", "status": "pass"},
-        {"chapter": "chapter-5", "status": "pass"},
-        {"chapter": "chapter-5", "status": "fail"},
-    ]
-    rst.print_chapter_breakdown(results)
-    captured = re.sub(r"\033\[[0-9;]*m", "", capsys.readouterr().out)
-    row5 = next(ln for ln in captured.splitlines() if ln.startswith("│ 5"))
-    assert [c.strip() for c in row5.strip("│").split("│")] == ["5", "1"]
-
-
-def test_print_chapter_breakdown_has_no_percentage_column(
-    rst: ModuleType, capsys: pytest.CaptureFixture[str],
+def test_failed_by_clause_counts_the_failures_under_each_chapter(
+    rst: ModuleType,
 ) -> None:
     results = [
         {"chapter": "chapter-5", "status": "pass"},
         {"chapter": "chapter-5", "status": "fail"},
-    ]
-    rst.print_chapter_breakdown(results)
-    captured = capsys.readouterr().out
-    assert not any(s in captured for s in ("Percentage", "%"))
-
-
-def test_print_chapter_breakdown_shows_correct_values(
-    rst: ModuleType, capsys: pytest.CaptureFixture[str],
-) -> None:
-    results = [
-        {"chapter": "chapter-5", "status": "pass"},
-        {"chapter": "chapter-5", "status": "fail"},
+        {"chapter": "chapter-5", "status": "timeout"},
         {"chapter": "chapter-6", "status": "pass"},
     ]
-    rst.print_chapter_breakdown(results)
-    captured = re.sub(r"\033\[[0-9;]*m", "", capsys.readouterr().out)
-    row5 = next(ln for ln in captured.splitlines() if ln.startswith("│ 5"))
-    row6 = next(ln for ln in captured.splitlines() if ln.startswith("│ 6"))
-    cells5 = [c.strip() for c in row5.strip("│").split("│")]
-    cells6 = [c.strip() for c in row6.strip("│").split("│")]
-    assert [cells5, cells6] == [["5", "1"], ["6", "0"]]
-
-
-def test_print_chapter_breakdown_uses_natural_order(
-    rst: ModuleType, capsys: pytest.CaptureFixture[str],
-) -> None:
-    results = [
-        {"chapter": "chapter-25", "status": "pass"},
-        {"chapter": "chapter-5", "status": "pass"},
-    ]
-    rst.print_chapter_breakdown(results)
-    captured = re.sub(r"\033\[[0-9;]*m", "", capsys.readouterr().out)
-    assert captured.index("│ 5") < captured.index("│ 25")
+    assert rst.failed_by_clause(results) == {"5": 2, "6": 0}
 
 
 def _print_status_for_a_clause_mismatch(rst: ModuleType) -> None:

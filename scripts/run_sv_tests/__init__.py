@@ -14,8 +14,9 @@ from typing import Any, Callable, NamedTuple
 from xml.etree import ElementTree as ET
 
 from lib.python.run_tests_common import (
-    BINARY, GREEN, RED, REPO_ROOT, RESET, check_assertions, check_binary,
-    parse_metadata, print_result, reported_subclauses, subclause_is_within,
+    BINARY, RED, REPO_ROOT, RESET, check_assertions, check_binary,
+    natural_sort_key, parse_metadata, print_clause_breakdown, print_result,
+    reported_subclauses, subclause_is_within,
 )
 
 TEST_DIR = REPO_ROOT / "third_party" / "sv-tests" / "tests"
@@ -87,14 +88,10 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def _natural_sort_key(text: str) -> list[Any]:
-    return [int(tok) if tok.isdigit() else tok for tok in re.split(r"(\d+)", text)]
-
-
 def collect_tests(chapter: str | None = None) -> list[str]:
     chapter_glob = f"chapter-{chapter}" if chapter else "chapter-*"
     pattern = str(TEST_DIR / chapter_glob / "**" / "*.sv")
-    return sorted(glob.glob(pattern, recursive=True), key=_natural_sort_key)
+    return sorted(glob.glob(pattern, recursive=True), key=natural_sort_key)
 
 
 _STAGE_OPTION_OF_MODE: dict[str, str | None] = {
@@ -151,46 +148,11 @@ def chapter_from_path(path: str) -> str:
     return Path(path).parent.name
 
 
-def _aggregate_chapters(
-    results: list[dict[str, Any]],
-) -> list[tuple[str, str]]:
+def failed_by_clause(results: list[dict[str, Any]]) -> dict[str, int]:
     failed: defaultdict[str, int] = defaultdict(int)
     for r in results:
-        failed[r["chapter"]] += int(r["status"] != "pass")
-    rows: list[tuple[str, str]] = []
-    for name in sorted(failed, key=_natural_sort_key):
-        rows.append((name.removeprefix("chapter-"), str(failed[name])))
-    return rows
-
-
-def print_chapter_breakdown(results: list[dict[str, Any]]) -> None:
-    rows = _aggregate_chapters(results)
-    headers = ("Clause", "Failed")
-    widths = [
-        max(len(h), max((len(row[i]) for row in rows), default=0))
-        for i, h in enumerate(headers)
-    ]
-
-    def _border(left: str, mid: str, right: str) -> str:
-        return left + mid.join("─" * (w + 2) for w in widths) + right
-
-    def _row(
-        vals: tuple[str, ...] | list[str],
-        aligns: list[str],
-        color: str = "",
-    ) -> str:
-        cells = [f" {v:{a}{widths[i]}} " for i, (v, a) in enumerate(zip(vals, aligns))]
-        inner = "│".join(cells)
-        return f"│{color}{inner}{RESET}│" if color else "│" + inner + "│"
-
-    print("\nPer-chapter breakdown:")
-    print(_border("┌", "┬", "┐"))
-    print(_row(headers, ["<"] * 2))
-    print(_border("├", "┼", "┤"))
-    for row in rows:
-        color = GREEN if row[1] == "0" else RED
-        print(_row(row, ["<", ">"], color))
-    print(_border("└", "┴", "┘"))
+        failed[r["chapter"].removeprefix("chapter-")] += int(r["status"] != "pass")
+    return dict(failed)
 
 
 def write_junit_xml(
@@ -477,7 +439,7 @@ def _print_summary(results: list[dict[str, Any]], passed: int) -> None:
         f"{failed} failed",
         flush=True,
     )
-    print_chapter_breakdown(results)
+    print_clause_breakdown(failed_by_clause(results))
     sys.stdout.flush()
 
 
