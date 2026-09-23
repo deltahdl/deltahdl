@@ -1,6 +1,8 @@
 import runpy
 import stat
+import subprocess
 import sys
+import textwrap
 from collections.abc import Callable, Iterator
 from pathlib import Path
 from types import ModuleType
@@ -62,6 +64,35 @@ def stub_binary(tmp_path: Path) -> Callable[..., Path]:
         return binary
 
     return _make
+
+
+@pytest.fixture()
+def run_runner_main() -> Callable[
+    [str, Path, Path], subprocess.CompletedProcess[str]
+]:
+    def _run(
+        package: str, test_dir: Path, binary: Path,
+    ) -> subprocess.CompletedProcess[str]:
+        code = textwrap.dedent(f"""\
+            import importlib
+            import sys
+            from pathlib import Path
+            sys.path[:0] = [{str(REPO_ROOT)!r}, {str(SCRIPTS_DIR)!r}]
+            common = importlib.import_module("lib.python.run_tests_common")
+            runner = importlib.import_module({package!r})
+            runner.TEST_DIR = Path({str(test_dir)!r})
+            common.BINARY = runner.BINARY = Path({str(binary)!r})
+            runner.main()
+        """)
+        return subprocess.run(
+            [sys.executable, "-c", code],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+
+    return _run
 
 
 @pytest.fixture()

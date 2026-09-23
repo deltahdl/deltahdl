@@ -20,8 +20,10 @@ def rit(module_loader: Callable[[str, Path], ModuleType]) -> ModuleType:
 
 @pytest.fixture()
 def run_case(
-    rit: ModuleType, tmp_path: Path,
+    module_loader: Callable[[str, Path], ModuleType], tmp_path: Path,
 ) -> Callable[[str, int, str, str], CaseRun]:
+    runner = module_loader("run_integration_tests", _RIT_INIT)
+
     def _run(header: str, returncode: int, out: str, err: str) -> CaseRun:
         sv = tmp_path / "case.sv"
         sv.write_text(f"/*\n{header}*/\nmodule case_m; endmodule\n")
@@ -31,8 +33,8 @@ def run_case(
             seen.extend(cmd)
             return MagicMock(returncode=returncode, stdout=out, stderr=err)
 
-        with patch.object(rit.subprocess, "run", side_effect=fake_run):
-            outcome: tuple[bool, str] = rit.run_test(sv)
+        with patch.object(runner.subprocess, "run", side_effect=fake_run):
+            outcome: tuple[bool, str] = runner.run_test(sv)
         return seen, outcome
 
     return _run
