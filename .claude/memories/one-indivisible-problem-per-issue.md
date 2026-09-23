@@ -19,7 +19,7 @@ half its content is done, its title says less than its body, and nothing in
 the tracker says which half is left.
 
 **How to apply:** Ask of each finding whether it could be fixed and closed
-alone; where it could, it is its own issue. This applies to every new problem
-filed per [[solving-what-a-session-finds]], and to any issue a session brings
-up to date. Two symptoms of one defect stay
+alone; where it could, it is its own issue. This applies to every issue
+filed, per [[research-lives-in-issues]] or at the user's request, and to any
+issue a session brings up to date. Two symptoms of one defect stay
 together — a split divides fixes, not file lists.

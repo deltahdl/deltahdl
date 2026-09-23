@@ -16,7 +16,7 @@ Every `start` form creates these.
 | `3,23,43 * * * *` | `REMINDER: Let every push carry exactly one commit, and let that commit hold a whole body of work: an issue solved end to end, or a request of the user's carried out in full.` |
 | `6,26,46 * * * *` | `REMINDER: Keep the task list itself current, not only the marks on it: a task that arises is added the moment it does, a task that turns out unneeded is removed, and a task whose shape changed is rewritten, so that the list always says what is left to do.` |
 | `7,27,47 * * * *` | `REMINDER: While any CI run for a pushed commit is in progress, only wait: no diagnosis, edits or commits.` |
-| `8,28,48 * * * *` | `REMINDER: When you come up against a new problem, file a GitHub issue per indivisible problem, unless an issue or issues are already filed. Then solve whatever issue or issues need to be solved in order to solve the original issue.` |
+| `8,28,48 * * * *` | `REMINDER: Solve what you find rather than filing it and moving on.` |
 | `9,29,49 * * * *` | `REMINDER: Ensure every task on the list is indivisible, whether it was written with TaskCreate or rewritten with TaskUpdate: read each subject as written and count the actions it names; a subject naming more than one action is divisible, whatever single purpose those actions serve, and is split into one task per action.` |
 
 ## The two loop reminders

@@ -1,15 +1,15 @@
 ---
 name: solving-what-a-session-finds
-description: "A new problem met while working is filed as one GitHub issue per indivisible problem unless an issue already covers it, then the issues the original issue depends on are solved."
+description: "Solve a problem the session finds rather than filing it and moving on."
 metadata:
   node_type: memory
   type: feedback
 ---
 
-# Filing, then solving, what a session finds
+# Solving what a session finds
 
-When you come up against a new problem, file a GitHub issue per indivisible problem, unless an issue or issues are already filed. Then solve whatever issue or issues need to be solved in order to solve the original issue.
+Solve what you find rather than filing it and moving on.
 
-**Why:** This is reminder :08 of `.claude/skills/autopilot/SKILL.md`, and the notes have to say what the reminder says or a session runs under two rules.
+**Why:** This is reminder :08 of `.claude/skills/autopilot/SKILL.md`, and the notes have to say what the reminder says or a session runs under two rules. A problem written into the tracker waits for a later session to redo the reading that found it, while the session that found it has the reading in hand.
 
-**How to apply:** File each new problem as its own issue, split per [[one-indivisible-problem-per-issue]] and skipping what [[what-does-not-get-filed]] excludes. Then solve the filed issues the original one depends on, and go back to the original.
+**How to apply:** Finish the work in hand first, then fix the finding in the same session — in the commit in hand where it belongs there, otherwise in a commit of its own — and let that commit's message state it. Nothing is filed for it, which is what [[what-does-not-get-filed]] says of a defect the commit in hand fixes. A finding that cannot be solved in the session is a question for the user, not an issue.
