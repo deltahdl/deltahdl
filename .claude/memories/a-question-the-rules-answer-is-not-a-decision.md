@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 0eac2fc8-aa5f-4f95-9fa7-69e4f3f0a42a
-  modified: 2026-09-23T02:25:43.464Z
+  modified: 2026-09-23T02:27:02.159Z
 ---
 
 # A question the rules answer is not a decision
@@ -20,7 +20,7 @@ to made? knowing what the reminders tell you and what the issue says. can you
 make the right decision that is not a guess?" The issue had waited on whether
 to take the §8.25 refactor, #3774, ahead of the non-UVM work. The reminder to
 solve whatever issues the original one depends on already answered that, and
-#3774 had since closed anyway.
+the refactor had since closed anyway.
 
 **How to apply:** Before writing a question for a person, test it against each
 reminder and against the blocked-by links. Questions of order or priority
