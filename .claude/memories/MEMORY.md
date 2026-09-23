@@ -7,6 +7,7 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 ## Commits and pushes
 
 - [Pushing to main](pushing-to-main.md) — commit straight to `main`; there are no pull requests here.
+- [One commit is a whole body of work](one-commit-is-a-whole-body-of-work.md) — a push holds an issue end to end or a request in full, never one step; each push costs a full deltahdl.yml run.
 - [Staging explicit paths](git-add-explicit-paths.md) — never `git add -A` or `git add .`; name every path.
 - [git add stages nothing when one pathspec misses](git-add-all-or-nothing-pathspecs.md) — never name a removed path to `git add`; it then stages none of them.
 - [Reading the index back](reading-the-index-before-committing.md) — `git status --porcelain` between staging and committing, every time.

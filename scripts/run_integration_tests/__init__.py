@@ -1,11 +1,13 @@
 import re
 import subprocess
 import sys
+from collections import defaultdict
 from pathlib import Path
 
 from lib.python.run_tests_common import (
     BINARY, REPO_ROOT, check_assertions, check_binary, parse_metadata,
-    print_result, reported_subclauses, subclause_is_within,
+    print_clause_breakdown, print_result, reported_subclauses,
+    subclause_is_within,
 )
 
 TEST_DIR = REPO_ROOT / "test" / "src" / "integration"
@@ -25,12 +27,28 @@ def collect_tests() -> list[Path]:
     return sorted(TEST_DIR.glob("*.sv"))
 
 
-def subclause_of(metadata: dict[str, str], sv_path: Path) -> str:
+def numbered_subclause(metadata: dict[str, str]) -> str:
     subclause = metadata.get("subclause", "")
-    if not _SUBCLAUSE_TEXT.fullmatch(subclause):
-        msg = f"{sv_path.name}: expected a :subclause: header, got {subclause!r}"
+    return subclause if _SUBCLAUSE_TEXT.fullmatch(subclause) else ""
+
+
+def subclause_of(metadata: dict[str, str], sv_path: Path) -> str:
+    subclause = numbered_subclause(metadata)
+    if not subclause:
+        msg = (
+            f"{sv_path.name}: expected a :subclause: header,"
+            f" got {metadata.get('subclause', '')!r}"
+        )
         raise ValueError(msg)
     return subclause
+
+
+def result_name(subclause: str, sv_path: Path) -> str:
+    return f"{subclause}--{sv_path.name}" if subclause else sv_path.name
+
+
+def clause_row(subclause: str) -> str:
+    return subclause.split(".")[0] or "none"
 
 
 def stage_option(metadata: dict[str, str], sv_path: Path) -> str | None:
@@ -105,18 +123,21 @@ def main() -> None:
         print(f"error: no .sv files found in {TEST_DIR}", file=sys.stderr)
         sys.exit(1)
 
-    passed = 0
-    failed = 0
+    failed_by_clause: defaultdict[str, int] = defaultdict(int)
     for sv_path in tests:
+        subclause = numbered_subclause(parse_metadata(str(sv_path)))
         ok, detail = run_test(sv_path)
-        print_result(ok, sv_path.stem)
-        passed += ok
-        failed += not ok
+        print_result(ok, result_name(subclause, sv_path))
+        failed_by_clause[clause_row(subclause)] += not ok
         for line in detail.splitlines():
             print(f"    {line}")
 
-    total = passed + failed
+    total = len(tests)
+    failed = sum(failed_by_clause.values())
+    passed = total - failed
     print(
-        f"\nintegration-tests summary: {passed}/{total} passed, {failed} failed",
+        f"\nintegration-tests summary: {passed}/{total} passed"
+        f" ({100.0 * passed / total:.1f}%), {failed} failed",
     )
+    print_clause_breakdown(dict(failed_by_clause))
     sys.exit(min(failed, 1))

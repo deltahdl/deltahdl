@@ -28,6 +28,31 @@ def test_collects_no_file_that_is_not_sv(rit: ModuleType, tmp_path: Path) -> Non
         assert not rit.collect_tests()
 
 
+def test_a_result_name_leads_with_the_subclause(rit: ModuleType) -> None:
+    assert rit.result_name("8.25", Path("case.sv")) == "8.25--case.sv"
+
+
+def test_a_result_name_without_a_subclause_is_the_file_name(
+    rit: ModuleType,
+) -> None:
+    assert rit.result_name("", Path("case.sv")) == "case.sv"
+
+
+def test_a_clause_row_is_the_subclause_top_number(rit: ModuleType) -> None:
+    assert rit.clause_row("8.25.1") == "8"
+
+
+def test_a_clause_row_without_a_subclause_is_none(rit: ModuleType) -> None:
+    assert rit.clause_row("") == "none"
+
+
+def test_a_subclause_that_is_not_a_number_is_named_in_the_detail(
+    run_case: RunCase,
+) -> None:
+    _, (_, detail) = run_case(":subclause: classes\n:stage: simulation\n", 0, "", "")
+    assert "got 'classes'" in detail
+
+
 def test_a_case_without_a_subclause_fails_naming_the_header(
     run_case: RunCase,
 ) -> None:

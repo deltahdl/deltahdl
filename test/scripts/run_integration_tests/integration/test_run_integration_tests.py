@@ -1,3 +1,4 @@
+import re
 from collections.abc import Callable
 from pathlib import Path
 from types import ModuleType
@@ -24,6 +25,17 @@ def _run_main(
          patch.object(rit, "check_binary"), \
          patch.object(rit.subprocess, "run", side_effect=fake_run):
         rit.main()
+
+
+def _printed(
+    rit: ModuleType,
+    tmp_path: Path,
+    fake_run: Callable[..., MagicMock],
+    get_exit_code: ExitCode,
+    capsys: pytest.CaptureFixture[str],
+) -> str:
+    get_exit_code(lambda: _run_main(rit, tmp_path, fake_run))
+    return re.sub(r"\033\[[0-9;]*m", "", capsys.readouterr().out)
 
 
 def _one_holding_one_failing(tmp_path: Path) -> Callable[..., MagicMock]:
@@ -56,8 +68,8 @@ def test_the_summary_counts_each_verdict(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     fake_run = _one_holding_one_failing(tmp_path)
-    get_exit_code(lambda: _run_main(rit, tmp_path, fake_run))
-    assert "integration-tests summary: 1/2 passed, 1 failed" in capsys.readouterr().out
+    out = _printed(rit, tmp_path, fake_run, get_exit_code, capsys)
+    assert "integration-tests summary: 1/2 passed (50.0%), 1 failed" in out
 
 
 def test_a_failure_prints_its_detail_indented(
@@ -67,8 +79,30 @@ def test_a_failure_prints_its_detail_indented(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     fake_run = _one_holding_one_failing(tmp_path)
-    get_exit_code(lambda: _run_main(rit, tmp_path, fake_run))
-    assert "    Assertion failed: (1 == 2)" in capsys.readouterr().out
+    out = _printed(rit, tmp_path, fake_run, get_exit_code, capsys)
+    assert "    Assertion failed: (1 == 2)" in out
+
+
+def test_a_result_is_named_by_its_subclause_and_file(
+    rit: ModuleType,
+    tmp_path: Path,
+    get_exit_code: ExitCode,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    fake_run = _one_holding_one_failing(tmp_path)
+    out = _printed(rit, tmp_path, fake_run, get_exit_code, capsys)
+    assert "  PASS: 8.25--holds.sv\n" in out
+
+
+def test_the_clause_table_counts_the_failures_under_the_top_clause(
+    rit: ModuleType,
+    tmp_path: Path,
+    get_exit_code: ExitCode,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    fake_run = _one_holding_one_failing(tmp_path)
+    out = _printed(rit, tmp_path, fake_run, get_exit_code, capsys)
+    assert "│ 8      │      1 │" in out
 
 
 def test_a_malformed_header_does_not_stop_the_later_cases(
@@ -80,8 +114,35 @@ def test_a_malformed_header_does_not_stop_the_later_cases(
     (tmp_path / "a_stageless.sv").write_text("/*\n:subclause: 8.25\n*/\n")
     (tmp_path / "b_holds.sv").write_text(_SIMULATION)
     fake_run = _stub_printing({"b_holds": ":assert: (1 == 1)\n"})
-    get_exit_code(lambda: _run_main(rit, tmp_path, fake_run))
-    assert "integration-tests summary: 1/2 passed, 1 failed" in capsys.readouterr().out
+    out = _printed(rit, tmp_path, fake_run, get_exit_code, capsys)
+    assert "integration-tests summary: 1/2 passed (50.0%), 1 failed" in out
+
+
+def _one_unnumbered(tmp_path: Path) -> Callable[..., MagicMock]:
+    (tmp_path / "unnumbered.sv").write_text("/*\n:stage: simulation\n*/\n")
+    return _stub_printing({})
+
+
+def test_a_result_without_a_subclause_is_named_by_its_file(
+    rit: ModuleType,
+    tmp_path: Path,
+    get_exit_code: ExitCode,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    fake_run = _one_unnumbered(tmp_path)
+    out = _printed(rit, tmp_path, fake_run, get_exit_code, capsys)
+    assert "  FAIL: unnumbered.sv\n" in out
+
+
+def test_a_failure_without_a_subclause_counts_under_none(
+    rit: ModuleType,
+    tmp_path: Path,
+    get_exit_code: ExitCode,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    fake_run = _one_unnumbered(tmp_path)
+    out = _printed(rit, tmp_path, fake_run, get_exit_code, capsys)
+    assert "│ none   │      1 │" in out
 
 
 def test_an_empty_directory_exits_one(
