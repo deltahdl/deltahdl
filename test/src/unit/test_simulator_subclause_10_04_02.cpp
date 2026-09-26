@@ -1,6 +1,8 @@
 
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_simulator.h"
 #include "helpers_lower_run.h"
 #include "helpers_nonblocking_swap.h"
@@ -688,6 +690,29 @@ TEST(NonblockingAssignSim, PropertyNamedInAClassTaskWithAndWithoutADelay) {
       "endmodule\n",
       "result");
   EXPECT_EQ(val, 50059u);
+}
+
+// §10.4.2 (printed page 253): the index expression a variable_lvalue carries
+// is evaluated when the statement executes, beside the right-hand side, and
+// §11.4.2 (printed page 275) makes `i++` an assignment of its own, so the
+// statement increments i once and the update sets the bit the first value of
+// i names. The element resolver evaluated the index to spell an array element,
+// found none for a packed variable, and declined, and the select window was
+// then resolved from a second evaluation: i ended at 2 and bit 1 was set.
+TEST(NonblockingAssignSim, BitSelectIndexEvaluatedOnce) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  logic [7:0] v;\n"
+      "  int i;\n"
+      "  initial begin\n"
+      "    v = 8'h00;\n"
+      "    v[i++] <= 1'b1;\n"
+      "    #1 $display(\"%0d %b\", i, v);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 00000001\n");
 }
 
 }  // namespace

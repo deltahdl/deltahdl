@@ -2,6 +2,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 
 #include "common/types.h"
 #include "fixture_simulator.h"
@@ -309,6 +310,150 @@ TEST(BlockingAssignSim, BitSelectWriteOnCopyLeavesSourceIntact) {
   ASSERT_NE(selected, nullptr);
   EXPECT_EQ(original->value.ToUint64(), 0xA5u);
   EXPECT_EQ(selected->value.ToUint64(), 0xA4u);
+}
+
+// §10.4.1 (printed page 252): the index expression a variable_lvalue carries
+// is evaluated at the one time the clause names, and §11.4.2 (printed page 275)
+// makes `j++` an assignment of its own, so the statement increments j once and
+// writes the element the first value of j names. The element writers are asked
+// in turn, and the first of them evaluated the index to spell a fixed-size
+// array's element, found no such element for a dynamic array, and declined, the
+// queue writer that answers a dynamic array then evaluating it again: j ended
+// at 2 and 7 landed at index 1.
+TEST(BlockingAssignSim, DynamicArrayElementIndexEvaluatedOnce) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  int d[];\n"
+      "  int j;\n"
+      "  initial begin\n"
+      "    d = new[4];\n"
+      "    d[j++] = 7;\n"
+      "    $display(\"%0d %0d %0d\", j, d[0], d[1]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 7 0\n");
+}
+
+// §10.4.1 as above, for §7.10's queue, whose element writer is reached by the
+// same decline.
+TEST(BlockingAssignSim, QueueElementIndexEvaluatedOnce) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  int q[$];\n"
+      "  int k;\n"
+      "  initial begin\n"
+      "    q = '{0, 0, 0, 0};\n"
+      "    q[k++] = 7;\n"
+      "    $display(\"%0d %0d %0d\", k, q[0], q[1]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 7 0\n");
+}
+
+// §10.4.1 as above, for §7.8's associative array: the one write allocates the
+// one entry at the key the first value of m names, where the second
+// evaluation allocated key 1.
+TEST(BlockingAssignSim, AssocElementIndexEvaluatedOnce) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  int aa[int];\n"
+      "  int m;\n"
+      "  initial begin\n"
+      "    aa[m++] = 7;\n"
+      "    $display(\"%0d %0d %0d %0d\", m, aa.num(), aa.exists(0), aa[0]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 1 1 7\n");
+}
+
+// §10.4.1 as above, for §11.5.1's bit-select of a packed variable: the
+// element writers each decline a name that is no array, the first having
+// evaluated the index already, and the bit-select writer evaluated it again,
+// so i ended at 2 and bit 1 was set rather than bit 0.
+TEST(BlockingAssignSim, PackedBitSelectIndexEvaluatedOnce) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  logic [7:0] v;\n"
+      "  int i;\n"
+      "  initial begin\n"
+      "    v = 8'h00;\n"
+      "    v[i++] = 1'b1;\n"
+      "    $display(\"%0d %b\", i, v);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 00000001\n");
+}
+
+// §10.4.1 as above, in the shape UVM's uvm_phase::get_adjacent_successor_nodes
+// fills its output array with: a dynamic array passed by reference (§13.5.2),
+// sized in the function and written once per element through `idx++` in a
+// foreach. Each write landed one element further along, the last past the
+// end, so the array came back '{0, 10, 0, 11} and one size larger.
+TEST(BlockingAssignSim, RefDynamicArrayFilledThroughPostIncrementIndex) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  function automatic void fill(ref int succ[]);\n"
+      "    int idx;\n"
+      "    succ = new[3];\n"
+      "    foreach (succ[i]) succ[idx++] = i + 10;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    int d[];\n"
+      "    fill(d);\n"
+      "    $display(\"%0d %0d %0d %0d\", d.size(), d[0], d[1], d[2]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "3 10 11 12\n");
+}
+
+// §10.4.1 as above, for a queue element written as one element of a
+// concatenation target (§11.4.12): the concatenation's element writer asks
+// the same writers in the same order, and evaluated the index twice the same
+// way.
+TEST(BlockingAssignSim, ConcatQueueElementIndexEvaluatedOnce) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  byte q[$];\n"
+      "  byte b;\n"
+      "  int k;\n"
+      "  initial begin\n"
+      "    q = '{0, 0};\n"
+      "    {q[k++], b} = 16'h0703;\n"
+      "    $display(\"%0d %0d %0d %0d\", k, q[0], q[1], b);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 7 0 3\n");
+}
+
+// §10.4.1 as above, with an intra-assignment delay (§9.4.5): the index is
+// evaluated once, when the delay has elapsed, by the store the delayed form
+// makes after its wait.
+TEST(BlockingAssignSim, DelayedDynamicArrayElementIndexEvaluatedOnce) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  int d[];\n"
+      "  int j;\n"
+      "  initial begin\n"
+      "    d = new[4];\n"
+      "    d[j++] = #1 7;\n"
+      "    $display(\"%0d %0d %0d\", j, d[0], d[1]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 7 0\n");
 }
 
 }  // namespace

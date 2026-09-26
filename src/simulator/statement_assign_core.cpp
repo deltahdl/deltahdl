@@ -461,6 +461,9 @@ bool TryDispatchSpecialBlockingAssign(const Stmt* stmt, SimContext& ctx,
 // unpack, bit/part-select writes, array writes, and the scalar fallback.
 void ApplyGenericBlockingAssign(const Stmt* stmt, Logic4Vec rhs_val,
                                 SimContext& ctx, Arena& arena) {
+  // §10.4.1: every writer below re-derives the target from the left-hand side's
+  // index nodes, and the target's indices are evaluated once for all of them.
+  LhsIndexPin pin(stmt->lhs, ctx, arena);
   // §10.9: a typed assignment pattern expression (type'{...}) is also a valid
   // left-hand target, and TryUnpackConcatLhs strips the type prefix so its
   // members unpack the RHS exactly as a bare positional pattern does.
@@ -497,6 +500,9 @@ StmtResult ExecBlockingAssignImpl(const Stmt* stmt, SimContext& ctx,
 void PerformBlockingAssign(const Expr* lhs, const Logic4Vec& rhs_val,
                            SimContext& ctx, Arena& arena) {
   if (!lhs) return;
+  // §10.4.1, as in ApplyGenericBlockingAssign: one evaluation of the target's
+  // indices for every writer below.
+  LhsIndexPin pin(lhs, ctx, arena);
   // The value arrives already made, from a caller outside this file -- an
   // embedded assignment expression, a continuous assignment's driven value, an
   // output argument's writeback, a DPI or system task's result. This entry is

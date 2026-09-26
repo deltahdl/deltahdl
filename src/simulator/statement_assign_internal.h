@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "common/packed_range.h"
@@ -101,6 +102,44 @@ void WriteVar(Variable* var, const Logic4Vec& val, Arena& arena);
 // node.
 void SnapshotSelectIndices(const Expr* lhs, SimContext& ctx, Arena& arena);
 void ClearSelectIndices(const Expr* lhs, SimContext& ctx);
+
+// Defined in statement_assign_lhs_snapshots.cpp; also used by the nonblocking
+// scheduler in statement_assign_nonblocking.cpp. Each index node under a
+// left-hand side -- a select's own and its base's, and those under every
+// element of a concatenation, an assignment pattern or a streaming
+// concatenation -- paired with the value it has when collected. The value is
+// held in a Logic4Snapshot rather than a Logic4Vec because a Logic4Vec copy
+// keeps pointing at the words it was copied from, and a write does not always
+// replace the words it writes -- the trap variable.h records for #3358, where
+// both sides of a comparison became one value. A snapshot owns its words, so
+// an in-place write to the object an index expression read cannot reach back
+// into what was sampled. Install makes each pair a deferred-argument snapshot
+// EvalExpr answers from; Clear removes them.
+using LhsIndexSnapshots = std::vector<std::pair<const Expr*, Logic4Snapshot>>;
+LhsIndexSnapshots CollectLhsIndexSnapshots(const Expr* lhs, SimContext& ctx,
+                                           Arena& arena);
+void InstallLhsIndexSnapshots(const LhsIndexSnapshots& snaps, SimContext& ctx);
+void ClearLhsIndexSnapshots(const LhsIndexSnapshots& snaps, SimContext& ctx);
+
+// Defined in statement_assign_lhs_snapshots.cpp; also used by the blocking
+// stores in statement_assign_core.cpp and the nonblocking scheduler in
+// statement_assign_nonblocking.cpp. §10.4.1 and §10.4.2: evaluates, once, each
+// index under `lhs` whose evaluation could change something and that no caller
+// has pinned already, and holds the values as deferred-argument snapshots until
+// it is destroyed, so every writer a store asks reads the same index.
+class LhsIndexPin {
+ public:
+  LhsIndexPin(const Expr* lhs, SimContext& ctx, Arena& arena);
+  ~LhsIndexPin();
+  LhsIndexPin(const LhsIndexPin&) = delete;
+  LhsIndexPin& operator=(const LhsIndexPin&) = delete;
+  LhsIndexPin(LhsIndexPin&&) = delete;
+  LhsIndexPin& operator=(LhsIndexPin&&) = delete;
+
+ private:
+  SimContext* ctx_;
+  LhsIndexSnapshots snaps_;
+};
 
 // Defined in statement_assign_core.cpp; also used by the subroutine-body
 // statement executor in eval_function_body.cpp. §10.4 lists "Bit-selects,

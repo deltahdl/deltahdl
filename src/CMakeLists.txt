@@ -499,6 +499,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/statement_assign_decl.cpp
     simulator/statement_assign_force.cpp
     simulator/statement_assign_lhs.cpp
+    simulator/statement_assign_lhs_snapshots.cpp
     simulator/statement_assign_select.cpp
     simulator/statement_assign_slice.cpp
     simulator/statement_assign_stream.cpp
