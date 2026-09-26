@@ -18,7 +18,7 @@ Every `start` form creates these.
 | `8,28,48 * * * *` | `REMINDER: Solve what you find rather than filing it and moving on.` |
 | `9,29,49 * * * *` | `REMINDER: Ensure every task on the list is indivisible, whether it was written with TaskCreate or rewritten with TaskUpdate: read each subject as written and count the actions it names; a subject naming more than one action is divisible, whatever single purpose those actions serve, and is split into one task per action.` |
 
-## The two loop reminders
+## The three loop reminders
 
 Every `start` form but `reminders-only` adds these.
 
@@ -42,11 +42,12 @@ REMINDER: Run gh issue list --state open --limit 1000 --json number,title --jq '
 REMINDER: Run gh issue list --state open --label '{L}' --limit 1000 --json number,title for the open issues labelled '{L}'; take one, solve it, and run the same command again when it closes. The open issues without the label '{L}' are not this loop's work.
 ```
 
-And this one:
+And these:
 
 | Cron | Prompt |
 | --- | --- |
 | `4,24,44 * * * *` | `REMINDER: Continue autonomously, unless you need human feedback about ANYTHING — not just about what to take next. When you do, rewrite the issue's title if necessary, rewrite the issue's body, label the issue 'needs decision', and move on to the next issue.` |
+| `5,25,45 * * * *` | `REMINDER: Before working on an issue, ensure the issue is up to date. If it is outdated, rewrite its title and body as necessary, delete all its comments, and ensure its labels are correct.` |
 
 ## Start
 
