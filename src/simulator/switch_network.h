@@ -8,6 +8,7 @@
 namespace delta {
 
 class Arena;
+class Scheduler;
 struct Net;
 struct Variable;
 
@@ -61,5 +62,28 @@ uint64_t BidirSwitchBuiltinControlXZDelay(const BidirSwitchDelaySpec& spec);
 
 void ResolveBidirSwitchNetwork(std::vector<BidirSwitchInst>& switches,
                                Arena& arena);
+
+// §28.8: one bidirectional switch as a run holds it, which the nets at its two
+// terminals link to (Net::switch_links). `state` is kOff, kOn, or kUnknown
+// where a tranif0, tranif1, rtranif0 or rtranif1 has a control of x or z; a
+// tran or rtran is on for as long as the run lasts.
+struct BidirSwitchState {
+  static constexpr uint8_t kOff = 0;
+  static constexpr uint8_t kOn = 1;
+  static constexpr uint8_t kUnknown = 2;
+  BidirSwitchKind kind = BidirSwitchKind::kTran;
+  uint8_t state = kOff;
+  bool user_defined_nets = false;
+};
+
+// The state a control value puts a switch of `kind` in.
+uint8_t BidirSwitchStateFor(BidirSwitchKind kind, Logic4Word control);
+
+// §28.8: resolves every net joined to `net` through bidirectional switches,
+// each from its own drivers and from the drivers of the nets it reaches
+// through switches that conduct. Answers false, resolving nothing, where
+// `net` is being resolved as one of such a group already, for the caller to
+// resolve it from the drivers it has.
+bool ResolveSwitchGroup(Net& net, Arena& arena, Scheduler* sched);
 
 }  // namespace delta

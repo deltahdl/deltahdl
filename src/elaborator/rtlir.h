@@ -318,6 +318,21 @@ struct RtlirVariable {
   SourceLoc loc;
 };
 
+// §28.8: one bidirectional pass switch -- tran, rtran, or a tranif0, tranif1,
+// rtranif0 or rtranif1 -- between two bidirectional terminals, with the
+// control terminal and the turn-on and turn-off delays of the enabled forms.
+// Unlike every other gate it drives neither terminal from the other, so it is
+// no continuous assignment: the run joins the two nets it connects while it
+// conducts.
+struct RtlirBidirSwitch {
+  GateKind kind = GateKind::kTran;
+  Expr* terminal_a = nullptr;
+  Expr* terminal_b = nullptr;
+  Expr* control = nullptr;
+  Expr* turn_on_delay = nullptr;
+  Expr* turn_off_delay = nullptr;
+};
+
 struct RtlirContAssign {
   Expr* lhs = nullptr;
   Expr* rhs = nullptr;
@@ -742,6 +757,9 @@ struct RtlirModule {
   // several assignments. RegisterModuleGates (src/simulator/specify.h) walks
   // this list once per module instance to register those drivers.
   std::vector<ModuleItem*> gate_insts;
+  // §28.8: the module's bidirectional pass switches, one per instance, an
+  // instance array's elements among them.
+  std::vector<RtlirBidirSwitch> bidir_switches;
   // §6.20.5's specparams declared in the module body, outside every specify
   // block: "A specparam ... may be declared inside a specify block or in the
   // module body." Each entry is the name the specparam was lowered under, which

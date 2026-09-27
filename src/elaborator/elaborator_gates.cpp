@@ -615,6 +615,24 @@ static Expr* MakeBitSelect(Arena& arena, Expr* base, uint32_t idx) {
 
 // Elaborates one scalar gate or switch from the terminal list currently held on
 // `item` (a single instance, or one element of an expanded instance array).
+// §28.8: a bidirectional switch keeps its terminals and delays for the run to
+// join its two nets by. The two bidirectional terminals come first, and a
+// tranif0, tranif1, rtranif0 or rtranif1 has its control third.
+static void ElaborateBidirSwitch(ModuleItem* item, RtlirModule* mod) {
+  auto& terms = item->gate_terminals;
+  if (terms.size() < 2) return;
+  RtlirBidirSwitch sw;
+  sw.kind = item->gate_kind;
+  sw.terminal_a = terms[0];
+  sw.terminal_b = terms[1];
+  if (IsControlBidirectionalSwitch(item->gate_kind) && terms.size() >= 3) {
+    sw.control = terms[2];
+  }
+  sw.turn_on_delay = item->gate_delay;
+  sw.turn_off_delay = item->gate_delay_fall;
+  mod->bidir_switches.push_back(sw);
+}
+
 static void ElaborateOneGate(ModuleItem* item, RtlirModule* mod, Arena& arena) {
   auto kind = item->gate_kind;
   auto& terms = item->gate_terminals;
@@ -632,6 +650,7 @@ static void ElaborateOneGate(ModuleItem* item, RtlirModule* mod, Arena& arena) {
   }
 
   if (IsBidirectionalSwitch(kind)) {
+    ElaborateBidirSwitch(item, mod);
     return;
   }
 

@@ -18,6 +18,16 @@ struct DriverStrength {
   Strength s1 = Strength::kStrong;
 };
 
+struct Net;
+struct BidirSwitchState;
+
+// §28.8: one bidirectional pass switch a net is a terminal of -- the net at
+// its other terminal, and the switch, whose state says whether it conducts.
+struct SwitchLink {
+  Net* other = nullptr;
+  const BidirSwitchState* sw = nullptr;
+};
+
 struct NetStrength {
   Strength s0_hi = Strength::kHighz;
   Strength s0_lo = Strength::kHighz;
@@ -65,6 +75,15 @@ struct Net {
 
   bool is_user_nettype = false;
   std::string_view resolve_func;
+
+  // §28.8: the bidirectional switches this net is a terminal of, and the
+  // drivers of the nets they join it to, which it resolves with its own. The
+  // latter are gathered by ResolveSwitchGroup (simulator/switch_network.h)
+  // each time the group resolves, their strengths already reduced across the
+  // switches as §28.13 and §28.14 say.
+  std::vector<SwitchLink> switch_links;
+  std::vector<Logic4Vec> switch_drivers;
+  std::vector<DriverStrength> switch_strengths;
 
   void Resolve(Arena& arena, Scheduler* sched = nullptr);
 

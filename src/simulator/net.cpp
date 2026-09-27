@@ -9,6 +9,7 @@
 #include "common/types.h"
 #include "simulator/net_bit_outcomes.h"
 #include "simulator/scheduler.h"
+#include "simulator/switch_network.h"
 #include "simulator/variable.h"
 
 namespace delta {
@@ -593,6 +594,11 @@ static void ResolveStrengthDriven(Net& net, Arena& arena,
                                   const Logic4Vec* charge = nullptr) {
   std::vector<Logic4Vec> drivers = net.drivers;
   std::vector<DriverStrength> strengths = net.driver_strengths;
+  strengths.resize(drivers.size());
+  drivers.insert(drivers.end(), net.switch_drivers.begin(),
+                 net.switch_drivers.end());
+  strengths.insert(strengths.end(), net.switch_strengths.begin(),
+                   net.switch_strengths.end());
   if (charge != nullptr) {
     drivers.push_back(*charge);
     strengths.push_back({net.charge_strength, net.charge_strength});
@@ -710,6 +716,7 @@ static void ResolveFromDrivers(Net& net, Arena& arena, Scheduler* sched);
 
 void Net::Resolve(Arena& arena, Scheduler* sched) {
   if (!resolved) return;
+  if (!switch_links.empty() && ResolveSwitchGroup(*this, arena, sched)) return;
 
   // Every resolution below either records one strength per bit or gives the
   // whole net one, so what a previous resolution recorded says nothing about
@@ -745,7 +752,10 @@ static void ResolveFromDrivers(Net& net, Arena& arena, Scheduler* sched) {
       net.is_user_nettype || net.type == NetType::kTri0 ||
       net.type == NetType::kTri1 || net.type == NetType::kSupply0 ||
       net.type == NetType::kSupply1;
-  if (net.drivers.empty() && !needs_resolution_when_undriven) return;
+  if (net.drivers.empty() && net.switch_drivers.empty() &&
+      !needs_resolution_when_undriven) {
+    return;
+  }
 
   const Logic4Vec* charge = nullptr;
   if (net.type == NetType::kTrireg && !AllDriversZ(net.drivers)) {
@@ -762,19 +772,23 @@ static void ResolveFromDrivers(Net& net, Arena& arena, Scheduler* sched) {
 
   if (ResolveSpecialNet(net, arena, sched)) return;
 
-  if (!net.is_user_nettype && !net.driver_strengths.empty()) {
+  if (!net.is_user_nettype &&
+      (!net.driver_strengths.empty() || !net.switch_drivers.empty())) {
     ResolveStrengthDriven(net, arena, charge);
     return;
   }
 
-  if (net.drivers.size() == 1) {
-    net.resolved->value = net.drivers[0];
+  std::vector<Logic4Vec> all = net.drivers;
+  all.insert(all.end(), net.switch_drivers.begin(), net.switch_drivers.end());
+  if (all.empty()) return;
+  if (all.size() == 1) {
+    net.resolved->value = all[0];
     FixupTriPull(net.resolved->value, net.type);
     net.resolved->NotifyWatchers();
     return;
   }
 
-  Logic4Vec result = CombineAllDrivers(net.drivers, arena, net.type);
+  Logic4Vec result = CombineAllDrivers(all, arena, net.type);
   FixupTriPull(result, net.type);
   net.resolved->value = result;
   net.resolved->NotifyWatchers();

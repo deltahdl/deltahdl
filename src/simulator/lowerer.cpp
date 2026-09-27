@@ -414,6 +414,9 @@ void Lowerer::LowerModule(const RtlirModule* mod) {
   for (const auto& ca : mod->assigns) {
     LowerContAssign(ca, mod->is_program);
   }
+  for (const auto& sw : mod->bidir_switches) {
+    LowerBidirSwitch(sw, mod->is_program);
+  }
   // §29.8: "Instances of UDPs are specified inside modules in the same manner
   // as gates", so a primitive instance is lowered beside the continuous
   // assignments a gate instance elaborates to.
