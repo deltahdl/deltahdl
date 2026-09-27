@@ -76,4 +76,27 @@ TEST(UnpackedArrayPortsAndArraysOfInstancesSimulation,
   EXPECT_EQ(var->value.ToUint64(), 0xCAFEu);
 }
 
+// §23.3.3.5 (printed page 748): a packed port connection wider than one
+// instance's port gives each instance of the array a part-select, the
+// rightmost instance the rightmost bits, so four `xcell`s -- each an `xor`
+// on scalar ports, §28.3.6 (printed page 833) -- on `4'b1100` and `4'b1010`
+// drive `0110` onto the parent's four-bit net. The net output port of each
+// instance left y all x.
+TEST(UnpackedArrayPortsAndArraysOfInstancesSimulation,
+     InstanceArrayGivesEachInstanceItsBitsOfAVectorNet) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module xcell (output y, input a, b);\n"
+      "  xor g (y, a, b);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  wire [3:0] y;\n"
+      "  logic [3:0] a = 4'b1100, b = 4'b1010;\n"
+      "  xcell c[3:0] (y, a, b);\n"
+      "  initial #1 $display(\"y=%b\", y);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "y=0110\n");
+}
+
 }  // namespace
