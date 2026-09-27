@@ -53,34 +53,42 @@ std::optional<uint32_t> SynthLower::ExprWidth(const Expr* expr) {
       return ElementsWidth(expr);
     case ExprKind::kReplicate:
       return ReplicateWidth(expr);
-    // The three operator cases below are sized here rather than by
-    // InferExprWidth, which answers 0 for a name, for the reason the identifier
-    // case above gives: it would size `a | 4'b0000` from the literal alone.
-    // Each follows its row of §11.6.1 Table 11-21, and an operand that has no
-    // width leaves the whole without one.
     case ExprKind::kUnary:
-      // The reductions and `!` are one bit long, and `+`, `-` and `~` are as
-      // long as their operand.
-      if (IsUnsignedResultUnaryOp(expr->op)) return 1;
-      return ExprWidth(expr->lhs);
     case ExprKind::kBinary:
-      // The comparisons and the logical operators are one bit long. A shift
-      // and `**` are as long as their left operand, and the other operators
-      // are as long as the longer of their two operands.
-      if (IsCompareOp(expr->op) || IsLogicalOp(expr->op)) return 1;
-      if (IsShiftOp(expr->op) || expr->op == TokenKind::kPower) {
-        return ExprWidth(expr->lhs);
-      }
-      return LongerOf(ExprWidth(expr->lhs), ExprWidth(expr->rhs));
     case ExprKind::kTernary:
-      // `i ? j : k` is as long as the longer of `j` and `k`.
-      return LongerOf(ExprWidth(expr->true_expr), ExprWidth(expr->false_expr));
+      return OperatorWidth(expr);
     default: {
       uint32_t width = InferExprWidth(expr, NoTypedefs());
       if (width == 0) return std::nullopt;
       return width;
     }
   }
+}
+
+std::optional<uint32_t> SynthLower::OperatorWidth(const Expr* expr) {
+  // The three operator kinds are sized here rather than by InferExprWidth,
+  // which answers 0 for a name, for the reason SynthLower::ExprWidth gives for
+  // an identifier: it would size `a | 4'b0000` from the literal alone. Each
+  // follows its row of §11.6.1 Table 11-21, and an operand that has no width
+  // leaves the whole without one.
+  if (expr->kind == ExprKind::kUnary) {
+    // The reductions and `!` are one bit long, and `+`, `-` and `~` are as long
+    // as their operand.
+    if (IsUnsignedResultUnaryOp(expr->op)) return 1;
+    return ExprWidth(expr->lhs);
+  }
+  if (expr->kind == ExprKind::kTernary) {
+    // `i ? j : k` is as long as the longer of `j` and `k`.
+    return LongerOf(ExprWidth(expr->true_expr), ExprWidth(expr->false_expr));
+  }
+  // The comparisons and the logical operators are one bit long. A shift and
+  // `**` are as long as their left operand, and the other operators are as long
+  // as the longer of their two operands.
+  if (IsCompareOp(expr->op) || IsLogicalOp(expr->op)) return 1;
+  if (IsShiftOp(expr->op) || expr->op == TokenKind::kPower) {
+    return ExprWidth(expr->lhs);
+  }
+  return LongerOf(ExprWidth(expr->lhs), ExprWidth(expr->rhs));
 }
 
 std::optional<uint32_t> SynthLower::ElementsWidth(const Expr* expr) {

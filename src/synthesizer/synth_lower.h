@@ -224,6 +224,10 @@ class SynthLower {
   // lowering for.
   std::optional<uint32_t> ExprWidth(const Expr* expr);
 
+  // How many bits a unary, binary or conditional operator expression carries,
+  // for SynthLower::ExprWidth, and nothing where an operand it needs has none.
+  std::optional<uint32_t> OperatorWidth(const Expr* expr);
+
   // The widths of the operands of `expr` together.
   std::optional<uint32_t> ElementsWidth(const Expr* expr);
 
