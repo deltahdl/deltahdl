@@ -234,14 +234,17 @@ ProtectKeyBlocks ProtectKeyBlocksFor(const ProtectKeyBlockRequests& requests,
                                      std::string_view cleartext,
                                      const ProtectKeyList& keys,
                                      const ProtectEncoding& encoding,
-                                     const ProtectDigestBlockPolicy& digest) {
+                                     const ProtectDigestBlockPolicy& digest,
+                                     std::string_view data_key) {
   ProtectKeyBlocks blocks;
   const ProtectDataDecryption* first = nullptr;
   for (const ProtectKeyBlockRequest& request : requests.Requests()) {
     std::string_view key = KeyOfRequest(request, keys);
     if (key.empty()) continue;
     if (blocks.data_key.empty()) {
-      blocks.data_key = ProtectGeneratedDataKey(cleartext, key);
+      blocks.data_key = data_key.empty()
+                            ? ProtectGeneratedDataKey(cleartext, key)
+                            : std::string(data_key);
       blocks.digest_key = ProtectGeneratedDigestKey(blocks.data_key);
     }
     if (first == nullptr) {

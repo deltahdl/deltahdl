@@ -304,10 +304,16 @@ std::string ProtectKeyBlockDirectives(const ProtectKeyBlockRequest& request,
 // afterwards: a reader that has just opened a block finds the digest for that
 // block on the next expression rather than having to decide which of several
 // digests belongs to it.
+//
+// `data_key` is the key the region's data are under where the region named
+// one the tool holds, which the blocks then carry (§34.5.25.2: the key a
+// key_keyname names "shall be used for encrypting the data encryption keys");
+// where it is empty the region's key is made here.
 ProtectKeyBlocks ProtectKeyBlocksFor(const ProtectKeyBlockRequests& requests,
                                      std::string_view cleartext,
                                      const ProtectKeyList& keys,
                                      const ProtectEncoding& encoding,
-                                     const ProtectDigestBlockPolicy& digest);
+                                     const ProtectDigestBlockPolicy& digest,
+                                     std::string_view data_key);
 
 }  // namespace delta

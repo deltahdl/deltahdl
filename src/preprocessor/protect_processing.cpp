@@ -414,6 +414,22 @@ ProtectDigestBlockPolicy DigestPolicyFor(const RegionKeyReader& in_effect) {
   return policy;
 }
 
+// The arrangement of a region its data name a key the tool holds for, carrying
+// no key block: its data are under that key, and so is its digest unless it
+// named a key of its own for that.
+static void UnderNamedKey(RegionEncryption& how,
+                          const RegionKeyReader& in_effect,
+                          std::string_view named, const ProtectKeyList& keys) {
+  how.key = named;
+  // §34.5.16 has the entity a region named for its digest select the key
+  // encrypting the digest block, so a region naming one whose key the tool
+  // holds puts its digest under that key. Where those names reach none,
+  // §34.5.20 fills the place from the key the data are under: such a region
+  // carries no key block for a digest key of its own to travel in.
+  std::string_view own = RegionDigestKey(in_effect.names, keys);
+  how.digest.key = own.empty() ? named : own;
+}
+
 RegionEncryption RegionEncryptionFor(const RegionKeyReader& in_effect,
                                      const ReadRegion& region,
                                      std::string_view exchange_key,
@@ -422,31 +438,34 @@ RegionEncryption RegionEncryptionFor(const RegionKeyReader& in_effect,
   RegionEncryption how;
   how.digest = DigestPolicyFor(in_effect);
   std::string_view named = RegionKey(in_effect.names, exchange_key, keys);
-  if (!named.empty()) {
-    how.key = named;
-    // §34.5.16 has the entity a region named for its digest select the key
-    // encrypting the digest block, so a region naming one whose key the tool
-    // holds puts its digest under that key. Where those names reach none,
-    // §34.5.20 fills the place from the key the data are under: such a region
-    // carries no key block for a digest key of its own to travel in.
-    std::string_view own = RegionDigestKey(in_effect.names, keys);
-    how.digest.key = own.empty() ? named : own;
-    return how;
-  }
   ProtectKeyBlockRequests requests =
       region.written_inside.key_blocks.Empty()
           ? DesignatedKeyBlocks(in_effect.names, closing_line,
                                 ProtectPragmaValueBody(in_effect.data_method))
           : region.written_inside.key_blocks;
+  if (!named.empty() && requests.Empty()) {
+    UnderNamedKey(how, in_effect, named, keys);
+    return how;
+  }
   // §34.5.24 names the cipher the region's own keys are under, and §34.5.24.2
   // sends the identifier to §34.5.11's table, so des-cbc is required for these
   // blocks as it is for the data. It is stated once for the region, so it goes
   // on the collection rather than on a designation.
   requests.UseKeyMethod(
       ProvidedCipher(ProtectPragmaValueBody(in_effect.key_method)));
+  // §34.5.25.2 (printed page 964): "When a key_keyname is provided in the
+  // input, it indicates the key that shall be used for encrypting the data
+  // encryption keys." A region that named the key its data are under and a
+  // key for its key blocks has that data key carried in the blocks, rather
+  // than a key made for it; one naming no held data key has one made.
   how.key_blocks = ProtectKeyBlocksFor(
       requests, region.body, keys,
-      EnvelopeBlockEncoding(region.written_inside.encoding), how.digest);
+      EnvelopeBlockEncoding(region.written_inside.encoding), how.digest, named);
+  if (how.key_blocks.data_key.empty() && !named.empty()) {
+    how.key_blocks = ProtectKeyBlocks{};
+    UnderNamedKey(how, in_effect, named, keys);
+    return how;
+  }
   how.key = how.key_blocks.data_key;
   // A region whose keys travel in key blocks has a key of its own for its
   // digests, made beside them and carried in the same blocks, so the digest of
