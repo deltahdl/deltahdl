@@ -38,6 +38,7 @@
 #include "simulator/process.h"
 #include "simulator/sim_context.h"
 #include "simulator/specify.h"
+#include "simulator/specify_path_delay.h"
 #include "simulator/specify_sdf.h"
 #include "simulator/statement_assign.h"
 #include "simulator/stmt_exec.h"
@@ -700,6 +701,28 @@ struct ContAssignWait {
   const std::function<void(const Logic4Vec&)>& commit;
 };
 
+// §32.4.1 Table 32-1 (printed page 925): a DEVICE entry on a cell with no
+// specify paths annotates the primitives driving its outputs, so a gate lowered
+// to this assignment takes the rise, fall and turn-off delays the entry gave
+// its driver in place of its own. Read on every transition, as an interconnect
+// delay is, since $sdf_annotate runs during simulation. Kept on the driver
+// alone, the annotation timed nothing: the gate went on waiting out its #1.
+// False, leaving `d` alone, where no DEVICE entry reached the driver.
+static bool AnnotatedGateDelays(const ContAssignParams& params, SimContext& ctx,
+                                ContAssignDelays& d) {
+  const SpecifyManager* mgr = ctx.GetSpecifyManager();
+  if (mgr == nullptr) return false;
+  const PrimitiveDriver* driver = mgr->FindAnnotatedPrimitiveDriver(
+      params.inst_prefix, ContAssignTargetName(params.lhs));
+  if (driver == nullptr) return false;
+  d.rise = driver->delays[0];
+  d.fall = driver->delays[1];
+  d.decay = driver->delays[2];
+  d.has_fall = true;
+  d.has_decay = true;
+  return true;
+}
+
 // Waits out one pending transition, reporting through `*committed` whether the
 // wait already drove the target. Only the module path route ever does, because
 // §30.7's pulse filtering places two values on the output -- x and then the
@@ -709,16 +732,15 @@ static ExecTask RunContAssignWait(const ContAssignWait& w,
                                   const ContAssignDriver& drv, Logic4Vec& val,
                                   bool* committed) {
   ContAssignDelays d;
-  if (w.params.delays.rise) {
-    d = BuildContAssignDelays(w.params.delays, w.ctx, w.arena);
-  }
+  bool delayed = w.params.delays.rise != nullptr;
+  if (delayed) d = BuildContAssignDelays(w.params.delays, w.ctx, w.arena);
+  if (AnnotatedGateDelays(w.params, w.ctx, d)) delayed = true;
   Logic4Vec old_val = CurrentContAssignOldValue(w.params, drv, w.ctx, w.arena);
   Logic4Vec driven = ContAssignDrivenBits(drv, val, w.arena);
-  uint64_t ticks = w.params.delays.rise
-                       ? SelectContAssignDelay(
-                             old_val, driven, d,
-                             ContAssignTransitionWidth(drv, w.params.width))
-                       : 0;
+  uint64_t ticks = delayed ? SelectContAssignDelay(
+                                 old_val, driven, d,
+                                 ContAssignTransitionWidth(drv, w.params.width))
+                           : 0;
 
   if (w.path_mgr != nullptr && !Logic4VecEqual(driven, old_val)) {
     ModulePathDrive drive{w.ctx,          w.arena,     *w.path_mgr,

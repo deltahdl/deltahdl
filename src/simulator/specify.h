@@ -183,6 +183,12 @@ class SpecifyManager {
                                    Arena& arena,
                                    std::string_view inst_prefix = {});
 
+  // §32.4.1 Table 32-1: the primitive driver of output `output` of the instance
+  // `inst_prefix` names whose delays an SDF DEVICE entry annotated, or null
+  // where no DEVICE entry reached one, the gate then keeping its own delays.
+  const PrimitiveDriver* FindAnnotatedPrimitiveDriver(
+      std::string_view inst_prefix, std::string_view output) const;
+
   const std::vector<PrimitiveDriver>& GetPrimitiveDrivers() const {
     return primitive_drivers_;
   }

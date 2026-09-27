@@ -820,9 +820,21 @@ void ApplySdfDeviceThreeStateValues(PrimitiveDriver& driver,
 
   driver.delay_count = 3;
   for (int i = 0; i < 12; ++i) driver.delays[i] = scratch.delays[i];
+  driver.sdf_annotated = true;
 }
 
 }  // namespace
+
+const PrimitiveDriver* SpecifyManager::FindAnnotatedPrimitiveDriver(
+    std::string_view inst_prefix, std::string_view output) const {
+  for (const auto& driver : primitive_drivers_) {
+    if (driver.sdf_annotated && driver.inst_prefix == inst_prefix &&
+        driver.output_port == output) {
+      return &driver;
+    }
+  }
+  return nullptr;
+}
 
 bool SpecifyManager::AnnotateSdfDeviceDelay(const SdfDeviceAnnotation& a,
                                             std::string_view inst_prefix) {

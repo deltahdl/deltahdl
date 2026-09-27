@@ -121,6 +121,11 @@ struct PrimitiveDriver {
   std::string inst_prefix;
   uint8_t delay_count = 1;
   uint64_t delays[12] = {};
+  // §32.4.1 Table 32-1: whether an SDF DEVICE entry has annotated these
+  // delays, which the gate's own delay expressions then give way to at run
+  // time (the continuous assignment the gate is lowered to reads them through
+  // SpecifyManager::FindAnnotatedPrimitiveDriver).
+  bool sdf_annotated = false;
 };
 
 // §32.4.1: collect the module-output drivers one gate instantiation

@@ -65,6 +65,7 @@
 #include <string_view>
 
 #include "fixture_sdf_design.h"
+#include "fixture_simulator.h"
 #include "simulator/specify.h"
 #include "simulator/specify_path_delay.h"
 
@@ -312,6 +313,59 @@ TEST(GateDriverSpecparamRebuild,
   ASSERT_NE(mgr, nullptr);
 
   EXPECT_EQ(mgr->GetPrimitiveDrivers().size(), 2u);
+}
+
+// A gate-level cell with no specify block, its output driven by an `and #1`,
+// annotated from the SDF file `sdf_path` and timed through a transition of a
+// at 50 and one back at 100.
+std::string AndCellRun(const std::string& sdf_path) {
+  return "module and_cell(input a, input b, output y);\n"
+         "  and #1 g1(y, a, b);\n"
+         "endmodule\n"
+         "module top;\n"
+         "  reg a, b;\n"
+         "  wire yo;\n"
+         "  and_cell u1(.a(a), .b(b), .y(yo));\n"
+         "  initial $sdf_annotate(\"" +
+         sdf_path +
+         "\");\n"
+         "  always @(yo) if ($time > 40) $display(\"yo=%0d at %0t\", yo, "
+         "$time);\n"
+         "  initial begin\n"
+         "    a = 0; b = 1;\n"
+         "    #50 a = 1;\n"
+         "    #50 a = 0;\n"
+         "  end\n"
+         "endmodule\n";
+}
+
+std::string WriteAndCellSdf(const std::string& name,
+                            const std::string& device) {
+  const std::string kPath = "/tmp/delta_c32_04_01b_" + name + ".sdf";
+  std::ofstream out(kPath, std::ios::trunc);
+  out << "(DELAYFILE (CELL (CELLTYPE \"and_cell\") (INSTANCE top/u1) (DELAY "
+         "(ABSOLUTE "
+      << device << "))))";
+  return kPath;
+}
+
+// §32.4.1 Table 32-1 (printed page 925): a DEVICE entry with no port on a cell
+// with no specify paths annotates every primitive driving a module output, and
+// one naming an output port the primitive driving that port, so the and gate's
+// #1 becomes rise 7 and fall 13 and yo moves at 57 and 113. The annotation was
+// kept on the primitive driver, which no transition of the gate reads, and yo
+// moved at 51 and 101.
+TEST(SdfGateDeviceRun, DeviceEntryTimesTheGateDrivingTheOutput) {
+  SimFixture whole;
+  EXPECT_EQ(
+      RunCapture(AndCellRun(WriteAndCellSdf("whole", "(DEVICE (7) (13))")),
+                 whole),
+      "yo=1 at 57\nyo=0 at 113\n");
+  SimFixture port;
+  EXPECT_EQ(
+      RunCapture(AndCellRun(WriteAndCellSdf("port", "(DEVICE y (7) (13))")),
+                 port),
+      "yo=1 at 57\nyo=0 at 113\n");
 }
 
 }  // namespace
