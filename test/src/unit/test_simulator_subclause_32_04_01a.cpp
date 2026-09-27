@@ -6,7 +6,6 @@
 
 #include "fixture_simulator.h"
 #include "helpers_sdf_delay_mapping.h"
-#include "parser/ast_module.h"
 #include "parser/ast_specify.h"
 #include "simulator/sdf_parser.h"
 #include "simulator/specify.h"
